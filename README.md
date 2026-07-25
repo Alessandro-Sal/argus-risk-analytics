@@ -109,13 +109,15 @@ flowchart TD
 
 ## 📚 Documentazione di Progetto
 
-Il repository contiene una documentazione tecnica completa all'interno della cartella [`docs/`](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs):
+Il repository contiene una documentazione tecnica completa all'interno della cartella [`docs/`](docs/):
 
-1. 🌐 **[docs/argus-architecture.html](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs/argus-architecture.html)**: Mappa interattiva dell'architettura di sistema generata con Archify.
-2. 🗺️ **[docs/FLOWCHART.md](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs/FLOWCHART.md)**: Architettura visiva del sistema e diagramma dei flussi dati ETL a 5 livelli.
-3. 🤝 **[docs/PROJECT_HANDOFF.md](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs/PROJECT_HANDOFF.md)**: Documento di consegna del progetto, stato dei moduli e contesto decisionale per la commissione.
-4. 📈 **[docs/metriche_rischio.md](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs/metriche_rischio.md)**: Manuale matematico ed econometrico dettagliato di tutte le metriche e dei moduli finanziari implementati.
-5. 📝 **[docs/CSV_Format_Specification.md](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs/CSV_Format_Specification.md)**: Specifica tecnica del formato CSV di input e supporto per l'adapter DeGiro.
+1. 🌐 **[Mappa Architetturale Interattiva (HTML)](docs/argus-architecture.html)**: Mappa interattiva dell'architettura di sistema generata con Archify.
+2. 🗺️ **[docs/FLOWCHART.md](docs/FLOWCHART.md)**: Architettura visiva del sistema e diagramma dei flussi dati ETL a 5 livelli.
+3. 🤝 **[docs/PROJECT_HANDOFF.md](docs/PROJECT_HANDOFF.md)**: Documento di consegna del progetto, stato dei moduli e contesto decisionale per la commissione.
+4. 📈 **[docs/metriche_rischio.md](docs/metriche_rischio.md)**: Manuale matematico ed econometrico dettagliato di tutte le metriche e dei moduli finanziari implementati.
+5. 📊 **[docs/PRESENTATION_SLIDES.md](docs/PRESENTATION_SLIDES.md)**: Traccia completa di 10 slide per la discussione orale con domande attese e risposte.
+6. 📐 **[docs/DESIGN.md](docs/DESIGN.md)**: Linee guida architetturali e design system della dashboard.
+7. 📝 **[docs/CSV_Format_Specification.md](docs/CSV_Format_Specification.md)**: Specifica tecnica del formato CSV di input e supporto per l'adapter DeGiro.
 
 ---
 
@@ -176,8 +178,8 @@ L'applicazione web sarà accessibile su `http://localhost:8501`.
 
 2. **Clona il repository**:
    ```bash
-   git clone https://github.com/tuousername/investment-risk-bi.git
-   cd investment-risk-bi
+   git clone https://github.com/Alessandro-Sal/argus-risk-analytics.git
+   cd argus-risk-analytics
    ```
 
 3. **Crea un ambiente virtuale e installa le dipendenze**:
@@ -201,7 +203,7 @@ L'applicazione web sarà accessibile su `http://localhost:8501`.
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include 26 test automatizzati PyTest che coprono l'engine quantitativo, i contratti dati, la generazione di report PDF/Excel e uno smoke test della UI Streamlit:
+Il progetto include 36 test automatizzati PyTest che coprono l'engine quantitativo, i contratti dati, la generazione di report PDF/Excel e uno smoke test della UI Streamlit:
 
 ```bash
 pytest
@@ -214,7 +216,7 @@ Il sistema accetta sia un formato CSV generico sia esportazioni dirette dal brok
 
 - **Colonne Obbligatorie (CSV Generico)**: `tx_date`, `ticker`, `tx_type` (`buy`/`sell`/`dividend`), `quantity`, `price`, `currency`.
 - **Colonne Opzionali**: `fees`, `asset_class`, `notes`.
-- *(Per tutti i dettagli, consultare [docs/CSV_Format_Specification.md](file:///c:/Users/Alessandro%20Personale/Desktop/Progetti%20Personali%20e%20Corsi/CAPSTONE%20PROJECT/docs/CSV_Format_Specification.md)).*
+- *(Per tutti i dettagli, consultare [docs/CSV_Format_Specification.md](docs/CSV_Format_Specification.md)).*
 
 ---
 
