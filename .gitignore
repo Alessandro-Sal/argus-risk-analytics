@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Streamlit config
+.streamlit/secrets.toml
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# AI Agents configs & caches
+.agents/
+.dsp/
+scratch/
+
+
+# Temp and Data files
+_temp_scripts/
+data/*.csv
+exports/*.csv
+credentials/
+gsheets_sync_subproject/
+*.json
+!config.json
+
+# Private docs
+docs/CAPSTONE_REPORT_OUTLINE.md
+docs/POWER_BI_GUIDE.md
+
