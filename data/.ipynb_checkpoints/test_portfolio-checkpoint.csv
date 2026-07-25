@@ -1,0 +1,17 @@
+tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
+2021-01-15,AAPL,buy,10,128.98,USD,1.50,stock,Primo acquisto AAPL
+2021-03-10,MSFT,buy,5,232.10,USD,1.50,stock,Acquisto MSFT
+2021-06-01,VWRL.L,buy,20,88.50,GBP,0.00,etf,ETF world
+2021-09-01,BTC,buy,0.1,47200.00,USD,5.00,crypto,Bitcoin senza coppia valuta
+2021-11-15,AAPL,buy,5,150.50,USD,1.50,stock,Acquisto aggiuntivo
+2022-01-20,MSFT,sell,2,295.00,USD,1.50,stock,Presa parziale profitto
+2022-03-01,AAPL,dividend,0,0.22,USD,0.00,stock,Dividendo Q1 2022
+2022-06-15,VWRL.L,buy,10,82.30,GBP,0.00,etf,Acquisto in calo
+2022-09-01,AAPL,dividend,0,0.23,USD,0.00,stock,Dividendo Q3 2022
+2022-11-01,BTC-USD,buy,0.05,20100.00,USD,3.00,crypto,DCA Bitcoin
+2023-01-10,MSFT,buy,3,240.50,USD,1.50,stock,Riacquisto MSFT
+2023-03-01,AAPL,dividend,1,2.30,USD,0.00,stock,Dividendo con quantity=1 edge case
+2023-06-01,VWRL.L,sell,5,95.20,GBP,0.00,etf,Presa parziale profitto ETF
+2023-09-15,AAPL,buy,8,178.90,USD,1.50,stock,Acquisto Q3
+2024-01-05,MSFT,buy,2,374.00,USD,1.50,stock,Acquisto inizio anno
+2024-03-01,AAPL,dividend,0,0.25,USD,0.00,stock,Dividendo Q1 2024
