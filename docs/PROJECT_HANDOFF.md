@@ -54,7 +54,7 @@ Tutti i moduli sorgente sono stati sviluppati, ottimizzati e verificati con una 
 
 ### `core/hedging.py` — ✅ Completo
 - **Beta-Neutral Hedging Engine**: Calcola il valore e le quote esatte di ETF Inversi (`SH`, `PSQ`, `DOG`, `VIXY`) per portare il Beta di portafoglio da $\beta_p$ a $\beta = 0.00$ senza liquidare gli asset.
-- **Tail Risk Protection**: Stima della copertura di protezione da eventi estremi di coda basata sul $\text{VaR}_{99\%}$.
+- **Tail Risk Protection**: Stima della copertura di protezione da eventi estremi di coda basata sul VaR 99%.
 
 ### `core/attribution.py` — ✅ Completo (Nuovo Modulo)
 - **Brinson-Fachler Performance Attribution**: Modello istituzionale per la scomposizione dell'extra-rendimento di portafoglio rispetto al benchmark nei 3 fattori: **Allocation Effect** (decisioni settoriali), **Selection Effect** (selezione dei titoli) ed **Interaction Effect**.
