@@ -17,13 +17,10 @@ def package_release():
     print(" Preparazione Pacchetto GitHub Release per il Cliente")
     print("=" * 60)
     
-    # 1. Se la cartella dist non esiste, esegue la compilazione PyInstaller
-    if not os.path.exists(dist_dir):
-        print("[1/2] Compilazione eseguibile ARGUS.exe in corso...")
-        build_script = os.path.join(project_dir, "scripts", "build_desktop_app.py")
-        subprocess.run([sys.executable, build_script], check=True)
-    else:
-        print("[1/2] Cartella compilata ARGUS_Desktop individuata.")
+    # 1. Ricompila sempre l'eseguibile ARGUS.exe per includere gli ultimi aggiornamenti di codice
+    print("[1/2] Compilazione eseguibile ARGUS.exe in corso...")
+    build_script = os.path.join(project_dir, "scripts", "build_desktop_app.py")
+    subprocess.run([sys.executable, build_script], check=True)
 
     # 2. Crea il file ZIP distribuiscibile
     print("[2/2] Creazione archivio ZIP per GitHub Releases...")
