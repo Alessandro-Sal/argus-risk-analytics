@@ -170,7 +170,11 @@ df_history["display_label"] = df_history.apply(
 st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
 
 # ── Main Tabs ────────────────────────────────────────────────
-tab_ts, tab_cmp = st.tabs(["📈 Serie Storiche Temporali", "⚖️ Confronto Affiancato (Side-by-Side)"])
+tab_ts, tab_cmp, tab_rec = st.tabs([
+    "📈 Serie Storiche Temporali",
+    "⚖️ Confronto Affiancato (Side-by-Side)",
+    "🗃️ Registro Completo Snapshot Storici"
+])
 
 # ── TAB 1: SERIE STORICHE TEMPORALI ─────────────────────────
 with tab_ts:
@@ -206,66 +210,80 @@ with tab_ts:
             x=df_history["calc_date"], y=df_history["total_value"],
             mode="lines+markers", name="Valore Totale Portafoglio (€)",
             line=dict(color="#3fb950", width=3),
-            marker=dict(size=8, color="#3fb950")
+            marker=dict(size=8, color="#3fb950"),
+            hovertemplate="<b>Valore Totale Portafoglio</b><br>Data Snapshot: %{x|%Y-%m-%d %H:%M}<br>Valore: € %{y:,.2f}<extra></extra>"
         ),
         secondary_y=False
     )
     if "total_pnl" in df_history.columns and df_history["total_pnl"].notna().any():
         fig_val.add_trace(
-            bg.Bar(
+            bg.Scatter(
                 x=df_history["calc_date"], y=df_history["total_pnl"],
-                name="PnL Cumulato (€)",
-                marker_color=np.where(df_history["total_pnl"] >= 0, "rgba(63, 185, 80, 0.3)", "rgba(248, 81, 73, 0.3)"),
-                marker_line_color=np.where(df_history["total_pnl"] >= 0, "#3fb950", "#f85149"),
-                marker_line_width=1
+                mode="lines+markers", name="PnL Cumulato (€)",
+                line=dict(color="#00f3ff", width=2, dash="dash"),
+                marker=dict(size=6, color="#00f3ff"),
+                hovertemplate="<b>PnL Cumulato</b><br>Data Snapshot: %{x|%Y-%m-%d %H:%M}<br>PnL: € %{y:,.2f}<extra></extra>"
             ),
             secondary_y=True
         )
     fig_val.update_layout(
-        title="<b>Evoluzione Patrimonio & PnL Cumulato nel Tempo</b>",
+        title="<b>Evoluzione Patrimonio & PnL Cumulato nel Tempo (€)</b>",
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         height=380,
-        margin=dict(l=20, r=20, t=40, b=20)
+        margin=dict(l=20, r=20, t=40, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
     )
     fig_val.update_xaxes(title="Data Snapshot")
     fig_val.update_yaxes(title_text="Valore Portafoglio (€)", secondary_y=False)
     fig_val.update_yaxes(title_text="PnL Cumulato (€)", secondary_y=True)
     st.plotly_chart(fig_val, use_container_width=True)
 
-    # 2. Chart: Sharpe Ratio & CAGR
+    # 2. Charts: Sharpe & Sortino + VaR 95% & Max Drawdown
     col_c1, col_c2 = st.columns(2)
     
     with col_c1:
+        df_sh_chart = df_history.rename(columns={
+            "sharpe_ratio": "Sharpe Ratio",
+            "sortino_ratio": "Sortino Ratio"
+        })
         fig_sh = px.line(
-            df_history, x="calc_date", y=["sharpe_ratio", "sortino_ratio"],
-            labels={"value": "Ratio", "calc_date": "Data Snapshot", "variable": "Indice"},
+            df_sh_chart, x="calc_date", y=["Sharpe Ratio", "Sortino Ratio"],
+            labels={"value": "Indice", "calc_date": "Data Snapshot", "variable": "Indice di Rischio"},
             title="<b>Andamento Efficienza di Rischio (Sharpe & Sortino)</b>",
-            markers=True
+            markers=True,
+            template="plotly_dark"
         )
-        fig_sh.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=320)
+        fig_sh.update_traces(
+            hovertemplate="<b>%{fullData.name}</b><br>Data Snapshot: %{x|%Y-%m-%d %H:%M}<br>Valore: %{y:.2f}<extra></extra>"
+        )
+        fig_sh.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=340,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
+        )
         st.plotly_chart(fig_sh, use_container_width=True)
         
     with col_c2:
-        fig_var = px.area(
-            df_history, x="calc_date", y=["var_95_pct", "max_drawdown_pct"],
-            labels={"value": "Valore (€ / %)", "calc_date": "Data Snapshot"},
-            title="<b>Evoluzione dei Rischi Estremi (VaR 95% & Max Drawdown)</b>"
+        df_var_chart = df_history.rename(columns={
+            "var_95_pct": "VaR 95% (%)",
+            "max_drawdown_pct": "Max Drawdown (%)"
+        })
+        fig_var = px.line(
+            df_var_chart, x="calc_date", y=["VaR 95% (%)", "Max Drawdown (%)"],
+            labels={"value": "Percentuale %", "calc_date": "Data Snapshot", "variable": "Metrica di Rischio"},
+            title="<b>Evoluzione dei Rischi Estremi (VaR 95% & Max Drawdown)</b>",
+            markers=True,
+            template="plotly_dark"
         )
-        fig_var.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=320)
+        fig_var.update_traces(
+            hovertemplate="<b>%{fullData.name}</b><br>Data Snapshot: %{x|%Y-%m-%d %H:%M}<br>Valore: %{y:.2f}%<extra></extra>"
+        )
+        fig_var.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=340,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
+        )
         st.plotly_chart(fig_var, use_container_width=True)
-
-    # Historical Table View
-    with st.expander("📄 Visualizza Tabella Completa degli Snapshot Storici"):
-        st.dataframe(
-            df_history[[
-                "calc_date", "run_id", "run_name", "total_value", "total_pnl", 
-                "cagr_pct", "sharpe_ratio", "max_drawdown_pct", "var_95_pct", "hhi_index"
-            ]].sort_values(by="calc_date", ascending=False),
-            use_container_width=True
-        )
-
 
 # ── TAB 2: CONFRONTO AFFIANCATO (SIDE-BY-SIDE) ───────────────
 with tab_cmp:
@@ -289,7 +307,7 @@ with tab_cmp:
 
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-    # ── Delta Comparison Cards ───────────────────────────────
+    # Delta Comparison Cards
     val_a = snap_a["total_value"] or 0
     val_b = snap_b["total_value"] or 0
     d_val = val_a - val_b
@@ -332,7 +350,6 @@ with tab_cmp:
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Fetch Positions for Snapshot A and Snapshot B ────────
     df_pos_a = get_snapshot_positions_by_id(engine, snap_a["snapshot_id"])
     df_pos_b = get_snapshot_positions_by_id(engine, snap_b["snapshot_id"])
 
@@ -345,6 +362,9 @@ with tab_cmp:
                 df_pos_a, names="asset_class", values="current_value",
                 title="Ripartizione per Asset Class A", hole=0.4
             )
+            fig_pie_a.update_traces(
+                hovertemplate="<b>Asset Class: %{label}</b><br>Valore: € %{value:,.2f} (%{percent})<extra></extra>"
+            )
             fig_pie_a.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", height=280)
             st.plotly_chart(fig_pie_a, use_container_width=True)
             
@@ -355,10 +375,12 @@ with tab_cmp:
                 df_pos_b, names="asset_class", values="current_value",
                 title="Ripartizione per Asset Class B", hole=0.4
             )
+            fig_pie_b.update_traces(
+                hovertemplate="<b>Asset Class: %{label}</b><br>Valore: € %{value:,.2f} (%{percent})<extra></extra>"
+            )
             fig_pie_b.update_layout(template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)", height=280)
             st.plotly_chart(fig_pie_b, use_container_width=True)
 
-    # ── Position-Level Comparison Table ───────────────────────
     st.markdown("#### 📋 Confronto Dettagliato Titolo per Titolo")
     
     if not df_pos_a.empty or not df_pos_b.empty:
@@ -392,3 +414,37 @@ with tab_cmp:
             }),
             use_container_width=True
         )
+
+# ── TAB 3: REGISTRO COMPLETO SNAPSHOT ─────────────────────────
+with tab_rec:
+    st.markdown("### 🗃️ Registro Completo degli Snapshot Storici")
+    st.caption("Consultazione analitica di tutti i punti storici registrati nel Data Warehouse MySQL.")
+    
+    df_history_disp = df_history[[
+        "calc_date", "run_id", "run_name", "total_value", "total_pnl", 
+        "cagr_pct", "sharpe_ratio", "max_drawdown_pct", "var_95_pct", "hhi_index"
+    ]].sort_values(by="calc_date", ascending=False).rename(columns={
+        "calc_date": "Data e Ora Snapshot",
+        "run_id": "Run ID",
+        "run_name": "Nome Analisi",
+        "total_value": "Valore Totale (€)",
+        "total_pnl": "PnL Cumulato (€)",
+        "cagr_pct": "CAGR %",
+        "sharpe_ratio": "Sharpe Ratio",
+        "max_drawdown_pct": "Max Drawdown %",
+        "var_95_pct": "VaR 95% %",
+        "hhi_index": "Indice HHI"
+    })
+    
+    st.dataframe(
+        df_history_disp.style.format({
+            "Valore Totale (€)": "€ {:,.2f}",
+            "PnL Cumulato (€)": "€ {:+,.2f}",
+            "CAGR %": "{:+.2f}%",
+            "Sharpe Ratio": "{:.2f}",
+            "Max Drawdown %": "{:.2f}%",
+            "VaR 95% %": "{:.2f}%",
+            "Indice HHI": "{:.4f}"
+        }),
+        use_container_width=True, hide_index=True
+    )
