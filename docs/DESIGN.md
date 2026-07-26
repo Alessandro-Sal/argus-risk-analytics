@@ -96,3 +96,14 @@ Tutti i pulsanti di esportazione (**Report PDF Factsheet 2 Pagine**, **Workbook 
 
 ### Regola di Terminologia UI
 Non viene utilizzato l'acronimo "AI" nell'interfaccia utente. Si utilizzano definizioni quantitative formali come **"ARGUS Quant Advisor"** e **"Diagnostica Quantitativa"**.
+
+## 7. Desktop Application Shell & Icon Specifications
+
+* **Native Desktop Window (`pywebview` + Edge WebView2):**
+  * **Window Dimensions:** Default viewport `1366px` width × `850px` height, resizable with minimum boundary `1024px` × `700px`.
+  * **Window Title:** `ARGUS — Risk Analytics Platform`.
+  * **Chromeless Native Feel:** Eliminates browser tabs, address bars, bookmarks, and developer overlays for a pure institutional software aesthetic.
+
+* **Icon Asset: "L'Occhio di Argus" (`docs/argus_icon.ico`):**
+  * **Visual Symbolism:** Cybernetic all-seeing eye ("L'osservatore che vede tutto e non dorme mai") with an almond-shaped neon cyan outline (`#00f5d4`), deep cobalt iris (`#4895ef`), and a quantitative trading candlestick embedded in the glowing pupil (`#f72585`).
+  * **Formats:** Multi-resolution `.ico` bundle (16x16, 32x32, 48x48, 64x64, 128x128, 256x256) assigned to the executable resources, Windows taskbar, and Desktop shortcut.

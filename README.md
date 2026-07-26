@@ -146,11 +146,15 @@ CAPSTONE PROJECT/
 ├── docker/                      # File di containerizzazione
 ├── docs/                        # Documentazione tecnica e manuali econometrici
 ├── tests/                       # Test suite automatizzata PyTest (31 test PASSED)
-├── scripts/                     # Script di utilità e schema database SQL
-├── app.py                       # Entry point alias per la dashboard
-├── start_dashboard.bat          # Script d'avvio rapido per Windows (nella root)
+├── scripts/                     # Script di utilità, schema SQL e build desktop
+│   ├── build_desktop_app.py     # Automazione compilazione PyInstaller (.exe)
+│   ├── create_desktop_shortcut.py # Generatore collegamento Desktop con icona (.lnk)
+│   └── generate_icon.py         # Generatore icona ICO multi-risoluzione
+├── desktop_launcher.py          # Entry point nativo Desktop App (PyWebView + Lifecycle)
+├── app.py                       # Entry point alias per la dashboard web
+├── start_dashboard.bat          # Script d'avvio rapido per Windows (priorità Desktop)
 ├── pyproject.toml               # Configurazione tool (PyTest, Ruff)
-├── requirements.txt             # Dipendenze Python
+├── requirements.txt             # Dipendenze Python (incl. pywebview & pyinstaller)
 ├── README.md                    # Documentazione del progetto
 └── DESIGN.md                    # Linee guida architetturali e UI
 ```
@@ -159,7 +163,30 @@ CAPSTONE PROJECT/
 
 ## ⚙️ Requisiti di Sistema & Installazione
 
-### Opzione A: Avvio Rapido con Docker Compose (Consigliato)
+### Opzione A: Applicazione Desktop Nativa Windows (Consigliato per l'Utente Finale)
+
+ARGUS include un'architettura **Desktop Nativa** basata su **PyWebView** (motore Windows Edge WebView2) che esegue la piattaforma in una finestra indipendente con icona personalizzata, senza barre del browser o schede esterne, ed arresta automaticamente i processi in background alla chiusura della finestra.
+
+1. **Configurazione 1-Click per Nuovi Utenti / Clienti (Da GitHub)**:
+   Se stai scaricando il progetto per la prima volta da GitHub, fai doppio clic sul file **`setup_desktop.bat`**.
+   Questo script installerà automaticamente le dipendenze e genererà l'icona dell'**Occhio di Argus** sul tuo Desktop personale.
+
+2. **Avvio Diretto in Finestra Nativa**:
+   ```bash
+   py desktop_launcher.py
+   ```
+   *Oppure fai doppio clic sul file `start_dashboard.bat` o sulla nuova icona dal Desktop.*
+
+3. **Compilazione dell'Eseguibile Standalone (`ARGUS.exe`)**:
+   Per pacchettizzare l'intera piattaforma in un singolo eseguibile `.exe` distribuiscibile su qualsiasi PC senza Python:
+   ```bash
+   py scripts/build_desktop_app.py
+   ```
+   L'eseguibile compilato verrà generato nella cartella `dist/ARGUS_Desktop/ARGUS.exe`.
+
+---
+
+### Opzione B: Avvio Rapido con Docker Compose
 L'applicazione è completamente containerizzata (Streamlit App + Database MySQL 8.0). È sufficiente eseguire:
 
 ```bash
@@ -169,7 +196,7 @@ L'applicazione web sarà accessibile su `http://localhost:8501`.
 
 ---
 
-### Opzione B: Installazione Locale Native
+### Opzione C: Installazione Locale Native (Browser Web Standard)
 
 1. **Prerequisiti**:
    - Python 3.11+
@@ -192,8 +219,7 @@ L'applicazione web sarà accessibile su `http://localhost:8501`.
    pip install -r requirements.txt
    ```
 
-4. **Avvia la Dashboard Streamlit**:
-   Su Windows puoi fare doppio clic sul file `start_dashboard.bat` (nella root), oppure da terminale:
+4. **Avvia la Dashboard Streamlit nel Browser**:
    ```bash
    streamlit run app.py
    ```

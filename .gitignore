@@ -39,6 +39,10 @@ gsheets_sync_subproject/
 *.json
 !config.json
 
+# PyInstaller builds
+build/
+dist/
+
 # Private docs
 docs/CAPSTONE_REPORT_OUTLINE.md
 docs/POWER_BI_GUIDE.md

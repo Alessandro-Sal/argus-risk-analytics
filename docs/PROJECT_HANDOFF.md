@@ -13,6 +13,7 @@
 - **Python 3.11+**: Motore ETL, Risk Engine quantitativo, Modelli AI/ML, Generazione PDF/Excel.
 - **SQL & MySQL 8.0 (SQLAlchemy ORM)**: Data Warehouse relazionale, tabelle transazionali e storicizzazione snapshot.
 - **Streamlit**: Application Web Frontend interattiva per la demo live (6 pagine con interfaccia quantitativa ad alta densità).
+- **PyWebView & PyInstaller**: Architettura Desktop Nativa Windows (WebView2 engine, finestra dedicata, gestione ciclo di vita senza browser, eseguibile `.exe` standalone e collegamento Desktop).
 - **Power BI & Google Looker Studio**: Executive Dashboards per il reporting direzionale aziendale.
 - **Excel (`openpyxl`/`xlsxwriter`)**: Modello tattico di simulazione what-if esportato in-memory.
 - **Docker & Docker Compose**: Containerizzazione completa dell'infrastruttura (App Streamlit + Database MySQL).
@@ -32,8 +33,10 @@ CSV / DeGiro ──┐
                ├──► core/validator.py ──► core/schemas.py ──► core/fetcher.py ──► MySQL ORM ──► core/risk_engine.py
 yfinance API ──┘                           (Pydantic)         (FX / ISIN)      (models.py)          │
                                                                                                     ▼
-Power BI / Looker Studio ◄─── core/exporter.py ◄─── core/db_exporter.py ◄─── Presentation Layer (Streamlit App)
-                               (CSV Export)         (MySQL Snapshots)        ├── PDF Tear-Sheet (pdf_generator.py)
+Power BI / Looker Studio ◄─── core/exporter.py ◄─── core/db_exporter.py ◄─── Presentation Layer (Streamlit / PyWebView)
+                               (CSV Export)         (MySQL Snapshots)        ├── Desktop App (desktop_launcher.py)
+                                                                             ├── Standalone Executable (ARGUS.exe)
+                                                                             ├── PDF Tear-Sheet (pdf_generator.py)
                                                                              └── Excel What-If (excel_generator.py)
 ```
 
@@ -51,6 +54,17 @@ Tutti i moduli sorgente sono stati sviluppati, ottimizzati e verificati con una 
 
 ### `scripts/export_star_schema.py` — ✅ Completo (Nuovo Modulo v5.0)
 - **Generatore Pacchetto ZIP Star Schema per Power BI**: Creazione in-memory dell'archivio `.zip` contenente le 3 tabelle relazionali Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`) ed il manuale d'importazione `README_POWERBI.md` per Microsoft Power BI e Google Looker Studio.
+
+### `desktop_launcher.py` & Architettura Desktop Nativa — ✅ Completo (Nuovo Modulo v5.0)
+- **Native Window Launcher (`pywebview` + Edge WebView2)**: Avvia la piattaforma in una finestra Desktop indipendente a risoluzione 1366x850 con icona applicativa personalizzata, senza barre del browser web.
+- **Sottoprocesso Isolato & Main Thread Signal Compliance**: Esegue Streamlit in un sottoprocesso separato garantendo la compatibilità nativa dei segnali di sistema (`signal.signal`) su Windows.
+- **Active Connection Polling (`wait_for_server`)**: Verifica in polling attivo la risposta su `127.0.0.1:{port}` ed apre la finestra nativa solo a connessione confermata al 100%, eliminando errori `ERR_CONNECTION_REFUSED`.
+- **Automatic Lifecycle Management**: Arresta ed estingue pulitamente il sottoprocesso Streamlit alla chiusura della finestra con la `X`.
+
+### `scripts/build_desktop_app.py` & `scripts/create_desktop_shortcut.py` — ✅ Completo
+- **PyInstaller Build Automation**: Automazione della compilazione dell'eseguibile standalone `dist/ARGUS_Desktop/ARGUS.exe` in modalità `--onedir` per avvio istantaneo.
+- **Windows Desktop Shortcut & Shell Refresh**: Generazione del collegamento **`ARGUS Risk Analytics.lnk`** sul Desktop con icona **Occhio di Argus** e notifica `SHChangeNotify` per il refresh della Icon Cache di Windows.
+- **Icon Generator (`scripts/generate_icon.py`)**: Script grafico Pillow per la generazione del file `.ico` a 6 risoluzioni (`docs/argus_icon.ico`) raffigurante l'Occhio di Argus cibernetico con grafico finanziario integrato nell'iride.
 
 ### `core/hedging.py` — ✅ Completo
 - **Beta-Neutral Hedging Engine**: Calcola il valore e le quote esatte di ETF Inversi (`SH`, `PSQ`, `DOG`, `VIXY`) per portare il Beta di portafoglio da $\beta_p$ a $\beta = 0.00$ senza liquidare gli asset.

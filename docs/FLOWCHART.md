@@ -54,11 +54,14 @@ flowchart TD
         DBEXP{"⚙️ core/db_exporter.py\n(Storicizzazione DB & Multi-Snapshot)"}:::script
     end
 
-    subgraph Layer5 ["📊 5. PRESENTATION & REPORTING LAYER"]
+    subgraph Layer5 ["📊 5. PRESENTATION & DESKTOP REPORTING LAYER"]
         direction TB
-        APP("💻 Streamlit App (7 Pagine Live)"):::frontend
+        APP("💻 Streamlit App / Control Room (7 Pagine Live)"):::frontend
+        DESK("🖥️ Native Desktop App\n(desktop_launcher.py + WebView2)"):::frontend
+        EXE("📦 Standalone Executable\n(dist/ARGUS_Desktop/ARGUS.exe)"):::frontend
         REPEXP{"📄 core/report_exporter.py\n(PDF Factsheet & Multi-Tab Excel)"}:::script
         STARZIP{"🗃️ scripts/export_star_schema.py\n(Power BI Star Schema ZIP Package)"}:::script
+        RELZIP{"📦 scripts/package_release.py\n(GitHub Release ZIP Package)"}:::script
         BIEXP{"📤 core/exporter.py\n(Esportatore CSV Denormalizzati)"}:::script
         POWERBI[/"📈 Power BI / Looker Studio\n(Executive Dashboards)"/]:::frontend
     end
@@ -122,7 +125,8 @@ flowchart TD
 - **`core/dividend_engine.py`**: Calcolo del Dividend Yield medio, dividendi storici reali e proiezione del calendario di incassi mensili per singola azienda pagatrice.
 - **`core/db_exporter.py`**: Layer di storicizzazione snapshot su MySQL e recupero delle serie storiche per l'analisi temporale multi-run.
 
-### 5. Presentation & Reporting Layer
-- **Streamlit App (`app.py` & `pages/`)**: Dashboard a 7 pagine interattive con UI istituzionale stile terminal quantitativo, selettore di valuta base, selettore di temi cromatici e popover guidati (`st.popover`).
+### 5. Presentation & Desktop Reporting Layer
+- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 7 pagine interattive fruibile sia via browser sia come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona personalizzata **Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto con polling attivo `wait_for_server`.
+- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_Desktop_v5.0.zip` per la pubblicazione su GitHub Releases.
 - **`core/report_exporter.py`**: Generazione dinamica in-memory sia del report Executive PDF Factsheet (2 pagine) sia del Workbook Excel Multi-Tab (.xlsx) con 4 schede tematiche.
-- **`core/exporter.py`**: Esportazione di tabelle denormalizzate in CSV per la connessione nativa verso Microsoft Power BI e Google Looker Studio.
+- **`core/exporter.py` & `scripts/export_star_schema.py`**: Esportazione di tabelle denormalizzate e Star Schema in formato `.zip` per la connessione nativa verso Microsoft Power BI e Google Looker Studio.
