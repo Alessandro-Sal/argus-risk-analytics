@@ -106,24 +106,40 @@ with tab1:
                 ))
                 
                 ms = opt.get("max_sharpe", {})
+                ms_v = ms.get("volatility", ms.get("risk", 0.0)) * 100.0 if ms else 0.0
+                ms_r = ms.get("return", 0.0) * 100.0 if ms else 0.0
+
+                mv = opt.get("min_vol", {})
+                mv_v = mv.get("volatility", mv.get("risk", 0.0)) * 100.0 if mv else 0.0
+                mv_r = mv.get("return", 0.0) * 100.0 if mv else 0.0
+
                 if ms:
-                    ms_v = ms.get("volatility", ms.get("risk", 0.0)) * 100.0
-                    ms_r = ms.get("return", 0.0) * 100.0
                     fig_f.add_trace(go.Scatter(
                         x=[ms_v], y=[ms_r], mode="markers+text",
                         name="Max Sharpe Ratio", text=["Max Sharpe"], textposition="top left",
                         marker=dict(size=12, color="#ff9900", symbol="diamond")
                     ))
                     
-                mv = opt.get("min_vol", {})
                 if mv:
-                    mv_v = mv.get("volatility", mv.get("risk", 0.0)) * 100.0
-                    mv_r = mv.get("return", 0.0) * 100.0
                     fig_f.add_trace(go.Scatter(
                         x=[mv_v], y=[mv_r], mode="markers+text",
                         name="Min Volatility", text=["Min Vol"], textposition="bottom right",
                         marker=dict(size=12, color="#00f3ff", symbol="circle")
                     ))
+
+                # Dynamic axis range calculation so ALL points (Current, Max Sharpe, Min Vol, Cloud) fit perfectly
+                all_vols = [frontier["vol_pct"].min(), frontier["vol_pct"].max(), cur_v, ms_v, mv_v]
+                all_rets = [frontier["ret_pct"].min(), frontier["ret_pct"].max(), cur_r, ms_r, mv_r]
+                all_vols = [v for v in all_vols if v > 0]
+                all_rets = [r for r in all_rets]
+
+                min_x = max(0, min(all_vols) - 2.0) if all_vols else 0
+                max_x = max(all_vols) + 3.0 if all_vols else 30
+                min_y = min(0, min(all_rets) - 2.0) if all_rets else 0
+                max_y = max(all_rets) + 5.0 if all_rets else 40
+
+                fig_f.update_xaxes(range=[min_x, max_x])
+                fig_f.update_yaxes(range=[min_y, max_y])
                     
                 fig_f.update_layout(
                     paper_bgcolor="rgba(0,0,0,0)",
