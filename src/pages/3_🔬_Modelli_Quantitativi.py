@@ -96,8 +96,9 @@ with tab1:
                     hovertemplate="<b>Portafoglio Ottimo sulla Frontiera</b><br>Volatilità: %{x:.2f}%<br>Rendimento Atteso: %{y:.2f}%<extra></extra>"
                 )
                 
-                cur_v = opt.get("current_vol", 0) * 100
-                cur_r = opt.get("current_ret", 0) * 100
+                cur = opt.get("current", {})
+                cur_v = cur.get("risk", cur.get("volatility", opt.get("current_vol", 0))) * 100.0
+                cur_r = cur.get("return", opt.get("current_ret", 0)) * 100.0
                 fig_f.add_trace(go.Scatter(
                     x=[cur_v], y=[cur_r], mode="markers+text",
                     name="Portafoglio Attuale", text=["Attuale"], textposition="top right",
@@ -133,9 +134,15 @@ with tab1:
 
         with col_opt2:
             st.markdown("**Confronto Allocazioni Ottimali**")
+            cur = opt.get("current", {})
             ms = opt.get("max_sharpe", {})
             mv = opt.get("min_vol", {})
             
+            if cur:
+                cur_v = cur.get("risk", 0.0) * 100.0
+                cur_r = cur.get("return", 0.0) * 100.0
+                cur_s = cur.get("sharpe", 0.0)
+                st.warning(f"⭐ **Portafoglio Attuale**\nRendimento: **{cur_r:.2f}%** | Volatilità: **{cur_v:.2f}%** | Sharpe: **{cur_s:.2f}**")
             if ms:
                 ms_v = ms.get("volatility", ms.get("risk", 0.0)) * 100.0
                 ms_r = ms.get("return", 0.0) * 100.0
