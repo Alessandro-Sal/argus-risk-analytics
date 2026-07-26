@@ -90,20 +90,17 @@ with tab1:
                     frontier, x="vol_pct", y="ret_pct",
                     labels={"vol_pct": "Volatilità Annua %", "ret_pct": "Rendimento Atteso %"},
                     title="Frontiera Efficiente (Markowitz & Ledoit-Wolf Shrinkage)",
-                    template="plotly_dark", height=420
+                    template="plotly_dark", height=440
                 )
+                # Cloud di punti Monte Carlo traslucida per non nascondere i marcatori chiave
                 fig_f.update_traces(
-                    hovertemplate="<b>Portafoglio Ottimo sulla Frontiera</b><br>Volatilità: %{x:.2f}%<br>Rendimento Atteso: %{y:.2f}%<extra></extra>"
+                    marker=dict(opacity=0.30, size=5, color="#4895ef"),
+                    hovertemplate="<b>Portafoglio Simulato</b><br>Volatilità: %{x:.2f}%<br>Rendimento Atteso: %{y:.2f}%<extra></extra>"
                 )
                 
                 cur = opt.get("current", {})
                 cur_v = cur.get("risk", cur.get("volatility", opt.get("current_vol", 0))) * 100.0
                 cur_r = cur.get("return", opt.get("current_ret", 0)) * 100.0
-                fig_f.add_trace(go.Scatter(
-                    x=[cur_v], y=[cur_r], mode="markers+text",
-                    name="Portafoglio Attuale", text=["Attuale"], textposition="top right",
-                    marker=dict(size=14, color="#00ff66", symbol="star")
-                ))
                 
                 ms = opt.get("max_sharpe", {})
                 ms_v = ms.get("volatility", ms.get("risk", 0.0)) * 100.0 if ms else 0.0
@@ -113,18 +110,45 @@ with tab1:
                 mv_v = mv.get("volatility", mv.get("risk", 0.0)) * 100.0 if mv else 0.0
                 mv_r = mv.get("return", 0.0) * 100.0 if mv else 0.0
 
+                # 1. Portafoglio Attuale (Stella Verde Gigante in primo piano con bordo bianco luminoso)
+                fig_f.add_trace(go.Scatter(
+                    x=[cur_v], y=[cur_r], mode="markers+text",
+                    name="Portafoglio Attuale", text=["⭐ Portafoglio Attuale"], textposition="top center",
+                    marker=dict(
+                        size=20,
+                        color="#00ff66",
+                        symbol="star",
+                        line=dict(width=2.5, color="#ffffff")
+                    ),
+                    textfont=dict(color="#00ff66", size=13, family="Arial Black")
+                ))
+
+                # 2. Max Sharpe Ratio
                 if ms:
                     fig_f.add_trace(go.Scatter(
                         x=[ms_v], y=[ms_r], mode="markers+text",
-                        name="Max Sharpe Ratio", text=["Max Sharpe"], textposition="top left",
-                        marker=dict(size=12, color="#ff9900", symbol="diamond")
+                        name="Max Sharpe Ratio", text=["🏆 Max Sharpe"], textposition="top left",
+                        marker=dict(
+                            size=16,
+                            color="#ff9900",
+                            symbol="diamond",
+                            line=dict(width=2, color="#ffffff")
+                        ),
+                        textfont=dict(color="#ff9900", size=13, family="Arial Black")
                     ))
                     
+                # 3. Minima Volatilità
                 if mv:
                     fig_f.add_trace(go.Scatter(
                         x=[mv_v], y=[mv_r], mode="markers+text",
-                        name="Min Volatility", text=["Min Vol"], textposition="bottom right",
-                        marker=dict(size=12, color="#00f3ff", symbol="circle")
+                        name="Min Volatility", text=["🛡️ Min Vol"], textposition="bottom right",
+                        marker=dict(
+                            size=16,
+                            color="#00f3ff",
+                            symbol="circle",
+                            line=dict(width=2, color="#ffffff")
+                        ),
+                        textfont=dict(color="#00f3ff", size=13, family="Arial Black")
                     ))
 
                 # Dynamic axis range calculation so ALL points (Current, Max Sharpe, Min Vol, Cloud) fit perfectly
