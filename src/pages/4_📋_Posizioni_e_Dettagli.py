@@ -303,11 +303,22 @@ with tab3:
 
     st.markdown("#### 💡 Candidati Tax-Loss Harvesting (Riduzione Debito Fiscale)")
     if not tax_harv.empty:
+        df_harv_disp = tax_harv.rename(columns={
+            "ticker": "Ticker",
+            "asset_class": "Classe Asset",
+            "pnl_unrealized": "PnL Non Realizzato (€)",
+            "potential_tax_saving_eur": "Risparmio Fiscale Potenziale (€)",
+            "tax_rate_pct": "Aliquota Fiscale %",
+            "qualifying_type": "Tipologia Reddito (TUIR)"
+        })
+        
+        format_dict = {}
+        for col in ["PnL Non Realizzato (€)", "Risparmio Fiscale Potenziale (€)"]:
+            if col in df_harv_disp.columns and pd.api.types.is_numeric_dtype(df_harv_disp[col]):
+                format_dict[col] = "€ {:,.2f}"
+
         st.dataframe(
-            tax_harv.style.format({
-                "pnl_unrealized": "€ {:,.2f}",
-                "potential_tax_saving_eur": "€ {:,.2f}"
-            }),
+            df_harv_disp.style.format(format_dict) if format_dict else df_harv_disp,
             use_container_width=True, hide_index=True
         )
     else:
@@ -315,14 +326,31 @@ with tab3:
 
     if not tax_by_year.empty:
         st.markdown("#### 📊 Dettaglio Imposte & Plusvalenze per Anno Solare")
+        
+        df_tax_chart = tax_by_year.rename(columns={
+            "year": "Anno Solare",
+            "realized_gain_eur": "Plusvalenze Realizzate (€)",
+            "realized_loss_eur": "Minusvalenze Realizzate (€)",
+            "estimated_tax_eur": "Stima Imposte Dovute (€)"
+        })
+        
         fig_tax_y = px.bar(
-            tax_by_year, x="year", y=["realized_gain_eur", "realized_loss_eur", "estimated_tax_eur"],
+            df_tax_chart, x="Anno Solare", 
+            y=["Plusvalenze Realizzate (€)", "Minusvalenze Realizzate (€)", "Stima Imposte Dovute (€)"],
             barmode="group", title="Storico Fiscale Anno per Anno (€)",
-            labels={"value": "Euro (€)", "year": "Anno Solare", "variable": "Voce Fiscale"},
-            template="plotly_dark", height=350
+            labels={"value": "Euro (€)", "Anno Solare": "Anno Solare", "variable": "Voce Fiscale"},
+            color_discrete_map={
+                "Plusvalenze Realizzate (€)": "#4b7bec",
+                "Minusvalenze Realizzate (€)": "#fc5c65",
+                "Stima Imposte Dovute (€)": "#26de81"
+            },
+            template="plotly_dark", height=380
+        )
+        fig_tax_y.update_traces(
+            hovertemplate="<b>Anno %{x}</b><br>%{fullData.name}: € %{y:,.2f}<extra></extra>"
         )
         fig_tax_y.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
+            legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5, title=None)
         )
         st.plotly_chart(fig_tax_y, use_container_width=True)
