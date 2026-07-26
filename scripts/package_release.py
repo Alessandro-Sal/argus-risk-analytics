@@ -17,10 +17,14 @@ def package_release():
     print(" Preparazione Pacchetto GitHub Release per il Cliente")
     print("=" * 60)
     
-    # 1. Ricompila sempre l'eseguibile ARGUS.exe per includere gli ultimi aggiornamenti di codice
-    print("[1/2] Compilazione eseguibile ARGUS.exe in corso...")
-    build_script = os.path.join(project_dir, "scripts", "build_desktop_app.py")
-    subprocess.run([sys.executable, build_script], check=True)
+    # 1. Se richiesto con --rebuild o se non esiste la cartella, esegue la compilazione PyInstaller
+    force_rebuild = "--rebuild" in sys.argv
+    if force_rebuild or not os.path.exists(dist_dir):
+        print("[1/2] Compilazione PyInstaller in corso (può richiedere ~1-2 minuti)...")
+        build_script = os.path.join(project_dir, "scripts", "build_desktop_app.py")
+        subprocess.run([sys.executable, build_script], check=True)
+    else:
+        print("[1/2] Usando l'eseguibile ARGUS_Desktop già compilato. (Usa '--rebuild' per ricompilare).")
 
     # 2. Crea il file ZIP distribuiscibile
     print("[2/2] Creazione archivio ZIP per GitHub Releases...")
