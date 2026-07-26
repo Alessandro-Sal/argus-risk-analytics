@@ -139,9 +139,12 @@ def compute_rebalancing_orders(
         "current_total_value": curr_total_value,
         "new_cash_input": new_cash_eur,
         "target_total_value": target_total_value,
+        "target_total_value_eur": target_total_value,
         "final_total_value": final_total_val,
         "total_buy_value": total_spent,
+        "total_buy_eur": total_spent,
         "total_sell_value": total_raised,
+        "total_sell_eur": total_raised,
         "net_cash_delta": total_spent - total_raised,
         "cash_remaining_buffer": max(0.0, cash_remaining),
         "target_mode": target_mode

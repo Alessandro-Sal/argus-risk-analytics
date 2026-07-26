@@ -236,11 +236,14 @@ with tab1:
 
             col_om1, col_om2, col_om3 = st.columns(3)
             with col_om1:
-                st.metric("Valore Portafoglio Target", f"€ {summary_orders.get('target_total_value_eur', 0):,.2f}")
+                t_val = summary_orders.get('target_total_value_eur', summary_orders.get('target_total_value', 0.0))
+                st.metric("Valore Portafoglio Target", f"€ {t_val:,.2f}")
             with col_om2:
-                st.metric("Totale Acquisti (€)", f"€ {summary_orders.get('total_buy_eur', 0):,.2f}")
+                b_val = summary_orders.get('total_buy_eur', summary_orders.get('total_buy_value', 0.0))
+                st.metric("Totale Acquisti (€)", f"€ {b_val:,.2f}")
             with col_om3:
-                st.metric("Totale Vendite (€)", f"€ {summary_orders.get('total_sell_eur', 0):,.2f}")
+                s_val = summary_orders.get('total_sell_eur', summary_orders.get('total_sell_value', 0.0))
+                st.metric("Totale Vendite (€)", f"€ {s_val:,.2f}")
 
             df_disp_orders = df_orders[["ticker", "action", "current_qty", "target_qty", "qty_delta", "last_price", "order_value_eur", "current_weight_pct", "target_weight_pct"]].rename(columns={
                 "ticker": "Ticker", "action": "Azione Tattica", "current_qty": "Quote Attuali", "target_qty": "Quote Target",
