@@ -1,0 +1,69 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Streamlit config
+.streamlit/secrets.toml
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# AI Agents configs & caches
+.agents/
+.dsp/
+scratch/
+
+
+# Temp, Logs, and Data files
+_temp_scripts/
+scratch/
+logs/
+*.log
+*.sqlite
+*.sqlite3
+*.db
+data/*
+!data/.gitkeep
+!data/portfolio_transactions_realistic.csv
+exports/*.csv
+exports/*.xlsx
+exports/*.pdf
+exports/*.zip
+!exports/.gitkeep
+gsheets_sync_subproject/logs/
+credentials/
+*.json
+!config.json
+!docs/argus-architecture.json
+google_service_account.json
+gsheets_sync_subproject/*.json
+gsheets_sync_subproject/google_service_account.json
+
+# PyInstaller builds
+build/
+dist/
+*.spec
+
+# Specific documentation ignored
+docs/POWER_BI_GUIDE.md
+docs/EXECUTIVE_REPORT_OUTLINE.md
+docs/PRESENTATION_SLIDES.md
+
+
