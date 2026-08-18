@@ -1,0 +1,149 @@
+from sqlalchemy import (
+    Column, Integer, BigInteger, String, Numeric, Date, DateTime, Text, ForeignKey, UniqueConstraint
+)
+from sqlalchemy.orm import declarative_base
+from datetime import datetime
+
+Base = declarative_base()
+
+class Portfolio(Base):
+    __tablename__ = 'portfolios'
+    
+    portfolio_id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    owner = Column(String(100), nullable=False, default='anonymous')
+    base_currency = Column(String(3), nullable=False, default='EUR')
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    description = Column(Text, nullable=True)
+
+class Asset(Base):
+    __tablename__ = 'assets'
+    
+    asset_id = Column(Integer, primary_key=True, autoincrement=True)
+    ticker = Column(String(20), nullable=False, unique=True)
+    name = Column(String(200), nullable=True)
+    asset_class = Column(String(50), nullable=False)
+    currency = Column(String(3), nullable=False)
+    gics_sector = Column(String(100), nullable=True)
+    country = Column(String(100), nullable=True)
+    industry = Column(String(100), nullable=True)
+    exchange = Column(String(50), nullable=True)
+    recommendation_key = Column(String(50), nullable=True)
+    market_cap = Column(BigInteger, nullable=True)
+    beta_5y = Column(Numeric(10, 4), nullable=True)
+    fifty_two_week_high = Column(Numeric(18, 6), nullable=True)
+    fifty_two_week_low = Column(Numeric(18, 6), nullable=True)
+    fifty_day_average = Column(Numeric(18, 6), nullable=True)
+    two_hundred_day_average = Column(Numeric(18, 6), nullable=True)
+    trailing_pe = Column(Numeric(10, 2), nullable=True)
+    forward_pe = Column(Numeric(10, 2), nullable=True)
+    price_to_book = Column(Numeric(10, 2), nullable=True)
+    dividend_yield = Column(Numeric(10, 4), nullable=True)
+    roe = Column(Numeric(10, 4), nullable=True)
+    target_mean_price = Column(Numeric(18, 6), nullable=True)
+    peg_ratio = Column(Numeric(10, 2), nullable=True)
+    profit_margins = Column(Numeric(10, 4), nullable=True)
+    gross_margins = Column(Numeric(10, 4), nullable=True)
+    operating_margins = Column(Numeric(10, 4), nullable=True)
+    total_revenue = Column(BigInteger, nullable=True)
+    ebitda = Column(BigInteger, nullable=True)
+    debt_to_equity = Column(Numeric(10, 4), nullable=True)
+    revenue_growth = Column(Numeric(10, 4), nullable=True)
+    earnings_growth = Column(Numeric(10, 4), nullable=True)
+
+class Transaction(Base):
+    __tablename__ = 'transactions'
+    
+    tx_id = Column(Integer, primary_key=True, autoincrement=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.portfolio_id', ondelete='CASCADE'), nullable=False)
+    asset_id = Column(Integer, ForeignKey('assets.asset_id', ondelete='RESTRICT'), nullable=False)
+    tx_date = Column(Date, nullable=False)
+    tx_type = Column(String(20), nullable=False)
+    quantity = Column(Numeric(18, 8), nullable=False)
+    price = Column(Numeric(18, 6), nullable=False)
+    currency = Column(String(3), nullable=False)
+    fees = Column(Numeric(10, 4), nullable=False, default=0.0000)
+    notes = Column(String(255), nullable=True)
+
+class MarketPrice(Base):
+    __tablename__ = 'market_prices'
+    
+    price_id = Column(Integer, primary_key=True, autoincrement=True)
+    asset_id = Column(Integer, ForeignKey('assets.asset_id', ondelete='CASCADE'), nullable=False)
+    price_date = Column(Date, nullable=False)
+    close = Column(Numeric(18, 6), nullable=False)
+    volume = Column(BigInteger, nullable=True)
+    source = Column(String(50), nullable=False, default='yfinance')
+    
+    __table_args__ = (
+        UniqueConstraint('asset_id', 'price_date', name='uq_asset_date'),
+    )
+
+class AssetMapping(Base):
+    __tablename__ = 'asset_mapping'
+    
+    mapping_id = Column(Integer, primary_key=True, autoincrement=True)
+    input_ticker = Column(String(50), nullable=False, unique=True)
+    yfinance_ticker = Column(String(50), nullable=False)
+    description = Column(String(255), nullable=True)
+
+class PortfolioSnapshot(Base):
+    __tablename__ = 'portfolio_snapshots'
+    
+    snapshot_id = Column(Integer, primary_key=True, autoincrement=True)
+    run_id = Column(String(50), nullable=False)
+    run_name = Column(String(100), nullable=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.portfolio_id', ondelete='CASCADE'), nullable=False)
+    calc_date = Column(DateTime, nullable=False, default=datetime.utcnow)
+    total_value = Column(Numeric(18, 6), nullable=True)
+    total_pnl = Column(Numeric(18, 6), nullable=True)
+    cagr_pct = Column(Numeric(10, 4), nullable=True)
+    sharpe_ratio = Column(Numeric(10, 4), nullable=True)
+    max_drawdown_pct = Column(Numeric(10, 4), nullable=True)
+    var_95_pct = Column(Numeric(10, 4), nullable=True)
+    hhi_index = Column(Numeric(10, 4), nullable=True)
+    mc_expected_return_1y = Column(Numeric(10, 4), nullable=True)
+    mc_var_95 = Column(Numeric(10, 4), nullable=True)
+    var_exceptions_count = Column(Integer, nullable=True)
+    sortino_ratio = Column(Numeric(10, 4), nullable=True)
+    calmar_ratio = Column(Numeric(10, 4), nullable=True)
+    alpha_pct = Column(Numeric(10, 4), nullable=True)
+    information_ratio = Column(Numeric(10, 4), nullable=True)
+    r_squared_pct = Column(Numeric(10, 4), nullable=True)
+    opt_max_sharpe_ratio = Column(Numeric(10, 4), nullable=True)
+    opt_max_sharpe_return = Column(Numeric(10, 4), nullable=True)
+    opt_max_sharpe_risk = Column(Numeric(10, 4), nullable=True)
+    opt_min_vol_ratio = Column(Numeric(10, 4), nullable=True)
+    opt_min_vol_return = Column(Numeric(10, 4), nullable=True)
+    opt_min_vol_risk = Column(Numeric(10, 4), nullable=True)
+    stress_covid_loss = Column(Numeric(18, 6), nullable=True)
+    stress_lehman_loss = Column(Numeric(18, 6), nullable=True)
+    stress_rates_loss = Column(Numeric(18, 6), nullable=True)
+
+class SnapshotPosition(Base):
+    __tablename__ = 'snapshot_positions'
+    
+    record_id = Column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id = Column(Integer, ForeignKey('portfolio_snapshots.snapshot_id', ondelete='CASCADE'), nullable=False)
+    ticker = Column(String(20), nullable=False)
+    asset_class = Column(String(50), nullable=True)
+    qty_net = Column(Numeric(18, 8), nullable=True)
+    avg_cost = Column(Numeric(18, 6), nullable=True)
+    last_price = Column(Numeric(18, 6), nullable=True)
+    current_value = Column(Numeric(18, 6), nullable=True)
+    unrealized_pnl = Column(Numeric(18, 6), nullable=True)
+    weight_pct = Column(Numeric(10, 4), nullable=True)
+    volatility_pct = Column(Numeric(10, 4), nullable=True)
+    cluster_label = Column(String(50), nullable=True)
+    days_to_liquidate = Column(Numeric(10, 2), nullable=True)
+    trailing_pe = Column(Numeric(10, 2), nullable=True)
+    forward_pe = Column(Numeric(10, 2), nullable=True)
+    price_to_book = Column(Numeric(10, 2), nullable=True)
+    dividend_yield = Column(Numeric(10, 4), nullable=True)
+    roe = Column(Numeric(10, 4), nullable=True)
+    target_mean_price = Column(Numeric(18, 6), nullable=True)
+    peg_ratio = Column(Numeric(10, 2), nullable=True)
+    marginal_var_pct = Column(Numeric(10, 4), nullable=True)
+    component_var_pct = Column(Numeric(10, 4), nullable=True)
+    beta_vs_benchmark = Column(Numeric(10, 4), nullable=True)
+    opt_weight_pct = Column(Numeric(10, 4), nullable=True)

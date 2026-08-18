@@ -1,0 +1,1898 @@
+import streamlit as st
+import pandas as pd
+import numpy as np
+import plotly.express as px
+import plotly.graph_objects as go
+from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal
+from core.hrp_optimizer import compute_hrp_portfolio
+from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
+from core.advanced_quant import compute_tail_copula_matrix, compute_kelly_criterion_sizing, compute_equal_risk_contribution_portfolio
+
+st.set_page_config(page_title="Modelli Quantitativi | ARGUS", page_icon="🔬", layout="wide")
+inject_custom_css()
+
+# Cache bust
+from core.sidebar import render_sidebar
+render_sidebar()
+import importlib
+import core.ui_utils
+import core.risk_engine
+importlib.reload(core.ui_utils)
+importlib.reload(core.risk_engine)
+from core.ui_utils import ensure_risk_bundle_loaded, render_sandbox_banner
+
+results, has_real = ensure_risk_bundle_loaded()
+has_portfolio = results is not None and isinstance(results, dict) and bool(results.get("positions") is not None and not results.get("positions").empty)
+m = results.get("metrics", {})
+pos = results.get("positions", pd.DataFrame())
+ai = m.get("ai_insights", {})
+mc = ai.get("montecarlo", {})
+clusters = ai.get("asset_clusters", [])
+opt = results.get("optimization", {})
+
+render_sandbox_banner(page_key="p3")
+
+st.title("🔬 Modelli Quantitativi & Frontiera di Portafoglio")
+if "run_id" in st.session_state:
+    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Frontiera Markowitz/Ledoit-Wolf, Equal Risk Contribution, Tail Copula, Kelly Sizing, Monte Carlo e Black-Scholes.")
+elif results.get("is_sandbox"):
+    st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
+col_head1, col_head2 = st.columns([3.5, 1.2])
+with col_head1:
+    render_executive_badges(m)
+with col_head2:
+    st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+    glossary_modal("📚 Glossario Istituzionale dei Modelli Quantitativi", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Suite di Ingegneria Finanziaria ARGUS</div>
+  <div>Una collezione integrata di modelli econometrici, stocastici e di machine learning per l'ottimizzazione dell'asset allocation, la simulazione del rischio di coda e la copertura dinamica.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Modelli Quantitativi di Frontiera</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    • <b>Markowitz & Ledoit-Wolf:</b> Frontiera efficiente con covarianza a shrinkage antirumore.<br>
+    • <b>Equal Risk Contribution (ERC):</b> Parità pura di rischio dove ogni asset contribuisce 1/N alla volatilità.<br>
+    • <b>Hierarchical Risk Parity (HRP):</b> Clustering ad albero (López de Prado) senza matrice inversa.<br>
+    • <b>Tail Copula Asimmetriche:</b> Dipendenza di coda (Clayton/Gumbel) per quantificare il rischio di crash congiunto.<br>
+    • <b>Kelly Criterion Sizing:</b> Dimensionamento matematico per la massima crescita del capitale.<br>
+    • <b>Monte Carlo Multivariato:</b> Decomposizione Cholesky & code Student-t su 3.000 percorsi.<br>
+    • <b>Merton Jump-Diffusion:</b> Processo a salti Poissoniani per shock estremi di mercato.<br>
+    • <b>Black-Scholes Delta-Hedging:</b> Neutralizzazione del Beta con opzioni Put e Covered Call.
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>I moduli <code>core/risk_engine.py</code> e <code>core/financial_analysis.py</code> eseguono simulazioni stocastiche vettorializzate ad alte prestazioni.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come navigare la sezione</div>
+  <div>Utilizza le 5 schede superiori per passare dall'ottimizzazione di allocazione (Tab 1), alle proiezioni stocastiche (Tab 2), alle strategie di copertura attiva (Tab 3), all'attribuzione Brinson (Tab 4) e ai fattori Barra (Tab 5).</div>
+</div>
+
+</div>
+""", button_label="📚 Glossario Modelli Quantitativi")
+
+st.divider()
+
+# ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
+active_quant_tab = render_segmented_tabs([
+    "📊 Frontiera Markowitz & Rebalancing",
+    "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)",
+    "🛡️ Hedging Tattico & Tail Risk",
+    "🎯 Attribuzione Brinson-Fachler",
+    "🏛️ Modelli Fattoriali, Black-Litterman & ML"
+], key="quant_active_tab")
+
+# ── TAB 1: MARKOWITZ & LEDOIT-WOLF ────────────────────────────
+if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
+    if not has_portfolio:
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare la Frontiera Efficiente di Markowitz.")
+    elif opt and opt.get("tickers"):
+        col_head_opt1, col_head_opt2 = st.columns([3.2, 1.1])
+        with col_head_opt1:
+            st.markdown("#### Ottimizzazione di Portafoglio (Markowitz Efficient Frontier)")
+            st.caption(f"Confronta il tuo portafoglio attuale con le allocazioni ottimali (Stima Covarianza: **{opt.get('cov_type', 'Ledoit-Wolf Shrinkage')}**)")
+        with col_head_opt2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida all'Ottimizzazione Ledoit-Wolf & Ribilanciamento", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è la Frontiera Efficiente di Markowitz</div>
+  <div>Il luogo geometrico dei portafogli ottimali che massimizzano il rendimento atteso per ogni livello di volatilità (o minimizzano il rischio per un dato rendimento target).</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Matrice di Covarianza Ledoit-Wolf Shrinkage</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12.5px; text-align: center;">
+    <b>&Sigma;<sub>LW</sub></b> = &delta; &middot; <b>F</b> + (1 &minus; &delta;) &middot; <b>S</b>
+  </div>
+  <div>dove <i>S</i> è la covarianza campionaria, <i>F</i> è la matrice target strutturata a singolo fattore e <i>&delta;</i> è il parametro ottimale di contrazione (shrinkage) che minimizza l'errore quadratico medio.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>Risolve l'instabilità dell'ottimizzazione classica (l'effetto "error-maximizer"), producendo pesi di ribilanciamento concreti ed eseguibili senza pesi estremi.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>ARGUS risolve l'ottimizzazione quadratica vincolata (Long-Only, sum(w)=1) calcolando i due portafogli cardine: <b>Max Sharpe Ratio</b> e <b>Minima Varianza</b>.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>
+    • 🟢 <b>Stella Verde:</b> Il tuo portafoglio attuale.<br>
+    • 🟠 <b>Stella Arancione:</b> Portafoglio a Massimo Sharpe Ratio (massima efficienza rendimento/rischio).<br>
+    • 🔵 <b>Stella Azzurra:</b> Portafoglio a Minima Volatilità (massima stabilità del capitale).
+  </div>
+</div>
+""", button_label="💡 Come funziona Ledoit-Wolf & Ribilanciamento?")
+        
+        cand_handoff = st.session_state.get("screener_candidate_to_optimize")
+        if cand_handoff:
+            cand_tk = cand_handoff.get("ticker", "")
+            cand_w = cand_handoff.get("weight_pct", 5.0)
+            col_cand1, col_cand2 = st.columns([3.5, 1])
+            with col_cand1:
+                st.info(f"🧪 **Integrazione Screener Attiva**: Ricevuto asset candidato **{cand_tk}** (Allocazione Ipotetica: **{cand_w}%**). Puoi confrontare la frontiera con il portafoglio attuale o rimuovere la simulazione.")
+            with col_cand2:
+                if st.button("❌ Rimuovi Simulazione", use_container_width=True):
+                    del st.session_state["screener_candidate_to_optimize"]
+                    st.rerun()
+
+        raw_frontier = opt.get("frontier", {})
+        frontier = pd.DataFrame(raw_frontier)
+        if not frontier.empty:
+            v_col = "volatility" if "volatility" in frontier.columns else ("risk" if "risk" in frontier.columns else frontier.columns[0])
+            r_col = "return" if "return" in frontier.columns else (frontier.columns[1] if len(frontier.columns) > 1 else frontier.columns[0])
+            
+            frontier["vol_pct"] = frontier[v_col] * 100.0
+            frontier["ret_pct"] = frontier[r_col] * 100.0
+            
+            fig_f = px.scatter(
+                frontier, x="vol_pct", y="ret_pct",
+                labels={"vol_pct": "Volatilità Annua %", "ret_pct": "Rendimento Atteso %"},
+                template="plotly_dark", height=490
+            )
+            # Cloud di punti Monte Carlo traslucida per non nascondere i marcatori chiave
+            fig_f.update_traces(
+                marker=dict(opacity=0.32, size=5, color="#58a6ff"),
+                hovertemplate="<b>Portafoglio Simulato</b><br>Volatilità: %{x:.2f}%<br>Rendimento Atteso: %{y:.2f}%<extra></extra>"
+            )
+            
+            cur = opt.get("current", {})
+            cur_v = cur.get("risk", cur.get("volatility", opt.get("current_vol", 0))) * 100.0
+            cur_r = cur.get("return", opt.get("current_ret", 0)) * 100.0
+            cur_s = cur.get("sharpe", 0.0)
+            
+            ms = opt.get("max_sharpe", {})
+            ms_v = ms.get("volatility", ms.get("risk", 0.0)) * 100.0 if ms else 0.0
+            ms_r = ms.get("return", 0.0) * 100.0 if ms else 0.0
+            ms_s = ms.get("sharpe", 0.0) if ms else 0.0
+
+            mv = opt.get("min_vol", {})
+            mv_v = mv.get("volatility", mv.get("risk", 0.0)) * 100.0 if mv else 0.0
+            mv_r = mv.get("return", 0.0) * 100.0 if mv else 0.0
+            mv_s = mv.get("sharpe", 0.0) if mv else 0.0
+
+            # 1. Portafoglio Attuale (Stella Verde Smeraldo in primo piano con bordo luminoso)
+            fig_f.add_trace(go.Scatter(
+                x=[cur_v], y=[cur_r], mode="markers+text",
+                name="Portafoglio Attuale", text=["⭐ Attuale"], textposition="top center",
+                marker=dict(
+                    size=20,
+                    color="#00e676",
+                    symbol="star",
+                    line=dict(width=2.5, color="#ffffff")
+                ),
+                textfont=dict(color="#00e676", size=13),
+                hovertemplate=f"<b>⭐ Portafoglio Attuale</b><br>Rendimento Atteso: <b>{cur_r:+.2f}%</b><br>Volatilità Annua: <b>{cur_v:.2f}%</b><br>Sharpe Ratio: <b>{cur_s:.2f}</b><extra></extra>"
+            ))
+
+            # 2. Max Sharpe Ratio
+            if ms:
+                fig_f.add_trace(go.Scatter(
+                    x=[ms_v], y=[ms_r], mode="markers+text",
+                    name="Max Sharpe Ratio", text=["🏆 Max Sharpe"], textposition="top right",
+                    marker=dict(
+                        size=17,
+                        color="#ff9900",
+                        symbol="diamond",
+                        line=dict(width=2, color="#ffffff")
+                    ),
+                    textfont=dict(color="#ff9900", size=13),
+                    hovertemplate=f"<b>🏆 Max Sharpe Ratio</b><br>Rendimento Atteso: <b>{ms_r:+.2f}%</b><br>Volatilità Annua: <b>{ms_v:.2f}%</b><br>Sharpe Ratio: <b>{ms_s:.2f}</b><extra></extra>"
+                ))
+                
+            # 3. Minima Volatilità
+            if mv:
+                fig_f.add_trace(go.Scatter(
+                    x=[mv_v], y=[mv_r], mode="markers+text",
+                    name="Min Volatility", text=["🛡️ Min Vol"], textposition="bottom right",
+                    marker=dict(
+                        size=18,
+                        color="#00f3ff",
+                        symbol="circle",
+                        line=dict(width=2.5, color="#ffffff")
+                    ),
+                    textfont=dict(color="#00f3ff", size=13),
+                    hovertemplate=f"<b>🛡️ Minima Volatilità</b><br>Rendimento Atteso: <b>{mv_r:+.2f}%</b><br>Volatilità Annua: <b>{mv_v:.2f}%</b><br>Sharpe Ratio: <b>{mv_s:.2f}</b><extra></extra>"
+                ))
+
+            # Dynamic axis range calculation so ALL points fit perfectly
+            all_vols = [frontier["vol_pct"].min(), frontier["vol_pct"].max(), cur_v, ms_v, mv_v]
+            all_rets = [frontier["ret_pct"].min(), frontier["ret_pct"].max(), cur_r, ms_r, mv_r]
+            all_vols = [v for v in all_vols if v > 0]
+            all_rets = [r for r in all_rets]
+
+            min_x = max(0, min(all_vols) - 2.0) if all_vols else 0
+            max_x = max(all_vols) + 3.0 if all_vols else 30
+            min_y = min(0, min(all_rets) - 2.0) if all_rets else 0
+            max_y = max(all_rets) + 5.0 if all_rets else 40
+
+            fig_f.update_xaxes(range=[min_x, max_x], gridcolor="rgba(255,255,255,0.06)")
+            fig_f.update_yaxes(range=[min_y, max_y], gridcolor="rgba(255,255,255,0.06)")
+                
+            fig_f.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(t=65, b=40, l=45, r=30),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.04,
+                    xanchor="left",
+                    x=0.0,
+                    bgcolor="rgba(22, 27, 34, 0.85)",
+                    bordercolor="rgba(255, 255, 255, 0.15)",
+                    borderwidth=1,
+                    font=dict(size=12, color="#ffffff"),
+                    title=None
+                )
+            )
+            apply_plotly_theme(fig_f)
+            st.plotly_chart(fig_f, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+            # ── 3 CARDS SOTTO IL GRAFICO: CONFRONTO ALLOCAZIONI ────────
+            st.markdown('<div style="margin-top: 6px; margin-bottom: 10px; font-weight: 700; font-size: 14px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">Confronto Allocazioni Ottimali</div>', unsafe_allow_html=True)
+            col_c1, col_c2, col_c3 = st.columns(3)
+
+            with col_c1:
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(234, 179, 8, 0.35); border-left: 4px solid #eab308; border-radius: 12px; padding: 16px 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); height: 100%;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <div style="font-weight: 700; font-size: 15px; color: #ffffff;">⭐ Portafoglio Attuale</div>
+                        <span class="argus-command-pill" style="border-color: rgba(234, 179, 8, 0.5); color: #eab308; font-size: 10.5px; font-weight: 700;">ATTUALE</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">RENDIMENTO</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #eab308;">{cur_r:.2f}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">VOLATILITÀ</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #58a6ff;">{cur_v:.2f}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">SHARPE</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #3fb950;">{cur_s:.2f}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col_c2:
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(255, 153, 0, 0.35); border-left: 4px solid #ff9900; border-radius: 12px; padding: 16px 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); height: 100%;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <div style="font-weight: 700; font-size: 15px; color: #ffffff;">🏆 Max Sharpe Ratio</div>
+                        <span class="argus-command-pill" style="border-color: rgba(255, 153, 0, 0.5); color: #ff9900; font-size: 10.5px; font-weight: 700;">OTTIMALE</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">RENDIMENTO</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #ff9900;">{ms_r:.2f}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">VOLATILITÀ</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #58a6ff;">{ms_v:.2f}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">SHARPE</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #3fb950;">{ms_s:.2f}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col_c3:
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(0, 243, 255, 0.35); border-left: 4px solid #00f3ff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); height: 100%;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <div style="font-weight: 700; font-size: 15px; color: #ffffff;">🛡️ Minima Volatilità</div>
+                        <span class="argus-command-pill" style="border-color: rgba(0, 243, 255, 0.5); color: #00f3ff; font-size: 10.5px; font-weight: 700;">DIFENSIVO</span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">RENDIMENTO</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #00f3ff;">{mv_r:.2f}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">VOLATILITÀ</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #58a6ff;">{mv_v:.2f}%</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                            <div style="font-size: 10px; color: #8b949e; font-weight: 600;">SHARPE</div>
+                            <div style="font-size: 16px; font-weight: 800; color: #3fb950;">{mv_s:.2f}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ── LIVE REBALANCING SANDBOX (FEATURE 3) ───────────────────────
+        st.divider()
+        st.markdown("#### 🧪 Live Rebalancing Sandbox & Simulatore Real-Time (What-If Weight Matrix)")
+        st.caption("Modifica liberamente i pesi con gli slider: ARGUS ricalcola in tempo reale i delta di Rendimento, Volatilità, VaR 95% e Sharpe Ratio.")
+
+        tickers_in_opt = opt.get("tickers", [])
+        if tickers_in_opt and not pos.empty:
+            def _to_weight_map(raw_weights, tickers):
+                if isinstance(raw_weights, dict):
+                    return raw_weights
+                if isinstance(raw_weights, (list, tuple, np.ndarray)) and len(raw_weights) == len(tickers):
+                    return {t: float(w) for t, w in zip(tickers, raw_weights)}
+                return {t: 1.0 / len(tickers) for t in tickers}
+
+            cur_w_map = _to_weight_map(opt.get("current", {}).get("weights"), tickers_in_opt)
+            ms_w_map = _to_weight_map(opt.get("max_sharpe", {}).get("weights"), tickers_in_opt)
+            mv_w_map = _to_weight_map(opt.get("min_vol", {}).get("weights"), tickers_in_opt)
+            
+            col_pre1, col_pre2, col_pre3, col_pre4, col_pre5 = st.columns(5)
+            with col_pre1:
+                if st.button("⭐ Pesi Attuali", key="sbx_preset_cur", use_container_width=True):
+                    for t in tickers_in_opt:
+                        st.session_state[f"sbx_w_{t}"] = float(cur_w_map.get(t, 0.0) * 100.0)
+                    st.rerun()
+            with col_pre2:
+                if st.button("⚖️ Equipesato (1/N)", key="sbx_preset_eq", use_container_width=True):
+                    eq_w = 100.0 / len(tickers_in_opt)
+                    for t in tickers_in_opt:
+                        st.session_state[f"sbx_w_{t}"] = float(eq_w)
+                    st.rerun()
+            with col_pre3:
+                if st.button("🏆 Max Sharpe", key="sbx_preset_ms", use_container_width=True):
+                    for t in tickers_in_opt:
+                        st.session_state[f"sbx_w_{t}"] = float(ms_w_map.get(t, 0.0) * 100.0)
+                    st.rerun()
+            with col_pre4:
+                if st.button("🛡️ Minima Vol.", key="sbx_preset_mv", use_container_width=True):
+                    for t in tickers_in_opt:
+                        st.session_state[f"sbx_w_{t}"] = float(mv_w_map.get(t, 0.0) * 100.0)
+                    st.rerun()
+            with col_pre5:
+                if st.button("🧬 Equal Risk (ERC)", key="sbx_preset_erc", use_container_width=True):
+                    df_ret_temp = results.get("returns", pd.DataFrame())
+                    erc_res = compute_equal_risk_contribution_portfolio(df_ret_temp[tickers_in_opt] if not df_ret_temp.empty and all(t in df_ret_temp.columns for t in tickers_in_opt) else None)
+                    erc_w = erc_res.get("weights", {})
+                    for t in tickers_in_opt:
+                        st.session_state[f"sbx_w_{t}"] = float(erc_w.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                    st.rerun()
+
+            st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE PESI ASSET:</div>', unsafe_allow_html=True)
+            
+            sim_weights = {}
+            grid_cols = st.columns(min(4, len(tickers_in_opt)))
+            for i, t in enumerate(tickers_in_opt):
+                default_w = float(cur_w_map.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                with grid_cols[i % len(grid_cols)]:
+                    sim_weights[t] = st.slider(
+                        f"**{t}**", 
+                        min_value=0.0, 
+                        max_value=100.0, 
+                        value=float(st.session_state.get(f"sbx_w_{t}", default_w)), 
+                        step=0.5,
+                        key=f"sbx_w_{t}"
+                    )
+
+            tot_raw_w = sum(sim_weights.values())
+            if tot_raw_w > 0:
+                norm_sim_weights = {t: w / tot_raw_w for t, w in sim_weights.items()}
+            else:
+                norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
+
+            df_ret_sim = results.get("returns", pd.DataFrame())
+            if df_ret_sim.empty or not all(t in df_ret_sim.columns for t in tickers_in_opt):
+                df_pr = results.get("df_prices", pd.DataFrame())
+                if not df_pr.empty and "ticker" in df_pr.columns:
+                    piv = df_pr.pivot(index="price_date", columns="ticker", values="close")
+                    df_ret_sim = piv[[t for t in tickers_in_opt if t in piv.columns]].pct_change().dropna()
+
+            valid_ts = [t for t in tickers_in_opt if t in df_ret_sim.columns]
+            if len(valid_ts) >= 2:
+                mu_vec = df_ret_sim[valid_ts].mean().values * 252.0
+                cov_mat = df_ret_sim[valid_ts].cov().values * 252.0
+                w_sim_arr = np.array([norm_sim_weights[t] for t in valid_ts])
+                w_cur_arr = np.array([cur_w_map.get(t, 0.0) for t in valid_ts])
+                
+                if w_cur_arr.sum() > 0:
+                    w_cur_arr = w_cur_arr / w_cur_arr.sum()
+
+                ret_sim = float(np.dot(w_sim_arr, mu_vec) * 100.0)
+                vol_sim = float(np.sqrt(np.dot(w_sim_arr, np.dot(cov_mat, w_sim_arr))) * 100.0)
+                var_sim = float(1.645 * (vol_sim / np.sqrt(252.0)))
+                rf = 3.0
+                sharpe_sim = float((ret_sim - rf) / vol_sim) if vol_sim > 0 else 0.0
+
+                ret_cur = float(np.dot(w_cur_arr, mu_vec) * 100.0)
+                vol_cur = float(np.sqrt(np.dot(w_cur_arr, np.dot(cov_mat, w_cur_arr))) * 100.0)
+                var_cur = float(1.645 * (vol_cur / np.sqrt(252.0)))
+                sharpe_cur = float((ret_cur - rf) / vol_cur) if vol_cur > 0 else 0.0
+
+                d_ret = ret_sim - ret_cur
+                d_vol = vol_sim - vol_cur
+                d_var = var_sim - var_cur
+                d_sharpe = sharpe_sim - sharpe_cur
+
+                st.markdown(f"""
+                <div style="background:rgba(22,27,34,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:8px 12px; margin: 10px 0;">
+                    <span style="font-size:12px; color:#8b949e;">Somma Pesi Regolati: <b>{tot_raw_w:.1f}%</b> (Normalizzato automaticamente al <b>100.0%</b>)</span>
+                </div>
+                """, unsafe_allow_html=True)
+
+                c_sb1, c_sb2, c_sb3, c_sb4 = st.columns(4)
+                with c_sb1:
+                    st.metric("Rendimento Atteso", f"{ret_sim:.2f}%", delta=f"{d_ret:+.2f}% vs Attuale")
+                with c_sb2:
+                    st.metric("Volatilità Annua", f"{vol_sim:.2f}%", delta=f"{d_vol:+.2f}% vs Attuale", delta_color="inverse")
+                with c_sb3:
+                    st.metric("VaR 95% Giornaliero", f"{var_sim:.2f}%", delta=f"{d_var:+.2f}% vs Attuale", delta_color="inverse")
+                with c_sb4:
+                    st.metric("Sharpe Ratio Simulato", f"{sharpe_sim:.2f}", delta=f"{d_sharpe:+.2f} vs Attuale")
+
+                df_compare_w = pd.DataFrame({
+                    "Ticker": valid_ts,
+                    "Peso Attuale (%)": [cur_w_map.get(t, 0.0) * 100.0 for t in valid_ts],
+                    "Peso Sandbox (%)": [norm_sim_weights[t] * 100.0 for t in valid_ts]
+                })
+
+                fig_sbx = go.Figure()
+                fig_sbx.add_trace(go.Bar(
+                    x=df_compare_w["Ticker"],
+                    y=df_compare_w["Peso Attuale (%)"],
+                    name="Allocazione Attuale",
+                    marker_color="#8b949e"
+                ))
+                fig_sbx.add_trace(go.Bar(
+                    x=df_compare_w["Ticker"],
+                    y=df_compare_w["Peso Sandbox (%)"],
+                    name="Allocazione Sandbox",
+                    marker_color="#ff9900"
+                ))
+                fig_sbx.update_layout(
+                    barmode="group",
+                    height=280,
+                    template="plotly_dark",
+                    margin=dict(l=20, r=20, t=30, b=20),
+                    yaxis=dict(title="Peso %", gridcolor="rgba(255,255,255,0.06)")
+                )
+                apply_plotly_theme(fig_sbx)
+                st.plotly_chart(fig_sbx, use_container_width=True)
+
+        st.divider()
+        col_head_hrp1, col_head_hrp2 = st.columns([3.2, 1.1])
+        with col_head_hrp1:
+            st.markdown("#### 🧬 Hierarchical Risk Parity (HRP - Marcos López de Prado)")
+            st.caption("Allocazione robusta basata su Machine Learning & Clustering Gerarchico ad Albero (Tree Clustering & Recursive Bisection) senza inversione di matrice.")
+        with col_head_hrp2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida all'Hierarchical Risk Parity (HRP)", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è l'Hierarchical Risk Parity (HRP)</div>
+  <div>Un algoritmo quantitativo di allocazione sviluppato da Marcos López de Prado (2016) che sfrutta la teoria dei grafi e il machine learning non supervisionato per superare l'instabilità dell'inversione di matrice (&Sigma;<sup>&minus;1</sup>) di Markowitz.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Il Processo in 3 Fasi Matematiche</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    1. <b>Tree Clustering:</b> Calcola la distanza di correlazione <b>D<sub>i,j</sub> = &radic;[ (1 &minus; &rho;<sub>i,j</sub>) / 2 ]</b> e costruisce il dendrogramma gerarchico.<br>
+    2. <b>Quasi-Diagonalization:</b> Riordina la matrice affinché gli asset simili e correlati siano contigui.<br>
+    3. <b>Recursive Bisection:</b> Alloca il capitale bipartendo ricorsivamente i cluster in modo inversamente proporzionale alla loro varianza aggregata.
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>Garantisce una diversificazione gerarchica genuina ed evita l'iper-concentrazione su singoli asset quando la matrice di covarianza presenta collinearità elevata o campioni ridotti.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>Il modulo <code>core/risk_engine.py</code> calcola la matrice delle distanze informative e genera il dendrogramma dei legami gerarchici con i pesi di allocazione paritaria ottimali.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>Confronta i pesi calcolati da HRP con l'allocazione attuale: gli scostamenti evidenziano cluster di titoli con sovraesposizione di rischio non compensata.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona l'HRP?")
+
+        df_returns_hrp = results.get("returns", pd.DataFrame())
+        if df_returns_hrp.empty or df_returns_hrp.shape[1] < 2:
+            df_pr = results.get("df_prices", pd.DataFrame())
+            if not df_pr.empty and "ticker" in df_pr.columns and "close" in df_pr.columns:
+                piv = df_pr.pivot(index="price_date", columns="ticker", values="close").sort_index()
+                df_returns_hrp = piv.pct_change().dropna(how="all")
+
+        # Filtro per isolare SOLO i titoli ATTIVAMENTE DETENUTI (qty_net > 0) ed escludere posizioni chiuse e tassi FX (es. DKKEUR=X)
+        if not df_returns_hrp.empty and not pos.empty:
+            active_mask = (pos["qty_net"] > 1e-6) if "qty_net" in pos.columns else pd.Series(True, index=pos.index)
+            port_tickers = [t for t in pos[active_mask]["ticker"].dropna().unique() if not str(t).endswith("=X")]
+            valid_cols = [c for c in df_returns_hrp.columns if c in port_tickers]
+            if len(valid_cols) >= 2:
+                df_returns_hrp = df_returns_hrp[valid_cols]
+
+        # Sanitizzazione outlier estremi nei rendimenti giornalieri (es. split non rettificati o anomalie decimali)
+        if not df_returns_hrp.empty:
+            df_returns_hrp = df_returns_hrp.replace([np.inf, -np.inf], np.nan).clip(lower=-0.50, upper=1.0)
+
+        if not df_returns_hrp.empty and df_returns_hrp.shape[1] >= 2:
+            hrp_res = compute_hrp_portfolio(df_returns_hrp)
+            if hrp_res:
+                col_hrp1, col_hrp2 = st.columns([1.5, 1])
+                with col_hrp1:
+                    df_hrp_w = hrp_res.get("df_weights", pd.DataFrame()).sort_values("hrp_weight_pct", ascending=False)
+                    fig_hrp = px.bar(
+                        df_hrp_w, x="ticker", y="hrp_weight_pct",
+                        labels={"ticker": "Asset in Portafoglio", "hrp_weight_pct": "Allocazione Ottima HRP %"},
+                        title="Allocazione Ottima Hierarchical Risk Parity (HRP)",
+                        color="hrp_weight_pct", color_continuous_scale="Viridis",
+                        template="plotly_dark", height=340
+                    )
+                    fig_hrp.update_layout(
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        margin=dict(l=10, r=10, t=40, b=10)
+                    )
+                    st.plotly_chart(fig_hrp, use_container_width=True)
+
+                with col_hrp2:
+                    st.markdown(f"""
+                    * **Rendimento Atteso HRP**: <span style='color:#00e676; font-weight:bold;'>{hrp_res['expected_return_pct']:.2f}%</span>
+                    * **Volatilità Annua HRP**: <span style='color:#ffab40; font-weight:bold;'>{hrp_res['volatility_annual_pct']:.2f}%</span>
+                    * **Sharpe Ratio HRP**: <span style='color:#00f3ff; font-weight:bold;'>{hrp_res['sharpe_ratio']:.2f}</span>
+                    """, unsafe_allow_html=True)
+                    
+                    df_hrp_display = df_hrp_w.rename(columns={
+                        "ticker": "Asset / Titolo",
+                        "hrp_weight": "Peso Frazionario",
+                        "hrp_weight_pct": "Allocazione Ottima HRP %"
+                    })
+                    st.dataframe(
+                        df_hrp_display.style.format({
+                            "Allocazione Ottima HRP %": "{:.2f}%",
+                            "Peso Frazionario": "{:.4f}"
+                        }),
+                        use_container_width=True,
+                        hide_index=True,
+                        height=240
+                    )
+        # ── SEZIONE ERC (EQUAL RISK CONTRIBUTION) ──
+        st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
+        col_erc_t1, col_erc_t2 = st.columns([3.2, 1.1])
+        with col_erc_t1:
+            st.markdown("##### ⚖️ Equal Risk Contribution (ERC / Parità di Rischio Pura)")
+            st.caption("Allocazione dove ogni singolo asset contribuisce esattamente per la stessa quota (1/N) alla volatilità totale di portafoglio.")
+        with col_erc_t2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            render_info_modal(
+                title="Come Funziona Equal Risk Contribution (ERC)",
+                content="""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+
+<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+  <b style="color: #ff9900;">🎯 Differenza tra 1/N ed Equal Risk Contribution</b><br>
+  Un portafoglio equipesato in capitale (1/N) non è equipesato in rischio: un titolo molto volatile (es. Tech o Crypto) dominerà l'80% delle oscillazioni totali.
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Formulazione Matematica</div>
+  <div>ARGUS risolve il problema di ottimizzazione non lineare (SLSQP):</div>
+  <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 4px; font-family: monospace; margin: 4px 0; color: #79c0ff;">
+    min<sub>w</sub> &sum;<sub>i,j</sub> ( RC<sub>i</sub> &minus; RC<sub>j</sub> )<sup>2</sup> &nbsp;&nbsp;s.t.&nbsp;&nbsp; &sum; w<sub>i</sub> = 1, w<sub>i</sub> &ge; 0
+  </div>
+  <div>dove il contributo marginale al rischio è <b>RC<sub>i</sub> = w<sub>i</sub> &middot; (&Sigma;w)<sub>i</sub> / &sigma;<sub>p</sub> = &sigma;<sub>p</sub> / N</b>.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Vantaggi Istituzionali</div>
+  <div>Evita la concentrazione nei titoli più volatili e non richiede la stima dei rendimenti attesi futuri &mu; (che è notoriamente rumorosa), massimizzando la stabilità e la diversificazione nei mercati avversi.</div>
+</div>
+
+</div>
+""",
+                button_label="📖 Metodologia Equal Risk (ERC)"
+            )
+
+        erc_res = compute_equal_risk_contribution_portfolio(df_returns_hrp)
+        if erc_res and erc_res.get("weights"):
+            col_erc1, col_erc2 = st.columns([1.5, 1])
+            with col_erc1:
+                df_erc_w = pd.DataFrame([
+                    {"ticker": t, "erc_weight_pct": round(w * 100.0, 2), "risk_contrib_pct": erc_res.get("risk_contributions_pct", {}).get(t, 0.0)}
+                    for t, w in erc_res["weights"].items()
+                ]).sort_values("erc_weight_pct", ascending=False)
+
+                fig_erc = px.bar(
+                    df_erc_w, x="ticker", y="erc_weight_pct",
+                    labels={"ticker": "Asset in Portafoglio", "erc_weight_pct": "Peso ERC %"},
+                    title="Pesi Ottimali Equal Risk Contribution (ERC)",
+                    color="erc_weight_pct", color_continuous_scale="Teal",
+                    template="plotly_dark", height=330
+                )
+                fig_erc.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=40, b=10))
+                apply_plotly_theme(fig_erc)
+                st.plotly_chart(fig_erc, use_container_width=True)
+
+            with col_erc2:
+                st.markdown(f"""
+                * **Rendimento Atteso ERC**: <span style='color:#00e676; font-weight:bold;'>{erc_res['expected_return']*100:.2f}%</span>
+                * **Volatilità Annua ERC**: <span style='color:#ffab40; font-weight:bold;'>{erc_res['volatility']*100:.2f}%</span>
+                * **Sharpe Ratio ERC**: <span style='color:#00f3ff; font-weight:bold;'>{erc_res['sharpe_ratio']:.2f}</span>
+                """, unsafe_allow_html=True)
+
+                st.dataframe(
+                    df_erc_w.rename(columns={
+                        "ticker": "Asset",
+                        "erc_weight_pct": "Peso ERC (%)",
+                        "risk_contrib_pct": "Contributo al Rischio (%)"
+                    }).style.format({
+                        "Peso ERC (%)": "{:.2f}%",
+                        "Contributo al Rischio (%)": "{:.2f}%"
+                    }),
+                    use_container_width=True,
+                    hide_index=True,
+                    height=230
+                )
+
+        st.divider()
+        st.markdown("#### 🧮 Calcolatore di Ribilanciamento Tattico (Pesi & Quote Operative)")
+        st.caption("Calcola gli ordini esatti di acquisto/vendita per riallineare il tuo portafoglio ai pesi ottimi di Markowitz o ad una strategia custom.")
+
+        import importlib
+        import core.rebalancer
+        importlib.reload(core.rebalancer)
+        from core.rebalancer import compute_rebalancing_orders
+
+        col_reb1, col_reb2, col_reb3 = st.columns([2, 1.5, 1])
+        with col_reb1:
+            target_strategy = st.radio(
+                "Profilo Bersaglio di Ribilanciamento:",
+                ["Max Sharpe (Markowitz)", "Minima Volatilità", "Equi-peso (Equal Weight)"],
+                horizontal=True
+            )
+        with col_reb2:
+            new_cash_input = st.number_input(
+                "Nuova Cassa / Iniezione Liquidità (€):",
+                value=0.0, step=500.0, format="%.2f",
+                help="Inserisci un valore positivo per nuovi versamenti o negativo per prelievi di cassa."
+            )
+        with col_reb3:
+            int_shares_flag = st.checkbox("Quote Intere", value=True, help="Arrotonda le quote agli interi.")
+
+        mode_key = "max_sharpe" if "Max Sharpe" in target_strategy else ("min_vol" if "Minima" in target_strategy else "equal_weight")
+
+        rebal_res = compute_rebalancing_orders(
+            results,
+            target_mode=mode_key,
+            new_cash_eur=new_cash_input,
+            integer_shares=int_shares_flag
+        )
+
+        df_orders = rebal_res.get("orders", pd.DataFrame())
+        summary_orders = rebal_res.get("summary", {})
+
+        if not df_orders.empty:
+            def highlight_action(val):
+                if str(val).startswith("BUY"):
+                    return "color: #00ff66; font-weight: bold;"
+                elif str(val).startswith("SELL"):
+                    return "color: #ff3333; font-weight: bold;"
+                return "color: #8b949e;"
+
+            col_om1, col_om2, col_om3 = st.columns(3)
+            with col_om1:
+                t_val = summary_orders.get('target_total_value_eur', summary_orders.get('target_total_value', 0.0))
+                st.metric("Valore Portafoglio Target", f"€ {t_val:,.2f}")
+            with col_om2:
+                b_val = summary_orders.get('total_buy_eur', summary_orders.get('total_buy_value', 0.0))
+                st.metric("Totale Acquisti (€)", f"€ {b_val:,.2f}")
+            with col_om3:
+                s_val = summary_orders.get('total_sell_eur', summary_orders.get('total_sell_value', 0.0))
+                st.metric("Totale Vendite (€)", f"€ {s_val:,.2f}")
+
+            req_cols = ["ticker", "action", "current_qty", "target_qty", "qty_delta", "last_price", "order_value_eur", "current_weight_pct", "target_weight_pct"]
+            df_disp_orders = df_orders.reindex(columns=req_cols).fillna(0).rename(columns={
+                "ticker": "Ticker", "action": "Azione Tattica", "current_qty": "Quote Attuali", "target_qty": "Quote Target",
+                "qty_delta": "Quote Operative", "last_price": "Prezzo (€)", "order_value_eur": "Controvalore Ordine (€)",
+                "current_weight_pct": "Peso Attuale %", "target_weight_pct": "Peso Target %"
+            })
+
+            st.dataframe(
+                df_disp_orders.style.map(highlight_action, subset=["Azione Tattica"]).format({
+                    "Quote Attuali": "{:,.2f}", "Quote Target": "{:,.2f}", "Quote Operative": "{:+,.2f}",
+                    "Prezzo (€)": "€ {:,.2f}", "Controvalore Ordine (€)": "€ {:+,.2f}",
+                    "Peso Attuale %": "{:.2f}%", "Peso Target %": "{:.2f}%"
+                }),
+                use_container_width=True, hide_index=True
+            )
+            
+        # ── BACKTESTING ESTRATTO (HRP / MARKOWITZ / EQUI-PESO) ────────
+        bt_data = opt.get("backtest", {})
+        if bt_data:
+            st.divider()
+            st.markdown("#### ⏳ Backtesting Storico: Portafoglio vs Markowitz vs HRP vs S&P 500")
+            st.caption("Verifica la performance out-of-sample storicizzata dei modelli di allocazione rispetto al mercato.")
+            
+            glossary_modal("ℹ️ Cos'è l'Hierarchical Risk Parity (HRP)?", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+L'<b>Hierarchical Risk Parity (HRP)</b> è un algoritmo quantitativo sviluppato da Marcos López de Prado che supera i limiti dell'ottimizzazione classica di Markowitz sfruttando il <b>clustering gerarchico e la bisezione ricorsiva</b>. Produce pesi out-of-sample solidi senza invertire matrici di covarianza.
+</div>
+            """, button_label="💡 Cos'è l'Hierarchical Risk Parity?")
+            
+            df_bt = pd.DataFrame(bt_data.get("equity_curves", {}))
+            if not df_bt.empty and "date" in df_bt.columns:
+                df_bt["date"] = pd.to_datetime(df_bt["date"])
+                
+                fig_bt = px.line(
+                    df_bt, x="date", y=[c for c in df_bt.columns if c != "date"],
+                    labels={"value": "Valore Indiciato (Base 100)", "date": "Data", "variable": "Strategia"},
+                    title="Confronto Curve di Equity Storiche (Base 100)",
+                    color_discrete_sequence=["#58a6ff", "#00e676", "#ff9900", "#bc8cff"],
+                    template="plotly_dark", height=420
+                )
+                fig_bt.update_traces(
+                    line=dict(width=2.2),
+                    hovertemplate="<b>Data: %{x|%d %b %Y}</b><br>%{fullData.name}: %{y:.2f}<extra></extra>"
+                )
+                fig_bt.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None),
+                    yaxis=dict(gridcolor="rgba(255,255,255,0.06)"),
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.06)")
+                )
+                apply_plotly_theme(fig_bt)
+                st.plotly_chart(fig_bt, use_container_width=True)
+
+    else:
+        st.info("Dati di ottimizzazione di Markowitz non disponibili.")
+
+# ── TAB 2: TAIL COPULA & KELLY SIZING ────────────────────────────
+elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
+    if not has_portfolio:
+        st.warning("⚠️ Carica prima un portafoglio per calcolare le Copule di Coda e il dimensionamento di Kelly.")
+    else:
+        col_cop_h1, col_cop_h2 = st.columns([3.2, 1.1])
+        with col_cop_h1:
+            st.markdown("### 🧬 Modelli di Dipendenza di Coda (Tail Copula) & Kelly Criterion")
+            st.caption("Quantifica il rischio di crash congiunto asimmetrico (Clayton/Gumbel Copulas) e calcola il dimensionamento matematico ottimale delle posizioni (Half-Kelly).")
+        with col_cop_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            render_info_modal(
+                title="Guida a Tail Copula & Kelly Criterion",
+                content="""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+
+<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+  <b style="color: #ff9900;">🎯 Oltre la Correlazione Lineare di Pearson</b><br>
+  Nei momenti di panico di mercato, la correlazione lineare sottostima sistematicamente il rischio: gli asset tendono a crollare insieme molto più di quanto previsto dalla curva normale (Asymmetric Crash Contagion).
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">1. Lower Tail Dependence (&lambda;<sub>L</sub>) & Copula di Clayton</div>
+  <div>Misura la probabilità condizionata che l'asset <i>j</i> subisca una perdita estrema dato che l'asset <i>i</i> è in crollo (percentile &le; q):</div>
+  <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 4px; font-family: monospace; margin: 4px 0; color: #79c0ff;">
+    &lambda;<sub>L</sub> = lim<sub>q&rarr;0<sup>+</sup></sub> P(U<sub>j</sub> &le; q | U<sub>i</sub> &le; q) = 2<sup>&minus;1/&theta;</sup> (Clayton)
+  </div>
+  <div>Valori elevati (&lambda;<sub>L</sub> &gt; 0.35) indicano che la diversificazione svanisce durante i crolli sistemici.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">2. Criterio di Kelly & Fractional Sizing</div>
+  <div>Massimizza il tasso atteso di crescita logaritmica del capitale nel lungo periodo:</div>
+  <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 4px; font-family: monospace; margin: 4px 0; color: #7ee787;">
+    f<sup>*</sup> = (&mu; &minus; R<sub>f</sub>) / &sigma;<sup>2</sup> &nbsp;&nbsp;|&nbsp;&nbsp; Half-Kelly = f<sup>*</sup> / 2
+  </div>
+  <div><b>Perché Half-Kelly:</b> Il Full Kelly espone a drawdown violenti (&gt;50%). L'approccio istituzionale Half-Kelly cattura il 75% della crescita massima con il 50% di volatilità in meno e azzera il rischio di rovina statistica.</div>
+</div>
+
+</div>
+""",
+                button_label="📖 Metodologia Copula & Kelly"
+            )
+
+        df_returns_all = results.get("returns", pd.DataFrame())
+        if df_returns_all.empty or not isinstance(df_returns_all, pd.DataFrame) or df_returns_all.shape[1] < 2:
+            df_pr_t = results.get("df_prices", pd.DataFrame())
+            if not df_pr_t.empty and "ticker" in df_pr_t.columns:
+                piv_t = df_pr_t.pivot(index="price_date", columns="ticker", values="close")
+                df_returns_all = piv_t.pct_change().dropna()
+
+        pos = results.get("positions", pd.DataFrame())
+        # Filtro per isolare SOLO le posizioni attive attualmente in portafoglio
+        if not df_returns_all.empty and not pos.empty:
+            active_mask = (pos["qty_net"] > 1e-6) if "qty_net" in pos.columns else pd.Series(True, index=pos.index)
+            active_tickers_list = [t for t in pos[active_mask]["ticker"].dropna().unique() if not str(t).endswith("=X")]
+            common_active = [c for c in df_returns_all.columns if c in active_tickers_list]
+            if len(common_active) >= 2:
+                df_returns_all = df_returns_all[common_active]
+
+        # ── SEZIONE 1: TAIL COPULA MATRIX ──
+        section("1. 🧬 Matrice di Dipendenza di Coda Asimmetrica (Tail Copulas)")
+        st.caption("Quantifica la dipendenza non lineare e la probabilità di shock simultaneo sulle code di distribuzione.")
+
+        col_cop_q, col_cop_stat = st.columns([2, 4])
+        with col_cop_q:
+            q_thresh = st.slider(
+                "Soglia Percentile di Coda (q):",
+                min_value=0.01,
+                max_value=0.15,
+                value=0.05,
+                step=0.01,
+                help="q=0.05 analizza il 5% delle giornate di mercato peggiori (Tail Risk al 95%)."
+            )
+        
+        copula_res = compute_tail_copula_matrix(df_returns_all, quantile_threshold=q_thresh)
+        with col_cop_stat:
+            st.metric(
+                "Dipendenza Media di Coda Inferiore (λ_L)",
+                f"{copula_res.get('mean_tail_dependence', 0.0):.3f}",
+                help="Media della probabilità di crash congiunto tra tutte le coppie di asset."
+            )
+
+        col_hm1, col_hm2 = st.columns(2)
+        with col_hm1:
+            st.markdown(r"##### 🔻 Lower Tail Dependence ($\lambda_L$ - Rischio Crash)")
+            df_l = copula_res.get("lambda_lower_df", pd.DataFrame())
+            if not df_l.empty:
+                fig_cl = px.imshow(
+                    df_l,
+                    color_continuous_scale=[[0.0, "#161b22"], [0.5, "#d29922"], [1.0, "#f85149"]],
+                    zmin=0.0, zmax=1.0, text_auto=".2f",
+                    labels={"x": "Asset", "y": "Asset", "color": "λ_L"}
+                )
+                fig_cl.update_traces(
+                    hovertemplate="<b>Coppia: %{x} ↔ %{y}</b><br>🔻 Lower Tail Copula (λ_L): <b>%{z:.3f}</b><br><i>Probabilità di crash simultaneo nei sell-off</i><extra></extra>"
+                )
+                fig_cl.update_layout(
+                    height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=10, b=10)
+                )
+                apply_plotly_theme(fig_cl)
+                st.plotly_chart(fig_cl, use_container_width=True)
+
+        with col_hm2:
+            st.markdown(r"##### 🔺 Upper Tail Dependence ($\lambda_U$ - Co-Boom)")
+            df_u = copula_res.get("lambda_upper_df", pd.DataFrame())
+            if not df_u.empty:
+                fig_cu = px.imshow(
+                    df_u,
+                    color_continuous_scale=[[0.0, "#161b22"], [0.5, "#58a6ff"], [1.0, "#3fb950"]],
+                    zmin=0.0, zmax=1.0, text_auto=".2f",
+                    labels={"x": "Asset", "y": "Asset", "color": "λ_U"}
+                )
+                fig_cu.update_traces(
+                    hovertemplate="<b>Coppia: %{x} ↔ %{y}</b><br>🔺 Upper Tail Copula (λ_U): <b>%{z:.3f}</b><br><i>Probabilità di co-boom rialzista simultaneo</i><extra></extra>"
+                )
+                fig_cu.update_layout(
+                    height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=10, b=10)
+                )
+                apply_plotly_theme(fig_cu)
+                st.plotly_chart(fig_cu, use_container_width=True)
+
+        # Tabella Coppie a Rischio Contagio
+        contagion = copula_res.get("contagion_pairs", [])
+        if contagion:
+            st.markdown(r"##### ⚠️ Alert Coppie ad Alto Contagio di Coda ($\lambda_L \ge 0.30$)")
+            df_cont = pd.DataFrame(contagion)
+            st.dataframe(df_cont, use_container_width=True, hide_index=True)
+
+        st.divider()
+
+        # ── SEZIONE 2: KELLY CRITERION SIZING ──
+        st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
+        section("2. 🎯 Ottimizzazione dei Pesi con Criterio di Kelly (Half-Kelly)")
+        st.caption("Confronto tra pesi effettivi di portafoglio e allocazione ottimale Half-Kelly per la massimizzazione del tasso di crescita del capitale.")
+
+        col_k_rf, col_k_info = st.columns([2, 4])
+        with col_k_rf:
+            rf_rate = st.slider("Tasso Risk-Free Annuo (Rf %):", 0.0, 6.0, 2.0, 0.5) / 100.0
+        
+        # Mappa pesi attuali solo posizioni attive
+        pos_df = results.get("positions", pd.DataFrame())
+        cur_w_k = {}
+        if not pos_df.empty and "ticker" in pos_df.columns:
+            active_pos = pos_df[pos_df["qty_net"] > 1e-6] if "qty_net" in pos_df.columns else pos_df
+            w_col = "weight_pct" if "weight_pct" in active_pos.columns else ("weight" if "weight" in active_pos.columns else None)
+            if w_col:
+                cur_w_k = dict(zip(active_pos["ticker"], active_pos[w_col] / (100.0 if w_col == "weight_pct" else 1.0)))
+
+        df_kelly = compute_kelly_criterion_sizing(df_returns_all, current_weights=cur_w_k, risk_free_rate=rf_rate)
+        
+        if not df_kelly.empty:
+            st.dataframe(df_kelly, use_container_width=True, hide_index=True)
+
+            # Grafico a barre comparative: Peso Attuale vs Half-Kelly Target
+            df_k_plot = pd.DataFrame({
+                "Ticker": df_kelly["Ticker"],
+                "Peso Attuale (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_kelly["Peso Attuale"]],
+                "Half-Kelly Target (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_kelly["Half-Kelly (Target)"]]
+            })
+
+            fig_k_bar = go.Figure()
+            fig_k_bar.add_trace(go.Bar(
+                x=df_k_plot["Ticker"],
+                y=df_k_plot["Peso Attuale (%)"],
+                name="⭐ Peso Attuale",
+                marker_color="#58a6ff"
+            ))
+            fig_k_bar.add_trace(go.Bar(
+                x=df_k_plot["Ticker"],
+                y=df_k_plot["Half-Kelly Target (%)"],
+                name="🎯 Half-Kelly Target",
+                marker_color="#ff9900"
+            ))
+            fig_k_bar.update_layout(
+                template="plotly_dark",
+                barmode="group",
+                height=340,
+                margin=dict(l=10, r=10, t=20, b=20),
+                yaxis=dict(title="Allocazione (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+                xaxis=dict(title="Asset"),
+                legend=dict(orientation="h", y=1.1)
+            )
+            apply_plotly_theme(fig_k_bar)
+            st.plotly_chart(fig_k_bar, use_container_width=True)
+
+# ── TAB 3: SIMULAZIONI STOCASTICHE ────────────────────────────
+elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
+    col_head_mc1, col_head_mc2 = st.columns([3.2, 1.1])
+    with col_head_mc1:
+        st.markdown("### 🎲 Simulatore Stocastico Monte Carlo Multivariato & Clustering")
+        st.caption("Proietta 3.000 traiettorie causali del portafoglio nel tempo tramite Decomposizione di Cholesky, con supporto per regimi di stress, distribuzioni a code grasse (Student-t) e metriche di Tail Risk (VaR & CVaR).")
+    with col_head_mc2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("📚 Guida alla Simulazione Monte Carlo Multivariata", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Simulatore Monte Carlo Multivariato</div>
+  <div>Un generatore di percorsi stocastici casuali che simula migliaia di possibili evoluzioni future del valore di portafoglio, preservando la reale matrice di covarianza storica tra tutti i titoli componenti.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Decomposizione di Cholesky & Code Grasse (Student-t)</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    • <b>Fattorizzazione di Cholesky:</b> &Sigma; = <b>L &middot; L<sup>T</sup></b> per generare shock correlati <b>&epsilon;<sub>corr</sub> = L &middot; z</b><br>
+    • <b>Distribuzione Student-t (&nu; = 5):</b> Introduce code pesanti per simulare cigni neri e shock estremi
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>Stimare la probabilità di perdita del capitale a 1, 2 o 3 anni, calcolare il VaR/CVaR terminale e valutare la resilienza del portafoglio sotto stress di volatilità o calo del drift.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>ARGUS esegue 3.000 iterazioni stocastiche vettorializzate con NumPy, proiettando percentili 5°, 25°, 50° (mediana), 75° e 95° e aggregando i cluster K-Means degli asset.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>
+    • <b>Linea Blu Centrale:</b> Traiettoria mediana attesa (scenario base).<br>
+    • <b>Banda Ombreggiata (5° - 95° percentile):</b> Intervallo di confidenza al 90% del controvalore finale.<br>
+    • <b>Probabilità di Perdita (%):</b> Quota di simulazioni che chiudono sotto il capitale iniziale.
+  </div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona Monte Carlo?")
+
+    try:
+        from core.risk_engine import run_advanced_monte_carlo_simulation
+    except ImportError:
+        import importlib
+        import core.risk_engine
+        importlib.reload(core.risk_engine)
+        from core.risk_engine import run_advanced_monte_carlo_simulation
+
+    if not has_portfolio or results is None:
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room per eseguire le simulazioni Monte Carlo & Merton.")
+    else:
+        with st.expander("⚙️ Pannello di Controllo Scenario Monte Carlo & Regimi di Stress", expanded=True):
+            mc_c1, mc_c2, mc_c3, mc_c4 = st.columns(4)
+            with mc_c1:
+                horizon_opt = st.selectbox(
+                    "Orizzonte Temporale Proiettato:",
+                    options=[63, 126, 252, 504, 756],
+                    index=2,
+                    format_func=lambda x: {63: "3 Mesi (63 gg)", 126: "6 Mesi (126 gg)", 252: "1 Anno (252 gg)", 504: "2 Anni (504 gg)", 756: "3 Anni (756 gg)"}[x]
+                )
+            with mc_c2:
+                vol_mult = st.slider("Moltiplicatore Volatilità (Stress):", 0.50, 2.50, 1.00, 0.25, help="1.0x = Condizioni Normali; 1.5x - 2.0x = Regime di Alta Volatilità / Crisi")
+            with mc_c3:
+                drift_shift = st.slider("Aggiustamento Trend / Drift Anno (%):", -20.0, 20.0, 0.0, 1.0, help="Shift % sul rendimento atteso anno")
+            with mc_c4:
+                dist_type = st.radio("Distribuzione Shock:", ["Gaussiana (Normale)", "Student-t (Code Grasse)"], horizontal=True)
+                dist_key = "student_t" if "Student-t" in dist_type else "gaussian"
+
+        # Esecuzione della Simulazione Monte Carlo
+        mc_adv = run_advanced_monte_carlo_simulation(
+            results_dict=results,
+            horizon_days=horizon_opt,
+            volatility_multiplier=vol_mult,
+            drift_shift_pct=drift_shift,
+            distribution_type=dist_key,
+            n_simulations=3000
+        )
+
+        if mc_adv:
+            # Head KPI Cards
+            mk1, mk2, mk3, mk4, mk5 = st.columns(5)
+            with mk1:
+                metric_card("Valore Iniziale", f"€ {mc_adv['initial_portfolio_value']:,.0f}", "Capitale Base", True)
+            with mk2:
+                metric_card("Mediana Attesa (1Y)", f"€ {mc_adv['expected_value_median']:,.0f}", f"Rendimento: {mc_adv['expected_return_median_pct']:+.2f}%", mc_adv['expected_return_median_pct'] >= 0)
+            with mk3:
+                metric_card("VaR 95% (Rischio)", f"€ {mc_adv['var_95_val_eur']:,.0f}", f"Perdita Max: -{mc_adv['var_95_pct']:.2f}%", False)
+            with mk4:
+                metric_card("CVaR 95% (Shortfall)", f"€ {mc_adv['cvar_95_val_eur']:,.0f}", f"Perdita Media: -{mc_adv['cvar_95_pct']:.2f}%", False)
+            with mk5:
+                metric_card("Probabilità Profitto", f"{mc_adv['prob_profit_pct']:.1f}%", "3.000 Simulazioni", mc_adv['prob_profit_pct'] >= 50.0)
+
+            st.divider()
+
+            # Grafico a Nastro (Ribbon & Path Generator Chart)
+            st.markdown("#### 📈 Proiezione Stocastica delle Traiettorie nel Tempo (Fan / Ribbon Chart)")
+            st.caption(f"Fascio stocastico di 3.000 traiettorie simulate su orizzonte di **{horizon_opt} giorni** ({dist_type}) con intervalli di confidenza percentili (P01 – P99).")
+            
+            t_days = mc_adv["time_axis"]
+            fig_fan = go.Figure()
+
+            # 80 sample paths traslucidi per evidenziare il fascio esteso
+            sample_paths = mc_adv["sample_paths"]
+            for s_idx in range(sample_paths.shape[1]):
+                fig_fan.add_trace(go.Scatter(
+                    x=t_days, y=sample_paths[:, s_idx],
+                    mode="lines",
+                    line=dict(color="rgba(72, 149, 239, 0.07)", width=1),
+                    showlegend=False,
+                    hoverinfo="skip"
+                ))
+
+            # Fasce a nastro (Ribbon Fills)
+            fig_fan.add_trace(go.Scatter(
+                x=t_days, y=mc_adv["p99_path"], mode="lines", name="P99 (Scenario Ultra-Rialzista)",
+                line=dict(color="rgba(0, 255, 153, 0.6)", width=1.5, dash="dot"),
+                hovertemplate="<b>P99 (Scenario Ultra-Rialzista)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_fan.add_trace(go.Scatter(
+                x=t_days, y=mc_adv["p75_path"], mode="lines", name="P75 (Scenario Positivo)",
+                line=dict(color="rgba(0, 204, 255, 0.5)", width=1), fill="tonexty", fillcolor="rgba(0, 255, 153, 0.05)",
+                hovertemplate="<b>P75 (Scenario Positivo)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_fan.add_trace(go.Scatter(
+                x=t_days, y=mc_adv["p50_path"], mode="lines", name="P50 (Mediana Attesa)",
+                line=dict(color="#00ff99", width=3),
+                hovertemplate="<b>P50 (Mediana Attesa)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_fan.add_trace(go.Scatter(
+                x=t_days, y=mc_adv["p25_path"], mode="lines", name="P25 (Scenario Conservativo)",
+                line=dict(color="rgba(255, 204, 0, 0.5)", width=1), fill="tonexty", fillcolor="rgba(255, 204, 0, 0.05)",
+                hovertemplate="<b>P25 (Scenario Conservativo)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_fan.add_trace(go.Scatter(
+                x=t_days, y=mc_adv["p05_path"], mode="lines", name="P05 (VaR 95%)",
+                line=dict(color="#ff9900", width=2, dash="dash"),
+                hovertemplate="<b>P05 (VaR 95%)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_fan.add_trace(go.Scatter(
+                x=t_days, y=mc_adv["p01_path"], mode="lines", name="P01 (Worst Case / VaR 99%)",
+                line=dict(color="#ff3333", width=2.5, dash="dash"),
+                hovertemplate="<b>P01 (Worst Case / VaR 99%)</b><br>Giorno: %{x}<br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+
+            fig_fan.update_layout(
+                xaxis_title="Giorni di Contrattazione (Trading Days)",
+                yaxis_title="Valore stimato di Portafoglio (€)",
+                template="plotly_dark",
+                height=480,
+                margin=dict(t=50, b=40, l=55, r=25),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0.0,
+                    bgcolor="rgba(22, 27, 34, 0.85)",
+                    bordercolor="rgba(255, 255, 255, 0.12)",
+                    borderwidth=1,
+                    font=dict(size=11, color="#ffffff")
+                )
+            )
+            apply_plotly_theme(fig_fan)
+            st.plotly_chart(fig_fan, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+            # ── RIGA 1: ISTOGRAMMA DEL VALORE FINALE & SOGLIE DI RISCHIO ───
+            st.markdown("#### 📊 Istogramma del Valore Finale & Soglie di Rischio (VaR / CVaR)")
+            st.caption("Distribuzione di frequenza empirica del capitale stimato a fine orizzonte con indicazione del capitale iniziale, della mediana attesa e dei livelli di VaR 95% e CVaR 95%.")
+            
+            final_vals = mc_adv["final_values"]
+            fig_hist_mc = go.Figure()
+            
+            fig_hist_mc.add_trace(go.Histogram(
+                x=final_vals, nbinsx=55, name="Valore Finale",
+                marker=dict(
+                    color="rgba(0, 243, 255, 0.45)",
+                    line=dict(color="#00f3ff", width=0.8)
+                ),
+                hovertemplate="<b>Capitale Finale: € %{x:,.0f}</b><br>Frequenza: %{y} simulazioni<extra></extra>"
+            ))
+
+            init_v = mc_adv["initial_portfolio_value"]
+            med_v = mc_adv["expected_value_median"]
+            var95_v = init_v - mc_adv["var_95_val_eur"]
+            cvar95_v = init_v - mc_adv["cvar_95_val_eur"]
+
+            fig_hist_mc.add_vline(
+                x=cvar95_v, line_dash="dot", line_color="#ff3333", line_width=2,
+                annotation_text=f"<b>CVaR 95%</b>: € {cvar95_v:,.0f}", 
+                annotation_position="top left",
+                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff3333", borderwidth=1, borderpad=4, font=dict(color="#ff5252", size=11))
+            )
+            fig_hist_mc.add_vline(
+                x=var95_v, line_dash="dash", line_color="#ff9900", line_width=2,
+                annotation_text=f"<b>VaR 95%</b>: € {var95_v:,.0f}", 
+                annotation_position="top left",
+                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff9900", borderwidth=1, borderpad=4, font=dict(color="#ffab40", size=11), yshift=-35)
+            )
+            fig_hist_mc.add_vline(
+                x=init_v, line_dash="dash", line_color="#ffffff", line_width=1.8,
+                annotation_text=f"<b>Capitale Iniziale</b>: € {init_v:,.0f}", 
+                annotation_position="top right",
+                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="rgba(255, 255, 255, 0.35)", borderwidth=1, borderpad=4, font=dict(color="#ffffff", size=11))
+            )
+            fig_hist_mc.add_vline(
+                x=med_v, line_dash="solid", line_color="#00ff99", line_width=2.2,
+                annotation_text=f"<b>Mediana Attesa</b>: € {med_v:,.0f}", 
+                annotation_position="top right",
+                annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#00ff99", borderwidth=1, borderpad=4, font=dict(color="#00e676", size=11), yshift=-35)
+            )
+
+            fig_hist_mc.update_layout(
+                xaxis_title="Valore Finale Stimato di Portafoglio (€)",
+                yaxis_title="Frequenza Simulazioni",
+                template="plotly_dark", height=415,
+                margin=dict(t=45, b=40, l=55, r=25),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            apply_plotly_theme(fig_hist_mc)
+            st.plotly_chart(fig_hist_mc, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+            # ── RIGA 2: MATRICE DELLE PROBABILITÀ & RISK PROFILE ───────────
+            st.markdown("#### 🎯 Matrice delle Probabilità & Risk Profile")
+            st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
+            
+            df_odds = pd.DataFrame([
+                {"Scenario Stocastico": "🟢 Probabilità di Profitto", "Probabilità / Valore": f"{mc_adv['prob_profit_pct']:.1f}%", "Condizione": "Rendimento Finale > 0%"},
+                {"Scenario Stocastico": "🚀 Target Moderato (≥ +10%)", "Probabilità / Valore": f"{mc_adv['prob_gain_10_pct']:.1f}%", "Condizione": "Guadagno Finale ≥ +10%"},
+                {"Scenario Stocastico": "🔥 Target Rialzista (≥ +20%)", "Probabilità / Valore": f"{mc_adv['prob_gain_20_pct']:.1f}%", "Condizione": "Guadagno Finale ≥ +20%"},
+                {"Scenario Stocastico": "⚠️ Rischio Ribasso (≤ -10%)", "Probabilità / Valore": f"{mc_adv['prob_loss_10_pct']:.1f}%", "Condizione": "Perdita Finale ≤ -10%"},
+                {"Scenario Stocastico": "🔴 Rischio Crollo (≤ -20%)", "Probabilità / Valore": f"{mc_adv['prob_loss_20_pct']:.1f}%", "Condizione": "Perdita Finale ≤ -20%"},
+                {"Scenario Stocastico": "📉 Max Drawdown Simulato Medio", "Probabilità / Valore": f"{mc_adv['avg_max_drawdown_pct']:.2f}%", "Condizione": "Perdita massima media registrata lungo il path"},
+                {"Scenario Stocastico": "💥 Max Drawdown Simulato Worst 1%", "Probabilità / Valore": f"{mc_adv['p99_max_drawdown_pct']:.2f}%", "Condizione": "Peggior drawdown nell'1% dei percorsi estremi"}
+            ])
+            st.dataframe(df_odds, use_container_width=True, hide_index=True)
+
+        else:
+            st.info("Simulazione Monte Carlo non disponibile per gli asset selezionati.")
+
+        st.divider()
+
+        st.markdown("#### 🧬 K-Means Clustering: Segmentazione Asset per Profilo di Rischio & Rendimento")
+        st.caption("Algoritmo di machine learning non supervisionato che raggruppa gli asset di portafoglio in cluster omogenei in base al tradeoff tra Volatilità Annua e CAGR.")
+
+        if clusters:
+            df_cl = pd.DataFrame(clusters)
+            if "ticker" not in df_cl.columns and "index" in df_cl.columns:
+                df_cl = df_cl.rename(columns={"index": "ticker"})
+            elif "ticker" not in df_cl.columns:
+                df_cl["ticker"] = [f"Asset {i+1}" for i in range(len(df_cl))]
+
+            df_cl["volatility"] = df_cl["volatility"] * 100.0
+            df_cl["cagr"] = df_cl["cagr"] * 100.0
+
+            # Dynamic meaningful cluster naming based on average volatility
+            stats = df_cl.groupby("cluster")[["volatility", "cagr"]].mean()
+            sorted_c = stats.sort_values("volatility").index.tolist()
+            
+            label_map = {}
+            for i, cid in enumerate(sorted_c):
+                if i == 0:
+                    label_map[cid] = "🛡️ Cluster 1: Bassa Volatilità / Core"
+                elif i == len(sorted_c) - 1 and len(sorted_c) > 1:
+                    label_map[cid] = f"⚡ Cluster {i+1}: Alta Volatilità / Outlier"
+                else:
+                    label_map[cid] = f"🚀 Cluster {i+1}: Crescita / Moderato"
+
+            df_cl["cluster_label"] = df_cl["cluster"].map(label_map)
+            df_cl = df_cl.sort_values(by=["volatility", "cagr"]).reset_index(drop=True)
+
+            # Smart label offsetting to eliminate overlapping text for nearby points
+            pos_options = ["top center", "bottom right", "top right", "bottom left", "top left"]
+            df_cl["text_pos"] = [pos_options[i % len(pos_options)] for i in range(len(df_cl))]
+
+            fig_cl = go.Figure()
+            colors = ["#58a6ff", "#00e676", "#ff9900", "#f85149", "#bc8cff", "#00f3ff"]
+
+            for idx, cl_name in enumerate(df_cl["cluster_label"].unique()):
+                sub = df_cl[df_cl["cluster_label"] == cl_name]
+                fig_cl.add_trace(go.Scatter(
+                    x=sub["volatility"],
+                    y=sub["cagr"],
+                    mode="markers+text",
+                    name=cl_name,
+                    text=sub["ticker"],
+                    textposition=sub["text_pos"].tolist(),
+                    marker=dict(
+                        size=14,
+                        color=colors[idx % len(colors)],
+                        line=dict(width=1.5, color="#ffffff")
+                    ),
+                    textfont=dict(size=11, color="#e6edf3"),
+                    hovertemplate="<b>%{text}</b><br>" + cl_name + "<br>Volatilità Annua: <b>%{x:.2f}%</b><br>CAGR: <b>%{y:.2f}%</b><extra></extra>"
+                ))
+
+            # Quadrant reference lines (Medians)
+            med_v = float(df_cl["volatility"].median())
+            med_r = float(df_cl["cagr"].median())
+            fig_cl.add_vline(x=med_v, line_dash="dot", line_color="rgba(255,255,255,0.18)", line_width=1)
+            fig_cl.add_hline(y=med_r, line_dash="dot", line_color="rgba(255,255,255,0.18)", line_width=1)
+
+            fig_cl.update_layout(
+                xaxis_title="Volatilità Annua % (Rischio)",
+                yaxis_title="CAGR % (Rendimento Composto Annuo)",
+                template="plotly_dark",
+                height=450,
+                margin=dict(t=50, b=40, l=55, r=25),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0.0,
+                    bgcolor="rgba(22, 27, 34, 0.85)",
+                    bordercolor="rgba(255, 255, 255, 0.12)",
+                    borderwidth=1,
+                    font=dict(size=11, color="#ffffff")
+                )
+            )
+            apply_plotly_theme(fig_cl)
+            st.plotly_chart(fig_cl, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+        st.divider()
+        col_head_mer1, col_head_mer2 = st.columns([3.2, 1.1])
+        with col_head_mer1:
+            st.markdown("#### ⚡ Simulatore Jump-Diffusion di Merton (Shock Stocastici & Tail Risk)")
+            st.caption("Modellizzazione stocastica avanzata non-gaussiana che integra salti di Poisson (Crash Shock) per misurare perdite catastrofiche di coda (Fat Tails).")
+        with col_head_mer2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("⚡ Guida al Modello Merton Jump-Diffusion", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Processo Jump-Diffusion di Merton (1976)</div>
+  <div>Un'estensione del moto browniano geometrico sviluppata dal premio Nobel Robert C. Merton che combina una dinamica continua di diffusione con salti discontinui discreti governati da un processo di Poisson.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Equazione Differenziale Stocastica (SDE)</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12.5px; text-align: center;">
+    <b>dS<sub>t</sub></b> = &mu; S<sub>t</sub> dt + &sigma; S<sub>t</sub> dW<sub>t</sub> + (e<sup>Y<sub>t</sub></sup> &minus; 1) S<sub>t</sub> dN<sub>t</sub>
+  </div>
+  <div>
+    • <b>&lambda;:</b> Frequenza media annua di arrivo dei salti (Processo di Poisson <i>N<sub>t</sub></i>)<br>
+    • <b>&mu;<sub>J</sub>, &sigma;<sub>J</sub>:</b> Media e deviazione standard logaritmica dell'ampiezza dello shock (<i>Y<sub>t</sub> ~ N(&mu;<sub>J</sub>, &sigma;<sub>J</sub><sup>2</sup>)</i>)
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>Modellizzare i crash istantanei (Flash Crash, eventi geopolitici, default bancari improvvisi) che i modelli gaussiani standard non possono fisicamente generare.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>Il modulo <code>core/risk_engine.py</code> calibra i salti sui rendimenti storici e calcola la discrepanza percentuale tra il VaR normale e il VaR sotto processo di Merton.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>Se il VaR Merton è significativamente più severo del VaR normale, il portafoglio è esposto a grave rischio di salto asimmetrico e richiede strategie di tail hedging.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona Merton Jump-Diffusion?")
+
+        with st.expander("⚙️ Configurazione Parametri Merton Jump Shocks", expanded=False):
+            col_mj1, col_mj2, col_mj3 = st.columns(3)
+            with col_mj1:
+                lambda_in = st.slider("Frequenza Salto Poisson (salti/anno):", 0.1, 5.0, 1.5, 0.1, help="Numero medio di shock improvvisi attesi all'anno")
+            with col_mj2:
+                mu_j_in = st.slider("Dimensione Media Salto (%)", -30.0, 5.0, -8.0, 1.0, help="Shock medio in % (valori negativi = crolli)") / 100.0
+            with col_mj3:
+                sigma_j_in = st.slider("Volatilità Salto (%)", 1.0, 20.0, 5.0, 1.0) / 100.0
+
+        from core.risk_engine import compute_merton_jump_diffusion_simulation
+        sr_p_merton = results.get("portfolio_return", pd.Series(dtype=float)) if results else pd.Series(dtype=float)
+        merton_res = compute_merton_jump_diffusion_simulation(
+            sr_portfolio=sr_p_merton,
+            n_sims=500,
+            time_horizon_days=horizon_opt,
+            lambda_j=lambda_in,
+            mu_j=mu_j_in,
+            sigma_j=sigma_j_in,
+            initial_value=mc_adv['initial_portfolio_value'] if mc_adv else 100000.0
+        )
+
+        cmj1, cmj2, cmj3, cmj4 = st.columns(4)
+        with cmj1:
+            metric_card("VaR 99% Gaussiano", f"{merton_res['var_99_gauss_pct']:.2f}%", "Benchmark Normale", True)
+        with cmj2:
+            merton_diff = merton_res['var_99_jump_pct'] - merton_res['var_99_gauss_pct']
+            metric_card("VaR 99% Merton Jump", f"{merton_res['var_99_jump_pct']:.2f}%", f"{merton_diff:+.2f}% vs Gauss", False)
+        with cmj3:
+            metric_card("CVaR 99% Shortfall", f"{merton_res['cvar_99_jump_pct']:.2f}%", "Coda Estrema Fat Tail", False)
+        with cmj4:
+            metric_card("Frequenza Salti", f"{merton_res['mean_jumps_per_year']:.1f} / anno", "Processo di Poisson", True)
+
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown("##### 📈 Traiettorie Stocastiche Merton Jump-Diffusion")
+        st.caption(f"Fascio stocastico simulato con Poisson Jump Shocks (λ = {lambda_in} salti/anno, ampiezza media shock μ_J = {mu_j_in*100:.1f}%, σ_J = {sigma_j_in*100:.1f}%).")
+
+        m_days = merton_res["days"]
+        fig_merton = go.Figure()
+        fig_merton.add_trace(go.Scatter(
+            x=m_days, y=merton_res["p95"], mode="lines", name="P95 Scenario Rialzista",
+            line=dict(color="rgba(0,255,153,0.6)", width=1.2),
+            hovertemplate="<b>P95 (Scenario Rialzista)</b><br>Giorno: <b>%{x}</b><br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_merton.add_trace(go.Scatter(
+            x=m_days, y=merton_res["p75"], mode="lines", name="P75 Scenario Positivo",
+            line=dict(color="rgba(0,204,255,0.5)", width=1), fill="tonexty", fillcolor="rgba(0,255,153,0.05)",
+            hovertemplate="<b>P75 (Scenario Positivo)</b><br>Giorno: <b>%{x}</b><br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_merton.add_trace(go.Scatter(
+            x=m_days, y=merton_res["p50"], mode="lines", name="P50 Mediana Jump-Diffusion",
+            line=dict(color="#00f3ff", width=2.5),
+            hovertemplate="<b>P50 (Mediana Jump-Diffusion)</b><br>Giorno: <b>%{x}</b><br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_merton.add_trace(go.Scatter(
+            x=m_days, y=merton_res["p25"], mode="lines", name="P25 Scenario Conservativo",
+            line=dict(color="rgba(255,204,0,0.5)", width=1), fill="tonexty", fillcolor="rgba(255,204,0,0.05)",
+            hovertemplate="<b>P25 (Scenario Conservativo)</b><br>Giorno: <b>%{x}</b><br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_merton.add_trace(go.Scatter(
+            x=m_days, y=merton_res["p5"], mode="lines", name="P05 Tail Crash Zone",
+            line=dict(color="#ff3333", width=2, dash="dash"),
+            hovertemplate="<b>P05 (Tail Crash Zone)</b><br>Giorno: <b>%{x}</b><br>Valore: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+
+        fig_merton.update_layout(
+            xaxis_title="Giorni di Contrattazione (Trading Days)",
+            yaxis_title="Valore Portafoglio (€)",
+            template="plotly_dark",
+            height=450,
+            margin=dict(t=50, b=40, l=55, r=25),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="left",
+                x=0.0,
+                bgcolor="rgba(22, 27, 34, 0.85)",
+                bordercolor="rgba(255, 255, 255, 0.12)",
+                borderwidth=1,
+                font=dict(size=11, color="#ffffff")
+            )
+        )
+        apply_plotly_theme(fig_merton)
+        st.plotly_chart(fig_merton, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+# ── TAB 3: HEDGING TATTICO & TAIL RISK ────────────────────────
+elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
+    section("🛡️ Simulatore di Copertura & Hedging Tattico (Beta-Neutral & Tail Protection)")
+    st.caption("Calcola le coperture esatte con ETF inversi o micro-futures per azzerare o ridurre la sensibilità al rischio sistemico senza vendere gli asset.")
+
+    if not has_portfolio or results is None:
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare le coperture di Hedging Tattico.")
+    else:
+        from core.hedging import compute_beta_neutral_hedge, HEDGE_INSTRUMENTS
+
+        col_hd1, col_hd2 = st.columns(2)
+        with col_hd1:
+            target_beta_input = st.slider(
+                "Target Beta Desiderato:",
+                min_value=-0.50, max_value=1.50, value=0.00, step=0.10,
+                help="Imposta 0.00 per renderti immune ai movimenti del mercato generale (Beta-Neutral)."
+            )
+        with col_hd2:
+            hedge_inst_input = st.selectbox(
+                "Strumento di Copertura:",
+                options=list(HEDGE_INSTRUMENTS.keys()),
+                format_func=lambda k: f"{k} - {HEDGE_INSTRUMENTS[k]['name']} ({HEDGE_INSTRUMENTS[k]['underlying']})"
+            )
+
+        hedge_res = compute_beta_neutral_hedge(results, target_beta=target_beta_input, hedge_ticker=hedge_inst_input)
+
+        col_hm1, col_hm2, col_hm3, col_hm4 = st.columns(4)
+        with col_hm1:
+            st.metric("Beta Attuale Portafoglio", f"{hedge_res['current_beta']:.2f}")
+        with col_hm2:
+            st.metric("Valore Copertura Necessaria", f"€ {hedge_res['hedge_value_eur']:,.2f}")
+        with col_hm3:
+            st.metric(f"Quote {hedge_inst_input} da Acquistare", f"{hedge_res['hedge_shares']} quote")
+        with col_hm4:
+            st.metric("Protezione Tail Risk (VaR 99%)", f"€ {hedge_res['tail_risk_var99_eur']:,.2f}")
+
+        st.info(f"""
+        💡 **Indicazione Operativa di Copertura**:
+        Per portare il Beta di portafoglio da **{hedge_res['current_beta']:.2f}** a **{target_beta_input:.2f}**, acquista **{hedge_res['hedge_shares']} quote** dello strumento **{hedge_res['instrument_name']} ({hedge_inst_input})** ad un prezzo indicativo di **€ {hedge_res['instrument_price']:.2f}** per un investimento protettivo di **€ {hedge_res['hedge_value_eur']:,.2f}**.
+        """)
+
+        st.divider()
+        col_head_bs1, col_head_bs2 = st.columns([3.2, 1.1])
+        with col_head_bs1:
+            st.markdown("#### 🛡️ Modello Black-Scholes (1973): Opzioni Put Hedging & Covered Call Yield")
+            st.caption("Calcolo analitico dei 5 Greci ($\\Delta, \\Gamma, \\Theta, \\text{Vega}, \\rho$), copertura Delta-Hedge con opzioni Put e generazione di rendimento passivo con Covered Call.")
+        with col_head_bs2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida al Modello Black-Scholes, Greci & Covered Call", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Modello di Black-Scholes-Merton (1973)</div>
+  <div>La pietra miliare della finanza matematica per il pricing teorico arbitraggio-free delle opzioni europee su azioni e indici azionari.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Pricing Analitico & I 5 Greci</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    • <b>Delta (&Delta;):</b> Sensibilità del premio al sottostante (Hedge Ratio)<br>
+    • <b>Gamma (&Gamma;):</b> Curvatura e derivata seconda rispetto al prezzo spot<br>
+    • <b>Theta (&Theta;):</b> Decadimento temporale giornaliero (<i>Time Decay</i>)<br>
+    • <b>Vega:</b> Sensibilità all'1% di variazione della volatilità implicita (&sigma;)<br>
+    • <b>Rho (&rho;):</b> Reattività alle variazioni della curva dei tassi d'interesse
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>
+    1. <b>Put Delta-Hedging:</b> Calcolare esattamente quanti contratti Put acquistare sul benchmark per sterilizzare il Beta di portafoglio a costo minimo.<br>
+    2. <b>Covered Call Writing:</b> Vendere opzioni Call OTM (+5%) a 30 giorni per incassare premi regolari migliorando il rendimento (<i>Yield Enhancement</i>).
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>Il modulo <code>core/risk_engine.py</code> calcola il numero di contratti: <code>Contratti = (Valore &times; &beta; &times; Copertura %) / (Spot &times; 100 &times; |&Delta;|)</code>.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>La tabella mostra i contratti esatti da negoziare sul mercato derivati e il rendimento annualizzato atteso dalla strategia Covered Call.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona Black-Scholes & Greci?")
+
+        from core.options_hedging import compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
+
+        col_opt_in1, col_opt_in2, col_opt_in3 = st.columns(3)
+        with col_opt_in1:
+            bm_spot_in = st.number_input("Prezzo Sottostante Benchmark (SPY/SPX $):", value=550.0, step=10.0)
+        with col_opt_in2:
+            iv_in = st.slider("Volatilità Implicita Opzioni (%):", 10.0, 60.0, 18.0, 1.0) / 100.0
+        with col_opt_in3:
+            target_hedge_pct = st.slider("Copertura del Portafoglio (%):", 25.0, 100.0, 100.0, 25.0)
+
+        port_val_tot = float(pos["current_value"].sum()) if (isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns) else 100000.0
+        port_b = float(results.get("metrics", {}).get("market_risk", {}).get("beta", 1.10) or 1.10) if results else 1.10
+
+        bs_hedge = compute_portfolio_delta_hedge(
+            portfolio_value=port_val_tot,
+            portfolio_beta=port_b,
+            benchmark_spot=bm_spot_in,
+            target_hedge_pct=target_hedge_pct,
+            implied_vol=iv_in
+        )
+
+        col_bs1, col_bs2, col_bs3, col_bs4 = st.columns(4)
+        with col_bs1:
+            st.metric("Contratti Put Necessari", f"{bs_hedge['contracts_needed']} contratti")
+        with col_bs2:
+            st.metric("Prezzo Opzione Put", f"$ {bs_hedge['put_price']:.2f}")
+        with col_bs3:
+            st.metric("Costo Totale Copertura", f"$ {bs_hedge['total_hedge_cost']:,.2f}", delta=f"{bs_hedge['cost_pct_of_portfolio']:.2f}% portafoglio", delta_color="inverse")
+        with col_bs4:
+            st.metric("Delta Put (Sensibilità)", f"{bs_hedge['put_delta']:.3f}", help="Variazione del prezzo dell'opzione per variazione di $1 del sottostante")
+
+        st.markdown("##### 💵 Covered Call Yield Enhancer per Titoli in Portafoglio")
+        df_cov_call = compute_covered_call_yield_enhancement(pos, otm_pct=5.0, implied_vol=iv_in) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
+        if not df_cov_call.empty:
+            df_cov_display = df_cov_call.rename(columns={
+                "ticker": "Asset / Titolo",
+                "prezzo_spot": "Prezzo Spot (€)",
+                "strike_call_otm": "Strike OTM (+5%)",
+                "premio_per_azione": "Premio per Azione (€)",
+                "incasso_premio_totale": "Incasso Totale Premio (€)",
+                "extra_rendimento_mensile_pct": "Extra Yield Mensile %",
+                "extra_rendimento_annuo_pct": "Extra Yield Annuo %",
+                "delta_call": "Delta Call (Δ)"
+            })
+            st.dataframe(
+                df_cov_display.style.format({
+                    "Prezzo Spot (€)": "€ {:.2f}",
+                    "Strike OTM (+5%)": "€ {:.2f}",
+                    "Premio per Azione (€)": "€ {:.2f}",
+                    "Incasso Totale Premio (€)": "€ {:,.2f}",
+                    "Extra Yield Mensile %": "{:.2f}%",
+                    "Extra Yield Annuo %": "{:.2f}%",
+                    "Delta Call (Δ)": "{:.3f}"
+                }),
+                use_container_width=True,
+                hide_index=True,
+                height=240
+            )
+
+# ── TAB 4: ATTRIBUZIONE BRINSON-FACHLER ───────────────────────
+elif active_quant_tab == "🎯 Attribuzione Brinson-Fachler":
+    section("🎯 Attribuzione della Performance Brinson-Fachler")
+    st.caption("Scompone l'extra-rendimento di portafoglio rispetto al Benchmark nei 3 fattori: Allocazione Settoriale, Selezione dei Titoli e Interazione.")
+
+    if not has_portfolio or results is None:
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room per visualizzare l'attribuzione di performance Brinson-Fachler.")
+    else:
+        from core.attribution import compute_brinson_attribution
+
+        attr_res = compute_brinson_attribution(results)
+        attr_summary = attr_res.get("summary", {})
+        attr_df = attr_res.get("attribution_df", pd.DataFrame())
+        if not attr_df.empty:
+            st.markdown("**Scomposizione per Settore (Allocation vs Selection vs Interaction)**")
+            fig_attr = px.bar(
+                attr_df, x="sector", y=["allocation_effect_pct", "selection_effect_pct", "interaction_effect_pct"],
+                barmode="group",
+                color_discrete_sequence=["#58a6ff", "#3fb950", "#bc8cff"],
+                labels={
+                    "value": "Impatto %", "sector": "Settore GICS", "variable": "Fattore Attribuzione",
+                    "allocation_effect_pct": "Allocation Effect",
+                    "selection_effect_pct": "Selection Effect",
+                    "interaction_effect_pct": "Interaction Effect"
+                },
+                template="plotly_dark", height=430
+            )
+            new_names = {
+                "allocation_effect_pct": "Allocation Effect",
+                "selection_effect_pct": "Selection Effect",
+                "interaction_effect_pct": "Interaction Effect"
+            }
+            fig_attr.for_each_trace(lambda t: t.update(name=new_names.get(t.name, t.name)))
+            fig_attr.update_traces(
+                hovertemplate="<b>Settore: %{x}</b><br>%{fullData.name}: <b>%{y:.2f}%</b><extra></extra>"
+            )
+            fig_attr.update_layout(
+                xaxis_title="Settore GICS",
+                yaxis_title="Impatto su Extra-Rendimento %",
+                margin=dict(t=50, b=40, l=55, r=25),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="left",
+                    x=0.0,
+                    bgcolor="rgba(22, 27, 34, 0.85)",
+                    bordercolor="rgba(255, 255, 255, 0.12)",
+                    borderwidth=1,
+                    font=dict(size=11, color="#ffffff")
+                ),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            apply_plotly_theme(fig_attr)
+            st.plotly_chart(fig_attr, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+        else:
+            st.info("Dati di settore insufficienti per calcolare l'attribuzione Brinson-Fachler.")
+
+# ── TAB 5: BLACK-LITTERMAN & CARHART 4-FACTOR ────────────────
+elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
+    st.markdown("#### Modello Black-Litterman & Regressione Fattoriale Carhart (4 Fattori)")
+    st.caption("Combina le stime di equilibrio di mercato con le opinioni dell'investitore (Views) ed analizza l'esposizione ai 4 fattori di rischio (Market, Size SMB, Value HML, Momentum WML).")
+
+    if not has_portfolio or results is None:
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare i fattori Barra e Black-Litterman.")
+    else:
+        from core.risk_engine import compute_black_litterman_optimization, compute_carhart_4factor_exposures
+
+        sr_p = results.get("portfolio_return", pd.Series(dtype=float)) if results else pd.Series(dtype=float)
+
+        # ── RIGA 1: OTTIMIZZAZIONE BLACK-LITTERMAN ────────────────
+        st.markdown("#### 🏛️ Ottimizzazione Black-Litterman (Equilibrio Implicito & Pesi)")
+        st.caption("Stima i rendimenti attesi di equilibrio inverso (Reverse Optimization) a partire dalla matrice di covarianza e dai pesi correnti di portafoglio.")
+
+        cov_df = None
+        if opt and "cov_matrix" in opt and isinstance(opt["cov_matrix"], pd.DataFrame) and not opt["cov_matrix"].empty:
+            cov_df = opt["cov_matrix"]
+        else:
+            df_returns_all = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()
+            if isinstance(df_returns_all, pd.DataFrame) and not df_returns_all.empty:
+                active_tickers = []
+                if isinstance(pos, pd.DataFrame) and not pos.empty and "qty_net" in pos.columns and "ticker" in pos.columns:
+                    active_tickers = pos[pos["qty_net"] > 0]["ticker"].tolist()
+                common = [t for t in active_tickers if t in df_returns_all.columns]
+                if len(common) >= 1:
+                    cov_df = df_returns_all[common].cov() * 252
+
+        if cov_df is not None and not cov_df.empty:
+            mkt_w = None
+            if isinstance(pos, pd.DataFrame) and not pos.empty and "weight_pct" in pos.columns and "ticker" in pos.columns:
+                active_pos = pos[pos["qty_net"] > 1e-6] if "qty_net" in pos.columns else pos
+                mkt_w = active_pos.set_index("ticker")["weight_pct"] / 100.0
+            else:
+                mkt_w = pd.Series(1.0 / len(cov_df), index=cov_df.index)
+            
+            bl_res = compute_black_litterman_optimization(cov_df, mkt_w)
+            if bl_res:
+                df_bl = pd.DataFrame({
+                    "Ticker": cov_df.index,
+                    "Equilibrium Return %": bl_res["implied_equilibrium_returns"].values * 100,
+                    "BL Return %": bl_res["black_litterman_returns"].values * 100,
+                    "BL Weight %": bl_res["black_litterman_weights"].values * 100
+                })
+                df_bl = df_bl.sort_values(by="BL Weight %", ascending=False)
+
+                col_tbl_bl, col_chart_bl = st.columns([1.1, 1.1])
+                with col_tbl_bl:
+                    st.dataframe(
+                        df_bl.style.format({
+                            "Equilibrium Return %": "{:.2f}%",
+                            "BL Return %": "{:.2f}%",
+                            "BL Weight %": "{:.2f}%"
+                        }),
+                        use_container_width=True,
+                        hide_index=True,
+                        height=280
+                    )
+                with col_chart_bl:
+                    df_bl_plot = df_bl.sort_values(by="BL Weight %", ascending=True)
+                    fig_bl = go.Figure()
+                    fig_bl.add_trace(go.Bar(
+                        y=df_bl_plot["Ticker"],
+                        x=df_bl_plot["BL Weight %"],
+                        orientation="h",
+                        name="BL Weight %",
+                        marker=dict(color="#58a6ff", line=dict(width=1, color="rgba(255,255,255,0.2)")),
+                        hovertemplate="<b>%{y}</b><br>Peso Ottimale BL: <b>%{x:.2f}%</b><extra></extra>"
+                    ))
+                    fig_bl.update_layout(
+                        xaxis_title="Peso Ottimale Black-Litterman %",
+                        template="plotly_dark",
+                        height=280,
+                        margin=dict(t=15, b=35, l=60, r=20),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)"
+                    )
+                    apply_plotly_theme(fig_bl)
+                    st.plotly_chart(fig_bl, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+            else:
+                st.info("Dati di covarianza insufficienti per Black-Litterman.")
+        else:
+            st.info("Matrice di covarianza non disponibile. Assicurati di aver calcolato i rendimenti per le posizioni attive.")
+
+        st.divider()
+
+        # ── RIGA 2: ANALISI FATTORIALE CARHART ────────────────────
+        col_c_head1, col_c_head2 = st.columns([3.5, 1.0])
+        with col_c_head1:
+            st.markdown("#### 🧠 Analisi Fattoriale Carhart (4 Fattori: Alpha, Beta, SMB, HML, WML)")
+            st.caption("Regressione multi-fattoriale per isolare l'Alpha puro di gestione e le esposizioni a Dimensione d'Impresa (Size), Stile (Value) e Inerzia (Momentum).")
+        with col_c_head2:
+            render_formula_popover(
+                "🧠 Formula & Teoria Carhart 4-Factor",
+                "Modello di Carhart a 4 Fattori (1997)",
+                r"R_{i,t} - R_{f,t} = \alpha + \beta_1 (R_{m,t} - R_{f,t}) + \beta_2 \text{SMB}_t + \beta_3 \text{HML}_t + \beta_4 \text{WML}_t + \epsilon_t",
+                "<b>Significato dei Fattori:</b><br>"
+                "• <b>Mkt-RF:</b> Rischio sistemico di mercato generale.<br>"
+                "• <b>SMB (Small Minus Big):</b> Inclinazione verso titoli Small Cap.<br>"
+                "• <b>HML (High Minus Low):</b> Inclinazione verso titoli Value.<br>"
+                "• <b>WML (Winners Minus Losers):</b> Esposizione al fattore Momentum."
+            )
+
+        c4_res = compute_carhart_4factor_exposures(sr_p)
+
+        col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
+        with col_c1:
+            metric_card("Alpha Puro (α)", f"{c4_res['alpha']*100:+.2f}%", f"R² = {c4_res['r_squared']*100:.1f}%", True)
+        with col_c2:
+            metric_card("Beta Mercato (Mkt)", f"{c4_res['beta_mkt']:+.2f}", "Rischio Sistemico", True)
+        with col_c3:
+            metric_card("Beta Size (SMB)", f"{c4_res['beta_smb']:+.2f}", "Small vs Large Cap", False)
+        with col_c4:
+            metric_card("Beta Value (HML)", f"{c4_res['beta_hml']:+.2f}", "Value vs Growth", False)
+        with col_c5:
+            metric_card("Beta Momentum (WML)", f"{c4_res['beta_wml']:+.2f}", "Inerzia Trend 12M", True)
+
+        st.divider()
+        col_head_bar1, col_head_bar2 = st.columns([3.2, 1.1])
+        with col_head_bar1:
+            st.markdown("#### 🏛️ Modello Macro-Fattoriale MSCI Barra (5 Fattori Ortogonalizzati)")
+            st.caption("Decomposizione avanzata ed ortogonale delle esposizioni fattoriali del portafoglio (Market, Size SMB, Value HML, Momentum WML, Term Premium).")
+        with col_head_bar2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida al Modello Fattoriale MSCI Barra & Forecast ML", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Modello Macro-Fattoriale MSCI Barra</div>
+  <div>Lo standard quantitativo dell'industria per l'attribuzione del rischio istituzionale, che scompone la varianza totale del portafoglio in 5 macro-fattori ortogonalizzati e rischio specifico.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 I 5 Macro-Fattori Ortogonali</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    • <b>MKT (Equity Systematic):</b> Esposizione al mercato azionario globale<br>
+    • <b>SMB (Small Minus Big):</b> Sensibilità al fattore dimensione d'impresa<br>
+    • <b>HML (High Minus Low):</b> Esposizione a titoli Value vs Growth<br>
+    • <b>WML (Winners Minus Losers):</b> Inerzia di Momentum a 12 mesi<br>
+    • <b>TERM (Term Premium):</b> Sensibilità all'inclinazione della curva dei tassi sovrani
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>Separare la componente di rischio sistemico (spiegata dai fattori) dal rischio specifico non diversificato, stimando la vera abilità gestionale (&alpha; puro).</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS & Forecast ML</div>
+  <div>ARGUS esegue la regressione ortogonale con calcolo delle t-stat al 95% e combina un modello Random Forest per prevedere la volatilità attesa sui successivi 30 giorni.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>I fattori con <code>|t-stat| &ge; 1.96</code> sono statisticamente significativi; una quota di Rischio Specifico &gt; 40% indica una marcata esposizione a eventi societari idiosincratici.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il Modello MSCI Barra?")
+
+        from core.risk_engine import compute_msci_barra_multifactor_model
+        barra_res = compute_msci_barra_multifactor_model(sr_p)
+
+        betas_dict = barra_res.get("factor_betas", {})
+        t_dict = barra_res.get("t_stats", {})
+
+        factor_names_map = {
+            "MKT": "Mercato (Equity Systematic)",
+            "SMB": "Dimensione (Small Caps)",
+            "HML": "Valore (High Book-to-Market)",
+            "WML": "Inerzia (12M Momentum)",
+            "TERM": "Macro Curva Tassi (Term Premium)"
+        }
+
+        df_barra = pd.DataFrame({
+            "Fattore": list(betas_dict.keys()),
+            "Nome Esteso": [factor_names_map.get(k, k) for k in betas_dict.keys()],
+            "Beta Fattoriale": [betas_dict[k] for k in betas_dict.keys()],
+            "Statistica t": [t_dict.get(k, 0.0) for k in betas_dict.keys()],
+            "Significatività (95%)": ["🟢 Significativo" if abs(t_dict.get(k, 0.0)) >= 1.96 else "⚪ In Linea" for k in betas_dict.keys()]
+        })
+
+        col_bar1, col_bar2 = st.columns([1.5, 1])
+
+        with col_bar1:
+            colors = ["#3fb950" if b >= 0 else "#f85149" for b in df_barra["Beta Fattoriale"]]
+
+            fig_barra = go.Figure(go.Bar(
+                x=df_barra["Fattore"],
+                y=df_barra["Beta Fattoriale"],
+                marker_color=colors,
+                text=df_barra["Beta Fattoriale"].apply(lambda b: f"{b:+.2f}"),
+                textposition="outside",
+                textfont=dict(size=12, color="white"),
+                hovertemplate="<b>Fattore: %{x}</b><br>Beta Fattoriale: <b>%{text}</b><extra></extra>"
+            ))
+
+            fig_barra.update_layout(
+                template="plotly_dark",
+                height=350,
+                margin=dict(l=10, r=10, t=20, b=30),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(title="Esposizione (Beta)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+                xaxis=dict(title="Fattori Stile & Macro")
+            )
+            apply_plotly_theme(fig_barra)
+            st.plotly_chart(fig_barra, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+        with col_bar2:
+            st.markdown("##### 🍩 Decomposizione Varianza Rischio")
+            sys_pct = barra_res.get("systematic_risk_pct", 88.0)
+            spec_pct = barra_res.get("specific_risk_pct", 12.0)
+
+            fig_pie = go.Figure(data=[go.Pie(
+                labels=["Rischio Sistemico (Fattori)", "Rischio Specifico (Residuo)"],
+                values=[sys_pct, spec_pct],
+                hole=0.6,
+                marker=dict(colors=["#58a6ff", "#bc8cff"], line=dict(color="#0d1117", width=2)),
+                hovertemplate="<b>%{label}</b><br>Quota Varianza: <b>%{percent}</b><extra></extra>"
+            )])
+            fig_pie.update_layout(
+                template="plotly_dark",
+                height=260,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.1)
+            )
+            apply_plotly_theme(fig_pie)
+            st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+            metric_card("Alpha Multi-Fattoriale (α)", f"{barra_res.get('alpha_annualized', 0.0)*100:+.2f}%", "MSCI Barra 5-Factor", True)
+
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        st.markdown("##### 📋 Tabella di Dettaglio dei Fattori MSCI Barra")
+        st.dataframe(
+            df_barra.style.format({
+                "Beta Fattoriale": "{:+.3f}",
+                "Statistica t": "{:+.2f}"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+        st.divider()
+        st.markdown("##### 🤖 Forecast Volatilità a 30 Giorni (Machine Learning Ensemble)")
+        from core.financial_analysis import predict_ml_distress_and_volatility
+        df_p_ml = st.session_state.get("df_prices")
+        ml_res = predict_ml_distress_and_volatility(df_prices=df_p_ml)
+
+        col_ml1, col_ml2 = st.columns([1, 2.5])
+        with col_ml1:
+            metric_card("Volatilità Predetta 30G", f"{ml_res['predicted_volatility_30d_pct']:.2f}%", "Random Forest Regressor", True)
+        with col_ml2:
+            st.markdown(f"**Verdetto ML:** {ml_res['verdict']}")
+            st.caption("Stima avanzata della volatilità annualizzata a 30 giorni basata su Random Forest Regressor e indicatori tecnici di mercato.")
+

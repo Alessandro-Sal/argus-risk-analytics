@@ -1,0 +1,162 @@
+tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
+2021-01-15,EUE.MI,buy,120.0,47.4341,EUR,2.0,ETF,Allocazione Iniziale Azionario Euro
+2021-01-15,SWDA.MI,buy,150.0,94.3,EUR,2.0,ETF,Allocazione Iniziale Core Globale
+2021-01-18,BND,buy,60.0,68.7989,USD,1.5,Bond,Copertura Obbligazionaria Iniziale
+2021-01-18,SPY,buy,25.0,546.6684,USD,1.5,ETF,Esposizione Core S&P 500
+2021-01-20,AAPL,buy,30.0,224.0161,USD,1.5,Stock,Posizione Strategica Big Tech
+2021-01-20,MSFT,buy,15.0,415.7559,USD,1.5,Stock,Posizione Cloud & Software Core
+2021-01-22,JNJ,buy,20.0,150.8246,USD,1.5,Stock,Difensivo Healthcare Dividend
+2021-01-22,PG,buy,25.0,159.5739,USD,1.5,Stock,Consumer Staples Core
+2021-01-25,ENEL.MI,buy,400.0,5.8815,EUR,2.5,Stock,Utilities & Dividendo Italia
+2021-01-25,ISP.MI,buy,1200.0,3.1203,EUR,2.5,Stock,Banking & High Dividend Yield
+2021-01-28,GLD,buy,20.0,231.61,USD,1.5,Commodity,Copertura Oro Fisico
+2021-01-29,BTC-USD,buy,0.15,58483.9648,USD,0.0,Crypto,Allocazione Satellite Cripto
+2021-01-29,ETH-USD,buy,1.5,2613.3572,USD,0.0,Crypto,Allocazione Satellite Smart Contracts
+2021-03-09,JNJ,dividend,1.0,20.2,USD,0.0,Stock,Dividendo Q1 Johnson & Johnson
+2021-04-15,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2021-04-15,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2021-04-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2021-04-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2021-05-17,PG,dividend,1.0,21.73,USD,0.0,Stock,Dividendo Q2 Procter & Gamble
+2021-05-24,ISP.MI,dividend,1.0,42.0,EUR,0.0,Stock,Dividendo Straordinario Intesa
+2021-06-08,JNJ,dividend,1.0,21.2,USD,0.0,Stock,Dividendo Q2 Johnson & Johnson
+2021-06-10,MSFT,dividend,1.0,8.4,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2021-06-10,NVDA,buy,20.0,129.7861,USD,1.5,Stock,Ingresso AI & GPU Computing
+2021-07-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2021-07-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2021-07-22,ENEL.MI,dividend,1.0,73.2,EUR,0.0,Stock,Dividendo Saldo Enel 2020
+2021-08-16,PG,dividend,1.0,21.73,USD,0.0,Stock,Dividendo Q3 Procter & Gamble
+2021-09-07,JNJ,dividend,1.0,21.2,USD,0.0,Stock,Dividendo Q3 Johnson & Johnson
+2021-09-14,GOOGL,buy,10.0,165.3947,USD,1.5,Stock,Acquisto Search & Cloud Leader
+2021-10-15,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2021-10-15,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2021-10-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2021-10-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2021-10-20,ISP.MI,dividend,1.0,118.8,EUR,0.0,Stock,Dividendo Residuo Intesa 2020
+2021-11-15,PG,dividend,1.0,21.73,USD,0.0,Stock,Dividendo Q4 Procter & Gamble
+2021-11-18,ASML,buy,5.0,917.7681,EUR,2.5,Stock,Monopolio EUV Semiconductors
+2021-11-22,BTC-USD,sell,0.05,58483.9648,USD,0.0,Crypto,Presa di Profitto Parziale All-Time High 2021
+2021-12-07,JNJ,dividend,1.0,21.2,USD,0.0,Stock,Dividendo Q4 Johnson & Johnson
+2021-12-09,MSFT,dividend,1.0,9.3,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2022-01-05,AAPL,sell,5.0,224.0161,USD,1.5,Stock,Trim Prudenziale Valutazioni Tech 3T
+2022-01-14,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2022-01-14,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2022-01-26,ENEL.MI,dividend,1.0,76.0,EUR,0.0,Stock,Dividendo Acconto Enel 2021
+2022-02-15,PG,dividend,1.0,21.73,USD,0.0,Stock,Dividendo Q1 Procter & Gamble
+2022-03-08,JNJ,dividend,1.0,21.2,USD,0.0,Stock,Dividendo Q1 Johnson & Johnson
+2022-04-14,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2022-04-14,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2022-04-14,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2022-04-14,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2022-05-12,AMZN,buy,15.0,178.22,USD,1.5,Stock,Acquisto su Storno E-Commerce/AWS
+2022-05-16,PG,dividend,1.0,22.82,USD,0.0,Stock,Dividendo Q2 Procter & Gamble
+2022-05-23,ISP.MI,dividend,1.0,93.6,EUR,0.0,Stock,Dividendo Saldo Intesa 2021
+2022-06-07,JNJ,dividend,1.0,22.6,USD,0.0,Stock,Dividendo Q2 Johnson & Johnson
+2022-06-09,MSFT,dividend,1.0,9.3,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2022-06-20,MC.PA,buy,4.0,642.118,EUR,2.5,Stock,Ingresso Lusso Europeo Pricing Power
+2022-07-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2022-07-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2022-07-20,ENEL.MI,dividend,1.0,76.0,EUR,0.0,Stock,Dividendo Saldo Enel 2021
+2022-08-15,PG,dividend,1.0,22.82,USD,0.0,Stock,Dividendo Q3 Procter & Gamble
+2022-09-06,JNJ,dividend,1.0,22.6,USD,0.0,Stock,Dividendo Q3 Johnson & Johnson
+2022-10-14,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2022-10-14,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2022-10-14,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2022-10-14,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2022-10-24,SAP,buy,15.0,213.3681,EUR,2.5,Stock,Enterprise Software Resilience
+2022-11-15,PG,dividend,1.0,22.82,USD,0.0,Stock,Dividendo Q4 Procter & Gamble
+2022-11-21,ISP.MI,dividend,1.0,87.6,EUR,0.0,Stock,Dividendo Acconto Intesa 2022
+2022-12-06,JNJ,dividend,1.0,22.6,USD,0.0,Stock,Dividendo Q4 Johnson & Johnson
+2022-12-08,MSFT,dividend,1.0,10.2,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2023-01-16,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2023-01-16,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2023-01-25,ENEL.MI,dividend,1.0,80.0,EUR,0.0,Stock,Dividendo Acconto Enel 2022
+2023-02-15,PG,dividend,1.0,22.82,USD,0.0,Stock,Dividendo Q1 Procter & Gamble
+2023-03-07,JNJ,dividend,1.0,22.6,USD,0.0,Stock,Dividendo Q1 Johnson & Johnson
+2023-03-10,NVDA,buy,15.0,129.7861,USD,1.5,Stock,Rafforzamento AI Boom Wave
+2023-04-14,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2023-04-14,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2023-04-14,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2023-04-14,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2023-05-15,PG,dividend,1.0,23.5,USD,0.0,Stock,Dividendo Q2 Procter & Gamble
+2023-05-22,ISP.MI,dividend,1.0,103.2,EUR,0.0,Stock,Dividendo Saldo Intesa 2022
+2023-06-06,JNJ,dividend,1.0,23.8,USD,0.0,Stock,Dividendo Q2 Johnson & Johnson
+2023-06-08,MSFT,dividend,1.0,10.2,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2023-07-14,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2023-07-14,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2023-07-20,NVDA,sell,5.0,129.7861,USD,1.5,Stock,Ribilanciamento Tattico AI Rally
+2023-07-26,ENEL.MI,dividend,1.0,80.0,EUR,0.0,Stock,Dividendo Saldo Enel 2022
+2023-08-15,PG,dividend,1.0,23.5,USD,0.0,Stock,Dividendo Q3 Procter & Gamble
+2023-08-25,BTC-USD,buy,0.1,58483.9648,USD,0.0,Crypto,DCA Pre-Halving Bitcoin
+2023-09-05,JNJ,dividend,1.0,23.8,USD,0.0,Stock,Dividendo Q3 Johnson & Johnson
+2023-10-16,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2023-10-16,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2023-10-16,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2023-10-16,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2023-11-15,PG,dividend,1.0,23.5,USD,0.0,Stock,Dividendo Q4 Procter & Gamble
+2023-11-20,ISP.MI,dividend,1.0,172.8,EUR,0.0,Stock,Dividendo Acconto Intesa 2023
+2023-12-05,JNJ,dividend,1.0,23.8,USD,0.0,Stock,Dividendo Q4 Johnson & Johnson
+2023-12-14,MSFT,dividend,1.0,11.25,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2024-01-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2024-01-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2024-01-24,ENEL.MI,dividend,1.0,86.0,EUR,0.0,Stock,Dividendo Acconto Enel 2023
+2024-02-12,ASML,buy,3.0,917.7681,EUR,2.5,Stock,Upgrade Capacità Chipmaking
+2024-02-15,PG,dividend,1.0,23.5,USD,0.0,Stock,Dividendo Q1 Procter & Gamble
+2024-03-05,JNJ,dividend,1.0,23.8,USD,0.0,Stock,Dividendo Q1 Johnson & Johnson
+2024-03-15,BTC-USD,sell,0.05,58483.9648,USD,0.0,Crypto,Profit Taking Rally ETFs Spot
+2024-04-15,BND,buy,5.0,68.7989,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2024-04-15,EIMI.MI,buy,20.0,31.755,EUR,1.0,ETF,Incremento Mercati Emergenti
+2024-04-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2024-04-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2024-05-15,PG,dividend,1.0,25.15,USD,0.0,Stock,Dividendo Q2 Procter & Gamble
+2024-05-20,GOOGL,buy,8.0,165.3947,USD,1.5,Stock,Espansione Modelli Gemini AI
+2024-05-20,ISP.MI,dividend,1.0,182.4,EUR,0.0,Stock,Dividendo Saldo Intesa 2023
+2024-06-04,JNJ,dividend,1.0,24.8,USD,0.0,Stock,Dividendo Q2 Johnson & Johnson
+2024-06-13,MSFT,dividend,1.0,11.25,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2024-06-20,NVDA,sell,5.0,129.7861,USD,1.5,Stock,Ribilanciamento Disciplinato Pesi
+2024-07-15,SPY,buy,2.0,546.6684,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2024-07-15,SWDA.MI,buy,10.0,94.3,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2024-07-24,ENEL.MI,dividend,1.0,86.0,EUR,0.0,Stock,Dividendo Saldo Enel 2023
+2024-08-15,PG,dividend,1.0,25.15,USD,0.0,Stock,Dividendo Q3 Procter & Gamble
+2024-09-10,JNJ,dividend,1.0,24.8,USD,0.0,Stock,Dividendo Q3 Johnson & Johnson
+2024-09-18,ISP.MI,buy,300.0,3.2533,EUR,2.0,Stock,Reinvestimento Cedole Bancarie
+2024-10-15,BND,buy,5.0,68.9516,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2024-10-15,EIMI.MI,buy,20.0,33.23,EUR,1.0,ETF,Incremento Mercati Emergenti
+2024-10-15,SPY,buy,2.0,568.1093,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2024-10-15,SWDA.MI,buy,10.0,99.41,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2024-11-12,ISP.MI,sell,200.0,3.2839,EUR,2.0,Stock,Chiusura Parziale su Massimi di Ciclo
+2024-11-15,PG,dividend,1.0,25.15,USD,0.0,Stock,Dividendo Q4 Procter & Gamble
+2024-11-18,ISP.MI,dividend,1.0,221.0,EUR,0.0,Stock,Dividendo Acconto Intesa 2024
+2024-12-10,JNJ,dividend,1.0,24.8,USD,0.0,Stock,Dividendo Q4 Johnson & Johnson
+2024-12-12,MSFT,dividend,1.0,12.45,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2025-01-15,SPY,buy,2.0,582.8026,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2025-01-15,SWDA.MI,buy,10.0,105.45,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2025-01-22,ENEL.MI,dividend,1.0,126.5,EUR,0.0,Stock,Dividendo Acconto Enel 2024
+2025-02-10,AAPL,buy,10.0,226.2583,USD,1.5,Stock,Rinnovamento Ciclo iPhone AI
+2025-02-18,PG,dividend,1.0,25.15,USD,0.0,Stock,Dividendo Q1 Procter & Gamble
+2025-03-04,JNJ,dividend,1.0,24.8,USD,0.0,Stock,Dividendo Q1 Johnson & Johnson
+2025-04-15,BND,buy,5.0,68.892,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2025-04-15,EIMI.MI,buy,20.0,30.1,EUR,1.0,ETF,Incremento Mercati Emergenti
+2025-04-15,SPY,buy,2.0,530.1511,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2025-04-15,SWDA.MI,buy,10.0,91.17,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2025-05-15,PG,dividend,1.0,26.4,USD,0.0,Stock,Dividendo Q2 Procter & Gamble
+2025-05-19,ISP.MI,dividend,1.0,234.0,EUR,0.0,Stock,Dividendo Saldo Intesa 2024
+2025-06-10,JNJ,dividend,1.0,26.0,USD,0.0,Stock,Dividendo Q2 Johnson & Johnson
+2025-06-12,ENEL.MI,buy,150.0,7.3829,EUR,2.0,Stock,Transizione Energetica & Renewables
+2025-06-12,MSFT,dividend,1.0,12.45,USD,0.0,Stock,Dividendo Trimestrale Microsoft
+2025-07-15,SPY,buy,2.0,615.322,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2025-07-15,SWDA.MI,buy,10.0,102.06,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2025-07-22,GLD,sell,5.0,316.1,USD,1.5,Commodity,Monetizzazione Parziale Rally Oro
+2025-07-23,ENEL.MI,dividend,1.0,126.5,EUR,0.0,Stock,Dividendo Saldo Enel 2024
+2025-10-15,BND,buy,5.0,72.2718,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2025-10-15,EIMI.MI,buy,20.0,37.655,EUR,1.0,ETF,Incremento Mercati Emergenti
+2025-10-15,SPY,buy,2.0,659.7044,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2025-10-15,SWDA.MI,buy,10.0,108.92,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2026-01-15,SPY,buy,2.0,688.5807,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2026-01-15,SWDA.MI,buy,10.0,114.95,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2026-04-15,BND,buy,5.0,72.89,USD,1.5,Bond,Ribilanciamento Cedolare Bond
+2026-04-15,EIMI.MI,buy,20.0,43.12,EUR,1.0,ETF,Incremento Mercati Emergenti
+2026-04-15,SPY,buy,2.0,698.1414,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2026-04-15,SWDA.MI,buy,10.0,114.65,EUR,1.0,ETF,PAC DCA Trimestrale Core World
+2026-07-15,SPY,buy,2.0,754.81,USD,1.5,ETF,PAC DCA Trimestrale S&P 500
+2026-07-15,SWDA.MI,buy,10.0,126.29,EUR,1.0,ETF,PAC DCA Trimestrale Core World

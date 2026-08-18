@@ -1,0 +1,15 @@
+[theme]
+# Colore principale per widget, slider e barra di progresso (Ambra Bloomberg)
+primaryColor = "#ff9900"
+
+# Sfondo principale della pagina (Nero profondo)
+backgroundColor = "#0b0e14"
+
+# Sfondo secondario per sidebar e box interni (Grigio/blu molto scuro)
+secondaryBackgroundColor = "#12141c"
+
+# Colore del testo primario (Bianco/Grigio chiaro)
+textColor = "#e2e8f0"
+
+# Forzare il tema scuro a prescindere dalle impostazioni di sistema
+base = "dark"
