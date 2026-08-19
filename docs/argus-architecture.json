@@ -2,287 +2,326 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "ARGUS — Risk Analytics Platform Architecture",
-    "subtitle": "Quantitative Portfolio Risk Management, FIFO Accounting & Multi-Tier Analytics",
+    "title": "ARGUS — Quantitative Risk Analytics Platform",
+    "subtitle": "Institutional Portfolio Risk Intelligence, AI Narrative Analytics & Multi-Asset Data Warehouse",
     "output": "argus-architecture.html",
-    "quality_profile": "standard",
+    "quality_profile": "showcase",
     "animation": "trace",
     "repository": {
       "url": "https://github.com/Alessandro-Sal/argus-risk-analytics",
-      "revision": "main"
+      "revision": "f272f3565a85f53450d998219acb472053571844"
     },
     "views": [
       {
-        "id": "user-flow",
-        "label": "User Interaction & Control Room",
-        "focus": ["users", "streamlit_app", "risk_engine", "report_exporter"],
-        "note": "Analyst interacts with Streamlit dashboard to trigger risk calculations and export reports."
+        "id": "analyst-workflow",
+        "label": "Analyst Interaction & Control Room",
+        "focus": ["analyst_ui", "control_room", "analytical_modules", "report_engine"],
+        "note": "Portfolio managers and analysts interact with ARGUS Control Room and 10 specialized analytical modules."
       },
       {
-        "id": "market-data-ingestion",
-        "label": "Data Ingestion & Market Sync",
-        "focus": ["csv_degiro", "yfinance_api", "data_fetcher", "risk_engine"],
-        "note": "Imports broker transactions CSV and fetches historical prices & forex rates from Yahoo Finance."
+        "id": "ingestion-pipeline",
+        "label": "Multi-Source Ingestion & Cache Shield",
+        "focus": ["csv_sources", "gsheets_api", "market_api", "validator", "data_fetcher", "cache_shield"],
+        "note": "Ingests CSV, DeGiro transactions, and Google Sheets Live Sync, backed by multi-currency FX conversion and SQLite Cache Shield."
       },
       {
-        "id": "quant-risk-analysis",
-        "label": "Quantitative Risk & Compliance",
-        "focus": ["risk_engine", "risk_limits", "quant_advisor", "rebalancer_hedging"],
-        "note": "Executes FIFO accounting, VaR/CVaR calculations, institutional risk limit checks, and Markowitz optimization."
+        "id": "quant-ai-core",
+        "label": "Quantitative & AI Analytics Engine",
+        "focus": ["risk_engine", "adv_quant", "valuation_forensics", "llm_api"],
+        "note": "Executes FIFO WACP accounting, VaR/CVaR Cornish-Fisher, Tail Copulas, Kelly Criterion, HRP, Beneish M-Score, and AI Narrative intelligence."
       },
       {
-        "id": "persistence-reporting",
-        "label": "Data Warehouse & BI Export",
-        "focus": ["risk_engine", "mysql_dw", "powerbi_looker", "report_exporter"],
-        "note": "Persists multi-snapshot data in MySQL 8.0 Star Schema and exports to Power BI / Looker / PDF / Excel."
+        "id": "dw-bi-reporting",
+        "label": "Data Warehouse & Multi-Format Reports",
+        "focus": ["control_room", "dw_database", "report_engine"],
+        "note": "Persists Star Schema snapshots, multi-portfolio registrations and asset mappings in MySQL/SQLite, exporting PDF Factsheets, Excel and HTML."
       }
     ]
   },
   "components": [
     {
-      "id": "users",
+      "id": "analyst_ui",
       "type": "external",
       "label": "Portfolio Analyst",
-      "sublabel": "Browser / Web Client",
-      "pos": [60, 160],
+      "sublabel": "Desktop WebView2 / Web UI",
+      "pos": [40, 160],
       "size": [160, 64]
     },
     {
-      "id": "streamlit_app",
+      "id": "control_room",
       "type": "frontend",
-      "label": "Streamlit App",
-      "sublabel": "Control Room & 9 Modules",
-      "tag": "Python 3.11+",
+      "label": "ARGUS Control Room",
+      "sublabel": "Multi-Account & ISIN DB",
+      "brand": "python",
+      "tag": "v5.4.0 Core Hub",
       "sources": [
-        {"path": "app.py", "label": "Entrypoint"},
-        {"path": "src/0_Control_Room.py", "label": "Control Room"}
+        { "path": "src/0_Control_Room.py", "label": "Control Room Hub" },
+        { "path": "app.py", "label": "Application Entrypoint" }
       ],
-      "pos": [360, 160],
-      "size": [170, 64]
+      "pos": [330, 160],
+      "size": [180, 64]
+    },
+    {
+      "id": "analytical_modules",
+      "type": "frontend",
+      "label": "10 Analytical Pillars",
+      "sublabel": "Risk, Quant & Forensics",
+      "brand": "python",
+      "tag": "Streamlit 1.31+",
+      "sources": [
+        { "path": "src/pages/1_📈_Dashboard_Generale.py", "label": "Executive Cockpit" },
+        { "path": "src/pages/2_🔴_Analisi_Rischio.py", "label": "Risk & VaR" },
+        { "path": "src/pages/3_🔬_Modelli_Quantitativi.py", "label": "Quant Frontier" }
+      ],
+      "pos": [630, 160],
+      "size": [190, 64]
     },
     {
       "id": "risk_engine",
       "type": "backend",
-      "label": "Risk Engine",
-      "sublabel": "FIFO, PnL, VaR, CVaR",
-      "tag": "Core Quantitative Engine",
-      "sources": [{"path": "core/risk_engine.py", "label": "Risk Engine"}],
-      "pos": [660, 160],
-      "size": [170, 64]
+      "label": "Quantitative Risk Engine",
+      "sublabel": "FIFO WACP, VaR & Markowitz",
+      "tag": "Core Compute Engine",
+      "sources": [
+        { "path": "core/risk_engine.py", "label": "FIFO & Risk Engine" }
+      ],
+      "pos": [940, 160],
+      "size": [190, 64]
     },
     {
-      "id": "report_exporter",
+      "id": "report_engine",
       "type": "backend",
-      "label": "Report Exporter",
-      "sublabel": "PDF Factsheet & Excel",
-      "sources": [{"path": "core/report_exporter.py", "label": "Report Exporter"}],
-      "pos": [960, 160],
-      "size": [170, 64]
+      "label": "Multi-Format Exporters",
+      "sublabel": "PDF, Excel, HTML & Star ZIP",
+      "sources": [
+        { "path": "core/report_exporter.py", "label": "Report Hub" },
+        { "path": "core/html_exporter.py", "label": "HTML Exporter" }
+      ],
+      "pos": [1250, 160],
+      "size": [180, 64]
     },
     {
-      "id": "csv_degiro",
+      "id": "csv_sources",
       "type": "external",
-      "label": "Broker CSV Data",
-      "sublabel": "DeGiro & Generic CSV",
-      "sources": [{"path": "docs/CSV_Format_Specification.md", "label": "CSV Spec"}],
-      "pos": [60, 380],
+      "label": "Broker CSV & DeGiro",
+      "sublabel": "Standard & DeGiro Export",
+      "sources": [
+        { "path": "core/adapters/degiro.py", "label": "DeGiro Adapter" },
+        { "path": "docs/CSV_Format_Specification.md", "label": "CSV Spec" }
+      ],
+      "pos": [40, 390],
       "size": [160, 64]
+    },
+    {
+      "id": "validator",
+      "type": "backend",
+      "label": "Data Validator & Clean",
+      "sublabel": "Pydantic & Ingestion Rules",
+      "sources": [
+        { "path": "core/validator.py", "label": "Validator Pipeline" },
+        { "path": "core/schemas.py", "label": "Pydantic Contracts" }
+      ],
+      "pos": [330, 390],
+      "size": [180, 64]
     },
     {
       "id": "data_fetcher",
       "type": "backend",
-      "label": "Data Fetcher",
-      "sublabel": "yfinance & Mapping",
-      "sources": [{"path": "core/fetcher.py", "label": "Data Ingestion"}],
-      "pos": [360, 380],
-      "size": [170, 64]
+      "label": "Market Fetcher & FX",
+      "sublabel": "Multi-Currency FX Engine",
+      "sources": [
+        { "path": "core/fetcher.py", "label": "Historical Sync & FX" }
+      ],
+      "pos": [630, 390],
+      "size": [190, 64]
     },
     {
-      "id": "risk_limits",
-      "type": "security",
-      "label": "Risk Limits Monitor",
-      "sublabel": "6 Institutional Rules",
-      "sources": [{"path": "core/risk_limits.py", "label": "Risk Limits"}],
-      "pos": [660, 380],
-      "size": [170, 64]
+      "id": "adv_quant",
+      "type": "backend",
+      "label": "Advanced Quant & AI",
+      "sublabel": "Tail Copula, Kelly & ERC",
+      "sources": [
+        { "path": "core/advanced_quant.py", "label": "Tail Copula & Kelly" },
+        { "path": "core/ai_analyst.py", "label": "AI Narrative Intelligence" }
+      ],
+      "pos": [940, 390],
+      "size": [190, 64]
     },
     {
-      "id": "mysql_dw",
+      "id": "dw_database",
       "type": "database",
-      "label": "MySQL 8.0 DW",
-      "sublabel": "Star Schema & History",
-      "tag": "Port :3306",
-      "sources": [{"path": "core/db_exporter.py", "label": "DB Layer"}],
-      "pos": [960, 380],
-      "size": [170, 64]
+      "label": "MySQL & SQLite DW",
+      "sublabel": "Star Schema & ISIN DB",
+      "brand": "mysql",
+      "tag": "SQL Data Warehouse",
+      "sources": [
+        { "path": "core/models.py", "label": "ORM Models" },
+        { "path": "core/db_exporter.py", "label": "DB Exporter" }
+      ],
+      "pos": [1250, 390],
+      "size": [180, 64]
     },
     {
-      "id": "yfinance_api",
+      "id": "gsheets_api",
       "type": "external",
-      "label": "Yahoo Finance API",
-      "sublabel": "Historical Prices & Forex",
-      "pos": [60, 600],
+      "label": "Google Sheets Live",
+      "sublabel": "Stocks & Crypto Sync",
+      "sources": [
+        { "path": "gsheets_sync_subproject/sync_google_sheets.py", "label": "Google Sheets ETL" }
+      ],
+      "pos": [40, 620],
       "size": [160, 64]
     },
     {
-      "id": "quant_advisor",
-      "type": "backend",
-      "label": "ARGUS Quant Advisor",
-      "sublabel": "Health Score & Diagnostics",
-      "sources": [{"path": "core/advisor.py", "label": "Advisor"}],
-      "pos": [360, 600],
-      "size": [170, 64]
-    },
-    {
-      "id": "rebalancer_hedging",
-      "type": "backend",
-      "label": "Rebalancer & Hedging",
-      "sublabel": "Markowitz & Beta Neutral",
-      "sources": [
-        {"path": "core/rebalancer.py", "label": "Rebalancer"},
-        {"path": "core/hedging.py", "label": "Hedging"}
-      ],
-      "pos": [660, 600],
-      "size": [170, 64]
-    },
-    {
-      "id": "powerbi_looker",
+      "id": "market_api",
       "type": "external",
-      "label": "Power BI / Looker",
-      "sublabel": "Executive Dashboards",
-      "sources": [{"path": "scripts/export_star_schema.py", "label": "Star Schema Exporter"}],
-      "pos": [960, 600],
-      "size": [170, 64]
+      "label": "Yahoo Finance API",
+      "sublabel": "Historical Prices & ISIN",
+      "pos": [330, 620],
+      "size": [180, 64]
+    },
+    {
+      "id": "cache_shield",
+      "type": "database",
+      "label": "Multi-Tier Cache Shield",
+      "sublabel": "LRU + SQLite TTL 24h",
+      "brand": "sqlite",
+      "tag": "Rate-Limit Protection",
+      "sources": [
+        { "path": "core/cache_shield.py", "label": "Cache Shield Engine" }
+      ],
+      "pos": [630, 620],
+      "size": [190, 64]
+    },
+    {
+      "id": "valuation_forensics",
+      "type": "backend",
+      "label": "Valuation & Forensics",
+      "sublabel": "Beneish, Sloan & Altman Z",
+      "sources": [
+        { "path": "core/forensic_accounting.py", "label": "Beneish & Sloan" },
+        { "path": "core/financial_analysis.py", "label": "Altman Z & DCF" }
+      ],
+      "pos": [940, 620],
+      "size": [190, 64]
+    },
+    {
+      "id": "llm_api",
+      "type": "external",
+      "label": "Gemini & OpenAI API",
+      "sublabel": "LLM Narrative Intelligence",
+      "brand": "google-gemini",
+      "pos": [1250, 620],
+      "size": [180, 64]
     }
   ],
   "boundaries": [
     {
       "kind": "region",
-      "label": "ARGUS Platform Core Container (Streamlit + Python Engines)",
+      "label": "ARGUS Application & Quantitative Core Container (Python 3.11+)",
       "wraps": [
-        "streamlit_app",
-        "data_fetcher",
+        "control_room",
+        "analytical_modules",
         "risk_engine",
-        "risk_limits",
-        "quant_advisor",
-        "rebalancer_hedging",
-        "report_exporter"
+        "report_engine",
+        "validator",
+        "data_fetcher",
+        "adv_quant",
+        "cache_shield",
+        "valuation_forensics"
       ]
     },
     {
-      "kind": "region",
-      "label": "Data Storage & Business Intelligence Layer",
-      "wraps": ["mysql_dw", "powerbi_looker"]
+      "kind": "security-group",
+      "label": "Data Warehouse Storage & Persistence Layer",
+      "wraps": [
+        "dw_database"
+      ]
     }
   ],
   "connections": [
     {
-      "id": "user-access",
-      "from": "users",
-      "to": "streamlit_app",
-      "label": "HTTP / UI",
-      "variant": "emphasis",
-      "fromSide": "right",
-      "toSide": "left",
-      "route": "orthogonal-h",
-      "labelDy": -14
+      "from": "analyst_ui",
+      "to": "control_room",
+      "label": "HTTPS / UI",
+      "variant": "emphasis"
     },
     {
-      "id": "csv-import",
-      "from": "csv_degiro",
-      "to": "streamlit_app",
-      "label": "Upload CSV",
-      "fromSide": "top",
-      "toSide": "bottom",
-      "route": "orthogonal-v"
+      "from": "control_room",
+      "to": "analytical_modules",
+      "label": "Module Route",
+      "variant": "emphasis"
     },
     {
-      "id": "market-fetch",
-      "from": "yfinance_api",
+      "from": "analytical_modules",
+      "to": "risk_engine",
+      "label": "Risk Computations",
+      "variant": "emphasis"
+    },
+    {
+      "from": "risk_engine",
+      "to": "report_engine",
+      "label": "Factsheet Data"
+    },
+    {
+      "from": "csv_sources",
+      "to": "validator",
+      "label": "Raw CSV",
+      "variant": "dashed"
+    },
+    {
+      "from": "gsheets_api",
+      "to": "validator",
+      "label": "Live Sync ETL",
+      "variant": "dashed"
+    },
+    {
+      "from": "validator",
+      "to": "control_room",
+      "label": "Validated Portfolio"
+    },
+    {
+      "from": "market_api",
+      "to": "cache_shield",
+      "label": "Market Ingestion"
+    },
+    {
+      "from": "cache_shield",
       "to": "data_fetcher",
-      "label": "Market Sync",
-      "fromSide": "top",
-      "toSide": "bottom",
-      "route": "orthogonal-v"
+      "label": "Cached Data"
     },
     {
-      "id": "fetcher-to-engine",
       "from": "data_fetcher",
       "to": "risk_engine",
-      "label": "Prices & Forex",
-      "fromSide": "top",
-      "toSide": "bottom",
-      "route": "orthogonal-v"
+      "label": "FX-Adjusted Prices"
     },
     {
-      "id": "app-to-engine",
-      "from": "streamlit_app",
-      "to": "risk_engine",
-      "label": "Calculate Risk",
-      "fromSide": "right",
-      "toSide": "left",
-      "route": "orthogonal-h",
-      "labelDy": -14
-    },
-    {
-      "id": "engine-to-limits",
       "from": "risk_engine",
-      "to": "risk_limits",
-      "label": "Portfolio Metrics",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "route": "orthogonal-v"
+      "to": "adv_quant",
+      "label": "Return Matrix",
+      "labelDy": 24
     },
     {
-      "id": "engine-to-advisor",
+      "from": "adv_quant",
+      "to": "llm_api",
+      "label": "LLM Synthesis",
+      "variant": "dashed"
+    },
+    {
+      "from": "adv_quant",
+      "to": "valuation_forensics",
+      "label": "Fundamentals",
+      "labelDy": 24
+    },
+    {
       "from": "risk_engine",
-      "to": "quant_advisor",
-      "label": "Asset Allocations",
-      "fromSide": "left",
-      "toSide": "top",
-      "route": "orthogonal-v",
-      "via": [[570, 192], [570, 520], [445, 520]],
-      "labelDy": -14
+      "to": "dw_database",
+      "label": "Persist Snapshots"
     },
     {
-      "id": "engine-to-rebalancer",
-      "from": "risk_engine",
-      "to": "rebalancer_hedging",
-      "label": "Covariance Data",
-      "fromSide": "right",
-      "toSide": "right",
-      "route": "orthogonal-v",
-      "via": [[870, 192], [870, 632], [830, 632]]
-    },
-    {
-      "id": "engine-to-exporter",
-      "from": "risk_engine",
-      "to": "report_exporter",
-      "label": "Factsheet Data",
-      "fromSide": "right",
-      "toSide": "left",
-      "route": "orthogonal-h",
-      "labelDy": -14
-    },
-    {
-      "id": "engine-to-dw",
-      "from": "risk_engine",
-      "to": "mysql_dw",
-      "label": "Persist Snapshots",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "route": "orthogonal-v",
-      "via": [[745, 300], [1045, 300]]
-    },
-    {
-      "id": "dw-to-bi",
-      "from": "mysql_dw",
-      "to": "powerbi_looker",
-      "label": "Star Schema Queries",
-      "fromSide": "bottom",
-      "toSide": "top",
-      "route": "orthogonal-v",
-      "labelAt": [1045, 490]
+      "from": "dw_database",
+      "to": "report_engine",
+      "label": "Historical Queries"
     }
   ],
   "cards": [
@@ -290,36 +329,37 @@
       "dot": "cyan",
       "title": "Ingestion & Interface",
       "items": [
-        "Streamlit multi-page UI (7 pages + Control Room)",
-        "DeGiro & Generic CSV transaction parsing",
-        "Automated yfinance historical market & forex download"
+        "Control Room v5.4.0 with 10 analytical modules",
+        "Dual Google Sheets Live Sync (Stocks + Crypto)",
+        "Automated ISIN / Ticker Database Resolver & Multi-Currency FX Engine"
       ]
     },
     {
       "dot": "emerald",
       "title": "Quantitative & Risk Core",
       "items": [
-        "Exact FIFO accounting & Cost Basis tracking",
-        "Multi-method VaR (Historical, Parametric, Cornish-Fisher) & CVaR",
-        "Markowitz Max Sharpe & Min Volatility Rebalancer",
-        "Beta-Neutral Hedging & Tail Risk Insurance Estimator"
+        "FIFO WACP deterministico & VaR/CVaR Cornish-Fisher",
+        "Tail Copulas (Clayton/Gumbel), Kelly Sizing & Equal Risk Contribution (ERC)",
+        "Live Rebalancing Sandbox con 5 preset quantitativi",
+        "Hierarchical Risk Parity (HRP) & Black-Scholes Delta-Hedging"
       ]
     },
     {
       "dot": "rose",
-      "title": "Governance & Compliance",
+      "title": "AI & Forensic Intelligence",
       "items": [
-        "6 Institutional Risk Limits monitoring & Early Warning",
-        "Health Score (0-100) & Anomaly Scanner"
+        "AI Analyst dual-engine (Gemini / OpenAI / NLG Offline 100%)",
+        "Contabilità Forense Beneish M-Score (1999) & Sloan Accruals (1996)",
+        "Altman Z-Score, Scomposizione DuPont & DCF Monte Carlo"
       ]
     },
     {
       "dot": "violet",
-      "title": "Persistence & BI",
+      "title": "Storage, Caching & BI",
       "items": [
-        "MySQL 8.0 Star Schema Data Warehouse",
-        "Multi-Tab Excel & PDF Factsheet exporter",
-        "Star Schema export for Power BI & Looker Studio"
+        "Multi-Tier Cache Shield (LRU + SQLite 24h) anti-rate limit",
+        "MySQL 8.0 & SQLite Data Warehouse Star Schema",
+        "Esportazione Factsheet PDF, Excel Multi-Tab, HTML Standalone e Power BI ZIP"
       ]
     }
   ]
