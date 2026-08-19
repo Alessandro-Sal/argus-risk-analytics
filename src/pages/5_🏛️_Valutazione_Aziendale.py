@@ -991,6 +991,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             
             fig_comp_radar = go.Figure()
             radar_colors = ['#00e676', '#58a6ff', '#bc8cff', '#ff9900', '#f85149', '#00f3ff']
+            categories = ['Current Ratio', 'Quick Ratio', 'Asset Turnover', 'Debt/Equity (Inv)', 'Interest Coverage (Scaled)']
             
             for idx, (tk, rep) in enumerate(reps.items()):
                 r_l = rep["ratios"]["liquidity"]
