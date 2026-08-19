@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="generator" content="archify 2.12.0">
-  <title>ARGUS — Risk Analytics Platform Architecture Diagram</title>
+  <meta name="generator" content="archify 2.15.0">
+  <title>ARGUS — Quantitative Risk Analytics Platform Diagram</title>
   <script>
     // Resolve the theme before first paint so light-preference users don't
     // see a dark flash. The toolbar script below re-applies with UI state.
@@ -50,7 +50,7 @@
       --text: #ffffff;
       --text-muted: #94a3b8;
       --text-dim: #475569;
-      /* UI chrome (menu hints, footer) needs more contrast than SVG .t-dim accents */
+      /* UI chrome and menu hints need more contrast than SVG .t-dim accents */
       --text-faint: #7d8da1;
 
       --panel: rgba(15, 23, 42, 0.5);
@@ -397,7 +397,6 @@
     html[data-embed="true"] .toolbar,
     html[data-embed="true"] .header,
     html[data-embed="true"] .cards,
-    html[data-embed="true"] .footer,
     html[data-embed="true"] .diagram-nav,
     html[data-embed="true"] .overview-map,
     html[data-embed="true"] .focus-chip,
@@ -593,16 +592,29 @@
       height: 100%;
       min-width: 0;
     }
-    html[data-present="true"]:not([data-embed="true"]) .cards,
-    html[data-present="true"]:not([data-embed="true"]) .footer { display: none; }
+    html[data-present="true"]:not([data-embed="true"]) .cards { display: none; }
     html[data-present="true"]:not([data-embed="true"]) #btn-present {
       border-color: var(--frontend-stroke);
       color: var(--frontend-stroke);
     }
 
-    .container { max-width: 1200px; margin: 0 auto; }
+    /* The reader owns only the outer scale. Wide diagrams keep one authored
+       SVG/viewBox while the runtime chooses a desktop width from the actual
+       vertical budget. This avoids device-specific files and breakpoint
+       jumps between a laptop and a tall monitor. */
+    .container {
+      width: 100%;
+      max-width: var(--archify-reader-width, 1440px);
+      margin: 0 auto;
+    }
+    @media (min-width: 768px) and (max-height: 920px) {
+      .header { margin-bottom: 1rem; }
+      .diagram-container { padding: 1rem; }
+      .cards { margin-top: 1rem; }
+      .card { padding: 1rem; }
+    }
 
-    .header { margin-bottom: 2rem; padding-right: 29.5rem; }
+    .header { margin-bottom: 1.5rem; padding-right: 29.5rem; }
 
     html[data-preset="signal-flow"] .header,
     html[data-preset="blueprint"] .header,
@@ -903,14 +915,18 @@
       z-index: 12;
       display: inline-flex;
       align-items: center;
-      padding: 0.25rem;
-      gap: 0.2rem;
-      border: 1px solid var(--toolbar-border);
-      border-radius: 0.65rem;
-      background: var(--toolbar-bg);
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
+      max-width: calc(100% - 2rem);
+      padding: 0.15rem;
+      gap: 0;
+      overflow-x: auto;
+      border: 1px solid color-mix(in srgb, var(--toolbar-border) 48%, transparent);
+      border-radius: 0.58rem;
+      background: color-mix(in srgb, var(--toolbar-bg) 82%, transparent);
+      box-shadow: 0 5px 14px rgba(0, 0, 0, 0.07);
       backdrop-filter: blur(10px);
+      scrollbar-width: none;
     }
+    .diagram-nav::-webkit-scrollbar { display: none; }
     .diagram-nav button,
     .focus-chip button,
     .guided-views button {
@@ -923,10 +939,13 @@
     .diagram-nav button {
       min-width: 2rem;
       height: 2rem;
-      padding: 0 0.45rem;
-      border-radius: 0.4rem;
-      font-size: 0.75rem;
+      padding: 0 0.35rem;
+      border-radius: 0.35rem;
+      color: color-mix(in srgb, var(--toolbar-text) 68%, transparent);
+      font-size: 0.56rem;
       font-weight: 600;
+      letter-spacing: 0.02em;
+      transition: background 0.15s, color 0.15s;
     }
     .diagram-nav button:hover,
     .diagram-nav button:focus-visible,
@@ -941,11 +960,86 @@
       outline-offset: 1px;
     }
     .diagram-nav button:disabled { opacity: 0.38; cursor: default; }
-    .diagram-nav [data-view="reset"] { min-width: 3.35rem; font-size: 0.625rem; }
-    .diagram-container[data-camera-indicator="true"] .diagram-nav [data-view="reset"] {
-      min-width: 5.2rem;
-      color: var(--frontend-stroke);
+    .diagram-nav button:disabled:hover { background: transparent; }
+    .diagram-nav #btn-route-probe,
+    .diagram-nav #btn-overview-map,
+    .diagram-nav #btn-semantic-lens {
+      min-width: auto;
+      padding-inline: 0.5rem;
+      color: color-mix(in srgb, var(--toolbar-text) 86%, transparent);
+      font-weight: 650;
     }
+    .diagram-nav #btn-node-finder,
+    .diagram-nav [data-view="out"] {
+      position: relative;
+      margin-left: 0.25rem;
+    }
+    .diagram-nav #btn-node-finder::before,
+    .diagram-nav [data-view="out"]::before {
+      position: absolute;
+      top: 0.4rem;
+      bottom: 0.4rem;
+      left: -0.13rem;
+      width: 1px;
+      background: color-mix(in srgb, var(--toolbar-border) 62%, transparent);
+      content: "";
+      pointer-events: none;
+    }
+    .diagram-nav-icon {
+      display: block;
+      width: 0.72rem;
+      height: 0.72rem;
+      margin: auto;
+      background: currentColor;
+      -webkit-mask-position: center;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-size: contain;
+      mask-position: center;
+      mask-repeat: no-repeat;
+      mask-size: contain;
+    }
+    .diagram-nav-icon.find {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='8.5' cy='8.5' r='4.5' fill='none' stroke='black' stroke-width='1.8'/%3E%3Cpath d='m12 12 4 4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='8.5' cy='8.5' r='4.5' fill='none' stroke='black' stroke-width='1.8'/%3E%3Cpath d='m12 12 4 4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    .diagram-nav-icon.guide {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='7' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M7.8 7.3a2.4 2.4 0 014.6.9c0 1.8-2.4 2-2.4 3.7M10 14.9h.01' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='7' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M7.8 7.3a2.4 2.4 0 014.6.9c0 1.8-2.4 2-2.4 3.7M10 14.9h.01' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    .diagram-nav-icon.minus {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10h10' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 10h10' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    .diagram-nav-icon.plus {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 5v10M5 10h10' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 5v10M5 10h10' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    .diagram-nav [data-view="reset"] {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.2rem;
+      min-width: 3.1rem;
+      padding-inline: 0.35rem;
+    }
+    .diagram-nav [data-view="reset"][data-detail-visible] {
+      min-width: 3.8rem;
+    }
+    .diagram-nav-detail {
+      color: color-mix(in srgb, var(--toolbar-text) 52%, transparent);
+      font-size: 0.44rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.07em;
+    }
+    .diagram-nav-percent {
+      color: color-mix(in srgb, var(--toolbar-text) 84%, transparent);
+      font-size: 0.55rem;
+      font-weight: 650;
+      line-height: 1;
+    }
+    .diagram-container[data-camera-indicator="true"] .diagram-nav-detail,
+    .diagram-container[data-camera-indicator="true"] .diagram-nav-percent { color: var(--frontend-stroke); }
     .diagram-nav #btn-diagram-guide[aria-expanded="true"] {
       color: var(--cloud-stroke);
       background: var(--toolbar-hover);
@@ -1589,6 +1683,11 @@
       text-transform: uppercase;
     }
     .semantic-passport-meta [data-passport="tag"] { color: var(--cloud-stroke); }
+    .semantic-passport-meta [data-passport="brand"] {
+      border-color: color-mix(in srgb, var(--messagebus-stroke) 52%, var(--toolbar-border));
+      color: var(--messagebus-stroke);
+      font-weight: 700;
+    }
     .semantic-passport-meta [hidden] { display: none; }
     html[data-preset="blueprint"] .semantic-passport-meta span,
     html[data-preset="blueprint"] .semantic-passport-meta code { border-radius: 0.1rem; }
@@ -2696,6 +2795,20 @@
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 12px 32px rgba(45, 78, 99, 0.08);
     }
 
+    /* Preserve the one-screen guarantee on ordinary laptop displays. The
+       high-screen expansion above must not trade a fuller canvas for page
+       scrolling at 900–1080px heights. */
+    @media (min-width: 768px) and (max-height: 1100px) {
+      .header { margin-bottom: 1rem; }
+      .diagram-container { padding: 0.875rem; }
+      .cards { margin-top: 1rem; }
+      .card { padding: 1rem; }
+    }
+    @media (min-width: 768px) and (max-height: 920px) {
+      .header { margin-bottom: 0.875rem; }
+      .cards { margin-top: 0.75rem; }
+    }
+
     html[data-preset="blueprint"] .card {
       position: relative;
       border-color: var(--panel-border);
@@ -2758,26 +2871,6 @@
     }
 
     .card li { margin-bottom: 0.375rem; }
-
-    .footer {
-      text-align: center;
-      margin-top: 1.5rem;
-      color: var(--text-faint);
-      font-size: 0.75rem;
-    }
-
-    .footer .artifact-start-link {
-      color: var(--text-faint);
-      text-decoration-color: color-mix(in srgb, var(--frontend-stroke) 48%, transparent);
-      text-underline-offset: 0.22em;
-      transition: color 0.15s ease, text-decoration-color 0.15s ease;
-    }
-
-    .footer .artifact-start-link:hover,
-    .footer .artifact-start-link:focus-visible {
-      color: var(--frontend-stroke);
-      text-decoration-color: currentColor;
-    }
 
     /* ==========================================================
        Print stylesheet — hide interactive controls, force light,
@@ -2876,7 +2969,12 @@
       top: 1rem;
       right: 1rem;
       display: flex;
+      align-items: center;
       gap: 0.5rem;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
       z-index: 100;
     }
     .toolbar button {
@@ -2884,13 +2982,15 @@
       color: var(--toolbar-text);
       border: 1px solid var(--toolbar-border);
       padding: 0.5rem 0.875rem;
-      border-radius: 0.5rem;
+      border-radius: 0.625rem;
       font-family: inherit;
       font-size: 0.75rem;
       font-weight: 500;
       cursor: pointer;
-      backdrop-filter: blur(8px);
-      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
       display: inline-flex;
       align-items: center;
       gap: 0.375rem;
@@ -2898,7 +2998,22 @@
     }
     .toolbar button:hover {
       background: var(--toolbar-hover);
-      border-color: var(--arrow);
+      border-color: color-mix(in srgb, var(--arrow) 62%, var(--toolbar-border));
+    }
+    .toolbar button[aria-expanded="true"],
+    .toolbar button[aria-pressed="true"]:not(#btn-theme) {
+      background: color-mix(in srgb, var(--frontend-stroke) 10%, var(--toolbar-hover));
+      border-color: color-mix(in srgb, var(--frontend-stroke) 48%, var(--toolbar-border));
+    }
+    .toolbar #btn-export {
+      padding-right: 0.82rem;
+      padding-left: 0.82rem;
+    }
+    .toolbar #btn-export:hover,
+    .toolbar #btn-export[aria-expanded="true"] {
+      color: var(--toolbar-text);
+      background: color-mix(in srgb, var(--frontend-stroke) 10%, var(--toolbar-hover));
+      border-color: color-mix(in srgb, var(--frontend-stroke) 54%, var(--toolbar-border));
     }
     .toolbar button:focus-visible {
       outline: 2px solid var(--frontend-stroke);
@@ -2907,7 +3022,49 @@
     .toolbar #btn-motion[hidden] { display: none !important; }
     .toolbar #btn-motion { min-width: 4.4rem; }
     .toolbar #btn-motion:disabled { cursor: default; opacity: 0.58; }
-    .toolbar .preset-wrap { position: relative; }
+    .toolbar .preset-wrap,
+    .toolbar .export-wrap {
+      position: relative;
+    }
+    .toolbar-icon {
+      display: inline-block;
+      width: 0.95rem;
+      height: 0.95rem;
+      flex: 0 0 auto;
+      background: currentColor;
+      -webkit-mask-position: center;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-size: contain;
+      mask-position: center;
+      mask-repeat: no-repeat;
+      mask-size: contain;
+    }
+    .toolbar-chevron {
+      width: 0.65rem;
+      height: 0.65rem;
+      transition: transform 0.15s ease;
+    }
+    [aria-expanded="true"] > .toolbar-chevron { transform: rotate(180deg); }
+    [data-theme="light"] #theme-icon {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='3.1'/%3E%3Cpath d='M10 2.2v1.4M10 16.4v1.4M2.2 10h1.4M16.4 10h1.4M4.5 4.5l1 1M14.5 14.5l1 1M15.5 4.5l-1 1M5.5 14.5l-1 1'/%3E%3C/g%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'%3E%3Ccircle cx='10' cy='10' r='3.1'/%3E%3Cpath d='M10 2.2v1.4M10 16.4v1.4M2.2 10h1.4M16.4 10h1.4M4.5 4.5l1 1M14.5 14.5l1 1M15.5 4.5l-1 1M5.5 14.5l-1 1'/%3E%3C/g%3E%3C/svg%3E");
+    }
+    [data-theme="dark"] #theme-icon {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M15.2 12.7A6.3 6.3 0 017.3 4.8a6.3 6.3 0 107.9 7.9Z' fill='none' stroke='black' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M15.2 12.7A6.3 6.3 0 017.3 4.8a6.3 6.3 0 107.9 7.9Z' fill='none' stroke='black' stroke-width='1.7' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    #btn-present[aria-pressed="false"] #present-icon {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.2 3.2h-4v4M12.8 3.2h4v4M7.2 16.8h-4v-4M12.8 16.8h4v-4' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.2 3.2h-4v4M12.8 3.2h4v4M7.2 16.8h-4v-4M12.8 16.8h4v-4' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    #btn-present[aria-pressed="true"] #present-icon {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.2 7.2h-4v-4M12.8 7.2h4v-4M7.2 12.8h-4v4M12.8 12.8h4v4' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M7.2 7.2h-4v-4M12.8 7.2h4v-4M7.2 12.8h-4v4M12.8 12.8h4v4' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round'/%3E%3C/svg%3E");
+    }
+    .toolbar-chevron {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
     .toolbar #btn-preset { min-width: 5.4rem; }
     .preset-control-mark {
       width: 0.58rem;
@@ -2940,14 +3097,24 @@
       top: calc(100% + 0.375rem);
       right: 0;
       display: none;
-      width: 16.5rem;
-      padding: 0.4rem;
+      width: 18.5rem;
+      max-width: calc(100vw - 2rem);
+      padding: 0.45rem;
       border: 1px solid var(--toolbar-border);
-      border-radius: 0.5rem;
+      border-radius: 0.875rem;
       background: var(--toolbar-menu-bg);
-      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
     }
     .toolbar .preset-menu.open { display: block; }
+    .toolbar .preset-menu.open,
+    .toolbar .export-menu.open {
+      animation: toolbar-menu-in 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+      transform-origin: top right;
+    }
+    @keyframes toolbar-menu-in {
+      from { opacity: 0; transform: translateY(-0.25rem) scale(0.985); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
     .preset-menu-heading {
       display: flex;
       align-items: baseline;
@@ -2973,12 +3140,18 @@
       min-height: 3.35rem;
       padding: 0.5rem 0.62rem;
       border: 0;
-      border-radius: 0.34rem;
+      border-radius: 0.5rem;
       background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
       text-align: left;
     }
     .toolbar .preset-option:hover,
     .toolbar .preset-option:focus-visible { background: var(--toolbar-hover); }
+    .toolbar .preset-option[aria-checked="true"] {
+      background: color-mix(in srgb, var(--frontend-stroke) 9%, transparent);
+      border-color: color-mix(in srgb, var(--frontend-stroke) 36%, transparent);
+    }
     .preset-option-swatch {
       position: relative;
       width: 2rem;
@@ -3076,8 +3249,19 @@
       text-overflow: ellipsis;
     }
     .preset-option-check {
+      display: inline-block;
+      width: 0.9rem;
+      height: 0.9rem;
       color: var(--frontend-stroke);
-      font-size: 0.78rem;
+      background: currentColor;
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8.5 3 3 7-7' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      -webkit-mask-position: center;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-size: contain;
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3 8.5 3 3 7-7' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      mask-position: center;
+      mask-repeat: no-repeat;
+      mask-size: contain;
       opacity: 0;
     }
     .preset-option[aria-checked="true"] .preset-option-check { opacity: 1; }
@@ -3107,42 +3291,171 @@
       background: transparent;
       box-shadow: none;
     }
-    .toolbar .export-wrap { position: relative; }
     .toolbar .export-menu {
       position: absolute;
       top: calc(100% + 0.375rem);
       right: 0;
       background: var(--toolbar-menu-bg);
       border: 1px solid var(--toolbar-border);
-      border-radius: 0.5rem;
-      padding: 0.375rem;
-      min-width: 160px;
+      width: 19rem;
+      max-width: calc(100vw - 2rem);
+      max-height: calc(100vh - 5.5rem);
+      overflow-y: auto;
+      border-radius: 0.875rem;
+      padding: 0.55rem;
       display: none;
       flex-direction: column;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.24);
     }
     .toolbar .export-menu.open { display: flex; }
-    .toolbar .export-menu button {
-      background: transparent;
-      border: 0;
+    .export-menu-header {
+      display: flex;
+      align-items: flex-start;
       justify-content: space-between;
+      gap: 1rem;
+      padding: 0.5rem 0.55rem 0.72rem;
+    }
+    .export-menu-header strong,
+    .export-menu-header span { display: block; }
+    .export-menu-header strong {
+      color: var(--toolbar-text);
+      font-size: 0.78rem;
+      font-weight: 650;
+      letter-spacing: -0.015em;
+    }
+    .export-menu-header span {
+      margin-top: 0.16rem;
+      color: var(--text-faint);
+      font-size: 0.56rem;
+    }
+    .export-menu-header kbd {
+      padding: 0.16rem 0.36rem;
+      border: 1px solid var(--toolbar-border);
+      border-radius: 0.3rem;
+      color: var(--text-faint);
+      background: color-mix(in srgb, var(--toolbar-border) 16%, transparent);
+      font-family: inherit;
+      font-size: 0.54rem;
+      font-weight: 600;
+    }
+    .export-menu-section {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.18rem;
+    }
+    .export-menu-section + .export-menu-section {
+      margin-top: 0.42rem;
+      padding-top: 0.42rem;
+      border-top: 1px solid color-mix(in srgb, var(--toolbar-border) 68%, transparent);
+    }
+    .export-menu-heading {
+      grid-column: 1 / -1;
+      display: block;
+      padding: 0.24rem 0.55rem 0.2rem;
+      color: var(--text-faint);
+      font-size: 0.54rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .toolbar .export-menu button {
+      display: grid;
+      grid-template-columns: 1.15rem minmax(0, 1fr);
+      align-items: center;
+      column-gap: 0.52rem;
+      background: transparent;
+      border: 1px solid transparent;
+      box-shadow: none;
+      backdrop-filter: none;
       width: 100%;
+      min-height: 3rem;
       text-align: left;
-      padding: 0.5rem 0.75rem;
+      padding: 0.48rem 0.55rem;
+      border-radius: 0.5rem;
+      white-space: nowrap;
+    }
+    .export-item-copy {
+      display: block;
+      min-width: 0;
+    }
+    .export-item-copy strong,
+    .export-item-copy small { display: block; }
+    .export-item-copy strong {
+      overflow: hidden;
+      color: inherit;
+      font-size: 0.7rem;
+      font-weight: 550;
+      text-overflow: ellipsis;
+    }
+    .export-item-copy small {
+      margin-top: 0.12rem;
+      overflow: hidden;
+      color: var(--text-faint);
+      font-size: 0.55rem;
+      font-weight: 450;
+      text-overflow: ellipsis;
+    }
+    .toolbar .export-menu button::before {
+      width: 1rem;
+      height: 1rem;
+      background: currentColor;
+      content: "";
+      opacity: 0.72;
+      -webkit-mask-position: center;
+      -webkit-mask-repeat: no-repeat;
+      -webkit-mask-size: contain;
+      mask-position: center;
+      mask-repeat: no-repeat;
+      mask-size: contain;
+    }
+    .toolbar .export-menu button[data-format="share-card"]::before,
+    .toolbar .export-menu button[data-action="route-share-card"]::before,
+    .toolbar .export-menu button[data-action="reach-share-card"]::before {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='black' stroke-width='1.7' d='M3 4.5h14v11H3zM6 12l2.5-2.5 2 2 1.5-1.5 2 2'/%3E%3Ccircle cx='13.8' cy='7.3' r='1.2' fill='black'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath fill='none' stroke='black' stroke-width='1.7' d='M3 4.5h14v11H3zM6 12l2.5-2.5 2 2 1.5-1.5 2 2'/%3E%3Ccircle cx='13.8' cy='7.3' r='1.2' fill='black'/%3E%3C/svg%3E");
+    }
+    .toolbar .export-menu button[data-action^="copy"]::before {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='6' y='6' width='10' height='10' rx='1.5' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M4 13H3.5A1.5 1.5 0 012 11.5v-8A1.5 1.5 0 013.5 2h8A1.5 1.5 0 0113 3.5V4' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='6' y='6' width='10' height='10' rx='1.5' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M4 13H3.5A1.5 1.5 0 012 11.5v-8A1.5 1.5 0 013.5 2h8A1.5 1.5 0 0113 3.5V4' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+    }
+    .toolbar .export-menu button[data-format="png"]::before,
+    .toolbar .export-menu button[data-format="jpeg"]::before,
+    .toolbar .export-menu button[data-format="webp"]::before {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 2.5h7l3 3v12H5zM12 2.5v3h3' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M7.5 14l2-2 1.5 1.5 1.5-1.5' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5 2.5h7l3 3v12H5zM12 2.5v3h3' fill='none' stroke='black' stroke-width='1.7'/%3E%3Cpath d='M7.5 14l2-2 1.5 1.5 1.5-1.5' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+    }
+    .toolbar .export-menu button[data-format="svg"]::before,
+    .toolbar .export-menu button[data-format="webm"]::before {
+      -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 2.5l7 4v7l-7 4-7-4v-7zM3 6.5l7 4 7-4M10 10.5v7' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+      mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M10 2.5l7 4v7l-7 4-7-4v-7zM3 6.5l7 4 7-4M10 10.5v7' fill='none' stroke='black' stroke-width='1.7'/%3E%3C/svg%3E");
+    }
+    .toolbar .export-menu button[data-format="share-card"],
+    .toolbar .export-menu button[data-action="route-share-card"],
+    .toolbar .export-menu button[data-action="reach-share-card"] {
+      min-height: 3.35rem;
+      color: var(--toolbar-text);
+      background: color-mix(in srgb, var(--frontend-stroke) 8%, transparent);
+      border-color: color-mix(in srgb, var(--frontend-stroke) 24%, var(--toolbar-border));
     }
     .toolbar .export-menu button[hidden] { display: none; }
     .toolbar .export-menu button:hover {
       background: var(--toolbar-hover);
     }
+    .toolbar .export-menu button:focus-visible {
+      background: var(--toolbar-hover);
+      outline-offset: -2px;
+    }
+    .toolbar .export-menu button:disabled {
+      color: var(--text-faint);
+      background: color-mix(in srgb, var(--toolbar-border) 18%, transparent);
+      cursor: not-allowed;
+    }
+    .toolbar .export-menu button:disabled:hover {
+      border-color: transparent;
+    }
     .toolbar .export-menu .hint {
       color: var(--text-faint);
-      font-size: 0.625rem;
-    }
-    .toolbar .export-menu hr {
-      border: 0;
-      border-top: 1px solid var(--toolbar-border);
-      margin: 0.25rem 0.375rem;
-      opacity: 0.5;
+      font-size: 0.55rem;
     }
 
     /* Toast — brief feedback for actions like "copied" */
@@ -3171,16 +3484,21 @@
 
     @media (max-width: 720px) {
       body { padding: 1rem; }
-      .toolbar .preset-menu {
+      .toolbar .preset-menu,
+      .toolbar .export-menu {
         position: fixed;
         top: 4.5rem;
         right: 1rem;
         left: 1rem;
         width: auto;
+        max-width: none;
       }
       .toolbar {
         position: relative;
         justify-content: flex-end;
+        width: max-content;
+        max-width: 100%;
+        margin-left: auto;
         margin-bottom: 1rem;
       }
       .header { margin-bottom: 1.25rem; padding-right: 0; }
@@ -3242,6 +3560,12 @@
         transform: translateX(var(--archify-scroll-x, 0px));
       }
       .diagram-nav { right: 0.5rem; bottom: 0.5rem; }
+      .diagram-nav button {
+        min-width: 2.75rem;
+        height: 2.75rem;
+      }
+      .diagram-nav [data-view="reset"] { min-width: 3.75rem; }
+      .diagram-nav [data-view="reset"][data-detail-visible] { min-width: 4.35rem; }
       .overview-map {
         right: 0.5rem;
         bottom: 3.7rem;
@@ -3498,8 +3822,19 @@
       }
     }
 
+    @media (max-width: 420px) {
+      .export-menu-section { grid-template-columns: 1fr; }
+      .export-menu-heading,
+      .toolbar .export-menu button[data-format="share-card"],
+      .toolbar .export-menu button[data-action="route-share-card"],
+      .toolbar .export-menu button[data-action="reach-share-card"] { grid-column: 1; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .guided-story-caption { animation: none !important; }
+      .toolbar .preset-menu.open,
+      .toolbar .export-menu.open { animation: none; }
+      .toolbar-chevron { transition: none; }
     }
 
     @media (max-width: 360px) {
@@ -3557,6 +3892,27 @@
     svg .s-security   { color: var(--security-stroke); }
     svg .s-messagebus { color: var(--messagebus-stroke); }
     svg .s-external   { color: var(--external-stroke); }
+
+    /* Brand Marks are authored identity badges. Their color is contained
+       inside one neutral plate so vendor color never replaces Archify's
+       semantic node and relationship vocabulary. */
+    svg .brand-mark { pointer-events: none; }
+    svg .brand-mark-badge { fill: #fff; stroke: none; }
+    svg .brand-mark-frame {
+      fill: none;
+      stroke: #cbd5e1;
+      stroke-width: 0.8;
+      vector-effect: non-scaling-stroke;
+    }
+    svg .brand-mark-fallback {
+      fill: none;
+      stroke: #475569;
+      stroke-width: 1.15;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    svg[data-preset="blueprint"] .brand-mark-badge,
+    svg[data-preset="blueprint"] .brand-mark-frame { rx: 1px; }
 
     /* Reading Depth is a viewer-only level-of-detail layer. MAP preserves the
        authored structure and primary labels, READ restores relationship labels
@@ -3688,7 +4044,7 @@
     }
     svg [data-legend-count-badge] text {
       fill: var(--text-muted);
-      font-size: 7px;
+      font-size: 8px;
       font-weight: 700;
       text-anchor: middle;
     }
@@ -3973,6 +4329,9 @@
       opacity: 0.94;
       animation: archify-intent-trace-flow 1.15s linear 1 both;
     }
+    /* Direction names describe each edge relative to the focused node only.
+       The cloned geometry already runs from the authored source to target, so
+       incoming and outgoing signals must share the same playback direction. */
     .intent-trace-flow[data-direction="out"] {
       stroke: var(--frontend-stroke);
       filter: drop-shadow(0 0 4px var(--frontend-stroke));
@@ -3980,7 +4339,7 @@
     .intent-trace-flow[data-direction="in"] {
       stroke: var(--database-stroke);
       filter: drop-shadow(0 0 4px var(--database-stroke));
-      animation-direction: reverse;
+      animation-direction: normal;
     }
     .intent-trace-flow[data-direction="loop"] {
       stroke: var(--security-stroke);
@@ -4411,7 +4770,7 @@
             title="Toggle theme (T)"
             aria-label="Toggle color theme"
             aria-pressed="false">
-      <span id="theme-icon" aria-hidden="true">&#9790;</span>
+      <span id="theme-icon" class="toolbar-icon" aria-hidden="true"></span>
       <span id="theme-label">Dark</span>
     </button>
     <div class="preset-wrap">
@@ -4424,29 +4783,29 @@
               aria-keyshortcuts="S">
         <span class="preset-control-mark" aria-hidden="true"></span>
         <span id="preset-label">Style</span>
-        <span aria-hidden="true">&#9662;</span>
+        <span class="toolbar-icon toolbar-chevron" aria-hidden="true"></span>
       </button>
       <div class="preset-menu" id="preset-menu" role="menu" aria-label="Visual style">
         <div class="preset-menu-heading" role="presentation"><span>Visual identity</span><span>S cycles</span></div>
         <button class="preset-option" data-preset-value="classic" type="button" role="menuitemradio" aria-checked="false" tabindex="-1">
           <span class="preset-option-swatch classic" aria-hidden="true"></span>
           <span class="preset-option-copy"><strong>Classic</strong><small>Stable technical default</small></span>
-          <span class="preset-option-check" aria-hidden="true">&#10003;</span>
+          <span class="preset-option-check" aria-hidden="true"></span>
         </button>
         <button class="preset-option" data-preset-value="signal-flow" type="button" role="menuitemradio" aria-checked="false" tabindex="-1">
           <span class="preset-option-swatch signal-flow" aria-hidden="true"></span>
           <span class="preset-option-copy"><strong>Signal Flow</strong><small>Motion-forward presentation</small></span>
-          <span class="preset-option-check" aria-hidden="true">&#10003;</span>
+          <span class="preset-option-check" aria-hidden="true"></span>
         </button>
         <button class="preset-option" data-preset-value="blueprint" type="button" role="menuitemradio" aria-checked="false" tabindex="-1">
           <span class="preset-option-swatch blueprint" aria-hidden="true"></span>
           <span class="preset-option-copy"><strong>Blueprint</strong><small>Engineering review</small></span>
-          <span class="preset-option-check" aria-hidden="true">&#10003;</span>
+          <span class="preset-option-check" aria-hidden="true"></span>
         </button>
         <button class="preset-option" data-preset-value="editorial" type="button" role="menuitemradio" aria-checked="false" tabindex="-1">
           <span class="preset-option-swatch editorial" aria-hidden="true"></span>
           <span class="preset-option-copy"><strong>Editorial</strong><small>Publication and launch notes</small></span>
-          <span class="preset-option-check" aria-hidden="true">&#10003;</span>
+          <span class="preset-option-check" aria-hidden="true"></span>
         </button>
       </div>
     </div>
@@ -4461,7 +4820,7 @@
             title="Presentation stage (F)"
             aria-label="Enter presentation stage"
             aria-pressed="false">
-      <span id="present-icon" aria-hidden="true">&#9633;</span>
+      <span id="present-icon" class="toolbar-icon" aria-hidden="true"></span>
       <span id="present-label">Present</span>
     </button>
     <div class="export-wrap">
@@ -4471,22 +4830,32 @@
               aria-haspopup="menu"
               aria-expanded="false"
               aria-controls="export-menu">
-        Export <span aria-hidden="true">&#9662;</span>
+        Export <span class="toolbar-icon toolbar-chevron" aria-hidden="true"></span>
       </button>
       <div class="export-menu" id="export-menu" role="menu" aria-label="Export">
-        <button data-format="share-card" type="button" role="menuitem" tabindex="-1">Share Card <span class="hint">1200&times;630 PNG</span></button>
-        <button data-action="route-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled>Route Share Card <span class="hint">1200&times;630 PNG</span></button>
-        <button data-action="reach-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled>Reach Share Card <span class="hint">1200&times;630 PNG</span></button>
-        <button data-action="copy-share-card" type="button" role="menuitem" tabindex="-1">Copy Share Card <span class="hint">PNG</span></button>
-        <hr role="separator">
-        <button data-action="copy"  type="button" role="menuitem" tabindex="-1">Copy to clipboard <span class="hint">PNG</span></button>
-        <hr role="separator">
-        <button data-format="png"   type="button" role="menuitem" tabindex="-1">Download PNG</button>
-        <button data-format="jpeg"  type="button" role="menuitem" tabindex="-1">Download JPEG</button>
-        <button data-format="webp"  type="button" role="menuitem" tabindex="-1">Download WebP</button>
-        <hr role="separator">
-        <button data-format="svg"   type="button" role="menuitem" tabindex="-1">Download SVG <span class="hint">vector</span></button>
-        <button data-format="webm"  type="button" role="menuitem" tabindex="-1">Download WebM <span class="hint">6s motion</span></button>
+        <div class="export-menu-header" role="presentation">
+          <div><strong>Export diagram</strong><span>Portable, clean outputs</span></div>
+          <kbd>E</kbd>
+        </div>
+        <div class="export-menu-section" role="group" aria-label="Share">
+          <span class="export-menu-heading" aria-hidden="true">Share</span>
+          <button data-format="share-card" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>Share Card</strong><small class="hint">1200&times;630 PNG</small></span></button>
+          <button data-action="route-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled><span class="export-item-copy"><strong>Route Share Card</strong><small class="hint">1200&times;630 PNG</small></span></button>
+          <button data-action="reach-share-card" type="button" role="menuitem" tabindex="-1" hidden disabled><span class="export-item-copy"><strong>Reach Share Card</strong><small class="hint">1200&times;630 PNG</small></span></button>
+          <button data-action="copy-share-card" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>Copy Share Card</strong><small class="hint">PNG to clipboard</small></span></button>
+          <button data-action="copy" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>Copy diagram</strong><small class="hint">PNG to clipboard</small></span></button>
+        </div>
+        <div class="export-menu-section" role="group" aria-label="Raster images">
+          <span class="export-menu-heading" aria-hidden="true">Image</span>
+          <button data-format="png" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>PNG</strong><small class="hint">Lossless image</small></span></button>
+          <button data-format="jpeg" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>JPEG</strong><small class="hint">Compact image</small></span></button>
+          <button data-format="webp" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>WebP</strong><small class="hint">Modern image</small></span></button>
+        </div>
+        <div class="export-menu-section" role="group" aria-label="Vector and motion">
+          <span class="export-menu-heading" aria-hidden="true">Vector &amp; motion</span>
+          <button data-format="svg" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>SVG</strong><small class="hint">Editable vector</small></span></button>
+          <button data-format="webm" type="button" role="menuitem" tabindex="-1"><span class="export-item-copy"><strong>WebM</strong><small class="hint">6s motion</small></span></button>
+        </div>
       </div>
     </div>
   </div>
@@ -4496,13 +4865,13 @@
     <div class="header">
       <div class="header-row">
         <div class="pulse-dot"></div>
-        <h1>ARGUS — Risk Analytics Platform Architecture</h1>
+        <h1>ARGUS — Quantitative Risk Analytics Platform</h1>
       </div>
-      <p class="subtitle">Quantitative Portfolio Risk Management, FIFO Accounting &amp; Multi-Tier Analytics</p>
+      <p class="subtitle">Institutional Portfolio Risk Intelligence, AI Narrative Analytics &amp; Multi-Asset Data Warehouse</p>
     </div>
 
-    <script id="archify-guided-views-data" type="application/json">[{"id":"user-flow","label":"User Interaction \u0026 Control Room","focus":["users","streamlit_app","risk_engine","report_exporter"],"note":"Analyst interacts with Streamlit dashboard to trigger risk calculations and export reports."},{"id":"market-data-ingestion","label":"Data Ingestion \u0026 Market Sync","focus":["csv_degiro","yfinance_api","data_fetcher","risk_engine"],"note":"Imports broker transactions CSV and fetches historical prices \u0026 forex rates from Yahoo Finance."},{"id":"quant-risk-analysis","label":"Quantitative Risk \u0026 Compliance","focus":["risk_engine","risk_limits","quant_advisor","rebalancer_hedging"],"note":"Executes FIFO accounting, VaR/CVaR calculations, institutional risk limit checks, and Markowitz optimization."},{"id":"persistence-reporting","label":"Data Warehouse \u0026 BI Export","focus":["risk_engine","mysql_dw","powerbi_looker","report_exporter"],"note":"Persists multi-snapshot data in MySQL 8.0 Star Schema and exports to Power BI / Looker / PDF / Excel."}]</script>
-    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/Alessandro-Sal/capstone-risk-bi","revision":"31d0c7282b6d43ba53012c641eb9d797d2e4c259","shortRevision":"31d0c72"},"referenceCount":12,"nodes":{"streamlit_app":[{"path":"app.py","label":"Entrypoint","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/app.py"},{"path":"src/0_Control_Room.py","label":"Control Room","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/src/0_Control_Room.py"}],"risk_engine":[{"path":"core/risk_engine.py","label":"Risk Engine","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/risk_engine.py"}],"report_exporter":[{"path":"core/report_exporter.py","label":"Report Exporter","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/report_exporter.py"}],"csv_degiro":[{"path":"docs/CSV_Format_Specification.md","label":"CSV Spec","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/docs/CSV_Format_Specification.md"}],"data_fetcher":[{"path":"core/fetcher.py","label":"Data Ingestion","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/fetcher.py"}],"risk_limits":[{"path":"core/risk_limits.py","label":"Risk Limits","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/risk_limits.py"}],"mysql_dw":[{"path":"core/db_exporter.py","label":"DB Layer","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/db_exporter.py"}],"quant_advisor":[{"path":"core/advisor.py","label":"Advisor","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/advisor.py"}],"rebalancer_hedging":[{"path":"core/rebalancer.py","label":"Rebalancer","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/rebalancer.py"},{"path":"core/hedging.py","label":"Hedging","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/core/hedging.py"}],"powerbi_looker":[{"path":"scripts/export_star_schema.py","label":"Star Schema Exporter","href":"https://github.com/Alessandro-Sal/capstone-risk-bi/blob/31d0c7282b6d43ba53012c641eb9d797d2e4c259/scripts/export_star_schema.py"}]}}</script>
+    <script id="archify-guided-views-data" type="application/json">[{"id":"analyst-workflow","label":"Analyst Interaction \u0026 Control Room","focus":["analyst_ui","control_room","analytical_modules","report_engine"],"note":"Portfolio managers and analysts interact with ARGUS Control Room and 10 specialized analytical modules."},{"id":"ingestion-pipeline","label":"Multi-Source Ingestion \u0026 Cache Shield","focus":["csv_sources","gsheets_api","market_api","validator","data_fetcher","cache_shield"],"note":"Ingests CSV, DeGiro transactions, and Google Sheets Live Sync, backed by multi-currency FX conversion and SQLite Cache Shield."},{"id":"quant-ai-core","label":"Quantitative \u0026 AI Analytics Engine","focus":["risk_engine","adv_quant","valuation_forensics","llm_api"],"note":"Executes FIFO WACP accounting, VaR/CVaR Cornish-Fisher, Tail Copulas, Kelly Criterion, HRP, Beneish M-Score, and AI Narrative intelligence."},{"id":"dw-bi-reporting","label":"Data Warehouse \u0026 Multi-Format Reports","focus":["control_room","dw_database","report_engine"],"note":"Persists Star Schema snapshots, multi-portfolio registrations and asset mappings in MySQL/SQLite, exporting PDF Factsheets, Excel and HTML."}]</script>
+    <script id="archify-source-evidence-data" type="application/json">{"schemaVersion":1,"verified":true,"repository":{"url":"https://github.com/Alessandro-Sal/argus-risk-analytics","revision":"f272f3565a85f53450d998219acb472053571844","shortRevision":"f272f35"},"referenceCount":21,"nodes":{"control_room":[{"path":"src/0_Control_Room.py","label":"Control Room Hub","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/src/0_Control_Room.py"},{"path":"app.py","label":"Application Entrypoint","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/app.py"}],"analytical_modules":[{"path":"src/pages/1_📈_Dashboard_Generale.py","label":"Executive Cockpit","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/src/pages/1_%F0%9F%93%88_Dashboard_Generale.py"},{"path":"src/pages/2_🔴_Analisi_Rischio.py","label":"Risk \u0026 VaR","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/src/pages/2_%F0%9F%94%B4_Analisi_Rischio.py"},{"path":"src/pages/3_🔬_Modelli_Quantitativi.py","label":"Quant Frontier","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/src/pages/3_%F0%9F%94%AC_Modelli_Quantitativi.py"}],"risk_engine":[{"path":"core/risk_engine.py","label":"FIFO \u0026 Risk Engine","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/risk_engine.py"}],"report_engine":[{"path":"core/report_exporter.py","label":"Report Hub","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/report_exporter.py"},{"path":"core/html_exporter.py","label":"HTML Exporter","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/html_exporter.py"}],"csv_sources":[{"path":"core/adapters/degiro.py","label":"DeGiro Adapter","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/adapters/degiro.py"},{"path":"docs/CSV_Format_Specification.md","label":"CSV Spec","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/docs/CSV_Format_Specification.md"}],"validator":[{"path":"core/validator.py","label":"Validator Pipeline","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/validator.py"},{"path":"core/schemas.py","label":"Pydantic Contracts","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/schemas.py"}],"data_fetcher":[{"path":"core/fetcher.py","label":"Historical Sync \u0026 FX","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/fetcher.py"}],"adv_quant":[{"path":"core/advanced_quant.py","label":"Tail Copula \u0026 Kelly","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/advanced_quant.py"},{"path":"core/ai_analyst.py","label":"AI Narrative Intelligence","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/ai_analyst.py"}],"dw_database":[{"path":"core/models.py","label":"ORM Models","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/models.py"},{"path":"core/db_exporter.py","label":"DB Exporter","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/db_exporter.py"}],"gsheets_api":[{"path":"gsheets_sync_subproject/sync_google_sheets.py","label":"Google Sheets ETL","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/gsheets_sync_subproject/sync_google_sheets.py"}],"cache_shield":[{"path":"core/cache_shield.py","label":"Cache Shield Engine","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/cache_shield.py"}],"valuation_forensics":[{"path":"core/forensic_accounting.py","label":"Beneish \u0026 Sloan","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/forensic_accounting.py"},{"path":"core/financial_analysis.py","label":"Altman Z \u0026 DCF","href":"https://github.com/Alessandro-Sal/argus-risk-analytics/blob/f272f3565a85f53450d998219acb472053571844/core/financial_analysis.py"}]}}</script>
     <div class="guided-views no-print" id="guided-views" hidden aria-label="Guided diagram views">
       <button id="guided-view-prev" type="button" aria-label="Previous guided view" title="Previous guided view ([)">&#8592;</button>
       <div class="guided-view-copy">
@@ -4543,10 +4912,10 @@
     </div>
 
     <!-- Main Diagram -->
-    <div class="diagram-container" data-detail-level="map">
-      <svg viewBox="0 0 1200 752" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-animation="trace" data-preset="classic" data-quality-profile="standard">
-        <title id="archify-diagram-title">ARGUS — Risk Analytics Platform Architecture</title>
-        <desc id="archify-diagram-description">Quantitative Portfolio Risk Management, FIFO Accounting &amp; Multi-Tier Analytics</desc>
+    <div class="diagram-container" data-detail-level="read">
+      <svg viewBox="0 0 1500 772" role="img" aria-labelledby="archify-diagram-title archify-diagram-description" data-animation="trace" data-preset="classic" data-quality-profile="showcase">
+        <title id="archify-diagram-title">ARGUS — Quantitative Risk Analytics Platform</title>
+        <desc id="archify-diagram-description">Institutional Portfolio Risk Intelligence, AI Narrative Analytics &amp; Multi-Asset Data Warehouse</desc>
         <!-- Definitions -->
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
@@ -4570,238 +4939,318 @@
         <rect width="100%" height="100%" fill="url(#grid)" />
 
         <!-- Boundaries (behind everything) -->
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="330" y="130" width="830" height="554" rx="12" class="c-region" stroke-width="1"/>
-        <text x="338" y="148" class="t-cloud" font-size="9" font-weight="600">ARGUS Platform Core Container (Streamlit + Python Engines)</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="0" x="300" y="130" width="1160" height="574" rx="12" class="c-region" stroke-width="1"/>
+        <text x="308" y="148" class="t-cloud" font-size="9" font-weight="600">ARGUS Application &amp; Quantitative Core Container (Python 3.11+)</text>
 
-        <rect data-graph-role="structural-frame" data-composition-frame-kind="region" data-composition-frame-id="1" x="930" y="350" width="230" height="334" rx="12" class="c-region" stroke-width="1"/>
-        <text x="938" y="368" class="t-cloud" font-size="9" font-weight="600">Data Storage &amp; Business Intelligence Layer</text>
+        <rect data-graph-role="structural-frame" data-composition-frame-kind="security-group" data-composition-frame-id="1" x="1220" y="360" width="240" height="114" rx="8" class="c-security-group" stroke-width="1"/>
+        <text x="1228" y="378" class="t-security" font-size="9" font-weight="600">Data Warehouse Storage &amp; Persistence Layer</text>
 
         <!-- Connection paths (before components for correct z-order) -->
-        <path data-edge-from="users" data-edge-to="streamlit_app" data-edge-label="HTTP / UI" data-edge-key="0" data-edge-id="user-access" data-composition-points="220,192;290,192;290,192;360,192" d="M 220 192 L 290 192 L 290 192 L 360 192" class="a-emphasis" data-animate="edge" style="--step:0" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
-        <path data-edge-from="csv_degiro" data-edge-to="streamlit_app" data-edge-label="Upload CSV" data-edge-key="1" data-edge-id="csv-import" data-composition-points="140,380;140,302;445,302;445,224" d="M 140 380 L 140 310 Q 140 302 148 302 L 437 302 Q 445 302 445 294 L 445 224" class="a-default" data-animate="edge" style="--step:1" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="yfinance_api" data-edge-to="data_fetcher" data-edge-label="Market Sync" data-edge-key="2" data-edge-id="market-fetch" data-composition-points="140,600;140,522;445,522;445,444" d="M 140 600 L 140 530 Q 140 522 148 522 L 437 522 Q 445 522 445 514 L 445 444" class="a-default" data-animate="edge" style="--step:2" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="data_fetcher" data-edge-to="risk_engine" data-edge-label="Prices &amp; Forex" data-edge-key="3" data-edge-id="fetcher-to-engine" data-composition-points="445,380;445,302;745,302;745,224" d="M 445 380 L 445 310 Q 445 302 453 302 L 737 302 Q 745 302 745 294 L 745 224" class="a-default" data-animate="edge" style="--step:3" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="streamlit_app" data-edge-to="risk_engine" data-edge-label="Calculate Risk" data-edge-key="4" data-edge-id="app-to-engine" data-composition-points="530,192;595,192;595,192;660,192" d="M 530 192 L 595 192 L 595 192 L 660 192" class="a-default" data-animate="edge" style="--step:4" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="risk_engine" data-edge-to="risk_limits" data-edge-label="Portfolio Metrics" data-edge-key="5" data-edge-id="engine-to-limits" data-composition-points="745,224;745,302;745,302;745,380" d="M 745 224 L 745 302 L 745 302 L 745 380" class="a-default" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="risk_engine" data-edge-to="quant_advisor" data-edge-label="Asset Allocations" data-edge-key="6" data-edge-id="engine-to-advisor" data-composition-points="660,192;570,192;570,520;445,520;445,600" d="M 660 192 L 578 192 Q 570 192 570 200 L 570 512 Q 570 520 562 520 L 453 520 Q 445 520 445 528 L 445 600" class="a-default" data-animate="edge" style="--step:6" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="risk_engine" data-edge-to="rebalancer_hedging" data-edge-label="Covariance Data" data-edge-key="7" data-edge-id="engine-to-rebalancer" data-composition-points="830,192;870,192;870,632;830,632;830,632" d="M 830 192 L 862 192 Q 870 192 870 200 L 870 624 Q 870 632 862 632 L 830 632 L 830 632" class="a-default" data-animate="edge" style="--step:7" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="risk_engine" data-edge-to="report_exporter" data-edge-label="Factsheet Data" data-edge-key="8" data-edge-id="engine-to-exporter" data-composition-points="830,192;895,192;895,192;960,192" d="M 830 192 L 895 192 L 895 192 L 960 192" class="a-default" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="risk_engine" data-edge-to="mysql_dw" data-edge-label="Persist Snapshots" data-edge-key="9" data-edge-id="engine-to-dw" data-composition-points="745,224;745,300;1045,300;1045,380" d="M 745 224 L 745 292 Q 745 300 753 300 L 1037 300 Q 1045 300 1045 308 L 1045 380" class="a-default" data-animate="edge" style="--step:9" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="mysql_dw" data-edge-to="powerbi_looker" data-edge-label="Star Schema Queries" data-edge-key="10" data-edge-id="dw-to-bi" data-composition-points="1045,444;1045,522;1045,522;1045,600" d="M 1045 444 L 1045 522 L 1045 522 L 1045 600" class="a-default" data-animate="edge" style="--step:10" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="analyst_ui" data-edge-to="control_room" data-edge-label="HTTPS / UI" data-edge-key="0" data-composition-points="200,192;330,192" d="M 200 192 L 330 192" class="a-emphasis" data-animate="edge" style="--step:0" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="control_room" data-edge-to="analytical_modules" data-edge-label="Module Route" data-edge-key="1" data-composition-points="510,192;630,192" d="M 510 192 L 630 192" class="a-emphasis" data-animate="edge" style="--step:1" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="analytical_modules" data-edge-to="risk_engine" data-edge-label="Risk Computations" data-edge-key="2" data-composition-points="820,185;940,185" d="M 820 185 L 940 185" class="a-emphasis" data-animate="edge" style="--step:2" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
+        <path data-edge-from="risk_engine" data-edge-to="report_engine" data-edge-label="Factsheet Data" data-edge-key="3" data-composition-points="1130,185;1250,185" d="M 1130 185 L 1250 185" class="a-default" data-animate="edge" style="--step:3" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="csv_sources" data-edge-to="validator" data-edge-label="Raw CSV" data-edge-key="4" data-composition-points="200,415;330,415" d="M 200 415 L 330 415" class="a-dashed" data-animate="edge" style="--step:4" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="gsheets_api" data-edge-to="validator" data-edge-label="Live Sync ETL" data-edge-key="5" data-composition-points="200,652;265,652;265,429;330,429" d="M 200 652 L 257 652 Q 265 652 265 644 L 265 437 Q 265 429 273 429 L 330 429" class="a-dashed" data-animate="edge" style="--step:5" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="validator" data-edge-to="control_room" data-edge-label="Validated Portfolio" data-edge-key="6" data-composition-points="420,390;420,224" d="M 420 390 L 420 224" class="a-default" data-animate="edge" style="--step:6" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="market_api" data-edge-to="cache_shield" data-edge-label="Market Ingestion" data-edge-key="7" data-composition-points="510,652;630,652" d="M 510 652 L 630 652" class="a-default" data-animate="edge" style="--step:7" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="cache_shield" data-edge-to="data_fetcher" data-edge-label="Cached Data" data-edge-key="8" data-composition-points="725,620;725,454" d="M 725 620 L 725 454" class="a-default" data-animate="edge" style="--step:8" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="data_fetcher" data-edge-to="risk_engine" data-edge-label="FX-Adjusted Prices" data-edge-key="9" data-composition-points="820,422;880,422;880,199;940,199" d="M 820 422 L 872 422 Q 880 422 880 414 L 880 207 Q 880 199 888 199 L 940 199" class="a-default" data-animate="edge" style="--step:9" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="risk_engine" data-edge-to="adv_quant" data-edge-label="Return Matrix" data-edge-key="10" data-composition-points="1035,224;1035,390" d="M 1035 224 L 1035 390" class="a-default" data-animate="edge" style="--step:10" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="adv_quant" data-edge-to="llm_api" data-edge-label="LLM Synthesis" data-edge-key="11" data-composition-points="1130,422;1190,422;1190,652;1250,652" d="M 1130 422 L 1182 422 Q 1190 422 1190 430 L 1190 644 Q 1190 652 1198 652 L 1250 652" class="a-dashed" data-animate="edge" style="--step:11" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="adv_quant" data-edge-to="valuation_forensics" data-edge-label="Fundamentals" data-edge-key="12" data-composition-points="1035,454;1035,620" d="M 1035 454 L 1035 620" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="risk_engine" data-edge-to="dw_database" data-edge-label="Persist Snapshots" data-edge-key="13" data-composition-points="1130,199;1190,199;1190,422;1250,422" d="M 1130 199 L 1182 199 Q 1190 199 1190 207 L 1190 414 Q 1190 422 1198 422 L 1250 422" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="dw_database" data-edge-to="report_engine" data-edge-label="Historical Queries" data-edge-key="14" data-composition-points="1340,390;1340,224" d="M 1340 390 L 1340 224" class="a-default" data-animate="edge" style="--step:12" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
-        <g id="node-users" data-node-id="users" data-node-label="Portfolio Analyst" tabindex="0" role="button" aria-label="Focus Portfolio Analyst, Browser / Web Client, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Browser / Web Client" data-node-context="Architecture component">
-          <title>Portfolio Analyst · Browser / Web Client · Architecture component</title>
-          <rect x="60" y="160" width="160" height="64" rx="6" class="c-mask"/>
-          <rect x="60" y="160" width="160" height="64" rx="6" class="c-external" data-animate="node" style="--step:0" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(66 166) scale(0.6875)">
+        <g id="node-analyst_ui" data-node-id="analyst_ui" data-node-label="Portfolio Analyst" tabindex="0" role="button" aria-label="Focus Portfolio Analyst, Desktop WebView2 / Web UI, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Desktop WebView2 / Web UI" data-node-context="Architecture component">
+          <title>Portfolio Analyst · Desktop WebView2 / Web UI · Architecture component</title>
+          <rect x="40" y="160" width="160" height="64" rx="6" class="c-mask"/>
+          <rect x="40" y="160" width="160" height="64" rx="6" class="c-external" data-animate="node" style="--step:0" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 166) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="140" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Portfolio Analyst</text>
-        <text data-detail="context" x="140" y="206" class="t-muted" font-size="9" text-anchor="middle">Browser / Web Client</text>
+          <text data-detail-anchor x="120" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Portfolio Analyst</text>
+        <text data-detail="context" x="120" y="206" class="t-muted" font-size="9" text-anchor="middle">Desktop WebView2 / Web UI</text>
         </g>
 
-        <g id="node-streamlit_app" data-node-id="streamlit_app" data-node-label="Streamlit App" tabindex="0" role="button" aria-label="Focus Streamlit App, Control Room &amp; 7 Pages, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Control Room &amp; 7 Pages" data-node-tag="Python 3.11" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>Streamlit App · Control Room &amp; 7 Pages · ARGUS Platform Core Container (Streamlit + Python Engines) · Python 3.11</title>
-          <rect x="360" y="160" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="360" y="160" width="170" height="64" rx="6" class="c-frontend" data-animate="node" style="--step:1" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(366 166) scale(0.6875)">
+        <g id="node-control_room" data-node-id="control_room" data-node-label="ARGUS Control Room" tabindex="0" role="button" aria-label="Focus ARGUS Control Room, Multi-Account &amp; ISIN DB, ARGUS Application &amp; Quantitative Core Container (Python 3.11+), Python" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Multi-Account &amp; ISIN DB" data-node-tag="v5.4.0 Core Hub" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" data-node-brand="Python" data-node-brand-id="python" data-node-brand-status="preset" data-node-brand-source="https://www.python.org/community/logos/">
+          <title>ARGUS Control Room · Multi-Account &amp; ISIN DB · ARGUS Application &amp; Quantitative Core Container (Python 3.11+) · v5.4.0 Core Hub · Python</title>
+          <rect x="330" y="160" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="330" y="160" width="180" height="64" rx="6" class="c-frontend" data-animate="node" style="--step:1" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(336 166) scale(0.6875)">
             <rect x="2" y="3" width="12" height="10" rx="2"/>
             <path d="M2 6.5h12"/>
             <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
             <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
           </g>
-          <text data-detail-anchor x="445" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Streamlit App</text>
-        <text data-detail="context" x="445" y="206" class="t-muted" font-size="9" text-anchor="middle">Control Room &amp; 7 Pages</text>
-        <text data-detail="fine" x="445" y="216" class="t-frontend" font-size="7" text-anchor="middle">Python 3.11</text>
+          <g aria-hidden="true" data-brand-mark="python" data-brand-title="Python" data-brand-status="preset" data-brand-source="https://www.python.org/community/logos/" class="brand-mark" transform="translate(488 166)">
+            <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
+            <path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98l-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95l.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z" transform="translate(3 3) scale(0.4166666666666667)" fill="#3776AB"/>
+            <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
+          </g>
+          <text data-detail-anchor x="420" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">ARGUS Control Room</text>
+        <text data-detail="context" x="420" y="206" class="t-muted" font-size="9" text-anchor="middle">Multi-Account &amp; ISIN DB</text>
+        <text data-detail="fine" x="420" y="216" class="t-frontend" font-size="7" text-anchor="middle">v5.4.0 Core Hub</text>
         </g>
 
-        <g id="node-risk_engine" data-node-id="risk_engine" data-node-label="Risk Engine" tabindex="0" role="button" aria-label="Focus Risk Engine, FIFO, PnL, VaR, CVaR, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="FIFO, PnL, VaR, CVaR" data-node-tag="Core Quantitative Engine" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>Risk Engine · FIFO, PnL, VaR, CVaR · ARGUS Platform Core Container (Streamlit + Python Engines) · Core Quantitative Engine</title>
-          <rect x="660" y="160" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="660" y="160" width="170" height="64" rx="6" class="c-backend" data-animate="node" style="--step:4" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(666 166) scale(0.6875)">
+        <g id="node-analytical_modules" data-node-id="analytical_modules" data-node-label="10 Analytical Pillars" tabindex="0" role="button" aria-label="Focus 10 Analytical Pillars, Risk, Quant &amp; Forensics, ARGUS Application &amp; Quantitative Core Container (Python 3.11+), Python" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="Risk, Quant &amp; Forensics" data-node-tag="Streamlit 1.31+" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" data-node-brand="Python" data-node-brand-id="python" data-node-brand-status="preset" data-node-brand-source="https://www.python.org/community/logos/">
+          <title>10 Analytical Pillars · Risk, Quant &amp; Forensics · ARGUS Application &amp; Quantitative Core Container (Python 3.11+) · Streamlit 1.31+ · Python</title>
+          <rect x="630" y="160" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="630" y="160" width="190" height="64" rx="6" class="c-frontend" data-animate="node" style="--step:2" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(636 166) scale(0.6875)">
+            <rect x="2" y="3" width="12" height="10" rx="2"/>
+            <path d="M2 6.5h12"/>
+            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
+            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
+          </g>
+          <g aria-hidden="true" data-brand-mark="python" data-brand-title="Python" data-brand-status="preset" data-brand-source="https://www.python.org/community/logos/" class="brand-mark" transform="translate(798 166)">
+            <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
+            <path d="M14.25.18l.9.2.73.26.59.3.45.32.34.34.25.34.16.33.1.3.04.26.02.2-.01.13V8.5l-.05.63-.13.55-.21.46-.26.38-.3.31-.33.25-.35.19-.35.14-.33.1-.3.07-.26.04-.21.02H8.77l-.69.05-.59.14-.5.22-.41.27-.33.32-.27.35-.2.36-.15.37-.1.35-.07.32-.04.27-.02.21v3.06H3.17l-.21-.03-.28-.07-.32-.12-.35-.18-.36-.26-.36-.36-.35-.46-.32-.59-.28-.73-.21-.88-.14-1.05-.05-1.23.06-1.22.16-1.04.24-.87.32-.71.36-.57.4-.44.42-.33.42-.24.4-.16.36-.1.32-.05.24-.01h.16l.06.01h8.16v-.83H6.18l-.01-2.75-.02-.37.05-.34.11-.31.17-.28.25-.26.31-.23.38-.2.44-.18.51-.15.58-.12.64-.1.71-.06.77-.04.84-.02 1.27.05zm-6.3 1.98l-.23.33-.08.41.08.41.23.34.33.22.41.09.41-.09.33-.22.23-.34.08-.41-.08-.41-.23-.33-.33-.22-.41-.09-.41.09zm13.09 3.95l.28.06.32.12.35.18.36.27.36.35.35.47.32.59.28.73.21.88.14 1.04.05 1.23-.06 1.23-.16 1.04-.24.86-.32.71-.36.57-.4.45-.42.33-.42.24-.4.16-.36.09-.32.05-.24.02-.16-.01h-8.22v.82h5.84l.01 2.76.02.36-.05.34-.11.31-.17.29-.25.25-.31.24-.38.2-.44.17-.51.15-.58.13-.64.09-.71.07-.77.04-.84.01-1.27-.04-1.07-.14-.9-.2-.73-.25-.59-.3-.45-.33-.34-.34-.25-.34-.16-.33-.1-.3-.04-.25-.02-.2.01-.13v-5.34l.05-.64.13-.54.21-.46.26-.38.3-.32.33-.24.35-.2.35-.14.33-.1.3-.06.26-.04.21-.02.13-.01h5.84l.69-.05.59-.14.5-.21.41-.28.33-.32.27-.35.2-.36.15-.36.1-.35.07-.32.04-.28.02-.21V6.07h2.09l.14.01zm-6.47 14.25l-.23.33-.08.41.08.41.23.33.33.23.41.08.41-.08.33-.23.23-.33.08-.41-.08-.41-.23-.33-.33-.23-.41-.08-.41.08z" transform="translate(3 3) scale(0.4166666666666667)" fill="#3776AB"/>
+            <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
+          </g>
+          <text data-detail-anchor x="725" y="190" class="t-primary" font-size="10.6" font-weight="600" text-anchor="middle">10 Analytical Pillars</text>
+        <text data-detail="context" x="725" y="206" class="t-muted" font-size="9" text-anchor="middle">Risk, Quant &amp; Forensics</text>
+        <text data-detail="fine" x="725" y="216" class="t-frontend" font-size="7" text-anchor="middle">Streamlit 1.31+</text>
+        </g>
+
+        <g id="node-risk_engine" data-node-id="risk_engine" data-node-label="Quantitative Risk Engine" tabindex="0" role="button" aria-label="Focus Quantitative Risk Engine, FIFO WACP, VaR &amp; Markowitz, ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="FIFO WACP, VaR &amp; Markowitz" data-node-tag="Core Compute Engine" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)">
+          <title>Quantitative Risk Engine · FIFO WACP, VaR &amp; Markowitz · ARGUS Application &amp; Quantitative Core Container (Python 3.11+) · Core Compute Engine</title>
+          <rect x="940" y="160" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="940" y="160" width="190" height="64" rx="6" class="c-backend" data-animate="node" style="--step:3" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(946 166) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="745" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Risk Engine</text>
-        <text data-detail="context" x="745" y="206" class="t-muted" font-size="9" text-anchor="middle">FIFO, PnL, VaR, CVaR</text>
-        <text data-detail="fine" x="745" y="216" class="t-backend" font-size="7" text-anchor="middle">Core Quantitative Engine</text>
+          <text data-detail-anchor x="1035" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Quantitative Risk Engine</text>
+        <text data-detail="context" x="1035" y="206" class="t-muted" font-size="9" text-anchor="middle">FIFO WACP, VaR &amp; Markowitz</text>
+        <text data-detail="fine" x="1035" y="216" class="t-backend" font-size="7" text-anchor="middle">Core Compute Engine</text>
         </g>
 
-        <g id="node-report_exporter" data-node-id="report_exporter" data-node-label="Report Exporter" tabindex="0" role="button" aria-label="Focus Report Exporter, PDF Factsheet &amp; Excel, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="PDF Factsheet &amp; Excel" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>Report Exporter · PDF Factsheet &amp; Excel · ARGUS Platform Core Container (Streamlit + Python Engines)</title>
-          <rect x="960" y="160" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="960" y="160" width="170" height="64" rx="6" class="c-backend" data-animate="node" style="--step:9" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(966 166) scale(0.6875)">
+        <g id="node-report_engine" data-node-id="report_engine" data-node-label="Multi-Format Exporters" tabindex="0" role="button" aria-label="Focus Multi-Format Exporters, PDF, Excel, HTML &amp; Star ZIP, ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="PDF, Excel, HTML &amp; Star ZIP" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)">
+          <title>Multi-Format Exporters · PDF, Excel, HTML &amp; Star ZIP · ARGUS Application &amp; Quantitative Core Container (Python 3.11+)</title>
+          <rect x="1250" y="160" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="1250" y="160" width="180" height="64" rx="6" class="c-backend" data-animate="node" style="--step:4" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(1256 166) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="1045" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Report Exporter</text>
-        <text data-detail="context" x="1045" y="206" class="t-muted" font-size="9" text-anchor="middle">PDF Factsheet &amp; Excel</text>
+          <text data-detail-anchor x="1340" y="190" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Multi-Format Exporters</text>
+        <text data-detail="context" x="1340" y="206" class="t-muted" font-size="9" text-anchor="middle">PDF, Excel, HTML &amp; Star ZIP</text>
         </g>
 
-        <g id="node-csv_degiro" data-node-id="csv_degiro" data-node-label="Broker CSV Data" tabindex="0" role="button" aria-label="Focus Broker CSV Data, DeGiro &amp; Generic CSV, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="DeGiro &amp; Generic CSV" data-node-context="Architecture component">
-          <title>Broker CSV Data · DeGiro &amp; Generic CSV · Architecture component</title>
-          <rect x="60" y="380" width="160" height="64" rx="6" class="c-mask"/>
-          <rect x="60" y="380" width="160" height="64" rx="6" class="c-external" data-animate="node" style="--step:1" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(66 386) scale(0.6875)">
+        <g id="node-csv_sources" data-node-id="csv_sources" data-node-label="Broker CSV &amp; DeGiro" tabindex="0" role="button" aria-label="Focus Broker CSV &amp; DeGiro, Standard &amp; DeGiro Export, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Standard &amp; DeGiro Export" data-node-context="Architecture component">
+          <title>Broker CSV &amp; DeGiro · Standard &amp; DeGiro Export · Architecture component</title>
+          <rect x="40" y="390" width="160" height="64" rx="6" class="c-mask"/>
+          <rect x="40" y="390" width="160" height="64" rx="6" class="c-external" data-animate="node" style="--step:4" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 396) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="140" y="410" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Broker CSV Data</text>
-        <text data-detail="context" x="140" y="426" class="t-muted" font-size="9" text-anchor="middle">DeGiro &amp; Generic CSV</text>
+          <text data-detail-anchor x="120" y="420" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Broker CSV &amp; DeGiro</text>
+        <text data-detail="context" x="120" y="436" class="t-muted" font-size="9" text-anchor="middle">Standard &amp; DeGiro Export</text>
         </g>
 
-        <g id="node-data_fetcher" data-node-id="data_fetcher" data-node-label="Data Fetcher" tabindex="0" role="button" aria-label="Focus Data Fetcher, yfinance &amp; Mapping, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="yfinance &amp; Mapping" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>Data Fetcher · yfinance &amp; Mapping · ARGUS Platform Core Container (Streamlit + Python Engines)</title>
-          <rect x="360" y="380" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="360" y="380" width="170" height="64" rx="6" class="c-backend" data-animate="node" style="--step:3" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(366 386) scale(0.6875)">
+        <g id="node-validator" data-node-id="validator" data-node-label="Data Validator &amp; Clean" tabindex="0" role="button" aria-label="Focus Data Validator &amp; Clean, Pydantic &amp; Ingestion Rules, ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Pydantic &amp; Ingestion Rules" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)">
+          <title>Data Validator &amp; Clean · Pydantic &amp; Ingestion Rules · ARGUS Application &amp; Quantitative Core Container (Python 3.11+)</title>
+          <rect x="330" y="390" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="330" y="390" width="180" height="64" rx="6" class="c-backend" data-animate="node" style="--step:5" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(336 396) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="445" y="410" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Data Fetcher</text>
-        <text data-detail="context" x="445" y="426" class="t-muted" font-size="9" text-anchor="middle">yfinance &amp; Mapping</text>
+          <text data-detail-anchor x="420" y="420" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Data Validator &amp; Clean</text>
+        <text data-detail="context" x="420" y="436" class="t-muted" font-size="9" text-anchor="middle">Pydantic &amp; Ingestion Rules</text>
         </g>
 
-        <g id="node-risk_limits" data-node-id="risk_limits" data-node-label="Risk Limits Monitor" tabindex="0" role="button" aria-label="Focus Risk Limits Monitor, 6 Institutional Rules, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="security" data-node-sublabel="6 Institutional Rules" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>Risk Limits Monitor · 6 Institutional Rules · ARGUS Platform Core Container (Streamlit + Python Engines)</title>
-          <rect x="660" y="380" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="660" y="380" width="170" height="64" rx="6" class="c-security" data-animate="node" style="--step:6" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="security" class="semantic-sigil s-security" transform="translate(666 386) scale(0.6875)">
-            <path d="M8 2.2 13 4v3.5c0 3.1-1.8 5.4-5 6.5-3.2-1.1-5-3.4-5-6.5V4Z"/>
-            <path d="m5.8 8 1.5 1.5 3-3"/>
+        <g id="node-data_fetcher" data-node-id="data_fetcher" data-node-label="Market Fetcher &amp; FX" tabindex="0" role="button" aria-label="Focus Market Fetcher &amp; FX, Multi-Currency FX Engine, ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Multi-Currency FX Engine" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)">
+          <title>Market Fetcher &amp; FX · Multi-Currency FX Engine · ARGUS Application &amp; Quantitative Core Container (Python 3.11+)</title>
+          <rect x="630" y="390" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="630" y="390" width="190" height="64" rx="6" class="c-backend" data-animate="node" style="--step:9" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(636 396) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-detail-anchor x="745" y="410" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Risk Limits Monitor</text>
-        <text data-detail="context" x="745" y="426" class="t-muted" font-size="9" text-anchor="middle">6 Institutional Rules</text>
+          <text data-detail-anchor x="725" y="420" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Market Fetcher &amp; FX</text>
+        <text data-detail="context" x="725" y="436" class="t-muted" font-size="9" text-anchor="middle">Multi-Currency FX Engine</text>
         </g>
 
-        <g id="node-mysql_dw" data-node-id="mysql_dw" data-node-label="MySQL 8.0 DW" tabindex="0" role="button" aria-label="Focus MySQL 8.0 DW, Star Schema &amp; History, Data Storage &amp; Business Intelligence Layer" aria-pressed="false" data-node-kind="database" data-node-sublabel="Star Schema &amp; History" data-node-tag="Port :3306" data-node-context="Data Storage &amp; Business Intelligence Layer">
-          <title>MySQL 8.0 DW · Star Schema &amp; History · Data Storage &amp; Business Intelligence Layer · Port :3306</title>
-          <rect x="960" y="380" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="960" y="380" width="170" height="64" rx="6" class="c-database" data-animate="node" style="--step:10" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(966 386) scale(0.6875)">
+        <g id="node-adv_quant" data-node-id="adv_quant" data-node-label="Advanced Quant &amp; AI" tabindex="0" role="button" aria-label="Focus Advanced Quant &amp; AI, Tail Copula, Kelly &amp; ERC, ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Tail Copula, Kelly &amp; ERC" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)">
+          <title>Advanced Quant &amp; AI · Tail Copula, Kelly &amp; ERC · ARGUS Application &amp; Quantitative Core Container (Python 3.11+)</title>
+          <rect x="940" y="390" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="940" y="390" width="190" height="64" rx="6" class="c-backend" data-animate="node" style="--step:11" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(946 396) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="1035" y="420" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Advanced Quant &amp; AI</text>
+        <text data-detail="context" x="1035" y="436" class="t-muted" font-size="9" text-anchor="middle">Tail Copula, Kelly &amp; ERC</text>
+        </g>
+
+        <g id="node-dw_database" data-node-id="dw_database" data-node-label="MySQL &amp; SQLite DW" tabindex="0" role="button" aria-label="Focus MySQL &amp; SQLite DW, Star Schema &amp; ISIN DB, Data Warehouse Storage &amp; Persistence Layer, MySQL" aria-pressed="false" data-node-kind="database" data-node-sublabel="Star Schema &amp; ISIN DB" data-node-tag="SQL Data Warehouse" data-node-context="Data Warehouse Storage &amp; Persistence Layer" data-node-brand="MySQL" data-node-brand-id="mysql" data-node-brand-status="preset" data-node-brand-source="https://www.mysql.com/about/legal/logos.html">
+          <title>MySQL &amp; SQLite DW · Star Schema &amp; ISIN DB · Data Warehouse Storage &amp; Persistence Layer · SQL Data Warehouse · MySQL</title>
+          <rect x="1250" y="390" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="1250" y="390" width="180" height="64" rx="6" class="c-database" data-animate="node" style="--step:12" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(1256 396) scale(0.6875)">
             <ellipse cx="8" cy="4" rx="5" ry="2"/>
             <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
           </g>
-          <text data-detail-anchor x="1045" y="410" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">MySQL 8.0 DW</text>
-        <text data-detail="context" x="1045" y="426" class="t-muted" font-size="9" text-anchor="middle">Star Schema &amp; History</text>
-        <text data-detail="fine" x="1045" y="436" class="t-database" font-size="7" text-anchor="middle">Port :3306</text>
+          <g aria-hidden="true" data-brand-mark="mysql" data-brand-title="MySQL" data-brand-status="preset" data-brand-source="https://www.mysql.com/about/legal/logos.html" class="brand-mark" transform="translate(1408 396)">
+            <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
+            <path d="M16.405 5.501c-.115 0-.193.014-.274.033v.013h.014c.054.104.146.18.214.273.054.107.1.214.154.32l.014-.015c.094-.066.14-.172.14-.333-.04-.047-.046-.094-.08-.14-.04-.067-.126-.1-.18-.153zM5.77 18.695h-.927a50.854 50.854 0 00-.27-4.41h-.008l-1.41 4.41H2.45l-1.4-4.41h-.01a72.892 72.892 0 00-.195 4.41H0c.055-1.966.192-3.81.41-5.53h1.15l1.335 4.064h.008l1.347-4.064h1.095c.242 2.015.384 3.86.428 5.53zm4.017-4.08c-.378 2.045-.876 3.533-1.492 4.46-.482.716-1.01 1.073-1.583 1.073-.153 0-.34-.046-.566-.138v-.494c.11.017.24.026.386.026.268 0 .483-.075.647-.222.197-.18.295-.382.295-.605 0-.155-.077-.47-.23-.944L6.23 14.615h.91l.727 2.36c.164.536.233.91.205 1.123.4-1.064.678-2.227.835-3.483zm12.325 4.08h-2.63v-5.53h.885v4.85h1.745zm-3.32.135l-1.016-.5c.09-.076.177-.158.255-.25.433-.506.648-1.258.648-2.253 0-1.83-.718-2.746-2.155-2.746-.704 0-1.254.232-1.65.697-.43.508-.646 1.256-.646 2.245 0 .972.19 1.686.574 2.14.35.41.877.615 1.583.615.264 0 .506-.033.725-.098l1.325.772.36-.622zM15.5 17.588c-.225-.36-.337-.94-.337-1.736 0-1.393.424-2.09 1.27-2.09.443 0 .77.167.977.5.224.362.336.936.336 1.723 0 1.404-.424 2.108-1.27 2.108-.445 0-.77-.167-.978-.5zm-1.658-.425c0 .47-.172.856-.516 1.156-.344.3-.803.45-1.384.45-.543 0-1.064-.172-1.573-.515l.237-.476c.438.22.833.328 1.19.328.332 0 .593-.073.783-.22a.754.754 0 00.3-.615c0-.33-.23-.61-.648-.845-.388-.213-1.163-.657-1.163-.657-.422-.307-.632-.636-.632-1.177 0-.45.157-.81.47-1.085.315-.278.72-.415 1.22-.415.512 0 .98.136 1.4.41l-.213.476a2.726 2.726 0 00-1.064-.23c-.283 0-.502.068-.654.206a.685.685 0 00-.248.524c0 .328.234.61.666.85.393.215 1.187.67 1.187.67.433.305.648.63.648 1.168zm9.382-5.852c-.535-.014-.95.04-1.297.188-.1.04-.26.04-.274.167.055.053.063.14.11.214.08.134.218.313.346.407.14.11.28.216.427.31.26.16.555.255.81.416.145.094.293.213.44.313.073.05.12.14.214.172v-.02c-.046-.06-.06-.147-.105-.214-.067-.067-.134-.127-.2-.193a3.223 3.223 0 00-.695-.675c-.214-.146-.682-.35-.77-.595l-.013-.014c.146-.013.32-.066.46-.106.227-.06.435-.047.67-.106.106-.027.213-.06.32-.094v-.06c-.12-.12-.21-.283-.334-.395a8.867 8.867 0 00-1.104-.823c-.21-.134-.476-.22-.697-.334-.08-.04-.214-.06-.26-.127-.12-.146-.19-.34-.275-.514a17.69 17.69 0 01-.547-1.163c-.12-.262-.193-.523-.34-.763-.69-1.137-1.437-1.826-2.586-2.5-.247-.14-.543-.2-.856-.274-.167-.008-.334-.02-.5-.027-.11-.047-.216-.174-.31-.235-.38-.24-1.364-.76-1.644-.072-.18.434.267.862.422 1.082.115.153.26.328.34.5.047.116.06.235.107.356.106.294.207.622.347.897.073.14.153.287.247.413.054.073.146.107.167.227-.094.136-.1.334-.154.5-.24.757-.146 1.693.194 2.25.107.166.362.534.703.393.3-.12.234-.5.32-.835.02-.08.007-.133.048-.187v.015c.094.188.188.367.274.555.206.328.566.668.867.895.16.12.287.328.487.402v-.02h-.015c-.043-.058-.1-.086-.154-.133a3.445 3.445 0 01-.35-.4 8.76 8.76 0 01-.747-1.218c-.11-.21-.202-.436-.29-.643-.04-.08-.04-.2-.107-.24-.1.146-.247.273-.32.453-.127.288-.14.642-.188 1.01-.027.007-.014 0-.027.014-.214-.052-.287-.274-.367-.46-.2-.475-.233-1.238-.06-1.785.047-.14.247-.582.167-.716-.042-.127-.174-.2-.247-.303a2.478 2.478 0 01-.24-.427c-.16-.374-.24-.788-.414-1.162-.08-.173-.22-.354-.334-.513-.127-.18-.267-.307-.368-.52-.033-.073-.08-.194-.027-.274.014-.054.042-.075.094-.09.088-.072.335.022.422.062.247.1.455.194.662.334.094.066.195.193.315.226h.14c.214.047.455.014.655.073.355.114.675.28.962.46a5.953 5.953 0 012.085 2.286c.08.154.115.295.188.455.14.33.313.663.455.982.14.315.275.636.476.897.1.14.502.213.682.286.133.06.34.115.46.188.23.14.454.3.67.454.11.076.443.243.463.378z" transform="translate(3 3) scale(0.4166666666666667)" fill="#4479A1"/>
+            <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
+          </g>
+          <text data-detail-anchor x="1340" y="420" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">MySQL &amp; SQLite DW</text>
+        <text data-detail="context" x="1340" y="436" class="t-muted" font-size="9" text-anchor="middle">Star Schema &amp; ISIN DB</text>
+        <text data-detail="fine" x="1340" y="446" class="t-database" font-size="7" text-anchor="middle">SQL Data Warehouse</text>
         </g>
 
-        <g id="node-yfinance_api" data-node-id="yfinance_api" data-node-label="Yahoo Finance API" tabindex="0" role="button" aria-label="Focus Yahoo Finance API, Historical Prices &amp; Forex, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Historical Prices &amp; Forex" data-node-context="Architecture component">
-          <title>Yahoo Finance API · Historical Prices &amp; Forex · Architecture component</title>
-          <rect x="60" y="600" width="160" height="64" rx="6" class="c-mask"/>
-          <rect x="60" y="600" width="160" height="64" rx="6" class="c-external" data-animate="node" style="--step:2" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(66 606) scale(0.6875)">
+        <g id="node-gsheets_api" data-node-id="gsheets_api" data-node-label="Google Sheets Live" tabindex="0" role="button" aria-label="Focus Google Sheets Live, Stocks &amp; Crypto Sync, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Stocks &amp; Crypto Sync" data-node-context="Architecture component">
+          <title>Google Sheets Live · Stocks &amp; Crypto Sync · Architecture component</title>
+          <rect x="40" y="620" width="160" height="64" rx="6" class="c-mask"/>
+          <rect x="40" y="620" width="160" height="64" rx="6" class="c-external" data-animate="node" style="--step:5" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(46 626) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="140" y="630" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Yahoo Finance API</text>
-        <text data-detail="context" x="140" y="646" class="t-muted" font-size="9" text-anchor="middle">Historical Prices &amp; Forex</text>
+          <text data-detail-anchor x="120" y="650" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Google Sheets Live</text>
+        <text data-detail="context" x="120" y="666" class="t-muted" font-size="9" text-anchor="middle">Stocks &amp; Crypto Sync</text>
         </g>
 
-        <g id="node-quant_advisor" data-node-id="quant_advisor" data-node-label="ARGUS Quant Advisor" tabindex="0" role="button" aria-label="Focus ARGUS Quant Advisor, Health Score &amp; Diagnostics, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Health Score &amp; Diagnostics" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>ARGUS Quant Advisor · Health Score &amp; Diagnostics · ARGUS Platform Core Container (Streamlit + Python Engines)</title>
-          <rect x="360" y="600" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="360" y="600" width="170" height="64" rx="6" class="c-backend" data-animate="node" style="--step:7" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(366 606) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
-          </g>
-          <text data-detail-anchor x="445" y="630" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">ARGUS Quant Advisor</text>
-        <text data-detail="context" x="445" y="646" class="t-muted" font-size="9" text-anchor="middle">Health Score &amp; Diagnostics</text>
-        </g>
-
-        <g id="node-rebalancer_hedging" data-node-id="rebalancer_hedging" data-node-label="Rebalancer &amp; Hedging" tabindex="0" role="button" aria-label="Focus Rebalancer &amp; Hedging, Markowitz &amp; Beta Neutral, ARGUS Platform Core Container (Streamlit + Python Engines)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Markowitz &amp; Beta Neutral" data-node-context="ARGUS Platform Core Container (Streamlit + Python Engines)">
-          <title>Rebalancer &amp; Hedging · Markowitz &amp; Beta Neutral · ARGUS Platform Core Container (Streamlit + Python Engines)</title>
-          <rect x="660" y="600" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="660" y="600" width="170" height="64" rx="6" class="c-backend" data-animate="node" style="--step:8" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(666 606) scale(0.6875)">
-            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
-          </g>
-          <text data-detail-anchor x="745" y="630" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Rebalancer &amp; Hedging</text>
-        <text data-detail="context" x="745" y="646" class="t-muted" font-size="9" text-anchor="middle">Markowitz &amp; Beta Neutral</text>
-        </g>
-
-        <g id="node-powerbi_looker" data-node-id="powerbi_looker" data-node-label="Power BI / Looker" tabindex="0" role="button" aria-label="Focus Power BI / Looker, Executive Dashboards, Data Storage &amp; Business Intelligence Layer" aria-pressed="false" data-node-kind="external" data-node-sublabel="Executive Dashboards" data-node-context="Data Storage &amp; Business Intelligence Layer">
-          <title>Power BI / Looker · Executive Dashboards · Data Storage &amp; Business Intelligence Layer</title>
-          <rect x="960" y="600" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="960" y="600" width="170" height="64" rx="6" class="c-external" data-animate="node" style="--step:11" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(966 606) scale(0.6875)">
+        <g id="node-market_api" data-node-id="market_api" data-node-label="Yahoo Finance API" tabindex="0" role="button" aria-label="Focus Yahoo Finance API, Historical Prices &amp; ISIN, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Historical Prices &amp; ISIN" data-node-context="Architecture component">
+          <title>Yahoo Finance API · Historical Prices &amp; ISIN · Architecture component</title>
+          <rect x="330" y="620" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="330" y="620" width="180" height="64" rx="6" class="c-external" data-animate="node" style="--step:7" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(336 626) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-detail-anchor x="1045" y="630" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Power BI / Looker</text>
-        <text data-detail="context" x="1045" y="646" class="t-muted" font-size="9" text-anchor="middle">Executive Dashboards</text>
+          <text data-detail-anchor x="420" y="650" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Yahoo Finance API</text>
+        <text data-detail="context" x="420" y="666" class="t-muted" font-size="9" text-anchor="middle">Historical Prices &amp; ISIN</text>
+        </g>
+
+        <g id="node-cache_shield" data-node-id="cache_shield" data-node-label="Multi-Tier Cache Shield" tabindex="0" role="button" aria-label="Focus Multi-Tier Cache Shield, LRU + SQLite TTL 24h, ARGUS Application &amp; Quantitative Core Container (Python 3.11+), SQLite" aria-pressed="false" data-node-kind="database" data-node-sublabel="LRU + SQLite TTL 24h" data-node-tag="Rate-Limit Protection" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" data-node-brand="SQLite" data-node-brand-id="sqlite" data-node-brand-status="preset" data-node-brand-source="https://github.com/sqlite/sqlite/blob/43e862723ec680542ca6f608f9963c0993dd7324/art/sqlite370.eps">
+          <title>Multi-Tier Cache Shield · LRU + SQLite TTL 24h · ARGUS Application &amp; Quantitative Core Container (Python 3.11+) · Rate-Limit Protection · SQLite</title>
+          <rect x="630" y="620" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="630" y="620" width="190" height="64" rx="6" class="c-database" data-animate="node" style="--step:8" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="database" class="semantic-sigil s-database" transform="translate(636 626) scale(0.6875)">
+            <ellipse cx="8" cy="4" rx="5" ry="2"/>
+            <path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/>
+          </g>
+          <g aria-hidden="true" data-brand-mark="sqlite" data-brand-title="SQLite" data-brand-status="preset" data-brand-source="https://github.com/sqlite/sqlite/blob/43e862723ec680542ca6f608f9963c0993dd7324/art/sqlite370.eps" class="brand-mark" transform="translate(798 626)">
+            <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
+            <path d="M21.678.521c-1.032-.92-2.28-.55-3.513.544a8.71 8.71 0 0 0-.547.535c-2.109 2.237-4.066 6.38-4.674 9.544.237.48.422 1.093.544 1.561a13.044 13.044 0 0 1 .164.703s-.019-.071-.096-.296l-.05-.146a1.689 1.689 0 0 0-.033-.08c-.138-.32-.518-.995-.686-1.289-.143.423-.27.818-.376 1.176.484.884.778 2.4.778 2.4s-.025-.099-.147-.442c-.107-.303-.644-1.244-.772-1.464-.217.804-.304 1.346-.226 1.478.152.256.296.698.422 1.186.286 1.1.485 2.44.485 2.44l.017.224a22.41 22.41 0 0 0 .056 2.748c.095 1.146.273 2.13.5 2.657l.155-.084c-.334-1.038-.47-2.399-.41-3.967.09-2.398.642-5.29 1.661-8.304 1.723-4.55 4.113-8.201 6.3-9.945-1.993 1.8-4.692 7.63-5.5 9.788-.904 2.416-1.545 4.684-1.931 6.857.666-2.037 2.821-2.912 2.821-2.912s1.057-1.304 2.292-3.166c-.74.169-1.955.458-2.362.629-.6.251-.762.337-.762.337s1.945-1.184 3.613-1.72C21.695 7.9 24.195 2.767 21.678.521m-18.573.543A1.842 1.842 0 0 0 1.27 2.9v16.608a1.84 1.84 0 0 0 1.835 1.834h9.418a22.953 22.953 0 0 1-.052-2.707c-.006-.062-.011-.141-.016-.2a27.01 27.01 0 0 0-.473-2.378c-.121-.47-.275-.898-.369-1.057-.116-.197-.098-.31-.097-.432 0-.12.015-.245.037-.386a9.98 9.98 0 0 1 .234-1.045l.217-.028c-.017-.035-.014-.065-.031-.097l-.041-.381a32.8 32.8 0 0 1 .382-1.194l.2-.019c-.008-.016-.01-.038-.018-.053l-.043-.316c.63-3.28 2.587-7.443 4.8-9.791.066-.069.133-.128.198-.194Z" transform="translate(3 3) scale(0.4166666666666667)" fill="#003B57"/>
+            <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
+          </g>
+          <text data-detail-anchor x="725" y="650" class="t-primary" font-size="9.7" font-weight="600" text-anchor="middle">Multi-Tier Cache Shield</text>
+        <text data-detail="context" x="725" y="666" class="t-muted" font-size="9" text-anchor="middle">LRU + SQLite TTL 24h</text>
+        <text data-detail="fine" x="725" y="676" class="t-database" font-size="7" text-anchor="middle">Rate-Limit Protection</text>
+        </g>
+
+        <g id="node-valuation_forensics" data-node-id="valuation_forensics" data-node-label="Valuation &amp; Forensics" tabindex="0" role="button" aria-label="Focus Valuation &amp; Forensics, Beneish, Sloan &amp; Altman Z, ARGUS Application &amp; Quantitative Core Container (Python 3.11+)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Beneish, Sloan &amp; Altman Z" data-node-context="ARGUS Application &amp; Quantitative Core Container (Python 3.11+)">
+          <title>Valuation &amp; Forensics · Beneish, Sloan &amp; Altman Z · ARGUS Application &amp; Quantitative Core Container (Python 3.11+)</title>
+          <rect x="940" y="620" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="940" y="620" width="190" height="64" rx="6" class="c-backend" data-animate="node" style="--step:12" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(946 626) scale(0.6875)">
+            <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
+          </g>
+          <text data-detail-anchor x="1035" y="650" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Valuation &amp; Forensics</text>
+        <text data-detail="context" x="1035" y="666" class="t-muted" font-size="9" text-anchor="middle">Beneish, Sloan &amp; Altman Z</text>
+        </g>
+
+        <g id="node-llm_api" data-node-id="llm_api" data-node-label="Gemini &amp; OpenAI API" tabindex="0" role="button" aria-label="Focus Gemini &amp; OpenAI API, LLM Narrative Intelligence, Architecture component, Google Gemini" aria-pressed="false" data-node-kind="external" data-node-sublabel="LLM Narrative Intelligence" data-node-context="Architecture component" data-node-brand="Google Gemini" data-node-brand-id="google-gemini" data-node-brand-status="preset" data-node-brand-source="https://gemini.google.com">
+          <title>Gemini &amp; OpenAI API · LLM Narrative Intelligence · Architecture component · Google Gemini</title>
+          <rect x="1250" y="620" width="180" height="64" rx="6" class="c-mask"/>
+          <rect x="1250" y="620" width="180" height="64" rx="6" class="c-external" data-animate="node" style="--step:12" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1256 626) scale(0.6875)">
+            <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
+            <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
+          </g>
+          <g aria-hidden="true" data-brand-mark="google-gemini" data-brand-title="Google Gemini" data-brand-status="preset" data-brand-source="https://gemini.google.com" class="brand-mark" transform="translate(1408 626)">
+            <rect width="16" height="16" rx="4" class="brand-mark-badge"/>
+            <path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81" transform="translate(3 3) scale(0.4166666666666667)" fill="#8E75B2"/>
+            <rect width="16" height="16" rx="4" class="brand-mark-frame"/>
+          </g>
+          <text data-detail-anchor x="1340" y="650" class="t-primary" font-size="10.8" font-weight="600" text-anchor="middle">Gemini &amp; OpenAI API</text>
+        <text data-detail="context" x="1340" y="666" class="t-muted" font-size="9" text-anchor="middle">LLM Narrative Intelligence</text>
         </g>
 
         <!-- Connection labels -->
-        <g data-detail="context" data-edge-from="users" data-edge-to="streamlit_app" data-edge-label="HTTP / UI" data-edge-key="0" data-edge-id="user-access">
-          <rect x="263.4" y="158" width="53.199999999999996" height="14" rx="3" class="c-mask"/>
-          <text x="290" y="168" class="t-backend" font-size="8" text-anchor="middle">HTTP / UI</text>
+        <g data-detail="context" data-edge-from="analyst_ui" data-edge-to="control_room" data-edge-label="HTTPS / UI" data-edge-key="0">
+          <rect x="236" y="172" width="58" height="14" rx="3" class="c-mask"/>
+          <text x="265" y="182" class="t-backend" font-size="8" text-anchor="middle">HTTPS / UI</text>
         </g>
-        <g data-detail="context" data-edge-from="csv_degiro" data-edge-to="streamlit_app" data-edge-label="Upload CSV" data-edge-key="1" data-edge-id="csv-import">
-          <rect x="263.5" y="282" width="58" height="14" rx="3" class="c-mask"/>
-          <text x="292.5" y="292" class="t-muted" font-size="8" text-anchor="middle">Upload CSV</text>
+        <g data-detail="context" data-edge-from="control_room" data-edge-to="analytical_modules" data-edge-label="Module Route" data-edge-key="1">
+          <rect x="536.2" y="172" width="67.6" height="14" rx="3" class="c-mask"/>
+          <text x="570" y="182" class="t-backend" font-size="8" text-anchor="middle">Module Route</text>
         </g>
-        <g data-detail="context" data-edge-from="yfinance_api" data-edge-to="data_fetcher" data-edge-label="Market Sync" data-edge-key="2" data-edge-id="market-fetch">
-          <rect x="261.1" y="502" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="292.5" y="512" class="t-muted" font-size="8" text-anchor="middle">Market Sync</text>
+        <g data-detail="context" data-edge-from="analytical_modules" data-edge-to="risk_engine" data-edge-label="Risk Computations" data-edge-key="2">
+          <rect x="834.2" y="165" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="880" y="175" class="t-backend" font-size="8" text-anchor="middle">Risk Computations</text>
         </g>
-        <g data-detail="context" data-edge-from="data_fetcher" data-edge-to="risk_engine" data-edge-label="Prices &amp; Forex" data-edge-key="3" data-edge-id="fetcher-to-engine">
-          <rect x="556.4" y="282" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="595" y="292" class="t-muted" font-size="8" text-anchor="middle">Prices &amp; Forex</text>
+        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="report_engine" data-edge-label="Factsheet Data" data-edge-key="3">
+          <rect x="1151.4" y="165" width="77.2" height="14" rx="3" class="c-mask"/>
+          <text x="1190" y="175" class="t-muted" font-size="8" text-anchor="middle">Factsheet Data</text>
         </g>
-        <g data-detail="context" data-edge-from="streamlit_app" data-edge-to="risk_engine" data-edge-label="Calculate Risk" data-edge-key="4" data-edge-id="app-to-engine">
-          <rect x="556.4" y="158" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="595" y="168" class="t-muted" font-size="8" text-anchor="middle">Calculate Risk</text>
+        <g data-detail="context" data-edge-from="csv_sources" data-edge-to="validator" data-edge-label="Raw CSV" data-edge-key="4">
+          <rect x="243.2" y="395" width="43.6" height="14" rx="3" class="c-mask"/>
+          <text x="265" y="405" class="t-messagebus" font-size="8" text-anchor="middle">Raw CSV</text>
         </g>
-        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="risk_limits" data-edge-label="Portfolio Metrics" data-edge-key="5" data-edge-id="engine-to-limits">
-          <rect x="699.2" y="282" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="745" y="292" class="t-muted" font-size="8" text-anchor="middle">Portfolio Metrics</text>
+        <g data-detail="context" data-edge-from="gsheets_api" data-edge-to="validator" data-edge-label="Live Sync ETL" data-edge-key="5">
+          <rect x="228.8" y="520.5" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="265" y="530.5" class="t-messagebus" font-size="8" text-anchor="middle">Live Sync ETL</text>
         </g>
-        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="quant_advisor" data-edge-label="Asset Allocations" data-edge-key="6" data-edge-id="engine-to-advisor">
-          <rect x="524.2" y="322" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="570" y="332" class="t-muted" font-size="8" text-anchor="middle">Asset Allocations</text>
+        <g data-detail="context" data-edge-from="validator" data-edge-to="control_room" data-edge-label="Validated Portfolio" data-edge-key="6">
+          <rect x="369.4" y="370" width="101.2" height="14" rx="3" class="c-mask"/>
+          <text x="420" y="380" class="t-muted" font-size="8" text-anchor="middle">Validated Portfolio</text>
         </g>
-        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="rebalancer_hedging" data-edge-label="Covariance Data" data-edge-key="7" data-edge-id="engine-to-rebalancer">
-          <rect x="829" y="392" width="82" height="14" rx="3" class="c-mask"/>
-          <text x="870" y="402" class="t-muted" font-size="8" text-anchor="middle">Covariance Data</text>
+        <g data-detail="context" data-edge-from="market_api" data-edge-to="cache_shield" data-edge-label="Market Ingestion" data-edge-key="7">
+          <rect x="526.6" y="632" width="86.8" height="14" rx="3" class="c-mask"/>
+          <text x="570" y="642" class="t-muted" font-size="8" text-anchor="middle">Market Ingestion</text>
         </g>
-        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="report_exporter" data-edge-label="Factsheet Data" data-edge-key="8" data-edge-id="engine-to-exporter">
-          <rect x="856.4" y="158" width="77.2" height="14" rx="3" class="c-mask"/>
-          <text x="895" y="168" class="t-muted" font-size="8" text-anchor="middle">Factsheet Data</text>
+        <g data-detail="context" data-edge-from="cache_shield" data-edge-to="data_fetcher" data-edge-label="Cached Data" data-edge-key="8">
+          <rect x="693.6" y="600" width="62.8" height="14" rx="3" class="c-mask"/>
+          <text x="725" y="610" class="t-muted" font-size="8" text-anchor="middle">Cached Data</text>
         </g>
-        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="mysql_dw" data-edge-label="Persist Snapshots" data-edge-key="9" data-edge-id="engine-to-dw">
-          <rect x="849.2" y="280" width="91.6" height="14" rx="3" class="c-mask"/>
-          <text x="895" y="290" class="t-muted" font-size="8" text-anchor="middle">Persist Snapshots</text>
+        <g data-detail="context" data-edge-from="data_fetcher" data-edge-to="risk_engine" data-edge-label="FX-Adjusted Prices" data-edge-key="9">
+          <rect x="831.8" y="290.5" width="96.39999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="880" y="300.5" class="t-muted" font-size="8" text-anchor="middle">FX-Adjusted Prices</text>
         </g>
-        <g data-detail="context" data-edge-from="mysql_dw" data-edge-to="powerbi_looker" data-edge-label="Star Schema Queries" data-edge-key="10" data-edge-id="dw-to-bi">
-          <rect x="994.4" y="480" width="101.2" height="14" rx="3" class="c-mask"/>
-          <text x="1045" y="490" class="t-muted" font-size="8" text-anchor="middle">Star Schema Queries</text>
+        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="adv_quant" data-edge-label="Return Matrix" data-edge-key="10">
+          <rect x="998.8" y="228" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="1035" y="238" class="t-muted" font-size="8" text-anchor="middle">Return Matrix</text>
+        </g>
+        <g data-detail="context" data-edge-from="adv_quant" data-edge-to="llm_api" data-edge-label="LLM Synthesis" data-edge-key="11">
+          <rect x="1153.8" y="517" width="72.4" height="14" rx="3" class="c-mask"/>
+          <text x="1190" y="527" class="t-messagebus" font-size="8" text-anchor="middle">LLM Synthesis</text>
+        </g>
+        <g data-detail="context" data-edge-from="adv_quant" data-edge-to="valuation_forensics" data-edge-label="Fundamentals" data-edge-key="12">
+          <rect x="1001.2" y="458" width="67.6" height="14" rx="3" class="c-mask"/>
+          <text x="1035" y="468" class="t-muted" font-size="8" text-anchor="middle">Fundamentals</text>
+        </g>
+        <g data-detail="context" data-edge-from="risk_engine" data-edge-to="dw_database" data-edge-label="Persist Snapshots" data-edge-key="13">
+          <rect x="1144.2" y="290.5" width="91.6" height="14" rx="3" class="c-mask"/>
+          <text x="1190" y="300.5" class="t-muted" font-size="8" text-anchor="middle">Persist Snapshots</text>
+        </g>
+        <g data-detail="context" data-edge-from="dw_database" data-edge-to="report_engine" data-edge-label="Historical Queries" data-edge-key="14">
+          <rect x="1291.8" y="370" width="96.39999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="1340" y="380" class="t-muted" font-size="8" text-anchor="middle">Historical Queries</text>
         </g>
 
         <!-- Legend -->
-        <g data-legend-bridge>
-          <text x="40" y="723" class="t-primary" font-size="9" font-weight="600">Legend</text>
-          <g data-legend-kind="external">
-            <rect x="40" y="728" width="14" height="9" rx="2" class="c-external" stroke-width="1"/>
-            <text x="60" y="736" class="t-muted" font-size="8">External</text>
+        <g data-legend data-legend-bridge>
+          <text x="40" y="736" class="t-primary" font-size="12" font-weight="650">Legend</text>
+          <g data-legend-semantic-kind="frontend" data-legend-kind="frontend" data-legend-label="Frontend" data-legend-x="40" data-legend-baseline="756" data-legend-width="83">
+            <rect x="40" y="747" width="16" height="10" rx="2.5" class="c-frontend" stroke-width="1"/>
+            <text x="62" y="756" class="t-muted" font-size="10" font-weight="500">Frontend</text>
           </g>
-          <g data-legend-kind="frontend">
-            <rect x="144" y="728" width="14" height="9" rx="2" class="c-frontend" stroke-width="1"/>
-            <text x="164" y="736" class="t-muted" font-size="8">Frontend</text>
+          <g data-legend-semantic-kind="backend" data-legend-kind="backend" data-legend-label="Backend" data-legend-x="145" data-legend-baseline="756" data-legend-width="78">
+            <rect x="145" y="747" width="16" height="10" rx="2.5" class="c-backend" stroke-width="1"/>
+            <text x="167" y="756" class="t-muted" font-size="10" font-weight="500">Backend</text>
           </g>
-          <g data-legend-kind="backend">
-            <rect x="248" y="728" width="14" height="9" rx="2" class="c-backend" stroke-width="1"/>
-            <text x="268" y="736" class="t-muted" font-size="8">Backend</text>
+          <g data-legend-semantic-kind="database" data-legend-kind="database" data-legend-label="Database" data-legend-x="245" data-legend-baseline="756" data-legend-width="83">
+            <rect x="245" y="747" width="16" height="10" rx="2.5" class="c-database" stroke-width="1"/>
+            <text x="267" y="756" class="t-muted" font-size="10" font-weight="500">Database</text>
           </g>
-          <g data-legend-kind="security">
-            <rect x="347" y="728" width="14" height="9" rx="2" class="c-security" stroke-width="1"/>
-            <text x="367" y="736" class="t-muted" font-size="8">Security</text>
-          </g>
-          <g data-legend-kind="database">
-            <rect x="451" y="728" width="14" height="9" rx="2" class="c-database" stroke-width="1"/>
-            <text x="471" y="736" class="t-muted" font-size="8">Database</text>
+          <g data-legend-semantic-kind="external" data-legend-kind="external" data-legend-label="External" data-legend-x="350" data-legend-baseline="756" data-legend-width="83">
+            <rect x="350" y="747" width="16" height="10" rx="2.5" class="c-external" stroke-width="1"/>
+            <text x="372" y="756" class="t-muted" font-size="10" font-weight="500">External</text>
           </g>
         </g>
       </svg>
@@ -4888,6 +5337,7 @@
               <span id="focus-kind" data-passport="kind"></span>
               <span id="focus-context" data-passport="context" hidden></span>
               <span id="focus-tag" data-passport="tag" hidden></span>
+              <span id="focus-brand" data-passport="brand" hidden></span>
               <code id="focus-id" data-passport="id"></code>
             </div>
             <div class="semantic-passport-evidence" id="focus-evidence" hidden aria-label="Verified source evidence">
@@ -4977,11 +5427,11 @@
         <button id="btn-route-probe" type="button" aria-label="Trace a directed route" aria-pressed="false" aria-controls="route-probe" title="Trace route (R)">PATH</button>
         <button id="btn-overview-map" type="button" aria-label="Open semantic radar" aria-expanded="false" aria-controls="overview-map" title="Semantic radar (M)">MAP</button>
         <button id="btn-semantic-lens" type="button" aria-label="Open semantic lens" aria-haspopup="dialog" aria-expanded="false" aria-pressed="false" aria-controls="semantic-lens" title="Semantic lens (L)">LENS</button>
-        <button id="btn-node-finder" type="button" aria-label="Find a node" aria-haspopup="dialog" aria-expanded="false" aria-controls="node-finder" title="Find a node (/)" data-node-finder-trigger>&#8981;</button>
-        <button id="btn-diagram-guide" type="button" aria-label="Open diagram guide" aria-haspopup="dialog" aria-expanded="false" aria-controls="diagram-guide" title="Diagram guide (?)">?</button>
-        <button data-view="out" type="button" aria-label="Zoom out" title="Zoom out (-)">&#8722;</button>
-        <button data-view="reset" type="button" aria-label="Reset diagram view" title="Reset view (0)">100%</button>
-        <button data-view="in" type="button" aria-label="Zoom in" title="Zoom in (+)">+</button>
+        <button id="btn-node-finder" type="button" aria-label="Find a node" aria-haspopup="dialog" aria-expanded="false" aria-controls="node-finder" title="Find a node (/)" data-node-finder-trigger><span class="diagram-nav-icon find" aria-hidden="true"></span></button>
+        <button id="btn-diagram-guide" type="button" aria-label="Open diagram guide" aria-haspopup="dialog" aria-expanded="false" aria-controls="diagram-guide" title="Diagram guide (?)"><span class="diagram-nav-icon guide" aria-hidden="true"></span></button>
+        <button data-view="out" type="button" aria-label="Zoom out" title="Zoom out (-)"><span class="diagram-nav-icon minus" aria-hidden="true"></span></button>
+        <button data-view="reset" type="button" aria-label="Reset diagram view" title="Reset view (0)"><span class="diagram-nav-detail" data-view-detail hidden>READ</span><span class="diagram-nav-percent" data-view-percent>100%</span></button>
+        <button data-view="in" type="button" aria-label="Zoom in" title="Zoom in (+)"><span class="diagram-nav-icon plus" aria-hidden="true"></span></button>
       </div>
     </div>
 
@@ -4993,9 +5443,9 @@
           <h3>Ingestion &amp; Interface</h3>
         </div>
         <ul>
-          <li>&bull; Streamlit multi-page UI (7 pages + Control Room)</li>
-          <li>&bull; DeGiro &amp; Generic CSV transaction parsing</li>
-          <li>&bull; Automated yfinance historical market &amp; forex download</li>
+          <li>&bull; Control Room v5.4.0 with 10 analytical modules</li>
+          <li>&bull; Dual Google Sheets Live Sync (Stocks + Crypto)</li>
+          <li>&bull; Automated ISIN / Ticker Database Resolver &amp; Multi-Currency FX Engine</li>
         </ul>
       </div>
 
@@ -5005,41 +5455,38 @@
           <h3>Quantitative &amp; Risk Core</h3>
         </div>
         <ul>
-          <li>&bull; Exact FIFO accounting &amp; Cost Basis tracking</li>
-          <li>&bull; Multi-method VaR (Historical, Parametric, Cornish-Fisher) &amp; CVaR</li>
-          <li>&bull; Markowitz Max Sharpe &amp; Min Volatility Rebalancer</li>
-          <li>&bull; Beta-Neutral Hedging &amp; Tail Risk Insurance Estimator</li>
+          <li>&bull; FIFO WACP deterministico &amp; VaR/CVaR Cornish-Fisher</li>
+          <li>&bull; Tail Copulas (Clayton/Gumbel), Kelly Sizing &amp; Equal Risk Contribution (ERC)</li>
+          <li>&bull; Live Rebalancing Sandbox con 5 preset quantitativi</li>
+          <li>&bull; Hierarchical Risk Parity (HRP) &amp; Black-Scholes Delta-Hedging</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot rose"></div>
-          <h3>Governance &amp; Compliance</h3>
+          <h3>AI &amp; Forensic Intelligence</h3>
         </div>
         <ul>
-          <li>&bull; 6 Institutional Risk Limits monitoring &amp; Early Warning</li>
-          <li>&bull; Health Score (0-100) &amp; Anomaly Scanner</li>
+          <li>&bull; AI Analyst dual-engine (Gemini / OpenAI / NLG Offline 100%)</li>
+          <li>&bull; Contabilità Forense Beneish M-Score (1999) &amp; Sloan Accruals (1996)</li>
+          <li>&bull; Altman Z-Score, Scomposizione DuPont &amp; DCF Monte Carlo</li>
         </ul>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div class="card-dot violet"></div>
-          <h3>Persistence &amp; BI</h3>
+          <h3>Storage, Caching &amp; BI</h3>
         </div>
         <ul>
-          <li>&bull; MySQL 8.0 Star Schema Data Warehouse</li>
-          <li>&bull; Multi-Tab Excel &amp; PDF Factsheet exporter</li>
-          <li>&bull; Star Schema export for Power BI &amp; Looker Studio</li>
+          <li>&bull; Multi-Tier Cache Shield (LRU + SQLite 24h) anti-rate limit</li>
+          <li>&bull; MySQL 8.0 &amp; SQLite Data Warehouse Star Schema</li>
+          <li>&bull; Esportazione Factsheet PDF, Excel Multi-Tab, HTML Standalone e Power BI ZIP</li>
         </ul>
       </div>
     </div>
 
-    <!-- Footer -->
-    <p class="footer">
-      Architecture diagram &bull; Built with Archify<span class="no-print"> &bull; <a class="artifact-start-link" href="https://tt-a1i.github.io/archify/start.html?type=architecture" target="_blank" rel="noopener noreferrer">Create yours &nearr;</a> &bull; Hover to trace &bull; <kbd>R</kbd> route &bull; Click to focus &bull; <kbd>+</kbd>/<kbd>&minus;</kbd> zoom &bull; <kbd>M</kbd> radar &bull; <kbd>[</kbd>/<kbd>]</kbd> views &bull; <kbd>P</kbd> play story &bull; <kbd>T</kbd> theme &bull; <kbd>E</kbd> export</span>
-    </p>
   </div>
 
   <script>
@@ -5185,7 +5632,6 @@
       var STORAGE_KEY = 'archify-theme';
       var html = document.documentElement;
       var btn = document.getElementById('btn-theme');
-      var icon = document.getElementById('theme-icon');
       var label = document.getElementById('theme-label');
 
       // localStorage can throw (blocked cookies, sandboxed iframes); the whole
@@ -5215,7 +5661,6 @@
 
       function apply(theme) {
         html.setAttribute('data-theme', theme);
-        icon.textContent = theme === 'dark' ? '\u263E' : '\u263C';
         label.textContent = theme === 'dark' ? 'Dark' : 'Light';
         btn.setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');
       }
@@ -5520,6 +5965,7 @@
         });
         Array.prototype.forEach.call(clone.querySelectorAll('[data-legend-kind]'), function (el) {
           el.removeAttribute('data-legend-kind');
+          el.removeAttribute('data-legend-label');
           el.removeAttribute('data-legend-count');
           el.removeAttribute('data-legend-zero');
           el.removeAttribute('data-legend-selected');
@@ -6337,12 +6783,10 @@
         if (it.dataset.format && !supports(it.dataset.format)) {
           it.disabled = true;
           it.title = 'Not supported by this browser';
-          it.style.opacity = '0.5';
         }
         if ((it.dataset.action === 'copy' || it.dataset.action === 'copy-share-card') && !canCopyImage()) {
           it.disabled = true;
           it.title = 'Clipboard image write not supported by this browser';
-          it.style.opacity = '0.5';
         }
       });
 
@@ -6963,7 +7407,8 @@
           beacon.classList.add('source-evidence-beacon');
           beacon.setAttribute('data-source-evidence-beacon', '');
           beacon.setAttribute('aria-hidden', 'true');
-          beacon.setAttribute('transform', 'translate(' + (box.x + box.width - 35) + ' ' + (box.y + 5) + ')');
+          var brandOffset = node.hasAttribute('data-node-brand') ? 24 : 0;
+          beacon.setAttribute('transform', 'translate(' + (box.x + box.width - 35 - brandOffset) + ' ' + (box.y + 5) + ')');
           var title = document.createElementNS(svgNamespace, 'title');
           title.textContent = label;
           var plate = document.createElementNS(svgNamespace, 'rect');
@@ -7370,6 +7815,7 @@
         setPassportValue(kind, node.getAttribute('data-node-kind') || 'node');
         setPassportValue(context, node.getAttribute('data-node-context'));
         setPassportValue(tag, node.getAttribute('data-node-tag'));
+        setPassportValue(document.getElementById('focus-brand'), node.getAttribute('data-node-brand'));
         semanticId.textContent = id;
         semanticId.hidden = false;
         renderSourceEvidence(id);
@@ -10218,11 +10664,164 @@
       };
     })();
 
+    /* ============================================================
+       Adaptive Reader Shell — one diagram across laptop and monitor.
+       The canonical SVG and viewBox never change. On ordinary desktop pages,
+       wide diagrams receive only enough outer width to use the available
+       height without pushing summary cards below the viewport. Mobile,
+       embed, presentation, print, and non-wide diagrams retain their own
+       established layout contracts.
+       ============================================================ */
+    Archify.readerLayout = (function () {
+      var html = document.documentElement;
+      var body = document.body;
+      var shell = document.querySelector('.container');
+      var diagram = document.querySelector('.diagram-container');
+      var svg = diagram && diagram.querySelector(':scope > svg');
+      var header = shell && shell.querySelector('.header');
+      var guided = shell && shell.querySelector('.guided-views');
+      var cards = shell && shell.querySelector('.cards');
+      var viewBox = svg && svg.viewBox && svg.viewBox.baseVal;
+      var ratio = viewBox && viewBox.height > 0 ? viewBox.width / viewBox.height : 0;
+      var frame = 0;
+      var settleFrame = 0;
+      var lastWidth = 0;
+      var WIDE_RATIO = 1.55;
+      var MIN_DESKTOP_WIDTH = 1024;
+      var MIN_READER_WIDTH = 960;
+      var MAX_READER_WIDTH = 1920;
+      var SAFE_BOTTOM_GAP = 12;
+
+      if (diagram && ratio >= WIDE_RATIO) {
+        diagram.setAttribute('data-wide-diagram', 'true');
+        html.setAttribute('data-diagram-shape', 'wide');
+      }
+
+      function number(value) {
+        var parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      }
+      function visible(element) {
+        return Boolean(element && !element.hidden && window.getComputedStyle(element).display !== 'none');
+      }
+      function outerHeight(element) {
+        if (!visible(element)) return 0;
+        var style = window.getComputedStyle(element);
+        return element.getBoundingClientRect().height + number(style.marginTop) + number(style.marginBottom);
+      }
+      function eligible() {
+        return Boolean(
+          shell && diagram && svg && ratio >= WIDE_RATIO &&
+          window.innerWidth >= MIN_DESKTOP_WIDTH &&
+          html.getAttribute('data-embed') !== 'true' &&
+          html.getAttribute('data-present') !== 'true' &&
+          (!window.matchMedia || !window.matchMedia('print').matches)
+        );
+      }
+      function clear() {
+        html.style.removeProperty('--archify-reader-width');
+        html.removeAttribute('data-reader-layout');
+        html.removeAttribute('data-reader-overflow');
+        lastWidth = 0;
+      }
+      function chromeMetrics() {
+        var bodyStyle = window.getComputedStyle(body);
+        var diagramStyle = window.getComputedStyle(diagram);
+        return {
+          bodyX: number(bodyStyle.paddingLeft) + number(bodyStyle.paddingRight),
+          bodyY: number(bodyStyle.paddingTop) + number(bodyStyle.paddingBottom),
+          diagramX: number(diagramStyle.paddingLeft) + number(diagramStyle.paddingRight) +
+            number(diagramStyle.borderLeftWidth) + number(diagramStyle.borderRightWidth),
+          diagramY: number(diagramStyle.paddingTop) + number(diagramStyle.paddingBottom) +
+            number(diagramStyle.borderTopWidth) + number(diagramStyle.borderBottomWidth)
+        };
+      }
+      function applyWidth(width) {
+        var rounded = Math.round(width);
+        if (Math.abs(rounded - lastWidth) < 1) return false;
+        lastWidth = rounded;
+        html.style.setProperty('--archify-reader-width', rounded + 'px');
+        html.setAttribute('data-reader-layout', 'adaptive');
+        return true;
+      }
+      function settleOverflow(minWidth) {
+        if (settleFrame) cancelAnimationFrame(settleFrame);
+        settleFrame = requestAnimationFrame(function () {
+          settleFrame = 0;
+          if (!eligible() || !lastWidth) return;
+          var overflow = Math.max(
+            document.documentElement.scrollHeight,
+            document.body.scrollHeight
+          ) - window.innerHeight;
+          if (overflow > 1 && lastWidth > minWidth) {
+            applyWidth(Math.max(minWidth, lastWidth - overflow * ratio - 4));
+            html.setAttribute('data-reader-overflow', 'reduced');
+          } else if (overflow > 1) {
+            html.setAttribute('data-reader-overflow', 'authored');
+          } else {
+            html.removeAttribute('data-reader-overflow');
+          }
+        });
+      }
+      function measure() {
+        frame = 0;
+        if (!eligible()) {
+          clear();
+          return null;
+        }
+        var chrome = chromeMetrics();
+        var viewportCap = Math.max(0, window.innerWidth - chrome.bodyX);
+        var minWidth = Math.min(MIN_READER_WIDTH, viewportCap);
+        var maxWidth = Math.min(MAX_READER_WIDTH, viewportCap);
+        var fixedHeight = chrome.bodyY + chrome.diagramY + SAFE_BOTTOM_GAP +
+          outerHeight(header) + outerHeight(guided) + outerHeight(cards);
+        var availableSvgHeight = Math.max(1, window.innerHeight - fixedHeight);
+        var desiredWidth = availableSvgHeight * ratio + chrome.diagramX;
+        var width = Math.max(minWidth, Math.min(maxWidth, desiredWidth));
+        applyWidth(width);
+        settleOverflow(minWidth);
+        return {
+          ratio: ratio,
+          width: Math.round(width),
+          availableSvgHeight: Math.round(availableSvgHeight),
+          fixedHeight: Math.round(fixedHeight)
+        };
+      }
+      function schedule() {
+        if (frame) return;
+        frame = requestAnimationFrame(measure);
+      }
+
+      window.addEventListener('resize', schedule, { passive: true });
+      window.addEventListener('load', schedule, { once: true });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule).catch(function () {});
+      if (typeof ResizeObserver === 'function') {
+        var resizeObserver = new ResizeObserver(schedule);
+        [header, guided, cards].forEach(function (element) { if (element) resizeObserver.observe(element); });
+      }
+      if (typeof MutationObserver === 'function') {
+        var contentObserver = new MutationObserver(schedule);
+        if (guided) contentObserver.observe(guided, { attributes: true, childList: true, subtree: true });
+        if (cards) contentObserver.observe(cards, { attributes: true, childList: true, subtree: true });
+        contentObserver.observe(html, { attributes: true, attributeFilter: ['data-embed', 'data-present'] });
+      }
+      schedule();
+
+      return {
+        measure: measure,
+        schedule: schedule,
+        active: function () { return html.getAttribute('data-reader-layout') === 'adaptive'; },
+        receipt: function () { return { ratio: ratio, width: lastWidth }; }
+      };
+    })();
+
     Archify.view = (function () {
       var container = document.querySelector('.diagram-container');
       var svg = container.querySelector('svg');
       var outBtn = container.querySelector('[data-view="out"]');
       var resetBtn = container.querySelector('[data-view="reset"]');
+      var resetDetailLabel = resetBtn.querySelector('[data-view-detail]');
+      var resetPercentLabel = resetBtn.querySelector('[data-view-percent]');
       var inBtn = container.querySelector('[data-view="in"]');
       var state = { scale: 1, x: 0, y: 0, mode: 'overview' };
       var drag = null;
@@ -10234,9 +10833,6 @@
       var autoScrollUntil = 0;
 
       var viewBox = svg.viewBox && svg.viewBox.baseVal;
-      if (viewBox && viewBox.height > 0 && viewBox.width / viewBox.height >= 1.55) {
-        container.setAttribute('data-wide-diagram', 'true');
-      }
 
       function clamp() {
         var width = svg.clientWidth || 1;
@@ -10287,7 +10883,7 @@
       function detailLevel() {
         if (state.mode === 'semantic') return 'full';
         if (state.scale >= 1.75) return 'full';
-        if (state.scale >= 1.25) return 'read';
+        if (state.scale >= 1) return 'read';
         return 'map';
       }
       function renderControls() {
@@ -10300,7 +10896,14 @@
           : detail === 'read'
             ? 'Zoom in again to reveal tags and annotations'
             : 'Full diagram detail';
-        resetBtn.textContent = (semantic ? 'AUTO ' : levelLabel) + percent;
+        var resolvedLevel = (semantic ? 'AUTO ' : levelLabel).trim();
+        var showDetailLevel = resolvedLevel !== 'READ';
+        if (resetDetailLabel) {
+          resetDetailLabel.textContent = resolvedLevel;
+          resetDetailLabel.hidden = !showDetailLevel;
+        }
+        if (resetPercentLabel) resetPercentLabel.textContent = percent;
+        resetBtn.toggleAttribute('data-detail-visible', showDetailLevel);
         resetBtn.title = (semantic ? 'Semantic camera active · ' : '') + detailHint + ' · reset view (0)';
         resetBtn.setAttribute('aria-label', detailHint + '. Reset diagram view');
         resetBtn.setAttribute('data-detail-level', detail);
@@ -10987,7 +11590,6 @@
     Archify.presentation = (function () {
       var html = document.documentElement;
       var btn = document.getElementById('btn-present');
-      var icon = document.getElementById('present-icon');
       var label = document.getElementById('present-label');
       var previousScrollY = 0;
 
@@ -11006,7 +11608,6 @@
         btn.setAttribute('aria-pressed', next ? 'true' : 'false');
         btn.setAttribute('aria-label', next ? 'Exit presentation stage' : 'Enter presentation stage');
         btn.title = next ? 'Exit presentation stage (F or Escape)' : 'Presentation stage (F)';
-        icon.textContent = next ? '\u00d7' : '\u25a1';
         label.textContent = next ? 'Exit' : 'Present';
       }
 
@@ -11117,6 +11718,7 @@
         var sublabel = node.getAttribute('data-node-sublabel') || '';
         var context = node.getAttribute('data-node-context') || '';
         var tag = node.getAttribute('data-node-tag') || '';
+        var brand = node.getAttribute('data-node-brand') || '';
         var type = semanticType(node);
         var sources = Archify.sourceEvidence.node(id);
         var sourceSearch = sources.map(function (source) {
@@ -11129,9 +11731,10 @@
           sublabel: sublabel,
           context: context,
           tag: tag,
+          brand: brand,
           sources: sources,
           links: connectionsFor(id),
-          search: (id + ' ' + label + ' ' + type + ' ' + sublabel + ' ' + context + ' ' + tag + ' ' + sourceSearch + ' ' + text).toLowerCase(),
+          search: (id + ' ' + label + ' ' + type + ' ' + sublabel + ' ' + context + ' ' + tag + ' ' + sourceSearch + ' ' + text).toLowerCase() + ' ' + brand.toLowerCase(),
           node: node
         };
       });
@@ -12478,7 +13081,8 @@
           }
           entry.setAttribute('role', 'button');
           entry.setAttribute('tabindex', legendEntries.length ? '-1' : '0');
-          entry.setAttribute('aria-label', 'Inspect ' + fact.label + ', ' + count + ' node' + (count === 1 ? '' : 's'));
+          var visibleLabel = entry.getAttribute('data-legend-label') || fact.label;
+          entry.setAttribute('aria-label', 'Inspect ' + visibleLabel + ', ' + count + ' node' + (count === 1 ? '' : 's'));
           entry.setAttribute('aria-pressed', 'false');
           entry.setAttribute('aria-haspopup', 'dialog');
           entry.setAttribute('aria-controls', 'semantic-lens');
