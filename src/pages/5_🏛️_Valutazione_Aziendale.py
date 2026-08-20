@@ -317,10 +317,13 @@ Rapporto tra multiplo P/E e tasso di crescita atteso degli utili (EPS Growth). V
     st.markdown("#### 📈 Potenziale di Rialzo (Upside / Downside Consensus Analisti)")
     st.caption("Distanza percentuale necessaria affinché la quotazione di mercato converga verso il Target Price stimato dal consensus istituzionale.")
     
-    df_upside = df_valued.dropna(subset=["Upside %"]).sort_values("Upside %", ascending=True)
+    df_upside = df_valued.dropna(subset=["Upside %"]).sort_values("Upside %", ascending=True).copy()
 
     if not df_upside.empty:
         df_upside["Colore"] = np.where(df_upside["Upside %"] > 0, "#00e676", "#f85149")
+        df_upside["fmt_upside"] = df_upside["Upside %"].apply(lambda x: f"{x*100:+.2f}%")
+        df_upside["fmt_price"] = df_upside["last_price"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
+        df_upside["fmt_target"] = df_upside["target_mean_price"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
         
         min_x = min(0.0, float(df_upside["Upside %"].min()) * 100)
         max_x = max(0.0, float(df_upside["Upside %"].max()) * 100)
@@ -337,7 +340,8 @@ Rapporto tra multiplo P/E e tasso di crescita atteso degli utili (EPS Growth). V
             textposition="outside",
             textfont=dict(size=11, color="#ffffff"),
             cliponaxis=False,
-            hovertemplate="<b>%{y}</b><br>📈 Distanza dal Fair Value: <b>%{x:+.2f}%</b><extra></extra>"
+            customdata=np.stack((df_upside["fmt_upside"], df_upside["fmt_price"], df_upside["fmt_target"]), axis=-1),
+            hovertemplate="<b>%{y}</b><br>Prezzo Attuale: <b>%{customdata[1]}</b><br>Target Price: <b>%{customdata[2]}</b><br>📈 Distanza dal Fair Value: <b>%{customdata[0]}</b><extra></extra>"
         ))
         
         fig_bar.update_layout(
