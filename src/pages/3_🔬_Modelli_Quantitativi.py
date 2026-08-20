@@ -82,6 +82,7 @@ st.divider()
 # ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
 active_quant_tab = render_segmented_tabs([
     "📊 Frontiera Markowitz & Rebalancing",
+    "🧬 Tail Copula & Kelly Sizing",
     "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)",
     "🛡️ Hedging Tattico & Tail Risk",
     "🎯 Attribuzione Brinson-Fachler",
@@ -789,37 +790,56 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
             st.caption("Quantifica il rischio di crash congiunto asimmetrico (Clayton/Gumbel Copulas) e calcola il dimensionamento matematico ottimale delle posizioni (Half-Kelly).")
         with col_cop_h2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            render_info_modal(
-                title="Guida a Tail Copula & Kelly Criterion",
-                content="""
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+            glossary_modal(
+                "ℹ️ Guida Metodologica: Tail Copula & Criterio di Kelly",
+                """
+<div style="font-size: 13.5px; line-height: 1.45;">
 
-<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
-  <b style="color: #ff9900;">🎯 Oltre la Correlazione Lineare di Pearson</b><br>
-  Nei momenti di panico di mercato, la correlazione lineare sottostima sistematicamente il rischio: gli asset tendono a crollare insieme molto più di quanto previsto dalla curva normale (Asymmetric Crash Contagion).
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 1. COS'È</div>
+  <div>
+    • <b>Dipendenza di Coda (Tail Copulas):</b> Misura quantitativa non lineare della tendenza di due asset a crollare contemporaneamente durante shock sistemici di mercato, superando i limiti della classica correlazione lineare di Pearson.<br>
+    • <b>Criterio di Kelly (Trade Sizing):</b> Algoritmo di teoria dell'informazione che determina la percentuale ottimale di capitale da rischiare su ciascuna operazione per massimizzare la crescita geometrica di lungo termine.
+  </div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">1. Lower Tail Dependence (&lambda;<sub>L</sub>) & Copula di Clayton</div>
-  <div>Misura la probabilità condizionata che l'asset <i>j</i> subisca una perdita estrema dato che l'asset <i>i</i> è in crollo (percentile &le; q):</div>
-  <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 4px; font-family: monospace; margin: 4px 0; color: #79c0ff;">
-    &lambda;<sub>L</sub> = lim<sub>q&rarr;0<sup>+</sup></sub> P(U<sub>j</sub> &le; q | U<sub>i</sub> &le; q) = 2<sup>&minus;1/&theta;</sup> (Clayton)
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 2. COME SI CALCOLA</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px;">
+    <b>Lower Tail Dependence:</b> &lambda;<sub>L</sub> = lim<sub>q&rarr;0<sup>+</sup></sub> P(U<sub>j</sub> &le; q | U<sub>i</sub> &le; q) = 2<sup>&minus;1/&theta;</sup> (Clayton)<br>
+    <b>Kelly Formula (Discreta):</b> f<sup>*</sup> = [p &middot; (b + 1) &minus; 1] / b &nbsp;&nbsp;|&nbsp;&nbsp; <b>Half-Kelly:</b> f<sup>*</sup><sub>half</sub> = f<sup>*</sup> / 2
   </div>
-  <div>Valori elevati (&lambda;<sub>L</sub> &gt; 0.35) indicano che la diversificazione svanisce durante i crolli sistemici.</div>
+  <div>dove <i>p</i> è il Win Rate (%), <i>b</i> è il Payoff Ratio (Avg Win / Avg Loss) e <i>f<sup>*</sup></i> è la frazione di capitale ottimale.</div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">2. Criterio di Kelly & Fractional Sizing</div>
-  <div>Massimizza il tasso atteso di crescita logaritmica del capitale nel lungo periodo:</div>
-  <div style="background: rgba(0,0,0,0.3); padding: 6px 10px; border-radius: 4px; font-family: monospace; margin: 4px 0; color: #7ee787;">
-    f<sup>*</sup> = (&mu; &minus; R<sub>f</sub>) / &sigma;<sup>2</sup> &nbsp;&nbsp;|&nbsp;&nbsp; Half-Kelly = f<sup>*</sup> / 2
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 3. A COSA SERVE</div>
+  <div>
+    • <b>Prevenzione del Crash Contagion:</b> Rileva le coppie di asset che sembrano decorrelate in tempi normali ma perdono completamente la diversificazione durante i crash.<br>
+    • <b>Dimensionamento Scientifico:</b> Elimina il sovradimensionamento (overbetting) e azzera il rischio matematico di rovina (Gambler's Ruin).
   </div>
-  <div><b>Perché Half-Kelly:</b> Il Full Kelly espone a drawdown violenti (&gt;50%). L'approccio istituzionale Half-Kelly cattura il 75% della crescita massima con il 50% di volatilità in meno e azzera il rischio di rovina statistica.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ 4. COME VIENE CALCOLATO DA ARGUS</div>
+  <div>
+    • <b>Copule:</b> ARGUS trasforma i rendimenti storici in ranghi uniformi empirici (CDF) e stima il parametro di copula archimedea &theta; e &lambda;<sub>L</sub> sulla soglia di percentile estremo <i>q</i>.<br>
+    • <b>Kelly Simulator:</b> ARGUS estrae in tempo reale dal motore <b>FIFO del Graveyard</b> il Win Rate reale e il Payoff Ratio storico, calcolando il dimensionamento monetario (€) esatto in base allo Stop-Loss inserito.
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 5. COME LEGGERLO</div>
+  <div>
+    • 🚨 <b>&lambda;<sub>L</sub> &ge; 0.30:</b> Allerta Diversification Breakdown (in crollo la correlazione sale verso 1).<br>
+    • 🟢 <b>Half-Kelly (Raccomandato):</b> Ottiene il 75% del rendimento geometrico massimo riducendo la volatilità del 50% e proteggendo dai drawdown estremi.<br>
+    • ⚠️ <b>Edge &le; 0%:</b> Se l'edge statistico è negativo, il Kelly formula consiglia zero esposizione (non operare).
+  </div>
 </div>
 
 </div>
 """,
-                button_label="📖 Metodologia Copula & Kelly"
+                button_label="💡 Guida a Tail Copula & Kelly Sizing"
             )
 
         df_returns_all = results.get("returns", pd.DataFrame())
