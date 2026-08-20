@@ -61,16 +61,41 @@ var_val = float(mk.get("var_95", 0.0) or 0.0)
 if var_val < 0.20 and var_val > 0.0:
     var_val = var_val * 100.0
 
-st.markdown(f"""
-<div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 4px solid #ff9900; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;">
-    <div style="font-weight: 700; font-size: 15px; color: #ff9900; margin-bottom: 4px;">⚡ Sintesi Esecutiva Quantitativa | Status Portafoglio</div>
-    <div style="font-size: 13.5px; color: #c9d1d9; line-height: 1.5;">
-        Portafoglio attivo con controvalore totale di <b>€ {port_val:,.2f}</b>. 
-        Conformità del <b>{comp_score:.1f}%</b> sui 6 limiti di rischio regolamentari. 
-        Sharpe Ratio a <b>{sharpe_val:.2f}</b> con rendimento annuo (CAGR) del <b>{cagr_val:.2f}%</b> (totale cumulato: <b>{tot_ret_val:+.2f}%</b>) e VaR 95% giornaliero al <b>{var_val:.2f}%</b>.
+from core.yield_curve import get_active_risk_free_rate
+
+custom_rf_val = (float(st.session_state.get("custom_rf_rate_pct", 2.75)) / 100.0) if st.session_state.get("rf_mode") == "Manuale" else None
+active_rf_resolved = get_active_risk_free_rate(currency=st.session_state.get("base_currency", "EUR"), custom_override=custom_rf_val)
+
+rf_info = results.get("risk_free") or results.get("metrics", {}).get("risk_free")
+if not rf_info or not isinstance(rf_info, dict) or "rate_pct" not in rf_info:
+    rf_info = active_rf_resolved
+
+rf_rate_pct = float(rf_info.get("rate_pct", active_rf_resolved["rate_pct"]))
+rf_source = rf_info.get("source", active_rf_resolved["source"])
+rf_currency = rf_info.get("currency", active_rf_resolved["currency"])
+
+col_callout, col_rf_btn = st.columns([4.2, 1.2])
+with col_callout:
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 4px solid #ff9900; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+            <span style="font-weight: 700; font-size: 14.5px; color: #ff9900;">⚡ Sintesi Esecutiva Quantitativa | Status Portafoglio</span>
+            <span style="font-size: 11px; background: rgba(255,153,0,0.15); color: #ff9900; padding: 2px 8px; border-radius: 12px; font-weight: 700;">
+                🏛️ Risk-Free {rf_currency}: {rf_rate_pct:.2f}%
+            </span>
+        </div>
+        <div style="font-size: 13px; color: #c9d1d9; line-height: 1.45;">
+            Portafoglio attivo con controvalore totale di <b>€ {port_val:,.2f}</b>. 
+            Conformità del <b>{comp_score:.1f}%</b> sui 6 limiti di rischio regolamentari. 
+            Sharpe Ratio a <b>{sharpe_val:.2f}</b> (hurdle rate Rf: <b>{rf_rate_pct:.2f}%</b>) con rendimento annuo (CAGR) del <b>{cagr_val:.2f}%</b> e VaR 95% al <b>{var_val:.2f}%</b>.
+        </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+with col_rf_btn:
+    from core.ui_utils import render_risk_free_modal
+    st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
+    render_risk_free_modal(currency=rf_currency, use_popover=True, button_label="ℹ️ Guida Tasso Risk-Free", risk_free_info=rf_info)
 
 
 
@@ -200,18 +225,18 @@ with col4:
     metric_card(
         "Sharpe Ratio (Ex-Post)",
         f"{ret.get('sharpe_ratio', 0) if ret.get('sharpe_ratio') else 0:.2f}",
-        help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
+        help_text=f"""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Rappresenta lo <b>Sharpe Ratio Storico Realizzato (Ex-Post)</b>. Misura l'extra-rendimento effettivo conseguito dal portafoglio per unità di volatilità durante la sua storia reale, tenendo conto delle date di acquisto, delle vendite e dei flussi di cassa (metodo FIFO).</div>
 
 <div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
 <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
   <b>Sharpe Ratio<sub>Ex-Post</sub></b> = <span style="display:inline-block; vertical-align:middle; text-align:center; margin: 0 4px;"><span style="display:block; border-bottom:1px solid #ffb74d; padding-bottom:1px;">R<sub>p</sub> &minus; R<sub>f</sub></span><span style="display:block; padding-top:1px;">&sigma;<sub>p</sub></span></span> &times; &radic;252
 </div>
-dove <i>R<sub>p</sub></i> è il rendimento medio giornaliero dei flussi reali, <i>R<sub>f</sub></i> il tasso privo di rischio giornaliero (3.0% annuo) e <i>&sigma;<sub>p</sub></i> la deviazione standard giornaliera.
+dove <i>R<sub>p</sub></i> è il rendimento medio giornaliero dei flussi reali, <i>R<sub>f</sub></i> il tasso privo di rischio giornaliero ({rf_rate_pct:.2f}% annuo) e <i>&sigma;<sub>p</sub></i> la deviazione standard giornaliera.
 </div>
 
 <div style="margin-bottom: 8px;"><b>🎯 Differenza con Markowitz (Ex-Ante):</b>
-Mentre lo <b>Sharpe Ex-Post (0.51)</b> misura la storia reale con i pesi variabili nel tempo, lo <b>Sharpe Markowitz (0.77)</b> nella scheda Modelli Quantitativi misura l'efficienza teorica dell'allocazione attuale statica (<i>w<sup>T</sup>&mu; / &sigma;</i>).
+Mentre lo <b>Sharpe Ex-Post</b> misura la storia reale con i pesi variabili nel tempo, lo <b>Sharpe Markowitz</b> nella scheda Modelli Quantitativi misura l'efficienza teorica dell'allocazione attuale statica (<i>w<sup>T</sup>&mu; / &sigma;</i>).
 </div>
 
 <div><b>🔍 Come leggerlo:</b><br>
@@ -495,7 +520,7 @@ with col_head_m1:
 
 with col_head_m2:
     st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-    glossary_modal("📚 Glossario Completo Metriche di Rendimento & Efficienza", """
+    glossary_modal("📚 Glossario Completo Metriche di Rendimento & Efficienza", f"""
 <div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
 <!-- 1. ALPHA DI JENSEN -->
@@ -508,7 +533,7 @@ with col_head_m2:
     </div>
   </div>
   <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Identificare la reale abilità (<i>Skill</i>) di selezione dei titoli e di allocazione del capitale, isolandola dall'andamento generale del mercato.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Confronta il CAGR del portafoglio con il CAGR del benchmark prescelto (es. SPY), depurato dall'effetto Beta e dal tasso privo di rischio al 3.0%.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Confronta il CAGR del portafoglio con il CAGR del benchmark prescelto (es. SPY), depurato dall'effetto Beta e dal tasso privo di rischio al {rf_rate_pct:.2f}%.</div>
   <div><b>🔍 Come leggerlo:</b><br>
     • <b>&alpha; > 0:</b> Sovraperformance attiva (creazione reale di valore aggiunto).<br>
     • <b>&alpha; = 0:</b> Rendimento perfettamente allineato al rischio assunto.<br>
@@ -526,7 +551,7 @@ with col_head_m2:
     </div>
   </div>
   <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Capire se i rendimenti del portafoglio sono una reale ricompensa per il rischio o se dipendono da oscillazioni eccessive e insostenibili.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sulla serie storica dei rendimenti logaritmici giornalieri netti rispetto al Risk-Free rate (3.0% annuo) e riscalato su base annua con &radic;252.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sulla serie storica dei rendimenti logaritmici giornalieri netti rispetto al Risk-Free rate ({rf_rate_pct:.2f}% annuo) e riscalato su base annua con &radic;252.</div>
   <div><b>🔍 Come leggerlo:</b><br>
     • <b>< 0.50:</b> Efficienza debole (rischio eccessivo rispetto al rendimento).<br>
     • <b>0.50 – 0.99:</b> Efficienza moderata / standard di mercato.<br>
@@ -545,7 +570,7 @@ with col_head_m2:
     </div>
   </div>
   <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Valutare con precisione strategie asimmetriche (Growth, ETF tematici, opzioni) dove la volatilità al rialzo non deve essere punita.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Isola i rendimenti giornalieri inferiori al tasso privo di rischio (3.0%/252), calcola la deviazione standard quadratica dei soli ribassi e riscala su base annua con &radic;252.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Isola i rendimenti giornalieri inferiori al tasso privo di rischio ({rf_rate_pct:.2f}%/252), calcola la deviazione standard quadratica dei soli ribassi e riscala su base annua con &radic;252.</div>
   <div><b>🔍 Come leggerlo:</b><br>
     • <b>< 1.0:</b> Protezione dai ribassi debole o rendimento insufficiente.<br>
     • <b>1.0 – 2.0:</b> Ottimo profilo asimmetrico (buona difesa nelle correzioni).<br>

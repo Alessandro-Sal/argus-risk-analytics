@@ -315,7 +315,9 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                 
                 if btn_load:
                     with st.spinner(f"Ricalcolo rapido dell'analisi {sel_row.run_id}..."):
-                        results = compute_risk(sel_row.portfolio_id, engine_sidebar, benchmark_ticker=benchmark)
+                        rf_val = st.session_state.get("active_rf_rate")
+                        base_curr = st.session_state.get("base_currency", "EUR")
+                        results = compute_risk(sel_row.portfolio_id, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
                         st.session_state["pipeline_done"]  = True
                         st.session_state["portfolio_id"]   = sel_row.portfolio_id
                         st.session_state["portfolio_name"] = sel_row.port_name
@@ -758,12 +760,15 @@ with tab_ingest:
                                     "notes":    None if pd.isna(row.get("notes")) else row.get("notes"),
                                 })
 
+                    rf_val = st.session_state.get("active_rf_rate")
+                    base_curr = st.session_state.get("base_currency", "EUR")
+
                     if offline_mode:
                         fetch_report, df_tx, df_prices = fetch_and_store(df_clean, engine, portfolio_id, benchmark_ticker=benchmark)
-                        results = compute_risk(portfolio_id, engine, benchmark_ticker=benchmark, df_tx=df_tx, df_prices=df_prices)
+                        results = compute_risk(portfolio_id, engine, benchmark_ticker=benchmark, df_tx=df_tx, df_prices=df_prices, risk_free_rate=rf_val, base_currency=base_curr)
                     else:
                         fetch_report = fetch_and_store(df_clean, engine, portfolio_id, benchmark_ticker=benchmark)
-                        results = compute_risk(portfolio_id, engine, benchmark_ticker=benchmark)
+                        results = compute_risk(portfolio_id, engine, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
 
                     timestamp_str = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
                     run_id = f"ANL-{timestamp_str}"

@@ -894,11 +894,16 @@ def compute_piotroski_f_score(ticker: str) -> Dict[str, Any]:
     }
 
 
-def compute_wacc_estimation(ticker: str, rf_rate: float = 0.042, erp: float = 0.055) -> Dict[str, Any]:
+def compute_wacc_estimation(ticker: str, rf_rate: float = None, erp: float = 0.055) -> Dict[str, Any]:
     """
     Estimates the Weighted Average Cost of Capital (WACC) dynamically
     using CAPM for Cost of Equity and effective tax-adjusted Cost of Debt.
     """
+    from core.yield_curve import get_default_risk_free_rate
+    if rf_rate is None:
+        curr = "EUR" if any(ticker.upper().endswith(suf) for suf in [".MI", ".PA", ".MC", ".AS", ".DE"]) else "USD"
+        rf_rate = get_default_risk_free_rate(curr)
+
     try:
         import yfinance as yf
         t = yf.Ticker(ticker)
@@ -956,7 +961,7 @@ def compute_wacc_estimation(ticker: str, rf_rate: float = 0.042, erp: float = 0.
             "cost_of_equity_pct": 9.98,
             "cost_of_debt_after_tax_pct": 3.56,
             "beta": 1.05,
-            "risk_free_rate_pct": 4.20,
+            "risk_free_rate_pct": round(rf_rate * 100.0, 2),
             "equity_risk_premium_pct": 5.50,
             "weight_equity_pct": 92.5,
             "weight_debt_pct": 7.5,

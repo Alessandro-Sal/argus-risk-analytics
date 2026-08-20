@@ -1659,6 +1659,78 @@ def render_info_modal(title: str, content: str, button_label: str = "ℹ️ Meto
         glossary_modal(title=title, content=content, button_label=button_label)
 
 
+def render_risk_free_modal(
+    currency: str = "EUR",
+    use_popover: bool = False,
+    button_label: str = "ℹ️ Metodologia Risk-Free",
+    risk_free_info: dict = None
+):
+    """
+    Renderizza un modale o popover informativo sul Tasso Privo di Rischio (Risk-Free Rate),
+    spiegando la metodologia istituzionale, le fonti live (^IRX, €STR, SONIA, SARON),
+    e l'impatto matematico sui modelli di Sharpe, Sortino, Alpha, Black-Scholes, WACC e Kelly.
+    """
+    from core.yield_curve import get_active_risk_free_rate
+    if risk_free_info is not None and isinstance(risk_free_info, dict) and "rate_pct" in risk_free_info:
+        info = risk_free_info
+    else:
+        custom_rf_val = (float(st.session_state.get("custom_rf_rate_pct", 2.75)) / 100.0) if st.session_state.get("rf_mode") == "Manuale" else None
+        curr = currency or st.session_state.get("base_currency", "EUR")
+        info = get_active_risk_free_rate(curr, custom_override=custom_rf_val)
+
+    curr = info.get("currency", "EUR")
+    rate_pct = float(info.get("rate_pct", 2.75))
+    source = info.get("source", "BCE €STR")
+    
+    content = f"""
+### 🏛️ Tasso Privo di Rischio (Risk-Free Rate $R_f$) — Standard Istituzionale
+
+Il **Tasso Privo di Rischio ($R_f$)** rappresenta il rendimento teorico di un investimento a rischio di credito nullo su un orizzonte a breve termine. In **ARGUS**, il tasso $R_f$ è calibrato dinamicamente in base alla valuta base del portafoglio (**{curr}**) ed è attualmente pari a **{rate_pct:.2f}%** (*{source}*).
+
+---
+
+#### 🌐 Benchmark Istituzionali per Valuta
+
+| Valuta | Tasso di Riferimento | Proxy Live / Fonte | Tipologia di Strumento |
+| :--- | :--- | :--- | :--- |
+| **EUR** | **BCE €STR** (Euro Short-Term Rate) | `XEON.DE` / Bund 3M | Overnight Interbancario / Deposito BCE |
+| **USD** | **US 3M Treasury Bill** | `^IRX` (13-Week T-Bill) / SOFR | Titoli di Stato a Breve Termine USA |
+| **GBP** | **Bank of England SONIA** | `CSH2.L` / UK 3M Gilt | Sterling Overnight Index Average |
+| **CHF** | **SNB SARON** | Swiss Overnight Rate | Swiss Average Rate Overnight |
+
+---
+
+#### 📐 Impatto Matematico nei Motori Quantitativi di ARGUS
+
+1. **Sharpe Ratio & Sortino Ratio**:
+   $$\\text{{Sharpe}} = \\frac{{R_p - R_f}}{{\\sigma_p}}, \\quad \\text{{Sortino}} = \\frac{{R_p - R_f}}{{\\sigma_{{\\text{{downside}}}}}}$$
+   *Un $R_f$ più elevato incrementa l'hurdle rate richiesto al gestore per giustificare la volatilità assunta.*
+
+2. **Alpha di Jensen & CAPM**:
+   $$\\alpha = R_p - [R_f + \\beta_p (R_m - R_f)]$$
+   *Depura l'extra-rendimento sia dalla componente di mercato (Beta) sia dal rendimento monetario privo di rischio.*
+
+3. **Prezzatura Opzioni & Delta-Hedging (Black-Scholes 1973)**:
+   $$C = S N(d_1) - K e^{{-R_f T}} N(d_2), \\quad P = K e^{{-R_f T}} N(-d_2) - S N(-d_1)$$
+   *Il tasso $R_f$ determina il fattore di sconto monetario per il valore attuale dello strike price $K$.*
+
+4. **Costo del Capitale (WACC & DCF Intrinseco)**:
+   $$K_e = R_f + \\beta \\times \\text{{ERP}}$$
+   *Costituisce la base del tasso di attualizzazione per i flussi di cassa operativi e la valutazione intrinseca.*
+
+5. **Trade Sizing Ottimale (Kelly Criterion)**:
+   $$f^* = \\frac{{\\mu - R_f}}{{\\sigma^2}}$$
+   *Massimizza la crescita geometrica del capitale pesando l'eccesso di rendimento rispetto alla varianza.*
+"""
+    render_info_modal(
+        title=f"🏛️ Metodologia Tasso Risk-Free ({curr}: {rate_pct:.2f}%)",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
+
 def get_argus_eye_svg(size: int = 140, animated: bool = True, accent: str = None) -> str:
     """
     Genera l'Occhio Cibernetico di Argus Panoptes in vettoriale SVG puro a 60 FPS.
@@ -1840,7 +1912,9 @@ def ensure_risk_bundle_loaded(default_preset: str = "🏦 Bilanciato Istituziona
             }
             sel_preset = st.session_state.get("sandbox_preset_name", default_preset)
             tks = sandbox_presets.get(sel_preset, ["AAPL", "MSFT", "JNJ", "PG", "BND", "SPY"])
-            results = compute_sandbox_risk_bundle(tickers=tks, sandbox_name=sel_preset)
+            rf_val = st.session_state.get("active_rf_rate")
+            base_curr = st.session_state.get("base_currency", "EUR" if "Euro" in sel_preset else "USD")
+            results = compute_sandbox_risk_bundle(tickers=tks, sandbox_name=sel_preset, risk_free_rate=rf_val, base_currency=base_curr)
             st.session_state["results"] = results
             st.session_state["sandbox_preset_name"] = sel_preset
 

@@ -682,4 +682,37 @@ Dato un capitale di portafoglio $C$ e una distanza di Stop-Loss percentuale $SL\
 \[ G(f) = p \ln(1 + f \cdot b) + (1 - p) \ln(1 - f) \]
 Se l'Edge matematico $E = p \cdot b - (1 - p) \le 0$, l'algoritmo impone $f^* = 0$ (esposizione nulla).
 
+---
+
+## 41. Curva Tassi Privi di Rischio (Risk-Free Yield Curve) & Calibrazione Multi-Valuta (`core/yield_curve.py`)
+
+La piattaforma integra un motore dedicato di calibrazione automatica del tasso privo di rischio ($R_f$) ancorato alle principali curve monetarie interbancarie e governative internazionali a breve termine, con caching resiliente (TTL 12h) e fallback deterministici su dati ufficiali delle Banche Centrali:
+
+### 1. Benchmark Istituzionali per Valuta Base
+- **EUR (€STR / Deposit Facility BCE)**: Tasso overnight interbancario dell'Eurozona monitorato in tempo reale tramite il proxy monetario `XEON.DE` (Xtrackers II EUR Overnight Rate Swap UCITS ETF). Tasso di fallback ufficiale BCE: **2.75%**.
+- **USD (US 3M Treasury Bill / SOFR)**: Rendimento del Buono del Tesoro USA a 3 mesi monitorato tramite indice live `^IRX` (CBOE 13-Week Treasury Yield Index). Tasso di fallback ufficiale Federal Reserve: **4.35%**.
+- **GBP (BoE SONIA)**: Sterling Overnight Index Average tracciato tramite `CSH2.L` (Lyxor Smart Overnight Return UCITS ETF). Tasso di fallback ufficiale Bank of England: **4.75%**.
+- **CHF (SNB SARON)**: Swiss Average Rate Overnight. Tasso di fallback ufficiale Banca Nazionale Svizzera: **1.00%**.
+
+### 2. Conversione e Compounding Giornaliero
+Dato il tasso risk-free nominale annualizzato $R_f$, il tasso privo di rischio giornaliero $R_{f,d}$ applicato sui rendimenti logaritmici o discreti di portafoglio viene calcolato su base convenzionale a 252 giorni di borsa aperta:
+\[ R_{f,d} = \frac{R_f}{252} \]
+
+### 3. Propagazione Analitica nei Moduli Quantitativi
+Il tasso risk-free dinamico viene propagato automaticamente su tutte le metriche e i modelli della piattaforma:
+1. **Indice di Sharpe Annualizzato**:
+   \[ \text{Sharpe} = \frac{\mu_p - R_f}{\sigma_p} \]
+2. **Indice di Sortino**:
+   \[ \text{Sortino} = \frac{\mu_p - R_f}{\sigma_{\text{downside}}(R_{f,d})} \]
+3. **Jensen's Alpha**:
+   \[ \alpha = (R_p - R_f) - \beta (R_m - R_f) \]
+4. **Prezzatura Opzioni Black-Scholes (1973) & Delta-Hedging**:
+   \[ d_1 = \frac{\ln(S/K) + \left(R_f + \frac{\sigma^2}{2}\right)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T} \]
+   \[ C = S \cdot N(d_1) - K e^{-R_f T} N(d_2), \quad P = K e^{-R_f T} N(-d_2) - S \cdot N(-d_1) \]
+   \[ \rho_{\text{call}} = K T e^{-R_f T} N(d_2), \quad \rho_{\text{put}} = -K T e^{-R_f T} N(-d_2) \]
+5. **Costo Medio Ponderato del Capitale (WACC & CAPM)**:
+   \[ K_e = R_f + \beta_e \times \text{ERP} \]
+6. **Kelly Criterion Continuo**:
+   \[ f^* = \frac{\mu - R_f}{\sigma^2} \]
+
 

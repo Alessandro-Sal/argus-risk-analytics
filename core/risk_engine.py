@@ -27,13 +27,19 @@ from sklearn.covariance import LedoitWolf
 # ── Costanti ────────────────────────────────────────────────
 
 TRADING_DAYS_YEAR = 252
-RISK_FREE_RATE    = 0.03      # 3% annuo
+RISK_FREE_RATE    = 0.0275    # 2.75% annuo default istituzionale (BCE €STR)
 VAR_CONFIDENCE    = [0.95, 0.99]
 
 
 # ── Funzione principale ──────────────────────────────────────
 
-def compute_risk(portfolio_id: int, engine, benchmark_ticker: str = "SPY", df_tx: pd.DataFrame = None, df_prices: pd.DataFrame = None) -> dict:
+def compute_risk(portfolio_id: int,
+                 engine,
+                 benchmark_ticker: str = "SPY",
+                 df_tx: pd.DataFrame = None,
+                 df_prices: pd.DataFrame = None,
+                 risk_free_rate: float = None,
+                 base_currency: str = "EUR") -> dict:
     if df_tx is None or df_prices is None:
         df_tx, df_prices = _load_data(portfolio_id, engine, benchmark_ticker)
 
@@ -45,6 +51,16 @@ def compute_risk(portfolio_id: int, engine, benchmark_ticker: str = "SPY", df_tx
     # Assicurati che price_date sia un tipo datetime (cruciale per in-memory mode)
     df_prices["price_date"] = pd.to_datetime(df_prices["price_date"])
 
+    # Rilevamento automatico della valuta base prevalente se non esplicitata
+    if base_currency == "EUR" and "currency" in df_tx.columns:
+        curr_counts = df_tx["currency"].dropna().value_counts()
+        if not curr_counts.empty and curr_counts.index[0] in ["USD", "GBP", "CHF"]:
+            base_currency = curr_counts.index[0]
+
+    from core.yield_curve import get_active_risk_free_rate
+    rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
+    active_rf_rate = rf_info["rate"]
+
     warnings_list = []
     df_positions            = _compute_positions(df_tx, df_prices, warnings_list)
     df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx)
@@ -52,10 +68,11 @@ def compute_risk(portfolio_id: int, engine, benchmark_ticker: str = "SPY", df_tx
 
 
     metrics = {
-        "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker),
-        "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx, df_positions),
+        "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate),
+        "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx, df_positions, risk_free_rate=active_rf_rate),
         "concentration": _calc_concentration(df_positions),
         "ai_insights":   _calc_ai_insights(df_positions, df_returns, sr_portfolio),
+        "risk_free":     rf_info,
     }
 
     from core.closed_trades import compute_closed_trades_journal
@@ -72,9 +89,10 @@ def compute_risk(portfolio_id: int, engine, benchmark_ticker: str = "SPY", df_tx
         "df_prices":         df_prices,
         "atr_exits":         compute_atr_chandelier_exits(df_prices, df_positions),
         "metrics":          metrics,
+        "risk_free":        rf_info,
         "risk_contribution": _calc_risk_contribution(df_returns, df_positions),
         "stress_tests":     _calc_stress_tests(df_returns, df_positions, sr_benchmark),
-        "optimization":     _compute_efficient_frontier(df_returns, df_positions),
+        "optimization":     _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
         "closed_trades":    closed_trades_data,
         "warnings":         warnings_list
     }
@@ -841,9 +859,11 @@ def run_advanced_monte_carlo_simulation(
 
 # ── Ottimizzazione di Portafoglio (Markowitz) ────────────────
 
-def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataFrame) -> dict:
+def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataFrame, risk_free_rate: float = None) -> dict:
     active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist()
     common = [t for t in active_tickers if t in df_returns.columns]
+    
+    rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
     
     # We need at least 2 assets to optimize
     if len(common) < 2:
@@ -872,13 +892,13 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     def neg_sharpe(weights):
         r = np.sum(mean_returns * weights)
         vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
-        return -(r - RISK_FREE_RATE) / vol if vol > 0 else 0
+        return -(r - rf) / vol if vol > 0 else 0
 
     opt_sharpe = sco.minimize(neg_sharpe, init_weights, method='SLSQP', bounds=bounds, constraints=constraints)
     opt_sharpe_weights = opt_sharpe.x
     opt_sharpe_return = np.sum(mean_returns * opt_sharpe_weights)
     opt_sharpe_risk = np.sqrt(np.dot(opt_sharpe_weights.T, np.dot(cov_matrix, opt_sharpe_weights)))
-    opt_sharpe_ratio = (opt_sharpe_return - RISK_FREE_RATE) / opt_sharpe_risk if opt_sharpe_risk > 0 else 0
+    opt_sharpe_ratio = (opt_sharpe_return - rf) / opt_sharpe_risk if opt_sharpe_risk > 0 else 0
 
     # 2. Min Volatility Optimization
     def portfolio_vol(weights):
@@ -888,7 +908,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     opt_vol_weights = opt_vol.x
     opt_vol_return = np.sum(mean_returns * opt_vol_weights)
     opt_vol_risk = np.sqrt(np.dot(opt_vol_weights.T, np.dot(cov_matrix, opt_vol_weights)))
-    opt_vol_ratio = (opt_vol_return - RISK_FREE_RATE) / opt_vol_risk if opt_vol_risk > 0 else 0
+    opt_vol_ratio = (opt_vol_return - rf) / opt_vol_risk if opt_vol_risk > 0 else 0
 
     # Monte Carlo simulation for visual frontier plots
     num_portfolios = 5000
@@ -903,7 +923,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         
         port_return = np.sum(mean_returns * weights)
         port_std = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
-        sharpe_ratio = (port_return - RISK_FREE_RATE) / port_std if port_std > 0 else 0
+        sharpe_ratio = (port_return - rf) / port_std if port_std > 0 else 0
         
         results[0, i] = port_std
         results[1, i] = port_return
@@ -920,7 +940,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         
     curr_return = np.sum(mean_returns * curr_weights)
     curr_std = np.sqrt(np.dot(curr_weights.T, np.dot(cov_matrix, curr_weights)))
-    curr_sharpe = (curr_return - RISK_FREE_RATE) / curr_std if curr_std > 0 else 0
+    curr_sharpe = (curr_return - rf) / curr_std if curr_std > 0 else 0
     
     return {
         "tickers": common,
@@ -958,9 +978,12 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
 
 def _calc_market_risk(sr_portfolio: pd.Series,
                       sr_benchmark: pd.Series,
-                      benchmark_ticker: str) -> dict:
+                      benchmark_ticker: str,
+                      risk_free_rate: float = None) -> dict:
     r  = sr_portfolio.dropna()
     rb = sr_benchmark.reindex(r.index).fillna(0.0)
+
+    rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
 
     vol_daily  = r.std()
     vol_annual = vol_daily * np.sqrt(TRADING_DAYS_YEAR)
@@ -1022,8 +1045,8 @@ def _calc_market_risk(sr_portfolio: pd.Series,
     # Fama-French 3-Factor Style Analysis
     ff_alpha = ff_beta_mkt = smb_tilt = hml_tilt = 0.0
     if rb.std() > 0 and len(r) > 20:
-        r_excess = r - (RISK_FREE_RATE / TRADING_DAYS_YEAR)
-        rb_excess = rb - (RISK_FREE_RATE / TRADING_DAYS_YEAR)
+        r_excess = r - (rf / TRADING_DAYS_YEAR)
+        rb_excess = rb - (rf / TRADING_DAYS_YEAR)
         smb_factor = np.sin(np.linspace(0, 4*np.pi, len(r))) * r.std()
         hml_factor = np.cos(np.linspace(0, 4*np.pi, len(r))) * r.std()
         X = np.column_stack([np.ones(len(r)), rb_excess, smb_factor, hml_factor])
@@ -1061,6 +1084,7 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         "var_exceptions_count":  exceptions_count,
         "benchmark_ticker":      benchmark_ticker,
         "n_trading_days":        len(r),
+        "risk_free_rate_pct":    round(rf * 100, 4),
     }
 
 
@@ -1070,9 +1094,12 @@ def _calc_market_risk(sr_portfolio: pd.Series,
 def _calc_return_metrics(sr_portfolio: pd.Series,
                          sr_benchmark: pd.Series,
                          df_tx: pd.DataFrame,
-                         df_positions: pd.DataFrame) -> dict:
+                         df_positions: pd.DataFrame,
+                         risk_free_rate: float = None) -> dict:
     r  = sr_portfolio.dropna()
     rb = sr_benchmark.reindex(r.index).fillna(0.0) if (sr_benchmark is not None and not sr_benchmark.empty) else pd.Series(0.0, index=r.index)
+
+    rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
 
     # Calcolo accurato dell'orizzonte temporale basato su date effettive (evita distorsioni su asset 24/7 crypto)
     if isinstance(r.index, pd.DatetimeIndex) and len(r) > 1:
@@ -1081,7 +1108,7 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     else:
         n_years = max(len(r) / TRADING_DAYS_YEAR, 0.05)
 
-    rfr_daily = RISK_FREE_RATE / TRADING_DAYS_YEAR
+    rfr_daily = rf / TRADING_DAYS_YEAR
 
     total_return = float((1 + r).prod() - 1) if len(r) > 0 else 0.0
     cagr         = (1 + total_return) ** (1 / n_years) - 1 if n_years > 0 else None
@@ -1158,7 +1185,7 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
         "total_pnl":          round(float(total_pnl), 2),
         "total_pnl_pct":      round(float(total_pnl_pct), 4),
         "dividends_total":    round(float(total_divs), 2),
-        "risk_free_rate_pct": RISK_FREE_RATE * 100,
+        "risk_free_rate_pct": round(rf * 100, 4),
         "n_years":            round(float(n_years), 2),
     }
 
@@ -2066,13 +2093,19 @@ def compute_sandbox_risk_bundle(
     weights: list = None,
     initial_capital: float = 100000.0,
     benchmark_ticker: str = "SPY",
-    sandbox_name: str = "Bilanciato Istituzionale (60/40)"
+    sandbox_name: str = "Bilanciato Istituzionale (60/40)",
+    risk_free_rate: float = None,
+    base_currency: str = "USD"
 ) -> dict:
     """
     Costruisce un bundle completo di analisi di rischio, ottimizzazione Ledoit-Wolf,
     Monte Carlo e metriche su un portafoglio demo / sandbox senza dipendere da MySQL.
     """
     from core.cache_shield import get_cached_ticker_history
+    from core.yield_curve import get_active_risk_free_rate
+    
+    rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
+    active_rf_rate = rf_info["rate"]
     
     clean_tickers = [str(t).strip().upper() for t in tickers if str(t).strip()]
     if not clean_tickers:
@@ -2188,14 +2221,15 @@ def compute_sandbox_risk_bundle(
     # Calcolo Metriche
     stress_tests = _calc_stress_tests(df_returns, df_positions, sr_benchmark_aligned)
     metrics = {
-        "market_risk": _calc_market_risk(sr_portfolio_aligned, sr_benchmark_aligned, benchmark_ticker),
-        "returns": _calc_return_metrics(sr_portfolio_aligned, sr_benchmark_aligned, pd.DataFrame(), df_positions),
+        "market_risk": _calc_market_risk(sr_portfolio_aligned, sr_benchmark_aligned, benchmark_ticker, risk_free_rate=active_rf_rate),
+        "returns": _calc_return_metrics(sr_portfolio_aligned, sr_benchmark_aligned, pd.DataFrame(), df_positions, risk_free_rate=active_rf_rate),
         "concentration": _calc_concentration(df_positions),
         "ai_insights": _calc_ai_insights(df_positions, df_returns, sr_portfolio_aligned),
+        "risk_free": rf_info,
         "stress_tests": stress_tests
     }
     
-    optimization = _compute_efficient_frontier(df_returns, df_positions)
+    optimization = _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate)
     risk_contrib = _calc_risk_contribution(df_returns, df_positions)
     
     from core.closed_trades import compute_closed_trades_journal
@@ -2212,6 +2246,7 @@ def compute_sandbox_risk_bundle(
         "benchmark_return": sr_benchmark_aligned,
         "df_prices": df_prices,
         "metrics": metrics,
+        "risk_free": rf_info,
         "stress_tests": stress_tests,
         "risk_contribution": risk_contrib,
         "optimization": optimization,
