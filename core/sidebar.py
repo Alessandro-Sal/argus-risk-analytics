@@ -55,6 +55,7 @@ NAV_MODULES = [
         "tab_key": "quant_active_tab",
         "subtabs": [
             {"label": "📊 Markowitz & Rebalancing", "target": "📊 Frontiera Markowitz & Rebalancing"},
+            {"label": "🧬 Tail Copula & Kelly", "target": "🧬 Tail Copula & Kelly Sizing"},
             {"label": "🎲 Monte Carlo & Merton", "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)"},
             {"label": "🛡️ Hedging & Tail Risk", "target": "🛡️ Hedging Tattico & Tail Risk"},
             {"label": "🎯 Attribuzione Brinson", "target": "🎯 Attribuzione Brinson-Fachler"},
