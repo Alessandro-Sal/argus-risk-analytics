@@ -455,49 +455,111 @@ with col_head_m2:
 <!-- 1. ALPHA DI JENSEN -->
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
   <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏅 1. Alpha di Jensen (Extra-Rendimento Attivo CAPM)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura l'extra-rendimento puro generato dalla gestione rispetto a quanto atteso in base al modello CAPM e al rischio sistematico di mercato (Beta).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura la componente di extra-rendimento puro generata dal portafoglio rispetto a quanto atteso in base al modello CAPM e al rischio sistematico di mercato (Beta).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
     <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
       <b>&alpha;</b> = R<sub>p</sub> &minus; [ R<sub>f</sub> + &beta; &times; (R<sub>b</sub> &minus; R<sub>f</sub>) ]
     </div>
   </div>
-  <div><b>🔍 Interpretazione:</b> <b>&alpha; > 0</b> indica creazione reale di valore aggiunto rispetto a una replica passiva del benchmark.</div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Identificare la reale abilità (<i>Skill</i>) di selezione dei titoli e di allocazione del capitale, isolandola dall'andamento generale del mercato.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Confronta il CAGR del portafoglio con il CAGR del benchmark prescelto (es. SPY), depurato dall'effetto Beta e dal tasso privo di rischio al 3.0%.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>&alpha; > 0:</b> Sovraperformance attiva (creazione reale di valore aggiunto).<br>
+    • <b>&alpha; = 0:</b> Rendimento perfettamente allineato al rischio assunto.<br>
+    • <b>&alpha; < 0:</b> Sottoperformance rispetto al benchmark di riferimento.
+  </div>
 </div>
 
-<!-- 2. SORTINO RATIO -->
+<!-- 2. SHARPE RATIO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,215,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ffd700; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚖️ 2. Sharpe Ratio (Efficienza Rischio Totale Ex-Post)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> L'indicatore universale di efficienza finanziaria. Quantifica il premio al rendimento ottenuto per ogni unità di volatilità complessiva assunta.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(255,215,0,0.08); border-left: 3px solid #ffd700; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffe082; text-align: center; font-size: 13px;">
+      <b>Sharpe Ratio</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>totale</sub> &times; &radic;252
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Capire se i rendimenti del portafoglio sono una reale ricompensa per il rischio o se dipendono da oscillazioni eccessive e insostenibili.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sulla serie storica dei rendimenti logaritmici giornalieri netti rispetto al Risk-Free rate (3.0% annuo) e riscalato su base annua con &radic;252.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>< 0.50:</b> Efficienza debole (rischio eccessivo rispetto al rendimento).<br>
+    • <b>0.50 – 0.99:</b> Efficienza moderata / standard di mercato.<br>
+    • <b>1.00 – 1.99:</b> Ottima efficienza (standard di gestione istituzionale).<br>
+    • <b>&ge; 2.00:</b> Profilo d'eccellenza assoluta.
+  </div>
+</div>
+
+<!-- 3. SORTINO RATIO -->
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,153,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #00ff99; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Sortino Ratio (Efficienza sul Rischio di Perdita)</div>
+  <div style="color: #00ff99; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 3. Sortino Ratio (Efficienza sul Rischio di Perdita)</div>
   <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Variante evoluta dello Sharpe Ratio. Penalizza unicamente la volatilità negativa (<i>Downside Deviation</i>), considerando le oscillazioni rialziste come elemento favorevole.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
     <div style="background: rgba(0,255,153,0.08); border-left: 3px solid #00ff99; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00ff99; text-align: center; font-size: 13px;">
       <b>Sortino Ratio</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>downside</sub> &times; &radic;252
     </div>
   </div>
-  <div><b>🔍 Interpretazione:</b> Valori <b>> 1.0</b> indicano eccellente asimmetria e protezione efficace durante i ribassi di mercato.</div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Valutare con precisione strategie asimmetriche (Growth, ETF tematici, opzioni) dove la volatilità al rialzo non deve essere punita.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Isola i rendimenti giornalieri inferiori al tasso privo di rischio (3.0%/252), calcola la deviazione standard quadratica dei soli ribassi e riscala su base annua con &radic;252.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>< 1.0:</b> Protezione dai ribassi debole o rendimento insufficiente.<br>
+    • <b>1.0 – 2.0:</b> Ottimo profilo asimmetrico (buona difesa nelle correzioni).<br>
+    • <b>> 2.0:</b> Profilo d'eccellenza con perdite minime nei mercati orso.
+  </div>
 </div>
 
-<!-- 3. CALMAR RATIO -->
+<!-- 4. CALMAR RATIO -->
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌊 3. Calmar Ratio (Rendimento / Massimo Drawdown)</div>
+  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌊 4. Calmar Ratio (Rendimento / Massimo Drawdown)</div>
   <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto diretto tra il tasso di crescita annuo composto (CAGR) e la peggiore flessione percentuale storica registrata dal portafoglio (<i>Maximum Drawdown</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
     <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 13px;">
       <b>Calmar Ratio</b> = CAGR / |Max Drawdown|
     </div>
   </div>
-  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano un portafoglio in grado di recuperare rapidamente dai grandi crolli storici.</div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Quantifica quanti punti di rendimento annuo costante si ottengono per ciascun punto percentuale di capitale esposto al rischio di perdita estrema durante i crolli storici.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Rapporto tra il CAGR calcolato dall'inizio dello storico e il massimo drawdown percentuale registrato sulla serie cumulata.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>< 0.50:</b> Portafoglio fragile (il rendimento non compensa la gravità dei drawdown passati).<br>
+    • <b>0.50 – 1.00:</b> Profilo equilibrato e sostenibile.<br>
+    • <b>> 1.00:</b> Profilo resiliente (il rendimento annuo supera l'intero drawdown storico massimo).
+  </div>
 </div>
 
-<!-- 4. INFORMATION RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
-  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 4. Information Ratio (Costanza dell'Alpha)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto tra l'extra-rendimento medio rispetto al benchmark e il <i>Tracking Error</i> (la deviazione standard del differenziale).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+<!-- 5. INFORMATION RATIO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 5. Information Ratio (Costanza dell'Alpha)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto tra l'extra-rendimento medio generato rispetto al benchmark e il <i>Tracking Error</i> (la volatilità della differenza dei rendimenti).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
     <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #bc8cff; text-align: center; font-size: 13px;">
       <b>Information Ratio</b> = Media(R<sub>p</sub> &minus; R<sub>b</sub>) / Tracking Error &times; &radic;252
     </div>
   </div>
-  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano abilità costante e consistente di battere il mercato nel tempo.</div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Valutare la costanza e l'affidabilità con cui una strategia batte il mercato: indica se i sovrarendimenti sono stabili o episodici.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sulla serie giornaliera dei differenziali di rendimento attivo <i>(R<sub>p,t</sub> &minus; R<sub>b,t</sub>)</i> divisa per la loro deviazione standard annualizzata.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>< 0.00:</b> Sottoperformance rispetto all'indice di mercato.<br>
+    • <b>0.00 – 0.49:</b> Capacità di gestione attiva modesta.<br>
+    • <b>0.50 – 0.99:</b> Ottima costanza di sovraperformance.<br>
+    • <b>&ge; 1.00:</b> Gestione attiva d'élite (benchmark d'eccellenza istituzionale).
+  </div>
+</div>
+
+<!-- 6. CAGR & RENDIMENTO CUMULATO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,243,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
+  <div style="color: #00f3ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📈 6. CAGR & Rendimento Totale Cumulato</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Il CAGR (<i>Compound Annual Growth Rate</i>) è il tasso di crescita annuo costante equivalente che porterebbe il capitale iniziale al valore finale nell'orizzonte considerato.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(0,243,255,0.08); border-left: 3px solid #00f3ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #80d8ff; text-align: center; font-size: 13px;">
+      <b>CAGR</b> = ( V<sub>finale</sub> / V<sub>iniziale</sub> )<sup>(1 / Anni)</sup> &minus; 1
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Standardizzare la performance su base annua, consentendo il confronto omogeneo tra portafogli con durate storiche differenti.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sul time-weighted value del portafoglio tenendo conto del numero esatto di anni trascorsi dalla prima operazione.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>< 5.0%:</b> Rendimento moderato (rischio erosione inflattiva).<br>
+    • <b>7.0% – 12.0%:</b> Rendimento azionario solido a lungo termine.<br>
+    • <b>> 15.0%:</b> Crescita del capitale di fascia alta.
+  </div>
 </div>
 
 </div>
