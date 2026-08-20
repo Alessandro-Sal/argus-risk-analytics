@@ -1962,6 +1962,62 @@ La FHS rappresenta il gold standard raccomandato nei framework **Basel III / FRT
     )
 
 
+def render_volatility_smile_modal(
+    button_label: str = "ℹ️ Metodologia Volatility Smile & Skew",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
+    della Superficie di Volatilità Implicita, del Volatility Skew e dell'impatto sul Delta Hedging.
+    """
+    content = """
+### 📐 Volatilità Implicita, Skew, Smile & Superficie 3D
+
+Il modello fondamentale di **Black-Scholes-Merton (1973)** assume che la volatilità $\\sigma$ del sottostante sia costante per qualsiasi strike price $K$ e per qualunque orizzonte temporale $T$. Nella realtà operativa dei mercati derivati, questa ipotesi viene sistematicamente violata.
+
+---
+
+#### 📉 1. L'Origine dello Skew: Il Crash del 1987 e la Crash-Phobia
+Prima del crollo del *Black Monday* (Ottobre 1987), i prezzi delle opzioni quotavano con una volatilità implicita quasi piatta. Dopo il crash, gli operatori istituzionali hanno iniziato a pagare un premio sistematico per proteggersi dai crolli di mercato (*Tail Risk*):
+- **Volatility Skew (Asimmetria su Azioni & Indici)**: Le opzioni **Put Out-of-The-Money (OTM)** hanno una volatilità implicita (IV) molto più elevata rispetto alle opzioni **At-The-Money (ATM)** e **Call OTM**.
+- **Volatility Smile (Curva a 'U' su Forex & Crypto)**: La volatilità sale sia per strike OTM ribassisti che rialzisti, riflettendo la presenza di code pesanti (*Fat Tails*) bidirezionali.
+
+---
+
+#### 🔍 2. Inversione di Black-Scholes (Implied Volatility Solver)
+Dato il prezzo di mercato effettivo $P_{\\text{mkt}}$, la Volatilità Implicita è l'unico parametro non osservabile direttamente e viene risolto per via numerica tramite l'algoritmo di **Newton-Raphson**:
+
+$$\\sigma_{n+1} = \\sigma_n - \\frac{BS(S, K, T, r, \\sigma_n) - P_{\\text{mkt}}}{\\mathcal{V}(S, K, T, r, \\sigma_n)}$$
+
+dove $\\mathcal{V} = \\frac{\\partial BS}{\\partial \\sigma} = S \\sqrt{T} \\phi(d_1)$ è il **Vega** dell'opzione.
+
+---
+
+#### 🧬 3. Calibrazione Parametrica di Skew & Smile (Log-Moneyness)
+La curva di volatilità per una data scadenza $T$ viene calibrata in funzione del **Log-Moneyness** $m = \\ln(K / S)$:
+
+$$\\sigma_{\\text{IV}}(m) = a + b \\cdot m + c \\cdot m^2$$
+
+- **$a$ (ATM Level)**: Livello base di volatilità At-The-Money ($K = S$).
+- **$b$ (Skew Slope)**: Pendenza dell'asimmetria ($b < 0$ nei mercati azionari indica che strike più bassi hanno IV più alta).
+- **$c$ (Curvature / Convexity)**: Curvatura convessa dello Smile associata alla curtosi della distribuzione.
+
+---
+
+#### 🛡️ 4. Impatto Operativo sul Delta-Hedging di Portafoglio
+Se un gestore di portafoglio calcola la copertura con una Put OTM del 5% assumendo la volatilità ATM piatta (es. 18%), **sottostima il costo reale della copertura** perché sul mercato la Put 5% OTM quota a una IV del 20-21%.
+La calibrazione dello Skew in ARGUS garantisce che:
+1. Il prezzo della Put rifletta l'esatto premio al rischio richiesto dal mercato.
+2. Il **Delta effettivo ($\Delta_{\\text{skew}}$)** e i contratti necessari siano dimensionati correttamente per evitare sotto-coperture.
+"""
+    render_info_modal(
+        title="📐 Volatility Smile, Skew & Superficie 3D",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 

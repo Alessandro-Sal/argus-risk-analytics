@@ -91,11 +91,12 @@ def compute_portfolio_delta_hedge(
     strike_otm_pct: float = 5.0,
     expiry_months: float = 3.0,
     implied_vol: float = 0.18,
-    risk_free_rate: float = None
+    risk_free_rate: float = None,
+    use_skew_calibration: bool = True
 ) -> Dict[str, Any]:
     """
     Calcola la strategia ottimale di Delta-Hedging con opzioni Put sul benchmark (es. SPY / SPX)
-    per proteggere il valore del portafoglio azionario.
+    per proteggere il valore del portafoglio azionario, supportando la calibrazione dello Skew reale.
     """
     if risk_free_rate is None:
         risk_free_rate = get_default_risk_free_rate("USD")
@@ -103,7 +104,28 @@ def compute_portfolio_delta_hedge(
     T = expiry_months / 12.0
     K = benchmark_spot * (1.0 - (strike_otm_pct / 100.0))  # Strike OTM
 
+    # Calcolo IV con o senza Volatility Skew
+    if use_skew_calibration:
+        from core.volatility_surface import build_volatility_surface
+        surface = build_volatility_surface(spot=benchmark_spot, r=risk_free_rate, base_atm_iv=implied_vol)
+        m_key = f"{int(round(expiry_months))}M" if f"{int(round(expiry_months))}M" in surface["smile_models"] else "3M"
+        smile_model = surface["smile_models"].get(m_key, list(surface["smile_models"].values())[0])
+        effective_iv = smile_model["eval_func"](K)
+    else:
+        effective_iv = implied_vol
+
+    # Prezzatura Put con IV effettiva
     put_metrics = black_scholes_pricing(
+        S=benchmark_spot,
+        K=K,
+        T=T,
+        r=risk_free_rate,
+        sigma=effective_iv,
+        option_type="put"
+    )
+
+    # Prezzatura Put piatta per confronto
+    flat_put_metrics = black_scholes_pricing(
         S=benchmark_spot,
         K=K,
         T=T,
@@ -123,6 +145,11 @@ def compute_portfolio_delta_hedge(
     total_hedge_cost = contracts_needed * put_price * contract_multiplier
     cost_pct_of_portfolio = (total_hedge_cost / max(1.0, portfolio_value)) * 100.0
 
+    # Calcolo costo piatto teorico per confronto
+    flat_contracts = int(np.ceil(portfolio_delta_euros / max(1.0, benchmark_spot * contract_multiplier * abs(flat_put_metrics["delta"])))) if abs(flat_put_metrics["delta"]) > 0 else 0
+    flat_total_cost = flat_contracts * flat_put_metrics["price"] * contract_multiplier
+    skew_cost_premium_eur = total_hedge_cost - flat_total_cost
+
     return {
         "contracts_needed": contracts_needed,
         "contract_multiplier": contract_multiplier,
@@ -135,7 +162,14 @@ def compute_portfolio_delta_hedge(
         "put_theta_daily": float(put_metrics["theta"]),
         "put_vega": float(put_metrics["vega"]),
         "protected_value": float(portfolio_value * (target_hedge_pct / 100.0)),
-        "risk_free_rate_pct": round(risk_free_rate * 100.0, 2)
+        "risk_free_rate_pct": round(risk_free_rate * 100.0, 2),
+        "effective_iv_pct": float(effective_iv * 100.0),
+        "base_atm_iv_pct": float(implied_vol * 100.0),
+        "skew_spread_iv_pct": float((effective_iv - implied_vol) * 100.0),
+        "flat_put_price": float(flat_put_metrics["price"]),
+        "flat_total_cost": float(flat_total_cost),
+        "skew_cost_premium_eur": float(skew_cost_premium_eur),
+        "use_skew_calibration": use_skew_calibration
     }
 
 
@@ -144,7 +178,8 @@ def compute_covered_call_yield_enhancement(
     otm_pct: float = 5.0,
     expiry_months: float = 1.0,
     implied_vol: float = 0.25,
-    risk_free_rate: float = None
+    risk_free_rate: float = None,
+    use_skew_calibration: bool = True
 ) -> pd.DataFrame:
     """
     Calcola la strategia di Covered Call Writing (vendita di Call Out-of-The-Money) per generare
@@ -168,7 +203,16 @@ def compute_covered_call_yield_enhancement(
             continue
 
         K = price * (1.0 + (otm_pct / 100.0))
-        call_res = black_scholes_pricing(S=price, K=K, T=T, r=risk_free_rate, sigma=implied_vol, option_type="call")
+
+        if use_skew_calibration:
+            from core.volatility_surface import build_volatility_surface
+            surf_asset = build_volatility_surface(spot=price, r=risk_free_rate, base_atm_iv=implied_vol)
+            smile_model = surf_asset["smile_models"].get("1M", list(surf_asset["smile_models"].values())[0])
+            effective_call_iv = smile_model["eval_func"](K)
+        else:
+            effective_call_iv = implied_vol
+
+        call_res = black_scholes_pricing(S=price, K=K, T=T, r=risk_free_rate, sigma=effective_call_iv, option_type="call")
 
         call_premium_per_share = call_res["price"]
         total_premium_income = call_premium_per_share * qty
@@ -179,6 +223,7 @@ def compute_covered_call_yield_enhancement(
             "ticker": ticker,
             "prezzo_spot": price,
             "strike_call_otm": K,
+            "iv_effettiva_pct": effective_call_iv * 100.0,
             "premio_per_azione": call_premium_per_share,
             "incasso_premio_totale": total_premium_income,
             "extra_rendimento_mensile_pct": monthly_yield_pct,
