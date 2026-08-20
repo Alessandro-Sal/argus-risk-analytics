@@ -440,9 +440,68 @@ if selected_bms:
     )
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
-# ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & TABS) ──
-st.markdown("#### 🏛️ Analisi di Efficienza, Rischio & Performance Attiva")
-st.caption("Valutazione quantitativa dell'efficienza di gestione, asimmetria dei rendimenti e decomposizione dell'Alpha vs Benchmark.")
+# ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & MODAL) ──
+col_head_m1, col_head_m2 = st.columns([3.2, 1.2])
+
+with col_head_m1:
+    st.markdown("#### 🏛️ Analisi di Efficienza, Rischio & Performance Attiva")
+    st.caption("Valutazione quantitativa dell'efficienza di gestione, asimmetria dei rendimenti e decomposizione dell'Alpha vs Benchmark.")
+
+with col_head_m2:
+    st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+    glossary_modal("📚 Glossario Completo Metriche di Rendimento & Efficienza", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+
+<!-- 1. ALPHA DI JENSEN -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏅 1. Alpha di Jensen (Extra-Rendimento Attivo CAPM)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura l'extra-rendimento puro generato dalla gestione rispetto a quanto atteso in base al modello CAPM e al rischio sistematico di mercato (Beta).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      <b>&alpha;</b> = R<sub>p</sub> &minus; [ R<sub>f</sub> + &beta; &times; (R<sub>b</sub> &minus; R<sub>f</sub>) ]
+    </div>
+  </div>
+  <div><b>🔍 Interpretazione:</b> <b>&alpha; > 0</b> indica creazione reale di valore aggiunto rispetto a una replica passiva del benchmark.</div>
+</div>
+
+<!-- 2. SORTINO RATIO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,153,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #00ff99; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Sortino Ratio (Efficienza sul Rischio di Perdita)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Variante evoluta dello Sharpe Ratio. Penalizza unicamente la volatilità negativa (<i>Downside Deviation</i>), considerando le oscillazioni rialziste come elemento favorevole.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+    <div style="background: rgba(0,255,153,0.08); border-left: 3px solid #00ff99; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00ff99; text-align: center; font-size: 13px;">
+      <b>Sortino Ratio</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>downside</sub> &times; &radic;252
+    </div>
+  </div>
+  <div><b>🔍 Interpretazione:</b> Valori <b>> 1.0</b> indicano eccellente asimmetria e protezione efficace durante i ribassi di mercato.</div>
+</div>
+
+<!-- 3. CALMAR RATIO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌊 3. Calmar Ratio (Rendimento / Massimo Drawdown)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto diretto tra il tasso di crescita annuo composto (CAGR) e la peggiore flessione percentuale storica registrata dal portafoglio (<i>Maximum Drawdown</i>).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 13px;">
+      <b>Calmar Ratio</b> = CAGR / |Max Drawdown|
+    </div>
+  </div>
+  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano un portafoglio in grado di recuperare rapidamente dai grandi crolli storici.</div>
+</div>
+
+<!-- 4. INFORMATION RATIO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
+  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 4. Information Ratio (Costanza dell'Alpha)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto tra l'extra-rendimento medio rispetto al benchmark e il <i>Tracking Error</i> (la deviazione standard del differenziale).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
+    <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #bc8cff; text-align: center; font-size: 13px;">
+      <b>Information Ratio</b> = Media(R<sub>p</sub> &minus; R<sub>b</sub>) / Tracking Error &times; &radic;252
+    </div>
+  </div>
+  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano abilità costante e consistente di battere il mercato nel tempo.</div>
+</div>
+
+</div>
+""", button_label="📖 Apri Glossario & Formule")
 
 def _fmt_metric_val(v, is_pct=False):
     if v is None:
@@ -516,149 +575,87 @@ with b_col4:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown('<div style="margin-bottom: 12px;"></div>', unsafe_allow_html=True)
+st.markdown('<div style="margin-bottom: 14px;"></div>', unsafe_allow_html=True)
 
-# 2. Deep-Dive Tabs (Tabella + Barometro vs Glossario Metodologico)
-tab_perf_table, tab_perf_glossary = st.tabs([
-    "📊 Tabella Analitica & Barometro Visivo",
-    "📖 Glossario Metodologico & Formule Matematiche"
-])
+# 2. Main Content Grid (Tabella Analitica Affiancata al Barometro Visivo)
+col_t1, col_t2 = st.columns([1.35, 1.0])
 
-with tab_perf_table:
-    col_t1, col_t2 = st.columns([1.35, 1.0])
-    
-    with col_t1:
-        data_ret = {
-            "Metrica Quantitativa": [
-                "CAGR (Tasso Annuo Composto)",
-                "Rendimento Totale Cumulato",
-                "Alpha di Jensen (vs Benchmark)",
-                "Sharpe Ratio (Rendimento/Rischio)",
-                "Sortino Ratio (Downside Risk)",
-                "Calmar Ratio (CAGR/MaxDD)",
-                "Information Ratio (Active Risk)",
-                "Orizzonte Temporale Analizzato"
-            ],
-            "Valore Rilevato": [
-                _fmt_metric_val(cagr_num, is_pct=True),
-                _fmt_metric_val(tot_num, is_pct=True),
-                _fmt_metric_val(alpha_num, is_pct=True),
-                _fmt_metric_val(sharpe_num, is_pct=False),
-                _fmt_metric_val(sortino_num, is_pct=False),
-                _fmt_metric_val(calmar_num, is_pct=False),
-                _fmt_metric_val(ir_num, is_pct=False),
-                f"{float(n_yrs_val):.2f} Anni" if n_yrs_val else "N/A",
-            ],
-            "Target / Benchmark Istituzionale": [
-                "🟢 Solido (> 7.0%)" if (cagr_num or 0) >= 7.0 else "🟡 Moderato",
-                f"Storico reale transazioni ({float(n_yrs_val):.1f} anni)",
-                "🟢 Creazione Valore (> 0%)" if (alpha_num or 0) > 0 else "🔴 Sottoperformance",
-                "Soglia Ottimale ≥ 1.00",
-                "Soglia Ottimale ≥ 1.00",
-                "Soglia Ottimale ≥ 0.50",
-                "Soglia Ottimale ≥ 0.50",
-                "Periodo attivo portafoglio"
-            ]
-        }
-        st.dataframe(pd.DataFrame(data_ret), use_container_width=True, hide_index=True)
-        
-    with col_t2:
-        # Mini Barometro Visivo Plotly delle Metriche di Efficienza
-        metrics_names = ["Sharpe Ratio", "Sortino Ratio", "Calmar Ratio", "Info Ratio"]
-        metrics_vals = [s_val, so_val, c_val, ir_val]
-        target_vals = [1.0, 1.0, 0.5, 0.5]
-        bar_colors = [
-            "#00e676" if s_val >= 1.0 else ("#ff9900" if s_val >= 0.5 else "#f85149"),
-            "#00f3ff" if so_val >= 1.0 else ("#58a6ff" if so_val >= 0.5 else "#f85149"),
-            "#bc8cff" if c_val >= 0.5 else "#ff9900",
-            "#00e676" if ir_val >= 0.5 else ("#ff9900" if ir_val >= 0 else "#f85149")
+with col_t1:
+    data_ret = {
+        "Metrica Quantitativa": [
+            "CAGR (Tasso Annuo Composto)",
+            "Rendimento Totale Cumulato",
+            "Alpha di Jensen (vs Benchmark)",
+            "Sharpe Ratio (Rendimento/Rischio)",
+            "Sortino Ratio (Downside Risk)",
+            "Calmar Ratio (CAGR/MaxDD)",
+            "Information Ratio (Active Risk)",
+            "Orizzonte Temporale Analizzato"
+        ],
+        "Valore Rilevato": [
+            _fmt_metric_val(cagr_num, is_pct=True),
+            _fmt_metric_val(tot_num, is_pct=True),
+            _fmt_metric_val(alpha_num, is_pct=True),
+            _fmt_metric_val(sharpe_num, is_pct=False),
+            _fmt_metric_val(sortino_num, is_pct=False),
+            _fmt_metric_val(calmar_num, is_pct=False),
+            _fmt_metric_val(ir_num, is_pct=False),
+            f"{float(n_yrs_val):.2f} Anni" if n_yrs_val else "N/A",
+        ],
+        "Target / Benchmark Istituzionale": [
+            "🟢 Solido (> 7.0%)" if (cagr_num or 0) >= 7.0 else "🟡 Moderato",
+            f"Storico reale transazioni ({float(n_yrs_val):.1f} anni)",
+            "🟢 Creazione Valore (> 0%)" if (alpha_num or 0) > 0 else "🔴 Sottoperformance",
+            "Soglia Ottimale ≥ 1.00",
+            "Soglia Ottimale ≥ 1.00",
+            "Soglia Ottimale ≥ 0.50",
+            "Soglia Ottimale ≥ 0.50",
+            "Periodo attivo portafoglio"
         ]
-        
-        fig_barometer = go.Figure()
-        fig_barometer.add_trace(go.Bar(
-            x=metrics_vals,
-            y=metrics_names,
-            orientation='h',
-            marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.2)", width=1)),
-            text=[f"{v:.2f}" for v in metrics_vals],
-            textposition="auto",
-            textfont=dict(color="#ffffff", size=11, family="Roboto, monospace"),
-            hovertemplate="<b>%{y}</b>: %{x:.2f}<extra></extra>"
-        ))
-        
-        fig_barometer.update_layout(
-            title=dict(text="🎯 Barometro Efficienza vs Soglie Target", font=dict(size=13, color="#ffffff")),
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(22, 27, 34, 0.4)",
-            margin=dict(l=10, r=15, t=32, b=10),
-            height=280,
-            xaxis=dict(
-                title=dict(text="Valore Coefficiente", font=dict(size=10, color="#8b949e")),
-                gridcolor="rgba(255,255,255,0.06)",
-                zerolinecolor="rgba(255,255,255,0.2)",
-                tickfont=dict(size=10, color="#8b949e")
-            ),
-            yaxis=dict(
-                autorange="reversed",
-                tickfont=dict(size=11, color="#c9d1d9")
-            )
+    }
+    st.dataframe(pd.DataFrame(data_ret), use_container_width=True, hide_index=True)
+    
+with col_t2:
+    # Mini Barometro Visivo Plotly delle Metriche di Efficienza
+    metrics_names = ["Sharpe Ratio", "Sortino Ratio", "Calmar Ratio", "Info Ratio"]
+    metrics_vals = [s_val, so_val, c_val, ir_val]
+    bar_colors = [
+        "#00e676" if s_val >= 1.0 else ("#ff9900" if s_val >= 0.5 else "#f85149"),
+        "#00f3ff" if so_val >= 1.0 else ("#58a6ff" if so_val >= 0.5 else "#f85149"),
+        "#bc8cff" if c_val >= 0.5 else "#ff9900",
+        "#00e676" if ir_val >= 0.5 else ("#ff9900" if ir_val >= 0 else "#f85149")
+    ]
+    
+    fig_barometer = go.Figure()
+    fig_barometer.add_trace(go.Bar(
+        x=metrics_vals,
+        y=metrics_names,
+        orientation='h',
+        marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.2)", width=1)),
+        text=[f"{v:.2f}" for v in metrics_vals],
+        textposition="auto",
+        textfont=dict(color="#ffffff", size=11, family="Roboto, monospace"),
+        hovertemplate="<b>%{y}</b>: %{x:.2f}<extra></extra>"
+    ))
+    
+    fig_barometer.update_layout(
+        title=dict(text="🎯 Barometro Efficienza vs Soglie Target", font=dict(size=13, color="#ffffff")),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(22, 27, 34, 0.4)",
+        margin=dict(l=10, r=15, t=32, b=10),
+        height=280,
+        xaxis=dict(
+            title=dict(text="Valore Coefficiente", font=dict(size=10, color="#8b949e")),
+            gridcolor="rgba(255,255,255,0.06)",
+            zerolinecolor="rgba(255,255,255,0.2)",
+            tickfont=dict(size=10, color="#8b949e")
+        ),
+        yaxis=dict(
+            autorange="reversed",
+            tickfont=dict(size=11, color="#c9d1d9")
         )
-        st.plotly_chart(fig_barometer, use_container_width=True, config={"displayModeBar": False}, key="perf_barometer_chart")
-
-with tab_perf_glossary:
-    st.markdown("""
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. ALPHA DI JENSEN -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏅 1. Alpha di Jensen (Extra-Rendimento Attivo CAPM)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura l'extra-rendimento puro generato dalla gestione rispetto a quanto atteso in base al modello CAPM e al rischio sistematico di mercato (Beta).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-      <b>&alpha;</b> = R<sub>p</sub> &minus; [ R<sub>f</sub> + &beta; &times; (R<sub>b</sub> &minus; R<sub>f</sub>) ]
-    </div>
-  </div>
-  <div><b>🔍 Interpretazione:</b> <b>&alpha; > 0</b> indica creazione reale di valore aggiunto rispetto a una replica passiva del benchmark.</div>
-</div>
-
-<!-- 2. SORTINO RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,153,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #00ff99; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Sortino Ratio (Efficienza sul Rischio di Perdita)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Variante evoluta dello Sharpe Ratio. Penalizza unicamente la volatilità negativa (<i>Downside Deviation</i>), considerando le oscillazioni rialziste come elemento favorevole.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
-    <div style="background: rgba(0,255,153,0.08); border-left: 3px solid #00ff99; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00ff99; text-align: center; font-size: 13px;">
-      <b>Sortino Ratio</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>downside</sub> &times; &radic;252
-    </div>
-  </div>
-  <div><b>🔍 Interpretazione:</b> Valori <b>> 1.0</b> indicano eccellente asimmetria e protezione efficace durante i ribassi di mercato.</div>
-</div>
-
-<!-- 3. CALMAR RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌊 3. Calmar Ratio (Rendimento / Massimo Drawdown)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto diretto tra il tasso di crescita annuo composto (CAGR) e la peggiore flessione percentuale storica registrata dal portafoglio (<i>Maximum Drawdown</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
-    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 13px;">
-      <b>Calmar Ratio</b> = CAGR / |Max Drawdown|
-    </div>
-  </div>
-  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano un portafoglio in grado di recuperare rapidamente dai grandi crolli storici.</div>
-</div>
-
-<!-- 4. INFORMATION RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
-  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 4. Information Ratio (Costanza dell'Alpha)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto tra l'extra-rendimento medio rispetto al benchmark e il <i>Tracking Error</i> (la deviazione standard del differenziale).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
-    <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #bc8cff; text-align: center; font-size: 13px;">
-      <b>Information Ratio</b> = Media(R<sub>p</sub> &minus; R<sub>b</sub>) / Tracking Error &times; &radic;252
-    </div>
-  </div>
-  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano abilità costante e consistente di battere il mercato nel tempo.</div>
-</div>
-
-</div>
-    """, unsafe_allow_html=True)
+    )
+    st.plotly_chart(fig_barometer, use_container_width=True, config={"displayModeBar": False}, key="perf_barometer_chart")
 
 st.divider()
 
