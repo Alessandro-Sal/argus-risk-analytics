@@ -440,8 +440,9 @@ if selected_bms:
     )
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
-# ── TABELLA METRICHE E GLOSSARIO (POSIZIONATI SOTTO IL GRAFICO FULL-WIDTH) ──
-col_m1, col_m2 = st.columns([1.5, 1.0])
+# ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & TABS) ──
+st.markdown("#### 🏛️ Analisi di Efficienza, Rischio & Performance Attiva")
+st.caption("Valutazione quantitativa dell'efficienza di gestione, asimmetria dei rendimenti e decomposizione dell'Alpha vs Benchmark.")
 
 def _fmt_metric_val(v, is_pct=False):
     if v is None:
@@ -461,142 +462,203 @@ calmar_num = ret.get("calmar_ratio")
 ir_num = ret.get("information_ratio")
 n_yrs_val = ret.get("n_years", 0)
 
-with col_m1:
-    st.markdown("#### 📊 Tabella Analitica Metriche di Rendimento")
-    data_ret = {
-        "Metrica Quantitativa": [
-            "CAGR (Tasso Annuo Composto)",
-            "Rendimento Totale Cumulato",
-            "Alpha di Jensen (vs Benchmark)",
-            "Sharpe Ratio (Rendimento/Rischio)",
-            "Sortino Ratio (Downside Risk)",
-            "Calmar Ratio (CAGR/MaxDD)",
-            "Information Ratio (Active Risk)",
-            "Orizzonte Temporale Analizzato"
-        ],
-        "Valore Rilevato": [
-            _fmt_metric_val(cagr_num, is_pct=True),
-            _fmt_metric_val(tot_num, is_pct=True),
-            _fmt_metric_val(alpha_num, is_pct=True),
-            _fmt_metric_val(sharpe_num, is_pct=False),
-            _fmt_metric_val(sortino_num, is_pct=False),
-            _fmt_metric_val(calmar_num, is_pct=False),
-            _fmt_metric_val(ir_num, is_pct=False),
-            f"{float(n_yrs_val):.2f} Anni" if n_yrs_val else "N/A",
-        ],
-        "Target / Benchmark": [
-            "🟢 Solido (> 7.0%)" if (cagr_num or 0) >= 7.0 else "🟡 Moderato",
-            f"Storico reale transazioni",
-            "🟢 Creazione Valore" if (alpha_num or 0) > 0 else "🔴 Sottoperformance",
-            "Soglia Ottimale ≥ 1.00",
-            "Soglia Ottimale ≥ 1.00",
-            "Soglia Ottimale ≥ 0.50",
-            "Soglia Ottimale ≥ 0.50",
-            "Periodo attivo portafoglio"
-        ]
-    }
-    st.dataframe(pd.DataFrame(data_ret), use_container_width=True, hide_index=True)
+s_val = float(sharpe_num) if sharpe_num is not None else 0.0
+so_val = float(sortino_num) if sortino_num is not None else 0.0
+c_val = float(calmar_num) if calmar_num is not None else 0.0
+a_val = float(alpha_num) if alpha_num is not None else 0.0
+ir_val = float(ir_num) if ir_num is not None else 0.0
 
-with col_m2:
-    st.markdown("#### 📚 Guida & Glossario Metriche")
-    
-    # Indicatori di stato sintetici
-    s_val = float(sharpe_num) if sharpe_num is not None else 0.0
-    a_val = float(alpha_num) if alpha_num is not None else 0.0
-    sharpe_badge = "🟢 Efficienza Elevata (≥ 1.0)" if s_val >= 1.0 else ("🟡 Efficienza Moderata (0.5 - 1.0)" if s_val >= 0.5 else "🔴 Efficienza Bassa (< 0.5)")
-    alpha_badge = "🟢 Extra-Rendimento Positivo" if a_val > 0 else "🔴 Sottoperformance rispetto al Benchmark"
-    
+# 1. Top Bento Matrix (4 Quick Intelligence KPI Cards)
+b_col1, b_col2, b_col3, b_col4 = st.columns(4)
+
+with b_col1:
+    alpha_bg = "rgba(0, 230, 118, 0.12)" if a_val >= 0 else "rgba(248, 81, 73, 0.12)"
+    alpha_border = "#00e676" if a_val >= 0 else "#f85149"
+    alpha_tag = "🟢 Extra-Rendimento" if a_val >= 0 else "🔴 Sottoperformance"
     st.markdown(f"""
-    <div style="background: rgba(22,27,34,0.7); border: 1px solid rgba(255,153,0,0.3); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-        <div style="font-size: 13px; font-weight: 700; color: #ff9900; margin-bottom: 6px;">💡 Sintesi Efficienza di Gestione</div>
-        <div style="font-size: 12.5px; color: #c9d1d9; line-height: 1.45; margin-bottom: 8px;">
-            Le metriche quantitative misurano se il rendimento ottenuto deriva dall'abilità di selezione (<b>Alpha</b>) o solo dall'esposizione al rischio di mercato.
-        </div>
-        <div style="font-size: 12px; color: #8b949e; line-height: 1.5;">
-            • <b>Profilo Sharpe:</b> {sharpe_badge}<br>
-            • <b>Profilo Alpha:</b> {alpha_badge}
-        </div>
+    <div style="background: {alpha_bg}; border: 1px solid {alpha_border}; border-radius: 10px; padding: 12px 14px; min-height: 108px;">
+        <div style="font-size: 11px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">Alpha di Jensen (CAPM)</div>
+        <div style="font-size: 22px; font-weight: 800; color: {alpha_border}; margin: 2px 0;">{_fmt_metric_val(alpha_num, is_pct=True)}</div>
+        <div style="font-size: 11px; color: #c9d1d9;">{alpha_tag} vs Benchmark</div>
     </div>
     """, unsafe_allow_html=True)
 
-    glossary_modal("📚 Glossario Completo Metriche di Rendimento & Efficienza", """
-<div style="font-size: 13.5px; line-height: 1.45; color: #c9d1d9;">
+with b_col2:
+    s_color = "#00e676" if s_val >= 1.0 else ("#ff9900" if s_val >= 0.5 else "#f85149")
+    s_tag = "🟢 Elevato (≥1.0)" if s_val >= 1.0 else ("🟡 Moderato (0.5-1.0)" if s_val >= 0.5 else "🔴 Basso (<0.5)")
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.3); border-radius: 10px; padding: 12px 14px; min-height: 108px;">
+        <div style="font-size: 11px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">Sharpe Ratio (Ex-Post)</div>
+        <div style="font-size: 22px; font-weight: 800; color: {s_color}; margin: 2px 0;">{_fmt_metric_val(sharpe_num)}</div>
+        <div style="font-size: 11px; color: #c9d1d9;">Efficienza: {s_tag}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with b_col3:
+    so_color = "#00e676" if so_val >= 1.0 else ("#ff9900" if so_val >= 0.5 else "#f85149")
+    asym_note = "🛡️ Difesa Ribassi Superiore" if so_val > s_val + 0.05 else "⚖️ Volatilità Simmetrica"
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(0, 243, 255, 0.3); border-radius: 10px; padding: 12px 14px; min-height: 108px;">
+        <div style="font-size: 11px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">Sortino Ratio (Downside)</div>
+        <div style="font-size: 22px; font-weight: 800; color: #00f3ff; margin: 2px 0;">{_fmt_metric_val(sortino_num)}</div>
+        <div style="font-size: 11px; color: #c9d1d9;">{asym_note}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with b_col4:
+    c_color = "#00e676" if c_val >= 0.5 else ("#ff9900" if c_val >= 0.3 else "#f85149")
+    c_tag = "🟢 Resiliente (≥0.5)" if c_val >= 0.5 else "🟡 Recupero Moderato"
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(188, 140, 255, 0.3); border-radius: 10px; padding: 12px 14px; min-height: 108px;">
+        <div style="font-size: 11px; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">Calmar Ratio (CAGR/MaxDD)</div>
+        <div style="font-size: 22px; font-weight: 800; color: #bc8cff; margin: 2px 0;">{_fmt_metric_val(calmar_num)}</div>
+        <div style="font-size: 11px; color: #c9d1d9;">Resilienza: {c_tag}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown('<div style="margin-bottom: 12px;"></div>', unsafe_allow_html=True)
+
+# 2. Deep-Dive Tabs (Tabella + Barometro vs Glossario Metodologico)
+tab_perf_table, tab_perf_glossary = st.tabs([
+    "📊 Tabella Analitica & Barometro Visivo",
+    "📖 Glossario Metodologico & Formule Matematiche"
+])
+
+with tab_perf_table:
+    col_t1, col_t2 = st.columns([1.35, 1.0])
+    
+    with col_t1:
+        data_ret = {
+            "Metrica Quantitativa": [
+                "CAGR (Tasso Annuo Composto)",
+                "Rendimento Totale Cumulato",
+                "Alpha di Jensen (vs Benchmark)",
+                "Sharpe Ratio (Rendimento/Rischio)",
+                "Sortino Ratio (Downside Risk)",
+                "Calmar Ratio (CAGR/MaxDD)",
+                "Information Ratio (Active Risk)",
+                "Orizzonte Temporale Analizzato"
+            ],
+            "Valore Rilevato": [
+                _fmt_metric_val(cagr_num, is_pct=True),
+                _fmt_metric_val(tot_num, is_pct=True),
+                _fmt_metric_val(alpha_num, is_pct=True),
+                _fmt_metric_val(sharpe_num, is_pct=False),
+                _fmt_metric_val(sortino_num, is_pct=False),
+                _fmt_metric_val(calmar_num, is_pct=False),
+                _fmt_metric_val(ir_num, is_pct=False),
+                f"{float(n_yrs_val):.2f} Anni" if n_yrs_val else "N/A",
+            ],
+            "Target / Benchmark Istituzionale": [
+                "🟢 Solido (> 7.0%)" if (cagr_num or 0) >= 7.0 else "🟡 Moderato",
+                f"Storico reale transazioni ({float(n_yrs_val):.1f} anni)",
+                "🟢 Creazione Valore (> 0%)" if (alpha_num or 0) > 0 else "🔴 Sottoperformance",
+                "Soglia Ottimale ≥ 1.00",
+                "Soglia Ottimale ≥ 1.00",
+                "Soglia Ottimale ≥ 0.50",
+                "Soglia Ottimale ≥ 0.50",
+                "Periodo attivo portafoglio"
+            ]
+        }
+        st.dataframe(pd.DataFrame(data_ret), use_container_width=True, hide_index=True)
+        
+    with col_t2:
+        # Mini Barometro Visivo Plotly delle Metriche di Efficienza
+        metrics_names = ["Sharpe Ratio", "Sortino Ratio", "Calmar Ratio", "Info Ratio"]
+        metrics_vals = [s_val, so_val, c_val, ir_val]
+        target_vals = [1.0, 1.0, 0.5, 0.5]
+        bar_colors = [
+            "#00e676" if s_val >= 1.0 else ("#ff9900" if s_val >= 0.5 else "#f85149"),
+            "#00f3ff" if so_val >= 1.0 else ("#58a6ff" if so_val >= 0.5 else "#f85149"),
+            "#bc8cff" if c_val >= 0.5 else "#ff9900",
+            "#00e676" if ir_val >= 0.5 else ("#ff9900" if ir_val >= 0 else "#f85149")
+        ]
+        
+        fig_barometer = go.Figure()
+        fig_barometer.add_trace(go.Bar(
+            x=metrics_vals,
+            y=metrics_names,
+            orientation='h',
+            marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.2)", width=1)),
+            text=[f"{v:.2f}" for v in metrics_vals],
+            textposition="auto",
+            textfont=dict(color="#ffffff", size=11, family="Roboto, monospace"),
+            hovertemplate="<b>%{y}</b>: %{x:.2f}<extra></extra>"
+        ))
+        
+        fig_barometer.update_layout(
+            title=dict(text="🎯 Barometro Efficienza vs Soglie Target", font=dict(size=13, color="#ffffff")),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(22, 27, 34, 0.4)",
+            margin=dict(l=10, r=15, t=32, b=10),
+            height=280,
+            xaxis=dict(
+                title=dict(text="Valore Coefficiente", font=dict(size=10, color="#8b949e")),
+                gridcolor="rgba(255,255,255,0.06)",
+                zerolinecolor="rgba(255,255,255,0.2)",
+                tickfont=dict(size=10, color="#8b949e")
+            ),
+            yaxis=dict(
+                autorange="reversed",
+                tickfont=dict(size=11, color="#c9d1d9")
+            )
+        )
+        st.plotly_chart(fig_barometer, use_container_width=True, config={"displayModeBar": False}, key="perf_barometer_chart")
+
+with tab_perf_glossary:
+    st.markdown("""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
 <!-- 1. ALPHA DI JENSEN -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏅 1. Alpha di Jensen (Extra-Rendimento Attivo)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura la componente di extra-rendimento puro generata dal portafoglio rispetto a quanto atteso in base al modello CAPM e al rischio sistematico di mercato (Beta).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏅 1. Alpha di Jensen (Extra-Rendimento Attivo CAPM)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura l'extra-rendimento puro generato dalla gestione rispetto a quanto atteso in base al modello CAPM e al rischio sistematico di mercato (Beta).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
     <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
       <b>&alpha;</b> = R<sub>p</sub> &minus; [ R<sub>f</sub> + &beta; &times; (R<sub>b</sub> &minus; R<sub>f</sub>) ]
     </div>
   </div>
-  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Identificare la reale abilità (<i>Skill</i>) di selezione dei titoli e di allocazione del capitale, isolandola dall'andamento generale del mercato.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Confronta il CAGR del portafoglio con il CAGR del benchmark prescelto (es. SPY), depurato dall'effetto Beta e dal tasso privo di rischio al 3.0%.</div>
-  <div><b>🔍 Come leggerlo:</b><br>
-    • <b>&alpha; > 0:</b> Sovraperformance attiva (creazione reale di valore aggiunto).<br>
-    • <b>&alpha; = 0:</b> Rendimento perfettamente allineato al rischio assunto.<br>
-    • <b>&alpha; < 0:</b> Sottoperformance rispetto al benchmark di riferimento.
-  </div>
+  <div><b>🔍 Interpretazione:</b> <b>&alpha; > 0</b> indica creazione reale di valore aggiunto rispetto a una replica passiva del benchmark.</div>
 </div>
 
 <!-- 2. SORTINO RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,153,0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,255,153,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
   <div style="color: #00ff99; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Sortino Ratio (Efficienza sul Rischio di Perdita)</div>
   <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Variante evoluta dello Sharpe Ratio. Penalizza unicamente la volatilità negativa (<i>Downside Deviation</i>), considerando le oscillazioni rialziste come elemento favorevole.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
     <div style="background: rgba(0,255,153,0.08); border-left: 3px solid #00ff99; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00ff99; text-align: center; font-size: 13px;">
-      <b>Sortino Ratio</b> = <span style="display:inline-block; vertical-align:middle; text-align:center; margin: 0 4px;"><span style="display:block; border-bottom:1px solid #00ff99; padding-bottom:1px;">R<sub>p</sub> &minus; R<sub>f</sub></span><span style="display:block; padding-top:1px;">&sigma;<sub>downside</sub></span></span>
+      <b>Sortino Ratio</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>downside</sub> &times; &radic;252
     </div>
   </div>
-  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Valutare con precisione strategie asimmetriche (Growth, ETF tematici, opzioni) dove la volatilità al rialzo non deve essere punita.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Isola i rendimenti giornalieri inferiori al tasso privo di rischio (3.0%/252), calcola la deviazione standard quadratica dei soli ribassi e riscala su base annua con &radic;252.</div>
-  <div><b>🔍 Come leggerlo:</b><br>
-    • <b>< 1.0:</b> Protezione dai ribassi debole o rendimento insufficiente.<br>
-    • <b>1.0 – 2.0:</b> Ottimo profilo asimmetrico (buona difesa nelle correzioni).<br>
-    • <b>> 2.0:</b> Profilo d'eccellenza con perdite minime nei mercati orso.
-  </div>
+  <div><b>🔍 Interpretazione:</b> Valori <b>> 1.0</b> indicano eccellente asimmetria e protezione efficace durante i ribassi di mercato.</div>
 </div>
 
 <!-- 3. CALMAR RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
   <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌊 3. Calmar Ratio (Rendimento / Massimo Drawdown)</div>
   <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto diretto tra il tasso di crescita annuo composto (CAGR) e la peggiore flessione percentuale storica registrata dal portafoglio (<i>Maximum Drawdown</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
     <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 13px;">
-      <b>Calmar Ratio</b> = <span style="display:inline-block; vertical-align:middle; text-align:center; margin: 0 4px;"><span style="display:block; border-bottom:1px solid #58a6ff; padding-bottom:1px;">CAGR</span><span style="display:block; padding-top:1px;">|Max Drawdown|</span></span>
+      <b>Calmar Ratio</b> = CAGR / |Max Drawdown|
     </div>
   </div>
-  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Quantifica quanti punti di rendimento annuo costante si ottengono per ciascun punto percentuale di capitale esposto al rischio di perdita estrema durante i crolli storici.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Rapporto tra il CAGR calcolato dall'inizio dello storico e il massimo drawdown percentuale registrato sulla serie cumulata.</div>
-  <div><b>🔍 Come leggerlo:</b><br>
-    • <b>< 0.50:</b> Portafoglio fragile (il rendimento non compensa la gravità dei drawdown passati).<br>
-    • <b>0.50 – 1.00:</b> Profilo equilibrato e sostenibile.<br>
-    • <b>> 1.00:</b> Profilo resiliente (il rendimento annuo supera l'intero drawdown storico massimo).
-  </div>
+  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano un portafoglio in grado di recuperare rapidamente dai grandi crolli storici.</div>
 </div>
 
 <!-- 4. INFORMATION RATIO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 12px 14px; margin-bottom: 4px;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
   <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 4. Information Ratio (Costanza dell'Alpha)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto tra l'extra-rendimento medio generato rispetto al benchmark e il <i>Tracking Error</i> (la volatilità della differenza dei rendimenti).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Rapporto tra l'extra-rendimento medio rispetto al benchmark e il <i>Tracking Error</i> (la deviazione standard del differenziale).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula:</b>
     <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #bc8cff; text-align: center; font-size: 13px;">
-      <b>Information Ratio</b> = <span style="display:inline-block; vertical-align:middle; text-align:center; margin: 0 4px;"><span style="display:block; border-bottom:1px solid #bc8cff; padding-bottom:1px;">Media(R<sub>p</sub> &minus; R<sub>b</sub>)</span><span style="display:block; padding-top:1px;">Tracking Error</span></span> &times; &radic;252
+      <b>Information Ratio</b> = Media(R<sub>p</sub> &minus; R<sub>b</sub>) / Tracking Error &times; &radic;252
     </div>
   </div>
-  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Valutare la costanza e l'affidabilità con cui una strategia batte il mercato: indica se i sovrarendimenti sono stabili o episodici.</div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sulla serie giornaliera dei differenziali di rendimento attivo <i>(R<sub>p,t</sub> &minus; R<sub>b,t</sub>)</i> divisa per la loro deviazione standard annualizzata.</div>
-  <div><b>🔍 Come leggerlo:</b><br>
-    • <b>< 0.00:</b> Sottoperformance rispetto all'indice di mercato.<br>
-    • <b>0.00 – 0.49:</b> Capacità di gestione attiva modesta.<br>
-    • <b>0.50 – 0.99:</b> Ottima costanza di sovraperformance.<br>
-    • <b>&ge; 1.00:</b> Gestione attiva d'élite (benchmark d'eccellenza istituzionale).
-  </div>
+  <div><b>🔍 Interpretazione:</b> Valori <b>> 0.50</b> indicano abilità costante e consistente di battere il mercato nel tempo.</div>
 </div>
 
 </div>
-""", button_label="📖 Apri Glossario Metriche")
+    """, unsafe_allow_html=True)
 
 st.divider()
 
