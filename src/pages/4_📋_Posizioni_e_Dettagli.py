@@ -407,6 +407,7 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
 
         df_assets_closed = closed_data.get("df_closed_assets", pd.DataFrame())
         df_lots_closed = closed_data.get("df_closed_lots", pd.DataFrame())
+        chart_height = max(380, min(650, len(df_assets_closed) * 32)) if not df_assets_closed.empty else 380
 
         with col_g_chart1:
             st.markdown("##### 📊 PnL Realizzato per Asset (€)")
@@ -418,17 +419,27 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     x=df_sorted_a["realized_pnl_eur"],
                     y=df_sorted_a["ticker"],
                     orientation='h',
-                    marker=dict(color=bar_colors, line=dict(color="#0d1117", width=1)),
-                    text=[f"€ {v:+,.2f} ({p:+.1f}%)" for v, p in zip(df_sorted_a["realized_pnl_eur"], df_sorted_a["realized_pnl_pct"])],
-                    textposition="auto",
-                    textfont=dict(size=11, color="#ffffff"),
-                    hovertemplate="<b>Asset: %{y}</b><br>PnL Realizzato: <b>€ %{x:,.2f}</b><extra></extra>"
+                    marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
+                    customdata=df_sorted_a["realized_pnl_pct"],
+                    hovertemplate="<b>Asset: %{y}</b><br>PnL Realizzato: <b>€ %{x:+,.2f}</b><br>Rendimento: <b>%{customdata:+.2f}%</b><extra></extra>"
                 ))
                 fig_bar_pnl.update_layout(
-                    template="plotly_dark", height=320,
-                    xaxis=dict(title="PnL Realizzato (€)", zeroline=True, zerolinecolor="rgba(255,255,255,0.2)"),
-                    yaxis=dict(title=None),
-                    margin=dict(l=10, r=10, t=25, b=10),
+                    template="plotly_dark", height=chart_height,
+                    xaxis=dict(
+                        title="PnL Realizzato Netto (€)",
+                        zeroline=True,
+                        zerolinecolor="rgba(255,255,255,0.3)",
+                        zerolinewidth=1.5,
+                        gridcolor="rgba(255,255,255,0.06)",
+                        tickprefix="€ ",
+                        separatethousands=True
+                    ),
+                    yaxis=dict(
+                        title=None,
+                        gridcolor="rgba(255,255,255,0.04)",
+                        tickfont=dict(size=12, color="#c9d1d9")
+                    ),
+                    margin=dict(l=60, r=25, t=20, b=45),
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
                 )
                 apply_plotly_theme(fig_bar_pnl)
@@ -455,15 +466,36 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     labels={
                         "holding_days": "Giorni di Detenzione (Holding Period)",
                         "realized_pnl_pct": "Rendimento Realizzato (%)",
-                        "outcome": "Esito"
+                        "outcome": ""
                     }
                 )
-                fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.25)")
-                fig_scat.update_traces(marker=dict(size=11, line=dict(width=1, color='#ffffff')))
+                fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.35)", line_width=1.5)
+                fig_scat.update_traces(marker=dict(size=11, opacity=0.85, line=dict(width=1.2, color='#ffffff')))
                 fig_scat.update_layout(
-                    template="plotly_dark", height=320,
-                    legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
-                    margin=dict(l=10, r=10, t=25, b=10),
+                    template="plotly_dark", height=chart_height,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1.0,
+                        title_text="",
+                        bgcolor="rgba(22,27,34,0.6)",
+                        bordercolor="rgba(255,255,255,0.1)",
+                        borderwidth=1
+                    ),
+                    xaxis=dict(
+                        title="Giorni di Detenzione (Holding Period)",
+                        gridcolor="rgba(255,255,255,0.06)",
+                        zeroline=False
+                    ),
+                    yaxis=dict(
+                        title="Rendimento Realizzato (%)",
+                        ticksuffix="%",
+                        gridcolor="rgba(255,255,255,0.06)",
+                        zeroline=False
+                    ),
+                    margin=dict(l=45, r=20, t=30, b=45),
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
                 )
                 apply_plotly_theme(fig_scat)
