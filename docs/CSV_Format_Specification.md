@@ -1,6 +1,6 @@
-# Specifica Tecnica del Formato CSV di Input & Supporto DeGiro
+# Specifica Tecnica del Formato CSV di Input & Multi-Broker Ingestion Hub
 
-Questo documento fornisce le specifiche tecniche dettagliate per i file CSV di input accettati da **ARGUS Risk Analytics Platform**. Il sistema supporta sia uno standard CSV universale sia le esportazioni native dal broker **DeGiro** tramite l'adapter integrato (`core/adapters/degiro.py`).
+Questo documento fornisce le specifiche tecniche dettagliate per i file CSV di input accettati da **ARGUS Risk Analytics Platform**. Il sistema supporta sia uno standard CSV universale sia le esportazioni native dai principali broker italiani ed internazionali tramite il **Multi-Broker Ingestion Hub** (`core/adapters/broker_hub.py`).
 
 ---
 
@@ -38,25 +38,28 @@ Nel formato standard dell'applicazione:
 
 ---
 
-## 3. Gestione dei Casi Limite (Edge Cases & Normalizzazione)
+## 3. Multi-Broker Ingestion Hub & Auto-Detector (`core/adapters/`)
 
-La pipeline ETL esegue i seguenti passaggi di normalizzazione automatica durante la fase di ingestion:
+ARGUS include un modulo di auto-rilevamento (**Auto-Detection**) e adapter specifici per convertire automaticamente i file esportati dai principali broker nel formato standard:
 
-1. **Date Multi-Formato**: Conversione automatica di `DD/MM/YYYY` e `MM/DD/YYYY` nel formato standard ISO 8601 `YYYY-MM-DD`.
-2. **Separatori Decimali**: Supporto sia per il punto (`150.25`) che per la virgola italiana (`150,25`).
-3. **Ticker Crypto**: Auto-fix dei codici crypto incompleti (es. `BTC` o `ETH` vengono automaticamente convertiti in `BTC-USD` e `ETH-USD`).
-4. **Mappatura ISIN $\rightarrow$ Ticker**: Qualora nel campo `ticker` venga inserito un codice ISIN (es. `IE00B4K48X80`), il sistema utilizza la mappa persistente `config.json` e le API di Yahoo Finance per risolvere il ticker di negoziazione corrispondente (`IMEA.SW`).
-5. **Cambi Valuta Storici**: Conversione automatica di prezzi e dividendi esteri (USD, GBP, CHF) nella valuta base selezionata mediante le serie storiche dei tassi di cambio (es. `EURUSD=X`).
+| Piattaforma Broker | Adapter Modulo | Formati Supportati & Note |
+| :--- | :--- | :--- |
+| **Directa SIM** | `core/adapters/directa.py` | Ordini eseguiti ed estratto conto titoli da *dLite* e *Classic*. Normalizza formati numerici italiani con virgola. |
+| **Fineco Bank** | `core/adapters/fineco.py` | Movimenti Conto Trading, Ordini Eseguiti e Rendiconto Fiscale. Gestisce intestazioni bancarie multilinea. |
+| **Interactive Brokers (IBKR)** | `core/adapters/ibkr.py` | Activity Statement CSV multi-sezione (filtrando selettivamente `Trades,Data,Order`) e Trades Report tabellari. |
+| **Trade Republic** | `core/adapters/traderepublic.py` | Estratto conto, transazioni singole, ordini PAC (*Savings Plan / Sparplan*) e dividendi (IT, EN, DE). |
+| **Scalable Capital** | `core/adapters/scalable.py` | Esportazioni Baader Bank / Scalable Broker per compravendite, dividendi e PAC ETF. |
+| **DeGiro** | `core/adapters/degiro.py` | Report *Attività > Transazioni* (IT, EN, NL) con calcolo automatico del cambio valuta e fee. |
+
+### Riconoscimento Automatico dei Codici ISIN (`core/adapters/isin_resolver.py`)
+Per tutti i broker che esportano codici ISIN anziché ticker azionari (es. `IE00B4L5Y983`), il risolutore universale opera su 3 livelli:
+1. **Cache di sessione in memoria** per accesso istantaneo.
+2. **Mappatura persistente** in `config/config.json` con oltre 30 tra i principali ETF e stock mondiali preconfigurati.
+3. **Lookup dinamico live su Yahoo Finance Search API** con auto-apprendimento e memorizzazione automatica nel file di configurazione locale.
 
 ---
 
-## 4. Supporto Native Export Broker DeGiro (`core/adapters/degiro.py`)
-
-La piattaforma include un adapter dedicato per importare direttamente l'export delle transazioni esportato dalla dashboard di **DeGiro** senza richiedere alcuna riattrezzatura manuale.
-
----
-
-## 5. Supporto Google Sheets Live Dual Sync (`History B/S Stocks` & `History B/S Crypto`)
+## 4. Supporto Google Sheets Live Dual Sync (`History B/S Stocks` & `History B/S Crypto`)
 
 ARGUS include un connettore live crittografato tramite Google Service Account in grado di estrarre e separare nativamente due portafogli distinti da un unico foglio di calcolo:
 
@@ -68,21 +71,9 @@ ARGUS include un connettore live crittografato tramite Google Service Account in
    - Normalizza i simboli crypto nella valuta di riferimento (es. `BTC` $\rightarrow$ `BTC-EUR`, `ETH` $\rightarrow$ `ETH-EUR`).
    - Isola e serializza i due portafogli in profili separati (`Wealth Stocks Portfolio` e `Wealth Crypto Portfolio`) pronti per il consolidamento Master Wealth.
 
-### Mappatura Campi DeGiro $\rightarrow$ Schema Standard
-
-| Campo Export DeGiro | Campo Schema Standard | Trasformazione Applicata |
-| :--- | :--- | :--- |
-| `Data` + `Ora` | `tx_date` | Parsing della data in formato ISO `YYYY-MM-DD`. |
-| `Prodotto` / `ISIN` | `ticker` | Risoluzione da ISIN a Ticker Yahoo Finance via `config.json`. |
-| `Numero` | `quantity` | Valore assoluto della quantità negoziata. |
-| `Prezzo` | `price` | Prezzo unitario di esecuzione. |
-| `Valuta` | `currency` | Codice ISO della valuta originale dell'operazione. |
-| `Commissioni` | `fees` | Conversione e somma delle commissioni di negoziazione. |
-| `Descrizione` | `tx_type` | Inferenza automatica del tipo: `Acquisto` $\rightarrow$ `buy`, `Vendita` $\rightarrow$ `sell`, `Dividendo` $\rightarrow$ `dividend`. |
-
 ---
 
-## 6. Esempio File CSV Valido (Standard)
+## 5. Esempio File CSV Valido (Standard ARGUS)
 
 ```csv
 tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes

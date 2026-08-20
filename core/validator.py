@@ -162,18 +162,24 @@ def _normalize_dates(df: pd.DataFrame, report: dict) -> tuple:
     """
     original = df["tx_date"].copy()
 
-    # Tenta con dayfirst=True (DD/MM/YYYY e YYYY-MM-DD)
-    df["tx_date"] = pd.to_datetime(
-        df["tx_date"].astype(str).str.strip(),
-        dayfirst=True,
-        errors="coerce"
-    )
+    # Tenta prima il parsing standard ISO8601 (YYYY-MM-DD)
+    s_raw = df["tx_date"].astype(str).str.strip()
+    df["tx_date"] = pd.to_datetime(s_raw, format="%Y-%m-%d", errors="coerce")
 
-    # Righe ancora NaT → tenta dayfirst=False (MM/DD/YYYY)
+    # Righe ancora NaT → tenta con dayfirst=True (DD/MM/YYYY)
     mask_nat = df["tx_date"].isna()
     if mask_nat.any():
         df.loc[mask_nat, "tx_date"] = pd.to_datetime(
             original[mask_nat].astype(str).str.strip(),
+            dayfirst=True,
+            errors="coerce"
+        )
+
+    # Righe ancora NaT → tenta dayfirst=False (MM/DD/YYYY)
+    mask_nat2 = df["tx_date"].isna()
+    if mask_nat2.any():
+        df.loc[mask_nat2, "tx_date"] = pd.to_datetime(
+            original[mask_nat2].astype(str).str.strip(),
             dayfirst=False,
             errors="coerce"
         )

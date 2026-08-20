@@ -41,6 +41,7 @@ from core.ui_utils import (
     render_splash_screen,
     render_control_room_hero,
     get_display_portfolio_name,
+    render_broker_hub_modal,
 )
 from core.multi_portfolio import (
     save_portfolio_profile,
@@ -391,19 +392,50 @@ with tab_ingest:
     if st.session_state.get("pipeline_done"):
         current_wf_step = 3
 
-    section("① Carica la Sorgente Dati (CSV Standard, Degiro o Google Sheets)")
+    section("① Carica la Sorgente Dati (Multi-Broker Ingestion Hub, CSV Standard o Google Sheets)")
 
-    data_source = st.radio(
-        "Sorgente Dati",
-        options=["CSV Standard (Template)", "Degiro (Export Transazioni)", "Google Sheets Live Sync"],
-        horizontal=True,
-        help="Scegli 'CSV Standard' o 'Degiro' per caricare un file locale, oppure 'Google Sheets' per la sincronizzazione cloud live."
-    )
+    template_csv = """tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
+2021-03-15,AAPL,buy,10,121.03,USD,1.50,stock,Esempio acquisto
+2021-06-01,VWRL.L,buy,5,89.20,GBP,0.00,etf,
+2022-01-10,BTC-USD,buy,0.05,41800.00,USD,2.00,crypto,
+2022-08-20,AAPL,sell,5,162.50,USD,1.50,stock,Presa profitto
+2023-03-01,AAPL,dividend,0,0.23,USD,0.00,stock,Dividendo Q1"""
+
+    col_ds_sel, col_ds_modal, col_ds_tpl = st.columns([2.6, 1.0, 1.0])
+    with col_ds_sel:
+        data_source = st.selectbox(
+            "Sorgente Dati / Piattaforma Broker",
+            options=[
+                "⚡ Auto-Detect Broker (Riconoscimento Automatico Formato)",
+                "📄 CSV Standard (Template ARGUS)",
+                "🟡 DeGiro (Export Transazioni)",
+                "🔵 Directa SIM (Ordini Eseguiti / Estratto Conto)",
+                "🔴 Fineco Bank (Movimenti Conto Trading)",
+                "🟠 Interactive Brokers - IBKR (Activity Statement / Trades)",
+                "🟢 Trade Republic (Transazioni / PAC)",
+                "🔷 Scalable Capital (Transazioni / Baader Bank)",
+                "🌐 Google Sheets Live Sync"
+            ],
+            help="Seleziona il broker da cui proviene il file CSV oppure usa 'Auto-Detect' per il riconoscimento automatico intelligente."
+        )
+    with col_ds_modal:
+        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+        render_broker_hub_modal(use_popover=True)
+    with col_ds_tpl:
+        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+        st.download_button(
+            "⬇️ Template CSV",
+            data=template_csv,
+            file_name="template_portfolio.csv",
+            mime="text/csv",
+            use_container_width=True,
+            help="Scarica il file CSV di esempio con lo schema standard ARGUS a 9 colonne."
+        )
 
     uploaded_file = None
     df_raw = None
 
-    if data_source == "Google Sheets Live Sync":
+    if data_source == "🌐 Google Sheets Live Sync":
         st.markdown("##### 🌐 Sincronizzazione Diretta Google Sheets (Service Account)")
         st.caption("Estrai automaticamente le transazioni sia dall'azionario che dalle criptovalute, separando i portafogli su DB e registrandoli nel Total Wealth Hub.")
         
@@ -493,35 +525,17 @@ with tab_ingest:
                 except Exception as ex:
                     st.error(f"❌ Errore durante la sincronizzazione Google Sheets: {ex}")
     else:
-        col_upload, col_template = st.columns([3, 1])
-        with col_upload:
-            uploaded_file = st.file_uploader(
-                "Trascina qui il tuo file CSV",
-                type=["csv"],
-                help="Carica il file in base alla sorgente selezionata."
-            )
-            if uploaded_file:
-                df_raw = pd.read_csv(uploaded_file, dtype=str)
-                st.session_state.pop("session_cleared", None)
-                if not st.session_state.get("portfolio_name") or st.session_state.get("portfolio_name") == "Nessun Portafoglio (In attesa)":
-                    auto_name = os.path.splitext(uploaded_file.name)[0].replace("_", " ").replace("-", " ").title()
-                    st.session_state["portfolio_name"] = auto_name
-
-        with col_template:
-            template_csv = """tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
-2021-03-15,AAPL,buy,10,121.03,USD,1.50,stock,Esempio acquisto
-2021-06-01,VWRL.L,buy,5,89.20,GBP,0.00,etf,
-2022-01-10,BTC-USD,buy,0.05,41800.00,USD,2.00,crypto,
-2022-08-20,AAPL,sell,5,162.50,USD,1.50,stock,Presa profitto
-2023-03-01,AAPL,dividend,0,0.23,USD,0.00,stock,Dividendo Q1"""
-            if data_source == "CSV Standard (Template)":
-                st.download_button(
-                    "⬇️ Scarica template CSV",
-                    data=template_csv,
-                    file_name="template_portfolio.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
+        uploaded_file = st.file_uploader(
+            "Trascina qui il tuo file CSV esportato dal broker (o usa il template ARGUS):",
+            type=["csv"],
+            help="Carica il file in formato CSV. L'Auto-Detector riconoscerà automaticamente la struttura del broker."
+        )
+        if uploaded_file:
+            df_raw = pd.read_csv(uploaded_file, dtype=str)
+            st.session_state.pop("session_cleared", None)
+            if not st.session_state.get("portfolio_name") or st.session_state.get("portfolio_name") == "Nessun Portafoglio (In attesa)":
+                auto_name = os.path.splitext(uploaded_file.name)[0].replace("_", " ").replace("-", " ").title()
+                st.session_state["portfolio_name"] = auto_name
 
     if st.session_state.get("pipeline_done"):
         current_wf_step = 3
@@ -534,14 +548,32 @@ with tab_ingest:
 
     # ── STEP 2: Validazione Dati & Data Health HUD ───────────────
     if df_raw is not None:
-        if data_source == "Degiro (Export Transazioni)":
-            from core.adapters.degiro import parse_degiro_transactions
+        broker_key_map = {
+            "⚡ Auto-Detect Broker (Riconoscimento Automatico Formato)": "auto",
+            "📄 CSV Standard (Template ARGUS)": "standard",
+            "🟡 DeGiro (Export Transazioni)": "degiro",
+            "🔵 Directa SIM (Ordini Eseguiti / Estratto Conto)": "directa",
+            "🔴 Fineco Bank (Movimenti Conto Trading)": "fineco",
+            "🟠 Interactive Brokers - IBKR (Activity Statement / Trades)": "ibkr",
+            "🟢 Trade Republic (Transazioni / PAC)": "traderepublic",
+            "🔷 Scalable Capital (Transazioni / Baader Bank)": "scalable"
+        }
+        selected_broker_key = broker_key_map.get(data_source, "auto")
+
+        if selected_broker_key != "standard":
+            from core.adapters.broker_hub import parse_broker_csv
             try:
-                with st.spinner("⏳ Analisi ISIN tramite Yahoo Finance in corso... (potrebbe richiedere fino a 30 secondi per portafogli grandi)"):
-                    df_raw = parse_degiro_transactions(df_raw)
-                st.success("✅ File Degiro riconosciuto e convertito con successo.")
+                with st.spinner("⏳ Analisi struttura broker e normalizzazione ISIN via Multi-Broker Hub..."):
+                    df_raw, detected_key, b_report = parse_broker_csv(df_raw, broker_key=selected_broker_key)
+                
+                b_name = b_report.get("broker_name", detected_key.title())
+                b_icon = b_report.get("broker_icon", "📄")
+                if b_report.get("is_auto_detected"):
+                    st.success(f"✅ Formato riconosciuto automaticamente: **{b_icon} {b_name}** ({b_report.get('rows_parsed', 0)} transazioni convertite con successo).")
+                else:
+                    st.success(f"✅ File **{b_icon} {b_name}** convertito con successo ({b_report.get('rows_parsed', 0)} transazioni normalizzate).")
             except Exception as e:
-                st.error(f"Errore nel parsing del file Degiro: {e}")
+                st.error(f"❌ Errore durante il parsing del file broker: {e}")
                 st.stop()
 
         section("② Validazione Dati & Data Health HUD")
