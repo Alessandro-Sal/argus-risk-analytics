@@ -8,7 +8,7 @@ import core.ui_utils
 import core.risk_engine
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_executive_badges, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_executive_badges, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal
 from core.sidebar import render_sidebar
 
 st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
@@ -229,6 +229,34 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
         )
         st.plotly_chart(fig_liq, use_container_width=True)
+
+    # Sezione Corporate Actions & Stock Split Audit
+    corp_actions = results.get("corporate_actions", [])
+    st.markdown("---")
+    col_ca_title, col_ca_btn = st.columns([3.2, 1.2])
+    with col_ca_title:
+        st.markdown("#### 🧬 Corporate Actions & Stock Split Engine (Rettifica FIFO)")
+        st.caption("Rilevazione automatica e rettifica dei lotti storici per frazionamenti azionari (Stock Split) e raggruppamenti (Reverse Split), a garanzia dell'invarianza del costo fiscale.")
+    with col_ca_btn:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        render_corporate_actions_modal(corporate_actions_list=corp_actions, use_popover=True)
+
+    if corp_actions and len(corp_actions) > 0:
+        df_ca = pd.DataFrame(corp_actions)
+        col_ca_map = {
+            "ticker": "Ticker",
+            "split_date": "Data Efficacia",
+            "split_type": "Tipologia",
+            "split_ratio": "Rapporto Split",
+            "description": "Descrizione",
+            "affected_lots_count": "Lotti Rettificati",
+            "shares_before": "Quote Ante-Split",
+            "shares_after": "Quote Post-Split"
+        }
+        df_ca_disp = df_ca[[c for c in col_ca_map.keys() if c in df_ca.columns]].rename(columns=col_ca_map)
+        st.dataframe(df_ca_disp, use_container_width=True, hide_index=True)
+    else:
+        st.info("ℹ️ Nessuno split azionario o operazione straordinaria rilevata sui lotti storici di questo portafoglio (le transazioni sono già sincronizzate con i prezzi correnti).")
 
 
 # ── TAB 2: POSIZIONI CHIUSE & GRAVEYARD ───────────────────────

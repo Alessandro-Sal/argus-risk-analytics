@@ -715,4 +715,24 @@ Il tasso risk-free dinamico viene propagato automaticamente su tutte le metriche
 6. **Kelly Criterion Continuo**:
    \[ f^* = \frac{\mu - R_f}{\sigma^2} \]
 
+---
+
+## 42. Corporate Actions & Stock Split Accounting Engine (`core/corporate_actions.py`)
+
+Il modulo gestisce le operazioni straordinarie sul capitale (Stock Split, Reverse Split e Stock Dividend) garantendo la continuità contabile, l'integrità delle code FIFO e la conformità fiscale (TUIR Art. 67).
+
+### 1. Principio di Invarianza del Costo di Carico Fiscale
+Dato un lotto di acquisto $k$ registrato prima della data di efficacia dello split ($t_k < t_{\text{split}}$) con $Q_{\text{orig}, k}$ quote al prezzo unitario $P_{\text{orig}, k}$:
+\[ Q_{\text{adj}, k} = Q_{\text{orig}, k} \times R \]
+\[ P_{\text{adj}, k} = \frac{P_{\text{orig}, k}}{R} \]
+\[ \text{Cost Basis}_k = Q_{\text{adj}, k} \times P_{\text{adj}, k} = Q_{\text{orig}, k} \times P_{\text{orig}, k} \]
+
+dove $R$ è il coefficiente di frazionamento ($R > 1$ per Forward Split, $R < 1$ per Reverse Split).
+
+### 2. Rettifica FIFO Retroattiva e Prevenzione Errori di Inventario
+1. **Prevenzione Falsi Sbilanciamenti**: Se un investitore acquista 10 azioni a 500€ e successivamente interviene uno split 10:1 ($R=10$), il saldo rettificato diviene di 100 azioni a 50€. Una successiva vendita di 30 azioni a 70€ viene abbinata al lotto rettificato, determinando:
+   \[ \text{PnL Realizzato} = 30 \times (70 - 50) = +600€ \]
+   \[ \text{Quote Residue} = 70 \text{ azioni con WACP} = 50€ \]
+2. **Sincronizzazione con Prezzi di Mercato**: Poiché le serie storiche dei prezzi scaricate dai provider (Yahoo Finance) sono rettificate (*Adjusted Close*), la rettifica dei lotti di acquisto garantisce che il PnL latente ($P_{\text{market}} - \text{WACP}$) rifletta il reale guadagno economico senza distorsioni artificiali.
+
 

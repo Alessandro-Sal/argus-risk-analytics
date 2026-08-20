@@ -1730,6 +1730,61 @@ Il **Tasso Privo di Rischio ($R_f$)** rappresenta il rendimento teorico di un in
     )
 
 
+def render_corporate_actions_modal(
+    corporate_actions_list: list = None,
+    button_label: str = "ℹ️ Metodologia Corporate Actions & Split",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
+    delle Corporate Actions, Stock Split, Reverse Split e della rettifica dei lotti FIFO.
+    """
+    audit_summary = ""
+    if corporate_actions_list and len(corporate_actions_list) > 0:
+        audit_summary = "\n\n#### 📑 Corporate Actions Applicate a questo Portafoglio:\n"
+        for act in corporate_actions_list:
+            audit_summary += (
+                f"- **{act.get('ticker')}** ({act.get('split_date')}): **{act.get('description', act.get('split_type'))}** "
+                f"| Rapporto: **{act.get('split_ratio')}x** | Lotti rettificati: **{act.get('affected_lots_count', 1)}** "
+                f"| Quote: {act.get('shares_before', 'N/D')} ➔ **{act.get('shares_after', 'N/D')}**\n"
+            )
+
+    content = f"""
+### 🧬 Corporate Actions & Stock Split Engine
+
+Le **Corporate Actions** (operazioni straordinarie sul capitale) modificano la struttura delle azioni in circolazione di una società quotata senza alterare il valore intrinseco complessivo dell'azienda o la quota di partecipazione proporzionale dell'investitore.
+
+---
+
+#### ⚖️ Principio di Invarianza del Valore Fiscale (TUIR Art. 67 & IFRS)
+Secondo la normativa tributaria italiana ed internazionale, uno split azionario non costituisce realizzo di plusvalenza o minusvalenza. Il valore fiscale totale del lotto di acquisto rimane rigorosamente invariante:
+
+$$\\text{{Cost Basis}} = Q_{{\\text{{orig}}}} \\times P_{{\\text{{orig}}}} = Q_{{\\text{{rett}}}} \\times P_{{\\text{{rett}}}}$$
+
+- **Forward Stock Split** ($R > 1$, es. 10:1 come Nvidia o 4:1 come Apple):
+  $$Q_{{\\text{{rett}}}} = Q_{{\\text{{orig}}}} \\times R, \\quad P_{{\\text{{rett}}}} = \\frac{{P_{{\\text{{orig}}}}}}{{R}}$$
+  *Il numero di quote aumenta proporzionalmente, mentre il prezzo medio di carico (WACP) si riduce della stessa misura.*
+
+- **Reverse Stock Split** ($R < 1$, es. 1:10):
+  $$Q_{{\\text{{rett}}}} = Q_{{\\text{{orig}}}} \\times R, \\quad P_{{\\text{{rett}}}} = \\frac{{P_{{\\text{{orig}}}}}}{{R}}$$
+  *Il numero di quote si riduce e il prezzo unitario aumenta (es. per rientrare nei requisiti minimi di quotazione).*
+
+---
+
+#### 🔄 Perché la Rettifica FIFO è Fondamentale?
+1. **Coerenza con i Prezzi di Mercato**: Le quotazioni storiche e correnti scaricate da Yahoo Finance / Bloomberg sono rettificate (*Adjusted Close*). Se le transazioni di acquisto passate non venissero rettificate, il sistema confronterebbe un prezzo di carico ante-split (es. 1.000$ per Nvidia) con un prezzo corrente post-split (es. 120$), calcolando una perdita fittizia dell'88%.
+2. **Prevenzione Falsi Short / Errori di Saldo**: Una vendita eseguita post-split (es. vendita di 50 azioni Nvidia) supererebbe il saldo di un acquisto ante-split di 10 azioni non rettificate, generando errori di inventario negativo.
+3. **Calcolo Esatto delle Minusvalenze & Plusvalenze**: L'algoritmo FIFO di ARGUS rettifica retroattivamente tutti i lotti acquistati prima della data di efficacia dello split, garantendo il calcolo fiscale al centesimo di euro.{audit_summary}
+"""
+    render_info_modal(
+        title="🧬 Metodologia Corporate Actions & Stock Split",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
+
 
 def get_argus_eye_svg(size: int = 140, animated: bool = True, accent: str = None) -> str:
     """

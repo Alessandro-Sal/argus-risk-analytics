@@ -62,26 +62,32 @@ def compute_risk(portfolio_id: int,
     active_rf_rate = rf_info["rate"]
 
     warnings_list = []
-    df_positions            = _compute_positions(df_tx, df_prices, warnings_list)
-    df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx)
-    sr_benchmark            = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
+    
+    # Rettifica automatica Corporate Actions & Stock Splits sui lotti FIFO
+    from core.corporate_actions import adjust_transactions_for_splits
+    df_tx_adj, corp_actions_audit = adjust_transactions_for_splits(df_tx, auto_fetch=True)
 
+    df_positions            = _compute_positions(df_tx_adj, df_prices, warnings_list)
+    df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx_adj)
+    sr_benchmark            = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
 
     metrics = {
         "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate),
-        "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx, df_positions, risk_free_rate=active_rf_rate),
+        "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx_adj, df_positions, risk_free_rate=active_rf_rate),
         "concentration": _calc_concentration(df_positions),
         "ai_insights":   _calc_ai_insights(df_positions, df_returns, sr_portfolio),
         "risk_free":     rf_info,
     }
 
     from core.closed_trades import compute_closed_trades_journal
-    closed_trades_data = compute_closed_trades_journal(df_tx=df_tx, df_prices=df_prices, df_positions=df_positions)
+    closed_trades_data = compute_closed_trades_journal(df_tx=df_tx_adj, df_prices=df_prices, df_positions=df_positions)
 
     return {
         "portfolio_id":     portfolio_id,
         "computed_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "df_tx":            df_tx,
+        "df_tx":            df_tx_adj,
+        "df_tx_raw":        df_tx,
+        "corporate_actions": corp_actions_audit,
         "positions":        df_positions,
         "returns":          df_returns,
         "portfolio_return": sr_portfolio,
@@ -196,6 +202,13 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
                     realized     += qty_to_sell * (price_eur - lot_price_eur)
                     queue[0][0]  -= qty_to_sell
                     qty_to_sell   = 0.0
+
+        elif tx in ["split", "frazionamento"]:
+            split_ratio = float(row.get("quantity") or row.get("price") or 1.0)
+            if split_ratio > 0.0 and split_ratio != 1.0:
+                for lot in queue:
+                    lot[0] = lot[0] * split_ratio
+                    lot[1] = lot[1] / split_ratio
 
         elif tx == "dividend":
             # Nel CSV: quantity=1, price=importo totale incassato
@@ -2247,6 +2260,7 @@ def compute_sandbox_risk_bundle(
         "df_prices": df_prices,
         "metrics": metrics,
         "risk_free": rf_info,
+        "corporate_actions": [],
         "stress_tests": stress_tests,
         "risk_contribution": risk_contrib,
         "optimization": optimization,

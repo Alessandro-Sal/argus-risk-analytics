@@ -12,9 +12,9 @@ Questo documento fornisce le specifiche tecniche dettagliate per i file CSV di i
 | :--- | :---: | :---: | :--- | :--- |
 | `tx_date` | **Sì** | Data | Data dell'operazione (`YYYY-MM-DD`, `DD/MM/YYYY`, `MM/DD/YYYY`). | `2024-01-15` |
 | `ticker` | **Sì** | Stringa | Ticker Yahoo Finance o codice identificativo ISIN. | `AAPL`, `ISP.MI`, `BTC-USD` |
-| `tx_type` | **Sì** | ENUM | Tipo di operazione: `buy`, `sell`, o `dividend`. | `buy` |
-| `quantity` | **Sì** | Numerico | Quantità di quote negoziate. Per i dividendi, impostare `1`. | `10.5` |
-| `price` | **Sì** | Numerico | Prezzo unitario di acquisto/vendita. Per i dividendi, l'importo totale netto. | `150.25` |
+| `tx_type` | **Sì** | ENUM | Tipo di operazione: `buy`, `sell`, `dividend` o `split`. | `buy`, `split` |
+| `quantity` | **Sì** | Numerico | Quantità di quote negoziate. Per `dividend` = 1; per `split` = coefficiente (es. 10 per 10:1). | `10.5` |
+| `price` | **Sì** | Numerico | Prezzo unitario di acquisto/vendita. Per dividendi = importo netto; per `split` = coefficiente. | `150.25` |
 | `currency` | **Sì** | Stringa | Valuta dell'operazione (codice ISO 3 lettere: `EUR`, `USD`, `GBP`, `CHF`). | `EUR` |
 | `fees` | No | Numerico | Commissioni totali pagate per l'operazione (Default: `0.0`). | `2.50` |
 | `asset_class` | No | Stringa | Categoria strumento (`Stock`, `ETF`, `Bond`, `Crypto`, `Cash`). Auto-detected se omesso. | `Stock` |
@@ -22,13 +22,19 @@ Questo documento fornisce le specifiche tecniche dettagliate per i file CSV di i
 
 ---
 
-## 2. Regole di Gestione dei Dividendi (`tx_type = dividend`)
+## 2. Regole di Gestione dei Dividendi & Stock Split
 
+### A. Dividendi (`tx_type = dividend`)
 Nel formato standard dell'applicazione:
 - **`quantity`**: Deve essere impostato su **`1`**.
 - **`price`**: Rappresenta l'**importo totale netto incassato** dal dividendo espresso nella valuta dell'operazione (non l'importo per singola azione).
 
-> ⚠️ **Nota di Validazione (`core/validator.py`)**: Il motore di validazione garantisce che le righe con `tx_type = dividend` non subiscano alterazioni o azzeramenti del quantitativo, preservando l'integrità del flusso di cassa generato dai dividendi.
+### B. Stock Split & Corporate Actions (`tx_type = split`)
+- **`quantity`** (o **`price`**): Rappresenta il **rapporto di frazionamento** (es. `10.0` per uno split 10:1, `0.1` per un reverse split 1:10).
+- Il motore contabile di ARGUS rettifica retroattivamente tutti i lotti d'acquisto registrati prima della data dello split, moltiplicando le quote per il coefficiente e dividendo il prezzo di carico, mantenendo il **costo fiscale totale (Cost Basis) rigorosamente invariante**.
+- *Nota*: La piattaforma esegue inoltre la rilevazione automatica online da Yahoo Finance per gli split storici noti (es. NVDA 10:1, AAPL 4:1, TSLA 3:1).
+
+> ⚠️ **Nota di Validazione (`core/validator.py`)**: Il motore di validazione accetta i 4 tipi operativi ufficiali (`buy`, `sell`, `dividend`, `split`) garantendo coerenza e integrità del database.
 
 ---
 

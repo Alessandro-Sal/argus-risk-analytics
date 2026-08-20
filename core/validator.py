@@ -18,7 +18,7 @@ from datetime import datetime
 REQUIRED_COLS = ["tx_date", "ticker", "tx_type", "quantity", "price", "currency"]
 OPTIONAL_COLS = {"fees": 0.0, "asset_class": None, "notes": None}
 
-VALID_TX_TYPES    = {"buy", "sell", "dividend"}
+VALID_TX_TYPES    = {"buy", "sell", "dividend", "split"}
 VALID_ASSET_CLASS = {"stock", "etf", "bond", "crypto", "cash", "commodity"}
 
 # Codici ISO 4217 comuni + crypto principali
