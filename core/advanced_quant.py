@@ -146,7 +146,7 @@ def compute_tail_copula_matrix(
 def compute_kelly_criterion_sizing(
     returns_df: pd.DataFrame,
     current_weights: Optional[dict] = None,
-    risk_free_rate: float = 0.02
+    risk_free_rate: float = None
 ) -> pd.DataFrame:
     """
     Calcola l'allocazione ottimale secondo il Criterio di Kelly (Full Kelly, Half-Kelly, Quarter-Kelly).
@@ -155,6 +155,10 @@ def compute_kelly_criterion_sizing(
     Formula Bernoulli: f* = (p * (b + 1) - 1) / b
     dove p = win rate, b = rapporto medio vincita/perdita.
     """
+    from core.yield_curve import get_default_risk_free_rate
+    if risk_free_rate is None:
+        risk_free_rate = get_default_risk_free_rate("EUR")
+
     if returns_df is None or returns_df.empty:
         return pd.DataFrame()
 
@@ -280,7 +284,7 @@ def compute_interactive_trade_kelly(
 # 3. EQUAL RISK CONTRIBUTION (ERC / RISK PARITY)
 # ==============================================================================
 
-def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame) -> dict:
+def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame, risk_free_rate: float = None) -> dict:
     """
     Risolve il problema di ottimizzazione Equal Risk Contribution (ERC / Risk Parity).
     
@@ -288,6 +292,10 @@ def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame) -> dict:
     totale di portafoglio:
     RC_i = w_i * (Σ w)_i / σ_p = σ_p / N  per ogni i.
     """
+    from core.yield_curve import get_default_risk_free_rate
+    if risk_free_rate is None:
+        risk_free_rate = get_default_risk_free_rate("EUR")
+
     if returns_df is None or returns_df.empty or returns_df.shape[1] < 2:
         return {
             "weights": {},
@@ -383,7 +391,7 @@ def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame) -> dict:
     port_ret = float(np.clip(opt_w @ mean_returns, -2.0, 5.0))
     port_var = float(opt_w.T @ cov_matrix @ opt_w)
     port_vol = float(np.clip(np.sqrt(max(1e-6, port_var)), 0.001, 3.0))
-    sharpe = float((port_ret - 0.03) / port_vol) if port_vol > 0 else 0.0
+    sharpe = float((port_ret - risk_free_rate) / port_vol) if port_vol > 0 else 0.0
 
     # Calcolo esatto dei Risk Contributions
     marginal_risk = (cov_matrix @ opt_w) / port_vol

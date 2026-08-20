@@ -382,20 +382,28 @@ def compute_multi_portfolio_comparison(selected_names: List[str]) -> pd.DataFram
             "Volatilità (%)": f"{mk['volatility_pct']:.2f}%",
             "Sharpe Ratio": f"{mk['sharpe_ratio']:.2f}",
             "VaR 95% (1g)": f"{mk['var_95_pct']:.2f}%",
-            "Max Drawdown": f"{mk['max_dd_pct']:.2f}%",
-            "N° Posizioni": len(pos),
-            "Top Holding": top_h
-        })
+                    "Max Drawdown": f"{mk['max_dd_pct']:.2f}%",
+                    "N° Posizioni": len(pos),
+                    "Top Holding": top_h
+                })
 
     return pd.DataFrame(rows)
 
 
-def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
+def consolidate_multi_portfolios(
+    selected_names: List[str],
+    risk_free_rate: float = None,
+    base_currency: str = "EUR"
+) -> Optional[dict]:
     """
     Fonde e consolida più portafogli in un unico Master Portfolio (Total Wealth).
     Aggrega quote, ricalcola WACP, fonde le serie storiche dei rendimenti ponderate per patrimonio,
     e genera metriche di rischio e tabelle completamente conformi a tutta la piattaforma ARGUS.
     """
+    from core.yield_curve import get_active_risk_free_rate
+    rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
+    active_rf_rate = rf_info["rate"]
+
     if not selected_names or len(selected_names) < 2:
         return None
 
@@ -419,24 +427,25 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
             prof.get("positions") or (prof.get("results_full", {}).get("positions") if isinstance(prof.get("results_full"), dict) else None)
         )
         for pos in pos_list:
-            t = pos.get("ticker", "").strip()
+            t = pos.get("ticker", "").strip().upper()
             if not t:
                 continue
-            mv = float(pos.get("current_value", pos.get("market_value", 0.0)))
-            shares = float(pos.get("qty_net", pos.get("shares", pos.get("quantity", 0.0))))
-            cost = float(pos.get("cost_basis", pos.get("total_cost", 0.0)))
-            realized = float(pos.get("realized_pnl", 0.0))
-            divs = float(pos.get("dividends_total", 0.0))
-            ac = pos.get("asset_class", "Equity")
+
+            shares = float(pos.get("qty_net") or pos.get("shares") or 0.0)
+            cost = float(pos.get("cost_basis") or (pos.get("avg_cost", 0.0) * shares) or 0.0)
+            mv = float(pos.get("current_value") or pos.get("market_value") or (pos.get("last_price", 0.0) * shares) or 0.0)
+            realized = float(pos.get("realized_pnl") or 0.0)
+            divs = float(pos.get("dividends_total") or 0.0)
             curr = pos.get("currency", "EUR")
-            c_raw = pos.get("country", "")
-            s_raw = pos.get("gics_sector", pos.get("sector", ""))
-            c_clean, s_clean = resolve_asset_metadata(t, ac, c_raw, s_raw)
-            
+            s_clean = pos.get("gics_sector") or pos.get("sector") or "Diversified"
+            c_clean = pos.get("country") or "Global"
+            ac_clean = pos.get("asset_class") or "Equity"
+
             if t not in merged_positions:
                 merged_positions[t] = {
                     "ticker": t,
-                    "asset_class": ac,
+                    "name": pos.get("name", t),
+                    "asset_class": ac_clean,
                     "gics_sector": s_clean,
                     "sector": s_clean,
                     "country": c_clean,
@@ -468,26 +477,24 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
                     merged_positions[t]["last_price"] = merged_positions[t]["current_value"] / merged_positions[t]["qty_net"]
 
     # Calcolo pesi percentuali e HHI
-    consolidated_pos_list = []
-    hhi_sum = 0.0
-    for t, p_dict in merged_positions.items():
-        w_dec = (p_dict["current_value"] / total_master_value) if total_master_value > 0 else 0.0
-        p_dict["weight"] = w_dec
-        p_dict["weight_pct"] = round(w_dec * 100.0, 4)
-        hhi_sum += w_dec ** 2
-        p_dict["shares"] = p_dict["qty_net"]
-        p_dict["quantity"] = p_dict["qty_net"]
-        p_dict["market_value"] = p_dict["current_value"]
-        p_dict["total_cost"] = p_dict["cost_basis"]
-        p_dict["wacp"] = p_dict["avg_cost"]
-        consolidated_pos_list.append(p_dict)
+    df_positions = pd.DataFrame(list(merged_positions.values()))
+    if not df_positions.empty:
+        df_positions = df_positions.sort_values("current_value", ascending=False).reset_index(drop=True)
+        df_positions["weight"] = df_positions["current_value"] / total_master_value
+        df_positions["weight_pct"] = df_positions["weight"] * 100.0
+        df_positions["shares"] = df_positions["qty_net"]
+        df_positions["quantity"] = df_positions["qty_net"]
+        df_positions["market_value"] = df_positions["current_value"]
+        df_positions["total_cost"] = df_positions["cost_basis"]
+        df_positions["wacp"] = df_positions["avg_cost"]
+        hhi_sum = float(np.sum((df_positions["weight_pct"] / 100.0) ** 2))
+    else:
+        hhi_sum = 0.0
 
-    df_positions = pd.DataFrame(consolidated_pos_list).sort_values("current_value", ascending=False).reset_index(drop=True)
-
-    # 2. Fusione Serie Temporale Rendimenti Ponderata per Controvalore
+    # 2. Aggregazione Rendimenti Storici e Benchmark
     all_returns_series = []
-    all_bm_series = []
     weights_list = []
+    all_bm_series = []
     all_price_dfs = []
     all_asset_returns = []
 
@@ -495,14 +502,13 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
         r_ser = _get_portfolio_return_series(prof)
         bm_ser = _get_benchmark_return_series(prof)
         p_val = _extract_metrics_safe(prof)["portfolio_value"]
-        
         if r_ser is not None and not r_ser.empty and p_val > 0:
             all_returns_series.append(r_ser)
             weights_list.append(p_val)
             
         if bm_ser is not None and not bm_ser.empty:
             all_bm_series.append(bm_ser)
-            
+
         rf = prof.get("results_full")
         if isinstance(rf, dict):
             if "df_prices" in rf and isinstance(rf["df_prices"], pd.DataFrame):
@@ -511,7 +517,6 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
                 all_asset_returns.append(rf["returns"])
 
     if all_returns_series:
-        # Concatenazione temporale con fillna(0.0) per non tagliare le date storiche
         comb_df = pd.concat(all_returns_series, axis=1).fillna(0.0)
         total_w = sum(weights_list)
         w_arr = np.array([w / total_w for w in weights_list])
@@ -520,7 +525,6 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
     else:
         master_returns = pd.Series(dtype=float)
 
-    # Fusione Benchmark
     if all_bm_series:
         longest_bm = max(all_bm_series, key=lambda x: len(x))
         master_bm_returns = longest_bm.reindex(master_returns.index).fillna(0.0)
@@ -529,7 +533,6 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
     else:
         master_bm_returns = pd.Series(dtype=float)
 
-    # Fusione Matrici Prezzi e Rendimenti Asset
     if all_price_dfs:
         combined_prices = pd.concat(all_price_dfs, ignore_index=True).drop_duplicates(["ticker", "price_date"]).reset_index(drop=True)
     else:
@@ -548,7 +551,7 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
         n_years = max(cal_days / 365.2425, 0.05)
     else:
         n_years = max(n_days / 252.0, 0.05) if n_days > 0 else 1.0
-    rfr_daily = 0.03 / 252.0
+    rfr_daily = active_rf_rate / 252.0
 
     if not master_returns.empty and n_days > 5:
         cum_ret = float((1.0 + master_returns).prod() - 1.0)
@@ -668,9 +671,10 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
             "alpha_pct": round(alpha * 100.0, 4),
             "benchmark_cagr_pct": round(bm_cagr * 100.0, 4),
             "dividends_total": round(total_dividends, 2),
-            "risk_free_rate_pct": 3.0,
+            "risk_free_rate_pct": round(active_rf_rate * 100.0, 2),
             "n_years": round(n_years, 2)
         },
+        "risk_free": rf_info,
         "market_risk": {
             "volatility_daily_pct": round(vol_daily * 100.0, 4),
             "volatility_annual_pct": round(vol_annual * 100.0, 4),
@@ -689,7 +693,8 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
             "hml_tilt": round(hml_tilt, 4),
             "tracking_error_pct": round(tracking_error, 4),
             "benchmark_ticker": "SPY",
-            "n_trading_days": n_days
+            "n_trading_days": n_days,
+            "risk_free_rate_pct": round(active_rf_rate * 100.0, 2)
         },
         "concentration": {
             "hhi": round(hhi_sum, 6),
@@ -712,27 +717,32 @@ def consolidate_multi_portfolios(selected_names: List[str]) -> Optional[dict]:
     from core.risk_engine import _calc_risk_contribution, _calc_stress_tests, _compute_efficient_frontier
     rc_master = _calc_risk_contribution(combined_asset_returns, df_positions)
     stress_master = _calc_stress_tests(combined_asset_returns, df_positions, master_bm_returns)
-    opt_master = _compute_efficient_frontier(combined_asset_returns, df_positions)
+    opt_master = _compute_efficient_frontier(combined_asset_returns, df_positions, risk_free_rate=active_rf_rate)
 
-    consolidated_results = {
-        "portfolio_id": 888888,
+    from core.closed_trades import compute_closed_trades_journal
+    closed_trades_master = compute_closed_trades_journal(df_tx=pd.DataFrame(), df_positions=df_positions, is_sandbox=True)
+
+    return {
+        "portfolio_id": -99,
         "portfolio_value": round(total_master_value, 2),
+        "is_master_portfolio": True,
+        "is_sandbox": False,
+        "portfolio_name": f"Master Portfolio ({names_str})",
         "positions": df_positions,
-        "metrics": master_metrics,
         "returns": combined_asset_returns,
         "portfolio_return": master_returns,
         "benchmark_return": master_bm_returns,
         "df_prices": combined_prices,
-        "risk_contribution": rc_master,
+        "metrics": master_metrics,
+        "risk_free": rf_info,
         "stress_tests": stress_master,
+        "risk_contribution": rc_master,
         "optimization": opt_master,
-        "benchmark": "SPY",
+        "closed_trades": closed_trades_master,
+        "warnings": [],
         "base_currency": "EUR",
-        "portfolio_name": f"Master Wealth ({len(selected_names)} Conti: {names_str})",
         "run_id": f"MASTER-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
         "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
-
-    return consolidated_results
 
 

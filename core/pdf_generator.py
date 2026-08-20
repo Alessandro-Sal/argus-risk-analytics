@@ -202,7 +202,7 @@ def generate_asset_factsheet_pdf(asset: dict) -> bytes:
         "3. PROFILO QUANTITATIVO & DINAMICHE DI RISCHIO",
         f"   • Beta di Mercato vs Benchmark: {beta:.2f}",
         f"   • Volatilita Storica Annualizzata: {vol:.2f}%",
-        f"   • Indice di Sharpe (Rf = 3.0%): {sharpe:.2f}",
+        f"   • Indice di Sharpe: {sharpe:.2f}",
         f"   • Relative Strength Index RSI (14g): {rsi:.1f}",
         "",
         "4. PUNTEGGIO COMPOSITO ARGUS",

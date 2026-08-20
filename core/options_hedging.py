@@ -9,13 +9,14 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
+from core.yield_curve import get_default_risk_free_rate, get_active_risk_free_rate
 
 
 def black_scholes_pricing(
     S: float,
     K: float,
     T: float,
-    r: float = 0.035,
+    r: float = None,
     sigma: float = 0.20,
     option_type: str = "put"
 ) -> Dict[str, Any]:
@@ -26,10 +27,13 @@ def black_scholes_pricing(
     - S: Prezzo spot sottostante
     - K: Strike price
     - T: Tempo alla scadenza in anni (es. 0.25 per 3 mesi)
-    - r: Tasso d'interesse privo di rischio annuale (es. 0.035 per 3.5%)
+    - r: Tasso d'interesse privo di rischio annuale (se None, recuperato dinamicamente)
     - sigma: Volatilità implicita annualizzata (es. 0.20 per 20%)
     - option_type: 'call' o 'put'
     """
+    if r is None:
+        r = get_default_risk_free_rate("USD")
+
     if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
         return {
             "price": 0.0,
@@ -87,12 +91,15 @@ def compute_portfolio_delta_hedge(
     strike_otm_pct: float = 5.0,
     expiry_months: float = 3.0,
     implied_vol: float = 0.18,
-    risk_free_rate: float = 0.035
+    risk_free_rate: float = None
 ) -> Dict[str, Any]:
     """
     Calcola la strategia ottimale di Delta-Hedging con opzioni Put sul benchmark (es. SPY / SPX)
     per proteggere il valore del portafoglio azionario.
     """
+    if risk_free_rate is None:
+        risk_free_rate = get_default_risk_free_rate("USD")
+
     T = expiry_months / 12.0
     K = benchmark_spot * (1.0 - (strike_otm_pct / 100.0))  # Strike OTM
 
@@ -127,7 +134,8 @@ def compute_portfolio_delta_hedge(
         "put_gamma": float(put_metrics["gamma"]),
         "put_theta_daily": float(put_metrics["theta"]),
         "put_vega": float(put_metrics["vega"]),
-        "protected_value": float(portfolio_value * (target_hedge_pct / 100.0))
+        "protected_value": float(portfolio_value * (target_hedge_pct / 100.0)),
+        "risk_free_rate_pct": round(risk_free_rate * 100.0, 2)
     }
 
 
@@ -136,12 +144,15 @@ def compute_covered_call_yield_enhancement(
     otm_pct: float = 5.0,
     expiry_months: float = 1.0,
     implied_vol: float = 0.25,
-    risk_free_rate: float = 0.035
+    risk_free_rate: float = None
 ) -> pd.DataFrame:
     """
     Calcola la strategia di Covered Call Writing (vendita di Call Out-of-The-Money) per generare
     rendimento passivo (premio opzioni) su ciascuna posizione azionaria in portafoglio.
     """
+    if risk_free_rate is None:
+        risk_free_rate = get_default_risk_free_rate("USD")
+
     if positions_df.empty or "last_price" not in positions_df.columns:
         return pd.DataFrame()
 

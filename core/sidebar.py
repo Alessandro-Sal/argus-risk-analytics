@@ -286,6 +286,20 @@ def render_sidebar():
         if "sb_port_name" in st.session_state:
             st.session_state.portfolio_name = st.session_state.sb_port_name
 
+        from core.yield_curve import get_active_risk_free_rate
+        if "rf_mode" not in st.session_state: st.session_state.rf_mode = "Auto (Live Market)"
+        if "custom_rf_rate_pct" not in st.session_state: st.session_state.custom_rf_rate_pct = 2.75
+
+        if "sb_rf_mode" in st.session_state:
+            st.session_state.rf_mode = st.session_state.sb_rf_mode
+        if "sb_custom_rf" in st.session_state:
+            st.session_state.custom_rf_rate_pct = float(st.session_state.sb_custom_rf)
+
+        custom_rf_dec = (st.session_state.custom_rf_rate_pct / 100.0) if st.session_state.rf_mode != "Auto (Live Market)" else None
+        active_rf_info = get_active_risk_free_rate(currency=st.session_state.base_currency, custom_override=custom_rf_dec)
+        st.session_state.active_rf_rate = active_rf_info["rate"]
+        st.session_state.active_rf_info = active_rf_info
+
         from core.ui_utils import get_display_portfolio_name
         port_label, has_port = get_display_portfolio_name()
         port_text_style = "color:#ffffff; font-weight:700;" if has_port else "color:#e3b341; font-style:italic; font-weight:600;"
@@ -314,6 +328,10 @@ def render_sidebar():
             <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
                 <span>🗄️ <b style="color:#c9d1d9;">{active_db_label}</b></span>
                 <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🎯 <b style="color:#c9d1d9;">{st.session_state.benchmark}</b></span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 4px;">
+                <span>🏛️ Risk-Free <b style="color:#ff9900;">{active_rf_info['rate_pct']:.2f}%</b></span>
+                <span style="color:#8b949e; font-size:9.5px;">{active_rf_info['currency']} ({'Live' if active_rf_info.get('is_live') else 'BCE/Fed'})</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -366,6 +384,22 @@ def render_sidebar():
                 cust_b = st.text_input("Ticker Benchmark Custom", value="" if current_bench in bench_options[:-1] else current_bench, key="sb_custom_bench").strip().upper()
                 if cust_b:
                     st.session_state.benchmark = cust_b
+
+            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Tasso Privo di Rischio (Risk-Free)</div>', unsafe_allow_html=True)
+            col_rf_m, col_rf_v = st.columns([1.3, 1.0])
+            with col_rf_m:
+                rf_mode_opts = ["Auto (Live Market)", "Manuale"]
+                rf_mode_idx = 0 if st.session_state.rf_mode == "Auto (Live Market)" else 1
+                st.selectbox("Modalità Rf", rf_mode_opts, index=rf_mode_idx, key="sb_rf_mode")
+
+            with col_rf_v:
+                if st.session_state.rf_mode == "Manuale":
+                    st.number_input("Tasso %", min_value=0.0, max_value=25.0, value=float(st.session_state.custom_rf_rate_pct), step=0.25, key="sb_custom_rf")
+                else:
+                    st.text_input("Tasso Live", value=f"{active_rf_info['rate_pct']:.2f}%", disabled=True)
+
+            from core.ui_utils import render_risk_free_modal
+            render_risk_free_modal(currency=st.session_state.base_currency, use_popover=True, button_label="ℹ️ Info Metodologia Risk-Free")
 
         st.markdown('<div class="sidebar-section-header">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
 
