@@ -2070,6 +2070,55 @@ $$\\text{Imposta Dovuta} = \\text{Valore al 31/12} \\times 0{,}002 \\times \\fra
     )
 
 
+def render_fama_french_modal(
+    button_label: str = "ℹ️ Teoria Fama-French 5-Factor & Momentum",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale/popover istituzionale con la guida teorica ed econometrica
+    ai Modelli Fattoriali di Fama-French (1993, 2015) e Carhart (1997).
+    """
+    content = """
+### 🏛️ Modelli Fattoriali: Fama-French (3 & 5 Fattori) e Carhart Momentum
+
+I modelli multi-fattoriali estendono il classico **Capital Asset Pricing Model (CAPM)** di Sharpe-Lintner, spiegando che il rendimento di un portafoglio non dipende unicamente dal rischio di mercato generale ($MKT$), ma da premi al rischio sistematici legati a specifiche caratteristiche economico-finanziarie delle imprese.
+
+---
+
+#### 📐 1. L'Equazione di Regressione Econometrica (5-Factor + Momentum)
+$$R_{p,t} - R_{f,t} = \\alpha + \\beta_{\\text{MKT}}(R_{m,t} - R_{f,t}) + \\beta_{\\text{SMB}}\\text{SMB}_t + \\beta_{\\text{HML}}\\text{HML}_t + \\beta_{\\text{RMW}}\\text{RMW}_t + \\beta_{\\text{CMA}}\\text{CMA}_t + \\beta_{\\text{MOM}}\\text{MOM}_t + \\epsilon_t$$
+
+---
+
+#### 📊 2. I Fattori della Kenneth R. French Data Library (Dartmouth)
+1. **Mkt-RF (Excess Return on the Market)**: Premio per il rischio azionario sistemico rispetto al tasso privo di rischio ($R_f$).
+2. **SMB (Small Minus Big - Size Factor)**: Rendimento extra storico generato dalle società a bassa capitalizzazione rispetto alle mega-cap.
+   - $\\beta_{\\text{SMB}} > 0$: Portafoglio orientato verso Small/Mid Caps.
+   - $\\beta_{\\text{SMB}} < 0$: Portafoglio concentrato su Large/Mega Caps.
+3. **HML (High Minus Low - Value Factor)**: Differenziale di rendimento tra titoli *Value* (alto Book-to-Market) e titoli *Growth* (basso Book-to-Market).
+   - $\\beta_{\\text{HML}} > 0$: Bias Value (titoli a sconto sui fondamentali).
+   - $\\beta_{\\text{HML}} < 0$: Bias Growth (titoli tecnologici o ad alta crescita attesa).
+4. **RMW (Robust Minus Weak - Profitability Factor)**: Differenziale tra aziende con alta redditività operativa (*Robust Operating Profitability*) e aziende con margini deboli (*Weak*).
+5. **CMA (Conservative Minus Aggressive - Investment Factor)**: Differenziale tra aziende con politiche di allocazione del capitale prudenti (*Conservative*) e aziende con investimenti aggressivi di espansione.
+6. **MOM / WML (Momentum - Winners Minus Losers)**: Introdotto da Mark Carhart (1997), cattura la persistenza del trend di prezzo a 12 mesi escludendo l'ultimo mese.
+
+---
+
+#### 🎯 3. Significatività Statistica & Factor Attribution
+- **Alpha di Jensen ($\\alpha$)**: Rappresenta il rendimento extra generato dall'abilità del gestore (stock picking / timing) non spiegabile dai premi al rischio sistematici.
+- **Statistica $t$ e $p$-value**:
+  - Se $|t| \\ge 1.96$ ($p < 0.05$), l'esposizione al fattore è **statisticamente significativa al 95%**.
+  - Se $|t| < 1.96$, l'esposizione osservata potrebbe essere frutto del caso o del rumore di mercato.
+- **Rischio Sistemico vs Idiosincratico**: Scomposizione della varianza tra la componente spiegata dai fattori macro-strutturali e il rischio specifico dei singoli titoli non diversificato.
+"""
+    render_info_modal(
+        title="🏛️ Fama-French 5-Factor & Carhart Momentum",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 
