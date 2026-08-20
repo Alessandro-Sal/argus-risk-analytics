@@ -235,6 +235,15 @@ def _build_metrics_from_dataframes(df_lots: pd.DataFrame, df_assets: pd.DataFram
     # Dividendi totali incassati su posizioni chiuse
     total_divs = float(df_assets["dividends_eur"].sum()) if not df_assets.empty and "dividends_eur" in df_assets.columns else 0.0
 
+    # ── 1. Curva Cumulativa di PnL Realizzato
+    df_cum_curve = compute_cumulative_realized_curve(df_lots)
+
+    # ── 2. Matrice Trading Calendar Mensile
+    calendar_data = compute_monthly_trading_calendar(df_lots)
+
+    # ── 3. Scomposizione per Settore & Asset Class
+    breakdown_data = compute_sector_asset_class_breakdown(df_lots)
+
     return {
         "has_closed_trades": True,
         "total_realized_pnl_eur": round(total_realized_pnl, 2),
@@ -258,7 +267,109 @@ def _build_metrics_from_dataframes(df_lots: pd.DataFrame, df_assets: pd.DataFram
         "best_trade": best_trade,
         "worst_trade": worst_trade,
         "df_closed_lots": df_lots.sort_values("sell_date", ascending=False),
-        "df_closed_assets": df_assets.sort_values("realized_pnl_eur", ascending=False)
+        "df_closed_assets": df_assets.sort_values("realized_pnl_eur", ascending=False),
+        "df_cumulative_curve": df_cum_curve,
+        "calendar_data": calendar_data,
+        "breakdown_data": breakdown_data
+    }
+
+
+def compute_cumulative_realized_curve(df_lots: pd.DataFrame) -> pd.DataFrame:
+    """Genera la serie storica cumulativa del PnL realizzato nel tempo con High-Water Mark."""
+    if df_lots is None or df_lots.empty:
+        return pd.DataFrame()
+    
+    df_sorted = df_lots.sort_values("sell_date", ascending=True).copy()
+    df_sorted["sell_date"] = pd.to_datetime(df_sorted["sell_date"])
+    
+    # Aggrega per data per avere un punto temporale univoco
+    daily_pnl = df_sorted.groupby("sell_date").agg({
+        "realized_pnl_eur": "sum",
+        "ticker": lambda x: ", ".join(x.unique()[:3])
+    }).reset_index()
+    
+    daily_pnl["cum_realized_pnl_eur"] = daily_pnl["realized_pnl_eur"].cumsum()
+    daily_pnl["high_water_mark_eur"] = daily_pnl["cum_realized_pnl_eur"].cummax()
+    daily_pnl["drawdown_eur"] = daily_pnl["cum_realized_pnl_eur"] - daily_pnl["high_water_mark_eur"]
+    daily_pnl["sell_date_str"] = daily_pnl["sell_date"].dt.strftime("%Y-%m-%d")
+    
+    return daily_pnl
+
+
+def compute_monthly_trading_calendar(df_lots: pd.DataFrame) -> dict:
+    """Calcola la matrice di performance mese x anno per le posizioni chiuse."""
+    if df_lots is None or df_lots.empty:
+        return {"df_pivot": pd.DataFrame(), "monthly_records": []}
+    
+    df = df_lots.copy()
+    df["sell_date_dt"] = pd.to_datetime(df["sell_date"])
+    df["year"] = df["sell_date_dt"].dt.year
+    df["month"] = df["sell_date_dt"].dt.month
+    
+    month_names = {
+        1: "Gen", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mag", 6: "Giu",
+        7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
+    }
+    df["month_name"] = df["month"].map(month_names)
+    
+    # Raggruppamento per Anno e Mese
+    grp = df.groupby(["year", "month", "month_name"]).agg(
+        pnl_eur=("realized_pnl_eur", "sum"),
+        trades_count=("ticker", "count"),
+        win_count=("realized_pnl_eur", lambda x: (x > 0.01).sum())
+    ).reset_index()
+    
+    grp["win_rate"] = (grp["win_count"] / grp["trades_count"] * 100.0).round(1)
+    
+    # Pivot table Anno x Mese
+    pivot = grp.pivot(index="year", columns="month_name", values="pnl_eur").fillna(0.0)
+    
+    # Ordina colonne mesi
+    ordered_cols = [month_names[m] for m in range(1, 13) if month_names[m] in pivot.columns]
+    pivot = pivot[ordered_cols]
+    pivot["Totale Anno (€)"] = pivot.sum(axis=1)
+    
+    return {
+        "df_pivot": pivot.sort_index(ascending=False),
+        "monthly_records": grp.to_dict(orient="records")
+    }
+
+
+def compute_sector_asset_class_breakdown(df_lots: pd.DataFrame) -> dict:
+    """Scompone il PnL realizzato per settore economico e asset class."""
+    if df_lots is None or df_lots.empty:
+        return {"df_by_sector": pd.DataFrame(), "df_by_asset_class": pd.DataFrame()}
+    
+    df = df_lots.copy()
+    if "sector" not in df.columns:
+        df["sector"] = "Diversified"
+    if "asset_class" not in df.columns:
+        df["asset_class"] = "Equity"
+        
+    df["sector"] = df["sector"].fillna("Diversified").replace("", "Diversified")
+    df["asset_class"] = df["asset_class"].fillna("Equity").replace("", "Equity")
+    
+    by_sector = df.groupby("sector").agg(
+        pnl_eur=("realized_pnl_eur", "sum"),
+        proceeds_eur=("proceeds_eur", "sum"),
+        trades_count=("ticker", "count"),
+        win_trades=("realized_pnl_eur", lambda x: (x > 0.01).sum())
+    ).reset_index()
+    by_sector["win_rate_pct"] = (by_sector["win_trades"] / by_sector["trades_count"] * 100.0).round(1)
+    by_sector = by_sector.sort_values("pnl_eur", ascending=False)
+    
+    by_asset_class = df.groupby("asset_class").agg(
+        pnl_eur=("realized_pnl_eur", "sum"),
+        proceeds_eur=("proceeds_eur", "sum"),
+        trades_count=("ticker", "count"),
+        win_trades=("realized_pnl_eur", lambda x: (x > 0.01).sum())
+    ).reset_index()
+    by_asset_class["win_rate_pct"] = (by_asset_class["win_trades"] / by_asset_class["trades_count"] * 100.0).round(1)
+    by_asset_class = by_asset_class.sort_values("pnl_eur", ascending=False)
+    
+    return {
+        "df_by_sector": by_sector,
+        "df_by_asset_class": by_asset_class
     }
 
 
@@ -287,7 +398,10 @@ def _empty_closed_trades_result() -> dict:
         "best_trade": {},
         "worst_trade": {},
         "df_closed_lots": pd.DataFrame(),
-        "df_closed_assets": pd.DataFrame()
+        "df_closed_assets": pd.DataFrame(),
+        "df_cumulative_curve": pd.DataFrame(),
+        "calendar_data": {"df_pivot": pd.DataFrame(), "monthly_records": []},
+        "breakdown_data": {"df_by_sector": pd.DataFrame(), "df_by_asset_class": pd.DataFrame()}
     }
 
 

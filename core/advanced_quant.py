@@ -230,6 +230,52 @@ def compute_kelly_criterion_sizing(
     return pd.DataFrame(results)
 
 
+def compute_interactive_trade_kelly(
+    win_rate_pct: float,
+    payoff_ratio: float,
+    portfolio_capital_eur: float = 100000.0,
+    stop_loss_pct: float = 5.0
+) -> dict:
+    """
+    Calcola il dimensionamento monetario e percentuale ottimale di una singola operazione (Trade Sizing)
+    secondo il Criterio di Kelly, Half-Kelly e Quarter-Kelly con vincoli di stop-loss.
+    """
+    p = max(0.01, min(0.99, win_rate_pct / 100.0))
+    b = max(0.01, payoff_ratio)
+    
+    # Kelly fraction: f* = p - (1-p)/b = (p*(b+1) - 1)/b
+    f_star = (p * (b + 1.0) - 1.0) / b
+    
+    full_kelly_pct = max(0.0, min(100.0, f_star * 100.0))
+    half_kelly_pct = full_kelly_pct / 2.0
+    quarter_kelly_pct = full_kelly_pct / 4.0
+    
+    sl_dec = max(0.005, stop_loss_pct / 100.0)
+    
+    risk_full_eur = portfolio_capital_eur * (full_kelly_pct / 100.0)
+    risk_half_eur = portfolio_capital_eur * (half_kelly_pct / 100.0)
+    risk_quarter_eur = portfolio_capital_eur * (quarter_kelly_pct / 100.0)
+    
+    pos_size_half_eur = min(portfolio_capital_eur * 1.5, risk_half_eur / sl_dec)
+    
+    drawdown_risk = "🟢 Basso (< 5%)" if half_kelly_pct < 15.0 else ("🟡 Medio (5-15%)" if half_kelly_pct < 30.0 else "🔴 Elevato (> 15%)")
+    
+    growth_rate = (p * np.log(1 + f_star * b) + (1 - p) * np.log(max(0.001, 1 - f_star))) * 100.0 if f_star > 0 else 0.0
+    
+    return {
+        "full_kelly_pct": round(full_kelly_pct, 2),
+        "half_kelly_pct": round(half_kelly_pct, 2),
+        "quarter_kelly_pct": round(quarter_kelly_pct, 2),
+        "risk_full_eur": round(risk_full_eur, 2),
+        "risk_half_eur": round(risk_half_eur, 2),
+        "risk_quarter_eur": round(risk_quarter_eur, 2),
+        "pos_size_half_eur": round(pos_size_half_eur, 2),
+        "expected_growth_rate": round(growth_rate, 3),
+        "drawdown_risk": drawdown_risk,
+        "edge_pct": round((p * b - (1 - p)) * 100.0, 2)
+    }
+
+
 # ==============================================================================
 # 3. EQUAL RISK CONTRIBUTION (ERC / RISK PARITY)
 # ==============================================================================
