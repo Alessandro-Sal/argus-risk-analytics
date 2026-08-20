@@ -1,5 +1,5 @@
 """
-Script di packaging per la creazione dell'archivio ZIP della release v5.5.0 di ARGUS.
+Script di packaging per la creazione dell'archivio ZIP della release v5.14.0 di ARGUS.
 Esegue un'ispezione preventiva di sicurezza per garantire che NESSUN file sensibile
 (credenziali, chiavi, .env, token, database locali, file temporanei o cache) venga incluso.
 """
@@ -14,11 +14,11 @@ def create_secure_release_zip():
     dist_dir = os.path.join(project_dir, "dist")
     os.makedirs(dist_dir, exist_ok=True)
     
-    zip_filename = "ARGUS_v5.5.0.zip"
+    zip_filename = "ARGUS_v5.14.0.zip"
     zip_path = os.path.join(dist_dir, zip_filename)
     
     print("=" * 70)
-    print(" [ARGUS v5.5.0] Generazione Archivio Release ZIP con Audit di Sicurezza")
+    print(" [ARGUS v5.14.0] Generazione Archivio Release ZIP con Audit di Sicurezza")
     print("=" * 70)
     
     # Cartelle e file rigorosamente ESCLUSI
@@ -118,12 +118,12 @@ def create_secure_release_zip():
         
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for full_p, rel_p in files_to_zip:
-            archive_name = f"ARGUS_v5.5.0/{rel_p}"
+            archive_name = f"ARGUS_v5.14.0/{rel_p}"
             zf.write(full_p, archive_name)
             
     zip_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
     print("\n" + "=" * 70)
-    print(f" [OK] ARCHIVIO ZIP DELLA RELEASE V.5.5.0 CREATO CON SUCCESSO!")
+    print(f" [OK] ARCHIVIO ZIP DELLA RELEASE V.5.14.0 CREATO CON SUCCESSO!")
     print(f"      Percorso:    {zip_path}")
     print(f"      Dimensione:  {zip_size_mb:.2f} MB")
     print(f"      File inclusi: {len(files_to_zip)}")

@@ -35,20 +35,20 @@ jobs:
       - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/ARGUS_v5.5.0.zip
+          files: dist/ARGUS_*.zip
           name: ARGUS Risk Analytics ${{ github.ref_name }} — Institutional Production Release
           tag_name: ${{ github.ref_name }}
           overwrite: true
           make_latest: true
           body: |
-            # 👁️ ARGUS Risk Analytics Platform — Production Release v5.5.0
+            # 👁️ ARGUS Risk Analytics Platform — Production Release v5.14.0
 
-            Benvenuti nella release ufficiale di **ARGUS v5.5.0**, la piattaforma avanzata di **Business Intelligence, Financial Valuation, AI Narrative Intelligence, Forensic Accounting e Quantitative Risk Management**.
+            Benvenuti nella release ufficiale di **ARGUS v5.14.0**, la piattaforma avanzata di **Business Intelligence, Financial Valuation, AI Narrative Intelligence, Forensic Accounting e Quantitative Risk Management**.
 
             ---
 
             ### 📦 Download Archivio Release (Zero-Setup)
-            * **File**: `ARGUS_v5.5.0.zip`
+            * **File**: `ARGUS_v5.14.0.zip`
             * **Compatibilità**: Windows 10 / 11 (64-bit), macOS, Linux
             * **Caratteristiche**:
               * ⚡ **Zero-Setup**: Nessuna necessità di configurare database esterni.

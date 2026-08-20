@@ -725,7 +725,7 @@ def get_display_portfolio_name():
 
 
 def render_command_bar():
-    """Renderizza la barra di stato e comando ARGUS v5.5.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
+    """Renderizza la barra di stato e comando ARGUS v5.14.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
     try:
         from core.workspace_manager import sync_url_state
         sync_url_state()
@@ -752,7 +752,7 @@ def render_command_bar():
                 ARGUS ENGINE
             </span>
             <span style="background:rgba(255,153,0,0.12); color:#ff9900; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; border:1px solid rgba(255,153,0,0.25); letter-spacing:0.3px;">
-                v5.5.0
+                v5.14.0
             </span>
             <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
             <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
@@ -2297,7 +2297,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
         f'<div style="color:#3fb950;">[✓] GIPS Standard Calendar Engine (365.25d Solar Span) Active</div>'
         f'<div style="color:#3fb950;">[✓] Multi-Factor Risk Matrix (Carhart, Fama-French, MSCI Barra) Initialized</div>'
         f'<div style="color:#3fb950;">[✓] Ledoit-Wolf Shrinkage &amp; FIFO Accounting Reconciliation Ready</div>'
-        f'<div style="color:{accent};font-weight:bold;">[●] ARGUS Terminal v5.5.0 Ready for Operations</div>'
+        f'<div style="color:{accent};font-weight:bold;">[●] ARGUS Terminal v5.14.0 Ready for Operations</div>'
         f'</div>'
         f'</div>'
     )
@@ -2336,7 +2336,7 @@ def render_control_room_hero():
         f'<div style="display:flex;align-items:center;gap:10px;">'
         f'<span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">ARGUS CONTROL ROOM</span>'
         f'<span style="font-size:10px;font-weight:800;color:{mode_color};background:{mode_bg};padding:2px 8px;border-radius:12px;letter-spacing:0.5px;">{mode_text}</span>'
-        f'<span style="font-size:10px;font-weight:700;color:{accent};background:rgba(255,153,0,0.1);padding:2px 8px;border-radius:12px;">v5.5.0</span>'
+        f'<span style="font-size:10px;font-weight:700;color:{accent};background:rgba(255,153,0,0.1);padding:2px 8px;border-radius:12px;">v5.14.0</span>'
         f'</div>'
         f'<div style="font-size:12px;color:#8b949e;margin-top:4px;max-width:580px;">'
         f'Cabina di regia per l\'ingestione dati duale (Stocks &amp; Crypto), validazione contabile FIFO, sincronizzazione database e calcolo del rischio quantitativo.'
