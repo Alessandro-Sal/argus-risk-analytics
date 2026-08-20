@@ -548,14 +548,15 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     fillcolor=area_color,
                     customdata=np.stack((
                         df_cum_curve["ticker"],
-                        df_cum_curve["realized_pnl_eur"],
-                        df_cum_curve["drawdown_eur"]
+                        df_cum_curve["realized_pnl_eur"].apply(lambda v: f"€ {v:+,.2f}"),
+                        df_cum_curve["drawdown_eur"].apply(lambda v: f"€ {v:,.2f}"),
+                        df_cum_curve["cum_realized_pnl_eur"].apply(lambda v: f"€ {v:+,.2f}")
                     ), axis=-1),
                     hovertemplate=(
                         "<b>Data Vendita: %{x}</b><br>"
-                        "• PnL Cumulato: <b>€ %{y:+,.2f}</b><br>"
-                        "• Asset Venduti: <b>%{customdata[0]}</b> (PnL: € %{customdata[1]:+,.2f})<br>"
-                        "• Drawdown da Picco: <b>€ %{customdata[2]:,.2f}</b>"
+                        "• PnL Cumulato: <b>%{customdata[3]}</b><br>"
+                        "• Asset Venduti: <b>%{customdata[0]}</b> (PnL: %{customdata[1]})<br>"
+                        "• Drawdown da Picco: <b>%{customdata[2]}</b>"
                         "<extra></extra>"
                     )
                 ))
@@ -565,7 +566,8 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     mode="lines",
                     name="High-Water Mark (Picco)",
                     line=dict(color="#58a6ff", width=1.5, dash="dash"),
-                    hovertemplate="<b>Picco Storico PnL: € %{y:,.2f}</b><extra></extra>"
+                    customdata=df_cum_curve["high_water_mark_eur"].apply(lambda v: f"€ {v:,.2f}"),
+                    hovertemplate="<b>Picco Storico PnL: %{customdata}</b><extra></extra>"
                 ))
                 fig_cum.update_layout(
                     template="plotly_dark", height=350,
@@ -619,11 +621,26 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 apply_plotly_theme(fig_cal)
                 st.plotly_chart(fig_cal, use_container_width=True)
 
+                def _color_pnl_cell(val):
+                    try:
+                        v = float(val)
+                        if v > 0.01:
+                            return "color: #3fb950; font-weight: 600;"
+                        elif v < -0.01:
+                            return "color: #f85149; font-weight: 600;"
+                        else:
+                            return "color: #8b949e;"
+                    except Exception:
+                        return ""
+
                 st.markdown("###### 📑 Riepilogo Tabellare Performance per Anno")
-                st.dataframe(
-                    df_piv.style.format("€ {:+,.2f}").background_gradient(cmap="RdYlGn", subset=month_cols, vmin=-1000, vmax=1000),
-                    use_container_width=True
-                )
+                st_piv = df_piv.style.format("€ {:+,.2f}")
+                if hasattr(st_piv, "map"):
+                    st_piv = st_piv.map(_color_pnl_cell, subset=month_cols)
+                elif hasattr(st_piv, "applymap"):
+                    st_piv = st_piv.applymap(_color_pnl_cell, subset=month_cols)
+
+                st.dataframe(st_piv, use_container_width=True)
             else:
                 st.info("Nessuna operazione registrata nel calendario mensile.")
 
