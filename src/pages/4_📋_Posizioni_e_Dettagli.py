@@ -33,6 +33,7 @@ st.divider()
 # ── STRUTTURA IN TAB CON LAZY LOADING ──────────────────────────
 active_pos_tab = render_segmented_tabs([
     "📋 Posizioni Attive & Costi FIFO",
+    "🪦 Posizioni Chiuse & Graveyard",
     "📅 Proiezione Dividendi",
     "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
     "⚡ Impatto di Mercato (Almgren-Chriss)"
@@ -228,7 +229,280 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         )
         st.plotly_chart(fig_liq, use_container_width=True)
 
-# ── TAB 2: PROIEZIONE DIVIDENDI ───────────────────────────────
+
+# ── TAB 2: POSIZIONI CHIUSE & GRAVEYARD ───────────────────────
+elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
+    col_head_g1, col_head_g2 = st.columns([3.2, 1.2])
+    with col_head_g1:
+        st.markdown("### 🪦 Graveyard & Registro Operazioni Chiuse (FIFO)")
+        st.caption("Tracciamento contabile delle posizioni interamente o parzialmente liquidate, plus/minusvalenze realizzate, tempo di detenzione (holding period) e statistiche di performance.")
+    with col_head_g2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("🪦 Guida al Graveyard & PnL Realizzato (FIFO)", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+
+<!-- 1. PNL REALIZZATO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,230,118,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #00e676; font-size: 15px; font-weight: 700; margin-bottom: 6px;">💰 1. PnL Realizzato (Realized Profit & Loss)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Il guadagno o la perdita monetaria effettivamente incassata a seguito della chiusura totale o parziale di uno strumento finanziario.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(0,230,118,0.08); border-left: 3px solid #00e676; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00e676; text-align: center; font-size: 12.5px;">
+      <b>PnL Realizzato</b> = Incasso Netto Vendita &minus; Costo Storico Fiscale FIFO
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Misurare la ricchezza monetizzata e consolidata, separandola dalle oscillazioni temporanee dei prezzi delle posizioni ancora aperte (PnL Latente).</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Motore contabile a code FIFO che abbina ogni ordine di vendita al lotto d'acquisto cronologicamente più vecchio con conversione FX storica.</div>
+  <div><b>🔍 Come leggerlo:</b> Se positivo indica plusvalenza netta realizzata; se negativo minusvalenza fiscalmente compensabile.</div>
+</div>
+
+<!-- 2. WIN RATE & PROFIT FACTOR -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 2. Win Rate & Profit Factor</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Parametri quantitativi di efficienza strategica. Il <b>Win Rate</b> è la percentuale di trade chiusi in utile; il <b>Profit Factor</b> è il rapporto tra profitti lordi realizzati e perdite lorde.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 12.5px;">
+      <b>Win Rate</b> = N<sub>Trades Vincenti</sub> / N<sub>Totale</sub> &nbsp;|&nbsp; <b>Profit Factor</b> = &sum; Guadagni / &sum; |Perdite|
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Valutare la robustezza del processo decisionale e se i guadagni superano stabilmente i drawdown subiti.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato su tutti i lotti FIFO chiusi storicamente nel portafoglio.</div>
+  <div><b>🔍 Come leggerlo:</b> Un Profit Factor &gt; 1.50 e Win Rate &gt; 55% indicano un'eccellente disciplina di gestione del rischio.</div>
+</div>
+
+<!-- 3. GRAVEYARD & HOLDING PERIOD -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🪦 3. Graveyard & Holding Period (Tempo di Detenzione)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> L'archivio storico ('Cimitero dei Titoli') di tutti gli strumenti dismessi e il numero medio di giorni trascorsi tra l'acquisto e la vendita definitiva.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 12.5px;">
+      <b>Holding Period (gg)</b> = Data Vendita &minus; Data Acquisto FIFO
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Identificare se il portafoglio segue una strategia di lungo periodo (Buy & Hold / Compounder) o di rotazione frequente (Swing/Tactical Trading).</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato su ciascuna combinazione di lotto acquistato e venduto.</div>
+  <div><b>🔍 Come leggerlo:</b> Mostra l'orizzonte temporale effettivo di detenzione per ciascuna idea d'investimento.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il Graveyard?")
+
+    from core.closed_trades import compute_closed_trades_journal
+    df_tx = results.get("df_tx", pd.DataFrame())
+    df_prices = results.get("df_prices", pd.DataFrame())
+    is_sand = results.get("is_sandbox", False)
+    closed_data = results.get("closed_trades") or compute_closed_trades_journal(df_tx=df_tx, df_prices=df_prices, df_positions=pos, is_sandbox=is_sand)
+
+    if not closed_data.get("has_closed_trades", False) or closed_data.get("df_closed_lots", pd.DataFrame()).empty:
+        st.info("ℹ️ **Nessuna vendita registrata nello storico**: tutte le posizioni acquistate sono ancora aperte a mercato. Il PnL totale attuale corrisponde interamente a PnL Latente e Dividendi percepiti.")
+    else:
+        # ── 1. KPI COCKPIT DELLE OPERAZIONI CHIUSE ───────────────────
+        c_kpi1, c_kpi2, c_kpi3, c_kpi4, c_kpi5, c_kpi6 = st.columns(6)
+        
+        tot_real_pnl = closed_data["total_realized_pnl_eur"]
+        tot_real_pct = closed_data["total_realized_pnl_pct"]
+        win_rate = closed_data["win_rate_pct"]
+        prof_factor = closed_data["profit_factor"]
+        avg_holding = closed_data["avg_holding_days"]
+        n_closed = closed_data["total_closed_trades"]
+        best_t = closed_data.get("best_trade", {})
+        worst_t = closed_data.get("worst_trade", {})
+
+        with c_kpi1:
+            metric_card(
+                "PnL Realizzato Netto",
+                f"€ {tot_real_pnl:,.2f}",
+                delta=f"{tot_real_pct:+.2f}%",
+                positive=(tot_real_pnl >= 0),
+                help_text="Somma monetaria netta generata da tutte le vendite storiche su base FIFO."
+            )
+        with c_kpi2:
+            metric_card(
+                "Win Rate (%)",
+                f"{win_rate:.1f}%",
+                delta=f"{closed_data['n_winning_trades']}W / {closed_data['n_losing_trades']}L",
+                positive=(win_rate >= 50.0),
+                help_text="Percentuale di lotti chiusi in utile rispetto al totale delle vendite."
+            )
+        with c_kpi3:
+            metric_card(
+                "Profit Factor",
+                f"{prof_factor:.2f}" if prof_factor < 90 else "> 10.0",
+                delta="Profitti / |Perdite|",
+                positive=(prof_factor >= 1.30),
+                help_text="Rapporto tra la somma dei profitti lordi realizzati e le perdite lorde."
+            )
+        with c_kpi4:
+            metric_card(
+                "Holding Period Medio",
+                f"{avg_holding} gg",
+                delta=f"Su {n_closed} Trade",
+                positive=True,
+                help_text="Tempo medio di permanenza a mercato in giorni di calendario per i lotti venduti."
+            )
+        with c_kpi5:
+            best_tk = best_t.get("ticker", "N/A")
+            best_pnl = best_t.get("realized_pnl_eur", 0.0)
+            best_pct = best_t.get("realized_pnl_pct", 0.0)
+            metric_card(
+                "Miglior Trade Realizzato",
+                f"€ {best_pnl:+,.2f}",
+                delta=f"{best_tk} ({best_pct:+.1f}%)",
+                positive=True,
+                help_text=f"Operazione più profittevole chiusa: {best_tk} in data {best_t.get('sell_date', 'N/A')}."
+            )
+        with c_kpi6:
+            worst_tk = worst_t.get("ticker", "N/A")
+            worst_pnl = worst_t.get("realized_pnl_eur", 0.0)
+            worst_pct = worst_t.get("realized_pnl_pct", 0.0)
+            metric_card(
+                "Peggior Trade Realizzato",
+                f"€ {worst_pnl:+,.2f}",
+                delta=f"{worst_tk} ({worst_pct:+.1f}%)",
+                positive=False,
+                help_text=f"Operazione con la perdita più elevata: {worst_tk} in data {worst_t.get('sell_date', 'N/A')}."
+            )
+
+        st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+
+        # ── 2. GRAFICI ANALITICI COCKPIT ──────────────────────────────
+        col_g_chart1, col_g_chart2 = st.columns([1.3, 1.2])
+
+        df_assets_closed = closed_data.get("df_closed_assets", pd.DataFrame())
+        df_lots_closed = closed_data.get("df_closed_lots", pd.DataFrame())
+
+        with col_g_chart1:
+            st.markdown("##### 📊 PnL Realizzato per Asset (€)")
+            if not df_assets_closed.empty:
+                df_sorted_a = df_assets_closed.sort_values("realized_pnl_eur", ascending=True)
+                bar_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_sorted_a["realized_pnl_eur"]]
+                
+                fig_bar_pnl = go.Figure(go.Bar(
+                    x=df_sorted_a["realized_pnl_eur"],
+                    y=df_sorted_a["ticker"],
+                    orientation='h',
+                    marker=dict(color=bar_colors, line=dict(color="#0d1117", width=1)),
+                    text=[f"€ {v:+,.2f} ({p:+.1f}%)" for v, p in zip(df_sorted_a["realized_pnl_eur"], df_sorted_a["realized_pnl_pct"])],
+                    textposition="auto",
+                    textfont=dict(size=11, color="#ffffff"),
+                    hovertemplate="<b>Asset: %{y}</b><br>PnL Realizzato: <b>€ %{x:,.2f}</b><extra></extra>"
+                ))
+                fig_bar_pnl.update_layout(
+                    template="plotly_dark", height=320,
+                    xaxis=dict(title="PnL Realizzato (€)", zeroline=True, zerolinecolor="rgba(255,255,255,0.2)"),
+                    yaxis=dict(title=None),
+                    margin=dict(l=10, r=10, t=25, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_bar_pnl)
+                st.plotly_chart(fig_bar_pnl, use_container_width=True)
+
+        with col_g_chart2:
+            st.markdown("##### ⏱️ Rendimento Realizzato (%) vs Tempo di Detenzione")
+            if not df_lots_closed.empty:
+                fig_scat = px.scatter(
+                    df_lots_closed,
+                    x="holding_days",
+                    y="realized_pnl_pct",
+                    color="outcome",
+                    color_discrete_map={"🟢 WIN": "#3fb950", "🔴 LOSS": "#f85149", "🟡 BREAKEVEN": "#ffd700"},
+                    hover_name="ticker",
+                    hover_data={
+                        "holding_days": True,
+                        "realized_pnl_pct": ":.2f%",
+                        "realized_pnl_eur": ":.2f",
+                        "buy_date": True,
+                        "sell_date": True,
+                        "outcome": False
+                    },
+                    labels={
+                        "holding_days": "Giorni di Detenzione (Holding Period)",
+                        "realized_pnl_pct": "Rendimento Realizzato (%)",
+                        "outcome": "Esito"
+                    }
+                )
+                fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.25)")
+                fig_scat.update_traces(marker=dict(size=11, line=dict(width=1, color='#ffffff')))
+                fig_scat.update_layout(
+                    template="plotly_dark", height=320,
+                    legend=dict(orientation="h", yanchor="top", y=-0.2, xanchor="center", x=0.5),
+                    margin=dict(l=10, r=10, t=25, b=10),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_scat)
+                st.plotly_chart(fig_scat, use_container_width=True)
+
+        st.divider()
+
+        # ── 3. TABELLE GRAVEYARD & REGISTRO LOTTI ─────────────────────
+        st.markdown("#### 📜 Registro Operazioni Chiuse & Graveyard")
+        sub_view_gy = st.radio(
+            "Seleziona Vista Dati:",
+            ["🪦 Sintesi per Asset (Graveyard Aggregato)", "📑 Registro Analitico Lotti Chiusi (FIFO Log)"],
+            horizontal=True
+        )
+
+        if sub_view_gy == "🪦 Sintesi per Asset (Graveyard Aggregato)":
+            if not df_assets_closed.empty:
+                df_a_disp = df_assets_closed.copy()
+                df_a_disp_cols = [
+                    "ticker", "asset_class", "status", "qty_sold",
+                    "avg_buy_price_eur", "avg_sell_price_eur", "cost_basis_eur",
+                    "proceeds_eur", "realized_pnl_eur", "realized_pnl_pct",
+                    "dividends_eur", "total_profit_eur", "avg_holding_days", "outcome"
+                ]
+                df_a_show = df_a_disp[[c for c in df_a_disp_cols if c in df_a_disp.columns]].rename(columns={
+                    "ticker": "Ticker", "asset_class": "Asset Class", "status": "Stato Posizione",
+                    "qty_sold": "Q.tà Chiusa", "avg_buy_price_eur": "Prezzo Carico Medio (€)",
+                    "avg_sell_price_eur": "Prezzo Vendita Medio (€)", "cost_basis_eur": "Costo Fiscale (€)",
+                    "proceeds_eur": "Incasso (€)", "realized_pnl_eur": "PnL Realizzato (€)",
+                    "realized_pnl_pct": "Rendimento (%)", "dividends_eur": "Dividendi (€)",
+                    "total_profit_eur": "Profitto Netto (€)", "avg_holding_days": "Holding Medio (gg)",
+                    "outcome": "Esito"
+                })
+
+                cfg_a = {
+                    "Prezzo Carico Medio (€)": st.column_config.NumberColumn("Prezzo Carico Medio (€)", format="€ %.2f"),
+                    "Prezzo Vendita Medio (€)": st.column_config.NumberColumn("Prezzo Vendita Medio (€)", format="€ %.2f"),
+                    "Costo Fiscale (€)": st.column_config.NumberColumn("Costo Fiscale (€)", format="€ %.2f"),
+                    "Incasso (€)": st.column_config.NumberColumn("Incasso (€)", format="€ %.2f"),
+                    "PnL Realizzato (€)": st.column_config.NumberColumn("PnL Realizzato (€)", format="€ %.2f"),
+                    "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%"),
+                    "Dividendi (€)": st.column_config.NumberColumn("Dividendi (€)", format="€ %.2f"),
+                    "Profitto Netto (€)": st.column_config.NumberColumn("Profitto Netto (€)", format="€ %.2f"),
+                    "Holding Medio (gg)": st.column_config.NumberColumn("Holding Medio (gg)", format="%d gg")
+                }
+                st.dataframe(df_a_show, use_container_width=True, hide_index=True, column_config=cfg_a)
+
+        else:
+            if not df_lots_closed.empty:
+                df_l_disp = df_lots_closed.copy()
+                df_l_cols = [
+                    "ticker", "buy_date", "sell_date", "qty",
+                    "buy_price_eur", "sell_price_eur", "cost_basis_eur",
+                    "proceeds_eur", "realized_pnl_eur", "realized_pnl_pct",
+                    "holding_days", "outcome"
+                ]
+                df_l_show = df_l_disp[[c for c in df_l_cols if c in df_l_disp.columns]].rename(columns={
+                    "ticker": "Ticker", "buy_date": "Data Acquisto", "sell_date": "Data Vendita",
+                    "qty": "Quantità Lotto", "buy_price_eur": "Prezzo Acquisto (€)",
+                    "sell_price_eur": "Prezzo Vendita (€)", "cost_basis_eur": "Costo Lotto (€)",
+                    "proceeds_eur": "Incasso (€)", "realized_pnl_eur": "PnL Realizzato (€)",
+                    "realized_pnl_pct": "Rendimento (%)", "holding_days": "Holding (gg)", "outcome": "Esito"
+                })
+
+                cfg_l = {
+                    "Prezzo Acquisto (€)": st.column_config.NumberColumn("Prezzo Acquisto (€)", format="€ %.2f"),
+                    "Prezzo Vendita (€)": st.column_config.NumberColumn("Prezzo Vendita (€)", format="€ %.2f"),
+                    "Costo Lotto (€)": st.column_config.NumberColumn("Costo Lotto (€)", format="€ %.2f"),
+                    "Incasso (€)": st.column_config.NumberColumn("Incasso (€)", format="€ %.2f"),
+                    "PnL Realizzato (€)": st.column_config.NumberColumn("PnL Realizzato (€)", format="€ %.2f"),
+                    "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%"),
+                    "Holding (gg)": st.column_config.NumberColumn("Holding (gg)", format="%d gg")
+                }
+                st.dataframe(df_l_show, use_container_width=True, hide_index=True, column_config=cfg_l)
+
+
+# ── TAB 3: PROIEZIONE DIVIDENDI ───────────────────────────────
 elif active_pos_tab == "📅 Proiezione Dividendi":
     section("💰 Proiezione Flusso di Cassa & Calendario Dividendi (12 Mesi)")
     st.caption("Analisi previsionale dettagliata dei flussi di cassa da cedole e dividendi: scopri chi paga, i mesi di stacco, la frequenza e gli importi stimati per ciascuna posizione.")
