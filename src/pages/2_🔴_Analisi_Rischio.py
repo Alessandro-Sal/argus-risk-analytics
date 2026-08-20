@@ -155,43 +155,92 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
         st.caption("Decomposizione del rendimento in fattori sistemici: Market Beta, Size (SMB) e Value (HML).")
     with col_head_ff2:
         st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("ℹ️ Guida al Fama-French 3-Factor Model & Ulcer Index", """
-<div style="font-size: 13.5px; line-height: 1.45;">
+        glossary_modal("ℹ️ Guida al Fama-French 3-Factor Model & Style Analysis", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Fama-French 3-Factor Model</div>
-  <div>Modello econometrico premio Nobel (Eugene Fama e Kenneth French, 1993) che dimostra come oltre il 90% della variabilità dei rendimenti azionari sia spiegata da 3 fattori di rischio sistematico: Mercato, Dimensione (Size) e Valutazione Contabile (Value).</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Come si calcola (Equazione di Regressione)</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12.5px; text-align: center;">
-    <b>R<sub>p</sub> &minus; R<sub>f</sub></b> = &alpha; + &beta;<sub>MKT</sub>(R<sub>b</sub> &minus; R<sub>f</sub>) + &beta;<sub>SMB</sub>(SMB) + &beta;<sub>HML</sub>(HML) + &epsilon;
+<!-- 1. MODELLO GENERALE FAMA-FRENCH -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏛️ 1. Fama-French 3-Factor Model (Architettura Generale)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Modello econometrico fondamentale (Eugene Fama e Kenneth French, 1993) che scompone i rendimenti azionari su 3 fattori sistemici: Mercato, Dimensione (Size) e Valore Contabile (Value).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 13px;">
+      <b>R<sub>p</sub> &minus; R<sub>f</sub></b> = &alpha;<sub>FF</sub> + &beta;<sub>MKT</sub>(R<sub>b</sub> &minus; R<sub>f</sub>) + &beta;<sub>SMB</sub>(SMB) + &beta;<sub>HML</sub>(HML) + &epsilon;
+    </div>
   </div>
-  <div>
-    • <b>Market Beta (&beta;<sub>MKT</sub>):</b> Sensibilità all'indice azionario generale.<br>
-    • <b>SMB (Small Minus Big):</b> Esposizione al premio per il rischio delle Small Cap.<br>
-    • <b>HML (High Minus Low):</b> Esposizione a titoli Value (alto Book-to-Market) vs Growth.<br>
-    • <b>Alpha di Fama-French (&alpha;):</b> Extra-rendimento puro depurato da tutti i fattori.
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Isolare se la performance deriva da vera abilità di stock-picking (&alpha; > 0) o da semplici scommesse di stile (esposizione a titoli Small Cap o Value).</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Esegue una regressione OLS multivariata sui rendimenti storici netti del portafoglio rispetto ai fattori Fama-French e al tasso risk-free (3.0%).</div>
+  <div><b>🔍 Come leggerlo:</b> Fornisce la radiografia dello stile d'investimento e l'extra-rendimento reale non replicabile passivamente.</div>
+</div>
+
+<!-- 2. ALPHA DI FAMA-FRENCH -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏅 2. Alpha Fama-French (Extra-Rendimento Puro di Gestione)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Intercetta della regressione a 3 fattori. Rappresenta l'extra-rendimento annuo netto generato dalla gestione, depurato da tutti gli effetti di stile (Mercato, Size, Value).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      <b>&alpha;<sub>FF</sub></b> = Intercetta OLS &times; 252 &times; 100
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> È la prova più severa dell'abilità di gestione attiva (<i>True Skill</i>): se è positivo, il gestore batte il mercato non per fattori di fortuna o stile, ma per selezione.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Riscalato su base annua a 252 giorni e mostrato in percentuale con segno algebrico (+/-).</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>&alpha; > 0%:</b> Creazione reale di valore attivo puro.<br>
+    • <b>&alpha; = 0%:</b> Rendimento perfettamente spiegato dai fattori di mercato.<br>
+    • <b>&alpha; < 0%:</b> Sottoperformance rispetto all'esposizione fattoriale assunta.
   </div>
 </div>
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Consente di verificare se le performance del portafoglio derivano da vera capacità di stock-picking (Alpha positivo) oppure da una semplice inclinazione passiva verso aziende a bassa capitalizzazione o titoli a sconto contabile.</div>
+<!-- 3. MARKET BETA (FF) -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,230,118,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #00e676; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📈 3. Market Beta (FF) (Sensibilità al Mercato)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Coefficiente di sensibilità del portafoglio rispetto alle oscillazioni dell'indice azionario generale (es. S&P 500), controllato per Size e Value.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(0,230,118,0.08); border-left: 3px solid #00e676; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00e676; text-align: center; font-size: 13px;">
+      <b>&beta;<sub>MKT</sub></b> = Cov(R<sub>p</sub> &minus; R<sub>f</sub>, R<sub>b</sub> &minus; R<sub>f</sub> | SMB, HML) / Var(R<sub>b</sub> &minus; R<sub>f</sub>)
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Misurare la reattività del portafoglio ai movimenti ampi di mercato.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Stimato come coefficiente parziale del fattore di mercato nella regressione OLS multivariata.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>&beta; = 1.00:</b> Movimenti perfettamente allineati al benchmark.<br>
+    • <b>&beta; > 1.00:</b> Portafoglio aggressivo (amplifica i rialzi e i ribassi).<br>
+    • <b>&beta; < 1.00:</b> Portafoglio difensivo (minore oscillazione rispetto all'indice).
+  </div>
 </div>
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>ARGUS esegue una regressione OLS multivariata sui rendimenti giornalieri netti del portafoglio rispetto ai fattori Fama-French del mercato europeo e statunitense, calcolando i coefficienti e l'indice di stress Ulcer Index (UI).</div>
+<!-- 4. SMB TILT (SIZE) -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,243,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #00f3ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏢 4. SMB Tilt (Size: Small Minus Big)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Esposizione del portafoglio al fattore dimensione aziendale (Small Cap vs Large Cap).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(0,243,255,0.08); border-left: 3px solid #00f3ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #80d8ff; text-align: center; font-size: 13px;">
+      <b>SMB</b> = Rendimento Portafoglio Small Cap &minus; Rendimento Portafoglio Large Cap
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Capire se il portafoglio è sbilanciato su aziende ad alto potenziale di crescita ma più rischiose (Small Cap) o su colossi consolidati (Large Cap).</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Coefficiente &beta;<sub>SMB</sub> della regressione OLS multivariata.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>SMB > 0:</b> Inclinazione verso Small/Mid Cap (maggior premio di rischio ma più volatilità).<br>
+    • <b>SMB &approx; 0:</b> Esposizione neutrale bilanciata.<br>
+    • <b>SMB < 0:</b> Inclinazione verso titoli Mega/Large Cap (difensivo/stabile).
+  </div>
 </div>
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>
-    • <b>Alpha &gt; 0%:</b> Capacità superiore di generare valore netto indipendente dai fattori.<br>
-    • <b>SMB &gt; 0:</b> Portafoglio orientato su titoli a piccola/media capitalizzazione (più volatili).<br>
-    • <b>HML &gt; 0:</b> Inclinazione verso titoli Value; <b>HML &lt; 0:</b> Inclinazione Growth (Tech).
+<!-- 5. HML TILT (VALUE) -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
+  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏷️ 5. HML Tilt (Value: High Minus Low Book-to-Market)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Esposizione del portafoglio al fattore Value vs Growth (titoli a sconto contabile vs titoli ad alta crescita).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #bc8cff; text-align: center; font-size: 13px;">
+      <b>HML</b> = Rendimento Titoli High Book-to-Market (Value) &minus; Rendimento Titoli Low Book-to-Market (Growth)
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Identificare lo stile di investimento: titoli stabili con alti dividendi (Value) o società tecnologiche e di rapida espansione (Growth).</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Coefficiente &beta;<sub>HML</sub> della regressione OLS multivariata.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>HML > 0:</b> Stile Value (finanziari, industriali, utility con bassi multipli P/E e P/B).<br>
+    • <b>HML &approx; 0:</b> Stile Core / Blend (portafoglio neutrale).<br>
+    • <b>HML < 0:</b> Stile Growth (Tech, Biotech, semiconduttori con alti multipli e reinvestimento utili).
   </div>
 </div>
 
@@ -233,27 +282,51 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             "Alpha Fama-French",
             f"{ff_alpha:+.2f}%",
             positive=(ff_alpha >= 0),
-            help_text="L'extra-rendimento annuo puro del portafoglio, depurato dagli effetti di mercato, dimensione (SMB) e valore (HML)."
+            help_text="""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Extra-rendimento annuo netto generato dal portafoglio depurato dagli effetti di mercato, dimensione (SMB) e stile contabile (HML).</div>
+<div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b> Intercetta della regressione OLS multivariata a 3 fattori riscalata su base annua (&times;252).</div>
+<div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Misura la reale abilità (<i>Skill</i>) di stock-picking del gestore.</div>
+<div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Regressione OLS sui rendimenti giornalieri netti con Risk-Free al 3.0%.</div>
+<div><b>🔍 Come leggerlo:</b> <b>> 0%</b> indica sovraperformance reale attiva; <b>< 0%</b> sottoperformance.</div>
+</div>"""
         )
     with ff_c2:
         metric_card(
             "Market Beta (FF)",
             f"{ff_beta:.2f}",
-            help_text="La sensibilità del portafoglio rispetto all'indice di mercato generale all'interno della regressione a 3 fattori."
+            help_text="""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Reattività del portafoglio rispetto all'indice azionario generale all'interno del modello a 3 fattori.</div>
+<div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b> Coefficiente parziale del premio per il rischio di mercato (R<sub>b</sub> - R<sub>f</sub>).</div>
+<div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Quantificare l'esposizione al rischio sistematico di mercato.</div>
+<div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Stimato via regressione OLS multivariata sui rendimenti giornalieri.</div>
+<div><b>🔍 Come leggerlo:</b> <b>> 1.0</b> aggressivo (più reattivo); <b>< 1.0</b> difensivo.</div>
+</div>"""
         )
     with ff_c3:
         metric_card(
             "SMB Tilt (Size)",
             f"{smb_val:+.2f}",
             positive=(smb_val >= 0),
-            help_text="Fattore Small Minus Big. Misura l'inclinazione del portafoglio verso aziende a piccola capitalizzazione (Small Cap)."
+            help_text="""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Fattore Small Minus Big. Misura l'inclinazione verso titoli a piccola/media capitalizzazione.</div>
+<div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b> Coefficiente di regressione rispetto al differenziale di rendimento Small vs Large Cap.</div>
+<div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Individuare se il rendimento deriva dal premio al rischio delle Small Cap.</div>
+<div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Regressione OLS multivariata sui rendimenti storici.</div>
+<div><b>🔍 Come leggerlo:</b> <b>> 0</b> orientamento Small Cap; <b>< 0</b> orientamento Large/Mega Cap.</div>
+</div>"""
         )
     with ff_c4:
         metric_card(
             "HML Tilt (Value)",
             f"{hml_val:+.2f}",
             positive=(hml_val >= 0),
-            help_text="Fattore High Minus Low. Misura l'orientamento verso azioni Value rispetto a titoli Growth."
+            help_text="""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Fattore High Minus Low. Misura l'inclinazione verso titoli Value rispetto a titoli Growth.</div>
+<div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b> Coefficiente di regressione rispetto al differenziale tra alto e basso Book-to-Market.</div>
+<div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Riconoscere lo stile d'investimento: titoli a sconto (Value) o ad alta crescita (Growth).</div>
+<div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Regressione OLS multivariata sui rendimenti storici.</div>
+<div><b>🔍 Come leggerlo:</b> <b>> 0</b> Stile Value (bassi multipli); <b>< 0</b> Stile Growth (Tech/Innovazione).</div>
+</div>"""
         )
 
     st.divider()
@@ -583,23 +656,63 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
 # TAB 2: VAR, CVAR & BACKTESTING KUPIEC
 # ==============================================================================
 elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
-    st.markdown("### 🛠️ Calcolatore e Simulatore VaR Dinamico")
-    st.caption("Questo strumento consente di calcolare il Value at Risk (VaR) e l'Expected Shortfall (CVaR) a livello di portafoglio, modificando dinamicamente i parametri di rischio.")
+    col_head_var1, col_head_var2 = st.columns([3.2, 1.2])
+    with col_head_var1:
+        st.markdown("### 🛠️ Calcolatore e Simulatore VaR Dinamico")
+        st.caption("Questo strumento consente di calcolare il Value at Risk (VaR) e l'Expected Shortfall (CVaR) a livello di portafoglio, modificando dinamicamente i parametri di rischio.")
+    with col_head_var2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("ℹ️ Guida al VaR, CVaR Cornish-Fisher e Test di Kupiec", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-    glossary_modal("ℹ️ Guida al VaR, CVaR Cornish-Fisher e Test di Kupiec", """
-    <div style="font-size: 13.5px; line-height: 1.45;">
-    <div style="margin-bottom: 6px;"><b>📌 1. VaR Cornish-Fisher:</b><br>
-    Corregge il VaR parametrico gaussiano integrando asimmetria (Skewness) e curtosi (Kurtosis), catturando con precisione le perdite nelle 'code grasse'.</div>
-
-    <div style="margin-bottom: 6px;"><b>🔥 2. Expected Shortfall (CVaR):</b><br>
-    Indica la perdita media attesa nelle giornate estreme in cui la soglia di VaR viene superata.</div>
-
-    <div><b>🚦 3. Test di Kupiec (Semaforo di Basilea):</b><br>
-    • 🟢 <b>Zona Verde:</b> Modello accurato e affidabile.<br>
-    • 🟡 <b>Zona Gialla:</b> Modello sotto osservazione.<br>
+<!-- 1. VAR CORNISH-FISHER -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📊 1. VaR Cornish-Fisher (Code Grasse & Asimmetria)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Variante non-gaussiana del Value at Risk che corregge la distribuzione normale integrando l'asimmetria (Skewness, S) e la curtosi (Kurtosis, K) effettive dei rendimenti.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 12.5px;">
+      <b>z<sub>CF</sub></b> = z + &frac16;(z<sup>2</sup>&minus;1)S + &frac124;(z<sup>3</sup>&minus;3z)K &minus; &frac136;(2z<sup>3</sup>&minus;5z)S<sup>2</sup>
     </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Evitare la pericolosa sottostima delle perdite estreme (<i>Fat Tails</i> e cigni neri) tipica dei modelli gaussiani tradizionali.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcola skewness e curtosi campionaria sulla serie storica del portafoglio e corregge il quantile normale.</div>
+  <div><b>🔍 Come leggerlo:</b> Se |VaR<sub>CF</sub>| &gt; |VaR<sub>Param</sub>|, il portafoglio presenta code di rischio ribassiste più pesanti della distribuzione normale.</div>
+</div>
+
+<!-- 2. EXPECTED SHORTFALL (CVAR) -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(248,81,73,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #f85149; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔥 2. Expected Shortfall (CVaR / Conditional VaR)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura la perdita media attesa nelle sole giornate di shock estremo in cui la perdita supera la soglia critica del VaR (misura coerente di rischio).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(248,81,73,0.08); border-left: 3px solid #f85149; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #f85149; text-align: center; font-size: 13px;">
+      <b>CVaR<sub>&alpha;</sub></b> = &minus; E [ R<sub>t</sub> | R<sub>t</sub> &le; &minus;VaR<sub>&alpha;</sub> ]
     </div>
-    """, button_label="💡 Come funziona il VaR Cornish-Fisher & Kupiec?")
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Rispondere alla domanda: <i>'Se si verifica un crollo che infrange il VaR, quanto perderò mediamente?'</i>.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Isola i rendimenti storici che cadono oltre la soglia del VaR e ne calcola la media algebrica ponderata.</div>
+  <div><b>🔍 Come leggerlo:</b> È sempre più severo del VaR e quantifica la magnitudo reale delle perdite nei market crash.</div>
+</div>
+
+<!-- 3. TEST DI KUPIEC & BACKTESTING -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,230,118,0.25); border-radius: 10px; padding: 14px; margin-bottom: 4px;">
+  <div style="color: #00e676; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🚦 3. Test di Kupiec (Backtesting & Semaforo di Basilea)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Test di rapporto di verosimiglianza (<i>Likelihood Ratio</i>) per validare se il numero di eccezioni/violazioni storiche del VaR è statisticamente conforme al livello di confidenza prescelto.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(0,230,118,0.08); border-left: 3px solid #00e676; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00e676; text-align: center; font-size: 13px;">
+      <b>LR<sub>POF</sub></b> = &minus;2 ln [ (1&minus;p)<sup>N&minus;x</sup> p<sup>x</sup> / (1&minus;x/N)<sup>N&minus;x</sup> (x/N)<sup>x</sup> ]
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Certificare l'affidabilità predittiva del modello di rischio secondo i requisiti del Comitato di Basilea.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Conta le violazioni effettive negli ultimi 252 giorni di borsa aperta e assegna il semaforo regolamentare.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • 🟢 <b>Zona Verde:</b> Modello solido e prudente (violazioni attese &le; soglia).<br>
+    • 🟡 <b>Zona Gialla:</b> Sottostima lieve (richiede attenzione).<br>
+    • 🔴 <b>Zona Rossa:</b> Modello rigettato per grave sottostima del rischio.
+  </div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il VaR Cornish-Fisher & Kupiec?")
 
     col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
     with col_ctrl1:
@@ -971,14 +1084,26 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     st.markdown("#### 🔬 Validazione e Backtesting dei Modelli VaR (Kupiec Test)")
     st.caption(f"Verifica l'efficacia statistica dei tre modelli di VaR (Storico, Parametrico e Cornish-Fisher) ad un orizzonte di 1 giorno su {int(conf_level*100)}% confidenza.")
 
-    glossary_modal("Cos'è il Backtesting del VaR?", """
-    <p>Il <b>Backtesting del VaR</b> (Kupiec Test) verifica quante volte la perdita reale storicamente ha superato la stima del VaR.</p>
-    <ul>
-        <li><b>🟢 Verde:</b> Modello solido e prudente.</li>
-        <li><b>🟡 Giallo:</b> Sotto-stima lieve.</li>
-        <li><b>🔴 Rosso:</b> Sotto-stima grave (modello rigettato).</li>
-    </ul>
-    """, button_label="💡 Come funziona il Backtesting?")
+    glossary_modal("🔬 Guida al Backtesting del VaR (Test di Kupiec)", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,230,118,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+  <div style="color: #00e676; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🚦 Test di Kupiec (Validazione Statistica del VaR)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Procedura statistica regolamentare (POF - Proportion of Failures) che confronta il numero di perdite reali eccedenti il VaR con il numero teorico atteso.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(0,230,118,0.08); border-left: 3px solid #00e676; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #00e676; text-align: center; font-size: 13px;">
+      <b>Violazioni Attese</b> = N &times; (1 &minus; Confidenza) &nbsp;|&nbsp; <b>LR<sub>POF</sub></b> &sim; &chi;<sup>2</sup>(1)
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Rilevare se un modello di rischio sottostima sistematicamente le perdite reali o se è eccessivamente conservativo.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Analizza 252 sedute di trading storiche e classifica il modello secondo i criteri del Comitato di Basilea.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • 🟢 <b>Zona Verde:</b> Modello solido e conforme agli standard regolamentari.<br>
+    • 🟡 <b>Zona Gialla:</b> Sottostima lieve (richiede calibrazione dei parametri).<br>
+    • 🔴 <b>Zona Rossa:</b> Modello rigettato per gravi fallimenti predittivi.
+  </div>
+</div>
+</div>
+""", button_label="💡 Come funziona il Backtesting?")
 
     recent_r = r.tail(252)
     n_days = len(recent_r)
@@ -1057,9 +1182,26 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
     st.divider()
 
     st.markdown("### 💧 Rischio di Liquidità (Days-to-Liquidate)")
-    glossary_modal("Cos'è il Rischio di Liquidità?", 
-    "È la stima dei giorni necessari per liquidare completamente la posizione senza muovere il mercato (ipotizzando di non superare il 15% del Volume Medio Giornaliero).", 
-    button_label="💡 Come si legge?")
+    glossary_modal("💧 Guida al Rischio di Liquidità & Market Impact", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">💧 Days-to-Liquidate (Orizzonte di Smobilizzo)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Stima dei giorni lavorativi necessari per liquidare integralmente una posizione senza alterare il prezzo di mercato (assumendo una partecipazione max al 15% del Volume Medio Giornaliero - ADV).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #58a6ff; text-align: center; font-size: 13px;">
+      <b>Days to Liquidate</b> = Quantità Posizione / ( ADV<sub>30g</sub> &times; 15% )
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Prevenire il rischio di restare 'intrappolati' in asset poco liquidi durante fasi di panico o vendite forzate.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcolato sul volume medio giornaliero a 30 sedute scaricato da Yahoo Finance per ciascun asset aperto.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>< 1.0 Giorno:</b> Liquidità eccellente (smobilizzo istantaneo).<br>
+    • <b>1.0 – 3.0 Giorni:</b> Liquidità buona.<br>
+    • <b>> 5.0 Giorni:</b> Rischio illiquidità (possibile market impact e slippage severo).
+  </div>
+</div>
+</div>
+""", button_label="💡 Come si legge?")
 
     if "days_to_liquidate" in pos.columns:
         df_liq = pos[pos["qty_net"] > 0][["ticker", "current_value", "days_to_liquidate"]].copy()
@@ -1082,15 +1224,25 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
     st.caption("Livelli quantitativi di stop-loss dinamici ancorati alla volatilità effettiva ($ATR_{14}$) e ai massimi a 22 giorni per ciascun asset.")
 
     glossary_modal(
-        "🛡️ Cos'è l'ATR Trailing Stop-Loss & Chandelier Exit?",
+        "🛡️ Guida all'ATR Trailing Stop-Loss & Chandelier Exit",
         """
-        <div style="font-size: 13.5px; line-height: 1.45;">
-        <b>Cos'è il Chandelier Exit?</b><br>
-        Un algoritmo quantitativo che calcola un livello di stop-loss dinamico agganciato al massimo degli ultimi 22 giorni, sottratto di un multiplo della volatilità reale (3 &times; ATR<sub>14</sub>):
-        <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 6px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-          <b>Stop Chandelier</b> = Max<sub>22g</sub> &minus; 3 &times; ATR<sub>14</sub>
-        </div>
-        </div>
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ Chandelier Exit (Stop-Loss Dinamico Volatilità)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Algoritmo quantitativo di risk management (sviluppato da Chuck LeBeau) che fissa un livello di trailing stop agganciato al massimo recente, proporzionato alla volatilità reale (Average True Range).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      <b>Stop Chandelier</b> = Max<sub>22g</sub> &minus; 3.0 &times; ATR<sub>14</sub>
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Proteggere i profitti accumulati nei trend rialzisti ed evitare di uscire prematuramente a causa del normale 'rumore' di mercato.</div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Calcolo in ARGUS:</b> Calcola l'ATR a 14 periodi sui massimi, minimi e chiusure storiche e sottrae 3 volte tale valore dal picco massimo a 22 sedute.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • 🟢 <b>REGOLARE:</b> Il prezzo è sopra il livello di stop (trend intatto).<br>
+    • 🔴 <b>TRIGGER:</b> Il prezzo ha infranto il Chandelier Stop (segnale di chiusura o riduzione posizione).
+  </div>
+</div>
+</div>
         """,
         button_label="💡 Come funziona il Chandelier Exit?"
     )
