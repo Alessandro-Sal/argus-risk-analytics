@@ -1,6 +1,6 @@
 [project]
 name = "argus-risk-analytics"
-version = "5.4.0"
+version = "5.5.0"
 description = "ARGUS — Institutional Risk Analytics & Portfolio Intelligence Platform"
 readme = "README.md"
 requires-python = ">=3.10"
