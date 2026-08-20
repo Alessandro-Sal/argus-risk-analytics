@@ -2018,6 +2018,58 @@ La calibrazione dello Skew in ARGUS garantisce che:
     )
 
 
+def render_crypto_tax_modal(
+    button_label: str = "ℹ️ Normativa Fiscale Cripto (L. 197/2022)",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale/popover istituzionale con la guida completa alla fiscalità delle Cripto-Attività
+    in Italia (Legge di Bilancio 197/2022, Circolare Agenzia delle Entrate 30/E/2023, Quadri RT/RW/IVAFE).
+    """
+    content = """
+### 🪙 Fiscalità delle Cripto-Attività in Italia (Legge 197/2022)
+
+La **Legge di Bilancio 2023 (L. n. 197/2022, art. 1 commi 126-147)** e la **Circolare AdE n. 30/E/2023** hanno introdotto una disciplina organica per la tassazione e il monitoraggio delle cripto-attività detenute da persone fisiche residenti in Italia.
+
+---
+
+#### 📈 1. Quadro RT (Sezione II-B): Plusvalenze & Franchigia 2.000€
+Le plusvalenze derivanti da cessione a titolo oneroso di cripto-attività costituiscono una categoria autonoma di **Redditi Diversi** (art. 67, c. 1, lett. c-sexies del TUIR):
+- **Aliquota d'imposta sostitutiva**: **26%**.
+- **Fattispecie Imponibile**: Conversione da Cripto a Valuta Fiat (es. BTC $\\to$ EUR) o acquisto di beni e servizi. Lo scambio tra cripto-attività (*Crypto-to-Crypto*, es. BTC $\\to$ ETH) non costituisce realizzo imponibile.
+- **Franchigia Annuale di 2.000€**:
+  $$\\text{Se } \\sum (\\text{Plusvalenze} - \\text{Minusvalenze}) \\le 2.000€ \\implies \\text{Imposta Dovuta} = 0€$$
+  Se il saldo netto eccede 2.000€, l'imposta si applica sulla base imponibile.
+- **Zainetto Fiscale Cripto Separato**: Le minusvalenze cripto realizzate eccedenti 2.000€ sono riportabili nei **4 anni solari successivi**, ma possono essere compensate **esclusivamente** con future plusvalenze su cripto-attività (è vietata la compensazione incrociata con azioni o ETF).
+
+---
+
+#### 🌐 2. Quadro RW: Monitoraggio Fiscale Attività Estere (Codice 21)
+Tutti i contribuenti residenti in Italia che detengono criptovalute sono tenuti all'obbligo di monitoraggio fiscale nel **Quadro RW**:
+- **Ambito**: Piattaforme/Exchange esteri (Binance, Coinbase, Kraken, Bybit, ecc.) e *Self-Custody* (Hardware Wallet Ledger/Trezor, Non-Custodial Wallet MetaMask).
+- **Codice Bene (Col. 3)**: **21** (*Cripto-attività e valute virtuali*).
+- **Valori da Dichiarare**:
+  - Valore Iniziale al 1° Gennaio (o data di acquisto).
+  - Valore Finale al 31 Dicembre (o data di cessione).
+  - Valore Massimo raggiunto nel corso del periodo d'imposta.
+  - Giorni di detenzione effettiva (1 - 365).
+
+---
+
+#### 🏦 3. Imposta sul Valore delle Cripto-Attività (IVAFE Cripto - 0,20%)
+L'art. 1, comma 144 della L. 197/2022 ha esteso l'imposta sul valore delle attività finanziarie estere anche alle cripto-attività:
+$$\\text{Imposta Dovuta} = \\text{Valore al 31/12} \\times 0{,}002 \\times \\frac{\\text{Giorni di Possesso}}{365}$$
+- **Aliquota**: **2 per mille annuo (0,20%)**.
+- **Applicazione**: Si applica sul controvalore finale in Euro di tutte le cripto-attività detenute all'estero o su chiavette private non gestite da intermediari residenti che applicano l'imposta di bollo ordinaria.
+"""
+    render_info_modal(
+        title="🪙 Fisco Cripto-Attività (L. 197/2022)",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 
