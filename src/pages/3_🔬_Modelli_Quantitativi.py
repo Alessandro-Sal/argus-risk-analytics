@@ -339,8 +339,8 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
 
         # ── LIVE REBALANCING SANDBOX (FEATURE 3) ───────────────────────
         st.divider()
-        st.markdown("#### 🧪 Live Rebalancing Sandbox & Simulatore Real-Time (What-If Weight Matrix)")
-        st.caption("Modifica liberamente i pesi con gli slider: ARGUS ricalcola in tempo reale i delta di Rendimento, Volatilità, VaR 95% e Sharpe Ratio.")
+        st.markdown("#### 🧪 Live Rebalancing Sandbox & Simulatore Real-Time (What-If Weight & Shares Matrix)")
+        st.caption("Simula variazioni di portafoglio regolando **Pesi Percentuali (%)**, **Quantità di Quote (Vendi / Compra Azioni)** o **Importo Monetario (€)** con ricalcolo istantaneo di Rendimento, Volatilità, VaR 95%, Sharpe Ratio e Cash Flow.")
 
         tickers_in_opt = opt.get("tickers", [])
         if tickers_in_opt and not pos.empty:
@@ -354,59 +354,188 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
             cur_w_map = _to_weight_map(opt.get("current", {}).get("weights"), tickers_in_opt)
             ms_w_map = _to_weight_map(opt.get("max_sharpe", {}).get("weights"), tickers_in_opt)
             mv_w_map = _to_weight_map(opt.get("min_vol", {}).get("weights"), tickers_in_opt)
-            
-            col_pre1, col_pre2, col_pre3, col_pre4, col_pre5 = st.columns(5)
-            with col_pre1:
-                if st.button("⭐ Pesi Attuali", key="sbx_preset_cur", use_container_width=True):
-                    for t in tickers_in_opt:
-                        st.session_state[f"sbx_w_{t}"] = float(cur_w_map.get(t, 0.0) * 100.0)
-                    st.rerun()
-            with col_pre2:
-                if st.button("⚖️ Equipesato (1/N)", key="sbx_preset_eq", use_container_width=True):
-                    eq_w = 100.0 / len(tickers_in_opt)
-                    for t in tickers_in_opt:
-                        st.session_state[f"sbx_w_{t}"] = float(eq_w)
-                    st.rerun()
-            with col_pre3:
-                if st.button("🏆 Max Sharpe", key="sbx_preset_ms", use_container_width=True):
-                    for t in tickers_in_opt:
-                        st.session_state[f"sbx_w_{t}"] = float(ms_w_map.get(t, 0.0) * 100.0)
-                    st.rerun()
-            with col_pre4:
-                if st.button("🛡️ Minima Vol.", key="sbx_preset_mv", use_container_width=True):
-                    for t in tickers_in_opt:
-                        st.session_state[f"sbx_w_{t}"] = float(mv_w_map.get(t, 0.0) * 100.0)
-                    st.rerun()
-            with col_pre5:
-                if st.button("🧬 Equal Risk (ERC)", key="sbx_preset_erc", use_container_width=True):
-                    df_ret_temp = results.get("returns", pd.DataFrame())
-                    erc_res = compute_equal_risk_contribution_portfolio(df_ret_temp[tickers_in_opt] if not df_ret_temp.empty and all(t in df_ret_temp.columns for t in tickers_in_opt) else None)
-                    erc_w = erc_res.get("weights", {})
-                    for t in tickers_in_opt:
-                        st.session_state[f"sbx_w_{t}"] = float(erc_w.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
-                    st.rerun()
 
-            st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE PESI ASSET:</div>', unsafe_allow_html=True)
-            
+            # Mappa prezzi e quote attuali
+            price_map = {}
+            qty_map = {}
+            val_map = {}
+            for _, r in pos.iterrows():
+                tk = str(r.get("ticker", ""))
+                lp = float(r.get("last_price", 0.0) or 0.0)
+                qn = float(r.get("qty_net", 0.0) or 0.0)
+                cv = float(r.get("current_value", 0.0) or (qn * lp if lp > 0 else 0.0))
+                price_map[tk] = lp if lp > 0 else 100.0
+                qty_map[tk] = qn
+                val_map[tk] = cv
+
+            for t in tickers_in_opt:
+                if t not in price_map: price_map[t] = 100.0
+                if t not in qty_map: qty_map[t] = 10.0
+                if t not in val_map: val_map[t] = qty_map[t] * price_map[t]
+
+            tot_cur_val = sum(qty_map.get(t, 0.0) * price_map.get(t, 100.0) for t in tickers_in_opt)
+
+            sbx_mode = st.radio(
+                "Modalità di Simulazione Operativa:",
+                ["🔢 Variazione Quote (Vendi / Compra N Azioni)", "📊 Pesi Percentuali (%)", "💶 Importo Monetario (€)"],
+                horizontal=True,
+                key="sbx_simulation_mode"
+            )
+
             sim_weights = {}
-            grid_cols = st.columns(min(4, len(tickers_in_opt)))
-            for i, t in enumerate(tickers_in_opt):
-                default_w = float(cur_w_map.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
-                with grid_cols[i % len(grid_cols)]:
-                    sim_weights[t] = st.slider(
-                        f"**{t}**", 
-                        min_value=0.0, 
-                        max_value=100.0, 
-                        value=float(st.session_state.get(f"sbx_w_{t}", default_w)), 
-                        step=0.5,
-                        key=f"sbx_w_{t}"
-                    )
+            sim_qtys = {}
+            sim_vals = {}
 
-            tot_raw_w = sum(sim_weights.values())
-            if tot_raw_w > 0:
-                norm_sim_weights = {t: w / tot_raw_w for t, w in sim_weights.items()}
-            else:
-                norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
+            if sbx_mode == "🔢 Variazione Quote (Vendi / Compra N Azioni)":
+                col_q1, col_q2, col_q3, col_q4 = st.columns(4)
+                with col_q1:
+                    if st.button("⭐ Ripristina Quote Attuali", key="sbx_q_reset", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_q_{t}"] = float(qty_map.get(t, 0.0))
+                        st.rerun()
+                with col_q2:
+                    if st.button("➕ +10 Quote su Tutti", key="sbx_q_plus10", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_q_{t}"] = float(qty_map.get(t, 0.0) + 10.0)
+                        st.rerun()
+                with col_q3:
+                    if st.button("➖ -10 Quote (o Max Disp.)", key="sbx_q_minus10", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_q_{t}"] = max(0.0, float(qty_map.get(t, 0.0) - 10.0))
+                        st.rerun()
+                with col_q4:
+                    if st.button("🧹 Azzera Tutto (0 Quote)", key="sbx_q_zero", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_q_{t}"] = 0.0
+                        st.rerun()
+
+                st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE QUOTE AZIONI:</div>', unsafe_allow_html=True)
+                grid_cols = st.columns(min(4, len(tickers_in_opt)))
+                for i, t in enumerate(tickers_in_opt):
+                    cur_q = float(qty_map.get(t, 0.0))
+                    cur_px = float(price_map.get(t, 100.0))
+                    step_val = 1.0 if cur_q >= 1.0 and cur_q.is_integer() else 0.1
+                    with grid_cols[i % len(grid_cols)]:
+                        new_q = st.number_input(
+                            f"**{t}** (Attuali: {cur_q:,.1f})",
+                            min_value=0.0,
+                            value=float(st.session_state.get(f"sbx_q_{t}", cur_q)),
+                            step=step_val,
+                            key=f"sbx_q_{t}",
+                            help=f"Prezzo: € {cur_px:,.2f} | Valore Attuale: € {cur_q * cur_px:,.2f}"
+                        )
+                        sim_qtys[t] = new_q
+                        delta_q = new_q - cur_q
+                        delta_val = delta_q * cur_px
+                        if delta_q < 0:
+                            st.markdown(f"<span style='font-size:11px; color:#00e676; font-weight:700;'>🟢 VENDI {abs(delta_q):,.1f} (Libera € {abs(delta_val):,.2f})</span>", unsafe_allow_html=True)
+                        elif delta_q > 0:
+                            st.markdown(f"<span style='font-size:11px; color:#58a6ff; font-weight:700;'>🔵 COMPRA +{delta_q:,.1f} (Costa € {delta_val:,.2f})</span>", unsafe_allow_html=True)
+                        else:
+                            st.markdown("<span style='font-size:11px; color:#8b949e;'>⚪ Invariato</span>", unsafe_allow_html=True)
+
+                        sim_vals[t] = new_q * cur_px
+
+                tot_sim_val = sum(sim_vals.values())
+                net_cash_flow = sum((qty_map.get(t, 0.0) - sim_qtys[t]) * price_map.get(t, 100.0) for t in tickers_in_opt)
+                if tot_sim_val > 0:
+                    norm_sim_weights = {t: sim_vals[t] / tot_sim_val for t in tickers_in_opt}
+                else:
+                    norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
+
+            elif sbx_mode == "💶 Importo Monetario (€)":
+                col_m1, col_m2 = st.columns(2)
+                with col_m1:
+                    if st.button("⭐ Ripristina Valori Attuali", key="sbx_m_reset", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_m_{t}"] = float(val_map.get(t, 1000.0))
+                        st.rerun()
+                with col_m2:
+                    if st.button("⚖️ Equi-Valore (€ 5.000 / asset)", key="sbx_m_eq", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_m_{t}"] = 5000.0
+                        st.rerun()
+
+                st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE CONTROVALORE (€):</div>', unsafe_allow_html=True)
+                grid_cols = st.columns(min(4, len(tickers_in_opt)))
+                for i, t in enumerate(tickers_in_opt):
+                    cur_v = float(val_map.get(t, 0.0))
+                    cur_px = float(price_map.get(t, 100.0))
+                    with grid_cols[i % len(grid_cols)]:
+                        new_v = st.number_input(
+                            f"**{t} (€)** (Attuale: € {cur_v:,.0f})",
+                            min_value=0.0,
+                            value=float(st.session_state.get(f"sbx_m_{t}", cur_v)),
+                            step=250.0,
+                            key=f"sbx_m_{t}"
+                        )
+                        sim_vals[t] = new_v
+                        sim_qtys[t] = new_v / cur_px if cur_px > 0 else 0.0
+
+                tot_sim_val = sum(sim_vals.values())
+                net_cash_flow = tot_cur_val - tot_sim_val
+                if tot_sim_val > 0:
+                    norm_sim_weights = {t: sim_vals[t] / tot_sim_val for t in tickers_in_opt}
+                else:
+                    norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
+
+            else:  # Pesi Percentuali (%)
+                col_pre1, col_pre2, col_pre3, col_pre4, col_pre5 = st.columns(5)
+                with col_pre1:
+                    if st.button("⭐ Pesi Attuali", key="sbx_preset_cur", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_w_{t}"] = float(cur_w_map.get(t, 0.0) * 100.0)
+                        st.rerun()
+                with col_pre2:
+                    if st.button("⚖️ Equipesato (1/N)", key="sbx_preset_eq", use_container_width=True):
+                        eq_w = 100.0 / len(tickers_in_opt)
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_w_{t}"] = float(eq_w)
+                        st.rerun()
+                with col_pre3:
+                    if st.button("🏆 Max Sharpe", key="sbx_preset_ms", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_w_{t}"] = float(ms_w_map.get(t, 0.0) * 100.0)
+                        st.rerun()
+                with col_pre4:
+                    if st.button("🛡️ Minima Vol.", key="sbx_preset_mv", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_w_{t}"] = float(mv_w_map.get(t, 0.0) * 100.0)
+                        st.rerun()
+                with col_pre5:
+                    if st.button("🧬 Equal Risk (ERC)", key="sbx_preset_erc", use_container_width=True):
+                        df_ret_temp = results.get("returns", pd.DataFrame())
+                        erc_res = compute_equal_risk_contribution_portfolio(df_ret_temp[tickers_in_opt] if not df_ret_temp.empty and all(t in df_ret_temp.columns for t in tickers_in_opt) else None)
+                        erc_w = erc_res.get("weights", {})
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_w_{t}"] = float(erc_w.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                        st.rerun()
+
+                st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE PESI ASSET:</div>', unsafe_allow_html=True)
+                grid_cols = st.columns(min(4, len(tickers_in_opt)))
+                for i, t in enumerate(tickers_in_opt):
+                    default_w = float(cur_w_map.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                    with grid_cols[i % len(grid_cols)]:
+                        sim_weights[t] = st.slider(
+                            f"**{t}**", 
+                            min_value=0.0, 
+                            max_value=100.0, 
+                            value=float(st.session_state.get(f"sbx_w_{t}", default_w)), 
+                            step=0.5,
+                            key=f"sbx_w_{t}"
+                        )
+
+                tot_raw_w = sum(sim_weights.values())
+                if tot_raw_w > 0:
+                    norm_sim_weights = {t: w / tot_raw_w for t, w in sim_weights.items()}
+                else:
+                    norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
+                
+                tot_sim_val = tot_cur_val
+                net_cash_flow = 0.0
+                for t in tickers_in_opt:
+                    sim_vals[t] = norm_sim_weights[t] * tot_sim_val
+                    sim_qtys[t] = sim_vals[t] / price_map[t] if price_map[t] > 0 else 0.0
 
             df_ret_sim = results.get("returns", pd.DataFrame())
             if df_ret_sim.empty or not all(t in df_ret_sim.columns for t in tickers_in_opt):
@@ -441,11 +570,27 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                 d_var = var_sim - var_cur
                 d_sharpe = sharpe_sim - sharpe_cur
 
-                st.markdown(f"""
-                <div style="background:rgba(22,27,34,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:8px 12px; margin: 10px 0;">
-                    <span style="font-size:12px; color:#8b949e;">Somma Pesi Regolati: <b>{tot_raw_w:.1f}%</b> (Normalizzato automaticamente al <b>100.0%</b>)</span>
-                </div>
-                """, unsafe_allow_html=True)
+                if sbx_mode == "🔢 Variazione Quote (Vendi / Compra N Azioni)" or sbx_mode == "💶 Importo Monetario (€)":
+                    cf_color = "#00e676" if net_cash_flow > 0.01 else ("#f85149" if net_cash_flow < -0.01 else "#8b949e")
+                    cf_label = f"🟢 +€ {net_cash_flow:,.2f} (Liquidità netta liberata)" if net_cash_flow > 0.01 else (f"🔴 -€ {abs(net_cash_flow):,.2f} (Capitale aggiuntivo richiesto)" if net_cash_flow < -0.01 else "⚪ € 0.00 (Operazione bilanciata)")
+                    st.markdown(f"""
+                    <div style="background:rgba(22,27,34,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:10px 14px; margin: 12px 0; display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:center;">
+                        <div>
+                            <span style="font-size:12px; color:#8b949e;">Patrimonio Attuale: <b>€ {tot_cur_val:,.2f}</b></span> &nbsp;→&nbsp; 
+                            <span style="font-size:12px; color:#58a6ff;">Patrimonio Simulato: <b>€ {tot_sim_val:,.2f}</b></span>
+                        </div>
+                        <div>
+                            <span style="font-size:12px; color:#8b949e;">Cash Flow Operazione:</span> 
+                            <b style="font-size:12.5px; color:{cf_color}; margin-left:4px;">{cf_label}</b>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background:rgba(22,27,34,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:8px 12px; margin: 10px 0;">
+                        <span style="font-size:12px; color:#8b949e;">Somma Pesi Regolati: <b>{tot_raw_w:.1f}%</b> (Normalizzato automaticamente al <b>100.0%</b>)</span>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 c_sb1, c_sb2, c_sb3, c_sb4 = st.columns(4)
                 with c_sb1:
@@ -467,14 +612,18 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                 fig_sbx.add_trace(go.Bar(
                     x=df_compare_w["Ticker"],
                     y=df_compare_w["Peso Attuale (%)"],
-                    name="Allocazione Attuale",
-                    marker_color="#8b949e"
+                    name="Allocazione Attuale (%)",
+                    marker_color="#8b949e",
+                    text=[f"{w:.1f}%" for w in df_compare_w["Peso Attuale (%)"]],
+                    textposition="outside"
                 ))
                 fig_sbx.add_trace(go.Bar(
                     x=df_compare_w["Ticker"],
                     y=df_compare_w["Peso Sandbox (%)"],
-                    name="Allocazione Sandbox",
-                    marker_color="#ff9900"
+                    name="Allocazione Sandbox (%)",
+                    marker_color="#ff9900",
+                    text=[f"{w:.1f}%" for w in df_compare_w["Peso Sandbox (%)"]],
+                    textposition="outside"
                 ))
                 fig_sbx.update_layout(
                     barmode="group",
@@ -485,6 +634,43 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                 )
                 apply_plotly_theme(fig_sbx)
                 st.plotly_chart(fig_sbx, use_container_width=True)
+
+                # Tabella Operativa Dettagliata What-If
+                with st.expander("📋 Tabella di Dettaglio Operativo & Ticket What-If", expanded=True):
+                    table_rows = []
+                    for t in valid_ts:
+                        cq = float(qty_map.get(t, 0.0))
+                        sq = float(sim_qtys.get(t, 0.0))
+                        px = float(price_map.get(t, 100.0))
+                        cv = cq * px
+                        sv = sq * px
+                        dq = sq - cq
+                        dv = sv - cv
+                        cw = cur_w_map.get(t, 0.0) * 100.0
+                        sw = norm_sim_weights.get(t, 0.0) * 100.0
+
+                        if dq < -1e-4:
+                            action = f"🟢 VENDI {abs(dq):,.1f} quote"
+                        elif dq > 1e-4:
+                            action = f"🔵 COMPRA +{dq:,.1f} quote"
+                        else:
+                            action = "⚪ MANTIENI"
+
+                        table_rows.append({
+                            "Ticker": t,
+                            "Prezzo (€)": f"€ {px:,.2f}",
+                            "Quote Attuali": f"{cq:,.1f}",
+                            "Quote Simulate": f"{sq:,.1f}",
+                            "Delta Quote": f"{dq:+,.1f}" if abs(dq) > 1e-4 else "0.0",
+                            "Valore Attuale": f"€ {cv:,.2f}",
+                            "Valore Simulato": f"€ {sv:,.2f}",
+                            "Delta Controvalore": f"€ {dv:+,.2f}" if abs(dv) > 0.01 else "€ 0.00",
+                            "Peso Attuale": f"{cw:.2f}%",
+                            "Peso Simulato": f"{sw:.2f}%",
+                            "Azione": action
+                        })
+
+                    st.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
 
         st.divider()
         col_head_hrp1, col_head_hrp2 = st.columns([3.2, 1.1])
