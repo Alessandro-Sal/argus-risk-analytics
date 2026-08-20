@@ -3,9 +3,10 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal
 from core.hrp_optimizer import compute_hrp_portfolio
 from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
+from core.volatility_surface import build_volatility_surface, fit_volatility_smile
 from core.advanced_quant import compute_tail_copula_matrix, compute_kelly_criterion_sizing, compute_equal_risk_contribution_portfolio
 
 st.set_page_config(page_title="Modelli Quantitativi | ARGUS", page_icon="🔬", layout="wide")
@@ -17,8 +18,12 @@ render_sidebar()
 import importlib
 import core.ui_utils
 import core.risk_engine
+import core.options_hedging
+import core.volatility_surface
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
+importlib.reload(core.options_hedging)
+importlib.reload(core.volatility_surface)
 from core.ui_utils import ensure_risk_bundle_loaded, render_sandbox_banner
 
 results, has_real = ensure_risk_bundle_loaded()
@@ -1773,15 +1778,28 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
 </div>
 """, button_label="💡 Come funziona Black-Scholes & Greci?")
 
+        importlib.reload(core.options_hedging)
         from core.options_hedging import compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
 
-        col_opt_in1, col_opt_in2, col_opt_in3 = st.columns(3)
+        col_bs_h1, col_bs_h2 = st.columns([3.2, 1.2])
+        with col_bs_h1:
+            st.markdown("#### 🛡️ Strategia di Copertura Delta-Hedging (Black-Scholes & Skew Calibrato)")
+            st.caption("Dimensionamento matematico dei contratti di opzione Put per immunizzare il Beta di portafoglio con calibrazione del Volatility Skew reale.")
+        with col_bs_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            render_volatility_smile_modal(button_label="ℹ️ Metodologia Volatility Skew & Smile", use_popover=True)
+
+        col_opt_in1, col_opt_in2, col_opt_in3, col_opt_in4 = st.columns(4)
         with col_opt_in1:
-            bm_spot_in = st.number_input("Prezzo Sottostante Benchmark (SPY/SPX $):", value=550.0, step=10.0)
+            bm_spot_in = st.number_input("Prezzo Spot Benchmark (SPY/SPX $):", value=550.0, step=10.0)
         with col_opt_in2:
-            iv_in = st.slider("Volatilità Implicita Opzioni (%):", 10.0, 60.0, 18.0, 1.0) / 100.0
+            iv_in = st.slider("Volatilità Base ATM (%):", 10.0, 60.0, 18.0, 1.0) / 100.0
         with col_opt_in3:
-            target_hedge_pct = st.slider("Copertura del Portafoglio (%):", 25.0, 100.0, 100.0, 25.0)
+            target_hedge_pct = st.slider("Copertura Portafoglio (%):", 25.0, 100.0, 100.0, 25.0)
+        with col_opt_in4:
+            expiry_m_in = st.selectbox("Scadenza Opzioni:", [1.0, 3.0, 6.0, 12.0], index=1, format_func=lambda x: f"{int(x)} Mesi")
+
+        use_skew = st.toggle("⚡ Calibrazione Volatility Skew & Smile Reale", value=True, help="Applica la pendenza dello Skew per strike OTM (le Put OTM costano di più per il premio al crash risk)")
 
         port_val_tot = float(pos["current_value"].sum()) if (isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns) else 100000.0
         port_b = float(results.get("metrics", {}).get("market_risk", {}).get("beta", 1.10) or 1.10) if results else 1.10
@@ -1791,26 +1809,123 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
             portfolio_beta=port_b,
             benchmark_spot=bm_spot_in,
             target_hedge_pct=target_hedge_pct,
-            implied_vol=iv_in
+            strike_otm_pct=5.0,
+            expiry_months=expiry_m_in,
+            implied_vol=iv_in,
+            use_skew_calibration=use_skew
         )
 
         col_bs1, col_bs2, col_bs3, col_bs4 = st.columns(4)
         with col_bs1:
-            st.metric("Contratti Put Necessari", f"{bs_hedge['contracts_needed']} contratti")
+            st.metric("Contratti Put Necessari", f"{bs_hedge['contracts_needed']} contratti", help=f"Strike: ${bs_hedge['strike_price']:.1f} (5% OTM)")
         with col_bs2:
-            st.metric("Prezzo Opzione Put", f"$ {bs_hedge['put_price']:.2f}")
+            st.metric(
+                "Prezzo Put (Per Azione)",
+                f"${bs_hedge['put_price']:.2f}",
+                delta=f"+${bs_hedge['put_price'] - bs_hedge['flat_put_price']:.2f} Skew Premium" if use_skew else "IV Piatta",
+                delta_color="inverse" if use_skew else "off"
+            )
         with col_bs3:
-            st.metric("Costo Totale Copertura", f"$ {bs_hedge['total_hedge_cost']:,.2f}", delta=f"{bs_hedge['cost_pct_of_portfolio']:.2f}% portafoglio", delta_color="inverse")
+            st.metric(
+                "Costo Totale Copertura",
+                f"${bs_hedge['total_hedge_cost']:,.2f}",
+                delta=f"{bs_hedge['cost_pct_of_portfolio']:.2f}% portafoglio",
+                delta_color="inverse"
+            )
         with col_bs4:
-            st.metric("Delta Put (Sensibilità)", f"{bs_hedge['put_delta']:.3f}", help="Variazione del prezzo dell'opzione per variazione di $1 del sottostante")
+            st.metric(
+                f"IV Effettiva ({bs_hedge['effective_iv_pct']:.1f}%)",
+                f"Δ: {bs_hedge['put_delta']:.3f}",
+                delta=f"Vega: {bs_hedge['put_vega']:.2f} | Γ: {bs_hedge['put_gamma']:.4f}",
+                help="Greci di secondo ordine calibrati sulla curva reale"
+            )
+
+        # Superficie e Smile Plotly
+        surf_model = build_volatility_surface(spot=bm_spot_in, base_atm_iv=iv_in)
+        col_g_opt1, col_g_opt2 = st.columns([1.5, 1.5])
+        
+        with col_g_opt1:
+            st.markdown("##### 📉 Curva Volatility Smile & Skew (2D)")
+            fig_smile = go.Figure()
+            exp_key = f"{int(expiry_m_in)}M"
+            smile_fit = surf_model["smile_models"].get(exp_key, list(surf_model["smile_models"].values())[0])
+            k_range = np.linspace(bm_spot_in * 0.75, bm_spot_in * 1.25, 50)
+            iv_curve = [smile_fit["eval_func"](k) * 100.0 for k in k_range]
+            
+            fig_smile.add_trace(go.Scatter(
+                x=k_range,
+                y=iv_curve,
+                mode="lines",
+                name=f"Skew Calibrato ({int(expiry_m_in)}M)",
+                line=dict(color="#00f3ff", width=2.5),
+                hovertemplate="Strike: $%{x:.1f}<br>IV Calibrata: %{y:.2f}%<extra></extra>"
+            ))
+            
+            # Strike di Copertura
+            fig_smile.add_trace(go.Scatter(
+                x=[bs_hedge["strike_price"]],
+                y=[bs_hedge["effective_iv_pct"]],
+                mode="markers",
+                name="Strike Put Hedging (5% OTM)",
+                marker=dict(color="#f85149", size=10, symbol="diamond"),
+                hovertemplate="Put Hedging Strike: $%{x:.1f}<br>IV: %{y:.2f}%<extra></extra>"
+            ))
+            
+            # Strike Spot ATM
+            fig_smile.add_trace(go.Scatter(
+                x=[bm_spot_in],
+                y=[iv_in * 100.0],
+                mode="markers",
+                name=f"Spot ATM (${bm_spot_in:.0f})",
+                marker=dict(color="#ff9900", size=9, symbol="circle"),
+                hovertemplate="Spot ATM: $%{x:.1f}<br>IV ATM: %{y:.2f}%<extra></extra>"
+            ))
+            
+            fig_smile.update_layout(
+                height=320,
+                margin=dict(l=10, r=10, t=25, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(title="Strike Price ($)", showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+                yaxis=dict(title="Volatilità Implicita (%)", showgrid=True, gridcolor="rgba(255,255,255,0.05)")
+            )
+            st.plotly_chart(fig_smile, use_container_width=True)
+
+        with col_g_opt2:
+            st.markdown("##### 🌐 Superficie di Volatilità Implicita 3D")
+            matrix_z = surf_model["matrix_iv"].values
+            strikes_x = surf_model["matrix_iv"].columns.values
+            expiries_y = surf_model["matrix_iv"].index.values
+            
+            fig_surf3d = go.Figure(data=[go.Surface(
+                z=matrix_z,
+                x=strikes_x,
+                y=expiries_y,
+                colorscale="Viridis",
+                colorbar=dict(title="IV %", len=0.8)
+            )])
+            fig_surf3d.update_layout(
+                height=320,
+                margin=dict(l=5, r=5, t=10, b=5),
+                paper_bgcolor="rgba(0,0,0,0)",
+                scene=dict(
+                    xaxis=dict(title="Strike ($)", gridcolor="rgba(255,255,255,0.1)"),
+                    yaxis=dict(title="Scadenza (Mesi)", gridcolor="rgba(255,255,255,0.1)"),
+                    zaxis=dict(title="IV (%)", gridcolor="rgba(255,255,255,0.1)"),
+                    camera=dict(eye=dict(x=-1.5, y=-1.5, z=1.2))
+                )
+            )
+            st.plotly_chart(fig_surf3d, use_container_width=True)
 
         st.markdown("##### 💵 Covered Call Yield Enhancer per Titoli in Portafoglio")
-        df_cov_call = compute_covered_call_yield_enhancement(pos, otm_pct=5.0, implied_vol=iv_in) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
+        df_cov_call = compute_covered_call_yield_enhancement(pos, otm_pct=5.0, implied_vol=iv_in, use_skew_calibration=use_skew) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
         if not df_cov_call.empty:
             df_cov_display = df_cov_call.rename(columns={
                 "ticker": "Asset / Titolo",
                 "prezzo_spot": "Prezzo Spot (€)",
                 "strike_call_otm": "Strike OTM (+5%)",
+                "iv_effettiva_pct": "IV Calibrata %",
                 "premio_per_azione": "Premio per Azione (€)",
                 "incasso_premio_totale": "Incasso Totale Premio (€)",
                 "extra_rendimento_mensile_pct": "Extra Yield Mensile %",
@@ -1821,6 +1936,7 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                 df_cov_display.style.format({
                     "Prezzo Spot (€)": "€ {:.2f}",
                     "Strike OTM (+5%)": "€ {:.2f}",
+                    "IV Calibrata %": "{:.2f}%",
                     "Premio per Azione (€)": "€ {:.2f}",
                     "Incasso Totale Premio (€)": "€ {:,.2f}",
                     "Extra Yield Mensile %": "{:.2f}%",
