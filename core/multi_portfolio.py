@@ -698,8 +698,8 @@ def consolidate_multi_portfolios(
         },
         "concentration": {
             "hhi": round(hhi_sum, 6),
-            "eff_n": round(1.0 / hhi_sum, 2) if hhi_sum > 0 else len(consolidated_pos_list),
-            "effective_n_assets": round(1.0 / hhi_sum, 2) if hhi_sum > 0 else len(consolidated_pos_list),
+            "eff_n": round(1.0 / hhi_sum, 2) if hhi_sum > 0 else len(df_positions),
+            "effective_n_assets": round(1.0 / hhi_sum, 2) if hhi_sum > 0 else len(df_positions),
             "diversification_ratio": 1.45,
             "by_class": (df_positions.groupby("asset_class")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "asset_class" in df_positions else {},
             "by_asset_class_pct": (df_positions.groupby("asset_class")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "asset_class" in df_positions else {},

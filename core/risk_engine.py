@@ -82,6 +82,10 @@ def compute_risk(portfolio_id: int,
     from core.closed_trades import compute_closed_trades_journal
     closed_trades_data = compute_closed_trades_journal(df_tx=df_tx_adj, df_prices=df_prices, df_positions=df_positions)
 
+    from core.garch_engine import compute_garch_fhs_bundle
+    tot_val = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 100000.0
+    garch_bundle = compute_garch_fhs_bundle(sr_portfolio, total_value=tot_val)
+
     return {
         "portfolio_id":     portfolio_id,
         "computed_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -96,6 +100,7 @@ def compute_risk(portfolio_id: int,
         "atr_exits":         compute_atr_chandelier_exits(df_prices, df_positions),
         "metrics":          metrics,
         "risk_free":        rf_info,
+        "garch_fhs":        garch_bundle,
         "risk_contribution": _calc_risk_contribution(df_returns, df_positions),
         "stress_tests":     _calc_stress_tests(df_returns, df_positions, sr_benchmark),
         "optimization":     _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
@@ -513,30 +518,33 @@ def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame
             return (active_pos.set_index("ticker")["current_value"] / tot_val * 100.0).round(2).to_dict()
         return {t: round(100.0 / len(active_tickers), 2) for t in active_tickers}
 
-    common = [t for t in active_tickers if t in df_returns.columns]
+    common = list(dict.fromkeys([t for t in active_tickers if t in df_returns.columns]))
     if len(common) < 2:
         tot_val = active_pos["current_value"].sum() if "current_value" in active_pos.columns else 0.0
         if tot_val > 0:
-            return (active_pos.set_index("ticker")["current_value"] / tot_val * 100.0).round(2).to_dict()
+            return (active_pos.groupby("ticker")["current_value"].sum() / tot_val * 100.0).round(2).to_dict()
         return {t: round(100.0 / len(active_tickers), 2) for t in active_tickers}
 
+    df_clean_returns = df_returns.loc[:, ~df_returns.columns.duplicated()]
     if "weight_pct" in active_pos.columns:
-        weights = active_pos[active_pos["ticker"].isin(common)].set_index("ticker")["weight_pct"] / 100.0
+        weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100.0
     else:
         tot_common_val = active_pos[active_pos["ticker"].isin(common)]["current_value"].sum()
-        weights = active_pos[active_pos["ticker"].isin(common)].set_index("ticker")["current_value"] / (tot_common_val if tot_common_val > 0 else 1.0)
+        weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["current_value"].sum() / (tot_common_val if tot_common_val > 0 else 1.0)
 
     w = weights.reindex(common).fillna(0.0)
     if w.sum() == 0:
         return {}
     w = w / w.sum()
 
-    ret_subset = df_returns[common].fillna(0.0)
+    ret_subset = df_clean_returns[common].fillna(0.0)
     cov_matrix = ret_subset.cov()
     if cov_matrix.isna().any().any():
         cov_matrix = cov_matrix.fillna(0.0)
 
-    port_variance = float(w.T @ cov_matrix @ w)
+    w_arr = w.values
+    cov_arr = cov_matrix.values
+    port_variance = float(w_arr.T @ cov_arr @ w_arr)
     if port_variance <= 1e-12 or np.isnan(port_variance):
         stds = ret_subset.std()
         vol_w = w * stds
@@ -544,11 +552,11 @@ def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame
             return ((vol_w / vol_w.sum()) * 100.0).round(2).to_dict()
         return (w * 100.0).round(2).to_dict()
 
-    marginal_contrib = cov_matrix @ w
-    component_contrib = w * marginal_contrib
-    pct_contrib = (component_contrib / port_variance) * 100.0
+    marginal_contrib = cov_arr @ w_arr
+    component_contrib = w_arr * marginal_contrib
+    pct_contrib_arr = (component_contrib / port_variance) * 100.0
+    pct_contrib = pd.Series(pct_contrib_arr, index=common).clip(lower=0.0)
 
-    pct_contrib = pct_contrib.clip(lower=0.0)
     if pct_contrib.sum() > 0:
         pct_contrib = (pct_contrib / pct_contrib.sum()) * 100.0
 
@@ -605,11 +613,15 @@ def _calc_stress_tests(df_returns: pd.DataFrame, df_positions: pd.DataFrame, sr_
     rb = sr_benchmark.reindex(df_returns.index).fillna(0.0) if (sr_benchmark is not None and df_returns is not None and not df_returns.empty) else pd.Series(dtype=float)
     for ticker in target_tickers:
         if df_returns is not None and ticker in df_returns.columns and not rb.empty:
-            r = df_returns[ticker].dropna()
-            r_b = rb.reindex(r.index)
-            if len(r) > 10 and r_b.std() > 0:
-                cov = np.cov(r, r_b)
-                betas[ticker] = cov[0, 1] / cov[1, 1]
+            r_col = df_returns[ticker]
+            if isinstance(r_col, pd.DataFrame):
+                r_col = r_col.iloc[:, 0]
+            r = r_col.dropna()
+            r_b = rb.reindex(r.index).dropna()
+            common_idx = r.index.intersection(r_b.index)
+            if len(common_idx) > 10 and r_b.loc[common_idx].std() > 0:
+                cov = np.cov(r.loc[common_idx].values, r_b.loc[common_idx].values)
+                betas[ticker] = float(cov[0, 1] / cov[1, 1]) if cov[1, 1] != 0 else 1.0
             else:
                 betas[ticker] = 1.0
         else:
@@ -874,7 +886,7 @@ def run_advanced_monte_carlo_simulation(
 
 def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataFrame, risk_free_rate: float = None) -> dict:
     active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist()
-    common = [t for t in active_tickers if t in df_returns.columns]
+    common = list(dict.fromkeys([t for t in active_tickers if t in df_returns.columns]))
     
     rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
     
@@ -882,17 +894,18 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     if len(common) < 2:
         return {}
         
-    df_ret = df_returns[common].dropna(how="any")
+    df_clean_returns = df_returns.loc[:, ~df_returns.columns.duplicated()]
+    df_ret = df_clean_returns[common].dropna(how="any")
     if len(df_ret) < 60:
         return {} # Not enough overlapping history
         
-    mean_returns = df_ret.mean() * TRADING_DAYS_YEAR
+    mean_returns = df_ret.mean().values * TRADING_DAYS_YEAR
     try:
         lw = LedoitWolf().fit(df_ret)
         cov_matrix = lw.covariance_ * TRADING_DAYS_YEAR
         cov_type = "Ledoit-Wolf Shrinkage"
     except Exception:
-        cov_matrix = df_ret.cov() * TRADING_DAYS_YEAR
+        cov_matrix = df_ret.cov().values * TRADING_DAYS_YEAR
         cov_type = "Sample Covariance"
     
     # Exact SLSQP Optimization with SciPy
@@ -943,7 +956,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         results[2, i] = sharpe_ratio
 
     # Pesi correnti per comparazione
-    curr_weights_s = df_positions[df_positions["ticker"].isin(common)].set_index("ticker")["weight_pct"] / 100
+    curr_weights_s = df_positions[df_positions["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100
     curr_weights = np.array(curr_weights_s.reindex(common).fillna(0).values, dtype=float)
     curr_sum = np.sum(curr_weights)
     if curr_sum > 0:
@@ -2248,6 +2261,10 @@ def compute_sandbox_risk_bundle(
     from core.closed_trades import compute_closed_trades_journal
     closed_trades_data = compute_closed_trades_journal(df_tx=pd.DataFrame(), df_positions=df_positions, is_sandbox=True)
 
+    from core.garch_engine import compute_garch_fhs_bundle
+    tot_val_sb = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 100000.0
+    garch_bundle_sb = compute_garch_fhs_bundle(sr_portfolio_aligned, total_value=tot_val_sb)
+
     return {
         "portfolio_id": 0,
         "is_sandbox": True,
@@ -2260,6 +2277,7 @@ def compute_sandbox_risk_bundle(
         "df_prices": df_prices,
         "metrics": metrics,
         "risk_free": rf_info,
+        "garch_fhs": garch_bundle_sb,
         "corporate_actions": [],
         "stress_tests": stress_tests,
         "risk_contribution": risk_contrib,

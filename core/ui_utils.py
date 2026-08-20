@@ -1891,6 +1891,77 @@ Se utilizzi un broker non elencato o un foglio di calcolo personalizzato, puoi s
     )
 
 
+def render_garch_fhs_modal(
+    button_label: str = "ℹ️ Metodologia GARCH(1,1) & FHS",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
+    della Volatilità Condizionale GARCH(1,1), dei cluster di volatilità e della Filtered Historical Simulation (FHS).
+    """
+    content = """
+### ⚡ Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)
+
+Nei mercati finanziari, la varianza dei rendimenti non è costante nel tempo ma manifesta il fenomeno dei **Cluster di Volatilità** (*Volatility Clustering* — Mandelbrot, Engle 1982): shock violenti tendono ad essere seguiti da ulteriore instabilità, mentre periodi di calma generano prolungata stabilità.
+
+---
+
+#### 📐 1. Il Modello GARCH(1,1) (Bollerslev 1986)
+Il modello **GARCH(1,1)** (*Generalized Autoregressive Conditional Heteroskedasticity*) esprime la varianza condizionale $\\sigma_t^2$ del giorno $t$ come combinazione lineare di 3 componenti:
+
+$$\\sigma_t^2 = \\omega + \\alpha \\epsilon_{t-1}^2 + \\beta \\sigma_{t-1}^2, \\quad \\epsilon_t = r_t - \\mu$$
+
+- **$\\omega$ (Baseline Variance Weight)**: Costante di varianza di fondo ($\\omega > 0$).
+- **$\\alpha$ (ARCH Term / News Coefficient)**: Sensibilità e reattività all'ultimo shock di mercato $\\epsilon_{t-1}^2$ ($\\alpha \\ge 0$).
+- **$\\beta$ (GARCH Term / Memory Coefficient)**: Persistenza e memoria della varianza del giorno precedente $\\sigma_{t-1}^2$ ($\\beta \\ge 0$).
+
+---
+
+#### ⏳ 2. Stazionarietà, Persistenza & Half-Life dello Shock
+- **Condizione di Stazionarietà**: $\\alpha + \\beta < 1$. Se $\\alpha + \\beta = 1$, il modello diventa *Integrated GARCH (IGARCH)* con memoria infinita.
+- **Varianza di Lungo Termine ($V_L$)**:
+  $$V_L = \\frac{\\omega}{1 - \\alpha - \\beta}, \\quad \\sigma_{\\text{long-run}} = \\sqrt{252 \\times V_L}$$
+- **Persistenza ($P = \\alpha + \\beta$)**: Misura la velocità con cui la volatilità tende a riassorbirsi verso la media storica incondizionata $V_L$.
+- **Half-Life dello Shock (Tempo di Dimezzamento)**:
+  $$\\text{Half-Life} = \\frac{\\ln(0.5)}{\\ln(\\alpha + \\beta)} \\quad \\text{giorni lavorativi}$$
+  *Indica quanti giorni di borsa aperta sono necessari affinché un picco di volatilità riduca il suo eccesso del 50%.*
+
+---
+
+#### 🔮 3. Struttura a Termine della Volatilità (Term Structure Forecast)
+Per prevedere la volatilità futura su un orizzonte di $k$ giorni in avanti ($T+k$):
+
+$$\\sigma_{T+k}^2 = V_L + (\\alpha + \\beta)^{k-1} \\left(\\sigma_{T+1}^2 - V_L\\right)$$
+
+- Se la volatilità attuale $\\sigma_{T+1}$ è superiore a $\\sigma_{\\text{long-run}}$, la curva a termine è inclinata negativamente (*Mean-Reverting Downward*).
+- Se il mercato è calmo ($\\sigma_{T+1} < \\sigma_{\\text{long-run}}$), la curva è inclinata positivamente (*Mean-Reverting Upward*).
+
+---
+
+#### 🛡️ 4. Filtered Historical Simulation (FHS — Hull-White 1998, Barone-Adesi 1999)
+La simulazione storica standard ha un grave difetto: assume che la volatilità passata sia identica a quella odierna.
+La **Filtered Historical Simulation (FHS)** risolve questo limite mediante un processo a 3 stadi:
+
+1. **De-volatilizzazione dei Rendimenti Storici**:
+   $$e_t = \\frac{r_t - \\mu}{\\sigma_t}$$
+   I residui standardizzati $e_t$ risultano de-correlati e approssimativamente $i.i.d.$, preservando però integralmente l'asimmetria (*Skewness*) e le code grasse (*Fat Tails*) empiriche.
+
+2. **Re-scaling con la Volatilità Corrente $\\sigma_{T+1}$**:
+   $$r_{T+1, \\text{sim}}^{(i)} = \\mu + e_i \\times \\sigma_{T+1}$$
+
+3. **Stima di VaR e CVaR (Expected Shortfall)**:
+   $$\\text{VaR}_{\\alpha}^{\\text{FHS}} = -Q\\left(r_{\\text{sim}}, \\alpha\\right), \\quad \\text{CVaR}_{\\alpha}^{\\text{FHS}} = -E\\left[r_{\\text{sim}} \\mid r_{\\text{sim}} \\le -\\text{VaR}_{\\alpha}^{\\text{FHS}}\\right]$$
+
+La FHS rappresenta il gold standard raccomandato nei framework **Basel III / FRTB (Fundamental Review of the Trading Book)** perché adegua istantaneamente il capitale di vigilanza agli shock di mercato senza imporre la fallace ipotesi di normalità gaussiana.
+"""
+    render_info_modal(
+        title="⚡ Volatilità Condizionale GARCH(1,1) & FHS",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 
