@@ -101,27 +101,47 @@ Si moltiplica la quantità netta di quote per ciascun asset per il prezzo di mer
 </div>"""
     )
 with col2:
+    pnl_unrealized_val = ret.get("unrealized_pnl_total")
+    if pnl_unrealized_val is None and not pos.empty and "unrealized_pnl" in pos.columns:
+        pnl_unrealized_val = float(pos["unrealized_pnl"].sum())
+    pnl_unrealized_val = pnl_unrealized_val or 0.0
+
+    pnl_realized_val = ret.get("realized_pnl_total")
+    if pnl_realized_val is None and not pos.empty and "realized_pnl" in pos.columns:
+        pnl_realized_val = float(pos["realized_pnl"].sum())
+    pnl_realized_val = pnl_realized_val or 0.0
+
+    pnl_divs_val = ret.get("dividends_total")
+    if pnl_divs_val is None and not pos.empty and "dividends_total" in pos.columns:
+        pnl_divs_val = float(pos["dividends_total"].sum())
+    pnl_divs_val = pnl_divs_val or 0.0
+
+    tot_pnl_val = ret.get("total_pnl", pnl_unrealized_val + pnl_realized_val + pnl_divs_val)
+
     metric_card(
         "PnL Totale",
-        fmt_eur(ret.get("total_pnl")),
+        fmt_eur(tot_pnl_val),
         delta=f"{ret.get('total_pnl_pct', 0)*100:+.2f}%",
-        positive=(ret.get("total_pnl", 0) >= 0),
-        help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
+        positive=(tot_pnl_val >= 0),
+        help_text=f"""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Profit & Loss (Profitti e Perdite) Totale, in Euro e in percentuale sul capitale investito. Misura la ricchezza netta generata dal portafoglio dall'inizio dell'operatività.</div>
 
-<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
-Somma algebrica di PnL latente, PnL realizzato e dividendi netti percepiti:
-<div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-  <b>PnL Totale</b> = PnL Latente + PnL Realizzato + Dividendi Totali
+<div style="margin-bottom: 8px;"><b>📐 Scomposizione Analitica Live:</b>
+<div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 8px 12px; border-radius: 6px; margin: 4px 0; font-size: 13px;">
+  • 🟢 <b>PnL Latente (Posizioni Aperte):</b> <span style="color: {'#3fb950' if pnl_unrealized_val >= 0 else '#f85149'}; font-weight: 600;">€ {pnl_unrealized_val:+,.2f}</span><br>
+  • 🔵 <b>PnL Realizzato (Posizioni Chiuse):</b> <span style="color: {'#3fb950' if pnl_realized_val >= 0 else '#f85149'}; font-weight: 600;">€ {pnl_realized_val:+,.2f}</span><br>
+  • 🟡 <b>Dividendi & Cedole Incassate:</b> <span style="color: #ffd700; font-weight: 600;">€ {pnl_divs_val:+,.2f}</span><br>
+  <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.15); margin: 6px 0;">
+  <b>Totale Netto:</b> <span style="color: {'#3fb950' if tot_pnl_val >= 0 else '#f85149'}; font-weight: 700;">€ {tot_pnl_val:+,.2f}</span>
 </div>
 </div>
 
-<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Quantifica il ritorno economico effettivo in Euro sul patrimonio investito, integrando sia le plusvalenze che i flussi di cassa cedolari.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Quantifica il ritorno economico effettivo in Euro sul patrimonio investito, integrando sia le plusvalenze che i flussi di cassa cedolari e le operazioni già liquidate.</div>
 
 <div style="margin-bottom: 8px;"><b>⚙️ Come viene calcolato dall'applicazione:</b> ARGUS esegue un motore contabile a code FIFO che separa con precisione il costo medio ponderato dei lotti residui, le plusvalenze già liquidate e i dividendi storici accreditati.</div>
 
 <div><b>🔍 Come leggerlo:</b><br>
-• <b>Valore Positivo (Verde):</b> Il portafoglio è in guadagno rispetto al capitale complessivamente impiegato.<br>
+• <b>Valore Positivo (Verde):</b> Il portafoglio è in guadagno complessivo rispetto al capitale investito.<br>
 • <b>Valore Negativo (Rosso):</b> Il portafoglio registra una perdita netta complessiva.
 </div>
 </div>"""

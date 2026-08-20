@@ -58,6 +58,9 @@ def compute_risk(portfolio_id: int, engine, benchmark_ticker: str = "SPY", df_tx
         "ai_insights":   _calc_ai_insights(df_positions, df_returns, sr_portfolio),
     }
 
+    from core.closed_trades import compute_closed_trades_journal
+    closed_trades_data = compute_closed_trades_journal(df_tx=df_tx, df_prices=df_prices, df_positions=df_positions)
+
     return {
         "portfolio_id":     portfolio_id,
         "computed_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -72,6 +75,7 @@ def compute_risk(portfolio_id: int, engine, benchmark_ticker: str = "SPY", df_tx
         "risk_contribution": _calc_risk_contribution(df_returns, df_positions),
         "stress_tests":     _calc_stress_tests(df_returns, df_positions, sr_benchmark),
         "optimization":     _compute_efficient_frontier(df_returns, df_positions),
+        "closed_trades":    closed_trades_data,
         "warnings":         warnings_list
     }
 
@@ -1131,7 +1135,9 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
 
     total_value = df_positions["current_value"].sum() if "current_value" in df_positions.columns else 0.0
     total_cost  = df_positions["cost_basis"].sum() if "cost_basis" in df_positions.columns else 0.0
-    total_pnl   = df_positions["total_return"].sum() if "total_return" in df_positions.columns else 0.0
+    total_unrealized = df_positions["unrealized_pnl"].sum() if "unrealized_pnl" in df_positions.columns else 0.0
+    total_realized   = df_positions["realized_pnl"].sum() if "realized_pnl" in df_positions.columns else 0.0
+    total_pnl   = df_positions["total_return"].sum() if "total_return" in df_positions.columns else (total_unrealized + total_realized)
     total_divs  = df_positions["dividends_total"].sum() if "dividends_total" in df_positions.columns else 0.0
     
     total_pnl_pct = (total_pnl / total_cost) if total_cost > 0 else 0.0
@@ -1147,6 +1153,8 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
         "benchmark_cagr_pct": round(bm_cagr * 100, 4) if bm_cagr is not None else None,
         "portfolio_value":    round(float(total_value), 2),
         "cost_basis_total":   round(float(total_cost), 2),
+        "unrealized_pnl_total": round(float(total_unrealized), 2),
+        "realized_pnl_total":   round(float(total_realized), 2),
         "total_pnl":          round(float(total_pnl), 2),
         "total_pnl_pct":      round(float(total_pnl_pct), 4),
         "dividends_total":    round(float(total_divs), 2),
@@ -2190,6 +2198,9 @@ def compute_sandbox_risk_bundle(
     optimization = _compute_efficient_frontier(df_returns, df_positions)
     risk_contrib = _calc_risk_contribution(df_returns, df_positions)
     
+    from core.closed_trades import compute_closed_trades_journal
+    closed_trades_data = compute_closed_trades_journal(df_tx=pd.DataFrame(), df_positions=df_positions, is_sandbox=True)
+
     return {
         "portfolio_id": 0,
         "is_sandbox": True,
@@ -2204,6 +2215,7 @@ def compute_sandbox_risk_bundle(
         "stress_tests": stress_tests,
         "risk_contribution": risk_contrib,
         "optimization": optimization,
+        "closed_trades": closed_trades_data,
         "warnings": []
     }
 
