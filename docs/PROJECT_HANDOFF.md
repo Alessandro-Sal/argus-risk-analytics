@@ -1,4 +1,4 @@
-# Investment Risk BI Platform — Project Handoff (v5.4.0 Production Release)
+# Investment Risk BI Platform — Project Handoff (v5.5.0 Production Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.4.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.5.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
@@ -34,6 +34,7 @@ CSV / DeGiro / Google Sheets ──┐
 yfinance API ──────────────────┘                           (Pydantic)         (LRU + SQLite 24h)     (models.py)               │
                                                                                                                                ├──► core/ai_analyst.py
                                                                                                                                ├──► core/advanced_quant.py
+                                                                                                                               ├──► core/closed_trades.py
                                                                                                                                ├──► core/multi_portfolio.py
                                                                                                                                ├──► core/diagnostics.py
                                                                                                                                └──► core/financial_analysis.py
@@ -50,16 +51,22 @@ Power BI / Looker Studio ◄─── core/exporter.py ◄─── core/db_expo
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**104/104 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**110/110 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
 - **ARGUS Quant Copilot**: Assistente conversazionale integrato per interrogare il portafoglio su VaR, Sharpe, ribilanciamenti e titoli componenti.
 
 ### `core/advanced_quant.py` — ✅ Modelli Quantitativi di Frontiera
-- **Asymmetric Tail Copulas (Clayton & Gumbel)**: Calcolo della dipendenza non lineare di coda ($\lambda_L, \lambda_U$) e matrice di asimmetria ($\lambda_L - \lambda_U$) per intercettare il rischio di contagio e crollo simultaneo durante i crash di borsa.
-- **Criterio di Kelly & Fractional Sizing**: Calcolo dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)* per la massimizzazione del tasso di crescita del patrimonio azzerando il rischio di rovina statistica.
+- **Asymmetric Tail Copulas (Clayton & Gumbel)**: Calcolo della dipendenza non lineare di coda ($\lambda_L, \lambda_U$) e matrice di asimmetria ($\lambda_L - \lambda_U$) per intercettare il rischio di contagio e crollo simultaneo durante i crash di borsa, con allerta per coppie $\lambda_L \ge 0.30$.
+- **Simulatore Interattivo Trade Sizing (Kelly Criterion)**: Calcolo dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)*, dimensionamento monetario del nozionale in base allo Stop-Loss inserito e stima dell'Edge statistico e del tasso di crescita geometrico atteso.
 - **Equal Risk Contribution (ERC / Risk Parity Pura)**: Ottimizzazione non lineare SLSQP con matrice di covarianza Ledoit-Wolf per ripartire in modo rigorosamente paritario il contributo marginale al rischio ($RC_i = \sigma_p / N$).
+
+### `core/closed_trades.py` — ✅ Graveyard, FIFO Closed Trades Journal & Multi-View Analytics
+- **Closed Trades Journal**: Estrazione rigorosa a code FIFO dei singoli lotti chiusi con prezzi di carico/scarico, controvalori, PnL monetario/percentuale e holding period effettivo.
+- **Curva Cumulativa di PnL Realizzato**: Tracciamento cronologico della crescita del profitto monetizzato con linea di **High-Water Mark (Picco)** e telemetria di trade drawdown.
+- **Trading Calendar & Heatmap Mensile**: Matrice di performance Mese $\times$ Anno con totali annuali per l'identificazione della stagionalità dei profitti.
+- **Scomposizione Settori GICS & Asset Class**: Normalizzazione istituzionale e ripartizione del PnL e del Win Rate per settore economico e classe di attivo.
 
 ### `core/multi_portfolio.py` — ✅ Total Wealth Multi-Account & Master Wealth Engine
 - **Multi-Account Registry**: Salvataggio, caricamento ed eliminazione di profili di portafoglio con etichette strategiche (*Crescita*, *Dividendi*, *Previdenza*, *Crypto*).
@@ -110,10 +117,12 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - Discovery globale su 4 universi e archetipi quantitativi istituzionali (*GARP*, *Deep Value*, *Dividend Fortress*, *Low Volatility*, *Momentum Breakout*).
 - Simulatore di impatto pre-trade con ricalcolo dei delta su rischio, diversificazione e rendimento.
 
-### `core/tax_engine.py` — ✅ Ottimizzazione Fiscale TUIR Art. 67
+### `core/tax_engine.py` — ✅ Ottimizzazione Fiscale & Tax-Loss Harvesting Wizard (TUIR Art. 67)
 - **Tassazione Normativa Italiana**: Tassazione al 12.5% sui Titoli di Stato (White List) e 26.0% su Azioni, Obbligazioni, ETF e Cripto.
 - **Regola ETF vs Titoli Singoli**: Plusvalenze da ETF considerate *Redditi di Capitale* e non compensabili con minusvalenze (*Redditi Diversi*).
-- **Tax-Loss Harvesting Advisor**: Identificazione delle posizioni in perdita latente da liquidare strategicamente prima di fine anno fiscale.
+- **Tax-Loss Harvesting & Step-Up Wizard**:
+  - *Step-Up Fiscale a 0€ Imposte*: Calcolo esatto per vendere e ricomprare posizioni in utile su *Redditi Diversi*, azzerando minusvalenze in scadenza senza esborso fiscale e alzando il prezzo di carico a zero tasse.
+  - *Raccolta Minusvalenze*: Individuazione posizioni in perdita latente da monetizzare per generare scudi fiscali quadriennali.
 
 ### `core/attribution.py` — ✅ Attribuzione Performance Brinson-Fachler
 - Scomposizione dell'extra-rendimento rispetto al benchmark nei 3 fattori: **Allocation Effect**, **Selection Effect** ed **Interaction Effect**.
@@ -145,7 +154,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **1-Click Maintenance Utilities**: `optimize_database_storage` (VACUUM & compatta DB), `clean_expired_cache_records` (pulizia TTL 24h), `reindex_databases` (reindicizzazione B-Tree su ticker e date).
 - **Benchmark di Latenza**: Monitoraggio della latenza in millisecondi (ms) sui 26 motori quantitativi istituzionali e test di integrità `PRAGMA integrity_check`.
 
-### `core/workspace_manager.py` & `core/sidebar.py` — ✅ Navigation Rail v5.4.0, Spotlight & Workspace State
+### `core/workspace_manager.py` & `core/sidebar.py` — ✅ Navigation Rail v5.5.0, Spotlight & Workspace State
 - Gestione dello stato sessione e URL query parameters (`st.query_params`) per routing e permalink affidabili.
 - Command Palette Spotlight (`Ctrl+K` / `Cmd+K`) per saltare all'istante a qualsiasi modulo o ticker con fuzzy search.
 - Sistema di Tree Rail istituzionale a 10 moduli con routing reattivo a sotto-schede e persistenza multi-sessione.
@@ -157,8 +166,8 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 1. **`0_Control_Room.py`**: Control Room & Ingestione CSV/DeGiro/Google Sheets Live Sync, Switch Database, Selezione Valuta Base, **Total Wealth Hub (Multi-Account)** con Master Wealth Fusion, **Database & Memory Storage Cockpit** con Donut Chart e 1-Click Maintenance Tools.
 2. **`1_📈_Dashboard_Generale.py`**: Executive Cockpit, Badges Istituzionali, Radar Factor 360°, **Multi-Benchmark Overlay fino a 4 indici con Scorecard**, Early Warning Risk Limits, ARGUS AI Analyst, Quant Copilot e Centro Esportazione Report.
 3. **`2_🔴_Analisi_Rischio.py`**: Matrice di Correlazione, Risk Heatmap Grid, Component VaR, **Market Regime Switching (3-State Markov Model)**, Rischio Liquidità (ADV), Backtesting VaR (Kupiec Test), ATR Chandelier Exit Manager e **Machine Learning Anomaly Detector (Isolation Forest & Correlation Drift)**.
-4. **`3_🔬_Modelli_Quantitativi.py`**: Frontiera Efficiente Markowitz (Ledoit-Wolf), **Live Rebalancing Sandbox (What-If Weight Matrix)**, **Hierarchical Risk Parity (HRP — López de Prado)**, Simulatore Monte Carlo Fan/Ribbon Chart (Student-t), **Simulatore Jump-Diffusion di Merton (Poisson Tail Shocks)**, Hedging Tattico & Tail Risk, **Modello Black-Scholes & Delta-Hedging con Put / Covered Call Yield Enhancer**, Attribuzione Brinson-Fachler, e **Modelli Fattoriali (Carhart 4-Factor, MSCI Barra 5-Factor Ortogonalizzato, Black-Litterman)**.
-5. **`4_📋_Posizioni_e_Dettagli.py`**: Posizioni attive, Costo di carico FIFO, Smart Rebalancer, Calendario Dividendi per Azienda, Tax-Loss Harvesting TUIR e Modello Almgren-Chriss Market Impact.
+4. **`3_🔬_Modelli_Quantitativi.py`**: Frontiera Efficiente Markowitz (Ledoit-Wolf), **🧬 Tail Copula (Clayton/Gumbel) & Crash Contagion Matrix**, **⚖️ Simulatore Interattivo Trade Sizing (Kelly Criterion)**, **Live Rebalancing Sandbox (What-If Weight Matrix)**, **Hierarchical Risk Parity (HRP — López de Prado)**, Simulatore Monte Carlo Fan/Ribbon Chart (Student-t), **Simulatore Jump-Diffusion di Merton (Poisson Tail Shocks)**, Hedging Tattico & Tail Risk, **Modello Black-Scholes & Delta-Hedging con Put / Covered Call Yield Enhancer**, Attribuzione Brinson-Fachler, e **Modelli Fattoriali (Carhart 4-Factor, MSCI Barra 5-Factor Ortogonalizzato, Black-Litterman)**.
+5. **`4_📋_Posizioni_e_Dettagli.py`**: Posizioni attive, Costo di carico FIFO, **🪦 Posizioni Chiuse & Graveyard Cockpit Multi-Prospettiva (Curva Cumulativa, High-Water Mark, Trading Calendar & Heatmap Mensile, Scomposizione Settori/Asset Class)**, **💰 Tax-Loss Harvesting & Step-Up Wizard (TUIR Art. 67)**, Smart Rebalancer, Calendario Dividendi per Azienda e Modello Almgren-Chriss Market Impact.
 6. **`5_🏛️_Valutazione_Aziendale.py`**: Altman Z-Score, Scomposizione DuPont (3 e 5 fattori), Piotroski F-Score (9pt), **Contabilità Forense: Beneish M-Score & Sloan Accrual Ratio**, WACC CAPM, Valutazione DCF Monte Carlo, Bilanci 10-K, Comparativa Multiaziendale e **Diagnostica Predittiva Machine Learning (Random Forest Distress Risk Classifier)**.
 7. **`6_🌪️_Stress_Testing.py`**: MSCI Barra Multi-Scenario Matrix, Beta Shock Waterfall, Macro Scenario Builder interattivo ($\Delta r$, $\Delta \text{FX}$, $\Delta \text{Commodity}$, $\Delta \text{Equity}$) e **Visualizzatore 3D della Superficie di Rischio (Plotly Surface)**.
 8. **`7_📊_Analisi_Temporale.py`**: Storicizzazione Multi-Snapshot su Data Warehouse MySQL/SQLite, Evoluzione Temporale del Valore di Portafoglio, Matrice dei Delta ($\Delta$) tra Snapshot e Calcolatore del Tasso di Risparmio & Iniezioni di Liquidità.
@@ -169,26 +178,26 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **104 test automatizzati passano con successo (100%)**:
+Tutti i **110 test automatizzati passano con successo (100%)**:
 
 ```bash
 py -m pytest
 ```
 
 - Ingestione & Schemi: `test_validator.py`, `test_schemas.py`, `test_adapters.py`, `test_enhancements.py`
-- Engine Quantitativo: `test_risk_engine.py`, `test_var_cvar.py`, `test_var_backtest.py`, `test_var_lookback.py`, `test_diversification.py`, `test_merton_and_isolation_forest.py`
+- Engine Quantitativo & Graveyard: `test_risk_engine.py`, `test_closed_trades.py`, `test_quant_tax_graveyard_enhancements.py`, `test_var_cvar.py`, `test_var_backtest.py`, `test_var_lookback.py`, `test_diversification.py`, `test_merton_and_isolation_forest.py`
 - Analisi Tecnica: `test_technical_analysis.py`
-- Modelli & Ottimizzazione: `test_optimization.py`, `test_hrp_optimizer.py`, `test_hrp_and_options.py`, `test_kmeans_elbow.py`, `test_monte_carlo_ui.py`, `test_custom_stress.py`, `test_backtest.py`, `test_black_litterman_fama_french.py`, `test_new_quant_features.py`, `test_ml_and_3d_features.py`, `test_regime_switching.py`, `test_regime_and_options.py`
+- Modelli & Ottimizzazione: `test_optimization.py`, `test_hrp_optimizer.py`, `test_advanced_quant.py`, `test_kmeans_elbow.py`, `test_monte_carlo_ui.py`, `test_custom_stress.py`, `test_new_quant_features.py`, `test_ml_and_3d_features.py`, `test_regime_and_options.py`
 - Modelli di Bilancio & Forense: `test_financial_analysis.py`, `test_forensic_accounting.py`
-- Moduli Fiscali & Limiti: `test_tax_engine.py`, `test_tax_engine_edge_cases.py`, `test_hedging_attribution_limits.py`, `test_risk_limits.py`
-- Moduli Istituzionali & Reporting: `test_rebalancer_and_advisor.py`, `test_excel.py`, `test_html_exporter.py`, `test_report_exporter.py`, `test_export_star_schema.py`
+- Moduli Fiscali & Limiti: `test_tax_engine.py`, `test_tax_engine_edge_cases.py`, `test_hedging_attribution_limits.py`
+- Moduli Istituzionali & Reporting: `test_rebalancer_and_advisor.py`, `test_excel.py`, `test_html_exporter.py`
 - Multi-Portafoglio & Consolidamento: `test_multi_portfolio.py`
 - Screener & Pre-Trade: `test_screener_engine.py`
-- Caching, Storage & Diagnostica: `test_cache_shield.py`, `test_cache_shield_and_diagnostics.py`, `test_diagnostics.py`
-- Pipeline & Workspace: `test_pipeline.py`, `test_workspace_manager.py`, `test_session_snapshot.py`, `test_sync_url_state.py`, `test_gsheets_sync.py`
+- Caching, Storage & Diagnostica: `test_cache_shield_and_diagnostics.py`
+- Pipeline & Workspace: `test_workspace_manager.py`, `test_gsheets_sync.py`
 - Smoke Test UI Streamlit: `test_frontend_smoke.py`
 
 ---
 
-*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.4.0.*
+*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.5.0.*
 
