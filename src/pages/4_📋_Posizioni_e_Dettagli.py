@@ -663,10 +663,11 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                         hovertemplate="<b>Settore: %{y}</b><br>• PnL Realizzato: <b>€ %{x:+,.2f}</b><br>• Win Rate: <b>%{customdata[0]:.1f}%</b><br>• N. Trade: <b>%{customdata[1]}</b><extra></extra>"
                     ))
                     fig_sec.update_layout(
-                        template="plotly_dark", height=320,
+                        template="plotly_dark",
+                        height=max(320, 36 * len(df_sec_sort)),
                         xaxis=dict(title="PnL Realizzato Netto (€)", tickprefix="€ ", separatethousands=True, gridcolor="rgba(255,255,255,0.06)"),
-                        yaxis=dict(title=None),
-                        margin=dict(l=80, r=20, t=20, b=40),
+                        yaxis=dict(title=None, tickfont=dict(size=11, color="#c9d1d9")),
+                        margin=dict(l=175, r=20, t=20, b=40),
                         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
                     )
                     apply_plotly_theme(fig_sec)
@@ -686,10 +687,12 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                         hovertemplate="<b>Asset Class: %{y}</b><br>• PnL Realizzato: <b>€ %{x:+,.2f}</b><br>• Win Rate: <b>%{customdata[0]:.1f}%</b><br>• N. Trade: <b>%{customdata[1]}</b><extra></extra>"
                     ))
                     fig_ac.update_layout(
-                        template="plotly_dark", height=320,
+                        template="plotly_dark",
+                        height=max(260, 50 * len(df_ac_sort)),
+                        bargap=0.55,
                         xaxis=dict(title="PnL Realizzato Netto (€)", tickprefix="€ ", separatethousands=True, gridcolor="rgba(255,255,255,0.06)"),
-                        yaxis=dict(title=None),
-                        margin=dict(l=80, r=20, t=20, b=40),
+                        yaxis=dict(title=None, tickfont=dict(size=11, color="#c9d1d9")),
+                        margin=dict(l=145, r=20, t=20, b=40),
                         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
                     )
                     apply_plotly_theme(fig_ac)
