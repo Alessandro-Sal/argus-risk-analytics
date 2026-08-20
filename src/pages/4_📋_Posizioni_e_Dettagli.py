@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 import importlib
@@ -402,113 +403,113 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-        # ── 2. GRAFICI ANALITICI COCKPIT ──────────────────────────────
-        col_g_chart1, col_g_chart2 = st.columns([1.3, 1.2])
-
+        # ── 2. GRAFICI ANALITICI COCKPIT (DUE RIGHE A TUTTA LARGHEZZA) ─
         df_assets_closed = closed_data.get("df_closed_assets", pd.DataFrame())
         df_lots_closed = closed_data.get("df_closed_lots", pd.DataFrame())
-        chart_height = max(400, min(750, len(df_assets_closed) * 32)) if not df_assets_closed.empty else 400
 
-        with col_g_chart1:
+        # RIGA 1: PnL Realizzato per Asset
+        if not df_assets_closed.empty:
             st.markdown("##### 📊 PnL Realizzato per Asset (€)")
-            if not df_assets_closed.empty:
-                df_sorted_a = df_assets_closed.sort_values("realized_pnl_eur", ascending=True)
-                bar_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_sorted_a["realized_pnl_eur"]]
-                
-                fig_bar_pnl = go.Figure(go.Bar(
-                    x=df_sorted_a["realized_pnl_eur"],
-                    y=df_sorted_a["ticker"],
-                    orientation='h',
-                    marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
-                    customdata=df_sorted_a["realized_pnl_pct"],
-                    hovertemplate="<b>Asset: %{y}</b><br>PnL Realizzato: <b>€ %{x:+,.2f}</b><br>Rendimento: <b>%{customdata:+.2f}%</b><extra></extra>"
-                ))
-                fig_bar_pnl.update_layout(
-                    template="plotly_dark", height=chart_height,
-                    xaxis=dict(
-                        title="PnL Realizzato Netto (€)",
-                        zeroline=True,
-                        zerolinecolor="rgba(255,255,255,0.3)",
-                        zerolinewidth=1.5,
-                        gridcolor="rgba(255,255,255,0.06)",
-                        tickprefix="€ ",
-                        separatethousands=True
-                    ),
-                    yaxis=dict(
-                        title=None,
-                        gridcolor="rgba(255,255,255,0.04)",
-                        tickfont=dict(size=12, color="#c9d1d9")
-                    ),
-                    margin=dict(l=65, r=25, t=40, b=45),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-                )
-                apply_plotly_theme(fig_bar_pnl)
-                st.plotly_chart(fig_bar_pnl, use_container_width=True)
+            df_sorted_a = df_assets_closed.sort_values("realized_pnl_eur", ascending=True)
+            bar_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_sorted_a["realized_pnl_eur"]]
+            bar_height = max(340, min(700, len(df_sorted_a) * 28))
+            
+            fig_bar_pnl = go.Figure(go.Bar(
+                x=df_sorted_a["realized_pnl_eur"],
+                y=df_sorted_a["ticker"],
+                orientation='h',
+                marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
+                customdata=df_sorted_a["realized_pnl_pct"],
+                hovertemplate="<b>Asset: %{y}</b><br>• PnL Realizzato: <b>€ %{x:+,.2f}</b><br>• Rendimento: <b>%{customdata:+.2f}%</b><extra></extra>"
+            ))
+            fig_bar_pnl.update_layout(
+                template="plotly_dark", height=bar_height,
+                xaxis=dict(
+                    title="PnL Realizzato Netto (€)",
+                    zeroline=True,
+                    zerolinecolor="rgba(255,255,255,0.3)",
+                    zerolinewidth=1.5,
+                    gridcolor="rgba(255,255,255,0.06)",
+                    tickprefix="€ ",
+                    separatethousands=True
+                ),
+                yaxis=dict(
+                    title=None,
+                    gridcolor="rgba(255,255,255,0.04)",
+                    tickfont=dict(size=12, color="#c9d1d9")
+                ),
+                margin=dict(l=65, r=30, t=25, b=45),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            apply_plotly_theme(fig_bar_pnl)
+            st.plotly_chart(fig_bar_pnl, use_container_width=True)
 
-        with col_g_chart2:
+        st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+
+        # RIGA 2: Rendimento vs Tempo di Detenzione
+        if not df_lots_closed.empty:
             st.markdown("##### ⏱️ Rendimento Realizzato (%) vs Tempo di Detenzione")
-            if not df_lots_closed.empty:
-                fig_scat = go.Figure()
-                for outcome, color in [("🟢 WIN", "#3fb950"), ("🔴 LOSS", "#f85149"), ("🟡 BREAKEVEN", "#ffd700")]:
-                    df_sub = df_lots_closed[df_lots_closed["outcome"] == outcome]
-                    if not df_sub.empty:
-                        fig_scat.add_trace(go.Scatter(
-                            x=df_sub["holding_days"],
-                            y=df_sub["realized_pnl_pct"],
-                            mode="markers",
-                            name=outcome,
-                            marker=dict(
-                                color=color,
-                                size=11,
-                                opacity=0.88,
-                                line=dict(width=1.2, color="#ffffff")
-                            ),
-                            customdata=np.stack((
-                                df_sub["ticker"],
-                                df_sub["realized_pnl_eur"],
-                                df_sub["buy_date"],
-                                df_sub["sell_date"]
-                            ), axis=-1),
-                            hovertemplate=(
-                                "<b>%{customdata[0]}</b> (" + outcome + ")<br>"
-                                "• Tempo Detenzione: <b>%{x} gg</b><br>"
-                                "• Rendimento: <b>%{y:+.2f}%</b><br>"
-                                "• PnL Realizzato: <b>€ %{customdata[1]:+,.2f}</b><br>"
-                                "• Acquisto: <b>%{customdata[2]}</b> | Vendita: <b>%{customdata[3]}</b>"
-                                "<extra></extra>"
-                            )
-                        ))
-                fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.35)", line_width=1.5)
-                fig_scat.update_layout(
-                    template="plotly_dark", height=chart_height,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1.0,
-                        title_text="",
-                        bgcolor="rgba(22,27,34,0.75)",
-                        bordercolor="rgba(255,255,255,0.12)",
-                        borderwidth=1,
-                        font=dict(size=11)
-                    ),
-                    xaxis=dict(
-                        title="Giorni di Detenzione (Holding Period)",
-                        gridcolor="rgba(255,255,255,0.06)",
-                        zeroline=False
-                    ),
-                    yaxis=dict(
-                        title="Rendimento Realizzato (%)",
-                        ticksuffix="%",
-                        gridcolor="rgba(255,255,255,0.06)",
-                        zeroline=False
-                    ),
-                    margin=dict(l=55, r=20, t=40, b=45),
-                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-                )
-                apply_plotly_theme(fig_scat)
-                st.plotly_chart(fig_scat, use_container_width=True)
+            fig_scat = go.Figure()
+            for outcome, color in [("🟢 WIN", "#3fb950"), ("🔴 LOSS", "#f85149"), ("🟡 BREAKEVEN", "#ffd700")]:
+                df_sub = df_lots_closed[df_lots_closed["outcome"] == outcome]
+                if not df_sub.empty:
+                    fig_scat.add_trace(go.Scatter(
+                        x=df_sub["holding_days"],
+                        y=df_sub["realized_pnl_pct"],
+                        mode="markers",
+                        name=outcome,
+                        marker=dict(
+                            color=color,
+                            size=11,
+                            opacity=0.88,
+                            line=dict(width=1.2, color="#ffffff")
+                        ),
+                        customdata=np.stack((
+                            df_sub["ticker"],
+                            df_sub["realized_pnl_eur"],
+                            df_sub["buy_date"],
+                            df_sub["sell_date"]
+                        ), axis=-1),
+                        hovertemplate=(
+                            "<b>%{customdata[0]}</b> (" + outcome + ")<br>"
+                            "• Tempo Detenzione: <b>%{x} gg</b><br>"
+                            "• Rendimento: <b>%{y:+.2f}%</b><br>"
+                            "• PnL Realizzato: <b>€ %{customdata[1]:+,.2f}</b><br>"
+                            "• Acquisto: <b>%{customdata[2]}</b> | Vendita: <b>%{customdata[3]}</b>"
+                            "<extra></extra>"
+                        )
+                    ))
+            fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.35)", line_width=1.5)
+            fig_scat.update_layout(
+                template="plotly_dark", height=420,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1.0,
+                    title_text="",
+                    bgcolor="rgba(22,27,34,0.75)",
+                    bordercolor="rgba(255,255,255,0.12)",
+                    borderwidth=1,
+                    font=dict(size=11)
+                ),
+                xaxis=dict(
+                    title="Giorni di Detenzione (Holding Period)",
+                    gridcolor="rgba(255,255,255,0.06)",
+                    zeroline=False
+                ),
+                yaxis=dict(
+                    title="Rendimento Realizzato (%)",
+                    ticksuffix="%",
+                    gridcolor="rgba(255,255,255,0.06)",
+                    zeroline=False
+                ),
+                margin=dict(l=55, r=30, t=40, b=50),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            apply_plotly_theme(fig_scat)
+            st.plotly_chart(fig_scat, use_container_width=True)
 
         st.divider()
 
