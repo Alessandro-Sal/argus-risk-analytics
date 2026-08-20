@@ -9,7 +9,7 @@ import core.ui_utils
 import core.risk_engine
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
-from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner
+from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner, render_garch_fhs_modal
 from core.regime_switching import compute_market_regime_states
 
 
@@ -1145,6 +1145,185 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         * **🟡 Zona Gialla**: Sottostima lieve.
         * **🔴 Zona Rossa**: Troppe violazioni. Modello inaffidabile.
         """)
+
+    # ── SEZIONE GARCH(1,1) & FILTERED HISTORICAL SIMULATION (FHS) ────────
+    st.divider()
+    col_garch_head1, col_garch_head2 = st.columns([3.2, 1.2])
+    with col_garch_head1:
+        st.markdown("#### ⚡ Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)")
+        st.caption("Modellazione econometrica dei cluster di volatilità, persistenza degli shock e stima non-parametrica a code spesse conforme a FRTB / Basel III.")
+    with col_garch_head2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        render_garch_fhs_modal(button_label="ℹ️ Metodologia GARCH(1,1) & FHS", use_popover=True)
+
+    from core.garch_engine import compute_garch_fhs_bundle
+    garch_bundle = compute_garch_fhs_bundle(r, total_value=total_value, horizon=holding_period)
+    gkpi = garch_bundle["kpis"]
+    fit_data = garch_bundle["fit"]
+    df_dyn = garch_bundle["dynamic_bands"]
+    df_term = garch_bundle["term_structure"]
+
+    # 4 KPI Cards
+    col_g1, col_g2, col_g3, col_g4 = st.columns(4)
+    with col_g1:
+        vol_curr = gkpi["next_day_annual_vol_pct"]
+        vol_long = gkpi["unconditional_annual_vol_pct"]
+        diff_vol = vol_curr - vol_long
+        st.metric(
+            label="Volatilità Condizionale (T+1)",
+            value=f"{vol_curr:.2f}%",
+            delta=f"{diff_vol:+.2f}% vs Lungo Termine ({vol_long:.2f}%)",
+            delta_color="inverse" if diff_vol > 0 else "normal",
+            help="Volatilità annualizzata prevista per la prossima seduta dal modello GARCH(1,1)."
+        )
+    with col_g2:
+        persist_val = gkpi["persistence"]
+        hl_days = gkpi["half_life_days"]
+        st.metric(
+            label="Persistenza Shock (α + β)",
+            value=f"{persist_val:.3f}",
+            delta=f"Half-Life: {hl_days:.1f} giorni" if hl_days < 500 else "Memoria quasi-infinita",
+            help="Somma dei parametri ARCH (α) e GARCH (β). Se < 1 il processo è stazionario con ritorno verso la media."
+        )
+    with col_g3:
+        var_fhs_val = gkpi.get(f"var_fhs_{int(conf_level*100)}_pct", 0.0)
+        var_fhs_eur = gkpi.get(f"var_fhs_{int(conf_level*100)}_eur", 0.0)
+        st.metric(
+            label=f"VaR FHS ({int(conf_level*100)}% - {holding_period}g)",
+            value=f"{var_fhs_val:.2f}%",
+            delta=f"-€{var_fhs_eur:,.2f}",
+            delta_color="inverse",
+            help="Value at Risk ottenuto tramite Filtered Historical Simulation con residui empirici de-volatilizzati."
+        )
+    with col_g4:
+        cvar_fhs_val = gkpi.get(f"cvar_fhs_{int(conf_level*100)}_pct", 0.0)
+        cvar_fhs_eur = gkpi.get(f"cvar_fhs_{int(conf_level*100)}_eur", 0.0)
+        st.metric(
+            label="CVaR FHS (Expected Shortfall)",
+            value=f"{cvar_fhs_val:.2f}%",
+            delta=f"-€{cvar_fhs_eur:,.2f}",
+            delta_color="inverse",
+            help="Perdita media attesa nello scenario in cui si infranga il VaR FHS."
+        )
+
+    # 2 Grafici Plotly
+    col_chart_garch1, col_chart_garch2 = st.columns([1.6, 1.4])
+    with col_chart_garch1:
+        st.markdown("##### 📈 Volatilità Condizionale Storica & Bande VaR GARCH(1,1)")
+        fig_garch_ts = go.Figure()
+        
+        # Rendimenti effettivi
+        fig_garch_ts.add_trace(go.Scatter(
+            x=df_dyn.index,
+            y=df_dyn["return"] * 100.0,
+            mode="markers",
+            name="Rendimento Giornaliero",
+            marker=dict(color="rgba(140, 150, 165, 0.45)", size=3.5),
+            hovertemplate="Data: %{x|%Y-%m-%d}<br>Rendimento: %{y:.2f}%<extra></extra>"
+        ))
+        # Banda VaR 95% GARCH
+        fig_garch_ts.add_trace(go.Scatter(
+            x=df_dyn.index,
+            y=-df_dyn["var95_dynamic_pct"],
+            mode="lines",
+            name="Banda VaR 95% GARCH",
+            line=dict(color="#ff9900", width=1.6),
+            hovertemplate="Data: %{x|%Y-%m-%d}<br>VaR 95% GARCH: %{y:.2f}%<extra></extra>"
+        ))
+        # Banda VaR 99% GARCH
+        fig_garch_ts.add_trace(go.Scatter(
+            x=df_dyn.index,
+            y=-df_dyn["var99_dynamic_pct"],
+            mode="lines",
+            name="Banda VaR 99% GARCH",
+            line=dict(color="#f85149", width=1.8, dash="dot"),
+            hovertemplate="Data: %{x|%Y-%m-%d}<br>VaR 99% GARCH: %{y:.2f}%<extra></extra>"
+        ))
+        
+        fig_garch_ts.update_layout(
+            height=320,
+            margin=dict(l=10, r=10, t=25, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+            yaxis=dict(title="Rendimento / VaR (%)", showgrid=True, gridcolor="rgba(255,255,255,0.05)")
+        )
+        st.plotly_chart(fig_garch_ts, use_container_width=True)
+
+    with col_chart_garch2:
+        st.markdown("##### 🔮 Struttura a Termine Volatilità Prevista (30 Giorni)")
+        fig_term = go.Figure()
+        
+        fig_term.add_trace(go.Scatter(
+            x=df_term["horizon_days"],
+            y=df_term["forecast_annual_vol_pct"],
+            mode="lines+markers",
+            name="Volatilità Prevista σ(k)",
+            line=dict(color="#00f3ff", width=2.5),
+            marker=dict(size=5, color="#00f3ff"),
+            hovertemplate="Orizzonte: %{x} giorni<br>Volatilità Annua: %{y:.2f}%<extra></extra>"
+        ))
+        
+        # Linea asintotica V_L
+        fig_term.add_hline(
+            y=vol_long,
+            line_dash="dash",
+            line_color="#ff9900",
+            annotation_text=f"Varianza di Lungo Periodo ({vol_long:.2f}%)",
+            annotation_position="bottom right"
+        )
+        
+        fig_term.update_layout(
+            height=320,
+            margin=dict(l=10, r=10, t=25, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(title="Orizzonte di Previsione (Giorni)", showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
+            yaxis=dict(title="Volatilità Annualizzata (%)", showgrid=True, gridcolor="rgba(255,255,255,0.05)")
+        )
+        st.plotly_chart(fig_term, use_container_width=True)
+
+    # Parametri di calibrazione
+    with st.expander("🔬 Dettaglio Parametri Econometrici GARCH(1,1) & Test di Verosimiglianza"):
+        col_p1, col_p2 = st.columns(2)
+        with col_p1:
+            df_params = pd.DataFrame({
+                "Parametro Econometrico": [
+                    "Costante di Fondo (ω)",
+                    "Termine ARCH / News Shock (α)",
+                    "Termine GARCH / Persistenza (β)",
+                    "Persistenza Globale (α + β)",
+                    "Rendimento Medio Giornaliero (μ)"
+                ],
+                "Valore Stimato": [
+                    f"{fit_data['omega']:.8f}",
+                    f"{fit_data['alpha']:.5f}",
+                    f"{fit_data['beta']:.5f}",
+                    f"{fit_data['persistence']:.5f}",
+                    f"{fit_data['mu']*100:.4f}%"
+                ]
+            })
+            st.dataframe(df_params, use_container_width=True, hide_index=True)
+        with col_p2:
+            df_stats = pd.DataFrame({
+                "Metrica di Diagnostica": [
+                    "Status di Convergenza Ottimizzatore",
+                    "Log-Likelihood Massimizzata",
+                    "Akaike Information Criterion (AIC)",
+                    "Bayesian Information Criterion (BIC)",
+                    "Tempo di Dimezzamento Shock (Half-Life)"
+                ],
+                "Valore": [
+                    "🟢 Convergenza Raggiunta (SLSQP)" if fit_data["converged"] else "🟡 Fallback Parametrico Robusto",
+                    f"{fit_data['log_likelihood']:.2f}",
+                    f"{fit_data['aic']:.2f}",
+                    f"{fit_data['bic']:.2f}",
+                    f"{fit_data['half_life_days']:.1f} giorni lavorativi" if fit_data['half_life_days'] < 500 else "N/A"
+                ]
+            })
+            st.dataframe(df_stats, use_container_width=True, hide_index=True)
 
 
 # ==============================================================================
