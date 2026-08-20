@@ -1252,48 +1252,78 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
     display: none;
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(13, 17, 23, 0.85);
     z-index: 999999;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }}
 #modal-toggle-{unique_id}:checked ~ .modal-overlay-{unique_id} {{
     display: flex;
 }}
+.modal-backdrop-{unique_id} {{
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 14, 20, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    cursor: pointer;
+    z-index: 1;
+}}
 .modal-content-{unique_id} {{
     background: #161b22;
     border: 1px solid rgba(255, 153, 0, 0.4);
-    padding: 22px 26px;
-    border-radius: 14px;
+    padding: 24px 28px;
+    border-radius: 16px;
     width: 90%;
-    max-width: 650px;
+    max-width: 680px;
     max-height: 85vh;
     overflow-y: auto;
     color: #e6edf3;
     position: relative;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 20px rgba(255, 153, 0, 0.1);
-    font-family: 'Outfit', sans-serif;
+    z-index: 2;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.9), 0 0 30px rgba(255, 153, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     text-align: left;
-    animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }}
-@keyframes modalFadeIn {{
-    from {{ opacity: 0; transform: translateY(20px) scale(0.95); }}
-    to {{ opacity: 1; transform: translateY(0) scale(1); }}
+@keyframes modalScaleIn {{
+    from {{ opacity: 0; transform: scale(0.94) translateY(12px); }}
+    to {{ opacity: 1; transform: scale(1) translateY(0); }}
 }}
 .modal-close-{unique_id} {{
     position: absolute;
     top: 14px; right: 18px;
     cursor: pointer;
-    font-size: 24px;
+    font-size: 26px;
     color: rgba(255, 255, 255, 0.5);
     font-weight: 300;
     line-height: 1;
-    transition: 0.2s;
+    transition: all 0.2s ease;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
 }}
 .modal-close-{unique_id}:hover {{
     color: #ff9900;
+    background: rgba(255, 153, 0, 0.12);
+    transform: scale(1.1);
+}}
+.modal-content-{unique_id}::-webkit-scrollbar {{
+    width: 6px;
+}}
+.modal-content-{unique_id}::-webkit-scrollbar-track {{
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+}}
+.modal-content-{unique_id}::-webkit-scrollbar-thumb {{
+    background: rgba(255, 153, 0, 0.3);
+    border-radius: 4px;
+}}
+.modal-content-{unique_id}::-webkit-scrollbar-thumb:hover {{
+    background: rgba(255, 153, 0, 0.6);
 }}
 .info-icon-{unique_id} {{
     cursor: pointer; 
@@ -1319,10 +1349,11 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
 
 <input type="checkbox" id="modal-toggle-{unique_id}">
 <div class="modal-overlay-{unique_id}">
+    <label for="modal-toggle-{unique_id}" class="modal-backdrop-{unique_id}"></label>
     <div class="modal-content-{unique_id}">
         <label for="modal-toggle-{unique_id}" class="modal-close-{unique_id}">×</label>
-        <h3 style="margin: 0 0 12px 0; border-bottom: 1px solid rgba(255,153,0,0.3); padding-bottom: 8px; font-size: 18px; font-weight: 700; color: #ffffff;">{label}</h3>
-        <div style="font-size: 14px; line-height: 1.5; margin: 0; color: #c9d1d9;">{safe_help_text}</div>
+        <h3 style="margin: 0 0 14px 0; border-bottom: 1px solid rgba(255,153,0,0.3); padding-bottom: 10px; font-size: 18px; font-weight: 700; color: #ffffff;">{label}</h3>
+        <div style="font-size: 14px; line-height: 1.55; margin: 0; color: #c9d1d9;">{safe_help_text}</div>
     </div>
 </div>"""
         label_html = f'<div class="metric-label" style="display:flex; align-items:center;">{label} <label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
@@ -1391,44 +1422,78 @@ def glossary_modal(title: str, content: str, button_label: str = "📖 Approfond
     display: none;
     position: fixed;
     top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(13, 17, 23, 0.85);
     z-index: 999999;
     align-items: center;
     justify-content: center;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
 }}
 #modal-toggle-{unique_id}:checked ~ .modal-overlay-{unique_id} {{
     display: flex;
 }}
+.modal-backdrop-{unique_id} {{
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 14, 20, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    cursor: pointer;
+    z-index: 1;
+}}
 .modal-content-{unique_id} {{
     background: #161b22;
     border: 1px solid rgba(255, 153, 0, 0.4);
-    padding: 22px 26px;
-    border-radius: 14px;
+    padding: 24px 28px;
+    border-radius: 16px;
     width: 90%;
-    max-width: 650px;
+    max-width: 680px;
     max-height: 85vh;
     overflow-y: auto;
     color: #e6edf3;
     position: relative;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.8), 0 0 20px rgba(255, 153, 0, 0.1);
-    font-family: 'Outfit', sans-serif;
+    z-index: 2;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.9), 0 0 30px rgba(255, 153, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     text-align: left;
-    animation: modalFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}}
+@keyframes modalScaleIn {{
+    from {{ opacity: 0; transform: scale(0.94) translateY(12px); }}
+    to {{ opacity: 1; transform: scale(1) translateY(0); }}
 }}
 .modal-close-{unique_id} {{
     position: absolute;
     top: 14px; right: 18px;
     cursor: pointer;
-    font-size: 24px;
+    font-size: 26px;
     color: rgba(255, 255, 255, 0.5);
     font-weight: 300;
     line-height: 1;
-    transition: 0.2s;
+    transition: all 0.2s ease;
+    z-index: 3;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
 }}
 .modal-close-{unique_id}:hover {{
     color: #ff9900;
+    background: rgba(255, 153, 0, 0.12);
+    transform: scale(1.1);
+}}
+.modal-content-{unique_id}::-webkit-scrollbar {{
+    width: 6px;
+}}
+.modal-content-{unique_id}::-webkit-scrollbar-track {{
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+}}
+.modal-content-{unique_id}::-webkit-scrollbar-thumb {{
+    background: rgba(255, 153, 0, 0.3);
+    border-radius: 4px;
+}}
+.modal-content-{unique_id}::-webkit-scrollbar-thumb:hover {{
+    background: rgba(255, 153, 0, 0.6);
 }}
 .btn-glossary-{unique_id} {{
     cursor: pointer;
@@ -1452,10 +1517,11 @@ def glossary_modal(title: str, content: str, button_label: str = "📖 Approfond
 
 <input type="checkbox" id="modal-toggle-{unique_id}">
 <div class="modal-overlay-{unique_id}">
+    <label for="modal-toggle-{unique_id}" class="modal-backdrop-{unique_id}"></label>
     <div class="modal-content-{unique_id}">
         <label for="modal-toggle-{unique_id}" class="modal-close-{unique_id}">×</label>
-        <h3 style="margin: 0 0 12px 0; border-bottom: 1px solid rgba(255,153,0,0.3); padding-bottom: 8px; font-size: 18px; font-weight: 700; color: #ffffff;">{title}</h3>
-        <div style="font-size: 14px; line-height: 1.5; margin: 0; color: #c9d1d9;">{safe_content}</div>
+        <h3 style="margin: 0 0 14px 0; border-bottom: 1px solid rgba(255,153,0,0.3); padding-bottom: 10px; font-size: 18px; font-weight: 700; color: #ffffff;">{title}</h3>
+        <div style="font-size: 14px; line-height: 1.55; margin: 0; color: #c9d1d9;">{safe_content}</div>
     </div>
 </div>
 
