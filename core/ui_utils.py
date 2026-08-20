@@ -165,6 +165,35 @@ def inject_custom_css():
             padding: 8px 14px !important;
         }}
 
+        /* Popover scrolling & viewport constraints */
+        [data-testid="stPopoverBody"], [data-testid="stPopoverContent"], div[data-testid="stPopoverBody"] {{
+            max-height: 68vh !important;
+            overflow-y: auto !important;
+            overflow-x: hidden !important;
+            scrollbar-width: thin !important;
+            scrollbar-color: rgba(255, 153, 0, 0.4) rgba(22, 27, 34, 0.8) !important;
+            border: 1px solid rgba(255, 153, 0, 0.3) !important;
+            border-radius: 12px !important;
+            background: rgba(13, 17, 23, 0.98) !important;
+            backdrop-filter: blur(16px) !important;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
+            padding: 16px 20px !important;
+        }}
+        [data-testid="stPopoverBody"]::-webkit-scrollbar {{
+            width: 6px;
+        }}
+        [data-testid="stPopoverBody"]::-webkit-scrollbar-track {{
+            background: rgba(22, 27, 34, 0.6);
+            border-radius: 4px;
+        }}
+        [data-testid="stPopoverBody"]::-webkit-scrollbar-thumb {{
+            background: rgba(255, 153, 0, 0.4);
+            border-radius: 4px;
+        }}
+        [data-testid="stPopoverBody"]::-webkit-scrollbar-thumb:hover {{
+            background: rgba(255, 153, 0, 0.7);
+        }}
+
         /* Executive Health Badges */
         .executive-badge {{
             display: inline-flex;
@@ -1652,7 +1681,7 @@ def render_info_modal(title: str, content: str, button_label: str = "ℹ️ Meto
     formule matematiche, governance del rischio e razionale di business.
     """
     if use_popover:
-        with st.popover(button_label, help=f"Dettagli metodologici per {title}"):
+        with st.popover(button_label, help=f"Dettagli metodologici per {title}", use_container_width=True):
             st.markdown(f"### {title}")
             st.markdown(content)
     else:
@@ -1782,6 +1811,85 @@ $$\\text{{Cost Basis}} = Q_{{\\text{{orig}}}} \\times P_{{\\text{{orig}}}} = Q_{
         button_label=button_label,
         use_popover=use_popover
     )
+
+
+def render_broker_hub_modal(
+    button_label: str = "ℹ️ Guida Export Broker",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale o popover informativo con le istruzioni passo-passo
+    per esportare il file CSV corretto da tutti i broker supportati da ARGUS.
+    """
+    content = """
+### 🌐 Multi-Broker Ingestion Hub & Guida all'Esportazione
+
+ARGUS supporta l'ingestione automatica con **Auto-Detection del formato** e normalizzazione dei codici ISIN in Ticker Yahoo Finance per i principali broker italiani ed internazionali.
+
+---
+
+#### 🟡 1. DeGiro
+1. Accedi alla piattaforma web di **DeGiro**.
+2. Nel menu laterale, vai su **Attività** ➔ **Transazioni**.
+3. Seleziona l'intervallo temporale desiderato (es. *Tutto* o l'anno corrente).
+4. Clicca sul pulsante **Esporta** in alto a destra e seleziona **CSV**.
+5. *Nota*: ARGUS gestisce automaticamente i cambi valuta, i costi di transazione e risolve gli ISIN europei.
+
+---
+
+#### 🔵 2. Directa SIM
+1. Accedi alla piattaforma **dLite** o **Classic** di Directa.
+2. Vai nella sezione **Ordini ed Eseguiti** oppure **Estratto Conto Titoli**.
+3. Imposta il filtro temporale sulle operazioni concluse.
+4. Clicca sull'icona di esportazione **CSV / Excel**.
+5. *Nota*: Il parser riconosce le diciture italiane (*COMPRA*, *VENDE*, *DIVIDENDO*, *FRAZIONAMENTO*) e normalizza i formati numerici con virgola.
+
+---
+
+#### 🔴 3. Fineco Bank
+1. Accedi all'area riservata **Fineco** ➔ sezione **Portafoglio** ➔ **Reportistica Trading**.
+2. Seleziona **Movimenti e Ordini Eseguiti** oppure **Rendiconto Fiscale**.
+3. Seleziona il periodo e clicca su **Esporta in formato CSV / Testo**.
+4. *Nota*: Le intestazioni bancarie e i codici ISIN/Titolo vengono normalizzati automaticamente.
+
+---
+
+#### 🟠 4. Interactive Brokers (IBKR)
+1. Accedi al **Client Portal** di Interactive Brokers.
+2. Vai su **Performance & Reports** ➔ **Statements** (Estratti Conto).
+3. Seleziona **Activity Statement** (oppure crea una **Custom Flex Query** con la sezione *Trades*).
+4. Imposta il formato su **CSV** e scarica il file.
+5. *Nota*: Il motore ARGUS riconosce sia il formato Activity multi-sezione sia i report tabellari Flex Query.
+
+---
+
+#### 🟢 5. Trade Republic
+1. Accedi all'app o all'interfaccia web di **Trade Republic**.
+2. Vai nella sezione **Profilo** ➔ **Documenti / Attività**.
+3. Seleziona il riepilogo delle transazioni / ordini eseguiti o PAC (*Savings Plan*).
+4. Scarica il file **CSV** (supporta export in Italiano, Inglese o Tedesco).
+
+---
+
+#### 🔷 6. Scalable Capital
+1. Accedi all'area web o mobile di **Scalable Capital**.
+2. Vai su **Transazioni** (oppure all'estratto conto titoli della banca depositaria *Baader Bank*).
+3. Esporta l'elenco delle transazioni in formato **CSV**.
+4. *Nota*: Vengono mappati automaticamente acquisti singoli, piani di accumulo ETF e dividendi.
+
+---
+
+#### 📄 7. CSV Standard ARGUS (Template Universale)
+Se utilizzi un broker non elencato o un foglio di calcolo personalizzato, puoi scaricare il **Template CSV Standard** con le seguenti colonne:
+`tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes`
+"""
+    render_info_modal(
+        title="🌐 Guida Export Multi-Broker",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
 
 
 
