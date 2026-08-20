@@ -62,3 +62,23 @@ def test_dividend_forecast_engine(mock_risk_results):
     div_res = compute_dividend_forecast(mock_risk_results["positions"])
     assert div_res["total_annual_dividends_eur"] > 0
     assert not div_res["monthly_forecast"].empty
+
+def test_advisor_with_none_values():
+    results_with_nones = {
+        "metrics": {
+            "returns": {"sharpe_ratio": None},
+            "market_risk": {"beta": None, "volatility_annual_pct": None},
+            "concentration": {"hhi": None, "effective_n_assets": None}
+        },
+        "positions": pd.DataFrame([
+            {"ticker": "AAPL", "qty_net": 10, "weight_pct": 50.0, "trailing_pe": None},
+            {"ticker": "MSFT", "qty_net": 10, "weight_pct": 50.0, "trailing_pe": "N/A"}
+        ]),
+        "risk_contribution": {"component_var_pct": {"AAPL": None, "MSFT": 30.0}},
+        "optimization": {"max_sharpe": {"sharpe": None}}
+    }
+    advisor_res = generate_quant_advisory_report(results_with_nones)
+    assert 0 <= advisor_res["health_score"] <= 100
+    assert isinstance(advisor_res["diagnostics"], list)
+    assert advisor_res["summary"]["beta"] == 1.0
+
