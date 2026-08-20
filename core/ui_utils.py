@@ -2157,6 +2157,46 @@ I bilanci annuali 10-K contengono sezioni standard obbligatorie per tutte le soc
     )
 
 
+def render_duckdb_modal(
+    button_label: str = "ℹ️ Guida al Motore OLAP DuckDB & Parquet",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale/popover istituzionale con la guida all'architettura OLAP DuckDB,
+    all'esecuzione vettorizzata SIMD e all'archiviazione colonnare in Apache Parquet.
+    """
+    content = """
+### ⚡ Motore Analitico Embedded DuckDB & Storage Parquet
+
+Il modulo **DuckDB** fornisce un motore di elaborazione analitica ad altissime prestazioni (**OLAP - Online Analytical Processing**) integrato direttamente in memoria RAM, progettato per eseguire calcoli aggregati e query SQL complesse a velocità sub-millisecondo.
+
+---
+
+#### 🏛️ 1. OLTP (MySQL/SQLite) vs OLAP (DuckDB Colonnare)
+- **Database Tradizionali a Righe (OLTP)**: Memorizzano e leggono i record riga per riga. Sono ottimi per transazioni singole, ma inefficienti quando bisogna calcolare medie o somme su centinaia di migliaia di righe.
+- **Database Vettorizzati a Colonne (OLAP - DuckDB)**: Memorizzano i dati per colonna. Per calcolare il controvalore totale o il PnL medio, DuckDB accede unicamente alle colonne interessate, sfruttando le istruzioni **SIMD (AVX-2 / SSE4.2)** della CPU per processare vettori di dati in parallelo.
+
+---
+
+#### 📊 2. Potenzialità di Analisi & SQL Avanzato
+- **Cubi Multi-Dimensionali (`GROUP BY GROUPING SETS`)**: Calcolo simultaneo dei subtotali su più assi (Asset Class $\times$ Settore $\times$ Valuta) in un'unica scansione.
+- **Window Functions & `QUALIFY`**: Ordinamento e ranking dinamico all'interno delle partizioni (es. identificare i migliori 3 titoli per ciascun settore senza subquery lente).
+- **Time Series Rollup**: Aggregazione temporale istantanea di flussi di cassa, volumi scambiati e commissioni.
+
+---
+
+#### 📦 3. Accelerazione Storage in Apache Parquet
+- **Compressione Fino all'85%**: Il formato Parquet applica algoritmi di compressione colonnare (Snappy / ZSTD) e dizionari di encoding che riducono drasticamente lo spazio occupato rispetto a file CSV o Excel.
+- **Zero-Copy Data Transfer**: Compatibilità nativa con Apache Arrow per trasferire dati tra DuckDB, Pandas e Streamlit senza duplicazione di memoria.
+"""
+    render_info_modal(
+        title="⚡ Motore Analitico DuckDB & Parquet",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 
