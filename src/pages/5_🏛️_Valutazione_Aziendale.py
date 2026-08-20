@@ -7,13 +7,15 @@ import plotly.graph_objects as go
 
 import core.ui_utils as ui_utils
 import core.risk_engine as risk_engine
+import core.sec_rag_engine as sec_rag_engine
 importlib.reload(ui_utils)
 importlib.reload(risk_engine)
+importlib.reload(sec_rag_engine)
 
 from core.ui_utils import (
     inject_custom_css, metric_card, glossary_modal, fmt_pct, render_executive_badges,
     render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs,
-    ensure_risk_bundle_loaded, render_sandbox_banner
+    ensure_risk_bundle_loaded, render_sandbox_banner, render_sec_rag_modal
 )
 from core.workspace_manager import get_url_param, set_url_params, register_workspace_tab
 from core.forensic_accounting import compute_beneish_m_score, compute_sloan_accrual_ratio
@@ -901,6 +903,89 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
                     st.dataframe(cf_df, use_container_width=True, height=450)
                 else:
                     st.info(f"Rendiconto Finanziario di esercizio non disponibile offline per {selected_ticker}.")
+
+        # ── SUB-MODULO: LOCAL RAG & SEC FILING VECTOR STORE (10-K / 10-Q Q&A) ──────
+        st.divider()
+        col_rag_h1, col_rag_h2 = st.columns([3.5, 1.2])
+        with col_rag_h1:
+            st.markdown(f"#### 🔍 SEC Filing Vector Store & Local RAG per **{selected_company_name}** ({selected_ticker})")
+            st.caption("Interrogazione semantica in linguaggio naturale sui bilanci ufficiali depositati presso la SEC (Form 10-K, Form 10-Q ed Earnings Calls).")
+        with col_rag_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            render_sec_rag_modal(button_label="ℹ️ Guida al Motore SEC RAG & Form 10-K", use_popover=True)
+
+        from core.sec_rag_engine import query_sec_filings_rag, index_ticker_sec_filings
+
+        indexed_chunks_cnt = index_ticker_sec_filings(selected_ticker)
+        st.caption(f"📚 *Vector Store Indicizzato: **{indexed_chunks_cnt} chunk semantici** attivi per {selected_ticker} (Form 10-K / 10-Q).*")
+
+        col_rag_opt1, col_rag_opt2 = st.columns([2.5, 1.5])
+        with col_rag_opt1:
+            sec_filter_choice = st.selectbox(
+                "Filtra per Sezione Normativa SEC:",
+                options=[
+                    "Tutte le Sezioni",
+                    "Item 1A: Risk Factors & Macro Threats",
+                    "Item 7: Management's Discussion and Analysis (MD&A)",
+                    "Item 8: Financial Statements, Debt & Accounting Notes",
+                    "Item 1: Business Overview & Competitive Moat"
+                ],
+                index=0
+            )
+        with col_rag_opt2:
+            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+            rag_top_k = st.slider("Numero di Chunk da Recuperare (Top-K):", min_value=1, max_value=6, value=3)
+
+        st.markdown("##### 💡 Domande Frequenti di Due Diligence (1-Click Prompt):")
+        chip_col1, chip_col2 = st.columns(2)
+        with chip_col1:
+            if st.button("⚠️ Quali sono i principali fattori di rischio e minacce competitive (Item 1A)?", use_container_width=True):
+                st.session_state[f"sec_query_{selected_ticker}"] = "Quali sono i principali fattori di rischio, minacce geopolitiche e concentrazione della catena di fornitura?"
+            if st.button("📈 Qual è la dinamica dei margini operativi e la guidance del management (MD&A)?", use_container_width=True):
+                st.session_state[f"sec_query_{selected_ticker}"] = "Qual è l'evoluzione del fatturato, dei margini operativi lordi e la spesa in R&D?"
+        with chip_col2:
+            if st.button("🏦 Qual è la struttura delle scadenze del debito e gli impegni finanziari?", use_container_width=True):
+                st.session_state[f"sec_query_{selected_ticker}"] = "Dettaglio delle scadenze del debito a lungo termine, tassi di interesse e impegni di cassa."
+            if st.button("⚖️ Ci sono contenziosi legali rilevanti, rischi antitrust o concentrazione clienti?", use_container_width=True):
+                st.session_state[f"sec_query_{selected_ticker}"] = "Contenziosi legali, pressioni regolatorie antitrust e concentrazione dei clienti."
+
+        def_q = st.session_state.get(f"sec_query_{selected_ticker}", "Quali sono i principali fattori di rischio e minacce competitive?")
+        user_sec_query = st.text_input(
+            "Inserisci la tua domanda in linguaggio naturale per l'analisi dei bilanci SEC:",
+            value=def_q,
+            key=f"input_sec_query_{selected_ticker}"
+        )
+
+        if st.button(f"🔍 Interroga SEC Filings di {selected_ticker} (Local RAG)", type="primary", use_container_width=True):
+            with st.spinner(f"Elaborazione semantica e recupero vettoriale per {selected_ticker}..."):
+                rag_out = query_sec_filings_rag(selected_ticker, user_sec_query, section_filter=sec_filter_choice, top_k=rag_top_k)
+                st.session_state[f"rag_res_{selected_ticker}"] = rag_out
+
+        rag_res = st.session_state.get(f"rag_res_{selected_ticker}")
+        if rag_res and rag_res.get("found"):
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            col_k_rag1, col_k_rag2, col_k_rag3 = st.columns(3)
+            with col_k_rag1:
+                metric_card("Rilevanza Semantica Top", f"{rag_res['top_relevance_pct']:.1f}%", "BM25 / Cosine Score", True)
+            with col_k_rag2:
+                metric_card("Sezione Primaria", rag_res.get("primary_section", "10-K").split(":")[0], "Documento Ufficiale SEC", True)
+            with col_k_rag3:
+                metric_card("Fonti Citabili Trovate", f"{len(rag_res['citations'])} Sezioni", "Verificate nel Testo", True)
+
+            st.markdown("##### 🤖 Risposta Istituzionale Grounded (Sintesi RAG):")
+            st.markdown(
+                f"""
+                <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(88, 166, 255, 0.25); border-left: 4px solid #58a6ff; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px; color: #e6edf3; font-size: 13.5px; line-height: 1.55;">
+                    {rag_res['answer'].replace(chr(10), '<br>')}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            st.markdown("##### 📑 Citazioni dei Paragrafi Ufficiali SEC (Evidenze nel Testo):")
+            for idx, cit in enumerate(rag_res["citations"], start=1):
+                with st.expander(f"📌 Fonte {idx}: {cit['section']} ({cit['filing_type']} - Esercizio {cit['fiscal_year']}) — Rilevanza: {cit['relevance_pct']:.1f}%", expanded=(idx == 1)):
+                    st.markdown(f"*{cit['text']}*")
 
 
     # ── SUBTAB 2: COMPARATIVA MULTIAZIENDALE ──────────────────────────────────

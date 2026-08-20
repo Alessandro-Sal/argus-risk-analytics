@@ -2119,6 +2119,44 @@ $$R_{p,t} - R_{f,t} = \\alpha + \\beta_{\\text{MKT}}(R_{m,t} - R_{f,t}) + \\beta
     )
 
 
+def render_sec_rag_modal(
+    button_label: str = "ℹ️ Guida al Motore SEC RAG & Form 10-K",
+    use_popover: bool = True
+):
+    """
+    Renderizza un modale/popover istituzionale con la guida all'analisi dei bilanci SEC Form 10-K/10-Q
+    e all'architettura Local RAG (Retrieval-Augmented Generation).
+    """
+    content = """
+### 🔍 SEC Filing Vector Store & Local RAG Architecture
+
+Il modulo **SEC RAG** trasforma i lunghi documenti contabili depositati presso la **Securities and Exchange Commission (SEC)** in un archivio semantico interrogabile in linguaggio naturale per estrarre rischi non evidenti dai soli numeri di bilancio.
+
+---
+
+#### 📑 1. La Struttura Ufficiale dei Form 10-K della SEC
+I bilanci annuali 10-K contengono sezioni standard obbligatorie per tutte le società quotate a Wall Street:
+- **Item 1 (Business Overview)**: Descrizione dettagliata delle linee di business, dei mercati geografici, dei canali di distribuzione e del vantaggio competitivo (*Economic Moat*).
+- **Item 1A (Risk Factors)**: La sezione più critica per la profilazione del rischio. Elenca tutte le vulnerabilità operative, legali, normative, geopolitiche, di concentrazione dei clienti e di fornitura.
+- **Item 7 (Management's Discussion and Analysis - MD&A)**: La spiegazione ufficiale del management sui motivi per cui ricavi e margini sono aumentati o diminuiti, con commenti sulla liquidità futura e sulle spese in conto capitale (Capex).
+- **Item 7A (Disclosures about Market Risk)**: Sensibilità quantitativa alle oscillazioni dei tassi di interesse, dei tassi di cambio (FX) e dei prezzi delle materie prime.
+- **Item 8 (Financial Footnotes & Debt Notes)**: Note integrative ai rendiconti contabili con il dettaglio dei tassi d'interesse sul debito, scadenze dei prestiti (*Maturity Schedule*) e contenziosi legali pendenti.
+
+---
+
+#### ⚙️ 2. Come Funziona il Motore Local RAG in ARGUS
+1. **Semantic Chunking**: I testi ufficiali vengono scomposti in blocchi logici omogenei preservando i metadati di sezione, ticker ed esercizio fiscale.
+2. **Vector Indexing (BM25 / Cosine)**: Ogni chunk viene indicizzato localmente con pesature BM25 e frequenze inverse dei termini, garantendo ricerche semantiche immediate a latenza zero.
+3. **Grounded Synthesis**: La risposta viene generata ancorandola rigorosamente ai passaggi originali del bilancio, con citazione del paragrafo e calcolo dello score di rilevanza semantica (%).
+"""
+    render_info_modal(
+        title="🔍 SEC Filing Vector Store & Local RAG",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 
