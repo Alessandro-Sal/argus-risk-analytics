@@ -26,7 +26,9 @@ from core.fetcher import fetch_and_store, get_engine
 from core.risk_engine import compute_risk
 from core.db_exporter import save_snapshot_to_db
 import core.ui_utils
+import core.duckdb_engine as duckdb_engine
 importlib.reload(core.ui_utils)
+importlib.reload(duckdb_engine)
 from core.ui_utils import (
     inject_custom_css,
     section,
@@ -42,6 +44,7 @@ from core.ui_utils import (
     render_control_room_hero,
     get_display_portfolio_name,
     render_broker_hub_modal,
+    render_duckdb_modal,
 )
 from core.multi_portfolio import (
     save_portfolio_profile,
@@ -376,11 +379,12 @@ if st.session_state.get("pipeline_done"):
 
 # ── COMMAND TABS DELLA CONTROL ROOM ──────────────────────────
 
-tab_ingest, tab_wealth, tab_isin_mapping, tab_diagnostics = st.tabs([
+tab_ingest, tab_wealth, tab_isin_mapping, tab_diagnostics, tab_duckdb = st.tabs([
     "🚀 1. Ingestione Dati & Calcolo Pipeline",
     "🗂️ 2. Total Wealth Hub (Multi-Portafoglio)",
     "🏷️ 3. Anagrafica & Mappatura ISIN / Ticker DB",
-    "🩺 4. Telemetria di Sistema & Storage Profiler"
+    "🩺 4. Telemetria di Sistema & Storage Profiler",
+    "⚡ 5. Motore Analitico Embedded DuckDB (OLAP & SQL)"
 ])
 
 # =============================================================
@@ -1550,3 +1554,116 @@ with tab_diagnostics:
         * **Pandas Version**: `{env_dict['pandas_version']}`
         * **Determinismo Seed Stocastico**: `{'🟢 Confermato (Numpy 100% Deterministico)' if diag_res['seed_deterministic'] else '🔴 Non Deterministico'}`
         """)
+
+# =============================================================
+# TAB 5: MOTORE ANALITICO EMBEDDED DUCKDB (OLAP & SQL SANDBOX)
+# =============================================================
+with tab_duckdb:
+    col_d_title, col_d_modal = st.columns([3.5, 1.2])
+    with col_d_title:
+        st.markdown("### ⚡ Motore Analitico In-Process DuckDB & Accelerazione Parquet")
+        st.caption("Interrogazione SQL analitica (OLAP) in-memory a latenza sub-millisecondo, aggregazioni multi-dimensionali ed esportazione colonnare Apache Parquet.")
+    with col_d_modal:
+        st.markdown('<div style="margin-top: 8px;"></div>', unsafe_allow_html=True)
+        render_duckdb_modal(button_label="ℹ️ Guida al Motore DuckDB & Parquet", use_popover=True)
+
+    duck_info = duckdb_engine.get_duckdb_system_info()
+
+    # Prepara DataFrames di contesto
+    pos_df = st.session_state.get("positions_df")
+    tx_df = st.session_state.get("transactions_df")
+
+    # Fallback se non ancora caricato
+    if pos_df is None or pos_df.empty:
+        pos_df = pd.DataFrame([
+            {"ticker": "AAPL", "asset_name": "Apple Inc.", "asset_class": "Stock", "sector": "Technology", "currency": "USD", "current_value": 2200.0, "weight_pct": 20.0, "pnl_pct": 14.5},
+            {"ticker": "MSFT", "asset_name": "Microsoft Corp.", "asset_class": "Stock", "sector": "Technology", "currency": "USD", "current_value": 4400.0, "weight_pct": 40.0, "pnl_pct": 22.1},
+            {"ticker": "NVDA", "asset_name": "NVIDIA Corp.", "asset_class": "Stock", "sector": "Technology", "currency": "USD", "current_value": 1250.0, "weight_pct": 11.4, "pnl_pct": 68.3},
+            {"ticker": "RACE.MI", "asset_name": "Ferrari N.V.", "asset_class": "Stock", "sector": "Consumer Cyclical", "currency": "EUR", "current_value": 2100.0, "weight_pct": 19.1, "pnl_pct": 8.4},
+            {"ticker": "BTC-USD", "asset_name": "Bitcoin USD", "asset_class": "Crypto", "sector": "Digital Assets", "currency": "USD", "current_value": 1050.0, "weight_pct": 9.5, "pnl_pct": -4.2}
+        ])
+
+    if tx_df is None or tx_df.empty:
+        tx_df = pd.DataFrame([
+            {"tx_date": "2023-01-15", "ticker": "AAPL", "tx_type": "BUY", "quantity": 10, "price": 135.0, "currency": "USD", "fees": 1.5},
+            {"tx_date": "2023-04-20", "ticker": "MSFT", "tx_type": "BUY", "quantity": 10, "price": 280.0, "currency": "USD", "fees": 1.5},
+            {"tx_date": "2023-09-10", "ticker": "NVDA", "tx_type": "BUY", "quantity": 10, "price": 420.0, "currency": "USD", "fees": 2.0},
+            {"tx_date": "2024-02-01", "ticker": "RACE.MI", "tx_type": "BUY", "quantity": 5, "price": 320.0, "currency": "EUR", "fees": 2.5},
+            {"tx_date": "2024-06-15", "ticker": "BTC-USD", "tx_type": "BUY", "quantity": 0.02, "price": 62000.0, "currency": "USD", "fees": 3.0}
+        ])
+
+    context_tables = {
+        "positions": pos_df,
+        "transactions": tx_df
+    }
+
+    pq_stats = duckdb_engine.get_parquet_compression_ratio(pos_df)
+
+    col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+    with col_k1:
+        metric_card("Stato Motore DuckDB", f"v{duck_info['version']}", duck_info["engine_mode"], True)
+    with col_k2:
+        metric_card("SIMD Vectorization", duck_info["vectorization"], f"{duck_info['threads']} Core Paralleli", True)
+    with col_k3:
+        metric_card("Compressione Parquet", f"{pq_stats['space_saved_pct']:.1f}%", f"{pq_stats['parquet_bytes']} B vs {pq_stats['csv_bytes']} B CSV", True)
+    with col_k4:
+        metric_card("Tabelle In-Memory", f"{len(context_tables)} Registrate", "positions, transactions", True)
+
+    st.markdown("---")
+
+    st.markdown("#### ⚡ 1. Preset di Analisi OLAP Istituzionale (1-Click SQL):")
+    st.caption("Seleziona una delle pipeline analitiche preconfigurate per eseguire all'istante aggregazioni complesse.")
+
+    presets = duckdb_engine.get_preset_olap_queries()
+    preset_cols = st.columns(4)
+
+    if "current_duck_sql" not in st.session_state:
+        st.session_state["current_duck_sql"] = presets["cube_exposure"]["sql"]
+
+    with preset_cols[0]:
+        if st.button("📦 Cubo Multi-Dimensionale", use_container_width=True, help=presets["cube_exposure"]["description"]):
+            st.session_state["current_duck_sql"] = presets["cube_exposure"]["sql"]
+    with preset_cols[1]:
+        if st.button("🏆 Ranking & QUALIFY", use_container_width=True, help=presets["sector_ranking"]["description"]):
+            st.session_state["current_duck_sql"] = presets["sector_ranking"]["sql"]
+    with preset_cols[2]:
+        if st.button("💰 Storico Volumi & Mese", use_container_width=True, help=presets["monthly_tx_rollup"]["description"]):
+            st.session_state["current_duck_sql"] = presets["monthly_tx_rollup"]["sql"]
+    with preset_cols[3]:
+        if st.button("📊 Matrice Rischio FX", use_container_width=True, help=presets["fx_exposure_matrix"]["description"]):
+            st.session_state["current_duck_sql"] = presets["fx_exposure_matrix"]["sql"]
+
+    st.markdown("#### 💻 2. Console SQL Interattiva (Interactive SQL Sandbox):")
+    st.caption("Scrivi ed esegui qualsiasi query SQL sulle tabelle in-memory `positions` e `transactions`.")
+
+    custom_sql = st.text_area(
+        "Editor Query SQL (DuckDB Engine):",
+        value=st.session_state["current_duck_sql"],
+        height=140,
+        key="duckdb_sql_editor_area"
+    )
+
+    col_btn_run, col_btn_pq = st.columns([2.5, 1.5])
+    with col_btn_run:
+        btn_run_sql = st.button("⚡ Esegui Query SQL (DuckDB Engine)", type="primary", use_container_width=True)
+    with col_btn_pq:
+        pq_bytes = duckdb_engine.export_portfolio_to_parquet(pos_df)
+        st.download_button(
+            label="📦 Scarica Portafoglio in Apache Parquet (.parquet)",
+            data=pq_bytes,
+            file_name="argus_portfolio_master.parquet",
+            mime="application/octet-stream",
+            use_container_width=True
+        )
+
+    if btn_run_sql or "last_duck_res" not in st.session_state:
+        res = duckdb_engine.run_duckdb_olap_query(custom_sql, context_dfs=context_tables)
+        st.session_state["last_duck_res"] = res
+
+    last_res = st.session_state.get("last_duck_res")
+    if last_res:
+        if last_res["success"]:
+            st.success(f"⚡ Query eseguita con successo in **{last_res['latency_ms']:.3f} ms** | Restituite **{last_res['row_count']} righe**.")
+            st.dataframe(last_res["df"], use_container_width=True)
+        else:
+            st.error(f"❌ Errore durante l'esecuzione della query SQL: {last_res['error']}")
