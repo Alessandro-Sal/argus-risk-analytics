@@ -223,16 +223,22 @@ argus-risk-analytics/
 │   ├── advisor.py               # ARGUS Quant Advisor & Health Score Engine
 │   ├── ai_analyst.py            # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
 │   ├── attribution.py           # Brinson-Fachler Performance Attribution
+│   ├── broker_detector.py       # Multi-Broker Ingestion Hub & Auto-Detector Formati
 │   ├── cache_shield.py          # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
 │   ├── closed_trades.py         # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
+│   ├── corporate_actions.py     # Corporate Actions, Stock Splits & Stock Dividends Engine
+│   ├── crypto_tax_engine.py     # Fisco Cripto-Attività, Quadri RT/RW/IVAFE & Zainetto Cripto
 │   ├── db_exporter.py           # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
 │   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
 │   ├── dividend_engine.py       # Cash Flow Forecast & Dividend Calendar
+│   ├── duckdb_engine.py         # Motore Analitico In-Process DuckDB (OLAP) & Parquet Storage
 │   ├── excel_generator.py       # Modello tattico Excel What-If
 │   ├── exporter.py              # Esportatore CSV denormalizzati
+│   ├── factor_library.py        # Kenneth French Factor Library (5-Factor & Momentum OLS)
 │   ├── fetcher.py               # Download dati storici yfinance & conversione valute
 │   ├── financial_analysis.py    # Altman Z-Score, DuPont, Piotroski, WACC, DCF Monte Carlo
 │   ├── forensic_accounting.py   # Beneish M-Score (1999) & Sloan Accrual Ratio (1996)
+│   ├── garch_fhs_engine.py      # Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)
 │   ├── hedging.py               # Copertura Beta-Neutral & Tail Risk Protection
 │   ├── hrp_optimizer.py         # Hierarchical Risk Parity (HRP - Marcos López de Prado)
 │   ├── html_exporter.py         # Exporter Report Standalone HTML
@@ -247,12 +253,15 @@ argus-risk-analytics/
 │   ├── risk_limits.py           # Early Warning System & Controlli di Rischio UCITS/MiFID
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # Screener Quantitativo Multi-Fattoriale & Pre-Trade Simulator
-│   ├── sidebar.py               # Navigation Rail v5.5.0, Execution Mode & Spotlight Search
+│   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
+│   ├── sidebar.py               # Navigation Rail v5.14.0, Execution Mode & Spotlight Search
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
 │   ├── ui_utils.py              # Helper Grafici Plotly, Modali Informativi & Componenti UI
 │   ├── validator.py             # Pipeline di Bonifica & Normalizzazione Dati
-│   └── workspace_manager.py     # State Manager, Routing Dinamico & URL State Sync
+│   ├── volatility_surface.py    # Superficie di Volatilità Implicita 3D, Skew & Smile Calibration
+│   ├── workspace_manager.py     # State Manager, Routing Dinamico & URL State Sync
+│   └── yield_curve.py           # Curva Tassi Privi di Rischio Live Dinamica Multi-Valuta
 ├── data/                        # Dataset di input & database SQLite fallback
 │   ├── portfolio_transactions_realistic.csv # Dataset realistico multi-asset multi-valuta (EUR, USD, GBP, CHF)
 │   └── .gitkeep
@@ -358,7 +367,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **110 test automatizzati PyTest** con copertura end-to-end del 100%:
+Il progetto include **171 test automatizzati PyTest** con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -366,7 +375,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 110 passed in ~7.00s =============================
+============================= 171 passed in ~25.00s =============================
 ```
 
 ---
@@ -377,4 +386,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.5.0.*
+*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.14.0.*

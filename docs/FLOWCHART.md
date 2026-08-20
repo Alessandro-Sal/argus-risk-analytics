@@ -147,6 +147,6 @@ flowchart TD
 
 ### 5. Presentation & Desktop Reporting Layer
 - **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 10 moduli analitici interattivi fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto `wait_for_server`.
-- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v5.5.0.zip`.
+- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v5.14.0.zip`.
 - **`core/report_exporter.py`, `html_exporter.py`**: Generazione dinamica in-memory del report Executive PDF Factsheet (2 pagine), del Workbook Excel Multi-Tab (.xlsx su 4 schede) e del Report HTML Standalone.
 - **`scripts/export_star_schema.py`**: Esportazione pacchetto ZIP Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`) per Microsoft Power BI e Google Looker Studio.
