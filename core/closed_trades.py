@@ -2,6 +2,64 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 
+def _normalize_asset_class(ac_raw: str, ticker: str = "") -> str:
+    """Normalizza la classe di attivo in etichette istituzionali standard in italiano."""
+    if not ac_raw:
+        ac_raw = ""
+    s = str(ac_raw).lower().strip()
+    t = str(ticker).upper().strip()
+    
+    if "etf" in s or "etf" in t or t in ["CSPX", "VWCE", "IEMG", "AGGH", "EIMI", "MEUD", "XEON", "NDIA.L"]:
+        return "ETF & Fondi"
+    elif "crypto" in s or "btc" in t or "eth" in t or "crypto" in t:
+        return "Criptovalute"
+    elif "bond" in s or "fixed" in s or "obbligaz" in s or "btp" in s or "bot" in s or "treasury" in s:
+        return "Obbligazioni (Bond)"
+    elif "commodit" in s or "gold" in s or "oil" in s or "materie" in s:
+        return "Materie Prime"
+    elif "cash" in s or "liquid" in s:
+        return "Liquidità"
+    else:
+        return "Azioni (Equity)"
+
+
+def _normalize_sector(sec_raw: str, ticker: str = "", ac_normalized: str = "Azioni (Equity)") -> str:
+    """Normalizza il settore economico secondo la classificazione GICS standard in italiano."""
+    if not sec_raw:
+        sec_raw = ""
+    s = str(sec_raw).lower().strip()
+    t = str(ticker).upper().strip()
+    
+    if "tech" in s or "inform" in s or "semiconductor" in s or "software" in s:
+        return "Tecnologia"
+    elif "finan" in s or "bank" in s or "banc" in s or "assicur" in s or "insurance" in s:
+        return "Servizi Finanziari"
+    elif "health" in s or "pharma" in s or "salute" in s or "biotech" in s or "medical" in s:
+        return "Salute & Pharma"
+    elif "cyclical" in s or "discretionary" in s or "voluttuari" in s or "automotive" in s or "auto" in s or "beni di consumo" in s:
+        return "Beni di Consumo"
+    elif "staples" in s or "defensive" in s or "necessit" in s or "food" in s or "beverage" in s:
+        return "Beni di Prima Necessità"
+    elif "communi" in s or "telecom" in s or "media" in s:
+        return "Comunicazioni & Media"
+    elif "industr" in s or "manifatt" in s or "aerospace" in s:
+        return "Industria & Manifattura"
+    elif "energ" in s or "oil" in s or "gas" in s or "petrol" in s:
+        return "Energia & Petroliferi"
+    elif "utilit" in s or "rinnovabil" in s or "electric" in s or "green" in s:
+        return "Utilities & Rinnovabili"
+    elif "real estate" in s or "immobil" in s or "reit" in s:
+        return "Immobiliare (REIT)"
+    elif "mater" in s or "chemical" in s or "mining" in s or "metalli" in s:
+        return "Materiali di Base"
+    elif "emerging" in s or "emergenti" in s:
+        return "Mercati Emergenti"
+    elif "bond" in s or "obbligaz" in s or "treasury" in s or "gov" in s:
+        return "Titoli di Stato & Corporate"
+    else:
+        return "Azionario Diversificato"
+
+
 def compute_closed_trades_journal(
     df_tx: pd.DataFrame = None,
     df_prices: pd.DataFrame = None,
@@ -51,9 +109,13 @@ def compute_closed_trades_journal(
     meta_map = {}
     for ticker, grp in df.groupby("ticker"):
         first_row = grp.iloc[0]
+        raw_ac = first_row.get("asset_class", "Equity")
+        raw_sec = first_row.get("gics_sector", first_row.get("sector", "Azionario Diversificato"))
+        norm_ac = _normalize_asset_class(raw_ac, ticker)
+        norm_sec = _normalize_sector(raw_sec, ticker, norm_ac)
         meta_map[ticker] = {
-            "asset_class": first_row.get("asset_class", "Equity"),
-            "sector": first_row.get("gics_sector", first_row.get("sector", "Diversified")),
+            "asset_class": norm_ac,
+            "sector": norm_sec,
             "country": first_row.get("country", "Global"),
             "currency": str(first_row.get("currency", first_row.get("asset_currency", "EUR"))).upper()
         }
@@ -343,12 +405,12 @@ def compute_sector_asset_class_breakdown(df_lots: pd.DataFrame) -> dict:
     
     df = df_lots.copy()
     if "sector" not in df.columns:
-        df["sector"] = "Diversified"
+        df["sector"] = "Azionario Diversificato"
     if "asset_class" not in df.columns:
-        df["asset_class"] = "Equity"
+        df["asset_class"] = "Azioni (Equity)"
         
-    df["sector"] = df["sector"].fillna("Diversified").replace("", "Diversified")
-    df["asset_class"] = df["asset_class"].fillna("Equity").replace("", "Equity")
+    df["asset_class"] = df.apply(lambda r: _normalize_asset_class(r.get("asset_class", ""), r.get("ticker", "")), axis=1)
+    df["sector"] = df.apply(lambda r: _normalize_sector(r.get("sector", ""), r.get("ticker", ""), r.get("asset_class", "")), axis=1)
     
     by_sector = df.groupby("sector").agg(
         pnl_eur=("realized_pnl_eur", "sum"),
