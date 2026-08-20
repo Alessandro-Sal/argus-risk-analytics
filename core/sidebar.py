@@ -70,6 +70,7 @@ NAV_MODULES = [
         "tab_key": "positions_active_tab",
         "subtabs": [
             {"label": "📋 Posizioni & Costi FIFO", "target": "📋 Posizioni Attive & Costi FIFO"},
+            {"label": "🪦 Posizioni Chiuse & Graveyard", "target": "🪦 Posizioni Chiuse & Graveyard"},
             {"label": "📅 Proiezione Dividendi", "target": "📅 Proiezione Dividendi"},
             {"label": "💰 Ottimizzazione Fiscale", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)"},
             {"label": "⚡ Impatto Almgren-Chriss", "target": "⚡ Impatto di Mercato (Almgren-Chriss)"}

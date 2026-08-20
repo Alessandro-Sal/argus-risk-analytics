@@ -123,20 +123,17 @@ with col2:
         fmt_eur(tot_pnl_val),
         delta=f"{ret.get('total_pnl_pct', 0)*100:+.2f}%",
         positive=(tot_pnl_val >= 0),
-        help_text=f"""<div style="font-size: 13.5px; line-height: 1.45;">
+        help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Profit & Loss (Profitti e Perdite) Totale, in Euro e in percentuale sul capitale investito. Misura la ricchezza netta generata dal portafoglio dall'inizio dell'operatività.</div>
 
-<div style="margin-bottom: 8px;"><b>📐 Scomposizione Analitica Live:</b>
-<div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 8px 12px; border-radius: 6px; margin: 4px 0; font-size: 13px;">
-  • 🟢 <b>PnL Latente (Posizioni Aperte):</b> <span style="color: {'#3fb950' if pnl_unrealized_val >= 0 else '#f85149'}; font-weight: 600;">€ {pnl_unrealized_val:+,.2f}</span><br>
-  • 🔵 <b>PnL Realizzato (Posizioni Chiuse):</b> <span style="color: {'#3fb950' if pnl_realized_val >= 0 else '#f85149'}; font-weight: 600;">€ {pnl_realized_val:+,.2f}</span><br>
-  • 🟡 <b>Dividendi & Cedole Incassate:</b> <span style="color: #ffd700; font-weight: 600;">€ {pnl_divs_val:+,.2f}</span><br>
-  <hr style="border: 0; border-top: 1px solid rgba(255,255,255,0.15); margin: 6px 0;">
-  <b>Totale Netto:</b> <span style="color: {'#3fb950' if tot_pnl_val >= 0 else '#f85149'}; font-weight: 700;">€ {tot_pnl_val:+,.2f}</span>
+<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
+Somma algebrica di PnL latente, PnL realizzato sulle vendite e dividendi netti percepiti:
+<div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+  <b>PnL Totale</b> = PnL Latente + PnL Realizzato (FIFO) + Dividendi Totali
 </div>
 </div>
 
-<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Quantifica il ritorno economico effettivo in Euro sul patrimonio investito, integrando sia le plusvalenze che i flussi di cassa cedolari e le operazioni già liquidate.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Quantifica il ritorno economico effettivo in Euro sul patrimonio investito, integrando sia le plusvalenze latenti che le operazioni già liquidate e i flussi cedolari.</div>
 
 <div style="margin-bottom: 8px;"><b>⚙️ Come viene calcolato dall'applicazione:</b> ARGUS esegue un motore contabile a code FIFO che separa con precisione il costo medio ponderato dei lotti residui, le plusvalenze già liquidate e i dividendi storici accreditati.</div>
 
@@ -167,6 +164,35 @@ dove <i>R<sub>totale</sub></i> è il rendimento complessivo e <i>N<sub>anni</sub
 <div><b>🔍 Come leggerlo:</b> Rappresenta il 'tasso d'interesse annuo medio equivalente'. Un CAGR dell'8.5% indica che il portafoglio è cresciuto mediamente dell'8.5% all'anno.</div>
 </div>"""
     )
+
+# ── SCOMPOSIZIONE PNL A MERCATO (LIVE BREAKDOWN VISIBILE IN PAGINA) ────────
+st.markdown(f"""
+<div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 153, 0, 0.25); border-radius: 12px; padding: 12px 18px; margin-top: 10px; margin-bottom: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.3);">
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 14px;">
+        <div style="font-size: 13.5px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px;">
+            <span>📊 Scomposizione PnL Portafoglio:</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; font-size: 13px;">
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(63,185,80,0.25); border-radius: 8px; padding: 5px 12px;">
+                <span style="color: #8b949e;">🟢 PnL Latente (Aperte):</span>
+                <b style="color: {'#3fb950' if pnl_unrealized_val >= 0 else '#f85149'}; margin-left: 6px;">€ {pnl_unrealized_val:+,.2f}</b>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 8px; padding: 5px 12px;">
+                <span style="color: #8b949e;">🔵 PnL Realizzato (Chiuse):</span>
+                <b style="color: {'#3fb950' if pnl_realized_val >= 0 else '#f85149'}; margin-left: 6px;">€ {pnl_realized_val:+,.2f}</b>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,215,0,0.25); border-radius: 8px; padding: 5px 12px;">
+                <span style="color: #8b949e;">🟡 Cedole & Dividendi:</span>
+                <b style="color: #ffd700; margin-left: 6px;">€ {pnl_divs_val:+,.2f}</b>
+            </div>
+            <div style="background: rgba(255,153,0,0.08); border: 1px solid rgba(255,153,0,0.4); border-radius: 8px; padding: 5px 12px;">
+                <span style="color: #ff9900; font-weight: 600;">💰 PnL Netto Totale:</span>
+                <b style="color: {'#3fb950' if tot_pnl_val >= 0 else '#f85149'}; margin-left: 6px;">€ {tot_pnl_val:+,.2f}</b>
+            </div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("#### ⚡ Metriche di Rischio e Rendimento")
 col4, col5, col6 = st.columns(3)
