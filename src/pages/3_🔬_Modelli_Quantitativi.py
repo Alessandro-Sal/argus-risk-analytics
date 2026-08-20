@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal
 from core.hrp_optimizer import compute_hrp_portfolio
 from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
 from core.volatility_surface import build_volatility_surface, fit_volatility_smile
@@ -20,10 +20,12 @@ import core.ui_utils
 import core.risk_engine
 import core.options_hedging
 import core.volatility_surface
+import core.factor_library
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
 importlib.reload(core.options_hedging)
 importlib.reload(core.volatility_surface)
+importlib.reload(core.factor_library)
 from core.ui_utils import ensure_risk_bundle_loaded, render_sandbox_banner
 
 results, has_real = ensure_risk_bundle_loaded()
@@ -2093,36 +2095,176 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
 
         st.divider()
 
-        # ── RIGA 2: ANALISI FATTORIALE CARHART ────────────────────
-        col_c_head1, col_c_head2 = st.columns([3.5, 1.0])
+        # ── RIGA 2: ANALISI FATTORIALE KENNETH FRENCH & CARHART ────
+        col_c_head1, col_c_head2 = st.columns([3.5, 1.2])
         with col_c_head1:
-            st.markdown("#### 🧠 Analisi Fattoriale Carhart (4 Fattori: Alpha, Beta, SMB, HML, WML)")
-            st.caption("Regressione multi-fattoriale per isolare l'Alpha puro di gestione e le esposizioni a Dimensione d'Impresa (Size), Stile (Value) e Inerzia (Momentum).")
+            st.markdown("#### 🧠 Analisi Fattoriale Kenneth French (Fama-French 5-Factor & Momentum)")
+            st.caption("Regressione econometrica multivariata OLS su serie storiche ufficiali di Dartmouth: isolamento dell'Alpha puro di gestione, attribuzione del rendimento e significatività statistica (t-stat & p-value).")
         with col_c_head2:
-            render_formula_popover(
-                "🧠 Formula & Teoria Carhart 4-Factor",
-                "Modello di Carhart a 4 Fattori (1997)",
-                r"R_{i,t} - R_{f,t} = \alpha + \beta_1 (R_{m,t} - R_{f,t}) + \beta_2 \text{SMB}_t + \beta_3 \text{HML}_t + \beta_4 \text{WML}_t + \epsilon_t",
-                "<b>Significato dei Fattori:</b><br>"
-                "• <b>Mkt-RF:</b> Rischio sistemico di mercato generale.<br>"
-                "• <b>SMB (Small Minus Big):</b> Inclinazione verso titoli Small Cap.<br>"
-                "• <b>HML (High Minus Low):</b> Inclinazione verso titoli Value.<br>"
-                "• <b>WML (Winners Minus Losers):</b> Esposizione al fattore Momentum."
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            render_fama_french_modal(button_label="ℹ️ Teoria Fama-French & Formule", use_popover=True)
+
+        from core.factor_library import compute_fama_french_factor_model
+
+        ff_model_sel = st.radio(
+            "Seleziona Modello Econometrico di Regressione:",
+            options=[
+                "🏛️ Fama-French 5-Factor + Momentum (Kenneth French Library)",
+                "📊 Carhart 4-Factor (Mkt-RF, SMB, HML, MOM)",
+                "📐 Fama-French 3-Factor (Mkt-RF, SMB, HML)"
+            ],
+            horizontal=True
+        )
+
+        if "5-Factor" in ff_model_sel:
+            m_code = "5_factor_mom"
+        elif "Carhart" in ff_model_sel:
+            m_code = "4_factor"
+        else:
+            m_code = "3_factor"
+
+        ff_res = compute_fama_french_factor_model(sr_p, model_type=m_code)
+        df_ff_factors = ff_res.get("df_factors", pd.DataFrame())
+
+        # KPI Cards Dinamiche
+        alpha_ann = ff_res.get("alpha_annualized", 0.0)
+        alpha_sig_txt = "🟢 Significativo (p < 0.05)" if ff_res.get("alpha_is_significant") else "⚪ Non Significativo"
+        r2_val = ff_res.get("r_squared", 0.0)
+
+        # Mappatura rapida dei beta
+        betas_by_name = {}
+        if not df_ff_factors.empty:
+            for _, r in df_ff_factors.iterrows():
+                betas_by_name[r["factor"]] = r["beta"]
+
+        col_kpi_ff1, col_kpi_ff2, col_kpi_ff3, col_kpi_ff4, col_kpi_ff5, col_kpi_ff6 = st.columns(6)
+        with col_kpi_ff1:
+            metric_card("Alpha Puro (α)", f"{alpha_ann*100:+.2f}%", f"t = {ff_res.get('alpha_t_stat', 0.0):+.2f}", alpha_ann >= 0)
+        with col_kpi_ff2:
+            metric_card("Beta Mkt-RF", f"{betas_by_name.get('Mkt-RF', 1.0):+.2f}", "Rischio Sistemico", True)
+        with col_kpi_ff3:
+            metric_card("Beta Size (SMB)", f"{betas_by_name.get('SMB', 0.0):+.2f}", "Small vs Large Cap", False)
+        with col_kpi_ff4:
+            metric_card("Beta Value (HML)", f"{betas_by_name.get('HML', 0.0):+.2f}", "Value vs Growth", False)
+        with col_kpi_ff5:
+            if "RMW" in betas_by_name:
+                metric_card("Beta Profit (RMW)", f"{betas_by_name.get('RMW', 0.0):+.2f}", "Margini Operativi", True)
+            else:
+                metric_card("Beta Mom (MOM)", f"{betas_by_name.get('MOM', 0.0):+.2f}", "Inerzia Trend 12M", True)
+        with col_kpi_ff6:
+            if "CMA" in betas_by_name:
+                metric_card("Beta Inv (CMA)", f"{betas_by_name.get('CMA', 0.0):+.2f}", "Capex Prudente", False)
+            else:
+                metric_card("R² Modello", f"{r2_val*100:.1f}%", f"Adj R²: {ff_res.get('adj_r_squared', 0.0)*100:.1f}%", True)
+
+        # Grafici e Attribuzione
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        col_ff_g1, col_ff_g2 = st.columns([1.6, 1.1])
+
+        with col_ff_g1:
+            st.markdown("##### 🌊 Factor Return Attribution (% Rendimento Annuo Spiegato)")
+            attrib = ff_res.get("factor_attribution", {})
+            if attrib:
+                df_attr = pd.DataFrame([
+                    {"Fattore": k, "Contributo %": v * 100.0} for k, v in attrib.items()
+                ])
+                colors_attr = ["#3fb950" if val >= 0 else "#f85149" for val in df_attr["Contributo %"]]
+
+                fig_attr = go.Figure(go.Bar(
+                    x=df_attr["Fattore"],
+                    y=df_attr["Contributo %"],
+                    marker_color=colors_attr,
+                    text=df_attr["Contributo %"].apply(lambda x: f"{x:+.2f}%"),
+                    textposition="outside",
+                    hovertemplate="<b>%{x}</b><br>Contributo al Rendimento: <b>%{text}</b><extra></extra>"
+                ))
+                fig_attr.update_layout(
+                    template="plotly_dark",
+                    height=290,
+                    margin=dict(l=10, r=10, t=20, b=20),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    yaxis=dict(title="Contributo Annuo %", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+                    xaxis=dict(title="")
+                )
+                apply_plotly_theme(fig_attr)
+                st.plotly_chart(fig_attr, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+        with col_ff_g2:
+            st.markdown("##### 🍩 Decomposizione Varianza del Rischio")
+            sys_ff_pct = ff_res.get("systematic_risk_pct", 85.0)
+            spec_ff_pct = ff_res.get("specific_risk_pct", 15.0)
+
+            fig_pie_ff = go.Figure(data=[go.Pie(
+                labels=["Rischio Sistemico (Fattori)", "Rischio Specifico (Alpha/Idiosincratico)"],
+                values=[sys_ff_pct, spec_ff_pct],
+                hole=0.6,
+                marker=dict(colors=["#58a6ff", "#f59e0b"], line=dict(color="#0d1117", width=2)),
+                hovertemplate="<b>%{label}</b><br>Quota Varianza: <b>%{percent}</b><extra></extra>"
+            )])
+            fig_pie_ff.update_layout(
+                template="plotly_dark",
+                height=230,
+                margin=dict(l=10, r=10, t=10, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.1)
+            )
+            apply_plotly_theme(fig_pie_ff)
+            st.plotly_chart(fig_pie_ff, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+            st.caption(f"Bontà di Adattamento OLS: **R² = {r2_val*100:.1f}%** | **Adj R² = {ff_res.get('adj_r_squared', 0.0)*100:.1f}%**")
+
+        # Tabella Econometrica dei Parametri
+        if not df_ff_factors.empty:
+            st.markdown("##### 📋 Tabella Econometrica di Regressione OLS & Test di Ipotesi")
+            df_ff_show = df_ff_factors.rename(columns={
+                "factor": "Fattore di Rischio",
+                "beta": "Coefficiente Beta (β)",
+                "std_err": "Errore Standard",
+                "t_stat": "Statistica t",
+                "p_value": "p-value",
+                "ci_95": "Intervallo Confidenza 95%",
+                "is_significant": "Significatività (95%)",
+                "annual_return_contrib_pct": "Contributo Rendimento Annuo (%)"
+            })
+            df_ff_show["Significatività (95%)"] = df_ff_show["Significatività (95%)"].apply(
+                lambda x: "🟢 Significativo (|t| ≥ 1.96)" if x else "⚪ Non Significativo"
+            )
+            st.dataframe(
+                df_ff_show.style.format({
+                    "Coefficiente Beta (β)": "{:+.4f}",
+                    "Errore Standard": "{:.4f}",
+                    "Statistica t": "{:+.2f}",
+                    "p-value": "{:.4f}",
+                    "Contributo Rendimento Annuo (%)": "{:+.2f}%"
+                }),
+                use_container_width=True,
+                hide_index=True
             )
 
-        c4_res = compute_carhart_4factor_exposures(sr_p)
-
-        col_c1, col_c2, col_c3, col_c4, col_c5 = st.columns(5)
-        with col_c1:
-            metric_card("Alpha Puro (α)", f"{c4_res['alpha']*100:+.2f}%", f"R² = {c4_res['r_squared']*100:.1f}%", True)
-        with col_c2:
-            metric_card("Beta Mercato (Mkt)", f"{c4_res['beta_mkt']:+.2f}", "Rischio Sistemico", True)
-        with col_c3:
-            metric_card("Beta Size (SMB)", f"{c4_res['beta_smb']:+.2f}", "Small vs Large Cap", False)
-        with col_c4:
-            metric_card("Beta Value (HML)", f"{c4_res['beta_hml']:+.2f}", "Value vs Growth", False)
-        with col_c5:
-            metric_card("Beta Momentum (WML)", f"{c4_res['beta_wml']:+.2f}", "Inerzia Trend 12M", True)
+        # Grafico Rolling Factor Exposures (se presente)
+        df_roll_b = ff_res.get("rolling_betas", pd.DataFrame())
+        if not df_roll_b.empty:
+            st.markdown("##### 📈 Evoluzione Dinamica delle Esposizioni Fattoriali (Rolling OLS 60 Giorni)")
+            cols_to_plot = [c for c in df_roll_b.columns if c != "Alpha (Ann)"]
+            
+            fig_roll = px.line(
+                df_roll_b.reset_index(),
+                x="Date",
+                y=cols_to_plot,
+                labels={"value": "Beta Rolling (60G)", "Date": "", "variable": "Fattore"},
+                template="plotly_dark",
+                height=340
+            )
+            fig_roll.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=10, r=10, t=20, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+            )
+            apply_plotly_theme(fig_roll)
+            st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
         st.divider()
         col_head_bar1, col_head_bar2 = st.columns([3.2, 1.1])
