@@ -288,9 +288,10 @@ def compute_cumulative_realized_curve(df_lots: pd.DataFrame) -> pd.DataFrame:
         "ticker": lambda x: ", ".join(x.unique()[:3])
     }).reset_index()
     
-    daily_pnl["cum_realized_pnl_eur"] = daily_pnl["realized_pnl_eur"].cumsum()
-    daily_pnl["high_water_mark_eur"] = daily_pnl["cum_realized_pnl_eur"].cummax()
-    daily_pnl["drawdown_eur"] = daily_pnl["cum_realized_pnl_eur"] - daily_pnl["high_water_mark_eur"]
+    daily_pnl["realized_pnl_eur"] = daily_pnl["realized_pnl_eur"].round(2)
+    daily_pnl["cum_realized_pnl_eur"] = daily_pnl["realized_pnl_eur"].cumsum().round(2)
+    daily_pnl["high_water_mark_eur"] = daily_pnl["cum_realized_pnl_eur"].cummax().round(2)
+    daily_pnl["drawdown_eur"] = (daily_pnl["cum_realized_pnl_eur"] - daily_pnl["high_water_mark_eur"]).round(2)
     daily_pnl["sell_date_str"] = daily_pnl["sell_date"].dt.strftime("%Y-%m-%d")
     
     return daily_pnl
