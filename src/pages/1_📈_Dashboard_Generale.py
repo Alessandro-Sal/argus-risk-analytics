@@ -441,34 +441,80 @@ if selected_bms:
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
 # ── TABELLA METRICHE E GLOSSARIO (POSIZIONATI SOTTO IL GRAFICO FULL-WIDTH) ──
-col_m1, col_m2 = st.columns([1.4, 1.0])
+col_m1, col_m2 = st.columns([1.5, 1.0])
+
+def _fmt_metric_val(v, is_pct=False):
+    if v is None:
+        return "N/A"
+    try:
+        val = float(v)
+        return f"{val:+.2f}%" if is_pct else f"{val:.2f}"
+    except Exception:
+        return str(v)
+
+cagr_num = ret.get("cagr_pct")
+tot_num = ret.get("total_return_pct")
+alpha_num = ret.get("alpha_pct")
+sharpe_num = ret.get("sharpe_ratio")
+sortino_num = ret.get("sortino_ratio")
+calmar_num = ret.get("calmar_ratio")
+ir_num = ret.get("information_ratio")
+n_yrs_val = ret.get("n_years", 0)
 
 with col_m1:
     st.markdown("#### 📊 Tabella Analitica Metriche di Rendimento")
     data_ret = {
-        "Metrica Quantitativa": ["CAGR (Tasso Annuo Composto)", "Rendimento Totale Cumulato", "Alpha di Jensen (vs Benchmark)",
-                                 "Sharpe Ratio (Rendimento/Rischio)", "Sortino Ratio (Downside Risk)", "Calmar Ratio (CAGR/MaxDD)",
-                                 "Information Ratio (Active Risk)", "Orizzonte Temporale Analizzato"],
+        "Metrica Quantitativa": [
+            "CAGR (Tasso Annuo Composto)",
+            "Rendimento Totale Cumulato",
+            "Alpha di Jensen (vs Benchmark)",
+            "Sharpe Ratio (Rendimento/Rischio)",
+            "Sortino Ratio (Downside Risk)",
+            "Calmar Ratio (CAGR/MaxDD)",
+            "Information Ratio (Active Risk)",
+            "Orizzonte Temporale Analizzato"
+        ],
         "Valore Rilevato": [
-            fmt_pct(ret.get("cagr_pct")),
-            fmt_pct(ret.get("total_return_pct")),
-            fmt_pct(ret.get("alpha_pct")),
-            str(ret.get("sharpe_ratio", "N/A")),
-            str(ret.get("sortino_ratio", "N/A")),
-            str(ret.get("calmar_ratio", "N/A")),
-            str(ret.get("information_ratio", "N/A")),
-            f"{ret.get('n_years', 0)} Anni",
+            _fmt_metric_val(cagr_num, is_pct=True),
+            _fmt_metric_val(tot_num, is_pct=True),
+            _fmt_metric_val(alpha_num, is_pct=True),
+            _fmt_metric_val(sharpe_num, is_pct=False),
+            _fmt_metric_val(sortino_num, is_pct=False),
+            _fmt_metric_val(calmar_num, is_pct=False),
+            _fmt_metric_val(ir_num, is_pct=False),
+            f"{float(n_yrs_val):.2f} Anni" if n_yrs_val else "N/A",
+        ],
+        "Target / Benchmark": [
+            "🟢 Solido (> 7.0%)" if (cagr_num or 0) >= 7.0 else "🟡 Moderato",
+            f"Storico reale transazioni",
+            "🟢 Creazione Valore" if (alpha_num or 0) > 0 else "🔴 Sottoperformance",
+            "Soglia Ottimale ≥ 1.00",
+            "Soglia Ottimale ≥ 1.00",
+            "Soglia Ottimale ≥ 0.50",
+            "Soglia Ottimale ≥ 0.50",
+            "Periodo attivo portafoglio"
         ]
     }
     st.dataframe(pd.DataFrame(data_ret), use_container_width=True, hide_index=True)
 
 with col_m2:
     st.markdown("#### 📚 Guida & Glossario Metriche")
-    st.markdown("""
+    
+    # Indicatori di stato sintetici
+    s_val = float(sharpe_num) if sharpe_num is not None else 0.0
+    a_val = float(alpha_num) if alpha_num is not None else 0.0
+    sharpe_badge = "🟢 Efficienza Elevata (≥ 1.0)" if s_val >= 1.0 else ("🟡 Efficienza Moderata (0.5 - 1.0)" if s_val >= 0.5 else "🔴 Efficienza Bassa (< 0.5)")
+    alpha_badge = "🟢 Extra-Rendimento Positivo" if a_val > 0 else "🔴 Sottoperformance rispetto al Benchmark"
+    
+    st.markdown(f"""
     <div style="background: rgba(22,27,34,0.7); border: 1px solid rgba(255,153,0,0.3); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-        <div style="font-size: 13px; color: #c9d1d9; line-height: 1.5;">
-            <b>Analisi dell'Efficienza di Gestione:</b><br>
-            Le metriche quantitative misurano se il rendimento ottenuto è stato generato grazie all'abilità del gestore (<b>Alpha</b>) o se deriva solo dall'esposizione al rischio di mercato.
+        <div style="font-size: 13px; font-weight: 700; color: #ff9900; margin-bottom: 6px;">💡 Sintesi Efficienza di Gestione</div>
+        <div style="font-size: 12.5px; color: #c9d1d9; line-height: 1.45; margin-bottom: 8px;">
+            Le metriche quantitative misurano se il rendimento ottenuto deriva dall'abilità di selezione (<b>Alpha</b>) o solo dall'esposizione al rischio di mercato.
+        </div>
+        <div style="font-size: 12px; color: #8b949e; line-height: 1.5;">
+            • <b>Profilo Sharpe:</b> {sharpe_badge}<br>
+            • <b>Profilo Alpha:</b> {alpha_badge}
         </div>
     </div>
     """, unsafe_allow_html=True)
