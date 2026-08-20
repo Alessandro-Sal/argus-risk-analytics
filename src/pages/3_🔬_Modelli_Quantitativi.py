@@ -855,9 +855,10 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
         
         copula_res = compute_tail_copula_matrix(df_returns_all, quantile_threshold=q_thresh)
         with col_cop_stat:
+            mean_t = copula_res.get('mean_tail_dependence', 0.0)
             st.metric(
                 "Dipendenza Media di Coda Inferiore (λ_L)",
-                f"{copula_res.get('mean_tail_dependence', 0.0):.3f}",
+                f"{mean_t:.3f}",
                 help="Media della probabilità di crash congiunto tra tutte le coppie di asset."
             )
 
@@ -902,11 +903,15 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
                 apply_plotly_theme(fig_cu)
                 st.plotly_chart(fig_cu, use_container_width=True)
 
-        # Tabella Coppie a Rischio Contagio
+        # Tabella Coppie a Rischio Contagio & Indice di Rottura della Diversificazione
         contagion = copula_res.get("contagion_pairs", [])
         if contagion:
             st.markdown(r"##### ⚠️ Alert Coppie ad Alto Contagio di Coda ($\lambda_L \ge 0.30$)")
-            df_cont = pd.DataFrame(contagion)
+            st.caption("Queste coppie mostrano un picco di correlazione durante i crolli di mercato (*'In a crisis, all correlations go to 1'*), azzerando l'effetto protettivo della diversificazione.")
+            df_cont = pd.DataFrame(contagion).rename(columns={
+                "pair": "Coppia Asset", "lambda_lower": "Lower Tail (λ_L)",
+                "lambda_upper": "Upper Tail (λ_U)", "asymmetry": "Asimmetria di Coda", "risk_level": "Livello Rischio"
+            })
             st.dataframe(df_cont, use_container_width=True, hide_index=True)
 
         st.divider()
@@ -957,7 +962,7 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
             fig_k_bar.update_layout(
                 template="plotly_dark",
                 barmode="group",
-                height=340,
+                height=320,
                 margin=dict(l=10, r=10, t=20, b=20),
                 yaxis=dict(title="Allocazione (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
                 xaxis=dict(title="Asset"),
@@ -965,6 +970,49 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
             )
             apply_plotly_theme(fig_k_bar)
             st.plotly_chart(fig_k_bar, use_container_width=True)
+
+        # ── SEZIONE 3: SIMULATORE INTERATTIVO DI TRADE SIZING (KELLY) ─
+        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+        st.markdown("#### ⚖️ Simulatore Interattivo Trade Sizing (Kelly Criterion)")
+        st.caption("Calcola il dimensionamento matematico ideale di una nuova posizione (o strategia) per massimizzare la crescita geometrica del capitale a zero rischio di rovina statistica.")
+
+        from core.advanced_quant import compute_interactive_trade_kelly
+        from core.closed_trades import compute_closed_trades_journal
+
+        # Pre-popola con statistiche reali del Graveyard se disponibili
+        gy_stats = compute_closed_trades_journal(
+            df_tx=results.get("df_tx"),
+            df_prices=results.get("df_prices"),
+            df_positions=results.get("positions"),
+            is_sandbox=bool(results.get("is_sandbox"))
+        )
+        real_wr = gy_stats.get("win_rate_pct", 55.0) if gy_stats.get("has_closed_trades") else 55.0
+        real_pr = gy_stats.get("payoff_ratio", 1.8) if gy_stats.get("has_closed_trades") else 1.8
+
+        with st.expander("⚙️ Parametri della Nuova Idea di Trading", expanded=True):
+            col_k_in1, col_k_in2, col_k_in3, col_k_in4 = st.columns(4)
+            with col_k_in1:
+                k_win_rate = st.slider("Probabilità di Successo (Win Rate %):", 10.0, 90.0, float(real_wr), 1.0, help="Percentuale storica o stimata di trade vincenti.")
+            with col_k_in2:
+                k_payoff = st.slider("Payoff Ratio (Avg Win / Avg Loss):", 0.5, 5.0, float(real_pr), 0.1, help="Rapporto tra profitto medio su trade vincenti e perdita media su trade perdenti.")
+            with col_k_in3:
+                k_capital = st.number_input("Capitale di Riferimento Portafoglio (€):", min_value=1000.0, value=100000.0, step=5000.0)
+            with col_k_in4:
+                k_sl = st.slider("Stop-Loss Previsto (% sull'asset):", 1.0, 25.0, 5.0, 0.5, help="Distanza percentuale del livello di stop loss dal prezzo di ingresso.")
+
+        k_res = compute_interactive_trade_kelly(k_win_rate, k_payoff, k_capital, k_sl)
+
+        col_kr1, col_kr2, col_kr3, col_kr4 = st.columns(4)
+        with col_kr1:
+            metric_card("🎯 Half-Kelly (Consigliato)", f"{k_res['half_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_half_eur']:,.2f}", True)
+        with col_kr2:
+            metric_card("🔥 Full Kelly (Massima Leva)", f"{k_res['full_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_full_eur']:,.2f}", False)
+        with col_kr3:
+            metric_card("🛡️ Quarter-Kelly (Prudente)", f"{k_res['quarter_kelly_pct']:.2f}%", f"Rischio: € {k_res['risk_quarter_eur']:,.2f}", True)
+        with col_kr4:
+            metric_card("📦 Nozionale Suggerito (Half-K)", f"€ {k_res['pos_size_half_eur']:,.2f}", f"Con Stop al {k_sl:.1f}%", True)
+
+        st.info(f"💡 **Edge Matematico della Strategia:** **{k_res['edge_pct']:+.2f}%** | **Tasso di Crescita Geometrico Teorico:** **{k_res['expected_growth_rate']:+.3f}% per operazione** | Profilo di Rischio Drawdown: **{k_res['drawdown_risk']}**")
 
 # ── TAB 3: SIMULAZIONI STOCASTICHE ────────────────────────────
 elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":

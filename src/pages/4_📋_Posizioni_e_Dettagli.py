@@ -403,112 +403,280 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-        # ── 2. GRAFICI ANALITICI COCKPIT (DUE RIGHE COMPATTE A TUTTA LARGHEZZA) ─
+        # ── 2. SELETTORE PROSPETTIVA GRAFICA COCKPIT ──────────────────
         df_assets_closed = closed_data.get("df_closed_assets", pd.DataFrame())
         df_lots_closed = closed_data.get("df_closed_lots", pd.DataFrame())
+        df_cum_curve = closed_data.get("df_cumulative_curve", pd.DataFrame())
+        cal_data = closed_data.get("calendar_data", {})
+        breakdown_data = closed_data.get("breakdown_data", {})
 
-        # RIGA 1: PnL Realizzato per Asset (Istogramma Verticale Divergente)
-        if not df_assets_closed.empty:
-            st.markdown("##### 📊 PnL Realizzato per Asset (€)")
-            df_sorted_a = df_assets_closed.sort_values("realized_pnl_eur", ascending=False)
-            bar_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_sorted_a["realized_pnl_eur"]]
-            
-            fig_bar_pnl = go.Figure(go.Bar(
-                x=df_sorted_a["ticker"],
-                y=df_sorted_a["realized_pnl_eur"],
-                marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
-                customdata=df_sorted_a["realized_pnl_pct"],
-                hovertemplate="<b>Asset: %{x}</b><br>• PnL Realizzato: <b>€ %{y:+,.2f}</b><br>• Rendimento: <b>%{customdata:+.2f}%</b><extra></extra>"
-            ))
-            fig_bar_pnl.update_layout(
-                template="plotly_dark", height=300,
-                xaxis=dict(
-                    title=None,
-                    gridcolor="rgba(255,255,255,0.04)",
-                    tickfont=dict(size=11, color="#c9d1d9"),
-                    tickangle=-30
-                ),
-                yaxis=dict(
-                    title="PnL Realizzato Netto (€)",
-                    zeroline=True,
-                    zerolinecolor="rgba(255,255,255,0.3)",
-                    zerolinewidth=1.5,
-                    gridcolor="rgba(255,255,255,0.06)",
-                    tickprefix="€ ",
-                    separatethousands=True
-                ),
-                margin=dict(l=60, r=20, t=20, b=40),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-            )
-            apply_plotly_theme(fig_bar_pnl)
-            st.plotly_chart(fig_bar_pnl, use_container_width=True)
+        st.markdown("#### 📊 Analisi Grafica delle Posizioni Chiuse")
+        view_mode_gy = st.radio(
+            "Seleziona Prospettiva Grafica:",
+            [
+                "📊 PnL Asset & Timeline (2 Righe)",
+                "📈 Curva Cumulativa PnL Realizzato (€)",
+                "📅 Trading Calendar & Heatmap Mensile",
+                "🏷️ Scomposizione Settori & Asset Class"
+            ],
+            horizontal=True,
+            key="gy_chart_view_mode_radio"
+        )
 
-        st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+        if view_mode_gy == "📊 PnL Asset & Timeline (2 Righe)":
+            # RIGA 1: PnL Realizzato per Asset (Istogramma Verticale Divergente)
+            if not df_assets_closed.empty:
+                st.markdown("##### 📊 PnL Realizzato per Asset (€)")
+                df_sorted_a = df_assets_closed.sort_values("realized_pnl_eur", ascending=False)
+                bar_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_sorted_a["realized_pnl_eur"]]
+                
+                fig_bar_pnl = go.Figure(go.Bar(
+                    x=df_sorted_a["ticker"],
+                    y=df_sorted_a["realized_pnl_eur"],
+                    marker=dict(color=bar_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
+                    customdata=df_sorted_a["realized_pnl_pct"],
+                    hovertemplate="<b>Asset: %{x}</b><br>• PnL Realizzato: <b>€ %{y:+,.2f}</b><br>• Rendimento: <b>%{customdata:+.2f}%</b><extra></extra>"
+                ))
+                fig_bar_pnl.update_layout(
+                    template="plotly_dark", height=300,
+                    xaxis=dict(
+                        title=None,
+                        gridcolor="rgba(255,255,255,0.04)",
+                        tickfont=dict(size=11, color="#c9d1d9"),
+                        tickangle=-30
+                    ),
+                    yaxis=dict(
+                        title="PnL Realizzato Netto (€)",
+                        zeroline=True,
+                        zerolinecolor="rgba(255,255,255,0.3)",
+                        zerolinewidth=1.5,
+                        gridcolor="rgba(255,255,255,0.06)",
+                        tickprefix="€ ",
+                        separatethousands=True
+                    ),
+                    margin=dict(l=60, r=20, t=20, b=40),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_bar_pnl)
+                st.plotly_chart(fig_bar_pnl, use_container_width=True)
 
-        # RIGA 2: Rendimento vs Tempo di Detenzione (Scatter Timeline)
-        if not df_lots_closed.empty:
-            st.markdown("##### ⏱️ Rendimento Realizzato (%) vs Tempo di Detenzione")
-            fig_scat = go.Figure()
-            for outcome, color in [("🟢 WIN", "#3fb950"), ("🔴 LOSS", "#f85149"), ("🟡 BREAKEVEN", "#ffd700")]:
-                df_sub = df_lots_closed[df_lots_closed["outcome"] == outcome]
-                if not df_sub.empty:
-                    fig_scat.add_trace(go.Scatter(
-                        x=df_sub["holding_days"],
-                        y=df_sub["realized_pnl_pct"],
-                        mode="markers",
-                        name=outcome,
-                        marker=dict(
-                            color=color,
-                            size=9,
-                            opacity=0.88,
-                            line=dict(width=1.0, color="#ffffff")
-                        ),
-                        customdata=np.stack((
-                            df_sub["ticker"],
-                            df_sub["realized_pnl_eur"],
-                            df_sub["buy_date"],
-                            df_sub["sell_date"]
-                        ), axis=-1),
-                        hovertemplate=(
-                            "<b>%{customdata[0]}</b> (" + outcome + ")<br>"
-                            "• Tempo Detenzione: <b>%{x} gg</b><br>"
-                            "• Rendimento: <b>%{y:+.2f}%</b><br>"
-                            "• PnL Realizzato: <b>€ %{customdata[1]:+,.2f}</b><br>"
-                            "• Acquisto: <b>%{customdata[2]}</b> | Vendita: <b>%{customdata[3]}</b>"
-                            "<extra></extra>"
-                        )
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+
+            # RIGA 2: Rendimento vs Tempo di Detenzione (Scatter Timeline)
+            if not df_lots_closed.empty:
+                st.markdown("##### ⏱️ Rendimento Realizzato (%) vs Tempo di Detenzione")
+                fig_scat = go.Figure()
+                for outcome, color in [("🟢 WIN", "#3fb950"), ("🔴 LOSS", "#f85149"), ("🟡 BREAKEVEN", "#ffd700")]:
+                    df_sub = df_lots_closed[df_lots_closed["outcome"] == outcome]
+                    if not df_sub.empty:
+                        fig_scat.add_trace(go.Scatter(
+                            x=df_sub["holding_days"],
+                            y=df_sub["realized_pnl_pct"],
+                            mode="markers",
+                            name=outcome,
+                            marker=dict(
+                                color=color,
+                                size=9,
+                                opacity=0.88,
+                                line=dict(width=1.0, color="#ffffff")
+                            ),
+                            customdata=np.stack((
+                                df_sub["ticker"],
+                                df_sub["realized_pnl_eur"],
+                                df_sub["buy_date"],
+                                df_sub["sell_date"]
+                            ), axis=-1),
+                            hovertemplate=(
+                                "<b>%{customdata[0]}</b> (" + outcome + ")<br>"
+                                "• Tempo Detenzione: <b>%{x} gg</b><br>"
+                                "• Rendimento: <b>%{y:+.2f}%</b><br>"
+                                "• PnL Realizzato: <b>€ %{customdata[1]:+,.2f}</b><br>"
+                                "• Acquisto: <b>%{customdata[2]}</b> | Vendita: <b>%{customdata[3]}</b>"
+                                "<extra></extra>"
+                            )
+                        ))
+                fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.35)", line_width=1.5)
+                fig_scat.update_layout(
+                    template="plotly_dark", height=320,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1.0,
+                        title_text="",
+                        bgcolor="rgba(22,27,34,0.75)",
+                        bordercolor="rgba(255,255,255,0.12)",
+                        borderwidth=1,
+                        font=dict(size=10)
+                    ),
+                    xaxis=dict(
+                        title="Giorni di Detenzione (Holding Period)",
+                        gridcolor="rgba(255,255,255,0.06)",
+                        zeroline=False
+                    ),
+                    yaxis=dict(
+                        title="Rendimento Realizzato (%)",
+                        ticksuffix="%",
+                        gridcolor="rgba(255,255,255,0.06)",
+                        zeroline=False
+                    ),
+                    margin=dict(l=55, r=20, t=30, b=45),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_scat)
+                st.plotly_chart(fig_scat, use_container_width=True)
+
+        elif view_mode_gy == "📈 Curva Cumulativa PnL Realizzato (€)":
+            if not df_cum_curve.empty:
+                st.markdown("##### 📈 Crescita Progressiva del Capitale Chiuso & High-Water Mark")
+                st.caption("Visualizza l'accumulazione monetaria progressiva del PnL realizzato e la distanza dal picco storico (Drawdown del capitale chiuso).")
+                
+                last_cum = float(df_cum_curve["cum_realized_pnl_eur"].iloc[-1])
+                area_color = "rgba(63, 185, 80, 0.15)" if last_cum >= 0 else "rgba(248, 81, 73, 0.15)"
+                line_color = "#3fb950" if last_cum >= 0 else "#f85149"
+                
+                fig_cum = go.Figure()
+                fig_cum.add_trace(go.Scatter(
+                    x=df_cum_curve["sell_date_str"],
+                    y=df_cum_curve["cum_realized_pnl_eur"],
+                    mode="lines+markers",
+                    name="PnL Realizzato Cumulato",
+                    line=dict(color=line_color, width=2.5),
+                    marker=dict(size=7, color=line_color, line=dict(color="#ffffff", width=1)),
+                    fill="tozeroy",
+                    fillcolor=area_color,
+                    customdata=np.stack((
+                        df_cum_curve["ticker"],
+                        df_cum_curve["realized_pnl_eur"],
+                        df_cum_curve["drawdown_eur"]
+                    ), axis=-1),
+                    hovertemplate=(
+                        "<b>Data Vendita: %{x}</b><br>"
+                        "• PnL Cumulato: <b>€ %{y:+,.2f}</b><br>"
+                        "• Asset Venduti: <b>%{customdata[0]}</b> (PnL: € %{customdata[1]:+,.2f})<br>"
+                        "• Drawdown da Picco: <b>€ %{customdata[2]:,.2f}</b>"
+                        "<extra></extra>"
+                    )
+                ))
+                fig_cum.add_trace(go.Scatter(
+                    x=df_cum_curve["sell_date_str"],
+                    y=df_cum_curve["high_water_mark_eur"],
+                    mode="lines",
+                    name="High-Water Mark (Picco)",
+                    line=dict(color="#58a6ff", width=1.5, dash="dash"),
+                    hovertemplate="<b>Picco Storico PnL: € %{y:,.2f}</b><extra></extra>"
+                ))
+                fig_cum.update_layout(
+                    template="plotly_dark", height=350,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
+                    xaxis=dict(title="Data di Uscita FIFO", gridcolor="rgba(255,255,255,0.06)"),
+                    yaxis=dict(title="PnL Realizzato Cumulato (€)", tickprefix="€ ", separatethousands=True, gridcolor="rgba(255,255,255,0.06)"),
+                    margin=dict(l=60, r=20, t=30, b=40),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_cum)
+                st.plotly_chart(fig_cum, use_container_width=True)
+            else:
+                st.info("Dati insufficienti per generare la curva cumulativa di PnL.")
+
+        elif view_mode_gy == "📅 Trading Calendar & Heatmap Mensile":
+            df_piv = cal_data.get("df_pivot", pd.DataFrame())
+            if not df_piv.empty:
+                st.markdown("##### 📅 Trading Calendar: Performance Realizzata per Mese & Anno (€)")
+                st.caption("Matrice di monitoraggio temporale delle chiusure: identificazione della stagionalità e dei mesi più profittevoli.")
+                
+                month_cols = [c for c in df_piv.columns if c != "Totale Anno (€)"]
+                z_matrix = df_piv[month_cols].values
+                y_years = [str(y) for y in df_piv.index]
+
+                fig_cal = go.Figure(data=go.Heatmap(
+                    z=z_matrix,
+                    x=month_cols,
+                    y=y_years,
+                    colorscale=[
+                        [0.0, "#f85149"],
+                        [0.48, "#21262d"],
+                        [0.50, "#161b22"],
+                        [0.52, "#21262d"],
+                        [1.0, "#3fb950"]
+                    ],
+                    zmid=0.0,
+                    text=[[f"€ {v:+,.0f}" if abs(v) > 0.01 else "—" for v in row] for row in z_matrix],
+                    texttemplate="%{text}",
+                    textfont=dict(size=11, color="#ffffff"),
+                    hoverongaps=False,
+                    hovertemplate="<b>Anno %{y} - %{x}</b><br>• PnL Realizzato: <b>%{text}</b><extra></extra>"
+                ))
+                fig_cal.update_layout(
+                    template="plotly_dark",
+                    height=200 + len(y_years) * 45,
+                    xaxis=dict(title=None, side="top", gridcolor="rgba(255,255,255,0.02)"),
+                    yaxis=dict(title="Anno", autorange="reversed", gridcolor="rgba(255,255,255,0.02)"),
+                    margin=dict(l=55, r=20, t=40, b=20),
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                )
+                apply_plotly_theme(fig_cal)
+                st.plotly_chart(fig_cal, use_container_width=True)
+
+                st.markdown("###### 📑 Riepilogo Tabellare Performance per Anno")
+                st.dataframe(
+                    df_piv.style.format("€ {:+,.2f}").background_gradient(cmap="RdYlGn", subset=month_cols, vmin=-1000, vmax=1000),
+                    use_container_width=True
+                )
+            else:
+                st.info("Nessuna operazione registrata nel calendario mensile.")
+
+        elif view_mode_gy == "🏷️ Scomposizione Settori & Asset Class":
+            df_sec = breakdown_data.get("df_by_sector", pd.DataFrame())
+            df_ac = breakdown_data.get("df_by_asset_class", pd.DataFrame())
+
+            col_sec, col_ac = st.columns(2)
+            with col_sec:
+                st.markdown("##### 🏢 PnL Realizzato per Settore (€)")
+                if not df_sec.empty:
+                    df_sec_sort = df_sec.sort_values("pnl_eur", ascending=True)
+                    sec_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_sec_sort["pnl_eur"]]
+                    fig_sec = go.Figure(go.Bar(
+                        x=df_sec_sort["pnl_eur"],
+                        y=df_sec_sort["sector"],
+                        orientation="h",
+                        marker=dict(color=sec_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
+                        customdata=np.stack((df_sec_sort["win_rate_pct"], df_sec_sort["trades_count"]), axis=-1),
+                        hovertemplate="<b>Settore: %{y}</b><br>• PnL Realizzato: <b>€ %{x:+,.2f}</b><br>• Win Rate: <b>%{customdata[0]:.1f}%</b><br>• N. Trade: <b>%{customdata[1]}</b><extra></extra>"
                     ))
-            fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.35)", line_width=1.5)
-            fig_scat.update_layout(
-                template="plotly_dark", height=320,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1.0,
-                    title_text="",
-                    bgcolor="rgba(22,27,34,0.75)",
-                    bordercolor="rgba(255,255,255,0.12)",
-                    borderwidth=1,
-                    font=dict(size=10)
-                ),
-                xaxis=dict(
-                    title="Giorni di Detenzione (Holding Period)",
-                    gridcolor="rgba(255,255,255,0.06)",
-                    zeroline=False
-                ),
-                yaxis=dict(
-                    title="Rendimento Realizzato (%)",
-                    ticksuffix="%",
-                    gridcolor="rgba(255,255,255,0.06)",
-                    zeroline=False
-                ),
-                margin=dict(l=55, r=20, t=30, b=45),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-            )
-            apply_plotly_theme(fig_scat)
-            st.plotly_chart(fig_scat, use_container_width=True)
+                    fig_sec.update_layout(
+                        template="plotly_dark", height=320,
+                        xaxis=dict(title="PnL Realizzato Netto (€)", tickprefix="€ ", separatethousands=True, gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis=dict(title=None),
+                        margin=dict(l=80, r=20, t=20, b=40),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                    )
+                    apply_plotly_theme(fig_sec)
+                    st.plotly_chart(fig_sec, use_container_width=True)
+
+            with col_ac:
+                st.markdown("##### 🏛️ PnL Realizzato per Asset Class (€)")
+                if not df_ac.empty:
+                    df_ac_sort = df_ac.sort_values("pnl_eur", ascending=True)
+                    ac_colors = ["#3fb950" if v >= 0 else "#f85149" for v in df_ac_sort["pnl_eur"]]
+                    fig_ac = go.Figure(go.Bar(
+                        x=df_ac_sort["pnl_eur"],
+                        y=df_ac_sort["asset_class"],
+                        orientation="h",
+                        marker=dict(color=ac_colors, line=dict(color="rgba(255,255,255,0.15)", width=1)),
+                        customdata=np.stack((df_ac_sort["win_rate_pct"], df_ac_sort["trades_count"]), axis=-1),
+                        hovertemplate="<b>Asset Class: %{y}</b><br>• PnL Realizzato: <b>€ %{x:+,.2f}</b><br>• Win Rate: <b>%{customdata[0]:.1f}%</b><br>• N. Trade: <b>%{customdata[1]}</b><extra></extra>"
+                    ))
+                    fig_ac.update_layout(
+                        template="plotly_dark", height=320,
+                        xaxis=dict(title="PnL Realizzato Netto (€)", tickprefix="€ ", separatethousands=True, gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis=dict(title=None),
+                        margin=dict(l=80, r=20, t=20, b=40),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                    )
+                    apply_plotly_theme(fig_ac)
+                    st.plotly_chart(fig_ac, use_container_width=True)
 
         st.divider()
 
@@ -999,6 +1167,166 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             use_container_width=True,
             hide_index=True
         )
+
+    # ── WIZARD GUIDATO: TAX-LOSS HARVESTING & STEP-UP FISCALE ────────
+    st.divider()
+    col_wiz_h1, col_wiz_h2 = st.columns([3.2, 1.1])
+    with col_wiz_h1:
+        st.markdown("#### 🧙‍♂️ Tax-Loss Harvesting & Step-Up Wizard (TUIR Art. 67)")
+        st.caption("Assistente decisionale per l'ottimizzazione del carico fiscale: compensazione delle minusvalenze in scadenza senza imposte e monetizzazione strategica delle perdite.")
+    with col_wiz_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("🧙‍♂️ Guida allo Step-Up & Tax-Loss Harvesting", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è lo Step-Up Fiscale e il Tax-Loss Harvesting</div>
+  <div>Tecniche di ingegneria fiscale per massimizzare il rendimento netto di portafoglio:
+  1. <b>Step-Up:</b> Vendere e ricomprare titoli in guadagno (Redditi Diversi) per assorbire minusvalenze in scadenza a imposta zero, alzando il prezzo di carico fiscale.
+  2. <b>Tax-Loss Harvesting:</b> Vendere posizioni in perdita per generare nuove minusvalenze compensative.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Calcolo del Risparmio Fiscale</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    • <b>Risparmio Fiscale Diretto:</b> Plusvalenza Compensata &times; Aliquota (26% / 12.5%)<br>
+    • <b>Regola Fondamentale TUIR:</b> Le minusvalenze compensano <i>solo</i> i Redditi Diversi (azioni singole, bond, ETC), NON i guadagni su ETF (Redditi di Capitale).
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
+  <div>Evitare che le minusvalenze nello zainetto fiscale scadano dopo 4 anni senza essere utilizzate, monetizzando i profitti con 0€ di capital gain tax.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
+  <div>Il modulo <code>core/tax_engine.py</code> scansiona i prezzi medi di carico FIFO delle posizioni aperte, separa gli ETF dai titoli compensabili e calcola il dimensionamento esatto delle vendite.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
+  <div>In Italia non esiste la <i>Wash-Sale Rule</i> americana (30 giorni): vendere e ricomprare lo stesso titolo nello stesso giorno è legale e permette di resettare il prezzo fiscale a zero imposte.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il Wizard Fiscale?")
+
+    from core.tax_engine import compute_tax_loss_harvesting_strategy
+    
+    # Valore di default dello zainetto da compensare
+    def_zainetto = float(df_zainetto["residual_active_eur"].sum()) if not df_zainetto.empty else 2500.0
+    
+    with st.expander("⚙️ Parametri di Simulazione dello Zainetto Fiscale", expanded=True):
+        col_w_in1, col_w_in2 = st.columns([2, 2])
+        with col_w_in1:
+            sim_zainetto = st.number_input(
+                "Capienza Zainetto Fiscale da Compensare (€):",
+                min_value=0.0,
+                max_value=200000.0,
+                value=def_zainetto,
+                step=250.0,
+                help="Inserisci l'ammontare di minusvalenze pregresse accumulate nella tua banca/broker che desideri compensare."
+            )
+        with col_w_in2:
+            st.info(f"💡 Zainetto Attivo Registrato in ARGUS: **€ {def_zainetto:,.2f}**")
+
+    wiz_res = compute_tax_loss_harvesting_strategy(results, custom_zainetto_eur=sim_zainetto)
+
+    col_wk1, col_wk2, col_wk3 = st.columns(3)
+    with col_wk1:
+        metric_card(
+            "Risparmio Fiscale Netto Stimato",
+            f"€ {wiz_res['total_tax_savings_eur']:,.2f}",
+            "Imposte risparmiate al 26%",
+            True
+        )
+    with col_wk2:
+        metric_card(
+            "Minusvalenze Consumate",
+            f"€ {wiz_res['total_minus_consumed_eur']:,.2f}",
+            f"Su € {sim_zainetto:,.2f} disponibili",
+            True
+        )
+    with col_wk3:
+        metric_card(
+            "Nuovo Scudo Fiscale Creabile",
+            f"€ {wiz_res['total_tax_shield_created_eur']:,.2f}",
+            "Da chiusure in perdita",
+            False
+        )
+
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+    df_step = wiz_res.get("df_step_up", pd.DataFrame())
+    df_harv_l = wiz_res.get("df_harvest_loss", pd.DataFrame())
+
+    tab_w_step, tab_w_loss = st.tabs([
+        "🎯 Strategia Step-Up (Vendi & Ricompra a 0€ Imposte)",
+        "✂️ Raccolta Minusvalenze (Tax-Loss Harvesting)"
+    ])
+
+    with tab_w_step:
+        if not df_step.empty:
+            st.markdown("##### 🚀 Titoli in Utile Compensabili a Costo Fiscale Zero")
+            st.caption("Questi titoli appartengono alla categoria **Redditi Diversi** (azioni singole/bond): puoi venderli e riacquistarli immediatamente per assorbire le minusvalenze pregresse senza pagare capital gain.")
+            
+            df_step_show = df_step[[
+                "ticker", "asset_class", "qty_held", "current_price_eur",
+                "unrealized_gain_eur", "consumable_minus_eur", "tax_saving_eur", "action"
+            ]].rename(columns={
+                "ticker": "Ticker",
+                "asset_class": "Asset Class",
+                "qty_held": "Q.tà in Portafoglio",
+                "current_price_eur": "Prezzo Attuale (€)",
+                "unrealized_gain_eur": "Plusvalenza Latente (€)",
+                "consumable_minus_eur": "Minus Compensabile (€)",
+                "tax_saving_eur": "Risparmio Fiscale (€)",
+                "action": "Azione Consigliata"
+            })
+            
+            st.dataframe(
+                df_step_show.style.format({
+                    "Prezzo Attuale (€)": "€ {:,.2f}",
+                    "Plusvalenza Latente (€)": "€ {:,.2f}",
+                    "Minus Compensabile (€)": "€ {:,.2f}",
+                    "Risparmio Fiscale (€)": "€ {:,.2f}"
+                }),
+                use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("Nessuna posizione in utile su Redditi Diversi (azioni/bond) idonea per la compensazione dello zainetto fiscale.")
+
+    with tab_w_loss:
+        if not df_harv_l.empty:
+            st.markdown("##### ✂️ Titoli in Perdita per Generazione Nuovo Credito Fiscale")
+            st.caption("Monetizzare queste perdite permette di abbattere il debito fiscale dell'anno in corso o creare nuove minusvalenze con scadenza a 4 anni.")
+            
+            df_loss_show = df_harv_l[[
+                "ticker", "asset_class", "qty_held", "current_price_eur",
+                "unrealized_loss_eur", "loss_to_harvest_eur", "tax_shield_created_eur", "action"
+            ]].rename(columns={
+                "ticker": "Ticker",
+                "asset_class": "Asset Class",
+                "qty_held": "Q.tà in Portafoglio",
+                "current_price_eur": "Prezzo Attuale (€)",
+                "unrealized_loss_eur": "Perdita Latente (€)",
+                "loss_to_harvest_eur": "Minusvalenza Generabile (€)",
+                "tax_shield_created_eur": "Scudo Fiscale Stimato (€)",
+                "action": "Azione Consigliata"
+            })
+            
+            st.dataframe(
+                df_loss_show.style.format({
+                    "Prezzo Attuale (€)": "€ {:,.2f}",
+                    "Perdita Latente (€)": "€ {:,.2f}",
+                    "Minusvalenza Generabile (€)": "€ {:,.2f}",
+                    "Scudo Fiscale Stimato (€)": "€ {:,.2f}"
+                }),
+                use_container_width=True, hide_index=True
+            )
+        else:
+            st.info("Nessuna posizione in perdita latente significativa da raccogliere.")
 
 # ── TAB 4: RISCHIO LIQUIDITÀ & ALMGREN-CHRISS ─────────────────
 elif active_pos_tab == "⚡ Impatto di Mercato (Almgren-Chriss)":

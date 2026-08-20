@@ -399,3 +399,122 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
 
     return pd.DataFrame(timeline_rows)
 
+
+def compute_tax_loss_harvesting_strategy(
+    results: Dict[str, Any],
+    custom_zainetto_eur: float = None
+) -> Dict[str, Any]:
+    """
+    Motore di Ottimizzazione Fiscale & Tax-Loss Harvesting Wizard (TUIR Art. 67).
+    
+    Identifica con precisione:
+    1. Strategie di Step-Up Fiscale a imposta 0€:
+       Vendere e ricomprare posizioni in utile (Redditi Diversi: azioni singole, bond, ETC) per
+       consumare le minusvalenze pregresse accumulate nello Zainetto Fiscale, alzando il prezzo di carico
+       senza pagare capital gain e risparmiando il 26% sulle future plusvalenze.
+    2. Opportunità di Tax-Loss Harvesting su posizioni in perdita:
+       Monetizzare perdite latenti per azzerare le imposte sui capital gain realizzati nell'anno corrente.
+    """
+    pos = results.get("positions", pd.DataFrame())
+    if pos is None or pos.empty:
+        return {
+            "has_recommendations": False,
+            "df_step_up": pd.DataFrame(),
+            "df_harvest_loss": pd.DataFrame(),
+            "total_tax_savings_eur": 0.0,
+            "total_minus_consumable_eur": 0.0,
+            "summary": {}
+        }
+
+    # Stima minusvalenze disponibili nello zainetto
+    tax_res = compute_tax_and_harvesting(results) if results else {}
+    df_timeline = tax_res.get("zainetto_timeline", pd.DataFrame())
+    active_minus = float(df_timeline["residual_active_eur"].sum()) if isinstance(df_timeline, pd.DataFrame) and not df_timeline.empty and "residual_active_eur" in df_timeline.columns else 0.0
+    
+    if custom_zainetto_eur is not None and custom_zainetto_eur >= 0:
+        available_zainetto = float(custom_zainetto_eur)
+    else:
+        available_zainetto = active_minus
+
+    step_up_rows = []
+    loss_harvest_rows = []
+
+    remaining_zainetto = available_zainetto
+
+    for _, row in pos.iterrows():
+        ticker = str(row.get("ticker", ""))
+        ac = str(row.get("asset_class", "Equity"))
+        qty = float(row.get("qty_net", row.get("quantity", 0.0)) or 0.0)
+        curr_price = float(row.get("current_price", row.get("price", 0.0)) or 0.0)
+        cost_basis_eur = float(row.get("cost_basis_eur", row.get("cost_basis", 0.0)) or 0.0)
+        unrealized_pnl = float(row.get("unrealized_pnl", row.get("pnl_unrealized", 0.0)) or 0.0)
+        unrealized_pct = float(row.get("unrealized_pnl_pct", 0.0) or 0.0)
+        
+        etf_flag = is_etf(ac, ticker)
+        tax_rate = get_asset_tax_rate(ac, ticker)
+
+        # 1. Candidato Step-Up Fiscale (Utile su Redditi Diversi: NON ETF)
+        if unrealized_pnl > 10.0 and not etf_flag and qty > 0 and curr_price > 0:
+            consumable_gain = min(unrealized_pnl, remaining_zainetto) if remaining_zainetto > 0 else unrealized_pnl
+            tax_saved = consumable_gain * tax_rate
+            
+            step_up_rows.append({
+                "ticker": ticker,
+                "asset_class": ac,
+                "qty_held": round(qty, 4),
+                "current_price_eur": round(curr_price, 2),
+                "unrealized_gain_eur": round(unrealized_pnl, 2),
+                "unrealized_gain_pct": round(unrealized_pct, 2),
+                "consumable_minus_eur": round(consumable_gain, 2),
+                "tax_saving_eur": round(tax_saved, 2),
+                "action": "🎯 Vendi & Ricompra (Step-Up a 0€ Imposta)",
+                "rationale": f"Monetizza € {consumable_gain:,.2f} di plusvalenza compensandola al 100% con lo zainetto. Il prezzo di carico sale a € {curr_price:.2f} con 0€ di tasse."
+            })
+            if remaining_zainetto > 0:
+                remaining_zainetto = max(0.0, remaining_zainetto - consumable_gain)
+
+        # 2. Candidato Tax-Loss Harvesting (Perdite Latenti)
+        elif unrealized_pnl < -10.0 and qty > 0:
+            loss_amt = abs(unrealized_pnl)
+            potential_tax_shield = loss_amt * tax_rate
+            
+            loss_harvest_rows.append({
+                "ticker": ticker,
+                "asset_class": ac,
+                "qty_held": round(qty, 4),
+                "current_price_eur": round(curr_price, 2),
+                "unrealized_loss_eur": round(unrealized_pnl, 2),
+                "unrealized_loss_pct": round(unrealized_pct, 2),
+                "loss_to_harvest_eur": round(loss_amt, 2),
+                "tax_shield_created_eur": round(potential_tax_shield, 2),
+                "action": "✂️ Vendi per Raccolta Minusvalenze",
+                "rationale": f"Genera € {loss_amt:,.2f} di nuove minusvalenze per schermare future plusvalenze e ridurre il carico fiscale di € {potential_tax_shield:,.2f}."
+            })
+
+    df_step_up = pd.DataFrame(step_up_rows)
+    if not df_step_up.empty:
+        df_step_up = df_step_up.sort_values(by="tax_saving_eur", ascending=False)
+
+    df_harvest = pd.DataFrame(loss_harvest_rows)
+    if not df_harvest.empty:
+        df_harvest = df_harvest.sort_values(by="tax_shield_created_eur", ascending=False)
+
+    tot_tax_saved = float(df_step_up["tax_saving_eur"].sum()) if not df_step_up.empty else 0.0
+    tot_minus_consumed = float(df_step_up["consumable_minus_eur"].sum()) if not df_step_up.empty else 0.0
+    tot_shield_created = float(df_harvest["tax_shield_created_eur"].sum()) if not df_harvest.empty else 0.0
+
+    return {
+        "has_recommendations": (not df_step_up.empty or not df_harvest.empty),
+        "df_step_up": df_step_up,
+        "df_harvest_loss": df_harvest,
+        "available_zainetto_eur": round(available_zainetto, 2),
+        "total_minus_consumed_eur": round(tot_minus_consumed, 2),
+        "total_tax_savings_eur": round(tot_tax_saved, 2),
+        "total_tax_shield_created_eur": round(tot_shield_created, 2),
+        "summary": {
+            "n_step_up_candidates": len(df_step_up),
+            "n_loss_candidates": len(df_harvest),
+            "estimated_net_benefit_eur": round(tot_tax_saved + tot_shield_created, 2)
+        }
+    }
+

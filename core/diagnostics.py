@@ -243,7 +243,11 @@ def reindex_databases() -> bool:
             cur = conn.cursor()
             cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='market_prices';")
             if cur.fetchone():
-                conn.execute("CREATE INDEX IF NOT EXISTS idx_mp_ticker_date ON market_prices(ticker, price_date);")
+                cols = [c[1] for c in cur.execute("PRAGMA table_info(market_prices);").fetchall()]
+                if "asset_id" in cols and "price_date" in cols:
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_mp_asset_date ON market_prices(asset_id, price_date);")
+                elif "ticker" in cols and "price_date" in cols:
+                    conn.execute("CREATE INDEX IF NOT EXISTS idx_mp_ticker_date ON market_prices(ticker, price_date);")
             conn.execute("REINDEX;")
             conn.close()
             
