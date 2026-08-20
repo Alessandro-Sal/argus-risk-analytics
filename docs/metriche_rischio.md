@@ -616,4 +616,70 @@ Framework per l'analisi telemetrica dell'occupazione fisica dei database SQLite/
   \[ \Delta t = t_{\text{now}} - t_{\text{cached}} > 86.400\,\text{s} \]
 - **Reindexing B-Tree**: Ricostruzione periodica degli indici compositi su `(ticker, price_date)` tramite `REINDEX` per mantenere le latenze di ricerca temporale su complessità logaritmica $\mathcal{O}(\log N)$.
 
+---
+
+## 38. Posizioni Chiuse & Graveyard Analytics (`core/closed_trades.py`)
+
+Framework analitico per la ricostruzione e l'audit delle operazioni di disinvestimento totale o parziale elaborate con precisione contabile FIFO:
+
+### 1. Curva Cumulativa di PnL Realizzato & High-Water Mark (HWM)
+Traccia l'evoluzione progressiva del profitto o perdita monetizzato nel tempo:
+\[ \text{CumPnL}_t = \sum_{\tau \le t} \text{RealizedPnL}_\tau \]
+La linea di **High-Water Mark (Picco)** quantifica il massimo storico di capitale realizzato:
+\[ \text{HWM}_t = \max_{\tau \le t} \text{CumPnL}_\tau \]
+Il **Trade Drawdown** associato misura l'erosione del capitale realizzato rispetto al picco:
+\[ \text{DD}_t = \text{CumPnL}_t - \text{HWM}_t \]
+
+### 2. Trading Calendar & Heatmap Stagionale (Mese $\times$ Anno)
+Matrice di monitoraggio temporale delle chiusure:
+\[ \text{PnL}_{\text{Anno}, \text{Mese}} = \sum_{i \in \text{Trades}_{\text{Anno}, \text{Mese}}} \text{RealizedPnL}_i \]
+Evidenzia la ciclicità delle decisioni di monetizzazione e la consistenza temporale del processo di gestione.
+
+### 3. Scomposizione Settoriale e per Asset Class
+Aggrega il PnL realizzato, i volumi transati e il Win Rate percentuale su base GICS:
+\[ \text{Win Rate}_{\text{settore}} = \frac{\sum \mathbf{1}_{\{\text{RealizedPnL}_i > 0\}}}{N_{\text{settore}}} \times 100 \]
+
+---
+
+## 39. Fisco Italiano & Tax-Loss Harvesting Wizard (TUIR Art. 67) (`core/tax_engine.py`)
+
+Motore di ottimizzazione e pianificazione fiscale per investitori residenti in Italia basato sul Testo Unico delle Imposte sui Redditi (TUIR, D.P.R. 917/1986):
+
+### 1. Asimmetria Fiscale: Redditi di Capitale vs Redditi Diversi
+- **ETF e Fondi Comuni**: Le plusvalenze sono qualificate come *Redditi di Capitale* (tassazione 26%) e **non possono** essere compensate con le minusvalenze pregresse. Le minusvalenze generate da ETF sono invece *Redditi Diversi* e vanno a confluire nello Zainetto Fiscale.
+- **Azioni Singole, Obbligazioni ed ETC**: Le plusvalenze costituiscono *Redditi Diversi* e possono compensare **1:1** le minusvalenze accumulate nello Zainetto Fiscale.
+- **Titoli di Stato White List**: Aliquota agevolata al 12.5% (equivalente al 48.08% di imponibilità a fini di compensazione).
+
+### 2. Strategia Step-Up Fiscale a 0€ Imposte
+Per evitare la decadenza delle minusvalenze dopo 4 anni solari ($t + 4$), il wizard individua le posizioni in utile appartenenti ai *Redditi Diversi* da vendere e ricomprare immediatamente:
+\[ \text{Controvalore Vendita} = \min\left(\text{Valore Posizione}, \frac{\text{Minusvalenza Residua}}{\text{Plusvalenza Percentuale}}\right) \]
+- **Effetto Fiscale**: La plusvalenza monetizzata azzera le minusvalenze in scadenza senza versare 1€ di imposte.
+- **Vantaggio Futuro**: Il nuovo prezzo di carico (WACP) viene innalzato al prezzo di mercato, generando un risparmio fiscale futuro certo del **26%** sulla quota di plusvalenza assorbita:
+  \[ \text{Risparmio Fiscale Futuro} = \text{Minusvalenza Compensata} \times 26\% \]
+
+### 3. Strategia Tax-Loss Harvesting (Raccolta Minusvalenze)
+Monetizzazione strategica delle perdite latenti prima del 31 dicembre per compensare plusvalenze maturate nell'anno o rinnovare lo scudo fiscale quadriennale.
+
+---
+
+## 40. Simulatore Interattivo Trade-Level Kelly Criterion (`core/advanced_quant.py`)
+
+Algoritmo di dimensionamento ottimale delle scommesse (Position Sizing) derivato dalla teoria dell'informazione di John L. Kelly Jr. (1956):
+
+### 1. Formulazione Discreta e Fractional Sizing
+Dati il Win Rate storico $p$ e il Payoff Ratio $b = \frac{\overline{\text{Win}}}{\overline{\text{Loss}}}$ estratti dal registro FIFO:
+\[ f^* = \frac{p(b + 1) - 1}{b} \]
+- **Half-Kelly ($f^*_{\text{half}} = f^*/2$)**: Frazione raccomandata che massimizza il trade-off rendimento/volatilità, catturando il 75% della crescita geometrica massima con un dimezzamento della varianza e abbattimento del rischio di rovina.
+- **Quarter-Kelly ($f^*_{\text{quarter}} = f^*/4$)**: Profilo ultra-difensivo per mercati ad elevata incertezza o regimi di crisi.
+
+### 2. Dimensionamento del Nozionale in Funzione dello Stop-Loss
+Dato un capitale di portafoglio $C$ e una distanza di Stop-Loss percentuale $SL\% = \frac{P_{\text{entry}} - P_{\text{stop}}}{P_{\text{entry}}}$:
+\[ \text{Capitale a Rischio (€)} = C \times f^*_{\text{half}} \]
+\[ \text{Controvalore Nozionale Posizione (€)} = \frac{\text{Capitale a Rischio (€)}}{SL\%} \]
+\[ \text{Numero Quote Operative} = \left\lfloor \frac{\text{Controvalore Nozionale}}{P_{\text{entry}}} \right\rfloor \]
+
+### 3. Tasso di Crescita Geometrico Atteso
+\[ G(f) = p \ln(1 + f \cdot b) + (1 - p) \ln(1 - f) \]
+Se l'Edge matematico $E = p \cdot b - (1 - p) \le 0$, l'algoritmo impone $f^* = 0$ (esposizione nulla).
+
 

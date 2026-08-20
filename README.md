@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-5.4.0-blue.svg)
+![Version](https://img.shields.io/badge/version-5.5.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-104%2F104%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-110%2F110%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -18,7 +18,9 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Infrastruttura Data Warehouse Duale & Total Wealth Hub**: Storicizzazione relazionale duale su MySQL 8.0 e SQLite locale (`data/argus_local.db`), gestione multi-valuta (EUR, USD, GBP, CHF) e **Total Wealth Hub Multi-Portafoglio** per salvare, confrontare e consolidare profili distinti (*Crescita, Dividendi, Previdenza, Crypto*) in un unico Master Portfolio unificato con fusione ponderata delle serie storiche dei rendimenti, stima esatta della durata solare (standard GIPS / CFA Institute) e decomposizione del rischio di componente.
 * **Dual Google Sheets Pipeline (Stocks + Crypto)**: Connessione crittografata tramite Google Service Account con estrazione parallela e separazione nativa a livello di database dei fogli `History B/S Stocks` e `History B/S Crypto`, normalizzazione automatica dei tassi di cambio multi-valuta (EUR/USD/GBP) e mappatura dei ticker crypto (`BTC-EUR`, `ETH-EUR`, `SOL-EUR`, ecc.).
 * **Database & Memory Storage Cockpit**: Monitoraggio in tempo reale dell'occupazione fisica dei database SQLite/MySQL, della memoria RAM (RSS) del processo, grafico Donut della ripartizione dello storage e strumenti di manutenzione 1-click (*VACUUM compattazione disco, pulizia cache scaduta TTL 24h, rigenerazione indici B-Tree e test PRAGMA integrity*).
-* **Motore Quantitativo & Portfolio Engineering di Frontiera**: Risoluzione analitica della Frontiera Efficiente di Markowitz affiancata da stimatori *Ledoit-Wolf Shrinkage*, **Equal Risk Contribution (ERC / Parità di Rischio Pura)**, **Dipendenza di Coda Asimmetrica con Tail Copulas (Clayton & Gumbel)** per rilevare il rischio di crash congiunto non lineare, **Criterio di Kelly & Half-Kelly Position Sizing** per la massimizzazione del tasso di crescita del capitale, **Live Rebalancing Sandbox** interattivo, allocazione mediante Machine Learning con **Hierarchical Risk Parity (HRP - Marcos López de Prado)**, copertura analitica con **Black-Scholes (1973)** con calcolo dei 5 Greci e Delta-Hedging con opzioni Put, generazione di rendimento passivo con *Covered Call Yield Enhancer*, modelli econometrici a 3 fattori di Fama-French (con regressione OLS multivariata), Carhart a 4 fattori, modello macro-fattoriale *MSCI Barra a 5 fattori ortogonalizzati*, simulazioni stocastiche *Merton Jump-Diffusion*, classificazione di regime macro con **Market Regime Switching (3-State Markov Model)**, rilevatore di anomalie di mercato via *Machine Learning Isolation Forest* e proiezioni stocastiche *Monte Carlo* (con decomposizione di Cholesky e distribuzioni *Student-t* a code grasse).
+* **Posizioni Chiuse & Graveyard Analytics**: Tracciamento contabile FIFO integrale delle operazioni chiuse con **Curva Cumulativa di PnL Realizzato (€)**, **High-Water Mark (Picco)**, telemetria di trade drawdown, **Trading Calendar & Heatmap Mensile** (matrice Mese $\times$ Anno) e scomposizione per settore GICS e asset class.
+* **Fisco Italiano & Tax-Loss Harvesting Wizard (TUIR Art. 67)**: Modulo per la massimizzazione dell'efficienza fiscale con **Strategia Step-Up a 0€ imposte** (vendita e riacquisto immediato di titoli in utile su *Redditi Diversi* per azzerare le minusvalenze pregresse dello Zainetto Fiscale in scadenza quadriennale) e **Strategia Tax-Loss Harvesting** su posizioni in perdita latente.
+* **Motore Quantitativo & Portfolio Engineering di Frontiera**: Risoluzione analitica della Frontiera Efficiente di Markowitz affiancata da stimatori *Ledoit-Wolf Shrinkage*, **Equal Risk Contribution (ERC / Parità di Rischio Pura)**, **Dipendenza di Coda Asimmetrica con Tail Copulas (Clayton & Gumbel)** per rilevare il rischio di crash congiunto non lineare, **Simulatore Interattivo Trade-Level Kelly Criterion & Half-Kelly Position Sizing** (pre-popolato con Win Rate e Payoff Ratio reali del Graveyard), **Live Rebalancing Sandbox** interattivo, allocazione mediante Machine Learning con **Hierarchical Risk Parity (HRP - Marcos López de Prado)**, copertura analitica con **Black-Scholes (1973)** con calcolo dei 5 Greci e Delta-Hedging con opzioni Put, generazione di rendimento passivo con *Covered Call Yield Enhancer*, modelli econometrici a 3 fattori di Fama-French (con regressione OLS multivariata), Carhart a 4 fattori, modello macro-fattoriale *MSCI Barra a 5 fattori ortogonalizzati*, simulazioni stocastiche *Merton Jump-Diffusion*, classificazione di regime macro con **Market Regime Switching (3-State Markov Model)**, rilevatore di anomalie di mercato via *Machine Learning Isolation Forest* e proiezioni stocastiche *Monte Carlo* (con decomposizione di Cholesky e distribuzioni *Student-t* a code grasse).
 * **AI & LLM Narrative Intelligence (ARGUS AI Analyst & Copilot)**: Motore di sintesi narrativa automatica a due livelli (**LLM Online** con Google Gemini / OpenAI e **NLG Deterministico Offline 100%**) per generare Executive Memorandum istituzionali e rispondere in tempo reale a domande complesse sul portafoglio via chat interattiva.
 * **Financial Statement & Forensic Accounting**: Suite completa per la valutazione della solvibilità e del valore intrinseco aziendale mediante modelli *Altman Z-Score*, decomposizione *DuPont a 5 fattori*, *Piotroski F-Score (9pt)*, **Contabilità Forense Beneish M-Score (1999)** a 8 indici econometrici per il rilevamento di frodi contabili e manipolazione degli utili, **Sloan Accrual Ratio (1996)** per la qualità dei flussi di cassa, stima del *WACC (CAPM)*, *DCF stocastico a due stadi* e classificatore *Random Forest Distress Risk*.
 * **Interfaccia Istituzionale & Spotlight Command Palette (`Ctrl+K`)**: Modalità di esecuzione rapida, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 10 moduli, oltre 30 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
@@ -50,8 +52,8 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva, analisi Average Daily Volume (ADV) e Stop-Loss dinamici Chandelier ($3 \times ATR_{14}$).
 
 ### 3. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/3_🔬_Modelli_Quantitativi.py`)
-* **🧬 Asymmetric Tail Copula Models (Clayton & Gumbel)**: Calcolo della dipendenza di coda inferiore ($\lambda_L$) e superiore ($\lambda_U$) per identificare il rischio di contagio e crollo simultaneo non lineare durante i panic selling di mercato.
-* **🎯 Criterio di Kelly & Fractional Position Sizing**: Calcolo matematico dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)* per massimizzare la crescita geometrica azzerando il rischio di rovina.
+* **🧬 Asymmetric Tail Copula Models (Clayton & Gumbel)**: Calcolo della dipendenza di coda inferiore ($\lambda_L$) e superiore ($\lambda_U$) per identificare il rischio di contagio e crollo simultaneo non lineare durante i panic selling di mercato, con allerta per coppie ad elevata asimmetria ($\lambda_L \ge 0.30$).
+* **🎯 Simulatore Interattivo Trade Sizing (Kelly Criterion)**: Calcolo matematico dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)* per massimizzare la crescita geometrica azzerando il rischio di rovina, pre-popolato automaticamente con Win Rate % e Payoff Ratio reali del Graveyard e dimensionamento monetario esatto sullo Stop-Loss.
 * **⚖️ Equal Risk Contribution (ERC / Risk Parity Pura)**: Ottimizzazione non lineare SLSQP dove ciascun asset contribuisce esattamente per $1/N$ alla volatilità complessiva di portafoglio.
 * **Live Rebalancing Sandbox (What-If Weight Matrix)**: Simulatore in tempo reale con slider e preset istituzionali (*⭐ Pesi Attuali*, *⚖️ Equipesato 1/N*, *🏆 Max Sharpe*, *🛡️ Minima Volatilità*, *🧬 Equal Risk ERC*) per calcolare istantaneamente le variazioni $\Delta R$, $\Delta\sigma$, $\Delta\text{VaR}_{95}$ e $\Delta\text{Sharpe}$ con grafico a barre comparative.
 * **Hierarchical Risk Parity (HRP - Marcos López de Prado 2016)**: Ottimizzazione del portafoglio basata su Machine Learning, Tree Clustering e Bisezione Ricorsiva con matrice di distanza $D_{i,j} = \sqrt{(1 - \rho_{i,j})/2}$.
@@ -62,9 +64,16 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 
 ### 4. 📋 Posizioni, Contabilità FIFO & Fiscalità TUIR (`src/pages/4_📋_Posizioni_e_Dettagli.py`)
 * **Motore Contabile FIFO (`_fifo_engine`)**: Calcolo deterministico del Weighted Average Cost Price (WACP) e separazione analitica tra PnL realizzato e non realizzato.
+* **🪦 Posizioni Chiuse & Graveyard Cockpit Multi-Prospettiva**:
+  - *Curva Cumulativa PnL Realizzato (€)* con High-Water Mark di picco e telemetria di trade drawdown.
+  - *Trading Calendar & Heatmap Mensile*: Matrice Mese $\times$ Anno con totale annuo e codice colore dinamico.
+  - *Scomposizione Settori GICS & Asset Class*: Analisi aggregata del profitto monetario e del Win Rate per settore.
+  - *Registro Lotti Chiusi FIFO Log*: Dettaglio cronologico di ciascuna operazione con holding period e prezzo di carico/scarico.
+* **💰 Tax-Loss Harvesting & Step-Up Wizard (TUIR Art. 67)**:
+  - *Strategia Step-Up Fiscale a 0€ Imposte*: Individua i titoli in guadagno su *Redditi Diversi* (azioni singole, bond, ETC) e calcola le quote da vendere e ricomprare per azzerare le minusvalenze dello Zainetto Fiscale in scadenza senza pagare tasse, alzando il prezzo di carico a zero imposte e risparmiando il 26% sulle plusvalenze future.
+  - *Strategia Tax-Loss Harvesting*: Rileva le perdite latenti da monetizzare per abbattere le imposte dell'anno in corso.
 * **Smart Rebalancer**: Generatore di ordini operativi ad azioni intere per allineare il portafoglio ai pesi target con gestione del buffer di liquidità.
 * **Calendario & Previsione Flusso Dividendi**: Dividend Yield medio di portafoglio, storico reale e calendario mensile degli incassi stimati per azienda.
-* **Ottimizzazione Fiscale TUIR Art. 67**: Aliquota 12.5% su Titoli di Stato White List vs 26.0% su Azioni/ETF, gestione asimmetria fiscale minusvalenze (Zainetto Fiscale) e Tax-Loss Harvesting Advisor.
 
 ### 5. 🏛️ Analisi dei Bilanci, Valutazione & Contabilità Forense (`src/pages/5_🏛️_Valutazione_Aziendale.py`)
 * **Beneish M-Score (1999)**: Modello econometrico a 8 indici (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) per rilevare manipolazioni contabili (soglia critica $M > -1.78$).
@@ -199,8 +208,9 @@ argus-risk-analytics/
 │   ├── ai_analyst.py            # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
 │   ├── attribution.py           # Brinson-Fachler Performance Attribution
 │   ├── cache_shield.py          # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
+│   ├── closed_trades.py         # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
 │   ├── db_exporter.py           # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
-│   ├── diagnostics.py           # System Diagnostics & Health-Check Cockpit
+│   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
 │   ├── dividend_engine.py       # Cash Flow Forecast & Dividend Calendar
 │   ├── excel_generator.py       # Modello tattico Excel What-If
 │   ├── exporter.py              # Esportatore CSV denormalizzati
@@ -221,8 +231,8 @@ argus-risk-analytics/
 │   ├── risk_limits.py           # Early Warning System & Controlli di Rischio UCITS/MiFID
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # Screener Quantitativo Multi-Fattoriale & Pre-Trade Simulator
-│   ├── sidebar.py               # Navigation Rail v5.4.0, Execution Mode & Spotlight Search
-│   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67
+│   ├── sidebar.py               # Navigation Rail v5.5.0, Execution Mode & Spotlight Search
+│   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
 │   ├── ui_utils.py              # Helper Grafici Plotly, Modali Informativi & Componenti UI
 │   ├── validator.py             # Pipeline di Bonifica & Normalizzazione Dati
@@ -241,7 +251,7 @@ argus-risk-analytics/
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
 │   ├── argus_icon.ico           # Asset icona Occhio di Argus
-│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (36 Sezioni)
+│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (40 Sezioni)
 ├── exports/                     # Cartella di destinazione report esportati (.xlsx, .pdf, .zip)
 │   └── .gitkeep
 ├── gsheets_sync_subproject/     # Sub-servizio Sincronizzazione ETL Google Sheets
@@ -270,7 +280,7 @@ argus-risk-analytics/
 │       ├── 7_📊_Analisi_Temporale.py
 │       ├── 8_📈_Analisi_Tecnica.py
 │       └── 9_🔍_Screener_Opportunita.py
-├── tests/                       # Test suite automatizzata PyTest (98 Test)
+├── tests/                       # Test suite automatizzata PyTest (110 Test)
 │   ├── test_adapters.py
 │   ├── test_advanced_quant.py
 │   ├── test_advisor.py
@@ -279,6 +289,7 @@ argus-risk-analytics/
 │   ├── test_backtest.py
 │   ├── test_black_litterman_fama_french.py
 │   ├── test_cache_shield_and_diagnostics.py
+│   ├── test_closed_trades.py
 │   ├── test_custom_stress.py
 │   ├── test_diversification.py
 │   ├── test_enhancements.py
@@ -298,6 +309,7 @@ argus-risk-analytics/
 │   ├── test_multi_portfolio.py
 │   ├── test_new_quant_features.py
 │   ├── test_optimization.py
+│   ├── test_quant_tax_graveyard_enhancements.py
 │   ├── test_rebalancer_and_advisor.py
 │   ├── test_regime_and_options.py
 │   ├── test_risk_engine.py
@@ -330,7 +342,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **98 test automatizzati PyTest** con copertura end-to-end del 100%:
+Il progetto include **110 test automatizzati PyTest** con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -338,7 +350,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 98 passed in ~13.50s =============================
+============================= 110 passed in ~7.00s =============================
 ```
 
 ---
@@ -349,4 +361,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.4.0.*
+*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.5.0.*
