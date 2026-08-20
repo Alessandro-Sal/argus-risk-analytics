@@ -407,7 +407,7 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
 
         df_assets_closed = closed_data.get("df_closed_assets", pd.DataFrame())
         df_lots_closed = closed_data.get("df_closed_lots", pd.DataFrame())
-        chart_height = max(380, min(650, len(df_assets_closed) * 32)) if not df_assets_closed.empty else 380
+        chart_height = max(400, min(750, len(df_assets_closed) * 32)) if not df_assets_closed.empty else 400
 
         with col_g_chart1:
             st.markdown("##### 📊 PnL Realizzato per Asset (€)")
@@ -439,7 +439,7 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                         gridcolor="rgba(255,255,255,0.04)",
                         tickfont=dict(size=12, color="#c9d1d9")
                     ),
-                    margin=dict(l=60, r=25, t=20, b=45),
+                    margin=dict(l=65, r=25, t=40, b=45),
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
                 )
                 apply_plotly_theme(fig_bar_pnl)
@@ -448,29 +448,37 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
         with col_g_chart2:
             st.markdown("##### ⏱️ Rendimento Realizzato (%) vs Tempo di Detenzione")
             if not df_lots_closed.empty:
-                fig_scat = px.scatter(
-                    df_lots_closed,
-                    x="holding_days",
-                    y="realized_pnl_pct",
-                    color="outcome",
-                    color_discrete_map={"🟢 WIN": "#3fb950", "🔴 LOSS": "#f85149", "🟡 BREAKEVEN": "#ffd700"},
-                    hover_name="ticker",
-                    hover_data={
-                        "holding_days": True,
-                        "realized_pnl_pct": ":.2f%",
-                        "realized_pnl_eur": ":.2f",
-                        "buy_date": True,
-                        "sell_date": True,
-                        "outcome": False
-                    },
-                    labels={
-                        "holding_days": "Giorni di Detenzione (Holding Period)",
-                        "realized_pnl_pct": "Rendimento Realizzato (%)",
-                        "outcome": ""
-                    }
-                )
+                fig_scat = go.Figure()
+                for outcome, color in [("🟢 WIN", "#3fb950"), ("🔴 LOSS", "#f85149"), ("🟡 BREAKEVEN", "#ffd700")]:
+                    df_sub = df_lots_closed[df_lots_closed["outcome"] == outcome]
+                    if not df_sub.empty:
+                        fig_scat.add_trace(go.Scatter(
+                            x=df_sub["holding_days"],
+                            y=df_sub["realized_pnl_pct"],
+                            mode="markers",
+                            name=outcome,
+                            marker=dict(
+                                color=color,
+                                size=11,
+                                opacity=0.88,
+                                line=dict(width=1.2, color="#ffffff")
+                            ),
+                            customdata=np.stack((
+                                df_sub["ticker"],
+                                df_sub["realized_pnl_eur"],
+                                df_sub["buy_date"],
+                                df_sub["sell_date"]
+                            ), axis=-1),
+                            hovertemplate=(
+                                "<b>%{customdata[0]}</b> (" + outcome + ")<br>"
+                                "• Tempo Detenzione: <b>%{x} gg</b><br>"
+                                "• Rendimento: <b>%{y:+.2f}%</b><br>"
+                                "• PnL Realizzato: <b>€ %{customdata[1]:+,.2f}</b><br>"
+                                "• Acquisto: <b>%{customdata[2]}</b> | Vendita: <b>%{customdata[3]}</b>"
+                                "<extra></extra>"
+                            )
+                        ))
                 fig_scat.add_hline(y=0, line_dash="dash", line_color="rgba(255,255,255,0.35)", line_width=1.5)
-                fig_scat.update_traces(marker=dict(size=11, opacity=0.85, line=dict(width=1.2, color='#ffffff')))
                 fig_scat.update_layout(
                     template="plotly_dark", height=chart_height,
                     legend=dict(
@@ -480,9 +488,10 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                         xanchor="right",
                         x=1.0,
                         title_text="",
-                        bgcolor="rgba(22,27,34,0.6)",
-                        bordercolor="rgba(255,255,255,0.1)",
-                        borderwidth=1
+                        bgcolor="rgba(22,27,34,0.75)",
+                        bordercolor="rgba(255,255,255,0.12)",
+                        borderwidth=1,
+                        font=dict(size=11)
                     ),
                     xaxis=dict(
                         title="Giorni di Detenzione (Holding Period)",
@@ -495,7 +504,7 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                         gridcolor="rgba(255,255,255,0.06)",
                         zeroline=False
                     ),
-                    margin=dict(l=45, r=20, t=30, b=45),
+                    margin=dict(l=55, r=20, t=40, b=45),
                     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
                 )
                 apply_plotly_theme(fig_scat)
