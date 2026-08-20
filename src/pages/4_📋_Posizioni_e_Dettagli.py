@@ -5,10 +5,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 import importlib
 import core.ui_utils
-import core.risk_engine
+import core.crypto_tax_engine
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_executive_badges, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal
+importlib.reload(core.crypto_tax_engine)
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_executive_badges, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
 
 st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
@@ -973,12 +974,15 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
 # ── TAB 3: OTTIMIZZAZIONE FISCALE ─────────────────────────────
 elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
     section("💰 Ottimizzazione Fiscale & Tax-Loss Harvesting")
-    st.caption("Analisi delle plusvalenze realizzate, della stima delle imposte (aliquote 26% / 12.5%) ed opportunità di Tax-Loss Harvesting per la riduzione del debito fiscale.")
+    st.caption("Analisi delle plusvalenze realizzate, della stima delle imposte (aliquote 26% / 12.5%), fiscalità Cripto (L. 197/2022) ed opportunità di Tax-Loss Harvesting.")
 
     import importlib
     import core.tax_engine
+    import core.crypto_tax_engine
     importlib.reload(core.tax_engine)
+    importlib.reload(core.crypto_tax_engine)
     from core.tax_engine import compute_tax_and_harvesting
+    from core.crypto_tax_engine import compute_crypto_tax_report
 
     engine = st.session_state.get("db_engine", None)
     if engine is None:
@@ -996,385 +1000,435 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
     )
 
     tax_year_param = None if selected_year == "Tutti gli Anni" else int(selected_year)
-    tax_res = compute_tax_and_harvesting(results, db_engine=engine, tax_year=tax_year_param)
-    tax_sum = tax_res["summary"]
-    tax_harv = tax_res["harvesting_candidates"]
-    tax_by_year = tax_res.get("tax_by_year", pd.DataFrame())
 
-    col_tx1, col_tx2, col_tx3, col_tx4 = st.columns(4)
-    with col_tx1:
-        sub_txt = f"Div: € {tax_sum['total_realized_gain_diversi_eur']:,.0f} | ETF: € {tax_sum['total_realized_gain_etf_eur']:,.0f}"
-        metric_card(f"Plusvalenze ({selected_year})", f"€ {tax_sum['total_realized_gain_eur']:,.2f}", sub_txt, True)
-    with col_tx2:
-        metric_card(f"Minusvalenze ({selected_year})", f"€ {tax_sum['total_realized_loss_eur']:,.2f}", "Inviate a Zainetto Fiscale", False)
-    with col_tx3:
-        metric_card(f"Stima Imposte ({selected_year})", f"€ {tax_sum['estimated_tax_due_eur']:,.2f}", "Aliquote 26% / 12.5%", False)
-    with col_tx4:
-        metric_card("Zainetto Residuo", f"€ {tax_sum['tax_credit_zainetto_eur']:,.2f}", "Compensabile in 4 Anni", True)
+    sub_tax_mode = st.radio(
+        "Regime Fiscale:",
+        options=["🏦 Regime Ordinario (Azioni, ETF, Obbligazioni - TUIR Art. 67)", "🪙 Fisco Cripto-Attività & Quadri RT / RW / IVAFE (L. 197/2022)"],
+        horizontal=True,
+        label_visibility="collapsed"
+    )
 
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    st.markdown("#### 💡 Candidati Tax-Loss Harvesting (Riduzione Debito Fiscale)")
-    if not tax_harv.empty:
-        df_harv_disp = tax_harv.copy()
-        if "asset_class" in df_harv_disp.columns:
-            df_harv_disp["asset_class"] = df_harv_disp["asset_class"].apply(
-                lambda x: str(x).upper() if str(x).lower() in ["etf", "fx"] else str(x).title()
+    if sub_tax_mode.startswith("🏦"):
+        tax_res = compute_tax_and_harvesting(results, db_engine=engine, tax_year=tax_year_param)
+        tax_sum = tax_res["summary"]
+        tax_harv = tax_res["harvesting_candidates"]
+        tax_by_year = tax_res.get("tax_by_year", pd.DataFrame())
+
+        col_tx1, col_tx2, col_tx3, col_tx4 = st.columns(4)
+        with col_tx1:
+            sub_txt = f"Div: € {tax_sum['total_realized_gain_diversi_eur']:,.0f} | ETF: € {tax_sum['total_realized_gain_etf_eur']:,.0f}"
+            metric_card(f"Plusvalenze ({selected_year})", f"€ {tax_sum['total_realized_gain_eur']:,.2f}", sub_txt, True)
+        with col_tx2:
+            metric_card(f"Minusvalenze ({selected_year})", f"€ {tax_sum['total_realized_loss_eur']:,.2f}", "Inviate a Zainetto Fiscale", False)
+        with col_tx3:
+            metric_card(f"Stima Imposte ({selected_year})", f"€ {tax_sum['estimated_tax_due_eur']:,.2f}", "Aliquote 26% / 12.5%", False)
+        with col_tx4:
+            metric_card("Zainetto Residuo", f"€ {tax_credit_val:,.2f}" if (tax_credit_val := tax_sum.get("tax_credit_zainetto_eur", 0.0)) else "€ 0.00", "Compensabile in 4 Anni", True)
+
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown("#### 💡 Candidati Tax-Loss Harvesting (Riduzione Debito Fiscale)")
+        if not tax_harv.empty:
+            df_harv_disp = tax_harv.copy()
+            if "asset_class" in df_harv_disp.columns:
+                df_harv_disp["asset_class"] = df_harv_disp["asset_class"].apply(
+                    lambda x: str(x).upper() if str(x).lower() in ["etf", "fx"] else str(x).title()
+                )
+            df_harv_disp = df_harv_disp.rename(columns={
+                "ticker": "Ticker",
+                "asset_class": "Classe Asset",
+                "pnl_unrealized": "PnL Non Realizzato (€)",
+                "potential_tax_saving_eur": "Risparmio Fiscale Potenziale (€)",
+                "tax_rate_pct": "Aliquota Fiscale %",
+                "qualifying_type": "Tipologia Reddito (TUIR)"
+            })
+            
+            format_dict = {}
+            for col, fmt in [
+                ("PnL Non Realizzato (€)", "€ {:,.2f}"),
+                ("Risparmio Fiscale Potenziale (€)", "€ {:,.2f}"),
+                ("Aliquota Fiscale %", "{:.1f}%")
+            ]:
+                if col in df_harv_disp.columns:
+                    df_harv_disp[col] = pd.to_numeric(
+                        df_harv_disp[col].astype(str).str.replace("%", "").str.replace("€", "").str.strip(),
+                        errors="coerce"
+                    ).fillna(0.0)
+                    format_dict[col] = fmt
+
+            st.dataframe(
+                df_harv_disp.style.format(format_dict) if format_dict else df_harv_disp,
+                use_container_width=True, hide_index=True
             )
-        df_harv_disp = df_harv_disp.rename(columns={
-            "ticker": "Ticker",
-            "asset_class": "Classe Asset",
-            "pnl_unrealized": "PnL Non Realizzato (€)",
-            "potential_tax_saving_eur": "Risparmio Fiscale Potenziale (€)",
-            "tax_rate_pct": "Aliquota Fiscale %",
-            "qualifying_type": "Tipologia Reddito (TUIR)"
-        })
-        
-        format_dict = {}
-        for col, fmt in [
-            ("PnL Non Realizzato (€)", "€ {:,.2f}"),
-            ("Risparmio Fiscale Potenziale (€)", "€ {:,.2f}"),
-            ("Aliquota Fiscale %", "{:.1f}%")
-        ]:
-            if col in df_harv_disp.columns:
-                df_harv_disp[col] = pd.to_numeric(
-                    df_harv_disp[col].astype(str).str.replace("%", "").str.replace("€", "").str.strip(),
-                    errors="coerce"
-                ).fillna(0.0)
-                format_dict[col] = fmt
+        else:
+            st.info("Nessuna posizione in perdita latente compensabile individuata.")
 
-        st.dataframe(
-            df_harv_disp.style.format(format_dict) if format_dict else df_harv_disp,
-            use_container_width=True, hide_index=True
-        )
-    else:
-        st.info("Nessuna posizione in perdita latente compensabile individuata.")
+        if not tax_by_year.empty:
+            st.markdown("##### 📊 Dettaglio Imposte & Plusvalenze per Anno Solare (€)")
+            
+            df_tax_chart = tax_by_year.rename(columns={
+                "year": "Anno Solare",
+                "realized_gain_eur": "Plusvalenze Realizzate (€)",
+                "realized_loss_eur": "Minusvalenze Realizzate (€)",
+                "estimated_tax_eur": "Stima Imposte Dovute (€)"
+            })
+            
+            fig_tax_y = px.bar(
+                df_tax_chart, x="Anno Solare", 
+                y=["Plusvalenze Realizzate (€)", "Minusvalenze Realizzate (€)", "Stima Imposte Dovute (€)"],
+                barmode="group",
+                labels={"value": "Euro (€)", "Anno Solare": "", "variable": ""},
+                color_discrete_map={
+                    "Plusvalenze Realizzate (€)": "#58a6ff",
+                    "Minusvalenze Realizzate (€)": "#f85149",
+                    "Stima Imposte Dovute (€)": "#00e676"
+                },
+                template="plotly_dark", height=370
+            )
+            fig_tax_y.update_traces(
+                hovertemplate="<b>Anno %{x}</b><br>%{fullData.name}: <b>€ %{y:,.2f}</b><extra></extra>"
+            )
+            fig_tax_y.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=20, r=20, t=35, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, title=None)
+            )
+            st.plotly_chart(fig_tax_y, use_container_width=True, config={"displayModeBar": False})
 
-    if not tax_by_year.empty:
-        st.markdown("##### 📊 Dettaglio Imposte & Plusvalenze per Anno Solare (€)")
-        
-        df_tax_chart = tax_by_year.rename(columns={
-            "year": "Anno Solare",
-            "realized_gain_eur": "Plusvalenze Realizzate (€)",
-            "realized_loss_eur": "Minusvalenze Realizzate (€)",
-            "estimated_tax_eur": "Stima Imposte Dovute (€)"
-        })
-        
-        fig_tax_y = px.bar(
-            df_tax_chart, x="Anno Solare", 
-            y=["Plusvalenze Realizzate (€)", "Minusvalenze Realizzate (€)", "Stima Imposte Dovute (€)"],
-            barmode="group",
-            labels={"value": "Euro (€)", "Anno Solare": "", "variable": ""},
-            color_discrete_map={
-                "Plusvalenze Realizzate (€)": "#58a6ff",
-                "Minusvalenze Realizzate (€)": "#f85149",
-                "Stima Imposte Dovute (€)": "#00e676"
-            },
-            template="plotly_dark", height=370
-        )
-        fig_tax_y.update_traces(
-            hovertemplate="<b>Anno %{x}</b><br>%{fullData.name}: <b>€ %{y:,.2f}</b><extra></extra>"
-        )
-        fig_tax_y.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=20, r=20, t=35, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, title=None)
-        )
-        st.plotly_chart(fig_tax_y, use_container_width=True, config={"displayModeBar": False})
+            cols_present = [c for c in [
+                "year", "realized_gain_diversi_eur", "realized_gain_etf_eur", "realized_loss_eur",
+                "prior_minus_deducted_eur", "taxable_base_eur", "estimated_tax_due_eur", "tax_credit_zainetto_eur"
+            ] if c in tax_by_year.columns]
+            
+            df_tax_show = tax_by_year[cols_present].rename(columns={
+                "year": "Anno Solare",
+                "realized_gain_diversi_eur": "Plusv. Azioni/Bond (€)",
+                "realized_gain_etf_eur": "Plusv. ETF (€)",
+                "realized_loss_eur": "Minusv. Realizzate (€)",
+                "prior_minus_deducted_eur": "Minusv. Dedotte (€)",
+                "taxable_base_eur": "Base Imponibile (€)",
+                "estimated_tax_due_eur": "Imposta Dovuta (€)",
+                "tax_credit_zainetto_eur": "Zainetto Residuo (€)"
+            })
+            
+            st.dataframe(
+                df_tax_show.style.format({c: "€ {:,.2f}" for c in df_tax_show.columns if c != "Anno Solare"}),
+                use_container_width=True, hide_index=True
+            )
 
-        # Tabella Dettagliata Anno per Anno con deduzioni e base imponibile trasparente
-        cols_present = [c for c in [
-            "year", "realized_gain_diversi_eur", "realized_gain_etf_eur", "realized_loss_eur",
-            "prior_minus_deducted_eur", "taxable_base_eur", "estimated_tax_due_eur", "tax_credit_zainetto_eur"
-        ] if c in tax_by_year.columns]
-        
-        df_tax_show = tax_by_year[cols_present].rename(columns={
-            "year": "Anno Solare",
-            "realized_gain_diversi_eur": "Plusv. Azioni/Bond (€)",
-            "realized_gain_etf_eur": "Plusv. ETF (€)",
-            "realized_loss_eur": "Minusv. Realizzate (€)",
-            "prior_minus_deducted_eur": "Minusv. Dedotte (€)",
-            "taxable_base_eur": "Base Imponibile (€)",
-            "estimated_tax_due_eur": "Imposta Dovuta (€)",
-            "tax_credit_zainetto_eur": "Zainetto Residuo (€)"
-        })
-        
-        st.dataframe(
-            df_tax_show.style.format({c: "€ {:,.2f}" for c in df_tax_show.columns if c != "Anno Solare"}),
-            use_container_width=True, hide_index=True
-        )
+        # ── TIMELINE ZAINETTO FISCALE MULTIANNO (TUIR ART. 68 C. 5) ──
+        df_zainetto = tax_res.get("zainetto_timeline", pd.DataFrame())
+        if not df_zainetto.empty:
+            st.divider()
+            st.markdown("#### ⏳ Timeline Zainetto Fiscale & Scadenze Quadriennali (TUIR Art. 68 c. 5)")
+            st.caption("Tracciamento delle minusvalenze pregresse con scadenza quadriennale (compensabili entro il 31 dicembre del 4° anno successivo alla realizzazione).")
 
-    # ── TIMELINE ZAINETTO FISCALE MULTIANNO (TUIR ART. 68 C. 5) ──
-    df_zainetto = tax_res.get("zainetto_timeline", pd.DataFrame())
-    if not df_zainetto.empty:
+            tot_active_credit = float(df_zainetto["residual_active_eur"].sum())
+            expiring_soon = df_zainetto[df_zainetto["urgency"].isin(["CRITICAL", "HIGH"])]
+            tot_expiring_soon = float(expiring_soon["residual_active_eur"].sum()) if not expiring_soon.empty else 0.0
+            tot_compensated = float(df_zainetto["compensated_eur"].sum())
+            tax_saved_realized = tot_compensated * 0.26
+
+            col_z_kpi1, col_z_kpi2, col_z_kpi3 = st.columns(3)
+            with col_z_kpi1:
+                metric_card("Credito Fiscale Attivo", f"€ {tot_active_credit:,.2f}", "Zainetto Disponibile", True)
+            with col_z_kpi2:
+                sub_scad = "Nessuna Scadenza Imminente" if tot_expiring_soon <= 0 else "Priorità di Recupero"
+                metric_card("In Scadenza (12-24M)", f"€ {tot_expiring_soon:,.2f}", sub_scad, tot_expiring_soon <= 0)
+            with col_z_kpi3:
+                metric_card("Minusvalenze Compensate", f"€ {tot_compensated:,.2f}", f"Risparmio: € {tax_saved_realized:,.2f}", True)
+
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("##### 📦 Stato dei Bucket di Minusvalenze per Anno di Origine (€)")
+
+            df_z_plot = df_zainetto.copy()
+            df_z_plot["Anno Origine (Scadenza)"] = df_z_plot.apply(lambda r: f"Origine {r['origin_year']} (Scade {r['expiry_year']})", axis=1)
+
+            fig_z_timeline = px.bar(
+                df_z_plot,
+                x="Anno Origine (Scadenza)",
+                y=["residual_active_eur", "compensated_eur", "expired_eur"],
+                labels={
+                    "value": "Euro (€)",
+                    "variable": "",
+                    "Anno Origine (Scadenza)": ""
+                },
+                color_discrete_map={
+                    "residual_active_eur": "#ff9900",
+                    "compensated_eur": "#3fb950",
+                    "expired_eur": "#f85149"
+                },
+                barmode="stack",
+                template="plotly_dark",
+                height=370
+            )
+            
+            legend_names = {
+                "residual_active_eur": "Residuo Attivo Compensabile",
+                "compensated_eur": "Già Compensato",
+                "expired_eur": "Prescritto / Scaduto"
+            }
+            fig_z_timeline.for_each_trace(lambda t: t.update(
+                name=legend_names.get(t.name, t.name),
+                hovertemplate="<b>%{x}</b><br>" + legend_names.get(t.name, t.name) + ": <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            
+            fig_z_timeline.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=20, r=20, t=45, b=20),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5,
+                    bgcolor="rgba(22, 27, 34, 0.85)",
+                    bordercolor="rgba(255, 255, 255, 0.12)",
+                    borderwidth=1,
+                    font=dict(size=11, color="#ffffff")
+                )
+            )
+            apply_plotly_theme(fig_z_timeline)
+            st.plotly_chart(fig_z_timeline, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+            df_z_table = df_zainetto.copy()
+            
+            def format_tempo_residuo(row):
+                if "Totalmente Compensato" in str(row["status"]):
+                    return "✅ Concluso"
+                if "Prescritto" in str(row["status"]):
+                    return "❌ Scaduto"
+                y = int(row["years_to_expiry"])
+                return "< 12 mesi" if y == 0 else f"{y} anni"
+
+            df_z_table["Tempo alla Scadenza"] = df_z_table.apply(format_tempo_residuo, axis=1)
+
+            df_z_table_show = df_z_table[[
+                "origin_year", "expiry_year", "initial_minus_eur", "compensated_eur", 
+                "residual_active_eur", "Tempo alla Scadenza", "status"
+            ]].rename(columns={
+                "origin_year": "Anno Origine",
+                "expiry_year": "Anno Scadenza",
+                "initial_minus_eur": "Minusvalenza Iniziale (€)",
+                "compensated_eur": "Compensato (€)",
+                "residual_active_eur": "Credito Residuo (€)",
+                "status": "Stato Fiscale"
+            })
+
+            st.dataframe(
+                df_z_table_show.style.format({
+                    "Minusvalenza Iniziale (€)": "€ {:,.2f}",
+                    "Compensato (€)": "€ {:,.2f}",
+                    "Credito Residuo (€)": "€ {:,.2f}"
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
+        # ── WIZARD GUIDATO: TAX-LOSS HARVESTING & STEP-UP FISCALE ────────
         st.divider()
-        st.markdown("#### ⏳ Timeline Zainetto Fiscale & Scadenze Quadriennali (TUIR Art. 68 c. 5)")
-        st.caption("Tracciamento delle minusvalenze pregresse con scadenza quadriennale (compensabili entro il 31 dicembre del 4° anno successivo alla realizzazione).")
-
-        tot_active_credit = float(df_zainetto["residual_active_eur"].sum())
-        expiring_soon = df_zainetto[df_zainetto["urgency"].isin(["CRITICAL", "HIGH"])]
-        tot_expiring_soon = float(expiring_soon["residual_active_eur"].sum()) if not expiring_soon.empty else 0.0
-        tot_compensated = float(df_zainetto["compensated_eur"].sum())
-        tax_saved_realized = tot_compensated * 0.26
-
-        col_z_kpi1, col_z_kpi2, col_z_kpi3 = st.columns(3)
-        with col_z_kpi1:
-            metric_card("Credito Fiscale Attivo", f"€ {tot_active_credit:,.2f}", "Zainetto Disponibile", True)
-        with col_z_kpi2:
-            sub_scad = "Nessuna Scadenza Imminente" if tot_expiring_soon <= 0 else "Priorità di Recupero"
-            metric_card("In Scadenza (12-24M)", f"€ {tot_expiring_soon:,.2f}", sub_scad, tot_expiring_soon <= 0)
-        with col_z_kpi3:
-            metric_card("Minusvalenze Compensate", f"€ {tot_compensated:,.2f}", f"Risparmio: € {tax_saved_realized:,.2f}", True)
-
-        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        st.markdown("##### 📦 Stato dei Bucket di Minusvalenze per Anno di Origine (€)")
-
-        # Grafico Timeline a Barre Orizzontali / Raggruppate delle Scadenze
-        df_z_plot = df_zainetto.copy()
-        df_z_plot["Anno Origine (Scadenza)"] = df_z_plot.apply(lambda r: f"Origine {r['origin_year']} (Scade {r['expiry_year']})", axis=1)
-
-        fig_z_timeline = px.bar(
-            df_z_plot,
-            x="Anno Origine (Scadenza)",
-            y=["residual_active_eur", "compensated_eur", "expired_eur"],
-            labels={
-                "value": "Euro (€)",
-                "variable": "",
-                "Anno Origine (Scadenza)": ""
-            },
-            color_discrete_map={
-                "residual_active_eur": "#ff9900",
-                "compensated_eur": "#3fb950",
-                "expired_eur": "#f85149"
-            },
-            barmode="stack",
-            template="plotly_dark",
-            height=370
-        )
-        
-        # Rinominazione leggenda pulita senza duplicati di simboli
-        legend_names = {
-            "residual_active_eur": "Residuo Attivo Compensabile",
-            "compensated_eur": "Già Compensato",
-            "expired_eur": "Prescritto / Scaduto"
-        }
-        fig_z_timeline.for_each_trace(lambda t: t.update(
-            name=legend_names.get(t.name, t.name),
-            hovertemplate="<b>%{x}</b><br>" + legend_names.get(t.name, t.name) + ": <b>€ %{y:,.2f}</b><extra></extra>"
-        ))
-        
-        fig_z_timeline.update_layout(
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=20, r=20, t=45, b=20),
-            legend=dict(
-                orientation="h",
-                yanchor="bottom",
-                y=1.02,
-                xanchor="center",
-                x=0.5,
-                bgcolor="rgba(22, 27, 34, 0.85)",
-                bordercolor="rgba(255, 255, 255, 0.12)",
-                borderwidth=1,
-                font=dict(size=11, color="#ffffff")
-            )
-        )
-        apply_plotly_theme(fig_z_timeline)
-        st.plotly_chart(fig_z_timeline, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
-
-        # Tabella Dettagliata delle Scadenze con formattazione intelligente del tempo residuo
-        df_z_table = df_zainetto.copy()
-        
-        def format_tempo_residuo(row):
-            if "Totalmente Compensato" in str(row["status"]):
-                return "✅ Concluso"
-            if "Prescritto" in str(row["status"]):
-                return "❌ Scaduto"
-            y = int(row["years_to_expiry"])
-            return "< 12 mesi" if y == 0 else f"{y} anni"
-
-        df_z_table["Tempo alla Scadenza"] = df_z_table.apply(format_tempo_residuo, axis=1)
-
-        df_z_table_show = df_z_table[[
-            "origin_year", "expiry_year", "initial_minus_eur", "compensated_eur", 
-            "residual_active_eur", "Tempo alla Scadenza", "status"
-        ]].rename(columns={
-            "origin_year": "Anno Origine",
-            "expiry_year": "Anno Scadenza",
-            "initial_minus_eur": "Minusvalenza Iniziale (€)",
-            "compensated_eur": "Compensato (€)",
-            "residual_active_eur": "Credito Residuo (€)",
-            "status": "Stato Fiscale"
-        })
-
-        st.dataframe(
-            df_z_table_show.style.format({
-                "Minusvalenza Iniziale (€)": "€ {:,.2f}",
-                "Compensato (€)": "€ {:,.2f}",
-                "Credito Residuo (€)": "€ {:,.2f}"
-            }),
-            use_container_width=True,
-            hide_index=True
-        )
-
-    # ── WIZARD GUIDATO: TAX-LOSS HARVESTING & STEP-UP FISCALE ────────
-    st.divider()
-    col_wiz_h1, col_wiz_h2 = st.columns([3.2, 1.1])
-    with col_wiz_h1:
-        st.markdown("#### 🧙‍♂️ Tax-Loss Harvesting & Step-Up Wizard (TUIR Art. 67)")
-        st.caption("Assistente decisionale per l'ottimizzazione del carico fiscale: compensazione delle minusvalenze in scadenza senza imposte e monetizzazione strategica delle perdite.")
-    with col_wiz_h2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("🧙‍♂️ Guida allo Step-Up & Tax-Loss Harvesting", """
+        col_wiz_h1, col_wiz_h2 = st.columns([3.2, 1.1])
+        with col_wiz_h1:
+            st.markdown("#### 🧙‍♂️ Tax-Loss Harvesting & Step-Up Wizard (TUIR Art. 67)")
+            st.caption("Assistente decisionale per l'ottimizzazione del carico fiscale: compensazione delle minusvalenze in scadenza senza imposte e monetizzazione strategica delle perdite.")
+        with col_wiz_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("🧙‍♂️ Guida allo Step-Up & Tax-Loss Harvesting", """
 <div style="font-size: 13.5px; line-height: 1.45;">
-
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è lo Step-Up Fiscale e il Tax-Loss Harvesting</div>
-  <div>Tecniche di ingegneria fiscale per massimizzare il rendimento netto di portafoglio:
-  1. <b>Step-Up:</b> Vendere e ricomprare titoli in guadagno (Redditi Diversi) per assorbire minusvalenze in scadenza a imposta zero, alzando il prezzo di carico fiscale.
+  <div>1. <b>Step-Up:</b> Vendere e ricomprare titoli in guadagno (Redditi Diversi) per assorbire minusvalenze a imposta zero.<br>
   2. <b>Tax-Loss Harvesting:</b> Vendere posizioni in perdita per generare nuove minusvalenze compensative.</div>
 </div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Calcolo del Risparmio Fiscale</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Risparmio Fiscale Diretto:</b> Plusvalenza Compensata &times; Aliquota (26% / 12.5%)<br>
-    • <b>Regola Fondamentale TUIR:</b> Le minusvalenze compensano <i>solo</i> i Redditi Diversi (azioni singole, bond, ETC), NON i guadagni su ETF (Redditi di Capitale).
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Evitare che le minusvalenze nello zainetto fiscale scadano dopo 4 anni senza essere utilizzate, monetizzando i profitti con 0€ di capital gain tax.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>Il modulo <code>core/tax_engine.py</code> scansiona i prezzi medi di carico FIFO delle posizioni aperte, separa gli ETF dai titoli compensabili e calcola il dimensionamento esatto delle vendite.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>In Italia non esiste la <i>Wash-Sale Rule</i> americana (30 giorni): vendere e ricomprare lo stesso titolo nello stesso giorno è legale e permette di resettare il prezzo fiscale a zero imposte.</div>
-</div>
-
 </div>
 """, button_label="💡 Come funziona il Wizard Fiscale?")
 
-    from core.tax_engine import compute_tax_loss_harvesting_strategy
-    
-    # Valore di default dello zainetto da compensare
-    def_zainetto = float(df_zainetto["residual_active_eur"].sum()) if not df_zainetto.empty else 2500.0
-    
-    with st.expander("⚙️ Parametri di Simulazione dello Zainetto Fiscale", expanded=True):
-        col_w_in1, col_w_in2 = st.columns([2, 2])
-        with col_w_in1:
-            sim_zainetto = st.number_input(
-                "Capienza Zainetto Fiscale da Compensare (€):",
-                min_value=0.0,
-                max_value=200000.0,
-                value=def_zainetto,
-                step=250.0,
-                help="Inserisci l'ammontare di minusvalenze pregresse accumulate nella tua banca/broker che desideri compensare."
-            )
-        with col_w_in2:
-            st.info(f"💡 Zainetto Attivo Registrato in ARGUS: **€ {def_zainetto:,.2f}**")
+        from core.tax_engine import compute_tax_loss_harvesting_strategy
+        def_zainetto = float(df_zainetto["residual_active_eur"].sum()) if not df_zainetto.empty else 2500.0
+        
+        with st.expander("⚙️ Parametri di Simulazione dello Zainetto Fiscale", expanded=True):
+            col_w_in1, col_w_in2 = st.columns([2, 2])
+            with col_w_in1:
+                target_minus = st.number_input("Minusvalenze Totali da Compensare (€):", value=float(def_zainetto), step=250.0, min_value=0.0)
+            with col_w_in2:
+                reinvest_same_day = st.checkbox("Simula Reinvestimento Immediato (Step-Up Carico Fiscale)", value=True)
 
-    wiz_res = compute_tax_loss_harvesting_strategy(results, custom_zainetto_eur=sim_zainetto)
+        strat_res = compute_tax_loss_harvesting_strategy(results, custom_zainetto_eur=target_minus)
+        summary_w = strat_res.get("summary", {})
+        df_harv_g = strat_res.get("df_step_up", pd.DataFrame())
+        df_harv_l = strat_res.get("df_harvest_loss", pd.DataFrame())
 
-    col_wk1, col_wk2, col_wk3 = st.columns(3)
-    with col_wk1:
-        metric_card(
-            "Risparmio Fiscale Netto Stimato",
-            f"€ {wiz_res['total_tax_savings_eur']:,.2f}",
-            "Imposte risparmiate al 26%",
-            True
-        )
-    with col_wk2:
-        metric_card(
-            "Minusvalenze Consumate",
-            f"€ {wiz_res['total_minus_consumed_eur']:,.2f}",
-            f"Su € {sim_zainetto:,.2f} disponibili",
-            True
-        )
-    with col_wk3:
-        metric_card(
-            "Nuovo Scudo Fiscale Creabile",
-            f"€ {wiz_res['total_tax_shield_created_eur']:,.2f}",
-            "Da chiusure in perdita",
-            False
-        )
+        col_ws1, col_ws2, col_ws3, col_ws4 = st.columns(4)
+        with col_ws1:
+            metric_card("Zainetto da Compensare", f"€ {target_minus:,.2f}", "Obiettivo Fiscale", True)
+        with col_ws2:
+            metric_card("Minusvalenze Assorbibili", f"€ {strat_res.get('total_minus_consumed_eur', 0.0):,.2f}", f"Disponibili: € {target_minus:,.2f}", True)
+        with col_ws3:
+            metric_card("Risparmio Imposte Stimato", f"€ {strat_res.get('total_tax_savings_eur', 0.0):,.2f}", "0€ imposte su plusvalenze", True)
+        with col_ws4:
+            metric_card("Nuovo Scudo Fiscale", f"€ {strat_res.get('total_tax_shield_created_eur', 0.0):,.2f}", "Da chiusure in perdita", False)
 
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        tab_w_gain, tab_w_loss = st.tabs(["🚀 Strategia Step-Up (Vendita Titoli in Utile)", "✂️ Tax-Loss Harvesting (Monetizzazione Perdite)"])
 
-    df_step = wiz_res.get("df_step_up", pd.DataFrame())
-    df_harv_l = wiz_res.get("df_harvest_loss", pd.DataFrame())
+        with tab_w_gain:
+            if not df_harv_g.empty:
+                st.markdown("##### 📋 Piano Operativo di Vendita / Riacquisto per Step-Up Fiscale")
+                st.caption("Esegui gli ordini di vendita indicati e riacquista immediatamente i titoli per innalzare il prezzo di carico a costo fiscale zero.")
+                
+                df_gain_show = df_harv_g[[
+                    "ticker", "asset_class", "qty_held", "current_price_eur",
+                    "unrealized_gain_eur", "consumable_minus_eur", "tax_saving_eur", "action"
+                ]].rename(columns={
+                    "ticker": "Ticker", "asset_class": "Asset Class", "qty_held": "Q.tà Totale",
+                    "current_price_eur": "Prezzo Attuale (€)", "unrealized_gain_eur": "Plusvalenza Latente (€)",
+                    "consumable_minus_eur": "Minus Compensabile (€)", "tax_saving_eur": "Risparmio Fiscale (€)",
+                    "action": "Azione Consigliata"
+                })
+                st.dataframe(
+                    df_gain_show.style.format({
+                        "Prezzo Attuale (€)": "€ {:,.2f}",
+                        "Plusvalenza Latente (€)": "€ {:,.2f}",
+                        "Minus Compensabile (€)": "€ {:,.2f}",
+                        "Risparmio Fiscale (€)": "€ {:,.2f}"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Nessuna posizione in utile su Redditi Diversi (azioni/bond) idonea per la compensazione dello zainetto fiscale.")
 
-    tab_w_step, tab_w_loss = st.tabs([
-        "🎯 Strategia Step-Up (Vendi & Ricompra a 0€ Imposte)",
-        "✂️ Raccolta Minusvalenze (Tax-Loss Harvesting)"
-    ])
+        with tab_w_loss:
+            if not df_harv_l.empty:
+                st.markdown("##### ✂️ Titoli in Perdita per Generazione Nuovo Credito Fiscale")
+                st.caption("Monetizzare queste perdite permette di abbattere il debito fiscale dell'anno in corso o creare nuove minusvalenze con scadenza a 4 anni.")
+                
+                df_loss_show = df_harv_l[[
+                    "ticker", "asset_class", "qty_held", "current_price_eur",
+                    "unrealized_loss_eur", "loss_to_harvest_eur", "tax_shield_created_eur", "action"
+                ]].rename(columns={
+                    "ticker": "Ticker", "asset_class": "Asset Class", "qty_held": "Q.tà in Portafoglio",
+                    "current_price_eur": "Prezzo Attuale (€)", "unrealized_loss_eur": "Perdita Latente (€)",
+                    "loss_to_harvest_eur": "Minusvalenza Generabile (€)", "tax_shield_created_eur": "Scudo Fiscale Stimato (€)",
+                    "action": "Azione Consigliata"
+                })
+                st.dataframe(
+                    df_loss_show.style.format({
+                        "Prezzo Attuale (€)": "€ {:,.2f}", "Perdita Latente (€)": "€ {:,.2f}",
+                        "Minusvalenza Generabile (€)": "€ {:,.2f}", "Scudo Fiscale Stimato (€)": "€ {:,.2f}"
+                    }),
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Nessuna posizione in perdita latente significativa da raccogliere.")
 
-    with tab_w_step:
-        if not df_step.empty:
-            st.markdown("##### 🚀 Titoli in Utile Compensabili a Costo Fiscale Zero")
-            st.caption("Questi titoli appartengono alla categoria **Redditi Diversi** (azioni singole/bond): puoi venderli e riacquistarli immediatamente per assorbire le minusvalenze pregresse senza pagare capital gain.")
-            
-            df_step_show = df_step[[
-                "ticker", "asset_class", "qty_held", "current_price_eur",
-                "unrealized_gain_eur", "consumable_minus_eur", "tax_saving_eur", "action"
-            ]].rename(columns={
-                "ticker": "Ticker",
-                "asset_class": "Asset Class",
-                "qty_held": "Q.tà in Portafoglio",
-                "current_price_eur": "Prezzo Attuale (€)",
-                "unrealized_gain_eur": "Plusvalenza Latente (€)",
-                "consumable_minus_eur": "Minus Compensabile (€)",
-                "tax_saving_eur": "Risparmio Fiscale (€)",
-                "action": "Azione Consigliata"
+    # ══════════════════════════════════════════════════════════════════════
+    # SEZIONE FISCO CRIPTO-ATTIVITÀ (L. 197/2022 & CIRCOLARE AdE 30/E/2023)
+    # ══════════════════════════════════════════════════════════════════════
+    else:
+        col_cr_h1, col_cr_h2 = st.columns([3.2, 1.2])
+        with col_cr_h1:
+            st.markdown("#### 🪙 Fiscalità Cripto-Attività (Legge di Bilancio 197/2022 & Circolare AdE 30/E/2023)")
+            st.caption("Quadro RT (Plusvalenze 26% & Franchigia 2.000€), Quadro RW (Monitoraggio Fiscale Codice 21), IVAFE (0,20%) e Zainetto Fiscale Cripto.")
+        with col_cr_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            render_crypto_tax_modal(button_label="ℹ️ Normativa Fiscale Cripto (L. 197/2022)", use_popover=True)
+
+        crypto_report = compute_crypto_tax_report(results, db_engine=engine, tax_year=tax_year_param)
+        c_sum = crypto_report["summary"]
+        df_c_rt = crypto_report["df_rt"]
+        df_c_rw = crypto_report["df_rw"]
+        df_c_zainetto = crypto_report["df_crypto_zainetto"]
+
+        col_cr1, col_cr2, col_cr3, col_cr4 = st.columns(4)
+        with col_cr1:
+            metric_card(f"Controvalore Cripto ({selected_year})", f"€ {c_sum['total_crypto_portfolio_val_eur']:,.2f}", "Posizioni al 31/12 (Quadro RW)", True)
+        with col_cr2:
+            net_cr_pnl = c_sum['total_realized_gains_eur'] - c_sum['total_realized_losses_eur']
+            franchigia_txt = "Esente (< 2.000€)" if (0 < net_cr_pnl <= 2000.0) else ("Soggetta a Imposta 26%" if net_cr_pnl > 2000.0 else "Nessuna Plusvalenza")
+            metric_card("Plusvalenze Nette Cripto", f"€ {net_cr_pnl:,.2f}", franchigia_txt, net_cr_pnl <= 2000.0)
+        with col_cr3:
+            metric_card(f"Imposta Quadro RT (26%)", f"€ {c_sum['total_tax_due_rt_eur']:,.2f}", "Imposta Sostitutiva Plusvalenze", False)
+        with col_cr4:
+            metric_card("Imposta Valore / IVAFE (0,20%)", f"€ {c_sum['total_ivafe_rw_eur']:,.2f}", f"Totale Carico: € {c_sum['total_crypto_tax_burden_eur']:,.2f}", False)
+
+        # 1. Prospetto Quadro RT
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        st.markdown("##### 📈 Quadro RT (Sezione II-B) — Plusvalenze su Cripto-Attività (Art. 67 c. 1 lett. c-sexies TUIR)")
+        if not df_c_rt.empty:
+            df_rt_show = df_c_rt.rename(columns={
+                "year": "Anno Fiscale",
+                "realized_gains_eur": "Plusvalenze Realizzate (€)",
+                "realized_losses_eur": "Minusvalenze Realizzate (€)",
+                "net_pnl_eur": "Saldo Netto (€)",
+                "prior_crypto_minus_deducted_eur": "Minusv. Cripto Dedotte (€)",
+                "taxable_base_rt_eur": "Base Imponibile (€)",
+                "tax_due_rt_eur": "Imposta Dovuta 26% (€)",
+                "threshold_exempt": "Franchigia 2.000€ Applicata",
+                "crypto_zainetto_residual_eur": "Zainetto Cripto Residuo (€)"
             })
-            
+            df_rt_show["Franchigia 2.000€ Applicata"] = df_rt_show["Franchigia 2.000€ Applicata"].apply(lambda x: "✅ Sì (Esente)" if x else "❌ No (Oltre Soglia)")
             st.dataframe(
-                df_step_show.style.format({
-                    "Prezzo Attuale (€)": "€ {:,.2f}",
-                    "Plusvalenza Latente (€)": "€ {:,.2f}",
-                    "Minus Compensabile (€)": "€ {:,.2f}",
-                    "Risparmio Fiscale (€)": "€ {:,.2f}"
+                df_rt_show.style.format({
+                    "Plusvalenze Realizzate (€)": "€ {:,.2f}",
+                    "Minusvalenze Realizzate (€)": "€ {:,.2f}",
+                    "Saldo Netto (€)": "€ {:,.2f}",
+                    "Minusv. Cripto Dedotte (€)": "€ {:,.2f}",
+                    "Base Imponibile (€)": "€ {:,.2f}",
+                    "Imposta Dovuta 26% (€)": "€ {:,.2f}",
+                    "Zainetto Cripto Residuo (€)": "€ {:,.2f}"
                 }),
                 use_container_width=True, hide_index=True
             )
         else:
-            st.info("Nessuna posizione in utile su Redditi Diversi (azioni/bond) idonea per la compensazione dello zainetto fiscale.")
+            st.info("Nessuna transazione di vendita o realizzo cripto registrata per il periodo selezionato.")
 
-    with tab_w_loss:
-        if not df_harv_l.empty:
-            st.markdown("##### ✂️ Titoli in Perdita per Generazione Nuovo Credito Fiscale")
-            st.caption("Monetizzare queste perdite permette di abbattere il debito fiscale dell'anno in corso o creare nuove minusvalenze con scadenza a 4 anni.")
-            
-            df_loss_show = df_harv_l[[
-                "ticker", "asset_class", "qty_held", "current_price_eur",
-                "unrealized_loss_eur", "loss_to_harvest_eur", "tax_shield_created_eur", "action"
-            ]].rename(columns={
-                "ticker": "Ticker",
-                "asset_class": "Asset Class",
-                "qty_held": "Q.tà in Portafoglio",
-                "current_price_eur": "Prezzo Attuale (€)",
-                "unrealized_loss_eur": "Perdita Latente (€)",
-                "loss_to_harvest_eur": "Minusvalenza Generabile (€)",
-                "tax_shield_created_eur": "Scudo Fiscale Stimato (€)",
-                "action": "Azione Consigliata"
+        # 2. Prospetto Quadro RW
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        st.markdown("##### 🌐 Quadro RW — Prospetto Monitoraggio Fiscale Attività Estere & Self-Custody (Codice 21)")
+        if not df_c_rw.empty:
+            df_rw_show = df_c_rw.rename(columns={
+                "quadro": "Quadro",
+                "codice_investimento": "Codice Bene",
+                "descrizione_bene": "Descrizione Cripto-Attività",
+                "valore_iniziale_eur": "Valore Iniziale 01/01 (€)",
+                "valore_finale_eur": "Valore Finale 31/12 (€)",
+                "valore_massimo_eur": "Valore Massimo (€)",
+                "giorni_detenzione": "Giorni Possesso",
+                "quota_possesso_pct": "Quota Possesso %",
+                "imposta_valore_ivafe_eur": "Imposta Valore / IVAFE 0,20% (€)"
             })
-            
             st.dataframe(
-                df_loss_show.style.format({
-                    "Prezzo Attuale (€)": "€ {:,.2f}",
-                    "Perdita Latente (€)": "€ {:,.2f}",
-                    "Minusvalenza Generabile (€)": "€ {:,.2f}",
-                    "Scudo Fiscale Stimato (€)": "€ {:,.2f}"
+                df_rw_show.style.format({
+                    "Valore Iniziale 01/01 (€)": "€ {:,.2f}",
+                    "Valore Finale 31/12 (€)": "€ {:,.2f}",
+                    "Valore Massimo (€)": "€ {:,.2f}",
+                    "Quota Possesso %": "{:.0f}%",
+                    "Imposta Valore / IVAFE 0,20% (€)": "€ {:,.2f}"
                 }),
                 use_container_width=True, hide_index=True
             )
         else:
-            st.info("Nessuna posizione in perdita latente significativa da raccogliere.")
+            st.info("Nessuna posizione cripto aperta attualmente in portafoglio da monitorare nel Quadro RW.")
+
+        # 3. Zainetto Fiscale Cripto Separato
+        if not df_c_zainetto.empty:
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("##### 📦 Zainetto Fiscale Cripto Separato (Minusvalenze Riportabili in 4 Anni)")
+            df_cz_show = df_c_zainetto.rename(columns={
+                "origin_year": "Anno Origine",
+                "expiry_year": "Anno Scadenza",
+                "initial_minus_eur": "Minusvalenza Iniziale (€)",
+                "compensated_eur": "Compensato (€)",
+                "residual_active_eur": "Credito Cripto Residuo (€)",
+                "status": "Stato Fiscale"
+            })
+            st.dataframe(
+                df_cz_show.style.format({
+                    "Minusvalenza Iniziale (€)": "€ {:,.2f}",
+                    "Compensato (€)": "€ {:,.2f}",
+                    "Credito Cripto Residuo (€)": "€ {:,.2f}"
+                }),
+                use_container_width=True, hide_index=True
+            )
 
 # ── TAB 4: RISCHIO LIQUIDITÀ & ALMGREN-CHRISS ─────────────────
 elif active_pos_tab == "⚡ Impatto di Mercato (Almgren-Chriss)":
