@@ -276,7 +276,7 @@ argus-risk-analytics/
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
 │   ├── argus_icon.ico           # Asset icona Occhio di Argus
-│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (40 Sezioni)
+│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (48 Sezioni)
 ├── exports/                     # Cartella di destinazione report esportati (.xlsx, .pdf, .zip)
 │   └── .gitkeep
 ├── gsheets_sync_subproject/     # Sub-servizio Sincronizzazione ETL Google Sheets

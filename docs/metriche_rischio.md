@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`) di **ARGUS Risk Analytics Platform**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`) di **ARGUS Risk Analytics Platform v5.14.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -734,5 +734,195 @@ dove $R$ è il coefficiente di frazionamento ($R > 1$ per Forward Split, $R < 1$
    \[ \text{PnL Realizzato} = 30 \times (70 - 50) = +600€ \]
    \[ \text{Quote Residue} = 70 \text{ azioni con WACP} = 50€ \]
 2. **Sincronizzazione con Prezzi di Mercato**: Poiché le serie storiche dei prezzi scaricate dai provider (Yahoo Finance) sono rettificate (*Adjusted Close*), la rettifica dei lotti di acquisto garantisce che il PnL latente ($P_{\text{market}} - \text{WACP}$) rifletta il reale guadagno economico senza distorsioni artificiali.
+
+---
+
+## 43. Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS) (`core/garch_fhs_engine.py`)
+
+Il modulo modella i cluster di volatilità e la varianza condizionale time-varying nei mercati finanziari (Bollerslev 1986), superando il limite dell'omoschedasticità tipico dei modelli a volatilità costante.
+
+### 1. Equazione del Modello GARCH(1,1)
+Dati i rendimenti giornalieri $r_t = \mu + \epsilon_t$, con $\epsilon_t = \sigma_t z_t$ e $z_t \sim \text{i.i.d.}(0, 1)$:
+\[ \sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2 \]
+
+Vincoli di stazionarietà e regolarità:
+- $\omega > 0$: Costante di varianza di base.
+- $\alpha \ge 0$: Reattività agli shock di mercato a breve termine (effetto ARCH).
+- $\beta \ge 0$: Persistenza della volatilità passata (effetto GARCH).
+- $\alpha + \beta < 1$: Condizione necessaria e sufficiente per la stazionarietà in senso debole.
+
+### 2. Stima dei Parametri tramite Maximum Likelihood Estimation (MLE)
+La funzione di log-verosimiglianza Gaussiana da massimizzare numericamente (algoritmo SLSQP o L-BFGS-B) è:
+\[ \ln L(\omega, \alpha, \beta) = -\frac{1}{2} \sum_{t=1}^T \left( \ln(2\pi) + \ln(\sigma_t^2) + \frac{\epsilon_t^2}{\sigma_t^2} \right) \]
+
+### 3. Varianza Incondizionata di Lungo Periodo ed Emodimezzamento (Half-Life)
+1. **Varianza di Lungo Periodo ($V_L$)**:
+   \[ V_L = \frac{\omega}{1 - \alpha - \beta}, \quad \sigma_{\text{annuale, asymptotic}} = \sqrt{252 \times V_L} \]
+2. **Half-Life degli Shock ($T_{1/2}$)**:
+   Misura il numero di giorni necessari affinché uno shock di volatilità si riassorba del 50% tornando verso la media di lungo termine:
+   \[ T_{1/2} = \frac{\ln(0.5)}{\ln(\alpha + \beta)} \]
+
+### 4. Struttura a Termine della Volatilità (Term Structure a $k$ Giorni)
+La previsione della varianza condizionale a $k$ passi in avanti è espressa in forma chiusa:
+\[ \mathbb{E}_t[\sigma_{t+k}^2] = V_L + (\alpha + \beta)^k (\sigma_t^2 - V_L) \]
+- Se $\sigma_t^2 > V_L$: Struttura a termine decrescente (*Mean Reversion* da regime di alta volatilità).
+- Se $\sigma_t^2 < V_L$: Struttura a termine crescente (espansione della volatilità verso la media storica).
+
+### 5. Filtered Historical Simulation (FHS - Hull-White 1998, Barone-Adesi 1999)
+La FHS combina la capacità del modello GARCH di catturare il livello di rischio contingente con la distribuzione non parametrica dei residui empirici:
+1. **De-volatilizzazione dei Rendimenti Storici**:
+   \[ z_t = \frac{r_t - \bar{r}}{\sigma_t^{\text{GARCH}}}, \quad \forall t \in [1, T] \]
+2. **Generazione dei Rendimenti Filtrati per il Periodo Successivo ($T+1$)**:
+   \[ r_{T+1, t}^* = \bar{r} + z_t \cdot \sigma_{T+1}^{\text{GARCH}} \]
+3. **Calcolo di VaR e CVaR FHS a Code Spesse (Conformità Basel III / FRTB)**:
+   \[ VaR_{\text{FHS}}(h, \alpha) = - \text{Percentile}(r^*, \alpha) \cdot \sqrt{h} \cdot V_{\text{portfolio}} \]
+   \[ CVaR_{\text{FHS}}(h, \alpha) = - \mathbb{E}[r^* \mid r^* \le -VaR_{\text{FHS}}] \cdot \sqrt{h} \cdot V_{\text{portfolio}} \]
+
+---
+
+## 44. Superficie di Volatilità Implicita 3D, Inversione Numerica e Calibrazione Skew/Smile (`core/volatility_surface.py`)
+
+Il modulo calibra la struttura di volatilità implicita delle opzioni su moneyness e scadenze, quantificando il premio per il rischio di crash e dimensionando coperture con opzioni Put.
+
+### 1. Inversione Numerica di Black-Scholes tramite Metodo di Newton-Raphson
+Data la formula di prezzatura Black-Scholes (1973) per un'opzione Put europea:
+\[ P_{\text{BS}}(S, K, T, r, \sigma) = K e^{-r T} N(-d_2) - S N(-d_1) \]
+\[ d_1 = \frac{\ln(S/K) + \left(r + \frac{\sigma^2}{2}\right)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T} \]
+
+La volatilità implicita $\sigma_{\text{IV}}$ è la radice dell'equazione non lineare $f(\sigma) = P_{\text{BS}}(\sigma) - P_{\text{market}} = 0$, risolta iterativamente:
+\[ \sigma_{n+1} = \sigma_n - \frac{P_{\text{BS}}(\sigma_n) - P_{\text{market}}}{\mathcal{V}(\sigma_n)} \]
+dove il Vega dell'opzione è la derivata parziale analitica:
+\[ \mathcal{V} = \frac{\partial P_{\text{BS}}}{\partial \sigma} = S \sqrt{T} \phi(d_1) = S \sqrt{T} \frac{1}{\sqrt{2\pi}} e^{-\frac{d_1^2}{2}} \]
+In caso di fallimento di convergenza o Vega nullo ($\mathcal{V} \approx 0$ su contratti deep-ITM/OTM), il sistema attiva un algoritmo robusto di bisezione / Brent entro l'intervallo $\sigma \in [0.001, 5.0]$.
+
+### 2. Calibrazione Parametrica di Volatility Skew e Smile
+Sia il log-moneyness normalizzato definito come $m = \ln(K / S)$:
+\[ \sigma_{\text{IV}}(m) = a + b \cdot m + c \cdot m^2 \]
+- **Parametro $a$**: Livello di volatilità at-the-money ($m=0$, $K=S$).
+- **Parametro $b < 0$ (*Skew Slope*)**: Pendenza della curva. Un valore negativo riflette la tipica asimmetria dei mercati azionari (*Crash Risk Premium* per Put Out-of-the-Money).
+- **Parametro $c > 0$ (*Smile Curvature*)**: Curvatura convessa associata al costo delle opzioni con strike estremi (fat-tail hedging).
+
+### 3. Delta-Hedging Skew-Adjusted con Opzioni Put
+Dato un portafoglio di valore nominale $V_{\text{port}}$ con esposizione Delta equivalente $\Delta_{\text{port}} = \beta_{\text{port}} \cdot V_{\text{port}}$, il dimensionamento della copertura con opzioni Put a strike OTM ($K < S$) è:
+\[ \Delta_{\text{put}} = -N(-d_1(\sigma_{\text{IV}}(m_{\text{OTM}}))) \]
+\[ N_{\text{contratti}} = \frac{\Delta_{\text{port}}}{|\Delta_{\text{put}}| \times \text{Multiplier} \times S} \]
+\[ \text{Costo Annuo Assicurazione (\% AUM)} = \frac{N_{\text{contratti}} \times P_{\text{put}} \times \text{Multiplier}}{V_{\text{port}}} \times \frac{365.25}{T_{\text{giorni}}} \]
+
+---
+
+## 45. Modulo Fiscale Cripto-Attività e Quadri RT / RW / IVAFE (`core/crypto_tax_engine.py`)
+
+Il motore applica il quadro normativo introdotto dalla **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** e dalla **Circolare dell'Agenzia delle Entrate n. 30/E/2023**.
+
+### 1. Inquadramento TUIR (Art. 67, comma 1, lett. c-sexies)
+Le plusvalenze realizzate mediante cessione a titolo oneroso, rimborso o permuta di cripto-attività costituiscono *Redditi Diversi di Natura Finanziaria*.
+1. **Franchigia Annuale di 2.000€**:
+   \[ \text{Base Imponibile Netta} = \max\left(0, \sum \text{Plusvalenze} - \sum \text{Minusvalenze} - 2.000€\right) \]
+2. **Imposta Sostitutiva (26%)**:
+   \[ \text{Debito Fiscale RT} = \text{Base Imponibile Netta} \times 26\% \]
+3. **Irrilevanza Fiscale delle Permute Cripto-to-Cripto**: La conversione di un token in un altro token avente le medesime caratteristiche non genera fattispecie fiscalmente imponibile. Il costo di carico del token ceduto si trasferisce proporzionalmente sul nuovo token acquistato.
+
+### 2. Zainetto Fiscale Cripto Separato (Regime a 4 Anni)
+Le minusvalenze cripto realizzate in eccedenza possono essere portate in deduzione dalle plusvalenze cripto dei 4 periodi d'imposta successivi ($t+1, t+2, t+3, t+4$):
+- **Principio di Segregazione Contabile**: Le minusvalenze su cripto-attività **non sono compensabili** con plusvalenze derivanti da azioni, obbligazioni o fondi tradizionali, e viceversa.
+
+### 3. Monitoraggio Fiscale (Quadro RW, Codice 21) ed Imposta di Bollo / IVAFE
+1. **Quadro RW**: Obbligo di monitoraggio per le cripto-attività detenute su exchange esteri o private keys/cold wallet, con indicazione di valore iniziale (1/1) e valore finale (31/12).
+2. **Imposta sul Valore delle Cripto-Attività (0,20% annuo)**:
+   \[ \text{Imposta Cripto-Attività} = \text{Controvalore al 31/12} \times 0.20\% \times \frac{\text{Giorni di Detenzione}}{365.25} \]
+
+---
+
+## 46. Kenneth French Factor Library Live (Fama-French 5-Factor & Momentum) (`core/factor_library.py`)
+
+Il modulo integra le serie storiche ufficiali di ricerca accademica del *Dartmouth College (Kenneth R. French Data Library)* per eseguire regressioni multifattoriali avanzate.
+
+### 1. Equazione del Modello Fama-French a 5 Fattori + Carhart Momentum
+\[ R_{i,t} - R_{f,t} = \alpha_i + \beta_{MKT} (R_{m,t} - R_{f,t}) + \beta_{SMB} SMB_t + \beta_{HML} HML_t + \beta_{RMW} RMW_t + \beta_{CMA} CMA_t + \beta_{MOM} MOM_t + \epsilon_{i,t} \]
+
+### 2. Definizione dei Driver Accademici di Rendimento
+- **Mkt-RF**: Eccesso di rendimento del portafoglio di mercato su tutti i titoli NYSE/AMEX/NASDAQ rispetto al tasso privo di rischio US 1M T-Bill.
+- **SMB (*Small Minus Big*)**: Spread di rendimento basato sulla dimensione (*Market Cap*), misurando l'extra-rendimento storico delle small cap.
+- **HML (*High Minus Low*)**: Spread basato sul valore contabile/prezzo (*Book-to-Market*), catturando il premio per il rischio dei titoli Value rispetto ai titoli Growth.
+- **RMW (*Robust Minus Weak*)**: Spread basato sulla qualità della redditività operativa (*Operating Profitability*).
+- **CMA (*Conservative Minus Aggressive*)**: Spread basato sulla prudenza negli investimenti di capitale (*Investment Factor*).
+- **MOM / WML (*Winners Minus Losers*)**: Spread tra titoli con momentum relativo positivo vs negativo nei precedenti 12 mesi.
+
+### 3. Risoluzione OLS Multivariata e Test Statistici
+\[ \hat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{Y} \]
+\[ \hat{\sigma}_\epsilon^2 = \frac{\sum_{t=1}^T \hat{\epsilon}_t^2}{T - K - 1}, \quad \text{SE}(\hat{\beta}_k) = \sqrt{\hat{\sigma}_\epsilon^2 \cdot [(\mathbf{X}^T \mathbf{X})^{-1}]_{kk}} \]
+\[ t_k = \frac{\hat{\beta}_k}{\text{SE}(\hat{\beta}_k)}, \quad p\text{-value} = 2 \cdot (1 - \Phi(|t_k|)) \]
+
+### 4. Factor Return Attribution e Rolling OLS
+1. **Attribuzione di Rendimento Annualizzata**:
+   \[ \text{Contributo Fattoriale}_k = \hat{\beta}_k \times \overline{\text{Factor}}_k \times 252 \]
+   \[ \text{Alpha Annualizzato} = \hat{\alpha} \times 252 \]
+2. **Rolling Factor Betas a 60 Giorni**: Identificazione dinamica di cambi di allocazione, transizioni tra regimi di mercato e rotazioni di stile (*Style Drift*).
+
+---
+
+## 47. Retrieval-Augmented Generation (RAG) & Vector Store Semantico sui Bilanci SEC (`core/sec_rag_engine.py`)
+
+Il modulo esegue analisi documentale forense e risposte in linguaggio naturale sui bilanci ufficiali SEC (Form 10-K annuali e Form 10-Q trimestrali).
+
+### 1. Chunking Normativo Strutturato (SEC Standard Taxonomy)
+I documenti vengono normalizzati e partizionati per Item normativi conformi al Regolamento S-K:
+- **Item 1**: *Business Model, Moat, Segment Breakdown, Key Clients*.
+- **Item 1A**: *Risk Factors, Geopolitical Threats, Supply Chain Hazards, Regulatory Liabilities*.
+- **Item 7**: *Management's Discussion & Analysis (MD&A), Gross Margins, Capital Expenditures, Guidance*.
+- **Item 8**: *Financial Statements, Supplementary Debt Schedule, Commitments & Contingencies*.
+
+### 2. Algoritmo di Ponderazione Lessicale BM25 Okapi
+\[ \text{Score}_{\text{BM25}}(D, Q) = \sum_{i=1}^n \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)} \]
+con parametri calibrati $k_1 = 1.5, b = 0.75$, e Inverse Document Frequency:
+\[ \text{IDF}(q_i) = \ln\left( \frac{N - n(q_i) + 0.5}{n(q_i) + 0.5} + 1 \right) \]
+
+### 3. Dense Vector Similarity e Pipeline di Risposta Grounded
+1. **Similarità Coseno su Vettori TF-IDF Normalizzati**:
+   \[ \text{Cosine}(Q, D) = \frac{\mathbf{v}_Q \cdot \mathbf{v}_D}{\|\mathbf{v}_Q\|_2 \cdot \|\mathbf{v}_D\|_2} \]
+2. **Punteggio Ibrido di Rilevanza**:
+   \[ \text{Score}_{\text{Hybrid}} = 0.60 \times \text{Norm}(\text{Score}_{\text{BM25}}) + 0.40 \times \text{Cosine}(Q, D) \]
+3. **Citazioni Grounded**: Ogni insight generato include metadati verificabili: `[SEC Filing: Form 10-K | Sezione: Item 1A (Risk Factors) | Rilevanza: 94.2%]`.
+
+---
+
+## 48. Motore Analitico Embedded DuckDB & Archiviazione Apache Parquet (`core/duckdb_engine.py`)
+
+Il modulo integra un database analitico vettorizzato colonnare in-process per abilitare interrogazioni OLAP a latenza sub-millisecondo ed esportazioni ad alta efficienza di memoria.
+
+### 1. Architettura Vettorizzata SIMD (OLAP vs OLTP)
+- **OLTP Tradizionale (MySQL/SQLite)**: Memorizzazione per riga (Row-Oriented). Ottimale per inserimenti/aggiornamenti singoli, ma inefficiente per aggregazioni su milioni di record a causa dell'overhead di decodifica di ogni singola riga.
+- **DuckDB Vectorized Engine (C++)**: Elaborazione colonnare in vettori di dimensione fissa (solitamente 2048 elementi). I cicli di calcolo sfruttano i registri SIMD (Single Instruction Multiple Data: AVX-512, NEON) della CPU per elaborare simultaneamente decine di valori numerici per ciclo di clock.
+
+### 2. Registrazione Zero-Copy Arrow/Pandas
+Le strutture dati in memoria (`st.session_state.portfolio_data`) vengono registrate direttamente nel motore DuckDB tramite puntatori Arrow (`con.register('positions', df)`) senza duplicazione fisica in RAM, garantendo latenze di esecuzione $< 1 \text{ ms}$.
+
+### 3. Cubi Multi-Dimensionali e Window Functions con QUALIFY
+1. **Cubo di Rischio Multi-Dimensionale (`GROUPING SETS`)**:
+   Calcolo simultaneo di tutti i subtotali di esposizione per `Asset Class`, `Settore GICS` e `Valuta`:
+   ```sql
+   SELECT asset_class, sector, currency,
+          COUNT(*) as n_positions,
+          SUM(market_value) as total_exposure,
+          AVG(pnl_pct) as avg_return
+   FROM positions
+   GROUP BY GROUPING SETS ((asset_class, sector, currency), (asset_class), (sector), ());
+   ```
+2. **Ranking Settoriale con `QUALIFY` e `DENSE_RANK()`**:
+   Estrazione immediata dei migliori e peggiori asset per settore senza sottoquery nidificate:
+   ```sql
+   SELECT ticker, sector, pnl_pct,
+          DENSE_RANK() OVER (PARTITION BY sector ORDER BY pnl_pct DESC) as sector_rank
+   FROM positions
+   QUALIFY sector_rank <= 3;
+   ```
+
+### 4. Compressione Colonnare Apache Parquet
+La serializzazione del portafoglio nel formato binario aperto Apache Parquet sfrutta:
+- **Dictionary Encoding**: Sostituzione di stringhe ripetitive (settori, valute) con indici interi compatti a 1-2 byte.
+- **Snappy Compression**: Algoritmo di compressione lossless ad altissimo throughput di decompressione (> 250 MB/s per core).
+- **Risparmio di Storage**:
+  \[ \text{Storage Savings} = 1 - \frac{\text{Dimensione}_{\text{Parquet}}}{\text{Dimensione}_{\text{CSV}}} \approx 85\% \]
+- **Column Pruning & Predicate Pushdown**: In lettura, il motore carica esclusivamente le colonne referenziate nella query, saltando i blocchi di byte irrilevanti tramite metadati di pagina (min/max bounds).
 
 
