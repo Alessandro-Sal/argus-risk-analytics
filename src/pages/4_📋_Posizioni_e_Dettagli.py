@@ -295,8 +295,8 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
     if not closed_data.get("has_closed_trades", False) or closed_data.get("df_closed_lots", pd.DataFrame()).empty:
         st.info("ℹ️ **Nessuna vendita registrata nello storico**: tutte le posizioni acquistate sono ancora aperte a mercato. Il PnL totale attuale corrisponde interamente a PnL Latente e Dividendi percepiti.")
     else:
-        # ── 1. KPI COCKPIT DELLE OPERAZIONI CHIUSE ───────────────────
-        c_kpi1, c_kpi2, c_kpi3, c_kpi4, c_kpi5, c_kpi6 = st.columns(6)
+        # ── 1. KPI COCKPIT DELLE OPERAZIONI CHIUSE (GRID 2x3) ─────────
+        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
         
         tot_real_pnl = closed_data["total_realized_pnl_eur"]
         tot_real_pct = closed_data["total_realized_pnl_pct"]
@@ -313,7 +313,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 f"€ {tot_real_pnl:,.2f}",
                 delta=f"{tot_real_pct:+.2f}%",
                 positive=(tot_real_pnl >= 0),
-                help_text="Somma monetaria netta generata da tutte le vendite storiche su base FIFO."
+                help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Somma monetaria netta consolidata derivante da tutte le operazioni di vendita concluse dall'inizio dell'operatività.</div>
+<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b> Somma algebrica del differenziale tra prezzo di vendita ed il costo storico d'acquisto FIFO per ogni quota liquidata.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Misura la redditività effettivamente monetizzata, distinta dal PnL latente (ancora soggetto alle fluttuazioni di mercato).</div>
+<div style="margin-bottom: 8px;"><b>⚙️ Calcolo in ARGUS:</b> Coda FIFO con conversione dei tassi di cambio storici alla data dell'operazione.</div>
+<div><b>🔍 Come leggerlo:</b> Se positivo indica che le vendite storiche hanno generato un surplus di cassa netto.</div>
+</div>"""
             )
         with c_kpi2:
             metric_card(
@@ -321,7 +327,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 f"{win_rate:.1f}%",
                 delta=f"{closed_data['n_winning_trades']}W / {closed_data['n_losing_trades']}L",
                 positive=(win_rate >= 50.0),
-                help_text="Percentuale di lotti chiusi in utile rispetto al totale delle vendite."
+                help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Percentuale di operazioni chiuse in profitto (Win) rispetto al totale dei lotti venduti.</div>
+<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b> (Numero Trade Vincenti / Numero Totale Trade Chiusi) &times; 100.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Valuta la frequenza di successo delle decisioni di disinvestimento o presa di profitto.</div>
+<div style="margin-bottom: 8px;"><b>⚙️ Calcolo in ARGUS:</b> Traccia ciascun lotto FIFO chiuso con PnL > 0 come Win, PnL < 0 come Loss.</div>
+<div><b>🔍 Come leggerlo:</b> Un Win Rate > 50% combinato con un buon Profit Factor indica una strategia statisticamente solida.</div>
+</div>"""
             )
         with c_kpi3:
             metric_card(
@@ -329,15 +341,29 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 f"{prof_factor:.2f}" if prof_factor < 90 else "> 10.0",
                 delta="Profitti / |Perdite|",
                 positive=(prof_factor >= 1.30),
-                help_text="Rapporto tra la somma dei profitti lordi realizzati e le perdite lorde."
+                help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Rapporto di efficienza tra i profitti lordi realizzati e le perdite lorde subite sulle posizioni chiuse.</div>
+<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b> &sum;(Guadagni delle vendite in utile) / &sum;|Perdite delle vendite in perdita|.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Misura la qualità asimmetrica del trading: quanti Euro si guadagnano per ogni Euro perso.</div>
+<div style="margin-bottom: 8px;"><b>⚙️ Calcolo in ARGUS:</b> Rapporto tra le plusvalenze complessive e il valore assoluto delle minusvalenze storiche.</div>
+<div><b>🔍 Come leggerlo:</b> Valori > 1.50 indicano eccellente gestione del rischio; < 1.0 segnala che le perdite superano i guadagni realizzati.</div>
+</div>"""
             )
+
+        c_kpi4, c_kpi5, c_kpi6 = st.columns(3)
         with c_kpi4:
             metric_card(
                 "Holding Period Medio",
                 f"{avg_holding} gg",
                 delta=f"Su {n_closed} Trade",
                 positive=True,
-                help_text="Tempo medio di permanenza a mercato in giorni di calendario per i lotti venduti."
+                help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Numero medio di giorni di calendario trascorsi tra la data d'acquisto e la data di vendita definitiva dei lotti.</div>
+<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b> Media aritmetica della differenza (Data Vendita &minus; Data Acquisto FIFO) per ciascun lotto chiuso.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Identifica lo stile operativo effettivo (es. medio termine, swing trading, buy-and-hold pluriennale).</div>
+<div style="margin-bottom: 8px;"><b>⚙️ Calcolo in ARGUS:</b> Differenza temporale esatta in giorni per ciascun matching contabile.</div>
+<div><b>🔍 Come leggerlo:</b> Valori elevati (> 365 gg) riflettono un approccio d'investimento paziente e orientato al compounding.</div>
+</div>"""
             )
         with c_kpi5:
             best_tk = best_t.get("ticker", "N/A")
@@ -348,7 +374,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 f"€ {best_pnl:+,.2f}",
                 delta=f"{best_tk} ({best_pct:+.1f}%)",
                 positive=True,
-                help_text=f"Operazione più profittevole chiusa: {best_tk} in data {best_t.get('sell_date', 'N/A')}."
+                help_text=f"""<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> L'operazione chiusa che ha generato il maggior profitto monetario in assoluto (€).</div>
+<div style="margin-bottom: 8px;"><b>📐 Dati Trade:</b> Ticker: <b>{best_tk}</b> | PnL: <b>€ {best_pnl:+,.2f}</b> ({best_pct:+.1f}%) | Chiusura: <b>{best_t.get('sell_date', 'N/A')}</b>.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Evidenzia il 'fuoriclasse' storico del portafoglio e il suo contributo alla ricchezza complessiva.</div>
+<div style="margin-bottom: 8px;"><b>⚙️ Calcolo in ARGUS:</b> Massimo PnL realizzato tra tutti i lotti chiusi.</div>
+<div><b>🔍 Come leggerlo:</b> Mostra l'asset che ha beneficiato del miglior timing e dimensionamento della posizione.</div>
+</div>"""
             )
         with c_kpi6:
             worst_tk = worst_t.get("ticker", "N/A")
@@ -359,7 +391,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 f"€ {worst_pnl:+,.2f}",
                 delta=f"{worst_tk} ({worst_pct:+.1f}%)",
                 positive=False,
-                help_text=f"Operazione con la perdita più elevata: {worst_tk} in data {worst_t.get('sell_date', 'N/A')}."
+                help_text=f"""<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> L'operazione chiusa che ha registrato la maggior perdita monetaria in assoluto (€).</div>
+<div style="margin-bottom: 8px;"><b>📐 Dati Trade:</b> Ticker: <b>{worst_tk}</b> | PnL: <b>€ {worst_pnl:+,.2f}</b> ({worst_pct:+.1f}%) | Chiusura: <b>{worst_t.get('sell_date', 'N/A')}</b>.</div>
+<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Fornisce trasparenza sui rischi incorsi e sulle decisioni di stop-loss o disinvestimento in perdita.</div>
+<div style="margin-bottom: 8px;"><b>⚙️ Calcolo in ARGUS:</b> Minimo PnL realizzato tra tutti i lotti chiusi.</div>
+<div><b>🔍 Come leggerlo:</b> Utile per analizzare gli errori di timing o le tesi d'investimento invalidate.</div>
+</div>"""
             )
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
