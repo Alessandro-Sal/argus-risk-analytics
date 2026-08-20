@@ -215,7 +215,15 @@ def compute_closed_trades_journal(
                         lot["qty"] -= qty_to_sell
                         qty_to_sell = 0.0
 
-            elif tx_t in ["dividend", "cedola", "div", "d"]:
+            elif tx_t in ["split", "frazionamento"]:
+                sp_ratio = float(row.get("quantity") or row.get("price") or 1.0)
+                if sp_ratio > 0.0 and sp_ratio != 1.0:
+                    for lot in queue:
+                        lot["qty"] = lot["qty"] * sp_ratio
+                        lot["price_eur"] = lot["price_eur"] / sp_ratio
+                        lot["price_orig"] = lot["price_orig"] / sp_ratio
+
+            elif tx_t in ["dividend", "dividendo", "d"]:
                 dividends_collected += price_eur
 
         # Se ci sono state vendite, crea la riga di riepilogo asset
