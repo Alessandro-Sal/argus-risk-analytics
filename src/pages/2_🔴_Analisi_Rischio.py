@@ -836,25 +836,6 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 </div>"""
         )
 
-    with st.expander("📚 Dettaglio Formule e Teoria Finanziaria del VaR & CVaR"):
-        st.markdown(r"""
-        ### Fondamenti Teorici del Value at Risk (VaR)
-        Il **Value at Risk (VaR)** rappresenta la massima perdita potenziale che un portafoglio può subire in un orizzonte temporale ($T$) con un livello di confidenza prefissato ($c = 1 - \alpha$).
-        
-        1. **VaR Storico (Non-Parametrico)**:
-           $$VaR_{storico} = -Q(R_p, \alpha) \cdot \sqrt{T}$$
-           
-        2. **VaR Parametrico (Varianza-Covarianza Gaussiano)**:
-           $$VaR_{param} = -(\mu_p + z_{\alpha} \cdot \sigma_p) \cdot \sqrt{T}$$
-           
-        3. **VaR Cornish-Fisher (Espansione Quantilica per Code Grasse)**:
-           $$z_{cf} = z + \frac{1}{6}(z^2-1)S + \frac{1}{24}(z^3-3z)K - \frac{1}{36}(2z^3-5z)S^2$$
-           $$VaR_{cf} = -(\mu_p + z_{cf} \cdot \sigma_p) \cdot \sqrt{T}$$
-        
-        4. **Expected Shortfall (CVaR / Conditional VaR)**:
-           $$ES_{\alpha} = -E[R_p \mid R_p \le -VaR_{\alpha}] \cdot \sqrt{T}$$
-        """)
-
     st.divider()
 
     # ── RIGA 1: METRICHE DI RISCHIO PRINCIPALI (FULL WIDTH) ────────────────
