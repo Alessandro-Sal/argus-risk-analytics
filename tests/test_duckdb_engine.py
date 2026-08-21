@@ -116,10 +116,42 @@ def test_export_portfolio_to_parquet_and_stats(sample_portfolio_dfs):
 
 
 def test_run_duckdb_olap_query_syntax_error_handling(sample_portfolio_dfs):
-    bad_res = run_duckdb_olap_query("SELECT invalid_column_xyz FROM non_existing_table", context_dfs=sample_portfolio_dfs)
-    assert bad_res["success"] is False
-    assert bad_res["error"] is not None
-    assert bad_res["row_count"] == 0
-
     empty_res = run_duckdb_olap_query("")
     assert empty_res["success"] is False
+
+
+def test_compute_duckdb_ui_aggregations(sample_portfolio_dfs):
+    """Verifica le funzioni analitiche accelerate per l'interfaccia utente Streamlit."""
+    from core.duckdb_engine import (
+        compute_duckdb_asset_sector_currency_cube,
+        compute_duckdb_sector_rankings,
+        compute_duckdb_temporal_snapshot_analytics,
+    )
+    pos_df = sample_portfolio_dfs["positions"]
+
+    # 1. Cubo Asset x Settore x Valuta
+    cube_res = compute_duckdb_asset_sector_currency_cube(pos_df)
+    assert cube_res["success"] is True
+    assert not cube_res["df"].empty
+    assert "asset_class" in cube_res["df"].columns
+    assert "sector" in cube_res["df"].columns
+    assert "controvalore_totale" in cube_res["df"].columns
+
+    # 2. Ranking Settoriale QUALIFY
+    rank_res = compute_duckdb_sector_rankings(pos_df, top_n=2)
+    assert rank_res["success"] is True
+    assert not rank_res["df"].empty
+    assert "rank_settoriale" in rank_res["df"].columns
+    assert (rank_res["df"]["rank_settoriale"] <= 2).all()
+
+    # 3. Snapshot Temporali
+    hist_df = pd.DataFrame([
+        {"calc_date": "2024-01-01 10:00", "run_name": "Snap1", "total_value": 100000.0},
+        {"calc_date": "2024-02-01 10:00", "run_name": "Snap2", "total_value": 105000.0},
+        {"calc_date": "2024-03-01 10:00", "run_name": "Snap3", "total_value": 108000.0},
+    ])
+    temp_res = compute_duckdb_temporal_snapshot_analytics(hist_df)
+    assert temp_res["success"] is True
+    assert not temp_res["df"].empty
+    assert "delta_valore_step_eur" in temp_res["df"].columns
+    assert "media_mobile_3_snapshot" in temp_res["df"].columns

@@ -160,3 +160,25 @@ def test_institutional_and_pe_engines():
     assert pe_res["gp_carried_interest"] > 0
 
 
+def test_optimize_plotly_figure_memory():
+    """Verifica che optimize_plotly_figure_memory arrotondi i dati float e riduca il payload."""
+    import plotly.graph_objects as go
+    from core.ui_utils import optimize_plotly_figure_memory, apply_plotly_theme
+
+    fig = go.Figure(data=[
+        go.Scatter(
+            x=[1.123456789, 2.987654321],
+            y=[10.55555555, 20.88888888],
+            marker=dict(color=[0.11111111, 0.99999999])
+        )
+    ])
+    fig_opt = apply_plotly_theme(fig)
+    assert fig_opt is not None
+    # Verifica arrotondamento coordinate x, y
+    assert list(fig_opt.data[0].x) == [1.1235, 2.9877]
+    assert list(fig_opt.data[0].y) == [10.5556, 20.8889]
+    assert list(fig_opt.data[0].marker.color) == [0.1111, 1.0]
+
+
+
+

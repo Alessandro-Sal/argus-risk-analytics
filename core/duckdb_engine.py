@@ -232,3 +232,112 @@ def get_parquet_compression_ratio(df: pd.DataFrame) -> Dict[str, Any]:
         "parquet_bytes": parquet_bytes,
         "space_saved_pct": round(saved_pct, 1)
     }
+
+
+def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Calcola un Cubo Multi-Dimensionale (Asset Class x Settore x Valuta) con subtotali completi
+    sfruttando il motore colonnare C++ DuckDB a latenza sub-millisecondo.
+    """
+    if df_positions is None or df_positions.empty:
+        return {"success": False, "df": pd.DataFrame(), "latency_ms": 0.0}
+
+    df_clean = df_positions.copy()
+    # Normalizza colonne essenziali
+    for col in ["asset_class", "sector", "currency"]:
+        if col not in df_clean.columns:
+            df_clean[col] = "Altro"
+        else:
+            df_clean[col] = df_clean[col].fillna("Altro").astype(str)
+
+    if "current_value" not in df_clean.columns:
+        df_clean["current_value"] = 0.0
+    if "pnl_unrealized" not in df_clean.columns:
+        df_clean["pnl_unrealized"] = 0.0
+
+    sql = """
+        SELECT 
+            COALESCE(asset_class, '--- TOTALE ASSET CLASS ---') as asset_class,
+            COALESCE(sector, '--- TUTTI I SETTORI ---') as sector,
+            COALESCE(currency, 'ALL') as currency,
+            COUNT(*) as n_posizioni,
+            ROUND(SUM(current_value), 2) as controvalore_totale,
+            ROUND(SUM(pnl_unrealized), 2) as pnl_latente_totale,
+            ROUND(AVG(CASE WHEN current_value > 0 THEN (pnl_unrealized / current_value) * 100.0 ELSE 0.0 END), 2) as rendimento_medio_pct
+        FROM positions
+        GROUP BY GROUPING SETS (
+            (asset_class, sector, currency),
+            (asset_class, sector),
+            (asset_class),
+            ()
+        )
+        ORDER BY 
+            (asset_class = '--- TOTALE ASSET CLASS ---') ASC,
+            controvalore_totale DESC;
+    """
+    res = run_duckdb_olap_query(sql, context_dfs={"positions": df_clean})
+    return res
+
+
+def compute_duckdb_sector_rankings(df_positions: pd.DataFrame, top_n: int = 3) -> Dict[str, Any]:
+    """
+    Estrae i migliori asset per PnL all'interno di ciascun settore GICS utilizzando
+    la window function nativa QUALIFY DENSE_RANK() di DuckDB.
+    """
+    if df_positions is None or df_positions.empty:
+        return {"success": False, "df": pd.DataFrame(), "latency_ms": 0.0}
+
+    df_clean = df_positions.copy()
+    if "sector" not in df_clean.columns:
+        df_clean["sector"] = "Altro"
+    if "ticker" not in df_clean.columns:
+        df_clean["ticker"] = "UNKNOWN"
+    if "current_value" not in df_clean.columns:
+        df_clean["current_value"] = 0.0
+    if "pnl_unrealized" not in df_clean.columns:
+        df_clean["pnl_unrealized"] = 0.0
+
+    sql = f"""
+        SELECT 
+            sector as settore,
+            ticker,
+            ROUND(current_value, 2) as controvalore_eur,
+            ROUND(pnl_unrealized, 2) as pnl_latente_eur,
+            ROUND(CASE WHEN current_value > 0 THEN (pnl_unrealized / current_value) * 100.0 ELSE 0.0 END, 2) as gain_pct,
+            DENSE_RANK() OVER (PARTITION BY sector ORDER BY pnl_unrealized DESC) as rank_settoriale
+        FROM positions
+        WHERE current_value > 0
+        QUALIFY rank_settoriale <= {top_n}
+        ORDER BY sector ASC, rank_settoriale ASC;
+    """
+    return run_duckdb_olap_query(sql, context_dfs={"positions": df_clean})
+
+
+def compute_duckdb_temporal_snapshot_analytics(df_history: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Esegue un'aggregazione ad altissima velocità sulle serie storiche degli snapshot di portafoglio,
+    calcolando i tassi di crescita tra rilevazioni consecutive (LAG) e medie mobili.
+    """
+    if df_history is None or df_history.empty:
+        return {"success": False, "df": pd.DataFrame(), "latency_ms": 0.0}
+
+    df_clean = df_history.copy()
+    if "calc_date" in df_clean.columns:
+        df_clean["calc_date"] = df_clean["calc_date"].astype(str)
+
+    sql = """
+        SELECT 
+            calc_date,
+            run_name,
+            ROUND(total_value, 2) as valore_portafoglio_eur,
+            ROUND(total_value - LAG(total_value, 1, total_value) OVER (ORDER BY calc_date ASC), 2) as delta_valore_step_eur,
+            ROUND(CASE 
+                WHEN LAG(total_value, 1) OVER (ORDER BY calc_date ASC) > 0 
+                THEN ((total_value - LAG(total_value, 1) OVER (ORDER BY calc_date ASC)) / LAG(total_value, 1) OVER (ORDER BY calc_date ASC)) * 100.0 
+                ELSE 0.0 
+            END, 2) as delta_pct_step,
+            ROUND(AVG(total_value) OVER (ORDER BY calc_date ASC ROWS BETWEEN 2 PRECEDING AND CURRENT ROW), 2) as media_mobile_3_snapshot
+        FROM history
+        ORDER BY calc_date DESC;
+    """
+    return run_duckdb_olap_query(sql, context_dfs={"history": df_clean})
