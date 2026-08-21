@@ -274,20 +274,61 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             cube_res = compute_duckdb_asset_sector_currency_cube(df_l)
             rank_res = compute_duckdb_sector_rankings(df_l, top_n=3)
 
-            c_olap_1, c_olap_2 = st.columns([1.5, 1])
-            with c_olap_1:
-                st.markdown(f"##### 🧊 Cubo Multi-Dimensionale (Asset Class × Settore × Valuta)")
+            tab_cube, tab_rank = st.tabs([
+                "🧊 Cubo Multi-Dimensionale (Asset Class × Settore × Valuta)",
+                "🏆 Leader Settoriali (QUALIFY Rank ≤ 3)"
+            ])
+
+            with tab_cube:
                 if cube_res.get("success") and not cube_res["df"].empty:
-                    st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
-                    st.dataframe(cube_res["df"], use_container_width=True, hide_index=True)
+                    df_cube = cube_res["df"].copy()
+                    col_cu_h1, col_cu_h2 = st.columns([3.2, 1.0])
+                    with col_cu_h1:
+                        st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms** (DuckDB GROUPING SETS Rollup)")
+                    with col_cu_h2:
+                        csv_cube = df_cube.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Scarica Cubo CSV", data=csv_cube, file_name="duckdb_olap_cube.csv", mime="text/csv", use_container_width=True)
+
+                    cube_cfg = {
+                        "asset_class": st.column_config.TextColumn("Asset Class"),
+                        "sector": st.column_config.TextColumn("Settore GICS"),
+                        "currency": st.column_config.TextColumn("Valuta"),
+                        "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
+                        "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f")
+                    }
+                    st.dataframe(
+                        df_cube,
+                        column_config=cube_cfg,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=300
+                    )
                 else:
                     st.info("Nessun dato disponibile per il cubo OLAP.")
 
-            with c_olap_2:
-                st.markdown("##### 🏆 Leader Settoriali (QUALIFY Rank ≤ 3)")
+            with tab_rank:
                 if rank_res.get("success") and not rank_res["df"].empty:
-                    st.caption(f"⚡ Calcolo Window Function in **{rank_res['latency_ms']:.2f} ms**")
-                    st.dataframe(rank_res["df"], use_container_width=True, hide_index=True)
+                    df_rank = rank_res["df"].copy()
+                    col_rk_h1, col_rk_h2 = st.columns([3.2, 1.0])
+                    with col_rk_h1:
+                        st.caption(f"⚡ Calcolo Window Function in **{rank_res['latency_ms']:.2f} ms** (DuckDB QUALIFY DENSE_RANK() ≤ 3)")
+                    with col_rk_h2:
+                        csv_rank = df_rank.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Scarica Leader CSV", data=csv_rank, file_name="duckdb_sector_leaders.csv", mime="text/csv", use_container_width=True)
+
+                    rank_cfg = {
+                        "settore": st.column_config.TextColumn("Settore GICS"),
+                        "ticker": st.column_config.TextColumn("Ticker"),
+                        "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
+                        "rank_in_settore": st.column_config.NumberColumn("Rank Settoriale", format="#%d")
+                    }
+                    st.dataframe(
+                        df_rank,
+                        column_config=rank_cfg,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=300
+                    )
                 else:
                     st.info("Nessun ranking disponibile.")
 
