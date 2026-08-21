@@ -1171,52 +1171,157 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     badge_param = get_basel_badge(exc_param, expected_exc)
     badge_cf = get_basel_badge(exc_cf, expected_exc)
 
-    st.markdown(f"""
-    <div style="background: rgba(18, 24, 38, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; overflow-x: auto;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-            <thead>
-                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; font-size: 11.5px; font-weight: 700; letter-spacing: 0.5px; height: 32px;">
-                    <th style="text-align: left; padding: 6px 10px;">MODELLO VAR</th>
-                    <th style="text-align: right; padding: 6px 10px;">SOGLIA VAR (1G)</th>
-                    <th style="text-align: center; padding: 6px 10px;">ECCEZIONI REALI (252G)</th>
-                    <th style="text-align: right; padding: 6px 10px;">TASSO VIOLAZIONE</th>
-                    <th style="text-align: right; padding: 6px 10px;">TARGET ATTESO</th>
-                    <th style="text-align: center; padding: 6px 10px;">TEST KUPIEC LR (p-val)</th>
-                    <th style="text-align: right; padding: 6px 10px;">ACCORDO BASILEA III</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); height: 42px;">
-                    <td style="color: #ffffff; font-weight: 600; padding: 6px 10px; white-space: nowrap;">📊 VaR Storico</td>
-                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8; padding: 6px 10px; white-space: nowrap;">{var_hist_1d * 100:.2f}%</td>
-                    <td style="text-align: center; font-family: monospace; font-weight: 600; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">{exc_hist} / {n_days}</td>
-                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #4ade80; padding: 6px 10px; white-space: nowrap;">{ratio_hist:.2f}%</td>
-                    <td style="text-align: right; font-family: monospace; color: #94a3b8; padding: 6px 10px; white-space: nowrap;">{alpha * 100:.1f}% ({expected_exc:.1f} violazioni)</td>
-                    <td style="text-align: center; font-family: monospace; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">LR = {lr_hist:.2f} (p = {pval_hist:.2f})</td>
-                    <td style="text-align: right; padding: 6px 10px;">{badge_hist}</td>
-                </tr>
-                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); height: 42px;">
-                    <td style="color: #ffffff; font-weight: 600; padding: 6px 10px; white-space: nowrap;">📐 VaR Parametrico (Gaussiano)</td>
-                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8; padding: 6px 10px; white-space: nowrap;">{var_param_1d * 100:.2f}%</td>
-                    <td style="text-align: center; font-family: monospace; font-weight: 600; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">{exc_param} / {n_days}</td>
-                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #4ade80; padding: 6px 10px; white-space: nowrap;">{ratio_param:.2f}%</td>
-                    <td style="text-align: right; font-family: monospace; color: #94a3b8; padding: 6px 10px; white-space: nowrap;">{alpha * 100:.1f}% ({expected_exc:.1f} violazioni)</td>
-                    <td style="text-align: center; font-family: monospace; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">LR = {lr_param:.2f} (p = {pval_param:.2f})</td>
-                    <td style="text-align: right; padding: 6px 10px;">{badge_param}</td>
-                </tr>
-                <tr style="height: 42px;">
-                    <td style="color: #ffffff; font-weight: 600; padding: 6px 10px; white-space: nowrap;">📈 VaR Cornish-Fisher (Code Spesse)</td>
-                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8; padding: 6px 10px; white-space: nowrap;">{var_cf_1d * 100:.2f}%</td>
-                    <td style="text-align: center; font-family: monospace; font-weight: 600; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">{exc_cf} / {n_days}</td>
-                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #4ade80; padding: 6px 10px; white-space: nowrap;">{ratio_cf:.2f}%</td>
-                    <td style="text-align: right; font-family: monospace; color: #94a3b8; padding: 6px 10px; white-space: nowrap;">{alpha * 100:.1f}% ({expected_exc:.1f} violazioni)</td>
-                    <td style="text-align: center; font-family: monospace; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">LR = {lr_cf:.2f} (p = {pval_cf:.2f})</td>
-                    <td style="text-align: right; padding: 6px 10px;">{badge_cf}</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-    """, unsafe_allow_html=True)
+    col_b1, col_b2, col_b3 = st.columns(3)
+    
+    with col_b1:
+        st.markdown(f"""
+        <div style="background: rgba(18, 24, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">📊 VaR Storico</span>
+                {badge_hist}
+            </div>
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 26px; font-weight: 800; font-family: monospace; color: #38bdf8; line-height: 1.1;">{var_hist_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Soglia Perdita 1G ({int(conf_level*100)}% Confidenza)</div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span>Violazioni Registrate:</span>
+                    <b style="font-family: monospace; color: #ffffff;">{exc_hist} / {n_days} ({ratio_hist:.2f}%)</b>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+                    <span>Target Atteso (5%):</span>
+                    <span style="font-family: monospace;">{expected_exc:.1f} violazioni</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                <span>Test LR Kupiec:</span>
+                <span style="font-family: monospace; color: #cbd5e1;">LR = {lr_hist:.2f} &bull; p-val = {pval_hist:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_b2:
+        st.markdown(f"""
+        <div style="background: rgba(18, 24, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">📐 VaR Parametrico</span>
+                {badge_param}
+            </div>
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 26px; font-weight: 800; font-family: monospace; color: #38bdf8; line-height: 1.1;">{var_param_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Soglia Gaussiana 1G ({int(conf_level*100)}% Confidenza)</div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span>Violazioni Registrate:</span>
+                    <b style="font-family: monospace; color: #ffffff;">{exc_param} / {n_days} ({ratio_param:.2f}%)</b>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+                    <span>Target Atteso (5%):</span>
+                    <span style="font-family: monospace;">{expected_exc:.1f} violazioni</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                <span>Test LR Kupiec:</span>
+                <span style="font-family: monospace; color: #cbd5e1;">LR = {lr_param:.2f} &bull; p-val = {pval_param:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_b3:
+        st.markdown(f"""
+        <div style="background: rgba(18, 24, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">📈 VaR Cornish-Fisher</span>
+                {badge_cf}
+            </div>
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 26px; font-weight: 800; font-family: monospace; color: #38bdf8; line-height: 1.1;">{var_cf_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Soglia Non-Gaussiana (Skew/Kurt)</div>
+            </div>
+            <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span>Violazioni Registrate:</span>
+                    <b style="font-family: monospace; color: #ffffff;">{exc_cf} / {n_days} ({ratio_cf:.2f}%)</b>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+                    <span>Target Atteso (5%):</span>
+                    <span style="font-family: monospace;">{expected_exc:.1f} violazioni</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                <span>Test LR Kupiec:</span>
+                <span style="font-family: monospace; color: #cbd5e1;">LR = {lr_cf:.2f} &bull; p-val = {pval_cf:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown('<div style="margin-top: 14px;"></div>', unsafe_allow_html=True)
+    st.markdown("##### 📉 Tracciamento Temporale delle Violazioni VaR (Backtest a 252 Sedute)")
+    
+    fig_kup = go.Figure()
+    
+    # Rendimenti ordinari vs Violazioni
+    recent_r_pct = (recent_r * 100.0).round(2)
+    breach_mask = recent_r < threshold_hist_1d
+    normal_r = recent_r_pct[~breach_mask]
+    breach_r = recent_r_pct[breach_mask]
+    
+    fig_kup.add_trace(go.Scatter(
+        x=normal_r.index,
+        y=normal_r.values,
+        mode="markers",
+        name="Rendimento Conforme",
+        marker=dict(color="rgba(148, 163, 184, 0.40)", size=4.0),
+        hovertemplate="<b>Data:</b> %{x|%d/%m/%Y}<br><b>Rendimento:</b> %{y:+.2f}%<extra></extra>"
+    ))
+    
+    # Linea Soglia VaR Storico 95%
+    var_line_val = round(-var_hist_1d * 100.0, 2)
+    fig_kup.add_hline(
+        y=var_line_val,
+        line_dash="dash",
+        line_color="#ff9900",
+        annotation_text=f" Soglia VaR 95% (-{var_hist_1d*100:.2f}%)",
+        annotation_position="bottom right",
+        annotation_font=dict(color="#ffb74d", size=11)
+    )
+    
+    # Punti di Violazione Evidenziati in Rosso
+    if not breach_r.empty:
+        fig_kup.add_trace(go.Scatter(
+            x=breach_r.index,
+            y=breach_r.values,
+            mode="markers",
+            name=f"Violazioni VaR ({len(breach_r)} eccezioni)",
+            marker=dict(
+                color="#ef4444",
+                size=8.5,
+                symbol="diamond",
+                line=dict(color="#ffffff", width=1.2)
+            ),
+            hovertemplate="<b>⚠️ Violazione VaR</b><br><b>Data:</b> %{x|%d/%m/%Y}<br><b>Perdita Effettiva:</b> %{y:.2f}%<br><b>Soglia VaR:</b> " + f"{var_line_val:.2f}%" + "<extra></extra>"
+        ))
+        
+    fig_kup.update_layout(
+        height=320,
+        margin=dict(l=10, r=10, t=30, b=10),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="center",
+            x=0.5,
+            bgcolor="rgba(0,0,0,0)",
+            font=dict(size=12, color="#cbd5e1")
+        ),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=False),
+        yaxis=dict(title="Rendimento Giornaliero (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=True, zerolinecolor="rgba(255,255,255,0.15)")
+    )
+    st.plotly_chart(fig_kup, use_container_width=True)
 
     # ── SEZIONE GARCH(1,1) & FILTERED HISTORICAL SIMULATION (FHS) ────────
     st.divider()
