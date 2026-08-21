@@ -506,8 +506,23 @@ if selected_bms:
         })
 
     df_scorecard = pd.DataFrame(scorecard_rows)
+    col_sc_h1, col_sc_h2 = st.columns([3.5, 0.9])
+    with col_sc_h2:
+        csv_sc = df_scorecard.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="benchmark_scorecard.csv", mime="text/csv", use_container_width=True)
+
+    sc_cfg = {
+        "Asset / Benchmark": st.column_config.TextColumn("Asset / Benchmark", width="medium"),
+        "Rendimento Totale": st.column_config.TextColumn("Rendimento Totale", width="small"),
+        "CAGR Annuo": st.column_config.TextColumn("CAGR Annuo", width="small"),
+        "Volatilità Annua": st.column_config.TextColumn("Volatilità Annua", width="small"),
+        "Sharpe Ratio": st.column_config.TextColumn("Sharpe Ratio", width="small"),
+        "Max Drawdown": st.column_config.TextColumn("Max Drawdown", width="small"),
+        "Alpha vs Portafoglio": st.column_config.TextColumn("Alpha vs Portafoglio", width="small")
+    }
     st.dataframe(
         df_scorecard,
+        column_config=sc_cfg,
         use_container_width=True,
         hide_index=True
     )
@@ -519,7 +534,12 @@ if not pos.empty:
         from core.duckdb_engine import compute_duckdb_asset_sector_currency_cube
         cube_res = compute_duckdb_asset_sector_currency_cube(pos)
         if cube_res.get("success") and not cube_res["df"].empty:
-            st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
+            col_cu_h1, col_cu_h2 = st.columns([3.5, 0.9])
+            with col_cu_h1:
+                st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
+            with col_cu_h2:
+                csv_cube = cube_res["df"].to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_cube, file_name="duckdb_olap_cube.csv", mime="text/csv", use_container_width=True)
             st.dataframe(cube_res["df"], use_container_width=True, hide_index=True)
 
 # ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & MODAL) ──
@@ -1069,14 +1089,28 @@ with col_rl1:
     """, unsafe_allow_html=True)
 
 with col_rl2:
+    col_rl_h1, col_rl_h2 = st.columns([3.5, 0.9])
+    with col_rl_h2:
+        csv_eval = df_eval.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica CSV", data=csv_eval, file_name="risk_compliance_limits.csv", mime="text/csv", use_container_width=True)
+
+    df_eval_show = df_eval[["status_icon", "rule_name", "current_value", "limit_threshold", "unit"]].rename(columns={
+        "status_icon": "Stato",
+        "rule_name": "Regola di Rischio",
+        "current_value": "Valore Rilevato",
+        "limit_threshold": "Soglia Limite",
+        "unit": "Unità"
+    })
+    eval_cfg = {
+        "Stato": st.column_config.TextColumn("Stato", width="small"),
+        "Regola di Rischio": st.column_config.TextColumn("Regola di Rischio", width="medium"),
+        "Valore Rilevato": st.column_config.TextColumn("Valore Rilevato", width="small"),
+        "Soglia Limite": st.column_config.TextColumn("Soglia Limite", width="small"),
+        "Unità": st.column_config.TextColumn("Unità", width="small")
+    }
     st.dataframe(
-        df_eval[["status_icon", "rule_name", "current_value", "limit_threshold", "unit"]].rename(columns={
-            "status_icon": "Stato",
-            "rule_name": "Regola di Rischio",
-            "current_value": "Valore Rilevato",
-            "limit_threshold": "Soglia Limite",
-            "unit": "Unità"
-        }),
+        df_eval_show,
+        column_config=eval_cfg,
         use_container_width=True,
         hide_index=True
     )

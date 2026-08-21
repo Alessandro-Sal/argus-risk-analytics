@@ -199,18 +199,38 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         }
         df_disp.rename(columns=col_renames, inplace=True)
 
+        col_pos_f1, col_pos_f2, col_pos_f3 = st.columns([2.0, 1.3, 0.9])
+        with col_pos_f1:
+            search_pos = st.text_input("🔍 Cerca Posizione:", placeholder="Filtra per Ticker o Settore...", key="search_main_pos")
+        with col_pos_f2:
+            classes_available = ["Tutte le Classi"] + sorted(list(df_disp["Asset Class"].dropna().unique())) if "Asset Class" in df_disp.columns else ["Tutte"]
+            filter_ac = st.selectbox("🏷️ Asset Class:", classes_available, key="filter_main_pos_ac")
+        with col_pos_f3:
+            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+            csv_pos = df_disp.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CSV", data=csv_pos, file_name="posizioni_portafoglio.csv", mime="text/csv", use_container_width=True)
+
+        df_disp_filt = df_disp.copy()
+        if search_pos:
+            mask = df_disp_filt["Ticker"].astype(str).str.contains(search_pos.strip(), case=False, na=False)
+            if "Settore" in df_disp_filt.columns:
+                mask |= df_disp_filt["Settore"].astype(str).str.contains(search_pos.strip(), case=False, na=False)
+            df_disp_filt = df_disp_filt[mask]
+        if filter_ac != "Tutte le Classi" and "Asset Class" in df_disp_filt.columns:
+            df_disp_filt = df_disp_filt[df_disp_filt["Asset Class"] == filter_ac]
+
         column_config = {
             "Prezzo Carico (€)": st.column_config.NumberColumn("Prezzo Carico (€)", format="€ %.2f"),
             "Prezzo Mkt (€)": st.column_config.NumberColumn("Prezzo Mkt (€)", format="€ %.2f"),
             "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
             "PnL Realizz. (€)": st.column_config.NumberColumn("PnL Realizz. (€)", format="€ %.2f"),
             "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
-            "Peso (%)": st.column_config.NumberColumn("Peso (%)", format="%.2f%%"),
+            "Peso (%)": st.column_config.ProgressColumn("Peso (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
             "Giorni Liq. (ADV 15%)": st.column_config.NumberColumn("Giorni Liq. (ADV 15%)", format="%.2f gg"),
-            "Yield on Cost (%)": st.column_config.NumberColumn("Yield on Cost (%)", format="%.2f%%")
+            "Yield on Cost (%)": st.column_config.ProgressColumn("Yield on Cost (%)", format="%.2f%%", min_value=0.0, max_value=20.0)
         }
 
-        st.dataframe(df_disp, use_container_width=True, hide_index=True, column_config=column_config)
+        st.dataframe(df_disp_filt, use_container_width=True, hide_index=True, column_config=column_config)
 
         st.markdown("#### Ripartizione Liquidità del Portafoglio (ADV Days)")
         t1 = df_l[df_l["days_to_liquidate"] <= 1.0]["current_value"].sum()

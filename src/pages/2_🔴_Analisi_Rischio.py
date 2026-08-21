@@ -409,17 +409,29 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             df_rc = df_rc.sort_values(by="risk_contrib_pct", ascending=False)
             df_display = df_rc
 
-        col_rc1, col_rc2 = st.columns([1.35, 1.15])
+        col_rc1, col_rc2 = st.columns([1.4, 1.1])
         with col_rc1:
+            col_rc_h1, col_rc_h2 = st.columns([2.5, 1.0])
+            with col_rc_h1:
+                search_rc = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_contrib")
+            with col_rc_h2:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                csv_rc = df_display.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_rc, file_name="scomposizione_rischio.csv", mime="text/csv", use_container_width=True)
+
+            df_rc_filt = df_display.copy()
+            if search_rc:
+                df_rc_filt = df_rc_filt[df_rc_filt["ticker"].astype(str).str.contains(search_rc.strip(), case=False, na=False)]
+
             cfg = {
                 "ticker": st.column_config.TextColumn("Asset", width="small"),
                 "asset_class": st.column_config.TextColumn("Classe", width="small"),
-                "weight_pct": st.column_config.NumberColumn("Peso", format="%.2f%%"),
-                "risk_contrib_pct": st.column_config.NumberColumn("Rischio", format="%.2f%%"),
+                "weight_pct": st.column_config.ProgressColumn("Peso (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
+                "risk_contrib_pct": st.column_config.ProgressColumn("Contributo Rischio (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
                 "risk_vs_weight": st.column_config.NumberColumn("Sbilancio", format="%+.2f%%"),
             }
             st.dataframe(
-                df_display,
+                df_rc_filt,
                 column_config=cfg,
                 use_container_width=True,
                 hide_index=True,

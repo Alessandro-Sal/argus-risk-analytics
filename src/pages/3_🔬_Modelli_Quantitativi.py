@@ -1303,13 +1303,29 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
         # Tabella Coppie a Rischio Contagio & Indice di Rottura della Diversificazione
         contagion = copula_res.get("contagion_pairs", [])
         if contagion:
-            st.markdown(r"##### ⚠️ Alert Coppie ad Alto Contagio di Coda ($\lambda_L \ge 0.30$)")
-            st.caption("Queste coppie mostrano un picco di correlazione durante i crolli di mercato (*'In a crisis, all correlations go to 1'*), azzerando l'effetto protettivo della diversificazione.")
+            col_cont_h1, col_cont_h2 = st.columns([3.5, 0.9])
+            with col_cont_h1:
+                st.markdown(r"##### ⚠️ Alert Coppie ad Alto Contagio di Coda ($\lambda_L \ge 0.30$)")
+                st.caption("Queste coppie mostrano un picco di correlazione durante i crolli di mercato (*'In a crisis, all correlations go to 1'*), azzerando l'effetto protettivo della diversificazione.")
+            
             df_cont = pd.DataFrame(contagion).rename(columns={
                 "pair": "Coppia Asset", "lambda_lower": "Lower Tail (λ_L)",
                 "lambda_upper": "Upper Tail (λ_U)", "asymmetry": "Asimmetria di Coda", "risk_level": "Livello Rischio"
             })
-            st.dataframe(df_cont, use_container_width=True, hide_index=True)
+
+            with col_cont_h2:
+                st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+                csv_cont = df_cont.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_cont, file_name="coppie_contagio_tail_risk.csv", mime="text/csv", use_container_width=True)
+
+            cont_cfg = {
+                "Coppia Asset": st.column_config.TextColumn("Coppia Asset", width="medium"),
+                "Lower Tail (λ_L)": st.column_config.ProgressColumn("Lower Tail (λ_L)", format="%.3f", min_value=0.0, max_value=1.0),
+                "Upper Tail (λ_U)": st.column_config.ProgressColumn("Upper Tail (λ_U)", format="%.3f", min_value=0.0, max_value=1.0),
+                "Asimmetria di Coda": st.column_config.NumberColumn("Asimmetria (λ_L - λ_U)", format="%+.3f"),
+                "Livello Rischio": st.column_config.TextColumn("Livello Rischio", width="small")
+            }
+            st.dataframe(df_cont, column_config=cont_cfg, use_container_width=True, hide_index=True)
 
         st.divider()
 
@@ -1739,8 +1755,10 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             # ── RIGA 2: MATRICE DELLE PROBABILITÀ & RISK PROFILE ───────────
-            st.markdown("#### 🎯 Matrice delle Probabilità & Risk Profile")
-            st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
+            col_mo_h1, col_mo_h2 = st.columns([3.5, 0.9])
+            with col_mo_h1:
+                st.markdown("#### 🎯 Matrice delle Probabilità & Risk Profile")
+                st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
             
             df_odds = pd.DataFrame([
                 {"Scenario Stocastico": "🟢 Probabilità di Profitto", "Probabilità / Valore": f"{mc_adv['prob_profit_pct']:.1f}%", "Condizione": "Rendimento Finale > 0%"},
@@ -1751,7 +1769,18 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
                 {"Scenario Stocastico": "📉 Max Drawdown Simulato Medio", "Probabilità / Valore": f"{mc_adv['avg_max_drawdown_pct']:.2f}%", "Condizione": "Perdita massima media registrata lungo il path"},
                 {"Scenario Stocastico": "💥 Max Drawdown Simulato Worst 1%", "Probabilità / Valore": f"{mc_adv['p99_max_drawdown_pct']:.2f}%", "Condizione": "Peggior drawdown nell'1% dei percorsi estremi"}
             ])
-            st.dataframe(df_odds, use_container_width=True, hide_index=True)
+
+            with col_mo_h2:
+                st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+                csv_odds = df_odds.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_odds, file_name="monte_carlo_odds_matrix.csv", mime="text/csv", use_container_width=True)
+
+            odds_cfg = {
+                "Scenario Stocastico": st.column_config.TextColumn("Scenario Stocastico", width="medium"),
+                "Probabilità / Valore": st.column_config.TextColumn("Probabilità / Valore", width="small"),
+                "Condizione": st.column_config.TextColumn("Condizione di Verifica", width="large")
+            }
+            st.dataframe(df_odds, column_config=odds_cfg, use_container_width=True, hide_index=True)
 
         else:
             st.info("Simulazione Monte Carlo non disponibile per gli asset selezionati.")
@@ -2426,14 +2455,17 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
                 })
                 df_bl = df_bl.sort_values(by="BL Weight %", ascending=False)
 
-                col_tbl_bl, col_chart_bl = st.columns([1.1, 1.1])
+                col_tbl_bl, col_chart_bl = st.columns([1.2, 1.0])
                 with col_tbl_bl:
+                    bl_cfg = {
+                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "Equilibrium Return %": st.column_config.NumberColumn("Equilibrium Return", format="%.2f%%"),
+                        "BL Return %": st.column_config.NumberColumn("BL Return", format="%.2f%%"),
+                        "BL Weight %": st.column_config.ProgressColumn("BL Target Weight", format="%.2f%%", min_value=0.0, max_value=100.0)
+                    }
                     st.dataframe(
-                        df_bl.style.format({
-                            "Equilibrium Return %": "{:.2f}%",
-                            "BL Return %": "{:.2f}%",
-                            "BL Weight %": "{:.2f}%"
-                        }),
+                        df_bl,
+                        column_config=bl_cfg,
                         use_container_width=True,
                         hide_index=True,
                         height=280
@@ -2587,8 +2619,15 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             st.caption(f"Bontà di Adattamento OLS: **R² = {r2_val*100:.1f}%** | **Adj R² = {ff_res.get('adj_r_squared', 0.0)*100:.1f}%**")
 
         # Tabella Econometrica dei Parametri
+        # Tabella Econometrica dei Parametri
         if not df_ff_factors.empty:
-            st.markdown("##### 📋 Tabella Econometrica di Regressione OLS & Test di Ipotesi")
+            col_ff_h1, col_ff_h2 = st.columns([3.5, 0.9])
+            with col_ff_h1:
+                st.markdown("##### 📋 Tabella Econometrica di Regressione OLS & Test di Ipotesi")
+            with col_ff_h2:
+                csv_ff = df_ff_factors.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_ff, file_name="fama_french_factor_regression.csv", mime="text/csv", use_container_width=True)
+
             df_ff_show = df_ff_factors.rename(columns={
                 "factor": "Fattore di Rischio",
                 "beta": "Coefficiente Beta (β)",
@@ -2602,14 +2641,19 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             df_ff_show["Significatività (95%)"] = df_ff_show["Significatività (95%)"].apply(
                 lambda x: "🟢 Significativo (|t| ≥ 1.96)" if x else "⚪ Non Significativo"
             )
+            ff_cfg = {
+                "Fattore di Rischio": st.column_config.TextColumn("Fattore di Rischio", width="medium"),
+                "Coefficiente Beta (β)": st.column_config.NumberColumn("Beta (β)", format="%+.4f"),
+                "Errore Standard": st.column_config.NumberColumn("Std Error", format="%.4f"),
+                "Statistica t": st.column_config.NumberColumn("Statistica t", format="%+.2f"),
+                "p-value": st.column_config.NumberColumn("p-value", format="%.4f"),
+                "Intervallo Confidenza 95%": st.column_config.TextColumn("CI 95%", width="medium"),
+                "Significatività (95%)": st.column_config.TextColumn("Significatività (95%)", width="medium"),
+                "Contributo Rendimento Annuo (%)": st.column_config.NumberColumn("Contributo Rend. Annuo", format="%+.2f%%")
+            }
             st.dataframe(
-                df_ff_show.style.format({
-                    "Coefficiente Beta (β)": "{:+.4f}",
-                    "Errore Standard": "{:.4f}",
-                    "Statistica t": "{:+.2f}",
-                    "p-value": "{:.4f}",
-                    "Contributo Rendimento Annuo (%)": "{:+.2f}%"
-                }),
+                df_ff_show,
+                column_config=ff_cfg,
                 use_container_width=True,
                 hide_index=True
             )
@@ -2756,12 +2800,22 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             metric_card("Alpha Multi-Fattoriale (α)", f"{barra_res.get('alpha_annualized', 0.0)*100:+.2f}%", "MSCI Barra 5-Factor", True)
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        st.markdown("##### 📋 Tabella di Dettaglio dei Fattori MSCI Barra")
+        col_bar_h1, col_bar_h2 = st.columns([3.5, 0.9])
+        with col_bar_h1:
+            st.markdown("##### 📋 Tabella di Dettaglio dei Fattori MSCI Barra")
+        with col_bar_h2:
+            csv_barra = df_barra.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CSV", data=csv_barra, file_name="msci_barra_factors.csv", mime="text/csv", use_container_width=True)
+
+        barra_cfg = {
+            "Fattore Barra": st.column_config.TextColumn("Fattore Barra", width="medium"),
+            "Beta Fattoriale": st.column_config.NumberColumn("Beta Fattoriale", format="%+.3f"),
+            "Statistica t": st.column_config.NumberColumn("Statistica t", format="%+.2f"),
+            "Significatività (95%)": st.column_config.TextColumn("Significatività (95%)", width="medium")
+        }
         st.dataframe(
-            df_barra.style.format({
-                "Beta Fattoriale": "{:+.3f}",
-                "Statistica t": "{:+.2f}"
-            }),
+            df_barra,
+            column_config=barra_cfg,
             use_container_width=True,
             hide_index=True
         )
