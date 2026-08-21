@@ -1915,62 +1915,38 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
         """)
 
         st.divider()
-        col_head_bs1, col_head_bs2 = st.columns([3.2, 1.1])
+        col_head_bs1, col_head_bs2 = st.columns([3.2, 1.2])
         with col_head_bs1:
-            st.markdown("#### 🛡️ Modello Black-Scholes (1973): Opzioni Put Hedging & Covered Call Yield")
-            st.caption("Calcolo analitico dei 5 Greci ($\\Delta, \\Gamma, \\Theta, \\text{Vega}, \\rho$), copertura Delta-Hedge con opzioni Put e generazione di rendimento passivo con Covered Call.")
+            st.markdown("#### 🛡️ Modello Black-Scholes (1973): Copertura Delta-Hedging & Volatility Skew")
+            st.caption("Dimensionamento matematico dei contratti Put per immunizzare il Beta di portafoglio, calcolo analitico dei 5 Greci ($\\Delta, \\Gamma, \\Theta, \\text{Vega}, \\rho$) e calibrazione dello Skew reale.")
         with col_head_bs2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            glossary_modal("ℹ️ Guida al Modello Black-Scholes, Greci & Covered Call", """
+            glossary_modal("💡 Guida a Black-Scholes, Greci & Skew", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Modello di Black-Scholes-Merton (1973)</div>
-  <div>La pietra miliare della finanza matematica per il pricing teorico arbitraggio-free delle opzioni europee su azioni e indici azionari.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Pricing Analitico & I 5 Greci</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 1. Modello di Black-Scholes-Merton (1973) & Greci</div>
+  <div>
     • <b>Delta (&Delta;):</b> Sensibilità del premio al sottostante (Hedge Ratio)<br>
-    • <b>Gamma (&Gamma;):</b> Curvatura e derivata seconda rispetto al prezzo spot<br>
+    • <b>Gamma (&Gamma;):</b> Curvatura e derivata seconda del prezzo rispetto allo Spot<br>
     • <b>Theta (&Theta;):</b> Decadimento temporale giornaliero (<i>Time Decay</i>)<br>
     • <b>Vega:</b> Sensibilità all'1% di variazione della volatilità implicita (&sigma;)<br>
-    • <b>Rho (&rho;):</b> Reattività alle variazioni della curva dei tassi d'interesse
+    • <b>Rho (&rho;):</b> Reattività alle variazioni dei tassi d'interesse
   </div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>
-    1. <b>Put Delta-Hedging:</b> Calcolare esattamente quanti contratti Put acquistare sul benchmark per sterilizzare il Beta di portafoglio a costo minimo.<br>
-    2. <b>Covered Call Writing:</b> Vendere opzioni Call OTM (+5%) a 30 giorni per incassare premi regolari migliorando il rendimento (<i>Yield Enhancement</i>).
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>Il modulo <code>core/risk_engine.py</code> calcola il numero di contratti: <code>Contratti = (Valore &times; &beta; &times; Copertura %) / (Spot &times; 100 &times; |&Delta;|)</code>.</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 2. Volatility Smile & Skew Reale</div>
+  <div>Black-Scholes assume volatilità costante. Nella realtà, le Put OTM incorporano un premio di crash risk (&sigma;<sub>IV</sub> più elevata). ARGUS calibra la curva di Skew reale &sigma;(m) = a + b&middot;m + c&middot;m<sup>2</sup> per un pricing rigoroso dei contratti.</div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>La tabella mostra i contratti esatti da negoziare sul mercato derivati e il rendimento annualizzato atteso dalla strategia Covered Call.</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 3. Dimensionamento Contratti Put</div>
+  <div><code>Contratti = (Valore Portafoglio &times; &beta; &times; Copertura %) / (Spot &times; 100 &times; |&Delta;|)</code></div>
 </div>
 
 </div>
 """, button_label="💡 Come funziona Black-Scholes & Greci?")
-
-        importlib.reload(core.options_hedging)
-        from core.options_hedging import compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
-
-        col_bs_h1, col_bs_h2 = st.columns([3.2, 1.2])
-        with col_bs_h1:
-            st.markdown("#### 🛡️ Strategia di Copertura Delta-Hedging (Black-Scholes & Skew Calibrato)")
-            st.caption("Dimensionamento matematico dei contratti di opzione Put per immunizzare il Beta di portafoglio con calibrazione del Volatility Skew reale.")
-        with col_bs_h2:
-            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            render_volatility_smile_modal(button_label="ℹ️ Metodologia Volatility Skew & Smile", use_popover=False)
 
         col_opt_in1, col_opt_in2, col_opt_in3, col_opt_in4 = st.columns(4)
         with col_opt_in1:
