@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_pct, fmt_eur_it, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal
 from core.hrp_optimizer import compute_hrp_portfolio
 from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
 from core.volatility_surface import build_volatility_surface, fit_volatility_smile
@@ -1450,42 +1450,42 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             with mk1:
                 metric_card(
                     "Valore Iniziale",
-                    f"€ {mc_adv['initial_portfolio_value']:,.0f}",
-                    delta="Capitale Base",
-                    positive=True,
-                    help_text="Valore del patrimonio netto iniziale sottoposto a simulazione stocastica Monte Carlo."
+                    fmt_eur_it(mc_adv['initial_portfolio_value']),
+                    "Capitale Base",
+                    True,
+                    help_text="Valore attuale complessivo del portafoglio utilizzato come base di simulazione."
                 )
             with mk2:
                 metric_card(
-                    "Mediana Attesa",
-                    f"€ {mc_adv['expected_value_median']:,.0f}",
-                    delta=f"{mc_adv['expected_return_median_pct']:+.2f}% ROI",
-                    positive=(mc_adv['expected_return_median_pct'] >= 0),
-                    help_text=f"Valore mediano (50° percentile) stimato al termine dell'orizzonte di {horizon_opt} giorni."
+                    "Mediana Attesa (1Y)",
+                    fmt_eur_it(mc_adv['expected_value_median']),
+                    f"Rendimento: {mc_adv['expected_return_median_pct']:+.2f}%",
+                    mc_adv['expected_return_median_pct'] >= 0,
+                    help_text="Valore mediano del portafoglio al termine dell'orizzonte temporale."
                 )
             with mk3:
                 metric_card(
-                    "VaR 95% Rischio",
-                    f"€ {mc_adv['var_95_val_eur']:,.0f}",
-                    delta=f"-{mc_adv['var_95_pct']:.2f}% Max",
-                    positive=False,
-                    help_text="Value at Risk 95%: massima perdita stimata con confidenza statistica del 95%."
+                    "VaR 95% (Rischio)",
+                    fmt_eur_it(mc_adv['var_95_val_eur']),
+                    f"Perdita Max: -{mc_adv['var_95_pct']:.2f}%",
+                    False,
+                    help_text="Perdita massima stimata al 95% di confidenza statistica."
                 )
             with mk4:
                 metric_card(
-                    "CVaR 95% Coda",
-                    f"€ {mc_adv['cvar_95_val_eur']:,.0f}",
-                    delta=f"-{mc_adv['cvar_95_pct']:.2f}% ES",
-                    positive=False,
-                    help_text="Expected Shortfall (CVaR 95%): perdita media attesa nell'estremo 5% degli scenari peggiori."
+                    "CVaR 95% (Shortfall)",
+                    fmt_eur_it(mc_adv['cvar_95_val_eur']),
+                    f"Perdita Media: -{mc_adv['cvar_95_pct']:.2f}%",
+                    False,
+                    help_text="Expected Shortfall: perdita media attesa qualora si verifichi uno shock oltre il VaR 95%."
                 )
             with mk5:
                 metric_card(
-                    "Prob. Guadagno",
+                    "Probabilità Profitto",
                     f"{mc_adv['prob_profit_pct']:.1f}%",
-                    delta=f"{n_sims_val:,} Percorsi",
-                    positive=(mc_adv['prob_profit_pct'] >= 50.0),
-                    help_text="Percentuale di traiettorie stocastiche che si concludono con rendimento positivo."
+                    "3.000 Simulazioni",
+                    mc_adv['prob_profit_pct'] >= 50.0,
+                    help_text="Frazione di percorsi stocastici che registrano un valore finale superiore al capitale iniziale."
                 )
 
             st.divider()
@@ -1586,25 +1586,25 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
 
             fig_hist_mc.add_vline(
                 x=cvar95_v, line_dash="dot", line_color="#ff3333", line_width=2,
-                annotation_text=f"<b>CVaR 95%</b>: € {cvar95_v:,.0f}", 
+                annotation_text=f"<b>CVaR 95%</b>: {fmt_eur_it(cvar95_v)}", 
                 annotation_position="top left",
                 annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff3333", borderwidth=1, borderpad=4, font=dict(color="#ff5252", size=11))
             )
             fig_hist_mc.add_vline(
                 x=var95_v, line_dash="dash", line_color="#ff9900", line_width=2,
-                annotation_text=f"<b>VaR 95%</b>: € {var95_v:,.0f}", 
+                annotation_text=f"<b>VaR 95%</b>: {fmt_eur_it(var95_v)}", 
                 annotation_position="top left",
                 annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#ff9900", borderwidth=1, borderpad=4, font=dict(color="#ffab40", size=11), yshift=-35)
             )
             fig_hist_mc.add_vline(
                 x=init_v, line_dash="dash", line_color="#ffffff", line_width=1.8,
-                annotation_text=f"<b>Capitale Iniziale</b>: € {init_v:,.0f}", 
+                annotation_text=f"<b>Capitale Iniziale</b>: {fmt_eur_it(init_v)}", 
                 annotation_position="top right",
                 annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="rgba(255, 255, 255, 0.35)", borderwidth=1, borderpad=4, font=dict(color="#ffffff", size=11))
             )
             fig_hist_mc.add_vline(
                 x=med_v, line_dash="solid", line_color="#00ff99", line_width=2.2,
-                annotation_text=f"<b>Mediana Attesa</b>: € {med_v:,.0f}", 
+                annotation_text=f"<b>Mediana Attesa</b>: {fmt_eur_it(med_v)}", 
                 annotation_position="top right",
                 annotation=dict(bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#00ff99", borderwidth=1, borderpad=4, font=dict(color="#00e676", size=11), yshift=-35)
             )
