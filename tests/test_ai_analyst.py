@@ -96,3 +96,23 @@ def test_query_argus_assistant_offline_intents(dummy_results):
 
     ans_empty = query_argus_assistant("", dummy_results)
     assert "Inserisci una domanda" in ans_empty
+
+
+def test_ai_analyst_fama_french_and_rates_enrichment(dummy_results):
+    """Verifica che il memorandum incorpori l'attribuzione Fama-French e il tasso risk-free."""
+    if "market_risk" not in dummy_results["metrics"]:
+        dummy_results["metrics"]["market_risk"] = {}
+    dummy_results["metrics"]["market_risk"]["ff_alpha_pct"] = 2.45
+    dummy_results["metrics"]["market_risk"]["smb_tilt"] = 0.35
+    dummy_results["metrics"]["market_risk"]["hml_tilt"] = -0.20
+    dummy_results["risk_free"] = {"rate_pct": 3.15, "currency": "EUR"}
+    dummy_results["options_hedging"] = {"covered_call": {"incasso_eseguibile_eur": 1250.0}}
+
+    memo = generate_portfolio_narrative_memorandum(dummy_results, provider="offline")
+    assert memo is not None
+    full_text = memo["full_text"]
+    assert "Fama-French" in full_text
+    assert "+2.45%" in full_text
+    assert "3.15%" in full_text
+    assert "Covered Call" in full_text or "1,250.00" in full_text
+

@@ -61,10 +61,54 @@ def _calc_bm25_score(
     return score
 
 
+def _calc_cosine_tfidf_score(
+    q_tokens: List[str],
+    doc_tokens: List[str],
+    doc_freqs: Dict[str, int],
+    total_docs: int
+) -> float:
+    """Calcola la similarità coseno densa ponderata TF-IDF tra la query e il documento."""
+    if not q_tokens or not doc_tokens:
+        return 0.0
+
+    tf_q: Dict[str, float] = {}
+    for t in q_tokens:
+        tf_q[t] = tf_q.get(t, 0.0) + 1.0
+
+    tf_d: Dict[str, float] = {}
+    for t in doc_tokens:
+        tf_d[t] = tf_d.get(t, 0.0) + 1.0
+
+    dot_product = 0.0
+    norm_q_sq = 0.0
+    norm_d_sq = 0.0
+
+    for t, tf in tf_q.items():
+        df = doc_freqs.get(t, 1)
+        idf = math.log(1.0 + float(total_docs) / float(df + 0.5))
+        w_q = (1.0 + math.log(tf)) * idf
+        norm_q_sq += w_q * w_q
+
+        if t in tf_d:
+            w_d = (1.0 + math.log(tf_d[t])) * idf
+            dot_product += w_q * w_d
+
+    for t, tf in tf_d.items():
+        df = doc_freqs.get(t, 1)
+        idf = math.log(1.0 + float(total_docs) / float(df + 0.5))
+        w_d = (1.0 + math.log(tf)) * idf
+        norm_d_sq += w_d * w_d
+
+    if norm_q_sq <= 1e-9 or norm_d_sq <= 1e-9:
+        return 0.0
+
+    return float(dot_product / (math.sqrt(norm_q_sq) * math.sqrt(norm_d_sq)))
+
+
 class LocalFilingVectorStore:
     """
     Vector Store leggero in-memory per documenti finanziari basato su BM25 / TF-IDF
-    e similarità del coseno, ottimizzato per latenze sub-millisecondo senza dipendenze esterne.
+    e similarità del coseno con Reciprocal Rank Fusion (RRF), ottimizzato per latenze sub-millisecondo.
     """
     def __init__(self):
         self.chunks: List[Dict[str, Any]] = []
@@ -96,7 +140,8 @@ class LocalFilingVectorStore:
         top_k: int = 4
     ) -> List[Tuple[Dict[str, Any], float]]:
         """
-        Esegue la ricerca semantica con ranking ibrido BM25 e Cosine TF-IDF.
+        Esegue la ricerca semantica ibrida combinando BM25 e Cosine TF-IDF
+        con Reciprocal Rank Fusion (RRF, k=60).
         """
         if not self.chunks:
             return []
@@ -105,7 +150,7 @@ class LocalFilingVectorStore:
         if not q_tokens:
             return []
 
-        scores = []
+        candidates = []
         for c in self.chunks:
             if ticker_filter and c.get("ticker", "").upper() != ticker_filter.upper():
                 continue
@@ -113,15 +158,51 @@ class LocalFilingVectorStore:
                 c_sec = c.get("section", "")
                 if section_filter.lower() not in c_sec.lower():
                     continue
+            candidates.append(c)
 
-            score = _calc_bm25_score(
+        if not candidates:
+            return []
+
+        # 1. Punteggi BM25
+        bm25_scores = []
+        for c in candidates:
+            s_bm25 = _calc_bm25_score(
                 q_tokens, c["_tokens"], c["_len"], self.avg_doc_len, self.doc_freqs, self.total_docs
             )
-            if score > 0:
-                scores.append((c, score))
+            bm25_scores.append((c, s_bm25))
 
-        scores.sort(key=lambda x: x[1], reverse=True)
-        return scores[:top_k]
+        # 2. Punteggi Cosine TF-IDF
+        cosine_scores = []
+        for c in candidates:
+            s_cos = _calc_cosine_tfidf_score(
+                q_tokens, c["_tokens"], self.doc_freqs, self.total_docs
+            )
+            cosine_scores.append((c, s_cos))
+
+        # 3. Reciprocal Rank Fusion (RRF, standard k=60)
+        bm25_sorted = sorted(bm25_scores, key=lambda x: x[1], reverse=True)
+        cosine_sorted = sorted(cosine_scores, key=lambda x: x[1], reverse=True)
+
+        rank_bm25 = {id(doc): idx + 1 for idx, (doc, sc) in enumerate(bm25_sorted) if sc > 0}
+        rank_cos = {id(doc): idx + 1 for idx, (doc, sc) in enumerate(cosine_sorted) if sc > 0}
+
+        rrf_results = []
+        for c in candidates:
+            doc_id = id(c)
+            r_b = rank_bm25.get(doc_id)
+            r_c = rank_cos.get(doc_id)
+
+            if r_b is not None or r_c is not None:
+                score_rrf = 0.0
+                if r_b is not None:
+                    score_rrf += 1.0 / (60.0 + r_b)
+                if r_c is not None:
+                    score_rrf += 1.0 / (60.0 + r_c)
+
+                rrf_results.append((c, score_rrf * 100.0))
+
+        rrf_results.sort(key=lambda x: x[1], reverse=True)
+        return rrf_results[:top_k]
 
 
 def _get_preset_sec_texts(ticker_upper: str) -> Dict[str, str]:

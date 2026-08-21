@@ -80,3 +80,27 @@ def test_query_sec_filings_rag_empty_inputs():
 
     res_no_match = query_sec_filings_rag("AAPL", "xyz_quantum_superconducting_anomaly_9999")
     assert res_no_match["found"] is False
+
+
+def test_reciprocal_rank_fusion_logic():
+    """Verifica che la combinazione RRF assegni punteggi coerenti a match multi-termine."""
+    store = LocalFilingVectorStore()
+    store.add_documents([
+        {
+            "ticker": "TECH",
+            "section": "Item 1: Overview",
+            "content": "Cloud hyperscaler platform computing and developer ecosystem.",
+        },
+        {
+            "ticker": "TECH",
+            "section": "Item 8: Notes",
+            "content": "Unsecured debt maturities and cash marketable securities.",
+        }
+    ])
+    # Ricerca con termini distribuiti
+    res = store.search("cloud developer platform", ticker_filter="TECH", top_k=2)
+    assert len(res) >= 1
+    top_doc, score = res[0]
+    assert top_doc["section"] == "Item 1: Overview"
+    assert score > 0.0
+
