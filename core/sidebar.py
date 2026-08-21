@@ -74,7 +74,7 @@ NAV_MODULES = [
             {"label": "🪦 Posizioni Chiuse & Graveyard", "target": "🪦 Posizioni Chiuse & Graveyard"},
             {"label": "📅 Proiezione Dividendi", "target": "📅 Proiezione Dividendi"},
             {"label": "💰 Ottimizzazione Fiscale", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)"},
-            {"label": "⚡ Impatto Almgren-Chriss", "target": "⚡ Impatto di Mercato (Almgren-Chriss)"}
+            {"label": "⚡ Liquidità Almgren-Chriss", "target": "⚡ Liquidità Almgren-Chriss"}
         ]
     },
     {
