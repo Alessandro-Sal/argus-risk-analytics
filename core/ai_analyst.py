@@ -157,6 +157,15 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
         except Exception:
             advisor_score = 80
 
+    # 12. Fama-French Factor Attributions & Yield Curve Context
+    ff_alpha = float(mr_m.get("ff_alpha_pct", mr_m.get("fama_french_alpha_pct", m.get("ff_alpha_pct", 0.0))) or 0.0)
+    ff_beta = float(mr_m.get("ff_beta_mkt", mr_m.get("beta_mkt", m.get("ff_beta_mkt", beta))) or beta)
+    smb_val = float(mr_m.get("smb_tilt", mr_m.get("size_smb", m.get("smb_tilt", 0.0))) or 0.0)
+    hml_val = float(mr_m.get("hml_tilt", mr_m.get("value_hml", m.get("hml_tilt", 0.0))) or 0.0)
+
+    rf_rate = float(results.get("risk_free", {}).get("rate_pct", 2.75) if isinstance(results.get("risk_free"), dict) else 2.75)
+    opt_inc = float(results.get("options_hedging", {}).get("covered_call", {}).get("incasso_eseguibile_eur", 0.0) if isinstance(results.get("options_hedging"), dict) else 0.0)
+
     return {
         "portfolio_value_eur": round(val_eur, 2),
         "cagr_pct": round(cagr, 2),
@@ -173,6 +182,12 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
         "health_score": advisor_score,
         "market_regime": regime,
         "anomalies_detected": anomalies_cnt,
+        "ff_alpha_pct": round(ff_alpha, 2),
+        "ff_beta_mkt": round(ff_beta, 2),
+        "smb_tilt": round(smb_val, 2),
+        "hml_tilt": round(hml_val, 2),
+        "rf_rate_pct": round(rf_rate, 2),
+        "covered_call_income_eur": round(opt_inc, 2),
         "top_holdings": top_holdings,
         "benchmark": results.get("benchmark", "SPY"),
         "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -197,6 +212,11 @@ def _generate_deterministic_memorandum(ctx: dict) -> dict:
     regime = ctx.get("market_regime", "Trend Ordinario")
     top_h = ctx.get("top_holdings", [])
     bm = ctx.get("benchmark", "SPY")
+    ff_alpha = ctx.get("ff_alpha_pct", 0.0)
+    smb = ctx.get("smb_tilt", 0.0)
+    hml = ctx.get("hml_tilt", 0.0)
+    rf_rate = ctx.get("rf_rate_pct", 2.75)
+    cc_inc = ctx.get("covered_call_income_eur", 0.0)
 
     # Giudizio sintetico
     if sharpe >= 1.5:
@@ -213,27 +233,33 @@ def _generate_deterministic_memorandum(ctx: dict) -> dict:
         f"Al controvalore attuale di **€ {val:,.2f}**, il portafoglio evidenzia un {perf_verdict}. "
         f"Il rendimento annuo composto (**CAGR**) si attesta al **{cagr:+.2f}%** (rendimento cumulato totale del **{tot_ret:+.2f}%**), "
         f"a fronte di una volatilità storica annualizzata del **{vol:.2f}%**. "
-        f"L'indice di Sharpe pari a **{sharpe:.2f}** e l'indice di Sortino pari a **{sortino:.2f}** confermano una buona asimmetria "
-        f"a favore dei rendimenti positivi rispetto alle oscillazioni ribassiste."
+        f"L'indice di Sharpe pari a **{sharpe:.2f}** (rispetto a un tasso risk-free privo di rischio del **{rf_rate:.2f}%**) "
+        f"e l'indice di Sortino pari a **{sortino:.2f}** confermano una buona asimmetria a favore dei rendimenti positivi."
     )
 
-    # Sezione 2: Profilo di Rischio & Code di Perdita
+    # Sezione 2: Profilo di Rischio & Decomposizione Fattoriale Kenneth French
     if hhi > 0.25:
         conc_warn = f"Si segnala un'elevata concentrazione specifica (Indice HHI pari a **{hhi:.3f}**), guidata dalle prime posizioni in portafoglio."
     else:
         conc_warn = f"Il grado di diversificazione risulta soddisfacente (HHI: **{hhi:.3f}**, Diversification Ratio: **{div_r:.2f}**)."
+
+    ff_narrative = (
+        f"La decomposizione econometrica multifattoriale di Fama-French indica un'Alpha annualizzato di **{ff_alpha:+.2f}%**, "
+        f"con un tilt dimensionale Size (SMB) di **{smb:+.2f}** e un fattore Value (HML) di **{hml:+.2f}**."
+    )
 
     top_names = ", ".join([f"{h['ticker']} ({h['weight_pct']}%)" for h in top_h[:3]]) if top_h else "asset principali"
     sec2 = (
         f"Sul fronte del rischio di mercato, il **Value at Risk giornaliero al 95% (VaR 95%)** è stimato al **{var_95:.2f}%** "
         f"(pari a una perdita massima attesa in una singola seduta ordinaria di circa € {val * var_95 / 100:,.2f}). "
         f"Nello scenario di shock di coda, l'**Expected Shortfall (CVaR 95%)** sale al **{cvar_95:.2f}%** (€ {val * cvar_95 / 100:,.2f}). "
-        f"Il Beta sistemico verso {bm} è pari a **{beta:.2f}**. {conc_warn} Le prime esposizioni per peso sono {top_names}."
+        f"Il Beta sistemico verso {bm} è pari a **{beta:.2f}**. {ff_narrative} {conc_warn} Le prime esposizioni per peso sono {top_names}."
     )
 
-    # Sezione 3: Regime Macro & Salute Strutturale
+    # Sezione 3: Regime Macro, Curva dei Tassi & Diagnostica Strutturale
     sec3 = (
-        f"L'algoritmo di classificazione di regime macro identifica attualmente una fase di **{regime}**. "
+        f"L'algoritmo di classificazione di regime macro identifica attualmente una fase di **{regime}**, "
+        f"in un contesto di curva dei tassi sovrani con hurdle rate calibrato al **{rf_rate:.2f}%**. "
         f"L'**Health Score complessivo di ARGUS** assegna un punteggio di **{score}/100**, riflettendo la tenuta dello "
         f"storico Drawdown (massima flessione storica registrata: **{max_dd:.2f}%**). "
         f"I modelli di diagnostica contabile (Altman Z-Score e Beneish M-Score) non rilevano anomalie sistemiche di manipolazione o default a breve termine."
@@ -245,6 +271,8 @@ def _generate_deterministic_memorandum(ctx: dict) -> dict:
         recs.append("Valutare il ribilanciamento verso pesi di Max Sharpe o Equal Risk Contribution per comprimere la varianza specifica.")
     if beta > 1.15:
         recs.append(f"Considerare una strategia di Delta-Hedging con opzioni Put su {bm} per immunizzare l'extra-beta nei periodi di alta volatilità.")
+    if cc_inc > 0.0:
+        recs.append(f"Valutare un overlay di Covered Call sui lotti azionari da 100 quote per generare fino a € {cc_inc:,.2f} di rendimento addizionale.")
     if hhi > 0.20:
         recs.append("Riallocare parzialmente le posizioni sovrappesate verso settori decorrelati per incrementare il Diversification Ratio.")
     if not recs:
