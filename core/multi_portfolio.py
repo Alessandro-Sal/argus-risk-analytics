@@ -497,6 +497,7 @@ def consolidate_multi_portfolios(
     all_bm_series = []
     all_price_dfs = []
     all_asset_returns = []
+    all_tx_dfs = []
 
     for prof in profiles:
         r_ser = _get_portfolio_return_series(prof)
@@ -515,6 +516,19 @@ def consolidate_multi_portfolios(
                 all_price_dfs.append(rf["df_prices"])
             if "returns" in rf and isinstance(rf["returns"], pd.DataFrame):
                 all_asset_returns.append(rf["returns"])
+            tx_cand = rf.get("df_tx") if isinstance(rf.get("df_tx"), pd.DataFrame) else (rf.get("df_tx_raw") if isinstance(rf.get("df_tx_raw"), pd.DataFrame) else None)
+            if tx_cand is not None and not tx_cand.empty:
+                all_tx_dfs.append(tx_cand)
+        elif "df_tx" in prof and isinstance(prof["df_tx"], pd.DataFrame) and not prof["df_tx"].empty:
+            all_tx_dfs.append(prof["df_tx"])
+
+    if all_tx_dfs:
+        master_df_tx = pd.concat(all_tx_dfs, ignore_index=True)
+        if "tx_date" in master_df_tx.columns:
+            master_df_tx["tx_date"] = pd.to_datetime(master_df_tx["tx_date"])
+            master_df_tx = master_df_tx.sort_values(["tx_date", "tx_id"] if "tx_id" in master_df_tx.columns else ["tx_date"]).reset_index(drop=True)
+    else:
+        master_df_tx = pd.DataFrame()
 
     if all_returns_series:
         cleaned_returns = []
@@ -561,7 +575,7 @@ def consolidate_multi_portfolios(
 
     # 3. Calcolo Completo Metriche Quantitative Standard ARGUS
     market_risk_res = _calc_market_risk(master_returns, master_bm_returns, benchmark_ticker="SPY", risk_free_rate=active_rf_rate)
-    return_metrics_res = _calc_return_metrics(master_returns, master_bm_returns, pd.DataFrame(), df_positions, risk_free_rate=active_rf_rate)
+    return_metrics_res = _calc_return_metrics(master_returns, master_bm_returns, master_df_tx, df_positions, risk_free_rate=active_rf_rate)
     concentration_res = _calc_concentration(df_positions)
 
     cum_ret = float(return_metrics_res.get("total_return_pct", 0.0) or 0.0) / 100.0
@@ -609,7 +623,12 @@ def consolidate_multi_portfolios(
     opt_master = _compute_efficient_frontier(combined_asset_returns, df_positions, risk_free_rate=active_rf_rate)
 
     from core.closed_trades import compute_closed_trades_journal
-    closed_trades_master = compute_closed_trades_journal(df_tx=pd.DataFrame(), df_positions=df_positions, is_sandbox=True)
+    closed_trades_master = compute_closed_trades_journal(
+        df_tx=master_df_tx,
+        df_prices=combined_prices,
+        df_positions=df_positions,
+        is_sandbox=False
+    )
 
     return {
         "portfolio_id": -99,
@@ -618,6 +637,8 @@ def consolidate_multi_portfolios(
         "is_sandbox": False,
         "portfolio_name": f"Master Portfolio ({names_str})",
         "positions": df_positions,
+        "df_tx": master_df_tx,
+        "df_tx_raw": master_df_tx,
         "returns": combined_asset_returns,
         "portfolio_return": master_returns,
         "benchmark_return": master_bm_returns,
