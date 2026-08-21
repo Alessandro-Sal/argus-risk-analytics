@@ -1350,45 +1350,73 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     )
     st.plotly_chart(fig_term, use_container_width=True)
 
-    # Parametri di calibrazione
+    # Parametri di calibrazione con tabelle HTML responsive (Zero Scrollbar)
     with st.expander("🔬 Dettaglio Parametri Econometrici GARCH(1,1) & Test di Verosimiglianza"):
         col_p1, col_p2 = st.columns(2)
         with col_p1:
-            df_params = pd.DataFrame({
-                "Parametro Econometrico": [
-                    "Costante di Fondo (ω)",
-                    "Termine ARCH / News Shock (α)",
-                    "Termine GARCH / Persistenza (β)",
-                    "Persistenza Globale (α + β)",
-                    "Rendimento Medio Giornaliero (μ)"
-                ],
-                "Valore Stimato": [
-                    f"{fit_data['omega']:.8f}",
-                    f"{fit_data['alpha']:.5f}",
-                    f"{fit_data['beta']:.5f}",
-                    f"{fit_data['persistence']:.5f}",
-                    f"{fit_data['mu']*100:.4f}%"
-                ]
-            })
-            st.dataframe(df_params, use_container_width=True, hide_index=True)
+            st.markdown(f"""
+            <div style="background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px 18px; margin-bottom: 6px;">
+                <div style="font-size: 12px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px;">
+                    PARAMETRI ECONOMETRICI STIMATI
+                </div>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Costante di Fondo (&omega;)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['omega']:.8f}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Termine ARCH / News Shock (&alpha;)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['alpha']:.5f}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Termine GARCH / Persistenza (&beta;)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['beta']:.5f}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1; font-weight: 600;">Persistenza Globale (&alpha; + &beta;)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 700; color: #4ade80;">{fit_data['persistence']:.5f}</td>
+                    </tr>
+                    <tr style="height: 32px;">
+                        <td style="color: #cbd5e1;">Rendimento Medio Giornaliero (&mu;)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['mu']*100:.4f}%</td>
+                    </tr>
+                </table>
+            </div>
+            """, unsafe_allow_html=True)
+            
         with col_p2:
-            df_stats = pd.DataFrame({
-                "Metrica di Diagnostica": [
-                    "Status di Convergenza Ottimizzatore",
-                    "Log-Likelihood Massimizzata",
-                    "Akaike Information Criterion (AIC)",
-                    "Bayesian Information Criterion (BIC)",
-                    "Tempo di Dimezzamento Shock (Half-Life)"
-                ],
-                "Valore": [
-                    "🟢 Convergenza Raggiunta (SLSQP)" if fit_data["converged"] else "🟡 Fallback Parametrico Robusto",
-                    f"{fit_data['log_likelihood']:.2f}",
-                    f"{fit_data['aic']:.2f}",
-                    f"{fit_data['bic']:.2f}",
-                    f"{fit_data['half_life_days']:.1f} giorni lavorativi" if fit_data['half_life_days'] < 500 else "N/A"
-                ]
-            })
-            st.dataframe(df_stats, use_container_width=True, hide_index=True)
+            conv_status = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">🟢 Convergenza (SLSQP)</span>' if fit_data["converged"] else '<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;">🟡 Fallback Robusto</span>'
+            hl_str = f"{fit_data['half_life_days']:.1f} giorni lavorativi" if fit_data['half_life_days'] < 500 else "Memoria ultra-lunga"
+            
+            st.markdown(f"""
+            <div style="background: rgba(18, 24, 38, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 14px 18px; margin-bottom: 6px;">
+                <div style="font-size: 12px; font-weight: 700; color: #94a3b8; letter-spacing: 0.5px; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 6px;">
+                    DIAGNOSTICA & TEST DI VEROSIMIGLIANZA
+                </div>
+                <table style="width: 100%; font-size: 13px; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Status Ottimizzatore</td>
+                        <td style="text-align: right;">{conv_status}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Log-Likelihood (LLF)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['log_likelihood']:.2f}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Criterio AIC (Akaike)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['aic']:.2f}</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: 32px;">
+                        <td style="color: #cbd5e1;">Criterio BIC (Bayesiano)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8;">{fit_data['bic']:.2f}</td>
+                    </tr>
+                    <tr style="height: 32px;">
+                        <td style="color: #cbd5e1;">Dimezzamento Shock (Half-Life)</td>
+                        <td style="text-align: right; font-family: monospace; font-weight: 600; color: #facc15;">{hl_str}</td>
+                    </tr>
+                </table>
+            </div>
+            """, unsafe_allow_html=True)
 
 
 # ==============================================================================
