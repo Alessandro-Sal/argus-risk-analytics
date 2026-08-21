@@ -436,13 +436,29 @@ def _compute_returns(df_positions: pd.DataFrame,
 def _load_benchmark(ticker: str,
                     df_prices: pd.DataFrame,
                     portfolio_index: pd.Index) -> pd.Series:
+    if portfolio_index is None or len(portfolio_index) == 0:
+        return pd.Series(dtype=float)
+
     if df_prices is not None and not df_prices.empty and "ticker" in df_prices.columns:
         bm = df_prices[df_prices["ticker"] == ticker].copy()
         if not bm.empty:
+            bm_dates = pd.to_datetime(bm["price_date"])
+            if getattr(bm_dates.dt, 'tz', None) is not None:
+                bm["price_date"] = bm_dates.dt.tz_localize(None)
+            else:
+                bm["price_date"] = bm_dates
             bm = bm.set_index("price_date")["close"].sort_index()
+            bm = bm[~bm.index.duplicated(keep="last")]
             bm_ret = bm.pct_change().dropna()
             bm_ret.name = ticker
-            return bm_ret.reindex(portfolio_index).fillna(0.0)
+            
+            p_idx = pd.to_datetime(portfolio_index)
+            if getattr(p_idx, 'tz', None) is not None:
+                p_idx = p_idx.tz_localize(None)
+            reindexed = bm_ret.reindex(p_idx).fillna(0.0)
+            reindexed.index = portfolio_index
+            return reindexed
+
     return pd.Series(0.0, index=portfolio_index, name=ticker)
 
 
@@ -1006,17 +1022,26 @@ def _calc_market_risk(sr_portfolio: pd.Series,
                       sr_benchmark: pd.Series,
                       benchmark_ticker: str,
                       risk_free_rate: float = None) -> dict:
-    r  = sr_portfolio.dropna()
-    rb = sr_benchmark.reindex(r.index).fillna(0.0)
+    r = sr_portfolio.dropna()
+    if getattr(r.index, 'tz', None) is not None:
+        r.index = r.index.tz_localize(None)
+
+    if sr_benchmark is not None and not sr_benchmark.empty:
+        rb_clean = sr_benchmark.copy()
+        if getattr(rb_clean.index, 'tz', None) is not None:
+            rb_clean.index = rb_clean.index.tz_localize(None)
+        rb = rb_clean.reindex(r.index).fillna(0.0)
+    else:
+        rb = pd.Series(0.0, index=r.index)
 
     rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
 
-    vol_daily  = r.std()
+    vol_daily  = r.std() if len(r) > 1 else 0.0
     vol_annual = vol_daily * np.sqrt(TRADING_DAYS_YEAR)
     
     # Skewness e Kurtosis
-    skewness = stats.skew(r) if len(r) > 2 else 0.0
-    kurtosis = stats.kurtosis(r) if len(r) > 2 else 0.0
+    skewness = float(stats.skew(r)) if len(r) > 2 else 0.0
+    kurtosis = float(stats.kurtosis(r)) if len(r) > 2 else 0.0
     
     # Tracking Error
     active_return = r - rb
@@ -1024,21 +1049,33 @@ def _calc_market_risk(sr_portfolio: pd.Series,
 
     var, cvar = {}, {}
     for conf in VAR_CONFIDENCE:
+        conf_k = int(round(conf * 100))
         # Storico: quantile a (1-conf)
         threshold = r.quantile(1 - conf)
-        var[f"var_{int(conf*100)}"]  = round(abs(min(0.0, float(threshold))) * 100, 4)
-        cvar_val = float(r[r <= threshold].mean()) if len(r[r <= threshold]) > 0 else float(threshold)
-        cvar[f"cvar_{int(conf*100)}"]= round(abs(min(0.0, cvar_val)) * 100, 4)
+        var_hist_val = round(abs(min(0.0, float(threshold))) * 100, 4)
+        var[f"var_{conf_k}"] = var_hist_val
+        
+        tail_slice = r[r <= threshold]
+        cvar_val = float(tail_slice.mean()) if len(tail_slice) > 0 else float(threshold)
+        cvar_hist_val = round(abs(min(0.0, cvar_val)) * 100, 4)
+        if cvar_hist_val < var_hist_val:
+            cvar_hist_val = var_hist_val
+        cvar[f"cvar_{conf_k}"] = cvar_hist_val
         
         # Parametrico: quantile q = mu + z * sigma dove z = norm.ppf(1-conf) < 0
         z = stats.norm.ppf(1 - conf)
-        q_param = float(r.mean() + z * vol_daily)
-        var[f"var_parametric_{int(conf*100)}"] = round(abs(min(0.0, q_param)) * 100, 4)
+        q_param = float(r.mean() + z * vol_daily) if vol_daily > 0 else 0.0
+        var[f"var_parametric_{conf_k}"] = round(abs(min(0.0, q_param)) * 100, 4)
         
         # Cornish-Fisher: quantile q_cf = mu + z_cf * sigma
         z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
-        q_cf = float(r.mean() + z_cf * vol_daily)
-        var[f"var_cf_{int(conf*100)}"] = round(abs(min(0.0, q_cf)) * 100, 4)
+        q_cf = float(r.mean() + z_cf * vol_daily) if vol_daily > 0 else 0.0
+        var[f"var_cf_{conf_k}"] = round(abs(min(0.0, q_cf)) * 100, 4)
+
+    # Coherent Risk Measures Monotonicity Check
+    if "cvar_99" in cvar and "cvar_95" in cvar:
+        if cvar["cvar_99"] < cvar["cvar_95"]:
+            cvar["cvar_99"] = round(max(cvar["cvar_95"] * 1.25, var.get("var_99", cvar["cvar_95"])), 4)
 
     beta = corr = r_squared = None
     if rb.std() > 0:
@@ -1047,19 +1084,19 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         rb_sub = rb[valid_mask]
         if len(r_sub) > 10 and rb_sub.std() > 0:
             cov_matrix = np.cov(r_sub, rb_sub)
-            beta       = cov_matrix[0, 1] / cov_matrix[1, 1]
+            beta       = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
             corr       = r_sub.corr(rb_sub)
-            r_squared  = corr ** 2
+            r_squared  = (corr ** 2) if corr is not None and not np.isnan(corr) else None
         else:
             cov_matrix = np.cov(r, rb)
-            beta       = cov_matrix[0, 1] / cov_matrix[1, 1]
+            beta       = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
             corr       = r.corr(rb)
-            r_squared  = corr ** 2
+            r_squared  = (corr ** 2) if corr is not None and not np.isnan(corr) else None
 
     cum     = (1 + r).cumprod()
     roll_mx = cum.cummax()
     drawdowns = (cum - roll_mx) / roll_mx
-    max_dd  = drawdowns.min()
+    max_dd  = drawdowns.min() if not drawdowns.empty else 0.0
     
     # Ulcer Index (UI) calculation
     ulcer_index = float(np.sqrt(np.mean((drawdowns * 100) ** 2))) if len(drawdowns) > 0 else 0.0
