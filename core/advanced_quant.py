@@ -151,7 +151,7 @@ def compute_kelly_criterion_sizing(
     """
     Calcola l'allocazione ottimale secondo il Criterio di Kelly (Full Kelly, Half-Kelly, Quarter-Kelly).
     
-    Formula Continua: f* = (μ - Rf) / σ^2
+    Formula Continua: f* = max(0, (μ - Rf) / σ^2)
     Formula Bernoulli: f* = (p * (b + 1) - 1) / b
     dove p = win rate, b = rapporto medio vincita/perdita.
     """
@@ -162,76 +162,111 @@ def compute_kelly_criterion_sizing(
     if returns_df is None or returns_df.empty:
         return pd.DataFrame()
 
-    clean_df = returns_df.dropna()
-    if clean_df.empty:
-        return pd.DataFrame()
-
     cur_w = current_weights or {}
-    results = []
+    raw_stats = []
+    raw_f_stars = {}
 
-    for col in clean_df.columns:
-        r_series = clean_df[col].dropna()
+    for col in returns_df.columns:
+        r_series = returns_df[col].dropna()
         if len(r_series) < 15:
             continue
 
-        mean_daily = r_series.mean()
-        std_daily = r_series.std()
+        mean_daily = float(r_series.mean())
+        std_daily = float(r_series.std())
         
         # Annualizzazione
         ann_mu = mean_daily * 252.0
         ann_vol = std_daily * np.sqrt(252.0)
-        ann_var = (ann_vol ** 2.0) if ann_vol > 0 else 0.0001
+        ann_var = (ann_vol ** 2.0) if ann_vol > 1e-6 else 0.0001
 
-        # Metriche Bernoulli
-        pos_ret = r_series[r_series > 0]
-        neg_ret = r_series[r_series < 0]
+        # Metriche Bernoulli su sedute attive (escludendo rendimenti flat a 0)
+        active_r = r_series[r_series.abs() > 1e-6]
+        if len(active_r) < 10:
+            active_r = r_series
+            
+        pos_ret = active_r[active_r > 0]
+        neg_ret = active_r[active_r < 0]
         
-        win_rate = len(pos_ret) / len(r_series) if len(r_series) > 0 else 0.5
-        avg_win = pos_ret.mean() if len(pos_ret) > 0 else 0.001
-        avg_loss = abs(neg_ret.mean()) if len(neg_ret) > 0 else 0.001
-        b_ratio = avg_win / avg_loss if avg_loss > 0 else 1.0
+        win_rate = float(len(pos_ret) / len(active_r)) if len(active_r) > 0 else 0.5
+        avg_win = float(pos_ret.mean()) if len(pos_ret) > 0 else 0.001
+        avg_loss = float(abs(neg_ret.mean())) if len(neg_ret) > 0 else 0.001
+        b_ratio = (avg_win / avg_loss) if avg_loss > 0 else 1.0
 
-        # Kelly Continuo (Gaussian / Modern Portfolio Theory)
+        # Kelly Continuo (Excess Return / Varianza)
         excess_ret = ann_mu - risk_free_rate
-        f_continuous = excess_ret / ann_var if ann_var > 0 else 0.0
+        f_continuous = (excess_ret / ann_var) if (excess_ret > 0 and ann_var > 0) else 0.0
 
-        # Kelly Discreto (Bernoulli)
-        f_bernoulli = (win_rate * (b_ratio + 1.0) - 1.0) / b_ratio if b_ratio > 0 else 0.0
+        # Kelly Discreto (Bernoulli Edge)
+        b_edge = (win_rate * (b_ratio + 1.0) - 1.0)
+        f_bernoulli = (b_edge / b_ratio) if (b_edge > 0 and b_ratio > 0) else 0.0
 
-        # Robust Blend
-        f_star_raw = 0.5 * f_continuous + 0.5 * f_bernoulli if f_continuous > 0 and f_bernoulli > 0 else max(0.0, f_continuous)
+        # Kelly robusto (se excess return <= 0, f* = 0)
+        if excess_ret <= 0:
+            f_star = 0.0
+        elif f_bernoulli > 0 and f_continuous > 0:
+            f_star = float(0.7 * f_continuous + 0.3 * f_bernoulli)
+        else:
+            f_star = float(f_continuous)
+
+        raw_f_stars[col] = max(0.0, f_star)
+        raw_stats.append({
+            "ticker": col,
+            "ann_mu": ann_mu,
+            "ann_vol": ann_vol,
+            "win_rate": win_rate,
+            "b_ratio": b_ratio,
+            "f_star": f_star,
+            "act_w": float(cur_w.get(col, 0.0))
+        })
+
+    if not raw_stats:
+        return pd.DataFrame()
+
+    # Normalizzazione Multi-Asset a somma 100% per target di portafoglio
+    tot_f = sum(raw_f_stars.values())
+    results = []
+
+    for item in raw_stats:
+        t = item["ticker"]
+        f_val = item["f_star"]
+        act_w = item["act_w"]
         
-        # Vincolo a valori positivi non a leva illimitata
-        full_kelly = float(np.clip(f_star_raw, 0.0, 1.5))
-        half_kelly = full_kelly / 2.0
-        quarter_kelly = full_kelly / 4.0
-
-        act_w = cur_w.get(col, 0.0)
-
+        # Target Normalizzato di Portafoglio
+        norm_target_w = (f_val / tot_f) if tot_f > 0 else (1.0 / len(raw_stats))
+        half_kelly_w = norm_target_w
+        quarter_kelly_w = norm_target_w * 0.5
+        
+        # Standalone Kelly (con leva)
+        standalone_full = f_val
+        standalone_half = f_val * 0.5
+        
         # Delta & Diagnostica
-        delta_w = act_w - half_kelly
-        if act_w > full_kelly:
-            status = "🔴 Sovra-Allocato (Alto Rischio Drawdown)"
-        elif act_w < quarter_kelly and full_kelly > 0.15:
-            status = "🟢 Sotto-Allocato (Margine di Espansione)"
+        delta_w = act_w - half_kelly_w
+        if f_val <= 1e-4:
+            status = "⛔ Nessun Edge (Rf > Rendimento)"
+        elif act_w > (half_kelly_w * 1.5):
+            status = "🔴 Sovra-Allocato (Alto Rischio)"
+        elif act_w < (half_kelly_w * 0.6) and half_kelly_w > 0.03:
+            status = "🟢 Sotto-Allocato (Margine Espansione)"
         else:
             status = "⚪ Equilibrato (Zona Half-Kelly)"
 
         results.append({
-            "Ticker": col,
-            "Rendimento Annuo": f"{ann_mu * 100:+.2f}%",
-            "Volatilità Annua": f"{ann_vol * 100:.2f}%",
-            "Win Rate": f"{win_rate * 100:.1f}%",
-            "Win/Loss Ratio": f"{b_ratio:.2f}x",
+            "Ticker": t,
+            "Rendimento Annuo": f"{item['ann_mu'] * 100:+.2f}%",
+            "Volatilità Annua": f"{item['ann_vol'] * 100:.2f}%",
+            "Win Rate": f"{item['win_rate'] * 100:.1f}%",
+            "Win/Loss Ratio": f"{item['b_ratio']:.2f}x",
             "Peso Attuale": f"{act_w * 100:.2f}%",
-            "Half-Kelly (Target)": f"{half_kelly * 100:.2f}%",
-            "Full Kelly": f"{full_kelly * 100:.2f}%",
-            "Quarter Kelly": f"{quarter_kelly * 100:.2f}%",
+            "Half-Kelly (Target)": f"{half_kelly_w * 100:.2f}%",
+            "Full Kelly": f"{standalone_full * 100:.2f}%",
+            "Quarter Kelly": f"{quarter_kelly_w * 100:.2f}%",
             "Delta vs Half-Kelly": f"{delta_w * 100:+.2f}%",
             "Stato Allocazione": status
         })
 
-    return pd.DataFrame(results)
+    df_out = pd.DataFrame(results)
+    return df_out
 
 
 def compute_interactive_trade_kelly(

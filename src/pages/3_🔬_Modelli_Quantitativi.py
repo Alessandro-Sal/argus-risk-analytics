@@ -1252,7 +1252,34 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
         df_kelly = compute_kelly_criterion_sizing(df_returns_all, current_weights=cur_w_k, risk_free_rate=rf_rate)
         
         if not df_kelly.empty:
-            st.dataframe(df_kelly, use_container_width=True, hide_index=True)
+            # Tabella Kelly Glassmorphic Formattata
+            rows_k_list = []
+            for _, r_k in df_kelly.iterrows():
+                tk = str(r_k["Ticker"])
+                mu_s = str(r_k["Rendimento Annuo"])
+                vol_s = str(r_k["Volatilità Annua"])
+                wr_s = str(r_k["Win Rate"])
+                wl_s = str(r_k["Win/Loss Ratio"])
+                w_act = str(r_k["Peso Attuale"])
+                w_half = str(r_k["Half-Kelly (Target)"])
+                f_full = str(r_k["Full Kelly"])
+                st_alloc = str(r_k["Stato Allocazione"])
+                
+                if "Sovra" in st_alloc:
+                    st_badge = '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🔴 Sovra-Allocato</span>'
+                elif "Sotto" in st_alloc:
+                    st_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🟢 Sotto-Allocato</span>'
+                elif "Nessun" in st_alloc:
+                    st_badge = '<span style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">⛔ Zero Edge</span>'
+                else:
+                    st_badge = '<span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">⚪ Equilibrato</span>'
+                    
+                mu_color = "#4ade80" if not mu_s.startswith("-") else "#f87171"
+                r_k_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 12px;font-family:monospace;">{tk}</td><td style="color:{mu_color};padding:8px 12px;font-family:monospace;font-weight:600;">{mu_s}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{vol_s}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{wr_s}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{wl_s}</td><td style="color:#f8fafc;padding:8px 12px;font-family:monospace;font-weight:600;">{w_act}</td><td style="color:#ff9900;padding:8px 12px;font-family:monospace;font-weight:700;">{w_half}</td><td style="color:#94a3b8;padding:8px 12px;font-family:monospace;">{f_full}</td><td style="padding:8px 12px;white-space:nowrap;">{st_badge}</td></tr>'
+                rows_k_list.append(r_k_str)
+                
+            tbl_k_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:14px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 12px;width:12%;">TICKER</th><th style="text-align:left;padding:8px 12px;width:12%;">RENDIMENTO</th><th style="text-align:left;padding:8px 12px;width:11%;">VOLATILITÀ</th><th style="text-align:left;padding:8px 12px;width:10%;">WIN RATE</th><th style="text-align:left;padding:8px 12px;width:10%;">PAYOFF (B)</th><th style="text-align:left;padding:8px 12px;width:11%;">PESO ATTUALE</th><th style="text-align:left;padding:8px 12px;width:12%;color:#ff9900;">TARGET KELLY</th><th style="text-align:left;padding:8px 12px;width:10%;">LEVA FULL</th><th style="text-align:left;padding:8px 12px;width:12%;">DIAGNOSTICA</th></tr></thead><tbody>{"".join(rows_k_list)}</tbody></table></div>'
+            st.markdown(tbl_k_html, unsafe_allow_html=True)
 
             # Grafico a barre comparative: Peso Attuale vs Half-Kelly Target
             df_k_plot = pd.DataFrame({
@@ -1266,22 +1293,26 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
                 x=df_k_plot["Ticker"],
                 y=df_k_plot["Peso Attuale (%)"],
                 name="⭐ Peso Attuale",
-                marker_color="#58a6ff"
+                marker=dict(color="#58a6ff", line=dict(color="rgba(255,255,255,0.1)", width=1)),
+                hovertemplate="<b>%{x}</b><br>Peso Attuale: <b>%{y:.2f}%</b><extra></extra>"
             ))
             fig_k_bar.add_trace(go.Bar(
                 x=df_k_plot["Ticker"],
                 y=df_k_plot["Half-Kelly Target (%)"],
-                name="🎯 Half-Kelly Target",
-                marker_color="#ff9900"
+                name="🎯 Target Kelly Normalizzato",
+                marker=dict(color="#ff9900", line=dict(color="rgba(255,153,0,0.4)", width=1)),
+                hovertemplate="<b>%{x}</b><br>Target Kelly: <b>%{y:.2f}%</b><extra></extra>"
             ))
             fig_k_bar.update_layout(
                 template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
                 barmode="group",
-                height=320,
-                margin=dict(l=10, r=10, t=20, b=20),
+                height=340,
+                margin=dict(l=10, r=10, t=30, b=30),
                 yaxis=dict(title="Allocazione (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
-                xaxis=dict(title="Asset"),
-                legend=dict(orientation="h", y=1.1)
+                xaxis=dict(title=None, tickangle=-45, tickfont=dict(size=11, family="monospace")),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=11.5))
             )
             apply_plotly_theme(fig_k_bar)
             st.plotly_chart(fig_k_bar, use_container_width=True)
