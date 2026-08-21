@@ -125,6 +125,32 @@ def inject_custom_css():
             white-space: nowrap;
         }}
 
+        .metric-delta-pos {{
+            color: #4ade80;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+        .metric-delta-neg {{
+            color: #f87171;
+            font-size: 12px;
+            font-weight: 600;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
         /* Streamlit Main Canvas Controls & Input Fields */
         [data-testid="stMain"] [data-baseweb="select"] > div {{
             background: rgba(22, 27, 34, 0.75) !important;

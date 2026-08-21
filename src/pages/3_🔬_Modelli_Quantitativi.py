@@ -1448,15 +1448,45 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             # Head KPI Cards
             mk1, mk2, mk3, mk4, mk5 = st.columns(5)
             with mk1:
-                metric_card("Valore Iniziale", f"€ {mc_adv['initial_portfolio_value']:,.0f}", "Capitale Base", True)
+                metric_card(
+                    "Valore Iniziale",
+                    f"€ {mc_adv['initial_portfolio_value']:,.0f}",
+                    delta="Capitale Base",
+                    positive=True,
+                    help_text="Valore del patrimonio netto iniziale sottoposto a simulazione stocastica Monte Carlo."
+                )
             with mk2:
-                metric_card("Mediana Attesa (1Y)", f"€ {mc_adv['expected_value_median']:,.0f}", f"Rendimento: {mc_adv['expected_return_median_pct']:+.2f}%", mc_adv['expected_return_median_pct'] >= 0)
+                metric_card(
+                    "Mediana Attesa",
+                    f"€ {mc_adv['expected_value_median']:,.0f}",
+                    delta=f"{mc_adv['expected_return_median_pct']:+.2f}% ROI",
+                    positive=(mc_adv['expected_return_median_pct'] >= 0),
+                    help_text=f"Valore mediano (50° percentile) stimato al termine dell'orizzonte di {horizon_opt} giorni."
+                )
             with mk3:
-                metric_card("VaR 95% (Rischio)", f"€ {mc_adv['var_95_val_eur']:,.0f}", f"Perdita Max: -{mc_adv['var_95_pct']:.2f}%", False)
+                metric_card(
+                    "VaR 95% Rischio",
+                    f"€ {mc_adv['var_95_val_eur']:,.0f}",
+                    delta=f"-{mc_adv['var_95_pct']:.2f}% Max",
+                    positive=False,
+                    help_text="Value at Risk 95%: massima perdita stimata con confidenza statistica del 95%."
+                )
             with mk4:
-                metric_card("CVaR 95% (Shortfall)", f"€ {mc_adv['cvar_95_val_eur']:,.0f}", f"Perdita Media: -{mc_adv['cvar_95_pct']:.2f}%", False)
+                metric_card(
+                    "CVaR 95% Coda",
+                    f"€ {mc_adv['cvar_95_val_eur']:,.0f}",
+                    delta=f"-{mc_adv['cvar_95_pct']:.2f}% ES",
+                    positive=False,
+                    help_text="Expected Shortfall (CVaR 95%): perdita media attesa nell'estremo 5% degli scenari peggiori."
+                )
             with mk5:
-                metric_card("Probabilità Profitto", f"{mc_adv['prob_profit_pct']:.1f}%", "3.000 Simulazioni", mc_adv['prob_profit_pct'] >= 50.0)
+                metric_card(
+                    "Prob. Guadagno",
+                    f"{mc_adv['prob_profit_pct']:.1f}%",
+                    delta=f"{n_sims_val:,} Percorsi",
+                    positive=(mc_adv['prob_profit_pct'] >= 50.0),
+                    help_text="Percentuale di traiettorie stocastiche che si concludono con rendimento positivo."
+                )
 
             st.divider()
 
