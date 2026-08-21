@@ -97,7 +97,7 @@ with col_callout:
 with col_rf_btn:
     from core.ui_utils import render_risk_free_modal
     st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
-    render_risk_free_modal(currency=rf_currency, use_popover=True, button_label="ℹ️ Guida Tasso Risk-Free", risk_free_info=rf_info)
+    render_risk_free_modal(currency=rf_currency, use_popover=False, button_label="ℹ️ Guida Tasso Risk-Free", risk_free_info=rf_info)
 
 
 

@@ -428,7 +428,7 @@ with tab_ingest:
         )
     with col_ds_modal:
         st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-        render_broker_hub_modal(use_popover=True)
+        render_broker_hub_modal(use_popover=False)
     with col_ds_tpl:
         st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
         st.download_button(
@@ -1128,16 +1128,25 @@ with tab_isin_mapping:
         st.caption("Gestisci l'anagrafica centralizzata di conversione tra codici ISIN bancari / Ticker locali e simboli Yahoo Finance. Le mappature vengono salvate sia nella tabella SQL **`asset_mapping`** che nel file di configurazione.")
     with col_head_map2:
         glossary_modal("ℹ️ Guida alla Mappatura ISIN / Ticker", """
-<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Tabella DB asset_mapping</div>
-  <div>Permette al motore ARGUS di riconoscere automaticamente i codici ISIN (es. <code>IE00B4L5Y983</code> per SWDA o <code>IT0000072618</code> per Intesa Sanpaolo) o formati Degiro (<code>BIT:ISP</code>) e associarli al rispettivo ticker di mercato yfinance (<code>SWDA.MI</code>, <code>ISP.MI</code>) per il download delle serie storiche e il calcolo dei rendimenti.</div>
+<!-- 1. TABELLA DB ASSET MAPPING -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📌 1. Tabella DB Centralizzata (asset_mapping)</div>
+  <div style="margin-bottom: 6px;"><b>Cos'è:</b> Il dizionario anagrafico che converte i codici ISIN bancari internazionali (es. <code>IE00B4L5Y983</code>) e i ticker proprietari broker (es. <code>BIT:ISP</code>) nei simboli standard Yahoo Finance (<code>SWDA.MI</code>, <code>ISP.MI</code>).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Schema di Risoluzione:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      <b>ISIN / Broker Code</b> &rarr; <b>Asset Mapping SQL</b> &rarr; <b>Yahoo Finance Ticker</b>
+    </div>
+  </div>
+  <div><b>🎯 A cosa serve:</b> Garantisce il download automatico a latenza zero delle serie storiche dei prezzi anche per file CSV esportati da banche italiane ed europee.</div>
 </div>
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Risoluzione Automatica</div>
-  <div>Inserendo un codice ISIN, ARGUS può interrogare direttamente l'API di ricerca Yahoo Finance per individuare il ticker azionario o ETF corrispondente con la borsa di quotazione principale (es. Milano <code>.MI</code>, Francoforte <code>.DE</code>, Londra <code>.L</code>, Parigi <code>.PA</code>, NYSE/NASDAQ).</div>
+<!-- 2. RISOLUZIONE AUTOMATICA -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔍 2. Risoluzione Intelligente & Ricerca Live</div>
+  <div style="margin-bottom: 6px;"><b>Autocompletamento:</b> Inserendo un codice ISIN, ARGUS interroga le API di ricerca per identificare automaticamente la borsa di quotazione principale (Milano <code>.MI</code>, Francoforte <code>.DE</code>, Londra <code>.L</code>, NYSE/NASDAQ).</div>
+  <div><b>Persistenza:</b> Ogni nuova mappatura inserita viene salvata istantaneamente sia nel Database SQL che nel file locale <code>config.json</code>.</div>
 </div>
 
 </div>
@@ -1386,25 +1395,24 @@ with tab_diagnostics:
         st.caption("Profilazione avanzata dello storage su disco, memoria RAM di processo, integrità database e benchmark latenza dei 26 motori quantitativi.")
     with col_head_diag2:
         glossary_modal("ℹ️ Guida alla Diagnostica & Storage Profiler", """
-<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Profiler di Memoria & Storage</div>
-  <div>L'infrastruttura di monitoraggio delle risorse di ARGUS che analizza l'occupazione fisica dei database SQLite/MySQL, la frammentazione su disco (freelist pages), la memoria RAM (RSS) e la cache multi-tier anti-rate limit.</div>
+<!-- 1. STORAGE & MEMORIA -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🩺 1. Profiler di Memoria, DB & Multi-Tier Cache Shield</div>
+  <div style="margin-bottom: 6px;"><b>Cos'è:</b> Il centro di diagnostica che monitora l'occupazione fisica del database SQL, la memoria RAM (RSS), la frammentazione su disco e la cache multi-tier anti-rate limit.</div>
+  <div><b>🎯 Obiettivo:</b> Garantire prestazioni sub-millisecondo per tutti i 26 motori quantitativi senza memory leak.</div>
 </div>
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Azioni di Manutenzione 1-Click</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>VACUUM & Compatta DB:</b> Rilascia lo spazio su disco non utilizzato dai record cancellati o sovrascritti.<br>
-    • <b>Pulisci Cache Scaduta:</b> Rimuove i prezzi storici più vecchi del TTL di 24 ore.<br>
-    • <b>Reindicizza DB:</b> Rigenera gli indici B-Tree per query sui prezzi istantanee a zero latenza.
+<!-- 2. AZIONI 1-CLICK -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📐 2. Azioni di Manutenzione 1-Click</div>
+  <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #7dd3fc; font-size: 12.5px; line-height: 1.45;">
+    • <b>VACUUM & Compatta DB:</b> Rilascia lo spazio su disco dei record cancellati.<br>
+    • <b>Pulisci Cache Scaduta:</b> Rimuove i prezzi storici più vecchi del TTL di 24h.<br>
+    • <b>Reindicizza DB:</b> Rigenera gli indici B-Tree per query istantanee.
   </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>Uno stato "🟢 Integro (100% Operativo)" con latenze dei moduli quantitativi &lt; 50 ms e frammentazione &lt; 5% certifica che l'ambiente è ultra-ottimizzato.</div>
+  <div><b>🔍 Come leggerlo:</b> Stato <i>🟢 Integro (100% Operativo)</i> e frammentazione &lt; 5% indicano un ambiente ad efficienza massima.</div>
 </div>
 
 </div>
@@ -1571,7 +1579,7 @@ with tab_duckdb:
         st.caption("Interrogazione SQL analitica (OLAP) in-memory a latenza sub-millisecondo, aggregazioni multi-dimensionali ed esportazione colonnare Apache Parquet.")
     with col_d_modal:
         st.markdown('<div style="margin-top: 8px;"></div>', unsafe_allow_html=True)
-        render_duckdb_modal(button_label="ℹ️ Guida al Motore DuckDB & Parquet", use_popover=True)
+        render_duckdb_modal(button_label="ℹ️ Guida al Motore DuckDB & Parquet", use_popover=False)
 
     duck_info = duckdb_engine.get_duckdb_system_info()
 

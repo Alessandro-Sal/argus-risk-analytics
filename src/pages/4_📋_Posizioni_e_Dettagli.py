@@ -266,7 +266,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         st.caption("Rilevazione automatica e rettifica dei lotti storici per frazionamenti azionari (Stock Split) e raggruppamenti (Reverse Split), a garanzia dell'invarianza del costo fiscale.")
     with col_ca_btn:
         st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        render_corporate_actions_modal(corporate_actions_list=corp_actions, use_popover=True)
+        render_corporate_actions_modal(corporate_actions_list=corp_actions, use_popover=False)
 
     if corp_actions and len(corp_actions) > 0:
         df_ca = pd.DataFrame(corp_actions)
@@ -1356,7 +1356,7 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             st.caption("Quadro RT (Plusvalenze 26% & Franchigia 2.000€), Quadro RW (Monitoraggio Fiscale Codice 21), IVAFE (0,20%) e Zainetto Fiscale Cripto.")
         with col_cr_h2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            render_crypto_tax_modal(button_label="ℹ️ Normativa Fiscale Cripto (L. 197/2022)", use_popover=True)
+            render_crypto_tax_modal(button_label="ℹ️ Normativa Fiscale Cripto (L. 197/2022)", use_popover=False)
 
         crypto_report = compute_crypto_tax_report(results, db_engine=engine, tax_year=tax_year_param)
         c_sum = crypto_report["summary"]
