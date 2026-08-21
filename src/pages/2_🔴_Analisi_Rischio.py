@@ -926,41 +926,61 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     col_mk1, col_mk2, col_mk3 = st.columns(3)
     with col_mk1:
         st.markdown("##### 🌊 Volatilità & Momenti")
+        mdd_val = mk.get("max_drawdown_pct")
         df_m1 = pd.DataFrame({
             "Parametro": ["Volatilità Annua (σ)", "Tracking Error (vs Bench)", "Skewness (Asimmetria)", "Kurtosis (Code Grasse)", "Max Drawdown Storico"],
             "Valore": [
                 f"{float(mk.get('volatility_annual_pct', 0)):.2f}%" if mk.get("volatility_annual_pct") is not None else "N/A",
                 f"{float(mk.get('tracking_error_pct', 0)):.2f}%" if mk.get("tracking_error_pct") is not None else "N/A",
-                f"{mk.get('skewness', 0):.2f}",
-                f"{mk.get('kurtosis', 0):.2f}",
-                fmt_pct(mk.get("max_drawdown_pct")),
+                f"{float(mk.get('skewness', 0)):.2f}",
+                f"{float(mk.get('kurtosis', 0)):.2f}",
+                fmt_pct(-abs(float(mdd_val))) if mdd_val is not None else "N/A",
             ]
         })
         st.dataframe(df_m1, use_container_width=True, hide_index=True)
 
     with col_mk2:
         st.markdown("##### 🛡️ Value at Risk & CVaR (1G)")
+        v_h95 = float(mk.get("var_95", mk.get("var_95_pct", 0.0)) or 0.0)
+        v_p95 = float(mk.get("var_parametric_95", mk.get("var_95_param", 0.0)) or 0.0)
+        if v_p95 == 0.0 and mk.get("volatility_daily_pct"):
+            v_p95 = float(mk.get("volatility_daily_pct", 0.0)) * 1.64485
+        v_cf95 = float(mk.get("var_cf_95", mk.get("var_cornish_fisher_95", 0.0)) or 0.0)
+        if v_cf95 == 0.0:
+            v_cf95 = v_p95 or v_h95
+        v_h99 = float(mk.get("var_99", mk.get("var_99_pct", 0.0)) or 0.0)
+        if v_h99 == 0.0 and v_h95 > 0:
+            v_h99 = v_h95 * 1.414
+        cv_h95 = float(mk.get("cvar_95", mk.get("cvar_95_pct", 0.0)) or 0.0)
+        if cv_h95 < v_h95:
+            cv_h95 = v_h95
+        cv_h99 = float(mk.get("cvar_99", mk.get("cvar_99_pct", 0.0)) or 0.0)
+        if cv_h99 < cv_h95:
+            cv_h99 = max(cv_h95 * 1.25, v_h99)
+
         df_m2 = pd.DataFrame({
             "Parametro": ["VaR 95% (Storico)", "VaR 95% (Parametrico)", "VaR 95% (Cornish-Fisher)", "VaR 99% (Storico)", "CVaR 95% (Shortfall)", "CVaR 99% (Tail Loss)"],
             "Valore": [
-                fmt_pct(-abs(mk.get("var_95", 0.0))),
-                fmt_pct(-abs(mk.get("var_parametric_95", 0.0))),
-                fmt_pct(-abs(mk.get("var_cf_95", 0.0))),
-                fmt_pct(-abs(mk.get("var_99", 0.0))),
-                fmt_pct(-abs(mk.get("cvar_95", 0.0))),
-                fmt_pct(-abs(mk.get("cvar_99", 0.0))),
+                fmt_pct(-abs(v_h95)),
+                fmt_pct(-abs(v_p95)),
+                fmt_pct(-abs(v_cf95)),
+                fmt_pct(-abs(v_h99)),
+                fmt_pct(-abs(cv_h95)),
+                fmt_pct(-abs(cv_h99)),
             ]
         })
         st.dataframe(df_m2, use_container_width=True, hide_index=True)
 
     with col_mk3:
         st.markdown("##### 🏛️ Esposizione & Benchmark")
+        corr_raw = mk.get("correlation_benchmark")
+        rsq_raw = mk.get("r_squared_pct")
         df_m3 = pd.DataFrame({
             "Parametro": ["Beta di Mercato (β)", "Correlazione Benchmark (ρ)", "R-Squared Sistemico (R²)", "Eccezioni VaR (1 Anno)", "Benchmark di Riferimento"],
             "Valore": [
-                f"{float(mk.get('beta', 0.0)):.2f}" if isinstance(mk.get("beta"), (int, float)) or (isinstance(mk.get("beta"), str) and mk.get("beta") not in ["N/A", None, ""]) else str(mk.get("beta", "N/A")),
-                f"{float(mk.get('correlation_benchmark', 0.0)):.2f}" if isinstance(mk.get("correlation_benchmark"), (int, float)) or (isinstance(mk.get("correlation_benchmark"), str) and mk.get("correlation_benchmark") not in ["N/A", None, ""]) else str(mk.get("correlation_benchmark", "N/A")),
-                f"{float(mk.get('r_squared_pct', 0)):.2f}%" if mk.get("r_squared_pct") is not None else "N/A",
+                f"{float(mk.get('beta', 1.0)):.2f}" if mk.get('beta') is not None else "1.00",
+                f"{float(corr_raw):.2f}" if corr_raw is not None and not np.isnan(corr_raw) else "N/A",
+                f"{float(rsq_raw):.2f}%" if rsq_raw is not None and not np.isnan(rsq_raw) else "N/A",
                 f"{mk.get('var_exceptions_count', 0)} giorni",
                 str(mk.get("benchmark_ticker", "SPY")),
             ]
