@@ -1334,7 +1334,7 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
         df_kelly = compute_kelly_criterion_sizing(df_returns_all, current_weights=cur_w_k, risk_free_rate=rf_rate)
         
         if not df_kelly.empty:
-            col_k_f1, col_k_f2 = st.columns([2.5, 1.5])
+            col_k_f1, col_k_f2, col_k_f3 = st.columns([2.0, 1.3, 0.9])
             with col_k_f1:
                 search_k = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker (es. AAPL, BTC, ETH, GOOGL)...", key="search_kelly_ticker")
             with col_k_f2:
@@ -1352,37 +1352,51 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
             elif filter_k_diag == "⛔ Zero Edge":
                 df_k_filt = df_k_filt[df_k_filt["Stato Allocazione"].astype(str).str.contains("Nessun|Zero", case=False, na=False)]
 
+            with col_k_f3:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                csv_k = df_k_filt.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Scarica CSV",
+                    data=csv_k,
+                    file_name="kelly_criterion_sizing.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+
             if df_k_filt.empty:
                 st.info("ℹ️ Nessun asset corrisponde ai criteri di filtro selezionati.")
             else:
-                # Tabella Kelly Glassmorphic Formattata
-                rows_k_list = []
-                for _, r_k in df_k_filt.iterrows():
-                    tk = str(r_k["Ticker"])
-                    mu_s = str(r_k["Rendimento Annuo"])
-                    vol_s = str(r_k["Volatilità Annua"])
-                    wr_s = str(r_k["Win Rate"])
-                    wl_s = str(r_k["Win/Loss Ratio"])
-                    w_act = str(r_k["Peso Attuale"])
-                    w_half = str(r_k["Half-Kelly (Target)"])
-                    f_full = str(r_k["Full Kelly"])
-                    st_alloc = str(r_k["Stato Allocazione"])
-                    
-                    if "Sovra" in st_alloc:
-                        st_badge = '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🔴 Sovra-Allocato</span>'
-                    elif "Sotto" in st_alloc:
-                        st_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🟢 Sotto-Allocato</span>'
-                    elif "Nessun" in st_alloc:
-                        st_badge = '<span style="background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">⛔ Zero Edge</span>'
-                    else:
-                        st_badge = '<span style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">⚪ Equilibrato</span>'
-                        
-                    mu_color = "#4ade80" if not mu_s.startswith("-") else "#f87171"
-                    r_k_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 12px;font-family:monospace;">{tk}</td><td style="color:{mu_color};padding:8px 12px;font-family:monospace;font-weight:600;">{mu_s}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{vol_s}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{wr_s}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{wl_s}</td><td style="color:#f8fafc;padding:8px 12px;font-family:monospace;font-weight:600;">{w_act}</td><td style="color:#ff9900;padding:8px 12px;font-family:monospace;font-weight:700;">{w_half}</td><td style="color:#94a3b8;padding:8px 12px;font-family:monospace;">{f_full}</td><td style="padding:8px 12px;white-space:nowrap;">{st_badge}</td></tr>'
-                    rows_k_list.append(r_k_str)
-                    
-                tbl_k_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:14px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 12px;width:12%;">TICKER</th><th style="text-align:left;padding:8px 12px;width:12%;">RENDIMENTO</th><th style="text-align:left;padding:8px 12px;width:11%;">VOLATILITÀ</th><th style="text-align:left;padding:8px 12px;width:10%;">WIN RATE</th><th style="text-align:left;padding:8px 12px;width:10%;">PAYOFF (B)</th><th style="text-align:left;padding:8px 12px;width:11%;">PESO ATTUALE</th><th style="text-align:left;padding:8px 12px;width:12%;color:#ff9900;">TARGET KELLY</th><th style="text-align:left;padding:8px 12px;width:10%;">LEVA FULL</th><th style="text-align:left;padding:8px 12px;width:12%;">DIAGNOSTICA</th></tr></thead><tbody>{"".join(rows_k_list)}</tbody></table></div>'
-                st.markdown(tbl_k_html, unsafe_allow_html=True)
+                # Tabella Interattiva con Sorting su ogni colonna e Column Config
+                df_k_interactive = pd.DataFrame({
+                    "Ticker": df_k_filt["Ticker"],
+                    "Rendimento Annuo (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_k_filt["Rendimento Annuo"]],
+                    "Volatilità Annua (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_k_filt["Volatilità Annua"]],
+                    "Win Rate (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_k_filt["Win Rate"]],
+                    "Win/Loss (B)": df_k_filt["Win/Loss Ratio"],
+                    "Peso Attuale (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_k_filt["Peso Attuale"]],
+                    "Target Kelly (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_k_filt["Half-Kelly (Target)"]],
+                    "Leva Full Kelly (%)": [float(str(w).replace("%", "").replace("+", "")) for w in df_k_filt["Full Kelly"]],
+                    "Diagnostica": df_k_filt["Stato Allocazione"]
+                })
+
+                kelly_cfg = {
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Rendimento Annuo (%)": st.column_config.NumberColumn("Rendimento Annuo", format="%+.2f%%"),
+                    "Volatilità Annua (%)": st.column_config.NumberColumn("Volatilità Annua", format="%.2f%%"),
+                    "Win Rate (%)": st.column_config.ProgressColumn("Win Rate", format="%.1f%%", min_value=0.0, max_value=100.0),
+                    "Win/Loss (B)": st.column_config.TextColumn("Payoff (B)", width="small"),
+                    "Peso Attuale (%)": st.column_config.NumberColumn("Peso Attuale", format="%.2f%%"),
+                    "Target Kelly (%)": st.column_config.ProgressColumn("Target Kelly", format="%.2f%%", min_value=0.0, max_value=100.0),
+                    "Leva Full Kelly (%)": st.column_config.NumberColumn("Leva Full Kelly", format="%.2f%%"),
+                    "Diagnostica": st.column_config.TextColumn("Diagnostica Allocazione", width="medium")
+                }
+
+                st.dataframe(
+                    df_k_interactive,
+                    column_config=kelly_cfg,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
                 # Grafico a barre comparative: Peso Attuale vs Half-Kelly Target
                 df_k_plot = pd.DataFrame({
@@ -2243,7 +2257,7 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
         ) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
 
         if not df_cov_call.empty:
-            col_cc_f1, col_cc_f2 = st.columns([2.5, 1.5])
+            col_cc_f1, col_cc_f2, col_cc_f3 = st.columns([2.0, 1.3, 0.9])
             with col_cc_f1:
                 search_cc = st.text_input("🔍 Cerca Ticker:", placeholder="Digita ticker per filtrare (es. BTC, GOOGL, AMZN)...", key="search_cov_call")
             with col_cc_f2:
@@ -2257,43 +2271,55 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
             elif filter_cc_type == "⚪ Solo Frazionari (<100 quote)":
                 df_cov_filtered = df_cov_filtered[df_cov_filtered["contratti_eseguibili"] == 0]
 
+            with col_cc_f3:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                csv_cc = df_cov_filtered.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="📥 Scarica CSV",
+                    data=csv_cc,
+                    file_name="covered_call_strategy.csv",
+                    mime="text/csv",
+                    use_container_width=True
+                )
+
             if df_cov_filtered.empty:
                 st.info("ℹ️ Nessuna posizione trovata corrispondente ai criteri di ricerca.")
             else:
-                rows_cc_list = []
-                for _, r_cc in df_cov_filtered.iterrows():
-                    tk = str(r_cc["ticker"])
-                    q_val = float(r_cc["quantita_totale"])
-                    if q_val.is_integer():
-                        q_str = f"{int(q_val)}"
-                    elif q_val < 1:
-                        q_str = f"{q_val:.4f}"
-                    else:
-                        q_str = f"{q_val:.2f}"
-                        
-                    p_spot = float(r_cc["prezzo_spot"])
-                    k_call = float(r_cc["strike_call_otm"])
-                    iv_c = float(r_cc["iv_effettiva_pct"])
-                    prem_sh = float(r_cc["premio_per_azione"])
-                    tot_inc = float(r_cc["incasso_premio_totale"])
-                    ann_y = float(r_cc["extra_rendimento_annuo_pct"])
-                    c_trad = int(r_cc.get("contratti_eseguibili", 0))
-                    
-                    p_spot_s = f"€ {p_spot:,.2f}".replace(",", ".")
-                    k_call_s = f"€ {k_call:,.2f}".replace(",", ".")
-                    prem_sh_s = f"€ {prem_sh:.2f}".replace(",", ".")
-                    tot_inc_s = f"€ {tot_inc:,.2f}".replace(",", ".")
-                    
-                    if c_trad > 0:
-                        badge_c = f'<span style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:10px;font-weight:700;font-size:11px;white-space:nowrap;">🟢 {c_trad} Contr. ({c_trad*100} q.)</span>'
-                    else:
-                        badge_c = f'<span style="background:rgba(148,163,184,0.12);color:#94a3b8;border:1px solid rgba(148,163,184,0.25);padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;">⚪ Frazionario ({q_str}/100)</span>'
-                        
-                    r_cc_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 12px;font-family:monospace;">{tk}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{q_str}</td><td style="color:#f8fafc;padding:8px 12px;font-family:monospace;font-weight:600;">{p_spot_s}</td><td style="color:#38bdf8;padding:8px 12px;font-family:monospace;font-weight:600;">{k_call_s}</td><td style="color:#ffb74d;padding:8px 12px;font-family:monospace;">{iv_c:.1f}%</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{prem_sh_s}</td><td style="color:#ff9900;padding:8px 12px;font-family:monospace;font-weight:700;">{tot_inc_s}</td><td style="color:#4ade80;padding:8px 12px;font-family:monospace;font-weight:700;">+{ann_y:.2f}%</td><td style="padding:8px 12px;white-space:nowrap;">{badge_c}</td></tr>'
-                    rows_cc_list.append(r_cc_str)
-                    
-                tbl_cc_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:14px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 12px;width:12%;">TICKER</th><th style="text-align:left;padding:8px 12px;width:10%;">QUOTE</th><th style="text-align:left;padding:8px 12px;width:12%;">PREZZO SPOT</th><th style="text-align:left;padding:8px 12px;width:12%;color:#38bdf8;">STRIKE CALL (+5%)</th><th style="text-align:left;padding:8px 12px;width:10%;color:#ffb74d;">IV SPECIFICA</th><th style="text-align:left;padding:8px 12px;width:11%;">PREMIO / AZIONE</th><th style="text-align:left;padding:8px 12px;width:11%;color:#ff9900;">INCASSO MENSILE</th><th style="text-align:left;padding:8px 12px;width:10%;color:#4ade80;">EXTRA YIELD</th><th style="text-align:left;padding:8px 12px;width:12%;">LOTTI STANDARD</th></tr></thead><tbody>{"".join(rows_cc_list)}</tbody></table></div>'
-                st.markdown(tbl_cc_html, unsafe_allow_html=True)
+                df_cov_show = pd.DataFrame({
+                    "Ticker": df_cov_filtered["ticker"],
+                    "Quote Posizione": df_cov_filtered["quantita_totale"],
+                    "Prezzo Spot (€)": df_cov_filtered["prezzo_spot"],
+                    "Strike Call (+5%)": df_cov_filtered["strike_call_otm"],
+                    "IV Specifica (%)": df_cov_filtered["iv_effettiva_pct"],
+                    "Premio / Azione (€)": df_cov_filtered["premio_per_azione"],
+                    "Incasso Mensile (€)": df_cov_filtered["incasso_premio_totale"],
+                    "Extra Yield Annuo (%)": df_cov_filtered["extra_rendimento_annuo_pct"],
+                    "Lotti Opzioni": df_cov_filtered.apply(
+                        lambda r: f"🟢 {int(r['contratti_eseguibili'])} Contratti ({int(r['contratti_eseguibili']*100)} quote)"
+                        if r['contratti_eseguibili'] > 0
+                        else f"⚪ Frazionario ({r['quantita_totale']:g}/100)",
+                        axis=1
+                    )
+                })
+
+                cov_cfg = {
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Quote Posizione": st.column_config.NumberColumn("Quote Posizione", format="%.2f"),
+                    "Prezzo Spot (€)": st.column_config.NumberColumn("Prezzo Spot (€)", format="€ %.2f"),
+                    "Strike Call (+5%)": st.column_config.NumberColumn("Strike OTM (+5%)", format="€ %.2f"),
+                    "IV Specifica (%)": st.column_config.ProgressColumn("IV Specifica", format="%.1f%%", min_value=0.0, max_value=100.0),
+                    "Premio / Azione (€)": st.column_config.NumberColumn("Premio / Azione", format="€ %.2f"),
+                    "Incasso Mensile (€)": st.column_config.NumberColumn("Incasso Stimato", format="€ %.2f"),
+                    "Extra Yield Annuo (%)": st.column_config.NumberColumn("Extra Yield Annuo", format="+%.2f%%"),
+                    "Lotti Opzioni": st.column_config.TextColumn("Lotti Opzioni (x100)", width="medium")
+                }
+
+                st.dataframe(
+                    df_cov_show,
+                    column_config=cov_cfg,
+                    use_container_width=True,
+                    hide_index=True
+                )
 
 # ── TAB 4: ATTRIBUZIONE BRINSON-FACHLER ───────────────────────
 elif active_quant_tab == "🎯 Attribuzione Brinson-Fachler":
