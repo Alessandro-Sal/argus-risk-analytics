@@ -157,7 +157,14 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                 "currency": curr,
                 "total_return": tot_ret,
                 "realized_pnl": float(row.get("realized_pnl", 0.0)),
-                "dividends_total": float(row.get("dividends_total", 0.0))
+                "dividends_total": float(row.get("dividends_total", 0.0)),
+                "dividend_yield": float(row.get("dividend_yield")) if pd.notna(row.get("dividend_yield")) else None,
+                "trailing_pe": float(row.get("trailing_pe")) if pd.notna(row.get("trailing_pe")) else None,
+                "forward_pe": float(row.get("forward_pe")) if pd.notna(row.get("forward_pe")) else None,
+                "price_to_book": float(row.get("price_to_book")) if pd.notna(row.get("price_to_book")) else None,
+                "roe": float(row.get("roe")) if pd.notna(row.get("roe")) else None,
+                "beta_5y": float(row.get("beta_5y")) if pd.notna(row.get("beta_5y")) else None,
+                "market_cap": float(row.get("market_cap")) if pd.notna(row.get("market_cap")) else None,
             })
     elif isinstance(positions_raw, list):
         for p in positions_raw:
@@ -207,7 +214,14 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                     "currency": curr,
                     "total_return": tot_ret,
                     "realized_pnl": float(p.get("realized_pnl", 0.0)),
-                    "dividends_total": float(p.get("dividends_total", 0.0))
+                    "dividends_total": float(p.get("dividends_total", 0.0)),
+                    "dividend_yield": float(p.get("dividend_yield")) if pd.notna(p.get("dividend_yield")) else None,
+                    "trailing_pe": float(p.get("trailing_pe")) if pd.notna(p.get("trailing_pe")) else None,
+                    "forward_pe": float(p.get("forward_pe")) if pd.notna(p.get("forward_pe")) else None,
+                    "price_to_book": float(p.get("price_to_book")) if pd.notna(p.get("price_to_book")) else None,
+                    "roe": float(p.get("roe")) if pd.notna(p.get("roe")) else None,
+                    "beta_5y": float(p.get("beta_5y")) if pd.notna(p.get("beta_5y")) else None,
+                    "market_cap": float(p.get("market_cap")) if pd.notna(p.get("market_cap")) else None,
                 })
     return records
 
@@ -461,7 +475,14 @@ def consolidate_multi_portfolios(
                     "dividends_total": divs,
                     "total_return": (mv - cost) + realized + divs,
                     "yield_on_cost_pct": (divs / cost * 100.0) if cost > 0 else 0.0,
-                    "days_to_liquidate": pos.get("days_to_liquidate", 1.0)
+                    "days_to_liquidate": pos.get("days_to_liquidate", 1.0),
+                    "dividend_yield": pos.get("dividend_yield"),
+                    "trailing_pe": pos.get("trailing_pe"),
+                    "forward_pe": pos.get("forward_pe"),
+                    "price_to_book": pos.get("price_to_book"),
+                    "roe": pos.get("roe"),
+                    "beta_5y": pos.get("beta_5y"),
+                    "market_cap": pos.get("market_cap"),
                 }
             else:
                 merged_positions[t]["qty_net"] += shares
@@ -472,6 +493,8 @@ def consolidate_multi_portfolios(
                 merged_positions[t]["unrealized_pnl"] = merged_positions[t]["current_value"] - merged_positions[t]["cost_basis"]
                 merged_positions[t]["unrealized_pnl_pct"] = (merged_positions[t]["unrealized_pnl"] / merged_positions[t]["cost_basis"] * 100.0) if merged_positions[t]["cost_basis"] > 0 else 0.0
                 merged_positions[t]["total_return"] = merged_positions[t]["unrealized_pnl"] + merged_positions[t]["realized_pnl"] + merged_positions[t]["dividends_total"]
+                if pos.get("dividend_yield") is not None and pd.notna(pos.get("dividend_yield")):
+                    merged_positions[t]["dividend_yield"] = pos.get("dividend_yield")
                 if merged_positions[t]["qty_net"] > 0:
                     merged_positions[t]["avg_cost"] = merged_positions[t]["cost_basis"] / merged_positions[t]["qty_net"]
                     merged_positions[t]["last_price"] = merged_positions[t]["current_value"] / merged_positions[t]["qty_net"]

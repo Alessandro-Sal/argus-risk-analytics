@@ -237,8 +237,6 @@ if active_val_tab == "🏛️ Fair Value & Consensus Analisti":
     col_a, col_b = st.columns([2, 1])
 
     with col_a:
-        st.markdown("#### Tabella Fair Value & Target Price")
-        
         df_display = df_valued[["ticker", "Verdetto", "last_price", "target_mean_price", "Upside %", "peg_ratio", "trailing_pe"]].copy()
         df_display.rename(columns={
             "ticker": "Asset",
@@ -253,6 +251,13 @@ if active_val_tab == "🏛️ Fair Value & Consensus Analisti":
         df_display["Upside %"] = df_display["Upside %"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "N/A")
         df_display["PEG Ratio"] = df_display["PEG Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
         df_display["P/E Ratio"] = df_display["P/E Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+
+        col_fv_h1, col_fv_h2 = st.columns([3.2, 1.1])
+        with col_fv_h1:
+            st.markdown("#### Tabella Fair Value & Target Price")
+        with col_fv_h2:
+            csv_fv = df_display.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CSV", data=csv_fv, file_name="fair_value_target_price.csv", mime="text/csv", use_container_width=True, key="btn_download_fv_tp")
         
         st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
 
@@ -659,13 +664,20 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             st.plotly_chart(fig_z, use_container_width=True, key="val_altman_z_gauge", config={"displayModeBar": "hover", "displaylogo": False})
 
         with col_z2:
-            st.markdown("#### 🔍 Driver del ROE (DuPont 3-Fattori)")
+            col_dp_h1, col_dp_h2 = st.columns([3.0, 1.2])
+            with col_dp_h1:
+                st.markdown("#### 🔍 Driver del ROE (DuPont 3-Fattori)")
+            
             df_dp = pd.DataFrame([
                 {"Fattore": "Profit Margin (Utile/Sales)", "Valore": f"{dp_data['profit_margin_pct']:.2f}%"},
                 {"Fattore": "Asset Turnover (Sales/Assets)", "Valore": f"{dp_data['asset_turnover']:.2f}x"},
                 {"Fattore": "Equity Multiplier (Assets/Equity)", "Valore": f"{dp_data['equity_multiplier']:.2f}x"},
                 {"Fattore": "ROE Risultante", "Valore": f"{dp_data['roe_pct']:.2f}%"}
             ])
+            with col_dp_h2:
+                csv_dp = df_dp.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_dp, file_name="dupont_analysis_roe.csv", mime="text/csv", use_container_width=True, key="btn_download_dupont")
+
             st.dataframe(df_dp, use_container_width=True, hide_index=True)
 
         st.divider()
@@ -888,18 +900,30 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
 
             with st_tab1:
                 if not inc_df.empty:
+                    col_inc_h1, col_inc_h2 = st.columns([3.5, 0.9])
+                    with col_inc_h2:
+                        csv_inc = inc_df.to_csv(index=True).encode('utf-8')
+                        st.download_button("📥 Scarica CSV", data=csv_inc, file_name=f"{selected_ticker}_conto_economico.csv", mime="text/csv", use_container_width=True, key="btn_download_inc_stmt")
                     st.dataframe(inc_df, use_container_width=True, height=450)
                 else:
                     st.info(f"Conto Economico di esercizio non disponibile offline per {selected_ticker}.")
 
             with st_tab2:
                 if not bal_df.empty:
+                    col_bal_h1, col_bal_h2 = st.columns([3.5, 0.9])
+                    with col_bal_h2:
+                        csv_bal = bal_df.to_csv(index=True).encode('utf-8')
+                        st.download_button("📥 Scarica CSV", data=csv_bal, file_name=f"{selected_ticker}_stato_patrimoniale.csv", mime="text/csv", use_container_width=True, key="btn_download_bal_stmt")
                     st.dataframe(bal_df, use_container_width=True, height=450)
                 else:
                     st.info(f"Stato Patrimoniale di esercizio non disponibile offline per {selected_ticker}.")
 
             with st_tab3:
                 if not cf_df.empty:
+                    col_cf_h1, col_cf_h2 = st.columns([3.5, 0.9])
+                    with col_cf_h2:
+                        csv_cf = cf_df.to_csv(index=True).encode('utf-8')
+                        st.download_button("📥 Scarica CSV", data=csv_cf, file_name=f"{selected_ticker}_rendiconto_finanziario.csv", mime="text/csv", use_container_width=True, key="btn_download_cf_stmt")
                     st.dataframe(cf_df, use_container_width=True, height=450)
                 else:
                     st.info(f"Rendiconto Finanziario di esercizio non disponibile offline per {selected_ticker}.")

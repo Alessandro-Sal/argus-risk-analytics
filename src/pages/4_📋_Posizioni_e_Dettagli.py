@@ -1106,6 +1106,29 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                 "historical_payout_eur": "Storico Incassato Reale"
             })
 
+            # Toolbar: Ricerca, Filtro Frequenza e Download CSV
+            col_df1, col_df2, col_df3 = st.columns([2.0, 1.2, 1.1])
+            with col_df1:
+                search_div = st.text_input("🔍 Cerca Asset / Mesi:", key="search_div_table", placeholder="Es. ISP.MI, NOVO, Maggio, Trimestrale...")
+            with col_df2:
+                freqs = ["Tutte le Frequenze"] + sorted(list(df_table_show["Frequenza"].dropna().unique())) if "Frequenza" in df_table_show.columns else ["Tutte"]
+                filter_freq = st.selectbox("⏳ Frequenza:", freqs, key="filter_div_freq")
+            with col_df3:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                csv_div = df_table_show.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_div, file_name="calendario_dividendi_stimati.csv", mime="text/csv", use_container_width=True, key="btn_download_div_table")
+
+            df_table_filt = df_table_show.copy()
+            if search_div:
+                mask = df_table_filt["Asset / Ticker"].astype(str).str.contains(search_div.strip(), case=False, na=False)
+                if "Mesi di Stacco Stimati" in df_table_filt.columns:
+                    mask |= df_table_filt["Mesi di Stacco Stimati"].astype(str).str.contains(search_div.strip(), case=False, na=False)
+                if "Frequenza" in df_table_filt.columns:
+                    mask |= df_table_filt["Frequenza"].astype(str).str.contains(search_div.strip(), case=False, na=False)
+                df_table_filt = df_table_filt[mask]
+            if filter_freq != "Tutte le Frequenze" and "Frequenza" in df_table_filt.columns:
+                df_table_filt = df_table_filt[df_table_filt["Frequenza"] == filter_freq]
+
             div_table_config = {
                 "Dividend Yield": st.column_config.NumberColumn("Dividend Yield", format="%.2f%%"),
                 "Yield on Cost (YOC)": st.column_config.NumberColumn("Yield on Cost (YOC)", format="%.2f%%"),
@@ -1114,7 +1137,7 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                 "Storico Incassato Reale": st.column_config.NumberColumn("Storico Incassato Reale", format="€ %.2f")
             }
 
-            st.dataframe(df_table_show, use_container_width=True, hide_index=True, column_config=div_table_config)
+            st.dataframe(df_table_filt, use_container_width=True, hide_index=True, column_config=div_table_config)
         else:
             st.info("Nessuna posizione in portafoglio genera dividendi o cedole attive.")
 
@@ -1122,6 +1145,12 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
     if not df_matrix.empty:
         with st.expander("🗓️ Visualizza la Matrice Annuale Completa (Incassi Titolo per Mese)", expanded=False):
             st.caption("Importo monetario stimato (€) per ciascun mese dell'anno solare:")
+            
+            col_m1, col_m2 = st.columns([3.0, 1.1])
+            with col_m2:
+                csv_mat = df_matrix.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica Matrice CSV", data=csv_mat, file_name="matrice_annuale_dividendi.csv", mime="text/csv", use_container_width=True, key="btn_download_div_matrix")
+
             matrix_config = {
                 "Yield %": st.column_config.NumberColumn("Yield %", format="%.2f%%"),
                 "Totale Annuo (€)": st.column_config.NumberColumn("Totale Annuo (€)", format="€ %.2f")
@@ -1258,7 +1287,6 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "year", "realized_gain_diversi_eur", "realized_gain_etf_eur", "realized_loss_eur",
                 "prior_minus_deducted_eur", "taxable_base_eur", "estimated_tax_due_eur", "tax_credit_zainetto_eur"
             ] if c in tax_by_year.columns]
-            
             df_tax_show = tax_by_year[cols_present].rename(columns={
                 "year": "Anno Solare",
                 "realized_gain_diversi_eur": "Plusv. Azioni/Bond (€)",
@@ -1270,6 +1298,11 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "tax_credit_zainetto_eur": "Zainetto Residuo (€)"
             })
             
+            col_txy_h1, col_txy_h2 = st.columns([3.5, 0.9])
+            with col_txy_h2:
+                csv_txy = df_tax_show.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_txy, file_name="imposte_plusvalenze_per_anno.csv", mime="text/csv", use_container_width=True, key="btn_download_tax_year")
+
             st.dataframe(
                 df_tax_show.style.format({c: "€ {:,.2f}" for c in df_tax_show.columns if c != "Anno Solare"}),
                 use_container_width=True, hide_index=True
@@ -1375,6 +1408,11 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "status": "Stato Fiscale"
             })
 
+            col_z_dh1, col_z_dh2 = st.columns([3.5, 0.9])
+            with col_z_dh2:
+                csv_zt = df_z_table_show.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_zt, file_name="timeline_zainetto_fiscale.csv", mime="text/csv", use_container_width=True, key="btn_download_zainetto_timeline")
+
             st.dataframe(
                 df_z_table_show.style.format({
                     "Minusvalenza Iniziale (€)": "€ {:,.2f}",
@@ -1432,8 +1470,14 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 
         with tab_w_gain:
             if not df_harv_g.empty:
-                st.markdown("##### 📋 Piano Operativo di Vendita / Riacquisto per Step-Up Fiscale")
-                st.caption("Esegui gli ordini di vendita indicati e riacquista immediatamente i titoli per innalzare il prezzo di carico a costo fiscale zero.")
+                col_sg_h1, col_sg_h2 = st.columns([3.5, 0.9])
+                with col_sg_h1:
+                    st.markdown("##### 📋 Piano Operativo di Vendita / Riacquisto per Step-Up Fiscale")
+                    st.caption("Esegui gli ordini di vendita indicati e riacquista immediatamente i titoli per innalzare il prezzo di carico a costo fiscale zero.")
+                with col_sg_h2:
+                    st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+                    csv_sg = df_harv_g.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_sg, file_name="piano_step_up_fiscale.csv", mime="text/csv", use_container_width=True, key="btn_download_step_up")
                 
                 df_gain_show = df_harv_g[[
                     "ticker", "asset_class", "qty_held", "current_price_eur",
@@ -1458,8 +1502,14 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 
         with tab_w_loss:
             if not df_harv_l.empty:
-                st.markdown("##### ✂️ Titoli in Perdita per Generazione Nuovo Credito Fiscale")
-                st.caption("Monetizzare queste perdite permette di abbattere il debito fiscale dell'anno in corso o creare nuove minusvalenze con scadenza a 4 anni.")
+                col_sl_h1, col_sl_h2 = st.columns([3.5, 0.9])
+                with col_sl_h1:
+                    st.markdown("##### ✂️ Titoli in Perdita per Generazione Nuovo Credito Fiscale")
+                    st.caption("Monetizzare queste perdite permette di abbattere il debito fiscale dell'anno in corso o creare nuove minusvalenze con scadenza a 4 anni.")
+                with col_sl_h2:
+                    st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+                    csv_sl = df_harv_l.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_sl, file_name="piano_tax_loss_harvesting.csv", mime="text/csv", use_container_width=True, key="btn_download_tax_harvesting")
                 
                 df_loss_show = df_harv_l[[
                     "ticker", "asset_class", "qty_held", "current_price_eur",
@@ -1512,7 +1562,14 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 
         # 1. Prospetto Quadro RT
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        st.markdown("##### 📈 Quadro RT (Sezione II-B) — Plusvalenze su Cripto-Attività (Art. 67 c. 1 lett. c-sexies TUIR)")
+        col_rt_h1, col_rt_h2 = st.columns([3.5, 0.9])
+        with col_rt_h1:
+            st.markdown("##### 📈 Quadro RT (Sezione II-B) — Plusvalenze su Cripto-Attività (Art. 67 c. 1 lett. c-sexies TUIR)")
+        with col_rt_h2:
+            if not df_c_rt.empty:
+                csv_rt = df_c_rt.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_rt, file_name="quadro_rt_cripto.csv", mime="text/csv", use_container_width=True, key="btn_download_quadro_rt")
+
         if not df_c_rt.empty:
             df_rt_show = df_c_rt.rename(columns={
                 "year": "Anno Fiscale",
@@ -1543,7 +1600,14 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 
         # 2. Prospetto Quadro RW
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        st.markdown("##### 🌐 Quadro RW — Prospetto Monitoraggio Fiscale Attività Estere & Self-Custody (Codice 21)")
+        col_rw_h1, col_rw_h2 = st.columns([3.5, 0.9])
+        with col_rw_h1:
+            st.markdown("##### 🌐 Quadro RW — Prospetto Monitoraggio Fiscale Attività Estere & Self-Custody (Codice 21)")
+        with col_rw_h2:
+            if not df_c_rw.empty:
+                csv_rw = df_c_rw.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_rw, file_name="quadro_rw_cripto.csv", mime="text/csv", use_container_width=True, key="btn_download_quadro_rw")
+
         if not df_c_rw.empty:
             df_rw_show = df_c_rw.rename(columns={
                 "quadro": "Quadro",
@@ -1572,7 +1636,13 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
         # 3. Zainetto Fiscale Cripto Separato
         if not df_c_zainetto.empty:
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-            st.markdown("##### 📦 Zainetto Fiscale Cripto Separato (Minusvalenze Riportabili in 4 Anni)")
+            col_cz_h1, col_cz_h2 = st.columns([3.5, 0.9])
+            with col_cz_h1:
+                st.markdown("##### 📦 Zainetto Fiscale Cripto Separato (Minusvalenze Riportabili in 4 Anni)")
+            with col_cz_h2:
+                csv_cz = df_c_zainetto.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_cz, file_name="zainetto_fiscale_cripto.csv", mime="text/csv", use_container_width=True, key="btn_download_zainetto_cripto")
+
             df_cz_show = df_c_zainetto.rename(columns={
                 "origin_year": "Anno Origine",
                 "expiry_year": "Anno Scadenza",
@@ -1653,7 +1723,13 @@ elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
         col_ac_a, col_ac_b = st.columns([1.8, 1.2])
 
         with col_ac_a:
-            st.markdown("#### 📊 Dettaglio Impatto e Slippage per Asset")
+            col_ac_h1, col_ac_h2 = st.columns([2.5, 1.0])
+            with col_ac_h1:
+                st.markdown("#### 📊 Dettaglio Impatto e Slippage per Asset")
+            with col_ac_h2:
+                csv_ac = df_ac.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_ac, file_name="liquidita_almgren_chriss.csv", mime="text/csv", use_container_width=True, key="btn_download_almgren_chriss")
+
             st.dataframe(
                 df_ac.style.format({
                     "Valore (€)": "€ {:,.2f}",
