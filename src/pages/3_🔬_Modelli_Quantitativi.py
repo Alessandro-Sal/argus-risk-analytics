@@ -2041,58 +2041,75 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
 
         # Superficie e Smile Plotly
         surf_model = build_volatility_surface(spot=bm_spot_in, base_atm_iv=iv_in)
-        col_g_opt1, col_g_opt2 = st.columns([1.5, 1.5])
         
-        with col_g_opt1:
-            st.markdown("##### 📉 Curva Volatility Smile & Skew (2D)")
+        st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+        tab_opt_2d, tab_opt_3d = st.tabs([
+            "📉 Curva Volatility Smile & Skew (2D)",
+            "🌐 Superficie di Volatilità Implicita 3D (Term Structure x Moneyness)"
+        ])
+        
+        with tab_opt_2d:
             fig_smile = go.Figure()
             exp_key = f"{int(expiry_m_in)}M"
             smile_fit = surf_model["smile_models"].get(exp_key, list(surf_model["smile_models"].values())[0])
-            k_range = np.linspace(bm_spot_in * 0.75, bm_spot_in * 1.25, 50)
+            k_range = np.linspace(bm_spot_in * 0.75, bm_spot_in * 1.25, 60)
             iv_curve = [smile_fit["eval_func"](k) * 100.0 for k in k_range]
             
             fig_smile.add_trace(go.Scatter(
                 x=k_range,
                 y=iv_curve,
                 mode="lines",
-                name=f"Skew Calibrato ({int(expiry_m_in)}M)",
-                line=dict(color="#00f3ff", width=2.5),
-                hovertemplate="Strike: $%{x:.1f}<br>IV Calibrata: %{y:.2f}%<extra></extra>"
+                name=f"Skew Calibrato ({int(expiry_m_in)} Mesi)",
+                line=dict(color="#00f3ff", width=2.8),
+                hovertemplate="<b>Strike: $%{x:.1f}</b><br>IV Calibrata: <b>%{y:.2f}%</b><extra></extra>"
             ))
             
-            # Strike di Copertura
+            # Strike di Copertura Put
             fig_smile.add_trace(go.Scatter(
                 x=[bs_hedge["strike_price"]],
                 y=[bs_hedge["effective_iv_pct"]],
-                mode="markers",
+                mode="markers+text",
                 name="Strike Put Hedging (5% OTM)",
-                marker=dict(color="#f85149", size=10, symbol="diamond"),
-                hovertemplate="Put Hedging Strike: $%{x:.1f}<br>IV: %{y:.2f}%<extra></extra>"
+                text=["Put Strike"],
+                textposition="top left",
+                textfont=dict(color="#f87171", size=11),
+                marker=dict(color="#ef4444", size=12, symbol="diamond", line=dict(color="#ffffff", width=1.5)),
+                hovertemplate="<b>Strike Put Hedging: $%{x:.1f}</b><br>IV Skew Effettiva: <b>%{y:.2f}%</b><extra></extra>"
             ))
             
             # Strike Spot ATM
             fig_smile.add_trace(go.Scatter(
                 x=[bm_spot_in],
                 y=[iv_in * 100.0],
-                mode="markers",
+                mode="markers+text",
                 name=f"Spot ATM (${bm_spot_in:.0f})",
-                marker=dict(color="#ff9900", size=9, symbol="circle"),
-                hovertemplate="Spot ATM: $%{x:.1f}<br>IV ATM: %{y:.2f}%<extra></extra>"
+                text=["Spot ATM"],
+                textposition="top right",
+                textfont=dict(color="#ffb74d", size=11),
+                marker=dict(color="#ff9900", size=11, symbol="circle", line=dict(color="#ffffff", width=1.5)),
+                hovertemplate="<b>Spot Benchmark: $%{x:.1f}</b><br>IV Base ATM: <b>%{y:.2f}%</b><extra></extra>"
             ))
             
             fig_smile.update_layout(
-                height=320,
-                margin=dict(l=10, r=10, t=25, b=10),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                height=380,
+                margin=dict(l=15, r=15, t=30, b=20),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=11.5)
+                ),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(title="Strike Price ($)", showgrid=True, gridcolor="rgba(255,255,255,0.05)"),
-                yaxis=dict(title="Volatilità Implicita (%)", showgrid=True, gridcolor="rgba(255,255,255,0.05)")
+                xaxis=dict(title="Strike Price ($)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(family="monospace")),
+                yaxis=dict(title="Volatilità Implicita (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(family="monospace"))
             )
+            apply_plotly_theme(fig_smile)
             st.plotly_chart(fig_smile, use_container_width=True)
 
-        with col_g_opt2:
-            st.markdown("##### 🌐 Superficie di Volatilità Implicita 3D")
+        with tab_opt_3d:
             matrix_z = surf_model["matrix_iv"].values
             strikes_x = surf_model["matrix_iv"].columns.values
             expiries_y = surf_model["matrix_iv"].index.values
@@ -2102,19 +2119,26 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                 x=strikes_x,
                 y=expiries_y,
                 colorscale="Viridis",
-                colorbar=dict(title="IV %", len=0.8)
+                colorbar=dict(
+                    title=dict(text="IV (%)", font=dict(color="#ffffff", size=12)),
+                    tickfont=dict(color="#cbd5e1", size=10),
+                    len=0.75,
+                    thickness=16
+                ),
+                hovertemplate="<b>Strike: $%{x:.1f}</b><br>Scadenza: %{y} Mesi<br>Volatilità Implicita: <b>%{z:.2f}%</b><extra></extra>"
             )])
             fig_surf3d.update_layout(
-                height=320,
-                margin=dict(l=5, r=5, t=10, b=5),
+                height=480,
+                margin=dict(l=10, r=10, t=20, b=20),
                 paper_bgcolor="rgba(0,0,0,0)",
                 scene=dict(
-                    xaxis=dict(title="Strike ($)", gridcolor="rgba(255,255,255,0.1)"),
-                    yaxis=dict(title="Scadenza (Mesi)", gridcolor="rgba(255,255,255,0.1)"),
-                    zaxis=dict(title="IV (%)", gridcolor="rgba(255,255,255,0.1)"),
-                    camera=dict(eye=dict(x=-1.5, y=-1.5, z=1.2))
+                    xaxis=dict(title="Strike ($)", gridcolor="rgba(255,255,255,0.08)", tickfont=dict(family="monospace")),
+                    yaxis=dict(title="Scadenza (Mesi)", gridcolor="rgba(255,255,255,0.08)", tickfont=dict(family="monospace")),
+                    zaxis=dict(title="IV (%)", gridcolor="rgba(255,255,255,0.08)", tickfont=dict(family="monospace")),
+                    camera=dict(eye=dict(x=-1.65, y=-1.65, z=1.25))
                 )
             )
+            apply_plotly_theme(fig_surf3d)
             st.plotly_chart(fig_surf3d, use_container_width=True)
 
         st.markdown("##### 💵 Covered Call Yield Enhancer per Titoli in Portafoglio")
