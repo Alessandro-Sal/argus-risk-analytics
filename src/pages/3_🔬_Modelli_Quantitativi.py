@@ -2141,35 +2141,53 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
             apply_plotly_theme(fig_surf3d)
             st.plotly_chart(fig_surf3d, use_container_width=True)
 
-        st.markdown("##### 💵 Covered Call Yield Enhancer per Titoli in Portafoglio")
-        df_cov_call = compute_covered_call_yield_enhancement(pos, otm_pct=5.0, implied_vol=iv_in, use_skew_calibration=use_skew) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
+        st.markdown("##### 💵 Strategia Covered Call Yield Enhancer sui Titoli in Portafoglio")
+        st.caption("Simula la vendita sistematica di opzioni Call Out-of-The-Money (+5% Strike) a 30 giorni per monetizzare la volatilità implicita ed estrarre rendimento addizionale (*Yield Enhancement*).")
+        
+        vol_map_pos = (df_returns_all.std() * np.sqrt(252.0)).to_dict() if not df_returns_all.empty else {}
+        df_cov_call = compute_covered_call_yield_enhancement(
+            pos,
+            otm_pct=5.0,
+            implied_vol=iv_in,
+            use_skew_calibration=use_skew,
+            vol_map=vol_map_pos
+        ) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
+
         if not df_cov_call.empty:
-            df_cov_display = df_cov_call.rename(columns={
-                "ticker": "Asset / Titolo",
-                "prezzo_spot": "Prezzo Spot (€)",
-                "strike_call_otm": "Strike OTM (+5%)",
-                "iv_effettiva_pct": "IV Calibrata %",
-                "premio_per_azione": "Premio per Azione (€)",
-                "incasso_premio_totale": "Incasso Totale Premio (€)",
-                "extra_rendimento_mensile_pct": "Extra Yield Mensile %",
-                "extra_rendimento_annuo_pct": "Extra Yield Annuo %",
-                "delta_call": "Delta Call (Δ)"
-            })
-            st.dataframe(
-                df_cov_display.style.format({
-                    "Prezzo Spot (€)": "€ {:.2f}",
-                    "Strike OTM (+5%)": "€ {:.2f}",
-                    "IV Calibrata %": "{:.2f}%",
-                    "Premio per Azione (€)": "€ {:.2f}",
-                    "Incasso Totale Premio (€)": "€ {:,.2f}",
-                    "Extra Yield Mensile %": "{:.2f}%",
-                    "Extra Yield Annuo %": "{:.2f}%",
-                    "Delta Call (Δ)": "{:.3f}"
-                }),
-                use_container_width=True,
-                hide_index=True,
-                height=240
-            )
+            rows_cc_list = []
+            for _, r_cc in df_cov_call.iterrows():
+                tk = str(r_cc["ticker"])
+                q_val = float(r_cc["quantita_totale"])
+                if q_val.is_integer():
+                    q_str = f"{int(q_val)}"
+                elif q_val < 1:
+                    q_str = f"{q_val:.4f}"
+                else:
+                    q_str = f"{q_val:.2f}"
+                    
+                p_spot = float(r_cc["prezzo_spot"])
+                k_call = float(r_cc["strike_call_otm"])
+                iv_c = float(r_cc["iv_effettiva_pct"])
+                prem_sh = float(r_cc["premio_per_azione"])
+                tot_inc = float(r_cc["incasso_premio_totale"])
+                ann_y = float(r_cc["extra_rendimento_annuo_pct"])
+                c_trad = int(r_cc.get("contratti_eseguibili", 0))
+                
+                p_spot_s = f"€ {p_spot:,.2f}".replace(",", ".")
+                k_call_s = f"€ {k_call:,.2f}".replace(",", ".")
+                prem_sh_s = f"€ {prem_sh:.2f}".replace(",", ".")
+                tot_inc_s = f"€ {tot_inc:,.2f}".replace(",", ".")
+                
+                if c_trad > 0:
+                    badge_c = f'<span style="background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3);padding:2px 8px;border-radius:10px;font-weight:700;font-size:11px;white-space:nowrap;">🟢 {c_trad} Contr. ({c_trad*100} q.)</span>'
+                else:
+                    badge_c = f'<span style="background:rgba(148,163,184,0.12);color:#94a3b8;border:1px solid rgba(148,163,184,0.25);padding:2px 8px;border-radius:10px;font-size:11px;white-space:nowrap;">⚪ Frazionario ({q_str}/100)</span>'
+                    
+                r_cc_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 12px;font-family:monospace;">{tk}</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{q_str}</td><td style="color:#f8fafc;padding:8px 12px;font-family:monospace;font-weight:600;">{p_spot_s}</td><td style="color:#38bdf8;padding:8px 12px;font-family:monospace;font-weight:600;">{k_call_s}</td><td style="color:#ffb74d;padding:8px 12px;font-family:monospace;">{iv_c:.1f}%</td><td style="color:#cbd5e1;padding:8px 12px;font-family:monospace;">{prem_sh_s}</td><td style="color:#ff9900;padding:8px 12px;font-family:monospace;font-weight:700;">{tot_inc_s}</td><td style="color:#4ade80;padding:8px 12px;font-family:monospace;font-weight:700;">+{ann_y:.2f}%</td><td style="padding:8px 12px;white-space:nowrap;">{badge_c}</td></tr>'
+                rows_cc_list.append(r_cc_str)
+                
+            tbl_cc_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:14px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 12px;width:12%;">TICKER</th><th style="text-align:left;padding:8px 12px;width:10%;">QUOTE</th><th style="text-align:left;padding:8px 12px;width:12%;">PREZZO SPOT</th><th style="text-align:left;padding:8px 12px;width:12%;color:#38bdf8;">STRIKE CALL (+5%)</th><th style="text-align:left;padding:8px 12px;width:10%;color:#ffb74d;">IV SPECIFICA</th><th style="text-align:left;padding:8px 12px;width:11%;">PREMIO / AZIONE</th><th style="text-align:left;padding:8px 12px;width:11%;color:#ff9900;">INCASSO MENSILE</th><th style="text-align:left;padding:8px 12px;width:10%;color:#4ade80;">EXTRA YIELD</th><th style="text-align:left;padding:8px 12px;width:12%;">LOTTI STANDARD</th></tr></thead><tbody>{"".join(rows_cc_list)}</tbody></table></div>'
+            st.markdown(tbl_cc_html, unsafe_allow_html=True)
 
 # ── TAB 4: ATTRIBUZIONE BRINSON-FACHLER ───────────────────────
 elif active_quant_tab == "🎯 Attribuzione Brinson-Fachler":

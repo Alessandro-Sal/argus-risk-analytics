@@ -180,7 +180,8 @@ def compute_covered_call_yield_enhancement(
     implied_vol: float = 0.25,
     risk_free_rate: float = None,
     use_skew_calibration: bool = True,
-    contract_multiplier: int = 100
+    contract_multiplier: int = 100,
+    vol_map: Optional[dict] = None
 ) -> pd.DataFrame:
     """
     Calcola la strategia di Covered Call Writing (vendita di Call Out-of-The-Money) per generare
@@ -195,6 +196,7 @@ def compute_covered_call_yield_enhancement(
 
     results = []
     T = expiry_months / 12.0
+    v_map = vol_map or {}
 
     for _, row in positions_df[positions_df["qty_net"] > 0].iterrows():
         ticker = row.get("ticker", "N/A")
@@ -204,15 +206,19 @@ def compute_covered_call_yield_enhancement(
         if price <= 0 or qty <= 0:
             continue
 
+        asset_base_iv = float(v_map.get(ticker, implied_vol))
+        if asset_base_iv <= 0.01:
+            asset_base_iv = implied_vol
+
         K = price * (1.0 + (otm_pct / 100.0))
 
         if use_skew_calibration:
             from core.volatility_surface import build_volatility_surface
-            surf_asset = build_volatility_surface(spot=price, r=risk_free_rate, base_atm_iv=implied_vol)
+            surf_asset = build_volatility_surface(spot=price, r=risk_free_rate, base_atm_iv=asset_base_iv)
             smile_model = surf_asset["smile_models"].get("1M", list(surf_asset["smile_models"].values())[0])
             effective_call_iv = smile_model["eval_func"](K)
         else:
-            effective_call_iv = implied_vol
+            effective_call_iv = asset_base_iv
 
         call_res = black_scholes_pricing(S=price, K=K, T=T, r=risk_free_rate, sigma=effective_call_iv, option_type="call")
 
