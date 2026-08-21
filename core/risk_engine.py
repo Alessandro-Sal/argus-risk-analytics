@@ -1133,7 +1133,7 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         try:
             from core.factor_library import compute_fama_french_factor_model
             ff_res = compute_fama_french_factor_model(r, model_type="3_factor")
-            ff_alpha = float(ff_res.get("alpha_annualized", 0.0) or 0.0)
+            ff_alpha = float(ff_res.get("alpha_annualized", 0.0) or 0.0) * 100.0
             df_f = ff_res.get("df_factors")
             if isinstance(df_f, pd.DataFrame) and not df_f.empty and "factor" in df_f.columns:
                 f_map = df_f.set_index("factor")["beta"].to_dict()
