@@ -6,6 +6,11 @@ import plotly.graph_objects as bg
 from plotly.subplots import make_subplots
 import os
 
+import importlib
+import core.ui_utils
+import core.duckdb_engine
+importlib.reload(core.ui_utils)
+importlib.reload(core.duckdb_engine)
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
 from core.db_exporter import get_all_snapshots_history, get_snapshot_positions_by_id

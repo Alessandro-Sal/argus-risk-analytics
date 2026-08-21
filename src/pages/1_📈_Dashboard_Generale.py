@@ -5,8 +5,10 @@ import plotly.graph_objects as go
 import importlib
 import core.ui_utils
 import core.risk_engine
+import core.duckdb_engine
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
+importlib.reload(core.duckdb_engine)
 from core.ui_utils import inject_custom_css, section, metric_card, fmt_pct, fmt_eur, glossary_modal, render_executive_badges, render_command_bar, apply_plotly_theme, render_factor_radar_chart, render_info_modal, ensure_risk_bundle_loaded, render_sandbox_banner
 from core.excel_generator import generate_excel_in_memory
 
