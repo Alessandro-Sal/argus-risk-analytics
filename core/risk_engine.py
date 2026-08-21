@@ -1868,6 +1868,7 @@ def compute_atr_chandelier_exits(df_prices: pd.DataFrame, df_positions: pd.DataF
             "highest_high_22": highest_high_22,
             "chandelier_stop": chandelier_stop,
             "distance_pct": distance_pct,
+            "stop_triggered": (last_p < chandelier_stop),
             "status": status
         })
 
