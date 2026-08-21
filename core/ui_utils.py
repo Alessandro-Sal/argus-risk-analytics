@@ -829,11 +829,11 @@ def render_spotlight_palette():
             # Dashboard
             {"title": "📈 Dashboard Generale & KPI Executive", "page": "pages/1_📈_Dashboard_Generale.py", "tab_key": None, "target": None, "keywords": "dashboard cagr sharpe rendimento cumulato benchmark max drawdown kpi"},
             # Rischio
-            {"title": "🔴 Rischio ➔ VaR & CVaR (Parametrico, Storico, Cornish-Fisher)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 Value at Risk (VaR) & CVaR", "keywords": "var cvar cornish fisher parametrico storico rischio perdita"},
-            {"title": "🔴 Rischio ➔ Backtesting VaR & Test Kupiec", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🎯 Backtesting VaR (Kupiec & Basel)", "keywords": "kupiec basel backtesting violazioni var test p-value"},
-            {"title": "🔴 Rischio ➔ Modello Fama-French & Carhart (4 Fattori)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🏛️ Modello Fama-French & Carhart", "keywords": "fama french carhart smb hml mom wml fattori regressione alpha beta"},
-            {"title": "🔴 Rischio ➔ Limiti di Rischio & Conformità UCITS", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "⚠️ Limiti di Rischio & Conformità", "keywords": "limiti concentrazione ucits mifid conformità breach stop loss"},
-            {"title": "🔴 Rischio ➔ Rilevamento Anomalie ML (Isolation Forest)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🤖 Rilevamento Anomalie (Machine Learning)", "keywords": "isolation forest machine learning anomalie outlier cluster ml"},
+            {"title": "🔴 Rischio ➔ VaR & CVaR (Parametrico, Storico, Cornish-Fisher)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "var cvar cornish fisher parametrico storico rischio perdita"},
+            {"title": "🔴 Rischio ➔ Backtesting VaR & Test Kupiec", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "kupiec basel backtesting violazioni var test p-value"},
+            {"title": "🔴 Rischio ➔ Modello Fama-French & Carhart (4 Fattori)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "fama french carhart smb hml mom wml fattori regressione alpha beta"},
+            {"title": "🔴 Rischio ➔ Limiti di Rischio & Conformità UCITS", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "limiti concentrazione ucits mifid conformità breach stop loss"},
+            {"title": "🔴 Rischio ➔ Rilevamento Anomalie ML (Isolation Forest)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)", "keywords": "isolation forest machine learning anomalie outlier cluster ml"},
             # Quant
             {"title": "🔬 Quant ➔ Frontiera Markowitz & Rebalancing Sandbox", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "markowitz frontiera efficiente ledoit wolf sandbox ribilanciamento pesi sharpe"},
             {"title": "🔬 Quant ➔ Hierarchical Risk Parity (HRP)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "hrp hierarchical risk parity lopez de prado clustering dendrogramma"},
@@ -1716,6 +1716,7 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
     # 2. Rendering del Deck a Schede Istituzionale
     st.markdown('<div class="argus-tab-deck-container">', unsafe_allow_html=True)
     cols = st.columns(len(options))
+    changed = False
     for i, opt in enumerate(options):
         is_selected = (opt == current)
         with cols[i]:
@@ -1724,8 +1725,13 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
             if st.button(opt, key=btn_key, type=btn_type, use_container_width=True):
                 if st.session_state.get(key) != opt:
                     st.session_state[key] = opt
+                    changed = True
     st.markdown('</div>', unsafe_allow_html=True)
-    return st.session_state[key]
+
+    if changed:
+        st.rerun()
+
+    return st.session_state.get(key, options[0])
 
 
 def render_info_modal(title: str, content: str, button_label: str = "ℹ️ Metodologia & Guida", use_popover: bool = False):
