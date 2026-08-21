@@ -81,7 +81,7 @@ def compute_closed_trades_journal(
     """
     # ── 1. GESTIONE SANDBOX / DATI VUOTI ─────────────────────────────────────
     if df_tx is None or df_tx.empty:
-        if is_sandbox or (df_positions is not None and not df_positions.empty and "is_sandbox" in str(df_positions)):
+        if is_sandbox and (df_positions is None or df_positions.empty):
             return _generate_sandbox_closed_trades()
         else:
             return _empty_closed_trades_result()
