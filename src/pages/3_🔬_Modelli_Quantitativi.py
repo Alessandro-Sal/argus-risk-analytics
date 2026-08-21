@@ -2803,21 +2803,95 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
         df_roll_b = ff_res.get("rolling_betas", pd.DataFrame())
         if not df_roll_b.empty:
             st.markdown("##### 📈 Evoluzione Dinamica delle Esposizioni Fattoriali (Rolling OLS 60 Giorni)")
-            cols_to_plot = [c for c in df_roll_b.columns if c != "Alpha (Ann)"]
+            st.caption("Traccia nel tempo come cambiano i Beta di rischio sistemico e di stile del portafoglio (evidenziando cambi di regime o drift stilistici).")
             
-            fig_roll = px.line(
-                df_roll_b.reset_index(),
-                x="Date",
-                y=cols_to_plot,
-                labels={"value": "Beta Rolling (60G)", "Date": "", "variable": "Fattore"},
-                template="plotly_dark",
-                height=340
+            all_factors = [c for c in df_roll_b.columns if c != "Alpha (Ann)"]
+            col_rf1, col_rf2 = st.columns([3.2, 1.0])
+            with col_rf1:
+                selected_factors = st.multiselect(
+                    "🔍 Filtra Fattori da visualizzare nel Grafico:",
+                    options=all_factors,
+                    default=all_factors,
+                    key="rolling_factors_filter"
+                )
+            with col_rf2:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                csv_roll = df_roll_b.to_csv().encode('utf-8')
+                st.download_button("📥 Scarica Serie CSV", data=csv_roll, file_name="rolling_factor_betas_60d.csv", mime="text/csv", use_container_width=True)
+
+            factors_to_show = selected_factors if selected_factors else all_factors
+
+            color_map = {
+                "Mkt-RF": "#58a6ff",
+                "SMB": "#f59e0b",
+                "HML": "#3fb950",
+                "RMW": "#bc8cff",
+                "CMA": "#f43f5e",
+                "MOM": "#00f3ff"
+            }
+
+            df_plot_r = df_roll_b.reset_index()
+            fig_roll = go.Figure()
+
+            # Linea neutra y=0
+            fig_roll.add_hline(
+                y=0.0,
+                line_dash="dash",
+                line_color="rgba(255, 255, 255, 0.25)",
+                line_width=1.2,
+                annotation_text="Neutrale (β = 0.0)",
+                annotation_position="bottom right",
+                annotation_font=dict(size=10, color="#8b949e")
             )
+
+            for f_name in factors_to_show:
+                if f_name in df_plot_r.columns:
+                    fig_roll.add_trace(go.Scatter(
+                        x=df_plot_r["Date"],
+                        y=df_plot_r[f_name],
+                        mode="lines",
+                        name=f_name,
+                        line=dict(color=color_map.get(f_name, "#58a6ff"), width=2),
+                        hovertemplate=f"<b>{f_name}</b>: %{{y:+.3f}}<extra></extra>"
+                    ))
+
             fig_roll.update_layout(
+                template="plotly_dark",
+                height=350,
+                hovermode="x unified",
+                margin=dict(l=10, r=15, t=25, b=20),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=10, r=10, t=20, b=20),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+                xaxis=dict(
+                    title=None,
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.06)",
+                    rangeselector=dict(
+                        buttons=[
+                            dict(count=6, label="6M", step="month", stepmode="backward"),
+                            dict(count=1, label="1A", step="year", stepmode="backward"),
+                            dict(count=3, label="3A", step="year", stepmode="backward"),
+                            dict(step="all", label="Tutto")
+                        ],
+                        bgcolor="rgba(22, 27, 34, 0.9)",
+                        font=dict(color="#ffffff", size=10.5),
+                        activecolor="#ff9900"
+                    )
+                ),
+                yaxis=dict(
+                    title="Beta Rolling (60G)",
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.06)",
+                    tickformat="+.2f"
+                ),
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.04,
+                    xanchor="center",
+                    x=0.5,
+                    font=dict(size=11, family="monospace")
+                )
             )
             apply_plotly_theme(fig_roll)
             st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
