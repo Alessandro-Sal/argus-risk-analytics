@@ -862,6 +862,8 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                         "hrp_weight": "Peso Frazionario",
                         "hrp_weight_pct": "Allocazione Ottima HRP %"
                     })
+                    csv_hrp = df_hrp_display.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_hrp, file_name="pesi_ottimali_hrp.csv", mime="text/csv", use_container_width=True, key="btn_download_hrp_weights")
                     st.dataframe(
                         df_hrp_display.style.format({
                             "Allocazione Ottima HRP %": "{:.2f}%",
@@ -935,12 +937,15 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                 * **Sharpe Ratio ERC**: <span style='color:#00f3ff; font-weight:bold;'>{erc_res['sharpe_ratio']:.2f}</span>
                 """, unsafe_allow_html=True)
 
+                df_erc_disp = df_erc_w.rename(columns={
+                    "ticker": "Asset",
+                    "erc_weight_pct": "Peso ERC (%)",
+                    "risk_contrib_pct": "Contributo al Rischio (%)"
+                })
+                csv_erc = df_erc_disp.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_erc, file_name="pesi_ottimali_erc.csv", mime="text/csv", use_container_width=True, key="btn_download_erc_weights")
                 st.dataframe(
-                    df_erc_w.rename(columns={
-                        "ticker": "Asset",
-                        "erc_weight_pct": "Peso ERC (%)",
-                        "risk_contrib_pct": "Contributo al Rischio (%)"
-                    }).style.format({
+                    df_erc_disp.style.format({
                         "Peso ERC (%)": "{:.2f}%",
                         "Contributo al Rischio (%)": "{:.2f}%"
                     }),
@@ -2330,6 +2335,11 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                         axis=1
                     )
                 })
+
+                col_cov_h1, col_cov_h2 = st.columns([3.5, 0.9])
+                with col_cov_h2:
+                    csv_cov = df_cov_show.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_cov, file_name="strategia_covered_call.csv", mime="text/csv", use_container_width=True, key="btn_download_covered_call")
 
                 cov_cfg = {
                     "Ticker": st.column_config.TextColumn("Ticker", width="small"),

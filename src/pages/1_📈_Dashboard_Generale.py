@@ -539,6 +539,7 @@ if not pos.empty:
                 st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
             with col_cu_h2:
                 csv_cube = cube_res["df"].to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_cube, file_name="cubo_olap_duckdb.csv", mime="text/csv", use_container_width=True, key="btn_download_duckdb_cube_p1")
             cube_cfg = {
                 "asset_class": st.column_config.TextColumn("Asset Class"),
                 "sector": st.column_config.TextColumn("Settore GICS"),

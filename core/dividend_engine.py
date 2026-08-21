@@ -82,25 +82,64 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
         "QQQ": [3, 6, 9, 12],
     }
 
+    KNOWN_DIVIDEND_YIELDS = {
+        "ISP.MI": 5.58,
+        "NOVO-B.CO": 3.95,
+        "BMW.DE": 7.20,
+        "BMW": 7.20,
+        "ASML.AS": 1.20,
+        "MSFT": 0.76,
+        "META": 0.38,
+        "AAPL": 0.50,
+        "KO": 3.10,
+        "PEP": 3.00,
+        "JNJ": 3.20,
+        "PG": 2.40,
+        "IBM": 3.30,
+        "WMT": 1.40,
+        "T": 6.20,
+        "C": 3.60,
+        "QCOM": 2.10,
+        "BABA": 1.80,
+        "GOOGL": 0.45,
+        "PYPL": 0.90,
+        "PRX.AS": 0.74,
+        "VWRL.L": 1.85,
+        "BND": 3.40,
+        "SPY": 1.25,
+        "QQQ": 0.60,
+        "NDIA.L": 0.80,
+        "DFNS.PA": 1.10,
+        "DFND.PA": 1.10,
+        "INTC": 1.50,
+    }
+
     breakdown_list = []
     total_annual_div = 0.0
     calendar_events_list = []
 
     for _, row in pos.iterrows():
-        t = row["ticker"]
-        cval = float(row.get("current_value", 0))
-        qty = float(row.get("qty_net", 0))
-        hist_div = float(row.get("dividends_total", 0)) if "dividends_total" in row and not pd.isna(row.get("dividends_total")) else 0.0
+        t = str(row.get("ticker", "")).strip().upper()
+        cval = float(row.get("current_value", row.get("market_value", 0.0)))
+        qty = float(row.get("qty_net", row.get("shares", row.get("quantity", 0.0))))
+        hist_div = float(row.get("dividends_total", 0.0)) if "dividends_total" in row and not pd.isna(row.get("dividends_total")) else 0.0
         
         # Calcolo Invested Capital per Yield on Cost
-        avg_price = float(row.get("avg_price", 0)) if "avg_price" in row else 0.0
+        avg_price = float(row.get("avg_cost", row.get("avg_price", 0.0)))
         invested_cap = (qty * avg_price) if (qty > 0 and avg_price > 0) else cval
         
         dy_raw = row.get("dividend_yield")
+        if (dy_raw is None or pd.isna(dy_raw) or float(dy_raw) <= 0) and t in KNOWN_DIVIDEND_YIELDS:
+            dy_raw = KNOWN_DIVIDEND_YIELDS[t]
+
         if dy_raw is not None and not pd.isna(dy_raw) and float(dy_raw) > 0:
             val_f = float(dy_raw)
-            dy_display = val_f
-            dy_pct = val_f / 100.0
+            if val_f <= 0.20:
+                dy_pct = val_f
+                dy_display = val_f * 100.0
+            else:
+                dy_pct = val_f / 100.0
+                dy_display = val_f
         else:
             dy_pct = 0.0
             dy_display = 0.0
