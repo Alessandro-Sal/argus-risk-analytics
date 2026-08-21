@@ -517,7 +517,13 @@ def consolidate_multi_portfolios(
                 all_asset_returns.append(rf["returns"])
 
     if all_returns_series:
-        comb_df = pd.concat(all_returns_series, axis=1).fillna(0.0)
+        cleaned_returns = []
+        for s in all_returns_series:
+            s_c = s.copy()
+            if getattr(s_c.index, 'tz', None) is not None:
+                s_c.index = s_c.index.tz_localize(None)
+            cleaned_returns.append(s_c)
+        comb_df = pd.concat(cleaned_returns, axis=1).fillna(0.0)
         total_w = sum(weights_list)
         w_arr = np.array([w / total_w for w in weights_list])
         master_returns = comb_df.dot(w_arr).dropna()
@@ -525,13 +531,8 @@ def consolidate_multi_portfolios(
     else:
         master_returns = pd.Series(dtype=float)
 
-    if all_bm_series:
-        longest_bm = max(all_bm_series, key=lambda x: len(x))
-        master_bm_returns = longest_bm.reindex(master_returns.index).fillna(0.0)
-    elif not master_returns.empty:
-        master_bm_returns = pd.Series(0.0004, index=master_returns.index, name="SPY")
-    else:
-        master_bm_returns = pd.Series(dtype=float)
+    if getattr(master_returns.index, 'tz', None) is not None:
+        master_returns.index = master_returns.index.tz_localize(None)
 
     if all_price_dfs:
         combined_prices = pd.concat(all_price_dfs, ignore_index=True).drop_duplicates(["ticker", "price_date"]).reset_index(drop=True)
@@ -541,103 +542,38 @@ def consolidate_multi_portfolios(
     if all_asset_returns:
         combined_asset_returns = pd.concat(all_asset_returns, axis=1)
         combined_asset_returns = combined_asset_returns.loc[:, ~combined_asset_returns.columns.duplicated()].fillna(0.0)
+        if getattr(combined_asset_returns.index, 'tz', None) is not None:
+            combined_asset_returns.index = combined_asset_returns.index.tz_localize(None)
     else:
         combined_asset_returns = pd.DataFrame()
 
-    # 3. Calcolo Completo Metriche Quantitative
-    n_days = len(master_returns)
-    if isinstance(master_returns.index, pd.DatetimeIndex) and len(master_returns) > 1:
-        cal_days = (master_returns.index.max() - master_returns.index.min()).days
-        n_years = max(cal_days / 365.2425, 0.05)
+    from core.risk_engine import _load_benchmark, _calc_market_risk, _calc_return_metrics, _calc_concentration
+    if all_bm_series:
+        longest_bm = max(all_bm_series, key=lambda x: len(x)).copy()
+        if getattr(longest_bm.index, 'tz', None) is not None:
+            longest_bm.index = longest_bm.index.tz_localize(None)
+        master_bm_returns = longest_bm.reindex(master_returns.index).fillna(0.0)
     else:
-        n_years = max(n_days / 252.0, 0.05) if n_days > 0 else 1.0
-    rfr_daily = active_rf_rate / 252.0
+        master_bm_returns = _load_benchmark("SPY", combined_prices, master_returns.index)
 
-    if not master_returns.empty and n_days > 5:
-        cum_ret = float((1.0 + master_returns).prod() - 1.0)
-        cagr = float((1.0 + cum_ret) ** (1.0 / n_years) - 1.0) if cum_ret > -1.0 else 0.0
-        
-        vol_daily = float(master_returns.std())
-        vol_annual = float(vol_daily * np.sqrt(252.0))
-        
-        excess = master_returns - rfr_daily
-        sharpe = float(excess.mean() / excess.std() * np.sqrt(252.0)) if excess.std() > 0 else 0.0
-        
-        downside = master_returns[master_returns < rfr_daily] - rfr_daily
-        down_std = float(np.sqrt((downside ** 2).mean())) if len(downside) > 0 else 0.001
-        sortino = float(excess.mean() / down_std * np.sqrt(252.0)) if down_std > 0 else 0.0
-        
-        # VaR & CVaR Storico 95% e 99%
-        var_95 = float(abs(np.percentile(master_returns, 5)) * 100.0)
-        var_99 = float(abs(np.percentile(master_returns, 1)) * 100.0)
-        tail_95 = master_returns[master_returns <= np.percentile(master_returns, 5)]
-        cvar_95 = float(abs(tail_95.mean()) * 100.0) if len(tail_95) > 0 else var_95 * 1.3
-        
-        # Cornish-Fisher VaR 95%
-        skewness = float(stats.skew(master_returns)) if len(master_returns) > 2 else 0.0
-        kurtosis = float(stats.kurtosis(master_returns)) if len(master_returns) > 2 else 0.0
-        z = stats.norm.ppf(0.05)
-        z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
-        var_cf_95 = float(abs(master_returns.mean() - z_cf * vol_daily) * 100.0)
-        
-        # Max Drawdown & Ulcer Index
-        cum_series = (1.0 + master_returns).cumprod()
-        running_max = cum_series.cummax()
-        drawdowns = (cum_series - running_max) / running_max
-        max_dd = float(abs(drawdowns.min())) if not drawdowns.empty else 0.0
-        ulcer_index = float(np.sqrt(np.mean((drawdowns * 100.0) ** 2))) if not drawdowns.empty else 0.0
-        calmar = abs(cagr / max_dd) if max_dd > 0 else 0.0
-        
-        # Beta & Alpha vs Benchmark
-        if not master_bm_returns.empty and master_bm_returns.std() > 0:
-            valid_mask = (master_bm_returns != 0.0) | (master_returns != 0.0)
-            r_sub_m = master_returns[valid_mask]
-            bm_sub_m = master_bm_returns.reindex(master_returns.index).fillna(0.0)[valid_mask]
-            if len(r_sub_m) > 10 and bm_sub_m.std() > 0:
-                cov_mat = np.cov(r_sub_m, bm_sub_m)
-                beta = float(cov_mat[0, 1] / cov_mat[1, 1]) if cov_mat[1, 1] > 0 else 1.0
-            else:
-                cov_mat = np.cov(master_returns, master_bm_returns.reindex(master_returns.index).fillna(0.0))
-                beta = float(cov_mat[0, 1] / cov_mat[1, 1]) if cov_mat[1, 1] > 0 else 1.0
-            bm_total = float((1.0 + master_bm_returns).prod() - 1.0)
-            bm_cagr = float((1.0 + bm_total) ** (1.0 / n_years) - 1.0) if bm_total > -1.0 else 0.0
-            alpha = float(cagr - bm_cagr)
+    if master_bm_returns.empty or master_bm_returns.std() == 0:
+        master_bm_returns = _load_benchmark("SPY", combined_prices, master_returns.index)
 
-            # Fama-French 3-Factor Style Analysis & Tracking Error
-            active_ret = master_returns - master_bm_returns.reindex(master_returns.index).fillna(0.0)
-            tracking_error = float(active_ret.std() * np.sqrt(252.0) * 100.0)
-            
-            r_excess = master_returns - rfr_daily
-            rb_excess = master_bm_returns.reindex(master_returns.index).fillna(0.0) - rfr_daily
-            t_axis = np.linspace(0, len(master_returns)/252.0, len(master_returns))
-            smb_factor = (np.sin(2 * np.pi * t_axis) * 0.003 + np.random.RandomState(42).normal(0, 0.004, len(master_returns)))
-            hml_factor = (np.cos(2 * np.pi * t_axis) * 0.003 + np.random.RandomState(43).normal(0, 0.004, len(master_returns)))
-            X_ff = np.column_stack([np.ones(len(master_returns)), rb_excess.values, smb_factor, hml_factor])
-            try:
-                coeffs_ff, _, _, _ = np.linalg.lstsq(X_ff, r_excess.values, rcond=None)
-                ff_alpha = float(coeffs_ff[0] * 252.0 * 100.0)
-                ff_beta_mkt = float(coeffs_ff[1])
-                smb_tilt = float(coeffs_ff[2])
-                hml_tilt = float(coeffs_ff[3])
-            except Exception:
-                ff_alpha, ff_beta_mkt, smb_tilt, hml_tilt = 0.0, beta, 0.0, 0.0
-        else:
-            beta = 1.0
-            alpha = 0.0
-            bm_cagr = 0.08
-            ff_alpha, ff_beta_mkt, smb_tilt, hml_tilt, tracking_error = 0.0, 1.0, 0.0, 0.0, 0.0
-    else:
-        cum_ret, cagr, vol_annual, vol_daily, sharpe, sortino = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-        var_95, var_99, var_cf_95, cvar_95, max_dd, ulcer_index, calmar, beta, alpha, bm_cagr = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0
-        skewness, kurtosis = 0.0, 0.0
-        ff_alpha, ff_beta_mkt, smb_tilt, hml_tilt, tracking_error = 0.0, 1.0, 0.0, 0.0, 0.0
+    # 3. Calcolo Completo Metriche Quantitative Standard ARGUS
+    market_risk_res = _calc_market_risk(master_returns, master_bm_returns, benchmark_ticker="SPY", risk_free_rate=active_rf_rate)
+    return_metrics_res = _calc_return_metrics(master_returns, master_bm_returns, pd.DataFrame(), df_positions, risk_free_rate=active_rf_rate)
+    concentration_res = _calc_concentration(df_positions)
 
-    total_cost_basis = float(df_positions["cost_basis"].sum()) if not df_positions.empty else total_master_value
-    total_unrealized = float(df_positions["unrealized_pnl"].sum()) if not df_positions.empty else 0.0
-    total_realized = float(df_positions["realized_pnl"].sum()) if not df_positions.empty else 0.0
-    total_dividends = float(df_positions["dividends_total"].sum()) if not df_positions.empty else 0.0
-    total_pnl = total_unrealized + total_realized + total_dividends
-    total_pnl_pct = (total_pnl / total_cost_basis) if total_cost_basis > 0 else 0.0
+    cum_ret = float(return_metrics_res.get("total_return_pct", 0.0) or 0.0) / 100.0
+    cagr = float(return_metrics_res.get("cagr_pct", 0.0) or 0.0) / 100.0
+    vol_annual = float(market_risk_res.get("volatility_annual_pct", 0.0) or 0.0) / 100.0
+    sharpe = float(return_metrics_res.get("sharpe_ratio", 0.0) or 0.0)
+    sortino = float(return_metrics_res.get("sortino_ratio", 0.0) or 0.0)
+    var_95 = float(market_risk_res.get("var_95", 0.0) or 0.0)
+    var_cf_95 = float(market_risk_res.get("var_cf_95", 0.0) or 0.0)
+    cvar_95 = float(market_risk_res.get("cvar_95", 0.0) or 0.0)
+    max_dd = float(market_risk_res.get("max_drawdown_pct", 0.0) or 0.0)
+    beta = float(market_risk_res.get("beta", 1.0) or 1.0)
 
     # Struttura standard delle metriche identica a risk_engine.py
     master_metrics = {
@@ -653,62 +589,15 @@ def consolidate_multi_portfolios(
         "var_95": round(var_95, 4),
         "var_cf_95": round(var_cf_95, 4),
         "cvar_95": round(cvar_95, 4),
-        "max_drawdown": round(max_dd, 6),
-        "max_drawdown_pct": round(max_dd * 100.0, 4),
+        "max_drawdown": round(abs(max_dd) / 100.0, 6),
+        "max_drawdown_pct": round(max_dd, 4),
         "beta": round(beta, 4),
         "hhi": round(hhi_sum, 6),
         "diversification_ratio": 1.45,
-        "returns": {
-            "portfolio_value": round(total_master_value, 2),
-            "cost_basis_total": round(total_cost_basis, 2),
-            "total_pnl": round(total_pnl, 2),
-            "total_pnl_pct": round(total_pnl_pct, 4),
-            "total_return_pct": round(cum_ret * 100.0, 4),
-            "cagr_pct": round(cagr * 100.0, 4),
-            "sharpe_ratio": round(sharpe, 4),
-            "sortino_ratio": round(sortino, 4),
-            "calmar_ratio": round(calmar, 4),
-            "alpha_pct": round(alpha * 100.0, 4),
-            "benchmark_cagr_pct": round(bm_cagr * 100.0, 4),
-            "dividends_total": round(total_dividends, 2),
-            "risk_free_rate_pct": round(active_rf_rate * 100.0, 2),
-            "n_years": round(n_years, 2)
-        },
-        "risk_free": rf_info,
-        "market_risk": {
-            "volatility_daily_pct": round(vol_daily * 100.0, 4),
-            "volatility_annual_pct": round(vol_annual * 100.0, 4),
-            "var_95": round(var_95, 4),
-            "var_99": round(var_99, 4),
-            "var_cf_95": round(var_cf_95, 4),
-            "cvar_95": round(cvar_95, 4),
-            "max_drawdown_pct": round(max_dd * 100.0, 4),
-            "ulcer_index": round(ulcer_index, 4),
-            "beta": round(beta, 4),
-            "skewness": round(skewness, 4),
-            "kurtosis": round(kurtosis, 4),
-            "ff_alpha_pct": round(ff_alpha, 4),
-            "ff_beta_mkt": round(ff_beta_mkt, 4),
-            "smb_tilt": round(smb_tilt, 4),
-            "hml_tilt": round(hml_tilt, 4),
-            "tracking_error_pct": round(tracking_error, 4),
-            "benchmark_ticker": "SPY",
-            "n_trading_days": n_days,
-            "risk_free_rate_pct": round(active_rf_rate * 100.0, 2)
-        },
-        "concentration": {
-            "hhi": round(hhi_sum, 6),
-            "eff_n": round(1.0 / hhi_sum, 2) if hhi_sum > 0 else len(df_positions),
-            "effective_n_assets": round(1.0 / hhi_sum, 2) if hhi_sum > 0 else len(df_positions),
-            "diversification_ratio": 1.45,
-            "by_class": (df_positions.groupby("asset_class")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "asset_class" in df_positions else {},
-            "by_asset_class_pct": (df_positions.groupby("asset_class")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "asset_class" in df_positions else {},
-            "by_sector": (df_positions.groupby("gics_sector")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "gics_sector" in df_positions else {},
-            "by_gics_sector_pct": (df_positions.groupby("gics_sector")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "gics_sector" in df_positions else {},
-            "by_country": (df_positions.groupby("country")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "country" in df_positions else {},
-            "by_country_pct": (df_positions.groupby("country")["current_value"].sum() / total_master_value * 100.0).round(2).to_dict() if "country" in df_positions else {},
-            "n_active_positions": len(df_positions[df_positions["current_value"] > 0])
-        }
+        "returns": return_metrics_res,
+        "market_risk": market_risk_res,
+        "concentration": concentration_res,
+        "risk_free": rf_info
     }
 
     names_str = " + ".join(selected_names)
