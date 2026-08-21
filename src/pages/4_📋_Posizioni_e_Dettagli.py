@@ -5,10 +5,13 @@ import plotly.graph_objects as go
 import plotly.express as px
 import importlib
 import core.ui_utils
+import core.risk_engine
 import core.crypto_tax_engine
+import core.duckdb_engine
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
 importlib.reload(core.crypto_tax_engine)
+importlib.reload(core.duckdb_engine)
 from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_executive_badges, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
 
