@@ -511,6 +511,15 @@ if selected_bms:
     )
     st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
+# ── VISTA ANALITICA AGGREGATA DUCKDB (OLAP ACCELERATION) ──────────
+if not pos.empty:
+    with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Asset Class × Settore × Valuta)", expanded=False):
+        from core.duckdb_engine import compute_duckdb_asset_sector_currency_cube
+        cube_res = compute_duckdb_asset_sector_currency_cube(pos)
+        if cube_res.get("success") and not cube_res["df"].empty:
+            st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
+            st.dataframe(cube_res["df"], use_container_width=True, hide_index=True)
+
 # ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & MODAL) ──
 col_head_m1, col_head_m2 = st.columns([3.2, 1.2])
 

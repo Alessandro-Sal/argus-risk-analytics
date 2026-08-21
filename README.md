@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-5.14.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-179%2F179%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-181%2F181%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -369,7 +369,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **179 test automatizzati PyTest** con copertura end-to-end del 100%:
+Il progetto include **181 test automatizzati PyTest** con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -377,7 +377,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 179 passed in ~25.00s =============================
+============================= 181 passed in ~25.00s =============================
 ```
 
 ---

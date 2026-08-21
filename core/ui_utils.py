@@ -1039,8 +1039,42 @@ def render_executive_badges(metrics_dict: dict):
     st.markdown(f'<div style="margin-bottom: 16px;">{sharpe_badge}{vol_badge}{dd_badge}</div>', unsafe_allow_html=True)
 
 
+def optimize_plotly_figure_memory(fig, precision: int = 4):
+    """
+    Comprime la serializzazione JSON delle figure Plotly per minimizzare il consumo di RAM
+    nel browser e nel server Streamlit:
+    - Arrotonda gli array float a 4 cifre decimali (evitando stringhe float64 a 16 cifre).
+    - Converte coordinate, color scale e customdata numerici in formati compatti.
+    """
+    if fig is None or not hasattr(fig, "data"):
+        return fig
+    try:
+        for trace in fig.data:
+            for attr in ["x", "y", "z", "customdata", "text"]:
+                if hasattr(trace, attr):
+                    val = getattr(trace, attr)
+                    if val is not None and isinstance(val, (list, tuple, np.ndarray, pd.Series)):
+                        arr = np.asarray(val)
+                        if np.issubdtype(arr.dtype, np.floating):
+                            rounded = np.round(arr, precision)
+                            setattr(trace, attr, rounded.tolist())
+            if hasattr(trace, "marker") and trace.marker is not None:
+                if hasattr(trace.marker, "color") and trace.marker.color is not None:
+                    m_color = trace.marker.color
+                    if isinstance(m_color, (list, tuple, np.ndarray, pd.Series)):
+                        arr_c = np.asarray(m_color)
+                        if np.issubdtype(arr_c.dtype, np.floating):
+                            setattr(trace.marker, "color", np.round(arr_c, precision).tolist())
+    except Exception:
+        pass
+    return fig
+
+
 def apply_plotly_theme(fig, theme_name=None):
-    """Applica uno stile dark vettoriale con tooltip luminosi al grafico Plotly."""
+    """Applica uno stile dark vettoriale con tooltip luminosi al grafico Plotly e ottimizza la memoria."""
+    if fig is None:
+        return fig
+
     if not theme_name:
         theme_name = st.session_state.get("ui_theme", "Midnight Obsidian")
 
@@ -1061,6 +1095,9 @@ def apply_plotly_theme(fig, theme_name=None):
     )
     fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor="rgba(255,255,255,0.05)")
     fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor="rgba(255,255,255,0.05)")
+    
+    # Comprime e ottimizza i float per ridurre il footprint in RAM
+    optimize_plotly_figure_memory(fig, precision=4)
     return fig
 
 
@@ -1970,36 +2007,36 @@ def render_volatility_smile_modal(
     Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
     della Superficie di Volatilità Implicita, del Volatility Skew e dell'impatto sul Delta Hedging.
     """
-    content = """
-### 📐 Volatilità Implicita, Skew, Smile & Superficie 3D
+    content = r"""
+### 📐 Volatility Smile, Skew & Superficie 3D: Fondamenti Matematici
 
-Il modello fondamentale di **Black-Scholes-Merton (1973)** assume che la volatilità $\\sigma$ del sottostante sia costante per qualsiasi strike price $K$ e per qualunque orizzonte temporale $T$. Nella realtà operativa dei mercati derivati, questa ipotesi viene sistematicamente violata.
+#### 📌 1. Dai Limiti di Black-Scholes allo Smile di Mercato
+Il modello classico di Black-Scholes-Merton (1973) assume che la volatilità del sottostante $\sigma$ sia **costante nel tempo** e identica per tutti i livelli di prezzo di esercizio (Strike $K$) e scadenze ($T$).
 
----
-
-#### 📉 1. L'Origine dello Skew: Il Crash del 1987 e la Crash-Phobia
-Prima del crollo del *Black Monday* (Ottobre 1987), i prezzi delle opzioni quotavano con una volatilità implicita quasi piatta. Dopo il crash, gli operatori istituzionali hanno iniziato a pagare un premio sistematico per proteggersi dai crolli di mercato (*Tail Risk*):
-- **Volatility Skew (Asimmetria su Azioni & Indici)**: Le opzioni **Put Out-of-The-Money (OTM)** hanno una volatilità implicita (IV) molto più elevata rispetto alle opzioni **At-The-Money (ATM)** e **Call OTM**.
-- **Volatility Smile (Curva a 'U' su Forex & Crypto)**: La volatilità sale sia per strike OTM ribassisti che rialzisti, riflettendo la presenza di code pesanti (*Fat Tails*) bidirezionali.
-
----
-
-#### 🔍 2. Inversione di Black-Scholes (Implied Volatility Solver)
-Dato il prezzo di mercato effettivo $P_{\\text{mkt}}$, la Volatilità Implicita è l'unico parametro non osservabile direttamente e viene risolto per via numerica tramite l'algoritmo di **Newton-Raphson**:
-
-$$\\sigma_{n+1} = \\sigma_n - \\frac{BS(S, K, T, r, \\sigma_n) - P_{\\text{mkt}}}{\\mathcal{V}(S, K, T, r, \\sigma_n)}$$
-
-dove $\\mathcal{V} = \\frac{\\partial BS}{\\partial \\sigma} = S \\sqrt{T} \\phi(d_1)$ è il **Vega** dell'opzione.
+Nella realtà empirica post-crash 1987:
+- Le opzioni **Out-of-the-Money (OTM) Put** incorporano un premio per il rischio di ribasso estremo (*Crash Phobia* / Asimmetria negativa), quotando a una **volatilità implicita ($\sigma_{IV}$) sistematicamente più alta** rispetto alle Call OTM.
+- L'insieme delle $\sigma_{IV}$ osservate a mercato per diversi strike $K$ forma la curva dello **Smile** (o **Skew** asimmetrico azionario).
+- L'estensione congiunta a tutte le scadenze temporali $T$ genera la **Superficie di Volatilità 3D** $\sigma_{IV}(K, T)$.
 
 ---
 
-#### 🧬 3. Calibrazione Parametrica di Skew & Smile (Log-Moneyness)
-La curva di volatilità per una data scadenza $T$ viene calibrata in funzione del **Log-Moneyness** $m = \\ln(K / S)$:
+#### 🔢 2. Risolutore Numerico di Volatilità Implicita (Inversione Newton-Raphson & Brent)
+Dato il prezzo di mercato di un'opzione $C_{\text{mkt}}$ (o $P_{\text{mkt}}$), la volatilità implicita $\sigma_{IV}$ è il valore che annulla la discrepanza:
+$$f(\sigma) = C_{\text{BS}}(S_0, K, T, r, \sigma) - C_{\text{mkt}} = 0$$
 
-$$\\sigma_{\\text{IV}}(m) = a + b \\cdot m + c \\cdot m^2$$
+Il motore quantitativo di ARGUS risolve l'equazione con:
+1. **Newton-Raphson Veloce**: Sfruttando la derivata prima analitica (Vega $\nu = S\sqrt{T}\phi(d_1)$):
+   $$\sigma_{n+1} = \sigma_n - \frac{C_{\text{BS}}(\sigma_n) - C_{\text{mkt}}}{\nu(\sigma_n)}$$
+2. **Fallback Robusto con Metodo di Brent**: Se il Vega è quasi nullo (opzioni Deep OTM/ITM), il solutore esegue una ricerca a bisezione sicura garantendo convergenza a precisione $10^{-6}$.
 
-- **$a$ (ATM Level)**: Livello base di volatilità At-The-Money ($K = S$).
-- **$b$ (Skew Slope)**: Pendenza dell'asimmetria ($b < 0$ nei mercati azionari indica che strike più bassi hanno IV più alta).
+---
+
+#### 📊 3. Calibrazione Parametrica dello Skew Quadratico
+La curva di volatilità per ciascuna scadenza $T$ viene interpolata parametricamente in funzione della **Log-Moneyness** $m = \ln(K / S_0)$:
+$$\sigma(m) = a + b \cdot m + c \cdot m^2$$
+
+- **$a$ (ATM Volatility)**: Livello base della volatilità At-The-Money ($m=0$).
+- **$b$ (Skew Slope)**: Pendenza asimmetrica negativa ($b < 0$), riflette la domanda istituzionale di coperture assicurative su ribassi.
 - **$c$ (Curvature / Convexity)**: Curvatura convessa dello Smile associata alla curtosi della distribuzione.
 
 ---

@@ -506,3 +506,14 @@ elif active_time_tab == "🗃️ Registro Completo Snapshot Storici":
         }),
         use_container_width=True, hide_index=True
     )
+
+    # ⚡ DuckDB Analytics su Variazioni Step-by-Step & Medie Mobili
+    st.markdown("---")
+    with st.expander("⚡ Vista Analitica Aggregata DuckDB (Trend Vettorizzato & Medie Mobili)", expanded=False):
+        from core.duckdb_engine import compute_duckdb_temporal_snapshot_analytics
+        duck_snap = compute_duckdb_temporal_snapshot_analytics(df_history)
+        if duck_snap.get("success") and not duck_snap["df"].empty:
+            st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{duck_snap['latency_ms']:.2f} ms**")
+            st.dataframe(duck_snap["df"], use_container_width=True, hide_index=True)
+        else:
+            st.info("Dati insufficienti per l'analisi del trend temporale.")

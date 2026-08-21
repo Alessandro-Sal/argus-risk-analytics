@@ -231,6 +231,29 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         )
         st.plotly_chart(fig_liq, use_container_width=True)
 
+        # ⚡ DuckDB OLAP In-Process Accelerated Aggregations
+        with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP & Ranking Settoriale)", expanded=False):
+            from core.duckdb_engine import compute_duckdb_asset_sector_currency_cube, compute_duckdb_sector_rankings
+            cube_res = compute_duckdb_asset_sector_currency_cube(df_l)
+            rank_res = compute_duckdb_sector_rankings(df_l, top_n=3)
+
+            c_olap_1, c_olap_2 = st.columns([1.5, 1])
+            with c_olap_1:
+                st.markdown(f"##### 🧊 Cubo Multi-Dimensionale (Asset Class × Settore × Valuta)")
+                if cube_res.get("success") and not cube_res["df"].empty:
+                    st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
+                    st.dataframe(cube_res["df"], use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nessun dato disponibile per il cubo OLAP.")
+
+            with c_olap_2:
+                st.markdown("##### 🏆 Leader Settoriali (QUALIFY Rank ≤ 3)")
+                if rank_res.get("success") and not rank_res["df"].empty:
+                    st.caption(f"⚡ Calcolo Window Function in **{rank_res['latency_ms']:.2f} ms**")
+                    st.dataframe(rank_res["df"], use_container_width=True, hide_index=True)
+                else:
+                    st.info("Nessun ranking disponibile.")
+
     # Sezione Corporate Actions & Stock Split Audit
     corp_actions = results.get("corporate_actions", [])
     st.markdown("---")
