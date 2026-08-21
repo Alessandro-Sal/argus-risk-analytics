@@ -60,3 +60,28 @@ def test_portfolio_delta_hedge_and_covered_call():
     assert not cov_call.empty
     assert len(cov_call) == 2
     assert "incasso_premio_totale" in cov_call.columns
+    assert "contratti_eseguibili" in cov_call.columns
+    assert "incasso_eseguibile_eur" in cov_call.columns
+
+
+def test_covered_call_discrete_lot_sizing():
+    df_pos = pd.DataFrame([
+        {"ticker": "AAPL", "last_price": 200.0, "qty_net": 150},
+        {"ticker": "MSFT", "last_price": 400.0, "qty_net": 75}
+    ])
+    cov_call = compute_covered_call_yield_enhancement(df_pos, contract_multiplier=100)
+    assert not cov_call.empty
+    aapl_row = cov_call[cov_call["ticker"] == "AAPL"].iloc[0]
+    msft_row = cov_call[cov_call["ticker"] == "MSFT"].iloc[0]
+
+    assert aapl_row["contratti_eseguibili"] == 1
+    assert aapl_row["quote_coperte"] == 100
+    assert aapl_row["quote_scoperte"] == 50
+    assert aapl_row["incasso_eseguibile_eur"] > 0
+    assert aapl_row["incasso_premio_totale"] > aapl_row["incasso_eseguibile_eur"]
+
+    assert msft_row["contratti_eseguibili"] == 0
+    assert msft_row["quote_coperte"] == 0
+    assert msft_row["quote_scoperte"] == 75
+    assert msft_row["incasso_eseguibile_eur"] == 0.0
+    assert msft_row["incasso_premio_totale"] > 0.0

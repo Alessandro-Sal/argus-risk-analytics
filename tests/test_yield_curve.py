@@ -132,3 +132,44 @@ def test_kelly_criterion_with_dynamic_rf():
     assert not df_kelly.empty
     assert "Half-Kelly (Target)" in df_kelly.columns
     assert "Full Kelly" in df_kelly.columns
+
+
+def test_nelson_siegel_curve_fitting_and_evaluation():
+    """Verifica la calibrazione e la valutazione della curva dei rendimenti Nelson-Siegel."""
+    from core.yield_curve import (
+        fit_nelson_siegel_curve,
+        evaluate_yield_term_structure,
+        compute_discount_factors,
+        get_institutional_yield_curve,
+    )
+    maturities = np.array([0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0])
+    yields = np.array([0.025, 0.027, 0.030, 0.033, 0.035, 0.038, 0.042, 0.045])
+
+    fit_res = fit_nelson_siegel_curve(maturities, yields)
+    assert "beta0" in fit_res
+    assert "beta1" in fit_res
+    assert "beta2" in fit_res
+    assert "tau" in fit_res
+    assert fit_res["r_squared"] > 0.90
+    assert fit_res["rmse"] < 0.005
+
+    # Valutazione su scadenze intermedie
+    eval_tenors = np.array([0.5, 1.5, 7.0, 15.0])
+    fitted_yields = evaluate_yield_term_structure(eval_tenors, fit_res)
+    assert len(fitted_yields) == 4
+    assert np.all(fitted_yields > 0.01)
+    assert np.all(fitted_yields < 0.10)
+
+    # I fattori di sconto devono essere compresi in (0, 1] e strettamente decrescenti
+    dfs = compute_discount_factors(eval_tenors, fit_res)
+    assert len(dfs) == 4
+    assert np.all(dfs > 0.0)
+    assert np.all(dfs <= 1.0)
+    assert np.all(np.diff(dfs) < 0)
+
+    # Report completo istituzionale
+    inst_curve_eur = get_institutional_yield_curve("EUR")
+    assert inst_curve_eur["currency"] == "EUR"
+    assert "nelson_siegel_params" in inst_curve_eur
+    assert not inst_curve_eur["df_curve"].empty
+    assert len(inst_curve_eur["df_curve"]) == 11

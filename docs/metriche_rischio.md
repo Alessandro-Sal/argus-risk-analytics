@@ -50,13 +50,15 @@ Il Value at Risk stima la massima perdita potenziale in un orizzonte temporale $
 \[ VaR_{\text{Storico}}(1, \alpha) = - \text{Percentile}(R, \alpha) \]
 
 ### 2. VaR Parametrico (Gaussiano)
-Basato sull'assunzione di rendimenti normalmente distribuiti con media $\mu$ e deviazione standard $\sigma_d$:
-\[ VaR_{\text{Parametrico}}(1, \alpha) = - (\mu - Z_\alpha \cdot \sigma_d) \]
+Basato sull'assunzione di rendimenti normalmente distribuiti con media $\mu$, deviazione standard $\sigma_d$ e quantile normale standard $Z_\alpha = \Phi^{-1}(\alpha) < 0$ (es. $Z_{0.05} = -1.64485$):
+\[ q_{\text{Param}} = \mu + Z_\alpha \cdot \sigma_d \]
+\[ VaR_{\text{Parametrico}}(1, \alpha) = - q_{\text{Param}} = -\mu + |Z_\alpha| \cdot \sigma_d \]
 
-### 3. VaR Cornish-Fisher (Modello Avanzato)
-Incorpora Skewness ($S$) e Kurtosis ($K$) tramite l'espansione di Cornish-Fisher per correggere la stima in presenza di code spesse:
+### 3. VaR Cornish-Fisher (Modello Asimmetrico & Code Spesse)
+Incorpora Asimmetria ($S$) e Curtosi ($K$) tramite l'espansione di Cornish-Fisher per correggere la stima in presenza di code non gaussiane:
 \[ Z_{CF} = Z_\alpha + \frac{1}{6}(Z_\alpha^2 - 1)S + \frac{1}{24}(Z_\alpha^3 - 3Z_\alpha)K - \frac{1}{36}(2Z_\alpha^3 - 5Z_\alpha)S^2 \]
-\[ VaR_{CF}(1, \alpha) = - (\mu - Z_{CF} \cdot \sigma_d) \]
+\[ q_{CF} = \mu + Z_{CF} \cdot \sigma_d \]
+\[ VaR_{CF}(1, \alpha) = - q_{CF} = -\mu + |Z_{CF}| \cdot \sigma_d \]
 
 ### Riscalamento Temporale $\sqrt{T}$
 I valori di VaR giornalieri vengono proiettati su un orizzonte di $T$ giorni tramite la regola della radice del tempo:
@@ -924,5 +926,39 @@ La serializzazione del portafoglio nel formato binario aperto Apache Parquet sfr
 - **Risparmio di Storage**:
   \[ \text{Storage Savings} = 1 - \frac{\text{Dimensione}_{\text{Parquet}}}{\text{Dimensione}_{\text{CSV}}} \approx 85\% \]
 - **Column Pruning & Predicate Pushdown**: In lettura, il motore carica esclusivamente le colonne referenziate nella query, saltando i blocchi di byte irrilevanti tramite metadati di pagina (min/max bounds).
+
+---
+
+## 49. Modello Parametrico Nelson-Siegel per la Curva dei Rendimenti (`core/yield_curve.py`)
+
+Il modulo implementa il modello parametrico a 4 parametri di **Nelson-Siegel (1987)** per l'interpolazione ed estrapolazione continua della struttura a termine dei tassi d'interesse zero-coupon privi di rischio (*Risk-Free Term Structure*).
+
+### 1. Formulazione Matematica
+Il tasso zero-coupon spot continuo $y(t)$ per una scadenza temporale $t > 0$ (espressa in anni) è espresso come combinazione lineare di tre componenti economiche:
+
+\[ y(t) = \beta_0 + \beta_1 \left( \frac{1 - e^{-t/\tau}}{t/\tau} \right) + \beta_2 \left( \frac{1 - e^{-t/\tau}}{t/\tau} - e^{-t/\tau} \right) \]
+
+Dove:
+- **$\beta_0$ (Livello / Long-Term Level)**: Rappresenta il tasso asintotico di lungo termine per $t \to \infty$. Determina lo shift parallelo della curva.
+- **$\beta_1$ (Pendenza / Slope)**: Controlla l'inclinazione della curva a breve termine. Per $t \to 0$, il tasso spot converge a $\beta_0 + \beta_1$ (Short Rate). Se $\beta_1 < 0$, la curva è normalmente inclinata verso l'alto (*Normal Yield Curve*); se $\beta_1 > 0$, la curva è invertita (*Inverted Yield Curve*).
+- **$\beta_2$ (Curvatura / Humdrum)**: Modella la convessità/gobba intermedia (*Hump/Trough*) della term structure.
+- **$\tau$ (Parametro di Scala / Decay Factor)**: Determina la posizione temporale esatta in cui la funzione di curvatura raggiunge il suo massimo ($\tau \approx t_{\text{peak}}$).
+
+### 2. Calibrazione Numerica OLS Condizionata
+Fissato un valore candidato di $\tau$ su una griglia densa $\tau \in [0.2, 5.0]$, il modello risulta **perfettamente lineare** nei coefficienti $(\beta_0, \beta_1, \beta_2)$:
+
+\[ \mathbf{X}(\tau) = \begin{bmatrix} 1 & f_1(t_1, \tau) & f_2(t_1, \tau) \\ \vdots & \vdots & \vdots \\ 1 & f_1(t_N, \tau) & f_2(t_N, \tau) \end{bmatrix} \]
+
+La stima dei coefficienti ottimali viene eseguita istantaneamente tramite Ordinary Least Squares (OLS):
+\[ \hat{\boldsymbol{\beta}}(\tau) = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{y} \]
+
+Il valore ottimale $\tau^*$ viene selezionato massimizzando il coefficiente di determinazione $R^2$ (o minimizzando il Root Mean Square Error, $\text{RMSE}$).
+
+### 3. Fattori di Sconto Continui (Discount Factors)
+Dalla curva continua dei rendimenti stimata $y(t)$, il fattore di sconto $DF(t)$ per attualizzare flussi di cassa alla data $t$ è calcolato in capitalizzazione continua:
+
+\[ DF(t) = \exp(-y(t) \cdot t) \]
+
+I fattori di sconto $DF(t) \in (0, 1]$ risultano strettamente decrescenti con la maturità $t$, garantendo l'assenza di arbitraggi temporali.
 
 

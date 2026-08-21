@@ -113,3 +113,27 @@ def test_crypto_quadro_rw_and_ivafe():
     # IVAFE totale: (30000 + 15000) * 0.002 = 90.00€
     assert summary["total_crypto_portfolio_val_eur"] == 45000.0
     assert summary["total_ivafe_rw_eur"] == 90.0
+
+
+def test_crypto_dynamic_fx_conversion():
+    """Verifica che transazioni in USD utilizzino i tassi di cambio storici dinamici forniti da df_prices."""
+    df_prices = pd.DataFrame([
+        {"ticker": "USDEUR=X", "price_date": pd.to_datetime("2024-01-10"), "close": 0.90},
+        {"ticker": "USDEUR=X", "price_date": pd.to_datetime("2024-06-15"), "close": 0.95},
+    ])
+    results = {
+        "positions": pd.DataFrame(),
+        "df_prices": df_prices,
+        "df_tx": pd.DataFrame([
+            # Buy 1 BTC @ 40,000 USD on 2024-01-10 -> cost in EUR = 40,000 * 0.90 = 36,000 EUR
+            {"tx_id": 1, "tx_date": "2024-01-10", "tx_type": "buy", "quantity": 1.0, "price": 40000.0, "currency": "USD", "ticker": "BTC-USD", "asset_class": "Crypto"},
+            # Sell 1 BTC @ 50,000 USD on 2024-06-15 -> revenue in EUR = 50,000 * 0.95 = 47,500 EUR
+            # Realized Gain in EUR = 47,500 - 36,000 = 11,500 EUR
+            {"tx_id": 2, "tx_date": "2024-06-15", "tx_type": "sell", "quantity": 1.0, "price": 50000.0, "currency": "USD", "ticker": "BTC-USD", "asset_class": "Crypto"},
+        ]),
+    }
+    report = compute_crypto_tax_report(results, tax_year=2024)
+    summary = report["summary"]
+
+    assert summary["total_realized_gains_eur"] == 11500.0
+    assert summary["total_tax_due_rt_eur"] == 11500.0 * 0.26

@@ -77,11 +77,27 @@ def _get_crypto_transactions(results: Dict[str, Any], db_engine=None) -> pd.Data
     return df_crypto_tx
 
 
-def _calc_yearly_crypto_stats(df_crypto_tx: pd.DataFrame) -> Dict[int, Dict[str, float]]:
-    """Elabora code FIFO per determinare plusvalenze e minusvalenze realizzate anno per anno."""
+def _calc_yearly_crypto_stats(
+    df_crypto_tx: pd.DataFrame,
+    df_prices: Optional[pd.DataFrame] = None
+) -> Dict[int, Dict[str, float]]:
+    """Elabora code FIFO per determinare plusvalenze e minusvalenze realizzate anno per anno con conversione FX storica."""
     yearly_crypto_stats: Dict[int, Dict[str, float]] = {}
     if df_crypto_tx.empty:
         return yearly_crypto_stats
+
+    # Pre-costruzione serie di cambio storico se disponibili in df_prices
+    fx_series_map: Dict[str, pd.Series] = {}
+    if df_prices is not None and not df_prices.empty and "ticker" in df_prices.columns:
+        for c_code in ["USD", "GBP", "CHF", "JPY"]:
+            for pair in [f"{c_code}EUR=X", f"EUR{c_code}=X"]:
+                p_sub = df_prices[df_prices["ticker"] == pair]
+                if not p_sub.empty and "close" in p_sub.columns and not p_sub["close"].dropna().empty:
+                    s = p_sub.set_index("price_date")["close"].sort_index().ffill()
+                    if pair.startswith("EUR"):
+                        s = 1.0 / s
+                    fx_series_map[c_code] = s
+                    break
 
     for _, grp in df_crypto_tx.groupby("ticker"):
         queue: List[List[float]] = []
@@ -93,8 +109,23 @@ def _calc_yearly_crypto_stats(df_crypto_tx: pd.DataFrame) -> Dict[int, Dict[str,
             raw_price = float(row["price"])
             yr = int(row["year"])
             curr = str(row.get("currency", "EUR")).upper().strip()
+            tx_dt = pd.to_datetime(row["tx_date"])
 
-            fx = 0.92 if curr == "USD" else (1.17 if curr == "GBP" else 1.0)
+            # Risoluzione dinamica del tasso di cambio storico
+            fx = 1.0
+            if curr not in ["EUR", "XXX", "CRYPTO", "", "NAN", "NONE"]:
+                if curr in fx_series_map and not fx_series_map[curr].empty:
+                    s_fx = fx_series_map[curr]
+                    try:
+                        idx = s_fx.index.get_indexer([tx_dt], method='ffill')[0]
+                        fx = float(s_fx.iloc[idx]) if idx >= 0 else float(s_fx.iloc[0])
+                    except Exception:
+                        fx = float(s_fx.iloc[-1])
+                else:
+                    # Fallback calibrato sui benchmark storici BCE
+                    fallback_map = {"USD": 0.92, "GBP": 1.17, "CHF": 1.06, "JPY": 0.006}
+                    fx = fallback_map.get(curr, 1.0)
+
             price_eur = raw_price * fx
 
             if yr not in yearly_crypto_stats:
@@ -283,7 +314,8 @@ def compute_crypto_tax_report(
         df_crypto_pos = pos[crypto_mask].copy()
 
     df_crypto_tx = _get_crypto_transactions(results, db_engine)
-    yearly_crypto_stats = _calc_yearly_crypto_stats(df_crypto_tx)
+    df_prices = results.get("df_prices")
+    yearly_crypto_stats = _calc_yearly_crypto_stats(df_crypto_tx, df_prices=df_prices)
 
     df_rt, crypto_buckets = _build_crypto_rt_dataframe(yearly_crypto_stats, tax_year)
     df_rw, rw_totals = _build_crypto_rw_dataframe(df_crypto_pos)
