@@ -27,8 +27,10 @@ from core.risk_engine import compute_risk
 from core.db_exporter import save_snapshot_to_db
 import core.ui_utils
 import core.duckdb_engine as duckdb_engine
+import core.adapters.broker_hub as broker_hub
 importlib.reload(core.ui_utils)
 importlib.reload(duckdb_engine)
+importlib.reload(broker_hub)
 from core.ui_utils import (
     inject_custom_css,
     section,
@@ -418,6 +420,8 @@ with tab_ingest:
                 "🟠 Interactive Brokers - IBKR (Activity Statement / Trades)",
                 "🟢 Trade Republic (Transazioni / PAC)",
                 "🔷 Scalable Capital (Transazioni / Baader Bank)",
+                "🟩 eToro (Account Statement / Closed Trades)",
+                "🟪 Revolut Trading (Estratto Conto Transazioni)",
                 "🌐 Google Sheets Live Sync"
             ],
             help="Seleziona il broker da cui proviene il file CSV oppure usa 'Auto-Detect' per il riconoscimento automatico intelligente."
@@ -560,7 +564,9 @@ with tab_ingest:
             "🔴 Fineco Bank (Movimenti Conto Trading)": "fineco",
             "🟠 Interactive Brokers - IBKR (Activity Statement / Trades)": "ibkr",
             "🟢 Trade Republic (Transazioni / PAC)": "traderepublic",
-            "🔷 Scalable Capital (Transazioni / Baader Bank)": "scalable"
+            "🔷 Scalable Capital (Transazioni / Baader Bank)": "scalable",
+            "🟩 eToro (Account Statement / Closed Trades)": "etoro",
+            "🟪 Revolut Trading (Estratto Conto Transazioni)": "revolut"
         }
         selected_broker_key = broker_key_map.get(data_source, "auto")
 
