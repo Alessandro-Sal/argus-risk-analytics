@@ -84,6 +84,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             st.markdown("**Per Settore GICS**")
             s_dict = con["by_gics_sector_pct"]
             s_df = pd.DataFrame(list(s_dict.items()), columns=["Settore", "Peso %"]).sort_values(by="Peso %", ascending=True)
+            max_s = s_df["Peso %"].max() if not s_df.empty else 20.0
 
             fig_sec = go.Figure(go.Bar(
                 y=s_df["Settore"],
@@ -96,14 +97,15 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
                 ),
                 text=s_df["Peso %"].apply(lambda v: f"{v:.1f}%"),
                 textposition="outside",
-                textfont=dict(size=10.5, color="#e6edf3"),
+                cliponaxis=False,
+                textfont=dict(size=11, color="#e6edf3", family="monospace"),
                 hovertemplate="<b>%{y}</b><br>Peso: <b>%{x:.2f}%</b><extra></extra>"
             ))
             fig_sec.update_layout(
                 template="plotly_dark", height=290,
-                margin=dict(l=10, r=35, t=10, b=20),
+                margin=dict(l=10, r=45, t=10, b=20),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", title=None),
+                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", title=None, range=[0, max(5.0, max_s * 1.25)]),
                 yaxis=dict(title=None, tickfont=dict(size=10.5))
             )
             apply_plotly_theme(fig_sec)
@@ -114,6 +116,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             st.markdown("**Per Paese**")
             g_dict = con["by_country_pct"]
             g_df = pd.DataFrame(list(g_dict.items()), columns=["Paese", "Peso %"]).sort_values(by="Peso %", ascending=True)
+            max_g = g_df["Peso %"].max() if not g_df.empty else 40.0
 
             fig_geo = go.Figure(go.Bar(
                 y=g_df["Paese"],
@@ -126,14 +129,15 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
                 ),
                 text=g_df["Peso %"].apply(lambda v: f"{v:.1f}%"),
                 textposition="outside",
-                textfont=dict(size=10.5, color="#e6edf3"),
+                cliponaxis=False,
+                textfont=dict(size=11, color="#e6edf3", family="monospace"),
                 hovertemplate="<b>%{y}</b><br>Peso: <b>%{x:.2f}%</b><extra></extra>"
             ))
             fig_geo.update_layout(
                 template="plotly_dark", height=290,
-                margin=dict(l=10, r=35, t=10, b=20),
+                margin=dict(l=10, r=45, t=10, b=20),
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", title=None),
+                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", title=None, range=[0, max(5.0, max_g * 1.25)]),
                 yaxis=dict(title=None, tickfont=dict(size=10.5))
             )
             apply_plotly_theme(fig_geo)
