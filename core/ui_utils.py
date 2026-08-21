@@ -1916,7 +1916,22 @@ ARGUS supporta l'ingestione automatica con **Auto-Detection del formato** e norm
 
 ---
 
-#### 📄 7. CSV Standard ARGUS (Template Universale)
+#### 🟩 7. eToro
+1. Accedi al tuo account **eToro** ➔ sezione **Portafoglio** ➔ **Cronologia** (*History*).
+2. Clicca sull'icona delle impostazioni in alto a destra ➔ **Estratto conto** (*Account Statement*).
+3. Seleziona l'intervallo temporale desiderato e scarica il file in formato **CSV / Excel**.
+4. *Nota*: Il parser converte automaticamente le posizioni chiuse (*Closed Positions* e *Account Activity*) in coppie BUY/SELL con gestione corretta delle commissioni di rollover/overnight e valuta USD.
+
+---
+
+#### 🟪 8. Revolut Trading
+1. Apri l'app **Revolut** ➔ sezione **Investimenti / Trading** ➔ **Altro (...)** ➔ **Estratti conto** (*Statements*).
+2. Seleziona il periodo desiderato ed esporta il file in formato **CSV / Excel**.
+3. *Nota*: Vengono riconosciute e normalizzate automaticamente le operazioni di compravendita di azioni/ETF frazionate e i dividendi accreditati.
+
+---
+
+#### 📄 9. CSV Standard ARGUS (Template Universale)
 Se utilizzi un broker non elencato o un foglio di calcolo personalizzato, puoi scaricare il **Template CSV Standard** con le seguenti colonne:
 `tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes`
 """
