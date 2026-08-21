@@ -1100,11 +1100,13 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     st.plotly_chart(fig_dd, use_container_width=True)
 
     st.divider()
-
-    st.markdown("#### 🔬 Validazione e Backtesting dei Modelli VaR (Kupiec Test)")
-    st.caption(f"Verifica l'efficacia statistica dei tre modelli di VaR (Storico, Parametrico e Cornish-Fisher) ad un orizzonte di 1 giorno su {int(conf_level*100)}% confidenza.")
-
-    glossary_modal("🔬 Guida al Backtesting del VaR (Test di Kupiec)", """
+    col_kup_h1, col_kup_h2 = st.columns([3.5, 1.2])
+    with col_kup_h1:
+        st.markdown("#### 🔬 Validazione e Backtesting dei Modelli VaR (Kupiec Test)")
+        st.caption(f"Verifica l'efficacia statistica dei tre modelli di VaR (Storico, Parametrico e Cornish-Fisher) su un orizzonte di 1 giorno con livello di confidenza al {int(conf_level*100)}%.")
+    with col_kup_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("🔬 Guida al Backtesting del VaR (Test di Kupiec)", """
 <div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(0,230,118,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
   <div style="color: #00e676; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🚦 Test di Kupiec (Validazione Statistica del VaR)</div>
@@ -1123,7 +1125,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
   </div>
 </div>
 </div>
-""", button_label="💡 Come funziona il Backtesting?")
+""", button_label="💡 Guida al Backtesting")
 
     recent_r = r.tail(252)
     n_days = len(recent_r)
@@ -1137,34 +1139,84 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     ratio_param = (exc_param / n_days) * 100
     ratio_cf = (exc_cf / n_days) * 100
 
-    def get_basel_zone(exc_count, expected):
-        if exc_count <= expected:
-            return "🟢 Modello Valido (Conservativo)"
-        elif exc_count <= expected * 1.5:
-            return "🟡 Modello Accettabile (Sotto-stima lieve)"
+    from scipy.stats import chi2
+    def calc_kupiec_lr(x: int, N: int, p: float = 0.05):
+        if N <= 0: return 0.0, 1.0
+        p_hat = x / N
+        if p_hat == 0:
+            lr = -2.0 * (N * np.log(1.0 - p))
+        elif p_hat >= 1:
+            lr = -2.0 * (N * np.log(p))
         else:
-            return "🔴 Modello Debole (Sotto-stima grave)"
+            num = ((1.0 - p) ** (N - x)) * (p ** x)
+            den = ((1.0 - p_hat) ** (N - x)) * (p_hat ** x)
+            lr = -2.0 * np.log(num / den) if (den > 0 and num > 0) else 0.0
+        lr = max(0.0, float(lr))
+        pval = float(1.0 - chi2.cdf(lr, df=1))
+        return lr, pval
 
-    df_backtest = pd.DataFrame({
-        "Modello VaR": ["Storico", "Parametrico (Gaussiano)", "Cornish-Fisher"],
-        "Soglia VaR (1g)": [f"{var_hist_1d * 100:.2f}%", f"{var_param_1d * 100:.2f}%", f"{var_cf_1d * 100:.2f}%"],
-        "Eccezioni Reali (252g)": [exc_hist, exc_param, exc_cf],
-        "Tasso di Violazione": [f"{ratio_hist:.2f}%", f"{ratio_param:.2f}%", f"{ratio_cf:.2f}%"],
-        "Target Violazioni": [f"{alpha * 100:.1f}%", f"{alpha * 100:.1f}%", f"{alpha * 100:.1f}%"],
-        "Stato (Basel Accord)": [get_basel_zone(exc_hist, expected_exc), get_basel_zone(exc_param, expected_exc), get_basel_zone(exc_cf, expected_exc)]
-    })
+    lr_hist, pval_hist = calc_kupiec_lr(exc_hist, n_days, alpha)
+    lr_param, pval_param = calc_kupiec_lr(exc_param, n_days, alpha)
+    lr_cf, pval_cf = calc_kupiec_lr(exc_cf, n_days, alpha)
 
-    col_bt_tbl, col_bt_desc = st.columns([2, 1])
-    with col_bt_tbl:
-        st.dataframe(df_backtest, use_container_width=True, hide_index=True)
-    with col_bt_desc:
-        st.info(f"""
-        **Come leggere i risultati:**
-        * **Eccezioni Attese**: In {n_days} giorni di trading, ci aspettiamo circa **{expected_exc:.1f} violazioni**.
-        * **🟢 Zona Verde**: Modello solido.
-        * **🟡 Zona Gialla**: Sottostima lieve.
-        * **🔴 Zona Rossa**: Troppe violazioni. Modello inaffidabile.
-        """)
+    def get_basel_badge(exc_count, expected):
+        if exc_count <= expected:
+            return '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap;">🟢 Zona Verde (Conforme)</span>'
+        elif exc_count <= expected * 1.5:
+            return '<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap;">🟡 Zona Gialla (Sottostima)</span>'
+        else:
+            return '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap;">🔴 Zona Rossa (Rigettato)</span>'
+
+    badge_hist = get_basel_badge(exc_hist, expected_exc)
+    badge_param = get_basel_badge(exc_param, expected_exc)
+    badge_cf = get_basel_badge(exc_cf, expected_exc)
+
+    st.markdown(f"""
+    <div style="background: rgba(18, 24, 38, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 18px; margin-bottom: 8px; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; font-size: 11.5px; font-weight: 700; letter-spacing: 0.5px; height: 32px;">
+                    <th style="text-align: left; padding: 6px 10px;">MODELLO VAR</th>
+                    <th style="text-align: right; padding: 6px 10px;">SOGLIA VAR (1G)</th>
+                    <th style="text-align: center; padding: 6px 10px;">ECCEZIONI REALI (252G)</th>
+                    <th style="text-align: right; padding: 6px 10px;">TASSO VIOLAZIONE</th>
+                    <th style="text-align: right; padding: 6px 10px;">TARGET ATTESO</th>
+                    <th style="text-align: center; padding: 6px 10px;">TEST KUPIEC LR (p-val)</th>
+                    <th style="text-align: right; padding: 6px 10px;">ACCORDO BASILEA III</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); height: 42px;">
+                    <td style="color: #ffffff; font-weight: 600; padding: 6px 10px; white-space: nowrap;">📊 VaR Storico</td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8; padding: 6px 10px; white-space: nowrap;">{var_hist_1d * 100:.2f}%</td>
+                    <td style="text-align: center; font-family: monospace; font-weight: 600; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">{exc_hist} / {n_days}</td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #4ade80; padding: 6px 10px; white-space: nowrap;">{ratio_hist:.2f}%</td>
+                    <td style="text-align: right; font-family: monospace; color: #94a3b8; padding: 6px 10px; white-space: nowrap;">{alpha * 100:.1f}% ({expected_exc:.1f} violazioni)</td>
+                    <td style="text-align: center; font-family: monospace; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">LR = {lr_hist:.2f} (p = {pval_hist:.2f})</td>
+                    <td style="text-align: right; padding: 6px 10px;">{badge_hist}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); height: 42px;">
+                    <td style="color: #ffffff; font-weight: 600; padding: 6px 10px; white-space: nowrap;">📐 VaR Parametrico (Gaussiano)</td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8; padding: 6px 10px; white-space: nowrap;">{var_param_1d * 100:.2f}%</td>
+                    <td style="text-align: center; font-family: monospace; font-weight: 600; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">{exc_param} / {n_days}</td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #4ade80; padding: 6px 10px; white-space: nowrap;">{ratio_param:.2f}%</td>
+                    <td style="text-align: right; font-family: monospace; color: #94a3b8; padding: 6px 10px; white-space: nowrap;">{alpha * 100:.1f}% ({expected_exc:.1f} violazioni)</td>
+                    <td style="text-align: center; font-family: monospace; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">LR = {lr_param:.2f} (p = {pval_param:.2f})</td>
+                    <td style="text-align: right; padding: 6px 10px;">{badge_param}</td>
+                </tr>
+                <tr style="height: 42px;">
+                    <td style="color: #ffffff; font-weight: 600; padding: 6px 10px; white-space: nowrap;">📈 VaR Cornish-Fisher (Code Spesse)</td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #38bdf8; padding: 6px 10px; white-space: nowrap;">{var_cf_1d * 100:.2f}%</td>
+                    <td style="text-align: center; font-family: monospace; font-weight: 600; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">{exc_cf} / {n_days}</td>
+                    <td style="text-align: right; font-family: monospace; font-weight: 600; color: #4ade80; padding: 6px 10px; white-space: nowrap;">{ratio_cf:.2f}%</td>
+                    <td style="text-align: right; font-family: monospace; color: #94a3b8; padding: 6px 10px; white-space: nowrap;">{alpha * 100:.1f}% ({expected_exc:.1f} violazioni)</td>
+                    <td style="text-align: center; font-family: monospace; color: #cbd5e1; padding: 6px 10px; white-space: nowrap;">LR = {lr_cf:.2f} (p = {pval_cf:.2f})</td>
+                    <td style="text-align: right; padding: 6px 10px;">{badge_cf}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    """, unsafe_allow_html=True)
 
     # ── SEZIONE GARCH(1,1) & FILTERED HISTORICAL SIMULATION (FHS) ────────
     st.divider()
