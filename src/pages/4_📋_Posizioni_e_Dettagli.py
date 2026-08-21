@@ -1216,6 +1216,8 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         st.markdown("#### 💡 Candidati Tax-Loss Harvesting (Riduzione Debito Fiscale)")
+        st.caption("Posizioni attualmente in perdita latente compensabile per ridurre il carico fiscale sulle plusvalenze realizzate o accumulare credito d'imposta nello zainetto fiscale.")
+
         if not tax_harv.empty:
             df_harv_disp = tax_harv.copy()
             if "asset_class" in df_harv_disp.columns:
@@ -1231,22 +1233,51 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "qualifying_type": "Tipologia Reddito (TUIR)"
             })
             
-            format_dict = {}
-            for col, fmt in [
-                ("PnL Non Realizzato (€)", "€ {:,.2f}"),
-                ("Risparmio Fiscale Potenziale (€)", "€ {:,.2f}"),
-                ("Aliquota Fiscale %", "{:.1f}%")
-            ]:
+            # Formattazione numerica standard
+            for col in ["PnL Non Realizzato (€)", "Risparmio Fiscale Potenziale (€)", "Aliquota Fiscale %"]:
                 if col in df_harv_disp.columns:
                     df_harv_disp[col] = pd.to_numeric(
                         df_harv_disp[col].astype(str).str.replace("%", "").str.replace("€", "").str.strip(),
                         errors="coerce"
                     ).fillna(0.0)
-                    format_dict[col] = fmt
+
+            # Toolbar: Ricerca, Filtro Classe Asset e Download CSV
+            col_th_f1, col_th_f2, col_th_f3 = st.columns([2.0, 1.2, 1.1])
+            with col_th_f1:
+                search_th = st.text_input("🔍 Cerca Asset / TUIR:", key="search_tax_loss_cands", placeholder="Es. ENPH, ADA, Stock, Crypto...")
+            with col_th_f2:
+                cls_list = ["Tutte le Classi"] + sorted(list(df_harv_disp["Classe Asset"].dropna().unique())) if "Classe Asset" in df_harv_disp.columns else ["Tutte"]
+                filter_th_cls = st.selectbox("🏷️ Classe Asset:", cls_list, key="filter_tax_loss_cls")
+            with col_th_f3:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                csv_th = df_harv_disp.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_th, file_name="candidati_tax_loss_harvesting.csv", mime="text/csv", use_container_width=True, key="btn_download_tax_loss_cands")
+
+            df_harv_filt = df_harv_disp.copy()
+            if search_th:
+                mask = df_harv_filt["Ticker"].astype(str).str.contains(search_th.strip(), case=False, na=False)
+                if "Tipologia Reddito (TUIR)" in df_harv_filt.columns:
+                    mask |= df_harv_filt["Tipologia Reddito (TUIR)"].astype(str).str.contains(search_th.strip(), case=False, na=False)
+                if "Classe Asset" in df_harv_filt.columns:
+                    mask |= df_harv_filt["Classe Asset"].astype(str).str.contains(search_th.strip(), case=False, na=False)
+                df_harv_filt = df_harv_filt[mask]
+            if filter_th_cls != "Tutte le Classi" and "Classe Asset" in df_harv_filt.columns:
+                df_harv_filt = df_harv_filt[df_harv_filt["Classe Asset"] == filter_th_cls]
+
+            th_cfg = {
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Classe Asset": st.column_config.TextColumn("Classe Asset", width="small"),
+                "PnL Non Realizzato (€)": st.column_config.NumberColumn("PnL Non Realizzato (€)", format="€ %.2f"),
+                "Risparmio Fiscale Potenziale (€)": st.column_config.NumberColumn("Risparmio Fiscale Potenziale (€)", format="€ %.2f"),
+                "Aliquota Fiscale %": st.column_config.NumberColumn("Aliquota Fiscale", format="%.1f%%"),
+                "Tipologia Reddito (TUIR)": st.column_config.TextColumn("Tipologia Reddito (TUIR)", width="medium")
+            }
 
             st.dataframe(
-                df_harv_disp.style.format(format_dict) if format_dict else df_harv_disp,
-                use_container_width=True, hide_index=True
+                df_harv_filt,
+                column_config=th_cfg,
+                use_container_width=True,
+                hide_index=True
             )
         else:
             st.info("Nessuna posizione in perdita latente compensabile individuata.")
