@@ -835,27 +835,56 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
         sub_view_gy = st.radio(
             "Seleziona Vista Dati:",
             ["🪦 Sintesi per Asset (Graveyard Aggregato)", "📑 Registro Analitico Lotti Chiusi (FIFO Log)"],
-            horizontal=True
+            horizontal=True,
+            key="sub_view_gy_radio"
         )
 
         if sub_view_gy == "🪦 Sintesi per Asset (Graveyard Aggregato)":
             if not df_assets_closed.empty:
                 df_a_disp = df_assets_closed.copy()
                 df_a_disp_cols = [
-                    "ticker", "asset_class", "status", "qty_sold",
+                    "ticker", "asset_class", "sector", "country", "status", "qty_sold",
                     "avg_buy_price_eur", "avg_sell_price_eur", "cost_basis_eur",
                     "proceeds_eur", "realized_pnl_eur", "realized_pnl_pct",
                     "dividends_eur", "total_profit_eur", "avg_holding_days", "outcome"
                 ]
                 df_a_show = df_a_disp[[c for c in df_a_disp_cols if c in df_a_disp.columns]].rename(columns={
-                    "ticker": "Ticker", "asset_class": "Asset Class", "status": "Stato Posizione",
-                    "qty_sold": "Q.tà Chiusa", "avg_buy_price_eur": "Prezzo Carico Medio (€)",
+                    "ticker": "Ticker", "asset_class": "Asset Class", "sector": "Settore", "country": "Paese",
+                    "status": "Stato Posizione", "qty_sold": "Q.tà Chiusa", "avg_buy_price_eur": "Prezzo Carico Medio (€)",
                     "avg_sell_price_eur": "Prezzo Vendita Medio (€)", "cost_basis_eur": "Costo Fiscale (€)",
                     "proceeds_eur": "Incasso (€)", "realized_pnl_eur": "PnL Realizzato (€)",
                     "realized_pnl_pct": "Rendimento (%)", "dividends_eur": "Dividendi (€)",
                     "total_profit_eur": "Profitto Netto (€)", "avg_holding_days": "Holding Medio (gg)",
                     "outcome": "Esito"
                 })
+
+                # Toolbar: Ricerca, Filtri e Download CSV
+                col_f1, col_f2, col_f3, col_f4 = st.columns([2.0, 1.2, 1.2, 1.1])
+                with col_f1:
+                    search_gy_a = st.text_input("🔍 Cerca Ticker / Settore:", key="search_gy_assets", placeholder="Es. META, AAPL, Tecnologia...")
+                with col_f2:
+                    statuses = ["Tutti gli Stati"] + sorted(list(df_a_show["Stato Posizione"].dropna().unique())) if "Stato Posizione" in df_a_show.columns else ["Tutti"]
+                    filter_status = st.selectbox("📌 Stato:", statuses, key="filter_gy_status")
+                with col_f3:
+                    outcomes = ["Tutti gli Esiti"] + sorted(list(df_a_show["Esito"].dropna().unique())) if "Esito" in df_a_show.columns else ["Tutti"]
+                    filter_outcome = st.selectbox("🎯 Esito:", outcomes, key="filter_gy_outcome")
+                with col_f4:
+                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                    csv_a = df_a_show.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_a, file_name="graveyard_sintesi_asset.csv", mime="text/csv", use_container_width=True, key="btn_download_gy_assets")
+
+                df_a_filt = df_a_show.copy()
+                if search_gy_a:
+                    mask = df_a_filt["Ticker"].astype(str).str.contains(search_gy_a.strip(), case=False, na=False)
+                    if "Settore" in df_a_filt.columns:
+                        mask |= df_a_filt["Settore"].astype(str).str.contains(search_gy_a.strip(), case=False, na=False)
+                    if "Asset Class" in df_a_filt.columns:
+                        mask |= df_a_filt["Asset Class"].astype(str).str.contains(search_gy_a.strip(), case=False, na=False)
+                    df_a_filt = df_a_filt[mask]
+                if filter_status != "Tutti gli Stati" and "Stato Posizione" in df_a_filt.columns:
+                    df_a_filt = df_a_filt[df_a_filt["Stato Posizione"] == filter_status]
+                if filter_outcome != "Tutti gli Esiti" and "Esito" in df_a_filt.columns:
+                    df_a_filt = df_a_filt[df_a_filt["Esito"] == filter_outcome]
 
                 cfg_a = {
                     "Prezzo Carico Medio (€)": st.column_config.NumberColumn("Prezzo Carico Medio (€)", format="€ %.2f"),
@@ -868,24 +897,52 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     "Profitto Netto (€)": st.column_config.NumberColumn("Profitto Netto (€)", format="€ %.2f"),
                     "Holding Medio (gg)": st.column_config.NumberColumn("Holding Medio (gg)", format="%d gg")
                 }
-                st.dataframe(df_a_show, use_container_width=True, hide_index=True, column_config=cfg_a)
+                st.dataframe(df_a_filt, use_container_width=True, hide_index=True, column_config=cfg_a)
+            else:
+                st.info("Nessuna sintesi per asset disponibile.")
 
         else:
             if not df_lots_closed.empty:
                 df_l_disp = df_lots_closed.copy()
                 df_l_cols = [
-                    "ticker", "buy_date", "sell_date", "qty",
+                    "ticker", "asset_class", "sector", "country", "buy_date", "sell_date", "qty",
                     "buy_price_eur", "sell_price_eur", "cost_basis_eur",
                     "proceeds_eur", "realized_pnl_eur", "realized_pnl_pct",
                     "holding_days", "outcome"
                 ]
                 df_l_show = df_l_disp[[c for c in df_l_cols if c in df_l_disp.columns]].rename(columns={
-                    "ticker": "Ticker", "buy_date": "Data Acquisto", "sell_date": "Data Vendita",
+                    "ticker": "Ticker", "asset_class": "Asset Class", "sector": "Settore", "country": "Paese",
+                    "buy_date": "Data Acquisto", "sell_date": "Data Vendita",
                     "qty": "Quantità Lotto", "buy_price_eur": "Prezzo Acquisto (€)",
                     "sell_price_eur": "Prezzo Vendita (€)", "cost_basis_eur": "Costo Lotto (€)",
                     "proceeds_eur": "Incasso (€)", "realized_pnl_eur": "PnL Realizzato (€)",
                     "realized_pnl_pct": "Rendimento (%)", "holding_days": "Holding (gg)", "outcome": "Esito"
                 })
+
+                # Toolbar: Ricerca, Filtri e Download CSV per Registro Lotti
+                col_lf1, col_lf2, col_lf3 = st.columns([2.0, 1.2, 1.1])
+                with col_lf1:
+                    search_gy_l = st.text_input("🔍 Cerca Ticker / Data / Settore:", key="search_gy_lots", placeholder="Es. BTC, 2024, META, Tecnologia...")
+                with col_lf2:
+                    outcomes_l = ["Tutti gli Esiti"] + sorted(list(df_l_show["Esito"].dropna().unique())) if "Esito" in df_l_show.columns else ["Tutti"]
+                    filter_outcome_l = st.selectbox("🎯 Esito:", outcomes_l, key="filter_gy_outcome_lots")
+                with col_lf3:
+                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                    csv_l = df_l_show.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_l, file_name="registro_analitico_lotti_chiusi.csv", mime="text/csv", use_container_width=True, key="btn_download_gy_lots")
+
+                df_l_filt = df_l_show.copy()
+                if search_gy_l:
+                    mask = df_l_filt["Ticker"].astype(str).str.contains(search_gy_l.strip(), case=False, na=False)
+                    if "Data Acquisto" in df_l_filt.columns:
+                        mask |= df_l_filt["Data Acquisto"].astype(str).str.contains(search_gy_l.strip(), case=False, na=False)
+                    if "Data Vendita" in df_l_filt.columns:
+                        mask |= df_l_filt["Data Vendita"].astype(str).str.contains(search_gy_l.strip(), case=False, na=False)
+                    if "Settore" in df_l_filt.columns:
+                        mask |= df_l_filt["Settore"].astype(str).str.contains(search_gy_l.strip(), case=False, na=False)
+                    df_l_filt = df_l_filt[mask]
+                if filter_outcome_l != "Tutti gli Esiti" and "Esito" in df_l_filt.columns:
+                    df_l_filt = df_l_filt[df_l_filt["Esito"] == filter_outcome_l]
 
                 cfg_l = {
                     "Prezzo Acquisto (€)": st.column_config.NumberColumn("Prezzo Acquisto (€)", format="€ %.2f"),
@@ -896,7 +953,9 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%"),
                     "Holding (gg)": st.column_config.NumberColumn("Holding (gg)", format="%d gg")
                 }
-                st.dataframe(df_l_show, use_container_width=True, hide_index=True, column_config=cfg_l)
+                st.dataframe(df_l_filt, use_container_width=True, hide_index=True, column_config=cfg_l)
+            else:
+                st.info("Nessun lotto chiuso disponibile.")
 
 
 # ── TAB 3: PROIEZIONE DIVIDENDI ───────────────────────────────
