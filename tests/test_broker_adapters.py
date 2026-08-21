@@ -12,6 +12,7 @@ from core.adapters.broker_hub import (
 )
 from core.adapters.degiro import parse_degiro_transactions
 from core.adapters.directa import parse_directa_transactions
+from core.adapters.etoro import parse_etoro_transactions
 from core.adapters.fineco import parse_fineco_transactions
 from core.adapters.ibkr import parse_ibkr_transactions
 from core.adapters.isin_resolver import (
@@ -20,6 +21,7 @@ from core.adapters.isin_resolver import (
     clean_numeric_value,
     resolve_isin_to_ticker,
 )
+from core.adapters.revolut import parse_revolut_transactions
 from core.adapters.scalable import parse_scalable_transactions
 from core.adapters.traderepublic import parse_traderepublic_transactions
 from core.validator import validate_csv
@@ -312,6 +314,122 @@ def test_broker_hub_auto_detection():
     # DeGiro
     df_deg = pd.DataFrame(columns=["Data", "Ora", "Prodotto", "ISIN", "Quantità", "Prezzo", "Costi di transazione"])
     assert detect_broker_format(df_deg) == "degiro"
+
+    # eToro
+    df_etoro = pd.DataFrame(columns=["Position ID", "Action", "Details", "Units", "Open Rate", "Close Rate", "Amount"])
+    assert detect_broker_format(df_etoro) == "etoro"
+
+    # Revolut
+    df_rev = pd.DataFrame(columns=["Date", "Ticker", "Type", "Quantity", "Price per share", "Total Amount", "Currency"])
+    assert detect_broker_format(df_rev) == "revolut"
+
+
+def test_etoro_adapter_parsing():
+    """Verifica il parsing e la normalizzazione dei record eToro (Open/Close e dividendi)."""
+    raw_df = pd.DataFrame([
+        {
+            "Position ID": "1001",
+            "Action": "Buy Apple",
+            "Details": "Apple Inc (AAPL)",
+            "Units": "5.0",
+            "Open Rate": "150.00",
+            "Close Rate": "180.00",
+            "Open Date": "10/01/2023 14:00",
+            "Close Date": "15/06/2023 16:30",
+            "Amount": "750.00",
+            "Profit": "150.00",
+            "Spread": "2.00",
+            "Currency": "USD",
+            "Asset type": "Stocks",
+            "ISIN": "US0378331005"
+        },
+        {
+            "Position ID": "1002",
+            "Action": "Dividend",
+            "Details": "Microsoft Corp",
+            "Units": "1.0",
+            "Open Rate": "0.00",
+            "Close Rate": "0.00",
+            "Open Date": "20/09/2023",
+            "Close Date": "20/09/2023",
+            "Amount": "25.50",
+            "Profit": "25.50",
+            "Spread": "0.00",
+            "Currency": "USD",
+            "Asset type": "Stocks",
+            "ISIN": "US5949181045"
+        }
+    ])
+
+    parsed = parse_etoro_transactions(raw_df)
+    assert not parsed.empty
+    assert len(parsed) == 3  # 1 Buy + 1 Sell (da posizione chiusa) + 1 Dividend
+
+    # Buy AAPL
+    buy_aapl = parsed[parsed["tx_type"] == "buy"].iloc[0]
+    assert buy_aapl["ticker"] == "AAPL"
+    assert buy_aapl["quantity"] == 5.0
+    assert buy_aapl["price"] == 150.0
+    assert buy_aapl["currency"] == "USD"
+
+    # Sell AAPL
+    sell_aapl = parsed[parsed["tx_type"] == "sell"].iloc[0]
+    assert sell_aapl["ticker"] == "AAPL"
+    assert sell_aapl["price"] == 180.0
+
+    # Dividend
+    div_row = parsed[parsed["tx_type"] == "dividend"].iloc[0]
+    assert div_row["ticker"] == "MSFT"
+    assert div_row["price"] == 25.50
+
+    # Validazione conformità schema ARGUS
+    validated, report = validate_csv(parsed)
+    assert len(report["errors"]) == 0
+    assert not validated.empty
+
+
+def test_revolut_adapter_parsing():
+    """Verifica il parsing e la normalizzazione dei record Revolut Trading."""
+    raw_df = pd.DataFrame([
+        {
+            "Date": "2023-03-15T10:00:00Z",
+            "Ticker": "NVDA",
+            "Type": "BUY",
+            "Quantity": "0.5",
+            "Price per share": "240.00",
+            "Total Amount": "120.00",
+            "Currency": "USD",
+            "Description": "NVIDIA Corp"
+        },
+        {
+            "Date": "2023-08-20T11:00:00Z",
+            "Ticker": "NVDA",
+            "Type": "DIVIDEND",
+            "Quantity": "0.5",
+            "Price per share": "10.00",
+            "Total Amount": "5.00",
+            "Currency": "USD",
+            "Description": "NVIDIA Dividend"
+        }
+    ])
+
+    parsed = parse_revolut_transactions(raw_df)
+    assert not parsed.empty
+    assert len(parsed) == 2
+
+    buy_row = parsed[parsed["tx_type"] == "buy"].iloc[0]
+    assert buy_row["ticker"] == "NVDA"
+    assert buy_row["quantity"] == 0.5
+    assert buy_row["price"] == 240.0
+
+    div_row = parsed[parsed["tx_type"] == "dividend"].iloc[0]
+    assert div_row["ticker"] == "NVDA"
+    assert div_row["tx_type"] == "dividend"
+    assert div_row["price"] == 5.00
+
+    validated, report = validate_csv(parsed)
+    assert len(report["errors"]) == 0
+    assert not validated.empty
 
 
 def test_parse_broker_csv_auto_pipeline():

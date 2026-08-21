@@ -26,7 +26,13 @@ _L1_CACHE: Dict[str, Tuple[float, Any]] = {}
 def _get_cache_connection() -> sqlite3.Connection:
     """Restituisce una connessione SQLite thread-safe per il Tier 2 di cache su disco."""
     os.makedirs("data", exist_ok=True)
-    conn = sqlite3.connect(str(CACHE_DB_PATH), check_same_thread=False)
+    conn = sqlite3.connect(str(CACHE_DB_PATH), check_same_thread=False, timeout=10.0)
+    try:
+        conn.execute("PRAGMA journal_mode = WAL;")
+        conn.execute("PRAGMA synchronous = NORMAL;")
+        conn.execute("PRAGMA busy_timeout = 10000;")
+    except Exception:
+        pass
     conn.execute("""
         CREATE TABLE IF NOT EXISTS yfinance_cache (
             cache_key TEXT PRIMARY KEY,

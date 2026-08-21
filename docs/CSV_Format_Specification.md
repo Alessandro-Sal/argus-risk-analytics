@@ -50,6 +50,8 @@ ARGUS include un modulo di auto-rilevamento (**Auto-Detection**) e adapter speci
 | **Trade Republic** | `core/adapters/traderepublic.py` | Estratto conto, transazioni singole, ordini PAC (*Savings Plan / Sparplan*) e dividendi (IT, EN, DE). |
 | **Scalable Capital** | `core/adapters/scalable.py` | Esportazioni Baader Bank / Scalable Broker per compravendite, dividendi e PAC ETF. |
 | **DeGiro** | `core/adapters/degiro.py` | Report *Attività > Transazioni* (IT, EN, NL) con calcolo automatico del cambio valuta e fee. |
+| **eToro** | `core/adapters/etoro.py` | Estratto conto *Account Statement*, posizioni chiuse con prezzo/data di apertura e chiusura e dividendi. |
+| **Revolut Trading** | `core/adapters/revolut.py` | Esportazioni sezione Trading / Investimenti con frazioni di azioni, compravendite e dividendi multi-valuta. |
 
 ### Riconoscimento Automatico dei Codici ISIN (`core/adapters/isin_resolver.py`)
 Per tutti i broker che esportano codici ISIN anziché ticker azionari (es. `IE00B4L5Y983`), il risolutore universale opera su 3 livelli:

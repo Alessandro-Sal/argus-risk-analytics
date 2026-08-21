@@ -11,8 +11,10 @@ import pandas as pd
 
 from core.adapters.degiro import parse_degiro_transactions
 from core.adapters.directa import parse_directa_transactions
+from core.adapters.etoro import parse_etoro_transactions
 from core.adapters.fineco import parse_fineco_transactions
 from core.adapters.ibkr import parse_ibkr_transactions
+from core.adapters.revolut import parse_revolut_transactions
 from core.adapters.scalable import parse_scalable_transactions
 from core.adapters.traderepublic import parse_traderepublic_transactions
 
@@ -60,6 +62,18 @@ SUPPORTED_BROKERS: Dict[str, Dict[str, Any]] = {
         "icon": "🔷",
         "desc": "Export transazioni Baader Bank / Scalable Broker per compravendite, dividendi e PAC ETF.",
         "sample_columns": ["date", "type", "security", "isin", "shares", "price", "amount"]
+    },
+    "etoro": {
+        "name": "eToro",
+        "icon": "🟩",
+        "desc": "Estratto Conto / Account Statement e Closed Positions esportati da eToro.",
+        "sample_columns": ["position id", "action", "details", "units", "open rate", "close rate", "amount"]
+    },
+    "revolut": {
+        "name": "Revolut Trading",
+        "icon": "🟣",
+        "desc": "Export transazioni e ordini della sezione Trading / Investimenti di Revolut.",
+        "sample_columns": ["date", "ticker", "type", "quantity", "price per share", "total amount", "currency"]
     }
 }
 
@@ -87,6 +101,12 @@ def _match_broker_signatures(cols_lower: list, cols_joined: str, first_col_value
 
     if any(k in cols_joined for k in ["timestamp", "wertpapier", "gebuehr", "gebühr", "traderepublic", "trade republic"]):
         return "traderepublic"
+
+    if any(k in cols_joined for k in ["position id", "open rate", "close rate", "take profit", "stop loss rate", "realized equity change", "etoro"]):
+        return "etoro"
+
+    if any(k in cols_joined for k in ["price per share", "total amount", "revolut"]) or ("ticker" in cols_joined and "price" in cols_joined and ("fx rate" in cols_joined or "amount" in cols_joined)):
+        return "revolut"
 
     if "isin" in cols_joined and any(k in cols_joined for k in ["name", "shares", "stueck", "stück"]):
         return "traderepublic"
@@ -127,6 +147,10 @@ def _dispatch_parser(df_raw: pd.DataFrame, broker_key: str) -> pd.DataFrame:
         return parse_traderepublic_transactions(df_raw)
     if broker_key == "scalable":
         return parse_scalable_transactions(df_raw)
+    if broker_key == "etoro":
+        return parse_etoro_transactions(df_raw)
+    if broker_key == "revolut":
+        return parse_revolut_transactions(df_raw)
     return df_raw.copy()
 
 
