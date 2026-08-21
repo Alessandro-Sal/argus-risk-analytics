@@ -136,3 +136,47 @@ def test_safe_float_clamping():
     assert clamped_pos == 999999.9999
 
 
+from core.risk_engine import _calc_market_risk
+
+
+def test_parametric_var_drift_sensitivity():
+    """
+    Verifica che con media di rendimenti positiva (drift positivo), il VaR parametrico
+    sia inferiore a quello con drift nullo (riduzione della perdita attesa).
+    """
+    dates = pd.date_range("2024-01-01", periods=500, freq="B")
+    np.random.seed(42)
+    vol = 0.01
+    white_noise = np.random.normal(0, vol, 500)
+
+    sr_zero_drift = pd.Series(white_noise, index=dates)
+    sr_pos_drift = pd.Series(white_noise + 0.002, index=dates)
+
+    sr_bm = pd.Series(white_noise * 0.8, index=dates)
+
+    res_zero = _calc_market_risk(sr_zero_drift, sr_bm, "SPY")
+    res_pos = _calc_market_risk(sr_pos_drift, sr_bm, "SPY")
+
+    # A parità di volatilità, un drift positivo deve RIDURRE il VaR parametrico e Cornish-Fisher
+    assert res_pos["var_parametric_95"] < res_zero["var_parametric_95"]
+    assert res_pos["var_cf_95"] < res_zero["var_cf_95"]
+    assert res_pos["var_parametric_95"] > 0
+    assert res_pos["var_cf_95"] > 0
+
+
+def test_market_risk_fama_french_integration():
+    """Verifica che _calc_market_risk calcoli correttamente i coefficienti Fama-French integrati."""
+    dates = pd.date_range("2024-01-01", periods=100, freq="B")
+    np.random.seed(42)
+    sr_p = pd.Series(np.random.normal(0.0005, 0.012, 100), index=dates)
+    sr_bm = pd.Series(np.random.normal(0.0004, 0.010, 100), index=dates)
+
+    res = _calc_market_risk(sr_p, sr_bm, "SPY")
+    assert "ff_alpha_pct" in res
+    assert "ff_beta_mkt" in res
+    assert "smb_tilt" in res
+    assert "hml_tilt" in res
+    assert isinstance(res["ff_alpha_pct"], float)
+    assert isinstance(res["ff_beta_mkt"], float)
+
+

@@ -179,11 +179,13 @@ def compute_covered_call_yield_enhancement(
     expiry_months: float = 1.0,
     implied_vol: float = 0.25,
     risk_free_rate: float = None,
-    use_skew_calibration: bool = True
+    use_skew_calibration: bool = True,
+    contract_multiplier: int = 100
 ) -> pd.DataFrame:
     """
     Calcola la strategia di Covered Call Writing (vendita di Call Out-of-The-Money) per generare
-    rendimento passivo (premio opzioni) su ciascuna posizione azionaria in portafoglio.
+    rendimento passivo (premio opzioni) su ciascuna posizione azionaria in portafoglio,
+    supportando sia il modello frazionario teorico sia la discretizzazione a contratti eseguibili interi (es. 100 azioni/contratto).
     """
     if risk_free_rate is None:
         risk_free_rate = get_default_risk_free_rate("USD")
@@ -219,13 +221,24 @@ def compute_covered_call_yield_enhancement(
         monthly_yield_pct = (call_premium_per_share / price) * 100.0
         annualized_yield_pct = monthly_yield_pct * (12.0 / expiry_months)
 
+        # Discretizzazione contratti eseguibili reali (multiplo di 100)
+        contracts_tradable = int(qty // max(1, contract_multiplier))
+        covered_shares = contracts_tradable * contract_multiplier
+        uncovered_shares = max(0.0, qty - covered_shares)
+        executable_premium_income = contracts_tradable * call_premium_per_share * contract_multiplier
+
         results.append({
             "ticker": ticker,
+            "quantita_totale": qty,
             "prezzo_spot": price,
             "strike_call_otm": K,
             "iv_effettiva_pct": effective_call_iv * 100.0,
             "premio_per_azione": call_premium_per_share,
             "incasso_premio_totale": total_premium_income,
+            "contratti_eseguibili": contracts_tradable,
+            "quote_coperte": covered_shares,
+            "quote_scoperte": uncovered_shares,
+            "incasso_eseguibile_eur": executable_premium_income,
             "extra_rendimento_mensile_pct": monthly_yield_pct,
             "extra_rendimento_annuo_pct": annualized_yield_pct,
             "delta_call": call_res["delta"]

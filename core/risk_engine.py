@@ -1024,20 +1024,21 @@ def _calc_market_risk(sr_portfolio: pd.Series,
 
     var, cvar = {}, {}
     for conf in VAR_CONFIDENCE:
-        # Storico
+        # Storico: quantile a (1-conf)
         threshold = r.quantile(1 - conf)
-        var[f"var_{int(conf*100)}"]  = round(abs(threshold) * 100, 4)
-        cvar[f"cvar_{int(conf*100)}"]= round(abs(r[r <= threshold].mean()) * 100, 4)
+        var[f"var_{int(conf*100)}"]  = round(abs(min(0.0, float(threshold))) * 100, 4)
+        cvar_val = float(r[r <= threshold].mean()) if len(r[r <= threshold]) > 0 else float(threshold)
+        cvar[f"cvar_{int(conf*100)}"]= round(abs(min(0.0, cvar_val)) * 100, 4)
         
-        # Parametrico
+        # Parametrico: quantile q = mu + z * sigma dove z = norm.ppf(1-conf) < 0
         z = stats.norm.ppf(1 - conf)
-        var_param = r.mean() - z * vol_daily
-        var[f"var_parametric_{int(conf*100)}"] = round(abs(var_param) * 100, 4)
+        q_param = float(r.mean() + z * vol_daily)
+        var[f"var_parametric_{int(conf*100)}"] = round(abs(min(0.0, q_param)) * 100, 4)
         
-        # Cornish-Fisher
+        # Cornish-Fisher: quantile q_cf = mu + z_cf * sigma
         z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
-        var_cf = r.mean() - z_cf * vol_daily
-        var[f"var_cf_{int(conf*100)}"] = round(abs(var_cf) * 100, 4)
+        q_cf = float(r.mean() + z_cf * vol_daily)
+        var[f"var_cf_{int(conf*100)}"] = round(abs(min(0.0, q_cf)) * 100, 4)
 
     beta = corr = r_squared = None
     if rb.std() > 0:
@@ -1068,22 +1069,30 @@ def _calc_market_risk(sr_portfolio: pd.Series,
     dd_groups = (~in_dd).cumsum()[in_dd]
     avg_dd_days = float(dd_groups.value_counts().mean()) if not dd_groups.empty else 0.0
 
-    # Fama-French 3-Factor Style Analysis
+    # Fama-French Factor Style Analysis (Integrato con Factor Library)
     ff_alpha = ff_beta_mkt = smb_tilt = hml_tilt = 0.0
-    if rb.std() > 0 and len(r) > 20:
-        r_excess = r - (rf / TRADING_DAYS_YEAR)
-        rb_excess = rb - (rf / TRADING_DAYS_YEAR)
-        smb_factor = np.sin(np.linspace(0, 4*np.pi, len(r))) * r.std()
-        hml_factor = np.cos(np.linspace(0, 4*np.pi, len(r))) * r.std()
-        X = np.column_stack([np.ones(len(r)), rb_excess, smb_factor, hml_factor])
+    if len(r) >= 15:
         try:
-            coeffs, _, _, _ = np.linalg.lstsq(X, r_excess, rcond=None)
-            ff_alpha = float(coeffs[0] * TRADING_DAYS_YEAR * 100)
-            ff_beta_mkt = float(coeffs[1])
-            smb_tilt = float(coeffs[2] * 10)
-            hml_tilt = float(coeffs[3] * 10)
+            from core.factor_library import compute_fama_french_factor_model
+            ff_res = compute_fama_french_factor_model(r, model_type="3_factor")
+            ff_alpha = float(ff_res.get("alpha_annualized", 0.0) or 0.0)
+            df_f = ff_res.get("df_factors")
+            if isinstance(df_f, pd.DataFrame) and not df_f.empty and "factor" in df_f.columns:
+                f_map = df_f.set_index("factor")["beta"].to_dict()
+                ff_beta_mkt = float(f_map.get("Mkt-RF", beta or 1.0))
+                smb_tilt = float(f_map.get("SMB", 0.0))
+                hml_tilt = float(f_map.get("HML", 0.0))
         except Exception:
-            pass
+            if rb.std() > 0 and len(r) > 20:
+                r_excess = r - (rf / TRADING_DAYS_YEAR)
+                rb_excess = rb - (rf / TRADING_DAYS_YEAR)
+                X = np.column_stack([np.ones(len(r)), rb_excess])
+                try:
+                    coeffs, _, _, _ = np.linalg.lstsq(X, r_excess, rcond=None)
+                    ff_alpha = float(coeffs[0] * TRADING_DAYS_YEAR * 100)
+                    ff_beta_mkt = float(coeffs[1])
+                except Exception:
+                    pass
 
     # VaR Exceptions (Kupiec)
     threshold = r.quantile(0.05)
