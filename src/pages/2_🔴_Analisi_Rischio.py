@@ -639,12 +639,12 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             
             df_stats_in = regime_res.get("regime_stats", pd.DataFrame())
             if not df_stats_in.empty:
-                rows_html = ""
+                rows_list = []
                 for _, r_item in df_stats_in.iterrows():
-                    reg_label = r_item.get("Stato / Regime Macro", "")
-                    reg_dyn = r_item.get("Dinamica & Profilo di Rischio", "")
-                    reg_prob = r_item.get("Probabilità Recente %", "")
-                    reg_alloc = r_item.get("Allocazione Tattica Istituzionale", "")
+                    reg_label = str(r_item.get("Stato / Regime Macro", ""))
+                    reg_dyn = str(r_item.get("Dinamica & Profilo di Rischio", ""))
+                    reg_prob = str(r_item.get("Probabilità Recente %", ""))
+                    reg_alloc = str(r_item.get("Allocazione Tattica Istituzionale", ""))
                     
                     if "Bull" in reg_label or "Regime 1" in reg_label:
                         p_color = "#4ade80"
@@ -659,34 +659,12 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
                         p_bg = "rgba(239, 68, 68, 0.15)"
                         p_bd = "rgba(239, 68, 68, 0.3)"
                         
-                    badge_prob = f'<span style="background: {p_bg}; color: {p_color}; border: 1px solid {p_bd}; padding: 3px 10px; border-radius: 12px; font-family: monospace; font-weight: 700; font-size: 12px;">{reg_prob}</span>'
+                    badge_prob = f'<span style="background:{p_bg};color:{p_color};border:1px solid {p_bd};padding:3px 10px;border-radius:12px;font-family:monospace;font-weight:700;font-size:12px;">{reg_prob}</span>'
+                    row_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:46px;"><td style="color:#ffffff;font-weight:700;padding:10px 14px;white-space:nowrap;">{reg_label}</td><td style="text-align:center;padding:10px 14px;white-space:nowrap;">{badge_prob}</td><td style="color:#cbd5e1;padding:10px 14px;line-height:1.4;">{reg_dyn}</td><td style="color:#e2e8f0;padding:10px 14px;line-height:1.4;font-weight:500;">{reg_alloc}</td></tr>'
+                    rows_list.append(row_str)
                     
-                    rows_html += f"""
-                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); height: 46px;">
-                        <td style="color: #ffffff; font-weight: 700; padding: 10px 14px; white-space: nowrap;">{reg_label}</td>
-                        <td style="text-align: center; padding: 10px 14px; white-space: nowrap;">{badge_prob}</td>
-                        <td style="color: #cbd5e1; padding: 10px 14px; line-height: 1.4;">{reg_dyn}</td>
-                        <td style="color: #e2e8f0; padding: 10px 14px; line-height: 1.4; font-weight: 500;">{reg_alloc}</td>
-                    </tr>
-                    """
-                    
-                st.markdown(f"""
-                <div style="background: rgba(18, 24, 38, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; font-size: 11.5px; font-weight: 700; letter-spacing: 0.5px; height: 32px;">
-                                <th style="text-align: left; padding: 8px 14px; width: 22%;">REGIME MACRO</th>
-                                <th style="text-align: center; padding: 8px 14px; width: 14%;">PROBABILITÀ ATTUALE</th>
-                                <th style="text-align: left; padding: 8px 14px; width: 30%;">DINAMICA & PROFILO RISCHIO</th>
-                                <th style="text-align: left; padding: 8px 14px; width: 34%;">ALLOCAZIONE TATTICA CONSIGLIATA</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {rows_html}
-                        </tbody>
-                    </table>
-                </div>
-                """, unsafe_allow_html=True)
+                table_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:22%;">REGIME MACRO</th><th style="text-align:center;padding:8px 14px;width:14%;">PROBABILITÀ ATTUALE</th><th style="text-align:left;padding:8px 14px;width:30%;">DINAMICA & PROFILO RISCHIO</th><th style="text-align:left;padding:8px 14px;width:34%;">ALLOCAZIONE TATTICA CONSIGLIATA</th></tr></thead><tbody>{"".join(rows_list)}</tbody></table></div>'
+                st.markdown(table_html, unsafe_allow_html=True)
 
             # ── MATRICE DI TRANSIZIONE DI MARKOV (HEATMAP TABLE) ──
             st.markdown("##### 🔄 Matrice di Transizione di Markov (Probabilità di Persistenza & Cambio Regime)")
@@ -694,9 +672,9 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             
             df_trans = regime_res.get("transition_matrix", pd.DataFrame())
             if not df_trans.empty:
-                mat_rows = ""
+                mat_rows_list = []
                 for idx_label, row_data in df_trans.iterrows():
-                    cells = ""
+                    cells_list = []
                     for col_label, val in row_data.items():
                         val_pct = float(val) if not isinstance(val, str) else float(val.replace("%", ""))
                         
@@ -717,37 +695,14 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
                             tx_color = "#94a3b8"
                             bd_cell = "transparent"
                             
-                        cells += f"""
-                        <td style="text-align: center; padding: 10px 14px;">
-                            <div style="background: {bg_cell}; color: {tx_color}; border: 1px solid {bd_cell}; border-radius: 8px; padding: 6px 12px; font-family: monospace; font-weight: 700; font-size: 13px; display: inline-block; min-width: 70px;">
-                                {val_pct:.1f}%
-                            </div>
-                        </td>
-                        """
-                    mat_rows += f"""
-                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04); height: 48px;">
-                        <td style="color: #ffffff; font-weight: 700; padding: 10px 14px; white-space: nowrap;">{idx_label}</td>
-                        {cells}
-                    </tr>
-                    """
+                        cell_str = f'<td style="text-align:center;padding:10px 14px;"><div style="background:{bg_cell};color:{tx_color};border:1px solid {bd_cell};border-radius:8px;padding:6px 12px;font-family:monospace;font-weight:700;font-size:13px;display:inline-block;min-width:70px;">{val_pct:.1f}%</div></td>'
+                        cells_list.append(cell_str)
                     
-                st.markdown(f"""
-                <div style="background: rgba(18, 24, 38, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px 18px; margin-bottom: 12px; overflow-x: auto;">
-                    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.12); color: #94a3b8; font-size: 11.5px; font-weight: 700; letter-spacing: 0.5px; height: 32px;">
-                                <th style="text-align: left; padding: 8px 14px; width: 28%;">STATO DI PARTENZA (T)</th>
-                                <th style="text-align: center; padding: 8px 14px; width: 24%; color: #4ade80;">🟢 A Regime 1 (Bull)</th>
-                                <th style="text-align: center; padding: 8px 14px; width: 24%; color: #facc15;">🟡 A Regime 2 (Range-Bound)</th>
-                                <th style="text-align: center; padding: 8px 14px; width: 24%; color: #f87171;">🔴 A Regime 3 (Crisis)</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {mat_rows}
-                        </tbody>
-                    </table>
-                </div>
-                """, unsafe_allow_html=True)
+                    row_mat_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:48px;"><td style="color:#ffffff;font-weight:700;padding:10px 14px;white-space:nowrap;">{idx_label}</td>{"".join(cells_list)}</tr>'
+                    mat_rows_list.append(row_mat_str)
+                    
+                matrix_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:28%;">STATO DI PARTENZA (T)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#4ade80;">🟢 A Regime 1 (Bull)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#facc15;">🟡 A Regime 2 (Range-Bound)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#f87171;">🔴 A Regime 3 (Crisis)</th></tr></thead><tbody>{"".join(mat_rows_list)}</tbody></table></div>'
+                st.markdown(matrix_html, unsafe_allow_html=True)
             else:
                 st.caption("Matrice di transizione in fase di calcolo.")
     else:
