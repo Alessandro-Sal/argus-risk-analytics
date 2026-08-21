@@ -781,54 +781,78 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     var_cf_eur = var_cf_t * total_value
     cvar_hist_eur = cvar_hist_t * total_value
 
-    # Layout metriche
+    # 4 KPI Cards ad Alta Risoluzione (Nessun Troncamento)
     col_m1, col_m2, col_m3, col_m4 = st.columns(4)
     with col_m1:
-        st.metric(
-            label=f"VaR Storico ({holding_period}g)",
-            value=f"{var_hist_t*100:.2f}%",
-            delta=f"-€{var_hist_eur:,.2f}",
-            delta_color="inverse"
+        metric_card(
+            f"VaR Storico ({holding_period}G)",
+            f"{var_hist_t*100:.2f}%",
+            delta=f"-€ {var_hist_eur:,.2f}",
+            positive=False,
+            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Value at Risk non-parametrico calcolato sul quantile empirico reale ({int(conf_level*100)}%) dei rendimenti storici.</div>
+<div style="margin-bottom: 6px;"><b>📐 Formula:</b> VaR<sub>storico</sub> = &minus;Q(R<sub>p</sub>, &alpha;) &times; &radic;{holding_period}</div>
+<div style="margin-bottom: 6px;"><b>🎯 Significato:</b> Perdita massima attesa a {int(conf_level*100)}% su {holding_period} giorni basata sulla storia effettiva del portafoglio.</div>
+<div><b>💶 Impatto Capitale:</b> Perdita stimata pari a -€ {var_hist_eur:,.2f}.</div>
+</div>"""
         )
     with col_m2:
-        st.metric(
-            label=f"VaR Parametrico ({holding_period}g)",
-            value=f"{var_param_t*100:.2f}%",
-            delta=f"-€{var_param_eur:,.2f}",
-            delta_color="inverse"
+        metric_card(
+            f"VaR Parametrico ({holding_period}G)",
+            f"{var_param_t*100:.2f}%",
+            delta=f"-€ {var_param_eur:,.2f}",
+            positive=False,
+            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Value at Risk gaussiano basato sull'ipotesi di distribuzione normale dei rendimenti.</div>
+<div style="margin-bottom: 6px;"><b>📐 Formula:</b> VaR<sub>param</sub> = &minus;(&mu;<sub>p</sub> + z<sub>&alpha;</sub> &times; &sigma;<sub>p</sub>) &times; &radic;{holding_period}</div>
+<div style="margin-bottom: 6px;"><b>🎯 Significato:</b> Stima teorica della massima perdita attesa con quantile normale z = {z:.2f}.</div>
+<div><b>💶 Impatto Capitale:</b> Perdita stimata pari a -€ {var_param_eur:,.2f}.</div>
+</div>"""
         )
     with col_m3:
-        st.metric(
-            label=f"VaR Cornish-Fisher ({holding_period}g)",
-            value=f"{var_cf_t*100:.2f}%",
-            delta=f"-€{var_cf_eur:,.2f}",
-            delta_color="inverse"
+        metric_card(
+            f"VaR Cornish-Fisher ({holding_period}G)",
+            f"{var_cf_t*100:.2f}%",
+            delta=f"-€ {var_cf_eur:,.2f}",
+            positive=False,
+            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Value at Risk modificato per catturare le code grasse (Fat Tails) e l'asimmetria reale del portafoglio.</div>
+<div style="margin-bottom: 6px;"><b>📐 Parametri:</b> Skewness = {skewness:+.2f} | Kurtosis = {kurtosis:+.2f} | z<sub>CF</sub> = {z_cf:.2f}</div>
+<div style="margin-bottom: 6px;"><b>🎯 Significato:</b> Evita la sottostima dei crolli improvvisi tipica del VaR gaussiano.</div>
+<div><b>💶 Impatto Capitale:</b> Perdita stimata pari a -€ {var_cf_eur:,.2f}.</div>
+</div>"""
         )
     with col_m4:
-        st.metric(
-            label=f"Expected Shortfall (CVaR - {holding_period}g)",
-            value=f"{cvar_hist_t*100:.2f}%",
-            delta=f"-€{cvar_hist_eur:,.2f}",
-            delta_color="inverse"
+        metric_card(
+            f"Expected Shortfall (CVaR - {holding_period}G)",
+            f"{cvar_hist_t*100:.2f}%",
+            delta=f"-€ {cvar_hist_eur:,.2f}",
+            positive=False,
+            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+<div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura di rischio coerente (Artzner) che calcola la perdita media negli scenari peggiori oltre la soglia del VaR.</div>
+<div style="margin-bottom: 6px;"><b>📐 Formula:</b> CVaR<sub>&alpha;</sub> = &minus;E[R<sub>p</sub> | R<sub>p</sub> &le; &minus;VaR<sub>&alpha;</sub>] &times; &radic;{holding_period}</div>
+<div style="margin-bottom: 6px;"><b>🎯 Requisito:</b> Metrica primaria adottata da Basilea III (FRTB) per il monitoraggio del rischio di coda estremo.</div>
+<div><b>💶 Impatto Capitale:</b> Perdita media nello scenario di superamento pari a -€ {cvar_hist_eur:,.2f}.</div>
+</div>"""
         )
 
-    with st.expander("📚 Dettaglio Formule e Teoria Finanziaria"):
+    with st.expander("📚 Dettaglio Formule e Teoria Finanziaria del VaR & CVaR"):
         st.markdown(r"""
-        ### Value at Risk (VaR)
-        Il **Value at Risk (VaR)** rappresenta la massima perdita potenziale che un portafoglio può subire in un determinato orizzonte temporale ($T$) con un certo livello di confidenza ($c = 1 - \alpha$).
+        ### Fondamenti Teorici del Value at Risk (VaR)
+        Il **Value at Risk (VaR)** rappresenta la massima perdita potenziale che un portafoglio può subire in un orizzonte temporale ($T$) con un livello di confidenza prefissato ($c = 1 - \alpha$).
         
         1. **VaR Storico (Non-Parametrico)**:
-           $$VaR_{storico} = -Q(R_p, \alpha)$$
+           $$VaR_{storico} = -Q(R_p, \alpha) \cdot \sqrt{T}$$
            
-        2. **VaR Parametrico (Varianza-Covarianza)**:
-           $$VaR_{param} = -(\mu_p + z_{\alpha} \cdot \sigma_p)$$
+        2. **VaR Parametrico (Varianza-Covarianza Gaussiano)**:
+           $$VaR_{param} = -(\mu_p + z_{\alpha} \cdot \sigma_p) \cdot \sqrt{T}$$
            
-        3. **VaR Cornish-Fisher**:
-           $$z_{cf} = z + \frac{1}{6}(z^2-1)s + \frac{1}{24}(z^3-3z)k - \frac{1}{36}(2z^3-5z)s^2$$
-           $$VaR_{cf} = -(\mu_p + z_{cf} \cdot \sigma_p)$$
+        3. **VaR Cornish-Fisher (Espansione Quantilica per Code Grasse)**:
+           $$z_{cf} = z + \frac{1}{6}(z^2-1)S + \frac{1}{24}(z^3-3z)K - \frac{1}{36}(2z^3-5z)S^2$$
+           $$VaR_{cf} = -(\mu_p + z_{cf} \cdot \sigma_p) \cdot \sqrt{T}$$
         
-        4. **Expected Shortfall (ES / CVaR)**:
-           $$ES_{\alpha} = -E[R_p \mid R_p \le -VaR_{\alpha}]$$
+        4. **Expected Shortfall (CVaR / Conditional VaR)**:
+           $$ES_{\alpha} = -E[R_p \mid R_p \le -VaR_{\alpha}] \cdot \sqrt{T}$$
         """)
 
     st.divider()
@@ -1167,49 +1191,95 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         else:
             return '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap;">🔴 Zona Rossa</span>'
 
+    badge_hist = get_basel_badge(exc_hist, expected_exc)
+    badge_param = get_basel_badge(exc_param, expected_exc)
+    badge_cf = get_basel_badge(exc_cf, expected_exc)
+
     col_b1, col_b2, col_b3 = st.columns(3)
     
     with col_b1:
-        metric_card(
-            label="VaR Storico (1G - 95%)",
-            value=f"{var_hist_1d * 100:.2f}%",
-            delta=f"{exc_hist} violazioni ({ratio_hist:.2f}%) • Zona Verde",
-            positive=(exc_hist <= expected_exc * 1.5),
-            help_text="""<div style="font-size: 13.5px; line-height: 1.5;">
-<div style="color: #4ade80; font-weight: 700; margin-bottom: 6px;">🟢 Modello VaR Storico (Conforme Basilea III)</div>
-<div style="margin-bottom: 6px;"><b>📌 Soglia Perdita 1G:</b> """ + f"{var_hist_1d * 100:.2f}%" + """ al 95% di confidenza.</div>
-<div style="margin-bottom: 6px;"><b>📊 Violazioni Registrate:</b> """ + f"{exc_hist} su {n_days} sedute ({ratio_hist:.2f}%) rispetto a {expected_exc:.1f} attese (5.0%)." + """</div>
-<div><b>🧪 Test Statistico LR Kupiec:</b> LR = """ + f"{lr_hist:.2f}" + """ &bull; p-value = """ + f"{pval_hist:.2f}" + """</div>
-</div>"""
-        )
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 18px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14.5px; font-weight: 700; color: #f8fafc; white-space: nowrap;">📊 VaR Storico</span>
+                {badge_hist}
+            </div>
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 27px; font-weight: 800; font-family: monospace; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px;">{var_hist_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 3px;">Soglia Perdita 1G ({int(conf_level*100)}% Confidenza)</div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span>Violazioni Registrate:</span>
+                    <b style="font-family: monospace; color: #f8fafc;">{exc_hist} / {n_days} ({ratio_hist:.2f}%)</b>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+                    <span>Target Atteso (5%):</span>
+                    <span style="font-family: monospace; color: #cbd5e1;">{expected_exc:.1f} violazioni</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                <span>Test LR Kupiec:</span>
+                <span style="font-family: monospace; color: #f8fafc;">LR = {lr_hist:.2f} &bull; p-val = {pval_hist:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col_b2:
-        metric_card(
-            label="VaR Parametrico (1G - 95%)",
-            value=f"{var_param_1d * 100:.2f}%",
-            delta=f"{exc_param} violazioni ({ratio_param:.2f}%) • Zona Verde",
-            positive=(exc_param <= expected_exc * 1.5),
-            help_text="""<div style="font-size: 13.5px; line-height: 1.5;">
-<div style="color: #4ade80; font-weight: 700; margin-bottom: 6px;">🟢 Modello VaR Parametrico Gaussiano (Conforme Basilea III)</div>
-<div style="margin-bottom: 6px;"><b>📌 Soglia Perdita 1G:</b> """ + f"{var_param_1d * 100:.2f}%" + """ al 95% di confidenza.</div>
-<div style="margin-bottom: 6px;"><b>📊 Violazioni Registrate:</b> """ + f"{exc_param} su {n_days} sedute ({ratio_param:.2f}%) rispetto a {expected_exc:.1f} attese (5.0%)." + """</div>
-<div><b>🧪 Test Statistico LR Kupiec:</b> LR = """ + f"{lr_param:.2f}" + """ &bull; p-value = """ + f"{pval_param:.2f}" + """</div>
-</div>"""
-        )
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 18px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14.5px; font-weight: 700; color: #f8fafc; white-space: nowrap;">📐 VaR Parametrico</span>
+                {badge_param}
+            </div>
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 27px; font-weight: 800; font-family: monospace; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px;">{var_param_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 3px;">Soglia Gaussiana 1G ({int(conf_level*100)}% Confidenza)</div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span>Violazioni Registrate:</span>
+                    <b style="font-family: monospace; color: #f8fafc;">{exc_param} / {n_days} ({ratio_param:.2f}%)</b>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+                    <span>Target Atteso (5%):</span>
+                    <span style="font-family: monospace; color: #cbd5e1;">{expected_exc:.1f} violazioni</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                <span>Test LR Kupiec:</span>
+                <span style="font-family: monospace; color: #f8fafc;">LR = {lr_param:.2f} &bull; p-val = {pval_param:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     with col_b3:
-        metric_card(
-            label="VaR Cornish-Fisher (1G - 95%)",
-            value=f"{var_cf_1d * 100:.2f}%",
-            delta=f"{exc_cf} violazioni ({ratio_cf:.2f}%) • Zona Verde",
-            positive=(exc_cf <= expected_exc * 1.5),
-            help_text="""<div style="font-size: 13.5px; line-height: 1.5;">
-<div style="color: #4ade80; font-weight: 700; margin-bottom: 6px;">🟢 Modello VaR Cornish-Fisher (Code Spesse)</div>
-<div style="margin-bottom: 6px;"><b>📌 Soglia Perdita 1G:</b> """ + f"{var_cf_1d * 100:.2f}%" + """ corretto per asimmetria e curtosi.</div>
-<div style="margin-bottom: 6px;"><b>📊 Violazioni Registrate:</b> """ + f"{exc_cf} su {n_days} sedute ({ratio_cf:.2f}%) rispetto a {expected_exc:.1f} attese (5.0%)." + """</div>
-<div><b>🧪 Test Statistico LR Kupiec:</b> LR = """ + f"{lr_cf:.2f}" + """ &bull; p-value = """ + f"{pval_cf:.2f}" + """</div>
-</div>"""
-        )
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 18px; position: relative;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <span style="font-size: 14.5px; font-weight: 700; color: #f8fafc; white-space: nowrap;">📈 VaR Cornish-Fisher</span>
+                {badge_cf}
+            </div>
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 27px; font-weight: 800; font-family: monospace; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px;">{var_cf_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 3px;">Soglia Non-Gaussiana (Skew/Kurt)</div>
+            </div>
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span>Violazioni Registrate:</span>
+                    <b style="font-family: monospace; color: #f8fafc;">{exc_cf} / {n_days} ({ratio_cf:.2f}%)</b>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
+                    <span>Target Atteso (5%):</span>
+                    <span style="font-family: monospace; color: #cbd5e1;">{expected_exc:.1f} violazioni</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
+                <span>Test LR Kupiec:</span>
+                <span style="font-family: monospace; color: #f8fafc;">LR = {lr_cf:.2f} &bull; p-val = {pval_cf:.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown('<div style="margin-top: 14px;"></div>', unsafe_allow_html=True)
     st.markdown("##### 📉 Tracciamento Temporale delle Violazioni VaR (Backtest a 252 Sedute)")
