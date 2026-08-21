@@ -1672,8 +1672,13 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
 
     st.divider()
 
-    st.markdown("### 💧 Rischio di Liquidità (Days-to-Liquidate)")
-    glossary_modal("💧 Guida al Rischio di Liquidità & Market Impact", """
+    col_liq_h1, col_liq_h2 = st.columns([3.5, 1.2])
+    with col_liq_h1:
+        st.markdown("### 💧 Rischio di Liquidità & Orizzonte di Smobilizzo (Days-to-Liquidate)")
+        st.caption("Stima del tempo necessario per smobilizzare le posizioni assumendo una partecipazione prudenziale massima al 15% del Volume Medio Giornaliero ($ADV_{30g}$).")
+    with col_liq_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("💧 Guida al Rischio di Liquidità & Market Impact", """
 <div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
   <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">💧 Days-to-Liquidate (Orizzonte di Smobilizzo)</div>
@@ -1696,16 +1701,67 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
 
     if "days_to_liquidate" in pos.columns:
         df_liq = pos[pos["qty_net"] > 0][["ticker", "current_value", "days_to_liquidate"]].copy()
+        tot_liq_val = df_liq["current_value"].sum()
+        df_liq["weight"] = (df_liq["current_value"] / tot_liq_val * 100.0) if tot_liq_val > 0 else 0.0
         df_liq = df_liq.sort_values(by="days_to_liquidate", ascending=False)
         
-        col_l1, col_l2 = st.columns([1, 1])
-        with col_l1:
-            st.dataframe(df_liq, use_container_width=True, hide_index=True)
-        with col_l2:
-            if df_liq["days_to_liquidate"].max() > 5:
-                st.warning(f"Attenzione: alcuni asset richiedono più di 5 giorni per essere liquidati. L'asset più illiquido è **{df_liq.iloc[0]['ticker']}** con **{df_liq.iloc[0]['days_to_liquidate']:.1f} giorni**.")
+        # KPI Card di sintesi
+        weighted_dtl = (df_liq["days_to_liquidate"] * (df_liq["current_value"] / tot_liq_val)).sum() if tot_liq_val > 0 else 0.0
+        critical_cnt = len(df_liq[df_liq["days_to_liquidate"] > 3.0])
+        max_dtl_asset = df_liq.iloc[0]["ticker"] if not df_liq.empty else "-"
+        max_dtl_val = df_liq.iloc[0]["days_to_liquidate"] if not df_liq.empty else 0.0
+        
+        col_lq1, col_lq2, col_lq3 = st.columns(3)
+        with col_lq1:
+            metric_card(
+                "Days-to-Liquidate Ponderato",
+                f"{weighted_dtl:.1f} gg",
+                delta="Smobilizzo Istantaneo",
+                positive=True,
+                help_text="Tempo medio stimato per liquidare l'intero portafoglio ponderato per il valore di ciascuna posizione."
+            )
+        with col_lq2:
+            metric_card(
+                "Posizioni a Rischio (> 3 Giorni)",
+                f"{critical_cnt} / {len(df_liq)}",
+                delta="Nessun Rischio Illiquidità" if critical_cnt == 0 else f"{critical_cnt} Asset da monitorare",
+                positive=(critical_cnt == 0),
+                help_text="Numero di posizioni che richiederebbero oltre 3 giorni di borsa aperta per essere liquidate senza superare il 15% dell'ADV."
+            )
+        with col_lq3:
+            metric_card(
+                "Tempo Max di Smobilizzo",
+                f"{max_dtl_val:.1f} gg",
+                delta=f"Asset: {max_dtl_asset}",
+                positive=(max_dtl_val <= 3.0),
+                help_text=f"La posizione che richiede il maggior orizzonte di liquidazione è {max_dtl_asset} con {max_dtl_val:.1f} giorni stimati."
+            )
+            
+        st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
+        
+        # Tabella DTL Glassmorphic
+        rows_liq_list = []
+        for _, r_l in df_liq.iterrows():
+            t_name = str(r_l["ticker"])
+            c_val = float(r_l["current_value"])
+            w_pct = float(r_l["weight"])
+            dtl_v = float(r_l["days_to_liquidate"])
+            
+            if dtl_v <= 1.0:
+                dtl_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 8px; border-radius: 10px; font-family: monospace; font-weight: 700; font-size: 11.5px;">&le; 1.0 g</span>'
+                status_txt = '<span style="color: #4ade80; font-weight: 600; font-size: 12px;">🟢 Immediato</span>'
+            elif dtl_v <= 3.0:
+                dtl_badge = f'<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 2px 8px; border-radius: 10px; font-family: monospace; font-weight: 700; font-size: 11.5px;">{dtl_v:.1f} g</span>'
+                status_txt = '<span style="color: #facc15; font-weight: 600; font-size: 12px;">🟡 Moderato</span>'
             else:
-                st.success("Il portafoglio è altamente liquido. Tutte le posizioni possono essere smobilizzate in tempi rapidi senza impatto significativo sui prezzi.")
+                dtl_badge = f'<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 10px; font-family: monospace; font-weight: 700; font-size: 11.5px;">{dtl_v:.1f} g</span>'
+                status_txt = '<span style="color: #f87171; font-weight: 600; font-size: 12px;">🔴 Rischioso</span>'
+                
+            r_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 14px;font-family:monospace;">{t_name}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {c_val:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">{w_pct:.2f}%</td><td style="text-align:center;padding:8px 14px;">{dtl_badge}</td><td style="padding:8px 14px;">{status_txt}</td></tr>'
+            rows_liq_list.append(r_str)
+            
+        liq_table_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;max-height:420px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:20%;">TICKER ASSET</th><th style="text-align:left;padding:8px 14px;width:24%;">VALORE (€)</th><th style="text-align:left;padding:8px 14px;width:18%;">PESO %</th><th style="text-align:center;padding:8px 14px;width:20%;">DAYS TO LIQUIDATE</th><th style="text-align:left;padding:8px 14px;width:18%;">PROFILO SMOBILIZZO</th></tr></thead><tbody>{"".join(rows_liq_list)}</tbody></table></div>'
+        st.markdown(liq_table_html, unsafe_allow_html=True)
     else:
         st.info("Dati sui volumi non sufficienti per calcolare i Days-to-Liquidate.")
 
