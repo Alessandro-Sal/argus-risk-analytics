@@ -1096,7 +1096,7 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
         section("1. 🧬 Matrice di Dipendenza di Coda Asimmetrica (Tail Copulas)")
         st.caption("Quantifica la dipendenza non lineare e la probabilità di shock simultaneo sulle code di distribuzione.")
 
-        col_cop_q, col_cop_stat = st.columns([2, 4])
+        col_cop_q, col_cop_k1, col_cop_k2, col_cop_k3 = st.columns([1.4, 1, 1, 1])
         with col_cop_q:
             q_thresh = st.slider(
                 "Soglia Percentile di Coda (q):",
@@ -1108,54 +1108,115 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
             )
         
         copula_res = compute_tail_copula_matrix(df_returns_all, quantile_threshold=q_thresh)
-        with col_cop_stat:
-            mean_t = copula_res.get('mean_tail_dependence', 0.0)
-            st.metric(
-                "Dipendenza Media di Coda Inferiore (λ_L)",
-                f"{mean_t:.3f}",
-                help="Media della probabilità di crash congiunto tra tutte le coppie di asset."
+        mean_tl = copula_res.get('mean_tail_dependence', 0.0)
+        df_l = copula_res.get("lambda_lower_df", pd.DataFrame())
+        df_u = copula_res.get("lambda_upper_df", pd.DataFrame())
+        df_asym = copula_res.get("asymmetry_df", pd.DataFrame())
+        contagion = copula_res.get("contagion_pairs", [])
+        
+        if not df_u.empty:
+            upper_vals = df_u.values[np.triu_indices_from(df_u.values, k=1)]
+            mean_tu = float(np.mean(upper_vals)) if len(upper_vals) > 0 else 0.0
+        else:
+            mean_tu = 0.0
+
+        with col_cop_k1:
+            metric_card(
+                "Dipendenza Coda Inferiore (λ_L)",
+                f"{mean_tl:.3f}",
+                delta="Rischio Crash Congiunto",
+                positive=(mean_tl < 0.20),
+                help_text="Media della probabilità di crash congiunto tra tutte le coppie di asset durante shock ribassisti."
+            )
+        with col_cop_k2:
+            metric_card(
+                "Dipendenza Coda Superiore (λ_U)",
+                f"{mean_tu:.3f}",
+                delta="Co-Boom Rialzista",
+                positive=True,
+                help_text="Media della probabilità di rally congiunto tra tutte le coppie di asset durante fasi di espansione."
+            )
+        with col_cop_k3:
+            metric_card(
+                "Coppie ad Alto Contagio (λ_L ≥ 0.30)",
+                f"{len(contagion)}",
+                delta="Breakdown Diversificazione" if len(contagion) > 0 else "Nessun Alert Critico",
+                positive=(len(contagion) == 0),
+                help_text="Numero di coppie di asset che perdono la diversificazione durante i crolli di mercato."
             )
 
-        col_hm1, col_hm2 = st.columns(2)
-        with col_hm1:
-            st.markdown(r"##### 🔻 Lower Tail Dependence ($\lambda_L$ - Rischio Crash)")
-            df_l = copula_res.get("lambda_lower_df", pd.DataFrame())
+        st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
+        tab_cl, tab_cu, tab_asym = st.tabs([
+            "🔻 Lower Tail Dependence (λ_L - Rischio Crash)",
+            "🔺 Upper Tail Dependence (λ_U - Co-Boom)",
+            "⚖️ Matrice Asimmetria di Coda (λ_L - λ_U)"
+        ])
+        
+        n_assets = len(df_l) if not df_l.empty else 0
+        show_matrix_text = (n_assets <= 12)
+        
+        with tab_cl:
             if not df_l.empty:
                 fig_cl = px.imshow(
                     df_l,
-                    color_continuous_scale=[[0.0, "#161b22"], [0.5, "#d29922"], [1.0, "#f85149"]],
-                    zmin=0.0, zmax=1.0, text_auto=".2f",
+                    color_continuous_scale=[[0.0, "#0f172a"], [0.4, "#d97706"], [1.0, "#ef4444"]],
+                    zmin=0.0, zmax=1.0,
+                    text_auto=".2f" if show_matrix_text else False,
                     labels={"x": "Asset", "y": "Asset", "color": "λ_L"}
                 )
                 fig_cl.update_traces(
                     hovertemplate="<b>Coppia: %{x} ↔ %{y}</b><br>🔻 Lower Tail Copula (λ_L): <b>%{z:.3f}</b><br><i>Probabilità di crash simultaneo nei sell-off</i><extra></extra>"
                 )
                 fig_cl.update_layout(
-                    height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    margin=dict(l=10, r=10, t=10, b=10)
+                    height=480, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=20, b=10),
+                    xaxis=dict(tickangle=-45, tickfont=dict(size=11, family="monospace")),
+                    yaxis=dict(tickfont=dict(size=11, family="monospace"))
                 )
                 apply_plotly_theme(fig_cl)
                 st.plotly_chart(fig_cl, use_container_width=True)
 
-        with col_hm2:
-            st.markdown(r"##### 🔺 Upper Tail Dependence ($\lambda_U$ - Co-Boom)")
-            df_u = copula_res.get("lambda_upper_df", pd.DataFrame())
+        with tab_cu:
             if not df_u.empty:
                 fig_cu = px.imshow(
                     df_u,
-                    color_continuous_scale=[[0.0, "#161b22"], [0.5, "#58a6ff"], [1.0, "#3fb950"]],
-                    zmin=0.0, zmax=1.0, text_auto=".2f",
+                    color_continuous_scale=[[0.0, "#0f172a"], [0.4, "#0284c7"], [1.0, "#22c55e"]],
+                    zmin=0.0, zmax=1.0,
+                    text_auto=".2f" if show_matrix_text else False,
                     labels={"x": "Asset", "y": "Asset", "color": "λ_U"}
                 )
                 fig_cu.update_traces(
                     hovertemplate="<b>Coppia: %{x} ↔ %{y}</b><br>🔺 Upper Tail Copula (λ_U): <b>%{z:.3f}</b><br><i>Probabilità di co-boom rialzista simultaneo</i><extra></extra>"
                 )
                 fig_cu.update_layout(
-                    height=360, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                    margin=dict(l=10, r=10, t=10, b=10)
+                    height=480, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=20, b=10),
+                    xaxis=dict(tickangle=-45, tickfont=dict(size=11, family="monospace")),
+                    yaxis=dict(tickfont=dict(size=11, family="monospace"))
                 )
                 apply_plotly_theme(fig_cu)
                 st.plotly_chart(fig_cu, use_container_width=True)
+
+        with tab_asym:
+            if not df_asym.empty:
+                fig_asym = px.imshow(
+                    df_asym,
+                    color_continuous_scale=[[0.0, "#22c55e"], [0.5, "#0f172a"], [1.0, "#ef4444"]],
+                    zmin=-0.5, zmax=0.5,
+                    text_auto=".2f" if show_matrix_text else False,
+                    labels={"x": "Asset", "y": "Asset", "color": "Δ (λ_L - λ_U)"}
+                )
+                fig_asym.update_traces(
+                    hovertemplate="<b>Coppia: %{x} ↔ %{y}</b><br>⚖️ Asimmetria Coda: <b>%{z:+.3f}</b><br><i>Valori positivi indicano maggiore rischio di crash congiunto rispetto ai rally</i><extra></extra>"
+                )
+                fig_asym.update_layout(
+                    height=480, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=20, b=10),
+                    xaxis=dict(tickangle=-45, tickfont=dict(size=11, family="monospace")),
+                    yaxis=dict(tickfont=dict(size=11, family="monospace"))
+                )
+                apply_plotly_theme(fig_asym)
+                st.plotly_chart(fig_asym, use_container_width=True)
 
         # Tabella Coppie a Rischio Contagio & Indice di Rottura della Diversificazione
         contagion = copula_res.get("contagion_pairs", [])
