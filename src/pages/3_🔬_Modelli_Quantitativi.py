@@ -966,13 +966,16 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
             col_om1, col_om2, col_om3 = st.columns(3)
             with col_om1:
                 t_val = summary_orders.get('target_total_value_eur', summary_orders.get('target_total_value', 0.0))
-                st.metric("Valore Portafoglio Target", f"€ {t_val:,.2f}")
+                t_val_str = f"€ {t_val:,.2f}".replace(",", ".")
+                metric_card("Valore Portafoglio Target", t_val_str, delta="Allocazione Ottimale", positive=True, help_text="Valore target complessivo del portafoglio post-ribilanciamento.")
             with col_om2:
                 b_val = summary_orders.get('total_buy_eur', summary_orders.get('total_buy_value', 0.0))
-                st.metric("Totale Acquisti (€)", f"€ {b_val:,.2f}")
+                b_val_str = f"€ {b_val:,.2f}".replace(",", ".")
+                metric_card("Totale Acquisti", b_val_str, delta="Liquidità Richiesta", positive=True, help_text="Somma del controvalore di tutti gli ordini di acquisto generati dal ribilanciatore.")
             with col_om3:
                 s_val = summary_orders.get('total_sell_eur', summary_orders.get('total_sell_value', 0.0))
-                st.metric("Totale Vendite (€)", f"€ {s_val:,.2f}")
+                s_val_str = f"€ {s_val:,.2f}".replace(",", ".")
+                metric_card("Totale Vendite", s_val_str, delta="Liquidità Liberata", positive=True, help_text="Somma del controvalore di tutti gli ordini di vendita generati dal ribilanciatore.")
 
             req_cols = ["ticker", "action", "current_qty", "target_qty", "qty_delta", "last_price", "order_value_eur", "current_weight_pct", "target_weight_pct"]
             df_disp_orders = df_orders.reindex(columns=req_cols).fillna(0).rename(columns={
@@ -1901,13 +1904,39 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
 
         col_hm1, col_hm2, col_hm3, col_hm4 = st.columns(4)
         with col_hm1:
-            st.metric("Beta Attuale Portafoglio", f"{hedge_res['current_beta']:.2f}")
+            metric_card(
+                "Beta Attuale Portafoglio",
+                f"{hedge_res['current_beta']:.2f}",
+                delta=f"Target: {target_beta_input:.2f}",
+                positive=True,
+                help_text="Sensibilità complessiva del portafoglio alle oscillazioni del mercato benchmark."
+            )
         with col_hm2:
-            st.metric("Valore Copertura Necessaria", f"€ {hedge_res['hedge_value_eur']:,.2f}")
+            val_eur_str = f"€ {hedge_res['hedge_value_eur']:,.2f}".replace(",", ".")
+            metric_card(
+                "Valore Copertura",
+                val_eur_str,
+                delta="Controvalore Reale",
+                positive=True,
+                help_text="Controvalore finanziario totale dello strumento short necessario per azzerare il Beta."
+            )
         with col_hm3:
-            st.metric(f"Quote {hedge_inst_input} da Acquistare", f"{hedge_res['hedge_shares']} quote")
+            metric_card(
+                f"Quote {hedge_inst_input}",
+                f"{hedge_res['hedge_shares']} quote",
+                delta=f"Prezzo: € {hedge_res['instrument_price']:.2f}".replace(",", "."),
+                positive=True,
+                help_text="Numero esatto di quote/azioni dello strumento di copertura da acquistare a mercato."
+            )
         with col_hm4:
-            st.metric("Protezione Tail Risk (VaR 99%)", f"€ {hedge_res['tail_risk_var99_eur']:,.2f}")
+            tail_eur_str = f"€ {hedge_res['tail_risk_var99_eur']:,.2f}".replace(",", ".")
+            metric_card(
+                "Protezione Tail Risk (99%)",
+                tail_eur_str,
+                delta="Scudo anti-crash",
+                positive=True,
+                help_text="Perdita massima stimata al 99% coperta dal posizionamento di hedging."
+            )
 
         st.info(f"""
         💡 **Indicazione Operativa di Copertura**:
@@ -1915,9 +1944,9 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
         """)
 
         st.divider()
-        col_head_bs1, col_head_bs2 = st.columns([3.2, 1.2])
+        col_head_bs1, col_head_bs2 = st.columns([3.5, 1.0])
         with col_head_bs1:
-            st.markdown("#### 🛡️ Modello Black-Scholes (1973): Copertura Delta-Hedging & Volatility Skew")
+            st.markdown("#### 🛡️ Copertura Delta-Hedging & Volatility Skew (Black-Scholes 1973)")
             st.caption("Dimensionamento matematico dei contratti Put per immunizzare il Beta di portafoglio, calcolo analitico dei 5 Greci ($\\Delta, \\Gamma, \\Theta, \\text{Vega}, \\rho$) e calibrazione dello Skew reale.")
         with col_head_bs2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
@@ -1976,27 +2005,38 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
 
         col_bs1, col_bs2, col_bs3, col_bs4 = st.columns(4)
         with col_bs1:
-            st.metric("Contratti Put Necessari", f"{bs_hedge['contracts_needed']} contratti", help=f"Strike: ${bs_hedge['strike_price']:.1f} (5% OTM)")
+            metric_card(
+                "Contratti Put Necessari",
+                f"{bs_hedge['contracts_needed']} Contratti",
+                delta=f"Strike ${bs_hedge['strike_price']:.1f} (5% OTM)",
+                positive=True,
+                help_text=f"Numero di contratti di opzione Put 5% OTM necessari per sterilizzare il Beta al {target_hedge_pct:.0f}% del portafoglio."
+            )
         with col_bs2:
-            st.metric(
-                "Prezzo Put (Per Azione)",
+            skew_diff = bs_hedge['put_price'] - bs_hedge['flat_put_price']
+            metric_card(
+                "Premio Put (Per Azione)",
                 f"${bs_hedge['put_price']:.2f}",
-                delta=f"+${bs_hedge['put_price'] - bs_hedge['flat_put_price']:.2f} Skew Premium" if use_skew else "IV Piatta",
-                delta_color="inverse" if use_skew else "off"
+                delta=f"+${skew_diff:.2f} Skew Prem." if use_skew else "IV Piatta ATM",
+                positive=(not use_skew or skew_diff <= 0),
+                help_text="Costo unitario del premio dell'opzione Put per singola azione del sottostante."
             )
         with col_bs3:
-            st.metric(
+            cost_usd_str = f"${bs_hedge['total_hedge_cost']:,.2f}".replace(",", ".")
+            metric_card(
                 "Costo Totale Copertura",
-                f"${bs_hedge['total_hedge_cost']:,.2f}",
-                delta=f"{bs_hedge['cost_pct_of_portfolio']:.2f}% portafoglio",
-                delta_color="inverse"
+                cost_usd_str,
+                delta=f"{bs_hedge['cost_pct_of_portfolio']:.2f}% del Portafoglio",
+                positive=(bs_hedge['cost_pct_of_portfolio'] < 5.0),
+                help_text="Esborso finanziario totale per l'acquisto di tutti i contratti Put di copertura."
             )
         with col_bs4:
-            st.metric(
+            metric_card(
                 f"IV Effettiva ({bs_hedge['effective_iv_pct']:.1f}%)",
                 f"Δ: {bs_hedge['put_delta']:.3f}",
                 delta=f"Vega: {bs_hedge['put_vega']:.2f} | Γ: {bs_hedge['put_gamma']:.4f}",
-                help="Greci di secondo ordine calibrati sulla curva reale"
+                positive=True,
+                help_text="Greci di Black-Scholes: Delta (Δ), Vega (sensibilità all'1% di IV) e Gamma (Γ, curvatura)."
             )
 
         # Superficie e Smile Plotly
