@@ -8,9 +8,13 @@ import plotly.graph_objects as go
 import core.ui_utils as ui_utils
 import core.risk_engine as risk_engine
 import core.sec_rag_engine as sec_rag_engine
+import core.metadata_resolver as metadata_resolver
+import core.financial_analysis as financial_analysis
 importlib.reload(ui_utils)
 importlib.reload(risk_engine)
 importlib.reload(sec_rag_engine)
+importlib.reload(metadata_resolver)
+importlib.reload(financial_analysis)
 
 from core.ui_utils import (
     inject_custom_css, metric_card, glossary_modal, fmt_pct, render_executive_badges,
@@ -19,6 +23,8 @@ from core.ui_utils import (
 )
 from core.workspace_manager import get_url_param, set_url_params, register_workspace_tab
 from core.forensic_accounting import compute_beneish_m_score, compute_sloan_accrual_ratio
+from core.metadata_resolver import resolve_asset_metadata, resolve_asset_valuation_metrics
+from core.financial_analysis import resolve_company_name
 
 st.set_page_config(page_title="Valutazione Aziendale | ARGUS", page_icon="🏛️", layout="wide")
 inject_custom_css()
@@ -130,6 +136,15 @@ for col in ["last_price", "target_mean_price", "peg_ratio", "trailing_pe", "forw
     else:
         df_fund[col] = np.nan
 
+# Arricchimento automatico per asset noti privi di Target Price o multipli
+for idx, row in df_fund.iterrows():
+    tk = str(row.get("ticker", "")).strip().upper()
+    known_val = resolve_asset_valuation_metrics(tk)
+    if known_val:
+        for metric_k, metric_v in known_val.items():
+            if metric_k in df_fund.columns and (pd.isna(df_fund.at[idx, metric_k]) or df_fund.at[idx, metric_k] is None):
+                df_fund.at[idx, metric_k] = metric_v
+
 # Normalizzazione automatica valuta per Target Price (es. DKK, SEK, JPY, GBp)
 def normalize_target_price(row):
     last = row.get("last_price")
@@ -186,10 +201,6 @@ df_fund["Upside %"] = np.where(
 df_fund["Verdetto"] = df_fund.apply(get_verdict, axis=1)
 df_valued = df_fund[df_fund["Verdetto"] != "⚪ N/A"]
 
-if df_valued.empty:
-    st.warning("⚠️ Impossibile calcolare il Fair Value: i dati degli Analisti e il Target Price non sono disponibili per gli asset attuali.")
-    st.stop()
-
 # ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
 active_val_tab = render_segmented_tabs([
     "🏛️ Fair Value & Consensus Analisti",
@@ -200,69 +211,72 @@ active_val_tab = render_segmented_tabs([
 
 # ── TAB 1: FAIR VALUE & CONSENSUS ANALISTI ─────────────────────
 if active_val_tab == "🏛️ Fair Value & Consensus Analisti":
-    st.markdown("#### Riepilogo Giudizi di Mercato")
-    col1, col2, col3 = st.columns(3)
+    if df_valued.empty:
+        st.info("ℹ️ Nessun dato di Target Price o Consensus Analisti disponibile per gli asset attualmente caricati in portafoglio.")
+    else:
+        st.markdown("#### Riepilogo Giudizi di Mercato")
+        col1, col2, col3 = st.columns(3)
 
-    n_under = len(df_valued[df_valued["Verdetto"].str.contains("Sottovalutata")])
-    n_fair  = len(df_valued[df_valued["Verdetto"].str.contains("Fair Value")])
-    n_over  = len(df_valued[df_valued["Verdetto"].str.contains("Sopravvalutata")])
+        n_under = len(df_valued[df_valued["Verdetto"].str.contains("Sottovalutata")])
+        n_fair  = len(df_valued[df_valued["Verdetto"].str.contains("Fair Value")])
+        n_over  = len(df_valued[df_valued["Verdetto"].str.contains("Sopravvalutata")])
 
-    with col1:
-        metric_card(
-            "Sottovalutate (Buy)",
-            str(n_under),
-            "Asset a sconto vs target price",
-            True,
-            help_text="<b>Cosa significa:</b> Azioni con Target Price a 12 mesi superiore di almeno il 10% al prezzo attuale con multipli equilibrati."
-        )
-    with col2:
-        metric_card(
-            "Fairly Valued (Hold)",
-            str(n_fair),
-            "Asset in linea col fair value",
-            True,
-            help_text="<b>Cosa significa:</b> Azioni scambiate in un intervallo di normalità tra -5% e +10% rispetto al prezzo obiettivo."
-        )
-    with col3:
-        metric_card(
-            "Sopravvalutate (Sell)",
-            str(n_over),
-            "Asset a premio vs target price",
-            False,
-            help_text="<b>Cosa significa:</b> Azioni con Upside negativo (< -5%) o con PEG Ratio superiore a 2.5 (premio eccessivo)."
-        )
+        with col1:
+            metric_card(
+                "Sottovalutate (Buy)",
+                str(n_under),
+                "Asset a sconto vs target price",
+                True,
+                help_text="<b>Cosa significa:</b> Azioni con Target Price a 12 mesi superiore di almeno il 10% al prezzo attuale con multipli equilibrati."
+            )
+        with col2:
+            metric_card(
+                "Fairly Valued (Hold)",
+                str(n_fair),
+                "Asset in linea col fair value",
+                True,
+                help_text="<b>Cosa significa:</b> Azioni scambiate in un intervallo di normalità tra -5% e +10% rispetto al prezzo obiettivo."
+            )
+        with col3:
+            metric_card(
+                "Sopravvalutate (Sell)",
+                str(n_over),
+                "Asset a premio vs target price",
+                False,
+                help_text="<b>Cosa significa:</b> Azioni con Upside negativo (< -5%) o con PEG Ratio superiore a 2.5 (premio eccessivo)."
+            )
 
-    st.divider()
+        st.divider()
 
-    col_a, col_b = st.columns([2, 1])
+        col_a, col_b = st.columns([2, 1])
 
-    with col_a:
-        df_display = df_valued[["ticker", "Verdetto", "last_price", "target_mean_price", "Upside %", "peg_ratio", "trailing_pe"]].copy()
-        df_display.rename(columns={
-            "ticker": "Asset",
-            "last_price": "Prezzo Attuale",
-            "target_mean_price": "Target Price (Analisti)",
-            "peg_ratio": "PEG Ratio",
-            "trailing_pe": "P/E Ratio"
-        }, inplace=True)
-        
-        df_display["Prezzo Attuale"] = df_display["Prezzo Attuale"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
-        df_display["Target Price (Analisti)"] = df_display["Target Price (Analisti)"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
-        df_display["Upside %"] = df_display["Upside %"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "N/A")
-        df_display["PEG Ratio"] = df_display["PEG Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
-        df_display["P/E Ratio"] = df_display["P/E Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+        with col_a:
+            df_display = df_valued[["ticker", "Verdetto", "last_price", "target_mean_price", "Upside %", "peg_ratio", "trailing_pe"]].copy()
+            df_display.rename(columns={
+                "ticker": "Asset",
+                "last_price": "Prezzo Attuale",
+                "target_mean_price": "Target Price (Analisti)",
+                "peg_ratio": "PEG Ratio",
+                "trailing_pe": "P/E Ratio"
+            }, inplace=True)
+            
+            df_display["Prezzo Attuale"] = df_display["Prezzo Attuale"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
+            df_display["Target Price (Analisti)"] = df_display["Target Price (Analisti)"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
+            df_display["Upside %"] = df_display["Upside %"].apply(lambda x: f"{x*100:+.2f}%" if pd.notna(x) else "N/A")
+            df_display["PEG Ratio"] = df_display["PEG Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
+            df_display["P/E Ratio"] = df_display["P/E Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
 
-        col_fv_h1, col_fv_h2 = st.columns([3.2, 1.1])
-        with col_fv_h1:
-            st.markdown("#### Tabella Fair Value & Target Price")
-        with col_fv_h2:
-            csv_fv = df_display.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CSV", data=csv_fv, file_name="fair_value_target_price.csv", mime="text/csv", use_container_width=True, key="btn_download_fv_tp")
-        
-        st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+            col_fv_h1, col_fv_h2 = st.columns([3.2, 1.1])
+            with col_fv_h1:
+                st.markdown("#### Tabella Fair Value & Target Price")
+            with col_fv_h2:
+                csv_fv = df_display.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_fv, file_name="fair_value_target_price.csv", mime="text/csv", use_container_width=True, key="btn_download_fv_tp")
+            
+            st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
 
-    with col_b:
-        glossary_modal("📚 Glossario Metriche di Valutazione", """
+        with col_b:
+            glossary_modal("📚 Glossario Metriche di Valutazione", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 6px;"><b>🎯 Target Price:</b><br>
 Prezzo obiettivo a 12 mesi stimato dal consensus degli analisti istituzionali.</div>
@@ -274,99 +288,99 @@ Distanza percentuale necessaria affinché il prezzo di mercato converga verso il
 Rapporto tra multiplo P/E e tasso di crescita atteso degli utili (EPS Growth). Valori < 1.0 indicano forte convenienza.
 </div>
 </div>
-        """, button_label="📖 Glossario Metriche")
-        
-        verdict_counts = df_valued["Verdetto"].value_counts().reset_index()
-        verdict_counts.columns = ["Verdetto", "Conteggio"]
-        
-        color_map = {
-            "🟢 Sottovalutata": "#00e676",
-            "🟡 Fair Value": "#ff9900",
-            "🔴 Sopravvalutata (PEG Alto)": "#f85149",
-            "🔴 Sopravvalutata": "#f85149"
-        }
-        
-        st.markdown("**Distribuzione Valutazioni**")
-        fig = px.pie(
-            verdict_counts, values="Conteggio", names="Verdetto", hole=0.62,
-            color="Verdetto", color_discrete_map=color_map
-        )
-        fig.update_traces(
-            textposition='inside',
-            textinfo='percent',
-            insidetextorientation='horizontal',
-            textfont=dict(size=12, color="#ffffff"),
-            marker=dict(line=dict(color="#0d1117", width=2)),
-            hovertemplate="<b>%{label}</b><br>Quota Valutazioni: <b>%{percent}</b> (%{value} titoli)<extra></extra>"
-        )
-        fig.update_layout(
-            template="plotly_dark", height=320,
-            showlegend=True,
-            legend=dict(
-                orientation="h",
-                yanchor="top",
-                y=-0.12,
-                xanchor="center",
-                x=0.5,
-                bgcolor="rgba(22, 27, 34, 0.85)",
-                bordercolor="rgba(255, 255, 255, 0.12)",
-                borderwidth=1,
-                font=dict(size=11, color="#ffffff")
-            ),
-            margin=dict(l=10, r=10, t=10, b=25),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-        )
-        apply_plotly_theme(fig)
-        st.plotly_chart(fig, use_container_width=True, key="val_fair_value_scatter", config={"displayModeBar": "hover", "displaylogo": False})
+            """, button_label="📖 Glossario Metriche")
+            
+            verdict_counts = df_valued["Verdetto"].value_counts().reset_index()
+            verdict_counts.columns = ["Verdetto", "Conteggio"]
+            
+            color_map = {
+                "🟢 Sottovalutata": "#00e676",
+                "🟡 Fair Value": "#ff9900",
+                "🔴 Sopravvalutata (PEG Alto)": "#f85149",
+                "🔴 Sopravvalutata": "#f85149"
+            }
+            
+            st.markdown("**Distribuzione Valutazioni**")
+            fig = px.pie(
+                verdict_counts, values="Conteggio", names="Verdetto", hole=0.62,
+                color="Verdetto", color_discrete_map=color_map
+            )
+            fig.update_traces(
+                textposition='inside',
+                textinfo='percent',
+                insidetextorientation='horizontal',
+                textfont=dict(size=12, color="#ffffff"),
+                marker=dict(line=dict(color="#0d1117", width=2)),
+                hovertemplate="<b>%{label}</b><br>Quota Valutazioni: <b>%{percent}</b> (%{value} titoli)<extra></extra>"
+            )
+            fig.update_layout(
+                template="plotly_dark", height=320,
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="top",
+                    y=-0.12,
+                    xanchor="center",
+                    x=0.5,
+                    bgcolor="rgba(22, 27, 34, 0.85)",
+                    bordercolor="rgba(255, 255, 255, 0.12)",
+                    borderwidth=1,
+                    font=dict(size=11, color="#ffffff")
+                ),
+                margin=dict(l=10, r=10, t=10, b=25),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            apply_plotly_theme(fig)
+            st.plotly_chart(fig, use_container_width=True, key="val_fair_value_scatter", config={"displayModeBar": "hover", "displaylogo": False})
 
-    # ── GRAFICO POTENZIALE DI RIALZO (UPSIDE / DOWNSIDE) INTEGRATO ──────
-    st.divider()
-    st.markdown("#### 📈 Potenziale di Rialzo (Upside / Downside Consensus Analisti)")
-    st.caption("Distanza percentuale necessaria affinché la quotazione di mercato converga verso il Target Price stimato dal consensus istituzionale.")
-    
-    df_upside = df_valued.dropna(subset=["Upside %"]).sort_values("Upside %", ascending=True).copy()
-
-    if not df_upside.empty:
-        df_upside["Colore"] = np.where(df_upside["Upside %"] > 0, "#00e676", "#f85149")
-        df_upside["fmt_upside"] = df_upside["Upside %"].apply(lambda x: f"{x*100:+.2f}%")
-        df_upside["fmt_price"] = df_upside["last_price"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
-        df_upside["fmt_target"] = df_upside["target_mean_price"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
+        # ── GRAFICO POTENZIALE DI RIALZO (UPSIDE / DOWNSIDE) INTEGRATO ──────
+        st.divider()
+        st.markdown("#### 📈 Potenziale di Rialzo (Upside / Downside Consensus Analisti)")
+        st.caption("Distanza percentuale necessaria affinché la quotazione di mercato converga verso il Target Price stimato dal consensus istituzionale.")
         
-        min_x = min(0.0, float(df_upside["Upside %"].min()) * 100)
-        max_x = max(0.0, float(df_upside["Upside %"].max()) * 100)
-        x_pad = max(10.0, (max_x - min_x) * 0.18)
-        chart_height = max(380, len(df_upside) * 36)
+        df_upside = df_valued.dropna(subset=["Upside %"]).sort_values("Upside %", ascending=True).copy()
 
-        fig_bar = go.Figure()
-        fig_bar.add_trace(go.Bar(
-            x=df_upside["Upside %"] * 100,
-            y=df_upside["ticker"],
-            orientation='h',
-            marker=dict(color=df_upside["Colore"], line=dict(color="#0d1117", width=1.5), opacity=0.9),
-            text=df_upside["Upside %"].apply(lambda x: f"{x*100:+.1f}%"),
-            textposition="outside",
-            textfont=dict(size=11, color="#ffffff"),
-            cliponaxis=False,
-            customdata=np.stack((df_upside["fmt_upside"], df_upside["fmt_price"], df_upside["fmt_target"]), axis=-1),
-            hovertemplate="<b>%{y}</b><br>Prezzo Attuale: <b>%{customdata[1]}</b><br>Target Price: <b>%{customdata[2]}</b><br>📈 Distanza dal Fair Value: <b>%{customdata[0]}</b><extra></extra>"
-        ))
-        
-        fig_bar.update_layout(
-            template="plotly_dark", height=chart_height,
-            xaxis=dict(
-                title="Distanza dal Fair Value degli Analisti (%)",
-                zeroline=True, zerolinecolor="#8b949e", zerolinewidth=1.5,
-                gridcolor="rgba(255,255,255,0.06)",
-                range=[min_x - x_pad, max_x + x_pad]
-            ),
-            yaxis=dict(title=None, showgrid=False),
-            margin=dict(l=20, r=40, t=20, b=30),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-        )
-        apply_plotly_theme(fig_bar)
-        st.plotly_chart(fig_bar, use_container_width=True, key="val_upside_bar_chart", config={"displayModeBar": "hover", "displaylogo": False})
-    else:
-        st.info("Dati di Upside non disponibili per gli asset attuali.")
+        if not df_upside.empty:
+            df_upside["Colore"] = np.where(df_upside["Upside %"] > 0, "#00e676", "#f85149")
+            df_upside["fmt_upside"] = df_upside["Upside %"].apply(lambda x: f"{x*100:+.2f}%")
+            df_upside["fmt_price"] = df_upside["last_price"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
+            df_upside["fmt_target"] = df_upside["target_mean_price"].apply(lambda x: f"€ {x:,.2f}" if pd.notna(x) else "N/A")
+            
+            min_x = min(0.0, float(df_upside["Upside %"].min()) * 100)
+            max_x = max(0.0, float(df_upside["Upside %"].max()) * 100)
+            x_pad = max(10.0, (max_x - min_x) * 0.18)
+            chart_height = max(380, len(df_upside) * 36)
+
+            fig_bar = go.Figure()
+            fig_bar.add_trace(go.Bar(
+                x=df_upside["Upside %"] * 100,
+                y=df_upside["ticker"],
+                orientation='h',
+                marker=dict(color=df_upside["Colore"], line=dict(color="#0d1117", width=1.5), opacity=0.9),
+                text=df_upside["Upside %"].apply(lambda x: f"{x*100:+.1f}%"),
+                textposition="outside",
+                textfont=dict(size=11, color="#ffffff"),
+                cliponaxis=False,
+                customdata=np.stack((df_upside["fmt_upside"], df_upside["fmt_price"], df_upside["fmt_target"]), axis=-1),
+                hovertemplate="<b>%{y}</b><br>Prezzo Attuale: <b>%{customdata[1]}</b><br>Target Price: <b>%{customdata[2]}</b><br>📈 Distanza dal Fair Value: <b>%{customdata[0]}</b><extra></extra>"
+            ))
+            
+            fig_bar.update_layout(
+                template="plotly_dark", height=chart_height,
+                xaxis=dict(
+                    title="Distanza dal Fair Value degli Analisti (%)",
+                    zeroline=True, zerolinecolor="#8b949e", zerolinewidth=1.5,
+                    gridcolor="rgba(255,255,255,0.06)",
+                    range=[min_x - x_pad, max_x + x_pad]
+                ),
+                yaxis=dict(title=None, showgrid=False),
+                margin=dict(l=20, r=40, t=20, b=30),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            apply_plotly_theme(fig_bar)
+            st.plotly_chart(fig_bar, use_container_width=True, key="val_upside_bar_chart", config={"displayModeBar": "hover", "displaylogo": False})
+        else:
+            st.info("Dati di Upside non disponibili per gli asset attuali.")
 
 # ── TAB 2: PRIVATE EQUITY SIMULATOR ───────────────────────────
 elif active_val_tab == "💼 Private Equity & Waterfall":
