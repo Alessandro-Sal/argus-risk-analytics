@@ -41,7 +41,7 @@ active_pos_tab = render_segmented_tabs([
     "🪦 Posizioni Chiuse & Graveyard",
     "📅 Proiezione Dividendi",
     "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
-    "⚡ Impatto di Mercato (Almgren-Chriss)"
+    "⚡ Liquidità Almgren-Chriss"
 ], key="positions_active_tab")
 
 # ── TAB 1: POSIZIONI & LIQUIDITÀ ──────────────────────────────
@@ -52,14 +52,15 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
 
     with col_c1:
         if con.get("by_asset_class_pct"):
-            st.markdown("**Per Asset Class**")
+            st.markdown("**Macro Asset Class**")
             ac_labels = [str(k).upper() if str(k).lower() in ["etf", "fx"] else str(k).title() for k in con["by_asset_class_pct"].keys()]
+            ac_vals = list(con["by_asset_class_pct"].values())
             fig_ac = go.Figure(go.Pie(
                 labels=ac_labels,
-                values=list(con["by_asset_class_pct"].values()),
-                hole=0.62,
+                values=ac_vals,
+                hole=0.65,
                 marker=dict(
-                    colors=["#00e676", "#58a6ff", "#bc8cff", "#ff9900", "#f85149"],
+                    colors=["#bc8cff", "#00e676", "#58a6ff", "#ff9900", "#f85149"],
                     line=dict(color="#0d1117", width=2)
                 ),
                 textposition='inside',
@@ -69,10 +70,11 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
                 hovertemplate="<b>Asset Class: %{label}</b><br>Peso: <b>%{percent}</b><extra></extra>"
             ))
             fig_ac.update_layout(
-                template="plotly_dark", height=310,
-                legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5, font=dict(size=10, color="#ffffff")),
+                template="plotly_dark", height=290,
+                legend=dict(orientation="h", yanchor="top", y=-0.08, xanchor="center", x=0.5, font=dict(size=10.5, color="#ffffff")),
                 margin=dict(l=10, r=10, t=10, b=25),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                annotations=[dict(text=f"<b>{len(ac_labels)}</b><br><span style='font-size:10px; color:#8b949e;'>Classi</span>", x=0.5, y=0.5, font_size=13, showarrow=False)]
             )
             apply_plotly_theme(fig_ac)
             st.plotly_chart(fig_ac, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
@@ -80,25 +82,29 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
     with col_c2:
         if con.get("by_gics_sector_pct"):
             st.markdown("**Per Settore GICS**")
-            fig_sec = go.Figure(go.Pie(
-                labels=list(con["by_gics_sector_pct"].keys()),
-                values=list(con["by_gics_sector_pct"].values()),
-                hole=0.62,
+            s_dict = con["by_gics_sector_pct"]
+            s_df = pd.DataFrame(list(s_dict.items()), columns=["Settore", "Peso %"]).sort_values(by="Peso %", ascending=True)
+
+            fig_sec = go.Figure(go.Bar(
+                y=s_df["Settore"],
+                x=s_df["Peso %"],
+                orientation="h",
                 marker=dict(
-                    colors=["#58a6ff", "#3fb950", "#ff9900", "#f85149", "#bc8cff", "#00f3ff", "#d29922", "#f0883e"],
-                    line=dict(color="#0d1117", width=2)
+                    color=s_df["Peso %"],
+                    colorscale=[[0, "#1e3a8a"], [1, "#38bdf8"]],
+                    line=dict(color="rgba(255,255,255,0.1)", width=1)
                 ),
-                textposition='inside',
-                textinfo='percent',
-                insidetextorientation='horizontal',
-                textfont=dict(size=11, color='#ffffff'),
-                hovertemplate="<b>Settore: %{label}</b><br>Peso: <b>%{percent}</b><extra></extra>"
+                text=s_df["Peso %"].apply(lambda v: f"{v:.1f}%"),
+                textposition="outside",
+                textfont=dict(size=10.5, color="#e6edf3"),
+                hovertemplate="<b>%{y}</b><br>Peso: <b>%{x:.2f}%</b><extra></extra>"
             ))
             fig_sec.update_layout(
-                template="plotly_dark", height=310,
-                legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5, font=dict(size=10, color="#ffffff")),
-                margin=dict(l=10, r=10, t=10, b=25),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                template="plotly_dark", height=290,
+                margin=dict(l=10, r=35, t=10, b=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", title=None),
+                yaxis=dict(title=None, tickfont=dict(size=10.5))
             )
             apply_plotly_theme(fig_sec)
             st.plotly_chart(fig_sec, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
@@ -106,25 +112,29 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
     with col_c3:
         if con.get("by_country_pct"):
             st.markdown("**Per Paese**")
-            fig_geo = go.Figure(go.Pie(
-                labels=list(con["by_country_pct"].keys()),
-                values=list(con["by_country_pct"].values()),
-                hole=0.62,
+            g_dict = con["by_country_pct"]
+            g_df = pd.DataFrame(list(g_dict.items()), columns=["Paese", "Peso %"]).sort_values(by="Peso %", ascending=True)
+
+            fig_geo = go.Figure(go.Bar(
+                y=g_df["Paese"],
+                x=g_df["Peso %"],
+                orientation="h",
                 marker=dict(
-                    colors=["#58a6ff", "#3fb950", "#ff9900", "#f85149", "#bc8cff", "#00f3ff", "#d29922", "#f0883e"],
-                    line=dict(color="#0d1117", width=2)
+                    color=g_df["Peso %"],
+                    colorscale=[[0, "#7c2d12"], [1, "#fb923c"]],
+                    line=dict(color="rgba(255,255,255,0.1)", width=1)
                 ),
-                textposition='inside',
-                textinfo='percent',
-                insidetextorientation='horizontal',
-                textfont=dict(size=11, color='#ffffff'),
-                hovertemplate="<b>Paese: %{label}</b><br>Peso: <b>%{percent}</b><extra></extra>"
+                text=g_df["Peso %"].apply(lambda v: f"{v:.1f}%"),
+                textposition="outside",
+                textfont=dict(size=10.5, color="#e6edf3"),
+                hovertemplate="<b>%{y}</b><br>Peso: <b>%{x:.2f}%</b><extra></extra>"
             ))
             fig_geo.update_layout(
-                template="plotly_dark", height=310,
-                legend=dict(orientation="h", yanchor="top", y=-0.12, xanchor="center", x=0.5, font=dict(size=10, color="#ffffff")),
-                margin=dict(l=10, r=10, t=10, b=25),
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+                template="plotly_dark", height=290,
+                margin=dict(l=10, r=35, t=10, b=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", title=None),
+                yaxis=dict(title=None, tickfont=dict(size=10.5))
             )
             apply_plotly_theme(fig_geo)
             st.plotly_chart(fig_geo, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
@@ -1477,7 +1487,7 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             )
 
 # ── TAB 4: RISCHIO LIQUIDITÀ & ALMGREN-CHRISS ─────────────────
-elif active_pos_tab == "⚡ Impatto di Mercato (Almgren-Chriss)":
+elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
     col_head_ac1, col_head_ac2 = st.columns([3.2, 1.1])
     with col_head_ac1:
         st.markdown("#### ⚡ Impatto di Mercato & Rischio di Liquidazione (Almgren-Chriss)")
