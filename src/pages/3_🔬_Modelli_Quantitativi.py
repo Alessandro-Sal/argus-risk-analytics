@@ -2467,52 +2467,94 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
                     "BL Return %": bl_res["black_litterman_returns"].values * 100,
                     "BL Weight %": bl_res["black_litterman_weights"].values * 100
                 })
-                df_bl = df_bl.sort_values(by="BL Weight %", ascending=False)
+                # ── RIGA 1: GRAFICI INTERATTIVI AD ALTA DENSITÀ (TREEMAP & BARRE RAGGRUPPATE) ──
+                tab_bl_tm, tab_bl_bar = st.tabs([
+                    "🗺️ Mappa di Allocazione Ottimale (Treemap)",
+                    "📊 Confronto Pesi (Peso Attuale vs Target Black-Litterman)"
+                ])
 
-                col_tbl_bl, col_chart_bl = st.columns([1.2, 1.0])
-                dyn_h = max(340, len(df_bl) * 30)
-
-                with col_tbl_bl:
-                    col_bl_h1, col_bl_h2 = st.columns([2.5, 1.0])
-                    with col_bl_h2:
-                        csv_bl = df_bl.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Scarica CSV", data=csv_bl, file_name="black_litterman_weights.csv", mime="text/csv", use_container_width=True)
-
-                    bl_cfg = {
-                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                        "Equilibrium Return %": st.column_config.NumberColumn("Equilibrium Return", format="%.2f%%"),
-                        "BL Return %": st.column_config.NumberColumn("BL Return", format="%.2f%%"),
-                        "BL Weight %": st.column_config.ProgressColumn("BL Target Weight", format="%.2f%%", min_value=0.0, max_value=100.0)
-                    }
-                    st.dataframe(
+                with tab_bl_tm:
+                    fig_bl_tm = px.treemap(
                         df_bl,
-                        column_config=bl_cfg,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=dyn_h
+                        path=[px.Constant("Allocazione Black-Litterman"), "Ticker"],
+                        values="BL Weight %",
+                        color="BL Return %",
+                        color_continuous_scale=[[0.0, "#0f172a"], [0.5, "#1e3a8a"], [1.0, "#38bdf8"]],
+                        labels={"BL Weight %": "Peso Target %", "BL Return %": "Rendimento BL %"}
                     )
-                with col_chart_bl:
-                    df_bl_plot = df_bl.sort_values(by="BL Weight %", ascending=True)
-                    fig_bl = go.Figure()
-                    fig_bl.add_trace(go.Bar(
-                        y=df_bl_plot["Ticker"],
-                        x=df_bl_plot["BL Weight %"],
-                        orientation="h",
-                        name="BL Weight %",
-                        marker=dict(color="#58a6ff", line=dict(width=1, color="rgba(255,255,255,0.2)")),
-                        hovertemplate="<b>%{y}</b><br>Peso Ottimale BL: <b>%{x:.2f}%</b><extra></extra>"
-                    ))
-                    fig_bl.update_layout(
-                        xaxis=dict(title="Peso Ottimale Black-Litterman %", ticksuffix="%"),
-                        yaxis=dict(categoryorder="total ascending", tickfont=dict(family="monospace", size=11)),
-                        template="plotly_dark",
-                        height=dyn_h,
-                        margin=dict(t=15, b=35, l=75, r=20),
+                    fig_bl_tm.update_traces(
+                        textinfo="label+value",
+                        texttemplate="<b>%{label}</b><br>%{value:.2f}%<br><span style='font-size:10.5px;'>Ret: %{color:.2f}%</span>",
+                        hovertemplate="<b>Asset: %{label}</b><br>🎯 Peso Target BL: <b>%{value:.2f}%</b><br>📈 Rendimento Atteso: <b>%{color:.2f}%</b><extra></extra>"
+                    )
+                    fig_bl_tm.update_layout(
+                        height=310,
+                        margin=dict(t=25, b=15, l=10, r=10),
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)"
                     )
-                    apply_plotly_theme(fig_bl)
-                    st.plotly_chart(fig_bl, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+                    apply_plotly_theme(fig_bl_tm)
+                    st.plotly_chart(fig_bl_tm, use_container_width=True)
+
+                with tab_bl_bar:
+                    cur_w_map = (mkt_w * 100.0).to_dict() if isinstance(mkt_w, pd.Series) else {}
+                    df_bl_comp = df_bl.copy()
+                    df_bl_comp["Peso Attuale %"] = df_bl_comp["Ticker"].map(cur_w_map).fillna(0.0)
+
+                    fig_bl_bar = go.Figure()
+                    fig_bl_bar.add_trace(go.Bar(
+                        x=df_bl_comp["Ticker"],
+                        y=df_bl_comp["Peso Attuale %"],
+                        name="⭐ Peso Attuale",
+                        marker=dict(color="#58a6ff", line=dict(color="rgba(255,255,255,0.1)", width=1)),
+                        hovertemplate="<b>%{x}</b><br>Peso Attuale: <b>%{y:.2f}%</b><extra></extra>"
+                    ))
+                    fig_bl_bar.add_trace(go.Bar(
+                        x=df_bl_comp["Ticker"],
+                        y=df_bl_comp["BL Weight %"],
+                        name="🎯 Target Black-Litterman",
+                        marker=dict(color="#ff9900", line=dict(color="rgba(255,153,0,0.4)", width=1)),
+                        hovertemplate="<b>%{x}</b><br>Target BL: <b>%{y:.2f}%</b><extra></extra>"
+                    ))
+                    fig_bl_bar.update_layout(
+                        height=310,
+                        barmode="group",
+                        margin=dict(t=20, b=35, l=40, r=15),
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        xaxis=dict(tickangle=-45, tickfont=dict(size=10.5, family="monospace")),
+                        yaxis=dict(title="Allocazione %", ticksuffix="%", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=11))
+                    )
+                    apply_plotly_theme(fig_bl_bar)
+                    st.plotly_chart(fig_bl_bar, use_container_width=True)
+
+                # ── RIGA 2: TABELLA INTERATTIVA AD ALTEZZA COMPATTA CON FILTRI ───────
+                col_bl_f1, col_bl_f2 = st.columns([3.2, 0.9])
+                with col_bl_f1:
+                    search_bl = st.text_input("🔍 Cerca Ticker nella Tabella Black-Litterman:", placeholder="Filtra per Ticker (es. GOOGL, BTC, ETH)...", key="search_bl_ticker")
+                with col_bl_f2:
+                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                    csv_bl = df_bl.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica CSV", data=csv_bl, file_name="black_litterman_weights.csv", mime="text/csv", use_container_width=True)
+
+                df_bl_filt = df_bl.copy()
+                if search_bl:
+                    df_bl_filt = df_bl_filt[df_bl_filt["Ticker"].astype(str).str.contains(search_bl.strip(), case=False, na=False)]
+
+                bl_cfg = {
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Equilibrium Return %": st.column_config.NumberColumn("Equilibrium Return", format="%.2f%%"),
+                    "BL Return %": st.column_config.NumberColumn("BL Return", format="%.2f%%"),
+                    "BL Weight %": st.column_config.ProgressColumn("BL Target Weight", format="%.2f%%", min_value=0.0, max_value=100.0)
+                }
+                st.dataframe(
+                    df_bl_filt,
+                    column_config=bl_cfg,
+                    use_container_width=True,
+                    hide_index=True,
+                    height=280
+                )
             else:
                 st.info("Dati di covarianza insufficienti per Black-Litterman.")
         else:
