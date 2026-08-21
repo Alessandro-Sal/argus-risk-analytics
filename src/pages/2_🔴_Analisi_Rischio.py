@@ -1161,11 +1161,11 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 
     def get_basel_badge(exc_count, expected):
         if exc_count <= expected:
-            return '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap;">🟢 Zona Verde (Conforme)</span>'
+            return '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap;">🟢 Zona Verde</span>'
         elif exc_count <= expected * 1.5:
-            return '<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap;">🟡 Zona Gialla (Sottostima)</span>'
+            return '<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap;">🟡 Zona Gialla</span>'
         else:
-            return '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 10px; border-radius: 12px; font-size: 11.5px; font-weight: 600; white-space: nowrap;">🔴 Zona Rossa (Rigettato)</span>'
+            return '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap;">🔴 Zona Rossa</span>'
 
     badge_hist = get_basel_badge(exc_hist, expected_exc)
     badge_param = get_basel_badge(exc_param, expected_exc)
@@ -1175,84 +1175,84 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     
     with col_b1:
         st.markdown(f"""
-        <div style="background: rgba(18, 24, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; position: relative;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 18px; position: relative;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">📊 VaR Storico</span>
+                <span style="font-size: 14.5px; font-weight: 700; color: #f8fafc; white-space: nowrap;">📊 VaR Storico</span>
                 {badge_hist}
             </div>
             <div style="margin-bottom: 14px;">
-                <div style="font-size: 26px; font-weight: 800; font-family: monospace; color: #38bdf8; line-height: 1.1;">{var_hist_1d * 100:.2f}%</div>
-                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Soglia Perdita 1G ({int(conf_level*100)}% Confidenza)</div>
+                <div style="font-size: 27px; font-weight: 800; font-family: monospace; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px;">{var_hist_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 3px;">Soglia Perdita 1G ({int(conf_level*100)}% Confidenza)</div>
             </div>
-            <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
                     <span>Violazioni Registrate:</span>
-                    <b style="font-family: monospace; color: #ffffff;">{exc_hist} / {n_days} ({ratio_hist:.2f}%)</b>
+                    <b style="font-family: monospace; color: #f8fafc;">{exc_hist} / {n_days} ({ratio_hist:.2f}%)</b>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
                     <span>Target Atteso (5%):</span>
-                    <span style="font-family: monospace;">{expected_exc:.1f} violazioni</span>
+                    <span style="font-family: monospace; color: #cbd5e1;">{expected_exc:.1f} violazioni</span>
                 </div>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
                 <span>Test LR Kupiec:</span>
-                <span style="font-family: monospace; color: #cbd5e1;">LR = {lr_hist:.2f} &bull; p-val = {pval_hist:.2f}</span>
+                <span style="font-family: monospace; color: #f8fafc;">LR = {lr_hist:.2f} &bull; p-val = {pval_hist:.2f}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
     with col_b2:
         st.markdown(f"""
-        <div style="background: rgba(18, 24, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; position: relative;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 18px; position: relative;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">📐 VaR Parametrico</span>
+                <span style="font-size: 14.5px; font-weight: 700; color: #f8fafc; white-space: nowrap;">📐 VaR Parametrico</span>
                 {badge_param}
             </div>
             <div style="margin-bottom: 14px;">
-                <div style="font-size: 26px; font-weight: 800; font-family: monospace; color: #38bdf8; line-height: 1.1;">{var_param_1d * 100:.2f}%</div>
-                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Soglia Gaussiana 1G ({int(conf_level*100)}% Confidenza)</div>
+                <div style="font-size: 27px; font-weight: 800; font-family: monospace; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px;">{var_param_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 3px;">Soglia Gaussiana 1G ({int(conf_level*100)}% Confidenza)</div>
             </div>
-            <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
                     <span>Violazioni Registrate:</span>
-                    <b style="font-family: monospace; color: #ffffff;">{exc_param} / {n_days} ({ratio_param:.2f}%)</b>
+                    <b style="font-family: monospace; color: #f8fafc;">{exc_param} / {n_days} ({ratio_param:.2f}%)</b>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
                     <span>Target Atteso (5%):</span>
-                    <span style="font-family: monospace;">{expected_exc:.1f} violazioni</span>
+                    <span style="font-family: monospace; color: #cbd5e1;">{expected_exc:.1f} violazioni</span>
                 </div>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
                 <span>Test LR Kupiec:</span>
-                <span style="font-family: monospace; color: #cbd5e1;">LR = {lr_param:.2f} &bull; p-val = {pval_param:.2f}</span>
+                <span style="font-family: monospace; color: #f8fafc;">LR = {lr_param:.2f} &bull; p-val = {pval_param:.2f}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
     with col_b3:
         st.markdown(f"""
-        <div style="background: rgba(18, 24, 38, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; position: relative;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.09); border-radius: 12px; padding: 18px; position: relative;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-size: 14px; font-weight: 700; color: #ffffff;">📈 VaR Cornish-Fisher</span>
+                <span style="font-size: 14.5px; font-weight: 700; color: #f8fafc; white-space: nowrap;">📈 VaR Cornish-Fisher</span>
                 {badge_cf}
             </div>
             <div style="margin-bottom: 14px;">
-                <div style="font-size: 26px; font-weight: 800; font-family: monospace; color: #38bdf8; line-height: 1.1;">{var_cf_1d * 100:.2f}%</div>
-                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">Soglia Non-Gaussiana (Skew/Kurt)</div>
+                <div style="font-size: 27px; font-weight: 800; font-family: monospace; color: #ffffff; line-height: 1.1; letter-spacing: -0.5px;">{var_cf_1d * 100:.2f}%</div>
+                <div style="font-size: 11.5px; color: #94a3b8; margin-top: 3px;">Soglia Non-Gaussiana (Skew/Kurt)</div>
             </div>
-            <div style="background: rgba(0, 0, 0, 0.25); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+            <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
                 <div style="display: flex; justify-content: space-between; font-size: 12px; color: #cbd5e1; margin-bottom: 4px;">
                     <span>Violazioni Registrate:</span>
-                    <b style="font-family: monospace; color: #ffffff;">{exc_cf} / {n_days} ({ratio_cf:.2f}%)</b>
+                    <b style="font-family: monospace; color: #f8fafc;">{exc_cf} / {n_days} ({ratio_cf:.2f}%)</b>
                 </div>
                 <div style="display: flex; justify-content: space-between; font-size: 12px; color: #94a3b8;">
                     <span>Target Atteso (5%):</span>
-                    <span style="font-family: monospace;">{expected_exc:.1f} violazioni</span>
+                    <span style="font-family: monospace; color: #cbd5e1;">{expected_exc:.1f} violazioni</span>
                 </div>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #94a3b8; border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 8px;">
                 <span>Test LR Kupiec:</span>
-                <span style="font-family: monospace; color: #cbd5e1;">LR = {lr_cf:.2f} &bull; p-val = {pval_cf:.2f}</span>
+                <span style="font-family: monospace; color: #f8fafc;">LR = {lr_cf:.2f} &bull; p-val = {pval_cf:.2f}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
