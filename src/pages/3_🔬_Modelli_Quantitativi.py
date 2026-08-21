@@ -2573,15 +2573,12 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
 
         from core.factor_library import compute_fama_french_factor_model
 
-        ff_model_sel = st.radio(
-            "Seleziona Modello Econometrico di Regressione:",
-            options=[
-                "🏛️ Fama-French 5-Factor + Momentum (Kenneth French Library)",
-                "📊 Carhart 4-Factor (Mkt-RF, SMB, HML, MOM)",
-                "📐 Fama-French 3-Factor (Mkt-RF, SMB, HML)"
-            ],
-            horizontal=True
-        )
+        st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+        ff_model_sel = render_segmented_tabs([
+            "🏛️ Fama-French 5-Factor + Momentum",
+            "📊 Carhart 4-Factor (Mkt, SMB, HML, MOM)",
+            "📐 Fama-French 3-Factor (Mkt, SMB, HML)"
+        ], key="ff_model_selector_tab")
 
         if "5-Factor" in ff_model_sel:
             m_code = "5_factor_mom"
@@ -2593,10 +2590,11 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
         ff_res = compute_fama_french_factor_model(sr_p, model_type=m_code)
         df_ff_factors = ff_res.get("df_factors", pd.DataFrame())
 
-        # KPI Cards Dinamiche
+        # KPI Cards Dinamiche e Bilanciate
         alpha_ann = ff_res.get("alpha_annualized", 0.0)
-        alpha_sig_txt = "🟢 Significativo (p < 0.05)" if ff_res.get("alpha_is_significant") else "⚪ Non Significativo"
+        alpha_t = ff_res.get("alpha_t_stat", 0.0)
         r2_val = ff_res.get("r_squared", 0.0)
+        adj_r2 = ff_res.get("adj_r_squared", 0.0)
 
         # Mappatura rapida dei beta
         betas_by_name = {}
@@ -2604,25 +2602,104 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             for _, r in df_ff_factors.iterrows():
                 betas_by_name[r["factor"]] = r["beta"]
 
-        col_kpi_ff1, col_kpi_ff2, col_kpi_ff3, col_kpi_ff4, col_kpi_ff5, col_kpi_ff6 = st.columns(6)
-        with col_kpi_ff1:
-            metric_card("Alpha Puro (α)", f"{alpha_ann*100:+.2f}%", f"t = {ff_res.get('alpha_t_stat', 0.0):+.2f}", alpha_ann >= 0)
-        with col_kpi_ff2:
-            metric_card("Beta Mkt-RF", f"{betas_by_name.get('Mkt-RF', 1.0):+.2f}", "Rischio Sistemico", True)
-        with col_kpi_ff3:
-            metric_card("Beta Size (SMB)", f"{betas_by_name.get('SMB', 0.0):+.2f}", "Small vs Large Cap", False)
-        with col_kpi_ff4:
-            metric_card("Beta Value (HML)", f"{betas_by_name.get('HML', 0.0):+.2f}", "Value vs Growth", False)
-        with col_kpi_ff5:
-            if "RMW" in betas_by_name:
-                metric_card("Beta Profit (RMW)", f"{betas_by_name.get('RMW', 0.0):+.2f}", "Margini Operativi", True)
-            else:
-                metric_card("Beta Mom (MOM)", f"{betas_by_name.get('MOM', 0.0):+.2f}", "Inerzia Trend 12M", True)
-        with col_kpi_ff6:
-            if "CMA" in betas_by_name:
-                metric_card("Beta Inv (CMA)", f"{betas_by_name.get('CMA', 0.0):+.2f}", "Capex Prudente", False)
-            else:
-                metric_card("R² Modello", f"{r2_val*100:.1f}%", f"Adj R²: {ff_res.get('adj_r_squared', 0.0)*100:.1f}%", True)
+        b_mkt = betas_by_name.get("Mkt-RF", 1.0)
+        b_smb = betas_by_name.get("SMB", 0.0)
+        b_hml = betas_by_name.get("HML", 0.0)
+        b_rmw = betas_by_name.get("RMW")
+        b_cma = betas_by_name.get("CMA")
+        b_mom = betas_by_name.get("MOM")
+
+        # Riga 1: Alpha, Mercato, Size, Value
+        col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+        with col_kpi1:
+            metric_card(
+                "Alpha Puro (α)",
+                f"{alpha_ann*100:+.2f}%",
+                f"t = {alpha_t:+.2f} ({'Significativo' if abs(alpha_t)>=1.96 else 'Non Sig.'})",
+                alpha_ann >= 0
+            )
+        with col_kpi2:
+            metric_card(
+                "Beta Mkt-RF",
+                f"{b_mkt:+.2f}",
+                "Esposizione Sistemica",
+                b_mkt >= 0
+            )
+        with col_kpi3:
+            metric_card(
+                "Beta Size (SMB)",
+                f"{b_smb:+.2f}",
+                "Small Cap Tilt" if b_smb > 0 else "Large Cap Tilt",
+                b_smb >= 0
+            )
+        with col_kpi4:
+            metric_card(
+                "Beta Value (HML)",
+                f"{b_hml:+.2f}",
+                "Value Tilt" if b_hml > 0 else "Growth Tilt",
+                b_hml >= 0
+            )
+
+        # Riga 2: Fattori Aggiuntivi & Bontà del Modello
+        if b_rmw is not None and b_cma is not None:
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+            col_kpi5, col_kpi6, col_kpi7, col_kpi8 = st.columns(4)
+            with col_kpi5:
+                metric_card(
+                    "Beta Profit (RMW)",
+                    f"{b_rmw:+.2f}",
+                    "Alta Redditività" if b_rmw > 0 else "Margini Deboli",
+                    b_rmw >= 0
+                )
+            with col_kpi6:
+                metric_card(
+                    "Beta Inv (CMA)",
+                    f"{b_cma:+.2f}",
+                    "Capex Conservativo" if b_cma > 0 else "Capex Aggressivo",
+                    b_cma >= 0
+                )
+            with col_kpi7:
+                b_m_val = b_mom if b_mom is not None else 0.0
+                metric_card(
+                    "Beta Momentum (MOM)",
+                    f"{b_m_val:+.2f}",
+                    "Trend Winner" if b_m_val > 0 else "Trend Loser",
+                    b_m_val >= 0
+                )
+            with col_kpi8:
+                metric_card(
+                    "Bontà Modello (R²)",
+                    f"{r2_val*100:.1f}%",
+                    f"Adj R²: {adj_r2*100:.1f}%",
+                    True
+                )
+        elif b_mom is not None:
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+            col_kpi5, col_kpi6 = st.columns(2)
+            with col_kpi5:
+                metric_card(
+                    "Beta Momentum (MOM)",
+                    f"{b_mom:+.2f}",
+                    "Trend Winner (12M)" if b_mom > 0 else "Trend Loser (12M)",
+                    b_mom >= 0
+                )
+            with col_kpi6:
+                metric_card(
+                    "Bontà Modello (R²)",
+                    f"{r2_val*100:.1f}%",
+                    f"Adj R²: {adj_r2*100:.1f}%",
+                    True
+                )
+        else:
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+            col_kpi5, _ = st.columns([1, 3])
+            with col_kpi5:
+                metric_card(
+                    "Bontà Modello (R²)",
+                    f"{r2_val*100:.1f}%",
+                    f"Adj R²: {adj_r2*100:.1f}%",
+                    True
+                )
 
         # Grafici e Attribuzione
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
