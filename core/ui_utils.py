@@ -125,32 +125,6 @@ def inject_custom_css():
             white-space: nowrap;
         }}
 
-        .metric-delta-pos {{
-            color: #4ade80;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }}
-
-        .metric-delta-neg {{
-            color: #f87171;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 6px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }}
-
         /* Streamlit Main Canvas Controls & Input Fields */
         [data-testid="stMain"] [data-baseweb="select"] > div {{
             background: rgba(22, 27, 34, 0.75) !important;
@@ -1494,6 +1468,21 @@ def fmt_eur(v):
         return f"{sign}€{abs_v / 1_000_000:,.2f}M"
     else:
         return f"{sign}€{abs_v:,.2f}"
+
+def fmt_eur_it(v, decimals: int = 0) -> str:
+    """Formatta un controvalore monetario in standard italiano (punto come separatore delle migliaia)."""
+    if v is None:
+        return "N/A"
+    try:
+        val = float(v)
+    except (ValueError, TypeError):
+        return "N/A"
+    if decimals == 0:
+        return f"€ {val:,.0f}".replace(",", ".")
+    else:
+        formatted = f"{val:,.{decimals}f}"
+        int_part, dec_part = formatted.split(".")
+        return f"€ {int_part.replace(',', '.')},{dec_part}"
 
 def color_pnl(val):
     color = "#3fb950" if val >= 0 else "#f85149"
