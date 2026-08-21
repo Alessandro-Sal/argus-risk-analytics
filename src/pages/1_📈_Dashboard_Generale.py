@@ -539,8 +539,14 @@ if not pos.empty:
                 st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
             with col_cu_h2:
                 csv_cube = cube_res["df"].to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_cube, file_name="duckdb_olap_cube.csv", mime="text/csv", use_container_width=True)
-            st.dataframe(cube_res["df"], use_container_width=True, hide_index=True)
+            cube_cfg = {
+                "asset_class": st.column_config.TextColumn("Asset Class"),
+                "sector": st.column_config.TextColumn("Settore GICS"),
+                "currency": st.column_config.TextColumn("Valuta"),
+                "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
+                "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f")
+            }
+            st.dataframe(cube_res["df"], column_config=cube_cfg, use_container_width=True, hide_index=True)
 
 # ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & MODAL) ──
 col_head_m1, col_head_m2 = st.columns([3.2, 1.2])
