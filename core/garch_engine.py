@@ -48,6 +48,8 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
         persistenza, varianza di lungo termine, half-life, serie delle deviazioni standard
         condizionali sigma_t e serie dei residui standardizzati e_t.
     """
+    if isinstance(returns, pd.DataFrame):
+        returns = returns.iloc[:, 0]
     s_ret = returns.dropna().astype(float)
     if len(s_ret) < 30:
         logger.warning("Serie storica troppo breve per GARCH(1,1) (<30 osservazioni). Utilizzo parametri di fallback.")
@@ -81,7 +83,7 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
             "bic": 0.0
         }
 
-    r_vals = s_ret.values
+    r_vals = np.asarray(s_ret.values, dtype=float).ravel()
     mu = float(np.mean(r_vals))
     eps = r_vals - mu
     sample_var = float(np.var(eps, ddof=1))
@@ -260,6 +262,8 @@ def compute_garch_fhs_bundle(
     """
     Costruisce il bundle diagnostico completo GARCH(1,1) e FHS integrato per la UI di ARGUS.
     """
+    if isinstance(returns, pd.DataFrame):
+        returns = returns.iloc[:, 0]
     s_ret = returns.dropna().astype(float)
     fit_res = fit_garch11(s_ret)
     fhs_res = compute_filtered_historical_simulation(s_ret, fit_res=fit_res, horizon=horizon)
