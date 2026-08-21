@@ -1840,7 +1840,8 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
                 
             st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
             
-            # Tabella Chandelier Exit Glassmorphic
+            # Tabella Chandelier Exit Glassmorphic (ordinata per urgenza di rischio)
+            df_atr_disp = df_atr_disp.sort_values(by="distance_pct", ascending=True)
             rows_atr_list = []
             for _, r_a in df_atr_disp.iterrows():
                 t_code = str(r_a.get("ticker", ""))
@@ -1849,16 +1850,19 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
                 hi_v = float(r_a.get("highest_high_22", 0.0))
                 stop_v = float(r_a.get("chandelier_stop", 0.0))
                 dist_v = float(r_a.get("distance_pct", 0.0))
-                is_trig = bool(r_a.get("stop_triggered", False))
+                is_trig = bool(r_a.get("stop_triggered", False)) or (p_mkt < stop_v) or (dist_v < 0)
                 
                 if is_trig:
-                    status_badge = '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px;">🔴 TRIGGER</span>'
+                    status_badge = '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🔴 TRIGGER</span>'
                     dist_txt = f'<span style="color: #f87171; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
+                elif dist_v < 4.0:
+                    status_badge = '<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🟡 VICINO STOP</span>'
+                    dist_txt = f'<span style="color: #facc15; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
                 else:
-                    status_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px;">🟢 REGOLARE</span>'
+                    status_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🟢 REGOLARE</span>'
                     dist_txt = f'<span style="color: #4ade80; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
                     
-                row_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 14px;font-family:monospace;">{t_code}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {p_mkt:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {atr_v:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {hi_v:,.2f}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {stop_v:,.2f}</td><td style="text-align:center;padding:8px 14px;">{dist_txt}</td><td style="padding:8px 14px;">{status_badge}</td></tr>'
+                row_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:44px;"><td style="color:#ffffff;font-weight:700;padding:8px 14px;font-family:monospace;">{t_code}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {p_mkt:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {atr_v:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {hi_v:,.2f}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {stop_v:,.2f}</td><td style="text-align:center;padding:8px 14px;">{dist_txt}</td><td style="padding:8px 14px;white-space:nowrap;">{status_badge}</td></tr>'
                 rows_atr_list.append(row_str)
                 
             table_atr_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:15%;">TICKER</th><th style="text-align:left;padding:8px 14px;width:16%;">PREZZO MKT (€)</th><th style="text-align:left;padding:8px 14px;width:14%;">ATR 14G (€)</th><th style="text-align:left;padding:8px 14px;width:15%;">MAX 22G (€)</th><th style="text-align:left;padding:8px 14px;width:16%;">CHANDELIER STOP (€)</th><th style="text-align:center;padding:8px 14px;width:12%;">DISTANZA %</th><th style="text-align:left;padding:8px 14px;width:12%;">STATO ALERT</th></tr></thead><tbody>{"".join(rows_atr_list)}</tbody></table></div>'
