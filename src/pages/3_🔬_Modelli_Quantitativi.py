@@ -601,13 +601,37 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
 
                 c_sb1, c_sb2, c_sb3, c_sb4 = st.columns(4)
                 with c_sb1:
-                    st.metric("Rendimento Atteso", f"{ret_sim:.2f}%", delta=f"{d_ret:+.2f}% vs Attuale")
+                    metric_card(
+                        "Rendimento Atteso",
+                        f"{ret_sim:.2f}%",
+                        delta=f"{d_ret:+.2f}% vs Attuale",
+                        positive=(d_ret >= 0),
+                        help_text="Rendimento annuo atteso del portafoglio post-ribilanciamento simulato."
+                    )
                 with c_sb2:
-                    st.metric("Volatilità Annua", f"{vol_sim:.2f}%", delta=f"{d_vol:+.2f}% vs Attuale", delta_color="inverse")
+                    metric_card(
+                        "Volatilità Annua",
+                        f"{vol_sim:.2f}%",
+                        delta=f"{d_vol:+.2f}% vs Attuale",
+                        positive=(d_vol <= 0),
+                        help_text="Volatilità annua stimata del portafoglio simulato."
+                    )
                 with c_sb3:
-                    st.metric("VaR 95% Giornaliero", f"{var_sim:.2f}%", delta=f"{d_var:+.2f}% vs Attuale", delta_color="inverse")
+                    metric_card(
+                        "VaR 95% Giornaliero",
+                        f"{var_sim:.2f}%",
+                        delta=f"{d_var:+.2f}% vs Attuale",
+                        positive=(d_var <= 0),
+                        help_text="Value at Risk 95% su orizzonte di 1 giorno post-ribilanciamento."
+                    )
                 with c_sb4:
-                    st.metric("Sharpe Ratio Simulato", f"{sharpe_sim:.2f}", delta=f"{d_sharpe:+.2f} vs Attuale")
+                    metric_card(
+                        "Sharpe Ratio Simulato",
+                        f"{sharpe_sim:.2f}",
+                        delta=f"{d_sharpe:+.2f} vs Attuale",
+                        positive=(d_sharpe >= 0),
+                        help_text="Indice di Sharpe atteso del portafoglio post-ribilanciamento."
+                    )
 
                 df_compare_w = pd.DataFrame({
                     "Ticker": valid_ts,
@@ -620,24 +644,41 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                     x=df_compare_w["Ticker"],
                     y=df_compare_w["Peso Attuale (%)"],
                     name="Allocazione Attuale (%)",
-                    marker_color="#8b949e",
-                    text=[f"{w:.1f}%" for w in df_compare_w["Peso Attuale (%)"]],
-                    textposition="outside"
+                    marker=dict(color="#64748b", line=dict(color="rgba(255,255,255,0.1)", width=1)),
+                    hovertemplate="<b>%{x}</b><br>Allocazione Attuale: <b>%{y:.2f}%</b><extra></extra>"
                 ))
                 fig_sbx.add_trace(go.Bar(
                     x=df_compare_w["Ticker"],
                     y=df_compare_w["Peso Sandbox (%)"],
                     name="Allocazione Sandbox (%)",
-                    marker_color="#ff9900",
-                    text=[f"{w:.1f}%" for w in df_compare_w["Peso Sandbox (%)"]],
-                    textposition="outside"
+                    marker=dict(color="#ff9900", line=dict(color="rgba(255,153,0,0.4)", width=1)),
+                    hovertemplate="<b>%{x}</b><br>Allocazione Sandbox: <b>%{y:.2f}%</b><extra></extra>"
                 ))
                 fig_sbx.update_layout(
                     barmode="group",
-                    height=280,
+                    height=340,
                     template="plotly_dark",
-                    margin=dict(l=20, r=20, t=30, b=20),
-                    yaxis=dict(title="Peso %", gridcolor="rgba(255,255,255,0.06)")
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=20, r=20, t=35, b=30),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="center",
+                        x=0.5,
+                        font=dict(size=11.5)
+                    ),
+                    xaxis=dict(
+                        title=None,
+                        tickangle=-45,
+                        tickfont=dict(size=11, family="monospace")
+                    ),
+                    yaxis=dict(
+                        title="Peso %",
+                        gridcolor="rgba(255,255,255,0.06)",
+                        zerolinecolor="rgba(255,255,255,0.12)"
+                    )
                 )
                 apply_plotly_theme(fig_sbx)
                 st.plotly_chart(fig_sbx, use_container_width=True)
