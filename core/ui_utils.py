@@ -1513,8 +1513,8 @@ def glossary_modal(title: str, content: str, button_label: str = "📖 Approfond
     border: 1px solid rgba(255, 153, 0, 0.4);
     padding: 24px 28px;
     border-radius: 16px;
-    width: 90%;
-    max-width: 680px;
+    width: 92%;
+    max-width: 720px;
     max-height: 85vh;
     overflow-y: auto;
     color: #e6edf3;
@@ -1709,9 +1709,7 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
             if st.button(opt, key=btn_key, type=btn_type, use_container_width=True):
                 if st.session_state.get(key) != opt:
                     st.session_state[key] = opt
-                    st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
-    
     return st.session_state[key]
 
 
@@ -1723,7 +1721,7 @@ def render_info_modal(title: str, content: str, button_label: str = "ℹ️ Meto
     if use_popover:
         with st.popover(button_label, help=f"Dettagli metodologici per {title}", use_container_width=True):
             st.markdown(f"### {title}")
-            st.markdown(content)
+            st.markdown(content, unsafe_allow_html=True)
     else:
         glossary_modal(title=title, content=content, button_label=button_label)
 
@@ -1752,44 +1750,34 @@ def render_risk_free_modal(
     source = info.get("source", "BCE €STR")
     
     content = f"""
-### 🏛️ Tasso Privo di Rischio (Risk-Free Rate $R_f$) — Standard Istituzionale
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-Il **Tasso Privo di Rischio ($R_f$)** rappresenta il rendimento teorico di un investimento a rischio di credito nullo su un orizzonte a breve termine. In **ARGUS**, il tasso $R_f$ è calibrato dinamicamente in base alla valuta base del portafoglio (**{curr}**) ed è attualmente pari a **{rate_pct:.2f}%** (*{source}*).
+<!-- 1. DEFINIZIONE & PROXY -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏛️ 1. Tasso Privo di Rischio (Risk-Free Rate Rf)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Il rendimento teorico di un investimento a rischio di credito e liquidità nullo su orizzonte a breve termine. In ARGUS è attualmente pari a <b>{rate_pct:.2f}%</b> (Fonte: <i>{source}</i>) per la valuta base <b>{curr}</b>.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Proxy Istituzionali di Riferimento:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-size: 13px;">
+      • <b>EUR:</b> BCE €STR (Euro Short-Term Rate) / Bund 3M (XEON.DE)<br>
+      • <b>USD:</b> US 3M Treasury Bill (^IRX) / SOFR<br>
+      • <b>GBP:</b> Bank of England SONIA (CSH2.L)<br>
+      • <b>CHF:</b> SNB SARON Swiss Overnight Rate
+    </div>
+  </div>
+  <div><b>🎯 A cosa serve:</b> Fornisce la remunerazione base del capitale monetario privo di rischio con cui confrontare ogni rendimento attivo.</div>
+</div>
 
----
+<!-- 2. IMPATTO QUANTITATIVO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚙️ 2. Impatto Matematico nei Motori Quantitativi ARGUS</div>
+  <div style="margin-bottom: 6px;"><b>⚖️ Sharpe & Sortino Ratio:</b> (Rp &minus; Rf) / &sigma; — Un Rf più elevato aumenta l'hurdle rate richiesto al gestore per giustificare la volatilità.</div>
+  <div style="margin-bottom: 6px;"><b>🏅 Alpha di Jensen:</b> &alpha; = Rp &minus; [Rf + &beta; &times; (Rb &minus; Rf)] — Depura l'extra-rendimento sia dal Beta di mercato sia dal rendimento monetario base.</div>
+  <div style="margin-bottom: 6px;"><b>⚡ Black-Scholes & Opzioni:</b> Fattore di sconto monetario per il valore attuale dello strike price K.</div>
+  <div style="margin-bottom: 6px;"><b>💼 Costo del Capitale (WACC & DCF):</b> Ke = Rf + &beta; &times; ERP — Tasso base di attualizzazione per i flussi di cassa operativi.</div>
+  <div><b>🎯 Trade Sizing (Kelly Criterion):</b> f* = (&mu; &minus; Rf) / &sigma;² — Massimizza la crescita geometrica del capitale rispetto alla varianza.</div>
+</div>
 
-#### 🌐 Benchmark Istituzionali per Valuta
-
-| Valuta | Tasso di Riferimento | Proxy Live / Fonte | Tipologia di Strumento |
-| :--- | :--- | :--- | :--- |
-| **EUR** | **BCE €STR** (Euro Short-Term Rate) | `XEON.DE` / Bund 3M | Overnight Interbancario / Deposito BCE |
-| **USD** | **US 3M Treasury Bill** | `^IRX` (13-Week T-Bill) / SOFR | Titoli di Stato a Breve Termine USA |
-| **GBP** | **Bank of England SONIA** | `CSH2.L` / UK 3M Gilt | Sterling Overnight Index Average |
-| **CHF** | **SNB SARON** | Swiss Overnight Rate | Swiss Average Rate Overnight |
-
----
-
-#### 📐 Impatto Matematico nei Motori Quantitativi di ARGUS
-
-1. **Sharpe Ratio & Sortino Ratio**:
-   $$\\text{{Sharpe}} = \\frac{{R_p - R_f}}{{\\sigma_p}}, \\quad \\text{{Sortino}} = \\frac{{R_p - R_f}}{{\\sigma_{{\\text{{downside}}}}}}$$
-   *Un $R_f$ più elevato incrementa l'hurdle rate richiesto al gestore per giustificare la volatilità assunta.*
-
-2. **Alpha di Jensen & CAPM**:
-   $$\\alpha = R_p - [R_f + \\beta_p (R_m - R_f)]$$
-   *Depura l'extra-rendimento sia dalla componente di mercato (Beta) sia dal rendimento monetario privo di rischio.*
-
-3. **Prezzatura Opzioni & Delta-Hedging (Black-Scholes 1973)**:
-   $$C = S N(d_1) - K e^{{-R_f T}} N(d_2), \\quad P = K e^{{-R_f T}} N(-d_2) - S N(-d_1)$$
-   *Il tasso $R_f$ determina il fattore di sconto monetario per il valore attuale dello strike price $K$.*
-
-4. **Costo del Capitale (WACC & DCF Intrinseco)**:
-   $$K_e = R_f + \\beta \\times \\text{{ERP}}$$
-   *Costituisce la base del tasso di attualizzazione per i flussi di cassa operativi e la valutazione intrinseca.*
-
-5. **Trade Sizing Ottimale (Kelly Criterion)**:
-   $$f^* = \\frac{{\\mu - R_f}}{{\\sigma^2}}$$
-   *Massimizza la crescita geometrica del capitale pesando l'eccesso di rendimento rispetto alla varianza.*
+</div>
 """
     render_info_modal(
         title=f"🏛️ Metodologia Tasso Risk-Free ({curr}: {rate_pct:.2f}%)",
@@ -1802,48 +1790,53 @@ Il **Tasso Privo di Rischio ($R_f$)** rappresenta il rendimento teorico di un in
 def render_corporate_actions_modal(
     corporate_actions_list: list = None,
     button_label: str = "ℹ️ Metodologia Corporate Actions & Split",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
+    Renderizza un modale informativo istituzionale dedicato alla spiegazione
     delle Corporate Actions, Stock Split, Reverse Split e della rettifica dei lotti FIFO.
     """
-    audit_summary = ""
+    audit_summary_html = ""
     if corporate_actions_list and len(corporate_actions_list) > 0:
-        audit_summary = "\n\n#### 📑 Corporate Actions Applicate a questo Portafoglio:\n"
+        rows_act = ""
         for act in corporate_actions_list:
-            audit_summary += (
-                f"- **{act.get('ticker')}** ({act.get('split_date')}): **{act.get('description', act.get('split_type'))}** "
-                f"| Rapporto: **{act.get('split_ratio')}x** | Lotti rettificati: **{act.get('affected_lots_count', 1)}** "
-                f"| Quote: {act.get('shares_before', 'N/D')} ➔ **{act.get('shares_after', 'N/D')}**\n"
-            )
+            rows_act += f"• <b>{act.get('ticker')}</b> ({act.get('split_date')}): {act.get('description', act.get('split_type'))} | Ratio: <b>{act.get('split_ratio')}x</b> | Lotti rettificati: <b>{act.get('affected_lots_count', 1)}</b><br>"
+        audit_summary_html = f"""
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(63,185,80,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #3fb950; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📑 Corporate Actions Applicate a questo Portafoglio</div>
+  <div style="font-size: 12.5px; color: #7ee787;">{rows_act}</div>
+</div>
+"""
 
     content = f"""
-### 🧬 Corporate Actions & Stock Split Engine
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-Le **Corporate Actions** (operazioni straordinarie sul capitale) modificano la struttura delle azioni in circolazione di una società quotata senza alterare il valore intrinseco complessivo dell'azienda o la quota di partecipazione proporzionale dell'investitore.
+<!-- 1. PRINCIPIO FISCALE -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🧬 1. Principio di Invarianza Fiscale (TUIR Art. 67 & IFRS)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Le operazioni straordinarie (Stock Split / Reverse Split) non costituiscono realizzo di plusvalenza o minusvalenza. Il valore fiscale complessivo del lotto di acquisto rimane invariato.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Formula di Rettifica Invariante:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      <b>Cost Basis</b> = Q<sub>orig</sub> &times; P<sub>orig</sub> = Q<sub>rett</sub> &times; P<sub>rett</sub>
+    </div>
+  </div>
+  <div><b>🔍 Tipologie:</b><br>
+    • <b>Forward Split (R > 1):</b> Il numero di quote aumenta (Q &times; R) e il prezzo di carico medio si riduce (P / R).<br>
+    • <b>Reverse Split (R < 1):</b> Il numero di quote si riduce e il prezzo unitario aumenta proporzionalmente.
+  </div>
+</div>
 
----
+<!-- 2. RETTIFICA FIFO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔄 2. Perché la Rettifica FIFO in ARGUS è Fondamentale?</div>
+  <div style="margin-bottom: 6px;"><b>1. Coerenza con i Prezzi di Mercato:</b> Le serie storiche scaricate da Yahoo Finance sono rettificate (Adjusted Close). Senza rettifica dei lotti di acquisto passati, verrebbero generate perdite o guadagni fittizi.</div>
+  <div style="margin-bottom: 6px;"><b>2. Prevenzione Errori di Inventario:</b> Le vendite concluse post-split impiegano quote rettificate evitando disallineamenti di saldo.</div>
+  <div><b>3. Calcolo Fiscale Esatto:</b> Plusvalenze e minusvalenze per lo zainetto fiscale vengono determinate con precisione contabile al centesimo.</div>
+</div>
 
-#### ⚖️ Principio di Invarianza del Valore Fiscale (TUIR Art. 67 & IFRS)
-Secondo la normativa tributaria italiana ed internazionale, uno split azionario non costituisce realizzo di plusvalenza o minusvalenza. Il valore fiscale totale del lotto di acquisto rimane rigorosamente invariante:
+{audit_summary_html}
 
-$$\\text{{Cost Basis}} = Q_{{\\text{{orig}}}} \\times P_{{\\text{{orig}}}} = Q_{{\\text{{rett}}}} \\times P_{{\\text{{rett}}}}$$
-
-- **Forward Stock Split** ($R > 1$, es. 10:1 come Nvidia o 4:1 come Apple):
-  $$Q_{{\\text{{rett}}}} = Q_{{\\text{{orig}}}} \\times R, \\quad P_{{\\text{{rett}}}} = \\frac{{P_{{\\text{{orig}}}}}}{{R}}$$
-  *Il numero di quote aumenta proporzionalmente, mentre il prezzo medio di carico (WACP) si riduce della stessa misura.*
-
-- **Reverse Stock Split** ($R < 1$, es. 1:10):
-  $$Q_{{\\text{{rett}}}} = Q_{{\\text{{orig}}}} \\times R, \\quad P_{{\\text{{rett}}}} = \\frac{{P_{{\\text{{orig}}}}}}{{R}}$$
-  *Il numero di quote si riduce e il prezzo unitario aumenta (es. per rientrare nei requisiti minimi di quotazione).*
-
----
-
-#### 🔄 Perché la Rettifica FIFO è Fondamentale?
-1. **Coerenza con i Prezzi di Mercato**: Le quotazioni storiche e correnti scaricate da Yahoo Finance / Bloomberg sono rettificate (*Adjusted Close*). Se le transazioni di acquisto passate non venissero rettificate, il sistema confronterebbe un prezzo di carico ante-split (es. 1.000$ per Nvidia) con un prezzo corrente post-split (es. 120$), calcolando una perdita fittizia dell'88%.
-2. **Prevenzione Falsi Short / Errori di Saldo**: Una vendita eseguita post-split (es. vendita di 50 azioni Nvidia) supererebbe il saldo di un acquisto ante-split di 10 azioni non rettificate, generando errori di inventario negativo.
-3. **Calcolo Esatto delle Minusvalenze & Plusvalenze**: L'algoritmo FIFO di ARGUS rettifica retroattivamente tutti i lotti acquistati prima della data di efficacia dello split, garantendo il calcolo fiscale al centesimo di euro.{audit_summary}
+</div>
 """
     render_info_modal(
         title="🧬 Metodologia Corporate Actions & Stock Split",
@@ -1855,91 +1848,174 @@ $$\\text{{Cost Basis}} = Q_{{\\text{{orig}}}} \\times P_{{\\text{{orig}}}} = Q_{
 
 def render_broker_hub_modal(
     button_label: str = "ℹ️ Guida Export Broker",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale o popover informativo con le istruzioni passo-passo
+    Renderizza un modale istituzionale con le istruzioni passo-passo
     per esportare il file CSV corretto da tutti i broker supportati da ARGUS.
     """
     content = """
-### 🌐 Multi-Broker Ingestion Hub & Guida all'Esportazione
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-ARGUS supporta l'ingestione automatica con **Auto-Detection del formato** e normalizzazione dei codici ISIN in Ticker Yahoo Finance per i principali broker italiani ed internazionali.
+<div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;">
+  <div style="color: #38bdf8; font-weight: 700; font-size: 14px; margin-bottom: 4px;">🌐 Ingestion Automatica Multi-Broker ARGUS</div>
+  <div>ARGUS supporta l'ingestione istantanea con <b>Auto-Detection del formato</b>, risoluzione automatica degli ISIN bancari in Ticker Yahoo Finance e calcolo fiscale multi-valuta per tutti i principali broker.</div>
+</div>
 
----
+<!-- 1. DEGIRO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟡 1. DeGiro (Trading & Multi-Valuta)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App / Web:</b> Nel menu laterale seleziona <b>Attività</b> ➔ <b>Transazioni</b>.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-size: 13px;">
+      1. Imposta l'intervallo temporale (es. <i>Da Inizio / Tutto</i>).<br>
+      2. Clicca sul pulsante <b>Esporta</b> in alto a destra ➔ seleziona <b>CSV</b>.<br>
+      3. Carica il file scaricato direttamente in ARGUS senza modifiche.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Normalizza cambi EUR/USD/GBP, commissioni di negoziazione e converte gli ISIN europei in Ticker quotati.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> Intestazioni standard DeGiro (<i>Data, Ora, Prodotto, ISIN, Descrizione, Quantità, Prezzo, Valore, Commissioni</i>).</div>
+</div>
 
-#### 🟡 1. DeGiro
-1. Accedi alla piattaforma web di **DeGiro**.
-2. Nel menu laterale, vai su **Attività** ➔ **Transazioni**.
-3. Seleziona l'intervallo temporale desiderato (es. *Tutto* o l'anno corrente).
-4. Clicca sul pulsante **Esporta** in alto a destra e seleziona **CSV**.
-5. *Nota*: ARGUS gestisce automaticamente i cambi valuta, i costi di transazione e risolve gli ISIN europei.
+<!-- 2. DIRECTA SIM -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔵 2. Directa SIM (dLite & Classic)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App / Web:</b> Entra in <b>dLite</b> o piattaforma <b>Classic</b> ➔ <b>Ordini ed Eseguiti</b> / <b>Estratto Conto Titoli</b>.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7dd3fc; font-size: 13px;">
+      1. Seleziona le operazioni storiche concluse nel periodo desiderato.<br>
+      2. Clicca sull'icona di esportazione <b>CSV / Excel</b>.<br>
+      3. Se esportato in Excel, salva con nome in formato <b>CSV (delimitato da virgole)</b>.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Gestisce la notazione contabile italiana (COMPRA/VENDE, virgole decimali, dividendi e frazionamenti azionari).</div>
+  <div><b>🔍 Formato Riconosciuto:</b> Tracciati tabellari Directa dLite / Libera / Classic con codici ISIN o ticker MTA/US.</div>
+</div>
 
----
+<!-- 3. FINECO BANK -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(248,81,73,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #f85149; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔴 3. Fineco Bank (Reportistica Portafoglio)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'Area Riservata:</b> Accedi a <b>Portafoglio</b> ➔ <b>Reportistica Trading</b> ➔ <b>Ordini Eseguiti / Movimenti</b>.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(248,81,73,0.08); border-left: 3px solid #f85149; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #fca5a5; font-size: 13px;">
+      1. Imposta la data di inizio dalla prima transazione a oggi.<br>
+      2. Clicca su <b>Esporta in formato CSV / Testo</b>.<br>
+      3. Trascina il file nell'area di upload di ARGUS.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Riconosce le causali bancarie Fineco, scorpora le ritenute fiscali e converte gli ISIN di Borsa Italiana ed esteri.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> Estratti conto ordini eseguiti Fineco Bank con colonne ISIN, Descrizione Titolo, Operazione, Quantità e Prezzo.</div>
+</div>
 
-#### 🔵 2. Directa SIM
-1. Accedi alla piattaforma **dLite** o **Classic** di Directa.
-2. Vai nella sezione **Ordini ed Eseguiti** oppure **Estratto Conto Titoli**.
-3. Imposta il filtro temporale sulle operazioni concluse.
-4. Clicca sull'icona di esportazione **CSV / Excel**.
-5. *Nota*: Il parser riconosce le diciture italiane (*COMPRA*, *VENDE*, *DIVIDENDO*, *FRAZIONAMENTO*) e normalizza i formati numerici con virgola.
+<!-- 4. INTERACTIVE BROKERS -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,123,114,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff7b72; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟠 4. Interactive Brokers - IBKR (Activity Statement & Flex Query)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nel Client Portal:</b> Vai su <b>Performance & Reports</b> ➔ <b>Statements</b> (oppure <i>Flex Queries</i>).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(255,123,114,0.08); border-left: 3px solid #ff7b72; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffa198; font-size: 13px;">
+      1. Seleziona <b>Activity Statement</b> ➔ periodo <i>Custom Date Range</i>.<br>
+      2. Imposta il formato di download su <b>CSV</b>.<br>
+      3. In alternativa crea una Flex Query includendo la sezione <i>Trades (Eseguiti)</i>.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Supporta sia i file Activity multi-sezione complessi che i report tabellari Flex Query, estraendo automaticamente i ticker US/EU e le commissioni reali.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> Sezione 'Trades' di IBKR Activity Statement e Flex Query CSV.</div>
+</div>
 
----
+<!-- 5. TRADE REPUBLIC -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(63,185,80,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #3fb950; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟢 5. Trade Republic (Transazioni & PAC)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App / Web:</b> Vai nella sezione <b>Profilo</b> ➔ <b>Documenti & Attività</b>.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(63,185,80,0.08); border-left: 3px solid #3fb950; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7ee787; font-size: 13px;">
+      1. Esporta l'elenco riassuntivo delle transazioni e dei piani di accumulo (PAC).<br>
+      2. Scarica il file <b>CSV</b> delle attività.<br>
+      3. Carica il documento in ARGUS.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Mappa automaticamente gli ISIN dei PAC e degli acquisti frazionati in Italiano, Inglese e Tedesco.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> CSV Trade Republic con colonne Data, Tipo, Titolo, ISIN, Importo, Quote.</div>
+</div>
 
-#### 🔴 3. Fineco Bank
-1. Accedi all'area riservata **Fineco** ➔ sezione **Portafoglio** ➔ **Reportistica Trading**.
-2. Seleziona **Movimenti e Ordini Eseguiti** oppure **Rendiconto Fiscale**.
-3. Seleziona il periodo e clicca su **Esporta in formato CSV / Testo**.
-4. *Nota*: Le intestazioni bancarie e i codici ISIN/Titolo vengono normalizzati automaticamente.
+<!-- 6. SCALABLE CAPITAL -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔷 6. Scalable Capital (Transazioni & Baader Bank)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'Area Clienti:</b> Vai su <b>Profilo / Transazioni</b> (oppure al portale della banca depositaria <i>Baader Bank</i>).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #a5d6ff; font-size: 13px;">
+      1. Filtra per l'intervallo temporale completo del conto.<br>
+      2. Clicca su <b>Esporta CSV</b>.<br>
+      3. Inserisci il file nella Control Room ARGUS.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Elabora gli acquisti ordinari, i piani di risparmio automatizzati ETF e gli accrediti dei dividendi con tassazione estera.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> Export CSV Scalable Capital / Baader Bank.</div>
+</div>
 
----
+<!-- 7. ETORO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(46,160,67,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #2ea043; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟩 7. eToro (Account Statement & Closed Trades)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nel Portafoglio:</b> Vai su <b>Portafoglio</b> ➔ icona orologio <b>Cronologia</b> (<i>History</i>).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(46,160,67,0.08); border-left: 3px solid #2ea043; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #56d364; font-size: 13px;">
+      1. Clicca sull'icona delle impostazioni in alto a destra ➔ <b>Estratto conto</b> (<i>Account Statement</i>).<br>
+      2. Seleziona l'intervallo temporale (es. <i>Dall'apertura conto</i>).<br>
+      3. Clicca su <b>CSV / Excel</b> per avviare il download.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Converte le posizioni chiuse in coppie BUY/SELL con gestione corretta delle commissioni di rollover/overnight e valuta USD.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> Fogli 'Closed Positions' e 'Account Activity' dell'Account Statement eToro.</div>
+</div>
 
-#### 🟠 4. Interactive Brokers (IBKR)
-1. Accedi al **Client Portal** di Interactive Brokers.
-2. Vai su **Performance & Reports** ➔ **Statements** (Estratti Conto).
-3. Seleziona **Activity Statement** (oppure crea una **Custom Flex Query** con la sezione *Trades*).
-4. Imposta il formato su **CSV** e scarica il file.
-5. *Nota*: Il motore ARGUS riconosce sia il formato Activity multi-sezione sia i report tabellari Flex Query.
+<!-- 8. REVOLUT TRADING -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟪 8. Revolut Trading (Estratto Conto Transazioni)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App Revolut:</b> Sezione <b>Investimenti / Trading</b> ➔ <b>Altro (...)</b> ➔ <b>Estratti conto</b> (<i>Statements</i>).</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
+    <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #d2a8ff; font-size: 13px;">
+      1. Scegli la voce <b>Estratto conto transazioni</b>.<br>
+      2. Imposta l'intervallo temporale completo.<br>
+      3. Seleziona il formato <b>CSV / Excel</b>.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Riconosce acquisti e vendite frazionate di azioni/ETF, commissioni di custodia e dividendi netti accreditati.</div>
+  <div><b>🔍 Formato Riconosciuto:</b> File CSV di Revolut Trading (Trading Statement).</div>
+</div>
 
----
+<!-- 9. GOOGLE SHEETS LIVE SYNC -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌐 9. Google Sheets Live Sync (Sincronizzazione Cloud)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Modalità:</b> Connessione automatica e sicura tramite Service Account Google.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura di Configurazione:</b>
+    <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7dd3fc; font-size: 13px;">
+      1. Condividi il tuo foglio Google con l'email del Service Account.<br>
+      2. Inserisci l'URL o il nome del foglio nella Control Room ARGUS.<br>
+      3. I tab <i>Azioni</i> e <i>Cripto</i> vengono sincronizzati e consolidati automaticamente.
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Supporta il monitoraggio in tempo reale, la separazione automatica dei portafogli e l'integrazione nel Total Wealth.</div>
+</div>
 
-#### 🟢 5. Trade Republic
-1. Accedi all'app o all'interfaccia web di **Trade Republic**.
-2. Vai nella sezione **Profilo** ➔ **Documenti / Attività**.
-3. Seleziona il riepilogo delle transazioni / ordini eseguiti o PAC (*Savings Plan*).
-4. Scarica il file **CSV** (supporta export in Italiano, Inglese o Tedesco).
+<!-- 10. CSV STANDARD ARGUS -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(139,148,158,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #8b949e; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📄 10. Template CSV Standard ARGUS (Schema Universale a 9 Colonne)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Utilizzo:</b> Ideale per broker non elencati o fogli di calcolo custom.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Schema delle Colonne:</b>
+    <div style="background: rgba(139,148,158,0.08); border-left: 3px solid #8b949e; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #c9d1d9; font-family: monospace; font-size: 12px;">
+      tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
+    </div>
+  </div>
+  <div><b>🔍 Valori Validi:</b><br>
+    • <b>tx_type:</b> BUY, SELL, DIVIDEND, SPLIT, DEPOSIT, WITHDRAWAL.<br>
+    • <b>currency:</b> EUR, USD, GBP, CHF, ecc.<br>
+    • <b>asset_class:</b> Equity, ETF, Fixed Income, Commodity, Crypto, Cash.
+  </div>
+</div>
 
----
-
-#### 🔷 6. Scalable Capital
-1. Accedi all'area web o mobile di **Scalable Capital**.
-2. Vai su **Transazioni** (oppure all'estratto conto titoli della banca depositaria *Baader Bank*).
-3. Esporta l'elenco delle transazioni in formato **CSV**.
-4. *Nota*: Vengono mappati automaticamente acquisti singoli, piani di accumulo ETF e dividendi.
-
----
-
-#### 🟩 7. eToro
-1. Accedi al tuo account **eToro** ➔ sezione **Portafoglio** ➔ **Cronologia** (*History*).
-2. Clicca sull'icona delle impostazioni in alto a destra ➔ **Estratto conto** (*Account Statement*).
-3. Seleziona l'intervallo temporale desiderato e scarica il file in formato **CSV / Excel**.
-4. *Nota*: Il parser converte automaticamente le posizioni chiuse (*Closed Positions* e *Account Activity*) in coppie BUY/SELL con gestione corretta delle commissioni di rollover/overnight e valuta USD.
-
----
-
-#### 🟪 8. Revolut Trading
-1. Apri l'app **Revolut** ➔ sezione **Investimenti / Trading** ➔ **Altro (...)** ➔ **Estratti conto** (*Statements*).
-2. Seleziona il periodo desiderato ed esporta il file in formato **CSV / Excel**.
-3. *Nota*: Vengono riconosciute e normalizzate automaticamente le operazioni di compravendita di azioni/ETF frazionate e i dividendi accreditati.
-
----
-
-#### 📄 9. CSV Standard ARGUS (Template Universale)
-Se utilizzi un broker non elencato o un foglio di calcolo personalizzato, puoi scaricare il **Template CSV Standard** con le seguenti colonne:
-`tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes`
+</div>
 """
     render_info_modal(
-        title="🌐 Guida Export Multi-Broker",
+        title="🌐 Guida Export Multi-Broker & Ingestion Hub",
         content=content,
         button_label=button_label,
         use_popover=use_popover
@@ -1948,66 +2024,46 @@ Se utilizzi un broker non elencato o un foglio di calcolo personalizzato, puoi s
 
 def render_garch_fhs_modal(
     button_label: str = "ℹ️ Metodologia GARCH(1,1) & FHS",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
+    Renderizza un modale informativo istituzionale dedicato alla spiegazione
     della Volatilità Condizionale GARCH(1,1), dei cluster di volatilità e della Filtered Historical Simulation (FHS).
     """
     content = """
-### ⚡ Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-Nei mercati finanziari, la varianza dei rendimenti non è costante nel tempo ma manifesta il fenomeno dei **Cluster di Volatilità** (*Volatility Clustering* — Mandelbrot, Engle 1982): shock violenti tendono ad essere seguiti da ulteriore instabilità, mentre periodi di calma generano prolungata stabilità.
+<!-- 1. GARCH MODELLO -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚡ 1. Il Modello GARCH(1,1) (Bollerslev 1986)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Cattura i <i>Cluster di Volatilità</i> (Engle, Nobel 2003): periodi ad alta turbolenza tendono a persistere nel tempo.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Equazione della Varianza Condizionale:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      &sigma;<sub>t</sub><sup>2</sup> = &omega; + &alpha; &epsilon;<sub>t&minus;1</sub><sup>2</sup> + &beta; &sigma;<sub>t&minus;1</sub><sup>2</sup>
+    </div>
+  </div>
+  <div><b>🔍 Parametri:</b><br>
+    • <b>&omega; (Baseline):</b> Varianza di fondo incondizionata.<br>
+    • <b>&alpha; (ARCH Shock):</b> Reattività all'ultimo shock di mercato (&epsilon;<sub>t&minus;1</sub>).<br>
+    • <b>&beta; (GARCH Memory):</b> Persistenza della volatilità passata (&sigma;<sub>t&minus;1</sub>).
+  </div>
+</div>
 
----
+<!-- 2. FHS -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Filtered Historical Simulation (FHS — Barone-Adesi, Hull-White)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Il gold standard per il calcolo del VaR e CVaR sotto Basilea III / FRTB. Unisce la reattività del GARCH alla flessibilità empirica non parametrica.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Procedura a 3 Fasi:</b>
+    <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7dd3fc; font-size: 13px;">
+      1. <b>De-volatilizzazione:</b> e<sub>t</sub> = (r<sub>t</sub> &minus; &mu;) / &sigma;<sub>t</sub> (preserva code grasse e skewness).<br>
+      2. <b>Re-scaling:</b> r<sub>sim</sub> = &mu; + e<sub>t</sub> &times; &sigma;<sub>T+1</sub> (adegua alla volatilità odierna).<br>
+      3. <b>Stima VaR/CVaR:</b> Calcolo quantili e Shortfall sulla distribuzione filtrata.
+    </div>
+  </div>
+  <div><b>🎯 Vantaggio:</b> Reagisce istantaneamente ai cambi di regime di mercato senza assumere una distribuzione gaussiana a campana.</div>
+</div>
 
-#### 📐 1. Il Modello GARCH(1,1) (Bollerslev 1986)
-Il modello **GARCH(1,1)** (*Generalized Autoregressive Conditional Heteroskedasticity*) esprime la varianza condizionale $\\sigma_t^2$ del giorno $t$ come combinazione lineare di 3 componenti:
-
-$$\\sigma_t^2 = \\omega + \\alpha \\epsilon_{t-1}^2 + \\beta \\sigma_{t-1}^2, \\quad \\epsilon_t = r_t - \\mu$$
-
-- **$\\omega$ (Baseline Variance Weight)**: Costante di varianza di fondo ($\\omega > 0$).
-- **$\\alpha$ (ARCH Term / News Coefficient)**: Sensibilità e reattività all'ultimo shock di mercato $\\epsilon_{t-1}^2$ ($\\alpha \\ge 0$).
-- **$\\beta$ (GARCH Term / Memory Coefficient)**: Persistenza e memoria della varianza del giorno precedente $\\sigma_{t-1}^2$ ($\\beta \\ge 0$).
-
----
-
-#### ⏳ 2. Stazionarietà, Persistenza & Half-Life dello Shock
-- **Condizione di Stazionarietà**: $\\alpha + \\beta < 1$. Se $\\alpha + \\beta = 1$, il modello diventa *Integrated GARCH (IGARCH)* con memoria infinita.
-- **Varianza di Lungo Termine ($V_L$)**:
-  $$V_L = \\frac{\\omega}{1 - \\alpha - \\beta}, \\quad \\sigma_{\\text{long-run}} = \\sqrt{252 \\times V_L}$$
-- **Persistenza ($P = \\alpha + \\beta$)**: Misura la velocità con cui la volatilità tende a riassorbirsi verso la media storica incondizionata $V_L$.
-- **Half-Life dello Shock (Tempo di Dimezzamento)**:
-  $$\\text{Half-Life} = \\frac{\\ln(0.5)}{\\ln(\\alpha + \\beta)} \\quad \\text{giorni lavorativi}$$
-  *Indica quanti giorni di borsa aperta sono necessari affinché un picco di volatilità riduca il suo eccesso del 50%.*
-
----
-
-#### 🔮 3. Struttura a Termine della Volatilità (Term Structure Forecast)
-Per prevedere la volatilità futura su un orizzonte di $k$ giorni in avanti ($T+k$):
-
-$$\\sigma_{T+k}^2 = V_L + (\\alpha + \\beta)^{k-1} \\left(\\sigma_{T+1}^2 - V_L\\right)$$
-
-- Se la volatilità attuale $\\sigma_{T+1}$ è superiore a $\\sigma_{\\text{long-run}}$, la curva a termine è inclinata negativamente (*Mean-Reverting Downward*).
-- Se il mercato è calmo ($\\sigma_{T+1} < \\sigma_{\\text{long-run}}$), la curva è inclinata positivamente (*Mean-Reverting Upward*).
-
----
-
-#### 🛡️ 4. Filtered Historical Simulation (FHS — Hull-White 1998, Barone-Adesi 1999)
-La simulazione storica standard ha un grave difetto: assume che la volatilità passata sia identica a quella odierna.
-La **Filtered Historical Simulation (FHS)** risolve questo limite mediante un processo a 3 stadi:
-
-1. **De-volatilizzazione dei Rendimenti Storici**:
-   $$e_t = \\frac{r_t - \\mu}{\\sigma_t}$$
-   I residui standardizzati $e_t$ risultano de-correlati e approssimativamente $i.i.d.$, preservando però integralmente l'asimmetria (*Skewness*) e le code grasse (*Fat Tails*) empiriche.
-
-2. **Re-scaling con la Volatilità Corrente $\\sigma_{T+1}$**:
-   $$r_{T+1, \\text{sim}}^{(i)} = \\mu + e_i \\times \\sigma_{T+1}$$
-
-3. **Stima di VaR e CVaR (Expected Shortfall)**:
-   $$\\text{VaR}_{\\alpha}^{\\text{FHS}} = -Q\\left(r_{\\text{sim}}, \\alpha\\right), \\quad \\text{CVaR}_{\\alpha}^{\\text{FHS}} = -E\\left[r_{\\text{sim}} \\mid r_{\\text{sim}} \\le -\\text{VaR}_{\\alpha}^{\\text{FHS}}\\right]$$
-
-La FHS rappresenta il gold standard raccomandato nei framework **Basel III / FRTB (Fundamental Review of the Trading Book)** perché adegua istantaneamente il capitale di vigilanza agli shock di mercato senza imporre la fallace ipotesi di normalità gaussiana.
+</div>
 """
     render_info_modal(
         title="⚡ Volatilità Condizionale GARCH(1,1) & FHS",
@@ -2019,51 +2075,39 @@ La FHS rappresenta il gold standard raccomandato nei framework **Basel III / FRT
 
 def render_volatility_smile_modal(
     button_label: str = "ℹ️ Metodologia Volatility Smile & Skew",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale o popover informativo istituzionale dedicato alla spiegazione
+    Renderizza un modale informativo istituzionale dedicato alla spiegazione
     della Superficie di Volatilità Implicita, del Volatility Skew e dell'impatto sul Delta Hedging.
     """
-    content = r"""
-### 📐 Volatility Smile, Skew & Superficie 3D: Fondamenti Matematici
+    content = """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-#### 📌 1. Dai Limiti di Black-Scholes allo Smile di Mercato
-Il modello classico di Black-Scholes-Merton (1973) assume che la volatilità del sottostante $\sigma$ sia **costante nel tempo** e identica per tutti i livelli di prezzo di esercizio (Strike $K$) e scadenze ($T$).
+<!-- 1. LIMITI BS & SMILE -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📐 1. Dai Limiti di Black-Scholes allo Smile di Mercato</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Black-Scholes assume una volatilità costante su tutti gli strike. Nella realtà, le Put Out-of-the-Money incorporano un premio per il rischio ribasso (<i>Crash Phobia</i>) quotando a volatilità implicita (&sigma;<sub>IV</sub>) superiore.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Calibrazione dello Skew Quadratico:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      &sigma;(m) = a + b &times; m + c &times; m<sup>2</sup>, &nbsp; con moneyness m = ln(K / S<sub>0</sub>)
+    </div>
+  </div>
+  <div><b>🔍 Parametri:</b><br>
+    • <b>a (ATM Vol):</b> Livello base della volatilità At-The-Money.<br>
+    • <b>b (Skew Slope):</b> Pendenza asimmetrica negativa (domanda di hedging su ribassi).<br>
+    • <b>c (Curvature):</b> Curvatura convessa associata alla curtosi di mercato.
+  </div>
+</div>
 
-Nella realtà empirica post-crash 1987:
-- Le opzioni **Out-of-the-Money (OTM) Put** incorporano un premio per il rischio di ribasso estremo (*Crash Phobia* / Asimmetria negativa), quotando a una **volatilità implicita ($\sigma_{IV}$) sistematicamente più alta** rispetto alle Call OTM.
-- L'insieme delle $\sigma_{IV}$ osservate a mercato per diversi strike $K$ forma la curva dello **Smile** (o **Skew** asimmetrico azionario).
-- L'estensione congiunta a tutte le scadenze temporali $T$ genera la **Superficie di Volatilità 3D** $\sigma_{IV}(K, T)$.
+<!-- 2. DELTA HEDGING -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Impatto sul Delta-Hedging & Covered Call</div>
+  <div style="margin-bottom: 6px;"><b>1. Prezzo Corretto della Copertura:</b> Evita di sottostimare il costo delle Put OTM per proteggere il portafoglio.</div>
+  <div><b>2. Dimensionamento dei Contratti:</b> Calcola il Delta effettivo (&Delta;<sub>skew</sub>) garantendo la perfetta neutralità al rischio direzionale.</div>
+</div>
 
----
-
-#### 🔢 2. Risolutore Numerico di Volatilità Implicita (Inversione Newton-Raphson & Brent)
-Dato il prezzo di mercato di un'opzione $C_{\text{mkt}}$ (o $P_{\text{mkt}}$), la volatilità implicita $\sigma_{IV}$ è il valore che annulla la discrepanza:
-$$f(\sigma) = C_{\text{BS}}(S_0, K, T, r, \sigma) - C_{\text{mkt}} = 0$$
-
-Il motore quantitativo di ARGUS risolve l'equazione con:
-1. **Newton-Raphson Veloce**: Sfruttando la derivata prima analitica (Vega $\nu = S\sqrt{T}\phi(d_1)$):
-   $$\sigma_{n+1} = \sigma_n - \frac{C_{\text{BS}}(\sigma_n) - C_{\text{mkt}}}{\nu(\sigma_n)}$$
-2. **Fallback Robusto con Metodo di Brent**: Se il Vega è quasi nullo (opzioni Deep OTM/ITM), il solutore esegue una ricerca a bisezione sicura garantendo convergenza a precisione $10^{-6}$.
-
----
-
-#### 📊 3. Calibrazione Parametrica dello Skew Quadratico
-La curva di volatilità per ciascuna scadenza $T$ viene interpolata parametricamente in funzione della **Log-Moneyness** $m = \ln(K / S_0)$:
-$$\sigma(m) = a + b \cdot m + c \cdot m^2$$
-
-- **$a$ (ATM Volatility)**: Livello base della volatilità At-The-Money ($m=0$).
-- **$b$ (Skew Slope)**: Pendenza asimmetrica negativa ($b < 0$), riflette la domanda istituzionale di coperture assicurative su ribassi.
-- **$c$ (Curvature / Convexity)**: Curvatura convessa dello Smile associata alla curtosi della distribuzione.
-
----
-
-#### 🛡️ 4. Impatto Operativo sul Delta-Hedging di Portafoglio
-Se un gestore di portafoglio calcola la copertura con una Put OTM del 5% assumendo la volatilità ATM piatta (es. 18%), **sottostima il costo reale della copertura** perché sul mercato la Put 5% OTM quota a una IV del 20-21%.
-La calibrazione dello Skew in ARGUS garantisce che:
-1. Il prezzo della Put rifletta l'esatto premio al rischio richiesto dal mercato.
-2. Il **Delta effettivo ($\Delta_{\\text{skew}}$)** e i contratti necessari siano dimensionati correttamente per evitare sotto-coperture.
+</div>
 """
     render_info_modal(
         title="📐 Volatility Smile, Skew & Superficie 3D",
@@ -2075,47 +2119,35 @@ La calibrazione dello Skew in ARGUS garantisce che:
 
 def render_crypto_tax_modal(
     button_label: str = "ℹ️ Normativa Fiscale Cripto (L. 197/2022)",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale/popover istituzionale con la guida completa alla fiscalità delle Cripto-Attività
+    Renderizza un modale istituzionale con la guida completa alla fiscalità delle Cripto-Attività
     in Italia (Legge di Bilancio 197/2022, Circolare Agenzia delle Entrate 30/E/2023, Quadri RT/RW/IVAFE).
     """
     content = """
-### 🪙 Fiscalità delle Cripto-Attività in Italia (Legge 197/2022)
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-La **Legge di Bilancio 2023 (L. n. 197/2022, art. 1 commi 126-147)** e la **Circolare AdE n. 30/E/2023** hanno introdotto una disciplina organica per la tassazione e il monitoraggio delle cripto-attività detenute da persone fisiche residenti in Italia.
+<!-- 1. QUADRO RT -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📈 1. Quadro RT (Sez. II-B): Plusvalenze & Franchigia 2.000€</div>
+  <div style="margin-bottom: 6px;"><b>📌 Aliquota:</b> Imposta sostitutiva al <b>26%</b> sulle plusvalenze realizzate da conversione in valuta Fiat (es. BTC ➔ EUR) o acquisto beni/servizi.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Franchigia Annuale:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      Se &sum; (Plusvalenze &minus; Minusvalenze) &le; 2.000€ &rArr; Imposta Dovuta = 0€
+    </div>
+  </div>
+  <div><b>🔍 Zainetto Fiscale:</b> Le minusvalenze eccedenti i 2.000€ sono riportabili nei <b>4 anni successivi</b> (esclusivamente compensabili con future plusvalenze cripto).</div>
+</div>
 
----
+<!-- 2. QUADRO RW & IVAFE -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌐 2. Quadro RW & Imposta sul Valore (IVAFE Cripto 0,20%)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Monitoraggio Fiscale:</b> Obbligo dichiarativo con <b>Codice 21</b> per exchange esteri e chiavette hardware (Ledger/Trezor/MetaMask).</div>
+  <div><b>📐 Imposta sul Valore (0,20% annuo):</b> Valore al 31/12 &times; 0,002 &times; (Giorni di possesso / 365).</div>
+</div>
 
-#### 📈 1. Quadro RT (Sezione II-B): Plusvalenze & Franchigia 2.000€
-Le plusvalenze derivanti da cessione a titolo oneroso di cripto-attività costituiscono una categoria autonoma di **Redditi Diversi** (art. 67, c. 1, lett. c-sexies del TUIR):
-- **Aliquota d'imposta sostitutiva**: **26%**.
-- **Fattispecie Imponibile**: Conversione da Cripto a Valuta Fiat (es. BTC $\\to$ EUR) o acquisto di beni e servizi. Lo scambio tra cripto-attività (*Crypto-to-Crypto*, es. BTC $\\to$ ETH) non costituisce realizzo imponibile.
-- **Franchigia Annuale di 2.000€**:
-  $$\\text{Se } \\sum (\\text{Plusvalenze} - \\text{Minusvalenze}) \\le 2.000€ \\implies \\text{Imposta Dovuta} = 0€$$
-  Se il saldo netto eccede 2.000€, l'imposta si applica sulla base imponibile.
-- **Zainetto Fiscale Cripto Separato**: Le minusvalenze cripto realizzate eccedenti 2.000€ sono riportabili nei **4 anni solari successivi**, ma possono essere compensate **esclusivamente** con future plusvalenze su cripto-attività (è vietata la compensazione incrociata con azioni o ETF).
-
----
-
-#### 🌐 2. Quadro RW: Monitoraggio Fiscale Attività Estere (Codice 21)
-Tutti i contribuenti residenti in Italia che detengono criptovalute sono tenuti all'obbligo di monitoraggio fiscale nel **Quadro RW**:
-- **Ambito**: Piattaforme/Exchange esteri (Binance, Coinbase, Kraken, Bybit, ecc.) e *Self-Custody* (Hardware Wallet Ledger/Trezor, Non-Custodial Wallet MetaMask).
-- **Codice Bene (Col. 3)**: **21** (*Cripto-attività e valute virtuali*).
-- **Valori da Dichiarare**:
-  - Valore Iniziale al 1° Gennaio (o data di acquisto).
-  - Valore Finale al 31 Dicembre (o data di cessione).
-  - Valore Massimo raggiunto nel corso del periodo d'imposta.
-  - Giorni di detenzione effettiva (1 - 365).
-
----
-
-#### 🏦 3. Imposta sul Valore delle Cripto-Attività (IVAFE Cripto - 0,20%)
-L'art. 1, comma 144 della L. 197/2022 ha esteso l'imposta sul valore delle attività finanziarie estere anche alle cripto-attività:
-$$\\text{Imposta Dovuta} = \\text{Valore al 31/12} \\times 0{,}002 \\times \\frac{\\text{Giorni di Possesso}}{365}$$
-- **Aliquota**: **2 per mille annuo (0,20%)**.
-- **Applicazione**: Si applica sul controvalore finale in Euro di tutte le cripto-attività detenute all'estero o su chiavette private non gestite da intermediari residenti che applicano l'imposta di bollo ordinaria.
+</div>
 """
     render_info_modal(
         title="🪙 Fisco Cripto-Attività (L. 197/2022)",
@@ -2127,44 +2159,42 @@ $$\\text{Imposta Dovuta} = \\text{Valore al 31/12} \\times 0{,}002 \\times \\fra
 
 def render_fama_french_modal(
     button_label: str = "ℹ️ Teoria Fama-French 5-Factor & Momentum",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale/popover istituzionale con la guida teorica ed econometrica
+    Renderizza un modale istituzionale con la guida teorica ed econometrica
     ai Modelli Fattoriali di Fama-French (1993, 2015) e Carhart (1997).
     """
     content = """
-### 🏛️ Modelli Fattoriali: Fama-French (3 & 5 Fattori) e Carhart Momentum
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-I modelli multi-fattoriali estendono il classico **Capital Asset Pricing Model (CAPM)** di Sharpe-Lintner, spiegando che il rendimento di un portafoglio non dipende unicamente dal rischio di mercato generale ($MKT$), ma da premi al rischio sistematici legati a specifiche caratteristiche economico-finanziarie delle imprese.
+<!-- 1. REGRESSIONE FATTORIALE -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏛️ 1. L'Equazione di Regressione Econometrica</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Estende il CAPM spiegando che il rendimento di un portafoglio è guidato da molteplici premi al rischio sistematici indipendenti.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Modello Fama-French 5-Factor + Momentum:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      R<sub>p</sub> &minus; R<sub>f</sub> = &alpha; + &beta;<sub>MKT</sub>(R<sub>m</sub> &minus; R<sub>f</sub>) + &beta;<sub>SMB</sub>SMB + &beta;<sub>HML</sub>HML + &beta;<sub>RMW</sub>RMW + &beta;<sub>CMA</sub>CMA + &beta;<sub>MOM</sub>MOM
+    </div>
+  </div>
+  <div><b>🔍 I 6 Fattori:</b><br>
+    • <b>MKT-RF:</b> Premio per il rischio azionario di mercato.<br>
+    • <b>SMB (Size):</b> Small Caps vs Mega Caps.<br>
+    • <b>HML (Value):</b> Titoli Value (alto B/M) vs Growth (basso B/M).<br>
+    • <b>RMW (Profitability):</b> Alta redditività operativa vs aziende con margini deboli.<br>
+    • <b>CMA (Investment):</b> Politiche di investimento prudenti vs espansione aggressiva.<br>
+    • <b>MOM (Momentum):</b> Persistenza del trend di prezzo a 12 mesi.
+  </div>
+</div>
 
----
+<!-- 2. ATTRIBUZIONE -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 2. Significatività Statistica & Alpha Puro</div>
+  <div style="margin-bottom: 6px;"><b>Alpha (&alpha;):</b> Misura l'abilità di selezione attiva pura del gestore non spiegata dai fattori sistematici.</div>
+  <div><b>Test t & p-value:</b> Se |t| &ge; 1.96 (p < 0.05), l'esposizione al fattore è <b>statisticamente significativa al 95%</b>.</div>
+</div>
 
-#### 📐 1. L'Equazione di Regressione Econometrica (5-Factor + Momentum)
-$$R_{p,t} - R_{f,t} = \\alpha + \\beta_{\\text{MKT}}(R_{m,t} - R_{f,t}) + \\beta_{\\text{SMB}}\\text{SMB}_t + \\beta_{\\text{HML}}\\text{HML}_t + \\beta_{\\text{RMW}}\\text{RMW}_t + \\beta_{\\text{CMA}}\\text{CMA}_t + \\beta_{\\text{MOM}}\\text{MOM}_t + \\epsilon_t$$
-
----
-
-#### 📊 2. I Fattori della Kenneth R. French Data Library (Dartmouth)
-1. **Mkt-RF (Excess Return on the Market)**: Premio per il rischio azionario sistemico rispetto al tasso privo di rischio ($R_f$).
-2. **SMB (Small Minus Big - Size Factor)**: Rendimento extra storico generato dalle società a bassa capitalizzazione rispetto alle mega-cap.
-   - $\\beta_{\\text{SMB}} > 0$: Portafoglio orientato verso Small/Mid Caps.
-   - $\\beta_{\\text{SMB}} < 0$: Portafoglio concentrato su Large/Mega Caps.
-3. **HML (High Minus Low - Value Factor)**: Differenziale di rendimento tra titoli *Value* (alto Book-to-Market) e titoli *Growth* (basso Book-to-Market).
-   - $\\beta_{\\text{HML}} > 0$: Bias Value (titoli a sconto sui fondamentali).
-   - $\\beta_{\\text{HML}} < 0$: Bias Growth (titoli tecnologici o ad alta crescita attesa).
-4. **RMW (Robust Minus Weak - Profitability Factor)**: Differenziale tra aziende con alta redditività operativa (*Robust Operating Profitability*) e aziende con margini deboli (*Weak*).
-5. **CMA (Conservative Minus Aggressive - Investment Factor)**: Differenziale tra aziende con politiche di allocazione del capitale prudenti (*Conservative*) e aziende con investimenti aggressivi di espansione.
-6. **MOM / WML (Momentum - Winners Minus Losers)**: Introdotto da Mark Carhart (1997), cattura la persistenza del trend di prezzo a 12 mesi escludendo l'ultimo mese.
-
----
-
-#### 🎯 3. Significatività Statistica & Factor Attribution
-- **Alpha di Jensen ($\\alpha$)**: Rappresenta il rendimento extra generato dall'abilità del gestore (stock picking / timing) non spiegabile dai premi al rischio sistematici.
-- **Statistica $t$ e $p$-value**:
-  - Se $|t| \\ge 1.96$ ($p < 0.05$), l'esposizione al fattore è **statisticamente significativa al 95%**.
-  - Se $|t| < 1.96$, l'esposizione osservata potrebbe essere frutto del caso o del rumore di mercato.
-- **Rischio Sistemico vs Idiosincratico**: Scomposizione della varianza tra la componente spiegata dai fattori macro-strutturali e il rischio specifico dei singoli titoli non diversificato.
+</div>
 """
     render_info_modal(
         title="🏛️ Fama-French 5-Factor & Carhart Momentum",
@@ -2176,33 +2206,36 @@ $$R_{p,t} - R_{f,t} = \\alpha + \\beta_{\\text{MKT}}(R_{m,t} - R_{f,t}) + \\beta
 
 def render_sec_rag_modal(
     button_label: str = "ℹ️ Guida al Motore SEC RAG & Form 10-K",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale/popover istituzionale con la guida all'analisi dei bilanci SEC Form 10-K/10-Q
+    Renderizza un modale istituzionale con la guida all'analisi dei bilanci SEC Form 10-K/10-Q
     e all'architettura Local RAG (Retrieval-Augmented Generation).
     """
     content = """
-### 🔍 SEC Filing Vector Store & Local RAG Architecture
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-Il modulo **SEC RAG** trasforma i lunghi documenti contabili depositati presso la **Securities and Exchange Commission (SEC)** in un archivio semantico interrogabile in linguaggio naturale per estrarre rischi non evidenti dai soli numeri di bilancio.
+<!-- 1. FORM 10-K -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📑 1. La Struttura dei Bilanci Annuali SEC Form 10-K</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Documenti contabili e legali ufficiali depositati presso la SEC da tutte le società quotate a Wall Street.</div>
+  <div><b>🔍 Sezioni Chiave Estratte:</b><br>
+    • <b>Item 1A (Risk Factors):</b> Vulnerabilità operative, geopolitiche, legali e di concentrazione clienti.<br>
+    • <b>Item 7 (MD&A):</b> Spiegazione del management su ricavi, margini e liquidità futura.<br>
+    • <b>Item 7A (Market Risk):</b> Sensibilità a tassi d'interesse, cambi valutari e materie prime.<br>
+    • <b>Item 8 (Financial Footnotes):</b> Note al debito, maturity schedule e contenziosi legali.
+  </div>
+</div>
 
----
+<!-- 2. LOCAL RAG -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚙️ 2. Architettura Local RAG in ARGUS</div>
+  <div style="margin-bottom: 6px;"><b>1. Semantic Chunking:</b> Segmentazione per blocchi logici omogenei con metadati di sezione.</div>
+  <div style="margin-bottom: 6px;"><b>2. Vector Indexing BM25/Cosine:</b> Ricerca semantica locale ad altissima velocità e privacy totale.</div>
+  <div><b>3. Grounded Synthesis:</b> Risposte ancorate rigorosamente ai passaggi ufficiali del bilancio con citazione del paragrafo.</div>
+</div>
 
-#### 📑 1. La Struttura Ufficiale dei Form 10-K della SEC
-I bilanci annuali 10-K contengono sezioni standard obbligatorie per tutte le società quotate a Wall Street:
-- **Item 1 (Business Overview)**: Descrizione dettagliata delle linee di business, dei mercati geografici, dei canali di distribuzione e del vantaggio competitivo (*Economic Moat*).
-- **Item 1A (Risk Factors)**: La sezione più critica per la profilazione del rischio. Elenca tutte le vulnerabilità operative, legali, normative, geopolitiche, di concentrazione dei clienti e di fornitura.
-- **Item 7 (Management's Discussion and Analysis - MD&A)**: La spiegazione ufficiale del management sui motivi per cui ricavi e margini sono aumentati o diminuiti, con commenti sulla liquidità futura e sulle spese in conto capitale (Capex).
-- **Item 7A (Disclosures about Market Risk)**: Sensibilità quantitativa alle oscillazioni dei tassi di interesse, dei tassi di cambio (FX) e dei prezzi delle materie prime.
-- **Item 8 (Financial Footnotes & Debt Notes)**: Note integrative ai rendiconti contabili con il dettaglio dei tassi d'interesse sul debito, scadenze dei prestiti (*Maturity Schedule*) e contenziosi legali pendenti.
-
----
-
-#### ⚙️ 2. Come Funziona il Motore Local RAG in ARGUS
-1. **Semantic Chunking**: I testi ufficiali vengono scomposti in blocchi logici omogenei preservando i metadati di sezione, ticker ed esercizio fiscale.
-2. **Vector Indexing (BM25 / Cosine)**: Ogni chunk viene indicizzato localmente con pesature BM25 e frequenze inverse dei termini, garantendo ricerche semantiche immediate a latenza zero.
-3. **Grounded Synthesis**: La risposta viene generata ancorandola rigorosamente ai passaggi originali del bilancio, con citazione del paragrafo e calcolo dello score di rilevanza semantica (%).
+</div>
 """
     render_info_modal(
         title="🔍 SEC Filing Vector Store & Local RAG",
@@ -2214,35 +2247,33 @@ I bilanci annuali 10-K contengono sezioni standard obbligatorie per tutte le soc
 
 def render_duckdb_modal(
     button_label: str = "ℹ️ Guida al Motore OLAP DuckDB & Parquet",
-    use_popover: bool = True
+    use_popover: bool = False
 ):
     """
-    Renderizza un modale/popover istituzionale con la guida all'architettura OLAP DuckDB,
+    Renderizza un modale istituzionale con la guida all'architettura OLAP DuckDB,
     all'esecuzione vettorizzata SIMD e all'archiviazione colonnare in Apache Parquet.
     """
     content = """
-### ⚡ Motore Analitico Embedded DuckDB & Storage Parquet
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 
-Il modulo **DuckDB** fornisce un motore di elaborazione analitica ad altissime prestazioni (**OLAP - Online Analytical Processing**) integrato direttamente in memoria RAM, progettato per eseguire calcoli aggregati e query SQL complesse a velocità sub-millisecondo.
+<!-- 1. OLTP VS OLAP -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚡ 1. OLTP (Righe) vs OLAP (DuckDB Colonnare)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> DuckDB è un motore analitico embedded in memoria RAM, ottimizzato per query aggregate complesse e scansioni colonnari sub-millisecondo.</div>
+  <div><b>🔍 Vantaggi Architetturali:</b><br>
+    • <b>Esecuzione Vettorizzata SIMD:</b> Processa vettori di dati in parallelo sfruttando le istruzioni hardware della CPU (AVX-2).<br>
+    • <b>Zero-Copy Data Transfer:</b> Compatibilità nativa con Apache Arrow per trasferire dati senza duplicazione di memoria.
+  </div>
+</div>
 
----
+<!-- 2. ANALISI AVANZATA -->
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📊 2. Cubi Multi-Dimensionali & Storage Parquet</div>
+  <div style="margin-bottom: 6px;"><b>Cubi OLAP (`GROUPING SETS`):</b> Calcolo simultaneo dei subtotali su Asset Class &times; Settore &times; Valuta in un'unica scansione.</div>
+  <div><b>Compressione Parquet (fino all'85%):</b> Formato colonnare ad alta densità con encoding snappato per archiviazione istantanea.</div>
+</div>
 
-#### 🏛️ 1. OLTP (MySQL/SQLite) vs OLAP (DuckDB Colonnare)
-- **Database Tradizionali a Righe (OLTP)**: Memorizzano e leggono i record riga per riga. Sono ottimi per transazioni singole, ma inefficienti quando bisogna calcolare medie o somme su centinaia di migliaia di righe.
-- **Database Vettorizzati a Colonne (OLAP - DuckDB)**: Memorizzano i dati per colonna. Per calcolare il controvalore totale o il PnL medio, DuckDB accede unicamente alle colonne interessate, sfruttando le istruzioni **SIMD (AVX-2 / SSE4.2)** della CPU per processare vettori di dati in parallelo.
-
----
-
-#### 📊 2. Potenzialità di Analisi & SQL Avanzato
-- **Cubi Multi-Dimensionali (`GROUP BY GROUPING SETS`)**: Calcolo simultaneo dei subtotali su più assi (Asset Class $\times$ Settore $\times$ Valuta) in un'unica scansione.
-- **Window Functions & `QUALIFY`**: Ordinamento e ranking dinamico all'interno delle partizioni (es. identificare i migliori 3 titoli per ciascun settore senza subquery lente).
-- **Time Series Rollup**: Aggregazione temporale istantanea di flussi di cassa, volumi scambiati e commissioni.
-
----
-
-#### 📦 3. Accelerazione Storage in Apache Parquet
-- **Compressione Fino all'85%**: Il formato Parquet applica algoritmi di compressione colonnare (Snappy / ZSTD) e dizionari di encoding che riducono drasticamente lo spazio occupato rispetto a file CSV o Excel.
-- **Zero-Copy Data Transfer**: Compatibilità nativa con Apache Arrow per trasferire dati tra DuckDB, Pandas e Streamlit senza duplicazione di memoria.
+</div>
 """
     render_info_modal(
         title="⚡ Motore Analitico DuckDB & Parquet",

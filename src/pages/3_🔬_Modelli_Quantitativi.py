@@ -1789,7 +1789,7 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
             st.caption("Dimensionamento matematico dei contratti di opzione Put per immunizzare il Beta di portafoglio con calibrazione del Volatility Skew reale.")
         with col_bs_h2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            render_volatility_smile_modal(button_label="ℹ️ Metodologia Volatility Skew & Smile", use_popover=True)
+            render_volatility_smile_modal(button_label="ℹ️ Metodologia Volatility Skew & Smile", use_popover=False)
 
         col_opt_in1, col_opt_in2, col_opt_in3, col_opt_in4 = st.columns(4)
         with col_opt_in1:
@@ -2102,7 +2102,7 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             st.caption("Regressione econometrica multivariata OLS su serie storiche ufficiali di Dartmouth: isolamento dell'Alpha puro di gestione, attribuzione del rendimento e significatività statistica (t-stat & p-value).")
         with col_c_head2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            render_fama_french_modal(button_label="ℹ️ Teoria Fama-French & Formule", use_popover=True)
+            render_fama_french_modal(button_label="ℹ️ Teoria Fama-French & Formule", use_popover=False)
 
         from core.factor_library import compute_fama_french_factor_model
 

@@ -1174,7 +1174,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         st.caption("Modellazione econometrica dei cluster di volatilità, persistenza degli shock e stima non-parametrica a code spesse conforme a FRTB / Basel III.")
     with col_garch_head2:
         st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        render_garch_fhs_modal(button_label="ℹ️ Metodologia GARCH(1,1) & FHS", use_popover=True)
+        render_garch_fhs_modal(button_label="ℹ️ Metodologia GARCH(1,1) & FHS", use_popover=False)
 
     from core.garch_engine import compute_garch_fhs_bundle
     garch_bundle = compute_garch_fhs_bundle(r, total_value=total_value, horizon=holding_period)

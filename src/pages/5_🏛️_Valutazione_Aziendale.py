@@ -912,7 +912,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             st.caption("Interrogazione semantica in linguaggio naturale sui bilanci ufficiali depositati presso la SEC (Form 10-K, Form 10-Q ed Earnings Calls).")
         with col_rag_h2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            render_sec_rag_modal(button_label="ℹ️ Guida al Motore SEC RAG & Form 10-K", use_popover=True)
+            render_sec_rag_modal(button_label="ℹ️ Guida al Motore SEC RAG & Form 10-K", use_popover=False)
 
         from core.sec_rag_engine import query_sec_filings_rag, index_ticker_sec_filings
 
