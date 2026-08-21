@@ -1823,9 +1823,16 @@ def compute_atr_chandelier_exits(df_prices: pd.DataFrame, df_positions: pd.DataF
         px_sub = df_prices[df_prices["ticker"] == ticker].sort_values("price_date") if (not df_prices.empty and "ticker" in df_prices.columns) else pd.DataFrame()
         
         if not px_sub.empty and "close" in px_sub.columns:
-            close_s = px_sub["close"].dropna().values
-            high_s = px_sub["high"].dropna().values if ("high" in px_sub.columns and px_sub["high"].notna().any()) else close_s * 1.01
-            low_s = px_sub["low"].dropna().values if ("low" in px_sub.columns and px_sub["low"].notna().any()) else close_s * 0.99
+            close_s = px_sub["close"].dropna().values.astype(float)
+            high_s = px_sub["high"].dropna().values.astype(float) if ("high" in px_sub.columns and px_sub["high"].notna().any()) else close_s * 1.01
+            low_s = px_sub["low"].dropna().values.astype(float) if ("low" in px_sub.columns and px_sub["low"].notna().any()) else close_s * 0.99
+            
+            # Normalizzazione valutaria/FX: adegua la serie storica alla valuta base di last_p (€)
+            if len(close_s) > 0 and close_s[-1] > 0:
+                fx_scale = float(last_p) / float(close_s[-1])
+                close_s = close_s * fx_scale
+                high_s = high_s * fx_scale
+                low_s = low_s * fx_scale
         else:
             close_s = np.array([last_p])
             high_s = np.array([last_p * 1.01])
