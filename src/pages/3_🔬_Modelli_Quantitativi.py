@@ -2144,7 +2144,14 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
         st.markdown("##### 💵 Strategia Covered Call Yield Enhancer sui Titoli in Portafoglio")
         st.caption("Simula la vendita sistematica di opzioni Call Out-of-The-Money (+5% Strike) a 30 giorni per monetizzare la volatilità implicita ed estrarre rendimento addizionale (*Yield Enhancement*).")
         
-        vol_map_pos = (df_returns_all.std() * np.sqrt(252.0)).to_dict() if not df_returns_all.empty else {}
+        df_ret_hedging = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()
+        if (df_ret_hedging.empty or not isinstance(df_ret_hedging, pd.DataFrame) or df_ret_hedging.shape[1] < 2) and results:
+            df_pr_h = results.get("df_prices", pd.DataFrame())
+            if not df_pr_h.empty and "ticker" in df_pr_h.columns and "price_date" in df_pr_h.columns:
+                piv_h = df_pr_h.pivot(index="price_date", columns="ticker", values="close")
+                df_ret_hedging = piv_h.pct_change().dropna(how="all")
+
+        vol_map_pos = (df_ret_hedging.std() * np.sqrt(252.0)).to_dict() if (isinstance(df_ret_hedging, pd.DataFrame) and not df_ret_hedging.empty) else {}
         df_cov_call = compute_covered_call_yield_enhancement(
             pos,
             otm_pct=5.0,
