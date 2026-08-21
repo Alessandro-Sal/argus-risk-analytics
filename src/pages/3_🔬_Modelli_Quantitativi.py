@@ -2445,7 +2445,21 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             else:
                 mkt_w = pd.Series(1.0 / len(cov_df), index=cov_df.index)
             
-            bl_res = compute_black_litterman_optimization(cov_df, mkt_w)
+            # Opzionale: Input interattivo delle Views dell'Investitore
+            custom_views = {}
+            with st.expander("🎯 Personalizza Views dell'Investitore (Opzionale)", expanded=False):
+                st.caption("Inserisci le tue aspettative soggettive di rendimento su specifici titoli per osservare come il modello Black-Litterman aggiorna i rendimenti attesi a posteriori e ricalibra i pesi ottimali.")
+                col_v1, col_v2 = st.columns([2, 2])
+                with col_v1:
+                    view_asset = st.selectbox("Seleziona Titolo per la View:", options=list(cov_df.index), key="bl_view_asset")
+                with col_v2:
+                    view_return_pct = st.number_input(f"Rendimento Atteso Annuo per {view_asset} (%):", min_value=-50.0, max_value=150.0, value=15.0, step=1.0, key="bl_view_return")
+                
+                enable_view = st.checkbox("Applica questa View soggettiva al Modello", value=False, key="bl_enable_view")
+                if enable_view and view_asset:
+                    custom_views[view_asset] = view_return_pct / 100.0
+
+            bl_res = compute_black_litterman_optimization(cov_df, mkt_w, views_dict=custom_views if custom_views else None)
             if bl_res:
                 df_bl = pd.DataFrame({
                     "Ticker": cov_df.index,
@@ -2456,7 +2470,14 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
                 df_bl = df_bl.sort_values(by="BL Weight %", ascending=False)
 
                 col_tbl_bl, col_chart_bl = st.columns([1.2, 1.0])
+                dyn_h = max(340, len(df_bl) * 30)
+
                 with col_tbl_bl:
+                    col_bl_h1, col_bl_h2 = st.columns([2.5, 1.0])
+                    with col_bl_h2:
+                        csv_bl = df_bl.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Scarica CSV", data=csv_bl, file_name="black_litterman_weights.csv", mime="text/csv", use_container_width=True)
+
                     bl_cfg = {
                         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
                         "Equilibrium Return %": st.column_config.NumberColumn("Equilibrium Return", format="%.2f%%"),
@@ -2468,7 +2489,7 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
                         column_config=bl_cfg,
                         use_container_width=True,
                         hide_index=True,
-                        height=280
+                        height=dyn_h
                     )
                 with col_chart_bl:
                     df_bl_plot = df_bl.sort_values(by="BL Weight %", ascending=True)
@@ -2482,10 +2503,11 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
                         hovertemplate="<b>%{y}</b><br>Peso Ottimale BL: <b>%{x:.2f}%</b><extra></extra>"
                     ))
                     fig_bl.update_layout(
-                        xaxis_title="Peso Ottimale Black-Litterman %",
+                        xaxis=dict(title="Peso Ottimale Black-Litterman %", ticksuffix="%"),
+                        yaxis=dict(categoryorder="total ascending", tickfont=dict(family="monospace", size=11)),
                         template="plotly_dark",
-                        height=280,
-                        margin=dict(t=15, b=35, l=60, r=20),
+                        height=dyn_h,
+                        margin=dict(t=15, b=35, l=75, r=20),
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)"
                     )
