@@ -925,11 +925,14 @@ def render_spotlight_palette():
             st.session_state["show_spotlight_palette"] = False
             switch_to_page("pages/1_📈_Dashboard_Generale.py")
 
-        if st.button("♻️ Svuota Cache", key="spot_clean_cache_all", use_container_width=True):
+        if st.button("♻️ Svuota Cache & Reset Sessione", key="spot_clean_cache_all", use_container_width=True):
+            from core.workspace_manager import clear_session_cache
+            clear_session_cache()
             st.cache_data.clear()
-            st.session_state["show_spotlight_palette"] = False
-            st.success("Cache svuotata!")
-            st.rerun()
+            for k in list(st.session_state.keys()):
+                if k not in ["splash_dismissed"]:
+                    del st.session_state[k]
+            switch_to_page("0_Control_Room.py")
 
         if st.button("🗗 2° Monitor", key="spot_popout_2nd", use_container_width=True):
             st.session_state["show_spotlight_palette"] = False

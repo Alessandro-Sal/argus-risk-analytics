@@ -472,15 +472,17 @@ def render_sidebar():
             from core.workspace_manager import clear_session_cache
             clear_session_cache()
             st.cache_data.clear()
-            for k in ["results", "pipeline_done", "portfolio_id", "run_id", "fetch_report"]:
-                if k in st.session_state:
+            for k in list(st.session_state.keys()):
+                if k not in ["splash_dismissed"]:
                     del st.session_state[k]
             st.session_state["session_cleared"] = True
             modules_to_reload = [m for m in sys.modules if m.startswith('core.')]
             for m in modules_to_reload:
-                del sys.modules[m]
-            st.success("Sessione azzerata con successo!")
-            st.rerun()
+                try:
+                    del sys.modules[m]
+                except Exception:
+                    pass
+            switch_to_page("0_Control_Room.py")
 
         if st.button("👁️ Schermata di Avvio (Splash)", key="btn_sidebar_show_splash", use_container_width=True):
             st.session_state["splash_dismissed"] = False
