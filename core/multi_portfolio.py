@@ -220,6 +220,8 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                     "forward_pe": float(p.get("forward_pe")) if pd.notna(p.get("forward_pe")) else None,
                     "price_to_book": float(p.get("price_to_book")) if pd.notna(p.get("price_to_book")) else None,
                     "roe": float(p.get("roe")) if pd.notna(p.get("roe")) else None,
+                    "target_mean_price": float(p.get("target_mean_price")) if pd.notna(p.get("target_mean_price")) else None,
+                    "peg_ratio": float(p.get("peg_ratio")) if pd.notna(p.get("peg_ratio")) else None,
                     "beta_5y": float(p.get("beta_5y")) if pd.notna(p.get("beta_5y")) else None,
                     "market_cap": float(p.get("market_cap")) if pd.notna(p.get("market_cap")) else None,
                 })
@@ -481,6 +483,8 @@ def consolidate_multi_portfolios(
                     "forward_pe": pos.get("forward_pe"),
                     "price_to_book": pos.get("price_to_book"),
                     "roe": pos.get("roe"),
+                    "target_mean_price": pos.get("target_mean_price"),
+                    "peg_ratio": pos.get("peg_ratio"),
                     "beta_5y": pos.get("beta_5y"),
                     "market_cap": pos.get("market_cap"),
                 }
@@ -495,6 +499,18 @@ def consolidate_multi_portfolios(
                 merged_positions[t]["total_return"] = merged_positions[t]["unrealized_pnl"] + merged_positions[t]["realized_pnl"] + merged_positions[t]["dividends_total"]
                 if pos.get("dividend_yield") is not None and pd.notna(pos.get("dividend_yield")):
                     merged_positions[t]["dividend_yield"] = pos.get("dividend_yield")
+                if pos.get("target_mean_price") is not None and pd.notna(pos.get("target_mean_price")):
+                    merged_positions[t]["target_mean_price"] = pos.get("target_mean_price")
+                if pos.get("peg_ratio") is not None and pd.notna(pos.get("peg_ratio")):
+                    merged_positions[t]["peg_ratio"] = pos.get("peg_ratio")
+                if pos.get("trailing_pe") is not None and pd.notna(pos.get("trailing_pe")):
+                    merged_positions[t]["trailing_pe"] = pos.get("trailing_pe")
+                if pos.get("forward_pe") is not None and pd.notna(pos.get("forward_pe")):
+                    merged_positions[t]["forward_pe"] = pos.get("forward_pe")
+                if pos.get("price_to_book") is not None and pd.notna(pos.get("price_to_book")):
+                    merged_positions[t]["price_to_book"] = pos.get("price_to_book")
+                if pos.get("roe") is not None and pd.notna(pos.get("roe")):
+                    merged_positions[t]["roe"] = pos.get("roe")
                 if merged_positions[t]["qty_net"] > 0:
                     merged_positions[t]["avg_cost"] = merged_positions[t]["cost_basis"] / merged_positions[t]["qty_net"]
                     merged_positions[t]["last_price"] = merged_positions[t]["current_value"] / merged_positions[t]["qty_net"]
