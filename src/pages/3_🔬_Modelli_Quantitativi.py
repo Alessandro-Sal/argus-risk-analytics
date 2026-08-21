@@ -3,7 +3,28 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-from core.ui_utils import inject_custom_css, metric_card, fmt_pct, fmt_eur_it, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal
+import importlib
+
+import core.ui_utils
+importlib.reload(core.ui_utils)
+
+try:
+    from core.ui_utils import fmt_eur_it
+except ImportError:
+    def fmt_eur_it(v, decimals: int = 0) -> str:
+        if v is None:
+            return "N/A"
+        try:
+            val = float(v)
+        except (ValueError, TypeError):
+            return "N/A"
+        if decimals == 0:
+            return f"€ {val:,.0f}".replace(",", ".")
+        formatted = f"{val:,.{decimals}f}"
+        int_p, dec_p = formatted.split(".")
+        return f"€ {int_p.replace(',', '.')},{dec_p}"
+
+from core.ui_utils import inject_custom_css, metric_card, fmt_pct, glossary_modal, render_executive_badges, section, render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal
 from core.hrp_optimizer import compute_hrp_portfolio
 from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
 from core.volatility_surface import build_volatility_surface, fit_volatility_smile
@@ -15,13 +36,10 @@ inject_custom_css()
 # Cache bust
 from core.sidebar import render_sidebar
 render_sidebar()
-import importlib
-import core.ui_utils
 import core.risk_engine
 import core.options_hedging
 import core.volatility_surface
 import core.factor_library
-importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
 importlib.reload(core.options_hedging)
 importlib.reload(core.volatility_surface)
