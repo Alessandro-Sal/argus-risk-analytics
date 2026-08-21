@@ -318,20 +318,31 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         "argus_score": "ARGUS Score"
     }, inplace=True)
 
+    col_sc_h1, col_sc_h2 = st.columns([3.5, 0.9])
+    with col_sc_h2:
+        csv_sc = df_table.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="screener_opportunita.csv", mime="text/csv", use_container_width=True)
+
+    scr_cfg = {
+        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+        "Azienda": st.column_config.TextColumn("Azienda", width="medium"),
+        "Settore": st.column_config.TextColumn("Settore", width="small"),
+        "Prezzo": st.column_config.NumberColumn("Prezzo (€)", format="€ %.2f"),
+        "Upside Consensus %": st.column_config.NumberColumn("Upside Consensus", format="%+.2f%%"),
+        "P/E Ratio": st.column_config.NumberColumn("P/E Ratio", format="%.1f"),
+        "PEG Ratio": st.column_config.NumberColumn("PEG Ratio", format="%.2f"),
+        "Div. Yield %": st.column_config.ProgressColumn("Div. Yield", format="%.2f%%", min_value=0.0, max_value=15.0),
+        "ROE %": st.column_config.ProgressColumn("ROE", format="%.1f%%", min_value=0.0, max_value=50.0),
+        "Altman Z": st.column_config.NumberColumn("Altman Z", format="%.2f"),
+        "Vol. Annua %": st.column_config.NumberColumn("Vol. Annua", format="%.1f%%"),
+        "Beta": st.column_config.NumberColumn("Beta", format="%.2f"),
+        "RSI (14)": st.column_config.ProgressColumn("RSI (14)", format="%.1f", min_value=0.0, max_value=100.0),
+        "ARGUS Score": st.column_config.ProgressColumn("ARGUS Score", format="%.1f / 100", min_value=0.0, max_value=100.0)
+    }
+
     st.dataframe(
-        df_table.style.format({
-            "Prezzo": "{:.2f}",
-            "Upside Consensus %": "{:+.2f}%",
-            "P/E Ratio": "{:.1f}",
-            "PEG Ratio": "{:.2f}",
-            "Div. Yield %": "{:.2f}%",
-            "ROE %": "{:.1f}%",
-            "Altman Z": "{:.2f}",
-            "Vol. Annua %": "{:.1f}%",
-            "Beta": "{:.2f}",
-            "RSI (14)": "{:.1f}",
-            "ARGUS Score": "{:.1f}"
-        }, na_rep="N/D"),
+        df_table,
+        column_config=scr_cfg,
         use_container_width=True,
         hide_index=True,
         height=380
