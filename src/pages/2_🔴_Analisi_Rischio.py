@@ -1248,19 +1248,23 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     st.markdown("##### 📈 Volatilità Condizionale Storica & Bande Dinamiche VaR GARCH(1,1)")
     fig_garch_ts = go.Figure()
     
+    ret_pct = (df_dyn["return"] * 100.0).round(2)
+    var95_pct = (-df_dyn["var95_dynamic_pct"]).round(2)
+    var99_pct = (-df_dyn["var99_dynamic_pct"]).round(2)
+    
     # Rendimenti effettivi
     fig_garch_ts.add_trace(go.Scatter(
         x=df_dyn.index,
-        y=df_dyn["return"] * 100.0,
+        y=ret_pct,
         mode="markers",
         name="Rendimento Giornaliero Effettivo",
         marker=dict(color="rgba(148, 163, 184, 0.40)", size=3.5),
-        hovertemplate="<b>Data:</b> %{x|%d/%m/%Y}<br><b>Rendimento:</b> %{y:+.2f}%<extra></extra>"
+        hovertemplate="<b>Data:</b> %{x|%d/%m/%Y}<br><b>Rendimento:</b> %{y:.2f}%<extra></extra>"
     ))
     # Banda VaR 95% GARCH
     fig_garch_ts.add_trace(go.Scatter(
         x=df_dyn.index,
-        y=-df_dyn["var95_dynamic_pct"],
+        y=var95_pct,
         mode="lines",
         name="Banda VaR 95% Dinamica (GARCH)",
         line=dict(color="#ff9900", width=2.0),
@@ -1269,7 +1273,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     # Banda VaR 99% GARCH
     fig_garch_ts.add_trace(go.Scatter(
         x=df_dyn.index,
-        y=-df_dyn["var99_dynamic_pct"],
+        y=var99_pct,
         mode="lines",
         name="Banda VaR 99% Estrema (GARCH)",
         line=dict(color="#ff4d4f", width=2.0, dash="dot"),
@@ -1300,9 +1304,10 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     st.markdown("##### 🔮 Struttura a Termine della Volatilità Prevista σ(k) a 30 Giorni (Mean-Reversion)")
     fig_term = go.Figure()
     
+    fc_vol = df_term["forecast_annual_vol_pct"].round(2)
     fig_term.add_trace(go.Scatter(
         x=df_term["horizon_days"],
-        y=df_term["forecast_annual_vol_pct"],
+        y=fc_vol,
         mode="lines+markers",
         name="Volatilità Annualizzata Prevista σ(k)",
         line=dict(color="#00f3ff", width=2.8),
