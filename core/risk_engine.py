@@ -439,6 +439,11 @@ def _load_benchmark(ticker: str,
     if portfolio_index is None or len(portfolio_index) == 0:
         return pd.Series(dtype=float)
 
+    p_idx = pd.to_datetime(portfolio_index)
+    if getattr(p_idx, 'tz', None) is not None:
+        p_idx = p_idx.tz_localize(None)
+
+    # 1. Prova da df_prices
     if df_prices is not None and not df_prices.empty and "ticker" in df_prices.columns:
         bm = df_prices[df_prices["ticker"] == ticker].copy()
         if not bm.empty:
@@ -452,12 +457,28 @@ def _load_benchmark(ticker: str,
             bm_ret = bm.pct_change().dropna()
             bm_ret.name = ticker
             
-            p_idx = pd.to_datetime(portfolio_index)
-            if getattr(p_idx, 'tz', None) is not None:
-                p_idx = p_idx.tz_localize(None)
             reindexed = bm_ret.reindex(p_idx).fillna(0.0)
             reindexed.index = portfolio_index
-            return reindexed
+            if reindexed.std() > 0:
+                return reindexed
+
+    # 2. Fallback automatico da cache shield locale (RAM + SQLite 24h)
+    try:
+        from core.cache_shield import get_cached_ticker_history
+        df_bm_cache = get_cached_ticker_history(ticker)
+        if df_bm_cache is not None and not df_bm_cache.empty and "close" in df_bm_cache.columns:
+            s_bm = df_bm_cache["close"].copy()
+            if getattr(s_bm.index, 'tz', None) is not None:
+                s_bm.index = s_bm.index.tz_localize(None)
+            s_bm = s_bm[~s_bm.index.duplicated(keep="last")]
+            bm_ret = s_bm.pct_change().dropna()
+            bm_ret.name = ticker
+            reindexed = bm_ret.reindex(p_idx).fillna(0.0)
+            reindexed.index = portfolio_index
+            if reindexed.std() > 0:
+                return reindexed
+    except Exception:
+        pass
 
     return pd.Series(0.0, index=portfolio_index, name=ticker)
 
