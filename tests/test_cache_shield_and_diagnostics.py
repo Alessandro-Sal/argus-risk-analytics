@@ -79,3 +79,29 @@ def test_storage_and_memory_profiler_operations():
     reidx = reindex_databases()
     assert reidx is True
 
+
+def test_sqlite_wal_pragmas():
+    """Verifica che le connessioni SQLite abilitino la modalità WAL e timeout anti-lock."""
+    from core.cache_shield import _get_cache_connection
+    from core.fetcher import get_engine
+    from sqlalchemy import text
+
+    # Verifica connessione diretta cache SQLite
+    conn = _get_cache_connection()
+    cur = conn.cursor()
+    cur.execute("PRAGMA journal_mode;")
+    jmode = cur.fetchone()[0].lower()
+    assert jmode == "wal"
+
+    cur.execute("PRAGMA busy_timeout;")
+    btimeout = int(cur.fetchone()[0])
+    assert btimeout >= 5000
+    conn.close()
+
+    # Verifica SQLAlchemy engine fallback locale
+    engine = get_engine("user", "pass", "invalid_host_fallback_test", db="test_db")
+    if engine.dialect.name == "sqlite":
+        with engine.connect() as s_conn:
+            res_wal = s_conn.execute(text("PRAGMA journal_mode;")).scalar()
+            assert str(res_wal).lower() == "wal"
+

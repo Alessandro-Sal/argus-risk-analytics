@@ -17,8 +17,20 @@ import json
 import os
 from pathlib import Path
 import concurrent.futures
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, event
 from datetime import datetime, timedelta
+
+
+def _set_sqlite_pragmas(dbapi_connection, connection_record):
+    """Abilita la modalità WAL e ottimizzazioni di concorrenza per SQLite."""
+    try:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode = WAL")
+        cursor.execute("PRAGMA synchronous = NORMAL")
+        cursor.execute("PRAGMA busy_timeout = 10000")
+        cursor.close()
+    except Exception:
+        pass
 
 
 def _get_config_file_path() -> Path:
@@ -80,6 +92,13 @@ def get_engine(user: str, password: str, host: str,
         os.makedirs("data", exist_ok=True)
         sqlite_url = "sqlite:///data/argus_local.db"
         engine = create_engine(sqlite_url, echo=False)
+        event.listen(engine, "connect", _set_sqlite_pragmas)
+
+    if engine.dialect.name == "sqlite":
+        try:
+            event.listen(engine, "connect", _set_sqlite_pragmas)
+        except Exception:
+            pass
 
     from core.models import Base
     Base.metadata.create_all(engine)
