@@ -1767,12 +1767,15 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
 
     st.divider()
 
-    st.markdown("### 🛡️ ATR Trailing Stop-Loss & Chandelier Exit Manager")
-    st.caption("Livelli quantitativi di stop-loss dinamici ancorati alla volatilità effettiva ($ATR_{14}$) e ai massimi a 22 giorni per ciascun asset.")
-
-    glossary_modal(
-        "🛡️ Guida all'ATR Trailing Stop-Loss & Chandelier Exit",
-        """
+    col_atr_h1, col_atr_h2 = st.columns([3.5, 1.2])
+    with col_atr_h1:
+        st.markdown("### 🛡️ ATR Trailing Stop-Loss & Chandelier Exit Manager")
+        st.caption("Livelli quantitativi di stop-loss dinamici ancorati alla volatilità effettiva ($ATR_{14}$) e ai massimi a 22 giorni per ciascun asset.")
+    with col_atr_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal(
+            "🛡️ Guida all'ATR Trailing Stop-Loss & Chandelier Exit",
+            """
 <div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
   <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ Chandelier Exit (Stop-Loss Dinamico Volatilità)</div>
@@ -1790,9 +1793,9 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
   </div>
 </div>
 </div>
-        """,
-        button_label="💡 Come funziona il Chandelier Exit?"
-    )
+            """,
+            button_label="💡 Come funziona il Chandelier Exit?"
+        )
 
     df_prices_all = results.get("df_prices", pd.DataFrame())
     pos_df = results.get("positions", pd.DataFrame())
@@ -1800,43 +1803,68 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
     if not pos_df.empty:
         from core.risk_engine import compute_atr_chandelier_exits
         atr_res = compute_atr_chandelier_exits(df_prices_all, pos_df, period=14, multiplier=3.0)
+        df_atr_disp = atr_res.get("summary_df", pd.DataFrame())
         
-        col_atr1, col_atr2 = st.columns([1, 2.5])
-        with col_atr1:
+        if isinstance(df_atr_disp, pd.DataFrame) and not df_atr_disp.empty:
             trig_cnt = atr_res.get("stop_triggered_count", 0)
-            metric_card(
-                "Titoli in Trigger Stop-Loss",
-                f"{trig_cnt}",
-                positive=(trig_cnt == 0),
-                help_text="Numero di asset la cui quotazione attuale ha infranto la soglia di Chandelier Exit."
-            )
-        with col_atr2:
-            df_atr_disp = atr_res.get("summary_df", pd.DataFrame())
-            if isinstance(df_atr_disp, pd.DataFrame) and not df_atr_disp.empty:
-                df_atr_formatted = df_atr_disp.rename(columns={
-                    "ticker": "Ticker",
-                    "last_price": "Prezzo Mkt (€)",
-                    "atr_14": "ATR 14g (€)",
-                    "highest_high_22": "Max 22g (€)",
-                    "chandelier_stop": "Chandelier Stop (€)",
-                    "distance_pct": "Distanza Stop %",
-                    "stop_triggered": "Stato Alert"
-                })
-                if "Stato Alert" in df_atr_formatted.columns:
-                    df_atr_formatted["Stato Alert"] = df_atr_formatted["Stato Alert"].apply(lambda x: "🔴 TRIGGER" if x else "🟢 REGOLARE")
-                st.dataframe(
-                    df_atr_formatted.style.format({
-                        "Prezzo Mkt (€)": "€ {:,.2f}",
-                        "ATR 14g (€)": "€ {:,.2f}",
-                        "Max 22g (€)": "€ {:,.2f}",
-                        "Chandelier Stop (€)": "€ {:,.2f}",
-                        "Distanza Stop %": "{:+.2f}%"
-                    }),
-                    use_container_width=True,
-                    hide_index=True
+            tot_pos = len(df_atr_disp)
+            ok_cnt = tot_pos - trig_cnt
+            avg_dist = df_atr_disp["distance_pct"].mean() if "distance_pct" in df_atr_disp.columns else 0.0
+            
+            # 3 KPI Cards Scorecard
+            col_k1, col_k2, col_k3 = st.columns(3)
+            with col_k1:
+                metric_card(
+                    "Posizioni in Stop Trigger",
+                    f"{trig_cnt} / {tot_pos}",
+                    delta="Chiusura o Hedging Consigliato" if trig_cnt > 0 else "Nessun Alert Attivo",
+                    positive=(trig_cnt == 0),
+                    help_text="Numero di asset la cui quotazione attuale ha infranto la soglia di Chandelier Exit."
                 )
-            else:
-                st.info("Dati storici sui prezzi insufficienti per il calcolo dell'ATR.")
+            with col_k2:
+                metric_card(
+                    "Posizioni con Trend Intatto",
+                    f"{ok_cnt} / {tot_pos}",
+                    delta="Sopra la Soglia di Stop",
+                    positive=True,
+                    help_text="Asset che mantengono un prezzo di mercato superiore al livello di trailing stop."
+                )
+            with col_k3:
+                metric_card(
+                    "Distanza Media dallo Stop",
+                    f"{avg_dist:+.2f}%",
+                    delta="Cuscinetto Volatilità",
+                    positive=(avg_dist >= 0),
+                    help_text="Distanza percentuale media dei prezzi di mercato rispetto ai rispettivi livelli di Chandelier Stop."
+                )
+                
+            st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
+            
+            # Tabella Chandelier Exit Glassmorphic
+            rows_atr_list = []
+            for _, r_a in df_atr_disp.iterrows():
+                t_code = str(r_a.get("ticker", ""))
+                p_mkt = float(r_a.get("last_price", 0.0))
+                atr_v = float(r_a.get("atr_14", 0.0))
+                hi_v = float(r_a.get("highest_high_22", 0.0))
+                stop_v = float(r_a.get("chandelier_stop", 0.0))
+                dist_v = float(r_a.get("distance_pct", 0.0))
+                is_trig = bool(r_a.get("stop_triggered", False))
+                
+                if is_trig:
+                    status_badge = '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px;">🔴 TRIGGER</span>'
+                    dist_txt = f'<span style="color: #f87171; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
+                else:
+                    status_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 11px;">🟢 REGOLARE</span>'
+                    dist_txt = f'<span style="color: #4ade80; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
+                    
+                row_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 14px;font-family:monospace;">{t_code}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {p_mkt:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {atr_v:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {hi_v:,.2f}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {stop_v:,.2f}</td><td style="text-align:center;padding:8px 14px;">{dist_txt}</td><td style="padding:8px 14px;">{status_badge}</td></tr>'
+                rows_atr_list.append(row_str)
+                
+            table_atr_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:15%;">TICKER</th><th style="text-align:left;padding:8px 14px;width:16%;">PREZZO MKT (€)</th><th style="text-align:left;padding:8px 14px;width:14%;">ATR 14G (€)</th><th style="text-align:left;padding:8px 14px;width:15%;">MAX 22G (€)</th><th style="text-align:left;padding:8px 14px;width:16%;">CHANDELIER STOP (€)</th><th style="text-align:center;padding:8px 14px;width:12%;">DISTANZA %</th><th style="text-align:left;padding:8px 14px;width:12%;">STATO ALERT</th></tr></thead><tbody>{"".join(rows_atr_list)}</tbody></table></div>'
+            st.markdown(table_atr_html, unsafe_allow_html=True)
+        else:
+            st.info("Dati storici sui prezzi insufficienti per il calcolo dell'ATR.")
 
 
 # ==============================================================================
