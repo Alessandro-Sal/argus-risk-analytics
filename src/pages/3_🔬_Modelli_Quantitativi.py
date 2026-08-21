@@ -689,9 +689,9 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
                     for t in valid_ts:
                         cq = float(qty_map.get(t, 0.0))
                         sq = float(sim_qtys.get(t, 0.0))
-                        px = float(price_map.get(t, 100.0))
-                        cv = cq * px
-                        sv = sq * px
+                        asset_px = float(price_map.get(t, 100.0))
+                        cv = cq * asset_px
+                        sv = sq * asset_px
                         dq = sq - cq
                         dv = sv - cv
                         cw = cur_w_map.get(t, 0.0) * 100.0
@@ -706,7 +706,7 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
 
                         table_rows.append({
                             "Ticker": t,
-                            "Prezzo (€)": f"€ {px:,.2f}",
+                            "Prezzo (€)": f"€ {asset_px:,.2f}",
                             "Quote Attuali": f"{cq:,.1f}",
                             "Quote Simulate": f"{sq:,.1f}",
                             "Delta Quote": f"{dq:+,.1f}" if abs(dq) > 1e-4 else "0.0",
