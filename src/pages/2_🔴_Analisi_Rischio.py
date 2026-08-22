@@ -1563,8 +1563,8 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     pad = max(0.4, (y_max - y_min) * 0.18)
     
     fig_term.update_layout(
-        height=390,
-        margin=dict(l=10, r=10, t=35, b=45),
+        height=420,
+        margin=dict(l=15, r=15, t=35, b=60),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1576,12 +1576,18 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(title="Orizzonte Previsionale (Giorni Lavorativi)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", dtick=2, automargin=True),
+        xaxis=dict(
+            title=dict(text="Orizzonte Previsionale (Giorni Lavorativi)", font=dict(size=12, color="#94a3b8")),
+            showgrid=True,
+            gridcolor="rgba(255,255,255,0.06)",
+            dtick=2,
+            automargin=True
+        ),
         yaxis=dict(title="Volatilità Annualizzata (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", range=[max(0.0, y_min - pad), y_max + pad])
     )
     st.plotly_chart(fig_term, use_container_width=True)
 
-    st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="margin-bottom: 24px;"></div>', unsafe_allow_html=True)
 
     # Parametri di calibrazione con tabelle HTML responsive a riga singola (Zero Wrapping)
     with st.expander("🔬 Dettaglio Parametri Econometrici GARCH(1,1) & Test di Verosimiglianza"):
