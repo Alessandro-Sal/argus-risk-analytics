@@ -460,7 +460,6 @@ st.plotly_chart(fig, use_container_width=True)
 
 # ── SCORECARD COMPARATIVA MULTI-BENCHMARK (FEATURE 5) ─────────────
 if selected_bms:
-    st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark")
     scorecard_rows = []
     
     # Riga 1: Portafoglio
@@ -474,7 +473,7 @@ if selected_bms:
 
     scorecard_rows.append({
         "Asset / Benchmark": "⭐ Portafoglio ARGUS",
-        "Rendimento Totale": f"{p_tot_ret:+.2f}%",
+        "Rendimento Tot": f"{p_tot_ret:+.2f}%",
         "CAGR Annuo": f"{p_cagr:+.2f}%",
         "Volatilità Annua": f"{p_vol:.2f}%",
         "Sharpe Ratio": f"{p_sharpe:.2f}",
@@ -497,7 +496,7 @@ if selected_bms:
 
         scorecard_rows.append({
             "Asset / Benchmark": f"📊 {bm_str}",
-            "Rendimento Totale": f"{bm_tot_ret:+.2f}%",
+            "Rendimento Tot": f"{bm_tot_ret:+.2f}%",
             "CAGR Annuo": f"{bm_cagr:+.2f}%",
             "Volatilità Annua": f"{bm_vol:.2f}%",
             "Sharpe Ratio": f"{bm_sharpe:.2f}",
@@ -506,19 +505,21 @@ if selected_bms:
         })
 
     df_scorecard = pd.DataFrame(scorecard_rows)
-    col_sc_h1, col_sc_h2 = st.columns([3.5, 0.9])
+    col_sc_h1, col_sc_h2 = st.columns([3.8, 1.0])
+    with col_sc_h1:
+        st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark")
     with col_sc_h2:
         csv_sc = df_scorecard.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="benchmark_scorecard.csv", mime="text/csv", use_container_width=True)
+        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="benchmark_scorecard.csv", mime="text/csv", use_container_width=True, key="btn_download_bm_scorecard")
 
     sc_cfg = {
         "Asset / Benchmark": st.column_config.TextColumn("Asset / Benchmark", width="medium"),
-        "Rendimento Totale": st.column_config.TextColumn("Rendimento Totale", width="small"),
+        "Rendimento Tot": st.column_config.TextColumn("Rendimento Tot", width="small"),
         "CAGR Annuo": st.column_config.TextColumn("CAGR Annuo", width="small"),
         "Volatilità Annua": st.column_config.TextColumn("Volatilità Annua", width="small"),
         "Sharpe Ratio": st.column_config.TextColumn("Sharpe Ratio", width="small"),
         "Max Drawdown": st.column_config.TextColumn("Max Drawdown", width="small"),
-        "Alpha vs Portafoglio": st.column_config.TextColumn("Alpha vs Portafoglio", width="small")
+        "Alpha vs Portafoglio": st.column_config.TextColumn("Alpha vs Portafoglio", width="medium")
     }
     st.dataframe(
         df_scorecard,
