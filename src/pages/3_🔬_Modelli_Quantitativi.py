@@ -50,9 +50,26 @@ results, has_real = ensure_risk_bundle_loaded()
 has_portfolio = results is not None and isinstance(results, dict) and bool(results.get("positions") is not None and not results.get("positions").empty)
 m = results.get("metrics", {})
 pos = results.get("positions", pd.DataFrame())
+# Filtro rigoroso: solo asset ATTUALMENTE APERTI in portafoglio (escludi posizioni liquidate e cambi FX)
+if isinstance(pos, pd.DataFrame) and not pos.empty and "ticker" in pos.columns:
+    mask_open = (pos["qty_net"] > 1e-6) if "qty_net" in pos.columns else pd.Series(True, index=pos.index)
+    if "current_value" in pos.columns:
+        mask_open = mask_open & (pos["current_value"] > 0)
+    active_tickers_set = set([t for t in pos[mask_open]["ticker"].dropna().unique() if not str(t).endswith("=X")])
+else:
+    active_tickers_set = set()
+
 ai = m.get("ai_insights", {})
 mc = ai.get("montecarlo", {})
-clusters = ai.get("asset_clusters", [])
+raw_clusters = ai.get("asset_clusters", [])
+# Filtra clusters per soli asset aperti ed elimina cambi FX
+if raw_clusters and active_tickers_set:
+    clusters = [c for c in raw_clusters if (c.get("ticker") or c.get("index")) in active_tickers_set and not str(c.get("ticker", c.get("index"))).endswith("=X")]
+elif raw_clusters and not active_tickers_set:
+    clusters = [c for c in raw_clusters if not str(c.get("ticker", c.get("index"))).endswith("=X")]
+else:
+    clusters = []
+
 opt = results.get("optimization", {})
 
 render_sandbox_banner(page_key="p3")
@@ -1825,10 +1842,10 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             df_prices_all = results.get("df_prices", pd.DataFrame())
             pos_active = results.get("positions", pd.DataFrame())
             
-            # 1. Prova di calcolo da df_returns
+            # 1. Prova di calcolo da df_returns usando SOLO asset attivi
             if isinstance(df_returns_all, pd.DataFrame) and not df_returns_all.empty:
-                active_t = pos_active[pos_active["qty_net"] > 0]["ticker"].tolist() if (isinstance(pos_active, pd.DataFrame) and not pos_active.empty and "qty_net" in pos_active.columns) else df_returns_all.columns.tolist()
-                common_t = [t for t in active_t if t in df_returns_all.columns]
+                candidate_tickers = list(active_tickers_set) if active_tickers_set else [t for t in df_returns_all.columns if not str(t).endswith("=X")]
+                common_t = [t for t in candidate_tickers if t in df_returns_all.columns and not str(t).endswith("=X")]
                 if len(common_t) >= 2:
                     v_rets = df_returns_all[common_t].replace([np.inf, -np.inf], np.nan).dropna(how="all")
                     v_rets = v_rets.clip(lower=-0.75, upper=2.0)
@@ -1855,8 +1872,10 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             
             # 2. Prova di calcolo da df_prices se df_returns era vuoto
             if (not clusters or len(clusters) == 0) and isinstance(df_prices_all, pd.DataFrame) and not df_prices_all.empty and "ticker" in df_prices_all.columns and "close" in df_prices_all.columns:
-                p_piv = df_prices_all.pivot_table(index="price_date", columns="ticker", values="close").pct_change()
+                cand_p = df_prices_all[df_prices_all["ticker"].isin(active_tickers_set)] if active_tickers_set else df_prices_all
+                p_piv = cand_p.pivot_table(index="price_date", columns="ticker", values="close").pct_change()
                 p_piv = p_piv.replace([np.inf, -np.inf], np.nan).dropna(how="all").clip(lower=-0.75, upper=2.0)
+                p_piv = p_piv[[c for c in p_piv.columns if not str(c).endswith("=X") and (not active_tickers_set or c in active_tickers_set)]]
                 if not p_piv.empty and len(p_piv.columns) >= 2:
                     vol_s = (p_piv.std() * np.sqrt(252)).clip(0.001, 3.0)
                     mean_p = p_piv.mean().clip(lower=-0.05, upper=0.05)
@@ -1885,6 +1904,11 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
                 df_cl = df_cl.rename(columns={"index": "ticker"})
             elif "ticker" not in df_cl.columns:
                 df_cl["ticker"] = [f"Asset {i+1}" for i in range(len(df_cl))]
+
+            # Filtra rigorosamente solo asset aperti
+            if active_tickers_set:
+                df_cl = df_cl[df_cl["ticker"].isin(active_tickers_set)]
+            df_cl = df_cl[~df_cl["ticker"].astype(str).str.endswith("=X")]
 
             # Sanitizzazione preventiva valori
             df_cl = df_cl.replace([np.inf, -np.inf], np.nan).dropna(subset=["volatility", "cagr"])

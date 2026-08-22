@@ -1390,7 +1390,15 @@ def print_results(results: dict) -> None:
 def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_portfolio: pd.Series) -> dict:
     insights = {}
     
-    active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist()
+    # Filtro rigoroso: solo asset ATTUALMENTE APERTI in portafoglio (escludi posizioni liquidate e cambi valuta)
+    if isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "ticker" in df_positions.columns:
+        mask_active = (df_positions["qty_net"] > 1e-6) if "qty_net" in df_positions.columns else pd.Series(True, index=df_positions.index)
+        if "current_value" in df_positions.columns:
+            mask_active = mask_active & (df_positions["current_value"] > 0)
+        active_tickers = [t for t in df_positions[mask_active]["ticker"].dropna().unique() if not str(t).endswith("=X")]
+    else:
+        active_tickers = []
+
     common_tickers = [t for t in active_tickers if t in df_returns.columns]
     
     # 1. K-Means Clustering on Assets (Risk vs Return)
@@ -1433,7 +1441,7 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
     df_sync = df_returns[common_tickers].dropna()
     weights_series = (
         df_positions[df_positions["ticker"].isin(common_tickers)]
-        .set_index("ticker")["weight_pct"] / 100
+        .groupby("ticker")["weight_pct"].sum() / 100
     )
     weights = weights_series.reindex(common_tickers).fillna(0).values
     weights = weights / weights.sum() if weights.sum() > 0 else weights
