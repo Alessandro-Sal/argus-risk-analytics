@@ -1429,6 +1429,323 @@ def render_risk_heatmap(positions_df, risk_contrib=None):
 
 
 
+def format_institutional_5point_html(
+    title: str,
+    what_is: str,
+    how_calc: str,
+    why_useful: str,
+    argus_calc: str,
+    how_to_read: str
+) -> str:
+    """
+    Formatta il contenuto informativo di modali e popover seguendo rigorosamente
+    lo standard istituzionale a 5 sezioni:
+    1. 📌 Cos'è
+    2. 📐 Come si calcola
+    3. 🎯 A cosa serve
+    4. ⚙️ Come viene calcolato da ARGUS
+    5. 🔍 Come leggerlo
+    """
+    return f"""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+  <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+    <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 8px;">{title}</div>
+    <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> {what_is}</div>
+    <div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
+      <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-family: monospace; font-size: 12.5px;">
+        {how_calc}
+      </div>
+    </div>
+    <div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> {why_useful}</div>
+    <div style="margin-bottom: 8px;"><b>⚙️ Come viene calcolato da ARGUS:</b> {argus_calc}</div>
+    <div><b>🔍 Come leggerlo:</b><br>{how_to_read}</div>
+  </div>
+</div>
+"""
+
+
+KNOWN_METRICS_KNOWLEDGE_BASE = {
+    "rendimento_atteso": {
+        "title": "📈 Rendimento Atteso (Expected Return / CAGR)",
+        "what_is": "Tasso di rendimento composto annuo atteso o storico generato dal portafoglio di investimenti.",
+        "how_calc": "CAGR = (V_finale / V_iniziale)^(252 / N) - 1 &nbsp;|&nbsp; μ_port = w^T * μ",
+        "why_useful": "Misurare la capacità del portafoglio di incrementare il capitale nel tempo al netto delle fluttuazioni temporanee.",
+        "argus_calc": "Calcolato sulle serie storiche dei prezzi rettificati (Adjusted Close) con base a 252 sedute lavorative o per combinazione lineare dei pesi simulati.",
+        "how_to_read": "• 🟢 > Benchmark (Alpha positivo, sovraperformance gestionale)<br>• 🟡 In linea con l'indice di riferimento<br>• 🔴 < Benchmark o negativo (Erosione del capitale reale)."
+    },
+    "volatilita_annua": {
+        "title": "⚡ Volatilità Annua (Annualized Standard Deviation)",
+        "what_is": "Misura statistica della dispersione dei rendimenti del portafoglio attorno alla loro media (rischio totale di mercato).",
+        "how_calc": "σ_annua = σ_daily * √252 = √(w^T * Σ * w) * √252",
+        "why_useful": "Quantificare l'incertezza e l'ampiezza delle oscillazioni di prezzo a cui è esposto il capitale nel corso di un anno solare.",
+        "argus_calc": "Determinata tramite moltiplicazione quadratica della matrice di covarianza (de-noised con shrinkage Ledoit-Wolf) per il vettore dei pesi, annualizzata a 252 sedute.",
+        "how_to_read": "• 🟢 < 12.0% (Profilo Prudente/Conservativo)<br>• 🟡 12.0% - 22.0% (Profilo Bilanciato Standard)<br>• 🔴 > 22.0% (Profilo Aggressivo ad elevata oscillazione)."
+    },
+    "var_95": {
+        "title": "🛡️ Value at Risk (VaR 95% Giornaliero)",
+        "what_is": "La massima perdita potenziale stimata su un orizzonte di 1 giorno con un livello di confidenza statistica del 95%.",
+        "how_calc": "VaR_95 = -(μ - 1.645 * σ) &nbsp;|&nbsp; Storico: 5° percentile della distribuzione dei rendimenti",
+        "why_useful": "Fissare un limite prudenziale di perdita massima in condizioni ordinarie di mercato per calibrare liquidità e margini.",
+        "argus_calc": "Calcolato con doppio approccio integrato: Parametrico (Gaussiano/Cornish-Fisher con asimmetria e curtosi) e Storico empirico non parametrico su 252+ sedute.",
+        "how_to_read": "• 🟢 < 1.50% (Rischio giornaliero contenuto)<br>• 🟡 1.50% - 2.50% (Esposizione nella media)<br>• 🔴 > 2.50% (Elevata vulnerabilità a shock giornalieri)."
+    },
+    "sharpe_ratio": {
+        "title": "🎯 Sharpe Ratio (Rendimento / Rischio Totale)",
+        "what_is": "Indice che misura l'extra-rendimento generato per ciascuna unità di rischio totale (volatilità) assunto oltre il tasso privo di rischio.",
+        "how_calc": "Sharpe = (R_p - R_f) / σ_p",
+        "why_useful": "Distinguere la reale abilità allocativa del gestore da rendimenti ottenuti assumendo una volatilità eccessiva e non sostenibile.",
+        "argus_calc": "Utilizza il tasso Risk-Free live armonizzato per valuta (BCE €STR per EUR, Fed ^IRX per USD) e annualizza i rendimenti a 252 giorni.",
+        "how_to_read": "• 🟢 > 1.20 (Eccellente efficienza rischio/rendimento)<br>• 🟡 0.70 - 1.20 (Buono / Accettabile)<br>• 🔴 < 0.70 (Inefficiente, remunerazione insufficiente per il rischio corso)."
+    },
+    "sortino_ratio": {
+        "title": "🛡️ Sortino Ratio (Rendimento / Downside Risk)",
+        "what_is": "Variante dello Sharpe Ratio che penalizza unicamente la volatilità negativa di ribasso (Downside Deviation), ignorando la volatilità positiva.",
+        "how_calc": "Sortino = (R_p - R_f) / σ_downside, &nbsp; σ_downside = √[ (1/N) * Σ min(0, R_t - R_f)^2 * 252 ]",
+        "why_useful": "Valutare strategie asimmetriche e opzioni dove la volatilità positiva è desiderabile e solo le perdite costituiscono rischio.",
+        "argus_calc": "Calcolato estraendo i rendimenti inferiori al target MAR (Minimum Acceptable Return = Tasso Risk-Free live).",
+        "how_to_read": "• 🟢 > 1.50 (Ottima asimmetria e protezione dai ribassi)<br>• 🟡 0.80 - 1.50 (Sufficiente)<br>• 🔴 < 0.80 (Elevata frequenza o entità di rendimenti negativi)."
+    },
+    "max_drawdown": {
+        "title": "📉 Massimo Drawdown Storico (Max Drawdown)",
+        "what_is": "La massima perdita percentuale registrata dal picco di valore più elevato fino al punto di minimo successivo.",
+        "how_calc": "MDD = min_t [ (V_t - max_{s ≤ t} V_s) / max_{s ≤ t} V_s ]",
+        "why_useful": "Quantificare il peggior calo storico subito dal portafoglio e testare la resilienza psicologica e finanziaria dell'investitore.",
+        "argus_calc": "Tracciato punto a punto sulla serie storica cumulata dell'equity value, registrando picco, valle e durata del recupero (Recovery Time).",
+        "how_to_read": "• 🟢 < 12.0% (Capitale molto protetto e resiliente)<br>• 🟡 12.0% - 25.0% (Correzione fisiologica di mercato)<br>• 🔴 > 25.0% (Rischio di prolungata distruzione di valore)."
+    },
+    "beta": {
+        "title": "🏛️ Beta di Mercato (Market Sensitivity)",
+        "what_is": "Misura della sensibilità del rendimento del portafoglio rispetto alle variazioni dell'indice di riferimento (rischio sistematico).",
+        "how_calc": "β = Cov(R_p, R_m) / Var(R_m)",
+        "why_useful": "Stabilire se il portafoglio amplifica o attenua i movimenti del mercato complessivo.",
+        "argus_calc": "Regressione OLS dei rendimenti giornalieri del portafoglio contro il benchmark principale selezionato (SPY, QQQ, ACWI).",
+        "how_to_read": "• 🟢 β < 0.80 (Difensivo / Bassa correlazione al mercato)<br>• 🟡 β ≈ 1.00 (In linea col mercato)<br>• 🔴 β > 1.20 (Aggressivo, amplifica fortemente i ribassi di mercato)."
+    },
+    "alpha": {
+        "title": "🏆 Alpha di Jensen (Extra-Rendimento Gestionale)",
+        "what_is": "L'extra-rendimento netto generato dal portafoglio rispetto a quello atteso in base al modello CAPM per il livello di rischio sistematico assunto.",
+        "how_calc": "α = R_p - [ R_f + β * (R_m - R_f) ]",
+        "why_useful": "Isolare il valore aggiunto puro generato dalle scelte di stock picking e asset allocation del gestore.",
+        "argus_calc": "Intercetta della regressione lineare tra i rendimenti in eccesso del portafoglio e del benchmark, calcolata con p-value di confidenza.",
+        "how_to_read": "• 🟢 α > +2.0% (Netta creazione di valore attivo)<br>• 🟡 0.0% ≤ α ≤ +2.0% (Lieve extra-performance)<br>• 🔴 α < 0.0% (Distruzione di valore rispetto a una replica passiva)."
+    },
+    "calmar_ratio": {
+        "title": "⚖️ Calmar Ratio (CAGR / Max Drawdown)",
+        "what_is": "Rapporto tra il tasso di crescita annuo composto (CAGR) e il Massimo Drawdown storico subito.",
+        "how_calc": "Calmar = CAGR / |Max Drawdown|",
+        "why_useful": "Valutare se il rendimento annuo generato giustifica l'ampiezza della peggiore flessione storica sopportata.",
+        "argus_calc": "Calcolato dal rapporto tra il CAGR del portafoglio e il valore assoluto del massimo drawdown sulla finestra storica.",
+        "how_to_read": "• 🟢 > 1.00 (Eccellente: il rendimento annuo supera la peggiore perdita)<br>• 🟡 0.50 - 1.00 (Equilibrato)<br>• 🔴 < 0.50 (Drawdown sproporzionato rispetto al rendimento generato)."
+    },
+    "days_to_liquidate": {
+        "title": "⚡ Days-to-Liquidate (Almgren-Chriss Liquidity Horizon)",
+        "what_is": "Il numero stimato di giorni lavorativi necessari per liquidare le posizioni senza eccedere il 15% del volume medio giornaliero (ADV).",
+        "how_calc": "DTL = Quantità Netta / (ADV_30g * 0.15)",
+        "why_useful": "Evitare trappole di illiquidità, shock da market impact e disallineamenti di prezzo in caso di liquidazione forzata o ribilanciamento rapido.",
+        "argus_calc": "Pondera ciascun asset sul volume medio a 30 sedute ricavato dai flussi di mercato e applica il modello di impatto Almgren-Chriss.",
+        "how_to_read": "• 🟢 ≤ 1.0 gg (Smobilizzo immediato, asset ultra-liquido)<br>• 🟡 1.0 - 3.0 gg (Liquidità moderata)<br>• 🔴 > 3.0 gg (Posizione illiquida, elevato rischio di market impact)."
+    },
+    "chandelier_exit": {
+        "title": "🛡️ Chandelier Exit (ATR Trailing Stop-Loss)",
+        "what_is": "Algoritmo di stop-loss dinamico agganciato al picco massimo recente, tarato sulla volatilità effettiva a 14 periodi (Average True Range).",
+        "how_calc": "Stop = Max(High_22g) - 3.0 * ATR_14",
+        "why_useful": "Proteggere i guadagni accumulati lasciando correre i profitti durante i trend rialzisti ed evitando uscite premature per rumore di mercato.",
+        "argus_calc": "Calcola l'ATR a 14 sedute sulle barre High-Low-Close di ciascun titolo e sottrae 3 volte tale valore dal massimo a 22 giorni lavorativi.",
+        "how_to_read": "• 🟢 Prezzo > Stop (Trend intatto, posizione regolare)<br>• 🟡 Distanza < 4% (Vicinanza alla soglia di allerta)<br>• 🔴 Prezzo ≤ Stop (Trigger di uscita/copertura scattato)."
+    },
+    "diversification_ratio": {
+        "title": "🌐 Diversification Ratio (DR)",
+        "what_is": "Rapporto tra la media ponderata delle volatilità dei singoli componenti e la volatilità complessiva del portafoglio.",
+        "how_calc": "DR = ( Σ w_i * σ_i ) / √(w^T * Σ * w)",
+        "why_useful": "Quantificare in termini matematici il beneficio della diversificazione e la riduzione del rischio ottenuta combinando asset non perfettamente correlati.",
+        "argus_calc": "Calcolato con la matrice di covarianza de-noised Ledoit-Wolf e i pesi effettivi di portafoglio.",
+        "how_to_read": "• 🟢 > 1.40 (Ottima diversificazione istituzionale)<br>• 🟡 1.15 - 1.40 (Diversificazione moderata)<br>• 🔴 < 1.15 (Scarsa diversificazione, elevato rischio di concentrazione)."
+    },
+    "altman_z_score": {
+        "title": "🏛️ Altman Z-Score (Solvibilità e Rischio Default)",
+        "what_is": "Modello econometrico multivariato a 5 indici di bilancio per prevedere la probabilità di insolvenza o dissesto finanziario aziendale a 2 anni.",
+        "how_calc": "Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 0.999*X5",
+        "why_useful": "Verificare la solidità fondamentale e proteggersi da fallimenti o default societari nei titoli detenuti.",
+        "argus_calc": "Estrae automaticamente le voci di bilancio annuali certificate (SEC 10-K / bilanci societari) calcolando i 5 ratios finanziari.",
+        "how_to_read": "• 🟢 Z > 2.99 (Zona Sicura: azienda solida e solvente)<br>• 🟡 1.81 ≤ Z ≤ 2.99 (Zona Grigia: rischio moderato)<br>• 🔴 Z < 1.81 (Zona di Distress: alto rischio di insolvenza)."
+    },
+    "beneish_m_score": {
+        "title": "🔍 Beneish M-Score (Forensic Accounting & Manipolazione)",
+        "what_is": "Modello statistico probabilistico a 8 indici di bilancio per rilevare anomalie contabili o pratiche aggressive di manipolazione degli utili.",
+        "how_calc": "M = -4.84 + 0.92*DSRI + 0.528*GMI + 0.404*AQI + 0.892*SGI + 0.115*DEPI - 0.172*SGAI + 4.037*TATA + 0.0327*LVGI",
+        "why_useful": "Individuare tempestivamente red flags contabili prima che si traducano in scandali finanziari o crolli delle quotazioni.",
+        "argus_calc": "Confronta le voci di conto economico e stato patrimoniale degli ultimi due esercizi contabili calcolando gli 8 indicatori standard.",
+        "how_to_read": "• 🟢 M < -2.22 (Bassa probabilità di manipolazione, bilancio affidabile)<br>• 🔴 M > -2.22 (Alta probabilità di anomalie o abbellimenti contabili)."
+    },
+    "sloan_accrual": {
+        "title": "📊 Sloan Accrual Ratio (Qualità degli Utili)",
+        "what_is": "Indicatore di qualità contabile che misura la percentuale di utile derivante da mere scritture di competenza rispetto ai flussi di cassa operativi reali.",
+        "how_calc": "Accrual Ratio = [ Net Income - (CFO + CFI) ] / Total Assets",
+        "why_useful": "Evidenziare se gli utili annunciati sono supportati da denaro effettivo incassato sul conto corrente aziendale.",
+        "argus_calc": "Estrae Net Income, Cash Flow Operativo (CFO) e Totale Attivo dall'ultimo rendiconto finanziario societario.",
+        "how_to_read": "• 🟢 |Accrual| < 5.0% (Qualità eccellente degli utili)<br>• 🟡 5.0% - 10.0% (Livello intermedio)<br>• 🔴 |Accrual| > 10.0% (Bassa qualità, rischio revisioni al ribasso)."
+    },
+    "wacc": {
+        "title": "💼 WACC & DCF Fair Value (Costo del Capitale e Valutazione Intrinseca)",
+        "what_is": "Il costo medio ponderato del capitale aziendale (WACC) e il valore intrinseco per azione calcolato attualizzando i flussi di cassa futuri (DCF).",
+        "how_calc": "WACC = (E/V)*Ke + (D/V)*Kd*(1 - t) &nbsp;|&nbsp; Target Price = (Σ FCFF_t / (1+WACC)^t + Terminal Value) / Shares",
+        "why_useful": "Fissare il prezzo equo (Fair Value) fondamentale di un titolo per determinare se quota a sconto (sottovalutato) o a premio (sopravvalutato).",
+        "argus_calc": "Simulazione DCF Monte Carlo con 1,000 iterazioni stocastiche su tassi di crescita, WACC calcolato con CAPM e tasso risk-free live.",
+        "how_to_read": "• 🟢 Prezzo < Fair Value (Margine di sicurezza favorevole, sottovalutato)<br>• 🟡 Prezzo ≈ Fair Value (Equamente valutato)<br>• 🔴 Prezzo > Fair Value (Sopravvalutato rispetto ai fondamentali)."
+    },
+    "piotroski_f_score": {
+        "title": "⭐ Piotroski F-Score (Solidità e Momentum Fondamentale)",
+        "what_is": "Punteggio discreto da 0 a 9 basato su 9 criteri contabili suddivisi in Redditività, Leva/Liquidità ed Efficienza Operativa.",
+        "how_calc": "F-Score = Σ (9 criteri binari 0 o 1 su ROA, CFO, ΔLeva, ΔMargini, ΔRotazione Attivo, ecc.)",
+        "why_useful": "Selezionare titoli value con solidi fondamentali ed eliminare società fragili a rischio declino economico.",
+        "argus_calc": "Analisi automatizzata punto per punto sui bilanci societari storici ufficiali.",
+        "how_to_read": "• 🟢 8 - 9 (Società finanziariamente eccellente e in espansione)<br>• 🟡 5 - 7 (Solidità moderata / nella media)<br>• 🔴 0 - 4 (Struttura finanziaria fragile o deterioramento operativo)."
+    },
+    "kelly_criterion": {
+        "title": "🎯 Kelly Criterion (Dimensionamento Ottimale del Capitale)",
+        "what_is": "Formula per determinare la percentuale teorica ottimale di capitale da allocare su una posizione per massimizzare la crescita geometrica a lungo termine.",
+        "how_calc": "f* = (p * b - q) / b &nbsp;|&nbsp; f* = (μ - R_f) / σ²",
+        "why_useful": "Prevenire la rovina statistica del capitale (Gambler's Ruin) ed evitare sia il sotto-investimento che l'over-betting.",
+        "argus_calc": "Calcolato con frazionamento prudenziale (Half-Kelly al 50% o Quarter-Kelly al 25%) integrato con il tasso risk-free live.",
+        "how_to_read": "• 🟢 f* applicato al 25%-50% (Allocazione robusta ed equilibrata)<br>• 🔴 Full Kelly al 100% (Sconsigliato: eccessiva volatilità del portafoglio)."
+    },
+    "tracking_error": {
+        "title": "🎯 Tracking Error & Information Ratio",
+        "what_is": "La volatilità della differenza dei rendimenti tra il portafoglio e il benchmark (Tracking Error) e l'extra-rendimento per unità di rischio attivo (Information Ratio).",
+        "how_calc": "TE = √(Var(R_p - R_b)) * √252 &nbsp;|&nbsp; IR = (R_p - R_b) / TE",
+        "why_useful": "Valutare la coerenza della gestione rispetto al benchmark di riferimento e premiare l'abilità di generazione attiva di Alpha.",
+        "argus_calc": "Calcolato sulle serie temporali allineate dei rendimenti giornalieri di portafoglio e benchmark su 252 sedute.",
+        "how_to_read": "• 🟢 IR > 0.70 (Gestione attiva di alto livello)<br>• 🟡 0.30 ≤ IR ≤ 0.70 (Buona efficienza)<br>• 🔴 IR < 0.30 o negativo (Rischio attivo non remunerato)."
+    },
+    "omega_ratio": {
+        "title": "⚖️ Omega Ratio (Distribuzione Asimmetrica)",
+        "what_is": "Rapporto tra la probabilità cumulata dei guadagni rispetto a una soglia di rendimento target e la probabilità cumulata delle perdite sotto tale soglia.",
+        "how_calc": "Ω(L) = ∫_L^∞ (1 - F(r))dr / ∫_{-∞}^L F(r)dr",
+        "why_useful": "Catturare tutte le proprietà della distribuzione dei rendimenti (inclusi skewness e code grasse) senza assumere la normalità gaussiana.",
+        "argus_calc": "Integrazione numerica continua dei rendimenti storici ponderati rispetto al tasso risk-free live.",
+        "how_to_read": "• 🟢 > 1.50 (Distribuzione asimmetrica nettamente a favore dei guadagni)<br>• 🟡 1.00 - 1.50 (Bilanciato)<br>• 🔴 < 1.00 (Prevalenza statistica di perdite)."
+    },
+    "ulcer_index": {
+        "title": "📉 Ulcer Index & Martin Ratio",
+        "what_is": "Misura di stress e profondità dei cali che tiene conto sia della percentuale di drawdown che del numero di giorni necessari per recuperare il picco.",
+        "how_calc": "UI = √( (1/N) * Σ DD_i^2 ) &nbsp;|&nbsp; Martin = (CAGR - R_f) / UI",
+        "why_useful": "Misurare il logorio temporale dell'investitore durante le fasi negative prolungate del mercato.",
+        "argus_calc": "Calcolo quadratico continuo delle percentuali di drawdown su tutti i giorni di negoziazione.",
+        "how_to_read": "• 🟢 UI < 5.0% (Crescita lineare, minimi drawdown)<br>• 🟡 5.0% - 12.0% (Volatilità fisiologica)<br>• 🔴 UI > 12.0% (Elevato stress temporale e drawdowns prolungati)."
+    },
+    "tuir_67": {
+        "title": "💰 Zainetto Fiscale & TUIR Art. 67 (Fisco Italiano)",
+        "what_is": "La disciplina fiscale italiana (D.P.R. 917/1986) per la tassazione dei redditi diversi di natura finanziaria (26% ordinario, 12.5% Titoli di Stato).",
+        "how_calc": "Imposta = max(0, Plusvalenze_realizzate - Minusvalenze_pregresse) * Aliquota",
+        "why_useful": "Monitorare e recuperare le minusvalenze prima della prescrizione quadriennale (Tax-Loss Harvesting strategico).",
+        "argus_calc": "Tracciamento contabile FIFO per singolo lotto di acquisto/vendita con data certa, calcolo aliquota per asset class e scadenza a 4 anni.",
+        "how_to_read": "• 🟢 Crediti fiscali compensati tempestivamente<br>• 🟡 Minusvalenze in scadenza entro 12 mesi da monitorare<br>• 🔴 Minusvalenze scadute non recuperate."
+    },
+    "isolation_forest": {
+        "title": "🕵️‍♂️ Machine Learning Isolation Forest (Rilevazione Anomalie)",
+        "what_is": "Algoritmo di Machine Learning non supervisionato per identificare giornate storiche atipiche con rotture di correlazione o shock sistemici.",
+        "how_calc": "Ensemble di 100 Isolation Trees nello spazio 4D: Rendimento, Volatilità rolling 20d, Correlazione media, Drawdown.",
+        "why_useful": "Rilevare cluster di anomalie di mercato prima che si trasformino in perdite permanenti di capitale.",
+        "argus_calc": "Pipeline integrata in scikit-learn con parametro di contaminazione del 5% su tutta la cronologia disponibile.",
+        "how_to_read": "• 🔴 ANOMALIA (Punteggio negativo marcato, dinamica anomala)<br>• 🟢 Normale (Fluttuazione coerente con la serie storica)."
+    }
+}
+
+
+def resolve_metric_knowledge(label: str, help_text: str = None) -> str:
+    """
+    Risolve il testo informativo per qualsiasi metrica o card, assicurando sempre
+    la struttura standard a 5 sezioni:
+    1. 📌 Cos'è
+    2. 📐 Come si calcola
+    3. 🎯 A cosa serve
+    4. ⚙️ Come viene calcolato da ARGUS
+    5. 🔍 Come leggerlo
+    """
+    if help_text and all(k in help_text for k in ["Cos'è", "Come si calcola", "A cosa serve"]):
+        return help_text
+        
+    import re
+    cleaned_label = re.sub(r'[^a-zA-Z0-9]', '', label).lower()
+    
+    # Mappatura chiavi
+    alias_map = {
+        "rendimento": "rendimento_atteso",
+        "cagr": "rendimento_atteso",
+        "expectedreturn": "rendimento_atteso",
+        "volatilita": "volatilita_annua",
+        "volatility": "volatilita_annua",
+        "deviazionestandard": "volatilita_annua",
+        "var": "var_95",
+        "valueatrisk": "var_95",
+        "sharpe": "sharpe_ratio",
+        "sortino": "sortino_ratio",
+        "drawdown": "max_drawdown",
+        "mdd": "max_drawdown",
+        "beta": "beta",
+        "alpha": "alpha",
+        "calmar": "calmar_ratio",
+        "liquidate": "days_to_liquidate",
+        "smobilizzo": "days_to_liquidate",
+        "chandelier": "chandelier_exit",
+        "stoploss": "chandelier_exit",
+        "diversification": "diversification_ratio",
+        "altman": "altman_z_score",
+        "beneish": "beneish_m_score",
+        "sloan": "sloan_accrual",
+        "wacc": "wacc",
+        "dcf": "wacc",
+        "piotroski": "piotroski_f_score",
+        "kelly": "kelly_criterion",
+        "tracking": "tracking_error",
+        "omega": "omega_ratio",
+        "ulcer": "ulcer_index",
+        "tuir": "tuir_67",
+        "minusvalenze": "tuir_67",
+        "fiscale": "tuir_67",
+        "anomalie": "isolation_forest",
+        "isolation": "isolation_forest"
+    }
+    
+    target_key = None
+    for token, mapped_k in alias_map.items():
+        if token in cleaned_label:
+            target_key = mapped_k
+            break
+            
+    if target_key and target_key in KNOWN_METRICS_KNOWLEDGE_BASE:
+        d = KNOWN_METRICS_KNOWLEDGE_BASE[target_key]
+        return format_institutional_5point_html(
+            title=d["title"],
+            what_is=d["what_is"],
+            how_calc=d["how_calc"],
+            why_useful=d["why_useful"],
+            argus_calc=d["argus_calc"],
+            how_to_read=d["how_to_read"]
+        )
+        
+    for k, d in KNOWN_METRICS_KNOWLEDGE_BASE.items():
+        if k in cleaned_label or cleaned_label in k:
+            return format_institutional_5point_html(
+                title=d["title"],
+                what_is=d["what_is"],
+                how_calc=d["how_calc"],
+                why_useful=d["why_useful"],
+                argus_calc=d["argus_calc"],
+                how_to_read=d["how_to_read"]
+            )
+            
+    fallback_desc = help_text.strip() if help_text else f"Indicatore di performance e controllo quantitativo per {label}."
+    return format_institutional_5point_html(
+        title=f"📊 {label}",
+        what_is=fallback_desc,
+        how_calc="Calcolato sulle serie storiche dei prezzi rettificati e sui pesi di allocazione di portafoglio.",
+        why_useful="Monitorare l'efficienza gestionale, la volatilità e la protezione del capitale investito.",
+        argus_calc="Elaborazione continua del Risk Engine con normalizzazione su 252 giorni e tasso risk-free live.",
+        how_to_read="• 🟢 Valori ottimali coerenti con gli obiettivi strategici<br>• 🟡 Fascia di oscillazione standard<br>• 🔴 Soglia di attenzione o rischio elevato."
+    )
+
+
 def metric_card(label: str, value: str, delta: str = None, positive: bool = True, help_text: str = None, is_positive: bool = None):
     if is_positive is not None:
         positive = is_positive
@@ -1444,17 +1761,15 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
         delta_html = f'<div class="{cls}">{arrow} {delta}</div>'
     
     modal_html = ""
-    if help_text:
-        help_text = help_text.strip()
-        if "<" in help_text and ">" in help_text:
-            cleaned = re.sub(r'<!--.*?-->', '', help_text, flags=re.DOTALL)
-            cleaned = re.sub(r'>\s+<', '><', cleaned)
-            cleaned = re.sub(r'\s*\n\s*', ' ', cleaned)
-            safe_help_text = cleaned.strip()
-        else:
-            safe_help_text = help_text.replace('\n', '<br>')
-        
-        modal_html = f"""<style>
+    # Risolvi sempre il contenuto a 5 sezioni
+    resolved_content = resolve_metric_knowledge(label, help_text)
+    
+    cleaned = re.sub(r'<!--.*?-->', '', resolved_content, flags=re.DOTALL)
+    cleaned = re.sub(r'>\s+<', '><', cleaned)
+    cleaned = re.sub(r'\s*\n\s*', ' ', cleaned)
+    safe_help_text = cleaned.strip()
+    
+    modal_html = f"""<style>
 #modal-toggle-{unique_id} {{ display: none; }}
 .modal-overlay-{unique_id} {{
     display: none;
@@ -1564,9 +1879,7 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
         <div style="font-size: 14px; line-height: 1.55; margin: 0; color: #c9d1d9;">{safe_help_text}</div>
     </div>
 </div>"""
-        label_html = f'<div class="metric-label" style="display:flex; align-items:center;">{label} <label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
-    else:
-        label_html = f'<div class="metric-label">{label}</div>'
+    label_html = f'<div class="metric-label" style="display:flex; align-items:center;">{label} <label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
 
     st.markdown(f"""{modal_html}
 <div class="metric-card">
@@ -1915,36 +2228,14 @@ def render_risk_free_modal(
     rate_pct = float(info.get("rate_pct", 2.75))
     source = info.get("source", "BCE €STR")
     
-    content = f"""
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. DEFINIZIONE & PROXY -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏛️ 1. Tasso Privo di Rischio (Risk-Free Rate Rf)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Il rendimento teorico di un investimento a rischio di credito e liquidità nullo su orizzonte a breve termine. In ARGUS è attualmente pari a <b>{rate_pct:.2f}%</b> (Fonte: <i>{source}</i>) per la valuta base <b>{curr}</b>.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Proxy Istituzionali di Riferimento:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-size: 13px;">
-      • <b>EUR:</b> BCE €STR (Euro Short-Term Rate) / Bund 3M (XEON.DE)<br>
-      • <b>USD:</b> US 3M Treasury Bill (^IRX) / SOFR<br>
-      • <b>GBP:</b> Bank of England SONIA (CSH2.L)<br>
-      • <b>CHF:</b> SNB SARON Swiss Overnight Rate
-    </div>
-  </div>
-  <div><b>🎯 A cosa serve:</b> Fornisce la remunerazione base del capitale monetario privo di rischio con cui confrontare ogni rendimento attivo.</div>
-</div>
-
-<!-- 2. IMPATTO QUANTITATIVO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚙️ 2. Impatto Matematico nei Motori Quantitativi ARGUS</div>
-  <div style="margin-bottom: 6px;"><b>⚖️ Sharpe & Sortino Ratio:</b> (Rp &minus; Rf) / &sigma; — Un Rf più elevato aumenta l'hurdle rate richiesto al gestore per giustificare la volatilità.</div>
-  <div style="margin-bottom: 6px;"><b>🏅 Alpha di Jensen:</b> &alpha; = Rp &minus; [Rf + &beta; &times; (Rb &minus; Rf)] — Depura l'extra-rendimento sia dal Beta di mercato sia dal rendimento monetario base.</div>
-  <div style="margin-bottom: 6px;"><b>⚡ Black-Scholes & Opzioni:</b> Fattore di sconto monetario per il valore attuale dello strike price K.</div>
-  <div style="margin-bottom: 6px;"><b>💼 Costo del Capitale (WACC & DCF):</b> Ke = Rf + &beta; &times; ERP — Tasso base di attualizzazione per i flussi di cassa operativi.</div>
-  <div><b>🎯 Trade Sizing (Kelly Criterion):</b> f* = (&mu; &minus; Rf) / &sigma;² — Massimizza la crescita geometrica del capitale rispetto alla varianza.</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title=f"🏛️ Tasso Privo di Rischio (Risk-Free Rate Rf) — {curr}: {rate_pct:.2f}%",
+        what_is=f"Il rendimento teorico di un investimento monetario a rischio di credito e di liquidità nullo su orizzonte a breve termine (1-3 mesi). In ARGUS è attualmente pari a <b>{rate_pct:.2f}%</b> (Fonte: <i>{source}</i>) per la valuta base <b>{curr}</b>.",
+        how_calc="• EUR: BCE €STR (Euro Short-Term Rate) / Bund 3M (XEON.DE)<br>• USD: US 3M Treasury Bill (^IRX) / SOFR<br>• GBP: Bank of England SONIA (CSH2.L)<br>• CHF: SNB SARON Swiss Overnight Rate",
+        why_useful="Fornisce l'hurdle rate (costo opportunità del capitale) per determinare se la volatilità di un asset o portafoglio è adeguatamente remunerata rispetto al parcheggio monetario.",
+        argus_calc="Recupero live dalle banche centrali (BCE, Federal Reserve via Yahoo Finance ^IRX / XEON.DE) con caching orario e conversione algebrica su base giornaliera r_daily = (1 + Rf)^(1/252) - 1.",
+        how_to_read="• 🟢 Rendimento Portafoglio > Rf (Creazione reale di ricchezza)<br>• 🟡 Rendimento ≈ Rf (Rendimento assorbito dal tasso monetario)<br>• 🔴 Rendimento < Rf (Distruzione di valore economico rispetto a titoli di stato a brevissimo termine)."
+    )
     render_info_modal(
         title=f"🏛️ Metodologia Tasso Risk-Free ({curr}: {rate_pct:.2f}%)",
         content=content,
@@ -1967,43 +2258,16 @@ def render_corporate_actions_modal(
         rows_act = ""
         for act in corporate_actions_list:
             rows_act += f"• <b>{act.get('ticker')}</b> ({act.get('split_date')}): {act.get('description', act.get('split_type'))} | Ratio: <b>{act.get('split_ratio')}x</b> | Lotti rettificati: <b>{act.get('affected_lots_count', 1)}</b><br>"
-        audit_summary_html = f"""
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(63,185,80,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #3fb950; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📑 Corporate Actions Applicate a questo Portafoglio</div>
-  <div style="font-size: 12.5px; color: #7ee787;">{rows_act}</div>
-</div>
-"""
+        audit_summary_html = f"<div style='margin-top:8px; font-size:12px; color:#7ee787;'><b>📑 Eventi rilevati nel portafoglio:</b><br>{rows_act}</div>"
 
-    content = f"""
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. PRINCIPIO FISCALE -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🧬 1. Principio di Invarianza Fiscale (TUIR Art. 67 & IFRS)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Le operazioni straordinarie (Stock Split / Reverse Split) non costituiscono realizzo di plusvalenza o minusvalenza. Il valore fiscale complessivo del lotto di acquisto rimane invariato.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Formula di Rettifica Invariante:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-      <b>Cost Basis</b> = Q<sub>orig</sub> &times; P<sub>orig</sub> = Q<sub>rett</sub> &times; P<sub>rett</sub>
-    </div>
-  </div>
-  <div><b>🔍 Tipologie:</b><br>
-    • <b>Forward Split (R > 1):</b> Il numero di quote aumenta (Q &times; R) e il prezzo di carico medio si riduce (P / R).<br>
-    • <b>Reverse Split (R < 1):</b> Il numero di quote si riduce e il prezzo unitario aumenta proporzionalmente.
-  </div>
-</div>
-
-<!-- 2. RETTIFICA FIFO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔄 2. Perché la Rettifica FIFO in ARGUS è Fondamentale?</div>
-  <div style="margin-bottom: 6px;"><b>1. Coerenza con i Prezzi di Mercato:</b> Le serie storiche scaricate da Yahoo Finance sono rettificate (Adjusted Close). Senza rettifica dei lotti di acquisto passati, verrebbero generate perdite o guadagni fittizi.</div>
-  <div style="margin-bottom: 6px;"><b>2. Prevenzione Errori di Inventario:</b> Le vendite concluse post-split impiegano quote rettificate evitando disallineamenti di saldo.</div>
-  <div><b>3. Calcolo Fiscale Esatto:</b> Plusvalenze e minusvalenze per lo zainetto fiscale vengono determinate con precisione contabile al centesimo.</div>
-</div>
-
-{audit_summary_html}
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="🧬 Corporate Actions, Stock Split & Rettifica FIFO",
+        what_is=f"Operazioni straordinarie sul capitale (frazionamenti azionari, raggruppamenti, scorpori) che modificano il numero di quote in circolazione senza alterare il controvalore totale investito.{audit_summary_html}",
+        how_calc="Principio di Invarianza: Cost Basis = Q_orig * P_orig = Q_rett * P_rett &nbsp;|&nbsp; Forward Split (R > 1): Q' = Q*R, P' = P/R &nbsp;|&nbsp; Reverse Split (R < 1): Q' = Q*R, P' = P/R",
+        why_useful="Garantire la perfetta coerenza storica contabile, fiscale e grafica: senza rettifica, uno split 10:1 genererebbe un falso crollo del 90% del prezzo e un'errata plusvalenza/minusvalenza.",
+        argus_calc="Il Corporate Action Engine intercetta gli split storici e rettifica retroattivamente tutti i lotti FIFO di acquisto antecedenti la data di stacco, allineandoli ai prezzi Adjusted Close.",
+        how_to_read="• 🟢 Lotti allineati (PnL latente e storico fiscale corretti al centesimo)<br>• 🟡 Nuove operazioni straordinarie in corso di elaborazione<br>• 🔴 Disallineamento quote (necessaria ricalibrazione dello storico transazioni)."
+    )
     render_info_modal(
         title="🧬 Metodologia Corporate Actions & Stock Split",
         content=content,
@@ -2020,166 +2284,14 @@ def render_broker_hub_modal(
     Renderizza un modale istituzionale con le istruzioni passo-passo
     per esportare il file CSV corretto da tutti i broker supportati da ARGUS.
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<div style="background: rgba(56,189,248,0.06); border: 1px solid rgba(56,189,248,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 14px;">
-  <div style="color: #38bdf8; font-weight: 700; font-size: 14px; margin-bottom: 4px;">🌐 Ingestion Automatica Multi-Broker ARGUS</div>
-  <div>ARGUS supporta l'ingestione istantanea con <b>Auto-Detection del formato</b>, risoluzione automatica degli ISIN bancari in Ticker Yahoo Finance e calcolo fiscale multi-valuta per tutti i principali broker.</div>
-</div>
-
-<!-- 1. DEGIRO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟡 1. DeGiro (Trading & Multi-Valuta)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App / Web:</b> Nel menu laterale seleziona <b>Attività</b> ➔ <b>Transazioni</b>.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-size: 13px;">
-      1. Imposta l'intervallo temporale (es. <i>Da Inizio / Tutto</i>).<br>
-      2. Clicca sul pulsante <b>Esporta</b> in alto a destra ➔ seleziona <b>CSV</b>.<br>
-      3. Carica il file scaricato direttamente in ARGUS senza modifiche.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Normalizza cambi EUR/USD/GBP, commissioni di negoziazione e converte gli ISIN europei in Ticker quotati.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> Intestazioni standard DeGiro (<i>Data, Ora, Prodotto, ISIN, Descrizione, Quantità, Prezzo, Valore, Commissioni</i>).</div>
-</div>
-
-<!-- 2. DIRECTA SIM -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔵 2. Directa SIM (dLite & Classic)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App / Web:</b> Entra in <b>dLite</b> o piattaforma <b>Classic</b> ➔ <b>Ordini ed Eseguiti</b> / <b>Estratto Conto Titoli</b>.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7dd3fc; font-size: 13px;">
-      1. Seleziona le operazioni storiche concluse nel periodo desiderato.<br>
-      2. Clicca sull'icona di esportazione <b>CSV / Excel</b>.<br>
-      3. Se esportato in Excel, salva con nome in formato <b>CSV (delimitato da virgole)</b>.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Gestisce la notazione contabile italiana (COMPRA/VENDE, virgole decimali, dividendi e frazionamenti azionari).</div>
-  <div><b>🔍 Formato Riconosciuto:</b> Tracciati tabellari Directa dLite / Libera / Classic con codici ISIN o ticker MTA/US.</div>
-</div>
-
-<!-- 3. FINECO BANK -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(248,81,73,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #f85149; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔴 3. Fineco Bank (Reportistica Portafoglio)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'Area Riservata:</b> Accedi a <b>Portafoglio</b> ➔ <b>Reportistica Trading</b> ➔ <b>Ordini Eseguiti / Movimenti</b>.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(248,81,73,0.08); border-left: 3px solid #f85149; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #fca5a5; font-size: 13px;">
-      1. Imposta la data di inizio dalla prima transazione a oggi.<br>
-      2. Clicca su <b>Esporta in formato CSV / Testo</b>.<br>
-      3. Trascina il file nell'area di upload di ARGUS.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Riconosce le causali bancarie Fineco, scorpora le ritenute fiscali e converte gli ISIN di Borsa Italiana ed esteri.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> Estratti conto ordini eseguiti Fineco Bank con colonne ISIN, Descrizione Titolo, Operazione, Quantità e Prezzo.</div>
-</div>
-
-<!-- 4. INTERACTIVE BROKERS -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,123,114,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff7b72; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟠 4. Interactive Brokers - IBKR (Activity Statement & Flex Query)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nel Client Portal:</b> Vai su <b>Performance & Reports</b> ➔ <b>Statements</b> (oppure <i>Flex Queries</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(255,123,114,0.08); border-left: 3px solid #ff7b72; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffa198; font-size: 13px;">
-      1. Seleziona <b>Activity Statement</b> ➔ periodo <i>Custom Date Range</i>.<br>
-      2. Imposta il formato di download su <b>CSV</b>.<br>
-      3. In alternativa crea una Flex Query includendo la sezione <i>Trades (Eseguiti)</i>.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Supporta sia i file Activity multi-sezione complessi che i report tabellari Flex Query, estraendo automaticamente i ticker US/EU e le commissioni reali.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> Sezione 'Trades' di IBKR Activity Statement e Flex Query CSV.</div>
-</div>
-
-<!-- 5. TRADE REPUBLIC -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(63,185,80,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #3fb950; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟢 5. Trade Republic (Transazioni & PAC)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App / Web:</b> Vai nella sezione <b>Profilo</b> ➔ <b>Documenti & Attività</b>.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(63,185,80,0.08); border-left: 3px solid #3fb950; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7ee787; font-size: 13px;">
-      1. Esporta l'elenco riassuntivo delle transazioni e dei piani di accumulo (PAC).<br>
-      2. Scarica il file <b>CSV</b> delle attività.<br>
-      3. Carica il documento in ARGUS.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Mappa automaticamente gli ISIN dei PAC e degli acquisti frazionati in Italiano, Inglese e Tedesco.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> CSV Trade Republic con colonne Data, Tipo, Titolo, ISIN, Importo, Quote.</div>
-</div>
-
-<!-- 6. SCALABLE CAPITAL -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(88,166,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #58a6ff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔷 6. Scalable Capital (Transazioni & Baader Bank)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'Area Clienti:</b> Vai su <b>Profilo / Transazioni</b> (oppure al portale della banca depositaria <i>Baader Bank</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(88,166,255,0.08); border-left: 3px solid #58a6ff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #a5d6ff; font-size: 13px;">
-      1. Filtra per l'intervallo temporale completo del conto.<br>
-      2. Clicca su <b>Esporta CSV</b>.<br>
-      3. Inserisci il file nella Control Room ARGUS.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Elabora gli acquisti ordinari, i piani di risparmio automatizzati ETF e gli accrediti dei dividendi con tassazione estera.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> Export CSV Scalable Capital / Baader Bank.</div>
-</div>
-
-<!-- 7. ETORO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(46,160,67,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #2ea043; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟩 7. eToro (Account Statement & Closed Trades)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nel Portafoglio:</b> Vai su <b>Portafoglio</b> ➔ icona orologio <b>Cronologia</b> (<i>History</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(46,160,67,0.08); border-left: 3px solid #2ea043; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #56d364; font-size: 13px;">
-      1. Clicca sull'icona delle impostazioni in alto a destra ➔ <b>Estratto conto</b> (<i>Account Statement</i>).<br>
-      2. Seleziona l'intervallo temporale (es. <i>Dall'apertura conto</i>).<br>
-      3. Clicca su <b>CSV / Excel</b> per avviare il download.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Converte le posizioni chiuse in coppie BUY/SELL con gestione corretta delle commissioni di rollover/overnight e valuta USD.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> Fogli 'Closed Positions' e 'Account Activity' dell'Account Statement eToro.</div>
-</div>
-
-<!-- 8. REVOLUT TRADING -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(188,140,255,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #bc8cff; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🟪 8. Revolut Trading (Estratto Conto Transazioni)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Percorso nell'App Revolut:</b> Sezione <b>Investimenti / Trading</b> ➔ <b>Altro (...)</b> ➔ <b>Estratti conto</b> (<i>Statements</i>).</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Esportazione:</b>
-    <div style="background: rgba(188,140,255,0.08); border-left: 3px solid #bc8cff; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #d2a8ff; font-size: 13px;">
-      1. Scegli la voce <b>Estratto conto transazioni</b>.<br>
-      2. Imposta l'intervallo temporale completo.<br>
-      3. Seleziona il formato <b>CSV / Excel</b>.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Riconosce acquisti e vendite frazionate di azioni/ETF, commissioni di custodia e dividendi netti accreditati.</div>
-  <div><b>🔍 Formato Riconosciuto:</b> File CSV di Revolut Trading (Trading Statement).</div>
-</div>
-
-<!-- 9. GOOGLE SHEETS LIVE SYNC -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌐 9. Google Sheets Live Sync (Sincronizzazione Cloud)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Modalità:</b> Connessione automatica e sicura tramite Service Account Google.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura di Configurazione:</b>
-    <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7dd3fc; font-size: 13px;">
-      1. Condividi il tuo foglio Google con l'email del Service Account.<br>
-      2. Inserisci l'URL o il nome del foglio nella Control Room ARGUS.<br>
-      3. I tab <i>Azioni</i> e <i>Cripto</i> vengono sincronizzati e consolidati automaticamente.
-    </div>
-  </div>
-  <div style="margin-bottom: 6px;"><b>⚙️ Parser ARGUS:</b> Supporta il monitoraggio in tempo reale, la separazione automatica dei portafogli e l'integrazione nel Total Wealth.</div>
-</div>
-
-<!-- 10. CSV STANDARD ARGUS -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(139,148,158,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #8b949e; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📄 10. Template CSV Standard ARGUS (Schema Universale a 9 Colonne)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Utilizzo:</b> Ideale per broker non elencati o fogli di calcolo custom.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Schema delle Colonne:</b>
-    <div style="background: rgba(139,148,158,0.08); border-left: 3px solid #8b949e; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #c9d1d9; font-family: monospace; font-size: 12px;">
-      tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
-    </div>
-  </div>
-  <div><b>🔍 Valori Validi:</b><br>
-    • <b>tx_type:</b> BUY, SELL, DIVIDEND, SPLIT, DEPOSIT, WITHDRAWAL.<br>
-    • <b>currency:</b> EUR, USD, GBP, CHF, ecc.<br>
-    • <b>asset_class:</b> Equity, ETF, Fixed Income, Commodity, Crypto, Cash.
-  </div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="🌐 Ingestion Automatica Multi-Broker & Standard CSV",
+        what_is="Hub di ingestion unificato che accetta estratti conto ed eseguiti dai principali broker (DeGiro, Directa, Fineco, Interactive Brokers, Scalable, Trade Republic, eToro, Revolut, Google Sheets).",
+        how_calc="Schema Universale a 9 Colonne: tx_date, ticker, tx_type, quantity, price, currency, fees, asset_class, notes",
+        why_useful="Consolidare portafogli multi-broker e multi-valuta in un unico cockpit analitico senza dover formattare manualmente i dati.",
+        argus_calc="Auto-detection intelligente del tracciato broker, parsing multi-lingua, conversione automatica ISIN -> Ticker Yahoo Finance e normalizzazione cambi FX BCE.",
+        how_to_read="• 🟢 Export Diretto: esportare l'elenco transazioni complete dal broker in formato CSV e caricarlo direttamente<br>• 🟡 Formati personalizzati: mappare i campi nel template a 9 colonne<br>• 🔴 Errori di validazione: controllare la presenza di date e quantità valorizzate."
+    )
     render_info_modal(
         title="🌐 Guida Export Multi-Broker & Ingestion Hub",
         content=content,
@@ -2196,41 +2308,14 @@ def render_garch_fhs_modal(
     Renderizza un modale informativo istituzionale dedicato alla spiegazione
     della Volatilità Condizionale GARCH(1,1), dei cluster di volatilità e della Filtered Historical Simulation (FHS).
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. GARCH MODELLO -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚡ 1. Il Modello GARCH(1,1) (Bollerslev 1986)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Cattura i <i>Cluster di Volatilità</i> (Engle, Nobel 2003): periodi ad alta turbolenza tendono a persistere nel tempo.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Equazione della Varianza Condizionale:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-      &sigma;<sub>t</sub><sup>2</sup> = &omega; + &alpha; &epsilon;<sub>t&minus;1</sub><sup>2</sup> + &beta; &sigma;<sub>t&minus;1</sub><sup>2</sup>
-    </div>
-  </div>
-  <div><b>🔍 Parametri:</b><br>
-    • <b>&omega; (Baseline):</b> Varianza di fondo incondizionata.<br>
-    • <b>&alpha; (ARCH Shock):</b> Reattività all'ultimo shock di mercato (&epsilon;<sub>t&minus;1</sub>).<br>
-    • <b>&beta; (GARCH Memory):</b> Persistenza della volatilità passata (&sigma;<sub>t&minus;1</sub>).
-  </div>
-</div>
-
-<!-- 2. FHS -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Filtered Historical Simulation (FHS — Barone-Adesi, Hull-White)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Il gold standard per il calcolo del VaR e CVaR sotto Basilea III / FRTB. Unisce la reattività del GARCH alla flessibilità empirica non parametrica.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Procedura a 3 Fasi:</b>
-    <div style="background: rgba(56,189,248,0.08); border-left: 3px solid #38bdf8; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #7dd3fc; font-size: 13px;">
-      1. <b>De-volatilizzazione:</b> e<sub>t</sub> = (r<sub>t</sub> &minus; &mu;) / &sigma;<sub>t</sub> (preserva code grasse e skewness).<br>
-      2. <b>Re-scaling:</b> r<sub>sim</sub> = &mu; + e<sub>t</sub> &times; &sigma;<sub>T+1</sub> (adegua alla volatilità odierna).<br>
-      3. <b>Stima VaR/CVaR:</b> Calcolo quantili e Shortfall sulla distribuzione filtrata.
-    </div>
-  </div>
-  <div><b>🎯 Vantaggio:</b> Reagisce istantaneamente ai cambi di regime di mercato senza assumere una distribuzione gaussiana a campana.</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="⚡ Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)",
+        what_is="Modello econometrico avanzato (Bollerslev 1986, Barone-Adesi) per catturare i cluster di volatilità e stimare il VaR e CVaR condizionale.",
+        how_calc="σ_t^2 = ω + α * ε_{t-1}^2 + β * σ_{t-1}^2 &nbsp;|&nbsp; FHS Rescaling: r_sim = μ + e_t * σ_{T+1}",
+        why_useful="Superare i limiti della volatilità statica e dell'ipotesi gaussiana, reagendo istantaneamente all'insorgere di shock e turbolenze di mercato.",
+        argus_calc="Stima di massima verosimiglianza dei parametri (ω, α, β) sulla serie storica del portafoglio, de-volatilizzazione dei residui standardizzati e simulazione FHS su 252+ giorni.",
+        how_to_read="• 🟢 α + β < 1.0 (Modello stazionario e convergente)<br>• 🟡 α elevato (Alta sensibilità a shock recenti)<br>• 🔴 α + β ≥ 1.0 (Persistenza estrema della volatilità / Instabilità di mercato)."
+    )
     render_info_modal(
         title="⚡ Volatilità Condizionale GARCH(1,1) & FHS",
         content=content,
@@ -2247,34 +2332,14 @@ def render_volatility_smile_modal(
     Renderizza un modale informativo istituzionale dedicato alla spiegazione
     della Superficie di Volatilità Implicita, del Volatility Skew e dell'impatto sul Delta Hedging.
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. LIMITI BS & SMILE -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📐 1. Dai Limiti di Black-Scholes allo Smile di Mercato</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Black-Scholes assume una volatilità costante su tutti gli strike. Nella realtà, le Put Out-of-the-Money incorporano un premio per il rischio ribasso (<i>Crash Phobia</i>) quotando a volatilità implicita (&sigma;<sub>IV</sub>) superiore.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Calibrazione dello Skew Quadratico:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-      &sigma;(m) = a + b &times; m + c &times; m<sup>2</sup>, &nbsp; con moneyness m = ln(K / S<sub>0</sub>)
-    </div>
-  </div>
-  <div><b>🔍 Parametri:</b><br>
-    • <b>a (ATM Vol):</b> Livello base della volatilità At-The-Money.<br>
-    • <b>b (Skew Slope):</b> Pendenza asimmetrica negativa (domanda di hedging su ribassi).<br>
-    • <b>c (Curvature):</b> Curvatura convessa associata alla curtosi di mercato.
-  </div>
-</div>
-
-<!-- 2. DELTA HEDGING -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🛡️ 2. Impatto sul Delta-Hedging & Covered Call</div>
-  <div style="margin-bottom: 6px;"><b>1. Prezzo Corretto della Copertura:</b> Evita di sottostimare il costo delle Put OTM per proteggere il portafoglio.</div>
-  <div><b>2. Dimensionamento dei Contratti:</b> Calcola il Delta effettivo (&Delta;<sub>skew</sub>) garantendo la perfetta neutralità al rischio direzionale.</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="📐 Volatility Smile, Skew & Superficie 3D",
+        what_is="La struttura della volatilità implicita delle opzioni su diversi strike e scadenze, riflettente il premio richiesto dal mercato contro i rischi di crollo (Crash Phobia).",
+        how_calc="σ(m) = a + b * m + c * m^2, &nbsp; con moneyness m = ln(K / S_0)",
+        why_useful="Prezzare correttamente le opzioni Put Out-of-the-Money ed evitare di sottostimare il costo effettivo e il Delta di copertura di portafoglio.",
+        argus_calc="Inversione numerica della formula di Black-Scholes su catene di opzioni reali (o calibrate parametricamente) con fit parabolico per lo skew.",
+        how_to_read="• 🟢 Skew moderato (Mercato tranquillo, hedging standard)<br>• 🟡 Skew ripido (Forte domanda di Put protettive OTM)<br>• 🔴 Curvatura convessa elevata (Aspettative di shock estremi)."
+    )
     render_info_modal(
         title="📐 Volatility Smile, Skew & Superficie 3D",
         content=content,
@@ -2291,30 +2356,14 @@ def render_crypto_tax_modal(
     Renderizza un modale istituzionale con la guida completa alla fiscalità delle Cripto-Attività
     in Italia (Legge di Bilancio 197/2022, Circolare Agenzia delle Entrate 30/E/2023, Quadri RT/RW/IVAFE).
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. QUADRO RT -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📈 1. Quadro RT (Sez. II-B): Plusvalenze & Franchigia 2.000€</div>
-  <div style="margin-bottom: 6px;"><b>📌 Aliquota:</b> Imposta sostitutiva al <b>26%</b> sulle plusvalenze realizzate da conversione in valuta Fiat (es. BTC ➔ EUR) o acquisto beni/servizi.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Franchigia Annuale:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-      Se &sum; (Plusvalenze &minus; Minusvalenze) &le; 2.000€ &rArr; Imposta Dovuta = 0€
-    </div>
-  </div>
-  <div><b>🔍 Zainetto Fiscale:</b> Le minusvalenze eccedenti i 2.000€ sono riportabili nei <b>4 anni successivi</b> (esclusivamente compensabili con future plusvalenze cripto).</div>
-</div>
-
-<!-- 2. QUADRO RW & IVAFE -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌐 2. Quadro RW & Imposta sul Valore (IVAFE Cripto 0,20%)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Monitoraggio Fiscale:</b> Obbligo dichiarativo con <b>Codice 21</b> per exchange esteri e chiavette hardware (Ledger/Trezor/MetaMask).</div>
-  <div><b>📐 Imposta sul Valore (0,20% annuo):</b> Valore al 31/12 &times; 0,002 &times; (Giorni di possesso / 365).</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="🪙 Fiscalità Cripto-Attività (Legge 197/2022 & Agenzia Entrate)",
+        what_is="La normativa fiscale italiana per le plusvalenze su criptovalute, monitoraggio fiscale estero e imposta sul valore delle cripto-attività.",
+        how_calc="Quadro RT: Plusvalenze > 2.000€ tassate al 26% &nbsp;|&nbsp; Quadro RW: Monitoraggio fiscale &nbsp;|&nbsp; IVAFE: 0.20% annuo sul controvalore al 31/12",
+        why_useful="Garantire la piena conformità tributaria, calcolare la franchigia annuale di 2.000€ e tracciare le minusvalenze riportabili per 4 anni.",
+        argus_calc="Tracciamento FIFO per singolo wallet/exchange con conversione in EUR al cambio del giorno della transazione e calcolo automatico dello zainetto cripto.",
+        how_to_read="• 🟢 Plusvalenze nette ≤ 2.000€ (Franchigia applicata, imposta = 0€)<br>• 🟡 Plusvalenze nette > 2.000€ (Imposta sostitutiva del 26% sull'intero importo)<br>• 🔴 Minusvalenze eccedenti i 2.000€ (Riportabili nel Quadro RT fino al 4° anno successivo)."
+    )
     render_info_modal(
         title="🪙 Fisco Cripto-Attività (L. 197/2022)",
         content=content,
@@ -2331,37 +2380,14 @@ def render_fama_french_modal(
     Renderizza un modale istituzionale con la guida teorica ed econometrica
     ai Modelli Fattoriali di Fama-French (1993, 2015) e Carhart (1997).
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. REGRESSIONE FATTORIALE -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🏛️ 1. L'Equazione di Regressione Econometrica</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Estende il CAPM spiegando che il rendimento di un portafoglio è guidato da molteplici premi al rischio sistematici indipendenti.</div>
-  <div style="margin-bottom: 6px;"><b>📐 Modello Fama-French 5-Factor + Momentum:</b>
-    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-      R<sub>p</sub> &minus; R<sub>f</sub> = &alpha; + &beta;<sub>MKT</sub>(R<sub>m</sub> &minus; R<sub>f</sub>) + &beta;<sub>SMB</sub>SMB + &beta;<sub>HML</sub>HML + &beta;<sub>RMW</sub>RMW + &beta;<sub>CMA</sub>CMA + &beta;<sub>MOM</sub>MOM
-    </div>
-  </div>
-  <div><b>🔍 I 6 Fattori:</b><br>
-    • <b>MKT-RF:</b> Premio per il rischio azionario di mercato.<br>
-    • <b>SMB (Size):</b> Small Caps vs Mega Caps.<br>
-    • <b>HML (Value):</b> Titoli Value (alto B/M) vs Growth (basso B/M).<br>
-    • <b>RMW (Profitability):</b> Alta redditività operativa vs aziende con margini deboli.<br>
-    • <b>CMA (Investment):</b> Politiche di investimento prudenti vs espansione aggressiva.<br>
-    • <b>MOM (Momentum):</b> Persistenza del trend di prezzo a 12 mesi.
-  </div>
-</div>
-
-<!-- 2. ATTRIBUZIONE -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🎯 2. Significatività Statistica & Alpha Puro</div>
-  <div style="margin-bottom: 6px;"><b>Alpha (&alpha;):</b> Misura l'abilità di selezione attiva pura del gestore non spiegata dai fattori sistematici.</div>
-  <div><b>Test t & p-value:</b> Se |t| &ge; 1.96 (p < 0.05), l'esposizione al fattore è <b>statisticamente significativa al 95%</b>.</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="🏛️ Fama-French 5-Factor & Carhart Momentum",
+        what_is="Modello econometrico di scomposizione del rendimento in fattori sistematici di rischio: Mercato (MKT), Dimensione (SMB), Valore (HML), Redditività (RMW), Investimento (CMA) e Momentum (MOM).",
+        how_calc="R_p - R_f = α + β_MKT*(R_m - R_f) + β_SMB*SMB + β_HML*HML + β_RMW*RMW + β_CMA*CMA + β_MOM*MOM",
+        why_useful="Spiegare le reali determinanti della performance ed evitare di pagare costi di gestione attiva per esposizioni fattoriali replicabili passivamente.",
+        argus_calc="Regressione multivariata OLS su serie storiche sincronizzate dei fattori Kenneth French / MSCI, con test t di Student e p-value al 95%.",
+        how_to_read="• 🟢 β_SMB > 0 (Inclinazione Small Cap) | β_HML > 0 (Inclinazione Value) | β_MOM > 0 (Inclinazione Momentum)<br>• 🟡 |t-stat| ≥ 1.96 (Esposizione statisticamente significativa)<br>• 🟢 α > 0 (Vera abilità di stock picking non spiegata dai fattori)."
+    )
     render_info_modal(
         title="🏛️ Fama-French 5-Factor & Carhart Momentum",
         content=content,
@@ -2378,31 +2404,14 @@ def render_sec_rag_modal(
     Renderizza un modale istituzionale con la guida all'analisi dei bilanci SEC Form 10-K/10-Q
     e all'architettura Local RAG (Retrieval-Augmented Generation).
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. FORM 10-K -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📑 1. La Struttura dei Bilanci Annuali SEC Form 10-K</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Documenti contabili e legali ufficiali depositati presso la SEC da tutte le società quotate a Wall Street.</div>
-  <div><b>🔍 Sezioni Chiave Estratte:</b><br>
-    • <b>Item 1A (Risk Factors):</b> Vulnerabilità operative, geopolitiche, legali e di concentrazione clienti.<br>
-    • <b>Item 7 (MD&A):</b> Spiegazione del management su ricavi, margini e liquidità futura.<br>
-    • <b>Item 7A (Market Risk):</b> Sensibilità a tassi d'interesse, cambi valutari e materie prime.<br>
-    • <b>Item 8 (Financial Footnotes):</b> Note al debito, maturity schedule e contenziosi legali.
-  </div>
-</div>
-
-<!-- 2. LOCAL RAG -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚙️ 2. Architettura Local RAG in ARGUS</div>
-  <div style="margin-bottom: 6px;"><b>1. Semantic Chunking:</b> Segmentazione per blocchi logici omogenei con metadati di sezione.</div>
-  <div style="margin-bottom: 6px;"><b>2. Vector Indexing BM25/Cosine:</b> Ricerca semantica locale ad altissima velocità e privacy totale.</div>
-  <div><b>3. Grounded Synthesis:</b> Risposte ancorate rigorosamente ai passaggi ufficiali del bilancio con citazione del paragrafo.</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="🔍 SEC Filing Vector Store & Local RAG Architecture",
+        what_is="Motore di ricerca semantica vettoriale e intelligenza artificiale locale ancorata ai bilanci ufficiali SEC Form 10-K (annuali) e 10-Q (trimestrali).",
+        how_calc="Pipeline RAG: Chunking Semantico per Sezioni (Item 1A Risk Factors, Item 7 MD&A, Item 8 Note) -> Embedding vettoriali -> Ricerca Cosine/BM25 -> Grounded Synthesis",
+        why_useful="Estrarre istantaneamente rischi aziendali, guidance del management, impegni di debito e contenziosi legali senza allucinazioni.",
+        argus_calc="Archiviazione vettoriale locale embedded, filtraggio per sezione contabile e citazione puntuale del paragrafo del bilancio ufficiale.",
+        how_to_read="• 🟢 Risposte verificate con citazione diretta della sezione (Item 1A, Item 7, Item 8)<br>• 🟡 Sezioni contabili parzialmente indicizzate<br>• 🔴 Documento non presente nel database locale SEC."
+    )
     render_info_modal(
         title="🔍 SEC Filing Vector Store & Local RAG",
         content=content,
@@ -2419,28 +2428,14 @@ def render_duckdb_modal(
     Renderizza un modale istituzionale con la guida all'architettura OLAP DuckDB,
     all'esecuzione vettorizzata SIMD e all'archiviazione colonnare in Apache Parquet.
     """
-    content = """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-
-<!-- 1. OLTP VS OLAP -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">⚡ 1. OLTP (Righe) vs OLAP (DuckDB Colonnare)</div>
-  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> DuckDB è un motore analitico embedded in memoria RAM, ottimizzato per query aggregate complesse e scansioni colonnari sub-millisecondo.</div>
-  <div><b>🔍 Vantaggi Architetturali:</b><br>
-    • <b>Esecuzione Vettorizzata SIMD:</b> Processa vettori di dati in parallelo sfruttando le istruzioni hardware della CPU (AVX-2).<br>
-    • <b>Zero-Copy Data Transfer:</b> Compatibilità nativa con Apache Arrow per trasferire dati senza duplicazione di memoria.
-  </div>
-</div>
-
-<!-- 2. ANALISI AVANZATA -->
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px; margin-bottom: 12px;">
-  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">📊 2. Cubi Multi-Dimensionali & Storage Parquet</div>
-  <div style="margin-bottom: 6px;"><b>Cubi OLAP (`GROUPING SETS`):</b> Calcolo simultaneo dei subtotali su Asset Class &times; Settore &times; Valuta in un'unica scansione.</div>
-  <div><b>Compressione Parquet (fino all'85%):</b> Formato colonnare ad alta densità con encoding snappato per archiviazione istantanea.</div>
-</div>
-
-</div>
-"""
+    content = format_institutional_5point_html(
+        title="⚡ Motore Analitico DuckDB OLAP & Storage Parquet",
+        what_is="Database analitico colonnare in-process ultra-veloce integrato in ARGUS per aggregazioni multi-dimensionali istantanee su grandi volumi di dati.",
+        how_calc="Architettura Colonnare Vettorizzata: Esecuzione istruzioni CPU SIMD (AVX-2) + Zero-Copy Data Transfer via Apache Arrow + Compressione Snappy Parquet",
+        why_useful="Eseguire cubi analitici (GROUPING SETS) e stress testing temporali in frazioni di secondo senza sovraccaricare la memoria.",
+        argus_calc="Query analitiche SQL eseguite direttamente sui file Parquet compressi o in memoria RAM con allocazione dinamica dei thread CPU.",
+        how_to_read="• 🟢 Query time < 5ms su milioni di righe storiche<br>• 🟡 Scansione su file Parquet su disco<br>• 🔴 Fallback su scansione sequenziale riga per riga."
+    )
     render_info_modal(
         title="⚡ Motore Analitico DuckDB & Parquet",
         content=content,
