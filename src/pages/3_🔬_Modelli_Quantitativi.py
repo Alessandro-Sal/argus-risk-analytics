@@ -79,11 +79,11 @@ if "run_id" in st.session_state:
     st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Frontiera Markowitz/Ledoit-Wolf, Equal Risk Contribution, Tail Copula, Kelly Sizing, Monte Carlo e Black-Scholes.")
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
-col_head1, col_head2 = st.columns([3.5, 1.2])
+col_head1, col_head2 = st.columns([3.0, 1.4])
 with col_head1:
     render_executive_badges(m)
 with col_head2:
-    st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="display: flex; justify-content: flex-end; margin-top: 2px;">', unsafe_allow_html=True)
     glossary_modal("📚 Glossario Istituzionale dei Modelli Quantitativi", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -118,6 +118,7 @@ with col_head2:
 
 </div>
 """, button_label="📚 Glossario Modelli Quantitativi")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
