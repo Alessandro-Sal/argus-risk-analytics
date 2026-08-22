@@ -592,6 +592,14 @@ else:
 
         with col_v2:
             if not df_prof.empty:
+                col_vh1, col_vh2 = st.columns([1.8, 1.2])
+                with col_vh1:
+                    st.markdown("##### 📊 Nodi di Prezzo & Fasce Volumetriche")
+                with col_vh2:
+                    csv_vp = df_prof.to_csv(index=False).encode('utf-8')
+                    tk_slug = target_ticker.lower().replace(" ", "_").replace(":", "_").replace("/", "_")
+                    st.download_button("📥 Scarica CSV", data=csv_vp, file_name=f"volume_profile_{tk_slug}.csv", mime="text/csv", use_container_width=True, key="btn_download_volume_profile")
+
                 df_table = pd.DataFrame({
                     "Livello Prezzo": df_prof["price_bin_mid"].map(lambda v: f"€ {v:.2f}"),
                     "Fascia Minima": df_prof["price_bin_min"].map(lambda v: f"€ {v:.2f}"),
@@ -661,6 +669,12 @@ else:
 
             df_factors = pd.DataFrame(confluence_res["factors"])
             if not df_factors.empty:
+                col_cfh1, col_cfh2 = st.columns([1.8, 1.2])
+                with col_cfh1:
+                    st.caption("Fattori di confluenza quantitativi")
+                with col_cfh2:
+                    csv_fac = df_factors.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Fattori CSV", data=csv_fac, file_name=f"confluence_fattori_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_download_confluence_factors")
                 df_factors_display = df_factors.rename(columns={
                     "indicator": "Indicatore",
                     "status": "Segnale / Stato",
@@ -670,9 +684,14 @@ else:
                 st.dataframe(df_factors_display, use_container_width=True, hide_index=True, height=270)
 
         with col_patt:
-            st.markdown("#### 🕯️ Pattern Candlestick Algoritmici Rilevati")
+            col_pth1, col_pth2 = st.columns([2.0, 1.2])
+            with col_pth1:
+                st.markdown("#### 🕯️ Pattern Candlestick Rilevati")
             if patterns_res:
                 df_patt = pd.DataFrame(patterns_res)
+                with col_pth2:
+                    csv_patt = df_patt.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Pattern CSV", data=csv_patt, file_name=f"pattern_candlestick_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_download_candlestick_patterns")
                 df_patt_display = df_patt.rename(columns={
                     "date": "Data",
                     "pattern": "Pattern",
