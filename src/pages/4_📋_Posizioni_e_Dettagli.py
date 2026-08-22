@@ -1039,7 +1039,9 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
             st.markdown("##### 🔍 Chi Paga per Singolo Mese")
             
             month_options = ["Tutti i Mesi con Incassi", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
-            selected_m = st.selectbox("Seleziona Mese da Ispezionare:", options=month_options, index=0, key="select_div_month_focus")
+            col_m_sel, col_m_btn = st.columns([2.0, 1.1])
+            with col_m_sel:
+                selected_m = st.selectbox("Seleziona Mese da Ispezionare:", options=month_options, index=0, key="select_div_month_focus")
             
             if selected_m == "Tutti i Mesi con Incassi":
                 if not df_events.empty and "month_num" in df_events.columns and "installment_payout_eur" in df_events.columns:
@@ -1047,9 +1049,23 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                     df_disp_ev = active_events[["month_name", "ticker", "installment_payout_eur", "annual_payout_eur"]].rename(columns={
                         "month_name": "Mese", "ticker": "Asset", "installment_payout_eur": "Stacco", "annual_payout_eur": "Tot. Annuo"
                     })
+                    with col_m_btn:
+                        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                        csv_m = df_disp_ev.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Scarica CSV", data=csv_m, file_name="dividendi_per_mese.csv", mime="text/csv", use_container_width=True, key="btn_download_div_m_all")
+
+                    ev_cfg = {
+                        "Mese": st.column_config.TextColumn("Mese", width="small"),
+                        "Asset": st.column_config.TextColumn("Asset", width="small"),
+                        "Stacco": st.column_config.NumberColumn("Stacco Singolo", format="€ %.2f"),
+                        "Tot. Annuo": st.column_config.NumberColumn("Tot. Annuo", format="€ %.2f")
+                    }
                     st.dataframe(
-                        df_disp_ev.style.format({"Stacco": "€ {:.2f}", "Tot. Annuo": "€ {:.2f}"}),
-                        use_container_width=True, hide_index=True, height=240
+                        df_disp_ev,
+                        column_config=ev_cfg,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=280
                     )
                 else:
                     st.info("Nessun dividendo previsto nel portafoglio.")
@@ -1062,13 +1078,27 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
 
                 if not m_events.empty:
                     tot_m = m_events["installment_payout_eur"].sum()
-                    st.success(f"🗓️ **{selected_m}**: Incasso Totale Stimato di **€ {tot_m:,.2f}**")
                     df_disp_ev = m_events[["ticker", "dividend_yield_pct", "installment_payout_eur", "annual_payout_eur"]].rename(columns={
                         "ticker": "Asset", "dividend_yield_pct": "Yield %", "installment_payout_eur": "Stacco", "annual_payout_eur": "Tot. Annuo"
                     })
+                    with col_m_btn:
+                        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                        csv_m = df_disp_ev.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Scarica CSV", data=csv_m, file_name=f"dividendi_{selected_m.lower()}.csv", mime="text/csv", use_container_width=True, key=f"btn_download_div_m_{m_num}")
+
+                    st.success(f"🗓️ **{selected_m}**: Incasso Totale Stimato di **€ {tot_m:,.2f}**")
+                    ev_cfg = {
+                        "Asset": st.column_config.TextColumn("Asset", width="small"),
+                        "Yield %": st.column_config.NumberColumn("Yield Dividendo", format="%.2f%%"),
+                        "Stacco": st.column_config.NumberColumn("Stacco Singolo", format="€ %.2f"),
+                        "Tot. Annuo": st.column_config.NumberColumn("Tot. Annuo", format="€ %.2f")
+                    }
                     st.dataframe(
-                        df_disp_ev.style.format({"Yield %": "{:.2f}%", "Stacco": "€ {:.2f}", "Tot. Annuo": "€ {:.2f}"}),
-                        use_container_width=True, hide_index=True, height=200
+                        df_disp_ev,
+                        column_config=ev_cfg,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=240
                     )
                 else:
                     st.info(f"ℹ️ Nessun titolo in portafoglio prevede stacchi di dividendo nel mese di **{selected_m}**.")
