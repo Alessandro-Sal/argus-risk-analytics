@@ -1875,33 +1875,58 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
                 
             st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
             
-            # Tabella Chandelier Exit Glassmorphic (ordinata per urgenza di rischio)
+            # Tabella Interattiva Chandelier Exit
             df_atr_disp = df_atr_disp.sort_values(by="distance_pct", ascending=True)
-            rows_atr_list = []
-            for _, r_a in df_atr_disp.iterrows():
-                t_code = str(r_a.get("ticker", ""))
-                p_mkt = float(r_a.get("last_price", 0.0))
-                atr_v = float(r_a.get("atr_14", 0.0))
-                hi_v = float(r_a.get("highest_high_22", 0.0))
-                stop_v = float(r_a.get("chandelier_stop", 0.0))
-                dist_v = float(r_a.get("distance_pct", 0.0))
-                is_trig = bool(r_a.get("stop_triggered", False)) or (p_mkt < stop_v) or (dist_v < 0)
-                
-                if is_trig:
-                    status_badge = '<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🔴 TRIGGER</span>'
-                    dist_txt = f'<span style="color: #f87171; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
+            
+            def _resolve_atr_status(row):
+                p_mkt = float(row.get("last_price", 0.0))
+                stop_v = float(row.get("chandelier_stop", 0.0))
+                dist_v = float(row.get("distance_pct", 0.0))
+                if bool(row.get("stop_triggered", False)) or (p_mkt < stop_v) or (dist_v < 0):
+                    return "🔴 TRIGGER (Violazione)"
                 elif dist_v < 4.0:
-                    status_badge = '<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🟡 VICINO STOP</span>'
-                    dist_txt = f'<span style="color: #facc15; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
-                else:
-                    status_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 3px 10px; border-radius: 10px; font-weight: 700; font-size: 11px; white-space: nowrap;">🟢 REGOLARE</span>'
-                    dist_txt = f'<span style="color: #4ade80; font-weight: 700; font-family: monospace;">{dist_v:+.2f}%</span>'
-                    
-                row_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:44px;"><td style="color:#ffffff;font-weight:700;padding:8px 14px;font-family:monospace;">{t_code}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {p_mkt:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {atr_v:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">€ {hi_v:,.2f}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {stop_v:,.2f}</td><td style="text-align:center;padding:8px 14px;">{dist_txt}</td><td style="padding:8px 14px;white-space:nowrap;">{status_badge}</td></tr>'
-                rows_atr_list.append(row_str)
-                
-            table_atr_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;max-height:440px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:15%;">TICKER</th><th style="text-align:left;padding:8px 14px;width:16%;">PREZZO MKT (€)</th><th style="text-align:left;padding:8px 14px;width:14%;">ATR 14G (€)</th><th style="text-align:left;padding:8px 14px;width:15%;">MAX 22G (€)</th><th style="text-align:left;padding:8px 14px;width:16%;">CHANDELIER STOP (€)</th><th style="text-align:center;padding:8px 14px;width:12%;">DISTANZA %</th><th style="text-align:left;padding:8px 14px;width:12%;">STATO ALERT</th></tr></thead><tbody>{"".join(rows_atr_list)}</tbody></table></div>'
-            st.markdown(table_atr_html, unsafe_allow_html=True)
+                    return "🟡 VICINO STOP (< 4%)"
+                return "🟢 REGOLARE (Trend Intatto)"
+
+            df_atr_table = pd.DataFrame({
+                "Ticker": df_atr_disp["ticker"].astype(str),
+                "Prezzo Mkt (€)": df_atr_disp["last_price"].astype(float),
+                "ATR 14G (€)": df_atr_disp["atr_14"].astype(float),
+                "Max 22G (€)": df_atr_disp["highest_high_22"].astype(float),
+                "Chandelier Stop (€)": df_atr_disp["chandelier_stop"].astype(float),
+                "Distanza dallo Stop %": df_atr_disp["distance_pct"].astype(float),
+                "Stato Alert": df_atr_disp.apply(_resolve_atr_status, axis=1)
+            })
+
+            col_atr_tb1, col_atr_tb2, col_atr_tb3 = st.columns([2.4, 1.2, 0.9])
+            with col_atr_tb1:
+                st.markdown("##### 📋 Dettaglio Livelli Chandelier Stop per Posizione")
+            with col_atr_tb2:
+                search_atr = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_risk_atr", label_visibility="collapsed")
+            with col_atr_tb3:
+                csv_atr = df_atr_table.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_atr, file_name="atr_chandelier_stops.csv", mime="text/csv", use_container_width=True, key="btn_download_risk_atr")
+
+            df_atr_filt = df_atr_table.copy()
+            if search_atr:
+                df_atr_filt = df_atr_filt[df_atr_filt["Ticker"].str.contains(search_atr.strip(), case=False, na=False)]
+
+            atr_col_config = {
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Prezzo Mkt (€)": st.column_config.NumberColumn("Prezzo Mkt (€)", format="€ %.2f"),
+                "ATR 14G (€)": st.column_config.NumberColumn("ATR 14G (€)", format="€ %.2f"),
+                "Max 22G (€)": st.column_config.NumberColumn("Max 22G (€)", format="€ %.2f"),
+                "Chandelier Stop (€)": st.column_config.NumberColumn("Chandelier Stop (€)", format="€ %.2f"),
+                "Distanza dallo Stop %": st.column_config.NumberColumn("Distanza dallo Stop %", format="%+.2f%%"),
+                "Stato Alert": st.column_config.TextColumn("Stato Alert", width="medium")
+            }
+
+            st.dataframe(
+                df_atr_filt,
+                column_config=atr_col_config,
+                use_container_width=True,
+                hide_index=True
+            )
         else:
             st.info("Dati storici sui prezzi insufficienti per il calcolo dell'ATR.")
 
