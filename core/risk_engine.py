@@ -1394,22 +1394,36 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
     common_tickers = [t for t in active_tickers if t in df_returns.columns]
     
     # 1. K-Means Clustering on Assets (Risk vs Return)
-    valid_returns = df_returns[common_tickers].dropna(how="all")
+    valid_returns = df_returns[common_tickers].replace([np.inf, -np.inf], np.nan).dropna(how="all")
+    # Filtro spikes per evitare anomalie da split o valute
+    valid_returns = valid_returns.clip(lower=-0.75, upper=2.0)
     
-    if not valid_returns.empty and len(common_tickers) >= 3:
-        # Volatilità annua e CAGR stimato per asset
-        asset_vol = valid_returns.std() * np.sqrt(TRADING_DAYS_YEAR)
-        asset_cagr = (1 + valid_returns.mean()) ** TRADING_DAYS_YEAR - 1
+    if not valid_returns.empty and len(common_tickers) >= 2:
+        # Volatilità annua e CAGR stimato per asset (in scala decimale, es. 0.20 per 20%)
+        asset_vol = (valid_returns.std() * np.sqrt(TRADING_DAYS_YEAR)).clip(0.001, 3.0)
+        mean_r = valid_returns.mean().clip(lower=-0.05, upper=0.05)
+        asset_cagr = ((1 + mean_r) ** TRADING_DAYS_YEAR - 1).clip(-0.90, 5.0)
         
-        features = pd.DataFrame({'volatility': asset_vol, 'cagr': asset_cagr}).dropna()
+        features = pd.DataFrame({'volatility': asset_vol, 'cagr': asset_cagr})
+        features = features.replace([np.inf, -np.inf], np.nan).dropna()
+        features = features[np.isfinite(features).all(axis=1)]
         features.index.name = "ticker"
-        if len(features) >= 3:
-            n_clusters = min(3, len(features))
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-            features['cluster'] = kmeans.fit_predict(features)
-            
-            clusters_list = features.reset_index().to_dict(orient="records")
-            insights["asset_clusters"] = clusters_list
+        if len(features) >= 2:
+            try:
+                # Scalatura delle feature per equilibrare varianza e rendimento
+                X = features[['volatility', 'cagr']].values
+                std_X = X.std(axis=0)
+                std_X[std_X == 0] = 1.0
+                X_scaled = (X - X.mean(axis=0)) / std_X
+                
+                n_clusters = min(3, len(features))
+                kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+                features['cluster'] = kmeans.fit_predict(X_scaled)
+                
+                clusters_list = features.reset_index().to_dict(orient="records")
+                insights["asset_clusters"] = clusters_list
+            except Exception:
+                insights["asset_clusters"] = []
         else:
             insights["asset_clusters"] = []
     else:

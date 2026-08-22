@@ -1830,32 +1830,54 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
                 active_t = pos_active[pos_active["qty_net"] > 0]["ticker"].tolist() if (isinstance(pos_active, pd.DataFrame) and not pos_active.empty and "qty_net" in pos_active.columns) else df_returns_all.columns.tolist()
                 common_t = [t for t in active_t if t in df_returns_all.columns]
                 if len(common_t) >= 2:
-                    v_rets = df_returns_all[common_t].dropna(how="all")
-                    vol_s = v_rets.std() * np.sqrt(252)
-                    cagr_s = (1 + v_rets.mean()) ** 252 - 1
-                    f_df = pd.DataFrame({'volatility': vol_s, 'cagr': cagr_s}).dropna()
+                    v_rets = df_returns_all[common_t].replace([np.inf, -np.inf], np.nan).dropna(how="all")
+                    v_rets = v_rets.clip(lower=-0.75, upper=2.0)
+                    vol_s = (v_rets.std() * np.sqrt(252)).clip(0.001, 3.0)
+                    mean_r = v_rets.mean().clip(lower=-0.05, upper=0.05)
+                    cagr_s = ((1 + mean_r) ** 252 - 1).clip(-0.90, 5.0)
+                    f_df = pd.DataFrame({'volatility': vol_s, 'cagr': cagr_s})
+                    f_df = f_df.replace([np.inf, -np.inf], np.nan).dropna()
+                    f_df = f_df[np.isfinite(f_df).all(axis=1)]
                     f_df.index.name = "ticker"
                     if len(f_df) >= 2:
-                        from sklearn.cluster import KMeans
-                        n_c = min(3, len(f_df))
-                        km = KMeans(n_clusters=n_c, random_state=42, n_init=10)
-                        f_df['cluster'] = km.fit_predict(f_df)
-                        clusters = f_df.reset_index().to_dict(orient="records")
+                        try:
+                            from sklearn.cluster import KMeans
+                            X = f_df[['volatility', 'cagr']].values
+                            std_X = X.std(axis=0)
+                            std_X[std_X == 0] = 1.0
+                            X_scaled = (X - X.mean(axis=0)) / std_X
+                            n_c = min(3, len(f_df))
+                            km = KMeans(n_clusters=n_c, random_state=42, n_init=10)
+                            f_df['cluster'] = km.fit_predict(X_scaled)
+                            clusters = f_df.reset_index().to_dict(orient="records")
+                        except Exception:
+                            clusters = []
             
             # 2. Prova di calcolo da df_prices se df_returns era vuoto
             if (not clusters or len(clusters) == 0) and isinstance(df_prices_all, pd.DataFrame) and not df_prices_all.empty and "ticker" in df_prices_all.columns and "close" in df_prices_all.columns:
-                p_piv = df_prices_all.pivot_table(index="price_date", columns="ticker", values="close").pct_change().dropna(how="all")
+                p_piv = df_prices_all.pivot_table(index="price_date", columns="ticker", values="close").pct_change()
+                p_piv = p_piv.replace([np.inf, -np.inf], np.nan).dropna(how="all").clip(lower=-0.75, upper=2.0)
                 if not p_piv.empty and len(p_piv.columns) >= 2:
-                    vol_s = p_piv.std() * np.sqrt(252)
-                    cagr_s = (1 + p_piv.mean()) ** 252 - 1
-                    f_df = pd.DataFrame({'volatility': vol_s, 'cagr': cagr_s}).dropna()
+                    vol_s = (p_piv.std() * np.sqrt(252)).clip(0.001, 3.0)
+                    mean_p = p_piv.mean().clip(lower=-0.05, upper=0.05)
+                    cagr_s = ((1 + mean_p) ** 252 - 1).clip(-0.90, 5.0)
+                    f_df = pd.DataFrame({'volatility': vol_s, 'cagr': cagr_s})
+                    f_df = f_df.replace([np.inf, -np.inf], np.nan).dropna()
+                    f_df = f_df[np.isfinite(f_df).all(axis=1)]
                     f_df.index.name = "ticker"
                     if len(f_df) >= 2:
-                        from sklearn.cluster import KMeans
-                        n_c = min(3, len(f_df))
-                        km = KMeans(n_clusters=n_c, random_state=42, n_init=10)
-                        f_df['cluster'] = km.fit_predict(f_df)
-                        clusters = f_df.reset_index().to_dict(orient="records")
+                        try:
+                            from sklearn.cluster import KMeans
+                            X = f_df[['volatility', 'cagr']].values
+                            std_X = X.std(axis=0)
+                            std_X[std_X == 0] = 1.0
+                            X_scaled = (X - X.mean(axis=0)) / std_X
+                            n_c = min(3, len(f_df))
+                            km = KMeans(n_clusters=n_c, random_state=42, n_init=10)
+                            f_df['cluster'] = km.fit_predict(X_scaled)
+                            clusters = f_df.reset_index().to_dict(orient="records")
+                        except Exception:
+                            clusters = []
 
         if clusters and len(clusters) > 0:
             df_cl = pd.DataFrame(clusters)
@@ -1864,11 +1886,19 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             elif "ticker" not in df_cl.columns:
                 df_cl["ticker"] = [f"Asset {i+1}" for i in range(len(df_cl))]
 
-            # Normalizzazione scala percentuale se necessario
-            if df_cl["volatility"].max() <= 2.5:
+            # Sanitizzazione preventiva valori
+            df_cl = df_cl.replace([np.inf, -np.inf], np.nan).dropna(subset=["volatility", "cagr"])
+            df_cl["volatility"] = pd.to_numeric(df_cl["volatility"], errors="coerce").fillna(0.0)
+            df_cl["cagr"] = pd.to_numeric(df_cl["cagr"], errors="coerce").fillna(0.0)
+
+            # Rilevamento scala percentuale basato sulla mediana dei valori (robusto contro outlier)
+            is_decimal = float(df_cl["volatility"].median()) < 2.0
+            if is_decimal:
                 df_cl["volatility"] = df_cl["volatility"] * 100.0
-            if df_cl["cagr"].abs().max() <= 2.5:
                 df_cl["cagr"] = df_cl["cagr"] * 100.0
+
+            df_cl["volatility"] = df_cl["volatility"].clip(lower=0.1, upper=250.0)
+            df_cl["cagr"] = df_cl["cagr"].clip(lower=-99.0, upper=500.0)
 
             # Dynamic meaningful cluster naming based on average volatility
             stats = df_cl.groupby("cluster")[["volatility", "cagr"]].mean()
