@@ -1881,7 +1881,7 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
         <div style="font-size: 14px; line-height: 1.55; margin: 0; color: #c9d1d9;">{safe_help_text}</div>
     </div>
 </div>"""
-    label_html = f'<div class="metric-label" style="display:flex; align-items:center; justify-content:space-between;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{label}">{label}</span><label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
+    label_html = f'<div class="metric-label" style="display:flex; align-items:center; justify-content:space-between; gap:6px;"><span>{label}</span><label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
 
     st.markdown(f"""{modal_html}
 <div class="metric-card">

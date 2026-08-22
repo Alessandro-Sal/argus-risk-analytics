@@ -1344,15 +1344,17 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 
         st.markdown(f"#### 🎯 Verdetto Valutazione: {dcf_res['recommendation']}")
 
-        dk1, dk2, dk3, dk4 = st.columns(4)
+        dk1, dk2 = st.columns(2)
         with dk1:
-            metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
+            metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base Case: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
         with dk2:
-            metric_card("Prezzo Attuale", f"€ {dcf_res['current_price']:.2f}", "Prezzo Spot Mercato", True)
+            metric_card("Prezzo di Mercato Attuale", f"€ {dcf_res['current_price']:.2f}", "Quotazione Spot", True)
+
+        dk3, dk4 = st.columns(2)
         with dk3:
-            metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
+            metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine di Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
         with dk4:
-            metric_card("Prob. Sottovalutaz.", f"{dcf_res['prob_undervalued_pct']:.1f}%", f"{n_sims} Simulazioni", True if dcf_res['prob_undervalued_pct'] > 50 else False)
+            metric_card("Probabilità Sottovalutazione", f"{dcf_res['prob_undervalued_pct']:.1f}%", f"{n_sims} Simulazioni", True if dcf_res['prob_undervalued_pct'] > 50 else False)
 
         st.divider()
 
