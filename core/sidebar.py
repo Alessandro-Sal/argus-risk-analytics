@@ -401,7 +401,7 @@ def render_sidebar():
             from core.ui_utils import render_risk_free_modal
             render_risk_free_modal(currency=st.session_state.base_currency, use_popover=True, button_label="ℹ️ Info Metodologia Risk-Free")
 
-        st.markdown('<div class="sidebar-section-header">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-section-header" style="padding-top: 14px; padding-bottom: 6px; margin: 0; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
 
         def _is_mod_active(mod_dict: dict, cur_page_str: str) -> bool:
             import re
