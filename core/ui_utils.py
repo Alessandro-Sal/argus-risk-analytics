@@ -755,6 +755,65 @@ def inject_custom_css():
     </style>
     """, unsafe_allow_html=True)
 
+    try:
+        import streamlit.components.v1 as components
+        js_tab_observer = """
+        <script>
+        (function() {
+            function setupTabScroll() {
+                try {
+                    const doc = window.parent.document || document;
+                    
+                    // 1. Tab native di Streamlit (st.tabs interne ed esterne)
+                    doc.querySelectorAll('button[data-testid="stTab"]').forEach(function(tabBtn) {
+                        if (tabBtn.dataset.hasScrollListener) return;
+                        tabBtn.dataset.hasScrollListener = "true";
+                        tabBtn.addEventListener('click', function() {
+                            setTimeout(function() {
+                                const tabList = tabBtn.closest('div[data-testid="stTabs"]') || tabBtn.closest('.stTabs');
+                                if (tabList && typeof tabList.scrollIntoView === 'function') {
+                                    tabList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                            }, 40);
+                        });
+                    });
+
+                    // 2. Segmented Tab Decks di ARGUS (render_segmented_tabs principali e sub-tab)
+                    doc.querySelectorAll('.argus-tab-deck-container button').forEach(function(btn) {
+                        if (btn.dataset.hasScrollListener) return;
+                        btn.dataset.hasScrollListener = "true";
+                        btn.addEventListener('click', function() {
+                            setTimeout(function() {
+                                const deck = btn.closest('.argus-tab-deck-container');
+                                if (deck && typeof deck.scrollIntoView === 'function') {
+                                    deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                            }, 40);
+                        });
+                    });
+                } catch (e) {}
+            }
+
+            try {
+                const targetDoc = window.parent.document || document;
+                if (!window.parent._argusTabObserverAttached) {
+                    window.parent._argusTabObserverAttached = true;
+                    const observer = new MutationObserver(function() {
+                        setupTabScroll();
+                    });
+                    observer.observe(targetDoc.body, { childList: true, subtree: true });
+                }
+                setupTabScroll();
+            } catch(e) {
+                setupTabScroll();
+            }
+        })();
+        </script>
+        """
+        components.html(js_tab_observer, height=0, width=0)
+    except Exception:
+        pass
+
 apply_custom_css = inject_custom_css
 
 
