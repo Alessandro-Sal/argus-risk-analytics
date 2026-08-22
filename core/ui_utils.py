@@ -503,15 +503,39 @@ def inject_custom_css():
             color: #8b949e !important;
             text-transform: uppercase !important;
             letter-spacing: 0.8px !important;
-            margin: 12px 0 6px 2px !important;
+            margin: 14px 0 8px 4px !important;
+            padding: 2px 0 !important;
+            line-height: 1.2 !important;
+            display: block !important;
         }}
 
-        /* Ultra-Compact Institutional Sidebar Expanders & Navigation */
+        /* Ultra-Compact Institutional Sidebar Navigation & Gap Compression */
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"],
+        section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
+            gap: 0.18rem !important;
+        }}
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] {{
+            margin-bottom: 0px !important;
+            margin-top: 0px !important;
+        }}
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div,
+        section[data-testid="stSidebar"] div[data-testid="element-container"],
+        section[data-testid="stSidebar"] div.stElementContainer {{
+            margin-bottom: 0px !important;
+            margin-top: 0px !important;
+            padding-bottom: 0px !important;
+            padding-top: 0px !important;
+        }}
+        section[data-testid="stSidebar"] .stButton {{
+            margin: 0px !important;
+            padding: 0px !important;
+        }}
+
         section[data-testid="stSidebar"] [data-testid="stExpander"] {{
             background: rgba(22, 27, 34, 0.6) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
-            border-radius: 7px !important;
-            margin-bottom: 4px !important;
+            border-radius: 6px !important;
+            margin: 1px 0 !important;
             box-shadow: none !important;
             transition: all 0.15s ease !important;
         }}
@@ -519,12 +543,13 @@ def inject_custom_css():
             padding: 0 !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-            padding: 6px 10px !important;
-            min-height: 32px !important;
-            font-size: 12px !important;
+            padding: 4px 8px !important;
+            min-height: 28px !important;
+            height: 28px !important;
+            font-size: 11.5px !important;
             font-weight: 600 !important;
             color: #c9d1d9 !important;
-            border-radius: 6px !important;
+            border-radius: 5px !important;
             transition: all 0.15s ease !important;
             display: flex !important;
             align-items: center !important;
@@ -540,7 +565,7 @@ def inject_custom_css():
             border-left: 3px solid #ff9900 !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
-            padding: 4px 6px 6px 6px !important;
+            padding: 3px 6px 4px 6px !important;
             background: rgba(13, 17, 23, 0.5) !important;
             border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
         }}
@@ -565,7 +590,7 @@ def inject_custom_css():
             border-radius: 6px !important;
             background: rgba(22, 27, 34, 0.8) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            min-height: 32px !important;
+            min-height: 30px !important;
         }}
         section[data-testid="stSidebar"] div[data-baseweb="select"] * {{
             font-size: 11.5px !important;
@@ -573,14 +598,15 @@ def inject_custom_css():
 
         /* Direct Top-Level Navigation Buttons (Matching Expanders) */
         section[data-testid="stSidebar"] > div > div > div > .stButton > button,
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button {{
-            padding: 5px 10px !important;
-            min-height: 32px !important;
-            height: 32px !important;
-            font-size: 12px !important;
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button,
+        section[data-testid="stSidebar"] .stButton > button {{
+            padding: 4px 8px !important;
+            min-height: 28px !important;
+            height: 28px !important;
+            font-size: 11.5px !important;
             font-weight: 600 !important;
-            margin: 2px 0 !important;
-            border-radius: 7px !important;
+            margin: 0px 0 !important;
+            border-radius: 6px !important;
             background: rgba(22, 27, 34, 0.6) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             color: #c9d1d9 !important;
@@ -594,7 +620,8 @@ def inject_custom_css():
             text-overflow: ellipsis !important;
         }}
         section[data-testid="stSidebar"] > div > div > div > .stButton > button:hover,
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button:hover {{
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button:hover,
+        section[data-testid="stSidebar"] .stButton > button:hover {{
             background: rgba(255, 255, 255, 0.06) !important;
             border-color: rgba(255, 255, 255, 0.15) !important;
             color: #ffffff !important;
@@ -603,7 +630,8 @@ def inject_custom_css():
         }}
         /* Direct Active Top-Level Button */
         section[data-testid="stSidebar"] > div > div > div > .stButton > button[kind="primary"],
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button[kind="primary"] {{
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button[kind="primary"],
+        section[data-testid="stSidebar"] .stButton > button[kind="primary"] {{
             background: rgba(255, 153, 0, 0.12) !important;
             border: 1px solid rgba(255, 153, 0, 0.35) !important;
             border-left: 3px solid #ff9900 !important;
@@ -615,14 +643,14 @@ def inject_custom_css():
         section[data-testid="stSidebar"] [data-testid="stExpander"] button,
         section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stBaseButton-secondary"],
         section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stBaseButton-primary"] {{
-            padding: 4px 8px !important;
-            min-height: 28px !important;
-            height: auto !important;
-            line-height: 20px !important;
-            font-size: 11.5px !important;
+            padding: 3px 8px !important;
+            min-height: 24px !important;
+            height: 24px !important;
+            line-height: 18px !important;
+            font-size: 11px !important;
             font-weight: 500 !important;
-            margin: 2px 0 !important;
-            border-radius: 6px !important;
+            margin: 1px 0 !important;
+            border-radius: 5px !important;
             background: transparent !important;
             border: 1px solid transparent !important;
             color: #8b949e !important;
