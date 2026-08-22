@@ -1759,29 +1759,44 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
             
         st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
         
-        # Tabella DTL Glassmorphic
-        rows_liq_list = []
-        for _, r_l in df_liq.iterrows():
-            t_name = str(r_l["ticker"])
-            c_val = float(r_l["current_value"])
-            w_pct = float(r_l["weight"])
-            dtl_v = float(r_l["days_to_liquidate"])
-            
-            if dtl_v <= 1.0:
-                dtl_badge = '<span style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); padding: 2px 8px; border-radius: 10px; font-family: monospace; font-weight: 700; font-size: 11.5px;">&le; 1.0 g</span>'
-                status_txt = '<span style="color: #4ade80; font-weight: 600; font-size: 12px;">🟢 Immediato</span>'
-            elif dtl_v <= 3.0:
-                dtl_badge = f'<span style="background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); padding: 2px 8px; border-radius: 10px; font-family: monospace; font-weight: 700; font-size: 11.5px;">{dtl_v:.1f} g</span>'
-                status_txt = '<span style="color: #facc15; font-weight: 600; font-size: 12px;">🟡 Moderato</span>'
-            else:
-                dtl_badge = f'<span style="background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); padding: 2px 8px; border-radius: 10px; font-family: monospace; font-weight: 700; font-size: 11.5px;">{dtl_v:.1f} g</span>'
-                status_txt = '<span style="color: #f87171; font-weight: 600; font-size: 12px;">🔴 Rischioso</span>'
-                
-            r_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:42px;"><td style="color:#ffffff;font-weight:700;padding:8px 14px;font-family:monospace;">{t_name}</td><td style="color:#f8fafc;padding:8px 14px;font-family:monospace;font-weight:600;">€ {c_val:,.2f}</td><td style="color:#cbd5e1;padding:8px 14px;font-family:monospace;">{w_pct:.2f}%</td><td style="text-align:center;padding:8px 14px;">{dtl_badge}</td><td style="padding:8px 14px;">{status_txt}</td></tr>'
-            rows_liq_list.append(r_str)
-            
-        liq_table_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;max-height:420px;overflow-y:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:20%;">TICKER ASSET</th><th style="text-align:left;padding:8px 14px;width:24%;">VALORE (€)</th><th style="text-align:left;padding:8px 14px;width:18%;">PESO %</th><th style="text-align:center;padding:8px 14px;width:20%;">DAYS TO LIQUIDATE</th><th style="text-align:left;padding:8px 14px;width:18%;">PROFILO SMOBILIZZO</th></tr></thead><tbody>{"".join(rows_liq_list)}</tbody></table></div>'
-        st.markdown(liq_table_html, unsafe_allow_html=True)
+        # Tabella Interattiva DTL & Profilo Smobilizzo
+        df_liq_display = pd.DataFrame({
+            "Ticker Asset": df_liq["ticker"].astype(str),
+            "Valore (€)": df_liq["current_value"].astype(float),
+            "Peso %": df_liq["weight"].astype(float),
+            "Days to Liquidate": df_liq["days_to_liquidate"].astype(float),
+            "Profilo Smobilizzo": df_liq["days_to_liquidate"].apply(
+                lambda d: "🟢 Immediato (≤ 1.0 g)" if d <= 1.0 else ("🟡 Moderato (1.0 - 3.0 g)" if d <= 3.0 else "🔴 Rischioso (> 3.0 g)")
+            )
+        })
+
+        col_tb_h1, col_tb_h2, col_tb_h3 = st.columns([2.4, 1.2, 0.9])
+        with col_tb_h1:
+            st.markdown("##### 📋 Dettaglio Smobilizzo & Liquidità per Posizione")
+        with col_tb_h2:
+            search_liq = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_liq", label_visibility="collapsed")
+        with col_tb_h3:
+            csv_liq = df_liq_display.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CSV", data=csv_liq, file_name="liquidita_smobilizzo_portafoglio.csv", mime="text/csv", use_container_width=True, key="btn_download_risk_liq")
+
+        df_liq_filt = df_liq_display.copy()
+        if search_liq:
+            df_liq_filt = df_liq_filt[df_liq_filt["Ticker Asset"].str.contains(search_liq.strip(), case=False, na=False)]
+
+        liq_col_config = {
+            "Ticker Asset": st.column_config.TextColumn("Ticker Asset", width="medium"),
+            "Valore (€)": st.column_config.NumberColumn("Valore (€)", format="€ %.2f"),
+            "Peso %": st.column_config.ProgressColumn("Peso %", format="%.2f%%", min_value=0.0, max_value=100.0),
+            "Days to Liquidate": st.column_config.NumberColumn("Days to Liquidate", format="%.2f gg"),
+            "Profilo Smobilizzo": st.column_config.TextColumn("Profilo Smobilizzo", width="medium")
+        }
+
+        st.dataframe(
+            df_liq_filt,
+            column_config=liq_col_config,
+            use_container_width=True,
+            hide_index=True
+        )
     else:
         st.info("Dati sui volumi non sufficienti per calcolare i Days-to-Liquidate.")
 
