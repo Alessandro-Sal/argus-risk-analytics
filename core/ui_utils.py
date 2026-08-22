@@ -36,6 +36,27 @@ def inject_custom_css():
             font-feature-settings: "tnum" 1, "zero" 1 !important;
         }}
 
+        /* Institutional Typography Hierarchy */
+        h1, [data-testid="stHeading"] h1, [data-testid="stHeader"] h1 {{
+            font-size: 1.85rem !important;
+            font-weight: 750 !important;
+            letter-spacing: -0.5px !important;
+            line-height: 1.25 !important;
+        }}
+        h2, [data-testid="stHeading"] h2 {{
+            font-size: 1.45rem !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.3px !important;
+        }}
+        h3, [data-testid="stHeading"] h3 {{
+            font-size: 1.25rem !important;
+            font-weight: 650 !important;
+        }}
+        h4, [data-testid="stHeading"] h4 {{
+            font-size: 1.05rem !important;
+            font-weight: 650 !important;
+        }}
+
         [data-testid="stAppViewContainer"] {{
             background: {bg_gradient};
             background-size: cover;
