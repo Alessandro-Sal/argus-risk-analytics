@@ -337,7 +337,7 @@ elif active_stress_tab == "🏛️ Analisi Scenari Storici Dettagliata":
                     st.markdown("##### 📋 Dettaglio per Singola Posizione")
                 with col_hd2:
                     csv_det = df_det.to_csv(index=False).encode('utf-8')
-                    sc_slug = scenario_key.lower().replace(" ", "_") if "scenario_key" in locals() else "scenario"
+                    sc_slug = active_scenario.lower().replace(" ", "_").replace(":", "").replace("/", "_")
                     st.download_button("📥 Scarica CSV", data=csv_det, file_name=f"stress_test_posizioni_{sc_slug}.csv", mime="text/csv", use_container_width=True, key="btn_download_stress_positions")
                 
                 df_disp = df_det.copy()
