@@ -252,8 +252,31 @@ def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dic
 
     if "current_value" not in df_clean.columns:
         df_clean["current_value"] = 0.0
+    else:
+        df_clean["current_value"] = pd.to_numeric(df_clean["current_value"], errors="coerce").fillna(0.0)
+
+    # Estrai PnL non realizzato da tutte le possibili nomenclature
     if "pnl_unrealized" not in df_clean.columns:
-        df_clean["pnl_unrealized"] = 0.0
+        if "unrealized_pnl" in df_clean.columns:
+            df_clean["pnl_unrealized"] = pd.to_numeric(df_clean["unrealized_pnl"], errors="coerce").fillna(0.0)
+        elif "pnl" in df_clean.columns:
+            df_clean["pnl_unrealized"] = pd.to_numeric(df_clean["pnl"], errors="coerce").fillna(0.0)
+        else:
+            df_clean["pnl_unrealized"] = 0.0
+    else:
+        df_clean["pnl_unrealized"] = pd.to_numeric(df_clean["pnl_unrealized"], errors="coerce").fillna(0.0)
+
+    # Base di costo per calcolo rendimento percentuale
+    if "cost_basis" in df_clean.columns:
+        df_clean["cost_basis"] = pd.to_numeric(df_clean["cost_basis"], errors="coerce").fillna(0.0)
+    else:
+        df_clean["cost_basis"] = df_clean["current_value"] - df_clean["pnl_unrealized"]
+
+    # Filtra solo posizioni attive
+    if "qty_net" in df_clean.columns:
+        df_clean = df_clean[df_clean["qty_net"] > 1e-6]
+    elif "quantity" in df_clean.columns:
+        df_clean = df_clean[df_clean["quantity"] > 1e-6]
 
     sql = """
         SELECT 
@@ -263,7 +286,11 @@ def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dic
             COUNT(*) as n_posizioni,
             ROUND(SUM(current_value), 2) as controvalore_totale,
             ROUND(SUM(pnl_unrealized), 2) as pnl_latente_totale,
-            ROUND(AVG(CASE WHEN current_value > 0 THEN (pnl_unrealized / current_value) * 100.0 ELSE 0.0 END), 2) as rendimento_medio_pct
+            ROUND(CASE 
+                WHEN SUM(cost_basis) > 0 THEN (SUM(pnl_unrealized) / SUM(cost_basis)) * 100.0
+                WHEN SUM(current_value) > 0 THEN (SUM(pnl_unrealized) / SUM(current_value)) * 100.0
+                ELSE 0.0 
+            END, 2) as rendimento_medio_pct
         FROM positions
         GROUP BY GROUPING SETS (
             (asset_class, sector, currency),
@@ -294,8 +321,23 @@ def compute_duckdb_sector_rankings(df_positions: pd.DataFrame, top_n: int = 3) -
         df_clean["ticker"] = "UNKNOWN"
     if "current_value" not in df_clean.columns:
         df_clean["current_value"] = 0.0
+    else:
+        df_clean["current_value"] = pd.to_numeric(df_clean["current_value"], errors="coerce").fillna(0.0)
+
     if "pnl_unrealized" not in df_clean.columns:
-        df_clean["pnl_unrealized"] = 0.0
+        if "unrealized_pnl" in df_clean.columns:
+            df_clean["pnl_unrealized"] = pd.to_numeric(df_clean["unrealized_pnl"], errors="coerce").fillna(0.0)
+        elif "pnl" in df_clean.columns:
+            df_clean["pnl_unrealized"] = pd.to_numeric(df_clean["pnl"], errors="coerce").fillna(0.0)
+        else:
+            df_clean["pnl_unrealized"] = 0.0
+    else:
+        df_clean["pnl_unrealized"] = pd.to_numeric(df_clean["pnl_unrealized"], errors="coerce").fillna(0.0)
+
+    if "cost_basis" in df_clean.columns:
+        df_clean["cost_basis"] = pd.to_numeric(df_clean["cost_basis"], errors="coerce").fillna(0.0)
+    else:
+        df_clean["cost_basis"] = df_clean["current_value"] - df_clean["pnl_unrealized"]
 
     sql = f"""
         SELECT 
@@ -303,7 +345,11 @@ def compute_duckdb_sector_rankings(df_positions: pd.DataFrame, top_n: int = 3) -
             ticker,
             ROUND(current_value, 2) as controvalore_eur,
             ROUND(pnl_unrealized, 2) as pnl_latente_eur,
-            ROUND(CASE WHEN current_value > 0 THEN (pnl_unrealized / current_value) * 100.0 ELSE 0.0 END, 2) as gain_pct,
+            ROUND(CASE 
+                WHEN cost_basis > 0 THEN (pnl_unrealized / cost_basis) * 100.0
+                WHEN current_value > 0 THEN (pnl_unrealized / current_value) * 100.0 
+                ELSE 0.0 
+            END, 2) as gain_pct,
             DENSE_RANK() OVER (PARTITION BY sector ORDER BY pnl_unrealized DESC) as rank_settoriale
         FROM positions
         WHERE current_value > 0
