@@ -12,7 +12,7 @@ importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
 importlib.reload(core.crypto_tax_engine)
 importlib.reload(core.duckdb_engine)
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_executive_badges, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
 
 st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
@@ -32,7 +32,6 @@ if "run_id" in st.session_state:
     st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Mappa dettagliata delle posizioni aperte, analisi dei dividendi passivi ed ottimizzazione fiscale (TUIR Art. 67).")
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
-render_executive_badges(results.get("metrics", {}))
 st.divider()
 
 # ── STRUTTURA IN TAB CON LAZY LOADING ──────────────────────────
