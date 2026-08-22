@@ -2032,15 +2032,34 @@ elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Fore
         st.plotly_chart(fig_iso, use_container_width=True)
 
         if not iso_res["anomaly_df"].empty:
-            st.markdown("**📋 Tabella delle Giornate Anomale Rilevate dal Modello ML**")
+            df_ano = iso_res["anomaly_df"].copy()
+            
+            col_ano_h1, col_ano_h2, col_ano_h3 = st.columns([2.4, 1.2, 0.9])
+            with col_ano_h1:
+                st.markdown("##### 📋 Tabella delle Giornate Anomale Rilevate dal Modello ML")
+            with col_ano_h2:
+                search_ano = st.text_input("🔍 Cerca Data:", placeholder="Filtra data (YYYY-MM-DD)...", key="search_risk_anomaly", label_visibility="collapsed")
+            with col_ano_h3:
+                csv_ano = df_ano.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_ano, file_name="giornate_anomale_ml_isolation_forest.csv", mime="text/csv", use_container_width=True, key="btn_download_risk_anomaly")
+
+            df_ano_filt = df_ano.copy()
+            if search_ano:
+                df_ano_filt = df_ano_filt[df_ano_filt["Data"].astype(str).str.contains(search_ano.strip(), case=False, na=False)]
+
+            ano_col_config = {
+                "Data": st.column_config.TextColumn("Data", width="small"),
+                "Rendimento Portafoglio %": st.column_config.NumberColumn("Rendimento Portafoglio %", format="%+.2f%%"),
+                "Volatilità Rolling 20d %": st.column_config.NumberColumn("Volatilità Rolling 20d %", format="%.2f%%"),
+                "Correlazione Media": st.column_config.NumberColumn("Correlazione Media", format="%.2f"),
+                "Drawdown %": st.column_config.NumberColumn("Drawdown %", format="%.2f%%"),
+                "Anomalia": st.column_config.TextColumn("Anomalia", width="small"),
+                "Score Anomalia": st.column_config.NumberColumn("Score Anomalia", format="%.3f")
+            }
+
             st.dataframe(
-                iso_res["anomaly_df"].style.format({
-                    "Rendimento Portafoglio %": "{:+.2f}%",
-                    "Volatilità Rolling 20d %": "{:.2f}%",
-                    "Correlazione Media": "{:.2f}",
-                    "Drawdown %": "{:.2f}%",
-                    "Score Anomalia": "{:.3f}"
-                }),
+                df_ano_filt,
+                column_config=ano_col_config,
                 use_container_width=True,
                 hide_index=True
             )
