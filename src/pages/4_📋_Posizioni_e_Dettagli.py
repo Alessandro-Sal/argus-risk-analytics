@@ -1177,9 +1177,9 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
     # ── MATRICE MENSILE DISTRIBUZIONE DIVIDENDI ──────────────────────
     if not df_matrix.empty:
         with st.expander("🗓️ Visualizza la Matrice Annuale Completa (Incassi Titolo per Mese)", expanded=False):
-            st.caption("Importo monetario stimato (€) per ciascun mese dell'anno solare:")
-            
-            col_m1, col_m2 = st.columns([3.0, 1.1])
+            col_m1, col_m2 = st.columns([3.4, 1.1])
+            with col_m1:
+                st.markdown('<div style="padding-top: 6px; font-size: 13.5px; color: #8b949e;">Importo monetario stimato (€) per ciascun mese dell\'anno solare:</div>', unsafe_allow_html=True)
             with col_m2:
                 csv_mat = df_matrix.to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Scarica Matrice CSV", data=csv_mat, file_name="matrice_annuale_dividendi.csv", mime="text/csv", use_container_width=True, key="btn_download_div_matrix")
