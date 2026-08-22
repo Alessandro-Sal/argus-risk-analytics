@@ -249,7 +249,13 @@ if active_stress_tab == "⚡ Matrice Comparativa MSCI Barra":
     st.plotly_chart(fig_mat, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    st.markdown("##### 📋 Matrice Sinottica Dettagliata degli Scenari")
+    col_syn1, col_syn2 = st.columns([3.2, 1.0])
+    with col_syn1:
+        st.markdown("##### 📋 Matrice Sinottica Dettagliata degli Scenari")
+    with col_syn2:
+        csv_syn = df_matrix.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica CSV", data=csv_syn, file_name="matrice_scenari_stress_test.csv", mime="text/csv", use_container_width=True, key="btn_download_stress_matrix")
+
     st.dataframe(
         df_matrix[["Scenario", "Shock Mercato %", "Impatto Portafoglio %", "Differenziale (Alpha) %", "Perdita Stimata (€)"]].style.format({
             "Shock Mercato %": "{:+.2f}%",
@@ -324,9 +330,16 @@ elif active_stress_tab == "🏛️ Analisi Scenari Storici Dettagliata":
             df_det.rename(columns={k: v for k, v in rename_map.items() if k in df_det.columns}, inplace=True)
             df_det = df_det.sort_values(by="Perdita Stimata (€)", ascending=True)
             
-            col_t, col_c = st.columns([1.1, 1.2])
+            col_t, col_c = st.columns([1.15, 1.15])
             with col_t:
-                st.markdown("##### 📋 Dettaglio per Singola Posizione")
+                col_hd1, col_hd2 = st.columns([2.0, 1.1])
+                with col_hd1:
+                    st.markdown("##### 📋 Dettaglio per Singola Posizione")
+                with col_hd2:
+                    csv_det = df_det.to_csv(index=False).encode('utf-8')
+                    sc_slug = scenario_key.lower().replace(" ", "_") if "scenario_key" in locals() else "scenario"
+                    st.download_button("📥 Scarica CSV", data=csv_det, file_name=f"stress_test_posizioni_{sc_slug}.csv", mime="text/csv", use_container_width=True, key="btn_download_stress_positions")
+                
                 df_disp = df_det.copy()
                 df_disp["Shock %"] = df_disp["Shock %"].apply(lambda x: f"{x:.2f}%")
                 df_disp["Perdita Stimata (€)"] = df_disp["Perdita Stimata (€)"].apply(lambda x: f"€ {x:,.2f}")
@@ -446,7 +459,13 @@ elif active_stress_tab == "🛠️ Simulatore What-if Custom":
             metric_card("Variazione Stimata (€)", fmt_eur(macro_res.get("portfolio_loss_eur", 0.0)), positive=macro_res.get("portfolio_loss_eur", 0.0) >= 0)
 
         if not macro_res["details_df"].empty:
-            st.markdown("##### 📋 Dettaglio Impatto per Singolo Asset")
+            col_mhd1, col_mhd2 = st.columns([2.8, 1.2])
+            with col_mhd1:
+                st.markdown("##### 📋 Dettaglio Impatto per Singolo Asset")
+            with col_mhd2:
+                csv_mac = macro_res["details_df"].to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_mac, file_name="simulazione_macro_whatif_posizioni.csv", mime="text/csv", use_container_width=True, key="btn_download_macro_whatif")
+            
             df_macro_disp = macro_res["details_df"].rename(columns={
                 "ticker": "Ticker",
                 "current_value": "Valore Attuale (€)",
