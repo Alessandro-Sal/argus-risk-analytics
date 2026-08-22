@@ -444,7 +444,9 @@ elif active_time_tab == "⚖️ Confronto Affiancato (Side-by-Side)":
             apply_plotly_theme(fig_pie_b)
             st.plotly_chart(fig_pie_b, use_container_width=True, key="temporal_pie_chart_b", config={"displayModeBar": "hover", "displaylogo": False})
 
-    st.markdown("#### 📋 Confronto Dettagliato Titolo per Titolo")
+    col_hd1, col_hd2 = st.columns([3.2, 1.0])
+    with col_hd1:
+        st.markdown("#### 📋 Confronto Dettagliato Titolo per Titolo")
     
     if not df_pos_a.empty or not df_pos_b.empty:
         merged = pd.merge(
@@ -469,19 +471,30 @@ elif active_time_tab == "⚖️ Confronto Affiancato (Side-by-Side)":
             "Peso A (%)", "Peso B (%)", "Δ Peso (%)"
         ]
         
+        with col_hd2:
+            csv_comp = merged_display.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CSV", data=csv_comp, file_name="confronto_temporale_posizioni.csv", mime="text/csv", use_container_width=True, key="btn_download_temp_comparison")
+
         st.dataframe(
             merged_display.style.format({
                 "Quantità A": "{:,.2f}", "Quantità B": "{:,.2f}", "Δ Qty": "{:+,.2f}",
                 "Valore A (€)": "€ {:,.2f}", "Valore B (€)": "€ {:,.2f}", "Δ Valore (€)": "€ {:+,.2f}",
                 "Peso A (%)": "{:.2f}%", "Peso B (%)": "{:.2f}%", "Δ Peso (%)": "{:+.2f}%"
             }),
-            use_container_width=True
+            use_container_width=True,
+            hide_index=True
         )
 
 # ── TAB 3: REGISTRO COMPLETO SNAPSHOT ─────────────────────────
 elif active_time_tab == "🗃️ Registro Completo Snapshot Storici":
-    st.markdown("### 🗃️ Registro Completo degli Snapshot Storici")
-    st.caption("Consultazione analitica di tutti i punti storici registrati nel Data Warehouse MySQL.")
+    col_hist_h1, col_hist_h2 = st.columns([3.2, 1.0])
+    with col_hist_h1:
+        st.markdown("### 🗃️ Registro Completo degli Snapshot Storici")
+        st.caption("Consultazione analitica di tutti i punti storici registrati nel Data Warehouse MySQL.")
+    with col_hist_h2:
+        if not df_history.empty:
+            csv_hist = df_history.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica Registro CSV", data=csv_hist, file_name="registro_snapshot_storici.csv", mime="text/csv", use_container_width=True, key="btn_download_hist_snapshots")
     
     df_history_disp = df_history[[
         "calc_date", "run_id", "run_name", "total_value", "total_pnl", 
@@ -518,7 +531,12 @@ elif active_time_tab == "🗃️ Registro Completo Snapshot Storici":
         from core.duckdb_engine import compute_duckdb_temporal_snapshot_analytics
         duck_snap = compute_duckdb_temporal_snapshot_analytics(df_history)
         if duck_snap.get("success") and not duck_snap["df"].empty:
-            st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{duck_snap['latency_ms']:.2f} ms**")
+            col_dk1, col_dk2 = st.columns([3.2, 1.0])
+            with col_dk1:
+                st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{duck_snap['latency_ms']:.2f} ms**")
+            with col_dk2:
+                csv_duck = duck_snap["df"].to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica Trend CSV", data=csv_duck, file_name="duckdb_trend_temporale.csv", mime="text/csv", use_container_width=True, key="btn_download_duck_trend")
             st.dataframe(duck_snap["df"], use_container_width=True, hide_index=True)
         else:
             st.info("Dati insufficienti per l'analisi del trend temporale.")
