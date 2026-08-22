@@ -219,12 +219,12 @@ def inject_custom_css():
         .executive-badge {{
             display: inline-flex;
             align-items: center;
-            padding: 5px 12px;
-            border-radius: 16px;
-            font-size: 12px;
+            padding: 3px 9px;
+            border-radius: 14px;
+            font-size: 11.5px;
             font-weight: 600;
-            margin-right: 8px;
-            margin-bottom: 10px;
+            margin-right: 6px;
+            margin-bottom: 2px;
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
@@ -349,10 +349,24 @@ def inject_custom_css():
         }}
 
         /* ARGUS Institutional Tab Deck (Bloomberg / Linear Terminal Grade) */
-        div[data-testid="stHorizontalBlock"] button[kind="secondary"],
+        .argus-tab-deck-container {{
+            background: linear-gradient(180deg, rgba(22, 27, 34, 0.85) 0%, rgba(13, 17, 23, 0.95) 100%) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 12px !important;
+            padding: 5px 6px !important;
+            margin: 6px 0 20px 0 !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+            backdrop-filter: blur(20px) !important;
+        }}
+
+        .argus-tab-deck-container div[data-testid="column"] {{
+            padding: 0 3px !important;
+        }}
+
+        /* Inactive Tab Deck Button */
         .argus-tab-deck-container button[kind="secondary"] {{
             background: rgba(255, 255, 255, 0.02) !important;
-            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.06) !important;
             border-radius: 8px !important;
             color: #8b949e !important;
             font-size: 12px !important;
@@ -369,7 +383,6 @@ def inject_custom_css():
             transform: none !important;
         }}
 
-        div[data-testid="stHorizontalBlock"] button[kind="secondary"]:hover,
         .argus-tab-deck-container button[kind="secondary"]:hover {{
             background: rgba(255, 255, 255, 0.07) !important;
             border-color: rgba(255, 255, 255, 0.18) !important;
@@ -379,7 +392,6 @@ def inject_custom_css():
         }}
 
         /* Active Tab Deck Button (Illuminated Dark Metal Capsule) */
-        div[data-testid="stHorizontalBlock"] button[kind="primary"],
         .argus-tab-deck-container button[kind="primary"] {{
             background: linear-gradient(180deg, #24292f 0%, #161b22 100%) !important;
             border: 1px solid #ff9900 !important;
@@ -399,7 +411,6 @@ def inject_custom_css():
             transform: none !important;
         }}
 
-        div[data-testid="stHorizontalBlock"] button[kind="primary"]:hover,
         .argus-tab-deck-container button[kind="primary"]:hover {{
             box-shadow: 0 6px 20px rgba(255, 153, 0, 0.35), 0 0 14px rgba(255, 153, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
         }}
@@ -1070,7 +1081,7 @@ def render_executive_badges(metrics_dict: dict):
     else:
         dd_badge = '<span class="executive-badge badge-red">🔴 Drawdown Elevato (> 22%)</span>'
 
-    st.markdown(f'<div style="margin-bottom: 16px;">{sharpe_badge}{vol_badge}{dd_badge}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="margin-top: 4px; margin-bottom: 6px;">{sharpe_badge}{vol_badge}{dd_badge}</div>', unsafe_allow_html=True)
 
 
 def optimize_plotly_figure_memory(fig, precision: int = 4):
@@ -1745,6 +1756,7 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
         st.session_state[key] = current
 
     # 2. Rendering del Deck a Schede Istituzionale
+    st.markdown('<div class="argus-tab-deck-container">', unsafe_allow_html=True)
     cols = st.columns(len(options))
     changed = False
     for i, opt in enumerate(options):
@@ -1756,6 +1768,7 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
                 if st.session_state.get(key) != opt:
                     st.session_state[key] = opt
                     changed = True
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if changed:
         st.rerun()
