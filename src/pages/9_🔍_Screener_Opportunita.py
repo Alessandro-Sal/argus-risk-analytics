@@ -293,8 +293,6 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
             (df_filtered["rsi_14"].between(rsi_range[0], rsi_range[1]))
         ]
 
-    st.markdown(f"**Risultati dello Screening:** Trovate **{len(df_filtered)}** opportunità su {len(df_raw)} titoli esaminati.")
-
     # Dataframe di visualizzazione principale
     cols_display = [
         "ticker", "name", "sector", "last_price", "upside_pct", "trailing_pe", "peg_ratio",
@@ -318,10 +316,12 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         "argus_score": "ARGUS Score"
     }, inplace=True)
 
-    col_sc_h1, col_sc_h2 = st.columns([3.5, 0.9])
+    col_sc_h1, col_sc_h2 = st.columns([3.2, 1.0])
+    with col_sc_h1:
+        st.markdown(f"<div style='margin-top: 6px; font-size: 15px; color: #e6edf3;'><b>Risultati dello Screening:</b> Trovate <b>{len(df_filtered)}</b> opportunità su {len(df_raw)} titoli esaminati.</div>", unsafe_allow_html=True)
     with col_sc_h2:
         csv_sc = df_table.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="screener_opportunita.csv", mime="text/csv", use_container_width=True)
+        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="screener_opportunita.csv", mime="text/csv", use_container_width=True, key="btn_download_screener_main")
 
     scr_cfg = {
         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
