@@ -57,6 +57,20 @@ def inject_custom_css():
             font-weight: 650 !important;
         }}
 
+        /* Compact Institutional Dividers */
+        hr, [data-testid="stDivider"], hr[data-testid="stDivider"] {{
+            margin-top: 8px !important;
+            margin-bottom: 12px !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            padding: 0 !important;
+        }}
+        div:has(> hr), div:has(> [data-testid="stDivider"]) {{
+            margin-top: 0px !important;
+            margin-bottom: 0px !important;
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+        }}
+
         [data-testid="stAppViewContainer"] {{
             background: {bg_gradient};
             background-size: cover;

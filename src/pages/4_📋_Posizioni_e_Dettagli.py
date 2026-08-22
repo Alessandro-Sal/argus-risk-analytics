@@ -33,6 +33,7 @@ if "run_id" in st.session_state:
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 render_executive_badges(results.get("metrics", {}))
+st.divider()
 
 # ── STRUTTURA IN TAB CON LAZY LOADING ──────────────────────────
 active_pos_tab = render_segmented_tabs([
