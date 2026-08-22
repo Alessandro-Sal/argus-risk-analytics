@@ -111,18 +111,17 @@ def inject_custom_css():
         /* Metric Cards */
         .metric-card {{
             background: {card_bg};
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.8) 0%, rgba(13, 17, 23, 0.95) 100%);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
-            padding: 16px 16px;
-            margin-bottom: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+            padding: 12px 14px;
             position: relative;
-            overflow: hidden;
-            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
         }}
-        
+
         .metric-card::before {{
             content: '';
             position: absolute;
@@ -143,21 +142,24 @@ def inject_custom_css():
 
         .metric-label {{ 
             color: #8b949e; 
-            font-size: 11.5px; 
+            font-size: 11px; 
             font-weight: 600; 
-            letter-spacing: 0.6px; 
+            letter-spacing: 0.4px; 
             text-transform: uppercase;
+            line-height: 1.2;
         }}
         
         .metric-value {{ 
             background: linear-gradient(90deg, #ffffff, #c9d1d9);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            font-size: clamp(17px, 1.45vw, 23px); 
+            font-size: clamp(14px, 1.25vw, 21px); 
             font-weight: 700; 
-            margin-top: 6px;
-            letter-spacing: -0.5px;
+            margin-top: 5px;
+            letter-spacing: -0.3px;
             white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }}
 
         /* Streamlit Main Canvas Controls & Input Fields */
@@ -1879,7 +1881,7 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
         <div style="font-size: 14px; line-height: 1.55; margin: 0; color: #c9d1d9;">{safe_help_text}</div>
     </div>
 </div>"""
-    label_html = f'<div class="metric-label" style="display:flex; align-items:center;">{label} <label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
+    label_html = f'<div class="metric-label" style="display:flex; align-items:center; justify-content:space-between;"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{label}">{label}</span><label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
 
     st.markdown(f"""{modal_html}
 <div class="metric-card">
