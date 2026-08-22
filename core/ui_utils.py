@@ -1745,10 +1745,59 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
     return derived
 
 
+def scroll_to_top(target_selector: str = None):
+    """
+    Inietta un micro-script JavaScript invisibile per reindirizzare lo scroll
+    in cima alla tab / pagina in modo fluido ogni volta che l'utente cambia tab o pagina.
+    """
+    try:
+        import streamlit.components.v1 as components
+        selector_js = f"'{target_selector}'" if target_selector else "null"
+        js_code = f"""
+        <script>
+            (function() {{
+                function doScroll() {{
+                    try {{
+                        const doc = window.parent.document;
+                        const targetSel = {selector_js};
+                        let targetEl = null;
+                        if (targetSel) {{
+                            targetEl = doc.querySelector(targetSel);
+                        }}
+                        
+                        if (targetEl && typeof targetEl.scrollIntoView === 'function') {{
+                            targetEl.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                            return;
+                        }}
+
+                        const mainCont = doc.querySelector('section[data-testid="stMain"]') || doc.querySelector('.main') || doc.querySelector('[data-testid="stAppViewContainer"]');
+                        if (mainCont && typeof mainCont.scrollTo === 'function') {{
+                            mainCont.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
+                        }} else if (mainCont) {{
+                            mainCont.scrollTop = 0;
+                        }}
+                        if (window.parent && typeof window.parent.scrollTo === 'function') {{
+                            window.parent.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
+                        }}
+                    }} catch (e) {{
+                        // Fallback safe
+                    }}
+                }}
+                setTimeout(doScroll, 30);
+                setTimeout(doScroll, 140);
+            }})();
+        </script>
+        """
+        components.html(js_code, height=0, width=0)
+    except Exception:
+        pass
+
+
 def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
     """
     Renderizza una barra di navigazione a schede istituzionale in stile Bloomberg Terminal / Linear.
     Zero cerchietti radio, pulsanti tattili a tutta larghezza con indicatore oro, feedback immediato e piena sincronizzazione con la sidebar.
+    Reindirizza sempre lo scroll all'inizio della scheda al cambio tab.
     """
     if not options:
         return ""
@@ -1770,8 +1819,15 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
         current = options[0]
         st.session_state[key] = current
 
-    # 2. Rendering del Deck a Schede Istituzionale
-    st.markdown('<div class="argus-tab-deck-container">', unsafe_allow_html=True)
+    # Rileva se il tab è cambiato rispetto al run precedente
+    last_tab_tracker_key = f"_last_seen_tab_{key}"
+    prev_tab = st.session_state.get(last_tab_tracker_key)
+    tab_has_changed = (prev_tab is not None and prev_tab != current)
+    st.session_state[last_tab_tracker_key] = current
+
+    # 2. Rendering del Deck a Schede Istituzionale con ID di ancoraggio
+    deck_id = f"argus_tab_deck_{key}"
+    st.markdown(f'<div id="{deck_id}" class="argus-tab-deck-container">', unsafe_allow_html=True)
     cols = st.columns(len(options))
     changed = False
     for i, opt in enumerate(options):
@@ -1786,7 +1842,12 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
     st.markdown('</div>', unsafe_allow_html=True)
 
     if changed:
+        st.session_state[f"_need_scroll_top_{key}"] = True
         st.rerun()
+
+    # Reindirizza in cima alla tab se è cambiato il tab attivo
+    if tab_has_changed or st.session_state.pop(f"_need_scroll_top_{key}", False):
+        scroll_to_top(f"#{deck_id}")
 
     return st.session_state.get(key, options[0])
 
