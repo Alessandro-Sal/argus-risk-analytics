@@ -503,28 +503,21 @@ def inject_custom_css():
             color: #8b949e !important;
             text-transform: uppercase !important;
             letter-spacing: 0.8px !important;
-            margin: 14px 0 8px 4px !important;
-            padding: 2px 0 !important;
-            line-height: 1.2 !important;
+            padding: 16px 4px 8px 4px !important;
+            margin: 0 !important;
+            line-height: 14px !important;
             display: block !important;
+            box-sizing: border-box !important;
         }}
 
         /* Ultra-Compact Institutional Sidebar Navigation & Gap Compression */
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"],
         section[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
-            gap: 0.18rem !important;
+            gap: 3px !important;
         }}
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"] {{
             margin-bottom: 0px !important;
             margin-top: 0px !important;
-        }}
-        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div,
-        section[data-testid="stSidebar"] div[data-testid="element-container"],
-        section[data-testid="stSidebar"] div.stElementContainer {{
-            margin-bottom: 0px !important;
-            margin-top: 0px !important;
-            padding-bottom: 0px !important;
-            padding-top: 0px !important;
         }}
         section[data-testid="stSidebar"] .stButton {{
             margin: 0px !important;
@@ -535,7 +528,7 @@ def inject_custom_css():
             background: rgba(22, 27, 34, 0.6) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 6px !important;
-            margin: 1px 0 !important;
+            margin: 0px !important;
             box-shadow: none !important;
             transition: all 0.15s ease !important;
         }}
