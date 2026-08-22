@@ -1513,7 +1513,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     
     fig_garch_ts.update_layout(
         height=380,
-        margin=dict(l=10, r=10, t=35, b=10),
+        margin=dict(l=10, r=10, t=35, b=25),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1525,7 +1525,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=False),
+        xaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=False, automargin=True),
         yaxis=dict(title="Rendimento / VaR (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", zeroline=True, zerolinecolor="rgba(255,255,255,0.15)")
     )
     st.plotly_chart(fig_garch_ts, use_container_width=True)
@@ -1563,8 +1563,8 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     pad = max(0.4, (y_max - y_min) * 0.18)
     
     fig_term.update_layout(
-        height=380,
-        margin=dict(l=10, r=10, t=35, b=10),
+        height=390,
+        margin=dict(l=10, r=10, t=35, b=45),
         legend=dict(
             orientation="h",
             yanchor="bottom",
@@ -1576,10 +1576,12 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         ),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(title="Orizzonte Previsionale (Giorni Lavorativi)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", dtick=2),
+        xaxis=dict(title="Orizzonte Previsionale (Giorni Lavorativi)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", dtick=2, automargin=True),
         yaxis=dict(title="Volatilità Annualizzata (%)", showgrid=True, gridcolor="rgba(255,255,255,0.06)", range=[max(0.0, y_min - pad), y_max + pad])
     )
     st.plotly_chart(fig_term, use_container_width=True)
+
+    st.markdown('<div style="margin-top: 12px;"></div>', unsafe_allow_html=True)
 
     # Parametri di calibrazione con tabelle HTML responsive a riga singola (Zero Wrapping)
     with st.expander("🔬 Dettaglio Parametri Econometrici GARCH(1,1) & Test di Verosimiglianza"):
