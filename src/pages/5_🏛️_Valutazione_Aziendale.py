@@ -18,7 +18,7 @@ importlib.reload(financial_analysis)
 
 from core.ui_utils import (
     inject_custom_css, metric_card, glossary_modal, fmt_pct,
-    render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs,
+    render_altman_zscore_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs,
     ensure_risk_bundle_loaded, render_sandbox_banner, render_sec_rag_modal
 )
 from core.workspace_manager import get_url_param, set_url_params, register_workspace_tab
@@ -618,18 +618,13 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
         col_z1, col_z2 = st.columns([1.5, 1])
 
         with col_z1:
-            col_zt1, col_zt2 = st.columns([3, 1])
+            col_zt1, col_zt2 = st.columns([2.4, 1.6])
             with col_zt1:
                 st.markdown(f"#### 🛡️ Verdetto Solvibilità: {z_data['zone_icon']}")
             with col_zt2:
-                render_formula_popover(
-                    "🧮 Formula Altman", 
-                    "Altman Z-Score (1968)",
-                    r"Z = 1.2X_1 + 1.4X_2 + 3.3X_3 + 0.6X_4 + 0.999X_5",
-                    "<b>Fasce di Rischio Solvibilità:</b><br>"
-                    "• Z > 2.99: Zona Sicura (Verde)<br>"
-                    "• 1.81 ≤ Z ≤ 2.99: Zona Grigia (Giallo)<br>"
-                    "• Z < 1.81: Zona di Rischio Insolvenza (Rosso)"
+                render_altman_zscore_modal(
+                    button_label="🧮 Formula & Guida Altman",
+                    use_popover=False
                 )
             st.info(z_data["description"])
 

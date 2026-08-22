@@ -2447,6 +2447,38 @@ def render_duckdb_modal(
     )
 
 
+def render_altman_zscore_modal(
+    button_label: str = "🧮 Guida & Formula Altman Z-Score",
+    use_popover: bool = False
+):
+    """
+    Renderizza un modale istituzionale standardizzato a 5 punti per l'Altman Z-Score (1968).
+    """
+    content = format_institutional_5point_html(
+        title="🛡️ Modello di Solvibilità Altman Z-Score (1968)",
+        what_is="Modello econometrico multivariato sviluppato dal Prof. Edward Altman nel 1968 per stimare la probabilità di insolvenza, default e dissesto finanziario di un'azienda a un orizzonte temporale di 24 mesi.",
+        how_calc="Combinazione lineare ponderata di 5 indici di bilancio fondamentali:<br>"
+                 "<div style='background: rgba(255,255,255,0.05); padding: 10px 14px; border-radius: 8px; font-family: monospace; font-size: 13.5px; margin: 8px 0; border-left: 3px solid #ff9900;'>"
+                 "<b>Z = 1.2·X₁ + 1.4·X₂ + 3.3·X₃ + 0.6·X₄ + 0.999·X₅</b></div>"
+                 "• <b>X₁ = Capitale Circolante Netto / Totale Attivo:</b> Misura la liquidità netta a breve termine.<br>"
+                 "• <b>X₂ = Utili Non Distribuiti / Totale Attivo:</b> Misura l'autofinanziamento e la redditività cumulativa nel tempo.<br>"
+                 "• <b>X₃ = EBIT / Totale Attivo:</b> Misura la redditività operativa pura degli asset, al lordo di imposte e oneri finanziari.<br>"
+                 "• <b>X₄ = Capitalizzazione di Mercato / Totale Debiti (Passività):</b> Misura la capacità dell'equity di assorbire perdite prima dell'insolvenza.<br>"
+                 "• <b>X₅ = Fatturato / Totale Attivo:</b> Misura l'efficienza della rotazione degli asset nel generare vendite.",
+        why_useful="Fornisce un indicatore quantitativo precoce per identificare il deterioramento dei fondamentali societari e il rischio di bancarotta o downgrade del credito prima che si rifletta sui corsi azionari.",
+        argus_calc="ARGUS estrae le voci di bilancio annuali certificate (SEC 10-K / bilanci UE) tramite yfinance, normalizza i dati in valuta base di portafoglio, calcola i 5 ratio e determina la fascia di rischio (Safe, Grey, Distress).",
+        how_to_read="• 🟢 <b>Zona Sicura (Z &gt; 2.99):</b> Struttura patrimoniale solida, probabilità di default trascurabile (&lt; 5%).<br>"
+                    "• 🟡 <b>Zona Grigia (1.81 &le; Z &le; 2.99):</b> Situazione di incertezza e vigilanza, equilibrio finanziario vulnerabile a shock operativi o di tassi.<br>"
+                    "• 🔴 <b>Zona di Rischio (Z &lt; 1.81):</b> Elevato rischio di insolvenza e dissesto finanziario nei successivi 24 mesi (probabilità di default storicamente superiore all'80%)."
+    )
+    render_info_modal(
+        title="🛡️ Guida all'Altman Z-Score (1968)",
+        content=content,
+        button_label=button_label,
+        use_popover=use_popover
+    )
+
+
 
 
 
