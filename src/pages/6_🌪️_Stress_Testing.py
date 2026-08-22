@@ -7,7 +7,7 @@ import core.ui_utils
 import core.risk_engine
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, render_executive_badges, apply_plotly_theme, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner
 
 st.set_page_config(page_title="Stress Testing | ARGUS", page_icon="🌪️", layout="wide")
 inject_custom_css()
@@ -33,16 +33,16 @@ if not stress and not pos.empty:
 
 render_sandbox_banner(page_key="p6")
 
-st.title("🌪️ Stress Testing & Resilience Analysis")
-if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Simulazione d'impatto e matrice MSCI Barra nei 5 principali scenari storici di crisi e stress macroeconomico.")
-elif results.get("is_sandbox"):
-    st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
-col_head1, col_head2 = st.columns([3.2, 1.2])
+col_head1, col_head2 = st.columns([3.4, 1.2])
 with col_head1:
-    render_executive_badges(results.get("metrics", {}))
+    st.title("🌪️ Stress Testing & Resilience Analysis")
+    if "run_id" in st.session_state:
+        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Simulazione d'impatto e matrice MSCI Barra nei 5 principali scenari storici di crisi e stress macroeconomico.")
+    elif results.get("is_sandbox"):
+        st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
+
 with col_head2:
-    st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="display: flex; justify-content: flex-end; margin-top: 24px;">', unsafe_allow_html=True)
     glossary_modal("Cos'è lo Stress Testing Istituzionale?", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -79,6 +79,7 @@ with col_head2:
 
 </div>
 """, button_label="💡 Come funziona lo Stress Testing?")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 

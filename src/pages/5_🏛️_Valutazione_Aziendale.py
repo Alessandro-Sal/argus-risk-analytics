@@ -17,7 +17,7 @@ importlib.reload(metadata_resolver)
 importlib.reload(financial_analysis)
 
 from core.ui_utils import (
-    inject_custom_css, metric_card, glossary_modal, fmt_pct, render_executive_badges,
+    inject_custom_css, metric_card, glossary_modal, fmt_pct,
     render_formula_popover, apply_plotly_theme, render_command_bar, render_segmented_tabs,
     ensure_risk_bundle_loaded, render_sandbox_banner, render_sec_rag_modal
 )
@@ -66,14 +66,14 @@ for _, r in equity_pos.iterrows():
     raw_name = r.get("name", r.get("asset_name", tk))
     company_options[tk] = resolve_company_name(tk, raw_name)
 
-st.title("🏛️ Valutazione Intrinseca & Fair Value")
-if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Analisi dei fondamentali societari, target price dei mercati (Consensus) e simulazioni di private equity (IRR & TVPI).")
-col_head1, col_head2 = st.columns([3.2, 1.2])
+col_head1, col_head2 = st.columns([3.4, 1.2])
 with col_head1:
-    render_executive_badges(port_metrics)
+    st.title("🏛️ Valutazione Intrinseca & Fair Value")
+    if "run_id" in st.session_state:
+        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Analisi dei fondamentali societari, target price dei mercati (Consensus) e simulazioni di private equity (IRR & TVPI).")
+
 with col_head2:
-    st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="display: flex; justify-content: flex-end; margin-top: 24px;">', unsafe_allow_html=True)
     glossary_modal("Cos'è la Valutazione Aziendale & Fair Value", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -110,6 +110,7 @@ with col_head2:
 
 </div>
 """, button_label="💡 Come funziona la Valutazione?")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
