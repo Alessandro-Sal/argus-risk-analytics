@@ -542,11 +542,13 @@ if not pos.empty:
                 csv_cube = cube_res["df"].to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Scarica CSV", data=csv_cube, file_name="cubo_olap_duckdb.csv", mime="text/csv", use_container_width=True, key="btn_download_duckdb_cube_p1")
             cube_cfg = {
-                "asset_class": st.column_config.TextColumn("Asset Class"),
-                "sector": st.column_config.TextColumn("Settore GICS"),
-                "currency": st.column_config.TextColumn("Valuta"),
+                "asset_class": st.column_config.TextColumn("Asset Class", width="medium"),
+                "sector": st.column_config.TextColumn("Settore GICS", width="medium"),
+                "currency": st.column_config.TextColumn("Valuta", width="small"),
                 "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
-                "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f")
+                "controvalore_totale": st.column_config.NumberColumn("Controvalore Totale (€)", format="€ %.2f"),
+                "pnl_latente_totale": st.column_config.NumberColumn("PnL Latente Totale (€)", format="€ %.2f"),
+                "rendimento_medio_pct": st.column_config.NumberColumn("Rendimento Medio (%)", format="%.2f%%")
             }
             st.dataframe(cube_res["df"], column_config=cube_cfg, use_container_width=True, hide_index=True)
 

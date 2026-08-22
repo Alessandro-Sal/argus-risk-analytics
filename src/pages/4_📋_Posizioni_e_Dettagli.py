@@ -289,18 +289,20 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
                         st.download_button("📥 Scarica Cubo CSV", data=csv_cube, file_name="duckdb_olap_cube.csv", mime="text/csv", use_container_width=True)
 
                     cube_cfg = {
-                        "asset_class": st.column_config.TextColumn("Asset Class"),
-                        "sector": st.column_config.TextColumn("Settore GICS"),
-                        "currency": st.column_config.TextColumn("Valuta"),
+                        "asset_class": st.column_config.TextColumn("Asset Class", width="medium"),
+                        "sector": st.column_config.TextColumn("Settore GICS", width="medium"),
+                        "currency": st.column_config.TextColumn("Valuta", width="small"),
                         "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
-                        "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f")
+                        "controvalore_totale": st.column_config.NumberColumn("Controvalore Totale (€)", format="€ %.2f"),
+                        "pnl_latente_totale": st.column_config.NumberColumn("PnL Latente Totale (€)", format="€ %.2f"),
+                        "rendimento_medio_pct": st.column_config.NumberColumn("Rendimento Medio (%)", format="%.2f%%")
                     }
                     st.dataframe(
                         df_cube,
                         column_config=cube_cfg,
                         use_container_width=True,
                         hide_index=True,
-                        height=300
+                        height=320
                     )
                 else:
                     st.info("Nessun dato disponibile per il cubo OLAP.")
@@ -316,17 +318,19 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
                         st.download_button("📥 Scarica Leader CSV", data=csv_rank, file_name="duckdb_sector_leaders.csv", mime="text/csv", use_container_width=True)
 
                     rank_cfg = {
-                        "settore": st.column_config.TextColumn("Settore GICS"),
-                        "ticker": st.column_config.TextColumn("Ticker"),
+                        "settore": st.column_config.TextColumn("Settore GICS", width="medium"),
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
                         "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
-                        "rank_in_settore": st.column_config.NumberColumn("Rank Settoriale", format="#%d")
+                        "pnl_latente_eur": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
+                        "gain_pct": st.column_config.NumberColumn("Gain Latente (%)", format="%.2f%%"),
+                        "rank_settoriale": st.column_config.NumberColumn("Rank Settoriale", format="#%d")
                     }
                     st.dataframe(
                         df_rank,
                         column_config=rank_cfg,
                         use_container_width=True,
                         hide_index=True,
-                        height=300
+                        height=320
                     )
                 else:
                     st.info("Nessun ranking disponibile.")
