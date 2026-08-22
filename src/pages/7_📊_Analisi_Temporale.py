@@ -537,6 +537,15 @@ elif active_time_tab == "🗃️ Registro Completo Snapshot Storici":
             with col_dk2:
                 csv_duck = duck_snap["df"].to_csv(index=False).encode('utf-8')
                 st.download_button("📥 Scarica Trend CSV", data=csv_duck, file_name="duckdb_trend_temporale.csv", mime="text/csv", use_container_width=True, key="btn_download_duck_trend")
-            st.dataframe(duck_snap["df"], use_container_width=True, hide_index=True)
+            
+            cfg_duck = {
+                "calc_date": st.column_config.TextColumn("Data e Ora Snapshot"),
+                "run_name": st.column_config.TextColumn("Nome Rilevazione"),
+                "valore_portafoglio_eur": st.column_config.NumberColumn("Valore Portafoglio (€)", format="€ %.2f"),
+                "delta_valore_step_eur": st.column_config.NumberColumn("Δ Valore Step (€)", format="€ %+.2f"),
+                "delta_pct_step": st.column_config.NumberColumn("Δ % Step", format="%+.2f%%"),
+                "media_mobile_3_snapshot": st.column_config.NumberColumn("Media Mobile (3 Snap)", format="€ %.2f")
+            }
+            st.dataframe(duck_snap["df"], column_config=cfg_duck, use_container_width=True, hide_index=True)
         else:
             st.info("Dati insufficienti per l'analisi del trend temporale.")
