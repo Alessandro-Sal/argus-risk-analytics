@@ -1221,7 +1221,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
 
 # ── TAB 5: VALUTAZIONE INTRINSECA DCF MONTE CARLO ─────────────────────
 elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
-    col_head_dcf1, col_head_dcf2 = st.columns([3.2, 1.1])
+    col_head_dcf1, col_head_dcf2 = st.columns([3.0, 1.4])
     with col_head_dcf1:
         st.markdown("### 🧮 Modello di Valutazione Intrinseca DCF Monte Carlo")
         st.caption("Stima il Fair Value intrinseco aziendale attualizzando i Flussi di Cassa Liberi (FCF) al WACC ed eseguendo 1.000 simulazioni stocastiche sui parametri chiave.")
@@ -1263,7 +1263,7 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 </div>
 
 </div>
-""", button_label="💡 Come funziona il DCF Monte Carlo?")
+""", button_label="💡 Guida al DCF Monte Carlo")
 
     try:
         from core.financial_analysis import compute_dcf_monte_carlo_valuation
@@ -1273,7 +1273,7 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         importlib.reload(core.financial_analysis)
         from core.financial_analysis import compute_dcf_monte_carlo_valuation
 
-    c_dcf1, c_dcf2 = st.columns([1.5, 2.5])
+    c_dcf1, c_dcf2 = st.columns([1.25, 2.75])
     with c_dcf1:
         st.markdown("#### ⚙️ Input & Parametri del Modello")
         
@@ -1346,13 +1346,13 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 
         dk1, dk2, dk3, dk4 = st.columns(4)
         with dk1:
-            metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base Case: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
+            metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
         with dk2:
-            metric_card("Prezzo Attuale", f"€ {dcf_res['current_price']:.2f}", f"Quotazione di Mercato", True)
+            metric_card("Prezzo Attuale", f"€ {dcf_res['current_price']:.2f}", "Prezzo Spot Mercato", True)
         with dk3:
-            metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine di Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
+            metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
         with dk4:
-            metric_card("Prob. Sottovalutazione", f"{dcf_res['prob_undervalued_pct']:.1f}%", f"{n_sims} Simulazioni", True if dcf_res['prob_undervalued_pct'] > 50 else False)
+            metric_card("Prob. Sottovalutaz.", f"{dcf_res['prob_undervalued_pct']:.1f}%", f"{n_sims} Simulazioni", True if dcf_res['prob_undervalued_pct'] > 50 else False)
 
         st.divider()
 
