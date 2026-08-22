@@ -2036,14 +2036,17 @@ def glossary_modal(title: str, content: str, button_label: str = "📖 Approfond
     background: rgba(255, 153, 0, 0.1);
     color: #ff9900;
     border: 1px solid rgba(255, 153, 0, 0.4);
-    padding: 8px 14px;
+    padding: 7px 14px;
     border-radius: 8px;
     font-size: 13px;
     font-weight: 500;
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
-    margin-bottom: 12px;
+    justify-content: center;
+    white-space: nowrap;
+    margin-bottom: 8px;
+    text-decoration: none;
 }}
 .btn-glossary-{unique_id}:hover {{
     background: rgba(255, 153, 0, 0.2);
