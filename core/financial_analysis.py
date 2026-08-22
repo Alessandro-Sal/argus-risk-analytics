@@ -699,8 +699,19 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
         t = yf.Ticker(ticker)
         inf = t.info or {}
         
-        price = float(inf.get("currentPrice") or inf.get("regularMarketPrice") or inf.get("previousClose") or fallback_price)
-        mkt_cap = float(inf.get("marketCap") or 100000000000.0)
+        price = None
+        try:
+            if hasattr(t, "fast_info") and t.fast_info is not None:
+                fi_price = getattr(t.fast_info, "last_price", None) or getattr(t.fast_info, "previous_close", None)
+                if fi_price is not None and float(fi_price) > 0:
+                    price = float(fi_price)
+        except Exception:
+            pass
+        
+        if price is None:
+            price = float(inf.get("currentPrice") or inf.get("regularMarketPrice") or inf.get("previousClose") or fallback_price)
+
+        mkt_cap = float(inf.get("marketCap") or (price * 1e9))
         
         # Priority to impliedSharesOutstanding (total shares across Class A, B, C for dual-class stocks)
         shares = float(inf.get("impliedSharesOutstanding") or inf.get("sharesOutstanding") or (mkt_cap / max(1.0, price)))

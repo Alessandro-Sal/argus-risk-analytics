@@ -1276,16 +1276,16 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
     # ── RIGA 1: SELEZIONE AZIENDA & PARAMETRI MODELLO ──────────────────────
     st.markdown("#### ⚙️ Input & Parametri del Modello")
     
-    col_sel1, col_sel2 = st.columns([1.4, 2.6])
+    col_sel1, col_sel2 = st.columns([1.3, 2.7])
     with col_sel1:
         search_mode_dcf = st.radio(
-            "Modalità Selezione Azienda:",
-            ["Azienda dal Portafoglio", "Cerca Qualsiasi Azienda sul Mercato"],
+            "Modalità Selezione:",
+            ["Portafoglio", "Cerca sul Mercato"],
             horizontal=True,
             key="radio_dcf_search"
         )
     with col_sel2:
-        if search_mode_dcf == "Azienda dal Portafoglio":
+        if search_mode_dcf == "Portafoglio":
             dcf_tk = st.selectbox(
                 "Seleziona Azienda dal Portafoglio:",
                 list(company_options.keys()),
@@ -1309,12 +1309,11 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 
     col_inp1, col_inp2, col_inp3 = st.columns(3)
     with col_inp1:
-        input_price = st.number_input("Prezzo di Mercato Attuale (€ / $):", value=float(dcf_defaults["price"]), min_value=0.1, step=1.0)
+        input_price = st.number_input("Prezzo Spot Attuale (€ / $):", value=float(dcf_defaults["price"]), min_value=0.1, step=1.0)
     with col_inp2:
-        input_fcf = st.number_input("Flusso di Cassa Libero Iniziale (FCF Base in M €/$):", value=float(dcf_defaults["fcf_m"]), min_value=1.0, step=500.0) * 1e6
+        input_fcf = st.number_input("FCF Base Iniziale (M €/$):", value=float(dcf_defaults["fcf_m"]), min_value=1.0, step=500.0) * 1e6
     with col_inp3:
-        input_shares = st.number_input("Azioni in Circolazione (Milioni):", value=float(dcf_defaults["shares_m"]), min_value=1.0, step=100.0) * 1e6
-        st.caption(f"💡 *Azioni diluite stimate: {dcf_defaults['shares_m']:,.0f} Milioni (classi A/B/C)*")
+        input_shares = st.number_input("Azioni Diluite (Milioni):", value=float(dcf_defaults["shares_m"]), min_value=1.0, step=100.0) * 1e6
 
     with st.expander("🛠️ Parametri Avanzati di Simulazione (WACC, Tassi di Crescita & Volatilità)", expanded=False):
         c_adv1, c_adv2, c_adv3 = st.columns(3)
