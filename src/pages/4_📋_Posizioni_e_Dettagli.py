@@ -1185,13 +1185,22 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                 st.download_button("📥 Scarica Matrice CSV", data=csv_mat, file_name="matrice_annuale_dividendi.csv", mime="text/csv", use_container_width=True, key="btn_download_div_matrix")
 
             matrix_config = {
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
                 "Yield %": st.column_config.NumberColumn("Yield %", format="%.2f%%"),
+                "Frequenza": st.column_config.TextColumn("Frequenza", width="medium"),
                 "Totale Annuo (€)": st.column_config.NumberColumn("Totale Annuo (€)", format="€ %.2f")
             }
             for m_l in ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"]:
                 matrix_config[m_l] = st.column_config.NumberColumn(m_l, format="€ %.2f")
 
-            st.dataframe(df_matrix, use_container_width=True, hide_index=True, column_config=matrix_config)
+            mat_height = min(480, max(220, 42 + len(df_matrix) * 38))
+            st.dataframe(
+                df_matrix,
+                use_container_width=True,
+                hide_index=True,
+                column_config=matrix_config,
+                height=mat_height
+            )
 
 # ── TAB 3: OTTIMIZZAZIONE FISCALE ─────────────────────────────
 elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
