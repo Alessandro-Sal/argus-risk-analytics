@@ -463,7 +463,6 @@ def render_sidebar():
                                 st.session_state[mod["tab_key"]] = sub["target"]
                                 st.session_state[f"target_subtab_{mod['tab_key']}"] = sub["target"]
                                 st.session_state["global_target_subtab"] = sub["target"]
-                                st.session_state[f"_need_scroll_top_{mod['tab_key']}"] = True
                             switch_to_page(mod["page_file"])
 
         st.divider()
