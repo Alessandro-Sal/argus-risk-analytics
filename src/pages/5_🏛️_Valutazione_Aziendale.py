@@ -1266,12 +1266,12 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 """, button_label="💡 Guida al DCF Monte Carlo")
 
     try:
-        from core.financial_analysis import compute_dcf_monte_carlo_valuation
+        from core.financial_analysis import compute_dcf_monte_carlo_valuation, fetch_dcf_initial_inputs
     except ImportError:
         import importlib
         import core.financial_analysis
         importlib.reload(core.financial_analysis)
-        from core.financial_analysis import compute_dcf_monte_carlo_valuation
+        from core.financial_analysis import compute_dcf_monte_carlo_valuation, fetch_dcf_initial_inputs
 
     # ── RIGA 1: SELEZIONE AZIENDA & PARAMETRI MODELLO ──────────────────────
     st.markdown("#### ⚙️ Input & Parametri del Modello")
