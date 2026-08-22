@@ -221,7 +221,7 @@ df_prof = vol_res["df_profile"]
 st.divider()
 
 chg_pct = ((df_prices['close'].iloc[-1] / df_prices['close'].iloc[-2] - 1)*100) if len(df_prices) > 1 else 0.0
-m1, m2, m3, m4, m5 = st.columns(5)
+m1, m2, m3 = st.columns(3)
 with m1:
     metric_card("Prezzo Attuale", f"€ {tech_res['last_close']:.2f}", f"{chg_pct:+.2f}% 24h", positive=chg_pct >= 0)
 with m2:
@@ -230,6 +230,9 @@ with m2:
 with m3:
     rsi_val = tech_res['rsi_latest']
     metric_card("RSI (14)", f"{rsi_val:.1f}", tech_res["rsi_status"], positive=(30 <= rsi_val <= 70))
+
+st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+m4, m5 = st.columns(2)
 with m4:
     metric_card("Point of Control (POC)", f"€ {vol_res['poc_price']:.2f}", f"VA: € {vol_res['val_price']:.1f} - {vol_res['vah_price']:.1f}", positive=True, help_text="Livello di prezzo con la massima concentrazione di volumi scambiati.")
 with m5:
