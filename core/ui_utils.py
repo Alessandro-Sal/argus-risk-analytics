@@ -752,62 +752,91 @@ def inject_custom_css():
         footer {{visibility: hidden;}}
         header, [data-testid="stHeader"] {{ visibility: visible !important; display: block !important; }}
         [data-testid="collapsedControl"] {{ visibility: visible !important; display: block !important; z-index: 999999 !important; }}
+
+        /* Zero-height wrapper for background JS runners */
+        iframe[data-testid="stCustomComponentV1"],
+        div[data-testid="stCustomComponentV1"],
+        div:has(> iframe[height="0"]) {{
+            display: none !important;
+            height: 0px !important;
+            margin: 0px !important;
+            padding: 0px !important;
+        }}
     </style>
     """, unsafe_allow_html=True)
-
-    js_tab_hooks = """
-    <script>
-    (function() {
-        function hookTabs() {
-            try {
-                // 1. Native st.tabs
-                document.querySelectorAll('button[data-testid="stTab"]').forEach(function(btn) {
-                    if (btn.dataset.argusHooked) return;
-                    btn.dataset.argusHooked = "true";
-                    btn.addEventListener('click', function() {
-                        setTimeout(function() {
-                            const tabsCont = btn.closest('div[data-testid="stTabs"]') || btn.closest('.stTabs') || btn;
-                            if (tabsCont && typeof tabsCont.scrollIntoView === 'function') {
-                                tabsCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }
-                        }, 40);
-                    });
-                });
-
-                // 2. Segmented tab decks
-                document.querySelectorAll('.argus-tab-deck-container button').forEach(function(btn) {
-                    if (btn.dataset.argusHooked) return;
-                    btn.dataset.argusHooked = "true";
-                    btn.addEventListener('click', function() {
-                        setTimeout(function() {
-                            const deck = btn.closest('.argus-tab-deck-container') || btn.closest('div[data-testid="stHorizontalBlock"]');
-                            if (deck && typeof deck.scrollIntoView === 'function') {
-                                deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            } else {
-                                const main = document.querySelector('section[data-testid="stMain"]') || document.querySelector('.main') || window;
-                                if (main && main.scrollTo) main.scrollTo({ top: 0, behavior: 'smooth' });
-                            }
-                        }, 40);
-                    });
-                });
-            } catch(e) {}
-        }
-
-        if (!window._argusObserverActive) {
-            window._argusObserverActive = true;
-            const obs = new MutationObserver(function() {
-                hookTabs();
-            });
-            obs.observe(document.body, { childList: true, subtree: true });
-        }
-        hookTabs();
-    })();
-    </script>
-    """
-    if hasattr(st, "html"):
-        st.html(js_tab_hooks)
+    
+    scroll_to_top()
 
 apply_custom_css = inject_custom_css
+
+
+def scroll_to_top(behavior: str = "instant"):
+    """
+    Esegue lo scroll automatico verso la cima della pagina e dei container scrollabili Streamlit.
+    Attivato automaticamente al cambio pagina e al cambio di tab interne (sia st.tabs che segmented tabs).
+    """
+    import streamlit.components.v1 as components
+    js_code = f"""
+    <script>
+    (function() {{
+        function performScroll() {{
+            try {{
+                const p = window.parent;
+                const d = p ? p.document : document;
+                if (!p || !d) return;
+
+                const targets = [
+                    p,
+                    d.documentElement,
+                    d.body,
+                    d.querySelector('section.main'),
+                    d.querySelector('[data-testid="stAppViewContainer"]'),
+                    d.querySelector('[data-testid="stMain"]'),
+                    d.querySelector('.main'),
+                    d.querySelector('[data-testid="stMainBlockContainer"]')
+                ];
+                targets.forEach(function(el) {{
+                    if (el) {{
+                        if (typeof el.scrollTo === 'function') {{
+                            el.scrollTo({{ top: 0, left: 0, behavior: '{behavior}' }});
+                        }}
+                        el.scrollTop = 0;
+                    }}
+                }});
+            }} catch (e) {{}}
+        }}
+
+        performScroll();
+        setTimeout(performScroll, 30);
+        setTimeout(performScroll, 100);
+        setTimeout(performScroll, 250);
+
+        // Installa listener globale permanente sui click di qualsiasi tab o link di navigazione
+        try {{
+            if (window.parent && !window.parent._argus_scroll_listener_installed) {{
+                window.parent._argus_scroll_listener_installed = true;
+                const doc = window.parent.document;
+                doc.addEventListener('click', function(e) {{
+                    const t = e.target;
+                    if (!t) return;
+                    const isTab = t.closest('button[data-testid="stTab"]') || 
+                                  t.closest('[data-testid="stTab"]') ||
+                                  t.closest('.argus-tab-deck-container button') ||
+                                  t.closest('section[data-testid="stSidebar"] button') ||
+                                  t.closest('section[data-testid="stSidebar"] [data-testid="stExpander"] button');
+                    if (isTab) {{
+                        performScroll();
+                        setTimeout(performScroll, 40);
+                        setTimeout(performScroll, 120);
+                        setTimeout(performScroll, 300);
+                    }}
+                }}, true);
+            }}
+        }} catch(err) {{}}
+    }})();
+    </script>
+    """
+    components.html(js_code, height=0, width=0)
 
 
 def render_header(title: str, subtitle: str = None):
@@ -1797,49 +1826,10 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
     return derived
 
 
-def scroll_to_top(target_selector: str = None):
-    """
-    Inietta uno script ad esecuzione immediata nel DOM principale di Streamlit tramite st.html
-    per riallineare lo scroll in cima alla tab o alla pagina in modo fluido al cambio tab.
-    """
-    target_arg = f"'{target_selector}'" if target_selector else "null"
-    js_code = f"""
-    <script>
-    (function() {{
-        function doScroll() {{
-            try {{
-                const target = {target_arg};
-                let el = target ? document.querySelector(target) : null;
-                if (el && typeof el.scrollIntoView === 'function') {{
-                    el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-                    return;
-                }}
-                const mainEl = document.querySelector('section[data-testid="stMain"]') || document.querySelector('.main') || document.querySelector('[data-testid="stAppViewContainer"]') || window;
-                if (mainEl && typeof mainEl.scrollTo === 'function') {{
-                    mainEl.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
-                }} else if (mainEl) {{
-                    mainEl.scrollTop = 0;
-                }}
-                if (typeof window.scrollTo === 'function') {{
-                    window.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
-                }}
-            }} catch(e) {{}}
-        }}
-        doScroll();
-        setTimeout(doScroll, 40);
-        setTimeout(doScroll, 140);
-    }})();
-    </script>
-    """
-    if hasattr(st, "html"):
-        st.html(js_code)
-
-
 def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
     """
     Renderizza una barra di navigazione a schede istituzionale in stile Bloomberg Terminal / Linear.
     Zero cerchietti radio, pulsanti tattili a tutta larghezza con indicatore oro, feedback immediato e piena sincronizzazione con la sidebar.
-    Reindirizza sempre lo scroll all'inizio della scheda al cambio tab.
     """
     if not options:
         return ""
@@ -1861,15 +1851,13 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
         current = options[0]
         st.session_state[key] = current
 
-    # Rileva se il tab è cambiato rispetto al run precedente
-    last_tab_tracker_key = f"_last_seen_tab_{key}"
-    prev_tab = st.session_state.get(last_tab_tracker_key)
-    tab_has_changed = (prev_tab is not None and prev_tab != current)
-    st.session_state[last_tab_tracker_key] = current
+    # 2. Rendering del Deck a Schede Istituzionale & Gestione Scroll to Top
+    prev_tab_session_key = f"_prev_rendered_tab_{key}"
+    if st.session_state.get(prev_tab_session_key) != current:
+        st.session_state[prev_tab_session_key] = current
+        scroll_to_top()
 
-    # 2. Rendering del Deck a Schede Istituzionale con ID di ancoraggio
-    deck_id = f"argus_tab_deck_{key}"
-    st.markdown(f'<div id="{deck_id}" class="argus-tab-deck-container">', unsafe_allow_html=True)
+    st.markdown('<div class="argus-tab-deck-container">', unsafe_allow_html=True)
     cols = st.columns(len(options))
     changed = False
     for i, opt in enumerate(options):
@@ -1880,16 +1868,13 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
             if st.button(opt, key=btn_key, type=btn_type, use_container_width=True):
                 if st.session_state.get(key) != opt:
                     st.session_state[key] = opt
+                    st.session_state[prev_tab_session_key] = opt
                     changed = True
     st.markdown('</div>', unsafe_allow_html=True)
 
     if changed:
-        st.session_state[f"_need_scroll_top_{key}"] = True
+        scroll_to_top()
         st.rerun()
-
-    # Reindirizza in cima alla tab se è cambiato il tab attivo
-    if tab_has_changed or st.session_state.pop(f"_need_scroll_top_{key}", False):
-        scroll_to_top(f"#{deck_id}")
 
     return st.session_state.get(key, options[0])
 
