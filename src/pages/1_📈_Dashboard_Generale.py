@@ -49,6 +49,8 @@ if has_warnings:
         for w in warn_list:
             st.warning(f"• {w}")
 
+st.divider()
+
 # ⚡ Sintesi Esecutiva Quantitativa (Executive Callout Box)
 from core.risk_limits import check_risk_limits
 limits_res = check_risk_limits(results)
