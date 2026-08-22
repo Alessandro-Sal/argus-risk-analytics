@@ -755,64 +755,55 @@ def inject_custom_css():
     </style>
     """, unsafe_allow_html=True)
 
-    try:
-        import streamlit.components.v1 as components
-        js_tab_observer = """
-        <script>
-        (function() {
-            function setupTabScroll() {
-                try {
-                    const doc = window.parent.document || document;
-                    
-                    // 1. Tab native di Streamlit (st.tabs interne ed esterne)
-                    doc.querySelectorAll('button[data-testid="stTab"]').forEach(function(tabBtn) {
-                        if (tabBtn.dataset.hasScrollListener) return;
-                        tabBtn.dataset.hasScrollListener = "true";
-                        tabBtn.addEventListener('click', function() {
-                            setTimeout(function() {
-                                const tabList = tabBtn.closest('div[data-testid="stTabs"]') || tabBtn.closest('.stTabs');
-                                if (tabList && typeof tabList.scrollIntoView === 'function') {
-                                    tabList.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }
-                            }, 40);
-                        });
-                    });
-
-                    // 2. Segmented Tab Decks di ARGUS (render_segmented_tabs principali e sub-tab)
-                    doc.querySelectorAll('.argus-tab-deck-container button').forEach(function(btn) {
-                        if (btn.dataset.hasScrollListener) return;
-                        btn.dataset.hasScrollListener = "true";
-                        btn.addEventListener('click', function() {
-                            setTimeout(function() {
-                                const deck = btn.closest('.argus-tab-deck-container');
-                                if (deck && typeof deck.scrollIntoView === 'function') {
-                                    deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                                }
-                            }, 40);
-                        });
-                    });
-                } catch (e) {}
-            }
-
+    js_tab_hooks = """
+    (function() {
+        function hookTabs() {
             try {
-                const targetDoc = window.parent.document || document;
-                if (!window.parent._argusTabObserverAttached) {
-                    window.parent._argusTabObserverAttached = true;
-                    const observer = new MutationObserver(function() {
-                        setupTabScroll();
+                // 1. Native st.tabs
+                document.querySelectorAll('button[data-testid="stTab"]').forEach(function(btn) {
+                    if (btn.dataset.argusHooked) return;
+                    btn.dataset.argusHooked = "true";
+                    btn.addEventListener('click', function() {
+                        setTimeout(function() {
+                            const tabsCont = btn.closest('div[data-testid="stTabs"]') || btn.closest('.stTabs') || btn;
+                            if (tabsCont && typeof tabsCont.scrollIntoView === 'function') {
+                                tabsCont.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                        }, 40);
                     });
-                    observer.observe(targetDoc.body, { childList: true, subtree: true });
-                }
-                setupTabScroll();
-            } catch(e) {
-                setupTabScroll();
-            }
-        })();
-        </script>
-        """
-        components.html(js_tab_observer, height=0, width=0)
-    except Exception:
-        pass
+                });
+
+                // 2. Segmented tab decks
+                document.querySelectorAll('.argus-tab-deck-container button').forEach(function(btn) {
+                    if (btn.dataset.argusHooked) return;
+                    btn.dataset.argusHooked = "true";
+                    btn.addEventListener('click', function() {
+                        setTimeout(function() {
+                            const deck = btn.closest('.argus-tab-deck-container') || btn.closest('div[data-testid="stHorizontalBlock"]');
+                            if (deck && typeof deck.scrollIntoView === 'function') {
+                                deck.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            } else {
+                                const main = document.querySelector('section[data-testid="stMain"]') || document.querySelector('.main') || window;
+                                if (main && main.scrollTo) main.scrollTo({ top: 0, behavior: 'smooth' });
+                            }
+                        }, 40);
+                    });
+                });
+            } catch(e) {}
+        }
+
+        if (!window._argusObserverActive) {
+            window._argusObserverActive = true;
+            const obs = new MutationObserver(function() {
+                hookTabs();
+            });
+            obs.observe(document.body, { childList: true, subtree: true });
+        }
+        hookTabs();
+    })();
+    """.replace("\n", " ").strip()
+
+    st.markdown(f'<img src="argus_tab_hooks" style="display:none;" onerror="{js_tab_hooks}">', unsafe_allow_html=True)
 
 apply_custom_css = inject_custom_css
 
@@ -1806,50 +1797,38 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
 
 def scroll_to_top(target_selector: str = None):
     """
-    Inietta un micro-script JavaScript invisibile per reindirizzare lo scroll
-    in cima alla tab / pagina in modo fluido ogni volta che l'utente cambia tab o pagina.
+    Inietta uno script ad esecuzione immediata nel DOM principale di Streamlit
+    per riallineare lo scroll in cima alla tab o alla pagina in modo fluido al cambio tab.
     """
-    try:
-        import streamlit.components.v1 as components
-        selector_js = f"'{target_selector}'" if target_selector else "null"
-        js_code = f"""
-        <script>
-            (function() {{
-                function doScroll() {{
-                    try {{
-                        const doc = window.parent.document;
-                        const targetSel = {selector_js};
-                        let targetEl = null;
-                        if (targetSel) {{
-                            targetEl = doc.querySelector(targetSel);
-                        }}
-                        
-                        if (targetEl && typeof targetEl.scrollIntoView === 'function') {{
-                            targetEl.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
-                            return;
-                        }}
-
-                        const mainCont = doc.querySelector('section[data-testid="stMain"]') || doc.querySelector('.main') || doc.querySelector('[data-testid="stAppViewContainer"]');
-                        if (mainCont && typeof mainCont.scrollTo === 'function') {{
-                            mainCont.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
-                        }} else if (mainCont) {{
-                            mainCont.scrollTop = 0;
-                        }}
-                        if (window.parent && typeof window.parent.scrollTo === 'function') {{
-                            window.parent.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
-                        }}
-                    }} catch (e) {{
-                        // Fallback safe
-                    }}
+    target_arg = f"'{target_selector}'" if target_selector else "null"
+    js_inline = f"""
+    (function() {{
+        function doScroll() {{
+            try {{
+                const target = {target_arg};
+                let el = target ? document.querySelector(target) : null;
+                if (el && typeof el.scrollIntoView === 'function') {{
+                    el.scrollIntoView({{ behavior: 'smooth', block: 'start' }});
+                    return;
                 }}
-                setTimeout(doScroll, 30);
-                setTimeout(doScroll, 140);
-            }})();
-        </script>
-        """
-        components.html(js_code, height=0, width=0)
-    except Exception:
-        pass
+                const mainEl = document.querySelector('section[data-testid="stMain"]') || document.querySelector('.main') || document.querySelector('[data-testid="stAppViewContainer"]') || window;
+                if (mainEl && typeof mainEl.scrollTo === 'function') {{
+                    mainEl.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
+                }} else if (mainEl) {{
+                    mainEl.scrollTop = 0;
+                }}
+                if (typeof window.scrollTo === 'function') {{
+                    window.scrollTo({{ top: 0, left: 0, behavior: 'smooth' }});
+                }}
+            }} catch(e) {{}}
+        }}
+        doScroll();
+        setTimeout(doScroll, 40);
+        setTimeout(doScroll, 140);
+    }})();
+    """.replace("\n", " ").strip()
+
+    st.markdown(f'<img src="argus_scroll_exec" style="display:none;" onerror="{js_inline}">', unsafe_allow_html=True)
 
 
 def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
