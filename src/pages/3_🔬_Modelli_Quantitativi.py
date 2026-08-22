@@ -2440,13 +2440,14 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                 df_ret_hedging = piv_h.pct_change().dropna(how="all")
 
         vol_map_pos = (df_ret_hedging.std() * np.sqrt(252.0)).to_dict() if (isinstance(df_ret_hedging, pd.DataFrame) and not df_ret_hedging.empty) else {}
+        pos_active_cc = pos[(pos["qty_net"] > 1e-6) & (pos["current_value"] > 0)] if (isinstance(pos, pd.DataFrame) and not pos.empty and "qty_net" in pos.columns and "current_value" in pos.columns) else pos
         df_cov_call = compute_covered_call_yield_enhancement(
-            pos,
+            pos_active_cc,
             otm_pct=5.0,
             implied_vol=iv_in,
             use_skew_calibration=use_skew,
             vol_map=vol_map_pos
-        ) if isinstance(pos, pd.DataFrame) else pd.DataFrame()
+        ) if isinstance(pos_active_cc, pd.DataFrame) and not pos_active_cc.empty else pd.DataFrame()
 
         if not df_cov_call.empty:
             col_cc_f1, col_cc_f2, col_cc_f3 = st.columns([2.0, 1.3, 0.9])
@@ -2462,17 +2463,6 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                 df_cov_filtered = df_cov_filtered[df_cov_filtered["contratti_eseguibili"] > 0]
             elif filter_cc_type == "⚪ Solo Frazionari (<100 quote)":
                 df_cov_filtered = df_cov_filtered[df_cov_filtered["contratti_eseguibili"] == 0]
-
-            with col_cc_f3:
-                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                csv_cc = df_cov_filtered.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Scarica CSV",
-                    data=csv_cc,
-                    file_name="covered_call_strategy.csv",
-                    mime="text/csv",
-                    use_container_width=True
-                )
 
             if df_cov_filtered.empty:
                 st.info("ℹ️ Nessuna posizione trovata corrispondente ai criteri di ricerca.")
@@ -2494,10 +2484,17 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                     )
                 })
 
-                col_cov_h1, col_cov_h2 = st.columns([3.5, 0.9])
-                with col_cov_h2:
+                with col_cc_f3:
+                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                     csv_cov = df_cov_show.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica CSV", data=csv_cov, file_name="strategia_covered_call.csv", mime="text/csv", use_container_width=True, key="btn_download_covered_call")
+                    st.download_button(
+                        label="📥 Scarica CSV",
+                        data=csv_cov,
+                        file_name="strategia_covered_call.csv",
+                        mime="text/csv",
+                        use_container_width=True,
+                        key="btn_download_covered_call"
+                    )
 
                 cov_cfg = {
                     "Ticker": st.column_config.TextColumn("Ticker", width="small"),
