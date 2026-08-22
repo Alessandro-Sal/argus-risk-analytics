@@ -1273,17 +1273,18 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         importlib.reload(core.financial_analysis)
         from core.financial_analysis import compute_dcf_monte_carlo_valuation
 
-    c_dcf1, c_dcf2 = st.columns([1.25, 2.75])
-    with c_dcf1:
-        st.markdown("#### ⚙️ Input & Parametri del Modello")
-        
+    # ── RIGA 1: SELEZIONE AZIENDA & PARAMETRI MODELLO ──────────────────────
+    st.markdown("#### ⚙️ Input & Parametri del Modello")
+    
+    col_sel1, col_sel2 = st.columns([1.4, 2.6])
+    with col_sel1:
         search_mode_dcf = st.radio(
-            "Modalità Selezione Azienda per la Valutazione DCF:",
-            ["Azienda dal Portafoglio", "Cerca Qualsiasi Azienda sul Mercato (es. AAPL, NVDA, RACE.MI, TSLA)"],
+            "Modalità Selezione Azienda:",
+            ["Azienda dal Portafoglio", "Cerca Qualsiasi Azienda sul Mercato"],
             horizontal=True,
             key="radio_dcf_search"
         )
-
+    with col_sel2:
         if search_mode_dcf == "Azienda dal Portafoglio":
             dcf_tk = st.selectbox(
                 "Seleziona Azienda dal Portafoglio:",
@@ -1299,69 +1300,71 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
             )
             dcf_tk = custom_dcf_input.upper().strip()
 
-        dcf_name = resolve_company_name(dcf_tk)
-        
-        try:
-            from core.financial_analysis import compute_dcf_monte_carlo_valuation, fetch_dcf_initial_inputs
-        except ImportError:
-            import importlib
-            import core.financial_analysis
-            importlib.reload(core.financial_analysis)
-            from core.financial_analysis import compute_dcf_monte_carlo_valuation, fetch_dcf_initial_inputs
+    dcf_name = resolve_company_name(dcf_tk)
 
-        match_pos = active_pos[active_pos["ticker"] == dcf_tk] if "ticker" in active_pos.columns else pd.DataFrame()
-        p_price_fallback = float(match_pos.iloc[0]["last_price"]) if not match_pos.empty and pd.notna(match_pos.iloc[0].get("last_price")) else 150.0
+    match_pos = active_pos[active_pos["ticker"] == dcf_tk] if "ticker" in active_pos.columns else pd.DataFrame()
+    p_price_fallback = float(match_pos.iloc[0]["last_price"]) if not match_pos.empty and pd.notna(match_pos.iloc[0].get("last_price")) else 150.0
 
-        dcf_defaults = fetch_dcf_initial_inputs(dcf_tk, fallback_price=p_price_fallback)
+    dcf_defaults = fetch_dcf_initial_inputs(dcf_tk, fallback_price=p_price_fallback)
 
+    col_inp1, col_inp2, col_inp3 = st.columns(3)
+    with col_inp1:
         input_price = st.number_input("Prezzo di Mercato Attuale (€ / $):", value=float(dcf_defaults["price"]), min_value=0.1, step=1.0)
+    with col_inp2:
         input_fcf = st.number_input("Flusso di Cassa Libero Iniziale (FCF Base in M €/$):", value=float(dcf_defaults["fcf_m"]), min_value=1.0, step=500.0) * 1e6
+    with col_inp3:
         input_shares = st.number_input("Azioni in Circolazione (Milioni):", value=float(dcf_defaults["shares_m"]), min_value=1.0, step=100.0) * 1e6
-        st.caption(f"💡 *Azioni totali diluite pre-compilate ({dcf_defaults['shares_m']:,.0f} Milioni tra tutte le classi azionarie A/B/C).*")
-        
-        with st.expander("🛠️ Parametri Avanzati (WACC, Tassi di Crescita & Volatilità)", expanded=True):
+        st.caption(f"💡 *Azioni diluite stimate: {dcf_defaults['shares_m']:,.0f} Milioni (classi A/B/C)*")
+
+    with st.expander("🛠️ Parametri Avanzati di Simulazione (WACC, Tassi di Crescita & Volatilità)", expanded=False):
+        c_adv1, c_adv2, c_adv3 = st.columns(3)
+        with c_adv1:
             wacc_val = st.slider("WACC Medio (%):", 4.0, 16.0, 8.5, 0.25) / 100.0
-            growth_val = st.slider("Crescita FCF Anni 1-5 (%):", -5.0, 30.0, 8.5, 0.5) / 100.0
-            term_g_val = st.slider("Crescita Perpetua Terminale (%):", 0.5, 4.5, 2.5, 0.1) / 100.0
-            
             cash_val = st.number_input("Cassa Netta & Equivalenti (M €/$):", value=float(dcf_defaults["cash_m"])) * 1e6
+        with c_adv2:
+            growth_val = st.slider("Crescita FCF Anni 1-5 (%):", -5.0, 30.0, 8.5, 0.5) / 100.0
             debt_val = st.number_input("Debito Totale (M €/$):", value=float(dcf_defaults["debt_m"])) * 1e6
-            
+        with c_adv3:
+            term_g_val = st.slider("Crescita Perpetua Terminale (%):", 0.5, 4.5, 2.5, 0.1) / 100.0
             n_sims = st.select_slider("Numero Iterazioni Monte Carlo:", options=[250, 500, 1000, 2000], value=1000)
 
-    with c_dcf2:
-        dcf_res = compute_dcf_monte_carlo_valuation(
-            fcf_base=input_fcf,
-            current_price=input_price,
-            shares_outstanding=input_shares,
-            cash_and_equiv=cash_val,
-            total_debt=debt_val,
-            growth_rate_mean=growth_val,
-            wacc_mean=wacc_val,
-            terminal_growth_mean=term_g_val,
-            n_simulations=n_sims
-        )
+    # Calcolo Simulazione Monte Carlo
+    dcf_res = compute_dcf_monte_carlo_valuation(
+        fcf_base=input_fcf,
+        current_price=input_price,
+        shares_outstanding=input_shares,
+        cash_and_equiv=cash_val,
+        total_debt=debt_val,
+        growth_rate_mean=growth_val,
+        wacc_mean=wacc_val,
+        terminal_growth_mean=term_g_val,
+        n_simulations=n_sims
+    )
 
-        st.markdown(f"#### 🎯 Verdetto Valutazione: {dcf_res['recommendation']}")
+    st.divider()
 
-        dk1, dk2 = st.columns(2)
-        with dk1:
-            metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base Case: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
-        with dk2:
-            metric_card("Prezzo di Mercato Attuale", f"€ {dcf_res['current_price']:.2f}", "Quotazione Spot", True)
+    # ── RIGA 2: VERDETTO & 4 KPI HEAD CARDS A TUTTA LARGHEZZA ─────────────
+    st.markdown(f"#### 🎯 Verdetto Valutazione: {dcf_res['recommendation']}")
 
-        dk3, dk4 = st.columns(2)
-        with dk3:
-            metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine di Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
-        with dk4:
-            metric_card("Probabilità Sottovalutazione", f"{dcf_res['prob_undervalued_pct']:.1f}%", f"{n_sims} Simulazioni", True if dcf_res['prob_undervalued_pct'] > 50 else False)
+    dk1, dk2, dk3, dk4 = st.columns(4)
+    with dk1:
+        metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base Case: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
+    with dk2:
+        metric_card("Prezzo Attuale di Mercato", f"€ {dcf_res['current_price']:.2f}", "Quotazione Spot", True)
+    with dk3:
+        metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine di Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
+    with dk4:
+        metric_card("Probabilità Sottovalutazione", f"{dcf_res['prob_undervalued_pct']:.1f}%", f"{n_sims} Simulazioni", True if dcf_res['prob_undervalued_pct'] > 50 else False)
 
-        st.divider()
+    st.divider()
 
-        # Istogramma Distribuzione Monte Carlo Fair Value
-        sim_vals = dcf_res["simulated_fair_values"]
-        st.markdown(f"##### 📈 Distribuzione Monte Carlo del Fair Value Intrinseco | {dcf_name} ({dcf_tk})")
+    # ── RIGA 3: ISTOGRAMMA DISTRIBUZIONE MONTE CARLO & TABELLA SCENARI ────
+    col_chart, col_scen = st.columns([1.65, 1.15])
+    
+    with col_chart:
+        st.markdown(f"##### 📈 Distribuzione Monte Carlo del Fair Value | {dcf_name} ({dcf_tk})")
         
+        sim_vals = dcf_res["simulated_fair_values"]
         fv_med = dcf_res["fair_value_median"]
         cur_p = dcf_res["current_price"]
         p10 = dcf_res["p10_bear_case"]
@@ -1379,13 +1382,11 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
             hovertemplate="Intervallo Fair Value: <b>€ %{x:,.2f}</b><br>Conteggio Simulazioni: <b>%{y}</b><extra></extra>"
         ))
         
-        # Tracce per la legenda orizzontale in alto
-        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Mediana DCF (€ {fv_med:.2f})", line=dict(color="#00e676", width=2.5, dash="solid")))
-        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Prezzo Attuale (€ {cur_p:.2f})", line=dict(color="#f85149", width=2, dash="dash")))
+        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Mediana (€ {fv_med:.2f})", line=dict(color="#00e676", width=2.5, dash="solid")))
+        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Prezzo (€ {cur_p:.2f})", line=dict(color="#f85149", width=2, dash="dash")))
         fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Bear 10% (€ {p10:.2f})", line=dict(color="#d29922", width=1.5, dash="dot")))
         fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Bull 90% (€ {p90:.2f})", line=dict(color="#58a6ff", width=1.5, dash="dot")))
         
-        # Linee verticali pulite a tutta altezza senza etichette testuali interne sovrapposte
         fig_dcf_hist.add_vline(x=fv_med, line_dash="solid", line_color="#00e676", line_width=2.5)
         fig_dcf_hist.add_vline(x=cur_p, line_dash="dash", line_color="#f85149", line_width=2)
         fig_dcf_hist.add_vline(x=p10, line_dash="dot", line_color="#d29922", line_width=1.5)
@@ -1397,7 +1398,7 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1.03,
+                y=1.02,
                 xanchor="center",
                 x=0.5,
                 font=dict(size=11, color="#ffffff"),
@@ -1406,7 +1407,7 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
                 borderwidth=1
             ),
             template="plotly_dark",
-            height=370,
+            height=360,
             margin=dict(l=20, r=20, t=45, b=25),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)"
@@ -1414,13 +1415,16 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         apply_plotly_theme(fig_dcf_hist)
         st.plotly_chart(fig_dcf_hist, use_container_width=True, key="val_dcf_mc_histogram", config={"displayModeBar": "hover", "displaylogo": False})
 
-        st.markdown("##### 📋 Matrice di Sensibilità & Scenari DCF")
+    with col_scen:
+        st.markdown("##### 📋 Matrice di Sensibilità & Scenari")
         df_dcf_scenarios = pd.DataFrame([
-            {"Scenario": "🐻 Bear Case (10° Percentile)", "Fair Value per Azione": f"€ {dcf_res['p10_bear_case']:.2f}", "Upside/Downside": f"{((dcf_res['p10_bear_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"},
-            {"Scenario": "⚖️ Base Case (Mediana Monte Carlo)", "Fair Value per Azione": f"€ {dcf_res['fair_value_median']:.2f}", "Upside/Downside": f"{dcf_res['upside_downside_pct']:+.1f}%"},
-            {"Scenario": "🐂 Bull Case (90° Percentile)", "Fair Value per Azione": f"€ {dcf_res['p90_bull_case']:.2f}", "Upside/Downside": f"{((dcf_res['p90_bull_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"}
+            {"Scenario": "🐻 Bear Case (10° Percentile)", "Fair Value": f"€ {dcf_res['p10_bear_case']:.2f}", "Upside/Downside": f"{((dcf_res['p10_bear_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"},
+            {"Scenario": "⚖️ Base Case (Mediana DCF)", "Fair Value": f"€ {dcf_res['fair_value_median']:.2f}", "Upside/Downside": f"{dcf_res['upside_downside_pct']:+.1f}%"},
+            {"Scenario": "🐂 Bull Case (90° Percentile)", "Fair Value": f"€ {dcf_res['p90_bull_case']:.2f}", "Upside/Downside": f"{((dcf_res['p90_bull_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"}
         ])
-        st.dataframe(df_dcf_scenarios, use_container_width=True, hide_index=True)
+        st.dataframe(df_dcf_scenarios, use_container_width=True, hide_index=True, height=210)
+        
+        st.info(f"💡 **Sintesi Strategica**: Con una probabilità di sottovalutazione del **{dcf_res['prob_undervalued_pct']:.1f}%**, il titolo quota a **{abs(dcf_res['upside_downside_pct']):.1f}%** {'a premio' if dcf_res['upside_downside_pct'] < 0 else 'a sconto'} rispetto al Fair Value intrinseco mediano.")
 
 
 
