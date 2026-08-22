@@ -191,7 +191,8 @@ def inject_custom_css():
             border-radius: 12px !important;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
             backdrop-filter: blur(12px) !important;
-            margin-bottom: 12px !important;
+            margin-top: 18px !important;
+            margin-bottom: 16px !important;
         }}
         [data-testid="stMain"] [data-testid="stExpander"] summary {{
             font-weight: 600 !important;
