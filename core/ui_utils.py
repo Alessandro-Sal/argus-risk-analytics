@@ -756,6 +756,7 @@ def inject_custom_css():
     """, unsafe_allow_html=True)
 
     js_tab_hooks = """
+    <script>
     (function() {
         function hookTabs() {
             try {
@@ -801,9 +802,10 @@ def inject_custom_css():
         }
         hookTabs();
     })();
-    """.replace("\n", " ").strip()
-
-    st.markdown(f'<img src="argus_tab_hooks" style="display:none;" onerror="{js_tab_hooks}">', unsafe_allow_html=True)
+    </script>
+    """
+    if hasattr(st, "html"):
+        st.html(js_tab_hooks)
 
 apply_custom_css = inject_custom_css
 
@@ -1797,11 +1799,12 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
 
 def scroll_to_top(target_selector: str = None):
     """
-    Inietta uno script ad esecuzione immediata nel DOM principale di Streamlit
+    Inietta uno script ad esecuzione immediata nel DOM principale di Streamlit tramite st.html
     per riallineare lo scroll in cima alla tab o alla pagina in modo fluido al cambio tab.
     """
     target_arg = f"'{target_selector}'" if target_selector else "null"
-    js_inline = f"""
+    js_code = f"""
+    <script>
     (function() {{
         function doScroll() {{
             try {{
@@ -1826,9 +1829,10 @@ def scroll_to_top(target_selector: str = None):
         setTimeout(doScroll, 40);
         setTimeout(doScroll, 140);
     }})();
-    """.replace("\n", " ").strip()
-
-    st.markdown(f'<img src="argus_scroll_exec" style="display:none;" onerror="{js_inline}">', unsafe_allow_html=True)
+    </script>
+    """
+    if hasattr(st, "html"):
+        st.html(js_code)
 
 
 def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
