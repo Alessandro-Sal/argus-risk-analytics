@@ -1792,18 +1792,83 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
 
         st.divider()
 
-        st.markdown("#### 🧬 K-Means Clustering: Segmentazione Asset per Profilo di Rischio & Rendimento")
-        st.caption("Algoritmo di machine learning non supervisionato che raggruppa gli asset di portafoglio in cluster omogenei in base al tradeoff tra Volatilità Annua e CAGR.")
+        col_km_h1, col_km_h2 = st.columns([3.2, 1.1])
+        with col_km_h1:
+            st.markdown("#### 🧬 K-Means Clustering: Segmentazione Asset per Profilo di Rischio & Rendimento")
+            st.caption("Algoritmo di machine learning non supervisionato che raggruppa gli asset di portafoglio in cluster omogenei in base al tradeoff tra Volatilità Annua e CAGR.")
+        with col_km_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("💡 Guida al K-Means Clustering", r"""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+  <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+    <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 8px;">🧬 K-Means Clustering degli Asset</div>
+    <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Algoritmo di Machine Learning non supervisionato che partiziona gli $N$ asset del portafoglio in $k$ cluster omogenei, minimizzando la varianza interna a ciascun gruppo (Within-Cluster Sum of Squares).</div>
+    <div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
+      <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-family: monospace; font-size: 12.5px;">
+        argmin_S &Sigma;_{i=1}^k &Sigma;_{x \in S_i} || x - &mu;_i ||^2 &nbsp;|&nbsp; Features: [Volatilità Annua, CAGR]
+      </div>
+    </div>
+    <div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Identificare categorie funzionali di rischio (Core difensivi, Motori di crescita, Outlier volatili) evitando di trattare tutti i titoli azionari o obbligazionari come un blocco monolitico.</div>
+    <div style="margin-bottom: 8px;"><b>⚙️ Come viene calcolato da ARGUS:</b> Estrazione della volatilità storica annualizzata (252 gg) e del CAGR per ciascun asset attivo, standardizzazione delle feature e applicazione di k-means (k=2..3 con metodo Elbow/Silhouette).</div>
+    <div><b>🔍 Come leggerlo:</b><br>
+      • 🟢 <b>Cluster 1 (Core / Bassa Volatilità):</b> Asset stabilizzatori con moderata oscillazione.<br>
+      • 🟡 <b>Cluster 2 (Crescita / Rendimento):</b> Titoli ad alto CAGR e profilo di rischio equilibrato.<br>
+      • 🔴 <b>Cluster 3 (Alta Volatilità / Outlier):</b> Asset speculativi o fortemente oscillanti da monitorare.
+    </div>
+  </div>
+</div>
+""", button_label="💡 Come funziona K-Means?")
 
-        if clusters:
+        # Fallback computazionale dinamico se clusters non è presente o è vuoto
+        if not clusters or len(clusters) == 0:
+            df_returns_all = results.get("df_returns", pd.DataFrame())
+            df_prices_all = results.get("df_prices", pd.DataFrame())
+            pos_active = results.get("positions", pd.DataFrame())
+            
+            # 1. Prova di calcolo da df_returns
+            if isinstance(df_returns_all, pd.DataFrame) and not df_returns_all.empty:
+                active_t = pos_active[pos_active["qty_net"] > 0]["ticker"].tolist() if (isinstance(pos_active, pd.DataFrame) and not pos_active.empty and "qty_net" in pos_active.columns) else df_returns_all.columns.tolist()
+                common_t = [t for t in active_t if t in df_returns_all.columns]
+                if len(common_t) >= 2:
+                    v_rets = df_returns_all[common_t].dropna(how="all")
+                    vol_s = v_rets.std() * np.sqrt(252)
+                    cagr_s = (1 + v_rets.mean()) ** 252 - 1
+                    f_df = pd.DataFrame({'volatility': vol_s, 'cagr': cagr_s}).dropna()
+                    f_df.index.name = "ticker"
+                    if len(f_df) >= 2:
+                        from sklearn.cluster import KMeans
+                        n_c = min(3, len(f_df))
+                        km = KMeans(n_clusters=n_c, random_state=42, n_init=10)
+                        f_df['cluster'] = km.fit_predict(f_df)
+                        clusters = f_df.reset_index().to_dict(orient="records")
+            
+            # 2. Prova di calcolo da df_prices se df_returns era vuoto
+            if (not clusters or len(clusters) == 0) and isinstance(df_prices_all, pd.DataFrame) and not df_prices_all.empty and "ticker" in df_prices_all.columns and "close" in df_prices_all.columns:
+                p_piv = df_prices_all.pivot_table(index="price_date", columns="ticker", values="close").pct_change().dropna(how="all")
+                if not p_piv.empty and len(p_piv.columns) >= 2:
+                    vol_s = p_piv.std() * np.sqrt(252)
+                    cagr_s = (1 + p_piv.mean()) ** 252 - 1
+                    f_df = pd.DataFrame({'volatility': vol_s, 'cagr': cagr_s}).dropna()
+                    f_df.index.name = "ticker"
+                    if len(f_df) >= 2:
+                        from sklearn.cluster import KMeans
+                        n_c = min(3, len(f_df))
+                        km = KMeans(n_clusters=n_c, random_state=42, n_init=10)
+                        f_df['cluster'] = km.fit_predict(f_df)
+                        clusters = f_df.reset_index().to_dict(orient="records")
+
+        if clusters and len(clusters) > 0:
             df_cl = pd.DataFrame(clusters)
             if "ticker" not in df_cl.columns and "index" in df_cl.columns:
                 df_cl = df_cl.rename(columns={"index": "ticker"})
             elif "ticker" not in df_cl.columns:
                 df_cl["ticker"] = [f"Asset {i+1}" for i in range(len(df_cl))]
 
-            df_cl["volatility"] = df_cl["volatility"] * 100.0
-            df_cl["cagr"] = df_cl["cagr"] * 100.0
+            # Normalizzazione scala percentuale se necessario
+            if df_cl["volatility"].max() <= 2.5:
+                df_cl["volatility"] = df_cl["volatility"] * 100.0
+            if df_cl["cagr"].abs().max() <= 2.5:
+                df_cl["cagr"] = df_cl["cagr"] * 100.0
 
             # Dynamic meaningful cluster naming based on average volatility
             stats = df_cl.groupby("cluster")[["volatility", "cagr"]].mean()
@@ -1874,6 +1939,45 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
             )
             apply_plotly_theme(fig_cl)
             st.plotly_chart(fig_cl, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+            # Tabella Interattiva Dettaglio Cluster
+            df_cl_table = pd.DataFrame({
+                "Ticker": df_cl["ticker"].astype(str),
+                "Segmento Cluster": df_cl["cluster_label"].astype(str),
+                "Volatilità Annua %": df_cl["volatility"].astype(float),
+                "CAGR %": df_cl["cagr"].astype(float),
+                "Sharpe Implicito": ((df_cl["cagr"] - 2.75) / df_cl["volatility"].replace(0, np.nan)).fillna(0.0).round(2)
+            })
+
+            col_cl_t1, col_cl_t2, col_cl_t3 = st.columns([2.4, 1.2, 0.9])
+            with col_cl_t1:
+                st.markdown("##### 📋 Dettaglio Asset per Cluster di Rischio")
+            with col_cl_t2:
+                search_cl = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_km_cluster", label_visibility="collapsed")
+            with col_cl_t3:
+                csv_cl = df_cl_table.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica CSV", data=csv_cl, file_name="asset_clusters_kmeans.csv", mime="text/csv", use_container_width=True, key="btn_download_kmeans_clusters")
+
+            df_cl_filt = df_cl_table.copy()
+            if search_cl:
+                df_cl_filt = df_cl_filt[df_cl_filt["Ticker"].str.contains(search_cl.strip(), case=False, na=False)]
+
+            cl_col_config = {
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Segmento Cluster": st.column_config.TextColumn("Segmento Cluster", width="medium"),
+                "Volatilità Annua %": st.column_config.NumberColumn("Volatilità Annua %", format="%.2f%%"),
+                "CAGR %": st.column_config.NumberColumn("CAGR %", format="%+.2f%%"),
+                "Sharpe Implicito": st.column_config.NumberColumn("Sharpe Implicito", format="%.2f")
+            }
+
+            st.dataframe(
+                df_cl_filt,
+                column_config=cl_col_config,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("ℹ️ Il modello K-Means Clustering richiede almeno 2 asset attivi con serie storica dei prezzi per calcolare la segmentazione del profilo rischio/rendimento.")
 
         st.divider()
         col_head_mer1, col_head_mer2 = st.columns([3.2, 1.1])
