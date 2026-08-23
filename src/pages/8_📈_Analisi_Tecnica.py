@@ -390,18 +390,18 @@ if split_view_active:
 else:
     # ── GRAFICO COCKPIT & MODULI AVANZATI CON SEGMENTED TABS (LAZY LOADING) ───
     tab_tech = render_segmented_tabs([
-        "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
-        "🧱 Distribuzione Analitica Volume Profile",
-        "🚦 Confluence Score & Pattern Recognition",
-        "⏳ Trend Multi-Timeframe Alignment (1D / 1W)",
-        "⚡ Real-Time Streaming & Book Depth (STREAM)"
+        "📊 Cockpit & Candlestick",
+        "🧱 Volume Profile Dettaglio",
+        "🚦 Confluence Score",
+        "⏳ Trend Multi-Timeframe",
+        "⚡ Real-Time Streaming"
     ], key="tech_active_subtab")
 
-    if tab_tech == "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)":
+    if tab_tech == "📊 Cockpit & Candlestick":
         col_chart, col_side_profile = st.columns([3.2, 0.95])
 
         with col_chart:
-            col_cp1, col_cp2 = st.columns([3.2, 1.2])
+            col_cp1, col_cp2 = st.columns([3.0, 1.3])
             with col_cp1:
                 st.markdown(f"#### 📊 Cockpit Tecnico & Quantitative Overlays | `{target_ticker}`")
             with col_cp2:
@@ -426,7 +426,7 @@ else:
   </div>
 </div>
 </div>
-""", button_label="📖 Guida Indicatori Cockpit")
+""", button_label="💡 Guida Cockpit")
 
             fig = make_subplots(
                 rows=3, cols=1,
@@ -627,8 +627,8 @@ else:
             else:
                 st.info("Nessun dato di volume profile disponibile.")
 
-    elif tab_tech == "🚦 Confluence Score & Pattern Recognition":
-        col_cp_h1, col_cp_h2 = st.columns([3.2, 1.2])
+    elif tab_tech == "🚦 Confluence Score":
+        col_cp_h1, col_cp_h2 = st.columns([3.0, 1.3])
         with col_cp_h1:
             st.subheader("🚦 Technical Confluence Score Card & Pattern Recognition")
         with col_cp_h2:
@@ -654,7 +654,7 @@ else:
   </div>
 </div>
 </div>
-""", button_label="📖 Guida Confluence & Pattern")
+""", button_label="💡 Guida Confluence")
 
         col_conf, col_patt = st.columns([1.05, 1.15])
 
@@ -675,43 +675,38 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            df_factors = pd.DataFrame(confluence_res["factors"])
-            if not df_factors.empty:
-                col_cfh1, col_cfh2 = st.columns([1.8, 1.2])
-                with col_cfh1:
-                    st.caption("Fattori di confluenza quantitativi")
-                with col_cfh2:
-                    csv_fac = df_factors.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Fattori CSV", data=csv_fac, file_name=f"confluence_fattori_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_download_confluence_factors")
-                df_factors_display = df_factors.rename(columns={
-                    "indicator": "Indicatore",
-                    "status": "Segnale / Stato",
-                    "impact": "Punti",
-                    "note": "Condizione"
-                })
-                st.dataframe(df_factors_display, use_container_width=True, hide_index=True, height=270)
+            # Scomposizione Metriche Componenti
+            st.markdown("**Scomposizione Indicatori di Confluenza**")
+            for brk in confluence_res.get("breakdown", []):
+                b_color = "#3fb950" if brk['status'] == "bullish" else ("#f85149" if brk['status'] == "bearish" else "#8b949e")
+                st.markdown(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12.5px;">
+                    <span style="color: #c9d1d9;">{brk['name']}</span>
+                    <span style="color: {b_color}; font-weight: 600;">{brk['points']:+d} pts ({brk['reading']})</span>
+                </div>
+                """, unsafe_allow_html=True)
 
         with col_patt:
-            col_pth1, col_pth2 = st.columns([2.0, 1.2])
-            with col_pth1:
-                st.markdown("#### 🕯️ Pattern Candlestick Rilevati")
-            if patterns_res:
-                df_patt = pd.DataFrame(patterns_res)
-                with col_pth2:
-                    csv_patt = df_patt.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Pattern CSV", data=csv_patt, file_name=f"pattern_candlestick_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_download_candlestick_patterns")
-                df_patt_display = df_patt.rename(columns={
-                    "date": "Data",
-                    "pattern": "Pattern",
-                    "bias": "Bias Direzionale",
-                    "description": "Implicazione Operativa"
-                })
-                st.dataframe(df_patt_display, use_container_width=True, hide_index=True, height=270)
+            st.markdown(f"**Pattern Candlestick Riconosciuti (`{target_ticker}`)**")
+            patterns = confluence_res.get("patterns", [])
+            if patterns:
+                for p in patterns:
+                    p_color = "#3fb950" if p['type'] == "bullish" else ("#f85149" if p['type'] == "bearish" else "#8b949e")
+                    p_badge = "Rialzista (Bullish)" if p['type'] == "bullish" else ("Ribassista (Bearish)" if p['type'] == "bearish" else "Neutrale")
+                    st.markdown(f"""
+                    <div class="glass-card" style="padding: 12px 16px; border-radius: 10px; border-left: 3px solid {p_color}; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; color: #ffffff; font-size: 13.5px;">{p['name']}</span>
+                            <span style="color: {p_color}; font-size: 11px; font-weight: 600; background: rgba(255,255,255,0.05); padding: 2px 8px; border-radius: 4px;">{p_badge}</span>
+                        </div>
+                        <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">Data: <b>{p['date']}</b> | Barra: <i>{p['position']}</i></div>
+                    </div>
+                    """, unsafe_allow_html=True)
             else:
                 st.info("ℹ️ Nessun pattern candlestick rilevante individuato sulle ultime barre.")
 
-    elif tab_tech == "⏳ Trend Multi-Timeframe Alignment (1D / 1W)":
-        col_mtf_h1, col_mtf_h2 = st.columns([3.2, 1.2])
+    elif tab_tech == "⏳ Trend Multi-Timeframe":
+        col_mtf_h1, col_mtf_h2 = st.columns([3.0, 1.3])
         with col_mtf_h1:
             st.subheader("⏳ Trend Multi-Timeframe Alignment (1D / 1W)")
         with col_mtf_h2:
@@ -731,7 +726,7 @@ else:
   </div>
 </div>
 </div>
-""", button_label="📖 Guida Multi-Timeframe")
+""", button_label="💡 Guida Multi-Timeframe")
 
         d_bull = "Rialzista" in mtf_res.get("trend_daily", "") or "Bullish" in mtf_res.get("trend_daily", "")
         w_bull = "Rialzista" in mtf_res.get("trend_weekly", "") or "Bullish" in mtf_res.get("trend_weekly", "")
@@ -811,8 +806,8 @@ else:
         """, unsafe_allow_html=True)
 
     # ── TAB 5: REAL-TIME STREAMING & LEVEL-2 BOOK DEPTH (STREAM) ──────
-    elif tab_tech == "⚡ Real-Time Streaming & Book Depth (STREAM)":
-        col_st_h1, col_st_h2 = st.columns([3.2, 1.2])
+    elif tab_tech == "⚡ Real-Time Streaming":
+        col_st_h1, col_st_h2 = st.columns([3.0, 1.3])
         with col_st_h1:
             st.markdown(f"#### ⚡ Real-Time Market Feed, In-Memory Ring Buffer & Level-2 Book Depth | `{target_ticker}`")
             st.caption("Flusso dati ad alta frequenza con buffer circolare O(1), Volume-Weighted Average Price (VWAP), Order Flow Imbalance (OFI) e Microprice.")
@@ -846,13 +841,11 @@ else:
 </div>
 
 </div>
-""", button_label="💡 Come funziona il Real-Time Streaming?")
+""", button_label="💡 Guida Streaming")
 
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-        # Inizializza Ring Buffer ed estrae o genera tick per target_ticker
         ref_price = float(df_prices["close"].iloc[-1]) if not df_prices.empty else 150.0
-        
         # Buffer circolare a 60 tick
         ring_buf = TickRingBuffer(capacity=60, ticker=target_ticker)
         synthetic_ticks = generate_mock_streaming_ticks(

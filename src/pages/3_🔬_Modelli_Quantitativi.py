@@ -88,7 +88,7 @@ opt = results.get("optimization", {})
 
 render_sandbox_banner(page_key="p3")
 
-col_head1, col_head2 = st.columns([3.4, 1.2])
+col_head1, col_head2 = st.columns([3.0, 1.3])
 with col_head1:
     st.title("🔬 Modelli Quantitativi & Frontiera di Portafoglio")
     if "run_id" in st.session_state:
@@ -127,32 +127,31 @@ with col_head2:
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come navigare la sezione</div>
-  <div>Utilizza le 5 schede superiori per passare dall'ottimizzazione di allocazione (Tab 1), alle proiezioni stocastiche (Tab 2), alle strategie di copertura attiva (Tab 3), all'attribuzione Brinson (Tab 4) e ai fattori Barra (Tab 5).</div>
+  <div>Utilizza le schede superiori per passare dall'ottimizzazione di allocazione (Tab 1), alle proiezioni stocastiche (Tab 2), alle strategie di copertura attiva (Tab 3), all'attribuzione Brinson/Fattori (Tab 4) e al Fixed Income (Tab 5).</div>
 </div>
 
 </div>
-""", button_label="📚 Glossario Modelli Quantitativi")
+""", button_label="📚 Guida Quant")
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.divider()
 
 # ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
 active_quant_tab = render_segmented_tabs([
-    "📊 Frontiera Markowitz & Rebalancing",
-    "🧬 Tail Copula & Kelly Sizing",
-    "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)",
-    "🛡️ Hedging Tattico & Tail Risk",
-    "🎯 Attribuzione Brinson-Fachler",
-    "🏛️ Modelli Fattoriali, Black-Litterman & ML",
-    "🏛️ Fixed Income & Z-Spread (YAS)"
+    "📊 Markowitz & Rebalancing",
+    "🧬 Tail Copula & Kelly",
+    "🎲 Monte Carlo & Merton",
+    "🛡️ Hedging & Opzioni",
+    "🎯 Attribuzione & Fattori",
+    "🏛️ Fixed Income & Z-Spread"
 ], key="quant_active_tab")
 
 # ── TAB 1: MARKOWITZ & LEDOIT-WOLF ────────────────────────────
-if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
+if active_quant_tab == "📊 Markowitz & Rebalancing":
     if not has_portfolio:
         st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare la Frontiera Efficiente di Markowitz.")
     elif opt and opt.get("tickers"):
-        col_head_opt1, col_head_opt2 = st.columns([3.2, 1.1])
+        col_head_opt1, col_head_opt2 = st.columns([3.0, 1.3])
         with col_head_opt1:
             st.markdown("#### Ottimizzazione di Portafoglio (Markowitz Efficient Frontier)")
             st.caption(f"Confronta il tuo portafoglio attuale con le allocazioni ottimali (Stima Covarianza: **{opt.get('cov_type', 'Ledoit-Wolf Shrinkage')}**)")
@@ -192,7 +191,7 @@ if active_quant_tab == "📊 Frontiera Markowitz & Rebalancing":
     • 🔵 <b>Stella Azzurra:</b> Portafoglio a Minima Volatilità (massima stabilità del capitale).
   </div>
 </div>
-""", button_label="💡 Come funziona Ledoit-Wolf & Ribilanciamento?")
+""", button_label="💡 Guida Markowitz")
         
         cand_handoff = st.session_state.get("screener_candidate_to_optimize")
         if cand_handoff:
@@ -1134,11 +1133,11 @@ L'<b>Hierarchical Risk Parity (HRP)</b> è un algoritmo quantitativo sviluppato 
         st.info("Dati di ottimizzazione di Markowitz non disponibili.")
 
 # ── TAB 2: TAIL COPULA & KELLY SIZING ────────────────────────────
-elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
+elif active_quant_tab == "🧬 Tail Copula & Kelly":
     if not has_portfolio:
         st.warning("⚠️ Carica prima un portafoglio per calcolare le Copule di Coda e il dimensionamento di Kelly.")
     else:
-        col_cop_h1, col_cop_h2 = st.columns([3.2, 1.1])
+        col_cop_h1, col_cop_h2 = st.columns([3.0, 1.3])
         with col_cop_h1:
             st.markdown("### 🧬 Modelli di Dipendenza di Coda (Tail Copula) & Kelly Criterion")
             st.caption("Quantifica il rischio di crash congiunto asimmetrico (Clayton/Gumbel Copulas) e calcola il dimensionamento matematico ottimale delle posizioni (Half-Kelly).")
@@ -1193,7 +1192,7 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
 
 </div>
 """,
-                button_label="💡 Guida a Tail Copula & Kelly Sizing"
+                button_label="💡 Guida Copula & Kelly"
             )
 
         df_returns_all = results.get("returns", pd.DataFrame())
@@ -1532,8 +1531,8 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly Sizing":
         st.info(f"💡 **Edge Matematico della Strategia:** **{k_res['edge_pct']:+.2f}%** | **Tasso di Crescita Geometrico Teorico:** **{k_res['expected_growth_rate']:+.3f}% per operazione** | Profilo di Rischio Drawdown: **{k_res['drawdown_risk']}**")
 
 # ── TAB 3: SIMULAZIONI STOCASTICHE ────────────────────────────
-elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
-    col_head_mc1, col_head_mc2 = st.columns([3.2, 1.1])
+elif active_quant_tab == "🎲 Monte Carlo & Merton":
+    col_head_mc1, col_head_mc2 = st.columns([3.0, 1.3])
     with col_head_mc1:
         st.markdown("### 🎲 Simulatore Stocastico Monte Carlo Multivariato & Clustering")
         st.caption("Proietta 3.000 traiettorie causali del portafoglio nel tempo tramite Decomposizione di Cholesky, con supporto per regimi di stress, distribuzioni a code grasse (Student-t) e metriche di Tail Risk (VaR & CVaR).")
@@ -1575,7 +1574,7 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
 </div>
 
 </div>
-""", button_label="💡 Come funziona Monte Carlo?")
+""", button_label="💡 Guida Monte Carlo")
 
     try:
         from core.risk_engine import run_advanced_monte_carlo_simulation
@@ -2180,8 +2179,8 @@ elif active_quant_tab == "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)":
         apply_plotly_theme(fig_merton)
         st.plotly_chart(fig_merton, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-# ── TAB 3: HEDGING TATTICO & TAIL RISK ────────────────────────
-elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
+# ── TAB 4: HEDGING TATTICO & TAIL RISK ────────────────────────
+elif active_quant_tab == "🛡️ Hedging & Opzioni":
     section("🛡️ Simulatore di Copertura & Hedging Tattico (Beta-Neutral & Tail Protection)")
     st.caption("Calcola le coperture esatte con ETF inversi o micro-futures per azzerare o ridurre la sensibilità al rischio sistemico senza vendere gli asset.")
 
@@ -2531,13 +2530,13 @@ elif active_quant_tab == "🛡️ Hedging Tattico & Tail Risk":
                     hide_index=True
                 )
 
-# ── TAB 4: ATTRIBUZIONE BRINSON-FACHLER ───────────────────────
-elif active_quant_tab == "🎯 Attribuzione Brinson-Fachler":
-    section("🎯 Attribuzione della Performance Brinson-Fachler")
-    st.caption("Scompone l'extra-rendimento di portafoglio rispetto al Benchmark nei 3 fattori: Allocazione Settoriale, Selezione dei Titoli e Interazione.")
+# ── TAB 5: ATTRIBUZIONE BRINSON & FATTORI MULTI-FATTORIALI ────────
+elif active_quant_tab == "🎯 Attribuzione & Fattori":
+    section("🎯 Attribuzione della Performance & Modelli Multi-Fattoriali (Brinson, Barra & ML)")
+    st.caption("Scompone l'extra-rendimento di portafoglio rispetto al Benchmark ed analizza l'esposizione ai fattori di rischio Barra/Carhart, Black-Litterman e Volatilità ML.")
 
     if not has_portfolio or results is None:
-        st.warning("⚠️ Carica prima un portafoglio nella Control Room per visualizzare l'attribuzione di performance Brinson-Fachler.")
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room per visualizzare l'attribuzione di performance e i fattori Barra.")
     else:
         from core.attribution import compute_brinson_attribution
 
@@ -2589,14 +2588,8 @@ elif active_quant_tab == "🎯 Attribuzione Brinson-Fachler":
         else:
             st.info("Dati di settore insufficienti per calcolare l'attribuzione Brinson-Fachler.")
 
-# ── TAB 5: BLACK-LITTERMAN & CARHART 4-FACTOR ────────────────
-elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
-    st.markdown("#### Modello Black-Litterman & Regressione Fattoriale Carhart (4 Fattori)")
-    st.caption("Combina le stime di equilibrio di mercato con le opinioni dell'investitore (Views) ed analizza l'esposizione ai 4 fattori di rischio (Market, Size SMB, Value HML, Momentum WML).")
+        st.divider()
 
-    if not has_portfolio or results is None:
-        st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare i fattori Barra e Black-Litterman.")
-    else:
         from core.risk_engine import compute_black_litterman_optimization, compute_carhart_4factor_exposures
 
         sr_p = results.get("portfolio_return", pd.Series(dtype=float)) if results else pd.Series(dtype=float)
@@ -3229,9 +3222,9 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
             st.markdown(f"**Verdetto ML:** {ml_res['verdict']}")
             st.caption("Stima avanzata della volatilità annualizzata a 30 giorni basata su Random Forest Regressor e indicatori tecnici di mercato.")
 
-# ── TAB 7: FIXED INCOME, YTM & Z-SPREAD (YAS) ──────────────────────
-elif active_quant_tab == "🏛️ Fixed Income & Z-Spread (YAS)":
-    col_fi_h1, col_fi_h2 = st.columns([3.2, 1.1])
+# ── TAB 6: FIXED INCOME, YTM & Z-SPREAD (YAS) ──────────────────────
+elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
+    col_fi_h1, col_fi_h2 = st.columns([3.0, 1.3])
     with col_fi_h1:
         st.markdown("#### 🏛️ Fixed Income Istituzionale & Z-Spread Cockpit (Bloomberg YAS Style)")
         st.caption("Analisi quantitativa per Titoli di Stato ed Obbligazioni Corporate • Yield to Maturity (YTM), Duration, Convessità, DV01, Z-Spread e Probabilità di Default CDS.")
@@ -3262,7 +3255,7 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread (YAS)":
 </div>
 
 </div>
-""", button_label="💡 Come leggere i dati Fixed Income?")
+""", button_label="💡 Guida Fixed Income")
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 

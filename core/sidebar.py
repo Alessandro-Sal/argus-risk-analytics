@@ -54,12 +54,12 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "quant_active_tab",
         "subtabs": [
-            {"label": "📊 Markowitz & Rebalancing", "target": "📊 Frontiera Markowitz & Rebalancing"},
-            {"label": "🧬 Tail Copula & Kelly", "target": "🧬 Tail Copula & Kelly Sizing"},
-            {"label": "🎲 Monte Carlo & Merton", "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)"},
-            {"label": "🛡️ Hedging & Tail Risk", "target": "🛡️ Hedging Tattico & Tail Risk"},
-            {"label": "🎯 Attribuzione Brinson", "target": "🎯 Attribuzione Brinson-Fachler"},
-            {"label": "🏛️ Black-Litterman & ML", "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML"}
+            {"label": "📊 Markowitz & Rebalancing", "target": "📊 Markowitz & Rebalancing"},
+            {"label": "🧬 Tail Copula & Kelly", "target": "🧬 Tail Copula & Kelly"},
+            {"label": "🎲 Monte Carlo & Merton", "target": "🎲 Monte Carlo & Merton"},
+            {"label": "🛡️ Hedging & Opzioni", "target": "🛡️ Hedging & Opzioni"},
+            {"label": "🎯 Attribuzione & Fattori", "target": "🎯 Attribuzione & Fattori"},
+            {"label": "🏛️ Fixed Income & Z-Spread", "target": "🏛️ Fixed Income & Z-Spread"}
         ]
     },
     {
@@ -125,10 +125,11 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "tech_active_subtab",
         "subtabs": [
-            {"label": "📊 Cockpit & Candlestick", "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)"},
-            {"label": "🧱 Volume Profile Dettaglio", "target": "🧱 Distribuzione Analitica Volume Profile"},
-            {"label": "🚦 Confluence Score", "target": "🚦 Confluence Score & Pattern Recognition"},
-            {"label": "⏳ Trend Multi-Timeframe", "target": "⏳ Trend Multi-Timeframe Alignment (1D / 1W)"}
+            {"label": "📊 Cockpit & Candlestick", "target": "📊 Cockpit & Candlestick"},
+            {"label": "🧱 Volume Profile Dettaglio", "target": "🧱 Volume Profile Dettaglio"},
+            {"label": "🚦 Confluence Score", "target": "🚦 Confluence Score"},
+            {"label": "⏳ Trend Multi-Timeframe", "target": "⏳ Trend Multi-Timeframe"},
+            {"label": "⚡ Real-Time Streaming", "target": "⚡ Real-Time Streaming"}
         ]
     },
     {

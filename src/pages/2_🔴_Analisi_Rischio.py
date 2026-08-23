@@ -725,7 +725,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
 # TAB 2: VAR, CVAR & BACKTESTING KUPIEC
 # ==============================================================================
 elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
-    col_head_var1, col_head_var2 = st.columns([3.2, 1.2])
+    col_head_var1, col_head_var2 = st.columns([3.0, 1.3])
     with col_head_var1:
         st.markdown("### 🛠️ Calcolatore e Simulatore VaR Dinamico")
         st.caption("Questo strumento consente di calcolare il Value at Risk (VaR) e l'Expected Shortfall (CVaR) a livello di portafoglio, modificando dinamicamente i parametri di rischio.")
@@ -781,7 +781,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 </div>
 
 </div>
-""", button_label="💡 Come funziona il VaR Cornish-Fisher & Kupiec?")
+""", button_label="💡 Guida VaR & Kupiec")
 
     col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
     with col_ctrl1:
@@ -1659,7 +1659,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 
     # ── DECOMPOSIZIONE ISTITUZIONALE DEL RISCHIO (MARGINAL & COMPONENT VAR) ──
     st.divider()
-    col_euler_h1, col_euler_h2 = st.columns([3.2, 1.2])
+    col_euler_h1, col_euler_h2 = st.columns([3.0, 1.3])
     with col_euler_h1:
         st.markdown("#### 🏛️ Decomposizione del Rischio di Portafoglio (Marginal VaR & Component VaR)")
         st.caption("Decomposizione analitica esatta del Value at Risk con il Teorema di Eulero (Bloomberg PORT Parity): isola il contributo reale di ciascuna posizione al rischio complessivo.")
@@ -1687,7 +1687,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 </div>
 
 </div>
-""", button_label="💡 Come funziona la decomposizione del rischio?")
+""", button_label="💡 Guida Euler VaR")
 
     from core.risk_engine import compute_marginal_and_component_var, compute_liquidity_adjusted_var
     
