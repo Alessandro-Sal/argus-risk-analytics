@@ -1781,9 +1781,10 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
             format_func=lambda d: f"{d} Giorno" if d==1 else f"{d} Giorni"
         )
     with col_lv_ctrl2:
-        spread_bps_user = st.slider(
+        spread_bps_user = st.select_slider(
             "Bid-Ask Spread Medio di Mercato (bps):",
-            min_value=5, max_value=100, value=20, step=5,
+            options=[5, 10, 15, 20, 25, 30, 40, 50, 75, 100],
+            value=20,
             format_func=lambda b: f"{b} bps ({b/100:.2f}%)"
         )
 
