@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`) di **ARGUS Risk Analytics Platform v5.16.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`) di **ARGUS Risk Analytics Platform v5.17.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -1029,5 +1029,54 @@ Dato l'order book L2 con i migliori livelli di denaro $(P_b, Q_b)$ e lettera $(P
 \[ \text{Depth Imbalance} = \frac{Q_b - Q_a}{Q_b + Q_a} \in [-1, +1] \]
 \[ \text{Microprice} = \frac{Q_b \cdot P_a + Q_a \cdot P_b}{Q_b + Q_a} = P_b + \left(\frac{Q_b}{Q_b + Q_a}\right) \cdot (P_a - P_b) \]
 Il microprice anticipa la direzione immediata del prezzo d'equilibrio incorporando la pressione asimmetrica della liquidità presente sul book.
+
+---
+
+## 54. Motore di Formula EQS Bloomberg-Style (`core/screener_engine.py`)
+
+### 1. Parsing ed Esecuzione Vettorializzata di Formule Arbitrarie
+Il motore `evaluate_custom_screener_query` supporta espressioni logico-matematiche complesse composte dall'utente (es. `Piotroski >= 7 AND Altman > 2.9 AND ROIC > WACC * 1.5 AND Beta < 1.0`).
+
+1. **Normalizzazione Operatori**: Conversione case-insensitive di `AND` $\to$ `&`, `OR` $\to$ `|`, `NOT` $\to$ `~` ed eguaglianze `=` $\to$ `==`.
+2. **Risoluzione Alias Elastica**: Mappatura biunivoca di oltre 35 alias finanziari (`Piotroski`, `Altman`, `ROE`, `PE`, `PEG`, `PB`, `DivYield`, `FCFYield`, `DebtToEquity`, `Beta`, `Vol`, `Sharpe`, `RSI`, `SMA200`, `Perf1Y`, `Score`).
+3. **Valutazione AST Protetta**: Esecuzione sandbox vettorizzata tramite motore Python con isolamento da injection e feedback di sintassi in tempo reale.
+
+---
+
+## 55. Modello di Traiettoria Ottimale di Liquidazione Almgren-Chriss (`core/risk_engine.py`)
+
+### 1. Dinamica di Impatto di Mercato (Almgren & Chriss, 2000)
+Dato un portafoglio di $X_0$ quote/valore da liquidare su un orizzonte $T$ suddiviso in $N$ intervalli $\tau = T/N$:
+- **Impatto Permanente**: $\gamma \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}$ (spostamento duraturo del prezzo mid-market).
+- **Impatto Temporaneo**: $\eta \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}$ (attrito istantaneo da svuotamento del book ordini).
+- **Parametro di Urgenza ($\kappa$)**:
+  \[ \kappa \tau = \operatorname{arccosh}\left( 1 + \frac{\lambda \sigma^2 \tau^2}{2 \eta} \right) \approx \sqrt{\frac{\lambda \sigma^2}{\eta}} \cdot \tau \]
+
+### 2. Traiettoria Ottimale e Half-Life
+La quota residua al tempo $t_j = j \cdot \tau$ è governata dalla funzione iperbolica:
+\[ x(t_j) = X_0 \cdot \frac{\sinh(\kappa (T - t_j))}{\sinh(\kappa T)} \]
+\[ \text{Half-Life di Liquidazione } t_{1/2} = \frac{\ln(2)}{\kappa} \]
+
+### 3. Costo Atteso $E[x]$, Varianza $V[x]$ e VaR di Esecuzione al 95%
+\[ E[x] = \frac{1}{2} \gamma X_0^2 + \tau \eta \sum_{j=1}^N v_j^2 + \frac{\text{Spread}}{2} \cdot X_0 \]
+\[ V[x] = \sigma_{\text{daily}}^2 \tau \sum_{j=1}^N x_j^2 \]
+\[ \text{Execution VaR}_{95\%} = E[x] + 1.645 \cdot \sqrt{V[x]} \]
+
+---
+
+## 56. Backtesting di Strategie Multi-Fattoriali a 5 Quintili (`core/factor_library.py`)
+
+### 1. Partizionamento dell'Universo & Ribilanciamento Periodico
+A ogni nodo di ribilanciamento temporale $t$ (mensile o trimestrale), l'intero universo azionario viene ordinato in base allo score del fattore accademico selezionato:
+- **Q1 (Top 20% · High Factor)**: Paniere dei titoli con massima esposizione desiderata (es. Quality-Minus-Junk, Low-Beta, High Profitability).
+- **Q2, Q3, Q4**: Panieri intermedi di transizione.
+- **Q5 (Bottom 20% · Junk / High Risk)**: Paniere dei titoli con minima qualità o massima speculazione.
+
+### 2. Spread Long-Short & Test di Monotonicità di Spearman
+- **Rendimento dello Spread Long-Short**: $R_{\text{L/S}, t} = R_{Q1, t} - R_{Q5, t}$
+- **Information Ratio di Q1 vs Universo**: $\text{IR} = \frac{\text{mean}(R_{Q1} - R_{\text{Univ}})}{\text{std}(R_{Q1} - R_{\text{Univ}})} \cdot \sqrt{252}$
+- **Coefficiente di Monotonicità di Spearman ($r_s$)**: Misura la correlazione di rango decrescente tra i quintili $1 \dots 5$ e il rendimento medio annualizzato:
+  \[ r_s = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)} \]
+  Un valore $r_s \ge 0.80$ conferma la validità empirica del fattore nell'ordinare monotonicamente la distribuzione dei rendimenti attesi senza inversioni di stile.
 
 

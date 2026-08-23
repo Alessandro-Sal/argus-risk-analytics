@@ -301,6 +301,159 @@ def fetch_screener_universe_data(
     return df_out
 
 
+SCREENER_FIELD_ALIASES: Dict[str, str] = {
+    "piotroski": "piotroski_score",
+    "piotroski_score": "piotroski_score",
+    "altman": "altman_z_score",
+    "altman_z": "altman_z_score",
+    "altman_z_score": "altman_z_score",
+    "z_score": "altman_z_score",
+    "zscore": "altman_z_score",
+    "roic": "roe_pct",
+    "roe": "roe_pct",
+    "roe_pct": "roe_pct",
+    "wacc": "wacc",
+    "profit_margin": "profit_margin_pct",
+    "profit_margin_pct": "profit_margin_pct",
+    "profitmargin": "profit_margin_pct",
+    "margin": "profit_margin_pct",
+    "pe": "trailing_pe",
+    "trailing_pe": "trailing_pe",
+    "trailingpe": "trailing_pe",
+    "forward_pe": "forward_pe",
+    "forwardpe": "forward_pe",
+    "peg": "peg_ratio",
+    "peg_ratio": "peg_ratio",
+    "pegratio": "peg_ratio",
+    "pb": "price_to_book",
+    "price_to_book": "price_to_book",
+    "pricetobook": "price_to_book",
+    "divyield": "dividend_yield_pct",
+    "div_yield": "dividend_yield_pct",
+    "dividend_yield": "dividend_yield_pct",
+    "dividend_yield_pct": "dividend_yield_pct",
+    "dividendyield": "dividend_yield_pct",
+    "fcf_yield": "fcf_yield_pct",
+    "fcf_yield_pct": "fcf_yield_pct",
+    "fcfyield": "fcf_yield_pct",
+    "debt_to_equity": "debt_to_equity",
+    "de": "debt_to_equity",
+    "debttoequity": "debt_to_equity",
+    "beta": "beta",
+    "vol": "volatility_ann_pct",
+    "volatility": "volatility_ann_pct",
+    "volatility_ann_pct": "volatility_ann_pct",
+    "sharpe": "sharpe_ratio",
+    "sharpe_ratio": "sharpe_ratio",
+    "sharperatio": "sharpe_ratio",
+    "max_dd": "max_drawdown_pct",
+    "max_drawdown": "max_drawdown_pct",
+    "max_drawdown_pct": "max_drawdown_pct",
+    "maxdd": "max_drawdown_pct",
+    "rsi": "rsi_14",
+    "rsi_14": "rsi_14",
+    "rsi14": "rsi_14",
+    "sma200": "price_to_sma200_pct",
+    "sma_200": "price_to_sma200_pct",
+    "price_to_sma200": "price_to_sma200_pct",
+    "price_to_sma200_pct": "price_to_sma200_pct",
+    "perf_3m": "perf_3m_pct",
+    "perf_3m_pct": "perf_3m_pct",
+    "perf3m": "perf_3m_pct",
+    "perf_1y": "perf_1y_pct",
+    "perf_1y_pct": "perf_1y_pct",
+    "perf1y": "perf_1y_pct",
+    "upside": "upside_pct",
+    "upside_pct": "upside_pct",
+    "score": "argus_score",
+    "argus_score": "argus_score",
+    "last_price": "last_price",
+    "price": "last_price",
+    "target_price": "target_mean_price",
+    "target": "target_mean_price"
+}
+
+SCREENER_FORMULA_PRESETS: Dict[str, Dict[str, str]] = {
+    "buffett_moat": {
+        "title": "🏛️ Buffett Quality Moat",
+        "formula": "Piotroski >= 7 AND Altman > 2.9 AND ROE > 15 AND DebtToEquity < 0.8",
+        "description": "Aziende ad altissima qualità contabile, forte redditività del capitale e basso indebitamento."
+    },
+    "peter_lynch": {
+        "title": "🚀 Peter Lynch Growth",
+        "formula": "PEG < 1.2 AND Upside > 15 AND ROE > 12 AND DebtToEquity < 1.2",
+        "description": "Crescita a valutazione attraente con solido potenziale di apprezzamento del consensus."
+    },
+    "graham_value": {
+        "title": "💎 Graham Deep Value",
+        "formula": "PE < 16 AND PB < 2.0 AND DivYield > 2.5 AND Altman > 2.0",
+        "description": "Margine di sicurezza classico con multipli compressi, rendimento da dividendo e solvibilità."
+    },
+    "low_beta_income": {
+        "title": "🛡️ Low-Beta Dividend Fortress",
+        "formula": "Beta < 0.85 AND Volatility < 22 AND DivYield > 3.0 AND Sharpe > 0.6",
+        "description": "Titoli difensivi a bassa correlazione con il mercato e flusso cedolare stabile."
+    },
+    "momentum_breakout": {
+        "title": "⚡ Momentum & Breakout",
+        "formula": "RSI >= 50 AND RSI <= 72 AND Perf1Y > 15 AND SMA200 > 0",
+        "description": "Trend primario positivo, prezzo sopra la media mobile a 200 periodi e momentum intatto."
+    }
+}
+
+
+def evaluate_custom_screener_query(
+    df_screener: pd.DataFrame,
+    query_str: str
+) -> tuple[pd.DataFrame, bool, str]:
+    """
+    Esegue il parsing e la valutazione vettorializzata di una formula di screening personalizzata EQS.
+    Restituisce: (DataFrame filtrato, successo booleano, messaggio diagnostico).
+    """
+    if df_screener is None or df_screener.empty:
+        return pd.DataFrame(), True, "Dataset vuoto."
+    
+    if not query_str or not str(query_str).strip():
+        return df_screener.copy(), True, "Nessun filtro applicato (mostrati tutti i titoli)."
+    
+    import re
+    
+    df_work = df_screener.copy()
+    if "wacc" not in df_work.columns:
+        df_work["wacc"] = 8.0 # Tasso WACC indicativo di riferimento 8.0%
+    
+    # 1. Pulizia e normalizzazione sintassi
+    expr = str(query_str).strip()
+    
+    # Sostituzione operatori logici
+    expr = re.sub(r'\bAND\b', ' & ', expr, flags=re.IGNORECASE)
+    expr = re.sub(r'\bOR\b', ' | ', expr, flags=re.IGNORECASE)
+    expr = re.sub(r'\bNOT\b', ' ~ ', expr, flags=re.IGNORECASE)
+    
+    # Normalizza singoli '=' in '==' (ma non '<=', '>=', '!=', '==')
+    expr = re.sub(r'(?<![<>=!])=(?![=])', ' == ', expr)
+    
+    # 2. Sostituisci gli identificatori/alias dei campi
+    def replace_identifier(match):
+        tok = match.group(0)
+        tok_lower = tok.lower()
+        if tok_lower in SCREENER_FIELD_ALIASES:
+            return SCREENER_FIELD_ALIASES[tok_lower]
+        return tok
+
+    parsed_expr = re.sub(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', replace_identifier, expr)
+    
+    # 3. Valutazione sicura
+    try:
+        filtered_df = df_work.query(parsed_expr, engine="python")
+        count = len(filtered_df)
+        msg = f"✅ Filtro EQS applicato: {count} titoli selezionati su {len(df_screener)}."
+        return filtered_df, True, msg
+    except Exception as e:
+        err_msg = f"❌ Errore nella formula EQS: {str(e)}"
+        return df_screener.copy(), False, err_msg
+
+
 def apply_strategy_preset(df_screener: pd.DataFrame, preset_key: str) -> pd.DataFrame:
     """
     Filtra i titoli in base a uno specifico archetipo di investimento quantitativo istituzionale.

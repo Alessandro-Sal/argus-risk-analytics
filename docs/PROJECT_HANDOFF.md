@@ -1,4 +1,4 @@
-# Investment Risk BI Platform — Project Handoff (v5.16.0 Production Release)
+# Investment Risk BI Platform — Project Handoff (v5.17.0 Production Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.16.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.17.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
@@ -172,13 +172,13 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 7. **`6_🌪️_Stress_Testing.py`**: MSCI Barra Multi-Scenario Matrix, Beta Shock Waterfall, Macro Scenario Builder interattivo ($\Delta r$, $\Delta \text{FX}$, $\Delta \text{Commodity}$, $\Delta \text{Equity}$) e **Visualizzatore 3D della Superficie di Rischio (Plotly Surface)**.
 8. **`7_📊_Analisi_Temporale.py`**: Storicizzazione Multi-Snapshot su Data Warehouse MySQL/SQLite, Evoluzione Temporale del Valore di Portafoglio, Matrice dei Delta ($\Delta$) tra Snapshot e Calcolatore del Tasso di Risparmio & Iniezioni di Liquidità.
 9. **`8_📈_Analisi_Tecnica.py`**: Cockpit di Analisi Tecnica & Quantitative Charting, Volume Profile (POC/VAH/VAL), Candlestick Pattern Recognition, Technical Confluence Score Card (0-100), Multi-Timeframe Alignment (1D vs 1W) e Tabella Screener di Confluenza.
-10. **`9_🔍_Screener_Opportunita.py`**: Screener Quantitativo Multi-Fattoriale (Valutazione, Qualità Contabile, Rischio, Momentum), Archetipi Istituzionali, Pre-Trade Impact Simulator e Generatore Factsheet PDF One-Pager.
+10. **`9_🔍_Screener_Opportunita.py`**: Screener Quantitativo Multi-Fattoriale (Valutazione, Qualità Contabile, Rischio, Momentum), **⚡ Formula Engine EQS (Custom Query Builder con sintassi logica avanzata)**, Archetipi Istituzionali, Pre-Trade Impact Simulator e Generatore Factsheet PDF One-Pager.
 
 ---
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **201 test automatizzati passano con successo (100%)**:
+Tutti i **207 test automatizzati passano con successo (100%)**:
 
 ```bash
 py -m pytest
@@ -186,5 +186,5 @@ py -m pytest
 
 ---
 
-*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.16.0.*
+*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.17.0.*
 

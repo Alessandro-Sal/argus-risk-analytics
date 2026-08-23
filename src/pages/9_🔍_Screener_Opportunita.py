@@ -36,6 +36,9 @@ from core.screener_engine import (
     MARKET_UNIVERSES,
     fetch_screener_universe_data,
     apply_strategy_preset,
+    evaluate_custom_screener_query,
+    SCREENER_FORMULA_PRESETS,
+    SCREENER_FIELD_ALIASES,
     simulate_pre_trade_impact,
     compute_market_and_watchlist_alerts
 )
@@ -235,63 +238,128 @@ active_screener_tab = render_segmented_tabs([
 if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
     st.markdown("#### 🎯 Selezione Strategica & Filtri Quantitativi")
     
-    # Archetipi Istituzionali
-    preset_col, reset_col = st.columns([4, 1])
-    with preset_col:
-        preset_choice = st.radio(
-            "⚡ Preset Strategico Istituzionale (One-Click Archetype):",
-            [
-                "Tutti i Titoli",
-                "🚀 GARP (Growth at Reasonable Price)",
-                "🛡️ Dividend Fortress (Alto Yield & Safe Z-Score)",
-                "💎 Deep Value (Graham Margin of Safety)",
-                "🌐 Low Volatility & High Sharpe",
-                "⚡ Momentum & Trend Breakout"
-            ],
-            horizontal=True
+    # Selezione Modalità di Filtraggio (Archetipi vs Formula Engine EQS)
+    filter_mode = st.radio(
+        "Modalità di Screening:",
+        ["🎯 Archetipi Istituzionali Standard", "⚡ Formula Engine EQS (Custom Query Builder)"],
+        horizontal=True,
+        key="screener_filter_mode"
+    )
+
+    if filter_mode == "⚡ Formula Engine EQS (Custom Query Builder)":
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        st.markdown("##### ⚡ Terminal EQS Formula Query Bar")
+        st.caption("Scrivi formule logico-matematiche complesse combinando multipli, ratio contabili, metriche di rischio e indicatori tecnici.")
+
+        # Preset Rapidi
+        col_pr_h, col_pr_btns = st.columns([1.2, 4.8])
+        with col_pr_h:
+            st.markdown("<span style='font-size: 13px; font-weight: 600; color: #ff9900;'>💡 Formule Preset:</span>", unsafe_allow_html=True)
+        with col_pr_btns:
+            p_cols = st.columns(len(SCREENER_FORMULA_PRESETS))
+            for i, (pk, pdata) in enumerate(SCREENER_FORMULA_PRESETS.items()):
+                with p_cols[i]:
+                    if st.button(pdata["title"], key=f"btn_eqs_preset_{pk}", use_container_width=True):
+                        st.session_state["eqs_query_input"] = pdata["formula"]
+
+        # Default input query
+        if "eqs_query_input" not in st.session_state:
+            st.session_state["eqs_query_input"] = "Piotroski >= 7 AND Altman > 2.9 AND ROE > 15 AND DebtToEquity < 0.8"
+
+        user_eqs_query = st.text_input(
+            "Formula di Screening EQS (es. `Piotroski >= 7 AND Altman > 2.9 AND ROIC > WACC * 1.5 AND Beta < 1.0`):",
+            value=st.session_state["eqs_query_input"],
+            key="eqs_query_input_box"
         )
-    with reset_col:
-        st.markdown('<div style="margin-top: 26px;"></div>', unsafe_allow_html=True)
-        show_all = st.button("🔄 Reset Filtri", use_container_width=True)
 
-    # Mappatura preset
-    preset_key = "all"
-    if "GARP" in preset_choice: preset_key = "garp"
-    elif "Dividend Fortress" in preset_choice: preset_key = "dividend_fortress"
-    elif "Deep Value" in preset_choice: preset_key = "deep_value"
-    elif "Low Volatility" in preset_choice: preset_key = "low_volatility"
-    elif "Momentum" in preset_choice: preset_key = "momentum_breakout"
+        df_filtered, is_valid, msg = evaluate_custom_screener_query(df_raw, user_eqs_query)
 
-    df_filtered = apply_strategy_preset(df_raw, preset_key) if preset_key != "all" else df_raw.copy()
+        # Badge di validazione sintattica
+        if is_valid:
+            st.markdown(f"""
+            <div style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 8px 14px; margin: 8px 0 14px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #4ade80; font-weight: 600; font-size: 13px;">{msg}</span>
+                <span style="color: #86efac; font-family: monospace; font-size: 12px;">Query OK</span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background: rgba(248, 81, 73, 0.12); border: 1px solid rgba(248, 81, 73, 0.3); border-radius: 8px; padding: 8px 14px; margin: 8px 0 14px;">
+                <span style="color: #f87171; font-weight: 600; font-size: 13px;">{msg}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-    # Pannello Espandibile di Micro-Filtri Manuali
-    with st.expander("🛠️ Filtri Avanzati di Precisione (Personalizza Soglie Fondamentali & Tecniche)", expanded=False):
-        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-        
-        with f_col1:
-            max_pe = st.slider("P/E Massimo", 5.0, 100.0, 45.0, step=1.0)
-            max_peg = st.slider("PEG Ratio Massimo", 0.5, 4.0, 2.5, step=0.1)
-        with f_col2:
-            min_roe = st.slider("ROE Minimo (%)", 0.0, 40.0, 5.0, step=1.0)
-            min_yield = st.slider("Dividend Yield Minimo (%)", 0.0, 10.0, 0.0, step=0.5)
-        with f_col3:
-            min_upside = st.slider("Upside Minimo Target Price (%)", -20.0, 50.0, 0.0, step=5.0)
-            min_z = st.slider("Altman Z-Score Minimo", 1.0, 5.0, 1.8, step=0.2)
-        with f_col4:
-            max_vol = st.slider("Volatilità Annua Massima (%)", 10.0, 60.0, 45.0, step=1.0)
-            rsi_range = st.slider("Range RSI (14)", 10, 90, (20, 80))
+        with st.expander("📖 Guida alla Sintassi & Campi Supportati (Bloomberg EQS Cheat-Sheet)", expanded=False):
+            st.markdown("""
+            **Operatori Logici:** `AND`, `OR`, `NOT`, parentesi `(...)`  
+            **Operatori di Confronto:** `>`, `<`, `>=`, `<=`, `==`, `!=`  
+            **Operatori Aritmetici:** `+`, `-`, `*`, `/`  
+            
+            **Campi Disponibili (Case-Insensitive):**
+            - **Qualità & Bilancio:** `Piotroski`, `Altman` (o `Z_Score`), `ROE` (o `ROIC`), `Profit_Margin`, `DebtToEquity` (o `DE`), `FCF_Yield`, `WACC`
+            - **Valutazione:** `PE` (o `Trailing_PE`), `Forward_PE`, `PEG`, `PB` (Price-to-Book), `DivYield`, `Upside`
+            - **Rischio & Volatilità:** `Beta`, `Vol` (o `Volatility`), `Sharpe`, `Max_DD`
+            - **Tecnici & Momentum:** `RSI`, `SMA200`, `Perf_3M`, `Perf_1Y`, `Score` (ARGUS Score [0-100]), `Price`
+            """)
 
-        # Applicazione micro-filtri
-        df_filtered = df_filtered[
-            (df_filtered["trailing_pe"].isna() | (df_filtered["trailing_pe"] <= max_pe)) &
-            (df_filtered["peg_ratio"].isna() | (df_filtered["peg_ratio"] <= max_peg)) &
-            (df_filtered["roe_pct"].isna() | (df_filtered["roe_pct"] >= min_roe)) &
-            (df_filtered["dividend_yield_pct"] >= min_yield) &
-            (df_filtered["upside_pct"].isna() | (df_filtered["upside_pct"] >= min_upside)) &
-            (df_filtered["altman_z_score"].isna() | (df_filtered["altman_z_score"] >= min_z)) &
-            (df_filtered["volatility_ann_pct"].isna() | (df_filtered["volatility_ann_pct"] <= max_vol)) &
-            (df_filtered["rsi_14"].between(rsi_range[0], rsi_range[1]))
-        ]
+    else:
+        # Archetipi Istituzionali
+        preset_col, reset_col = st.columns([4, 1])
+        with preset_col:
+            preset_choice = st.radio(
+                "⚡ Preset Strategico Istituzionale (One-Click Archetype):",
+                [
+                    "Tutti i Titoli",
+                    "🚀 GARP (Growth at Reasonable Price)",
+                    "🛡️ Dividend Fortress (Alto Yield & Safe Z-Score)",
+                    "💎 Deep Value (Graham Margin of Safety)",
+                    "🌐 Low Volatility & High Sharpe",
+                    "⚡ Momentum & Trend Breakout"
+                ],
+                horizontal=True
+            )
+        with reset_col:
+            st.markdown('<div style="margin-top: 26px;"></div>', unsafe_allow_html=True)
+            show_all = st.button("🔄 Reset Filtri", use_container_width=True)
+
+        # Mappatura preset
+        preset_key = "all"
+        if "GARP" in preset_choice: preset_key = "garp"
+        elif "Dividend Fortress" in preset_choice: preset_key = "dividend_fortress"
+        elif "Deep Value" in preset_choice: preset_key = "deep_value"
+        elif "Low Volatility" in preset_choice: preset_key = "low_volatility"
+        elif "Momentum" in preset_choice: preset_key = "momentum_breakout"
+
+        df_filtered = apply_strategy_preset(df_raw, preset_key) if preset_key != "all" else df_raw.copy()
+
+        # Pannello Espandibile di Micro-Filtri Manuali
+        with st.expander("🛠️ Filtri Avanzati di Precisione (Personalizza Soglie Fondamentali & Tecniche)", expanded=False):
+            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+            
+            with f_col1:
+                max_pe = st.slider("P/E Massimo", 5.0, 100.0, 45.0, step=1.0)
+                max_peg = st.slider("PEG Ratio Massimo", 0.5, 4.0, 2.5, step=0.1)
+            with f_col2:
+                min_roe = st.slider("ROE Minimo (%)", 0.0, 40.0, 5.0, step=1.0)
+                min_yield = st.slider("Dividend Yield Minimo (%)", 0.0, 10.0, 0.0, step=0.5)
+            with f_col3:
+                min_upside = st.slider("Upside Minimo Target Price (%)", -20.0, 50.0, 0.0, step=5.0)
+                min_z = st.slider("Altman Z-Score Minimo", 1.0, 5.0, 1.8, step=0.2)
+            with f_col4:
+                max_vol = st.slider("Volatilità Annua Massima (%)", 10.0, 60.0, 45.0, step=1.0)
+                rsi_range = st.slider("Range RSI (14)", 10, 90, (20, 80))
+
+            # Applicazione micro-filtri
+            df_filtered = df_filtered[
+                (df_filtered["trailing_pe"].isna() | (df_filtered["trailing_pe"] <= max_pe)) &
+                (df_filtered["peg_ratio"].isna() | (df_filtered["peg_ratio"] <= max_peg)) &
+                (df_filtered["roe_pct"].isna() | (df_filtered["roe_pct"] >= min_roe)) &
+                (df_filtered["dividend_yield_pct"] >= min_yield) &
+                (df_filtered["upside_pct"].isna() | (df_filtered["upside_pct"] >= min_upside)) &
+                (df_filtered["altman_z_score"].isna() | (df_filtered["altman_z_score"] >= min_z)) &
+                (df_filtered["volatility_ann_pct"].isna() | (df_filtered["volatility_ann_pct"] <= max_vol)) &
+                (df_filtered["rsi_14"].between(rsi_range[0], rsi_range[1]))
+            ]
 
     # Dataframe di visualizzazione principale
     cols_display = [
