@@ -3431,7 +3431,7 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
             st.markdown("##### 🛡️ Curva Default Implicita (CDS)")
         with col_cds_h2:
             csv_cds = df_cds.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CDS CSV", data=csv_cds, file_name=f"cds_default_curve_{sel_preset.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_cds_curve")
+            st.download_button("📥 Scarica CDS CSV", data=csv_cds, file_name=f"cds_default_curve_{preset_choice.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_cds_curve")
         st.caption(f"Term structure cumulativa di default basata sullo spread CDS di **{inp_cds:.0f} bps** (Recovery: 40%).")
         
         fig_cds = go.Figure()
@@ -3462,7 +3462,7 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
         st.markdown("##### 📋 Matrice di Sensibilità Istituzionale a Shock di Tasso (Basis Points Shock)")
     with col_sens_h2:
         csv_sens = df_sens.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica Sensibilità CSV", data=csv_sens, file_name=f"bond_sensitivity_{sel_preset.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_bond_sens")
+        st.download_button("📥 Scarica Sensibilità CSV", data=csv_sens, file_name=f"bond_sensitivity_{preset_choice.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_bond_sens")
     
     sens_cfg = {
         "shift_bps": st.column_config.NumberColumn("Shock Tasso", format="%+d bps"),
