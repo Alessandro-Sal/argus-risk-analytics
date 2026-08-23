@@ -109,9 +109,8 @@ def test_frontend_pages_execution():
     st.session_state["run_id"] = "RUN_TEST_123"
     st.session_state["base_currency"] = "EUR"
 
-    # Verifichiamo la presenza di tutte le pagine Streamlit (9 moduli in pages/)
     page_files = glob.glob("src/pages/*.py") or glob.glob("pages/*.py")
-    assert len(page_files) >= 9, f"Ci si aspettano 9 pagine nella cartella pages/, trovate: {len(page_files)}"
+    assert len(page_files) >= 10, f"Ci si aspettano almeno 10 pagine nella cartella pages/, trovate: {len(page_files)}"
     
     all_files = list(page_files)
     if os.path.exists("src/0_Control_Room.py"):

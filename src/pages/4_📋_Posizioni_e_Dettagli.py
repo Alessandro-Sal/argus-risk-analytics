@@ -1828,8 +1828,39 @@ elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
 
         # ── SEZIONE 2: SIMULATORE DI TRAIETTORIA OTTIMALE ALMGREN-CHRISS ───
         st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
-        st.markdown("#### 🎯 Simulatore Traiettoria Ottimale di Liquidazione (Optimal Execution Schedule)")
-        st.caption("Determina la velocità di vendita e la traiettoria matematica di smobilizzo che minimizza la combinazione lineare tra Costo Atteso E[x] e Rischio di Esecuzione V[x].")
+        col_ac_opt_h1, col_ac_opt_h2 = st.columns([3.2, 1.3])
+        with col_ac_opt_h1:
+            st.markdown("#### 🎯 Simulatore Traiettoria Ottimale di Liquidazione (Optimal Execution Schedule)")
+            st.caption("Determina la velocità di vendita e la traiettoria matematica di smobilizzo che minimizza la combinazione lineare tra Costo Atteso E[x] e Rischio di Esecuzione V[x].")
+        with col_ac_opt_h2:
+            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+            glossary_modal("💡 Come funziona la Traiettoria Ottimale Almgren-Chriss", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 Teoria dell'Esecuzione Ottimale (Almgren &amp; Chriss, 2000)</div>
+  <div>Il modello risolve il dilemma del trader istituzionale: vendere troppo velocemente causa elevato <b>impatto temporaneo sul prezzo</b> (slippage), mentre vendere troppo lentamente espone al <b>rischio di oscillazione del mercato</b> durante l'orizzonte di liquidazione.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Traiettoria Iperbolica &amp; Urgenza (&kappa;)</div>
+  <div>
+    La traiettoria ottima di rimanenza segue l'equazione differenziale iperbolica:<br>
+    <code>x(t) = X_0 &middot; sinh(&kappa;(T - t)) / sinh(&kappa;T)</code><br>
+    dove <b>&kappa;</b> è il parametro di urgenza calibrato su avversione al rischio (&lambda;), volatilità (&sigma;) ed elasticità temporanea (&eta;).
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🛡️ Half-Life &amp; Execution VaR</div>
+  <div>
+    • <b>Liquidation Half-Life (t_1/2):</b> Tempo necessario per smobilizzare il primo 50% della posizione (<code>ln(2)/&kappa;</code>).<br>
+    • <b>Execution VaR (95%/99%):</b> Massima perdita potenziale complessiva (Costo Atteso + 1.645/2.326 &middot; &sigma;_esecuzione).
+  </div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona la Traiettoria?")
 
         col_opt_ctrl1, col_opt_ctrl2, col_opt_ctrl3 = st.columns([1.5, 1.5, 1.5])
         

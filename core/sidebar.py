@@ -145,6 +145,19 @@ NAV_MODULES = [
             {"label": "📊 Radar Multi-Titolo", "target": "📊 Radar Comparativo Multi-Titolo"},
             {"label": "💾 Watchlist & Segnali", "target": "💾 Watchlist & Segnali Operativi"}
         ]
+    },
+    {
+        "title": "BQuant & Launchpad",
+        "icon": "💻",
+        "page_file": "pages/10_💻_BQuant_e_Launchpad.py",
+        "key": "10_BQuant_e_Launchpad",
+        "has_subtabs": True,
+        "tab_key": "bquant_active_tab",
+        "subtabs": [
+            {"label": "🐍 BQuant Python Console", "target": "🐍 ARGUS BQuant Python Sandbox"},
+            {"label": "🎛️ Launchpad & Ruoli", "target": "🎛️ Launchpad & Workspace Customizer"},
+            {"label": "📊 Excel Live Connector", "target": "📊 Excel Live Connector & RTD"}
+        ]
     }
 ]
 
@@ -495,6 +508,6 @@ def render_sidebar():
         st.markdown("""
         <div style="text-align: center; padding: 10px 0 2px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 10px;">
             <div style="font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: 0.5px;">ARGUS RISK INTELLIGENCE</div>
-            <div style="font-size: 10px; font-weight: 600; color: #ff9900; margin-top: 2px;">Versione 5.17.0 Institutional Engine</div>
+            <div style="font-size: 10px; font-weight: 600; color: #ff9900; margin-top: 2px;">Versione 5.18.0 Institutional Engine</div>
         </div>
         """, unsafe_allow_html=True)
