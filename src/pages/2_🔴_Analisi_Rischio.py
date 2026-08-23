@@ -1789,13 +1789,12 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         )
 
     # ── LIQUIDITY-ADJUSTED VAR (LVAR) INTERATTIVO ──────────────────────
-    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-    st.markdown("##### 💧 Liquidity-Adjusted Value at Risk (LVaR - Bangia / Basel III)")
+    st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
     
-    col_lv_ctrl1, col_lv_ctrl2 = st.columns([2, 2])
+    col_lv_ctrl1, col_lv_ctrl2 = st.columns([1, 1])
     with col_lv_ctrl1:
         liq_days = st.select_slider(
-            "Orizzonte di Smobilizzo Completo (Giorni Lavorativi per Liquidazione Ordinata):",
+            "Orizzonte di Smobilizzo (Giorni Lavorativi):",
             options=[1, 3, 5, 10, 20],
             value=5,
             format_func=lambda d: f"{d} Giorno" if d==1 else f"{d} Giorni"
@@ -1816,26 +1815,29 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         default_spread_pct=spread_bps_user / 10000.0
     )
 
-    col_l1, col_l2, col_l3, col_l4 = st.columns(4)
-    with col_l1:
-        metric_card("VaR 1G Base", f"€ {lvar_calc['unadjusted_var_amount']:,.0f}".replace(",", "."), "Senza Illiquidità", True)
-    with col_l2:
-        metric_card(f"VaR Scalato ({liq_days}G)", f"€ {lvar_calc['time_scaled_var_amount']:,.0f}".replace(",", "."), f"Fattore: √{liq_days} = {np.sqrt(liq_days):.2f}x", True)
-    with col_l3:
-        metric_card("Costo Bid-Ask Spread", f"€ {lvar_calc['liquidity_cost_amount']:,.0f}".replace(",", "."), f"Spread: {spread_bps_user} bps", True)
-    with col_l4:
-        metric_card("LVaR Totale Liquidità", f"€ {lvar_calc['lvar_amount']:,.0f}".replace(",", "."), f"Premio Illiquidità: +{lvar_calc['lvar_premium_pct']:.1f}%", True)
-
     df_lvar_export = pd.DataFrame([
         {"Metrica LVaR": "VaR 1G Base (Non Aggiustato)", "Valore (€)": lvar_calc['unadjusted_var_amount'], "Note": "Orizzonte 1 Giorno standard"},
         {"Metrica LVaR": f"VaR Scalato ({liq_days} Giorni)", "Valore (€)": lvar_calc['time_scaled_var_amount'], "Note": f"Fattore Tempo √{liq_days} = {np.sqrt(liq_days):.2f}x"},
         {"Metrica LVaR": "Costo Esogeno Spread", "Valore (€)": lvar_calc['liquidity_cost_amount'], "Note": f"Spread medio {spread_bps_user} bps"},
         {"Metrica LVaR": "LVaR Totale", "Valore (€)": lvar_calc['lvar_amount'], "Note": f"Premio Liquidità: +{lvar_calc['lvar_premium_pct']:.2f}%"}
     ])
-    col_lvh1, col_lvh2 = st.columns([3.0, 1.0])
-    with col_lvh2:
+
+    col_lvar_h1, col_lvar_h2 = st.columns([3.0, 1.0])
+    with col_lvar_h1:
+        st.markdown("##### 💧 Liquidity-Adjusted Value at Risk (LVaR - Bangia / Basel III)")
+    with col_lvar_h2:
         csv_lvar = df_lvar_export.to_csv(index=False).encode('utf-8')
         st.download_button("📥 Scarica Report LVaR CSV", data=csv_lvar, file_name=f"lvar_report_{liq_days}d.csv", mime="text/csv", use_container_width=True, key="btn_dl_lvar_report")
+
+    col_l1, col_l2, col_l3, col_l4 = st.columns(4)
+    with col_l1:
+        metric_card("VaR 1G Base", f"€ {lvar_calc['unadjusted_var_amount']:,.0f}".replace(",", "."), "Senza Illiquidità", None)
+    with col_l2:
+        metric_card(f"VaR Scalato ({liq_days}G)", f"€ {lvar_calc['time_scaled_var_amount']:,.0f}".replace(",", "."), f"Fattore: √{liq_days} = {np.sqrt(liq_days):.2f}x", None)
+    with col_l3:
+        metric_card("Costo Bid-Ask Spread", f"€ {lvar_calc['liquidity_cost_amount']:,.0f}".replace(",", "."), f"Spread: {spread_bps_user} bps", None)
+    with col_l4:
+        metric_card("LVaR Totale Liquidità", f"€ {lvar_calc['lvar_amount']:,.0f}".replace(",", "."), f"+{lvar_calc['lvar_premium_pct']:.1f}% Premio Illiquidità", False)
 
 
 
