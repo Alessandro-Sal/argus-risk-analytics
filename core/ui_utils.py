@@ -1080,6 +1080,34 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "target": "📊 Frontiera Markowitz & Rebalancing",
             "context_type": "rates"
         },
+        "YAS": {
+            "title": "Yield & Spread Analysis (YTM, Duration, Convexity, Z-Spread)",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "context_type": "fixed_income"
+        },
+        "FI": {
+            "title": "Fixed Income & Sovereign Debt Monitor",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "context_type": "fixed_income"
+        },
+        "CDS": {
+            "title": "Credit Default Swap & Default Probability Matrix",
+            "page": "pages/2_🔴_Analisi_Rischio.py",
+            "tab_key": "risk_active_tab",
+            "target": "📉 VaR, CVaR & Backtesting Kupiec",
+            "context_type": "credit"
+        },
+        "STREAM": {
+            "title": "Real-Time In-Memory Market Feed & Order Flow",
+            "page": "pages/8_📈_Analisi_Tecnica.py",
+            "tab_key": "tech_active_subtab",
+            "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
+            "context_type": "streaming"
+        },
         "EQS": {
             "title": "Equity & Multi-Asset Screener Universale",
             "page": "pages/9_🔍_Screener_Opportunita.py",
