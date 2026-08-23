@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`) di **ARGUS Risk Analytics Platform v5.15.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`) di **ARGUS Risk Analytics Platform v5.16.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -960,5 +960,74 @@ Dalla curva continua dei rendimenti stimata $y(t)$, il fattore di sconto $DF(t)$
 \[ DF(t) = \exp(-y(t) \cdot t) \]
 
 I fattori di sconto $DF(t) \in (0, 1]$ risultano strettamente decrescenti con la maturità $t$, garantendo l'assenza di arbitraggi temporali.
+
+---
+
+## 50. Decomposizione del Rischio di Eulero & Marginal VaR (`core/risk_engine.py`)
+
+Poiché il Value at Risk (VaR) e la deviazione standard di portafoglio sono funzioni omogenee di grado 1 rispetto ai pesi di allocazione $\mathbf{w}$, per il **Teorema di Eulero per funzioni omogenee** il rischio totale di portafoglio può essere esattamente scomposto nella somma dei contributi marginali dei singoli asset senza residui:
+
+\[ \text{VaR}_p = \sum_{i=1}^N w_i \cdot \frac{\partial \text{VaR}_p}{\partial w_i} \]
+
+### 1. Marginal VaR ($\text{MVaR}_i$)
+Rappresenta la derivata prima parziale del VaR di portafoglio rispetto al peso dell'asset $i$-esimo:
+\[ \text{MVaR}_i = \frac{\partial \text{VaR}_p}{\partial w_i} = z_\alpha \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p} \]
+
+### 2. Component VaR ($\text{CVaR}_i$)
+Quantifica l'ammontare monetario assoluto (o percentuale) di rischio apportato dalla posizione $i$-esima al portafoglio complessivo:
+\[ \text{CVaR}_i = w_i \cdot \text{MVaR}_i \]
+\[ \text{Contributo \% Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\% \]
+Proprietà di chiusura esatta: $\sum_{i=1}^N \text{Contributo \% Rischio}_i = 100.0\%$.
+
+---
+
+## 51. Liquidity-Adjusted Value at Risk (LVaR - Bangia / Basel III) (`core/risk_engine.py`)
+
+Il VaR tradizionale ipotizza che le posizioni possano essere liquidate istantaneamente a prezzi mid-market senza costi di attrito. Il modello **LVaR** estende il profilo di rischio considerando l'orizzonte effettivo di smobilizzo $T$ e l'impatto esogeno del bid-ask spread medio di mercato $S$:
+
+\[ \text{LVaR} = \text{VaR}_1 \cdot \sqrt{T} + \frac{1}{2} \cdot V_{\text{port}} \cdot \left( \bar{S} + z_\alpha \cdot \sigma_S \right) \]
+
+Dove:
+- $\text{VaR}_1 \cdot \sqrt{T}$: VaR di mercato scalato temporalmente per l'orizzonte di liquidazione ordinata a $T$ giorni.
+- $\frac{1}{2} \cdot V_{\text{port}} \cdot \bar{S}$: Costo atteso di attraversamento dello spread (Costo di Liquidità Esogeno).
+- $\text{Premio Illiquidità \%} = \frac{\text{LVaR} - \text{VaR}_1}{\text{VaR}_1} \times 100\%$.
+
+---
+
+## 52. Analisi Obbligazionaria Istituzionale & Credit Default Swap (YAS Cockpit) (`core/yield_curve.py`)
+
+### 1. Prezzo Obbligazionario e Yield to Maturity (YTM)
+Dati il valore nominale $F$, la cedola annua $C$, la frequenza $m$, la maturità $T$ e il prezzo di mercato $P$, il rendimento a scadenza $y$ (YTM) risolve per via numerica (algoritmo di Newton-Raphson/Brent) l'equazione:
+\[ P = \sum_{k=1}^{m \cdot T} \frac{C/m}{\left(1 + \frac{y}{m}\right)^k} + \frac{F}{\left(1 + \frac{y}{m}\right)^{m \cdot T}} \]
+
+### 2. Duration, Convessità & DV01
+- **Macaulay Duration**: $D_{\text{mac}} = \frac{1}{P} \sum_{k=1}^{m \cdot T} t_k \cdot \text{PV}(CF_k)$
+- **Modified Duration**: $D_{\text{mod}} = \frac{D_{\text{mac}}}{1 + y/m}$
+- **Convexity**: $C = \frac{1}{P \left(1 + \frac{y}{m}\right)^2} \sum_{k=1}^{m \cdot T} \frac{t_k (t_k + 1/m) \cdot CF_k}{\left(1 + \frac{y}{m}\right)^{m \cdot t_k}}$
+- **DV01 (Dollar Value of an 01 / PVBP)**: $\text{DV01} = P \cdot D_{\text{mod}} \cdot 0.0001$
+- **Espansione di Taylor di 2° Ordine**: $\frac{\Delta P}{P} \approx -D_{\text{mod}} \cdot \Delta y + \frac{1}{2} \cdot C \cdot (\Delta y)^2$
+
+### 3. Z-Spread (Zero-Volatility Spread)
+Lo spread costante $z$ (espresso in bps) da aggiungere a ciascun nodo della curva spot sovrana $r(t)$ tale per cui:
+\[ P_{\text{mkt}} = \sum_{k=1}^N \frac{CF_k}{\left(1 + \frac{r(t_k) + z}{m}\right)^{m \cdot t_k}} \]
+
+### 4. Modello Credit Default Swap (Hazard Rate & Default Probability)
+Dato lo spread CDS a 5 anni $S_{\text{CDS}}$ e il Recovery Rate $R = 40\%$, l'intensità di default (Hazard Rate $\lambda$) e la probabilità cumulativa di default su orizzonte $t$ sono date da:
+\[ \lambda = \frac{S_{\text{CDS}}}{1 - R} \]
+\[ PD(t) = 1 - e^{-\lambda \cdot t} \]
+
+---
+
+## 53. Real-Time High-Frequency Streaming Engine & Level-2 Book (`core/streaming_engine.py`)
+
+### 1. Ring Buffer O(1) FIFO Thread-Safe
+Struttura dati circolare a memoria fissa pre-allocata con puntatore atomico di scrittura per ingestione ad alta frequenza di stream di tick senza allocazione dinamica o overhead di garbage collection.
+
+### 2. Stoikov Microprice (2018) & Depth Imbalance
+Dato l'order book L2 con i migliori livelli di denaro $(P_b, Q_b)$ e lettera $(P_a, Q_a)$:
+\[ \text{Mid Price} = \frac{P_a + P_b}{2} \]
+\[ \text{Depth Imbalance} = \frac{Q_b - Q_a}{Q_b + Q_a} \in [-1, +1] \]
+\[ \text{Microprice} = \frac{Q_b \cdot P_a + Q_a \cdot P_b}{Q_b + Q_a} = P_b + \left(\frac{Q_b}{Q_b + Q_a}\right) \cdot (P_a - P_b) \]
+Il microprice anticipa la direzione immediata del prezzo d'equilibrio incorporando la pressione asimmetrica della liquidità presente sul book.
 
 
