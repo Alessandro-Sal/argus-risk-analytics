@@ -3281,6 +3281,11 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
 
         # Esecuzione del Backtest a Quintili
         df_rets_port = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()
+        if not isinstance(df_rets_port, pd.DataFrame) or df_rets_port.empty:
+            df_pr = results.get("df_prices", pd.DataFrame()) if results else pd.DataFrame()
+            if isinstance(df_pr, pd.DataFrame) and not df_pr.empty and "price_date" in df_pr.columns:
+                df_rets_port = df_pr.pivot(index="price_date", columns="ticker", values="close").pct_change().dropna(how="all")
+
         fq_res = run_factor_quintile_backtest(
             df_returns=df_rets_port,
             factor_type=fact_choice,
