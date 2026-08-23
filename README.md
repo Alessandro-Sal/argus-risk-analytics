@@ -2,7 +2,7 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-5.15.0-blue.svg)
+![Version](https://img.shields.io/badge/version-5.16.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 ![PyTest Suite](https://img.shields.io/badge/PyTest-201%2F201%20PASSED%20(100%25)-brightgreen)
@@ -262,7 +262,7 @@ argus-risk-analytics/
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # Screener Quantitativo Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── sidebar.py               # Navigation Rail v5.15.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v5.16.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
@@ -378,7 +378,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **184 test automatizzati PyTest** con copertura end-to-end del 100%:
+Il progetto include **201 test automatizzati PyTest** con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -386,7 +386,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 184 passed in ~25.00s =============================
+============================= 201 passed in ~25.00s =============================
 ```
 
 ---
@@ -397,4 +397,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.15.0.*
+*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.16.0.*
