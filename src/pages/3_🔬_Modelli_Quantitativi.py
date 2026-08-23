@@ -3425,10 +3425,15 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
         st.plotly_chart(fig_py, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
     with col_plot2:
-        st.markdown("##### 🛡️ Curva Probabilità di Default Implicita (CDS)")
+        df_cds = cds_res["default_probability_curve"]
+        col_cds_h1, col_cds_h2 = st.columns([2.0, 1.2])
+        with col_cds_h1:
+            st.markdown("##### 🛡️ Curva Default Implicita (CDS)")
+        with col_cds_h2:
+            csv_cds = df_cds.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CDS CSV", data=csv_cds, file_name=f"cds_default_curve_{sel_preset.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_cds_curve")
         st.caption(f"Term structure cumulativa di default basata sullo spread CDS di **{inp_cds:.0f} bps** (Recovery: 40%).")
         
-        df_cds = cds_res["default_probability_curve"]
         fig_cds = go.Figure()
         fig_cds.add_trace(go.Scatter(
             x=df_cds["tenor_years"], y=df_cds["cumulative_default_prob_pct"],
@@ -3451,9 +3456,14 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
 
     # Tabella di Sensibilità a Shock di Rendimento
     st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-    st.markdown("##### 📋 Matrice di Sensibilità Istituzionale a Shock di Tasso (Basis Points Shock)")
-    
     df_sens = bond_res["sensitivity_table"].copy()
+    col_sens_h1, col_sens_h2 = st.columns([3.0, 1.0])
+    with col_sens_h1:
+        st.markdown("##### 📋 Matrice di Sensibilità Istituzionale a Shock di Tasso (Basis Points Shock)")
+    with col_sens_h2:
+        csv_sens = df_sens.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica Sensibilità CSV", data=csv_sens, file_name=f"bond_sensitivity_{sel_preset.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_bond_sens")
+    
     sens_cfg = {
         "shift_bps": st.column_config.NumberColumn("Shock Tasso", format="%+d bps"),
         "new_ytm_pct": st.column_config.NumberColumn("Nuovo YTM", format="%.3f%%"),
