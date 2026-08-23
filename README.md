@@ -15,11 +15,17 @@
 **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è una piattaforma integrata di **Business Intelligence, Financial Valuation, Forensic Accounting, AI Narrative Intelligence e Quantitative Risk Management** potenziata con standard **Bloomberg Terminal Parity**. Progettata con un'interfaccia ad alta densità informativa di livello istituzionale, la soluzione offre un ecosistema avanzato per la diagnosi contabile, la profilazione del rischio e la protezione strategica di portafogli d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto e Cash*).
 
 Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGUS** converte registri di negoziazione eterogenei (file CSV generici, esportazioni native da broker quali **DeGiro**, **Directa SIM**, **Fineco Bank**, **Interactive Brokers / IBKR**, **Trade Republic**, **Scalable Capital**, **eToro**, **Revolut Trading** e sincronizzazioni live da **Google Sheets** con estrazione duale separata di *Stocks & Crypto*) in un framework analitico strutturato. La piattaforma integra:
-* **⚡ Bloomberg Terminal Command Gateway & Mnemonic Parser**: Barra di comando istituzionale globale con sintassi a codici rapidi (`<TICKER> <MNEMONIC> <GO>`, es. `AAPL DES`, `MSFT FA`, `NVDA VOLS`, `PORT RISK`, `YCRV`, `BTP YAS`, `US10Y FI`, `CDS`, `STREAM`, `ATTR`, `TAX`, `EQS`, `HP`), autocompletamento fuzzy, visual command feedback in tempo reale e navigazione rapida senza mouse.
+* **⚡ Bloomberg Terminal Command Gateway & Mnemonic Parser**: Barra di comando istituzionale globale con sintassi a codici rapidi (`<TICKER> <MNEMONIC> <GO>`, es. `AAPL DES`, `MSFT FA`, `NVDA VOLS`, `PORT RISK`, `YCRV`, `BTP YAS`, `US10Y FI`, `CDS`, `STREAM`, `ATTR`, `TAX`, `EQS`, `BQUANT`, `LAUNCHPAD`, `XL`, `HP`), autocompletamento fuzzy, visual command feedback in tempo reale e navigazione rapida senza mouse.
+* **🐍 ARGUS BQuant Python Sandbox In-App (`BQUANT` / `PY`)**: Console Python interattiva in-app per eseguire script analitici direttamente in-memory sui DataFrame di sessione (`df_positions`, `df_returns`, `df_prices`, `results`), interrogazioni SQL ad alta velocità con motore DuckDB in-process, cattura automatica di stdout/stderr, tabelle `df_out` e figure Plotly interattive con 5 snippet quantitativi istituzionali preimpostati.
+* **🎛️ ARGUS Launchpad & Institutional Role Workspaces (`LAUNCHPAD` / `WS`)**: Orchestratore di dashboard per 5 profili operativi istituzionali (*Trading Desk & Execution*, *Risk Officer & Compliance*, *Portfolio Manager & CIO*, *Quantitative Analyst & Data Scientist*, *Corporate Treasurer & Fixed Income*) con 1-Click Fast Teleportation verso i moduli primari, Live Role KPI Cockpit e persistenza del layout su database SQLite locale.
+* **📊 Excel Live Connector & Bloomberg RTD Builder (`XL` / `EXCEL`)**: Costruttore visuale di formule Excel Bloomberg Parity (`=ARGUS_BDP`, `=ARGUS_BDH`, `=ARGUS_RISK`), generatore di moduli VBA Desktop (`.bas`), Microsoft Office Scripts TypeScript (`.ts`) per Excel 365/Web ed esportatore di cartelle di lavoro multi-foglio `.xlsx` (*Executive_Summary*, *Positions_Portfolio*, *Fixed_Income_YAS*, *Execution_Schedule*).
+* **🔍 Formula Engine EQS & Screener Universale (`EQS`)**: Motore di valutazione AST logico-booleana per interrogazioni composte personalizzate dall'utente (es. `Piotroski >= 7 AND Altman > 2.9 AND ROIC > WACC * 1.5 AND Beta < 1.0`) con risoluzione elastica di oltre 35 alias finanziari.
+* **🌊 Modello di Market Impact Almgren-Chriss & Execution Schedule**: Modellazione analitica dell'impatto permanente e temporaneo di liquidazione di ordini istituzionali in base all'Average Daily Volume (ADV), traiettoria ottima iperbolica $\sinh(\kappa(T-t))/\sinh(\kappa T)$, Half-Life di smobilizzo, piano di slicing a 10 scaglioni ed Execution VaR al 95%.
+* **📊 Backtesting di Strategie Multi-Fattoriali a 5 Quintili**: Analisi di performance e rischio su panieri quantitativi ordinati (Q1..Q5), calcolo dello spread Long-Short ($Q1 - Q5$), Information Ratio e test di monotonicità di rango di Spearman ($r_s$) sui fattori Quality, Low-Beta, Momentum e Profitability.
 * **📈 Fixed Income Istituzionale & Z-Spread (`YAS` / `FI`)**: Risolutore numerico per **Yield to Maturity (YTM)**, **Current Yield**, **Macaulay Duration**, **Modified Duration**, **Convexity esatta**, **DV01 / PVBP**, espansione di Taylor di 2° ordine ($\frac{\Delta P}{P} \approx -D_{\text{mod}} \Delta y + \frac{1}{2} C (\Delta y)^2$) e calibrazione dello **Z-Spread (Zero-Volatility Spread)** rispetto alla curva spot sovereign Nelson-Siegel-Svensson.
 * **🛡️ Credit Default Swap (CDS) & Curva di Default Implicita**: Stima dell'Hazard Rate (intensità di default $\lambda = \frac{S_{\text{CDS}}}{1 - R}$) e term structure continua della probabilità cumulativa di default $PD(t) = 1 - e^{-\lambda \cdot t}$ su scadenze 6M, 1Y, 2Y, 3Y, 5Y, 7Y, 10Y, 15Y, 30Y.
 * **⚡ Real-Time In-Memory Ring Buffer & Order Flow Engine (`STREAM`)**: Struttura dati circolare thread-safe con complessità temporale $O(1)$ per ingestione tick-by-tick ad alta frequenza, calcolo istantaneo di **VWAP intraday**, **Order Flow Imbalance (OFI)**, volatilità rolling e Level-2 Order Book Microprice (Stoikov 2018).
-* **📉 Decomposizione Istituzionale del Rischio (Marginal VaR, Component VaR & LVaR)**: Decomposizione del Value at Risk con proprietà di Eulero ($\sum \text{CVaR}_i = \text{VaR}_p$), calcolo del Marginal VaR $(\partial \text{VaR}/\partial w_i)$, quantificazione del contributo percentuale di ogni posizione al rischio e stima del **Liquidity-Adjusted VaR (LVaR)** con penalizzazione per orizzonti di smobilizzo e bid-ask spread.
+* **📉 Decomposizione Istituzionale del Rischio (Marginal VaR, Component VaR & LVaR)**: Decomposizione del Value at Risk con proprietà di Eulero ($\sum \text{CVaR}_i = \text{VaR}_p$), calcolo del Marginal VaR $(\partial \text{VaR}/\partial w_i)$, quantificazione del contributo percentuale di ogni posizione al rischio e stima del **Liquidity-Adjusted VaR (LVaR Bangia 1999)** con penalizzazione per orizzonti di smobilizzo e bid-ask spread.
 * **📊 Attribuzione di Performance Multi-Periodo Carino (Zero-Residual) & Karnosky-Singer**: Algoritmo di raccordo logaritmico multi-periodale (Carino 1999) con garanzia matematica di **residuo zero** su orizzonti multi-anno ($\sum \text{Effetti} = R_p - R_b$) e scomposizione valutaria Karnosky-Singer per isolare l'impatto del mercato locale, dell'asset selection e del rischio di cambio.
 * **🏛️ Modello Nelson-Siegel-Svensson (NSS a 6 Parametri) & Key Rate Durations (KRD)**: Modellazione continua della struttura a termine dei tassi sovrani con doppia gobba $(\beta_0, \beta_1, \beta_2, \beta_3, \tau_1, \tau_2)$, calcolo della sensitività triangolare dei flussi obbligazionari sui nodi chiave (6M, 1Y, 2Y, 5Y, 10Y, 30Y) e stima esatta della Duration Effettiva.
 * **Motore Analitico Embedded DuckDB & Archiviazione Apache Parquet**: Database colonnare in-process vettorizzato (C++ SIMD) per eseguire aggregazioni OLAP complesse a latenza sub-millisecondo ($\mu s$/ms), **Cubi Multi-Dimensionali** (`Asset Class` $\times$ `Settore` $\times$ `Valuta`), window functions con `QUALIFY` e `DENSE_RANK()`, **Console SQL Interattiva** per query analitiche arbitrarie su tabelle in-memory ed esportazione con **compressione colonnare dell'85% in Apache Parquet**.
@@ -39,11 +45,11 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Motore Quantitativo & Portfolio Engineering di Frontiera**: Risoluzione analitica della Frontiera Efficiente di Markowitz affiancata da stimatori *Ledoit-Wolf Shrinkage*, **Equal Risk Contribution (ERC / Parità di Rischio Pura)**, **Dipendenza di Coda Asimmetrica con Tail Copulas (Clayton & Gumbel)** per rilevare il rischio di crash congiunto non lineare, **Simulatore Interattivo Trade-Level Kelly Criterion & Half-Kelly Position Sizing** (pre-popolato con Win Rate e Payoff Ratio reali del Graveyard), **Live Rebalancing Sandbox** interattivo, allocazione mediante Machine Learning con **Hierarchical Risk Parity (HRP - Marcos López de Prado)**, copertura analitica con **Black-Scholes (1973)** con calcolo dei 5 Greci e Delta-Hedging con opzioni Put, generazione di rendimento passivo con *Covered Call Yield Enhancer*, modelli econometrici a 3 fattori di Fama-French (con regressione OLS multivariata), Carhart a 4 fattori, modello macro-fattoriale *MSCI Barra a 5 fattori ortogonalizzati*, simulazioni stocastiche *Merton Jump-Diffusion*, classificazione di regime macro con **Market Regime Switching (3-State Markov Model)**, rilevatore di anomalie di mercato via *Machine Learning Isolation Forest* e proiezioni stocastiche *Monte Carlo* (con decomposizione di Cholesky e distribuzioni *Student-t* a code grasse).
 * **AI & LLM Narrative Intelligence (ARGUS AI Analyst & Copilot)**: Motore di sintesi narrativa automatica a due livelli (**LLM Online** con Google Gemini / OpenAI e **NLG Deterministico Offline 100%**) per generare Executive Memorandum istituzionali e rispondere in tempo reale a domande complesse sul portafoglio via chat interattiva.
 * **Financial Statement & Forensic Accounting**: Suite completa per la valutazione della solvibilità e del valore intrinseco aziendale mediante modelli *Altman Z-Score*, decomposizione *DuPont a 5 fattori*, *Piotroski F-Score (9pt)*, **Contabilità Forense Beneish M-Score (1999)** a 8 indici econometrici per il rilevamento di frodi contabili e manipolazione degli utili, **Sloan Accrual Ratio (1996)** per la qualità dei flussi di cassa, stima del *WACC (CAPM)*, *DCF stocastico a due stadi* e classificatore *Random Forest Distress Risk*.
-* **Interfaccia Istituzionale & Spotlight Command Palette (`Ctrl+K`)**: Modalità di esecuzione rapida, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 10 moduli, oltre 30 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
+* **Interfaccia Istituzionale & Spotlight Command Palette (`Ctrl+K`)**: Modalità di esecuzione rapida, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti gli 11 moduli, oltre 35 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
 
 ---
 
-## 🚀 Caratteristiche Chiave & Moduli Operativi (10 Pagine)
+## 🚀 Caratteristiche Chiave & Moduli Operativi (11 Moduli Operativi)
 
 ### 0. 🎛️ Control Room & Total Wealth Hub (`src/0_Control_Room.py`)
 * **⚡ Motore Analitico Embedded DuckDB & SQL Sandbox**: Esecuzione in-process vettorizzata SIMD per aggregazioni OLAP sub-millisecondo, preset istituzionali 1-click (Cubi Multi-Dimensionali, Window Functions `QUALIFY`, Storico Volumi/Commissioni, Matrice FX), console SQL interattiva ed esportazione compressa in formato **Apache Parquet**.
@@ -62,6 +68,8 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Centro Esportazione Report**: Download in-memory di Factsheet PDF a 2 pagine, Workbook Excel multi-tab, Report HTML Standalone e pacchetto Star Schema ZIP per Power BI.
 
 ### 2. 🔴 Analisi del Rischio & Rilevamento Anomalie (`src/pages/2_🔴_Analisi_Rischio.py`)
+* **Decomposizione di Eulero VaR/CVaR**: Calcolo del Marginal VaR $(\partial \text{VaR}/\partial w_i)$ e Component VaR in € e % con proprietà additiva $\sum \text{CVaR}_i = \text{VaR}_p$.
+* **Liquidity-Adjusted VaR (LVaR Bangia 1999)**: Integrazione del rischio di illiquidità di mercato e dello spread bid-ask monetario su orizzonti di disinvestimento forzato a 5 e 10 giorni.
 * **Volatilità Condizionale GARCH(1,1) & FHS**: Calibrazione MLE per la varianza condizionale $\sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2$, bande dinamiche di VaR, stima della persistenza e Half-Life dello shock, curva di Term Structure a 30 giorni e simulazione storica filtrata (FHS).
 * **Value at Risk (VaR) & Expected Shortfall (CVaR)**: Stima analitica della perdita massima (VaR) e della perdita media nello scenario peggiore (CVaR al 95% e 99%) nelle metodologie Storica, Parametrica, Cornish-Fisher e FHS.
 * **Validazione Regolamentare VaR (Kupiec POF Backtest)**: Backtest su 252 giorni di negoziazione con classificazione a semaforo dell'Accordo di Basilea (*Verde/Giallo/Rosso*).
@@ -70,17 +78,20 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva, analisi Average Daily Volume (ADV) e Stop-Loss dinamici Chandelier ($3 \times ATR_{14}$).
 
 ### 3. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/3_🔬_Modelli_Quantitativi.py`)
-* **🧬 Asymmetric Tail Copula Models (Clayton & Gumbel)**: Calcolo della dipendenza di coda inferiore ($\lambda_L$) e superiore ($\lambda_U$) per identificare il rischio di contagio e crollo simultaneo non lineare durante i panic selling di mercato, con allerta per coppie ad elevata asimmetria ($\lambda_L \ge 0.30$).
-* **🎯 Simulatore Interattivo Trade Sizing (Kelly Criterion)**: Calcolo matematico dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)* per massimizzare la crescita geometrica azzerando il rischio di rovina, pre-popolato automaticamente con Win Rate % e Payoff Ratio reali del Graveyard e dimensionamento monetario esatto sullo Stop-Loss.
+* **🏛️ Fixed Income Istituzionale, Z-Spread & CDS Curve (`YAS` / `FI`)**: Risoluzione analitica di YTM, Macaulay Duration, Modified Duration, Convexity esatta, DV01/PVBP, Z-Spread rispetto alla curva sovereign Nelson-Siegel e term structure della probabilità di default da spread CDS.
+* **📊 Attribuzione Multi-Periodo Carino (Zero-Residual) & Karnosky-Singer FX**: Algoritmo logaritmico multi-anno a residuo zero per l'attribuzione di Brinson-Fachler e scomposizione valutaria Karnosky-Singer per isolare l'impatto del mercato locale rispetto alle fluttuazioni dei cambi.
+* **📊 Backtesting di Strategie Multi-Fattoriali a 5 Quintili**: Analisi di performance e rischio su panieri quantitativi ordinati (Q1..Q5), calcolo dello spread Long-Short ($Q1 - Q5$), Information Ratio e test di monotonicità di rango di Spearman ($r_s$) sui fattori Quality, Low-Beta, Momentum e Profitability.
+* **🧬 Asymmetric Tail Copula Models (Clayton & Gumbel)**: Calcolo della dipendenza di coda inferiore ($\lambda_L$) e superiore ($\lambda_U$) per identificare il rischio di contagio e crollo simultaneo non lineare durante i panic selling di mercato.
+* **🎯 Simulatore Interattivo Trade Sizing (Kelly Criterion)**: Calcolo matematico dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)* per massimizzare la crescita geometrica azzerando il rischio di rovina.
 * **⚖️ Equal Risk Contribution (ERC / Risk Parity Pura)**: Ottimizzazione non lineare SLSQP dove ciascun asset contribuisce esattamente per $1/N$ alla volatilità complessiva di portafoglio.
-* **Live Rebalancing Sandbox (What-If Weight Matrix)**: Simulatore in tempo reale con slider e preset istituzionali (*⭐ Pesi Attuali*, *⚖️ Equipesato 1/N*, *🏆 Max Sharpe*, *🛡️ Minima Volatilità*, *🧬 Equal Risk ERC*) per calcolare istantaneamente le variazioni $\Delta R$, $\Delta\sigma$, $\Delta\text{VaR}_{95}$ e $\Delta\text{Sharpe}$ con grafico a barre comparative.
-* **Hierarchical Risk Parity (HRP - Marcos López de Prado 2016)**: Ottimizzazione del portafoglio basata su Machine Learning, Tree Clustering e Bisezione Ricorsiva con matrice di distanza $D_{i,j} = \sqrt{(1 - \rho_{i,j})/2}$.
-* **Modello Analitico Black-Scholes (1973) & Greci**: Prezzatura di opzioni Call/Put europee, calcolo dei 5 Greci ($\Delta, \Gamma, \Theta, \text{Vega}, \rho$), Put Delta-Hedging per immunizzare il Beta e Covered Call Yield Enhancer per generare rendimento extra.
-* **Simulatore Stocastico Merton Jump-Diffusion**: Modellizzazione con Moto Browniano Geometrico e shock di salto di Poisson ($N_t \sim \text{Poisson}(\lambda dt)$) per quantificare il rischio di crollo estremo.
-* **🧠 Modelli Fattoriali Kenneth French (Fama-French 5-Factor & Carhart Momentum)**: Regressione econometrica OLS multivariata su dataset ufficiali di Dartmouth (*3-Factor, 4-Factor, 5-Factor + MOM*), con calcolo di $\alpha$ annualizzato, statistica $t$, $p$-value, intervalli di confidenza 95%, Factor Return Attribution e Rolling Factor Betas a 60 giorni.
-* **Fattori Fama-French, Carhart & MSCI Barra a 5 Fattori**: Decomposizione del rendimento su fattori ortogonalizzati via Gram-Schmidt per azzerare la multicollinearità.
+* **Live Rebalancing Sandbox (What-If Weight Matrix)**: Simulatore in tempo reale con slider e preset istituzionali (*⭐ Pesi Attuali*, *⚖️ Equipesato 1/N*, *🏆 Max Sharpe*, *🛡️ Minima Volatilità*, *🧬 Equal Risk ERC*).
+* **Hierarchical Risk Parity (HRP - Marcos López de Prado 2016)**: Ottimizzazione del portafoglio basata su Machine Learning, Tree Clustering e Bisezione Ricorsiva.
+* **Modello Analitico Black-Scholes (1973) & Superficie di Volatilità 3D**: Prezzatura di opzioni Call/Put europee, 5 Greci, Put Delta-Hedging, Covered Call Yield Enhancer e calibrazione dello Skew parametrico.
+* **Simulatore Stocastico Merton Jump-Diffusion**: Modellizzazione con Moto Browniano Geometrico e shock di salto di Poisson ($N_t \sim \text{Poisson}(\lambda dt)$).
+* **🧠 Modelli Fattoriali Kenneth French (Fama-French 5-Factor & Carhart Momentum)**: Regressione econometrica OLS multivariata su dataset ufficiali di Dartmouth con Factor Return Attribution e Rolling Factor Betas a 60 giorni.
 
 ### 4. 📋 Posizioni, Contabilità FIFO & Fiscalità TUIR (`src/pages/4_📋_Posizioni_e_Dettagli.py`)
+* **🌊 Modello Almgren-Chriss & Traiettoria Ottima di Liquidazione**: Stima dei costi di impatto permanente e temporaneo sul mercato azionario, Half-Life di smobilizzo, slicing a 10 scaglioni ed Execution VaR al 95%.
 * **Motore Contabile FIFO (`_fifo_engine`)**: Calcolo deterministico del Weighted Average Cost Price (WACP) e separazione analitica tra PnL realizzato e non realizzato.
 * **🪦 Posizioni Chiuse & Graveyard Cockpit Multi-Prospettiva**:
   - *Curva Cumulativa PnL Realizzato (€)* con High-Water Mark di picco e telemetria di trade drawdown.
@@ -117,20 +128,22 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Matrice dei Delta ($\Delta$)**: Confronto analitico affiancato tra due punti temporali qualsiasi con calcolo del tasso di risparmio e apporti di liquidità.
 
 ### 8. 📈 Analisi Tecnica Quantitativa & Volume Profile (`src/pages/8_📈_Analisi_Tecnica.py`)
+* **⚡ Real-Time Streaming Ring Buffer & Order Flow Imbalance (OFI)**: Ingestione tick-by-tick ad alta frequenza, VWAP dinamico, Order Flow Imbalance e Level-2 Microprice (Stoikov 2018).
 * **Indicatori Algoritmici**: Medie Mobili (EMA 20, EMA 50, SMA 200 con Golden/Death Cross), MACD, RSI 14, Bande di Bollinger con **Bollinger Squeeze Detection**, ATR 14 e ADX 14.
 * **Volume Profile (POC, VAH, VAL)**: Distribuzione orizzontale dei volumi sul grafico con evidenziazione del Point of Control (POC) e della Value Area (70% del volume totale).
 * **Candlestick Pattern Recognition**: Rilevamento automatico di pattern (*Bullish/Bearish Engulfing*, *Hammer*, *Shooting Star*, *Doji*).
 * **Technical Confluence Score Card (0-100)**: Score ponderato su 5 driver tecnici con verdetto tattico (*Strong Buy* $\rightarrow$ *Strong Sell*) e allineamento trend multi-timeframe (1D vs 1W).
 
 ### 9. 🔍 Screener Quantitativo & Pre-Trade Simulator (`src/pages/9_🔍_Screener_Opportunita.py`)
+* **⚡ Formula Engine EQS (Custom Query Builder)**: Parsing ed esecuzione vettorizzata di espressioni logiche personalizzate dall'utente con oltre 35 alias finanziari supportati.
 * **Asset Discovery Multi-Fattoriale**: Esplorazione quantitativa di universi globali (*US Mega Caps S&P 100*, *EuroStoxx 50*, *FTSE MIB Leaders*, *Dividend Aristocrats*, *Disruptive Tech*, *Custom*) su Valutazione, Qualità Contabile, Rischio e Momentum.
 * **Archetipi Quantitativi Istituzionali**: Filtri 1-click basati su stili di gestione (*GARP*, *Dividend Fortress*, *Deep Value*, *Low Volatility*, *Momentum Breakout*).
-* **Pre-Trade Portfolio Impact Simulator & Almgren-Chriss**: Simulazione *What-If* dell'impatto di un nuovo acquisto sulla frontiera di rischio del portafoglio reale e stima dell'impatto permanente/temporaneo su scaglioni di volume di mercato (ADV).
+* **Pre-Trade Portfolio Impact Simulator**: Simulazione *What-If* dell'impatto di un nuovo acquisto sulla frontiera di rischio del portafoglio reale ($\Delta\text{CAGR}$, $\Delta\sigma$, $\Delta\text{Sharpe}$, $\Delta\text{Beta}$, $\Delta\text{Diversification Ratio}$).
 * **Confronto Radar Head-to-Head & Factsheet PDF One-Pager**: Confronto grafico a 6 dimensioni fino a 4 titoli ed esportazione immediata di Factsheet PDF istituzionale ad alta risoluzione per qualsiasi asset analizzato.
 
 ### 10. 💻 BQuant Python Sandbox, Workspace Launchpad & Excel Live Connector (`src/pages/10_💻_BQuant_e_Launchpad.py`)
-* **🐍 Console Python Interattiva In-App (Bloomberg BQuant Style)**: Editor di codice Python integrato con iniezione dinamica in-memory dei DataFrame di sessione (`df_positions`, `df_returns`, `df_prices`, `results`), query SQL vettoriali ad alta velocità con DuckDB in-process, cattura automatica di stdout, tabelle e grafici Plotly interattivi con 5 snippet quantitativi istituzionali preimpostati.
-* **🎛️ ARGUS Launchpad & Role Workspace Customizer**: Configurazione rapida dell'ambiente operativo basata su 5 profili istituzionali predefiniti (*Trading Desk & Execution*, *Risk Officer & Compliance*, *Portfolio Manager & CIO*, *Quantitative Analyst & Data Scientist*, *Corporate Treasurer & Fixed Income*) con link diretti ai moduli chiave, monitoraggio dei KPI specifici e persistenza delle preferenze su SQLite locale.
+* **🐍 Console Python Interattiva In-App (Bloomberg BQuant Style)**: Editor di codice Python integrato con iniezione dinamica in-memory dei DataFrame di sessione (`df_positions`, `df_returns`, `df_prices`, `results`), query SQL vettoriali ad alta velocità con DuckDB in-process, cattura automatica di stdout, tabelle `df_out` con download CSV e grafici Plotly interattivi con 5 snippet quantitativi istituzionali preimpostati.
+* **🎛️ ARGUS Launchpad & Role Workspace Customizer**: Configurazione rapida dell'ambiente operativo basata su 5 profili istituzionali predefiniti (*Trading Desk & Execution*, *Risk Officer & Compliance*, *Portfolio Manager & CIO*, *Quantitative Analyst & Data Scientist*, *Corporate Treasurer & Fixed Income*) con 1-Click Fast Teleportation verso i moduli primari, Live Role KPI Cockpit e persistenza delle preferenze su SQLite locale.
 * **📊 Excel Live Connector & Bloomberg RTD Formula Generator**: Costruttore visuale di formule Excel compatibili Bloomberg Terminal (`=ARGUS_BDP`, `=ARGUS_BDH`, `=ARGUS_RISK`), generatore di codice VBA Desktop (`.bas`), Microsoft Office Scripts TypeScript (`.ts`) per Excel 365/Web ed esportatore di workbook istituzionali multi-foglio formattati (`Executive_Summary`, `Positions_Portfolio`, `Fixed_Income_YAS`, `Execution_Schedule`).
 
 ---
@@ -147,7 +160,7 @@ flowchart TD
     end
 
     subgraph Layer2 ["⚙️ 2. ETL & VALIDATION PIPELINE"]
-        ADAPT{"🔌 core/adapters/degiro.py"}
+        ADAPT{"🔌 core/adapters/broker_hub.py"}
         VAL{"⚙️ core/validator.py"}
         SCH{"🛡️ core/schemas.py"}
         FETCH{"⚙️ core/fetcher.py"}
@@ -158,20 +171,27 @@ flowchart TD
         DB_RAW[("Tabelle Grezze ORM\n(portfolios, assets, transactions, market_prices)")]
         DB_SNAP[("Tabelle Snapshot Metriche\n(portfolio_snapshots, snapshot_positions)")]
         MULTI_REG[("🗂️ core/multi_portfolio.py\n(Total Wealth Registry & Merged Snapshots)")]
+        DUCK_OLAP[("🦆 core/duckdb_engine.py\n(In-Memory OLAP & Parquet Store)")]
     end
 
     subgraph Layer4 ["🧠 4. ANALYTICS & QUANTITATIVE ENGINE"]
-        RE{"⚙️ core/risk_engine.py"}
+        RE{"⚙️ core/risk_engine.py (VaR/CVaR, LVaR, Almgren-Chriss)"}
         ADV_Q{"🧬 core/advanced_quant.py (Tail Copulas, Kelly, ERC)"}
+        FACTORS{"📊 core/factor_library.py (Dartmouth 5-Factor & Q1-Q5 Backtest)"}
+        FI_YAS{"🏛️ core/fixed_income.py (YAS, Z-Spread, CDS Curve)"}
+        STREAM_ENG{"⚡ core/streaming_engine.py (Ring Buffer, VWAP, OFI)"}
         AI_ANL{"🧠 core/ai_analyst.py (Dual-Engine LLM/NLG & Copilot)"}
+        BQUANT_ENG{"🐍 core/bquant_engine.py (Python Sandbox & DuckDB SQL)"}
+        WS_ENG{"🎛️ core/workspace_engine.py (Launchpad Role Profiles)"}
+        XL_ENG{"📊 core/excel_connector.py (Bloomberg Formulas & XLSX)"}
         HRP{"🧬 core/hrp_optimizer.py"}
-        OPT{"🛡️ core/options_hedging.py"}
-        REG{"🌊 core/regime_switching.py"}
-        FIN{"🏛️ core/financial_analysis.py"}
-        FORENSIC{"🕵️‍♂️ core/forensic_accounting.py"}
+        OPT{"🛡️ core/options_hedging.py & volatility_surface.py"}
+        REG{"🌊 core/regime_switching.py & garch_fhs_engine.py"}
+        FIN{"🏛️ core/financial_analysis.py & sec_rag_engine.py"}
+        FORENSIC{"🕵️‍♂️ core/forensic_accounting.py (Beneish & Sloan)"}
         TA{"📈 core/technical_analysis.py"}
-        SCREENER{"🔍 core/screener_engine.py"}
-        TAX{"💰 core/tax_engine.py"}
+        SCREENER{"🔍 core/screener_engine.py (EQS Formula Engine)"}
+        TAX{"💰 core/tax_engine.py & crypto_tax_engine.py"}
         REBAL{"⚖️ core/rebalancer.py"}
         DIV{"📅 core/dividend_engine.py"}
         DIAG{"🩺 core/diagnostics.py"}
@@ -179,7 +199,7 @@ flowchart TD
     end
 
     subgraph Layer5 ["📊 5. PRESENTATION & DESKTOP REPORTING LAYER"]
-        APP("💻 Streamlit App / Control Room (10 Moduli Live)")
+        APP("💻 Streamlit App / Control Room (11 Moduli Live)")
         DESK("🖥️ Native Desktop App (desktop_launcher.py + WebView2)")
         SPOTLIGHT{"🔍 Spotlight Command Palette (Ctrl+K)"}
         REPEXP{"📄 core/report_exporter.py (PDF, Excel, HTML)"}
@@ -195,16 +215,25 @@ flowchart TD
     SCH --> FETCH
     YF <==> CACHE <==> FETCH
     FETCH ==> DB_RAW
+    DB_RAW ==> DUCK_OLAP
     DB_RAW ==> RE
     DB_RAW ==> FIN
     DB_RAW ==> TA
     RE --> ADV_Q
+    RE --> FACTORS
+    RE --> FI_YAS
     RE --> AI_ANL
     RE --> DBEXP
     DBEXP ==> DB_SNAP
     DBEXP ==> MULTI_REG
     RE ==> APP
     ADV_Q ==> APP
+    FACTORS ==> APP
+    FI_YAS ==> APP
+    STREAM_ENG ==> APP
+    BQUANT_ENG ==> APP
+    WS_ENG ==> APP
+    XL_ENG ==> APP
     AI_ANL ==> APP
     FIN ==> APP
     TA ==> APP
@@ -228,13 +257,23 @@ argus-risk-analytics/
 ├── config/                      # Configurazione e mapping ISIN-Ticker
 │   └── config.json
 ├── core/                        # Engine quantitativo, calcoli di rischio e moduli istituzionali
-│   ├── adapters/                # Adapter per broker esterni (DeGiro)
+│   ├── adapters/                # Adapter per broker esterni (DeGiro, Directa, Fineco, IBKR, ecc.)
 │   │   ├── __init__.py
-│   │   └── degiro.py
+│   │   ├── broker_hub.py
+│   │   ├── degiro.py
+│   │   ├── directa.py
+│   │   ├── etoro.py
+│   │   ├── fineco.py
+│   │   ├── ibkr.py
+│   │   ├── isin_resolver.py
+│   │   ├── revolut.py
+│   │   ├── scalable.py
+│   │   └── traderepublic.py
 │   ├── advanced_quant.py        # Tail Copulas, Kelly Criterion & Equal Risk Contribution (ERC)
 │   ├── advisor.py               # ARGUS Quant Advisor & Health Score Engine
 │   ├── ai_analyst.py            # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
-│   ├── attribution.py           # Brinson-Fachler Performance Attribution
+│   ├── attribution.py           # Brinson-Fachler, Carino Multi-Period & Karnosky-Singer FX
+│   ├── bquant_engine.py         # ARGUS BQuant In-App Python Sandbox & DuckDB In-Memory SQL
 │   ├── broker_detector.py       # Multi-Broker Ingestion Hub & Auto-Detector Formati
 │   ├── cache_shield.py          # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
 │   ├── closed_trades.py         # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
@@ -244,17 +283,19 @@ argus-risk-analytics/
 │   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
 │   ├── dividend_engine.py       # Cash Flow Forecast & Dividend Calendar
 │   ├── duckdb_engine.py         # Motore Analitico In-Process DuckDB (OLAP) & Parquet Storage
+│   ├── excel_connector.py       # Bloomberg Formula Generator, VBA Macro, Office Scripts & XLSX Exporter
 │   ├── excel_generator.py       # Modello tattico Excel What-If
 │   ├── exporter.py              # Esportatore CSV denormalizzati
-│   ├── factor_library.py        # Kenneth French Factor Library (5-Factor & Momentum OLS)
+│   ├── factor_library.py        # Kenneth French Factor Library (5-Factor, MOM & Q1-Q5 Backtest)
 │   ├── fetcher.py               # Download dati storici yfinance & conversione valute
 │   ├── financial_analysis.py    # Altman Z-Score, DuPont, Piotroski, WACC, DCF Monte Carlo
-│   ├── fixed_income.py          # Fixed Income Istituzionale (YTM, Duration, Convexity, DV01, Z-Spread, CDS)
+│   ├── fixed_income.py          # Fixed Income YTM, Duration, Convexity, DV01, Z-Spread, CDS
 │   ├── forensic_accounting.py   # Beneish M-Score (1999) & Sloan Accrual Ratio (1996)
 │   ├── garch_fhs_engine.py      # Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)
 │   ├── hedging.py               # Copertura Beta-Neutral & Tail Risk Protection
 │   ├── hrp_optimizer.py         # Hierarchical Risk Parity (HRP - Marcos López de Prado)
 │   ├── html_exporter.py         # Exporter Report Standalone HTML
+│   ├── metadata_resolver.py     # Risoluzione metadati e anagrafiche asset
 │   ├── models.py                # Schema ORM SQLAlchemy (MySQL & SQLite)
 │   ├── multi_portfolio.py       # Total Wealth Multi-Account Registry, Scorecard & Consolidator
 │   ├── options_hedging.py       # Black-Scholes 1973, 5 Greci, Delta-Hedging & Covered Call
@@ -262,22 +303,24 @@ argus-risk-analytics/
 │   ├── rebalancer.py            # Smart Rebalancer & Generatore Ordini
 │   ├── regime_switching.py      # Market Regime Switching (3-State Markov Model)
 │   ├── report_exporter.py       # Manager Centralizzato Esportazione Report
-│   ├── risk_engine.py           # Motore FIFO, VaR Cornish-Fisher, Kupiec, Markowitz, MC
+│   ├── risk_engine.py           # Motore FIFO, VaR/CVaR Euler, LVaR Bangia, Almgren-Chriss, Kupiec
 │   ├── risk_limits.py           # Early Warning System & Controlli di Rischio UCITS/MiFID
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
-│   ├── screener_engine.py       # Screener Quantitativo Multi-Fattoriale & Pre-Trade Simulator
+│   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── sidebar.py               # Navigation Rail v5.16.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v5.18.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
 │   ├── ui_utils.py              # Helper Grafici Plotly, Modali Informativi & Componenti UI
 │   ├── validator.py             # Pipeline di Bonifica & Normalizzazione Dati
 │   ├── volatility_surface.py    # Superficie di Volatilità Implicita 3D, Skew & Smile Calibration
+│   ├── workspace_engine.py      # ARGUS Launchpad, 5 Ruoli Istituzionali & Layout Persistence
 │   ├── workspace_manager.py     # State Manager, Routing Dinamico & URL State Sync
 │   └── yield_curve.py           # Curva Tassi Privi di Rischio Live Dinamica Multi-Valuta
 ├── data/                        # Dataset di input & database SQLite fallback
 │   ├── portfolio_transactions_realistic.csv # Dataset realistico multi-asset multi-valuta (EUR, USD, GBP, CHF)
+│   ├── argus_workspaces.db      # Database SQLite per persistenza profili Launchpad
 │   └── .gitkeep
 ├── docker/                      # File di containerizzazione Docker
 │   └── Dockerfile
@@ -285,12 +328,12 @@ argus-risk-analytics/
 │   ├── CSV_Format_Specification.md # Specifica tecnica formato CSV & DeGiro
 │   ├── DESIGN.md                # Design System & UI Specs
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v5.18.0)
 │   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
 │   ├── argus_icon.ico           # Asset icona Occhio di Argus
-│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (48 Sezioni)
+│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (59 Sezioni)
 ├── exports/                     # Cartella di destinazione report esportati (.xlsx, .pdf, .zip)
 │   └── .gitkeep
 ├── gsheets_sync_subproject/     # Sub-servizio Sincronizzazione ETL Google Sheets
@@ -307,9 +350,9 @@ argus-risk-analytics/
 │   ├── generate_icon.py         # Generatore icona ICO multi-risoluzione
 │   ├── package_release.py       # Pacchettizzatore Release ZIP
 │   └── test_run.py              # Script di esecuzione e verifica rapida
-├── src/                         # Codice sorgente dell'applicazione Streamlit (10 Moduli)
+├── src/                         # Codice sorgente dell'applicazione Streamlit (11 Moduli Operativi)
 │   ├── 0_Control_Room.py        # Entry point principale, Total Wealth Hub & Control Room
-│   └── pages/                   # Moduli e viste (1..9) della dashboard
+│   └── pages/                   # Moduli e viste (1..10) della dashboard
 │       ├── 1_📈_Dashboard_Generale.py
 │       ├── 2_🔴_Analisi_Rischio.py
 │       ├── 3_🔬_Modelli_Quantitativi.py
@@ -318,8 +361,9 @@ argus-risk-analytics/
 │       ├── 6_🌪️_Stress_Testing.py
 │       ├── 7_📊_Analisi_Temporale.py
 │       ├── 8_📈_Analisi_Tecnica.py
-│       └── 9_🔍_Screener_Opportunita.py
-├── tests/                       # Test suite automatizzata PyTest (110 Test)
+│       ├── 9_🔍_Screener_Opportunita.py
+│       └── 10_💻_BQuant_e_Launchpad.py
+├── tests/                       # Test suite automatizzata PyTest (217 Test su 50 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_quant.py
 │   ├── test_advisor.py
@@ -327,16 +371,25 @@ argus-risk-analytics/
 │   ├── test_attribution.py
 │   ├── test_backtest.py
 │   ├── test_black_litterman_fama_french.py
+│   ├── test_bloomberg_terminal_features.py
+│   ├── test_broker_adapters.py
 │   ├── test_cache_shield_and_diagnostics.py
 │   ├── test_closed_trades.py
+│   ├── test_corporate_actions.py
+│   ├── test_crypto_tax.py
 │   ├── test_custom_stress.py
 │   ├── test_diversification.py
+│   ├── test_duckdb_engine.py
 │   ├── test_enhancements.py
 │   ├── test_excel.py
+│   ├── test_factor_library.py
+│   ├── test_fase3_screener_almgren_factors.py
+│   ├── test_fase4_bquant_launchpad_excel.py
 │   ├── test_financial_analysis.py
+│   ├── test_fixed_income_and_streaming.py
 │   ├── test_forensic_accounting.py
 │   ├── test_frontend_smoke.py
-│   ├── test_gsheets_sync.py
+│   ├── test_garch_fhs.py
 │   ├── test_hedging_attribution_limits.py
 │   ├── test_history_analytics.py
 │   ├── test_hrp_optimizer.py
@@ -353,6 +406,7 @@ argus-risk-analytics/
 │   ├── test_regime_and_options.py
 │   ├── test_risk_engine.py
 │   ├── test_screener_engine.py
+│   ├── test_sec_rag.py
 │   ├── test_tax_engine.py
 │   ├── test_tax_engine_edge_cases.py
 │   ├── test_technical_analysis.py
@@ -383,7 +437,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **201 test automatizzati PyTest** con copertura end-to-end del 100%:
+Il progetto include **217 test automatizzati PyTest** distribuiti su 50 file di test con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -391,7 +445,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 201 passed in ~25.00s =============================
+============================= 217 passed in ~27.00s =============================
 ```
 
 ---
