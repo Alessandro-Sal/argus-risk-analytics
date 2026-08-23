@@ -2044,9 +2044,12 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
     
     delta_html = ""
     if delta:
-        cls = "metric-delta-pos" if positive else "metric-delta-neg"
-        arrow = "↑" if positive else "↓"
-        delta_html = f'<div class="{cls}">{arrow} {delta}</div>'
+        if positive is None:
+            delta_html = f'<div style="color: #8b949e; font-size: 11.5px; font-weight: 500; margin-top: 3px;">{delta}</div>'
+        else:
+            cls = "metric-delta-pos" if positive else "metric-delta-neg"
+            arrow = "↑" if positive else "↓"
+            delta_html = f'<div class="{cls}">{arrow} {delta}</div>'
     
     modal_html = ""
     # Risolvi sempre il contenuto a 5 sezioni
