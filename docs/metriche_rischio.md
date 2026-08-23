@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`) di **ARGUS Risk Analytics Platform v5.14.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`) di **ARGUS Risk Analytics Platform v5.15.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 

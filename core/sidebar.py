@@ -228,12 +228,12 @@ def render_sidebar():
     current_page = get_current_page_name()
 
     with st.sidebar:
-        # Header del Brand ARGUS v5.14.0
+        # Header del Brand ARGUS
         st.markdown("""
         <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 8px; padding: 2px 0;">
             <span style="font-size: 22px;">👁️</span>
             <div>
-                <div style="font-size: 14.5px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; line-height: 1.1;">ARGUS <span style="font-size: 11px; color: #ff9900; font-weight: 700;">v5.14.0</span></div>
+                <div style="font-size: 14.5px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; line-height: 1.1;">ARGUS</div>
                 <div style="font-size: 9.5px; font-weight: 600; color: #8b949e; letter-spacing: 0.4px;">INSTITUTIONAL RISK INTELLIGENCE</div>
             </div>
         </div>
@@ -494,6 +494,6 @@ def render_sidebar():
         st.markdown("""
         <div style="text-align: center; padding: 10px 0 2px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 10px;">
             <div style="font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: 0.5px;">ARGUS RISK INTELLIGENCE</div>
-            <div style="font-size: 10px; font-weight: 600; color: #ff9900; margin-top: 2px;">Versione 5.14.0 Institutional Engine</div>
+            <div style="font-size: 10px; font-weight: 600; color: #ff9900; margin-top: 2px;">Versione 5.15.0 Institutional Engine</div>
         </div>
         """, unsafe_allow_html=True)
