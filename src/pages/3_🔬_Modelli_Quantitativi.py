@@ -3222,6 +3222,198 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             st.markdown(f"**Verdetto ML:** {ml_res['verdict']}")
             st.caption("Stima avanzata della volatilità annualizzata a 30 giorni basata su Random Forest Regressor e indicatori tecnici di mercato.")
 
+        # ── SEZIONE FACTOR QUINTILES BACKTESTING ────────────────────────
+        st.divider()
+        col_fq_h1, col_fq_h2 = st.columns([3.2, 1.1])
+        with col_fq_h1:
+            st.markdown("#### 🔬 Backtesting di Strategie Multi-Fattoriali (Analisi a 5 Quintili)")
+            st.caption("Simulatore di ordinamento periodico su fattori istituzionali (QMJ, Low-Beta BAB, Gross Profitability, Momentum, Deep Value) con scomposizione in 5 quantili e calcolo dello Spread Long-Short (Q1 - Q5).")
+        with col_fq_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida al Backtesting Fattoriale a Quintili", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Metodologia a Quintili di Fama-French & AQR</div>
+  <div>A ogni intervallo di ribilanciamento (mensile o trimestrale), tutti i titoli dell'universo vengono ordinati in base al punteggio del fattore prescelto e divisi in 5 panieri equi-ponderati:
+  <ul style="margin: 4px 0 0 16px; padding: 0;">
+    <li><b>Q1 (Top 20%):</b> Massima esposizione al fattore positivo (es. Alta Qualità, Basso Beta, Alto Momentum).</li>
+    <li><b>Q2, Q3, Q4:</b> Quintili intermedi di transizione.</li>
+    <li><b>Q5 (Bottom 20%):</b> Titoli speculativi o ad esposizione avversa (Junk, High Beta, Neglect).</li>
+  </ul>
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Spread Long-Short & Test di Monotonicità</div>
+  <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 8px 12px; margin: 6px 0; font-family: monospace; color: #e6edf3;">
+    <b>Spread Long-Short:</b> R<sub>L/S</sub> = R<sub>Q1</sub> - R<sub>Q5</sub><br>
+    <b>Monotonicità di Spearman:</b> Correlazione di rango tra Quintile (1..5) e Rendimento Annuo (Ideale = +1.0).
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Interpretazione Istituzionale</div>
+  <div>Un fattore è statisticamente robusto e sfruttabile quando genera uno <b>Spread Long-Short positivo e persistente</b> e una curva di rendimento <b>strettamente decrescente</b> da Q1 a Q5 (nessun incrocio di stile).</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il Backtest a Quintili")
+
+        from core.factor_library import run_factor_quintile_backtest, FACTOR_PRESET_DEFINITIONS
+        
+        col_fq_c1, col_fq_c2, col_fq_c3 = st.columns([2.0, 1.2, 1.2])
+        with col_fq_c1:
+            fact_choice = st.selectbox(
+                "Seleziona Strategia Fattoriale da Testare:",
+                list(FACTOR_PRESET_DEFINITIONS.keys()),
+                format_func=lambda k: FACTOR_PRESET_DEFINITIONS[k]["name"],
+                index=0,
+                key="sel_factor_quintile_strategy"
+            )
+        with col_fq_c2:
+            rebal_choice = st.radio("Frequenza Ribilanciamento:", ["Mensile (M)", "Trimestrale (Q)"], horizontal=True, key="sel_fq_rebal")
+            rebal_code = "Q" if "Trimestrale" in rebal_choice else "M"
+        with col_fq_c3:
+            lb_choice = st.slider("Lookback Calcolo Score (Giorni):", min_value=30, max_value=252, value=126, step=21, key="sel_fq_lookback")
+
+        st.caption(f"ℹ️ **Razionale Accademico:** {FACTOR_PRESET_DEFINITIONS[fact_choice]['rationale']}")
+
+        # Esecuzione del Backtest a Quintili
+        df_rets_port = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()
+        fq_res = run_factor_quintile_backtest(
+            df_returns=df_rets_port,
+            factor_type=fact_choice,
+            rebalance_freq=rebal_code,
+            lookback_window=lb_choice
+        )
+
+        if fq_res.get("valid", False):
+            # KPI Cards
+            col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+            with col_k1:
+                metric_card("Spread Long-Short (Q1 - Q5)", f"{fq_res['spread_cagr']:+.2f}%", "Extra-rendimento annuo fattore", fq_res['spread_cagr'] > 0)
+            with col_k2:
+                q1_row = fq_res["metrics_df"][fq_res["metrics_df"]["Quintile"].str.contains("Q1")]
+                q1_sharpe = q1_row["Sharpe Ratio"].iloc[0] if not q1_row.empty else 0.0
+                metric_card("Sharpe Ratio Q1 (Top 20%)", f"{q1_sharpe:.2f}", "Efficienza paniere alta qualità", q1_sharpe >= 0.7)
+            with col_k3:
+                q1_ir = q1_row["Information Ratio vs Univ"].iloc[0] if not q1_row.empty else 0.0
+                metric_card("Information Ratio Q1 vs Univ", f"{q1_ir:.2f}", "Consistenza rispetto al benchmark", q1_ir >= 0.5)
+            with col_k4:
+                metric_card("Monotonicità di Spearman", f"{fq_res['monotonicity_score']:+.2f}", fq_res["monotonicity_verdict"].split("(")[0].strip(), fq_res["monotonicity_score"] >= 0.4)
+
+            # Grafico Curve Cumulative dei 5 Quintili + Spread Long-Short
+            col_g1, col_g2 = st.columns([2.2, 1.1])
+            with col_g1:
+                st.markdown("##### 📈 Curve di Crescita Patrimoniale dei 5 Quintili (Base 100)")
+                df_cum_q = fq_res["cumulative_df"].reset_index()
+                date_col_name = df_cum_q.columns[0]
+                
+                fig_fq = go.Figure()
+                q_colors = {
+                    "Q1": "#3fb950",
+                    "Q2": "#58a6ff",
+                    "Q3": "#d2a8ff",
+                    "Q4": "#f59e0b",
+                    "Q5": "#f85149",
+                    "Long_Short_Spread": "#ff9900",
+                    "Equal_Weight_Univ": "#8b949e"
+                }
+                q_labels = {
+                    "Q1": "Q1 (Top 20% · High Factor)",
+                    "Q2": "Q2 (Quintile 2)",
+                    "Q3": "Q3 (Mediano)",
+                    "Q4": "Q4 (Quintile 4)",
+                    "Q5": "Q5 (Bottom 20% · Junk)",
+                    "Long_Short_Spread": "⚡ Spread Long-Short (Q1 - Q5)",
+                    "Equal_Weight_Univ": "🌐 Universo Equi-Ponderato"
+                }
+
+                for col_k in ["Q1", "Q2", "Q3", "Q4", "Q5", "Equal_Weight_Univ", "Long_Short_Spread"]:
+                    if col_k in df_cum_q.columns:
+                        is_main = col_k in ["Q1", "Q5", "Long_Short_Spread"]
+                        fig_fq.add_trace(go.Scatter(
+                            x=df_cum_q[date_col_name],
+                            y=df_cum_q[col_k],
+                            mode="lines",
+                            name=q_labels.get(col_k, col_k),
+                            line=dict(
+                                color=q_colors.get(col_k, "#ffffff"),
+                                width=3.0 if is_main else 1.5,
+                                dash="solid" if col_k != "Equal_Weight_Univ" else "dash"
+                            ),
+                            hovertemplate=f"<b>{q_labels.get(col_k, col_k)}</b>: %{{y:.1f}}<extra></extra>"
+                        ))
+
+                fig_fq.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(13,17,23,0.7)",
+                    margin=dict(l=15, r=15, t=25, b=15),
+                    height=360,
+                    xaxis=dict(gridcolor="rgba(255,255,255,0.06)"),
+                    yaxis=dict(title="Valore Portafoglio (Base 100)", gridcolor="rgba(255,255,255,0.06)"),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                apply_plotly_theme(fig_fq)
+                st.plotly_chart(fig_fq, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+            with col_g2:
+                st.markdown("##### 📊 Rendimento Annuo per Quintile")
+                df_bar_q = fq_res["metrics_df"][fq_res["metrics_df"]["Quintile"].str.startswith("Q")].copy()
+                fig_bar_q = px.bar(
+                    df_bar_q,
+                    x="Quintile",
+                    y="Rendimento Annuo CAGR %",
+                    color="Rendimento Annuo CAGR %",
+                    color_continuous_scale=["#f85149", "#58a6ff", "#3fb950"],
+                    template="plotly_dark",
+                    height=360
+                )
+                fig_bar_q.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=25, b=10),
+                    xaxis=dict(title=None, tickangle=-25),
+                    coloraxis_showscale=False
+                )
+                fig_bar_q.update_traces(hovertemplate="<b>%{x}</b><br>CAGR: <b>%{y:+.2f}%</b><extra></extra>")
+                apply_plotly_theme(fig_bar_q)
+                st.plotly_chart(fig_bar_q, use_container_width=True, config={"displayModeBar": False})
+
+            # Tabella Dettagliata Analytics per Quintile
+            col_t_h1, col_t_h2 = st.columns([3.2, 1.0])
+            with col_t_h1:
+                st.markdown("##### 📋 Tabella Comparativa di Performance e Rischio per Quintile")
+            with col_t_h2:
+                csv_fq = fq_res["metrics_df"].to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Scarica Analytics CSV",
+                    data=csv_fq,
+                    file_name=f"factor_quintile_analysis_{fact_choice}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key="btn_dl_factor_quintiles"
+                )
+
+            st.dataframe(
+                fq_res["metrics_df"],
+                column_config={
+                    "Quintile": st.column_config.TextColumn("Paniere Quintile", width="medium"),
+                    "Rendimento Annuo CAGR %": st.column_config.NumberColumn("CAGR Ann %", format="%+.2f%%"),
+                    "Volatilità Annua %": st.column_config.NumberColumn("Volatilità %", format="%.2f%%"),
+                    "Sharpe Ratio": st.column_config.NumberColumn("Sharpe Ratio", format="%.2f"),
+                    "Max Drawdown %": st.column_config.NumberColumn("Max Drawdown", format="%.2f%%"),
+                    "Win Rate Mensile %": st.column_config.NumberColumn("Win Rate Mensile", format="%.1f%%"),
+                    "Information Ratio vs Univ": st.column_config.NumberColumn("Information Ratio", format="%.2f")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+        else:
+            st.info(fq_res.get("message", "Dati non sufficienti per calcolare il backtest a quintili."))
+
 # ── TAB 6: FIXED INCOME, YTM & Z-SPREAD (YAS) ──────────────────────
 elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
     col_fi_h1, col_fi_h2 = st.columns([3.0, 1.3])

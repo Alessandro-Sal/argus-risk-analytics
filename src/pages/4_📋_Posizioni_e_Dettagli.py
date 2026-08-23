@@ -1775,7 +1775,7 @@ elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
 </div>
 """, button_label="💡 Come funziona Almgren-Chriss?")
 
-    from core.risk_engine import compute_almgren_chriss_market_impact
+    from core.risk_engine import compute_almgren_chriss_market_impact, compute_almgren_chriss_optimal_execution
     df_ac = compute_almgren_chriss_market_impact(pos)
 
     if not df_ac.empty:
@@ -1825,6 +1825,151 @@ elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
             )
             fig_ac_bar.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
             st.plotly_chart(fig_ac_bar, use_container_width=True)
+
+        # ── SEZIONE 2: SIMULATORE DI TRAIETTORIA OTTIMALE ALMGREN-CHRISS ───
+        st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
+        st.markdown("#### 🎯 Simulatore Traiettoria Ottimale di Liquidazione (Optimal Execution Schedule)")
+        st.caption("Determina la velocità di vendita e la traiettoria matematica di smobilizzo che minimizza la combinazione lineare tra Costo Atteso E[x] e Rischio di Esecuzione V[x].")
+
+        col_opt_ctrl1, col_opt_ctrl2, col_opt_ctrl3 = st.columns([1.5, 1.5, 1.5])
+        
+        # Scelta asset o totale
+        all_ac_tickers = ["Intero Portafoglio (€ " + f"{pos['current_value'].sum():,.0f}".replace(",", ".") + ")"] + list(df_ac["Ticker"].unique())
+        with col_opt_ctrl1:
+            sel_target = st.selectbox("Seleziona Ordine da Liquidare:", all_ac_tickers, index=0)
+            if "Intero Portafoglio" in sel_target:
+                target_order_val = float(pos["current_value"].sum()) if "current_value" in pos.columns else 100_000.0
+                target_adv = float(pos["current_value"].sum() * 5.0) # ADV aggregato prudenziale
+                target_vol = 22.0
+            else:
+                sel_row = pos[pos["ticker"] == sel_target]
+                target_order_val = float(sel_row["current_value"].iloc[0]) if not sel_row.empty else 10_000.0
+                target_adv = target_order_val * 8.0
+                target_vol = 28.0
+
+        with col_opt_ctrl2:
+            exec_horizon = st.slider("Orizzonte di Liquidazione (Giorni T):", min_value=1, max_value=20, value=5, step=1)
+            spread_bps_ac = st.slider("Bid-Ask Spread Stimato (bps):", min_value=5, max_value=80, value=15, step=5)
+
+        with col_opt_ctrl3:
+            lambda_choice = st.select_slider(
+                "Avversione al Rischio (λ):",
+                options=[0.0, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5],
+                value=1e-6,
+                format_func=lambda l: "0.0 (Risk-Neutral TWAP)" if l==0.0 else (f"{l:.1e} (Aggressivo)" if l>=1e-5 else f"{l:.1e} (Bilanciato)")
+            )
+            n_steps = st.slider("Intervalli di Esecuzione (N Slices):", min_value=5, max_value=30, value=15, step=5)
+
+        # Calcolo Traiettoria Ottimale
+        exec_res = compute_almgren_chriss_optimal_execution(
+            order_value=target_order_val,
+            adv_value=target_adv,
+            volatility_ann_pct=target_vol,
+            horizon_days=float(exec_horizon),
+            n_intervals=n_steps,
+            risk_aversion_lambda=lambda_choice,
+            bid_ask_spread_bps=float(spread_bps_ac)
+        )
+
+        col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+        with col_kpi1:
+            metric_card("Costo Atteso E[x]", f"€ {exec_res['expected_cost_amount']:,.2f}", f"{exec_res['expected_cost_bps']:.1f} bps su nozionale", None)
+        with col_kpi2:
+            metric_card("Execution Risk (Std Dev)", f"€ {exec_res['execution_std_amount']:,.2f}", "Incertezza prezzo durante trade", None)
+        with col_kpi3:
+            metric_card("Execution VaR (95%)", f"€ {exec_res['execution_var_95_amount']:,.2f}", "Costo massimo al 95% conf.", False)
+        with col_kpi4:
+            metric_card("Half-Life di Liquidazione", f"{exec_res['half_life_days']:.2f} giorni", f"Parametro urgenza κ = {exec_res['kappa']:.3f}", True)
+
+        # Grafico Traiettorie a Confronto (Ottimale vs TWAP vs Aggressivo)
+        col_f1, col_f2 = st.columns([2.0, 1.0])
+        with col_f1:
+            st.markdown("##### 📉 Traiettorie di Smobilizzo a Confronto (Ottimale vs TWAP vs Aggressiva)")
+            df_sched = exec_res["schedule_df"]
+            
+            fig_traj = go.Figure()
+            # Valore iniziale punto 0
+            t_vals = [0.0] + list(df_sched["Giorno"])
+            opt_vals = [exec_res["order_value"]] + list(df_sched["Posizione Residua (€)"])
+            twap_vals = [exec_res["order_value"]] + list(df_sched["Traiettoria TWAP (€)"])
+            agg_vals = [exec_res["order_value"]] + list(df_sched["Traiettoria Aggressiva (€)"])
+
+            fig_traj.add_trace(go.Scatter(
+                x=t_vals, y=opt_vals,
+                mode="lines+markers", name="Traiettoria Ottimale (Almgren-Chriss)",
+                line=dict(color="#ff9900", width=3.5),
+                marker=dict(size=6, color="#ff9900")
+            ))
+            fig_traj.add_trace(go.Scatter(
+                x=t_vals, y=twap_vals,
+                mode="lines", name="TWAP Lineare (Risk-Neutral)",
+                line=dict(color="#58a6ff", width=2, dash="dash")
+            ))
+            fig_traj.add_trace(go.Scatter(
+                x=t_vals, y=agg_vals,
+                mode="lines", name="Esecuzione Aggressiva (High Urgency)",
+                line=dict(color="#f85149", width=1.8, dash="dot")
+            ))
+            fig_traj.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(13,17,23,0.7)",
+                margin=dict(l=20, r=20, t=30, b=20),
+                height=340,
+                xaxis=dict(title="Tempo di Esecuzione (Giorni)", gridcolor="rgba(255,255,255,0.06)"),
+                yaxis=dict(title="Posizione Residua (€)", gridcolor="rgba(255,255,255,0.06)"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            apply_plotly_theme(fig_traj)
+            st.plotly_chart(fig_traj, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+        with col_f2:
+            st.markdown("##### 🍩 Scomposizione Costi di Esecuzione")
+            bd = exec_res["cost_breakdown"]
+            fig_bd = go.Figure(data=[go.Pie(
+                labels=["Impatto Temporaneo", "Impatto Permanente", "Bid-Ask Spread"],
+                values=[bd["temporary_impact_amount"], bd["permanent_impact_amount"], bd["spread_cost_amount"]],
+                hole=0.55,
+                marker=dict(colors=["#58a6ff", "#f85149", "#ff9900"]),
+                textinfo="percent",
+                textposition="inside",
+                hovertemplate="<b>%{label}</b><br>Costo: <b>€ %{value:,.2f}</b><br>Quota: <b>%{percent}</b><extra></extra>"
+            )])
+            fig_bd.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=10, r=10, t=30, b=20),
+                height=340,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+            )
+            apply_plotly_theme(fig_bd)
+            st.plotly_chart(fig_bd, use_container_width=True, config={"displayModeBar": False})
+
+        # Tabella Schedule di Trading
+        col_sch_h1, col_sch_h2 = st.columns([3.0, 1.0])
+        with col_sch_h1:
+            st.markdown("##### 📋 Tabella di Esecuzione a Scaglioni (Order Slicing Schedule)")
+        with col_sch_h2:
+            csv_sched = df_sched.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica Schedule CSV", data=csv_sched, file_name=f"execution_schedule_{exec_horizon}d.csv", mime="text/csv", use_container_width=True, key="btn_dl_exec_sched")
+
+        st.dataframe(
+            df_sched,
+            column_config={
+                "Intervallo": st.column_config.TextColumn("Fetta"),
+                "Giorno": st.column_config.NumberColumn("Giorno", format="%.2f"),
+                "Posizione Residua (€)": st.column_config.NumberColumn("Posizione Residua", format="€ %,.2f"),
+                "Flusso Liquidato (€)": st.column_config.NumberColumn("Da Vendere", format="€ %,.2f"),
+                "Velocità Vendita (€/giorno)": st.column_config.NumberColumn("Velocità (€/g)", format="€ %,.2f"),
+                "Costo Step (€)": st.column_config.NumberColumn("Costo Fetta", format="€ %,.2f"),
+                "Costo Cumulato (€)": st.column_config.NumberColumn("Costo Cumulato", format="€ %,.2f"),
+                "% Liquidata": st.column_config.NumberColumn("% Eseguita", format="%.1f%%")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
     else:
         st.info("Impossibile calcolare il modello Almgren-Chriss: posizioni attive o dati di volume non sufficienti.")
 

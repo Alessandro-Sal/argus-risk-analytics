@@ -1648,6 +1648,168 @@ def compute_almgren_chriss_market_impact(df_pos: pd.DataFrame):
     return pd.DataFrame(results)
 
 
+def compute_almgren_chriss_optimal_execution(
+    order_value: float,
+    adv_value: float = 5_000_000.0,
+    volatility_ann_pct: float = 25.0,
+    horizon_days: float = 5.0,
+    n_intervals: int = 20,
+    risk_aversion_lambda: float = 1e-6,
+    eta_param: float = 0.15,
+    gamma_param: float = 0.25,
+    bid_ask_spread_bps: float = 10.0
+) -> Dict[str, Any]:
+    """
+    Modello Istituzionale Almgren & Chriss (2000) per la Liquidazione Ottimale di Portafoglio.
+    Calcola:
+    1. Traiettoria ottimale x(t) = X_0 * sinh(kappa*(T-t)) / sinh(kappa*T)
+    2. Confronto con esecuzione lineare TWAP e strategia aggressiva
+    3. Scomposizione analitica del Costo Atteso E[x] (Temporaneo, Permanente, Bid-Ask Spread)
+    4. Varianza di Esecuzione V[x], Execution Risk e VaR di Liquidazione al 95% / 99%
+    5. Parametro di urgenza kappa e Half-Life di liquidazione.
+    """
+    X0 = max(100.0, float(order_value))
+    V = max(1000.0, float(adv_value))
+    T = max(0.2, float(horizon_days))
+    N = max(4, int(n_intervals))
+    tau = T / N
+    
+    sigma_daily = (volatility_ann_pct / 100.0) / np.sqrt(252.0)
+    sigma_tau = sigma_daily * np.sqrt(tau)
+    
+    # Parametri di impatto normalizzati sull'ADV
+    eta = max(1e-8, (eta_param * sigma_daily) / V) # Costo impatto temporaneo
+    gamma = max(1e-8, (gamma_param * sigma_daily) / V) # Costo impatto permanente
+    spread_cost_rate = (bid_ask_spread_bps / 10000.0) / 2.0 # Metà spread
+    
+    # Parametro di urgenza (kappa)
+    # kappa*tau = arccosh( lambda * sigma^2 * tau^2 / (2*eta) + 1 )
+    arg = 1.0 + (risk_aversion_lambda * (sigma_daily ** 2) * (tau ** 2)) / (2.0 * eta)
+    if arg < 1.00000001:
+        # Approssimazione lineare per lambda -> 0 (TWAP)
+        kappa = np.sqrt(max(1e-12, (risk_aversion_lambda * (sigma_daily ** 2)) / eta))
+    else:
+        kappa = float(np.arccosh(arg) / tau)
+        
+    kappa = max(1e-6, kappa)
+    half_life_days = float(np.log(2.0) / kappa) if kappa > 1e-5 else float(T / 2.0)
+    
+    # Generazione dei punti temporali t_j (j = 0 .. N)
+    t_points = np.linspace(0, T, N + 1)
+    
+    # 1. Traiettoria Ottimale
+    if kappa * T > 50:
+        # Evita overflow numerico di sinh
+        x_opt = X0 * np.exp(-kappa * t_points)
+        x_opt[-1] = 0.0
+    elif kappa * T < 1e-4:
+        # Converge a lineare per kappa -> 0
+        x_opt = X0 * (1.0 - t_points / T)
+    else:
+        x_opt = X0 * (np.sinh(kappa * (T - t_points)) / np.sinh(kappa * T))
+    x_opt = np.clip(x_opt, 0.0, X0)
+    x_opt[-1] = 0.0
+    
+    # 2. Traiettoria TWAP (Lineare Risk-Neutral)
+    x_twap = X0 * (1.0 - t_points / T)
+    x_twap[-1] = 0.0
+    
+    # 3. Traiettoria Aggressiva (High Urgency)
+    kappa_agg = kappa * 3.5
+    if kappa_agg * T > 50:
+        x_agg = X0 * np.exp(-kappa_agg * t_points)
+    else:
+        x_agg = X0 * (np.sinh(kappa_agg * (T - t_points)) / np.sinh(kappa_agg * T))
+    x_agg = np.clip(x_agg, 0.0, X0)
+    x_agg[-1] = 0.0
+    
+    # Calcolo trading velocity e costi per step
+    v_opt = -np.diff(x_opt) / tau # Quote/valore venduto per intervallo
+    v_twap = -np.diff(x_twap) / tau
+    v_agg = -np.diff(x_agg) / tau
+    
+    # Costi Attesi E[x] = 0.5 * gamma * X0^2 + eta * tau * sum(v_j^2) + spread * X0
+    perm_cost = 0.5 * gamma * (X0 ** 2)
+    temp_cost_opt = float(eta * tau * np.sum(v_opt ** 2))
+    temp_cost_twap = float(eta * tau * np.sum(v_twap ** 2))
+    temp_cost_agg = float(eta * tau * np.sum(v_agg ** 2))
+    spread_cost = spread_cost_rate * X0
+    
+    total_cost_opt = perm_cost + temp_cost_opt + spread_cost
+    total_cost_twap = perm_cost + temp_cost_twap + spread_cost
+    total_cost_agg = perm_cost + temp_cost_agg + spread_cost
+    
+    # Varianza V[x] = sigma^2 * sum(tau * x_j^2)
+    # x_mid_opt per integrazione trapezoidale o somme rettangolari
+    var_opt = (sigma_daily ** 2) * tau * float(np.sum(x_opt[:-1] ** 2))
+    var_twap = (sigma_daily ** 2) * tau * float(np.sum(x_twap[:-1] ** 2))
+    var_agg = (sigma_daily ** 2) * tau * float(np.sum(x_agg[:-1] ** 2))
+    
+    std_opt = float(np.sqrt(max(0.0, var_opt)))
+    std_twap = float(np.sqrt(max(0.0, var_twap)))
+    std_agg = float(np.sqrt(max(0.0, var_agg)))
+    
+    # VaR di Esecuzione al 95% e 99%
+    var_95_opt = total_cost_opt + 1.645 * std_opt
+    var_99_opt = total_cost_opt + 2.326 * std_opt
+    
+    # Creazione Schedule DataFrame
+    schedule_rows = []
+    cum_shares_sold = 0.0
+    cum_cost = 0.0
+    
+    for j in range(N):
+        t_start = t_points[j]
+        t_end = t_points[j + 1]
+        shares_held = x_opt[j]
+        shares_sold_step = v_opt[j] * tau
+        cum_shares_sold += shares_sold_step
+        step_cost = (eta * (v_opt[j] ** 2) * tau) + (gamma * shares_sold_step * shares_held) + (spread_cost_rate * shares_sold_step)
+        cum_cost += step_cost
+        
+        schedule_rows.append({
+            "Intervallo": f"T{j+1}",
+            "Giorno": round(t_end, 2),
+            "Posizione Residua (€)": round(x_opt[j+1], 2),
+            "Flusso Liquidato (€)": round(shares_sold_step, 2),
+            "Velocità Vendita (€/giorno)": round(v_opt[j], 2),
+            "Costo Step (€)": round(step_cost, 2),
+            "Costo Cumulato (€)": round(cum_cost, 2),
+            "% Liquidata": round((cum_shares_sold / X0) * 100.0, 1),
+            "Traiettoria TWAP (€)": round(x_twap[j+1], 2),
+            "Traiettoria Aggressiva (€)": round(x_agg[j+1], 2)
+        })
+        
+    df_schedule = pd.DataFrame(schedule_rows)
+    
+    return {
+        "order_value": X0,
+        "adv_value": V,
+        "participation_rate_pct": (X0 / V) * 100.0,
+        "horizon_days": T,
+        "n_intervals": N,
+        "risk_aversion_lambda": risk_aversion_lambda,
+        "kappa": kappa,
+        "half_life_days": half_life_days,
+        "expected_cost_amount": total_cost_opt,
+        "expected_cost_bps": (total_cost_opt / X0) * 10000.0,
+        "cost_breakdown": {
+            "temporary_impact_amount": temp_cost_opt,
+            "permanent_impact_amount": perm_cost,
+            "spread_cost_amount": spread_cost
+        },
+        "execution_std_amount": std_opt,
+        "execution_var_95_amount": var_95_opt,
+        "execution_var_99_amount": var_99_opt,
+        "schedule_df": df_schedule,
+        "comparison": {
+            "twap": {"cost": total_cost_twap, "std": std_twap, "var95": total_cost_twap + 1.645 * std_twap},
+            "optimal": {"cost": total_cost_opt, "std": std_opt, "var95": var_95_opt},
+            "aggressive": {"cost": total_cost_agg, "std": std_agg, "var95": total_cost_agg + 1.645 * std_agg}
+        }
+    }
+
+
 def compute_private_equity_waterfall(capital_calls: float, distributions: float, nav: float, hurdle_rate: float = 0.08, carried_interest: float = 0.20):
     """
     Simulatore dei flussi di cassa Private Equity (J-Curve & Waterfall Allocation):
