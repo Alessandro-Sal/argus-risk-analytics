@@ -23,6 +23,13 @@ from core.technical_analysis import (
     compute_technical_confluence_score,
     compute_multi_timeframe_analysis
 )
+from core.streaming_engine import (
+    MarketTick,
+    TickRingBuffer,
+    OrderBookLevel,
+    OrderBookL2,
+    generate_mock_streaming_ticks
+)
 
 # Configurazione della Pagina Streamlit
 st.set_page_config(
@@ -386,7 +393,8 @@ else:
         "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
         "🧱 Distribuzione Analitica Volume Profile",
         "🚦 Confluence Score & Pattern Recognition",
-        "⏳ Trend Multi-Timeframe Alignment (1D / 1W)"
+        "⏳ Trend Multi-Timeframe Alignment (1D / 1W)",
+        "⚡ Real-Time Streaming & Book Depth (STREAM)"
     ], key="tech_active_subtab")
 
     if tab_tech == "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)":
@@ -801,3 +809,205 @@ else:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+    # ── TAB 5: REAL-TIME STREAMING & LEVEL-2 BOOK DEPTH (STREAM) ──────
+    elif tab_tech == "⚡ Real-Time Streaming & Book Depth (STREAM)":
+        col_st_h1, col_st_h2 = st.columns([3.2, 1.2])
+        with col_st_h1:
+            st.markdown(f"#### ⚡ Real-Time Market Feed, In-Memory Ring Buffer & Level-2 Book Depth | `{target_ticker}`")
+            st.caption("Flusso dati ad alta frequenza con buffer circolare O(1), Volume-Weighted Average Price (VWAP), Order Flow Imbalance (OFI) e Microprice.")
+        with col_st_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida a Real-Time Streaming & Microstruttura", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 In-Memory Ring Buffer O(1)</div>
+  <div>Struttura dati circolare thread-safe che memorizza gli ultimi N tick ad alta frequenza senza allocazione dinamica di memoria, consentendo calcoli istantanei a bassissima latenza.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📊 Volume-Weighted Average Price (VWAP)</div>
+  <div>Il prezzo medio ponderato per i volumi scambiati durante la sessione. È il principale benchmark di esecuzione per gli algoritmi istituzionali di broker routing.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚖️ Order Flow Imbalance (OFI - Cont et al. 2014)</div>
+  <div>Misura la pressione istantanea netta del flusso ordini (Bid delta vs Ask delta). Un OFI fortemente positivo anticipa un movimento rialzista a breve termine.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 Microprice Istituzionale (Stoikov 2018)</div>
+  <div>Prezzo fair di equilibrio del book ponderato per la liquidità presente sul Best Bid e Best Ask:
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 4px 8px; border-radius: 4px; margin: 4px 0; color: #ffb74d; font-size: 11.5px;">
+      P<sub>micro</sub> = (Bid &middot; Q<sub>ask</sub> + Ask &middot; Q<sub>bid</sub>) / (Q<sub>bid</sub> + Q<sub>ask</sub>)
+    </div>
+  </div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il Real-Time Streaming?")
+
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+        # Inizializza Ring Buffer ed estrae o genera tick per target_ticker
+        ref_price = float(df_prices["close"].iloc[-1]) if not df_prices.empty else 150.0
+        
+        # Buffer circolare a 60 tick
+        ring_buf = TickRingBuffer(capacity=60, ticker=target_ticker)
+        synthetic_ticks = generate_mock_streaming_ticks(
+            ticker=target_ticker,
+            initial_price=ref_price,
+            num_ticks=60,
+            volatility=0.0015,
+            spread_pct=0.0006
+        )
+        for t in synthetic_ticks:
+            ring_buf.append(t)
+
+        stats = ring_buf.get_summary_statistics()
+        df_stream = ring_buf.to_dataframe()
+
+        # 4 Executive KPI Cards
+        col_st1, col_st2, col_st3, col_st4 = st.columns(4)
+        with col_st1:
+            metric_card(
+                "Ultimo Prezzo Tick",
+                f"${stats['last_price']:.2f}",
+                f"Range: ${stats['min_price']:.2f} - ${stats['max_price']:.2f}",
+                True
+            )
+        with col_st2:
+            metric_card(
+                "VWAP Intraday",
+                f"${stats['vwap']:.2f}",
+                f"Volume Totale: {stats['total_volume']:,.0f} sh",
+                True
+            )
+        with col_st3:
+            ofi_val = stats['order_flow_imbalance']
+            ofi_label = "Pressione Buy" if ofi_val >= 0 else "Pressione Sell"
+            metric_card(
+                "Order Flow Imbalance (OFI)",
+                f"{ofi_val:+.0f}",
+                f"{ofi_label} (Cont 2014)",
+                ofi_val >= 0
+            )
+        with col_st4:
+            metric_card(
+                "Spread Medio & Volatilità",
+                f"${stats['mean_spread']:.4f}",
+                f"Vol Intraday: {stats['rolling_volatility_pct']:.1f}%",
+                True
+            )
+
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+        # Grafico Time-Series Real-Time Ticks & VWAP
+        st.markdown("##### 📈 Flusso Tick-by-Tick ad Alta Frequenza & Linea VWAP")
+        
+        fig_st = go.Figure()
+        # Fascia Spread Bid/Ask
+        fig_st.add_trace(go.Scatter(
+            x=list(range(len(df_stream))), y=df_stream["ask"],
+            mode="lines", line=dict(color="rgba(248, 81, 73, 0.4)", width=1),
+            name="Ask (Lettera)", showlegend=True
+        ))
+        fig_st.add_trace(go.Scatter(
+            x=list(range(len(df_stream))), y=df_stream["bid"],
+            mode="lines", line=dict(color="rgba(46, 160, 67, 0.4)", width=1),
+            fill="tonexty", fillcolor="rgba(255, 255, 255, 0.04)",
+            name="Bid (Denaro)", showlegend=True
+        ))
+        # Prezzo Tick
+        fig_st.add_trace(go.Scatter(
+            x=list(range(len(df_stream))), y=df_stream["price"],
+            mode="lines+markers", line=dict(color="#58a6ff", width=2.5),
+            marker=dict(size=5, color="#58a6ff"),
+            name="Prezzo Eseguito (Tick)", showlegend=True
+        ))
+        # Linea VWAP
+        # Calcola VWAP cumulativo
+        cum_pv = (df_stream["price"] * df_stream["size"]).cumsum()
+        cum_v = df_stream["size"].cumsum()
+        rolling_vwap = cum_pv / cum_v
+        fig_st.add_trace(go.Scatter(
+            x=list(range(len(df_stream))), y=rolling_vwap,
+            mode="lines", line=dict(color="#ff9900", width=2, dash="dash"),
+            name="VWAP Cumulativo", showlegend=True
+        ))
+
+        fig_st.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(13,17,23,0.7)",
+            height=360,
+            margin=dict(l=10, r=10, t=25, b=20),
+            xaxis=dict(title="Sequenza Tick (In-Memory Ring Buffer FIFO)", gridcolor="rgba(255,255,255,0.06)"),
+            yaxis=dict(title="Prezzo ($)", gridcolor="rgba(255,255,255,0.06)"),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_st, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+        # Due Colonne: Level-2 Book Depth & Registro Tick Ring Buffer
+        col_l2_left, col_l2_right = st.columns([1.2, 1.8])
+        
+        with col_l2_left:
+            st.markdown("##### 🧱 Level-2 Order Book (Profondità a 5 Livelli)")
+            
+            # Generazione snapshot Book L2 coerente
+            last_p = stats["last_price"]
+            bids_l2 = [
+                OrderBookLevel(price=round(last_p - 0.02 * i, 2), size=float(np.random.randint(150, 800)))
+                for i in range(1, 6)
+            ]
+            asks_l2 = [
+                OrderBookLevel(price=round(last_p + 0.02 * i, 2), size=float(np.random.randint(150, 800)))
+                for i in range(1, 6)
+            ]
+            l2_book = OrderBookL2(ticker=target_ticker, bids=bids_l2, asks=asks_l2)
+            micro_p = l2_book.compute_microprice()
+            imb_val = l2_book.compute_book_imbalance()
+
+            st.markdown(f"""
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #cbd5e1; margin-bottom: 4px;">
+                    <span><b>Microprice (Stoikov):</b> <code style="color: #ff9900;">${micro_p:.3f}</code></span>
+                    <span><b>Mid Price:</b> <code style="color: #58a6ff;">${l2_book.mid_price:.3f}</code></span>
+                </div>
+                <div style="font-size: 12px; color: #94a3b8;">
+                    Depth Imbalance Ratio: <b style="color: {'#4ade80' if imb_val>=0 else '#f87171'};">{imb_val:+.2%}</b> ({'Pressione Buy' if imb_val>=0 else 'Pressione Sell'})
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Tabella Profondità L2
+            df_bids = pd.DataFrame([{"Livello": f"Bid {i+1}", "Prezzo ($)": b.price, "Volume (Denaro)": b.size} for i, b in enumerate(bids_l2)])
+            df_asks = pd.DataFrame([{"Livello": f"Ask {i+1}", "Prezzo ($)": a.price, "Volume (Lettera)": a.size} for i, a in enumerate(asks_l2)])
+            
+            col_b, col_a = st.columns(2)
+            with col_b:
+                st.caption("🟢 Lato Bid (Denaro)")
+                st.dataframe(df_bids, hide_index=True, use_container_width=True)
+            with col_a:
+                st.caption("🔴 Lato Ask (Lettera)")
+                st.dataframe(df_asks, hide_index=True, use_container_width=True)
+
+        with col_l2_right:
+            st.markdown("##### 📋 Registro Tick Recenti nel Ring Buffer (O(1) FIFO)")
+            df_display = df_stream[["ticker", "price", "size", "bid", "ask", "spread", "mid_price"]].tail(15).iloc[::-1]
+            st.dataframe(
+                df_display,
+                column_config={
+                    "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "price": st.column_config.NumberColumn("Prezzo Tick", format="$ %.4f"),
+                    "size": st.column_config.NumberColumn("Volume", format="%,.0f"),
+                    "bid": st.column_config.NumberColumn("Bid", format="$ %.4f"),
+                    "ask": st.column_config.NumberColumn("Ask", format="$ %.4f"),
+                    "spread": st.column_config.NumberColumn("Spread", format="$ %.4f"),
+                    "mid_price": st.column_config.NumberColumn("Mid Price", format="$ %.4f")
+                },
+                hide_index=True,
+                use_container_width=True
+            )
+

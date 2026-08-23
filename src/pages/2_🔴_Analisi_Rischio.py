@@ -1657,6 +1657,155 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
             </div>
             """, unsafe_allow_html=True)
 
+    # ── DECOMPOSIZIONE ISTITUZIONALE DEL RISCHIO (MARGINAL & COMPONENT VAR) ──
+    st.divider()
+    col_euler_h1, col_euler_h2 = st.columns([3.2, 1.2])
+    with col_euler_h1:
+        st.markdown("#### 🏛️ Decomposizione del Rischio di Portafoglio (Marginal VaR & Component VaR)")
+        st.caption("Decomposizione analitica esatta del Value at Risk con il Teorema di Eulero (Bloomberg PORT Parity): isola il contributo reale di ciascuna posizione al rischio complessivo.")
+    with col_euler_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("ℹ️ Guida a Marginal VaR & Component VaR", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Marginal VaR (MVaR)</div>
+  <div>La derivata parziale del VaR totale rispetto al peso dell'asset <i>i</i> (&part;VaR / &part;w<sub>i</sub>). Indica quanto aumenterebbe il rischio complessivo incrementando marginalmente la posizione.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Component VaR & Teorema di Eulero</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12.5px; text-align: center;">
+    <b>CVaR<sub>i</sub></b> = w<sub>i</sub> &middot; MVaR<sub>i</sub> &emsp;&rArr;&emsp; &sum; <b>CVaR<sub>i</sub></b> = <b>VaR<sub>p</sub></b> (100.0%)
+  </div>
+  <div>Garantisce la conservazione matematica dell'allocazione del rischio a residuo zero.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">💧 Liquidity-Adjusted VaR (LVaR)</div>
+  <div>Penalizza il VaR per il tempo necessario a smobilizzare le posizioni (Square-Root of Time) e per il costo esogeno del bid-ask spread sul mercato.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona la decomposizione del rischio?")
+
+    from core.risk_engine import compute_marginal_and_component_var, compute_liquidity_adjusted_var
+    
+    decomp_res = compute_marginal_and_component_var(
+        df_returns=df_returns,
+        df_positions=pos,
+        confidence_level=conf_level,
+        total_portfolio_value=total_value
+    )
+    df_decomp = decomp_res.get("decomposition_df", pd.DataFrame())
+
+    if not df_decomp.empty:
+        col_dec_p1, col_dec_p2 = st.columns([1.3, 1.7])
+        with col_dec_p1:
+            st.markdown("##### 🍩 Contributo % al Rischio Totale")
+            fig_donut = px.pie(
+                df_decomp,
+                names="ticker",
+                values="risk_contribution_pct",
+                hole=0.55,
+                color_discrete_sequence=px.colors.qualitative.Dark24
+            )
+            fig_donut.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=10, r=10, t=20, b=20),
+                height=300,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+            )
+            st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
+
+        with col_dec_p2:
+            st.markdown("##### 📊 Bar Chart di Component VaR (€)")
+            fig_bar_cvar = go.Figure()
+            fig_bar_cvar.add_trace(go.Bar(
+                x=df_decomp["ticker"],
+                y=df_decomp["component_var_amount"],
+                marker_color="#ff9900",
+                text=[f"€ {val:,.0f}".replace(",", ".") for val in df_decomp["component_var_amount"]],
+                textposition="auto"
+            ))
+            fig_bar_cvar.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(13,17,23,0.7)",
+                margin=dict(l=10, r=10, t=20, b=20),
+                height=300,
+                xaxis=dict(gridcolor="rgba(255,255,255,0.06)"),
+                yaxis=dict(title="Component VaR (€)", gridcolor="rgba(255,255,255,0.06)")
+            )
+            st.plotly_chart(fig_bar_cvar, use_container_width=True, config={"displayModeBar": False})
+
+        # Badge Teorema di Eulero
+        euler_ok = decomp_res.get("euler_check_passed", True)
+        res_euler = decomp_res.get("euler_residual", 0.0)
+        if euler_ok:
+            st.markdown(f"""
+            <div style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
+                <span style="color: #4ade80; font-weight: 600; font-size: 13px;">✅ Proprietà di Eulero Rispettata: Somma Component VaR = VaR di Portafoglio (€ {decomp_res.get('portfolio_var_amount', 0):,.2f})</span>
+                <span style="color: #86efac; font-family: monospace; font-size: 12px;">Residuo: € {res_euler:.4f} (0.00%)</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # Tabella Dettagliata Decomposizione
+        decomp_cfg = {
+            "ticker": st.column_config.TextColumn("Ticker", width="small"),
+            "weight_pct": st.column_config.NumberColumn("Peso (%)", format="%.2f%%"),
+            "position_value": st.column_config.NumberColumn("Valore Posizione", format="€ %,.2f"),
+            "marginal_var_pct": st.column_config.NumberColumn("Marginal VaR (MVaR)", format="%.3f%%"),
+            "component_var_pct": st.column_config.NumberColumn("Component VaR %", format="%.3f%%"),
+            "component_var_amount": st.column_config.NumberColumn("Component VaR (€)", format="€ %,.2f"),
+            "risk_contribution_pct": st.column_config.NumberColumn("% Rischio Totale", format="%.2f%%")
+        }
+        st.dataframe(
+            df_decomp,
+            column_config=decomp_cfg,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    # ── LIQUIDITY-ADJUSTED VAR (LVAR) INTERATTIVO ──────────────────────
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("##### 💧 Liquidity-Adjusted Value at Risk (LVaR - Bangia / Basel III)")
+    
+    col_lv_ctrl1, col_lv_ctrl2 = st.columns([2, 2])
+    with col_lv_ctrl1:
+        liq_days = st.select_slider(
+            "Orizzonte di Smobilizzo Completo (Giorni Lavorativi per Liquidazione Ordinata):",
+            options=[1, 3, 5, 10, 20],
+            value=5,
+            format_func=lambda d: f"{d} Giorno" if d==1 else f"{d} Giorni"
+        )
+    with col_lv_ctrl2:
+        spread_bps_user = st.slider(
+            "Bid-Ask Spread Medio di Mercato (bps):",
+            min_value=5, max_value=100, value=20, step=5,
+            format_func=lambda b: f"{b} bps ({b/100:.2f}%)"
+        )
+
+    lvar_calc = compute_liquidity_adjusted_var(
+        df_positions=pos,
+        portfolio_var_pct=decomp_res.get("portfolio_var_pct", float(var_hist_1d * 100.0)),
+        total_portfolio_value=total_value,
+        liquidation_horizon_days=liq_days,
+        default_spread_pct=spread_bps_user / 10000.0
+    )
+
+    col_l1, col_l2, col_l3, col_l4 = st.columns(4)
+    with col_l1:
+        metric_card("VaR 1G Base", f"€ {lvar_calc['unadjusted_var_amount']:,.0f}".replace(",", "."), "Senza Illiquidità", True)
+    with col_l2:
+        metric_card(f"VaR Scalato ({liq_days}G)", f"€ {lvar_calc['time_scaled_var_amount']:,.0f}".replace(",", "."), f"Fattore: √{liq_days} = {np.sqrt(liq_days):.2f}x", True)
+    with col_l3:
+        metric_card("Costo Bid-Ask Spread", f"€ {lvar_calc['liquidity_cost_amount']:,.0f}".replace(",", "."), f"Spread: {spread_bps_user} bps", True)
+    with col_l4:
+        metric_card("LVaR Totale Liquidità", f"€ {lvar_calc['lvar_amount']:,.0f}".replace(",", "."), f"Premio Illiquidità: +{lvar_calc['lvar_premium_pct']:.1f}%", True)
+
+
 
 # ==============================================================================
 # TAB 3: CORRELAZIONI, LIQUIDITÀ & ATR CHANDELIER

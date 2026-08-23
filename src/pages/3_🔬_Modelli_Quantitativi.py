@@ -29,6 +29,20 @@ from core.hrp_optimizer import compute_hrp_portfolio
 from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
 from core.volatility_surface import build_volatility_surface, fit_volatility_smile
 from core.advanced_quant import compute_tail_copula_matrix, compute_kelly_criterion_sizing, compute_equal_risk_contribution_portfolio
+from core.fixed_income import (
+    compute_bond_cash_flows,
+    compute_bond_price_from_ytm,
+    compute_bond_ytm,
+    compute_bond_analytics,
+    compute_z_spread,
+    compute_cds_implied_default_probability,
+    INSTITUTIONAL_BOND_PRESETS
+)
+from core.yield_curve import (
+    evaluate_nelson_siegel_svensson_curve,
+    compute_key_rate_durations,
+    get_institutional_yield_curve
+)
 
 st.set_page_config(page_title="Modelli Quantitativi | ARGUS", page_icon="🔬", layout="wide")
 inject_custom_css()
@@ -129,7 +143,8 @@ active_quant_tab = render_segmented_tabs([
     "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)",
     "🛡️ Hedging Tattico & Tail Risk",
     "🎯 Attribuzione Brinson-Fachler",
-    "🏛️ Modelli Fattoriali, Black-Litterman & ML"
+    "🏛️ Modelli Fattoriali, Black-Litterman & ML",
+    "🏛️ Fixed Income & Z-Spread (YAS)"
 ], key="quant_active_tab")
 
 # ── TAB 1: MARKOWITZ & LEDOIT-WOLF ────────────────────────────
@@ -3213,4 +3228,253 @@ elif active_quant_tab == "🏛️ Modelli Fattoriali, Black-Litterman & ML":
         with col_ml2:
             st.markdown(f"**Verdetto ML:** {ml_res['verdict']}")
             st.caption("Stima avanzata della volatilità annualizzata a 30 giorni basata su Random Forest Regressor e indicatori tecnici di mercato.")
+
+# ── TAB 7: FIXED INCOME, YTM & Z-SPREAD (YAS) ──────────────────────
+elif active_quant_tab == "🏛️ Fixed Income & Z-Spread (YAS)":
+    col_fi_h1, col_fi_h2 = st.columns([3.2, 1.1])
+    with col_fi_h1:
+        st.markdown("#### 🏛️ Fixed Income Istituzionale & Z-Spread Cockpit (Bloomberg YAS Style)")
+        st.caption("Analisi quantitativa per Titoli di Stato ed Obbligazioni Corporate • Yield to Maturity (YTM), Duration, Convessità, DV01, Z-Spread e Probabilità di Default CDS.")
+    with col_fi_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("ℹ️ Guida a Fixed Income, Duration & Z-Spread", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Metriche di Sensibilità Obbligazionaria</div>
+  <div>
+    • <b>Yield to Maturity (YTM):</b> Tasso interno di rendimento (TIR) che eguaglia il valore attuale dei flussi al prezzo di mercato.<br>
+    • <b>Macaulay Duration:</b> Scadenza media ponderata per il valore attuale dei flussi di cassa.<br>
+    • <b>Modified Duration:</b> Sensibilità percentuale del prezzo per una variazione dell'1% (100 bps) nei tassi di interesse.<br>
+    • <b>Convexity:</b> Curvatura di 2° ordine che quantifica il vantaggio per cui i bond guadagnano di più quando i tassi scendono e perdono di meno quando i tassi salgono.<br>
+    • <b>DV01 / PVBP:</b> Variazione del valore monetario del titolo per ogni movimento di 1 punto base (0.01%) di rendimento.
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Z-Spread (Zero-Volatility Spread)</div>
+  <div>Lo spread costante in punti base (bps) da aggiungere a ciascun nodo della curva spot sovrana per riprodurre esattamente il prezzo di mercato del bond.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🛡️ Probabilità di Default Implicita (CDS)</div>
+  <div>Stima dell'intensità di default (Hazard Rate &lambda; = Spread / (1 - Recovery Rate)) e probabilità cumulativa di insolvenza su orizzonti da 1 a 30 anni.</div>
+</div>
+
+</div>
+""", button_label="💡 Come leggere i dati Fixed Income?")
+
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+    # Selezione Titolo Benchmark o Custom
+    preset_keys = ["IT10Y", "DE10Y", "US10Y", "CORP_ENI", "CUSTOM"]
+    preset_names = [
+        "🇮🇹 BTP Decennale 4.00% (Italia)",
+        "🇩🇪 Bund Decennale 2.50% (Germania)",
+        "🇺🇸 US 10-Year Treasury 4.25% (USA)",
+        "🏢 ENI SpA Sustainability 3.875% (Corporate)",
+        "✏️ Obbligazione Personalizzata (Custom)"
+    ]
+    
+    col_sel1, col_sel2 = st.columns([2.5, 1.5])
+    with col_sel1:
+        selected_idx = st.selectbox(
+            "Seleziona Strumento Obbligazionario Benchmark o Personalizzato:",
+            options=range(len(preset_names)),
+            format_func=lambda i: preset_names[i],
+            index=0,
+            key="fi_preset_choice"
+        )
+    
+    preset_choice = preset_keys[selected_idx]
+    
+    # Parametri iniziali
+    if preset_choice != "CUSTOM":
+        p_data = INSTITUTIONAL_BOND_PRESETS[preset_choice]
+        def_face = float(p_data.get("face_value", 100.0))
+        def_coupon = float(p_data["coupon_rate"] * 100.0)
+        def_mat = float(p_data["maturity_years"])
+        def_price = float(p_data["market_price"])
+        def_freq = int(p_data["coupon_freq"])
+        def_cds = float(p_data.get("cds_5y_bps", 80.0))
+        curr_symbol = "€" if p_data.get("currency") == "EUR" else "$"
+    else:
+        def_face = 100.0
+        def_coupon = 4.50
+        def_mat = 7.0
+        def_price = 99.50
+        def_freq = 2
+        def_cds = 110.0
+        curr_symbol = "€"
+
+    # Input interattivi
+    with st.expander("⚙️ Parametri Finanziari dell'Obbligazione", expanded=True):
+        col_inp1, col_inp2, col_inp3, col_inp4, col_inp5, col_inp6 = st.columns(6)
+        with col_inp1:
+            inp_face = st.number_input("Valore Nominale", min_value=1.0, value=def_face, step=10.0, key="fi_face_val")
+        with col_inp2:
+            inp_coupon = st.number_input("Tasso Cedolare (%)", min_value=0.0, max_value=25.0, value=def_coupon, step=0.10, key="fi_coupon_val")
+        with col_inp3:
+            inp_mat = st.number_input("Scadenza (Anni)", min_value=0.1, max_value=50.0, value=def_mat, step=0.5, key="fi_mat_val")
+        with col_inp4:
+            inp_price = st.number_input("Prezzo di Mercato", min_value=1.0, max_value=300.0, value=def_price, step=0.25, key="fi_price_val")
+        with col_inp5:
+            inp_freq = st.selectbox("Frequenza Cedola", options=[1, 2, 4], format_func=lambda x: "Annuale (1x)" if x==1 else ("Semestrale (2x)" if x==2 else "Trimestrale (4x)"), index=(0 if def_freq==1 else (1 if def_freq==2 else 2)), key="fi_freq_val")
+        with col_inp6:
+            inp_cds = st.number_input("Spread CDS 5Y (bps)", min_value=0.0, max_value=2000.0, value=def_cds, step=5.0, key="fi_cds_val")
+
+    # Calcolo metriche
+    coupon_dec = inp_coupon / 100.0
+    bond_res = compute_bond_analytics(
+        face_value=inp_face,
+        coupon_rate=coupon_dec,
+        maturity_years=inp_mat,
+        market_price=inp_price,
+        coupon_frequency=inp_freq
+    )
+    z_spread_bps = compute_z_spread(
+        face_value=inp_face,
+        coupon_rate=coupon_dec,
+        maturity_years=inp_mat,
+        market_price=inp_price,
+        spot_curve_fn_or_params=None,
+        coupon_frequency=inp_freq
+    )
+    cds_res = compute_cds_implied_default_probability(
+        cds_spread_bps=inp_cds,
+        recovery_rate=0.40
+    )
+
+    # 4 Executive KPI Cards
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+    with col_kpi1:
+        metric_card(
+            "Yield to Maturity (YTM)",
+            f"{bond_res['ytm_pct']:.3f}%",
+            f"Cedola Corrente: {bond_res['current_yield_pct']:.2f}%",
+            True
+        )
+    with col_kpi2:
+        metric_card(
+            "Modified Duration",
+            f"{bond_res['modified_duration']:.2f}x",
+            f"Macaulay Duration: {bond_res['macaulay_duration_years']:.2f} Anni",
+            True
+        )
+    with col_kpi3:
+        metric_card(
+            "Convexity (Convessità)",
+            f"{bond_res['convexity']:.2f}",
+            f"DV01 / PVBP: {curr_symbol} {bond_res['dv01']:.4f} / bp",
+            True
+        )
+    with col_kpi4:
+        metric_card(
+            "Z-Spread & Hazard Rate",
+            f"{z_spread_bps:+.1f} bps",
+            f"Hazard Rate CDS: {cds_res['implied_hazard_rate_pct']:.2f}%/anno",
+            True
+        )
+
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+
+    # Simulatore Interattivo Shock di Rendimento & Price-Yield Curve
+    col_plot1, col_plot2 = st.columns([1.8, 1.2])
+    with col_plot1:
+        st.markdown("##### 📈 Curva Prezzo-Rendimento & Guadagno di Convessità")
+        st.caption("Confronto tra Curva di Prezzo Esatta, Approssimazione di 1° Ordine (Sola Duration) e di 2° Ordine (Duration + Convessità).")
+        
+        # Genera punti per la curva continua
+        ytm_center = bond_res['ytm_pct'] / 100.0
+        y_shifts = np.linspace(-0.03, 0.03, 60)
+        y_points = (ytm_center + y_shifts) * 100.0
+        exact_prices = [compute_bond_price_from_ytm(inp_face, coupon_dec, inp_mat, ytm_center + dy, inp_freq) for dy in y_shifts]
+        
+        # Taylor 1 (Duration) e Taylor 2 (Duration + Convexity)
+        taylor_1_prices = [inp_price * (1.0 - bond_res['modified_duration'] * dy) for dy in y_shifts]
+        taylor_2_prices = [inp_price * (1.0 - bond_res['modified_duration'] * dy + 0.5 * bond_res['convexity'] * (dy**2)) for dy in y_shifts]
+
+        fig_py = go.Figure()
+        fig_py.add_trace(go.Scatter(
+            x=y_points, y=exact_prices,
+            mode='lines', name='Prezzo Esatto P(y)',
+            line=dict(color='#ff9900', width=3.5)
+        ))
+        fig_py.add_trace(go.Scatter(
+            x=y_points, y=taylor_2_prices,
+            mode='lines', name='Taylor 2° Ordine (Duration + Convexity)',
+            line=dict(color='#00c853', width=2, dash='dash')
+        ))
+        fig_py.add_trace(go.Scatter(
+            x=y_points, y=taylor_1_prices,
+            mode='lines', name='Taylor 1° Ordine (Solo Duration)',
+            line=dict(color='#f85149', width=1.5, dash='dot')
+        ))
+        # Punto di prezzo corrente
+        fig_py.add_trace(go.Scatter(
+            x=[bond_res['ytm_pct']], y=[inp_price],
+            mode='markers+text', name='Prezzo Attuale',
+            marker=dict(color='#ffffff', size=10, symbol='diamond'),
+            text=[f"YTM {bond_res['ytm_pct']:.2f}%"], textposition='top center'
+        ))
+
+        fig_py.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(13,17,23,0.7)',
+            margin=dict(l=20, r=20, t=30, b=20),
+            height=360,
+            xaxis=dict(title="Yield to Maturity (%)", gridcolor='rgba(255,255,255,0.06)'),
+            yaxis=dict(title=f"Prezzo Obbligazione ({curr_symbol})", gridcolor='rgba(255,255,255,0.06)'),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_py, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+    with col_plot2:
+        st.markdown("##### 🛡️ Curva Probabilità di Default Implicita (CDS)")
+        st.caption(f"Term structure cumulativa di default basata sullo spread CDS di **{inp_cds:.0f} bps** (Recovery: 40%).")
+        
+        df_cds = cds_res["default_probability_curve"]
+        fig_cds = go.Figure()
+        fig_cds.add_trace(go.Scatter(
+            x=df_cds["tenor_years"], y=df_cds["cumulative_default_prob_pct"],
+            mode='lines+markers', name='Probabilità di Default Cumulativa (%)',
+            line=dict(color='#f85149', width=3),
+            fill='tozeroy', fillcolor='rgba(248,81,73,0.12)',
+            marker=dict(size=7, color='#f85149')
+        ))
+        fig_cds.update_layout(
+            template='plotly_dark',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(13,17,23,0.7)',
+            margin=dict(l=20, r=20, t=30, b=20),
+            height=360,
+            xaxis=dict(title="Scadenza (Anni)", gridcolor='rgba(255,255,255,0.06)'),
+            yaxis=dict(title="Probabilità Cumulativa Default (%)", gridcolor='rgba(255,255,255,0.06)'),
+            showlegend=False
+        )
+        st.plotly_chart(fig_cds, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+    # Tabella di Sensibilità a Shock di Rendimento
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    st.markdown("##### 📋 Matrice di Sensibilità Istituzionale a Shock di Tasso (Basis Points Shock)")
+    
+    df_sens = bond_res["sensitivity_table"].copy()
+    sens_cfg = {
+        "shift_bps": st.column_config.NumberColumn("Shock Tasso", format="%+d bps"),
+        "new_ytm_pct": st.column_config.NumberColumn("Nuovo YTM", format="%.3f%%"),
+        "exact_price": st.column_config.NumberColumn(f"Prezzo Esatto ({curr_symbol})", format="%.2f"),
+        "pct_change_exact": st.column_config.NumberColumn("Var % Prezzo Esatta", format="%+.2f%%"),
+        "pct_change_duration_only": st.column_config.NumberColumn("Stima Solo Duration", format="%+.2f%%"),
+        "pct_change_duration_plus_convexity": st.column_config.NumberColumn("Stima Duration + Convexity", format="%+.2f%%"),
+        "convexity_gain_pct": st.column_config.NumberColumn("Vantaggio Convessità", format="%+.2f%%")
+    }
+    st.dataframe(
+        df_sens,
+        column_config=sens_cfg,
+        use_container_width=True,
+        hide_index=True
+    )
+
 
