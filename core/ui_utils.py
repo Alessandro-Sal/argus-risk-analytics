@@ -1142,10 +1142,52 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "tab_key": None,
             "target": None,
             "context_type": "system"
+        },
+        "BQUANT": {
+            "title": "BQuant Python Interactive Console (Bloomberg Style)",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🐍 ARGUS BQuant Python Sandbox",
+            "context_type": "bquant"
+        },
+        "PY": {
+            "title": "BQuant Python Interactive Console (Bloomberg Style)",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🐍 ARGUS BQuant Python Sandbox",
+            "context_type": "bquant"
+        },
+        "LAUNCHPAD": {
+            "title": "Launchpad & Role Workspace Customizer",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🎛️ Launchpad & Workspace Customizer",
+            "context_type": "workspace"
+        },
+        "WS": {
+            "title": "Launchpad & Role Workspace Customizer",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🎛️ Launchpad & Workspace Customizer",
+            "context_type": "workspace"
+        },
+        "XL": {
+            "title": "Excel Live Connector & Bloomberg RTD Builder",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "📊 Excel Live Connector & RTD",
+            "context_type": "excel"
+        },
+        "EXCEL": {
+            "title": "Excel Live Connector & Bloomberg RTD Builder",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "📊 Excel Live Connector & RTD",
+            "context_type": "excel"
         }
     }
 
-    # Caso 1: Singolo token mnemonico (es. "YCRV", "EQS", "TAX", "PORT")
+    # Caso 1: Singolo token mnemonico (es. "YCRV", "EQS", "TAX", "PORT", "BQUANT", "XL")
     if len(tokens) == 1 and tokens[0] in MNEMONIC_REGISTRY:
         cmd_info = dict(MNEMONIC_REGISTRY[tokens[0]])
         cmd_info["mnemonic"] = tokens[0]
@@ -2034,9 +2076,16 @@ def resolve_metric_knowledge(label: str, help_text: str = None) -> str:
     )
 
 
-def metric_card(label: str, value: str, delta: str = None, positive: bool = True, help_text: str = None, is_positive: bool = None):
+def metric_card(label: str, value: str, delta: str = None, positive: bool = True, help_text: str = None, is_positive: bool = None, delta_color: str = None):
     if is_positive is not None:
         positive = is_positive
+    elif delta_color is not None:
+        if delta_color in ["off", "none", "gray"]:
+            positive = None
+        elif delta_color == "inverse":
+            positive = False
+        elif delta_color == "normal":
+            positive = True
     import re
     import random
     
@@ -2181,6 +2230,18 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
 
 def section(title: str):
     st.markdown(f'<div class="section-header">{title}</div>', unsafe_allow_html=True)
+
+def render_page_header(title: str, subtitle: str = "", icon: str = "👁️"):
+    """Renderizza un'intestazione di pagina istituzionale conforme al Design System ARGUS."""
+    st.markdown(f"""
+    <div style="margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 24px;">{icon}</span>
+            <span style="font-size: 20px; font-weight: 800; color: #ffffff; letter-spacing: 0.3px;">{title}</span>
+        </div>
+        {f'<div style="font-size: 12.5px; color: #8b949e; margin-top: 3px; margin-left: 32px;">{subtitle}</div>' if subtitle else ''}
+    </div>
+    """, unsafe_allow_html=True)
 
 def fmt_pct(v, *args, **kwargs):
     if v is None:

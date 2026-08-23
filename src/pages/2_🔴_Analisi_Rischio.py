@@ -1790,7 +1790,37 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 
     # ── LIQUIDITY-ADJUSTED VAR (LVAR) INTERATTIVO ──────────────────────
     st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
-    
+    col_lvar_h1, col_lvar_h2 = st.columns([3.2, 1.3])
+    with col_lvar_h1:
+        st.markdown("#### 💧 Liquidity-Adjusted VaR (LVaR) — Modello di Bangia")
+        st.caption("Stima del rischio totale di mercato combinato al costo di attrito ed esogeno di liquidazione delle posizioni in base al bid-ask spread e all'orizzonte di smobilizzo.")
+    with col_lvar_h2:
+        st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+        glossary_modal("💡 Come funziona il Liquidity-Adjusted VaR (LVaR)", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">💧 Limiti del VaR Tradizionale &amp; Rischio di Liquidità</div>
+  <div>Il VaR classico assume che le posizioni possano essere liquidate istantaneamente al prezzo mid-market senza costi di attrito. In mercati stressati o per portafogli illiquidi, l'allargamento del bid-ask spread genera perdite addizionali rilevanti.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Modello di Bangia et al. (1999)</div>
+  <div>
+    La formula istituzionale decompone il rischio complessivo in due componenti additive:<br>
+    <code>LVaR_&alpha; = VaR_&alpha; + Costo di Liquidità_&alpha;</code><br>
+    dove <code>Costo di Liquidità = &frac12; &middot; Portafoglio &middot; (&mu;_spread + z_&alpha; &middot; &sigma;_spread)</code>.
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⏳ Scaling Temporale Multi-Day</div>
+  <div>Se l'orizzonte di smobilizzo è esteso su <i>T</i> giorni lavorativi, la volatilità di mercato scala con <code>&radic;T</code> (Root-T Rule), quantificando l'esposizione al rischio durante l'intero periodo di liquidazione ordinata.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona LVaR?")
+
     col_lv_ctrl1, col_lv_ctrl2 = st.columns([1, 1])
     with col_lv_ctrl1:
         liq_days = st.select_slider(

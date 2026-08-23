@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`) di **ARGUS Risk Analytics Platform v5.17.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`) di **ARGUS Risk Analytics Platform v5.18.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -1077,6 +1077,58 @@ A ogni nodo di ribilanciamento temporale $t$ (mensile o trimestrale), l'intero u
 - **Information Ratio di Q1 vs Universo**: $\text{IR} = \frac{\text{mean}(R_{Q1} - R_{\text{Univ}})}{\text{std}(R_{Q1} - R_{\text{Univ}})} \cdot \sqrt{252}$
 - **Coefficiente di Monotonicità di Spearman ($r_s$)**: Misura la correlazione di rango decrescente tra i quintili $1 \dots 5$ e il rendimento medio annualizzato:
   \[ r_s = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)} \]
-  Un valore $r_s \ge 0.80$ conferma la validità empirica del fattore nell'ordinare monotonicamente la distribuzione dei rendimenti attesi senza inversioni di stile.
+---
+
+## 57. ARGUS BQuant In-Memory Python Sandbox & DuckDB SQL (`core/bquant_engine.py`)
+
+### 1. Architettura di Esecuzione Sandboxed In-Memory
+La console BQuant (Bloomberg Quant parity) consente l'esecuzione di script analitici Python direttamente sui DataFrame in-memory della sessione attiva senza overhead di serializzazione o persistenza intermedia su disco:
+- **Namespace Injection**: Iniezione automatica delle strutture di mercato e portafoglio:
+  - `df_positions`: tabella dettagliata delle posizioni aperte, pesi percentuali, PnL e classificazione GICS.
+  - `df_returns`: matrice dei rendimenti storici logaritmici e percentuali per asset e benchmark.
+  - `df_prices`: serie temporali dei prezzi di chiusura rettificati.
+  - `results`: dizionario generale delle metriche di rischio VaR/CVaR, Fama-French ed elasticità di stress test.
+- **DuckDB SQL Engine Integrato**: Registrazione automatica delle tabelle pandas in una sessione in-process DuckDB (`:memory:`) per consentire aggregazioni OLAP complesse, window functions e query SQL ANSI a latenza sub-millisecondo.
+- **Intercettazione Dinamica degli Output**:
+  - Reindirizzamento dei flussi `sys.stdout` e `sys.stderr` verso il log visuale del terminale.
+  - Rilevamento automatico di variabili DataFrame assegnate a `df_out` o `df_result` con rendering in tabella interattiva ed esportazione CSV.
+  - Rilevamento automatico di figure Plotly (`fig`, `figure`) o grafici Matplotlib attivi con rendering grafico ad alta risoluzione.
+
+---
+
+## 58. ARGUS Launchpad & Institutional Role Workspace Profiles (`core/workspace_engine.py`)
+
+### 1. Personalizzazione dei Layout Operativi per Ruolo Organizzativo
+Il modulo Launchpad struttura l'accesso ai moduli della piattaforma in base a 5 profili operativi istituzionali predefiniti:
+1. **Trading Desk & Execution (`#ff9900`)**: Focus su microstructure ad alta frequenza, order book L2, Order Flow Imbalance (OFI), microprice Stoikov, traiettorie di liquidazione Almgren-Chriss e coperture delta-hedging. Refresh rate consigliato: 5s.
+2. **Risk Officer & Compliance (`#f85149`)**: Focus su limiti normativi Basel III/IV, backtesting VaR Kupiec/Christoffersen, volatilità condizionale GARCH(1,1), stress testing macroeconomico 3D e LVaR Bangia. Refresh rate consigliato: 60s.
+3. **Portfolio Manager & CIO (`#58a6ff`)**: Focus su frontiera efficiente Markowitz & Hierarchical Risk Parity (HRP), attribuzione di performance Brinson/Carino, factor backtest a quintili e flussi cedolari. Refresh rate consigliato: 30s.
+4. **Quantitative Analyst & Data Scientist (`#d2a8ff`)**: Focus su sandbox Python BQuant, calibrazione Merton Jump-Diffusion, superfici di volatilità SVI/Spline e clustering non supervisionato K-Means. Esecuzione on-demand.
+5. **Corporate Treasurer & Fixed Income (`#3fb950`)**: Focus su Yield to Maturity (YTM), Duration/Convexity/DV01, Z-Spread Nelson-Siegel, monitoraggio CDS sovrano/corporate e ottimizzazione fiscale minusvalenze. Refresh rate consigliato: 120s.
+
+### 2. Persistenza Locale su SQLite
+I layout utente, i ruoli attivi e le configurazioni personalizzate vengono salvati nella tabella `user_workspaces` del database SQLite locale (`data/argus_workspaces.db`), garantendo continuità operativa tra le sessioni.
+
+---
+
+## 59. Bloomberg-Style Excel Live Connector UDFs & Multi-Sheet Architecture (`core/excel_connector.py`)
+
+### 1. Formule UDF Bloomberg Parity per Microsoft Excel e Google Sheets
+Il connettore genera formule pronte all'uso conformi alla sintassi Bloomberg Professional:
+- **`=ARGUS_BDP(Ticker, Field)`**: Bloomberg Data Point istantaneo (es. `=ARGUS_BDP("AAPL", "LAST_PRICE")`, `=ARGUS_BDP("IT10Y", "YTM")`, `=ARGUS_BDP("MSFT", "BETA")`).
+- **`=ARGUS_BDH(Ticker, Field, StartDate, EndDate)`**: Bloomberg Data History per serie storiche (es. `=ARGUS_BDH("AAPL", "CLOSE", "2024-01-01", "2026-08-01")`).
+- **`=ARGUS_RISK(MetricName)`**: Metrica di rischio di portafoglio (es. `=ARGUS_RISK("PORTFOLIO_VAR_95")`, `=ARGUS_RISK("PORTFOLIO_SHARPE")`).
+
+### 2. Generatore di Codice VBA & Office Scripts (TypeScript)
+- **VBA Macro Module (`.bas`)**: Funzioni UDF per Excel Desktop basate su chiamate non bloccanti `MSXML2.ServerXMLHTTP.6.0` all'endpoint locale di ARGUS (`/api/bdp`, `/api/risk`).
+- **Microsoft Office Scripts (`.ts`)**: Script asincrono TypeScript per Excel 365 e Web per sincronizzare e formattare automaticamente snapshot di portafoglio tramite `fetch()`.
+
+### 3. Esportazione Multi-Foglio OpenPyXL / XlsxWriter
+Generazione automatica di workbook Excel strutturati con formattazione istituzionale Bloomberg Dark Palette e larghezze di colonna auto-adattate:
+- `Executive_Summary`: KPI generali di rischio, Sharpe, VaR, CVaR e tasso risk-free.
+- `Positions_Portfolio`: Tabella integrale delle posizioni con pesi, PnL e moltiplicatori.
+- `Fixed_Income_YAS`: Duration, Convessità, DV01 e Z-Spread delle emissioni obbligazionarie.
+- `Execution_Schedule`: Scaglioni temporali e costi di impatto del modello Almgren-Chriss.
+
 
 

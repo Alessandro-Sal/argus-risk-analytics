@@ -248,8 +248,42 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
 
     if filter_mode == "⚡ Formula Engine EQS (Custom Query Builder)":
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-        st.markdown("##### ⚡ Terminal EQS Formula Query Bar")
-        st.caption("Scrivi formule logico-matematiche complesse combinando multipli, ratio contabili, metriche di rischio e indicatori tecnici.")
+        col_eqs_h1, col_eqs_h2 = st.columns([3.2, 1.2])
+        with col_eqs_h1:
+            st.markdown("##### ⚡ Terminal EQS Formula Query Bar")
+            st.caption("Scrivi formule logico-matematiche complesse combinando multipli, ratio contabili, metriche di rischio e indicatori tecnici.")
+        with col_eqs_h2:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            glossary_modal("💡 Come funziona il Formula Engine EQS (Custom Query)", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚡ Motore di Querying Logico Bloomberg-Style</div>
+  <div>Il Formula Engine interpreta e compila vettorialmente espressioni logiche complesse applicate all'universo azionario. Permette di combinare filtri multidimensionali di Valutazione, Qualità Contabile, Rischio e Momentum con sintassi standardizzata.</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔤 Operatori Logici & Relazionali Supportati</div>
+  <div>
+    • <b>Logici:</b> <code>AND</code> (o <code>&</code>), <code>OR</code> (o <code>|</code>), <code>NOT</code> (o <code>~</code>), parentesi <code>(...)</code>.<br>
+    • <b>Relazionali:</b> <code>&gt;=</code>, <code>&lt;=</code>, <code>&gt;</code>, <code>&lt;</code>, <code>==</code>, <code>!=</code>.<br>
+    • <b>Aritmetici:</b> moltiplicazione per costanti (es. <code>ROIC &gt; WACC * 1.5</code>).
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🏛️ Archetipi Istituzionali Pre-Impostati</div>
+  <div>
+    • <b>Buffett Quality Moat:</b> Piotroski &ge; 7 &amp; Altman &gt; 2.9 &amp; ROE &gt; 15% &amp; Debt/Equity &lt; 0.8.<br>
+    • <b>Peter Lynch Growth:</b> PEG &lt; 1.2 &amp; Upside &gt; 15% &amp; ROE &gt; 12% &amp; Debt/Equity &lt; 1.2.<br>
+    • <b>Graham Deep Value:</b> P/E &lt; 16 &amp; P/B &lt; 2.0 &amp; DivYield &gt; 2.5% &amp; Altman &gt; 2.0.<br>
+    • <b>Low-Beta Fortress:</b> Beta &lt; 0.85 &amp; Vol &lt; 22% &amp; DivYield &gt; 3.0% &amp; Sharpe &gt; 0.6.<br>
+    • <b>Momentum Breakout:</b> RSI tra 50 e 72 &amp; Perf1Y &gt; 15% &amp; Prezzo &gt; SMA200.
+  </div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona EQS?")
 
         # Preset Rapidi
         col_pr_h, col_pr_btns = st.columns([1.2, 4.8])

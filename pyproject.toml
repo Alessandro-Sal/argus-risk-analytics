@@ -1,6 +1,6 @@
 [project]
 name = "argus-risk-analytics"
-version = "5.17.0"
+version = "5.18.0"
 description = "ARGUS Risk Analytics Platform — Quantitative Risk Management & BI"
 readme = "README.md"
 requires-python = ">=3.10"
