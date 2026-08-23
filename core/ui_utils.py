@@ -382,17 +382,22 @@ def inject_custom_css():
         }}
 
         /* Inactive Tab Deck Button */
-        .argus-tab-deck-container button[kind="secondary"] {{
-            background: rgba(255, 255, 255, 0.02) !important;
-            border: 1px solid rgba(255, 255, 255, 0.06) !important;
+        .argus-tab-deck-container button[kind="secondary"],
+        .argus-tab-deck-container button[data-testid="baseButton-secondary"] {{
+            background: rgba(22, 27, 34, 0.6) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 8px !important;
             color: #8b949e !important;
             font-size: 12px !important;
             font-weight: 600 !important;
-            letter-spacing: 0.2px !important;
-            padding: 7px 10px !important;
-            min-height: 38px !important;
-            height: 38px !important;
+            letter-spacing: 0.1px !important;
+            padding: 4px 8px !important;
+            min-height: 42px !important;
+            height: 42px !important;
+            max-height: 42px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             line-height: 1.2 !important;
             white-space: normal !important;
             text-align: center !important;
@@ -401,27 +406,33 @@ def inject_custom_css():
             transform: none !important;
         }}
 
-        .argus-tab-deck-container button[kind="secondary"]:hover {{
-            background: rgba(255, 255, 255, 0.07) !important;
-            border-color: rgba(255, 255, 255, 0.18) !important;
+        .argus-tab-deck-container button[kind="secondary"]:hover,
+        .argus-tab-deck-container button[data-testid="baseButton-secondary"]:hover {{
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.22) !important;
             color: #ffffff !important;
             transform: translateY(-1px) !important;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
         }}
 
         /* Active Tab Deck Button (Illuminated Dark Metal Capsule) */
-        .argus-tab-deck-container button[kind="primary"] {{
+        .argus-tab-deck-container button[kind="primary"],
+        .argus-tab-deck-container button[data-testid="baseButton-primary"] {{
             background: linear-gradient(180deg, #24292f 0%, #161b22 100%) !important;
             border: 1px solid #ff9900 !important;
             border-bottom: 3px solid #ff9900 !important;
             border-radius: 8px !important;
             color: #ff9900 !important;
-            font-size: 12.5px !important;
+            font-size: 12px !important;
             font-weight: 700 !important;
-            letter-spacing: 0.3px !important;
-            padding: 7px 10px !important;
-            min-height: 38px !important;
-            height: 38px !important;
+            letter-spacing: 0.2px !important;
+            padding: 4px 8px !important;
+            min-height: 42px !important;
+            height: 42px !important;
+            max-height: 42px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             line-height: 1.2 !important;
             white-space: normal !important;
             text-align: center !important;
@@ -429,8 +440,11 @@ def inject_custom_css():
             transform: none !important;
         }}
 
-        .argus-tab-deck-container button[kind="primary"]:hover {{
+        .argus-tab-deck-container button[kind="primary"]:hover,
+        .argus-tab-deck-container button[data-testid="baseButton-primary"]:hover {{
+            background: linear-gradient(180deg, #2d333b 0%, #1c2128 100%) !important;
             box-shadow: 0 6px 20px rgba(255, 153, 0, 0.35), 0 0 14px rgba(255, 153, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2) !important;
+            color: #ffb74d !important;
         }}
 
         /* Legacy Radio Fallback (Hidden) */
@@ -1031,24 +1045,24 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "context_type": "portfolio"
         },
         "BARRA": {
-            "title": "MSCI Barra Multi-Factor Risk Model",
+            "title": "Modello Multi-Fattoriale MSCI Barra & Black-Litterman",
             "page": "pages/3_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
-            "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML",
+            "target": "🎯 Attribuzione & Fattori",
             "context_type": "portfolio"
         },
         "COPULA": {
             "title": "Asymmetric Tail Copula & Kelly Sizing",
             "page": "pages/3_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
-            "target": "🧬 Tail Copula & Kelly Sizing",
+            "target": "🧬 Tail Copula & Kelly",
             "context_type": "portfolio"
         },
         "MC": {
             "title": "Monte Carlo 10k Paths & Merton Jump",
             "page": "pages/3_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
-            "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)",
+            "target": "🎲 Monte Carlo & Merton",
             "context_type": "portfolio"
         },
         "STRESS": {
@@ -1077,21 +1091,21 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "title": "Nelson-Siegel-Svensson Yield Curves",
             "page": "pages/3_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
-            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "target": "📊 Markowitz & Rebalancing",
             "context_type": "rates"
         },
         "YAS": {
             "title": "Yield & Spread Analysis (YTM, Duration, Convexity, Z-Spread)",
             "page": "pages/3_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
-            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "target": "🏛️ Fixed Income & Z-Spread",
             "context_type": "fixed_income"
         },
         "FI": {
             "title": "Fixed Income & Sovereign Debt Monitor",
             "page": "pages/3_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
-            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "target": "🏛️ Fixed Income & Z-Spread",
             "context_type": "fixed_income"
         },
         "CDS": {
@@ -1105,7 +1119,7 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "title": "Real-Time In-Memory Market Feed & Order Flow",
             "page": "pages/8_📈_Analisi_Tecnica.py",
             "tab_key": "tech_active_subtab",
-            "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
+            "target": "⚡ Real-Time Streaming",
             "context_type": "streaming"
         },
         "EQS": {
@@ -2307,24 +2321,30 @@ def glossary_modal(title: str, content: str, button_label: str = "📖 Approfond
 }}
 .btn-glossary-{unique_id} {{
     cursor: pointer;
-    background: rgba(255, 153, 0, 0.1);
+    background: rgba(255, 153, 0, 0.08);
     color: #ff9900;
     border: 1px solid rgba(255, 153, 0, 0.4);
-    padding: 7px 14px;
+    padding: 6px 12px;
     border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.2s;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.2s ease;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    white-space: nowrap;
-    margin-bottom: 8px;
+    box-sizing: border-box;
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.25;
+    margin-bottom: 6px;
     text-decoration: none;
 }}
 .btn-glossary-{unique_id}:hover {{
-    background: rgba(255, 153, 0, 0.2);
+    background: rgba(255, 153, 0, 0.18);
+    border-color: #ff9900;
     transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(255, 153, 0, 0.2);
 }}
 </style>
 
@@ -2338,7 +2358,9 @@ def glossary_modal(title: str, content: str, button_label: str = "📖 Approfond
     </div>
 </div>
 
-<label for="modal-toggle-{unique_id}" class="btn-glossary-{unique_id}">{button_label}</label>
+<div style="display: flex; justify-content: flex-end; width: 100%; box-sizing: border-box;">
+    <label for="modal-toggle-{unique_id}" class="btn-glossary-{unique_id}">{button_label}</label>
+</div>
 """
     st.markdown(modal_html, unsafe_allow_html=True)
 
