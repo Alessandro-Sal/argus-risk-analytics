@@ -399,9 +399,13 @@ def run_factor_quintile_backtest(
             use_synthetic = True
         else:
             df_work = df_returns[clean_cols].copy()
-            # Se i valori sembrano prezzi (max > 1.5), calcola pct_change
-            if (df_work.abs().max().max() > 1.5):
+            # Rilevamento accurato Prezzi vs Rendimenti Giornalieri
+            has_neg_returns = bool((df_work.min().min() < -0.005))
+            median_abs = float(df_work.abs().median().median())
+            if not has_neg_returns and median_abs > 0.5:
+                # Sono serie storiche di prezzo: converti in variazioni percentuali giornaliere
                 df_work = df_work.pct_change().dropna(how="all")
+                
             # Assicura indice datetime
             df_work.index = pd.to_datetime(df_work.index)
             # Rimuovi timezone se presente
@@ -446,7 +450,6 @@ def run_factor_quintile_backtest(
     dates_out = []
     
     # Esegui la classificazione cross-sectional ad ogni periodo
-    cum_days_passed = 0
     for p_dates in rebal_dates:
         t_start = p_dates[0]
         # Trova la finestra di lookback storica precedente a t_start
@@ -498,27 +501,30 @@ def run_factor_quintile_backtest(
         
         # Rendimenti giornalieri realizzati durante il periodo corrente
         period_df = df_rets.loc[p_dates]
-        for dt_val, row_r in period_df.iterrows():
-            dates_out.append(dt_val)
+        if not period_df.empty:
+            dates_out.extend(period_df.index.tolist())
             for q in range(1, 6):
                 q_key = f"Q{q}"
                 asset_list = q_assets[q_key]
                 if asset_list:
-                    ret_mean = float(row_r[asset_list].mean())
+                    q_srs = period_df[asset_list].mean(axis=1).clip(-0.10, 0.10)
                 else:
-                    ret_mean = 0.0
-                q_daily_returns[q_key].append(np.clip(ret_mean, -0.15, 0.15))
+                    q_srs = pd.Series(0.0, index=period_df.index)
+                q_daily_returns[q_key].extend(q_srs.tolist())
                 
     df_out_rets = pd.DataFrame(q_daily_returns, index=dates_out)
     if df_out_rets.empty:
         return {"valid": False, "message": "Errore nella generazione delle serie dei quintili."}
         
     # Calcolo Spread Long-Short giornaliero
-    df_out_rets["Long_Short_Spread"] = df_out_rets["Q1"] - df_out_rets["Q5"]
+    df_out_rets["Long_Short_Spread"] = (df_out_rets["Q1"] - df_out_rets["Q5"]).clip(-0.10, 0.10)
     df_out_rets["Equal_Weight_Univ"] = df_out_rets[["Q1", "Q2", "Q3", "Q4", "Q5"]].mean(axis=1)
     
     # Curve Cumulative di Ricchezza (Base 100)
-    df_cum = (1.0 + df_out_rets).cumprod() * 100.0
+    df_cum = pd.DataFrame(index=df_out_rets.index)
+    for col_name in df_out_rets.columns:
+        df_cum[col_name] = (1.0 + df_out_rets[col_name]).cumprod() * 100.0
+        
     total_days = len(df_out_rets)
     years = max(0.2, total_days / 252.0)
     
@@ -530,10 +536,17 @@ def run_factor_quintile_backtest(
     for col_name in ["Q1", "Q2", "Q3", "Q4", "Q5", "Long_Short_Spread", "Equal_Weight_Univ"]:
         sr_r = df_out_rets[col_name]
         
-        # CAGR Geometrico esatto
+        # Rendimento medio annuo istituzionale
+        ann_mean = float(sr_r.mean() * 252.0 * 100.0)
+        
+        # CAGR Geometrico
         final_val = float(df_cum[col_name].iloc[-1])
-        cagr_geom = float(((final_val / 100.0) ** (1.0 / years) - 1.0) * 100.0) if final_val > 0 else -99.0
-        cagr_geom = np.clip(cagr_geom, -95.0, 300.0)
+        if final_val > 0 and years > 0:
+            cagr_geom = float(((final_val / 100.0) ** (1.0 / years) - 1.0) * 100.0)
+        else:
+            cagr_geom = ann_mean
+            
+        cagr_geom = round(float(np.clip(cagr_geom, -90.0, 150.0)), 2)
         
         vol_ann = float(sr_r.std() * np.sqrt(252.0) * 100.0)
         vol_ann = max(0.1, vol_ann)
@@ -578,7 +591,7 @@ def run_factor_quintile_backtest(
         
         metrics_summary.append({
             "Quintile": label_map.get(col_name, col_name),
-            "Rendimento Annuo CAGR %": round(cagr_geom, 2),
+            "Rendimento Annuo CAGR %": cagr_geom,
             "Volatilità Annua %": round(vol_ann, 2),
             "Sharpe Ratio": sharpe,
             "Max Drawdown %": max_dd,
