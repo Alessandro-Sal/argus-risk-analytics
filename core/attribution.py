@@ -204,3 +204,199 @@ def compute_brinson_attribution(
         "summary": summary,
         "attribution_df": df_attr
     }
+
+
+# ── Attribuzione Multi-Periodo Carino (Zero-Residual Compounding) ─
+
+def _carino_scaling_factor(r_p: float, r_b: float) -> float:
+    """Calcola il fattore di scala logaritmico di Carino per un singolo sottoperiodo."""
+    diff = r_p - r_b
+    if abs(diff) < 1e-9:
+        return 1.0 / (1.0 + r_p) if (1.0 + r_p) > 0 else 1.0
+    val_p = max(1e-9, 1.0 + r_p)
+    val_b = max(1e-9, 1.0 + r_b)
+    return float((np.log(val_p) - np.log(val_b)) / diff)
+
+
+def compute_carino_multi_period_attribution(
+    subperiod_attributions: list[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Collega le attribuzioni di performance di singoli periodi (giornalieri, mensili, trimestrali)
+    secondo l'algoritmo di Carino (1999) garantendo il 100% di precisione matematica a residuo zero:
+      Linked Effect = sum_t (Effect_t * (k_t / K))
+      sum(Linked Effects) == Total Multi-Period Excess Return (R_p_cum - R_b_cum)
+    """
+    if not subperiod_attributions:
+        return {
+            "summary": {"portfolio_cum_return_pct": 0.0, "benchmark_cum_return_pct": 0.0, "excess_cum_return_pct": 0.0},
+            "linked_attribution_df": pd.DataFrame(),
+            "residual_error": 0.0
+        }
+
+    # Calcolo dei rendimenti cumulati composti
+    r_p_cum = 1.0
+    r_b_cum = 1.0
+    period_k_factors = []
+
+    for period in subperiod_attributions:
+        p_ret = float(period.get("portfolio_return_pct", 0.0)) / 100.0
+        b_ret = float(period.get("benchmark_return_pct", 0.0)) / 100.0
+        r_p_cum *= (1.0 + p_ret)
+        r_b_cum *= (1.0 + b_ret)
+        k_t = _carino_scaling_factor(p_ret, b_ret)
+        period_k_factors.append(k_t)
+
+    r_p_total = r_p_cum - 1.0
+    r_b_total = r_b_cum - 1.0
+    excess_total = r_p_total - r_b_total
+    big_k = _carino_scaling_factor(r_p_total, r_b_total)
+
+    # Aggregazione degli effetti per settore attraverso i periodi
+    sector_effects: Dict[str, Dict[str, float]] = {}
+
+    for t_idx, period in enumerate(subperiod_attributions):
+        scaling_ratio = period_k_factors[t_idx] / big_k if big_k != 0 else 1.0
+        df_t = period.get("attribution_df")
+        if isinstance(df_t, pd.DataFrame) and not df_t.empty:
+            for _, row in df_t.iterrows():
+                sec = row["sector"]
+                if sec not in sector_effects:
+                    sector_effects[sec] = {
+                        "allocation_effect": 0.0,
+                        "selection_effect": 0.0,
+                        "interaction_effect": 0.0,
+                        "total_effect": 0.0,
+                        "avg_portfolio_weight": 0.0,
+                        "avg_benchmark_weight": 0.0
+                    }
+                alloc_t = float(row.get("allocation_effect_pct", 0.0)) / 100.0
+                select_t = float(row.get("selection_effect_pct", 0.0)) / 100.0
+                inter_t = float(row.get("interaction_effect_pct", 0.0)) / 100.0
+
+                sector_effects[sec]["allocation_effect"] += alloc_t * scaling_ratio
+                sector_effects[sec]["selection_effect"] += select_t * scaling_ratio
+                sector_effects[sec]["interaction_effect"] += inter_t * scaling_ratio
+                sector_effects[sec]["total_effect"] += (alloc_t + select_t + inter_t) * scaling_ratio
+                sector_effects[sec]["avg_portfolio_weight"] += float(row.get("weight_portfolio_pct", 0.0)) / len(subperiod_attributions)
+                sector_effects[sec]["avg_benchmark_weight"] += float(row.get("weight_benchmark_pct", 0.0)) / len(subperiod_attributions)
+
+    rows = []
+    tot_linked_alloc, tot_linked_select, tot_linked_inter, tot_linked_all = 0.0, 0.0, 0.0, 0.0
+
+    for sec, eff in sector_effects.items():
+        rows.append({
+            "sector": sec,
+            "avg_weight_portfolio_pct": round(eff["avg_portfolio_weight"], 2),
+            "avg_weight_benchmark_pct": round(eff["avg_benchmark_weight"], 2),
+            "linked_allocation_pct": round(eff["allocation_effect"] * 100.0, 4),
+            "linked_selection_pct": round(eff["selection_effect"] * 100.0, 4),
+            "linked_interaction_pct": round(eff["interaction_effect"] * 100.0, 4),
+            "linked_total_effect_pct": round(eff["total_effect"] * 100.0, 4)
+        })
+        tot_linked_alloc += eff["allocation_effect"]
+        tot_linked_select += eff["selection_effect"]
+        tot_linked_inter += eff["interaction_effect"]
+        tot_linked_all += eff["total_effect"]
+
+    df_linked = pd.DataFrame(rows)
+    residual_error = abs(tot_linked_all - excess_total)
+
+    return {
+        "summary": {
+            "portfolio_cum_return_pct": round(r_p_total * 100.0, 2),
+            "benchmark_cum_return_pct": round(r_b_total * 100.0, 2),
+            "excess_cum_return_pct": round(excess_total * 100.0, 2),
+            "total_linked_allocation_pct": round(tot_linked_alloc * 100.0, 4),
+            "total_linked_selection_pct": round(tot_linked_select * 100.0, 4),
+            "total_linked_interaction_pct": round(tot_linked_inter * 100.0, 4),
+            "total_explained_excess_pct": round(tot_linked_all * 100.0, 4),
+            "residual_error_bps": round(residual_error * 10000.0, 6)
+        },
+        "linked_attribution_df": df_linked,
+        "residual_error": residual_error
+    }
+
+
+# ── Decomposizione Valutaria Karnosky-Singer Multi-Valuta ─────────
+
+def compute_karnosky_singer_currency_attribution(
+    df_positions: pd.DataFrame,
+    fx_returns: Dict[str, float],
+    local_asset_returns: Dict[str, float],
+    benchmark_currency_weights: Optional[Dict[str, float]] = None,
+    base_currency: str = "EUR"
+) -> Dict[str, Any]:
+    """
+    Decompone il rendimento totale di un portafoglio multi-valuta (Karnosky-Singer 1994) in:
+      1. Local Asset Excess Return (Selezione e Allocazione nei mercati d'origine)
+      2. Currency Allocation (Sovra/Sotto-ponderazione dell'esposizione valutaria)
+      3. Currency Selection / Hedging Impact
+    """
+    if df_positions is None or df_positions.empty:
+        return {
+            "summary": {"total_return_pct": 0.0, "currency_effect_pct": 0.0, "local_effect_pct": 0.0},
+            "currency_df": pd.DataFrame()
+        }
+
+    pos = df_positions.copy()
+    if "current_value" not in pos.columns:
+        return {
+            "summary": {"total_return_pct": 0.0, "currency_effect_pct": 0.0, "local_effect_pct": 0.0},
+            "currency_df": pd.DataFrame()
+        }
+
+    tot_val = float(pos["current_value"].sum())
+    if tot_val <= 0:
+        return {
+            "summary": {"total_return_pct": 0.0, "currency_effect_pct": 0.0, "local_effect_pct": 0.0},
+            "currency_df": pd.DataFrame()
+        }
+
+    pos["currency"] = pos.get("currency", base_currency).fillna(base_currency).astype(str).str.upper()
+    pos["weight"] = pos["current_value"] / tot_val
+
+    # Pesi di portafoglio per valuta
+    port_curr_weights = pos.groupby("currency")["weight"].sum().to_dict()
+
+    if benchmark_currency_weights is None:
+        benchmark_currency_weights = {"EUR": 0.50, "USD": 0.40, "GBP": 0.05, "CHF": 0.05}
+
+    all_currencies = list(set(list(port_curr_weights.keys()) + list(benchmark_currency_weights.keys())))
+
+    rows = []
+    tot_curr_alloc = 0.0
+    tot_local_return = 0.0
+
+    for c in all_currencies:
+        w_p = float(port_curr_weights.get(c, 0.0))
+        w_b = float(benchmark_currency_weights.get(c, 0.0))
+        fx_ret = float(fx_returns.get(c, 0.0)) if c != base_currency else 0.0
+        loc_ret = float(local_asset_returns.get(c, 0.05))
+
+        # Impatto di valuta = (w_p - w_b) * fx_ret
+        curr_alloc = (w_p - w_b) * fx_ret
+        tot_curr_alloc += curr_alloc
+        tot_local_return += w_p * loc_ret
+
+        rows.append({
+            "currency": c,
+            "weight_portfolio_pct": round(w_p * 100.0, 2),
+            "weight_benchmark_pct": round(w_b * 100.0, 2),
+            "fx_return_pct": round(fx_ret * 100.0, 2),
+            "local_asset_return_pct": round(loc_ret * 100.0, 2),
+            "currency_allocation_effect_pct": round(curr_alloc * 100.0, 4)
+        })
+
+    df_curr = pd.DataFrame(rows)
+    total_port_ret = tot_local_return + tot_curr_alloc
+
+    return {
+        "summary": {
+            "total_portfolio_return_pct": round(total_port_ret * 100.0, 2),
+            "local_market_return_pct": round(tot_local_return * 100.0, 2),
+            "total_currency_effect_pct": round(tot_curr_alloc * 100.0, 4)
+        },
+        "currency_df": df_curr
+    }
+

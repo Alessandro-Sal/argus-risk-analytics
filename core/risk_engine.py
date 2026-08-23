@@ -2384,3 +2384,181 @@ def compute_sandbox_risk_bundle(
     }
 
 
+# ── Decomposizione Istituzionale Marginal VaR & Component VaR ──
+
+def compute_marginal_and_component_var(
+    df_returns: pd.DataFrame,
+    df_positions: pd.DataFrame,
+    confidence_level: float = 0.95,
+    total_portfolio_value: Optional[float] = None
+) -> Dict[str, Any]:
+    """
+    Calcola la decomposizione analitica istituzionale del Value at Risk (Bloomberg PORT / RiskMetrics Parity):
+      - Marginal VaR (MVaR_i): sensibilità del VaR totale rispetto al peso di ciascun asset (dVaR / dw_i).
+      - Component VaR (CVaR_i): contributo monetario e percentuale di ciascun titolo al VaR totale (w_i * MVaR_i).
+      - Proprietà di Eulero: sum(Component_VaR_i) == Total_Portfolio_VaR.
+    """
+    if df_positions is None or df_positions.empty or df_returns is None or df_returns.empty:
+        return {
+            "portfolio_var_pct": 0.0,
+            "portfolio_var_amount": 0.0,
+            "decomposition_df": pd.DataFrame(),
+            "euler_check_passed": True
+        }
+
+    qty_col = "qty_net" if "qty_net" in df_positions.columns else ("shares" if "shares" in df_positions.columns else None)
+    if qty_col:
+        active_pos = df_positions[df_positions[qty_col] > 0].copy()
+    elif "current_value" in df_positions.columns:
+        active_pos = df_positions[df_positions["current_value"] > 0].copy()
+    else:
+        active_pos = df_positions.copy()
+
+    if active_pos.empty:
+        return {
+            "portfolio_var_pct": 0.0,
+            "portfolio_var_amount": 0.0,
+            "decomposition_df": pd.DataFrame(),
+            "euler_check_passed": True
+        }
+
+    tot_val = total_portfolio_value if total_portfolio_value and total_portfolio_value > 0 else float(active_pos["current_value"].sum() if "current_value" in active_pos.columns else 100000.0)
+
+    # Identifica ticker comuni
+    active_tickers = [t for t in active_pos["ticker"].tolist() if t in df_returns.columns]
+    if not active_tickers:
+        return {
+            "portfolio_var_pct": 0.0,
+            "portfolio_var_amount": 0.0,
+            "decomposition_df": pd.DataFrame(),
+            "euler_check_passed": True
+        }
+
+    # Pesi normalizzati
+    if "weight_pct" in active_pos.columns:
+        weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["weight_pct"].sum() / 100.0
+    else:
+        tot_sub_val = active_pos[active_pos["ticker"].isin(active_tickers)]["current_value"].sum()
+        weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["current_value"].sum() / max(1e-6, tot_sub_val)
+
+    w = weights.reindex(active_tickers).fillna(0.0)
+    w_sum = w.sum()
+    if w_sum <= 0:
+        return {
+            "portfolio_var_pct": 0.0,
+            "portfolio_var_amount": 0.0,
+            "decomposition_df": pd.DataFrame(),
+            "euler_check_passed": True
+        }
+    w = w / w_sum
+
+    ret_sub = df_returns[active_tickers].fillna(0.0)
+    cov_matrix = ret_sub.cov().values
+    w_arr = w.values
+
+    port_var = float(w_arr.T @ cov_matrix @ w_arr)
+    port_sigma = float(np.sqrt(max(1e-12, port_var)))
+
+    z_alpha = float(stats.norm.ppf(confidence_level))
+
+    # VaR percentuale del portafoglio (giornaliero)
+    port_var_pct = z_alpha * port_sigma
+    port_var_amount = port_var_pct * tot_val
+
+    # Marginal VaR: (Cov @ w) / sigma_p * z_alpha
+    cov_w = cov_matrix @ w_arr
+    marginal_var_pct = (z_alpha / port_sigma) * cov_w
+    component_var_pct = w_arr * marginal_var_pct
+    component_var_amount = component_var_pct * tot_val
+
+    pct_contribution = (component_var_pct / max(1e-12, port_var_pct)) * 100.0
+
+    rows = []
+    for idx, tk in enumerate(active_tickers):
+        pos_val = float(active_pos[active_pos["ticker"] == tk]["current_value"].sum() if "current_value" in active_pos.columns else w_arr[idx] * tot_val)
+        rows.append({
+            "ticker": tk,
+            "weight_pct": round(float(w_arr[idx] * 100.0), 2),
+            "position_value": round(pos_val, 2),
+            "marginal_var_pct": round(float(marginal_var_pct[idx] * 100.0), 4),
+            "component_var_pct": round(float(component_var_pct[idx] * 100.0), 4),
+            "component_var_amount": round(float(component_var_amount[idx]), 2),
+            "risk_contribution_pct": round(float(pct_contribution[idx]), 2)
+        })
+
+    df_decomp = pd.DataFrame(rows).sort_values("component_var_amount", ascending=False).reset_index(drop=True)
+    euler_diff = abs(df_decomp["component_var_amount"].sum() - port_var_amount)
+
+    return {
+        "confidence_level": confidence_level,
+        "portfolio_var_pct": round(port_var_pct * 100.0, 4),
+        "portfolio_var_amount": round(port_var_amount, 2),
+        "portfolio_sigma_daily_pct": round(port_sigma * 100.0, 4),
+        "decomposition_df": df_decomp,
+        "euler_check_passed": bool(euler_diff < 0.05),
+        "euler_residual": round(float(euler_diff), 6)
+    }
+
+
+# ── Liquidity-Adjusted Value at Risk (LVaR) ──────────────────────
+
+def compute_liquidity_adjusted_var(
+    df_positions: pd.DataFrame,
+    portfolio_var_pct: float,
+    total_portfolio_value: float,
+    liquidation_horizon_days: int = 1,
+    default_spread_pct: float = 0.002
+) -> Dict[str, Any]:
+    """
+    Calcola il Liquidity-Adjusted VaR (LVaR - Bangia et al. / Basel III standard):
+      LVaR = VaR_T + Liquidity_Cost
+      VaR_T = VaR_1d * sqrt(T_horizon)
+      Liquidity_Cost = 0.5 * sum_i (Value_i * BidAskSpread_i)
+    """
+    if df_positions is None or df_positions.empty or total_portfolio_value <= 0:
+        return {
+            "unadjusted_var_amount": 0.0,
+            "time_scaled_var_amount": 0.0,
+            "liquidity_cost_amount": 0.0,
+            "lvar_amount": 0.0,
+            "lvar_premium_pct": 0.0
+        }
+
+    base_var_amount = (portfolio_var_pct / 100.0) * total_portfolio_value
+    horizon_factor = np.sqrt(max(1, liquidation_horizon_days))
+    time_scaled_var = base_var_amount * horizon_factor
+
+    # Stima costo di liquidazione esogeno dallo spread
+    pos = df_positions.copy()
+    val_col = "current_value" if "current_value" in pos.columns else None
+    
+    if val_col:
+        # Se disponibile spread per asset (es. crypto/small-cap 0.5%, mega-cap 0.05%)
+        spreads = []
+        for _, row in pos.iterrows():
+            tk = str(row.get("ticker", ""))
+            if "-USD" in tk or "-EUR" in tk or "BTC" in tk or "ETH" in tk:
+                spreads.append(0.0035)  # Crypto ~35 bps
+            elif ".MI" in tk or ".PA" in tk:
+                spreads.append(0.0015)  # Euro stocks ~15 bps
+            else:
+                spreads.append(default_spread_pct)  # Standard 20 bps
+        pos["bid_ask_spread"] = spreads
+        liquidity_cost = float(0.5 * (pos[val_col] * pos["bid_ask_spread"]).sum())
+    else:
+        liquidity_cost = float(0.5 * total_portfolio_value * default_spread_pct)
+
+    lvar_amount = time_scaled_var + liquidity_cost
+    lvar_premium_pct = ((lvar_amount - base_var_amount) / max(1e-6, base_var_amount)) * 100.0 if base_var_amount > 0 else 0.0
+
+    return {
+        "unadjusted_var_amount": round(base_var_amount, 2),
+        "liquidation_horizon_days": liquidation_horizon_days,
+        "time_scaled_var_amount": round(time_scaled_var, 2),
+        "liquidity_cost_amount": round(liquidity_cost, 2),
+        "lvar_amount": round(lvar_amount, 2),
+        "lvar_premium_pct": round(lvar_premium_pct, 2)
+    }
+
+
+

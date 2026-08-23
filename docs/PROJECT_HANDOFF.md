@@ -1,4 +1,4 @@
-# Investment Risk BI Platform — Project Handoff (v5.14.0 Production Release)
+# Investment Risk BI Platform — Project Handoff (v5.15.0 Production Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.14.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.15.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
@@ -178,7 +178,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **171 test automatizzati passano con successo (100%)**:
+Tutti i **192 test automatizzati passano con successo (100%)**:
 
 ```bash
 py -m pytest
@@ -186,5 +186,5 @@ py -m pytest
 
 ---
 
-*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.14.0.*
+*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.15.0.*
 

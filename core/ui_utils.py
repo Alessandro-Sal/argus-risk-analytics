@@ -891,9 +891,6 @@ def render_command_bar():
             <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
                 ARGUS ENGINE
             </span>
-            <span style="background:rgba(255,153,0,0.12); color:#ff9900; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:700; border:1px solid rgba(255,153,0,0.25); letter-spacing:0.3px;">
-                v5.14.0
-            </span>
             <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
             <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                 <span>{port_icon}</span> {port_label}
@@ -922,33 +919,290 @@ def render_command_bar():
         render_spotlight_palette()
 
 
+def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
+    """
+    Parser di sintassi per la Bloomberg-style Command Line:
+      Sintassi supportate:
+        - <TICKER> <MNEMONIC> (es. 'AAPL DES', 'MSFT FA', 'NVDA VOLS', 'BTC HP')
+        - <MNEMONIC> <TICKER> (es. 'DES AAPL', 'FA NVDA')
+        - <MNEMONIC>          (es. 'YCRV', 'PORT RISK', 'EQS', 'ATTR', 'TAX', 'REBAL', 'BARRA', 'HRP')
+    """
+    if not raw_query:
+        return None
+        
+    tokens = [t.strip().upper() for t in raw_query.replace("<GO>", "").replace("<go>", "").split() if t.strip()]
+    if not tokens:
+        return None
+
+    # Mappatura dei codici mnemonici istituzionali Bloomberg-style
+    MNEMONIC_REGISTRY = {
+        # Azioni e Sicurezza Singola
+        "DES": {
+            "title": "Security Description & Fondamentali",
+            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "tab_key": "val_segmented_tab",
+            "target": "📊 Bilanci & Solvibilità (Altman & DuPont)",
+            "context_type": "ticker"
+        },
+        "FA": {
+            "title": "Financial Analysis & SEC 10-K Filings",
+            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "tab_key": "val_segmented_tab",
+            "target": "📊 Bilanci & Solvibilità (Altman & DuPont)",
+            "context_type": "ticker"
+        },
+        "DCF": {
+            "title": "Valutazione Intrinseca DCF Monte Carlo",
+            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "tab_key": "val_segmented_tab",
+            "target": "🧮 Valutazione Intrinseca DCF Monte Carlo",
+            "context_type": "ticker"
+        },
+        "ANR": {
+            "title": "Analyst Recommendations & Consensus",
+            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "tab_key": "val_segmented_tab",
+            "target": "🏛️ Fair Value & Consensus Analisti",
+            "context_type": "ticker"
+        },
+        "HP": {
+            "title": "Historical Prices & Candlestick Cockpit",
+            "page": "pages/8_📈_Analisi_Tecnica.py",
+            "tab_key": "tech_active_subtab",
+            "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
+            "context_type": "ticker_tech"
+        },
+        "TECH": {
+            "title": "Analisi Tecnica & Volume Profile POC",
+            "page": "pages/8_📈_Analisi_Tecnica.py",
+            "tab_key": "tech_active_subtab",
+            "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
+            "context_type": "ticker_tech"
+        },
+        "VOLS": {
+            "title": "Superficie Volatilità 3D & SABR Skew",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "🛡️ Hedging Tattico & Tail Risk",
+            "context_type": "ticker"
+        },
+        # Portafoglio e Rischio
+        "PORT": {
+            "title": "Portfolio Risk & Decomposizione VaR",
+            "page": "pages/2_🔴_Analisi_Rischio.py",
+            "tab_key": "risk_active_tab",
+            "target": "📉 VaR, CVaR & Backtesting Kupiec",
+            "context_type": "portfolio"
+        },
+        "RISK": {
+            "title": "VaR, CVaR & Kupiec POF Backtest",
+            "page": "pages/2_🔴_Analisi_Rischio.py",
+            "tab_key": "risk_active_tab",
+            "target": "📉 VaR, CVaR & Backtesting Kupiec",
+            "context_type": "portfolio"
+        },
+        "ATTR": {
+            "title": "Performance Attribution (Brinson & Carino)",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "🎯 Attribuzione Brinson-Fachler",
+            "context_type": "portfolio"
+        },
+        "TAX": {
+            "title": "Tax-Loss Harvesting & Step-Up TUIR",
+            "page": "pages/4_📋_Posizioni_e_Dettagli.py",
+            "tab_key": "positions_active_tab",
+            "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
+            "context_type": "portfolio"
+        },
+        "REBAL": {
+            "title": "Rebalancing Sandbox & Markowitz Frontier",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "context_type": "portfolio"
+        },
+        "HRP": {
+            "title": "Hierarchical Risk Parity (López de Prado)",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "context_type": "portfolio"
+        },
+        "BARRA": {
+            "title": "MSCI Barra Multi-Factor Risk Model",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML",
+            "context_type": "portfolio"
+        },
+        "COPULA": {
+            "title": "Asymmetric Tail Copula & Kelly Sizing",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "🧬 Tail Copula & Kelly Sizing",
+            "context_type": "portfolio"
+        },
+        "MC": {
+            "title": "Monte Carlo 10k Paths & Merton Jump",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)",
+            "context_type": "portfolio"
+        },
+        "STRESS": {
+            "title": "Stress Testing & Scenari di Crisi",
+            "page": "pages/6_🌪️_Stress_Testing.py",
+            "tab_key": "stress_active_tab",
+            "target": "⚡ Matrice Comparativa MSCI Barra",
+            "context_type": "portfolio"
+        },
+        "FIFO": {
+            "title": "Registro FIFO Lotti & Graveyard Analytics",
+            "page": "pages/4_📋_Posizioni_e_Dettagli.py",
+            "tab_key": "positions_active_tab",
+            "target": "🪦 Posizioni Chiuse & Graveyard",
+            "context_type": "portfolio"
+        },
+        "DIV": {
+            "title": "Calendario & Flusso Dividendi",
+            "page": "pages/4_📋_Posizioni_e_Dettagli.py",
+            "tab_key": "positions_active_tab",
+            "target": "📅 Proiezione Dividendi",
+            "context_type": "portfolio"
+        },
+        # Macro, Tassi e Mercato
+        "YCRV": {
+            "title": "Nelson-Siegel-Svensson Yield Curves",
+            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "tab_key": "quant_active_tab",
+            "target": "📊 Frontiera Markowitz & Rebalancing",
+            "context_type": "rates"
+        },
+        "EQS": {
+            "title": "Equity & Multi-Asset Screener Universale",
+            "page": "pages/9_🔍_Screener_Opportunita.py",
+            "tab_key": "screener_segmented_subtab",
+            "target": "🔍 Screener Multi-Fattoriale & Archetipi",
+            "context_type": "screener"
+        },
+        "DASH": {
+            "title": "Executive Dashboard & Copilot",
+            "page": "pages/1_📈_Dashboard_Generale.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "dashboard"
+        },
+        "CR": {
+            "title": "Control Room & Data Ingestion",
+            "page": "0_Control_Room.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "system"
+        }
+    }
+
+    # Caso 1: Singolo token mnemonico (es. "YCRV", "EQS", "TAX", "PORT")
+    if len(tokens) == 1 and tokens[0] in MNEMONIC_REGISTRY:
+        cmd_info = dict(MNEMONIC_REGISTRY[tokens[0]])
+        cmd_info["mnemonic"] = tokens[0]
+        cmd_info["ticker"] = None
+        cmd_info["raw_command"] = tokens[0]
+        return cmd_info
+
+    # Caso 2: Due token "<TICKER> <MNEMONIC>" (es. "AAPL DES", "NVDA HP", "PORT RISK")
+    if len(tokens) >= 2:
+        # Check se il secondo token è un mnemonico
+        if tokens[1] in MNEMONIC_REGISTRY:
+            cmd_info = dict(MNEMONIC_REGISTRY[tokens[1]])
+            cmd_info["mnemonic"] = tokens[1]
+            cmd_info["ticker"] = tokens[0]
+            cmd_info["raw_command"] = f"{tokens[0]} <{tokens[1]}>"
+            return cmd_info
+        # Check se il primo token è un mnemonico
+        if tokens[0] in MNEMONIC_REGISTRY:
+            cmd_info = dict(MNEMONIC_REGISTRY[tokens[0]])
+            cmd_info["mnemonic"] = tokens[0]
+            cmd_info["ticker"] = tokens[1]
+            cmd_info["raw_command"] = f"{tokens[1]} <{tokens[0]}>"
+            return cmd_info
+
+    # Caso 3: Solo un ticker valido (es. "AAPL", "MSFT", "BTC-USD") -> Default DES
+    if len(tokens) == 1 and len(tokens[0]) <= 8 and (tokens[0].isalnum() or "-" in tokens[0] or "." in tokens[0]):
+        cmd_info = dict(MNEMONIC_REGISTRY["DES"])
+        cmd_info["mnemonic"] = "DES"
+        cmd_info["ticker"] = tokens[0]
+        cmd_info["raw_command"] = f"{tokens[0]} <DES>"
+        return cmd_info
+
+    return None
+
+
 def render_spotlight_palette():
-    """Renderizza la Command Palette Spotlight in stile Raycast / Linear / Bloomberg Terminal."""
-    from core.sidebar import NAV_MODULES, switch_to_page
+    """Renderizza la Bloomberg-Style Command Line Gateway con parser mnemonico e search unificata."""
+    from core.sidebar import switch_to_page
     
     st.markdown("""
-    <div style="background: linear-gradient(135deg, rgba(28, 33, 40, 0.95) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1.5px solid #ff9900; border-radius: 12px; padding: 14px 18px; margin: 10px 0 20px 0; box-shadow: 0 12px 40px rgba(0,0,0,0.7), 0 0 24px rgba(255,153,0,0.25);">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div style="font-size:14px; font-weight:800; color:#ff9900; letter-spacing:0.6px; display:flex; align-items:center; gap:8px;">
-                <span>⚡</span> ARGUS SPOTLIGHT COMMAND PALETTE & SEARCH
+    <div style="background: linear-gradient(135deg, rgba(20, 24, 30, 0.98) 0%, rgba(10, 13, 18, 1.0) 100%); border: 1.5px solid #ff9900; border-radius: 10px; padding: 10px 16px; margin: 8px 0 14px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(255,153,0,0.2);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div style="font-size:12.5px; font-weight:800; color:#ff9900; letter-spacing:0.8px; display:inline-flex; align-items:center; gap:8px;">
+                <span>⚡</span> ARGUS TERMINAL COMMAND GATEWAY
+                <span style="font-size:9.5px; padding:1px 6px; background:#ff9900; color:#000000; border-radius:3px; font-weight:900; letter-spacing:0.5px;">BBG PARITY</span>
             </div>
-            <div style="font-size:11px; color:#8b949e;">Digita per filtrare • Clicca per saltare direttamente</div>
+            <div style="font-size:11px; color:#8b949e; font-family:monospace;">
+                Sintassi: <span style="color:#e6edf3;">&lt;TICKER&gt; &lt;CMD&gt;</span> • es. <code style="color:#ff9900; background:rgba(255,153,0,0.1); padding:1px 4px; border-radius:3px;">AAPL DES</code>, <code style="color:#ff9900; background:rgba(255,153,0,0.1); padding:1px 4px; border-radius:3px;">PORT RISK</code>, <code style="color:#ff9900; background:rgba(255,153,0,0.1); padding:1px 4px; border-radius:3px;">YCRV</code>
+            </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    col_q, col_close = st.columns([5.5, 1.0])
+    col_q, col_exec, col_close = st.columns([5.0, 1.2, 0.8])
     with col_q:
         query = st.text_input(
-            "Cerca", 
-            placeholder="🔍 Digita: es. Monte Carlo, DCF, AAPL, VaR, Fisco, Barra, HRP, FIFO, Kupiec, Screener...", 
+            "Terminal Command", 
+            placeholder="⌨️ Digita comando: es. AAPL DES, MSFT FA, NVDA VOLS, PORT RISK, YCRV, ATTR, TAX, EQS...", 
             key="spotlight_search_box", 
             label_visibility="collapsed"
-        ).strip().lower()
+        ).strip()
+    
+    parsed_cmd = parse_terminal_command(query)
+
+    with col_exec:
+        exec_label = f"▶ <GO> ({parsed_cmd['mnemonic']})" if parsed_cmd else "▶ <GO>"
+        if st.button(exec_label, key="btn_exec_command_go", use_container_width=True, type="primary" if parsed_cmd else "secondary"):
+            if parsed_cmd:
+                if parsed_cmd.get("ticker"):
+                    tk = parsed_cmd["ticker"]
+                    if parsed_cmd.get("context_type") == "ticker_tech":
+                        st.session_state["tech_ticker_input"] = tk
+                    else:
+                        st.session_state["selected_val_company"] = tk
+                if parsed_cmd.get("tab_key") and parsed_cmd.get("target"):
+                    st.session_state[parsed_cmd["tab_key"]] = parsed_cmd["target"]
+                    st.session_state[f"target_subtab_{parsed_cmd['tab_key']}"] = parsed_cmd["target"]
+                    st.session_state["global_target_subtab"] = parsed_cmd["target"]
+                st.session_state["show_spotlight_palette"] = False
+                switch_to_page(parsed_cmd["page"])
+            else:
+                st.warning("Comando non riconosciuto. Digita es. `AAPL DES` o `YCRV`.")
+
     with col_close:
-        if st.button("✕ Chiudi", key="btn_close_spotlight", use_container_width=True):
+        if st.button("✕ Esc", key="btn_close_spotlight", use_container_width=True):
             st.session_state["show_spotlight_palette"] = False
             st.rerun()
+
+    # Visual Feedback del comando riconosciuto
+    if parsed_cmd:
+        st.markdown(f"""
+        <div style="background: rgba(0, 230, 118, 0.08); border-left: 3px solid #00E676; padding: 6px 12px; margin-bottom: 12px; font-size: 12px; color: #e6edf3; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <span style="font-weight:700; color:#00E676;">COMANDO RICONOSCIUTO:</span> 
+                <code style="color:#ff9900; background:#161b22; padding:2px 6px; border-radius:3px;">{parsed_cmd.get('raw_command', query)}</code> ➔ 
+                <strong>{parsed_cmd['title']}</strong> ({parsed_cmd['page']})
+            </div>
+            <div style="font-size:11px; color:#8b949e;">Premi <strong>&lt;GO&gt;</strong> per eseguire</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     results_data = st.session_state.get("results", {})
     df_pos = results_data.get("positions", None) if isinstance(results_data, dict) else None
@@ -958,63 +1212,58 @@ def render_spotlight_palette():
 
     col_res1, col_res2, col_res3 = st.columns([1.6, 1.4, 1.0])
 
-    # ── COLONNA 1: SCHEDE & SOTTOMODULI ─────────────────────────────
+    # ── COLONNA 1: SCHEDE & MODULI ANALITICI ────────────────────────
     with col_res1:
         st.markdown('<div style="font-size:11.5px; font-weight:700; color:#ff9900; margin-bottom:6px; letter-spacing:0.5px;">📑 SCHEDE & MODULI ANALITICI</div>', unsafe_allow_html=True)
         
-        # Mappatura arricchita con sinonimi di ricerca
         search_index = [
             # Control Room
-            {"title": "🎛️ Control Room & Ingestione CSV", "page": "0_Control_Room.py", "tab_key": None, "target": None, "keywords": "control room upload csv degiro database ingestione parametri mysql offline"},
+            {"title": "🎛️ Control Room & Ingestione CSV", "page": "0_Control_Room.py", "tab_key": None, "target": None, "keywords": "control room upload csv degiro database ingestione parametri mysql offline cr"},
             # Dashboard
-            {"title": "📈 Dashboard Generale & KPI Executive", "page": "pages/1_📈_Dashboard_Generale.py", "tab_key": None, "target": None, "keywords": "dashboard cagr sharpe rendimento cumulato benchmark max drawdown kpi"},
+            {"title": "📈 Dashboard Generale & Copilot", "page": "pages/1_📈_Dashboard_Generale.py", "tab_key": None, "target": None, "keywords": "dashboard cagr sharpe rendimento cumulato benchmark max drawdown kpi dash"},
             # Rischio
-            {"title": "🔴 Rischio ➔ VaR & CVaR (Parametrico, Storico, Cornish-Fisher)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "var cvar cornish fisher parametrico storico rischio perdita"},
+            {"title": "🔴 Rischio ➔ VaR, CVaR & Marginal VaR", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "var cvar cornish fisher marginal component lvar rischio perdita risk port"},
             {"title": "🔴 Rischio ➔ Backtesting VaR & Test Kupiec", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "kupiec basel backtesting violazioni var test p-value"},
-            {"title": "🔴 Rischio ➔ Modello Fama-French & Carhart (4 Fattori)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "fama french carhart smb hml mom wml fattori regressione alpha beta"},
+            {"title": "🔴 Rischio ➔ Modello Fama-French & Carhart", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "fama french carhart smb hml mom wml fattori regressione alpha beta"},
             {"title": "🔴 Rischio ➔ Limiti di Rischio & Conformità UCITS", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "limiti concentrazione ucits mifid conformità breach stop loss"},
             {"title": "🔴 Rischio ➔ Rilevamento Anomalie ML (Isolation Forest)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)", "keywords": "isolation forest machine learning anomalie outlier cluster ml"},
             # Quant
-            {"title": "🔬 Quant ➔ Frontiera Markowitz & Rebalancing Sandbox", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "markowitz frontiera efficiente ledoit wolf sandbox ribilanciamento pesi sharpe"},
+            {"title": "🔬 Quant ➔ Frontiera Markowitz & Rebalancing", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "markowitz frontiera efficiente ledoit wolf sandbox ribilanciamento pesi sharpe rebal"},
             {"title": "🔬 Quant ➔ Hierarchical Risk Parity (HRP)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "hrp hierarchical risk parity lopez de prado clustering dendrogramma"},
-            {"title": "🔬 Quant ➔ Tail Copula (Clayton/Gumbel) & Kelly Criterion Simulator", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🧬 Tail Copula & Kelly Sizing", "keywords": "tail copula clayton gumbel kelly criterion sizing half kelly crash contagion asimmetria coda"},
-            {"title": "🔬 Quant ➔ Monte Carlo 10k Paths & Merton Jump", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)", "keywords": "monte carlo merton jump diffusion student-t cholesky simulazione stocastica"},
-            {"title": "🔬 Quant ➔ Prezzatore Opzioni Black-Scholes & Delta Hedge", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🛡️ Hedging Tattico & Tail Risk", "keywords": "opzioni black scholes call put greeks delta gamma theta vega hedge coperture"},
-            {"title": "🔬 Quant ➔ Performance Attribution Brinson-Fachler", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎯 Attribuzione Brinson-Fachler", "keywords": "brinson fachler allocazione selezione interazione benchmark attribution"},
-            {"title": "🔬 Quant ➔ Modelli Fattoriali (Carhart, Barra & Black-Litterman)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML", "keywords": "carhart barra fama french black litterman fattori regressione ml"},
+            {"title": "🔬 Quant ➔ Tail Copula & Kelly Sizing", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🧬 Tail Copula & Kelly Sizing", "keywords": "tail copula clayton gumbel kelly criterion sizing half kelly crash contagion copula"},
+            {"title": "🔬 Quant ➔ Monte Carlo 10k Paths & Merton", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)", "keywords": "monte carlo merton jump diffusion student-t cholesky simulazione stocastica mc"},
+            {"title": "🔬 Quant ➔ Opzioni Black-Scholes & SABR Skew", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🛡️ Hedging Tattico & Tail Risk", "keywords": "opzioni black scholes call put greeks delta gamma theta vega hedge vols"},
+            {"title": "🔬 Quant ➔ Performance Attribution (Brinson & Carino)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎯 Attribuzione Brinson-Fachler", "keywords": "brinson fachler carino menchero allocazione selezione interazione attribution attr"},
+            {"title": "🔬 Quant ➔ Modelli Fattoriali (Carhart & Barra 5F)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML", "keywords": "carhart barra fama french black litterman fattori regressione ml"},
             # Posizioni
-            {"title": "📋 Posizioni ➔ FIFO Realized/Unrealized Book", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "📋 Posizioni Attive & Costi FIFO", "keywords": "posizioni fifo plusvalenze minusvalenze pnl book ordini titoli"},
-            {"title": "📋 Posizioni ➔ Fisco Italiano TUIR Art. 67 & Minus", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)", "keywords": "fisco tasse tuir imposte minusvalenze capital gain 26% 12.5% tax harvesting"},
-            {"title": "📋 Posizioni ➔ Calendario Dividendi & Yield", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "📅 Proiezione Dividendi", "keywords": "dividendi stacco yield cedole proiezioni calendario flusso cassa"},
-            {"title": "📋 Posizioni ➔ Liquidità Almgren-Chriss", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "⚡ Liquidità Almgren-Chriss", "keywords": "almgren chriss liquidita market impact impatto mercato liquidazione"},
+            {"title": "📋 Posizioni ➔ FIFO Realized & Graveyard", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "🪦 Posizioni Chiuse & Graveyard", "keywords": "posizioni fifo plusvalenze minusvalenze pnl book ordini titoli graveyard"},
+            {"title": "📋 Posizioni ➔ Fisco Italiano TUIR Art. 67 & Step-Up", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)", "keywords": "fisco tasse tuir imposte minusvalenze capital gain 26% tax harvesting step-up tax"},
+            {"title": "📋 Posizioni ➔ Calendario Dividendi & Yield", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "📅 Proiezione Dividendi", "keywords": "dividendi stacco yield cedole proiezioni calendario div"},
             # Valutazione
-            {"title": "🏛️ Valutazione ➔ DCF Monte Carlo Intrinseco & WACC", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🧮 Valutazione Intrinseca DCF Monte Carlo", "keywords": "dcf discounted cash flow wacc capm fair value intrinseco monte carlo"},
-            {"title": "🏛️ Valutazione ➔ Solvibilità Altman Z-Score & DuPont", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)", "keywords": "altman z score dupont bilanci solvibilita bancarotta piotroski f-score"},
-            {"title": "🏛️ Valutazione ➔ Forensic Accounting (Beneish M-Score & Sloan)", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)", "keywords": "beneish m score sloan accrual manipolazione bilancio frode contabile"},
+            {"title": "🏛️ Valutazione ➔ DCF Monte Carlo & WACC", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🧮 Valutazione Intrinseca DCF Monte Carlo", "keywords": "dcf discounted cash flow wacc capm fair value intrinseco monte carlo"},
+            {"title": "🏛️ Valutazione ➔ Solvibilità Altman & Beneish", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)", "keywords": "altman z score dupont bilanci solvibilita beneish m score sloan des fa"},
+            {"title": "🏛️ Valutazione ➔ Consensus Analisti & Target Price", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🏛️ Fair Value & Consensus Analisti", "keywords": "consensus analisti target price price target anr stime"},
             # Stress
-            {"title": "🌪️ Stress Testing ➔ Matrice Comparativa MSCI Barra", "page": "pages/6_🌪️_Stress_Testing.py", "tab_key": "stress_active_tab", "target": "⚡ Matrice Comparativa MSCI Barra", "keywords": "stress testing msci barra scenari storici crisi 2008 covid crollo"},
-            {"title": "🌪️ Stress Testing ➔ Superficie di Volatilità 3D & What-If", "page": "pages/6_🌪️_Stress_Testing.py", "tab_key": "stress_active_tab", "target": "🛠️ Simulatore What-if Custom", "keywords": "superficie 3d what-if simulatore shock tassi inflazione macro"},
-            # Temporale
-            {"title": "📊 Temporale ➔ Serie Storiche & Side-by-Side Drift", "page": "pages/7_📊_Analisi_Temporale.py", "tab_key": "time_active_tab", "target": "📈 Serie Storiche Temporali", "keywords": "serie storiche temporale snapshot drift evoluzione patrimonio"},
+            {"title": "🌪️ Stress Testing ➔ Matrice Scenari MSCI Barra", "page": "pages/6_🌪️_Stress_Testing.py", "tab_key": "stress_active_tab", "target": "⚡ Matrice Comparativa MSCI Barra", "keywords": "stress testing msci barra scenari storici crisi 2008 covid crollo stress"},
             # Tecnica
-            {"title": "📈 Tecnica ➔ Candlestick Cockpit & Volume Profile (POC)", "page": "pages/8_📈_Analisi_Tecnica.py", "tab_key": "tech_active_subtab", "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)", "keywords": "analisi tecnica candlestick volume profile poc vah val rsi macd bollinger ema"},
-            {"title": "📈 Tecnica ➔ Confluence Score & Pattern Recognition", "page": "pages/8_📈_Analisi_Tecnica.py", "tab_key": "tech_active_subtab", "target": "🚦 Confluence Score & Pattern Recognition", "keywords": "confluence score pattern candlestick engulfing doji martello segnali"},
+            {"title": "📈 Tecnica ➔ Candlestick & Volume Profile (POC)", "page": "pages/8_📈_Analisi_Tecnica.py", "tab_key": "tech_active_subtab", "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)", "keywords": "analisi tecnica candlestick volume profile poc vah val rsi macd hp tech"},
             # Screener
-            {"title": "🔍 Screener ➔ Screener Opportunità & Archetipi", "page": "pages/9_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🔍 Screener Multi-Fattoriale & Archetipi", "keywords": "screener filtri opportunita momentum value growth dividendi qualita"},
+            {"title": "🔍 Screener ➔ Screener Opportunità (EQS)", "page": "pages/9_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🔍 Screener Multi-Fattoriale & Archetipi", "keywords": "screener filtri opportunita momentum value growth dividendi qualita eqs"},
             {"title": "🔍 Screener ➔ Pre-Trade Impact Simulator", "page": "pages/9_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🧪 Pre-Trade Portfolio Impact Simulator", "keywords": "pre-trade simulatore impatto nuovo acquisto asset candidato"}
         ]
 
         matched = []
+        q_lower = query.lower()
         for item in search_index:
             if not query:
                 matched.append(item)
             else:
-                q_words = query.split()
+                q_words = q_lower.split()
                 if any(w in item["title"].lower() or w in item["keywords"].lower() for w in q_words):
                     matched.append(item)
 
         if matched:
-            for item in matched[:7]:
+            for item in matched[:6]:
                 if st.button(item["title"], key=f"spot_idx_{item['title']}", use_container_width=True):
                     if item["tab_key"] and item["target"]:
                         st.session_state[item["tab_key"]] = item["target"]
@@ -1023,49 +1272,47 @@ def render_spotlight_palette():
                     st.session_state["show_spotlight_palette"] = False
                     switch_to_page(item["page"])
         else:
-            st.caption("Nessuna scheda trovata per la ricerca.")
+            st.caption("Nessuna scheda trovata.")
 
-    # ── COLONNA 2: TICKER & ASSET FINANZIARI ────────────────────────
+    # ── COLONNA 2: TICKER & MNEMONICI RAPIDI ────────────────────────
     with col_res2:
-        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#ff9900; margin-bottom:6px; letter-spacing:0.5px;">💼 TICKER & AZIONI RAPIDE</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#ff9900; margin-bottom:6px; letter-spacing:0.5px;">💼 MNEMONICI RAPIDI & TICKER</div>', unsafe_allow_html=True)
         
-        # Mostra ticker del portafoglio se presenti
         display_tickers = portfolio_tickers if portfolio_tickers else ["AAPL", "MSFT", "NVDA", "BTC-USD", "SPY", "QQQ"]
-        if query and query.upper() not in display_tickers:
-            # Consenti la ricerca di qualsiasi ticker digitato
-            cleaned_q = query.upper().strip()
-            if len(cleaned_q) >= 2:
-                display_tickers = [cleaned_q] + [t for t in display_tickers if query in t.lower()]
-        elif query:
-            display_tickers = [t for t in display_tickers if query in t.lower()]
+        cleaned_q = query.upper().strip()
+        if cleaned_q and len(cleaned_q) <= 10 and cleaned_q not in display_tickers:
+            display_tickers = [cleaned_q] + [t for t in display_tickers if cleaned_q in t]
 
-        for tk in display_tickers[:4]:
+        for tk in display_tickers[:3]:
             st.markdown(f"**Asset: `{tk}`**")
             c_tk1, c_tk2 = st.columns(2)
             with c_tk1:
-                if st.button(f"📈 {tk} Chart", key=f"spot_tc_{tk}", use_container_width=True):
+                if st.button(f"📊 {tk} DES", key=f"spot_des_{tk}", use_container_width=True):
+                    st.session_state["selected_val_company"] = tk
+                    st.session_state["val_segmented_tab"] = "📊 Bilanci & Solvibilità (Altman & DuPont)"
+                    st.session_state["show_spotlight_palette"] = False
+                    switch_to_page("pages/5_🏛️_Valutazione_Aziendale.py")
+            with c_tk2:
+                if st.button(f"📈 {tk} HP", key=f"spot_hp_{tk}", use_container_width=True):
                     st.session_state["tech_ticker_input"] = tk
                     st.session_state["show_spotlight_palette"] = False
                     switch_to_page("pages/8_📈_Analisi_Tecnica.py")
-            with c_tk2:
-                if st.button(f"🏛️ {tk} DCF", key=f"spot_vd_{tk}", use_container_width=True):
-                    st.session_state["selected_val_company"] = tk
-                    st.session_state["show_spotlight_palette"] = False
-                    switch_to_page("pages/5_🏛️_Valutazione_Aziendale.py")
 
-    # ── COLONNA 3: AZIONI DI SISTEMA & TELEMETRIA ───────────────────
+    # ── COLONNA 3: SISTEMA & SHORTCUT CHEAT SHEET ───────────────────
     with col_res3:
-        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#ff9900; margin-bottom:6px; letter-spacing:0.5px;">⚙️ SISTEMA</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#ff9900; margin-bottom:6px; letter-spacing:0.5px;">⌨️ SHORTCUTS</div>', unsafe_allow_html=True)
         
-        if st.button("🎛️ Control Room", key="spot_to_cr", use_container_width=True):
-            st.session_state["show_spotlight_palette"] = False
-            switch_to_page("0_Control_Room.py")
+        st.markdown("""
+        <div style="font-family:monospace; font-size:11px; color:#8b949e; line-height:1.6;">
+            <div><strong style="color:#ff9900;">YCRV</strong> Curva Tassi</div>
+            <div><strong style="color:#ff9900;">PORT</strong> Rischio VaR</div>
+            <div><strong style="color:#ff9900;">ATTR</strong> Carino Link</div>
+            <div><strong style="color:#ff9900;">EQS</strong> Screener</div>
+            <div><strong style="color:#ff9900;">TAX</strong> Step-Up</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if st.button("📈 Executive Dashboard", key="spot_to_dash", use_container_width=True):
-            st.session_state["show_spotlight_palette"] = False
-            switch_to_page("pages/1_📈_Dashboard_Generale.py")
-
-        if st.button("♻️ Svuota Cache & Reset Sessione", key="spot_clean_cache_all", use_container_width=True):
+        if st.button("♻️ Reset Cache", key="spot_clean_cache_all", use_container_width=True):
             from core.workspace_manager import clear_session_cache
             clear_session_cache()
             st.cache_data.clear()
@@ -1073,10 +1320,6 @@ def render_spotlight_palette():
                 if k not in ["splash_dismissed"]:
                     del st.session_state[k]
             switch_to_page("0_Control_Room.py")
-
-        if st.button("🗗 2° Monitor", key="spot_popout_2nd", use_container_width=True):
-            st.session_state["show_spotlight_palette"] = False
-            st.info("Apri una seconda finestra nel tuo browser per il 2° monitor.")
     
     st.divider()
 
@@ -2581,7 +2824,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
         f'<div style="color:#3fb950;">[✓] GIPS Standard Calendar Engine (365.25d Solar Span) Active</div>'
         f'<div style="color:#3fb950;">[✓] Multi-Factor Risk Matrix (Carhart, Fama-French, MSCI Barra) Initialized</div>'
         f'<div style="color:#3fb950;">[✓] Ledoit-Wolf Shrinkage &amp; FIFO Accounting Reconciliation Ready</div>'
-        f'<div style="color:{accent};font-weight:bold;">[●] ARGUS Terminal v5.14.0 Ready for Operations</div>'
+        f'<div style="color:{accent};font-weight:bold;">[●] ARGUS Terminal Ready for Operations</div>'
         f'</div>'
         f'</div>'
     )
@@ -2620,7 +2863,6 @@ def render_control_room_hero():
         f'<div style="display:flex;align-items:center;gap:10px;">'
         f'<span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">ARGUS CONTROL ROOM</span>'
         f'<span style="font-size:10px;font-weight:800;color:{mode_color};background:{mode_bg};padding:2px 8px;border-radius:12px;letter-spacing:0.5px;">{mode_text}</span>'
-        f'<span style="font-size:10px;font-weight:700;color:{accent};background:rgba(255,153,0,0.1);padding:2px 8px;border-radius:12px;">v5.14.0</span>'
         f'</div>'
         f'<div style="font-size:12px;color:#8b949e;margin-top:4px;max-width:580px;">'
         f'Cabina di regia per l\'ingestione dati duale (Stocks &amp; Crypto), validazione contabile FIFO, sincronizzazione database e calcolo del rischio quantitativo.'
