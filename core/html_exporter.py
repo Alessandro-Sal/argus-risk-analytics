@@ -9,7 +9,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
-from typing import Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 def generate_interactive_html_report(results: Dict[str, Any], output_path: str = None) -> str:
     """

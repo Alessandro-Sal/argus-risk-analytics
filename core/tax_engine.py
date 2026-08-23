@@ -6,7 +6,7 @@ Italian Fiscal Framework (TUIR Art. 67 - Regime Amministrato/Dichiarativo)
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 TAX_RATES = {
     "Government Bond": 0.125,

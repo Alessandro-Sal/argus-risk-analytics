@@ -5,7 +5,7 @@ Core Module: Hedging Engine (Beta-Neutral & Tail Risk Protection)
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Standard Market Prices for popular Inverse ETFs / Hedging instruments
 HEDGE_INSTRUMENTS = {

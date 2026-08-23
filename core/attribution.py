@@ -5,7 +5,7 @@ Core Module: Brinson-Fachler Performance Attribution Engine
 
 import pandas as pd
 import numpy as np
-from typing import Dict, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Standard S&P 500 Sector Benchmark Weights & Returns Proxy
 BENCHMARK_SECTOR_WEIGHTS = {
