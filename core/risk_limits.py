@@ -4,7 +4,7 @@ Core Module: Risk Limits & Early Warning Engine
 """
 
 import pandas as pd
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 DEFAULT_RISK_LIMITS = {
     "max_single_asset_pct": {"label": "Peso Max Singola Posizione", "limit": 20.0, "unit": "%", "comparator": "le"},
