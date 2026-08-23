@@ -946,18 +946,26 @@ else:
         col_l2_left, col_l2_right = st.columns([1.2, 1.8])
         
         with col_l2_left:
-            st.markdown("##### 🧱 Level-2 Order Book (Profondità a 5 Livelli)")
+            col_l2_h1, col_l2_h2 = st.columns([1.6, 1.4])
+            with col_l2_h1:
+                st.markdown("##### 🧱 Level-2 Book")
+            with col_l2_h2:
+                # Generazione snapshot Book L2 coerente
+                last_p = stats["last_price"]
+                bids_l2 = [
+                    OrderBookLevel(price=round(last_p - 0.02 * i, 2), size=float(np.random.randint(150, 800)))
+                    for i in range(1, 6)
+                ]
+                asks_l2 = [
+                    OrderBookLevel(price=round(last_p + 0.02 * i, 2), size=float(np.random.randint(150, 800)))
+                    for i in range(1, 6)
+                ]
+                df_bids = pd.DataFrame([{"Livello": f"Bid {i+1}", "Prezzo ($)": b.price, "Volume (Denaro)": b.size} for i, b in enumerate(bids_l2)])
+                df_asks = pd.DataFrame([{"Livello": f"Ask {i+1}", "Prezzo ($)": a.price, "Volume (Lettera)": a.size} for i, a in enumerate(asks_l2)])
+                df_l2_export = pd.concat([df_bids, df_asks], axis=1)
+                csv_l2 = df_l2_export.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica Book CSV", data=csv_l2, file_name=f"l2_book_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_l2_book")
             
-            # Generazione snapshot Book L2 coerente
-            last_p = stats["last_price"]
-            bids_l2 = [
-                OrderBookLevel(price=round(last_p - 0.02 * i, 2), size=float(np.random.randint(150, 800)))
-                for i in range(1, 6)
-            ]
-            asks_l2 = [
-                OrderBookLevel(price=round(last_p + 0.02 * i, 2), size=float(np.random.randint(150, 800)))
-                for i in range(1, 6)
-            ]
             l2_book = OrderBookL2(ticker=target_ticker, bids=bids_l2, asks=asks_l2)
             micro_p = l2_book.compute_microprice()
             imb_val = l2_book.compute_book_imbalance()
@@ -974,10 +982,6 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
-            # Tabella Profondità L2
-            df_bids = pd.DataFrame([{"Livello": f"Bid {i+1}", "Prezzo ($)": b.price, "Volume (Denaro)": b.size} for i, b in enumerate(bids_l2)])
-            df_asks = pd.DataFrame([{"Livello": f"Ask {i+1}", "Prezzo ($)": a.price, "Volume (Lettera)": a.size} for i, a in enumerate(asks_l2)])
-            
             col_b, col_a = st.columns(2)
             with col_b:
                 st.caption("🟢 Lato Bid (Denaro)")
@@ -987,7 +991,13 @@ else:
                 st.dataframe(df_asks, hide_index=True, use_container_width=True)
 
         with col_l2_right:
-            st.markdown("##### 📋 Registro Tick Recenti nel Ring Buffer (O(1) FIFO)")
+            col_reg_h1, col_reg_h2 = st.columns([2.0, 1.2])
+            with col_reg_h1:
+                st.markdown("##### 📋 Registro Tick (Ring Buffer FIFO)")
+            with col_reg_h2:
+                csv_ticks = df_stream.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica Tick CSV", data=csv_ticks, file_name=f"ticks_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_stream_ticks")
+
             df_display = df_stream[["ticker", "price", "size", "bid", "ask", "spread", "mid_price"]].tail(15).iloc[::-1]
             st.dataframe(
                 df_display,

@@ -1700,43 +1700,56 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     df_decomp = decomp_res.get("decomposition_df", pd.DataFrame())
 
     if not df_decomp.empty:
-        col_dec_p1, col_dec_p2 = st.columns([1.3, 1.7])
+        col_dec_p1, col_dec_p2 = st.columns([1.2, 1.8])
         with col_dec_p1:
             st.markdown("##### 🍩 Contributo % al Rischio Totale")
-            fig_donut = px.pie(
-                df_decomp,
-                names="ticker",
-                values="risk_contribution_pct",
-                hole=0.55,
-                color_discrete_sequence=px.colors.qualitative.Dark24
-            )
+            fig_donut = go.Figure(data=[go.Pie(
+                labels=df_decomp["ticker"],
+                values=df_decomp["risk_contribution_pct"],
+                hole=0.6,
+                textinfo="percent",
+                textposition="inside",
+                insidetextorientation="horizontal",
+                showlegend=False,
+                hovertemplate="<b>%{label}</b><br>Contributo Rischio: <b>%{value:.2f}%</b><extra></extra>",
+                marker=dict(
+                    colors=px.colors.qualitative.Dark24,
+                    line=dict(color="#0d1117", width=2)
+                )
+            )])
             fig_donut.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=10, r=10, t=20, b=20),
-                height=300,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5)
+                plot_bgcolor="rgba(0,0,0,0)",
+                margin=dict(l=10, r=10, t=10, b=10),
+                height=340
             )
             st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
 
         with col_dec_p2:
             st.markdown("##### 📊 Bar Chart di Component VaR (€)")
-            fig_bar_cvar = go.Figure()
-            fig_bar_cvar.add_trace(go.Bar(
-                x=df_decomp["ticker"],
-                y=df_decomp["component_var_amount"],
-                marker_color="#ff9900",
-                text=[f"€ {val:,.0f}".replace(",", ".") for val in df_decomp["component_var_amount"]],
-                textposition="auto"
-            ))
+            df_sorted = df_decomp.sort_values(by="component_var_amount", ascending=True)
+            fig_bar_cvar = go.Figure(data=[go.Bar(
+                y=df_sorted["ticker"],
+                x=df_sorted["component_var_amount"],
+                orientation="h",
+                marker=dict(
+                    color=df_sorted["risk_contribution_pct"],
+                    colorscale=[[0.0, "#38bdf8"], [0.4, "#ff9900"], [1.0, "#f85149"]],
+                    showscale=False
+                ),
+                text=[f"€ {val:,.1f} ({pct:.1f}%)" for val, pct in zip(df_sorted["component_var_amount"], df_sorted["risk_contribution_pct"])],
+                textposition="auto",
+                hovertemplate="<b>%{y}</b><br>Component VaR: <b>€ %{x:,.2f}</b><br>Quota Rischio: <b>%{marker.color:.2f}%</b><extra></extra>"
+            )])
             fig_bar_cvar.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(13,17,23,0.7)",
-                margin=dict(l=10, r=10, t=20, b=20),
-                height=300,
-                xaxis=dict(gridcolor="rgba(255,255,255,0.06)"),
-                yaxis=dict(title="Component VaR (€)", gridcolor="rgba(255,255,255,0.06)")
+                margin=dict(l=10, r=20, t=10, b=10),
+                height=340,
+                xaxis=dict(title="Component VaR (€)", gridcolor="rgba(255,255,255,0.06)"),
+                yaxis=dict(gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=12))
             )
             st.plotly_chart(fig_bar_cvar, use_container_width=True, config={"displayModeBar": False})
 
@@ -1751,7 +1764,14 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
             </div>
             """, unsafe_allow_html=True)
 
-        # Tabella Dettagliata Decomposizione
+        # Tabella Dettagliata Decomposizione con Pulsante Download CSV
+        col_dec_h1, col_dec_h2 = st.columns([3.0, 1.0])
+        with col_dec_h1:
+            st.markdown("##### 📋 Dettaglio Decomposizione di Eulero per Asset")
+        with col_dec_h2:
+            csv_decomp = df_decomp.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica Decomposizione CSV", data=csv_decomp, file_name="euler_risk_decomposition.csv", mime="text/csv", use_container_width=True, key="btn_dl_euler_decomp")
+
         decomp_cfg = {
             "ticker": st.column_config.TextColumn("Ticker", width="small"),
             "weight_pct": st.column_config.NumberColumn("Peso (%)", format="%.2f%%"),
@@ -1805,6 +1825,17 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         metric_card("Costo Bid-Ask Spread", f"€ {lvar_calc['liquidity_cost_amount']:,.0f}".replace(",", "."), f"Spread: {spread_bps_user} bps", True)
     with col_l4:
         metric_card("LVaR Totale Liquidità", f"€ {lvar_calc['lvar_amount']:,.0f}".replace(",", "."), f"Premio Illiquidità: +{lvar_calc['lvar_premium_pct']:.1f}%", True)
+
+    df_lvar_export = pd.DataFrame([
+        {"Metrica LVaR": "VaR 1G Base (Non Aggiustato)", "Valore (€)": lvar_calc['unadjusted_var_amount'], "Note": "Orizzonte 1 Giorno standard"},
+        {"Metrica LVaR": f"VaR Scalato ({liq_days} Giorni)", "Valore (€)": lvar_calc['time_scaled_var_amount'], "Note": f"Fattore Tempo √{liq_days} = {np.sqrt(liq_days):.2f}x"},
+        {"Metrica LVaR": "Costo Esogeno Spread", "Valore (€)": lvar_calc['liquidity_cost_amount'], "Note": f"Spread medio {spread_bps_user} bps"},
+        {"Metrica LVaR": "LVaR Totale", "Valore (€)": lvar_calc['lvar_amount'], "Note": f"Premio Liquidità: +{lvar_calc['lvar_premium_pct']:.2f}%"}
+    ])
+    col_lvh1, col_lvh2 = st.columns([3.0, 1.0])
+    with col_lvh2:
+        csv_lvar = df_lvar_export.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Scarica Report LVaR CSV", data=csv_lvar, file_name=f"lvar_report_{liq_days}d.csv", mime="text/csv", use_container_width=True, key="btn_dl_lvar_report")
 
 
 
