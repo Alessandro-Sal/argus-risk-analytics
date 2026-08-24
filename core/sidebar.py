@@ -253,42 +253,57 @@ def render_sidebar():
                 z-index: 99 !important;
             }
 
-            /* Comprehensive Removal of Streamlit Deploy Button, Toolbar & Top Decoration */
+            /* Comprehensive Removal of Streamlit Deploy Button & Top Decoration ONLY */
             [data-testid="stDecoration"],
             .stDeployButton,
             [data-testid="stDeployButton"],
-            [data-testid="stToolbar"],
-            div[data-testid="stToolbar"],
-            [data-testid="stToolbarActions"],
+            .stAppDeployButton,
             button[title="Deploy"],
-            div:has(> .stDeployButton),
-            header [data-testid="stToolbar"],
-            header .stDeployButton,
-            header [data-testid="stToolbarActions"] {
+            div:has(> .stDeployButton) {
                 display: none !important;
                 visibility: hidden !important;
                 opacity: 0 !important;
                 height: 0px !important;
                 width: 0px !important;
-                padding: 0px !important;
-                margin: 0px !important;
                 pointer-events: none !important;
-                position: absolute !important;
-                left: -9999px !important;
+            }
+
+            /* Ensure Streamlit Toolbar is transparent and allows collapsedControl to show */
+            header[data-testid="stHeader"],
+            [data-testid="stHeader"],
+            [data-testid="stToolbar"],
+            div[data-testid="stToolbar"] {
+                background: transparent !important;
+                background-color: transparent !important;
+                border: none !important;
             }
 
             /* Always keep Collapsed Control (Open Sidebar Button) Visible & Clickable */
             [data-testid="collapsedControl"],
             button[data-testid="stSidebarCollapsedControl"],
-            div[data-testid="collapsedControl"] {
+            div[data-testid="collapsedControl"],
+            [data-testid="stHeader"] [data-testid="collapsedControl"] {
                 display: flex !important;
                 visibility: visible !important;
                 opacity: 1 !important;
                 cursor: pointer !important;
+                pointer-events: auto !important;
+                z-index: 999999 !important;
             }
-            [data-testid="collapsedControl"] button {
+            [data-testid="collapsedControl"] button,
+            button[data-testid="stSidebarCollapsedControl"] {
+                display: inline-flex !important;
+                visibility: visible !important;
                 color: #ff9900 !important;
+                background: rgba(22, 27, 34, 0.95) !important;
+                border: 1px solid rgba(255, 153, 0, 0.4) !important;
                 border-radius: 8px !important;
+                padding: 4px 8px !important;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
+            }
+            [data-testid="collapsedControl"] button:hover {
+                border-color: #ff9900 !important;
+                background: rgba(33, 38, 45, 1) !important;
             }
 
             /* Hide Streamlit Raw Page Nav */
