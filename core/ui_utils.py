@@ -87,6 +87,21 @@ def inject_custom_css():
             pointer-events: none !important;
         }}
 
+        /* Hide Streamlit Top Decoration, Deploy Button and Default Header Toolbar */
+        [data-testid="stDecoration"],
+        [data-testid="stToolbar"],
+        .stDeployButton,
+        button[title="Deploy"],
+        [data-testid="stToolbarActions"],
+        [data-testid="stStatusWidget"] {{
+            display: none !important;
+            visibility: hidden !important;
+            height: 0px !important;
+            width: 0px !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }}
+
         /* Floating Sidebar Toggle Button when Closed */
         [data-testid="collapsedControl"],
         button[data-testid="stSidebarCollapsedControl"],
@@ -95,21 +110,21 @@ def inject_custom_css():
             visibility: visible !important;
             pointer-events: auto !important;
             position: fixed !important;
-            top: 10px !important;
-            left: 12px !important;
+            top: 12px !important;
+            left: 14px !important;
             z-index: 999999 !important;
-            background: rgba(22, 27, 34, 0.88) !important;
-            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            background: rgba(22, 27, 34, 0.90) !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
             border-radius: 8px !important;
             color: #e6edf3 !important;
-            backdrop-filter: blur(10px) !important;
-            padding: 4px 6px !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+            backdrop-filter: blur(12px) !important;
+            padding: 4px 8px !important;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
             transition: all 0.2s ease !important;
         }}
         [data-testid="collapsedControl"]:hover {{
-            background: rgba(33, 38, 45, 0.95) !important;
-            border-color: rgba(255, 153, 0, 0.6) !important;
+            background: rgba(33, 38, 45, 0.98) !important;
+            border-color: rgba(255, 153, 0, 0.7) !important;
             color: #ff9900 !important;
         }}
 
@@ -127,9 +142,9 @@ def inject_custom_css():
         /* Compact Sidebar Header containing the Close (<) Button */
         div[data-testid="stSidebarHeader"],
         [data-testid="stSidebarHeader"] {{
-            height: 28px !important;
-            min-height: 28px !important;
-            padding: 2px 8px 0px 8px !important;
+            height: 32px !important;
+            min-height: 32px !important;
+            padding: 4px 8px 0px 8px !important;
             margin: 0px !important;
             display: flex !important;
             justify-content: flex-end !important;
@@ -147,7 +162,7 @@ def inject_custom_css():
             color: #8b949e !important;
             background: transparent !important;
             border: none !important;
-            padding: 2px 6px !important;
+            padding: 3px 6px !important;
             margin: 0px !important;
             cursor: pointer !important;
             border-radius: 6px !important;
@@ -157,7 +172,7 @@ def inject_custom_css():
         button[data-testid="stSidebarCollapseButton"]:hover,
         div[data-testid="stSidebarHeader"] button:hover {{
             color: #ffffff !important;
-            background: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(255, 255, 255, 0.12) !important;
         }}
 
         /* Tighten Main Block Container */
@@ -165,7 +180,7 @@ def inject_custom_css():
         [data-testid="block-container"],
         [data-testid="stMainBlockContainer"],
         .stMainBlockContainer {{
-            padding-top: 0.85rem !important;
+            padding-top: 1.15rem !important;
             padding-bottom: 2rem !important;
             padding-left: 1.75rem !important;
             padding-right: 1.75rem !important;
