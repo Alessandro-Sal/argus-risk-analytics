@@ -74,19 +74,90 @@ def inject_custom_css():
 
         /* ── Above-the-fold Viewport Optimization (Zero Dead Space) ── */
         header[data-testid="stHeader"],
-        [data-testid="stHeader"],
-        div[data-testid="stSidebarHeader"],
-        [data-testid="stSidebarHeader"],
-        [data-testid="stSidebarNav"] {{
+        [data-testid="stHeader"] {{
             height: 0px !important;
             min-height: 0px !important;
-            max-height: 0px !important;
             background: transparent !important;
-            display: none !important;
+            display: flex !important;
+            visibility: visible !important;
             padding: 0 !important;
             margin: 0 !important;
+            border: none !important;
+            z-index: 99 !important;
+            pointer-events: none !important;
+        }}
+
+        /* Floating Sidebar Toggle Button when Closed */
+        [data-testid="collapsedControl"],
+        button[data-testid="stSidebarCollapsedControl"],
+        [data-testid="stHeader"] [data-testid="collapsedControl"] {{
+            display: flex !important;
+            visibility: visible !important;
+            pointer-events: auto !important;
+            position: fixed !important;
+            top: 10px !important;
+            left: 12px !important;
+            z-index: 999999 !important;
+            background: rgba(22, 27, 34, 0.88) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            border-radius: 8px !important;
+            color: #e6edf3 !important;
+            backdrop-filter: blur(10px) !important;
+            padding: 4px 6px !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+            transition: all 0.2s ease !important;
+        }}
+        [data-testid="collapsedControl"]:hover {{
+            background: rgba(33, 38, 45, 0.95) !important;
+            border-color: rgba(255, 153, 0, 0.6) !important;
+            color: #ff9900 !important;
+        }}
+
+        /* Hide Streamlit Raw Page Nav (replaced by institutional tree rail) */
+        [data-testid="stSidebarNav"] {{
+            display: none !important;
+            height: 0px !important;
+            max-height: 0px !important;
+            padding: 0px !important;
+            margin: 0px !important;
             visibility: hidden !important;
             overflow: hidden !important;
+        }}
+
+        /* Compact Sidebar Header containing the Close (<) Button */
+        div[data-testid="stSidebarHeader"],
+        [data-testid="stSidebarHeader"] {{
+            height: 28px !important;
+            min-height: 28px !important;
+            padding: 2px 8px 0px 8px !important;
+            margin: 0px !important;
+            display: flex !important;
+            justify-content: flex-end !important;
+            align-items: center !important;
+            background: transparent !important;
+            visibility: visible !important;
+        }}
+
+        /* Sidebar Close Button */
+        [data-testid="stSidebarCollapseButton"],
+        button[data-testid="stSidebarCollapseButton"],
+        div[data-testid="stSidebarHeader"] button {{
+            display: inline-flex !important;
+            visibility: visible !important;
+            color: #8b949e !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 2px 6px !important;
+            margin: 0px !important;
+            cursor: pointer !important;
+            border-radius: 6px !important;
+            transition: all 0.15s ease !important;
+        }}
+        [data-testid="stSidebarCollapseButton"]:hover,
+        button[data-testid="stSidebarCollapseButton"]:hover,
+        div[data-testid="stSidebarHeader"] button:hover {{
+            color: #ffffff !important;
+            background: rgba(255, 255, 255, 0.1) !important;
         }}
 
         /* Tighten Main Block Container */
@@ -113,7 +184,7 @@ def inject_custom_css():
         [data-testid="stSidebarUserContent"],
         section[data-testid="stSidebar"] .stSidebarContent,
         section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
-            padding-top: 0.5rem !important;
+            padding-top: 0.25rem !important;
             padding-left: 0.75rem !important;
             padding-right: 0.75rem !important;
             margin-top: 0px !important;
