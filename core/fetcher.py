@@ -452,52 +452,102 @@ def _upsert_asset(ticker: str,
             "earnings_growth": earnings_growth
         }
 
-    sql = text("""
-        INSERT INTO assets
-            (ticker, name, asset_class, currency, gics_sector, country, 
-             trailing_pe, forward_pe, price_to_book, dividend_yield, roe, target_mean_price, peg_ratio,
-             industry, exchange, recommendation_key, market_cap, beta_5y,
-             fifty_two_week_high, fifty_two_week_low, fifty_day_average, two_hundred_day_average,
-             profit_margins, gross_margins, operating_margins, total_revenue, ebitda,
-             debt_to_equity, revenue_growth, earnings_growth)
-        VALUES
-            (:ticker, :name, :asset_class, :currency, :gics_sector, :country,
-             :trailing_pe, :forward_pe, :price_to_book, :dividend_yield, :roe, :target_mean, :peg,
-             :industry, :exchange, :recommendation_key, :market_cap, :beta_5y,
-             :fifty_two_week_high, :fifty_two_week_low, :fifty_day_average, :two_hundred_day_average,
-             :profit_margins, :gross_margins, :operating_margins, :total_revenue, :ebitda,
-             :debt_to_equity, :revenue_growth, :earnings_growth)
-        ON DUPLICATE KEY UPDATE
-            name           = VALUES(name),
-            asset_class    = VALUES(asset_class),
-            currency       = VALUES(currency),
-            gics_sector    = VALUES(gics_sector),
-            country        = VALUES(country),
-            trailing_pe    = VALUES(trailing_pe),
-            forward_pe     = VALUES(forward_pe),
-            price_to_book  = VALUES(price_to_book),
-            dividend_yield = VALUES(dividend_yield),
-            roe            = VALUES(roe),
-            target_mean_price = VALUES(target_mean_price),
-            peg_ratio      = VALUES(peg_ratio),
-            industry       = VALUES(industry),
-            exchange       = VALUES(exchange),
-            recommendation_key = VALUES(recommendation_key),
-            market_cap     = VALUES(market_cap),
-            beta_5y        = VALUES(beta_5y),
-            fifty_two_week_high = VALUES(fifty_two_week_high),
-            fifty_two_week_low  = VALUES(fifty_two_week_low),
-            fifty_day_average   = VALUES(fifty_day_average),
-            two_hundred_day_average = VALUES(two_hundred_day_average),
-            profit_margins = VALUES(profit_margins),
-            gross_margins  = VALUES(gross_margins),
-            operating_margins = VALUES(operating_margins),
-            total_revenue  = VALUES(total_revenue),
-            ebitda         = VALUES(ebitda),
-            debt_to_equity = VALUES(debt_to_equity),
-            revenue_growth = VALUES(revenue_growth),
-            earnings_growth = VALUES(earnings_growth)
-    """)
+    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+
+    if is_sqlite:
+        sql = text("""
+            INSERT INTO assets
+                (ticker, name, asset_class, currency, gics_sector, country, 
+                 trailing_pe, forward_pe, price_to_book, dividend_yield, roe, target_mean_price, peg_ratio,
+                 industry, exchange, recommendation_key, market_cap, beta_5y,
+                 fifty_two_week_high, fifty_two_week_low, fifty_day_average, two_hundred_day_average,
+                 profit_margins, gross_margins, operating_margins, total_revenue, ebitda,
+                 debt_to_equity, revenue_growth, earnings_growth)
+            VALUES
+                (:ticker, :name, :asset_class, :currency, :gics_sector, :country,
+                 :trailing_pe, :forward_pe, :price_to_book, :dividend_yield, :roe, :target_mean, :peg,
+                 :industry, :exchange, :recommendation_key, :market_cap, :beta_5y,
+                 :fifty_two_week_high, :fifty_two_week_low, :fifty_day_average, :two_hundred_day_average,
+                 :profit_margins, :gross_margins, :operating_margins, :total_revenue, :ebitda,
+                 :debt_to_equity, :revenue_growth, :earnings_growth)
+            ON CONFLICT(ticker) DO UPDATE SET
+                name           = excluded.name,
+                asset_class    = excluded.asset_class,
+                currency       = excluded.currency,
+                gics_sector    = excluded.gics_sector,
+                country        = excluded.country,
+                trailing_pe    = excluded.trailing_pe,
+                forward_pe     = excluded.forward_pe,
+                price_to_book  = excluded.price_to_book,
+                dividend_yield = excluded.dividend_yield,
+                roe            = excluded.roe,
+                target_mean_price = excluded.target_mean_price,
+                peg_ratio      = excluded.peg_ratio,
+                industry       = excluded.industry,
+                exchange       = excluded.exchange,
+                recommendation_key = excluded.recommendation_key,
+                market_cap     = excluded.market_cap,
+                beta_5y        = excluded.beta_5y,
+                fifty_two_week_high = excluded.fifty_two_week_high,
+                fifty_two_week_low  = excluded.fifty_two_week_low,
+                fifty_day_average   = excluded.fifty_day_average,
+                two_hundred_day_average = excluded.two_hundred_day_average,
+                profit_margins = excluded.profit_margins,
+                gross_margins  = excluded.gross_margins,
+                operating_margins = excluded.operating_margins,
+                total_revenue  = excluded.total_revenue,
+                ebitda         = excluded.ebitda,
+                debt_to_equity = excluded.debt_to_equity,
+                revenue_growth = excluded.revenue_growth,
+                earnings_growth = excluded.earnings_growth
+        """)
+    else:
+        sql = text("""
+            INSERT INTO assets
+                (ticker, name, asset_class, currency, gics_sector, country, 
+                 trailing_pe, forward_pe, price_to_book, dividend_yield, roe, target_mean_price, peg_ratio,
+                 industry, exchange, recommendation_key, market_cap, beta_5y,
+                 fifty_two_week_high, fifty_two_week_low, fifty_day_average, two_hundred_day_average,
+                 profit_margins, gross_margins, operating_margins, total_revenue, ebitda,
+                 debt_to_equity, revenue_growth, earnings_growth)
+            VALUES
+                (:ticker, :name, :asset_class, :currency, :gics_sector, :country,
+                 :trailing_pe, :forward_pe, :price_to_book, :dividend_yield, :roe, :target_mean, :peg,
+                 :industry, :exchange, :recommendation_key, :market_cap, :beta_5y,
+                 :fifty_two_week_high, :fifty_two_week_low, :fifty_day_average, :two_hundred_day_average,
+                 :profit_margins, :gross_margins, :operating_margins, :total_revenue, :ebitda,
+                 :debt_to_equity, :revenue_growth, :earnings_growth)
+            ON DUPLICATE KEY UPDATE
+                name           = VALUES(name),
+                asset_class    = VALUES(asset_class),
+                currency       = VALUES(currency),
+                gics_sector    = VALUES(gics_sector),
+                country        = VALUES(country),
+                trailing_pe    = VALUES(trailing_pe),
+                forward_pe     = VALUES(forward_pe),
+                price_to_book  = VALUES(price_to_book),
+                dividend_yield = VALUES(dividend_yield),
+                roe            = VALUES(roe),
+                target_mean_price = VALUES(target_mean_price),
+                peg_ratio      = VALUES(peg_ratio),
+                industry       = VALUES(industry),
+                exchange       = VALUES(exchange),
+                recommendation_key = VALUES(recommendation_key),
+                market_cap     = VALUES(market_cap),
+                beta_5y        = VALUES(beta_5y),
+                fifty_two_week_high = VALUES(fifty_two_week_high),
+                fifty_two_week_low  = VALUES(fifty_two_week_low),
+                fifty_day_average   = VALUES(fifty_day_average),
+                two_hundred_day_average = VALUES(two_hundred_day_average),
+                profit_margins = VALUES(profit_margins),
+                gross_margins  = VALUES(gross_margins),
+                operating_margins = VALUES(operating_margins),
+                total_revenue  = VALUES(total_revenue),
+                ebitda         = VALUES(ebitda),
+                debt_to_equity = VALUES(debt_to_equity),
+                revenue_growth = VALUES(revenue_growth),
+                earnings_growth = VALUES(earnings_growth)
+        """)
 
     with engine.begin() as conn:
         conn.execute(sql, {
@@ -548,7 +598,7 @@ def _store_prices(hist: pd.DataFrame,
                   ticker: str = None):
     """
     Scrive i prezzi storici su market_prices.
-    Usa INSERT IGNORE per non duplicare righe già presenti
+    Usa INSERT IGNORE (MySQL) o INSERT OR IGNORE (SQLite) per non duplicare righe già presenti
     (grazie a UNIQUE KEY uq_asset_date).
     """
     records = []
@@ -578,12 +628,21 @@ def _store_prices(hist: pd.DataFrame,
         df_p["ticker"] = ticker
         return df_p[["ticker", "price_date", "close", "volume"]]
 
-    sql = text("""
-        INSERT IGNORE INTO market_prices
-            (asset_id, price_date, close, volume, source)
-        VALUES
-            (:asset_id, :price_date, :close, :volume, :source)
-    """)
+    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    if is_sqlite:
+        sql = text("""
+            INSERT OR IGNORE INTO market_prices
+                (asset_id, price_date, close, volume, source)
+            VALUES
+                (:asset_id, :price_date, :close, :volume, :source)
+        """)
+    else:
+        sql = text("""
+            INSERT IGNORE INTO market_prices
+                (asset_id, price_date, close, volume, source)
+            VALUES
+                (:asset_id, :price_date, :close, :volume, :source)
+        """)
 
     with engine.begin() as conn:
         conn.execute(sql, records)
@@ -631,14 +690,38 @@ def _store_isin_price(ticker: str,
             f"{ticker}: {len(precords)} prezzi da CSV (ISIN, no yfinance)"
         )
         return adict, pd.DataFrame(precords)
-    sql_asset = text("""
-        INSERT INTO assets (ticker, name, asset_class, currency, gics_sector, country)
-        VALUES (:ticker, :name, :asset_class, :currency, NULL, NULL)
-        ON DUPLICATE KEY UPDATE
-            name        = VALUES(name),
-            asset_class = VALUES(asset_class),
-            currency    = VALUES(currency)
-    """)
+
+    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    if is_sqlite:
+        sql_asset = text("""
+            INSERT INTO assets (ticker, name, asset_class, currency, gics_sector, country)
+            VALUES (:ticker, :name, :asset_class, :currency, NULL, NULL)
+            ON CONFLICT(ticker) DO UPDATE SET
+                name        = excluded.name,
+                asset_class = excluded.asset_class,
+                currency    = excluded.currency
+        """)
+        sql_price = text("""
+            INSERT OR IGNORE INTO market_prices
+                (asset_id, price_date, close, volume, source)
+            VALUES
+                (:asset_id, :price_date, :close, NULL, 'csv_manual')
+        """)
+    else:
+        sql_asset = text("""
+            INSERT INTO assets (ticker, name, asset_class, currency, gics_sector, country)
+            VALUES (:ticker, :name, :asset_class, :currency, NULL, NULL)
+            ON DUPLICATE KEY UPDATE
+                name        = VALUES(name),
+                asset_class = VALUES(asset_class),
+                currency    = VALUES(currency)
+        """)
+        sql_price = text("""
+            INSERT IGNORE INTO market_prices
+                (asset_id, price_date, close, volume, source)
+            VALUES
+                (:asset_id, :price_date, :close, NULL, 'csv_manual')
+        """)
 
     currency = rows["currency"].iloc[0] if not rows.empty else "EUR"
 
@@ -655,13 +738,6 @@ def _store_isin_price(ticker: str,
         ).scalar()
 
     # Inserisce i prezzi dal CSV (una riga per transazione)
-    sql_price = text("""
-        INSERT IGNORE INTO market_prices
-            (asset_id, price_date, close, volume, source)
-        VALUES
-            (:asset_id, :price_date, :close, NULL, 'csv_manual')
-    """)
-
     records = [
         {
             "asset_id":   asset_id,

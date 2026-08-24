@@ -69,7 +69,7 @@ def compute_risk(portfolio_id: int,
     df_tx_adj, corp_actions_audit = adjust_transactions_for_splits(df_tx, auto_fetch=True)
 
     df_positions            = _compute_positions(df_tx_adj, df_prices, warnings_list)
-    df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx_adj)
+    df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx_adj, warnings_list=warnings_list)
     sr_benchmark            = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
 
     metrics = {
@@ -388,7 +388,8 @@ def _compute_positions(df_tx: pd.DataFrame,
 
 def _compute_returns(df_positions: pd.DataFrame,
                      df_prices: pd.DataFrame,
-                     df_tx: pd.DataFrame) -> tuple:
+                     df_tx: pd.DataFrame,
+                     warnings_list: list = None) -> tuple:
     pivot = df_prices.pivot(
         index="price_date", columns="ticker", values="close"
     )
@@ -409,6 +410,19 @@ def _compute_returns(df_positions: pd.DataFrame,
                     fx_series_inv = pivot[fx_ticker_inv].ffill().bfill()
                     pivot[tk] = pivot[tk] * (1.0 / fx_series_inv)
 
+    # ── Data Quality Gate: Rilevamento Serie Illiquide o Prezzi Stantii ──
+    active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist() if "qty_net" in df_positions.columns else df_positions["ticker"].tolist()
+    if warnings_list is not None and not pivot.empty:
+        for tk in active_tickers:
+            if tk in pivot.columns:
+                s_tk = pivot[tk].dropna()
+                if len(s_tk) > 5:
+                    zero_diff_streak = (s_tk.diff() == 0).astype(int).groupby((s_tk.diff() != 0).cumsum()).sum().max()
+                    if zero_diff_streak >= 10:
+                        warnings_list.append(f"Data Quality Alert: l'asset {tk} presenta una serie prezzi piatta/stantia per {zero_diff_streak} giorni consecutivi.")
+                elif len(s_tk) <= 3 and len(pivot) > 30:
+                    warnings_list.append(f"Data Quality Alert: l'asset {tk} ha solo {len(s_tk)} quotazioni storiche disponibili rispetto all'orizzonte di analisi.")
+
     # Forward fill per mitigare discrepanze nei calendari festivi (es. USA vs Europa)
     pivot = pivot.ffill(limit=5)
     df_returns = pivot.pct_change().dropna(how="all")
@@ -416,7 +430,6 @@ def _compute_returns(df_positions: pd.DataFrame,
     # Taglia i rendimenti a partire dalla data della prima operazione
     min_tx_date = pd.to_datetime(df_tx["tx_date"].min())
 
-    active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist()
     weights = (
         df_positions[df_positions["ticker"].isin(active_tickers)]
         .set_index("ticker")["weight_pct"] / 100
