@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 class PortfolioEnv:
     """
     Simulation environment for portfolio management MDP (Markov Decision Process).
-    Observation State: [Rolling Asset Sharpe, Asset Momentum, Asset Downside Volatility]
+    Observation State: [Asset Sharpe, Momentum, Downside Volatility] per asset.
     Action: Simplex portfolio weight allocation w in Delta^{N-1}
     Reward: Risk-adjusted Sortino/Sharpe utility minus turnover friction with diversification incentive.
     """
@@ -22,12 +22,12 @@ class PortfolioEnv:
         df_returns: pd.DataFrame,
         window_size: int = 25,
         reward_type: str = "sortino",
-        turnover_penalty: float = 0.0005
+        turnover_penalty: float = 0.0003
     ):
         self.df_returns = df_returns.dropna().copy()
         self.tickers = self.df_returns.columns.tolist()
         self.n_assets = len(self.tickers)
-        self.window_size = max(15, window_size)
+        self.window_size = max(10, window_size)
         self.reward_type = reward_type.lower()
         self.turnover_penalty = turnover_penalty
         self.current_step = 0
@@ -41,22 +41,27 @@ class PortfolioEnv:
 
     def _get_state(self) -> np.ndarray:
         window_data = self.df_returns.iloc[self.current_step - self.window_size : self.current_step].values
-        means = np.mean(window_data, axis=0)
-        vols = np.std(window_data, axis=0) + 1e-6
+        means = np.mean(window_data, axis=0) * 100.0
+        vols = np.std(window_data, axis=0) * 100.0 + 1e-4
         sharpes = means / vols
 
         # Multi-timeframe momentum
-        ema_fast = np.mean(window_data[-5:], axis=0)
-        ema_slow = np.mean(window_data, axis=0)
-        mom = (ema_fast - ema_slow) / vols
+        ema_fast = np.mean(window_data[-5:], axis=0) * 100.0
+        ema_slow = np.mean(window_data, axis=0) * 100.0
+        mom = (ema_fast - ema_slow) / (vols + 1e-4)
 
         # Cross-sectional z-score standardization across universe
         def _zscore(v: np.ndarray) -> np.ndarray:
             s = np.std(v)
             return (v - np.mean(v)) / (s + 1e-6) if s > 1e-6 else np.zeros_like(v)
 
-        state = np.concatenate([_zscore(sharpes), _zscore(mom), _zscore(vols)])
-        return np.clip(state, -3.0, 3.0)
+        f_sharpe = _zscore(sharpes)
+        f_mom = _zscore(mom)
+        f_vol = _zscore(vols)
+        
+        # Matrix of features per asset (N, 3) flattened to (N * 3,)
+        feat_matrix = np.column_stack([f_sharpe, f_mom, f_vol])
+        return np.clip(feat_matrix.flatten(), -3.0, 3.0)
 
     def step(self, action_weights: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
         # Ensure weights are valid simplex on Delta^{N-1}
@@ -74,19 +79,19 @@ class PortfolioEnv:
         cost = turnover * self.turnover_penalty
         net_ret = portfolio_ret - cost
 
-        # Diversification incentive (1 - HHI is maximized when perfectly equi-weighted)
+        # Diversification incentive (1 - HHI is maximized when balanced)
         div_bonus = 1.0 - float(np.sum(w ** 2))
 
         # Risk-adjusted reward calculation
         if self.reward_type == "sortino":
             downside = max(0.0, -net_ret)
-            reward = net_ret * 100.0 - 2.5 * (downside * 100.0) - cost * 50.0 + 0.15 * div_bonus
+            reward = net_ret * 100.0 - 2.0 * (downside * 100.0) - cost * 30.0 + 0.15 * div_bonus
         elif self.reward_type == "sharpe":
             vol_est = float(np.std(step_returns)) + 1e-4
-            reward = (net_ret / vol_est) * 5.0 - cost * 50.0 + 0.10 * div_bonus
+            reward = (net_ret / vol_est) * 5.0 - cost * 30.0 + 0.10 * div_bonus
         else:
             # Min volatility
-            reward = net_ret * 50.0 - 2.0 * (portfolio_ret ** 2) * 100.0 - cost * 50.0 + 0.20 * div_bonus
+            reward = net_ret * 50.0 - 2.0 * (portfolio_ret ** 2) * 100.0 - cost * 30.0 + 0.20 * div_bonus
 
         self.prev_weights = w.copy()
         self.current_step += 1
@@ -104,32 +109,34 @@ class PortfolioEnv:
 
 class RLPolicyAgent:
     """
-    Direct Policy-Gradient Neural Actor network for Continuous Portfolio Allocation.
-    Trained with Batch Policy Gradient REINFORCE, Adam Optimization and Entropy Regularization.
+    Permutation-Equivariant Neural Policy Actor network for Continuous Portfolio Allocation.
+    Trained with Shared Cross-Asset Scoring, Adam Optimization, and Entropy Regularization.
     """
     def __init__(
         self,
         state_dim: int,
         action_dim: int,
-        lr: float = 0.012,
-        entropy_coeff: float = 0.04,
+        lr: float = 0.025,
+        entropy_coeff: float = 0.02,
         random_seed: int = 42
     ):
         np.random.seed(random_seed)
         self.state_dim = state_dim
         self.action_dim = action_dim
+        self.feature_dim = max(1, state_dim // action_dim)
+        self.hidden_dim = 16
         self.lr = lr
         self.entropy_coeff = entropy_coeff
         self.t = 0
 
-        # Xavier Uniform Initialization
-        limit1 = np.sqrt(6.0 / (state_dim + 32))
-        self.W1 = np.random.uniform(-limit1, limit1, (state_dim, 32)) * 0.35
-        self.b1 = np.zeros(32)
+        # Shared scoring network across all assets
+        limit1 = np.sqrt(6.0 / (self.feature_dim + self.hidden_dim))
+        self.W1 = np.random.uniform(-limit1, limit1, (self.feature_dim, self.hidden_dim))
+        self.b1 = np.zeros(self.hidden_dim)
 
-        limit2 = np.sqrt(6.0 / (32 + action_dim))
-        self.W2 = np.random.uniform(-limit2, limit2, (32, action_dim)) * 0.08
-        self.b2 = np.zeros(action_dim)
+        limit2 = np.sqrt(6.0 / (self.hidden_dim + 1))
+        self.W2 = np.random.uniform(-limit2, limit2, (self.hidden_dim, 1))
+        self.b2 = np.zeros(1)
 
         # Adam moments
         self.mW1, self.vW1 = np.zeros_like(self.W1), np.zeros_like(self.W1)
@@ -138,16 +145,22 @@ class RLPolicyAgent:
         self.mb2, self.vb2 = np.zeros_like(self.b2), np.zeros_like(self.b2)
 
     def forward(self, state: np.ndarray, temperature: float = 1.0) -> np.ndarray:
-        # Layer 1: Tanh for bounded non-linear representations
-        h = np.tanh(np.dot(state, self.W1) + self.b1)
-        # Layer 2: Logits with temperature scaling
-        logits = (np.dot(h, self.W2) + self.b2) / max(0.2, temperature)
-        # Stable Softmax
+        if state.ndim == 1:
+            feat = state.reshape(self.action_dim, self.feature_dim)
+        else:
+            feat = state
+
+        # Shared layer forward pass for all assets simultaneously
+        h = np.tanh(np.dot(feat, self.W1) + self.b1) # (N, hidden_dim)
+        logits = (np.dot(h, self.W2) + self.b2).flatten() / max(0.2, temperature) # (N,)
+
+        # Softmax over assets
         exp_logits = np.exp(logits - np.max(logits))
         weights = exp_logits / np.sum(exp_logits)
-        # Institutional blending with 1/N prior to prevent single-asset corner collapse
-        prior_1n = np.ones(self.action_dim) / self.action_dim
-        return 0.85 * weights + 0.15 * prior_1n
+
+        # Diversification blend (75% dynamic active policy + 25% equi-weighted anchor)
+        w_clamped = 0.75 * weights + 0.25 * (np.ones(self.action_dim) / self.action_dim)
+        return w_clamped / np.sum(w_clamped)
 
     def update(
         self,
@@ -181,37 +194,28 @@ class RLPolicyAgent:
         g_W2 = np.zeros_like(self.W2)
         g_b2 = np.zeros_like(self.b2)
 
-        for state, action, adv in zip(states, actions, advantages):
-            h = np.tanh(np.dot(state, self.W1) + self.b1)
-            pred_w = self.forward(state)
+        for s, action, adv in zip(states, actions, advantages):
+            feat = s.reshape(self.action_dim, self.feature_dim) if s.ndim == 1 else s
+            h = np.tanh(np.dot(feat, self.W1) + self.b1)
+            pred_w = self.forward(s)
 
             # Policy gradient + entropy regularizer for exploration
-            entropy_grad = (np.log(pred_w + 1e-8) + 1.0) * self.entropy_coeff
-            d_logits = -(action - pred_w) * adv + entropy_grad
-            d_logits = np.clip(d_logits, -1.5, 1.5)
+            d_logits = -(action - pred_w) * adv
+            d_logits += (np.log(pred_w + 1e-8) + 1.0) * self.entropy_coeff
+            d_logits = np.clip(d_logits, -1.0, 1.0).reshape(-1, 1)
 
-            g_W2 += np.outer(h, d_logits)
-            g_b2 += d_logits
+            g_W2 += np.dot(h.T, d_logits)
+            g_b2 += np.sum(d_logits, axis=0)
 
-            dh = np.dot(self.W2, d_logits) * (1.0 - h**2)
-            g_W1 += np.outer(state, dh)
-            g_b1 += dh
+            dh = np.dot(d_logits, self.W2.T) * (1.0 - h**2)
+            g_W1 += np.dot(feat.T, dh)
+            g_b1 += np.sum(dh, axis=0)
 
         # Average over batch trajectory
         g_W1 /= T
         g_b1 /= T
         g_W2 /= T
         g_b2 /= T
-
-        # Global gradient clipping
-        total_norm = np.sqrt(np.sum(g_W1**2) + np.sum(g_b1**2) + np.sum(g_W2**2) + np.sum(g_b2**2))
-        clip_norm = 1.0
-        if total_norm > clip_norm:
-            scale = clip_norm / (total_norm + 1e-6)
-            g_W1 *= scale
-            g_b1 *= scale
-            g_W2 *= scale
-            g_b2 *= scale
 
         # Adam Optimizer parameter update
         beta1, beta2, eps = 0.9, 0.999, 1e-8
@@ -233,7 +237,7 @@ def train_and_evaluate_rl_portfolio(
     episodes: int = 35,
     window_size: int = 25,
     reward_type: str = "sortino",
-    turnover_penalty: float = 0.0005,
+    turnover_penalty: float = 0.0003,
     random_seed: int = 42
 ) -> Dict[str, Any]:
     """
@@ -265,8 +269,8 @@ def train_and_evaluate_rl_portfolio(
     agent = RLPolicyAgent(
         state_dim=state_dim,
         action_dim=action_dim,
-        lr=0.012,
-        entropy_coeff=0.04,
+        lr=0.025,
+        entropy_coeff=0.02,
         random_seed=random_seed
     )
 
