@@ -316,14 +316,11 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     hovertemplate="<b>Portafoglio Simulato</b><br>Volatilità: %{x:.2f}%<br>Rendimento: %{y:.2f}%<br>" + z_label + ": %{z:" + z_format + "}<extra></extra>"
                 ))
 
-                # Vertice 1: Portafoglio Attuale (Gold 3D)
+                # Vertice 1: Portafoglio Attuale (Gold / Emerald 3D)
                 fig_3d.add_trace(go.Scatter3d(
                     x=[cur_v], y=[cur_r], z=[cur_z],
-                    mode="markers+text",
+                    mode="markers",
                     name="⭐ Attuale",
-                    text=["⭐ ATTUALE"],
-                    textposition="top center",
-                    textfont=dict(color="#00e676", size=12),
                     marker=dict(size=11, color="#00e676", symbol="diamond", line=dict(color="#ffffff", width=2)),
                     hovertemplate=f"<b>⭐ Portafoglio Attuale</b><br>Volatilità: <b>{cur_v:.2f}%</b><br>Rendimento: <b>{cur_r:+.2f}%</b><br>Sharpe: <b>{cur_s:.2f}</b><br>{z_label}: <b>{cur_z:{z_format}}</b><extra></extra>"
                 ))
@@ -332,11 +329,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 if ms:
                     fig_3d.add_trace(go.Scatter3d(
                         x=[ms_v], y=[ms_r], z=[ms_z],
-                        mode="markers+text",
+                        mode="markers",
                         name="🏆 Max Sharpe",
-                        text=["🏆 MAX SHARPE"],
-                        textposition="top center",
-                        textfont=dict(color="#ff9900", size=12),
                         marker=dict(size=11, color="#ff9900", symbol="diamond", line=dict(color="#ffffff", width=2)),
                         hovertemplate=f"<b>🏆 Max Sharpe Ratio</b><br>Volatilità: <b>{ms_v:.2f}%</b><br>Rendimento: <b>{ms_r:+.2f}%</b><br>Sharpe: <b>{ms_s:.2f}</b><br>{z_label}: <b>{ms_z:{z_format}}</b><extra></extra>"
                     ))
@@ -345,22 +339,18 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 if mv:
                     fig_3d.add_trace(go.Scatter3d(
                         x=[mv_v], y=[mv_r], z=[mv_z],
-                        mode="markers+text",
+                        mode="markers",
                         name="🛡️ Minima Volatilità",
-                        text=["🛡️ MIN VOL"],
-                        textposition="top center",
-                        textfont=dict(color="#00f3ff", size=12),
                         marker=dict(size=11, color="#00f3ff", symbol="circle", line=dict(color="#ffffff", width=2)),
                         hovertemplate=f"<b>🛡️ Minima Volatilità</b><br>Volatilità: <b>{mv_v:.2f}%</b><br>Rendimento: <b>{mv_r:+.2f}%</b><br>Sharpe: <b>{mv_s:.2f}</b><br>{z_label}: <b>{mv_z:{z_format}}</b><extra></extra>"
                     ))
 
                 fig_3d.update_layout(
-                    title=f"🌐 Superficie di Rischio 3D & Iperspazio di Allocazione ({z_label})",
                     template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
-                    height=560,
-                    margin=dict(t=50, b=20, l=10, r=10),
+                    height=580,
+                    margin=dict(t=45, b=20, l=10, r=10),
                     scene=dict(
                         xaxis=dict(title="Volatilità Annua (%)", backgroundcolor="rgba(13, 17, 23, 0.6)", gridcolor="rgba(255,255,255,0.08)"),
                         yaxis=dict(title="Rendimento Atteso (%)", backgroundcolor="rgba(13, 17, 23, 0.6)", gridcolor="rgba(255,255,255,0.08)"),
@@ -380,6 +370,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     )
                 )
                 apply_plotly_theme(fig_3d)
+                st.markdown(f"##### 🌐 Superficie di Rischio 3D & Iperspazio di Allocazione ({z_label})")
                 st.plotly_chart(fig_3d, use_container_width=True, config={"displayModeBar": True, "displaylogo": False})
 
             else:
