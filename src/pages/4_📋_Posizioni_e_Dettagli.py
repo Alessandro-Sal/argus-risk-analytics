@@ -268,9 +268,11 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         st.plotly_chart(fig_liq, use_container_width=True)
 
         # ⚡ DuckDB OLAP In-Process Accelerated Aggregations
-        with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Asset Class × Settore × Valuta)", expanded=False):
-            from core.ui_utils import render_duckdb_olap_cube_widget
-            render_duckdb_olap_cube_widget(df_l, key_prefix="p4_pos")
+        st.markdown("#### ⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Multi-Dimensionale)")
+        st.caption("Aggregazione colonnare ad alta performance per Asset Class × Settore GICS × Valuta con scomposizione gerarchica.")
+        from core.ui_utils import render_duckdb_olap_cube_widget
+        render_duckdb_olap_cube_widget(df_l, key_prefix="p4_pos")
+        st.markdown('<div style="margin-bottom: 24px;"></div>', unsafe_allow_html=True)
 
     # Sezione Corporate Actions & Stock Split Audit
     corp_actions = results.get("corporate_actions", [])
