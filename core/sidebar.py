@@ -253,15 +253,28 @@ def render_sidebar():
                 z-index: 99 !important;
             }
 
-            /* Hide Streamlit Top Decoration and Deploy Button only */
+            /* Comprehensive Removal of Streamlit Deploy Button, Toolbar & Top Decoration */
             [data-testid="stDecoration"],
             .stDeployButton,
+            [data-testid="stDeployButton"],
+            [data-testid="stToolbar"],
+            div[data-testid="stToolbar"],
+            [data-testid="stToolbarActions"],
             button[title="Deploy"],
-            [data-testid="stToolbarActions"] {
+            div:has(> .stDeployButton),
+            header [data-testid="stToolbar"],
+            header .stDeployButton,
+            header [data-testid="stToolbarActions"] {
                 display: none !important;
                 visibility: hidden !important;
+                opacity: 0 !important;
                 height: 0px !important;
                 width: 0px !important;
+                padding: 0px !important;
+                margin: 0px !important;
+                pointer-events: none !important;
+                position: absolute !important;
+                left: -9999px !important;
             }
 
             /* Always keep Collapsed Control (Open Sidebar Button) Visible & Clickable */
