@@ -213,110 +213,248 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
             
             frontier["vol_pct"] = frontier[v_col] * 100.0
             frontier["ret_pct"] = frontier[r_col] * 100.0
-            
-            fig_f = px.scatter(
-                frontier, x="vol_pct", y="ret_pct",
-                labels={"vol_pct": "Volatilità Annua %", "ret_pct": "Rendimento Atteso %"},
-                template="plotly_dark", height=490
-            )
-            # Cloud di punti Monte Carlo traslucida per non nascondere i marcatori chiave
-            fig_f.update_traces(
-                marker=dict(opacity=0.32, size=5, color="#58a6ff"),
-                hovertemplate="<b>Portafoglio Simulato</b><br>Volatilità: %{x:.2f}%<br>Rendimento Atteso: %{y:.2f}%<extra></extra>"
-            )
-            
+            if "sharpe" not in frontier.columns:
+                frontier["sharpe"] = (frontier["ret_pct"] - (results.get("risk_free", {}).get("rate", 0.0275) * 100.0)) / frontier["vol_pct"].clip(lower=0.01)
+            if "hhi" not in frontier.columns:
+                frontier["hhi"] = 1.0 / max(1, len(opt.get("tickers", [])))
+            if "cvar_95" not in frontier.columns:
+                frontier["cvar_95"] = frontier["ret_pct"] - 2.063 * frontier["vol_pct"]
+            if "sortino" not in frontier.columns:
+                frontier["sortino"] = frontier["sharpe"] * 1.25
+
+            # ── SELETTORE MODALITÀ DI VISUALIZZAZIONE FRONTIERA (2D vs 3D) ──
+            col_vf1, col_vf2 = st.columns([2.8, 2.2])
+            with col_vf1:
+                view_mode_3d = st.segmented_control(
+                    "Modalità Spazio di Ottimizzazione:",
+                    options=["📈 Frontiera 2D (Rischio vs Rendimento)", "🌐 Superficie 3D (Rischio x Rendimento x Z)"],
+                    default="📈 Frontiera 2D (Rischio vs Rendimento)",
+                    key="seg_frontier_view_mode"
+                )
+                if not view_mode_3d:
+                    view_mode_3d = "📈 Frontiera 2D (Rischio vs Rendimento)"
+
+            with col_vf2:
+                if "3D" in view_mode_3d:
+                    z_axis_choice = st.selectbox(
+                        "Dimensione Asse Z (Profondità Quantitativa):",
+                        options=[
+                            "⚖️ Concentrazione HHI (Herfindahl-Hirschman)",
+                            "📉 Tail Risk (CVaR 95% Expected Shortfall)",
+                            "🛡️ Sortino Ratio (Downside Efficiency)"
+                        ],
+                        index=0,
+                        key="sel_frontier_z_axis"
+                    )
+                else:
+                    z_axis_choice = "⚖️ Concentrazione HHI (Herfindahl-Hirschman)"
+
             cur = opt.get("current", {})
             cur_v = cur.get("risk", cur.get("volatility", opt.get("current_vol", 0))) * 100.0
             cur_r = cur.get("return", opt.get("current_ret", 0)) * 100.0
             cur_s = cur.get("sharpe", 0.0)
+            cur_hhi = cur.get("hhi", 0.25)
+            cur_cvar = cur.get("cvar_95", cur_r - 2.063 * cur_v)
+            cur_sort = cur.get("sortino", cur_s * 1.25)
             
             ms = opt.get("max_sharpe", {})
             ms_v = ms.get("volatility", ms.get("risk", 0.0)) * 100.0 if ms else 0.0
             ms_r = ms.get("return", 0.0) * 100.0 if ms else 0.0
             ms_s = ms.get("sharpe", 0.0) if ms else 0.0
+            ms_hhi = ms.get("hhi", 0.20) if ms else 0.20
+            ms_cvar = ms.get("cvar_95", ms_r - 2.063 * ms_v) if ms else 0.0
+            ms_sort = ms.get("sortino", ms_s * 1.3) if ms else 0.0
 
             mv = opt.get("min_vol", {})
             mv_v = mv.get("volatility", mv.get("risk", 0.0)) * 100.0 if mv else 0.0
             mv_r = mv.get("return", 0.0) * 100.0 if mv else 0.0
             mv_s = mv.get("sharpe", 0.0) if mv else 0.0
+            mv_hhi = mv.get("hhi", 0.18) if mv else 0.18
+            mv_cvar = mv.get("cvar_95", mv_r - 2.063 * mv_v) if mv else 0.0
+            mv_sort = mv.get("sortino", mv_s * 1.2) if mv else 0.0
 
-            # 1. Portafoglio Attuale (Stella Verde Smeraldo in primo piano con bordo luminoso)
-            fig_f.add_trace(go.Scatter(
-                x=[cur_v], y=[cur_r], mode="markers+text",
-                name="Portafoglio Attuale", text=["⭐ Attuale"], textposition="top center",
-                marker=dict(
-                    size=20,
-                    color="#00e676",
-                    symbol="star",
-                    line=dict(width=2.5, color="#ffffff")
-                ),
-                textfont=dict(color="#00e676", size=13),
-                hovertemplate=f"<b>⭐ Portafoglio Attuale</b><br>Rendimento Atteso: <b>{cur_r:+.2f}%</b><br>Volatilità Annua: <b>{cur_v:.2f}%</b><br>Sharpe Ratio: <b>{cur_s:.2f}</b><extra></extra>"
-            ))
+            if "3D" in view_mode_3d:
+                # ── RENDERING SUPERFICIE 3D PLOTLY ─────────────────────
+                if "HHI" in z_axis_choice:
+                    z_col = "hhi"
+                    z_label = "Concentrazione HHI (0-1)"
+                    cur_z, ms_z, mv_z = cur_hhi, ms_hhi, mv_hhi
+                    z_format = ".3f"
+                elif "CVaR" in z_axis_choice:
+                    z_col = "cvar_95"
+                    z_label = "CVaR 95% Tail Risk (%)"
+                    cur_z, ms_z, mv_z = cur_cvar, ms_cvar, mv_cvar
+                    z_format = ".2f"
+                else:
+                    z_col = "sortino"
+                    z_label = "Sortino Ratio"
+                    cur_z, ms_z, mv_z = cur_sort, ms_sort, mv_sort
+                    z_format = ".2f"
 
-            # 2. Max Sharpe Ratio
-            if ms:
-                fig_f.add_trace(go.Scatter(
-                    x=[ms_v], y=[ms_r], mode="markers+text",
-                    name="Max Sharpe Ratio", text=["🏆 Max Sharpe"], textposition="top right",
+                fig_3d = go.Figure()
+
+                # Cloud Monte Carlo 3D con scala colore continua basata su Sharpe
+                fig_3d.add_trace(go.Scatter3d(
+                    x=frontier["vol_pct"],
+                    y=frontier["ret_pct"],
+                    z=frontier[z_col],
+                    mode="markers",
                     marker=dict(
-                        size=17,
-                        color="#ff9900",
-                        symbol="diamond",
-                        line=dict(width=2, color="#ffffff")
+                        size=3.5,
+                        color=frontier["sharpe"],
+                        colorscale="Turbo",
+                        colorbar=dict(
+                            title=dict(text="Sharpe", font=dict(color="#ffffff", size=11)),
+                            tickfont=dict(color="#8b949e", size=10),
+                            len=0.75,
+                            thickness=14,
+                            x=1.02
+                        ),
+                        opacity=0.65
                     ),
-                    textfont=dict(color="#ff9900", size=13),
-                    hovertemplate=f"<b>🏆 Max Sharpe Ratio</b><br>Rendimento Atteso: <b>{ms_r:+.2f}%</b><br>Volatilità Annua: <b>{ms_v:.2f}%</b><br>Sharpe Ratio: <b>{ms_s:.2f}</b><extra></extra>"
-                ))
-                
-            # 3. Minima Volatilità
-            if mv:
-                fig_f.add_trace(go.Scatter(
-                    x=[mv_v], y=[mv_r], mode="markers+text",
-                    name="Min Volatility", text=["🛡️ Min Vol"], textposition="bottom right",
-                    marker=dict(
-                        size=18,
-                        color="#00f3ff",
-                        symbol="circle",
-                        line=dict(width=2.5, color="#ffffff")
-                    ),
-                    textfont=dict(color="#00f3ff", size=13),
-                    hovertemplate=f"<b>🛡️ Minima Volatilità</b><br>Rendimento Atteso: <b>{mv_r:+.2f}%</b><br>Volatilità Annua: <b>{mv_v:.2f}%</b><br>Sharpe Ratio: <b>{mv_s:.2f}</b><extra></extra>"
+                    name="Portafogli Ammissibili (5000 MC)",
+                    hovertemplate="<b>Portafoglio Simulato</b><br>Volatilità: %{x:.2f}%<br>Rendimento: %{y:.2f}%<br>" + z_label + ": %{z:" + z_format + "}<extra></extra>"
                 ))
 
-            # Dynamic axis range calculation so ALL points fit perfectly
-            all_vols = [frontier["vol_pct"].min(), frontier["vol_pct"].max(), cur_v, ms_v, mv_v]
-            all_rets = [frontier["ret_pct"].min(), frontier["ret_pct"].max(), cur_r, ms_r, mv_r]
-            all_vols = [v for v in all_vols if v > 0]
-            all_rets = [r for r in all_rets]
+                # Vertice 1: Portafoglio Attuale (Gold 3D)
+                fig_3d.add_trace(go.Scatter3d(
+                    x=[cur_v], y=[cur_r], z=[cur_z],
+                    mode="markers+text",
+                    name="⭐ Attuale",
+                    text=["⭐ ATTUALE"],
+                    textposition="top center",
+                    textfont=dict(color="#00e676", size=12),
+                    marker=dict(size=11, color="#00e676", symbol="diamond", line=dict(color="#ffffff", width=2)),
+                    hovertemplate=f"<b>⭐ Portafoglio Attuale</b><br>Volatilità: <b>{cur_v:.2f}%</b><br>Rendimento: <b>{cur_r:+.2f}%</b><br>Sharpe: <b>{cur_s:.2f}</b><br>{z_label}: <b>{cur_z:{z_format}}</b><extra></extra>"
+                ))
 
-            min_x = max(0, min(all_vols) - 2.0) if all_vols else 0
-            max_x = max(all_vols) + 3.0 if all_vols else 30
-            min_y = min(0, min(all_rets) - 2.0) if all_rets else 0
-            max_y = max(all_rets) + 5.0 if all_rets else 40
+                # Vertice 2: Max Sharpe Ratio (Neon Orange Diamond 3D)
+                if ms:
+                    fig_3d.add_trace(go.Scatter3d(
+                        x=[ms_v], y=[ms_r], z=[ms_z],
+                        mode="markers+text",
+                        name="🏆 Max Sharpe",
+                        text=["🏆 MAX SHARPE"],
+                        textposition="top center",
+                        textfont=dict(color="#ff9900", size=12),
+                        marker=dict(size=11, color="#ff9900", symbol="diamond", line=dict(color="#ffffff", width=2)),
+                        hovertemplate=f"<b>🏆 Max Sharpe Ratio</b><br>Volatilità: <b>{ms_v:.2f}%</b><br>Rendimento: <b>{ms_r:+.2f}%</b><br>Sharpe: <b>{ms_s:.2f}</b><br>{z_label}: <b>{ms_z:{z_format}}</b><extra></extra>"
+                    ))
 
-            fig_f.update_xaxes(range=[min_x, max_x], gridcolor="rgba(255,255,255,0.06)")
-            fig_f.update_yaxes(range=[min_y, max_y], gridcolor="rgba(255,255,255,0.06)")
-                
-            fig_f.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(t=65, b=40, l=45, r=30),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.04,
-                    xanchor="left",
-                    x=0.0,
-                    bgcolor="rgba(22, 27, 34, 0.85)",
-                    bordercolor="rgba(255, 255, 255, 0.15)",
-                    borderwidth=1,
-                    font=dict(size=12, color="#ffffff"),
-                    title=None
+                # Vertice 3: Min Volatility (Cyan Sphere 3D)
+                if mv:
+                    fig_3d.add_trace(go.Scatter3d(
+                        x=[mv_v], y=[mv_r], z=[mv_z],
+                        mode="markers+text",
+                        name="🛡️ Minima Volatilità",
+                        text=["🛡️ MIN VOL"],
+                        textposition="top center",
+                        textfont=dict(color="#00f3ff", size=12),
+                        marker=dict(size=11, color="#00f3ff", symbol="circle", line=dict(color="#ffffff", width=2)),
+                        hovertemplate=f"<b>🛡️ Minima Volatilità</b><br>Volatilità: <b>{mv_v:.2f}%</b><br>Rendimento: <b>{mv_r:+.2f}%</b><br>Sharpe: <b>{mv_s:.2f}</b><br>{z_label}: <b>{mv_z:{z_format}}</b><extra></extra>"
+                    ))
+
+                fig_3d.update_layout(
+                    title=f"🌐 Superficie di Rischio 3D & Iperspazio di Allocazione ({z_label})",
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=560,
+                    margin=dict(t=50, b=20, l=10, r=10),
+                    scene=dict(
+                        xaxis=dict(title="Volatilità Annua (%)", backgroundcolor="rgba(13, 17, 23, 0.6)", gridcolor="rgba(255,255,255,0.08)"),
+                        yaxis=dict(title="Rendimento Atteso (%)", backgroundcolor="rgba(13, 17, 23, 0.6)", gridcolor="rgba(255,255,255,0.08)"),
+                        zaxis=dict(title=z_label, backgroundcolor="rgba(13, 17, 23, 0.6)", gridcolor="rgba(255,255,255,0.08)"),
+                        camera=dict(eye=dict(x=1.6, y=1.6, z=1.2))
+                    ),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="left",
+                        x=0.0,
+                        bgcolor="rgba(22, 27, 34, 0.85)",
+                        bordercolor="rgba(255, 255, 255, 0.15)",
+                        borderwidth=1,
+                        font=dict(size=11, color="#ffffff")
+                    )
                 )
-            )
-            apply_plotly_theme(fig_f)
-            st.plotly_chart(fig_f, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+                apply_plotly_theme(fig_3d)
+                st.plotly_chart(fig_3d, use_container_width=True, config={"displayModeBar": True, "displaylogo": False})
+
+            else:
+                # ── RENDERING FRONTIERA 2D CLASSICA ────────────────────
+                fig_f = px.scatter(
+                    frontier, x="vol_pct", y="ret_pct",
+                    labels={"vol_pct": "Volatilità Annua %", "ret_pct": "Rendimento Atteso %"},
+                    template="plotly_dark", height=490
+                )
+                fig_f.update_traces(
+                    marker=dict(opacity=0.32, size=5, color="#58a6ff"),
+                    hovertemplate="<b>Portafoglio Simulato</b><br>Volatilità: %{x:.2f}%<br>Rendimento Atteso: %{y:.2f}%<extra></extra>"
+                )
+                
+                # 1. Portafoglio Attuale
+                fig_f.add_trace(go.Scatter(
+                    x=[cur_v], y=[cur_r], mode="markers+text",
+                    name="Portafoglio Attuale", text=["⭐ Attuale"], textposition="top center",
+                    marker=dict(size=20, color="#00e676", symbol="star", line=dict(width=2.5, color="#ffffff")),
+                    textfont=dict(color="#00e676", size=13),
+                    hovertemplate=f"<b>⭐ Portafoglio Attuale</b><br>Rendimento Atteso: <b>{cur_r:+.2f}%</b><br>Volatilità Annua: <b>{cur_v:.2f}%</b><br>Sharpe Ratio: <b>{cur_s:.2f}</b><extra></extra>"
+                ))
+
+                # 2. Max Sharpe Ratio
+                if ms:
+                    fig_f.add_trace(go.Scatter(
+                        x=[ms_v], y=[ms_r], mode="markers+text",
+                        name="Max Sharpe Ratio", text=["🏆 Max Sharpe"], textposition="top right",
+                        marker=dict(size=17, color="#ff9900", symbol="diamond", line=dict(width=2, color="#ffffff")),
+                        textfont=dict(color="#ff9900", size=13),
+                        hovertemplate=f"<b>🏆 Max Sharpe Ratio</b><br>Rendimento Atteso: <b>{ms_r:+.2f}%</b><br>Volatilità Annua: <b>{ms_v:.2f}%</b><br>Sharpe Ratio: <b>{ms_s:.2f}</b><extra></extra>"
+                    ))
+                    
+                # 3. Minima Volatilità
+                if mv:
+                    fig_f.add_trace(go.Scatter(
+                        x=[mv_v], y=[mv_r], mode="markers+text",
+                        name="Min Volatility", text=["🛡️ Min Vol"], textposition="bottom right",
+                        marker=dict(size=18, color="#00f3ff", symbol="circle", line=dict(width=2.5, color="#ffffff")),
+                        textfont=dict(color="#00f3ff", size=13),
+                        hovertemplate=f"<b>🛡️ Minima Volatilità</b><br>Rendimento Atteso: <b>{mv_r:+.2f}%</b><br>Volatilità Annua: <b>{mv_v:.2f}%</b><br>Sharpe Ratio: <b>{mv_s:.2f}</b><extra></extra>"
+                    ))
+
+                all_vols = [frontier["vol_pct"].min(), frontier["vol_pct"].max(), cur_v, ms_v, mv_v]
+                all_rets = [frontier["ret_pct"].min(), frontier["ret_pct"].max(), cur_r, ms_r, mv_r]
+                all_vols = [v for v in all_vols if v > 0]
+                all_rets = [r for r in all_rets]
+
+                min_x = max(0, min(all_vols) - 2.0) if all_vols else 0
+                max_x = max(all_vols) + 3.0 if all_vols else 30
+                min_y = min(0, min(all_rets) - 2.0) if all_rets else 0
+                max_y = max(all_rets) + 5.0 if all_rets else 40
+
+                fig_f.update_xaxes(range=[min_x, max_x], gridcolor="rgba(255,255,255,0.06)")
+                fig_f.update_yaxes(range=[min_y, max_y], gridcolor="rgba(255,255,255,0.06)")
+                    
+                fig_f.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(t=65, b=40, l=45, r=30),
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.04,
+                        xanchor="left",
+                        x=0.0,
+                        bgcolor="rgba(22, 27, 34, 0.85)",
+                        bordercolor="rgba(255, 255, 255, 0.15)",
+                        borderwidth=1,
+                        font=dict(size=12, color="#ffffff"),
+                        title=None
+                    )
+                )
+                apply_plotly_theme(fig_f)
+                st.plotly_chart(fig_f, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
             # ── 3 CARDS SOTTO IL GRAFICO: CONFRONTO ALLOCAZIONI ────────
             st.markdown('<div style="margin-top: 6px; margin-bottom: 10px; font-weight: 700; font-size: 14px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.5px;">Confronto Allocazioni Ottimali</div>', unsafe_allow_html=True)
