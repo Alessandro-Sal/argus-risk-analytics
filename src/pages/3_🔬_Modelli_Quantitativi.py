@@ -1296,31 +1296,31 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
         col_rl_h1, col_rl_h2 = st.columns([3.0, 1.3])
         with col_rl_h1:
             st.markdown("### 🤖 Asset Allocation con Reinforcement Learning (RL Policy Sandbox)")
-            st.caption("Addestramento di agenti neurali continui (Policy Gradient REINFORCE) per l'adattamento dinamico dei pesi su regimi macro e minimizzazione del Downside Risk.")
+            st.caption("Addestramento di agenti neurali continui (Permutation-Equivariant Policy Gradient) per l'adattamento dinamico dei pesi su regimi macro e minimizzazione del Downside Risk.")
         with col_rl_h2:
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
             glossary_modal(
                 "ℹ️ Guida Metodologica: Reinforcement Learning in Portfolio Management",
-                """
+                r"""
 <div style="font-size: 13.5px; line-height: 1.45;">
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Portfolio Management via RL</div>
-  <div>A differenza dei modelli statici di Markowitz (che assumono parametri di covarianza costanti nel tempo), un agente di <b>Reinforcement Learning (RL)</b> apprende una <i>policy</i> decisionale dinamica &pi;<sub>&theta;</sub>(a|s) formulata come Processo Decisionale di Markov (MDP).</div>
+  <div>A differenza dei modelli statici di Markowitz (che assumono parametri di covarianza costanti nel tempo), un agente di <b>Reinforcement Learning (RL)</b> apprende una <i>policy</i> decisionale dinamica $\pi_\theta(a|s)$ formulata come Processo Decisionale di Markov (MDP).</div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Spazio degli Stati, Azioni e Funzione di Ricompensa</div>
   <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Stato (S<sub>t</sub> &isin; &Ropf;<sup>3N</sup>):</b> Vettore delle medie rolling, deviazioni standard e momentum a 25 giorni per ciascun asset.<br>
-    • <b>Azione (A<sub>t</sub> &isin; &Delta;<sup>N-1</sup>):</b> Vettore pesi sul simplesso (&sum; w<sub>i</sub> = 1, w<sub>i</sub> &ge; 0) generato tramite attivazione Softmax.<br>
-    • <b>Ricompensa (R<sub>t</sub>):</b> R<sub>t</sub> = r<sub>p,t</sub> &minus; &gamma; &middot; max(0, &minus;r<sub>p,t</sub>)<sup>2</sup> &minus; &lambda; &middot; ||&Delta;w<sub>t</sub>||<sub>1</sub> (Sortino Reward con penalità per turnover).
+    • <b>Stato ($S_t \in \mathbb{R}^{3N}$):</b> Feature sub-vettoriali per asset (Sharpe Rolling 20g, Momentum Multi-Timeframe e Downside Volatility standardizzati via z-score cross-sectional).<br>
+    • <b>Azione ($A_t \in \Delta^{N-1}$):</b> Vettore pesi sul simplesso ($\sum w_i = 1, w_i \ge 0$) generato tramite rete neurale a scoring condiviso (Permutation-Equivariant) e attivazione Softmax.<br>
+    • <b>Ricompensa ($R_t$):</b> $R_t = r_{p,t} - 2.0 \cdot \max(0, -r_{p,t}) - \text{Costi Turnover} + \beta_{\text{div}} \cdot (1 - \text{HHI}_t)$ (Sortino Reward con incentivo alla diversificazione).
   </div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Algoritmo di Ottimizzazione</div>
-  <div>La rete neurale a 2 livelli viene addestrata mediante <b>Policy Gradient REINFORCE</b> con riduzione della varianza tramite baseline mobile, garantendo convergenza stabile anche su orizzonti multi-anno.</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Algoritmo di Ottimizzazione Batch Adam</div>
+  <div>La rete neurale a scoring condiviso viene addestrata mediante <b>Batch Policy Gradient REINFORCE</b> con regolarizzazione dell'entropia ($\mathcal{H}(\pi)$) e ottimizzatore <b>Adam</b> con gradient clipping, garantendo convergenza progressiva e onde di allocazione fluide.</div>
 </div>
 
 </div>
@@ -1412,7 +1412,8 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                         mode="lines+markers",
                         name="Reward Totale Episodio",
                         line=dict(color="#58a6ff", width=2.5),
-                        marker=dict(size=5, color="#58a6ff")
+                        marker=dict(size=5, color="#58a6ff"),
+                        hovertemplate="<b>Episodio %{x}</b><br>Reward Cumulato: %{y:.1f}<extra></extra>"
                     ))
                     fig_lc.update_layout(
                         template="plotly_dark",
@@ -1436,14 +1437,16 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                         y=df_bt["rl_equity_curve"],
                         mode="lines",
                         name="RL Policy Agent (Adattivo)",
-                        line=dict(color="#3fb950", width=3.0)
+                        line=dict(color="#3fb950", width=3.0),
+                        hovertemplate="<b>RL Agent</b>: %{y:.2f}<extra></extra>"
                     ))
                     fig_bt.add_trace(go.Scatter(
                         x=df_bt["date"],
                         y=df_bt["ew_equity_curve"],
                         mode="lines",
                         name="Benchmark Equipesato (1/N)",
-                        line=dict(color="#8b949e", width=2.0, dash="dash")
+                        line=dict(color="#8b949e", width=2.0, dash="dash"),
+                        hovertemplate="<b>1/N Benchmark</b>: %{y:.2f}<extra></extra>"
                     ))
                     fig_bt.update_layout(
                         template="plotly_dark",
@@ -1499,12 +1502,14 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                     csv_rl_w = df_target_w.to_csv(index=False).encode('utf-8')
                     st.download_button("📥 Scarica Pesi RL (CSV)", data=csv_rl_w, file_name="pesi_target_rl_agent.csv", mime="text/csv", use_container_width=True, key="btn_dl_rl_weights")
 
-                # Costruisci confronto con pesi attuali
+                # Costruisci confronto con pesi attuali con rilevamento ticker robusto
                 target_rows = []
                 tot_val = float(pos["current_value"].sum()) if ("current_value" in pos.columns and pos["current_value"].sum() > 0) else 100_000.0
+                tk_col = next((c for c in ["ticker", "Ticker", "symbol", "Symbol", "Asset"] if c in pos.columns), None)
+
                 for tk in rl_res["tickers"]:
                     w_rl = rl_res["final_weights"].get(tk, 0.0) * 100.0
-                    cur_row = pos[pos["ticker"] == tk] if not pos.empty and "ticker" in pos.columns else pd.DataFrame()
+                    cur_row = pos[pos[tk_col] == tk] if (tk_col and not pos.empty) else pd.DataFrame()
                     cur_w = (float(cur_row["current_value"].iloc[0]) / tot_val * 100.0) if (not cur_row.empty and "current_value" in cur_row.columns) else (100.0 / len(rl_res["tickers"]))
                     delta_w = w_rl - cur_w
                     
