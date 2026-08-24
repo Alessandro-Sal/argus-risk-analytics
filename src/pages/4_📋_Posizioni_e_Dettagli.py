@@ -1872,59 +1872,68 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
 </div>
 """, button_label="💡 Come funziona?")
 
-        col_p1, col_p2, col_p3 = st.columns([1.5, 1.5, 1.2])
-        with col_p1:
-            exec_horizon = st.slider("Orizzonte di Liquidazione (Giorni)", min_value=1, max_value=20, value=5, step=1, key="ac_horizon_slider")
-        with col_p2:
-            risk_aversion = st.select_slider(
-                "Profilo di Urgenza / Avversione al Rischio (λ)",
-                options=[1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
-                value=1e-5,
-                format_func=lambda x: {
-                    1e-7: "Passivo / Paziente (Min Impact)",
-                    1e-6: "Moderato Passivo",
-                    1e-5: "Istituzionale Bilanciato",
-                    1e-4: "Moderato Aggressivo",
-                    1e-3: "Aggressivo / Urgente (Min Risk)"
-                }.get(x, f"{x:.1e}"),
-                key="ac_lambda_slider"
+        col_opt_ctrl1, col_opt_ctrl2, col_opt_ctrl3 = st.columns([1.5, 1.5, 1.5])
+        
+        # Scelta asset o totale
+        all_ac_tickers = ["Intero Portafoglio (€ " + f"{pos['current_value'].sum():,.0f}".replace(",", ".") + ")"] + list(df_ac["Ticker"].unique()) if ("current_value" in pos.columns and not pos.empty) else ["Intero Portafoglio (€ 100.000)"]
+        with col_opt_ctrl1:
+            sel_target = st.selectbox("Seleziona Ordine da Liquidare:", all_ac_tickers, index=0, key="ac_sel_target_box")
+            if "Intero Portafoglio" in sel_target:
+                target_order_val = float(pos["current_value"].sum()) if ("current_value" in pos.columns and pos["current_value"].sum() > 0) else 100_000.0
+                target_adv = target_order_val * 5.0 # ADV aggregato prudenziale
+                target_vol = 22.0
+            else:
+                sel_row = pos[pos["ticker"] == sel_target] if "ticker" in pos.columns else pd.DataFrame()
+                target_order_val = float(sel_row["current_value"].iloc[0]) if (not sel_row.empty and "current_value" in sel_row.columns) else 10_000.0
+                target_adv = target_order_val * 8.0
+                target_vol = 28.0
+
+        with col_opt_ctrl2:
+            exec_horizon = st.slider("Orizzonte di Liquidazione (Giorni T):", min_value=1, max_value=20, value=5, step=1, key="ac_exec_horizon_sl")
+            spread_bps_ac = st.slider("Bid-Ask Spread Stimato (bps):", min_value=5, max_value=80, value=15, step=5, key="ac_spread_sl")
+
+        with col_opt_ctrl3:
+            lambda_choice = st.select_slider(
+                "Avversione al Rischio (λ):",
+                options=[0.0, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5],
+                value=1e-6,
+                format_func=lambda l: "0.0 (Risk-Neutral TWAP)" if l == 0.0 else (f"{l:.1e} (Aggressivo)" if l >= 1e-5 else f"{l:.1e} (Bilanciato)"),
+                key="ac_lambda_sl"
             )
-        with col_p3:
-            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-            include_spread = st.checkbox("Includi Half-Spread Bid-Ask", value=True, key="ac_include_spread")
+            n_steps = st.slider("Intervalli di Esecuzione (N Slices):", min_value=5, max_value=30, value=15, step=5, key="ac_n_steps_sl")
 
         exec_res = compute_almgren_chriss_optimal_execution(
-            pos,
-            total_days=float(exec_horizon),
-            risk_aversion=float(risk_aversion),
-            n_steps=10,
-            include_half_spread=include_spread
+            order_value=target_order_val,
+            adv_value=target_adv,
+            volatility_ann_pct=target_vol,
+            horizon_days=float(exec_horizon),
+            n_intervals=n_steps,
+            risk_aversion_lambda=lambda_choice,
+            bid_ask_spread_bps=float(spread_bps_ac)
         )
 
         df_sched = exec_res["schedule_df"]
-        kpis = exec_res["kpis"]
 
         # KPI Cards
         col_k1, col_k2, col_k3, col_k4 = st.columns(4)
         with col_k1:
-            metric_card("Controvalore Portafoglio", f"€ {kpis['initial_portfolio_value']:,.2f}", "Capitale iniziale")
+            metric_card("Costo Atteso E[x]", f"€ {exec_res['expected_cost_amount']:,.2f}", f"{exec_res['expected_cost_bps']:.1f} bps su nozionale")
         with col_k2:
-            metric_card("Costo Totale Atteso (E[Cost])", f"€ {kpis['expected_total_cost']:,.2f}", f"Slippage: {kpis['expected_cost_pct']:.2f}% ({kpis['expected_cost_bps']:.1f} bps)")
+            metric_card("Execution Risk (Std Dev)", f"€ {exec_res['execution_std_amount']:,.2f}", "Incertezza prezzo durante trade")
         with col_k3:
-            metric_card("Execution VaR (95%)", f"€ {kpis['execution_var_95']:,.2f}", f"{kpis['execution_var_pct']:.2f}% del valore")
+            metric_card("Execution VaR (95%)", f"€ {exec_res['execution_var_95_amount']:,.2f}", "Costo massimo al 95% conf.")
         with col_k4:
-            metric_card("Half-Life di Liquidazione", f"{kpis['half_life_days']:.2f} gg", f"Parametro Urgenza κ: {kpis['urgency_kappa']:.3f}")
+            metric_card("Half-Life di Liquidazione", f"{exec_res['half_life_days']:.2f} gg", f"Parametro Urgenza κ: {exec_res['kappa']:.3f}")
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
         col_f1, col_f2 = st.columns([1.6, 1.0])
         with col_f1:
             st.markdown("##### 📉 Traiettorie di Smobilizzo a Confronto")
-            t_vals = df_sched["Giorno"].tolist()
-            opt_vals = df_sched["Posizione Residua (€)"].tolist()
-            x0 = kpis['initial_portfolio_value']
-            twap_vals = [x0 * (1.0 - t / exec_horizon) for t in t_vals]
-            agg_vals = [x0 * np.exp(-3.0 * t / exec_horizon) for t in t_vals]
+            t_vals = [0.0] + list(df_sched["Giorno"])
+            opt_vals = [exec_res["order_value"]] + list(df_sched["Posizione Residua (€)"])
+            twap_vals = [exec_res["order_value"]] + list(df_sched["Traiettoria TWAP (€)"])
+            agg_vals = [exec_res["order_value"]] + list(df_sched["Traiettoria Aggressiva (€)"])
 
             fig_traj = go.Figure()
             fig_traj.add_trace(go.Scatter(
