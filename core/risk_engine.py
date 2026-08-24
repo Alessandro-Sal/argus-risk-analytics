@@ -987,9 +987,12 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     opt_vol_risk = np.sqrt(np.dot(opt_vol_weights.T, np.dot(cov_matrix, opt_vol_weights)))
     opt_vol_ratio = (opt_vol_return - rf) / opt_vol_risk if opt_vol_risk > 0 else 0
 
-    # Monte Carlo simulation for visual frontier plots
+    # Monte Carlo simulation for visual frontier and 3D risk surface plots
     num_portfolios = 5000
     results = np.zeros((3, num_portfolios))
+    hhi_records = np.zeros(num_portfolios)
+    cvar_records = np.zeros(num_portfolios)
+    sortino_records = np.zeros(num_portfolios)
     weights_record = []
     
     # Random portfolios for Monte Carlo
@@ -1001,10 +1004,16 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         port_return = np.sum(mean_returns * weights)
         port_std = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
         sharpe_ratio = (port_return - rf) / port_std if port_std > 0 else 0
+        hhi_val = float(np.sum(weights ** 2))
+        cvar_val = float(port_return - 2.063 * port_std)
+        sortino_val = float((port_return - rf) / max(0.001, port_std * 0.707))
         
         results[0, i] = port_std
         results[1, i] = port_return
         results[2, i] = sharpe_ratio
+        hhi_records[i] = hhi_val
+        cvar_records[i] = cvar_val
+        sortino_records[i] = sortino_val
 
     # Pesi correnti per comparazione
     curr_weights_s = df_positions[df_positions["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100
@@ -1018,6 +1027,9 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     curr_return = np.sum(mean_returns * curr_weights)
     curr_std = np.sqrt(np.dot(curr_weights.T, np.dot(cov_matrix, curr_weights)))
     curr_sharpe = (curr_return - rf) / curr_std if curr_std > 0 else 0
+    curr_hhi = float(np.sum(curr_weights ** 2))
+    curr_cvar = float(curr_return - 2.063 * curr_std)
+    curr_sortino = float((curr_return - rf) / max(0.001, curr_std * 0.707))
     
     return {
         "tickers": common,
@@ -1027,24 +1039,36 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
             "return": curr_return,
             "risk": curr_std,
             "sharpe": curr_sharpe,
+            "hhi": curr_hhi,
+            "cvar_95": curr_cvar,
+            "sortino": curr_sortino,
             "weights": curr_weights.tolist()
         },
         "max_sharpe": {
             "return": float(opt_sharpe_return),
             "risk": float(opt_sharpe_risk),
             "sharpe": float(opt_sharpe_ratio),
+            "hhi": float(np.sum(opt_sharpe_weights ** 2)),
+            "cvar_95": float(opt_sharpe_return - 2.063 * opt_sharpe_risk),
+            "sortino": float((opt_sharpe_return - rf) / max(0.001, opt_sharpe_risk * 0.707)),
             "weights": opt_sharpe_weights.tolist()
         },
         "min_vol": {
             "return": float(opt_vol_return),
             "risk": float(opt_vol_risk),
             "sharpe": float(opt_vol_ratio),
+            "hhi": float(np.sum(opt_vol_weights ** 2)),
+            "cvar_95": float(opt_vol_return - 2.063 * opt_vol_risk),
+            "sortino": float((opt_vol_return - rf) / max(0.001, opt_vol_risk * 0.707)),
             "weights": opt_vol_weights.tolist()
         },
         "frontier": {
             "risk": results[0].tolist(),
             "return": results[1].tolist(),
-            "sharpe": results[2].tolist()
+            "sharpe": results[2].tolist(),
+            "hhi": hhi_records.tolist(),
+            "cvar_95": cvar_records.tolist(),
+            "sortino": sortino_records.tolist()
         }
     }
 

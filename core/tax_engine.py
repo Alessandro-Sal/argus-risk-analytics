@@ -441,6 +441,23 @@ def compute_tax_loss_harvesting_strategy(
 
     remaining_zainetto = available_zainetto
 
+    REPLACEMENT_PROXIES = {
+        "AAPL": "MSFT (Proxy Tech Mega-Cap)",
+        "NVDA": "AMD / SMH (Proxy Semiconduttori)",
+        "MSFT": "GOOGL / QQQ (Proxy Cloud & Software)",
+        "AMZN": "META / XLY (Proxy Consumer & Cloud)",
+        "GOOGL": "META / MSFT (Proxy AI & Advertising)",
+        "TSLA": "RIVN / XLY (Proxy EV & Auto)",
+        "ENEL.MI": "IBE.MC (Iberdrola / Utilities Europa)",
+        "ISP.MI": "UCG.MI (UniCredit / Banche Italia)",
+        "UCG.MI": "ISP.MI (Intesa Sanpaolo / Banche Italia)",
+        "ENI.MI": "TTE.PA (TotalEnergies / Oil & Gas)",
+        "BND": "AGGH / IEAC (Proxy Obbligazionario)",
+        "TLT": "IEF / VGEA (Proxy Treasury / Gov)",
+        "BTC": "ETH / SOL (Proxy Crypto Major)",
+        "ETH": "BTC / SOL (Proxy Crypto Smart Contracts)",
+    }
+
     for _, row in pos.iterrows():
         ticker = str(row.get("ticker", ""))
         ac = str(row.get("asset_class", "Equity"))
@@ -452,6 +469,7 @@ def compute_tax_loss_harvesting_strategy(
         
         etf_flag = is_etf(ac, ticker)
         tax_rate = get_asset_tax_rate(ac, ticker)
+        proxy_asset = REPLACEMENT_PROXIES.get(ticker, f"Attendi 31 Giorni o ETF Settoriale ({ac})")
 
         # 1. Candidato Step-Up Fiscale (Utile su Redditi Diversi: NON ETF)
         if unrealized_pnl > 10.0 and not etf_flag and qty > 0 and curr_price > 0:
@@ -467,8 +485,9 @@ def compute_tax_loss_harvesting_strategy(
                 "unrealized_gain_pct": round(unrealized_pct, 2),
                 "consumable_minus_eur": round(consumable_gain, 2),
                 "tax_saving_eur": round(tax_saved, 2),
-                "action": "🎯 Vendi & Ricompra (Step-Up a 0€ Imposta)",
-                "rationale": f"Monetizza € {consumable_gain:,.2f} di plusvalenza compensandola al 100% con lo zainetto. Il prezzo di carico sale a € {curr_price:.2f} con 0€ di tasse."
+                "action": "🎯 Vendi & Ricompra (Step-Up 0€ Tasse)",
+                "replacement_proxy": "Riacquisto Immediato stesso Ticker",
+                "rationale": f"Monetizza € {consumable_gain:,.2f} di plusvalenza compensandola al 100% con lo zainetto. Il prezzo di carico sale a € {curr_price:.2f} con 0€ di imposta."
             })
             if remaining_zainetto > 0:
                 remaining_zainetto = max(0.0, remaining_zainetto - consumable_gain)
@@ -477,18 +496,21 @@ def compute_tax_loss_harvesting_strategy(
         elif unrealized_pnl < -10.0 and qty > 0:
             loss_amt = abs(unrealized_pnl)
             potential_tax_shield = loss_amt * tax_rate
+            order_notional = qty * curr_price
             
             loss_harvest_rows.append({
                 "ticker": ticker,
                 "asset_class": ac,
                 "qty_held": round(qty, 4),
                 "current_price_eur": round(curr_price, 2),
+                "order_notional_eur": round(order_notional, 2),
                 "unrealized_loss_eur": round(unrealized_pnl, 2),
                 "unrealized_loss_pct": round(unrealized_pct, 2),
                 "loss_to_harvest_eur": round(loss_amt, 2),
                 "tax_shield_created_eur": round(potential_tax_shield, 2),
-                "action": "✂️ Vendi per Raccolta Minusvalenze",
-                "rationale": f"Genera € {loss_amt:,.2f} di nuove minusvalenze per schermare future plusvalenze e ridurre il carico fiscale di € {potential_tax_shield:,.2f}."
+                "action": "✂️ SELL HARVEST (Monetizza Minus)",
+                "replacement_proxy": proxy_asset,
+                "rationale": f"Vendi {qty:,.2f} quote per generare € {loss_amt:,.2f} di credito fiscale nello zainetto (€ {potential_tax_shield:,.2f} risparmio netto). Re-investi in {proxy_asset}."
             })
 
     df_step_up = pd.DataFrame(step_up_rows)
