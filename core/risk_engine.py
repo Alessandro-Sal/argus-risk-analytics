@@ -987,7 +987,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     opt_vol_risk = np.sqrt(np.dot(opt_vol_weights.T, np.dot(cov_matrix, opt_vol_weights)))
     opt_vol_ratio = (opt_vol_return - rf) / opt_vol_risk if opt_vol_risk > 0 else 0
 
-    # Monte Carlo simulation for visual frontier and 3D risk surface plots
+    # Monte Carlo simulation for visual frontier and 3D risk surface plots (Multi-Alpha Dirichlet for full 3D envelope)
     num_portfolios = 5000
     results = np.zeros((3, num_portfolios))
     hhi_records = np.zeros(num_portfolios)
@@ -995,25 +995,56 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     sortino_records = np.zeros(num_portfolios)
     weights_record = []
     
-    # Random portfolios for Monte Carlo
-    for i in range(num_portfolios):
-        weights = np.random.random(len(common))
-        weights /= np.sum(weights)
+    n_assets = len(common)
+    alphas = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0]
+    
+    # 1. Single asset corner vertices
+    k = 0
+    for idx_a in range(min(n_assets, num_portfolios)):
+        w = np.zeros(n_assets)
+        w[idx_a] = 1.0
+        weights_record.append(w)
+        p_ret = float(np.sum(mean_returns * w))
+        p_std = float(np.sqrt(np.dot(w.T, np.dot(cov_matrix, w))))
+        results[0, k] = p_std
+        results[1, k] = p_ret
+        results[2, k] = (p_ret - rf) / p_std if p_std > 0 else 0
+        hhi_records[k] = 1.0
+        cvar_records[k] = p_ret - 2.063 * p_std
+        sortino_records[k] = (p_ret - rf) / max(0.001, p_std * 0.707)
+        k += 1
+
+    # 2. Multi-concentration Dirichlet and sparse portfolio sampling
+    while k < num_portfolios:
+        alpha_val = alphas[k % len(alphas)]
+        weights = np.random.dirichlet(np.ones(n_assets) * alpha_val)
+        
+        # Sparsity sampling: 25% of portfolios concentrate on a random subset of assets
+        if np.random.random() < 0.25 and n_assets > 2:
+            subset_size = np.random.randint(2, n_assets)
+            mask = np.random.choice(n_assets, subset_size, replace=False)
+            w_sparse = np.zeros(n_assets)
+            w_sparse[mask] = weights[mask]
+            sum_sp = np.sum(w_sparse)
+            if sum_sp > 0:
+                weights = w_sparse / sum_sp
+                
         weights_record.append(weights)
         
-        port_return = np.sum(mean_returns * weights)
-        port_std = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+        port_return = float(np.sum(mean_returns * weights))
+        port_std = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))))
         sharpe_ratio = (port_return - rf) / port_std if port_std > 0 else 0
         hhi_val = float(np.sum(weights ** 2))
         cvar_val = float(port_return - 2.063 * port_std)
         sortino_val = float((port_return - rf) / max(0.001, port_std * 0.707))
         
-        results[0, i] = port_std
-        results[1, i] = port_return
-        results[2, i] = sharpe_ratio
-        hhi_records[i] = hhi_val
-        cvar_records[i] = cvar_val
-        sortino_records[i] = sortino_val
+        results[0, k] = port_std
+        results[1, k] = port_return
+        results[2, k] = sharpe_ratio
+        hhi_records[k] = hhi_val
+        cvar_records[k] = cvar_val
+        sortino_records[k] = sortino_val
+        k += 1
 
     # Pesi correnti per comparazione
     curr_weights_s = df_positions[df_positions["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100
