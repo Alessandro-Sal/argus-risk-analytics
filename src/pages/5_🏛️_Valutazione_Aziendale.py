@@ -112,6 +112,8 @@ with col_head2:
 """, button_label="💡 Come funziona la Valutazione?")
     st.markdown('</div>', unsafe_allow_html=True)
 
+st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
+
 
 if active_pos.empty:
     st.info("Nessuna posizione aperta in portafoglio.")

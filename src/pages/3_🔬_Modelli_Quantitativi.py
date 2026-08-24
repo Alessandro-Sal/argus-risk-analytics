@@ -134,6 +134,8 @@ with col_head2:
 """, button_label="📚 Guida Quant")
     st.markdown('</div>', unsafe_allow_html=True)
 
+st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
+
 # ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
 active_quant_tab = render_segmented_tabs([
     "📊 Markowitz & Rebalancing",
