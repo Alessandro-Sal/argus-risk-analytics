@@ -485,14 +485,15 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             apply_plotly_theme(fig_rc)
             st.plotly_chart(fig_rc, use_container_width=True)
 
-        st.markdown("**Risk Heatmap Grid (Mappa di Calore Rischio/PnL)**")
+        st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+        st.markdown("#### 🗺️ Risk Heatmap Grid (Mappa di Calore Rischio & PnL)")
+        st.caption("Mappa visiva ad alta densità in stile Finviz/Bloomberg: area proporzionale al controvalore (€), intensità cromatica dinamica sul PnL non realizzato.")
         fig_hm = render_risk_heatmap(pos, risk_contrib)
         if fig_hm:
             st.plotly_chart(fig_hm, use_container_width=True)
+        st.markdown('<div style="margin-bottom: 24px;"></div>', unsafe_allow_html=True)
     else:
         st.info("Impossibile calcolare la scomposizione del rischio (nessuna posizione attiva con controvalore).")
-
-    st.divider()
 
     col_head_mrs1, col_head_mrs2 = st.columns([3.2, 1.1])
     with col_head_mrs1:
