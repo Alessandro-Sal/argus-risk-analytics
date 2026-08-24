@@ -345,6 +345,12 @@ def execute_bquant_script(
     df_prices = ctx.get("df_prices", results_obj.get("df_prices", pd.DataFrame()))
     df_returns = ctx.get("df_returns", results_obj.get("returns", pd.DataFrame()))
     df_tx = ctx.get("df_tx", results_obj.get("df_tx", pd.DataFrame()))
+    portfolio_name = ctx.get("portfolio_name", results_obj.get("portfolio_name", "Portfolio"))
+    portfolio_return = ctx.get("portfolio_return", results_obj.get("portfolio_return", pd.Series(dtype=float)))
+    benchmark_return = ctx.get("benchmark_return", results_obj.get("benchmark_return", pd.Series(dtype=float)))
+    benchmark_ticker = ctx.get("benchmark_ticker", results_obj.get("benchmark_ticker", "SPY"))
+    base_currency = ctx.get("base_currency", results_obj.get("base_currency", "EUR"))
+    portfolio_value = float(df_positions["current_value"].sum()) if (df_positions is not None and isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "current_value" in df_positions.columns) else 0.0
     
     # Configurazione del Namespace di esecuzione
     namespace = {
@@ -362,6 +368,14 @@ def execute_bquant_script(
         "df_prices": df_prices,
         "df_returns": df_returns,
         "df_tx": df_tx,
+        "portfolio_name": portfolio_name,
+        "portfolio_return": portfolio_return,
+        "portfolio_returns": portfolio_return,
+        "benchmark_return": benchmark_return,
+        "benchmark_returns": benchmark_return,
+        "benchmark_ticker": benchmark_ticker,
+        "base_currency": base_currency,
+        "portfolio_value": portfolio_value,
         "df_out": None,
         "fig": None
     }
