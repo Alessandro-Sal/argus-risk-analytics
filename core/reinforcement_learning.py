@@ -13,21 +13,21 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 class PortfolioEnv:
     """
     Simulation environment for portfolio management MDP (Markov Decision Process).
-    Observation State: [Rolling Returns (10d, 30d), Rolling Volatility (20d), Asset Momentum]
+    Observation State: [Rolling Asset Sharpe, Asset Momentum, Asset Downside Volatility]
     Action: Simplex portfolio weight allocation w in Delta^{N-1}
-    Reward: Risk-adjusted return metric (Sortino / Sharpe) minus turnover friction.
+    Reward: Risk-adjusted Sortino/Sharpe utility minus turnover friction with diversification incentive.
     """
     def __init__(
         self,
         df_returns: pd.DataFrame,
-        window_size: int = 30,
+        window_size: int = 25,
         reward_type: str = "sortino",
-        turnover_penalty: float = 0.001
+        turnover_penalty: float = 0.0005
     ):
         self.df_returns = df_returns.dropna().copy()
         self.tickers = self.df_returns.columns.tolist()
         self.n_assets = len(self.tickers)
-        self.window_size = window_size
+        self.window_size = max(15, window_size)
         self.reward_type = reward_type.lower()
         self.turnover_penalty = turnover_penalty
         self.current_step = 0
@@ -40,41 +40,53 @@ class PortfolioEnv:
         return self._get_state()
 
     def _get_state(self) -> np.ndarray:
-        # State vector: Rolling return means + rolling vol + correlation centroid
         window_data = self.df_returns.iloc[self.current_step - self.window_size : self.current_step].values
-        means = np.mean(window_data, axis=0) * 100.0
-        vols = np.std(window_data, axis=0) * 100.0
-        momentum = (window_data[-1] - window_data[0]) * 100.0
-        return np.concatenate([means, vols, momentum])
+        means = np.mean(window_data, axis=0)
+        vols = np.std(window_data, axis=0) + 1e-6
+        sharpes = means / vols
+
+        # Multi-timeframe momentum
+        ema_fast = np.mean(window_data[-5:], axis=0)
+        ema_slow = np.mean(window_data, axis=0)
+        mom = (ema_fast - ema_slow) / vols
+
+        # Cross-sectional z-score standardization across universe
+        def _zscore(v: np.ndarray) -> np.ndarray:
+            s = np.std(v)
+            return (v - np.mean(v)) / (s + 1e-6) if s > 1e-6 else np.zeros_like(v)
+
+        state = np.concatenate([_zscore(sharpes), _zscore(mom), _zscore(vols)])
+        return np.clip(state, -3.0, 3.0)
 
     def step(self, action_weights: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
-        # Ensure weights are valid simplex
-        w = np.maximum(0.0, action_weights)
+        # Ensure weights are valid simplex on Delta^{N-1}
+        w = np.maximum(0.001, action_weights)
         if np.sum(w) > 0:
             w = w / np.sum(w)
         else:
             w = np.ones(self.n_assets) / self.n_assets
 
-        # Asset returns on step t
         step_returns = self.df_returns.iloc[self.current_step].values
         portfolio_ret = float(np.dot(w, step_returns))
-        
-        # Turnover cost
+
+        # Turnover friction
         turnover = float(np.sum(np.abs(w - self.prev_weights)))
         cost = turnover * self.turnover_penalty
         net_ret = portfolio_ret - cost
 
-        # Calculate reward
+        # Diversification incentive (1 - HHI is maximized when perfectly equi-weighted)
+        div_bonus = 1.0 - float(np.sum(w ** 2))
+
+        # Risk-adjusted reward calculation
         if self.reward_type == "sortino":
-            # Downside semi-variance penalty
-            downside = max(0.0, -net_ret) ** 2
-            reward = net_ret * 100.0 - 4.5 * downside * 100.0
+            downside = max(0.0, -net_ret)
+            reward = net_ret * 100.0 - 2.5 * (downside * 100.0) - cost * 50.0 + 0.15 * div_bonus
         elif self.reward_type == "sharpe":
             vol_est = float(np.std(step_returns)) + 1e-4
-            reward = (net_ret / vol_est) * 10.0
+            reward = (net_ret / vol_est) * 5.0 - cost * 50.0 + 0.10 * div_bonus
         else:
-            # Min volatility reward
-            reward = net_ret * 50.0 - 2.0 * (portfolio_ret ** 2) * 100.0
+            # Min volatility
+            reward = net_ret * 50.0 - 2.0 * (portfolio_ret ** 2) * 100.0 - cost * 50.0 + 0.20 * div_bonus
 
         self.prev_weights = w.copy()
         self.current_step += 1
@@ -92,60 +104,128 @@ class PortfolioEnv:
 
 class RLPolicyAgent:
     """
-    Direct Policy-Gradient / Softmax Actor network for Continuous Portfolio Allocation.
-    Trained with Policy Gradient REINFORCE + Baseline Variance Reduction.
+    Direct Policy-Gradient Neural Actor network for Continuous Portfolio Allocation.
+    Trained with Batch Policy Gradient REINFORCE, Adam Optimization and Entropy Regularization.
     """
-    def __init__(self, state_dim: int, action_dim: int, lr: float = 0.015, random_seed: int = 42):
+    def __init__(
+        self,
+        state_dim: int,
+        action_dim: int,
+        lr: float = 0.012,
+        entropy_coeff: float = 0.04,
+        random_seed: int = 42
+    ):
         np.random.seed(random_seed)
         self.state_dim = state_dim
         self.action_dim = action_dim
         self.lr = lr
-        # Initialize 2-layer linear policy weights
-        self.W1 = np.random.randn(state_dim, 24) * 0.1
-        self.b1 = np.zeros(24)
-        self.W2 = np.random.randn(24, action_dim) * 0.1
+        self.entropy_coeff = entropy_coeff
+        self.t = 0
+
+        # Xavier Uniform Initialization
+        limit1 = np.sqrt(6.0 / (state_dim + 32))
+        self.W1 = np.random.uniform(-limit1, limit1, (state_dim, 32)) * 0.35
+        self.b1 = np.zeros(32)
+
+        limit2 = np.sqrt(6.0 / (32 + action_dim))
+        self.W2 = np.random.uniform(-limit2, limit2, (32, action_dim)) * 0.08
         self.b2 = np.zeros(action_dim)
 
-    def forward(self, state: np.ndarray) -> np.ndarray:
-        # Layer 1: ReLU
-        h = np.maximum(0.0, np.dot(state, self.W1) + self.b1)
-        # Layer 2: Logits -> Softmax
-        logits = np.dot(h, self.W2) + self.b2
-        # Softmax for valid probability simplex
+        # Adam moments
+        self.mW1, self.vW1 = np.zeros_like(self.W1), np.zeros_like(self.W1)
+        self.mb1, self.vb1 = np.zeros_like(self.b1), np.zeros_like(self.b1)
+        self.mW2, self.vW2 = np.zeros_like(self.W2), np.zeros_like(self.W2)
+        self.mb2, self.vb2 = np.zeros_like(self.b2), np.zeros_like(self.b2)
+
+    def forward(self, state: np.ndarray, temperature: float = 1.0) -> np.ndarray:
+        # Layer 1: Tanh for bounded non-linear representations
+        h = np.tanh(np.dot(state, self.W1) + self.b1)
+        # Layer 2: Logits with temperature scaling
+        logits = (np.dot(h, self.W2) + self.b2) / max(0.2, temperature)
+        # Stable Softmax
         exp_logits = np.exp(logits - np.max(logits))
         weights = exp_logits / np.sum(exp_logits)
-        return weights
+        # Institutional blending with 1/N prior to prevent single-asset corner collapse
+        prior_1n = np.ones(self.action_dim) / self.action_dim
+        return 0.85 * weights + 0.15 * prior_1n
 
-    def update(self, states: List[np.ndarray], actions: List[np.ndarray], rewards: List[float]):
-        discounted_r = np.zeros(len(rewards))
+    def update(
+        self,
+        states: List[np.ndarray],
+        actions: List[np.ndarray],
+        rewards: List[float]
+    ):
+        self.t += 1
+        T = len(rewards)
+        if T == 0:
+            return
+
+        # Discounted returns G_t
+        gamma = 0.98
+        discounted_r = np.zeros(T)
         running_add = 0.0
-        gamma = 0.95
-        for t in reversed(range(len(rewards))):
+        for t in reversed(range(T)):
             running_add = running_add * gamma + rewards[t]
             discounted_r[t] = running_add
 
-        # Standardize returns baseline
-        if np.std(discounted_r) > 1e-6:
-            discounted_r = (discounted_r - np.mean(discounted_r)) / (np.std(discounted_r) + 1e-6)
+        # Standardize returns / advantages
+        std_g = np.std(discounted_r)
+        if std_g > 1e-6:
+            advantages = (discounted_r - np.mean(discounted_r)) / (std_g + 1e-6)
+        else:
+            advantages = discounted_r - np.mean(discounted_r)
 
-        # Policy gradient step
-        for state, action, G in zip(states, actions, discounted_r):
-            h = np.maximum(0.0, np.dot(state, self.W1) + self.b1)
+        # Batch gradient accumulators
+        g_W1 = np.zeros_like(self.W1)
+        g_b1 = np.zeros_like(self.b1)
+        g_W2 = np.zeros_like(self.W2)
+        g_b2 = np.zeros_like(self.b2)
+
+        for state, action, adv in zip(states, actions, advantages):
+            h = np.tanh(np.dot(state, self.W1) + self.b1)
             pred_w = self.forward(state)
-            
-            # Gradient of softmax cross-entropy with advantage G
-            d_logits = (pred_w - action) * G * self.lr
-            d_W2 = np.outer(h, d_logits)
-            d_b2 = d_logits
-            
-            dh = np.dot(self.W2, d_logits) * (h > 0)
-            d_W1 = np.outer(state, dh)
-            d_b1 = dh
-            
-            self.W2 -= d_W2
-            self.b2 -= d_b2
-            self.W1 -= d_W1
-            self.b1 -= d_b1
+
+            # Policy gradient + entropy regularizer for exploration
+            entropy_grad = (np.log(pred_w + 1e-8) + 1.0) * self.entropy_coeff
+            d_logits = -(action - pred_w) * adv + entropy_grad
+            d_logits = np.clip(d_logits, -1.5, 1.5)
+
+            g_W2 += np.outer(h, d_logits)
+            g_b2 += d_logits
+
+            dh = np.dot(self.W2, d_logits) * (1.0 - h**2)
+            g_W1 += np.outer(state, dh)
+            g_b1 += dh
+
+        # Average over batch trajectory
+        g_W1 /= T
+        g_b1 /= T
+        g_W2 /= T
+        g_b2 /= T
+
+        # Global gradient clipping
+        total_norm = np.sqrt(np.sum(g_W1**2) + np.sum(g_b1**2) + np.sum(g_W2**2) + np.sum(g_b2**2))
+        clip_norm = 1.0
+        if total_norm > clip_norm:
+            scale = clip_norm / (total_norm + 1e-6)
+            g_W1 *= scale
+            g_b1 *= scale
+            g_W2 *= scale
+            g_b2 *= scale
+
+        # Adam Optimizer parameter update
+        beta1, beta2, eps = 0.9, 0.999, 1e-8
+        for p, g, m, v in [
+            (self.W1, g_W1, self.mW1, self.vW1),
+            (self.b1, g_b1, self.mb1, self.vb1),
+            (self.W2, g_W2, self.mW2, self.vW2),
+            (self.b2, g_b2, self.mb2, self.vb2)
+        ]:
+            m[:] = beta1 * m + (1.0 - beta1) * g
+            v[:] = beta2 * v + (1.0 - beta2) * (g ** 2)
+            m_hat = m / (1.0 - beta1 ** self.t)
+            v_hat = v / (1.0 - beta2 ** self.t)
+            p -= self.lr * m_hat / (np.sqrt(v_hat) + eps)
 
 
 def train_and_evaluate_rl_portfolio(
@@ -153,7 +233,7 @@ def train_and_evaluate_rl_portfolio(
     episodes: int = 35,
     window_size: int = 25,
     reward_type: str = "sortino",
-    turnover_penalty: float = 0.001,
+    turnover_penalty: float = 0.0005,
     random_seed: int = 42
 ) -> Dict[str, Any]:
     """
@@ -176,8 +256,19 @@ def train_and_evaluate_rl_portfolio(
     state_dim = n_assets * 3
     action_dim = n_assets
 
-    env = PortfolioEnv(rets, window_size=window_size, reward_type=reward_type, turnover_penalty=turnover_penalty)
-    agent = RLPolicyAgent(state_dim=state_dim, action_dim=action_dim, lr=0.012, random_seed=random_seed)
+    env = PortfolioEnv(
+        rets,
+        window_size=window_size,
+        reward_type=reward_type,
+        turnover_penalty=turnover_penalty
+    )
+    agent = RLPolicyAgent(
+        state_dim=state_dim,
+        action_dim=action_dim,
+        lr=0.012,
+        entropy_coeff=0.04,
+        random_seed=random_seed
+    )
 
     learning_curve_data = []
 
@@ -188,8 +279,8 @@ def train_and_evaluate_rl_portfolio(
         total_ep_reward = 0.0
 
         while True:
-            # Forward pass + exploration noise decaying with episodes
-            noise_scale = max(0.02, 0.20 * (1.0 - (ep / episodes)))
+            # Forward pass + exploration noise smoothly decaying with training progress
+            noise_scale = max(0.01, 0.08 * (1.0 - (ep / episodes)))
             raw_w = agent.forward(state)
             noisy_w = np.maximum(0.001, raw_w + np.random.normal(0, noise_scale, action_dim))
             action_w = noisy_w / np.sum(noisy_w)
@@ -205,7 +296,7 @@ def train_and_evaluate_rl_portfolio(
             if done:
                 break
 
-        # Policy update step
+        # Batch policy gradient update
         agent.update(states_history, actions_history, rewards_history)
         learning_curve_data.append({
             "episode": ep,
