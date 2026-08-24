@@ -22,9 +22,9 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "icon": "⚡",
         "description": "Ottimizzato per trader istituzionali, execution desk e market maker. Focus su flussi streaming ad alta frequenza, order book L2, slippage Almgren-Chriss e coperture delta rapide.",
         "primary_pages": [
-            {"name": "Posizioni e Dettagli", "page": "4_📋_Posizioni_e_Dettagli", "tab": "⚡ Liquidità Almgren-Chriss"},
-            {"name": "Analisi Tecnica", "page": "8_📈_Analisi_Tecnica", "tab": "📊 Volume Profile & Confluenza"},
-            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "📉 Opzioni & Coperture Delta"},
+            {"name": "Posizioni e Dettagli", "page": "4_📋_Posizioni_e_Dettagli", "tab": "⚡ Liquidità & Smart Order Router"},
+            {"name": "Analisi Tecnica", "page": "8_📈_Analisi_Tecnica", "tab": "🧱 Volume Profile Dettaglio"},
+            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🛡️ Hedging & Opzioni"},
             {"name": "BQuant Python", "page": "10_💻_BQuant_e_Launchpad", "tab": "🐍 ARGUS BQuant Python Sandbox"}
         ],
         "key_kpis": ["Order Flow Imbalance", "Microprice L2", "Slippage Stimato", "Execution VaR", "Delta Hedge Ratio"],
@@ -39,10 +39,10 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "icon": "🛡️",
         "description": "Configurato per Chief Risk Officer e comitati di controllo. Focus su limiti di rischio Basel III/IV, volatilità dinamica GARCH(1,1), stress test macroeconomici 3D e LVaR Bangia.",
         "primary_pages": [
-            {"name": "Analisi Rischio", "page": "2_🔴_Analisi_Rischio", "tab": "📊 VaR & CVaR Istituzionale"},
-            {"name": "Analisi Rischio", "page": "2_🔴_Analisi_Rischio", "tab": "🌪️ GARCH & Volatilità Dinamica"},
-            {"name": "Stress Testing", "page": "6_🌪️_Stress_Testing", "tab": "🌐 Superficie di Rischio 3D"},
-            {"name": "Analisi Rischio", "page": "2_🔴_Analisi_Rischio", "tab": "💧 LVaR & Liquidità Bangia"}
+            {"name": "Analisi Rischio", "page": "2_🔴_Analisi_Rischio", "tab": "📉 VaR, CVaR & Backtesting Kupiec"},
+            {"name": "Analisi Rischio", "page": "2_🔴_Analisi_Rischio", "tab": "📊 Profilo del Rischio & Fama-French"},
+            {"name": "Stress Testing", "page": "6_🌪️_Stress_Testing", "tab": "⚡ Matrice Comparativa MSCI Barra"},
+            {"name": "Analisi Rischio", "page": "2_🔴_Analisi_Rischio", "tab": "🔗 Correlazioni, Liquidità & ATR Chandelier"}
         ],
         "key_kpis": ["Parametric VaR 95%", "Expected Shortfall (CVaR)", "GARCH Term Structure", "Basel Traffic Light Zone", "LVaR 5-Days"],
         "recommended_refresh_rate": 60
@@ -56,10 +56,10 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "icon": "💼",
         "description": "Strutturato per gestori di fondi e allocatori strategici. Focus sull'ottimizzazione Hierarchical Risk Parity, attribuzione performance Brinson / Fama-French, backtesting a quintili e flussi cedolari.",
         "primary_pages": [
-            {"name": "Dashboard Generale", "page": "1_📈_Dashboard_Generale", "tab": "🎯 Asset Allocation & Radar"},
-            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🌿 Ottimizzatore HRP"},
+            {"name": "Dashboard Generale", "page": "1_📈_Dashboard_Generale", "tab": "Dashboard Generale"},
+            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "📊 Markowitz & Rebalancing"},
             {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🎯 Attribuzione & Fattori"},
-            {"name": "Screener Opportunità", "page": "9_🔍_Screener_Opportunita", "tab": "🔍 Screener Multi-Fattoriale"}
+            {"name": "Screener Opportunità", "page": "9_🔍_Screener_Opportunita", "tab": "🔍 Screener Multi-Fattoriale & Archetipi"}
         ],
         "key_kpis": ["Sharpe Ratio", "Information Ratio", "Alpha Fama-French", "Spread Long-Short Q1-Q5", "Yield on Cost"],
         "recommended_refresh_rate": 30
@@ -74,9 +74,9 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "description": "Dedicato alla ricerca quantitativa e modellistica avanzata. Include console interattiva BQuant Python, superfici di volatilità SVI/Spline, calibrazione Merton Jump-Diffusion e clustering non supervisionato K-Means.",
         "primary_pages": [
             {"name": "BQuant Python", "page": "10_💻_BQuant_e_Launchpad", "tab": "🐍 ARGUS BQuant Python Sandbox"},
-            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🌊 Superficie di Volatilità"},
-            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "⚡ Jump-Diffusion & Merton"},
-            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🧠 Machine Learning & Cluster"}
+            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🎲 Monte Carlo & Merton"},
+            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🧬 Tail Copula & Kelly"},
+            {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🤖 AI Reinforcement Learning"}
         ],
         "key_kpis": ["Implied Volatility Smile", "Jump Intensity (λ)", "Spearman Monotonicity", "K-Means Silhouette", "Python Execution Time"],
         "recommended_refresh_rate": 0 # Manual execution
@@ -91,8 +91,8 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "description": "Ottimizzato per direttori finanziari, tesorieri d'impresa e desk obbligazionari. Focus su YTM, Duration, Convexity, Z-Spread Nelson-Siegel, monitoraggio CDS sovrano/corporate e compensazione fiscale minusvalenze.",
         "primary_pages": [
             {"name": "Modelli Quantitativi", "page": "3_🔬_Modelli_Quantitativi", "tab": "🏛️ Fixed Income & Z-Spread"},
-            {"name": "Posizioni e Dettagli", "page": "4_📋_Posizioni_e_Dettagli", "tab": "🧾 Efficienza Fiscale & Zainetto"},
-            {"name": "Valutazione Aziendale", "page": "5_🏛️_Valutazione_Aziendale", "tab": "📊 Valutazione & DCF"},
+            {"name": "Posizioni e Dettagli", "page": "4_📋_Posizioni_e_Dettagli", "tab": "💰 Ottimizzazione Fiscale (TUIR Art. 67)"},
+            {"name": "Valutazione Aziendale", "page": "5_🏛️_Valutazione_Aziendale", "tab": "🏛️ Fair Value & Consensus Analisti"},
             {"name": "Excel Live Connector", "page": "10_💻_BQuant_e_Launchpad", "tab": "📊 Excel Live Connector & RTD"}
         ],
         "key_kpis": ["Yield to Maturity (YTM)", "Modified Duration", "DV01 Total", "Z-Spread (bps)", "Credito Fiscale Zainetto"],

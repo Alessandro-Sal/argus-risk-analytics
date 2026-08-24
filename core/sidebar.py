@@ -40,10 +40,10 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "risk_active_tab",
         "subtabs": [
-            {"label": "📊 Profilo & Fama-French", "target": "📊 Profilo del Rischio & Fama-French"},
-            {"label": "📉 VaR & Test Kupiec", "target": "📉 VaR, CVaR & Backtesting Kupiec"},
-            {"label": "🔗 Correlazioni & ATR", "target": "🔗 Correlazioni, Liquidità & ATR Chandelier"},
-            {"label": "🕵️ Anomalie ML", "target": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)"}
+            {"label": "📊 Profilo del Rischio & Fama-French", "target": "📊 Profilo del Rischio & Fama-French"},
+            {"label": "📉 VaR, CVaR & Backtesting Kupiec", "target": "📉 VaR, CVaR & Backtesting Kupiec"},
+            {"label": "🔗 Correlazioni, Liquidità & ATR Chandelier", "target": "🔗 Correlazioni, Liquidità & ATR Chandelier"},
+            {"label": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)", "target": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)"}
         ]
     },
     {
@@ -55,6 +55,7 @@ NAV_MODULES = [
         "tab_key": "quant_active_tab",
         "subtabs": [
             {"label": "📊 Markowitz & Rebalancing", "target": "📊 Markowitz & Rebalancing"},
+            {"label": "🤖 AI Reinforcement Learning", "target": "🤖 AI Reinforcement Learning"},
             {"label": "🧬 Tail Copula & Kelly", "target": "🧬 Tail Copula & Kelly"},
             {"label": "🎲 Monte Carlo & Merton", "target": "🎲 Monte Carlo & Merton"},
             {"label": "🛡️ Hedging & Opzioni", "target": "🛡️ Hedging & Opzioni"},
@@ -70,11 +71,11 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "positions_active_tab",
         "subtabs": [
-            {"label": "📋 Posizioni & Costi FIFO", "target": "📋 Posizioni Attive & Costi FIFO"},
+            {"label": "📋 Posizioni Attive & Costi FIFO", "target": "📋 Posizioni Attive & Costi FIFO"},
             {"label": "🪦 Posizioni Chiuse & Graveyard", "target": "🪦 Posizioni Chiuse & Graveyard"},
             {"label": "📅 Proiezione Dividendi", "target": "📅 Proiezione Dividendi"},
-            {"label": "💰 Ottimizzazione Fiscale", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)"},
-            {"label": "⚡ Liquidità Almgren-Chriss", "target": "⚡ Liquidità Almgren-Chriss"}
+            {"label": "💰 Ottimizzazione Fiscale (TUIR Art. 67)", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)"},
+            {"label": "⚡ Liquidità & Smart Order Router", "target": "⚡ Liquidità & Smart Order Router"}
         ]
     },
     {
@@ -85,10 +86,10 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "val_segmented_tab",
         "subtabs": [
-            {"label": "🏛️ Fair Value & Consensus", "target": "🏛️ Fair Value & Consensus Analisti"},
-            {"label": "💼 Private Equity Waterfall", "target": "💼 Private Equity & Waterfall"},
-            {"label": "📊 Altman Z & DuPont", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)"},
-            {"label": "🧮 Intrinseco DCF MC", "target": "🧮 Valutazione Intrinseca DCF Monte Carlo"}
+            {"label": "🏛️ Fair Value & Consensus Analisti", "target": "🏛️ Fair Value & Consensus Analisti"},
+            {"label": "💼 Private Equity & Waterfall", "target": "💼 Private Equity & Waterfall"},
+            {"label": "📊 Bilanci & Solvibilità (Altman & DuPont)", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)"},
+            {"label": "🧮 Valutazione Intrinseca DCF Monte Carlo", "target": "🧮 Valutazione Intrinseca DCF Monte Carlo"}
         ]
     },
     {
@@ -99,9 +100,9 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "stress_active_tab",
         "subtabs": [
-            {"label": "⚡ Matrice MSCI Barra", "target": "⚡ Matrice Comparativa MSCI Barra"},
-            {"label": "🏛️ Scenari Storici", "target": "🏛️ Analisi Scenari Storici Dettagliata"},
-            {"label": "🛠️ Simulatore What-if", "target": "🛠️ Simulatore What-if Custom"}
+            {"label": "⚡ Matrice Comparativa MSCI Barra", "target": "⚡ Matrice Comparativa MSCI Barra"},
+            {"label": "🏛️ Analisi Scenari Storici Dettagliata", "target": "🏛️ Analisi Scenari Storici Dettagliata"},
+            {"label": "🛠️ Simulatore What-if Custom", "target": "🛠️ Simulatore What-if Custom"}
         ]
     },
     {
@@ -112,9 +113,9 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "time_active_tab",
         "subtabs": [
-            {"label": "📈 Serie Storiche", "target": "📈 Serie Storiche Temporali"},
-            {"label": "⚖️ Confronto Side-by-Side", "target": "⚖️ Confronto Affiancato (Side-by-Side)"},
-            {"label": "🗃️ Registro Snapshot", "target": "🗃️ Registro Completo Snapshot Storici"}
+            {"label": "📈 Serie Storiche Temporali", "target": "📈 Serie Storiche Temporali"},
+            {"label": "⚖️ Confronto Affiancato (Side-by-Side)", "target": "⚖️ Confronto Affiancato (Side-by-Side)"},
+            {"label": "🗃️ Registro Completo Snapshot Storici", "target": "🗃️ Registro Completo Snapshot Storici"}
         ]
     },
     {
@@ -140,10 +141,10 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "screener_segmented_subtab",
         "subtabs": [
-            {"label": "🔍 Screener & Archetipi", "target": "🔍 Screener Multi-Fattoriale & Archetipi"},
-            {"label": "🧪 Pre-Trade Simulator", "target": "🧪 Pre-Trade Portfolio Impact Simulator"},
-            {"label": "📊 Radar Multi-Titolo", "target": "📊 Radar Comparativo Multi-Titolo"},
-            {"label": "💾 Watchlist & Segnali", "target": "💾 Watchlist & Segnali Operativi"}
+            {"label": "🔍 Screener Multi-Fattoriale & Archetipi", "target": "🔍 Screener Multi-Fattoriale & Archetipi"},
+            {"label": "🧪 Pre-Trade Portfolio Impact Simulator", "target": "🧪 Pre-Trade Portfolio Impact Simulator"},
+            {"label": "📊 Radar Comparativo Multi-Titolo", "target": "📊 Radar Comparativo Multi-Titolo"},
+            {"label": "💾 Watchlist & Segnali Operativi", "target": "💾 Watchlist & Segnali Operativi"}
         ]
     },
     {
@@ -154,9 +155,9 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "bquant_active_tab",
         "subtabs": [
-            {"label": "🐍 BQuant Python Console", "target": "🐍 ARGUS BQuant Python Sandbox"},
-            {"label": "🎛️ Launchpad & Ruoli", "target": "🎛️ Launchpad & Workspace Customizer"},
-            {"label": "📊 Excel Live Connector", "target": "📊 Excel Live Connector & RTD"}
+            {"label": "🐍 ARGUS BQuant Python Sandbox", "target": "🐍 ARGUS BQuant Python Sandbox"},
+            {"label": "🎛️ Launchpad & Workspace Customizer", "target": "🎛️ Launchpad & Workspace Customizer"},
+            {"label": "📊 Excel Live Connector & RTD", "target": "📊 Excel Live Connector & RTD"}
         ]
     }
 ]
