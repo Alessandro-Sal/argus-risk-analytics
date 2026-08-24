@@ -995,8 +995,9 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
         importlib.reload(core.rebalancer)
         from core.rebalancer import compute_rebalancing_orders
 
-        col_reb1, col_reb2, col_reb3 = st.columns([3.3, 1.3, 0.8])
-        with col_reb1:
+        # ── CONTROLLI DI RIBILANCIAMENTO (LAYOUT DEDICATO) ─────────────
+        col_st1, col_st2 = st.columns([2.6, 1.4])
+        with col_st1:
             target_strategy = st.segmented_control(
                 "Profilo Bersaglio di Ribilanciamento:",
                 options=["🎯 Max Sharpe (Markowitz)", "🛡️ Minima Volatilità", "⚖️ Equi-peso (Equal Weight)"],
@@ -1005,15 +1006,17 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
             )
             if not target_strategy:
                 target_strategy = "🎯 Max Sharpe (Markowitz)"
-        with col_reb2:
-            new_cash_input = st.number_input(
-                "Iniezione Cassa (€):",
-                value=0.0, step=500.0, format="%.2f",
-                help="Inserisci un valore positivo per nuovi versamenti o negativo per prelievi di cassa."
-            )
-        with col_reb3:
-            st.markdown('<div style="margin-top: 32px;"></div>', unsafe_allow_html=True)
-            int_shares_flag = st.checkbox("Quote Intere", value=True, help="Arrotonda le quote operative agli interi.")
+        with col_st2:
+            col_c1, col_c2 = st.columns([1.1, 0.9])
+            with col_c1:
+                new_cash_input = st.number_input(
+                    "Iniezione Cassa (€):",
+                    value=0.0, step=500.0, format="%.2f",
+                    help="Inserisci un valore positivo per nuovi versamenti o negativo per prelievi di cassa."
+                )
+            with col_c2:
+                st.markdown('<div style="margin-top: 32px;"></div>', unsafe_allow_html=True)
+                int_shares_flag = st.checkbox("Quote Intere", value=True, help="Arrotonda le quote operative agli interi.")
 
         mode_key = "max_sharpe" if "Max Sharpe" in target_strategy else ("min_vol" if "Minima" in target_strategy else "equal_weight")
 
@@ -1030,9 +1033,9 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
         if not df_orders.empty:
             def highlight_action(val):
                 if str(val).startswith("BUY"):
-                    return "color: #00ff66; font-weight: bold;"
+                    return "color: #3fb950; font-weight: bold;"
                 elif str(val).startswith("SELL"):
-                    return "color: #ff3333; font-weight: bold;"
+                    return "color: #f85149; font-weight: bold;"
                 return "color: #8b949e;"
 
             col_om1, col_om2, col_om3 = st.columns(3)
@@ -1056,6 +1059,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 "current_weight_pct": "Peso Attuale %", "target_weight_pct": "Peso Target %"
             })
 
+            st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
             col_ro_f1, col_ro_f2, col_ro_f3 = st.columns([2.0, 1.3, 0.9])
             with col_ro_f1:
                 search_ro = st.text_input("🔍 Cerca Ordine:", placeholder="Filtra per Ticker (es. AAPL, BTC, ISP.MI)...", key="search_rebal_ord")
@@ -1087,13 +1091,26 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
             if df_disp_orders_filt.empty:
                 st.info("ℹ️ Nessun ordine corrisponde ai criteri di filtro impostati.")
             else:
+                rebal_cfg = {
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Azione Tattica": st.column_config.TextColumn("Azione Tattica", width="medium"),
+                    "Quote Attuali": st.column_config.NumberColumn("Quote Attuali", format="%.2f"),
+                    "Quote Target": st.column_config.NumberColumn("Quote Target", format="%.2f"),
+                    "Quote Operative": st.column_config.NumberColumn("Quote Operative (Δ)", format="%+,.2f"),
+                    "Prezzo (€)": st.column_config.NumberColumn("Prezzo Spot (€)", format="€ %.2f"),
+                    "Controvalore Ordine (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %+,.2f"),
+                    "Peso Attuale %": st.column_config.ProgressColumn("Peso Attuale %", format="%.2f%%", min_value=0.0, max_value=100.0),
+                    "Peso Target %": st.column_config.ProgressColumn("Peso Target %", format="%.2f%%", min_value=0.0, max_value=100.0),
+                }
                 st.dataframe(
                     df_disp_orders_filt.style.map(highlight_action, subset=["Azione Tattica"]).format({
                         "Quote Attuali": "{:,.2f}", "Quote Target": "{:,.2f}", "Quote Operative": "{:+,.2f}",
                         "Prezzo (€)": "€ {:,.2f}", "Controvalore Ordine (€)": "€ {:+,.2f}",
                         "Peso Attuale %": "{:.2f}%", "Peso Target %": "{:.2f}%"
                     }),
-                    use_container_width=True, hide_index=True
+                    column_config=rebal_cfg,
+                    use_container_width=True,
+                    hide_index=True
                 )
             
         # ── BACKTESTING ESTRATTO (HRP / MARKOWITZ / EQUI-PESO) ────────
