@@ -532,25 +532,8 @@ if selected_bms:
 # ── VISTA ANALITICA AGGREGATA DUCKDB (OLAP ACCELERATION) ──────────
 if not pos.empty:
     with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Asset Class × Settore × Valuta)", expanded=False):
-        from core.duckdb_engine import compute_duckdb_asset_sector_currency_cube
-        cube_res = compute_duckdb_asset_sector_currency_cube(pos)
-        if cube_res.get("success") and not cube_res["df"].empty:
-            col_cu_h1, col_cu_h2 = st.columns([3.5, 0.9])
-            with col_cu_h1:
-                st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms**")
-            with col_cu_h2:
-                csv_cube = cube_res["df"].to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_cube, file_name="cubo_olap_duckdb.csv", mime="text/csv", use_container_width=True, key="btn_download_duckdb_cube_p1")
-            cube_cfg = {
-                "asset_class": st.column_config.TextColumn("Asset Class", width="medium"),
-                "sector": st.column_config.TextColumn("Settore GICS", width="medium"),
-                "currency": st.column_config.TextColumn("Valuta", width="small"),
-                "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
-                "controvalore_totale": st.column_config.NumberColumn("Controvalore Totale (€)", format="€ %.2f"),
-                "pnl_latente_totale": st.column_config.NumberColumn("PnL Latente Totale (€)", format="€ %.2f"),
-                "rendimento_medio_pct": st.column_config.NumberColumn("Rendimento Medio (%)", format="%.2f%%")
-            }
-            st.dataframe(cube_res["df"], column_config=cube_cfg, use_container_width=True, hide_index=True)
+        from core.ui_utils import render_duckdb_olap_cube_widget
+        render_duckdb_olap_cube_widget(pos, key_prefix="p1_dash")
 
 # ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & MODAL) ──
 col_head_m1, col_head_m2 = st.columns([3.2, 1.2])

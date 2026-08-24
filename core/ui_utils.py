@@ -3263,3 +3263,338 @@ def render_sandbox_banner(page_key: str = "gen"):
                 st.session_state["sandbox_preset_name"] = sel_preset_name
                 st.rerun()
 
+
+def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str = "p1"):
+    """
+    Renderizza un modulo avanzato di analytics OLAP multi-dimensionale accelerato da DuckDB:
+    - Micro-KPI di sintesi in testata (Asset dominante, Top settore, Valuta primaria, Latenza C++ SIMD)
+    - Esportazione multi-formato (CSV + Parquet colonnare nativo)
+    - 3 Tab interattive:
+      1. 🏛️ Matrice Gerarchica & Subtotali Puliti (con selettore di granularità)
+      2. 🌐 Treemap / Sunburst Gerarchico (mappa visiva multi-livello con color coding del rendimento)
+      3. 🏆 Leaderboard Top Performers per Settore (DuckDB Window Function QUALIFY DENSE_RANK)
+    """
+    if df_positions is None or df_positions.empty:
+        st.info("Nessuna posizione attiva disponibile per l'aggregazione DuckDB OLAP.")
+        return
+
+    from core.duckdb_engine import (
+        compute_duckdb_asset_sector_currency_cube,
+        compute_duckdb_sector_rankings
+    )
+    import plotly.express as px
+    import io
+
+    cube_res = compute_duckdb_asset_sector_currency_cube(df_positions)
+    rank_res = compute_duckdb_sector_rankings(df_positions, top_n=3)
+
+    if not cube_res.get("success") or cube_res["df"].empty:
+        st.info("Impossibile calcolare il cubo OLAP con i dati correnti.")
+        return
+
+    df_cube = cube_res["df"].copy()
+    latency_ms = cube_res.get("latency_ms", 0.0)
+
+    # 1. Header Bar: Latency & Multi-Format Exports
+    col_h1, col_h2, col_h3 = st.columns([2.6, 0.9, 1.1])
+    with col_h1:
+        st.markdown(
+            f"""
+            <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                <span style="background: rgba(56, 189, 248, 0.12); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 6px; padding: 3px 8px; font-size: 11.5px; font-weight: 700;">⚡ DUCKDB IN-PROCESS OLAP</span>
+                <span style="color: #8b949e; font-size: 12px;">Esecuzione C++ SIMD Vettorizzata in <b style="color: #3fb950;">{latency_ms:.2f} ms</b></span>
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
+    with col_h2:
+        csv_cube = df_cube.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Scarica CSV", 
+            data=csv_cube, 
+            file_name="cubo_olap_duckdb.csv", 
+            mime="text/csv", 
+            use_container_width=True, 
+            key=f"btn_dl_csv_cube_{key_prefix}"
+        )
+    with col_h3:
+        try:
+            buf_parquet = io.BytesIO()
+            df_cube.to_parquet(buf_parquet, index=False, engine='pyarrow')
+            st.download_button(
+                "📦 Esporta Parquet", 
+                data=buf_parquet.getvalue(), 
+                file_name="cubo_olap_duckdb.parquet", 
+                mime="application/octet-stream", 
+                use_container_width=True, 
+                key=f"btn_dl_parquet_cube_{key_prefix}"
+            )
+        except Exception:
+            pass
+
+    # 2. Compute Summary Metrics for the KPI Cards
+    # Asset Class Dominante
+    df_assets = df_cube[df_cube["livello_aggregazione"] == "Macro Asset Class"] if "livello_aggregazione" in df_cube.columns else df_cube[df_cube["sector"] == "--- TUTTI I SETTORI ---"]
+    top_asset_name = "N/A"
+    top_asset_val = 0.0
+    top_asset_pct = 0.0
+    total_port_val = df_cube[df_cube["livello_aggregazione"] == "Portafoglio Totale"]["controvalore_totale"].sum() if "livello_aggregazione" in df_cube.columns else df_cube["controvalore_totale"].max()
+    if total_port_val == 0.0:
+        total_port_val = df_positions["current_value"].sum() if "current_value" in df_positions.columns else 1.0
+
+    if not df_assets.empty:
+        top_asset_row = df_assets.sort_values(by="controvalore_totale", ascending=False).iloc[0]
+        top_asset_name = str(top_asset_row["asset_class"]).upper()
+        top_asset_val = float(top_asset_row["controvalore_totale"])
+        top_asset_pct = (top_asset_val / total_port_val * 100.0) if total_port_val > 0 else 0.0
+
+    # Top Settore per Rendimento %
+    df_sectors = df_cube[df_cube["livello_aggregazione"] == "Breakdown Settoriale"] if "livello_aggregazione" in df_cube.columns else df_cube[(df_cube["currency"] == "ALL") & (df_cube["sector"] != "--- TUTTI I SETTORI ---")]
+    top_sec_name = "N/A"
+    top_sec_ret = 0.0
+    top_sec_pnl = 0.0
+    if not df_sectors.empty:
+        top_sec_row = df_sectors.sort_values(by="rendimento_medio_pct", ascending=False).iloc[0]
+        top_sec_name = str(top_sec_row["sector"])
+        top_sec_ret = float(top_sec_row["rendimento_medio_pct"])
+        top_sec_pnl = float(top_sec_row["pnl_latente_totale"])
+
+    # Esposizione Valutaria
+    df_curr = df_positions.groupby("currency")["current_value"].sum().reset_index() if "currency" in df_positions.columns and "current_value" in df_positions.columns else pd.DataFrame()
+    top_curr_name = "EUR"
+    top_curr_pct = 100.0
+    if not df_curr.empty:
+        df_curr = df_curr.sort_values(by="current_value", ascending=False)
+        top_curr_name = str(df_curr.iloc[0]["currency"])
+        top_curr_pct = (df_curr.iloc[0]["current_value"] / total_port_val * 100.0) if total_port_val > 0 else 100.0
+
+    # Display KPI Cards
+    col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+    with col_k1:
+        st.markdown(
+            f"""
+            <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+                <div style="color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase;">🏛️ Asset Class Dominante</div>
+                <div style="color: #e6edf3; font-size: 16px; font-weight: 700; margin-top: 2px;">{top_asset_name}</div>
+                <div style="color: #58a6ff; font-size: 12px; font-weight: 600;">€ {top_asset_val:,.2f} ({top_asset_pct:.1f}%)</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col_k2:
+        color_ret = "#3fb950" if top_sec_ret >= 0 else "#f85149"
+        sign_ret = "+" if top_sec_ret >= 0 else ""
+        st.markdown(
+            f"""
+            <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+                <div style="color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase;">🚀 Top Settore (Rendimento)</div>
+                <div style="color: #e6edf3; font-size: 16px; font-weight: 700; margin-top: 2px; text-overflow: ellipsis; white-space: nowrap; overflow: hidden;" title="{top_sec_name}">{top_sec_name}</div>
+                <div style="color: {color_ret}; font-size: 12px; font-weight: 600;">{sign_ret}{top_sec_ret:.2f}% (€ {top_sec_pnl:+,.2f})</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col_k3:
+        st.markdown(
+            f"""
+            <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+                <div style="color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase;">💱 Valuta Principale</div>
+                <div style="color: #e6edf3; font-size: 16px; font-weight: 700; margin-top: 2px;">{top_curr_name}</div>
+                <div style="color: #d29922; font-size: 12px; font-weight: 600;">{top_curr_pct:.1f}% esposizione</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    with col_k4:
+        st.markdown(
+            f"""
+            <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 10px 14px;">
+                <div style="color: #8b949e; font-size: 11px; font-weight: 600; text-transform: uppercase;">⚡ Query Throughput</div>
+                <div style="color: #3fb950; font-size: 16px; font-weight: 700; margin-top: 2px;">{latency_ms:.2f} ms</div>
+                <div style="color: #8b949e; font-size: 12px;">Rollup SIMD Vectorized</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown('<div style="margin-bottom: 12px;"></div>', unsafe_allow_html=True)
+
+    # 3. Interactive Tabs: Tabella Gerarchica, Treemap Visiva, Leaderboard Settoriale
+    tab_matrice, tab_treemap, tab_ranking = st.tabs([
+        "🏛️ Matrice Gerarchica & Subtotali",
+        "🌐 Treemap Gerarchico Multi-Livello",
+        "🏆 Top Performers per Settore"
+    ])
+
+    with tab_matrice:
+        col_f1, col_f2 = st.columns([2.6, 1.4])
+        with col_f1:
+            granularity_options = [
+                "🎯 Breakdown Settoriale",
+                "🏛️ Macro Asset Class",
+                "💱 Dettaglio Valuta 3D",
+                "🌐 Cubo Integrale"
+            ]
+            sel_gran = st.segmented_control(
+                "Filtra Livello di Granularità:",
+                granularity_options,
+                default="🎯 Breakdown Settoriale",
+                key=f"seg_granularity_{key_prefix}"
+            ) or "🎯 Breakdown Settoriale"
+
+        if sel_gran == "🎯 Breakdown Settoriale":
+            df_view = df_cube[df_cube["livello_aggregazione"] == "Breakdown Settoriale"].copy() if "livello_aggregazione" in df_cube.columns else df_cube.copy()
+            display_cols = ["asset_class", "sector", "n_posizioni", "controvalore_totale", "pnl_latente_totale", "rendimento_medio_pct"]
+        elif sel_gran == "🏛️ Macro Asset Class":
+            df_view = df_cube[df_cube["livello_aggregazione"] == "Macro Asset Class"].copy() if "livello_aggregazione" in df_cube.columns else df_cube.copy()
+            display_cols = ["asset_class", "n_posizioni", "controvalore_totale", "pnl_latente_totale", "rendimento_medio_pct"]
+        elif sel_gran == "💱 Dettaglio Valuta 3D":
+            df_view = df_cube[df_cube["livello_aggregazione"] == "Dettaglio Valuta 3D"].copy() if "livello_aggregazione" in df_cube.columns else df_cube.copy()
+            display_cols = ["asset_class", "sector", "currency", "n_posizioni", "controvalore_totale", "pnl_latente_totale", "rendimento_medio_pct"]
+        else:
+            df_view = df_cube.copy()
+            display_cols = ["livello_aggregazione", "asset_class", "sector", "currency", "n_posizioni", "controvalore_totale", "pnl_latente_totale", "rendimento_medio_pct"]
+
+        df_view = df_view[[c for c in display_cols if c in df_view.columns]]
+
+        cube_cfg = {
+            "livello_aggregazione": st.column_config.TextColumn("Livello", width="small"),
+            "asset_class": st.column_config.TextColumn("Asset Class", width="medium"),
+            "sector": st.column_config.TextColumn("Settore GICS", width="medium"),
+            "currency": st.column_config.TextColumn("Valuta", width="small"),
+            "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
+            "controvalore_totale": st.column_config.NumberColumn("Controvalore Totale (€)", format="€ %.2f"),
+            "pnl_latente_totale": st.column_config.NumberColumn("PnL Latente Totale (€)", format="€ %.2f"),
+            "rendimento_medio_pct": st.column_config.NumberColumn("Rendimento Medio (%)", format="%.2f%%")
+        }
+
+        st.dataframe(
+            df_view,
+            column_config=cube_cfg,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with tab_treemap:
+        df_tree = df_positions.copy()
+        for col in ["asset_class", "sector", "currency", "ticker"]:
+            if col not in df_tree.columns:
+                df_tree[col] = "Altro"
+            else:
+                df_tree[col] = df_tree[col].fillna("Altro").astype(str)
+
+        if "current_value" not in df_tree.columns:
+            df_tree["current_value"] = 0.0
+        else:
+            df_tree["current_value"] = pd.to_numeric(df_tree["current_value"], errors="coerce").fillna(0.0)
+
+        if "pnl_unrealized" not in df_tree.columns:
+            if "unrealized_pnl" in df_tree.columns:
+                df_tree["pnl_unrealized"] = pd.to_numeric(df_tree["unrealized_pnl"], errors="coerce").fillna(0.0)
+            elif "pnl" in df_tree.columns:
+                df_tree["pnl_unrealized"] = pd.to_numeric(df_tree["pnl"], errors="coerce").fillna(0.0)
+            else:
+                df_tree["pnl_unrealized"] = 0.0
+
+        if "cost_basis" in df_tree.columns:
+            df_tree["cost_basis"] = pd.to_numeric(df_tree["cost_basis"], errors="coerce").fillna(0.0)
+        else:
+            df_tree["cost_basis"] = df_tree["current_value"] - df_tree["pnl_unrealized"]
+
+        df_tree["gain_pct"] = df_tree.apply(
+            lambda r: (r["pnl_unrealized"] / r["cost_basis"] * 100.0) if r["cost_basis"] > 0 else 0.0, 
+            axis=1
+        )
+        df_tree = df_tree[df_tree["current_value"] > 0]
+
+        if not df_tree.empty:
+            col_t1, col_t2 = st.columns([3.0, 1.0])
+            with col_t2:
+                chart_type = st.segmented_control("Forma Grafica:", ["📦 Treemap", "🍩 Sunburst"], default="📦 Treemap", key=f"seg_chart_shape_{key_prefix}") or "📦 Treemap"
+
+            # Color scale: Red to Dark Gray to Emerald Green
+            color_scale = [
+                [0.0, "#cf222e"],
+                [0.5, "#21262d"],
+                [1.0, "#2ea043"]
+            ]
+
+            max_abs_gain = max(abs(df_tree["gain_pct"].min()), abs(df_tree["gain_pct"].max()), 15.0)
+            if max_abs_gain > 100.0:
+                max_abs_gain = 100.0
+
+            if chart_type == "🍩 Sunburst":
+                fig = px.sunburst(
+                    df_tree,
+                    path=['asset_class', 'sector', 'ticker'],
+                    values='current_value',
+                    color='gain_pct',
+                    color_continuous_scale=color_scale,
+                    range_color=[-max_abs_gain, max_abs_gain],
+                    title="Mappa Gerarchica Multi-Livello (Asset Class ➔ Settore ➔ Ticker)"
+                )
+            else:
+                fig = px.treemap(
+                    df_tree,
+                    path=[px.Constant("Portafoglio"), 'asset_class', 'sector', 'ticker'],
+                    values='current_value',
+                    color='gain_pct',
+                    color_continuous_scale=color_scale,
+                    range_color=[-max_abs_gain, max_abs_gain],
+                    title="Mappa di Allocazione & Rendimento (Dimensione = Controvalore €, Colore = Rendimento %)"
+                )
+
+            fig.update_layout(
+                margin=dict(t=35, l=10, r=10, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#e6edf3"),
+                coloraxis_colorbar=dict(
+                    title="Rend. %",
+                    ticksuffix="%",
+                    len=0.75,
+                    thickness=12
+                )
+            )
+            fig.update_traces(
+                hovertemplate="<b>%{label}</b><br>Controvalore: €%{value:,.2f}<br>Rendimento: %{color:+.2f}%<extra></extra>"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Nessuna posizione con controvalore positivo per la rappresentazione grafica.")
+
+    with tab_ranking:
+        if rank_res.get("success") and not rank_res["df"].empty:
+            df_rank = rank_res["df"].copy()
+            col_r1, col_r2 = st.columns([3.0, 1.0])
+            with col_r1:
+                st.caption(f"⚡ Calcolo Window Function in **{rank_res['latency_ms']:.2f} ms** (DuckDB `QUALIFY DENSE_RANK() ≤ 3` per Settore)")
+            with col_r2:
+                csv_rank = df_rank.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    "📥 Scarica CSV Leader", 
+                    data=csv_rank, 
+                    file_name="leaderboard_settoriale_duckdb.csv", 
+                    mime="text/csv", 
+                    use_container_width=True, 
+                    key=f"btn_dl_rank_{key_prefix}"
+                )
+
+            rank_cfg = {
+                "settore": st.column_config.TextColumn("Settore GICS", width="medium"),
+                "rank_settoriale": st.column_config.NumberColumn("Rank", format="#%d"),
+                "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
+                "pnl_latente_eur": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
+                "gain_pct": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%")
+            }
+            st.dataframe(
+                df_rank,
+                column_config=rank_cfg,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("Nessun dato di ranking settoriale disponibile.")
+
+

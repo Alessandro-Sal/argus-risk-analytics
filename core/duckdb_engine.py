@@ -280,7 +280,13 @@ def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dic
 
     sql = """
         SELECT 
-            COALESCE(asset_class, '--- TOTALE ASSET CLASS ---') as asset_class,
+            CASE 
+                WHEN asset_class IS NULL THEN 'Portafoglio Totale'
+                WHEN sector IS NULL THEN 'Macro Asset Class'
+                WHEN currency IS NULL THEN 'Breakdown Settoriale'
+                ELSE 'Dettaglio Valuta 3D'
+            END as livello_aggregazione,
+            COALESCE(asset_class, '--- TOTALE PORTAFOGLIO ---') as asset_class,
             COALESCE(sector, '--- TUTTI I SETTORI ---') as sector,
             COALESCE(currency, 'ALL') as currency,
             COUNT(*) as n_posizioni,
@@ -299,7 +305,7 @@ def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dic
             ()
         )
         ORDER BY 
-            (asset_class = '--- TOTALE ASSET CLASS ---') ASC,
+            (asset_class = '--- TOTALE PORTAFOGLIO ---') ASC,
             controvalore_totale DESC;
     """
     res = run_duckdb_olap_query(sql, context_dfs={"positions": df_clean})
