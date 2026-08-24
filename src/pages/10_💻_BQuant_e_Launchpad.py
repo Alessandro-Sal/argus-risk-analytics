@@ -172,7 +172,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
         if sk and sk in BQUANT_SNIPPETS:
             st.session_state["bquant_code_text_area"] = BQUANT_SNIPPETS[sk]["code"]
         elif sk == "custom":
-            st.session_state["bquant_code_text_area"] = f"# Scrivi il tuo script Python per BQuant collegato a {port_name}\nimport pandas as pd\nimport numpy as np\n\nprint('Portafoglio:', portfolio_name)\nprint('Posizioni attive:', len(df_positions))\nprint('Valore totale (€):', f'{portfolio_value:,.2f}')\n"
+            st.session_state["bquant_code_text_area"] = f"# Scrivi il tuo script Python per BQuant collegato a {port_name}\nimport pandas as pd\nimport numpy as np\n\nprint('Portafoglio:', portfolio_name)\nprint('Posizioni attive:', len(df_positions))\nprint('Valore totale (€):', f'{{portfolio_value:,.2f}}')\n"
 
     # Inizializza session_state per editor se assente
     if "bquant_code_text_area" not in st.session_state:
