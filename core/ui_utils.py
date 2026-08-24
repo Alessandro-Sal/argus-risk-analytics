@@ -3002,7 +3002,7 @@ def render_altman_zscore_modal(
 
 
 
-def get_argus_eye_svg(size: int = 140, animated: bool = True, accent: str = None) -> str:
+def get_argus_eye_svg(size: int = 140, animated: bool = True, accent: str = None, unique_id: str = None) -> str:
     """
     Genera l'Occhio Cibernetico di Argus Panoptes in vettoriale SVG puro a 60 FPS.
     Include reticolo compass radar, anello matrice rischio, iride metallica, pupilla pulsante e fascio laser.
@@ -3011,52 +3011,55 @@ def get_argus_eye_svg(size: int = 140, animated: bool = True, accent: str = None
         theme = st.session_state.get("ui_theme", "Midnight Obsidian")
         accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#ff9900")
     
+    uid = unique_id or f"argus_{size}_{abs(hash(accent)) % 10000}"
+    
     anim_css = (
-        f".argus-rot-cw {{ transform-origin: 100px 100px; animation: argusSpinCW 22s linear infinite; }}"
-        f".argus-rot-ccw {{ transform-origin: 100px 100px; animation: argusSpinCCW 15s linear infinite; }}"
-        f".argus-pulse-core {{ transform-origin: 100px 100px; animation: argusEyePulse 3s ease-in-out infinite; }}"
-        f".argus-scan-beam {{ animation: argusScanMove 2.6s ease-in-out infinite; }}"
-        f"@keyframes argusSpinCW {{ 100% {{ transform: rotate(360deg); }} }}"
-        f"@keyframes argusSpinCCW {{ 100% {{ transform: rotate(-360deg); }} }}"
-        f"@keyframes argusEyePulse {{ 0%, 100% {{ transform: scale(1); opacity: 0.88; }} 50% {{ transform: scale(1.08); opacity: 1; }} }}"
-        f"@keyframes argusScanMove {{ 0%, 100% {{ transform: translateY(0px); opacity: 0.15; }} 50% {{ transform: translateY(70px); opacity: 0.85; }} }}"
+        f".argus-rot-cw-{uid} {{ transform-origin: 100px 100px; animation: argusSpinCW_{uid} 22s linear infinite; }}"
+        f".argus-rot-ccw-{uid} {{ transform-origin: 100px 100px; animation: argusSpinCCW_{uid} 15s linear infinite; }}"
+        f".argus-pulse-core-{uid} {{ transform-origin: 100px 100px; animation: argusEyePulse_{uid} 3s ease-in-out infinite; }}"
+        f".argus-scan-beam-{uid} {{ animation: argusScanMove_{uid} 2.6s ease-in-out infinite; }}"
+        f"@keyframes argusSpinCW_{uid} {{ 100% {{ transform: rotate(360deg); }} }}"
+        f"@keyframes argusSpinCCW_{uid} {{ 100% {{ transform: rotate(-360deg); }} }}"
+        f"@keyframes argusEyePulse_{uid} {{ 0%, 100% {{ transform: scale(1); opacity: 0.90; }} 50% {{ transform: scale(1.12); opacity: 1; }} }}"
+        f"@keyframes argusScanMove_{uid} {{ 0%, 100% {{ transform: translateY(0px); opacity: 0.10; }} 50% {{ transform: translateY(70px); opacity: 0.80; }} }}"
     ) if animated else ""
 
     svg = (
-        f'<svg width="{size}" height="{size}" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;filter:drop-shadow(0 0 12px {accent}44);">'
+        f'<svg width="{size}" height="{size}" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="display:block;margin:auto;filter:drop-shadow(0 0 10px {accent}44);flex-shrink:0;">'
         f'<defs>'
-        f'<radialGradient id="argusIris" cx="50%" cy="50%" r="50%">'
-        f'<stop offset="0%" stop-color="#ffe082" stop-opacity="0.9"/>'
-        f'<stop offset="40%" stop-color="{accent}" stop-opacity="0.6"/>'
-        f'<stop offset="85%" stop-color="#b36b00" stop-opacity="0.25"/>'
-        f'<stop offset="100%" stop-color="#0d1117" stop-opacity="0.95"/>'
+        f'<radialGradient id="argusIris_{uid}" cx="50%" cy="50%" r="50%">'
+        f'<stop offset="0%" stop-color="#fff4d0" stop-opacity="0.95"/>'
+        f'<stop offset="35%" stop-color="{accent}" stop-opacity="0.75"/>'
+        f'<stop offset="70%" stop-color="#b36b00" stop-opacity="0.40"/>'
+        f'<stop offset="100%" stop-color="#0a0e14" stop-opacity="0.98"/>'
         f'</radialGradient>'
-        f'<radialGradient id="argusPupil" cx="45%" cy="45%" r="50%">'
+        f'<radialGradient id="argusPupil_{uid}" cx="42%" cy="42%" r="50%">'
         f'<stop offset="0%" stop-color="#ffffff"/>'
-        f'<stop offset="35%" stop-color="{accent}"/>'
-        f'<stop offset="80%" stop-color="#0d1117"/>'
+        f'<stop offset="30%" stop-color="{accent}"/>'
+        f'<stop offset="75%" stop-color="#0d1117"/>'
         f'</radialGradient>'
-        f'<filter id="argusGlow" x="-20%" y="-20%" width="140%" height="140%">'
-        f'<feGaussianBlur stdDeviation="3" result="blur"/>'
+        f'<filter id="argusGlow_{uid}" x="-20%" y="-20%" width="140%" height="140%">'
+        f'<feGaussianBlur stdDeviation="2.5" result="blur"/>'
         f'<feComposite in="SourceGraphic" in2="blur" operator="over"/>'
         f'</filter>'
         f'</defs>'
         f'<style>{anim_css}</style>'
-        f'<g filter="url(#argusGlow)">'
-        f'<circle cx="100" cy="100" r="88" fill="none" stroke="{accent}" stroke-width="1.2" stroke-opacity="0.25" stroke-dasharray="4, 6" class="argus-rot-cw"/>'
-        f'<circle cx="100" cy="12" r="3.5" fill="{accent}" class="argus-rot-cw"/>'
-        f'<circle cx="188" cy="100" r="3.5" fill="{accent}" class="argus-rot-cw"/>'
-        f'<circle cx="100" cy="188" r="3.5" fill="{accent}" class="argus-rot-cw"/>'
-        f'<circle cx="12" cy="100" r="3.5" fill="{accent}" class="argus-rot-cw"/>'
-        f'<circle cx="100" cy="100" r="68" fill="none" stroke="{accent}" stroke-width="2" stroke-opacity="0.45" stroke-dasharray="16, 8, 4, 8" class="argus-rot-ccw"/>'
-        f'<path d="M 32 100 Q 100 48 168 100 Q 100 152 32 100 Z" fill="rgba(22, 27, 34, 0.75)" stroke="{accent}" stroke-width="2" stroke-opacity="0.85"/>'
-        f'<circle cx="100" cy="100" r="36" fill="url(#argusIris)" stroke="{accent}" stroke-width="1.5"/>'
-        f'<circle cx="100" cy="100" r="18" fill="url(#argusPupil)" class="argus-pulse-core"/>'
-        f'<line x1="50" y1="65" x2="150" y2="65" stroke="{accent}" stroke-width="2" stroke-linecap="round" class="argus-scan-beam" opacity="0.75"/>'
-        f'<line x1="100" y1="24" x2="100" y2="38" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
-        f'<line x1="100" y1="162" x2="100" y2="176" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
-        f'<line x1="24" y1="100" x2="38" y2="100" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
-        f'<line x1="162" y1="100" x2="176" y2="100" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
+        f'<g filter="url(#argusGlow_{uid})">'
+        f'<circle cx="100" cy="100" r="90" fill="none" stroke="{accent}" stroke-width="1.2" stroke-opacity="0.25" stroke-dasharray="4, 6" class="argus-rot-cw-{uid}"/>'
+        f'<circle cx="100" cy="10" r="3.5" fill="{accent}" class="argus-rot-cw-{uid}"/>'
+        f'<circle cx="190" cy="100" r="3.5" fill="{accent}" class="argus-rot-cw-{uid}"/>'
+        f'<circle cx="100" cy="190" r="3.5" fill="{accent}" class="argus-rot-cw-{uid}"/>'
+        f'<circle cx="10" cy="100" r="3.5" fill="{accent}" class="argus-rot-cw-{uid}"/>'
+        f'<circle cx="100" cy="100" r="72" fill="none" stroke="{accent}" stroke-width="1.8" stroke-opacity="0.40" stroke-dasharray="14, 8, 4, 8" class="argus-rot-ccw-{uid}"/>'
+        f'<path d="M 22 100 Q 100 40 178 100 Q 100 160 22 100 Z" fill="rgba(13, 17, 23, 0.85)" stroke="{accent}" stroke-width="2.2" stroke-opacity="0.90"/>'
+        f'<circle cx="100" cy="100" r="38" fill="url(#argusIris_{uid})" stroke="{accent}" stroke-width="1.6"/>'
+        f'<circle cx="100" cy="100" r="28" fill="none" stroke="{accent}" stroke-width="1" stroke-opacity="0.45" stroke-dasharray="3, 3"/>'
+        f'<circle cx="100" cy="100" r="16" fill="url(#argusPupil_{uid})" class="argus-pulse-core-{uid}"/>'
+        f'<line x1="45" y1="65" x2="155" y2="65" stroke="{accent}" stroke-width="1.8" stroke-linecap="round" class="argus-scan-beam-{uid}" opacity="0.80"/>'
+        f'<line x1="100" y1="20" x2="100" y2="35" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
+        f'<line x1="100" y1="165" x2="100" y2="180" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
+        f'<line x1="20" y1="100" x2="35" y2="100" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
+        f'<line x1="165" y1="100" x2="180" y2="100" stroke="{accent}" stroke-width="1.5" stroke-opacity="0.6"/>'
         f'</g>'
         f'</svg>'
     )
