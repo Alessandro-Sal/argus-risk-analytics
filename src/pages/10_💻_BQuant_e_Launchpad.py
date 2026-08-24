@@ -132,6 +132,36 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
 """, button_label="💡 Come funziona BQuant?")
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+    # ── Pipeline Binding Status Strip (Bloomberg BQuant Data Bus) ──
+    port_label, has_port = ui_utils.get_display_portfolio_name()
+    port_name = st.session_state.get("portfolio_name", port_label)
+    n_pos = len(pos) if (pos is not None and isinstance(pos, pd.DataFrame)) else 0
+    tot_val = float(pos["current_value"].sum()) if (pos is not None and isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns) else 0.0
+    tot_val_str = f"€ {tot_val:,.2f}".replace(",", ".")
+    
+    n_rets_rows = len(df_rets) if (df_rets is not None and isinstance(df_rets, pd.DataFrame)) else 0
+    n_rets_cols = df_rets.shape[1] if (df_rets is not None and isinstance(df_rets, pd.DataFrame)) else 0
+    n_prices_rows = len(df_prices) if (df_prices is not None and isinstance(df_prices, pd.DataFrame)) else 0
+    
+    status_icon = "🟢" if has_real_portfolio else "🧪"
+    status_title = f"Portafoglio Connesso: {port_name}" if has_real_portfolio else f"Modalità Sandbox: {results.get('sandbox_name', 'Demo')}"
+    
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #58a6ff; border-radius: 10px; padding: 10px 16px; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 14px;">{status_icon}</span>
+            <span style="font-weight: 700; font-size: 13px; color: #ffffff;">{status_title}</span>
+            <span style="background: rgba(88, 166, 255, 0.15); color: #58a6ff; border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600;">{n_pos} Posizioni • {tot_val_str}</span>
+        </div>
+        <div style="display: flex; gap: 8px; font-family: monospace; font-size: 11px; color: #8b949e; flex-wrap: wrap;">
+            <span style="background: rgba(13, 17, 23, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); padding: 3px 8px; border-radius: 6px;"><code>df_positions</code>: {n_pos} rows</span>
+            <span style="background: rgba(13, 17, 23, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); padding: 3px 8px; border-radius: 6px;"><code>df_returns</code>: {n_rets_rows}x{n_rets_cols}</span>
+            <span style="background: rgba(13, 17, 23, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); padding: 3px 8px; border-radius: 6px;"><code>df_prices</code>: {n_prices_rows} rows</span>
+            <span style="background: rgba(13, 17, 23, 0.8); border: 1px solid rgba(255, 255, 255, 0.06); padding: 3px 8px; border-radius: 6px;"><code>results</code>: dict ({len(results)} chiavi)</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Selezione Snippet Istituzionali
     col_snip1, col_snip2 = st.columns([3.5, 1.2])
@@ -153,7 +183,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
             if sel_snippet_key in BQUANT_SNIPPETS:
                 st.session_state["bquant_code_editor"] = BQUANT_SNIPPETS[sel_snippet_key]["code"]
             else:
-                st.session_state["bquant_code_editor"] = "# Scrivi il tuo script Python per BQuant\nimport pandas as pd\nimport numpy as np\n\nprint('Posizioni attive:', len(df_positions))\n"
+                st.session_state["bquant_code_editor"] = f"# Scrivi il tuo script Python per BQuant collegato a {port_name}\nimport pandas as pd\nimport numpy as np\n\nprint('Portafoglio:', portfolio_name)\nprint('Posizioni attive:', len(df_positions))\nprint('Valore totale (€):', f'{portfolio_value:,.2f}')\n"
 
     # Inizializza session_state per editor
     if "bquant_code_editor" not in st.session_state:
@@ -164,7 +194,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
 
     # Code Editor
     user_code = st.text_area(
-        "Editor di Codice Python (Variabili disponibili: `df_positions`, `df_returns`, `df_prices`, `results`, `duckdb`, `pd`, `np`, `px`, `go`):",
+        f"Editor di Codice Python (Variabili collegate a '{port_name}': `df_positions`, `df_returns`, `df_prices`, `df_tx`, `portfolio_returns`, `benchmark_returns`, `results`, `duckdb`, `pd`, `np`, `px`, `go`):",
         value=st.session_state["bquant_code_editor"],
         height=320,
         key="bquant_code_text_area"
@@ -175,7 +205,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
     with col_run_btn:
         run_script_clicked = st.button("⚡ Esegui Script BQuant", type="primary", use_container_width=True, key="btn_run_bquant")
     with col_run_status:
-        st.caption("Esecuzione sandboxed in-memory ad alta performance • Output stdout, DataFrame e Plotly Figures catturati dinamicamente.")
+        st.caption(f"Esecuzione sandboxed in-memory ad alta performance sui dati di <b>{port_name}</b> • Output stdout, DataFrame e Plotly Figures catturati dinamicamente.", unsafe_allow_html=True)
 
     # Esecuzione
     if run_script_clicked or "last_bquant_result" in st.session_state:
@@ -185,7 +215,12 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
                 "df_positions": pos,
                 "df_returns": df_rets,
                 "df_prices": df_prices,
-                "df_tx": df_tx
+                "df_tx": df_tx,
+                "portfolio_name": port_name,
+                "portfolio_return": results.get("portfolio_return", pd.Series(dtype=float)),
+                "benchmark_return": results.get("benchmark_return", pd.Series(dtype=float)),
+                "benchmark_ticker": st.session_state.get("benchmark", "SPY"),
+                "base_currency": st.session_state.get("base_currency", "EUR")
             }
             res_exec = execute_bquant_script(user_code, exec_ctx)
             st.session_state["last_bquant_result"] = res_exec
