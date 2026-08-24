@@ -81,8 +81,6 @@ with col_head2:
 """, button_label="💡 Come funziona lo Stress Testing?")
     st.markdown('</div>', unsafe_allow_html=True)
 
-st.divider()
-
 if not stress:
     st.info("Risultati dello stress test non disponibili (dati insufficienti).")
     st.stop()

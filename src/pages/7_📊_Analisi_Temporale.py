@@ -34,7 +34,6 @@ if "run_id" in st.session_state:
     st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Intelligence multi-temporale per tracciare l'evoluzione del patrimonio, dei pesi e dei singoli titoli nel tempo.")
 else:
     st.caption("Intelligence multi-temporale per tracciare l'evoluzione del patrimonio, dei pesi e dei singoli titoli nel tempo.")
-st.divider()
 
 db_host = st.session_state.get("db_host", "localhost")
 db_port = int(st.session_state.get("db_port", 3306))
