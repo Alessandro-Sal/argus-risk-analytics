@@ -34,7 +34,6 @@ if "run_id" in st.session_state:
     st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Diagnostica quantitativa del rischio di mercato, VaR 95/99%, Tail Risk, modelli Fama-French, ATR Chandelier Exit e ML Anomaly Detection.")
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
-st.divider()
 
 # Struttura a 4 Tab Tematiche con Lazy Loading
 active_risk_tab = render_segmented_tabs([

@@ -43,6 +43,13 @@ def inject_custom_css():
             font-weight: 750 !important;
             letter-spacing: -0.5px !important;
             line-height: 1.25 !important;
+            margin-bottom: 2px !important;
+            padding-bottom: 0px !important;
+        }}
+        [data-testid="stCaptionContainer"] {{
+            margin-top: 0px !important;
+            margin-bottom: 6px !important;
+            padding-top: 0px !important;
         }}
         h2, [data-testid="stHeading"] h2 {{
             font-size: 1.45rem !important;
@@ -522,7 +529,7 @@ def inject_custom_css():
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 12px !important;
             padding: 5px 6px !important;
-            margin: 6px 0 20px 0 !important;
+            margin: 4px 0 16px 0 !important;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
             backdrop-filter: blur(20px) !important;
         }}
