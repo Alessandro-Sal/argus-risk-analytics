@@ -2015,14 +2015,30 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
 
         # ── SEZIONE 3: SMART ORDER ROUTER INTRADAY (TWAP & VWAP) ────────────
+        # ── SEZIONE 3: SMART ORDER ROUTER INTRADAY (TWAP & VWAP) ────────────
         st.markdown("#### 🤖 Smart Order Router Intraday (TWAP & VWAP Slicing Engine)")
         st.caption("Pianificazione operativa delle tranche di negoziazione intraday (09:00 - 17:30) per minimizzare lo slippage su ordini consistenti.")
 
-        # Rilevamento completo e robusto dei ticker disponibili
+        # Filtra rigorosamente SOLO le posizioni aperte (esclude posizioni chiuse o a valore zero)
+        if not pos.empty:
+            if "qty_net" in pos.columns and "current_value" in pos.columns:
+                active_pos_sor = pos[(pos["qty_net"] > 1e-5) & (pos["current_value"] > 0)].copy()
+            elif "current_value" in pos.columns:
+                active_pos_sor = pos[pos["current_value"] > 0].copy()
+            elif "qty_net" in pos.columns:
+                active_pos_sor = pos[pos["qty_net"] > 1e-5].copy()
+            else:
+                active_pos_sor = pos.copy()
+        elif not df_ac.empty:
+            active_pos_sor = df_ac.copy()
+        else:
+            active_pos_sor = pd.DataFrame()
+
+        # Rilevamento completo e robusto dei ticker disponibili solo da posizioni aperte
         avail_tickers = []
         for c in ["ticker", "Ticker", "symbol", "Symbol", "Asset"]:
-            if c in pos.columns:
-                cands = [str(x).strip() for x in pos[c].dropna().unique() if str(x).strip() and str(x).strip().upper() not in ["UNKNOWN", "NAN", "NONE", "SAMPLE_STOCK"]]
+            if c in active_pos_sor.columns:
+                cands = [str(x).strip() for x in active_pos_sor[c].dropna().unique() if str(x).strip() and str(x).strip().upper() not in ["UNKNOWN", "NAN", "NONE", "SAMPLE_STOCK"]]
                 if cands:
                     avail_tickers = cands
                     break
@@ -2043,7 +2059,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 sel_ticker = st.selectbox("Seleziona Titolo", options=avail_tickers, key="sor_single_tk")
             else:
                 sel_ticker = "PORTFOLIO_BASKET"
-                st.markdown(f"<div style='padding-top: 28px; font-weight: 600; color: #58a6ff;'>Tutti gli Asset ({len(avail_tickers)})</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top: 28px; font-weight: 600; color: #58a6ff;'>Posizioni Aperte ({len(avail_tickers)})</div>", unsafe_allow_html=True)
 
         with col_sor3:
             trade_quota_pct = st.select_slider(
@@ -2098,7 +2114,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             if not tk:
                 tk = fallback_tk
 
-            # Controvalore
+            # Controvalore reale della posizione
             c_val = 0.0
             for c in ["current_value", "Controvalore (€)", "value", "valore", "Valore (€)", "notional"]:
                 if c in row_data and pd.notna(row_data[c]):
@@ -2109,7 +2125,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     except Exception:
                         pass
 
-            # Prezzo
+            # Prezzo reale di mercato
             p = 0.0
             for c in ["last_price", "current_price", "Prezzo Mkt (€)", "price", "prezzo", "close", "wacp", "Prezzo Carico (€)"]:
                 if c in row_data and pd.notna(row_data[c]):
@@ -2120,7 +2136,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     except Exception:
                         pass
 
-            # Quantità
+            # Quantità reale posseduta
             q = 0.0
             for c in ["qty_net", "quantity", "shares", "Quantità", "qty", "quote", "Quote"]:
                 if c in row_data and pd.notna(row_data[c]):
@@ -2131,19 +2147,22 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     except Exception:
                         pass
 
+            # Se la posizione non ha controvalore né quantità (es. posizione chiusa), scartala
+            if c_val <= 0 and q <= 0:
+                return None
+
             if q <= 0 and c_val > 0 and p > 0:
                 q = c_val / p
+            elif q > 0 and c_val <= 0 and p > 0:
+                c_val = q * p
             elif q > 0 and p <= 0 and c_val > 0:
                 p = c_val / q
             elif q <= 0 and c_val > 0:
-                p = 100.0
-                q = c_val / p
-            elif q <= 0:
-                q = 100.0
-                p = 100.0 if p <= 0 else p
+                p = 1.0
+                q = c_val
 
-            # Applica la quota percentuale di smobilizzo/ribilanciamento selezionata
-            q = q * (float(trade_quota_pct) / 100.0)
+            # Applica la quota percentuale di smobilizzo/ribilanciamento selezionata (es. 10%)
+            q_trade = q * (float(trade_quota_pct) / 100.0)
 
             # ADV
             adv = 0.0
@@ -2156,12 +2175,12 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     except Exception:
                         pass
             if adv <= 0:
-                adv = max(500_000.0, (q * p) * 15.0)
+                adv = max(500_000.0, (q * p) * 30.0)
 
             return {
                 "ticker": str(tk),
                 "action": "SELL",
-                "quantity": max(0.1, float(q)),
+                "quantity": max(0.001, float(q_trade)),
                 "price": max(0.01, float(p)),
                 "adv": max(10_000.0, float(adv))
             }
@@ -2169,10 +2188,10 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         # Build order list
         orders_for_sor = []
         if sel_asset_mode == "Singolo Titolo da Smobilizzare" and avail_tickers and sel_ticker in avail_tickers:
-            # Trova riga in pos
+            # Trova riga in active_pos_sor
             match_row = None
-            if not pos.empty:
-                for _, r in pos.iterrows():
+            if not active_pos_sor.empty:
+                for _, r in active_pos_sor.iterrows():
                     for c in ["ticker", "Ticker", "symbol", "Symbol", "Asset"]:
                         if c in r and str(r[c]).strip() == str(sel_ticker).strip():
                             match_row = r
@@ -2180,26 +2199,27 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     if match_row is not None:
                         break
             if match_row is not None:
-                orders_for_sor.append(_extract_order_info(match_row, fallback_tk=sel_ticker))
+                ord_info = _extract_order_info(match_row, fallback_tk=sel_ticker)
+                if ord_info is not None:
+                    orders_for_sor.append(ord_info)
             elif not df_ac.empty and "Ticker" in df_ac.columns:
                 match_ac = df_ac[df_ac["Ticker"] == sel_ticker]
                 if not match_ac.empty:
-                    orders_for_sor.append(_extract_order_info(match_ac.iloc[0], fallback_tk=sel_ticker))
-        elif not pos.empty:
-            for _, r in pos.iterrows():
+                    ord_info = _extract_order_info(match_ac.iloc[0], fallback_tk=sel_ticker)
+                    if ord_info is not None:
+                        orders_for_sor.append(ord_info)
+        elif not active_pos_sor.empty:
+            for _, r in active_pos_sor.iterrows():
                 ord_item = _extract_order_info(r)
-                orders_for_sor.append(ord_item)
-        elif not df_ac.empty:
-            for _, r in df_ac.iterrows():
-                ord_item = _extract_order_info(r)
-                orders_for_sor.append(ord_item)
+                if ord_item is not None:
+                    orders_for_sor.append(ord_item)
 
         if not orders_for_sor and avail_tickers:
             for tk in avail_tickers[:5]:
                 orders_for_sor.append({
                     "ticker": tk,
                     "action": "SELL",
-                    "quantity": max(1.0, 100.0 * (float(trade_quota_pct) / 100.0)),
+                    "quantity": max(1.0, 10.0 * (float(trade_quota_pct) / 100.0)),
                     "price": 100.0,
                     "adv": 500_000.0
                 })
@@ -2207,7 +2227,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             orders_for_sor.append({
                 "ticker": "AAPL",
                 "action": "SELL",
-                "quantity": max(1.0, 100.0 * (float(trade_quota_pct) / 100.0)),
+                "quantity": max(1.0, 10.0 * (float(trade_quota_pct) / 100.0)),
                 "price": 150.0,
                 "adv": 1_000_000.0
             })
