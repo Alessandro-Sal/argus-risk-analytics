@@ -49,6 +49,8 @@ if has_warnings:
         for w in warn_list:
             st.warning(f"• {w}")
 
+st.divider()
+
 # ⚡ Sintesi Esecutiva Quantitativa (Executive Callout Box)
 from core.risk_limits import check_risk_limits
 limits_res = check_risk_limits(results)
@@ -219,6 +221,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+st.markdown("---")
 st.markdown("#### ⚡ Metriche di Rischio e Rendimento")
 col4, col5, col6 = st.columns(3)
 with col4:
@@ -503,6 +506,7 @@ if selected_bms:
         })
 
     df_scorecard = pd.DataFrame(scorecard_rows)
+    st.markdown("---")
     col_sc_h1, col_sc_h2 = st.columns([3.8, 1.0])
     with col_sc_h1:
         st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark")
