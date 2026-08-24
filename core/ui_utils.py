@@ -75,57 +75,35 @@ def inject_custom_css():
         /* ── Above-the-fold Viewport Optimization (Zero Dead Space) ── */
         header[data-testid="stHeader"],
         [data-testid="stHeader"] {{
-            height: 0px !important;
-            min-height: 0px !important;
             background: transparent !important;
-            display: flex !important;
-            visibility: visible !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            border: none !important;
+            background-color: transparent !important;
+            color: #ffffff !important;
             z-index: 99 !important;
-            pointer-events: none !important;
         }}
 
-        /* Hide Streamlit Top Decoration, Deploy Button and Default Header Toolbar */
+        /* Hide Streamlit Top Decoration and Deploy Button only */
         [data-testid="stDecoration"],
-        [data-testid="stToolbar"],
         .stDeployButton,
         button[title="Deploy"],
-        [data-testid="stToolbarActions"],
-        [data-testid="stStatusWidget"] {{
+        [data-testid="stToolbarActions"] {{
             display: none !important;
             visibility: hidden !important;
             height: 0px !important;
             width: 0px !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
         }}
 
-        /* Floating Sidebar Toggle Button when Closed */
+        /* Always keep Collapsed Control (Open Sidebar Button) Visible & Clickable */
         [data-testid="collapsedControl"],
         button[data-testid="stSidebarCollapsedControl"],
-        [data-testid="stHeader"] [data-testid="collapsedControl"] {{
+        div[data-testid="collapsedControl"] {{
             display: flex !important;
             visibility: visible !important;
-            pointer-events: auto !important;
-            position: fixed !important;
-            top: 12px !important;
-            left: 14px !important;
-            z-index: 999999 !important;
-            background: rgba(22, 27, 34, 0.90) !important;
-            border: 1px solid rgba(255, 255, 255, 0.18) !important;
-            border-radius: 8px !important;
-            color: #e6edf3 !important;
-            backdrop-filter: blur(12px) !important;
-            padding: 4px 8px !important;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45) !important;
-            transition: all 0.2s ease !important;
+            opacity: 1 !important;
+            cursor: pointer !important;
         }}
-        [data-testid="collapsedControl"]:hover {{
-            background: rgba(33, 38, 45, 0.98) !important;
-            border-color: rgba(255, 153, 0, 0.7) !important;
+        [data-testid="collapsedControl"] button {{
             color: #ff9900 !important;
+            border-radius: 8px !important;
         }}
 
         /* Hide Streamlit Raw Page Nav (replaced by institutional tree rail) */
@@ -142,7 +120,6 @@ def inject_custom_css():
         /* Compact Sidebar Header containing the Close (<) Button */
         div[data-testid="stSidebarHeader"],
         [data-testid="stSidebarHeader"] {{
-            height: 32px !important;
             min-height: 32px !important;
             padding: 4px 8px 0px 8px !important;
             margin: 0px !important;
@@ -180,7 +157,7 @@ def inject_custom_css():
         [data-testid="block-container"],
         [data-testid="stMainBlockContainer"],
         .stMainBlockContainer {{
-            padding-top: 1.15rem !important;
+            padding-top: 1.5rem !important;
             padding-bottom: 2rem !important;
             padding-left: 1.75rem !important;
             padding-right: 1.75rem !important;
