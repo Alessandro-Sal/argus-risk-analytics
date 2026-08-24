@@ -3427,20 +3427,18 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
     ])
 
     with tab_matrice:
-        col_f1, col_f2 = st.columns([2.6, 1.4])
-        with col_f1:
-            granularity_options = [
-                "🎯 Breakdown Settoriale",
-                "🏛️ Macro Asset Class",
-                "💱 Dettaglio Valuta 3D",
-                "🌐 Cubo Integrale"
-            ]
-            sel_gran = st.segmented_control(
-                "Filtra Livello di Granularità:",
-                granularity_options,
-                default="🎯 Breakdown Settoriale",
-                key=f"seg_granularity_{key_prefix}"
-            ) or "🎯 Breakdown Settoriale"
+        granularity_options = [
+            "🎯 Breakdown Settoriale",
+            "🏛️ Macro Asset Class",
+            "💱 Dettaglio Valuta 3D",
+            "🌐 Cubo Integrale"
+        ]
+        sel_gran = st.segmented_control(
+            "Filtra Livello di Granularità:",
+            granularity_options,
+            default="🎯 Breakdown Settoriale",
+            key=f"seg_granularity_{key_prefix}"
+        ) or "🎯 Breakdown Settoriale"
 
         if sel_gran == "🎯 Breakdown Settoriale":
             df_view = df_cube[df_cube["livello_aggregazione"] == "Breakdown Settoriale"].copy() if "livello_aggregazione" in df_cube.columns else df_cube.copy()
@@ -3504,13 +3502,21 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
         df_tree["gain_pct"] = df_tree.apply(
             lambda r: (r["pnl_unrealized"] / r["cost_basis"] * 100.0) if r["cost_basis"] > 0 else 0.0, 
             axis=1
-        )
+        ).round(2)
         df_tree = df_tree[df_tree["current_value"] > 0]
 
         if not df_tree.empty:
-            col_t1, col_t2 = st.columns([3.0, 1.0])
+            col_t1, col_t2 = st.columns([2.8, 1.2])
+            with col_t1:
+                st.markdown("<div style='color: #8b949e; font-size: 13px; margin-top: 6px;'>🗺️ <b>Mappa Gerarchica di Allocazione</b> (Dimensione = Controvalore €, Colore = Rendimento %)</div>", unsafe_allow_html=True)
             with col_t2:
-                chart_type = st.segmented_control("Forma Grafica:", ["📦 Treemap", "🍩 Sunburst"], default="📦 Treemap", key=f"seg_chart_shape_{key_prefix}") or "📦 Treemap"
+                chart_type = st.segmented_control(
+                    "Forma Grafica:", 
+                    ["📦 Treemap", "🍩 Sunburst"], 
+                    default="📦 Treemap", 
+                    key=f"seg_chart_shape_{key_prefix}",
+                    label_visibility="collapsed"
+                ) or "📦 Treemap"
 
             # Color scale: Red to Dark Gray to Emerald Green
             color_scale = [
@@ -3530,8 +3536,7 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
                     values='current_value',
                     color='gain_pct',
                     color_continuous_scale=color_scale,
-                    range_color=[-max_abs_gain, max_abs_gain],
-                    title="Mappa Gerarchica Multi-Livello (Asset Class ➔ Settore ➔ Ticker)"
+                    range_color=[-max_abs_gain, max_abs_gain]
                 )
             else:
                 fig = px.treemap(
@@ -3540,12 +3545,11 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
                     values='current_value',
                     color='gain_pct',
                     color_continuous_scale=color_scale,
-                    range_color=[-max_abs_gain, max_abs_gain],
-                    title="Mappa di Allocazione & Rendimento (Dimensione = Controvalore €, Colore = Rendimento %)"
+                    range_color=[-max_abs_gain, max_abs_gain]
                 )
 
             fig.update_layout(
-                margin=dict(t=35, l=10, r=10, b=10),
+                margin=dict(t=15, l=10, r=10, b=10),
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 font=dict(color="#e6edf3"),
@@ -3557,7 +3561,7 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
                 )
             )
             fig.update_traces(
-                hovertemplate="<b>%{label}</b><br>Controvalore: €%{value:,.2f}<br>Rendimento: %{color:+.2f}%<extra></extra>"
+                hovertemplate="<b>%{label}</b><br>Controvalore: €%{value:,.2f}<br>Rendimento: %{color:.2f}%<extra></extra>"
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
