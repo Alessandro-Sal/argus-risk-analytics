@@ -2031,11 +2031,11 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         if not avail_tickers and "tickers" in results and results["tickers"]:
             avail_tickers = [str(x).strip() for x in results["tickers"] if str(x).strip()]
 
-        col_sor1, col_sor2, col_sor3, col_sor4 = st.columns([1.5, 1.2, 1.2, 1.1])
+        col_sor1, col_sor2, col_sor3, col_sor4, col_sor5 = st.columns([1.4, 1.2, 1.0, 1.2, 0.9])
         with col_sor1:
             sel_asset_mode = st.selectbox(
                 "Paniere Operativo",
-                options=["Singolo Titolo da Smobilizzare", "Paniere Intero Portafoglio (Pro-Quota)"],
+                options=["Paniere Intero Portafoglio (Pro-Quota)", "Singolo Titolo da Smobilizzare"],
                 key="sor_asset_mode"
             )
         with col_sor2:
@@ -2043,9 +2043,18 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 sel_ticker = st.selectbox("Seleziona Titolo", options=avail_tickers, key="sor_single_tk")
             else:
                 sel_ticker = "PORTFOLIO_BASKET"
-                st.markdown("<div style='padding-top: 28px; font-weight: 600; color: #58a6ff;'>Tutti gli Asset Aperti</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top: 28px; font-weight: 600; color: #58a6ff;'>Tutti gli Asset ({len(avail_tickers)})</div>", unsafe_allow_html=True)
 
         with col_sor3:
+            trade_quota_pct = st.select_slider(
+                "Quota da Negoziare",
+                options=[5, 10, 15, 20, 25, 50, 100],
+                value=10,
+                format_func=lambda x: f"{x}%",
+                key="sor_trade_quota_pct"
+            )
+
+        with col_sor4:
             sel_window = st.selectbox(
                 "Orizzonte di Sessione",
                 options=[
@@ -2056,8 +2065,8 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 ],
                 key="sor_window_mode"
             )
-        with col_sor4:
-            pov_cap = st.slider("POV Participation Cap", min_value=5, max_value=30, value=15, step=5, format="%d%%", key="sor_pov_cap")
+        with col_sor5:
+            pov_cap = st.slider("POV Cap", min_value=5, max_value=30, value=15, step=5, format="%d%%", key="sor_pov_cap")
 
         # Map interval parameters
         if "16 tranche" in sel_window:
@@ -2133,6 +2142,9 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 q = 100.0
                 p = 100.0 if p <= 0 else p
 
+            # Applica la quota percentuale di smobilizzo/ribilanciamento selezionata
+            q = q * (float(trade_quota_pct) / 100.0)
+
             # ADV
             adv = 0.0
             for c in ["adv", "ADV (€)", "volume", "avg_daily_volume", "Volume"]:
@@ -2149,7 +2161,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             return {
                 "ticker": str(tk),
                 "action": "SELL",
-                "quantity": max(1.0, float(q)),
+                "quantity": max(0.1, float(q)),
                 "price": max(0.01, float(p)),
                 "adv": max(10_000.0, float(adv))
             }
@@ -2187,7 +2199,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 orders_for_sor.append({
                     "ticker": tk,
                     "action": "SELL",
-                    "quantity": 100.0,
+                    "quantity": max(1.0, 100.0 * (float(trade_quota_pct) / 100.0)),
                     "price": 100.0,
                     "adv": 500_000.0
                 })
@@ -2195,7 +2207,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             orders_for_sor.append({
                 "ticker": "AAPL",
                 "action": "SELL",
-                "quantity": 100.0,
+                "quantity": max(1.0, 100.0 * (float(trade_quota_pct) / 100.0)),
                 "price": 150.0,
                 "adv": 1_000_000.0
             })
@@ -2214,6 +2226,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
 
         tot_notional_val = comp_summary.get("total_notional_eur", 0.0)
         mkt_cost_val = comp_summary.get("market_order_cost_eur", 0.0)
+        mkt_slip_bps = comp_summary.get("market_order_slippage_bps", 3.5)
         vwap_cost_val = comp_summary.get("vwap_cost_eur", 0.0)
         vwap_save_val = comp_summary.get("vwap_savings_vs_market_eur", 0.0)
         avg_slip = vwap_data.get("summary", {}).get("avg_slippage_bps", 0.0)
@@ -2221,13 +2234,13 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         # Scorecards Comparazione Algoritmi
         col_sc1, col_sc2, col_sc3, col_sc4 = st.columns(4)
         with col_sc1:
-            metric_card("Controvalore Ordine", f"€ {tot_notional_val:,.2f}", f"{len(orders_for_sor)} ordini pianificati")
+            metric_card("Controvalore Ordine", f"€ {tot_notional_val:,.2f}", f"{len(orders_for_sor)} ordini ({trade_quota_pct}% portafoglio)")
         with col_sc2:
-            metric_card("Costo Esecuzione Blocco (Market)", f"€ {mkt_cost_val:,.2f}", "Slippage 25.0 bps (blocco unico)")
+            metric_card("Costo Esecuzione Blocco (Market)", f"€ {mkt_cost_val:,.2f}", f"Slippage stimato: {mkt_slip_bps:.1f} bps")
         with col_sc3:
             metric_card("Costo VWAP Istituzionale", f"€ {vwap_cost_val:,.2f}", f"Slippage medio: {avg_slip:.1f} bps")
         with col_sc4:
-            metric_card("Risparmio Netto Stimato", f"€ {vwap_save_val:,.2f}", f"Risparmio vs Market: € {vwap_save_val:,.2f}", positive=True)
+            metric_card("Risparmio Netto Stimato", f"€ {vwap_save_val:,.2f}", f"Risparmio {mkt_slip_bps - avg_slip:.1f} bps (€ {vwap_save_val:,.2f})", positive=True)
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
