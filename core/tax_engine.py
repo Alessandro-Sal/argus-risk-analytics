@@ -21,14 +21,20 @@ TAX_RATES = {
 }
 
 def get_asset_tax_rate(asset_class: str, ticker: str = "") -> float:
-    """Returns applicable tax rate (12.5% for government bonds, 26% for equities/ETFs/crypto)."""
+    """Returns applicable tax rate (12.5% for sovereign/whitelist government bonds, 26% for equities/ETFs/crypto)."""
     if not asset_class:
         asset_class = ""
     ac_lower = str(asset_class).lower()
     t_upper = str(ticker).upper()
     
-    if "gov" in ac_lower or "btp" in ac_lower or "bot" in ac_lower or "treasury" in ac_lower or "stato" in ac_lower or "BTP" in t_upper or "BOT" in t_upper:
+    gov_keywords = ["gov", "btp", "bot", "treasury", "stato", "sovereign", "titolo di stato", "bund", "oat", "bonos", "gilt"]
+    if any(k in ac_lower for k in gov_keywords):
         return 0.125
+    
+    gov_ticker_prefixes = ["BTP", "BOT", "CCT", "CTZ", "TREASURY", "UST", "BUND", "OAT", "BONOS", "GILT", "US-TREASURY"]
+    if any(p in t_upper for p in gov_ticker_prefixes):
+        return 0.125
+
     return 0.26
 
 def is_etf(asset_class: str, ticker: str = "") -> bool:
