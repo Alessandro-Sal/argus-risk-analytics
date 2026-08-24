@@ -383,13 +383,18 @@ def render_sidebar():
         </style>
         """, unsafe_allow_html=True)
 
-        # Header del Brand ARGUS
-        st.markdown("""
-        <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 8px; padding: 2px 0;">
-            <span style="font-size: 22px;">👁️</span>
+        # Header del Brand ARGUS con Logo Vettoriale Dinamico
+        theme = st.session_state.get("ui_theme", "Midnight Obsidian")
+        accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#ff9900")
+        from core.ui_utils import get_argus_eye_svg
+        eye_sidebar_svg = get_argus_eye_svg(size=30, animated=True, accent=accent, unique_id="sidebar_brand_eye")
+        
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; gap: 10px; margin-bottom: 8px; padding: 2px 0;">
+            <div style="flex-shrink: 0; display: flex; align-items: center;">{eye_sidebar_svg}</div>
             <div>
-                <div style="font-size: 14.5px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px; line-height: 1.1;">ARGUS</div>
-                <div style="font-size: 9.5px; font-weight: 600; color: #8b949e; letter-spacing: 0.4px;">INSTITUTIONAL RISK INTELLIGENCE</div>
+                <div style="font-size: 15px; font-weight: 800; color: #ffffff; letter-spacing: 0.8px; line-height: 1.1;">ARGUS</div>
+                <div style="font-size: 9px; font-weight: 700; color: {accent}; letter-spacing: 0.5px; text-transform: uppercase;">INSTITUTIONAL RISK INTELLIGENCE</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
