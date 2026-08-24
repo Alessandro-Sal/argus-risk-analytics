@@ -495,6 +495,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
     else:
         st.info("Impossibile calcolare la scomposizione del rischio (nessuna posizione attiva con controvalore).")
 
+    st.markdown("---")
     col_head_mrs1, col_head_mrs2 = st.columns([3.2, 1.1])
     with col_head_mrs1:
         st.markdown("#### 🌊 Market Regime Switching (Modello Stocastico a 3 Stati)")
@@ -1063,7 +1064,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         })
         st.dataframe(df_m3, use_container_width=True, hide_index=True)
 
-    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    st.markdown("---")
 
     # ── RIGA 2: DISTRIBUZIONE RENDIMENTI & CODA DI RISCHIO (FULL WIDTH) ──────
     st.markdown("#### 📉 Distribuzione Rendimenti Giornalieri e Coda di Rischio (Tail Risk)")
@@ -1791,7 +1792,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         )
 
     # ── LIQUIDITY-ADJUSTED VAR (LVAR) INTERATTIVO ──────────────────────
-    st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
+    st.markdown("---")
     col_lvar_h1, col_lvar_h2 = st.columns([3.2, 1.3])
     with col_lvar_h1:
         st.markdown("#### 💧 Liquidity-Adjusted VaR (LVaR) — Modello di Bangia")
