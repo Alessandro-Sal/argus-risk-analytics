@@ -2057,7 +2057,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 key="sor_window_mode"
             )
         with col_sor4:
-            pov_cap = st.slider("POV Participation Cap", min_value=0.05, max_value=0.30, value=0.15, step=0.05, format="%.0f%%", key="sor_pov_cap")
+            pov_cap = st.slider("POV Participation Cap", min_value=5, max_value=30, value=15, step=5, format="%d%%", key="sor_pov_cap")
 
         # Map interval parameters
         if "16 tranche" in sel_window:
@@ -2204,7 +2204,8 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             orders_for_sor,
             start_time_str=start_t,
             interval_minutes=interv_min,
-            n_intervals=n_interv
+            n_intervals=n_interv,
+            pov_cap_pct=float(pov_cap) / 100.0
         )
         
         twap_data = comp_exec["twap"]
@@ -2222,11 +2223,11 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         with col_sc1:
             metric_card("Controvalore Ordine", f"€ {tot_notional_val:,.2f}", f"{len(orders_for_sor)} ordini pianificati")
         with col_sc2:
-            metric_card("Costo Esecuzione Blocco (Market)", f"€ {mkt_cost_val:,.2f}", "Slippage 25.0 bps (singolo ordine)")
+            metric_card("Costo Esecuzione Blocco (Market)", f"€ {mkt_cost_val:,.2f}", "Slippage 25.0 bps (blocco unico)")
         with col_sc3:
             metric_card("Costo VWAP Istituzionale", f"€ {vwap_cost_val:,.2f}", f"Slippage medio: {avg_slip:.1f} bps")
         with col_sc4:
-            metric_card("Risparmio Netto Stimato", f"€ {vwap_save_val:,.2f}", f"-{vwap_save_val:,.2f} € vs Market", positive=True)
+            metric_card("Risparmio Netto Stimato", f"€ {vwap_save_val:,.2f}", f"Risparmio vs Market: € {vwap_save_val:,.2f}", positive=True)
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
@@ -2236,22 +2237,39 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             df_vwap_sched = vwap_data["schedule_df"]
             if not df_vwap_sched.empty:
                 col_g1, col_g2 = st.columns([1.5, 1.0])
+                unique_ts = df_vwap_sched["timestamp"].unique()
+                agg_notional_t = [df_vwap_sched[df_vwap_sched["timestamp"] == t]["order_notional_eur"].sum() for t in unique_ts]
+                
+                # Calcolo aggregate POV rate
+                agg_pov_rates = []
+                for t in unique_ts:
+                    df_slice_t = df_vwap_sched[df_vwap_sched["timestamp"] == t]
+                    total_slice_eur = df_slice_t["order_notional_eur"].sum()
+                    total_mkt_eur = (df_slice_t["interval_mkt_vol"] * df_slice_t["benchmark_price_eur"]).sum()
+                    if total_mkt_eur > 0:
+                        agg_pov_rates.append(round((total_slice_eur / total_mkt_eur) * 100.0, 2))
+                    else:
+                        agg_pov_rates.append(round(float(df_slice_t["pov_rate_pct"].mean()), 2))
+
+                max_p = max(agg_pov_rates) if agg_pov_rates else 1.0
+
                 with col_g1:
                     fig_vwap = go.Figure()
                     fig_vwap.add_trace(go.Bar(
-                        x=df_vwap_sched["timestamp"].unique(),
-                        y=[df_vwap_sched[df_vwap_sched["timestamp"] == t]["order_notional_eur"].sum() for t in df_vwap_sched["timestamp"].unique()],
+                        x=unique_ts,
+                        y=agg_notional_t,
                         name="Controvalore Tranche (€)",
                         marker_color="#58a6ff",
                         opacity=0.85
                     ))
                     fig_vwap.add_trace(go.Scatter(
-                        x=df_vwap_sched["timestamp"].unique(),
-                        y=[df_vwap_sched[df_vwap_sched["timestamp"] == t]["pov_rate_pct"].mean() for t in df_vwap_sched["timestamp"].unique()],
+                        x=unique_ts,
+                        y=agg_pov_rates,
                         name="Participation Rate (% Mkt)",
                         yaxis="y2",
                         mode="lines+markers",
-                        line=dict(color="#ff9900", width=2.5)
+                        line=dict(color="#ff9900", width=2.5),
+                        marker=dict(size=5, color="#ff9900")
                     ))
                     fig_vwap.update_layout(
                         template="plotly_dark",
@@ -2260,31 +2278,41 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                         height=310,
                         margin=dict(l=20, r=20, t=30, b=20),
                         yaxis=dict(title="Controvalore Tranche (€)", gridcolor="rgba(255,255,255,0.06)"),
-                        yaxis2=dict(title="Partecipazione (%)", overlaying="y", side="right", showgrid=False),
+                        yaxis2=dict(title="Partecipazione (% Mkt)", overlaying="y", side="right", showgrid=False, rangemode="tozero", range=[0, max(1.0, max_p * 1.5)]),
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
                     apply_plotly_theme(fig_vwap)
                     st.plotly_chart(fig_vwap, use_container_width=True)
 
                 with col_g2:
+                    # Traiettoria unica aggregata di avanzamento
+                    cum_prog_vals = []
+                    tot_order_notional = df_vwap_sched["order_notional_eur"].sum()
+                    running_notional = 0.0
+                    for t in unique_ts:
+                        running_notional += df_vwap_sched[df_vwap_sched["timestamp"] == t]["order_notional_eur"].sum()
+                        cum_prog_vals.append(round((running_notional / max(1.0, tot_order_notional)) * 100.0, 1))
+
                     fig_cum = go.Figure()
-                    for tk in df_vwap_sched["ticker"].unique():
-                        df_tk = df_vwap_sched[df_vwap_sched["ticker"] == tk]
-                        fig_cum.add_trace(go.Scatter(
-                            x=df_tk["timestamp"],
-                            y=df_tk["cum_progress_pct"],
-                            mode="lines+markers",
-                            name=f"{tk} (% Cumulata)"
-                        ))
+                    fig_cum.add_trace(go.Scatter(
+                        x=unique_ts,
+                        y=cum_prog_vals,
+                        mode="lines+markers",
+                        name="Avanzamento Globale (%)",
+                        line=dict(color="#58a6ff", width=3),
+                        marker=dict(size=6, color="#58a6ff"),
+                        fill="tozeroy",
+                        fillcolor="rgba(88,166,255,0.12)"
+                    ))
                     fig_cum.update_layout(
                         template="plotly_dark",
                         paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(13,17,23,0.7)",
                         height=310,
                         margin=dict(l=20, r=20, t=30, b=20),
-                        yaxis=dict(title="% Avanzamento Esecuzione", range=[0, 105], gridcolor="rgba(255,255,255,0.06)"),
-                        xaxis=dict(title="Orario"),
-                        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5)
+                        yaxis=dict(title="% Avanzamento", range=[0, 105], gridcolor="rgba(255,255,255,0.06)"),
+                        xaxis=dict(title="Orario", gridcolor="rgba(255,255,255,0.06)"),
+                        showlegend=False
                     )
                     apply_plotly_theme(fig_cum)
                     st.plotly_chart(fig_cum, use_container_width=True)
@@ -2321,6 +2349,64 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         with col_algo_tab2:
             df_twap_sched = twap_data["schedule_df"]
             if not df_twap_sched.empty:
+                col_g1_tw, col_g2_tw = st.columns([1.5, 1.0])
+                unique_ts_tw = df_twap_sched["timestamp"].unique()
+                agg_notional_tw = [df_twap_sched[df_twap_sched["timestamp"] == t]["order_notional_eur"].sum() for t in unique_ts_tw]
+                
+                with col_g1_tw:
+                    fig_twap = go.Figure()
+                    fig_twap.add_trace(go.Bar(
+                        x=unique_ts_tw,
+                        y=agg_notional_tw,
+                        name="Controvalore TWAP (€)",
+                        marker_color="#a371f7",
+                        opacity=0.85
+                    ))
+                    fig_twap.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=310,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        yaxis=dict(title="Controvalore Tranche (€)", gridcolor="rgba(255,255,255,0.06)"),
+                        xaxis=dict(title="Orario", gridcolor="rgba(255,255,255,0.06)"),
+                        showlegend=False
+                    )
+                    apply_plotly_theme(fig_twap)
+                    st.plotly_chart(fig_twap, use_container_width=True)
+
+                with col_g2_tw:
+                    cum_prog_tw = []
+                    tot_notional_tw = df_twap_sched["order_notional_eur"].sum()
+                    running_tw = 0.0
+                    for t in unique_ts_tw:
+                        running_tw += df_twap_sched[df_twap_sched["timestamp"] == t]["order_notional_eur"].sum()
+                        cum_prog_tw.append(round((running_tw / max(1.0, tot_notional_tw)) * 100.0, 1))
+
+                    fig_cum_tw = go.Figure()
+                    fig_cum_tw.add_trace(go.Scatter(
+                        x=unique_ts_tw,
+                        y=cum_prog_tw,
+                        mode="lines+markers",
+                        name="Avanzamento TWAP (%)",
+                        line=dict(color="#a371f7", width=3),
+                        marker=dict(size=6, color="#a371f7"),
+                        fill="tozeroy",
+                        fillcolor="rgba(163,113,247,0.12)"
+                    ))
+                    fig_cum_tw.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=310,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        yaxis=dict(title="% Avanzamento", range=[0, 105], gridcolor="rgba(255,255,255,0.06)"),
+                        xaxis=dict(title="Orario", gridcolor="rgba(255,255,255,0.06)"),
+                        showlegend=False
+                    )
+                    apply_plotly_theme(fig_cum_tw)
+                    st.plotly_chart(fig_cum_tw, use_container_width=True)
+
                 col_twap_h1, col_twap_h2 = st.columns([3.0, 1.0])
                 with col_twap_h1:
                     st.markdown("##### 📋 Tabella Dettagliata Tranche TWAP (Uniform Time Jitter)")

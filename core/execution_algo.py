@@ -258,14 +258,15 @@ def compare_execution_strategies(
     orders: Union[pd.DataFrame, List[Dict[str, Any]]],
     start_time_str: str = "09:00",
     interval_minutes: int = 30,
-    n_intervals: int = 16
+    n_intervals: int = 16,
+    pov_cap_pct: float = 0.15
 ) -> Dict[str, Any]:
     """
     Compares TWAP vs VWAP vs Immediate Market Execution (Arrival Price / Full Block).
     Quantifies expected slippage savings and market impact reduction.
     """
     twap_res = compute_twap_schedule(orders, start_time_str, interval_minutes, n_intervals)
-    vwap_res = compute_vwap_schedule(orders, start_time_str, interval_minutes, n_intervals)
+    vwap_res = compute_vwap_schedule(orders, start_time_str, interval_minutes, n_intervals, pov_cap_pct=pov_cap_pct)
     
     df_twap = twap_res["schedule_df"]
     df_vwap = vwap_res["schedule_df"]
