@@ -540,3 +540,6 @@ def compute_tax_loss_harvesting_strategy(
         }
     }
 
+
+# Institutional Alias for Frontend & Module Imports
+generate_tax_loss_harvesting_strategy = compute_tax_loss_harvesting_strategy
