@@ -223,16 +223,16 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 frontier["sortino"] = frontier["sharpe"] * 1.25
 
             # ── SELETTORE MODALITÀ DI VISUALIZZAZIONE FRONTIERA (2D vs 3D) ──
-            col_vf1, col_vf2 = st.columns([2.8, 2.2])
+            col_vf1, col_vf2 = st.columns([1.4, 1.6])
             with col_vf1:
                 view_mode_3d = st.segmented_control(
                     "Modalità Spazio di Ottimizzazione:",
-                    options=["📈 Frontiera 2D (Rischio vs Rendimento)", "🌐 Superficie 3D (Rischio x Rendimento x Z)"],
-                    default="📈 Frontiera 2D (Rischio vs Rendimento)",
+                    options=["📈 Frontiera 2D", "🌐 Superficie 3D"],
+                    default="📈 Frontiera 2D",
                     key="seg_frontier_view_mode"
                 )
                 if not view_mode_3d:
-                    view_mode_3d = "📈 Frontiera 2D (Rischio vs Rendimento)"
+                    view_mode_3d = "📈 Frontiera 2D"
 
             with col_vf2:
                 if "3D" in view_mode_3d:
