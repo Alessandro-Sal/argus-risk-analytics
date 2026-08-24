@@ -64,3 +64,85 @@ def test_compute_zainetto_timeline():
     assert row_2023["years_to_expiry"] == 1
     assert row_2023["urgency"] == "HIGH"
 
+
+def test_compute_riforma_fiscale_comparison():
+    from core.tax_engine import compute_riforma_fiscale_comparison
+    
+    positions_data = [
+        {"ticker": "AAPL", "asset_class": "Equity", "qty_net": 10, "cost_basis_eur": 1500.0, "current_value": 2000.0, "realized_pnl": 500.0, "unrealized_pnl": 500.0},
+        {"ticker": "CSPX", "asset_class": "ETF", "qty_net": 20, "cost_basis_eur": 8000.0, "current_value": 10000.0, "realized_pnl": 2000.0, "unrealized_pnl": 2000.0},
+    ]
+    df_pos = pd.DataFrame(positions_data)
+    results = {"positions": df_pos}
+    
+    comp = compute_riforma_fiscale_comparison(results, custom_zainetto_eur=1000.0)
+    assert "current_regime" in comp
+    assert "reformed_regime" in comp
+    assert "comparison" in comp
+    # In Reformed regime, the full 1000€ minus is applied to total gains (500 + 2000 = 2500)
+    assert comp["reformed_regime"]["minus_applied_eur"] == 1000.0
+    assert comp["comparison"]["net_tax_savings_eur"] > 0
+
+
+def test_compute_modello_redditi_pf():
+    from core.tax_engine import compute_modello_redditi_pf
+    
+    positions_data = [
+        {"ticker": "AAPL", "asset_class": "Equity", "cost_basis_eur": 1000.0, "current_value": 1500.0, "realized_pnl": 200.0},
+        {"ticker": "BTC", "asset_class": "Crypto", "cost_basis_eur": 2000.0, "current_value": 3000.0, "realized_pnl": 0.0},
+    ]
+    df_pos = pd.DataFrame(positions_data)
+    results = {"positions": df_pos}
+    
+    modello = compute_modello_redditi_pf(results, tax_year=2026, prior_minus_custom_eur=100.0)
+    assert "df_quadro_rt" in modello
+    assert "df_quadro_rw" in modello
+    df_rt = modello["df_quadro_rt"]
+    df_rw = modello["df_quadro_rw"]
+    assert not df_rt.empty
+    assert not df_rw.empty
+    assert "RT21" in df_rt["rigo"].values
+    assert "RT26" in df_rt["rigo"].values
+    assert any("069" in str(cp) for cp in df_rw["codice_paese"])
+
+
+def test_compute_withholding_tax_analysis():
+    from core.tax_engine import compute_withholding_tax_analysis
+    
+    positions_data = [
+        {"ticker": "AAPL", "asset_class": "Equity", "current_value": 10000.0, "dividends_total": 300.0, "dividend_yield_pct": 3.0},
+        {"ticker": "ALV.DE", "asset_class": "Equity", "current_value": 10000.0, "dividends_total": 500.0, "dividend_yield_pct": 5.0},
+    ]
+    df_pos = pd.DataFrame(positions_data)
+    results = {"positions": df_pos}
+    
+    wht_res = compute_withholding_tax_analysis(results)
+    df_wht = wht_res["df_withholding"]
+    assert not df_wht.empty
+    assert len(df_wht) == 2
+    assert "aliquota_effettiva_combinata_pct" in df_wht.columns
+    # US effective rate ~ 37.1% (15% US + 26% on net)
+    aapl_row = df_wht[df_wht["ticker"] == "AAPL"].iloc[0]
+    assert 37.0 <= aapl_row["aliquota_effettiva_combinata_pct"] <= 37.2
+
+
+def test_simulate_fifo_lot_sale():
+    from core.tax_engine import simulate_fifo_lot_sale
+    
+    positions_data = [
+        {"ticker": "NVDA", "asset_class": "Equity", "qty_net": 100.0, "current_price": 120.0, "cost_basis_eur": 80.0}
+    ]
+    tx_data = [
+        {"ticker": "NVDA", "tx_type": "buy", "quantity": 40.0, "price": 60.0, "tx_date": "2024-01-10"},
+        {"ticker": "NVDA", "tx_type": "buy", "quantity": 60.0, "price": 93.33, "tx_date": "2024-06-15"}
+    ]
+    results = {"positions": pd.DataFrame(positions_data), "df_tx": pd.DataFrame(tx_data)}
+    
+    sim = simulate_fifo_lot_sale(results, ticker="NVDA", qty_to_sell=50.0, sale_price=120.0)
+    assert sim["qty_requested_to_sell"] == 50.0
+    assert sim["total_proceeds_eur"] == 6000.0 # 50 * 120
+    assert len(sim["df_affected_lots"]) == 2 # 40 from lot 1 + 10 from lot 2
+    assert sim["realized_pnl_eur"] > 0
+    assert sim["residual_shares"] == 50.0
+
+

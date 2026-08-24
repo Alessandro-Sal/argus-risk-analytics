@@ -1151,7 +1151,14 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
     import core.crypto_tax_engine
     importlib.reload(core.tax_engine)
     importlib.reload(core.crypto_tax_engine)
-    from core.tax_engine import compute_tax_and_harvesting, generate_tax_loss_harvesting_strategy
+    from core.tax_engine import (
+        compute_tax_and_harvesting,
+        generate_tax_loss_harvesting_strategy,
+        compute_riforma_fiscale_comparison,
+        compute_modello_redditi_pf,
+        compute_withholding_tax_analysis,
+        simulate_fifo_lot_sale
+    )
     from core.crypto_tax_engine import compute_crypto_tax_report
 
     engine = st.session_state.get("db_engine", None)
@@ -1181,32 +1188,93 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
     if sub_tax_mode.startswith("🏦"):
         tax_res = compute_tax_and_harvesting(results, db_engine=engine, tax_year=tax_year_param)
         tax_sum = tax_res["summary"]
-        tax_harv = tax_res["harvesting_candidates"]
-        tax_by_year = tax_res.get("tax_by_year", pd.DataFrame())
         tax_credit_val = tax_sum.get("tax_credit_zainetto_eur", 0.0)
 
-        col_tx1, col_tx2, col_tx3, col_tx4 = st.columns(4)
-        with col_tx1:
-            sub_txt = f"Div: € {tax_sum['total_realized_gain_diversi_eur']:,.0f} | ETF: € {tax_sum['total_realized_gain_etf_eur']:,.0f}"
-            metric_card(f"Plusvalenze ({selected_year})", f"€ {tax_sum['total_realized_gain_eur']:,.2f}", sub_txt, True)
-        with col_tx2:
-            metric_card(f"Minusvalenze ({selected_year})", f"€ {tax_sum['total_realized_loss_eur']:,.2f}", "Inviate a Zainetto Fiscale", False)
-        with col_tx3:
-            metric_card(f"Stima Imposte ({selected_year})", f"€ {tax_sum['estimated_tax_due_eur']:,.2f}", "Aliquote 26% / 12.5%", False)
-        with col_tx4:
-            metric_card("Zainetto Residuo", f"€ {tax_credit_val:,.2f}", "Compensabile in 4 Anni", True)
+        # ── 4 SUB-TABS FISCALI ISTITUZIONALI ──
+        tab_tax_c1, tab_tax_c2, tab_tax_c3, tab_tax_c4 = st.tabs([
+            "🏛️ Cockpit Fiscale & Riforma 2026",
+            "📑 Modello Redditi PF (RT & RW)",
+            "🇺🇸 Withholding Tax (Doppia Imposizione)",
+            "🧮 Tax-Smart Lot Sizing (Pre-Trade FIFO)"
+        ])
 
-        # ── COCKPIT INTERATTIVO ZAINETTO FISCALE & HARVESTING OPTIMIZER ──
-        st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-        col_zf_h1, col_zf_h2 = st.columns([3.2, 1.2])
-        with col_zf_h1:
-            st.markdown("#### 💼 Simulatore Zainetto Fiscale & Generatore Ordini di Harvesting")
-            st.caption("Algoritmo istituzionale di ottimizzazione fiscale: calcola il piano di realizzo minusvalenze e le strategie di Step-Up per azzerare le imposte sul capital gain.")
-        with col_zf_h2:
-            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            glossary_modal(
-                "📖 Guida Fiscale TUIR",
-                """
+        # ══════════════════════════════════════════════════════════════════════
+        # SUB-TAB 1: COCKPIT FISCALE, ZAINETTO & SIMULATORE RIFORMA 2026
+        # ══════════════════════════════════════════════════════════════════════
+        with tab_tax_c1:
+            col_tx1, col_tx2, col_tx3, col_tx4 = st.columns(4)
+            with col_tx1:
+                sub_txt = f"Div: € {tax_sum['total_realized_gain_diversi_eur']:,.0f} | ETF: € {tax_sum['total_realized_gain_etf_eur']:,.0f}"
+                metric_card(f"Plusvalenze ({selected_year})", f"€ {tax_sum['total_realized_gain_eur']:,.2f}", sub_txt, True)
+            with col_tx2:
+                metric_card(f"Minusvalenze ({selected_year})", f"€ {tax_sum['total_realized_loss_eur']:,.2f}", "Inviate a Zainetto Fiscale", False)
+            with col_tx3:
+                metric_card(f"Stima Imposte ({selected_year})", f"€ {tax_sum['estimated_tax_due_eur']:,.2f}", "Aliquote 26% / 12.5%", False)
+            with col_tx4:
+                metric_card("Zainetto Residuo", f"€ {tax_credit_val:,.2f}", "Compensabile in 4 Anni", True)
+
+            # ── SIMULATORE RIFORMA FISCALE 2026 ──
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            col_rf_t1, col_rf_t2 = st.columns([3.2, 1.2])
+            with col_rf_t1:
+                st.markdown("##### 🔮 Simulatore Riforma Fiscale 2026 (Armonizzazione ETF & Compensazione 100%)")
+                st.caption("Confronta il carico tributario tra il regime asimmetrico attuale e il nuovo regime unificato dove le plusvalenze da ETF compensano al 100% le minusvalenze.")
+            with col_rf_t2:
+                st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
+                glossary_modal(
+                    "💡 Come Funziona la Riforma Fiscale",
+                    """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+  <b style="color: #ff9900;">📜 Superamento dell'Asimmetria Fiscale</b><br>
+  Attualmente i guadagni da ETF sono considerati <i>Redditi di Capitale</i> (tassati al 26% senza compensazione). Con la Riforma Fiscale, tutti i redditi finanziari confluiscono in un'unica categoria, consentendo di assorbire lo zainetto fiscale anche con gli ETF.
+</div>
+<div>ARGUS quantifica in tempo reale il <b>Tax Drag</b> risparmiato dal nuovo quadro normativo.</div>
+</div>
+"""
+                )
+
+            sim_regime = st.segmented_control(
+                "Regime Normativo:",
+                options=["🏦 TUIR Attuale (Asimmetrico)", "🔮 Riforma Fiscale Unificata (Armonizzata)"],
+                default="🏦 TUIR Attuale (Asimmetrico)",
+                key="seg_tax_reform_mode"
+            )
+
+            riforma_res = compute_riforma_fiscale_comparison(results, tax_year=tax_year_param)
+            curr_reg = riforma_res["current_regime"]
+            ref_reg = riforma_res["reformed_regime"]
+            comp_reg = riforma_res["comparison"]
+
+            if "Riforma" in (sim_regime or ""):
+                st.markdown(f"""
+                <div style="background: rgba(46, 160, 67, 0.12); border: 1px solid rgba(46, 160, 67, 0.35); border-left: 4px solid #3fb950; border-radius: 10px; padding: 14px 18px; margin: 10px 0 16px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 15px; color: #3fb950;">✨ Vantaggio della Riforma Fiscale Unificata</div>
+                            <div style="font-size: 13px; color: #c9d1d9; margin-top: 3px;">
+                                Grazie alla compensazione estesa agli ETF, il tuo debito d'imposta scende da <b>€ {curr_reg['tax_due_eur']:,.2f}</b> a <b>€ {ref_reg['tax_due_eur']:,.2f}</b>.
+                            </div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 11px; color: #8b949e; font-weight: 600;">RISPARMIO NETTO DIRETTO</div>
+                            <div style="font-size: 22px; font-weight: 800; color: #3fb950;">€ {comp_reg['net_tax_savings_eur']:,.2f}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # ── COCKPIT INTERATTIVO ZAINETTO FISCALE & HARVESTING OPTIMIZER ──
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            col_zf_h1, col_zf_h2 = st.columns([3.2, 1.2])
+            with col_zf_h1:
+                st.markdown("##### 💼 Simulatore Zainetto Fiscale & Generatore Ordini di Harvesting")
+                st.caption("Algoritmo istituzionale di ottimizzazione fiscale: calcola il piano di realizzo minusvalenze e le strategie di Step-Up per azzerare le imposte sul capital gain.")
+            with col_zf_h2:
+                st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
+                glossary_modal(
+                    "📖 Guida Fiscale TUIR",
+                    """
 <div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
 <div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
   <b style="color: #ff9900;">📜 Regola dei 4 Anni (TUIR Art. 67)</b><br>
@@ -1217,295 +1285,373 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 <b>3. Proxy Re-Entry:</b> Reinvestire in strumenti correlati per non perdere il trend di mercato.</div>
 </div>
 """
-            )
-
-        col_z1, col_z2 = st.columns([2.0, 2.0])
-        with col_z1:
-            custom_zainetto = st.number_input(
-                "Saldo Zainetto Fiscale Pregresso da Compensare (€):",
-                value=float(tax_credit_val),
-                step=250.0, format="%.2f",
-                key="input_custom_zainetto_val",
-                help="Inserisci le minusvalenze pregresse accumulate presso la tua banca o broker (Directa, Fineco, Degiro, IBKR)."
-            )
-        with col_z2:
-            tax_harvest_res = generate_tax_loss_harvesting_strategy(results, custom_zainetto_eur=custom_zainetto)
-            tot_shield = tax_harvest_res.get("total_tax_shield_created_eur", 0.0)
-            tot_saved = tax_harvest_res.get("total_tax_savings_eur", 0.0)
-            st.markdown(f"""
-            <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; margin-top: 4px; display: flex; justify-content: space-around; text-align: center;">
-                <div>
-                    <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">RISPARMIO STEP-UP (0€ TASSE)</div>
-                    <div style="font-size: 17px; font-weight: 800; color: #3fb950;">€ {tot_saved:,.2f}</div>
-                </div>
-                <div style="border-left: 1px solid rgba(255,255,255,0.08);"></div>
-                <div>
-                    <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">NUOVO CREDITO FISCALE</div>
-                    <div style="font-size: 17px; font-weight: 800; color: #58a6ff;">€ {tot_shield:,.2f}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        df_harvest_loss = tax_harvest_res.get("df_harvest_loss", pd.DataFrame())
-        df_step_up = tax_harvest_res.get("df_step_up", pd.DataFrame())
-
-        tab_harv1, tab_harv2 = st.tabs([
-            f"✂️ Raccolta Minusvalenze & Proxy Re-Entry ({len(df_harvest_loss)})",
-            f"🎯 Step-Up a 0€ Imposte ({len(df_step_up)})"
-        ])
-
-        with tab_harv1:
-            if not df_harvest_loss.empty:
-                df_hl_disp = df_harvest_loss.rename(columns={
-                    "ticker": "Ticker",
-                    "asset_class": "Classe Asset",
-                    "qty_held": "Quote Detenute",
-                    "current_price_eur": "Prezzo (€)",
-                    "order_notional_eur": "Controvalore (€)",
-                    "unrealized_loss_eur": "Minus Realizzabile (€)",
-                    "unrealized_loss_pct": "Loss %",
-                    "tax_shield_created_eur": "Risparmio Fiscale (€)",
-                    "action": "Azione Consigliata",
-                    "replacement_proxy": "Re-Entry Proxy Correlato",
-                    "rationale": "Logica Operativa"
-                })
-
-                col_hl1, col_hl2 = st.columns([3.5, 1.2])
-                with col_hl1:
-                    st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
-                with col_hl2:
-                    csv_hl = df_hl_disp.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Ordini CSV", data=csv_hl, file_name="ordini_tax_loss_harvesting.csv", mime="text/csv", use_container_width=True, key="btn_download_orders_tax_harvest")
-
-                cfg_hl = {
-                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                    "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
-                    "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
-                    "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
-                    "Controvalore (€)": st.column_config.NumberColumn("Controvalore", format="€ %.2f"),
-                    "Minus Realizzabile (€)": st.column_config.NumberColumn("Minus (€)", format="€ %.2f"),
-                    "Risparmio Fiscale (€)": st.column_config.NumberColumn("Risparmio Imposta", format="€ %.2f"),
-                    "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
-                    "Re-Entry Proxy Correlato": st.column_config.TextColumn("Proxy Re-Entry", width="medium"),
-                }
-
-                st.dataframe(
-                    df_hl_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Controvalore (€)", "Minus Realizzabile (€)", "Risparmio Fiscale (€)", "Azione Consigliata", "Re-Entry Proxy Correlato"]],
-                    column_config=cfg_hl,
-                    use_container_width=True,
-                    hide_index=True
                 )
-            else:
-                st.info("Nessuna posizione in perdita latente da raccogliere.")
 
-        with tab_harv2:
-            if not df_step_up.empty:
-                df_su_disp = df_step_up.rename(columns={
-                    "ticker": "Ticker",
-                    "asset_class": "Classe Asset",
-                    "qty_held": "Quote Detenute",
-                    "current_price_eur": "Prezzo (€)",
-                    "unrealized_gain_eur": "Plusvalenza Latente (€)",
-                    "consumable_minus_eur": "Minus Compensabile (€)",
-                    "tax_saving_eur": "Tasse Azzerate (€)",
-                    "action": "Azione Consigliata",
-                    "replacement_proxy": "Re-Entry",
-                    "rationale": "Logica Operativa"
-                })
-
-                st.caption("Monetizza le plusvalenze compensandole al 100% con lo zainetto fiscale prima della scadenza dei 4 anni. Riacquista subito per alzare il prezzo di carico a 0€ di imposta.")
-                
-                cfg_su = {
-                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
-                    "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
-                    "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
-                    "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
-                    "Plusvalenza Latente (€)": st.column_config.NumberColumn("Plusvalenza (€)", format="€ %.2f"),
-                    "Minus Compensabile (€)": st.column_config.NumberColumn("Minus Compensata", format="€ %.2f"),
-                    "Tasse Azzerate (€)": st.column_config.NumberColumn("Tasse Risparmiate", format="€ %.2f"),
-                    "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
-                }
-
-                st.dataframe(
-                    df_su_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Plusvalenza Latente (€)", "Minus Compensabile (€)", "Tasse Azzerate (€)", "Azione Consigliata"]],
-                    column_config=cfg_su,
-                    use_container_width=True,
-                    hide_index=True
+            col_z1, col_z2 = st.columns([2.0, 2.0])
+            with col_z1:
+                custom_zainetto = st.number_input(
+                    "Saldo Zainetto Fiscale Pregresso da Compensare (€):",
+                    value=float(tax_credit_val),
+                    step=250.0, format="%.2f",
+                    key="input_custom_zainetto_val",
+                    help="Inserisci le minusvalenze pregresse accumulate presso la tua banca o broker (Directa, Fineco, Degiro, IBKR)."
                 )
-            else:
-                st.info("Nessun candidato per Step-Up a 0€ imposte (richiede posizioni in utile su Redditi Diversi e saldo zainetto attivo).")
+            with col_z2:
+                tax_harvest_res = generate_tax_loss_harvesting_strategy(results, custom_zainetto_eur=custom_zainetto)
+                tot_shield = tax_harvest_res.get("total_tax_shield_created_eur", 0.0)
+                tot_saved = tax_harvest_res.get("total_tax_savings_eur", 0.0)
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 18px; margin-top: 4px; display: flex; justify-content: space-around; text-align: center;">
+                    <div>
+                        <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">RISPARMIO STEP-UP (0€ TASSE)</div>
+                        <div style="font-size: 17px; font-weight: 800; color: #3fb950;">€ {tot_saved:,.2f}</div>
+                    </div>
+                    <div style="border-left: 1px solid rgba(255,255,255,0.08);"></div>
+                    <div>
+                        <div style="font-size: 10.5px; color: #8b949e; font-weight: 600;">NUOVO CREDITO FISCALE</div>
+                        <div style="font-size: 17px; font-weight: 800; color: #58a6ff;">€ {tot_shield:,.2f}</div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-        if not tax_by_year.empty:
-            st.markdown("##### 📊 Dettaglio Imposte & Plusvalenze per Anno Solare (€)")
-            
-            df_tax_chart = tax_by_year.rename(columns={
-                "year": "Anno Solare",
-                "realized_gain_eur": "Plusvalenze Realizzate (€)",
-                "realized_loss_eur": "Minusvalenze Realizzate (€)",
-                "estimated_tax_eur": "Stima Imposte Dovute (€)"
-            })
-            
-            fig_tax_y = px.bar(
-                df_tax_chart, x="Anno Solare", 
-                y=["Plusvalenze Realizzate (€)", "Minusvalenze Realizzate (€)", "Stima Imposte Dovute (€)"],
-                barmode="group",
-                labels={"value": "Euro (€)", "Anno Solare": "", "variable": ""},
-                color_discrete_map={
-                    "Plusvalenze Realizzate (€)": "#58a6ff",
-                    "Minusvalenze Realizzate (€)": "#f85149",
-                    "Stima Imposte Dovute (€)": "#00e676"
-                },
-                template="plotly_dark", height=370
-            )
-            fig_tax_y.update_traces(
-                hovertemplate="<b>Anno %{x}</b><br>%{fullData.name}: <b>€ %{y:,.2f}</b><extra></extra>"
-            )
-            fig_tax_y.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=20, r=20, t=35, b=20),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, title=None)
-            )
-            st.plotly_chart(fig_tax_y, use_container_width=True, config={"displayModeBar": False})
+            df_harvest_loss = tax_harvest_res.get("df_harvest_loss", pd.DataFrame())
+            df_step_up = tax_harvest_res.get("df_step_up", pd.DataFrame())
 
-            cols_present = [c for c in [
-                "year", "realized_gain_diversi_eur", "realized_gain_etf_eur", "realized_loss_eur",
-                "prior_minus_deducted_eur", "taxable_base_eur", "estimated_tax_due_eur", "tax_credit_zainetto_eur"
-            ] if c in tax_by_year.columns]
-            df_tax_show = tax_by_year[cols_present].rename(columns={
-                "year": "Anno Solare",
-                "realized_gain_diversi_eur": "Plusv. Azioni/Bond (€)",
-                "realized_gain_etf_eur": "Plusv. ETF (€)",
-                "realized_loss_eur": "Minusv. Realizzate (€)",
-                "prior_minus_deducted_eur": "Minusv. Dedotte (€)",
-                "taxable_base_eur": "Base Imponibile (€)",
-                "estimated_tax_due_eur": "Imposta Dovuta (€)",
-                "tax_credit_zainetto_eur": "Zainetto Residuo (€)"
-            })
-            
-            col_txy_h1, col_txy_h2 = st.columns([3.5, 0.9])
-            with col_txy_h2:
-                csv_txy = df_tax_show.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_txy, file_name="imposte_plusvalenze_per_anno.csv", mime="text/csv", use_container_width=True, key="btn_download_tax_year")
+            tab_harv1, tab_harv2 = st.tabs([
+                f"✂️ Raccolta Minusvalenze & Proxy Re-Entry ({len(df_harvest_loss)})",
+                f"🎯 Step-Up a 0€ Imposte ({len(df_step_up)})"
+            ])
+
+            with tab_harv1:
+                if not df_harvest_loss.empty:
+                    df_hl_disp = df_harvest_loss.rename(columns={
+                        "ticker": "Ticker", "asset_class": "Classe Asset", "qty_held": "Quote Detenute",
+                        "current_price_eur": "Prezzo (€)", "order_notional_eur": "Controvalore (€)",
+                        "unrealized_loss_eur": "Minus Realizzabile (€)", "unrealized_loss_pct": "Loss %",
+                        "tax_shield_created_eur": "Risparmio Fiscale (€)", "action": "Azione Consigliata",
+                        "replacement_proxy": "Re-Entry Proxy Correlato", "rationale": "Logica Operativa"
+                    })
+
+                    col_hl1, col_hl2 = st.columns([3.5, 1.2])
+                    with col_hl1:
+                        st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
+                    with col_hl2:
+                        csv_hl = df_hl_disp.to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Scarica Ordini CSV", data=csv_hl, file_name="ordini_tax_loss_harvesting.csv", mime="text/csv", use_container_width=True, key="btn_download_orders_tax_harvest")
+
+                    cfg_hl = {
+                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
+                        "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
+                        "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
+                        "Controvalore (€)": st.column_config.NumberColumn("Controvalore", format="€ %.2f"),
+                        "Minus Realizzabile (€)": st.column_config.NumberColumn("Minus (€)", format="€ %.2f"),
+                        "Risparmio Fiscale (€)": st.column_config.NumberColumn("Risparmio Imposta", format="€ %.2f"),
+                        "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
+                        "Re-Entry Proxy Correlato": st.column_config.TextColumn("Proxy Re-Entry", width="medium"),
+                    }
+
+                    st.dataframe(
+                        df_hl_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Controvalore (€)", "Minus Realizzabile (€)", "Risparmio Fiscale (€)", "Azione Consigliata", "Re-Entry Proxy Correlato"]],
+                        column_config=cfg_hl, use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("Nessuna posizione in perdita latente da raccogliere.")
+
+            with tab_harv2:
+                if not df_step_up.empty:
+                    df_su_disp = df_step_up.rename(columns={
+                        "ticker": "Ticker", "asset_class": "Classe Asset", "qty_held": "Quote Detenute",
+                        "current_price_eur": "Prezzo (€)", "unrealized_gain_eur": "Plusvalenza Latente (€)",
+                        "consumable_minus_eur": "Minus Compensabile (€)", "tax_saving_eur": "Tasse Azzerate (€)",
+                        "action": "Azione Consigliata", "replacement_proxy": "Re-Entry", "rationale": "Logica Operativa"
+                    })
+
+                    st.caption("Monetizza le plusvalenze compensandole al 100% con lo zainetto fiscale prima della scadenza dei 4 anni. Riacquista subito per alzare il prezzo di carico a 0€ di imposta.")
+                    
+                    cfg_su = {
+                        "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
+                        "Quote Detenute": st.column_config.NumberColumn("Quote", format="%.2f"),
+                        "Prezzo (€)": st.column_config.NumberColumn("Prezzo", format="€ %.2f"),
+                        "Plusvalenza Latente (€)": st.column_config.NumberColumn("Plusvalenza (€)", format="€ %.2f"),
+                        "Minus Compensabile (€)": st.column_config.NumberColumn("Minus Compensata", format="€ %.2f"),
+                        "Tasse Azzerate (€)": st.column_config.NumberColumn("Tasse Risparmiate", format="€ %.2f"),
+                        "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
+                    }
+
+                    st.dataframe(
+                        df_su_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Plusvalenza Latente (€)", "Minus Compensabile (€)", "Tasse Azzerate (€)", "Azione Consigliata"]],
+                        column_config=cfg_su, use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("Nessun candidato per Step-Up a 0€ imposte (richiede posizioni in utile su Redditi Diversi e saldo zainetto attivo).")
+
+            # ── TIMELINE SCADENZA ZAINETTO ──
+            df_zainetto = tax_res.get("zainetto_timeline", pd.DataFrame())
+            if not df_zainetto.empty:
+                st.divider()
+                st.markdown("##### ⏳ Timeline Zainetto Fiscale & Scadenze Quadriennali (TUIR Art. 68 c. 5)")
+                st.caption("Tracciamento delle minusvalenze pregresse con scadenza quadriennale (compensabili entro il 31 dicembre del 4° anno successivo alla realizzazione).")
+
+                df_z_plot = df_zainetto.copy()
+                df_z_plot["Anno Origine (Scadenza)"] = df_z_plot.apply(lambda r: f"Origine {r['origin_year']} (Scade {r['expiry_year']})", axis=1)
+
+                fig_z_timeline = px.bar(
+                    df_z_plot, x="Anno Origine (Scadenza)", y=["residual_active_eur", "compensated_eur", "expired_eur"],
+                    labels={"value": "Euro (€)", "variable": "", "Anno Origine (Scadenza)": ""},
+                    color_discrete_map={"residual_active_eur": "#ff9900", "compensated_eur": "#3fb950", "expired_eur": "#f85149"},
+                    barmode="stack", template="plotly_dark", height=320
+                )
+                legend_names = {"residual_active_eur": "Residuo Attivo", "compensated_eur": "Compensato", "expired_eur": "Scaduto"}
+                fig_z_timeline.for_each_trace(lambda t: t.update(name=legend_names.get(t.name, t.name), hovertemplate="<b>%{x}</b><br>" + legend_names.get(t.name, t.name) + ": <b>€ %{y:,.2f}</b><extra></extra>"))
+                fig_z_timeline.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=20, r=20, t=35, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=11, color="#ffffff")))
+                apply_plotly_theme(fig_z_timeline)
+                st.plotly_chart(fig_z_timeline, use_container_width=True, config={"displayModeBar": False})
+
+        # ══════════════════════════════════════════════════════════════════════
+        # SUB-TAB 2: PROSPETTO PRECOMPILATO MODELLO REDDITI PF (QUADRO RT & RW)
+        # ══════════════════════════════════════════════════════════════════════
+        with tab_tax_c2:
+            col_rt_h1, col_rt_h2 = st.columns([3.2, 1.2])
+            with col_rt_h1:
+                st.markdown("#### 📑 Prospetto Precompilato Modello Redditi Persone Fisiche")
+                st.caption("Prospetto conforme per chi opera in **Regime Dichiarativo** (es. Interactive Brokers, Degiro, Scalable Capital, Revolut o Wallet Privati).")
+            with col_rt_h2:
+                st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+                glossary_modal(
+                    "ℹ️ Istruzioni Modello Redditi PF",
+                    """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+  <b style="color: #ff9900;">🏛️ Come utilizzare questi prospetti</b><br>
+  I dati calcolati riportano esattamente i codici rigo ministeriali per la compilazione della dichiarazione annuale dei redditi da parte del Commercialista o CAF.
+</div>
+<div><b>Quadro RT (Sez. II):</b> Plusvalenze su partecipazioni non qualificate assoggettate ad imposta sostitutiva del 26% (Codice tributo F24: <b>1100</b>).<br>
+<b>Quadro RW:</b> Monitoraggio fiscale delle attività finanziarie detenute all'estero e liquidazione IVAFE (0,20%).</div>
+</div>
+"""
+                )
+
+            col_rt_in1, col_rt_in2 = st.columns([2.0, 2.0])
+            with col_rt_in1:
+                prior_minus_in = st.number_input(
+                    "Minusvalenze Pregresse da Quadro RT Anno Precedente (€):",
+                    value=float(tax_credit_val),
+                    step=250.0, format="%.2f",
+                    key="input_prior_minus_rt"
+                )
+
+            pf_res = compute_modello_redditi_pf(results, tax_year=tax_year_param, db_engine=engine, prior_minus_custom_eur=prior_minus_in)
+            pf_sum = pf_res["summary"]
+            df_rt_table = pf_res["df_quadro_rt"]
+            df_rw_table = pf_res["df_quadro_rw"]
+
+            col_pf1, col_pf2, col_pf3, col_pf4 = st.columns(4)
+            with col_pf1:
+                metric_card("Imposta Sostitutiva (RT)", f"€ {pf_sum['imposta_sostitutiva_rt_eur']:,.2f}", "Aliquota 26% F24 (Cod. 1100)", False)
+            with col_pf2:
+                metric_card("IVAFE Dovuta (RW)", f"€ {pf_sum['totale_ivafe_rw_eur']:,.2f}", "Esente se < 12€" if pf_sum["esenzione_ivafe_applicata"] else "0.20% su giacenza estera", False)
+            with col_pf3:
+                metric_card("Totale Debito F24", f"€ {pf_sum['totale_debito_dichiarativo_eur']:,.2f}", "RT26 + RW IVAFE", False)
+            with col_pf4:
+                metric_card("Minus Riportabili (RT25)", f"€ {pf_sum['minusvalenze_riportabili_eur']:,.2f}", "Valide per i prossimi 4 anni", True)
+
+            st.markdown("##### 📋 Quadro RT — Sezione II (Plusvalenze & Minusvalenze Finanziarie)")
+            col_rt_d1, col_rt_d2 = st.columns([3.5, 1.2])
+            with col_rt_d2:
+                csv_rt = df_rt_table.to_csv(index=False).encode('utf-8')
+                st.download_button("📥 Scarica Quadro RT CSV", data=csv_rt, file_name="quadro_rt_precompilato.csv", mime="text/csv", use_container_width=True, key="btn_download_rt_csv")
 
             st.dataframe(
-                df_tax_show.style.format({c: "€ {:,.2f}" for c in df_tax_show.columns if c != "Anno Solare"}),
+                df_rt_table.rename(columns={"rigo": "Rigo", "descrizione": "Descrizione Ministeriale", "valore_eur": "Importo (€)"}),
+                column_config={"Importo (€)": st.column_config.NumberColumn("Importo (€)", format="€ %.2f")},
                 use_container_width=True, hide_index=True
             )
 
-        # ── TIMELINE ZAINETTO FISCALE MULTIANNO (TUIR ART. 68 C. 5) ──
-        df_zainetto = tax_res.get("zainetto_timeline", pd.DataFrame())
-        if not df_zainetto.empty:
-            st.divider()
-            st.markdown("#### ⏳ Timeline Zainetto Fiscale & Scadenze Quadriennali (TUIR Art. 68 c. 5)")
-            st.caption("Tracciamento delle minusvalenze pregresse con scadenza quadriennale (compensabili entro il 31 dicembre del 4° anno successivo alla realizzazione).")
+            st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+            st.markdown("##### 🌍 Quadro RW — Monitoraggio Fiscale Attività Estere & Calcolo IVAFE")
+            if not df_rw_table.empty:
+                col_rw_d1, col_rw_d2 = st.columns([3.5, 1.2])
+                with col_rw_d2:
+                    csv_rw = df_rw_table.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Quadro RW CSV", data=csv_rw, file_name="quadro_rw_precompilato.csv", mime="text/csv", use_container_width=True, key="btn_download_rw_csv")
 
-            tot_active_credit = float(df_zainetto["residual_active_eur"].sum())
-            expiring_soon = df_zainetto[df_zainetto["urgency"].isin(["CRITICAL", "HIGH"])]
-            tot_expiring_soon = float(expiring_soon["residual_active_eur"].sum()) if not expiring_soon.empty else 0.0
-            tot_compensated = float(df_zainetto["compensated_eur"].sum())
-            tax_saved_realized = tot_compensated * 0.26
-
-            col_z_kpi1, col_z_kpi2, col_z_kpi3 = st.columns(3)
-            with col_z_kpi1:
-                metric_card("Credito Fiscale Attivo", f"€ {tot_active_credit:,.2f}", "Zainetto Disponibile", True)
-            with col_z_kpi2:
-                sub_scad = "Nessuna Scadenza Imminente" if tot_expiring_soon <= 0 else "Priorità di Recupero"
-                metric_card("In Scadenza (12-24M)", f"€ {tot_expiring_soon:,.2f}", sub_scad, tot_expiring_soon <= 0)
-            with col_z_kpi3:
-                metric_card("Minusvalenze Compensate", f"€ {tot_compensated:,.2f}", f"Risparmio: € {tax_saved_realized:,.2f}", True)
-
-            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-            st.markdown("##### 📦 Stato dei Bucket di Minusvalenze per Anno di Origine (€)")
-
-            df_z_plot = df_zainetto.copy()
-            df_z_plot["Anno Origine (Scadenza)"] = df_z_plot.apply(lambda r: f"Origine {r['origin_year']} (Scade {r['expiry_year']})", axis=1)
-
-            fig_z_timeline = px.bar(
-                df_z_plot,
-                x="Anno Origine (Scadenza)",
-                y=["residual_active_eur", "compensated_eur", "expired_eur"],
-                labels={
-                    "value": "Euro (€)",
-                    "variable": "",
-                    "Anno Origine (Scadenza)": ""
-                },
-                color_discrete_map={
-                    "residual_active_eur": "#ff9900",
-                    "compensated_eur": "#3fb950",
-                    "expired_eur": "#f85149"
-                },
-                barmode="stack",
-                template="plotly_dark",
-                height=370
-            )
-            
-            legend_names = {
-                "residual_active_eur": "Residuo Attivo Compensabile",
-                "compensated_eur": "Già Compensato",
-                "expired_eur": "Prescritto / Scaduto"
-            }
-            fig_z_timeline.for_each_trace(lambda t: t.update(
-                name=legend_names.get(t.name, t.name),
-                hovertemplate="<b>%{x}</b><br>" + legend_names.get(t.name, t.name) + ": <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            
-            fig_z_timeline.update_layout(
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                margin=dict(l=20, r=20, t=45, b=20),
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="center",
-                    x=0.5,
-                    bgcolor="rgba(22, 27, 34, 0.85)",
-                    bordercolor="rgba(255, 255, 255, 0.12)",
-                    borderwidth=1,
-                    font=dict(size=11, color="#ffffff")
+                st.dataframe(
+                    df_rw_table.rename(columns={
+                        "rigo": "Rigo", "ticker": "Asset / Ticker", "asset_class": "Classe",
+                        "codice_investimento": "Cod. Investimento", "codice_paese": "Cod. Paese",
+                        "quota_possesso_pct": "Possesso %", "giorni_detenzione": "Giorni",
+                        "valore_iniziale_eur": "Valore Iniziale (€)", "valore_finale_eur": "Valore Finale (€)",
+                        "ivafe_calcolata_eur": "IVAFE (€)"
+                    }),
+                    column_config={
+                        "Valore Iniziale (€)": st.column_config.NumberColumn("Valore Iniziale", format="€ %.2f"),
+                        "Valore Finale (€)": st.column_config.NumberColumn("Valore Finale", format="€ %.2f"),
+                        "IVAFE (€)": st.column_config.NumberColumn("IVAFE (0.2%)", format="€ %.2f"),
+                        "Possesso %": st.column_config.NumberColumn("Possesso", format="%.0f%%")
+                    },
+                    use_container_width=True, hide_index=True
                 )
-            )
-            apply_plotly_theme(fig_z_timeline)
-            st.plotly_chart(fig_z_timeline, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+            else:
+                st.info("Nessun asset estero rilevante ai fini del monitoraggio Quadro RW.")
 
-            df_z_table = df_zainetto.copy()
-            
-            def format_tempo_residuo(row):
-                if "Totalmente Compensato" in str(row["status"]):
-                    return "✅ Concluso"
-                if "Prescritto" in str(row["status"]):
-                    return "❌ Scaduto"
-                y = int(row["years_to_expiry"])
-                return "< 12 mesi" if y == 0 else f"{y} anni"
+        # ══════════════════════════════════════════════════════════════════════
+        # SUB-TAB 3: WITHHOLDING TAX DIVIDENDI ESTERI (DOPPIA IMPOSIZIONE)
+        # ══════════════════════════════════════════════════════════════════════
+        with tab_tax_c3:
+            col_wt_h1, col_wt_h2 = st.columns([3.2, 1.2])
+            with col_wt_h1:
+                st.markdown("#### 🇺🇸 Withholding Tax Dividendi Esteri & Doppia Imposizione")
+                st.caption("Analisi dell'impatto fiscale sui dividendi azionari esteri (Ritenuta alla fonte W-8BEN + Ritenuta italiana al 26% sul netto frontiera).")
+            with col_wt_h2:
+                st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+                glossary_modal(
+                    "📖 Guida Withholding Tax & Doppia Imposizione",
+                    """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+  <b style="color: #ff9900;">🇺🇸 Meccanismo della Doppia Imposizione</b><br>
+  Sui dividendi azionari USA viene applicata la ritenuta alla fonte del <b>15%</b> (con W-8BEN). L'intermediario italiano applica poi il <b>26% sul netto frontiera (85%)</b>, portando l'aliquota effettiva reale al <b>37,10%</b>.
+</div>
+<div><b>Confronto con ETF ad Accumulazione:</b> Gli ETF UCITS trattengono internamente il 15% sul dividendo reinvestito senza subire la tassazione italiana immediata, eliminando il Tax Drag.</div>
+</div>
+"""
+                )
 
-            df_z_table["Tempo alla Scadenza"] = df_z_table.apply(format_tempo_residuo, axis=1)
+            wht_res = compute_withholding_tax_analysis(results)
+            wht_sum = wht_res["summary"]
+            df_wht = wht_res["df_withholding"]
 
-            df_z_table_show = df_z_table[[
-                "origin_year", "expiry_year", "initial_minus_eur", "compensated_eur", 
-                "residual_active_eur", "Tempo alla Scadenza", "status"
-            ]].rename(columns={
-                "origin_year": "Anno Origine",
-                "expiry_year": "Anno Scadenza",
-                "initial_minus_eur": "Minusvalenza Iniziale (€)",
-                "compensated_eur": "Compensato (€)",
-                "residual_active_eur": "Credito Residuo (€)",
-                "status": "Stato Fiscale"
-            })
+            col_w1, col_w2, col_w3, col_w4 = st.columns(4)
+            with col_w1:
+                metric_card("Dividendi Lordi Stimati", f"€ {wht_sum['total_gross_dividends_eur']:,.2f}", "Flusso Cedolare Lordo", True)
+            with col_w2:
+                metric_card("Ritenute Estere (WHT)", f"€ {wht_sum['total_foreign_wht_eur']:,.2f}", "Trattenute alla fonte", False)
+            with col_w3:
+                metric_card("Imposta Italia (26%)", f"€ {wht_sum['total_italian_tax_eur']:,.2f}", "Applicata su netto frontiera", False)
+            with col_w4:
+                metric_card("Aliquota Effettiva Media", f"{wht_sum['weighted_effective_tax_pct']:.2f}%", f"Tax Drag vs ETF: € {wht_sum['total_tax_drag_vs_accumulating_eur']:,.2f}", False)
 
-            col_z_dh1, col_z_dh2 = st.columns([3.5, 0.9])
-            with col_z_dh2:
-                csv_zt = df_z_table_show.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_zt, file_name="timeline_zainetto_fiscale.csv", mime="text/csv", use_container_width=True, key="btn_download_zainetto_timeline")
+            if not df_wht.empty:
+                col_wd1, col_wd2 = st.columns([3.5, 1.2])
+                with col_wd1:
+                    st.markdown("##### 🔍 Breakdown Fiscale per Singolo Asset a Distribuzione")
+                with col_wd2:
+                    csv_wht = df_wht.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Report WHT CSV", data=csv_wht, file_name="withholding_tax_report.csv", mime="text/csv", use_container_width=True, key="btn_download_wht_csv")
 
-            st.dataframe(
-                df_z_table_show.style.format({
-                    "Minusvalenza Iniziale (€)": "€ {:,.2f}",
-                    "Compensato (€)": "€ {:,.2f}",
-                    "Credito Residuo (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
+                st.dataframe(
+                    df_wht.rename(columns={
+                        "ticker": "Ticker", "asset_class": "Classe", "paese_regime": "Paese / Regime Fiscale",
+                        "dividendo_lordo_eur": "Dividendo Lordo (€)", "ritenuta_estera_wht_eur": "WHT Estera (€)",
+                        "aliquota_wht_pct": "Aliquota WHT %", "netto_frontiera_eur": "Netto Frontiera (€)",
+                        "imposta_italiana_26_eur": "Imposta IT 26% (€)", "totale_imposte_eur": "Totale Imposte (€)",
+                        "dividendo_netto_incassato_eur": "Netto Incassato (€)", "aliquota_effettiva_combinata_pct": "Aliquota Effettiva %",
+                        "tax_drag_vs_accumulo_eur": "Tax Drag vs Accumulo (€)"
+                    }),
+                    column_config={
+                        "Dividendo Lordo (€)": st.column_config.NumberColumn("Lordo (€)", format="€ %.2f"),
+                        "WHT Estera (€)": st.column_config.NumberColumn("WHT Estera", format="€ %.2f"),
+                        "Netto Frontiera (€)": st.column_config.NumberColumn("Netto Frontiera", format="€ %.2f"),
+                        "Imposta IT 26% (€)": st.column_config.NumberColumn("Imposta IT 26%", format="€ %.2f"),
+                        "Netto Incassato (€)": st.column_config.NumberColumn("Netto Reale", format="€ %.2f"),
+                        "Aliquota Effettiva %": st.column_config.NumberColumn("Aliquota Effettiva", format="%.2f%%"),
+                        "Tax Drag vs Accumulo (€)": st.column_config.NumberColumn("Tax Drag vs Acc.", format="€ %.2f"),
+                    },
+                    use_container_width=True, hide_index=True
+                )
+            else:
+                st.info("Nessuna posizione azionaria estera a dividendo presente in portafoglio.")
+
+        # ══════════════════════════════════════════════════════════════════════
+        # SUB-TAB 4: TAX-SMART LOT SIZING (SIMULATORE PRE-TRADE FIFO)
+        # ══════════════════════════════════════════════════════════════════════
+        with tab_tax_c4:
+            col_ls_h1, col_ls_h2 = st.columns([3.2, 1.2])
+            with col_ls_h1:
+                st.markdown("#### 🧮 Tax-Smart Lot Sizing (Simulatore Pre-Trade FIFO)")
+                st.caption("Simula la vendita parziale di un asset per prevedere con esattezza quali lotti storici verranno scaricati e l'imposta netta generata.")
+            with col_ls_h2:
+                st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+                glossary_modal(
+                    "💡 Come Funziona il Lot Sizing FIFO",
+                    """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+  <b style="color: #ff9900;">🎯 Principio First-In First-Out (FIFO)</b><br>
+  L'Agenzia delle Entrate impone di liquidare prioritariamente le quote acquistate per prime. Quando vendi una quantità parziale, il simulatore calcola lo scorporo puntuale dei lotti per mostrarti il capital gain effettivo prima di confermare l'ordine sul broker.
+</div>
+</div>
+"""
+                )
+
+            pos_df = results.get("positions", pd.DataFrame())
+            active_pos_tickers = sorted(pos_df[pos_df["qty_net"] > 0]["ticker"].unique().tolist()) if not pos_df.empty and "qty_net" in pos_df.columns else []
+
+            if active_pos_tickers:
+                col_ls_in1, col_ls_in2, col_ls_in3 = st.columns([2.0, 1.5, 1.5])
+                with col_ls_in1:
+                    sel_lot_ticker = st.selectbox("Seleziona Titolo da Simulare:", options=active_pos_tickers, key="sel_lot_sizing_ticker")
+                
+                cur_lot_pos = pos_df[pos_df["ticker"] == sel_lot_ticker].iloc[0]
+                cur_qty = float(cur_lot_pos.get("qty_net", 1.0))
+                cur_price = float(cur_lot_pos.get("current_price", 100.0))
+
+                with col_ls_in2:
+                    qty_to_sell_input = st.number_input(
+                        f"Quote da Vendere (Max: {cur_qty:,.2f}):",
+                        min_value=0.01, max_value=float(cur_qty), value=float(min(cur_qty, max(1.0, round(cur_qty * 0.5, 2)))),
+                        step=1.0 if cur_qty >= 10 else 0.1, key="input_qty_to_sell_sim"
+                    )
+                with col_ls_in3:
+                    price_sell_input = st.number_input(
+                        "Prezzo di Esecuzione Stimato (€):",
+                        value=float(cur_price), step=1.0, format="%.2f", key="input_price_to_sell_sim"
+                    )
+
+                sim_res = simulate_fifo_lot_sale(results, ticker=sel_lot_ticker, qty_to_sell=qty_to_sell_input, sale_price=price_sell_input)
+
+                col_lr1, col_lr2, col_lr3, col_lr4 = st.columns(4)
+                with col_lr1:
+                    metric_card("Controvalore Incassato", f"€ {sim_res['total_proceeds_eur']:,.2f}", f"Prezzo: € {sim_res['sale_price_eur']:.2f}", True)
+                with col_lr2:
+                    pnl_color = sim_res["total_realized_pnl_eur"] >= 0
+                    metric_card("PnL Realizzato", f"€ {sim_res['total_realized_pnl_eur']:,.2f}", f"{sim_res['realized_pnl_pct']:+.2f}% vs costo FIFO", pnl_color)
+                with col_lr3:
+                    if sim_res["total_realized_pnl_eur"] >= 0:
+                        metric_card("Imposta Stimata", f"€ {sim_res['estimated_tax_due_eur']:,.2f}", f"Aliquota: {sim_res['applicable_tax_rate_pct']:.1f}%", False)
+                    else:
+                        metric_card("Nuova Minusvalenza", f"€ {sim_res['minusvalenza_generata_eur']:,.2f}", "Credito zainetto fiscale", True)
+                with col_lr4:
+                    metric_card("Quote Residue in PTF", f"{sim_res['residual_shares']:,.2f}", f"Valore Residuo: € {sim_res['residual_value_eur']:,.2f}", True)
+
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+                st.markdown(f"##### 📦 Dettaglio Lotti FIFO Scaricati per {sel_lot_ticker}")
+                
+                df_aff = sim_res.get("df_affected_lots", pd.DataFrame())
+                if not df_aff.empty:
+                    st.dataframe(
+                        df_aff.rename(columns={
+                            "data_lotto": "Data Acquisto", "quote_scaricate": "Quote Scaricate",
+                            "prezzo_carico_lotto_eur": "Prezzo Carico (€)", "prezzo_vendita_eur": "Prezzo Vendita (€)",
+                            "controvalore_lotto_eur": "Controvalore (€)", "costo_fiscale_lotto_eur": "Costo FIFO (€)",
+                            "pnl_lotto_eur": "PnL Lotto (€)", "pnl_lotto_pct": "PnL %",
+                            "imposta_stimata_eur": "Imposta (€)", "tipo_reddito": "Tipologia Fiscale"
+                        }),
+                        column_config={
+                            "Quote Scaricate": st.column_config.NumberColumn("Quote", format="%.2f"),
+                            "Prezzo Carico (€)": st.column_config.NumberColumn("Prezzo Carico", format="€ %.2f"),
+                            "Prezzo Vendita (€)": st.column_config.NumberColumn("Prezzo Vendita", format="€ %.2f"),
+                            "Controvalore (€)": st.column_config.NumberColumn("Controvalore", format="€ %.2f"),
+                            "PnL Lotto (€)": st.column_config.NumberColumn("PnL Lotto", format="€ %.2f"),
+                            "Imposta (€)": st.column_config.NumberColumn("Imposta Stimata", format="€ %.2f"),
+                            "PnL %": st.column_config.NumberColumn("PnL %", format="%+.2f%%")
+                        },
+                        use_container_width=True, hide_index=True
+                    )
+            else:
+                st.info("Nessuna posizione attiva in portafoglio disponibile per la simulazione.")
 
     # ══════════════════════════════════════════════════════════════════════
     # SEZIONE FISCO CRIPTO-ATTIVITÀ (L. 197/2022 & CIRCOLARE AdE 30/E/2023)
