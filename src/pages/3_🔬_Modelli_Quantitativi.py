@@ -995,19 +995,19 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
         importlib.reload(core.rebalancer)
         from core.rebalancer import compute_rebalancing_orders
 
-        col_reb1, col_reb2, col_reb3 = st.columns([2.5, 1.3, 0.9])
+        col_reb1, col_reb2, col_reb3 = st.columns([3.3, 1.3, 0.8])
         with col_reb1:
             target_strategy = st.segmented_control(
                 "Profilo Bersaglio di Ribilanciamento:",
-                options=["Max Sharpe (Markowitz)", "Minima Volatilità", "Equi-peso (Equal Weight)"],
-                default="Max Sharpe (Markowitz)",
+                options=["🎯 Max Sharpe (Markowitz)", "🛡️ Minima Volatilità", "⚖️ Equi-peso (Equal Weight)"],
+                default="🎯 Max Sharpe (Markowitz)",
                 key="seg_target_strategy"
             )
             if not target_strategy:
-                target_strategy = "Max Sharpe (Markowitz)"
+                target_strategy = "🎯 Max Sharpe (Markowitz)"
         with col_reb2:
             new_cash_input = st.number_input(
-                "Nuova Cassa / Iniezione (€):",
+                "Iniezione Cassa (€):",
                 value=0.0, step=500.0, format="%.2f",
                 help="Inserisci un valore positivo per nuovi versamenti o negativo per prelievi di cassa."
             )
