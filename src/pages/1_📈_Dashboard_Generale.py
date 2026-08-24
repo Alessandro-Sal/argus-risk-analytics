@@ -531,9 +531,11 @@ if selected_bms:
 
 # ── VISTA ANALITICA AGGREGATA DUCKDB (OLAP ACCELERATION) ──────────
 if not pos.empty:
-    with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Asset Class × Settore × Valuta)", expanded=False):
-        from core.ui_utils import render_duckdb_olap_cube_widget
-        render_duckdb_olap_cube_widget(pos, key_prefix="p1_dash")
+    st.markdown("#### ⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Multi-Dimensionale)")
+    st.caption("Aggregazione colonnare ad alta performance per Asset Class × Settore GICS × Valuta con scomposizione gerarchica del rischio e rendimento.")
+    from core.ui_utils import render_duckdb_olap_cube_widget
+    render_duckdb_olap_cube_widget(pos, key_prefix="p1_dash")
+    st.markdown('<div style="margin-bottom: 24px;"></div>', unsafe_allow_html=True)
 
 # ── ANALISI DI EFFICIENZA, RISCHIO & PERFORMANCE ATTIVA (BENTO & MODAL) ──
 col_head_m1, col_head_m2 = st.columns([3.2, 1.2])
