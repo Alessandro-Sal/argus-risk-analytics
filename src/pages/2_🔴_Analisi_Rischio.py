@@ -560,6 +560,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             # ── GRAFICO TIMELINE PROBABILITÀ DI REGIME & CUMULATO ──
             df_probs_hist = regime_res.get("historical_probabilities_df", pd.DataFrame())
             if not df_probs_hist.empty:
+                st.markdown('<div style="margin-top: 18px;"></div>', unsafe_allow_html=True)
                 st.markdown("##### 📊 Cronistoria delle Probabilità di Regime Macroeconomico (Modello di Markov)")
                 
                 from plotly.subplots import make_subplots
