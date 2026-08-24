@@ -995,21 +995,25 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
         importlib.reload(core.rebalancer)
         from core.rebalancer import compute_rebalancing_orders
 
-        col_reb1, col_reb2, col_reb3 = st.columns([2, 1.5, 1])
+        col_reb1, col_reb2, col_reb3 = st.columns([2.5, 1.3, 0.9])
         with col_reb1:
-            target_strategy = st.radio(
+            target_strategy = st.segmented_control(
                 "Profilo Bersaglio di Ribilanciamento:",
-                ["Max Sharpe (Markowitz)", "Minima Volatilità", "Equi-peso (Equal Weight)"],
-                horizontal=True
+                options=["Max Sharpe (Markowitz)", "Minima Volatilità", "Equi-peso (Equal Weight)"],
+                default="Max Sharpe (Markowitz)",
+                key="seg_target_strategy"
             )
+            if not target_strategy:
+                target_strategy = "Max Sharpe (Markowitz)"
         with col_reb2:
             new_cash_input = st.number_input(
-                "Nuova Cassa / Iniezione Liquidità (€):",
+                "Nuova Cassa / Iniezione (€):",
                 value=0.0, step=500.0, format="%.2f",
                 help="Inserisci un valore positivo per nuovi versamenti o negativo per prelievi di cassa."
             )
         with col_reb3:
-            int_shares_flag = st.checkbox("Quote Intere", value=True, help="Arrotonda le quote agli interi.")
+            st.markdown('<div style="margin-top: 32px;"></div>', unsafe_allow_html=True)
+            int_shares_flag = st.checkbox("Quote Intere", value=True, help="Arrotonda le quote operative agli interi.")
 
         mode_key = "max_sharpe" if "Max Sharpe" in target_strategy else ("min_vol" if "Minima" in target_strategy else "equal_weight")
 
@@ -1076,7 +1080,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     data=csv_ro,
                     file_name="ordini_ribilanciamento_tattico.csv",
                     mime="text/csv",
-                    use_container_width=True
+                    use_container_width=True,
+                    key="btn_download_rebal_csv"
                 )
 
             if df_disp_orders_filt.empty:
