@@ -54,11 +54,14 @@ import core.risk_engine
 import core.options_hedging
 import core.volatility_surface
 import core.factor_library
+import core.reinforcement_learning
 importlib.reload(core.risk_engine)
 importlib.reload(core.options_hedging)
 importlib.reload(core.volatility_surface)
 importlib.reload(core.factor_library)
+importlib.reload(core.reinforcement_learning)
 from core.ui_utils import ensure_risk_bundle_loaded, render_sandbox_banner
+from core.reinforcement_learning import train_and_evaluate_rl_portfolio
 
 results, has_real = ensure_risk_bundle_loaded()
 has_portfolio = results is not None and isinstance(results, dict) and bool(results.get("positions") is not None and not results.get("positions").empty)
@@ -110,6 +113,7 @@ with col_head2:
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Modelli Quantitativi di Frontiera</div>
   <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
     • <b>Markowitz & Ledoit-Wolf:</b> Frontiera efficiente con covarianza a shrinkage antirumore.<br>
+    • <b>Reinforcement Learning:</b> Policy Gradient REINFORCE per asset allocation dinamica su regimi di volatilità.<br>
     • <b>Equal Risk Contribution (ERC):</b> Parità pura di rischio dove ogni asset contribuisce 1/N alla volatilità.<br>
     • <b>Hierarchical Risk Parity (HRP):</b> Clustering ad albero (López de Prado) senza matrice inversa.<br>
     • <b>Tail Copula Asimmetriche:</b> Dipendenza di coda (Clayton/Gumbel) per quantificare il rischio di crash congiunto.<br>
@@ -122,12 +126,12 @@ with col_head2:
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>I moduli <code>core/risk_engine.py</code> e <code>core/financial_analysis.py</code> eseguono simulazioni stocastiche vettorializzate ad alte prestazioni.</div>
+  <div>I moduli <code>core/risk_engine.py</code>, <code>core/reinforcement_learning.py</code> e <code>core/financial_analysis.py</code> eseguono simulazioni stocastiche vettorializzate ad alte prestazioni.</div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come navigare la sezione</div>
-  <div>Utilizza le schede superiori per passare dall'ottimizzazione di allocazione (Tab 1), alle proiezioni stocastiche (Tab 2), alle strategie di copertura attiva (Tab 3), all'attribuzione Brinson/Fattori (Tab 4) e al Fixed Income (Tab 5).</div>
+  <div>Utilizza le schede superiori per passare dall'ottimizzazione Markowitz (Tab 1), all'Asset Allocation AI RL (Tab 2), alle Copule/Kelly (Tab 3), al Monte Carlo (Tab 4), alla Copertura (Tab 5), all'Attribuzione (Tab 6) e al Fixed Income (Tab 7).</div>
 </div>
 
 </div>
@@ -139,6 +143,7 @@ st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 # ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
 active_quant_tab = render_segmented_tabs([
     "📊 Markowitz & Rebalancing",
+    "🤖 AI Reinforcement Learning",
     "🧬 Tail Copula & Kelly",
     "🎲 Monte Carlo & Merton",
     "🛡️ Hedging & Opzioni",
@@ -1283,7 +1288,246 @@ L'<b>Hierarchical Risk Parity (HRP)</b> è un algoritmo quantitativo sviluppato 
     else:
         st.info("Dati di ottimizzazione di Markowitz non disponibili.")
 
-# ── TAB 2: TAIL COPULA & KELLY SIZING ────────────────────────────
+# ── TAB 2: AI REINFORCEMENT LEARNING ASSET ALLOCATION ───────────
+elif active_quant_tab == "🤖 AI Reinforcement Learning":
+    if not has_portfolio:
+        st.warning("⚠️ Carica prima un portafoglio per addestrare l'Agente AI di Reinforcement Learning.")
+    else:
+        col_rl_h1, col_rl_h2 = st.columns([3.0, 1.3])
+        with col_rl_h1:
+            st.markdown("### 🤖 Asset Allocation con Reinforcement Learning (RL Policy Sandbox)")
+            st.caption("Addestramento di agenti neurali continui (Policy Gradient REINFORCE) per l'adattamento dinamico dei pesi su regimi macro e minimizzazione del Downside Risk.")
+        with col_rl_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal(
+                "ℹ️ Guida Metodologica: Reinforcement Learning in Portfolio Management",
+                """
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Portfolio Management via RL</div>
+  <div>A differenza dei modelli statici di Markowitz (che assumono parametri di covarianza costanti nel tempo), un agente di <b>Reinforcement Learning (RL)</b> apprende una <i>policy</i> decisionale dinamica &pi;<sub>&theta;</sub>(a|s) formulata come Processo Decisionale di Markov (MDP).</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Spazio degli Stati, Azioni e Funzione di Ricompensa</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
+    • <b>Stato (S<sub>t</sub> &isin; &Ropf;<sup>3N</sup>):</b> Vettore delle medie rolling, deviazioni standard e momentum a 25 giorni per ciascun asset.<br>
+    • <b>Azione (A<sub>t</sub> &isin; &Delta;<sup>N-1</sup>):</b> Vettore pesi sul simplesso (&sum; w<sub>i</sub> = 1, w<sub>i</sub> &ge; 0) generato tramite attivazione Softmax.<br>
+    • <b>Ricompensa (R<sub>t</sub>):</b> R<sub>t</sub> = r<sub>p,t</sub> &minus; &gamma; &middot; max(0, &minus;r<sub>p,t</sub>)<sup>2</sup> &minus; &lambda; &middot; ||&Delta;w<sub>t</sub>||<sub>1</sub> (Sortino Reward con penalità per turnover).
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Algoritmo di Ottimizzazione</div>
+  <div>La rete neurale a 2 livelli viene addestrata mediante <b>Policy Gradient REINFORCE</b> con riduzione della varianza tramite baseline mobile, garantendo convergenza stabile anche su orizzonti multi-anno.</div>
+</div>
+
+</div>
+""",
+                button_label="💡 Guida RL Agent"
+            )
+
+        df_returns_rl = results.get("returns", pd.DataFrame())
+        if active_tickers_set:
+            valid_cols = [c for c in df_returns_rl.columns if c in active_tickers_set]
+            if len(valid_cols) >= 2:
+                df_returns_rl = df_returns_rl[valid_cols]
+
+        if df_returns_rl.empty or len(df_returns_rl.columns) < 2:
+            st.info("Dati di serie storiche insufficienti per l'addestramento del modello di Reinforcement Learning.")
+        else:
+            # Control Bar di Configurazione dell'Agente
+            col_cfg1, col_cfg2, col_cfg3, col_cfg4 = st.columns([1.2, 1.6, 1.2, 1.2])
+            with col_cfg1:
+                episodes_in = st.slider("Episodi di Addestramento", min_value=10, max_value=60, value=30, step=5, key="rl_episodes_slider")
+            with col_cfg2:
+                reward_choice = st.selectbox(
+                    "Obiettivo di Ricompensa (Reward Function)",
+                    options=[
+                        "Massimizzazione Sortino (Penalità Downside)",
+                        "Massimizzazione Sharpe Ratio",
+                        "Minima Volatilità & Low Turnover"
+                    ],
+                    key="rl_reward_select"
+                )
+                reward_key = "sortino" if "Sortino" in reward_choice else ("sharpe" if "Sharpe" in reward_choice else "min_vol")
+            with col_cfg3:
+                lookback_w = st.slider("Finestra Lookback (Giorni)", min_value=15, max_value=50, value=25, step=5, key="rl_window_slider")
+            with col_cfg4:
+                turnover_pen = st.slider("Penalità Turnover (%)", min_value=0.0, max_value=0.5, value=0.1, step=0.05, format="%.2f%%", key="rl_turnover_slider") / 100.0
+
+            col_btn1, col_btn2 = st.columns([1.5, 3.5])
+            with col_btn1:
+                run_rl_btn = st.button("⚡ Avvia Addestramento Agente RL", type="primary", use_container_width=True, key="btn_train_rl")
+
+            # Training Execution / Session State Cache
+            if run_rl_btn or "rl_portfolio_results" not in st.session_state:
+                with st.spinner("🤖 Addestramento della Policy Neurale in corso con simulazione ad episodi..."):
+                    rl_res = train_and_evaluate_rl_portfolio(
+                        df_returns=df_returns_rl,
+                        episodes=episodes_in,
+                        window_size=lookback_w,
+                        reward_type=reward_key,
+                        turnover_penalty=turnover_pen
+                    )
+                    st.session_state["rl_portfolio_results"] = rl_res
+
+            rl_res = st.session_state.get("rl_portfolio_results")
+
+            if rl_res and rl_res.get("has_data"):
+                rl_stats = rl_res["rl_stats"]
+                ew_stats = rl_res["ew_stats"]
+
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+
+                # ── KPI SCORECARD ROW ──
+                col_k1, col_k2, col_k3, col_k4, col_k5, col_k6 = st.columns(6)
+                with col_k1:
+                    metric_card("Rendimento Totale RL", f"{rl_stats['total_return_pct']:.2f}%", f"Benchmark 1/N: {ew_stats['total_return_pct']:.2f}%", delta=f"{rl_res['alpha_over_ew_pct']:+.2f}%")
+                with col_k2:
+                    metric_card("CAGR Annualizzato", f"{rl_stats['cagr_pct']:.2f}%", f"1/N: {ew_stats['cagr_pct']:.2f}%")
+                with col_k3:
+                    metric_card("Volatilità Ann.", f"{rl_stats['volatility_pct']:.2f}%", f"1/N: {ew_stats['volatility_pct']:.2f}%")
+                with col_k4:
+                    metric_card("Sharpe Ratio", f"{rl_stats['sharpe_ratio']:.2f}", f"1/N: {ew_stats['sharpe_ratio']:.2f}", delta=f"{rl_stats['sharpe_ratio'] - ew_stats['sharpe_ratio']:+.2f}")
+                with col_k5:
+                    metric_card("Sortino Ratio", f"{rl_stats['sortino_ratio']:.2f}", f"1/N: {ew_stats['sortino_ratio']:.2f}", delta=f"{rl_stats['sortino_ratio'] - ew_stats['sortino_ratio']:+.2f}")
+                with col_k6:
+                    metric_card("Max Drawdown", f"{rl_stats['max_drawdown_pct']:.2f}%", f"1/N: {ew_stats['max_drawdown_pct']:.2f}%")
+
+                st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
+
+                # ── CHARTS ROW: Learning Curve & Backtest Equity Curve ──
+                col_ch1, col_ch2 = st.columns([1.1, 1.6])
+                with col_ch1:
+                    st.markdown("##### 📈 Curva di Apprendimento dell'Agente (Reward Convergence)")
+                    df_lc = rl_res["learning_curve"]
+                    fig_lc = go.Figure()
+                    fig_lc.add_trace(go.Scatter(
+                        x=df_lc["episode"],
+                        y=df_lc["cumulative_reward"],
+                        mode="lines+markers",
+                        name="Reward Totale Episodio",
+                        line=dict(color="#58a6ff", width=2.5),
+                        marker=dict(size=5, color="#58a6ff")
+                    ))
+                    fig_lc.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=320,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        xaxis=dict(title="Episodio di Training", gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis=dict(title="Reward Cumulato", gridcolor="rgba(255,255,255,0.06)"),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    apply_plotly_theme(fig_lc)
+                    st.plotly_chart(fig_lc, use_container_width=True)
+
+                with col_ch2:
+                    st.markdown("##### 🚀 Equity Curve: Agente AI RL vs Equipesato (Base 100)")
+                    df_bt = rl_res["backtest_df"]
+                    fig_bt = go.Figure()
+                    fig_bt.add_trace(go.Scatter(
+                        x=df_bt["date"],
+                        y=df_bt["rl_equity_curve"],
+                        mode="lines",
+                        name="RL Policy Agent (Adattivo)",
+                        line=dict(color="#3fb950", width=3.0)
+                    ))
+                    fig_bt.add_trace(go.Scatter(
+                        x=df_bt["date"],
+                        y=df_bt["ew_equity_curve"],
+                        mode="lines",
+                        name="Benchmark Equipesato (1/N)",
+                        line=dict(color="#8b949e", width=2.0, dash="dash")
+                    ))
+                    fig_bt.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=320,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        xaxis=dict(title="Data", gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis=dict(title="Valore Portafoglio (Base 100)", gridcolor="rgba(255,255,255,0.06)"),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    apply_plotly_theme(fig_bt)
+                    st.plotly_chart(fig_bt, use_container_width=True)
+
+                # ── CHART 3: DYNAMIC ASSET ALLOCATION OVER TIME (STACKED AREA) ──
+                st.markdown("##### 🧬 Evoluzione dell'Allocazione Dinamica nel Tempo (AI Policy Weights)")
+                df_w = rl_res["weights_history"]
+                if not df_w.empty:
+                    tickers_list = rl_res["tickers"]
+                    fig_area = go.Figure()
+                    for tk in tickers_list:
+                        if tk in df_w.columns:
+                            fig_area.add_trace(go.Scatter(
+                                x=df_w["date"],
+                                y=df_w[tk] * 100.0,
+                                mode="lines",
+                                stackgroup="one",
+                                name=tk,
+                                hovertemplate=f"<b>{tk}</b>: %{{y:.1f}}%<extra></extra>"
+                            ))
+                    fig_area.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=300,
+                        margin=dict(l=20, r=20, t=25, b=20),
+                        xaxis=dict(title="Data di Valutazione", gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis=dict(title="Allocazione (%)", range=[0, 100], gridcolor="rgba(255,255,255,0.06)"),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    apply_plotly_theme(fig_area)
+                    st.plotly_chart(fig_area, use_container_width=True)
+
+                # ── ALLOCATION SUMMARY TABLE & EXPORT ──
+                col_tbl1, col_tbl2 = st.columns([3.0, 1.2])
+                with col_tbl1:
+                    st.markdown("##### 📋 Pesi Target Raccomandati dall'Agente RL")
+                with col_tbl2:
+                    df_target_w = pd.DataFrame([
+                        {"Ticker": tk, "Peso RL Target (%)": round(rl_res["final_weights"].get(tk, 0.0) * 100.0, 2)}
+                        for tk in rl_res["tickers"]
+                    ])
+                    csv_rl_w = df_target_w.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Pesi RL (CSV)", data=csv_rl_w, file_name="pesi_target_rl_agent.csv", mime="text/csv", use_container_width=True, key="btn_dl_rl_weights")
+
+                # Costruisci confronto con pesi attuali
+                target_rows = []
+                tot_val = float(pos["current_value"].sum()) if ("current_value" in pos.columns and pos["current_value"].sum() > 0) else 100_000.0
+                for tk in rl_res["tickers"]:
+                    w_rl = rl_res["final_weights"].get(tk, 0.0) * 100.0
+                    cur_row = pos[pos["ticker"] == tk] if not pos.empty and "ticker" in pos.columns else pd.DataFrame()
+                    cur_w = (float(cur_row["current_value"].iloc[0]) / tot_val * 100.0) if (not cur_row.empty and "current_value" in cur_row.columns) else (100.0 / len(rl_res["tickers"]))
+                    delta_w = w_rl - cur_w
+                    
+                    target_rows.append({
+                        "Ticker": tk,
+                        "Peso Attuale (%)": round(cur_w, 2),
+                        "Peso RL Target (%)": round(w_rl, 2),
+                        "Variazione Tattica (Δ)": round(delta_w, 2),
+                        "Azione Suggerita": "🟢 Incrementa" if delta_w > 1.0 else ("🔴 Riduci" if delta_w < -1.0 else "⚪ Mantieni")
+                    })
+
+                st.dataframe(
+                    pd.DataFrame(target_rows),
+                    column_config={
+                        "Ticker": st.column_config.TextColumn("Ticker"),
+                        "Peso Attuale (%)": st.column_config.NumberColumn("Peso Attuale", format="%.2f%%"),
+                        "Peso RL Target (%)": st.column_config.NumberColumn("Peso Target RL", format="%.2f%%"),
+                        "Variazione Tattica (Δ)": st.column_config.NumberColumn("Variazione (Δ)", format="%+.2f%%"),
+                        "Azione Suggerita": st.column_config.TextColumn("Raccomandazione AI")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+
+# ── TAB 3: TAIL COPULA & KELLY SIZING ────────────────────────────
 elif active_quant_tab == "🧬 Tail Copula & Kelly":
     if not has_portfolio:
         st.warning("⚠️ Carica prima un portafoglio per calcolare le Copule di Coda e il dimensionamento di Kelly.")

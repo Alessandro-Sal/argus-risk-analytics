@@ -1192,5 +1192,40 @@ Consente di simulare lo scarico della coda dei lotti d'acquisto prima di inviare
   \[ \text{Imposta}_k = \max(0, \text{PnL}_k \times \tau_k) \]
 - Calcola in tempo reale il nuovo prezzo medio di carico residuo (WACP) delle quote rimanenti in portafoglio.
 
+---
+
+## 62. Smart Order Routing & Algoritmi di Esecuzione Intraday TWAP e VWAP (`core/execution_algo.py`)
+
+### 1. Curva di Liquidità Intraday a "U" (U-Shaped Volume Profile)
+La distribuzione dei volumi scambiati durante la sessione ordinaria di contrattazione (09:00 - 17:30) viene modellata come una funzione convessa parametrica con picchi in apertura (Open Rush) e in chiusura (Market-on-Close):
+\[ V_{\text{norm}}(t) = 2.4 \cdot (t - 0.45)^2 + 0.35 \]
+normalizzata in modo che $\sum_{i=1}^N V_{\text{norm}}(t_i) = 1.0$.
+
+### 2. Algoritmo TWAP (Time-Weighted Average Price) con Jitter Anti-Frontrunning
+Suddivide un ordine totale $Q$ in $N$ intervalli temporali discreti applicando una leggera perturbazione stocastica $\epsilon_t \sim U(-\delta, \delta)$ (con $\delta = 4\%$) per impedire l'identificazione e il front-running da parte di algoritmi HFT concorrenti:
+\[ q_t = \frac{Q}{N} \cdot (1 + \epsilon_t), \quad \text{con } \sum_{t=1}^N q_t = Q \]
+
+### 3. Algoritmo VWAP (Volume-Weighted Average Price) con POV Cap
+Pesa le quote da negoziare in ciascuna tranche $t$ proporzionalmente al volume di mercato atteso per quell'intervallo ($V_t = \text{ADV} \cdot V_{\text{norm}}(t)$), vincolando la tranche a un tetto di partecipazione massima (Percentage of Volume Cap, tipicamente $15\%$):
+\[ q_t = \min\left( Q \cdot V_{\text{norm}}(t), \; V_t \cdot \text{POV}_{\text{cap}} \right) \]
+
+---
+
+## 63. Dynamic Portfolio Optimization via Reinforcement Learning (`core/reinforcement_learning.py`)
+
+### 1. Formulazione MDP (Markov Decision Process)
+Il ribilanciamento continuo del portafoglio viene formulato come un MDP $(\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma)$:
+- **Spazio degli Stati ($S_t \in \mathbb{R}^{3N}$)**: Include medie rolling dei rendimenti a 25 giorni $\mu_{i,t}$, deviazioni standard rolling $\sigma_{i,t}$ e momentum direzionale $\Delta R_{i,t}$ per ciascuno degli $N$ asset.
+- **Spazio delle Azioni ($A_t \in \Delta^{N-1}$)**: Vettore di pesi sul simplesso $w_t = [w_{1,t}, \dots, w_{N,t}]$ con vincoli $\sum w_i = 1$ e $w_i \ge 0$, generato mediante strato di attivazione Softmax.
+
+### 2. Funzione di Ricompensa Orientata al Sortino Ratio con Attrito di Turnover
+La funzione di ricompensa premia il rendimento netto penalizzando quadraticamente le sole perdite (semi-varianza negativa / Downside Risk) e i costi di transazione da turnover:
+\[ R_t = r_{p,t} \cdot 100 - \gamma \cdot \max(0, -r_{p,t})^2 \cdot 100 - \lambda \cdot \|w_t - w_{t-1}\|_1 \]
+dove $\gamma = 4.5$ è il coefficiente di avversione alle perdite e $\lambda$ è la penalità di turnover.
+
+### 3. Policy Gradient REINFORCE con Baseline di Riduzione della Varianza
+I parametri $\theta = \{W_1, b_1, W_2, b_2\}$ della rete neurale Policy Actor vengono aggiornati a fine episodio calcolando il gradiente dei ritorni cumulati scontati $G_t = \sum_{k=t}^T \gamma^{k-t} R_k$, normalizzati con baseline standardizzata per minimizzare la varianza del gradiente:
+\[ \nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \ln \pi_\theta(a_t | s_t) \cdot (G_t - b(s_t)) \right] \]
+
 
 
