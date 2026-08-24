@@ -2073,9 +2073,19 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         orders_for_sor = []
         if sel_asset_mode == "Singolo Titolo da Smobilizzare" and avail_tickers:
             row_tk = pos[pos["ticker"] == sel_ticker].iloc[0]
-            qty_val = float(row_tk.get("qty_net", row_tk.get("quantity", 100.0)))
-            p_val = float(row_tk.get("current_price", row_tk.get("price", 100.0)))
+            qty_val = float(row_tk.get("qty_net", row_tk.get("quantity", row_tk.get("shares", 0.0))))
+            p_val = float(row_tk.get("current_price", row_tk.get("price", row_tk.get("close", 0.0))))
+            c_val = float(row_tk.get("current_value", 0.0))
+            if qty_val <= 0 and c_val > 0 and p_val > 0:
+                qty_val = c_val / p_val
+            elif qty_val <= 0:
+                qty_val = 100.0
+            if p_val <= 0:
+                p_val = 100.0
             adv_val = float(row_tk.get("adv", row_tk.get("volume", 500000.0)))
+            if adv_val <= 0:
+                adv_val = 500000.0
+
             orders_for_sor.append({
                 "ticker": sel_ticker,
                 "action": "SELL",
@@ -2085,18 +2095,32 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             })
         else:
             for _, r in pos.iterrows():
-                tk = r.get("ticker", "UNKNOWN")
-                q = float(r.get("qty_net", r.get("quantity", 0.0)))
-                p = float(r.get("current_price", r.get("price", 0.0)))
+                tk = r.get("ticker", r.get("Ticker", "UNKNOWN"))
+                q = float(r.get("qty_net", r.get("quantity", r.get("shares", 0.0))))
+                p = float(r.get("current_price", r.get("price", r.get("close", 0.0))))
+                c_val = float(r.get("current_value", 0.0))
+                if q <= 0 and c_val > 0 and p > 0:
+                    q = c_val / p
                 adv_v = float(r.get("adv", r.get("volume", 500000.0)))
+                if adv_v <= 0:
+                    adv_v = 500000.0
                 if q > 0 and p > 0:
                     orders_for_sor.append({
-                        "ticker": tk,
+                        "ticker": str(tk),
                         "action": "SELL",
                         "quantity": q,
                         "price": p,
                         "adv": adv_v
                     })
+
+        if not orders_for_sor:
+            orders_for_sor.append({
+                "ticker": "SAMPLE_STOCK",
+                "action": "SELL",
+                "quantity": 100.0,
+                "price": 100.0,
+                "adv": 500_000.0
+            })
 
         comp_exec = compare_execution_strategies(
             orders_for_sor,
@@ -2109,16 +2133,22 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         vwap_data = comp_exec["vwap"]
         comp_summary = comp_exec["comparison"]
 
+        tot_notional_val = comp_summary.get("total_notional_eur", 0.0)
+        mkt_cost_val = comp_summary.get("market_order_cost_eur", 0.0)
+        vwap_cost_val = comp_summary.get("vwap_cost_eur", 0.0)
+        vwap_save_val = comp_summary.get("vwap_savings_vs_market_eur", 0.0)
+        avg_slip = vwap_data.get("summary", {}).get("avg_slippage_bps", 0.0)
+
         # Scorecards Comparazione Algoritmi
         col_sc1, col_sc2, col_sc3, col_sc4 = st.columns(4)
         with col_sc1:
-            metric_card("Controvalore Ordine", f"€ {comp_summary['total_notional_eur']:,.2f}", f"{len(orders_for_sor)} ordini pianificati")
+            metric_card("Controvalore Ordine", f"€ {tot_notional_val:,.2f}", f"{len(orders_for_sor)} ordini pianificati")
         with col_sc2:
-            metric_card("Costo Esecuzione Blocco (Market)", f"€ {comp_summary['market_order_cost_eur']:,.2f}", "Slippage 25.0 bps (singolo ordine)")
+            metric_card("Costo Esecuzione Blocco (Market)", f"€ {mkt_cost_val:,.2f}", "Slippage 25.0 bps (singolo ordine)")
         with col_sc3:
-            metric_card("Costo VWAP Istituzionale", f"€ {comp_summary['vwap_cost_eur']:,.2f}", f"Slippage medio: {vwap_data['summary']['avg_slippage_bps']:.1f} bps")
+            metric_card("Costo VWAP Istituzionale", f"€ {vwap_cost_val:,.2f}", f"Slippage medio: {avg_slip:.1f} bps")
         with col_sc4:
-            metric_card("Risparmio Netto Stimato", f"€ {comp_summary['vwap_savings_vs_market_eur']:,.2f}", f"-{comp_summary['vwap_savings_vs_market_eur']:,.2f} € vs Market", positive=True)
+            metric_card("Risparmio Netto Stimato", f"€ {vwap_save_val:,.2f}", f"-{vwap_save_val:,.2f} € vs Market", positive=True)
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 

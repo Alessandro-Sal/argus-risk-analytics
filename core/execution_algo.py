@@ -275,6 +275,7 @@ def compare_execution_strategies(
             "twap": twap_res,
             "vwap": vwap_res,
             "comparison": {
+                "total_notional_eur": 0.0,
                 "market_order_cost_eur": 0.0,
                 "twap_cost_eur": 0.0,
                 "vwap_cost_eur": 0.0,
