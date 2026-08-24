@@ -943,8 +943,6 @@ def inject_custom_css():
         }}
     </style>
     """, unsafe_allow_html=True)
-    
-    scroll_to_top()
 
 apply_custom_css = inject_custom_css
 
