@@ -34,6 +34,7 @@ if "run_id" in st.session_state:
     st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Diagnostica quantitativa del rischio di mercato, VaR 95/99%, Tail Risk, modelli Fama-French, ATR Chandelier Exit e ML Anomaly Detection.")
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
+st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
 # Struttura a 4 Tab Tematiche con Lazy Loading
 active_risk_tab = render_segmented_tabs([
@@ -148,6 +149,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
 </div>"""
         )
 
+    st.markdown("---")
     col_head_ff1, col_head_ff2 = st.columns([3.2, 1.1])
     with col_head_ff1:
         st.markdown("#### 🏛️ Style Analysis (Fama-French 3-Factor Model)")
