@@ -182,15 +182,15 @@ def inject_custom_css():
 
         /* Institutional Segmented Controls (Never Wrap & Expand Buttons) */
         [data-testid="stSegmentedControl"],
-        div[data-testid="stSegmentedControl"] > div {
+        div[data-testid="stSegmentedControl"] > div {{
             display: flex !important;
             flex-wrap: nowrap !important;
             width: 100% !important;
-        }
-        [data-testid="stSegmentedControl"] button {
+        }}
+        [data-testid="stSegmentedControl"] button {{
             white-space: nowrap !important;
             text-overflow: ellipsis !important;
-        }
+        }}
 
         /* Tighten Main Block Container */
         .block-container,
