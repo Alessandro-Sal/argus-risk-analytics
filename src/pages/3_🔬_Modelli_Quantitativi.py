@@ -1384,15 +1384,17 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                 # ── KPI SCORECARD ROW ──
                 col_k1, col_k2, col_k3, col_k4, col_k5, col_k6 = st.columns(6)
                 with col_k1:
-                    metric_card("Rendimento Totale RL", f"{rl_stats['total_return_pct']:.2f}%", f"Benchmark 1/N: {ew_stats['total_return_pct']:.2f}%", delta=f"{rl_res['alpha_over_ew_pct']:+.2f}%")
+                    metric_card("Rendimento Totale RL", f"{rl_stats['total_return_pct']:.2f}%", f"{rl_res['alpha_over_ew_pct']:+.2f}% vs 1/N", positive=(rl_res['alpha_over_ew_pct'] >= 0))
                 with col_k2:
                     metric_card("CAGR Annualizzato", f"{rl_stats['cagr_pct']:.2f}%", f"1/N: {ew_stats['cagr_pct']:.2f}%")
                 with col_k3:
                     metric_card("Volatilità Ann.", f"{rl_stats['volatility_pct']:.2f}%", f"1/N: {ew_stats['volatility_pct']:.2f}%")
                 with col_k4:
-                    metric_card("Sharpe Ratio", f"{rl_stats['sharpe_ratio']:.2f}", f"1/N: {ew_stats['sharpe_ratio']:.2f}", delta=f"{rl_stats['sharpe_ratio'] - ew_stats['sharpe_ratio']:+.2f}")
+                    diff_sh = rl_stats['sharpe_ratio'] - ew_stats['sharpe_ratio']
+                    metric_card("Sharpe Ratio", f"{rl_stats['sharpe_ratio']:.2f}", f"{diff_sh:+.2f} vs 1/N", positive=(diff_sh >= 0))
                 with col_k5:
-                    metric_card("Sortino Ratio", f"{rl_stats['sortino_ratio']:.2f}", f"1/N: {ew_stats['sortino_ratio']:.2f}", delta=f"{rl_stats['sortino_ratio'] - ew_stats['sortino_ratio']:+.2f}")
+                    diff_so = rl_stats['sortino_ratio'] - ew_stats['sortino_ratio']
+                    metric_card("Sortino Ratio", f"{rl_stats['sortino_ratio']:.2f}", f"{diff_so:+.2f} vs 1/N", positive=(diff_so >= 0))
                 with col_k6:
                     metric_card("Max Drawdown", f"{rl_stats['max_drawdown_pct']:.2f}%", f"1/N: {ew_stats['max_drawdown_pct']:.2f}%")
 

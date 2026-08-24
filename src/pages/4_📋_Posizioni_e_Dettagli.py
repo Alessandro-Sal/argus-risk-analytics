@@ -2118,7 +2118,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         with col_sc3:
             metric_card("Costo VWAP Istituzionale", f"€ {comp_summary['vwap_cost_eur']:,.2f}", f"Slippage medio: {vwap_data['summary']['avg_slippage_bps']:.1f} bps")
         with col_sc4:
-            metric_card("Risparmio Netto Stimato", f"€ {comp_summary['vwap_savings_vs_market_eur']:,.2f}", "Risparmio vs Market Order", delta=f"-{comp_summary['vwap_savings_vs_market_eur']:,.2f} €")
+            metric_card("Risparmio Netto Stimato", f"€ {comp_summary['vwap_savings_vs_market_eur']:,.2f}", f"-{comp_summary['vwap_savings_vs_market_eur']:,.2f} € vs Market", positive=True)
 
         st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
