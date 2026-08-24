@@ -242,6 +242,55 @@ def render_sidebar():
     current_page = get_current_page_name()
 
     with st.sidebar:
+        # Zero Dead-Space Top Padding Override
+        st.markdown("""
+        <style>
+            [data-testid="stSidebarHeader"],
+            div[data-testid="stSidebarHeader"],
+            header[data-testid="stHeader"],
+            [data-testid="stHeader"],
+            [data-testid="stSidebarNav"] {
+                display: none !important;
+                height: 0px !important;
+                min-height: 0px !important;
+                max-height: 0px !important;
+                padding: 0px !important;
+                margin: 0px !important;
+                visibility: hidden !important;
+                overflow: hidden !important;
+            }
+
+            section[data-testid="stSidebar"],
+            [data-testid="stSidebar"] {
+                padding-top: 0px !important;
+                margin-top: 0px !important;
+            }
+
+            section[data-testid="stSidebar"] > div:first-child,
+            [data-testid="stSidebarContent"],
+            [data-testid="stSidebarUserContent"],
+            section[data-testid="stSidebar"] .stSidebarContent,
+            section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+                padding-top: 0.5rem !important;
+                padding-left: 0.75rem !important;
+                padding-right: 0.75rem !important;
+                margin-top: 0px !important;
+            }
+
+            section[data-testid="stSidebar"] [data-testid="stVerticalBlock"]:first-child,
+            section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+                padding-top: 0px !important;
+                margin-top: 0px !important;
+                gap: 6px !important;
+            }
+
+            section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:first-child {
+                padding-top: 0px !important;
+                margin-top: 0px !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
         # Header del Brand ARGUS
         st.markdown("""
         <div style="display:flex; align-items:center; gap: 8px; margin-bottom: 8px; padding: 2px 0;">

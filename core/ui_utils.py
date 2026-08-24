@@ -74,14 +74,19 @@ def inject_custom_css():
 
         /* ── Above-the-fold Viewport Optimization (Zero Dead Space) ── */
         header[data-testid="stHeader"],
-        [data-testid="stHeader"] {{
+        [data-testid="stHeader"],
+        div[data-testid="stSidebarHeader"],
+        [data-testid="stSidebarHeader"],
+        [data-testid="stSidebarNav"] {{
             height: 0px !important;
             min-height: 0px !important;
+            max-height: 0px !important;
             background: transparent !important;
             display: none !important;
             padding: 0 !important;
             margin: 0 !important;
             visibility: hidden !important;
+            overflow: hidden !important;
         }}
 
         /* Tighten Main Block Container */
@@ -89,7 +94,7 @@ def inject_custom_css():
         [data-testid="block-container"],
         [data-testid="stMainBlockContainer"],
         .stMainBlockContainer {{
-            padding-top: 1rem !important;
+            padding-top: 0.85rem !important;
             padding-bottom: 2rem !important;
             padding-left: 1.75rem !important;
             padding-right: 1.75rem !important;
@@ -97,13 +102,33 @@ def inject_custom_css():
         }}
 
         /* Tighten Sidebar Container */
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebar"] {{
+            padding-top: 0px !important;
+            margin-top: 0px !important;
+        }}
+
+        section[data-testid="stSidebar"] > div:first-child,
         [data-testid="stSidebarContent"],
         [data-testid="stSidebarUserContent"],
-        section[data-testid="stSidebar"] > div:first-child,
-        section[data-testid="stSidebar"] .stSidebarContent {{
-            padding-top: 0.85rem !important;
-            padding-left: 0.85rem !important;
-            padding-right: 0.85rem !important;
+        section[data-testid="stSidebar"] .stSidebarContent,
+        section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
+            padding-top: 0.5rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+            margin-top: 0px !important;
+        }}
+
+        section[data-testid="stSidebar"] [data-testid="stVerticalBlock"]:first-child,
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {{
+            padding-top: 0px !important;
+            margin-top: 0px !important;
+            gap: 6px !important;
+        }}
+
+        section[data-testid="stSidebar"] div[data-testid="stVerticalBlockBorderWrapper"]:first-child {{
+            padding-top: 0px !important;
+            margin-top: 0px !important;
         }}
 
         [data-testid="stAppViewContainer"] {{
