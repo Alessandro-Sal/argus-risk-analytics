@@ -192,13 +192,13 @@ def inject_custom_css():
             text-overflow: ellipsis !important;
         }}
 
-        /* Tighten Main Block Container */
+        /* Main Block Container - Generous Bottom Padding for Safe Scrolling */
         .block-container,
         [data-testid="block-container"],
         [data-testid="stMainBlockContainer"],
         .stMainBlockContainer {{
             padding-top: 1.5rem !important;
-            padding-bottom: 2rem !important;
+            padding-bottom: 6.5rem !important;
             padding-left: 1.75rem !important;
             padding-right: 1.75rem !important;
             max-width: 100% !important;
