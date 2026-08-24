@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-5.18.0-blue.svg)
+![Version](https://img.shields.io/badge/version-5.19.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-217%2F217%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-228%2F228%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -16,6 +16,12 @@
 
 Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGUS** converte registri di negoziazione eterogenei (file CSV generici, esportazioni native da broker quali **DeGiro**, **Directa SIM**, **Fineco Bank**, **Interactive Brokers / IBKR**, **Trade Republic**, **Scalable Capital**, **eToro**, **Revolut Trading** e sincronizzazioni live da **Google Sheets** con estrazione duale separata di *Stocks & Crypto*) in un framework analitico strutturato. La piattaforma integra:
 * **⚡ Bloomberg Terminal Command Gateway & Mnemonic Parser**: Barra di comando istituzionale globale con sintassi a codici rapidi (`<TICKER> <MNEMONIC> <GO>`, es. `AAPL DES`, `MSFT FA`, `NVDA VOLS`, `PORT RISK`, `YCRV`, `BTP YAS`, `US10Y FI`, `CDS`, `STREAM`, `ATTR`, `TAX`, `EQS`, `BQUANT`, `LAUNCHPAD`, `XL`, `HP`), autocompletamento fuzzy, visual command feedback in tempo reale e navigazione rapida senza mouse.
+* **🌐 Frontiera Efficiente Tri-Dimensionale & Iperspazio Quantitativo 3D**: Estensione volumetrica della frontiera di Markowitz con proiezione nello spazio 3D $(X = \text{Volatilità}, Y = \text{Rendimento}, Z = \text{Concentrazione HHI } / \text{ CVaR 95\% } / \text{ Sortino})$, alimentata da un algoritmo di campionamento **Multi-Alpha Dirichlet ($\alpha \in [0.05, 5.0]$) con Sparse Masking** per mappare con continuità l'intero volume geometrico dal baricentro ($1/N$) ai vertici di massima concentrazione ($HHI = 1.0$).
+* **🏛️ Suite Fiscale Avanzata a 4 Pilastri (TUIR, Dichiarativo & Withholding)**:
+  1. *Simulatore Riforma Fiscale 2026*: Armonizzazione tra *Redditi di Capitale* e *Redditi Diversi* per la compensazione al 100% delle minusvalenze con ETF e quantificazione del Tax Drag risparmiato.
+  2. *Prospetto Precompilato Modello Redditi PF*: Compilazione automatica dei campi ministeriali per il Regime Dichiarativo con **Quadro RT (Sezione II, righi RT21-RT26, tributo 1100)** e **Quadro RW (Monitoraggio estero, Codice 21 crypto / Codice 1 titoli ed IVAFE 0,20% con franchigia < 12€)**.
+  3. *Analizzatore Withholding Tax & Doppia Imposizione*: Tracciamento ritenute alla fonte estere (W-8BEN 15% USA, 26,375% Germania, 35% Svizzera), calcolo dell'aliquota effettiva reale ($37,10\%$ USA) e quantificazione del Tax Drag rispetto ad ETF UCITS ad accumulazione.
+  4. *Simulatore Pre-Trade "Tax-Smart Lot Sizing"*: Previsione istantanea del PnL e dell'imposta generata dalla vendita mirata di specifici lotti d'acquisto secondo la disciplina ministeriale FIFO.
 * **🐍 ARGUS BQuant Python Sandbox In-App (`BQUANT` / `PY`)**: Console Python interattiva in-app per eseguire script analitici direttamente in-memory sui DataFrame di sessione (`df_positions`, `df_returns`, `df_prices`, `results`), interrogazioni SQL ad alta velocità con motore DuckDB in-process, cattura automatica di stdout/stderr, tabelle `df_out` e figure Plotly interattive con 5 snippet quantitativi istituzionali preimpostati.
 * **🎛️ ARGUS Launchpad & Institutional Role Workspaces (`LAUNCHPAD` / `WS`)**: Orchestratore di dashboard per 5 profili operativi istituzionali (*Trading Desk & Execution*, *Risk Officer & Compliance*, *Portfolio Manager & CIO*, *Quantitative Analyst & Data Scientist*, *Corporate Treasurer & Fixed Income*) con 1-Click Fast Teleportation verso i moduli primari, Live Role KPI Cockpit e persistenza del layout su database SQLite locale.
 * **📊 Excel Live Connector & Bloomberg RTD Builder (`XL` / `EXCEL`)**: Costruttore visuale di formule Excel Bloomberg Parity (`=ARGUS_BDP`, `=ARGUS_BDH`, `=ARGUS_RISK`), generatore di moduli VBA Desktop (`.bas`), Microsoft Office Scripts TypeScript (`.ts`) per Excel 365/Web ed esportatore di cartelle di lavoro multi-foglio `.xlsx` (*Executive_Summary*, *Positions_Portfolio*, *Fixed_Income_YAS*, *Execution_Schedule*).
@@ -78,6 +84,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva, analisi Average Daily Volume (ADV) e Stop-Loss dinamici Chandelier ($3 \times ATR_{14}$).
 
 ### 3. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/3_🔬_Modelli_Quantitativi.py`)
+* **🌐 Frontiera Efficiente 3D & Iperspazio Multi-Alpha Dirichlet**: Visualizzazione volumetrica interattiva 3D con selezione dinamica dell'asse $Z$ (*Concentrazione HHI*, *Tail Risk CVaR 95%*, *Sortino Ratio*), resa nitida e priva di collisioni visive con campionamento multi-concentrazione su simplesso e tooltip analitico hover.
 * **🏛️ Fixed Income Istituzionale, Z-Spread & CDS Curve (`YAS` / `FI`)**: Risoluzione analitica di YTM, Macaulay Duration, Modified Duration, Convexity esatta, DV01/PVBP, Z-Spread rispetto alla curva sovereign Nelson-Siegel e term structure della probabilità di default da spread CDS.
 * **📊 Attribuzione Multi-Periodo Carino (Zero-Residual) & Karnosky-Singer FX**: Algoritmo logaritmico multi-anno a residuo zero per l'attribuzione di Brinson-Fachler e scomposizione valutaria Karnosky-Singer per isolare l'impatto del mercato locale rispetto alle fluttuazioni dei cambi.
 * **📊 Backtesting di Strategie Multi-Fattoriali a 5 Quintili**: Analisi di performance e rischio su panieri quantitativi ordinati (Q1..Q5), calcolo dello spread Long-Short ($Q1 - Q5$), Information Ratio e test di monotonicità di rango di Spearman ($r_s$) sui fattori Quality, Low-Beta, Momentum e Profitability.
@@ -91,6 +98,13 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🧠 Modelli Fattoriali Kenneth French (Fama-French 5-Factor & Carhart Momentum)**: Regressione econometrica OLS multivariata su dataset ufficiali di Dartmouth con Factor Return Attribution e Rolling Factor Betas a 60 giorni.
 
 ### 4. 📋 Posizioni, Contabilità FIFO & Fiscalità TUIR (`src/pages/4_📋_Posizioni_e_Dettagli.py`)
+* **🏛️ Suite Fiscale Istituzionale a 4 Pilastri**:
+  - **1. Cockpit Fiscale & Simulatore Riforma 2026**: Toggle interattivo tra regime TUIR asimmetrico e Riforma Fiscale unificata (compensazione al 100% delle minusvalenze con ETF), quantificazione del Tax Drag risparmiato, timeline delle minusvalenze a 4 anni (TUIR Art. 68 c. 5) e ordini di Step-Up a 0€ imposte con proxy correlati.
+  - **2. Prospetto Precompilato Modello Redditi PF**: Calcolo dei righi ministeriali per chi opera in **Regime Dichiarativo** (IBKR, Degiro, Scalable, Revolut, Crypto):
+    - *Quadro RT (Sez. II)*: Corrispettivi `RT21`, Costi FIFO `RT22`, Plusvalenza netta `RT23`, Minusvalenze dedotte `RT24`, Minus residue `RT25` e Imposta 26% `RT26` (Cod. F24 `1100`).
+    - *Quadro RW*: Codici investimento (1 titoli esteri, 21 crypto), codici paese ISO, giorni e liquidazione IVAFE (0,20% con franchigia < 12€) con export CSV dedicato.
+  - **3. Withholding Tax & Doppia Imposizione Dividendi Esteri**: Calcolo della ritenuta alla fonte estera (15% USA con W-8BEN, 26,375% DE, 35% CH) sommata al 26% italiano sul netto frontiera (**37,10% reale su titoli USA**) e quantificazione del Tax Drag rispetto ad ETF UCITS ad accumulazione.
+  - **4. Tax-Smart Lot Sizing (Simulatore Pre-Trade FIFO)**: Previsione esatta dei lotti d'acquisto storici scaricati per vendite parziali, calcolo del PnL realizzato e stima dell'imposta prima dell'ordine a mercato.
 * **🌊 Modello Almgren-Chriss & Traiettoria Ottima di Liquidazione**: Stima dei costi di impatto permanente e temporaneo sul mercato azionario, Half-Life di smobilizzo, slicing a 10 scaglioni ed Execution VaR al 95%.
 * **Motore Contabile FIFO (`_fifo_engine`)**: Calcolo deterministico del Weighted Average Cost Price (WACP) e separazione analitica tra PnL realizzato e non realizzato.
 * **🪦 Posizioni Chiuse & Graveyard Cockpit Multi-Prospettiva**:
@@ -102,9 +116,6 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
   - *Quadro RT (Sezione II-B)*: Calcolo plusvalenze/minusvalenze su criptovalute (Art. 67 c. 1 lett. c-sexies TUIR), franchigia annuale di 2.000€, applicazione dell'aliquota sostitutiva al 26% e gestione dello Zainetto Fiscale Cripto a 4 anni separato.
   - *Quadro RW (Codice 21)*: Prospetto per il monitoraggio fiscale delle consistenze estere o in self-custody (ledger, wallet privati, exchange esteri).
   - *Imposta sul Valore / IVAFE (0,20%)*: Calcolo automatico dell'imposta proporzionale sulle consistenze al 31/12.
-* **💰 Tax-Loss Harvesting & Step-Up Wizard (TUIR Art. 67)**:
-  - *Strategia Step-Up Fiscale a 0€ Imposte*: Individua i titoli in guadagno su *Redditi Diversi* (azioni singole, bond, ETC) e calcola le quote da vendere e ricomprare per azzerare le minusvalenze dello Zainetto Fiscale in scadenza senza pagare tasse, alzando il prezzo di carico a zero imposte e risparmiando il 26% sulle plusvalenze future.
-  - *Strategia Tax-Loss Harvesting*: Rileva le perdite latenti da monetizzare per abbattere le imposte dell'anno in corso.
 * **Smart Rebalancer**: Generatore di ordini operativi ad azioni intere per allineare il portafoglio ai pesi target con gestione del buffer di liquidità.
 * **Calendario & Previsione Flusso Dividendi**: Dividend Yield medio di portafoglio, storico reale e calendario mensile degli incassi stimati per azienda.
 

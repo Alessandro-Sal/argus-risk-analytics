@@ -1130,5 +1130,67 @@ Generazione automatica di workbook Excel strutturati con formattazione istituzio
 - `Fixed_Income_YAS`: Duration, Convessità, DV01 e Z-Spread delle emissioni obbligazionarie.
 - `Execution_Schedule`: Scaglioni temporali e costi di impatto del modello Almgren-Chriss.
 
+---
+
+## 60. Superficie di Frontiera Efficiente 3D & Campionamento Multi-Alpha Dirichlet (`core/risk_engine.py`)
+
+### 1. Iperspazio Quantitativo a 3 Dimensioni
+Nelle tradizionali analisi di Markowitz, la frontiera è proiettata nello spazio bidimensionale $(\sigma_p, R_p)$. ARGUS estende l'analisi al volume tridimensionale introducendo una terza dimensione quantitativa $Z$:
+- **Indice di Concentrazione HHI (Herfindahl-Hirschman Index)**:
+  \[ HHI = \sum_{i=1}^N w_i^2 \in \left[ \frac{1}{N}, 1.0 \right] \]
+  Permette di mappare l'iperspazio da portafogli perfettamente equi-pesati ($HHI = 1/N$) a portafogli iper-concentrati su singoli asset ($HHI \to 1.0$).
+- **Tail Risk (CVaR 95% / Expected Shortfall)**:
+  Quantifica la perdita attesa nella coda estrema del 5% per ciascuna combinazione di pesi.
+- **Sortino Ratio (Downside Volatility Efficiency)**:
+  Misura l'efficienza ponderata esclusivamente sulla semi-deviazione standard negativa.
+
+### 2. Algoritmo di Campionamento Multi-Alpha Dirichlet con Sparse Masking
+Il campionamento uniforme standard $U(0,1)$ concentra la quasi totalità dei punti campionati attorno al baricentro ($1/N$). Per generare una vera cupola volumetrica continua nello spazio $3D$, ARGUS implementa un campionamento composito:
+1. **Multi-Concentration Dirichlet**: Variazione dinamica del parametro di concentrazione $\alpha \in [0.05, 5.0]$ per esplorare sia le zone interne del simplesso che le regioni periferiche.
+2. **Sparse Subset Masking**: Selezione casuale di sottoinsiemi sparsi di $k < N$ asset per garantire la presenza di portafogli realistici a concentrazione medio-alta.
+3. **Vertici Puri**: Inclusione deterministica dei portafogli monomarca ($w_i = 1$) per ancorare i limiti massimi della superficie.
+
+---
+
+## 61. Suite Fiscale Avanzata TUIR, Dichiarativo & Withholding Tax a 4 Pilastri (`core/tax_engine.py`)
+
+### 1. Pilastro 1: Simulatore Riforma Fiscale 2026 (Armonizzazione ETF)
+* **Quadro Attuale (TUIR Art. 67)**: I proventi da ETF sono classificati come *Redditi di Capitale* e tassati al 26% alla fonte, senza possibilità di compensare le perdite pregresse (*Redditi Diversi*).
+* **Quadro Post-Riforma**: Unificazione di tutti i redditi finanziari in un'unica categoria di redditi da capitale/diversi.
+* **Formulazione del Tax Drag Asimmetrico**:
+  \[ \text{Tax Drag}_{\text{ETF}} = \text{Tax}_{\text{Attuale}} - \text{Tax}_{\text{Riformata}} = \max\left(0, \min(\text{Gain}_{\text{ETF}}, \text{Minus}_{\text{Disponibili}} - \text{Gain}_{\text{Diversi}}) \times 0.26\right) \]
+
+### 2. Pilastro 2: Prospetto Precompilato Modello Redditi Persone Fisiche (Regime Dichiarativo)
+Per gli investitori che operano con intermediari esteri o in regime dichiarativo (IBKR, Degiro, Scalable, Revolut, Crypto Wallets):
+* **Quadro RT (Sezione II)**:
+  - `RT21`: $\sum (\text{Quantità} \times \text{Prezzo di Vendita})$ (Corrispettivi totali).
+  - `RT22`: $\sum (\text{Quantità} \times \text{Costo Fiscale FIFO})$ (Costi rilevanti).
+  - `RT23`: $\max(0, RT21 - RT22)$ (Plusvalenza lorda).
+  - `RT24`: $\min(RT23, \text{Minus Pregresse})$ (Minusvalenze dedotte).
+  - `RT25`: Minusvalenza residua da riportare ai 4 anni successivi.
+  - `RT26`: $(RT23 - RT24) \times 0.26$ (Imposta sostitutiva da versare con Codice Tributo F24 **1100**).
+* **Quadro RW & Liquidazione IVAFE**:
+  - Mappatura codici investimento (1 per titoli esteri, 21 per crypto).
+  - Identificazione codice paese ISO (es. 069 USA, 018 DE, 080 CH).
+  - Calcolo dell'IVAFE: $IVAFE = \text{Valore Finale al 31/12} \times 0.002$.
+  - Applicazione della franchigia di esenzione per debiti complessivi $< 12.00$ €.
+
+### 3. Pilastro 3: Analizzatore Withholding Tax (WHT) & Doppia Imposizione Dividendi Esteri
+* **Convenzioni contro le Doppie Imposizioni (DTT) & Modulo W-8BEN**:
+  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\%$, $WHT_{\text{DE}} = 26.375\%$, $WHT_{\text{CH}} = 35\%$, $WHT_{\text{FR}} = 12.8\%$.
+  - Tassazione italiana sul "Netto Frontiera": $T_{\text{IT}} = (\text{Dividendo Lordo} \times (1 - WHT)) \times 0.26$.
+  - **Aliquota Effettiva Combinata**:
+    \[ \tau_{\text{eff}} = 1 - (1 - WHT) \times (1 - 0.26) \]
+    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\%$)*.
+* **Tax Drag vs ETF UCITS ad Accumulazione**:
+  Gli ETF ad accumulazione trattengono internamente il 15% alla fonte senza subire l'imposta italiana immediata sul netto frontiera fino al realizzo finale, eliminando la perdita di rendimento composto da tassazione anticipata.
+
+### 4. Pilastro 4: Simulatore Pre-Trade "Tax-Smart Lot Sizing" (Lotti FIFO Puntuali)
+Consente di simulare lo scarico della coda dei lotti d'acquisto prima di inviare un ordine di vendita a mercato:
+- Per ogni lotto $k \in \{1 \dots M\}$ consumato fino al raggiungimento della quantità target $Q$:
+  \[ \text{PnL}_k = q_k \cdot (P_{\text{vendita}} - P_{\text{carico}, k}) \]
+  \[ \text{Imposta}_k = \max(0, \text{PnL}_k \times \tau_k) \]
+- Calcola in tempo reale il nuovo prezzo medio di carico residuo (WACP) delle quote rimanenti in portafoglio.
+
 
 
