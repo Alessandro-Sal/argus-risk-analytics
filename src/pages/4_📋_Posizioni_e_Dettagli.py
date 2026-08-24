@@ -2018,10 +2018,18 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         st.markdown("#### 🤖 Smart Order Router Intraday (TWAP & VWAP Slicing Engine)")
         st.caption("Pianificazione operativa delle tranche di negoziazione intraday (09:00 - 17:30) per minimizzare lo slippage su ordini consistenti.")
 
-        # Costruisci lista ordini di prova dalle posizioni
-        avail_tickers = pos[pos["qty_net"] > 0]["ticker"].dropna().unique().tolist() if "qty_net" in pos.columns else []
-        if not avail_tickers and "ticker" in pos.columns:
-            avail_tickers = pos["ticker"].dropna().unique().tolist()
+        # Rilevamento completo e robusto dei ticker disponibili
+        avail_tickers = []
+        for c in ["ticker", "Ticker", "symbol", "Symbol", "Asset"]:
+            if c in pos.columns:
+                cands = [str(x).strip() for x in pos[c].dropna().unique() if str(x).strip() and str(x).strip().upper() not in ["UNKNOWN", "NAN", "NONE", "SAMPLE_STOCK"]]
+                if cands:
+                    avail_tickers = cands
+                    break
+        if not avail_tickers and not df_ac.empty and "Ticker" in df_ac.columns:
+            avail_tickers = [str(x).strip() for x in df_ac["Ticker"].dropna().unique() if str(x).strip() and str(x).strip().upper() not in ["UNKNOWN", "NAN", "NONE", "SAMPLE_STOCK"]]
+        if not avail_tickers and "tickers" in results and results["tickers"]:
+            avail_tickers = [str(x).strip() for x in results["tickers"] if str(x).strip()]
 
         col_sor1, col_sor2, col_sor3, col_sor4 = st.columns([1.5, 1.2, 1.2, 1.1])
         with col_sor1:
@@ -2069,57 +2077,127 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             start_t = "10:00"
             interv_min = 15
 
+        def _extract_order_info(row_data, fallback_tk="ASSET"):
+            # Ticker
+            tk = None
+            for c in ["ticker", "Ticker", "symbol", "Symbol", "Asset"]:
+                if c in row_data and pd.notna(row_data[c]):
+                    v = str(row_data[c]).strip()
+                    if v and v.upper() not in ["UNKNOWN", "NAN", "NONE"]:
+                        tk = v
+                        break
+            if not tk:
+                tk = fallback_tk
+
+            # Controvalore
+            c_val = 0.0
+            for c in ["current_value", "Controvalore (€)", "value", "valore", "Valore (€)", "notional"]:
+                if c in row_data and pd.notna(row_data[c]):
+                    try:
+                        c_val = float(str(row_data[c]).replace("€", "").replace(" ", "").replace(",", "."))
+                        if c_val > 0:
+                            break
+                    except Exception:
+                        pass
+
+            # Prezzo
+            p = 0.0
+            for c in ["last_price", "current_price", "Prezzo Mkt (€)", "price", "prezzo", "close", "wacp", "Prezzo Carico (€)"]:
+                if c in row_data and pd.notna(row_data[c]):
+                    try:
+                        p = float(str(row_data[c]).replace("€", "").replace(" ", "").replace(",", "."))
+                        if p > 0:
+                            break
+                    except Exception:
+                        pass
+
+            # Quantità
+            q = 0.0
+            for c in ["qty_net", "quantity", "shares", "Quantità", "qty", "quote", "Quote"]:
+                if c in row_data and pd.notna(row_data[c]):
+                    try:
+                        q = float(str(row_data[c]).replace(" ", "").replace(",", "."))
+                        if q > 0:
+                            break
+                    except Exception:
+                        pass
+
+            if q <= 0 and c_val > 0 and p > 0:
+                q = c_val / p
+            elif q > 0 and p <= 0 and c_val > 0:
+                p = c_val / q
+            elif q <= 0 and c_val > 0:
+                p = 100.0
+                q = c_val / p
+            elif q <= 0:
+                q = 100.0
+                p = 100.0 if p <= 0 else p
+
+            # ADV
+            adv = 0.0
+            for c in ["adv", "ADV (€)", "volume", "avg_daily_volume", "Volume"]:
+                if c in row_data and pd.notna(row_data[c]):
+                    try:
+                        adv = float(str(row_data[c]).replace("€", "").replace(" ", "").replace(",", "."))
+                        if adv > 0:
+                            break
+                    except Exception:
+                        pass
+            if adv <= 0:
+                adv = max(500_000.0, (q * p) * 15.0)
+
+            return {
+                "ticker": str(tk),
+                "action": "SELL",
+                "quantity": max(1.0, float(q)),
+                "price": max(0.01, float(p)),
+                "adv": max(10_000.0, float(adv))
+            }
+
         # Build order list
         orders_for_sor = []
-        if sel_asset_mode == "Singolo Titolo da Smobilizzare" and avail_tickers:
-            row_tk = pos[pos["ticker"] == sel_ticker].iloc[0]
-            qty_val = float(row_tk.get("qty_net", row_tk.get("quantity", row_tk.get("shares", 0.0))))
-            p_val = float(row_tk.get("current_price", row_tk.get("price", row_tk.get("close", 0.0))))
-            c_val = float(row_tk.get("current_value", 0.0))
-            if qty_val <= 0 and c_val > 0 and p_val > 0:
-                qty_val = c_val / p_val
-            elif qty_val <= 0:
-                qty_val = 100.0
-            if p_val <= 0:
-                p_val = 100.0
-            adv_val = float(row_tk.get("adv", row_tk.get("volume", 500000.0)))
-            if adv_val <= 0:
-                adv_val = 500000.0
-
-            orders_for_sor.append({
-                "ticker": sel_ticker,
-                "action": "SELL",
-                "quantity": qty_val,
-                "price": p_val,
-                "adv": adv_val
-            })
-        else:
+        if sel_asset_mode == "Singolo Titolo da Smobilizzare" and avail_tickers and sel_ticker in avail_tickers:
+            # Trova riga in pos
+            match_row = None
+            if not pos.empty:
+                for _, r in pos.iterrows():
+                    for c in ["ticker", "Ticker", "symbol", "Symbol", "Asset"]:
+                        if c in r and str(r[c]).strip() == str(sel_ticker).strip():
+                            match_row = r
+                            break
+                    if match_row is not None:
+                        break
+            if match_row is not None:
+                orders_for_sor.append(_extract_order_info(match_row, fallback_tk=sel_ticker))
+            elif not df_ac.empty and "Ticker" in df_ac.columns:
+                match_ac = df_ac[df_ac["Ticker"] == sel_ticker]
+                if not match_ac.empty:
+                    orders_for_sor.append(_extract_order_info(match_ac.iloc[0], fallback_tk=sel_ticker))
+        elif not pos.empty:
             for _, r in pos.iterrows():
-                tk = r.get("ticker", r.get("Ticker", "UNKNOWN"))
-                q = float(r.get("qty_net", r.get("quantity", r.get("shares", 0.0))))
-                p = float(r.get("current_price", r.get("price", r.get("close", 0.0))))
-                c_val = float(r.get("current_value", 0.0))
-                if q <= 0 and c_val > 0 and p > 0:
-                    q = c_val / p
-                adv_v = float(r.get("adv", r.get("volume", 500000.0)))
-                if adv_v <= 0:
-                    adv_v = 500000.0
-                if q > 0 and p > 0:
-                    orders_for_sor.append({
-                        "ticker": str(tk),
-                        "action": "SELL",
-                        "quantity": q,
-                        "price": p,
-                        "adv": adv_v
-                    })
+                ord_item = _extract_order_info(r)
+                orders_for_sor.append(ord_item)
+        elif not df_ac.empty:
+            for _, r in df_ac.iterrows():
+                ord_item = _extract_order_info(r)
+                orders_for_sor.append(ord_item)
 
-        if not orders_for_sor:
+        if not orders_for_sor and avail_tickers:
+            for tk in avail_tickers[:5]:
+                orders_for_sor.append({
+                    "ticker": tk,
+                    "action": "SELL",
+                    "quantity": 100.0,
+                    "price": 100.0,
+                    "adv": 500_000.0
+                })
+        elif not orders_for_sor:
             orders_for_sor.append({
-                "ticker": "SAMPLE_STOCK",
+                "ticker": "AAPL",
                 "action": "SELL",
                 "quantity": 100.0,
-                "price": 100.0,
-                "adv": 500_000.0
+                "price": 150.0,
+                "adv": 1_000_000.0
             })
 
         comp_exec = compare_execution_strategies(
@@ -2159,7 +2237,6 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             if not df_vwap_sched.empty:
                 col_g1, col_g2 = st.columns([1.5, 1.0])
                 with col_g1:
-                    # Intraday Volume vs VWAP Slices Chart
                     fig_vwap = go.Figure()
                     fig_vwap.add_trace(go.Bar(
                         x=df_vwap_sched["timestamp"].unique(),
@@ -2190,7 +2267,6 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     st.plotly_chart(fig_vwap, use_container_width=True)
 
                 with col_g2:
-                    # Trajectory of completion
                     fig_cum = go.Figure()
                     for tk in df_vwap_sched["ticker"].unique():
                         df_tk = df_vwap_sched[df_vwap_sched["ticker"] == tk]
@@ -2226,10 +2302,10 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                         "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "pov_rate_pct"
                     ]],
                     column_config={
-                        "tranche_idx": st.column_config.NumberColumn("#", format="%d"),
-                        "timestamp": st.column_config.TextColumn("Orario"),
-                        "ticker": st.column_config.TextColumn("Ticker"),
-                        "action": st.column_config.TextColumn("Azione"),
+                        "tranche_idx": st.column_config.NumberColumn("#", format="%d", width="small"),
+                        "timestamp": st.column_config.TextColumn("Orario", width="small"),
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "action": st.column_config.TextColumn("Azione", width="small"),
                         "slice_qty": st.column_config.NumberColumn("Quote Tranche", format="%,.2f"),
                         "cum_progress_pct": st.column_config.NumberColumn("% Eseguita", format="%.1f%%"),
                         "order_notional_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
@@ -2258,10 +2334,10 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                         "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "pov_rate_pct"
                     ]],
                     column_config={
-                        "tranche_idx": st.column_config.NumberColumn("#", format="%d"),
-                        "timestamp": st.column_config.TextColumn("Orario"),
-                        "ticker": st.column_config.TextColumn("Ticker"),
-                        "action": st.column_config.TextColumn("Azione"),
+                        "tranche_idx": st.column_config.NumberColumn("#", format="%d", width="small"),
+                        "timestamp": st.column_config.TextColumn("Orario", width="small"),
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "action": st.column_config.TextColumn("Azione", width="small"),
                         "slice_qty": st.column_config.NumberColumn("Quote Tranche", format="%,.2f"),
                         "cum_progress_pct": st.column_config.NumberColumn("% Eseguita", format="%.1f%%"),
                         "order_notional_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
