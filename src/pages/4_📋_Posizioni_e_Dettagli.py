@@ -8,12 +8,15 @@ import core.ui_utils
 import core.risk_engine
 import core.crypto_tax_engine
 import core.duckdb_engine
+import core.execution_algo
 importlib.reload(core.ui_utils)
 importlib.reload(core.risk_engine)
 importlib.reload(core.crypto_tax_engine)
 importlib.reload(core.duckdb_engine)
+importlib.reload(core.execution_algo)
 from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
+from core.execution_algo import compute_twap_schedule, compute_vwap_schedule, compare_execution_strategies, generate_intraday_volume_profile
 
 st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
 inject_custom_css()
@@ -40,7 +43,7 @@ active_pos_tab = render_segmented_tabs([
     "🪦 Posizioni Chiuse & Graveyard",
     "📅 Proiezione Dividendi",
     "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
-    "⚡ Liquidità Almgren-Chriss"
+    "⚡ Liquidità & Smart Order Router"
 ], key="positions_active_tab")
 
 # ── TAB 1: POSIZIONI & LIQUIDITÀ ──────────────────────────────
@@ -1783,198 +1786,147 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 use_container_width=True, hide_index=True
             )
 
-# ── TAB 4: RISCHIO LIQUIDITÀ & ALMGREN-CHRISS ─────────────────
-elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
+# ── TAB 5: RISCHIO LIQUIDITÀ & SMART ORDER ROUTER ─────────────
+elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
     col_head_ac1, col_head_ac2 = st.columns([3.2, 1.1])
     with col_head_ac1:
-        st.markdown("#### ⚡ Impatto di Mercato & Rischio di Liquidazione (Almgren-Chriss)")
-        st.caption("Stima dello slippage e dei costi di esecuzione imposti dal mercato durante la smobilizzazione o il ri-bilanciamento delle posizioni.")
+        st.markdown("#### ⚡ Impatto di Mercato, Liquidità & Smart Order Router (TWAP/VWAP)")
+        st.caption("Stima dello slippage e dei costi di esecuzione imposti dal mercato durante la smobilizzazione o il ri-bilanciamento delle posizioni con algoritmi istituzionali.")
     with col_head_ac2:
         st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("ℹ️ Guida al Modello Almgren-Chriss & Optimal Execution", """
+        glossary_modal("ℹ️ Guida ad Almgren-Chriss & Smart Order Router", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Modello Almgren-Chriss (2000)</div>
-  <div>Il gold standard quantitativo istituzionale per calcolare l'impatto sui prezzi durante la negoziazione di blocchi azionari e determinare la traiettoria ottimale di esecuzione (Optimal Execution Schedule).</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Smart Order Routing Istituzionale (TWAP & VWAP)</div>
+  <div>Tecniche di suddivisione temporale e volumetrica (Order Slicing) per eseguire grandi ordini minimizzando il Market Impact e l'asimmetria informativa sul book:</div>
+  <div style="margin-top: 5px; color: #ffb74d;">
+    • <b>TWAP (Time-Weighted Average Price):</b> Suddivide l'ordine in tranche temporali costanti con jitter stocastico per evitare rilevamenti e front-running algoritmico.<br>
+    • <b>VWAP (Volume-Weighted Average Price):</b> Pesa le tranche in base alla curva di liquidità intraday a "U", concentrando gli scambi in apertura e chiusura dove la profondità del book è massima.
+  </div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Scomposizione dell'Impatto di Mercato</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Modello Almgren-Chriss (2000)</div>
   <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
     • <b>Impatto Temporaneo:</b> &eta; &middot; (v / V)<sup>0.5</sup> &middot; &sigma; (pressione immediata sul book ordini)<br>
     • <b>Impatto Permanente:</b> &gamma; &middot; (V<sub>tot</sub> / ADV) &middot; &sigma; (spostamento strutturale del Fair Value)
   </div>
 </div>
 
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Risolve il trade-off fondamentale: vendere troppo velocemente causa slippage elevato per impatto sul book, mentre vendere troppo lentamente espone il capitale al rischio di oscillazioni avverse di mercato nel tempo.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>ARGUS stima per ciascun titolo il controvalore da liquidare, il volume medio a 30 giorni (ADV) e calcola i giorni stimati assumendo una partecipazione massima prudenziale del 10% al volume giornaliero.</div>
-</div>
-
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>Uno slippage totale stimato superiore all'1.5% o tempi di smobilizzo &gt; 5 giorni evidenziano titoli poco liquidi che richiedono algoritmi TWAP/VWAP o ordini dilazionati.</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ POV Cap (Percentage of Volume)</div>
+  <div>Per limitare l'impatto sul book, il router fissa un tetto massimo di partecipazione (tipicamente 10%-15% del volume dell'intervallo).</div>
 </div>
 
 </div>
-""", button_label="💡 Come funziona Almgren-Chriss?")
+""", button_label="💡 Guida Execution Router")
 
     from core.risk_engine import compute_almgren_chriss_market_impact, compute_almgren_chriss_optimal_execution
     df_ac = compute_almgren_chriss_market_impact(pos)
-
+    
     if not df_ac.empty:
-        tot_impact_eur = float(df_ac["Impatto Monetario (€)"].sum())
-        avg_slippage = float(df_ac["Slippage Stimato %"].mean())
-        avg_days = float(df_ac["Giorni Liquidazione"].mean())
+        # Sezione 1: Overview Tabellare
+        col_t1, col_t2 = st.columns([3.0, 1.0])
+        with col_t1:
+            st.markdown("##### 📊 Profilo di Rischio Liquidità per Asset")
+        with col_t2:
+            csv_ac = df_ac.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Scarica CSV", data=csv_ac, file_name="liquidita_almgren_chriss.csv", mime="text/csv", use_container_width=True, key="btn_download_almgren_chriss")
 
-        ac_c1, ac_c2, ac_c3 = st.columns(3)
-        with ac_c1:
-            metric_card("Stima Costi di Impatto Totali", f"€ {tot_impact_eur:,.2f}", "Costo stimato di smobilizzazione rapida", False)
-        with ac_c2:
-            metric_card("Slippage Medio Stimato", f"{avg_slippage:.2f}%", "Perdita di valore media per ordine", False)
-        with ac_c3:
-            metric_card("Giorni Medi Liquidazione ADV", f"{avg_days:.1f} giorni", "Tempo stimato con 10% ADV", True)
-
-        st.divider()
-
-        col_ac_a, col_ac_b = st.columns([1.8, 1.2])
-
-        with col_ac_a:
-            col_ac_h1, col_ac_h2 = st.columns([2.5, 1.0])
-            with col_ac_h1:
-                st.markdown("#### 📊 Dettaglio Impatto e Slippage per Asset")
-            with col_ac_h2:
-                csv_ac = df_ac.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_ac, file_name="liquidita_almgren_chriss.csv", mime="text/csv", use_container_width=True, key="btn_download_almgren_chriss")
-
-            st.dataframe(
-                df_ac.style.format({
-                    "Valore (€)": "€ {:,.2f}",
-                    "Giorni Liquidazione": "{:.1f}",
-                    "Slippage Stimato %": "{:.2f}%",
-                    "Impatto Monetario (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True, hide_index=True
-            )
-
-        with col_ac_b:
-            st.markdown("#### 📈 Slippage % Stimato per Ticker")
-            fig_ac_bar = px.bar(
-                df_ac, x="Slippage Stimato %", y="Ticker", orientation="h",
-                color="Slippage Stimato %", color_continuous_scale="Reds",
-                title="Slippage Stimato (%)", template="plotly_dark", height=320
-            )
-            fig_ac_bar.update_traces(
-                hovertemplate="<b>Ticker: %{y}</b><br>⚡ Slippage: %{x:.2f}%<extra></extra>"
-            )
-            fig_ac_bar.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
-            st.plotly_chart(fig_ac_bar, use_container_width=True)
-
-        # ── SEZIONE 2: SIMULATORE DI TRAIETTORIA OTTIMALE ALMGREN-CHRISS ───
-        st.markdown("<div style='margin-top: 25px;'></div>", unsafe_allow_html=True)
-        col_ac_opt_h1, col_ac_opt_h2 = st.columns([3.2, 1.3])
-        with col_ac_opt_h1:
-            st.markdown("#### 🎯 Simulatore Traiettoria Ottimale di Liquidazione (Optimal Execution Schedule)")
-            st.caption("Determina la velocità di vendita e la traiettoria matematica di smobilizzo che minimizza la combinazione lineare tra Costo Atteso E[x] e Rischio di Esecuzione V[x].")
-        with col_ac_opt_h2:
-            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-            glossary_modal("💡 Come funziona la Traiettoria Ottimale Almgren-Chriss", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 Teoria dell'Esecuzione Ottimale (Almgren &amp; Chriss, 2000)</div>
-  <div>Il modello risolve il dilemma del trader istituzionale: vendere troppo velocemente causa elevato <b>impatto temporaneo sul prezzo</b> (slippage), mentre vendere troppo lentamente espone al <b>rischio di oscillazione del mercato</b> durante l'orizzonte di liquidazione.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Traiettoria Iperbolica &amp; Urgenza (&kappa;)</div>
-  <div>
-    La traiettoria ottima di rimanenza segue l'equazione differenziale iperbolica:<br>
-    <code>x(t) = X_0 &middot; sinh(&kappa;(T - t)) / sinh(&kappa;T)</code><br>
-    dove <b>&kappa;</b> è il parametro di urgenza calibrato su avversione al rischio (&lambda;), volatilità (&sigma;) ed elasticità temporanea (&eta;).
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🛡️ Half-Life &amp; Execution VaR</div>
-  <div>
-    • <b>Liquidation Half-Life (t_1/2):</b> Tempo necessario per smobilizzare il primo 50% della posizione (<code>ln(2)/&kappa;</code>).<br>
-    • <b>Execution VaR (95%/99%):</b> Massima perdita potenziale complessiva (Costo Atteso + 1.645/2.326 &middot; &sigma;_esecuzione).
-  </div>
-</div>
-
-</div>
-""", button_label="💡 Come funziona la Traiettoria?")
-
-        col_opt_ctrl1, col_opt_ctrl2, col_opt_ctrl3 = st.columns([1.5, 1.5, 1.5])
-        
-        # Scelta asset o totale
-        all_ac_tickers = ["Intero Portafoglio (€ " + f"{pos['current_value'].sum():,.0f}".replace(",", ".") + ")"] + list(df_ac["Ticker"].unique())
-        with col_opt_ctrl1:
-            sel_target = st.selectbox("Seleziona Ordine da Liquidare:", all_ac_tickers, index=0)
-            if "Intero Portafoglio" in sel_target:
-                target_order_val = float(pos["current_value"].sum()) if "current_value" in pos.columns else 100_000.0
-                target_adv = float(pos["current_value"].sum() * 5.0) # ADV aggregato prudenziale
-                target_vol = 22.0
-            else:
-                sel_row = pos[pos["ticker"] == sel_target]
-                target_order_val = float(sel_row["current_value"].iloc[0]) if not sel_row.empty else 10_000.0
-                target_adv = target_order_val * 8.0
-                target_vol = 28.0
-
-        with col_opt_ctrl2:
-            exec_horizon = st.slider("Orizzonte di Liquidazione (Giorni T):", min_value=1, max_value=20, value=5, step=1)
-            spread_bps_ac = st.slider("Bid-Ask Spread Stimato (bps):", min_value=5, max_value=80, value=15, step=5)
-
-        with col_opt_ctrl3:
-            lambda_choice = st.select_slider(
-                "Avversione al Rischio (λ):",
-                options=[0.0, 1e-7, 5e-7, 1e-6, 5e-6, 1e-5, 5e-5],
-                value=1e-6,
-                format_func=lambda l: "0.0 (Risk-Neutral TWAP)" if l==0.0 else (f"{l:.1e} (Aggressivo)" if l>=1e-5 else f"{l:.1e} (Bilanciato)")
-            )
-            n_steps = st.slider("Intervalli di Esecuzione (N Slices):", min_value=5, max_value=30, value=15, step=5)
-
-        # Calcolo Traiettoria Ottimale
-        exec_res = compute_almgren_chriss_optimal_execution(
-            order_value=target_order_val,
-            adv_value=target_adv,
-            volatility_ann_pct=target_vol,
-            horizon_days=float(exec_horizon),
-            n_intervals=n_steps,
-            risk_aversion_lambda=lambda_choice,
-            bid_ask_spread_bps=float(spread_bps_ac)
+        st.dataframe(
+            df_ac,
+            column_config={
+                "Ticker": st.column_config.TextColumn("Ticker"),
+                "Valore (€)": st.column_config.NumberColumn("Valore", format="€ %,.2f"),
+                "ADV (€)": st.column_config.NumberColumn("Volume Medio Giornaliero (ADV)", format="€ %,.2f"),
+                "Partecipazione (% ADV)": st.column_config.NumberColumn("Quota su ADV", format="%.2f%%"),
+                "Giorni Liquidazione (10% ADV)": st.column_config.NumberColumn("Giorni Stimati (10% ADV)", format="%.2f gg"),
+                "Impatto Permanente (€)": st.column_config.NumberColumn("Impatto Perm.", format="€ %,.2f"),
+                "Impatto Temporaneo (€)": st.column_config.NumberColumn("Impatto Temp.", format="€ %,.2f"),
+                "Costo Totale (€)": st.column_config.NumberColumn("Costo Stimato", format="€ %,.2f"),
+                "Costo (bps)": st.column_config.NumberColumn("Slippage", format="%.1f bps"),
+                "Rischio Liquidità": st.column_config.TextColumn("Livello Rischio")
+            },
+            hide_index=True,
+            use_container_width=True
         )
 
-        col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
-        with col_kpi1:
-            metric_card("Costo Atteso E[x]", f"€ {exec_res['expected_cost_amount']:,.2f}", f"{exec_res['expected_cost_bps']:.1f} bps su nozionale", None)
-        with col_kpi2:
-            metric_card("Execution Risk (Std Dev)", f"€ {exec_res['execution_std_amount']:,.2f}", "Incertezza prezzo durante trade", None)
-        with col_kpi3:
-            metric_card("Execution VaR (95%)", f"€ {exec_res['execution_var_95_amount']:,.2f}", "Costo massimo al 95% conf.", False)
-        with col_kpi4:
-            metric_card("Half-Life di Liquidazione", f"{exec_res['half_life_days']:.2f} giorni", f"Parametro urgenza κ = {exec_res['kappa']:.3f}", True)
+        st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 24px 0;'>", unsafe_allow_html=True)
 
-        # Grafico Traiettorie a Confronto (Ottimale vs TWAP vs Aggressivo)
-        col_f1, col_f2 = st.columns([2.0, 1.0])
+        # ── SEZIONE 2: SIMULATORE DI TRAIETTORIA OTTIMALE ALMGREN-CHRISS ───
+        col_tr1, col_tr2 = st.columns([3.0, 1.2])
+        with col_tr1:
+            st.markdown("#### 🎯 Traiettoria Ottimale di Smobilizzo Multi-Day (Almgren-Chriss)")
+            st.caption("Modellazione stocastica della velocità ottima di disinvestimento per bilanciare market impact e volatility risk.")
+        with col_tr2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("💡 Come funziona la Traiettoria Ottimale Almgren-Chriss", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 Teoria dell'Esecuzione Ottimale (Almgren &amp; Chriss, 2000)</div>
+  <div>La traiettoria ottima di disinvestimento risolve l'equazione differenziale di secondo ordine:</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 6px 0; color: #ffb74d; font-family: monospace; font-size: 12px;">
+    x(t) = X &middot; sinh(&kappa; (T &minus; t)) / sinh(&kappa; T)
+  </div>
+  <div>dove <i>&kappa;</i> rappresenta il parametro di urgenza che dipende dall'avversione al rischio (&lambda;), dalla volatilità (&sigma;) e dall'elasticità del book (&eta;).</div>
+</div>
+""", button_label="💡 Come funziona?")
+
+        col_p1, col_p2, col_p3 = st.columns([1.5, 1.5, 1.2])
+        with col_p1:
+            exec_horizon = st.slider("Orizzonte di Liquidazione (Giorni)", min_value=1, max_value=20, value=5, step=1, key="ac_horizon_slider")
+        with col_p2:
+            risk_aversion = st.select_slider(
+                "Profilo di Urgenza / Avversione al Rischio (λ)",
+                options=[1e-7, 1e-6, 1e-5, 1e-4, 1e-3],
+                value=1e-5,
+                format_func=lambda x: {
+                    1e-7: "Passivo / Paziente (Min Impact)",
+                    1e-6: "Moderato Passivo",
+                    1e-5: "Istituzionale Bilanciato",
+                    1e-4: "Moderato Aggressivo",
+                    1e-3: "Aggressivo / Urgente (Min Risk)"
+                }.get(x, f"{x:.1e}"),
+                key="ac_lambda_slider"
+            )
+        with col_p3:
+            st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+            include_spread = st.checkbox("Includi Half-Spread Bid-Ask", value=True, key="ac_include_spread")
+
+        exec_res = compute_almgren_chriss_optimal_execution(
+            pos,
+            total_days=float(exec_horizon),
+            risk_aversion=float(risk_aversion),
+            n_steps=10,
+            include_half_spread=include_spread
+        )
+
+        df_sched = exec_res["schedule_df"]
+        kpis = exec_res["kpis"]
+
+        # KPI Cards
+        col_k1, col_k2, col_k3, col_k4 = st.columns(4)
+        with col_k1:
+            metric_card("Controvalore Portafoglio", f"€ {kpis['initial_portfolio_value']:,.2f}", "Capitale iniziale")
+        with col_k2:
+            metric_card("Costo Totale Atteso (E[Cost])", f"€ {kpis['expected_total_cost']:,.2f}", f"Slippage: {kpis['expected_cost_pct']:.2f}% ({kpis['expected_cost_bps']:.1f} bps)")
+        with col_k3:
+            metric_card("Execution VaR (95%)", f"€ {kpis['execution_var_95']:,.2f}", f"{kpis['execution_var_pct']:.2f}% del valore")
+        with col_k4:
+            metric_card("Half-Life di Liquidazione", f"{kpis['half_life_days']:.2f} gg", f"Parametro Urgenza κ: {kpis['urgency_kappa']:.3f}")
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+        col_f1, col_f2 = st.columns([1.6, 1.0])
         with col_f1:
-            st.markdown("##### 📉 Traiettorie di Smobilizzo a Confronto (Ottimale vs TWAP vs Aggressiva)")
-            df_sched = exec_res["schedule_df"]
-            
-            fig_traj = go.Figure()
-            # Valore iniziale punto 0
-            t_vals = [0.0] + list(df_sched["Giorno"])
-            opt_vals = [exec_res["order_value"]] + list(df_sched["Posizione Residua (€)"])
-            twap_vals = [exec_res["order_value"]] + list(df_sched["Traiettoria TWAP (€)"])
-            agg_vals = [exec_res["order_value"]] + list(df_sched["Traiettoria Aggressiva (€)"])
+            st.markdown("##### 📉 Traiettorie di Smobilizzo a Confronto")
+            t_vals = df_sched["Giorno"].tolist()
+            opt_vals = df_sched["Posizione Residua (€)"].tolist()
+            x0 = kpis['initial_portfolio_value']
+            twap_vals = [x0 * (1.0 - t / exec_horizon) for t in t_vals]
+            agg_vals = [x0 * np.exp(-3.0 * t / exec_horizon) for t in t_vals]
 
+            fig_traj = go.Figure()
             fig_traj.add_trace(go.Scatter(
                 x=t_vals, y=opt_vals,
                 mode="lines+markers", name="Traiettoria Ottimale (Almgren-Chriss)",
@@ -2051,6 +2003,237 @@ elif active_pos_tab == "⚡ Liquidità Almgren-Chriss":
             use_container_width=True
         )
 
+        st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
+
+        # ── SEZIONE 3: SMART ORDER ROUTER INTRADAY (TWAP & VWAP) ────────────
+        st.markdown("#### 🤖 Smart Order Router Intraday (TWAP & VWAP Slicing Engine)")
+        st.caption("Pianificazione operativa delle tranche di negoziazione intraday (09:00 - 17:30) per minimizzare lo slippage su ordini consistenti.")
+
+        # Costruisci lista ordini di prova dalle posizioni
+        avail_tickers = pos[pos["qty_net"] > 0]["ticker"].dropna().unique().tolist() if "qty_net" in pos.columns else []
+        if not avail_tickers and "ticker" in pos.columns:
+            avail_tickers = pos["ticker"].dropna().unique().tolist()
+
+        col_sor1, col_sor2, col_sor3, col_sor4 = st.columns([1.5, 1.2, 1.2, 1.1])
+        with col_sor1:
+            sel_asset_mode = st.selectbox(
+                "Paniere Operativo",
+                options=["Singolo Titolo da Smobilizzare", "Paniere Intero Portafoglio (Pro-Quota)"],
+                key="sor_asset_mode"
+            )
+        with col_sor2:
+            if sel_asset_mode == "Singolo Titolo da Smobilizzare" and avail_tickers:
+                sel_ticker = st.selectbox("Seleziona Titolo", options=avail_tickers, key="sor_single_tk")
+            else:
+                sel_ticker = "PORTFOLIO_BASKET"
+                st.markdown("<div style='padding-top: 28px; font-weight: 600; color: #58a6ff;'>Tutti gli Asset Aperti</div>", unsafe_allow_html=True)
+
+        with col_sor3:
+            sel_window = st.selectbox(
+                "Orizzonte di Sessione",
+                options=[
+                    "Sessione Intera (09:00 - 17:30, 16 tranche da 30m)",
+                    "Sessione Mattina (09:00 - 13:00, 8 tranche da 30m)",
+                    "Sessione Pomeriggio (14:00 - 17:30, 7 tranche da 30m)",
+                    "Esecuzione Rapida (2 Ore, 8 tranche da 15m)"
+                ],
+                key="sor_window_mode"
+            )
+        with col_sor4:
+            pov_cap = st.slider("POV Participation Cap", min_value=0.05, max_value=0.30, value=0.15, step=0.05, format="%.0f%%", key="sor_pov_cap")
+
+        # Map interval parameters
+        if "16 tranche" in sel_window:
+            n_interv = 16
+            start_t = "09:00"
+            interv_min = 30
+        elif "Mattina" in sel_window:
+            n_interv = 8
+            start_t = "09:00"
+            interv_min = 30
+        elif "Pomeriggio" in sel_window:
+            n_interv = 7
+            start_t = "14:00"
+            interv_min = 30
+        else:
+            n_interv = 8
+            start_t = "10:00"
+            interv_min = 15
+
+        # Build order list
+        orders_for_sor = []
+        if sel_asset_mode == "Singolo Titolo da Smobilizzare" and avail_tickers:
+            row_tk = pos[pos["ticker"] == sel_ticker].iloc[0]
+            qty_val = float(row_tk.get("qty_net", row_tk.get("quantity", 100.0)))
+            p_val = float(row_tk.get("current_price", row_tk.get("price", 100.0)))
+            adv_val = float(row_tk.get("adv", row_tk.get("volume", 500000.0)))
+            orders_for_sor.append({
+                "ticker": sel_ticker,
+                "action": "SELL",
+                "quantity": qty_val,
+                "price": p_val,
+                "adv": adv_val
+            })
+        else:
+            for _, r in pos.iterrows():
+                tk = r.get("ticker", "UNKNOWN")
+                q = float(r.get("qty_net", r.get("quantity", 0.0)))
+                p = float(r.get("current_price", r.get("price", 0.0)))
+                adv_v = float(r.get("adv", r.get("volume", 500000.0)))
+                if q > 0 and p > 0:
+                    orders_for_sor.append({
+                        "ticker": tk,
+                        "action": "SELL",
+                        "quantity": q,
+                        "price": p,
+                        "adv": adv_v
+                    })
+
+        comp_exec = compare_execution_strategies(
+            orders_for_sor,
+            start_time_str=start_t,
+            interval_minutes=interv_min,
+            n_intervals=n_interv
+        )
+        
+        twap_data = comp_exec["twap"]
+        vwap_data = comp_exec["vwap"]
+        comp_summary = comp_exec["comparison"]
+
+        # Scorecards Comparazione Algoritmi
+        col_sc1, col_sc2, col_sc3, col_sc4 = st.columns(4)
+        with col_sc1:
+            metric_card("Controvalore Ordine", f"€ {comp_summary['total_notional_eur']:,.2f}", f"{len(orders_for_sor)} ordini pianificati")
+        with col_sc2:
+            metric_card("Costo Esecuzione Blocco (Market)", f"€ {comp_summary['market_order_cost_eur']:,.2f}", "Slippage 25.0 bps (singolo ordine)")
+        with col_sc3:
+            metric_card("Costo VWAP Istituzionale", f"€ {comp_summary['vwap_cost_eur']:,.2f}", f"Slippage medio: {vwap_data['summary']['avg_slippage_bps']:.1f} bps")
+        with col_sc4:
+            metric_card("Risparmio Netto Stimato", f"€ {comp_summary['vwap_savings_vs_market_eur']:,.2f}", "Risparmio vs Market Order", delta=f"-{comp_summary['vwap_savings_vs_market_eur']:,.2f} €")
+
+        st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+
+        col_algo_tab1, col_algo_tab2 = st.tabs(["📊 VWAP Execution Schedule (Liquidity-Matched)", "⏱️ TWAP Execution Schedule (Uniform Jitter)"])
+
+        with col_algo_tab1:
+            df_vwap_sched = vwap_data["schedule_df"]
+            if not df_vwap_sched.empty:
+                col_g1, col_g2 = st.columns([1.5, 1.0])
+                with col_g1:
+                    # Intraday Volume vs VWAP Slices Chart
+                    fig_vwap = go.Figure()
+                    fig_vwap.add_trace(go.Bar(
+                        x=df_vwap_sched["timestamp"].unique(),
+                        y=[df_vwap_sched[df_vwap_sched["timestamp"] == t]["order_notional_eur"].sum() for t in df_vwap_sched["timestamp"].unique()],
+                        name="Controvalore Tranche (€)",
+                        marker_color="#58a6ff",
+                        opacity=0.85
+                    ))
+                    fig_vwap.add_trace(go.Scatter(
+                        x=df_vwap_sched["timestamp"].unique(),
+                        y=[df_vwap_sched[df_vwap_sched["timestamp"] == t]["pov_rate_pct"].mean() for t in df_vwap_sched["timestamp"].unique()],
+                        name="Participation Rate (% Mkt)",
+                        yaxis="y2",
+                        mode="lines+markers",
+                        line=dict(color="#ff9900", width=2.5)
+                    ))
+                    fig_vwap.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=310,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        yaxis=dict(title="Controvalore Tranche (€)", gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis2=dict(title="Partecipazione (%)", overlaying="y", side="right", showgrid=False),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    apply_plotly_theme(fig_vwap)
+                    st.plotly_chart(fig_vwap, use_container_width=True)
+
+                with col_g2:
+                    # Trajectory of completion
+                    fig_cum = go.Figure()
+                    for tk in df_vwap_sched["ticker"].unique():
+                        df_tk = df_vwap_sched[df_vwap_sched["ticker"] == tk]
+                        fig_cum.add_trace(go.Scatter(
+                            x=df_tk["timestamp"],
+                            y=df_tk["cum_progress_pct"],
+                            mode="lines+markers",
+                            name=f"{tk} (% Cumulata)"
+                        ))
+                    fig_cum.update_layout(
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(13,17,23,0.7)",
+                        height=310,
+                        margin=dict(l=20, r=20, t=30, b=20),
+                        yaxis=dict(title="% Avanzamento Esecuzione", range=[0, 105], gridcolor="rgba(255,255,255,0.06)"),
+                        xaxis=dict(title="Orario"),
+                        legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5)
+                    )
+                    apply_plotly_theme(fig_cum)
+                    st.plotly_chart(fig_cum, use_container_width=True)
+
+                col_vwap_h1, col_vwap_h2 = st.columns([3.0, 1.0])
+                with col_vwap_h1:
+                    st.markdown("##### 📋 Tabella Dettagliata Tranche VWAP")
+                with col_vwap_h2:
+                    csv_vwap = df_vwap_sched.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Ordini FIX/CSV", data=csv_vwap, file_name="vwap_orders_schedule.csv", mime="text/csv", use_container_width=True, key="btn_dl_vwap_sched")
+
+                st.dataframe(
+                    df_vwap_sched[[
+                        "tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_progress_pct",
+                        "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "pov_rate_pct"
+                    ]],
+                    column_config={
+                        "tranche_idx": st.column_config.NumberColumn("#", format="%d"),
+                        "timestamp": st.column_config.TextColumn("Orario"),
+                        "ticker": st.column_config.TextColumn("Ticker"),
+                        "action": st.column_config.TextColumn("Azione"),
+                        "slice_qty": st.column_config.NumberColumn("Quote Tranche", format="%,.2f"),
+                        "cum_progress_pct": st.column_config.NumberColumn("% Eseguita", format="%.1f%%"),
+                        "order_notional_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
+                        "benchmark_price_eur": st.column_config.NumberColumn("Prezzo Riferimento (€)", format="€ %,.2f"),
+                        "est_exec_price_eur": st.column_config.NumberColumn("Prezzo Esecuzione Stimato (€)", format="€ %,.2f"),
+                        "est_slippage_bps": st.column_config.NumberColumn("Slippage (bps)", format="%.1f bps"),
+                        "pov_rate_pct": st.column_config.NumberColumn("POV Rate", format="%.2f%%")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+
+        with col_algo_tab2:
+            df_twap_sched = twap_data["schedule_df"]
+            if not df_twap_sched.empty:
+                col_twap_h1, col_twap_h2 = st.columns([3.0, 1.0])
+                with col_twap_h1:
+                    st.markdown("##### 📋 Tabella Dettagliata Tranche TWAP (Uniform Time Jitter)")
+                with col_twap_h2:
+                    csv_twap = df_twap_sched.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Scarica Ordini TWAP CSV", data=csv_twap, file_name="twap_orders_schedule.csv", mime="text/csv", use_container_width=True, key="btn_dl_twap_sched")
+
+                st.dataframe(
+                    df_twap_sched[[
+                        "tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_progress_pct",
+                        "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "pov_rate_pct"
+                    ]],
+                    column_config={
+                        "tranche_idx": st.column_config.NumberColumn("#", format="%d"),
+                        "timestamp": st.column_config.TextColumn("Orario"),
+                        "ticker": st.column_config.TextColumn("Ticker"),
+                        "action": st.column_config.TextColumn("Azione"),
+                        "slice_qty": st.column_config.NumberColumn("Quote Tranche", format="%,.2f"),
+                        "cum_progress_pct": st.column_config.NumberColumn("% Eseguita", format="%.1f%%"),
+                        "order_notional_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
+                        "benchmark_price_eur": st.column_config.NumberColumn("Prezzo Riferimento (€)", format="€ %,.2f"),
+                        "est_exec_price_eur": st.column_config.NumberColumn("Prezzo Esecuzione Stimato (€)", format="€ %,.2f"),
+                        "est_slippage_bps": st.column_config.NumberColumn("Slippage (bps)", format="%.1f bps"),
+                        "pov_rate_pct": st.column_config.NumberColumn("POV Rate", format="%.2f%%")
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+
     else:
         st.info("Impossibile calcolare il modello Almgren-Chriss: posizioni attive o dati di volume non sufficienti.")
-
