@@ -268,72 +268,9 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         st.plotly_chart(fig_liq, use_container_width=True)
 
         # ⚡ DuckDB OLAP In-Process Accelerated Aggregations
-        with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP & Ranking Settoriale)", expanded=False):
-            from core.duckdb_engine import compute_duckdb_asset_sector_currency_cube, compute_duckdb_sector_rankings
-            cube_res = compute_duckdb_asset_sector_currency_cube(df_l)
-            rank_res = compute_duckdb_sector_rankings(df_l, top_n=3)
-
-            tab_cube, tab_rank = st.tabs([
-                "🧊 Cubo Multi-Dimensionale (Asset Class × Settore × Valuta)",
-                "🏆 Leader Settoriali (QUALIFY Rank ≤ 3)"
-            ])
-
-            with tab_cube:
-                if cube_res.get("success") and not cube_res["df"].empty:
-                    df_cube = cube_res["df"].copy()
-                    col_cu_h1, col_cu_h2 = st.columns([3.2, 1.0])
-                    with col_cu_h1:
-                        st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{cube_res['latency_ms']:.2f} ms** (DuckDB GROUPING SETS Rollup)")
-                    with col_cu_h2:
-                        csv_cube = df_cube.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Scarica Cubo CSV", data=csv_cube, file_name="duckdb_olap_cube.csv", mime="text/csv", use_container_width=True)
-
-                    cube_cfg = {
-                        "asset_class": st.column_config.TextColumn("Asset Class", width="medium"),
-                        "sector": st.column_config.TextColumn("Settore GICS", width="medium"),
-                        "currency": st.column_config.TextColumn("Valuta", width="small"),
-                        "n_posizioni": st.column_config.NumberColumn("N. Posizioni", format="%d"),
-                        "controvalore_totale": st.column_config.NumberColumn("Controvalore Totale (€)", format="€ %.2f"),
-                        "pnl_latente_totale": st.column_config.NumberColumn("PnL Latente Totale (€)", format="€ %.2f"),
-                        "rendimento_medio_pct": st.column_config.NumberColumn("Rendimento Medio (%)", format="%.2f%%")
-                    }
-                    st.dataframe(
-                        df_cube,
-                        column_config=cube_cfg,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=320
-                    )
-                else:
-                    st.info("Nessun dato disponibile per il cubo OLAP.")
-
-            with tab_rank:
-                if rank_res.get("success") and not rank_res["df"].empty:
-                    df_rank = rank_res["df"].copy()
-                    col_rk_h1, col_rk_h2 = st.columns([3.2, 1.0])
-                    with col_rk_h1:
-                        st.caption(f"⚡ Calcolo Window Function in **{rank_res['latency_ms']:.2f} ms** (DuckDB QUALIFY DENSE_RANK() ≤ 3)")
-                    with col_rk_h2:
-                        csv_rank = df_rank.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Scarica Leader CSV", data=csv_rank, file_name="duckdb_sector_leaders.csv", mime="text/csv", use_container_width=True)
-
-                    rank_cfg = {
-                        "settore": st.column_config.TextColumn("Settore GICS", width="medium"),
-                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
-                        "controvalore_eur": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
-                        "pnl_latente_eur": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
-                        "gain_pct": st.column_config.NumberColumn("Gain Latente (%)", format="%.2f%%"),
-                        "rank_settoriale": st.column_config.NumberColumn("Rank Settoriale", format="#%d")
-                    }
-                    st.dataframe(
-                        df_rank,
-                        column_config=rank_cfg,
-                        use_container_width=True,
-                        hide_index=True,
-                        height=320
-                    )
-                else:
-                    st.info("Nessun ranking disponibile.")
+        with st.expander("⚡ Vista Analitica Aggregata DuckDB (Cubo OLAP Asset Class × Settore × Valuta)", expanded=False):
+            from core.ui_utils import render_duckdb_olap_cube_widget
+            render_duckdb_olap_cube_widget(df_l, key_prefix="p4_pos")
 
     # Sezione Corporate Actions & Stock Split Audit
     corp_actions = results.get("corporate_actions", [])
