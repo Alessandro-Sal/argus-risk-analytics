@@ -105,8 +105,8 @@ def compute_twap_schedule(
             interval_mkt_vol = adv * vol_profile[idx]
             pov_rate = (s_qty / max(1.0, interval_mkt_vol)) * 100.0
             
-            # Estimated slippage in basis points (TWAP constant participation model)
-            est_slippage_bps = min(50.0, max(0.5, 3.5 * np.sqrt(pov_rate)))
+            # Estimated slippage in basis points (Base Half-Spread ~1.5 bps + Sliced Impact)
+            est_slippage_bps = min(40.0, max(1.2, 1.5 + 2.2 * np.sqrt(pov_rate / 100.0) * 100.0 / np.sqrt(n_intervals)))
             est_exec_price = price * (1.0 + (est_slippage_bps / 10000.0) if "BUY" in action else 1.0 - (est_slippage_bps / 10000.0))
 
             schedule_rows.append({
@@ -166,7 +166,10 @@ def compute_vwap_schedule(
                 "total_orders": 0,
                 "total_notional_eur": 0.0,
                 "total_tranches": 0,
-                "algo_type": "VWAP"
+                "algo_type": "VWAP",
+                "n_intervals": n_intervals,
+                "avg_slippage_bps": 0.0,
+                "max_pov_pct": 0.0
             }
         }
 
@@ -218,8 +221,8 @@ def compute_vwap_schedule(
             interval_mkt_vol = adv * vol_profile[idx]
             pov_rate = (s_qty / max(1.0, interval_mkt_vol)) * 100.0
             
-            # VWAP slippage is significantly lower during high volume intervals (liquidity smoothing)
-            est_slippage_bps = min(40.0, max(0.2, 2.2 * np.sqrt(pov_rate)))
+            # VWAP slippage benefits from high volume matching (Base Half-Spread ~0.8 bps + Liquidity-Matched Impact)
+            est_slippage_bps = min(35.0, max(0.8, 0.9 + 1.5 * np.sqrt(pov_rate / 100.0) * 100.0 / np.sqrt(n_intervals)))
             est_exec_price = price * (1.0 + (est_slippage_bps / 10000.0) if "BUY" in action else 1.0 - (est_slippage_bps / 10000.0))
 
             schedule_rows.append({
@@ -263,7 +266,7 @@ def compare_execution_strategies(
 ) -> Dict[str, Any]:
     """
     Compares TWAP vs VWAP vs Immediate Market Execution (Arrival Price / Full Block).
-    Quantifies expected slippage savings and market impact reduction.
+    Quantifies expected slippage savings and market impact reduction using institutional TCA.
     """
     twap_res = compute_twap_schedule(orders, start_time_str, interval_minutes, n_intervals)
     vwap_res = compute_vwap_schedule(orders, start_time_str, interval_minutes, n_intervals, pov_cap_pct=pov_cap_pct)
@@ -278,6 +281,7 @@ def compare_execution_strategies(
             "comparison": {
                 "total_notional_eur": 0.0,
                 "market_order_cost_eur": 0.0,
+                "market_order_slippage_bps": 0.0,
                 "twap_cost_eur": 0.0,
                 "vwap_cost_eur": 0.0,
                 "vwap_savings_vs_market_eur": 0.0,
@@ -287,15 +291,20 @@ def compare_execution_strategies(
 
     tot_notional = twap_res["summary"]["total_notional_eur"]
     
-    # Immediate Market Order Impact is roughly 4x higher due to crossing spread in a single lump sum
-    mkt_slippage_bps = 25.0
-    mkt_cost_eur = tot_notional * (mkt_slippage_bps / 10000.0)
+    # Dynamic Market Order Impact calculated per-order via Square-Root Law
+    mkt_cost_eur = 0.0
+    for _, ord_row in df_twap.drop_duplicates(subset=["ticker"]).iterrows():
+        tk_notional = float(df_twap[df_twap["ticker"] == ord_row["ticker"]]["order_notional_eur"].sum())
+        tk_adv = float(ord_row.get("interval_mkt_vol", 500000.0) * n_intervals)
+        pov_block = tk_notional / max(1000.0, tk_adv)
+        # Block slippage: 2.0 bps half-spread + square-root impact
+        block_slip_bps = min(60.0, max(2.5, 2.0 + 10.0 * np.sqrt(pov_block) * 100.0))
+        mkt_cost_eur += tk_notional * (block_slip_bps / 10000.0)
+
+    mkt_avg_slip_bps = (mkt_cost_eur / max(1.0, tot_notional)) * 10000.0
     
-    twap_slip_bps = twap_res["summary"]["avg_slippage_bps"]
-    twap_cost_eur = tot_notional * (twap_slip_bps / 10000.0)
-    
-    vwap_slip_bps = vwap_res["summary"]["avg_slippage_bps"]
-    vwap_cost_eur = tot_notional * (vwap_slip_bps / 10000.0)
+    twap_cost_eur = float((df_twap["order_notional_eur"] * (df_twap["est_slippage_bps"] / 10000.0)).sum())
+    vwap_cost_eur = float((df_vwap["order_notional_eur"] * (df_vwap["est_slippage_bps"] / 10000.0)).sum())
     
     return {
         "twap": twap_res,
@@ -303,6 +312,7 @@ def compare_execution_strategies(
         "comparison": {
             "total_notional_eur": tot_notional,
             "market_order_cost_eur": round(mkt_cost_eur, 2),
+            "market_order_slippage_bps": round(mkt_avg_slip_bps, 1),
             "twap_cost_eur": round(twap_cost_eur, 2),
             "vwap_cost_eur": round(vwap_cost_eur, 2),
             "vwap_savings_vs_market_eur": round(max(0.0, mkt_cost_eur - vwap_cost_eur), 2),
