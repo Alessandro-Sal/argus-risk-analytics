@@ -164,30 +164,36 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
     """, unsafe_allow_html=True)
     
     # Selezione Snippet Istituzionali
+    snippet_options = {sk: sdata["title"] for sk, sdata in BQUANT_SNIPPETS.items()}
+    snippet_options["custom"] = "✍️ Script Personalizzato (Editor Libero)"
+
+    def _sync_bquant_snippet_selection():
+        sk = st.session_state.get("sel_bquant_snippet")
+        if sk and sk in BQUANT_SNIPPETS:
+            st.session_state["bquant_code_text_area"] = BQUANT_SNIPPETS[sk]["code"]
+        elif sk == "custom":
+            st.session_state["bquant_code_text_area"] = f"# Scrivi il tuo script Python per BQuant collegato a {port_name}\nimport pandas as pd\nimport numpy as np\n\nprint('Portafoglio:', portfolio_name)\nprint('Posizioni attive:', len(df_positions))\nprint('Valore totale (€):', f'{portfolio_value:,.2f}')\n"
+
+    # Inizializza session_state per editor se assente
+    if "bquant_code_text_area" not in st.session_state:
+        st.session_state["bquant_code_text_area"] = BQUANT_SNIPPETS["rolling_correlation"]["code"]
+
     col_snip1, col_snip2 = st.columns([3.5, 1.2])
     with col_snip1:
-        snippet_options = {sk: sdata["title"] for sk, sdata in BQUANT_SNIPPETS.items()}
-        snippet_options["custom"] = "✍️ Script Personalizzato (Editor Libero)"
-        
         sel_snippet_key = st.selectbox(
             "Carica Snippet Quantitativo Istituzionale:",
             list(snippet_options.keys()),
             format_func=lambda k: snippet_options[k],
             index=0,
-            key="sel_bquant_snippet"
+            key="sel_bquant_snippet",
+            on_change=_sync_bquant_snippet_selection
         )
         
     with col_snip2:
         st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         if st.button("📥 Inserisci Codice", key="btn_load_snippet", use_container_width=True):
-            if sel_snippet_key in BQUANT_SNIPPETS:
-                st.session_state["bquant_code_editor"] = BQUANT_SNIPPETS[sel_snippet_key]["code"]
-            else:
-                st.session_state["bquant_code_editor"] = f"# Scrivi il tuo script Python per BQuant collegato a {port_name}\nimport pandas as pd\nimport numpy as np\n\nprint('Portafoglio:', portfolio_name)\nprint('Posizioni attive:', len(df_positions))\nprint('Valore totale (€):', f'{portfolio_value:,.2f}')\n"
-
-    # Inizializza session_state per editor
-    if "bquant_code_editor" not in st.session_state:
-        st.session_state["bquant_code_editor"] = BQUANT_SNIPPETS["rolling_correlation"]["code"]
+            _sync_bquant_snippet_selection()
+            st.rerun()
 
     if sel_snippet_key in BQUANT_SNIPPETS:
         st.caption(f"ℹ️ **Descrizione Snippet:** {BQUANT_SNIPPETS[sel_snippet_key]['description']}")
@@ -195,7 +201,6 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
     # Code Editor
     user_code = st.text_area(
         f"Editor di Codice Python (Variabili collegate a '{port_name}': `df_positions`, `df_returns`, `df_prices`, `df_tx`, `portfolio_returns`, `benchmark_returns`, `results`, `duckdb`, `pd`, `np`, `px`, `go`):",
-        value=st.session_state["bquant_code_editor"],
         height=320,
         key="bquant_code_text_area"
     )
