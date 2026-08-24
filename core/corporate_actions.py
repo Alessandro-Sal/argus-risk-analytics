@@ -77,12 +77,12 @@ def fetch_stock_splits(ticker: str, start_date: Optional[str] = None) -> pd.Seri
     if clean_tk in _SPLIT_CACHE:
         cached_time, cached_series = _SPLIT_CACHE[clean_tk]
         if (now - cached_time).total_seconds() < _SPLIT_CACHE_TTL_SECONDS:
-            if start_date:
+            if start_date and not cached_series.empty:
                 st_ts = pd.to_datetime(start_date)
                 return cached_series[cached_series.index >= st_ts]
             return cached_series
 
-    splits_series = pd.Series(dtype=float)
+    splits_series = pd.Series(dtype=float, index=pd.DatetimeIndex([]))
 
     # 2. Query live a Yahoo Finance via yfinance
     try:

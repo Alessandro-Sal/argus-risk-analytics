@@ -72,6 +72,40 @@ def inject_custom_css():
             padding-bottom: 0px !important;
         }}
 
+        /* ── Above-the-fold Viewport Optimization (Zero Dead Space) ── */
+        header[data-testid="stHeader"],
+        [data-testid="stHeader"] {{
+            height: 0px !important;
+            min-height: 0px !important;
+            background: transparent !important;
+            display: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            visibility: hidden !important;
+        }}
+
+        /* Tighten Main Block Container */
+        .block-container,
+        [data-testid="block-container"],
+        [data-testid="stMainBlockContainer"],
+        .stMainBlockContainer {{
+            padding-top: 1rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 1.75rem !important;
+            padding-right: 1.75rem !important;
+            max-width: 100% !important;
+        }}
+
+        /* Tighten Sidebar Container */
+        [data-testid="stSidebarContent"],
+        [data-testid="stSidebarUserContent"],
+        section[data-testid="stSidebar"] > div:first-child,
+        section[data-testid="stSidebar"] .stSidebarContent {{
+            padding-top: 0.85rem !important;
+            padding-left: 0.85rem !important;
+            padding-right: 0.85rem !important;
+        }}
+
         [data-testid="stAppViewContainer"] {{
             background: {bg_gradient};
             background-size: cover;
