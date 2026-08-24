@@ -76,54 +76,26 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Centro Esportazione Report**: Download in-memory di Factsheet PDF a 2 pagine, Workbook Excel multi-tab, Report HTML Standalone e pacchetto Star Schema ZIP per Power BI.
 
 ### 2. 🔴 Analisi del Rischio & Rilevamento Anomalie (`src/pages/2_🔴_Analisi_Rischio.py`)
-* **Decomposizione di Eulero VaR/CVaR**: Calcolo del Marginal VaR $(\partial \text{VaR}/\partial w_i)$ e Component VaR in € e % con proprietà additiva $\sum \text{CVaR}_i = \text{VaR}_p$.
-* **Liquidity-Adjusted VaR (LVaR Bangia 1999)**: Integrazione del rischio di illiquidità di mercato e dello spread bid-ask monetario su orizzonti di disinvestimento forzato a 5 e 10 giorni.
-* **Volatilità Condizionale GARCH(1,1) & FHS**: Calibrazione MLE per la varianza condizionale $\sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2$, bande dinamiche di VaR, stima della persistenza e Half-Life dello shock, curva di Term Structure a 30 giorni e simulazione storica filtrata (FHS).
-* **Value at Risk (VaR) & Expected Shortfall (CVaR)**: Stima analitica della perdita massima (VaR) e della perdita media nello scenario peggiore (CVaR al 95% e 99%) nelle metodologie Storica, Parametrica, Cornish-Fisher e FHS.
-* **Validazione Regolamentare VaR (Kupiec POF Backtest)**: Backtest su 252 giorni di negoziazione con classificazione a semaforo dell'Accordo di Basilea (*Verde/Giallo/Rosso*).
-* **Market Regime Switching (3-State Markov Model)**: Identificazione statistica dello stato macroeconomico del mercato (Bull Low-Vol, Range-Bound, Crisis High-Vol) basato su volatilità e rendimenti rolling a 21 giorni.
-* **Rilevatore di Anomalie ML Isolation Forest**: Algoritmo non supervisionato per identificare giornate di panico, rotture di correlazione (*Correlation Breakdown*) e code di rischio non lineari.
-* **Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva, analisi Average Daily Volume (ADV) e Stop-Loss dinamici Chandelier ($3 \times ATR_{14}$).
+* **📊 Profilo del Rischio & Fama-French**: Rischio sistematico Beta, Tracking Error, Information Ratio, asimmetria (Skewness), curtosi (Kurtosis/Fat Tails) e regressione OLS multivariata sui 3 fattori accademici Kenneth French.
+* **📉 VaR, CVaR & Backtesting Kupiec**: Decomposizione di Eulero VaR/CVaR $(\sum \text{CVaR}_i = \text{VaR}_p)$, Marginal VaR $(\partial \text{VaR}/\partial w_i)$, Liquidity-Adjusted VaR (LVaR Bangia 1999), 4 modelli di VaR (Storico, Parametrico Gaussiano, Cornish-Fisher asimmetrico e Filtered Historical Simulation FHS) e validazione regolamentare su 252 giorni con test Kupiec POF conforme ai semafori di Basilea.
+* **🔗 Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva Pearson/Spearman, monitoraggio volumi medi giornalieri (Average Daily Volume ADV) e calcolo dinamico degli Stop-Loss Chandelier ($3 \times ATR_{14}$).
+* **🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)**: Algoritmo non supervisionato di Machine Learning per l'identificazione precoce di panic selling, rotture improvvise delle correlazioni storiche (*Correlation Breakdown*) e code di rischio non lineari.
 
 ### 3. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/3_🔬_Modelli_Quantitativi.py`)
+* **📊 Markowitz & Rebalancing**: Frontiera Efficiente risolta via SciPy SLSQP vincolato con stimatori di covarianza *Ledoit-Wolf Shrinkage*, Parità di Rischio Pura (Equal Risk Contribution ERC), Frontiera 3D ad alta densità con campionamento Multi-Alpha Dirichlet e generatore di ribilanciamento interattivo.
 * **🤖 AI Reinforcement Learning Policy Sandbox**: Ottimizzazione dinamica dei pesi di portafoglio basata su Policy Gradient REINFORCE e MDP continuo nello spazio degli stati $\mathbb{R}^{3N}$, addestrata ad adattarsi ai cambi di regime di mercato massimizzando il Sortino Ratio con controllo del turnover.
-* **🌐 Frontiera Efficiente 3D & Iperspazio Multi-Alpha Dirichlet**: Visualizzazione volumetrica interattiva 3D con selezione dinamica dell'asse $Z$ (*Concentrazione HHI*, *Tail Risk CVaR 95%*, *Sortino Ratio*), resa nitida e priva di collisioni visive con campionamento multi-concentrazione su simplesso e tooltip analitico hover.
-* **🏛️ Fixed Income Istituzionale, Z-Spread & CDS Curve (`YAS` / `FI`)**: Risoluzione analitica di YTM, Macaulay Duration, Modified Duration, Convexity esatta, DV01/PVBP, Z-Spread rispetto alla curva sovereign Nelson-Siegel e term structure della probabilità di default da spread CDS.
-* **📊 Attribuzione Multi-Periodo Carino (Zero-Residual) & Karnosky-Singer FX**: Algoritmo logaritmico multi-anno a residuo zero per l'attribuzione di Brinson-Fachler e scomposizione valutaria Karnosky-Singer per isolare l'impatto del mercato locale rispetto alle fluttuazioni dei cambi.
-* **📊 Backtesting di Strategie Multi-Fattoriali a 5 Quintili**: Analisi di performance e rischio su panieri quantitativi ordinati (Q1..Q5), calcolo dello spread Long-Short ($Q1 - Q5$), Information Ratio e test di monotonicità di rango di Spearman ($r_s$) sui fattori Quality, Low-Beta, Momentum e Profitability.
-* **🧬 Asymmetric Tail Copula Models (Clayton & Gumbel)**: Calcolo della dipendenza di coda inferiore ($\lambda_L$) e superiore ($\lambda_U$) per identificare il rischio di contagio e crollo simultaneo non lineare durante i panic selling di mercato.
-* **🎯 Simulatore Interattivo Trade Sizing (Kelly Criterion)**: Calcolo matematico dell'allocazione ottima continua e discreta con raccomandazione *Half-Kelly ($f^*/2$)* per massimizzare la crescita geometrica azzerando il rischio di rovina.
-* **⚖️ Equal Risk Contribution (ERC / Risk Parity Pura)**: Ottimizzazione non lineare SLSQP dove ciascun asset contribuisce esattamente per $1/N$ alla volatilità complessiva di portafoglio.
-* **Live Rebalancing Sandbox (What-If Weight Matrix)**: Simulatore in tempo reale con slider e preset istituzionali (*⭐ Pesi Attuali*, *⚖️ Equipesato 1/N*, *🏆 Max Sharpe*, *🛡️ Minima Volatilità*, *🧬 Equal Risk ERC*).
-* **Hierarchical Risk Parity (HRP - Marcos López de Prado 2016)**: Ottimizzazione del portafoglio basata su Machine Learning, Tree Clustering e Bisezione Ricorsiva.
-* **Modello Analitico Black-Scholes (1973) & Superficie di Volatilità 3D**: Prezzatura di opzioni Call/Put europee, 5 Greci, Put Delta-Hedging, Covered Call Yield Enhancer e calibrazione dello Skew parametrico.
-* **Simulatore Stocastico Merton Jump-Diffusion**: Modellizzazione con Moto Browniano Geometrico e shock di salto di Poisson ($N_t \sim \text{Poisson}(\lambda dt)$).
-* **🧠 Modelli Fattoriali Kenneth French (Fama-French 5-Factor & Carhart Momentum)**: Regressione econometrica OLS multivariata su dataset ufficiali di Dartmouth con Factor Return Attribution e Rolling Factor Betas a 60 giorni.
+* **🧬 Tail Copula & Kelly**: Mappatura della dipendenza di coda asimmetrica inferiore ($\lambda_L$) e superiore ($\lambda_U$) con copule di Clayton e Gumbel per il rischio di crash sistemico, affiancata dal simulatore continuo/discreto Kelly Criterion & Half-Kelly Position Sizing.
+* **🎲 Monte Carlo & Merton**: Simulazioni stocastiche previsionali a 10.000 cammini con Decomposizione di Cholesky e distribuzioni Student-t a code grasse, combinate con il modello Merton Jump-Diffusion a shock di salto Poissoniani.
+* **🛡️ Hedging & Opzioni**: Prezzatura analitica Black-Scholes (1973), calcolo dei 5 Greci ($\Delta, \Gamma, \Theta, \mathcal{V}, \rho$), dimensionamento del Delta-Hedging con opzioni Put protettive, strategie Covered Call a lotti interi (100x) e calibrazione dello Skew/Smile di volatilità 3D.
+* **🎯 Attribuzione & Fattori**: Decomposizione di Brinson-Fachler con algoritmo di raccordo logaritmico multi-periodale a residuo zero (Carino 1999), scomposizione valutaria Karnosky-Singer FX e backtesting fattoriale a 5 quintili con test di monotonicità di rango di Spearman ($r_s$).
+* **🏛️ Fixed Income & Z-Spread**: Risolutore numerico per Yield to Maturity (YTM), Current Yield, Macaulay/Modified Duration, Convessità esatta, DV01/PVBP, Z-Spread rispetto alla curva sovrana Nelson-Siegel e term structure della probabilità di default da spread CDS.
 
 ### 4. 📋 Posizioni, Contabilità FIFO & Fiscalità TUIR (`src/pages/4_📋_Posizioni_e_Dettagli.py`)
-* **🤖 Smart Order Routing TWAP & VWAP (Order Slicing Engine)**:
-  - Generatore di schedule intraday per la minimizzazione dello slippage su ordini consistenti.
-  - Curva a "U" di liquidità di mercato, TWAP con jitter stocastico, VWAP con Percentage of Volume (POV) Cap al 15% e quantificazione del risparmio monetario (€).
-* **🏛️ Suite Fiscale Istituzionale a 4 Pilastri**:
-  - **1. Cockpit Fiscale & Simulatore Riforma 2026**: Toggle interattivo tra regime TUIR asimmetrico e Riforma Fiscale unificata (compensazione al 100% delle minusvalenze con ETF), quantificazione del Tax Drag risparmiato, timeline delle minusvalenze a 4 anni (TUIR Art. 68 c. 5) e ordini di Step-Up a 0€ imposte con proxy correlati.
-  - **2. Prospetto Precompilato Modello Redditi PF**: Calcolo dei righi ministeriali per chi opera in **Regime Dichiarativo** (IBKR, Degiro, Scalable, Revolut, Crypto):
-    - *Quadro RT (Sez. II)*: Corrispettivi `RT21`, Costi FIFO `RT22`, Plusvalenza netta `RT23`, Minusvalenze dedotte `RT24`, Minus residue `RT25` e Imposta 26% `RT26` (Cod. F24 `1100`).
-    - *Quadro RW*: Codici investimento (1 titoli esteri, 21 crypto), codici paese ISO, giorni e liquidazione IVAFE (0,20% con franchigia < 12€) con export CSV dedicato.
-  - **3. Withholding Tax & Doppia Imposizione Dividendi Esteri**: Calcolo della ritenuta alla fonte estera (15% USA con W-8BEN, 26,375% DE, 35% CH) sommata al 26% italiano sul netto frontiera (**37,10% reale su titoli USA**) e quantificazione del Tax Drag rispetto ad ETF UCITS ad accumulazione.
-  - **4. Tax-Smart Lot Sizing (Simulatore Pre-Trade FIFO)**: Previsione esatta dei lotti d'acquisto storici scaricati per vendite parziali, calcolo del PnL realizzato e stima dell'imposta prima dell'ordine a mercato.
-* **🌊 Modello Almgren-Chriss & Traiettoria Ottima di Liquidazione**: Stima dei costi di impatto permanente e temporaneo sul mercato azionario, Half-Life di smobilizzo, slicing a 10 scaglioni ed Execution VaR al 95%.
-* **Motore Contabile FIFO (`_fifo_engine`)**: Calcolo deterministico del Weighted Average Cost Price (WACP) e separazione analitica tra PnL realizzato e non realizzato.
-* **🪦 Posizioni Chiuse & Graveyard Cockpit Multi-Prospettiva**:
-  - *Curva Cumulativa PnL Realizzato (€)* con High-Water Mark di picco e telemetria di trade drawdown.
-  - *Trading Calendar & Heatmap Mensile*: Matrice Mese $\times$ Anno con totale annuo e codice colore dinamico.
-  - *Scomposizione Settori GICS & Asset Class*: Analisi aggregata del profitto monetario e del Win Rate per settore.
-  - *Registro Lotti Chiusi FIFO Log*: Dettaglio cronologico di ciascuna operazione con holding period e prezzo di carico/scarico.
-* **🪙 Fisco Cripto-Attività & Quadri RT / RW / IVAFE (L. 197/2022)**:
-  - *Quadro RT (Sezione II-B)*: Calcolo plusvalenze/minusvalenze su criptovalute (Art. 67 c. 1 lett. c-sexies TUIR), franchigia annuale di 2.000€, applicazione dell'aliquota sostitutiva al 26% e gestione dello Zainetto Fiscale Cripto a 4 anni separato.
-  - *Quadro RW (Codice 21)*: Prospetto per il monitoraggio fiscale delle consistenze estere o in self-custody (ledger, wallet privati, exchange esteri).
-  - *Imposta sul Valore / IVAFE (0,20%)*: Calcolo automatico dell'imposta proporzionale sulle consistenze al 31/12.
-* **Smart Rebalancer**: Generatore di ordini operativi ad azioni intere per allineare il portafoglio ai pesi target con gestione del buffer di liquidità.
-* **Calendario & Previsione Flusso Dividendi**: Dividend Yield medio di portafoglio, storico reale e calendario mensile degli incassi stimati per azienda.
+* **📋 Posizioni Attive & Costi FIFO**: Mappa analitica e tabellare dei titoli in portafoglio con calcolo deterministico del Weighted Average Cost Price (WACP), separazione tra PnL realizzato/non realizzato e grafici di concentrazione settoriale GICS.
+* **🪦 Posizioni Chiuse & Graveyard Cockpit**: Tracciamento contabile FIFO delle operazioni storiche chiuse, Curva Cumulativa del PnL Realizzato (€) con High-Water Mark di picco, telemetria di trade drawdown e Trading Calendar Heatmap Mese $\times$ Anno.
+* **📅 Proiezione Dividendi**: Calendario dinamico mensile degli incassi cedolari per singola società, storico incassi reali e calcolo del Dividend Yield medio di portafoglio.
+* **💰 Ottimizzazione Fiscale (TUIR Art. 67)**: Suite fiscale integrata a 4 pilastri con simulatore Riforma Fiscale 2026 (armonizzazione ETF e quantificazione Tax Drag), prospetto precompilato per il Regime Dichiarativo con Quadro RT (tributo 1100) e Quadro RW/IVAFE, analizzatore Withholding Tax (W-8BEN 15% USA, aliquota reale 37,10%) e simulatore pre-trade Tax-Smart Lot Sizing.
+* **⚡ Liquidità & Smart Order Router**: Motore istituzionale di order slicing intraday (09:00 - 17:30) per la minimizzazione dello slippage su ordini consistenti e ribilanciamenti con profilazione della curva a "U", algoritmi **TWAP** uniforme (con jitter anti-frontrunning) e **VWAP** ponderato sui volumi (con POV Cap al 15%), affiancato dal modello di liquidazione ottima iperbolica di Almgren-Chriss.
 
 ### 5. 🏛️ Analisi dei Bilanci, Valutazione & Contabilità Forense (`src/pages/5_🏛️_Valutazione_Aziendale.py`)
 * **Beneish M-Score (1999)**: Modello econometrico a 8 indici (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) per rilevare manipolazioni contabili (soglia critica $M > -1.78$).

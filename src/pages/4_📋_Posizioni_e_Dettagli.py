@@ -2015,9 +2015,44 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
 
         # ── SEZIONE 3: SMART ORDER ROUTER INTRADAY (TWAP & VWAP) ────────────
-        # ── SEZIONE 3: SMART ORDER ROUTER INTRADAY (TWAP & VWAP) ────────────
-        st.markdown("#### 🤖 Smart Order Router Intraday (TWAP & VWAP Slicing Engine)")
-        st.caption("Pianificazione operativa delle tranche di negoziazione intraday (09:00 - 17:30) per minimizzare lo slippage su ordini consistenti.")
+        col_sor_h1, col_sor_h2 = st.columns([3.2, 1.2])
+        with col_sor_h1:
+            st.markdown("#### 🤖 Smart Order Router Intraday (TWAP & VWAP Slicing Engine)")
+            st.caption("Pianificazione operativa delle tranche di negoziazione intraday (09:00 - 17:30) per minimizzare lo slippage su ordini consistenti.")
+        with col_sor_h2:
+            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+            glossary_modal("ℹ️ Guida allo Smart Order Router (TWAP & VWAP)", r"""
+<div style="font-size: 13.5px; line-height: 1.45;">
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è lo Smart Order Router (SOR)</div>
+  <div>È il motore di routing algoritmico che converte un ordine complessivo o un'operazione di ribilanciamento multi-asset in una serie discreta di <b>tranche temporali</b>, minimizzando l'impatto sul book degli ordini (Market Impact) e lo slippage rispetto al prezzo di arrivo (Arrival Price).</div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 TWAP vs VWAP: Quale Algoritmo Scegliere?</div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-size: 12.5px;">
+    • <b>TWAP (Time-Weighted Average Price):</b> Distribuisce il volume in quote uguali nel tempo ($Q_i = Q / N$) applicando un <i>jitter pseudo-casuale</i> ($\pm 4\%$) per impedire agli algoritmi HFT concorrenti di individuare il pattern e fare front-running.<br>
+    • <b>VWAP (Volume-Weighted Average Price):</b> Modella la tipica curva a "U" della liquidità intraday (massima in apertura 09:00 e chiusura 17:00, minima a metà giornata), inviando tranche più corpose solo quando il mercato è più profondo.
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🛡️ POV Participation Cap & Modello TCA Square-Root</div>
+  <div>
+    • <b>Percentage of Volume (POV Cap 15%):</b> Limita la quota di mercato assorbita da ciascuna tranche per evitare di svuotare la liquidità dell'intervallo.<br>
+    • <b>Slippage Atteso:</b> Calcolato con la legge della radice quadrata di microstruttura (Almgren, Bouchaud):
+    <br><code style="color: #ff9900;">Slippage (bps) = Half-Spread + &gamma; &times; &radic;(Ordine / ADV) &times; 10000 / &radic;N</code>
+  </div>
+</div>
+
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">💡 Perché c'è Risparmio vs Market Order?</div>
+  <div>Un ordine a mercato istantaneo su un intero blocco deve crossare l'intero book pagando spread e impatto permanente immediato. L'esecuzione algoritmica a fette permette al book di rigenerarsi, riducendo lo slippage da 50-60 bps a meno di 2 bps.</div>
+</div>
+
+</div>
+""", button_label="💡 Come funziona il Router?")
 
         # Filtra rigorosamente SOLO le posizioni aperte (esclude posizioni chiuse o a valore zero)
         if not pos.empty:
