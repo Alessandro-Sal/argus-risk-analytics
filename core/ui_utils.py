@@ -2670,8 +2670,7 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
     if portfolio_index is None or len(portfolio_index) == 0:
         return pd.Series(dtype=float)
         
-    p_idx_str = [str(x)[:10] for x in portfolio_index]
-    p_idx = pd.Index(p_idx_str)
+    dt_port_idx = pd.to_datetime(portfolio_index)
 
     # 1. Ricerca prioritaria in df_prices con risoluzione alias
     alias_candidates = [ticker]
@@ -2687,24 +2686,31 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
     if df_prices is not None and isinstance(df_prices, pd.DataFrame) and not df_prices.empty and "ticker" in df_prices.columns:
         for cand in alias_candidates:
             bm = df_prices[df_prices["ticker"] == cand].copy()
-            if not bm.empty:
-                bm["p_date_str"] = bm["price_date"].astype(str).str[:10]
-                bm = bm.set_index("p_date_str")["close"].sort_index()
+            if not bm.empty and len(bm) > 5:
+                bm["dt"] = pd.to_datetime(bm["price_date"])
+                bm = bm.set_index("dt")["close"].sort_index()
                 bm = bm[~bm.index.duplicated(keep='first')]
-                bm_ret = bm.pct_change().fillna(0.0)
-                bm_ret.name = ticker
-                return bm_ret.reindex(p_idx).fillna(0.0)
+                bm_ret = bm.pct_change().dropna()
+                bm_reindexed = bm_ret.reindex(dt_port_idx).ffill().fillna(0.0)
+                bm_reindexed.index = portfolio_index
+                bm_reindexed.name = ticker
+                return bm_reindexed
 
     # 2. Download reale da Yahoo Finance via caching
-    start_dt = str(p_idx.min())[:10]
-    end_dt = str(p_idx.max())[:10]
+    start_dt = str(dt_port_idx.min())[:10]
+    end_dt = str(dt_port_idx.max())[:10]
     try:
         from datetime import datetime, timedelta
         st_obj = datetime.strptime(start_dt, "%Y-%m-%d") - timedelta(days=7)
         ed_obj = datetime.strptime(end_dt, "%Y-%m-%d") + timedelta(days=2)
         real_ret = fetch_cached_benchmark_returns(ticker, st_obj.strftime("%Y-%m-%d"), ed_obj.strftime("%Y-%m-%d"))
         if not real_ret.empty and len(real_ret) >= 5:
-            return real_ret.reindex(p_idx).ffill().fillna(0.0)
+            real_ret_dt = real_ret.copy()
+            real_ret_dt.index = pd.to_datetime(real_ret_dt.index)
+            real_reindexed = real_ret_dt.reindex(dt_port_idx).ffill().fillna(0.0)
+            real_reindexed.index = portfolio_index
+            real_reindexed.name = ticker
+            return real_reindexed
     except Exception:
         pass
 
