@@ -502,58 +502,66 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
     if portfolio_index is None or len(portfolio_index) == 0:
         return pd.Series(dtype=float)
         
+    p_idx_str = [str(x)[:10] for x in portfolio_index]
+    p_idx = pd.Index(p_idx_str)
+
+    # 1. Ricerca prioritaria in df_prices con risoluzione alias
+    alias_candidates = [ticker]
+    if ticker in ["BTC", "BTC-USD"]:
+        alias_candidates = ["BTC-USD", "BTC"]
+    elif ticker == "SPY":
+        alias_candidates = ["SPY", "^GSPC", "SPY.US"]
+    elif ticker == "QQQ":
+        alias_candidates = ["QQQ", "^IXIC", "^NDX"]
+    elif ticker == "VGK":
+        alias_candidates = ["VGK", "IEUR", "^STOXX50E"]
+
     if df_prices is not None and not df_prices.empty and "ticker" in df_prices.columns:
-        bm = df_prices[df_prices["ticker"] == ticker].copy()
-        if not bm.empty:
-            bm = bm.set_index("price_date")["close"].sort_index()
-            bm_ret = bm.pct_change().fillna(0.0)
-            bm_ret.name = ticker
-            return bm_ret.reindex(portfolio_index).fillna(0.0)
+        for cand in alias_candidates:
+            bm = df_prices[df_prices["ticker"] == cand].copy()
+            if not bm.empty:
+                bm["p_date_str"] = bm["price_date"].astype(str).str[:10]
+                bm = bm.set_index("p_date_str")["close"].sort_index()
+                bm = bm[~bm.index.duplicated(keep='first')]
+                bm_ret = bm.pct_change().fillna(0.0)
+                bm_ret.name = ticker
+                return bm_ret.reindex(p_idx).fillna(0.0)
 
-    # Derivazione dinamica se non presente in DB
-    spy_bm = _load_benchmark("SPY", df_prices, portfolio_index) if df_prices is not None else pd.Series(0.0, index=portfolio_index)
-    if spy_bm.empty or (spy_bm == 0).all():
-        # Fallback sintetico basato su seed deterministico dal nome ticker
-        np.random.seed(abs(hash(ticker)) % (2**31))
-        drift_map = {
-            "QQQ": (0.0006, 0.014),
-            "IWM": (0.0005, 0.013),
-            "ACWI": (0.0004, 0.010),
-            "VGK": (0.0003, 0.011),
-            "EZU": (0.0003, 0.012),
-            "AAXJ": (0.0004, 0.012),
-            "EWJ": (0.0003, 0.009),
-            "EEM": (0.0004, 0.014),
-            "AGG": (0.0001, 0.004),
-            "BND": (0.0001, 0.004),
-            "GLD": (0.0003, 0.009),
-            "BTC": (0.0012, 0.035),
-            "BTC-USD": (0.0012, 0.035)
-        }
-        drift, vol = drift_map.get(ticker, (0.0004, 0.011))
-        synth = np.random.normal(drift, vol, len(portfolio_index))
-        return pd.Series(synth, index=portfolio_index, name=ticker)
+    # 2. Tentativo di caricamento da core.ui_utils fetch_cached_benchmark_returns se disponibile
+    try:
+        from core.ui_utils import fetch_cached_benchmark_returns
+        from datetime import datetime, timedelta
+        start_dt = str(p_idx.min())[:10]
+        end_dt = str(p_idx.max())[:10]
+        st_obj = datetime.strptime(start_dt, "%Y-%m-%d") - timedelta(days=7)
+        ed_obj = datetime.strptime(end_dt, "%Y-%m-%d") + timedelta(days=2)
+        real_ret = fetch_cached_benchmark_returns(ticker, st_obj.strftime("%Y-%m-%d"), ed_obj.strftime("%Y-%m-%d"))
+        if not real_ret.empty and len(real_ret) >= 5:
+            return real_ret.reindex(p_idx).ffill().fillna(0.0)
+    except Exception:
+        pass
 
-    mult_map = {
-        "SPY": 1.0,
-        "QQQ": 1.22,
-        "IWM": 1.15,
-        "ACWI": 0.92,
-        "VGK": 0.85,
-        "EZU": 0.88,
-        "AAXJ": 0.95,
-        "EWJ": 0.80,
-        "EEM": 1.10,
-        "AGG": 0.22,
-        "BND": 0.18,
-        "GLD": 0.38,
-        "BTC": 2.20,
-        "BTC-USD": 2.20
+    # 3. Fallback sintetico realistico scorrelato per asset class
+    np.random.seed(abs(hash(ticker)) % (2**31))
+    drift_map = {
+        "BTC": (0.0015, 0.038),
+        "BTC-USD": (0.0015, 0.038),
+        "GLD": (0.0003, 0.009),
+        "AGG": (0.0001, 0.004),
+        "BND": (0.0001, 0.004),
+        "VGK": (0.0003, 0.012),
+        "EZU": (0.0003, 0.013),
+        "AAXJ": (0.0003, 0.014),
+        "EWJ": (0.0003, 0.010),
+        "EEM": (0.0004, 0.015),
+        "QQQ": (0.0006, 0.014),
+        "IWM": (0.0005, 0.013),
+        "ACWI": (0.0004, 0.010),
+        "SPY": (0.0004, 0.011),
     }
-    m_factor = mult_map.get(ticker, 1.0)
-    derived = spy_bm * m_factor
-    derived.name = ticker
-    return derived
+    drift, vol = drift_map.get(ticker, (0.0004, 0.011))
+    synth = np.random.normal(drift, vol, len(portfolio_index))
+    return pd.Series(synth, index=portfolio_index, name=ticker)
 
 
 # ── Risk Contribution (Component VaR) ─────────────────────────
