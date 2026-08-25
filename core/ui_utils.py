@@ -3573,9 +3573,18 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
                     thickness=12
                 )
             )
-            fig.update_traces(
-                hovertemplate="<b>%{label}</b><br>Controvalore: €%{value:,.2f}<br>Rendimento: %{color:.2f}%<extra></extra>"
-            )
+            if hasattr(fig.data[0], "marker") and getattr(fig.data[0].marker, "colors", None) is not None:
+                colors_arr = np.asarray(fig.data[0].marker.colors, dtype=float)
+                fig.data[0].customdata = np.column_stack([
+                    [f"{c:+.2f}%" if not np.isnan(c) else "0.00%" for c in colors_arr]
+                ])
+                fig.update_traces(
+                    hovertemplate="<b>%{label}</b><br>Controvalore: €%{value:,.2f}<br>Rendimento: %{customdata[0]}<extra></extra>"
+                )
+            else:
+                fig.update_traces(
+                    hovertemplate="<b>%{label}</b><br>Controvalore: €%{value:,.2f}<extra></extra>"
+                )
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Nessuna posizione con controvalore positivo per la rappresentazione grafica.")
