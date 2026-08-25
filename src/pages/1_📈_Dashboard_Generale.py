@@ -427,13 +427,13 @@ with c_bm:
     selected_bms = st.multiselect(
         "Benchmark Attivi",
         options=bm_options,
-        default=[bm_options[def_idx]],
+        default=bm_options,
         key="multi_bm_selector_p1",
         placeholder="Aggiungi Benchmark...",
         label_visibility="collapsed"
     )
     if not selected_bms:
-        selected_bms = [bm_options[def_idx]]
+        selected_bms = bm_options
 
 with c_view:
     chart_view_mode = st.selectbox(
