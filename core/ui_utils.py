@@ -2650,8 +2650,15 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
     mult_map = {
         "SPY": 1.0,
         "QQQ": 1.25,
+        "IWM": 1.15,
         "ACWI": 0.90,
+        "VGK": 0.85,
+        "EZU": 0.88,
+        "AAXJ": 0.95,
+        "EWJ": 0.80,
+        "EEM": 1.10,
         "AGG": 0.20,
+        "BND": 0.18,
         "GLD": 0.35,
         "BTC": 2.10,
         "BTC-USD": 2.10
