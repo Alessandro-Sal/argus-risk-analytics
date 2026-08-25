@@ -446,6 +446,9 @@ else:
 
     curr_idx = tech_keys.index(st.session_state["tech_active_subtab"])
 
+    # Spaziatura e Respiro Layout
+    st.markdown("<div style='margin-top: 24px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+
     # Barra Selettore Compatta Bloomberg Style
     c_sel_t, c_prev_t, c_next_t = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
 
@@ -475,9 +478,9 @@ else:
     tab_tech = st.session_state["tech_active_subtab"]
     active_tech_info = TECHNICAL_MODELS_CATALOG[tab_tech]
 
-    # Bloomberg Terminal Header Banner per il Modulo Attivo
+    # Bloomberg Terminal Header Banner per il Modulo Attivo con Spaziatura Ottimizzata
     st.markdown(f"""
-    <div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_tech_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+    <div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_tech_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
         <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
           {active_tech_info['title']}
