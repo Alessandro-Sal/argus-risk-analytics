@@ -766,7 +766,7 @@ scorecard_rows.append({
     "Volatilità Annua %": p_vol,
     "Sharpe Ratio": p_sharpe,
     "Max Drawdown %": p_dd,
-    "Alpha vs Portafoglio %": 0.0,
+    "Alpha (Δ Rendimento %)": 0.0,
     "Esito Alpha": "⚪ Base di Riferimento"
 })
 
