@@ -257,20 +257,26 @@ with col5:
         help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Quantifica la peggior flessione percentuale registrata dal portafoglio tra un massimo storico relativo (<i>Peak / High-Water Mark</i>) e il minimo successivo (<i>Trough</i>), prima di un nuovo picco.</div>
 
-<div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
-<div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
-  <b>Drawdown<sub>t</sub></b> = <span style="display:inline-block; vertical-align:middle; text-align:center; margin: 0 4px;"><span style="display:block; border-bottom:1px solid #ffb74d; padding-bottom:1px;">Valore<sub>t</sub> &minus; Max(Valore)</span><span style="display:block; padding-top:1px;">Max(Valore)</span></span>
-</div>
+<div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0 8px 0; color: #ffb74d;">
+  <b>💡 Perché non è la semplice differenza sull'asse Y?</b><br>
+  Il Drawdown misura la <b>perdita percentuale del capitale dal picco</b>, non la sottrazione di punti percentuali.<br>
+  <i>Esempio reale su 10.000 €:</i><br>
+  • Il portafoglio sale a <b>+98.4%</b> valendo <b>19.840 €</b> (High-Water Mark).<br>
+  • Poi scende al <b>+20.6%</b> valendo <b>12.060 €</b>.<br>
+  • Sull'asse Y la linea scende di 77.8 p.p., ma la perdita reale dal picco è: <br>
+  <code style="color:#ffb74d;">(12.060 € &minus; 19.840 €) / 19.840 € = &minus;39.21%</code>
 </div>
 
-<div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> È la misura principe del <b>rischio di capitale e di coda</b> (<i>Tail Risk</i>). Risponde alla domanda: 'Se avessi investito nel momento peggiore, quanto capitale avrei visto evaporare prima del recupero?'.</div>
-
-<div style="margin-bottom: 8px;"><b>⚙️ Come viene calcolato dall'applicazione:</b> ARGUS estrae i massimi storici progressivi (<i>High-Water Mark</i>) e misura la flessione percentuale massima registrata su tutto l'orizzonte.</div>
+<div style="margin-bottom: 8px;"><b>📐 Formula Ufficiale (GIPS / CFA):</b>
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 5px 10px; border-radius: 6px; margin: 4px 0; text-align: center;">
+  <b>Drawdown<sub>t</sub></b> = (Valore<sub>t</sub> &minus; HighWaterMark<sub>t</sub>) / HighWaterMark<sub>t</sub>
+</div>
+</div>
 
 <div><b>🔍 Come leggerlo:</b><br>
 • <b>0% a -10%:</b> Profilo a basso rischio / difensivo.<br>
 • <b>-10% a -25%:</b> Profilo bilanciato / azionario moderato.<br>
-• <b>< -30%:</b> Profilo ad elevata volatilità o concentrato in asset rischiosi.
+• <b>< -30%:</b> Profilo ad elevata volatilità o concentrato in asset azionari/crypto.
 </div>
 </div>"""
     )
@@ -307,7 +313,7 @@ df_prices_ref = results.get("df_prices", pd.DataFrame())
 # Header Ultra-Spazioso e Istituzionale (2-Row Layout)
 st.markdown("### 📈 Rendimento cumulato vs benchmark")
 
-c_bm, c_sel = st.columns([3.2, 1.0])
+c_bm, c_view, c_sel = st.columns([2.4, 1.4, 1.0])
 
 primary_bm = mk.get('benchmark_ticker', 'SPY')
 bm_options = ["SPY (S&P 500)", "QQQ (Nasdaq 100)", "ACWI (MSCI World)", "AGG (US Bonds)", "GLD (Gold)", "BTC (Bitcoin)"]
@@ -328,6 +334,15 @@ with c_bm:
     )
     if not selected_bms:
         selected_bms = [bm_options[def_idx]]
+
+with c_view:
+    chart_view_mode = st.selectbox(
+        "Modalità Grafico",
+        options=["📈 Rendimento Cumulato %", "📉 Curva di Drawdown (Underwater %)"],
+        index=0,
+        key="chart_view_mode_p1",
+        label_visibility="collapsed"
+    )
 
 with c_sel:
     horizon_options = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "10Y", "20Y", "TUTTO"]
@@ -365,12 +380,6 @@ elif selected_horizon == "YTD":
 else:
     sr_p_sub = sr_port.copy()
 
-# Ricalcolo rendimento cumulato Portafoglio (base 0%)
-cum_port = ((1 + sr_p_sub).cumprod() - 1) * 100
-date_x = pd.to_datetime(cum_port.index)
-
-fig = go.Figure()
-
 # Palette colori istituzionale per i benchmark
 bm_colors = {
     "SPY": "#58a6ff",       # Blu Chiaro
@@ -381,83 +390,177 @@ bm_colors = {
     "BTC": "#f0883e"        # Arancio Cripto
 }
 
-# Plot dei Benchmark selezionati dall'utente
-for bm_str in selected_bms:
-    bm_code = bm_str.split(" ")[0]
-    sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
-    sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
-    cum_bm_i = ((1 + sr_bm_sub).cumprod() - 1) * 100
-    spread_i = cum_port - cum_bm_i
+fig = go.Figure()
 
-    b_color = bm_colors.get(bm_code, "#8fa0ba")
+if "Drawdown" in chart_view_mode:
+    # ── MODALITÀ UNDERWATER PLOT (CURVA DI DRAWDOWN) ──
+    cum_p_raw = (1 + sr_p_sub).cumprod()
+    roll_max_p = cum_p_raw.cummax()
+    dd_port = ((cum_p_raw - roll_max_p) / roll_max_p) * 100.0
+    date_x = pd.to_datetime(dd_port.index)
 
-    customdata_bm = np.column_stack([
-        [f"{v:+.2f}%" for v in cum_port.values],
-        [f"{v:+.2f}%" for v in spread_i.values],
-        [f"{v:+.2f}%" for v in cum_bm_i.values]
+    # Benchmark Underwater curves
+    for bm_str in selected_bms:
+        bm_code = bm_str.split(" ")[0]
+        sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
+        sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
+        cum_bm_raw = (1 + sr_bm_sub).cumprod()
+        roll_max_bm = cum_bm_raw.cummax()
+        dd_bm_i = ((cum_bm_raw - roll_max_bm) / roll_max_bm) * 100.0
+        b_color = bm_colors.get(bm_code, "#8fa0ba")
+
+        fig.add_trace(go.Scatter(
+            x=date_x, y=dd_bm_i.values,
+            name=f"Drawdown {bm_code}",
+            line=dict(color=b_color, width=1.5, dash="dash"),
+            hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📉 Drawdown {bm_code}: %{{y:.2f}}%<extra></extra>"
+        ))
+
+    # Portafoglio Underwater Area
+    fig.add_trace(go.Scatter(
+        x=date_x, y=dd_port.values,
+        name="Drawdown Portafoglio ARGUS",
+        fill="tozeroy",
+        fillcolor="rgba(248, 81, 73, 0.12)",
+        line=dict(color="#f85149", width=2.6),
+        hovertemplate="<b>Data: %{x|%d %b %Y}</b><br>🔴 Drawdown Portafoglio: %{y:.2f}%<extra></extra>"
+    ))
+
+    # Annotazione Max Drawdown nel punto di minimo esatto
+    if not dd_port.empty:
+        min_dd_idx = dd_port.idxmin()
+        min_dd_val = dd_port.min()
+        fig.add_annotation(
+            x=pd.to_datetime(min_dd_idx), y=min_dd_val,
+            text=f"📉 Max Drawdown: {min_dd_val:.2f}%",
+            showarrow=True, arrowhead=2, arrowcolor="#f85149",
+            ax=0, ay=35,
+            font=dict(size=11, color="#f85149"),
+            bgcolor="rgba(22, 27, 34, 0.90)", bordercolor="#f85149", borderwidth=1
+        )
+
+    fig.update_layout(
+        xaxis_title=None,
+        height=480,
+        legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
+        yaxis=dict(
+            type="linear",
+            title="Drawdown dal Massimo (%)",
+            ticksuffix="%",
+            range=[min(dd_port.min() * 1.15, -10.0), 2.0] if not dd_port.empty else [-50, 0],
+            gridcolor="rgba(255,255,255,0.06)"
+        ),
+        xaxis=dict(
+            type="date",
+            range=[date_x.min(), date_x.max()] if len(date_x) > 0 else None,
+            gridcolor="rgba(255,255,255,0.06)"
+        )
+    )
+
+else:
+    # ── MODALITÀ RENDIMENTO CUMULATO STANDARD ──
+    cum_port = ((1 + sr_p_sub).cumprod() - 1) * 100
+    date_x = pd.to_datetime(cum_port.index)
+
+    # Plot dei Benchmark selezionati dall'utente
+    for bm_str in selected_bms:
+        bm_code = bm_str.split(" ")[0]
+        sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
+        sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
+        cum_bm_i = ((1 + sr_bm_sub).cumprod() - 1) * 100
+        spread_i = cum_port - cum_bm_i
+        b_color = bm_colors.get(bm_code, "#8fa0ba")
+
+        customdata_bm = np.column_stack([
+            [f"{v:+.2f}%" for v in cum_port.values],
+            [f"{v:+.2f}%" for v in spread_i.values],
+            [f"{v:+.2f}%" for v in cum_bm_i.values]
+        ])
+
+        fig.add_trace(go.Scatter(
+            x=date_x, y=cum_bm_i.values,
+            name=f"Benchmark ({bm_str})",
+            line=dict(color=b_color, width=1.8, dash="dash"),
+            customdata=customdata_bm,
+            hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📊 Benchmark ({bm_code}): %{{customdata[2]}}<br>📈 Portafoglio: %{{customdata[0]}}<br>⚡ Outperformance vs {bm_code} (Δ): %{{customdata[1]}}<extra></extra>"
+        ))
+
+    # Trace Portafoglio ARGUS
+    primary_bm_code = selected_bms[0].split(" ")[0]
+    sr_bm_prim = load_benchmark_returns(primary_bm_code, df_prices_ref, sr_port.index)
+    sr_bm_prim_sub = sr_bm_prim.reindex(sr_p_sub.index).fillna(0.0)
+    cum_bm_prim = ((1 + sr_bm_prim_sub).cumprod() - 1) * 100
+    spread_prim = cum_port - cum_bm_prim
+
+    customdata_port = np.column_stack([
+        [f"{v:+.2f}%" for v in cum_bm_prim.values],
+        [f"{v:+.2f}%" for v in spread_prim.values],
+        [f"{v:+.2f}%" for v in cum_port.values]
     ])
 
     fig.add_trace(go.Scatter(
-        x=date_x, y=cum_bm_i.values,
-        name=f"Benchmark ({bm_str})",
-        line=dict(color=b_color, width=1.8, dash="dash"),
-        customdata=customdata_bm,
-        hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📊 Benchmark ({bm_code}): %{{customdata[2]}}<br>📈 Portafoglio: %{{customdata[0]}}<br>⚡ Outperformance vs {bm_code} (Δ): %{{customdata[1]}}<extra></extra>"
+        x=date_x, y=cum_port.values,
+        name="Portafoglio ARGUS",
+        fill="tozeroy",
+        fillcolor="rgba(255, 153, 0, 0.08)",
+        line=dict(color="#ff9900", width=2.8),
+        customdata=customdata_port,
+        hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📈 Portafoglio: %{{customdata[2]}}<br>📊 Benchmark ({primary_bm_code}): %{{customdata[0]}}<br>⚡ Outperformance vs {primary_bm_code} (Δ): %{{customdata[1]}}<extra></extra>"
     ))
 
-# Trace Portafoglio ARGUS (linea principale con riempimento sfumato)
-primary_bm_code = selected_bms[0].split(" ")[0]
-sr_bm_prim = load_benchmark_returns(primary_bm_code, df_prices_ref, sr_port.index)
-sr_bm_prim_sub = sr_bm_prim.reindex(sr_p_sub.index).fillna(0.0)
-cum_bm_prim = ((1 + sr_bm_prim_sub).cumprod() - 1) * 100
-spread_prim = cum_port - cum_bm_prim
+    # Indicatore del Picco Massimo (High-Water Mark)
+    if not cum_port.empty:
+        max_idx = cum_port.idxmax()
+        max_val = cum_port.max()
+        fig.add_annotation(
+            x=pd.to_datetime(max_idx), y=max_val,
+            text=f"🏆 Max: {max_val:+.1f}%",
+            showarrow=True, arrowhead=2, arrowcolor="#ff9900",
+            ax=0, ay=-30,
+            font=dict(size=11, color="#ff9900"),
+            bgcolor="rgba(22, 27, 34, 0.85)", bordercolor="#ff9900", borderwidth=1
+        )
 
-customdata_port = np.column_stack([
-    [f"{v:+.2f}%" for v in cum_bm_prim.values],
-    [f"{v:+.2f}%" for v in spread_prim.values],
-    [f"{v:+.2f}%" for v in cum_port.values]
-])
-
-fig.add_trace(go.Scatter(
-    x=date_x, y=cum_port.values,
-    name="Portafoglio ARGUS",
-    fill="tozeroy",
-    fillcolor="rgba(255, 153, 0, 0.08)",
-    line=dict(color="#ff9900", width=2.8),
-    customdata=customdata_port,
-    hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📈 Portafoglio: %{{customdata[2]}}<br>📊 Benchmark ({primary_bm_code}): %{{customdata[0]}}<br>⚡ Outperformance vs {primary_bm_code} (Δ): %{{customdata[1]}}<extra></extra>"
-))
-
-# Indicatore del Picco Massimo (High-Water Mark)
-if not cum_port.empty:
-    max_idx = cum_port.idxmax()
-    max_val = cum_port.max()
-    fig.add_annotation(
-        x=pd.to_datetime(max_idx), y=max_val,
-        text=f"🏆 Max: {max_val:+.1f}%",
-        showarrow=True, arrowhead=2, arrowcolor="#ff9900",
-        ax=0, ay=-30,
-        font=dict(size=11, color="#ff9900"),
-        bgcolor="rgba(22, 27, 34, 0.85)", bordercolor="#ff9900", borderwidth=1
+    fig.update_layout(
+        xaxis_title=None,
+        height=480,
+        legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
+        yaxis=dict(
+            type="linear",
+            title="Rendimento Cumulato %",
+            gridcolor="rgba(255,255,255,0.06)"
+        ),
+        xaxis=dict(
+            type="date",
+            range=[date_x.min(), date_x.max()] if len(date_x) > 0 else None,
+            gridcolor="rgba(255,255,255,0.06)"
+        )
     )
 
-fig.update_layout(
-    xaxis_title=None,
-    height=480,
-    legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5),
-    yaxis=dict(
-        type="linear",
-        title="Rendimento Cumulato %",
-        gridcolor="rgba(255,255,255,0.06)"
-    ),
-    xaxis=dict(
-        type="date",
-        range=[date_x.min(), date_x.max()] if len(date_x) > 0 else None,
-        gridcolor="rgba(255,255,255,0.06)"
-    )
-)
 apply_plotly_theme(fig)
 st.plotly_chart(fig, use_container_width=True)
+
+with st.expander("💡 Guida Rapida: Perché il Max Drawdown non coincide con la differenza sull'asse Y?", expanded=False):
+    st.markdown("""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 6px;">📌 Differenza tra 'Differenza in Punti Percentuali' e 'Drawdown Reale'</div>
+  <div>
+    Nel grafico di <b>Rendimento Cumulato</b> (asse Y indicizzato a base 0%), l'occhio tende a misurare la distanza verticale sottraendo i valori (es. un calo dal <code>+98.4%</code> al <code>+20.6%</code> sembra una caduta di <code>77.8%</code>).
+    Tuttavia, il <b>Max Drawdown</b> misura la <b>perdita percentuale di ricchezza subita rispetto al picco massimo (High-Water Mark)</b>:
+  </div>
+  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 8px 12px; border-radius: 6px; margin: 8px 0; color: #ffb74d;">
+    <b>Esempio con Capitale di 10.000 €:</b><br>
+    1. Al picco (<code>+98.4%</code>), il portafoglio vale <b>19.840 €</b> (High-Water Mark).<br>
+    2. Al minimo successivo (<code>+20.6%</code>), il portafoglio vale <b>12.060 €</b>.<br>
+    3. Il capitale perso è <code>12.060 € &minus; 19.840 € = &minus;7.780 €</code>.<br>
+    4. <b>Max Drawdown = &minus;7.780 € / 19.840 € = &minus;39.21%</b>.<br>
+    Hai perso il <b>39.2% del patrimonio massimo raggiunto</b>, non il 77%!
+  </div>
+  <div>
+    💡 <i>Suggerimento:</i> Seleziona la vista <b>'📉 Curva di Drawdown (Underwater %)'</b> dal menu a tendina sopra il grafico per visualizzare la profondità reale di ogni flessione rispetto al pelo dell'acqua (0%).
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── SCORECARD COMPARATIVA MULTI-BENCHMARK (FEATURE 5) ─────────────
 if selected_bms:
