@@ -1310,12 +1310,18 @@ if not pos.empty:
             "ticker": "Asset"
         }
     )
+    if hasattr(fig_sunburst.data[0], "marker") and getattr(fig_sunburst.data[0].marker, "colors", None) is not None:
+        colors_arr = np.asarray(fig_sunburst.data[0].marker.colors, dtype=float)
+        fig_sunburst.data[0].customdata = np.column_stack([
+            [f"{c:+.2f}%" if not np.isnan(c) else "0.00%" for c in colors_arr]
+        ])
+
     fig_sunburst.update_traces(
         textinfo="label+percent root",
         insidetextorientation="horizontal",
         leaf_opacity=0.92,
         marker=dict(line=dict(color="#0d1117", width=1.5)),
-        hovertemplate="<b>%{label}</b><br>💰 Controvalore: € %{value:,.2f}<br>📊 Quota Portafoglio: %{percentRoot:.1%}<br>📈 PnL Latente: %{color:+.2f}%<extra></extra>"
+        hovertemplate="<b>%{label}</b><br>💰 Controvalore: € %{value:,.2f}<br>📊 Quota Portafoglio: %{percentRoot:.1%}<br>📈 PnL Latente: %{customdata[0]}<extra></extra>"
     )
     fig_sunburst.update_layout(
         template="plotly_dark",
