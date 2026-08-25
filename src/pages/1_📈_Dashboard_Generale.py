@@ -76,29 +76,124 @@ rf_rate_pct = float(rf_info.get("rate_pct", active_rf_resolved["rate_pct"]))
 rf_source = rf_info.get("source", active_rf_resolved["source"])
 rf_currency = rf_info.get("currency", active_rf_resolved["currency"])
 
-col_callout, col_rf_btn = st.columns([4.4, 1.2], vertical_alignment="center")
-with col_callout:
-    st.markdown(f"""
-    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 4px solid #ff9900; border-radius: 8px; padding: 12px 16px; margin-bottom: 0px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-            <span style="font-weight: 700; font-size: 14.5px; color: #ff9900;">⚡ Sintesi Esecutiva Quantitativa | Status Portafoglio</span>
-            <span style="font-size: 11px; background: rgba(255,153,0,0.15); color: #ff9900; padding: 2px 8px; border-radius: 12px; font-weight: 700;">
-                🏛️ Risk-Free {rf_currency}: {rf_rate_pct:.2f}%
-            </span>
-        </div>
-        <div style="font-size: 13px; color: #c9d1d9; line-height: 1.45;">
-            Portafoglio attivo con controvalore totale di <b>€ {port_val:,.2f}</b>. 
-            Conformità del <b>{comp_score:.1f}%</b> sui 6 limiti di rischio regolamentari. 
-            Sharpe Ratio a <b>{sharpe_val:.2f}</b> (hurdle rate Rf: <b>{rf_rate_pct:.2f}%</b>) con rendimento annuo (CAGR) del <b>{cagr_val:.2f}%</b> e VaR 95% al <b>{var_val:.2f}%</b>.
+import uuid
+import re
+from core.ui_utils import format_institutional_5point_html
+
+rf_modal_id = str(uuid.uuid4())[:8]
+rf_modal_content = format_institutional_5point_html(
+    title=f"🏛️ Tasso Privo di Rischio (Risk-Free Rate Rf) — {rf_currency}: {rf_rate_pct:.2f}%",
+    what_is=f"Il rendimento teorico di un investimento monetario a rischio di credito e di liquidità nullo su orizzonte a breve termine (1-3 mesi). In ARGUS è attualmente pari a <b>{rf_rate_pct:.2f}%</b> (Fonte: <i>{rf_source}</i>) per la valuta base <b>{rf_currency}</b>.",
+    how_calc="• EUR: BCE €STR (Euro Short-Term Rate) / Bund 3M (XEON.DE)<br>• USD: US 3M Treasury Bill (^IRX) / SOFR<br>• GBP: Bank of England SONIA (CSH2.L)<br>• CHF: SNB SARON Swiss Overnight Rate",
+    why_useful="Fornisce l'hurdle rate (costo opportunità del capitale) per determinare se la volatilità di un asset o portafoglio è adeguatamente remunerata rispetto al parcheggio monetario.",
+    argus_calc="Recupero live dalle banche centrali (BCE, Federal Reserve via Yahoo Finance ^IRX / XEON.DE) con caching orario e conversione algebrica su base giornaliera r_daily = (1 + Rf)^(1/252) - 1.",
+    how_to_read="• 🟢 Rendimento Portafoglio > Rf (Creazione reale di ricchezza)<br>• 🟡 Rendimento ≈ Rf (Rendimento assorbito dal tasso monetario)<br>• 🔴 Rendimento < Rf (Distruzione di valore economico rispetto a titoli di stato a brevissimo termine)."
+)
+
+cleaned_rf = re.sub(r'<!--.*?-->', '', rf_modal_content, flags=re.DOTALL)
+cleaned_rf = re.sub(r'>\s+<', '><', cleaned_rf)
+cleaned_rf = re.sub(r'\s*\n\s*', ' ', cleaned_rf)
+safe_rf_content = cleaned_rf.strip()
+
+st.markdown(f"""
+<style>
+#modal-toggle-{rf_modal_id} {{ display: none; }}
+.modal-overlay-{rf_modal_id} {{
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 999999;
+    align-items: center;
+    justify-content: center;
+}}
+#modal-toggle-{rf_modal_id}:checked ~ .modal-overlay-{rf_modal_id} {{
+    display: flex;
+}}
+.modal-backdrop-{rf_modal_id} {{
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(10, 14, 20, 0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    cursor: pointer;
+    z-index: 1;
+}}
+.modal-content-{rf_modal_id} {{
+    background: #161b22;
+    border: 1px solid rgba(255, 153, 0, 0.4);
+    padding: 24px 28px;
+    border-radius: 16px;
+    width: 92%;
+    max-width: 720px;
+    max-height: 85vh;
+    overflow-y: auto;
+    color: #e6edf3;
+    position: relative;
+    z-index: 2;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.9), 0 0 30px rgba(255, 153, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    text-align: left;
+    animation: modalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}}
+.modal-close-{rf_modal_id} {{
+    position: absolute;
+    top: 16px;
+    right: 18px;
+    font-size: 24px;
+    color: #8b949e;
+    cursor: pointer;
+    line-height: 1;
+    transition: color 0.2s ease;
+}}
+.modal-close-{rf_modal_id}:hover {{ color: #ffffff; }}
+.rf-badge-btn-{rf_modal_id} {{
+    font-size: 11.5px;
+    background: rgba(255,153,0,0.15);
+    border: 1px solid rgba(255,153,0,0.4);
+    color: #ff9900;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+    user-select: none;
+}}
+.rf-badge-btn-{rf_modal_id}:hover {{
+    background: rgba(255,153,0,0.28);
+    border-color: #ff9900;
+    box-shadow: 0 0 12px rgba(255,153,0,0.35);
+    transform: translateY(-1px);
+}}
+</style>
+<div style="background: rgba(22, 27, 34, 0.75); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 4px solid #ff9900; border-radius: 10px; padding: 14px 18px; margin-bottom: 14px; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 6px;">
+        <span style="font-weight: 700; font-size: 14.5px; color: #ff9900;">⚡ Sintesi Esecutiva Quantitativa | Status Portafoglio</span>
+        <label for="modal-toggle-{rf_modal_id}" class="rf-badge-btn-{rf_modal_id}" title="Clicca per aprire la Guida Metodologica al Tasso Risk-Free">
+            <span>🏛️ Risk-Free {rf_currency}: {rf_rate_pct:.2f}%</span>
+            <span style="font-size: 11px; background: rgba(255,153,0,0.25); border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;">ℹ️</span>
+        </label>
+    </div>
+    <input type="checkbox" id="modal-toggle-{rf_modal_id}">
+    <div class="modal-overlay-{rf_modal_id}">
+        <label for="modal-toggle-{rf_modal_id}" class="modal-backdrop-{rf_modal_id}"></label>
+        <div class="modal-content-{rf_modal_id}">
+            <label for="modal-toggle-{rf_modal_id}" class="modal-close-{rf_modal_id}">&times;</label>
+            <div style="font-size: 18px; font-weight: 700; color: #ff9900; margin-bottom: 16px; border-bottom: 1px solid rgba(255, 153, 0, 0.2); padding-bottom: 8px;">
+                🏛️ Metodologia Tasso Risk-Free ({rf_currency}: {rf_rate_pct:.2f}%)
+            </div>
+            <div>{safe_rf_content}</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
-
-with col_rf_btn:
-    from core.ui_utils import render_risk_free_modal
-    render_risk_free_modal(currency=rf_currency, use_popover=False, button_label="ℹ️ Guida Tasso Risk-Free", risk_free_info=rf_info)
-
-st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+    <div style="font-size: 13.5px; color: #c9d1d9; line-height: 1.5;">
+        Portafoglio attivo con controvalore totale di <b>€ {port_val:,.2f}</b>. 
+        Conformità del <b>{comp_score:.1f}%</b> sui 6 limiti di rischio regolamentari. 
+        Sharpe Ratio a <b>{sharpe_val:.2f}</b> (hurdle rate Rf: <b>{rf_rate_pct:.2f}%</b>) con rendimento annuo (CAGR) del <b>{cagr_val:.2f}%</b> e VaR 95% al <b>{var_val:.2f}%</b>.
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("#### 💼 Riepilogo Portafoglio")
 col1, col2, col3 = st.columns(3)
