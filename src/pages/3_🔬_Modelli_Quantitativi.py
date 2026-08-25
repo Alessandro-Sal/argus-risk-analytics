@@ -660,6 +660,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 if st.button("🧹 Azzera (0)", key="btn_pre_zero", use_container_width=True, help="Azzera tutto"):
                     apply_target_strategy_weights({t: 0.0 for t in tickers_in_opt})
 
+            st.divider()
+
             sim_weights = {}
             sim_qtys = {}
             sim_vals = {}
@@ -893,6 +895,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
 
                 w_color = "#4ade80" if abs(tot_raw_w - 100.0) < 0.1 else "#facc15"
                 st.caption(f"Somma Pesi Assegnati: <b style='color:{w_color};'>{tot_raw_w:.1f}%</b> {'(Normalizzati automaticamente a 100%)' if abs(tot_raw_w - 100.0) >= 0.1 else '✅'}", unsafe_allow_html=True)
+
+            st.divider()
 
             df_ret_sim = results.get("returns", pd.DataFrame())
             if df_ret_sim.empty or not all(t in df_ret_sim.columns for t in tickers_in_opt):
