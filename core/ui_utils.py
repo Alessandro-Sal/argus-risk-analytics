@@ -1942,7 +1942,7 @@ def format_institutional_5point_html(
     <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 8px;">{title}</div>
     <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> {what_is}</div>
     <div style="margin-bottom: 8px;"><b>📐 Come si calcola:</b>
-      <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-family: monospace; font-size: 12.5px;">
+      <div style="background: rgba(255,153,0,0.06); border: 1px solid rgba(255,153,0,0.20); border-left: 3px solid #ff9900; padding: 8px 12px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 13px; line-height: 1.6;">
         {how_calc}
       </div>
     </div>
@@ -1958,7 +1958,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "rendimento_atteso": {
         "title": "📈 Rendimento Atteso (Expected Return / CAGR)",
         "what_is": "Tasso di rendimento composto annuo atteso o storico generato dal portafoglio di investimenti.",
-        "how_calc": "CAGR = (V_finale / V_iniziale)^(252 / N) - 1 &nbsp;|&nbsp; μ_port = w^T * μ",
+        "how_calc": "<b>CAGR</b> = (V<sub>finale</sub> / V<sub>iniziale</sub>)<sup>252 / N</sup> &minus; 1 &nbsp;|&nbsp; <b>&mu;<sub>port</sub></b> = <b>w</b><sup>T</sup> &mu;",
         "why_useful": "Misurare la capacità del portafoglio di incrementare il capitale nel tempo al netto delle fluttuazioni temporanee.",
         "argus_calc": "Calcolato sulle serie storiche dei prezzi rettificati (Adjusted Close) con base a 252 sedute lavorative o per combinazione lineare dei pesi simulati.",
         "how_to_read": "• 🟢 > Benchmark (Alpha positivo, sovraperformance gestionale)<br>• 🟡 In linea con l'indice di riferimento<br>• 🔴 < Benchmark o negativo (Erosione del capitale reale)."
@@ -1966,7 +1966,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "volatilita_annua": {
         "title": "⚡ Volatilità Annua (Annualized Standard Deviation)",
         "what_is": "Misura statistica della dispersione dei rendimenti del portafoglio attorno alla loro media (rischio totale di mercato).",
-        "how_calc": "σ_annua = σ_daily * √252 = √(w^T * Σ * w) * √252",
+        "how_calc": "<b>&sigma;<sub>annua</sub></b> = &sigma;<sub>daily</sub> &times; &radic;252 = &radic;(<b>w</b><sup>T</sup> &Sigma; <b>w</b>) &times; &radic;252",
         "why_useful": "Quantificare l'incertezza e l'ampiezza delle oscillazioni di prezzo a cui è esposto il capitale nel corso di un anno solare.",
         "argus_calc": "Determinata tramite moltiplicazione quadratica della matrice di covarianza (de-noised con shrinkage Ledoit-Wolf) per il vettore dei pesi, annualizzata a 252 sedute.",
         "how_to_read": "• 🟢 < 12.0% (Profilo Prudente/Conservativo)<br>• 🟡 12.0% - 22.0% (Profilo Bilanciato Standard)<br>• 🔴 > 22.0% (Profilo Aggressivo ad elevata oscillazione)."
@@ -1974,7 +1974,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "var_95": {
         "title": "🛡️ Value at Risk (VaR 95% Giornaliero)",
         "what_is": "La massima perdita potenziale stimata su un orizzonte di 1 giorno con un livello di confidenza statistica del 95%.",
-        "how_calc": "VaR_95 = -(μ - 1.645 * σ) &nbsp;|&nbsp; Storico: 5° percentile della distribuzione dei rendimenti",
+        "how_calc": "<b>VaR<sub>95%</sub></b> = &minus;(&mu; &minus; 1.645 &times; &sigma;) &nbsp;|&nbsp; <i>Storico:</i> 5° percentile della distribuzione dei rendimenti",
         "why_useful": "Fissare un limite prudenziale di perdita massima in condizioni ordinarie di mercato per calibrare liquidità e margini.",
         "argus_calc": "Calcolato con doppio approccio integrato: Parametrico (Gaussiano/Cornish-Fisher con asimmetria e curtosi) e Storico empirico non parametrico su 252+ sedute.",
         "how_to_read": "• 🟢 < 1.50% (Rischio giornaliero contenuto)<br>• 🟡 1.50% - 2.50% (Esposizione nella media)<br>• 🔴 > 2.50% (Elevata vulnerabilità a shock giornalieri)."
@@ -1982,7 +1982,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "sharpe_ratio": {
         "title": "🎯 Sharpe Ratio (Rendimento / Rischio Totale)",
         "what_is": "Indice che misura l'extra-rendimento generato per ciascuna unità di rischio totale (volatilità) assunto oltre il tasso privo di rischio.",
-        "how_calc": "Sharpe = (R_p - R_f) / σ_p",
+        "how_calc": "<b>Sharpe</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>p</sub>",
         "why_useful": "Distinguere la reale abilità allocativa del gestore da rendimenti ottenuti assumendo una volatilità eccessiva e non sostenibile.",
         "argus_calc": "Utilizza il tasso Risk-Free live armonizzato per valuta (BCE €STR per EUR, Fed ^IRX per USD) e annualizza i rendimenti a 252 giorni.",
         "how_to_read": "• 🟢 > 1.20 (Eccellente efficienza rischio/rendimento)<br>• 🟡 0.70 - 1.20 (Buono / Accettabile)<br>• 🔴 < 0.70 (Inefficiente, remunerazione insufficiente per il rischio corso)."
@@ -1990,7 +1990,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "sortino_ratio": {
         "title": "🛡️ Sortino Ratio (Rendimento / Downside Risk)",
         "what_is": "Variante dello Sharpe Ratio che penalizza unicamente la volatilità negativa di ribasso (Downside Deviation), ignorando la volatilità positiva.",
-        "how_calc": "Sortino = (R_p - R_f) / σ_downside, &nbsp; σ_downside = √[ (1/N) * Σ min(0, R_t - R_f)^2 * 252 ]",
+        "how_calc": "<b>Sortino</b> = (R<sub>p</sub> &minus; R<sub>f</sub>) / &sigma;<sub>downside</sub> &nbsp;|&nbsp; <b>&sigma;<sub>downside</sub></b> = &radic;[ (1/N) &sum; min(0, R<sub>t</sub> &minus; R<sub>f</sub>)<sup>2</sup> &times; 252 ]",
         "why_useful": "Valutare strategie asimmetriche e opzioni dove la volatilità positiva è desiderabile e solo le perdite costituiscono rischio.",
         "argus_calc": "Calcolato estraendo i rendimenti inferiori al target MAR (Minimum Acceptable Return = Tasso Risk-Free live).",
         "how_to_read": "• 🟢 > 1.50 (Ottima asimmetria e protezione dai ribassi)<br>• 🟡 0.80 - 1.50 (Sufficiente)<br>• 🔴 < 0.80 (Elevata frequenza o entità di rendimenti negativi)."
@@ -1998,7 +1998,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "max_drawdown": {
         "title": "📉 Massimo Drawdown Storico (Max Drawdown)",
         "what_is": "La massima perdita percentuale registrata dal picco di valore più elevato fino al punto di minimo successivo.",
-        "how_calc": "MDD = min_t [ (V_t - max_{s ≤ t} V_s) / max_{s ≤ t} V_s ]",
+        "how_calc": "<b>MDD</b> = min<sub>t</sub> [ (V<sub>t</sub> &minus; HWM<sub>t</sub>) / HWM<sub>t</sub> ]<br><span style='font-size:11.5px; color:#8b949e;'>dove <b>HWM<sub>t</sub></b> = max<sub>s &le; t</sub> V<sub>s</sub> è il picco massimo storico progressivo (High-Water Mark)</span>",
         "why_useful": "Quantificare il peggior calo storico subito dal portafoglio e testare la resilienza psicologica e finanziaria dell'investitore.",
         "argus_calc": "Tracciato punto a punto sulla serie storica cumulata dell'equity value, registrando picco, valle e durata del recupero (Recovery Time).",
         "how_to_read": "• 🟢 < 12.0% (Capitale molto protetto e resiliente)<br>• 🟡 12.0% - 25.0% (Correzione fisiologica di mercato)<br>• 🔴 > 25.0% (Rischio di prolungata distruzione di valore)."
@@ -2006,7 +2006,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "beta": {
         "title": "🏛️ Beta di Mercato (Market Sensitivity)",
         "what_is": "Misura della sensibilità del rendimento del portafoglio rispetto alle variazioni dell'indice di riferimento (rischio sistematico).",
-        "how_calc": "β = Cov(R_p, R_m) / Var(R_m)",
+        "how_calc": "<b>&beta;</b> = Cov(R<sub>p</sub>, R<sub>m</sub>) / Var(R<sub>m</sub>)",
         "why_useful": "Stabilire se il portafoglio amplifica o attenua i movimenti del mercato complessivo.",
         "argus_calc": "Regressione OLS dei rendimenti giornalieri del portafoglio contro il benchmark principale selezionato (SPY, QQQ, ACWI).",
         "how_to_read": "• 🟢 β < 0.80 (Difensivo / Bassa correlazione al mercato)<br>• 🟡 β ≈ 1.00 (In linea col mercato)<br>• 🔴 β > 1.20 (Aggressivo, amplifica fortemente i ribassi di mercato)."
@@ -2014,7 +2014,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "alpha": {
         "title": "🏆 Alpha di Jensen (Extra-Rendimento Gestionale)",
         "what_is": "L'extra-rendimento netto generato dal portafoglio rispetto a quello atteso in base al modello CAPM per il livello di rischio sistematico assunto.",
-        "how_calc": "α = R_p - [ R_f + β * (R_m - R_f) ]",
+        "how_calc": "<b>&alpha;</b> = R<sub>p</sub> &minus; [ R<sub>f</sub> + &beta; &times; (R<sub>m</sub> &minus; R<sub>f</sub>) ]",
         "why_useful": "Isolare il valore aggiunto puro generato dalle scelte di stock picking e asset allocation del gestore.",
         "argus_calc": "Intercetta della regressione lineare tra i rendimenti in eccesso del portafoglio e del benchmark, calcolata con p-value di confidenza.",
         "how_to_read": "• 🟢 α > +2.0% (Netta creazione di valore attivo)<br>• 🟡 0.0% ≤ α ≤ +2.0% (Lieve extra-performance)<br>• 🔴 α < 0.0% (Distruzione di valore rispetto a una replica passiva)."
@@ -2022,7 +2022,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "calmar_ratio": {
         "title": "⚖️ Calmar Ratio (CAGR / Max Drawdown)",
         "what_is": "Rapporto tra il tasso di crescita annuo composto (CAGR) e il Massimo Drawdown storico subito.",
-        "how_calc": "Calmar = CAGR / |Max Drawdown|",
+        "how_calc": "<b>Calmar</b> = CAGR / |Max Drawdown|",
         "why_useful": "Valutare se il rendimento annuo generato giustifica l'ampiezza della peggiore flessione storica sopportata.",
         "argus_calc": "Calcolato dal rapporto tra il CAGR del portafoglio e il valore assoluto del massimo drawdown sulla finestra storica.",
         "how_to_read": "• 🟢 > 1.00 (Eccellente: il rendimento annuo supera la peggiore perdita)<br>• 🟡 0.50 - 1.00 (Equilibrato)<br>• 🔴 < 0.50 (Drawdown sproporzionato rispetto al rendimento generato)."
@@ -2030,7 +2030,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "days_to_liquidate": {
         "title": "⚡ Days-to-Liquidate (Almgren-Chriss Liquidity Horizon)",
         "what_is": "Il numero stimato di giorni lavorativi necessari per liquidare le posizioni senza eccedere il 15% del volume medio giornaliero (ADV).",
-        "how_calc": "DTL = Quantità Netta / (ADV_30g * 0.15)",
+        "how_calc": "<b>DTL</b> = Quantità Netta / (ADV<sub>30g</sub> &times; 0.15)",
         "why_useful": "Evitare trappole di illiquidità, shock da market impact e disallineamenti di prezzo in caso di liquidazione forzata o ribilanciamento rapido.",
         "argus_calc": "Pondera ciascun asset sul volume medio a 30 sedute ricavato dai flussi di mercato e applica il modello di impatto Almgren-Chriss.",
         "how_to_read": "• 🟢 ≤ 1.0 gg (Smobilizzo immediato, asset ultra-liquido)<br>• 🟡 1.0 - 3.0 gg (Liquidità moderata)<br>• 🔴 > 3.0 gg (Posizione illiquida, elevato rischio di market impact)."
@@ -2038,7 +2038,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "chandelier_exit": {
         "title": "🛡️ Chandelier Exit (ATR Trailing Stop-Loss)",
         "what_is": "Algoritmo di stop-loss dinamico agganciato al picco massimo recente, tarato sulla volatilità effettiva a 14 periodi (Average True Range).",
-        "how_calc": "Stop = Max(High_22g) - 3.0 * ATR_14",
+        "how_calc": "<b>Stop</b> = Max(High<sub>22g</sub>) &minus; 3.0 &times; ATR<sub>14</sub>",
         "why_useful": "Proteggere i guadagni accumulati lasciando correre i profitti durante i trend rialzisti ed evitando uscite premature per rumore di mercato.",
         "argus_calc": "Calcola l'ATR a 14 sedute sulle barre High-Low-Close di ciascun titolo e sottrae 3 volte tale valore dal massimo a 22 giorni lavorativi.",
         "how_to_read": "• 🟢 Prezzo > Stop (Trend intatto, posizione regolare)<br>• 🟡 Distanza < 4% (Vicinanza alla soglia di allerta)<br>• 🔴 Prezzo ≤ Stop (Trigger di uscita/copertura scattato)."
@@ -2046,7 +2046,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "diversification_ratio": {
         "title": "🌐 Diversification Ratio (DR)",
         "what_is": "Rapporto tra la media ponderata delle volatilità dei singoli componenti e la volatilità complessiva del portafoglio.",
-        "how_calc": "DR = ( Σ w_i * σ_i ) / √(w^T * Σ * w)",
+        "how_calc": "<b>DR</b> = (&sum; w<sub>i</sub> &times; &sigma;<sub>i</sub>) / &radic;(<b>w</b><sup>T</sup> &Sigma; <b>w</b>)",
         "why_useful": "Quantificare in termini matematici il beneficio della diversificazione e la riduzione del rischio ottenuta combinando asset non perfettamente correlati.",
         "argus_calc": "Calcolato con la matrice di covarianza de-noised Ledoit-Wolf e i pesi effettivi di portafoglio.",
         "how_to_read": "• 🟢 > 1.40 (Ottima diversificazione istituzionale)<br>• 🟡 1.15 - 1.40 (Diversificazione moderata)<br>• 🔴 < 1.15 (Scarsa diversificazione, elevato rischio di concentrazione)."
@@ -2054,7 +2054,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "altman_z_score": {
         "title": "🏛️ Altman Z-Score (Solvibilità e Rischio Default)",
         "what_is": "Modello econometrico multivariato a 5 indici di bilancio per prevedere la probabilità di insolvenza o dissesto finanziario aziendale a 2 anni.",
-        "how_calc": "Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 0.999*X5",
+        "how_calc": "<b>Z</b> = 1.2 &times; X<sub>1</sub> + 1.4 &times; X<sub>2</sub> + 3.3 &times; X<sub>3</sub> + 0.6 &times; X<sub>4</sub> + 0.999 &times; X<sub>5</sub>",
         "why_useful": "Verificare la solidità fondamentale e proteggersi da fallimenti o default societari nei titoli detenuti.",
         "argus_calc": "Estrae automaticamente le voci di bilancio annuali certificate (SEC 10-K / bilanci societari) calcolando i 5 ratios finanziari.",
         "how_to_read": "• 🟢 Z > 2.99 (Zona Sicura: azienda solida e solvente)<br>• 🟡 1.81 ≤ Z ≤ 2.99 (Zona Grigia: rischio moderato)<br>• 🔴 Z < 1.81 (Zona di Distress: alto rischio di insolvenza)."
@@ -2062,7 +2062,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "beneish_m_score": {
         "title": "🔍 Beneish M-Score (Forensic Accounting & Manipolazione)",
         "what_is": "Modello statistico probabilistico a 8 indici di bilancio per rilevare anomalie contabili o pratiche aggressive di manipolazione degli utili.",
-        "how_calc": "M = -4.84 + 0.92*DSRI + 0.528*GMI + 0.404*AQI + 0.892*SGI + 0.115*DEPI - 0.172*SGAI + 4.037*TATA + 0.0327*LVGI",
+        "how_calc": "<b>M</b> = &minus;4.84 + 0.92 &times; DSRI + 0.528 &times; GMI + 0.404 &times; AQI + 0.892 &times; SGI + 0.115 &times; DEPI &minus; 0.172 &times; SGAI + 4.037 &times; TATA + 0.0327 &times; LVGI",
         "why_useful": "Individuare tempestivamente red flags contabili prima che si traducano in scandali finanziari o crolli delle quotazioni.",
         "argus_calc": "Confronta le voci di conto economico e stato patrimoniale degli ultimi due esercizi contabili calcolando gli 8 indicatori standard.",
         "how_to_read": "• 🟢 M < -2.22 (Bassa probabilità di manipolazione, bilancio affidabile)<br>• 🔴 M > -2.22 (Alta probabilità di anomalie o abbellimenti contabili)."
@@ -2070,7 +2070,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "sloan_accrual": {
         "title": "📊 Sloan Accrual Ratio (Qualità degli Utili)",
         "what_is": "Indicatore di qualità contabile che misura la percentuale di utile derivante da mere scritture di competenza rispetto ai flussi di cassa operativi reali.",
-        "how_calc": "Accrual Ratio = [ Net Income - (CFO + CFI) ] / Total Assets",
+        "how_calc": "<b>Accrual Ratio</b> = [ Net Income &minus; (CFO + CFI) ] / Total Assets",
         "why_useful": "Evidenziare se gli utili annunciati sono supportati da denaro effettivo incassato sul conto corrente aziendale.",
         "argus_calc": "Estrae Net Income, Cash Flow Operativo (CFO) e Totale Attivo dall'ultimo rendiconto finanziario societario.",
         "how_to_read": "• 🟢 |Accrual| < 5.0% (Qualità eccellente degli utili)<br>• 🟡 5.0% - 10.0% (Livello intermedio)<br>• 🔴 |Accrual| > 10.0% (Bassa qualità, rischio revisioni al ribasso)."
@@ -2078,7 +2078,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "wacc": {
         "title": "💼 WACC & DCF Fair Value (Costo del Capitale e Valutazione Intrinseca)",
         "what_is": "Il costo medio ponderato del capitale aziendale (WACC) e il valore intrinseco per azione calcolato attualizzando i flussi di cassa futuri (DCF).",
-        "how_calc": "WACC = (E/V)*Ke + (D/V)*Kd*(1 - t) &nbsp;|&nbsp; Target Price = (Σ FCFF_t / (1+WACC)^t + Terminal Value) / Shares",
+        "how_calc": "<b>WACC</b> = (E/V) &times; K<sub>e</sub> + (D/V) &times; K<sub>d</sub> &times; (1 &minus; t) &nbsp;|&nbsp; <b>Target Price</b> = [ &sum; FCFF<sub>t</sub> / (1 + WACC)<sup>t</sup> + TV ] / Shares",
         "why_useful": "Fissare il prezzo equo (Fair Value) fondamentale di un titolo per determinare se quota a sconto (sottovalutato) o a premio (sopravvalutato).",
         "argus_calc": "Simulazione DCF Monte Carlo con 1,000 iterazioni stocastiche su tassi di crescita, WACC calcolato con CAPM e tasso risk-free live.",
         "how_to_read": "• 🟢 Prezzo < Fair Value (Margine di sicurezza favorevole, sottovalutato)<br>• 🟡 Prezzo ≈ Fair Value (Equamente valutato)<br>• 🔴 Prezzo > Fair Value (Sopravvalutato rispetto ai fondamentali)."
@@ -2086,7 +2086,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "piotroski_f_score": {
         "title": "⭐ Piotroski F-Score (Solidità e Momentum Fondamentale)",
         "what_is": "Punteggio discreto da 0 a 9 basato su 9 criteri contabili suddivisi in Redditività, Leva/Liquidità ed Efficienza Operativa.",
-        "how_calc": "F-Score = Σ (9 criteri binari 0 o 1 su ROA, CFO, ΔLeva, ΔMargini, ΔRotazione Attivo, ecc.)",
+        "how_calc": "<b>F-Score</b> = &sum; (9 criteri binari 0 o 1 su ROA, CFO, &Delta;Leva, &Delta;Margini, &Delta;Rotazione, ecc.)",
         "why_useful": "Selezionare titoli value con solidi fondamentali ed eliminare società fragili a rischio declino economico.",
         "argus_calc": "Analisi automatizzata punto per punto sui bilanci societari storici ufficiali.",
         "how_to_read": "• 🟢 8 - 9 (Società finanziariamente eccellente e in espansione)<br>• 🟡 5 - 7 (Solidità moderata / nella media)<br>• 🔴 0 - 4 (Struttura finanziaria fragile o deterioramento operativo)."
@@ -2094,7 +2094,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "kelly_criterion": {
         "title": "🎯 Kelly Criterion (Dimensionamento Ottimale del Capitale)",
         "what_is": "Formula per determinare la percentuale teorica ottimale di capitale da allocare su una posizione per massimizzare la crescita geometrica a lungo termine.",
-        "how_calc": "f* = (p * b - q) / b &nbsp;|&nbsp; f* = (μ - R_f) / σ²",
+        "how_calc": "<b>f*</b> = (p &times; b &minus; q) / b &nbsp;|&nbsp; <b>f*</b> = (&mu; &minus; R<sub>f</sub>) / &sigma;<sup>2</sup>",
         "why_useful": "Prevenire la rovina statistica del capitale (Gambler's Ruin) ed evitare sia il sotto-investimento che l'over-betting.",
         "argus_calc": "Calcolato con frazionamento prudenziale (Half-Kelly al 50% o Quarter-Kelly al 25%) integrato con il tasso risk-free live.",
         "how_to_read": "• 🟢 f* applicato al 25%-50% (Allocazione robusta ed equilibrata)<br>• 🔴 Full Kelly al 100% (Sconsigliato: eccessiva volatilità del portafoglio)."
@@ -2102,7 +2102,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "tracking_error": {
         "title": "🎯 Tracking Error & Information Ratio",
         "what_is": "La volatilità della differenza dei rendimenti tra il portafoglio e il benchmark (Tracking Error) e l'extra-rendimento per unità di rischio attivo (Information Ratio).",
-        "how_calc": "TE = √(Var(R_p - R_b)) * √252 &nbsp;|&nbsp; IR = (R_p - R_b) / TE",
+        "how_calc": "<b>TE</b> = &radic;(Var(R<sub>p</sub> &minus; R<sub>b</sub>)) &times; &radic;252 &nbsp;|&nbsp; <b>IR</b> = (R<sub>p</sub> &minus; R<sub>b</sub>) / TE",
         "why_useful": "Valutare la coerenza della gestione rispetto al benchmark di riferimento e premiare l'abilità di generazione attiva di Alpha.",
         "argus_calc": "Calcolato sulle serie temporali allineate dei rendimenti giornalieri di portafoglio e benchmark su 252 sedute.",
         "how_to_read": "• 🟢 IR > 0.70 (Gestione attiva di alto livello)<br>• 🟡 0.30 ≤ IR ≤ 0.70 (Buona efficienza)<br>• 🔴 IR < 0.30 o negativo (Rischio attivo non remunerato)."
@@ -2110,7 +2110,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "omega_ratio": {
         "title": "⚖️ Omega Ratio (Distribuzione Asimmetrica)",
         "what_is": "Rapporto tra la probabilità cumulata dei guadagni rispetto a una soglia di rendimento target e la probabilità cumulata delle perdite sotto tale soglia.",
-        "how_calc": "Ω(L) = ∫_L^∞ (1 - F(r))dr / ∫_{-∞}^L F(r)dr",
+        "how_calc": "<b>&Omega;(L)</b> = &int;<sub>L</sub><sup>&infin;</sup> (1 &minus; F(r)) dr &nbsp;/&nbsp; &int;<sub>&minus;&infin;</sub><sup>L</sup> F(r) dr",
         "why_useful": "Catturare tutte le proprietà della distribuzione dei rendimenti (inclusi skewness e code grasse) senza assumere la normalità gaussiana.",
         "argus_calc": "Integrazione numerica continua dei rendimenti storici ponderati rispetto al tasso risk-free live.",
         "how_to_read": "• 🟢 > 1.50 (Distribuzione asimmetrica nettamente a favore dei guadagni)<br>• 🟡 1.00 - 1.50 (Bilanciato)<br>• 🔴 < 1.00 (Prevalenza statistica di perdite)."
@@ -2118,7 +2118,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "ulcer_index": {
         "title": "📉 Ulcer Index & Martin Ratio",
         "what_is": "Misura di stress e profondità dei cali che tiene conto sia della percentuale di drawdown che del numero di giorni necessari per recuperare il picco.",
-        "how_calc": "UI = √( (1/N) * Σ DD_i^2 ) &nbsp;|&nbsp; Martin = (CAGR - R_f) / UI",
+        "how_calc": "<b>UI</b> = &radic;[ (1/N) &sum; DD<sub>i</sub><sup>2</sup> ] &nbsp;|&nbsp; <b>Martin</b> = (CAGR &minus; R<sub>f</sub>) / UI",
         "why_useful": "Misurare il logorio temporale dell'investitore durante le fasi negative prolungate del mercato.",
         "argus_calc": "Calcolo quadratico continuo delle percentuali di drawdown su tutti i giorni di negoziazione.",
         "how_to_read": "• 🟢 UI < 5.0% (Crescita lineare, minimi drawdown)<br>• 🟡 5.0% - 12.0% (Volatilità fisiologica)<br>• 🔴 UI > 12.0% (Elevato stress temporale e drawdowns prolungati)."
@@ -2126,7 +2126,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "tuir_67": {
         "title": "💰 Zainetto Fiscale & TUIR Art. 67 (Fisco Italiano)",
         "what_is": "La disciplina fiscale italiana (D.P.R. 917/1986) per la tassazione dei redditi diversi di natura finanziaria (26% ordinario, 12.5% Titoli di Stato).",
-        "how_calc": "Imposta = max(0, Plusvalenze_realizzate - Minusvalenze_pregresse) * Aliquota",
+        "how_calc": "<b>Imposta</b> = max(0, Plusvalenze<sub>realizzate</sub> &minus; Minusvalenze<sub>pregresse</sub>) &times; Aliquota",
         "why_useful": "Monitorare e recuperare le minusvalenze prima della prescrizione quadriennale (Tax-Loss Harvesting strategico).",
         "argus_calc": "Tracciamento contabile FIFO per singolo lotto di acquisto/vendita con data certa, calcolo aliquota per asset class e scadenza a 4 anni.",
         "how_to_read": "• 🟢 Crediti fiscali compensati tempestivamente<br>• 🟡 Minusvalenze in scadenza entro 12 mesi da monitorare<br>• 🔴 Minusvalenze scadute non recuperate."
@@ -2134,7 +2134,7 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
     "isolation_forest": {
         "title": "🕵️‍♂️ Machine Learning Isolation Forest (Rilevazione Anomalie)",
         "what_is": "Algoritmo di Machine Learning non supervisionato per identificare giornate storiche atipiche con rotture di correlazione o shock sistemici.",
-        "how_calc": "Ensemble di 100 Isolation Trees nello spazio 4D: Rendimento, Volatilità rolling 20d, Correlazione media, Drawdown.",
+        "how_calc": "<b>Anomalia (4D)</b>: f(Rendimento, &sigma;<sub>20d</sub>, &rho;<sub>media</sub>, DD<sub>t</sub>) &nbsp;&rarr;&nbsp; Score &lt; 0",
         "why_useful": "Rilevare cluster di anomalie di mercato prima che si trasformino in perdite permanenti di capitale.",
         "argus_calc": "Pipeline integrata in scikit-learn con parametro di contaminazione del 5% su tutta la cronologia disponibile.",
         "how_to_read": "• 🔴 ANOMALIA (Punteggio negativo marcato, dinamica anomala)<br>• 🟢 Normale (Fluttuazione coerente con la serie storica)."
