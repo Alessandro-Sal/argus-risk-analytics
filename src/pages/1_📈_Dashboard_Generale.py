@@ -416,18 +416,18 @@ df_prices_ref = results.get("df_prices", pd.DataFrame())
 
 # Definizione Catalogo Globale Benchmark Multi-Asset & Geografici
 ALL_BENCHMARKS = {
-    "SPY": {"name": "SPY (S&P 500)", "label": "S&P 500 (USA Large Cap)", "category": "🇺🇸 USA", "color": "#58a6ff"},
-    "QQQ": {"name": "QQQ (Nasdaq 100)", "label": "Nasdaq 100 (USA Tech)", "category": "🇺🇸 USA", "color": "#bc8cff"},
-    "IWM": {"name": "IWM (Russell 2000)", "label": "Russell 2000 (USA Small Cap)", "category": "🇺🇸 USA", "color": "#79c0ff"},
-    "ACWI": {"name": "ACWI (MSCI World)", "label": "MSCI All Country World (Globale)", "category": "🌍 Globale", "color": "#3fb950"},
-    "VGK": {"name": "VGK (FTSE Europe)", "label": "FTSE Developed Europe (Europa)", "category": "🇪🇺 Europa", "color": "#38bdf8"},
-    "EZU": {"name": "EZU (Eurozone EMU)", "label": "MSCI EMU (Eurozona)", "category": "🇪🇺 Europa", "color": "#818cf8"},
-    "AAXJ": {"name": "AAXJ (MSCI Asia ex-JP)", "label": "MSCI AC Asia ex-Japan (Asia)", "category": "🌏 Asia & Emergenti", "color": "#fb923c"},
-    "EWJ": {"name": "EWJ (MSCI Japan)", "label": "MSCI Japan (Giappone)", "category": "🌏 Asia & Emergenti", "color": "#f43f5e"},
-    "EEM": {"name": "EEM (Emerging Markets)", "label": "MSCI Emerging Markets (Emergenti)", "category": "🌏 Asia & Emergenti", "color": "#e879f9"},
-    "AGG": {"name": "AGG (US Aggregate Bond)", "label": "Bloomberg US Aggregate (Obbligazionario)", "category": "🏦 Obbligazioni & Materie Prime", "color": "#94a3b8"},
-    "GLD": {"name": "GLD (Gold Physical)", "label": "SPDR Gold Shares (Oro Fisico)", "category": "🏦 Obbligazioni & Materie Prime", "color": "#eab308"},
-    "BTC": {"name": "BTC (Bitcoin)", "label": "Bitcoin (Criptovalute)", "category": "⚡ Crypto", "color": "#f97316"}
+    "SPY": {"name": "SPY (S&P 500)", "label": "S&P 500 (USA Large Cap)", "category": "USA", "color": "#58a6ff"},
+    "QQQ": {"name": "QQQ (Nasdaq 100)", "label": "Nasdaq 100 (USA Tech)", "category": "USA", "color": "#bc8cff"},
+    "IWM": {"name": "IWM (Russell 2000)", "label": "Russell 2000 (USA Small Cap)", "category": "USA", "color": "#79c0ff"},
+    "ACWI": {"name": "ACWI (MSCI World)", "label": "MSCI All Country World (Globale)", "category": "Globale", "color": "#3fb950"},
+    "VGK": {"name": "VGK (FTSE Europe)", "label": "FTSE Developed Europe (Europa)", "category": "Europa", "color": "#38bdf8"},
+    "EZU": {"name": "EZU (Eurozone EMU)", "label": "MSCI EMU (Eurozona)", "category": "Europa", "color": "#818cf8"},
+    "AAXJ": {"name": "AAXJ (MSCI Asia ex-JP)", "label": "MSCI AC Asia ex-Japan (Asia)", "category": "Asia & Emergenti", "color": "#fb923c"},
+    "EWJ": {"name": "EWJ (MSCI Japan)", "label": "MSCI Japan (Giappone)", "category": "Asia & Emergenti", "color": "#f43f5e"},
+    "EEM": {"name": "EEM (Emerging Markets)", "label": "MSCI Emerging Markets (Emergenti)", "category": "Asia & Emergenti", "color": "#e879f9"},
+    "AGG": {"name": "AGG (US Aggregate Bond)", "label": "Bloomberg US Aggregate (Obbligazionario)", "category": "Obbligazioni & Oro", "color": "#94a3b8"},
+    "GLD": {"name": "GLD (Gold Physical)", "label": "SPDR Gold Shares (Oro Fisico)", "category": "Obbligazioni & Oro", "color": "#eab308"},
+    "BTC": {"name": "BTC (Bitcoin)", "label": "Bitcoin (Criptovalute)", "category": "Crypto", "color": "#f97316"}
 }
 
 # Header & Controlli Layout Spazioso
@@ -462,25 +462,25 @@ def set_chart_bms(bms):
     st.session_state["bm_preset_ver"] += 1
 
 # Barra di selezione Benchmark per il grafico con preset rapidi
-col_sel_bm, col_quick_bm = st.columns([2.8, 1.7], vertical_alignment="center")
+col_sel_bm, col_quick_bm = st.columns([2.6, 2.2], vertical_alignment="center")
 
 with col_quick_bm:
     st.markdown('<div style="margin-top: 18px;"></div>', unsafe_allow_html=True)
     c_q1, c_q2, c_q3, c_q4 = st.columns(4)
     with c_q1:
-        if st.button("🇺🇸 USA", key="btn_bm_usa", use_container_width=True, help="SPY + QQQ"):
+        if st.button("USA", key="btn_bm_usa", use_container_width=True, help="SPY + QQQ"):
             set_chart_bms(["SPY", "QQQ"])
             st.rerun()
     with c_q2:
-        if st.button("🇪🇺 Europa", key="btn_bm_eu", use_container_width=True, help="SPY + VGK + EZU"):
+        if st.button("Europa", key="btn_bm_eu", use_container_width=True, help="SPY + VGK + EZU"):
             set_chart_bms(["SPY", "VGK", "EZU"])
             st.rerun()
     with c_q3:
-        if st.button("🌏 Asia", key="btn_bm_asia", use_container_width=True, help="SPY + AAXJ + EWJ"):
+        if st.button("Asia", key="btn_bm_asia", use_container_width=True, help="SPY + AAXJ + EWJ"):
             set_chart_bms(["SPY", "AAXJ", "EWJ"])
             st.rerun()
     with c_q4:
-        if st.button("🌐 Tutti", key="btn_bm_all", use_container_width=True, help="Tutti i Benchmark"):
+        if st.button("Tutti", key="btn_bm_all", use_container_width=True, help="Tutti i Benchmark"):
             set_chart_bms(list(ALL_BENCHMARKS.keys()))
             st.rerun()
 
@@ -713,7 +713,7 @@ with col_sc_f1:
 with col_sc_f2:
     filter_sc_geo = st.selectbox(
         "🏷️ Macro-Area / Asset Class:",
-        ["Tutti i Benchmark (12)", "🌍 Globale", "🇺🇸 USA", "🇪🇺 Europa", "🌏 Asia & Emergenti", "🏦 Obbligazioni & Materie Prime", "⚡ Crypto"],
+        ["Tutti i Benchmark (12)", "Globale", "USA", "Europa", "Asia & Emergenti", "Obbligazioni & Oro", "Crypto"],
         key="filter_scorecard_geo"
     )
 with col_sc_f3:
