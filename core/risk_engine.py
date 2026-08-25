@@ -2621,13 +2621,15 @@ def compute_marginal_and_component_var(
     df_returns: pd.DataFrame,
     df_positions: pd.DataFrame,
     confidence_level: float = 0.95,
-    total_portfolio_value: Optional[float] = None
+    total_portfolio_value: Optional[float] = None,
+    time_horizon: int = 1
 ) -> Dict[str, Any]:
     """
     Calcola la decomposizione analitica istituzionale del Value at Risk (Bloomberg PORT / RiskMetrics Parity):
       - Marginal VaR (MVaR_i): sensibilità del VaR totale rispetto al peso di ciascun asset (dVaR / dw_i).
       - Component VaR (CVaR_i): contributo monetario e percentuale di ciascun titolo al VaR totale (w_i * MVaR_i).
       - Proprietà di Eulero: sum(Component_VaR_i) == Total_Portfolio_VaR.
+      - Supporta la proiezione temporale Square-Root of Time (1D, 10D Basilea, 20D Mensile, 252D Annuale).
     """
     if df_positions is None or df_positions.empty or df_returns is None or df_returns.empty:
         return {
@@ -2691,14 +2693,15 @@ def compute_marginal_and_component_var(
     port_sigma = float(np.sqrt(max(1e-12, port_var)))
 
     z_alpha = float(stats.norm.ppf(confidence_level))
+    scale_factor = float(np.sqrt(max(1, time_horizon)))
 
-    # VaR percentuale del portafoglio (giornaliero)
-    port_var_pct = z_alpha * port_sigma
+    # VaR percentuale del portafoglio scalato su time_horizon
+    port_var_pct = z_alpha * port_sigma * scale_factor
     port_var_amount = port_var_pct * tot_val
 
-    # Marginal VaR: (Cov @ w) / sigma_p * z_alpha
+    # Marginal VaR: (Cov @ w) / sigma_p * z_alpha * sqrt(T)
     cov_w = cov_matrix @ w_arr
-    marginal_var_pct = (z_alpha / port_sigma) * cov_w
+    marginal_var_pct = (z_alpha / port_sigma) * cov_w * scale_factor
     component_var_pct = w_arr * marginal_var_pct
     component_var_amount = component_var_pct * tot_val
 
@@ -2722,6 +2725,7 @@ def compute_marginal_and_component_var(
 
     return {
         "confidence_level": confidence_level,
+        "time_horizon": time_horizon,
         "portfolio_var_pct": round(port_var_pct * 100.0, 4),
         "portfolio_var_amount": round(port_var_amount, 2),
         "portfolio_sigma_daily_pct": round(port_sigma * 100.0, 4),

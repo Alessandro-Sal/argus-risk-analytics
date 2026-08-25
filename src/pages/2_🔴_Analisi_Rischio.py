@@ -1707,18 +1707,47 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 
     from core.risk_engine import compute_marginal_and_component_var, compute_liquidity_adjusted_var
     
+    col_eul_sel1, col_eul_sel2 = st.columns([1.6, 2.4], vertical_alignment="center")
+    with col_eul_sel1:
+        horizon_opt = st.selectbox(
+            "⏱️ Orizzonte Temporale Component VaR:",
+            [
+                "1 Giorno (Giornaliero Standard)",
+                "10 Giorni (Regolamentare Basilea / UCITS)",
+                "20 Giorni (1 Mese Solare)",
+                "60 Giorni (1 Trimestre)",
+                "252 Giorni (1 Anno Lavorativo)"
+            ],
+            index=0,
+            key="sb_euler_horizon_days",
+            help="Permette di scalare il Component VaR su orizzonti istituzionali via Square-Root of Time (sqrt(T))."
+        )
+        horizon_days = 1 if "1 Giorno" in horizon_opt else (10 if "10 Giorni" in horizon_opt else (20 if "20 Giorni" in horizon_opt else (60 if "60 Giorni" in horizon_opt else 252)))
+        horizon_short = f"{horizon_days}G" if horizon_days > 1 else "1G"
+
     decomp_res = compute_marginal_and_component_var(
         df_returns=df_returns,
         df_positions=pos,
         confidence_level=conf_level,
-        total_portfolio_value=total_value
+        total_portfolio_value=total_value,
+        time_horizon=horizon_days
     )
     df_decomp = decomp_res.get("decomposition_df", pd.DataFrame())
+    p_var_amt = decomp_res.get("portfolio_var_amount", 0.0)
+    p_var_pct = decomp_res.get("portfolio_var_pct", 0.0)
+
+    with col_eul_sel2:
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 3px solid #ff9900; border-radius: 8px; padding: 8px 14px; font-size: 12.5px; color: #c9d1d9; line-height: 1.45;">
+            💡 <b>Perché l'importo giornaliero (1D) può sembrare basso?</b> Il VaR 1D (€ {p_var_amt / np.sqrt(horizon_days):,.2f}) misura la perdita massima in una <i>singola seduta giornaliera ordinaria</i>. 
+            Su <b>10 Giorni</b> (Basilea) è <b>€ {p_var_amt / np.sqrt(horizon_days) * np.sqrt(10):,.2f}</b>, mentre su <b>1 Anno</b> sale a <b>€ {p_var_amt / np.sqrt(horizon_days) * np.sqrt(252):,.2f}</b>.
+        </div>
+        """, unsafe_allow_html=True)
 
     if not df_decomp.empty:
         col_dec_p1, col_dec_p2 = st.columns([1.2, 1.8])
         with col_dec_p1:
-            st.markdown("##### 🍩 Contributo % al Rischio Totale")
+            st.markdown("##### 🍩 Quota % di Rischio Totale")
             fig_donut = go.Figure(data=[go.Pie(
                 labels=df_decomp["ticker"],
                 values=df_decomp["risk_contribution_pct"],
@@ -1743,7 +1772,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
             st.plotly_chart(fig_donut, use_container_width=True, config={"displayModeBar": False})
 
         with col_dec_p2:
-            st.markdown("##### 📊 Bar Chart di Component VaR (€)")
+            st.markdown(f"##### 📊 Bar Chart Component VaR (€) — {horizon_short} (Conf. {conf_level*100:.0f}%)")
             df_sorted = df_decomp.sort_values(by="component_var_amount", ascending=True)
             fig_bar_cvar = go.Figure(data=[go.Bar(
                 y=df_sorted["ticker"],
@@ -1756,7 +1785,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
                 ),
                 text=[f"€ {val:,.1f} ({pct:.1f}%)" for val, pct in zip(df_sorted["component_var_amount"], df_sorted["risk_contribution_pct"])],
                 textposition="auto",
-                hovertemplate="<b>%{y}</b><br>Component VaR: <b>€ %{x:,.2f}</b><br>Quota Rischio: <b>%{marker.color:.2f}%</b><extra></extra>"
+                hovertemplate="<b>%{y}</b><br>Component VaR (" + horizon_short + "): <b>€ %{x:,.2f}</b><br>Quota Rischio: <b>%{marker.color:.2f}%</b><extra></extra>"
             )])
             fig_bar_cvar.update_layout(
                 template="plotly_dark",
@@ -1764,7 +1793,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
                 plot_bgcolor="rgba(13,17,23,0.7)",
                 margin=dict(l=10, r=20, t=10, b=10),
                 height=340,
-                xaxis=dict(title="Component VaR (€)", gridcolor="rgba(255,255,255,0.06)"),
+                xaxis=dict(title=f"Component VaR (€) — Orizzonte {horizon_short}", gridcolor="rgba(255,255,255,0.06)"),
                 yaxis=dict(gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=12))
             )
             st.plotly_chart(fig_bar_cvar, use_container_width=True, config={"displayModeBar": False})
@@ -1775,7 +1804,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         if euler_ok:
             st.markdown(f"""
             <div style="background: rgba(34, 197, 94, 0.12); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between;">
-                <span style="color: #4ade80; font-weight: 600; font-size: 13px;">✅ Proprietà di Eulero Rispettata: Somma Component VaR = VaR di Portafoglio (€ {decomp_res.get('portfolio_var_amount', 0):,.2f})</span>
+                <span style="color: #4ade80; font-weight: 600; font-size: 13px;">✅ Proprietà di Eulero Rispettata: Somma Component VaR = VaR di Portafoglio (€ {p_var_amt:,.2f} / {p_var_pct:.2f}%) [Orizzonte: {horizon_short}, Conf: {conf_level*100:.0f}%]</span>
                 <span style="color: #86efac; font-family: monospace; font-size: 12px;">Residuo: € {res_euler:.4f} (0.00%)</span>
             </div>
             """, unsafe_allow_html=True)
