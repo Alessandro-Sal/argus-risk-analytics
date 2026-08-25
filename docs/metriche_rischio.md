@@ -39,6 +39,28 @@ Misura la pesantezza delle code della distribuzione rispetto a una distribuzione
 Misura la deviazione standard del rendimento attivo rispetto al benchmark ($R_b$):
 \[ TE = \sqrt{\frac{1}{N-1} \sum_{t=1}^N \left( (R_t - R_{b,t}) - \overline{(R - R_b)} \right)^2} \times \sqrt{252} \]
 
+### Massimo Drawdown (Max Drawdown) & High-Water Mark
+Il **Max Drawdown** misura la peggiore perdita percentuale di capitale subita tra un picco massimo storico relativo (*High-Water Mark*, $\text{HWM}_t$) e il minimo successivo (*Trough*), prima del raggiungimento di un nuovo massimo:
+\[ \text{HWM}_t = \max_{s \le t} V_s \]
+\[ \text{Drawdown}_t = \frac{V_t - \text{HWM}_t}{\text{HWM}_t} \]
+\[ \text{Max Drawdown} = \min_{t} \text{Drawdown}_t \]
+
+#### Dimostrazione Algebrica: Perché il Drawdown non è la sottrazione sull'asse Y del Rendimento Cumulato
+Sia $V_0$ il capitale iniziale e $V_t = V_0 \prod_{i=1}^t (1 + R_i)$ il valore del portafoglio. Il rendimento cumulato indicizzato a base zero è $\text{CumRet}_t = \frac{V_t - V_0}{V_0}$.
+La differenza aritmetica tra il picco e il minimo successivo osservata sull'asse delle ordinate (in punti percentuali) è:
+\[ \Delta_{\text{asse } Y} = \text{CumRet}_{\text{peak}} - \text{CumRet}_{\text{trough}} = \frac{V_{\text{peak}} - V_{\text{trough}}}{V_0} \]
+Il vero **Drawdown Relativo** subito dall'investitore rispetto al picco è invece:
+\[ DD = \frac{V_{\text{trough}} - V_{\text{peak}}}{V_{\text{peak}}} = -\frac{V_{\text{peak}} - V_{\text{trough}}}{V_0 \cdot (1 + \text{CumRet}_{\text{peak}})} = -\frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} \]
+**Conseguenza Matematica:**
+Poiché al picco il rendimento cumulato è positivo ($\text{CumRet}_{\text{peak}} > 0$), il denominatore $(1 + \text{CumRet}_{\text{peak}}) > 1$. Pertanto, il valore assoluto della perdita percentuale effettiva è sistematicamente inferiore alla caduta visiva in punti percentuali sull'asse $Y$:
+\[ |DD| = \frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} < \Delta_{\text{asse } Y} \]
+*Esempio numerico:* Se il portafoglio raggiunge $\text{CumRet}_{\text{peak}} = +98.4\%$ e poi cade a $\text{CumRet}_{\text{trough}} = +20.6\%$, la discesa visiva sull'asse $Y$ è $\Delta = 98.4 - 20.6 = 77.8\%$. Tuttavia, la perdita reale subita dal patrimonio è:
+\[ DD = -\frac{77.8\%}{1 + 0.984} = -\frac{77.8\%}{1.984} = \mathbf{-39.21\%} \]
+
+### Ulcer Index (UI)
+Misura la profondità e la persistenza temporale dei periodi trascorsi sott'acqua (*underwater*), penalizzando quadraticamente i drawdown prolungati:
+\[ \text{UI} = \sqrt{\frac{1}{N} \sum_{t=1}^N (\text{Drawdown}_t \times 100)^2} \]
+
 ---
 
 ## 3. Value at Risk (VaR) & Conditional VaR (CVaR)
