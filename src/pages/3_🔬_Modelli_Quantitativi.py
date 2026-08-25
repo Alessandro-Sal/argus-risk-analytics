@@ -4,6 +4,7 @@ import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import importlib
+import uuid
 
 import core.ui_utils
 importlib.reload(core.ui_utils)
