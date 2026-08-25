@@ -1114,7 +1114,7 @@ with st.expander(f"🛡️ ARGUS Quant Advisor & Diagnostica Anomalie (Score Sal
                 badge_icon = "🟢" if dtype == "SUCCESS" else ("🔴" if dtype == "CRITICAL" else ("🟡" if dtype == "WARNING" else "🔵"))
                 border_c = '#3fb950' if dtype == 'SUCCESS' else ('#f85149' if dtype == 'CRITICAL' else ('#ff9900' if dtype == 'WARNING' else '#58a6ff'))
                 st.markdown(f"""
-                <div style="background: rgba(255,255,255,0.03); border-left: 4px solid {border_c}; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+                <div style="background: rgba(255,255,255,0.03); border-left: 4px solid {border_c}; padding: 12px; border-radius: 6px; margin-bottom: 6px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="font-weight:700; color:#ffffff;">{badge_icon} {diag['title']}</span>
                         <span style="font-size:10px; padding: 2px 8px; border-radius:10px; background:rgba(255,255,255,0.1); color:#8b949e;">{diag['category']}</span>
@@ -1123,6 +1123,14 @@ with st.expander(f"🛡️ ARGUS Quant Advisor & Diagnostica Anomalie (Score Sal
                     <div style="font-size:12px; color:#3fb950; font-weight:600; margin-top:4px;">👉 Raccomandazione: {diag['actionable_recommendation']}</div>
                 </div>
                 """, unsafe_allow_html=True)
+                target_page = diag.get("page_target")
+                if target_page:
+                    st.page_link(
+                        target_page,
+                        label=diag.get("page_label", "Apri Sezione Dedicata"),
+                        icon=diag.get("page_icon", "🔬")
+                    )
+                    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
 st.divider()
 
