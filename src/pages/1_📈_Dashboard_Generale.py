@@ -710,7 +710,6 @@ if selected_bms:
         })
 
     df_scorecard = pd.DataFrame(scorecard_rows)
-    st.markdown("---")
     col_sc_h1, col_sc_h2 = st.columns([3.8, 1.0])
     with col_sc_h1:
         st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark")
