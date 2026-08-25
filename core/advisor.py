@@ -60,7 +60,7 @@ def generate_quant_advisory_report(results: dict) -> dict:
             "description": f"Il portafoglio mostra un'alta concentrazione. Il titolo più pesante **{top1_ticker}** rappresenta da solo il **{top1_weight:.1f}%** del patrimonio totale. L'Indice di Herfindahl (HHI) è {hhi:.4f}.",
             "actionable_recommendation": f"Considera di prendere profitto o ridurre il peso di {top1_ticker} al di sotto del 15-20% per diversificare il rischio idiosincratico.",
             "page_target": "pages/4_📋_Posizioni_e_Dettagli.py",
-            "page_label": "📋 Vai alla Gestione Posizioni & Pesi",
+            "page_label": "Vai alla Gestione Posizioni & Pesi",
             "page_icon": "📋"
         })
     elif hhi < 0.10 and not pos.empty:
@@ -96,7 +96,7 @@ def generate_quant_advisory_report(results: dict) -> dict:
             "description": f"I seguenti titoli generano una quota sproporzionata del rischio di perdita totale: {risk_str}.",
             "actionable_recommendation": "Riduci l'esposizione sui titoli a più alta volatilità marginale o inserisci una copertura (hedging).",
             "page_target": "pages/2_🔴_Analisi_Rischio.py",
-            "page_label": "🔴 Analizza Component VaR & Coperture (Hedging)",
+            "page_label": "Analizza Component VaR & Coperture (Hedging)",
             "page_icon": "🔴"
         })
 
@@ -114,7 +114,7 @@ def generate_quant_advisory_report(results: dict) -> dict:
                 "description": f"L'attuale Sharpe Ratio ({curr_sharpe:.2f}) può essere incrementato fino a **{opt_sharpe:.2f}** riallineando i pesi alla Frontiera Efficiente di Markowitz.",
                 "actionable_recommendation": "Usa il Simulatore di Ribilanciamento per applicare la combinazione a Sharpe Massimo.",
                 "page_target": "pages/3_🔬_Modelli_Quantitativi.py",
-                "page_label": "🔬 Apri Ottimizzatore Markowitz & Simulatore di Ribilanciamento",
+                "page_label": "Apri Ottimizzatore Markowitz & Simulatore di Ribilanciamento",
                 "page_icon": "🔬"
             })
 
@@ -132,7 +132,7 @@ def generate_quant_advisory_report(results: dict) -> dict:
                     "description": f"I seguenti titoli in portafoglio scambiano a multipli P/E superiori a 45x: {exp_tickers}.",
                     "actionable_recommendation": "Verifica se la crescita degli utili attesa giustifica i multipli attuali o imposta stop-loss prudenziali.",
                     "page_target": "pages/5_🏛️_Valutazione_Aziendale.py",
-                    "page_label": "🏛️ Analisi Fondamentale Fair Value & Multipli",
+                    "page_label": "Analisi Fondamentale Fair Value & Multipli",
                     "page_icon": "🏛️"
                 })
 
@@ -157,7 +157,7 @@ def generate_quant_advisory_report(results: dict) -> dict:
             "description": f"Il portafoglio amplia i movimenti del mercato del **{((beta - 1) * 100):.0f}%**. In caso di storno dell'indice, le perdite saranno amplificate.",
             "actionable_recommendation": "Valuta l'inserimento di asset difensivi (es. bond, gold o titoli value) per ridurre il Beta complessivo verso 1.0.",
             "page_target": "pages/6_🌪️_Stress_Testing.py",
-            "page_label": "🌪️ Esegui Stress Test & Simulazione Shock Macro",
+            "page_label": "Esegui Stress Test & Simulazione Shock Macro",
             "page_icon": "🌪️"
         })
     elif beta < 0.7:
