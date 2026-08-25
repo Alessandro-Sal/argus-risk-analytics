@@ -689,27 +689,39 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
             df_trans = regime_res.get("transition_matrix", pd.DataFrame())
             if not df_trans.empty:
                 mat_rows_list = []
-                for idx_label, row_data in df_trans.iterrows():
+                for row_idx, (idx_label, row_data) in enumerate(df_trans.iterrows()):
                     cells_list = []
-                    for col_label, val in row_data.items():
+                    for col_idx, (col_label, val) in enumerate(row_data.items()):
                         val_pct = float(val) if not isinstance(val, str) else float(val.replace("%", ""))
                         
-                        if val_pct >= 80:
-                            bg_cell = "rgba(34, 197, 94, 0.20)"
-                            tx_color = "#4ade80"
-                            bd_cell = "rgba(34, 197, 94, 0.35)"
-                        elif val_pct >= 20:
-                            bg_cell = "rgba(234, 179, 8, 0.18)"
-                            tx_color = "#facc15"
-                            bd_cell = "rgba(234, 179, 8, 0.3)"
-                        elif val_pct >= 5:
-                            bg_cell = "rgba(56, 189, 248, 0.12)"
-                            tx_color = "#38bdf8"
-                            bd_cell = "rgba(56, 189, 248, 0.2)"
+                        # Diagonale: persistenza del regime di partenza
+                        if row_idx == col_idx:
+                            if row_idx == 0:  # Bull
+                                bg_cell = "rgba(34, 197, 94, 0.22)"
+                                tx_color = "#4ade80"
+                                bd_cell = "rgba(34, 197, 94, 0.45)"
+                            elif row_idx == 1:  # Range
+                                bg_cell = "rgba(234, 179, 8, 0.22)"
+                                tx_color = "#facc15"
+                                bd_cell = "rgba(234, 179, 8, 0.45)"
+                            else:  # Crisis
+                                bg_cell = "rgba(248, 113, 113, 0.22)"
+                                tx_color = "#f87171"
+                                bd_cell = "rgba(248, 113, 113, 0.45)"
                         else:
-                            bg_cell = "rgba(255, 255, 255, 0.02)"
-                            tx_color = "#94a3b8"
-                            bd_cell = "transparent"
+                            # Fuori diagonale: probabilità di switch
+                            if val_pct >= 10.0:
+                                bg_cell = "rgba(56, 189, 248, 0.16)"
+                                tx_color = "#38bdf8"
+                                bd_cell = "rgba(56, 189, 248, 0.35)"
+                            elif val_pct >= 1.0:
+                                bg_cell = "rgba(255, 255, 255, 0.04)"
+                                tx_color = "#cbd5e1"
+                                bd_cell = "rgba(255, 255, 255, 0.10)"
+                            else:
+                                bg_cell = "rgba(255, 255, 255, 0.015)"
+                                tx_color = "#64748b"
+                                bd_cell = "transparent"
                             
                         cell_str = f'<td style="text-align:center;padding:10px 14px;"><div style="background:{bg_cell};color:{tx_color};border:1px solid {bd_cell};border-radius:8px;padding:6px 12px;font-family:monospace;font-weight:700;font-size:13px;display:inline-block;min-width:70px;">{val_pct:.1f}%</div></td>'
                         cells_list.append(cell_str)
@@ -717,7 +729,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
                     row_mat_str = f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);height:48px;"><td style="color:#ffffff;font-weight:700;padding:10px 14px;white-space:nowrap;">{idx_label}</td>{"".join(cells_list)}</tr>'
                     mat_rows_list.append(row_mat_str)
                     
-                matrix_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:11.5px;font-weight:700;letter-spacing:0.5px;height:32px;"><th style="text-align:left;padding:8px 14px;width:28%;">STATO DI PARTENZA (T)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#4ade80;">🟢 A Regime 1 (Bull)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#facc15;">🟡 A Regime 2 (Range-Bound)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#f87171;">🔴 A Regime 3 (Crisis)</th></tr></thead><tbody>{"".join(mat_rows_list)}</tbody></table></div>'
+                matrix_html = f'<div style="background:rgba(18,24,38,0.75);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;margin-bottom:12px;overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr style="border-bottom:1px solid rgba(255,255,255,0.12);color:#94a3b8;font-size:12px;font-weight:700;letter-spacing:0.5px;height:34px;"><th style="text-align:left;padding:8px 14px;width:28%;white-space:nowrap;">STATO DI PARTENZA (T)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#4ade80;white-space:nowrap;">🟢 A Regime 1 (Bull)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#facc15;white-space:nowrap;">🟡 A Regime 2 (Range)</th><th style="text-align:center;padding:8px 14px;width:24%;color:#f87171;white-space:nowrap;">🔴 A Regime 3 (Crisis)</th></tr></thead><tbody>{"".join(mat_rows_list)}</tbody></table></div>'
                 st.markdown(matrix_html, unsafe_allow_html=True)
             else:
                 st.caption("Matrice di transizione in fase di calcolo.")
