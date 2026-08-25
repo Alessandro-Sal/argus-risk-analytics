@@ -616,11 +616,11 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 for t in tickers_in_opt:
                     w = float(w_dict.get(t, 0.0))
                     val = w * target_tot
-                    px = price_map.get(t, 100.0)
-                    q = (val / px) if px > 0 else 0.0
+                    unit_px = float(price_map.get(t, 100.0))
+                    q = (val / unit_px) if unit_px > 0 else 0.0
                     if int_shares_opt:
                         q = float(round(q))
-                        val = q * px
+                        val = q * unit_px
                     st.session_state[f"sbx_q_{t}"] = q
                     st.session_state[f"sbx_m_{t}"] = val
                     st.session_state[f"sbx_w_{t}"] = w * 100.0
@@ -773,8 +773,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 tot_sim_val = max(0.0, tot_cur_val + cash_injection)
                 for t in tickers_in_opt:
                     sim_vals[t] = norm_sim_weights[t] * tot_sim_val
-                    px = price_map.get(t, 100.0)
-                    q = (sim_vals[t] / px) if px > 0 else 0.0
+                    unit_px = float(price_map.get(t, 100.0))
+                    q = (sim_vals[t] / unit_px) if unit_px > 0 else 0.0
                     sim_qtys[t] = float(round(q)) if int_shares_opt else q
 
                 w_color = "#4ade80" if abs(tot_raw_w - 100.0) < 0.1 else "#facc15"
