@@ -1920,31 +1920,235 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 # TAB 3: CORRELAZIONI, LIQUIDITÀ & ATR CHANDELIER
 # ==============================================================================
 elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
-    st.markdown("### 🔗 Matrice di Correlazione tra Asset")
+    col_corr_h1, col_corr_h2 = st.columns([3.5, 1.2])
+    with col_corr_h1:
+        st.markdown("### 🔗 Matrice di Correlazione tra Asset")
+        st.caption("Analisi empirica del co-movimento lineare dei rendimenti di mercato (Coefficiente di Pearson ρ). I valori prossimi a +1 indicano rischio di concentrazione, mentre valori prossimi a 0 o negativi evidenziano benefici di diversificazione e hedging.")
+    with col_corr_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("ℹ️ Guida alla Matrice di Correlazione", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,153,0,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+  <div style="color: #ff9900; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🔗 Coefficiente di Correlazione Lineare (Pearson ρ)</div>
+  <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura statistica adimensionale compresa tra &minus;1.0 e +1.0 che quantifica il grado di sincronizzazione dei movimenti di prezzo tra coppie di asset.</div>
+  <div style="margin-bottom: 6px;"><b>📐 Come si calcola:</b>
+    <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
+      <b>&rho;<sub>i,j</sub></b> = Cov(R<sub>i</sub>, R<sub>j</sub>) / ( &sigma;<sub>i</sub> &middot; &sigma;<sub>j</sub> )
+    </div>
+  </div>
+  <div style="margin-bottom: 6px;"><b>🎯 A cosa serve:</b> Identificare cluster nascosti di rischio sistemico ed eliminare false diversificazioni tra titoli appartenenti allo stesso ecosistema tecnologico o macroeconomico.</div>
+  <div><b>🔍 Come leggerlo:</b><br>
+    • <b>&rho; &gt; +0.70:</b> Forte co-movimento (Rischio concentrazione).<br>
+    • <b>0.30 &le; &rho; &le; 0.70:</b> Correlazione positiva moderata.<br>
+    • <b>&minus;0.30 &lt; &rho; &lt; 0.30:</b> Asset decorrelati (Massima efficienza di Markowitz).<br>
+    • <b>&rho; &le; &minus;0.30:</b> Correlazione inversa (Protezione e Hedging naturale).
+  </div>
+</div>
+</div>
+""", button_label="💡 Come si legge?")
+
     df_ret_all = results["returns"].dropna(how="all")
     active_t = pos[pos["qty_net"] > 0]["ticker"].tolist()
     common_t = [t for t in active_t if t in df_ret_all.columns]
 
     if len(common_t) > 1:
-        corr_matrix = df_ret_all[common_t].corr().round(2)
-        fig_corr = px.imshow(
-            corr_matrix,
-            color_continuous_scale=[[0.0, "#f85149"], [0.5, "#161b22"], [1.0, "#3fb950"]],
-            zmin=-1, zmax=1,
-            text_auto=".2f",
-            labels={"x": "Asset 1", "y": "Asset 2", "color": "Correlazione (ρ)"}
-        )
-        fig_corr.update_traces(
-            hovertemplate="<b>Coppia: %{x} ↔ %{y}</b><br>🔗 Correlazione Lineare (ρ): <b>%{z:.2f}</b><extra></extra>"
-        )
-        fig_corr.update_layout(
-            height=430,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            coloraxis_colorbar=dict(title="Correlazione (ρ)", tickmode="linear", dtick=0.5)
-        )
-        apply_plotly_theme(fig_corr)
-        st.plotly_chart(fig_corr, use_container_width=True)
+        # Controlli interattivi
+        col_ctrl1, col_ctrl2, col_ctrl3 = st.columns([1.5, 1.5, 1.2], vertical_alignment="center")
+        with col_ctrl1:
+            sort_mode = st.selectbox(
+                "📐 Ordinamento Asset:",
+                ["Clustering Gerarchico (HRP / Dendrogram)", "Pesi di Portafoglio (Decrescente)", "Alfabetico (A-Z)"],
+                index=0,
+                key="sb_corr_sort_mode",
+                help="Il clustering gerarchico riorganizza le righe/colonne raggruppando vicini i titoli con dinamiche di prezzo simili."
+            )
+        with col_ctrl2:
+            palette_mode = st.selectbox(
+                "🎨 Tavolozza Cromatica:",
+                ["Institutional Teal-Charcoal-Amber", "Divergente Cool-Warm (Blu-Nero-Rosso)", "Emerald-Obsidian-Ruby", "Viridis"],
+                index=0,
+                key="sb_corr_palette_mode"
+            )
+        with col_ctrl3:
+            show_numbers = st.checkbox(
+                "Mostra Valori nelle Celle",
+                value=(len(common_t) <= 12),
+                key="cb_corr_show_numbers",
+                help="Abilita i valori numerici direttamente sulle celle della matrice (consigliato per matrici con max 12 asset)."
+            )
+
+        # Calcolo matrice di correlazione base
+        raw_corr = df_ret_all[common_t].corr()
+
+        # Ordinamento dei ticker
+        if "Clustering Gerarchico" in sort_mode and len(common_t) >= 3:
+            try:
+                from scipy.cluster.hierarchy import linkage, leaves_list
+                from scipy.spatial.distance import squareform
+                # Distanza di correlazione d = sqrt(0.5 * (1 - rho))
+                dist_matrix = np.sqrt(0.5 * np.maximum(0, 1.0 - raw_corr.clip(-1.0, 1.0)))
+                np.fill_diagonal(dist_matrix.values, 0.0)
+                condensed = squareform(dist_matrix, checks=False)
+                link = linkage(condensed, method='ward')
+                order_idx = leaves_list(link)
+                ordered_tickers = [raw_corr.columns[i] for i in order_idx]
+            except Exception:
+                ordered_tickers = common_t
+        elif "Pesi" in sort_mode:
+            ordered_tickers = pos[pos["ticker"].isin(common_t)].sort_values(by="weight_pct", ascending=False)["ticker"].tolist()
+            ordered_tickers += [t for t in common_t if t not in ordered_tickers]
+        else:
+            ordered_tickers = sorted(common_t)
+
+        corr_matrix = raw_corr.loc[ordered_tickers, ordered_tickers].round(2)
+
+        # Configurazione tavolozza colori
+        if "Teal-Charcoal-Amber" in palette_mode:
+            cs = [
+                [0.0, "#00f3ff"],
+                [0.35, "#0d2b38"],
+                [0.5, "#161b22"],
+                [0.65, "#3d240d"],
+                [0.85, "#ff9900"],
+                [1.0, "#ff5500"]
+            ]
+        elif "Cool-Warm" in palette_mode:
+            cs = [
+                [0.0, "#38bdf8"],
+                [0.5, "#161b22"],
+                [1.0, "#f85149"]
+            ]
+        elif "Emerald" in palette_mode:
+            cs = [
+                [0.0, "#f85149"],
+                [0.5, "#161b22"],
+                [1.0, "#22c55e"]
+            ]
+        else:
+            cs = "Viridis"
+
+        # Matrice di customdata per hover interpretativo
+        custom_labels = []
+        for i_row, r_name in enumerate(ordered_tickers):
+            row_labels = []
+            for j_col, c_name in enumerate(ordered_tickers):
+                if r_name == c_name:
+                    lbl = "Autocorrelazione (Identità = 1.00)"
+                else:
+                    v = corr_matrix.iloc[i_row, j_col]
+                    if v >= 0.70:
+                        lbl = "🔴 Forte Correlazione (Rischio Concentrazione)"
+                    elif v >= 0.35:
+                        lbl = "🟡 Media Correlazione Positiva"
+                    elif v >= 0.0:
+                        lbl = "⚪ Bassa Correlazione (Diversificante)"
+                    elif v >= -0.30:
+                        lbl = "🟢 Lieve Correlazione Inversa (Hedging)"
+                    else:
+                        lbl = "🛡️ Forte Decorrelazione / Safe Haven"
+                row_labels.append(lbl)
+            custom_labels.append(row_labels)
+
+        # Calcolo coppie top e diversificatori
+        pairs = []
+        for i in range(len(ordered_tickers)):
+            for j in range(i + 1, len(ordered_tickers)):
+                t1, t2 = ordered_tickers[i], ordered_tickers[j]
+                pairs.append({
+                    "t1": t1,
+                    "t2": t2,
+                    "corr": float(raw_corr.loc[t1, t2])
+                })
+        df_pairs = pd.DataFrame(pairs)
+        
+        # Correlazione media di portafoglio (esclusa diagonale)
+        avg_corr = df_pairs["corr"].mean() if not df_pairs.empty else 0.0
+
+        col_heat, col_kpi = st.columns([2.4, 1.1])
+        with col_heat:
+            fig_corr = px.imshow(
+                corr_matrix,
+                color_continuous_scale=cs,
+                zmin=-1.0,
+                zmax=1.0,
+                text_auto=(".2f" if show_numbers else False),
+                aspect="auto",
+                labels={"x": "Asset A", "y": "Asset B", "color": "Correlazione (ρ)"}
+            )
+            fig_corr.update_traces(
+                customdata=custom_labels,
+                hovertemplate="<b>%{x} ↔ %{y}</b><br>Correlazione di Pearson: <b>%{z:+.2f}</b><br>Status: <i>%{customdata}</i><extra></extra>"
+            )
+            fig_corr.update_layout(
+                height=520,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(13,17,23,0.6)",
+                margin=dict(l=10, r=10, t=10, b=10),
+                xaxis=dict(
+                    tickangle=-45,
+                    tickfont=dict(size=11, color="#e6edf3", family="monospace"),
+                    gridcolor="rgba(255,255,255,0.04)"
+                ),
+                yaxis=dict(
+                    tickfont=dict(size=11, color="#e6edf3", family="monospace"),
+                    gridcolor="rgba(255,255,255,0.04)"
+                ),
+                coloraxis_colorbar=dict(
+                    title="ρ (Pearson)",
+                    tickmode="linear",
+                    dtick=0.5,
+                    thickness=14,
+                    len=0.85
+                )
+            )
+            st.plotly_chart(fig_corr, use_container_width=True, config={"displayModeBar": False})
+
+        with col_kpi:
+            # Scorecard media
+            if avg_corr <= 0.25:
+                corr_badge = "🟢 Diversificazione Eccellente"
+                corr_color = "#4ade80"
+            elif avg_corr <= 0.50:
+                corr_badge = "🟡 Diversificazione Buona"
+                corr_color = "#facc15"
+            else:
+                corr_badge = "🔴 Elevata Co-movimentazione"
+                corr_color = "#f87171"
+
+            st.markdown(f"""
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px;">
+                <div style="font-size: 11px; color: #8b949e; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">Correlazione Media Asset</div>
+                <div style="font-size: 24px; font-weight: 800; color: #ffffff; margin: 4px 0;">{avg_corr:+.2f}</div>
+                <div style="font-size: 11.5px; font-weight: 700; color: {corr_color};">{corr_badge}</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if not df_pairs.empty:
+                top_corr = df_pairs.sort_values(by="corr", ascending=False).head(3)
+                top_div = df_pairs.sort_values(by="corr", ascending=True).head(3)
+
+                st.markdown("<div style='font-size: 12px; font-weight: 700; color: #f87171; margin-bottom: 4px;'>🔥 Top 3 Più Correlate (Co-Movement)</div>", unsafe_allow_html=True)
+                rows_tc = []
+                for _, r in top_corr.iterrows():
+                    rows_tc.append(f"""
+                    <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25); border-radius: 6px; padding: 5px 8px; margin-bottom: 5px; font-size: 11.5px;">
+                        <span style="font-weight: 700; color: #ffffff;">{r['t1']} ↔ {r['t2']}</span>
+                        <span style="font-family: monospace; font-weight: 700; color: #f87171;">+{r['corr']:.2f}</span>
+                    </div>
+                    """)
+                st.markdown("".join(rows_tc), unsafe_allow_html=True)
+
+                st.markdown("<div style='font-size: 12px; font-weight: 700; color: #38bdf8; margin: 10px 0 4px;'>🛡️ Top 3 Miglior Hedging (Decorrelate)</div>", unsafe_allow_html=True)
+                rows_td = []
+                for _, r in top_div.iterrows():
+                    clr = "#4ade80" if r['corr'] < 0 else "#38bdf8"
+                    rows_td.append(f"""
+                    <div style="display:flex; justify-content:space-between; align-items:center; background: rgba(56,189,248,0.08); border: 1px solid rgba(56,189,248,0.25); border-radius: 6px; padding: 5px 8px; margin-bottom: 5px; font-size: 11.5px;">
+                        <span style="font-weight: 700; color: #ffffff;">{r['t1']} ↔ {r['t2']}</span>
+                        <span style="font-family: monospace; font-weight: 700; color: {clr};">{r['corr']:+.2f}</span>
+                    </div>
+                    """)
+                st.markdown("".join(rows_td), unsafe_allow_html=True)
     else:
         st.info("Numero di asset attivi insufficiente per calcolare la matrice di correlazione.")
 
