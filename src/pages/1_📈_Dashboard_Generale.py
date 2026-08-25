@@ -779,7 +779,7 @@ for bm_code, bm_info in ALL_BENCHMARKS.items():
     bm_sharpe = float((bm_cagr - 3.0) / bm_vol) if bm_vol > 0.0 else 0.0
     bm_cum = (1 + sr_bm_sub).cumprod()
     bm_dd = float(((bm_cum - bm_cum.cummax()) / bm_cum.cummax()).min() * 100.0) if not bm_cum.empty else 0.0
-    alpha_delta = p_cagr - bm_cagr
+    alpha_delta = p_tot_ret - bm_tot_ret
 
     esito_txt = "🟢 Portafoglio Sovraperforma" if alpha_delta > 0.01 else ("🔴 Benchmark Sovraperforma" if alpha_delta < -0.01 else "⚪ In linea")
 
@@ -792,7 +792,7 @@ for bm_code, bm_info in ALL_BENCHMARKS.items():
         "Volatilità Annua %": bm_vol,
         "Sharpe Ratio": bm_sharpe,
         "Max Drawdown %": bm_dd,
-        "Alpha vs Portafoglio %": alpha_delta,
+        "Alpha (Δ Rendimento %)": alpha_delta,
         "Esito Alpha": esito_txt
     })
 
@@ -810,11 +810,11 @@ if filter_sc_geo != "Tutti i Benchmark (12)":
 # 2. Filtro Performance Alpha
 if filter_sc_alpha == "🟢 Solo Alpha Positivo (Portafoglio Vince)":
     df_sc_filtered = df_sc_filtered[
-        (df_sc_filtered["Alpha vs Portafoglio %"] >= -1e-5)
+        (df_sc_filtered["Alpha (Δ Rendimento %)"] >= -1e-5)
     ]
 elif filter_sc_alpha == "🔴 Solo Alpha Negativo (Benchmark Vince)":
     df_sc_filtered = df_sc_filtered[
-        (df_sc_filtered["Alpha vs Portafoglio %"] < -0.01) | (df_sc_filtered["Ticker"] == "PORTAFOGLIO")
+        (df_sc_filtered["Alpha (Δ Rendimento %)"] < -0.01) | (df_sc_filtered["Ticker"] == "PORTAFOGLIO")
     ]
 
 # 3. Filtro Ricerca
@@ -855,18 +855,18 @@ else:
         "Volatilità Annua %": st.column_config.NumberColumn("Volatilità Annua", format="%.2f%%"),
         "Sharpe Ratio": st.column_config.NumberColumn("Sharpe Ratio", format="%.2f"),
         "Max Drawdown %": st.column_config.NumberColumn("Max Drawdown", format="%.2f%%"),
-        "Alpha vs Portafoglio %": st.column_config.NumberColumn("Alpha vs Portafoglio", format="%+,.2f%%"),
+        "Alpha (Δ Rendimento %)": st.column_config.NumberColumn("Alpha (Δ Rendimento %)", format="%+,.2f%%", help="Sovraperformance Cumulata Totale = Rendimento Portafoglio (%) - Rendimento Benchmark (%)"),
         "Esito Alpha": st.column_config.TextColumn("Valutazione Outperformance", width="medium")
     }
     
     st.dataframe(
-        sc_disp_df.style.map(highlight_alpha_sc, subset=["Alpha vs Portafoglio %"]).format({
+        sc_disp_df.style.map(highlight_alpha_sc, subset=["Alpha (Δ Rendimento %)"]).format({
             "Rendimento Tot %": "{:+,.2f}%",
             "CAGR Annuo %": "{:+,.2f}%",
             "Volatilità Annua %": "{:.2f}%",
             "Sharpe Ratio": "{:.2f}",
             "Max Drawdown %": "{:.2f}%",
-            "Alpha vs Portafoglio %": "{:+,.2f}%"
+            "Alpha (Δ Rendimento %)": "{:+,.2f}%"
         }),
         column_config=sc_cfg,
         use_container_width=True,
