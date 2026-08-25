@@ -341,7 +341,7 @@ Il modulo di diagnostica analizza il portafoglio alla ricerca di vulnerabilità 
 1. **Punteggio Base**: Inizia da $100$.
 2. **Penalizzazioni**:
    - **Alta Concentrazione ($HHI > 0.25$ o Top 3 Asset $> 50\%$)**: $-15$ punti.
-   - **Contributo sproporzionato al Rischio ($\text{Component VaR}_i > 25\text{\%}$)**: $-15$ punti (calcolato solo sui titoli attivi $q_i > 0$).
+   - **Contributo sproporzionato al Rischio ($\text{Component VaR}_i > 25\%$)**: $-15$ punti (calcolato solo sui titoli attivi $q_i > 0$).
    - **Multipli P/E Elevati ($P/E > 45x$)**: Segnalazione d'alert per titoli ad alta valutazione fondamentale.
    - **Inefficienza di Sharpe ($\Delta \text{Sharpe} > 0.30$)**: $-10$ punti quando l'ottimizzatore Markowitz individua un guadagno significativo di rendimento corretto per il rischio.
    - **Aggressività Sistemica ($\beta > 1.3$)**: Alert per elevata sensibilità al mercato.
@@ -456,7 +456,7 @@ $$
    
 
 $$
-N_{\text{quote}} = \text{round}\left( \frac{|H|}{P_{\text{etf\_inverso}}} \right)
+N_{\text{quote}} = \text{round}\left( \frac{|H|}{P_{\text{ETF Inverso}}} \right)
 $$
 
 3. **Protezione Tail Risk ($\text{VaR}_{99}$)**:
@@ -649,7 +649,7 @@ $$
 Campiona simultaneamente il tasso di crescita del fatturato $g \sim \mathcal{N}(\mu_g, \sigma_g)$, il costo del capitale $WACC \sim \mathcal{N}(\mu_w, \sigma_w)$ ed il tasso di crescita terminale $g_{\text{term}} \sim \mathcal{N}(\mu_{tg}, \sigma_{tg})$ per ricavare la distribuzione completa del Fair Value e calcolare la percentuale di probabilità di sottovalutazione:
 
 $$
-\text{Probabilità Sottovalutazione \%} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}(\text{Fair Value}_i > \text{Prezzo Attuale}) \times 100
+\text{Probabilità Sottovalutazione (pct)} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}(\text{Fair Value}_i > \text{Prezzo Attuale}) \times 100
 $$
 
 ---
@@ -713,7 +713,7 @@ $$
 ### 3. Distanza Percentuale & Alert Condition
 
 $$
-\text{Distanza Stop \%} = \frac{P_{\text{mkt}} - \text{Chandelier Exit}_t}{P_{\text{mkt}}} \times 100
+\text{Distanza Stop (pct)} = \frac{P_{\text{mkt}} - \text{Chandelier Exit}_t}{P_{\text{mkt}}} \times 100
 $$
 
 $$
@@ -743,11 +743,11 @@ $$
 ### 2. Slippage Stimato % & Impatto Monetario (€)
 
 $$
-\text{Slippage Stimato \%} = \frac{I_{\text{perm}} + I_{\text{temp}}}{P_{\text{attuale}}} \times 100
+\text{Slippage Stimato (pct)} = \frac{I_{\text{perm}} + I_{\text{temp}}}{P_{\text{attuale}}} \times 100
 $$
 
 $$
-\text{Impatto Monetario Totale (\text{ EUR})} = \text{Quote Scambiate} \times (I_{\text{perm}} + I_{\text{temp}})
+\text{Impatto Monetario Totale (EUR)} = \text{Quote Scambiate} \times (I_{\text{perm}} + I_{\text{temp}})
 $$
 
 ---
@@ -943,7 +943,7 @@ $$
 Il numero di contratti Put (ciascuno rappresentante un moltiplicatore standard di 100 azioni) per immunizzare o ridurre il Beta di portafoglio:
 
 $$
-N_{\text{contratti}} = \left\lceil \frac{\text{Valore Portafoglio} \times \beta_{\text{portafoglio}} \times \text{Copertura \%}}{S_{\text{benchmark}} \times |\Delta_{\text{put}}| \times 100} \right\rceil
+N_{\text{contratti}} = \left\lceil \frac{\text{Valore Portafoglio} \times \beta_{\text{portafoglio}} \times \text{Copertura (pct)}}{S_{\text{benchmark}} \times |\Delta_{\text{put}}| \times 100} \right\rceil
 $$
 
 ---
@@ -1132,7 +1132,7 @@ Framework per l'analisi telemetrica dell'occupazione fisica dei database SQLite/
   
 
 $$
-\text{Reclaimable Space (Bytes)} = \text{freelist\_count} \times \text{page\_size}
+\text{Reclaimable Space (Bytes)} = \text{Freelist Count} \times \text{Page Size}
 $$
 
 - **Compattazione Dinamica (`VACUUM`)**: Esecuzione del comando SQLite `VACUUM` e `PRAGMA optimize` per deframmentare il database, azzerare le pagine orfane e recuperare spazio fisico su disco.
@@ -1245,11 +1245,11 @@ SL\% = \frac{P_{\text{entry}} - P_{\text{stop}}}{P_{\text{entry}}}
 $$
 
 $$
-\text{Capitale a Rischio (\text{ EUR})} = C \times f^*_{\text{half}}
+\text{Capitale a Rischio (EUR)} = C \times f^*_{\text{half}}
 $$
 
 $$
-\text{Controvalore Nozionale Posizione (\text{ EUR})} = \frac{\text{Capitale a Rischio (\text{ EUR})}}{SL\%}
+\text{Controvalore Nozionale Posizione (EUR)} = \frac{\text{Capitale a Rischio (EUR)}}{SL\%}
 $$
 
 $$
@@ -1517,7 +1517,7 @@ N_{\text{contratti}} = \frac{\Delta_{\text{port}}}{|\Delta_{\text{put}}| \times 
 $$
 
 $$
-\text{Costo Annuo Assicurazione (\% AUM)} = \frac{N_{\text{contratti}} \times P_{\text{put}} \times \text{Multiplier}}{V_{\text{port}}} \times \frac{365.25}{T_{\text{giorni}}}
+\text{Costo Annuo Assicurazione (pct AUM)} = \frac{N_{\text{contratti}} \times P_{\text{put}} \times \text{Multiplier}}{V_{\text{port}}} \times \frac{365.25}{T_{\text{giorni}}}
 $$
 
 ---
@@ -1763,13 +1763,13 @@ $$
 $$
 
 $$
-\text{Contributo \% Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\%
+\text{Contributo pct Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\%
 $$
 
 Proprietà di chiusura esatta:
 
 $$
-\sum_{i=1}^N \text{Contributo \% Rischio}_i = 100.0\%
+\sum_{i=1}^N \text{Contributo pct Rischio}_i = 100.0\%
 $$
 
 ---
@@ -1788,7 +1788,7 @@ Dove:
 - **Premio Illiquidità**:
 
 $$
-\text{Premio Illiquidità (\%)} = \frac{\text{LVaR} - \text{VaR}_1}{\text{VaR}_1} \times 100\%
+\text{Premio Illiquidità (pct)} = \frac{\text{LVaR} - \text{VaR}_1}{\text{VaR}_1} \times 100\%
 $$
 
 ---
@@ -2077,7 +2077,7 @@ Per gli investitori che operano con intermediari esteri o in regime dichiarativo
 
 ### 3. Pilastro 3: Analizzatore Withholding Tax (WHT) & Doppia Imposizione Dividendi Esteri
 * **Convenzioni contro le Doppie Imposizioni (DTT) & Modulo W-8BEN**:
-  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\text{\%}$, $WHT_{\text{DE}} = 26.375\text{\%}$, $WHT_{\text{CH}} = 35\text{\%}$, $WHT_{\text{FR}} = 12.8\text{\%}$.
+  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\%$, $WHT_{\text{DE}} = 26.375\%$, $WHT_{\text{CH}} = 35\%$, $WHT_{\text{FR}} = 12.8\%$.
   - Tassazione italiana sul "Netto Frontiera": $T_{\text{IT}} = (\text{Dividendo Lordo} \times (1 - WHT)) \times 0.26$.
   - **Aliquota Effettiva Combinata**:
     
@@ -2086,7 +2086,7 @@ $$
 \tau_{\text{eff}} = 1 - (1 - WHT) \times (1 - 0.26)
 $$
 
-    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\text{\%}$)*.
+    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\%$)*.
 * **Tax Drag vs ETF UCITS ad Accumulazione**:
   Gli ETF ad accumulazione trattengono internamente il 15% alla fonte senza subire l'imposta italiana immediata sul netto frontiera fino al realizzo finale, eliminando la perdita di rendimento composto da tassazione anticipata.
 
