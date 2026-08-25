@@ -583,49 +583,84 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     if st.button("⭐ Ripristina Quote Attuali", key="sbx_q_reset", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_q_{t}"] = float(qty_map.get(t, 0.0))
+                        st.session_state["sbx_edit_key_qty"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_q2:
                     if st.button("➕ +10 Quote su Tutti", key="sbx_q_plus10", use_container_width=True):
                         for t in tickers_in_opt:
-                            st.session_state[f"sbx_q_{t}"] = float(qty_map.get(t, 0.0) + 10.0)
+                            st.session_state[f"sbx_q_{t}"] = float(st.session_state.get(f"sbx_q_{t}", qty_map.get(t, 0.0)) + 10.0)
+                        st.session_state["sbx_edit_key_qty"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_q3:
                     if st.button("➖ -10 Quote (o Max Disp.)", key="sbx_q_minus10", use_container_width=True):
                         for t in tickers_in_opt:
-                            st.session_state[f"sbx_q_{t}"] = max(0.0, float(qty_map.get(t, 0.0) - 10.0))
+                            st.session_state[f"sbx_q_{t}"] = max(0.0, float(st.session_state.get(f"sbx_q_{t}", qty_map.get(t, 0.0)) - 10.0))
+                        st.session_state["sbx_edit_key_qty"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_q4:
                     if st.button("🧹 Azzera Tutto (0 Quote)", key="sbx_q_zero", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_q_{t}"] = 0.0
+                        st.session_state["sbx_edit_key_qty"] = str(uuid.uuid4())[:8]
                         st.rerun()
 
-                st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE QUOTE AZIONI:</div>', unsafe_allow_html=True)
-                grid_cols = st.columns(min(4, len(tickers_in_opt)))
-                for i, t in enumerate(tickers_in_opt):
+                st.markdown('<div style="font-size:12.5px; font-weight:700; color:#ff9900; margin: 12px 0 6px 0;">📋 TABELLA DI REBALANCING OPERATIVO (MODIFICA LE QUOTE NELLA COLONNA "NUOVE QUOTE"):</div>', unsafe_allow_html=True)
+                
+                rows_data = []
+                for t in tickers_in_opt:
                     cur_q = float(qty_map.get(t, 0.0))
                     cur_px = float(price_map.get(t, 100.0))
-                    step_val = 1.0 if cur_q >= 1.0 and cur_q.is_integer() else 0.1
-                    with grid_cols[i % len(grid_cols)]:
-                        new_q = st.number_input(
-                            f"**{t}** (Attuali: {cur_q:,.1f})",
-                            min_value=0.0,
-                            value=float(st.session_state.get(f"sbx_q_{t}", cur_q)),
-                            step=step_val,
-                            key=f"sbx_q_{t}",
-                            help=f"Prezzo: € {cur_px:,.2f} | Valore Attuale: € {cur_q * cur_px:,.2f}"
-                        )
-                        sim_qtys[t] = new_q
-                        delta_q = new_q - cur_q
-                        delta_val = delta_q * cur_px
-                        if delta_q < 0:
-                            st.markdown(f"<span style='font-size:11px; color:#00e676; font-weight:700;'>🟢 VENDI {abs(delta_q):,.1f} (Libera € {abs(delta_val):,.2f})</span>", unsafe_allow_html=True)
-                        elif delta_q > 0:
-                            st.markdown(f"<span style='font-size:11px; color:#58a6ff; font-weight:700;'>🔵 COMPRA +{delta_q:,.1f} (Costa € {delta_val:,.2f})</span>", unsafe_allow_html=True)
-                        else:
-                            st.markdown("<span style='font-size:11px; color:#8b949e;'>⚪ Invariato</span>", unsafe_allow_html=True)
+                    val_q = float(st.session_state.get(f"sbx_q_{t}", cur_q))
+                    cur_v = cur_q * cur_px
+                    sim_v = val_q * cur_px
+                    delta_q = val_q - cur_q
+                    delta_v = delta_q * cur_px
+                    if delta_q > 0:
+                        act = f"🔵 COMPRA +{delta_q:,.1f} (Costa € {delta_v:,.2f})"
+                    elif delta_q < 0:
+                        act = f"🟢 VENDI {abs(delta_q):,.1f} (Libera € {abs(delta_v):,.2f})"
+                    else:
+                        act = "⚪ Invariato"
+                    
+                    rows_data.append({
+                        "ticker": t,
+                        "price": cur_px,
+                        "current_qty": cur_q,
+                        "current_value": cur_v,
+                        "sim_qty": val_q,
+                        "sim_value": sim_v,
+                        "delta_qty": delta_q,
+                        "action": act
+                    })
+                
+                df_editor_qty = pd.DataFrame(rows_data)
+                edit_key = st.session_state.get("sbx_edit_key_qty", "default")
+                
+                edited_df = st.data_editor(
+                    df_editor_qty,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ticker", "price", "current_qty", "current_value", "sim_value", "delta_qty", "action"],
+                    column_config={
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "price": st.column_config.NumberColumn("Prezzo (€)", format="€ %,.2f"),
+                        "current_qty": st.column_config.NumberColumn("Quote Attuali", format="%,.1f"),
+                        "current_value": st.column_config.NumberColumn("Valore Attuale", format="€ %,.2f"),
+                        "sim_qty": st.column_config.NumberColumn("🎯 Nuove Quote (Modifica)", format="%,.1f", min_value=0.0, step=1.0, required=True),
+                        "sim_value": st.column_config.NumberColumn("Valore Target", format="€ %,.2f"),
+                        "delta_qty": st.column_config.NumberColumn("Δ Quote", format="%+,.1f"),
+                        "action": st.column_config.TextColumn("Azione Operativa", width="medium")
+                    },
+                    key=f"data_editor_qty_{edit_key}"
+                )
 
-                        sim_vals[t] = new_q * cur_px
+                for _, r in edited_df.iterrows():
+                    tk = str(r["ticker"])
+                    sq = float(r["sim_qty"])
+                    st.session_state[f"sbx_q_{tk}"] = sq
+                    sim_qtys[tk] = sq
+                    cur_px = float(price_map.get(tk, 100.0))
+                    sim_vals[tk] = sq * cur_px
 
                 tot_sim_val = sum(sim_vals.values())
                 net_cash_flow = sum((qty_map.get(t, 0.0) - sim_qtys[t]) * price_map.get(t, 100.0) for t in tickers_in_opt)
@@ -635,33 +670,79 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
 
             elif sbx_mode == "💶 Importo Monetario (€)":
-                col_m1, col_m2 = st.columns(2)
+                col_m1, col_m2, col_m3 = st.columns(3)
                 with col_m1:
                     if st.button("⭐ Ripristina Valori Attuali", key="sbx_m_reset", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_m_{t}"] = float(val_map.get(t, 1000.0))
+                        st.session_state["sbx_edit_key_m"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_m2:
                     if st.button("⚖️ Equi-Valore (€ 5.000 / asset)", key="sbx_m_eq", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_m_{t}"] = 5000.0
+                        st.session_state["sbx_edit_key_m"] = str(uuid.uuid4())[:8]
+                        st.rerun()
+                with col_m3:
+                    if st.button("🧹 Azzera Tutto (€ 0)", key="sbx_m_zero", use_container_width=True):
+                        for t in tickers_in_opt:
+                            st.session_state[f"sbx_m_{t}"] = 0.0
+                        st.session_state["sbx_edit_key_m"] = str(uuid.uuid4())[:8]
                         st.rerun()
 
-                st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE CONTROVALORE (€):</div>', unsafe_allow_html=True)
-                grid_cols = st.columns(min(4, len(tickers_in_opt)))
-                for i, t in enumerate(tickers_in_opt):
+                st.markdown('<div style="font-size:12.5px; font-weight:700; color:#ff9900; margin: 12px 0 6px 0;">📋 TABELLA OPERATIVA MONETARIA (MODIFICA IL CONTROVALORE NELLA COLONNA "NUOVO VALORE"):</div>', unsafe_allow_html=True)
+                
+                rows_data_m = []
+                for t in tickers_in_opt:
                     cur_v = float(val_map.get(t, 0.0))
                     cur_px = float(price_map.get(t, 100.0))
-                    with grid_cols[i % len(grid_cols)]:
-                        new_v = st.number_input(
-                            f"**{t} (€)** (Attuale: € {cur_v:,.0f})",
-                            min_value=0.0,
-                            value=float(st.session_state.get(f"sbx_m_{t}", cur_v)),
-                            step=250.0,
-                            key=f"sbx_m_{t}"
-                        )
-                        sim_vals[t] = new_v
-                        sim_qtys[t] = new_v / cur_px if cur_px > 0 else 0.0
+                    val_m = float(st.session_state.get(f"sbx_m_{t}", cur_v))
+                    delta_v = val_m - cur_v
+                    res_q = val_m / cur_px if cur_px > 0 else 0.0
+                    if delta_v > 0:
+                        act = f"🔵 INIETTA +€ {delta_v:,.2f}"
+                    elif delta_v < 0:
+                        act = f"🟢 DISINVESTI -€ {abs(delta_v):,.2f}"
+                    else:
+                        act = "⚪ Invariato"
+                    
+                    rows_data_m.append({
+                        "ticker": t,
+                        "price": cur_px,
+                        "current_value": cur_v,
+                        "sim_value": val_m,
+                        "sim_qty": res_q,
+                        "delta_val": delta_v,
+                        "action": act
+                    })
+                
+                df_editor_m = pd.DataFrame(rows_data_m)
+                edit_key_m = st.session_state.get("sbx_edit_key_m", "default")
+                
+                edited_df_m = st.data_editor(
+                    df_editor_m,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ticker", "price", "current_value", "sim_qty", "delta_val", "action"],
+                    column_config={
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "price": st.column_config.NumberColumn("Prezzo (€)", format="€ %,.2f"),
+                        "current_value": st.column_config.NumberColumn("Valore Attuale", format="€ %,.2f"),
+                        "sim_value": st.column_config.NumberColumn("🎯 Nuovo Valore (€) (Modifica)", format="€ %,.2f", min_value=0.0, step=250.0, required=True),
+                        "sim_qty": st.column_config.NumberColumn("Quote Stimata", format="%,.1f"),
+                        "delta_val": st.column_config.NumberColumn("Δ Capitale", format="€ %+,.2f"),
+                        "action": st.column_config.TextColumn("Azione Operativa", width="medium")
+                    },
+                    key=f"data_editor_m_{edit_key_m}"
+                )
+
+                for _, r in edited_df_m.iterrows():
+                    tk = str(r["ticker"])
+                    sm = float(r["sim_value"])
+                    st.session_state[f"sbx_m_{tk}"] = sm
+                    sim_vals[tk] = sm
+                    cur_px = float(price_map.get(tk, 100.0))
+                    sim_qtys[tk] = sm / cur_px if cur_px > 0 else 0.0
 
                 tot_sim_val = sum(sim_vals.values())
                 net_cash_flow = tot_cur_val - tot_sim_val
@@ -676,22 +757,26 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     if st.button("⭐ Pesi Attuali", key="sbx_preset_cur", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_w_{t}"] = float(cur_w_map.get(t, 0.0) * 100.0)
+                        st.session_state["sbx_edit_key_w"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_pre2:
                     if st.button("⚖️ Equipesato (1/N)", key="sbx_preset_eq", use_container_width=True):
                         eq_w = 100.0 / len(tickers_in_opt)
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_w_{t}"] = float(eq_w)
+                        st.session_state["sbx_edit_key_w"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_pre3:
                     if st.button("🏆 Max Sharpe", key="sbx_preset_ms", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_w_{t}"] = float(ms_w_map.get(t, 0.0) * 100.0)
+                        st.session_state["sbx_edit_key_w"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_pre4:
                     if st.button("🛡️ Minima Vol.", key="sbx_preset_mv", use_container_width=True):
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_w_{t}"] = float(mv_w_map.get(t, 0.0) * 100.0)
+                        st.session_state["sbx_edit_key_w"] = str(uuid.uuid4())[:8]
                         st.rerun()
                 with col_pre5:
                     if st.button("🧬 Equal Risk (ERC)", key="sbx_preset_erc", use_container_width=True):
@@ -700,23 +785,45 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                         erc_w = erc_res.get("weights", {})
                         for t in tickers_in_opt:
                             st.session_state[f"sbx_w_{t}"] = float(erc_w.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                        st.session_state["sbx_edit_key_w"] = str(uuid.uuid4())[:8]
                         st.rerun()
 
-                st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 10px 0 4px 0;">REGOLATORE PESI ASSET:</div>', unsafe_allow_html=True)
-                grid_cols = st.columns(min(4, len(tickers_in_opt)))
-                for i, t in enumerate(tickers_in_opt):
-                    default_w = float(cur_w_map.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
-                    with grid_cols[i % len(grid_cols)]:
-                        sim_weights[t] = st.slider(
-                            f"**{t}**", 
-                            min_value=0.0, 
-                            max_value=100.0, 
-                            value=float(st.session_state.get(f"sbx_w_{t}", default_w)), 
-                            step=0.5,
-                            key=f"sbx_w_{t}"
-                        )
+                st.markdown('<div style="font-size:12.5px; font-weight:700; color:#ff9900; margin: 12px 0 6px 0;">📋 TABELLA DI ALLOCAZIONE PESI (MODIFICA I PESI NELLA COLONNA "NUOVO PESO (%)"):</div>', unsafe_allow_html=True)
+                
+                rows_data_w = []
+                for t in tickers_in_opt:
+                    cur_w = float(cur_w_map.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                    val_w = float(st.session_state.get(f"sbx_w_{t}", cur_w))
+                    rows_data_w.append({
+                        "ticker": t,
+                        "cur_weight_pct": cur_w,
+                        "sim_weight_pct": val_w
+                    })
+                
+                df_editor_w = pd.DataFrame(rows_data_w)
+                edit_key_w = st.session_state.get("sbx_edit_key_w", "default")
+                
+                edited_df_w = st.data_editor(
+                    df_editor_w,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ticker", "cur_weight_pct"],
+                    column_config={
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "cur_weight_pct": st.column_config.NumberColumn("Peso Attuale (%)", format="%.2f%%"),
+                        "sim_weight_pct": st.column_config.NumberColumn("🎯 Nuovo Peso (%) (Modifica)", format="%.2f%%", min_value=0.0, max_value=100.0, step=0.5, required=True)
+                    },
+                    key=f"data_editor_w_{edit_key_w}"
+                )
 
-                tot_raw_w = sum(sim_weights.values())
+                tot_raw_w = 0.0
+                for _, r in edited_df_w.iterrows():
+                    tk = str(r["ticker"])
+                    sw = float(r["sim_weight_pct"])
+                    st.session_state[f"sbx_w_{tk}"] = sw
+                    sim_weights[tk] = sw
+                    tot_raw_w += sw
+
                 if tot_raw_w > 0:
                     norm_sim_weights = {t: w / tot_raw_w for t, w in sim_weights.items()}
                 else:
@@ -727,6 +834,9 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 for t in tickers_in_opt:
                     sim_vals[t] = norm_sim_weights[t] * tot_sim_val
                     sim_qtys[t] = sim_vals[t] / price_map[t] if price_map[t] > 0 else 0.0
+
+                w_color = "#4ade80" if abs(tot_raw_w - 100.0) < 0.1 else "#facc15"
+                st.caption(f"Somma Pesi Assegnati: <b style='color:{w_color};'>{tot_raw_w:.1f}%</b> {'(Normalizzati automaticamente a 100%)' if abs(tot_raw_w - 100.0) >= 0.1 else '✅'}", unsafe_allow_html=True)
 
             df_ret_sim = results.get("returns", pd.DataFrame())
             if df_ret_sim.empty or not all(t in df_ret_sim.columns for t in tickers_in_opt):
