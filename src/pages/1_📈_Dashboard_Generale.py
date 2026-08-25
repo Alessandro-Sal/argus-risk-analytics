@@ -452,39 +452,54 @@ with col_bm_h3:
         label_visibility="collapsed"
     )
 
+if "active_chart_bms" not in st.session_state:
+    st.session_state["active_chart_bms"] = ["SPY", "ACWI"]
+if "bm_preset_ver" not in st.session_state:
+    st.session_state["bm_preset_ver"] = 0
+
+def set_chart_bms(bms):
+    st.session_state["active_chart_bms"] = bms
+    st.session_state["bm_preset_ver"] += 1
+
 # Barra di selezione Benchmark per il grafico con preset rapidi
 col_sel_bm, col_quick_bm = st.columns([2.8, 1.7], vertical_alignment="center")
-with col_sel_bm:
-    chart_selected_bm_keys = st.multiselect(
-        "Benchmark tracciati sul grafico:",
-        options=list(ALL_BENCHMARKS.keys()),
-        default=["SPY", "ACWI"],
-        format_func=lambda k: ALL_BENCHMARKS[k]["name"],
-        key="chart_selected_bm_keys",
-        placeholder="Seleziona i benchmark da visualizzare..."
-    )
-    if not chart_selected_bm_keys:
-        chart_selected_bm_keys = ["SPY"]
 
 with col_quick_bm:
     st.markdown('<div style="margin-top: 18px;"></div>', unsafe_allow_html=True)
     c_q1, c_q2, c_q3, c_q4 = st.columns(4)
     with c_q1:
         if st.button("🇺🇸 USA", key="btn_bm_usa", use_container_width=True, help="SPY + QQQ"):
-            st.session_state["chart_selected_bm_keys"] = ["SPY", "QQQ"]
+            set_chart_bms(["SPY", "QQQ"])
             st.rerun()
     with c_q2:
         if st.button("🇪🇺 Europa", key="btn_bm_eu", use_container_width=True, help="SPY + VGK + EZU"):
-            st.session_state["chart_selected_bm_keys"] = ["SPY", "VGK", "EZU"]
+            set_chart_bms(["SPY", "VGK", "EZU"])
             st.rerun()
     with c_q3:
         if st.button("🌏 Asia", key="btn_bm_asia", use_container_width=True, help="SPY + AAXJ + EWJ"):
-            st.session_state["chart_selected_bm_keys"] = ["SPY", "AAXJ", "EWJ"]
+            set_chart_bms(["SPY", "AAXJ", "EWJ"])
             st.rerun()
     with c_q4:
         if st.button("🌐 Tutti", key="btn_bm_all", use_container_width=True, help="Tutti i Benchmark"):
-            st.session_state["chart_selected_bm_keys"] = list(ALL_BENCHMARKS.keys())
+            set_chart_bms(list(ALL_BENCHMARKS.keys()))
             st.rerun()
+
+with col_sel_bm:
+    curr_bm_default = [b for b in st.session_state["active_chart_bms"] if b in ALL_BENCHMARKS]
+    if not curr_bm_default:
+        curr_bm_default = ["SPY"]
+    
+    chart_selected_bm_keys = st.multiselect(
+        "Benchmark tracciati sul grafico:",
+        options=list(ALL_BENCHMARKS.keys()),
+        default=curr_bm_default,
+        format_func=lambda k: ALL_BENCHMARKS[k]["name"],
+        key=f"chart_bm_sel_{st.session_state['bm_preset_ver']}",
+        placeholder="Seleziona i benchmark da visualizzare..."
+    )
+    st.session_state["active_chart_bms"] = chart_selected_bm_keys
+    if not chart_selected_bm_keys:
+        chart_selected_bm_keys = ["SPY"]
 
 # Map orizzonti temporali in giorni lavorativi
 horizon_days_map = {
