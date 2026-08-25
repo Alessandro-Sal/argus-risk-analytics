@@ -614,7 +614,9 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
             def apply_target_strategy_weights(w_dict):
                 target_tot = max(0.0, tot_cur_val + cash_injection)
                 for t in tickers_in_opt:
-                    w = float(w_dict.get(t, 0.0))
+                    raw_w = float(w_dict.get(t, 0.0))
+                    w = 0.0 if abs(raw_w) < 1e-5 else raw_w
+                    w_pct = round(w * 100.0, 2)
                     val = w * target_tot
                     unit_px = float(price_map.get(t, 100.0))
                     q = (val / unit_px) if unit_px > 0 else 0.0
@@ -622,8 +624,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                         q = float(round(q))
                         val = q * unit_px
                     st.session_state[f"sbx_q_{t}"] = q
-                    st.session_state[f"sbx_m_{t}"] = val
-                    st.session_state[f"sbx_w_{t}"] = w * 100.0
+                    st.session_state[f"sbx_m_{t}"] = round(val, 2)
+                    st.session_state[f"sbx_w_{t}"] = w_pct
                 st.session_state["sbx_edit_key_qty"] = str(uuid.uuid4())[:8]
                 st.session_state["sbx_edit_key_m"] = str(uuid.uuid4())[:8]
                 st.session_state["sbx_edit_key_w"] = str(uuid.uuid4())[:8]
@@ -682,15 +684,55 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     cur_q = float(qty_map.get(t, 0.0))
                     cur_px = float(price_map.get(t, 100.0))
                     val_q = float(st.session_state.get(f"sbx_q_{t}", cur_q))
-                    sim_qtys[t] = val_q
-                    sim_vals[t] = val_q * cur_px
-                    rows_data.append({"ticker": t, "sim_qty": val_q})
+                    cur_v = cur_q * cur_px
+                    sim_v = val_q * cur_px
+                    delta_q = val_q - cur_q
+                    delta_v = delta_q * cur_px
+                    if delta_q > 0:
+                        act = f"🔵 COMPRA +{delta_q:,.1f} (Costa € {delta_v:,.2f})"
+                    elif delta_q < 0:
+                        act = f"🟢 VENDI {abs(delta_q):,.1f} (Libera € {abs(delta_v):,.2f})"
+                    else:
+                        act = "⚪ Invariato"
+                    
+                    rows_data.append({
+                        "ticker": t,
+                        "price": cur_px,
+                        "current_qty": cur_q,
+                        "current_value": cur_v,
+                        "sim_qty": val_q,
+                        "sim_value": sim_v,
+                        "delta_qty": delta_q,
+                        "action": act
+                    })
                 
-                edited_df = st.data_editor(pd.DataFrame(rows_data), hide_index=True, use_container_width=True, key=f"data_editor_qty_{edit_key}")
+                df_editor_qty = pd.DataFrame(rows_data)
+                
+                edited_df = st.data_editor(
+                    df_editor_qty,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ticker", "price", "current_qty", "current_value", "sim_value", "delta_qty", "action"],
+                    column_config={
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "price": st.column_config.NumberColumn("Prezzo (€)", format="€ %,.2f"),
+                        "current_qty": st.column_config.NumberColumn("Quote Attuali", format="%,.1f"),
+                        "current_value": st.column_config.NumberColumn("Valore Attuale", format="€ %,.2f"),
+                        "sim_qty": st.column_config.NumberColumn("🎯 Nuove Quote (Modifica)", format="%,.1f", min_value=0.0, step=1.0, required=True),
+                        "sim_value": st.column_config.NumberColumn("Valore Target", format="€ %,.2f"),
+                        "delta_qty": st.column_config.NumberColumn("Δ Quote", format="%+,.1f"),
+                        "action": st.column_config.TextColumn("Azione Operativa", width="medium")
+                    },
+                    key=f"data_editor_qty_{edit_key}"
+                )
+
                 for _, r in edited_df.iterrows():
-                    st.session_state[f"sbx_q_{r['ticker']}"] = float(r["sim_qty"])
-                    sim_qtys[r["ticker"]] = float(r["sim_qty"])
-                    sim_vals[r["ticker"]] = float(r["sim_qty"]) * price_map.get(r["ticker"], 100.0)
+                    tk = str(r["ticker"])
+                    sq = float(r["sim_qty"])
+                    st.session_state[f"sbx_q_{tk}"] = sq
+                    sim_qtys[tk] = sq
+                    cur_px = float(price_map.get(tk, 100.0))
+                    sim_vals[tk] = sq * cur_px
 
                 tot_sim_val = sum(sim_vals.values())
                 if tot_sim_val > 0:
@@ -716,10 +758,48 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 rows_data_m = []
                 for t in tickers_in_opt:
                     cur_v = float(val_map.get(t, 0.0))
+                    cur_px = float(price_map.get(t, 100.0))
                     val_m = float(st.session_state.get(f"sbx_m_{t}", cur_v))
-                    rows_data_m.append({"ticker": t, "sim_value": val_m})
+                    delta_v = val_m - cur_v
+                    res_q = (val_m / cur_px) if cur_px > 0 else 0.0
+                    if int_shares_opt:
+                        res_q = float(round(res_q))
+                    if delta_v > 0:
+                        act = f"🔵 INIETTA +€ {delta_v:,.2f}"
+                    elif delta_v < 0:
+                        act = f"🟢 DISINVESTI -€ {abs(delta_v):,.2f}"
+                    else:
+                        act = "⚪ Invariato"
+
+                    rows_data_m.append({
+                        "ticker": t,
+                        "price": cur_px,
+                        "current_value": cur_v,
+                        "sim_value": val_m,
+                        "sim_qty": res_q,
+                        "delta_val": delta_v,
+                        "action": act
+                    })
                 
-                edited_df_m = st.data_editor(pd.DataFrame(rows_data_m), hide_index=True, use_container_width=True, key=f"data_editor_m_{edit_key_m}")
+                df_editor_m = pd.DataFrame(rows_data_m)
+                
+                edited_df_m = st.data_editor(
+                    df_editor_m,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ticker", "price", "current_value", "sim_qty", "delta_val", "action"],
+                    column_config={
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "price": st.column_config.NumberColumn("Prezzo (€)", format="€ %,.2f"),
+                        "current_value": st.column_config.NumberColumn("Valore Attuale", format="€ %,.2f"),
+                        "sim_value": st.column_config.NumberColumn("🎯 Nuovo Valore (€) (Modifica)", format="€ %,.2f", min_value=0.0, step=250.0, required=True),
+                        "sim_qty": st.column_config.NumberColumn("Quote Stimate", format="%,.1f"),
+                        "delta_val": st.column_config.NumberColumn("Δ Capitale", format="€ %+,.2f"),
+                        "action": st.column_config.TextColumn("Azione Operativa", width="medium")
+                    },
+                    key=f"data_editor_m_{edit_key_m}"
+                )
+
                 for _, r in edited_df_m.iterrows():
                     tk = str(r["ticker"])
                     sm = float(r["sim_value"])
@@ -750,13 +830,47 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
 
                 st.markdown('<div style="font-size:12.5px; font-weight:700; color:#ff9900; margin: 12px 0 6px 0;">📋 TABELLA DI ALLOCAZIONE PESI (MODIFICA I PESI NELLA COLONNA "NUOVO PESO (%)"):</div>', unsafe_allow_html=True)
                 
+                target_tot_ref = max(0.0, tot_cur_val + cash_injection)
                 rows_data_w = []
                 for t in tickers_in_opt:
                     cur_w = float(cur_w_map.get(t, 1.0 / len(tickers_in_opt)) * 100.0)
+                    cur_px = float(price_map.get(t, 100.0))
                     val_w = float(st.session_state.get(f"sbx_w_{t}", cur_w))
-                    rows_data_w.append({"ticker": t, "sim_weight_pct": val_w})
+                    delta_w = val_w - cur_w
+                    est_val = (val_w / 100.0) * target_tot_ref
+                    est_q = (est_val / cur_px) if cur_px > 0 else 0.0
+                    if int_shares_opt:
+                        est_q = float(round(est_q))
+
+                    rows_data_w.append({
+                        "ticker": t,
+                        "price": cur_px,
+                        "cur_weight_pct": round(cur_w, 2),
+                        "sim_weight_pct": round(val_w, 2),
+                        "sim_value": est_val,
+                        "sim_qty": est_q,
+                        "delta_pct": delta_w
+                    })
                 
-                edited_df_w = st.data_editor(pd.DataFrame(rows_data_w), hide_index=True, use_container_width=True, key=f"data_editor_w_{edit_key_w}")
+                df_editor_w = pd.DataFrame(rows_data_w)
+                
+                edited_df_w = st.data_editor(
+                    df_editor_w,
+                    hide_index=True,
+                    use_container_width=True,
+                    disabled=["ticker", "price", "cur_weight_pct", "sim_value", "sim_qty", "delta_pct"],
+                    column_config={
+                        "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                        "price": st.column_config.NumberColumn("Prezzo (€)", format="€ %,.2f"),
+                        "cur_weight_pct": st.column_config.NumberColumn("Peso Attuale", format="%.2f%%"),
+                        "sim_weight_pct": st.column_config.NumberColumn("🎯 Nuovo Peso (Modifica)", format="%.2f%%", min_value=0.0, max_value=100.0, step=0.5, required=True),
+                        "sim_value": st.column_config.NumberColumn("Valore Target", format="€ %,.2f"),
+                        "sim_qty": st.column_config.NumberColumn("Quote Target", format="%,.1f"),
+                        "delta_pct": st.column_config.NumberColumn("Δ Peso %", format="%+,.2f%%")
+                    },
+                    key=f"data_editor_w_{edit_key_w}"
+                )
+
                 tot_raw_w = 0.0
                 for _, r in edited_df_w.iterrows():
                     tk = str(r["ticker"])
