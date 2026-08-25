@@ -76,10 +76,10 @@ rf_rate_pct = float(rf_info.get("rate_pct", active_rf_resolved["rate_pct"]))
 rf_source = rf_info.get("source", active_rf_resolved["source"])
 rf_currency = rf_info.get("currency", active_rf_resolved["currency"])
 
-col_callout, col_rf_btn = st.columns([4.2, 1.2])
+col_callout, col_rf_btn = st.columns([4.4, 1.2], vertical_alignment="center")
 with col_callout:
     st.markdown(f"""
-    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 4px solid #ff9900; border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.25); border-left: 4px solid #ff9900; border-radius: 8px; padding: 12px 16px; margin-bottom: 0px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
             <span style="font-weight: 700; font-size: 14.5px; color: #ff9900;">⚡ Sintesi Esecutiva Quantitativa | Status Portafoglio</span>
             <span style="font-size: 11px; background: rgba(255,153,0,0.15); color: #ff9900; padding: 2px 8px; border-radius: 12px; font-weight: 700;">
@@ -96,20 +96,20 @@ with col_callout:
 
 with col_rf_btn:
     from core.ui_utils import render_risk_free_modal
-    st.markdown('<div style="margin-top: 4px;"></div>', unsafe_allow_html=True)
     render_risk_free_modal(currency=rf_currency, use_popover=False, button_label="ℹ️ Guida Tasso Risk-Free", risk_free_info=rf_info)
 
-
+st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 st.markdown("#### 💼 Riepilogo Portafoglio")
 col1, col2, col3 = st.columns(3)
 with col1:
     port_value = ret.get("portfolio_value", 0.0)
+    twr_pct = ret.get("total_return_pct", 0.0) or 0.0
     metric_card(
         "Valore Portafoglio",
         fmt_eur(port_value),
-        delta=fmt_pct(ret.get("total_return_pct")),
-        positive=(ret.get("total_return_pct", 0) >= 0),
+        delta=f"{twr_pct:+.2f}% TWR (Cumulato)",
+        positive=(twr_pct >= 0),
         help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Il <b>Mark-to-Market (MtM)</b> corrente del portafoglio: controvalore monetario totale liquidabile istantaneamente delle posizioni aperte calcolato ai prezzi di chiusura o real-time più recenti.</div>
 
@@ -118,6 +118,7 @@ Si moltiplica la quantità netta di quote per ciascun asset per il prezzo di mer
 <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; text-align: center; font-size: 13px;">
   <b>Valore Totale</b> = &sum; (Quote Nette<sub>i</sub> &times; Prezzo<sub>i</sub> &times; Tasso FX<sub>i</sub>)
 </div>
+Il delta mostrato sotto (<b>TWR Cumulato</b>) rappresenta il rendimento ponderato nel tempo calcolato dalla combinazione delle quote lungo la storia del portafoglio.
 </div>
 
 <div style="margin-bottom: 8px;"><b>🎯 A cosa serve:</b> Rappresenta la dimensione patrimoniale effettiva dell'investimento. Risponde alla domanda: 'Se dovessi liquidare l'intero portafoglio ai prezzi attuali, quale capitale netto otterrei?'.</div>
@@ -148,7 +149,7 @@ with col2:
     metric_card(
         "PnL Totale",
         fmt_eur(tot_pnl_val),
-        delta=f"{ret.get('total_pnl_pct', 0)*100:+.2f}%",
+        delta=f"{ret.get('total_pnl_pct', 0)*100:+.2f}% sul Capitale",
         positive=(tot_pnl_val >= 0),
         help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Profit & Loss (Profitti e Perdite) Totale, in Euro e in percentuale sul capitale investito. Misura la ricchezza netta generata dal portafoglio dall'inizio dell'operatività.</div>
