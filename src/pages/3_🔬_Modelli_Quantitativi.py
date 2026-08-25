@@ -1200,7 +1200,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                         height=240
                     )
         # ── SEZIONE ERC (EQUAL RISK CONTRIBUTION) ──
-        st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
+        st.divider()
         col_erc_t1, col_erc_t2 = st.columns([3.2, 1.1])
         with col_erc_t1:
             st.markdown("##### ⚖️ Equal Risk Contribution (ERC / Parità di Rischio Pura)")
