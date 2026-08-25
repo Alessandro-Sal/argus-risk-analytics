@@ -202,13 +202,107 @@ df_fund["Upside %"] = np.where(
 df_fund["Verdetto"] = df_fund.apply(get_verdict, axis=1)
 df_valued = df_fund[df_fund["Verdetto"] != "⚪ N/A"]
 
-# ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
-active_val_tab = render_segmented_tabs([
-    "🏛️ Fair Value & Consensus Analisti",
-    "💼 Private Equity & Waterfall",
-    "📊 Bilanci & Solvibilità (Altman & DuPont)",
-    "🧮 Valutazione Intrinseca DCF Monte Carlo"
-], key="val_segmented_tab")
+# ── SELETTORE MODULI DI VALUTAZIONE STILE BLOOMBERG TERMINAL ─────────
+VALUATION_MODELS_CATALOG = {
+    "🏛️ Fair Value & Consensus Analisti": {
+        "title": "Stime di Fair Value, Target Price di Mercato & Consensus di Wall Street",
+        "badge": "Target Price • Upside • Multipli",
+        "badge_color": "#58a6ff",
+        "category": "Consensus & Prezzo Obiettivo",
+        "desc": "Confronto tra prezzi di mercato correnti, target price medio/mediano degli analisti, raccomandazioni (Buy/Hold/Sell) e stima del margine di sicurezza (Graham)."
+    },
+    "💼 Private Equity & Waterfall": {
+        "title": "Modellazione Cash Flow Private Equity, Struttura Waterfall & Metriche Rendimento",
+        "badge": "IRR • TVPI • DPI • Carry",
+        "badge_color": "#ff9900",
+        "category": "Private Markets & Fondi",
+        "desc": "Simulazione distribuzioni LP/GP con hurdle rate, catch-up, carried interest e calcolo istantaneo delle metriche istituzionali (IRR, TVPI, DPI, RVPI)."
+    },
+    "📊 Bilanci & Solvibilità (Altman & DuPont)": {
+        "title": "Analisi Fondamentale di Bilancio, Rischio Fallimento (Altman Z) & Scomposizione ROE",
+        "badge": "Altman Z-Score • DuPont 3/5 • Beneish",
+        "badge_color": "#3fb950",
+        "category": "Salute Finanziaria & Bilanci",
+        "desc": "Check-up patrimoniale completo: Probabilità di default Altman Z-Score a 5 coefficienti, scomposizione DuPont del ROE, qualità degli utili Sloan e Beneish M-Score."
+    },
+    "🧮 Valutazione Intrinseca DCF Monte Carlo": {
+        "title": "Discounted Cash Flow (DCF) Stocastico & Simulazioni Monte Carlo su WACC e Growth",
+        "badge": "DCF 1.000 Iterazioni • WACC • Terminal Value",
+        "badge_color": "#a855f7",
+        "category": "Valutazione Intrinseca",
+        "desc": "Attualizzazione dei flussi di cassa operativi liberi (FCFF/FCFE) con simulazione Monte Carlo congiunta su WACC, tasso di crescita terminale (g) e sensitivity table."
+    }
+}
+
+# Risoluzione dello stato attivo con priorità alla sidebar o global jump
+target_tab = None
+if "target_subtab_val_segmented_tab" in st.session_state:
+    target_tab = st.session_state.pop("target_subtab_val_segmented_tab")
+elif "global_target_subtab" in st.session_state:
+    target_tab = st.session_state.pop("global_target_subtab")
+elif "target_val_module" in st.session_state:
+    target_tab = st.session_state.pop("target_val_module")
+
+val_keys = list(VALUATION_MODELS_CATALOG.keys())
+
+if target_tab and target_tab in val_keys:
+    st.session_state["val_segmented_tab"] = target_tab
+    st.session_state["val_segmented_tab_selectbox"] = target_tab
+elif "val_segmented_tab" not in st.session_state or st.session_state["val_segmented_tab"] not in val_keys:
+    st.session_state["val_segmented_tab"] = val_keys[0]
+
+curr_idx = val_keys.index(st.session_state["val_segmented_tab"])
+
+# Barra Selettore Compatta Bloomberg Style
+c_sel_v, c_prev_v, c_next_v = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
+
+with c_prev_v:
+    if st.button("◀ Prec.", key="btn_val_prev", use_container_width=True, help="Modulo precedente"):
+        new_i = (curr_idx - 1) % len(val_keys)
+        st.session_state["target_val_module"] = val_keys[new_i]
+        st.rerun()
+
+with c_next_v:
+    if st.button("Succ. ▶", key="btn_val_next", use_container_width=True, help="Modulo successivo"):
+        new_i = (curr_idx + 1) % len(val_keys)
+        st.session_state["target_val_module"] = val_keys[new_i]
+        st.rerun()
+
+with c_sel_v:
+    selected_val_key = st.selectbox(
+        "Seleziona Modulo di Valutazione Aziendale:",
+        options=val_keys,
+        index=curr_idx,
+        format_func=lambda k: f"{k}  —  {VALUATION_MODELS_CATALOG[k]['category']} [{VALUATION_MODELS_CATALOG[k]['badge']}]",
+        key="val_segmented_tab_selectbox",
+        label_visibility="collapsed"
+    )
+    st.session_state["val_segmented_tab"] = selected_val_key
+
+active_val_tab = st.session_state["val_segmented_tab"]
+active_val_info = VALUATION_MODELS_CATALOG[active_val_tab]
+
+# Bloomberg Terminal Header Banner per il Modulo Attivo
+st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_val_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+      {active_val_info['title']}
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+        {active_val_info['category']}
+      </span>
+      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_val_info['badge_color']}22; color: {active_val_info['badge_color']}; border: 1px solid {active_info['badge_color'] if 'active_info' in locals() else active_val_info['badge_color']}55;">
+        {active_val_info['badge']}
+      </span>
+    </div>
+  </div>
+  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
+    {active_val_info['desc']}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── TAB 1: FAIR VALUE & CONSENSUS ANALISTI ─────────────────────
 if active_val_tab == "🏛️ Fair Value & Consensus Analisti":

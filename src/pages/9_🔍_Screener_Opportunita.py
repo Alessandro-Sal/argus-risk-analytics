@@ -226,13 +226,107 @@ with col_m4:
 
 st.divider()
 
-# ── STRUTTURA DELLE TAB AD ALTA PERFORMANCE CON LAZY LOADING ───
-active_screener_tab = render_segmented_tabs([
-    "🔍 Screener Multi-Fattoriale & Archetipi",
-    "🧪 Pre-Trade Portfolio Impact Simulator",
-    "📊 Radar Comparativo Multi-Titolo",
-    "💾 Watchlist & Segnali Operativi"
-], key="screener_segmented_subtab")
+# ── SELETTORE MODULI SCREENER STILE BLOOMBERG TERMINAL ─────────
+SCREENER_MODELS_CATALOG = {
+    "🔍 Screener Multi-Fattoriale & Archetipi": {
+        "title": "Screener Multi-Fattoriale EQS, Archetipi Quantitativi & Ranking",
+        "badge": "EQS • 6 Archetipi • Multi-Fattori",
+        "badge_color": "#3fb950",
+        "category": "Ricerca & Filtraggio Asset",
+        "desc": "Scansione multi-mercato con oltre 30 filtri quantitativi e fondamentali (Multipli, Crescita, Redditività, Momentum, Volatilità) e archetipi istituzionali preconfigurati."
+    },
+    "🧪 Pre-Trade Portfolio Impact Simulator": {
+        "title": "Simulatore Pre-Trade What-If & Analisi del Rischio Marginale (MVaR)",
+        "badge": "What-If • Δ Sharpe • MVaR",
+        "badge_color": "#ff9900",
+        "category": "Simulazione Pre-Trade",
+        "desc": "Simulazione d'impatto sul portafoglio reale prima dell'esecuzione dell'ordine: calcolo istantaneo del delta su Sharpe Ratio, Volatilità, VaR 95%, HHI e rendimento atteso."
+    },
+    "📊 Radar Comparativo Multi-Titolo": {
+        "title": "Radar Quantitativo Multi-Dimensionale & Benchmarking Competitivo",
+        "badge": "Radar 6 Dimensioni • Peer Analysis",
+        "badge_color": "#38bdf8",
+        "category": "Confronto Relativo",
+        "desc": "Visualizzazione sinottica a ragnatela per confrontare simultaneamente fino a 5 titoli candidati su 6 pilastri: Valore, Qualità, Crescita, Momentum, Bassa Volatilità e Rendita da Dividendi."
+    },
+    "💾 Watchlist & Segnali Operativi": {
+        "title": "Watchlist Istituzionale, Target Price & Alert di Rischio/Opportunità",
+        "badge": "Watchlist • Alert • Export",
+        "badge_color": "#a855f7",
+        "category": "Monitoraggio Continuo",
+        "desc": "Gestione del paniere di titoli monitorati con alert parametrici di prezzo/volatilità, report sintetico esportabile e sincronizzazione automatica con l'universo di analisi."
+    }
+}
+
+# Risoluzione dello stato attivo con priorità alla sidebar o global jump
+target_tab = None
+if "target_subtab_screener_segmented_subtab" in st.session_state:
+    target_tab = st.session_state.pop("target_subtab_screener_segmented_subtab")
+elif "global_target_subtab" in st.session_state:
+    target_tab = st.session_state.pop("global_target_subtab")
+elif "target_screener_module" in st.session_state:
+    target_tab = st.session_state.pop("target_screener_module")
+
+screener_keys = list(SCREENER_MODELS_CATALOG.keys())
+
+if target_tab and target_tab in screener_keys:
+    st.session_state["screener_segmented_subtab"] = target_tab
+    st.session_state["screener_segmented_subtab_selectbox"] = target_tab
+elif "screener_segmented_subtab" not in st.session_state or st.session_state["screener_segmented_subtab"] not in screener_keys:
+    st.session_state["screener_segmented_subtab"] = screener_keys[0]
+
+curr_idx = screener_keys.index(st.session_state["screener_segmented_subtab"])
+
+# Barra Selettore Compatta Bloomberg Style
+c_sel_sc, c_prev_sc, c_next_sc = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
+
+with c_prev_sc:
+    if st.button("◀ Prec.", key="btn_screener_prev", use_container_width=True, help="Modulo precedente"):
+        new_i = (curr_idx - 1) % len(screener_keys)
+        st.session_state["target_screener_module"] = screener_keys[new_i]
+        st.rerun()
+
+with c_next_sc:
+    if st.button("Succ. ▶", key="btn_screener_next", use_container_width=True, help="Modulo successivo"):
+        new_i = (curr_idx + 1) % len(screener_keys)
+        st.session_state["target_screener_module"] = screener_keys[new_i]
+        st.rerun()
+
+with c_sel_sc:
+    selected_screener_key = st.selectbox(
+        "Seleziona Modulo Screener:",
+        options=screener_keys,
+        index=curr_idx,
+        format_func=lambda k: f"{k}  —  {SCREENER_MODELS_CATALOG[k]['category']} [{SCREENER_MODELS_CATALOG[k]['badge']}]",
+        key="screener_segmented_subtab_selectbox",
+        label_visibility="collapsed"
+    )
+    st.session_state["screener_segmented_subtab"] = selected_screener_key
+
+active_screener_tab = st.session_state["screener_segmented_subtab"]
+active_screener_info = SCREENER_MODELS_CATALOG[active_screener_tab]
+
+# Bloomberg Terminal Header Banner per il Modulo Attivo
+st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_screener_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+      {active_screener_info['title']}
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+        {active_screener_info['category']}
+      </span>
+      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_screener_info['badge_color']}22; color: {active_screener_info['badge_color']}; border: 1px solid {active_screener_info['badge_color']}55;">
+        {active_screener_info['badge']}
+      </span>
+    </div>
+  </div>
+  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
+    {active_screener_info['desc']}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── TAB 1: SCREENER MULTI-FATTORIALE ───────────────────────────
 if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":

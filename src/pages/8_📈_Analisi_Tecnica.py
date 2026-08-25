@@ -388,14 +388,114 @@ if split_view_active:
                 metric_card("Prezzo Attuale 2°", f"€ {sec_tech['last_close']:.2f}", sec_tech["rsi_status"], positive=True)
 
 else:
-    # ── GRAFICO COCKPIT & MODULI AVANZATI CON SEGMENTED TABS (LAZY LOADING) ───
-    tab_tech = render_segmented_tabs([
-        "📊 Cockpit & Candlestick",
-        "🧱 Volume Profile Dettaglio",
-        "🚦 Confluence Score",
-        "⏳ Trend Multi-Timeframe",
-        "⚡ Real-Time Streaming"
-    ], key="tech_active_subtab")
+    # ── SELETTORE MODULI ANALISI TECNICA STILE BLOOMBERG TERMINAL ─────────
+    TECHNICAL_MODELS_CATALOG = {
+        "📊 Cockpit & Candlestick": {
+            "title": "Cockpit Tecnico Multi-Overlays, Candlestick & Indicatori Trend",
+            "badge": "EMA/SMA • Bollinger • Supertrend",
+            "badge_color": "#58a6ff",
+            "category": "Price Action & Grafici",
+            "desc": "Grafico a candele interattivo ad alta risoluzione con sovrapposizione di medie mobili esponenziali, bande di Bollinger, canale Supertrend e oscillatori di momentum."
+        },
+        "🧱 Distribuzione Analitica Volume Profile": {
+            "title": "Volume Profile Orizzontale, Point of Control (POC) & Value Area (VAH/VAL)",
+            "badge": "POC • Value Area 70% • HVN/LVN",
+            "badge_color": "#ff9900",
+            "category": "Volumetria & Liquidità",
+            "desc": "Mappatura dei volumi per livello di prezzo: individuazione del Point of Control (prezzo più scambiato), High/Low Volume Nodes e intervallo di equilibrio Value Area."
+        },
+        "🚦 Confluence Score": {
+            "title": "Algoritmo di Confluenza Quantitativa Multi-Indicatore (0-100 pts)",
+            "badge": "Confluence 0-100 • Scoring • Radar",
+            "badge_color": "#3fb950",
+            "category": "Segnali & Probabilità",
+            "desc": "Aggregatore quantitativo di oltre 12 indicatori (Trend, Momentum, Volatilità, Volume, Struttura) per produrre uno score sintetico di confidenza direzionale."
+        },
+        "⏳ Trend Multi-Timeframe": {
+            "title": "Analisi di Trend Multi-Timeframe Sincronizzata (Daily, Weekly, Monthly)",
+            "badge": "Daily • Weekly • Monthly",
+            "badge_color": "#a855f7",
+            "category": "Allineamento Orizzonti",
+            "desc": "Verifica della coerenza direzionale tra trend di breve (giornaliero), medio (settimanale) e lungo termine (mensile) per evitare trappole di contro-trend."
+        },
+        "⚡ Real-Time Streaming": {
+            "title": "Monitoraggio Flussi Intraday, Order Book & Tape Speed",
+            "badge": "Live Data • Streaming • Volatilità Tick",
+            "badge_color": "#38bdf8",
+            "category": "Streaming & Intraday",
+            "desc": "Monitoraggio in tempo reale della dinamica di prezzo tick-by-tick, velocità degli scambi e aggiornamento istantaneo dei livelli critici di supporto/resistenza."
+        }
+    }
+
+    # Risoluzione dello stato attivo con priorità alla sidebar o global jump
+    target_tab = None
+    if "target_subtab_tech_active_subtab" in st.session_state:
+        target_tab = st.session_state.pop("target_subtab_tech_active_subtab")
+    elif "global_target_subtab" in st.session_state:
+        target_tab = st.session_state.pop("global_target_subtab")
+    elif "target_tech_module" in st.session_state:
+        target_tab = st.session_state.pop("target_tech_module")
+
+    tech_keys = list(TECHNICAL_MODELS_CATALOG.keys())
+
+    if target_tab and target_tab in tech_keys:
+        st.session_state["tech_active_subtab"] = target_tab
+        st.session_state["tech_active_subtab_selectbox"] = target_tab
+    elif "tech_active_subtab" not in st.session_state or st.session_state["tech_active_subtab"] not in tech_keys:
+        st.session_state["tech_active_subtab"] = tech_keys[0]
+
+    curr_idx = tech_keys.index(st.session_state["tech_active_subtab"])
+
+    # Barra Selettore Compatta Bloomberg Style
+    c_sel_t, c_prev_t, c_next_t = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
+
+    with c_prev_t:
+        if st.button("◀ Prec.", key="btn_tech_prev", use_container_width=True, help="Modulo precedente"):
+            new_i = (curr_idx - 1) % len(tech_keys)
+            st.session_state["target_tech_module"] = tech_keys[new_i]
+            st.rerun()
+
+    with c_next_t:
+        if st.button("Succ. ▶", key="btn_tech_next", use_container_width=True, help="Modulo successivo"):
+            new_i = (curr_idx + 1) % len(tech_keys)
+            st.session_state["target_tech_module"] = tech_keys[new_i]
+            st.rerun()
+
+    with c_sel_t:
+        selected_tech_key = st.selectbox(
+            "Seleziona Modulo di Analisi Tecnica:",
+            options=tech_keys,
+            index=curr_idx,
+            format_func=lambda k: f"{k}  —  {TECHNICAL_MODELS_CATALOG[k]['category']} [{TECHNICAL_MODELS_CATALOG[k]['badge']}]",
+            key="tech_active_subtab_selectbox",
+            label_visibility="collapsed"
+        )
+        st.session_state["tech_active_subtab"] = selected_tech_key
+
+    tab_tech = st.session_state["tech_active_subtab"]
+    active_tech_info = TECHNICAL_MODELS_CATALOG[tab_tech]
+
+    # Bloomberg Terminal Header Banner per il Modulo Attivo
+    st.markdown(f"""
+    <div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_tech_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+        <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+          {active_tech_info['title']}
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+            {active_tech_info['category']}
+          </span>
+          <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_tech_info['badge_color']}22; color: {active_tech_info['badge_color']}; border: 1px solid {active_tech_info['badge_color']}55;">
+            {active_tech_info['badge']}
+          </span>
+        </div>
+      </div>
+      <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
+        {active_tech_info['desc']}
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     if tab_tech == "📊 Cockpit & Candlestick":
         col_chart, col_side_profile = st.columns([3.2, 0.95])

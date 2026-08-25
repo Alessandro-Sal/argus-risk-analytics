@@ -37,14 +37,114 @@ elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
-# ── STRUTTURA IN TAB CON LAZY LOADING ──────────────────────────
-active_pos_tab = render_segmented_tabs([
-    "📋 Posizioni Attive & Costi FIFO",
-    "🪦 Posizioni Chiuse & Graveyard",
-    "📅 Proiezione Dividendi",
-    "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
-    "⚡ Liquidità & Smart Order Router"
-], key="positions_active_tab")
+# ── SELETTORE MODULI POSIZIONI STILE BLOOMBERG TERMINAL ─────────
+POSITIONS_MODELS_CATALOG = {
+    "📋 Posizioni Attive & Costi FIFO": {
+        "title": "Mappa delle Posizioni Aperte, P&L Latente & Prezzo Medio di Carico FIFO",
+        "badge": "Lotti FIFO • Mark-to-Market • P&L",
+        "badge_color": "#58a6ff",
+        "category": "Allocazione & Holdings",
+        "desc": "Elenco analitico delle posizioni in essere, scomposizione per lotti di acquisto con metodo First-In First-Out, calcolo plus/minusvalenze latenti e ripartizione per valuta/settore."
+    },
+    "🪦 Posizioni Chiuse & Graveyard": {
+        "title": "Archivio Storico Trade Chiusi, Cimitero Asset (Graveyard) & P&L Realizzato",
+        "badge": "P&L Chiuso • Win Rate • Trade History",
+        "badge_color": "#8b949e",
+        "category": "Storico Eseguito",
+        "desc": "Analisi retrospettiva delle operazioni liquidate: metriche di efficacia (Win/Loss ratio, Profit Factor, Hold Period) e contabilizzazione fiscale dei proventi realizzati."
+    },
+    "📅 Proiezione Dividendi": {
+        "title": "Calendario Dividendi, Flussi di Cassa Cedolari & Stime Yield-on-Cost",
+        "badge": "Yield-on-Cost • Calendario Ex-Date",
+        "badge_color": "#3fb950",
+        "category": "Rendita Passiva",
+        "desc": "Proiezione a 12 mesi dei flussi di cassa da cedole e dividendi, tracking delle date di stacco/pagamento e stima del rendimento effettivo sul capitale investito (YoC)."
+    },
+    "💰 Ottimizzazione Fiscale (TUIR Art. 67)": {
+        "title": "Fiscalità Istituzionale, Zainetto Fiscale, Riforma 2026 & Tax-Loss Harvesting",
+        "badge": "Zainetto Minus • Riforma 2026 • Harvesting",
+        "badge_color": "#eab308",
+        "category": "Efficienza Fiscale",
+        "desc": "Ottimizzazione tributaria (TUIR Art. 67): monitoraggio scadenza minusvalenze (Zainetto a 4 anni), simulatore di compensazione minus/plus e impatto comparato con la Riforma Fiscale 2026."
+    },
+    "⚡ Liquidità & Smart Order Router": {
+        "title": "Gestione Riserve di Liquidità, Cash Drag & Smart Order Router (SOR)",
+        "badge": "Cash Drag • Ordini Limite • Broker Routing",
+        "badge_color": "#a855f7",
+        "category": "Esecuzione & Cassa",
+        "desc": "Controllo del cash buffer, stima del costo opportunità della liquidità inattiva (Cash Drag) e generazione distinta ordini per broker con sizing calibrato sui tick di mercato."
+    }
+}
+
+# Risoluzione dello stato attivo con priorità alla sidebar o global jump
+target_tab = None
+if "target_subtab_positions_active_tab" in st.session_state:
+    target_tab = st.session_state.pop("target_subtab_positions_active_tab")
+elif "global_target_subtab" in st.session_state:
+    target_tab = st.session_state.pop("global_target_subtab")
+elif "target_positions_module" in st.session_state:
+    target_tab = st.session_state.pop("target_positions_module")
+
+pos_keys = list(POSITIONS_MODELS_CATALOG.keys())
+
+if target_tab and target_tab in pos_keys:
+    st.session_state["positions_active_tab"] = target_tab
+    st.session_state["positions_active_tab_selectbox"] = target_tab
+elif "positions_active_tab" not in st.session_state or st.session_state["positions_active_tab"] not in pos_keys:
+    st.session_state["positions_active_tab"] = pos_keys[0]
+
+curr_idx = pos_keys.index(st.session_state["positions_active_tab"])
+
+# Barra Selettore Compatta Bloomberg Style
+c_sel_p, c_prev_p, c_next_p = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
+
+with c_prev_p:
+    if st.button("◀ Prec.", key="btn_pos_prev", use_container_width=True, help="Modulo precedente"):
+        new_i = (curr_idx - 1) % len(pos_keys)
+        st.session_state["target_positions_module"] = pos_keys[new_i]
+        st.rerun()
+
+with c_next_p:
+    if st.button("Succ. ▶", key="btn_pos_next", use_container_width=True, help="Modulo successivo"):
+        new_i = (curr_idx + 1) % len(pos_keys)
+        st.session_state["target_positions_module"] = pos_keys[new_i]
+        st.rerun()
+
+with c_sel_p:
+    selected_pos_key = st.selectbox(
+        "Seleziona Modulo Posizioni:",
+        options=pos_keys,
+        index=curr_idx,
+        format_func=lambda k: f"{k}  —  {POSITIONS_MODELS_CATALOG[k]['category']} [{POSITIONS_MODELS_CATALOG[k]['badge']}]",
+        key="positions_active_tab_selectbox",
+        label_visibility="collapsed"
+    )
+    st.session_state["positions_active_tab"] = selected_pos_key
+
+active_pos_tab = st.session_state["positions_active_tab"]
+active_pos_info = POSITIONS_MODELS_CATALOG[active_pos_tab]
+
+# Bloomberg Terminal Header Banner per il Modulo Attivo
+st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_pos_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+      {active_pos_info['title']}
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+        {active_pos_info['category']}
+      </span>
+      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_pos_info['badge_color']}22; color: {active_pos_info['badge_color']}; border: 1px solid {active_pos_info['badge_color']}55;">
+        {active_pos_info['badge']}
+      </span>
+    </div>
+  </div>
+  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
+    {active_pos_info['desc']}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── TAB 1: POSIZIONI & LIQUIDITÀ ──────────────────────────────
 if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
