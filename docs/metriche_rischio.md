@@ -31,8 +31,17 @@ $$
 
 ### Volatilità Annualizzata
 Misura la dispersione dei rendimenti del portafoglio attorno alla loro media:
-- **Volatilità Giornaliera**: $\sigma_d = \sqrt{\frac{1}{N-1} \sum_{t=1}^N (R_t - \bar{R})^2}$
-- **Volatilità Annualizzata**: $\sigma_a = \sigma_d \times \sqrt{252}$
+- **Volatilità Giornaliera**:
+
+$$
+\sigma_d = \sqrt{\frac{1}{N-1} \sum_{t=1}^N (R_t - \bar{R})^2}
+$$
+
+- **Volatilità Annualizzata**:
+
+$$
+\sigma_a = \sigma_d \times \sqrt{252}
+$$
 
 ### Asimmetria (Skewness)
 Misura la simmetria della distribuzione dei rendimenti attorno alla media:
@@ -96,7 +105,7 @@ $$
 |DD| = \frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} < \Delta_{\text{asse } Y}
 $$
 
-*Esempio numerico:* Se il portafoglio raggiunge $\text{CumRet}_{\text{peak}} = +98.4\%$ e poi cade a $\text{CumRet}_{\text{trough}} = +20.6\%$, la discesa visiva sull'asse $Y$ è $\Delta = 98.4 - 20.6 = 77.8\%$. Tuttavia, la perdita reale subita dal patrimonio è:
+*Esempio numerico:* Se il portafoglio raggiunge **+98.4%** e poi cade a **+20.6%**, la discesa visiva sull'asse $Y$ è $\Delta = 98.4 - 20.6 = 77.8\%$. Tuttavia, la perdita reale subita dal patrimonio è:
 
 $$
 DD = -\frac{77.8\%}{1 + 0.984} = -\frac{77.8\%}{1.984} = \mathbf{-39.21\%}
@@ -251,8 +260,17 @@ $$
 $$
 
 ### Ottimizzazione Vincolata SciPy SLSQP
-- **Max Sharpe Ratio**: $\max_w \frac{w^T \mu - R_f}{\sqrt{w^T \Sigma_{LW} w}} \quad \text{s.t. } \sum w_i = 1, w_i \ge 0$
-- **Min Volatility**: $\min_w w^T \Sigma_{LW} w \quad \text{s.t. } \sum w_i = 1, w_i \ge 0$
+- **Max Sharpe Ratio**:
+
+$$
+\max_w \frac{w^T \mu - R_f}{\sqrt{w^T \Sigma_{LW} w}} \quad \text{s.t. } \sum w_i = 1, w_i \ge 0
+$$
+
+- **Min Volatility**:
+
+$$
+\min_w w^T \Sigma_{LW} w \quad \text{s.t. } \sum w_i = 1, w_i \ge 0
+$$
 
 ### Ordini di Ribilanciamento
 Per ogni asset $i$, le quote da negoziare per raggiungere il peso ottimale $w_{i, \text{ott}}$ sono:
@@ -280,9 +298,23 @@ $$
 $$
 
 ### Concentrazione & Diversificazione
-- **Herfindahl-Hirschman Index (HHI)**: $HHI = \sum_{i=1}^M w_i^2$
-- **N Asset Effettivi**: $N_{\text{eff}} = \frac{1}{HHI}$
-- **Diversification Ratio (DR)**: $DR = \frac{\sum w_i \sigma_i}{\sigma_p}$
+- **Herfindahl-Hirschman Index (HHI)**:
+
+$$
+HHI = \sum_{i=1}^M w_i^2
+$$
+
+- **N Asset Effettivi**:
+
+$$
+N_{\text{eff}} = \frac{1}{HHI}
+$$
+
+- **Diversification Ratio (DR)**:
+
+$$
+DR = \frac{\sum w_i \sigma_i}{\sigma_p}
+$$
 
 ---
 
@@ -293,7 +325,7 @@ Il modulo di diagnostica analizza il portafoglio alla ricerca di vulnerabilità 
 1. **Punteggio Base**: Inizia da $100$.
 2. **Penalizzazioni**:
    - **Alta Concentrazione ($HHI > 0.25$ o Top 3 Asset $> 50\%$)**: $-15$ punti.
-   - **Contributo sproporzionato al Rischio ($\text{Component VaR}_i > 25\%$)**: $-15$ punti (calcolato solo sui titoli attivi $q_i > 0$).
+   - **Contributo sproporzionato al Rischio ($\text{Component VaR}_i > 25\text{\%}$)**: $-15$ punti (calcolato solo sui titoli attivi $q_i > 0$).
    - **Multipli P/E Elevati ($P/E > 45x$)**: Segnalazione d'alert per titoli ad alta valutazione fondamentale.
    - **Inefficienza di Sharpe ($\Delta \text{Sharpe} > 0.30$)**: $-10$ punti quando l'ottimizzatore Markowitz individua un guadagno significativo di rendimento corretto per il rischio.
    - **Aggressività Sistemica ($\beta > 1.3$)**: Alert per elevata sensibilità al mercato.
@@ -304,19 +336,53 @@ Il modulo di diagnostica analizza il portafoglio alla ricerca di vulnerabilità 
 
 Simula le transazioni esatte necessarie per portare il portafoglio dalla composizione attuale a quella target (*Max Sharpe*, *Min Volatility*, *Equal Weight*, *Custom*):
 
-1. **Patrimonio Target**: $V_{\text{target}} = V_{\text{attuale}} + \text{Cash}_{\text{deposit/withdraw}}$
-2. **Quota Teorica**: $Q_{i, \text{raw}} = \frac{V_{\text{target}} \cdot w_{i, \text{target}}}{P_{i, \text{ultimo}}}$
-3. **Arrotondamento ad Azioni Intere**: $Q_{i, \text{int}} = \text{round}(Q_{i, \text{raw}})$
-4. **Valore Ordine**: $\text{Controvalore}_i = (Q_{i, \text{int}} - Q_{i, \text{attuale}}) \cdot P_{i, \text{ultimo}}$
-5. **Buffer Liquidità Residua**: $\text{Cash Residuo} = V_{\text{target}} - \sum Q_{i, \text{int}} \cdot P_{i, \text{ultimo}}$
+1. **Patrimonio Target**:
+
+$$
+V_{\text{target}} = V_{\text{attuale}} + \text{Cash}_{\text{deposit/withdraw}}
+$$
+
+2. **Quota Teorica**:
+
+$$
+Q_{i, \text{raw}} = \frac{V_{\text{target}} \cdot w_{i, \text{target}}}{P_{i, \text{ultimo}}}
+$$
+
+3. **Arrotondamento ad Azioni Intere**:
+
+$$
+Q_{i, \text{int}} = \text{round}(Q_{i, \text{raw}})
+$$
+
+4. **Valore Ordine**:
+
+$$
+\text{Controvalore}_i = (Q_{i, \text{int}} - Q_{i, \text{attuale}}) \cdot P_{i, \text{ultimo}}
+$$
+
+5. **Buffer Liquidità Residua**:
+
+$$
+\text{Cash Residuo} = V_{\text{target}} - \sum Q_{i, \text{int}} \cdot P_{i, \text{ultimo}}
+$$
 
 ---
 
 ## 11. Dividendi & Proiezione Flussi di Cassa (`core/dividend_engine.py`)
 
-1. **Tasso Dividend Yield (%)**: I tassi $DY_i$ memorizzati a database come valori percentuali (es. $6.05\%$, $0.26\%$) vengono divisi per $100$ per ottenere il fattore decimale di calcolo ($dy_i = DY_i / 100$).
-2. **Flusso Annuo Stimato**: $\text{Dividendo Annuo}_i = V_{i, \text{attuale}} \cdot dy_i$
-3. **Yield Medio di Portafoglio**: $\text{Yield}_p = \frac{\sum \text{Dividendo Annuo}_i}{V_{\text{portafoglio}}} \times 100$
+1. **Tasso Dividend Yield (%)**: I tassi $DY_i$ memorizzati a database come valori percentuali (es. 6.05%, 0.26%) vengono divisi per $100$ per ottenere il fattore decimale di calcolo ($dy_i = DY_i / 100$).
+2. **Flusso Annuo Stimato**:
+
+$$
+\text{Dividendo Annuo}_i = V_{i, \text{attuale}} \cdot dy_i
+$$
+
+3. **Yield Medio di Portafoglio**:
+
+$$
+\text{Yield}_p = \frac{\sum \text{Dividendo Annuo}_i}{V_{\text{portafoglio}}} \times 100
+$$
+
 4. **Dividendi Storici Reali Incassati**: Somma algebrica del PnL reale registrato nelle transazioni storiche di tipo `dividend`.
 5. **Calendario Mensile per Azienda**: Scomposizione delle scadenze di stacco sui mesi reali di pagamento delle singole società ($m \in [1..12]$) per calcolare la massa di incasso mensile e l'elenco dei titoli pagatori.
 
@@ -405,12 +471,41 @@ $$
 
 Monitora in tempo reale 6 regole di rischio istituzionali:
 
-1. **Peso Max Singola Posizione**: $\max w_i \le 20\%$
-2. **Concentrazione Settoriale**: $\max \sum_{i \in \text{Settore}_k} w_i \le 35\%$
-3. **Value at Risk Max**: $\text{VaR}_{95} \le 3.00\%$
-4. **Beta Sistemico Max**: $\beta_p \le 1.25$
-5. **Diversification Ratio Min**: $DR = \frac{\sum w_i \sigma_i}{\sigma_p} \ge 1.20$
-6. **Indice HHI Max**: $HHI = \sum w_i^2 \le 0.25$
+1. **Peso Max Singola Posizione**:
+
+$$
+\max w_i \le 20\%
+$$
+
+2. **Concentrazione Settoriale**:
+
+$$
+\max \sum_{i \in \text{Settore}_k} w_i \le 35\%
+$$
+
+3. **Value at Risk Max**:
+
+$$
+\text{VaR}_{95} \le 3.00\%
+$$
+
+4. **Beta Sistemico Max**:
+
+$$
+\beta_p \le 1.25
+$$
+
+5. **Diversification Ratio Min**:
+
+$$
+DR = \frac{\sum w_i \sigma_i}{\sigma_p} \ge 1.20
+$$
+
+6. **Indice HHI Max**:
+
+$$
+HHI = \sum w_i^2 \le 0.25
+$$
 
 Classificazione a semaforo:
 - 🟢 **PASS**: Parametro entro i limiti di tolleranza.
@@ -539,9 +634,20 @@ Fasce di valutazione:
 
 ### 2. Stima Dinamica del WACC (Weighted Average Cost of Capital)
 Calcolo dinamico del costo medio del capitale aziendale tramite modello CAPM:
-- **Costo dell'Equity ($r_e$)**: $r_e = R_f + \beta \cdot \text{ERP}$
+- **Costo dell'Equity ($r_e$)**:
+
+$$
+r_e = R_f + \beta \cdot \text{ERP}
+$$
+
 - **Costo del Debito al netto delle imposte ($r_{d,\text{net}}$)**: $r_{d,\text{raw}} \cdot (1 - t_{\text{eff}})$, dove $t_{\text{eff}} = \frac{\text{Imposte}}{\text{Utile ante Imposte}}$.
-- **Pesi Strutturali**: $w_e = \frac{\text{Market Cap}}{\text{Market Cap} + \text{Debito}}$, $w_d = \frac{\text{Debito}}{\text{Market Cap} + \text{Debito}}$.
+- **Pesi Strutturali**:
+
+$$
+w_e = \frac{\text{Market Cap}}{\text{Market Cap} + \text{Debito}}
+$$
+
+, $w_d = \frac{\text{Debito}}{\text{Market Cap} + \text{Debito}}$.
 - **$\text{WACC}$**: $w_e \cdot r_e + w_d \cdot r_{d,\text{net}}$.
 
 ### 3. Matrice dei Multipli di Mercato Benchmark
@@ -655,8 +761,18 @@ R_{p,t} - R_{f,t} = \alpha + \beta_{\text{MKT}} F_{\text{MKT},t} + \beta_{\text{
 $$
 
 ### 3. Decomposizione della Varianza & Statistica $t$
-- **Rischio Sistemico Fattoriale \%**: $R^2 \times 100$
-- **Rischio Specifico Residuo \%**: $(1 - R^2) \times 100$
+- **Rischio Sistemico Fattoriale \%**:
+
+$$
+R^2 \times 100
+$$
+
+- **Rischio Specifico Residuo \%**:
+
+$$
+(1 - R^2) \times 100
+$$
+
 - **Statistica $t$ dei Betas**:
   
 
@@ -750,13 +866,37 @@ $$
 d_1 = \frac{\ln(S/K) + (r + \frac{1}{2}\sigma^2)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T}
 $$
 
-- **Call**: $C = S N(d_1) - K e^{-rT} N(d_2)$
-- **Put**: $P = K e^{-rT} N(-d_2) - S N(-d_1)$
+- **Call**:
+
+$$
+C = S N(d_1) - K e^{-rT} N(d_2)
+$$
+
+- **Put**:
+
+$$
+P = K e^{-rT} N(-d_2) - S N(-d_1)
+$$
 
 ### 2. I 5 Greci Analitici
-- **Delta ($\Delta$)**: $\Delta_{\text{Call}} = N(d_1), \quad \Delta_{\text{Put}} = N(d_1) - 1$
-- **Gamma ($\Gamma$)**: $\Gamma = \frac{N'(d_1)}{S \sigma \sqrt{T}}$
-- **Vega**: $\mathcal{V} = S \sqrt{T} N'(d_1)$
+- **Delta ($\Delta$)**:
+
+$$
+\Delta_{\text{Call}} = N(d_1), \quad \Delta_{\text{Put}} = N(d_1) - 1
+$$
+
+- **Gamma ($\Gamma$)**:
+
+$$
+\Gamma = \frac{N'(d_1)}{S \sigma \sqrt{T}}
+$$
+
+- **Vega**:
+
+$$
+\mathcal{V} = S \sqrt{T} N'(d_1)
+$$
+
 - **Theta ($\Theta$)**: Decadimento temporale dell'opzione per giorno
 - **Rho ($\rho$)**: Sensibilità al tasso d'interesse
 
@@ -1603,11 +1743,35 @@ P = \sum_{k=1}^{m \cdot T} \frac{C/m}{\left(1 + \frac{y}{m}\right)^k} + \frac{F}
 $$
 
 ### 2. Duration, Convessità & DV01
-- **Macaulay Duration**: $D_{\text{mac}} = \frac{1}{P} \sum_{k=1}^{m \cdot T} t_k \cdot \text{PV}(CF_k)$
-- **Modified Duration**: $D_{\text{mod}} = \frac{D_{\text{mac}}}{1 + y/m}$
-- **Convexity**: $C = \frac{1}{P \left(1 + \frac{y}{m}\right)^2} \sum_{k=1}^{m \cdot T} \frac{t_k (t_k + 1/m) \cdot CF_k}{\left(1 + \frac{y}{m}\right)^{m \cdot t_k}}$
-- **DV01 (Dollar Value of an 01 / PVBP)**: $\text{DV01} = P \cdot D_{\text{mod}} \cdot 0.0001$
-- **Espansione di Taylor di 2° Ordine**: $\frac{\Delta P}{P} \approx -D_{\text{mod}} \cdot \Delta y + \frac{1}{2} \cdot C \cdot (\Delta y)^2$
+- **Macaulay Duration**:
+
+$$
+D_{\text{mac}} = \frac{1}{P} \sum_{k=1}^{m \cdot T} t_k \cdot \text{PV}(CF_k)
+$$
+
+- **Modified Duration**:
+
+$$
+D_{\text{mod}} = \frac{D_{\text{mac}}}{1 + y/m}
+$$
+
+- **Convexity**:
+
+$$
+C = \frac{1}{P \left(1 + \frac{y}{m}\right)^2} \sum_{k=1}^{m \cdot T} \frac{t_k (t_k + 1/m) \cdot CF_k}{\left(1 + \frac{y}{m}\right)^{m \cdot t_k}}
+$$
+
+- **DV01 (Dollar Value of an 01 / PVBP)**:
+
+$$
+\text{DV01} = P \cdot D_{\text{mod}} \cdot 0.0001
+$$
+
+- **Espansione di Taylor di 2° Ordine**:
+
+$$
+\frac{\Delta P}{P} \approx -D_{\text{mod}} \cdot \Delta y + \frac{1}{2} \cdot C \cdot (\Delta y)^2
+$$
 
 ### 3. Z-Spread (Zero-Volatility Spread)
 Lo spread costante $z$ (espresso in bps) da aggiungere a ciascun nodo della curva spot sovrana $r(t)$ tale per cui:
@@ -1668,8 +1832,20 @@ Il motore `evaluate_custom_screener_query` supporta espressioni logico-matematic
 
 ### 1. Dinamica di Impatto di Mercato (Almgren & Chriss, 2000)
 Dato un portafoglio di $X_0$ quote/valore da liquidare su un orizzonte $T$ suddiviso in $N$ intervalli $\tau = T/N$:
-- **Impatto Permanente**: $\gamma \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}$ (spostamento duraturo del prezzo mid-market).
-- **Impatto Temporaneo**: $\eta \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}$ (attrito istantaneo da svuotamento del book ordini).
+- **Impatto Permanente**:
+
+$$
+\gamma \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}
+$$
+
+ (spostamento duraturo del prezzo mid-market).
+- **Impatto Temporaneo**:
+
+$$
+\eta \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}
+$$
+
+ (attrito istantaneo da svuotamento del book ordini).
 - **Parametro di Urgenza ($\kappa$)**:
   
 
@@ -1713,8 +1889,18 @@ A ogni nodo di ribilanciamento temporale $t$ (mensile o trimestrale), l'intero u
 - **Q5 (Bottom 20% · Junk / High Risk)**: Paniere dei titoli con minima qualità o massima speculazione.
 
 ### 2. Spread Long-Short & Test di Monotonicità di Spearman
-- **Rendimento dello Spread Long-Short**: $R_{\text{L/S}, t} = R_{Q1, t} - R_{Q5, t}$
-- **Information Ratio di Q1 vs Universo**: $\text{IR} = \frac{\text{mean}(R_{Q1} - R_{\text{Univ}})}{\text{std}(R_{Q1} - R_{\text{Univ}})} \cdot \sqrt{252}$
+- **Rendimento dello Spread Long-Short**:
+
+$$
+R_{\text{L/S}, t} = R_{Q1, t} - R_{Q5, t}
+$$
+
+- **Information Ratio di Q1 vs Universo**:
+
+$$
+\text{IR} = \frac{\text{mean}(R_{Q1} - R_{\text{Univ}})}{\text{std}(R_{Q1} - R_{\text{Univ}})} \cdot \sqrt{252}
+$$
+
 - **Coefficiente di Monotonicità di Spearman ($r_s$)**: Misura la correlazione di rango decrescente tra i quintili $1 \dots 5$ e il rendimento medio annualizzato:
   
 
@@ -1831,7 +2017,7 @@ Per gli investitori che operano con intermediari esteri o in regime dichiarativo
 
 ### 3. Pilastro 3: Analizzatore Withholding Tax (WHT) & Doppia Imposizione Dividendi Esteri
 * **Convenzioni contro le Doppie Imposizioni (DTT) & Modulo W-8BEN**:
-  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\%$, $WHT_{\text{DE}} = 26.375\%$, $WHT_{\text{CH}} = 35\%$, $WHT_{\text{FR}} = 12.8\%$.
+  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\text{\%}$, $WHT_{\text{DE}} = 26.375\text{\%}$, $WHT_{\text{CH}} = 35\text{\%}$, $WHT_{\text{FR}} = 12.8\text{\%}$.
   - Tassazione italiana sul "Netto Frontiera": $T_{\text{IT}} = (\text{Dividendo Lordo} \times (1 - WHT)) \times 0.26$.
   - **Aliquota Effettiva Combinata**:
     
@@ -1840,7 +2026,7 @@ $$
 \tau_{\text{eff}} = 1 - (1 - WHT) \times (1 - 0.26)
 $$
 
-    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\%$)*.
+    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\text{\%}$)*.
 * **Tax Drag vs ETF UCITS ad Accumulazione**:
   Gli ETF ad accumulazione trattengono internamente il 15% alla fonte senza subire l'imposta italiana immediata sul netto frontiera fino al realizzo finale, eliminando la perdita di rendimento composto da tassazione anticipata.
 
