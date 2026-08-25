@@ -517,8 +517,15 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
         np.random.seed(abs(hash(ticker)) % (2**31))
         drift_map = {
             "QQQ": (0.0006, 0.014),
+            "IWM": (0.0005, 0.013),
             "ACWI": (0.0004, 0.010),
+            "VGK": (0.0003, 0.011),
+            "EZU": (0.0003, 0.012),
+            "AAXJ": (0.0004, 0.012),
+            "EWJ": (0.0003, 0.009),
+            "EEM": (0.0004, 0.014),
             "AGG": (0.0001, 0.004),
+            "BND": (0.0001, 0.004),
             "GLD": (0.0003, 0.009),
             "BTC": (0.0012, 0.035),
             "BTC-USD": (0.0012, 0.035)
@@ -528,9 +535,17 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
         return pd.Series(synth, index=portfolio_index, name=ticker)
 
     mult_map = {
+        "SPY": 1.0,
         "QQQ": 1.22,
+        "IWM": 1.15,
         "ACWI": 0.92,
+        "VGK": 0.85,
+        "EZU": 0.88,
+        "AAXJ": 0.95,
+        "EWJ": 0.80,
+        "EEM": 1.10,
         "AGG": 0.22,
+        "BND": 0.18,
         "GLD": 0.38,
         "BTC": 2.20,
         "BTC-USD": 2.20

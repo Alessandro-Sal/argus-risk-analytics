@@ -410,32 +410,31 @@ st.divider()
 from core.ui_utils import load_benchmark_returns
 df_prices_ref = results.get("df_prices", pd.DataFrame())
 
-# Header Ultra-Spazioso e Istituzionale (2-Row Layout)
-st.markdown("### 📈 Rendimento cumulato vs benchmark")
+# ── RENDIMENTO CUMULATO VS BENCHMARK (100% FULL-WIDTH CHART) ───
+from core.ui_utils import load_benchmark_returns
+df_prices_ref = results.get("df_prices", pd.DataFrame())
 
-c_bm, c_view, c_sel = st.columns([2.4, 1.4, 1.0])
+# Definizione Catalogo Globale Benchmark Multi-Asset & Geografici
+ALL_BENCHMARKS = {
+    "SPY": {"name": "SPY (S&P 500)", "label": "S&P 500 (USA Large Cap)", "category": "🇺🇸 USA", "color": "#58a6ff"},
+    "QQQ": {"name": "QQQ (Nasdaq 100)", "label": "Nasdaq 100 (USA Tech)", "category": "🇺🇸 USA", "color": "#bc8cff"},
+    "IWM": {"name": "IWM (Russell 2000)", "label": "Russell 2000 (USA Small Cap)", "category": "🇺🇸 USA", "color": "#79c0ff"},
+    "ACWI": {"name": "ACWI (MSCI World)", "label": "MSCI All Country World (Globale)", "category": "🌍 Globale", "color": "#3fb950"},
+    "VGK": {"name": "VGK (FTSE Europe)", "label": "FTSE Developed Europe (Europa)", "category": "🇪🇺 Europa", "color": "#38bdf8"},
+    "EZU": {"name": "EZU (Eurozone EMU)", "label": "MSCI EMU (Eurozona)", "category": "🇪🇺 Europa", "color": "#818cf8"},
+    "AAXJ": {"name": "AAXJ (MSCI Asia ex-JP)", "label": "MSCI AC Asia ex-Japan (Asia)", "category": "🌏 Asia & Emergenti", "color": "#fb923c"},
+    "EWJ": {"name": "EWJ (MSCI Japan)", "label": "MSCI Japan (Giappone)", "category": "🌏 Asia & Emergenti", "color": "#f43f5e"},
+    "EEM": {"name": "EEM (Emerging Markets)", "label": "MSCI Emerging Markets (Emergenti)", "category": "🌏 Asia & Emergenti", "color": "#e879f9"},
+    "AGG": {"name": "AGG (US Aggregate Bond)", "label": "Bloomberg US Aggregate (Obbligazionario)", "category": "🏦 Obbligazioni & Materie Prime", "color": "#94a3b8"},
+    "GLD": {"name": "GLD (Gold Physical)", "label": "SPDR Gold Shares (Oro Fisico)", "category": "🏦 Obbligazioni & Materie Prime", "color": "#eab308"},
+    "BTC": {"name": "BTC (Bitcoin)", "label": "Bitcoin (Criptovalute)", "category": "⚡ Crypto", "color": "#f97316"}
+}
 
-primary_bm = mk.get('benchmark_ticker', 'SPY')
-bm_options = ["SPY (S&P 500)", "QQQ (Nasdaq 100)", "ACWI (MSCI World)", "AGG (US Bonds)", "GLD (Gold)", "BTC (Bitcoin)"]
-def_idx = 0
-for idx, opt in enumerate(bm_options):
-    if primary_bm in opt:
-        def_idx = idx
-        break
-
-with c_bm:
-    selected_bms = st.multiselect(
-        "Benchmark Attivi",
-        options=bm_options,
-        default=bm_options,
-        key="multi_bm_selector_p1",
-        placeholder="Aggiungi Benchmark...",
-        label_visibility="collapsed"
-    )
-    if not selected_bms:
-        selected_bms = bm_options
-
-with c_view:
+# Header & Controlli Layout Spazioso
+col_bm_h1, col_bm_h2, col_bm_h3 = st.columns([2.4, 1.4, 1.0])
+with col_bm_h1:
+    st.markdown("### 📈 Rendimento cumulato vs benchmark")
+with col_bm_h2:
     chart_view_mode = st.selectbox(
         "Modalità Grafico",
         options=["📈 Rendimento Cumulato %", "📉 Curva di Drawdown (Underwater %)"],
@@ -443,8 +442,7 @@ with c_view:
         key="chart_view_mode_p1",
         label_visibility="collapsed"
     )
-
-with c_sel:
+with col_bm_h3:
     horizon_options = ["1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "10Y", "20Y", "TUTTO"]
     selected_horizon = st.selectbox(
         "Orizzonte Temporale",
@@ -453,6 +451,40 @@ with c_sel:
         key="horizon_p1_selectbox",
         label_visibility="collapsed"
     )
+
+# Barra di selezione Benchmark per il grafico con preset rapidi
+col_sel_bm, col_quick_bm = st.columns([2.8, 1.7], vertical_alignment="center")
+with col_sel_bm:
+    chart_selected_bm_keys = st.multiselect(
+        "Benchmark tracciati sul grafico:",
+        options=list(ALL_BENCHMARKS.keys()),
+        default=["SPY", "ACWI"],
+        format_func=lambda k: ALL_BENCHMARKS[k]["name"],
+        key="chart_selected_bm_keys",
+        placeholder="Seleziona i benchmark da visualizzare..."
+    )
+    if not chart_selected_bm_keys:
+        chart_selected_bm_keys = ["SPY"]
+
+with col_quick_bm:
+    st.markdown('<div style="margin-top: 18px;"></div>', unsafe_allow_html=True)
+    c_q1, c_q2, c_q3, c_q4 = st.columns(4)
+    with c_q1:
+        if st.button("🇺🇸 USA", key="btn_bm_usa", use_container_width=True, help="SPY + QQQ"):
+            st.session_state["chart_selected_bm_keys"] = ["SPY", "QQQ"]
+            st.rerun()
+    with c_q2:
+        if st.button("🇪🇺 Europa", key="btn_bm_eu", use_container_width=True, help="SPY + VGK + EZU"):
+            st.session_state["chart_selected_bm_keys"] = ["SPY", "VGK", "EZU"]
+            st.rerun()
+    with c_q3:
+        if st.button("🌏 Asia", key="btn_bm_asia", use_container_width=True, help="SPY + AAXJ + EWJ"):
+            st.session_state["chart_selected_bm_keys"] = ["SPY", "AAXJ", "EWJ"]
+            st.rerun()
+    with c_q4:
+        if st.button("🌐 Tutti", key="btn_bm_all", use_container_width=True, help="Tutti i Benchmark"):
+            st.session_state["chart_selected_bm_keys"] = list(ALL_BENCHMARKS.keys())
+            st.rerun()
 
 # Map orizzonti temporali in giorni lavorativi
 horizon_days_map = {
@@ -484,16 +516,6 @@ else:
 cum_port = ((1 + sr_p_sub).cumprod() - 1) * 100
 date_x = pd.to_datetime(cum_port.index)
 
-# Palette colori istituzionale per i benchmark
-bm_colors = {
-    "SPY": "#58a6ff",       # Blu Chiaro
-    "QQQ": "#bc8cff",       # Viola Neon
-    "ACWI": "#3fb950",      # Verde Smeraldo
-    "AGG": "#8fa0ba",       # Grigio Ardesia
-    "GLD": "#d29922",       # Oro
-    "BTC": "#f0883e"        # Arancio Cripto
-}
-
 fig = go.Figure()
 
 if "Drawdown" in chart_view_mode:
@@ -503,18 +525,18 @@ if "Drawdown" in chart_view_mode:
     dd_port = ((cum_p_raw - roll_max_p) / roll_max_p) * 100.0
 
     # Benchmark Underwater curves
-    for bm_str in selected_bms:
-        bm_code = bm_str.split(" ")[0]
+    for bm_code in chart_selected_bm_keys:
+        bm_info = ALL_BENCHMARKS.get(bm_code, {"name": bm_code, "color": "#8fa0ba"})
         sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
         sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
         cum_bm_raw = (1 + sr_bm_sub).cumprod()
         roll_max_bm = cum_bm_raw.cummax()
         dd_bm_i = ((cum_bm_raw - roll_max_bm) / roll_max_bm) * 100.0
-        b_color = bm_colors.get(bm_code, "#8fa0ba")
+        b_color = bm_info.get("color", "#8fa0ba")
 
         fig.add_trace(go.Scatter(
             x=date_x, y=dd_bm_i.values,
-            name=f"Drawdown {bm_code}",
+            name=f"Drawdown {bm_info['name']}",
             line=dict(color=b_color, width=1.5, dash="dash"),
             hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📉 Drawdown {bm_code}: %{{y:.2f}}%<extra></extra>"
         ))
@@ -563,14 +585,14 @@ if "Drawdown" in chart_view_mode:
 else:
     # ── MODALITÀ RENDIMENTO CUMULATO STANDARD ──
 
-    # Plot dei Benchmark selezionati dall'utente
-    for bm_str in selected_bms:
-        bm_code = bm_str.split(" ")[0]
+    # Plot dei Benchmark selezionati per il grafico
+    for bm_code in chart_selected_bm_keys:
+        bm_info = ALL_BENCHMARKS.get(bm_code, {"name": bm_code, "color": "#8fa0ba"})
         sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
         sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
         cum_bm_i = ((1 + sr_bm_sub).cumprod() - 1) * 100
         spread_i = cum_port - cum_bm_i
-        b_color = bm_colors.get(bm_code, "#8fa0ba")
+        b_color = bm_info.get("color", "#8fa0ba")
 
         customdata_bm = np.column_stack([
             [f"{v:+.2f}%" for v in cum_port.values],
@@ -580,14 +602,14 @@ else:
 
         fig.add_trace(go.Scatter(
             x=date_x, y=cum_bm_i.values,
-            name=f"Benchmark ({bm_str})",
+            name=f"Benchmark ({bm_info['name']})",
             line=dict(color=b_color, width=1.8, dash="dash"),
             customdata=customdata_bm,
             hovertemplate=f"<b>Data: %{{x|%d %b %Y}}</b><br>📊 Benchmark ({bm_code}): %{{customdata[2]}}<br>📈 Portafoglio: %{{customdata[0]}}<br>⚡ Outperformance vs {bm_code} (Δ): %{{customdata[1]}}<extra></extra>"
         ))
 
     # Trace Portafoglio ARGUS
-    primary_bm_code = selected_bms[0].split(" ")[0]
+    primary_bm_code = chart_selected_bm_keys[0] if chart_selected_bm_keys else "SPY"
     sr_bm_prim = load_benchmark_returns(primary_bm_code, df_prices_ref, sr_port.index)
     sr_bm_prim_sub = sr_bm_prim.reindex(sr_p_sub.index).fillna(0.0)
     cum_bm_prim = ((1 + sr_bm_prim_sub).cumprod() - 1) * 100
@@ -663,76 +685,157 @@ with st.expander("💡 Guida Rapida: Perché il Max Drawdown non coincide con la
 </div>
 """, unsafe_allow_html=True)
 
-# ── SCORECARD COMPARATIVA MULTI-BENCHMARK (FEATURE 5) ─────────────
-if selected_bms:
-    scorecard_rows = []
-    
-    # Riga 1: Portafoglio
-    p_tot_ret = cum_port.iloc[-1] if not cum_port.empty else 0.0
-    p_n_yrs = max(0.1, len(sr_p_sub) / 252.0)
-    p_cagr = ((1 + p_tot_ret / 100.0) ** (1.0 / p_n_yrs) - 1.0) * 100.0 if p_tot_ret > -99.0 else -99.0
-    p_vol = float(sr_p_sub.std() * np.sqrt(252) * 100.0) if len(sr_p_sub) > 1 else 0.0
-    p_sharpe = float((p_cagr - 3.0) / p_vol) if p_vol > 0.0 else 0.0
-    p_cum = (1 + sr_p_sub).cumprod()
-    p_dd = float(((p_cum - p_cum.cummax()) / p_cum.cummax()).min() * 100.0) if not p_cum.empty else 0.0
+# ── SCORECARD COMPARATIVA MULTI-BENCHMARK (COMPLETAMENTE AUTONOMA & FILTRABILE) ──
+st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
+col_sc_title, col_sc_dl = st.columns([3.8, 1.0])
+with col_sc_title:
+    st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark Globale")
+    st.caption("Valutazione comparativa esaustiva e indipendente tra il Portafoglio ARGUS e l'intero panorama dei benchmark azionari (USA, Europa, Asia, Emergenti), obbligazionari e alternativi.")
+
+col_sc_f1, col_sc_f2, col_sc_f3 = st.columns([1.8, 1.6, 1.4])
+with col_sc_f1:
+    search_bm_sc = st.text_input("🔍 Cerca Benchmark / Asset:", placeholder="Filtra per Ticker o Nome (es. SPY, Europa, Asia, Gold)...", key="search_scorecard_bm")
+with col_sc_f2:
+    filter_sc_geo = st.selectbox(
+        "🏷️ Macro-Area Geografica / Asset Class:",
+        ["Tutti i Benchmark (12)", "🌍 Globale", "🇺🇸 USA", "🇪🇺 Europa", "🌏 Asia & Emergenti", "🏦 Obbligazioni & Materie Prime", "⚡ Crypto"],
+        key="filter_scorecard_geo"
+    )
+with col_sc_f3:
+    filter_sc_alpha = st.selectbox(
+        "⚡ Esito Performance (Alpha):",
+        ["Tutti gli Esiti", "🟢 Solo Alpha Positivo (Portafoglio Vince)", "🔴 Solo Alpha Negativo (Benchmark Vince)"],
+        key="filter_scorecard_alpha"
+    )
+
+# Calcolo di TUTTI i benchmark per la Scorecard
+scorecard_rows = []
+
+# Riga 1: Portafoglio ARGUS
+p_tot_ret = cum_port.iloc[-1] if not cum_port.empty else 0.0
+p_n_yrs = max(0.1, len(sr_p_sub) / 252.0)
+p_cagr = ((1 + p_tot_ret / 100.0) ** (1.0 / p_n_yrs) - 1.0) * 100.0 if p_tot_ret > -99.0 else -99.0
+p_vol = float(sr_p_sub.std() * np.sqrt(252) * 100.0) if len(sr_p_sub) > 1 else 0.0
+p_sharpe = float((p_cagr - 3.0) / p_vol) if p_vol > 0.0 else 0.0
+p_cum = (1 + sr_p_sub).cumprod()
+p_dd = float(((p_cum - p_cum.cummax()) / p_cum.cummax()).min() * 100.0) if not p_cum.empty else 0.0
+
+scorecard_rows.append({
+    "Ticker": "PORTAFOGLIO",
+    "Asset / Benchmark": "⭐ Portafoglio ARGUS",
+    "Macro-Area": "💼 Portafoglio Attivo",
+    "Rendimento Tot %": p_tot_ret,
+    "CAGR Annuo %": p_cagr,
+    "Volatilità Annua %": p_vol,
+    "Sharpe Ratio": p_sharpe,
+    "Max Drawdown %": p_dd,
+    "Alpha vs Portafoglio %": 0.0,
+    "Esito Alpha": "⚪ Base di Riferimento"
+})
+
+for bm_code, bm_info in ALL_BENCHMARKS.items():
+    sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
+    sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
+    bm_tot_ret = float(((1 + sr_bm_sub).cumprod() - 1).iloc[-1] * 100.0) if not sr_bm_sub.empty else 0.0
+    bm_cagr = ((1 + bm_tot_ret / 100.0) ** (1.0 / p_n_yrs) - 1.0) * 100.0 if bm_tot_ret > -99.0 else -99.0
+    bm_vol = float(sr_bm_sub.std() * np.sqrt(252) * 100.0) if len(sr_bm_sub) > 1 else 0.0
+    bm_sharpe = float((bm_cagr - 3.0) / bm_vol) if bm_vol > 0.0 else 0.0
+    bm_cum = (1 + sr_bm_sub).cumprod()
+    bm_dd = float(((bm_cum - bm_cum.cummax()) / bm_cum.cummax()).min() * 100.0) if not bm_cum.empty else 0.0
+    alpha_delta = p_cagr - bm_cagr
+
+    esito_txt = "🟢 Portafoglio Sovraperforma" if alpha_delta > 0.01 else ("🔴 Benchmark Sovraperforma" if alpha_delta < -0.01 else "⚪ In linea")
 
     scorecard_rows.append({
-        "Asset / Benchmark": "⭐ Portafoglio ARGUS",
-        "Rendimento Tot": f"{p_tot_ret:+.2f}%",
-        "CAGR Annuo": f"{p_cagr:+.2f}%",
-        "Volatilità Annua": f"{p_vol:.2f}%",
-        "Sharpe Ratio": f"{p_sharpe:.2f}",
-        "Max Drawdown": f"{p_dd:.2f}%",
-        "Alpha vs Portafoglio": "Base (0.00%)"
+        "Ticker": bm_code,
+        "Asset / Benchmark": f"📊 {bm_info['name']}",
+        "Macro-Area": bm_info["category"],
+        "Rendimento Tot %": bm_tot_ret,
+        "CAGR Annuo %": bm_cagr,
+        "Volatilità Annua %": bm_vol,
+        "Sharpe Ratio": bm_sharpe,
+        "Max Drawdown %": bm_dd,
+        "Alpha vs Portafoglio %": alpha_delta,
+        "Esito Alpha": esito_txt
     })
 
-    # Righe per ciascun Benchmark selezionato
-    for bm_str in selected_bms:
-        bm_code = bm_str.split(" ")[0]
-        sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
-        sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
-        bm_tot_ret = float(((1 + sr_bm_sub).cumprod() - 1).iloc[-1] * 100.0) if not sr_bm_sub.empty else 0.0
-        bm_cagr = ((1 + bm_tot_ret / 100.0) ** (1.0 / p_n_yrs) - 1.0) * 100.0 if bm_tot_ret > -99.0 else -99.0
-        bm_vol = float(sr_bm_sub.std() * np.sqrt(252) * 100.0) if len(sr_bm_sub) > 1 else 0.0
-        bm_sharpe = float((bm_cagr - 3.0) / bm_vol) if bm_vol > 0.0 else 0.0
-        bm_cum = (1 + sr_bm_sub).cumprod()
-        bm_dd = float(((bm_cum - bm_cum.cummax()) / bm_cum.cummax()).min() * 100.0) if not bm_cum.empty else 0.0
-        alpha_delta = p_cagr - bm_cagr
+df_scorecard_all = pd.DataFrame(scorecard_rows)
 
-        scorecard_rows.append({
-            "Asset / Benchmark": f"📊 {bm_str}",
-            "Rendimento Tot": f"{bm_tot_ret:+.2f}%",
-            "CAGR Annuo": f"{bm_cagr:+.2f}%",
-            "Volatilità Annua": f"{bm_vol:.2f}%",
-            "Sharpe Ratio": f"{bm_sharpe:.2f}",
-            "Max Drawdown": f"{bm_dd:.2f}%",
-            "Alpha vs Portafoglio": f"{alpha_delta:+.2f}%"
-        })
+# Applicazione filtri Scorecard
+df_sc_filtered = df_scorecard_all.copy()
 
-    df_scorecard = pd.DataFrame(scorecard_rows)
-    col_sc_h1, col_sc_h2 = st.columns([3.8, 1.0])
-    with col_sc_h1:
-        st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark")
-    with col_sc_h2:
-        csv_sc = df_scorecard.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="benchmark_scorecard.csv", mime="text/csv", use_container_width=True, key="btn_download_bm_scorecard")
+# 1. Filtro Macro-Area
+if filter_sc_geo != "Tutti i Benchmark (12)":
+    df_sc_filtered = df_sc_filtered[
+        (df_sc_filtered["Macro-Area"] == filter_sc_geo) | (df_sc_filtered["Ticker"] == "PORTAFOGLIO")
+    ]
 
+# 2. Filtro Performance Alpha
+if filter_sc_alpha == "🟢 Solo Alpha Positivo (Portafoglio Vince)":
+    df_sc_filtered = df_sc_filtered[
+        (df_sc_filtered["Alpha vs Portafoglio %"] >= -1e-5)
+    ]
+elif filter_sc_alpha == "🔴 Solo Alpha Negativo (Benchmark Vince)":
+    df_sc_filtered = df_sc_filtered[
+        (df_sc_filtered["Alpha vs Portafoglio %"] < -0.01) | (df_sc_filtered["Ticker"] == "PORTAFOGLIO")
+    ]
+
+# 3. Filtro Ricerca
+if search_bm_sc:
+    search_q = search_bm_sc.strip().lower()
+    df_sc_filtered = df_sc_filtered[
+        df_sc_filtered["Asset / Benchmark"].str.lower().str.contains(search_q) |
+        df_sc_filtered["Ticker"].str.lower().str.contains(search_q) |
+        (df_sc_filtered["Ticker"] == "PORTAFOGLIO")
+    ]
+
+with col_sc_dl:
+    csv_sc = df_sc_filtered.to_csv(index=False).encode('utf-8')
+    st.download_button("📥 Scarica CSV", data=csv_sc, file_name="benchmark_scorecard_globale.csv", mime="text/csv", use_container_width=True, key="btn_download_bm_scorecard_glob")
+
+# Visualizzazione Table con column config e styling
+if df_sc_filtered.empty:
+    st.info("ℹ️ Nessun benchmark corrisponde ai criteri di ricerca impostati.")
+else:
+    def highlight_alpha_sc(val):
+        try:
+            v = float(val)
+            if v > 0.01:
+                return "color: #3fb950; font-weight: bold;"
+            elif v < -0.01:
+                return "color: #f85149; font-weight: bold;"
+            return "color: #8b949e;"
+        except (ValueError, TypeError):
+            return ""
+
+    sc_disp_df = df_sc_filtered.drop(columns=["Ticker"])
+    
     sc_cfg = {
         "Asset / Benchmark": st.column_config.TextColumn("Asset / Benchmark", width="medium"),
-        "Rendimento Tot": st.column_config.TextColumn("Rendimento Tot", width="small"),
-        "CAGR Annuo": st.column_config.TextColumn("CAGR Annuo", width="small"),
-        "Volatilità Annua": st.column_config.TextColumn("Volatilità Annua", width="small"),
-        "Sharpe Ratio": st.column_config.TextColumn("Sharpe Ratio", width="small"),
-        "Max Drawdown": st.column_config.TextColumn("Max Drawdown", width="small"),
-        "Alpha vs Portafoglio": st.column_config.TextColumn("Alpha vs Portafoglio", width="medium")
+        "Macro-Area": st.column_config.TextColumn("Macro-Area", width="small"),
+        "Rendimento Tot %": st.column_config.NumberColumn("Rendimento Tot", format="%+,.2f%%"),
+        "CAGR Annuo %": st.column_config.NumberColumn("CAGR Annuo", format="%+,.2f%%"),
+        "Volatilità Annua %": st.column_config.NumberColumn("Volatilità Annua", format="%.2f%%"),
+        "Sharpe Ratio": st.column_config.NumberColumn("Sharpe Ratio", format="%.2f"),
+        "Max Drawdown %": st.column_config.NumberColumn("Max Drawdown", format="%.2f%%"),
+        "Alpha vs Portafoglio %": st.column_config.NumberColumn("Alpha vs Portafoglio", format="%+,.2f%%"),
+        "Esito Alpha": st.column_config.TextColumn("Valutazione Outperformance", width="medium")
     }
+    
     st.dataframe(
-        df_scorecard,
+        sc_disp_df.style.map(highlight_alpha_sc, subset=["Alpha vs Portafoglio %"]).format({
+            "Rendimento Tot %": "{:+,.2f}%",
+            "CAGR Annuo %": "{:+,.2f}%",
+            "Volatilità Annua %": "{:.2f}%",
+            "Sharpe Ratio": "{:.2f}",
+            "Max Drawdown %": "{:.2f}%",
+            "Alpha vs Portafoglio %": "{:+,.2f}%"
+        }),
         column_config=sc_cfg,
         use_container_width=True,
         hide_index=True
     )
-    st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
+st.markdown('<div style="margin-bottom: 20px;"></div>', unsafe_allow_html=True)
 
 # ── VISTA ANALITICA AGGREGATA DUCKDB (OLAP ACCELERATION) ──────────
 if not pos.empty:
