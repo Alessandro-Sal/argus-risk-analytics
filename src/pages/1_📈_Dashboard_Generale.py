@@ -380,6 +380,10 @@ elif selected_horizon == "YTD":
 else:
     sr_p_sub = sr_port.copy()
 
+# Ricalcolo rendimento cumulato Portafoglio (base 0%)
+cum_port = ((1 + sr_p_sub).cumprod() - 1) * 100
+date_x = pd.to_datetime(cum_port.index)
+
 # Palette colori istituzionale per i benchmark
 bm_colors = {
     "SPY": "#58a6ff",       # Blu Chiaro
@@ -397,7 +401,6 @@ if "Drawdown" in chart_view_mode:
     cum_p_raw = (1 + sr_p_sub).cumprod()
     roll_max_p = cum_p_raw.cummax()
     dd_port = ((cum_p_raw - roll_max_p) / roll_max_p) * 100.0
-    date_x = pd.to_datetime(dd_port.index)
 
     # Benchmark Underwater curves
     for bm_str in selected_bms:
@@ -459,8 +462,6 @@ if "Drawdown" in chart_view_mode:
 
 else:
     # ── MODALITÀ RENDIMENTO CUMULATO STANDARD ──
-    cum_port = ((1 + sr_p_sub).cumprod() - 1) * 100
-    date_x = pd.to_datetime(cum_port.index)
 
     # Plot dei Benchmark selezionati dall'utente
     for bm_str in selected_bms:
