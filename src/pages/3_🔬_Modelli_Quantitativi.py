@@ -141,16 +141,128 @@ with col_head2:
 
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
-# ── STRUTTURA IN TAB AD ALTA NAVIGABILITÀ CON LAZY LOADING ─────────
-active_quant_tab = render_segmented_tabs([
-    "📊 Markowitz & Rebalancing",
-    "🤖 AI Reinforcement Learning",
-    "🧬 Tail Copula & Kelly",
-    "🎲 Monte Carlo & Merton",
-    "🛡️ Hedging & Opzioni",
-    "🎯 Attribuzione & Fattori",
-    "🏛️ Fixed Income & Z-Spread"
-], key="quant_active_tab")
+# ── SELETTORE MODELLI QUANTITATIVI STILE BLOOMBERG TERMINAL ─────────
+QUANT_MODELS_CATALOG = {
+    "📊 Markowitz & Rebalancing": {
+        "title": "Frontiera Efficiente di Markowitz & Ribilanciatore Tattico",
+        "badge": "MPT • HRP • ERC",
+        "badge_color": "#ff9900",
+        "category": "Allocazione & Ottimizzazione",
+        "desc": "Ottimizzazione pesi con matrice di covarianza Ledoit-Wolf Shrinkage, Hierarchical Risk Parity (HRP), Equal Risk Contribution (ERC) e distinta ordini broker."
+    },
+    "🤖 AI Reinforcement Learning": {
+        "title": "AI Deep Reinforcement Learning (Q-Learning & Policy Gradient)",
+        "badge": "Deep RL • Agent AI",
+        "badge_color": "#a855f7",
+        "category": "Intelligenza Artificiale",
+        "desc": "Agente autonomo di trading addestrato su reward risk-adjusted (Sharpe Ratio), penalizzazione drawdown e allocazione multi-step."
+    },
+    "🧬 Tail Copula & Kelly": {
+        "title": "Tail Copula di Rischio Estremo & Criterio di Kelly",
+        "badge": "Dipendenza di Coda • Kelly Sizing",
+        "badge_color": "#ec4899",
+        "category": "Rischio Estremo & Dimensionamento",
+        "desc": "Modellazione non lineare della dipendenza nei crash di mercato (Copule Clayton, Gumbel, Student-t) e position sizing ottimale con Kelly frazionario."
+    },
+    "🎲 Monte Carlo & Merton": {
+        "title": "Simulazioni Stocastiche Monte Carlo 10k & Salti di Merton",
+        "badge": "10.000 Scenari • Jump-Diffusion",
+        "badge_color": "#3b82f6",
+        "category": "Simulazione Stocastica",
+        "desc": "Proiezioni patrimoniali vettoriali con 10.000 scenari stocastici (Browniano Geometrico, t-Student, Salti di Poisson) e cono di confidenza temporale."
+    },
+    "🛡️ Hedging & Opzioni": {
+        "title": "Hedging Tattico, Pricing Opzioni Black-Scholes & SABR Smile",
+        "badge": "Derivati • Greeks • Vol Skew",
+        "badge_color": "#06b6d4",
+        "category": "Copertura & Derivati",
+        "desc": "Pricing analitico di opzioni, calcolo delle Greche (Delta, Gamma, Vega, Theta), Volatility Skew/Smile e strategie di copertura asimmetrica di portafoglio."
+    },
+    "🎯 Attribuzione & Fattori": {
+        "title": "Performance Attribution Brinson-Fachler, Carhart 4F & Fama-French 5F",
+        "badge": "Brinson • Fama-French • Carhart",
+        "badge_color": "#10b981",
+        "category": "Scomposizione Alpha",
+        "desc": "Decomposizione delle determinanti di rendimento (Allocazione, Selezione Titoli, Interazione) e regressioni multivariata Fama-French / Carhart Momentum."
+    },
+    "🏛️ Fixed Income & Z-Spread": {
+        "title": "Analisi Strumenti a Reddito Fisso, Curve Tassi & Z-Spread",
+        "badge": "Fixed Income • Duration • Z-Spread",
+        "badge_color": "#eab308",
+        "category": "Obbligazionario",
+        "desc": "Valutazione obbligazionaria avanzata: Duration Modificata, Convessità, Bootstrapping curva Zero-Coupon e spread di credito (Z-Spread) rispetto al benchmark."
+    }
+}
+
+# Risoluzione dello stato attivo con priorità alla sidebar o global jump
+target_tab = None
+if "target_subtab_quant_active_tab" in st.session_state:
+    target_tab = st.session_state.pop("target_subtab_quant_active_tab")
+elif "global_target_subtab" in st.session_state:
+    target_tab = st.session_state.pop("global_target_subtab")
+elif "target_quant_model" in st.session_state:
+    target_tab = st.session_state.pop("target_quant_model")
+
+model_keys = list(QUANT_MODELS_CATALOG.keys())
+
+if target_tab and target_tab in model_keys:
+    st.session_state["quant_active_tab"] = target_tab
+    st.session_state["quant_active_tab_selectbox"] = target_tab
+elif "quant_active_tab" not in st.session_state or st.session_state["quant_active_tab"] not in model_keys:
+    st.session_state["quant_active_tab"] = model_keys[0]
+
+curr_idx = model_keys.index(st.session_state["quant_active_tab"])
+
+# Barra Selettore Compatta Bloomberg Style
+c_sel_q, c_prev_q, c_next_q = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
+
+with c_prev_q:
+    if st.button("◀ Prec.", key="btn_quant_prev", use_container_width=True, help="Modello precedente"):
+        new_i = (curr_idx - 1) % len(model_keys)
+        st.session_state["target_quant_model"] = model_keys[new_i]
+        st.rerun()
+
+with c_next_q:
+    if st.button("Succ. ▶", key="btn_quant_next", use_container_width=True, help="Modello successivo"):
+        new_i = (curr_idx + 1) % len(model_keys)
+        st.session_state["target_quant_model"] = model_keys[new_i]
+        st.rerun()
+
+with c_sel_q:
+    selected_model_key = st.selectbox(
+        "Seleziona Modello Quantitativo:",
+        options=model_keys,
+        index=curr_idx,
+        format_func=lambda k: f"{k}  —  {QUANT_MODELS_CATALOG[k]['category']} [{QUANT_MODELS_CATALOG[k]['badge']}]",
+        key="quant_active_tab_selectbox",
+        label_visibility="collapsed"
+    )
+    st.session_state["quant_active_tab"] = selected_model_key
+
+active_quant_tab = st.session_state["quant_active_tab"]
+active_info = QUANT_MODELS_CATALOG[active_quant_tab]
+
+# Bloomberg Terminal Header Banner per il Modello Attivo
+st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+      {active_info['title']}
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+        {active_info['category']}
+      </span>
+      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_info['badge_color']}22; color: {active_info['badge_color']}; border: 1px solid {active_info['badge_color']}55;">
+        {active_info['badge']}
+      </span>
+    </div>
+  </div>
+  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
+    {active_info['desc']}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ── TAB 1: MARKOWITZ & LEDOIT-WOLF ────────────────────────────
 if active_quant_tab == "📊 Markowitz & Rebalancing":
