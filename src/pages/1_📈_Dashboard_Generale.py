@@ -707,33 +707,55 @@ with col_sc_title:
     st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark Globale")
     st.caption("Valutazione comparativa esaustiva e indipendente tra il Portafoglio ARGUS e l'intero panorama dei benchmark azionari (USA, Europa, Asia, Emergenti), obbligazionari e alternativi.")
 
-col_sc_f1, col_sc_f2, col_sc_f3 = st.columns([1.8, 1.6, 1.4])
+col_sc_f1, col_sc_f2, col_sc_f3, col_sc_f4 = st.columns([1.5, 1.3, 1.2, 1.0])
 with col_sc_f1:
-    search_bm_sc = st.text_input("🔍 Cerca Benchmark / Asset:", placeholder="Filtra per Ticker o Nome (es. SPY, Europa, Asia, Gold)...", key="search_scorecard_bm")
+    search_bm_sc = st.text_input("🔍 Cerca Benchmark / Asset:", placeholder="Filtra per Ticker o Nome (es. SPY, Europa, Asia, Gold, BTC)...", key="search_scorecard_bm")
 with col_sc_f2:
     filter_sc_geo = st.selectbox(
-        "🏷️ Macro-Area Geografica / Asset Class:",
+        "🏷️ Macro-Area / Asset Class:",
         ["Tutti i Benchmark (12)", "🌍 Globale", "🇺🇸 USA", "🇪🇺 Europa", "🌏 Asia & Emergenti", "🏦 Obbligazioni & Materie Prime", "⚡ Crypto"],
         key="filter_scorecard_geo"
     )
 with col_sc_f3:
     filter_sc_alpha = st.selectbox(
-        "⚡ Esito Performance (Alpha):",
+        "⚡ Esito Alpha:",
         ["Tutti gli Esiti", "🟢 Solo Alpha Positivo (Portafoglio Vince)", "🔴 Solo Alpha Negativo (Benchmark Vince)"],
         key="filter_scorecard_alpha"
     )
+with col_sc_f4:
+    horizon_sc = st.selectbox(
+        "⏳ Orizzonte:",
+        ["TUTTO", "1M", "3M", "6M", "YTD", "1Y", "3Y", "5Y", "10Y", "20Y"],
+        index=0,
+        key="scorecard_horizon_select"
+    )
+
+# Slicing indipendente per la Scorecard
+if horizon_sc in horizon_days_map:
+    n_days_sc = horizon_days_map[horizon_sc]
+    sr_p_sc = sr_port.tail(n_days_sc)
+elif horizon_sc == "YTD":
+    if not sr_port.empty:
+        max_yr_sc = sr_port.index.max().year
+        ytd_mask_sc = sr_port.index.year == max_yr_sc
+        sr_p_sc = sr_port[ytd_mask_sc] if ytd_mask_sc.any() else sr_port.copy()
+    else:
+        sr_p_sc = sr_port.copy()
+else:
+    sr_p_sc = sr_port.copy()
 
 # Calcolo di TUTTI i benchmark per la Scorecard
 scorecard_rows = []
 
 # Riga 1: Portafoglio ARGUS
-p_tot_ret = cum_port.iloc[-1] if not cum_port.empty else 0.0
-p_n_yrs = max(0.1, len(sr_p_sub) / 252.0)
+p_cum_sc = ((1 + sr_p_sc).cumprod() - 1) * 100
+p_tot_ret = p_cum_sc.iloc[-1] if not p_cum_sc.empty else 0.0
+p_n_yrs = max(0.1, len(sr_p_sc) / 252.0)
 p_cagr = ((1 + p_tot_ret / 100.0) ** (1.0 / p_n_yrs) - 1.0) * 100.0 if p_tot_ret > -99.0 else -99.0
-p_vol = float(sr_p_sub.std() * np.sqrt(252) * 100.0) if len(sr_p_sub) > 1 else 0.0
+p_vol = float(sr_p_sc.std() * np.sqrt(252) * 100.0) if len(sr_p_sc) > 1 else 0.0
 p_sharpe = float((p_cagr - 3.0) / p_vol) if p_vol > 0.0 else 0.0
-p_cum = (1 + sr_p_sub).cumprod()
-p_dd = float(((p_cum - p_cum.cummax()) / p_cum.cummax()).min() * 100.0) if not p_cum.empty else 0.0
+p_cum_raw = (1 + sr_p_sc).cumprod()
+p_dd = float(((p_cum_raw - p_cum_raw.cummax()) / p_cum_raw.cummax()).min() * 100.0) if not p_cum_raw.empty else 0.0
 
 scorecard_rows.append({
     "Ticker": "PORTAFOGLIO",
@@ -750,7 +772,7 @@ scorecard_rows.append({
 
 for bm_code, bm_info in ALL_BENCHMARKS.items():
     sr_bm_raw = load_benchmark_returns(bm_code, df_prices_ref, sr_port.index)
-    sr_bm_sub = sr_bm_raw.reindex(sr_p_sub.index).fillna(0.0)
+    sr_bm_sub = sr_bm_raw.reindex(sr_p_sc.index).fillna(0.0)
     bm_tot_ret = float(((1 + sr_bm_sub).cumprod() - 1).iloc[-1] * 100.0) if not sr_bm_sub.empty else 0.0
     bm_cagr = ((1 + bm_tot_ret / 100.0) ** (1.0 / p_n_yrs) - 1.0) * 100.0 if bm_tot_ret > -99.0 else -99.0
     bm_vol = float(sr_bm_sub.std() * np.sqrt(252) * 100.0) if len(sr_bm_sub) > 1 else 0.0
