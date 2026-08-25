@@ -85,7 +85,18 @@ $$
 $$
 
 #### Dimostrazione Algebrica: Perché il Drawdown non è la sottrazione sull'asse Y del Rendimento Cumulato
-Sia $V_0$ il capitale iniziale e $V_t = V_0 \prod_{i=1}^t (1 + R_i)$ il valore del portafoglio. Il rendimento cumulato indicizzato a base zero è $\text{CumRet}_t = \frac{V_t - V_0}{V_0}$.
+Sia $V_0$ il capitale iniziale e:
+
+$$
+V_t = V_0 \prod_{i=1}^t (1 + R_i)
+$$
+
+il valore del portafoglio. Il rendimento cumulato indicizzato a base zero è:
+
+$$
+\text{CumRet}_t = \frac{V_t - V_0}{V_0}
+$$
+
 La differenza aritmetica tra il picco e il minimo successivo osservata sull'asse delle ordinate (in punti percentuali) è:
 
 $$
@@ -177,7 +188,12 @@ $$
 
 Per verificare l'accuratezza predittiva dei modelli VaR, il sistema esegue un backtest sui rendimenti effettivi degli ultimi 252 giorni di negoziazione:
 
-1. **Eccezioni (Breaches)**: Si contano i giorni $t$ in cui $R_t < -VaR_t(1, \alpha)$.
+1. **Eccezioni (Breaches)**: Si contano i giorni $t$ in cui:
+
+$$
+R_t < -VaR_t(1, \alpha)
+$$
+
 2. **Kupiec Proportion of Failures (POF) Test**: Test del rapporto di verosimiglianza basato su distribuzione binomiale:
    
 
@@ -227,7 +243,7 @@ $$
 $$
 
 $$
-\text{Perdita Stimata Asset } i (€) = \text{Valore Attuale}_i \times \Delta R_i
+\text{Perdita Stimata Asset } i \text{ (EUR)} = \text{Valore Attuale}_i \times \Delta R_i
 $$
 
 ### 3. Simulazione Monte Carlo Multi-Asset (Decomposizione di Cholesky & Student-t)
@@ -394,10 +410,29 @@ Consente il tracciamento della serie storica degli snapshot salvati a Data Wareh
 
 1. **Serie Temporale Metriche**: Recupero ordinato per data di $V_t$, $PnL_t$, $\text{Sharpe}_t$, $\text{Sortino}_t$, $VaR_{95, t}$, $MaxDD_t$.
 2. **Confronto Affiancato (Snapshot A vs Snapshot B)**:
-   - $\Delta V = V_B - V_A$
-   - $\Delta PnL = PnL_B - PnL_A$
-   - $\Delta \text{Sharpe} = \text{Sharpe}_B - \text{Sharpe}_A$
-   - Variazione pesi e quote a livello di singolo ticker: $\Delta w_i = w_{i, B} - w_{i, A}$.
+   - Variazione Valore:
+
+$$
+\Delta V = V_B - V_A
+$$
+
+   - Variazione PnL:
+
+$$
+\Delta PnL = PnL_B - PnL_A
+$$
+
+   - Variazione Sharpe:
+
+$$
+\Delta \text{Sharpe} = \text{Sharpe}_B - \text{Sharpe}_A
+$$
+
+   - Variazione pesi e quote a livello di singolo ticker:
+
+$$
+\Delta w_i = w_{i, B} - w_{i, A}
+$$
 
 ---
 
@@ -428,7 +463,7 @@ $$
    
 
 $$
-\text{Copertura Coda} (€) = V_{\text{portafoglio}} \cdot \text{VaR}_{99, \text{storico}}
+\text{Copertura Coda (EUR)} = V_{\text{portafoglio}} \cdot \text{VaR}_{99, \text{storico}}
 $$
 
 ---
@@ -712,7 +747,7 @@ $$
 $$
 
 $$
-\text{Impatto Monetario Totale (€)} = \text{Quote Scambiate} \times (I_{\text{perm}} + I_{\text{temp}})
+\text{Impatto Monetario Totale (\text{ EUR})} = \text{Quote Scambiate} \times (I_{\text{perm}} + I_{\text{temp}})
 $$
 
 ---
@@ -853,7 +888,11 @@ $$
 \alpha = 1 - \frac{\tilde{V}_1}{\tilde{V}_1 + \tilde{V}_2}
 $$
 
-   I pesi definitivi vengono scalati ricorsivamente: $w_1 \leftarrow w_1 \cdot \alpha$, $w_2 \leftarrow w_2 \cdot (1 - \alpha)$.
+   I pesi definitivi vengono scalati ricorsivamente:
+
+$$
+w_1 \leftarrow w_1 \cdot \alpha, \quad w_2 \leftarrow w_2 \cdot (1 - \alpha)
+$$
 
 ---
 
@@ -1060,7 +1099,12 @@ $$
 \text{CAGR} = (1 + R_{\text{tot}})^{\frac{1}{n_{\text{years}}}} - 1
 $$
 
-- **Serie Storica Rendimenti Consolidata**: Fonde le serie storiche dei rendimenti ponderandole per il peso patrimoniale $w_k = \frac{V_k}{V_{\text{tot}}}$:
+- **Serie Storica Rendimenti Consolidata**: Fonde le serie storiche dei rendimenti ponderandole per il peso patrimoniale:
+
+$$
+w_k = \frac{V_k}{V_{\text{tot}}}
+$$
+
   
 
 $$
@@ -1159,7 +1203,7 @@ Motore di ottimizzazione e pianificazione fiscale per investitori residenti in I
 - **Azioni Singole, Obbligazioni ed ETC**: Le plusvalenze costituiscono *Redditi Diversi* e possono compensare **1:1** le minusvalenze accumulate nello Zainetto Fiscale.
 - **Titoli di Stato White List**: Aliquota agevolata al 12.5% (equivalente al 48.08% di imponibilità a fini di compensazione).
 
-### 2. Strategia Step-Up Fiscale a 0€ Imposte
+### 2. Strategia Step-Up Fiscale a 0\text{ EUR} Imposte
 Per evitare la decadenza delle minusvalenze dopo 4 anni solari ($t + 4$), il wizard individua le posizioni in utile appartenenti ai *Redditi Diversi* da vendere e ricomprare immediatamente:
 
 $$
@@ -1194,14 +1238,18 @@ $$
 - **Quarter-Kelly ($f^*_{\text{quarter}} = f^*/4$)**: Profilo ultra-difensivo per mercati ad elevata incertezza o regimi di crisi.
 
 ### 2. Dimensionamento del Nozionale in Funzione dello Stop-Loss
-Dato un capitale di portafoglio $C$ e una distanza di Stop-Loss percentuale $SL\% = \frac{P_{\text{entry}} - P_{\text{stop}}}{P_{\text{entry}}}$:
+Dato un capitale di portafoglio $C$ e una distanza di Stop-Loss percentuale:
 
 $$
-\text{Capitale a Rischio (€)} = C \times f^*_{\text{half}}
+SL\% = \frac{P_{\text{entry}} - P_{\text{stop}}}{P_{\text{entry}}}
 $$
 
 $$
-\text{Controvalore Nozionale Posizione (€)} = \frac{\text{Capitale a Rischio (€)}}{SL\%}
+\text{Capitale a Rischio (\text{ EUR})} = C \times f^*_{\text{half}}
+$$
+
+$$
+\text{Controvalore Nozionale Posizione (\text{ EUR})} = \frac{\text{Capitale a Rischio (\text{ EUR})}}{SL\%}
 $$
 
 $$
@@ -1315,17 +1363,17 @@ $$
 dove $R$ è il coefficiente di frazionamento ($R > 1$ per Forward Split, $R < 1$ per Reverse Split).
 
 ### 2. Rettifica FIFO Retroattiva e Prevenzione Errori di Inventario
-1. **Prevenzione Falsi Sbilanciamenti**: Se un investitore acquista 10 azioni a 500€ e successivamente interviene uno split 10:1 ($R=10$), il saldo rettificato diviene di 100 azioni a 50€. Una successiva vendita di 30 azioni a 70€ viene abbinata al lotto rettificato, determinando:
+1. **Prevenzione Falsi Sbilanciamenti**: Se un investitore acquista 10 azioni a 500\text{ EUR} e successivamente interviene uno split 10:1 ($R=10$), il saldo rettificato diviene di 100 azioni a 50\text{ EUR}. Una successiva vendita di 30 azioni a 70\text{ EUR} viene abbinata al lotto rettificato, determinando:
    
 
 $$
-\text{PnL Realizzato} = 30 \times (70 - 50) = +600€
+\text{PnL Realizzato} = 30 \times (70 - 50) = +600\text{ EUR}
 $$
 
    
 
 $$
-\text{Quote Residue} = 70 \text{ azioni con WACP} = 50€
+\text{Quote Residue} = 70 \text{ azioni con WACP} = 50\text{ EUR}
 $$
 
 2. **Sincronizzazione con Prezzi di Mercato**: Poiché le serie storiche dei prezzi scaricate dai provider (Yahoo Finance) sono rettificate (*Adjusted Close*), la rettifica dei lotti di acquisto garantisce che il PnL latente ($P_{\text{market}} - \text{WACP}$) rifletta il reale guadagno economico senza distorsioni artificiali.
@@ -1337,7 +1385,11 @@ $$
 Il modulo modella i cluster di volatilità e la varianza condizionale time-varying nei mercati finanziari (Bollerslev 1986), superando il limite dell'omoschedasticità tipico dei modelli a volatilità costante.
 
 ### 1. Equazione del Modello GARCH(1,1)
-Dati i rendimenti giornalieri $r_t = \mu + \epsilon_t$, con $\epsilon_t = \sigma_t z_t$ e $z_t \sim \text{i.i.d.}(0, 1)$:
+Dati i rendimenti giornalieri:
+
+$$
+r_t = \mu + \epsilon_t, \quad \epsilon_t = \sigma_t z_t, \quad z_t \sim \text{i.i.d.}(0, 1)
+$$
 
 $$
 \sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2
@@ -1476,11 +1528,11 @@ Il motore applica il quadro normativo introdotto dalla **Legge 29 dicembre 2022,
 
 ### 1. Inquadramento TUIR (Art. 67, comma 1, lett. c-sexies)
 Le plusvalenze realizzate mediante cessione a titolo oneroso, rimborso o permuta di cripto-attività costituiscono *Redditi Diversi di Natura Finanziaria*.
-1. **Franchigia Annuale di 2.000€**:
+1. **Franchigia Annuale di 2.000\text{ EUR}**:
    
 
 $$
-\text{Base Imponibile Netta} = \max\left(0, \sum \text{Plusvalenze} - \sum \text{Minusvalenze} - 2.000€\right)
+\text{Base Imponibile Netta} = \max\left(0, \sum \text{Plusvalenze} - \sum \text{Minusvalenze} - 2.000\text{ EUR}\right)
 $$
 
 2. **Imposta Sostitutiva (26%)**:
@@ -1714,7 +1766,11 @@ $$
 \text{Contributo \% Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\%
 $$
 
-Proprietà di chiusura esatta: $\sum_{i=1}^N \text{Contributo \% Rischio}_i = 100.0\%$.
+Proprietà di chiusura esatta:
+
+$$
+\sum_{i=1}^N \text{Contributo \% Rischio}_i = 100.0\%
+$$
 
 ---
 
@@ -1729,7 +1785,11 @@ $$
 Dove:
 - $\text{VaR}_1 \cdot \sqrt{T}$: VaR di mercato scalato temporalmente per l'orizzonte di liquidazione ordinata a $T$ giorni.
 - $\frac{1}{2} \cdot V_{\text{port}} \cdot \bar{S}$: Costo atteso di attraversamento dello spread (Costo di Liquidità Esogeno).
-- $\text{Premio Illiquidità \%} = \frac{\text{LVaR} - \text{VaR}_1}{\text{VaR}_1} \times 100\%$.
+- **Premio Illiquidità**:
+
+$$
+\text{Premio Illiquidità (\%)} = \frac{\text{LVaR} - \text{VaR}_1}{\text{VaR}_1} \times 100\%
+$$
 
 ---
 
@@ -2107,7 +2167,7 @@ $$
 Il differenziale monetario risparmiato tramite esecuzione algoritmica istituzionale è definito da:
 
 $$
-\text{Risparmio Netto (€)} = \text{Costo}_{\text{Market Order}} - \text{Costo}_{\text{VWAP}} = \text{Controvalore} \times \left( \frac{\text{Slippage}_{\text{Market}} - \text{Slippage}_{\text{VWAP}}}{10000} \right)
+\text{Risparmio Netto (EUR)} = \text{Costo}_{\text{Market Order}} - \text{Costo}_{\text{VWAP}} = \text{Controvalore} \times \left( \frac{\text{Slippage}_{\text{Market}} - \text{Slippage}_{\text{VWAP}}}{10000} \right)
 $$
 
 ---
@@ -2117,7 +2177,13 @@ $$
 ### 1. Formulazione MDP (Markov Decision Process)
 Il ribilanciamento continuo del portafoglio viene formulato come un MDP $(\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma)$:
 - **Spazio degli Stati ($S_t \in \mathbb{R}^{3N}$)**: Include medie rolling dei rendimenti a 25 giorni $\mu_{i,t}$, deviazioni standard rolling $\sigma_{i,t}$ e momentum direzionale $\Delta R_{i,t}$ per ciascuno degli $N$ asset.
-- **Spazio delle Azioni ($A_t \in \Delta^{N-1}$)**: Vettore di pesi sul simplesso $w_t = [w_{1,t}, \dots, w_{N,t}]$ con vincoli $\sum w_i = 1$ e $w_i \ge 0$, generato mediante strato di attivazione Softmax.
+- **Spazio delle Azioni ($A_t \in \Delta^{N-1}$)**: Vettore di pesi sul simplesso:
+
+$$
+w_t = [w_{1,t}, \dots, w_{N,t}], \quad \sum w_i = 1, \quad w_i \ge 0
+$$
+
+generato mediante strato di attivazione Softmax.
 
 ### 2. Funzione di Ricompensa Orientata al Sortino Ratio con Attrito di Turnover
 La funzione di ricompensa premia il rendimento netto penalizzando quadraticamente le sole perdite (semi-varianza negativa / Downside Risk) e i costi di transazione da turnover:
@@ -2129,7 +2195,13 @@ $$
 dove $\gamma = 4.5$ è il coefficiente di avversione alle perdite e $\lambda$ è la penalità di turnover.
 
 ### 3. Policy Gradient REINFORCE con Baseline di Riduzione della Varianza
-I parametri $\theta = \{W_1, b_1, W_2, b_2\}$ della rete neurale Policy Actor vengono aggiornati a fine episodio calcolando il gradiente dei ritorni cumulati scontati $G_t = \sum_{k=t}^T \gamma^{k-t} R_k$, normalizzati con baseline standardizzata per minimizzare la varianza del gradiente:
+I parametri $\theta = \{W_1, b_1, W_2, b_2\}$ della rete neurale Policy Actor vengono aggiornati a fine episodio calcolando il gradiente dei ritorni cumulati scontati:
+
+$$
+G_t = \sum_{k=t}^T \gamma^{k-t} R_k
+$$
+
+normalizzati con baseline standardizzata per minimizzare la varianza del gradiente:
 
 $$
 \nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \ln \pi_\theta(a_t | s_t) \cdot (G_t - b(s_t)) \right]
