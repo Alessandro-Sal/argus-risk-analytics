@@ -579,6 +579,18 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
             sim_vals = {}
 
             if sbx_mode == "🔢 Variazione Quote (Vendi / Compra N Azioni)":
+                edit_key = st.session_state.get("sbx_edit_key_qty", "default")
+                editor_state = st.session_state.get(f"data_editor_qty_{edit_key}", {})
+                if isinstance(editor_state, dict) and "edited_rows" in editor_state:
+                    for row_idx_str, edits in editor_state["edited_rows"].items():
+                        try:
+                            r_idx = int(row_idx_str)
+                            if 0 <= r_idx < len(tickers_in_opt) and "sim_qty" in edits:
+                                tk = tickers_in_opt[r_idx]
+                                st.session_state[f"sbx_q_{tk}"] = float(edits["sim_qty"])
+                        except (ValueError, TypeError):
+                            pass
+
                 col_q1, col_q2, col_q3, col_q4 = st.columns(4)
                 with col_q1:
                     if st.button("⭐ Ripristina Quote Attuali", key="sbx_q_reset", use_container_width=True):
@@ -635,7 +647,6 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     })
                 
                 df_editor_qty = pd.DataFrame(rows_data)
-                edit_key = st.session_state.get("sbx_edit_key_qty", "default")
                 
                 edited_df = st.data_editor(
                     df_editor_qty,
@@ -670,7 +681,33 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 else:
                     norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
 
+                # Live Execution Banner
+                n_buy = sum(1 for t in tickers_in_opt if sim_qtys[t] > qty_map.get(t, 0.0))
+                n_sell = sum(1 for t in tickers_in_opt if sim_qtys[t] < qty_map.get(t, 0.0))
+                cf_color = "#4ade80" if net_cash_flow > 0 else ("#38bdf8" if net_cash_flow < 0 else "#8b949e")
+                cf_label = f"🟢 Liquidità Liberata da Vendite: +€ {net_cash_flow:,.2f}" if net_cash_flow > 0 else (f"🔵 Capitale Richiesto per Acquisti: € {abs(net_cash_flow):,.2f}" if net_cash_flow < 0 else "⚪ Impatto di Cassa Neutro (€ 0,00)")
+                
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <div><b>Valore Totale Simulato:</b> € {tot_sim_val:,.2f} <span style="color: #8b949e; font-size: 12px;">(Attuale: € {tot_cur_val:,.2f})</span></div>
+                    <div style="color: {cf_color}; font-weight: 700; font-size: 13px;">{cf_label}</div>
+                    <div style="font-size: 12px; color: #c9d1d9;"><b>Ordini:</b> 🔵 {n_buy} Acquisti | 🟢 {n_sell} Vendite</div>
+                </div>
+                """, unsafe_allow_html=True)
+
             elif sbx_mode == "💶 Importo Monetario (€)":
+                edit_key_m = st.session_state.get("sbx_edit_key_m", "default")
+                editor_state_m = st.session_state.get(f"data_editor_m_{edit_key_m}", {})
+                if isinstance(editor_state_m, dict) and "edited_rows" in editor_state_m:
+                    for row_idx_str, edits in editor_state_m["edited_rows"].items():
+                        try:
+                            r_idx = int(row_idx_str)
+                            if 0 <= r_idx < len(tickers_in_opt) and "sim_value" in edits:
+                                tk = tickers_in_opt[r_idx]
+                                st.session_state[f"sbx_m_{tk}"] = float(edits["sim_value"])
+                        except (ValueError, TypeError):
+                            pass
+
                 col_m1, col_m2, col_m3 = st.columns(3)
                 with col_m1:
                     if st.button("⭐ Ripristina Valori Attuali", key="sbx_m_reset", use_container_width=True):
@@ -718,7 +755,6 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     })
                 
                 df_editor_m = pd.DataFrame(rows_data_m)
-                edit_key_m = st.session_state.get("sbx_edit_key_m", "default")
                 
                 edited_df_m = st.data_editor(
                     df_editor_m,
@@ -752,7 +788,29 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 else:
                     norm_sim_weights = {t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt}
 
+                cf_color = "#4ade80" if net_cash_flow > 0 else ("#38bdf8" if net_cash_flow < 0 else "#8b949e")
+                cf_label = f"🟢 Liquidità Liberata da Disinvestimento: +€ {net_cash_flow:,.2f}" if net_cash_flow > 0 else (f"🔵 Capitale Addizionale Richiesto: € {abs(net_cash_flow):,.2f}" if net_cash_flow < 0 else "⚪ Impatto di Cassa Neutro (€ 0,00)")
+                
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 10px 14px; margin-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <div><b>Valore Totale Simulato:</b> € {tot_sim_val:,.2f} <span style="color: #8b949e; font-size: 12px;">(Attuale: € {tot_cur_val:,.2f})</span></div>
+                    <div style="color: {cf_color}; font-weight: 700; font-size: 13px;">{cf_label}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
             else:  # Pesi Percentuali (%)
+                edit_key_w = st.session_state.get("sbx_edit_key_w", "default")
+                editor_state_w = st.session_state.get(f"data_editor_w_{edit_key_w}", {})
+                if isinstance(editor_state_w, dict) and "edited_rows" in editor_state_w:
+                    for row_idx_str, edits in editor_state_w["edited_rows"].items():
+                        try:
+                            r_idx = int(row_idx_str)
+                            if 0 <= r_idx < len(tickers_in_opt) and "sim_weight_pct" in edits:
+                                tk = tickers_in_opt[r_idx]
+                                st.session_state[f"sbx_w_{tk}"] = float(edits["sim_weight_pct"])
+                        except (ValueError, TypeError):
+                            pass
+
                 col_pre1, col_pre2, col_pre3, col_pre4, col_pre5 = st.columns(5)
                 with col_pre1:
                     if st.button("⭐ Pesi Attuali", key="sbx_preset_cur", use_container_width=True):
@@ -802,7 +860,6 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     })
                 
                 df_editor_w = pd.DataFrame(rows_data_w)
-                edit_key_w = st.session_state.get("sbx_edit_key_w", "default")
                 
                 edited_df_w = st.data_editor(
                     df_editor_w,
