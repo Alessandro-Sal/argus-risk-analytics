@@ -78,17 +78,103 @@ render_page_header(
     icon="💻"
 )
 
-# ── Top-Level Segmented Tabs ─────────────────────────────────────────────────
-active_bquant_tab = st.segmented_control(
-    "Modulo Operativo:",
-    [
-        "🐍 ARGUS BQuant Python Sandbox",
-        "🎛️ Launchpad & Workspace Customizer",
-        "📊 Excel Live Connector & RTD"
-    ],
-    default="🐍 ARGUS BQuant Python Sandbox",
-    key="bquant_active_tab"
-)
+# ── SELETTORE MODULI BQUANT STILE BLOOMBERG TERMINAL ─────────
+BQUANT_MODELS_CATALOG = {
+    "🐍 ARGUS BQuant Python Sandbox": {
+        "title": "Console Python Interattiva In-App (Bloomberg BQuant Style)",
+        "badge": "Python REPL • NumPy/SciPy • DuckDB",
+        "badge_color": "#3fb950",
+        "category": "Programmazione Quantitativa",
+        "desc": "Ambiente interattivo in-memory per eseguire script Python avanzati con iniezione automatica dei DataFrame di portafoglio (df_positions, df_returns, df_prices), query SQL DuckDB e grafici Plotly."
+    },
+    "🎛️ Launchpad & Workspace Customizer": {
+        "title": "Configuratore di Ruolo, Layout & Personalizzazione Workspace",
+        "badge": "Ruoli • Asset Allocation • UI Customizer",
+        "badge_color": "#ff9900",
+        "category": "Esperienza Utente & Ruoli",
+        "desc": "Personalizzazione dell'interfaccia in base al profilo operativo: Wealth Manager, Risk Analyst, Quant Researcher o CIO, con visualizzazione moduli mirata."
+    },
+    "📊 Excel Live Connector & RTD": {
+        "title": "Connettore Live Excel Bloomberg Style (BDP / BDH / Real-Time Data)",
+        "badge": "Excel RTD • Formula Generator • Live Feed",
+        "badge_color": "#38bdf8",
+        "category": "Integrazione Dati Esterni",
+        "desc": "Generatore di formule compatibili Excel (BDP/BDH) ed esportazione flussi in tempo reale per alimentare modelli di pricing e fogli di calcolo proprietari."
+    }
+}
+
+# Risoluzione dello stato attivo con priorità alla sidebar o global jump
+target_tab = None
+if "target_subtab_bquant_active_tab" in st.session_state:
+    target_tab = st.session_state.pop("target_subtab_bquant_active_tab")
+elif "global_target_subtab" in st.session_state:
+    target_tab = st.session_state.pop("global_target_subtab")
+elif "target_bquant_module" in st.session_state:
+    target_tab = st.session_state.pop("target_bquant_module")
+
+bquant_keys = list(BQUANT_MODELS_CATALOG.keys())
+
+if target_tab and target_tab in bquant_keys:
+    st.session_state["bquant_active_tab"] = target_tab
+    st.session_state["bquant_active_tab_selectbox"] = target_tab
+elif "bquant_active_tab" not in st.session_state or st.session_state["bquant_active_tab"] not in bquant_keys:
+    st.session_state["bquant_active_tab"] = bquant_keys[0]
+
+curr_idx = bquant_keys.index(st.session_state["bquant_active_tab"])
+
+# Spaziatura e Respiro Layout
+st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+
+# Barra Selettore Compatta Bloomberg Style
+c_sel_bq, c_prev_bq, c_next_bq = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
+
+with c_prev_bq:
+    if st.button("◀ Prec.", key="btn_bquant_prev", use_container_width=True, help="Modulo precedente"):
+        new_i = (curr_idx - 1) % len(bquant_keys)
+        st.session_state["target_bquant_module"] = bquant_keys[new_i]
+        st.rerun()
+
+with c_next_bq:
+    if st.button("Succ. ▶", key="btn_bquant_next", use_container_width=True, help="Modulo successivo"):
+        new_i = (curr_idx + 1) % len(bquant_keys)
+        st.session_state["target_bquant_module"] = bquant_keys[new_i]
+        st.rerun()
+
+with c_sel_bq:
+    selected_bquant_key = st.selectbox(
+        "Seleziona Modulo BQuant:",
+        options=bquant_keys,
+        index=curr_idx,
+        format_func=lambda k: f"{k}  —  {BQUANT_MODELS_CATALOG[k]['category']} [{BQUANT_MODELS_CATALOG[k]['badge']}]",
+        key="bquant_active_tab_selectbox",
+        label_visibility="collapsed"
+    )
+    st.session_state["bquant_active_tab"] = selected_bquant_key
+
+active_bquant_tab = st.session_state["bquant_active_tab"]
+active_bquant_info = BQUANT_MODELS_CATALOG[active_bquant_tab]
+
+# Bloomberg Terminal Header Banner per il Modulo Attivo
+st.markdown(f"""
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_bquant_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+      {active_bquant_info['title']}
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+        {active_bquant_info['category']}
+      </span>
+      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_bquant_info['badge_color']}22; color: {active_bquant_info['badge_color']}; border: 1px solid {active_bquant_info['badge_color']}55;">
+        {active_bquant_info['badge']}
+      </span>
+    </div>
+  </div>
+  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
+    {active_bquant_info['desc']}
+  </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ═════════════════════════════════════════════════════════════════════════════
 # TAB 1: ARGUS BQUANT PYTHON SANDBOX

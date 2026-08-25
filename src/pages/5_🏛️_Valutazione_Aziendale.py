@@ -253,6 +253,9 @@ elif "val_segmented_tab" not in st.session_state or st.session_state["val_segmen
 
 curr_idx = val_keys.index(st.session_state["val_segmented_tab"])
 
+# Spaziatura e Respiro Layout
+st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+
 # Barra Selettore Compatta Bloomberg Style
 c_sel_v, c_prev_v, c_next_v = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
 
@@ -284,7 +287,7 @@ active_val_info = VALUATION_MODELS_CATALOG[active_val_tab]
 
 # Bloomberg Terminal Header Banner per il Modulo Attivo
 st.markdown(f"""
-<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_val_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_val_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
     <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
       {active_val_info['title']}
@@ -293,7 +296,7 @@ st.markdown(f"""
       <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
         {active_val_info['category']}
       </span>
-      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_val_info['badge_color']}22; color: {active_val_info['badge_color']}; border: 1px solid {active_info['badge_color'] if 'active_info' in locals() else active_val_info['badge_color']}55;">
+      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_val_info['badge_color']}22; color: {active_val_info['badge_color']}; border: 1px solid {active_val_info['badge_color']}55;">
         {active_val_info['badge']}
       </span>
     </div>

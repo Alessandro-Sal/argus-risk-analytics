@@ -209,6 +209,9 @@ elif "time_active_tab" not in st.session_state or st.session_state["time_active_
 
 curr_idx = time_keys.index(st.session_state["time_active_tab"])
 
+# Spaziatura e Respiro Layout
+st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+
 # Barra Selettore Compatta Bloomberg Style
 c_sel_tm, c_prev_tm, c_next_tm = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
 
@@ -240,7 +243,7 @@ active_time_info = TIME_MODELS_CATALOG[active_time_tab]
 
 # Bloomberg Terminal Header Banner per il Modulo Attivo
 st.markdown(f"""
-<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_time_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 4px; margin-bottom: 18px;">
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_time_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
     <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
       {active_time_info['title']}
