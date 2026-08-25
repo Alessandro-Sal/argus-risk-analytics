@@ -10,9 +10,19 @@ Per determinare accuratamente il costo di carico e i profitti/perdite realizzati
 
 1. **Gestione Acquisti**: Ogni operazione di acquisto (`buy`) aggiunge un lotto $(q_i, p_i)$ alla coda FIFO dell'asset.
 2. **Gestione Vendite**: Ogni operazione di vendita (`sell`) consuma le quote a partire dai lotti più vecchi nella coda:
-   \[ \text{PnL Realizzato} = \sum_{k} q_{\text{venduti}, k} \cdot (p_{\text{vendita}} - p_{\text{acquisto}, k}) - \text{Commissioni} \]
+   
+
+$$
+\text{PnL Realizzato} = \sum_{k} q_{\text{venduti}, k} \cdot (p_{\text{vendita}} - p_{\text{acquisto}, k}) - \text{Commissioni}
+$$
+
 3. **Prezzo Medio di Carico Residuo (Weighted Average Cost Basis - WACP)**:
-   \[ \text{WACP} = \frac{\sum_{m} q_{\text{residuo}, m} \cdot p_{\text{acquisto}, m}}{\sum_{m} q_{\text{residuo}, m}} \]
+   
+
+$$
+\text{WACP} = \frac{\sum_{m} q_{\text{residuo}, m} \cdot p_{\text{acquisto}, m}}{\sum_{m} q_{\text{residuo}, m}}
+$$
+
 4. **Dividendi**: I dividendi storici incassati vengono sommati direttamente per determinare il PnL totale effettivo.
 
 ---
@@ -26,40 +36,78 @@ Misura la dispersione dei rendimenti del portafoglio attorno alla loro media:
 
 ### Asimmetria (Skewness)
 Misura la simmetria della distribuzione dei rendimenti attorno alla media:
-\[ S = \frac{\frac{1}{N} \sum_{t=1}^N (R_t - \bar{R})^3}{\sigma_d^3} \]
+
+$$
+S = \frac{\frac{1}{N} \sum_{t=1}^N (R_t - \bar{R})^3}{\sigma_d^3}
+$$
+
 - $S < 0$: Coda sinistra pronunciata (maggiore probabilità di perdite estreme).
 - $S > 0$: Coda destra pronunciata.
 
 ### Curtosi (Kurtosis / Fat Tails)
 Misura la pesantezza delle code della distribuzione rispetto a una distribuzione gaussiana normale:
-\[ K = \frac{\frac{1}{N} \sum_{t=1}^N (R_t - \bar{R})^4}{\sigma_d^4} - 3 \]
+
+$$
+K = \frac{\frac{1}{N} \sum_{t=1}^N (R_t - \bar{R})^4}{\sigma_d^4} - 3
+$$
+
 - $K > 0$: Presenza di code spesse (*fat tails*), ovvero eventi estremi più frequenti rispetto alla normale.
 
 ### Tracking Error
 Misura la deviazione standard del rendimento attivo rispetto al benchmark ($R_b$):
-\[ TE = \sqrt{\frac{1}{N-1} \sum_{t=1}^N \left( (R_t - R_{b,t}) - \overline{(R - R_b)} \right)^2} \times \sqrt{252} \]
+
+$$
+TE = \sqrt{\frac{1}{N-1} \sum_{t=1}^N \left( (R_t - R_{b,t}) - \overline{(R - R_b)} \right)^2} \times \sqrt{252}
+$$
 
 ### Massimo Drawdown (Max Drawdown) & High-Water Mark
 Il **Max Drawdown** misura la peggiore perdita percentuale di capitale subita tra un picco massimo storico relativo (*High-Water Mark*, $\text{HWM}_t$) e il minimo successivo (*Trough*), prima del raggiungimento di un nuovo massimo:
-\[ \text{HWM}_t = \max_{s \le t} V_s \]
-\[ \text{Drawdown}_t = \frac{V_t - \text{HWM}_t}{\text{HWM}_t} \]
-\[ \text{Max Drawdown} = \min_{t} \text{Drawdown}_t \]
+
+$$
+\text{HWM}_t = \max_{s \le t} V_s
+$$
+
+$$
+\text{Drawdown}_t = \frac{V_t - \text{HWM}_t}{\text{HWM}_t}
+$$
+
+$$
+\text{Max Drawdown} = \min_{t} \text{Drawdown}_t
+$$
 
 #### Dimostrazione Algebrica: Perché il Drawdown non è la sottrazione sull'asse Y del Rendimento Cumulato
 Sia $V_0$ il capitale iniziale e $V_t = V_0 \prod_{i=1}^t (1 + R_i)$ il valore del portafoglio. Il rendimento cumulato indicizzato a base zero è $\text{CumRet}_t = \frac{V_t - V_0}{V_0}$.
 La differenza aritmetica tra il picco e il minimo successivo osservata sull'asse delle ordinate (in punti percentuali) è:
-\[ \Delta_{\text{asse } Y} = \text{CumRet}_{\text{peak}} - \text{CumRet}_{\text{trough}} = \frac{V_{\text{peak}} - V_{\text{trough}}}{V_0} \]
+
+$$
+\Delta_{\text{asse } Y} = \text{CumRet}_{\text{peak}} - \text{CumRet}_{\text{trough}} = \frac{V_{\text{peak}} - V_{\text{trough}}}{V_0}
+$$
+
 Il vero **Drawdown Relativo** subito dall'investitore rispetto al picco è invece:
-\[ DD = \frac{V_{\text{trough}} - V_{\text{peak}}}{V_{\text{peak}}} = -\frac{V_{\text{peak}} - V_{\text{trough}}}{V_0 \cdot (1 + \text{CumRet}_{\text{peak}})} = -\frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} \]
+
+$$
+DD = \frac{V_{\text{trough}} - V_{\text{peak}}}{V_{\text{peak}}} = -\frac{V_{\text{peak}} - V_{\text{trough}}}{V_0 \cdot (1 + \text{CumRet}_{\text{peak}})} = -\frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}}
+$$
+
 **Conseguenza Matematica:**
 Poiché al picco il rendimento cumulato è positivo ($\text{CumRet}_{\text{peak}} > 0$), il denominatore $(1 + \text{CumRet}_{\text{peak}}) > 1$. Pertanto, il valore assoluto della perdita percentuale effettiva è sistematicamente inferiore alla caduta visiva in punti percentuali sull'asse $Y$:
-\[ |DD| = \frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} < \Delta_{\text{asse } Y} \]
+
+$$
+|DD| = \frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} < \Delta_{\text{asse } Y}
+$$
+
 *Esempio numerico:* Se il portafoglio raggiunge $\text{CumRet}_{\text{peak}} = +98.4\%$ e poi cade a $\text{CumRet}_{\text{trough}} = +20.6\%$, la discesa visiva sull'asse $Y$ è $\Delta = 98.4 - 20.6 = 77.8\%$. Tuttavia, la perdita reale subita dal patrimonio è:
-\[ DD = -\frac{77.8\%}{1 + 0.984} = -\frac{77.8\%}{1.984} = \mathbf{-39.21\%} \]
+
+$$
+DD = -\frac{77.8\%}{1 + 0.984} = -\frac{77.8\%}{1.984} = \mathbf{-39.21\%}
+$$
 
 ### Ulcer Index (UI)
 Misura la profondità e la persistenza temporale dei periodi trascorsi sott'acqua (*underwater*), penalizzando quadraticamente i drawdown prolungati:
-\[ \text{UI} = \sqrt{\frac{1}{N} \sum_{t=1}^N (\text{Drawdown}_t \times 100)^2} \]
+
+$$
+\text{UI} = \sqrt{\frac{1}{N} \sum_{t=1}^N (\text{Drawdown}_t \times 100)^2}
+$$
 
 ---
 
@@ -69,26 +117,50 @@ Il Value at Risk stima la massima perdita potenziale in un orizzonte temporale $
 
 ### 1. VaR Storico
 È il percentile empirico esatto della distribuzione dei rendimenti giornalieri storici:
-\[ VaR_{\text{Storico}}(1, \alpha) = - \text{Percentile}(R, \alpha) \]
+
+$$
+VaR_{\text{Storico}}(1, \alpha) = - \text{Percentile}(R, \alpha)
+$$
 
 ### 2. VaR Parametrico (Gaussiano)
 Basato sull'assunzione di rendimenti normalmente distribuiti con media $\mu$, deviazione standard $\sigma_d$ e quantile normale standard $Z_\alpha = \Phi^{-1}(\alpha) < 0$ (es. $Z_{0.05} = -1.64485$):
-\[ q_{\text{Param}} = \mu + Z_\alpha \cdot \sigma_d \]
-\[ VaR_{\text{Parametrico}}(1, \alpha) = - q_{\text{Param}} = -\mu + |Z_\alpha| \cdot \sigma_d \]
+
+$$
+q_{\text{Param}} = \mu + Z_\alpha \cdot \sigma_d
+$$
+
+$$
+VaR_{\text{Parametrico}}(1, \alpha) = - q_{\text{Param}} = -\mu + |Z_\alpha| \cdot \sigma_d
+$$
 
 ### 3. VaR Cornish-Fisher (Modello Asimmetrico & Code Spesse)
 Incorpora Asimmetria ($S$) e Curtosi ($K$) tramite l'espansione di Cornish-Fisher per correggere la stima in presenza di code non gaussiane:
-\[ Z_{CF} = Z_\alpha + \frac{1}{6}(Z_\alpha^2 - 1)S + \frac{1}{24}(Z_\alpha^3 - 3Z_\alpha)K - \frac{1}{36}(2Z_\alpha^3 - 5Z_\alpha)S^2 \]
-\[ q_{CF} = \mu + Z_{CF} \cdot \sigma_d \]
-\[ VaR_{CF}(1, \alpha) = - q_{CF} = -\mu + |Z_{CF}| \cdot \sigma_d \]
+
+$$
+Z_{CF} = Z_\alpha + \frac{1}{6}(Z_\alpha^2 - 1)S + \frac{1}{24}(Z_\alpha^3 - 3Z_\alpha)K - \frac{1}{36}(2Z_\alpha^3 - 5Z_\alpha)S^2
+$$
+
+$$
+q_{CF} = \mu + Z_{CF} \cdot \sigma_d
+$$
+
+$$
+VaR_{CF}(1, \alpha) = - q_{CF} = -\mu + |Z_{CF}| \cdot \sigma_d
+$$
 
 ### Riscalamento Temporale $\sqrt{T}$
 I valori di VaR giornalieri vengono proiettati su un orizzonte di $T$ giorni tramite la regola della radice del tempo:
-\[ VaR(T, \alpha) = VaR(1, \alpha) \times \sqrt{T} \]
+
+$$
+VaR(T, \alpha) = VaR(1, \alpha) \times \sqrt{T}
+$$
 
 ### Conditional VaR (CVaR / Expected Shortfall)
 Misura la perdita media attesa nell'ipotesi in cui la perdita superi la soglia del VaR:
-\[ CVaR(1, \alpha) = - E[R_t \mid R_t \le -VaR(1, \alpha)] \]
+
+$$
+CVaR(1, \alpha) = - E[R_t \mid R_t \le -VaR(1, \alpha)]
+$$
 
 ---
 
@@ -98,7 +170,12 @@ Per verificare l'accuratezza predittiva dei modelli VaR, il sistema esegue un ba
 
 1. **Eccezioni (Breaches)**: Si contano i giorni $t$ in cui $R_t < -VaR_t(1, \alpha)$.
 2. **Kupiec Proportion of Failures (POF) Test**: Test del rapporto di verosimiglianza basato su distribuzione binomiale:
-   \[ LR_{POF} = -2 \ln \left[ \frac{(1-\alpha)^{N-x} \alpha^x}{\left(1-\frac{x}{N}\right)^{N-x} \left(\frac{x}{N}\right)^x} \right] \sim \chi^2(1) \]
+   
+
+$$
+LR_{POF} = -2 \ln \left[ \frac{(1-\alpha)^{N-x} \alpha^x}{\left(1-\frac{x}{N}\right)^{N-x} \left(\frac{x}{N}\right)^x} \right] \sim \chi^2(1)
+$$
+
 3. **Semaforo di Basilea**:
    - 🟢 **Zona Verde**: Eccezioni comprese nei limiti statistici ($x \le \text{Attesa}$). Modello affidabile.
    - 🟡 **Zona Gialla**: Lieve sottostima del rischio ($\text{Attesa} < x \le 1.5 \times \text{Attesa}$).
@@ -110,7 +187,9 @@ Per verificare l'accuratezza predittiva dei modelli VaR, il sistema esegue un ba
 
 Scompone l'Alpha e l'impronta di rischio del portafoglio sui tre fattori accademici premio Nobel tramite regressione multivariata:
 
-\[ R_p - R_f = \alpha_{FF} + \beta_{Mkt} (R_b - R_f) + s \cdot SMB + h \cdot HML + \epsilon \]
+$$
+R_p - R_f = \alpha_{FF} + \beta_{Mkt} (R_b - R_f) + s \cdot SMB + h \cdot HML + \epsilon
+$$
 
 - **$\alpha_{FF}$**: Extra-rendimento annuo puro depurato dallo stile di investimento.
 - **$\beta_{Mkt}$**: Sensibilità sistemica alle fluttuazioni del mercato azionario.
@@ -133,17 +212,32 @@ Per i titoli privi di storico nel periodo della crisi, il motore applica un fall
 
 ### 2. Custom What-If Beta Shock Simulator
 Simula l'impatto di uno shock arbitrario del benchmark $\Delta R_b \in [-50\%, +30\%]$:
-\[ \Delta R_i = \beta_i \times \Delta R_b \]
-\[ \text{Perdita Stimata Asset } i (€) = \text{Valore Attuale}_i \times \Delta R_i \]
+
+$$
+\Delta R_i = \beta_i \times \Delta R_b
+$$
+
+$$
+\text{Perdita Stimata Asset } i (€) = \text{Valore Attuale}_i \times \Delta R_i
+$$
 
 ### 3. Simulazione Monte Carlo Multi-Asset (Decomposizione di Cholesky & Student-t)
 Genera fino a 10.000 cammini casuali del valore complessivo di portafoglio su 252–756 giorni futuri:
 1. Si calcola la matrice di covarianza storica $\Sigma$.
 2. Si applica la **Decomposizione di Cholesky** per ottenere la matrice triangolare inferiore $L$ tale che $\Sigma = L \cdot L^T$.
 3. Per ogni passo temporale, si generano rendimenti casuali correlati con supporto opzionale per code grasse (distribuzione Student-t con $\nu=5$):
-   \[ Z \sim \sqrt{\frac{\nu-2}{\nu}} \times t_{\nu}(0, 1), \quad R_{\text{sim}} = \mu + L \cdot Z \]
+   
+
+$$
+Z \sim \sqrt{\frac{\nu-2}{\nu}} \times t_{\nu}(0, 1), \quad R_{\text{sim}} = \mu + L \cdot Z
+$$
+
 4. Evoluzione del prezzo via Moto Browniano Geometrico:
-   \[ P_t = P_0 \cdot \exp\left( \sum_{k=1}^t R_{k, \text{sim}} \right) \]
+   
+
+$$
+P_t = P_0 \cdot \exp\left( \sum_{k=1}^t R_{k, \text{sim}} \right)
+$$
 
 ---
 
@@ -151,7 +245,10 @@ Genera fino a 10.000 cammini casuali del valore complessivo di portafoglio su 25
 
 ### Ledoit-Wolf Shrinkage
 Per stabilizzare la stima della matrice di covarianza contro il rumore campionario, si contrae la covarianza campionaria $S$ verso una matrice bersaglio a singolo fattore $F$:
-\[ \Sigma_{LW} = (1 - \delta) S + \delta F, \quad \delta \in [0, 1] \]
+
+$$
+\Sigma_{LW} = (1 - \delta) S + \delta F, \quad \delta \in [0, 1]
+$$
 
 ### Ottimizzazione Vincolata SciPy SLSQP
 - **Max Sharpe Ratio**: $\max_w \frac{w^T \mu - R_f}{\sqrt{w^T \Sigma_{LW} w}} \quad \text{s.t. } \sum w_i = 1, w_i \ge 0$
@@ -159,7 +256,10 @@ Per stabilizzare la stima della matrice di covarianza contro il rumore campionar
 
 ### Ordini di Ribilanciamento
 Per ogni asset $i$, le quote da negoziare per raggiungere il peso ottimale $w_{i, \text{ott}}$ sono:
-\[ \Delta Q_i = \frac{V_{\text{totale}} \cdot w_{i, \text{ott}} - V_{i, \text{attuale}}}{P_{i, \text{corrente}}} \]
+
+$$
+\Delta Q_i = \frac{V_{\text{totale}} \cdot w_{i, \text{ott}} - V_{i, \text{attuale}}}{P_{i, \text{corrente}}}
+$$
 
 ---
 
@@ -167,11 +267,17 @@ Per ogni asset $i$, le quote da negoziare per raggiungere il peso ottimale $w_{i
 
 ### Ulcer Index (UI) & Recovery Analysis
 Misura la severità dello stress psicologico dell'investitore penalizzando quadraticamente sia la profondità che la durata dei cali sotto l'High-Water Mark:
-\[ UI = \sqrt{\frac{1}{N} \sum_{t=1}^N D_t^2}, \quad D_t = \frac{P_t - \max_{\tau \le t} P_\tau}{\max_{\tau \le t} P_\tau} \times 100 \]
+
+$$
+UI = \sqrt{\frac{1}{N} \sum_{t=1}^N D_t^2}, \quad D_t = \frac{P_t - \max_{\tau \le t} P_\tau}{\max_{\tau \le t} P_\tau} \times 100
+$$
 
 ### Rischio Liquidità (Giorni alla Liquidazione ADV)
 Stima il tempo necessario a smobilizzare una posizione senza causare market impact:
-\[ \text{Giorni alla Liquidazione} = \frac{\text{Quantità Posizione}}{0.15 \times \text{ADV}_{90g}} \]
+
+$$
+\text{Giorni alla Liquidazione} = \frac{\text{Quantità Posizione}}{0.15 \times \text{ADV}_{90g}}
+$$
 
 ### Concentrazione & Diversificazione
 - **Herfindahl-Hirschman Index (HHI)**: $HHI = \sum_{i=1}^M w_i^2$
@@ -233,12 +339,31 @@ Consente il tracciamento della serie storica degli snapshot salvati a Data Wareh
 
 1. **Valore Copertura Beta-Neutral**:
    Per ridurre o azzerare la sensibilità sistemica ($\beta_{\text{target}}$):
-   \[ \Delta \beta = \beta_p - \beta_{\text{target}} \]
-   \[ H = - \frac{\Delta \beta \cdot V_{\text{portafoglio}}}{|\text{Beta}_{\text{strumento}}|} \]
+   
+
+$$
+\Delta \beta = \beta_p - \beta_{\text{target}}
+$$
+
+   
+
+$$
+H = - \frac{\Delta \beta \cdot V_{\text{portafoglio}}}{|\text{Beta}_{\text{strumento}}|}
+$$
+
 2. **Numero di Quote dell'ETF Inverso**:
-   \[ N_{\text{quote}} = \text{round}\left( \frac{|H|}{P_{\text{etf\_inverso}}} \right) \]
+   
+
+$$
+N_{\text{quote}} = \text{round}\left( \frac{|H|}{P_{\text{etf\_inverso}}} \right)
+$$
+
 3. **Protezione Tail Risk ($\text{VaR}_{99}$)**:
-   \[ \text{Copertura Coda} (€) = V_{\text{portafoglio}} \cdot \text{VaR}_{99, \text{storico}} \]
+   
+
+$$
+\text{Copertura Coda} (€) = V_{\text{portafoglio}} \cdot \text{VaR}_{99, \text{storico}}
+$$
 
 ---
 
@@ -247,13 +372,32 @@ Consente il tracciamento della serie storica degli snapshot salvati a Data Wareh
 Scompone l'extra-rendimento di portafoglio rispetto al benchmark nei 3 fattori:
 
 1. **Allocation Effect (Effetto Allocazione Settoriale)**:
-   \[ A_i = (w_i^p - w_i^b) \cdot (R_i^b - R^b) \]
+   
+
+$$
+A_i = (w_i^p - w_i^b) \cdot (R_i^b - R^b)
+$$
+
 2. **Selection Effect (Effetto Selezione Titoli)**:
-   \[ S_i = w_i^b \cdot (R_i^p - R_i^b) \]
+   
+
+$$
+S_i = w_i^b \cdot (R_i^p - R_i^b)
+$$
+
 3. **Interaction Effect (Effetto Interazione)**:
-   \[ I_i = (w_i^p - w_i^b) \cdot (R_i^p - R_i^b) \]
+   
+
+$$
+I_i = (w_i^p - w_i^b) \cdot (R_i^p - R_i^b)
+$$
+
 4. **Extra-Rendimento Totale**:
-   \[ R^p - R^b = \sum_{i} (A_i + S_i + I_i) \]
+   
+
+$$
+R^p - R^b = \sum_{i} (A_i + S_i + I_i)
+$$
 
 ---
 
@@ -294,7 +438,11 @@ Classificazione a semaforo:
 
 ### 1. Altman Z-Score Model (Original 1968)
 Stima la probabilità di insolvenza/bancarotta aziendale su un orizzonte di 24 mesi tramite combinazione lineare di 5 indici patrimoniali e reddituali:
-\[ Z = 1.2 X_1 + 1.4 X_2 + 3.3 X_3 + 0.6 X_4 + 0.999 X_5 \]
+
+$$
+Z = 1.2 X_1 + 1.4 X_2 + 3.3 X_3 + 0.6 X_4 + 0.999 X_5
+$$
+
 - $X_1 = \frac{\text{Working Capital}}{\text{Total Assets}}$ (Indice di liquidità operativa)
 - $X_2 = \frac{\text{Retained Earnings}}{\text{Total Assets}}$ (Redditività cumulativa reinvestita)
 - $X_3 = \frac{\text{EBIT}}{\text{Total Assets}}$ (Produttività dell'attivo aziendale)
@@ -309,9 +457,18 @@ Zone di rischio:
 ### 2. Scomposizione DuPont (3-Factor & 5-Factor Models)
 Scompone il Return on Equity (ROE) nei suoi driver costitutivi:
 - **DuPont 3 Fattori**:
-  \[ ROE = \frac{\text{Net Income}}{\text{Sales}} \times \frac{\text{Sales}}{\text{Total Assets}} \times \frac{\text{Total Assets}}{\text{Total Equity}} = \text{Profit Margin} \times \text{Asset Turnover} \times \text{Equity Multiplier} \]
+  
+
+$$
+ROE = \frac{\text{Net Income}}{\text{Sales}} \times \frac{\text{Sales}}{\text{Total Assets}} \times \frac{\text{Total Assets}}{\text{Total Equity}} = \text{Profit Margin} \times \text{Asset Turnover} \times \text{Equity Multiplier}
+$$
+
 - **DuPont 5 Fattori**:
-  \[ ROE = \frac{\text{Net Income}}{\text{EBT}} \times \frac{\text{EBT}}{\text{EBIT}} \times \frac{\text{EBIT}}{\text{Sales}} \times \frac{\text{Sales}}{\text{Assets}} \times \frac{\text{Assets}}{\text{Equity}} \]
+  
+
+$$
+ROE = \frac{\text{Net Income}}{\text{EBT}} \times \frac{\text{EBT}}{\text{EBIT}} \times \frac{\text{EBIT}}{\text{Sales}} \times \frac{\text{Sales}}{\text{Assets}} \times \frac{\text{Assets}}{\text{Equity}}
+$$
 
 ### 3. Consultazione Bilanci Ufficiali 10-K (`fetch_detailed_financial_statements`)
 Download ed esplorazione dei rendiconti contabili di esercizio da Yahoo Finance:
@@ -333,16 +490,37 @@ Permette il confronto affiancato di due o più aziende (del portafoglio o del me
 
 ### 1. Attualizzazione Flussi di Cassa Liberi (2-Stage DCF)
 Modello fondamentale di finanza aziendale che calcola l'Enterprise Value ($EV$) ed il Fair Value intrinseco per azione attualizzando i Flussi di Cassa Liberi ($FCF$) ed il Valore Terminale ($TV$):
-\[ PV(FCF) = \sum_{t=1}^{5} \frac{FCF_0 \cdot (1 + g)^t}{(1 + WACC)^t} \]
-\[ TV = \frac{FCF_5 \cdot (1 + g_{\text{terminal}})}{WACC - g_{\text{terminal}}} \]
-\[ PV(TV) = \frac{TV}{(1 + WACC)^5} \]
-\[ \text{Enterprise Value} = PV(FCF) + PV(TV) \]
-\[ \text{Equity Value} = \text{Enterprise Value} + \text{Cassa Netta} - \text{Debito Totale} \]
-\[ \text{Fair Value per Azione} = \frac{\text{Equity Value}}{\text{Azioni Totali Diluite}} \]
+
+$$
+PV(FCF) = \sum_{t=1}^{5} \frac{FCF_0 \cdot (1 + g)^t}{(1 + WACC)^t}
+$$
+
+$$
+TV = \frac{FCF_5 \cdot (1 + g_{\text{terminal}})}{WACC - g_{\text{terminal}}}
+$$
+
+$$
+PV(TV) = \frac{TV}{(1 + WACC)^5}
+$$
+
+$$
+\text{Enterprise Value} = PV(FCF) + PV(TV)
+$$
+
+$$
+\text{Equity Value} = \text{Enterprise Value} + \text{Cassa Netta} - \text{Debito Totale}
+$$
+
+$$
+\text{Fair Value per Azione} = \frac{\text{Equity Value}}{\text{Azioni Totali Diluite}}
+$$
 
 ### 2. Simulazione Stocastica Monte Carlo (1,000 Iterazioni)
 Campiona simultaneamente il tasso di crescita del fatturato $g \sim \mathcal{N}(\mu_g, \sigma_g)$, il costo del capitale $WACC \sim \mathcal{N}(\mu_w, \sigma_w)$ ed il tasso di crescita terminale $g_{\text{term}} \sim \mathcal{N}(\mu_{tg}, \sigma_{tg})$ per ricavare la distribuzione completa del Fair Value e calcolare la percentuale di probabilità di sottovalutazione:
-\[ \text{Probabilità Sottovalutazione \%} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}(\text{Fair Value}_i > \text{Prezzo Attuale}) \times 100 \]
+
+$$
+\text{Probabilità Sottovalutazione \%} = \frac{1}{N} \sum_{i=1}^{N} \mathbb{I}(\text{Fair Value}_i > \text{Prezzo Attuale}) \times 100
+$$
 
 ---
 
@@ -375,16 +553,31 @@ Estrazione ed analisi comparativa in tempo reale dei multipli ufficiali di valut
 
 ### 1. True Range (TR) & Average True Range ($ATR_{14}$)
 L'Average True Range misura la volatilità fisiologica reale di ciascun asset tenendo conto anche dei gap di apertura:
-\[ TR_t = \max \left( H_t - L_t, \, |H_t - C_{t-1}|, \, |L_t - C_{t-1}| \right) \]
-\[ ATR_{14,t} = \frac{1}{14} \sum_{k=0}^{13} TR_{t-k} \]
+
+$$
+TR_t = \max \left( H_t - L_t, \, |H_t - C_{t-1}|, \, |L_t - C_{t-1}| \right)
+$$
+
+$$
+ATR_{14,t} = \frac{1}{14} \sum_{k=0}^{13} TR_{t-k}
+$$
 
 ### 2. Chandelier Exit Level ($3 \times ATR_{14}$)
 Stop-loss dinamico agganciato al massimo più alto degli ultimi 22 giorni lavorativi ($H_{22}$), sottratto di 3 volte la volatilità media reale:
-\[ \text{Chandelier Exit}_t = \max_{k=0..21}(H_{t-k}) - 3 \times ATR_{14,t} \]
+
+$$
+\text{Chandelier Exit}_t = \max_{k=0..21}(H_{t-k}) - 3 \times ATR_{14,t}
+$$
 
 ### 3. Distanza Percentuale & Alert Condition
-\[ \text{Distanza Stop \%} = \frac{P_{\text{mkt}} - \text{Chandelier Exit}_t}{P_{\text{mkt}}} \times 100 \]
-\[ \text{Alert Status} = \begin{cases} \text{🔴 TRIGGER}, & \text{se } P_{\text{mkt}} \le \text{Chandelier Exit}_t \\ \text{🟢 REGOLARE}, & \text{se } P_{\text{mkt}} > \text{Chandelier Exit}_t \end{cases} \]
+
+$$
+\text{Distanza Stop \%} = \frac{P_{\text{mkt}} - \text{Chandelier Exit}_t}{P_{\text{mkt}}} \times 100
+$$
+
+$$
+\text{Alert Status} = \begin{cases} \text{🔴 TRIGGER}, & \text{se } P_{\text{mkt}} \le \text{Chandelier Exit}_t \\ \text{🟢 REGOLARE}, & \text{se } P_{\text{mkt}} > \text{Chandelier Exit}_t \end{cases}
+$$
 
 ---
 
@@ -393,13 +586,28 @@ Stop-loss dinamico agganciato al massimo più alto degli ultimi 22 giorni lavora
 ### 1. Scomposizione dell'Impatto sui Prezzi (Almgren & Chriss, 2000)
 Modello istituzionale per la stima dello slippage e dei costi di esecuzione durante la smobilizzazione o il bilanciamento di posizioni azionarie:
 - **Impatto Permanente ($I_{\text{perm}}$)**: Spostamento strutturale del prezzo di equilibrio dovuto alla pressione informativa dell'ordine:
-  \[ I_{\text{perm}} = \gamma \cdot \left( \frac{\text{Volume Operativo}}{ADV} \right) \cdot P_{\text{attuale}} \]
+  
+
+$$
+I_{\text{perm}} = \gamma \cdot \left( \frac{\text{Volume Operativo}}{ADV} \right) \cdot P_{\text{attuale}}
+$$
+
 - **Impatto Temporaneo ($I_{\text{temp}}$)**: Pressione immediata sul book di negoziazione che si riassorbe nel tempo:
-  \[ I_{\text{temp}} = \eta \cdot \sqrt{\frac{\text{Volume Operativo}}{ADV \cdot T_{\text{ore}}}} \cdot P_{\text{attuale}} \]
+  
+
+$$
+I_{\text{temp}} = \eta \cdot \sqrt{\frac{\text{Volume Operativo}}{ADV \cdot T_{\text{ore}}}} \cdot P_{\text{attuale}}
+$$
 
 ### 2. Slippage Stimato % & Impatto Monetario (€)
-\[ \text{Slippage Stimato \%} = \frac{I_{\text{perm}} + I_{\text{temp}}}{P_{\text{attuale}}} \times 100 \]
-\[ \text{Impatto Monetario Totale (€)} = \text{Quote Scambiate} \times (I_{\text{perm}} + I_{\text{temp}}) \]
+
+$$
+\text{Slippage Stimato \%} = \frac{I_{\text{perm}} + I_{\text{temp}}}{P_{\text{attuale}}} \times 100
+$$
+
+$$
+\text{Impatto Monetario Totale (€)} = \text{Quote Scambiate} \times (I_{\text{perm}} + I_{\text{temp}})
+$$
 
 ---
 
@@ -410,7 +618,11 @@ Modellizzazione della superficie di PnL su una griglia bivariata $X \times Y$:
 - **Asse $X$ (Tassi $\Delta r$)**: Varie variazioni dei tassi da $-200\,\text{bps}$ a $+200\,\text{bps}$ (sensibilità duration $-4.5$).
 - **Asse $Y$ (Volatilità $\Delta \sigma$)**: Varie variazioni della volatilità da $-30\%$ a $+50\%$ (sensibilità vega/equity $-0.35$).
 - **Matrice $Z_{i,j}$ (Impatto PnL €)**:
-  \[ Z_{i,j} = \text{Capitale Totale} \times \left( \frac{\Delta r_j}{10000} \cdot (-4.5) + \frac{\Delta \sigma_i}{100} \cdot (-0.35) \right) \]
+  
+
+$$
+Z_{i,j} = \text{Capitale Totale} \times \left( \frac{\Delta r_j}{10000} \cdot (-4.5) + \frac{\Delta \sigma_i}{100} \cdot (-0.35) \right)
+$$
 
 ---
 
@@ -418,20 +630,40 @@ Modellizzazione della superficie di PnL su una griglia bivariata $X \times Y$:
 
 ### 1. Equazione di Ortogonalizzazione dei Fattori (Gram-Schmidt OLS)
 Per prevenire la multicollinearità ed isolare le reali esposizioni pure ai fattori di stile, ciascun fattore grezzo viene proiettato ed ortogonalizzato rispetto al fattore di mercato $F_{\text{MKT}}$:
-\[ F_{\text{SMB}} = \text{SMB}_{\text{raw}} - \frac{\text{cov}(\text{SMB}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}} \]
-\[ F_{\text{HML}} = \text{HML}_{\text{raw}} - \frac{\text{cov}(\text{HML}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}} \]
-\[ F_{\text{WML}} = \text{WML}_{\text{raw}} - \frac{\text{cov}(\text{WML}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}} \]
-\[ F_{\text{TERM}} = \text{TERM}_{\text{raw}} - \frac{\text{cov}(\text{TERM}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}} \]
+
+$$
+F_{\text{SMB}} = \text{SMB}_{\text{raw}} - \frac{\text{cov}(\text{SMB}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}}
+$$
+
+$$
+F_{\text{HML}} = \text{HML}_{\text{raw}} - \frac{\text{cov}(\text{HML}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}}
+$$
+
+$$
+F_{\text{WML}} = \text{WML}_{\text{raw}} - \frac{\text{cov}(\text{WML}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}}
+$$
+
+$$
+F_{\text{TERM}} = \text{TERM}_{\text{raw}} - \frac{\text{cov}(\text{TERM}_{\text{raw}}, F_{\text{MKT}})}{\text{var}(F_{\text{MKT}})} F_{\text{MKT}}
+$$
 
 ### 2. Equazione di Regressione Multivariata OLS
 Esposizione del rendimento in eccesso del portafoglio ai 5 fattori macro/di stile ortogonali:
-\[ R_{p,t} - R_{f,t} = \alpha + \beta_{\text{MKT}} F_{\text{MKT},t} + \beta_{\text{SMB}} F_{\text{SMB},t} + \beta_{\text{HML}} F_{\text{HML},t} + \beta_{\text{WML}} F_{\text{WML},t} + \beta_{\text{TERM}} F_{\text{TERM},t} + \epsilon_t \]
+
+$$
+R_{p,t} - R_{f,t} = \alpha + \beta_{\text{MKT}} F_{\text{MKT},t} + \beta_{\text{SMB}} F_{\text{SMB},t} + \beta_{\text{HML}} F_{\text{HML},t} + \beta_{\text{WML}} F_{\text{WML},t} + \beta_{\text{TERM}} F_{\text{TERM},t} + \epsilon_t
+$$
 
 ### 3. Decomposizione della Varianza & Statistica $t$
 - **Rischio Sistemico Fattoriale \%**: $R^2 \times 100$
 - **Rischio Specifico Residuo \%**: $(1 - R^2) \times 100$
 - **Statistica $t$ dei Betas**:
-  \[ t_{\beta_k} = \frac{\hat{\beta}_k}{\text{SE}(\hat{\beta}_k)}, \quad \text{SE}(\hat{\beta}_k) = \sqrt{\hat{\sigma}_{\epsilon}^2 (X^T X)^{-1}_{kk}} \]
+  
+
+$$
+t_{\beta_k} = \frac{\hat{\beta}_k}{\text{SE}(\hat{\beta}_k)}, \quad \text{SE}(\hat{\beta}_k) = \sqrt{\hat{\sigma}_{\epsilon}^2 (X^T X)^{-1}_{kk}}
+$$
+
   Valori di $|t_{\beta_k}| \ge 1.96$ indicano un'esposizione statisticamente significativa al livello di confidenza del 95% (`🟢 Significativo`).
 
 ---
@@ -440,7 +672,10 @@ Esposizione del rendimento in eccesso del portafoglio ai 5 fattori macro/di stil
 
 ### 1. Processo Stocastico Bivariato Diffusione + Salto Poissoniano
 Modellizzazione non-gaussiana dei rendimenti per la misurazione del *Tail Risk* e delle *Fat Tails* durante crolli finanziari improvvisi:
-\[ dS_t = \mu S_t dt + \sigma S_t dW_t + (e^{Y_t} - 1) S_t dN_t \]
+
+$$
+dS_t = \mu S_t dt + \sigma S_t dW_t + (e^{Y_t} - 1) S_t dN_t
+$$
 
 Dove:
 - $dW_t \sim \mathcal{N}(0, dt)$: Moto Browniano standard per la diffusione continua.
@@ -457,7 +692,11 @@ Il VaR ed il CVaR a confidenza 99% integrano gli shock Poissoniani per evitare l
 
 ### 1. Algoritmo di Isolamento Non Supervisionato
 Algoritmo basato su una foresta di alberi decisionali casuali ($N=100$) che misura il numero di partizioni (profondità dell'albero $h(x)$) necessarie per isolare un'osservazione $x$:
-\[ s(x, n) = 2^{-\frac{\mathbb{E}(h(x))}{c(n)}} \]
+
+$$
+s(x, n) = 2^{-\frac{\mathbb{E}(h(x))}{c(n)}}
+$$
+
 Dove $c(n)$ è la lunghezza media dei cammini negli alberi binari di ricerca per $n$ campioni. Valori di $s(x,n) \approx 1$ indicano anomalie marcate (giornate di panico o picchi di correlazione).
 
 ### 2. Vettore Multidimensionale delle Feature
@@ -474,15 +713,30 @@ Sviluppato da Marcos López de Prado (2016), l'algoritmo **Hierarchical Risk Par
 
 1. **Tree Clustering & Correlation Distance**:
    Definisce la distanza metrica tra asset $i$ e $j$ partendo dalla matrice di correlazione empirica $\rho_{i,j}$:
-   \[ D_{i,j} = \sqrt{\frac{1 - \rho_{i,j}}{2}} \]
+   
+
+$$
+D_{i,j} = \sqrt{\frac{1 - \rho_{i,j}}{2}}
+$$
+
    Applica il clustering gerarchico (linkage singolo) per costruire il dendrogramma delle relazioni tra asset.
 2. **Quasi-Diagonalization**:
    Riordina righe e colonne della matrice di covarianza secondo la sequenza dei nodi dell'albero gerarchico, posizionando gli asset più correlati in blocchi contigui lungo la diagonale principale.
 3. **Recursive Bisection (Allocazione Inversa della Varianza)**:
    Per ogni sotto-ramo bipartito $V_1, V_2$, calcola la varianza di cluster:
-   \[ \tilde{V}_k = w_k^T \Sigma_k w_k, \quad w_k = \frac{\text{diag}(\Sigma_k)^{-1}}{\text{Tr}(\text{diag}(\Sigma_k)^{-1})} \]
+   
+
+$$
+\tilde{V}_k = w_k^T \Sigma_k w_k, \quad w_k = \frac{\text{diag}(\Sigma_k)^{-1}}{\text{Tr}(\text{diag}(\Sigma_k)^{-1})}
+$$
+
    Il fattore di ripartizione $\alpha$ tra i due raggruppamenti è:
-   \[ \alpha = 1 - \frac{\tilde{V}_1}{\tilde{V}_1 + \tilde{V}_2} \]
+   
+
+$$
+\alpha = 1 - \frac{\tilde{V}_1}{\tilde{V}_1 + \tilde{V}_2}
+$$
+
    I pesi definitivi vengono scalati ricorsivamente: $w_1 \leftarrow w_1 \cdot \alpha$, $w_2 \leftarrow w_2 \cdot (1 - \alpha)$.
 
 ---
@@ -491,7 +745,11 @@ Sviluppato da Marcos López de Prado (2016), l'algoritmo **Hierarchical Risk Par
 
 ### 1. Prezzo Analitico Black-Scholes-Merton (1973)
 Per un'opzione Europea con sottostante $S$, strike $K$, scadenza $T$, tasso privo di rischio $r$ e volatilità implicita $\sigma$:
-\[ d_1 = \frac{\ln(S/K) + (r + \frac{1}{2}\sigma^2)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T} \]
+
+$$
+d_1 = \frac{\ln(S/K) + (r + \frac{1}{2}\sigma^2)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T}
+$$
+
 - **Call**: $C = S N(d_1) - K e^{-rT} N(d_2)$
 - **Put**: $P = K e^{-rT} N(-d_2) - S N(-d_1)$
 
@@ -504,7 +762,10 @@ Per un'opzione Europea con sottostante $S$, strike $K$, scadenza $T$, tasso priv
 
 ### 3. Portfolio Delta-Hedging con Opzioni Put
 Il numero di contratti Put (ciascuno rappresentante un moltiplicatore standard di 100 azioni) per immunizzare o ridurre il Beta di portafoglio:
-\[ N_{\text{contratti}} = \left\lceil \frac{\text{Valore Portafoglio} \times \beta_{\text{portafoglio}} \times \text{Copertura \%}}{S_{\text{benchmark}} \times |\Delta_{\text{put}}| \times 100} \right\rceil \]
+
+$$
+N_{\text{contratti}} = \left\lceil \frac{\text{Valore Portafoglio} \times \beta_{\text{portafoglio}} \times \text{Copertura \%}}{S_{\text{benchmark}} \times |\Delta_{\text{put}}| \times 100} \right\rceil
+$$
 
 ---
 
@@ -524,14 +785,21 @@ Il modulo calcola la matrice di transizione di stato e la distribuzione delle pr
 
 ### 1. Beneish M-Score (1999) — 8-Factor Fraud Detection
 Modello econometrico multivariato per quantificare la probabilità di manipolazione dei bilanci aziendali:
-\[ M = -4.84 + 0.920 \cdot \text{DSRI} + 0.528 \cdot \text{GMI} + 0.404 \cdot \text{AQI} + 0.892 \cdot \text{SGI} + 0.115 \cdot \text{DEPI} - 0.172 \cdot \text{SGAI} + 4.037 \cdot \text{TATA} + 0.0327 \cdot \text{LVGI} \]
+
+$$
+M = -4.84 + 0.920 \cdot \text{DSRI} + 0.528 \cdot \text{GMI} + 0.404 \cdot \text{AQI} + 0.892 \cdot \text{SGI} + 0.115 \cdot \text{DEPI} - 0.172 \cdot \text{SGAI} + 4.037 \cdot \text{TATA} + 0.0327 \cdot \text{LVGI}
+$$
 
 - **Soglia Istituzionale**: $M > -1.78 \implies$ 🔴 **Probabile Manipolatore di Bilancio**.
 - **$M \le -1.78 \implies$** 🟢 **Bilancio Genuino e Conforme**.
 
 ### 2. Sloan Accrual Ratio (1996) — Qualità degli Utili
 Quantifica la discrepanza tra utile netto contabile e flussi di cassa operativi reali:
-\[ \text{Accrual Ratio} = \frac{\text{Net Income} - \text{Operating Cash Flow}}{\text{Total Assets}} \]
+
+$$
+\text{Accrual Ratio} = \frac{\text{Net Income} - \text{Operating Cash Flow}}{\text{Total Assets}}
+$$
+
 - $\text{Ratio} \le -0.05 \implies$ 🟢🟢 **Qualità Eccellente** (Flussi di cassa reali eccedenti gli utili contabili).
 - $\text{Ratio} \in (-0.05, +0.10) \implies$ 🟢 **Qualità Stabile**.
 - $\text{Ratio} > +0.10 \implies$ 🔴 **Bassa Qualità Contabile** (Utili gonfiati da crediti e scritture contabili).
@@ -563,12 +831,20 @@ Superamento della correlazione lineare di Pearson nei momenti di crollo di merca
 
 ### 1. Lower Tail Dependence ($\lambda_L$) — Rischio di Crash Congiunto
 Misura la probabilità condizionata che l'asset $j$ registri una perdita estrema (sotto il percentile $q$) dato che l'asset $i$ è in una fase di crollo sistemico:
-\[ \lambda_L(i, j) = \lim_{q \to 0^+} P(U_j \le q \mid U_i \le q) = \lim_{q \to 0^+} \frac{C(q, q)}{q} \]
+
+$$
+\lambda_L(i, j) = \lim_{q \to 0^+} P(U_j \le q \mid U_i \le q) = \lim_{q \to 0^+} \frac{C(q, q)}{q}
+$$
+
 dove $U_i, U_j \sim \text{Uniform}(0, 1)$ sono le marginali ottenute tramite trasformazione di rango empirica.
 
 ### 2. Parametrizzazione tramite Copula di Clayton
 Nei modelli parametrici archimedei di Clayton (con $\tau > 0$ Kendall's Tau):
-\[ \theta = \frac{2\tau}{1 - \tau}, \quad \lambda_L^{\text{Clayton}} = 2^{-1/\theta} \]
+
+$$
+\theta = \frac{2\tau}{1 - \tau}, \quad \lambda_L^{\text{Clayton}} = 2^{-1/\theta}
+$$
+
 Valori elevati ($\lambda_L > 0.35$) evidenziano che la diversificazione di portafoglio collassa durante le giornate di panic selling (*Asymmetric Crash Contagion*).
 
 ---
@@ -578,11 +854,19 @@ Valori elevati ($\lambda_L > 0.35$) evidenziano che la diversificazione di porta
 Calcolo del dimensionamento matematico ottimale delle posizioni per massimizzare il tasso atteso di crescita logaritmica del capitale nel lungo periodo:
 
 ### 1. Formulazione Continua (Gaussian / MPT)
-\[ f^* = \frac{\mu - R_f}{\sigma^2} \]
+
+$$
+f^* = \frac{\mu - R_f}{\sigma^2}
+$$
+
 dove $\mu$ è il rendimento atteso annualizzato, $R_f$ è il tasso risk-free e $\sigma^2$ è la varianza annualizzata dell'asset.
 
 ### 2. Formulazione Discreta di Bernoulli
-\[ f^* = \frac{p \cdot (b + 1) - 1}{b} \]
+
+$$
+f^* = \frac{p \cdot (b + 1) - 1}{b}
+$$
+
 dove $p = P(R > 0)$ è il Win Rate e $b = \frac{\text{Media Guadagni}}{|\text{Media Perdite}|}$ è il rapporto vincita/perdita.
 
 ### 3. Approccio Istituzionale Half-Kelly ($f^* / 2$)
@@ -595,11 +879,19 @@ L'allocazione a Pieno Kelly ($f^*$) massimizza la crescita geometrica ma espone 
 Algoritmo di allocazione in cui ogni singolo asset contribuisce esattamente per la stessa quota ($1/N$) alla volatilità complessiva di portafoglio:
 
 ### 1. Contributo Marginale al Rischio
-\[ RC_i(w) = w_i \cdot \frac{(\Sigma w)_i}{\sigma_p} \]
+
+$$
+RC_i(w) = w_i \cdot \frac{(\Sigma w)_i}{\sigma_p}
+$$
+
 dove $\Sigma$ è la matrice di covarianza Ledoit-Wolf e $\sigma_p = \sqrt{w^T \Sigma w}$ è la volatilità di portafoglio.
 
 ### 2. Problema di Ottimizzazione SLSQP
-\[ \min_w \sum_{i=1}^N \sum_{j=1}^N \left( RC_i(w) - RC_j(w) \right)^2 \quad \text{s.t.} \quad \sum_{i=1}^N w_i = 1, \quad w_i \ge 0 \]
+
+$$
+\min_w \sum_{i=1}^N \sum_{j=1}^N \left( RC_i(w) - RC_j(w) \right)^2 \quad \text{s.t.} \quad \sum_{i=1}^N w_i = 1, \quad w_i \ge 0
+$$
+
 A differenza dell'approccio ingenuo $1/N$ in capitale, l'Equal Risk Contribution garantisce un'equa ripartizione del rischio senza concentrazioni nei titoli a più elevata volatilità.
 
 ---
@@ -608,15 +900,40 @@ A differenza dell'approccio ingenuo $1/N$ in capitale, l'Equal Risk Contribution
 
 Framework per la gestione, la sincronizzazione duale (Google Sheets Stocks & Crypto) e la fusione simultanea di più conti o strategie (Crescita, Dividendi, Previdenza, Crypto):
 - **Fusione Posizioni e WACP**: Aggregazione delle quote $Q_{\text{tot}} = \sum Q_k$ e ricalcolo del costo medio ponderato:
-  \[ WACP_{\text{cons}} = \frac{\sum Q_k \cdot WACP_k}{\sum Q_k} \]
+  
+
+$$
+WACP_{\text{cons}} = \frac{\sum Q_k \cdot WACP_k}{\sum Q_k}
+$$
+
 - **Standard Temporale GIPS (Global Investment Performance Standards)**: Per portafogli multi-asset comprendenti sia mercati azionari tradizionali (252 giorni/anno) sia mercati a contrattazione continua 24/7 come le criptovalute (365 giorni/anno), la durata temporale viene calcolata ancorandosi alla reale distanza solare tra le date:
-  \[ n_{\text{years}} = \frac{\text{Data}_{\max} - \text{Data}_{\min}}{365.2425} \]
+  
+
+$$
+n_{\text{years}} = \frac{\text{Data}_{\max} - \text{Data}_{\min}}{365.2425}
+$$
+
   garantendo un calcolo del CAGR privo di distorsioni da sovrastima dei giorni lavorativi:
-  \[ \text{CAGR} = (1 + R_{\text{tot}})^{\frac{1}{n_{\text{years}}}} - 1 \]
+  
+
+$$
+\text{CAGR} = (1 + R_{\text{tot}})^{\frac{1}{n_{\text{years}}}} - 1
+$$
+
 - **Serie Storica Rendimenti Consolidata**: Fonde le serie storiche dei rendimenti ponderandole per il peso patrimoniale $w_k = \frac{V_k}{V_{\text{tot}}}$:
-  \[ R_t^{\text{master}} = \sum_{k=1}^K w_k \cdot R_{t, k} \]
+  
+
+$$
+R_t^{\text{master}} = \sum_{k=1}^K w_k \cdot R_{t, k}
+$$
+
 - **Allineamento Regressione Beta e Style Analysis Fama-French**: Il Beta del Master Wealth e i fattori $\alpha_{\text{FF}}$, $\beta_{\text{MKT}}$, SMB e HML vengono stimati tramite regressione OLS multivariata allineata sulle date di effettiva contrattazione del mercato:
-  \[ \beta_{\text{Master}} = \frac{\text{Cov}(R_{\text{master}}, R_{\text{bm}})}{\text{Var}(R_{\text{bm}})} \]
+  
+
+$$
+\beta_{\text{Master}} = \frac{\text{Cov}(R_{\text{master}}, R_{\text{bm}})}{\text{Var}(R_{\text{bm}})}
+$$
+
 - **Frontiera Efficiente e Ottimizzazione Ledoit-Wolf**: Il consolidatore calcola automaticamente i portafogli ottimali a Massimo Sharpe Ratio e Minima Volatilità sulla matrice di covarianza a shrinkage antirumore di Ledoit-Wolf.
 
 ---
@@ -628,7 +945,12 @@ Framework per l'analisi telemetrica dell'occupazione fisica dei database SQLite/
 ### 1. Storage Footprint & Freelist Page Recovery
 - **Occupazione Fisica**: Misurazione esatta dei byte su disco per ciascun contenitore relazionale (`argus_local.db`, `yfinance_cache.db`, file binari `.pkl`).
 - **Pagine Libere (Freelist Space)**: Quantificazione delle pagine liberate in seguito a cancellazioni di record ma non ancora restituite al file system:
-  \[ \text{Reclaimable Space (Bytes)} = \text{freelist\_count} \times \text{page\_size} \]
+  
+
+$$
+\text{Reclaimable Space (Bytes)} = \text{freelist\_count} \times \text{page\_size}
+$$
+
 - **Compattazione Dinamica (`VACUUM`)**: Esecuzione del comando SQLite `VACUUM` e `PRAGMA optimize` per deframmentare il database, azzerare le pagine orfane e recuperare spazio fisico su disco.
 
 ### 2. Monitoraggio della Memoria di Processo (RAM RSS)
@@ -637,7 +959,12 @@ Framework per l'analisi telemetrica dell'occupazione fisica dei database SQLite/
 
 ### 3. Manutenzione e Reindicizzazione B-Tree
 - **Cache Eviction TTL**: Rimozione automatizzata dei record con timestamp superiore al Time-To-Live ($TTL > 24\text{h}$):
-  \[ \Delta t = t_{\text{now}} - t_{\text{cached}} > 86.400\,\text{s} \]
+  
+
+$$
+\Delta t = t_{\text{now}} - t_{\text{cached}} > 86.400\,\text{s}
+$$
+
 - **Reindexing B-Tree**: Ricostruzione periodica degli indici compositi su `(ticker, price_date)` tramite `REINDEX` per mantenere le latenze di ricerca temporale su complessità logaritmica $\mathcal{O}(\log N)$.
 
 ---
@@ -648,20 +975,38 @@ Framework analitico per la ricostruzione e l'audit delle operazioni di disinvest
 
 ### 1. Curva Cumulativa di PnL Realizzato & High-Water Mark (HWM)
 Traccia l'evoluzione progressiva del profitto o perdita monetizzato nel tempo:
-\[ \text{CumPnL}_t = \sum_{\tau \le t} \text{RealizedPnL}_\tau \]
+
+$$
+\text{CumPnL}_t = \sum_{\tau \le t} \text{RealizedPnL}_\tau
+$$
+
 La linea di **High-Water Mark (Picco)** quantifica il massimo storico di capitale realizzato:
-\[ \text{HWM}_t = \max_{\tau \le t} \text{CumPnL}_\tau \]
+
+$$
+\text{HWM}_t = \max_{\tau \le t} \text{CumPnL}_\tau
+$$
+
 Il **Trade Drawdown** associato misura l'erosione del capitale realizzato rispetto al picco:
-\[ \text{DD}_t = \text{CumPnL}_t - \text{HWM}_t \]
+
+$$
+\text{DD}_t = \text{CumPnL}_t - \text{HWM}_t
+$$
 
 ### 2. Trading Calendar & Heatmap Stagionale (Mese $\times$ Anno)
 Matrice di monitoraggio temporale delle chiusure:
-\[ \text{PnL}_{\text{Anno}, \text{Mese}} = \sum_{i \in \text{Trades}_{\text{Anno}, \text{Mese}}} \text{RealizedPnL}_i \]
+
+$$
+\text{PnL}_{\text{Anno}, \text{Mese}} = \sum_{i \in \text{Trades}_{\text{Anno}, \text{Mese}}} \text{RealizedPnL}_i
+$$
+
 Evidenzia la ciclicità delle decisioni di monetizzazione e la consistenza temporale del processo di gestione.
 
 ### 3. Scomposizione Settoriale e per Asset Class
 Aggrega il PnL realizzato, i volumi transati e il Win Rate percentuale su base GICS:
-\[ \text{Win Rate}_{\text{settore}} = \frac{\sum \mathbf{1}_{\{\text{RealizedPnL}_i > 0\}}}{N_{\text{settore}}} \times 100 \]
+
+$$
+\text{Win Rate}_{\text{settore}} = \frac{\sum \mathbf{1}_{\{\text{RealizedPnL}_i > 0\}}}{N_{\text{settore}}} \times 100
+$$
 
 ---
 
@@ -676,10 +1021,18 @@ Motore di ottimizzazione e pianificazione fiscale per investitori residenti in I
 
 ### 2. Strategia Step-Up Fiscale a 0€ Imposte
 Per evitare la decadenza delle minusvalenze dopo 4 anni solari ($t + 4$), il wizard individua le posizioni in utile appartenenti ai *Redditi Diversi* da vendere e ricomprare immediatamente:
-\[ \text{Controvalore Vendita} = \min\left(\text{Valore Posizione}, \frac{\text{Minusvalenza Residua}}{\text{Plusvalenza Percentuale}}\right) \]
+
+$$
+\text{Controvalore Vendita} = \min\left(\text{Valore Posizione}, \frac{\text{Minusvalenza Residua}}{\text{Plusvalenza Percentuale}}\right)
+$$
+
 - **Effetto Fiscale**: La plusvalenza monetizzata azzera le minusvalenze in scadenza senza versare 1€ di imposte.
 - **Vantaggio Futuro**: Il nuovo prezzo di carico (WACP) viene innalzato al prezzo di mercato, generando un risparmio fiscale futuro certo del **26%** sulla quota di plusvalenza assorbita:
-  \[ \text{Risparmio Fiscale Futuro} = \text{Minusvalenza Compensata} \times 26\% \]
+  
+
+$$
+\text{Risparmio Fiscale Futuro} = \text{Minusvalenza Compensata} \times 26\%
+$$
 
 ### 3. Strategia Tax-Loss Harvesting (Raccolta Minusvalenze)
 Monetizzazione strategica delle perdite latenti prima del 31 dicembre per compensare plusvalenze maturate nell'anno o rinnovare lo scudo fiscale quadriennale.
@@ -692,18 +1045,35 @@ Algoritmo di dimensionamento ottimale delle scommesse (Position Sizing) derivato
 
 ### 1. Formulazione Discreta e Fractional Sizing
 Dati il Win Rate storico $p$ e il Payoff Ratio $b = \frac{\overline{\text{Win}}}{\overline{\text{Loss}}}$ estratti dal registro FIFO:
-\[ f^* = \frac{p(b + 1) - 1}{b} \]
+
+$$
+f^* = \frac{p(b + 1) - 1}{b}
+$$
+
 - **Half-Kelly ($f^*_{\text{half}} = f^*/2$)**: Frazione raccomandata che massimizza il trade-off rendimento/volatilità, catturando il 75% della crescita geometrica massima con un dimezzamento della varianza e abbattimento del rischio di rovina.
 - **Quarter-Kelly ($f^*_{\text{quarter}} = f^*/4$)**: Profilo ultra-difensivo per mercati ad elevata incertezza o regimi di crisi.
 
 ### 2. Dimensionamento del Nozionale in Funzione dello Stop-Loss
 Dato un capitale di portafoglio $C$ e una distanza di Stop-Loss percentuale $SL\% = \frac{P_{\text{entry}} - P_{\text{stop}}}{P_{\text{entry}}}$:
-\[ \text{Capitale a Rischio (€)} = C \times f^*_{\text{half}} \]
-\[ \text{Controvalore Nozionale Posizione (€)} = \frac{\text{Capitale a Rischio (€)}}{SL\%} \]
-\[ \text{Numero Quote Operative} = \left\lfloor \frac{\text{Controvalore Nozionale}}{P_{\text{entry}}} \right\rfloor \]
+
+$$
+\text{Capitale a Rischio (€)} = C \times f^*_{\text{half}}
+$$
+
+$$
+\text{Controvalore Nozionale Posizione (€)} = \frac{\text{Capitale a Rischio (€)}}{SL\%}
+$$
+
+$$
+\text{Numero Quote Operative} = \left\lfloor \frac{\text{Controvalore Nozionale}}{P_{\text{entry}}} \right\rfloor
+$$
 
 ### 3. Tasso di Crescita Geometrico Atteso
-\[ G(f) = p \ln(1 + f \cdot b) + (1 - p) \ln(1 - f) \]
+
+$$
+G(f) = p \ln(1 + f \cdot b) + (1 - p) \ln(1 - f)
+$$
+
 Se l'Edge matematico $E = p \cdot b - (1 - p) \le 0$, l'algoritmo impone $f^* = 0$ (esposizione nulla).
 
 ---
@@ -720,24 +1090,66 @@ La piattaforma integra un motore dedicato di calibrazione automatica del tasso p
 
 ### 2. Conversione e Compounding Giornaliero
 Dato il tasso risk-free nominale annualizzato $R_f$, il tasso privo di rischio giornaliero $R_{f,d}$ applicato sui rendimenti logaritmici o discreti di portafoglio viene calcolato su base convenzionale a 252 giorni di borsa aperta:
-\[ R_{f,d} = \frac{R_f}{252} \]
+
+$$
+R_{f,d} = \frac{R_f}{252}
+$$
 
 ### 3. Propagazione Analitica nei Moduli Quantitativi
 Il tasso risk-free dinamico viene propagato automaticamente su tutte le metriche e i modelli della piattaforma:
 1. **Indice di Sharpe Annualizzato**:
-   \[ \text{Sharpe} = \frac{\mu_p - R_f}{\sigma_p} \]
+   
+
+$$
+\text{Sharpe} = \frac{\mu_p - R_f}{\sigma_p}
+$$
+
 2. **Indice di Sortino**:
-   \[ \text{Sortino} = \frac{\mu_p - R_f}{\sigma_{\text{downside}}(R_{f,d})} \]
+   
+
+$$
+\text{Sortino} = \frac{\mu_p - R_f}{\sigma_{\text{downside}}(R_{f,d})}
+$$
+
 3. **Jensen's Alpha**:
-   \[ \alpha = (R_p - R_f) - \beta (R_m - R_f) \]
+   
+
+$$
+\alpha = (R_p - R_f) - \beta (R_m - R_f)
+$$
+
 4. **Prezzatura Opzioni Black-Scholes (1973) & Delta-Hedging**:
-   \[ d_1 = \frac{\ln(S/K) + \left(R_f + \frac{\sigma^2}{2}\right)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T} \]
-   \[ C = S \cdot N(d_1) - K e^{-R_f T} N(d_2), \quad P = K e^{-R_f T} N(-d_2) - S \cdot N(-d_1) \]
-   \[ \rho_{\text{call}} = K T e^{-R_f T} N(d_2), \quad \rho_{\text{put}} = -K T e^{-R_f T} N(-d_2) \]
+   
+
+$$
+d_1 = \frac{\ln(S/K) + \left(R_f + \frac{\sigma^2}{2}\right)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T}
+$$
+
+   
+
+$$
+C = S \cdot N(d_1) - K e^{-R_f T} N(d_2), \quad P = K e^{-R_f T} N(-d_2) - S \cdot N(-d_1)
+$$
+
+   
+
+$$
+\rho_{\text{call}} = K T e^{-R_f T} N(d_2), \quad \rho_{\text{put}} = -K T e^{-R_f T} N(-d_2)
+$$
+
 5. **Costo Medio Ponderato del Capitale (WACC & CAPM)**:
-   \[ K_e = R_f + \beta_e \times \text{ERP} \]
+   
+
+$$
+K_e = R_f + \beta_e \times \text{ERP}
+$$
+
 6. **Kelly Criterion Continuo**:
-   \[ f^* = \frac{\mu - R_f}{\sigma^2} \]
+   
+
+$$
+f^* = \frac{\mu - R_f}{\sigma^2}
+$$
 
 ---
 
@@ -747,16 +1159,35 @@ Il modulo gestisce le operazioni straordinarie sul capitale (Stock Split, Revers
 
 ### 1. Principio di Invarianza del Costo di Carico Fiscale
 Dato un lotto di acquisto $k$ registrato prima della data di efficacia dello split ($t_k < t_{\text{split}}$) con $Q_{\text{orig}, k}$ quote al prezzo unitario $P_{\text{orig}, k}$:
-\[ Q_{\text{adj}, k} = Q_{\text{orig}, k} \times R \]
-\[ P_{\text{adj}, k} = \frac{P_{\text{orig}, k}}{R} \]
-\[ \text{Cost Basis}_k = Q_{\text{adj}, k} \times P_{\text{adj}, k} = Q_{\text{orig}, k} \times P_{\text{orig}, k} \]
+
+$$
+Q_{\text{adj}, k} = Q_{\text{orig}, k} \times R
+$$
+
+$$
+P_{\text{adj}, k} = \frac{P_{\text{orig}, k}}{R}
+$$
+
+$$
+\text{Cost Basis}_k = Q_{\text{adj}, k} \times P_{\text{adj}, k} = Q_{\text{orig}, k} \times P_{\text{orig}, k}
+$$
 
 dove $R$ è il coefficiente di frazionamento ($R > 1$ per Forward Split, $R < 1$ per Reverse Split).
 
 ### 2. Rettifica FIFO Retroattiva e Prevenzione Errori di Inventario
 1. **Prevenzione Falsi Sbilanciamenti**: Se un investitore acquista 10 azioni a 500€ e successivamente interviene uno split 10:1 ($R=10$), il saldo rettificato diviene di 100 azioni a 50€. Una successiva vendita di 30 azioni a 70€ viene abbinata al lotto rettificato, determinando:
-   \[ \text{PnL Realizzato} = 30 \times (70 - 50) = +600€ \]
-   \[ \text{Quote Residue} = 70 \text{ azioni con WACP} = 50€ \]
+   
+
+$$
+\text{PnL Realizzato} = 30 \times (70 - 50) = +600€
+$$
+
+   
+
+$$
+\text{Quote Residue} = 70 \text{ azioni con WACP} = 50€
+$$
+
 2. **Sincronizzazione con Prezzi di Mercato**: Poiché le serie storiche dei prezzi scaricate dai provider (Yahoo Finance) sono rettificate (*Adjusted Close*), la rettifica dei lotti di acquisto garantisce che il PnL latente ($P_{\text{market}} - \text{WACP}$) rifletta il reale guadagno economico senza distorsioni artificiali.
 
 ---
@@ -767,7 +1198,10 @@ Il modulo modella i cluster di volatilità e la varianza condizionale time-varyi
 
 ### 1. Equazione del Modello GARCH(1,1)
 Dati i rendimenti giornalieri $r_t = \mu + \epsilon_t$, con $\epsilon_t = \sigma_t z_t$ e $z_t \sim \text{i.i.d.}(0, 1)$:
-\[ \sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2 \]
+
+$$
+\sigma_t^2 = \omega + \alpha \epsilon_{t-1}^2 + \beta \sigma_{t-1}^2
+$$
 
 Vincoli di stazionarietà e regolarità:
 - $\omega > 0$: Costante di varianza di base.
@@ -777,30 +1211,65 @@ Vincoli di stazionarietà e regolarità:
 
 ### 2. Stima dei Parametri tramite Maximum Likelihood Estimation (MLE)
 La funzione di log-verosimiglianza Gaussiana da massimizzare numericamente (algoritmo SLSQP o L-BFGS-B) è:
-\[ \ln L(\omega, \alpha, \beta) = -\frac{1}{2} \sum_{t=1}^T \left( \ln(2\pi) + \ln(\sigma_t^2) + \frac{\epsilon_t^2}{\sigma_t^2} \right) \]
+
+$$
+\ln L(\omega, \alpha, \beta) = -\frac{1}{2} \sum_{t=1}^T \left( \ln(2\pi) + \ln(\sigma_t^2) + \frac{\epsilon_t^2}{\sigma_t^2} \right)
+$$
 
 ### 3. Varianza Incondizionata di Lungo Periodo ed Emodimezzamento (Half-Life)
 1. **Varianza di Lungo Periodo ($V_L$)**:
-   \[ V_L = \frac{\omega}{1 - \alpha - \beta}, \quad \sigma_{\text{annuale, asymptotic}} = \sqrt{252 \times V_L} \]
+   
+
+$$
+V_L = \frac{\omega}{1 - \alpha - \beta}, \quad \sigma_{\text{annuale, asymptotic}} = \sqrt{252 \times V_L}
+$$
+
 2. **Half-Life degli Shock ($T_{1/2}$)**:
    Misura il numero di giorni necessari affinché uno shock di volatilità si riassorba del 50% tornando verso la media di lungo termine:
-   \[ T_{1/2} = \frac{\ln(0.5)}{\ln(\alpha + \beta)} \]
+   
+
+$$
+T_{1/2} = \frac{\ln(0.5)}{\ln(\alpha + \beta)}
+$$
 
 ### 4. Struttura a Termine della Volatilità (Term Structure a $k$ Giorni)
 La previsione della varianza condizionale a $k$ passi in avanti è espressa in forma chiusa:
-\[ \mathbb{E}_t[\sigma_{t+k}^2] = V_L + (\alpha + \beta)^k (\sigma_t^2 - V_L) \]
+
+$$
+\mathbb{E}_t[\sigma_{t+k}^2] = V_L + (\alpha + \beta)^k (\sigma_t^2 - V_L)
+$$
+
 - Se $\sigma_t^2 > V_L$: Struttura a termine decrescente (*Mean Reversion* da regime di alta volatilità).
 - Se $\sigma_t^2 < V_L$: Struttura a termine crescente (espansione della volatilità verso la media storica).
 
 ### 5. Filtered Historical Simulation (FHS - Hull-White 1998, Barone-Adesi 1999)
 La FHS combina la capacità del modello GARCH di catturare il livello di rischio contingente con la distribuzione non parametrica dei residui empirici:
 1. **De-volatilizzazione dei Rendimenti Storici**:
-   \[ z_t = \frac{r_t - \bar{r}}{\sigma_t^{\text{GARCH}}}, \quad \forall t \in [1, T] \]
+   
+
+$$
+z_t = \frac{r_t - \bar{r}}{\sigma_t^{\text{GARCH}}}, \quad \forall t \in [1, T]
+$$
+
 2. **Generazione dei Rendimenti Filtrati per il Periodo Successivo ($T+1$)**:
-   \[ r_{T+1, t}^* = \bar{r} + z_t \cdot \sigma_{T+1}^{\text{GARCH}} \]
+   
+
+$$
+r_{T+1, t}^* = \bar{r} + z_t \cdot \sigma_{T+1}^{\text{GARCH}}
+$$
+
 3. **Calcolo di VaR e CVaR FHS a Code Spesse (Conformità Basel III / FRTB)**:
-   \[ VaR_{\text{FHS}}(h, \alpha) = - \text{Percentile}(r^*, \alpha) \cdot \sqrt{h} \cdot V_{\text{portfolio}} \]
-   \[ CVaR_{\text{FHS}}(h, \alpha) = - \mathbb{E}[r^* \mid r^* \le -VaR_{\text{FHS}}] \cdot \sqrt{h} \cdot V_{\text{portfolio}} \]
+   
+
+$$
+VaR_{\text{FHS}}(h, \alpha) = - \text{Percentile}(r^*, \alpha) \cdot \sqrt{h} \cdot V_{\text{portfolio}}
+$$
+
+   
+
+$$
+CVaR_{\text{FHS}}(h, \alpha) = - \mathbb{E}[r^* \mid r^* \le -VaR_{\text{FHS}}] \cdot \sqrt{h} \cdot V_{\text{portfolio}}
+$$
 
 ---
 
@@ -810,27 +1279,54 @@ Il modulo calibra la struttura di volatilità implicita delle opzioni su moneyne
 
 ### 1. Inversione Numerica di Black-Scholes tramite Metodo di Newton-Raphson
 Data la formula di prezzatura Black-Scholes (1973) per un'opzione Put europea:
-\[ P_{\text{BS}}(S, K, T, r, \sigma) = K e^{-r T} N(-d_2) - S N(-d_1) \]
-\[ d_1 = \frac{\ln(S/K) + \left(r + \frac{\sigma^2}{2}\right)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T} \]
+
+$$
+P_{\text{BS}}(S, K, T, r, \sigma) = K e^{-r T} N(-d_2) - S N(-d_1)
+$$
+
+$$
+d_1 = \frac{\ln(S/K) + \left(r + \frac{\sigma^2}{2}\right)T}{\sigma \sqrt{T}}, \quad d_2 = d_1 - \sigma \sqrt{T}
+$$
 
 La volatilità implicita $\sigma_{\text{IV}}$ è la radice dell'equazione non lineare $f(\sigma) = P_{\text{BS}}(\sigma) - P_{\text{market}} = 0$, risolta iterativamente:
-\[ \sigma_{n+1} = \sigma_n - \frac{P_{\text{BS}}(\sigma_n) - P_{\text{market}}}{\mathcal{V}(\sigma_n)} \]
+
+$$
+\sigma_{n+1} = \sigma_n - \frac{P_{\text{BS}}(\sigma_n) - P_{\text{market}}}{\mathcal{V}(\sigma_n)}
+$$
+
 dove il Vega dell'opzione è la derivata parziale analitica:
-\[ \mathcal{V} = \frac{\partial P_{\text{BS}}}{\partial \sigma} = S \sqrt{T} \phi(d_1) = S \sqrt{T} \frac{1}{\sqrt{2\pi}} e^{-\frac{d_1^2}{2}} \]
+
+$$
+\mathcal{V} = \frac{\partial P_{\text{BS}}}{\partial \sigma} = S \sqrt{T} \phi(d_1) = S \sqrt{T} \frac{1}{\sqrt{2\pi}} e^{-\frac{d_1^2}{2}}
+$$
+
 In caso di fallimento di convergenza o Vega nullo ($\mathcal{V} \approx 0$ su contratti deep-ITM/OTM), il sistema attiva un algoritmo robusto di bisezione / Brent entro l'intervallo $\sigma \in [0.001, 5.0]$.
 
 ### 2. Calibrazione Parametrica di Volatility Skew e Smile
 Sia il log-moneyness normalizzato definito come $m = \ln(K / S)$:
-\[ \sigma_{\text{IV}}(m) = a + b \cdot m + c \cdot m^2 \]
+
+$$
+\sigma_{\text{IV}}(m) = a + b \cdot m + c \cdot m^2
+$$
+
 - **Parametro $a$**: Livello di volatilità at-the-money ($m=0$, $K=S$).
 - **Parametro $b < 0$ (*Skew Slope*)**: Pendenza della curva. Un valore negativo riflette la tipica asimmetria dei mercati azionari (*Crash Risk Premium* per Put Out-of-the-Money).
 - **Parametro $c > 0$ (*Smile Curvature*)**: Curvatura convessa associata al costo delle opzioni con strike estremi (fat-tail hedging).
 
 ### 3. Delta-Hedging Skew-Adjusted con Opzioni Put
 Dato un portafoglio di valore nominale $V_{\text{port}}$ con esposizione Delta equivalente $\Delta_{\text{port}} = \beta_{\text{port}} \cdot V_{\text{port}}$, il dimensionamento della copertura con opzioni Put a strike OTM ($K < S$) è:
-\[ \Delta_{\text{put}} = -N(-d_1(\sigma_{\text{IV}}(m_{\text{OTM}}))) \]
-\[ N_{\text{contratti}} = \frac{\Delta_{\text{port}}}{|\Delta_{\text{put}}| \times \text{Multiplier} \times S} \]
-\[ \text{Costo Annuo Assicurazione (\% AUM)} = \frac{N_{\text{contratti}} \times P_{\text{put}} \times \text{Multiplier}}{V_{\text{port}}} \times \frac{365.25}{T_{\text{giorni}}} \]
+
+$$
+\Delta_{\text{put}} = -N(-d_1(\sigma_{\text{IV}}(m_{\text{OTM}})))
+$$
+
+$$
+N_{\text{contratti}} = \frac{\Delta_{\text{port}}}{|\Delta_{\text{put}}| \times \text{Multiplier} \times S}
+$$
+
+$$
+\text{Costo Annuo Assicurazione (\% AUM)} = \frac{N_{\text{contratti}} \times P_{\text{put}} \times \text{Multiplier}}{V_{\text{port}}} \times \frac{365.25}{T_{\text{giorni}}}
+$$
 
 ---
 
@@ -841,9 +1337,19 @@ Il motore applica il quadro normativo introdotto dalla **Legge 29 dicembre 2022,
 ### 1. Inquadramento TUIR (Art. 67, comma 1, lett. c-sexies)
 Le plusvalenze realizzate mediante cessione a titolo oneroso, rimborso o permuta di cripto-attività costituiscono *Redditi Diversi di Natura Finanziaria*.
 1. **Franchigia Annuale di 2.000€**:
-   \[ \text{Base Imponibile Netta} = \max\left(0, \sum \text{Plusvalenze} - \sum \text{Minusvalenze} - 2.000€\right) \]
+   
+
+$$
+\text{Base Imponibile Netta} = \max\left(0, \sum \text{Plusvalenze} - \sum \text{Minusvalenze} - 2.000€\right)
+$$
+
 2. **Imposta Sostitutiva (26%)**:
-   \[ \text{Debito Fiscale RT} = \text{Base Imponibile Netta} \times 26\% \]
+   
+
+$$
+\text{Debito Fiscale RT} = \text{Base Imponibile Netta} \times 26\%
+$$
+
 3. **Irrilevanza Fiscale delle Permute Cripto-to-Cripto**: La conversione di un token in un altro token avente le medesime caratteristiche non genera fattispecie fiscalmente imponibile. Il costo di carico del token ceduto si trasferisce proporzionalmente sul nuovo token acquistato.
 
 ### 2. Zainetto Fiscale Cripto Separato (Regime a 4 Anni)
@@ -853,7 +1359,11 @@ Le minusvalenze cripto realizzate in eccedenza possono essere portate in deduzio
 ### 3. Monitoraggio Fiscale (Quadro RW, Codice 21) ed Imposta di Bollo / IVAFE
 1. **Quadro RW**: Obbligo di monitoraggio per le cripto-attività detenute su exchange esteri o private keys/cold wallet, con indicazione di valore iniziale (1/1) e valore finale (31/12).
 2. **Imposta sul Valore delle Cripto-Attività (0,20% annuo)**:
-   \[ \text{Imposta Cripto-Attività} = \text{Controvalore al 31/12} \times 0.20\% \times \frac{\text{Giorni di Detenzione}}{365.25} \]
+   
+
+$$
+\text{Imposta Cripto-Attività} = \text{Controvalore al 31/12} \times 0.20\% \times \frac{\text{Giorni di Detenzione}}{365.25}
+$$
 
 ---
 
@@ -862,7 +1372,10 @@ Le minusvalenze cripto realizzate in eccedenza possono essere portate in deduzio
 Il modulo integra le serie storiche ufficiali di ricerca accademica del *Dartmouth College (Kenneth R. French Data Library)* per eseguire regressioni multifattoriali avanzate.
 
 ### 1. Equazione del Modello Fama-French a 5 Fattori + Carhart Momentum
-\[ R_{i,t} - R_{f,t} = \alpha_i + \beta_{MKT} (R_{m,t} - R_{f,t}) + \beta_{SMB} SMB_t + \beta_{HML} HML_t + \beta_{RMW} RMW_t + \beta_{CMA} CMA_t + \beta_{MOM} MOM_t + \epsilon_{i,t} \]
+
+$$
+R_{i,t} - R_{f,t} = \alpha_i + \beta_{MKT} (R_{m,t} - R_{f,t}) + \beta_{SMB} SMB_t + \beta_{HML} HML_t + \beta_{RMW} RMW_t + \beta_{CMA} CMA_t + \beta_{MOM} MOM_t + \epsilon_{i,t}
+$$
 
 ### 2. Definizione dei Driver Accademici di Rendimento
 - **Mkt-RF**: Eccesso di rendimento del portafoglio di mercato su tutti i titoli NYSE/AMEX/NASDAQ rispetto al tasso privo di rischio US 1M T-Bill.
@@ -873,14 +1386,33 @@ Il modulo integra le serie storiche ufficiali di ricerca accademica del *Dartmou
 - **MOM / WML (*Winners Minus Losers*)**: Spread tra titoli con momentum relativo positivo vs negativo nei precedenti 12 mesi.
 
 ### 3. Risoluzione OLS Multivariata e Test Statistici
-\[ \hat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{Y} \]
-\[ \hat{\sigma}_\epsilon^2 = \frac{\sum_{t=1}^T \hat{\epsilon}_t^2}{T - K - 1}, \quad \text{SE}(\hat{\beta}_k) = \sqrt{\hat{\sigma}_\epsilon^2 \cdot [(\mathbf{X}^T \mathbf{X})^{-1}]_{kk}} \]
-\[ t_k = \frac{\hat{\beta}_k}{\text{SE}(\hat{\beta}_k)}, \quad p\text{-value} = 2 \cdot (1 - \Phi(|t_k|)) \]
+
+$$
+\hat{\boldsymbol{\beta}} = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{Y}
+$$
+
+$$
+\hat{\sigma}_\epsilon^2 = \frac{\sum_{t=1}^T \hat{\epsilon}_t^2}{T - K - 1}, \quad \text{SE}(\hat{\beta}_k) = \sqrt{\hat{\sigma}_\epsilon^2 \cdot [(\mathbf{X}^T \mathbf{X})^{-1}]_{kk}}
+$$
+
+$$
+t_k = \frac{\hat{\beta}_k}{\text{SE}(\hat{\beta}_k)}, \quad p\text{-value} = 2 \cdot (1 - \Phi(|t_k|))
+$$
 
 ### 4. Factor Return Attribution e Rolling OLS
 1. **Attribuzione di Rendimento Annualizzata**:
-   \[ \text{Contributo Fattoriale}_k = \hat{\beta}_k \times \overline{\text{Factor}}_k \times 252 \]
-   \[ \text{Alpha Annualizzato} = \hat{\alpha} \times 252 \]
+   
+
+$$
+\text{Contributo Fattoriale}_k = \hat{\beta}_k \times \overline{\text{Factor}}_k \times 252
+$$
+
+   
+
+$$
+\text{Alpha Annualizzato} = \hat{\alpha} \times 252
+$$
+
 2. **Rolling Factor Betas a 60 Giorni**: Identificazione dinamica di cambi di allocazione, transizioni tra regimi di mercato e rotazioni di stile (*Style Drift*).
 
 ---
@@ -897,15 +1429,32 @@ I documenti vengono normalizzati e partizionati per Item normativi conformi al R
 - **Item 8**: *Financial Statements, Supplementary Debt Schedule, Commitments & Contingencies*.
 
 ### 2. Algoritmo di Ponderazione Lessicale BM25 Okapi
-\[ \text{Score}_{\text{BM25}}(D, Q) = \sum_{i=1}^n \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)} \]
+
+$$
+\text{Score}_{\text{BM25}}(D, Q) = \sum_{i=1}^n \text{IDF}(q_i) \cdot \frac{f(q_i, D) \cdot (k_1 + 1)}{f(q_i, D) + k_1 \cdot \left(1 - b + b \cdot \frac{|D|}{\text{avgdl}}\right)}
+$$
+
 con parametri calibrati $k_1 = 1.5, b = 0.75$, e Inverse Document Frequency:
-\[ \text{IDF}(q_i) = \ln\left( \frac{N - n(q_i) + 0.5}{n(q_i) + 0.5} + 1 \right) \]
+
+$$
+\text{IDF}(q_i) = \ln\left( \frac{N - n(q_i) + 0.5}{n(q_i) + 0.5} + 1 \right)
+$$
 
 ### 3. Dense Vector Similarity e Pipeline di Risposta Grounded
 1. **Similarità Coseno su Vettori TF-IDF Normalizzati**:
-   \[ \text{Cosine}(Q, D) = \frac{\mathbf{v}_Q \cdot \mathbf{v}_D}{\|\mathbf{v}_Q\|_2 \cdot \|\mathbf{v}_D\|_2} \]
+   
+
+$$
+\text{Cosine}(Q, D) = \frac{\mathbf{v}_Q \cdot \mathbf{v}_D}{\|\mathbf{v}_Q\|_2 \cdot \|\mathbf{v}_D\|_2}
+$$
+
 2. **Punteggio Ibrido di Rilevanza**:
-   \[ \text{Score}_{\text{Hybrid}} = 0.60 \times \text{Norm}(\text{Score}_{\text{BM25}}) + 0.40 \times \text{Cosine}(Q, D) \]
+   
+
+$$
+\text{Score}_{\text{Hybrid}} = 0.60 \times \text{Norm}(\text{Score}_{\text{BM25}}) + 0.40 \times \text{Cosine}(Q, D)
+$$
+
 3. **Citazioni Grounded**: Ogni insight generato include metadati verificabili: `[SEC Filing: Form 10-K | Sezione: Item 1A (Risk Factors) | Rilevanza: 94.2%]`.
 
 ---
@@ -946,7 +1495,12 @@ La serializzazione del portafoglio nel formato binario aperto Apache Parquet sfr
 - **Dictionary Encoding**: Sostituzione di stringhe ripetitive (settori, valute) con indici interi compatti a 1-2 byte.
 - **Snappy Compression**: Algoritmo di compressione lossless ad altissimo throughput di decompressione (> 250 MB/s per core).
 - **Risparmio di Storage**:
-  \[ \text{Storage Savings} = 1 - \frac{\text{Dimensione}_{\text{Parquet}}}{\text{Dimensione}_{\text{CSV}}} \approx 85\% \]
+  
+
+$$
+\text{Storage Savings} = 1 - \frac{\text{Dimensione}_{\text{Parquet}}}{\text{Dimensione}_{\text{CSV}}} \approx 85\%
+$$
+
 - **Column Pruning & Predicate Pushdown**: In lettura, il motore carica esclusivamente le colonne referenziate nella query, saltando i blocchi di byte irrilevanti tramite metadati di pagina (min/max bounds).
 
 ---
@@ -958,7 +1512,9 @@ Il modulo implementa il modello parametrico a 4 parametri di **Nelson-Siegel (19
 ### 1. Formulazione Matematica
 Il tasso zero-coupon spot continuo $y(t)$ per una scadenza temporale $t > 0$ (espressa in anni) è espresso come combinazione lineare di tre componenti economiche:
 
-\[ y(t) = \beta_0 + \beta_1 \left( \frac{1 - e^{-t/\tau}}{t/\tau} \right) + \beta_2 \left( \frac{1 - e^{-t/\tau}}{t/\tau} - e^{-t/\tau} \right) \]
+$$
+y(t) = \beta_0 + \beta_1 \left( \frac{1 - e^{-t/\tau}}{t/\tau} \right) + \beta_2 \left( \frac{1 - e^{-t/\tau}}{t/\tau} - e^{-t/\tau} \right)
+$$
 
 Dove:
 - **$\beta_0$ (Livello / Long-Term Level)**: Rappresenta il tasso asintotico di lungo termine per $t \to \infty$. Determina lo shift parallelo della curva.
@@ -969,17 +1525,24 @@ Dove:
 ### 2. Calibrazione Numerica OLS Condizionata
 Fissato un valore candidato di $\tau$ su una griglia densa $\tau \in [0.2, 5.0]$, il modello risulta **perfettamente lineare** nei coefficienti $(\beta_0, \beta_1, \beta_2)$:
 
-\[ \mathbf{X}(\tau) = \begin{bmatrix} 1 & f_1(t_1, \tau) & f_2(t_1, \tau) \\ \vdots & \vdots & \vdots \\ 1 & f_1(t_N, \tau) & f_2(t_N, \tau) \end{bmatrix} \]
+$$
+\mathbf{X}(\tau) = \begin{bmatrix} 1 & f_1(t_1, \tau) & f_2(t_1, \tau) \\ \vdots & \vdots & \vdots \\ 1 & f_1(t_N, \tau) & f_2(t_N, \tau) \end{bmatrix}
+$$
 
 La stima dei coefficienti ottimali viene eseguita istantaneamente tramite Ordinary Least Squares (OLS):
-\[ \hat{\boldsymbol{\beta}}(\tau) = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{y} \]
+
+$$
+\hat{\boldsymbol{\beta}}(\tau) = (\mathbf{X}^T \mathbf{X})^{-1} \mathbf{X}^T \mathbf{y}
+$$
 
 Il valore ottimale $\tau^*$ viene selezionato massimizzando il coefficiente di determinazione $R^2$ (o minimizzando il Root Mean Square Error, $\text{RMSE}$).
 
 ### 3. Fattori di Sconto Continui (Discount Factors)
 Dalla curva continua dei rendimenti stimata $y(t)$, il fattore di sconto $DF(t)$ per attualizzare flussi di cassa alla data $t$ è calcolato in capitalizzazione continua:
 
-\[ DF(t) = \exp(-y(t) \cdot t) \]
+$$
+DF(t) = \exp(-y(t) \cdot t)
+$$
 
 I fattori di sconto $DF(t) \in (0, 1]$ risultano strettamente decrescenti con la maturità $t$, garantendo l'assenza di arbitraggi temporali.
 
@@ -989,16 +1552,28 @@ I fattori di sconto $DF(t) \in (0, 1]$ risultano strettamente decrescenti con la
 
 Poiché il Value at Risk (VaR) e la deviazione standard di portafoglio sono funzioni omogenee di grado 1 rispetto ai pesi di allocazione $\mathbf{w}$, per il **Teorema di Eulero per funzioni omogenee** il rischio totale di portafoglio può essere esattamente scomposto nella somma dei contributi marginali dei singoli asset senza residui:
 
-\[ \text{VaR}_p = \sum_{i=1}^N w_i \cdot \frac{\partial \text{VaR}_p}{\partial w_i} \]
+$$
+\text{VaR}_p = \sum_{i=1}^N w_i \cdot \frac{\partial \text{VaR}_p}{\partial w_i}
+$$
 
 ### 1. Marginal VaR ($\text{MVaR}_i$)
 Rappresenta la derivata prima parziale del VaR di portafoglio rispetto al peso dell'asset $i$-esimo:
-\[ \text{MVaR}_i = \frac{\partial \text{VaR}_p}{\partial w_i} = z_\alpha \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p} \]
+
+$$
+\text{MVaR}_i = \frac{\partial \text{VaR}_p}{\partial w_i} = z_\alpha \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p}
+$$
 
 ### 2. Component VaR ($\text{CVaR}_i$)
 Quantifica l'ammontare monetario assoluto (o percentuale) di rischio apportato dalla posizione $i$-esima al portafoglio complessivo:
-\[ \text{CVaR}_i = w_i \cdot \text{MVaR}_i \]
-\[ \text{Contributo \% Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\% \]
+
+$$
+\text{CVaR}_i = w_i \cdot \text{MVaR}_i
+$$
+
+$$
+\text{Contributo \% Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\%
+$$
+
 Proprietà di chiusura esatta: $\sum_{i=1}^N \text{Contributo \% Rischio}_i = 100.0\%$.
 
 ---
@@ -1007,7 +1582,9 @@ Proprietà di chiusura esatta: $\sum_{i=1}^N \text{Contributo \% Rischio}_i = 10
 
 Il VaR tradizionale ipotizza che le posizioni possano essere liquidate istantaneamente a prezzi mid-market senza costi di attrito. Il modello **LVaR** estende il profilo di rischio considerando l'orizzonte effettivo di smobilizzo $T$ e l'impatto esogeno del bid-ask spread medio di mercato $S$:
 
-\[ \text{LVaR} = \text{VaR}_1 \cdot \sqrt{T} + \frac{1}{2} \cdot V_{\text{port}} \cdot \left( \bar{S} + z_\alpha \cdot \sigma_S \right) \]
+$$
+\text{LVaR} = \text{VaR}_1 \cdot \sqrt{T} + \frac{1}{2} \cdot V_{\text{port}} \cdot \left( \bar{S} + z_\alpha \cdot \sigma_S \right)
+$$
 
 Dove:
 - $\text{VaR}_1 \cdot \sqrt{T}$: VaR di mercato scalato temporalmente per l'orizzonte di liquidazione ordinata a $T$ giorni.
@@ -1020,7 +1597,10 @@ Dove:
 
 ### 1. Prezzo Obbligazionario e Yield to Maturity (YTM)
 Dati il valore nominale $F$, la cedola annua $C$, la frequenza $m$, la maturità $T$ e il prezzo di mercato $P$, il rendimento a scadenza $y$ (YTM) risolve per via numerica (algoritmo di Newton-Raphson/Brent) l'equazione:
-\[ P = \sum_{k=1}^{m \cdot T} \frac{C/m}{\left(1 + \frac{y}{m}\right)^k} + \frac{F}{\left(1 + \frac{y}{m}\right)^{m \cdot T}} \]
+
+$$
+P = \sum_{k=1}^{m \cdot T} \frac{C/m}{\left(1 + \frac{y}{m}\right)^k} + \frac{F}{\left(1 + \frac{y}{m}\right)^{m \cdot T}}
+$$
 
 ### 2. Duration, Convessità & DV01
 - **Macaulay Duration**: $D_{\text{mac}} = \frac{1}{P} \sum_{k=1}^{m \cdot T} t_k \cdot \text{PV}(CF_k)$
@@ -1031,12 +1611,21 @@ Dati il valore nominale $F$, la cedola annua $C$, la frequenza $m$, la maturità
 
 ### 3. Z-Spread (Zero-Volatility Spread)
 Lo spread costante $z$ (espresso in bps) da aggiungere a ciascun nodo della curva spot sovrana $r(t)$ tale per cui:
-\[ P_{\text{mkt}} = \sum_{k=1}^N \frac{CF_k}{\left(1 + \frac{r(t_k) + z}{m}\right)^{m \cdot t_k}} \]
+
+$$
+P_{\text{mkt}} = \sum_{k=1}^N \frac{CF_k}{\left(1 + \frac{r(t_k) + z}{m}\right)^{m \cdot t_k}}
+$$
 
 ### 4. Modello Credit Default Swap (Hazard Rate & Default Probability)
 Dato lo spread CDS a 5 anni $S_{\text{CDS}}$ e il Recovery Rate $R = 40\%$, l'intensità di default (Hazard Rate $\lambda$) e la probabilità cumulativa di default su orizzonte $t$ sono date da:
-\[ \lambda = \frac{S_{\text{CDS}}}{1 - R} \]
-\[ PD(t) = 1 - e^{-\lambda \cdot t} \]
+
+$$
+\lambda = \frac{S_{\text{CDS}}}{1 - R}
+$$
+
+$$
+PD(t) = 1 - e^{-\lambda \cdot t}
+$$
 
 ---
 
@@ -1047,9 +1636,19 @@ Struttura dati circolare a memoria fissa pre-allocata con puntatore atomico di s
 
 ### 2. Stoikov Microprice (2018) & Depth Imbalance
 Dato l'order book L2 con i migliori livelli di denaro $(P_b, Q_b)$ e lettera $(P_a, Q_a)$:
-\[ \text{Mid Price} = \frac{P_a + P_b}{2} \]
-\[ \text{Depth Imbalance} = \frac{Q_b - Q_a}{Q_b + Q_a} \in [-1, +1] \]
-\[ \text{Microprice} = \frac{Q_b \cdot P_a + Q_a \cdot P_b}{Q_b + Q_a} = P_b + \left(\frac{Q_b}{Q_b + Q_a}\right) \cdot (P_a - P_b) \]
+
+$$
+\text{Mid Price} = \frac{P_a + P_b}{2}
+$$
+
+$$
+\text{Depth Imbalance} = \frac{Q_b - Q_a}{Q_b + Q_a} \in [-1, +1]
+$$
+
+$$
+\text{Microprice} = \frac{Q_b \cdot P_a + Q_a \cdot P_b}{Q_b + Q_a} = P_b + \left(\frac{Q_b}{Q_b + Q_a}\right) \cdot (P_a - P_b)
+$$
+
 Il microprice anticipa la direzione immediata del prezzo d'equilibrio incorporando la pressione asimmetrica della liquidità presente sul book.
 
 ---
@@ -1072,17 +1671,36 @@ Dato un portafoglio di $X_0$ quote/valore da liquidare su un orizzonte $T$ suddi
 - **Impatto Permanente**: $\gamma \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}$ (spostamento duraturo del prezzo mid-market).
 - **Impatto Temporaneo**: $\eta \cdot \frac{\sigma_{\text{daily}}}{\text{ADV}}$ (attrito istantaneo da svuotamento del book ordini).
 - **Parametro di Urgenza ($\kappa$)**:
-  \[ \kappa \tau = \operatorname{arccosh}\left( 1 + \frac{\lambda \sigma^2 \tau^2}{2 \eta} \right) \approx \sqrt{\frac{\lambda \sigma^2}{\eta}} \cdot \tau \]
+  
+
+$$
+\kappa \tau = \operatorname{arccosh}\left( 1 + \frac{\lambda \sigma^2 \tau^2}{2 \eta} \right) \approx \sqrt{\frac{\lambda \sigma^2}{\eta}} \cdot \tau
+$$
 
 ### 2. Traiettoria Ottimale e Half-Life
 La quota residua al tempo $t_j = j \cdot \tau$ è governata dalla funzione iperbolica:
-\[ x(t_j) = X_0 \cdot \frac{\sinh(\kappa (T - t_j))}{\sinh(\kappa T)} \]
-\[ \text{Half-Life di Liquidazione } t_{1/2} = \frac{\ln(2)}{\kappa} \]
+
+$$
+x(t_j) = X_0 \cdot \frac{\sinh(\kappa (T - t_j))}{\sinh(\kappa T)}
+$$
+
+$$
+\text{Half-Life di Liquidazione } t_{1/2} = \frac{\ln(2)}{\kappa}
+$$
 
 ### 3. Costo Atteso $E[x]$, Varianza $V[x]$ e VaR di Esecuzione al 95%
-\[ E[x] = \frac{1}{2} \gamma X_0^2 + \tau \eta \sum_{j=1}^N v_j^2 + \frac{\text{Spread}}{2} \cdot X_0 \]
-\[ V[x] = \sigma_{\text{daily}}^2 \tau \sum_{j=1}^N x_j^2 \]
-\[ \text{Execution VaR}_{95\%} = E[x] + 1.645 \cdot \sqrt{V[x]} \]
+
+$$
+E[x] = \frac{1}{2} \gamma X_0^2 + \tau \eta \sum_{j=1}^N v_j^2 + \frac{\text{Spread}}{2} \cdot X_0
+$$
+
+$$
+V[x] = \sigma_{\text{daily}}^2 \tau \sum_{j=1}^N x_j^2
+$$
+
+$$
+\text{Execution VaR}_{95\%} = E[x] + 1.645 \cdot \sqrt{V[x]}
+$$
 
 ---
 
@@ -1098,7 +1716,12 @@ A ogni nodo di ribilanciamento temporale $t$ (mensile o trimestrale), l'intero u
 - **Rendimento dello Spread Long-Short**: $R_{\text{L/S}, t} = R_{Q1, t} - R_{Q5, t}$
 - **Information Ratio di Q1 vs Universo**: $\text{IR} = \frac{\text{mean}(R_{Q1} - R_{\text{Univ}})}{\text{std}(R_{Q1} - R_{\text{Univ}})} \cdot \sqrt{252}$
 - **Coefficiente di Monotonicità di Spearman ($r_s$)**: Misura la correlazione di rango decrescente tra i quintili $1 \dots 5$ e il rendimento medio annualizzato:
-  \[ r_s = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)} \]
+  
+
+$$
+r_s = 1 - \frac{6 \sum d_i^2}{n(n^2 - 1)}
+$$
+
 ---
 
 ## 57. ARGUS BQuant In-Memory Python Sandbox & DuckDB SQL (`core/bquant_engine.py`)
@@ -1159,7 +1782,12 @@ Generazione automatica di workbook Excel strutturati con formattazione istituzio
 ### 1. Iperspazio Quantitativo a 3 Dimensioni
 Nelle tradizionali analisi di Markowitz, la frontiera è proiettata nello spazio bidimensionale $(\sigma_p, R_p)$. ARGUS estende l'analisi al volume tridimensionale introducendo una terza dimensione quantitativa $Z$:
 - **Indice di Concentrazione HHI (Herfindahl-Hirschman Index)**:
-  \[ HHI = \sum_{i=1}^N w_i^2 \in \left[ \frac{1}{N}, 1.0 \right] \]
+  
+
+$$
+HHI = \sum_{i=1}^N w_i^2 \in \left[ \frac{1}{N}, 1.0 \right]
+$$
+
   Permette di mappare l'iperspazio da portafogli perfettamente equi-pesati ($HHI = 1/N$) a portafogli iper-concentrati su singoli asset ($HHI \to 1.0$).
 - **Tail Risk (CVaR 95% / Expected Shortfall)**:
   Quantifica la perdita attesa nella coda estrema del 5% per ciascuna combinazione di pesi.
@@ -1180,7 +1808,11 @@ Il campionamento uniforme standard $U(0,1)$ concentra la quasi totalità dei pun
 * **Quadro Attuale (TUIR Art. 67)**: I proventi da ETF sono classificati come *Redditi di Capitale* e tassati al 26% alla fonte, senza possibilità di compensare le perdite pregresse (*Redditi Diversi*).
 * **Quadro Post-Riforma**: Unificazione di tutti i redditi finanziari in un'unica categoria di redditi da capitale/diversi.
 * **Formulazione del Tax Drag Asimmetrico**:
-  \[ \text{Tax Drag}_{\text{ETF}} = \text{Tax}_{\text{Attuale}} - \text{Tax}_{\text{Riformata}} = \max\left(0, \min(\text{Gain}_{\text{ETF}}, \text{Minus}_{\text{Disponibili}} - \text{Gain}_{\text{Diversi}}) \times 0.26\right) \]
+  
+
+$$
+\text{Tax Drag}_{\text{ETF}} = \text{Tax}_{\text{Attuale}} - \text{Tax}_{\text{Riformata}} = \max\left(0, \min(\text{Gain}_{\text{ETF}}, \text{Minus}_{\text{Disponibili}} - \text{Gain}_{\text{Diversi}}) \times 0.26\right)
+$$
 
 ### 2. Pilastro 2: Prospetto Precompilato Modello Redditi Persone Fisiche (Regime Dichiarativo)
 Per gli investitori che operano con intermediari esteri o in regime dichiarativo (IBKR, Degiro, Scalable, Revolut, Crypto Wallets):
@@ -1202,7 +1834,12 @@ Per gli investitori che operano con intermediari esteri o in regime dichiarativo
   - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\%$, $WHT_{\text{DE}} = 26.375\%$, $WHT_{\text{CH}} = 35\%$, $WHT_{\text{FR}} = 12.8\%$.
   - Tassazione italiana sul "Netto Frontiera": $T_{\text{IT}} = (\text{Dividendo Lordo} \times (1 - WHT)) \times 0.26$.
   - **Aliquota Effettiva Combinata**:
-    \[ \tau_{\text{eff}} = 1 - (1 - WHT) \times (1 - 0.26) \]
+    
+
+$$
+\tau_{\text{eff}} = 1 - (1 - WHT) \times (1 - 0.26)
+$$
+
     *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\%$)*.
 * **Tax Drag vs ETF UCITS ad Accumulazione**:
   Gli ETF ad accumulazione trattengono internamente il 15% alla fonte senza subire l'imposta italiana immediata sul netto frontiera fino al realizzo finale, eliminando la perdita di rendimento composto da tassazione anticipata.
@@ -1210,8 +1847,18 @@ Per gli investitori che operano con intermediari esteri o in regime dichiarativo
 ### 4. Pilastro 4: Simulatore Pre-Trade "Tax-Smart Lot Sizing" (Lotti FIFO Puntuali)
 Consente di simulare lo scarico della coda dei lotti d'acquisto prima di inviare un ordine di vendita a mercato:
 - Per ogni lotto $k \in \{1 \dots M\}$ consumato fino al raggiungimento della quantità target $Q$:
-  \[ \text{PnL}_k = q_k \cdot (P_{\text{vendita}} - P_{\text{carico}, k}) \]
-  \[ \text{Imposta}_k = \max(0, \text{PnL}_k \times \tau_k) \]
+  
+
+$$
+\text{PnL}_k = q_k \cdot (P_{\text{vendita}} - P_{\text{carico}, k})
+$$
+
+  
+
+$$
+\text{Imposta}_k = \max(0, \text{PnL}_k \times \tau_k)
+$$
+
 - Calcola in tempo reale il nuovo prezzo medio di carico residuo (WACP) delle quote rimanenti in portafoglio.
 
 ---
@@ -1220,34 +1867,62 @@ Consente di simulare lo scarico della coda dei lotti d'acquisto prima di inviare
 
 ### 1. Curva di Liquidità Intraday a "U" (U-Shaped Volume Profile)
 La distribuzione dei volumi scambiati durante la sessione ordinaria di contrattazione (09:00 - 17:30) viene modellata come una funzione convessa parametrica con picchi in apertura (Open Rush) e in chiusura (Market-on-Close):
-\[ V_{\text{norm}}(t) = 2.4 \cdot (t - 0.45)^2 + 0.35 \]
+
+$$
+V_{\text{norm}}(t) = 2.4 \cdot (t - 0.45)^2 + 0.35
+$$
+
 normalizzata in modo che $\sum_{i=1}^N V_{\text{norm}}(t_i) = 1.0$. Questa profilazione riflette l'evidenza empirica di microstruttura dei mercati regolamentati (Borsa Italiana, NYSE, NASDAQ), dove circa il 35-45% dei volumi giornalieri si concentra nella prima e nell'ultima ora di negoziazione.
 
 ### 2. Algoritmo TWAP (Time-Weighted Average Price) con Jitter Anti-Frontrunning
 Suddivide un ordine totale $Q$ in $N$ intervalli temporali discreti applicando una leggera perturbazione stocastica $\epsilon_t \sim U(-\delta, \delta)$ (con $\delta = 4\%$) per impedire l'identificazione e il front-running da parte di algoritmi HFT concorrenti:
-\[ q_t = \frac{Q}{N} \cdot (1 + \epsilon_t), \quad \text{con vincolo di conservazione } \sum_{t=1}^N q_t = Q \]
+
+$$
+q_t = \frac{Q}{N} \cdot (1 + \epsilon_t), \quad \text{con vincolo di conservazione } \sum_{t=1}^N q_t = Q
+$$
+
 Lo slippage stimato per ciascuna tranche include il costo base del mezzo spread bid-ask sommato alla componente di impatto temporaneo:
-\[ \text{Slippage}_{\text{TWAP}}(t) = \text{HalfSpread} + \gamma \cdot \sqrt{\frac{\text{POV}_t}{100}} \times \frac{100}{\sqrt{N}} \]
+
+$$
+\text{Slippage}_{\text{TWAP}}(t) = \text{HalfSpread} + \gamma \cdot \sqrt{\frac{\text{POV}_t}{100}} \times \frac{100}{\sqrt{N}}
+$$
 
 ### 3. Algoritmo VWAP (Volume-Weighted Average Price) con POV Cap
 Pesa le quote da negoziare in ciascuna tranche $t$ proporzionalmente al volume di mercato atteso per quell'intervallo ($V_t = \text{ADV} \cdot V_{\text{norm}}(t)$), vincolando la tranche a un tetto di partecipazione massima (Percentage of Volume Cap, tipicamente $15\%$):
-\[ q_t = \min\left( Q \cdot V_{\text{norm}}(t), \; V_t \cdot \text{POV}_{\text{cap}} \right) \]
+
+$$
+q_t = \min\left( Q \cdot V_{\text{norm}}(t), \; V_t \cdot \text{POV}_{\text{cap}} \right)
+$$
+
 Le quote eccedenti il cap vengono redistribuite proporzionalmente sulle tranche con capienza residua per garantire l'esecuzione integrale dell'ordine.
 
 ### 4. Modello Microstrutturale TCA di Slippage & Square-Root Law
 La stima del Transaction Cost Analysis (TCA) impiega la legge della radice quadrata dell'impatto di mercato (*Square-Root Law*, Bouchaud et al. 2008, Almgren et al. 2005):
 - **Esecuzione Blocco Unico a Mercato (Market Order)**:
   L'intero controvalore viene eseguito istantaneamente assorbendo la liquidità disponibile sui primi livelli del book:
-  \[ \text{Slippage}_{\text{Market}} = \text{HalfSpread}_{\text{base}} + \gamma_{\text{mkt}} \cdot \sqrt{\frac{\text{Controvalore}}{\text{ADV}}} \times 10000 \]
+  
+
+$$
+\text{Slippage}_{\text{Market}} = \text{HalfSpread}_{\text{base}} + \gamma_{\text{mkt}} \cdot \sqrt{\frac{\text{Controvalore}}{\text{ADV}}} \times 10000
+$$
+
   Per ordini che superano l'1% dell'ADV, lo slippage cresce rapidamente verso 20–60 bps.
 - **Esecuzione Algoritmica Sliced (VWAP / TWAP)**:
   La frammentazione in $N$ intervalli temporali concede al book il tempo di rigenerare la liquidità tra una tranche e l'altra, abbattendo l'impatto quadratico:
-  \[ \text{Slippage}_{\text{VWAP}} = \text{HalfSpread}_{\text{eff}} + \gamma_{\text{vwap}} \cdot \sqrt{\frac{\text{POV}_{\text{interval}}}{100}} \times \frac{100}{\sqrt{N}} \]
+  
+
+$$
+\text{Slippage}_{\text{VWAP}} = \text{HalfSpread}_{\text{eff}} + \gamma_{\text{vwap}} \cdot \sqrt{\frac{\text{POV}_{\text{interval}}}{100}} \times \frac{100}{\sqrt{N}}
+$$
+
   riducendo l'attrito complessivo a soli 1.0–2.5 bps.
 
 ### 5. Quantificazione del Risparmio Netto
 Il differenziale monetario risparmiato tramite esecuzione algoritmica istituzionale è definito da:
-\[ \text{Risparmio Netto (€)} = \text{Costo}_{\text{Market Order}} - \text{Costo}_{\text{VWAP}} = \text{Controvalore} \times \left( \frac{\text{Slippage}_{\text{Market}} - \text{Slippage}_{\text{VWAP}}}{10000} \right) \]
+
+$$
+\text{Risparmio Netto (€)} = \text{Costo}_{\text{Market Order}} - \text{Costo}_{\text{VWAP}} = \text{Controvalore} \times \left( \frac{\text{Slippage}_{\text{Market}} - \text{Slippage}_{\text{VWAP}}}{10000} \right)
+$$
 
 ---
 
@@ -1260,12 +1935,19 @@ Il ribilanciamento continuo del portafoglio viene formulato come un MDP $(\mathc
 
 ### 2. Funzione di Ricompensa Orientata al Sortino Ratio con Attrito di Turnover
 La funzione di ricompensa premia il rendimento netto penalizzando quadraticamente le sole perdite (semi-varianza negativa / Downside Risk) e i costi di transazione da turnover:
-\[ R_t = r_{p,t} \cdot 100 - \gamma \cdot \max(0, -r_{p,t})^2 \cdot 100 - \lambda \cdot \|w_t - w_{t-1}\|_1 \]
+
+$$
+R_t = r_{p,t} \cdot 100 - \gamma \cdot \max(0, -r_{p,t})^2 \cdot 100 - \lambda \cdot \|w_t - w_{t-1}\|_1
+$$
+
 dove $\gamma = 4.5$ è il coefficiente di avversione alle perdite e $\lambda$ è la penalità di turnover.
 
 ### 3. Policy Gradient REINFORCE con Baseline di Riduzione della Varianza
 I parametri $\theta = \{W_1, b_1, W_2, b_2\}$ della rete neurale Policy Actor vengono aggiornati a fine episodio calcolando il gradiente dei ritorni cumulati scontati $G_t = \sum_{k=t}^T \gamma^{k-t} R_k$, normalizzati con baseline standardizzata per minimizzare la varianza del gradiente:
-\[ \nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \ln \pi_\theta(a_t | s_t) \cdot (G_t - b(s_t)) \right] \]
+
+$$
+\nabla_\theta J(\theta) = \mathbb{E}_{\pi_\theta} \left[ \nabla_\theta \ln \pi_\theta(a_t | s_t) \cdot (G_t - b(s_t)) \right]
+$$
 
 ---
 
@@ -1280,6 +1962,4 @@ I parametri $\theta = \{W_1, b_1, W_2, b_2\}$ della rete neurale Policy Actor ve
 7. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
 8. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
 9. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
-
-
 
