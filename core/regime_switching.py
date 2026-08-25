@@ -108,8 +108,8 @@ def compute_market_regime_states(benchmark_returns: pd.Series) -> Dict[str, Any]
 
     df_trans_matrix = pd.DataFrame(
         trans_probs.round(1),
-        index=["🟢 Da Regime 1", "🟡 Da Regime 2", "🔴 Da Regime 3"],
-        columns=["🟢 A Regime 1", "🟡 A Regime 2", "🔴 A Regime 3"]
+        index=["🟢 Da Regime 1 (Bull)", "🟡 Da Regime 2 (Range)", "🔴 Da Regime 3 (Crisis)"],
+        columns=["🟢 A Regime 1 (Bull)", "🟡 A Regime 2 (Range)", "🔴 A Regime 3 (Crisis)"]
     )
 
     df_stats = pd.DataFrame([
