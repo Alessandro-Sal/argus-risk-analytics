@@ -173,7 +173,11 @@ st.markdown(f"""
         <span style="font-weight: 700; font-size: 14.5px; color: #ff9900;">⚡ Sintesi Esecutiva Quantitativa | Status Portafoglio</span>
         <label for="modal-toggle-{rf_modal_id}" class="rf-badge-btn-{rf_modal_id}" title="Clicca per aprire la Guida Metodologica al Tasso Risk-Free">
             <span>🏛️ Risk-Free {rf_currency}: {rf_rate_pct:.2f}%</span>
-            <span style="font-size: 11px; background: rgba(255,153,0,0.25); border-radius: 50%; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center;">ℹ️</span>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff9900" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 2px; opacity: 0.95;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
         </label>
     </div>
     <input type="checkbox" id="modal-toggle-{rf_modal_id}">
