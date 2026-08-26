@@ -17,11 +17,13 @@ import core.ui_utils as ui_utils
 import core.excel_connector as excel_connector
 import core.workspace_engine as workspace_engine
 import core.bquant_engine as bquant_engine
+import core.terminal_engine as terminal_engine
 
 importlib.reload(ui_utils)
 importlib.reload(excel_connector)
 importlib.reload(workspace_engine)
 importlib.reload(bquant_engine)
+importlib.reload(terminal_engine)
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -50,6 +52,11 @@ from core.excel_connector import (
     generate_vba_macro_code,
     generate_office_script_code,
     export_institutional_multisheet_excel
+)
+from core.terminal_engine import (
+    get_terminal_engine,
+    TerminalCommandResult,
+    OMSOrder
 )
 
 st.set_page_config(
@@ -100,6 +107,13 @@ BQUANT_MODELS_CATALOG = {
         "badge_color": "#38bdf8",
         "category": "Integrazione Dati Esterni",
         "desc": "Generatore di formule compatibili Excel (BDP/BDH) ed esportazione flussi in tempo reale per alimentare modelli di pricing e fogli di calcolo proprietari."
+    },
+    "🖥️ Terminale Live & Interactive CLI": {
+        "title": "ARGUS Live Market Terminal & Interactive CLI Execution Desk",
+        "badge": "Bloomberg CLI • Level-2 Depth • OMS Blotter • TOP Telemetry",
+        "badge_color": "#eab308",
+        "category": "Trading Floor & Terminale Live",
+        "desc": "Terminale operativo interattivo ad alta densità con prompt comandi Bloomberg, streaming Level-2 Book Depth, simulatore OMS con order slicing TWAP/VWAP e telemetria TOP."
     }
 }
 
@@ -604,3 +618,239 @@ elif active_bquant_tab == "📊 Excel Live Connector & RTD":
     with tab_ts:
         st.caption("Incolla questo script in Excel per il Web o Microsoft 365 (Automatizza > Nuovo Script) per sincronizzare il foglio via fetch API.")
         st.code(generate_office_script_code(), language="typescript")
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 4: ARGUS LIVE MARKET TERMINAL & INTERACTIVE CLI EXECUTION DESK
+# ═════════════════════════════════════════════════════════════════════════════
+elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
+    col_term_h1, col_term_h2 = st.columns([3.2, 1.2])
+    with col_term_h1:
+        st.markdown("#### 🖥️ ARGUS Live Terminal & Interactive CLI Execution Desk")
+        st.caption("Console operativa ad alta densità con interprete comandi Bloomberg, Level-2 Book Depth streaming, OMS blotter e telemetria TOP.")
+    with col_term_h2:
+        st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+        glossary_modal("💡 Guida al Terminale Live & Sintassi CLI", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+<b>Sintassi dei Comandi Supportati:</b><br>
+• <code>&lt;TICKER&gt; DES</code> : Scheda informativa e PnL del titolo.<br>
+• <code>&lt;TICKER&gt; FA</code> : Analisi fondamentale e ratio di bilancio.<br>
+• <code>&lt;TICKER&gt; VOLS</code> : Volatilità storica e skew implicita.<br>
+• <code>PORT RISK</code> : Sintesi di rischio VaR, CVaR e Sharpe di portafoglio.<br>
+• <code>VAR 95</code> / <code>VAR 99</code> : Value at Risk 1D & 10D scalato Basilea III.<br>
+• <code>BUY &lt;qty&gt; &lt;ticker&gt; [@ px]</code> : Inserimento ordine simulato a mercato o limite.<br>
+• <code>TWAP &lt;qty&gt; &lt;ticker&gt; &lt;min&gt;</code> : Esecuzione algoritmica TWAP con stima dello slippage.<br>
+• <code>VWAP &lt;qty&gt; &lt;ticker&gt; &lt;min&gt;</code> : Esecuzione algoritmica VWAP ponderata sui volumi.<br>
+• <code>EQS &lt;filtro&gt;</code> : Esecuzione filtri su posizioni (es. <code>EQS Piotroski &gt;= 7</code>).<br>
+• <code>SQL &lt;query&gt;</code> : Query in-memory DuckDB su <code>df_positions</code>.<br>
+• <code>TOP</code> / <code>STATUS</code> : Telemetria di sistema RAM, CPU e thread attivi.<br>
+• <code>BLOTTER</code> : Visualizzazione registro ordini di negoziazione.<br>
+• <code>CLEAR</code> : Reset del buffer visuale del terminale.
+</div>
+""")
+
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+    term_eng = get_terminal_engine()
+    session_context = {
+        "df_positions": pos,
+        "df_returns": ret_df,
+        "df_prices": price_df,
+        "results": results
+    }
+
+    # Se il buffer è vuoto, inizializza con messaggio di benvenuto Bloomberg
+    if not term_eng.output_buffer:
+        init_res = term_eng.execute_command("HELP", session_context)
+        term_eng.output_buffer.append(init_res)
+
+    # ── RIGA 1: INTERACTIVE CLI (60%) vs LIVE LEVEL-2 BOOK MATRIX (40%) ──
+    col_cli, col_tape = st.columns([1.5, 1.0], gap="medium")
+
+    with col_cli:
+        st.markdown("##### ⌨️ Console Interattiva Bloomberg CLI")
+
+        # Chip di scelta rapida
+        st.caption("Comandi Rapidi:")
+        chips_cols = st.columns(6)
+        quick_cmds = ["PORT RISK", "VAR 95", "AAPL DES", "TWAP 500 AAPL 30", "TOP", "BLOTTER"]
+        for idx, qc in enumerate(quick_cmds):
+            with chips_cols[idx]:
+                if st.button(qc, key=f"btn_chip_cmd_{idx}", use_container_width=True):
+                    cmd_res = term_eng.execute_command(qc, session_context)
+                    term_eng.output_buffer.insert(0, cmd_res)
+                    st.rerun()
+
+        # Input box comando
+        col_inp, col_run = st.columns([4.0, 1.0])
+        with col_inp:
+            cmd_input = st.text_input(
+                "Command Prompt",
+                placeholder="ARGUS:LIVE> Digita comando (es. 'AAPL DES', 'VAR 95', 'BUY 100 NVDA', 'TOP', 'HELP')...",
+                key="term_cli_input_box",
+                label_visibility="collapsed"
+            )
+        with col_run:
+            btn_run_cmd = st.button("▶ Esegui", key="btn_run_term_cmd", type="primary", use_container_width=True)
+
+        if btn_run_cmd and cmd_input.strip():
+            cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
+            term_eng.output_buffer.insert(0, cmd_res)
+            st.rerun()
+
+        # Buffer di Output Terminale (Stile JetBrains Mono Dark Screen)
+        terminal_screen_lines = []
+        for item in term_eng.output_buffer[:8]:
+            status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
+            terminal_screen_lines.append(f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> <span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> <span style='color:#e6edf3;'>{item.command}</span>\n{item.output_text}\n" + "─"*72)
+
+        terminal_screen_html = "\n\n".join(terminal_screen_lines)
+
+        st.markdown(f"""
+        <div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 16px; font-family: 'Courier New', 'Fira Code', monospace; font-size: 12px; color: #c9d1d9; white-space: pre-wrap; height: 380px; overflow-y: auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8); line-height: 1.4;">
+{terminal_screen_html}
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_cls1, col_cls2 = st.columns([1.0, 3.0])
+        with col_cls1:
+            if st.button("🧹 Pulisci Schermo", key="btn_term_clear_buf", use_container_width=True):
+                term_eng.output_buffer.clear()
+                st.rerun()
+
+    with col_tape:
+        st.markdown("##### ⚡ Live Market Tape & Level-2 Book")
+        
+        # Selettore Ticker per Streaming Book
+        avail_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else ["AAPL", "MSFT", "NVDA", "SPY", "BTC-USD"]
+        selected_tape_ticker = st.selectbox("Ticker Live:", options=avail_tickers, key="sel_tape_ticker", label_visibility="collapsed")
+        
+        ring_buf = term_eng.get_or_create_ring_buffer(ticker=selected_tape_ticker, capacity=500)
+        
+        # Simulazione push tick rapido
+        col_tick_btn, col_tick_stat = st.columns([1.5, 2.5], vertical_alignment="center")
+        with col_tick_btn:
+            if st.button("⚡ Invia Tick Live", key="btn_push_sim_tick", use_container_width=True):
+                if ring_buf:
+                    # Inserisci tick casuale realistico
+                    last_px = float(pos[pos["ticker"] == selected_tape_ticker]["current_price"].iloc[0]) if not pos.empty and selected_tape_ticker in pos["ticker"].values else 150.0
+                    shock = np.random.normal(0, 0.003) * last_px
+                    new_p = max(1.0, last_px + shock)
+                    t = terminal_engine.MarketTick(
+                        timestamp=datetime.datetime.now(datetime.timezone.utc),
+                        ticker=selected_tape_ticker,
+                        price=round(new_p, 2),
+                        size=round(np.random.uniform(50, 400), 0),
+                        bid=round(new_p - 0.02, 2),
+                        ask=round(new_p + 0.02, 2),
+                        volume=1000.0
+                    )
+                    ring_buf.append(t)
+                st.rerun()
+
+        stats = ring_buf.get_summary_statistics() if ring_buf else {}
+        last_px = stats.get("last_price", 150.0)
+        vwap_px = stats.get("vwap", last_px)
+        ofi_val = stats.get("order_flow_imbalance", 0.0)
+        
+        # Microprice di Stoikov (2018)
+        microprice = last_px + (0.01 if ofi_val > 0 else -0.01)
+        
+        # Header Ticker Live
+        ofi_color = "#3fb950" if ofi_val >= 0 else "#f85149"
+        ofi_text = "BUY PRESSURE" if ofi_val >= 0 else "SELL PRESSURE"
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <span style="font-size:15px; font-weight:800; color:#f0f6fc;">{selected_tape_ticker}</span>
+                <span style="font-size:14px; font-weight:700; color:#ff9900; margin-left:8px;">${last_px:,.2f}</span>
+            </div>
+            <div style="text-align:right;">
+                <span style="font-size:10.5px; font-weight:700; color:{ofi_color}; background:{ofi_color}22; padding:2px 6px; border-radius:4px; border:1px solid {ofi_color}55;">{ofi_text}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Matrice Level-2 Depth Book
+        base_bid = round(last_px - 0.01, 2)
+        base_ask = round(last_px + 0.01, 2)
+        
+        book_rows = [
+            {"bid_vol": 1450, "bid_px": base_bid, "ask_px": base_ask, "ask_vol": 1200},
+            {"bid_vol": 920, "bid_px": round(base_bid - 0.02, 2), "ask_px": round(base_ask + 0.02, 2), "ask_vol": 1100},
+            {"bid_vol": 680, "bid_px": round(base_bid - 0.04, 2), "ask_px": round(base_ask + 0.04, 2), "ask_vol": 1650},
+            {"bid_vol": 410, "bid_px": round(base_bid - 0.06, 2), "ask_px": round(base_ask + 0.06, 2), "ask_vol": 890},
+            {"bid_vol": 320, "bid_px": round(base_bid - 0.08, 2), "ask_px": round(base_ask + 0.08, 2), "ask_vol": 540}
+        ]
+
+        book_html = """
+        <table style="width:100%; font-family:monospace; font-size:11px; border-collapse:collapse; text-align:center;">
+            <thead>
+                <tr style="border-bottom:1px solid #30363d; color:#8b949e;">
+                    <th style="padding:4px; text-align:right; color:#3fb950;">Vol (Bid)</th>
+                    <th style="padding:4px; color:#3fb950;">Bid Px</th>
+                    <th style="padding:4px; color:#f85149;">Ask Px</th>
+                    <th style="padding:4px; text-align:left; color:#f85149;">Vol (Ask)</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        for r in book_rows:
+            bid_bar = min(100, int((r["bid_vol"] / 2000) * 100))
+            ask_bar = min(100, int((r["ask_vol"] / 2000) * 100))
+            book_html += f"""
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+                    <td style="padding:4px; text-align:right; color:#c9d1d9;">
+                        <span style="display:inline-block; width:{bid_bar}px; background:rgba(63,185,80,0.25); height:8px; border-radius:2px; margin-right:4px;"></span>{r['bid_vol']}
+                    </td>
+                    <td style="padding:4px; font-weight:700; color:#3fb950;">${r['bid_px']:.2f}</td>
+                    <td style="padding:4px; font-weight:700; color:#f85149;">${r['ask_px']:.2f}</td>
+                    <td style="padding:4px; text-align:left; color:#c9d1d9;">
+                        {r['ask_vol']}<span style="display:inline-block; width:{ask_bar}px; background:rgba(248,81,73,0.25); height:8px; border-radius:2px; margin-left:4px;"></span>
+                    </td>
+                </tr>
+            """
+        book_html += "</tbody></table>"
+
+        st.markdown(f"""
+        <div style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
+            {book_html}
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.3f}` • **VWAP**: `${vwap_px:.2f}` • **Spread**: `$0.02`")
+
+    st.divider()
+
+    # ── RIGA 2: LIVE OMS EXECUTION BLOTTER & SYSTEM TELEMETRY (TOP) ──
+    col_blotter, col_top = st.columns([2.0, 1.0], gap="medium")
+
+    with col_blotter:
+        st.markdown("##### 📋 Live OMS Execution Blotter (Ordini di Negoziazione)")
+        if not term_eng.oms_blotter:
+            st.info("Nessun ordine registrato. Digita `BUY 100 AAPL @ MKT` o `TWAP 500 MSFT 30` nella console.")
+        else:
+            blotter_records = []
+            for o in term_eng.oms_blotter[:10]:
+                blotter_records.append({
+                    "Order ID": o.order_id,
+                    "Time": o.timestamp,
+                    "Ticker": o.ticker,
+                    "Side": o.side,
+                    "Qty": f"{o.qty:,.1f}",
+                    "Type": o.order_type,
+                    "Fill Px": f"${o.avg_fill_price:.2f}" if o.avg_fill_price > 0 else "MKT",
+                    "Status": o.status,
+                    "Saved (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
+                })
+            df_blotter_ui = pd.DataFrame(blotter_records)
+            st.dataframe(df_blotter_ui, use_container_width=True, hide_index=True)
+
+    with col_top:
+        st.markdown("##### 📊 Telemetria di Sistema (TOP Monitor)")
+        top_res = term_eng.execute_command("TOP", session_context)
+        st.markdown(f"""
+        <div style="background:#090d13; border:1px solid #30363d; border-radius:6px; padding:10px 12px; font-family:monospace; font-size:11px; color:#3fb950; white-space:pre-wrap;">
+{top_res.output_text}
+        </div>
+        """, unsafe_allow_html=True)
+

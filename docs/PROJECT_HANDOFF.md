@@ -1,4 +1,4 @@
-# Investment Risk BI Platform — Project Handoff (v5.22.0 Production Release)
+# Investment Risk BI Platform — Project Handoff (v5.23.0 Production Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.22.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.23.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
@@ -165,6 +165,12 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Integrazione Duale VBA / Office Scripts**: Modulo VBA per Excel Desktop (.bas) e script TypeScript per Excel 365/Web con chiamate REST non bloccanti.
 - **Esportatore Multi-Foglio OpenPyXL/XlsxWriter**: Creazione di cartelle di lavoro professionali con fogli *Executive_Summary*, *Positions_Portfolio*, *Fixed_Income_YAS*, *Execution_Schedule* con stili grafici e formattazione colonnare automatica.
 
+### `core/terminal_engine.py` — ✅ ARGUS Live Terminal, Interactive CLI & OMS Blotter
+- **Bloomberg CLI Parser**: Parsing ed esecuzione di comandi rapidi Bloomberg (`AAPL DES`, `MSFT FA`, `PORT RISK`, `VAR 95`, `EQS`, `SQL`, `TOP`, `HELP`).
+- **Live Level-2 Book Depth**: Calcolo continuo del Microprice di Stoikov (2018), spread in bps e visualizzazione del ladder Bid/Ask con barre volume.
+- **Simulatore OMS Trading Blotter**: Inserimento ordini simulati a mercato/limite, esecuzione algoritmica TWAP/VWAP con calcolo del risparmio slippage in bps ed euro.
+- **System Telemetry TOP Monitor**: Monitoraggio in tempo reale di memoria RAM RSS, CPU usage, saturazione Ring Buffer e stato transazionale del database.
+
 ### `core/workspace_manager.py` & `core/sidebar.py` — ✅ Navigation Rail, Sincronizzazione Bidirezionale & Spotlight
 - Gestione dello stato sessione e URL query parameters (`st.query_params`) per routing e permalink affidabili.
 - **Sincronizzazione Bidirezionale Zero-Desync**: Sincronia perfetta tra i pulsanti sottomodulo della Sidebar e i selettori a tendina `st.selectbox` di tutte le pagine.
@@ -185,13 +191,13 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 8. **`7_📊_Analisi_Temporale.py`**: Storicizzazione Multi-Snapshot su Data Warehouse MySQL/SQLite, Evoluzione Temporale del Valore di Portafoglio, Matrice dei Delta ($\Delta$) tra Snapshot e Calcolatore del Tasso di Risparmio & Iniezioni di Liquidità.
 9. **`8_📈_Analisi_Tecnica.py`**: Cockpit di Analisi Tecnica & Quantitative Charting, Volume Profile (POC/VAH/VAL), Candlestick Pattern Recognition, Technical Confluence Score Card (0-100), Multi-Timeframe Alignment (1D vs 1W), Screener di Confluenza e **Real-Time Streaming Engine con Ring Buffer L2 & Order Flow Imbalance**.
 10. **`9_🔍_Screener_Opportunita.py`**: Screener Quantitativo Multi-Fattoriale (Valutazione, Qualità Contabile, Rischio, Momentum), **⚡ Formula Engine EQS (Custom Query Builder)**, Archetipi Istituzionali, Parallel Multi-Thread Downloader (8 Workers), Granular Cache Invalidation con pulsante `🔄 Forza Live`, Smart Sizing Optimizer, Pre-Trade Impact Simulator e Generatore Factsheet PDF One-Pager.
-11. **`10_💻_BQuant_e_Launchpad.py`**: **🐍 ARGUS BQuant Python Sandbox In-App**, **🎛️ ARGUS Launchpad & Workspace Customizer (5 Ruoli Istituzionali)**, **📊 Excel Live Connector & Generatore Formule Bloomberg (=ARGUS_BDP, =ARGUS_BDH, =ARGUS_RISK) con Esportazione Multi-Foglio XLSX**.
+11. **`10_💻_BQuant_e_Launchpad.py`**: **🐍 ARGUS BQuant Python Sandbox In-App**, **🎛️ ARGUS Launchpad & Workspace Customizer (5 Ruoli Istituzionali)**, **📊 Excel Live Connector & Generatore Formule Bloomberg (=ARGUS_BDP, =ARGUS_BDH, =ARGUS_RISK) con Esportazione Multi-Foglio XLSX**, **🖥️ ARGUS Live Market Terminal & Interactive CLI Desk con Level-2 Depth Book e OMS Blotter**.
 
 ---
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **243 test automatizzati passano con successo (100%)**:
+Tutti i **250 test automatizzati passano con successo (100%)**:
 
 ```bash
 py -m pytest
@@ -199,6 +205,6 @@ py -m pytest
 
 ---
 
-*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.22.0.*
+*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.23.0.*
 
 

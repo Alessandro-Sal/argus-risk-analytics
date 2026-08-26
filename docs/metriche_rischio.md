@@ -2261,7 +2261,55 @@ generando la curva di frontiera continua dell'indice di Sharpe in funzione del p
 
 ---
 
-## 65. Riferimenti Bibliografici & Standard Istituzionali
+## 65. Live Market Terminal, Stoikov Microprice & Sliced OMS Execution Mechanics
+
+### 1. Stoikov Microprice & Level-2 Order Flow Imbalance (OFI)
+Nelle microstrutture di mercato ad alta frequenza, il Mid-Price $\frac{P_a + P_b}{2}$ non riflette l'asimmetria volumetrica del book. Il modello di **Stoikov (2018)** stima il prezzo atteso a breve termine correggendo il Mid-Price con l'imbalance dei volumi al primo livello:
+
+$$
+P_{\text{micro}} = P_{\text{mid}} + \frac{V_b - V_a}{V_b + V_a} \cdot \frac{S}{2}
+$$
+
+dove:
+- $P_b, P_a$ sono i migliori prezzi Bid e Ask.
+- $V_b, V_a$ sono i volumi esposti sul primo livello del book.
+- $S = P_a - P_b$ è il Bid-Ask Spread istantaneo.
+
+L'**Order Flow Imbalance (OFI)** misura la pressione netta di acquisto o vendita tra due istanti $t_{k-1}$ e $t_k$:
+
+$$
+\text{OFI}_k = I_{\{P_b(k) \ge P_b(k-1)\}} V_b(k) - I_{\{P_b(k) \le P_b(k-1)\}} V_b(k-1) - \left[ I_{\{P_a(k) \le P_a(k-1)\}} V_a(k) - I_{\{P_a(k) \ge P_a(k-1)\}} V_a(k-1) \right]
+$$
+
+### 2. Algoritmi di Slicing Esecutivo TWAP & VWAP
+Per minimizzare l'impatto di mercato temporaneo e permanente durante la negoziazione di ordini di dimensione rilevante, il simulatore OMS Blotter implementa due paradigmi esecutivi:
+
+- **Time-Weighted Average Price (TWAP)**:
+  L'ordine di quantità totale $Q$ viene suddiviso in $N$ scaglioni temporali uniformi su un orizzonte $T$:
+  
+$$
+q_i = \frac{Q}{N}, \quad t_i = i \cdot \frac{T}{N} + \epsilon_i \quad \text{con } \epsilon_i \sim \mathcal{U}(-\delta, \delta)
+$$
+
+  dove $\epsilon_i$ rappresenta un jitter stocastico per prevenire il rilevamento algoritmico da parte di altri partecipanti al mercato.
+
+- **Volume-Weighted Average Price (VWAP)**:
+  L'ordine viene profilato sulla curva storica intraday del volume $v(t)$, rispettando un Participation Rate massimo (POV Cap al 15% del volume di mercato per scaglione):
+  
+$$
+q_i = Q \cdot \frac{\int_{t_{i-1}}^{t_i} v(t) dt}{\int_0^T v(t) dt}, \quad \text{con } \sum_{i=1}^N q_i = Q
+$$
+
+- **Stima del Risparmio Slippage**:
+  Il risparmio netto in euro rispetto a un ordine a mercato immediato (Market Order con slippage pieno $\eta_{\text{mkt}}$) è formalizzato come:
+  
+$$
+\text{Risparmio (€)} = \text{Controvalore} \cdot \left( \frac{\eta_{\text{mkt}} - \eta_{\text{algo}}}{10.000} \right)
+$$
+
+---
+
+## 66. Riferimenti Bibliografici & Standard Istituzionali
 
 1. **Almgren, R., & Chriss, N. (2000)**. *Optimal execution of portfolio transactions*. Journal of Risk, 3(2), 5-40.
 2. **Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005)**. *Direct estimation of equity market impact*. Risk, 18(7), 58-62.
