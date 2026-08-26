@@ -723,7 +723,18 @@ UTILITÀ DI SISTEMA:
         df_pos = ctx.get("df_positions", pd.DataFrame())
         df_ret = ctx.get("df_returns", pd.DataFrame())
         
-        num_pos = len(df_pos) if not df_pos.empty else 0
+        # Conteggio posizioni attive (quantità netta > 0)
+        if not df_pos.empty:
+            qty_col = "qty_net" if "qty_net" in df_pos.columns else ("shares" if "shares" in df_pos.columns else ("quantity" if "quantity" in df_pos.columns else None))
+            if qty_col:
+                num_pos = len(df_pos[df_pos[qty_col] > 1e-6])
+            elif "current_value" in df_pos.columns:
+                num_pos = len(df_pos[df_pos["current_value"] > 0])
+            else:
+                num_pos = len(df_pos)
+        else:
+            num_pos = 0
+
         num_ret_rows = len(df_ret) if not df_ret.empty else 0
 
         top_text = f"""
@@ -732,12 +743,28 @@ UTILITÀ DI SISTEMA:
 ├────────────────────────────────────────────────────────────────────────────────────────┤
 │ Process PID      : {os.getpid():<10} │ Process RAM RSS  : {ram_mb:>7.2f} MB                  │
 │ Active Threads   : {threads_count:<10} │ CPU Usage        : {cpu_pct:>7.1f} %                   │
-│ Portfolio Assets : {num_pos:<10} │ Historical Days  : {num_ret_rows:>7d} obs                  │
+│ Active Assets    : {num_pos:<10} │ Historical Days  : {num_ret_rows:>7d} obs                  │
 │ Active Buffers   : {len(self._ring_buffers):<10} │ OMS Blotter Size : {len(self.oms_blotter):>7d} orders               │
 │ Cache Shield L2  : ONLINE (24h TTL) │ DuckDB Engine    : EMBEDDED C++ SIMD             │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 """
-        return TerminalCommandResult(command="TOP", status="SUCCESS", output_text=top_text.strip())
+        return TerminalCommandResult(
+            command="TOP",
+            status="SUCCESS",
+            output_text=top_text.strip(),
+            structured_data={
+                "pid": os.getpid(),
+                "ram_mb": round(ram_mb, 2),
+                "cpu_pct": round(cpu_pct, 1),
+                "threads": threads_count,
+                "active_assets": num_pos,
+                "hist_obs": num_ret_rows,
+                "active_buffers": len(self._ring_buffers),
+                "blotter_size": len(self.oms_blotter),
+                "duckdb_engine": "EMBEDDED C++ SIMD",
+                "cache_status": "ONLINE (24h TTL)"
+            }
+        )
 
     def _cmd_blotter(self) -> TerminalCommandResult:
         if not self.oms_blotter:
