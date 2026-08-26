@@ -124,6 +124,31 @@ with st.container():
         calc_start = min_avail_date
         calc_end = max_avail_date
 
+    # Applicazione del filtro data sulle serie storiche prima del rendering badge
+    def filter_series_by_date(sr: pd.Series, start_d, end_d) -> pd.Series:
+        if sr is None or sr.empty:
+            return sr
+        s_dt = sr.copy()
+        if getattr(s_dt.index, 'tz', None) is not None:
+            s_dt.index = s_dt.index.tz_localize(None)
+        s_dt.index = pd.to_datetime(s_dt.index)
+        mask = (s_dt.index.date >= start_d) & (s_dt.index.date <= end_d)
+        return s_dt[mask]
+
+    sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
+    sr_bm = filter_series_by_date(raw_sr_bm, calc_start, calc_end)
+    if df_returns is not None and not df_returns.empty:
+        df_ret_dt = df_returns.copy()
+        if getattr(df_ret_dt.index, 'tz', None) is not None:
+            df_ret_dt.index = df_ret_dt.index.tz_localize(None)
+        df_ret_dt.index = pd.to_datetime(df_ret_dt.index)
+        mask_df = (df_ret_dt.index.date >= calc_start) & (df_ret_dt.index.date <= calc_end)
+        df_returns_filtered = df_ret_dt[mask_df]
+    else:
+        df_returns_filtered = pd.DataFrame()
+
+    active_trading_days = len(sr_port) if not sr_port.empty else 0
+
     with col_t2:
         if time_preset == "Intervallo Personalizzato (Calendario)":
             date_range_picked = st.date_input(
@@ -135,6 +160,8 @@ with st.container():
             )
             if isinstance(date_range_picked, (tuple, list)) and len(date_range_picked) == 2:
                 calc_start, calc_end = date_range_picked
+                sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
+                active_trading_days = len(sr_port)
         else:
             delta_days_selected = max(1, (calc_end - calc_start).days)
             y_span = delta_days_selected / 365.25
@@ -144,7 +171,7 @@ with st.container():
                 dur_str = f"{y_int} Anni e {m_int} Mesi" if m_int > 0 else f"{y_int} Anni"
             else:
                 m_int = max(1, int(round(delta_days_selected / 30.4375)))
-                dur_str = f"{m_int} Mesi ({delta_days_selected} gg)"
+                dur_str = f"{m_int} Mesi"
 
             st.markdown(f"""
             <div style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 10px 16px; margin-top: 4px;">
@@ -157,35 +184,12 @@ with st.container():
                     </div>
                     <div>
                         <span style="font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #7dd3fc; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.25);">
-                            {total_trading_days:,} Sedute • {dur_str} ({delta_days_selected} gg)
+                            {active_trading_days:,} Sedute • {dur_str} ({delta_days_selected} gg)
                         </span>
                     </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
-
-# Applicazione del filtro data sulle serie storiche
-def filter_series_by_date(sr: pd.Series, start_d, end_d) -> pd.Series:
-    if sr is None or sr.empty:
-        return sr
-    s_dt = sr.copy()
-    if getattr(s_dt.index, 'tz', None) is not None:
-        s_dt.index = s_dt.index.tz_localize(None)
-    s_dt.index = pd.to_datetime(s_dt.index)
-    mask = (s_dt.index.date >= start_d) & (s_dt.index.date <= end_d)
-    return s_dt[mask]
-
-sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
-sr_bm = filter_series_by_date(raw_sr_bm, calc_start, calc_end)
-if df_returns is not None and not df_returns.empty:
-    df_ret_dt = df_returns.copy()
-    if getattr(df_ret_dt.index, 'tz', None) is not None:
-        df_ret_dt.index = df_ret_dt.index.tz_localize(None)
-    df_ret_dt.index = pd.to_datetime(df_ret_dt.index)
-    mask_df = (df_ret_dt.index.date >= calc_start) & (df_ret_dt.index.date <= calc_end)
-    df_returns_filtered = df_ret_dt[mask_df]
-else:
-    df_returns_filtered = pd.DataFrame()
 
 
 # ── SELETTORE MODULI ANALISI TEMPORALE BLOOMBERG STYLE ─────────
