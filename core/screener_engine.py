@@ -10,41 +10,86 @@ from core.cache_shield import get_cached_ticker_history, get_cached_ticker_info
 
 MARKET_UNIVERSES: Dict[str, Dict[str, Any]] = {
     "🇺🇸 US Mega & Large Caps (S&P 100)": {
-        "description": "I leader globali ad elevata capitalizzazione del mercato statunitense (Technology, Healthcare, Financials, Consumer).",
+        "description": "I leader ad elevata capitalizzazione e massima liquidità del mercato USA (Tech, Healthcare, Finanza, Industriali, Energy).",
         "tickers": [
             "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "BRK-B", "JPM", "JNJ",
             "V", "PG", "UNH", "HD", "MA", "LLY", "XOM", "ABBV", "CVX", "MRK",
-            "KO", "PEP", "COST", "AVGO", "ADBE", "CSCO", "CRM", "AMD", "NFLX", "WMT"
+            "KO", "PEP", "COST", "AVGO", "ADBE", "CSCO", "CRM", "AMD", "NFLX", "WMT",
+            "BAC", "MCD", "ACN", "LIN", "DIS", "ABT", "TMO", "TXN", "PM", "ORCL",
+            "CAT", "IBM", "GE", "VZ", "HON", "COP", "INTC", "QCOM", "SPGI", "AMAT"
+        ]
+    },
+    "🤖 AI Supercycle, Semiconductors & Infrastructure": {
+        "description": "Aziende cardine dell'infrastruttura AI: semiconduttori, foundry, apparecchiature litografiche, datacenter e networking.",
+        "tickers": [
+            "NVDA", "TSM", "ASML", "AVGO", "AMD", "QCOM", "AMAT", "LRCX", "KLAC", "ARM",
+            "MRVL", "MU", "SMCI", "ANET", "VST", "CEG", "NOW", "PLTR", "MSFT", "GOOGL", "DELL", "CRWD"
         ]
     },
     "🇪🇺 European Champions (EuroStoxx 50)": {
-        "description": "Le principali blue chips dell'Eurozona per solidità di bilancio e penetrazione di mercato internazionale.",
+        "description": "Le principali blue chips dell'Eurozona per solidità di bilancio, diversificazione e leadership globale.",
         "tickers": [
             "ASML", "SAP", "MC.PA", "OR.PA", "RMS.PA", "NOVO-B.CO", "NESN.SW", "SIE.DE",
             "ALV.DE", "SAN.MC", "IBE.MC", "AIR.PA", "TTE.PA", "BNP.PA", "SU.PA",
-            "ABI.BR", "INGA.AS", "EL.PA", "MBG.DE", "ENEL.MI", "ISP.MI", "RACE.MI"
+            "ABI.BR", "INGA.AS", "EL.PA", "MBG.DE", "ENEL.MI", "ISP.MI", "RACE.MI", "UCG.MI", "BAYN.DE", "BAS.DE"
         ]
     },
     "🇮🇹 FTSE MIB Leaders (Piazza Affari)": {
-        "description": "I titoli a maggiore capitalizzazione e liquidità del listino italiano (Borsa Italiana).",
+        "description": "I titoli a maggiore capitalizzazione, dividendi e liquidità del listino italiano (Borsa Italiana).",
         "tickers": [
             "RACE.MI", "ENEL.MI", "ISP.MI", "UCG.MI", "ENI.MI", "STMMI.MI", "PRY.MI",
             "MB.MI", "G.MI", "TIT.MI", "MONC.MI", "SRG.MI", "TRN.MI", "PST.MI",
-            "CPR.MI", "AMP.MI", "HER.MI", "BAMI.MI", "A2A.MI", "REC.MI"
+            "CPR.MI", "AMP.MI", "HER.MI", "BAMI.MI", "A2A.MI", "REC.MI", "LDO.MI", "NEXI.MI"
         ]
     },
     "👑 Dividend Aristocrats & High Yield": {
-        "description": "Società con storico solido di dividendi crescenti o rendimento da dividendo elevato e sostenibile.",
+        "description": "Società con storico impeccabile di dividendi crescenti e solidi flussi di cassa operativi.",
         "tickers": [
             "JNJ", "PG", "KO", "PEP", "ABBV", "O", "MO", "TROW", "MMM", "CVX",
-            "IBM", "MCD", "CL", "EMR", "KMB", "BDX", "ED", "ENB", "BNS", "RIO"
+            "IBM", "MCD", "CL", "EMR", "KMB", "BDX", "ED", "ENB", "BNS", "RIO",
+            "ADM", "GPC", "SWK", "SPG", "WBA"
         ]
     },
     "🚀 High Growth & Disruptive Tech": {
-        "description": "Aziende ad alta crescita nei settori Intelligenza Artificiale, Cloud, Semiconduttori e Cyber-security.",
+        "description": "Aziende ad altissimo tasso di crescita nei settori Cloud Software, Cyber-security, E-commerce e FinTech.",
         "tickers": [
             "NVDA", "AMD", "AVGO", "CRM", "NOW", "PANW", "CRWD", "PLTR", "SNOW", "MELI",
-            "ASML", "ARM", "SMCI", "SHOP", "UBER", "DDOG", "NET", "ZS", "FTNT", "MDB"
+            "ASML", "ARM", "SMCI", "SHOP", "UBER", "DDOG", "NET", "ZS", "FTNT", "MDB",
+            "COIN", "APP", "TTD", "MSTR", "SE"
+        ]
+    },
+    "💊 Global Healthcare, Pharma & Biotech": {
+        "description": "I colossi farmaceutici, biotecnologie innovative, dispositivi medici e protagonisti della rivoluzione GLP-1.",
+        "tickers": [
+            "LLY", "NVO", "JNJ", "ABBV", "MRK", "AZN", "ROG.SW", "PFE", "TMO", "DHR",
+            "ISRG", "VRTX", "REGN", "BMY", "MDT", "SYK", "AMGN", "GILD", "BSX", "ZTS"
+        ]
+    },
+    "🛡️ Aerospace, Defense & Cybersecurity": {
+        "description": "Leader globali della sicurezza nazionale, difesa aerospaziale, elettronica militare e cybersecurity strategica.",
+        "tickers": [
+            "LMT", "RTX", "NOC", "GD", "BA", "LDO.MI", "RHM.DE", "AIR.PA", "PANW", "CRWD",
+            "FTNT", "PLTR", "TDG", "HII", "GEN", "SAIC", "KTOS"
+        ]
+    },
+    "⚡ Clean Energy, Transition Metals & Nuclear": {
+        "description": "Aziende cardine della transizione energetica, estrazione di materie prime critiche (rame, litio, uranio) e nucleare.",
+        "tickers": [
+            "ENEL.MI", "IBE.MC", "NEE", "FSLR", "CCJ", "ALB", "SQM", "RIO", "BHP", "ENPH",
+            "CEG", "SCCO", "FCX", "VALE", "ENI.MI", "ORSTED.CO", "SEDG"
+        ]
+    },
+    "🌍 Emerging Markets & Global Giants": {
+        "description": "I giganti ad alta crescita dei mercati emergenti (Asia, America Latina, India) e piattaforme digitali globali.",
+        "tickers": [
+            "TSM", "BABA", "0700.HK", "INFY", "MELI", "VALE", "PDD", "SE", "HDB", "NU",
+            "BIDU", "JD", "ITUB", "BBD", "CPNG"
+        ]
+    },
+    "🪙 Crypto Blue Chips & Digital Assets Ecosystem": {
+        "description": "Asset crittografici a maggiore capitalizzazione e società quotate legate all'infrastruttura blockchain e crypto.",
+        "tickers": [
+            "BTC-USD", "ETH-USD", "SOL-USD", "COIN", "MSTR", "MARA", "RIOT", "SQ", "HOOD", "CLSK"
         ]
     }
 }
@@ -136,9 +181,26 @@ def fetch_screener_universe_data(
             
             fcf = float(info.get("freeCashflow") or 0.0)
             mcap = float(info.get("marketCap") or 0.0)
+            mcap_b = round(mcap / 1e9, 2) if mcap > 0 else np.nan
+            if pd.notna(mcap_b):
+                if mcap_b >= 200.0: mcap_cat = "Mega-Cap (>$200B)"
+                elif mcap_b >= 10.0: mcap_cat = "Large-Cap ($10B-$200B)"
+                elif mcap_b >= 2.0: mcap_cat = "Mid-Cap ($2B-$10B)"
+                else: mcap_cat = "Small-Cap (<$2B)"
+            else:
+                mcap_cat = "N/D"
+
             fcf_yield = (fcf / mcap * 100.0) if mcap > 0 and fcf != 0 else np.nan
             debt_to_equity = float(info.get("debtToEquity") or np.nan)
             if pd.notna(debt_to_equity): debt_to_equity /= 100.0
+            
+            # Consensus & Analisti Istituzionali
+            rec_raw = str(info.get("recommendationKey") or "N/D").replace("_", " ").title()
+            num_analysts = int(info.get("numberOfAnalystOpinions") or 0)
+            rev_growth = float(info.get("revenueGrowth") or np.nan)
+            if pd.notna(rev_growth): rev_growth *= 100.0
+            gross_margin = float(info.get("grossMargins") or np.nan)
+            if pd.notna(gross_margin): gross_margin *= 100.0
             
             # Metriche Tecniche & di Rischio da serie storica
             vol_ann_pct = np.nan
@@ -194,7 +256,6 @@ def fetch_screener_universe_data(
             # Solvibilità & Accounting Quality (Stima Rapida Istituzionale)
             z_score = np.nan
             if pd.notna(debt_to_equity) and pd.notna(profit_margin):
-                # Formula parametrica di prossimità per screening rapido
                 z_score = 1.8 + (profit_margin / 15.0) * 0.8 + (1.0 / max(0.2, debt_to_equity)) * 0.4
                 if pd.notna(roe) and roe > 15.0: z_score += 0.4
             
@@ -236,9 +297,15 @@ def fetch_screener_universe_data(
                 "industry": industry,
                 "country": country,
                 "currency": currency,
+                "market_cap_b": mcap_b,
+                "mcap_category": mcap_cat,
+                "consensus_rating": rec_key,
+                "num_analysts": num_analysts,
                 "last_price": round(last_price, 2),
                 "target_mean_price": round(target_mean, 2) if target_mean > 0 else np.nan,
                 "upside_pct": round(upside_pct, 2) if pd.notna(upside_pct) else np.nan,
+                "revenue_growth_pct": round(rev_growth, 2) if pd.notna(rev_growth) else np.nan,
+                "gross_margin_pct": round(gross_margin, 2) if pd.notna(gross_margin) else np.nan,
                 "trailing_pe": round(pe_trailing, 2) if pd.notna(pe_trailing) else np.nan,
                 "forward_pe": round(pe_forward, 2) if pd.notna(pe_forward) else np.nan,
                 "peg_ratio": round(peg_ratio, 2) if pd.notna(peg_ratio) else np.nan,
@@ -262,7 +329,6 @@ def fetch_screener_universe_data(
             })
             
         except Exception:
-            # Fallback robusto
             rows.append({
                 "ticker": tk,
                 "name": tk,
@@ -270,9 +336,15 @@ def fetch_screener_universe_data(
                 "industry": "N/D",
                 "country": "N/D",
                 "currency": "USD",
+                "market_cap_b": np.nan,
+                "mcap_category": "N/D",
+                "consensus_rating": "N/D",
+                "num_analysts": 0,
                 "last_price": np.nan,
                 "target_mean_price": np.nan,
                 "upside_pct": np.nan,
+                "revenue_growth_pct": np.nan,
+                "gross_margin_pct": np.nan,
                 "trailing_pe": np.nan,
                 "forward_pe": np.nan,
                 "peg_ratio": np.nan,
@@ -317,6 +389,14 @@ SCREENER_FIELD_ALIASES: Dict[str, str] = {
     "profit_margin_pct": "profit_margin_pct",
     "profitmargin": "profit_margin_pct",
     "margin": "profit_margin_pct",
+    "gross_margin": "gross_margin_pct",
+    "gross_margin_pct": "gross_margin_pct",
+    "grossmargin": "gross_margin_pct",
+    "revenue_growth": "revenue_growth_pct",
+    "revenue_growth_pct": "revenue_growth_pct",
+    "revenuegrowth": "revenue_growth_pct",
+    "rev_growth": "revenue_growth_pct",
+    "revgrowth": "revenue_growth_pct",
     "pe": "trailing_pe",
     "trailing_pe": "trailing_pe",
     "trailingpe": "trailing_pe",
@@ -367,6 +447,9 @@ SCREENER_FIELD_ALIASES: Dict[str, str] = {
     "upside_pct": "upside_pct",
     "score": "argus_score",
     "argus_score": "argus_score",
+    "mcap": "market_cap_b",
+    "market_cap": "market_cap_b",
+    "market_cap_b": "market_cap_b",
     "last_price": "last_price",
     "price": "last_price",
     "target_price": "target_mean_price",
@@ -374,20 +457,40 @@ SCREENER_FIELD_ALIASES: Dict[str, str] = {
 }
 
 SCREENER_FORMULA_PRESETS: Dict[str, Dict[str, str]] = {
+    "magic_formula": {
+        "title": "👑 Magic Formula (Joel Greenblatt)",
+        "formula": "ROE > 18 AND PE < 22 AND DebtToEquity < 1.0 AND Altman > 2.5",
+        "description": "Massima redditività del capitale investito (alta qualità) combinata con multipli compressi (alto rendimento degli utili)."
+    },
+    "fcf_kings": {
+        "title": "🏰 Free Cash Flow Kings & Solvency",
+        "formula": "FCF_Yield > 5.0 AND DebtToEquity < 0.6 AND Piotroski >= 7 AND ROE > 12",
+        "description": "Società che generano fiumi di cassa libera, con bilanci ultra-solidi e protezione assoluta contro il default."
+    },
     "buffett_moat": {
         "title": "🏛️ Buffett Quality Moat",
         "formula": "Piotroski >= 7 AND Altman > 2.9 AND ROE > 15 AND DebtToEquity < 0.8",
-        "description": "Aziende ad altissima qualità contabile, forte redditività del capitale e basso indebitamento."
+        "description": "Aziende con fossato economico competitivo inespugnabile, forte redditività del capitale e bilancio conservativo."
+    },
+    "ai_supercycle": {
+        "title": "🤖 AI Supercycle & Tech Growth",
+        "formula": "RevenueGrowth > 15 AND ROE > 15 AND Upside > 10 AND PEG < 2.2",
+        "description": "Leader tecnologici in forte espansione dei ricavi legati al superciclo dell'AI e del Cloud a multipli sostenibili."
     },
     "peter_lynch": {
-        "title": "🚀 Peter Lynch Growth",
+        "title": "🚀 Peter Lynch Growth at Reasonable Price",
         "formula": "PEG < 1.2 AND Upside > 15 AND ROE > 12 AND DebtToEquity < 1.2",
-        "description": "Crescita a valutazione attraente con solido potenziale di apprezzamento del consensus."
+        "description": "Crescita a valutazione attraente con solido potenziale di apprezzamento del consensus istituzionale."
     },
     "graham_value": {
-        "title": "💎 Graham Deep Value",
+        "title": "💎 Graham Deep Value & Margin of Safety",
         "formula": "PE < 16 AND PB < 2.0 AND DivYield > 2.5 AND Altman > 2.0",
         "description": "Margine di sicurezza classico con multipli compressi, rendimento da dividendo e solvibilità."
+    },
+    "turnaround_deep_value": {
+        "title": "🔄 Turnaround & Mean Reversion",
+        "formula": "PB < 1.8 AND Upside > 20 AND RSI >= 35 AND Altman > 1.8",
+        "description": "Opportunità in fase di recupero ciclico con forte sconto sul patrimonio netto e potenziale asimmetrico di ripresa."
     },
     "low_beta_income": {
         "title": "🛡️ Low-Beta Dividend Fortress",
@@ -395,7 +498,7 @@ SCREENER_FORMULA_PRESETS: Dict[str, Dict[str, str]] = {
         "description": "Titoli difensivi a bassa correlazione con il mercato e flusso cedolare stabile."
     },
     "momentum_breakout": {
-        "title": "⚡ Momentum & Breakout",
+        "title": "⚡ Momentum & Trend Breakout",
         "formula": "RSI >= 50 AND RSI <= 72 AND Perf1Y > 15 AND SMA200 > 0",
         "description": "Trend primario positivo, prezzo sopra la media mobile a 200 periodi e momentum intatto."
     }
@@ -419,8 +522,12 @@ def evaluate_custom_screener_query(
     import re
     
     df_work = df_screener.copy()
-    if "wacc" not in df_work.columns:
-        df_work["wacc"] = 8.0 # Tasso WACC indicativo di riferimento 8.0%
+    for col in set(SCREENER_FIELD_ALIASES.values()):
+        if col not in df_work.columns:
+            if col == "wacc":
+                df_work[col] = 8.0
+            else:
+                df_work[col] = np.nan
     
     # 1. Pulizia e normalizzazione sintassi
     expr = str(query_str).strip()
@@ -728,3 +835,113 @@ def compute_market_and_watchlist_alerts(df_screened: pd.DataFrame) -> List[Dict[
             })
 
     return alerts
+
+
+def compute_optimal_candidate_weight(
+    current_positions_df: pd.DataFrame,
+    candidate_ticker: str,
+    benchmark_ticker: str = "SPY"
+) -> Dict[str, Any]:
+    """
+    Calcola la quota di portafoglio ottimale (0.5% - 30%) per un titolo candidato.
+    Ottimizza per:
+    1. Massimo Indice di Sharpe (Max Sharpe Weight)
+    2. Massima Diversificazione (Max Choueifaty DR)
+    3. Analisi della frontiera rischio/rendimento marginale
+    """
+    clean_cand = str(candidate_ticker).strip().upper()
+    if current_positions_df is None or current_positions_df.empty:
+        return {"valid": False, "message": "Nessun portafoglio attivo caricato."}
+        
+    df_pos = current_positions_df.copy()
+    if "current_value" not in df_pos.columns:
+        df_pos["current_value"] = 1000.0
+    tot_val = df_pos["current_value"].sum()
+    if tot_val <= 0:
+        tot_val = 1000.0
+    df_pos["weight"] = df_pos["current_value"] / tot_val
+    
+    tickers = list(df_pos["ticker"].unique())
+    all_tickers = list(dict.fromkeys(tickers + [clean_cand]))
+    
+    price_dict = {}
+    for tk in all_tickers:
+        df_h = get_cached_ticker_history(tk)
+        if df_h is not None and not df_h.empty and "close" in df_h.columns:
+            price_dict[tk] = df_h["close"]
+            
+    df_prices = pd.DataFrame(price_dict).dropna(how="all").ffill().dropna()
+    if df_prices.empty or df_prices.shape[1] < 1 or clean_cand not in df_prices.columns:
+        return {"valid": False, "message": f"Dati storici insufficienti per {clean_cand}."}
+        
+    df_returns = df_prices.pct_change().dropna()
+    if df_returns.empty or len(df_returns) < 30:
+        return {"valid": False, "message": "Storico rendimenti troppo breve per una simulazione accurata."}
+        
+    w_old_map = {r["ticker"]: r["weight"] for _, r in df_pos.iterrows()}
+    w_old = np.array([w_old_map.get(c, 0.0) for c in df_returns.columns])
+    w_old = w_old / w_old.sum() if w_old.sum() > 0 else np.ones(len(df_returns.columns)) / len(df_returns.columns)
+    
+    cand_idx = df_returns.columns.get_loc(clean_cand)
+    rf = 3.0
+    vols = df_returns.std() * np.sqrt(252) * 100.0
+    
+    # Metriche Base Portafoglio Attuale
+    ret_old = (df_returns * w_old).sum(axis=1)
+    base_cagr = float(ret_old.mean() * 252 * 100.0)
+    base_vol = float(ret_old.std() * np.sqrt(252) * 100.0)
+    base_sharpe = float((base_cagr - rf) / max(0.01, base_vol))
+    base_dr = float((w_old * vols).sum() / max(0.01, base_vol))
+    
+    # Griglia di simulazione da 0.5% a 30% con passo 0.5%
+    best_sharpe = base_sharpe
+    best_sharpe_w = 0.0
+    best_dr = base_dr
+    best_dr_w = 0.0
+    
+    grid = np.linspace(0.005, 0.30, 60)
+    curve_data = []
+    
+    for w in grid:
+        w_test = w_old * (1.0 - w)
+        w_test[cand_idx] += w
+        w_test = w_test / w_test.sum()
+        
+        r_test = (df_returns * w_test).sum(axis=1)
+        cagr_t = float(r_test.mean() * 252 * 100.0)
+        vol_t = float(r_test.std() * np.sqrt(252) * 100.0)
+        sh_t = float((cagr_t - rf) / max(0.01, vol_t))
+        dr_t = float((w_test * vols).sum() / max(0.01, vol_t))
+        
+        curve_data.append({
+            "weight_pct": round(w * 100.0, 1),
+            "sharpe_ratio": round(sh_t, 3),
+            "volatility_pct": round(vol_t, 2),
+            "cagr_pct": round(cagr_t, 2),
+            "diversification_ratio": round(dr_t, 2)
+        })
+        
+        if sh_t > best_sharpe:
+            best_sharpe = sh_t
+            best_sharpe_w = w
+            
+        if dr_t > best_dr:
+            best_dr = dr_t
+            best_dr_w = w
+            
+    optimal_weight_pct = round(best_sharpe_w * 100.0, 1) if best_sharpe_w > 0 else 5.0
+    
+    return {
+        "valid": True,
+        "candidate_ticker": clean_cand,
+        "base_sharpe": round(base_sharpe, 3),
+        "base_volatility": round(base_vol, 2),
+        "base_cagr": round(base_cagr, 2),
+        "base_dr": round(base_dr, 2),
+        "optimal_sharpe_weight_pct": optimal_weight_pct,
+        "optimal_sharpe": round(best_sharpe, 3),
+        "delta_sharpe_optimal": round(best_sharpe - base_sharpe, 3),
+        "max_dr_weight_pct": round(best_dr_w * 100.0, 1) if best_dr_w > 0 else optimal_weight_pct,
+        "curve_df": pd.DataFrame(curve_data)
+    }
+
