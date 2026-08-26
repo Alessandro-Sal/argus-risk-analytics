@@ -82,21 +82,36 @@ class ArgusTerminalEngine:
         self._order_counter = 8800
         self._ring_buffers: Dict[str, Any] = {}
 
-    def get_or_create_ring_buffer(self, ticker: str = "AAPL", capacity: int = 500) -> Any:
-        """Restituisce o inizializza un TickRingBuffer dedicato per il ticker specificato."""
+    DEFAULT_PRICES = {
+        "AAPL": 225.50,
+        "MSFT": 415.20,
+        "NVDA": 128.80,
+        "SPY": 562.40,
+        "QQQ": 482.10,
+        "AMZN": 182.30,
+        "GOOGL": 168.90,
+        "META": 515.00,
+        "TSLA": 212.50,
+        "BTC-USD": 63400.00,
+        "ETH-USD": 2650.00
+    }
+
+    def get_or_create_ring_buffer(self, ticker: str = "AAPL", initial_price: Optional[float] = None, capacity: int = 500) -> Any:
+        """Restituisce o inizializza un TickRingBuffer dedicato per il ticker specificato con prezzo realistico."""
+        ticker_clean = (ticker or "AAPL").strip().upper()
         with self._lock:
-            if ticker not in self._ring_buffers or self._ring_buffers[ticker] is None:
+            if ticker_clean not in self._ring_buffers or self._ring_buffers[ticker_clean] is None:
                 if TickRingBuffer:
-                    buf = TickRingBuffer(capacity=capacity, ticker=ticker)
-                    # Pre-popola con alcuni tick realistici se disponibile il generatore
+                    buf = TickRingBuffer(capacity=capacity, ticker=ticker_clean)
+                    start_px = initial_price if (initial_price is not None and initial_price > 0) else self.DEFAULT_PRICES.get(ticker_clean, 150.0)
                     if generate_mock_streaming_ticks:
-                        ticks = generate_mock_streaming_ticks(ticker=ticker, initial_price=100.0, num_ticks=25)
+                        ticks = generate_mock_streaming_ticks(ticker=ticker_clean, initial_price=start_px, num_ticks=25)
                         for t in ticks:
                             buf.append(t)
-                    self._ring_buffers[ticker] = buf
+                    self._ring_buffers[ticker_clean] = buf
                 else:
-                    self._ring_buffers[ticker] = None
-            return self._ring_buffers[ticker]
+                    self._ring_buffers[ticker_clean] = None
+            return self._ring_buffers[ticker_clean]
 
     def execute_command(self, command_str: str, context: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
         """
