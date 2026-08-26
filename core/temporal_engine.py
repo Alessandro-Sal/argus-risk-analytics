@@ -367,6 +367,9 @@ def reconstruct_point_in_time_portfolio(
     if port_cum_factor <= 0.0001:
         port_cum_factor = 1.0
 
+    tot_today = float(pos_today["current_value"].sum()) if "current_value" in pos_today.columns else 0.0
+    true_past_nav = tot_today / port_cum_factor
+
     df_hist = pos_today.copy()
     
     # Ricostruzione asset-by-asset
@@ -380,6 +383,7 @@ def reconstruct_point_in_time_portfolio(
     else:
         asset_cum_factors = pd.Series()
 
+    raw_past_vals = []
     for idx, row in df_hist.iterrows():
         tk = row.get("ticker")
         val_now = float(row.get("current_value", 0.0))
@@ -388,17 +392,24 @@ def reconstruct_point_in_time_portfolio(
         else:
             f_asset = port_cum_factor
         
-        val_past = val_now / max(0.001, f_asset)
-        df_hist.at[idx, "current_value"] = val_past
+        raw_past_vals.append(val_now / max(0.001, f_asset))
+
+    raw_sum = sum(raw_past_vals)
+    scaling_ratio = (true_past_nav / raw_sum) if raw_sum > 0 else 1.0
+
+    for idx, row in df_hist.iterrows():
+        past_val = raw_past_vals[idx] * scaling_ratio
+        df_hist.at[idx, "current_value"] = past_val
+        if true_past_nav > 0:
+            df_hist.at[idx, "weight_pct"] = (past_val / true_past_nav) * 100.0
+        else:
+            df_hist.at[idx, "weight_pct"] = 0.0
+
         if "last_price" in df_hist.columns:
             price_now = float(row.get("last_price", 1.0))
+            tk = row.get("ticker")
+            f_asset = float(asset_cum_factors[tk]) if (not asset_cum_factors.empty and tk in asset_cum_factors.index and float(asset_cum_factors[tk]) > 0.0001) else port_cum_factor
             df_hist.at[idx, "last_price"] = price_now / max(0.001, f_asset)
-
-    tot_val = float(df_hist["current_value"].sum())
-    if tot_val > 0:
-        df_hist["weight_pct"] = (df_hist["current_value"] / tot_val) * 100.0
-    else:
-        df_hist["weight_pct"] = 0.0
 
     # Calcolo metriche di rischio storiche reali fino alla target_date
     sr_past = s_p[s_p.index <= target_dt]
@@ -417,7 +428,7 @@ def reconstruct_point_in_time_portfolio(
 
     return {
         "df_positions": df_hist,
-        "total_value": tot_val,
+        "total_value": true_past_nav,
         "metrics": {
             "sharpe_ratio": sharpe,
             "volatility_ann_pct": vol_ann,
