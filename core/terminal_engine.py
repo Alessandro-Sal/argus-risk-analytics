@@ -471,48 +471,48 @@ class ArgusTerminalEngine:
 
     def _cmd_help(self) -> TerminalCommandResult:
         help_text = """
-========================================================================================
-                      ARGUS INSTITUTIONAL TERMINAL & CLI DESK
-========================================================================================
-PREZZI E QUOTAZIONI REAL-TIME LIVE:
-  QUOTE <TICKER> / <TICKER> Q : Scheda Bloomberg ALLQ / GP con prezzo spot live, range e volume
-  <TICKER> PX / LIVE          : Quotazione istantanea in tempo reale (es. 'AAPL Q', 'BTC-USD')
-  WATCHLIST / WL              : Tabella comparativa multi-asset in streaming (Portafoglio + Indici)
-
-MNEMONICI BLOOMBERG:
-  <TICKER> DES           : Scheda informativa, prezzo, PnL e P/E dell'asset
-  <TICKER> FA            : Fondamentali contabili (ROE, Margini, Altman Z, Piotroski)
-  <TICKER> VOLS          : Volatilità storica e stima Skew/Implied Volatility
-  PORT RISK              : Sintesi istituzionale del rischio di portafoglio
-  YCRV / BTP YAS         : Term Structure dei tassi sovrani e Z-Spread
-  TAX                    : Prospetto fiscale, minusvalenze e potenziale Tax-Loss
-  STREAM [TICKER]        : Statistiche Order Flow Imbalance (OFI) & Microprice
-
-COMANDI QUANTITATIVI & RISK:
-  VAR [95|99]            : Value at Risk (1D & 10D) monetario e percentuale
-  SHARPE | SORTINO | BETA: Metriche istantanee di performance corretta per il rischio
-  CORR <TICK1> <TICK2>   : Matrice di correlazione Pearson & Spearman tra due titoli
-  KELLY                  : Dimensionamento trade ottimale Kelly Criterion & Half-Kelly
-  HEALTH                 : Health Score sintetico del portafoglio (0-100)
-
-ORDER MANAGEMENT SYSTEM (OMS SIMULATOR):
-  BUY <qty> <ticker> [@ px] : Inserimento ordine di acquisto simulato a mercato/limite
-  SELL <qty> <ticker> [@ px]: Inserimento ordine di vendita simulato
-  TWAP <qty> <ticker> <min> : Esecuzione algoritmica TWAP con stima dello slippage
-  VWAP <qty> <ticker> <min> : Esecuzione algoritmica VWAP su profilo di liquidità a U
-  BLOTTER                   : Visualizzazione registro ordini attivi ed eseguiti
-  CANCEL <order_id>         : Cancellazione ordine pendente
-
-SQL & SCREENER ENGINE:
-  SQL <query>            : Interrogazione SQL DuckDB in-memory su df_positions/df_returns
-  EQS <condizione>       : Valutazione filtro multi-fattoriale (es. EQS Piotroski >= 7)
-
-UTILITÀ DI SISTEMA:
-  TOP / STATUS           : Telemetria live CPU, RAM RSS, Cache Hit-Rate e DB Records
-  CLEAR / CLS            : Pulizia del buffer di output del terminale
-  HISTORY                : Storico delle ultime 15 istruzioni inviate
-  PING                   : Test di reattività del motore computazionale
-========================================================================================
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        ARGUS INSTITUTIONAL TERMINAL & CLI DESK                         │
+├────────────────────────────────────────────────────────────────────────────────────────┤
+│ PREZZI E QUOTAZIONI REAL-TIME LIVE:                                                    │
+│   QUOTE <TICKER> / <TICKER> Q : Scheda Bloomberg ALLQ / GP (prezzo spot, range, vol)   │
+│   <TICKER> PX / LIVE          : Quotazione istantanea in tempo reale (es. 'AAPL Q')    │
+│   WATCHLIST / WL              : Tabella comparativa multi-asset in streaming           │
+│                                                                                        │
+│ MNEMONICI BLOOMBERG:                                                                   │
+│   <TICKER> DES           : Scheda informativa, prezzo, PnL e P/E dell'asset            │
+│   <TICKER> FA            : Fondamentali contabili (ROE, Margini, Altman Z, Piotroski)  │
+│   <TICKER> VOLS          : Volatilità storica e stima Skew/Implied Volatility          │
+│   PORT RISK              : Sintesi istituzionale del rischio di portafoglio            │
+│   YCRV / BTP YAS         : Term Structure dei tassi sovrani e Z-Spread                 │
+│   TAX                    : Prospetto fiscale, minusvalenze e potenziale Tax-Loss       │
+│   STREAM [TICKER]        : Statistiche Order Flow Imbalance (OFI) & Microprice         │
+│                                                                                        │
+│ COMANDI QUANTITATIVI & RISK:                                                           │
+│   VAR [95|99]            : Value at Risk (1D & 10D) monetario e percentuale            │
+│   SHARPE | SORTINO | BETA: Metriche istantanee di performance corretta per il rischio  │
+│   CORR <TICK1> <TICK2>   : Matrice di correlazione Pearson & Spearman tra due titoli   │
+│   KELLY                  : Dimensionamento trade ottimale Kelly Criterion & Half-Kelly │
+│   HEALTH                 : Health Score sintetico del portafoglio (0-100)              │
+│                                                                                        │
+│ ORDER MANAGEMENT SYSTEM (OMS SIMULATOR):                                               │
+│   BUY <qty> <ticker> [@ px] : Ordine di acquisto simulato a mercato/limite             │
+│   SELL <qty> <ticker> [@ px]: Ordine di vendita simulato                               │
+│   TWAP <qty> <ticker> <min> : Esecuzione algoritmica TWAP con stima dello slippage     │
+│   VWAP <qty> <ticker> <min> : Esecuzione algoritmica VWAP su profilo a U               │
+│   BLOTTER                   : Visualizzazione registro ordini attivi ed eseguiti       │
+│   CANCEL <order_id>         : Cancellazione ordine pendente                            │
+│                                                                                        │
+│ SQL & SCREENER ENGINE:                                                                 │
+│   SQL <query>            : Interrogazione SQL DuckDB in-memory su df_positions/df_ret  │
+│   EQS <condizione>       : Valutazione filtro multi-fattoriale (es. EQS Piotroski >= 7)│
+│                                                                                        │
+│ UTILITÀ DI SISTEMA:                                                                    │
+│   TOP / STATUS           : Telemetria live CPU, RAM RSS, Cache Hit-Rate e DB Records   │
+│   CLEAR / CLS            : Pulizia del buffer di output del terminale                  │
+│   HISTORY                : Storico delle ultime 15 istruzioni inviate                  │
+│   PING                   : Test di reattività del motore computazionale                │
+└────────────────────────────────────────────────────────────────────────────────────────┘
 """
         return TerminalCommandResult(command="HELP", status="INFO", output_text=help_text.strip())
 
