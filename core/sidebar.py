@@ -159,7 +159,8 @@ NAV_MODULES = [
         "subtabs": [
             {"label": "🐍 Python Sandbox", "target": "🐍 ARGUS BQuant Python Sandbox"},
             {"label": "🎛️ Launchpad Workspace", "target": "🎛️ Launchpad & Workspace Customizer"},
-            {"label": "📊 Excel Connector", "target": "📊 Excel Live Connector & RTD"}
+            {"label": "📊 Excel Connector", "target": "📊 Excel Live Connector & RTD"},
+            {"label": "🖥️ Live Terminal", "target": "🖥️ Terminale Live & Interactive CLI"}
         ]
     }
 ]

@@ -1344,6 +1344,34 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "tab_key": "bquant_active_tab",
             "target": "📊 Excel Live Connector & RTD",
             "context_type": "excel"
+        },
+        "LIVE": {
+            "title": "ARGUS Live Terminal & Interactive CLI Desk",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🖥️ Terminale Live & Interactive CLI",
+            "context_type": "terminal"
+        },
+        "TERM": {
+            "title": "ARGUS Live Terminal & Interactive CLI Desk",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🖥️ Terminale Live & Interactive CLI",
+            "context_type": "terminal"
+        },
+        "CLI": {
+            "title": "ARGUS Live Terminal & Interactive CLI Desk",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🖥️ Terminale Live & Interactive CLI",
+            "context_type": "terminal"
+        },
+        "TERMINAL": {
+            "title": "ARGUS Live Terminal & Interactive CLI Desk",
+            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "tab_key": "bquant_active_tab",
+            "target": "🖥️ Terminale Live & Interactive CLI",
+            "context_type": "terminal"
         }
     }
 
