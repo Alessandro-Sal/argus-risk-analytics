@@ -145,11 +145,21 @@ st.markdown(f"""
 # TAB 1: PROFILO DEL RISCHIO & FAMA-FRENCH
 # ==============================================================================
 if active_risk_tab == "📊 Profilo del Rischio & Fama-French":
+    # Risoluzione robusta del Beta aggregato
+    b_val_display = mk.get('beta')
+    if b_val_display is None or (abs(float(b_val_display) - 1.0) < 1e-4 and not pos.empty):
+        valid_p = pos[pos.get("current_value", 0) > 0]
+        if "beta" in valid_p.columns and "weight_pct" in valid_p.columns:
+            w_sum = valid_p["weight_pct"].sum()
+            if w_sum > 0:
+                b_val_display = float((valid_p["weight_pct"] * valid_p["beta"]).sum() / w_sum)
+    b_val_display = float(b_val_display) if b_val_display is not None else 1.0
+
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         metric_card(
             "Rischio Mercato (Beta)",
-            f"{mk.get('beta', 0) if mk.get('beta') else 0:.2f}",
+            f"{b_val_display:.2f}",
             help_text="""<div style="font-size: 13.5px; line-height: 1.45;">
 <div style="margin-bottom: 8px;"><b>📌 Cos'è:</b> Il <b>Beta (&beta;)</b> misura il rischio sistematico e la sensibilità del portafoglio rispetto alle oscillazioni dell'indice di mercato di riferimento (S&P 500 / Benchmark).</div>
 
@@ -1165,7 +1175,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         df_m3 = pd.DataFrame({
             "Parametro": ["Beta di Mercato (β)", "Correlazione Benchmark (ρ)", "R-Squared Sistemico (R²)", "Eccezioni VaR (1 Anno)", "Benchmark di Riferimento"],
             "Valore": [
-                f"{float(mk.get('beta', 1.0)):.2f}" if mk.get('beta') is not None else "1.00",
+                f"{b_val_display:.2f}",
                 f"{float(corr_raw):.2f}" if corr_raw is not None and not np.isnan(corr_raw) else "N/A",
                 f"{float(rsq_raw):.2f}%" if rsq_raw is not None and not np.isnan(rsq_raw) else "N/A",
                 f"{mk.get('var_exceptions_count', 0)} giorni",
