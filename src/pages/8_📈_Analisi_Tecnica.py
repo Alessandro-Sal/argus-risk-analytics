@@ -441,8 +441,13 @@ else:
     if target_tab and target_tab in tech_keys:
         st.session_state["tech_active_subtab"] = target_tab
         st.session_state["tech_active_subtab_selectbox"] = target_tab
-    elif "tech_active_subtab" not in st.session_state or st.session_state["tech_active_subtab"] not in tech_keys:
+    elif "tech_active_subtab_selectbox" in st.session_state and st.session_state["tech_active_subtab_selectbox"] in tech_keys:
+        st.session_state["tech_active_subtab"] = st.session_state["tech_active_subtab_selectbox"]
+    elif "tech_active_subtab" in st.session_state and st.session_state["tech_active_subtab"] in tech_keys:
+        st.session_state["tech_active_subtab_selectbox"] = st.session_state["tech_active_subtab"]
+    else:
         st.session_state["tech_active_subtab"] = tech_keys[0]
+        st.session_state["tech_active_subtab_selectbox"] = tech_keys[0]
 
     curr_idx = tech_keys.index(st.session_state["tech_active_subtab"])
 
@@ -455,13 +460,17 @@ else:
     with c_prev_t:
         if st.button("◀ Prec.", key="btn_tech_prev", use_container_width=True, help="Modulo precedente"):
             new_i = (curr_idx - 1) % len(tech_keys)
-            st.session_state["target_tech_module"] = tech_keys[new_i]
+            st.session_state["target_subtab_tech_active_subtab"] = tech_keys[new_i]
+            st.session_state["tech_active_subtab"] = tech_keys[new_i]
+            st.session_state["tech_active_subtab_selectbox"] = tech_keys[new_i]
             st.rerun()
 
     with c_next_t:
         if st.button("Succ. ▶", key="btn_tech_next", use_container_width=True, help="Modulo successivo"):
             new_i = (curr_idx + 1) % len(tech_keys)
-            st.session_state["target_tech_module"] = tech_keys[new_i]
+            st.session_state["target_subtab_tech_active_subtab"] = tech_keys[new_i]
+            st.session_state["tech_active_subtab"] = tech_keys[new_i]
+            st.session_state["tech_active_subtab_selectbox"] = tech_keys[new_i]
             st.rerun()
 
     with c_sel_t:

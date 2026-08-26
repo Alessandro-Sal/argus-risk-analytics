@@ -230,8 +230,13 @@ time_keys = list(TIME_MODELS_CATALOG.keys())
 if target_tab and target_tab in time_keys:
     st.session_state["time_active_tab"] = target_tab
     st.session_state["time_active_tab_selectbox"] = target_tab
-elif "time_active_tab" not in st.session_state or st.session_state["time_active_tab"] not in time_keys:
+elif "time_active_tab_selectbox" in st.session_state and st.session_state["time_active_tab_selectbox"] in time_keys:
+    st.session_state["time_active_tab"] = st.session_state["time_active_tab_selectbox"]
+elif "time_active_tab" in st.session_state and st.session_state["time_active_tab"] in time_keys:
+    st.session_state["time_active_tab_selectbox"] = st.session_state["time_active_tab"]
+else:
     st.session_state["time_active_tab"] = time_keys[0]
+    st.session_state["time_active_tab_selectbox"] = time_keys[0]
 
 curr_idx = time_keys.index(st.session_state["time_active_tab"])
 
@@ -243,13 +248,17 @@ c_sel_tm, c_prev_tm, c_next_tm = st.columns([3.8, 0.6, 0.6], vertical_alignment=
 with c_prev_tm:
     if st.button("◀ Prec.", key="btn_time_prev", use_container_width=True, help="Modulo precedente"):
         new_i = (curr_idx - 1) % len(time_keys)
-        st.session_state["target_time_module"] = time_keys[new_i]
+        st.session_state["target_subtab_time_active_tab"] = time_keys[new_i]
+        st.session_state["time_active_tab"] = time_keys[new_i]
+        st.session_state["time_active_tab_selectbox"] = time_keys[new_i]
         st.rerun()
 
 with c_next_tm:
     if st.button("Succ. ▶", key="btn_time_next", use_container_width=True, help="Modulo successivo"):
         new_i = (curr_idx + 1) % len(time_keys)
-        st.session_state["target_time_module"] = time_keys[new_i]
+        st.session_state["target_subtab_time_active_tab"] = time_keys[new_i]
+        st.session_state["time_active_tab"] = time_keys[new_i]
+        st.session_state["time_active_tab_selectbox"] = time_keys[new_i]
         st.rerun()
 
 with c_sel_tm:

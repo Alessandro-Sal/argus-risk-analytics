@@ -588,6 +588,20 @@ def render_sidebar():
                     return True
             return False
 
+        # ── 1.1 SINCRONIZZAZIONE BIDIREZIONALE SUBTABS ───────────────
+        for mod_item in NAV_MODULES:
+            if mod_item.get("has_subtabs") and mod_item.get("tab_key"):
+                tk = mod_item["tab_key"]
+                sb_k = f"{tk}_selectbox"
+                tgt_k = f"target_subtab_{tk}"
+                if tgt_k in st.session_state and st.session_state[tgt_k]:
+                    st.session_state[tk] = st.session_state[tgt_k]
+                    st.session_state[sb_k] = st.session_state[tgt_k]
+                elif sb_k in st.session_state and st.session_state[sb_k]:
+                    st.session_state[tk] = st.session_state[sb_k]
+                elif tk in st.session_state and st.session_state[tk]:
+                    st.session_state[sb_k] = st.session_state[tk]
+
         # ── 2. RENDERING MODULI NAVIGAZIONE ─────────────────────────────
         for mod in NAV_MODULES:
             is_active = _is_mod_active(mod, current_page)
@@ -625,6 +639,7 @@ def render_sidebar():
                             if mod["tab_key"] and sub["target"]:
                                 st.session_state[mod["tab_key"]] = sub["target"]
                                 st.session_state[f"target_subtab_{mod['tab_key']}"] = sub["target"]
+                                st.session_state[f"{mod['tab_key']}_selectbox"] = sub["target"]
                                 st.session_state["global_target_subtab"] = sub["target"]
                             switch_to_page(mod["page_file"])
 

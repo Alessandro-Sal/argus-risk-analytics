@@ -299,8 +299,13 @@ screener_keys = list(SCREENER_MODELS_CATALOG.keys())
 if target_tab and target_tab in screener_keys:
     st.session_state["screener_segmented_subtab"] = target_tab
     st.session_state["screener_segmented_subtab_selectbox"] = target_tab
-elif "screener_segmented_subtab" not in st.session_state or st.session_state["screener_segmented_subtab"] not in screener_keys:
+elif "screener_segmented_subtab_selectbox" in st.session_state and st.session_state["screener_segmented_subtab_selectbox"] in screener_keys:
+    st.session_state["screener_segmented_subtab"] = st.session_state["screener_segmented_subtab_selectbox"]
+elif "screener_segmented_subtab" in st.session_state and st.session_state["screener_segmented_subtab"] in screener_keys:
+    st.session_state["screener_segmented_subtab_selectbox"] = st.session_state["screener_segmented_subtab"]
+else:
     st.session_state["screener_segmented_subtab"] = screener_keys[0]
+    st.session_state["screener_segmented_subtab_selectbox"] = screener_keys[0]
 
 curr_idx = screener_keys.index(st.session_state["screener_segmented_subtab"])
 
@@ -313,13 +318,17 @@ c_sel_sc, c_prev_sc, c_next_sc = st.columns([3.8, 0.6, 0.6], vertical_alignment=
 with c_prev_sc:
     if st.button("◀ Prec.", key="btn_screener_prev", use_container_width=True, help="Modulo precedente"):
         new_i = (curr_idx - 1) % len(screener_keys)
-        st.session_state["target_screener_module"] = screener_keys[new_i]
+        st.session_state["target_subtab_screener_segmented_subtab"] = screener_keys[new_i]
+        st.session_state["screener_segmented_subtab"] = screener_keys[new_i]
+        st.session_state["screener_segmented_subtab_selectbox"] = screener_keys[new_i]
         st.rerun()
 
 with c_next_sc:
     if st.button("Succ. ▶", key="btn_screener_next", use_container_width=True, help="Modulo successivo"):
         new_i = (curr_idx + 1) % len(screener_keys)
-        st.session_state["target_screener_module"] = screener_keys[new_i]
+        st.session_state["target_subtab_screener_segmented_subtab"] = screener_keys[new_i]
+        st.session_state["screener_segmented_subtab"] = screener_keys[new_i]
+        st.session_state["screener_segmented_subtab_selectbox"] = screener_keys[new_i]
         st.rerun()
 
 with c_sel_sc:
