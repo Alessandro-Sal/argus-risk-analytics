@@ -653,8 +653,8 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
     term_eng = get_terminal_engine()
     session_context = {
         "df_positions": pos,
-        "df_returns": ret_df,
-        "df_prices": price_df,
+        "df_returns": df_rets,
+        "df_prices": df_prices,
         "results": results
     }
 
@@ -705,11 +705,12 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
         terminal_screen_html = "\n\n".join(terminal_screen_lines)
 
-        st.markdown(f"""
-        <div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 16px; font-family: 'Courier New', 'Fira Code', monospace; font-size: 12px; color: #c9d1d9; white-space: pre-wrap; height: 380px; overflow-y: auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8); line-height: 1.4;">
-{terminal_screen_html}
-        </div>
-        """, unsafe_allow_html=True)
+        terminal_box_html = (
+            f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 16px; font-family: \'Courier New\', \'Fira Code\', monospace; font-size: 12px; color: #c9d1d9; white-space: pre-wrap; height: 380px; overflow-y: auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8); line-height: 1.4;">'
+            f'{terminal_screen_html}'
+            f'</div>'
+        )
+        st.markdown(terminal_box_html, unsafe_allow_html=True)
 
         col_cls1, col_cls2 = st.columns([1.0, 3.0])
         with col_cls1:
@@ -758,17 +759,14 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         # Header Ticker Live
         ofi_color = "#3fb950" if ofi_val >= 0 else "#f85149"
         ofi_text = "BUY PRESSURE" if ofi_val >= 0 else "SELL PRESSURE"
-        st.markdown(f"""
-        <div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <span style="font-size:15px; font-weight:800; color:#f0f6fc;">{selected_tape_ticker}</span>
-                <span style="font-size:14px; font-weight:700; color:#ff9900; margin-left:8px;">${last_px:,.2f}</span>
-            </div>
-            <div style="text-align:right;">
-                <span style="font-size:10.5px; font-weight:700; color:{ofi_color}; background:{ofi_color}22; padding:2px 6px; border-radius:4px; border:1px solid {ofi_color}55;">{ofi_text}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        tape_card_html = (
+            f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">'
+            f'<div><span style="font-size:15px; font-weight:800; color:#f0f6fc;">{selected_tape_ticker}</span>'
+            f'<span style="font-size:14px; font-weight:700; color:#ff9900; margin-left:8px;">${last_px:,.2f}</span></div>'
+            f'<div style="text-align:right;"><span style="font-size:10.5px; font-weight:700; color:{ofi_color}; background:{ofi_color}22; padding:2px 6px; border-radius:4px; border:1px solid {ofi_color}55;">{ofi_text}</span></div>'
+            f'</div>'
+        )
+        st.markdown(tape_card_html, unsafe_allow_html=True)
 
         # Matrice Level-2 Depth Book
         base_bid = round(last_px - 0.01, 2)
@@ -782,40 +780,32 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
             {"bid_vol": 320, "bid_px": round(base_bid - 0.08, 2), "ask_px": round(base_ask + 0.08, 2), "ask_vol": 540}
         ]
 
-        book_html = """
-        <table style="width:100%; font-family:monospace; font-size:11px; border-collapse:collapse; text-align:center;">
-            <thead>
-                <tr style="border-bottom:1px solid #30363d; color:#8b949e;">
-                    <th style="padding:4px; text-align:right; color:#3fb950;">Vol (Bid)</th>
-                    <th style="padding:4px; color:#3fb950;">Bid Px</th>
-                    <th style="padding:4px; color:#f85149;">Ask Px</th>
-                    <th style="padding:4px; text-align:left; color:#f85149;">Vol (Ask)</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
+        book_rows_html = []
         for r in book_rows:
             bid_bar = min(100, int((r["bid_vol"] / 2000) * 100))
             ask_bar = min(100, int((r["ask_vol"] / 2000) * 100))
-            book_html += f"""
-                <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
-                    <td style="padding:4px; text-align:right; color:#c9d1d9;">
-                        <span style="display:inline-block; width:{bid_bar}px; background:rgba(63,185,80,0.25); height:8px; border-radius:2px; margin-right:4px;"></span>{r['bid_vol']}
-                    </td>
-                    <td style="padding:4px; font-weight:700; color:#3fb950;">${r['bid_px']:.2f}</td>
-                    <td style="padding:4px; font-weight:700; color:#f85149;">${r['ask_px']:.2f}</td>
-                    <td style="padding:4px; text-align:left; color:#c9d1d9;">
-                        {r['ask_vol']}<span style="display:inline-block; width:{ask_bar}px; background:rgba(248,81,73,0.25); height:8px; border-radius:2px; margin-left:4px;"></span>
-                    </td>
-                </tr>
-            """
-        book_html += "</tbody></table>"
-
-        st.markdown(f"""
-        <div style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px 10px; margin-bottom:8px;">
-            {book_html}
-        </div>
-        """, unsafe_allow_html=True)
+            book_rows_html.append(
+                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">'
+                f'<td style="padding:4px; text-align:right; color:#c9d1d9;"><span style="display:inline-block; width:{bid_bar}px; background:rgba(63,185,80,0.25); height:8px; border-radius:2px; margin-right:4px;"></span>{r["bid_vol"]}</td>'
+                f'<td style="padding:4px; font-weight:700; color:#3fb950;">${r["bid_px"]:.2f}</td>'
+                f'<td style="padding:4px; font-weight:700; color:#f85149;">${r["ask_px"]:.2f}</td>'
+                f'<td style="padding:4px; text-align:left; color:#c9d1d9;">{r["ask_vol"]}<span style="display:inline-block; width:{ask_bar}px; background:rgba(248,81,73,0.25); height:8px; border-radius:2px; margin-left:4px;"></span></td>'
+                f'</tr>'
+            )
+        
+        book_table_inner = "".join(book_rows_html)
+        full_book_html = (
+            f'<div style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px 10px; margin-bottom:8px;">'
+            f'<table style="width:100%; font-family:monospace; font-size:11px; border-collapse:collapse; text-align:center;">'
+            f'<thead><tr style="border-bottom:1px solid #30363d; color:#8b949e;">'
+            f'<th style="padding:4px; text-align:right; color:#3fb950;">Vol (Bid)</th>'
+            f'<th style="padding:4px; color:#3fb950;">Bid Px</th>'
+            f'<th style="padding:4px; color:#f85149;">Ask Px</th>'
+            f'<th style="padding:4px; text-align:left; color:#f85149;">Vol (Ask)</th>'
+            f'</tr></thead>'
+            f'<tbody>{book_table_inner}</tbody></table></div>'
+        )
+        st.markdown(full_book_html, unsafe_allow_html=True)
 
         st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.3f}` • **VWAP**: `${vwap_px:.2f}` • **Spread**: `$0.02`")
 
@@ -848,9 +838,10 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
     with col_top:
         st.markdown("##### 📊 Telemetria di Sistema (TOP Monitor)")
         top_res = term_eng.execute_command("TOP", session_context)
-        st.markdown(f"""
-        <div style="background:#090d13; border:1px solid #30363d; border-radius:6px; padding:10px 12px; font-family:monospace; font-size:11px; color:#3fb950; white-space:pre-wrap;">
-{top_res.output_text}
-        </div>
-        """, unsafe_allow_html=True)
+        top_box_html = (
+            f'<div style="background:#090d13; border:1px solid #30363d; border-radius:6px; padding:10px 12px; font-family:monospace; font-size:11px; color:#3fb950; white-space:pre-wrap;">'
+            f'{top_res.output_text}'
+            f'</div>'
+        )
+        st.markdown(top_box_html, unsafe_allow_html=True)
 
