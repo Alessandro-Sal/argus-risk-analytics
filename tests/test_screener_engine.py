@@ -149,15 +149,68 @@ def test_generate_asset_factsheet_pdf():
         "roe_pct": 35.0,
         "altman_z_score": 4.2,
         "piotroski_score": 8,
-        "beta": 1.05,
-        "volatility_ann_pct": 22.5,
-        "sharpe_ratio": 1.25,
-        "rsi_14": 55.0,
-        "argus_score": 82.5
+        "volatility_ann_pct": 22.0,
+        "beta": 1.15,
+        "sharpe_ratio": 1.10,
+        "argus_score": 82.5,
+        "currency": "USD"
     }
     
     pdf_bytes = generate_asset_factsheet_pdf(sample_asset)
     assert isinstance(pdf_bytes, bytes)
-    assert len(pdf_bytes) > 200
-    assert pdf_bytes.startswith(b"%PDF-1.4")
+    assert len(pdf_bytes) > 500
+    assert pdf_bytes.startswith(b"%PDF")
 
+
+def test_compute_optimal_candidate_weight():
+    from core.screener_engine import compute_optimal_candidate_weight
+    
+    df_pos = pd.DataFrame({
+        "ticker": ["AAPL", "MSFT"],
+        "current_value": [5000.0, 5000.0]
+    })
+
+    dates = pd.date_range("2024-01-01", periods=100, freq="B")
+    np.random.seed(42)
+    p_aapl = 100 * np.exp(np.cumsum(np.random.normal(0.0005, 0.015, len(dates))))
+    p_msft = 100 * np.exp(np.cumsum(np.random.normal(0.0006, 0.014, len(dates))))
+    p_jnj = 100 * np.exp(np.cumsum(np.random.normal(0.0003, 0.009, len(dates))))
+
+    def mock_hist(ticker, **kwargs):
+        tk = str(ticker).upper()
+        if tk == "AAPL": return pd.DataFrame({"close": p_aapl}, index=dates)
+        elif tk == "MSFT": return pd.DataFrame({"close": p_msft}, index=dates)
+        elif tk == "JNJ": return pd.DataFrame({"close": p_jnj}, index=dates)
+        return pd.DataFrame({"close": p_jnj}, index=dates)
+
+    with patch("core.screener_engine.get_cached_ticker_history", side_effect=mock_hist):
+        res = compute_optimal_candidate_weight(
+            current_positions_df=df_pos,
+            candidate_ticker="JNJ"
+        )
+
+        assert res["valid"] is True
+        assert res["candidate_ticker"] == "JNJ"
+        assert 0.0 <= res["optimal_sharpe_weight_pct"] <= 30.0
+        assert "base_sharpe" in res
+        assert "optimal_sharpe" in res
+        assert "curve_df" in res
+        assert not res["curve_df"].empty
+
+
+def test_evaluate_custom_screener_query():
+    from core.screener_engine import evaluate_custom_screener_query
+    
+    df_sample = pd.DataFrame([
+        {"ticker": "NVDA", "revenue_growth_pct": 50.0, "roe_pct": 40.0, "upside_pct": 25.0, "peg_ratio": 1.5, "altman_z_score": 4.5, "piotroski_score": 8},
+        {"ticker": "AAPL", "revenue_growth_pct": 8.0, "roe_pct": 35.0, "upside_pct": 12.0, "peg_ratio": 2.2, "altman_z_score": 3.8, "piotroski_score": 7},
+        {"ticker": "XYZ", "revenue_growth_pct": -5.0, "roe_pct": 4.0, "upside_pct": -10.0, "peg_ratio": 4.0, "altman_z_score": 1.2, "piotroski_score": 3}
+    ])
+    
+    query = "RevenueGrowth > 10 AND ROE > 15 AND Piotroski >= 7"
+    df_res, is_valid, msg = evaluate_custom_screener_query(df_sample, query)
+    
+    assert is_valid is True
+    assert len(df_res) == 1
+    assert "NVDA" in df_res["ticker"].values
+    assert "AAPL" not in df_res["ticker"].values

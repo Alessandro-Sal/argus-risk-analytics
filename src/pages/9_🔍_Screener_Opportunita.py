@@ -40,6 +40,7 @@ from core.screener_engine import (
     SCREENER_FORMULA_PRESETS,
     SCREENER_FIELD_ALIASES,
     simulate_pre_trade_impact,
+    compute_optimal_candidate_weight,
     compute_market_and_watchlist_alerts
 )
 
@@ -94,7 +95,7 @@ with col_head2:
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è lo Screener & Pre-Trade Simulator</div>
-  <div>È il motore di <b>Asset Discovery quantitativo</b> di ARGUS. Permette di esplorare universi azionari globali (S&P 500, EuroStoxx 50, FTSE MIB, Dividend Champions) attraverso filtri multi-fattoriali e di <b>simulare l'impatto sul portafoglio prima di eseguire qualsiasi operazione a mercato</b>.</div>
+  <div>È il motore di <b>Asset Discovery quantitativo</b> di ARGUS. Permette di esplorare 11 universi azionari e tematici globali (S&P 100, AI Supercycle, EuroStoxx 50, FTSE MIB, Dividend Champions, Healthcare, Defense) attraverso filtri multi-fattoriali e di <b>simulare l'impatto sul portafoglio prima di eseguire qualsiasi operazione a mercato</b>.</div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
@@ -140,18 +141,30 @@ with col_head2:
 st.divider()
 
 # ── CONTROLLI UNIVERSO DI SCREENING ───────────────────────────
+portfolio_tickers = list(active_positions["ticker"].unique()) if not active_positions.empty and "ticker" in active_positions.columns else []
+
+univ_options = []
+if portfolio_tickers:
+    univ_options.append(f"💼 Portafoglio Attivo Live ({len(portfolio_tickers)} Titoli)")
+univ_options.extend(list(MARKET_UNIVERSES.keys()))
+univ_options.append("✍️ Lista Personalizzata (Custom Tickers)...")
+
 col_u1, col_u2, col_u3 = st.columns([2.2, 2.0, 1.2])
 
 with col_u1:
     univ_choice = st.selectbox(
         "🌐 Seleziona Universo di Mercato",
-        list(MARKET_UNIVERSES.keys()) + ["✍️ Lista Personalizzata (Custom Tickers)..."],
+        univ_options,
         index=0,
-        help="Scegli un indice globale pre-configurato o inserisci i tuoi ticker preferiti."
+        help="Scegli un indice globale pre-configurato, il tuo portafoglio attivo o inserisci i tuoi ticker preferiti."
     )
 
 custom_tickers_input = ""
-if univ_choice == "✍️ Lista Personalizzata (Custom Tickers)...":
+if univ_choice.startswith("💼 Portafoglio Attivo Live"):
+    tickers_to_screen = portfolio_tickers
+    with col_u2:
+        st.caption(f"ℹ️ **Portafoglio Attivo**: Scansione fondamentale e tecnica di tutti i **{len(portfolio_tickers)} asset** attualmente detenuti in portafoglio.")
+elif univ_choice == "✍️ Lista Personalizzata (Custom Tickers)...":
     with col_u2:
         custom_tickers_input = st.text_input(
             "Inserisci Ticker separati da virgola (es. AAPL, NVDA, RACE.MI, ASML, JNJ)",
@@ -492,9 +505,27 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
                 (df_filtered["rsi_14"].between(rsi_range[0], rsi_range[1]))
             ]
 
+    # ── Filtri Rapidi per Settore e Capitalizzazione ─────────────
+    if not df_raw.empty:
+        raw_sectors = sorted([str(s) for s in df_raw["sector"].dropna().unique() if str(s) not in ["N/D", "nan"]])
+        avail_sectors = ["Tutti i Settori"] + raw_sectors
+        avail_mcaps = ["Tutte le Capitalizzazioni", "Mega-Cap (>$200B)", "Large-Cap ($10B-$200B)", "Mid-Cap ($2B-$10B)", "Small-Cap (<$2B)"]
+        
+        col_f_sec, col_f_mcap = st.columns([1.5, 1.5])
+        with col_f_sec:
+            sel_sector = st.selectbox("🏢 Filtra per Settore:", avail_sectors, index=0, key="scr_filter_sector")
+        with col_f_mcap:
+            sel_mcap = st.selectbox("💰 Filtra per Capitalizzazione:", avail_mcaps, index=0, key="scr_filter_mcap")
+            
+        if sel_sector != "Tutti i Settori":
+            df_filtered = df_filtered[df_filtered["sector"] == sel_sector]
+        if sel_mcap != "Tutte le Capitalizzazioni":
+            df_filtered = df_filtered[df_filtered["mcap_category"] == sel_mcap]
+
     # Dataframe di visualizzazione principale
     cols_display = [
-        "ticker", "name", "sector", "last_price", "upside_pct", "trailing_pe", "peg_ratio",
+        "ticker", "name", "sector", "market_cap_b", "consensus_rating", "last_price", 
+        "upside_pct", "revenue_growth_pct", "trailing_pe", "peg_ratio",
         "dividend_yield_pct", "roe_pct", "altman_z_score", "volatility_ann_pct", "beta", "rsi_14", "argus_score"
     ]
     df_table = df_filtered[[c for c in cols_display if c in df_filtered.columns]].copy()
@@ -502,8 +533,11 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         "ticker": "Ticker",
         "name": "Azienda",
         "sector": "Settore",
+        "market_cap_b": "Mkt Cap ($B)",
+        "consensus_rating": "Consensus",
         "last_price": "Prezzo",
         "upside_pct": "Upside Consensus %",
+        "revenue_growth_pct": "Ricavi YoY %",
         "trailing_pe": "P/E Ratio",
         "peg_ratio": "PEG Ratio",
         "dividend_yield_pct": "Div. Yield %",
@@ -526,8 +560,11 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
         "Azienda": st.column_config.TextColumn("Azienda", width="medium"),
         "Settore": st.column_config.TextColumn("Settore", width="small"),
-        "Prezzo": st.column_config.NumberColumn("Prezzo (€)", format="€ %.2f"),
+        "Mkt Cap ($B)": st.column_config.NumberColumn("Mkt Cap", format="$ %.1fB"),
+        "Consensus": st.column_config.TextColumn("Consensus", width="small"),
+        "Prezzo": st.column_config.NumberColumn("Prezzo", format="%.2f"),
         "Upside Consensus %": st.column_config.NumberColumn("Upside Consensus", format="%+.2f%%"),
+        "Ricavi YoY %": st.column_config.NumberColumn("Ricavi YoY", format="%+.1f%%"),
         "P/E Ratio": st.column_config.NumberColumn("P/E Ratio", format="%.1f"),
         "PEG Ratio": st.column_config.NumberColumn("PEG Ratio", format="%.2f"),
         "Div. Yield %": st.column_config.ProgressColumn("Div. Yield", format="%.2f%%", min_value=0.0, max_value=15.0),
@@ -693,15 +730,77 @@ elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":
         sample_port = active_positions.copy()
         st.success(f"💼 **Portafoglio Attivo Rilevato**: `{portfolio_name}` ({len(active_positions)} posizioni aperte). La simulazione utilizzerà i tuoi pesi reali.")
 
+    if "pre_trade_cand_weight" not in st.session_state:
+        st.session_state["pre_trade_cand_weight"] = 5.0
+
     col_sim1, col_sim2, col_sim3 = st.columns([2, 2, 1.2])
     with col_sim1:
         cand_options = df_raw["ticker"].tolist()
         cand_ticker = st.selectbox("Seleziona Titolo Candidato dall'Universo:", cand_options, index=0)
     with col_sim2:
-        cand_weight = st.slider("Allocazione Ipotetica nel Portafoglio (%)", min_value=1.0, max_value=30.0, value=5.0, step=0.5)
+        cand_weight = st.slider(
+            "Allocazione Ipotetica nel Portafoglio (%)", 
+            min_value=0.5, 
+            max_value=30.0, 
+            value=float(st.session_state["pre_trade_cand_weight"]), 
+            step=0.5,
+            key="pre_trade_slider"
+        )
     with col_sim3:
         st.markdown('<div style="margin-top: 24px;"></div>', unsafe_allow_html=True)
         run_sim = st.button("⚡ Calcola Impatto", type="primary", use_container_width=True)
+
+    # ── Smart Sizing & Sharpe Frontier Optimizer ───────────────────
+    with st.expander("⚡ Ottimizzatore Intelligente di Allocazione (Trova il Peso Ideale a Massimo Sharpe & DR)", expanded=False):
+        opt_res = compute_optimal_candidate_weight(sample_port, cand_ticker, benchmark_ticker)
+        if opt_res.get("valid"):
+            opt_w = opt_res["optimal_sharpe_weight_pct"]
+            opt_sh = opt_res["optimal_sharpe"]
+            d_sh = opt_res["delta_sharpe_optimal"]
+            base_sh = opt_res["base_sharpe"]
+            max_dr_w = opt_res["max_dr_weight_pct"]
+            
+            col_opt_info, col_opt_chart = st.columns([1.6, 2.4])
+            with col_opt_info:
+                st.markdown(f"""
+                <div style="background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #38bdf8;">🎯 Peso Ottimale (Max Sharpe): <b style="font-size: 17px; color: #00e676;">{opt_w:.1f}%</b></div>
+                    <div style="font-size: 12px; color: #cbd5e1; margin-top: 6px; line-height: 1.6;">
+                        • Indice Sharpe Attuale: <b>{base_sh:.2f}</b><br>
+                        • Indice Sharpe Ottimizzato: <b style="color: #00e676;">{opt_sh:.2f}</b> (Variazione: <b>{d_sh:+.3f}</b>)<br>
+                        • Peso a Massima Decorrelazione (Choueifaty DR): <b>{max_dr_w:.1f}%</b>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"🎯 Imposta Peso Ottimale ({opt_w:.1f}%)", key="btn_apply_opt_w", use_container_width=True):
+                    st.session_state["pre_trade_cand_weight"] = opt_w
+                    st.rerun()
+                    
+            with col_opt_chart:
+                cdf = opt_res.get("curve_df", pd.DataFrame())
+                if not cdf.empty:
+                    fig_opt = go.Figure()
+                    fig_opt.add_trace(go.Scatter(
+                        x=cdf["weight_pct"], y=cdf["sharpe_ratio"],
+                        mode="lines+markers", name="Sharpe Ratio",
+                        line=dict(color="#38bdf8", width=2.5),
+                        marker=dict(size=4),
+                        hovertemplate="Allocazione: <b>%{x:.1f}%</b><br>Sharpe: <b>%{y:.3f}</b><extra></extra>"
+                    ))
+                    fig_opt.add_vline(
+                        x=opt_w, line_dash="dash", line_color="#00e676", 
+                        annotation_text=f"Max Sharpe: {opt_w:.1f}%", 
+                        annotation_position="top left", 
+                        annotation_font_color="#00e676"
+                    )
+                    fig_opt.update_layout(
+                        template="plotly_dark", height=185,
+                        margin=dict(l=10, r=10, t=20, b=20),
+                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                        xaxis=dict(title="Peso Ipotetico nel Portafoglio (%)", gridcolor="rgba(255,255,255,0.06)"),
+                        yaxis=dict(title="Sharpe Ratio", gridcolor="rgba(255,255,255,0.06)")
+                    )
+                    st.plotly_chart(fig_opt, use_container_width=True, config={"displayModeBar": False})
 
     # Esecuzione Simulazione Pre-Trade
     with st.spinner(f"Simulazione impatto inserimento {cand_ticker} ({cand_weight}%)..."):
