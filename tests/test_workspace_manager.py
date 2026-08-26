@@ -61,6 +61,7 @@ def test_workspace_tab_lifecycle():
 
 def test_session_snapshot_save_and_restore(tmp_path):
     """Test saving session snapshot to disk cache and restoring it."""
+    st.session_state.clear()
     test_df = pd.DataFrame([
         {"ticker": "NVDA", "asset_class": "Stock", "weight_pct": 50.0, "qty_net": 10, "current_value": 1200.0},
         {"ticker": "AAPL", "asset_class": "Stock", "weight_pct": 50.0, "qty_net": 10, "current_value": 2200.0}
