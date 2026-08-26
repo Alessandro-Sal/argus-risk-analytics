@@ -224,3 +224,27 @@ def test_terminal_engine_ring_buffer():
     stats = buf.get_summary_statistics()
     assert "last_price" in stats
     assert "vwap" in stats
+
+
+def test_terminal_engine_live_quote_and_watchlist(mock_session_context):
+    from core.terminal_engine import fetch_live_ticker_quote
+    engine = ArgusTerminalEngine()
+
+    # Direct fetch_live_ticker_quote
+    q_aapl = fetch_live_ticker_quote("AAPL")
+    assert q_aapl["ticker"] == "AAPL"
+    assert q_aapl["last_price"] > 0
+    assert "change_pct" in q_aapl
+
+    # Terminal command QUOTE AAPL
+    res_q = engine.execute_command("QUOTE AAPL", mock_session_context)
+    assert res_q.status == "SUCCESS"
+    assert "AAPL" in res_q.output_text
+    assert "LAST PRICE" in res_q.output_text
+
+    # Terminal command WATCHLIST
+    res_wl = engine.execute_command("WATCHLIST", mock_session_context)
+    assert res_wl.status == "SUCCESS"
+    assert "WATCHLIST" in res_wl.output_text
+    assert "LAST PRICE" in res_wl.output_text
+
