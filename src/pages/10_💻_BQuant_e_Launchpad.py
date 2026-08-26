@@ -725,17 +725,24 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         avail_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else ["AAPL", "MSFT", "NVDA", "SPY", "BTC-USD"]
         selected_tape_ticker = st.selectbox("Ticker Live:", options=avail_tickers, key="sel_tape_ticker", label_visibility="collapsed")
         
-        ring_buf = term_eng.get_or_create_ring_buffer(ticker=selected_tape_ticker, capacity=500)
+        # Recupera il prezzo corrente reale dal portafoglio se disponibile
+        real_current_price = None
+        if not pos.empty and "ticker" in pos.columns and "current_price" in pos.columns:
+            matched_pos = pos[pos["ticker"].astype(str).str.upper() == selected_tape_ticker.upper()]
+            if not matched_pos.empty and float(matched_pos["current_price"].iloc[0]) > 0:
+                real_current_price = float(matched_pos["current_price"].iloc[0])
+
+        ring_buf = term_eng.get_or_create_ring_buffer(ticker=selected_tape_ticker, initial_price=real_current_price, capacity=500)
         
         # Simulazione push tick rapido
         col_tick_btn, col_tick_stat = st.columns([1.5, 2.5], vertical_alignment="center")
         with col_tick_btn:
             if st.button("⚡ Invia Tick Live", key="btn_push_sim_tick", use_container_width=True):
                 if ring_buf:
-                    # Inserisci tick casuale realistico
-                    last_px = float(pos[pos["ticker"] == selected_tape_ticker]["current_price"].iloc[0]) if not pos.empty and selected_tape_ticker in pos["ticker"].values else 150.0
-                    shock = np.random.normal(0, 0.003) * last_px
-                    new_p = max(1.0, last_px + shock)
+                    # Inserisci tick su prezzo reale
+                    ref_px = real_current_price or (ring_buf.get_summary_statistics().get("last_price", 150.0) if ring_buf else 150.0)
+                    shock = np.random.normal(0, 0.002) * ref_px
+                    new_p = max(1.0, ref_px + shock)
                     t = terminal_engine.MarketTick(
                         timestamp=datetime.datetime.now(datetime.timezone.utc),
                         ticker=selected_tape_ticker,
@@ -749,7 +756,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
                 st.rerun()
 
         stats = ring_buf.get_summary_statistics() if ring_buf else {}
-        last_px = stats.get("last_price", 150.0)
+        last_px = stats.get("last_price", real_current_price or 150.0)
         vwap_px = stats.get("vwap", last_px)
         ofi_val = stats.get("order_flow_imbalance", 0.0)
         
