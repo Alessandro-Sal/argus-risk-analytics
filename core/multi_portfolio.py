@@ -632,7 +632,7 @@ def consolidate_multi_portfolios(
             pass
 
     # 3. Calcolo Completo Metriche Quantitative Standard ARGUS
-    market_risk_res = _calc_market_risk(master_returns, master_bm_returns, benchmark_ticker="SPY", risk_free_rate=active_rf_rate)
+    market_risk_res = _calc_market_risk(master_returns, master_bm_returns, benchmark_ticker="SPY", risk_free_rate=active_rf_rate, df_positions=df_positions)
     return_metrics_res = _calc_return_metrics(master_returns, master_bm_returns, master_df_tx, df_positions, risk_free_rate=active_rf_rate)
     concentration_res = _calc_concentration(df_positions)
 
