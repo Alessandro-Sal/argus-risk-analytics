@@ -346,11 +346,14 @@ def reconstruct_point_in_time_portfolio(
     sr_port: pd.Series,
     returns_df: pd.DataFrame,
     target_date: Any,
+    df_tx: Optional[pd.DataFrame] = None,
+    df_prices: Optional[pd.DataFrame] = None,
     rf_rate: float = 0.035
 ) -> Dict[str, Any]:
     """
-    Ricostruisce con precisione contabile lo stato storico (prezzi, pesi, controvalori e metriche di rischio)
-    del portafoglio a una specifica data passata (target_date), basandosi sui rendimenti reali degli asset.
+    Ricostruisce con precisione contabile e notarile lo stato storico (quantità fisiche di quote, 
+    prezzi, pesi, controvalori e metriche di rischio) del portafoglio a una specifica data passata (target_date).
+    Se df_tx (registro transazioni) è disponibile, calcola la quantità esatta di ogni asset alla data target.
     """
     if pos_today is None or pos_today.empty or sr_port is None or sr_port.empty:
         return {"df_positions": pos_today.copy() if pos_today is not None else pd.DataFrame(), "metrics": {}, "total_value": 0.0}
@@ -361,56 +364,113 @@ def reconstruct_point_in_time_portfolio(
     s_p.index = pd.to_datetime(s_p.index)
 
     target_dt = pd.to_datetime(target_date)
+    if getattr(target_dt, 'tz', None) is not None:
+        target_dt = target_dt.tz_localize(None)
 
-    # Fattore cumulato di crescita del portafoglio dal passato ad oggi
-    sr_after = s_p[s_p.index > target_dt]
-    port_cum_factor = float((1.0 + sr_after).prod()) if not sr_after.empty else 1.0
-    if port_cum_factor <= 0.0001:
-        port_cum_factor = 1.0
-
-    tot_today = float(pos_today["current_value"].sum()) if "current_value" in pos_today.columns else 0.0
-    true_past_nav = tot_today / port_cum_factor
-
-    df_hist = pos_today.copy()
-    
-    # Ricostruzione asset-by-asset
+    # 1. Calcolo prezzi storici di riferimento alla data target
+    hist_prices = {}
     if returns_df is not None and not returns_df.empty:
         r_df = returns_df.copy().dropna(how="all")
         if getattr(r_df.index, 'tz', None) is not None:
             r_df.index = r_df.index.tz_localize(None)
         r_df.index = pd.to_datetime(r_df.index)
         r_after = r_df[r_df.index > target_dt]
-        asset_cum_factors = (1.0 + r_after).prod() if not r_after.empty else pd.Series(1.0, index=r_df.columns)
-    else:
-        asset_cum_factors = pd.Series()
-
-    raw_past_vals = []
-    for idx, row in df_hist.iterrows():
-        tk = row.get("ticker")
-        val_now = float(row.get("current_value", 0.0))
-        if not asset_cum_factors.empty and tk in asset_cum_factors.index and float(asset_cum_factors[tk]) > 0.0001:
-            f_asset = float(asset_cum_factors[tk])
-        else:
-            f_asset = port_cum_factor
+        cum_factors = (1.0 + r_after).prod() if not r_after.empty else pd.Series(1.0, index=r_df.columns)
         
-        raw_past_vals.append(val_now / max(0.001, f_asset))
-
-    raw_sum = sum(raw_past_vals)
-    scaling_ratio = (true_past_nav / raw_sum) if raw_sum > 0 else 1.0
-
-    for idx, row in df_hist.iterrows():
-        past_val = raw_past_vals[idx] * scaling_ratio
-        df_hist.at[idx, "current_value"] = past_val
-        if true_past_nav > 0:
-            df_hist.at[idx, "weight_pct"] = (past_val / true_past_nav) * 100.0
-        else:
-            df_hist.at[idx, "weight_pct"] = 0.0
-
-        if "last_price" in df_hist.columns:
-            price_now = float(row.get("last_price", 1.0))
+        for _, row in pos_today.iterrows():
             tk = row.get("ticker")
-            f_asset = float(asset_cum_factors[tk]) if (not asset_cum_factors.empty and tk in asset_cum_factors.index and float(asset_cum_factors[tk]) > 0.0001) else port_cum_factor
-            df_hist.at[idx, "last_price"] = price_now / max(0.001, f_asset)
+            p_now = float(row.get("last_price", 1.0))
+            f = float(cum_factors[tk]) if (tk in cum_factors.index and float(cum_factors[tk]) > 0.0001) else 1.0
+            hist_prices[tk] = p_now / f
+
+    # 2. Se abbiamo df_tx, ricostruisci la quantità esatta posseduta alla data target
+    if df_tx is not None and not df_tx.empty and "tx_date" in df_tx.columns:
+        tx_c = df_tx.copy()
+        tx_c["tx_date"] = pd.to_datetime(tx_c["tx_date"])
+        if getattr(tx_c["tx_date"].dt, 'tz', None) is not None:
+            tx_c["tx_date"] = tx_c["tx_date"].dt.tz_localize(None)
+        
+        tx_past = tx_c[tx_c["tx_date"] <= target_dt]
+        
+        qtys = {}
+        for _, r in tx_past.iterrows():
+            tk = str(r["ticker"]).strip()
+            q = float(r.get("quantity", 0.0))
+            t_type = str(r.get("tx_type", "BUY")).upper().strip()
+            if any(w in t_type for w in ["BUY", "ACQUISTO", "DEPOSIT", "TRANSFER_IN"]):
+                qtys[tk] = qtys.get(tk, 0.0) + q
+            elif any(w in t_type for w in ["SELL", "VENDITA", "WITHDRAWAL", "TRANSFER_OUT"]):
+                qtys[tk] = qtys.get(tk, 0.0) - q
+        
+        meta_map = {}
+        for _, row in pos_today.iterrows():
+            tk = row.get("ticker")
+            meta_map[tk] = {
+                "asset_class": row.get("asset_class", "Stock"),
+                "sector": row.get("sector", row.get("gics_sector", "General")),
+                "country": row.get("country", "Global"),
+                "currency": row.get("currency", "EUR")
+            }
+
+        rows = []
+        for tk, q in qtys.items():
+            if q > 0.0001:
+                meta = meta_map.get(tk, {"asset_class": "Stock", "sector": "General", "country": "Global", "currency": "EUR"})
+                p_hist = hist_prices.get(tk, float(pos_today[pos_today["ticker"] == tk]["last_price"].iloc[0]) if (not pos_today.empty and tk in pos_today["ticker"].values and "last_price" in pos_today.columns) else 1.0)
+                val = q * p_hist
+                rows.append({
+                    "ticker": tk,
+                    "asset_class": meta["asset_class"],
+                    "sector": meta["sector"],
+                    "country": meta["country"],
+                    "currency": meta["currency"],
+                    "qty_net": q,
+                    "last_price": p_hist,
+                    "current_value": val
+                })
+        
+        df_hist = pd.DataFrame(rows)
+        if df_hist.empty:
+            df_hist = pos_today.copy()
+            df_hist["qty_net"] = 0.0
+            df_hist["current_value"] = 0.0
+            df_hist["weight_pct"] = 0.0
+            true_past_nav = 0.0
+        else:
+            true_past_nav = float(df_hist["current_value"].sum())
+            df_hist["weight_pct"] = (df_hist["current_value"] / true_past_nav * 100.0) if true_past_nav > 0 else 0.0
+
+    else:
+        # Fallback analitico se non c'è il log delle transazioni
+        sr_after = s_p[s_p.index > target_dt]
+        port_cum_factor = float((1.0 + sr_after).prod()) if not sr_after.empty else 1.0
+        if port_cum_factor <= 0.0001:
+            port_cum_factor = 1.0
+
+        tot_today = float(pos_today["current_value"].sum()) if "current_value" in pos_today.columns else 0.0
+        true_past_nav = tot_today / port_cum_factor
+
+        df_hist = pos_today.copy()
+        raw_past_vals = []
+        for idx, row in df_hist.iterrows():
+            tk = row.get("ticker")
+            val_now = float(row.get("current_value", 0.0))
+            f_asset = float(cum_factors[tk]) if (not cum_factors.empty and tk in cum_factors.index and float(cum_factors[tk]) > 0.0001) else port_cum_factor
+            raw_past_vals.append(val_now / max(0.001, f_asset))
+
+        raw_sum = sum(raw_past_vals)
+        scaling_ratio = (true_past_nav / raw_sum) if raw_sum > 0 else 1.0
+
+        for idx, row in df_hist.iterrows():
+            past_val = raw_past_vals[idx] * scaling_ratio
+            df_hist.at[idx, "current_value"] = past_val
+            if true_past_nav > 0:
+                df_hist.at[idx, "weight_pct"] = (past_val / true_past_nav) * 100.0
+            else:
+                df_hist.at[idx, "weight_pct"] = 0.0
+
+            if "last_price" in df_hist.columns:
+                df_hist.at[idx, "last_price"] = hist_prices.get(row.get("ticker"), float(row.get("last_price", 1.0)))
 
     # Calcolo metriche di rischio storiche reali fino alla target_date
     sr_past = s_p[s_p.index <= target_dt]
@@ -425,7 +485,7 @@ def reconstruct_point_in_time_portfolio(
         sharpe = 0.0
         var_95 = 2.0
 
-    hhi = float(((df_hist["weight_pct"] / 100.0) ** 2).sum())
+    hhi = float(((df_hist["weight_pct"] / 100.0) ** 2).sum()) if not df_hist.empty and "weight_pct" in df_hist.columns else 0.0
 
     return {
         "df_positions": df_hist,

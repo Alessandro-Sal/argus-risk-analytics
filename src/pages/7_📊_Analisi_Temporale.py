@@ -935,11 +935,16 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             else:
                 target_dt_b = st.date_input("Scegli Data Storica Esatta:", value=max_dt - timedelta(days=182), max_value=max_dt)
 
+            active_df_tx = results.get("df_tx") if (results.get("df_tx") is not None and not results.get("df_tx").empty) else results.get("df_tx_raw")
+            active_df_prices = results.get("df_prices")
+
             reconst_res = reconstruct_point_in_time_portfolio(
                 pos_today=pos,
                 sr_port=raw_sr_port,
                 returns_df=df_returns,
                 target_date=target_dt_b,
+                df_tx=active_df_tx,
+                df_prices=active_df_prices,
                 rf_rate=active_rf_rate
             )
             df_pos_b = reconst_res["df_positions"]
