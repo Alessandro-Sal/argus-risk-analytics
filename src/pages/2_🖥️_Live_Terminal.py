@@ -352,45 +352,45 @@ with tab_port_live:
         avg_arrow = "▲" if avg_1d >= 0 else "▼"
 
         kpi_cards_html = f"""
-        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px;">
           <!-- CARD 1 -->
-          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(56,189,248,0.25); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-              <span>💼 Controvalore Live</span>
-              <span style="font-size: 9.5px; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">REAL-TIME</span>
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(56,189,248,0.25); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">💼 Controvalore</span>
+              <span style="font-size: 9px; font-weight: 700; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3); white-space: nowrap;">REAL-TIME</span>
             </div>
-            <div style="font-size: 22px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px;">€ {tot_live_notional:,.2f}</div>
-            <div style="font-size: 11.5px; color: #8b949e; margin-top: 4px;">Capitale attivo a mercato spot</div>
+            <div style="font-size: 20px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">€ {tot_live_notional:,.2f}</div>
+            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Capitale attivo a mercato spot</div>
           </div>
 
           <!-- CARD 2 -->
-          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {pnl_color}44; border-left: 4px solid {pnl_color}; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-              <span>📈 PnL Non Realizzato</span>
-              <span style="font-size: 10px; font-weight: 700; background: {pnl_color}22; color: {pnl_color}; padding: 2px 8px; border-radius: 4px; border: 1px solid {pnl_color}55;">{pnl_sign}{tot_pnl_p:.2f}% {pnl_arrow}</span>
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {pnl_color}44; border-left: 4px solid {pnl_color}; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📈 PnL Latente</span>
+              <span style="font-size: 9.5px; font-weight: 700; background: {pnl_color}22; color: {pnl_color}; padding: 2px 6px; border-radius: 4px; border: 1px solid {pnl_color}55; white-space: nowrap;">{pnl_sign}{tot_pnl_p:.2f}% {pnl_arrow}</span>
             </div>
-            <div style="font-size: 22px; font-weight: 800; color: {pnl_color}; font-family: monospace; letter-spacing: -0.5px;">{pnl_sign}€ {tot_pnl:,.2f}</div>
-            <div style="font-size: 11.5px; color: #8b949e; margin-top: 4px;">Guadagno / perdita latente vs FIFO</div>
+            <div style="font-size: 20px; font-weight: 800; color: {pnl_color}; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">{pnl_sign}€ {tot_pnl:,.2f}</div>
+            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Guadagno / perdita vs FIFO</div>
           </div>
 
           <!-- CARD 3 -->
-          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(168,85,247,0.25); border-left: 4px solid #a855f7; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-              <span>⚡ Variazione Intraday</span>
-              <span style="font-size: 9.5px; background: rgba(168,85,247,0.15); color: #a855f7; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168,85,247,0.3);">1D CHG</span>
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(168,85,247,0.25); border-left: 4px solid #a855f7; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚡ Var. Intraday</span>
+              <span style="font-size: 9px; font-weight: 700; background: rgba(168,85,247,0.15); color: #a855f7; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168,85,247,0.3); white-space: nowrap;">1D CHG</span>
             </div>
-            <div style="font-size: 22px; font-weight: 800; color: {avg_color}; font-family: monospace; letter-spacing: -0.5px;">{avg_sign}{avg_1d:.2f}% {avg_arrow}</div>
-            <div style="font-size: 11.5px; color: #8b949e; margin-top: 4px;">Media variazioni giornaliere</div>
+            <div style="font-size: 20px; font-weight: 800; color: {avg_color}; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">{avg_sign}{avg_1d:.2f}% {avg_arrow}</div>
+            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Media variazioni giornaliere</div>
           </div>
 
           <!-- CARD 4 -->
-          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(63,185,80,0.25); border-left: 4px solid #3fb950; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
-            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
-              <span>🟢 Posizioni Attive</span>
-              <span style="font-size: 9.5px; background: rgba(63,185,80,0.15); color: #3fb950; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(63,185,80,0.3);">STREAMING</span>
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(63,185,80,0.25); border-left: 4px solid #3fb950; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🟢 Posizioni</span>
+              <span style="font-size: 9px; font-weight: 700; background: rgba(63,185,80,0.15); color: #3fb950; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(63,185,80,0.3); white-space: nowrap;">STREAMING</span>
             </div>
-            <div style="font-size: 22px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px;">{n_active} Titoli</div>
-            <div style="font-size: 11.5px; color: #3fb950; margin-top: 4px; font-weight: 600;">Feed Real-Time Streaming Attivo</div>
+            <div style="font-size: 20px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">{n_active} Titoli</div>
+            <div style="font-size: 11px; color: #3fb950; margin-top: 4px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Feed Streaming Attivo</div>
           </div>
         </div>
         """
