@@ -140,6 +140,23 @@ with col_tape_ctrl:
     ofi_val = stats.get("order_flow_imbalance", 0.0)
     microprice = display_px + (0.01 if ofi_val > 0 else -0.01)
 
+    # Risoluzione Simbolo Valutario
+    if active_tape_ticker.endswith((".MI", ".PA", ".DE")) or currency == "EUR":
+        tape_sym_curr = "€"
+        is_eur_asset = True
+    elif currency in ["USD", "USDT", "USD=X"]:
+        tape_sym_curr = "$"
+        is_eur_asset = False
+    elif currency in ["GBP", "GBp"] or active_tape_ticker.endswith(".L"):
+        tape_sym_curr = "£"
+        is_eur_asset = False
+    elif currency == "CHF" or active_tape_ticker.endswith(".SW"):
+        tape_sym_curr = "CHF "
+        is_eur_asset = False
+    else:
+        tape_sym_curr = f"{currency} "
+        is_eur_asset = False
+
     # Header Ticker Live con Badge Variazione e Stato API
     chg_color = "#3fb950" if chg >= 0 else "#f85149"
     chg_sign = "+" if chg >= 0 else ""
@@ -148,20 +165,20 @@ with col_tape_ctrl:
 
     # Conversione EUR per display spot
     eur_equiv_str = ""
-    if currency != "EUR":
+    if not is_eur_asset:
         tape_eur_px = display_px / 1.085 if currency == "USD" else display_px
         eur_equiv_str = f'<div style="font-size:12.5px; color:#58a6ff; font-weight:600; margin-top:-2px; margin-bottom:4px;">≈ € {tape_eur_px:,.2f} EUR</div>'
 
     tape_card_html = (
-        f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 16px; margin-top: 4px;">'
+        f'<div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.95) 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 16px; margin-top: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
         f'<div style="display:flex; justify-content:space-between; align-items:center;">'
         f'<div><span style="font-size:18px; font-weight:800; color:#f0f6fc;">{active_tape_ticker}</span> {api_badge}</div>'
         f'<div><span style="font-size:13px; font-weight:700; color:{chg_color}; background:{chg_color}22; padding:3px 8px; border-radius:4px; border:1px solid {chg_color}55;">{chg_sign}{chg:,.2f} ({chg_sign}{chg_pct:.2f}%) {arrow}</span></div>'
         f'</div>'
-        f'<div style="font-size:24px; font-weight:800; color:#ff9900; margin: 4px 0;">{currency} {display_px:,.2f}</div>'
+        f'<div style="font-size:24px; font-weight:800; color:#ff9900; margin: 4px 0;">{tape_sym_curr}{display_px:,.2f}</div>'
         f'{eur_equiv_str}'
         f'<div style="display:flex; justify-content:space-between; font-size:11px; color:#8b949e; font-family:monospace;">'
-        f'<span>Vol: {vol_str}</span><span>Range: {currency} {day_l:,.2f} - {currency} {day_h:,.2f}</span>'
+        f'<span>Vol: {vol_str}</span><span>Range: {tape_sym_curr}{day_l:,.2f} - {tape_sym_curr}{day_h:,.2f}</span>'
         f'</div>'
         f'</div>'
     )
@@ -173,6 +190,8 @@ with col_tape_book:
     spread_step = max(0.01, round(display_px * 0.0001, 2))
     base_bid = round(display_px - spread_step, 2)
     base_ask = round(display_px + spread_step, 2)
+    spread_val = round(base_ask - base_bid, 2)
+    spread_bps = (spread_val / display_px * 10000.0) if display_px > 0 else 0.0
     
     book_rows = [
         {"bid_vol": 1450, "bid_px": base_bid, "ask_px": base_ask, "ask_vol": 1200},
@@ -189,14 +208,14 @@ with col_tape_book:
         book_rows_html.append(
             f'<div style="display:flex; font-family:monospace; font-size:11px; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.04);">'
             f'<div style="flex:1; text-align:right; color:#8b949e; position:relative; padding-right:8px;"><div style="position:absolute; right:0; top:0; bottom:0; width:{bid_bar_w}%; background:rgba(63,185,80,0.15); z-index:1;"></div><span style="position:relative; z-index:2;">{r["bid_vol"]}</span></div>'
-            f'<div style="flex:1; text-align:right; color:#3fb950; font-weight:700; padding-right:12px;">${r["bid_px"]:,.2f}</div>'
-            f'<div style="flex:1; text-align:left; color:#f85149; font-weight:700; padding-left:12px;">${r["ask_px"]:,.2f}</div>'
+            f'<div style="flex:1; text-align:right; color:#3fb950; font-weight:700; padding-right:12px;">{tape_sym_curr}{r["bid_px"]:,.2f}</div>'
+            f'<div style="flex:1; text-align:left; color:#f85149; font-weight:700; padding-left:12px;">{tape_sym_curr}{r["ask_px"]:,.2f}</div>'
             f'<div style="flex:1; text-align:left; color:#8b949e; position:relative; padding-left:8px;"><div style="position:absolute; left:0; top:0; bottom:0; width:{ask_bar_w}%; background:rgba(248,81,73,0.15); z-index:1;"></div><span style="position:relative; z-index:2;">{r["ask_vol"]}</span></div>'
             f'</div>'
         )
 
     book_full_html = (
-        f'<div style="background: rgba(13, 17, 23, 0.9); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px;">'
+        f'<div style="background: rgba(13, 17, 23, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
         f'<div style="display:flex; font-size:10px; font-weight:700; color:#58a6ff; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;">'
         f'<div style="flex:1; text-align:right;">BID SIZE</div>'
         f'<div style="flex:1; text-align:right; padding-right:12px;">BID PX</div>'
@@ -207,7 +226,7 @@ with col_tape_book:
         f'</div>'
     )
     st.markdown(book_full_html, unsafe_allow_html=True)
-    st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.2f}` • **VWAP**: `${vwap_px:.2f}` • **Timestamp Feed**: `{live_q['timestamp']}`")
+    st.caption(f"🎯 **Microprice Stoikov**: `{tape_sym_curr}{microprice:.2f}` • **VWAP**: `{tape_sym_curr}{vwap_px:.2f}` • **Spread L2**: `{tape_sym_curr}{spread_val:.2f} ({spread_bps:.1f} bps)` • **Feed**: `{live_q['timestamp']}`")
 
 st.divider()
 
