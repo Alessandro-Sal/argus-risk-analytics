@@ -208,8 +208,13 @@ model_keys = list(QUANT_MODELS_CATALOG.keys())
 if target_tab and target_tab in model_keys:
     st.session_state["quant_active_tab"] = target_tab
     st.session_state["quant_active_tab_selectbox"] = target_tab
-elif "quant_active_tab" not in st.session_state or st.session_state["quant_active_tab"] not in model_keys:
+elif "quant_active_tab_selectbox" in st.session_state and st.session_state["quant_active_tab_selectbox"] in model_keys:
+    st.session_state["quant_active_tab"] = st.session_state["quant_active_tab_selectbox"]
+elif "quant_active_tab" in st.session_state and st.session_state["quant_active_tab"] in model_keys:
+    st.session_state["quant_active_tab_selectbox"] = st.session_state["quant_active_tab"]
+else:
     st.session_state["quant_active_tab"] = model_keys[0]
+    st.session_state["quant_active_tab_selectbox"] = model_keys[0]
 
 curr_idx = model_keys.index(st.session_state["quant_active_tab"])
 
@@ -222,13 +227,17 @@ c_sel_q, c_prev_q, c_next_q = st.columns([3.8, 0.6, 0.6], vertical_alignment="ce
 with c_prev_q:
     if st.button("◀ Prec.", key="btn_quant_prev", use_container_width=True, help="Modello precedente"):
         new_i = (curr_idx - 1) % len(model_keys)
-        st.session_state["target_quant_model"] = model_keys[new_i]
+        st.session_state["target_subtab_quant_active_tab"] = model_keys[new_i]
+        st.session_state["quant_active_tab"] = model_keys[new_i]
+        st.session_state["quant_active_tab_selectbox"] = model_keys[new_i]
         st.rerun()
 
 with c_next_q:
     if st.button("Succ. ▶", key="btn_quant_next", use_container_width=True, help="Modello successivo"):
         new_i = (curr_idx + 1) % len(model_keys)
-        st.session_state["target_quant_model"] = model_keys[new_i]
+        st.session_state["target_subtab_quant_active_tab"] = model_keys[new_i]
+        st.session_state["quant_active_tab"] = model_keys[new_i]
+        st.session_state["quant_active_tab_selectbox"] = model_keys[new_i]
         st.rerun()
 
 with c_sel_q:

@@ -82,8 +82,13 @@ risk_keys = list(RISK_MODELS_CATALOG.keys())
 if target_tab and target_tab in risk_keys:
     st.session_state["risk_active_tab"] = target_tab
     st.session_state["risk_active_tab_selectbox"] = target_tab
-elif "risk_active_tab" not in st.session_state or st.session_state["risk_active_tab"] not in risk_keys:
+elif "risk_active_tab_selectbox" in st.session_state and st.session_state["risk_active_tab_selectbox"] in risk_keys:
+    st.session_state["risk_active_tab"] = st.session_state["risk_active_tab_selectbox"]
+elif "risk_active_tab" in st.session_state and st.session_state["risk_active_tab"] in risk_keys:
+    st.session_state["risk_active_tab_selectbox"] = st.session_state["risk_active_tab"]
+else:
     st.session_state["risk_active_tab"] = risk_keys[0]
+    st.session_state["risk_active_tab_selectbox"] = risk_keys[0]
 
 curr_idx = risk_keys.index(st.session_state["risk_active_tab"])
 
@@ -96,13 +101,17 @@ c_sel_r, c_prev_r, c_next_r = st.columns([3.8, 0.6, 0.6], vertical_alignment="ce
 with c_prev_r:
     if st.button("◀ Prec.", key="btn_risk_prev", use_container_width=True, help="Modulo precedente"):
         new_i = (curr_idx - 1) % len(risk_keys)
-        st.session_state["target_risk_module"] = risk_keys[new_i]
+        st.session_state["target_subtab_risk_active_tab"] = risk_keys[new_i]
+        st.session_state["risk_active_tab"] = risk_keys[new_i]
+        st.session_state["risk_active_tab_selectbox"] = risk_keys[new_i]
         st.rerun()
 
 with c_next_r:
     if st.button("Succ. ▶", key="btn_risk_next", use_container_width=True, help="Modulo successivo"):
         new_i = (curr_idx + 1) % len(risk_keys)
-        st.session_state["target_risk_module"] = risk_keys[new_i]
+        st.session_state["target_subtab_risk_active_tab"] = risk_keys[new_i]
+        st.session_state["risk_active_tab"] = risk_keys[new_i]
+        st.session_state["risk_active_tab_selectbox"] = risk_keys[new_i]
         st.rerun()
 
 with c_sel_r:

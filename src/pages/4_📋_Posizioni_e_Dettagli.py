@@ -90,8 +90,13 @@ pos_keys = list(POSITIONS_MODELS_CATALOG.keys())
 if target_tab and target_tab in pos_keys:
     st.session_state["positions_active_tab"] = target_tab
     st.session_state["positions_active_tab_selectbox"] = target_tab
-elif "positions_active_tab" not in st.session_state or st.session_state["positions_active_tab"] not in pos_keys:
+elif "positions_active_tab_selectbox" in st.session_state and st.session_state["positions_active_tab_selectbox"] in pos_keys:
+    st.session_state["positions_active_tab"] = st.session_state["positions_active_tab_selectbox"]
+elif "positions_active_tab" in st.session_state and st.session_state["positions_active_tab"] in pos_keys:
+    st.session_state["positions_active_tab_selectbox"] = st.session_state["positions_active_tab"]
+else:
     st.session_state["positions_active_tab"] = pos_keys[0]
+    st.session_state["positions_active_tab_selectbox"] = pos_keys[0]
 
 curr_idx = pos_keys.index(st.session_state["positions_active_tab"])
 
@@ -104,13 +109,17 @@ c_sel_p, c_prev_p, c_next_p = st.columns([3.8, 0.6, 0.6], vertical_alignment="ce
 with c_prev_p:
     if st.button("◀ Prec.", key="btn_pos_prev", use_container_width=True, help="Modulo precedente"):
         new_i = (curr_idx - 1) % len(pos_keys)
-        st.session_state["target_positions_module"] = pos_keys[new_i]
+        st.session_state["target_subtab_positions_active_tab"] = pos_keys[new_i]
+        st.session_state["positions_active_tab"] = pos_keys[new_i]
+        st.session_state["positions_active_tab_selectbox"] = pos_keys[new_i]
         st.rerun()
 
 with c_next_p:
     if st.button("Succ. ▶", key="btn_pos_next", use_container_width=True, help="Modulo successivo"):
         new_i = (curr_idx + 1) % len(pos_keys)
-        st.session_state["target_positions_module"] = pos_keys[new_i]
+        st.session_state["target_subtab_positions_active_tab"] = pos_keys[new_i]
+        st.session_state["positions_active_tab"] = pos_keys[new_i]
+        st.session_state["positions_active_tab_selectbox"] = pos_keys[new_i]
         st.rerun()
 
 with c_sel_p:

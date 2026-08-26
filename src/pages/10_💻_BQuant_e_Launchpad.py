@@ -117,8 +117,13 @@ bquant_keys = list(BQUANT_MODELS_CATALOG.keys())
 if target_tab and target_tab in bquant_keys:
     st.session_state["bquant_active_tab"] = target_tab
     st.session_state["bquant_active_tab_selectbox"] = target_tab
-elif "bquant_active_tab" not in st.session_state or st.session_state["bquant_active_tab"] not in bquant_keys:
+elif "bquant_active_tab_selectbox" in st.session_state and st.session_state["bquant_active_tab_selectbox"] in bquant_keys:
+    st.session_state["bquant_active_tab"] = st.session_state["bquant_active_tab_selectbox"]
+elif "bquant_active_tab" in st.session_state and st.session_state["bquant_active_tab"] in bquant_keys:
+    st.session_state["bquant_active_tab_selectbox"] = st.session_state["bquant_active_tab"]
+else:
     st.session_state["bquant_active_tab"] = bquant_keys[0]
+    st.session_state["bquant_active_tab_selectbox"] = bquant_keys[0]
 
 curr_idx = bquant_keys.index(st.session_state["bquant_active_tab"])
 
@@ -131,13 +136,17 @@ c_sel_bq, c_prev_bq, c_next_bq = st.columns([3.8, 0.6, 0.6], vertical_alignment=
 with c_prev_bq:
     if st.button("◀ Prec.", key="btn_bquant_prev", use_container_width=True, help="Modulo precedente"):
         new_i = (curr_idx - 1) % len(bquant_keys)
-        st.session_state["target_bquant_module"] = bquant_keys[new_i]
+        st.session_state["target_subtab_bquant_active_tab"] = bquant_keys[new_i]
+        st.session_state["bquant_active_tab"] = bquant_keys[new_i]
+        st.session_state["bquant_active_tab_selectbox"] = bquant_keys[new_i]
         st.rerun()
 
 with c_next_bq:
     if st.button("Succ. ▶", key="btn_bquant_next", use_container_width=True, help="Modulo successivo"):
         new_i = (curr_idx + 1) % len(bquant_keys)
-        st.session_state["target_bquant_module"] = bquant_keys[new_i]
+        st.session_state["target_subtab_bquant_active_tab"] = bquant_keys[new_i]
+        st.session_state["bquant_active_tab"] = bquant_keys[new_i]
+        st.session_state["bquant_active_tab_selectbox"] = bquant_keys[new_i]
         st.rerun()
 
 with c_sel_bq:

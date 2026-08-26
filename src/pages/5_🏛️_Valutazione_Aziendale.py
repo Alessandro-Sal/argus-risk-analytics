@@ -248,8 +248,13 @@ val_keys = list(VALUATION_MODELS_CATALOG.keys())
 if target_tab and target_tab in val_keys:
     st.session_state["val_segmented_tab"] = target_tab
     st.session_state["val_segmented_tab_selectbox"] = target_tab
-elif "val_segmented_tab" not in st.session_state or st.session_state["val_segmented_tab"] not in val_keys:
+elif "val_segmented_tab_selectbox" in st.session_state and st.session_state["val_segmented_tab_selectbox"] in val_keys:
+    st.session_state["val_segmented_tab"] = st.session_state["val_segmented_tab_selectbox"]
+elif "val_segmented_tab" in st.session_state and st.session_state["val_segmented_tab"] in val_keys:
+    st.session_state["val_segmented_tab_selectbox"] = st.session_state["val_segmented_tab"]
+else:
     st.session_state["val_segmented_tab"] = val_keys[0]
+    st.session_state["val_segmented_tab_selectbox"] = val_keys[0]
 
 curr_idx = val_keys.index(st.session_state["val_segmented_tab"])
 
@@ -262,13 +267,17 @@ c_sel_v, c_prev_v, c_next_v = st.columns([3.8, 0.6, 0.6], vertical_alignment="ce
 with c_prev_v:
     if st.button("◀ Prec.", key="btn_val_prev", use_container_width=True, help="Modulo precedente"):
         new_i = (curr_idx - 1) % len(val_keys)
-        st.session_state["target_val_module"] = val_keys[new_i]
+        st.session_state["target_subtab_val_segmented_tab"] = val_keys[new_i]
+        st.session_state["val_segmented_tab"] = val_keys[new_i]
+        st.session_state["val_segmented_tab_selectbox"] = val_keys[new_i]
         st.rerun()
 
 with c_next_v:
     if st.button("Succ. ▶", key="btn_val_next", use_container_width=True, help="Modulo successivo"):
         new_i = (curr_idx + 1) % len(val_keys)
-        st.session_state["target_val_module"] = val_keys[new_i]
+        st.session_state["target_subtab_val_segmented_tab"] = val_keys[new_i]
+        st.session_state["val_segmented_tab"] = val_keys[new_i]
+        st.session_state["val_segmented_tab_selectbox"] = val_keys[new_i]
         st.rerun()
 
 with c_sel_v:
