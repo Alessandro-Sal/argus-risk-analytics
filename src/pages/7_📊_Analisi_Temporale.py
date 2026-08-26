@@ -87,12 +87,10 @@ if not raw_sr_port.empty:
     min_avail_date = idx_dates.min().to_pydatetime().date()
     max_avail_date = idx_dates.max().to_pydatetime().date()
     total_trading_days = len(raw_sr_port)
-    years_span = total_trading_days / 252.0
 else:
     min_avail_date = (datetime.now() - timedelta(days=365)).date()
     max_avail_date = datetime.now().date()
     total_trading_days = 0
-    years_span = 0.0
 
 with st.container():
     col_t1, col_t2 = st.columns([1.8, 2.2], vertical_alignment="center")
@@ -138,7 +136,16 @@ with st.container():
             if isinstance(date_range_picked, (tuple, list)) and len(date_range_picked) == 2:
                 calc_start, calc_end = date_range_picked
         else:
-            delta_days_selected = (calc_end - calc_start).days
+            delta_days_selected = max(1, (calc_end - calc_start).days)
+            y_span = delta_days_selected / 365.25
+            if y_span >= 1.0:
+                y_int = int(delta_days_selected // 365.25)
+                m_int = int((delta_days_selected % 365.25) // 30.4375)
+                dur_str = f"{y_int} Anni e {m_int} Mesi" if m_int > 0 else f"{y_int} Anni"
+            else:
+                m_int = max(1, int(round(delta_days_selected / 30.4375)))
+                dur_str = f"{m_int} Mesi ({delta_days_selected} gg)"
+
             st.markdown(f"""
             <div style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 10px 16px; margin-top: 4px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
@@ -150,7 +157,7 @@ with st.container():
                     </div>
                     <div>
                         <span style="font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #7dd3fc; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.25);">
-                            {total_trading_days:,} Sedute • {years_span:.1f} Anni ({delta_days_selected} gg)
+                            {total_trading_days:,} Sedute • {dur_str} ({delta_days_selected} gg)
                         </span>
                     </div>
                 </div>
