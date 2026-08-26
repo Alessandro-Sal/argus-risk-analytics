@@ -327,3 +327,91 @@ def compute_side_by_side_comparison(df_a: pd.DataFrame, df_b: pd.DataFrame) -> D
         "modified_count": int((merged["status"].isin(["⬆️ Incremento", "⬇️ Riduzione"])).sum())
     }
 
+
+def reconstruct_point_in_time_portfolio(
+    pos_today: pd.DataFrame,
+    sr_port: pd.Series,
+    returns_df: pd.DataFrame,
+    target_date: Any,
+    rf_rate: float = 0.035
+) -> Dict[str, Any]:
+    """
+    Ricostruisce con precisione contabile lo stato storico (prezzi, pesi, controvalori e metriche di rischio)
+    del portafoglio a una specifica data passata (target_date), basandosi sui rendimenti reali degli asset.
+    """
+    if pos_today is None or pos_today.empty or sr_port is None or sr_port.empty:
+        return {"df_positions": pos_today.copy() if pos_today is not None else pd.DataFrame(), "metrics": {}, "total_value": 0.0}
+
+    s_p = sr_port.copy().dropna()
+    if getattr(s_p.index, 'tz', None) is not None:
+        s_p.index = s_p.index.tz_localize(None)
+    s_p.index = pd.to_datetime(s_p.index)
+
+    target_dt = pd.to_datetime(target_date)
+
+    # Fattore cumulato di crescita del portafoglio dal passato ad oggi
+    sr_after = s_p[s_p.index > target_dt]
+    port_cum_factor = float((1.0 + sr_after).prod()) if not sr_after.empty else 1.0
+    if port_cum_factor <= 0.0001:
+        port_cum_factor = 1.0
+
+    df_hist = pos_today.copy()
+    
+    # Ricostruzione asset-by-asset
+    if returns_df is not None and not returns_df.empty:
+        r_df = returns_df.copy().dropna(how="all")
+        if getattr(r_df.index, 'tz', None) is not None:
+            r_df.index = r_df.index.tz_localize(None)
+        r_df.index = pd.to_datetime(r_df.index)
+        r_after = r_df[r_df.index > target_dt]
+        asset_cum_factors = (1.0 + r_after).prod() if not r_after.empty else pd.Series(1.0, index=r_df.columns)
+    else:
+        asset_cum_factors = pd.Series()
+
+    for idx, row in df_hist.iterrows():
+        tk = row.get("ticker")
+        val_now = float(row.get("current_value", 0.0))
+        if not asset_cum_factors.empty and tk in asset_cum_factors.index and float(asset_cum_factors[tk]) > 0.0001:
+            f_asset = float(asset_cum_factors[tk])
+        else:
+            f_asset = port_cum_factor
+        
+        val_past = val_now / max(0.001, f_asset)
+        df_hist.at[idx, "current_value"] = val_past
+        if "last_price" in df_hist.columns:
+            price_now = float(row.get("last_price", 1.0))
+            df_hist.at[idx, "last_price"] = price_now / max(0.001, f_asset)
+
+    tot_val = float(df_hist["current_value"].sum())
+    if tot_val > 0:
+        df_hist["weight_pct"] = (df_hist["current_value"] / tot_val) * 100.0
+    else:
+        df_hist["weight_pct"] = 0.0
+
+    # Calcolo metriche di rischio storiche reali fino alla target_date
+    sr_past = s_p[s_p.index <= target_dt]
+    if len(sr_past) >= 15:
+        vol_ann = float(sr_past.std() * np.sqrt(252.0) * 100.0)
+        daily_rf = (1.0 + rf_rate) ** (1.0 / 252.0) - 1.0
+        excess_mean = float((sr_past - daily_rf).mean() * 252.0)
+        sharpe = excess_mean / (vol_ann / 100.0) if vol_ann > 0 else 0.0
+        var_95 = float(abs(sr_past.quantile(0.05)) * 100.0)
+    else:
+        vol_ann = float(s_p.std() * np.sqrt(252.0) * 100.0)
+        sharpe = 0.0
+        var_95 = 2.0
+
+    hhi = float(((df_hist["weight_pct"] / 100.0) ** 2).sum())
+
+    return {
+        "df_positions": df_hist,
+        "total_value": tot_val,
+        "metrics": {
+            "sharpe_ratio": sharpe,
+            "volatility_ann_pct": vol_ann,
+            "var_95_pct": var_95,
+            "hhi_index": hhi
+        }
+    }
+
+

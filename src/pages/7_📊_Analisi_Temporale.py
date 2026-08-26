@@ -897,32 +897,53 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
                 meta_b = prof_b_data.get("metrics", {}) if prof_b_data else {}
 
     else:
-        # Modalità Live Point-in-Time
+        # Modalità Live Point-in-Time con Ricostruzione Matematica Reale
         col_lp1, col_lp2 = st.columns(2)
         with col_lp1:
-            st.markdown(f"**🅰️ Snapshot A**: Stato Attivo Oggi (**€ {pos['current_value'].sum():,.2f}**)")
+            tot_today_val = float(pos["current_value"].sum()) if not pos.empty and "current_value" in pos.columns else 0.0
+            st.markdown(f"**🅰️ Snapshot A**: Stato Attivo Oggi (**€ {tot_today_val:,.2f}**)")
             df_pos_a = pos.copy()
             label_a_title = "Portafoglio Live (Oggi)"
-            meta_a = m
+            meta_a = {
+                "sharpe_ratio": float(ret_m.get("sharpe_ratio", 0.0) or 0.0),
+                "volatility_ann_pct": float(ret_m.get("volatility_ann_pct", 0.0) or 0.0),
+                "var_95_pct": float(mk_m.get("var_historical_95", 0.0) or mk_m.get("var_parametric_95", 0.0) or 0.0),
+                "hhi_index": float(results.get("metrics", {}).get("concentration", {}).get("hhi", 0.0) or 0.0)
+            }
+            
         with col_lp2:
-            hist_compare_date = st.selectbox(
+            hist_compare_mode = st.selectbox(
                 "🅱️ Scegli Data Storica di Riferimento per Snapshot B:",
-                options=["Inizio Anno Corrente (YTD)", "6 Mesi Fa", "12 Mesi Fa (1 Anno)", "Prima Transazione"],
+                options=["6 Mesi Fa", "12 Mesi Fa (1 Anno)", "Inizio Anno Corrente (YTD)", "3 Mesi Fa", "Data Personalizzata (Calendario)"],
                 index=0
             )
-            label_b_title = f"Riferimento ({hist_compare_date})"
-            df_pos_b = pos.copy()
-            if not sr_port.empty:
-                tot_cum = (1.0 + sr_port).prod()
-                factor = 1.0 / max(0.2, tot_cum)
-                if hist_compare_date == "6 Mesi Fa":
-                    factor = factor * 1.10
-                elif hist_compare_date == "12 Mesi Fa (1 Anno)":
-                    factor = factor * 1.25
-                df_pos_b["current_value"] = df_pos_b["current_value"] * factor
-                df_pos_b["last_price"] = df_pos_b["last_price"] * factor
-                tot_b = df_pos_b["current_value"].sum()
-                df_pos_b["weight_pct"] = (df_pos_b["current_value"] / tot_b * 100.0) if tot_b > 0 else 0.0
+
+            if not raw_sr_port.empty:
+                max_dt = pd.to_datetime(raw_sr_port.index.max()).date()
+            else:
+                max_dt = datetime.now().date()
+
+            if hist_compare_mode == "6 Mesi Fa":
+                target_dt_b = max_dt - timedelta(days=182)
+            elif hist_compare_mode == "12 Mesi Fa (1 Anno)":
+                target_dt_b = max_dt - timedelta(days=365)
+            elif hist_compare_mode == "Inizio Anno Corrente (YTD)":
+                target_dt_b = datetime(max_dt.year, 1, 1).date()
+            elif hist_compare_mode == "3 Mesi Fa":
+                target_dt_b = max_dt - timedelta(days=91)
+            else:
+                target_dt_b = st.date_input("Scegli Data Storica Esatta:", value=max_dt - timedelta(days=182), max_value=max_dt)
+
+            reconst_res = reconstruct_point_in_time_portfolio(
+                pos_today=pos,
+                sr_port=raw_sr_port,
+                returns_df=df_returns,
+                target_date=target_dt_b,
+                rf_rate=active_rf_rate
+            )
+            df_pos_b = reconst_res["df_positions"]
+            meta_b = reconst_res["metrics"]
+            label_b_title = f"Riferimento ({target_dt_b.strftime('%d/%m/%Y')})"
 
     # ── ESECUZIONE DEL CONFRONTO MATEMATICO SIDE-BY-SIDE ─────────
     if not df_pos_a.empty or not df_pos_b.empty:
