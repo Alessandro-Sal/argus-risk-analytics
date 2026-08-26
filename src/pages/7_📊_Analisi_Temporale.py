@@ -48,7 +48,6 @@ render_command_bar()
 
 # ── Load In-Memory Portfolio Bundle ───────────────────────────
 results, has_real = ensure_risk_bundle_loaded()
-render_sandbox_banner(page_key="p7")
 
 raw_sr_port = results.get("portfolio_return", pd.Series(dtype=float))
 raw_sr_bm = results.get("benchmark_return", pd.Series(dtype=float))
@@ -71,12 +70,111 @@ else:
 
 # ── Header & Titolo ──────────────────────────────────────────
 st.title("📊 Analisi Temporale & Dinamica delle Serie Storiche")
-if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: **{st.session_state.get('portfolio_name', 'Master Wealth')}** • Seleziona gli strumenti, le date e gli snapshot di cui esaminare la dinamica temporale.")
-elif results.get("is_sandbox"):
-    st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Seleziona gli strumenti e le date da analizzare.")
+
+saved_profiles_list = list_saved_portfolio_profiles()
+saved_profile_names = [p.get("name") for p in saved_profiles_list if p.get("name")]
+
+# ── COCKPIT DI STATO & GESTIONE DUAL-MODE (ANALISI CARICATA vs NON CARICATA) ───
+if has_real:
+    tot_port_val = float(pos["current_value"].sum()) if not pos.empty and "current_value" in pos.columns else float(results.get("portfolio_value", 0.0))
+    p_name = st.session_state.get("portfolio_name", "Master Wealth")
+    p_run = st.session_state.get("run_id", "LIVE")
+    n_assets = len(pos) if not pos.empty else len(df_returns.columns)
+    
+    with st.expander(f"🟢 **Portafoglio Live Attivo: {p_name}** | Valore: **€ {tot_port_val:,.2f}** | {n_assets} Asset • *Opzioni di cambio portafoglio*", expanded=False):
+        c_sw1, c_sw2, c_sw3 = st.columns([2.5, 1.5, 1.2], vertical_alignment="center")
+        with c_sw1:
+            if saved_profile_names:
+                sel_switch_name = st.selectbox("Seleziona altro Portafoglio Salvato:", saved_profile_names, index=saved_profile_names.index(p_name) if p_name in saved_profile_names else 0, key="sw_active_port_p7")
+            else:
+                st.caption("Nessun altro portafoglio salvato nel Wealth Hub.")
+        with c_sw2:
+            st.markdown('<div style="height: 24px;"></div>', unsafe_allow_html=True)
+            if saved_profile_names and st.button("⚡ Attiva Portafoglio", key="btn_sw_port_p7", use_container_width=True):
+                prof_data = load_portfolio_profile(sel_switch_name)
+                if prof_data:
+                    st.session_state["results"] = prof_data.get("results_full") or prof_data
+                    st.session_state["pipeline_done"] = True
+                    st.session_state["portfolio_name"] = sel_switch_name
+                    st.session_state["run_id"] = f"LOAD-{sel_switch_name[:10]}"
+                    try:
+                        from core.workspace_manager import save_session_snapshot_to_cache
+                        save_session_snapshot_to_cache()
+                    except Exception:
+                        pass
+                    st.rerun()
+        with c_sw3:
+            st.markdown('<div style="height: 24px;"></div>', unsafe_allow_html=True)
+            try:
+                st.page_link("0_Control_Room.py", label="💼 Control Room", icon="📥", use_container_width=True)
+            except Exception:
+                pass
 else:
-    st.caption("Intelligence multi-temporale per tracciare l'evoluzione del patrimonio, dei singoli asset, dei rendimenti periodici e degli snapshot storici.")
+    # Modalità Sandbox / Nessun portafoglio reale caricato
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, rgba(234, 179, 8, 0.12) 0%, rgba(20, 24, 33, 0.85) 100%); border: 1px solid rgba(234, 179, 8, 0.4); border-left: 4px solid #eab308; border-radius: 8px; padding: 12px 18px; margin-bottom: 14px;">
+        <div style="font-size: 14px; font-weight: 700; color: #facc15; margin-bottom: 4px;">
+            ⚠️ Nessun Portafoglio Reale Attivo in Memoria (Modalità Sandbox Dimostrativa)
+        </div>
+        <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.4;">
+            I grafici sottostanti mostrano un benchmark simulato. Puoi caricare all'istante un portafoglio salvato dal Wealth Hub, importare un nuovo file o cambiare il preset dimostrativo.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    col_sb_act1, col_sb_act2, col_sb_act3 = st.columns([2.5, 1.8, 1.7])
+    with col_sb_act1:
+        if saved_profile_names:
+            sel_load_wh = st.selectbox("📂 Portafogli nel Wealth Hub:", saved_profile_names, index=0, key="sel_wh_load_sb_p7")
+            if st.button("⚡ Carica Questo Portafoglio", key="btn_load_wh_sb_p7", type="primary", use_container_width=True):
+                prof_data = load_portfolio_profile(sel_load_wh)
+                if prof_data:
+                    st.session_state["results"] = prof_data.get("results_full") or prof_data
+                    st.session_state["pipeline_done"] = True
+                    st.session_state["portfolio_name"] = sel_load_wh
+                    st.session_state["run_id"] = f"LOAD-{sel_load_wh[:10]}"
+                    try:
+                        from core.workspace_manager import save_session_snapshot_to_cache
+                        save_session_snapshot_to_cache()
+                    except Exception:
+                        pass
+                    st.rerun()
+        else:
+            st.info("Nessun portafoglio salvato trovato nel Wealth Hub.")
+            
+    with col_sb_act2:
+        st.markdown("**📥 Importa Nuovo File:**")
+        try:
+            st.page_link("0_Control_Room.py", label="Apri Control Room (Importa File)", icon="🚀", use_container_width=True)
+        except Exception:
+            pass
+            
+    with col_sb_act3:
+        sandbox_opts = [
+            "🏦 Bilanciato Istituzionale (60/40 Equity/Bond)",
+            "🚀 Mega-Cap Tech & AI Growth",
+            "🛡️ Ray Dalio All-Weather",
+            "🇪🇺 Euro Blue Chips & Value"
+        ]
+        curr_sb = st.session_state.get("sandbox_preset_name", sandbox_opts[0])
+        sel_sb_preset = st.selectbox("🧪 Scegli Benchmark Demo:", sandbox_opts, index=sandbox_opts.index(curr_sb) if curr_sb in sandbox_opts else 0, key="sel_sb_preset_p7")
+        if sel_sb_preset != curr_sb:
+            if st.button("🔄 Applica Preset Demo", key="btn_apply_sb_p7", use_container_width=True):
+                from core.risk_engine import compute_sandbox_risk_bundle
+                sb_presets_map = {
+                    "🏦 Bilanciato Istituzionale (60/40 Equity/Bond)": ["AAPL", "MSFT", "JNJ", "PG", "BND", "SPY"],
+                    "🚀 Mega-Cap Tech & AI Growth": ["AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META"],
+                    "🛡️ Ray Dalio All-Weather": ["SPY", "TLT", "IEF", "GLD", "DBC"],
+                    "🇪🇺 Euro Blue Chips & Value": ["ENEL.MI", "MC.PA", "SAP", "ASML", "SAN.MC"],
+                }
+                tks = sb_presets_map.get(sel_sb_preset, ["AAPL", "MSFT", "SPY"])
+                rf_v = st.session_state.get("active_rf_rate", 0.035)
+                base_c = "EUR" if "Euro" in sel_sb_preset else "USD"
+                sb_bundle = compute_sandbox_risk_bundle(tickers=tks, sandbox_name=sel_sb_preset, risk_free_rate=rf_v, base_currency=base_c)
+                st.session_state["results"] = sb_bundle
+                st.session_state["sandbox_preset_name"] = sel_sb_preset
+                st.rerun()
+
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
 
@@ -832,7 +930,8 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
         "⚡ Confronto Live Point-in-Time (Oggi vs Data Storica)",
         "📂 Confronto tra Profili Multi-Portafoglio (Wealth Hub)"
     ]
-    selected_source = st.radio("Seleziona Sorgente del Confronto:", comp_sources, horizontal=True)
+    def_source_idx = 1 if has_real else (2 if len(saved_profile_names) >= 2 else (0 if avail_portfolios else 1))
+    selected_source = st.radio("Seleziona Sorgente del Confronto:", comp_sources, index=def_source_idx, horizontal=True)
 
     if selected_source == "💾 Snapshot Archiviati su Database MySQL":
         if not avail_portfolios:
