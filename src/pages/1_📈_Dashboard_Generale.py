@@ -1728,17 +1728,77 @@ with st.expander("💬 ARGUS Quant Copilot (Fai una domanda sul portafoglio)", e
 st.divider()
 
 # ── CENTRO ESPORTAZIONE REPORT & DATI (IN FONDO ALLA PAGINA) ──
-section("📥 Centro Esportazione Report & Power BI Data Pack")
-st.caption("Esporta il Factsheet Executive HTML interattivo, il Factsheet PDF, il Workbook Excel Multi-Tab completo o il pacchetto Star Schema per Power BI (.zip).")
+section("📥 Centro Esportazione Report & Deliverable Istituzionali")
+st.caption("Esporta il Dossier Integrato di Due Diligence (Audit Completo a 10 Pagine PDF), il Factsheet Rapido (2 Pagine), il Workbook Excel Multi-Tab o il pacchetto Star Schema per Power BI.")
 
-col_exp_html, col_exp_pdf, col_exp_excel, col_exp_bi = st.columns(4)
+# Riga 1: Istituzionale PDF Dossier (Hero) & Factsheet Rapido
+col_exp_dossier, col_exp_pdf = st.columns([1.6, 1.4])
+
+with col_exp_dossier:
+    try:
+        from core.report_exporter import generate_institutional_audit_dossier
+        dossier_pdf_bytes = generate_institutional_audit_dossier(
+            results,
+            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
+        )
+        st.download_button(
+            label="🏛️ Scarica Dossier Audit Istituzionale (10 Pag. PDF)",
+            data=dossier_pdf_bytes,
+            file_name=f"ARGUS_Audit_Dossier_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            type="primary",
+            use_container_width=True,
+            help="Dossier completo per Comitati d'Investimento e Family Office con VaR, Fama-French, Brinson Attribution, Lotti FIFO, Dividendi, Fisco TUIR e Compliance IPS."
+        )
+    except Exception as e:
+        st.error(f"Errore nella generazione Audit Dossier PDF: {e}")
+
+with col_exp_pdf:
+    try:
+        from core.report_exporter import generate_pdf_factsheet
+        pdf_bytes = generate_pdf_factsheet(
+            results,
+            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
+        )
+        st.download_button(
+            label="📄 Scarica Executive Factsheet (2 Pag. PDF)",
+            data=pdf_bytes,
+            file_name=f"ARGUS_Factsheet_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            help="Sintesi esecutiva a 2 pagine con KPI, Top Holdings e Stress Test."
+        )
+    except Exception as e:
+        st.error(f"Errore nella generazione Factsheet PDF: {e}")
+
+st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+
+# Riga 2: Excel, HTML & Power BI
+col_exp_excel, col_exp_html, col_exp_bi = st.columns(3)
+
+with col_exp_excel:
+    try:
+        from core.report_exporter import generate_excel_report
+        excel_bytes = generate_excel_report(
+            results,
+            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
+        )
+        st.download_button(
+            label="📊 Scarica Report Excel (.xlsx)",
+            data=excel_bytes,
+            file_name=f"ARGUS_Report_MultiTab_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+    except Exception as e:
+        st.error(f"Errore nella generazione Excel: {e}")
 
 with col_exp_html:
     import os
     port_filename = f"ARGUS_Factsheet_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.html"
     file_path = os.path.abspath(os.path.join("exports", port_filename))
 
-    if st.button("🌐 Genera & Apri Factsheet HTML", type="primary", use_container_width=True, key="btn_generate_html_on_demand"):
+    if st.button("🌐 Genera & Apri Factsheet HTML", use_container_width=True, key="btn_generate_html_on_demand"):
         try:
             import importlib
             import core.html_exporter
@@ -1765,43 +1825,6 @@ with col_exp_html:
                 use_container_width=True,
                 key="btn_download_html_file"
             )
-        st.caption(f"📁 Salvato in `exports/{port_filename}`")
-
-with col_exp_pdf:
-    try:
-        from core.report_exporter import generate_pdf_factsheet
-        pdf_bytes = generate_pdf_factsheet(
-            results,
-            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
-        )
-        st.download_button(
-            label="📄 Scarica Executive PDF Factsheet",
-            data=pdf_bytes,
-            file_name=f"ARGUS_Factsheet_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True
-        )
-    except Exception as e:
-        st.error(f"Errore nella generazione PDF: {e}")
-
-with col_exp_excel:
-    try:
-        from core.report_exporter import generate_excel_report
-        excel_bytes = generate_excel_report(
-            results,
-            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
-        )
-        st.download_button(
-            label="📊 Scarica Report Excel (.xlsx)",
-            data=excel_bytes,
-            file_name=f"ARGUS_Report_MultiTab_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            type="primary",
-            use_container_width=True
-        )
-    except Exception as e:
-        st.error(f"Errore nella generazione Excel: {e}")
 
 with col_exp_bi:
     try:
@@ -1815,7 +1838,6 @@ with col_exp_bi:
             data=zip_bytes,
             file_name=f"ARGUS_PowerBI_StarSchema_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.zip",
             mime="application/zip",
-            type="primary",
             use_container_width=True
         )
     except Exception as e:
