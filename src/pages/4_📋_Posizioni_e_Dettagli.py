@@ -303,7 +303,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         display_cols = [
             "ticker", "asset_class", "sector", "country", "qty_net",
             "wacp", "last_price", "current_value", "weight_pct",
-            "pnl_realized", "pnl_unrealized", "days_to_liquidate", "yield_on_cost_pct"
+            "pnl_realized", "pnl_unrealized", "beta", "days_to_liquidate", "yield_on_cost_pct"
         ]
         valid_cols = [c for c in display_cols if c in df_l.columns]
         df_disp = df_l[valid_cols].copy()
@@ -313,7 +313,8 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             "country": "Paese", "qty_net": "Quantità", "wacp": "Prezzo Carico (€)",
             "last_price": "Prezzo Mkt (€)", "current_value": "Controvalore (€)",
             "weight_pct": "Peso (%)", "pnl_realized": "PnL Realizz. (€)",
-            "pnl_unrealized": "PnL Latente (€)", "days_to_liquidate": "Giorni Liq. (ADV 15%)",
+            "pnl_unrealized": "PnL Latente (€)", "beta": "Beta (vs SPY)",
+            "days_to_liquidate": "Giorni Liq. (ADV 15%)",
             "yield_on_cost_pct": "Yield on Cost (%)"
         }
         df_disp.rename(columns=col_renames, inplace=True)
@@ -344,6 +345,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
             "PnL Realizz. (€)": st.column_config.NumberColumn("PnL Realizz. (€)", format="€ %.2f"),
             "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
+            "Beta (vs SPY)": st.column_config.NumberColumn("Beta (vs SPY)", format="%.2f", help="Sensibilità sistematica dell'asset rispetto al Benchmark SPY"),
             "Peso (%)": st.column_config.ProgressColumn("Peso (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
             "Giorni Liq. (ADV 15%)": st.column_config.NumberColumn("Giorni Liq. (ADV 15%)", format="%.2f gg"),
             "Yield on Cost (%)": st.column_config.ProgressColumn("Yield on Cost (%)", format="%.2f%%", min_value=0.0, max_value=20.0)
