@@ -1,6 +1,6 @@
 import pytest
 import pandas as pd
-from core.report_exporter import generate_pdf_factsheet, generate_excel_report
+from core.report_exporter import generate_pdf_factsheet, generate_excel_report, generate_institutional_audit_dossier
 from core.rebalancer import compute_rebalancing_orders
 from core.advisor import generate_quant_advisory_report
 from core.dividend_engine import compute_dividend_forecast
@@ -33,6 +33,10 @@ def test_report_exporter_pdf_and_excel(mock_risk_results):
     pdf_bytes = generate_pdf_factsheet(mock_risk_results, portfolio_name="Test Portfolio")
     assert isinstance(pdf_bytes, bytes)
     assert len(pdf_bytes) > 100
+
+    dossier_bytes = generate_institutional_audit_dossier(mock_risk_results, portfolio_name="Test Portfolio")
+    assert isinstance(dossier_bytes, bytes)
+    assert len(dossier_bytes) > 10000
 
     excel_bytes = generate_excel_report(mock_risk_results, portfolio_name="Test Portfolio")
     assert isinstance(excel_bytes, bytes)
