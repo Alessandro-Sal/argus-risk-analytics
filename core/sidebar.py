@@ -33,10 +33,19 @@ NAV_MODULES = [
         "subtabs": []
     },
     {
+        "title": "Live Terminal & Desk",
+        "icon": "🖥️",
+        "page_file": "pages/2_🖥️_Live_Terminal.py",
+        "key": "2_Live_Terminal",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
         "title": "Analisi del Rischio",
         "icon": "🔴",
-        "page_file": "pages/2_🔴_Analisi_Rischio.py",
-        "key": "2_Analisi_Rischio",
+        "page_file": "pages/3_🔴_Analisi_Rischio.py",
+        "key": "3_Analisi_Rischio",
         "has_subtabs": True,
         "tab_key": "risk_active_tab",
         "subtabs": [
@@ -49,8 +58,8 @@ NAV_MODULES = [
     {
         "title": "Modelli Quantitativi",
         "icon": "🔬",
-        "page_file": "pages/3_🔬_Modelli_Quantitativi.py",
-        "key": "3_Modelli_Quantitativi",
+        "page_file": "pages/4_🔬_Modelli_Quantitativi.py",
+        "key": "4_Modelli_Quantitativi",
         "has_subtabs": True,
         "tab_key": "quant_active_tab",
         "subtabs": [
@@ -66,8 +75,8 @@ NAV_MODULES = [
     {
         "title": "Posizioni & Fisco",
         "icon": "📋",
-        "page_file": "pages/4_📋_Posizioni_e_Dettagli.py",
-        "key": "4_Posizioni_e_Dettagli",
+        "page_file": "pages/5_📋_Posizioni_e_Dettagli.py",
+        "key": "5_Posizioni_e_Dettagli",
         "has_subtabs": True,
         "tab_key": "positions_active_tab",
         "subtabs": [
@@ -81,8 +90,8 @@ NAV_MODULES = [
     {
         "title": "Valutazione Aziendale",
         "icon": "🏛️",
-        "page_file": "pages/5_🏛️_Valutazione_Aziendale.py",
-        "key": "5_Valutazione_Aziendale",
+        "page_file": "pages/6_🏛️_Valutazione_Aziendale.py",
+        "key": "6_Valutazione_Aziendale",
         "has_subtabs": True,
         "tab_key": "val_segmented_tab",
         "subtabs": [
@@ -95,8 +104,8 @@ NAV_MODULES = [
     {
         "title": "Stress Testing",
         "icon": "🌪️",
-        "page_file": "pages/6_🌪️_Stress_Testing.py",
-        "key": "6_Stress_Testing",
+        "page_file": "pages/7_🌪️_Stress_Testing.py",
+        "key": "7_Stress_Testing",
         "has_subtabs": True,
         "tab_key": "stress_active_tab",
         "subtabs": [
@@ -108,8 +117,8 @@ NAV_MODULES = [
     {
         "title": "Analisi Temporale",
         "icon": "📊",
-        "page_file": "pages/7_📊_Analisi_Temporale.py",
-        "key": "7_Analisi_Temporale",
+        "page_file": "pages/8_📊_Analisi_Temporale.py",
+        "key": "8_Analisi_Temporale",
         "has_subtabs": True,
         "tab_key": "time_active_tab",
         "subtabs": [
@@ -123,8 +132,8 @@ NAV_MODULES = [
     {
         "title": "Analisi Tecnica",
         "icon": "📈",
-        "page_file": "pages/8_📈_Analisi_Tecnica.py",
-        "key": "8_Analisi_Tecnica",
+        "page_file": "pages/9_📈_Analisi_Tecnica.py",
+        "key": "9_Analisi_Tecnica",
         "has_subtabs": True,
         "tab_key": "tech_active_subtab",
         "subtabs": [
@@ -138,8 +147,8 @@ NAV_MODULES = [
     {
         "title": "Screener Opportunità",
         "icon": "🔍",
-        "page_file": "pages/9_🔍_Screener_Opportunita.py",
-        "key": "9_Screener_Opportunita",
+        "page_file": "pages/10_🔍_Screener_Opportunita.py",
+        "key": "10_Screener_Opportunita",
         "has_subtabs": True,
         "tab_key": "screener_segmented_subtab",
         "subtabs": [
@@ -152,15 +161,14 @@ NAV_MODULES = [
     {
         "title": "BQuant & Launchpad",
         "icon": "💻",
-        "page_file": "pages/10_💻_BQuant_e_Launchpad.py",
-        "key": "10_BQuant_e_Launchpad",
+        "page_file": "pages/11_💻_BQuant_e_Launchpad.py",
+        "key": "11_BQuant_e_Launchpad",
         "has_subtabs": True,
         "tab_key": "bquant_active_tab",
         "subtabs": [
             {"label": "🐍 Python Sandbox", "target": "🐍 ARGUS BQuant Python Sandbox"},
             {"label": "🎛️ Launchpad Workspace", "target": "🎛️ Launchpad & Workspace Customizer"},
-            {"label": "📊 Excel Connector", "target": "📊 Excel Live Connector & RTD"},
-            {"label": "🖥️ Live Terminal", "target": "🖥️ Terminale Live & Interactive CLI"}
+            {"label": "📊 Excel Connector", "target": "📊 Excel Live Connector & RTD"}
         ]
     }
 ]
