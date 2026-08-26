@@ -661,94 +661,23 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         init_res = term_eng.execute_command("HELP", session_context)
         term_eng.output_buffer.append(init_res)
 
-    # ── RIGA 1: INTERACTIVE CLI (60%) vs LIVE LEVEL-2 BOOK MATRIX (40%) ──
-    col_cli, col_tape = st.columns([1.5, 1.0], gap="medium")
+    # ── SEZIONE 1: LIVE MARKET TAPE & LEVEL-2 BOOK (FULL-WIDTH ROW) ──
+    st.markdown("#### ⚡ Live Market Tape & Real-Time API")
+    
+    # Universo Ticker Selezionabili (Portafoglio + Benchmark Globali)
+    base_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else []
+    for bmk in ["AAPL", "MSFT", "NVDA", "SPY", "QQQ", "BTC-USD", "ETH-USD", "GC=F", "EURUSD=X"]:
+        if bmk not in base_tickers:
+            base_tickers.append(bmk)
 
-    with col_cli:
-        st.markdown("##### ⌨️ Console Interattiva Bloomberg CLI")
+    col_tape_ctrl, col_tape_book = st.columns([1.2, 1.8], gap="medium")
 
-        # Chip di scelta rapida (2 righe pulite e leggibili)
-        st.caption("Comandi Rapidi:")
-        chips_r1 = st.columns(4)
-        quick_cmds_r1 = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC"]
-        for idx, qc in enumerate(quick_cmds_r1):
-            with chips_r1[idx]:
-                if st.button(qc, key=f"btn_chip_r1_{idx}", use_container_width=True):
-                    cmd_res = term_eng.execute_command(qc, session_context)
-                    term_eng.output_buffer.insert(0, cmd_res)
-                    st.rerun()
-
-        chips_r2 = st.columns(4)
-        quick_cmds_r2 = ["WATCHLIST", "VAR 95", "TOP", "HELP"]
-        for idx, qc in enumerate(quick_cmds_r2):
-            with chips_r2[idx]:
-                if st.button(qc, key=f"btn_chip_r2_{idx}", use_container_width=True):
-                    cmd_res = term_eng.execute_command(qc, session_context)
-                    term_eng.output_buffer.insert(0, cmd_res)
-                    st.rerun()
-
-        st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
-
-        # Form interattivo con supporto a pressione tasto INVIO (Enter Key) e submit immediato
-        with st.form(key="term_cli_interactive_form", clear_on_submit=True):
-            col_inp, col_run = st.columns([4.2, 0.8])
-            with col_inp:
-                cmd_input = st.text_input(
-                    "Command Prompt",
-                    placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'QUOTE NVDA', 'BTC-USD', 'WATCHLIST', 'PORT RISK')...",
-                    key="term_cli_input_box",
-                    label_visibility="collapsed"
-                )
-            with col_run:
-                btn_run_cmd = st.form_submit_button("▶ Esegui", type="primary", use_container_width=True)
-
-            if btn_run_cmd and cmd_input.strip():
-                cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
-                term_eng.output_buffer.insert(0, cmd_res)
-                st.rerun()
-
-        # Buffer di Output Terminale (Stile JetBrains Mono Dark Screen) con sanitizzazione HTML
-        terminal_screen_lines = []
-        for item in term_eng.output_buffer[:10]:
-            status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
-            esc_cmd = html.escape(str(item.command))
-            esc_out = html.escape(str(item.output_text))
-            terminal_screen_lines.append(
-                f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
-                f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> "
-                f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>\n"
-                f"{esc_out}\n" + "─"*72
-            )
-
-        terminal_screen_html = "\n\n".join(terminal_screen_lines)
-
-        terminal_box_html = (
-            f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 16px; font-family: \'Courier New\', \'Fira Code\', monospace; font-size: 12px; color: #c9d1d9; white-space: pre-wrap; height: 380px; overflow-y: auto; box-shadow: inset 0 2px 10px rgba(0,0,0,0.8); line-height: 1.4;">'
-            f'{terminal_screen_html}'
-            f'</div>'
-        )
-        st.markdown(terminal_box_html, unsafe_allow_html=True)
-
-        col_cls1, col_cls2 = st.columns([1.0, 3.0])
-        with col_cls1:
-            if st.button("🧹 Pulisci Schermo", key="btn_term_clear_buf", use_container_width=True):
-                term_eng.output_buffer.clear()
-                st.rerun()
-
-    with col_tape:
-        st.markdown("##### ⚡ Live Market Tape & Real-Time API")
-        
-        # Universo Ticker Selezionabili (Portafoglio + Benchmark Globali)
-        base_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else []
-        for bmk in ["AAPL", "MSFT", "NVDA", "SPY", "QQQ", "BTC-USD", "ETH-USD", "GC=F", "EURUSD=X"]:
-            if bmk not in base_tickers:
-                base_tickers.append(bmk)
-
-        # Riga 1: Selezione Ticker da Dropdown
-        sel_dropdown_tk = st.selectbox("Seleziona Ticker:", options=base_tickers, key="sel_tape_ticker")
-        
-        # Riga 2: Inserimento Ticker Personalizzato
-        custom_tk_input = st.text_input("Oppure Ticker Personalizzato:", placeholder="Es. TSLA, ENI.MI, BTC-USD, GC=F", key="inp_custom_tape_tk").strip().upper()
+    with col_tape_ctrl:
+        col_t1, col_t2 = st.columns([1.2, 1.0])
+        with col_t1:
+            sel_dropdown_tk = st.selectbox("Seleziona Ticker:", options=base_tickers, key="sel_tape_ticker")
+        with col_t2:
+            custom_tk_input = st.text_input("Oppure Ticker Custom:", placeholder="Es. TSLA, ENI.MI", key="inp_custom_tape_tk").strip().upper()
 
         active_tape_ticker = custom_tk_input if custom_tk_input else sel_dropdown_tk
 
@@ -791,28 +720,30 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         display_px = stats.get("last_price", last_px)
         vwap_px = stats.get("vwap", display_px)
         ofi_val = stats.get("order_flow_imbalance", 0.0)
-        
-        # Microprice di Stoikov (2018)
         microprice = display_px + (0.01 if ofi_val > 0 else -0.01)
-        
+
         # Header Ticker Live con Badge Variazione e Stato API
         chg_color = "#3fb950" if chg >= 0 else "#f85149"
         chg_sign = "+" if chg >= 0 else ""
         arrow = "▲" if chg >= 0 else "▼"
-        api_badge = '<span style="font-size:9.5px; background:rgba(63,185,80,0.15); color:#3fb950; border:1px solid rgba(63,185,80,0.3); padding:1px 5px; border-radius:3px; font-weight:700;">LIVE API</span>' if live_q["is_live"] else '<span style="font-size:9.5px; background:rgba(255,153,0,0.15); color:#ff9900; border:1px solid rgba(255,153,0,0.3); padding:1px 5px; border-radius:3px; font-weight:700;">CACHE</span>'
+        api_badge = '<span style="font-size:10px; background:rgba(63,185,80,0.15); color:#3fb950; border:1px solid rgba(63,185,80,0.3); padding:2px 6px; border-radius:4px; font-weight:700;">LIVE API</span>' if live_q["is_live"] else '<span style="font-size:10px; background:rgba(255,153,0,0.15); color:#ff9900; border:1px solid rgba(255,153,0,0.3); padding:2px 6px; border-radius:4px; font-weight:700;">CACHE</span>'
 
         tape_card_html = (
-            f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">'
-            f'<div><span style="font-size:15px; font-weight:800; color:#f0f6fc;">{active_tape_ticker}</span> {api_badge}'
-            f'<div style="font-size:16px; font-weight:800; color:#ff9900; margin-top:2px;">{currency} {display_px:,.2f}</div></div>'
-            f'<div style="text-align:right;">'
-            f'<span style="font-size:12px; font-weight:700; color:{chg_color}; background:{chg_color}22; padding:3px 8px; border-radius:4px; border:1px solid {chg_color}55;">{chg_sign}{chg:,.2f} ({chg_sign}{chg_pct:.2f}%) {arrow}</span>'
-            f'<div style="font-size:10px; color:#8b949e; margin-top:3px; font-family:monospace;">Vol: {vol_str}</div>'
+            f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 16px; margin-top: 4px;">'
+            f'<div style="display:flex; justify-content:space-between; align-items:center;">'
+            f'<div><span style="font-size:18px; font-weight:800; color:#f0f6fc;">{active_tape_ticker}</span> {api_badge}</div>'
+            f'<div><span style="font-size:13px; font-weight:700; color:{chg_color}; background:{chg_color}22; padding:3px 8px; border-radius:4px; border:1px solid {chg_color}55;">{chg_sign}{chg:,.2f} ({chg_sign}{chg_pct:.2f}%) {arrow}</span></div>'
+            f'</div>'
+            f'<div style="font-size:24px; font-weight:800; color:#ff9900; margin: 4px 0;">{currency} {display_px:,.2f}</div>'
+            f'<div style="display:flex; justify-content:space-between; font-size:11px; color:#8b949e; font-family:monospace;">'
+            f'<span>Vol: {vol_str}</span><span>Range: ${day_l:,.2f} - ${day_h:,.2f}</span>'
             f'</div>'
             f'</div>'
         )
         st.markdown(tape_card_html, unsafe_allow_html=True)
 
+    with col_tape_book:
+        st.markdown("<div style='font-size:12.5px; font-weight:700; color:#8b949e; margin-bottom:4px;'>📊 Level-2 Depth Book (5 Livelli Bid/Ask)</div>", unsafe_allow_html=True)
         # Matrice Level-2 Depth Book dinamica attorno al prezzo reale
         spread_step = max(0.01, round(display_px * 0.0001, 2))
         base_bid = round(display_px - spread_step, 2)
@@ -828,66 +759,128 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
         book_rows_html = []
         for r in book_rows:
-            bid_bar = min(100, int((r["bid_vol"] / 2000) * 100))
-            ask_bar = min(100, int((r["ask_vol"] / 2000) * 100))
+            bid_bar = min(120, int((r["bid_vol"] / 2000) * 120))
+            ask_bar = min(120, int((r["ask_vol"] / 2000) * 120))
             book_rows_html.append(
-                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.03);">'
-                f'<td style="padding:4px; text-align:right; color:#c9d1d9;"><span style="display:inline-block; width:{bid_bar}px; background:rgba(63,185,80,0.25); height:8px; border-radius:2px; margin-right:4px;"></span>{r["bid_vol"]}</td>'
-                f'<td style="padding:4px; font-weight:700; color:#3fb950;">${r["bid_px"]:.2f}</td>'
-                f'<td style="padding:4px; font-weight:700; color:#f85149;">${r["ask_px"]:.2f}</td>'
-                f'<td style="padding:4px; text-align:left; color:#c9d1d9;">{r["ask_vol"]}<span style="display:inline-block; width:{ask_bar}px; background:rgba(248,81,73,0.25); height:8px; border-radius:2px; margin-left:4px;"></span></td>'
+                f'<tr style="border-bottom:1px solid rgba(255,255,255,0.04);">'
+                f'<td style="padding:4px 8px; text-align:right; color:#c9d1d9;"><span style="display:inline-block; width:{bid_bar}px; background:rgba(63,185,80,0.25); height:8px; border-radius:2px; margin-right:6px;"></span>{r["bid_vol"]}</td>'
+                f'<td style="padding:4px 8px; font-weight:700; color:#3fb950;">${r["bid_px"]:.2f}</td>'
+                f'<td style="padding:4px 8px; font-weight:700; color:#f85149;">${r["ask_px"]:.2f}</td>'
+                f'<td style="padding:4px 8px; text-align:left; color:#c9d1d9;">{r["ask_vol"]}<span style="display:inline-block; width:{ask_bar}px; background:rgba(248,81,73,0.25); height:8px; border-radius:2px; margin-left:6px;"></span></td>'
                 f'</tr>'
             )
         
         book_table_inner = "".join(book_rows_html)
         full_book_html = (
-            f'<div style="background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:8px 10px; margin-bottom:8px;">'
-            f'<table style="width:100%; font-family:monospace; font-size:11px; border-collapse:collapse; text-align:center;">'
+            f'<div style="background:#0d1117; border:1px solid #30363d; border-radius:8px; padding:8px 12px;">'
+            f'<table style="width:100%; font-family:monospace; font-size:11.5px; border-collapse:collapse; text-align:center;">'
             f'<thead><tr style="border-bottom:1px solid #30363d; color:#8b949e;">'
-            f'<th style="padding:4px; text-align:right; color:#3fb950;">Vol (Bid)</th>'
-            f'<th style="padding:4px; color:#3fb950;">Bid Px</th>'
-            f'<th style="padding:4px; color:#f85149;">Ask Px</th>'
-            f'<th style="padding:4px; text-align:left; color:#f85149;">Vol (Ask)</th>'
+            f'<th style="padding:4px 8px; text-align:right; color:#3fb950;">Vol (Bid)</th>'
+            f'<th style="padding:4px 8px; color:#3fb950;">Bid Px</th>'
+            f'<th style="padding:4px 8px; color:#f85149;">Ask Px</th>'
+            f'<th style="padding:4px 8px; text-align:left; color:#f85149;">Vol (Ask)</th>'
             f'</tr></thead>'
             f'<tbody>{book_table_inner}</tbody></table></div>'
         )
         st.markdown(full_book_html, unsafe_allow_html=True)
-
-        st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.2f}` • **VWAP**: `${vwap_px:.2f}` • **Range Day**: `${day_l:.2f} - ${day_h:.2f}` • **Aggiornato**: `{live_q['timestamp']}`")
+        st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.2f}` • **VWAP**: `${vwap_px:.2f}` • **Timestamp Feed**: `{live_q['timestamp']}`")
 
     st.divider()
 
-    # ── RIGA 2: LIVE OMS EXECUTION BLOTTER & SYSTEM TELEMETRY (TOP) ──
-    col_blotter, col_top = st.columns([2.0, 1.0], gap="medium")
+    # ── SEZIONE 2: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ──
+    st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
 
-    with col_blotter:
-        st.markdown("##### 📋 Live OMS Execution Blotter (Ordini di Negoziazione)")
-        if not term_eng.oms_blotter:
-            st.info("Nessun ordine registrato. Digita `BUY 100 AAPL @ MKT` o `TWAP 500 MSFT 30` nella console.")
-        else:
-            blotter_records = []
-            for o in term_eng.oms_blotter[:10]:
-                blotter_records.append({
-                    "Order ID": o.order_id,
-                    "Time": o.timestamp,
-                    "Ticker": o.ticker,
-                    "Side": o.side,
-                    "Qty": f"{o.qty:,.1f}",
-                    "Type": o.order_type,
-                    "Fill Px": f"${o.avg_fill_price:.2f}" if o.avg_fill_price > 0 else "MKT",
-                    "Status": o.status,
-                    "Saved (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
-                })
-            df_blotter_ui = pd.DataFrame(blotter_records)
-            st.dataframe(df_blotter_ui, use_container_width=True, hide_index=True)
+    # Chip di scelta rapida (1 riga orizzontale completa da 8 comandi)
+    st.caption("Comandi Rapidi:")
+    chips_cols = st.columns(8)
+    quick_cmds = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC", "WATCHLIST", "VAR 95", "TOP", "HELP"]
+    for idx, qc in enumerate(quick_cmds):
+        with chips_cols[idx]:
+            if st.button(qc, key=f"btn_chip_full_{idx}", use_container_width=True):
+                cmd_res = term_eng.execute_command(qc, session_context)
+                term_eng.output_buffer.insert(0, cmd_res)
+                st.rerun()
 
-    with col_top:
-        st.markdown("##### 📊 Telemetria di Sistema (TOP Monitor)")
-        top_res = term_eng.execute_command("TOP", session_context)
-        top_box_html = (
-            f'<div style="background:#090d13; border:1px solid #30363d; border-radius:6px; padding:10px 12px; font-family:monospace; font-size:11px; color:#3fb950; white-space:pre-wrap;">'
-            f'{top_res.output_text}'
-            f'</div>'
+    st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+
+    # Form interattivo con supporto a pressione tasto INVIO (Enter Key) e submit immediato
+    with st.form(key="term_cli_interactive_form", clear_on_submit=True):
+        col_inp, col_run = st.columns([5.5, 0.8])
+        with col_inp:
+            cmd_input = st.text_input(
+                "Command Prompt",
+                placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'QUOTE NVDA', 'BTC-USD', 'WATCHLIST', 'PORT RISK', 'BUY 100 AAPL')...",
+                key="term_cli_input_box",
+                label_visibility="collapsed"
+            )
+        with col_run:
+            btn_run_cmd = st.form_submit_button("▶ Esegui", type="primary", use_container_width=True)
+
+        if btn_run_cmd and cmd_input.strip():
+            cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
+            term_eng.output_buffer.insert(0, cmd_res)
+            st.rerun()
+
+    # Buffer di Output Terminale a tutta larghezza (Stile JetBrains Mono Dark Screen)
+    terminal_screen_lines = []
+    for item in term_eng.output_buffer[:12]:
+        status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
+        esc_cmd = html.escape(str(item.command))
+        esc_out = html.escape(str(item.output_text))
+        terminal_screen_lines.append(
+            f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
+            f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> "
+            f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>\n"
+            f"{esc_out}\n" + "─"*90
         )
-        st.markdown(top_box_html, unsafe_allow_html=True)
+
+    terminal_screen_html = "\n\n".join(terminal_screen_lines)
+
+    terminal_box_html = (
+        f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 16px 20px; font-family: \'Courier New\', \'Fira Code\', monospace; font-size: 12.5px; color: #c9d1d9; white-space: pre-wrap; height: 420px; overflow-y: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85); line-height: 1.45;">'
+        f'{terminal_screen_html}'
+        f'</div>'
+    )
+    st.markdown(terminal_box_html, unsafe_allow_html=True)
+
+    col_cls1, col_cls2 = st.columns([1.2, 5.0])
+    with col_cls1:
+        if st.button("🧹 Pulisci Schermo", key="btn_term_clear_buf", use_container_width=True):
+            term_eng.output_buffer.clear()
+            st.rerun()
+
+    st.divider()
+
+    # ── SEZIONE 3: LIVE OMS EXECUTION BLOTTER (FULL-WIDTH ROW) ──
+    st.markdown("#### 📋 Live OMS Execution Blotter (Ordini di Negoziazione)")
+    if not term_eng.oms_blotter:
+        st.info("Nessun ordine registrato. Digita `BUY 100 AAPL @ MKT` o `TWAP 500 MSFT 30` nella console sopra.")
+    else:
+        blotter_records = []
+        for o in term_eng.oms_blotter[:15]:
+            blotter_records.append({
+                "Order ID": o.order_id,
+                "Time": o.timestamp,
+                "Ticker": o.ticker,
+                "Side": o.side,
+                "Qty": f"{o.qty:,.1f}",
+                "Type": o.order_type,
+                "Fill Px": f"${o.avg_fill_price:.2f}" if o.avg_fill_price > 0 else "MKT",
+                "Status": o.status,
+                "Saved (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
+            })
+        df_blotter_ui = pd.DataFrame(blotter_records)
+        st.dataframe(df_blotter_ui, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── SEZIONE 4: SYSTEM TELEMETRY (FULL-WIDTH ROW) ──
+    st.markdown("#### 📊 Telemetria di Sistema (TOP Monitor)")
+    top_res = term_eng.execute_command("TOP", session_context)
+    top_box_html = (
+        f'<div style="background:#090d13; border:1px solid #30363d; border-radius:8px; padding:14px 18px; font-family:monospace; font-size:12px; color:#3fb950; white-space:pre-wrap;">'
+        f'{html.escape(top_res.output_text)}'
+        f'</div>'
+    )
+    st.markdown(top_box_html, unsafe_allow_html=True)
 
