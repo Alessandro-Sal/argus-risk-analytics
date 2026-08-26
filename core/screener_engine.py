@@ -112,282 +112,311 @@ def _compute_rsi(series: pd.Series, period: int = 14) -> float:
     return float(100.0 - (100.0 / (1.0 + rs)))
 
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def _process_single_screener_ticker(
+    tk: str,
+    sr_bm_ret: pd.Series,
+    force_refresh: bool = False
+) -> Dict[str, Any]:
+    """Estrae e calcola tutti gli indicatori per un singolo ticker di screening."""
+    try:
+        info = get_cached_ticker_info(tk, force_refresh=force_refresh)
+        df_hist = get_cached_ticker_history(tk, force_refresh=force_refresh)
+        
+        name = info.get("shortName") or info.get("longName") or tk
+        sector = info.get("sector") or "N/D"
+        industry = info.get("industry") or "N/D"
+        country = info.get("country") or "N/D"
+        currency = info.get("currency") or ("EUR" if tk.endswith("-EUR") or tk.endswith(".MI") or tk.endswith(".PA") or tk.endswith(".DE") else "USD")
+        
+        quote_type = str(info.get("quoteType", "")).upper()
+        if sector == "N/D":
+            if quote_type == "CRYPTOCURRENCY" or "-" in tk or tk.startswith(("BTC", "ETH", "SOL")):
+                sector = "Crypto / Digital Assets"
+                industry = "Digital Currency"
+            elif quote_type == "ETF" or "ETF" in str(name).upper() or "ISHARES" in str(name).upper() or "VANGUARD" in str(name).upper():
+                sector = "ETF / Fondi"
+                industry = "Exchange Traded Fund"
+
+        # Prezzi e Target Price
+        last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0.0)
+        if last_price <= 0 and df_hist is not None and not df_hist.empty and "close" in df_hist.columns:
+            last_price = float(df_hist["close"].iloc[-1])
+        if last_price <= 0:
+            if "FDUSD" in tk or "USDT" in tk or "USDC" in tk:
+                last_price = 0.86 if "-EUR" in tk else 1.00
+            
+        target_mean = float(info.get("targetMeanPrice") or 0.0)
+        
+        # Upside % normalizzato
+        upside_pct = np.nan
+        if last_price > 0 and target_mean > 0:
+            ratio = target_mean / last_price
+            if ratio > 3.0 or ratio < 0.2:
+                if tk.endswith(".CO") or (6.5 <= ratio <= 8.5): target_mean /= 7.46
+                elif tk.endswith(".ST") or (10.0 <= ratio <= 13.0): target_mean /= 11.40
+                elif tk.endswith(".OL"): target_mean /= 11.50
+                elif tk.endswith(".T") or ratio > 100: target_mean /= 162.0
+                elif tk.endswith(".L") and ratio > 50: target_mean = (target_mean / 100.0) / 1.17
+            upside_pct = ((target_mean - last_price) / last_price) * 100.0
+
+        # Valutazione & Multipli
+        pe_trailing = float(info.get("trailingPE") or np.nan)
+        pe_forward = float(info.get("forwardPE") or np.nan)
+        peg_ratio = float(info.get("pegRatio") or np.nan)
+        pb_ratio = float(info.get("priceToBook") or np.nan)
+        
+        # Dividend Yield % normalizzato istituzionale
+        div_rate = float(info.get("dividendRate") or info.get("trailingAnnualDividendRate") or 0.0)
+        if div_rate > 0 and last_price > 0:
+            div_yield = (div_rate / last_price) * 100.0
+        else:
+            div_raw = float(info.get("dividendYield") or info.get("trailingAnnualDividendYield") or 0.0)
+            if div_raw > 0:
+                div_yield = div_raw if div_raw >= 0.20 else (div_raw * 100.0)
+            else:
+                div_yield = 0.0
+        div_yield = round(div_yield, 2)
+        
+        # Redditività & Flussi
+        roe = float(info.get("returnOnEquity") or np.nan)
+        if pd.notna(roe): roe *= 100.0
+        profit_margin = float(info.get("profitMargins") or np.nan)
+        if pd.notna(profit_margin): profit_margin *= 100.0
+        
+        fcf = float(info.get("freeCashflow") or 0.0)
+        mcap = float(info.get("marketCap") or 0.0)
+        mcap_b = round(mcap / 1e9, 2) if mcap > 0 else np.nan
+        if pd.notna(mcap_b):
+            if mcap_b >= 200.0: mcap_cat = "Mega-Cap (>$200B)"
+            elif mcap_b >= 10.0: mcap_cat = "Large-Cap ($10B-$200B)"
+            elif mcap_b >= 2.0: mcap_cat = "Mid-Cap ($2B-$10B)"
+            else: mcap_cat = "Small-Cap (<$2B)"
+        else:
+            mcap_cat = "N/D"
+
+        fcf_yield = (fcf / mcap * 100.0) if mcap > 0 and fcf != 0 else np.nan
+        debt_to_equity = float(info.get("debtToEquity") or np.nan)
+        if pd.notna(debt_to_equity): debt_to_equity /= 100.0
+        
+        # Consensus & Analisti Istituzionali
+        rec_key = str(info.get("recommendationKey") or "N/D").replace("_", " ").title()
+        num_analysts = int(info.get("numberOfAnalystOpinions") or 0)
+        rev_growth = float(info.get("revenueGrowth") or np.nan)
+        if pd.notna(rev_growth): rev_growth *= 100.0
+        gross_margin = float(info.get("grossMargins") or np.nan)
+        if pd.notna(gross_margin): gross_margin *= 100.0
+        
+        # Metriche Tecniche & di Rischio da serie storica
+        vol_ann_pct = np.nan
+        beta_val = float(info.get("beta") or np.nan)
+        sharpe_val = np.nan
+        max_dd_pct = np.nan
+        rsi_val = 50.0
+        p_sma50_pct = np.nan
+        p_sma200_pct = np.nan
+        perf_3m_pct = np.nan
+        perf_1y_pct = np.nan
+        
+        if df_hist is not None and not df_hist.empty and len(df_hist) > 20:
+            closes = df_hist["close"].dropna()
+            rets = closes.pct_change().dropna()
+            
+            if not rets.empty:
+                vol_ann_pct = float(rets.std() * np.sqrt(252) * 100.0)
+                mean_ret_ann = float(rets.mean() * 252 * 100.0)
+                rf_rate = 3.0 # Tasso risk-free prudenziale 3%
+                if vol_ann_pct > 0:
+                    sharpe_val = (mean_ret_ann - rf_rate) / vol_ann_pct
+                    
+                cum_rets = (1 + rets).cumprod()
+                peak = cum_rets.cummax()
+                dd = (cum_rets - peak) / peak
+                max_dd_pct = float(dd.min() * 100.0)
+                
+                if pd.isna(beta_val) and not sr_bm_ret.empty:
+                    df_align = pd.concat([rets, sr_bm_ret], axis=1, join="inner").dropna()
+                    if len(df_align) > 30:
+                        cov_m = np.cov(df_align.iloc[:, 0], df_align.iloc[:, 1])
+                        var_bm = cov_m[1, 1]
+                        if var_bm > 0:
+                            beta_val = float(cov_m[0, 1] / var_bm)
+
+                rsi_val = _compute_rsi(closes, 14)
+                if len(closes) >= 50:
+                    sma50 = closes.rolling(50).mean().iloc[-1]
+                    if sma50 > 0: p_sma50_pct = ((closes.iloc[-1] - sma50) / sma50) * 100.0
+                if len(closes) >= 200:
+                    sma200 = closes.rolling(200).mean().iloc[-1]
+                    if sma200 > 0: p_sma200_pct = ((closes.iloc[-1] - sma200) / sma200) * 100.0
+                    
+                if len(closes) >= 63:
+                    perf_3m_pct = ((closes.iloc[-1] - closes.iloc[-63]) / closes.iloc[-63]) * 100.0
+                if len(closes) >= 252:
+                    perf_1y_pct = ((closes.iloc[-1] - closes.iloc[-252]) / closes.iloc[-252]) * 100.0
+
+        # Solvibilità & Accounting Quality
+        z_score = np.nan
+        if pd.notna(debt_to_equity) and pd.notna(profit_margin):
+            z_score = 1.8 + (profit_margin / 15.0) * 0.8 + (1.0 / max(0.2, debt_to_equity)) * 0.4
+            if pd.notna(roe) and roe > 15.0: z_score += 0.4
+        
+        piotroski_score = 6
+        if pd.notna(roe) and roe > 10.0: piotroski_score += 1
+        if pd.notna(fcf_yield) and fcf_yield > 4.0: piotroski_score += 1
+        if pd.notna(debt_to_equity) and debt_to_equity < 0.8: piotroski_score += 1
+        piotroski_score = min(9, max(1, piotroski_score))
+
+        # Calcolo Punteggio Istituzionale Globale ARGUS [0 - 100]
+        score_val = 50.0
+        if pd.notna(upside_pct): score_val += np.clip(upside_pct * 1.5, -25, 25)
+        if pd.notna(peg_ratio) and peg_ratio > 0:
+            score_val += (1.5 - min(3.0, peg_ratio)) * 15.0
+            
+        score_qual = 50.0
+        if pd.notna(roe): score_qual += np.clip((roe - 12.0) * 1.2, -20, 20)
+        if pd.notna(z_score): score_qual += (z_score - 2.5) * 10.0
+        
+        score_risk = 50.0
+        if pd.notna(vol_ann_pct): score_risk += (25.0 - min(45.0, vol_ann_pct)) * 1.5
+        if pd.notna(sharpe_val): score_risk += np.clip(sharpe_val * 15.0, -20, 25)
+        
+        score_mom = 50.0
+        if pd.notna(perf_1y_pct): score_mom += np.clip(perf_1y_pct * 0.8, -25, 25)
+        if 45 <= rsi_val <= 65: score_mom += 10.0
+        elif rsi_val > 75 or rsi_val < 30: score_mom -= 15.0
+
+        argus_composite_score = np.clip(
+            (score_val * 0.25) + (score_qual * 0.25) + (score_risk * 0.25) + (score_mom * 0.25),
+            5.0, 98.0
+        )
+
+        return {
+            "ticker": tk,
+            "name": name,
+            "sector": sector,
+            "industry": industry,
+            "country": country,
+            "currency": currency,
+            "market_cap_b": mcap_b,
+            "mcap_category": mcap_cat,
+            "consensus_rating": rec_key,
+            "num_analysts": num_analysts,
+            "last_price": round(last_price, 2),
+            "target_mean_price": round(target_mean, 2) if target_mean > 0 else np.nan,
+            "upside_pct": round(upside_pct, 2) if pd.notna(upside_pct) else np.nan,
+            "revenue_growth_pct": round(rev_growth, 2) if pd.notna(rev_growth) else np.nan,
+            "gross_margin_pct": round(gross_margin, 2) if pd.notna(gross_margin) else np.nan,
+            "trailing_pe": round(pe_trailing, 2) if pd.notna(pe_trailing) else np.nan,
+            "forward_pe": round(pe_forward, 2) if pd.notna(pe_forward) else np.nan,
+            "peg_ratio": round(peg_ratio, 2) if pd.notna(peg_ratio) else np.nan,
+            "price_to_book": round(pb_ratio, 2) if pd.notna(pb_ratio) else np.nan,
+            "dividend_yield_pct": round(div_yield, 2) if pd.notna(div_yield) else 0.0,
+            "roe_pct": round(roe, 2) if pd.notna(roe) else np.nan,
+            "profit_margin_pct": round(profit_margin, 2) if pd.notna(profit_margin) else np.nan,
+            "fcf_yield_pct": round(fcf_yield, 2) if pd.notna(fcf_yield) else np.nan,
+            "debt_to_equity": round(debt_to_equity, 2) if pd.notna(debt_to_equity) else np.nan,
+            "altman_z_score": round(z_score, 2) if pd.notna(z_score) else np.nan,
+            "piotroski_score": piotroski_score,
+            "beta": round(beta_val, 2) if pd.notna(beta_val) else np.nan,
+            "volatility_ann_pct": round(vol_ann_pct, 2) if pd.notna(vol_ann_pct) else np.nan,
+            "sharpe_ratio": round(sharpe_val, 2) if pd.notna(sharpe_val) else np.nan,
+            "max_drawdown_pct": round(max_dd_pct, 2) if pd.notna(max_dd_pct) else np.nan,
+            "rsi_14": round(rsi_val, 1),
+            "price_to_sma200_pct": round(p_sma200_pct, 2) if pd.notna(p_sma200_pct) else np.nan,
+            "perf_3m_pct": round(perf_3m_pct, 2) if pd.notna(perf_3m_pct) else np.nan,
+            "perf_1y_pct": round(perf_1y_pct, 2) if pd.notna(perf_1y_pct) else np.nan,
+            "argus_score": round(argus_composite_score, 1)
+        }
+    except Exception:
+        return {
+            "ticker": tk,
+            "name": tk,
+            "sector": "N/D",
+            "industry": "N/D",
+            "country": "N/D",
+            "currency": "USD",
+            "market_cap_b": np.nan,
+            "mcap_category": "N/D",
+            "consensus_rating": "N/D",
+            "num_analysts": 0,
+            "last_price": np.nan,
+            "target_mean_price": np.nan,
+            "upside_pct": np.nan,
+            "revenue_growth_pct": np.nan,
+            "gross_margin_pct": np.nan,
+            "trailing_pe": np.nan,
+            "forward_pe": np.nan,
+            "peg_ratio": np.nan,
+            "price_to_book": np.nan,
+            "dividend_yield_pct": 0.0,
+            "roe_pct": np.nan,
+            "profit_margin_pct": np.nan,
+            "fcf_yield_pct": np.nan,
+            "debt_to_equity": np.nan,
+            "altman_z_score": np.nan,
+            "piotroski_score": 5,
+            "beta": np.nan,
+            "volatility_ann_pct": np.nan,
+            "sharpe_ratio": np.nan,
+            "max_drawdown_pct": np.nan,
+            "rsi_14": 50.0,
+            "price_to_sma200_pct": np.nan,
+            "perf_3m_pct": np.nan,
+            "perf_1y_pct": np.nan,
+            "argus_score": 50.0
+        }
+
+
 def fetch_screener_universe_data(
     tickers: List[str],
     benchmark_ticker: str = "SPY",
-    progress_callback: Optional[Any] = None
+    progress_callback: Optional[Any] = None,
+    force_refresh: bool = False
 ) -> pd.DataFrame:
     """
-    Estrae e calcola in modo vettorializzato tutte le metriche multi-fattoriali per l'universo di titoli.
+    Estrae e calcola in modo vettorializzato e multi-thread tutte le metriche multi-fattoriali per l'universo di titoli.
     Utilizza lo scudo di caching multi-tier (L1 RAM + L2 SQLite) per garantire tempi di risposta ultra-rapidi.
     """
-    rows = []
     clean_tickers = list(dict.fromkeys([str(t).strip().upper() for t in tickers if str(t).strip()]))
+    if not clean_tickers:
+        return pd.DataFrame()
     
     # Pre-caricamento storico del benchmark per calcolo Beta
-    df_bm = get_cached_ticker_history(benchmark_ticker)
+    df_bm = get_cached_ticker_history(benchmark_ticker, force_refresh=force_refresh)
     sr_bm_ret = pd.Series(dtype=float)
     if df_bm is not None and not df_bm.empty and "close" in df_bm.columns:
         sr_bm_ret = df_bm["close"].pct_change().dropna()
 
     total = len(clean_tickers)
-    for idx, tk in enumerate(clean_tickers):
-        if progress_callback:
-            progress_callback(idx + 1, total, tk)
-            
-        try:
-            info = get_cached_ticker_info(tk)
-            df_hist = get_cached_ticker_history(tk)
-            
-            name = info.get("shortName") or info.get("longName") or tk
-            sector = info.get("sector") or "N/D"
-            industry = info.get("industry") or "N/D"
-            country = info.get("country") or "N/D"
-            currency = info.get("currency") or ("EUR" if tk.endswith("-EUR") or tk.endswith(".MI") or tk.endswith(".PA") or tk.endswith(".DE") else "USD")
-            
-            quote_type = str(info.get("quoteType", "")).upper()
-            if sector == "N/D":
-                if quote_type == "CRYPTOCURRENCY" or "-" in tk or tk.startswith(("BTC", "ETH", "SOL")):
-                    sector = "Crypto / Digital Assets"
-                    industry = "Digital Currency"
-                elif quote_type == "ETF" or "ETF" in str(name).upper() or "ISHARES" in str(name).upper() or "VANGUARD" in str(name).upper():
-                    sector = "ETF / Fondi"
-                    industry = "Exchange Traded Fund"
-
-            # Prezzi e Target Price
-            last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0.0)
-            if last_price <= 0 and df_hist is not None and not df_hist.empty and "close" in df_hist.columns:
-                last_price = float(df_hist["close"].iloc[-1])
-            if last_price <= 0:
-                if "FDUSD" in tk or "USDT" in tk or "USDC" in tk:
-                    last_price = 0.86 if "-EUR" in tk else 1.00
-                
-            target_mean = float(info.get("targetMeanPrice") or 0.0)
-            
-            # Upside % normalizzato
-            upside_pct = np.nan
-            if last_price > 0 and target_mean > 0:
-                # Normalizzazione ratio valute se necessario (es. DKK, SEK, GBp)
-                ratio = target_mean / last_price
-                if ratio > 3.0 or ratio < 0.2:
-                    if tk.endswith(".CO") or (6.5 <= ratio <= 8.5): target_mean /= 7.46
-                    elif tk.endswith(".ST") or (10.0 <= ratio <= 13.0): target_mean /= 11.40
-                    elif tk.endswith(".OL"): target_mean /= 11.50
-                    elif tk.endswith(".T") or ratio > 100: target_mean /= 162.0
-                    elif tk.endswith(".L") and ratio > 50: target_mean = (target_mean / 100.0) / 1.17
-                upside_pct = ((target_mean - last_price) / last_price) * 100.0
-
-            # Valutazione & Multipli
-            pe_trailing = float(info.get("trailingPE") or np.nan)
-            pe_forward = float(info.get("forwardPE") or np.nan)
-            peg_ratio = float(info.get("pegRatio") or np.nan)
-            pb_ratio = float(info.get("priceToBook") or np.nan)
-            
-            # Dividend Yield % normalizzato istituzionale
-            div_rate = float(info.get("dividendRate") or info.get("trailingAnnualDividendRate") or 0.0)
-            if div_rate > 0 and last_price > 0:
-                div_yield = (div_rate / last_price) * 100.0
-            else:
-                div_raw = float(info.get("dividendYield") or info.get("trailingAnnualDividendYield") or 0.0)
-                if div_raw > 0:
-                    div_yield = div_raw if div_raw >= 0.20 else (div_raw * 100.0)
-                else:
-                    div_yield = 0.0
-            div_yield = round(div_yield, 2)
-            
-            # Redditività & Flussi
-            roe = float(info.get("returnOnEquity") or np.nan)
-            if pd.notna(roe): roe *= 100.0
-            profit_margin = float(info.get("profitMargins") or np.nan)
-            if pd.notna(profit_margin): profit_margin *= 100.0
-            
-            fcf = float(info.get("freeCashflow") or 0.0)
-            mcap = float(info.get("marketCap") or 0.0)
-            mcap_b = round(mcap / 1e9, 2) if mcap > 0 else np.nan
-            if pd.notna(mcap_b):
-                if mcap_b >= 200.0: mcap_cat = "Mega-Cap (>$200B)"
-                elif mcap_b >= 10.0: mcap_cat = "Large-Cap ($10B-$200B)"
-                elif mcap_b >= 2.0: mcap_cat = "Mid-Cap ($2B-$10B)"
-                else: mcap_cat = "Small-Cap (<$2B)"
-            else:
-                mcap_cat = "N/D"
-
-            fcf_yield = (fcf / mcap * 100.0) if mcap > 0 and fcf != 0 else np.nan
-            debt_to_equity = float(info.get("debtToEquity") or np.nan)
-            if pd.notna(debt_to_equity): debt_to_equity /= 100.0
-            
-            # Consensus & Analisti Istituzionali
-            rec_key = str(info.get("recommendationKey") or "N/D").replace("_", " ").title()
-            num_analysts = int(info.get("numberOfAnalystOpinions") or 0)
-            rev_growth = float(info.get("revenueGrowth") or np.nan)
-            if pd.notna(rev_growth): rev_growth *= 100.0
-            gross_margin = float(info.get("grossMargins") or np.nan)
-            if pd.notna(gross_margin): gross_margin *= 100.0
-            
-            # Metriche Tecniche & di Rischio da serie storica
-            vol_ann_pct = np.nan
-            beta_val = float(info.get("beta") or np.nan)
-            sharpe_val = np.nan
-            max_dd_pct = np.nan
-            rsi_val = 50.0
-            p_sma50_pct = np.nan
-            p_sma200_pct = np.nan
-            perf_3m_pct = np.nan
-            perf_1y_pct = np.nan
-            
-            if df_hist is not None and not df_hist.empty and len(df_hist) > 20:
-                closes = df_hist["close"].dropna()
-                rets = closes.pct_change().dropna()
-                
-                if not rets.empty:
-                    vol_ann_pct = float(rets.std() * np.sqrt(252) * 100.0)
-                    mean_ret_ann = float(rets.mean() * 252 * 100.0)
-                    rf_rate = 3.0 # Tasso risk-free prudenziale 3%
-                    if vol_ann_pct > 0:
-                        sharpe_val = (mean_ret_ann - rf_rate) / vol_ann_pct
-                        
-                    # Calcolo Max Drawdown
-                    cum_rets = (1 + rets).cumprod()
-                    peak = cum_rets.cummax()
-                    dd = (cum_rets - peak) / peak
-                    max_dd_pct = float(dd.min() * 100.0)
-                    
-                    # Beta se non presente da info
-                    if pd.isna(beta_val) and not sr_bm_ret.empty:
-                        df_align = pd.concat([rets, sr_bm_ret], axis=1, join="inner").dropna()
-                        if len(df_align) > 30:
-                            cov_m = np.cov(df_align.iloc[:, 0], df_align.iloc[:, 1])
-                            var_bm = cov_m[1, 1]
-                            if var_bm > 0:
-                                beta_val = float(cov_m[0, 1] / var_bm)
-
-                    # Indicatori Tecnici
-                    rsi_val = _compute_rsi(closes, 14)
-                    if len(closes) >= 50:
-                        sma50 = closes.rolling(50).mean().iloc[-1]
-                        if sma50 > 0: p_sma50_pct = ((closes.iloc[-1] - sma50) / sma50) * 100.0
-                    if len(closes) >= 200:
-                        sma200 = closes.rolling(200).mean().iloc[-1]
-                        if sma200 > 0: p_sma200_pct = ((closes.iloc[-1] - sma200) / sma200) * 100.0
-                        
-                    if len(closes) >= 63:
-                        perf_3m_pct = ((closes.iloc[-1] - closes.iloc[-63]) / closes.iloc[-63]) * 100.0
-                    if len(closes) >= 252:
-                        perf_1y_pct = ((closes.iloc[-1] - closes.iloc[-252]) / closes.iloc[-252]) * 100.0
-
-            # Solvibilità & Accounting Quality (Stima Rapida Istituzionale)
-            z_score = np.nan
-            if pd.notna(debt_to_equity) and pd.notna(profit_margin):
-                z_score = 1.8 + (profit_margin / 15.0) * 0.8 + (1.0 / max(0.2, debt_to_equity)) * 0.4
-                if pd.notna(roe) and roe > 15.0: z_score += 0.4
-            
-            piotroski_score = 6
-            if pd.notna(roe) and roe > 10.0: piotroski_score += 1
-            if pd.notna(fcf_yield) and fcf_yield > 4.0: piotroski_score += 1
-            if pd.notna(debt_to_equity) and debt_to_equity < 0.8: piotroski_score += 1
-            piotroski_score = min(9, max(1, piotroski_score))
-
-            # Calcolo Punteggio Istituzionale Globale ARGUS [0 - 100]
-            # Basato su 4 pilastri: Valutazione (25%), Qualità (25%), Rischio (25%), Momentum (25%)
-            score_val = 50.0
-            if pd.notna(upside_pct): score_val += np.clip(upside_pct * 1.5, -25, 25)
-            if pd.notna(peg_ratio) and peg_ratio > 0:
-                score_val += (1.5 - min(3.0, peg_ratio)) * 15.0
-                
-            score_qual = 50.0
-            if pd.notna(roe): score_qual += np.clip((roe - 12.0) * 1.2, -20, 20)
-            if pd.notna(z_score): score_qual += (z_score - 2.5) * 10.0
-            
-            score_risk = 50.0
-            if pd.notna(vol_ann_pct): score_risk += (25.0 - min(45.0, vol_ann_pct)) * 1.5
-            if pd.notna(sharpe_val): score_risk += np.clip(sharpe_val * 15.0, -20, 25)
-            
-            score_mom = 50.0
-            if pd.notna(perf_1y_pct): score_mom += np.clip(perf_1y_pct * 0.8, -25, 25)
-            if 45 <= rsi_val <= 65: score_mom += 10.0
-            elif rsi_val > 75 or rsi_val < 30: score_mom -= 15.0
-
-            argus_composite_score = np.clip(
-                (score_val * 0.25) + (score_qual * 0.25) + (score_risk * 0.25) + (score_mom * 0.25),
-                5.0, 98.0
-            )
-
-            rows.append({
-                "ticker": tk,
-                "name": name,
-                "sector": sector,
-                "industry": industry,
-                "country": country,
-                "currency": currency,
-                "market_cap_b": mcap_b,
-                "mcap_category": mcap_cat,
-                "consensus_rating": rec_key,
-                "num_analysts": num_analysts,
-                "last_price": round(last_price, 2),
-                "target_mean_price": round(target_mean, 2) if target_mean > 0 else np.nan,
-                "upside_pct": round(upside_pct, 2) if pd.notna(upside_pct) else np.nan,
-                "revenue_growth_pct": round(rev_growth, 2) if pd.notna(rev_growth) else np.nan,
-                "gross_margin_pct": round(gross_margin, 2) if pd.notna(gross_margin) else np.nan,
-                "trailing_pe": round(pe_trailing, 2) if pd.notna(pe_trailing) else np.nan,
-                "forward_pe": round(pe_forward, 2) if pd.notna(pe_forward) else np.nan,
-                "peg_ratio": round(peg_ratio, 2) if pd.notna(peg_ratio) else np.nan,
-                "price_to_book": round(pb_ratio, 2) if pd.notna(pb_ratio) else np.nan,
-                "dividend_yield_pct": round(div_yield, 2) if pd.notna(div_yield) else 0.0,
-                "roe_pct": round(roe, 2) if pd.notna(roe) else np.nan,
-                "profit_margin_pct": round(profit_margin, 2) if pd.notna(profit_margin) else np.nan,
-                "fcf_yield_pct": round(fcf_yield, 2) if pd.notna(fcf_yield) else np.nan,
-                "debt_to_equity": round(debt_to_equity, 2) if pd.notna(debt_to_equity) else np.nan,
-                "altman_z_score": round(z_score, 2) if pd.notna(z_score) else np.nan,
-                "piotroski_score": piotroski_score,
-                "beta": round(beta_val, 2) if pd.notna(beta_val) else np.nan,
-                "volatility_ann_pct": round(vol_ann_pct, 2) if pd.notna(vol_ann_pct) else np.nan,
-                "sharpe_ratio": round(sharpe_val, 2) if pd.notna(sharpe_val) else np.nan,
-                "max_drawdown_pct": round(max_dd_pct, 2) if pd.notna(max_dd_pct) else np.nan,
-                "rsi_14": round(rsi_val, 1),
-                "price_to_sma200_pct": round(p_sma200_pct, 2) if pd.notna(p_sma200_pct) else np.nan,
-                "perf_3m_pct": round(perf_3m_pct, 2) if pd.notna(perf_3m_pct) else np.nan,
-                "perf_1y_pct": round(perf_1y_pct, 2) if pd.notna(perf_1y_pct) else np.nan,
-                "argus_score": round(argus_composite_score, 1)
-            })
-            
-        except Exception:
-            rows.append({
-                "ticker": tk,
-                "name": tk,
-                "sector": "N/D",
-                "industry": "N/D",
-                "country": "N/D",
-                "currency": "USD",
-                "market_cap_b": np.nan,
-                "mcap_category": "N/D",
-                "consensus_rating": "N/D",
-                "num_analysts": 0,
-                "last_price": np.nan,
-                "target_mean_price": np.nan,
-                "upside_pct": np.nan,
-                "revenue_growth_pct": np.nan,
-                "gross_margin_pct": np.nan,
-                "trailing_pe": np.nan,
-                "forward_pe": np.nan,
-                "peg_ratio": np.nan,
-                "price_to_book": np.nan,
-                "dividend_yield_pct": 0.0,
-                "roe_pct": np.nan,
-                "profit_margin_pct": np.nan,
-                "fcf_yield_pct": np.nan,
-                "debt_to_equity": np.nan,
-                "altman_z_score": np.nan,
-                "piotroski_score": 5,
-                "beta": np.nan,
-                "volatility_ann_pct": np.nan,
-                "sharpe_ratio": np.nan,
-                "max_drawdown_pct": np.nan,
-                "rsi_14": 50.0,
-                "price_to_sma200_pct": np.nan,
-                "perf_3m_pct": np.nan,
-                "perf_1y_pct": np.nan,
-                "argus_score": 50.0
-            })
+    rows = []
+    
+    # Concorrenza intelligente con ThreadPoolExecutor
+    max_workers = min(8, total)
+    if max_workers > 1:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_tk = {
+                executor.submit(_process_single_screener_ticker, tk, sr_bm_ret, force_refresh): tk 
+                for tk in clean_tickers
+            }
+            completed_count = 0
+            for future in as_completed(future_to_tk):
+                completed_count += 1
+                tk = future_to_tk[future]
+                if progress_callback:
+                    progress_callback(completed_count, total, tk)
+                try:
+                    row_data = future.result()
+                    rows.append(row_data)
+                except Exception:
+                    rows.append({"ticker": tk, "name": tk, "sector": "N/D", "argus_score": 50.0})
+    else:
+        for idx, tk in enumerate(clean_tickers):
+            if progress_callback:
+                progress_callback(idx + 1, total, tk)
+            row_data = _process_single_screener_ticker(tk, sr_bm_ret, force_refresh)
+            rows.append(row_data)
 
     df_out = pd.DataFrame(rows)
     if not df_out.empty and "argus_score" in df_out.columns:

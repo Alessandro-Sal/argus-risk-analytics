@@ -193,24 +193,49 @@ def get_cached_ticker_info(
 
     # Fetch yfinance info
     import yfinance as yf
-    try:
-        time.sleep(random.uniform(0.05, 0.15))
-        yf_obj = yf.Ticker(clean_ticker)
-        info_data = yf_obj.info or {}
-        if info_data:
-            _L1_CACHE[cache_key] = (now, info_data)
-            try:
-                cur = conn.cursor()
-                cur.execute("""
-                    INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
-                    VALUES (?, ?, 'info', ?, ?, ?)
-                """, (cache_key, clean_ticker, json.dumps(info_data), now, ttl_seconds))
-                conn.commit()
-            except Exception:
-                pass
-            return info_data
-    except Exception:
-        pass
+    info_data = {}
+    for attempt in range(2):
+        try:
+            time.sleep(random.uniform(0.04, 0.12))
+            yf_obj = yf.Ticker(clean_ticker)
+            info_data = yf_obj.info or {}
+            
+            # Se yf.info è vuoto o fallisce, prova fast_info come fallback leggero
+            if not info_data or len(info_data) < 4:
+                try:
+                    fi = yf_obj.fast_info
+                    if fi:
+                        info_data = {
+                            "shortName": clean_ticker,
+                            "currentPrice": getattr(fi, "last_price", getattr(fi, "previous_close", None)),
+                            "regularMarketPrice": getattr(fi, "last_price", getattr(fi, "previous_close", None)),
+                            "marketCap": getattr(fi, "market_cap", None),
+                            "currency": getattr(fi, "currency", "USD"),
+                            "fiftyDayAverage": getattr(fi, "fifty_day_average", None),
+                            "twoHundredDayAverage": getattr(fi, "two_hundred_day_average", None),
+                            "shares": getattr(fi, "shares", None)
+                        }
+                except Exception:
+                    pass
+                    
+            if info_data:
+                _L1_CACHE[cache_key] = (now, info_data)
+                try:
+                    cur = conn.cursor()
+                    cur.execute("""
+                        INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
+                        VALUES (?, ?, 'info', ?, ?, ?)
+                    """, (cache_key, clean_ticker, json.dumps(info_data), now, ttl_seconds))
+                    conn.commit()
+                except Exception:
+                    pass
+                return info_data
+        except Exception as e:
+            err_msg = str(e).lower()
+            if "too many requests" in err_msg or "429" in err_msg or "rate limit" in err_msg:
+                time.sleep((2 ** attempt) + random.uniform(0.1, 0.3))
+            else:
+                break
 
     # Fallback to existing disk info
     try:
