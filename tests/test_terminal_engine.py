@@ -248,3 +248,18 @@ def test_terminal_engine_live_quote_and_watchlist(mock_session_context):
     assert "WATCHLIST" in res_wl.output_text
     assert "LAST PRICE" in res_wl.output_text
 
+    # Watchlist ADD and DEL
+    res_add = engine.execute_command("WL ADD TSLA", mock_session_context)
+    assert res_add.status == "SUCCESS"
+    assert "TSLA" in engine.custom_watchlist
+
+    res_del = engine.execute_command("WL DEL TSLA", mock_session_context)
+    assert res_del.status == "SUCCESS"
+    assert "TSLA" not in engine.custom_watchlist
+
+    # Terminal command PORT LIVE
+    res_port = engine.execute_command("PORT LIVE", mock_session_context)
+    assert res_port.status == "SUCCESS"
+    assert "PORT LIVE" in res_port.output_text or "REAL-TIME" in res_port.output_text
+    assert "AAPL" in res_port.output_text
+

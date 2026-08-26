@@ -147,6 +147,7 @@ class ArgusTerminalEngine:
         self.oms_blotter: List[OMSOrder] = []
         self._order_counter = 8800
         self._ring_buffers: Dict[str, Any] = {}
+        self.custom_watchlist: List[str] = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "BTC-USD", "GC=F", "EURUSD=X"]
 
     DEFAULT_PRICES = {
         "AAPL": 225.50,
@@ -238,13 +239,27 @@ class ArgusTerminalEngine:
         # ---------------------------------------------------------
         # 2. OMS TRADING & EXECUTION (BUY, SELL, TWAP, VWAP, CANCEL)
         # ---------------------------------------------------------
-        # 1.5 QUOTAZIONI REAL-TIME LIVE & WATCHLIST (QUOTE, Q, PX, WL, LIVE)
+        # ---------------------------------------------------------
+        # 1.5 QUOTAZIONI REAL-TIME LIVE & WATCHLIST (QUOTE, Q, PX, WL, LIVE, PORT LIVE)
         # ---------------------------------------------------------
         if first_token in ("QUOTE", "Q", "PX", "PRICE", "ALLQ", "GP", "LIVE"):
             target_tk = tokens[1].upper() if len(tokens) > 1 else "AAPL"
             return self._cmd_quote(target_tk, ctx)
 
         if first_token in ("WL", "WATCHLIST", "MONITOR", "TAPE"):
+            if len(tokens) >= 3 and tokens[1].upper() in ("ADD", "+"):
+                sym_add = tokens[2].upper()
+                if sym_add not in self.custom_watchlist:
+                    self.custom_watchlist.append(sym_add)
+                return TerminalCommandResult(command=raw_cmd, status="SUCCESS", output_text=f"Aggiunto ticker '{sym_add}' alla Watchlist attiva.")
+            if len(tokens) >= 3 and tokens[1].upper() in ("DEL", "DELETE", "REMOVE", "-"):
+                sym_del = tokens[2].upper()
+                if sym_del in self.custom_watchlist:
+                    self.custom_watchlist.remove(sym_del)
+                return TerminalCommandResult(command=raw_cmd, status="SUCCESS", output_text=f"Rimosso ticker '{sym_del}' dalla Watchlist attiva.")
+            if len(tokens) == 2 and tokens[1].upper() in ("RESET", "CLEAR"):
+                self.custom_watchlist = ["SPY", "QQQ", "NVDA", "AAPL", "MSFT", "BTC-USD", "GC=F", "EURUSD=X"]
+                return TerminalCommandResult(command=raw_cmd, status="INFO", output_text="Watchlist ripristinata ai benchmark globali standard.")
             return self._cmd_watchlist(ctx)
 
         # ---------------------------------------------------------
@@ -297,6 +312,15 @@ class ArgusTerminalEngine:
         if len(tokens) >= 2 and tokens[-1].upper() in ("GO", "<GO>"):
             tokens = tokens[:-1]
 
+        if first_token in ("PORT", "PORTFOLIO"):
+            if len(tokens) >= 2 and tokens[1].upper() in ("RISK", "SUM", "SUMMARY"):
+                return self._cmd_portfolio_summary(results, df_pos)
+            else:
+                return self._cmd_portfolio_live_prices(df_pos, results)
+
+        if first_token == "RISK":
+            return self._cmd_portfolio_summary(results, df_pos)
+
         if len(tokens) == 2:
             ticker_arg = tokens[0].upper()
             mnem_arg = tokens[1].upper()
@@ -310,9 +334,6 @@ class ArgusTerminalEngine:
                 return self._cmd_ticker_fa(ticker_arg, df_pos)
             if mnem_arg in ("VOLS", "VOLATILITY", "IV"):
                 return self._cmd_ticker_vols(ticker_arg, df_ret)
-
-        if first_token in ("PORT", "PORTFOLIO", "RISK"):
-            return self._cmd_portfolio_summary(results, df_pos)
 
         if first_token in ("YCRV", "YAS", "FI", "BTP"):
             return self._cmd_fixed_income_summary(results)
@@ -464,12 +485,11 @@ UTILITÀ DI SISTEMA:
 
     def _cmd_watchlist(self, ctx: Dict[str, Any]) -> TerminalCommandResult:
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        wl_tickers = []
+        wl_tickers = list(self.custom_watchlist)
         if not df_pos.empty and "ticker" in df_pos.columns:
-            wl_tickers = list(df_pos["ticker"].astype(str).unique()[:6])
-        for b in ["SPY", "QQQ", "BTC-USD", "GC=F"]:
-            if b not in wl_tickers:
-                wl_tickers.append(b)
+            for pt in df_pos["ticker"].astype(str).unique()[:6]:
+                if pt not in wl_tickers:
+                    wl_tickers.insert(0, pt)
 
         lines = [
             "┌──────────────────────────────────────────────────────────────────┐",
@@ -479,7 +499,7 @@ UTILITÀ DI SISTEMA:
             "├──────────────────────────────────────────────────────────────────┤"
         ]
         
-        for sym in wl_tickers[:10]:
+        for sym in wl_tickers[:12]:
             q = fetch_live_ticker_quote(sym)
             sign = "+" if q['change'] >= 0 else ""
             arrow = "▲" if q['change'] >= 0 else "▼"
@@ -489,9 +509,71 @@ UTILITÀ DI SISTEMA:
             st_str = "LIVE" if q['is_live'] else "CACHE"
             lines.append(f"│ {sym:<8} {px_str:<13} {chg_str:<12} {range_str:<18} {st_str:<7} │")
 
-        lines.append("└──────────────────────────────────────────────────────────────────┘")
+        lines.extend([
+            "├──────────────────────────────────────────────────────────────────┤",
+            "│ TIP: Digita 'WL ADD <TICKER>' o 'WL DEL <TICKER>' per modifica   │",
+            "└──────────────────────────────────────────────────────────────────┘"
+        ])
         out_msg = "\n".join(lines)
         return TerminalCommandResult(command="WATCHLIST", status="SUCCESS", output_text=out_msg)
+
+    def _cmd_portfolio_live_prices(self, df_pos: pd.DataFrame, results: Dict[str, Any]) -> TerminalCommandResult:
+        if df_pos.empty or "ticker" not in df_pos.columns:
+            return TerminalCommandResult(
+                command="PORT LIVE",
+                status="INFO",
+                output_text="Nessun portafoglio attivo caricato. Carica un portafoglio per visualizzare prezzi e PnL live."
+            )
+
+        lines = [
+            "┌──────────────────────────────────────────────────────────────────┐",
+            "│ ARGUS PORTFOLIO REAL-TIME LIVE PRICING & P&L MONITOR [PORT LIVE] │",
+            "├──────────────────────────────────────────────────────────────────┤",
+            f"│ {'TICKER':<7} {'LIVE PX':<10} {'1D CHG':<9} {'WACP':<10} {'TOTAL P&L (€ / %)':<24} │",
+            "├──────────────────────────────────────────────────────────────────┤"
+        ]
+
+        total_live_val = 0.0
+        total_cost_basis = 0.0
+
+        for _, row in df_pos.iterrows():
+            sym = str(row["ticker"]).strip().upper()
+            qty = float(row.get("quantity", 0.0))
+            wacp = float(row.get("wacp", row.get("buy_price", 0.0)))
+            q = fetch_live_ticker_quote(sym)
+            live_p = q["last_price"]
+            chg_1d = q["change_pct"]
+            
+            cost = qty * wacp
+            val = qty * live_p
+            pnl = val - cost
+            pnl_p = (pnl / cost * 100.0) if cost > 0 else 0.0
+            
+            total_live_val += val
+            total_cost_basis += cost
+
+            sign = "+" if pnl >= 0 else ""
+            arrow = "▲" if pnl >= 0 else "▼"
+            chg_sign = "+" if chg_1d >= 0 else ""
+            chg_arrow = "▲" if chg_1d >= 0 else "▼"
+
+            pnl_str = f"{sign}€{pnl:>7,.0f} ({sign}{pnl_p:>5.1f}%) {arrow}"
+            lines.append(f"│ {sym:<7} ${live_p:<9.2f} {chg_sign}{chg_1d:<5.1f}%{chg_arrow} ${wacp:<9.2f} {pnl_str:<24} │")
+
+        tot_pnl = total_live_val - total_cost_basis
+        tot_pnl_p = (tot_pnl / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0
+        tot_sign = "+" if tot_pnl >= 0 else ""
+        tot_arrow = "▲" if tot_pnl >= 0 else "▼"
+
+        lines.extend([
+            "├──────────────────────────────────────────────────────────────────┤",
+            f"│ PORTFOLIO LIVE NOTIONAL : € {total_live_val:>12,.2f}                     │",
+            f"│ TOTAL UNREALIZED P&L    : {tot_sign}€ {tot_pnl:>10,.2f} ({tot_sign}{tot_pnl_p:.2f}%) {tot_arrow}          │",
+            f"│ REAL-TIME STATUS        : {len(df_pos)} ASSETS SYNCHRONIZED (LIVE API)       │",
+            "└──────────────────────────────────────────────────────────────────┘"
+        ])
+        out_msg = "\n".join(lines)
+        return TerminalCommandResult(command="PORT LIVE", status="SUCCESS", output_text=out_msg)
 
     def _cmd_top(self, ctx: Dict[str, Any]) -> TerminalCommandResult:
         process = psutil.Process(os.getpid())

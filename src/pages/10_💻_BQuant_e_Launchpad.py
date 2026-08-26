@@ -787,13 +787,114 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
     st.divider()
 
-    # ── SEZIONE 2: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ──
+    # ── SEZIONE 2: LIVE MULTI-ASSET MONITOR (PORTAFOGLIO + WATCHLIST) ──
+    st.markdown("#### 📊 Live Multi-Asset Pricing Monitor (Portafoglio & Watchlist)")
+
+    tab_port_live, tab_wl_live = st.tabs([
+        "💼 Prezzi Live Intero Portafoglio",
+        "🌐 Watchlist Istituzionale di Mercato"
+    ])
+
+    with tab_port_live:
+        if pos.empty or "ticker" not in pos.columns:
+            st.info("Nessun portafoglio attivo caricato. Carica una distinta posizioni per visualizzare i prezzi live.")
+        else:
+            # Calcolo prezzi live per ogni titolo del portafoglio
+            port_live_rows = []
+            tot_live_notional = 0.0
+            tot_wacp_cost = 0.0
+            day_chgs = []
+
+            for _, r in pos.iterrows():
+                sym = str(r["ticker"]).strip().upper()
+                q_val = float(r.get("quantity", 0.0))
+                wacp = float(r.get("wacp", r.get("buy_price", 0.0)))
+                live_item = terminal_engine.fetch_live_ticker_quote(sym)
+                live_px = live_item["last_price"]
+                chg_1d = live_item["change_pct"]
+                
+                mkt_val = q_val * live_px
+                cost = q_val * wacp
+                pnl = mkt_val - cost
+                pnl_pct = (pnl / cost * 100.0) if cost > 0 else 0.0
+                
+                tot_live_notional += mkt_val
+                tot_wacp_cost += cost
+                day_chgs.append(chg_1d)
+
+                port_live_rows.append({
+                    "Ticker": sym,
+                    "Prezzo Live Spot": f"${live_px:,.2f}",
+                    "Var. 1D (%)": f"{'+' if chg_1d>=0 else ''}{chg_1d:.2f}%",
+                    "Carico FIFO (WACP)": f"${wacp:,.2f}",
+                    "Quantità": f"{q_val:,.1f}",
+                    "Controvalore Live (€)": f"€ {mkt_val:,.2f}",
+                    "PnL Non Realizzato (€)": f"{'+' if pnl>=0 else ''}€ {pnl:,.2f}",
+                    "Rendimento (%)": f"{'+' if pnl_pct>=0 else ''}{pnl_pct:.2f}%",
+                    "Day Range (L - H)": f"${live_item['day_low']:.2f} - ${live_item['day_high']:.2f}",
+                    "Stato Feed": "LIVE API 🟢" if live_item["is_live"] else "ESTIMATE 🟡"
+                })
+
+            # KPI Summary
+            tot_pnl = tot_live_notional - tot_wacp_cost
+            tot_pnl_p = (tot_pnl / tot_wacp_cost * 100.0) if tot_wacp_cost > 0 else 0.0
+            avg_1d = np.mean(day_chgs) if day_chgs else 0.0
+
+            k1, k2, k3, k4 = st.columns(4)
+            with k1:
+                st.metric("Controvalore Portafoglio Live", f"€ {tot_live_notional:,.2f}")
+            with k2:
+                st.metric("PnL Totale Non Realizzato", f"€ {tot_pnl:+,.2f}", delta=f"{tot_pnl_p:+.2f}%")
+            with k3:
+                st.metric("Variazione Media Intraday (1D)", f"{avg_1d:+.2f}%")
+            with k4:
+                st.metric("Titoli Sincronizzati", f"{len(pos)} Asset", delta="Real-Time Active")
+
+            st.dataframe(pd.DataFrame(port_live_rows), use_container_width=True, hide_index=True)
+
+    with tab_wl_live:
+        col_wl_add, col_wl_info = st.columns([1.5, 2.5], vertical_alignment="bottom")
+        with col_wl_add:
+            col_in_tk, col_bt_tk = st.columns([2.0, 1.0])
+            with col_in_tk:
+                new_wl_tk = st.text_input("Aggiungi Ticker Watchlist:", placeholder="Es. TSLA, ENI.MI, BTP", key="inp_add_wl_tk", label_visibility="collapsed").strip().upper()
+            with col_bt_tk:
+                if st.button("➕ Aggiungi", key="btn_add_to_wl", use_container_width=True) and new_wl_tk:
+                    if new_wl_tk not in term_eng.custom_watchlist:
+                        term_eng.custom_watchlist.append(new_wl_tk)
+                    st.rerun()
+
+        with col_wl_info:
+            st.caption("Monitor multi-asset globale con supporto ad Azioni, ETF, Crypto (BTC, ETH), Commodities (Oro, Petrolio) e Forex (EUR/USD).")
+
+        wl_rows = []
+        for sym in term_eng.custom_watchlist:
+            q = terminal_engine.fetch_live_ticker_quote(sym)
+            vol_s = f"{q['volume']:,.0f}" if q['volume'] > 0 else "—"
+            mkt_c = f"${q['market_cap']/1e12:.2f}T" if q['market_cap']>=1e12 else (f"${q['market_cap']/1e9:.2f}B" if q['market_cap']>=1e9 else f"${q['market_cap']/1e6:.2f}M") if q['market_cap']>0 else "—"
+            wl_rows.append({
+                "Ticker": sym,
+                "Prezzo Spot Live": f"{q['currency']} {q['last_price']:,.2f}",
+                "Variazione 1D (%)": f"{'+' if q['change_pct']>=0 else ''}{q['change_pct']:.2f}%",
+                "Day Low": f"${q['day_low']:,.2f}",
+                "Day High": f"${q['day_high']:,.2f}",
+                "52-Week Range": f"${q['fifty_two_week_low']:.2f} - ${q['fifty_two_week_high']:.2f}",
+                "Volume": vol_s,
+                "Market Cap": mkt_c,
+                "Feed": "LIVE API 🟢" if q["is_live"] else "CACHE 🟡"
+            })
+
+        st.dataframe(pd.DataFrame(wl_rows), use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── SEZIONE 3: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ──
     st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
 
     # Chip di scelta rapida (1 riga orizzontale completa da 8 comandi)
     st.caption("Comandi Rapidi:")
     chips_cols = st.columns(8)
-    quick_cmds = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC", "WATCHLIST", "VAR 95", "TOP", "HELP"]
+    quick_cmds = ["PORT LIVE", "PORT RISK", "WATCHLIST", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC", "VAR 95", "TOP"]
     for idx, qc in enumerate(quick_cmds):
         with chips_cols[idx]:
             if st.button(qc, key=f"btn_chip_full_{idx}", use_container_width=True):
@@ -809,7 +910,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         with col_inp:
             cmd_input = st.text_input(
                 "Command Prompt",
-                placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'QUOTE NVDA', 'BTC-USD', 'WATCHLIST', 'PORT RISK', 'BUY 100 AAPL')...",
+                placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'PORT LIVE', 'WATCHLIST', 'QUOTE NVDA', 'BTC-USD', 'VAR 95')...",
                 key="term_cli_input_box",
                 label_visibility="collapsed"
             )
@@ -851,7 +952,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
     st.divider()
 
-    # ── SEZIONE 3: LIVE OMS EXECUTION BLOTTER (FULL-WIDTH ROW) ──
+    # ── SEZIONE 4: LIVE OMS EXECUTION BLOTTER (FULL-WIDTH ROW) ──
     st.markdown("#### 📋 Live OMS Execution Blotter (Ordini di Negoziazione)")
     if not term_eng.oms_blotter:
         st.info("Nessun ordine registrato. Digita `BUY 100 AAPL @ MKT` o `TWAP 500 MSFT 30` nella console sopra.")
@@ -874,7 +975,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
     st.divider()
 
-    # ── SEZIONE 4: SYSTEM TELEMETRY (FULL-WIDTH ROW) ──
+    # ── SEZIONE 5: SYSTEM TELEMETRY (FULL-WIDTH ROW) ──
     st.markdown("#### 📊 Telemetria di Sistema (TOP Monitor)")
     top_res = term_eng.execute_command("TOP", session_context)
     top_box_html = (
