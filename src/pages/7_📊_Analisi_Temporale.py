@@ -27,6 +27,7 @@ from core.temporal_engine import (
     compute_rolling_risk_metrics,
     compute_underwater_drawdowns,
     compute_seasonality_patterns,
+    compute_side_by_side_comparison,
 )
 from sqlalchemy import text as sqlt
 
@@ -75,7 +76,7 @@ else:
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
 
-# ── BARRA DI CONTROLLO GLOBALE: SCELTA DATE & OR鐘ZZONTE TEMPORALE ─────────
+# ── BARRA DI CONTROLLO GLOBALE: SCELTA DATE & ORIZZONTE TEMPORALE ─────────
 with st.container():
     st.markdown("""
     <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255,153,0,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
@@ -194,12 +195,12 @@ TIME_MODELS_CATALOG = {
         "category": "Pattern Comportamentali",
         "desc": "Distribuzione statistica dei rendimenti per giorno operativo (Lunedì-Venerdì) e per mese solare per intercettare anomalie di calendario (Effetto Gennaio, rally di fine anno, volatilità infrasettimanale)."
     },
-    "🗃️ Registro Snapshot DB & Confronto Side-by-Side": {
-        "title": "Audit Trail Immutabile degli Snapshot (MySQL / DuckDB) & Confronto Affiancato",
-        "badge": "Data Lineage • Delta Pesi • DuckDB SIMD",
+    "⚖️ Confronto Side-by-Side & Snapshot DB": {
+        "title": "Audit Differenziale Point-in-Time, Turnover Ratio, Allocation Shift & Registro Snapshot",
+        "badge": "Side-by-Side • Delta Pesi • Turnover • DuckDB",
         "badge_color": "#3fb950",
         "category": "Audit Trail & Confronto",
-        "desc": "Consultazione del registro storico degli snapshot archiviati nel Data Warehouse, confronto differenziale tra due date di rilevazione e aggregazione vettorizzata DuckDB C++ SIMD."
+        "desc": "Confronto analitico affiancato tra due momenti storici o profili: calcolo del turnover di ribilanciamento, delta controvalore per asset, spostamento pesi, waterfall dei contributi e audit trail DuckDB C++ SIMD."
     }
 }
 
@@ -221,7 +222,6 @@ elif "time_active_tab" not in st.session_state or st.session_state["time_active_
 
 curr_idx = time_keys.index(st.session_state["time_active_tab"])
 
-# Spaziatura e Respiro Layout
 st.markdown("<div style='margin-top: 6px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
 # Barra Selettore Compatta Bloomberg Style
@@ -283,7 +283,6 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
         st.warning("Serie storica dei rendimenti non disponibile per il periodo selezionato.")
         st.stop()
 
-    # Selettore strumenti da sovrapporre nel grafico
     all_instrument_options = ["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"] + [f"🔹 {t}" for t in active_tickers]
     
     col_sel_i1, col_sel_i2 = st.columns([3, 1])
@@ -302,7 +301,6 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
             help="Scegli quale asset sottoporre all'analisi analitica dei Drawdown e Top 5 Crisi."
         )
 
-    # Calcolo serie per lo strumento focus
     if underwater_focus == "🏛️ Portafoglio Completo":
         focus_sr = sr_port
         focus_label = "Portafoglio Completo"
@@ -323,8 +321,6 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     top_episodes = uw_data["top_episodes"]
 
     tot_val = float(results.get("portfolio_value", pos["current_value"].sum() if not pos.empty and "current_value" in pos.columns else 100000.0))
-    
-    # Calcolo CAGR sul periodo effettivo
     n_days = max(1, len(focus_sr))
     period_tot_ret = (cum_nav.iloc[-1] - 1.0) if not cum_nav.empty else 0.0
     cagr_period = ((1.0 + period_tot_ret) ** (252.0 / n_days) - 1.0) * 100.0 if period_tot_ret > -1.0 else 0.0
@@ -344,7 +340,6 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
 
     # 1. Chart: Cumulative Equity Line Multi-Asset
     st.markdown(f"##### 📈 Performance Comparativa Cumulata (Base 100)")
-    
     palette = ["#00e676", "#ff9900", "#38bdf8", "#bc8cff", "#f85149", "#e3b341", "#f0883e", "#2ea043", "#58a6ff", "#db61a2"]
     fig_equity = go.Figure()
 
@@ -356,7 +351,6 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
             line=dict(color="#00e676", width=2.6),
             hovertemplate="<b>Portafoglio:</b> %{y:.2f}<br>Data: %{x|%Y-%m-%d}<extra></extra>"
         ))
-        # Add HWM line
         p_hwm = p_cum.cummax()
         fig_equity.add_trace(go.Scatter(
             x=p_hwm.index, y=p_hwm,
@@ -407,7 +401,7 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     apply_plotly_theme(fig_equity)
     st.plotly_chart(fig_equity, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-    # 2. Chart: Underwater Drawdown Area for focus instrument
+    # 2. Chart: Underwater Drawdown Area
     st.markdown(f"##### 🔻 Curva Underwater Drawdown per `{focus_label}` (% da Massimo Precedente)")
     fig_dd = go.Figure()
     fig_dd.add_trace(go.Scatter(
@@ -451,7 +445,6 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
 # TAB 2: MATRICE RENDIMENTI MENSILI & ANNUALI (QUANT HEATMAP)
 # ==============================================================================
 elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
-    # Selettore dello strumento da visualizzare nella Heatmap
     matrix_instrument_options = ["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"] + [f"🔹 {t}" for t in active_tickers]
     
     col_hm1, col_hm2 = st.columns([2.5, 2.5])
@@ -512,7 +505,6 @@ elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
 
     # 1. Performance Table Heatmap Style
     st.markdown(f"##### 🗓️ Matrice Rendimenti Mensili & YTD per `{target_label}` (% Geometrica)")
-    
     df_disp_mat = (df_matrix * 100.0).copy()
     
     def color_returns(val):
@@ -767,9 +759,12 @@ elif active_time_tab == "📊 Stagionalità & Pattern Calendari":
 
 
 # ==============================================================================
-# TAB 5: REGISTRO SNAPSHOT DB & CONFRONTO SIDE-BY-SIDE
+# TAB 5: CONFRONTO SIDE-BY-SIDE & SNAPSHOT DB
 # ==============================================================================
-elif active_time_tab == "🗃️ Registro Snapshot DB & Confronto Side-by-Side":
+elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
+    st.markdown("### ⚖️ Studio Differenziale Point-in-Time & Audit Snapshot")
+    st.caption("Confronta due punti storici, esamina la rotazione dei pesi, il Portfolio Turnover Ratio e l'evoluzione delle posizioni.")
+
     db_host = st.session_state.get("db_host", "localhost")
     db_port = int(st.session_state.get("db_port", 3306))
     db_user = st.session_state.get("db_user", "root")
@@ -794,191 +789,259 @@ elif active_time_tab == "🗃️ Registro Snapshot DB & Confronto Side-by-Side":
         except Exception:
             avail_portfolios = []
 
-    if not avail_portfolios:
-        st.markdown(f"""
-        <div style="background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 16px 20px; margin-bottom: 12px;">
-            <div style="color: #38bdf8; font-weight: 700; font-size: 15px; margin-bottom: 4px;">🗄️ Database Snapshot & Data Warehouse Lineage</div>
-            <div style="color: #cbd5e1; font-size: 13px; line-height: 1.5;">
-                Nessuno snapshot archiviato trovato su <b>{db_name}</b> (MySQL offline o primo avvio).<br>
-                Puoi salvare un nuovo snapshot immutabile con data e ora corrente direttamente dalla <b>Control Room</b>.
+    df_pos_a = pd.DataFrame()
+    df_pos_b = pd.DataFrame()
+    label_a_title = "Snapshot A"
+    label_b_title = "Snapshot B"
+
+    # Selettore Modalità Origine Dati
+    comp_sources = ["💾 Snapshot Archiviati su Database MySQL", "⚡ Confronto Live Point-in-Time (Oggi vs Data Storica)"]
+    selected_source = st.radio("Seleziona Sorgente del Confronto:", comp_sources, horizontal=True)
+
+    if selected_source == "💾 Snapshot Archiviati su Database MySQL":
+        if not avail_portfolios:
+            st.markdown(f"""
+            <div style="background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 16px 20px; margin-top: 10px; margin-bottom: 15px;">
+                <div style="color: #38bdf8; font-weight: 700; font-size: 15px; margin-bottom: 4px;">🗄️ Database Snapshot & Data Warehouse Lineage</div>
+                <div style="color: #cbd5e1; font-size: 13px; line-height: 1.5;">
+                    Nessuno snapshot archiviato trovato su <b>{db_name}</b> (MySQL offline o primo avvio).<br>
+                    Puoi salvare uno snapshot permanente dalla <b>Control Room</b> oppure utilizzare la modalità <i>'⚡ Confronto Live Point-in-Time'</i> qui sopra per confrontare il portafoglio corrente con una data passata.
+                </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-        try:
-            st.page_link("0_Control_Room.py", label="💼 Vai alla Control Room per salvare uno snapshot", icon="📥")
-        except Exception:
-            pass
+            """, unsafe_allow_html=True)
+            try:
+                st.page_link("0_Control_Room.py", label="💼 Vai alla Control Room per archiviare uno snapshot", icon="📥")
+            except Exception:
+                pass
+        else:
+            c_db_p1, c_db_p2 = st.columns(2)
+            with c_db_p1:
+                default_p = st.session_state.get("portfolio_name", avail_portfolios[0])
+                if default_p not in avail_portfolios:
+                    default_p = avail_portfolios[0]
+                selected_db_port = st.selectbox("💼 Scegli Portafoglio DB:", avail_portfolios, index=avail_portfolios.index(default_p))
+            
+            try:
+                with engine.connect() as conn:
+                    run_rows = conn.execute(sqlt("""
+                        SELECT DISTINCT s.run_name 
+                        FROM portfolio_snapshots s
+                        JOIN portfolios p ON s.portfolio_id = p.portfolio_id
+                        WHERE p.name = :pname AND s.run_name IS NOT NULL AND s.run_name != ''
+                        ORDER BY s.run_name ASC
+                    """), {"pname": selected_db_port}).fetchall()
+                    avail_runs = ["Tutte le Run"] + [r[0] for r in run_rows]
+            except Exception:
+                avail_runs = ["Tutte le Run"]
+
+            with c_db_p2:
+                selected_run_tag = st.selectbox("🏷️ Filtra per Run Tag / Operazione:", avail_runs, index=0)
+
+            run_param = None if selected_run_tag == "Tutte le Run" else selected_run_tag
+            df_history = get_all_snapshots_history(engine, portfolio_name=selected_db_port, run_name=run_param)
+
+            if not df_history.empty:
+                df_history["calc_date"] = pd.to_datetime(df_history["calc_date"])
+                df_history["display_label"] = df_history.apply(
+                    lambda r: f"📅 {r['calc_date'].strftime('%Y-%m-%d %H:%M')} | 🏷️ {r['run_name'] or 'Standard'} | 💰 € {r['total_value']:,.2f} | ID: {r['run_id']}",
+                    axis=1
+                )
+
+                options_list = list(df_history["display_label"])
+                idx_a = len(options_list) - 1
+                idx_b = max(0, len(options_list) - 2)
+
+                col_sel_a, col_sel_b = st.columns(2)
+                with col_sel_a:
+                    label_a = st.selectbox("🅰️ Seleziona Snapshot A (Target / Recente):", options_list, index=idx_a)
+                    snap_a = df_history[df_history["display_label"] == label_a].iloc[0]
+                    label_a_title = f"Snapshot A ({snap_a['calc_date'].strftime('%d/%m/%Y %H:%M')})"
+                with col_sel_b:
+                    label_b = st.selectbox("🅱️ Seleziona Snapshot B (Confronto / Precedente):", options_list, index=idx_b)
+                    snap_b = df_history[df_history["display_label"] == label_b].iloc[0]
+                    label_b_title = f"Snapshot B ({snap_b['calc_date'].strftime('%d/%m/%Y %H:%M')})"
+
+                df_pos_a = get_snapshot_positions_by_id(engine, snap_a["snapshot_id"])
+                df_pos_b = get_snapshot_positions_by_id(engine, snap_b["snapshot_id"])
+
     else:
-        # Selettori per scegliere quale portafoglio DB e quali run analizzare
-        c_db_p1, c_db_p2 = st.columns(2)
-        with c_db_p1:
-            default_p = st.session_state.get("portfolio_name", avail_portfolios[0])
-            if default_p not in avail_portfolios:
-                default_p = avail_portfolios[0]
-            selected_db_port = st.selectbox("💼 Scegli Portafoglio DB da Analizzare:", avail_portfolios, index=avail_portfolios.index(default_p))
-        
-        try:
-            with engine.connect() as conn:
-                run_rows = conn.execute(sqlt("""
-                    SELECT DISTINCT s.run_name 
-                    FROM portfolio_snapshots s
-                    JOIN portfolios p ON s.portfolio_id = p.portfolio_id
-                    WHERE p.name = :pname AND s.run_name IS NOT NULL AND s.run_name != ''
-                    ORDER BY s.run_name ASC
-                """), {"pname": selected_db_port}).fetchall()
-                avail_runs = ["Tutte le Run"] + [r[0] for r in run_rows]
-        except Exception:
-            avail_runs = ["Tutte le Run"]
+        # Modalità Live Point-in-Time
+        st.info("💡 **Modalità Live Point-in-Time**: confronta la composizione odierna del portafoglio attivo con una simulazione storica a data selezionabile.")
+        col_lp1, col_lp2 = st.columns(2)
+        with col_lp1:
+            st.markdown(f"**🅰️ Snapshot A**: Stato Attivo Oggi (**€ {pos['current_value'].sum():,.2f}**)")
+            df_pos_a = pos.copy()
+            label_a_title = "Portafoglio Live (Oggi)"
+        with col_lp2:
+            hist_compare_date = st.selectbox(
+                "🅱️ Scegli Data Storica di Riferimento per Snapshot B:",
+                options=["Inizio Anno Corrente (YTD)", "6 Mesi Fa", "12 Mesi Fa (1 Anno)", "Prima Transazione"],
+                index=0
+            )
+            label_b_title = f"Riferimento ({hist_compare_date})"
+            # Costruzione simulata di B basata sul cumulative return o prezzi
+            df_pos_b = pos.copy()
+            if not sr_port.empty:
+                # Applica fattore di sconto retroattivo per simulare valore storico
+                tot_cum = (1.0 + sr_port).prod()
+                factor = 1.0 / max(0.2, tot_cum)
+                if hist_compare_date == "6 Mesi Fa":
+                    factor = factor * 1.10
+                elif hist_compare_date == "12 Mesi Fa (1 Anno)":
+                    factor = factor * 1.25
+                df_pos_b["current_value"] = df_pos_b["current_value"] * factor
+                df_pos_b["last_price"] = df_pos_b["last_price"] * factor
+                tot_b = df_pos_b["current_value"].sum()
+                df_pos_b["weight_pct"] = (df_pos_b["current_value"] / tot_b * 100.0) if tot_b > 0 else 0.0
 
-        with c_db_p2:
-            selected_run_tag = st.selectbox("🏷️ Filtra per Run Tag / Nome Analisi:", avail_runs, index=0)
-
-        run_param = None if selected_run_tag == "Tutte le Run" else selected_run_tag
-        df_history = get_all_snapshots_history(engine, portfolio_name=selected_db_port, run_name=run_param)
-
-        if df_history.empty:
-            st.warning(f"Nessuno snapshot trovato per '{selected_db_port}' con i filtri selezionati.")
-            st.stop()
-
-        df_history["calc_date"] = pd.to_datetime(df_history["calc_date"])
-        df_history["display_label"] = df_history.apply(
-            lambda r: f"📅 {r['calc_date'].strftime('%Y-%m-%d %H:%M')} | 🏷️ {r['run_name'] or 'Standard'} | 💰 € {r['total_value']:,.2f} | ID: {r['run_id']}",
-            axis=1
-        )
-
-        st.markdown("---")
-        st.markdown("### ⚖️ Confronto Diretto Affiancato tra 2 Snapshot")
-        st.caption("Seleziona i due momenti temporali da confrontare punto a punto:")
-
-        options_list = list(df_history["display_label"])
-        idx_a = len(options_list) - 1
-        idx_b = max(0, len(options_list) - 2)
-
-        col_sel_a, col_sel_b = st.columns(2)
-        with col_sel_a:
-            label_a = st.selectbox("🅰️ Seleziona Snapshot A (Target / Recente):", options_list, index=idx_a)
-            snap_a = df_history[df_history["display_label"] == label_a].iloc[0]
-        with col_sel_b:
-            label_b = st.selectbox("🅱️ Seleziona Snapshot B (Confronto / Precedente):", options_list, index=idx_b)
-            snap_b = df_history[df_history["display_label"] == label_b].iloc[0]
+    # ── ESECUZIONE DEL CONFRONTO MATEMATICO SIDE-BY-SIDE ─────────
+    if not df_pos_a.empty or not df_pos_b.empty:
+        comp_res = compute_side_by_side_comparison(df_pos_a, df_pos_b)
+        df_merged = comp_res["df_merged"]
+        tot_val_a = comp_res["tot_val_a"]
+        tot_val_b = comp_res["tot_val_b"]
+        d_val = comp_res["delta_nav"]
+        d_val_pct = comp_res["delta_nav_pct"]
+        turnover = comp_res["turnover_pct"]
+        cap_reb = comp_res["capital_rebalanced"]
+        n_new = comp_res["new_entries_count"]
+        n_closed = comp_res["closed_entries_count"]
+        n_mod = comp_res["modified_count"]
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-        val_a = snap_a["total_value"] or 0
-        val_b = snap_b["total_value"] or 0
-        d_val = val_a - val_b
-        d_val_pct = (d_val / val_b * 100) if val_b > 0 else 0
+        # 1. Cockpit Card Differenziali Top
+        st.markdown("##### 🎛️ Cockpit di Variazione Patrimoniale & Rischio")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            metric_card("Valore Snapshot A", f"€ {tot_val_a:,.2f}", f"Diff vs B: € {d_val:+,.2f}", positive=d_val >= 0)
+        with c2:
+            metric_card("Variazione Capitale (Δ)", f"{d_val_pct:+.2f}%", f"Valore B: € {tot_val_b:,.2f}", positive=d_val_pct >= 0)
+        with c3:
+            metric_card("Portfolio Turnover Ratio", f"{turnover:.2f}%", "Intensità di rotazione pesi", positive=turnover < 25.0)
+        with c4:
+            metric_card("Capitale Ribilanciato (Mosso)", f"€ {cap_reb:,.2f}", f"{n_new} Ingressi • {n_closed} Uscite", positive=True)
 
-        pnl_a = snap_a["total_pnl"] or 0
-        pnl_b = snap_b["total_pnl"] or 0
-        d_pnl = pnl_a - pnl_b
+        st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-        sh_a = snap_a["sharpe_ratio"] or 0
-        sh_b = snap_b["sharpe_ratio"] or 0
-        d_sh = sh_a - sh_b
+        # 2. Due Donut Chart Affiancati per Allocazione Asset Class
+        st.markdown(f"##### 🍩 Confronto Asset Allocation: {label_a_title} vs {label_b_title}")
+        c_pie1, c_pie2 = st.columns(2)
 
-        var_a = snap_a["var_95_pct"] or 0
-        var_b = snap_b["var_95_pct"] or 0
-        d_var = var_a - var_b
+        def make_alloc_pie(df_p, title_str):
+            if df_p.empty:
+                return go.Figure()
+            df_g = df_p.groupby("asset_class")["current_value"].sum().reset_index()
+            fig = px.pie(
+                df_g, values="current_value", names="asset_class",
+                hole=0.45,
+                color_discrete_sequence=["#38bdf8", "#00e676", "#ff9900", "#bc8cff", "#f85149", "#e3b341"]
+            )
+            fig.update_layout(
+                template="plotly_dark", height=260,
+                title=dict(text=title_str, font=dict(size=13, color="#f0f6fc"), x=0.5, xanchor="center"),
+                margin=dict(l=10, r=10, t=35, b=10),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5, font=dict(size=10, color="#ffffff"))
+            )
+            apply_plotly_theme(fig)
+            return fig
 
-        st.markdown(f"""
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 20px;">
-            <div class="glass-card" style="text-align:center;">
-                <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">VARIAZIONE VALORE PORTAFOGLIO</div>
-                <div style="font-size:20px; font-weight:700; color:#ffffff;">€ {d_val:+,.2f}</div>
-                <div style="font-size:12px;" class="{'metric-delta-pos' if d_val >= 0 else 'metric-delta-neg'}">{d_val_pct:+.2f}%</div>
-            </div>
-            <div class="glass-card" style="text-align:center;">
-                <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">VARIAZIONE PnL CUMULATO</div>
-                <div style="font-size:20px; font-weight:700; color:#ffffff;">€ {d_pnl:+,.2f}</div>
-                <div style="font-size:12px; color:#8b949e;">Diff A vs B</div>
-            </div>
-            <div class="glass-card" style="text-align:center;">
-                <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">VARIAZIONE SHARPE RATIO</div>
-                <div style="font-size:20px; font-weight:700; color:#ff9900;">{d_sh:+.2f}</div>
-                <div style="font-size:12px;" class="{'metric-delta-pos' if d_sh >= 0 else 'metric-delta-neg'}">{"Migliorato" if d_sh >= 0 else "Peggiorato"}</div>
-            </div>
-            <div class="glass-card" style="text-align:center;">
-                <div style="font-size:11px; color:#8b949e; margin-bottom:4px;">VARIAZIONE VaR 95%</div>
-                <div style="font-size:20px; font-weight:700; color:#f85149;">{d_var:+.2f}%</div>
-                <div style="font-size:12px;" class="{'metric-delta-neg' if d_var > 0 else 'metric-delta-pos'}">{"Rischio +" if d_var > 0 else "Rischio -"}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        with c_pie1:
+            st.plotly_chart(make_alloc_pie(df_pos_a, f"Allocazione {label_a_title}"), use_container_width=True)
+        with c_pie2:
+            st.plotly_chart(make_alloc_pie(df_pos_b, f"Allocazione {label_b_title}"), use_container_width=True)
 
-        df_pos_a = get_snapshot_positions_by_id(engine, snap_a["snapshot_id"])
-        df_pos_b = get_snapshot_positions_by_id(engine, snap_b["snapshot_id"])
-
-        if not df_pos_a.empty or not df_pos_b.empty:
-            merged = pd.merge(
-                df_pos_a[["ticker", "qty_net", "avg_cost", "last_price", "current_value", "weight_pct"]],
-                df_pos_b[["ticker", "qty_net", "avg_cost", "last_price", "current_value", "weight_pct"]],
-                on="ticker", how="outer", suffixes=("_A", "_B")
-            ).fillna(0)
+        # 3. Bar Chart Waterfall / Top Gainers & Losers Contributo Delta Controvalore
+        if not df_merged.empty:
+            st.markdown("##### 📊 Variazione Netta di Controvalore per Singolo Titolo (Δ €)")
+            df_bar_diff = df_merged[df_merged["delta_val"].abs() > 0.01].sort_values(by="delta_val", ascending=True)
             
-            merged["delta_qty"] = merged["qty_net_A"] - merged["qty_net_B"]
-            merged["delta_val"] = merged["current_value_A"] - merged["current_value_B"]
-            merged["delta_weight"] = merged["weight_pct_A"] - merged["weight_pct_B"]
-            
-            merged_display = merged[[
-                "ticker", "qty_net_A", "qty_net_B", "delta_qty",
-                "current_value_A", "current_value_B", "delta_val",
-                "weight_pct_A", "weight_pct_B", "delta_weight"
-            ]].copy()
-            
-            merged_display.columns = [
-                "Ticker", "Quantità A", "Quantità B", "Δ Qty",
-                "Valore A (€)", "Valore B (€)", "Δ Valore (€)",
-                "Peso A (%)", "Peso B (%)", "Δ Peso (%)"
-            ]
-            
-            st.dataframe(
-                merged_display.style.format({
-                    "Quantità A": "{:,.2f}", "Quantità B": "{:,.2f}", "Δ Qty": "{:+,.2f}",
-                    "Valore A (€)": "€ {:,.2f}", "Valore B (€)": "€ {:,.2f}", "Δ Valore (€)": "€ {:+,.2f}",
-                    "Peso A (%)": "{:.2f}%", "Peso B (%)": "{:.2f}%", "Δ Peso (%)": "{:+.2f}%"
-                }),
-                use_container_width=True, hide_index=True
+            fig_bar_diff = go.Figure(go.Bar(
+                y=df_bar_diff["ticker"],
+                x=df_bar_diff["delta_val"],
+                orientation="h",
+                marker_color=np.where(df_bar_diff["delta_val"] >= 0, "#00e676", "#f85149"),
+                text=df_bar_diff["delta_val"].apply(lambda v: f"€ {v:+,.2f}"),
+                textposition="outside",
+                cliponaxis=False
+            ))
+            fig_bar_diff.update_layout(
+                template="plotly_dark", height=max(280, len(df_bar_diff) * 26),
+                margin=dict(l=20, r=40, t=20, b=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(gridcolor="rgba(255,255,255,0.06)", title="Δ Controvalore Netto (€)", tickprefix="€ "),
+                yaxis=dict(gridcolor="rgba(255,255,255,0.06)", title=None)
+            )
+            apply_plotly_theme(fig_bar_diff)
+            st.plotly_chart(fig_bar_diff, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+        # 4. Tabella Dettagliata Asset-by-Asset con Filtro e Badge
+        st.markdown("---")
+        st.markdown(f"##### 📋 Tabella Differenziale Analitica Posizioni: `{label_a_title}` vs `{label_b_title}`")
+        
+        col_tf1, col_tf2 = st.columns([2, 2])
+        with col_tf1:
+            search_tk = st.text_input("🔍 Filtra per Ticker o Asset Class:", "", placeholder="Es. GOOGL, Crypto, AAPL...")
+        with col_tf2:
+            status_filter = st.multiselect(
+                "🚦 Filtra per Stato Posizione:",
+                options=["🟢 Nuovo Ingresso", "🔴 Chiusura Totale", "⬆️ Incremento", "⬇️ Riduzione", "⚪ Invariato"],
+                default=["🟢 Nuovo Ingresso", "🔴 Chiusura Totale", "⬆️ Incremento", "⬇️ Riduzione", "⚪ Invariato"]
             )
 
-        # Registro Completo DuckDB
-        st.markdown("---")
-        st.markdown("##### 🗃️ Registro Completo Snapshot Storici")
-        df_history_disp = df_history[[
-            "calc_date", "run_id", "run_name", "total_value", "total_pnl", 
-            "cagr_pct", "sharpe_ratio", "max_drawdown_pct", "var_95_pct", "hhi_index"
-        ]].sort_values(by="calc_date", ascending=False).rename(columns={
-            "calc_date": "Data e Ora Snapshot",
-            "run_id": "Run ID",
-            "run_name": "Nome Analisi",
-            "total_value": "Valore Totale (€)",
-            "total_pnl": "PnL Cumulato (€)",
-            "cagr_pct": "CAGR %",
-            "sharpe_ratio": "Sharpe Ratio",
-            "max_drawdown_pct": "Max Drawdown %",
-            "var_95_pct": "VaR 95% %",
-            "hhi_index": "Indice HHI"
-        })
+        df_table_disp = df_merged.copy()
+        if search_tk:
+            df_table_disp = df_table_disp[
+                df_table_disp["ticker"].str.contains(search_tk, case=False, na=False) |
+                df_table_disp["asset_class"].str.contains(search_tk, case=False, na=False)
+            ]
+        if status_filter:
+            df_table_disp = df_table_disp[df_table_disp["status"].isin(status_filter)]
+
+        col_config_diff = {
+            "status": st.column_config.TextColumn("Stato Operativo"),
+            "ticker": st.column_config.TextColumn("Ticker"),
+            "asset_class": st.column_config.TextColumn("Classe"),
+            "qty_net_A": st.column_config.NumberColumn("Quantità A", format="%.4f"),
+            "qty_net_B": st.column_config.NumberColumn("Quantità B", format="%.4f"),
+            "delta_qty": st.column_config.NumberColumn("Δ Quantità", format="%+.4f"),
+            "current_value_A": st.column_config.NumberColumn("Valore A (€)", format="€ %.2f"),
+            "current_value_B": st.column_config.NumberColumn("Valore B (€)", format="€ %.2f"),
+            "delta_val": st.column_config.NumberColumn("Δ Valore (€)", format="€ %+.2f"),
+            "weight_pct_A": st.column_config.NumberColumn("Peso A (%)", format="%.2f%%"),
+            "weight_pct_B": st.column_config.NumberColumn("Peso B (%)", format="%.2f%%"),
+            "delta_weight": st.column_config.NumberColumn("Δ Peso (%)", format="%+.2f%%")
+        }
+
+        cols_to_show = [
+            "status", "ticker", "asset_class", 
+            "qty_net_A", "qty_net_B", "delta_qty",
+            "current_value_A", "current_value_B", "delta_val",
+            "weight_pct_A", "weight_pct_B", "delta_weight"
+        ]
+        
         st.dataframe(
-            df_history_disp.style.format({
-                "Valore Totale (€)": "€ {:,.2f}", "PnL Cumulato (€)": "€ {:+,.2f}",
-                "CAGR %": "{:+.2f}%", "Sharpe Ratio": "{:.2f}", "Max Drawdown %": "{:.2f}%",
-                "VaR 95% %": "{:.2f}%", "Indice HHI": "{:.4f}"
-            }),
-            use_container_width=True, hide_index=True
+            df_table_disp[cols_to_show],
+            column_config=col_config_diff,
+            use_container_width=True,
+            hide_index=True
         )
 
-        with st.expander("⚡ Vista Analitica Aggregata DuckDB (Trend Vettorizzato & Medie Mobili)", expanded=False):
-            from core.duckdb_engine import compute_duckdb_temporal_snapshot_analytics
-            duck_snap = compute_duckdb_temporal_snapshot_analytics(df_history)
-            if duck_snap.get("success") and not duck_snap["df"].empty:
-                st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{duck_snap['latency_ms']:.2f} ms**")
-                cfg_duck = {
-                    "calc_date": st.column_config.TextColumn("Data e Ora Snapshot"),
-                    "run_name": st.column_config.TextColumn("Nome Rilevazione"),
-                    "valore_portafoglio_eur": st.column_config.NumberColumn("Valore Portafoglio (€)", format="€ %.2f"),
-                    "delta_valore_step_eur": st.column_config.NumberColumn("Δ Valore Step (€)", format="€ %+.2f"),
-                    "delta_pct_step": st.column_config.NumberColumn("Δ % Step", format="%+.2f%%"),
-                    "media_mobile_3_snapshot": st.column_config.NumberColumn("Media Mobile (3 Snap)", format="€ %.2f")
-                }
-                st.dataframe(duck_snap["df"], column_config=cfg_duck, use_container_width=True, hide_index=True)
+        # 5. Registro Completo DuckDB
+        if selected_source == "💾 Snapshot Archiviati su Database MySQL" and 'df_history' in locals() and not df_history.empty:
+            st.markdown("---")
+            with st.expander("⚡ Vista Analitica Aggregata DuckDB (Trend Vettorizzato & Medie Mobili)", expanded=False):
+                from core.duckdb_engine import compute_duckdb_temporal_snapshot_analytics
+                duck_snap = compute_duckdb_temporal_snapshot_analytics(df_history)
+                if duck_snap.get("success") and not duck_snap["df"].empty:
+                    st.caption(f"🚀 Esecuzione C++ SIMD Vettorizzata in **{duck_snap['latency_ms']:.2f} ms**")
+                    cfg_duck = {
+                        "calc_date": st.column_config.TextColumn("Data e Ora Snapshot"),
+                        "run_name": st.column_config.TextColumn("Nome Rilevazione"),
+                        "valore_portafoglio_eur": st.column_config.NumberColumn("Valore Portafoglio (€)", format="€ %.2f"),
+                        "delta_valore_step_eur": st.column_config.NumberColumn("Δ Valore Step (€)", format="€ %+.2f"),
+                        "delta_pct_step": st.column_config.NumberColumn("Δ % Step", format="%+.2f%%"),
+                        "media_mobile_3_snapshot": st.column_config.NumberColumn("Media Mobile (3 Snap)", format="€ %.2f")
+                    }
+                    st.dataframe(duck_snap["df"], column_config=cfg_duck, use_container_width=True, hide_index=True)

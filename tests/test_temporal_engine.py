@@ -71,3 +71,31 @@ def test_compute_seasonality_patterns():
     assert len(res["month_stats"]) == 12
     assert "Mean_Pct" in res["day_stats"].columns
     assert "Win_Rate" in res["day_stats"].columns
+
+
+def test_compute_side_by_side_comparison():
+    from core.temporal_engine import compute_side_by_side_comparison
+    df_a = pd.DataFrame({
+        "ticker": ["AAPL", "NVDA", "BTC"],
+        "asset_class": ["Stock", "Stock", "Crypto"],
+        "qty_net": [10.0, 5.0, 0.5],
+        "current_value": [1500.0, 600.0, 30000.0],
+        "weight_pct": [4.67, 1.87, 93.46]
+    })
+    df_b = pd.DataFrame({
+        "ticker": ["AAPL", "NVDA", "ETH"],
+        "asset_class": ["Stock", "Stock", "Crypto"],
+        "qty_net": [8.0, 5.0, 5.0],
+        "current_value": [1200.0, 600.0, 10000.0],
+        "weight_pct": [10.17, 5.08, 84.75]
+    })
+
+    comp = compute_side_by_side_comparison(df_a, df_b)
+    assert not comp["df_merged"].empty
+    assert comp["tot_val_a"] == 32100.0
+    assert comp["tot_val_b"] == 11800.0
+    assert comp["delta_nav"] > 0
+    assert comp["turnover_pct"] > 0
+    assert comp["new_entries_count"] == 1 # BTC
+    assert comp["closed_entries_count"] == 1 # ETH
+
