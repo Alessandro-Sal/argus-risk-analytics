@@ -2209,15 +2209,68 @@ $$
 
 ---
 
-## 64. Riferimenti Bibliografici & Standard Istituzionali
+## 64. Motore Quantitativo EQS Screener, Pre-Trade Impact & Smart Sizing Optimization (`core/screener_engine.py`)
+
+### 1. Punteggio Multi-Fattoriale Istituzionale ARGUS Composite Score
+Il modello valuta ogni asset candidato sintetizzando quattro pilastri quantitativi ortogonali, ciascuno ponderato al 25%:
+
+$$
+\text{ARGUS Score} = 0.25 \cdot S_{\text{Valutazione}} + 0.25 \cdot S_{\text{Qualità}} + 0.25 \cdot S_{\text{Rischio}} + 0.25 \cdot S_{\text{Momentum}}
+$$
+
+- **$S_{\text{Valutazione}}$**: Potenziale di rialzo implicito dal consensus target price normalizzato per il differenziale valutario ($\text{Upside } \% = \frac{\text{Target} - P}{P} \times 100$) e PEG Ratio.
+- **$S_{\text{Qualità}}$**: Redditività operativa (Return on Equity ROE), margine netto e indice di solvibilità contabile Altman Z-Score integrato con Piotroski F-Score.
+- **$S_{\text{Rischio}}$**: Volatilità annualizzata storica ($\sigma_a = \sigma_d \sqrt{252}$), Sharpe Ratio rispetto al benchmark e Max Drawdown a 2 anni.
+- **$S_{\text{Momentum}}$**: Performance relativa a 1 anno, posizione del prezzo rispetto alla media mobile SMA 200 e indice di forza relativa RSI 14 oscillatore.
+
+### 2. Simulatore Pre-Trade What-If & Decomposizione del Rischio Marginale
+Prima di impegnare capitale a mercato, il motore calcola l'impatto marginale dell'introduzione di una quota $w_{\text{cand}} \in [0.01, 0.30]$ del titolo candidato nel portafoglio reale:
+
+- **Ribilanciamento Vettoriale dei Pesi**:
+  
+$$
+w_{\text{new}} = (1 - w_{\text{cand}}) \cdot w_{\text{current}} + w_{\text{cand}} \cdot e_{\text{cand}}
+$$
+
+- **Impatto Marginale su Volatilità e Sharpe Ratio**:
+  
+$$
+\Delta \sigma_p = \sigma(w_{\text{new}}) - \sigma(w_{\text{current}})
+$$
+
+$$
+\Delta \text{Sharpe} = \frac{R(w_{\text{new}}) - R_f}{\sigma(w_{\text{new}})} - \frac{R(w_{\text{current}}) - R_f}{\sigma(w_{\text{current}})}
+$$
+
+- **Diversification Ratio di Choueifaty (2008)**:
+  
+$$
+DR(w) = \frac{\sum_{i=1}^N w_i \cdot \sigma_i}{\sqrt{w^T \Sigma w}}
+$$
+
+  Un $\Delta DR > 0$ certifica che il candidato apporta diversificazione decorrelata, riducendo la concentrazione del rischio sistemico.
+
+### 3. Smart Sizing Optimizer (Allocazione Ottima Pre-Trade)
+Il modulo determina la quota esatta $w^*$ che massimizza l'efficienza marginale o il Diversification Ratio tramite ottimizzazione vincolata unidimensionale (metodo di Brent / SLSQP):
+
+$$
+w^* = \arg\max_{w \in [0.01, 0.25]} \text{Sharpe}(w_{\text{new}}(w))
+$$
+
+generando la curva di frontiera continua dell'indice di Sharpe in funzione del peso del candidato.
+
+---
+
+## 65. Riferimenti Bibliografici & Standard Istituzionali
 
 1. **Almgren, R., & Chriss, N. (2000)**. *Optimal execution of portfolio transactions*. Journal of Risk, 3(2), 5-40.
 2. **Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005)**. *Direct estimation of equity market impact*. Risk, 18(7), 58-62.
 3. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
-4. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
-5. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
-6. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
-7. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
-8. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
-9. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+4. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
+5. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
+6. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
+7. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
+8. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
+9. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
+10. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
 

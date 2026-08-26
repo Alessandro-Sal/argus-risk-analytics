@@ -1,4 +1,4 @@
-# Investment Risk BI Platform — Project Handoff (v5.18.0 Production Release)
+# Investment Risk BI Platform — Project Handoff (v5.22.0 Production Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,12 +6,12 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.18.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.22.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
 - **SQL & MySQL 8.0 / SQLite (SQLAlchemy ORM)**: Data Warehouse relazionale, tabelle transazionali e storicizzazione snapshot temporali (`data/argus_local.db`).
-- **Streamlit**: Web Application Framework interattivo per la dashboard (10 moduli ad alta densità quantitativa con Navigation Rail ad albero).
+- **Streamlit**: Web Application Framework interattivo per la dashboard (11 moduli ad alta densità quantitativa con Navigation Rail ad albero).
 - **PyWebView & PyInstaller**: Architettura Desktop Nativa Windows (WebView2 engine, finestra dedicata, gestione ciclo di vita senza browser, eseguibile `.exe` standalone e collegamento Desktop).
 - **Power BI & Google Looker Studio**: Executive Dashboards basate su pacchetto Star Schema ZIP (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`).
 - **Excel (`openpyxl`/`xlsxwriter`)**: Modello tattico di simulazione What-If ed esportazione Workbook Multi-Tab.
@@ -51,7 +51,7 @@ Power BI / Looker Studio ◄─── core/exporter.py ◄─── core/db_expo
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**110/110 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**243/243 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
@@ -114,8 +114,11 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Comparativa Multiaziendale**: Confronto affiancato di 2+ aziende con Z-Score, DuPont, Radar Chart e Matrice dei Multipli (*P/E*, *EV/EBITDA*, *P/B*, *P/S*).
 
 ### `core/screener_engine.py` — ✅ Screener Quantitativo & Pre-Trade Impact Simulator
-- Discovery globale su 4 universi e archetipi quantitativi istituzionali (*GARP*, *Deep Value*, *Dividend Fortress*, *Low Volatility*, *Momentum Breakout*).
-- Simulatore di impatto pre-trade con ricalcolo dei delta su rischio, diversificazione e rendimento.
+- Discovery globale su 11 universi e archetipi quantitativi istituzionali (*GARP*, *Deep Value*, *Dividend Champions*, *Low Volatility*, *Momentum Breakout*, *Portafoglio Attivo Live*).
+- **Parallel Multi-Thread Engine (8 Workers)**: Scansione concorrente ad altissima velocità su universi fino a 100 titoli in soli ~3s con retry esponenziale anti-429 e fallback automatico `fast_info` per ETF/Crypto.
+- **Granular Cache Invalidation & Force Live Refresh**: Tracciamento granulare del contenuto degli universi con pulsante `🔄 Forza Live` per bypassare istantaneamente la cache L2.
+- **Smart Sizing Optimizer & Pre-Trade Impact Simulator**: Simulazione d'impatto pre-trade con massimizzazione dell'indice di Sharpe o del Diversification Ratio (Choueifaty 2008), determinazione del peso ottimo del candidato $w^*$ e curva continua di frontiera Sharpe.
+- **Normalizzazione Istituzionale Dividend Yield %**: Calcolo normalizzato su $\frac{\text{dividendRate}}{\text{last\_price}}\times 100$, pricing sintetico per stablecoin ed ETF europei.
 
 ### `core/tax_engine.py` — ✅ Ottimizzazione Fiscale & Tax-Loss Harvesting Wizard (TUIR Art. 67)
 - **Tassazione Normativa Italiana**: Tassazione al 12.5% sui Titoli di Stato (White List) e 26.0% su Azioni, Obbligazioni, ETF e Cripto.
@@ -162,8 +165,9 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Integrazione Duale VBA / Office Scripts**: Modulo VBA per Excel Desktop (.bas) e script TypeScript per Excel 365/Web con chiamate REST non bloccanti.
 - **Esportatore Multi-Foglio OpenPyXL/XlsxWriter**: Creazione di cartelle di lavoro professionali con fogli *Executive_Summary*, *Positions_Portfolio*, *Fixed_Income_YAS*, *Execution_Schedule* con stili grafici e formattazione colonnare automatica.
 
-### `core/workspace_manager.py` & `core/sidebar.py` — ✅ Navigation Rail v5.18.0, Spotlight & Workspace State
+### `core/workspace_manager.py` & `core/sidebar.py` — ✅ Navigation Rail, Sincronizzazione Bidirezionale & Spotlight
 - Gestione dello stato sessione e URL query parameters (`st.query_params`) per routing e permalink affidabili.
+- **Sincronizzazione Bidirezionale Zero-Desync**: Sincronia perfetta tra i pulsanti sottomodulo della Sidebar e i selettori a tendina `st.selectbox` di tutte le pagine.
 - Command Palette Spotlight (`Ctrl+K` / `Cmd+K`) per saltare all'istante a qualsiasi modulo o ticker con fuzzy search.
 - Sistema di Tree Rail istituzionale a 11 moduli con routing reattivo a sotto-schede e persistenza multi-sessione.
 
@@ -180,14 +184,14 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 7. **`6_🌪️_Stress_Testing.py`**: MSCI Barra Multi-Scenario Matrix, Beta Shock Waterfall, Macro Scenario Builder interattivo ($\Delta r$, $\Delta \text{FX}$, $\Delta \text{Commodity}$, $\Delta \text{Equity}$) e **Visualizzatore 3D della Superficie di Rischio (Plotly Surface)**.
 8. **`7_📊_Analisi_Temporale.py`**: Storicizzazione Multi-Snapshot su Data Warehouse MySQL/SQLite, Evoluzione Temporale del Valore di Portafoglio, Matrice dei Delta ($\Delta$) tra Snapshot e Calcolatore del Tasso di Risparmio & Iniezioni di Liquidità.
 9. **`8_📈_Analisi_Tecnica.py`**: Cockpit di Analisi Tecnica & Quantitative Charting, Volume Profile (POC/VAH/VAL), Candlestick Pattern Recognition, Technical Confluence Score Card (0-100), Multi-Timeframe Alignment (1D vs 1W), Screener di Confluenza e **Real-Time Streaming Engine con Ring Buffer L2 & Order Flow Imbalance**.
-10. **`9_🔍_Screener_Opportunita.py`**: Screener Quantitativo Multi-Fattoriale (Valutazione, Qualità Contabile, Rischio, Momentum), **⚡ Formula Engine EQS (Custom Query Builder con sintassi logica avanzata)**, Archetipi Istituzionali, Pre-Trade Impact Simulator e Generatore Factsheet PDF One-Pager.
+10. **`9_🔍_Screener_Opportunita.py`**: Screener Quantitativo Multi-Fattoriale (Valutazione, Qualità Contabile, Rischio, Momentum), **⚡ Formula Engine EQS (Custom Query Builder)**, Archetipi Istituzionali, Parallel Multi-Thread Downloader (8 Workers), Granular Cache Invalidation con pulsante `🔄 Forza Live`, Smart Sizing Optimizer, Pre-Trade Impact Simulator e Generatore Factsheet PDF One-Pager.
 11. **`10_💻_BQuant_e_Launchpad.py`**: **🐍 ARGUS BQuant Python Sandbox In-App**, **🎛️ ARGUS Launchpad & Workspace Customizer (5 Ruoli Istituzionali)**, **📊 Excel Live Connector & Generatore Formule Bloomberg (=ARGUS_BDP, =ARGUS_BDH, =ARGUS_RISK) con Esportazione Multi-Foglio XLSX**.
 
 ---
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **217 test automatizzati passano con successo (100%)**:
+Tutti i **243 test automatizzati passano con successo (100%)**:
 
 ```bash
 py -m pytest
@@ -195,6 +199,6 @@ py -m pytest
 
 ---
 
-*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.18.0.*
+*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.22.0.*
 
 
