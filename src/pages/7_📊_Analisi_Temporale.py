@@ -347,8 +347,14 @@ elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
             return f"background-color: rgba(248, 81, 73, {intensity:.2f}); color: #ffffff; font-weight: 600;"
         return "color: #c9d1d9;"
 
+    styler_mat = df_disp_mat.style.format("{:+.2f}%", na_rep="-")
+    if hasattr(styler_mat, "map"):
+        styler_mat = styler_mat.map(color_returns)
+    elif hasattr(styler_mat, "applymap"):
+        styler_mat = styler_mat.applymap(color_returns)
+
     st.dataframe(
-        df_disp_mat.style.format("{:+.2f}%", na_rep="-").applymap(color_returns),
+        styler_mat,
         use_container_width=True
     )
 
