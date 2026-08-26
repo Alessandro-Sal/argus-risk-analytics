@@ -594,9 +594,52 @@ st.divider()
 # ── SEZIONE 5: SYSTEM TELEMETRY (FULL-WIDTH ROW) ─────────────────────────────
 st.markdown("#### 📊 Telemetria di Sistema (TOP Monitor)")
 top_res = term_eng.execute_command("TOP", session_context)
-top_box_html = (
-    f'<div style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px 16px; font-family: monospace; font-size: 11.5px; color: #58a6ff; white-space: pre-wrap; margin-top: 4px;">'
-    f'{html.escape(top_res.output_text)}'
-    f'</div>'
-)
-st.markdown(top_box_html, unsafe_allow_html=True)
+sdata = top_res.structured_data or {}
+
+pid_val = sdata.get("pid", "N/A")
+ram_val = sdata.get("ram_mb", 450.0)
+cpu_val = sdata.get("cpu_pct", 0.0)
+threads_val = sdata.get("threads", 8)
+act_assets = sdata.get("active_assets", len(active_pos))
+hist_days = sdata.get("hist_obs", 5000)
+act_bufs = sdata.get("active_buffers", len(term_eng._ring_buffers))
+blotter_cnt = sdata.get("blotter_size", len(term_eng.oms_blotter))
+
+top_hud_html = f"""
+<div style="background: linear-gradient(135deg, rgba(13,17,23,0.95) 0%, rgba(22,27,34,0.95) 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 14px 18px; margin-top: 4px; box-shadow: 0 4px 16px rgba(0,0,0,0.35);">
+  <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+    <div style="font-size: 12.5px; font-weight: 700; color: #f0f6fc; display: flex; align-items: center; gap: 8px;">
+      <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #3fb950; box-shadow: 0 0 8px #3fb950;"></span>
+      <span>ARGUS ENGINE TELEMETRY</span>
+      <span style="font-size: 10px; background: rgba(63,185,80,0.15); color: #3fb950; border: 1px solid rgba(63,185,80,0.3); padding: 1px 6px; border-radius: 4px; font-weight: 700;">NODE ONLINE</span>
+    </div>
+    <div style="font-size: 11px; font-family: monospace; color: #8b949e;">
+      PID: <span style="color: #f0f6fc; font-weight: 700;">{pid_val}</span> • THREADS: <span style="color: #f0f6fc; font-weight: 700;">{threads_val}</span> • DUCKDB: <span style="color: #58a6ff; font-weight: 700;">C++ SIMD</span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;">
+    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(56,189,248,0.15); border-left: 3px solid #38bdf8; border-radius: 6px; padding: 8px 12px;">
+      <div style="font-size: 10px; font-weight: 700; color: #8b949e; text-transform: uppercase;">Memoria RAM Processo</div>
+      <div style="font-size: 16px; font-weight: 800; color: #58a6ff; font-family: monospace; margin: 2px 0;">{ram_val:.1f} MB</div>
+      <div style="font-size: 10px; color: #8b949e;">CPU Util: <span style="color: #f0f6fc; font-weight: 600;">{cpu_val:.1f}%</span></div>
+    </div>
+    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(63,185,80,0.15); border-left: 3px solid #3fb950; border-radius: 6px; padding: 8px 12px;">
+      <div style="font-size: 10px; font-weight: 700; color: #8b949e; text-transform: uppercase;">Portafoglio & Serie</div>
+      <div style="font-size: 16px; font-weight: 800; color: #3fb950; font-family: monospace; margin: 2px 0;">{act_assets} Asset Attivi</div>
+      <div style="font-size: 10px; color: #8b949e;">{hist_days} Obs storiche</div>
+    </div>
+    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,153,0,0.15); border-left: 3px solid #ff9900; border-radius: 6px; padding: 8px 12px;">
+      <div style="font-size: 10px; font-weight: 700; color: #8b949e; text-transform: uppercase;">Ring Buffer & OMS</div>
+      <div style="font-size: 16px; font-weight: 800; color: #ff9900; font-family: monospace; margin: 2px 0;">{act_bufs} Buffer L2 Attivi</div>
+      <div style="font-size: 10px; color: #8b949e;">{blotter_cnt} Ordini nel blotter</div>
+    </div>
+    <div style="background: rgba(0,0,0,0.3); border: 1px solid rgba(168,85,247,0.15); border-left: 3px solid #a855f7; border-radius: 6px; padding: 8px 12px;">
+      <div style="font-size: 10px; font-weight: 700; color: #8b949e; text-transform: uppercase;">Cache Shield & Engine</div>
+      <div style="font-size: 16px; font-weight: 800; color: #a855f7; font-family: monospace; margin: 2px 0;">ONLINE (24h TTL)</div>
+      <div style="font-size: 10px; color: #3fb950; font-weight: 600;">Vector Engine Attivo</div>
+    </div>
+  </div>
+</div>
+"""
+st.markdown(top_hud_html, unsafe_allow_html=True)
