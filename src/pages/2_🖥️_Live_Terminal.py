@@ -277,6 +277,7 @@ with tab_port_live:
         # Calcolo prezzi live per ogni titolo attivo del portafoglio
         port_live_rows = []
         tot_live_notional = 0.0
+        tot_prev_day_notional = 0.0
         tot_wacp_cost = 0.0
         day_chgs = []
 
@@ -288,6 +289,9 @@ with tab_port_live:
             
             live_item = all_quotes.get(sym, terminal_engine.fetch_live_ticker_quote(sym))
             live_px_orig = float(live_item.get("last_price", 0.0))
+            prev_close_orig = float(live_item.get("prev_close", live_px_orig))
+            if prev_close_orig <= 0:
+                prev_close_orig = live_px_orig
             chg_1d = float(live_item.get("change_pct", 0.0))
             
             # Determinazione valuta e conversione in EUR
@@ -296,30 +300,38 @@ with tab_port_live:
                 asset_curr = "EUR"
                 curr_sym = "€"
                 live_px_eur = live_px_orig
+                prev_px_eur = prev_close_orig
                 live_px_orig_str = f"€ {live_px_orig:,.2f}"
             elif asset_curr == "USD":
                 curr_sym = "$"
                 live_px_eur = (live_px_orig / eurusd_fx) if eurusd_fx > 0 else (live_px_orig * float(r.get("fx_rate_spot", 0.92)))
+                prev_px_eur = (prev_close_orig / eurusd_fx) if eurusd_fx > 0 else (prev_close_orig * float(r.get("fx_rate_spot", 0.92)))
                 live_px_orig_str = f"$ {live_px_orig:,.2f}"
             elif asset_curr in ["GBP", "GBp"]:
                 curr_sym = "£"
                 live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.17))
+                prev_px_eur = prev_close_orig * float(r.get("fx_rate_spot", 1.17))
                 live_px_orig_str = f"£ {live_px_orig:,.2f}"
             elif asset_curr == "CHF":
                 curr_sym = "CHF "
                 live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.05))
+                prev_px_eur = prev_close_orig * float(r.get("fx_rate_spot", 1.05))
                 live_px_orig_str = f"CHF {live_px_orig:,.2f}"
             else:
                 curr_sym = f"{asset_curr} "
                 live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.0))
+                prev_px_eur = prev_close_orig * float(r.get("fx_rate_spot", 1.0))
                 live_px_orig_str = f"{asset_curr} {live_px_orig:,.2f}"
 
             mkt_val_eur = q_val * live_px_eur
+            prev_val_eur = q_val * prev_px_eur
+            day_pnl_asset_eur = mkt_val_eur - prev_val_eur
             cost_eur = q_val * wacp_eur
             pnl_eur = mkt_val_eur - cost_eur
             pnl_pct = (pnl_eur / cost_eur * 100.0) if cost_eur > 0 else 0.0
             
             tot_live_notional += mkt_val_eur
+            tot_prev_day_notional += prev_val_eur
             tot_wacp_cost += cost_eur
             if q_val > 0:
                 day_chgs.append(chg_1d)
@@ -329,6 +341,7 @@ with tab_port_live:
                 "Prezzo Spot (Valuta Orig.)": live_px_orig_str,
                 "Prezzo Live (€ EUR)": f"€ {live_px_eur:,.2f}",
                 "Var. 1D (%)": f"{'+' if chg_1d>=0 else ''}{chg_1d:.2f}%",
+                "Var. Day 1D (€)": f"{'+' if day_pnl_asset_eur>=0 else ''}€ {day_pnl_asset_eur:,.2f}",
                 "Carico FIFO WACP (€)": f"€ {wacp_eur:,.2f}",
                 "Quantità": f"{q_val:,.2f}",
                 "Controvalore Live (€)": f"€ {mkt_val_eur:,.2f}",
@@ -338,32 +351,36 @@ with tab_port_live:
                 "Stato Feed": "LIVE API 🟢" if live_item["is_live"] else "ESTIMATE 🟡"
             })
 
-        # KPI Summary Cards con Styling Istituzionale Dark Glassmorphism
+        # Calcolo PnL Totale Latente e Variazione Live vs Ieri per l'Intero Portafoglio
         tot_pnl = tot_live_notional - tot_wacp_cost
         tot_pnl_p = (tot_pnl / tot_wacp_cost * 100.0) if tot_wacp_cost > 0 else 0.0
-        avg_1d = np.mean(day_chgs) if day_chgs else 0.0
+        
+        tot_day_pnl = tot_live_notional - tot_prev_day_notional
+        tot_day_pnl_p = (tot_day_pnl / tot_prev_day_notional * 100.0) if tot_prev_day_notional > 0 else 0.0
+        
         n_active = len(active_pos)
 
         pnl_color = "#3fb950" if tot_pnl >= 0 else "#f85149"
         pnl_sign = "+" if tot_pnl >= 0 else ""
         pnl_arrow = "▲" if tot_pnl >= 0 else "▼"
-        avg_color = "#3fb950" if avg_1d >= 0 else "#f85149"
-        avg_sign = "+" if avg_1d >= 0 else ""
-        avg_arrow = "▲" if avg_1d >= 0 else "▼"
+
+        day_color = "#3fb950" if tot_day_pnl >= 0 else "#f85149"
+        day_sign = "+" if tot_day_pnl >= 0 else ""
+        day_arrow = "▲" if tot_day_pnl >= 0 else "▼"
 
         kpi_cards_html = f"""
         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px;">
-          <!-- CARD 1 -->
+          <!-- CARD 1: CONTROVALORE -->
           <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(56,189,248,0.25); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">💼 Controvalore</span>
               <span style="font-size: 9px; font-weight: 700; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3); white-space: nowrap;">REAL-TIME</span>
             </div>
             <div style="font-size: 20px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">€ {tot_live_notional:,.2f}</div>
-            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Capitale attivo a mercato spot</div>
+            <div style="font-size: 11px; color: {day_color}; font-weight: 700; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{day_sign}€ {tot_day_pnl:,.2f} ({day_sign}{tot_day_pnl_p:.2f}%) vs ieri {day_arrow}</div>
           </div>
 
-          <!-- CARD 2 -->
+          <!-- CARD 2: PNL NON REALIZZATO -->
           <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {pnl_color}44; border-left: 4px solid {pnl_color}; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">📈 PnL Latente</span>
@@ -373,17 +390,17 @@ with tab_port_live:
             <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Guadagno / perdita vs FIFO</div>
           </div>
 
-          <!-- CARD 3 -->
-          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(168,85,247,0.25); border-left: 4px solid #a855f7; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
+          <!-- CARD 3: PNL DAY (VS IERI) -->
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {day_color}44; border-left: 4px solid {day_color}; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
-              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚡ Var. Intraday</span>
-              <span style="font-size: 9px; font-weight: 700; background: rgba(168,85,247,0.15); color: #a855f7; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168,85,247,0.3); white-space: nowrap;">1D CHG</span>
+              <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚡ PnL Day (vs Ieri)</span>
+              <span style="font-size: 9.5px; font-weight: 700; background: {day_color}22; color: {day_color}; padding: 2px 6px; border-radius: 4px; border: 1px solid {day_color}55; white-space: nowrap;">{day_sign}{tot_day_pnl_p:.2f}% {day_arrow}</span>
             </div>
-            <div style="font-size: 20px; font-weight: 800; color: {avg_color}; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">{avg_sign}{avg_1d:.2f}% {avg_arrow}</div>
-            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Media variazioni giornaliere</div>
+            <div style="font-size: 20px; font-weight: 800; color: {day_color}; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">{day_sign}€ {tot_day_pnl:,.2f}</div>
+            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Variazione monetaria vs chiusura ieri</div>
           </div>
 
-          <!-- CARD 4 -->
+          <!-- CARD 4: POSIZIONI ATTIVE -->
           <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(63,185,80,0.25); border-left: 4px solid #3fb950; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">🟢 Posizioni</span>
