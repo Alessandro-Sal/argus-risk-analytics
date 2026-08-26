@@ -972,19 +972,27 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
         with c3:
             metric_card("Portfolio Turnover Ratio", f"{turnover:.2f}%", "Intensità di rotazione pesi", positive=turnover < 25.0)
         with c4:
-            metric_card("Capitale Ribilanciato (Mosso)", f"€ {cap_reb:,.2f}", f"{n_new} Ingressi • {n_closed} Uscite", positive=True)
+            if cap_reb > 0:
+                metric_card("Capitale Transato (Trading)", f"€ {cap_reb:,.2f}", f"{n_new} Ingressi • {n_closed} Uscite", positive=True)
+            else:
+                n_up = comp_res.get('appreciated_count', 0)
+                n_dn = comp_res.get('depreciated_count', 0)
+                metric_card("Dinamica Prezzi Mercato", f"€ {d_val:+,.2f}", f"{n_up} 📈 Saliti • {n_dn} 📉 Scesi", positive=d_val >= 0)
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-        # 2. Risk & Concentration Drift Matrix (Se disponibili metriche)
-        sh_a = float(meta_a.get("sharpe_ratio", ret_m.get("sharpe_ratio", 1.25)) or 1.25)
-        sh_b = float(meta_b.get("sharpe_ratio", ret_m.get("sharpe_ratio", 1.10)) or 1.10)
-        vol_a = float(meta_a.get("volatility_ann_pct", ret_m.get("volatility_ann_pct", 16.5)) or 16.5)
-        vol_b = float(meta_b.get("volatility_ann_pct", ret_m.get("volatility_ann_pct", 17.8)) or 17.8)
-        var_a = float(meta_a.get("var_95_pct", mk_m.get("var_historical_95", 2.1)) or 2.1)
-        var_b = float(meta_b.get("var_95_pct", mk_m.get("var_historical_95", 2.3)) or 2.3)
-        hhi_a = float(meta_a.get("hhi_index", results.get("metrics", {}).get("concentration", {}).get("hhi", 0.065)) or 0.065)
-        hhi_b = float(meta_b.get("hhi_index", results.get("metrics", {}).get("concentration", {}).get("hhi", 0.082)) or 0.082)
+        # 2. Risk & Concentration Drift Matrix
+        sh_a = float(meta_a.get("sharpe_ratio") if meta_a.get("sharpe_ratio") is not None else (m.get("sharpe_ratio") or ret_m.get("sharpe_ratio", 0.0) or 0.0))
+        sh_b = float(meta_b.get("sharpe_ratio") if meta_b.get("sharpe_ratio") is not None else (m.get("sharpe_ratio") or ret_m.get("sharpe_ratio", 0.0) or 0.0))
+        
+        vol_a = float(meta_a.get("volatility_ann_pct") if meta_a.get("volatility_ann_pct") is not None else (m.get("volatility_annual_pct") or m.get("volatility_pct") or (m.get("volatility", 0.0)*100) or 0.0))
+        vol_b = float(meta_b.get("volatility_ann_pct") if meta_b.get("volatility_ann_pct") is not None else (m.get("volatility_annual_pct") or m.get("volatility_pct") or (m.get("volatility", 0.0)*100) or 0.0))
+        
+        var_a = float(meta_a.get("var_95_pct") if meta_a.get("var_95_pct") is not None else (m.get("var_95") or m.get("var_parametric_95") or mk_m.get("var_95", 0.0) or 0.0))
+        var_b = float(meta_b.get("var_95_pct") if meta_b.get("var_95_pct") is not None else (m.get("var_95") or m.get("var_parametric_95") or mk_m.get("var_95", 0.0) or 0.0))
+        
+        hhi_a = float(meta_a.get("hhi_index") if meta_a.get("hhi_index") is not None else (m.get("hhi") or m.get("concentration", {}).get("hhi", 0.0) or 0.0))
+        hhi_b = float(meta_b.get("hhi_index") if meta_b.get("hhi_index") is not None else (m.get("hhi") or m.get("concentration", {}).get("hhi", 0.0) or 0.0))
 
         st.markdown("##### ⚡ Matrice di Risk Drift & Concentrazione (Delta Metriche A vs B)")
         r1, r2, r3, r4 = st.columns(4)
@@ -1055,14 +1063,23 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
         st.markdown("---")
         st.markdown(f"##### 📋 Tabella Differenziale Analitica Posizioni: `{label_a_title}` vs `{label_b_title}`")
         
+        all_status_opts = [
+            "🟢 Nuovo Ingresso", 
+            "🔴 Chiusura Totale", 
+            "⬆️ Acquisto Quote (+Qty)", 
+            "⬇️ Vendita Quote (-Qty)", 
+            "📈 Apprezzamento (Prezzo +)", 
+            "📉 Deprezzamento (Prezzo -)", 
+            "⚪ Invariato"
+        ]
         col_tf1, col_tf2 = st.columns([2, 2])
         with col_tf1:
             search_tk = st.text_input("🔍 Filtra per Ticker o Asset Class:", "", placeholder="Es. GOOGL, PYPL, Crypto, AAPL...")
         with col_tf2:
             status_filter = st.multiselect(
                 "🚦 Filtra per Stato Posizione:",
-                options=["🟢 Nuovo Ingresso", "🔴 Chiusura Totale", "⬆️ Incremento", "⬇️ Riduzione", "⚪ Invariato"],
-                default=["🟢 Nuovo Ingresso", "🔴 Chiusura Totale", "⬆️ Incremento", "⬇️ Riduzione", "⚪ Invariato"]
+                options=all_status_opts,
+                default=[s for s in all_status_opts if s in df_merged["status"].unique()]
             )
 
         df_table_disp = df_merged.copy()

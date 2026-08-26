@@ -288,26 +288,36 @@ def compute_side_by_side_comparison(df_a: pd.DataFrame, df_b: pd.DataFrame) -> D
     merged["delta_val"] = merged.get("current_value_A", 0.0) - merged.get("current_value_B", 0.0)
     merged["delta_weight"] = merged.get("weight_pct_A", 0.0) - merged.get("weight_pct_B", 0.0)
 
-    # Classification status badge
+    # Accurate status categorization distinguishing trading activity vs organic price movements
     def get_status(row):
         q_a = float(row.get("qty_net_A", 0.0))
         q_b = float(row.get("qty_net_B", 0.0))
+        d_q = float(row.get("delta_qty", 0.0))
         d_val = float(row.get("delta_val", 0.0))
-        if q_b == 0 and q_a > 0:
+        
+        if q_b <= 0.0001 and q_a > 0.0001:
             return "🟢 Nuovo Ingresso"
-        elif q_a == 0 and q_b > 0:
+        elif q_a <= 0.0001 and q_b > 0.0001:
             return "🔴 Chiusura Totale"
-        elif d_val > 25.0:
-            return "⬆️ Incremento"
-        elif d_val < -25.0:
-            return "⬇️ Riduzione"
+        elif d_q > 0.0001:
+            return "⬆️ Acquisto Quote (+Qty)"
+        elif d_q < -0.0001:
+            return "⬇️ Vendita Quote (-Qty)"
+        elif d_val > 1.0:
+            return "📈 Apprezzamento (Prezzo +)"
+        elif d_val < -1.0:
+            return "📉 Deprezzamento (Prezzo -)"
         return "⚪ Invariato"
 
     merged["status"] = merged.apply(get_status, axis=1)
 
-    # Turnover ratio: 0.5 * sum(|w_A - w_B|)
+    # Portfolio Turnover ratio: 0.5 * sum(|w_A - w_B|)
+    # Since weight_pct is in [0, 100], sum(|delta_weight|) is in [0, 200]
+    # turnover_pct = 0.5 * sum(|delta_weight|) is between 0% and 100%
     turnover_pct = 0.5 * float(merged["delta_weight"].abs().sum())
-    capital_rebalanced = 0.5 * float(merged["delta_val"].abs().sum())
+    
+    # Trading Capital Rebalanced (sum of absolute quantity changes times estimated price):
+    trading_capital = float((merged["delta_qty"].abs() * merged.apply(lambda r: (float(r.get("current_value_A", 0)) / max(0.0001, float(r.get("qty_net_A", 1)))) if float(r.get("qty_net_A", 0)) > 0 else (float(r.get("current_value_B", 0)) / max(0.0001, float(r.get("qty_net_B", 1)))), axis=1)).sum())
     
     tot_val_a = float(df_a["current_value"].sum()) if (df_a is not None and not df_a.empty and "current_value" in df_a.columns) else 0.0
     tot_val_b = float(df_b["current_value"].sum()) if (df_b is not None and not df_b.empty and "current_value" in df_b.columns) else 0.0
@@ -321,10 +331,12 @@ def compute_side_by_side_comparison(df_a: pd.DataFrame, df_b: pd.DataFrame) -> D
         "delta_nav": delta_nav,
         "delta_nav_pct": delta_nav_pct,
         "turnover_pct": turnover_pct,
-        "capital_rebalanced": capital_rebalanced,
+        "capital_rebalanced": trading_capital,
         "new_entries_count": int((merged["status"] == "🟢 Nuovo Ingresso").sum()),
         "closed_entries_count": int((merged["status"] == "🔴 Chiusura Totale").sum()),
-        "modified_count": int((merged["status"].isin(["⬆️ Incremento", "⬇️ Riduzione"])).sum())
+        "modified_count": int((merged["status"].isin(["⬆️ Acquisto Quote (+Qty)", "⬇️ Vendita Quote (-Qty)"])).sum()),
+        "appreciated_count": int((merged["status"] == "📈 Apprezzamento (Prezzo +)").sum()),
+        "depreciated_count": int((merged["status"] == "📉 Deprezzamento (Prezzo -)").sum())
     }
 
 
