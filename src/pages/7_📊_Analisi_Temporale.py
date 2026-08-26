@@ -1072,14 +1072,20 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             "📉 Deprezzamento (Prezzo -)", 
             "⚪ Invariato"
         ]
+        
+        # Clean unique hash for state binding
+        clean_key_suffix = f"{label_a_title}_{label_b_title}".replace(" ", "_").replace("(", "").replace(")", "").replace("/", "_").replace(":", "_")
+
         col_tf1, col_tf2 = st.columns([2, 2])
         with col_tf1:
-            search_tk = st.text_input("🔍 Filtra per Ticker o Asset Class:", "", placeholder="Es. GOOGL, PYPL, Crypto, AAPL...")
+            search_tk = st.text_input("🔍 Filtra per Ticker o Asset Class:", "", placeholder="Es. GOOGL, PYPL, Crypto, AAPL...", key=f"sbs_search_{clean_key_suffix}")
         with col_tf2:
+            avail_statuses = [s for s in all_status_opts if s in df_merged["status"].unique()]
             status_filter = st.multiselect(
                 "🚦 Filtra per Stato Posizione:",
                 options=all_status_opts,
-                default=[s for s in all_status_opts if s in df_merged["status"].unique()]
+                default=avail_statuses if avail_statuses else all_status_opts,
+                key=f"sbs_status_{clean_key_suffix}"
             )
 
         df_table_disp = df_merged.copy()
@@ -1088,7 +1094,7 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
                 df_table_disp["ticker"].str.contains(search_tk, case=False, na=False) |
                 df_table_disp["asset_class"].str.contains(search_tk, case=False, na=False)
             ]
-        if status_filter:
+        if status_filter and len(status_filter) > 0:
             df_table_disp = df_table_disp[df_table_disp["status"].isin(status_filter)]
 
         col_config_diff = {
@@ -1098,6 +1104,9 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             "qty_net_A": st.column_config.NumberColumn("Quantità A", format="%.4f"),
             "qty_net_B": st.column_config.NumberColumn("Quantità B", format="%.4f"),
             "delta_qty": st.column_config.NumberColumn("Δ Quantità", format="%+.4f"),
+            "last_price_A": st.column_config.NumberColumn("Prezzo A (€)", format="€ %.2f"),
+            "last_price_B": st.column_config.NumberColumn("Prezzo B (€)", format="€ %.2f"),
+            "delta_price": st.column_config.NumberColumn("Δ Prezzo (€)", format="€ %+.2f"),
             "current_value_A": st.column_config.NumberColumn("Valore A (€)", format="€ %.2f"),
             "current_value_B": st.column_config.NumberColumn("Valore B (€)", format="€ %.2f"),
             "delta_val": st.column_config.NumberColumn("Δ Valore (€)", format="€ %+.2f"),
@@ -1109,6 +1118,7 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
         cols_to_show = [
             "status", "ticker", "asset_class", 
             "qty_net_A", "qty_net_B", "delta_qty",
+            "last_price_A", "last_price_B", "delta_price",
             "current_value_A", "current_value_B", "delta_val",
             "weight_pct_A", "weight_pct_B", "delta_weight"
         ]
@@ -1117,7 +1127,8 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             df_table_disp[cols_to_show],
             column_config=col_config_diff,
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            key=f"sbs_grid_{clean_key_suffix}"
         )
 
         # Download CSV Audit Report
@@ -1126,7 +1137,8 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             "📥 Esporta Report Differenziale (CSV)",
             data=csv_diff_bytes,
             file_name="ARGUS_SideBySide_Audit.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key=f"sbs_csv_btn_{clean_key_suffix}"
         )
 
         # 6. 🔎 ISPEZIONE SINGOLO TITOLO (ASSET DRILL-DOWN & LOTTI FIFO)

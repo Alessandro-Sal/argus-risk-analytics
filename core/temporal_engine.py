@@ -285,6 +285,7 @@ def compute_side_by_side_comparison(df_a: pd.DataFrame, df_b: pd.DataFrame) -> D
         merged["asset_class"] = "Stock"
 
     merged["delta_qty"] = merged.get("qty_net_A", 0.0) - merged.get("qty_net_B", 0.0)
+    merged["delta_price"] = merged.get("last_price_A", 0.0) - merged.get("last_price_B", 0.0)
     merged["delta_val"] = merged.get("current_value_A", 0.0) - merged.get("current_value_B", 0.0)
     merged["delta_weight"] = merged.get("weight_pct_A", 0.0) - merged.get("weight_pct_B", 0.0)
 
