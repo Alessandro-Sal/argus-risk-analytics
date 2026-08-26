@@ -205,7 +205,27 @@ with col_tape_book:
 st.divider()
 
 # ── SEZIONE 2: LIVE MULTI-ASSET MONITOR (PORTAFOGLIO + WATCHLIST) ────────────
-st.markdown("#### 📊 Live Multi-Asset Pricing Monitor (Portafoglio & Watchlist)")
+col_sec2_hdr, col_sec2_btn = st.columns([3.2, 1.2], vertical_alignment="center")
+with col_sec2_hdr:
+    st.markdown("#### 📊 Live Multi-Asset Pricing Monitor (Portafoglio & Watchlist)")
+with col_sec2_btn:
+    btn_force_sync = st.button("🔄 Sincronizza Prezzi Live", key="btn_sync_live_quotes_page2", use_container_width=True)
+
+# Lista completa di tutti i ticker necessari (Portafoglio + Watchlist)
+pos_tickers = [str(t).strip().upper() for t in pos["ticker"].unique() if str(t).strip()] if (not pos.empty and "ticker" in pos.columns) else []
+wl_tickers = [str(t).strip().upper() for t in term_eng.custom_watchlist if str(t).strip()]
+needed_tickers = list(dict.fromkeys(pos_tickers + wl_tickers))
+
+# Recupero in parallelo ultra-rapido con indicatore di caricamento Streamlit
+with st.spinner("⏳ Sincronizzazione flussi di mercato e prezzi live in tempo reale..."):
+    if hasattr(terminal_engine, "fetch_multiple_live_quotes"):
+        all_quotes = terminal_engine.fetch_multiple_live_quotes(
+            needed_tickers,
+            max_workers=10,
+            force_refresh=btn_force_sync
+        )
+    else:
+        all_quotes = {sym: terminal_engine.fetch_live_ticker_quote(sym) for sym in needed_tickers}
 
 tab_port_live, tab_wl_live = st.tabs([
     "💼 Prezzi Live Intero Portafoglio",
@@ -226,7 +246,7 @@ with tab_port_live:
             sym = str(r["ticker"]).strip().upper()
             q_val = float(r.get("quantity", 0.0))
             wacp = float(r.get("wacp", r.get("buy_price", 0.0)))
-            live_item = terminal_engine.fetch_live_ticker_quote(sym)
+            live_item = all_quotes.get(sym, terminal_engine.fetch_live_ticker_quote(sym))
             live_px = live_item["last_price"]
             chg_1d = live_item["change_pct"]
             
@@ -286,7 +306,7 @@ with tab_wl_live:
 
     wl_rows = []
     for sym in term_eng.custom_watchlist:
-        q = terminal_engine.fetch_live_ticker_quote(sym)
+        q = all_quotes.get(sym, terminal_engine.fetch_live_ticker_quote(sym))
         vol_s = f"{q['volume']:,.0f}" if q['volume'] > 0 else "—"
         mkt_c = f"${q['market_cap']/1e12:.2f}T" if q['market_cap']>=1e12 else (f"${q['market_cap']/1e9:.2f}B" if q['market_cap']>=1e9 else f"${q['market_cap']/1e6:.2f}M") if q['market_cap']>0 else "—"
         wl_rows.append({
