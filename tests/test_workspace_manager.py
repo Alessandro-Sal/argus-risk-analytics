@@ -107,7 +107,9 @@ def test_sync_url_state():
 def test_resolve_page_path():
     """Test mapping and resolution of page filepaths for st.page_link."""
     from core.workspace_manager import resolve_page_path
-    assert resolve_page_path("8_Analisi_Tecnica") == "pages/8_📈_Analisi_Tecnica.py"
+    assert resolve_page_path("9_Analisi_Tecnica") == "pages/9_📈_Analisi_Tecnica.py"
+    assert resolve_page_path("2_Live_Terminal") == "pages/2_🖥️_Live_Terminal.py"
     assert resolve_page_path("1_Dashboard_Generale") == "pages/1_📈_Dashboard_Generale.py"
     assert resolve_page_path("0_Control_Room") == "0_Control_Room.py"
-    assert resolve_page_path("pages/2_🔴_Analisi_Rischio.py") == "pages/2_🔴_Analisi_Rischio.py"
+    assert resolve_page_path("pages/3_🔴_Analisi_Rischio.py") == "pages/3_🔴_Analisi_Rischio.py"
+
