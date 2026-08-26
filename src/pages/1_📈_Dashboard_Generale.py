@@ -1736,6 +1736,9 @@ col_exp_dossier, col_exp_pdf = st.columns([1.6, 1.4])
 
 with col_exp_dossier:
     try:
+        import importlib
+        import core.report_exporter
+        importlib.reload(core.report_exporter)
         from core.report_exporter import generate_institutional_audit_dossier
         dossier_pdf_bytes = generate_institutional_audit_dossier(
             results,
@@ -1755,6 +1758,9 @@ with col_exp_dossier:
 
 with col_exp_pdf:
     try:
+        import importlib
+        import core.report_exporter
+        importlib.reload(core.report_exporter)
         from core.report_exporter import generate_pdf_factsheet
         pdf_bytes = generate_pdf_factsheet(
             results,
@@ -1778,6 +1784,9 @@ col_exp_excel, col_exp_html, col_exp_bi = st.columns(3)
 
 with col_exp_excel:
     try:
+        import importlib
+        import core.report_exporter
+        importlib.reload(core.report_exporter)
         from core.report_exporter import generate_excel_report
         excel_bytes = generate_excel_report(
             results,
