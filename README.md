@@ -58,7 +58,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 
 ---
 
-## 🚀 Caratteristiche Chiave & Moduli Operativi (11 Moduli Operativi)
+## 🚀 Caratteristiche Chiave & Moduli Operativi (12 Moduli Operativi)
 
 ### 0. 🎛️ Control Room & Total Wealth Hub (`src/0_Control_Room.py`)
 * **⚡ Motore Analitico Embedded DuckDB & SQL Sandbox**: Esecuzione in-process vettorizzata SIMD per aggregazioni OLAP sub-millisecondo, preset istituzionali 1-click (Cubi Multi-Dimensionali, Window Functions `QUALIFY`, Storico Volumi/Commissioni, Matrice FX), console SQL interattiva ed esportazione compressa in formato **Apache Parquet**.
@@ -76,13 +76,20 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Dynamic Multi-Benchmark Overlay & Scorecard**: Confronto simultaneo del portafoglio contro fino a 4 benchmark personalizzati (SPY, QQQ, ACWI, AGG, GLD, BTC) con tabella analitica comparativa (CAGR, Volatilità, Sharpe, Max Drawdown, Alpha).
 * **Centro Esportazione Report**: Download in-memory di Factsheet PDF a 2 pagine, Workbook Excel multi-tab, Report HTML Standalone e pacchetto Star Schema ZIP per Power BI.
 
-### 2. 🔴 Analisi del Rischio & Rilevamento Anomalie (`src/pages/2_🔴_Analisi_Rischio.py`)
+### 2. 🖥️ Live Terminal & Real-Time Market Desk (`src/pages/2_🖥️_Live_Terminal.py`)
+* **⚡ Live Market Streaming Tape & Level-2 Order Book**: Ingestione ad alta frequenza di quotazioni spot real-time multi-asset via `yfinance fast_info`, visualizzazione del Level-2 Depth Book a 5 livelli Bid/Ask, calcolo istantaneo del **Microprice di Stoikov (2018)**, **VWAP** e **Order Flow Imbalance (OFI)**.
+* **📊 Live Multi-Asset Pricing Monitor**: Tabella real-time con quotazioni spot, variazioni intraday (1D %), controvalori aggiornati, prezzi di carico FIFO (WACP) e P&L non realizzato per l'intero portafoglio attivo e per una **Watchlist globale personalizzabile** (Azioni, Crypto, Commodities, Forex).
+* **⌨️ Console Interattiva Bloomberg CLI (`ARGUS:LIVE>`)**: Prompt a riga di comando ad alta densità con supporto immediato all'invio con tasto **INVIO** (`PORT LIVE`, `PORT RISK`, `WATCHLIST`, `QUOTE <TICKER>`, `VAR 95`, `TOP`, `BUY`, `TWAP`, `EQS`, `SQL`).
+* **📋 Live OMS Execution Blotter**: Simulatore di negoziazione con algoritmi di order slicing TWAP e VWAP, stima dello slippage e calcolo del risparmio eseguito.
+* **📊 Telemetria di Sistema (TOP Monitor)**: Monitoraggio in tempo reale di RAM RSS, utilizzo CPU, thread attivi, cache e record DB.
+
+### 3. 🔴 Analisi del Rischio & Rilevamento Anomalie (`src/pages/3_🔴_Analisi_Rischio.py`)
 * **📊 Profilo del Rischio & Fama-French**: Rischio sistematico Beta, Tracking Error, Information Ratio, asimmetria (Skewness), curtosi (Kurtosis/Fat Tails) e regressione OLS multivariata sui 3 fattori accademici Kenneth French.
 * **📉 VaR, CVaR & Backtesting Kupiec**: Decomposizione di Eulero VaR/CVaR $(\sum \text{CVaR}_i = \text{VaR}_p)$, Marginal VaR $(\partial \text{VaR}/\partial w_i)$, Liquidity-Adjusted VaR (LVaR Bangia 1999), 4 modelli di VaR (Storico, Parametrico Gaussiano, Cornish-Fisher asimmetrico e Filtered Historical Simulation FHS) e validazione regolamentare su 252 giorni con test Kupiec POF conforme ai semafori di Basilea.
 * **🔗 Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva Pearson/Spearman, monitoraggio volumi medi giornalieri (Average Daily Volume ADV) e calcolo dinamico degli Stop-Loss Chandelier ($3 \times ATR_{14}$).
 * **🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)**: Algoritmo non supervisionato di Machine Learning per l'identificazione precoce di panic selling, rotture improvvise delle correlazioni storiche (*Correlation Breakdown*) e code di rischio non lineari.
 
-### 3. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/3_🔬_Modelli_Quantitativi.py`)
+### 4. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/4_🔬_Modelli_Quantitativi.py`)
 * **📊 Markowitz & Rebalancing**: Frontiera Efficiente risolta via SciPy SLSQP vincolato con stimatori di covarianza *Ledoit-Wolf Shrinkage*, Parità di Rischio Pura (Equal Risk Contribution ERC), Frontiera 3D ad alta densità con campionamento Multi-Alpha Dirichlet e generatore di ribilanciamento interattivo.
 * **🤖 AI Reinforcement Learning Policy Sandbox**: Ottimizzazione dinamica dei pesi di portafoglio basata su Policy Gradient REINFORCE e MDP continuo nello spazio degli stati $\mathbb{R}^{3N}$, addestrata ad adattarsi ai cambi di regime di mercato massimizzando il Sortino Ratio con controllo del turnover.
 * **🧬 Tail Copula & Kelly**: Mappatura della dipendenza di coda asimmetrica inferiore ($\lambda_L$) e superiore ($\lambda_U$) con copule di Clayton e Gumbel per il rischio di crash sistemico, affiancata dal simulatore continuo/discreto Kelly Criterion & Half-Kelly Position Sizing.
@@ -91,14 +98,14 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🎯 Attribuzione & Fattori**: Decomposizione di Brinson-Fachler con algoritmo di raccordo logaritmico multi-periodale a residuo zero (Carino 1999), scomposizione valutaria Karnosky-Singer FX e backtesting fattoriale a 5 quintili con test di monotonicità di rango di Spearman ($r_s$).
 * **🏛️ Fixed Income & Z-Spread**: Risolutore numerico per Yield to Maturity (YTM), Current Yield, Macaulay/Modified Duration, Convessità esatta, DV01/PVBP, Z-Spread rispetto alla curva sovrana Nelson-Siegel e term structure della probabilità di default da spread CDS.
 
-### 4. 📋 Posizioni, Contabilità FIFO & Fiscalità TUIR (`src/pages/4_📋_Posizioni_e_Dettagli.py`)
+### 5. 📋 Posizioni, Contabilità FIFO & Fiscalità TUIR (`src/pages/5_📋_Posizioni_e_Dettagli.py`)
 * **📋 Posizioni Attive & Costi FIFO**: Mappa analitica e tabellare dei titoli in portafoglio con calcolo deterministico del Weighted Average Cost Price (WACP), separazione tra PnL realizzato/non realizzato e grafici di concentrazione settoriale GICS.
 * **🪦 Posizioni Chiuse & Graveyard Cockpit**: Tracciamento contabile FIFO delle operazioni storiche chiuse, Curva Cumulativa del PnL Realizzato (€) con High-Water Mark di picco, telemetria di trade drawdown e Trading Calendar Heatmap Mese $\times$ Anno.
 * **📅 Proiezione Dividendi**: Calendario dinamico mensile degli incassi cedolari per singola società, storico incassi reali e calcolo del Dividend Yield medio di portafoglio.
 * **💰 Ottimizzazione Fiscale (TUIR Art. 67)**: Suite fiscale integrata a 4 pilastri con simulatore Riforma Fiscale 2026 (armonizzazione ETF e quantificazione Tax Drag), prospetto precompilato per il Regime Dichiarativo con Quadro RT (tributo 1100) e Quadro RW/IVAFE, analizzatore Withholding Tax (W-8BEN 15% USA, aliquota reale 37,10%) e simulatore pre-trade Tax-Smart Lot Sizing.
 * **⚡ Liquidità & Smart Order Router**: Motore istituzionale di order slicing intraday (09:00 - 17:30) per la minimizzazione dello slippage su ordini consistenti e ribilanciamenti con profilazione della curva a "U", algoritmi **TWAP** uniforme (con jitter anti-frontrunning) e **VWAP** ponderato sui volumi (con POV Cap al 15%), affiancato dal modello di liquidazione ottima iperbolica di Almgren-Chriss.
 
-### 5. 🏛️ Analisi dei Bilanci, Valutazione & Contabilità Forense (`src/pages/5_🏛️_Valutazione_Aziendale.py`)
+### 6. 🏛️ Analisi dei Bilanci, Valutazione & Contabilità Forense (`src/pages/6_🏛️_Valutazione_Aziendale.py`)
 * **Beneish M-Score (1999)**: Modello econometrico a 8 indici (DSRI, GMI, AQI, SGI, DEPI, SGAI, LVGI, TATA) per rilevare manipolazioni contabili (soglia critica $M > -1.78$).
 * **Sloan Accrual Ratio (1996)**: Analisi della qualità dell'utile netto rispetto ai flussi di cassa operativi reali per isolare gli utili artificiali.
 * **Altman Z-Score Model (1968)**: Previsione del rischio di fallimento a 24 mesi (*Safe Z > 2.99*, *Grey 1.81–2.99*, *Distress Z < 1.81*).
@@ -108,23 +115,23 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Local RAG & SEC Filing Vector Store (Form 10-K / 10-Q Q&A)**: Interrogazione semantica in linguaggio naturale sui bilanci e note integrative con chunking normativo (**Item 1**, **Item 1A**, **Item 7 MD&A**, **Item 8 Debt Notes**), retrieval BM25/Cosine a latenza zero e citazione verificata delle fonti ufficiali.
 * **Consultazione Bilanci Ufficiali 10-K** & **Comparativa Multiaziendale** con grafici Radar e multipli di settore.
 
-### 6. 🌪️ Stress Testing & Scenari di Crisi (`src/pages/6_🌪️_Stress_Testing.py`)
+### 7. 🌪️ Stress Testing & Scenari di Crisi (`src/pages/7_🌪️_Stress_Testing.py`)
 * **MSCI Barra Multi-Scenario Matrix**: Stima delle perdite in € e % simulando i 5 grandi shock storici (*Dot-Com 2000*, *Lehman 2008*, *US Downgrade 2011*, *COVID-19*, *Rate Shock 2022*).
 * **Beta Shock Waterfall & Macro Scenario Builder**: Simulazione interattiva su shock tassi ($\Delta r$), cambi ($\Delta\text{FX}$), materie prime ($\Delta\text{Commodity}$) ed equity.
 * **Superficie 3D di Rischio (Plotly Surface)**: Mappatura tridimensionale interattiva dell'impatto combinato di shock congiunti.
 
-### 7. 📊 Analisi Temporale & Storicizzazione Multi-Snapshot (`src/pages/7_📊_Analisi_Temporale.py`)
+### 8. 📊 Analisi Temporale & Storicizzazione Multi-Snapshot (`src/pages/8_📊_Analisi_Temporale.py`)
 * **Time Series Multi-Snapshot**: Evoluzione temporale del controvalore di portafoglio, del capitale investito e delle metriche di rischio tra snapshot storici.
 * **Matrice dei Delta ($\Delta$)**: Confronto analitico affiancato tra due punti temporali qualsiasi con calcolo del tasso di risparmio e apporti di liquidità.
 
-### 8. 📈 Analisi Tecnica Quantitativa & Volume Profile (`src/pages/8_📈_Analisi_Tecnica.py`)
+### 9. 📈 Analisi Tecnica Quantitativa & Volume Profile (`src/pages/9_📈_Analisi_Tecnica.py`)
 * **⚡ Real-Time Streaming Ring Buffer & Order Flow Imbalance (OFI)**: Ingestione tick-by-tick ad alta frequenza, VWAP dinamico, Order Flow Imbalance e Level-2 Microprice (Stoikov 2018).
 * **Indicatori Algoritmici**: Medie Mobili (EMA 20, EMA 50, SMA 200 con Golden/Death Cross), MACD, RSI 14, Bande di Bollinger con **Bollinger Squeeze Detection**, ATR 14 e ADX 14.
 * **Volume Profile (POC, VAH, VAL)**: Distribuzione orizzontale dei volumi sul grafico con evidenziazione del Point of Control (POC) e della Value Area (70% del volume totale).
 * **Candlestick Pattern Recognition**: Rilevamento automatico di pattern (*Bullish/Bearish Engulfing*, *Hammer*, *Shooting Star*, *Doji*).
 * **Technical Confluence Score Card (0-100)**: Score ponderato su 5 driver tecnici con verdetto tattico (*Strong Buy* $\rightarrow$ *Strong Sell*) e allineamento trend multi-timeframe (1D vs 1W).
 
-### 9. 🔍 Screener Quantitativo & Pre-Trade Simulator (`src/pages/9_🔍_Screener_Opportunita.py`)
+### 10. 🔍 Screener Quantitativo & Pre-Trade Simulator (`src/pages/10_🔍_Screener_Opportunita.py`)
 * **⚡ Formula Engine EQS (Custom Query Builder)**: Parsing ed esecuzione vettorizzata di espressioni logiche personalizzate dall'utente con oltre 35 alias finanziari supportati.
 * **🚀 Parallel Multi-Thread Download (8 Workers)**: Download concorrente con ThreadPoolExecutor e retry esponenziale anti-429 per processare interi universi di mercato (fino a 100 titoli) in 2–4 secondi, con fallback automatico `fast_info` per ETF e crypto.
 * **🔄 Granular Cache Invalidation & Force Live Refresh**: Tracciamento granulare del contenuto degli universi (preconfigurati, custom o portafoglio attivo) con pulsante `🔄 Forza Live` per bypassare istantaneamente la cache SQLite L2 e recuperare dati freschi.
@@ -133,11 +140,10 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Smart Sizing Optimizer & Pre-Trade Simulator**: Simulazione *What-If* dell'impatto sul portafoglio reale ($\Delta\text{CAGR}$, $\Delta\sigma$, $\Delta\text{Sharpe}$, $\Delta\text{Beta}$, $\Delta\text{Diversification Ratio}$ di Choueifaty), determinazione del peso ottimo $w^*$ del candidato con curva di frontiera Sharpe.
 * **Confronto Radar Head-to-Head & Factsheet PDF One-Pager**: Confronto grafico a 6 dimensioni fino a 4 titoli ed esportazione immediata di Factsheet PDF istituzionale ad alta risoluzione.
 
-### 10. 💻 BQuant Python Sandbox, Workspace Launchpad, Excel Live Connector & Live Terminal (`src/pages/10_💻_BQuant_e_Launchpad.py`)
+### 11. 💻 BQuant Python Sandbox, Workspace Launchpad & Excel Live Connector (`src/pages/11_💻_BQuant_e_Launchpad.py`)
 * **🐍 Console Python Interattiva In-App (Bloomberg BQuant Style)**: Editor di codice Python integrato con iniezione dinamica in-memory dei DataFrame di sessione (`df_positions`, `df_returns`, `df_prices`, `results`), query SQL vettoriali ad alta velocità con DuckDB in-process, cattura automatica di stdout, tabelle `df_out` con download CSV e grafici Plotly interattivi con 5 snippet quantitativi istituzionali preimpostati.
 * **🎛️ ARGUS Launchpad & Role Workspace Customizer**: Configurazione rapida dell'ambiente operativo basata su 5 profili istituzionali predefiniti (*Trading Desk & Execution*, *Risk Officer & Compliance*, *Portfolio Manager & CIO*, *Quantitative Analyst & Data Scientist*, *Corporate Treasurer & Fixed Income*) con 1-Click Fast Teleportation verso i moduli primari, Live Role KPI Cockpit e persistenza delle preferenze su SQLite locale.
 * **📊 Excel Live Connector & Bloomberg RTD Formula Generator**: Costruttore visuale di formule Excel compatibili Bloomberg Terminal (`=ARGUS_BDP`, `=ARGUS_BDH`, `=ARGUS_RISK`), generatore di codice VBA Desktop (`.bas`), Microsoft Office Scripts TypeScript (`.ts`) per Excel 365/Web ed esportatore di workbook istituzionali multi-foglio formattati (`Executive_Summary`, `Positions_Portfolio`, `Fixed_Income_YAS`, `Execution_Schedule`).
-* **🖥️ ARGUS Live Market Terminal & Interactive CLI Desk**: Console operativa a riga di comando con interprete per mnemonici Bloomberg (`AAPL DES`, `MSFT FA`, `PORT RISK`, `VAR 95`, `EQS`, `SQL`), streaming Level-2 Depth Book con Microprice Stoikov e OFI, simulatore Order Management System (OMS) Blotter con slicing algoritmico TWAP/VWAP e telemetria di sistema `TOP` (CPU, RAM RSS, Ring Buffer, DB).
 
 ---
 
