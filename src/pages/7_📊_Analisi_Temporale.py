@@ -5,6 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import os
+from datetime import datetime, timedelta
 
 import importlib
 import core.ui_utils
@@ -44,8 +45,8 @@ render_command_bar()
 results, has_real = ensure_risk_bundle_loaded()
 render_sandbox_banner(page_key="p7")
 
-sr_port = results.get("portfolio_return", pd.Series(dtype=float))
-sr_bm = results.get("benchmark_return", pd.Series(dtype=float))
+raw_sr_port = results.get("portfolio_return", pd.Series(dtype=float))
+raw_sr_bm = results.get("benchmark_return", pd.Series(dtype=float))
 df_returns = results.get("returns", pd.DataFrame())
 pos = results.get("positions", pd.DataFrame())
 m = results.get("metrics", {})
@@ -53,15 +54,115 @@ ret_m = m.get("returns", {})
 mk_m = m.get("market_risk", {})
 active_rf_rate = st.session_state.get("active_rf_rate", 0.035)
 
-# ── System Banner ───────────────────────────────────────────
+# Lista dei ticker attivi
+if not pos.empty and "ticker" in pos.columns:
+    active_tickers = sorted(list(pos[pos.get("current_value", 0) > 0]["ticker"].unique()))
+    if not active_tickers:
+        active_tickers = sorted(list(pos["ticker"].unique()))
+elif df_returns is not None and not df_returns.empty:
+    active_tickers = sorted(list(df_returns.columns))
+else:
+    active_tickers = []
+
+# ── Header & Titolo ──────────────────────────────────────────
 st.title("📊 Analisi Temporale & Dinamica delle Serie Storiche")
 if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: **{st.session_state.get('portfolio_name', 'Master Wealth')}** • Matrice mensile dei rendimenti, curva underwater, rolling risk metrics, stagionalità e audit trail degli snapshot.")
+    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: **{st.session_state.get('portfolio_name', 'Master Wealth')}** • Seleziona gli strumenti, le date e gli snapshot di cui esaminare la dinamica temporale.")
 elif results.get("is_sandbox"):
-    st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Matrice mensile dei rendimenti, curva underwater, rolling risk metrics e stagionalità.")
+    st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Seleziona gli strumenti e le date da analizzare.")
 else:
-    st.caption("Intelligence multi-temporale per tracciare l'evoluzione del patrimonio, dei rendimenti periodici, della volatilità mobile e degli snapshot storici.")
+    st.caption("Intelligence multi-temporale per tracciare l'evoluzione del patrimonio, dei singoli asset, dei rendimenti periodici e degli snapshot storici.")
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
+
+
+# ── BARRA DI CONTROLLO GLOBALE: SCELTA DATE & OR鐘ZZONTE TEMPORALE ─────────
+with st.container():
+    st.markdown("""
+    <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255,153,0,0.3); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px;">
+        <span style="font-size: 13px; font-weight: 700; color: #f0f6fc;">🎛️ Filtro Orizzonte Temporale di Analisi</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_t1, col_t2 = st.columns([2.2, 2.8])
+
+    # Date minime e massime disponibili
+    if not raw_sr_port.empty:
+        idx_dates = pd.to_datetime(raw_sr_port.index)
+        min_avail_date = idx_dates.min().to_pydatetime().date()
+        max_avail_date = idx_dates.max().to_pydatetime().date()
+    else:
+        min_avail_date = (datetime.now() - timedelta(days=365)).date()
+        max_avail_date = datetime.now().date()
+
+    with col_t1:
+        time_preset = st.selectbox(
+            "⏳ Orizzonte Rapido:",
+            options=["Tutto lo Storico (MAX)", "Anno in Corso (YTD)", "Ultimi 12 Mesi (1Y)", "Ultimi 6 Mesi (6M)", "Ultimi 3 Mesi (3M)", "Intervallo Personalizzato"],
+            index=0,
+            key="temporal_time_preset"
+        )
+
+    # Calcolo date inizio/fine in base al preset
+    if time_preset == "Anno in Corso (YTD)":
+        calc_start = datetime(max_avail_date.year, 1, 1).date()
+        calc_end = max_avail_date
+    elif time_preset == "Ultimi 12 Mesi (1Y)":
+        calc_start = max(min_avail_date, max_avail_date - timedelta(days=365))
+        calc_end = max_avail_date
+    elif time_preset == "Ultimi 6 Mesi (6M)":
+        calc_start = max(min_avail_date, max_avail_date - timedelta(days=182))
+        calc_end = max_avail_date
+    elif time_preset == "Ultimi 3 Mesi (3M)":
+        calc_start = max(min_avail_date, max_avail_date - timedelta(days=91))
+        calc_end = max_avail_date
+    elif time_preset == "Intervallo Personalizzato":
+        calc_start = min_avail_date
+        calc_end = max_avail_date
+    else:
+        calc_start = min_avail_date
+        calc_end = max_avail_date
+
+    with col_t2:
+        if time_preset == "Intervallo Personalizzato":
+            date_range_picked = st.date_input(
+                "📅 Seleziona Intervallo Date:",
+                value=(calc_start, calc_end),
+                min_value=min_avail_date,
+                max_value=max_avail_date,
+                key="temporal_date_range_picker"
+            )
+            if isinstance(date_range_picked, (tuple, list)) and len(date_range_picked) == 2:
+                calc_start, calc_end = date_range_picked
+        else:
+            st.markdown(f"""
+            <div style="padding-top: 28px; font-size: 13px; color: #8b949e;">
+                Periodo attivo: <b style="color: #38bdf8;">{calc_start.strftime('%d/%m/%Y')}</b> ➔ <b style="color: #38bdf8;">{calc_end.strftime('%d/%m/%Y')}</b>
+            </div>
+            """, unsafe_allow_html=True)
+
+# Applicazione del filtro data sulle serie storiche
+def filter_series_by_date(sr: pd.Series, start_d, end_d) -> pd.Series:
+    if sr is None or sr.empty:
+        return sr
+    s_dt = sr.copy()
+    if getattr(s_dt.index, 'tz', None) is not None:
+        s_dt.index = s_dt.index.tz_localize(None)
+    s_dt.index = pd.to_datetime(s_dt.index)
+    mask = (s_dt.index.date >= start_d) & (s_dt.index.date <= end_d)
+    return s_dt[mask]
+
+sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
+sr_bm = filter_series_by_date(raw_sr_bm, calc_start, calc_end)
+if df_returns is not None and not df_returns.empty:
+    df_ret_dt = df_returns.copy()
+    if getattr(df_ret_dt.index, 'tz', None) is not None:
+        df_ret_dt.index = df_ret_dt.index.tz_localize(None)
+    df_ret_dt.index = pd.to_datetime(df_ret_dt.index)
+    mask_df = (df_ret_dt.index.date >= calc_start) & (df_ret_dt.index.date <= calc_end)
+    df_returns_filtered = df_ret_dt[mask_df]
+else:
+    df_returns_filtered = pd.DataFrame()
+
 
 # ── SELETTORE MODULI ANALISI TEMPORALE BLOOMBERG STYLE ─────────
 TIME_MODELS_CATALOG = {
@@ -102,7 +203,6 @@ TIME_MODELS_CATALOG = {
     }
 }
 
-# Risoluzione dello stato attivo con priorità alla sidebar o global jump
 target_tab = None
 if "target_subtab_time_active_tab" in st.session_state:
     target_tab = st.session_state.pop("target_subtab_time_active_tab")
@@ -122,7 +222,7 @@ elif "time_active_tab" not in st.session_state or st.session_state["time_active_
 curr_idx = time_keys.index(st.session_state["time_active_tab"])
 
 # Spaziatura e Respiro Layout
-st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 6px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
 # Barra Selettore Compatta Bloomberg Style
 c_sel_tm, c_prev_tm, c_next_tm = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
@@ -153,7 +253,6 @@ with c_sel_tm:
 active_time_tab = st.session_state["time_active_tab"]
 active_time_info = TIME_MODELS_CATALOG[active_time_tab]
 
-# Bloomberg Terminal Header Banner per il Modulo Attivo
 st.markdown(f"""
 <div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_time_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
@@ -177,14 +276,45 @@ st.markdown(f"""
 
 
 # ==============================================================================
-# TAB 1: CURVA CUMULATA & UNDERWATER DRAWDOWN
+# TAB 1: CURVA CUMULATA & DRAWDOWN UNDERWATER
 # ==============================================================================
 if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     if sr_port.empty:
-        st.warning("Serie storica dei rendimenti di portafoglio non disponibile.")
+        st.warning("Serie storica dei rendimenti non disponibile per il periodo selezionato.")
         st.stop()
 
-    uw_data = compute_underwater_drawdowns(sr_port)
+    # Selettore strumenti da sovrapporre nel grafico
+    all_instrument_options = ["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"] + [f"🔹 {t}" for t in active_tickers]
+    
+    col_sel_i1, col_sel_i2 = st.columns([3, 1])
+    with col_sel_i1:
+        selected_instruments = st.multiselect(
+            "🔍 Scegli gli strumenti da visualizzare ed esaminare:",
+            options=all_instrument_options,
+            default=["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"],
+            help="Puoi isolare il portafoglio o confrontare l'andamento di specifici titoli azionari/crypto."
+        )
+    with col_sel_i2:
+        underwater_focus = st.selectbox(
+            "🔻 Strumento Focus Underwater:",
+            options=["🏛️ Portafoglio Completo"] + [f"🔹 {t}" for t in active_tickers],
+            index=0,
+            help="Scegli quale asset sottoporre all'analisi analitica dei Drawdown e Top 5 Crisi."
+        )
+
+    # Calcolo serie per lo strumento focus
+    if underwater_focus == "🏛️ Portafoglio Completo":
+        focus_sr = sr_port
+        focus_label = "Portafoglio Completo"
+    else:
+        tk_clean = underwater_focus.replace("🔹 ", "").strip()
+        if not df_returns_filtered.empty and tk_clean in df_returns_filtered.columns:
+            focus_sr = df_returns_filtered[tk_clean].dropna()
+        else:
+            focus_sr = sr_port
+        focus_label = tk_clean
+
+    uw_data = compute_underwater_drawdowns(focus_sr)
     cum_nav = uw_data["cumulative_nav"]
     hwm = uw_data["hwm"]
     dd_series = uw_data["drawdown_series"]
@@ -193,55 +323,77 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     top_episodes = uw_data["top_episodes"]
 
     tot_val = float(results.get("portfolio_value", pos["current_value"].sum() if not pos.empty and "current_value" in pos.columns else 100000.0))
-    cagr = float(ret_m.get("cagr_pct", 0.0) or 0.0)
-    sharpe = float(ret_m.get("sharpe_ratio", 0.0) or 0.0)
-    calmar = abs(cagr / max_dd) if max_dd > 0 else 0.0
+    
+    # Calcolo CAGR sul periodo effettivo
+    n_days = max(1, len(focus_sr))
+    period_tot_ret = (cum_nav.iloc[-1] - 1.0) if not cum_nav.empty else 0.0
+    cagr_period = ((1.0 + period_tot_ret) ** (252.0 / n_days) - 1.0) * 100.0 if period_tot_ret > -1.0 else 0.0
+    calmar = abs(cagr_period / max_dd) if max_dd > 0 else 0.0
 
-    # Macro KPI Row
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        metric_card("Patrimonio Attuale", f"€ {tot_val:,.2f}", f"CAGR: {cagr:+.2f}%", positive=cagr >= 0)
+        metric_card(f"Rendimento Periodo ({focus_label})", f"{period_tot_ret*100.0:+.2f}%", f"CAGR Ann.: {cagr_period:+.2f}%", positive=period_tot_ret >= 0)
     with c2:
-        metric_card("Max Drawdown Storico", f"-{max_dd:.2f}%", "Massimo Picco-Valle", positive=False)
+        metric_card("Max Drawdown Nel Periodo", f"-{max_dd:.2f}%", "Massimo Picco-Valle", positive=False)
     with c3:
-        metric_card("Ulcer Index (UI)", f"{ulcer:.2f}", "Indice di Stress Temporale", positive=ulcer < 8.0)
+        metric_card("Ulcer Index (UI)", f"{ulcer:.2f}", "Stress e Logorio Temporale", positive=ulcer < 8.0)
     with c4:
         metric_card("Calmar Ratio (CAGR/MDD)", f"{calmar:.2f}", "Efficienza sui Drawdown", positive=calmar >= 1.0)
 
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-    # 1. Chart: Cumulative Equity Line + HWM + Benchmark
-    st.markdown("##### 📈 Equity Line Cumulata vs High-Water Mark & Benchmark (Base 100)")
+    # 1. Chart: Cumulative Equity Line Multi-Asset
+    st.markdown(f"##### 📈 Performance Comparativa Cumulata (Base 100)")
     
+    palette = ["#00e676", "#ff9900", "#38bdf8", "#bc8cff", "#f85149", "#e3b341", "#f0883e", "#2ea043", "#58a6ff", "#db61a2"]
     fig_equity = go.Figure()
-    nav_base100 = cum_nav / cum_nav.iloc[0] * 100.0 if not cum_nav.empty and cum_nav.iloc[0] != 0 else cum_nav * 100.0
-    hwm_base100 = hwm / cum_nav.iloc[0] * 100.0 if not cum_nav.empty and cum_nav.iloc[0] != 0 else hwm * 100.0
 
-    fig_equity.add_trace(go.Scatter(
-        x=cum_nav.index, y=nav_base100,
-        mode="lines", name="Portafoglio (NAV Base 100)",
-        line=dict(color="#00e676", width=2.5),
-        hovertemplate="<b>Portafoglio:</b> %{y:.2f}<br>Data: %{x|%Y-%m-%d}<extra></extra>"
-    ))
-    fig_equity.add_trace(go.Scatter(
-        x=hwm.index, y=hwm_base100,
-        mode="lines", name="High-Water Mark (HWM)",
-        line=dict(color="#38bdf8", width=1.5, dash="dash"),
-        hovertemplate="<b>HWM:</b> %{y:.2f}<extra></extra>"
-    ))
-
-    if sr_bm is not None and not sr_bm.empty:
-        bm_cum = (1.0 + sr_bm.reindex(cum_nav.index).fillna(0.0)).cumprod()
-        bm_base100 = bm_cum / bm_cum.iloc[0] * 100.0 if not bm_cum.empty and bm_cum.iloc[0] != 0 else bm_cum * 100.0
+    if "🏛️ Portafoglio Completo" in selected_instruments and not sr_port.empty:
+        p_cum = (1.0 + sr_port).cumprod() * 100.0
         fig_equity.add_trace(go.Scatter(
-            x=cum_nav.index, y=bm_base100,
-            mode="lines", name="Benchmark SPY (Base 100)",
-            line=dict(color="#ff9900", width=1.8),
-            hovertemplate="<b>Benchmark SPY:</b> %{y:.2f}<extra></extra>"
+            x=p_cum.index, y=p_cum,
+            mode="lines", name="🏛️ Portafoglio Completo",
+            line=dict(color="#00e676", width=2.6),
+            hovertemplate="<b>Portafoglio:</b> %{y:.2f}<br>Data: %{x|%Y-%m-%d}<extra></extra>"
+        ))
+        # Add HWM line
+        p_hwm = p_cum.cummax()
+        fig_equity.add_trace(go.Scatter(
+            x=p_hwm.index, y=p_hwm,
+            mode="lines", name="High-Water Mark (Portafoglio)",
+            line=dict(color="#00e676", width=1.0, dash="dash"),
+            opacity=0.6,
+            hovertemplate="<b>HWM:</b> %{y:.2f}<extra></extra>"
         ))
 
+    if "🎯 Benchmark (SPY)" in selected_instruments and not sr_bm.empty:
+        bm_cum = (1.0 + sr_bm).cumprod() * 100.0
+        fig_equity.add_trace(go.Scatter(
+            x=bm_cum.index, y=bm_cum,
+            mode="lines", name="🎯 Benchmark (SPY)",
+            line=dict(color="#ff9900", width=2.0),
+            hovertemplate="<b>SPY:</b> %{y:.2f}<extra></extra>"
+        ))
+
+    color_idx = 2
+    for inst in selected_instruments:
+        if inst.startswith("🔹 "):
+            tk = inst.replace("🔹 ", "").strip()
+            if not df_returns_filtered.empty and tk in df_returns_filtered.columns:
+                s_asset = df_returns_filtered[tk].dropna()
+                if not s_asset.empty:
+                    s_cum = (1.0 + s_asset).cumprod() * 100.0
+                    c_color = palette[color_idx % len(palette)]
+                    color_idx += 1
+                    fig_equity.add_trace(go.Scatter(
+                        x=s_cum.index, y=s_cum,
+                        mode="lines", name=f"🔹 {tk}",
+                        line=dict(color=c_color, width=1.6),
+                        hovertemplate=f"<b>{tk}:</b> %{{y:.2f}}<extra></extra>"
+                    ))
+
     fig_equity.update_layout(
-        template="plotly_dark", height=380,
+        template="plotly_dark", height=390,
         margin=dict(l=20, r=20, t=30, b=20),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         legend=dict(
@@ -255,18 +407,18 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     apply_plotly_theme(fig_equity)
     st.plotly_chart(fig_equity, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-    # 2. Chart: Underwater Drawdown Area
-    st.markdown("##### 🔻 Curva Underwater Drawdown (% Perdita da Massimo Precedente)")
+    # 2. Chart: Underwater Drawdown Area for focus instrument
+    st.markdown(f"##### 🔻 Curva Underwater Drawdown per `{focus_label}` (% da Massimo Precedente)")
     fig_dd = go.Figure()
     fig_dd.add_trace(go.Scatter(
         x=dd_series.index, y=dd_series,
-        mode="lines", name="Drawdown (%)",
+        mode="lines", name=f"Drawdown ({focus_label})",
         line=dict(color="#f85149", width=1.5),
         fill="tozeroy",
         fillcolor="rgba(248, 81, 73, 0.25)",
         hovertemplate="<b>Drawdown:</b> %{y:.2f}%<br>Data: %{x|%Y-%m-%d}<extra></extra>"
     ))
-    fig_dd.add_hline(y=-max_dd, line_dash="dot", line_color="#ff4444", annotation_text=f"Max Drawdown: -{max_dd:.2f}%", annotation_position="bottom right", annotation_font_color="#ff4444")
+    fig_dd.add_hline(y=-max_dd, line_dash="dot", line_color="#ff4444", annotation_text=f"Max DD: -{max_dd:.2f}%", annotation_position="bottom right", annotation_font_color="#ff4444")
     fig_dd.update_layout(
         template="plotly_dark", height=240,
         margin=dict(l=20, r=20, t=20, b=20),
@@ -278,7 +430,7 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     st.plotly_chart(fig_dd, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
     # 3. Top 5 Drawdown Episodes Table
-    st.markdown("##### 🏆 Top 5 Crisi / Episodi di Drawdown Storico")
+    st.markdown(f"##### 🏆 Top 5 Crisi / Episodi di Drawdown Storico per `{focus_label}`")
     if not top_episodes.empty:
         col_cfg_dd = {
             "start_date": st.column_config.TextColumn("Inizio Crisi"),
@@ -299,16 +451,44 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
 # TAB 2: MATRICE RENDIMENTI MENSILI & ANNUALI (QUANT HEATMAP)
 # ==============================================================================
 elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
-    if sr_port.empty:
-        st.warning("Serie storica dei rendimenti non disponibile.")
+    # Selettore dello strumento da visualizzare nella Heatmap
+    matrix_instrument_options = ["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"] + [f"🔹 {t}" for t in active_tickers]
+    
+    col_hm1, col_hm2 = st.columns([2.5, 2.5])
+    with col_hm1:
+        selected_matrix_inst = st.selectbox(
+            "🔍 Scegli quale strumento analizzare nella Matrice Mensile:",
+            options=matrix_instrument_options,
+            index=0,
+            help="Puoi visualizzare la tavola periodica dei rendimenti dell'intero portafoglio oppure di qualsiasi singolo titolo azionario o crypto."
+        )
+    with col_hm2:
+        st.markdown(r"""
+        <div style="padding-top: 25px; font-size: 12.5px; color: #8b949e;">
+            💡 <i>I rendimenti mensili sono calcolati con capitalizzazione geometrica continua \(\prod (1 + r_t) - 1\).</i>
+        </div>
+        """, unsafe_allow_html=True)
+
+    if selected_matrix_inst == "🏛️ Portafoglio Completo":
+        target_series = sr_port
+        target_label = "Portafoglio Completo"
+    elif selected_matrix_inst == "🎯 Benchmark (SPY)":
+        target_series = sr_bm
+        target_label = "Benchmark SPY"
+    else:
+        tk_name = selected_matrix_inst.replace("🔹 ", "").strip()
+        target_series = df_returns_filtered[tk_name].dropna() if (not df_returns_filtered.empty and tk_name in df_returns_filtered.columns) else sr_port
+        target_label = tk_name
+
+    if target_series.empty:
+        st.warning(f"Serie storica insufficiente per `{target_label}`.")
         st.stop()
 
-    df_matrix = compute_monthly_return_matrix(sr_port)
+    df_matrix = compute_monthly_return_matrix(target_series)
     if df_matrix.empty:
         st.warning("Dati storici insufficienti per costruire la matrice mensile dei rendimenti.")
         st.stop()
 
-    # KPI Sintetici Mensili
     all_months = df_matrix.drop(columns=["YTD"]).values.flatten()
     valid_months = all_months[~np.isnan(all_months)]
     
@@ -320,7 +500,7 @@ elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
 
     c1, c2, c3, c4 = st.columns(4)
     with c1:
-        metric_card("Mesi Positivi (Win Rate)", f"{win_rate:.1f}%", f"{pos_months} su {len(valid_months)} mesi", positive=win_rate >= 55.0)
+        metric_card(f"Mesi Positivi ({target_label})", f"{win_rate:.1f}%", f"{pos_months} su {len(valid_months)} mesi", positive=win_rate >= 55.0)
     with c2:
         metric_card("Miglior Mese Storico", f"+{best_m:.2f}%", "Picco di rendimento mensile", positive=True)
     with c3:
@@ -331,9 +511,8 @@ elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
     # 1. Performance Table Heatmap Style
-    st.markdown("##### 🗓️ Matrice Rendimenti Mensili & YTD (% Geometrica)")
+    st.markdown(f"##### 🗓️ Matrice Rendimenti Mensili & YTD per `{target_label}` (% Geometrica)")
     
-    # Format dataframe for display with color coding
     df_disp_mat = (df_matrix * 100.0).copy()
     
     def color_returns(val):
@@ -353,13 +532,10 @@ elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
     elif hasattr(styler_mat, "applymap"):
         styler_mat = styler_mat.applymap(color_returns)
 
-    st.dataframe(
-        styler_mat,
-        use_container_width=True
-    )
+    st.dataframe(styler_mat, use_container_width=True)
 
     # 2. Bar Chart YTD Annual Returns
-    st.markdown("##### 📊 Rendimento Cumulato per Anno Solare (YTD Comparison)")
+    st.markdown(f"##### 📊 Rendimento Cumulato per Anno Solare (YTD Comparison - `{target_label}`)")
     df_ytd = df_matrix[["YTD"]].reset_index().rename(columns={"Year": "Anno", "YTD": "Rendimento %"})
     df_ytd["Rendimento %"] = df_ytd["Rendimento %"] * 100.0
     df_ytd["Colore"] = np.where(df_ytd["Rendimento %"] >= 0, "#00e676", "#f85149")
@@ -387,34 +563,47 @@ elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
 # TAB 3: RISCHIO MOBILE DINAMICO (ROLLING METRICS)
 # ==============================================================================
 elif active_time_tab == "🌊 Rischio Mobile Dinamico (Rolling Metrics)":
-    if sr_port.empty:
-        st.warning("Serie storica dei rendimenti non disponibile.")
-        st.stop()
-
-    col_w1, col_w2 = st.columns([2, 3])
+    rolling_target_options = ["🏛️ Portafoglio Completo"] + [f"🔹 {t}" for t in active_tickers]
+    
+    col_w1, col_w2, col_w3 = st.columns([2, 1.5, 2.5])
     with col_w1:
         roll_window_opt = st.select_slider(
-            "⏱️ Finestra Mobile di Calcolo (Rolling Window):",
+            "⏱️ Finestra Mobile (Rolling Window):",
             options=[21, 60, 90, 126, 252],
             value=60,
             format_func=lambda w: {21: "21 Giorni (1 Mese)", 60: "60 Giorni (Bimestre)", 90: "90 Giorni (Trimestre)", 126: "126 Giorni (Semestre)", 252: "252 Giorni (1 Anno)"}[w],
             help="Definisce il numero di sedute consecutive su cui calcolare le metriche dinamiche."
         )
     with col_w2:
-        st.markdown(f"""
+        selected_roll_target = st.selectbox(
+            "🎯 Strumento Target:",
+            options=rolling_target_options,
+            index=0,
+            help="Scegli quale strumento sottoporre al calcolo delle metriche rolling."
+        )
+    with col_w3:
+        st.markdown("""
         <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 6px; margin-top: 5px; font-size: 12.5px; color: #ffb74d;">
-            <b>💡 Perché l'analisi Rolling?</b> Evidenzia i cambi di regime e il <i>Risk Drift</i> temporale, isolando periodi in cui la volatilità o il Beta del portafoglio hanno subito spike anomali.
+            <b>💡 Perché l'analisi Rolling?</b> Evidenzia i cambi di regime e il <i>Risk Drift</i> temporale, isolando picchi anomali di volatilità o di Beta.
         </div>
         """, unsafe_allow_html=True)
 
-    df_roll = compute_rolling_risk_metrics(sr_port, sr_bm, window=roll_window_opt, rf_rate=active_rf_rate)
+    if selected_roll_target == "🏛️ Portafoglio Completo":
+        target_roll_sr = sr_port
+        target_roll_label = "Portafoglio Completo"
+    else:
+        tk_roll = selected_roll_target.replace("🔹 ", "").strip()
+        target_roll_sr = df_returns_filtered[tk_roll].dropna() if (not df_returns_filtered.empty and tk_roll in df_returns_filtered.columns) else sr_port
+        target_roll_label = tk_roll
+
+    df_roll = compute_rolling_risk_metrics(target_roll_sr, sr_bm, window=roll_window_opt, rf_rate=active_rf_rate)
 
     if df_roll.empty:
-        st.warning(f"Storico insufficiente per la finestra mobile di {roll_window_opt} sedute.")
+        st.warning(f"Storico insufficiente per `{target_roll_label}` con finestra mobile di {roll_window_opt} sedute.")
         st.stop()
 
     # 1. Chart: Rolling Volatility vs Rolling Sharpe
-    st.markdown(f"##### ⚡ Volatilità Annualizzata & Sharpe Ratio Mobile ({roll_window_opt} Giorni)")
+    st.markdown(f"##### ⚡ Volatilità Annualizzata & Sharpe Ratio Mobile per `{target_roll_label}` ({roll_window_opt} Giorni)")
     fig_roll1 = make_subplots(specs=[[{"secondary_y": True}]])
     
     fig_roll1.add_trace(
@@ -497,15 +686,33 @@ elif active_time_tab == "🌊 Rischio Mobile Dinamico (Rolling Metrics)":
 # TAB 4: STAGIONALITÀ & PATTERN CALENDARI
 # ==============================================================================
 elif active_time_tab == "📊 Stagionalità & Pattern Calendari":
-    if sr_port.empty:
-        st.warning("Serie storica dei rendimenti non disponibile.")
+    seas_target_options = ["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"] + [f"🔹 {t}" for t in active_tickers]
+    selected_seas_target = st.selectbox(
+        "🔍 Seleziona Strumento per la Stagionalità:",
+        options=seas_target_options,
+        index=0
+    )
+
+    if selected_seas_target == "🏛️ Portafoglio Completo":
+        target_seas_sr = sr_port
+        target_seas_label = "Portafoglio Completo"
+    elif selected_seas_target == "🎯 Benchmark (SPY)":
+        target_seas_sr = sr_bm
+        target_seas_label = "Benchmark SPY"
+    else:
+        tk_s = selected_seas_target.replace("🔹 ", "").strip()
+        target_seas_sr = df_returns_filtered[tk_s].dropna() if (not df_returns_filtered.empty and tk_s in df_returns_filtered.columns) else sr_port
+        target_seas_label = tk_s
+
+    if target_seas_sr.empty:
+        st.warning(f"Dati insufficienti per `{target_seas_label}`.")
         st.stop()
 
-    seas = compute_seasonality_patterns(sr_port)
+    seas = compute_seasonality_patterns(target_seas_sr)
     day_df = seas["day_stats"]
     month_df = seas["month_stats"]
 
-    st.markdown("##### 📅 Rendimenti Medi & Win Rate per Giorno della Settimana (Trading Days)")
+    st.markdown(f"##### 📅 Rendimenti Medi & Win Rate per Giorno della Settimana (`{target_seas_label}`)")
     c_d1, c_d2 = st.columns([1.5, 1.0])
     
     with c_d1:
@@ -539,7 +746,7 @@ elif active_time_tab == "📊 Stagionalità & Pattern Calendari":
         st.dataframe(day_df, column_config=cfg_d, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    st.markdown("##### 🗓️ Rendimenti Medi per Mese dell'Anno (Seasonality Pattern)")
+    st.markdown(f"##### 🗓️ Rendimenti Medi per Mese dell'Anno (`{target_seas_label}`)")
     fig_m = go.Figure(go.Bar(
         x=month_df["month_name"],
         y=month_df["Mean_Pct"],
@@ -571,7 +778,7 @@ elif active_time_tab == "🗃️ Registro Snapshot DB & Confronto Side-by-Side":
     offline_mode = st.session_state.get("offline_mode", False)
 
     engine = None
-    df_history = pd.DataFrame()
+    avail_portfolios = []
 
     if not offline_mode:
         try:
@@ -584,16 +791,10 @@ elif active_time_tab == "🗃️ Registro Snapshot DB & Confronto Side-by-Side":
                     ORDER BY p.name ASC
                 """)).fetchall()
                 avail_portfolios = [r[0] for r in port_rows]
-                
-            if avail_portfolios:
-                default_p = st.session_state.get("portfolio_name", avail_portfolios[0])
-                if default_p not in avail_portfolios:
-                    default_p = avail_portfolios[0]
-                df_history = get_all_snapshots_history(engine, portfolio_name=default_p)
         except Exception:
-            df_history = pd.DataFrame()
+            avail_portfolios = []
 
-    if df_history.empty:
+    if not avail_portfolios:
         st.markdown(f"""
         <div style="background: rgba(30, 41, 59, 0.45); border: 1px solid rgba(56, 189, 248, 0.25); border-radius: 10px; padding: 16px 20px; margin-bottom: 12px;">
             <div style="color: #38bdf8; font-weight: 700; font-size: 15px; margin-bottom: 4px;">🗄️ Database Snapshot & Data Warehouse Lineage</div>
@@ -608,23 +809,57 @@ elif active_time_tab == "🗃️ Registro Snapshot DB & Confronto Side-by-Side":
         except Exception:
             pass
     else:
+        # Selettori per scegliere quale portafoglio DB e quali run analizzare
+        c_db_p1, c_db_p2 = st.columns(2)
+        with c_db_p1:
+            default_p = st.session_state.get("portfolio_name", avail_portfolios[0])
+            if default_p not in avail_portfolios:
+                default_p = avail_portfolios[0]
+            selected_db_port = st.selectbox("💼 Scegli Portafoglio DB da Analizzare:", avail_portfolios, index=avail_portfolios.index(default_p))
+        
+        try:
+            with engine.connect() as conn:
+                run_rows = conn.execute(sqlt("""
+                    SELECT DISTINCT s.run_name 
+                    FROM portfolio_snapshots s
+                    JOIN portfolios p ON s.portfolio_id = p.portfolio_id
+                    WHERE p.name = :pname AND s.run_name IS NOT NULL AND s.run_name != ''
+                    ORDER BY s.run_name ASC
+                """), {"pname": selected_db_port}).fetchall()
+                avail_runs = ["Tutte le Run"] + [r[0] for r in run_rows]
+        except Exception:
+            avail_runs = ["Tutte le Run"]
+
+        with c_db_p2:
+            selected_run_tag = st.selectbox("🏷️ Filtra per Run Tag / Nome Analisi:", avail_runs, index=0)
+
+        run_param = None if selected_run_tag == "Tutte le Run" else selected_run_tag
+        df_history = get_all_snapshots_history(engine, portfolio_name=selected_db_port, run_name=run_param)
+
+        if df_history.empty:
+            st.warning(f"Nessuno snapshot trovato per '{selected_db_port}' con i filtri selezionati.")
+            st.stop()
+
         df_history["calc_date"] = pd.to_datetime(df_history["calc_date"])
         df_history["display_label"] = df_history.apply(
             lambda r: f"📅 {r['calc_date'].strftime('%Y-%m-%d %H:%M')} | 🏷️ {r['run_name'] or 'Standard'} | 💰 € {r['total_value']:,.2f} | ID: {r['run_id']}",
             axis=1
         )
 
+        st.markdown("---")
         st.markdown("### ⚖️ Confronto Diretto Affiancato tra 2 Snapshot")
+        st.caption("Seleziona i due momenti temporali da confrontare punto a punto:")
+
         options_list = list(df_history["display_label"])
         idx_a = len(options_list) - 1
         idx_b = max(0, len(options_list) - 2)
 
         col_sel_a, col_sel_b = st.columns(2)
         with col_sel_a:
-            label_a = st.selectbox("🅰️ Seleziona Snapshot A (Target):", options_list, index=idx_a)
+            label_a = st.selectbox("🅰️ Seleziona Snapshot A (Target / Recente):", options_list, index=idx_a)
             snap_a = df_history[df_history["display_label"] == label_a].iloc[0]
         with col_sel_b:
-            label_b = st.selectbox("🅱️ Seleziona Snapshot B (Precedente):", options_list, index=idx_b)
+            label_b = st.selectbox("🅱️ Seleziona Snapshot B (Confronto / Precedente):", options_list, index=idx_b)
             snap_b = df_history[df_history["display_label"] == label_b].iloc[0]
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
