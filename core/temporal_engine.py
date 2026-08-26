@@ -230,3 +230,100 @@ def compute_seasonality_patterns(sr_port: pd.Series) -> Dict[str, pd.DataFrame]:
         "day_stats": day_stats,
         "month_stats": month_stats
     }
+
+
+def compute_side_by_side_comparison(df_a: pd.DataFrame, df_b: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Esegue il confronto analitico approfondito tra due insiemi di posizioni/snapshot.
+    Calcola delta quantità, delta controvalore, delta peso di allocazione,
+    turnover ratio di ribilanciamento e classifica gli status (nuovo ingresso, chiusura, incremento, riduzione).
+    """
+    if (df_a is None or df_a.empty) and (df_b is None or df_b.empty):
+        return {
+            "df_merged": pd.DataFrame(),
+            "tot_val_a": 0.0,
+            "tot_val_b": 0.0,
+            "delta_nav": 0.0,
+            "delta_nav_pct": 0.0,
+            "turnover_pct": 0.0,
+            "capital_rebalanced": 0.0,
+            "new_entries_count": 0,
+            "closed_entries_count": 0,
+            "modified_count": 0
+        }
+
+    cols_a = [c for c in ["ticker", "asset_class", "qty_net", "avg_cost", "last_price", "current_value", "weight_pct"] if df_a is not None and c in df_a.columns]
+    cols_b = [c for c in ["ticker", "asset_class", "qty_net", "avg_cost", "last_price", "current_value", "weight_pct"] if df_b is not None and c in df_b.columns]
+    
+    merged = pd.merge(
+        df_a[cols_a] if (df_a is not None and not df_a.empty) else pd.DataFrame(columns=["ticker"]),
+        df_b[cols_b] if (df_b is not None and not df_b.empty) else pd.DataFrame(columns=["ticker"]),
+        on="ticker", how="outer", suffixes=("_A", "_B")
+    ).fillna(0.0)
+
+    if merged.empty:
+        return {
+            "df_merged": pd.DataFrame(),
+            "tot_val_a": 0.0,
+            "tot_val_b": 0.0,
+            "delta_nav": 0.0,
+            "delta_nav_pct": 0.0,
+            "turnover_pct": 0.0,
+            "capital_rebalanced": 0.0,
+            "new_entries_count": 0,
+            "closed_entries_count": 0,
+            "modified_count": 0
+        }
+
+    # Class reconciliation
+    if "asset_class_A" in merged.columns and "asset_class_B" in merged.columns:
+        merged["asset_class"] = merged["asset_class_A"].where(merged["asset_class_A"] != 0, merged["asset_class_B"])
+        merged["asset_class"] = merged["asset_class"].replace(0, "Stock")
+    elif "asset_class_A" in merged.columns:
+        merged["asset_class"] = merged["asset_class_A"]
+    else:
+        merged["asset_class"] = "Stock"
+
+    merged["delta_qty"] = merged.get("qty_net_A", 0.0) - merged.get("qty_net_B", 0.0)
+    merged["delta_val"] = merged.get("current_value_A", 0.0) - merged.get("current_value_B", 0.0)
+    merged["delta_weight"] = merged.get("weight_pct_A", 0.0) - merged.get("weight_pct_B", 0.0)
+
+    # Classification status badge
+    def get_status(row):
+        q_a = float(row.get("qty_net_A", 0.0))
+        q_b = float(row.get("qty_net_B", 0.0))
+        d_val = float(row.get("delta_val", 0.0))
+        if q_b == 0 and q_a > 0:
+            return "🟢 Nuovo Ingresso"
+        elif q_a == 0 and q_b > 0:
+            return "🔴 Chiusura Totale"
+        elif d_val > 25.0:
+            return "⬆️ Incremento"
+        elif d_val < -25.0:
+            return "⬇️ Riduzione"
+        return "⚪ Invariato"
+
+    merged["status"] = merged.apply(get_status, axis=1)
+
+    # Turnover ratio: 0.5 * sum(|w_A - w_B|)
+    turnover_pct = 0.5 * float(merged["delta_weight"].abs().sum())
+    capital_rebalanced = 0.5 * float(merged["delta_val"].abs().sum())
+    
+    tot_val_a = float(df_a["current_value"].sum()) if (df_a is not None and not df_a.empty and "current_value" in df_a.columns) else 0.0
+    tot_val_b = float(df_b["current_value"].sum()) if (df_b is not None and not df_b.empty and "current_value" in df_b.columns) else 0.0
+    delta_nav = tot_val_a - tot_val_b
+    delta_nav_pct = (delta_nav / tot_val_b * 100.0) if tot_val_b > 0 else 0.0
+
+    return {
+        "df_merged": merged.sort_values(by="delta_val", ascending=False).reset_index(drop=True),
+        "tot_val_a": tot_val_a,
+        "tot_val_b": tot_val_b,
+        "delta_nav": delta_nav,
+        "delta_nav_pct": delta_nav_pct,
+        "turnover_pct": turnover_pct,
+        "capital_rebalanced": capital_rebalanced,
+        "new_entries_count": int((merged["status"] == "🟢 Nuovo Ingresso").sum()),
+        "closed_entries_count": int((merged["status"] == "🔴 Chiusura Totale").sum()),
+        "modified_count": int((merged["status"].isin(["⬆️ Incremento", "⬇️ Riduzione"])).sum())
+    }
+

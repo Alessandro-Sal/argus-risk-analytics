@@ -117,7 +117,7 @@ NAV_MODULES = [
             {"label": "🗓️ Matrice Mensile", "target": "🗓️ Matrice Rendimenti Mensili & Annuali"},
             {"label": "🌊 Rolling Metrics", "target": "🌊 Rischio Mobile Dinamico (Rolling Metrics)"},
             {"label": "📊 Stagionalità", "target": "📊 Stagionalità & Pattern Calendari"},
-            {"label": "🗃️ Registro Snapshot", "target": "🗃️ Registro Snapshot DB & Confronto Side-by-Side"}
+            {"label": "⚖️ Confronto Side-by-Side", "target": "⚖️ Confronto Side-by-Side & Snapshot DB"}
         ]
     },
     {
