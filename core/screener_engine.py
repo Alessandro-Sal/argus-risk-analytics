@@ -143,11 +143,20 @@ def fetch_screener_universe_data(
             sector = info.get("sector") or "N/D"
             industry = info.get("industry") or "N/D"
             country = info.get("country") or "N/D"
-            currency = info.get("currency") or "USD"
+            currency = info.get("currency") or ("EUR" if tk.endswith("-EUR") or tk.endswith(".MI") or tk.endswith(".PA") or tk.endswith(".DE") else "USD")
             
+            quote_type = str(info.get("quoteType", "")).upper()
+            if sector == "N/D":
+                if quote_type == "CRYPTOCURRENCY" or "-" in tk or tk.startswith(("BTC", "ETH", "SOL")):
+                    sector = "Crypto / Digital Assets"
+                    industry = "Digital Currency"
+                elif quote_type == "ETF" or "ETF" in str(name).upper() or "ISHARES" in str(name).upper() or "VANGUARD" in str(name).upper():
+                    sector = "ETF / Fondi"
+                    industry = "Exchange Traded Fund"
+
             # Prezzi e Target Price
             last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0.0)
-            if last_price <= 0 and df_hist is not None and not df_hist.empty:
+            if last_price <= 0 and df_hist is not None and not df_hist.empty and "close" in df_hist.columns:
                 last_price = float(df_hist["close"].iloc[-1])
                 
             target_mean = float(info.get("targetMeanPrice") or 0.0)
@@ -195,7 +204,7 @@ def fetch_screener_universe_data(
             if pd.notna(debt_to_equity): debt_to_equity /= 100.0
             
             # Consensus & Analisti Istituzionali
-            rec_raw = str(info.get("recommendationKey") or "N/D").replace("_", " ").title()
+            rec_key = str(info.get("recommendationKey") or "N/D").replace("_", " ").title()
             num_analysts = int(info.get("numberOfAnalystOpinions") or 0)
             rev_growth = float(info.get("revenueGrowth") or np.nan)
             if pd.notna(rev_growth): rev_growth *= 100.0
