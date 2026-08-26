@@ -146,6 +146,12 @@ with col_tape_ctrl:
     arrow = "▲" if chg >= 0 else "▼"
     api_badge = '<span style="font-size:10px; background:rgba(63,185,80,0.15); color:#3fb950; border:1px solid rgba(63,185,80,0.3); padding:2px 6px; border-radius:4px; font-weight:700;">LIVE API</span>' if live_q["is_live"] else '<span style="font-size:10px; background:rgba(255,153,0,0.15); color:#ff9900; border:1px solid rgba(255,153,0,0.3); padding:2px 6px; border-radius:4px; font-weight:700;">CACHE</span>'
 
+    # Conversione EUR per display spot
+    eur_equiv_str = ""
+    if currency != "EUR":
+        tape_eur_px = display_px / 1.085 if currency == "USD" else display_px
+        eur_equiv_str = f'<div style="font-size:12.5px; color:#58a6ff; font-weight:600; margin-top:-2px; margin-bottom:4px;">≈ € {tape_eur_px:,.2f} EUR</div>'
+
     tape_card_html = (
         f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 16px; margin-top: 4px;">'
         f'<div style="display:flex; justify-content:space-between; align-items:center;">'
@@ -153,8 +159,9 @@ with col_tape_ctrl:
         f'<div><span style="font-size:13px; font-weight:700; color:{chg_color}; background:{chg_color}22; padding:3px 8px; border-radius:4px; border:1px solid {chg_color}55;">{chg_sign}{chg:,.2f} ({chg_sign}{chg_pct:.2f}%) {arrow}</span></div>'
         f'</div>'
         f'<div style="font-size:24px; font-weight:800; color:#ff9900; margin: 4px 0;">{currency} {display_px:,.2f}</div>'
+        f'{eur_equiv_str}'
         f'<div style="display:flex; justify-content:space-between; font-size:11px; color:#8b949e; font-family:monospace;">'
-        f'<span>Vol: {vol_str}</span><span>Range: ${day_l:,.2f} - ${day_h:,.2f}</span>'
+        f'<span>Vol: {vol_str}</span><span>Range: {currency} {day_l:,.2f} - {currency} {day_h:,.2f}</span>'
         f'</div>'
         f'</div>'
     )
@@ -248,6 +255,12 @@ tab_port_live, tab_wl_live = st.tabs([
     "🌐 Watchlist Istituzionale di Mercato"
 ])
 
+# Recupera tasso EURUSD per conversioni valutarie spot
+eurusd_q = all_quotes.get("EURUSD=X", terminal_engine.fetch_live_ticker_quote("EURUSD=X"))
+eurusd_fx = float(eurusd_q.get("last_price", 1.085))
+if eurusd_fx <= 0:
+    eurusd_fx = 1.085
+
 with tab_port_live:
     if pos.empty or "ticker" not in pos.columns:
         st.info("Nessun portafoglio attivo caricato. Carica una distinta posizioni per visualizzare i prezzi live.")
@@ -260,31 +273,59 @@ with tab_port_live:
 
         for _, r in pos.iterrows():
             sym = str(r["ticker"]).strip().upper()
-            q_val = float(r.get("quantity", 0.0))
-            wacp = float(r.get("wacp", r.get("buy_price", 0.0)))
+            # Supporto a tutte le nomenclature di colonna per quantità e costo medio
+            q_val = float(r.get("qty_net", r.get("quantity", r.get("shares", 0.0))))
+            wacp_eur = float(r.get("avg_cost", r.get("wacp", r.get("buy_price", 0.0))))
+            
             live_item = all_quotes.get(sym, terminal_engine.fetch_live_ticker_quote(sym))
-            live_px = live_item["last_price"]
-            chg_1d = live_item["change_pct"]
+            live_px_orig = float(live_item.get("last_price", 0.0))
+            chg_1d = float(live_item.get("change_pct", 0.0))
             
-            mkt_val = q_val * live_px
-            cost = q_val * wacp
-            pnl = mkt_val - cost
-            pnl_pct = (pnl / cost * 100.0) if cost > 0 else 0.0
+            # Determinazione valuta e conversione in EUR
+            asset_curr = str(r.get("asset_currency", live_item.get("currency", "USD"))).upper()
+            if sym.endswith((".MI", ".PA", ".DE")) or asset_curr == "EUR":
+                asset_curr = "EUR"
+                curr_sym = "€"
+                live_px_eur = live_px_orig
+                live_px_orig_str = f"€ {live_px_orig:,.2f}"
+            elif asset_curr == "USD":
+                curr_sym = "$"
+                live_px_eur = (live_px_orig / eurusd_fx) if eurusd_fx > 0 else (live_px_orig * float(r.get("fx_rate_spot", 0.92)))
+                live_px_orig_str = f"$ {live_px_orig:,.2f}"
+            elif asset_curr in ["GBP", "GBp"]:
+                curr_sym = "£"
+                live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.17))
+                live_px_orig_str = f"£ {live_px_orig:,.2f}"
+            elif asset_curr == "CHF":
+                curr_sym = "CHF "
+                live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.05))
+                live_px_orig_str = f"CHF {live_px_orig:,.2f}"
+            else:
+                curr_sym = f"{asset_curr} "
+                live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.0))
+                live_px_orig_str = f"{asset_curr} {live_px_orig:,.2f}"
+
+            mkt_val_eur = q_val * live_px_eur
+            cost_eur = q_val * wacp_eur
+            pnl_eur = mkt_val_eur - cost_eur
+            pnl_pct = (pnl_eur / cost_eur * 100.0) if cost_eur > 0 else 0.0
             
-            tot_live_notional += mkt_val
-            tot_wacp_cost += cost
-            day_chgs.append(chg_1d)
+            tot_live_notional += mkt_val_eur
+            tot_wacp_cost += cost_eur
+            if q_val > 0:
+                day_chgs.append(chg_1d)
 
             port_live_rows.append({
                 "Ticker": sym,
-                "Prezzo Live Spot": f"${live_px:,.2f}",
+                "Prezzo Spot (Valuta Orig.)": live_px_orig_str,
+                "Prezzo Live (€ EUR)": f"€ {live_px_eur:,.2f}",
                 "Var. 1D (%)": f"{'+' if chg_1d>=0 else ''}{chg_1d:.2f}%",
-                "Carico FIFO (WACP)": f"${wacp:,.2f}",
-                "Quantità": f"{q_val:,.1f}",
-                "Controvalore Live (€)": f"€ {mkt_val:,.2f}",
-                "PnL Non Realizzato (€)": f"{'+' if pnl>=0 else ''}€ {pnl:,.2f}",
+                "Carico FIFO WACP (€)": f"€ {wacp_eur:,.2f}",
+                "Quantità": f"{q_val:,.2f}",
+                "Controvalore Live (€)": f"€ {mkt_val_eur:,.2f}",
+                "PnL Non Realizzato (€)": f"{'+' if pnl_eur>=0 else ''}€ {pnl_eur:,.2f}",
                 "Rendimento (%)": f"{'+' if pnl_pct>=0 else ''}{pnl_pct:.2f}%",
-                "Day Range (L - H)": f"${live_item['day_low']:.2f} - ${live_item['day_high']:.2f}",
+                "Day Range (L - H)": f"{curr_sym}{live_item['day_low']:.2f} - {curr_sym}{live_item['day_high']:.2f}",
                 "Stato Feed": "LIVE API 🟢" if live_item["is_live"] else "ESTIMATE 🟡"
             })
 
@@ -292,6 +333,7 @@ with tab_port_live:
         tot_pnl = tot_live_notional - tot_wacp_cost
         tot_pnl_p = (tot_pnl / tot_wacp_cost * 100.0) if tot_wacp_cost > 0 else 0.0
         avg_1d = np.mean(day_chgs) if day_chgs else 0.0
+        active_assets_count = len([r for _, r in pos.iterrows() if float(r.get("qty_net", r.get("quantity", r.get("shares", 0.0)))) > 0])
 
         k1, k2, k3, k4 = st.columns(4)
         with k1:
@@ -301,7 +343,7 @@ with tab_port_live:
         with k3:
             st.metric("Variazione Media Intraday (1D)", f"{avg_1d:+.2f}%")
         with k4:
-            st.metric("Titoli Sincronizzati", f"{len(pos)} Asset", delta="Real-Time Active")
+            st.metric("Titoli Sincronizzati", f"{len(pos)} Asset", delta=f"{active_assets_count} Posizioni Attive")
 
         st.dataframe(pd.DataFrame(port_live_rows), use_container_width=True, hide_index=True)
 
@@ -323,15 +365,41 @@ with tab_wl_live:
     wl_rows = []
     for sym in term_eng.custom_watchlist:
         q = all_quotes.get(sym, terminal_engine.fetch_live_ticker_quote(sym))
-        vol_s = f"{q['volume']:,.0f}" if q['volume'] > 0 else "—"
-        mkt_c = f"${q['market_cap']/1e12:.2f}T" if q['market_cap']>=1e12 else (f"${q['market_cap']/1e9:.2f}B" if q['market_cap']>=1e9 else f"${q['market_cap']/1e6:.2f}M") if q['market_cap']>0 else "—"
+        curr_raw = str(q.get("currency", "USD")).upper()
+        px_orig = float(q.get("last_price", 0.0))
+        
+        if sym.endswith((".MI", ".PA", ".DE")) or curr_raw == "EUR":
+            curr_sym = "€"
+            px_eur = px_orig
+            px_orig_str = f"€ {px_orig:,.2f}"
+        elif curr_raw == "USD":
+            curr_sym = "$"
+            px_eur = (px_orig / eurusd_fx) if eurusd_fx > 0 else (px_orig * 0.92)
+            px_orig_str = f"$ {px_orig:,.2f}"
+        elif curr_raw in ["GBP", "GBp"]:
+            curr_sym = "£"
+            px_eur = px_orig * 1.17
+            px_orig_str = f"£ {px_orig:,.2f}"
+        elif curr_raw == "CHF":
+            curr_sym = "CHF "
+            px_eur = px_orig * 1.05
+            px_orig_str = f"CHF {px_orig:,.2f}"
+        else:
+            curr_sym = f"{curr_raw} "
+            px_eur = px_orig
+            px_orig_str = f"{curr_raw} {px_orig:,.2f}"
+
+        vol_s = f"{q['volume']:,.0f}" if q.get('volume', 0) > 0 else "—"
+        mkt_c = f"${q['market_cap']/1e12:.2f}T" if q.get('market_cap', 0)>=1e12 else (f"${q['market_cap']/1e9:.2f}B" if q.get('market_cap', 0)>=1e9 else f"${q['market_cap']/1e6:.2f}M") if q.get('market_cap', 0)>0 else "—"
+        
         wl_rows.append({
             "Ticker": sym,
-            "Prezzo Spot Live": f"{q['currency']} {q['last_price']:,.2f}",
+            "Prezzo Spot (Valuta Orig.)": px_orig_str,
+            "Prezzo Convertito (€ EUR)": f"€ {px_eur:,.2f}",
             "Variazione 1D (%)": f"{'+' if q['change_pct']>=0 else ''}{q['change_pct']:.2f}%",
-            "Day Low": f"${q['day_low']:,.2f}",
-            "Day High": f"${q['day_high']:,.2f}",
-            "52-Week Range": f"${q['fifty_two_week_low']:.2f} - ${q['fifty_two_week_high']:.2f}",
+            "Day Low": f"{curr_sym}{q['day_low']:,.2f}",
+            "Day High": f"{curr_sym}{q['day_high']:,.2f}",
+            "52-Week Range": f"{curr_sym}{q['fifty_two_week_low']:,.2f} - {curr_sym}{q['fifty_two_week_high']:,.2f}",
             "Volume": vol_s,
             "Market Cap": mkt_c,
             "Feed": "LIVE API 🟢" if q["is_live"] else "CACHE 🟡"

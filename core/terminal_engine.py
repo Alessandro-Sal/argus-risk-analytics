@@ -626,7 +626,7 @@ UTILITÀ DI SISTEMA:
             "┌──────────────────────────────────────────────────────────────────┐",
             "│ ARGUS PORTFOLIO REAL-TIME LIVE PRICING & P&L MONITOR [PORT LIVE] │",
             "├──────────────────────────────────────────────────────────────────┤",
-            f"│ {'TICKER':<7} {'LIVE PX':<10} {'1D CHG':<9} {'WACP':<10} {'TOTAL P&L (€ / %)':<24} │",
+            f"│ {'TICKER':<7} {'SPOT (ORIG)':<11} {'LIVE (€)':<10} {'1D CHG':<9} {'WACP (€)':<10} {'TOTAL P&L (€ / %)':<24} │",
             "├──────────────────────────────────────────────────────────────────┤"
         ]
 
@@ -636,16 +636,34 @@ UTILITÀ DI SISTEMA:
         port_tickers = [str(t).strip().upper() for t in df_pos["ticker"].unique() if str(t).strip()]
         quotes_map = fetch_multiple_live_quotes(port_tickers, max_workers=8)
 
+        # Recupera tasso EURUSD per conversione spot dinamica
+        fx_eurusd_quote = fetch_live_ticker_quote("EURUSD=X")
+        eurusd_rate = fx_eurusd_quote["last_price"] if fx_eurusd_quote["last_price"] > 0 else 1.085
+
         for _, row in df_pos.iterrows():
             sym = str(row["ticker"]).strip().upper()
-            qty = float(row.get("quantity", 0.0))
-            wacp = float(row.get("wacp", row.get("buy_price", 0.0)))
+            qty = float(row.get("qty_net", row.get("quantity", row.get("shares", 0.0))))
+            wacp_eur = float(row.get("avg_cost", row.get("wacp", row.get("buy_price", 0.0))))
             q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
-            live_p = q["last_price"]
+            live_p_orig = q["last_price"]
+            curr_code = str(q.get("currency", "USD")).upper()
+            if sym.endswith((".MI", ".PA", ".DE")) or str(row.get("asset_currency", "")).upper() == "EUR":
+                curr_code = "EUR"
+
+            if curr_code == "EUR":
+                live_p_eur = live_p_orig
+                curr_sym = "€"
+            elif curr_code == "USD":
+                live_p_eur = (live_p_orig / eurusd_rate) if eurusd_rate > 0 else (live_p_orig * float(row.get("fx_rate_spot", 0.92)))
+                curr_sym = "$"
+            else:
+                fx_spot = float(row.get("fx_rate_spot", 1.0))
+                live_p_eur = live_p_orig * fx_spot
+                curr_sym = curr_code
+
             chg_1d = q["change_pct"]
-            
-            cost = qty * wacp
-            val = qty * live_p
+            cost = qty * wacp_eur
+            val = qty * live_p_eur
             pnl = val - cost
             pnl_p = (pnl / cost * 100.0) if cost > 0 else 0.0
             
@@ -657,8 +675,9 @@ UTILITÀ DI SISTEMA:
             chg_sign = "+" if chg_1d >= 0 else ""
             chg_arrow = "▲" if chg_1d >= 0 else "▼"
 
+            spot_orig_str = f"{curr_sym}{live_p_orig:,.2f}"
             pnl_str = f"{sign}€{pnl:>7,.0f} ({sign}{pnl_p:>5.1f}%) {arrow}"
-            lines.append(f"│ {sym:<7} ${live_p:<9.2f} {chg_sign}{chg_1d:<5.1f}%{chg_arrow} ${wacp:<9.2f} {pnl_str:<24} │")
+            lines.append(f"│ {sym:<7} {spot_orig_str:<11} €{live_p_eur:<9.2f} {chg_sign}{chg_1d:<5.1f}%{chg_arrow} €{wacp_eur:<9.2f} {pnl_str:<24} │")
 
         tot_pnl = total_live_val - total_cost_basis
         tot_pnl_p = (tot_pnl / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0
