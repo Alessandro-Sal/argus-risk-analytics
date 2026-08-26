@@ -7,6 +7,7 @@ import io
 import time
 import datetime
 import importlib
+import html
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -18,12 +19,6 @@ import core.excel_connector as excel_connector
 import core.workspace_engine as workspace_engine
 import core.bquant_engine as bquant_engine
 import core.terminal_engine as terminal_engine
-
-importlib.reload(ui_utils)
-importlib.reload(excel_connector)
-importlib.reload(workspace_engine)
-importlib.reload(bquant_engine)
-importlib.reload(terminal_engine)
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -650,7 +645,10 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
-    term_eng = get_terminal_engine()
+    if "argus_terminal_engine" not in st.session_state or st.session_state["argus_terminal_engine"] is None:
+        st.session_state["argus_terminal_engine"] = terminal_engine.get_terminal_engine()
+    term_eng = st.session_state["argus_terminal_engine"]
+
     session_context = {
         "df_positions": pos,
         "df_returns": df_rets,
@@ -709,11 +707,18 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
                 term_eng.output_buffer.insert(0, cmd_res)
                 st.rerun()
 
-        # Buffer di Output Terminale (Stile JetBrains Mono Dark Screen)
+        # Buffer di Output Terminale (Stile JetBrains Mono Dark Screen) con sanitizzazione HTML
         terminal_screen_lines = []
-        for item in term_eng.output_buffer[:8]:
+        for item in term_eng.output_buffer[:10]:
             status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
-            terminal_screen_lines.append(f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> <span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> <span style='color:#e6edf3;'>{item.command}</span>\n{item.output_text}\n" + "─"*72)
+            esc_cmd = html.escape(str(item.command))
+            esc_out = html.escape(str(item.output_text))
+            terminal_screen_lines.append(
+                f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
+                f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> "
+                f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>\n"
+                f"{esc_out}\n" + "─"*72
+            )
 
         terminal_screen_html = "\n\n".join(terminal_screen_lines)
 
