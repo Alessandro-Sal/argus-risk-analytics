@@ -113,9 +113,11 @@ NAV_MODULES = [
         "has_subtabs": True,
         "tab_key": "time_active_tab",
         "subtabs": [
-            {"label": "📈 Serie Storiche", "target": "📈 Serie Storiche Temporali"},
-            {"label": "⚖️ Confronto Portafogli", "target": "⚖️ Confronto Affiancato (Side-by-Side)"},
-            {"label": "🗃️ Registro Snapshot", "target": "🗃️ Registro Completo Snapshot Storici"}
+            {"label": "📈 Curva & Underwater", "target": "📈 Curva Cumulata & Drawdown Underwater"},
+            {"label": "🗓️ Matrice Mensile", "target": "🗓️ Matrice Rendimenti Mensili & Annuali"},
+            {"label": "🌊 Rolling Metrics", "target": "🌊 Rischio Mobile Dinamico (Rolling Metrics)"},
+            {"label": "📊 Stagionalità", "target": "📊 Stagionalità & Pattern Calendari"},
+            {"label": "🗃️ Registro Snapshot", "target": "🗃️ Registro Snapshot DB & Confronto Side-by-Side"}
         ]
     },
     {

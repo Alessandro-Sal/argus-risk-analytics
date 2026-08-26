@@ -10,5 +10,11 @@ from core.report_exporter import (
     generate_pdf_factsheet,
     generate_excel_report,
 )
+from core.temporal_engine import (
+    compute_monthly_return_matrix,
+    compute_rolling_risk_metrics,
+    compute_underwater_drawdowns,
+    compute_seasonality_patterns,
+)
 
 
