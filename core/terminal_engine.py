@@ -50,7 +50,11 @@ _QUOTE_CACHE_LOCK = threading.Lock()
 _QUOTE_CACHE_TTL_SEC = 20.0  # 20 secondi TTL
 
 
-def fetch_live_ticker_quote(ticker: str, force_refresh: bool = False) -> Dict[str, Any]:
+def fetch_live_ticker_quote(
+    ticker: str,
+    force_refresh: bool = False,
+    fallback_price: Optional[float] = None
+) -> Dict[str, Any]:
     """
     Recupera le quotazioni in tempo reale via yfinance fast_info con cache in-memory e fallback su stima.
     Restituisce un dizionario contenente prezzo spot, variazioni, range giornaliero, volume e valuta.
@@ -107,8 +111,10 @@ def fetch_live_ticker_quote(ticker: str, force_refresh: bool = False) -> Dict[st
     except Exception:
         pass
 
-    # Fallback con tabella prezzi standard se API non raggiungibile
-    default_p = ArgusTerminalEngine.DEFAULT_PRICES.get(sym, 150.0) if hasattr(ArgusTerminalEngine, 'DEFAULT_PRICES') else 150.0
+    # Fallback con prezzo fornito o tabella prezzi standard se API non raggiungibile
+    default_p = fallback_price if (fallback_price is not None and fallback_price > 0) else (
+        ArgusTerminalEngine.DEFAULT_PRICES.get(sym, 150.0) if hasattr(ArgusTerminalEngine, 'DEFAULT_PRICES') else 150.0
+    )
     fallback_res = {
         "ticker": sym,
         "last_price": default_p,
@@ -131,9 +137,14 @@ def fetch_live_ticker_quote(ticker: str, force_refresh: bool = False) -> Dict[st
     return fallback_res
 
 
-def fetch_multiple_live_quotes(tickers: List[str], max_workers: int = 8, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+def fetch_multiple_live_quotes(
+    tickers: List[str],
+    max_workers: int = 8,
+    force_refresh: bool = False,
+    fallback_map: Optional[Dict[str, float]] = None
+) -> Dict[str, Dict[str, Any]]:
     """
-    Recupera le quotazioni in tempo reale in parallelo per una lista di ticker.
+    Recupera le quotazioni in tempo reale in parallelo per una lista di ticker con timeout protetto.
     Ottimizzato con ThreadPoolExecutor per accelerare il caricamento del portafoglio e della watchlist.
     """
     clean_tickers = list(dict.fromkeys([str(t).strip().upper() for t in tickers if str(t).strip()]))
@@ -141,6 +152,7 @@ def fetch_multiple_live_quotes(tickers: List[str], max_workers: int = 8, force_r
         return {}
 
     results: Dict[str, Dict[str, Any]] = {}
+    fb_dict = fallback_map or {}
     
     # Controlla gli elementi già in cache se non richiesto force_refresh
     tickers_to_fetch = []
@@ -162,14 +174,28 @@ def fetch_multiple_live_quotes(tickers: List[str], max_workers: int = 8, force_r
 
     workers = min(max_workers, len(tickers_to_fetch))
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        future_map = {executor.submit(fetch_live_ticker_quote, sym, force_refresh): sym for sym in tickers_to_fetch}
-        for future in as_completed(future_map):
-            sym = future_map[future]
-            try:
-                quote = future.result()
-                results[sym] = quote
-            except Exception:
-                results[sym] = fetch_live_ticker_quote(sym, force_refresh=False)
+        future_map = {
+            executor.submit(fetch_live_ticker_quote, sym, force_refresh, fb_dict.get(sym)): sym
+            for sym in tickers_to_fetch
+        }
+        try:
+            for future in as_completed(future_map, timeout=4.0):
+                sym = future_map[future]
+                try:
+                    quote = future.result(timeout=2.5)
+                    results[sym] = quote
+                except Exception:
+                    results[sym] = fetch_live_ticker_quote(sym, force_refresh=False, fallback_price=fb_dict.get(sym))
+        except Exception:
+            # Timeout globale scaduto, assegna fallback ai ticker rimanenti
+            for sym in tickers_to_fetch:
+                if sym not in results:
+                    results[sym] = fetch_live_ticker_quote(sym, force_refresh=False, fallback_price=fb_dict.get(sym))
+
+    # Assicura che tutti i clean_tickers abbiano una quotazione valida
+    for sym in clean_tickers:
+        if sym not in results:
+            results[sym] = fetch_live_ticker_quote(sym, force_refresh=False, fallback_price=fb_dict.get(sym))
 
     return results
 
