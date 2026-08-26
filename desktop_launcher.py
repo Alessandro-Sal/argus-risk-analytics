@@ -142,6 +142,7 @@ def main():
             width=1366,
             height=850,
             resizable=True,
+            maximized=True,
             min_size=(1024, 700),
             confirm_close=False
         )
