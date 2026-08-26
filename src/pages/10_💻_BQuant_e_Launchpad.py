@@ -671,8 +671,8 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
 
         # Chip di scelta rapida
         st.caption("Comandi Rapidi:")
-        chips_cols = st.columns(6)
-        quick_cmds = ["PORT RISK", "VAR 95", "AAPL DES", "TWAP 500 AAPL 30", "TOP", "BLOTTER"]
+        chips_cols = st.columns(7)
+        quick_cmds = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC-USD", "WATCHLIST", "VAR 95", "TOP"]
         for idx, qc in enumerate(quick_cmds):
             with chips_cols[idx]:
                 if st.button(qc, key=f"btn_chip_cmd_{idx}", use_container_width=True):
@@ -685,7 +685,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         with col_inp:
             cmd_input = st.text_input(
                 "Command Prompt",
-                placeholder="ARGUS:LIVE> Digita comando (es. 'AAPL DES', 'VAR 95', 'BUY 100 NVDA', 'TOP', 'HELP')...",
+                placeholder="ARGUS:LIVE> Digita comando (es. 'QUOTE NVDA', 'BTC-USD', 'WATCHLIST', 'VAR 95', 'BUY 100 NVDA', 'TOP')...",
                 key="term_cli_input_box",
                 label_visibility="collapsed"
             )
@@ -719,72 +719,94 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
                 st.rerun()
 
     with col_tape:
-        st.markdown("##### ⚡ Live Market Tape & Level-2 Book")
+        st.markdown("##### ⚡ Live Market Tape & Real-Time API")
         
-        # Selettore Ticker per Streaming Book
-        avail_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else ["AAPL", "MSFT", "NVDA", "SPY", "BTC-USD"]
-        selected_tape_ticker = st.selectbox("Ticker Live:", options=avail_tickers, key="sel_tape_ticker", label_visibility="collapsed")
-        
-        # Recupera il prezzo corrente reale dal portafoglio se disponibile
-        real_current_price = None
-        if not pos.empty and "ticker" in pos.columns and "current_price" in pos.columns:
-            matched_pos = pos[pos["ticker"].astype(str).str.upper() == selected_tape_ticker.upper()]
-            if not matched_pos.empty and float(matched_pos["current_price"].iloc[0]) > 0:
-                real_current_price = float(matched_pos["current_price"].iloc[0])
+        # Universo Ticker Selezionabili (Portafoglio + Benchmark Globali)
+        base_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else []
+        for bmk in ["AAPL", "MSFT", "NVDA", "SPY", "QQQ", "BTC-USD", "ETH-USD", "GC=F", "EURUSD=X"]:
+            if bmk not in base_tickers:
+                base_tickers.append(bmk)
 
-        ring_buf = term_eng.get_or_create_ring_buffer(ticker=selected_tape_ticker, initial_price=real_current_price, capacity=500)
+        col_sel_tk, col_custom_tk = st.columns([1.5, 1.2])
+        with col_sel_tk:
+            sel_dropdown_tk = st.selectbox("Ticker:", options=base_tickers, key="sel_tape_ticker", label_visibility="collapsed")
+        with col_custom_tk:
+            custom_tk_input = st.text_input("Custom Ticker:", placeholder="Es. TSLA, ENI.MI", key="inp_custom_tape_tk", label_visibility="collapsed").strip().upper()
+
+        active_tape_ticker = custom_tk_input if custom_tk_input else sel_dropdown_tk
+
+        # Fetch Live Quote in tempo reale via yfinance fast_info API
+        live_q = terminal_engine.fetch_live_ticker_quote(active_tape_ticker)
+        last_px = live_q["last_price"]
+        prev_close = live_q["prev_close"]
+        chg = live_q["change"]
+        chg_pct = live_q["change_pct"]
+        currency = live_q["currency"]
+        day_h = live_q["day_high"]
+        day_l = live_q["day_low"]
+        vol_str = f"{live_q['volume']:,.0f}" if live_q['volume'] > 0 else "N/A"
+
+        ring_buf = term_eng.get_or_create_ring_buffer(ticker=active_tape_ticker, initial_price=last_px, capacity=500)
         
-        # Simulazione push tick rapido
-        col_tick_btn, col_tick_stat = st.columns([1.5, 2.5], vertical_alignment="center")
+        # Bottoni di controllo streaming e refresh live
+        col_tick_btn, col_ref_btn = st.columns([1.0, 1.0])
         with col_tick_btn:
             if st.button("⚡ Invia Tick Live", key="btn_push_sim_tick", use_container_width=True):
                 if ring_buf:
-                    # Inserisci tick su prezzo reale
-                    ref_px = real_current_price or (ring_buf.get_summary_statistics().get("last_price", 150.0) if ring_buf else 150.0)
-                    shock = np.random.normal(0, 0.002) * ref_px
-                    new_p = max(1.0, ref_px + shock)
+                    shock = np.random.normal(0, 0.0015) * last_px
+                    new_p = max(0.01, last_px + shock)
                     t = terminal_engine.MarketTick(
                         timestamp=datetime.datetime.now(datetime.timezone.utc),
-                        ticker=selected_tape_ticker,
+                        ticker=active_tape_ticker,
                         price=round(new_p, 2),
                         size=round(np.random.uniform(50, 400), 0),
                         bid=round(new_p - 0.02, 2),
                         ask=round(new_p + 0.02, 2),
-                        volume=1000.0
+                        volume=live_q['volume'] or 1000.0
                     )
                     ring_buf.append(t)
                 st.rerun()
+        with col_ref_btn:
+            if st.button("🔄 Aggiorna Live", key="btn_refresh_live_quote", use_container_width=True, type="secondary"):
+                st.rerun()
 
         stats = ring_buf.get_summary_statistics() if ring_buf else {}
-        last_px = stats.get("last_price", real_current_price or 150.0)
-        vwap_px = stats.get("vwap", last_px)
+        display_px = stats.get("last_price", last_px)
+        vwap_px = stats.get("vwap", display_px)
         ofi_val = stats.get("order_flow_imbalance", 0.0)
         
         # Microprice di Stoikov (2018)
-        microprice = last_px + (0.01 if ofi_val > 0 else -0.01)
+        microprice = display_px + (0.01 if ofi_val > 0 else -0.01)
         
-        # Header Ticker Live
-        ofi_color = "#3fb950" if ofi_val >= 0 else "#f85149"
-        ofi_text = "BUY PRESSURE" if ofi_val >= 0 else "SELL PRESSURE"
+        # Header Ticker Live con Badge Variazione e Stato API
+        chg_color = "#3fb950" if chg >= 0 else "#f85149"
+        chg_sign = "+" if chg >= 0 else ""
+        arrow = "▲" if chg >= 0 else "▼"
+        api_badge = '<span style="font-size:9.5px; background:rgba(63,185,80,0.15); color:#3fb950; border:1px solid rgba(63,185,80,0.3); padding:1px 5px; border-radius:3px; font-weight:700;">LIVE API</span>' if live_q["is_live"] else '<span style="font-size:9.5px; background:rgba(255,153,0,0.15); color:#ff9900; border:1px solid rgba(255,153,0,0.3); padding:1px 5px; border-radius:3px; font-weight:700;">CACHE</span>'
+
         tape_card_html = (
-            f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">'
-            f'<div><span style="font-size:15px; font-weight:800; color:#f0f6fc;">{selected_tape_ticker}</span>'
-            f'<span style="font-size:14px; font-weight:700; color:#ff9900; margin-left:8px;">${last_px:,.2f}</span></div>'
-            f'<div style="text-align:right;"><span style="font-size:10.5px; font-weight:700; color:{ofi_color}; background:{ofi_color}22; padding:2px 6px; border-radius:4px; border:1px solid {ofi_color}55;">{ofi_text}</span></div>'
+            f'<div style="background: rgba(22, 27, 34, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">'
+            f'<div><span style="font-size:15px; font-weight:800; color:#f0f6fc;">{active_tape_ticker}</span> {api_badge}'
+            f'<div style="font-size:16px; font-weight:800; color:#ff9900; margin-top:2px;">{currency} {display_px:,.2f}</div></div>'
+            f'<div style="text-align:right;">'
+            f'<span style="font-size:12px; font-weight:700; color:{chg_color}; background:{chg_color}22; padding:3px 8px; border-radius:4px; border:1px solid {chg_color}55;">{chg_sign}{chg:,.2f} ({chg_sign}{chg_pct:.2f}%) {arrow}</span>'
+            f'<div style="font-size:10px; color:#8b949e; margin-top:3px; font-family:monospace;">Vol: {vol_str}</div>'
+            f'</div>'
             f'</div>'
         )
         st.markdown(tape_card_html, unsafe_allow_html=True)
 
-        # Matrice Level-2 Depth Book
-        base_bid = round(last_px - 0.01, 2)
-        base_ask = round(last_px + 0.01, 2)
+        # Matrice Level-2 Depth Book dinamica attorno al prezzo reale
+        spread_step = max(0.01, round(display_px * 0.0001, 2))
+        base_bid = round(display_px - spread_step, 2)
+        base_ask = round(display_px + spread_step, 2)
         
         book_rows = [
             {"bid_vol": 1450, "bid_px": base_bid, "ask_px": base_ask, "ask_vol": 1200},
-            {"bid_vol": 920, "bid_px": round(base_bid - 0.02, 2), "ask_px": round(base_ask + 0.02, 2), "ask_vol": 1100},
-            {"bid_vol": 680, "bid_px": round(base_bid - 0.04, 2), "ask_px": round(base_ask + 0.04, 2), "ask_vol": 1650},
-            {"bid_vol": 410, "bid_px": round(base_bid - 0.06, 2), "ask_px": round(base_ask + 0.06, 2), "ask_vol": 890},
-            {"bid_vol": 320, "bid_px": round(base_bid - 0.08, 2), "ask_px": round(base_ask + 0.08, 2), "ask_vol": 540}
+            {"bid_vol": 920, "bid_px": round(base_bid - spread_step * 2, 2), "ask_px": round(base_ask + spread_step * 2, 2), "ask_vol": 1100},
+            {"bid_vol": 680, "bid_px": round(base_bid - spread_step * 4, 2), "ask_px": round(base_ask + spread_step * 4, 2), "ask_vol": 1650},
+            {"bid_vol": 410, "bid_px": round(base_bid - spread_step * 6, 2), "ask_px": round(base_ask + spread_step * 6, 2), "ask_vol": 890},
+            {"bid_vol": 320, "bid_px": round(base_bid - spread_step * 8, 2), "ask_px": round(base_ask + spread_step * 8, 2), "ask_vol": 540}
         ]
 
         book_rows_html = []
@@ -814,7 +836,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         )
         st.markdown(full_book_html, unsafe_allow_html=True)
 
-        st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.3f}` • **VWAP**: `${vwap_px:.2f}` • **Spread**: `$0.02`")
+        st.caption(f"🎯 **Microprice Stoikov**: `${microprice:.2f}` • **VWAP**: `${vwap_px:.2f}` • **Range Day**: `${day_l:.2f} - ${day_h:.2f}` • **Aggiornato**: `{live_q['timestamp']}`")
 
     st.divider()
 
