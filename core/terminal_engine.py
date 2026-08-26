@@ -442,23 +442,23 @@ UTILITÀ DI SISTEMA:
         bar_chars[dot_idx] = "●"
         range_bar = "".join(bar_chars)
 
-        feed_status = "REAL-TIME LIVE API" if q["is_live"] else "ESTIMATE / CACHE"
+        feed_status = "LIVE API" if q["is_live"] else "ESTIMATE"
 
         out_msg = f"""
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ {sym:<12} REAL-TIME LIVE MARKET QUOTE [{sym} ALLQ / GP]                      │
-├──────────────────────────────────────────────────────────────────────────────┤
-│  LAST PRICE : {currency} {last_px:,.2f}              CHG : {sign}{chg:,.2f} ({sign}{chg_pct:.2f}%) {arrow}  [{feed_status}]
-│  BID / ASK  : {last_px - spread/2:,.2f} / {last_px + spread/2:,.2f}     SPREAD : {spread:,.2f} ({spread_bps:.1f} bps)
-├──────────────────────────────────────────────────────────────────────────────┤
-│  OPEN       : {q['open']:,.2f}                 DAY HIGH  : {day_h:,.2f}
-│  PREV CLOSE : {prev_close:,.2f}                 DAY LOW   : {day_l:,.2f}
-│  VOLUME     : {vol_str:<20} MKT CAP   : {mkt_cap_str}
-│  52W LOW    : {w52_l:,.2f}                 52W HIGH  : {w52_h:,.2f}
-├──────────────────────────────────────────────────────────────────────────────┤
+┌──────────────────────────────────────────────────────────────────┐
+│ {sym:<10} REAL-TIME LIVE MARKET QUOTE [{sym} ALLQ / GP]           │
+├──────────────────────────────────────────────────────────────────┤
+│  LAST PRICE : {currency} {last_px:,.2f}       CHG : {sign}{chg:,.2f} ({sign}{chg_pct:.2f}%) {arrow} [{feed_status}]
+│  BID / ASK  : {last_px - spread/2:,.2f} / {last_px + spread/2:,.2f}   SPREAD : {spread:,.2f} ({spread_bps:.1f} bps)
+├──────────────────────────────────────────────────────────────────┤
+│  OPEN       : {q['open']:,.2f}          DAY HIGH  : {day_h:,.2f}
+│  PREV CLOSE : {prev_close:,.2f}          DAY LOW   : {day_l:,.2f}
+│  VOLUME     : {vol_str:<16}  MKT CAP   : {mkt_cap_str}
+│  52W LOW    : {w52_l:,.2f}          52W HIGH  : {w52_h:,.2f}
+├──────────────────────────────────────────────────────────────────┤
 │  DAY RANGE  : [L {day_l:,.2f} {range_bar} H {day_h:,.2f}]
 │  FEED STATUS: STREAMING CONNECTED ({q['timestamp']}){pos_str}
-└──────────────────────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────────┘
 """
         return TerminalCommandResult(command=f"QUOTE {sym}", status="SUCCESS", output_text=out_msg.strip(), structured_data=q)
 
@@ -472,11 +472,11 @@ UTILITÀ DI SISTEMA:
                 wl_tickers.append(b)
 
         lines = [
-            "┌──────────────────────────────────────────────────────────────────────────────┐",
-            "│ ARGUS LIVE MULTI-ASSET WATCHLIST MONITOR [WL / ALLQ]                         │",
-            "├──────────────────────────────────────────────────────────────────────────────┤",
-            f"│ {'TICKER':<9} {'LAST PRICE':<14} {'1D CHG (%)':<14} {'DAY RANGE (L-H)':<22} {'STATUS':<10} │",
-            "├──────────────────────────────────────────────────────────────────────────────┤"
+            "┌──────────────────────────────────────────────────────────────────┐",
+            "│ ARGUS LIVE MULTI-ASSET WATCHLIST MONITOR [WL / ALLQ]             │",
+            "├──────────────────────────────────────────────────────────────────┤",
+            f"│ {'TICKER':<8} {'LAST PRICE':<13} {'1D CHG':<12} {'DAY RANGE':<18} {'STATUS':<7} │",
+            "├──────────────────────────────────────────────────────────────────┤"
         ]
         
         for sym in wl_tickers[:10]:
@@ -485,11 +485,11 @@ UTILITÀ DI SISTEMA:
             arrow = "▲" if q['change'] >= 0 else "▼"
             chg_str = f"{sign}{q['change_pct']:.2f}% {arrow}"
             px_str = f"{q['currency']} {q['last_price']:,.2f}"
-            range_str = f"{q['day_low']:,.2f} - {q['day_high']:,.2f}"
+            range_str = f"{q['day_low']:,.1f}-{q['day_high']:,.1f}"
             st_str = "LIVE" if q['is_live'] else "CACHE"
-            lines.append(f"│ {sym:<9} {px_str:<14} {chg_str:<14} {range_str:<22} {st_str:<10} │")
+            lines.append(f"│ {sym:<8} {px_str:<13} {chg_str:<12} {range_str:<18} {st_str:<7} │")
 
-        lines.append("└──────────────────────────────────────────────────────────────────────────────┘")
+        lines.append("└──────────────────────────────────────────────────────────────────┘")
         out_msg = "\n".join(lines)
         return TerminalCommandResult(command="WATCHLIST", status="SUCCESS", output_text=out_msg)
 

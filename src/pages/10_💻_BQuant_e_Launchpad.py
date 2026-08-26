@@ -670,7 +670,7 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
         # Chip di scelta rapida (2 righe pulite e leggibili)
         st.caption("Comandi Rapidi:")
         chips_r1 = st.columns(4)
-        quick_cmds_r1 = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC-USD"]
+        quick_cmds_r1 = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC"]
         for idx, qc in enumerate(quick_cmds_r1):
             with chips_r1[idx]:
                 if st.button(qc, key=f"btn_chip_r1_{idx}", use_container_width=True):
@@ -744,11 +744,11 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
             if bmk not in base_tickers:
                 base_tickers.append(bmk)
 
-        col_sel_tk, col_custom_tk = st.columns([1.5, 1.2])
-        with col_sel_tk:
-            sel_dropdown_tk = st.selectbox("Ticker:", options=base_tickers, key="sel_tape_ticker", label_visibility="collapsed")
-        with col_custom_tk:
-            custom_tk_input = st.text_input("Custom Ticker:", placeholder="Es. TSLA, ENI.MI", key="inp_custom_tape_tk", label_visibility="collapsed").strip().upper()
+        # Riga 1: Selezione Ticker da Dropdown
+        sel_dropdown_tk = st.selectbox("Seleziona Ticker:", options=base_tickers, key="sel_tape_ticker")
+        
+        # Riga 2: Inserimento Ticker Personalizzato
+        custom_tk_input = st.text_input("Oppure Ticker Personalizzato:", placeholder="Es. TSLA, ENI.MI, BTC-USD, GC=F", key="inp_custom_tape_tk").strip().upper()
 
         active_tape_ticker = custom_tk_input if custom_tk_input else sel_dropdown_tk
 
