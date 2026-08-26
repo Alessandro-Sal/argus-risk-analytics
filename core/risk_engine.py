@@ -92,7 +92,7 @@ def compute_risk(portfolio_id: int,
             pass
 
     metrics = {
-        "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate),
+        "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate, df_positions=df_positions),
         "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx_adj, df_positions, risk_free_rate=active_rf_rate),
         "concentration": _calc_concentration(df_positions),
         "ai_insights":   _calc_ai_insights(df_positions, df_returns, sr_portfolio),
@@ -1159,7 +1159,8 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
 def _calc_market_risk(sr_portfolio: pd.Series,
                       sr_benchmark: pd.Series,
                       benchmark_ticker: str,
-                      risk_free_rate: float = None) -> dict:
+                      risk_free_rate: float = None,
+                      df_positions: pd.DataFrame = None) -> dict:
     r = sr_portfolio.dropna()
     if getattr(r.index, 'tz', None) is not None:
         r.index = r.index.tz_localize(None)
@@ -1230,6 +1231,20 @@ def _calc_market_risk(sr_portfolio: pd.Series,
             beta       = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
             corr       = r.corr(rb)
             r_squared  = (corr ** 2) if corr is not None and not np.isnan(corr) else None
+
+    # Reconciliazione con Weighted Asset Beta se top-down regression non disponibile o default statico 1.0
+    if df_positions is not None and isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "beta" in df_positions.columns:
+        valid_b = df_positions[df_positions["beta"].notna() & (df_positions.get("current_value", 0) > 0)]
+        if not valid_b.empty:
+            w_col = "weight_pct" if "weight_pct" in valid_b.columns else "current_value"
+            w_sum = float(valid_b[w_col].sum())
+            if w_sum > 0:
+                weighted_beta = float((valid_b[w_col] * valid_b["beta"]).sum() / w_sum)
+                if beta is None or (abs(float(beta) - 1.0) < 1e-6 and abs(weighted_beta - 1.0) > 1e-4):
+                    beta = weighted_beta
+
+    if beta is None:
+        beta = 1.0
 
     cum     = (1 + r).cumprod()
     roll_mx = cum.cummax()
