@@ -215,7 +215,7 @@ with col_tape_book:
         )
 
     book_full_html = (
-        f'<div style="background: rgba(13, 17, 23, 0.95); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
+        f'<div style="background: linear-gradient(135deg, rgba(13, 17, 23, 0.95) 0%, rgba(22, 27, 34, 0.95) 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
         f'<div style="display:flex; font-size:10px; font-weight:700; color:#58a6ff; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;">'
         f'<div style="flex:1; text-align:right;">BID SIZE</div>'
         f'<div style="flex:1; text-align:right; padding-right:12px;">BID PX</div>'
@@ -223,10 +223,15 @@ with col_tape_book:
         f'<div style="flex:1; text-align:left;">ASK SIZE</div>'
         f'</div>'
         f'{"".join(book_rows_html)}'
+        f'<div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; font-family:monospace; color:#8b949e; border-top:1px solid rgba(255,255,255,0.06); padding-top:6px; margin-top:6px; flex-wrap:wrap; gap:4px;">'
+        f'<span>🎯 Stoikov: <b style="color:#3fb950;">{tape_sym_curr}{microprice:.2f}</b></span>'
+        f'<span>VWAP: <b style="color:#58a6ff;">{tape_sym_curr}{vwap_px:.2f}</b></span>'
+        f'<span>Spread L2: <b style="color:#f0f6fc;">{tape_sym_curr}{spread_val:.2f}</b> ({spread_bps:.1f} bps)</span>'
+        f'<span style="color:#8b949e;">{live_q["timestamp"]}</span>'
+        f'</div>'
         f'</div>'
     )
     st.markdown(book_full_html, unsafe_allow_html=True)
-    st.caption(f"🎯 **Microprice Stoikov**: `{tape_sym_curr}{microprice:.2f}` • **VWAP**: `{tape_sym_curr}{vwap_px:.2f}` • **Spread L2**: `{tape_sym_curr}{spread_val:.2f} ({spread_bps:.1f} bps)` • **Feed**: `{live_q['timestamp']}`")
 
 st.divider()
 
