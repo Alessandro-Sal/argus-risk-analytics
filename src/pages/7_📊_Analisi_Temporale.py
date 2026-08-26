@@ -80,118 +80,6 @@ else:
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
 
-# ── BARRA DI CONTROLLO GLOBALE: SCELTA DATE & ORIZZONTE TEMPORALE ─────────
-# Date minime e massime disponibili
-if not raw_sr_port.empty:
-    idx_dates = pd.to_datetime(raw_sr_port.index)
-    min_avail_date = idx_dates.min().to_pydatetime().date()
-    max_avail_date = idx_dates.max().to_pydatetime().date()
-    total_trading_days = len(raw_sr_port)
-else:
-    min_avail_date = (datetime.now() - timedelta(days=365)).date()
-    max_avail_date = datetime.now().date()
-    total_trading_days = 0
-
-with st.container():
-    col_t1, col_t2 = st.columns([1.8, 2.2], vertical_alignment="center")
-
-    with col_t1:
-        time_preset = st.selectbox(
-            "⏳ Orizzonte Temporale di Analisi:",
-            options=["Tutto lo Storico (MAX)", "Anno in Corso (YTD)", "Ultimi 12 Mesi (1Y)", "Ultimi 6 Mesi (6M)", "Ultimi 3 Mesi (3M)", "Intervallo Personalizzato (Calendario)"],
-            index=0,
-            key="temporal_time_preset",
-            help="Filtra l'orizzonte temporale applicato ai grafici, alla matrice mensile e all'intervallo storico."
-        )
-
-    # Calcolo date inizio/fine in base al preset
-    if time_preset == "Anno in Corso (YTD)":
-        calc_start = datetime(max_avail_date.year, 1, 1).date()
-        calc_end = max_avail_date
-    elif time_preset == "Ultimi 12 Mesi (1Y)":
-        calc_start = max(min_avail_date, max_avail_date - timedelta(days=365))
-        calc_end = max_avail_date
-    elif time_preset == "Ultimi 6 Mesi (6M)":
-        calc_start = max(min_avail_date, max_avail_date - timedelta(days=182))
-        calc_end = max_avail_date
-    elif time_preset == "Ultimi 3 Mesi (3M)":
-        calc_start = max(min_avail_date, max_avail_date - timedelta(days=91))
-        calc_end = max_avail_date
-    elif time_preset == "Intervallo Personalizzato (Calendario)":
-        calc_start = min_avail_date
-        calc_end = max_avail_date
-    else:
-        calc_start = min_avail_date
-        calc_end = max_avail_date
-
-    # Applicazione del filtro data sulle serie storiche prima del rendering badge
-    def filter_series_by_date(sr: pd.Series, start_d, end_d) -> pd.Series:
-        if sr is None or sr.empty:
-            return sr
-        s_dt = sr.copy()
-        if getattr(s_dt.index, 'tz', None) is not None:
-            s_dt.index = s_dt.index.tz_localize(None)
-        s_dt.index = pd.to_datetime(s_dt.index)
-        mask = (s_dt.index.date >= start_d) & (s_dt.index.date <= end_d)
-        return s_dt[mask]
-
-    sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
-    sr_bm = filter_series_by_date(raw_sr_bm, calc_start, calc_end)
-    if df_returns is not None and not df_returns.empty:
-        df_ret_dt = df_returns.copy()
-        if getattr(df_ret_dt.index, 'tz', None) is not None:
-            df_ret_dt.index = df_ret_dt.index.tz_localize(None)
-        df_ret_dt.index = pd.to_datetime(df_ret_dt.index)
-        mask_df = (df_ret_dt.index.date >= calc_start) & (df_ret_dt.index.date <= calc_end)
-        df_returns_filtered = df_ret_dt[mask_df]
-    else:
-        df_returns_filtered = pd.DataFrame()
-
-    active_trading_days = len(sr_port) if not sr_port.empty else 0
-
-    with col_t2:
-        if time_preset == "Intervallo Personalizzato (Calendario)":
-            date_range_picked = st.date_input(
-                "📅 Seleziona Intervallo Date Personalizzato:",
-                value=(calc_start, calc_end),
-                min_value=min_avail_date,
-                max_value=max_avail_date,
-                key="temporal_date_range_picker"
-            )
-            if isinstance(date_range_picked, (tuple, list)) and len(date_range_picked) == 2:
-                calc_start, calc_end = date_range_picked
-                sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
-                active_trading_days = len(sr_port)
-        else:
-            delta_days_selected = max(1, (calc_end - calc_start).days)
-            y_span = delta_days_selected / 365.25
-            if y_span >= 1.0:
-                y_int = int(delta_days_selected // 365.25)
-                m_int = int((delta_days_selected % 365.25) // 30.4375)
-                dur_str = f"{y_int} Anni e {m_int} Mesi" if m_int > 0 else f"{y_int} Anni"
-            else:
-                m_int = max(1, int(round(delta_days_selected / 30.4375)))
-                dur_str = f"{m_int} Mesi"
-
-            st.markdown(f"""
-            <div style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 10px 16px; margin-top: 4px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
-                    <div>
-                        <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600;">📅 Finestra Attiva:</span>
-                        <span style="font-size: 14px; font-weight: 700; color: #38bdf8; margin-left: 4px;">{calc_start.strftime('%d/%m/%Y')}</span>
-                        <span style="color: #64748b; margin: 0 4px;">➔</span>
-                        <span style="font-size: 14px; font-weight: 700; color: #38bdf8;">{calc_end.strftime('%d/%m/%Y')}</span>
-                    </div>
-                    <div>
-                        <span style="font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #7dd3fc; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.25);">
-                            {active_trading_days:,} Sedute • {dur_str} ({delta_days_selected} gg)
-                        </span>
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-
 # ── SELETTORE MODULI ANALISI TEMPORALE BLOOMBERG STYLE ─────────
 TIME_MODELS_CATALOG = {
     "📈 Curva Cumulata & Drawdown Underwater": {
@@ -281,7 +169,7 @@ active_time_tab = st.session_state["time_active_tab"]
 active_time_info = TIME_MODELS_CATALOG[active_time_tab]
 
 st.markdown(f"""
-<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_time_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_time_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 16px;">
   <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
     <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
       {active_time_info['title']}
@@ -300,6 +188,118 @@ st.markdown(f"""
   </div>
 </div>
 """, unsafe_allow_html=True)
+
+
+# ── BARRA DI CONTROLLO ORIZZONTE TEMPORALE (SOLO PER SCHEDE 1, 2, 3, 4) ─────────
+# Date minime e massime disponibili
+if not raw_sr_port.empty:
+    idx_dates = pd.to_datetime(raw_sr_port.index)
+    min_avail_date = idx_dates.min().to_pydatetime().date()
+    max_avail_date = idx_dates.max().to_pydatetime().date()
+else:
+    min_avail_date = (datetime.now() - timedelta(days=365)).date()
+    max_avail_date = datetime.now().date()
+
+calc_start = min_avail_date
+calc_end = max_avail_date
+
+def filter_series_by_date(sr: pd.Series, start_d, end_d) -> pd.Series:
+    if sr is None or sr.empty:
+        return sr
+    s_dt = sr.copy()
+    if getattr(s_dt.index, 'tz', None) is not None:
+        s_dt.index = s_dt.index.tz_localize(None)
+    s_dt.index = pd.to_datetime(s_dt.index)
+    mask = (s_dt.index.date >= start_d) & (s_dt.index.date <= end_d)
+    return s_dt[mask]
+
+if active_time_tab != "⚖️ Confronto Side-by-Side & Snapshot DB":
+    with st.container():
+        col_t1, col_t2 = st.columns([1.8, 2.2], vertical_alignment="center")
+
+        with col_t1:
+            time_preset = st.selectbox(
+                "⏳ Orizzonte Temporale di Analisi Grafici & Matrici:",
+                options=["Tutto lo Storico (MAX)", "Anno in Corso (YTD)", "Ultimi 12 Mesi (1Y)", "Ultimi 6 Mesi (6M)", "Ultimi 3 Mesi (3M)", "Intervallo Personalizzato (Calendario)"],
+                index=0,
+                key="temporal_time_preset",
+                help="Filtra l'orizzonte temporale applicato ai grafici, alla matrice mensile e all'intervallo storico."
+            )
+
+        if time_preset == "Anno in Corso (YTD)":
+            calc_start = datetime(max_avail_date.year, 1, 1).date()
+            calc_end = max_avail_date
+        elif time_preset == "Ultimi 12 Mesi (1Y)":
+            calc_start = max(min_avail_date, max_avail_date - timedelta(days=365))
+            calc_end = max_avail_date
+        elif time_preset == "Ultimi 6 Mesi (6M)":
+            calc_start = max(min_avail_date, max_avail_date - timedelta(days=182))
+            calc_end = max_avail_date
+        elif time_preset == "Ultimi 3 Mesi (3M)":
+            calc_start = max(min_avail_date, max_avail_date - timedelta(days=91))
+            calc_end = max_avail_date
+        elif time_preset == "Intervallo Personalizzato (Calendario)":
+            calc_start = min_avail_date
+            calc_end = max_avail_date
+        else:
+            calc_start = min_avail_date
+            calc_end = max_avail_date
+
+        sr_port_tmp = filter_series_by_date(raw_sr_port, calc_start, calc_end)
+        active_trading_days = len(sr_port_tmp) if not sr_port_tmp.empty else 0
+
+        with col_t2:
+            if time_preset == "Intervallo Personalizzato (Calendario)":
+                date_range_picked = st.date_input(
+                    "📅 Seleziona Intervallo Date Personalizzato:",
+                    value=(calc_start, calc_end),
+                    min_value=min_avail_date,
+                    max_value=max_avail_date,
+                    key="temporal_date_range_picker"
+                )
+                if isinstance(date_range_picked, (tuple, list)) and len(date_range_picked) == 2:
+                    calc_start, calc_end = date_range_picked
+            else:
+                delta_days_selected = max(1, (calc_end - calc_start).days)
+                y_span = delta_days_selected / 365.25
+                if y_span >= 1.0:
+                    y_int = int(delta_days_selected // 365.25)
+                    m_int = int((delta_days_selected % 365.25) // 30.4375)
+                    dur_str = f"{y_int} Anni e {m_int} Mesi" if m_int > 0 else f"{y_int} Anni"
+                else:
+                    m_int = max(1, int(round(delta_days_selected / 30.4375)))
+                    dur_str = f"{m_int} Mesi"
+
+                st.markdown(f"""
+                <div style="background: linear-gradient(90deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%); border: 1px solid rgba(56, 189, 248, 0.35); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 10px 16px; margin-top: 4px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
+                        <div>
+                            <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: 600;">📅 Finestra Attiva:</span>
+                            <span style="font-size: 14px; font-weight: 700; color: #38bdf8; margin-left: 4px;">{calc_start.strftime('%d/%m/%Y')}</span>
+                            <span style="color: #64748b; margin: 0 4px;">➔</span>
+                            <span style="font-size: 14px; font-weight: 700; color: #38bdf8;">{calc_end.strftime('%d/%m/%Y')}</span>
+                        </div>
+                        <div>
+                            <span style="font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: rgba(56, 189, 248, 0.12); color: #7dd3fc; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.25);">
+                                {active_trading_days:,} Sedute • {dur_str} ({delta_days_selected} gg)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        st.markdown('<div style="margin-bottom: 12px;"></div>', unsafe_allow_html=True)
+
+sr_port = filter_series_by_date(raw_sr_port, calc_start, calc_end)
+sr_bm = filter_series_by_date(raw_sr_bm, calc_start, calc_end)
+if df_returns is not None and not df_returns.empty:
+    df_ret_dt = df_returns.copy()
+    if getattr(df_ret_dt.index, 'tz', None) is not None:
+        df_ret_dt.index = df_ret_dt.index.tz_localize(None)
+    df_ret_dt.index = pd.to_datetime(df_ret_dt.index)
+    mask_df = (df_ret_dt.index.date >= calc_start) & (df_ret_dt.index.date <= calc_end)
+    df_returns_filtered = df_ret_dt[mask_df]
+else:
+    df_returns_filtered = pd.DataFrame()
 
 
 # ==============================================================================
