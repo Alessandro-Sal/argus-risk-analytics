@@ -99,3 +99,28 @@ def test_compute_side_by_side_comparison():
     assert comp["new_entries_count"] == 1 # BTC
     assert comp["closed_entries_count"] == 1 # ETH
 
+
+def test_reconstruct_point_in_time_portfolio():
+    from core.temporal_engine import reconstruct_point_in_time_portfolio
+    dates = pd.date_range(start="2023-01-01", end="2024-12-31", freq="B")
+    np.random.seed(42)
+    sr_port = pd.Series(np.random.normal(0.0005, 0.01, len(dates)), index=dates)
+    returns_df = pd.DataFrame({
+        "AAPL": np.random.normal(0.0006, 0.012, len(dates)),
+        "NVDA": np.random.normal(0.0008, 0.015, len(dates))
+    }, index=dates)
+    pos_today = pd.DataFrame({
+        "ticker": ["AAPL", "NVDA"],
+        "current_value": [5000.0, 5000.0],
+        "weight_pct": [50.0, 50.0],
+        "last_price": [150.0, 100.0]
+    })
+
+    target_dt = dates[150]
+    res = reconstruct_point_in_time_portfolio(pos_today, sr_port, returns_df, target_dt)
+    assert not res["df_positions"].empty
+    assert res["total_value"] > 0
+    assert "sharpe_ratio" in res["metrics"]
+    assert "volatility_ann_pct" in res["metrics"]
+
+
