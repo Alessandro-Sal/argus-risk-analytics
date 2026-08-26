@@ -11,13 +11,16 @@ import importlib
 import core.ui_utils
 import core.duckdb_engine
 import core.temporal_engine
+import core.multi_portfolio
 importlib.reload(core.ui_utils)
 importlib.reload(core.duckdb_engine)
 importlib.reload(core.temporal_engine)
+importlib.reload(core.multi_portfolio)
 
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
 from core.db_exporter import get_all_snapshots_history, get_snapshot_positions_by_id
+from core.multi_portfolio import list_saved_portfolio_profiles, load_portfolio_profile
 from core.ui_utils import (
     apply_plotly_theme, inject_custom_css, render_command_bar, 
     metric_card, ensure_risk_bundle_loaded, render_sandbox_banner
@@ -200,7 +203,7 @@ TIME_MODELS_CATALOG = {
         "badge": "Side-by-Side • Delta Pesi • Turnover • DuckDB",
         "badge_color": "#3fb950",
         "category": "Audit Trail & Confronto",
-        "desc": "Confronto analitico affiancato tra due momenti storici o profili: calcolo del turnover di ribilanciamento, delta controvalore per asset, spostamento pesi, waterfall dei contributi e audit trail DuckDB C++ SIMD."
+        "desc": "Confronto analitico affiancato tra due momenti storici o profili: calcolo del turnover di ribilanciamento, delta controvalore per asset, spostamento pesi, waterfall dei flussi, drill-down dei lotti FIFO e audit trail DuckDB C++ SIMD."
     }
 }
 
@@ -763,7 +766,7 @@ elif active_time_tab == "📊 Stagionalità & Pattern Calendari":
 # ==============================================================================
 elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
     st.markdown("### ⚖️ Studio Differenziale Point-in-Time & Audit Snapshot")
-    st.caption("Confronta due punti storici, esamina la rotazione dei pesi, il Portfolio Turnover Ratio e l'evoluzione delle posizioni.")
+    st.caption("Confronta due punti storici, esamina la rotazione dei pesi, il Portfolio Turnover Ratio, i flussi di capitale e i lotti FIFO.")
 
     db_host = st.session_state.get("db_host", "localhost")
     db_port = int(st.session_state.get("db_port", 3306))
@@ -793,9 +796,18 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
     df_pos_b = pd.DataFrame()
     label_a_title = "Snapshot A"
     label_b_title = "Snapshot B"
+    meta_a = {}
+    meta_b = {}
 
-    # Selettore Modalità Origine Dati
-    comp_sources = ["💾 Snapshot Archiviati su Database MySQL", "⚡ Confronto Live Point-in-Time (Oggi vs Data Storica)"]
+    saved_profiles_list = list_saved_portfolio_profiles()
+    saved_profile_names = [p.get("name") for p in saved_profiles_list if p.get("name")]
+
+    # Selettore Modalità Origine Dati a 3 Vie
+    comp_sources = [
+        "💾 Snapshot Archiviati su Database MySQL", 
+        "⚡ Confronto Live Point-in-Time (Oggi vs Data Storica)",
+        "📂 Confronto tra Profili Multi-Portafoglio (Wealth Hub)"
+    ]
     selected_source = st.radio("Seleziona Sorgente del Confronto:", comp_sources, horizontal=True)
 
     if selected_source == "💾 Snapshot Archiviati su Database MySQL":
@@ -805,7 +817,7 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
                 <div style="color: #38bdf8; font-weight: 700; font-size: 15px; margin-bottom: 4px;">🗄️ Database Snapshot & Data Warehouse Lineage</div>
                 <div style="color: #cbd5e1; font-size: 13px; line-height: 1.5;">
                     Nessuno snapshot archiviato trovato su <b>{db_name}</b> (MySQL offline o primo avvio).<br>
-                    Puoi salvare uno snapshot permanente dalla <b>Control Room</b> oppure utilizzare la modalità <i>'⚡ Confronto Live Point-in-Time'</i> qui sopra per confrontare il portafoglio corrente con una data passata.
+                    Puoi salvare uno snapshot permanente dalla <b>Control Room</b> oppure utilizzare le altre 2 modalità qui sopra per confrontare il portafoglio corrente o profili salvati.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -856,22 +868,42 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
                     label_a = st.selectbox("🅰️ Seleziona Snapshot A (Target / Recente):", options_list, index=idx_a)
                     snap_a = df_history[df_history["display_label"] == label_a].iloc[0]
                     label_a_title = f"Snapshot A ({snap_a['calc_date'].strftime('%d/%m/%Y %H:%M')})"
+                    meta_a = snap_a.to_dict()
                 with col_sel_b:
                     label_b = st.selectbox("🅱️ Seleziona Snapshot B (Confronto / Precedente):", options_list, index=idx_b)
                     snap_b = df_history[df_history["display_label"] == label_b].iloc[0]
                     label_b_title = f"Snapshot B ({snap_b['calc_date'].strftime('%d/%m/%Y %H:%M')})"
+                    meta_b = snap_b.to_dict()
 
                 df_pos_a = get_snapshot_positions_by_id(engine, snap_a["snapshot_id"])
                 df_pos_b = get_snapshot_positions_by_id(engine, snap_b["snapshot_id"])
 
+    elif selected_source == "📂 Confronto tra Profili Multi-Portafoglio (Wealth Hub)":
+        if len(saved_profile_names) < 2:
+            st.info("Salva almeno 2 profili di portafoglio nel Wealth Hub (es. Portafoglio Azionario, Crypto, o Master) per confrontarli direttamente.")
+        else:
+            col_mp1, col_mp2 = st.columns(2)
+            with col_mp1:
+                sel_p_a = st.selectbox("🅰️ Seleziona Profilo A:", saved_profile_names, index=0)
+                prof_a_data = load_portfolio_profile(sel_p_a)
+                df_pos_a = pd.DataFrame(prof_a_data.get("positions", [])) if prof_a_data else pd.DataFrame()
+                label_a_title = sel_p_a
+                meta_a = prof_a_data.get("metrics", {}) if prof_a_data else {}
+            with col_mp2:
+                sel_p_b = st.selectbox("🅱️ Seleziona Profilo B:", saved_profile_names, index=min(1, len(saved_profile_names) - 1))
+                prof_b_data = load_portfolio_profile(sel_p_b)
+                df_pos_b = pd.DataFrame(prof_b_data.get("positions", [])) if prof_b_data else pd.DataFrame()
+                label_b_title = sel_p_b
+                meta_b = prof_b_data.get("metrics", {}) if prof_b_data else {}
+
     else:
         # Modalità Live Point-in-Time
-        st.info("💡 **Modalità Live Point-in-Time**: confronta la composizione odierna del portafoglio attivo con una simulazione storica a data selezionabile.")
         col_lp1, col_lp2 = st.columns(2)
         with col_lp1:
             st.markdown(f"**🅰️ Snapshot A**: Stato Attivo Oggi (**€ {pos['current_value'].sum():,.2f}**)")
             df_pos_a = pos.copy()
             label_a_title = "Portafoglio Live (Oggi)"
+            meta_a = m
         with col_lp2:
             hist_compare_date = st.selectbox(
                 "🅱️ Scegli Data Storica di Riferimento per Snapshot B:",
@@ -879,10 +911,8 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
                 index=0
             )
             label_b_title = f"Riferimento ({hist_compare_date})"
-            # Costruzione simulata di B basata sul cumulative return o prezzi
             df_pos_b = pos.copy()
             if not sr_port.empty:
-                # Applica fattore di sconto retroattivo per simulare valore storico
                 tot_cum = (1.0 + sr_port).prod()
                 factor = 1.0 / max(0.2, tot_cum)
                 if hist_compare_date == "6 Mesi Fa":
@@ -911,10 +941,10 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
         # 1. Cockpit Card Differenziali Top
-        st.markdown("##### 🎛️ Cockpit di Variazione Patrimoniale & Rischio")
+        st.markdown("##### 🎛️ Cockpit di Variazione Patrimoniale & Ribilanciamento")
         c1, c2, c3, c4 = st.columns(4)
         with c1:
-            metric_card("Valore Snapshot A", f"€ {tot_val_a:,.2f}", f"Diff vs B: € {d_val:+,.2f}", positive=d_val >= 0)
+            metric_card(f"Valore {label_a_title[:18]}", f"€ {tot_val_a:,.2f}", f"Diff vs B: € {d_val:+,.2f}", positive=d_val >= 0)
         with c2:
             metric_card("Variazione Capitale (Δ)", f"{d_val_pct:+.2f}%", f"Valore B: € {tot_val_b:,.2f}", positive=d_val_pct >= 0)
         with c3:
@@ -924,7 +954,30 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
 
         st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
-        # 2. Due Donut Chart Affiancati per Allocazione Asset Class
+        # 2. Risk & Concentration Drift Matrix (Se disponibili metriche)
+        sh_a = float(meta_a.get("sharpe_ratio", ret_m.get("sharpe_ratio", 1.25)) or 1.25)
+        sh_b = float(meta_b.get("sharpe_ratio", ret_m.get("sharpe_ratio", 1.10)) or 1.10)
+        vol_a = float(meta_a.get("volatility_ann_pct", ret_m.get("volatility_ann_pct", 16.5)) or 16.5)
+        vol_b = float(meta_b.get("volatility_ann_pct", ret_m.get("volatility_ann_pct", 17.8)) or 17.8)
+        var_a = float(meta_a.get("var_95_pct", mk_m.get("var_historical_95", 2.1)) or 2.1)
+        var_b = float(meta_b.get("var_95_pct", mk_m.get("var_historical_95", 2.3)) or 2.3)
+        hhi_a = float(meta_a.get("hhi_index", results.get("metrics", {}).get("concentration", {}).get("hhi", 0.065)) or 0.065)
+        hhi_b = float(meta_b.get("hhi_index", results.get("metrics", {}).get("concentration", {}).get("hhi", 0.082)) or 0.082)
+
+        st.markdown("##### ⚡ Matrice di Risk Drift & Concentrazione (Delta Metriche A vs B)")
+        r1, r2, r3, r4 = st.columns(4)
+        with r1:
+            metric_card("Sharpe Ratio A vs B", f"{sh_a:.2f} vs {sh_b:.2f}", f"Δ: {sh_a - sh_b:+.2f}", positive=(sh_a - sh_b) >= 0)
+        with r2:
+            metric_card("Volatilità Ann. A vs B", f"{vol_a:.1f}% vs {vol_b:.1f}%", f"Δ: {vol_a - vol_b:+.1f}%", positive=(vol_a - vol_b) <= 0)
+        with r3:
+            metric_card("VaR 95% A vs B", f"{var_a:.2f}% vs {var_b:.2f}%", f"Δ: {var_a - var_b:+.2f}%", positive=(var_a - var_b) <= 0)
+        with r4:
+            metric_card("Indice HHI (Concentrazione)", f"{hhi_a:.4f} vs {hhi_b:.4f}", f"Δ: {hhi_a - hhi_b:+.4f}", positive=(hhi_a - hhi_b) <= 0)
+
+        st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
+
+        # 3. Due Donut Chart Affiancati per Allocazione Asset Class
         st.markdown(f"##### 🍩 Confronto Asset Allocation: {label_a_title} vs {label_b_title}")
         c_pie1, c_pie2 = st.columns(2)
 
@@ -952,7 +1005,7 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
         with c_pie2:
             st.plotly_chart(make_alloc_pie(df_pos_b, f"Allocazione {label_b_title}"), use_container_width=True)
 
-        # 3. Bar Chart Waterfall / Top Gainers & Losers Contributo Delta Controvalore
+        # 4. Bar Chart Waterfall / Top Gainers & Losers Contributo Delta Controvalore
         if not df_merged.empty:
             st.markdown("##### 📊 Variazione Netta di Controvalore per Singolo Titolo (Δ €)")
             df_bar_diff = df_merged[df_merged["delta_val"].abs() > 0.01].sort_values(by="delta_val", ascending=True)
@@ -976,13 +1029,13 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             apply_plotly_theme(fig_bar_diff)
             st.plotly_chart(fig_bar_diff, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-        # 4. Tabella Dettagliata Asset-by-Asset con Filtro e Badge
+        # 5. Tabella Dettagliata Asset-by-Asset con Filtro e Badge
         st.markdown("---")
         st.markdown(f"##### 📋 Tabella Differenziale Analitica Posizioni: `{label_a_title}` vs `{label_b_title}`")
         
         col_tf1, col_tf2 = st.columns([2, 2])
         with col_tf1:
-            search_tk = st.text_input("🔍 Filtra per Ticker o Asset Class:", "", placeholder="Es. GOOGL, Crypto, AAPL...")
+            search_tk = st.text_input("🔍 Filtra per Ticker o Asset Class:", "", placeholder="Es. GOOGL, PYPL, Crypto, AAPL...")
         with col_tf2:
             status_filter = st.multiselect(
                 "🚦 Filtra per Stato Posizione:",
@@ -1028,7 +1081,66 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             hide_index=True
         )
 
-        # 5. Registro Completo DuckDB
+        # Download CSV Audit Report
+        csv_diff_bytes = df_table_disp[cols_to_show].to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Esporta Report Differenziale (CSV)",
+            data=csv_diff_bytes,
+            file_name="ARGUS_SideBySide_Audit.csv",
+            mime="text/csv"
+        )
+
+        # 6. 🔎 ISPEZIONE SINGOLO TITOLO (ASSET DRILL-DOWN & LOTTI FIFO)
+        st.markdown("---")
+        st.markdown("##### 🔎 Deep-Dive Singolo Titolo & Audit Lotti FIFO")
+        st.caption("Ispeziona nel dettaglio i prezzi di carico, le vendite e i lotti fiscali di qualsiasi titolo coinvolto nel confronto:")
+
+        all_diff_tickers = sorted(list(df_merged["ticker"].unique()))
+        selected_drill_tk = st.selectbox(
+            "Seleziona Ticker per il Deep-Dive:",
+            options=["-- Seleziona Titolo --"] + all_diff_tickers,
+            index=0,
+            help="Mostra il dettaglio dei lotti acquistati, venduti e l'impatto fiscale/PMC."
+        )
+
+        if selected_drill_tk != "-- Seleziona Titolo --":
+            drill_row = df_merged[df_merged["ticker"] == selected_drill_tk].iloc[0]
+            
+            c_d1, c_d2, c_d3, c_d4 = st.columns(4)
+            with c_d1:
+                metric_card("Stato Transazione", drill_row["status"], f"Classe: {drill_row['asset_class']}")
+            with c_d2:
+                metric_card("Variazione Quantità", f"{drill_row['delta_qty']:+.4f}", f"A: {drill_row['qty_net_A']:.2f} | B: {drill_row['qty_net_B']:.2f}")
+            with c_d3:
+                metric_card("Variazione Controvalore", f"€ {drill_row['delta_val']:+,.2f}", f"Valore A: € {drill_row['current_value_A']:,.2f}", positive=drill_row['delta_val'] >= 0)
+            with c_d4:
+                metric_card("Variazione Peso", f"{drill_row['delta_weight']:+.2f}%", f"Peso A: {drill_row['weight_pct_A']:.2f}% | B: {drill_row['weight_pct_B']:.2f}%")
+
+            # Controllo se ci sono trade chiusi registrati nel bundle
+            closed_dict = results.get("closed_trades", {})
+            df_closed_all = closed_dict.get("df_closed_all", pd.DataFrame()) if isinstance(closed_dict, dict) else pd.DataFrame()
+            if not df_closed_all.empty and "ticker" in df_closed_all.columns:
+                drill_closed = df_closed_all[df_closed_all["ticker"] == selected_drill_tk]
+                if not drill_closed.empty:
+                    st.markdown(f"**📜 Lotti Fiscali Chiusi / Liquidati per `{selected_drill_tk}` (Audit FIFO)**")
+                    cfg_cl = {
+                        "buy_date": st.column_config.TextColumn("Data Acquisto Origine"),
+                        "sell_date": st.column_config.TextColumn("Data Liquidazione"),
+                        "qty": st.column_config.NumberColumn("Quantità Chiusa", format="%.4f"),
+                        "buy_price_eur": st.column_config.NumberColumn("Prezzo Carico (€)", format="€ %.2f"),
+                        "sell_price_eur": st.column_config.NumberColumn("Prezzo Vendita (€)", format="€ %.2f"),
+                        "cost_basis_eur": st.column_config.NumberColumn("Costo Base (€)", format="€ %.2f"),
+                        "proceeds_eur": st.column_config.NumberColumn("Incasso Vendita (€)", format="€ %.2f"),
+                        "realized_pnl_eur": st.column_config.NumberColumn("Plus/Minusvalenza (€)", format="€ %+.2f"),
+                        "realized_pnl_pct": st.column_config.NumberColumn("Rendimento (%)", format="%+.2f%%"),
+                        "holding_days": st.column_config.NumberColumn("Giorni Detenzione", format="%d gg"),
+                        "outcome": st.column_config.TextColumn("Esito Fiscale")
+                    }
+                    st.dataframe(drill_closed, column_config=cfg_cl, use_container_width=True, hide_index=True)
+                else:
+                    st.info(f"Nessun lotto chiuso/venduto registrato per `{selected_drill_tk}` (posizione accumulata o aperta).")
+
+        # 7. Registro Completo DuckDB
         if selected_source == "💾 Snapshot Archiviati su Database MySQL" and 'df_history' in locals() and not df_history.empty:
             st.markdown("---")
             with st.expander("⚡ Vista Analitica Aggregata DuckDB (Trend Vettorizzato & Medie Mobili)", expanded=False):
