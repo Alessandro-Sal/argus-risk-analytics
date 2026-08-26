@@ -158,6 +158,9 @@ def fetch_screener_universe_data(
             last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0.0)
             if last_price <= 0 and df_hist is not None and not df_hist.empty and "close" in df_hist.columns:
                 last_price = float(df_hist["close"].iloc[-1])
+            if last_price <= 0:
+                if "FDUSD" in tk or "USDT" in tk or "USDC" in tk:
+                    last_price = 0.86 if "-EUR" in tk else 1.00
                 
             target_mean = float(info.get("targetMeanPrice") or 0.0)
             
@@ -179,8 +182,18 @@ def fetch_screener_universe_data(
             pe_forward = float(info.get("forwardPE") or np.nan)
             peg_ratio = float(info.get("pegRatio") or np.nan)
             pb_ratio = float(info.get("priceToBook") or np.nan)
-            div_yield = float(info.get("dividendYield") or 0.0) * 100.0
-            if div_yield > 100.0: div_yield /= 100.0 # Fix formatting if already in pct
+            
+            # Dividend Yield % normalizzato istituzionale
+            div_rate = float(info.get("dividendRate") or info.get("trailingAnnualDividendRate") or 0.0)
+            if div_rate > 0 and last_price > 0:
+                div_yield = (div_rate / last_price) * 100.0
+            else:
+                div_raw = float(info.get("dividendYield") or info.get("trailingAnnualDividendYield") or 0.0)
+                if div_raw > 0:
+                    div_yield = div_raw if div_raw >= 0.20 else (div_raw * 100.0)
+                else:
+                    div_yield = 0.0
+            div_yield = round(div_yield, 2)
             
             # Redditività & Flussi
             roe = float(info.get("returnOnEquity") or np.nan)
