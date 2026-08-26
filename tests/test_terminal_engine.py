@@ -263,3 +263,12 @@ def test_terminal_engine_live_quote_and_watchlist(mock_session_context):
     assert "PORT LIVE" in res_port.output_text or "REAL-TIME" in res_port.output_text
     assert "AAPL" in res_port.output_text
 
+    # Batch parallel quote fetching
+    from core.terminal_engine import fetch_multiple_live_quotes
+    batch_res = fetch_multiple_live_quotes(["AAPL", "MSFT", "NVDA"], max_workers=3)
+    assert len(batch_res) == 3
+    assert "AAPL" in batch_res and batch_res["AAPL"]["last_price"] > 0
+    assert "MSFT" in batch_res and batch_res["MSFT"]["last_price"] > 0
+    assert "NVDA" in batch_res and batch_res["NVDA"]["last_price"] > 0
+
+

@@ -11,6 +11,7 @@
 #   - Real-Time System Telemetry (TOP/HTOP Monitor)
 # ============================================================
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import os
@@ -43,12 +44,27 @@ except ImportError:
     duckdb = None
 
 
-def fetch_live_ticker_quote(ticker: str) -> Dict[str, Any]:
+# Cache in-memory thread-safe con TTL per velocizzare il caricamento
+_LIVE_QUOTE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_QUOTE_CACHE_LOCK = threading.Lock()
+_QUOTE_CACHE_TTL_SEC = 20.0  # 20 secondi TTL
+
+
+def fetch_live_ticker_quote(ticker: str, force_refresh: bool = False) -> Dict[str, Any]:
     """
-    Recupera le quotazioni in tempo reale via yfinance fast_info con fallback su stima.
+    Recupera le quotazioni in tempo reale via yfinance fast_info con cache in-memory e fallback su stima.
     Restituisce un dizionario contenente prezzo spot, variazioni, range giornaliero, volume e valuta.
     """
     sym = (ticker or "AAPL").strip().upper()
+    now_ts = time.time()
+
+    if not force_refresh:
+        with _QUOTE_CACHE_LOCK:
+            if sym in _LIVE_QUOTE_CACHE:
+                cached_time, cached_data = _LIVE_QUOTE_CACHE[sym]
+                if now_ts - cached_time < _QUOTE_CACHE_TTL_SEC:
+                    return cached_data
+
     try:
         import yfinance as yf
         t = yf.Ticker(sym)
@@ -68,7 +84,7 @@ def fetch_live_ticker_quote(ticker: str) -> Dict[str, Any]:
             if last_px > 0:
                 chg = last_px - prev_close if prev_close > 0 else 0.0
                 chg_pct = (chg / prev_close * 100.0) if prev_close > 0 else 0.0
-                return {
+                res = {
                     "ticker": sym,
                     "last_price": round(last_px, 4 if last_px < 5 else 2),
                     "prev_close": round(prev_close, 4 if prev_close < 5 else 2),
@@ -85,12 +101,15 @@ def fetch_live_ticker_quote(ticker: str) -> Dict[str, Any]:
                     "is_live": True,
                     "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                 }
+                with _QUOTE_CACHE_LOCK:
+                    _LIVE_QUOTE_CACHE[sym] = (now_ts, res)
+                return res
     except Exception:
         pass
 
     # Fallback con tabella prezzi standard se API non raggiungibile
     default_p = ArgusTerminalEngine.DEFAULT_PRICES.get(sym, 150.0) if hasattr(ArgusTerminalEngine, 'DEFAULT_PRICES') else 150.0
-    return {
+    fallback_res = {
         "ticker": sym,
         "last_price": default_p,
         "prev_close": round(default_p * 0.995, 2),
@@ -107,6 +126,52 @@ def fetch_live_ticker_quote(ticker: str) -> Dict[str, Any]:
         "is_live": False,
         "timestamp": datetime.now(timezone.utc).strftime("%H:%M:%S (Simulated)")
     }
+    with _QUOTE_CACHE_LOCK:
+        _LIVE_QUOTE_CACHE[sym] = (now_ts, fallback_res)
+    return fallback_res
+
+
+def fetch_multiple_live_quotes(tickers: List[str], max_workers: int = 8, force_refresh: bool = False) -> Dict[str, Dict[str, Any]]:
+    """
+    Recupera le quotazioni in tempo reale in parallelo per una lista di ticker.
+    Ottimizzato con ThreadPoolExecutor per accelerare il caricamento del portafoglio e della watchlist.
+    """
+    clean_tickers = list(dict.fromkeys([str(t).strip().upper() for t in tickers if str(t).strip()]))
+    if not clean_tickers:
+        return {}
+
+    results: Dict[str, Dict[str, Any]] = {}
+    
+    # Controlla gli elementi già in cache se non richiesto force_refresh
+    tickers_to_fetch = []
+    now_ts = time.time()
+    if not force_refresh:
+        with _QUOTE_CACHE_LOCK:
+            for t in clean_tickers:
+                if t in _LIVE_QUOTE_CACHE:
+                    cached_time, cached_data = _LIVE_QUOTE_CACHE[t]
+                    if now_ts - cached_time < _QUOTE_CACHE_TTL_SEC:
+                        results[t] = cached_data
+                        continue
+                tickers_to_fetch.append(t)
+    else:
+        tickers_to_fetch = clean_tickers
+
+    if not tickers_to_fetch:
+        return results
+
+    workers = min(max_workers, len(tickers_to_fetch))
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        future_map = {executor.submit(fetch_live_ticker_quote, sym, force_refresh): sym for sym in tickers_to_fetch}
+        for future in as_completed(future_map):
+            sym = future_map[future]
+            try:
+                quote = future.result()
+                results[sym] = quote
+            except Exception:
+                results[sym] = fetch_live_ticker_quote(sym, force_refresh=False)
+
+    return results
 
 
 @dataclass
@@ -503,8 +568,10 @@ UTILITÀ DI SISTEMA:
             "├──────────────────────────────────────────────────────────────────┤"
         ]
         
-        for sym in wl_tickers[:12]:
-            q = fetch_live_ticker_quote(sym)
+        target_list = wl_tickers[:12]
+        quotes_map = fetch_multiple_live_quotes(target_list, max_workers=8)
+        for sym in target_list:
+            q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
             sign = "+" if q['change'] >= 0 else ""
             arrow = "▲" if q['change'] >= 0 else "▼"
             chg_str = f"{sign}{q['change_pct']:.2f}% {arrow}"
@@ -540,11 +607,14 @@ UTILITÀ DI SISTEMA:
         total_live_val = 0.0
         total_cost_basis = 0.0
 
+        port_tickers = [str(t).strip().upper() for t in df_pos["ticker"].unique() if str(t).strip()]
+        quotes_map = fetch_multiple_live_quotes(port_tickers, max_workers=8)
+
         for _, row in df_pos.iterrows():
             sym = str(row["ticker"]).strip().upper()
             qty = float(row.get("quantity", 0.0))
             wacp = float(row.get("wacp", row.get("buy_price", 0.0)))
-            q = fetch_live_ticker_quote(sym)
+            q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
             live_p = q["last_price"]
             chg_1d = q["change_pct"]
             
