@@ -216,16 +216,32 @@ pos_tickers = [str(t).strip().upper() for t in pos["ticker"].unique() if str(t).
 wl_tickers = [str(t).strip().upper() for t in term_eng.custom_watchlist if str(t).strip()]
 needed_tickers = list(dict.fromkeys(pos_tickers + wl_tickers))
 
-# Recupero in parallelo ultra-rapido con indicatore di caricamento Streamlit
-with st.spinner("⏳ Sincronizzazione flussi di mercato e prezzi live in tempo reale..."):
-    if hasattr(terminal_engine, "fetch_multiple_live_quotes"):
-        all_quotes = terminal_engine.fetch_multiple_live_quotes(
+# Costruisci mappa di fallback immediata dai dati del portafoglio caricato
+pos_fallback_map = {}
+if not pos.empty and "ticker" in pos.columns:
+    for _, row in pos.iterrows():
+        tk = str(row["ticker"]).strip().upper()
+        p_val = float(row.get("current_price", row.get("wacp", row.get("buy_price", 150.0))))
+        if p_val > 0:
+            pos_fallback_map[tk] = p_val
+
+if "argus_live_quotes_dict" not in st.session_state:
+    st.session_state["argus_live_quotes_dict"] = {}
+
+# Sincronizza se esplicitamente richiesto o se la cache di sessione è vuota
+need_sync = btn_force_sync or (not st.session_state["argus_live_quotes_dict"]) or any(t not in st.session_state["argus_live_quotes_dict"] for t in needed_tickers)
+
+if need_sync and needed_tickers:
+    with st.spinner("⏳ Sincronizzazione flussi di mercato e prezzi live in tempo reale..."):
+        synced_quotes = terminal_engine.fetch_multiple_live_quotes(
             needed_tickers,
             max_workers=10,
-            force_refresh=btn_force_sync
+            force_refresh=btn_force_sync,
+            fallback_map=pos_fallback_map
         )
-    else:
-        all_quotes = {sym: terminal_engine.fetch_live_ticker_quote(sym) for sym in needed_tickers}
+        st.session_state["argus_live_quotes_dict"].update(synced_quotes)
+
+all_quotes = st.session_state.get("argus_live_quotes_dict", {})
 
 tab_port_live, tab_wl_live = st.tabs([
     "💼 Prezzi Live Intero Portafoglio",
