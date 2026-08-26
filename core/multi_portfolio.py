@@ -612,6 +612,25 @@ def consolidate_multi_portfolios(
     if master_bm_returns.empty or master_bm_returns.std() == 0:
         master_bm_returns = _load_benchmark("SPY", combined_prices, master_returns.index)
 
+    # Calcolo Beta empirico per ciascun asset vs Benchmark
+    if combined_asset_returns is not None and not combined_asset_returns.empty and master_bm_returns is not None and not master_bm_returns.empty:
+        try:
+            asset_betas = {}
+            for col in combined_asset_returns.columns:
+                s_asset = combined_asset_returns[col].dropna()
+                s_bm = master_bm_returns.reindex(s_asset.index).dropna()
+                common_idx = s_asset.index.intersection(s_bm.index)
+                if len(common_idx) > 10:
+                    bm_sub = s_bm.loc[common_idx]
+                    bm_var = float(bm_sub.var())
+                    if bm_var > 1e-12:
+                        cov_val = float(np.cov(s_asset.loc[common_idx], bm_sub)[0, 1])
+                        asset_betas[col] = round(cov_val / bm_var, 3)
+            if "ticker" in df_positions.columns:
+                df_positions["beta"] = df_positions["ticker"].map(asset_betas)
+        except Exception:
+            pass
+
     # 3. Calcolo Completo Metriche Quantitative Standard ARGUS
     market_risk_res = _calc_market_risk(master_returns, master_bm_returns, benchmark_ticker="SPY", risk_free_rate=active_rf_rate)
     return_metrics_res = _calc_return_metrics(master_returns, master_bm_returns, master_df_tx, df_positions, risk_free_rate=active_rf_rate)

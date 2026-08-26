@@ -72,6 +72,25 @@ def compute_risk(portfolio_id: int,
     df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx_adj, warnings_list=warnings_list)
     sr_benchmark            = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
 
+    # Calcolo Beta empirico per ciascun asset vs Benchmark
+    if df_returns is not None and not df_returns.empty and sr_benchmark is not None and not sr_benchmark.empty:
+        try:
+            asset_betas = {}
+            for col in df_returns.columns:
+                s_asset = df_returns[col].dropna()
+                s_bm = sr_benchmark.reindex(s_asset.index).dropna()
+                common_idx = s_asset.index.intersection(s_bm.index)
+                if len(common_idx) > 10:
+                    bm_sub = s_bm.loc[common_idx]
+                    bm_var = float(bm_sub.var())
+                    if bm_var > 1e-12:
+                        cov_val = float(np.cov(s_asset.loc[common_idx], bm_sub)[0, 1])
+                        asset_betas[col] = round(cov_val / bm_var, 3)
+            if "ticker" in df_positions.columns:
+                df_positions["beta"] = df_positions["ticker"].map(asset_betas)
+        except Exception:
+            pass
+
     metrics = {
         "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate),
         "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx_adj, df_positions, risk_free_rate=active_rf_rate),
