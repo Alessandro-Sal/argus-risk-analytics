@@ -149,7 +149,7 @@ if portfolio_tickers:
 univ_options.extend(list(MARKET_UNIVERSES.keys()))
 univ_options.append("✍️ Lista Personalizzata (Custom Tickers)...")
 
-col_u1, col_u2, col_u3 = st.columns([2.2, 2.0, 1.2])
+col_u1, col_u2, col_u3, col_u4 = st.columns([2.0, 1.8, 1.0, 1.0])
 
 with col_u1:
     univ_choice = st.selectbox(
@@ -162,6 +162,7 @@ with col_u1:
 custom_tickers_input = ""
 if univ_choice.startswith("💼 Portafoglio Attivo Live"):
     tickers_to_screen = portfolio_tickers
+    univ_key = f"portfolio:{','.join(sorted(portfolio_tickers))}"
     with col_u2:
         st.caption(f"ℹ️ **Portafoglio Attivo**: Scansione fondamentale e tecnica di tutti i **{len(portfolio_tickers)} asset** attualmente detenuti in portafoglio.")
 elif univ_choice == "✍️ Lista Personalizzata (Custom Tickers)...":
@@ -171,8 +172,10 @@ elif univ_choice == "✍️ Lista Personalizzata (Custom Tickers)...":
             value="AAPL, NVDA, MSFT, RACE.MI, ASML, JNJ, MC.PA, ENEL.MI"
         )
     tickers_to_screen = [t.strip().upper() for t in custom_tickers_input.split(",") if t.strip()]
+    univ_key = f"custom:{','.join(sorted(tickers_to_screen))}"
 else:
     tickers_to_screen = MARKET_UNIVERSES[univ_choice]["tickers"]
+    univ_key = f"preset:{univ_choice}"
     with col_u2:
         st.caption(f"ℹ️ **{univ_choice}**: {MARKET_UNIVERSES[univ_choice]['description']}")
 
@@ -180,22 +183,33 @@ with col_u3:
     st.markdown('<div style="margin-top: 24px;"></div>', unsafe_allow_html=True)
     refresh_btn = st.button("🚀 Esegui Screening", type="primary", use_container_width=True)
 
+with col_u4:
+    st.markdown('<div style="margin-top: 24px;"></div>', unsafe_allow_html=True)
+    force_refresh_btn = st.button("🔄 Forza Live", help="Bypassa la cache locale e scarica i dati più recenti in tempo reale da Yahoo Finance", use_container_width=True)
+
 # Esecuzione / Caricamento dati
-need_fetch = refresh_btn or st.session_state.cached_screener_df.empty or st.session_state.last_screened_universe != univ_choice
+need_fetch = (
+    refresh_btn 
+    or force_refresh_btn 
+    or st.session_state.cached_screener_df.empty 
+    or st.session_state.get("last_screened_universe_key") != univ_key
+)
 
 if need_fetch and tickers_to_screen:
-    with st.spinner("Estrazione e calcolo metriche multi-fattoriali in corso (Cache Shield protetto)..."):
+    with st.spinner("Estrazione e calcolo metriche multi-fattoriali in corso (Multi-Thread Cache Shield)..."):
         df_screened = fetch_screener_universe_data(
             tickers=tickers_to_screen,
-            benchmark_ticker=benchmark_ticker
+            benchmark_ticker=benchmark_ticker,
+            force_refresh=force_refresh_btn
         )
         st.session_state.cached_screener_df = df_screened
+        st.session_state.last_screened_universe_key = univ_key
         st.session_state.last_screened_universe = univ_choice
 
 df_raw = st.session_state.cached_screener_df
 
 if df_raw.empty:
-    st.warning("⚠️ Nessun dato disponibile. Clicca su '🚀 Esegui Screening' per caricare le analisi.")
+    st.warning("⚠️ Nessun dato disponibile per l'universo selezionato. Clicca su '🚀 Esegui Screening' per caricare le analisi.")
     st.stop()
 
 # ── KPI METRICHE TOP ROW ──────────────────────────────────────
