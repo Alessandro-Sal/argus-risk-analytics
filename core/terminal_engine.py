@@ -323,6 +323,21 @@ class ArgusTerminalEngine:
         if first_token in ("STREAM", "BOOK", "OFI"):
             return self._cmd_stream_summary(tokens)
 
+        # Scorciatoie a singolo carattere
+        if len(tokens) == 1 and len(first_token) == 1:
+            if first_token in ("H", "?"):
+                return self._cmd_help()
+            elif first_token in ("R", "P"):
+                return self._cmd_portfolio_summary(results, df_pos)
+            elif first_token == "Q":
+                return self._cmd_quote("AAPL", ctx)
+            elif first_token == "W":
+                return self._cmd_watchlist(ctx)
+            elif first_token == "V":
+                return self._cmd_var(["VAR", "95"], results, df_pos)
+            elif first_token == "T":
+                return self._cmd_top(ctx)
+
         # Se il token è un singolo ticker noto o valido (es. AAPL, NVDA, BTC-USD, GC=F) -> Live Quote
         if len(tokens) == 1 and len(first_token) <= 10 and (first_token.isalnum() or "-" in first_token or "=" in first_token or "^" in first_token or "." in first_token):
             return self._cmd_quote(first_token, ctx)

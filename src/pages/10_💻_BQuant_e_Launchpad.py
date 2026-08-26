@@ -669,33 +669,45 @@ elif active_bquant_tab == "🖥️ Terminale Live & Interactive CLI":
     with col_cli:
         st.markdown("##### ⌨️ Console Interattiva Bloomberg CLI")
 
-        # Chip di scelta rapida
+        # Chip di scelta rapida (2 righe pulite e leggibili)
         st.caption("Comandi Rapidi:")
-        chips_cols = st.columns(7)
-        quick_cmds = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC-USD", "WATCHLIST", "VAR 95", "TOP"]
-        for idx, qc in enumerate(quick_cmds):
-            with chips_cols[idx]:
-                if st.button(qc, key=f"btn_chip_cmd_{idx}", use_container_width=True):
+        chips_r1 = st.columns(4)
+        quick_cmds_r1 = ["PORT RISK", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC-USD"]
+        for idx, qc in enumerate(quick_cmds_r1):
+            with chips_r1[idx]:
+                if st.button(qc, key=f"btn_chip_r1_{idx}", use_container_width=True):
                     cmd_res = term_eng.execute_command(qc, session_context)
                     term_eng.output_buffer.insert(0, cmd_res)
                     st.rerun()
 
-        # Input box comando
-        col_inp, col_run = st.columns([4.0, 1.0])
-        with col_inp:
-            cmd_input = st.text_input(
-                "Command Prompt",
-                placeholder="ARGUS:LIVE> Digita comando (es. 'QUOTE NVDA', 'BTC-USD', 'WATCHLIST', 'VAR 95', 'BUY 100 NVDA', 'TOP')...",
-                key="term_cli_input_box",
-                label_visibility="collapsed"
-            )
-        with col_run:
-            btn_run_cmd = st.button("▶ Esegui", key="btn_run_term_cmd", type="primary", use_container_width=True)
+        chips_r2 = st.columns(4)
+        quick_cmds_r2 = ["WATCHLIST", "VAR 95", "TOP", "HELP"]
+        for idx, qc in enumerate(quick_cmds_r2):
+            with chips_r2[idx]:
+                if st.button(qc, key=f"btn_chip_r2_{idx}", use_container_width=True):
+                    cmd_res = term_eng.execute_command(qc, session_context)
+                    term_eng.output_buffer.insert(0, cmd_res)
+                    st.rerun()
 
-        if btn_run_cmd and cmd_input.strip():
-            cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
-            term_eng.output_buffer.insert(0, cmd_res)
-            st.rerun()
+        st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+
+        # Form interattivo con supporto a pressione tasto INVIO (Enter Key) e submit immediato
+        with st.form(key="term_cli_interactive_form", clear_on_submit=True):
+            col_inp, col_run = st.columns([4.2, 0.8])
+            with col_inp:
+                cmd_input = st.text_input(
+                    "Command Prompt",
+                    placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'QUOTE NVDA', 'BTC-USD', 'WATCHLIST', 'PORT RISK')...",
+                    key="term_cli_input_box",
+                    label_visibility="collapsed"
+                )
+            with col_run:
+                btn_run_cmd = st.form_submit_button("▶ Esegui", type="primary", use_container_width=True)
+
+            if btn_run_cmd and cmd_input.strip():
+                cmd_res = term_eng.execute_command(cmd_input.strip(), session_context)
+                term_eng.output_buffer.insert(0, cmd_res)
+                st.rerun()
 
         # Buffer di Output Terminale (Stile JetBrains Mono Dark Screen)
         terminal_screen_lines = []
