@@ -631,6 +631,7 @@ UTILITÀ DI SISTEMA:
         ]
 
         total_live_val = 0.0
+        total_prev_day_val = 0.0
         total_cost_basis = 0.0
 
         port_tickers = [str(t).strip().upper() for t in df_pos["ticker"].unique() if str(t).strip()]
@@ -646,28 +647,34 @@ UTILITÀ DI SISTEMA:
             wacp_eur = float(row.get("avg_cost", row.get("wacp", row.get("buy_price", 0.0))))
             q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
             live_p_orig = q["last_price"]
+            prev_close_orig = q.get("prev_close", live_p_orig)
             curr_code = str(q.get("currency", "USD")).upper()
             if sym.endswith((".MI", ".PA", ".DE")) or str(row.get("asset_currency", "")).upper() == "EUR":
                 curr_code = "EUR"
 
             if curr_code == "EUR":
                 live_p_eur = live_p_orig
+                prev_p_eur = prev_close_orig
                 curr_sym = "€"
             elif curr_code == "USD":
                 live_p_eur = (live_p_orig / eurusd_rate) if eurusd_rate > 0 else (live_p_orig * float(row.get("fx_rate_spot", 0.92)))
+                prev_p_eur = (prev_close_orig / eurusd_rate) if eurusd_rate > 0 else (prev_close_orig * float(row.get("fx_rate_spot", 0.92)))
                 curr_sym = "$"
             else:
                 fx_spot = float(row.get("fx_rate_spot", 1.0))
                 live_p_eur = live_p_orig * fx_spot
+                prev_p_eur = prev_close_orig * fx_spot
                 curr_sym = curr_code
 
             chg_1d = q["change_pct"]
             cost = qty * wacp_eur
             val = qty * live_p_eur
+            prev_val = qty * prev_p_eur
             pnl = val - cost
             pnl_p = (pnl / cost * 100.0) if cost > 0 else 0.0
             
             total_live_val += val
+            total_prev_day_val += prev_val
             total_cost_basis += cost
 
             sign = "+" if pnl >= 0 else ""
@@ -684,9 +691,15 @@ UTILITÀ DI SISTEMA:
         tot_sign = "+" if tot_pnl >= 0 else ""
         tot_arrow = "▲" if tot_pnl >= 0 else "▼"
 
+        tot_day_pnl = total_live_val - total_prev_day_val
+        tot_day_pnl_p = (tot_day_pnl / total_prev_day_val * 100.0) if total_prev_day_val > 0 else 0.0
+        tot_day_sign = "+" if tot_day_pnl >= 0 else ""
+        tot_day_arrow = "▲" if tot_day_pnl >= 0 else "▼"
+
         lines.extend([
             "├──────────────────────────────────────────────────────────────────┤",
             f"│ PORTFOLIO LIVE NOTIONAL : € {total_live_val:>12,.2f}                     │",
+            f"│ 1D DAY CHANGE (VS IERI) : {tot_day_sign}€ {tot_day_pnl:>10,.2f} ({tot_day_sign}{tot_day_pnl_p:.2f}%) {tot_day_arrow}          │",
             f"│ TOTAL UNREALIZED P&L    : {tot_sign}€ {tot_pnl:>10,.2f} ({tot_sign}{tot_pnl_p:.2f}%) {tot_arrow}          │",
             f"│ REAL-TIME STATUS        : {len(df_pos)} ASSETS SYNCHRONIZED (LIVE API)       │",
             "└──────────────────────────────────────────────────────────────────┘"
