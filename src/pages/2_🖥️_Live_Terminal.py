@@ -218,15 +218,24 @@ with col_sec2_hdr:
 with col_sec2_btn:
     btn_force_sync = st.button("🔄 Sincronizza Prezzi Live", key="btn_sync_live_quotes_page2", use_container_width=True)
 
-# Lista completa di tutti i ticker necessari (Portafoglio + Watchlist)
-pos_tickers = [str(t).strip().upper() for t in pos["ticker"].unique() if str(t).strip()] if (not pos.empty and "ticker" in pos.columns) else []
+# Filtra esclusivamente le posizioni attive (quantità netta > 0)
+qty_col = "qty_net" if "qty_net" in pos.columns else ("shares" if "shares" in pos.columns else ("quantity" if "quantity" in pos.columns else None))
+if not pos.empty and qty_col:
+    active_pos = pos[pos[qty_col] > 1e-6].copy()
+elif not pos.empty and "current_value" in pos.columns:
+    active_pos = pos[pos["current_value"] > 0].copy()
+else:
+    active_pos = pos.copy() if not pos.empty else pd.DataFrame()
+
+# Lista completa di tutti i ticker necessari (Posizioni Attive + Watchlist)
+pos_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()] if (not active_pos.empty and "ticker" in active_pos.columns) else []
 wl_tickers = [str(t).strip().upper() for t in term_eng.custom_watchlist if str(t).strip()]
 needed_tickers = list(dict.fromkeys(pos_tickers + wl_tickers))
 
-# Costruisci mappa di fallback immediata dai dati del portafoglio caricato
+# Costruisci mappa di fallback immediata dai dati delle posizioni attive
 pos_fallback_map = {}
-if not pos.empty and "ticker" in pos.columns:
-    for _, row in pos.iterrows():
+if not active_pos.empty and "ticker" in active_pos.columns:
+    for _, row in active_pos.iterrows():
         tk = str(row["ticker"]).strip().upper()
         p_val = float(row.get("current_price", row.get("wacp", row.get("buy_price", 150.0))))
         if p_val > 0:
@@ -262,16 +271,16 @@ if eurusd_fx <= 0:
     eurusd_fx = 1.085
 
 with tab_port_live:
-    if pos.empty or "ticker" not in pos.columns:
-        st.info("Nessun portafoglio attivo caricato. Carica una distinta posizioni per visualizzare i prezzi live.")
+    if active_pos.empty or "ticker" not in active_pos.columns:
+        st.info("Nessuna posizione attiva aperta a mercato. Carica un portafoglio o una distinta transazioni per visualizzare i prezzi live.")
     else:
-        # Calcolo prezzi live per ogni titolo del portafoglio
+        # Calcolo prezzi live per ogni titolo attivo del portafoglio
         port_live_rows = []
         tot_live_notional = 0.0
         tot_wacp_cost = 0.0
         day_chgs = []
 
-        for _, r in pos.iterrows():
+        for _, r in active_pos.iterrows():
             sym = str(r["ticker"]).strip().upper()
             # Supporto a tutte le nomenclature di colonna per quantità e costo medio
             q_val = float(r.get("qty_net", r.get("quantity", r.get("shares", 0.0))))
@@ -329,22 +338,63 @@ with tab_port_live:
                 "Stato Feed": "LIVE API 🟢" if live_item["is_live"] else "ESTIMATE 🟡"
             })
 
-        # KPI Summary
+        # KPI Summary Cards con Styling Istituzionale Dark Glassmorphism
         tot_pnl = tot_live_notional - tot_wacp_cost
         tot_pnl_p = (tot_pnl / tot_wacp_cost * 100.0) if tot_wacp_cost > 0 else 0.0
         avg_1d = np.mean(day_chgs) if day_chgs else 0.0
-        active_assets_count = len([r for _, r in pos.iterrows() if float(r.get("qty_net", r.get("quantity", r.get("shares", 0.0)))) > 0])
+        n_active = len(active_pos)
 
-        k1, k2, k3, k4 = st.columns(4)
-        with k1:
-            st.metric("Controvalore Portafoglio Live", f"€ {tot_live_notional:,.2f}")
-        with k2:
-            st.metric("PnL Totale Non Realizzato", f"€ {tot_pnl:+,.2f}", delta=f"{tot_pnl_p:+.2f}%")
-        with k3:
-            st.metric("Variazione Media Intraday (1D)", f"{avg_1d:+.2f}%")
-        with k4:
-            st.metric("Titoli Sincronizzati", f"{len(pos)} Asset", delta=f"{active_assets_count} Posizioni Attive")
+        pnl_color = "#3fb950" if tot_pnl >= 0 else "#f85149"
+        pnl_sign = "+" if tot_pnl >= 0 else ""
+        pnl_arrow = "▲" if tot_pnl >= 0 else "▼"
+        avg_color = "#3fb950" if avg_1d >= 0 else "#f85149"
+        avg_sign = "+" if avg_1d >= 0 else ""
+        avg_arrow = "▲" if avg_1d >= 0 else "▼"
 
+        kpi_cards_html = f"""
+        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px;">
+          <!-- CARD 1 -->
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(56,189,248,0.25); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span>💼 Controvalore Live</span>
+              <span style="font-size: 9.5px; background: rgba(56,189,248,0.15); color: #38bdf8; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(56,189,248,0.3);">REAL-TIME</span>
+            </div>
+            <div style="font-size: 22px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px;">€ {tot_live_notional:,.2f}</div>
+            <div style="font-size: 11.5px; color: #8b949e; margin-top: 4px;">Capitale attivo a mercato spot</div>
+          </div>
+
+          <!-- CARD 2 -->
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {pnl_color}44; border-left: 4px solid {pnl_color}; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span>📈 PnL Non Realizzato</span>
+              <span style="font-size: 10px; font-weight: 700; background: {pnl_color}22; color: {pnl_color}; padding: 2px 8px; border-radius: 4px; border: 1px solid {pnl_color}55;">{pnl_sign}{tot_pnl_p:.2f}% {pnl_arrow}</span>
+            </div>
+            <div style="font-size: 22px; font-weight: 800; color: {pnl_color}; font-family: monospace; letter-spacing: -0.5px;">{pnl_sign}€ {tot_pnl:,.2f}</div>
+            <div style="font-size: 11.5px; color: #8b949e; margin-top: 4px;">Guadagno / perdita latente vs FIFO</div>
+          </div>
+
+          <!-- CARD 3 -->
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(168,85,247,0.25); border-left: 4px solid #a855f7; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span>⚡ Variazione Intraday</span>
+              <span style="font-size: 9.5px; background: rgba(168,85,247,0.15); color: #a855f7; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(168,85,247,0.3);">1D CHG</span>
+            </div>
+            <div style="font-size: 22px; font-weight: 800; color: {avg_color}; font-family: monospace; letter-spacing: -0.5px;">{avg_sign}{avg_1d:.2f}% {avg_arrow}</div>
+            <div style="font-size: 11.5px; color: #8b949e; margin-top: 4px;">Media variazioni giornaliere</div>
+          </div>
+
+          <!-- CARD 4 -->
+          <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(63,185,80,0.25); border-left: 4px solid #3fb950; border-radius: 10px; padding: 14px 18px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;">
+              <span>🟢 Posizioni Attive</span>
+              <span style="font-size: 9.5px; background: rgba(63,185,80,0.15); color: #3fb950; padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(63,185,80,0.3);">STREAMING</span>
+            </div>
+            <div style="font-size: 22px; font-weight: 800; color: #f0f6fc; font-family: monospace; letter-spacing: -0.5px;">{n_active} Titoli</div>
+            <div style="font-size: 11.5px; color: #3fb950; margin-top: 4px; font-weight: 600;">Feed Real-Time Streaming Attivo</div>
+          </div>
+        </div>
+        """
+        st.markdown(kpi_cards_html, unsafe_allow_html=True)
         st.dataframe(pd.DataFrame(port_live_rows), use_container_width=True, hide_index=True)
 
 with tab_wl_live:
@@ -361,6 +411,34 @@ with tab_wl_live:
 
     with col_wl_info:
         st.caption("Monitor multi-asset globale con supporto ad Azioni, ETF, Crypto (BTC, ETH), Commodities (Oro, Petrolio) e Forex (EUR/USD).")
+
+    # KPI Watchlist Cards
+    wl_chgs = [float(all_quotes.get(s, {}).get("change_pct", 0.0)) for s in term_eng.custom_watchlist if s in all_quotes]
+    avg_wl_chg = np.mean(wl_chgs) if wl_chgs else 0.0
+    wl_avg_col = "#3fb950" if avg_wl_chg >= 0 else "#f85149"
+    wl_avg_sgn = "+" if avg_wl_chg >= 0 else ""
+    wl_avg_arr = "▲" if avg_wl_chg >= 0 else "▼"
+
+    wl_kpi_html = f"""
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 10px; margin-bottom: 18px;">
+      <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(56,189,248,0.25); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 12px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 4px;">🌐 Strumenti in Watchlist</div>
+        <div style="font-size: 20px; font-weight: 800; color: #f0f6fc; font-family: monospace;">{len(term_eng.custom_watchlist)} Asset</div>
+        <div style="font-size: 11px; color: #8b949e; margin-top: 2px;">Multi-Asset Class Global Desk</div>
+      </div>
+      <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {wl_avg_col}44; border-left: 4px solid {wl_avg_col}; border-radius: 10px; padding: 12px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 4px;">⚡ Variazione Media Watchlist</div>
+        <div style="font-size: 20px; font-weight: 800; color: {wl_avg_col}; font-family: monospace;">{wl_avg_sgn}{avg_wl_chg:.2f}% {wl_avg_arr}</div>
+        <div style="font-size: 11px; color: #8b949e; margin-top: 2px;">Momentum medio benchmark</div>
+      </div>
+      <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid rgba(63,185,80,0.25); border-left: 4px solid #3fb950; border-radius: 10px; padding: 12px 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 4px;">📡 Feed Gateway Status</div>
+        <div style="font-size: 20px; font-weight: 800; color: #3fb950; font-family: monospace;">LIVE STREAMING</div>
+        <div style="font-size: 11px; color: #3fb950; margin-top: 2px; font-weight: 600;">Ticker e cross FX sincronizzati</div>
+      </div>
+    </div>
+    """
+    st.markdown(wl_kpi_html, unsafe_allow_html=True)
 
     wl_rows = []
     for sym in term_eng.custom_watchlist:
