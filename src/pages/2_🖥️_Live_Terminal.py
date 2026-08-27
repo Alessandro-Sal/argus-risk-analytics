@@ -667,6 +667,10 @@ with tab_heatmap_live:
         st.info("Nessuna posizione attiva disponibile per generare la Heatmap.")
     else:
         df_heat = pd.DataFrame(port_live_raw_items)
+        df_heat["Controvalore_EUR"] = pd.to_numeric(df_heat["Controvalore_EUR"], errors="coerce").fillna(0.0)
+        df_heat["Var_1D_Pct"] = pd.to_numeric(df_heat["Var_1D_Pct"], errors="coerce").fillna(0.0)
+        df_heat["PnL_EUR"] = pd.to_numeric(df_heat["PnL_EUR"], errors="coerce").fillna(0.0)
+        df_heat["Prezzo_EUR"] = pd.to_numeric(df_heat["Prezzo_EUR"], errors="coerce").fillna(0.0)
         
         fig_heat = px.treemap(
             df_heat,
@@ -679,8 +683,8 @@ with tab_heatmap_live:
         )
         
         fig_heat.update_traces(
-            textinfo="label+value",
-            texttemplate="<b>%{label}</b><br>€ %{value:,.0f}<br>%{color:+.2f}%",
+            textinfo="none",
+            texttemplate="<b>%{customdata[0]}</b><br>€ %{customdata[1]:,.0f}<br>%{customdata[2]:+.2f}%",
             textfont=dict(size=12, family="monospace", color="#ffffff"),
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br><br>"
