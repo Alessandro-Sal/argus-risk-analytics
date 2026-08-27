@@ -46,6 +46,7 @@ flowchart TD
     subgraph Layer4 ["🧠 4. ANALYTICS & QUANTITATIVE ENGINE"]
         direction TB
         RE{"⚙️ core/risk_engine.py\n(FIFO Basis, VaR Cornish-Fisher, Kupiec Test,\nLedoit-Wolf SLSQP, Black-Litterman, Carhart 4-Factor,\nMSCI Barra 5-Factor, Merton Jump-Diffusion,\nATR Chandelier Exits, 3D Stress Surface, Almgren-Chriss, Cholesky MC)"}:::engine
+        TERM_ENG{"🖥️ core/terminal_engine.py\n(Desk Risk Limits, Pre-Trade Circuit Breakers,\nOMS Blotter TWAP/VWAP Slicing, Intraday PnL Attribution,\nRelative Performance Overlay & Macro Catalysts)"}:::engine
         AI_ANL{"🧠 core/ai_analyst.py\n(Dual-Engine AI Analyst Memorandum & Copilot)"}:::engine
         ADV_Q{"🧬 core/advanced_quant.py\n(Asymmetric Tail Copulas, Kelly Sizing, ERC)"}:::engine
         MULTI{"🗂️ core/multi_portfolio.py\n(Total Wealth Multi-Portfolio Hub & Consolidator)"}:::engine
@@ -138,6 +139,7 @@ flowchart TD
 
 ### 4. Analytics & Quantitative Engine
 - **`core/risk_engine.py`**: Il cervello quantitativo dell'applicazione (FIFO Engine, VaR Cornish-Fisher, Kupiec Test, Markowitz SLSQP, Ledoit-Wolf Shrinkage, Black-Litterman Optimization, Monte Carlo Cholesky & Student-t, Fama-French 3-Factor, Carhart 4-Factor Model, ATR Trailing Stop-Loss & Chandelier Exit, Macro Scenario Builder, Almgren-Chriss Market Impact, K-Means Clustering).
+- **`core/terminal_engine.py`**: Motore del Live Trading Desk (Desk Compliance Limits, Pre-Trade Circuit Breakers, OMS Execution Blotter TWAP/VWAP, Intraday Multi-Currency PnL Attribution Price vs FX, Relative Performance Base 0% Overlay e Live News Catalysts).
 - **`core/financial_analysis.py`**: Modulo di valutazione fondamentale e solvibilità aziendale (Altman Z-Score, Scomposizione DuPont 3 e 5 fattori, Piotroski F-Score 9pt, WACC CAPM, DCF Monte Carlo 2-stage, Bilanci 10-K e Comparativa Multiaziendale).
 - **`core/advisor.py`**: Motore di diagnostica quantitativa e calcolo dello Health Score (0-100).
 - **`core/rebalancer.py`**: Generatore di ordini di trading in € e n° quote intere per l'allineamento a strategie target.
@@ -146,7 +148,7 @@ flowchart TD
 - **`core/attribution.py` & `core/risk_limits.py`**: Attribuzione Brinson-Fachler e sistema di Early Warning sui limiti di rischio.
 
 ### 5. Presentation & Desktop Reporting Layer
-- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 10 moduli analitici interattivi fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto `wait_for_server`.
-- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v5.14.0.zip`.
+- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 12 moduli analitici interattivi fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto `wait_for_server`.
+- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v5.24.0.zip`.
 - **`core/report_exporter.py`, `html_exporter.py`**: Generazione dinamica in-memory del report Executive PDF Factsheet (2 pagine), del Workbook Excel Multi-Tab (.xlsx su 4 schede) e del Report HTML Standalone.
 - **`scripts/export_star_schema.py`**: Esportazione pacchetto ZIP Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`) per Microsoft Power BI e Google Looker Studio.

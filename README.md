@@ -2,7 +2,7 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-5.23.0-blue.svg)
+![Version](https://img.shields.io/badge/version-5.24.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 ![PyTest Suite](https://img.shields.io/badge/PyTest-250%2F250%20PASSED%20(100%25)-brightgreen)
@@ -77,9 +77,13 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Centro Esportazione Report**: Download in-memory di Factsheet PDF a 2 pagine, Workbook Excel multi-tab, Report HTML Standalone e pacchetto Star Schema ZIP per Power BI.
 
 ### 2. 🖥️ Live Terminal & Real-Time Market Desk (`src/pages/2_🖥️_Live_Terminal.py`)
+* **🛡️ Desk Compliance HUD & Pre-Trade Risk Checks**: Controllo automatico e vincolante dei limiti di conformità istituzionale prima dell'invio a mercato (`evaluate_pre_trade_risk`), con monitoraggio in tempo reale del **Circuit Breaker** di perdita giornaliera (max -€5.000), del tetto di concentrazione su singolo asset (max 25%), della leva lorda (max 1.50x) e dell'impatto marginale sul VaR ($\Delta\text{VaR}$).
 * **⚡ Live Market Streaming Tape & Level-2 Order Book**: Ingestione ad alta frequenza di quotazioni spot real-time multi-asset via `yfinance fast_info`, visualizzazione del Level-2 Depth Book a 5 livelli Bid/Ask, calcolo istantaneo del **Microprice di Stoikov (2018)**, **VWAP** e **Order Flow Imbalance (OFI)**.
-* **📊 Live Multi-Asset Pricing Monitor**: Tabella real-time con quotazioni spot, variazioni intraday (1D %), controvalori aggiornati, prezzi di carico FIFO (WACP) e P&L non realizzato per l'intero portafoglio attivo e per una **Watchlist globale personalizzabile** (Azioni, Crypto, Commodities, Forex).
-* **⌨️ Console Interattiva Bloomberg CLI (`ARGUS:LIVE>`)**: Prompt a riga di comando ad alta densità con supporto immediato all'invio con tasto **INVIO** (`PORT LIVE`, `PORT RISK`, `WATCHLIST`, `QUOTE <TICKER>`, `VAR 95`, `TOP`, `BUY`, `TWAP`, `EQS`, `SQL`).
+* **⚡ Fast Ladder Trading & One-Click DOM Routing**: Pannello di immissione ed esecuzione ordini ultra-rapido (`🟢 BUY`, `🔴 SELL`, `🛑 Chiudi Posizione`) con routing istantaneo verso l'OMS, algoritmi di execution slicing `MKT`, `TWAP (15m)` e `VWAP (30m)`.
+* **🧩 Intraday Multi-Currency PnL Attribution**: Scomposizione analitica del PnL Day (€) in **Effetto Prezzo Titolo** $(\text{Qty} \cdot \Delta\text{Spot} \cdot \text{FX}_{t-1})$ ed **Effetto Tasso di Cambio FX** $(\text{Qty} \cdot \text{Spot}_t \cdot \Delta\text{FX})$, con visualizzazione a zero latenza nella tabella del portafoglio e nei KPI superiori.
+* **📈 Relative Performance Overlay Chart & Benchmark Matrix (Base 0%)**: Modulo di confronto dinamico intraday normalizzato a base $0.00\%$ tra il Portafoglio ARGUS e i benchmark di riferimento (SPY, QQQ, BTC-USD, EUR/USD), arricchito dalla **Matrice di Performance Relativa & Alpha Intraday** con stima di Beta implicito e stato di Momentum.
+* **📰 Live News & Macro Catalyst Feed Hub**: Feed istituzionale di annunci macroeconomici (CPI, decisioni BCE/Fed) ed eventi societari (trimestrali/earnings, lanci prodotto) con sentiment score (`BULLISH 🟢`, `HAWKISH 🦅`, `VOLATILE ⚡`, `NEUTRAL ⚪`) e countdown temporale.
+* **⌨️ Console Interattiva Bloomberg CLI (`ARGUS:LIVE>`)**: Prompt a riga di comando ad alta densità con supporto immediato all'invio con tasto **INVIO** (`PORT LIVE`, `PORT RISK`, `WATCHLIST`, `QUOTE <TICKER>`, `VAR 95`, `TOP`, `BUY`, `TWAP`, `EQS`, `SQL`, `NEWS`, `SNAP`, `SHOCK`, `CORR`).
 * **📋 Live OMS Execution Blotter**: Simulatore di negoziazione con algoritmi di order slicing TWAP e VWAP, stima dello slippage e calcolo del risparmio eseguito.
 * **📊 Telemetria di Sistema (TOP Monitor)**: Monitoraggio in tempo reale di RAM RSS, utilizzo CPU, thread attivi, cache e record DB.
 
@@ -307,10 +311,11 @@ argus-risk-analytics/
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── sidebar.py               # Navigation Rail v5.18.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v5.24.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
+│   ├── terminal_engine.py       # Live Terminal Desk, Pre-Trade Risk Checks, OMS Blotter & PnL Attribution
 │   ├── ui_utils.py              # Helper Grafici Plotly, Modali Informativi & Componenti UI
 │   ├── validator.py             # Pipeline di Bonifica & Normalizzazione Dati
 │   ├── volatility_surface.py    # Superficie di Volatilità Implicita 3D, Skew & Smile Calibration
