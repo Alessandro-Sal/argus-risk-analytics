@@ -529,62 +529,54 @@ with tab_port_live:
         """
         st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
-        # Filtri Rapidi di Ordinamento
-        if "port_sort_choice" not in st.session_state:
-            st.session_state["port_sort_choice"] = "ALL"
+        col_tbl_info, col_tbl_search = st.columns([3.0, 1.2], vertical_alignment="center")
+        with col_tbl_info:
+            st.markdown(
+                "<div style='font-size: 11.5px; color: #8b949e; margin-bottom: 6px;'>"
+                "💡 <b>Ordinamento Istantaneo:</b> Clicca sull'intestazione di <u>qualsiasi colonna</u> "
+                "(es. <i>Var. 1D (%)</i>, <i>Controvalore</i>, <i>PnL Latente</i>) per ordinare la tabella a <b>latenza zero</b>."
+                "</div>",
+                unsafe_allow_html=True
+            )
+        with col_tbl_search:
+            port_search_q = st.text_input("🔍 Filtra Ticker:", placeholder="Es. AAPL, ENI...", key="inp_port_table_search", label_visibility="collapsed").strip().upper()
 
-        f_c1, f_c2, f_c3, f_c4, f_c5 = st.columns(5)
-        with f_c1:
-            if st.button("Tutte le Posizioni", key="btn_sort_all", use_container_width=True):
-                st.session_state["port_sort_choice"] = "ALL"
-                st.rerun()
-        with f_c2:
-            if st.button("🚀 Top Gainers 1D", key="btn_sort_gain", use_container_width=True):
-                st.session_state["port_sort_choice"] = "GAIN"
-                st.rerun()
-        with f_c3:
-            if st.button("🔻 Top Losers 1D", key="btn_sort_loss", use_container_width=True):
-                st.session_state["port_sort_choice"] = "LOSS"
-                st.rerun()
-        with f_c4:
-            if st.button("💼 Maggior Controvalore", key="btn_sort_val", use_container_width=True):
-                st.session_state["port_sort_choice"] = "VAL"
-                st.rerun()
-        with f_c5:
-            if st.button("📈 Maggior PnL (€)", key="btn_sort_pnl", use_container_width=True):
-                st.session_state["port_sort_choice"] = "PNL"
-                st.rerun()
+        # Filtraggio in memoria per ricerca testo (senza ricaricare quote)
+        filtered_items = [x for x in port_live_raw_items if port_search_q in x["Ticker"]] if port_search_q else port_live_raw_items
 
-        # Applicazione ordinamento
-        sorted_raw = list(port_live_raw_items)
-        s_choice = st.session_state.get("port_sort_choice", "ALL")
-        if s_choice == "GAIN":
-            sorted_raw.sort(key=lambda x: x["Var_1D_Pct"], reverse=True)
-        elif s_choice == "LOSS":
-            sorted_raw.sort(key=lambda x: x["Var_1D_Pct"])
-        elif s_choice == "VAL":
-            sorted_raw.sort(key=lambda x: x["Controvalore_EUR"], reverse=True)
-        elif s_choice == "PNL":
-            sorted_raw.sort(key=lambda x: x["PnL_EUR"], reverse=True)
-
-        display_rows = []
-        for x in sorted_raw:
-            display_rows.append({
+        df_port_display = pd.DataFrame([
+            {
                 "Ticker": x["Ticker"],
                 "Prezzo Spot (Valuta Orig.)": x["Prezzo_Spot"],
-                "Prezzo Live (€ EUR)": f"€ {x['Prezzo_EUR']:,.2f}",
-                "Var. 1D (%)": f"{'+' if x['Var_1D_Pct']>=0 else ''}{x['Var_1D_Pct']:.2f}%",
-                "Var. Day 1D (€)": f"{'+' if x['Var_Day_EUR']>=0 else ''}€ {x['Var_Day_EUR']:,.2f}",
-                "Carico FIFO WACP (€)": f"€ {x['WACP_EUR']:,.2f}",
-                "Quantità": f"{x['Quantita']:,.2f}",
-                "Controvalore Live (€)": f"€ {x['Controvalore_EUR']:,.2f}",
-                "PnL Non Realizzato (€)": f"{'+' if x['PnL_EUR']>=0 else ''}€ {x['PnL_EUR']:,.2f}",
-                "Rendimento (%)": f"{'+' if x['PnL_Pct']>=0 else ''}{x['PnL_Pct']:.2f}%",
+                "Prezzo Live (€)": x["Prezzo_EUR"],
+                "Var. 1D (%)": x["Var_1D_Pct"],
+                "Var. Day 1D (€)": x["Var_Day_EUR"],
+                "Carico FIFO WACP (€)": x["WACP_EUR"],
+                "Quantità": x["Quantita"],
+                "Controvalore Live (€)": x["Controvalore_EUR"],
+                "PnL Latente (€)": x["PnL_EUR"],
+                "Rendimento (%)": x["PnL_Pct"],
                 "Day Range (L - H)": x["Day_Range"],
                 "Stato Feed": x["Feed"]
-            })
+            }
+            for x in filtered_items
+        ])
 
-        st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
+        st.dataframe(
+            df_port_display,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Prezzo Live (€)": st.column_config.NumberColumn("Prezzo Live (€)", format="€ %.2f"),
+                "Var. 1D (%)": st.column_config.NumberColumn("Var. 1D (%)", format="%.2f%%"),
+                "Var. Day 1D (€)": st.column_config.NumberColumn("Var. Day 1D (€)", format="€ %.2f"),
+                "Carico FIFO WACP (€)": st.column_config.NumberColumn("Carico FIFO WACP (€)", format="€ %.2f"),
+                "Quantità": st.column_config.NumberColumn("Quantità", format="%.2f"),
+                "Controvalore Live (€)": st.column_config.NumberColumn("Controvalore Live (€)", format="€ %.2f"),
+                "PnL Latente (€)": st.column_config.NumberColumn("PnL Latente (€)", format="€ %.2f"),
+                "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%"),
+            }
+        )
 
 with tab_heatmap_live:
     if not port_live_raw_items:
@@ -669,8 +661,8 @@ with tab_wl_live:
         wl_rows.append({
             "Ticker": sym,
             "Prezzo Spot (Valuta Orig.)": px_orig_str,
-            "Prezzo Convertito (€ EUR)": f"€ {px_eur:,.2f}",
-            "Variazione 1D (%)": f"{'+' if q['change_pct']>=0 else ''}{q['change_pct']:.2f}%",
+            "Prezzo Convertito (€)": px_eur,
+            "Variazione 1D (%)": float(q.get("change_pct", 0.0)),
             "Day Low": f"{curr_sym}{q['day_low']:,.2f}",
             "Day High": f"{curr_sym}{q['day_high']:,.2f}",
             "52-Week Range": f"{curr_sym}{q['fifty_two_week_low']:,.2f} - {curr_sym}{q['fifty_two_week_high']:,.2f}",
@@ -679,7 +671,15 @@ with tab_wl_live:
             "Feed": "LIVE API 🟢" if q["is_live"] else "CACHE 🟡"
         })
 
-    st.dataframe(pd.DataFrame(wl_rows), use_container_width=True, hide_index=True)
+    st.dataframe(
+        pd.DataFrame(wl_rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Prezzo Convertito (€)": st.column_config.NumberColumn("Prezzo Convertito (€)", format="€ %.2f"),
+            "Variazione 1D (%)": st.column_config.NumberColumn("Variazione 1D (%)", format="%.2f%%"),
+        }
+    )
 
 st.divider()
 
