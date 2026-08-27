@@ -667,7 +667,6 @@ with tab_heatmap_live:
         st.info("Nessuna posizione attiva disponibile per generare la Heatmap.")
     else:
         df_heat = pd.DataFrame(port_live_raw_items)
-        df_heat["Label"] = df_heat["Ticker"] + "<br>€" + df_heat["Controvalore_EUR"].apply(lambda v: f"{v:,.0f}") + "<br>" + df_heat["Var_1D_Pct"].apply(lambda v: f"{v:+.2f}%")
         
         fig_heat = px.treemap(
             df_heat,
@@ -676,17 +675,37 @@ with tab_heatmap_live:
             color="Var_1D_Pct",
             color_continuous_scale=["#f85149", "#21262d", "#3fb950"],
             color_continuous_midpoint=0.0,
-            hover_data={"Controvalore_EUR": ":,.2f", "Var_1D_Pct": ":+.2f", "PnL_EUR": ":+,.2f"}
+            custom_data=["Ticker", "Controvalore_EUR", "Var_1D_Pct", "PnL_EUR", "Prezzo_EUR"]
         )
+        
+        fig_heat.update_traces(
+            textinfo="label+value",
+            texttemplate="<b>%{label}</b><br>€ %{value:,.0f}<br>%{color:+.2f}%",
+            textfont=dict(size=12, family="monospace", color="#ffffff"),
+            hovertemplate=(
+                "<b>%{customdata[0]}</b><br><br>"
+                "Prezzo Live: <b>€ %{customdata[4]:,.2f}</b><br>"
+                "Controvalore: <b>€ %{customdata[1]:,.2f}</b><br>"
+                "Variazione 1D: <b>%{customdata[2]:+.2f}%</b><br>"
+                "PnL Latente: <b>€ %{customdata[3]:+,.2f}</b>"
+                "<extra></extra>"
+            )
+        )
+        
         fig_heat.update_layout(
             template="plotly_dark",
             paper_bgcolor="rgba(13,17,23,0.95)",
             plot_bgcolor="rgba(13,17,23,0.95)",
             margin=dict(l=0, r=0, t=10, b=0),
             height=380,
+            hoverlabel=dict(
+                bgcolor="#161b22",
+                bordercolor="rgba(255,255,255,0.15)",
+                font=dict(size=12, family="monospace", color="#f0f6fc")
+            ),
             coloraxis_colorbar=dict(title="Var 1D (%)", tickfont=dict(size=10, family="monospace"))
         )
-        st.plotly_chart(fig_heat, use_container_width=True)
+        st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
 
 with tab_rel_perf:
     st.caption("Confronto dinamico dei rendimenti percentuali intraday normalizzati a base 0.00% rispetto ai principali benchmark globali.")
