@@ -51,6 +51,16 @@ class TickRingBuffer:
         self._head = 0
         self._count = 0
 
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._buffer)
+
+    @property
+    def ticks(self) -> List[MarketTick]:
+        """Restituisce una copia della lista dei tick presenti nel buffer."""
+        with self._lock:
+            return list(self._buffer)
+
     def append(self, tick: MarketTick) -> None:
         """Inserisce un nuovo tick nel ring buffer con sovrascrittura automatica FIFO."""
         with self._lock:
