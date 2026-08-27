@@ -794,7 +794,6 @@ with tab_rel_perf:
             y=1.06,
             xanchor="left",
             x=0.0,
-            itemgap=14,
             font=dict(size=11, family="sans-serif", color="#c9d1d9")
         ),
         xaxis=dict(showgrid=False, tickfont=dict(size=10, family="monospace", color="#8b949e")),
