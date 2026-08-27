@@ -13,9 +13,14 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+import importlib
 
 import core.ui_utils as ui_utils
 import core.terminal_engine as terminal_engine
+
+# Ricarica dinamica garantita del modulo in ambiente Streamlit a caldo
+if not hasattr(terminal_engine, "convert_to_eur"):
+    importlib.reload(terminal_engine)
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -29,7 +34,12 @@ from core.ui_utils import (
 from core.terminal_engine import (
     get_terminal_engine,
     TerminalCommandResult,
-    OMSOrder
+    OMSOrder,
+    convert_to_eur,
+    detect_currency,
+    get_fx_rate_to_eur,
+    fetch_live_ticker_quote,
+    fetch_multiple_live_quotes
 )
 
 st.set_page_config(
@@ -73,6 +83,11 @@ session_context = {
     "portfolio_id": 1,
     "base_currency": st.session_state.get("base_currency", "EUR")
 }
+
+# Inizializzazione Cache Quote di Sessione
+if "argus_live_quotes_dict" not in st.session_state:
+    st.session_state["argus_live_quotes_dict"] = {}
+all_quotes = st.session_state.get("argus_live_quotes_dict", {})
 
 # Buffer iniziale con guida rapida se vuoto
 if not term_eng.output_buffer:
