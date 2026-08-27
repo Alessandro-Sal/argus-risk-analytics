@@ -140,22 +140,9 @@ with col_tape_ctrl:
     ofi_val = stats.get("order_flow_imbalance", 0.0)
     microprice = display_px + (0.01 if ofi_val > 0 else -0.01)
 
-    # Risoluzione Simbolo Valutario
-    if active_tape_ticker.endswith((".MI", ".PA", ".DE")) or currency == "EUR":
-        tape_sym_curr = "€"
-        is_eur_asset = True
-    elif currency in ["USD", "USDT", "USD=X"]:
-        tape_sym_curr = "$"
-        is_eur_asset = False
-    elif currency in ["GBP", "GBp"] or active_tape_ticker.endswith(".L"):
-        tape_sym_curr = "£"
-        is_eur_asset = False
-    elif currency == "CHF" or active_tape_ticker.endswith(".SW"):
-        tape_sym_curr = "CHF "
-        is_eur_asset = False
-    else:
-        tape_sym_curr = f"{currency} "
-        is_eur_asset = False
+    # Risoluzione Valutaria e Conversione Spot Dinamica in EUR
+    tape_eur_px, _, tape_sym_curr = terminal_engine.convert_to_eur(display_px, currency, active_tape_ticker, all_quotes)
+    is_eur_asset = (terminal_engine.detect_currency(active_tape_ticker, currency) == "EUR")
 
     # Header Ticker Live con Badge Variazione e Stato API
     chg_color = "#3fb950" if chg >= 0 else "#f85149"
@@ -163,10 +150,9 @@ with col_tape_ctrl:
     arrow = "▲" if chg >= 0 else "▼"
     api_badge = '<span style="font-size:10px; background:rgba(63,185,80,0.15); color:#3fb950; border:1px solid rgba(63,185,80,0.3); padding:2px 6px; border-radius:4px; font-weight:700;">LIVE API</span>' if live_q["is_live"] else '<span style="font-size:10px; background:rgba(255,153,0,0.15); color:#ff9900; border:1px solid rgba(255,153,0,0.3); padding:2px 6px; border-radius:4px; font-weight:700;">CACHE</span>'
 
-    # Conversione EUR per display spot
+    # Conversione EUR per display spot se asset non in Euro
     eur_equiv_str = ""
     if not is_eur_asset:
-        tape_eur_px = display_px / 1.085 if currency == "USD" else display_px
         eur_equiv_str = f'<div style="font-size:12.5px; color:#58a6ff; font-weight:600; margin-top:-2px; margin-bottom:4px;">≈ € {tape_eur_px:,.2f} EUR</div>'
 
     tape_card_html = (
@@ -251,10 +237,11 @@ elif not pos.empty and "current_value" in pos.columns:
 else:
     active_pos = pos.copy() if not pos.empty else pd.DataFrame()
 
-# Lista completa di tutti i ticker necessari (Posizioni Attive + Watchlist)
+# Lista completa di tutti i ticker necessari (Posizioni Attive + Watchlist + Cross FX)
 pos_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()] if (not active_pos.empty and "ticker" in active_pos.columns) else []
 wl_tickers = [str(t).strip().upper() for t in term_eng.custom_watchlist if str(t).strip()]
-needed_tickers = list(dict.fromkeys(pos_tickers + wl_tickers))
+fx_pairs = ["EURUSD=X", "EURDKK=X", "EURGBP=X", "EURCHF=X", "EURSEK=X", "EURNOK=X", "EURJPY=X", "EURCAD=X", "EURAUD=X", "EURHKD=X"]
+needed_tickers = list(dict.fromkeys(pos_tickers + wl_tickers + fx_pairs))
 
 # Costruisci mappa di fallback immediata dai dati delle posizioni attive
 pos_fallback_map = {}
@@ -288,12 +275,6 @@ tab_port_live, tab_wl_live = st.tabs([
     "🌐 Watchlist Istituzionale di Mercato"
 ])
 
-# Recupera tasso EURUSD per conversioni valutarie spot
-eurusd_q = all_quotes.get("EURUSD=X", terminal_engine.fetch_live_ticker_quote("EURUSD=X"))
-eurusd_fx = float(eurusd_q.get("last_price", 1.085))
-if eurusd_fx <= 0:
-    eurusd_fx = 1.085
-
 with tab_port_live:
     if active_pos.empty or "ticker" not in active_pos.columns:
         st.info("Nessuna posizione attiva aperta a mercato. Carica un portafoglio o una distinta transazioni per visualizzare i prezzi live.")
@@ -318,34 +299,12 @@ with tab_port_live:
                 prev_close_orig = live_px_orig
             chg_1d = float(live_item.get("change_pct", 0.0))
             
-            # Determinazione valuta e conversione in EUR
+            # Determinazione Valuta e Conversione Multi-Currency Live in EUR
             asset_curr = str(r.get("asset_currency", live_item.get("currency", "USD"))).upper()
-            if sym.endswith((".MI", ".PA", ".DE")) or asset_curr == "EUR":
-                asset_curr = "EUR"
-                curr_sym = "€"
-                live_px_eur = live_px_orig
-                prev_px_eur = prev_close_orig
-                live_px_orig_str = f"€ {live_px_orig:,.2f}"
-            elif asset_curr == "USD":
-                curr_sym = "$"
-                live_px_eur = (live_px_orig / eurusd_fx) if eurusd_fx > 0 else (live_px_orig * float(r.get("fx_rate_spot", 0.92)))
-                prev_px_eur = (prev_close_orig / eurusd_fx) if eurusd_fx > 0 else (prev_close_orig * float(r.get("fx_rate_spot", 0.92)))
-                live_px_orig_str = f"$ {live_px_orig:,.2f}"
-            elif asset_curr in ["GBP", "GBp"]:
-                curr_sym = "£"
-                live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.17))
-                prev_px_eur = prev_close_orig * float(r.get("fx_rate_spot", 1.17))
-                live_px_orig_str = f"£ {live_px_orig:,.2f}"
-            elif asset_curr == "CHF":
-                curr_sym = "CHF "
-                live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.05))
-                prev_px_eur = prev_close_orig * float(r.get("fx_rate_spot", 1.05))
-                live_px_orig_str = f"CHF {live_px_orig:,.2f}"
-            else:
-                curr_sym = f"{asset_curr} "
-                live_px_eur = live_px_orig * float(r.get("fx_rate_spot", 1.0))
-                prev_px_eur = prev_close_orig * float(r.get("fx_rate_spot", 1.0))
-                live_px_orig_str = f"{asset_curr} {live_px_orig:,.2f}"
+            provided_fx = float(r.get("fx_rate_spot", 0.0)) if ("fx_rate_spot" in r and float(r.get("fx_rate_spot", 0.0)) > 0) else None
+
+            live_px_eur, live_px_orig_str, curr_sym = terminal_engine.convert_to_eur(live_px_orig, asset_curr, sym, all_quotes, provided_fx)
+            prev_px_eur, _, _ = terminal_engine.convert_to_eur(prev_close_orig, asset_curr, sym, all_quotes, provided_fx)
 
             mkt_val_eur = q_val * live_px_eur
             prev_val_eur = q_val * prev_px_eur
@@ -487,26 +446,7 @@ with tab_wl_live:
         curr_raw = str(q.get("currency", "USD")).upper()
         px_orig = float(q.get("last_price", 0.0))
         
-        if sym.endswith((".MI", ".PA", ".DE")) or curr_raw == "EUR":
-            curr_sym = "€"
-            px_eur = px_orig
-            px_orig_str = f"€ {px_orig:,.2f}"
-        elif curr_raw == "USD":
-            curr_sym = "$"
-            px_eur = (px_orig / eurusd_fx) if eurusd_fx > 0 else (px_orig * 0.92)
-            px_orig_str = f"$ {px_orig:,.2f}"
-        elif curr_raw in ["GBP", "GBp"]:
-            curr_sym = "£"
-            px_eur = px_orig * 1.17
-            px_orig_str = f"£ {px_orig:,.2f}"
-        elif curr_raw == "CHF":
-            curr_sym = "CHF "
-            px_eur = px_orig * 1.05
-            px_orig_str = f"CHF {px_orig:,.2f}"
-        else:
-            curr_sym = f"{curr_raw} "
-            px_eur = px_orig
-            px_orig_str = f"{curr_raw} {px_orig:,.2f}"
+        px_eur, px_orig_str, curr_sym = terminal_engine.convert_to_eur(px_orig, curr_raw, sym, all_quotes)
 
         vol_s = f"{q['volume']:,.0f}" if q.get('volume', 0) > 0 else "—"
         mkt_c = f"${q['market_cap']/1e12:.2f}T" if q.get('market_cap', 0)>=1e12 else (f"${q['market_cap']/1e9:.2f}B" if q.get('market_cap', 0)>=1e9 else f"${q['market_cap']/1e6:.2f}M") if q.get('market_cap', 0)>0 else "—"

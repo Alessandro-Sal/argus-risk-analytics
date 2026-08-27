@@ -192,12 +192,159 @@ def fetch_multiple_live_quotes(
                 if sym not in results:
                     results[sym] = fetch_live_ticker_quote(sym, force_refresh=False, fallback_price=fb_dict.get(sym))
 
-    # Assicura che tutti i clean_tickers abbiano una quotazione valida
-    for sym in clean_tickers:
-        if sym not in results:
-            results[sym] = fetch_live_ticker_quote(sym, force_refresh=False, fallback_price=fb_dict.get(sym))
-
     return results
+
+
+# =========================================================================
+# DYNAMIC MULTI-CURRENCY CONVERSION ENGINE (GLOBAL FX DESK)
+# =========================================================================
+
+_DEFAULT_FX_TO_EUR: Dict[str, float] = {
+    "EUR": 1.0,
+    "USD": 1.0 / 1.085,    # ~0.9216
+    "USDT": 1.0 / 1.085,
+    "USDC": 1.0 / 1.085,
+    "DKK": 1.0 / 7.460,    # ~0.134048 (1 DKK = 0.134 EUR)
+    "GBP": 1.170,          # (1 GBP = 1.17 EUR)
+    "CHF": 1.0 / 0.940,    # ~1.0638 (1 CHF = 1.064 EUR)
+    "SEK": 1.0 / 11.200,   # ~0.08928 (1 SEK = 0.089 EUR)
+    "NOK": 1.0 / 11.600,   # ~0.08620 (1 NOK = 0.086 EUR)
+    "JPY": 1.0 / 160.000,  # ~0.00625 (1 JPY = 0.00625 EUR)
+    "CAD": 1.0 / 1.480,    # ~0.67567 (1 CAD = 0.676 EUR)
+    "AUD": 1.0 / 1.650,    # ~0.60606 (1 AUD = 0.606 EUR)
+    "HKD": 1.0 / 8.450,    # ~0.11834 (1 HKD = 0.118 EUR)
+    "PLN": 1.0 / 4.300,    # ~0.23255 (1 PLN = 0.233 EUR)
+    "BRL": 1.0 / 6.000,    # ~0.16667 (1 BRL = 0.167 EUR)
+    "INR": 1.0 / 90.000,   # ~0.01111 (1 INR = 0.011 EUR)
+    "SGD": 1.0 / 1.450,    # ~0.68965 (1 SGD = 0.690 EUR)
+    "CNY": 1.0 / 7.800,    # ~0.12820 (1 CNY = 0.128 EUR)
+    "MXN": 1.0 / 19.500,   # ~0.05128 (1 MXN = 0.051 EUR)
+}
+
+_CURRENCY_SYMBOLS: Dict[str, str] = {
+    "EUR": "€",
+    "USD": "$",
+    "USDT": "$",
+    "USDC": "$",
+    "DKK": "DKK ",
+    "GBP": "£",
+    "CHF": "CHF ",
+    "SEK": "SEK ",
+    "NOK": "NOK ",
+    "JPY": "¥",
+    "CAD": "CAD ",
+    "AUD": "AUD ",
+    "HKD": "HKD ",
+    "PLN": "PLN ",
+    "BRL": "R$ ",
+    "INR": "₹",
+    "SGD": "SGD ",
+    "CNY": "¥",
+    "MXN": "MX$ "
+}
+
+
+def detect_currency(ticker: str, declared_curr: str = "") -> str:
+    """Riconosce con precisione la valuta di quotazione di un ticker o strumento globale."""
+    curr = declared_curr.strip().upper() if declared_curr else ""
+    t = ticker.strip().upper()
+    
+    if curr and curr not in ["XXX", "NAN", "NONE", "NULL", ""]:
+        if curr in ["GBP", "GBp"]:
+            return "GBP"
+        return curr
+        
+    if t.endswith((".MI", ".PA", ".DE", ".MC", ".AS", ".BR", ".VI", ".HE", ".LS", ".AT", ".IR")):
+        return "EUR"
+    if t.endswith(".CO"):
+        return "DKK"
+    if t.endswith(".ST"):
+        return "SEK"
+    if t.endswith(".OL"):
+        return "NOK"
+    if t.endswith(".L"):
+        return "GBP"
+    if t.endswith((".SW", ".VX")):
+        return "CHF"
+    if t.endswith(".T"):
+        return "JPY"
+    if t.endswith((".TO", ".V")):
+        return "CAD"
+    if t.endswith(".AX"):
+        return "AUD"
+    if t.endswith(".HK"):
+        return "HKD"
+    if t.endswith(".WA"):
+        return "PLN"
+    if t.endswith(".SA"):
+        return "BRL"
+    if t.endswith((".NS", ".BO")):
+        return "INR"
+    if t.endswith(".SI"):
+        return "SGD"
+    return "USD"
+
+
+def get_fx_rate_to_eur(currency: str, quotes_map: Optional[Dict[str, Any]] = None) -> float:
+    """
+    Restituisce il moltiplicatore spot per convertire 1 unità di valuta estera in EUR.
+    Esempi:
+      get_fx_rate_to_eur('DKK') -> ~0.134
+      get_fx_rate_to_eur('USD') -> ~0.921
+      get_fx_rate_to_eur('GBP') -> ~1.170
+    """
+    curr = currency.strip().upper()
+    if curr in ["EUR", ""]:
+        return 1.0
+
+    quotes = quotes_map or {}
+    
+    # 1. Prova cross EUR<CURR>=X nella mappa quote (es. EURUSD=X, EURDKK=X)
+    pair_eur_base = f"EUR{curr}=X"
+    if pair_eur_base in quotes:
+        px = float(quotes[pair_eur_base].get("last_price", 0.0))
+        if px > 0:
+            return 1.0 / px
+            
+    # 2. Prova cross <CURR>EUR=X nella mappa quote (es. DKKEUR=X, USDEUR=X)
+    pair_curr_base = f"{curr}EUR=X"
+    if pair_curr_base in quotes:
+        px = float(quotes[pair_curr_base].get("last_price", 0.0))
+        if px > 0:
+            return px
+
+    # 3. Fallback tabelle predefinite istituzionali
+    return _DEFAULT_FX_TO_EUR.get(curr, 1.0)
+
+
+def convert_to_eur(
+    price: float,
+    currency: str,
+    ticker: str = "",
+    quotes_map: Optional[Dict[str, Any]] = None,
+    provided_fx_rate: Optional[float] = None
+) -> Tuple[float, str, str]:
+    """
+    Converte un prezzo o controvalore da valuta originale ad Euro (€ EUR).
+    Ritorna una tupla: (prezzo_eur: float, stringa_prezzo_originale: str, simbolo_valuta: str)
+    """
+    curr = detect_currency(ticker, currency)
+    sym = _CURRENCY_SYMBOLS.get(curr, f"{curr} ")
+    
+    # Special case: GBp in pence (centesimi di sterlina su London Stock Exchange)
+    is_pence = (currency.strip() == "GBp" or (ticker.endswith(".L") and price > 500 and curr == "GBP"))
+    calc_price = (price / 100.0) if is_pence else price
+
+    if curr == "EUR":
+        fx_rate = 1.0
+    elif provided_fx_rate is not None and 0.0001 < provided_fx_rate < 100.0 and provided_fx_rate != 1.0:
+        fx_rate = provided_fx_rate
+    else:
+        fx_rate = get_fx_rate_to_eur(curr, quotes_map)
+
+    eur_price = calc_price * fx_rate
+    orig_str = f"{sym}{price:,.2f}"
+    return eur_price, orig_str, sym
 
 
 @dataclass
@@ -637,10 +784,6 @@ class ArgusTerminalEngine:
         port_tickers = [str(t).strip().upper() for t in df_pos["ticker"].unique() if str(t).strip()]
         quotes_map = fetch_multiple_live_quotes(port_tickers, max_workers=8)
 
-        # Recupera tasso EURUSD per conversione spot dinamica
-        fx_eurusd_quote = fetch_live_ticker_quote("EURUSD=X")
-        eurusd_rate = fx_eurusd_quote["last_price"] if fx_eurusd_quote["last_price"] > 0 else 1.085
-
         for _, row in df_pos.iterrows():
             sym = str(row["ticker"]).strip().upper()
             qty = float(row.get("qty_net", row.get("quantity", row.get("shares", 0.0))))
@@ -648,23 +791,11 @@ class ArgusTerminalEngine:
             q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
             live_p_orig = q["last_price"]
             prev_close_orig = q.get("prev_close", live_p_orig)
-            curr_code = str(q.get("currency", "USD")).upper()
-            if sym.endswith((".MI", ".PA", ".DE")) or str(row.get("asset_currency", "")).upper() == "EUR":
-                curr_code = "EUR"
+            declared_curr = str(row.get("asset_currency", q.get("currency", "USD"))).upper()
+            provided_fx = float(row.get("fx_rate_spot", 0.0)) if "fx_rate_spot" in row else None
 
-            if curr_code == "EUR":
-                live_p_eur = live_p_orig
-                prev_p_eur = prev_close_orig
-                curr_sym = "€"
-            elif curr_code == "USD":
-                live_p_eur = (live_p_orig / eurusd_rate) if eurusd_rate > 0 else (live_p_orig * float(row.get("fx_rate_spot", 0.92)))
-                prev_p_eur = (prev_close_orig / eurusd_rate) if eurusd_rate > 0 else (prev_close_orig * float(row.get("fx_rate_spot", 0.92)))
-                curr_sym = "$"
-            else:
-                fx_spot = float(row.get("fx_rate_spot", 1.0))
-                live_p_eur = live_p_orig * fx_spot
-                prev_p_eur = prev_close_orig * fx_spot
-                curr_sym = curr_code
+            live_p_eur, spot_orig_str, curr_sym = convert_to_eur(live_p_orig, declared_curr, sym, quotes_map, provided_fx)
+            prev_p_eur, _, _ = convert_to_eur(prev_close_orig, declared_curr, sym, quotes_map, provided_fx)
 
             chg_1d = q["change_pct"]
             cost = qty * wacp_eur
