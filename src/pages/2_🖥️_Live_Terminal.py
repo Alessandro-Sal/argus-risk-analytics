@@ -672,6 +672,17 @@ with tab_heatmap_live:
         df_heat["PnL_EUR"] = pd.to_numeric(df_heat["PnL_EUR"], errors="coerce").fillna(0.0)
         df_heat["Prezzo_EUR"] = pd.to_numeric(df_heat["Prezzo_EUR"], errors="coerce").fillna(0.0)
         
+        # Stringhe pre-formattate a prova di bug di rendering Plotly.js su customdata
+        df_heat["Label_Tile"] = (
+            "<b>" + df_heat["Ticker"].astype(str) + "</b><br>"
+            + "€ " + df_heat["Controvalore_EUR"].apply(lambda v: f"{float(v):,.0f}") + "<br>"
+            + df_heat["Var_1D_Pct"].apply(lambda v: f"{float(v):+.2f}%")
+        )
+        df_heat["Prezzo_EUR_Str"] = df_heat["Prezzo_EUR"].apply(lambda v: f"€ {float(v):,.2f}")
+        df_heat["Controvalore_EUR_Str"] = df_heat["Controvalore_EUR"].apply(lambda v: f"€ {float(v):,.2f}")
+        df_heat["Var_1D_Pct_Str"] = df_heat["Var_1D_Pct"].apply(lambda v: f"{float(v):+.2f}%")
+        df_heat["PnL_EUR_Str"] = df_heat["PnL_EUR"].apply(lambda v: f"€ {float(v):+,.2f}")
+        
         fig_heat = px.treemap(
             df_heat,
             path=["Ticker"],
@@ -679,19 +690,19 @@ with tab_heatmap_live:
             color="Var_1D_Pct",
             color_continuous_scale=["#f85149", "#21262d", "#3fb950"],
             color_continuous_midpoint=0.0,
-            custom_data=["Ticker", "Controvalore_EUR", "Var_1D_Pct", "PnL_EUR", "Prezzo_EUR"]
+            custom_data=["Ticker", "Controvalore_EUR_Str", "Var_1D_Pct_Str", "PnL_EUR_Str", "Prezzo_EUR_Str", "Label_Tile"]
         )
         
         fig_heat.update_traces(
             textinfo="none",
-            texttemplate="<b>%{customdata[0]}</b><br>€ %{customdata[1]:,.0f}<br>%{customdata[2]:+.2f}%",
+            texttemplate="%{customdata[5]}",
             textfont=dict(size=12, family="monospace", color="#ffffff"),
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br><br>"
-                "Prezzo Live: <b>€ %{customdata[4]:,.2f}</b><br>"
-                "Controvalore: <b>€ %{customdata[1]:,.2f}</b><br>"
-                "Variazione 1D: <b>%{customdata[2]:+.2f}%</b><br>"
-                "PnL Latente: <b>€ %{customdata[3]:+,.2f}</b>"
+                "Prezzo Live: <b>%{customdata[4]}</b><br>"
+                "Controvalore: <b>%{customdata[1]}</b><br>"
+                "Variazione 1D: <b>%{customdata[2]}</b><br>"
+                "PnL Latente: <b>%{customdata[3]}</b>"
                 "<extra></extra>"
             )
         )
