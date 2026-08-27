@@ -522,23 +522,23 @@ terminal_screen_lines = []
 for item in term_eng.output_buffer[:12]:
     status_color = "#3fb950" if item.status == "SUCCESS" else ("#f85149" if item.status == "ERROR" else "#ff9900")
     esc_cmd = html.escape(str(item.command))
-    esc_out = html.escape(str(item.output_text))
+    esc_out = html.escape(str(item.output_text)).replace("\n", "<br>")
     terminal_screen_lines.append(
-        f"<div style='margin-bottom: 14px;'>"
-        f"<div style='margin-bottom: 4px; font-family: monospace; font-size: 12px;'>"
+        f"<div style='margin-bottom: 16px;'>"
+        f"<div style='margin-bottom: 6px; font-family: monospace; font-size: 12px;'>"
         f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
         f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> "
         f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>"
         f"</div>"
-        f"<pre style='margin:0; padding:0; background:transparent; border:none; font-family: monospace; font-size: 12px; color: #c9d1d9; white-space: pre-wrap; line-height: 1.45;'>{esc_out}</pre>"
-        f"<div style='border-bottom: 1px dashed rgba(255,255,255,0.08); margin-top: 10px;'></div>"
+        f"<div style='font-family: monospace; font-size: 11.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.4; padding-left: 2px;'>{esc_out}</div>"
+        f"<div style='border-bottom: 1px dashed rgba(255,255,255,0.08); margin-top: 12px;'></div>"
         f"</div>"
     )
 
 terminal_screen_html = "".join(terminal_screen_lines)
 
 terminal_box_html = (
-    f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 18px; font-family: monospace; font-size: 12px; color: #c9d1d9; height: 420px; overflow-y: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85);">'
+    f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 18px; font-family: monospace; height: 420px; overflow-y: auto; overflow-x: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85);">'
     f'{terminal_screen_html}'
     f'</div>'
 )
