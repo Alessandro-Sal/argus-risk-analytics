@@ -126,8 +126,12 @@ with col_tape_ctrl:
 
     active_tape_ticker = custom_tk_input if custom_tk_input else sel_dropdown_tk
 
-    # Fetch Live Quote in tempo reale via yfinance fast_info API
-    live_q = terminal_engine.fetch_live_ticker_quote(active_tape_ticker)
+    # Recupera quote: prioritizza cache in memoria se disponibile per risposta istantanea (0ms)
+    live_q = all_quotes.get(active_tape_ticker)
+    if not live_q:
+        live_q = terminal_engine.fetch_live_ticker_quote(active_tape_ticker)
+        st.session_state.setdefault("argus_live_quotes_dict", {})[active_tape_ticker] = live_q
+
     last_px = live_q["last_price"]
     prev_close = live_q["prev_close"]
     chg = live_q["change"]
@@ -386,8 +390,8 @@ if not active_pos.empty and "ticker" in active_pos.columns:
 if "argus_live_quotes_dict" not in st.session_state:
     st.session_state["argus_live_quotes_dict"] = {}
 
-# Sincronizza se esplicitamente richiesto o se la cache di sessione è vuota
-need_sync = btn_force_sync or (not st.session_state["argus_live_quotes_dict"]) or any(t not in st.session_state["argus_live_quotes_dict"] for t in needed_tickers)
+# Sincronizza solo su richiesta esplicita o al primissimo avvio se la cache è vuota
+need_sync = btn_force_sync or (len(st.session_state.get("argus_live_quotes_dict", {})) == 0)
 
 if need_sync and needed_tickers:
     with st.spinner("⏳ Sincronizzazione flussi di mercato e prezzi live in tempo reale..."):
@@ -529,15 +533,7 @@ with tab_port_live:
         """
         st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
-        col_tbl_info, col_tbl_search = st.columns([3.0, 1.2], vertical_alignment="center")
-        with col_tbl_info:
-            st.markdown(
-                "<div style='font-size: 11.5px; color: #8b949e; margin-bottom: 6px;'>"
-                "💡 <b>Ordinamento Istantaneo:</b> Clicca sull'intestazione di <u>qualsiasi colonna</u> "
-                "(es. <i>Var. 1D (%)</i>, <i>Controvalore</i>, <i>PnL Latente</i>) per ordinare la tabella a <b>latenza zero</b>."
-                "</div>",
-                unsafe_allow_html=True
-            )
+        col_spc, col_tbl_search = st.columns([3.5, 1.2], vertical_alignment="center")
         with col_tbl_search:
             port_search_q = st.text_input("🔍 Filtra Ticker:", placeholder="Es. AAPL, ENI...", key="inp_port_table_search", label_visibility="collapsed").strip().upper()
 
