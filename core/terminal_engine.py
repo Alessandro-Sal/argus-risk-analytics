@@ -554,6 +554,8 @@ class ArgusTerminalEngine:
             return self._cmd_metric(first_token, results)
 
         if first_token in ("CORR", "CORRELATION"):
+            if len(tokens) >= 2 and tokens[1].upper() in ("MATRIX", "MAT", "ALL", "TABLE"):
+                return self._cmd_corr_matrix(df_ret)
             return self._cmd_correlation(tokens, df_ret)
 
         if first_token in ("KELLY", "HALF-KELLY"):
@@ -561,6 +563,16 @@ class ArgusTerminalEngine:
 
         if first_token in ("HEALTH", "SCORE", "DIAG"):
             return self._cmd_health_score(results, df_pos)
+
+        if first_token in ("SHOCK", "STRESS"):
+            return self._cmd_shock(tokens, ctx)
+
+        if first_token in ("SNAP", "SNAPSHOT", "EXPORT", "DUMP"):
+            return self._cmd_snap(ctx)
+
+        if first_token == "NEWS" or (len(tokens) >= 2 and tokens[1].upper() == "NEWS"):
+            tk_news = tokens[1] if first_token == "NEWS" and len(tokens) >= 2 else (tokens[0] if len(tokens) >= 2 and tokens[1].upper() == "NEWS" else "AAPL")
+            return self._cmd_news(tk_news)
 
         # ---------------------------------------------------------
         # 6. MNEMONICI BLOOMBERG GLOBALI (<TICKER> <MNEMONIC> o <MNEMONIC>)
@@ -639,6 +651,7 @@ class ArgusTerminalEngine:
 │   QUOTE <TICKER> / <TICKER> Q : Scheda Bloomberg ALLQ / GP (prezzo spot, range, vol)   │
 │   <TICKER> PX / LIVE          : Quotazione istantanea in tempo reale (es. 'AAPL Q')    │
 │   WATCHLIST / WL              : Tabella comparativa multi-asset in streaming           │
+│   NEWS <TICKER>               : Ultime news di mercato con sentiment score in streaming│
 │                                                                                        │
 │ MNEMONICI BLOOMBERG:                                                                   │
 │   <TICKER> DES           : Scheda informativa, prezzo, PnL e P/E dell'asset            │
@@ -649,10 +662,12 @@ class ArgusTerminalEngine:
 │   TAX                    : Prospetto fiscale, minusvalenze e potenziale Tax-Loss       │
 │   STREAM [TICKER]        : Statistiche Order Flow Imbalance (OFI) & Microprice         │
 │                                                                                        │
-│ COMANDI QUANTITATIVI & RISK:                                                           │
+│ COMANDI QUANTITATIVI & STRESS TEST:                                                    │
 │   VAR [95|99]            : Value at Risk (1D & 10D) monetario e percentuale            │
-│   SHARPE | SORTINO | BETA: Metriche istantanee di performance corretta per il rischio  │
+│   SHOCK <PCT>            : Stress test istantaneo prezzi e capitale (es. 'SHOCK -5%')  │
 │   CORR <TICK1> <TICK2>   : Matrice di correlazione Pearson & Spearman tra due titoli   │
+│   CORR MATRIX            : Matrice di correlazione tabulare completa del portafoglio   │
+│   SHARPE | SORTINO | BETA: Metriche istantanee di performance corretta per il rischio  │
 │   KELLY                  : Dimensionamento trade ottimale Kelly Criterion & Half-Kelly │
 │   HEALTH                 : Health Score sintetico del portafoglio (0-100)              │
 │                                                                                        │
@@ -664,9 +679,10 @@ class ArgusTerminalEngine:
 │   BLOTTER                   : Visualizzazione registro ordini attivi ed eseguiti       │
 │   CANCEL <order_id>         : Cancellazione ordine pendente                            │
 │                                                                                        │
-│ SQL & SCREENER ENGINE:                                                                 │
+│ SQL, SCREENER & EXPORT:                                                                │
 │   SQL <query>            : Interrogazione SQL DuckDB in-memory su df_positions/df_ret  │
 │   EQS <condizione>       : Valutazione filtro multi-fattoriale (es. EQS Piotroski >= 7)│
+│   SNAP / EXPORT          : Generazione dump CSV dello snapshot prezzi live             │
 │                                                                                        │
 │ UTILITÀ DI SISTEMA:                                                                    │
 │   TOP / STATUS           : Telemetria live CPU, RAM RSS, Cache Hit-Rate e DB Records   │
@@ -1370,6 +1386,172 @@ Bid-Ask Average Spread   : ${stats.get('mean_spread', 0.0):.4f}
 Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buyer Aggression' if stats.get('order_flow_imbalance', 0.0) > 0 else 'Seller Aggression'})
 """
         return TerminalCommandResult(command="STREAM", status="SUCCESS", output_text=out_msg.strip())
+
+    def _cmd_news(self, ticker: str) -> TerminalCommandResult:
+        sym = (ticker or "AAPL").strip().upper()
+        raw_news = []
+        try:
+            import yfinance as yf
+            t = yf.Ticker(sym)
+            raw_news = getattr(t, "news", []) or []
+        except Exception:
+            raw_news = []
+
+        lines = [
+            f"┌────────────────────────────────────────────────────────────────────────────────────────┐",
+            f"│ FINANCIAL NEWS STREAM & MARKET SENTIMENT: {sym:<44} │",
+            f"├────────────────────────────────────────────────────────────────────────────────────────┤"
+        ]
+
+        if not raw_news:
+            lines.extend([
+                f"│ [INFO] Feed news in tempo reale al momento non disponibile per {sym:<23} │",
+                f"│ Verificare la connettività di rete o la quotazione del simbolo.                        │",
+                f"└────────────────────────────────────────────────────────────────────────────────────────┘"
+            ])
+            return TerminalCommandResult(command=f"NEWS {sym}", status="INFO", output_text="\n".join(lines))
+
+        for idx, item in enumerate(raw_news[:4], 1):
+            title = str(item.get("title", "News")).strip()
+            publisher = str(item.get("publisher", "Financial Feed")).strip()
+            ts = item.get("providerPublishTime", None)
+            time_str = datetime.fromtimestamp(ts, timezone.utc).strftime("%d/%m %H:%M") if ts else "N/A"
+            
+            lower_title = title.lower()
+            if any(w in lower_title for w in ["record", "surge", "gain", "profit", "beat", "rally", "upgrade", "bull", "growth", "high"]):
+                sent_badge = "[+] BULLISH "
+            elif any(w in lower_title for w in ["drop", "fall", "slump", "miss", "loss", "plunge", "downgrade", "bear", "lawsuit", "cut"]):
+                sent_badge = "[-] BEARISH "
+            else:
+                sent_badge = "[~] NEUTRAL "
+
+            if len(title) > 65:
+                title = title[:62] + "..."
+
+            lines.append(f"│ #{idx} [{time_str}] {sent_badge} | {publisher:<18} │")
+            lines.append(f"│    {title:<83} │")
+            if idx < min(4, len(raw_news)):
+                lines.append(f"│ ······················································································ │")
+
+        lines.append(f"└────────────────────────────────────────────────────────────────────────────────────────┘")
+        return TerminalCommandResult(command=f"NEWS {sym}", status="SUCCESS", output_text="\n".join(lines))
+
+    def _cmd_shock(self, tokens: List[str], ctx: Dict[str, Any]) -> TerminalCommandResult:
+        pct_val = -5.0
+        if len(tokens) >= 2:
+            try:
+                raw_pct = tokens[1].replace("%", "").replace("+", "").strip()
+                pct_val = float(raw_pct)
+            except ValueError:
+                pct_val = -5.0
+
+        df_pos = ctx.get("df_positions", pd.DataFrame())
+        if df_pos.empty or "ticker" not in df_pos.columns:
+            return TerminalCommandResult(command="SHOCK", status="ERROR", output_text="Portafoglio vuoto. Impossibile simulare lo stress test.")
+
+        qty_col = "qty_net" if "qty_net" in df_pos.columns else ("shares" if "shares" in df_pos.columns else ("quantity" if "quantity" in df_pos.columns else None))
+        active_pos = df_pos[df_pos[qty_col] > 1e-6] if qty_col else df_pos
+
+        port_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()]
+        quotes_map = fetch_multiple_live_quotes(port_tickers)
+
+        total_live_val = 0.0
+        shocked_live_val = 0.0
+        mult = 1.0 + (pct_val / 100.0)
+
+        lines = [
+            f"┌────────────────────────────────────────────────────────────────────────────────────────┐",
+            f"│ PORTFOLIO MARKET STRESS TEST (SHOCK {pct_val:+.1f}%)                                          │",
+            f"├────────────────────────────────────────────────────────────────────────────────────────┤",
+            f"│ TICKER   LIVE VAL (€)    SHOCKED VAL (€)     DELTA P&L (€)    SHOCK %                  │",
+            f"├────────────────────────────────────────────────────────────────────────────────────────┤"
+        ]
+
+        for _, row in active_pos.iterrows():
+            sym = str(row["ticker"]).strip().upper()
+            qty = float(row.get("qty_net", row.get("quantity", row.get("shares", 0.0))))
+            q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
+            live_p_orig = q["last_price"]
+            decl_curr = str(row.get("asset_currency", q.get("currency", "USD"))).upper()
+            live_p_eur, _, _ = convert_to_eur(live_p_orig, decl_curr, sym, quotes_map)
+
+            val_eur = qty * live_p_eur
+            shocked_val = val_eur * mult
+            delta_eur = shocked_val - val_eur
+
+            total_live_val += val_eur
+            shocked_live_val += shocked_val
+
+            d_sgn = "+" if delta_eur >= 0 else ""
+            lines.append(f"│ {sym:<8} € {val_eur:>10,.2f}    € {shocked_val:>12,.2f}    {d_sgn}€ {delta_eur:>10,.2f}    {pct_val:>+6.1f}%                 │")
+
+        tot_delta = shocked_live_val - total_live_val
+        tot_sgn = "+" if tot_delta >= 0 else ""
+
+        lines.extend([
+            f"├────────────────────────────────────────────────────────────────────────────────────────┤",
+            f"│ VALORE ATTUALE SPOT     : € {total_live_val:>12,.2f}                                         │",
+            f"│ VALORE DOPO SHOCK       : € {shocked_live_val:>12,.2f}                                         │",
+            f"│ IMPATTO MONETARIO TOTALE: {tot_sgn}€ {tot_delta:>12,.2f} ({pct_val:+.2f}%)                               │",
+            f"└────────────────────────────────────────────────────────────────────────────────────────┘"
+        ])
+        return TerminalCommandResult(command=f"SHOCK {pct_val:+.1f}%", status="SUCCESS", output_text="\n".join(lines))
+
+    def _cmd_snap(self, ctx: Dict[str, Any]) -> TerminalCommandResult:
+        df_pos = ctx.get("df_positions", pd.DataFrame())
+        if df_pos.empty or "ticker" not in df_pos.columns:
+            return TerminalCommandResult(command="SNAP", status="INFO", output_text="Nessuna posizione attiva per cui generare lo snapshot.")
+
+        qty_col = "qty_net" if "qty_net" in df_pos.columns else ("shares" if "shares" in df_pos.columns else ("quantity" if "quantity" in df_pos.columns else None))
+        active_pos = df_pos[df_pos[qty_col] > 1e-6] if qty_col else df_pos
+
+        port_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()]
+        quotes_map = fetch_multiple_live_quotes(port_tickers)
+
+        lines = [
+            "# ARGUS LIVE MARKET PRICING SNAPSHOT",
+            f"# Timestamp UTC: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}",
+            "Ticker,Valuta,Prezzo_Spot,Prezzo_EUR,Quantita,Controvalore_EUR,WACP_EUR,PnL_Unrealized_EUR,Var_1D_Pct",
+        ]
+        for _, row in active_pos.iterrows():
+            sym = str(row["ticker"]).strip().upper()
+            qty = float(row.get("qty_net", row.get("quantity", row.get("shares", 0.0))))
+            wacp = float(row.get("avg_cost", row.get("wacp", row.get("buy_price", 0.0))))
+            q = quotes_map.get(sym, fetch_live_ticker_quote(sym))
+            live_p = q["last_price"]
+            decl_curr = str(row.get("asset_currency", q.get("currency", "USD"))).upper()
+            live_p_eur, _, _ = convert_to_eur(live_p, decl_curr, sym, quotes_map)
+            val_eur = qty * live_p_eur
+            cost_eur = qty * wacp
+            pnl_eur = val_eur - cost_eur
+            chg_1d = q["change_pct"]
+            lines.append(f"{sym},{decl_curr},{live_p:.2f},{live_p_eur:.2f},{qty:.2f},{val_eur:.2f},{wacp:.2f},{pnl_eur:.2f},{chg_1d:.2f}")
+
+        return TerminalCommandResult(command="SNAP", status="SUCCESS", output_text="\n".join(lines))
+
+    def _cmd_corr_matrix(self, df_ret: pd.DataFrame) -> TerminalCommandResult:
+        if df_ret.empty or len(df_ret.columns) < 2:
+            return TerminalCommandResult(command="CORR MATRIX", status="ERROR", output_text="Serie storiche insufficienti per costruire la matrice di correlazione.")
+
+        sub_cols = [c for c in df_ret.columns if c not in ["Date", "Benchmark", "BENCHMARK"]][:6]
+        if len(sub_cols) < 2:
+            return TerminalCommandResult(command="CORR MATRIX", status="ERROR", output_text="Almeno 2 asset necessari per la matrice di correlazione.")
+
+        corr = df_ret[sub_cols].corr()
+
+        lines = [
+            "┌────────────────────────────────────────────────────────────────────────────────────────┐",
+            "│ CORRELATION MATRIX (PEARSON HISTORICAL RETURNS)                                        │",
+            "├──────────┬" + "──────────┬" * len(sub_cols),
+            "│ ASSET    │ " + " │ ".join([f"{c[:8]:^8}" for c in sub_cols]) + " │",
+            "├──────────┼" + "──────────┼" * len(sub_cols)
+        ]
+        for row_c in sub_cols:
+            vals = [f"{corr.loc[row_c, col_c]:>+7.2f}" for col_c in sub_cols]
+            lines.append(f"│ {row_c[:8]:<8} │ " + " │ ".join([f"{v:^8}" for v in vals]) + " │")
+
+        lines.append("└──────────┴" + "──────────┴" * len(sub_cols))
+        return TerminalCommandResult(command="CORR MATRIX", status="SUCCESS", output_text="\n".join(lines))
 
 
 # Singleton Istanza Globale del Terminal Engine
