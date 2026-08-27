@@ -741,29 +741,63 @@ with tab_rel_perf:
     fig_rel = go.Figure()
     # Portafoglio
     p_traj = [0.0, port_day_ret_p * 0.25, port_day_ret_p * 0.45, port_day_ret_p * 0.65, port_day_ret_p * 0.85, port_day_ret_p * 0.95, port_day_ret_p]
-    fig_rel.add_trace(go.Scatter(x=time_pts, y=p_traj, mode="lines+markers", name="💼 Portafoglio ARGUS", line=dict(color="#38bdf8", width=3.5), marker=dict(size=6, color="#38bdf8")))
+    fig_rel.add_trace(go.Scatter(
+        x=time_pts, y=p_traj, mode="lines+markers", name="Portafoglio ARGUS",
+        line=dict(color="#38bdf8", width=3.5), marker=dict(size=6, color="#38bdf8"),
+        hovertemplate="%{y:+.2f}%<extra></extra>"
+    ))
     # SPY
     s_traj = [0.0, spy_chg * 0.20, spy_chg * 0.50, spy_chg * 0.65, spy_chg * 0.80, spy_chg * 0.90, spy_chg]
-    fig_rel.add_trace(go.Scatter(x=time_pts, y=s_traj, mode="lines", name="🇺🇸 S&P 500 (SPY)", line=dict(color="#58a6ff", width=2, dash="dash")))
+    fig_rel.add_trace(go.Scatter(
+        x=time_pts, y=s_traj, mode="lines", name="S&P 500 (SPY)",
+        line=dict(color="#58a6ff", width=2, dash="dash"),
+        hovertemplate="%{y:+.2f}%<extra></extra>"
+    ))
     # QQQ
     q_traj = [0.0, qqq_chg * 0.30, qqq_chg * 0.55, qqq_chg * 0.70, qqq_chg * 0.85, qqq_chg * 0.95, qqq_chg]
-    fig_rel.add_trace(go.Scatter(x=time_pts, y=q_traj, mode="lines", name="💻 Nasdaq-100 (QQQ)", line=dict(color="#a855f7", width=2, dash="dot")))
+    fig_rel.add_trace(go.Scatter(
+        x=time_pts, y=q_traj, mode="lines", name="Nasdaq-100 (QQQ)",
+        line=dict(color="#a855f7", width=2, dash="dot"),
+        hovertemplate="%{y:+.2f}%<extra></extra>"
+    ))
     # BTC
     b_traj = [0.0, btc_chg * 0.15, btc_chg * 0.40, btc_chg * 0.75, btc_chg * 0.65, btc_chg * 0.90, btc_chg]
-    fig_rel.add_trace(go.Scatter(x=time_pts, y=b_traj, mode="lines", name="₿ Bitcoin (BTC-USD)", line=dict(color="#ff9900", width=2, dash="dot")))
+    fig_rel.add_trace(go.Scatter(
+        x=time_pts, y=b_traj, mode="lines", name="Bitcoin (BTC-USD)",
+        line=dict(color="#ff9900", width=2, dash="dot"),
+        hovertemplate="%{y:+.2f}%<extra></extra>"
+    ))
     # EUR/USD
     f_traj = [0.0, fx_chg * 0.25, fx_chg * 0.45, fx_chg * 0.60, fx_chg * 0.80, fx_chg * 0.95, fx_chg]
-    fig_rel.add_trace(go.Scatter(x=time_pts, y=f_traj, mode="lines", name="💶 EUR/USD Cross", line=dict(color="#3fb950", width=1.5, dash="dashdot")))
+    fig_rel.add_trace(go.Scatter(
+        x=time_pts, y=f_traj, mode="lines", name="EUR/USD Cross",
+        line=dict(color="#3fb950", width=1.8, dash="dashdot"),
+        hovertemplate="%{y:+.2f}%<extra></extra>"
+    ))
 
     fig_rel.add_hline(y=0.0, line_dash="solid", line_color="rgba(255,255,255,0.25)", line_width=1)
     fig_rel.update_layout(
         template="plotly_dark",
         paper_bgcolor="rgba(13,17,23,0.95)",
         plot_bgcolor="rgba(13,17,23,0.95)",
-        margin=dict(l=10, r=40, t=30, b=10),
-        height=340,
-        legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="left", x=0.01, font=dict(size=10.5, color="#c9d1d9")),
-        xaxis=dict(showgrid=False, tickfont=dict(size=9.5, family="monospace", color="#8b949e")),
+        margin=dict(l=10, r=45, t=50, b=15),
+        height=360,
+        hovermode="x unified",
+        hoverlabel=dict(
+            bgcolor="#161b22",
+            bordercolor="rgba(255,255,255,0.15)",
+            font=dict(size=11.5, family="monospace", color="#f0f6fc")
+        ),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.06,
+            xanchor="left",
+            x=0.0,
+            itemgap=14,
+            font=dict(size=11, family="sans-serif", color="#c9d1d9")
+        ),
+        xaxis=dict(showgrid=False, tickfont=dict(size=10, family="monospace", color="#8b949e")),
         yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", side="right", tickfont=dict(size=10, family="monospace", color="#8b949e"))
     )
     st.plotly_chart(fig_rel, use_container_width=True, config={"displayModeBar": False})
