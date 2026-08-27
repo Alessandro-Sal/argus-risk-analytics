@@ -68,7 +68,18 @@ render_page_header(
     icon="🖥️"
 )
 
-# ── Inizializzazione Session State per Terminal Engine ────────────────────────
+# Barra di Stato Desk & Auto-Refresh Configurabile
+col_hdr_status, col_hdr_refresh = st.columns([3.2, 1.4], vertical_alignment="center")
+with col_hdr_status:
+    st.markdown("<div style='font-size:12px; color:#8b949e;'><span style='display:inline-block; width:8px; height:8px; border-radius:50%; background:#3fb950; margin-right:6px; box-shadow:0 0 6px #3fb950;'></span><b>DESK FEED STATUS:</b> Streaming Real-Time Quotazioni & Cross FX Attivo</div>", unsafe_allow_html=True)
+with col_hdr_refresh:
+    autorefresh_sel = st.selectbox(
+        "⏱️ Auto-Refresh Streaming Feed:",
+        options=["Disattivato", "5s", "10s", "30s", "60s"],
+        index=0,
+        key="sel_live_autorefresh_rate",
+        label_visibility="collapsed"
+    )
 if "argus_terminal_engine" not in st.session_state:
     st.session_state["argus_terminal_engine"] = get_terminal_engine()
 
@@ -186,7 +197,6 @@ with col_tape_ctrl:
     st.markdown(tape_card_html, unsafe_allow_html=True)
 
 with col_tape_book:
-    st.markdown("<div style='font-size:12.5px; font-weight:700; color:#8b949e; margin-bottom:4px;'>📊 Level-2 Depth Book (5 Livelli Bid/Ask)</div>", unsafe_allow_html=True)
     # Matrice Level-2 Depth Book dinamica attorno al prezzo reale
     spread_step = max(0.01, round(display_px * 0.0001, 2))
     base_bid = round(display_px - spread_step, 2)
@@ -202,37 +212,116 @@ with col_tape_book:
         {"bid_vol": 320, "bid_px": round(base_bid - spread_step * 8, 2), "ask_px": round(base_ask + spread_step * 8, 2), "ask_vol": 540}
     ]
 
-    book_rows_html = []
-    for r in book_rows:
-        bid_bar_w = min(100, int((r["bid_vol"] / 2000.0) * 100))
-        ask_bar_w = min(100, int((r["ask_vol"] / 2000.0) * 100))
-        book_rows_html.append(
-            f'<div style="display:flex; font-family:monospace; font-size:11px; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.04);">'
-            f'<div style="flex:1; text-align:right; color:#8b949e; position:relative; padding-right:8px;"><div style="position:absolute; right:0; top:0; bottom:0; width:{bid_bar_w}%; background:rgba(63,185,80,0.15); z-index:1;"></div><span style="position:relative; z-index:2;">{r["bid_vol"]}</span></div>'
-            f'<div style="flex:1; text-align:right; color:#3fb950; font-weight:700; padding-right:12px;">{tape_sym_curr}{r["bid_px"]:,.2f}</div>'
-            f'<div style="flex:1; text-align:left; color:#f85149; font-weight:700; padding-left:12px;">{tape_sym_curr}{r["ask_px"]:,.2f}</div>'
-            f'<div style="flex:1; text-align:left; color:#8b949e; position:relative; padding-left:8px;"><div style="position:absolute; left:0; top:0; bottom:0; width:{ask_bar_w}%; background:rgba(248,81,73,0.15); z-index:1;"></div><span style="position:relative; z-index:2;">{r["ask_vol"]}</span></div>'
+    tab_b_matrix, tab_b_chart, tab_b_depth = st.tabs([
+        "📊 Matrice Depth L2",
+        "📈 Grafico Intraday & VWAP",
+        "🌊 Curva di Liquidità L2"
+    ])
+
+    with tab_b_matrix:
+        book_rows_html = []
+        for r in book_rows:
+            bid_bar_w = min(100, int((r["bid_vol"] / 2000.0) * 100))
+            ask_bar_w = min(100, int((r["ask_vol"] / 2000.0) * 100))
+            book_rows_html.append(
+                f'<div style="display:flex; font-family:monospace; font-size:11px; padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.04);">'
+                f'<div style="flex:1; text-align:right; color:#8b949e; position:relative; padding-right:8px;"><div style="position:absolute; right:0; top:0; bottom:0; width:{bid_bar_w}%; background:rgba(63,185,80,0.15); z-index:1;"></div><span style="position:relative; z-index:2;">{r["bid_vol"]}</span></div>'
+                f'<div style="flex:1; text-align:right; color:#3fb950; font-weight:700; padding-right:12px;">{tape_sym_curr}{r["bid_px"]:,.2f}</div>'
+                f'<div style="flex:1; text-align:left; color:#f85149; font-weight:700; padding-left:12px;">{tape_sym_curr}{r["ask_px"]:,.2f}</div>'
+                f'<div style="flex:1; text-align:left; color:#8b949e; position:relative; padding-left:8px;"><div style="position:absolute; left:0; top:0; bottom:0; width:{ask_bar_w}%; background:rgba(248,81,73,0.15); z-index:1;"></div><span style="position:relative; z-index:2;">{r["ask_vol"]}</span></div>'
+                f'</div>'
+            )
+
+        book_full_html = (
+            f'<div style="background: linear-gradient(135deg, rgba(13, 17, 23, 0.95) 0%, rgba(22, 27, 34, 0.95) 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
+            f'<div style="display:flex; font-size:10px; font-weight:700; color:#58a6ff; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;">'
+            f'<div style="flex:1; text-align:right;">BID SIZE</div>'
+            f'<div style="flex:1; text-align:right; padding-right:12px;">BID PX</div>'
+            f'<div style="flex:1; text-align:left; padding-left:12px;">ASK PX</div>'
+            f'<div style="flex:1; text-align:left;">ASK SIZE</div>'
+            f'</div>'
+            f'{"".join(book_rows_html)}'
+            f'<div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; font-family:monospace; color:#8b949e; border-top:1px solid rgba(255,255,255,0.06); padding-top:6px; margin-top:6px; flex-wrap:wrap; gap:4px;">'
+            f'<span>🎯 Stoikov: <b style="color:#3fb950;">{tape_sym_curr}{microprice:.2f}</b></span>'
+            f'<span>VWAP: <b style="color:#58a6ff;">{tape_sym_curr}{vwap_px:.2f}</b></span>'
+            f'<span>Spread L2: <b style="color:#f0f6fc;">{tape_sym_curr}{spread_val:.2f}</b> ({spread_bps:.1f} bps)</span>'
+            f'<span style="color:#8b949e;">{live_q["timestamp"]}</span>'
+            f'</div>'
             f'</div>'
         )
+        st.markdown(book_full_html, unsafe_allow_html=True)
 
-    book_full_html = (
-        f'<div style="background: linear-gradient(135deg, rgba(13, 17, 23, 0.95) 0%, rgba(22, 27, 34, 0.95) 100%); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">'
-        f'<div style="display:flex; font-size:10px; font-weight:700; color:#58a6ff; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:4px;">'
-        f'<div style="flex:1; text-align:right;">BID SIZE</div>'
-        f'<div style="flex:1; text-align:right; padding-right:12px;">BID PX</div>'
-        f'<div style="flex:1; text-align:left; padding-left:12px;">ASK PX</div>'
-        f'<div style="flex:1; text-align:left;">ASK SIZE</div>'
-        f'</div>'
-        f'{"".join(book_rows_html)}'
-        f'<div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; font-family:monospace; color:#8b949e; border-top:1px solid rgba(255,255,255,0.06); padding-top:6px; margin-top:6px; flex-wrap:wrap; gap:4px;">'
-        f'<span>🎯 Stoikov: <b style="color:#3fb950;">{tape_sym_curr}{microprice:.2f}</b></span>'
-        f'<span>VWAP: <b style="color:#58a6ff;">{tape_sym_curr}{vwap_px:.2f}</b></span>'
-        f'<span>Spread L2: <b style="color:#f0f6fc;">{tape_sym_curr}{spread_val:.2f}</b> ({spread_bps:.1f} bps)</span>'
-        f'<span style="color:#8b949e;">{live_q["timestamp"]}</span>'
-        f'</div>'
-        f'</div>'
-    )
-    st.markdown(book_full_html, unsafe_allow_html=True)
+    with tab_b_chart:
+        # Mini-grafico intraday tick/VWAP in tempo reale
+        df_ticks = ring_buf.to_dataframe() if ring_buf and len(ring_buf.ticks) >= 2 else pd.DataFrame()
+        if not df_ticks.empty:
+            df_ticks["cum_vol"] = df_ticks["size"].cumsum()
+            df_ticks["cum_pv"] = (df_ticks["price"] * df_ticks["size"]).cumsum()
+            df_ticks["vwap_calc"] = df_ticks["cum_pv"] / np.maximum(df_ticks["cum_vol"], 1.0)
+            
+            fig_intra = go.Figure()
+            fig_intra.add_trace(go.Scatter(
+                x=df_ticks.index, y=df_ticks["price"],
+                mode="lines+markers", name=f"{active_tape_ticker} Spot",
+                line=dict(color="#58a6ff", width=2),
+                marker=dict(size=4, color="#38bdf8")
+            ))
+            fig_intra.add_trace(go.Scatter(
+                x=df_ticks.index, y=df_ticks["vwap_calc"],
+                mode="lines", name="VWAP",
+                line=dict(color="#f0883e", width=1.5, dash="dot")
+            ))
+            fig_intra.add_hline(y=microprice, line_dash="dash", line_color="#3fb950", annotation_text="Stoikov", annotation_position="top right", annotation_font=dict(size=9, color="#3fb950"))
+            fig_intra.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(13,17,23,0.95)",
+                plot_bgcolor="rgba(13,17,23,0.95)",
+                margin=dict(l=10, r=10, t=25, b=10),
+                height=220,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
+                xaxis=dict(showgrid=False, title=None, showticklabels=False),
+                yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", title=None, tickfont=dict(size=10, family="monospace"))
+            )
+            st.plotly_chart(fig_intra, use_container_width=True)
+        else:
+            st.caption("Buffer streaming in avvio. Clicca su '⚡ Invia Tick Live' per generare dati nel grafico intraday.")
+
+    with tab_b_depth:
+        # Curva cumulativa di liquidità Level-2 (Order Book Depth)
+        bid_pxs = [r["bid_px"] for r in book_rows]
+        bid_vols = [r["bid_vol"] for r in book_rows]
+        ask_pxs = [r["ask_px"] for r in book_rows]
+        ask_vols = [r["ask_vol"] for r in book_rows]
+        
+        cum_bid = np.cumsum(bid_vols[::-1])[::-1]
+        cum_ask = np.cumsum(ask_vols)
+        
+        fig_depth = go.Figure()
+        fig_depth.add_trace(go.Scatter(
+            x=bid_pxs, y=cum_bid,
+            mode="lines", name="Bids (Acquisto)",
+            fill="tozeroy",
+            fillcolor="rgba(63, 185, 80, 0.25)",
+            line=dict(color="#3fb950", width=2)
+        ))
+        fig_depth.add_trace(go.Scatter(
+            x=ask_pxs, y=cum_ask,
+            mode="lines", name="Asks (Vendita)",
+            fill="tozeroy",
+            fillcolor="rgba(248, 81, 73, 0.25)",
+            line=dict(color="#f85149", width=2)
+        ))
+        fig_depth.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(13,17,23,0.95)",
+            plot_bgcolor="rgba(13,17,23,0.95)",
+            margin=dict(l=10, r=10, t=25, b=10),
+            height=220,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
+            xaxis=dict(title=dict(text="Prezzo L2", font=dict(size=10)), showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace")),
+            yaxis=dict(title=dict(text="Vol Cumulativo", font=dict(size=10)), showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace"))
+        )
+        st.plotly_chart(fig_depth, use_container_width=True)
 
 st.divider()
 
@@ -285,17 +374,19 @@ if need_sync and needed_tickers:
 
 all_quotes = st.session_state.get("argus_live_quotes_dict", {})
 
-tab_port_live, tab_wl_live = st.tabs([
+tab_port_live, tab_heatmap_live, tab_wl_live = st.tabs([
     "💼 Prezzi Live Intero Portafoglio",
+    "🗺️ Heatmap Portafoglio 1D",
     "🌐 Watchlist Istituzionale di Mercato"
 ])
+
+port_live_raw_items = []
 
 with tab_port_live:
     if active_pos.empty or "ticker" not in active_pos.columns:
         st.info("Nessuna posizione attiva aperta a mercato. Carica un portafoglio o una distinta transazioni per visualizzare i prezzi live.")
     else:
         # Calcolo prezzi live per ogni titolo attivo del portafoglio
-        port_live_rows = []
         tot_live_notional = 0.0
         tot_prev_day_notional = 0.0
         tot_wacp_cost = 0.0
@@ -334,19 +425,19 @@ with tab_port_live:
             if q_val > 0:
                 day_chgs.append(chg_1d)
 
-            port_live_rows.append({
+            port_live_raw_items.append({
                 "Ticker": sym,
-                "Prezzo Spot (Valuta Orig.)": live_px_orig_str,
-                "Prezzo Live (€ EUR)": f"€ {live_px_eur:,.2f}",
-                "Var. 1D (%)": f"{'+' if chg_1d>=0 else ''}{chg_1d:.2f}%",
-                "Var. Day 1D (€)": f"{'+' if day_pnl_asset_eur>=0 else ''}€ {day_pnl_asset_eur:,.2f}",
-                "Carico FIFO WACP (€)": f"€ {wacp_eur:,.2f}",
-                "Quantità": f"{q_val:,.2f}",
-                "Controvalore Live (€)": f"€ {mkt_val_eur:,.2f}",
-                "PnL Non Realizzato (€)": f"{'+' if pnl_eur>=0 else ''}€ {pnl_eur:,.2f}",
-                "Rendimento (%)": f"{'+' if pnl_pct>=0 else ''}{pnl_pct:.2f}%",
-                "Day Range (L - H)": f"{curr_sym}{live_item['day_low']:.2f} - {curr_sym}{live_item['day_high']:.2f}",
-                "Stato Feed": "LIVE API 🟢" if live_item["is_live"] else "ESTIMATE 🟡"
+                "Prezzo_Spot": live_px_orig_str,
+                "Prezzo_EUR": live_px_eur,
+                "Var_1D_Pct": chg_1d,
+                "Var_Day_EUR": day_pnl_asset_eur,
+                "WACP_EUR": wacp_eur,
+                "Quantita": q_val,
+                "Controvalore_EUR": mkt_val_eur,
+                "PnL_EUR": pnl_eur,
+                "PnL_Pct": pnl_pct,
+                "Day_Range": f"{curr_sym}{live_item['day_low']:.2f} - {curr_sym}{live_item['day_high']:.2f}",
+                "Feed": "LIVE API 🟢" if live_item["is_live"] else "ESTIMATE 🟡"
             })
 
         # Calcolo PnL Totale Latente e Variazione Live vs Ieri per l'Intero Portafoglio
@@ -410,7 +501,89 @@ with tab_port_live:
         </div>
         """
         st.markdown(kpi_cards_html, unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame(port_live_rows), use_container_width=True, hide_index=True)
+
+        # Filtri Rapidi di Ordinamento
+        if "port_sort_choice" not in st.session_state:
+            st.session_state["port_sort_choice"] = "ALL"
+
+        f_c1, f_c2, f_c3, f_c4, f_c5 = st.columns(5)
+        with f_c1:
+            if st.button("Tutte le Posizioni", key="btn_sort_all", use_container_width=True):
+                st.session_state["port_sort_choice"] = "ALL"
+                st.rerun()
+        with f_c2:
+            if st.button("🚀 Top Gainers 1D", key="btn_sort_gain", use_container_width=True):
+                st.session_state["port_sort_choice"] = "GAIN"
+                st.rerun()
+        with f_c3:
+            if st.button("🔻 Top Losers 1D", key="btn_sort_loss", use_container_width=True):
+                st.session_state["port_sort_choice"] = "LOSS"
+                st.rerun()
+        with f_c4:
+            if st.button("💼 Maggior Controvalore", key="btn_sort_val", use_container_width=True):
+                st.session_state["port_sort_choice"] = "VAL"
+                st.rerun()
+        with f_c5:
+            if st.button("📈 Maggior PnL (€)", key="btn_sort_pnl", use_container_width=True):
+                st.session_state["port_sort_choice"] = "PNL"
+                st.rerun()
+
+        # Applicazione ordinamento
+        sorted_raw = list(port_live_raw_items)
+        s_choice = st.session_state.get("port_sort_choice", "ALL")
+        if s_choice == "GAIN":
+            sorted_raw.sort(key=lambda x: x["Var_1D_Pct"], reverse=True)
+        elif s_choice == "LOSS":
+            sorted_raw.sort(key=lambda x: x["Var_1D_Pct"])
+        elif s_choice == "VAL":
+            sorted_raw.sort(key=lambda x: x["Controvalore_EUR"], reverse=True)
+        elif s_choice == "PNL":
+            sorted_raw.sort(key=lambda x: x["PnL_EUR"], reverse=True)
+
+        display_rows = []
+        for x in sorted_raw:
+            display_rows.append({
+                "Ticker": x["Ticker"],
+                "Prezzo Spot (Valuta Orig.)": x["Prezzo_Spot"],
+                "Prezzo Live (€ EUR)": f"€ {x['Prezzo_EUR']:,.2f}",
+                "Var. 1D (%)": f"{'+' if x['Var_1D_Pct']>=0 else ''}{x['Var_1D_Pct']:.2f}%",
+                "Var. Day 1D (€)": f"{'+' if x['Var_Day_EUR']>=0 else ''}€ {x['Var_Day_EUR']:,.2f}",
+                "Carico FIFO WACP (€)": f"€ {x['WACP_EUR']:,.2f}",
+                "Quantità": f"{x['Quantita']:,.2f}",
+                "Controvalore Live (€)": f"€ {x['Controvalore_EUR']:,.2f}",
+                "PnL Non Realizzato (€)": f"{'+' if x['PnL_EUR']>=0 else ''}€ {x['PnL_EUR']:,.2f}",
+                "Rendimento (%)": f"{'+' if x['PnL_Pct']>=0 else ''}{x['PnL_Pct']:.2f}%",
+                "Day Range (L - H)": x["Day_Range"],
+                "Stato Feed": x["Feed"]
+            })
+
+        st.dataframe(pd.DataFrame(display_rows), use_container_width=True, hide_index=True)
+
+with tab_heatmap_live:
+    if not port_live_raw_items:
+        st.info("Nessuna posizione attiva disponibile per generare la Heatmap.")
+    else:
+        df_heat = pd.DataFrame(port_live_raw_items)
+        df_heat["Label"] = df_heat["Ticker"] + "<br>€" + df_heat["Controvalore_EUR"].apply(lambda v: f"{v:,.0f}") + "<br>" + df_heat["Var_1D_Pct"].apply(lambda v: f"{v:+.2f}%")
+        
+        fig_heat = px.treemap(
+            df_heat,
+            path=["Ticker"],
+            values="Controvalore_EUR",
+            color="Var_1D_Pct",
+            color_continuous_scale=["#f85149", "#21262d", "#3fb950"],
+            color_continuous_midpoint=0.0,
+            hover_data={"Controvalore_EUR": ":,.2f", "Var_1D_Pct": ":+.2f", "PnL_EUR": ":+,.2f"}
+        )
+        fig_heat.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(13,17,23,0.95)",
+            plot_bgcolor="rgba(13,17,23,0.95)",
+            margin=dict(l=0, r=0, t=10, b=0),
+            height=380,
+            coloraxis_colorbar=dict(title="Var 1D (%)", tickfont=dict(size=10, family="monospace"))
+        )
+        st.plotly_chart(fig_heat, use_container_width=True)
 
 with tab_wl_live:
     col_wl_add, col_wl_info = st.columns([1.5, 2.5], vertical_alignment="bottom")
@@ -486,10 +659,10 @@ st.divider()
 # ── SEZIONE 3: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ────────────────────
 st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
 
-# Chip di scelta rapida (1 riga orizzontale completa da 8 comandi)
+# Chip di scelta rapida (1 riga orizzontale completa da 8 comandi istituzionali)
 st.caption("Comandi Rapidi:")
 chips_cols = st.columns(8)
-quick_cmds = ["PORT LIVE", "PORT RISK", "WATCHLIST", "QUOTE AAPL", "QUOTE NVDA", "QUOTE BTC", "VAR 95", "TOP"]
+quick_cmds = ["PORT LIVE", "PORT RISK", "NEWS AAPL", "SHOCK -5%", "CORR MATRIX", "VAR 95", "SNAP", "TOP"]
 for idx, qc in enumerate(quick_cmds):
     with chips_cols[idx]:
         if st.button(qc, key=f"btn_chip_p2_{idx}", use_container_width=True):
@@ -505,7 +678,7 @@ with st.form(key="term_cli_interactive_form_page2", clear_on_submit=True):
     with col_inp:
         cmd_input = st.text_input(
             "Command Prompt",
-            placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'PORT LIVE', 'WATCHLIST', 'QUOTE NVDA', 'BTC-USD', 'VAR 95')...",
+            placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'NEWS AAPL', 'SHOCK -5%', 'CORR MATRIX', 'SNAP', 'VAR 95')...",
             key="term_cli_input_box_page2",
             label_visibility="collapsed"
         )
@@ -559,6 +732,14 @@ if not term_eng.oms_blotter:
 else:
     blotter_records = []
     for o in term_eng.oms_blotter[:15]:
+        if o.slices_count > 1:
+            filled_s = o.slices_filled
+            tot_s = o.slices_count
+            bar_fill = int((filled_s / max(1, tot_s)) * 8)
+            prog_bar = f"[{'█' * bar_fill}{'░' * max(0, 8 - bar_fill)}] {filled_s}/{tot_s}"
+        else:
+            prog_bar = "[████████] 100%" if o.status == "FILLED" else "[░░░░░░░░] 0%"
+
         blotter_records.append({
             "Order ID": o.order_id,
             "Time": o.timestamp,
@@ -568,7 +749,8 @@ else:
             "Type": o.order_type,
             "Fill Px": f"${o.avg_fill_price:.2f}" if o.avg_fill_price > 0 else "MKT",
             "Status": o.status,
-            "Saved (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
+            "Execution Progress": prog_bar,
+            "Saved Friction (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
         })
     df_blotter_ui = pd.DataFrame(blotter_records)
     st.dataframe(df_blotter_ui, use_container_width=True, hide_index=True)
@@ -627,3 +809,10 @@ top_hud_html = f"""
 </div>
 """
 st.markdown(top_hud_html, unsafe_allow_html=True)
+
+# ── LOOP DI AUTO-REFRESH CONFIGURABILE IN BACKGROUND ──────────────────────────
+if autorefresh_sel != "Disattivato":
+    sec_lookup = {"5s": 5, "10s": 10, "30s": 30, "60s": 60}
+    w_sec = sec_lookup.get(autorefresh_sel, 10)
+    time.sleep(w_sec)
+    st.rerun()

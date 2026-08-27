@@ -316,3 +316,31 @@ def test_terminal_engine_multi_currency_conversion():
     assert 100.0 < eur_chf < 115.0
 
 
+def test_terminal_engine_advanced_features(mock_session_context):
+    from core.terminal_engine import get_terminal_engine
+    engine = get_terminal_engine()
+
+    # 1. NEWS command
+    res_news = engine.execute_command("NEWS AAPL", mock_session_context)
+    assert res_news.status in ("SUCCESS", "INFO")
+    assert "NEWS" in res_news.output_text or "FINANCIAL NEWS" in res_news.output_text
+
+    # 2. SHOCK command
+    res_shock = engine.execute_command("SHOCK -5%", mock_session_context)
+    assert res_shock.status == "SUCCESS"
+    assert "STRESS TEST" in res_shock.output_text
+    assert "-5.0%" in res_shock.output_text
+
+    # 3. SNAP command
+    res_snap = engine.execute_command("SNAP", mock_session_context)
+    assert res_snap.status == "SUCCESS"
+    assert "ARGUS LIVE MARKET PRICING SNAPSHOT" in res_snap.output_text
+    assert "AAPL" in res_snap.output_text
+
+    # 4. CORR MATRIX command
+    res_cmat = engine.execute_command("CORR MATRIX", mock_session_context)
+    assert res_cmat.status == "SUCCESS"
+    assert "CORRELATION MATRIX" in res_cmat.output_text
+
+
+
