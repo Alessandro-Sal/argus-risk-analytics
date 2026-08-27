@@ -740,35 +740,35 @@ with tab_rel_perf:
     
     fig_rel = go.Figure()
     # Portafoglio
-    p_traj = [0.0, port_day_ret_p * 0.25, port_day_ret_p * 0.45, port_day_ret_p * 0.65, port_day_ret_p * 0.85, port_day_ret_p * 0.95, port_day_ret_p]
+    p_traj = [round(v, 2) for v in [0.0, port_day_ret_p * 0.25, port_day_ret_p * 0.45, port_day_ret_p * 0.65, port_day_ret_p * 0.85, port_day_ret_p * 0.95, port_day_ret_p]]
     fig_rel.add_trace(go.Scatter(
         x=time_pts, y=p_traj, mode="lines+markers", name="Portafoglio ARGUS",
         line=dict(color="#38bdf8", width=3.5), marker=dict(size=6, color="#38bdf8"),
         hovertemplate="%{y:+.2f}%<extra></extra>"
     ))
     # SPY
-    s_traj = [0.0, spy_chg * 0.20, spy_chg * 0.50, spy_chg * 0.65, spy_chg * 0.80, spy_chg * 0.90, spy_chg]
+    s_traj = [round(v, 2) for v in [0.0, spy_chg * 0.20, spy_chg * 0.50, spy_chg * 0.65, spy_chg * 0.80, spy_chg * 0.90, spy_chg]]
     fig_rel.add_trace(go.Scatter(
         x=time_pts, y=s_traj, mode="lines", name="S&P 500 (SPY)",
         line=dict(color="#58a6ff", width=2, dash="dash"),
         hovertemplate="%{y:+.2f}%<extra></extra>"
     ))
     # QQQ
-    q_traj = [0.0, qqq_chg * 0.30, qqq_chg * 0.55, qqq_chg * 0.70, qqq_chg * 0.85, qqq_chg * 0.95, qqq_chg]
+    q_traj = [round(v, 2) for v in [0.0, qqq_chg * 0.30, qqq_chg * 0.55, qqq_chg * 0.70, qqq_chg * 0.85, qqq_chg * 0.95, qqq_chg]]
     fig_rel.add_trace(go.Scatter(
         x=time_pts, y=q_traj, mode="lines", name="Nasdaq-100 (QQQ)",
         line=dict(color="#a855f7", width=2, dash="dot"),
         hovertemplate="%{y:+.2f}%<extra></extra>"
     ))
     # BTC
-    b_traj = [0.0, btc_chg * 0.15, btc_chg * 0.40, btc_chg * 0.75, btc_chg * 0.65, btc_chg * 0.90, btc_chg]
+    b_traj = [round(v, 2) for v in [0.0, btc_chg * 0.15, btc_chg * 0.40, btc_chg * 0.75, btc_chg * 0.65, btc_chg * 0.90, btc_chg]]
     fig_rel.add_trace(go.Scatter(
         x=time_pts, y=b_traj, mode="lines", name="Bitcoin (BTC-USD)",
         line=dict(color="#ff9900", width=2, dash="dot"),
         hovertemplate="%{y:+.2f}%<extra></extra>"
     ))
     # EUR/USD
-    f_traj = [0.0, fx_chg * 0.25, fx_chg * 0.45, fx_chg * 0.60, fx_chg * 0.80, fx_chg * 0.95, fx_chg]
+    f_traj = [round(v, 2) for v in [0.0, fx_chg * 0.25, fx_chg * 0.45, fx_chg * 0.60, fx_chg * 0.80, fx_chg * 0.95, fx_chg]]
     fig_rel.add_trace(go.Scatter(
         x=time_pts, y=f_traj, mode="lines", name="EUR/USD Cross",
         line=dict(color="#3fb950", width=1.8, dash="dashdot"),
@@ -800,6 +800,78 @@ with tab_rel_perf:
         yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", side="right", tickfont=dict(size=10, family="monospace", color="#8b949e"))
     )
     st.plotly_chart(fig_rel, use_container_width=True, config={"displayModeBar": False})
+
+    # Tabella Comparativa Matrice di Performance Relativa & Alpha vs Benchmark
+    st.markdown("<div style='font-size:12px; font-weight:700; color:#8b949e; margin-top:14px; margin-bottom:8px;'>📋 MATRICE DI PERFORMANCE RELATIVA & ALPHA INTRADAY</div>", unsafe_allow_html=True)
+    
+    spy_spot = float(spy_quote.get("last_price", 562.40))
+    qqq_spot = float(qqq_quote.get("last_price", 482.10))
+    btc_spot = float(btc_quote.get("last_price", 63400.00))
+    fx_spot = float(fx_quote.get("last_price", 1.0850))
+    
+    rel_table_data = [
+        {
+            "Benchmark": "Portafoglio ARGUS",
+            "Asset Class": "Multi-Asset Custom",
+            "Spot Level": f"€ {tot_live_notional:,.2f}" if 'tot_live_notional' in locals() else "€ 100,000.00",
+            "Rendimento Day (%)": port_day_ret_p,
+            "Alpha vs Portafoglio (%)": 0.00,
+            "Beta Implicito": 1.00,
+            "Momentum Status": "🟢 LEADER" if port_day_ret_p >= max(spy_chg, qqq_chg) else "⚪ IN-LINE"
+        },
+        {
+            "Benchmark": "S&P 500 (SPY)",
+            "Asset Class": "US Equity Large Cap",
+            "Spot Level": f"${spy_spot:,.2f}",
+            "Rendimento Day (%)": spy_chg,
+            "Alpha vs Portafoglio (%)": port_day_ret_p - spy_chg,
+            "Beta Implicito": 0.85,
+            "Momentum Status": "🟢 OUTPERFORMED" if port_day_ret_p >= spy_chg else "🔴 UNDERPERFORMED"
+        },
+        {
+            "Benchmark": "Nasdaq-100 (QQQ)",
+            "Asset Class": "US Tech & Growth",
+            "Spot Level": f"${qqq_spot:,.2f}",
+            "Rendimento Day (%)": qqq_chg,
+            "Alpha vs Portafoglio (%)": port_day_ret_p - qqq_chg,
+            "Beta Implicito": 1.15,
+            "Momentum Status": "🟢 OUTPERFORMED" if port_day_ret_p >= qqq_chg else "🔴 UNDERPERFORMED"
+        },
+        {
+            "Benchmark": "Bitcoin (BTC-USD)",
+            "Asset Class": "Digital Asset / Crypto",
+            "Spot Level": f"${btc_spot:,.2f}",
+            "Rendimento Day (%)": btc_chg,
+            "Alpha vs Portafoglio (%)": port_day_ret_p - btc_chg,
+            "Beta Implicito": 0.35,
+            "Momentum Status": "🟢 OUTPERFORMED" if port_day_ret_p >= btc_chg else "🔴 UNDERPERFORMED"
+        },
+        {
+            "Benchmark": "EUR/USD Cross",
+            "Asset Class": "FX Currency Pair",
+            "Spot Level": f"{fx_spot:.4f}",
+            "Rendimento Day (%)": fx_chg,
+            "Alpha vs Portafoglio (%)": port_day_ret_p - fx_chg,
+            "Beta Implicito": -0.05,
+            "Momentum Status": "🟢 POSITIVE FX" if fx_chg >= 0 else "🔴 FX DRAG"
+        }
+    ]
+    
+    df_rel_table = pd.DataFrame(rel_table_data)
+    st.dataframe(
+        df_rel_table,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Benchmark": st.column_config.TextColumn("Benchmark / Strumento"),
+            "Asset Class": st.column_config.TextColumn("Asset Class"),
+            "Spot Level": st.column_config.TextColumn("Livello Spot"),
+            "Rendimento Day (%)": st.column_config.NumberColumn("Rendimento Day (%)", format="%.2f%%"),
+            "Alpha vs Portafoglio (%)": st.column_config.NumberColumn("Alpha vs Portafoglio (%)", format="%+.2f%%"),
+            "Beta Implicito": st.column_config.NumberColumn("Beta Implicito", format="%.2f"),
+            "Momentum Status": st.column_config.TextColumn("Status Momentum")
+        }
+    )
 
 with tab_news_cat:
     st.caption("Catalyst di mercato, earnings countdown ed eventi macroeconomici ad alto impatto monitorati dal desk.")
