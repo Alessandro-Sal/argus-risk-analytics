@@ -264,11 +264,55 @@ def test_terminal_engine_live_quote_and_watchlist(mock_session_context):
     assert "AAPL" in res_port.output_text
 
     # Batch parallel quote fetching
-    from core.terminal_engine import fetch_multiple_live_quotes
+    from core.terminal_engine import fetch_multiple_live_quotes, convert_to_eur, detect_currency, get_fx_rate_to_eur
     batch_res = fetch_multiple_live_quotes(["AAPL", "MSFT", "NVDA"], max_workers=3)
     assert len(batch_res) == 3
     assert "AAPL" in batch_res and batch_res["AAPL"]["last_price"] > 0
     assert "MSFT" in batch_res and batch_res["MSFT"]["last_price"] > 0
     assert "NVDA" in batch_res and batch_res["NVDA"]["last_price"] > 0
+
+
+def test_terminal_engine_multi_currency_conversion():
+    from core.terminal_engine import convert_to_eur, detect_currency, get_fx_rate_to_eur
+
+    # 1. DKK (Danish Krone, es. NOVO-B.CO)
+    assert detect_currency("NOVO-B.CO", "DKK") == "DKK"
+    assert detect_currency("NOVO-B.CO") == "DKK"
+    fx_dkk = get_fx_rate_to_eur("DKK")
+    assert 0.12 < fx_dkk < 0.15  # ~0.134
+    eur_p, orig_s, curr_sym = convert_to_eur(300.25, "DKK", "NOVO-B.CO")
+    assert 38.0 < eur_p < 43.0  # 300.25 DKK ~ 40.24 EUR
+    assert "DKK" in orig_s
+    assert "DKK" in curr_sym
+
+    # 2. USD (es. AAPL)
+    assert detect_currency("AAPL", "USD") == "USD"
+    fx_usd = get_fx_rate_to_eur("USD")
+    assert 0.85 < fx_usd < 0.98
+    eur_usd, orig_usd, sym_usd = convert_to_eur(100.0, "USD", "AAPL")
+    assert 85.0 < eur_usd < 98.0
+    assert sym_usd == "$"
+
+    # 3. EUR (es. ISP.MI)
+    assert detect_currency("ISP.MI", "EUR") == "EUR"
+    eur_eur, orig_eur, sym_eur = convert_to_eur(3.85, "EUR", "ISP.MI")
+    assert eur_eur == 3.85
+    assert sym_eur == "€"
+
+    # 4. GBP (es. AZN.L)
+    assert detect_currency("AZN.L", "GBP") == "GBP"
+    fx_gbp = get_fx_rate_to_eur("GBP")
+    assert 1.10 < fx_gbp < 1.25
+    eur_gbp, _, sym_gbp = convert_to_eur(100.0, "GBP", "AZN.L")
+    assert 110.0 < eur_gbp < 125.0
+    assert sym_gbp == "£"
+
+    # 5. SEK & CHF
+    assert detect_currency("VOLV-B.ST") == "SEK"
+    assert detect_currency("NESN.SW") == "CHF"
+    eur_sek, _, _ = convert_to_eur(1000.0, "SEK", "VOLV-B.ST")
+    assert 80.0 < eur_sek < 100.0
+    eur_chf, _, _ = convert_to_eur(100.0, "CHF", "NESN.SW")
+    assert 100.0 < eur_chf < 115.0
 
 
