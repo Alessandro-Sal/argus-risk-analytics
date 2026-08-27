@@ -1,6 +1,6 @@
 # ============================================================
 # 0_Control_Room.py (Main Entry Point)
-# ARGUS Risk Analytics Platform | Control Room v5.14.0
+# ARGUS Risk Analytics Platform | Control Room v5.24.0
 # ============================================================
 
 import sys

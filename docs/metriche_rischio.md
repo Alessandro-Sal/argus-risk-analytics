@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`) di **ARGUS Risk Analytics Platform v5.18.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`) di **ARGUS Risk Analytics Platform v5.24.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -2309,16 +2309,67 @@ $$
 
 ---
 
-## 66. Riferimenti Bibliografici & Standard Istituzionali
+## 66. Trading Desk Tier-1: Pre-Trade Risk Limits, Intraday PnL Attribution & Relative Performance Overlay
+
+Il modulo **Live Terminal & Execution Desk** (`src/pages/2_🖥️_Live_Terminal.py` e `core/terminal_engine.py`) integra 5 architetture istituzionali di sala operativa conformi a Bloomberg EMSX / Refinitiv REDI:
+
+### 1. Pre-Trade Compliance & Circuit Breakers (`evaluate_pre_trade_risk`)
+Prima che qualsiasi ordine venga instradato verso il blotter dell'Order Management System (OMS), il motore di validazione applica una serie di controlli vincolanti:
+
+- **Circuit Breaker di Perdita Giornaliera**:
+  Se la variazione monetaria della giornata corrente viola la perdita massima consentita ($\Delta\text{PnL}_{\text{Day}} \le -\text{Limit}_{\text{Daily Loss}}$, es. $-€5.000$), tutti gli ordini di acquisto (`BUY`) vengono bloccati istantaneamente a tutela del capitale.
+  
+- **Controllo di Concentrazione su Singolo Titolo**:
+  Per ogni ordine $k$ di quantità $q_k$ e prezzo stimato $P_k$, viene calcolato il controvalore post-trade $V_{\text{post}, i} = V_{\text{pre}, i} + q_k \cdot P_k$ e il peso complessivo $w_{\text{post}, i} = \frac{V_{\text{post}, i}}{V_{\text{port}} + q_k P_k}$. Se $w_{\text{post}, i} > w_{\text{max}}$ (25%), viene generato un warning operativo.
+
+- **Stima dell'Impatto Marginale sul VaR ($\Delta\text{VaR}$)**:
+  
+$$
+\Delta\text{VaR}_{\text{marginal}} \approx \left( \frac{q_k \cdot P_k}{V_{\text{port}}} \right) \cdot \beta_i \cdot \text{VaR}_{\text{port}}
+$$
+
+### 2. Decomposizione Analitica Intraday del PnL Multi-Valuta (Price Effect vs FX Effect)
+Per posizioni denominate in valute estere (USD, GBP, CHF, SEK, NOK, DKK), il rendimento monetario giornaliero ($\Delta\text{PnL}$) viene scomposto in modo esatto e privo di residui tra la fluttuazione del prezzo dell'asset e la variazione del tasso di cambio rispetto all'Euro:
+
+$$
+\Delta\text{PnL}_{\text{Totale (€)}} = \underbrace{q \cdot (S_t - S_{t-1}) \cdot \text{FX}_{t-1}}_{\text{Effetto Prezzo Asset (€)}} + \underbrace{q \cdot S_t \cdot (\text{FX}_t - \text{FX}_{t-1})}_{\text{Effetto Tasso di Cambio FX (€)}}
+$$
+
+dove:
+- $q$: Quantità netta detenuta in portafoglio.
+- $S_t, S_{t-1}$: Prezzo spot dell'asset nella valuta di quotazione originale al tempo $t$ e alla chiusura precedente $t-1$.
+- $\text{FX}_t, \text{FX}_{t-1}$: Tasso di cambio per convertire 1 unità di valuta estera in EUR (es. per USD, $\text{FX} = 1 / \text{EURUSD}$).
+
+Per asset quotati nativamente in EUR, l'effetto FX è identicamente nullo ($\Delta\text{FX} = 0$).
+
+### 3. Traiettoria di Rendimento Relativo Normalizzato (Base 0.00%)
+Per consentire il benchmark visivo istantaneo tra il portafoglio custom e gli indici globali (S&P 500, Nasdaq-100, Bitcoin, EUR/USD), ciascuna serie temporale intraday viene indicizzata a base zero:
+
+$$
+R_t = \left( \frac{P_t - P_{\text{close, prev}}}{P_{\text{close, prev}}} \right) \times 100\%
+$$
+
+La **Matrice di Performance Relativa** calcola inoltre l'Alpha intraday rispetto a ciascun benchmark:
+
+$$
+\alpha_{\text{intraday}, j} = R_{t, \text{Portafoglio}} - R_{t, \text{Benchmark}_j}
+$$
+
+---
+
+## 67. Riferimenti Bibliografici & Standard Istituzionali
 
 1. **Almgren, R., & Chriss, N. (2000)**. *Optimal execution of portfolio transactions*. Journal of Risk, 3(2), 5-40.
 2. **Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005)**. *Direct estimation of equity market impact*. Risk, 18(7), 58-62.
 3. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
-4. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
-5. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
-6. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
-7. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
-8. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
-9. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
-10. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+4. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
+5. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
+6. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
+7. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
+8. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
+9. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
+10. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
+11. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
+12. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
+13. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
 

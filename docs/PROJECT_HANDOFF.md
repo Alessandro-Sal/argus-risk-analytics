@@ -1,4 +1,4 @@
-# Investment Risk BI Platform — Project Handoff (v5.23.0 Production Release)
+# Investment Risk BI Platform — Project Handoff (v5.24.0 Production Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,12 +6,12 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.23.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics & Portfolio BI Platform v5.24.0.
 
 **Stack Tecnologico del Sistema**:
-- **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
+- **Python 3.11+ / 3.14**: Motore ETL, Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), AI Analyst (Dual-Engine LLM/NLG), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML.
 - **SQL & MySQL 8.0 / SQLite (SQLAlchemy ORM)**: Data Warehouse relazionale, tabelle transazionali e storicizzazione snapshot temporali (`data/argus_local.db`).
-- **Streamlit**: Web Application Framework interattivo per la dashboard (11 moduli ad alta densità quantitativa con Navigation Rail ad albero).
+- **Streamlit**: Web Application Framework interattivo per la dashboard (12 moduli ad alta densità quantitativa con Navigation Rail ad albero).
 - **PyWebView & PyInstaller**: Architettura Desktop Nativa Windows (WebView2 engine, finestra dedicata, gestione ciclo di vita senza browser, eseguibile `.exe` standalone e collegamento Desktop).
 - **Power BI & Google Looker Studio**: Executive Dashboards basate su pacchetto Star Schema ZIP (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`).
 - **Excel (`openpyxl`/`xlsxwriter`)**: Modello tattico di simulazione What-If ed esportazione Workbook Multi-Tab.
@@ -205,6 +205,6 @@ py -m pytest
 
 ---
 
-*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.23.0.*
+*ARGUS Risk Analytics Platform — Documento di Handoff Tecnico v5.24.0.*
 
 

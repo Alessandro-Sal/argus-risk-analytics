@@ -1040,7 +1040,7 @@ def get_display_portfolio_name():
 
 
 def render_command_bar():
-    """Renderizza la barra di stato e comando ARGUS v5.14.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
+    """Renderizza la barra di stato e comando ARGUS v5.24.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
     try:
         from core.workspace_manager import sync_url_state
         sync_url_state()
