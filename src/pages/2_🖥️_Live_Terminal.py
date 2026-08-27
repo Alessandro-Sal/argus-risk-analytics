@@ -98,6 +98,8 @@ session_context = {
     "df_prices": df_prices,
     "df_transactions": df_tx,
     "portfolio_id": 1,
+    "portfolio_name": st.session_state.get("portfolio_name", "Master Wealth"),
+    "has_real_portfolio": has_real_portfolio,
     "base_currency": st.session_state.get("base_currency", "EUR")
 }
 
@@ -974,10 +976,23 @@ st.divider()
 # ── SEZIONE 3: INTERACTIVE BLOOMBERG CLI (FULL-WIDTH ROW) ────────────────────
 st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
 
-# Chip di scelta rapida (1 riga orizzontale completa da 8 comandi istituzionali)
+port_name_display = st.session_state.get("portfolio_name", "Master Wealth") or "Master Wealth"
+n_pos_count = len(pos) if isinstance(pos, pd.DataFrame) and not pos.empty else 0
+pos_badge_color = "#3fb950" if n_pos_count > 0 else "#ff9900"
+pos_badge_text = f"🟢 COLLEGATA A: {port_name_display.upper()} ({n_pos_count} ASSETS • € {tot_port_val:,.2f})" if n_pos_count > 0 else "🟡 MODALITÀ SANDBOX (NESSUN PORTAFOGLIO CARICATO)"
+
+st.markdown(f"""
+<div style="background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-left: 4px solid {pos_badge_color}; border-radius: 6px; padding: 7px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-family: monospace;">
+    <div>💼 <b>CONSOLE PORTFOLIO CONTEXT:</b> <span style="color:#58a6ff; font-weight:700;">{port_name_display}</span> &bull; <span style="color:#c9d1d9;">{n_pos_count} Titoli in Memoria</span> &bull; <span style="color:#3fb950; font-weight:700;">Valore: € {tot_port_val:,.2f}</span></div>
+    <div style="color:{pos_badge_color}; font-weight:700; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:10px;">{pos_badge_text}</div>
+</div>
+""", unsafe_allow_html=True)
+
+# Chip di scelta rapida con ticker di portafoglio dinamico
+top_ticker_chip = top_w_sym if (top_w_sym and top_w_sym != "N/A") else "AAPL"
 st.caption("Comandi Rapidi:")
 chips_cols = st.columns(8)
-quick_cmds = ["PORT LIVE", "PORT RISK", "NEWS AAPL", "SHOCK -5%", "CORR MATRIX", "VAR 95", "SNAP", "TOP"]
+quick_cmds = ["PORT LIVE", "PORT RISK", f"NEWS {top_ticker_chip}", f"{top_ticker_chip} DES", "SHOCK -5%", "CORR MATRIX", "VAR 95", "REBAL"]
 for idx, qc in enumerate(quick_cmds):
     with chips_cols[idx]:
         if st.button(qc, key=f"btn_chip_p2_{idx}", use_container_width=True):
@@ -993,7 +1008,7 @@ with st.form(key="term_cli_interactive_form_page2", clear_on_submit=True):
     with col_inp:
         cmd_input = st.text_input(
             "Command Prompt",
-            placeholder="ARGUS:LIVE> Digita comando e premi INVIO (es. 'NEWS AAPL', 'SHOCK -5%', 'CORR MATRIX', 'SNAP', 'VAR 95')...",
+            placeholder=f"ARGUS:LIVE [{port_name_display}]> Digita comando per {port_name_display} (es. 'PORT LIVE', 'PORT RISK', 'SHOCK -5%', '{top_ticker_chip} DES', 'CLOSE {top_ticker_chip}', 'VAR 95')...",
             key="term_cli_input_box_page2",
             label_visibility="collapsed"
         )
@@ -1015,7 +1030,7 @@ for item in term_eng.output_buffer[:12]:
         f"<div style='margin-bottom: 16px;'>"
         f"<div style='margin-bottom: 6px; font-family: monospace; font-size: 12px;'>"
         f"<span style='color:#8b949e;'>[{item.timestamp.strftime('%H:%M:%S')}]</span> "
-        f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE&gt;</span> "
+        f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE [{port_name_display}]&gt;</span> "
         f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>"
         f"</div>"
         f"<div style='font-family: monospace; font-size: 11.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.4; padding-left: 2px;'>{esc_out}</div>"

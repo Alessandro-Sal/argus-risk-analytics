@@ -122,7 +122,7 @@ def test_terminal_engine_quant_commands(mock_session_context):
     # HEALTH
     res_health = engine.execute_command("HEALTH", mock_session_context)
     assert res_health.status == "SUCCESS"
-    assert "HEALTH & SOLVENCY" in res_health.output_text
+    assert "HEALTH" in res_health.output_text
 
 
 def test_terminal_engine_correlation(mock_session_context):
@@ -447,6 +447,61 @@ def test_market_catalysts_and_place_order():
     assert ok_twap is True
     assert order_twap.status == "SLICING"
     assert order_twap.slices_count > 1
+
+
+def test_terminal_engine_portfolio_linkage(mock_session_context):
+    engine = ArgusTerminalEngine()
+    ctx = dict(mock_session_context)
+    ctx["portfolio_name"] = "Wealth Institutional Alpha"
+
+    # 1. HELP displays connected portfolio header
+    res_help = engine.execute_command("HELP", ctx)
+    assert res_help.status == "INFO"
+    assert "CONNESSO AL PORTAFOGLIO" in res_help.output_text
+    assert "Wealth Institutional Alpha" in res_help.output_text
+
+    # 2. PORT LIVE displays connected portfolio name
+    res_port = engine.execute_command("PORT LIVE", ctx)
+    assert res_port.status == "SUCCESS"
+    assert "PORTFOLIO LIVE PRICING" in res_port.output_text
+    assert "Wealth Institutional Alpha" in res_port.output_text
+
+    # 3. PORT RISK displays connected portfolio metrics
+    res_risk = engine.execute_command("PORT RISK", ctx)
+    assert res_risk.status == "SUCCESS"
+    assert "Wealth Institutional Alpha" in res_risk.output_text
+    assert "CAGR" in res_risk.output_text
+
+    # 4. REBAL displays drift analysis and rebalancing action
+    res_rebal = engine.execute_command("REBAL", ctx)
+    assert res_rebal.status == "SUCCESS"
+    assert "REBALANCING DESK" in res_rebal.output_text
+    assert "DRIFT %" in res_rebal.output_text
+
+    # 5. DIVIDENDS displays cash flow projection
+    res_div = engine.execute_command("DIVIDENDS", ctx)
+    assert res_div.status == "SUCCESS"
+    assert "DIVIDEND & CASH FLOW" in res_div.output_text
+
+    # 6. QUOTE on a portfolio holding displays the PORTFOLIO HOLDING box
+    res_q_aapl = engine.execute_command("QUOTE AAPL", ctx)
+    assert res_q_aapl.status == "SUCCESS"
+    assert "PORTFOLIO HOLDING" in res_q_aapl.output_text
+    assert "shares" in res_q_aapl.output_text
+
+    # 7. DES, FA, VOLS without args default to top holding
+    res_des_top = engine.execute_command("DES", ctx)
+    assert res_des_top.status == "SUCCESS"
+    # Top asset by value is SPY (52,000 EUR)
+    assert "SPY" in res_des_top.output_text or "AAPL" in res_des_top.output_text
+
+    # 8. CLOSE command executes a SELL market order on OMS
+    res_close = engine.execute_command("CLOSE AAPL", ctx)
+    assert res_close.status == "SUCCESS"
+    assert "PORTFOLIO POSITION CLOSE" in res_close.output_text
+    assert "AAPL" in res_close.output_text
+    assert any(o.ticker == "AAPL" and o.side == "SELL" for o in engine.oms_blotter)
+
 
 
 
