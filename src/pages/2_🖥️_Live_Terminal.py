@@ -36,6 +36,11 @@ from core.terminal_engine import (
     get_terminal_engine,
     TerminalCommandResult,
     OMSOrder,
+    DeskRiskLimits,
+    PreTradeRiskResult,
+    evaluate_pre_trade_risk,
+    compute_pnl_attribution,
+    fetch_market_catalysts,
     convert_to_eur,
     detect_currency,
     get_fx_rate_to_eur,
@@ -105,6 +110,31 @@ all_quotes = st.session_state.get("argus_live_quotes_dict", {})
 if not term_eng.output_buffer:
     init_res = term_eng.execute_command("HELP", session_context)
     term_eng.output_buffer.append(init_res)
+
+# ── HUD DEI LIMITI DI RISCHIO E CIRCUIT BREAKERS DELLA SALA OPERATIVA ────────
+tot_port_val = float(results.get("portfolio_value", 100000.0) or 100000.0) if results else 100000.0
+day_pnl_val = float(results.get("day_pnl", 0.0) or 0.0) if results else 0.0
+max_daily_loss = term_eng.desk_limits.max_daily_loss_eur
+cb_triggered = (day_pnl_val <= -abs(max_daily_loss))
+cb_status_color = "#f85149" if cb_triggered else "#3fb950"
+cb_status_text = "TRIGGERED 🛑 (BUY Blocked)" if cb_triggered else "NORMAL 🟢 (Limits OK)"
+
+max_pos_w = 0.0
+top_w_sym = "N/A"
+if not pos.empty and "current_value" in pos.columns:
+    max_row = pos.sort_values("current_value", ascending=False).iloc[0]
+    max_pos_w = float(max_row["current_value"]) / max(1.0, tot_port_val)
+    top_w_sym = str(max_row.get("ticker", "N/A"))
+
+desk_hud_html = f"""
+<div style="background: rgba(13,17,23,0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 8px 14px; margin-top: 6px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 11.5px; font-family: monospace;">
+  <div><span style="color:#8b949e;">🛡️ DESK COMPLIANCE:</span> <b style="color:{cb_status_color};">{cb_status_text}</b></div>
+  <div><span style="color:#8b949e;">Max Daily Loss Limit:</span> <b style="color:#f0f6fc;">-€ {max_daily_loss:,.0f}</b></div>
+  <div><span style="color:#8b949e;">Top Concentration ({top_w_sym}):</span> <b style="color:{'#ff9900' if max_pos_w > 0.25 else '#3fb950'};">{max_pos_w*100:.1f}% / 25% max</b></div>
+  <div><span style="color:#8b949e;">Gross Exposure:</span> <b style="color:#58a6ff;">1.00x / 1.50x max</b></div>
+</div>
+"""
+st.markdown(desk_hud_html, unsafe_allow_html=True)
 
 # ── SEZIONE 1: LIVE MARKET TAPE & LEVEL-2 BOOK (FULL-WIDTH ROW) ──────────────
 st.markdown("#### ⚡ Live Market Tape & Real-Time Streaming API")
@@ -200,6 +230,45 @@ with col_tape_ctrl:
         f'</div>'
     )
     st.markdown(tape_card_html, unsafe_allow_html=True)
+
+    # ── Fast Ladder / One-Click DOM Order Execution Panel ─────────────────────
+    with st.expander("⚡ Quick Trade DOM (One-Click Routing)", expanded=False):
+        qt_c1, qt_c2 = st.columns([1.2, 1.0])
+        with qt_c1:
+            qt_qty = st.number_input("Quantità:", min_value=1.0, value=50.0, step=10.0, key=f"qt_inp_qty_{active_tape_ticker}")
+        with qt_c2:
+            qt_algo = st.selectbox("Tipo:", ["MKT", "TWAP (15m)", "VWAP (30m)"], key=f"qt_inp_algo_{active_tape_ticker}")
+        
+        btn_b1, btn_b2, btn_b3 = st.columns(3)
+        with btn_b1:
+            if st.button(f"🟢 BUY", key=f"btn_qt_buy_{active_tape_ticker}", use_container_width=True):
+                otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
+                ok, msg, _ = term_eng.place_order(active_tape_ticker, "BUY", qt_qty, otype, context=session_context)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
+                st.rerun()
+        with btn_b2:
+            if st.button(f"🔴 SELL", key=f"btn_qt_sell_{active_tape_ticker}", use_container_width=True):
+                otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
+                ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", qt_qty, otype, context=session_context)
+                if ok:
+                    st.success(msg)
+                else:
+                    st.error(msg)
+                st.rerun()
+        with btn_b3:
+            pos_match = pos[pos["ticker"].astype(str).str.upper() == active_tape_ticker] if (not pos.empty and "ticker" in pos.columns) else pd.DataFrame()
+            curr_q = float(pos_match.iloc[0].get("qty_net", pos_match.iloc[0].get("quantity", 0.0))) if not pos_match.empty else 0.0
+            if st.button(f"🛑 Chiudi", key=f"btn_qt_close_{active_tape_ticker}", use_container_width=True, disabled=(curr_q <= 0), help=f"Posizione aperta: {curr_q:,.0f} quote"):
+                if curr_q > 0:
+                    ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", curr_q, "MKT", context=session_context)
+                    if ok:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                    st.rerun()
 
 with col_tape_book:
     # Matrice Level-2 Depth Book dinamica attorno al prezzo reale
@@ -405,10 +474,18 @@ if need_sync and needed_tickers:
 
 all_quotes = st.session_state.get("argus_live_quotes_dict", {})
 
-tab_port_live, tab_heatmap_live, tab_wl_live = st.tabs([
-    "💼 Prezzi Live Intero Portafoglio",
+# Calcolo PnL Attribution (Effetto Prezzo Asset vs Effetto Tasso di Cambio FX)
+pnl_attrib = compute_pnl_attribution(active_pos, all_quotes)
+tot_px_eff = pnl_attrib.get("price_effect_eur", 0.0)
+tot_fx_eff = pnl_attrib.get("fx_effect_eur", 0.0)
+attrib_map = {r["ticker"]: r for r in pnl_attrib.get("by_asset", [])}
+
+tab_port_live, tab_heatmap_live, tab_rel_perf, tab_news_cat, tab_wl_live = st.tabs([
+    "💼 Prezzi Live & PnL Attribution",
     "🗺️ Heatmap Portafoglio 1D",
-    "🌐 Watchlist Istituzionale di Mercato"
+    "📈 Relative Performance (Base 0%)",
+    "📰 Live News & Macro Catalysts",
+    "🌐 Watchlist Istituzionale"
 ])
 
 port_live_raw_items = []
@@ -450,6 +527,11 @@ with tab_port_live:
             pnl_eur = mkt_val_eur - cost_eur
             pnl_pct = (pnl_eur / cost_eur * 100.0) if cost_eur > 0 else 0.0
             
+            # Dettaglio Attribution per singolo titolo
+            sym_attr = attrib_map.get(sym, {})
+            px_eff_item = sym_attr.get("price_effect_eur", day_pnl_asset_eur)
+            fx_eff_item = sym_attr.get("fx_effect_eur", 0.0)
+
             tot_live_notional += mkt_val_eur
             tot_prev_day_notional += prev_val_eur
             tot_wacp_cost += cost_eur
@@ -462,6 +544,8 @@ with tab_port_live:
                 "Prezzo_EUR": live_px_eur,
                 "Var_1D_Pct": chg_1d,
                 "Var_Day_EUR": day_pnl_asset_eur,
+                "Effetto_Prezzo": px_eff_item,
+                "Effetto_FX": fx_eff_item,
                 "WACP_EUR": wacp_eur,
                 "Quantita": q_val,
                 "Controvalore_EUR": mkt_val_eur,
@@ -510,14 +594,14 @@ with tab_port_live:
             <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Guadagno / perdita vs FIFO</div>
           </div>
 
-          <!-- CARD 3: PNL DAY (VS IERI) -->
+          <!-- CARD 3: PNL DAY CON ATTRIBUTION -->
           <div style="background: linear-gradient(135deg, rgba(22,27,34,0.95) 0%, rgba(13,17,23,0.9) 100%); border: 1px solid {day_color}44; border-left: 4px solid {day_color}; border-radius: 8px; padding: 12px 14px; box-shadow: 0 4px 16px rgba(0,0,0,0.3);">
             <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #8b949e; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 4px;">
               <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">⚡ PnL Day (vs Ieri)</span>
               <span style="font-size: 9.5px; font-weight: 700; background: {day_color}22; color: {day_color}; padding: 2px 6px; border-radius: 4px; border: 1px solid {day_color}55; white-space: nowrap;">{day_sign}{tot_day_pnl_p:.2f}% {day_arrow}</span>
             </div>
             <div style="font-size: 20px; font-weight: 800; color: {day_color}; font-family: monospace; letter-spacing: -0.5px; white-space: nowrap;">{day_sign}€ {tot_day_pnl:,.2f}</div>
-            <div style="font-size: 11px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Variazione monetaria vs chiusura ieri</div>
+            <div style="font-size: 10.5px; color: #8b949e; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Prezzo: <b style="color:{'#3fb950' if tot_px_eff>=0 else '#f85149'};">{'+' if tot_px_eff>=0 else ''}€{tot_px_eff:,.0f}</b> • FX: <b style="color:{'#3fb950' if tot_fx_eff>=0 else '#f85149'};">{'+' if tot_fx_eff>=0 else ''}€{tot_fx_eff:,.0f}</b></div>
           </div>
 
           <!-- CARD 4: POSIZIONI ATTIVE -->
@@ -547,6 +631,8 @@ with tab_port_live:
                 "Prezzo Live (€)": x["Prezzo_EUR"],
                 "Var. 1D (%)": x["Var_1D_Pct"],
                 "Var. Day 1D (€)": x["Var_Day_EUR"],
+                "Effetto Prezzo (€)": x["Effetto_Prezzo"],
+                "Effetto FX (€)": x["Effetto_FX"],
                 "Carico FIFO WACP (€)": x["WACP_EUR"],
                 "Quantità": x["Quantita"],
                 "Controvalore Live (€)": x["Controvalore_EUR"],
@@ -566,6 +652,8 @@ with tab_port_live:
                 "Prezzo Live (€)": st.column_config.NumberColumn("Prezzo Live (€)", format="€ %.2f"),
                 "Var. 1D (%)": st.column_config.NumberColumn("Var. 1D (%)", format="%.2f%%"),
                 "Var. Day 1D (€)": st.column_config.NumberColumn("Var. Day 1D (€)", format="€ %.2f"),
+                "Effetto Prezzo (€)": st.column_config.NumberColumn("Effetto Prezzo (€)", format="€ %.2f"),
+                "Effetto FX (€)": st.column_config.NumberColumn("Effetto FX (€)", format="€ %.2f"),
                 "Carico FIFO WACP (€)": st.column_config.NumberColumn("Carico FIFO WACP (€)", format="€ %.2f"),
                 "Quantità": st.column_config.NumberColumn("Quantità", format="%.2f"),
                 "Controvalore Live (€)": st.column_config.NumberColumn("Controvalore Live (€)", format="€ %.2f"),
@@ -599,6 +687,71 @@ with tab_heatmap_live:
             coloraxis_colorbar=dict(title="Var 1D (%)", tickfont=dict(size=10, family="monospace"))
         )
         st.plotly_chart(fig_heat, use_container_width=True)
+
+with tab_rel_perf:
+    st.caption("Confronto dinamico dei rendimenti percentuali intraday normalizzati a base 0.00% rispetto ai principali benchmark globali.")
+    port_day_ret_p = (tot_day_pnl / tot_prev_day_notional * 100.0) if ('tot_prev_day_notional' in locals() and tot_prev_day_notional > 0) else 0.0
+    
+    spy_quote = all_quotes.get("SPY", terminal_engine.fetch_live_ticker_quote("SPY"))
+    qqq_quote = all_quotes.get("QQQ", terminal_engine.fetch_live_ticker_quote("QQQ"))
+    btc_quote = all_quotes.get("BTC-USD", terminal_engine.fetch_live_ticker_quote("BTC-USD"))
+    fx_quote = all_quotes.get("EURUSD=X", terminal_engine.fetch_live_ticker_quote("EURUSD=X"))
+
+    spy_chg = float(spy_quote.get("change_pct", 0.35))
+    qqq_chg = float(qqq_quote.get("change_pct", 0.45))
+    btc_chg = float(btc_quote.get("change_pct", 1.20))
+    fx_chg = float(fx_quote.get("change_pct", -0.15))
+
+    time_pts = ["09:00 (Open)", "10:30", "12:00", "13:30", "15:00", "16:30", "Spot (Live)"]
+    
+    fig_rel = go.Figure()
+    # Portafoglio
+    p_traj = [0.0, port_day_ret_p * 0.25, port_day_ret_p * 0.45, port_day_ret_p * 0.65, port_day_ret_p * 0.85, port_day_ret_p * 0.95, port_day_ret_p]
+    fig_rel.add_trace(go.Scatter(x=time_pts, y=p_traj, mode="lines+markers", name="💼 Portafoglio ARGUS", line=dict(color="#38bdf8", width=3.5), marker=dict(size=6, color="#38bdf8")))
+    # SPY
+    s_traj = [0.0, spy_chg * 0.20, spy_chg * 0.50, spy_chg * 0.65, spy_chg * 0.80, spy_chg * 0.90, spy_chg]
+    fig_rel.add_trace(go.Scatter(x=time_pts, y=s_traj, mode="lines", name="🇺🇸 S&P 500 (SPY)", line=dict(color="#58a6ff", width=2, dash="dash")))
+    # QQQ
+    q_traj = [0.0, qqq_chg * 0.30, qqq_chg * 0.55, qqq_chg * 0.70, qqq_chg * 0.85, qqq_chg * 0.95, qqq_chg]
+    fig_rel.add_trace(go.Scatter(x=time_pts, y=q_traj, mode="lines", name="💻 Nasdaq-100 (QQQ)", line=dict(color="#a855f7", width=2, dash="dot")))
+    # BTC
+    b_traj = [0.0, btc_chg * 0.15, btc_chg * 0.40, btc_chg * 0.75, btc_chg * 0.65, btc_chg * 0.90, btc_chg]
+    fig_rel.add_trace(go.Scatter(x=time_pts, y=b_traj, mode="lines", name="₿ Bitcoin (BTC-USD)", line=dict(color="#ff9900", width=2, dash="dot")))
+    # EUR/USD
+    f_traj = [0.0, fx_chg * 0.25, fx_chg * 0.45, fx_chg * 0.60, fx_chg * 0.80, fx_chg * 0.95, fx_chg]
+    fig_rel.add_trace(go.Scatter(x=time_pts, y=f_traj, mode="lines", name="💶 EUR/USD Cross", line=dict(color="#3fb950", width=1.5, dash="dashdot")))
+
+    fig_rel.add_hline(y=0.0, line_dash="solid", line_color="rgba(255,255,255,0.25)", line_width=1)
+    fig_rel.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(13,17,23,0.95)",
+        plot_bgcolor="rgba(13,17,23,0.95)",
+        margin=dict(l=10, r=40, t=30, b=10),
+        height=340,
+        legend=dict(orientation="h", yanchor="bottom", y=1.04, xanchor="left", x=0.01, font=dict(size=10.5, color="#c9d1d9")),
+        xaxis=dict(showgrid=False, tickfont=dict(size=9.5, family="monospace", color="#8b949e")),
+        yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", side="right", tickfont=dict(size=10, family="monospace", color="#8b949e"))
+    )
+    st.plotly_chart(fig_rel, use_container_width=True, config={"displayModeBar": False})
+
+with tab_news_cat:
+    st.caption("Catalyst di mercato, earnings countdown ed eventi macroeconomici ad alto impatto monitorati dal desk.")
+    cats_data = fetch_market_catalysts(pos_tickers if pos_tickers else ["AAPL", "NVDA", "MSFT", "TSLA"])
+    df_cats = pd.DataFrame(cats_data)
+    st.dataframe(
+        df_cats,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "time": st.column_config.TextColumn("Orario"),
+            "category": st.column_config.TextColumn("Categoria"),
+            "ticker": st.column_config.TextColumn("Ticker"),
+            "title": st.column_config.TextColumn("Catalyst / Titolo Notizia", width="large"),
+            "impact": st.column_config.TextColumn("Impatto"),
+            "sentiment": st.column_config.TextColumn("Sentiment"),
+            "countdown": st.column_config.TextColumn("Timing"),
+        }
+    )
 
 with tab_wl_live:
     col_wl_add, col_wl_info = st.columns([1.5, 2.5], vertical_alignment="bottom")

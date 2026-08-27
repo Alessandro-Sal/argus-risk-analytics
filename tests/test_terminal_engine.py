@@ -343,4 +343,111 @@ def test_terminal_engine_advanced_features(mock_session_context):
     assert "CORRELATION MATRIX" in res_cmat.output_text
 
 
+def test_pre_trade_risk_evaluation():
+    from core.terminal_engine import evaluate_pre_trade_risk, DeskRiskLimits
+
+    limits = DeskRiskLimits(
+        max_daily_loss_eur=5000.0,
+        max_single_asset_weight=0.25,
+        max_order_notional_eur=50000.0
+    )
+
+    # 1. Normal order passes
+    res_ok = evaluate_pre_trade_risk(
+        ticker="AAPL", side="BUY", qty=50, price_eur=200.0,
+        current_portfolio_notional=100000.0, current_asset_notional=5000.0,
+        current_day_pnl_eur=500.0, limits=limits
+    )
+    assert res_ok.passed is True
+    assert res_ok.status == "APPROVED"
+
+    # 2. Circuit Breaker triggered on BUY
+    res_cb = evaluate_pre_trade_risk(
+        ticker="AAPL", side="BUY", qty=50, price_eur=200.0,
+        current_portfolio_notional=100000.0, current_asset_notional=5000.0,
+        current_day_pnl_eur=-5500.0, limits=limits
+    )
+    assert res_cb.passed is False
+    assert res_cb.status == "BLOCKED"
+    assert "CIRCUIT BREAKER" in res_cb.reasons[0]
+
+    # Circuit breaker does not block SELL
+    res_sell = evaluate_pre_trade_risk(
+        ticker="AAPL", side="SELL", qty=50, price_eur=200.0,
+        current_portfolio_notional=100000.0, current_asset_notional=10000.0,
+        current_day_pnl_eur=-5500.0, limits=limits
+    )
+    assert res_sell.passed is True
+
+    # 3. Max single order notional exceeded
+    res_huge = evaluate_pre_trade_risk(
+        ticker="MSFT", side="BUY", qty=500, price_eur=400.0,
+        current_portfolio_notional=1000000.0, current_asset_notional=10000.0,
+        current_day_pnl_eur=0.0, limits=limits
+    )
+    assert res_huge.passed is False
+    assert res_huge.status == "BLOCKED"
+    assert "NOZIONALE" in res_huge.reasons[0]
+
+    # 4. Concentration limit warning
+    res_conc = evaluate_pre_trade_risk(
+        ticker="NVDA", side="BUY", qty=100, price_eur=300.0,
+        current_portfolio_notional=100000.0, current_asset_notional=10000.0,
+        current_day_pnl_eur=0.0, limits=limits
+    )
+    assert res_conc.status == "WARNING"
+    assert res_conc.post_trade_weight_pct > 25.0
+
+
+def test_pnl_attribution_computation():
+    from core.terminal_engine import compute_pnl_attribution
+
+    df_pos = pd.DataFrame([
+        {"ticker": "AAPL", "qty_net": 100, "asset_currency": "USD", "current_price": 200.0},
+        {"ticker": "ENI.MI", "qty_net": 500, "asset_currency": "EUR", "current_price": 14.50}
+    ])
+    all_quotes = {
+        "AAPL": {"last_price": 210.0, "prev_close": 200.0, "currency": "USD"},
+        "ENI.MI": {"last_price": 15.00, "prev_close": 14.50, "currency": "EUR"},
+        "EURUSD=X": {"last_price": 1.10, "prev_close": 1.08}
+    }
+
+    attrib = compute_pnl_attribution(df_pos, all_quotes)
+    assert "price_effect_eur" in attrib
+    assert "fx_effect_eur" in attrib
+    assert "total_day_pnl" in attrib
+    assert len(attrib["by_asset"]) == 2
+    # Check that EUR asset has 0 fx effect
+    eni_row = next(r for r in attrib["by_asset"] if r["ticker"] == "ENI.MI")
+    assert eni_row["fx_effect_eur"] == 0.0
+    assert eni_row["price_effect_eur"] > 0
+
+
+def test_market_catalysts_and_place_order():
+    from core.terminal_engine import fetch_market_catalysts, get_terminal_engine
+
+    # 1. Fetch catalysts
+    cats = fetch_market_catalysts(["AAPL", "NVDA"])
+    assert len(cats) >= 2
+    assert any(c["category"] in ("MACRO", "CENTRAL BANK") for c in cats)
+    assert any(c["ticker"] in ("AAPL", "NVDA") for c in cats)
+
+    # 2. Place order through terminal engine
+    engine = get_terminal_engine()
+    ok, msg, order = engine.place_order("AAPL", "BUY", 20, "MKT")
+    assert ok is True
+    assert order is not None
+    assert order.ticker == "AAPL"
+    assert order.side == "BUY"
+    assert order.status == "FILLED"
+    assert order in engine.oms_blotter
+
+    # Sliced TWAP order
+    ok_twap, msg_twap, order_twap = engine.place_order("MSFT", "BUY", 100, "TWAP", duration_min=30)
+    assert ok_twap is True
+    assert order_twap.status == "SLICING"
+    assert order_twap.slices_count > 1
+
+
+
 
