@@ -273,31 +273,41 @@ with col_tape_book:
             df_ticks["cum_vol"] = df_ticks["size"].cumsum()
             df_ticks["cum_pv"] = (df_ticks["price"] * df_ticks["size"]).cumsum()
             df_ticks["vwap_calc"] = df_ticks["cum_pv"] / np.maximum(df_ticks["cum_vol"], 1.0)
+            df_ticks["time_str"] = df_ticks["timestamp"].apply(lambda t: t.strftime("%H:%M:%S") if hasattr(t, "strftime") else str(t)[:8])
             
             fig_intra = go.Figure()
             fig_intra.add_trace(go.Scatter(
-                x=df_ticks.index, y=df_ticks["price"],
+                x=df_ticks["time_str"], y=df_ticks["price"],
                 mode="lines+markers", name=f"{active_tape_ticker} Spot",
                 line=dict(color="#58a6ff", width=2),
-                marker=dict(size=4, color="#38bdf8")
+                marker=dict(size=4, color="#38bdf8"),
+                hovertemplate=f"<b>{active_tape_ticker} Spot: {tape_sym_curr}%{{y:,.2f}}</b><br><span style='color:#8b949e; font-size:10px;'>Ora: %{{x}}</span><extra></extra>"
             ))
             fig_intra.add_trace(go.Scatter(
-                x=df_ticks.index, y=df_ticks["vwap_calc"],
+                x=df_ticks["time_str"], y=df_ticks["vwap_calc"],
                 mode="lines", name="VWAP",
-                line=dict(color="#f0883e", width=1.5, dash="dot")
+                line=dict(color="#f0883e", width=1.5, dash="dot"),
+                hovertemplate=f"<b>VWAP: {tape_sym_curr}%{{y:,.2f}}</b><br><span style='color:#8b949e; font-size:10px;'>Ora: %{{x}}</span><extra></extra>"
             ))
-            fig_intra.add_hline(y=microprice, line_dash="dash", line_color="#3fb950", annotation_text="Stoikov", annotation_position="top right", annotation_font=dict(size=9, color="#3fb950"))
+            fig_intra.add_hline(
+                y=microprice,
+                line_dash="dash",
+                line_color="#3fb950",
+                annotation_text=f"🎯 Stoikov: {tape_sym_curr}{microprice:.2f}",
+                annotation_position="bottom left",
+                annotation_font=dict(size=9.5, color="#3fb950", family="monospace")
+            )
             fig_intra.update_layout(
                 template="plotly_dark",
                 paper_bgcolor="rgba(13,17,23,0.95)",
                 plot_bgcolor="rgba(13,17,23,0.95)",
-                margin=dict(l=10, r=10, t=25, b=10),
+                margin=dict(l=10, r=45, t=30, b=10),
                 height=220,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
-                xaxis=dict(showgrid=False, title=None, showticklabels=False),
-                yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", title=None, tickfont=dict(size=10, family="monospace"))
+                legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0.01, font=dict(size=10.5, color="#c9d1d9")),
+                xaxis=dict(showgrid=False, title=None, tickfont=dict(size=8.5, family="monospace", color="#8b949e")),
+                yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", title=None, side="right", tickprefix=tape_sym_curr, tickfont=dict(size=9.5, family="monospace", color="#8b949e"))
             )
-            st.plotly_chart(fig_intra, use_container_width=True)
+            st.plotly_chart(fig_intra, use_container_width=True, config={"displayModeBar": False})
         else:
             st.caption("Buffer streaming in avvio. Clicca su '⚡ Invia Tick Live' per generare dati nel grafico intraday.")
 
@@ -317,26 +327,28 @@ with col_tape_book:
             mode="lines", name="Bids (Acquisto)",
             fill="tozeroy",
             fillcolor="rgba(63, 185, 80, 0.25)",
-            line=dict(color="#3fb950", width=2)
+            line=dict(color="#3fb950", width=2),
+            hovertemplate=f"<b>Bid Depth: %{{y:,.0f}} shares</b><br>Px: {tape_sym_curr}%{{x:,.2f}}<extra></extra>"
         ))
         fig_depth.add_trace(go.Scatter(
             x=ask_pxs, y=cum_ask,
             mode="lines", name="Asks (Vendita)",
             fill="tozeroy",
             fillcolor="rgba(248, 81, 73, 0.25)",
-            line=dict(color="#f85149", width=2)
+            line=dict(color="#f85149", width=2),
+            hovertemplate=f"<b>Ask Depth: %{{y:,.0f}} shares</b><br>Px: {tape_sym_curr}%{{x:,.2f}}<extra></extra>"
         ))
         fig_depth.update_layout(
             template="plotly_dark",
             paper_bgcolor="rgba(13,17,23,0.95)",
             plot_bgcolor="rgba(13,17,23,0.95)",
-            margin=dict(l=10, r=10, t=25, b=10),
+            margin=dict(l=10, r=45, t=30, b=10),
             height=220,
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=10)),
-            xaxis=dict(title=dict(text="Prezzo L2", font=dict(size=10)), showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace")),
-            yaxis=dict(title=dict(text="Vol Cumulativo", font=dict(size=10)), showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace"))
+            legend=dict(orientation="h", yanchor="bottom", y=1.05, xanchor="left", x=0.01, font=dict(size=10.5, color="#c9d1d9")),
+            xaxis=dict(title=dict(text="Prezzo L2", font=dict(size=10, color="#8b949e")), tickprefix=tape_sym_curr, showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace", color="#8b949e")),
+            yaxis=dict(title=dict(text="Vol Cumulativo", font=dict(size=10, color="#8b949e")), side="right", showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace", color="#8b949e"))
         )
-        st.plotly_chart(fig_depth, use_container_width=True)
+        st.plotly_chart(fig_depth, use_container_width=True, config={"displayModeBar": False})
 
 st.divider()
 
