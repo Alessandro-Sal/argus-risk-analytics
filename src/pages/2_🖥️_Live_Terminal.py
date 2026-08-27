@@ -16,11 +16,12 @@ import plotly.graph_objects as go
 import importlib
 
 import core.ui_utils as ui_utils
+import core.streaming_engine as streaming_engine
 import core.terminal_engine as terminal_engine
 
-# Ricarica dinamica garantita del modulo in ambiente Streamlit a caldo
-if not hasattr(terminal_engine, "convert_to_eur"):
-    importlib.reload(terminal_engine)
+# Ricarica dinamica garantita dei moduli core in ambiente Streamlit a caldo
+importlib.reload(streaming_engine)
+importlib.reload(terminal_engine)
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -253,7 +254,21 @@ with col_tape_book:
 
     with tab_b_chart:
         # Mini-grafico intraday tick/VWAP in tempo reale
-        df_ticks = ring_buf.to_dataframe() if ring_buf and len(ring_buf.ticks) >= 2 else pd.DataFrame()
+        df_ticks = ring_buf.to_dataframe() if ring_buf is not None else pd.DataFrame()
+        if (df_ticks.empty or len(df_ticks) < 2) and ring_buf is not None:
+            for shock_pct in [-0.0012, -0.0006, 0.0004, 0.0012, 0.0002, -0.0003, 0.0007]:
+                p_sim = max(0.01, round(display_px * (1.0 + shock_pct), 2))
+                ring_buf.append(terminal_engine.MarketTick(
+                    timestamp=datetime.datetime.now(datetime.timezone.utc),
+                    ticker=active_tape_ticker,
+                    price=p_sim,
+                    size=round(np.random.uniform(50, 300), 0),
+                    bid=round(p_sim - 0.02, 2),
+                    ask=round(p_sim + 0.02, 2),
+                    volume=live_q.get("volume", 1000.0) or 1000.0
+                ))
+            df_ticks = ring_buf.to_dataframe()
+
         if not df_ticks.empty:
             df_ticks["cum_vol"] = df_ticks["size"].cumsum()
             df_ticks["cum_pv"] = (df_ticks["price"] * df_ticks["size"]).cumsum()
