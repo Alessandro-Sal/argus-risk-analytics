@@ -23,7 +23,7 @@ def _classify_scalable_tx_type(type_and_sec: str) -> Optional[str]:
     ts = type_and_sec.lower()
     if any(k in ts for k in ["dividend", "dividende", "dividendo", "ausschüttung", "ertrag", "cedola"]):
         return "dividend"
-    if any(k in ts for k in ["split", "frazionamento"]):
+    if any(k in ts for k in ["split", "frazionamento", "aktienteilung", "raggruppamento", "reverse split", "fusione", "merger", "spinoff", "scissione"]):
         return "split"
     if any(k in ts for k in ["sell", "verkauf", "vendita", "orderausführung verkauf"]):
         return "sell"

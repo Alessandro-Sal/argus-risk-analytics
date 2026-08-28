@@ -353,7 +353,10 @@ def compute_karnosky_singer_currency_attribution(
             "currency_df": pd.DataFrame()
         }
 
-    pos["currency"] = pos.get("currency", base_currency).fillna(base_currency).astype(str).str.upper()
+    if "asset_currency" in pos.columns:
+        pos["currency"] = pos["asset_currency"].fillna(pos.get("currency", base_currency)).astype(str).str.upper()
+    else:
+        pos["currency"] = pos.get("currency", base_currency).fillna(base_currency).astype(str).str.upper()
     pos["weight"] = pos["current_value"] / tot_val
 
     # Pesi di portafoglio per valuta

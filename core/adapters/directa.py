@@ -23,7 +23,7 @@ def _classify_directa_tx_type(raw_type: str) -> Optional[str]:
     rt = str(raw_type).strip().lower()
     if any(k in rt for k in ["dividendo", "cedola", "dividend", "accredito div"]) or rt == "div":
         return "dividend"
-    if any(k in rt for k in ["split", "frazionamento", "raggruppamento"]):
+    if any(k in rt for k in ["split", "frazionamento", "raggruppamento", "reverse split", "fusione", "incorporazione", "scambio", "merger", "scissione", "spinoff"]):
         return "split"
     if any(k in rt for k in ["vende", "vendita", "sell", "ven"]) or rt == "v":
         return "sell"

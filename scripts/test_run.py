@@ -31,12 +31,11 @@ if report["errors"]:
     print("Errori di validazione:", report["errors"])
     exit(1)
 
+from core.db_exporter import save_snapshot_to_db, get_or_create_portfolio_id
+
 with engine.begin() as conn:
-    conn.execute(sqlt("""
-        INSERT INTO portfolios (name, owner, base_currency, created_at)
-        VALUES (:name, 'test_user', 'EUR', NOW())
-    """), {"name": portfolio_name})
-    portfolio_id = conn.execute(sqlt("SELECT LAST_INSERT_ID()")).scalar()
+    portfolio_id = get_or_create_portfolio_id(conn, name=portfolio_name, owner='test_user', base_currency='EUR')
+    conn.execute(sqlt("DELETE FROM transactions WHERE portfolio_id = :pid"), {"pid": portfolio_id})
 
 
 

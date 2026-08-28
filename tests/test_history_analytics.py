@@ -77,7 +77,20 @@ def test_save_snapshot_to_db_full_metrics():
             "dividend_yield": 0.55,
             "roe": 1.45,
             "target_mean_price": 240.0,
-            "peg_ratio": 2.1
+            "peg_ratio": 2.1,
+            "altman_z_score": 3.85,
+            "piotroski_f_score": 8,
+            "beneish_m_score": -2.75,
+            "sloan_accrual_ratio": 0.04,
+            "ev_to_ebitda": 22.5,
+            "free_cash_flow_yield": 4.10,
+            "debt_to_equity": 0.85,
+            "atr_14_eur": 4.25,
+            "chandelier_exit_long_eur": 207.25,
+            "rsi_14": 58.4,
+            "total_return": 8700.0,
+            "marginal_var_pct": 1.25,
+            "component_var_pct": 55.4
         },
         {
             "ticker": "MSFT",
@@ -102,7 +115,20 @@ def test_save_snapshot_to_db_full_metrics():
             "dividend_yield": 0.75,
             "roe": 0.38,
             "target_mean_price": 480.0,
-            "peg_ratio": 2.4
+            "peg_ratio": 2.4,
+            "altman_z_score": 4.10,
+            "piotroski_f_score": 7,
+            "beneish_m_score": -2.90,
+            "sloan_accrual_ratio": 0.02,
+            "ev_to_ebitda": 24.0,
+            "free_cash_flow_yield": 3.80,
+            "debt_to_equity": 0.45,
+            "atr_14_eur": 8.50,
+            "chandelier_exit_long_eur": 414.50,
+            "rsi_14": 62.1,
+            "total_return": 3000.0,
+            "marginal_var_pct": 0.95,
+            "component_var_pct": 44.6
         }
     ])
 
@@ -134,6 +160,11 @@ def test_save_snapshot_to_db_full_metrics():
                 "cvar_95": -2.60,
                 "var_cf_95": -1.95,
                 "cvar_cf_95": -2.75,
+                "var_99": -2.85,
+                "cvar_99": -3.90,
+                "omega_ratio": 1.75,
+                "tail_ratio": 1.15,
+                "gain_loss_ratio": 1.40,
                 "ulcer_index": 3.45,
                 "skewness": -0.35,
                 "kurtosis": 3.80,
@@ -168,6 +199,30 @@ def test_save_snapshot_to_db_full_metrics():
                 "contratti_eseguibili": 1
             }
         },
+        "garch_fhs": {
+            "current_volatility_pct": 14.80
+        },
+        "regime_summary": {
+            "current_regime": "Bull Low-Vol",
+            "regime_crisis_probability": 8.5
+        },
+        "tax_summary": {
+            "accumulated_minusvalenze_eur": 450.0,
+            "total_tax_due_eur": 1250.0,
+            "tax_drag_pct": 1.15
+        },
+        "closed_trades": {
+            "summary": {
+                "total_trades": 12,
+                "win_rate_pct": 66.67,
+                "profit_factor": 2.15
+            }
+        },
+        "fixed_income_summary": {
+            "portfolio_duration_modified": 4.20,
+            "portfolio_convexity": 22.5,
+            "portfolio_ytm_weighted_pct": 3.85
+        },
         "stress_tests": {
             "COVID-19 Crash (Feb-Mar 2020)": {"portfolio_loss_eur": -8500.0, "details": {"AAPL": {"beta": 1.15}, "MSFT": {"beta": 0.95}}},
             "Lehman Brothers (Sep-Nov 2008)": {"portfolio_loss_eur": -12000.0},
@@ -189,14 +244,30 @@ def test_save_snapshot_to_db_full_metrics():
     assert row["ff_beta_mkt"] == 0.92
     assert row["cvar_95_pct"] == -2.60
     assert row["var_cf_95_pct"] == -1.95
+    assert row["cvar_cf_95_pct"] == -2.75
+    assert row["var_99_pct"] == -2.85
+    assert row["cvar_99_pct"] == -3.90
+    assert row["omega_ratio"] == 1.75
+    assert row["tail_ratio"] == 1.15
+    assert row["gain_loss_ratio"] == 1.40
     assert row["ulcer_index"] == 3.45
     assert row["skewness"] == -0.35
     assert row["kurtosis"] == 3.80
+    assert row["diversification_ratio"] == 1.35
     assert row["ns_beta0"] == 3.20
     assert row["covered_call_income_eur"] == 1450.0
     assert row["covered_call_contracts"] == 1
     assert row["cost_basis_total"] == 44500.0
     assert row["unrealized_pnl_total"] == 10500.0
+    assert row["garch_vol_current_pct"] == 14.80
+    assert row["current_regime"] == "Bull Low-Vol"
+    assert row["regime_crisis_probability"] == 8.5
+    assert row["accumulated_minusvalenze_eur"] == 450.0
+    assert row["total_tax_due_eur"] == 1250.0
+    assert row["closed_trades_count"] == 12
+    assert row["win_rate_pct"] == 66.67
+    assert row["profit_factor"] == 2.15
+    assert row["portfolio_duration_modified"] == 4.20
 
     # Retrieve and verify stored positions details
     snap_id = row["snapshot_id"]
@@ -208,5 +279,14 @@ def test_save_snapshot_to_db_full_metrics():
     assert aapl_row["currency"] == "USD"
     assert aapl_row["cost_basis"] == 25500.0
     assert aapl_row["realized_pnl"] == 1200.0
+    assert aapl_row["total_return"] == 8700.0
     assert aapl_row["yield_on_cost_pct"] == 1.85
+    assert aapl_row["marginal_var_pct"] == 1.25
+    assert aapl_row["component_var_pct"] == 55.4
+    assert aapl_row["altman_z_score"] == 3.85
+    assert aapl_row["piotroski_f_score"] == 8
+    assert aapl_row["beneish_m_score"] == -2.75
+    assert aapl_row["atr_14_eur"] == 4.25
+    assert aapl_row["chandelier_exit_long_eur"] == 207.25
+    assert aapl_row["rsi_14"] == 58.4
 

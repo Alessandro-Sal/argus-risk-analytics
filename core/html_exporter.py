@@ -67,15 +67,17 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     chart_alloc_html = "<div>Nessuna posizione attiva disponibile</div>"
     try:
         fig_alloc = go.Figure()
-        if isinstance(pos, pd.DataFrame) and not pos.empty and "market_value" in pos.columns:
-            active_pos = pos[pos["market_value"] > 0]
-            if not active_pos.empty:
-                fig_alloc.add_trace(go.Pie(
-                    labels=[str(t) for t in active_pos["ticker"]], 
-                    values=active_pos["market_value"].tolist(),
-                    hole=0.4,
-                    textinfo='label+percent'
-                ))
+        if isinstance(pos, pd.DataFrame) and not pos.empty:
+            val_col = "current_value" if "current_value" in pos.columns else ("market_value" if "market_value" in pos.columns else None)
+            if val_col:
+                active_pos = pos[(pos.get("qty_net", 1) > 1e-6) & (pos[val_col] > 0)]
+                if not active_pos.empty:
+                    fig_alloc.add_trace(go.Pie(
+                        labels=[str(t) for t in active_pos["ticker"]], 
+                        values=active_pos[val_col].tolist(),
+                        hole=0.4,
+                        textinfo='label+percent'
+                    ))
         fig_alloc.update_layout(
             title="Ripartizione Asset per Valore di Mercato",
             template="plotly_dark",
@@ -91,11 +93,13 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     # 3. Position Rows HTML Table
     table_rows = ""
     if isinstance(pos, pd.DataFrame) and not pos.empty:
-        for idx, row in pos.iterrows():
+        val_col = "current_value" if "current_value" in pos.columns else ("market_value" if "market_value" in pos.columns else None)
+        active_pos = pos[(pos.get("qty_net", 1) > 1e-6) & (pos[val_col] > 0)] if val_col else pos[pos.get("qty_net", 1) > 1e-6]
+        for idx, row in active_pos.iterrows():
             ticker = str(row.get("ticker", "N/A"))
             ac = str(row.get("asset_class", "N/A"))
             
-            mv_raw = row.get("market_value", 0.0)
+            mv_raw = row.get("current_value", row.get("market_value", 0.0))
             mv = float(mv_raw) if mv_raw is not None and not pd.isna(mv_raw) else 0.0
             
             w_raw = row.get("weight_pct", 0.0)
@@ -116,7 +120,7 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
             </tr>
             """
 
-    tot_val = float(pos["market_value"].sum()) if isinstance(pos, pd.DataFrame) and not pos.empty and "market_value" in pos.columns else 0.0
+    tot_val = float(pos["current_value"].sum()) if isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns else (float(pos["market_value"].sum()) if isinstance(pos, pd.DataFrame) and not pos.empty and "market_value" in pos.columns else 0.0)
     
     sharpe_raw = returns.get("sharpe_ratio", returns.get("sharpe", 0.0))
     sharpe = float(sharpe_raw) if sharpe_raw is not None and not pd.isna(sharpe_raw) else 0.0

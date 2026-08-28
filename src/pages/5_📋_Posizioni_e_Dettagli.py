@@ -1,24 +1,20 @@
 import streamlit as st
+
+st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-import importlib
 import core.ui_utils
 import core.risk_engine
 import core.crypto_tax_engine
 import core.duckdb_engine
 import core.execution_algo
-importlib.reload(core.ui_utils)
-importlib.reload(core.risk_engine)
-importlib.reload(core.crypto_tax_engine)
-importlib.reload(core.duckdb_engine)
-importlib.reload(core.execution_algo)
 from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
 from core.execution_algo import compute_twap_schedule, compute_vwap_schedule, compare_execution_strategies, generate_intraday_volume_profile
 
-st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
 inject_custom_css()
 render_sidebar()
 render_command_bar()
@@ -268,7 +264,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         )
         metric_card(
             "Posizioni attive",
-            str(con.get("n_active_positions", len(pos))),
+            str(con.get("n_active_positions", len(pos[pos.get("qty_net", 1) > 1e-6]) if not pos.empty else len(pos))),
             help_text="Conteggio del numero di strumenti finanziari posseduti in modo netto."
         )
         metric_card(

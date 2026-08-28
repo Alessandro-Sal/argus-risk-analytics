@@ -125,7 +125,10 @@ def compute_closed_trades_journal(
         meta = meta_map.get(ticker, {})
         cur = meta.get("currency", "EUR")
         fx_tk = f"{cur}EUR=X"
+        fx_tk_inv = f"EUR{cur}=X"
         fx_series = fx_dict.get(fx_tk, None)
+        if fx_series is None and fx_tk_inv in fx_dict:
+            fx_series = 1.0 / fx_dict[fx_tk_inv]
 
         queue = []  # [{ "date": date, "qty": qty, "price_eur": px_eur, "price_orig": px, "tx_id": id }]
         ticker_closed_lots = []
@@ -215,7 +218,7 @@ def compute_closed_trades_journal(
                         lot["qty"] -= qty_to_sell
                         qty_to_sell = 0.0
 
-            elif tx_t in ["split", "frazionamento"]:
+            elif tx_t in ["split", "frazionamento", "raggruppamento", "reverse_split", "reverse split", "stock_split", "stock split", "stock_dividend", "fusione", "merger", "scambio", "spinoff", "scissione"]:
                 sp_ratio = float(row.get("quantity") or row.get("price") or 1.0)
                 if sp_ratio > 0.0 and sp_ratio != 1.0:
                     for lot in queue:

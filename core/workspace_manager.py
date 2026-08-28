@@ -239,11 +239,15 @@ def sync_url_state():
 
 DEFAULT_WORKSPACE_TABS = [
     {"id": "ws_dashboard", "title": "Dashboard Generale", "page": "1_Dashboard_Generale", "icon": "📈", "pinned": True},
-    {"id": "ws_risk", "title": "Analisi Rischio", "page": "2_Analisi_Rischio", "icon": "🔴", "pinned": False},
-    {"id": "ws_models", "title": "Modelli Quant", "page": "3_Modelli_Quantitativi", "icon": "🔬", "pinned": False},
-    {"id": "ws_val", "title": "Valutazione Aziendale", "page": "5_Valutazione_Aziendale", "icon": "🏛️", "pinned": False},
-    {"id": "ws_tech", "title": "Analisi Tecnica", "page": "8_Analisi_Tecnica", "icon": "📈", "pinned": False},
-    {"id": "ws_screener", "title": "Screener Opportunità", "page": "9_Screener_Opportunita", "icon": "🔍", "pinned": False}
+    {"id": "ws_terminal", "title": "Live Terminal", "page": "2_Live_Terminal", "icon": "🖥️", "pinned": False},
+    {"id": "ws_risk", "title": "Analisi Rischio", "page": "3_Analisi_Rischio", "icon": "🔴", "pinned": False},
+    {"id": "ws_models", "title": "Modelli Quant", "page": "4_Modelli_Quantitativi", "icon": "🔬", "pinned": False},
+    {"id": "ws_pos", "title": "Posizioni & Fisco", "page": "5_Posizioni_e_Dettagli", "icon": "📋", "pinned": False},
+    {"id": "ws_val", "title": "Valutazione Aziendale", "page": "6_Valutazione_Aziendale", "icon": "🏛️", "pinned": False},
+    {"id": "ws_stress", "title": "Stress Testing", "page": "7_Stress_Testing", "icon": "🌪️", "pinned": False},
+    {"id": "ws_time", "title": "Analisi Temporale", "page": "8_Analisi_Temporale", "icon": "📊", "pinned": False},
+    {"id": "ws_tech", "title": "Analisi Tecnica", "page": "9_Analisi_Tecnica", "icon": "📈", "pinned": False},
+    {"id": "ws_screener", "title": "Screener Opportunità", "page": "10_Screener_Opportunita", "icon": "🔍", "pinned": False}
 ]
 
 

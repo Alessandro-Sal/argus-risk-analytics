@@ -167,6 +167,7 @@ def compute_tax_and_harvesting(
                     fx_rate = 1.0
                     if tx_curr not in ["EUR", "", "NAN", "NONE"]:
                         fx_pair = f"{tx_curr}EUR=X"
+                        fx_pair_inv = f"EUR{tx_curr}=X"
                         if fx_pair in fx_dict:
                             try:
                                 idx = fx_dict[fx_pair].index.get_indexer([row["tx_date"]], method='ffill')[0]
@@ -174,12 +175,22 @@ def compute_tax_and_harvesting(
                                     fx_rate = float(fx_dict[fx_pair].iloc[idx])
                             except Exception:
                                 pass
-                        elif tx_curr == "USD":
-                            fx_rate = 0.92
-                        elif tx_curr == "GBP":
-                            fx_rate = 1.17
-                        elif tx_curr == "CHF":
-                            fx_rate = 1.05
+                        elif fx_pair_inv in fx_dict:
+                            try:
+                                idx = fx_dict[fx_pair_inv].index.get_indexer([row["tx_date"]], method='ffill')[0]
+                                if idx >= 0:
+                                    inv_r = float(fx_dict[fx_pair_inv].iloc[idx])
+                                    if inv_r > 0:
+                                        fx_rate = 1.0 / inv_r
+                            except Exception:
+                                pass
+                        else:
+                            fallback_map = {
+                                "USD": 0.92, "GBP": 1.17, "CHF": 1.06, "DKK": 0.134,
+                                "SEK": 0.088, "NOK": 0.086, "JPY": 0.0062, "CAD": 0.68,
+                                "AUD": 0.61, "HKD": 0.118, "SGD": 0.69, "CNY": 0.128, "MXN": 0.051
+                            }
+                            fx_rate = fallback_map.get(tx_curr, 1.0)
 
                     price = raw_price * fx_rate
                     

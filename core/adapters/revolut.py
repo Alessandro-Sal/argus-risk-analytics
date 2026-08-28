@@ -27,7 +27,7 @@ def _classify_revolut_tx_type(raw_type: str) -> Optional[str]:
         return "sell"
     if any(k in t for k in ["buy", "acquisto", "buy - market", "buy - limit", "recurring buy"]):
         return "buy"
-    if any(k in t for k in ["split", "stock split"]):
+    if any(k in t for k in ["split", "stock split", "reverse split", "raggruppamento", "merger", "fusione", "spinoff", "scissione"]):
         return "split"
     if any(k in t for k in ["fee", "custody", "custodia", "topup", "deposit", "withdrawal", "transfer"]):
         return None

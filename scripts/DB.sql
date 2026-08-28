@@ -14,14 +14,15 @@ USE investment_risk_bi;
 --    Un record per ogni portafoglio caricato nel sistema.
 --    base_currency = valuta di riferimento per i report.
 -- ------------------------------------------------------------
-CREATE TABLE portfolios (
+CREATE TABLE IF NOT EXISTS portfolios (
     portfolio_id  INT            NOT NULL AUTO_INCREMENT,
     name          VARCHAR(100)   NOT NULL,
     owner         VARCHAR(100)   NOT NULL DEFAULT 'anonymous',
     base_currency CHAR(3)        NOT NULL DEFAULT 'EUR',
     created_at    DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
     description   TEXT,
-    PRIMARY KEY (portfolio_id)
+    PRIMARY KEY (portfolio_id),
+    UNIQUE KEY uq_portfolio_name (name)
 );
 
 -- ------------------------------------------------------------
@@ -139,7 +140,7 @@ CREATE TABLE asset_mapping (
 -- ------------------------------------------------------------
 -- 6. PORTFOLIO_SNAPSHOTS
 --    Snapshot salvato automaticamente al termine della pipeline.
---    Contiene le macro-metriche e i risultati globali dei modelli.
+--    Contiene le macro-metriche e i risultati globali dei modelli quantitativi.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     snapshot_id             INT           NOT NULL AUTO_INCREMENT,
@@ -156,6 +157,63 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
     hhi_index               DECIMAL(10,4),
     mc_expected_return_1y   DECIMAL(10,4),
     mc_var_95               DECIMAL(10,4),
+    var_exceptions_count    INT,
+    sortino_ratio           DECIMAL(10,4),
+    calmar_ratio            DECIMAL(10,4),
+    alpha_pct               DECIMAL(10,4),
+    information_ratio       DECIMAL(10,4),
+    r_squared_pct           DECIMAL(10,4),
+    volatility_annual_pct   DECIMAL(10,4),
+    volatility_daily_pct    DECIMAL(10,4),
+    cvar_95_pct             DECIMAL(10,4),
+    var_cf_95_pct           DECIMAL(10,4),
+    cvar_cf_95_pct          DECIMAL(10,4),
+    var_99_pct              DECIMAL(10,4),
+    cvar_99_pct             DECIMAL(10,4),
+    omega_ratio             DECIMAL(10,4),
+    tail_ratio              DECIMAL(10,4),
+    gain_loss_ratio         DECIMAL(10,4),
+    ulcer_index             DECIMAL(10,4),
+    skewness                DECIMAL(10,4),
+    kurtosis                DECIMAL(10,4),
+    diversification_ratio   DECIMAL(10,4),
+    ff_alpha_pct            DECIMAL(10,4),
+    ff_beta_mkt             DECIMAL(10,4),
+    smb_tilt                DECIMAL(10,4),
+    hml_tilt                DECIMAL(10,4),
+    risk_free_rate_pct      DECIMAL(10,4),
+    cost_basis_total        DECIMAL(18,6),
+    unrealized_pnl_total    DECIMAL(18,6),
+    realized_pnl_total      DECIMAL(18,6),
+    dividends_total         DECIMAL(18,6),
+    benchmark_ticker        VARCHAR(50),
+    ns_beta0                DECIMAL(10,4),
+    ns_beta1                DECIMAL(10,4),
+    ns_beta2                DECIMAL(10,4),
+    ns_tau                  DECIMAL(10,4),
+    covered_call_income_eur DECIMAL(18,6),
+    covered_call_contracts  INT,
+    garch_vol_current_pct   DECIMAL(10,4),
+    current_regime          VARCHAR(50),
+    regime_crisis_probability DECIMAL(10,4),
+    accumulated_minusvalenze_eur DECIMAL(18,6),
+    total_tax_due_eur       DECIMAL(18,6),
+    tax_drag_pct            DECIMAL(10,4),
+    closed_trades_count     INT,
+    win_rate_pct            DECIMAL(10,4),
+    profit_factor           DECIMAL(10,4),
+    portfolio_duration_modified DECIMAL(10,4),
+    portfolio_convexity     DECIMAL(10,4),
+    portfolio_ytm_weighted_pct DECIMAL(10,4),
+    opt_max_sharpe_ratio    DECIMAL(10,4),
+    opt_max_sharpe_return   DECIMAL(10,4),
+    opt_max_sharpe_risk     DECIMAL(10,4),
+    opt_min_vol_ratio       DECIMAL(10,4),
+    opt_min_vol_return      DECIMAL(10,4),
+    opt_min_vol_risk        DECIMAL(10,4),
+    stress_covid_loss       DECIMAL(18,6),
+    stress_lehman_loss      DECIMAL(18,6),
+    stress_rates_loss       DECIMAL(18,6),
     PRIMARY KEY (snapshot_id),
     CONSTRAINT fk_snapshot_portfolio FOREIGN KEY (portfolio_id)
         REFERENCES portfolios (portfolio_id)
@@ -165,21 +223,51 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshots (
 -- ------------------------------------------------------------
 -- 7. SNAPSHOT_POSITIONS
 --    Dettaglio riga per riga (asset) collegato a uno snapshot.
---    Unisce le posizioni tradizionali e i cluster dell'algoritmo.
+--    Unisce le posizioni tradizionali, metriche di rischio e cluster.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS snapshot_positions (
     record_id        INT           NOT NULL AUTO_INCREMENT,
     snapshot_id      INT           NOT NULL,
     ticker           VARCHAR(20)   NOT NULL,
     asset_class      VARCHAR(50),
+    sector           VARCHAR(100),
+    country          VARCHAR(100),
+    currency         VARCHAR(3),
     qty_net          DECIMAL(18,8),
     avg_cost         DECIMAL(18,6),
+    cost_basis       DECIMAL(18,6),
     last_price       DECIMAL(18,6),
     current_value    DECIMAL(18,6),
     unrealized_pnl   DECIMAL(18,6),
+    realized_pnl     DECIMAL(18,6),
+    dividends_total  DECIMAL(18,6),
+    total_return     DECIMAL(18,6),
+    yield_on_cost_pct DECIMAL(10,4),
     weight_pct       DECIMAL(10,4),
     volatility_pct   DECIMAL(10,4),
     cluster_label    VARCHAR(50),
+    days_to_liquidate DECIMAL(10,2),
+    trailing_pe      DECIMAL(10,2),
+    forward_pe       DECIMAL(10,2),
+    price_to_book    DECIMAL(10,2),
+    dividend_yield   DECIMAL(10,4),
+    roe              DECIMAL(10,4),
+    target_mean_price DECIMAL(18,6),
+    peg_ratio        DECIMAL(10,2),
+    marginal_var_pct DECIMAL(10,4),
+    component_var_pct DECIMAL(10,4),
+    beta_vs_benchmark DECIMAL(10,4),
+    opt_weight_pct   DECIMAL(10,4),
+    altman_z_score   DECIMAL(10,4),
+    piotroski_f_score DECIMAL(10,2),
+    beneish_m_score  DECIMAL(10,4),
+    sloan_accrual_ratio DECIMAL(10,4),
+    ev_to_ebitda     DECIMAL(10,2),
+    free_cash_flow_yield DECIMAL(10,4),
+    debt_to_equity   DECIMAL(10,4),
+    atr_14_eur       DECIMAL(18,6),
+    chandelier_exit_long_eur DECIMAL(18,6),
+    rsi_14           DECIMAL(10,2),
     PRIMARY KEY (record_id),
     CONSTRAINT fk_sp_snapshot FOREIGN KEY (snapshot_id)
         REFERENCES portfolio_snapshots (snapshot_id)

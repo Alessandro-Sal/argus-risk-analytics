@@ -1,4 +1,12 @@
 import streamlit as st
+
+st.set_page_config(
+    page_title="Analisi Temporale | ARGUS",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -7,15 +15,10 @@ from plotly.subplots import make_subplots
 import os
 from datetime import datetime, timedelta
 
-import importlib
 import core.ui_utils
 import core.duckdb_engine
 import core.temporal_engine
 import core.multi_portfolio
-importlib.reload(core.ui_utils)
-importlib.reload(core.duckdb_engine)
-importlib.reload(core.temporal_engine)
-importlib.reload(core.multi_portfolio)
 
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
@@ -34,13 +37,6 @@ from core.temporal_engine import (
     reconstruct_point_in_time_portfolio,
 )
 from sqlalchemy import text as sqlt
-
-st.set_page_config(
-    page_title="Analisi Temporale | ARGUS",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 inject_custom_css()
 render_sidebar()
@@ -79,7 +75,7 @@ if has_real:
     tot_port_val = float(pos["current_value"].sum()) if not pos.empty and "current_value" in pos.columns else float(results.get("portfolio_value", 0.0))
     p_name = st.session_state.get("portfolio_name", "Master Wealth")
     p_run = st.session_state.get("run_id", "LIVE")
-    n_assets = len(pos) if not pos.empty else len(df_returns.columns)
+    n_assets = len(pos[pos.get("qty_net", 1) > 1e-6]) if not pos.empty else len(df_returns.columns)
     
     with st.expander(f"🟢 **Portafoglio Live Attivo: {p_name}** | Valore: **€ {tot_port_val:,.2f}** | {n_assets} Asset • *Opzioni di cambio portafoglio*", expanded=False):
         c_sw1, c_sw2, c_sw3 = st.columns([2.5, 1.5, 1.2], vertical_alignment="center")

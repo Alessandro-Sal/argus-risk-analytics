@@ -6,9 +6,19 @@
 import io
 import time
 import datetime
-import importlib
 import html
 import streamlit as st
+
+st.set_page_config(
+    page_title="ARGUS - BQuant & Launchpad",
+    page_icon="💻",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+import io
+import time
+import datetime
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -52,13 +62,6 @@ from core.terminal_engine import (
     get_terminal_engine,
     TerminalCommandResult,
     OMSOrder
-)
-
-st.set_page_config(
-    page_title="ARGUS - BQuant & Launchpad",
-    page_icon="💻",
-    layout="wide",
-    initial_sidebar_state="expanded"
 )
 
 inject_custom_css()
@@ -233,7 +236,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
     # ── Pipeline Binding Status Strip (Bloomberg BQuant Data Bus) ──
     port_label, has_port = ui_utils.get_display_portfolio_name()
     port_name = st.session_state.get("portfolio_name", port_label)
-    n_pos = len(pos) if (pos is not None and isinstance(pos, pd.DataFrame)) else 0
+    n_pos = len(pos[pos.get("qty_net", 1) > 1e-6]) if (pos is not None and isinstance(pos, pd.DataFrame)) else 0
     tot_val = float(pos["current_value"].sum()) if (pos is not None and isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns) else 0.0
     tot_val_str = f"€ {tot_val:,.2f}".replace(",", ".")
     

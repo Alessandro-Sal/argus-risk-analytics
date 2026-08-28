@@ -30,6 +30,9 @@ def generate_excel_in_memory(df: pd.DataFrame) -> io.BytesIO:
     io.BytesIO
         Memory stream containing the generated XLSX file.
     """
+    if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+        df = df[(df.get("qty_net", 1) > 1e-6) & (df.get("current_value", 1) > 1e-6)].copy()
+
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True, 'nan_inf_to_errors': True})
     
