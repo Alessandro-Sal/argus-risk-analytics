@@ -1,18 +1,16 @@
 import streamlit as st
+
+st.set_page_config(page_title="Executive Cockpit | ARGUS", page_icon="📈", layout="wide")
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import importlib
 import core.ui_utils
 import core.risk_engine
 import core.duckdb_engine
-importlib.reload(core.ui_utils)
-importlib.reload(core.risk_engine)
-importlib.reload(core.duckdb_engine)
 from core.ui_utils import inject_custom_css, section, metric_card, fmt_pct, fmt_eur, glossary_modal, render_executive_badges, render_command_bar, apply_plotly_theme, render_factor_radar_chart, render_info_modal, ensure_risk_bundle_loaded, render_sandbox_banner
 from core.excel_generator import generate_excel_in_memory
 
-st.set_page_config(page_title="Executive Cockpit | ARGUS", page_icon="📈", layout="wide")
 inject_custom_css()
 
 from core.sidebar import render_sidebar
@@ -1364,12 +1362,17 @@ with st.expander(f"🛡️ ARGUS Quant Advisor & Diagnostica Anomalie (Score Sal
                 """, unsafe_allow_html=True)
                 target_page = diag.get("page_target")
                 if target_page:
-                    st.page_link(
-                        target_page,
-                        label=diag.get("page_label", "Apri Sezione Dedicata"),
-                        icon=diag.get("page_icon", "🔬")
-                    )
-                    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+                    try:
+                        from core.workspace_manager import resolve_page_path
+                        canonical_target = resolve_page_path(target_page)
+                        st.page_link(
+                            canonical_target,
+                            label=diag.get("page_label", "Apri Sezione Dedicata"),
+                            icon=diag.get("page_icon", "🔬")
+                        )
+                        st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+                    except Exception:
+                        pass
 
 st.divider()
 

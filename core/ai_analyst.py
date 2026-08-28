@@ -93,7 +93,10 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     top_holdings = []
     if isinstance(positions, pd.DataFrame) and not positions.empty:
         df_p = positions.copy()
+        if "qty_net" in df_p.columns:
+            df_p = df_p[df_p["qty_net"] > 1e-6]
         if "current_value" in df_p.columns:
+            df_p = df_p[df_p["current_value"] > 0]
             tot_v = float(df_p["current_value"].sum())
             if val_eur == 0.0 and tot_v > 0.0:
                 val_eur = tot_v

@@ -202,19 +202,19 @@ def test_terminal_command_gateway_phase4_mnemonics():
     """Verifica il corretto parsing e routing dei nuovi comandi gateway di Fase 4."""
     cmd_bquant = parse_terminal_command("BQUANT")
     assert cmd_bquant is not None
-    assert "10_💻_BQuant_e_Launchpad.py" in cmd_bquant["page"]
+    assert "11_💻_BQuant_e_Launchpad.py" in cmd_bquant["page"]
     assert "🐍" in cmd_bquant["target"]
 
     cmd_py = parse_terminal_command("PY")
     assert cmd_py is not None
-    assert "10_💻_BQuant_e_Launchpad.py" in cmd_py["page"]
+    assert "11_💻_BQuant_e_Launchpad.py" in cmd_py["page"]
 
     cmd_launchpad = parse_terminal_command("LAUNCHPAD")
     assert cmd_launchpad is not None
-    assert "10_💻_BQuant_e_Launchpad.py" in cmd_launchpad["page"]
+    assert "11_💻_BQuant_e_Launchpad.py" in cmd_launchpad["page"]
     assert "🎛️" in cmd_launchpad["target"]
 
     cmd_xl = parse_terminal_command("XL")
     assert cmd_xl is not None
-    assert "10_💻_BQuant_e_Launchpad.py" in cmd_xl["page"]
+    assert "11_💻_BQuant_e_Launchpad.py" in cmd_xl["page"]
     assert "📊" in cmd_xl["target"]

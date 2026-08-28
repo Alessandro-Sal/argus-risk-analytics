@@ -201,3 +201,31 @@ def test_resolve_asset_metadata_comprehensive():
     assert s_ndia == "ETF Mercati Emergenti"
 
 
+def test_multi_portfolio_active_positions_only():
+    """Verifica che posizioni chiuse o a quantità zero vengano escluse dal conteggio e dalla normalizzazione multi-portafoglio."""
+    port_with_closed = {
+        "portfolio_value": 40000.0,
+        "positions": pd.DataFrame({
+            "ticker": ["AAPL", "CLOSED_TSLA", "MSFT", "OLD_AMZN"],
+            "qty_net": [100.0, 0.0, 50.0, 0.0],
+            "current_value": [20000.0, 0.0, 20000.0, 0.0],
+            "cost_basis": [15000.0, 0.0, 16000.0, 0.0]
+        }),
+        "metrics": {"cagr": 0.10, "volatility": 0.12, "sharpe_ratio": 1.0, "var_95": 0.015, "max_drawdown": 0.05}
+    }
+    
+    save_portfolio_profile("Test_Port_Active_Only", port_with_closed, tag="Test Active")
+    profiles = list_saved_portfolio_profiles()
+    target_prof = next((p for p in profiles if p["name"] == "Test_Port_Active_Only"), None)
+    
+    assert target_prof is not None
+    # Deve contenere ESATTAMENTE 2 posizioni attive (AAPL e MSFT), escludendo CLOSED_TSLA e OLD_AMZN
+    assert target_prof["asset_count"] == 2
+    
+    df_comp = compute_multi_portfolio_comparison(["Test_Port_Active_Only"])
+    assert df_comp.iloc[0]["N° Posizioni"] == 2
+    
+    delete_saved_portfolio_profile("Test_Port_Active_Only")
+
+
+

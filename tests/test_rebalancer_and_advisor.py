@@ -86,3 +86,34 @@ def test_advisor_with_none_values():
     assert isinstance(advisor_res["diagnostics"], list)
     assert advisor_res["summary"]["beta"] == 1.0
 
+
+def test_advisor_page_targets_exist_on_disk():
+    """Verifica che tutti i page_target generati dall'advisor esistano fisicamente in src/."""
+    import os
+    from core.workspace_manager import resolve_page_path
+
+    src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+    mock_results = {
+        "metrics": {
+            "returns": {"sharpe_ratio": 0.5},
+            "market_risk": {"beta": 1.8, "volatility_annual_pct": 25.0},
+            "concentration": {"hhi": 0.40, "effective_n_assets": 2.5}
+        },
+        "positions": pd.DataFrame([
+            {"ticker": "NVDA", "qty_net": 100, "weight_pct": 60.0, "trailing_pe": 75.0},
+            {"ticker": "AAPL", "qty_net": 50, "weight_pct": 40.0, "trailing_pe": 35.0}
+        ]),
+        "risk_contribution": {"component_var_pct": {"NVDA": 70.0, "AAPL": 30.0}},
+        "optimization": {"max_sharpe": {"sharpe": 1.4}}
+    }
+    advisor_res = generate_quant_advisory_report(mock_results)
+    assert len(advisor_res["diagnostics"]) > 0
+
+    for d in advisor_res["diagnostics"]:
+        pt = d.get("page_target")
+        if pt:
+            canonical = resolve_page_path(pt)
+            full_path = os.path.join(src_dir, canonical)
+            assert os.path.exists(full_path), f"Il file di pagina {canonical} (da {pt}) non esiste in {src_dir}"
+
+

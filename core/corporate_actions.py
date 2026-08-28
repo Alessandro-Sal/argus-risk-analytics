@@ -47,8 +47,36 @@ KNOWN_HISTORICAL_SPLITS: Dict[str, List[Dict[str, Any]]] = {
     "MSFT": [
         {"date": "2003-02-18", "ratio": 2.0, "desc": "2:1 Forward Stock Split"},
     ],
+    "AVGO": [
+        {"date": "2024-07-15", "ratio": 10.0, "desc": "10:1 Forward Stock Split"},
+    ],
+    "CMG": [
+        {"date": "2024-06-26", "ratio": 50.0, "desc": "50:1 Forward Stock Split"},
+    ],
+    "WMT": [
+        {"date": "2024-02-26", "ratio": 3.0, "desc": "3:1 Forward Stock Split"},
+    ],
+    "NFLX": [
+        {"date": "2015-07-15", "ratio": 7.0, "desc": "7:1 Forward Stock Split"},
+    ],
+    "GE": [
+        {"date": "2021-08-02", "ratio": 0.125, "desc": "1:8 Reverse Stock Split / Raggruppamento"},
+    ],
+    "C": [
+        {"date": "2011-05-09", "ratio": 0.10, "desc": "1:10 Reverse Stock Split / Raggruppamento"},
+    ],
+    "NOVO-B.CO": [
+        {"date": "2023-09-13", "ratio": 2.0, "desc": "2:1 Forward Stock Split"},
+        {"date": "2014-01-02", "ratio": 5.0, "desc": "5:1 Forward Stock Split"},
+    ],
+    "ASML.AS": [
+        {"date": "2000-05-04", "ratio": 3.0, "desc": "3:1 Forward Stock Split"},
+    ],
+    "BMW.DE": [
+        {"date": "1999-05-10", "ratio": 3.0, "desc": "3:1 Forward Stock Split"},
+    ],
     "ISP.MI": [
-        {"date": "2018-06-18", "ratio": 1.0, "desc": "Conversione Azioni Risparmio"},
+        {"date": "2018-06-18", "ratio": 1.0, "desc": "Conversione Azioni Risparmio / Fusione Categorie"},
     ]
 }
 
@@ -146,7 +174,11 @@ def _resolve_splits_for_ticker(
                     "desc": f"{ratio:.4g}:1 Split" if ratio > 1.0 else f"1:{1.0/ratio:.4g} Reverse Split"
                 })
 
-    explicit_splits = grp[grp["tx_type"].astype(str).str.lower().str.strip() == "split"]
+    explicit_splits = grp[grp["tx_type"].astype(str).str.lower().str.strip().isin([
+        "split", "frazionamento", "raggruppamento", "reverse_split", "reverse split",
+        "stock_split", "stock split", "stock_dividend", "fusione", "merger",
+        "scambio", "scambio_azioni", "spinoff", "scissione"
+    ])]
     for _, sp_row in explicit_splits.iterrows():
         sp_ratio = float(sp_row.get("quantity") or sp_row.get("price") or 1.0)
         if sp_ratio > 0.0 and sp_ratio != 1.0:
@@ -155,7 +187,7 @@ def _resolve_splits_for_ticker(
                 splits_to_apply.append({
                     "date": sp_date,
                     "ratio": sp_ratio,
-                    "desc": f"Transazione Split Esplicita ({sp_ratio}:1)"
+                    "desc": f"Transazione Corporate Action ({sp_ratio:.4g}:1)"
                 })
 
     return sorted(splits_to_apply, key=lambda x: x["date"])
@@ -169,7 +201,7 @@ def _apply_split_to_dataframe(
     """Applica un singolo split su tutte le transazioni ante-split del ticker specificato."""
     sp_date = sp["date"]
     sp_ratio = sp["ratio"]
-    valid_tx = ["buy", "sell", "dividend", "acquisto", "vendita", "b", "s"]
+    valid_tx = ["buy", "sell", "dividend", "acquisto", "vendita", "b", "s", "cedola", "div"]
 
     mask = (
         (df["ticker"] == ticker) &
@@ -193,7 +225,7 @@ def _apply_split_to_dataframe(
         "ticker": ticker,
         "split_date": sp_date.strftime("%Y-%m-%d"),
         "split_ratio": sp_ratio,
-        "split_type": "Forward Split" if sp_ratio > 1.0 else ("Reverse Split" if sp_ratio < 1.0 else "Parità"),
+        "split_type": "Forward Split" if sp_ratio > 1.0 else ("Reverse Split / Raggruppamento" if sp_ratio < 1.0 else "Fusione / Conversione"),
         "description": sp["desc"],
         "affected_lots_count": len(affected_rows),
         "shares_before": round(total_qty_before, 4),
@@ -256,8 +288,13 @@ def adjust_transactions_for_splits(
             if audit_entry:
                 audit_trail.append(audit_entry)
 
-    # Rimuovi righe con tx_type == 'split' dal dataset di esecuzione FIFO per evitare duplicazioni
-    df_clean_fifo = df[df["tx_type"].astype(str).str.lower().str.strip() != "split"].copy()
+    # Rimuovi righe di corporate actions esplicite dal dataset di esecuzione FIFO per evitare duplicazioni
+    corp_act_types = [
+        "split", "frazionamento", "raggruppamento", "reverse_split", "reverse split",
+        "stock_split", "stock split", "stock_dividend", "fusione", "merger",
+        "scambio", "scambio_azioni", "spinoff", "scissione"
+    ]
+    df_clean_fifo = df[~df["tx_type"].astype(str).str.lower().str.strip().isin(corp_act_types)].copy()
 
     return df_clean_fifo, audit_trail
 

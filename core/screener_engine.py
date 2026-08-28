@@ -158,7 +158,7 @@ def _process_single_screener_ticker(
                 elif tk.endswith(".ST") or (10.0 <= ratio <= 13.0): target_mean /= 11.40
                 elif tk.endswith(".OL"): target_mean /= 11.50
                 elif tk.endswith(".T") or ratio > 100: target_mean /= 162.0
-                elif tk.endswith(".L") and ratio > 50: target_mean = (target_mean / 100.0) / 1.17
+                elif tk.endswith(".L") and ratio > 50: target_mean = (target_mean / 100.0) * 1.17
             upside_pct = ((target_mean - last_price) / last_price) * 100.0
 
         # Valutazione & Multipli

@@ -12,10 +12,17 @@ if _root_dir not in sys.path:
     sys.path.insert(0, _root_dir)
 
 import streamlit as st
+
+st.set_page_config(
+    page_title="Control Room | ARGUS Risk Analytics",
+    page_icon="👁️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import numpy as np
 import datetime
-import importlib
 import json
 import os
 import re
@@ -28,9 +35,6 @@ from core.db_exporter import save_snapshot_to_db
 import core.ui_utils
 import core.duckdb_engine as duckdb_engine
 import core.adapters.broker_hub as broker_hub
-importlib.reload(core.ui_utils)
-importlib.reload(duckdb_engine)
-importlib.reload(broker_hub)
 from core.ui_utils import (
     inject_custom_css,
     section,
@@ -48,6 +52,7 @@ from core.ui_utils import (
     render_broker_hub_modal,
     render_duckdb_modal,
 )
+import core.multi_portfolio
 from core.multi_portfolio import (
     save_portfolio_profile,
     list_saved_portfolio_profiles,
@@ -63,17 +68,6 @@ from core.diagnostics import (
     reindex_databases,
 )
 from core.cache_shield import clear_cache
-
-# ── Config pagina ────────────────────────────────────────────
-
-is_splash_dismissed = st.session_state.get("splash_dismissed", False)
-
-st.set_page_config(
-    page_title="Control Room | ARGUS Risk Analytics",
-    page_icon="👁️",
-    layout="wide",
-    initial_sidebar_state="expanded" if is_splash_dismissed else "collapsed",
-)
 
 inject_custom_css()
 
@@ -323,9 +317,29 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                     with st.spinner(f"Ricalcolo rapido dell'analisi {sel_row.run_id}..."):
                         rf_val = st.session_state.get("active_rf_rate")
                         base_curr = st.session_state.get("base_currency", "EUR")
-                        results = compute_risk(sel_row.portfolio_id, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
+                        from sqlalchemy import text as sqlt
+                        target_pid = sel_row.portfolio_id
+                        try:
+                            with engine_sidebar.connect() as conn:
+                                tx_cnt = conn.execute(sqlt("SELECT COUNT(*) FROM transactions WHERE portfolio_id = :pid"), {"pid": target_pid}).scalar()
+                                if not tx_cnt or tx_cnt == 0:
+                                    # Cerca se le transazioni sono archiviate sotto un altro ID con lo stesso nome
+                                    alt_pid = conn.execute(sqlt("""
+                                        SELECT t.portfolio_id 
+                                        FROM transactions t 
+                                        JOIN portfolios p ON t.portfolio_id = p.portfolio_id 
+                                        WHERE p.name = :pname 
+                                        GROUP BY t.portfolio_id 
+                                        ORDER BY COUNT(*) DESC LIMIT 1
+                                    """), {"pname": sel_row.port_name}).scalar()
+                                    if alt_pid:
+                                        target_pid = int(alt_pid)
+                        except Exception:
+                            pass
+
+                        results = compute_risk(target_pid, engine_sidebar, benchmark_ticker=benchmark, risk_free_rate=rf_val, base_currency=base_curr)
                         st.session_state["pipeline_done"]  = True
-                        st.session_state["portfolio_id"]   = sel_row.portfolio_id
+                        st.session_state["portfolio_id"]   = target_pid
                         st.session_state["portfolio_name"] = sel_row.port_name
                         st.session_state["engine"]         = engine_sidebar
                         st.session_state["results"]        = results
@@ -758,15 +772,15 @@ with tab_ingest:
                     
                     if not offline_mode:
                         from sqlalchemy import text as sqlt
+                        from core.db_exporter import get_or_create_portfolio_id
                         with engine.begin() as conn:
-                            conn.execute(sqlt("""
-                                INSERT INTO portfolios (name, owner, base_currency, created_at)
-                                VALUES (:name, 'streamlit_user', :base_currency, NOW())
-                            """), {
-                                "name": p_name_final,
-                                "base_currency": st.session_state.get("base_currency", "EUR")
-                            })
-                            portfolio_id = conn.execute(sqlt("SELECT LAST_INSERT_ID()")).scalar()
+                            portfolio_id = get_or_create_portfolio_id(
+                                conn,
+                                name=p_name_final,
+                                owner="streamlit_user",
+                                base_currency=st.session_state.get("base_currency", "EUR")
+                            )
+                            conn.execute(sqlt("DELETE FROM transactions WHERE portfolio_id = :pid"), {"pid": portfolio_id})
 
                             for _, row in df_clean.iterrows():
                                 conn.execute(sqlt("""
@@ -910,21 +924,21 @@ with tab_ingest:
             with nav_c1:
                 st.page_link("pages/1_📈_Dashboard_Generale.py", label="📈 Executive Cockpit ➔", use_container_width=True)
             with nav_c2:
-                st.page_link("pages/2_🔴_Analisi_Rischio.py", label="🔴 Analisi Rischio & VaR ➔", use_container_width=True)
+                st.page_link("pages/2_🖥️_Live_Terminal.py", label="🖥️ Live Terminal OMS ➔", use_container_width=True)
             with nav_c3:
-                st.page_link("pages/3_🔬_Modelli_Quantitativi.py", label="🔬 Modelli Quantitativi ➔", use_container_width=True)
+                st.page_link("pages/3_🔴_Analisi_Rischio.py", label="🔴 Analisi Rischio & VaR ➔", use_container_width=True)
             with nav_c4:
-                st.page_link("pages/4_📋_Posizioni_e_Dettagli.py", label="📋 Posizioni, Fisco & Div. ➔", use_container_width=True)
+                st.page_link("pages/4_🔬_Modelli_Quantitativi.py", label="🔬 Modelli Quantitativi ➔", use_container_width=True)
 
             nav_r2_1, nav_r2_2, nav_r2_3, nav_r2_4 = st.columns(4)
             with nav_r2_1:
-                st.page_link("pages/5_🏛️_Valutazione_Aziendale.py", label="🏛️ Valutazione Fair Value ➔", use_container_width=True)
+                st.page_link("pages/5_📋_Posizioni_e_Dettagli.py", label="📋 Posizioni & Fisco ➔", use_container_width=True)
             with nav_r2_2:
-                st.page_link("pages/6_🌪️_Stress_Testing.py", label="🌪️ Stress Testing Macro ➔", use_container_width=True)
+                st.page_link("pages/6_🏛️_Valutazione_Aziendale.py", label="🏛️ Valutazione Fair Value ➔", use_container_width=True)
             with nav_r2_3:
-                st.page_link("pages/8_📈_Analisi_Tecnica.py", label="📈 Analisi Tecnica & Charts ➔", use_container_width=True)
+                st.page_link("pages/7_🌪️_Stress_Testing.py", label="🌪️ Stress Testing Macro ➔", use_container_width=True)
             with nav_r2_4:
-                st.page_link("pages/9_🔍_Screener_Opportunita.py", label="🔍 Screener & Pre-Trade ➔", use_container_width=True)
+                st.page_link("pages/10_🔍_Screener_Opportunita.py", label="🔍 Screener & Pre-Trade ➔", use_container_width=True)
 
             with st.expander("🔄 Opzioni di Ricalcolo / Modifica Parametri", expanded=False):
                 col_re1, col_re2 = st.columns([2, 1])

@@ -1,15 +1,14 @@
 import streamlit as st
+
+st.set_page_config(page_title="Stress Testing | ARGUS", page_icon="🌪️", layout="wide")
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import importlib
 import core.ui_utils
 import core.risk_engine
-importlib.reload(core.ui_utils)
-importlib.reload(core.risk_engine)
 from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner
 
-st.set_page_config(page_title="Stress Testing | ARGUS", page_icon="🌪️", layout="wide")
 inject_custom_css()
 
 from core.sidebar import render_sidebar

@@ -5,19 +5,23 @@
 # ============================================================
 
 import streamlit as st
+
+st.set_page_config(
+    page_title="ARGUS · Market Screener & Pre-Trade",
+    page_icon="🔍",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 import io
 
-import importlib
 import core.ui_utils as ui_utils
 import core.risk_engine as risk_engine
 import core.screener_engine as screener_engine
-importlib.reload(ui_utils)
-importlib.reload(risk_engine)
-importlib.reload(screener_engine)
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -42,13 +46,6 @@ from core.screener_engine import (
     simulate_pre_trade_impact,
     compute_optimal_candidate_weight,
     compute_market_and_watchlist_alerts
-)
-
-st.set_page_config(
-    page_title="ARGUS · Market Screener & Pre-Trade",
-    page_icon="🔍",
-    layout="wide",
-    initial_sidebar_state="expanded"
 )
 
 inject_custom_css()
@@ -988,7 +985,8 @@ elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":
                 """, unsafe_allow_html=True)
             with col_h_link:
                 try:
-                    st.page_link("pages/3_🔬_Modelli_Quantitativi.py", label="➡️ Apri Modelli Quantitativi (Pag. 3)", icon="🔬")
+                    from core.workspace_manager import resolve_page_path
+                    st.page_link(resolve_page_path("4_Modelli_Quantitativi"), label="➡️ Apri Modelli Quantitativi (Pag. 4)", icon="🔬")
                 except Exception:
                     pass
             with col_h_cancel:
@@ -1014,12 +1012,12 @@ elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":
         with act_col2:
             if st.button(f"📈 Analisi Tecnica", use_container_width=True, help=f"Apri il Cockpit Tecnico su {cand_ticker}"):
                 st.session_state["ta_target_ticker"] = cand_ticker
-                st.switch_page("pages/8_📈_Analisi_Tecnica.py")
+                st.switch_page("pages/9_📈_Analisi_Tecnica.py")
 
         with act_col3:
             if st.button(f"🏛️ Bilanci 10-K", use_container_width=True, help=f"Apri la Valutazione Fondamentale su {cand_ticker}"):
                 st.session_state["fund_target_ticker"] = cand_ticker
-                st.switch_page("pages/5_🏛️_Valutazione_Aziendale.py")
+                st.switch_page("pages/6_🏛️_Valutazione_Aziendale.py")
 
         with act_col4:
             is_in_watch = cand_ticker in st.session_state.get("screener_watchlist", [])

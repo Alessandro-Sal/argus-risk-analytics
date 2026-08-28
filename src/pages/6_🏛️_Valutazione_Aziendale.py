@@ -1,5 +1,7 @@
-import importlib
 import streamlit as st
+
+st.set_page_config(page_title="Valutazione Aziendale | ARGUS", page_icon="🏛️", layout="wide")
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -10,11 +12,6 @@ import core.risk_engine as risk_engine
 import core.sec_rag_engine as sec_rag_engine
 import core.metadata_resolver as metadata_resolver
 import core.financial_analysis as financial_analysis
-importlib.reload(ui_utils)
-importlib.reload(risk_engine)
-importlib.reload(sec_rag_engine)
-importlib.reload(metadata_resolver)
-importlib.reload(financial_analysis)
 
 from core.ui_utils import (
     inject_custom_css, metric_card, glossary_modal, fmt_pct,
@@ -26,7 +23,6 @@ from core.forensic_accounting import compute_beneish_m_score, compute_sloan_accr
 from core.metadata_resolver import resolve_asset_metadata, resolve_asset_valuation_metrics
 from core.financial_analysis import resolve_company_name
 
-st.set_page_config(page_title="Valutazione Aziendale | ARGUS", page_icon="🏛️", layout="wide")
 inject_custom_css()
 
 from core.sidebar import render_sidebar
@@ -166,7 +162,7 @@ def normalize_target_price(row):
         elif ticker.endswith(".T") or ratio > 100:
             return target / 162.0 # JPY -> EUR
         elif ticker.endswith(".L") and ratio > 50:
-            return target / 100.0 / 1.17 # GBp -> EUR
+            return (target / 100.0) * 1.17 # GBp (pence) -> GBP -> EUR
 
     return target
 

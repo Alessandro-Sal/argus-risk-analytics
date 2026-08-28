@@ -173,11 +173,11 @@ def generate_institutional_audit_dossier(
     pos = results.get("positions", pd.DataFrame())
     stress = results.get("stress_tests", {})
 
-    # Filtro Posizioni Attive con Controvalore > 0 o Quantità > 0
+    # Filtro Posizioni Attive con Controvalore > 0 e Quantità > 0
     if not pos.empty:
-        active_pos = pos[(pos.get("current_value", 0) > 0.01) | (pos.get("qty_net", 0) > 1e-6)].copy()
-        if active_pos.empty:
-            active_pos = pos.copy()
+        active_pos = pos[(pos.get("current_value", 0) > 0.01) & (pos.get("qty_net", 0) > 1e-6)].copy()
+        if active_pos.empty and (pos.get("current_value", 0) > 0.01).any():
+            active_pos = pos[pos.get("current_value", 0) > 0.01].copy()
     else:
         active_pos = pd.DataFrame()
 

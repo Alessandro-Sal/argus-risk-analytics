@@ -23,7 +23,7 @@ def _classify_fineco_tx_type(type_and_desc: str) -> Optional[str]:
     td = type_and_desc.lower()
     if any(k in td for k in ["dividendo", "cedola", "dividend", "accredito dividendo", "accredito cedola"]):
         return "dividend"
-    if any(k in td for k in ["split", "frazionamento"]):
+    if any(k in td for k in ["split", "frazionamento", "raggruppamento", "reverse split", "fusione", "incorporazione", "scambio", "merger", "scissione", "spinoff"]):
         return "split"
     if any(k in td for k in ["vendi", "vendita", "ven", "sell"]):
         return "sell"

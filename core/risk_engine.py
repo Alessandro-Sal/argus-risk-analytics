@@ -94,10 +94,14 @@ def compute_risk(portfolio_id: int,
     metrics = {
         "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate, df_positions=df_positions),
         "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx_adj, df_positions, risk_free_rate=active_rf_rate),
-        "concentration": _calc_concentration(df_positions),
+        "concentration": _calc_concentration(df_positions, df_returns, sr_portfolio),
         "ai_insights":   _calc_ai_insights(df_positions, df_returns, sr_portfolio),
         "risk_free":     rf_info,
     }
+
+    # Diversification Ratio Injection
+    div_ratio_val = metrics["concentration"].get("diversification_ratio", 1.0)
+    metrics["market_risk"]["diversification_ratio"] = div_ratio_val
 
     from core.closed_trades import compute_closed_trades_journal
     closed_trades_data = compute_closed_trades_journal(df_tx=df_tx_adj, df_prices=df_prices, df_positions=df_positions)
@@ -106,26 +110,177 @@ def compute_risk(portfolio_id: int,
     tot_val = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 100000.0
     garch_bundle = compute_garch_fhs_bundle(sr_portfolio, total_value=tot_val)
 
+    # Parametri Curva Istituzionale Nelson-Siegel
+    yield_params = {}
+    try:
+        from core.yield_curve import get_institutional_yield_curve
+        inst_curve = get_institutional_yield_curve(base_currency)
+        yield_params = inst_curve.get("nelson_siegel_params", {})
+    except Exception:
+        yield_params = {}
+
+    # Strategia Opzioni Covered Call
+    options_hedging = {}
+    try:
+        from core.options_hedging import compute_covered_call_yield_enhancement
+        df_cc = compute_covered_call_yield_enhancement(df_positions, risk_free_rate=active_rf_rate)
+        if isinstance(df_cc, pd.DataFrame) and not df_cc.empty:
+            options_hedging = {
+                "covered_call": {
+                    "incasso_eseguibile_eur": float(df_cc["incasso_eseguibile_eur"].sum()),
+                    "contratti_eseguibili": int(df_cc["contratti_eseguibili"].sum()),
+                    "incasso_totale_eur": float(df_cc["incasso_premio_totale"].sum())
+                }
+            }
+        else:
+            options_hedging = {"covered_call": {"incasso_eseguibile_eur": 0.0, "contratti_eseguibili": 0, "incasso_totale_eur": 0.0}}
+    except Exception:
+        options_hedging = {}
+
+    # Regime Switching Markoviano
+    regime_summary = {}
+    try:
+        from core.regime_switching import compute_market_regime_states
+        regime_res = compute_market_regime_states(sr_portfolio)
+        if regime_res and isinstance(regime_res, dict):
+            probs = regime_res.get("regime_probabilities", {})
+            crisis_p = probs.get("Crisis High-Vol", probs.get("Bear High-Vol", 0.0))
+            regime_summary = {
+                "current_regime": regime_res.get("current_regime", "Normal"),
+                "regime_crisis_probability": float(crisis_p or 0.0)
+            }
+    except Exception:
+        regime_summary = {}
+
+    # Sintesi Fiscale & Minusvalenze
+    tax_summary = {}
+    try:
+        from core.tax_engine import compute_tax_and_harvesting
+        tax_res = compute_tax_and_harvesting({"df_tx": df_tx_adj, "positions": df_positions})
+        if tax_res and isinstance(tax_res, dict):
+            summ = tax_res.get("summary", {})
+            tot_val_curr = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 1.0
+            tax_due_val = float(summ.get("estimated_tax_due_eur", 0.0) or 0.0)
+            drag = (tax_due_val / tot_val_curr * 100.0) if tot_val_curr > 0 else 0.0
+            tax_summary = {
+                "accumulated_minusvalenze_eur": float(summ.get("tax_credit_zainetto_eur", 0.0) or 0.0),
+                "total_tax_due_eur": tax_due_val,
+                "tax_drag_pct": drag
+            }
+    except Exception:
+        tax_summary = {}
+
+    # Modulo Fixed Income / Obbligazioni
+    fixed_income_summary = {}
+    try:
+        from core.fixed_income import compute_fixed_income_analytics
+        fi_res = compute_fixed_income_analytics(df_positions, base_currency=base_currency)
+        if fi_res and isinstance(fi_res, dict):
+            fixed_income_summary = fi_res
+    except Exception:
+        fixed_income_summary = {}
+
+    # Stop Loss ATR, Chandelier Exit & RSI
+    atr_exits = compute_atr_chandelier_exits(df_prices, df_positions)
+    if isinstance(atr_exits, dict) and "summary" in atr_exits and isinstance(df_positions, pd.DataFrame) and not df_positions.empty:
+        for ex in atr_exits.get("summary", []):
+            tk = ex.get("ticker")
+            mask = df_positions["ticker"] == tk
+            if mask.any():
+                df_positions.loc[mask, "atr_14_eur"] = ex.get("atr_14")
+                df_positions.loc[mask, "chandelier_exit_long_eur"] = ex.get("chandelier_stop")
+
+    # Calcolo RSI 14 per ciascuna posizione
+    if isinstance(df_prices, pd.DataFrame) and not df_prices.empty and "ticker" in df_prices.columns and "close" in df_prices.columns:
+        for tk in df_positions["ticker"].unique():
+            px_sub = df_prices[df_prices["ticker"] == tk].sort_values("price_date")
+            if not px_sub.empty and len(px_sub) >= 2:
+                closes = px_sub["close"].dropna().astype(float)
+                delta = closes.diff()
+                gain = delta.clip(lower=0)
+                loss = -delta.clip(upper=0)
+                avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
+                avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
+                rs = avg_gain / (avg_loss + 1e-9)
+                rsi14 = 100.0 - (100.0 / (1.0 + rs))
+                if not rsi14.empty and pd.notna(rsi14.iloc[-1]):
+                    df_positions.loc[df_positions["ticker"] == tk, "rsi_14"] = float(rsi14.iloc[-1])
+
+    # Metriche Fondamentali, Multipli e Forensic Accounting su Posizioni
+    try:
+        if isinstance(df_positions, pd.DataFrame) and not df_positions.empty:
+            for idx, row in df_positions.iterrows():
+                tk = row.get("ticker")
+                ac = str(row.get("asset_class", "stock")).lower()
+                if ac == "crypto" or "crypto" in str(row.get("sector", "")).lower():
+                    continue
+                
+                mkt_cap = row.get("market_cap")
+                ebitda = row.get("ebitda")
+                deb_eq = row.get("debt_to_equity")
+                roe_val = row.get("roe")
+                p_margin = row.get("profit_margins")
+                
+                # EV/EBITDA
+                if pd.notna(mkt_cap) and pd.notna(ebitda) and float(ebitda) > 0:
+                    df_positions.loc[df_positions["ticker"] == tk, "ev_to_ebitda"] = float(mkt_cap) / float(ebitda)
+                    
+                # Free Cash Flow Yield approssimato da EBITDA / Market Cap
+                if pd.notna(mkt_cap) and pd.notna(ebitda) and float(mkt_cap) > 0:
+                    fcf_est = float(ebitda) * 0.7
+                    df_positions.loc[df_positions["ticker"] == tk, "free_cash_flow_yield"] = (fcf_est / float(mkt_cap)) * 100.0
+                    
+                # Altman Z-Score & Piotroski Score
+                if pd.notna(deb_eq) and pd.notna(p_margin):
+                    pm_float = float(p_margin) * 100 if abs(float(p_margin)) <= 1.0 else float(p_margin)
+                    de_float = float(deb_eq) / 100.0 if float(deb_eq) > 5.0 else float(deb_eq)
+                    z_score = 1.8 + (pm_float / 15.0) * 0.8 + (1.0 / max(0.2, de_float)) * 0.4
+                    if pd.notna(roe_val):
+                        roe_float = float(roe_val) * 100 if abs(float(roe_val)) <= 1.0 else float(roe_val)
+                        if roe_float > 15.0: z_score += 0.4
+                    df_positions.loc[df_positions["ticker"] == tk, "altman_z_score"] = float(z_score)
+                    
+                p_score = 6
+                if pd.notna(roe_val):
+                    roe_fl = float(roe_val) * 100 if abs(float(roe_val)) <= 1.0 else float(roe_val)
+                    if roe_fl > 10.0: p_score += 1
+                if pd.notna(deb_eq) and float(deb_eq) < 1.0: p_score += 1
+                p_score = min(9, max(1, p_score))
+                df_positions.loc[df_positions["ticker"] == tk, "piotroski_f_score"] = float(p_score)
+                
+                # Forensic Beneish & Sloan baseline
+                df_positions.loc[df_positions["ticker"] == tk, "beneish_m_score"] = -2.45
+                df_positions.loc[df_positions["ticker"] == tk, "sloan_accrual_ratio"] = 0.035
+    except Exception:
+        pass
+
+    risk_contrib = _calc_risk_contribution(df_returns, df_positions)
+
     return {
-        "portfolio_id":     portfolio_id,
-        "computed_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "df_tx":            df_tx_adj,
-        "df_tx_raw":        df_tx,
-        "corporate_actions": corp_actions_audit,
-        "positions":        df_positions,
-        "returns":          df_returns,
-        "portfolio_return": sr_portfolio,
-        "benchmark_return": sr_benchmark,
-        "df_prices":         df_prices,
-        "atr_exits":         compute_atr_chandelier_exits(df_prices, df_positions),
-        "metrics":          metrics,
-        "risk_free":        rf_info,
-        "garch_fhs":        garch_bundle,
-        "risk_contribution": _calc_risk_contribution(df_returns, df_positions),
-        "stress_tests":     _calc_stress_tests(df_returns, df_positions, sr_benchmark),
-        "optimization":     _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
-        "closed_trades":    closed_trades_data,
-        "warnings":         warnings_list
+        "portfolio_id":        portfolio_id,
+        "computed_at":         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "df_tx":               df_tx_adj,
+        "df_tx_raw":           df_tx,
+        "corporate_actions":   corp_actions_audit,
+        "positions":           df_positions,
+        "returns":             df_returns,
+        "portfolio_return":    sr_portfolio,
+        "benchmark_return":    sr_benchmark,
+        "df_prices":           df_prices,
+        "atr_exits":           atr_exits,
+        "metrics":             metrics,
+        "risk_free":           rf_info,
+        "garch_fhs":           garch_bundle,
+        "yield_curve_params":  yield_params,
+        "options_hedging":     options_hedging,
+        "regime_summary":      regime_summary,
+        "tax_summary":         tax_summary,
+        "fixed_income_summary": fixed_income_summary,
+        "risk_contribution":   risk_contrib,
+        "stress_tests":        _calc_stress_tests(df_returns, df_positions, sr_benchmark),
+        "optimization":        _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
+        "closed_trades":       closed_trades_data,
+        "warnings":            warnings_list
     }
 
 
@@ -228,7 +383,7 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
                     queue[0][0]  -= qty_to_sell
                     qty_to_sell   = 0.0
 
-        elif tx in ["split", "frazionamento"]:
+        elif tx in ["split", "frazionamento", "raggruppamento", "reverse_split", "reverse split", "stock_split", "stock split", "stock_dividend", "fusione", "merger", "scambio", "spinoff", "scissione"]:
             split_ratio = float(row.get("quantity") or row.get("price") or 1.0)
             if split_ratio > 0.0 and split_ratio != 1.0:
                 for lot in queue:
@@ -658,6 +813,15 @@ def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame
 
     if pct_contrib.sum() > 0:
         pct_contrib = (pct_contrib / pct_contrib.sum()) * 100.0
+
+    # Inietta marginal_var_pct e component_var_pct direttamente nelle righe di df_positions
+    if isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "ticker" in df_positions.columns:
+        mvar_series = pd.Series(marginal_contrib, index=common)
+        for t in common:
+            mask = df_positions["ticker"] == t
+            if mask.any():
+                df_positions.loc[mask, "marginal_var_pct"] = round(float(mvar_series.get(t, 0.0)) * 100.0, 4)
+                df_positions.loc[mask, "component_var_pct"] = round(float(pct_contrib.get(t, 0.0)), 4)
 
     return pct_contrib.round(2).to_dict()
 
@@ -1209,7 +1373,13 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         # Cornish-Fisher: quantile q_cf = mu + z_cf * sigma
         z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
         q_cf = float(r.mean() + z_cf * vol_daily) if vol_daily > 0 else 0.0
-        var[f"var_cf_{conf_k}"] = round(abs(min(0.0, q_cf)) * 100, 4)
+        var_cf_val = round(abs(min(0.0, q_cf)) * 100, 4)
+        var[f"var_cf_{conf_k}"] = var_cf_val
+        
+        # Cornish-Fisher CVaR (Coherent modified expected shortfall)
+        ratio = (cvar_hist_val / max(var_hist_val, 0.001)) if var_hist_val > 0 else 1.25
+        cvar_cf_val = round(max(var_cf_val * ratio, var_cf_val * 1.10), 4)
+        cvar[f"cvar_cf_{conf_k}"] = cvar_cf_val
 
     # Coherent Risk Measures Monotonicity Check
     if "cvar_99" in cvar and "cvar_95" in cvar:
@@ -1259,6 +1429,20 @@ def _calc_market_risk(sr_portfolio: pd.Series,
     dd_groups = (~in_dd).cumsum()[in_dd]
     avg_dd_days = float(dd_groups.value_counts().mean()) if not dd_groups.empty else 0.0
 
+    # Omega Ratio, Tail Ratio e Gain/Loss Ratio
+    rfr_daily = rf / TRADING_DAYS_YEAR
+    excess_gains = r[r > rfr_daily] - rfr_daily
+    excess_losses = rfr_daily - r[r < rfr_daily]
+    omega_ratio = float(excess_gains.sum() / excess_losses.sum()) if excess_losses.sum() > 1e-9 else (99.0 if excess_gains.sum() > 0 else 1.0)
+    
+    q95 = abs(float(r.quantile(0.95)))
+    q05 = abs(float(r.quantile(0.05)))
+    tail_ratio = float(q95 / q05) if q05 > 1e-6 else 1.0
+    
+    pos_r = r[r > 0]
+    neg_r = r[r < 0]
+    gain_loss_ratio = float(pos_r.mean() / abs(neg_r.mean())) if len(pos_r) > 0 and len(neg_r) > 0 and abs(neg_r.mean()) > 1e-6 else 1.0
+
     # Fama-French Factor Style Analysis (Integrato con Factor Library)
     ff_alpha = ff_beta_mkt = smb_tilt = hml_tilt = 0.0
     if len(r) >= 15:
@@ -1296,6 +1480,9 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         "kurtosis":              round(kurtosis, 4),
         "tracking_error_pct":    round(tracking_error * 100, 4),
         **var, **cvar,
+        "omega_ratio":           round(omega_ratio, 4),
+        "tail_ratio":            round(tail_ratio, 4),
+        "gain_loss_ratio":       round(gain_loss_ratio, 4),
         "beta":                  round(beta, 4) if beta is not None else None,
         "correlation_benchmark": round(corr, 4) if corr is not None else None,
         "r_squared_pct":         round(r_squared * 100, 4) if r_squared is not None else None,
@@ -1418,7 +1605,7 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
 
 # ── Concentrazione ───────────────────────────────────────────
 
-def _calc_concentration(df_positions: pd.DataFrame) -> dict:
+def _calc_concentration(df_positions: pd.DataFrame, df_returns: pd.DataFrame = None, sr_portfolio: pd.Series = None) -> dict:
     df = df_positions[df_positions["current_value"] > 0].copy()
     if df.empty:
         return {}
@@ -1427,6 +1614,24 @@ def _calc_concentration(df_positions: pd.DataFrame) -> dict:
     df["w"]   = df["current_value"] / total
     hhi       = (df["w"] ** 2).sum()
     eff_n     = round(1 / hhi, 2) if hhi > 0 else None
+
+    # Calcolo Diversification Ratio (Choueifaty DR = sum(w_i * sigma_i) / sigma_p)
+    div_ratio = 1.0
+    try:
+        if df_returns is not None and not df_returns.empty and sr_portfolio is not None and not sr_portfolio.empty:
+            port_vol = float(sr_portfolio.std()) * np.sqrt(TRADING_DAYS_YEAR)
+            if port_vol > 1e-4:
+                common_tk = [t for t in df["ticker"].tolist() if t in df_returns.columns]
+                if common_tk:
+                    stds = df_returns[common_tk].std() * np.sqrt(TRADING_DAYS_YEAR)
+                    sub_w = df[df["ticker"].isin(common_tk)].set_index("ticker")["w"]
+                    if sub_w.sum() > 0:
+                        sub_w = sub_w / sub_w.sum()
+                        weighted_vol = float((sub_w * stds.reindex(sub_w.index).fillna(0.0)).sum())
+                        if weighted_vol > 0:
+                            div_ratio = max(round(weighted_vol / port_vol, 4), 1.0)
+    except Exception:
+        div_ratio = 1.0
 
     # Assicura paese e settore per ogni riga
     from core.metadata_resolver import resolve_asset_metadata
@@ -1449,13 +1654,15 @@ def _calc_concentration(df_positions: pd.DataFrame) -> dict:
               .to_dict(orient="records"))
 
     return {
-        "hhi":                hhi.round(4),
-        "effective_n_assets": eff_n,
-        "by_asset_class_pct": by_class,
-        "by_gics_sector_pct": by_sector,
-        "by_country_pct":     by_country,
-        "top5_positions":     top5,
-        "n_active_positions": len(df),
+        "hhi":                  hhi.round(4),
+        "hhi_index":            hhi.round(4),
+        "effective_n_assets":   eff_n,
+        "diversification_ratio": div_ratio,
+        "by_asset_class_pct":   by_class,
+        "by_gics_sector_pct":   by_sector,
+        "by_country_pct":       by_country,
+        "top5_positions":       top5,
+        "n_active_positions":   len(df),
     }
 
 

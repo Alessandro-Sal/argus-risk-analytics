@@ -1,14 +1,18 @@
-import importlib
-import core.ui_utils as ui_utils
-import core.risk_engine as risk_engine
-importlib.reload(ui_utils)
-importlib.reload(risk_engine)
-
 import streamlit as st
+
+st.set_page_config(
+    page_title="Analisi Tecnica & Quantitative Charting | ARGUS",
+    page_icon="📈",
+    layout="wide"
+)
+
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+
+import core.ui_utils as ui_utils
+import core.risk_engine as risk_engine
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -29,13 +33,6 @@ from core.streaming_engine import (
     OrderBookLevel,
     OrderBookL2,
     generate_mock_streaming_ticks
-)
-
-# Configurazione della Pagina Streamlit
-st.set_page_config(
-    page_title="Analisi Tecnica & Quantitative Charting | ARGUS",
-    page_icon="📈",
-    layout="wide"
 )
 
 inject_custom_css()

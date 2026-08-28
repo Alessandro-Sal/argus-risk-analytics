@@ -18,9 +18,53 @@ import os
 import re
 import threading
 import time
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 import numpy as np
+
+
+def _visual_len(s: str) -> int:
+    """Calcola la larghezza visiva effettiva dei caratteri per layout monospace perfetto."""
+    w = 0
+    for ch in s:
+        eaw = unicodedata.east_asian_width(ch)
+        if eaw in ('W', 'F') or ord(ch) >= 0x1F300:
+            w += 2
+        else:
+            w += 1
+    return w
+
+
+def _pad_visual(s: str, target_w: int) -> str:
+    """Formatta e allinea la stringa al pixel esatto per griglie e box Unicode."""
+    curr = _visual_len(s)
+    if curr > target_w:
+        out = ''
+        w = 0
+        for ch in s:
+            ch_w = 2 if unicodedata.east_asian_width(ch) in ('W', 'F') or ord(ch) >= 0x1F300 else 1
+            if w + ch_w > target_w:
+                break
+            out += ch
+            w += ch_w
+        return out + ' ' * (target_w - w)
+    return s + ' ' * (target_w - curr)
+
+
+def _render_terminal_box(lines: List[str], width: int = 100) -> str:
+    """Costruisce un blocco ASCII perfettamente allineato con bordi Unicode precisi e zero sfasature."""
+    top = '┌' + '─' * (width + 2) + '┐'
+    bot = '└' + '─' * (width + 2) + '┘'
+    res = [top]
+    for line in lines:
+        if line == '---':
+            res.append('├' + '─' * (width + 2) + '┤')
+        else:
+            res.append('│ ' + _pad_visual(line, width) + ' │')
+    res.append(bot)
+    return '\n'.join(res)
+
 
 __all__ = [
     "ArgusTerminalEngine",
@@ -33,6 +77,7 @@ __all__ = [
     "DeskRiskLimits",
     "PreTradeRiskResult",
     "evaluate_pre_trade_risk",
+    "get_active_positions",
     "compute_pnl_attribution",
     "fetch_market_catalysts",
     "fetch_live_ticker_quote",
@@ -483,6 +528,53 @@ def evaluate_pre_trade_risk(
     )
 
 
+def get_active_positions(df_positions: Optional[pd.DataFrame]) -> pd.DataFrame:
+    """
+    Filtra in modo rigoroso e difensivo solo le posizioni ATTIVE (non chiuse o a quantità zero):
+      - DataFrame non vuoto e con colonna 'ticker'
+      - ticker non nullo / non vuoto
+      - qty_net / quantity / shares / units > 1e-6 (oppure current_value / market_value > 1e-6 se colonna quantità assente)
+    """
+    if df_positions is None or not isinstance(df_positions, pd.DataFrame) or df_positions.empty:
+        return pd.DataFrame()
+    
+    if "ticker" not in df_positions.columns:
+        return pd.DataFrame()
+
+    df = df_positions[df_positions["ticker"].notna() & (df_positions["ticker"].astype(str).str.strip() != "")].copy()
+    if df.empty:
+        return df
+
+    # Identifica colonna quantità
+    qty_col = None
+    for cand in ["qty_net", "quantity", "shares", "qty", "units"]:
+        if cand in df.columns:
+            qty_col = cand
+            break
+
+    if qty_col:
+        try:
+            numeric_q = pd.to_numeric(df[qty_col], errors="coerce").fillna(0.0)
+            df = df[numeric_q > 1e-6]
+        except Exception:
+            pass
+    else:
+        # Fallback su colonna controvalore
+        val_col = None
+        for cand in ["current_value", "market_value", "position_value", "total_val"]:
+            if cand in df.columns:
+                val_col = cand
+                break
+        if val_col:
+            try:
+                numeric_v = pd.to_numeric(df[val_col], errors="coerce").fillna(0.0)
+                df = df[numeric_v > 1e-6]
+            except Exception:
+                pass
+
+    return df
+
+
 def compute_pnl_attribution(
     df_positions: pd.DataFrame,
     all_quotes: Dict[str, Dict[str, Any]]
@@ -494,7 +586,8 @@ def compute_pnl_attribution(
     Formula:
       Delta_PnL = Qty * (Spot_t - Spot_t-1) * FX_t-1  +  Qty * Spot_t * (FX_t - FX_t-1)
     """
-    if df_positions.empty or "ticker" not in df_positions.columns:
+    active_pos = get_active_positions(df_positions)
+    if active_pos.empty or "ticker" not in active_pos.columns:
         return {"total_day_pnl": 0.0, "price_effect_eur": 0.0, "fx_effect_eur": 0.0, "fx_share_pct": 0.0, "by_asset": []}
 
     total_price_effect = 0.0
@@ -502,9 +595,9 @@ def compute_pnl_attribution(
     total_day_pnl = 0.0
     rows = []
 
-    qty_col = "qty_net" if "qty_net" in df_positions.columns else ("quantity" if "quantity" in df_positions.columns else "shares")
+    qty_col = "qty_net" if "qty_net" in active_pos.columns else ("quantity" if "quantity" in active_pos.columns else "shares")
 
-    for _, r in df_positions.iterrows():
+    for _, r in active_pos.iterrows():
         sym = str(r.get("ticker", "")).strip().upper()
         if not sym:
             continue
@@ -804,18 +897,20 @@ class ArgusTerminalEngine:
                 pass
 
         df_pos = ctx.get("df_positions", pd.DataFrame())
+        active_pos = get_active_positions(df_pos)
+        ctx["df_positions"] = active_pos
         df_ret = ctx.get("df_returns", pd.DataFrame())
         results = ctx.get("results", {})
         port_name = ctx.get("portfolio_name", "Master Wealth")
 
-        # Trova eventuale top holding di portafoglio come fallback intelligente
+        # Trova eventuale top holding di portafoglio tra le posizioni ATTIVE come fallback intelligente
         top_sym = "AAPL"
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty and "ticker" in df_pos.columns:
-            val_col = "current_value" if "current_value" in df_pos.columns else ("market_value" if "market_value" in df_pos.columns else None)
+        if isinstance(active_pos, pd.DataFrame) and not active_pos.empty and "ticker" in active_pos.columns:
+            val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
             if val_col:
-                top_sym = str(df_pos.sort_values(val_col, ascending=False)["ticker"].iloc[0]).upper()
+                top_sym = str(active_pos.sort_values(val_col, ascending=False)["ticker"].iloc[0]).upper()
             else:
-                top_sym = str(df_pos["ticker"].iloc[0]).upper()
+                top_sym = str(active_pos["ticker"].iloc[0]).upper()
 
         tokens = raw_cmd.split()
         first_token = tokens[0].upper()
@@ -857,22 +952,22 @@ class ArgusTerminalEngine:
         # ---------------------------------------------------------
         if first_token in ("PORT", "PORTFOLIO", "POS", "POSITIONS", "HOLDINGS", "ASSETS", "WEIGHTS", "W"):
             if len(tokens) >= 2 and tokens[1].upper() in ("RISK", "SUM", "SUMMARY", "METRICS", "STATS"):
-                return self._cmd_portfolio_summary(results, df_pos, ctx)
+                return self._cmd_portfolio_summary(results, active_pos, ctx)
             elif len(tokens) >= 2 and tokens[1].upper() in ("REBAL", "REBALANCE", "DRIFT"):
-                return self._cmd_rebalance_summary(results, df_pos, ctx)
+                return self._cmd_rebalance_summary(results, active_pos, ctx)
             elif len(tokens) >= 2 and tokens[1].upper() in ("DIV", "DIVIDENDS", "YIELD"):
-                return self._cmd_dividend_summary(results, df_pos, ctx)
+                return self._cmd_dividend_summary(results, active_pos, ctx)
             else:
-                return self._cmd_portfolio_live_prices(df_pos, results, ctx)
+                return self._cmd_portfolio_live_prices(active_pos, results, ctx)
 
         if first_token in ("RISK", "SUMMARY", "STATS", "METRICS"):
-            return self._cmd_portfolio_summary(results, df_pos, ctx)
+            return self._cmd_portfolio_summary(results, active_pos, ctx)
 
         if first_token in ("REBAL", "REBALANCE"):
-            return self._cmd_rebalance_summary(results, df_pos, ctx)
+            return self._cmd_rebalance_summary(results, active_pos, ctx)
 
         if first_token in ("DIV", "DIVIDENDS", "YIELD"):
-            return self._cmd_dividend_summary(results, df_pos, ctx)
+            return self._cmd_dividend_summary(results, active_pos, ctx)
 
         if first_token in ("CLOSE", "FLATTEN", "EXIT"):
             return self._cmd_close_position(tokens, ctx)
@@ -930,23 +1025,19 @@ class ArgusTerminalEngine:
         # 6. COMANDI QUANTITATIVI (VAR, SHARPE, BETA, CORR, KELLY, HEALTH, SHOCK, SNAP)
         # ---------------------------------------------------------
         if first_token == "VAR":
-            return self._cmd_var(tokens, results, df_pos, ctx)
+            return self._cmd_var(tokens, results, active_pos, ctx)
 
         if first_token in ("SHARPE", "SORTINO", "BETA", "VOL", "VOLATILITY", "CAGR", "DRAWDOWN"):
             return self._cmd_metric(first_token, results, ctx)
 
         if first_token in ("CORR", "CORRELATION"):
-            if len(tokens) >= 2 and tokens[1].upper() in ("MATRIX", "MAT", "ALL", "TABLE"):
-                return self._cmd_corr_matrix(df_ret, df_pos)
-            if len(tokens) < 3:
-                return self._cmd_corr_matrix(df_ret, df_pos)
-            return self._cmd_correlation(tokens, df_ret)
+            return self._cmd_correlation(tokens, df_ret, active_pos)
 
         if first_token in ("KELLY", "HALF-KELLY"):
             return self._cmd_kelly(results, ctx)
 
         if first_token in ("HEALTH", "SCORE", "DIAG"):
-            return self._cmd_health_score(results, df_pos, ctx)
+            return self._cmd_health_score(results, active_pos, ctx)
 
         if first_token in ("SHOCK", "STRESS"):
             return self._cmd_shock(tokens, ctx)
@@ -1032,71 +1123,73 @@ class ArgusTerminalEngine:
         ctx = ctx or {}
         port_name = ctx.get("portfolio_name", "Master Wealth")
         df_pos = ctx.get("df_positions", pd.DataFrame())
+        active_pos = get_active_positions(df_pos)
         results = ctx.get("results", {})
         
-        n_assets = len(df_pos) if isinstance(df_pos, pd.DataFrame) and not df_pos.empty else 0
+        n_assets = len(active_pos)
         tot_val = float(results.get("portfolio_value", 0.0) or 0.0)
-        if tot_val <= 0 and isinstance(df_pos, pd.DataFrame) and not df_pos.empty:
-            v_col = "current_value" if "current_value" in df_pos.columns else ("market_value" if "market_value" in df_pos.columns else None)
+        if tot_val <= 0 and not active_pos.empty:
+            v_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
             if v_col:
-                tot_val = float(df_pos[v_col].sum())
+                tot_val = float(active_pos[v_col].sum())
         base_curr = ctx.get("base_currency", "EUR")
         
         if n_assets > 0:
-            link_banner = f"💼 CONNESSO AL PORTAFOGLIO: {port_name} | {n_assets} ASSETS | VALORE: € {tot_val:,.2f} [{base_curr}]"
+            port_name_display = (port_name[:28] + "...") if len(port_name) > 30 else port_name
+            link_banner = f"💼 CONNESSO AL PORTAFOGLIO: {port_name_display} | {n_assets} ASSETS ATTIVI | VALORE: € {tot_val:,.2f} [{base_curr}]"
         else:
             link_banner = "⚠️ MODALITÀ SANDBOX GLOBALE: Nessun portafoglio attivo caricato"
 
-        help_text = f"""
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        ARGUS INSTITUTIONAL TERMINAL & CLI DESK                         │
-│ {link_banner:<86} │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ COMANDI DEDICATI AL PORTAFOGLIO ATTIVO:                                                │
-│   PORT LIVE / POS / HOLDINGS  : Tabella real-time spot, WACP e PnL di tutte le posizioni│
-│   PORT RISK / RISK / STATS    : Sintesi quantitativa (CAGR, Volatilità, Sharpe, Drawdown)│
-│   SHOCK <PCT>                 : Stress test istantaneo su tutte le posizioni (es. -5%) │
-│   CLOSE <TICKER> / FLATTEN    : Smobilizzo totale della posizione attiva con ordine MKT│
-│   REBAL / REBALANCE           : Analisi del drift e ordini di riallineamento 1/N       │
-│   DIV / DIVIDENDS             : Proiezione flusso cedolare e Dividend Yield di portafoglio│
-│   TAX                         : Monitoraggio zainetto fiscale minusvalenze e Step-Up 0€│
-│   VAR [95|99]                 : Value at Risk e Expected Shortfall (1D & 10D) monetario│
-│   CORR MATRIX                 : Matrice di correlazione Pearson tra tutti gli asset    │
-│   HEALTH / SCORE              : Health Score di diversificazione e solvibilità (0-100) │
-│                                                                                        │
-│ QUOTAZIONI E ANALISI TICKER (COLLEGATI AI TITOLI IN PORTAFOGLIO):                      │
-│   QUOTE <TICKER> / <TICKER> Q : Scheda ALLQ con prezzo spot, range e dettaglio quote   │
-│   <TICKER> DES / DES          : Scheda informativa, quantità in portafoglio, WACP, PnL │
-│   <TICKER> FA / FA            : Fondamentali contabili (Altman Z, Piotroski, ROE)      │
-│   <TICKER> VOLS / VOLS        : Volatilità storica, Implied Volatility e Skew          │
-│   NEWS <TICKER> / NEWS        : Feed news con sentiment score in streaming in tempo reale│
-│   WATCHLIST / WL              : Tabella comparativa multi-asset globale con posizioni  │
-│                                                                                        │
-│ ORDER MANAGEMENT SYSTEM (OMS SIMULATOR):                                               │
-│   BUY <qty> <ticker> [@ px]   : Ordine di acquisto a mercato o limite                  │
-│   SELL <qty> <ticker> [@ px]  : Ordine di vendita a mercato o limite                   │
-│   TWAP <qty> <ticker> <min>   : Esecuzione algoritmica TWAP uniforme con anti-frontrun │
-│   VWAP <qty> <ticker> <min>   : Esecuzione algoritmica VWAP su curva di liquidità a U  │
-│   BLOTTER / ORDERS            : Registro esecuzioni attive e storico ordini            │
-│   CANCEL <order_id>           : Annullamento ordine pendente                           │
-│                                                                                        │
-│ MOTORE SQL DUCKDB, SCREENER & EXPORT:                                                  │
-│   SQL <query>                 : Query SQL DuckDB in-memory su df_positions/df_returns  │
-│   EQS <condizione>            : Filtro logico su posizioni (es. EQS beta < 1.0)        │
-│   SNAP / EXPORT               : Esportazione snapshot CSV dei prezzi e PnL in tempo reale│
-│                                                                                        │
-│ TELEMETRIA & SISTEMA:                                                                  │
-│   TOP / STATUS                : Telemetria live CPU, RAM RSS, Cache e Thread attivi    │
-│   CLEAR / CLS                 : Pulizia del buffer di output della console             │
-│   HISTORY                     : Storico delle ultime 15 istruzioni inviate             │
-│   PING                        : Test di latenza sub-millisecondo                       │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-"""
-        return TerminalCommandResult(command="HELP", status="INFO", output_text=help_text.strip())
+        help_lines = [
+            "ARGUS INSTITUTIONAL TERMINAL & CLI DESK".center(102),
+            link_banner,
+            "---",
+            "COMANDI DEDICATI AL PORTAFOGLIO ATTIVO:",
+            "  PORT LIVE / POS / HOLDINGS  : Tabella real-time spot, WACP e PnL di tutte le posizioni",
+            "  PORT RISK / RISK / STATS    : Sintesi quantitativa (CAGR, Volatilità, Sharpe, Drawdown)",
+            "  SHOCK <PCT>                 : Stress test istantaneo su tutte le posizioni (es. -5%)",
+            "  CLOSE <TICKER> / FLATTEN    : Smobilizzo totale della posizione attiva con ordine MKT",
+            "  REBAL / REBALANCE           : Analisi del drift e ordini di riallineamento 1/N",
+            "  DIV / DIVIDENDS             : Proiezione flusso cedolare e Dividend Yield di portafoglio",
+            "  TAX                         : Monitoraggio zainetto fiscale minusvalenze e Step-Up 0€",
+            "  VAR [95|99]                 : Value at Risk e Expected Shortfall (1D & 10D) monetario",
+            "  CORR MATRIX / CORR <TICKER> : Matrice completa di correlazione e breakdown decorrelazione",
+            "  HEALTH / SCORE              : Health Score di diversificazione e solvibilità (0-100)",
+            "",
+            "QUOTAZIONI E ANALISI TICKER (COLLEGATI AI TITOLI IN PORTAFOGLIO):",
+            "  QUOTE <TICKER> / <TICKER> Q : Scheda ALLQ con prezzo spot, range e dettaglio quote",
+            "  <TICKER> DES / DES          : Scheda informativa, quantità in portafoglio, WACP, PnL",
+            "  <TICKER> FA / FA            : Fondamentali contabili (Altman Z, Piotroski, ROE)",
+            "  <TICKER> VOLS / VOLS        : Volatilità storica, Implied Volatility e Skew",
+            "  NEWS <TICKER> / NEWS        : Feed news con sentiment score in streaming in tempo reale",
+            "  WATCHLIST / WL              : Tabella comparativa multi-asset globale con posizioni",
+            "",
+            "ORDER MANAGEMENT SYSTEM (OMS SIMULATOR):",
+            "  BUY <qty> <ticker> [@ px]   : Ordine di acquisto a mercato o limite",
+            "  SELL <qty> <ticker> [@ px]  : Ordine di vendita a mercato o limite",
+            "  TWAP <qty> <ticker> <min>   : Esecuzione algoritmica TWAP uniforme con anti-frontrun",
+            "  VWAP <qty> <ticker> <min>   : Esecuzione algoritmica VWAP su curva di liquidità a U",
+            "  BLOTTER / ORDERS            : Registro esecuzioni attive e storico ordini",
+            "  CANCEL <order_id>           : Annullamento ordine pendente",
+            "",
+            "MOTORE SQL DUCKDB, SCREENER & EXPORT:",
+            "  SQL <query>                 : Query SQL DuckDB in-memory su df_positions/df_returns",
+            "  EQS <condizione>            : Filtro logico su posizioni (es. EQS beta < 1.0)",
+            "  SNAP / EXPORT               : Esportazione snapshot CSV dei prezzi e PnL in tempo reale",
+            "",
+            "TELEMETRIA & SISTEMA:",
+            "  TOP / STATUS                : Telemetria live CPU, RAM RSS, Cache e Thread attivi",
+            "  CLEAR / CLS                 : Pulizia del buffer di output della console",
+            "  HISTORY                     : Storico delle ultime 15 istruzioni inviate",
+            "  PING                        : Test di latenza sub-millisecondo"
+        ]
+        help_text = _render_terminal_box(help_lines, width=102)
+        return TerminalCommandResult(command="HELP", status="INFO", output_text=help_text)
 
     def _cmd_quote(self, ticker: str, ctx: Dict[str, Any]) -> TerminalCommandResult:
         sym = (ticker or "AAPL").strip().upper()
         df_pos = ctx.get("df_positions", pd.DataFrame())
+        active_pos = get_active_positions(df_pos)
         
         q = fetch_live_ticker_quote(sym)
         last_px = q["last_price"]
@@ -1112,10 +1205,10 @@ class ArgusTerminalEngine:
         mkt_cap = q["market_cap"]
         mkt_cap_str = f"${mkt_cap/1e12:.2f}T" if mkt_cap >= 1e12 else (f"${mkt_cap/1e9:.2f}B" if mkt_cap >= 1e9 else f"${mkt_cap/1e6:.2f}M") if mkt_cap > 0 else "N/A"
         
-        # Posizione in portafoglio se presente
+        # Posizione in portafoglio attivo se presente
         pos_str = ""
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty and "ticker" in df_pos.columns:
-            m = df_pos[df_pos["ticker"].astype(str).str.upper() == sym]
+        if not active_pos.empty and "ticker" in active_pos.columns:
+            m = active_pos[active_pos["ticker"].astype(str).str.upper() == sym]
             if not m.empty:
                 q_col = "qty_net" if "qty_net" in m.columns else ("quantity" if "quantity" in m.columns else ("shares" if "shares" in m.columns else None))
                 w_col = "avg_cost" if "avg_cost" in m.columns else ("wacp" if "wacp" in m.columns else ("buy_price" if "buy_price" in m.columns else None))
@@ -1128,10 +1221,11 @@ class ArgusTerminalEngine:
                 pnl_p = float(m[p_col].iloc[0]) if p_col else 0.0
                 
                 # Totale portafoglio per calcolare il peso
-                tot_v = float(df_pos[v_col].sum()) if v_col else 0.0
+                tot_v = float(active_pos[v_col].sum()) if v_col else 0.0
                 w_pct = (mv_held / tot_v * 100.0) if tot_v > 0 else 0.0
                 
-                pos_str = f"\n│ PORTFOLIO HOLDING: {q_held:,.1f} shares @ WACP € {w_held:,.2f} | Value: € {mv_held:,.2f} ({w_pct:.1f}% Weight) | PnL: {pnl_p:+.2f}%"
+                if q_held > 1e-6:
+                    pos_str = f"\n│ PORTFOLIO HOLDING: {q_held:,.1f} shares @ WACP € {w_held:,.2f} | Value: € {mv_held:,.2f} ({w_pct:.1f}% Weight) | PnL: {pnl_p:+.2f}%"
 
         sign = "+" if chg >= 0 else ""
         arrow = "▲" if chg >= 0 else "▼"
@@ -1149,38 +1243,41 @@ class ArgusTerminalEngine:
 
         feed_status = "LIVE API" if q["is_live"] else "ESTIMATE"
 
-        out_msg = f"""
-┌──────────────────────────────────────────────────────────────────┐
-│ {sym:<10} REAL-TIME LIVE MARKET QUOTE [{sym} ALLQ / GP]           │
-├──────────────────────────────────────────────────────────────────┤
-│  LAST PRICE : {currency} {last_px:,.2f}       CHG : {sign}{chg:,.2f} ({sign}{chg_pct:.2f}%) {arrow} [{feed_status}]
-│  BID / ASK  : {last_px - spread/2:,.2f} / {last_px + spread/2:,.2f}   SPREAD : {spread:,.2f} ({spread_bps:.1f} bps)
-├──────────────────────────────────────────────────────────────────┤
-│  OPEN       : {q['open']:,.2f}          DAY HIGH  : {day_h:,.2f}
-│  PREV CLOSE : {prev_close:,.2f}          DAY LOW   : {day_l:,.2f}
-│  VOLUME     : {vol_str:<16}  MKT CAP   : {mkt_cap_str}
-│  52W LOW    : {w52_l:,.2f}          52W HIGH  : {w52_h:,.2f}
-├──────────────────────────────────────────────────────────────────┤
-│  DAY RANGE  : [L {day_l:,.2f} {range_bar} H {day_h:,.2f}]
-│  FEED STATUS: STREAMING CONNECTED ({q['timestamp']}){pos_str}
-└──────────────────────────────────────────────────────────────────┘
-"""
-        return TerminalCommandResult(command=f"QUOTE {sym}", status="SUCCESS", output_text=out_msg.strip(), structured_data=q)
+        quote_lines = [
+            f"{sym} REAL-TIME LIVE MARKET QUOTE [{sym} ALLQ / GP]",
+            "---",
+            f"LAST PRICE : {currency} {last_px:,.2f}       CHG : {sign}{chg:,.2f} ({sign}{chg_pct:.2f}%) {arrow} [{feed_status}]",
+            f"BID / ASK  : {last_px - spread/2:,.2f} / {last_px + spread/2:,.2f}   SPREAD : {spread:,.2f} ({spread_bps:.1f} bps)",
+            "---",
+            f"OPEN       : {q['open']:,.2f}          DAY HIGH  : {day_h:,.2f}",
+            f"PREV CLOSE : {prev_close:,.2f}          DAY LOW   : {day_l:,.2f}",
+            f"VOLUME     : {vol_str:<16}  MKT CAP   : {mkt_cap_str}",
+            f"52W LOW    : {w52_l:,.2f}          52W HIGH  : {w52_h:,.2f}",
+            "---",
+            f"DAY RANGE  : [L {day_l:,.2f} {range_bar} H {day_h:,.2f}]",
+            f"FEED STATUS: STREAMING CONNECTED ({q['timestamp']})"
+        ]
+        if pos_str.strip():
+            clean_pos = pos_str.strip().lstrip('│').strip()
+            quote_lines.append(f"HOLDING    : {clean_pos}")
+
+        out_msg = _render_terminal_box(quote_lines, width=76)
+        return TerminalCommandResult(command=f"QUOTE {sym}", status="SUCCESS", output_text=out_msg, structured_data=q)
 
     def _cmd_watchlist(self, ctx: Dict[str, Any]) -> TerminalCommandResult:
         df_pos = ctx.get("df_positions", pd.DataFrame())
+        active_pos = get_active_positions(df_pos)
         wl_tickers = list(self.custom_watchlist)
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty and "ticker" in df_pos.columns:
-            for pt in df_pos["ticker"].astype(str).unique()[:6]:
+        if not active_pos.empty and "ticker" in active_pos.columns:
+            for pt in active_pos["ticker"].astype(str).unique()[:8]:
                 if pt not in wl_tickers:
                     wl_tickers.insert(0, pt)
 
         lines = [
-            "┌──────────────────────────────────────────────────────────────────┐",
-            "│ ARGUS LIVE MULTI-ASSET WATCHLIST MONITOR [WL / ALLQ]             │",
-            "├──────────────────────────────────────────────────────────────────┤",
-            f"│ {'TICKER':<8} {'LAST PRICE':<13} {'1D CHG':<12} {'DAY RANGE':<18} {'STATUS':<7} │",
-            "├──────────────────────────────────────────────────────────────────┤"
+            "ARGUS LIVE MULTI-ASSET WATCHLIST MONITOR [WL / ALLQ]",
+            "---",
+            f"{'TICKER':<8} {'LAST PRICE':<14} {'1D CHG':<12} {'DAY RANGE':<18} {'STATUS':<7}",
+            "---"
         ]
         
         target_list = wl_tickers[:12]
@@ -1193,42 +1290,41 @@ class ArgusTerminalEngine:
             px_str = f"{q['currency']} {q['last_price']:,.2f}"
             range_str = f"{q['day_low']:,.1f}-{q['day_high']:,.1f}"
             st_str = "LIVE" if q['is_live'] else "CACHE"
-            lines.append(f"│ {sym:<8} {px_str:<13} {chg_str:<12} {range_str:<18} {st_str:<7} │")
+            lines.append(f"{sym:<8} {px_str:<14} {chg_str:<12} {range_str:<18} {st_str:<7}")
 
         lines.extend([
-            "├──────────────────────────────────────────────────────────────────┤",
-            "│ TIP: Digita 'WL ADD <TICKER>' o 'WL DEL <TICKER>' per modifica   │",
-            "└──────────────────────────────────────────────────────────────────┘"
+            "---",
+            "TIP: Digita 'WL ADD <TICKER>' o 'WL DEL <TICKER>' per modifica"
         ])
-        out_msg = "\n".join(lines)
+        out_msg = _render_terminal_box(lines, width=76)
         return TerminalCommandResult(command="WATCHLIST", status="SUCCESS", output_text=out_msg)
 
     def _cmd_portfolio_live_prices(self, df_pos: pd.DataFrame, results: Dict[str, Any], ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
         ctx = ctx or {}
         port_name = ctx.get("portfolio_name", "Master Wealth")
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
+        active_pos = get_active_positions(df_pos)
+        if active_pos.empty or "ticker" not in active_pos.columns:
             return TerminalCommandResult(
                 command="PORT LIVE",
                 status="INFO",
-                output_text="Nessun portafoglio attivo caricato. Carica un portafoglio per visualizzare prezzi e PnL live."
+                output_text="Nessuna posizione attiva aperta a mercato nel portafoglio."
             )
 
         lines = [
-            "┌──────────────────────────────────────────────────────────────────┐",
-            f"│ ARGUS PORTFOLIO LIVE PRICING & P&L: {port_name[:28]:<28} │",
-            "├──────────────────────────────────────────────────────────────────┤",
-            f"│ {'TICKER':<7} {'SPOT (ORIG)':<11} {'LIVE (€)':<10} {'1D CHG':<9} {'WACP (€)':<10} {'TOTAL P&L (€ / %)':<24} │",
-            "├──────────────────────────────────────────────────────────────────┤"
+            f"ARGUS PORTFOLIO LIVE PRICING & P&L: {port_name[:32]}",
+            "---",
+            f"{'TICKER':<8} {'SPOT (ORIG)':<13} {'LIVE (€)':<11} {'1D CHG':<10} {'WACP (€)':<11} {'TOTAL P&L (€ / %)':<26}",
+            "---"
         ]
 
         total_live_val = 0.0
         total_prev_day_val = 0.0
         total_cost_basis = 0.0
 
-        port_tickers = [str(t).strip().upper() for t in df_pos["ticker"].unique() if str(t).strip()]
+        port_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()]
         quotes_map = fetch_multiple_live_quotes(port_tickers, max_workers=8)
 
-        for _, row in df_pos.iterrows():
+        for _, row in active_pos.iterrows():
             sym = str(row["ticker"]).strip().upper()
             qty = float(row.get("qty_net", row.get("quantity", row.get("shares", 0.0))))
             wacp_eur = float(row.get("avg_cost", row.get("wacp", row.get("buy_price", 0.0))))
@@ -1259,7 +1355,7 @@ class ArgusTerminalEngine:
 
             spot_orig_str = f"{curr_sym}{live_p_orig:,.2f}"
             pnl_str = f"{sign}€{pnl:>7,.0f} ({sign}{pnl_p:>5.1f}%) {arrow}"
-            lines.append(f"│ {sym:<7} {spot_orig_str:<11} €{live_p_eur:<9.2f} {chg_sign}{chg_1d:<5.1f}%{chg_arrow} €{wacp_eur:<9.2f} {pnl_str:<24} │")
+            lines.append(f"{sym:<8} {spot_orig_str:<13} €{live_p_eur:<10.2f} {chg_sign}{chg_1d:<5.1f}%{chg_arrow}  €{wacp_eur:<10.2f} {pnl_str:<26}")
 
         tot_pnl = total_live_val - total_cost_basis
         tot_pnl_p = (tot_pnl / total_cost_basis * 100.0) if total_cost_basis > 0 else 0.0
@@ -1272,14 +1368,13 @@ class ArgusTerminalEngine:
         tot_day_arrow = "▲" if tot_day_pnl >= 0 else "▼"
 
         lines.extend([
-            "├──────────────────────────────────────────────────────────────────┤",
-            f"│ PORTFOLIO LIVE NOTIONAL : € {total_live_val:>12,.2f}                     │",
-            f"│ 1D DAY CHANGE (VS IERI) : {tot_day_sign}€ {tot_day_pnl:>10,.2f} ({tot_day_sign}{tot_day_pnl_p:.2f}%) {tot_day_arrow}          │",
-            f"│ TOTAL UNREALIZED P&L    : {tot_sign}€ {tot_pnl:>10,.2f} ({tot_sign}{tot_pnl_p:.2f}%) {tot_arrow}          │",
-            f"│ REAL-TIME STATUS        : {len(df_pos)} ASSETS SYNCHRONIZED (LIVE API)       │",
-            "└──────────────────────────────────────────────────────────────────┘"
+            "---",
+            f"PORTFOLIO LIVE NOTIONAL : € {total_live_val:>12,.2f}",
+            f"1D DAY CHANGE (VS IERI) : {tot_day_sign}€ {tot_day_pnl:>10,.2f} ({tot_day_sign}{tot_day_pnl_p:.2f}%) {tot_day_arrow}",
+            f"TOTAL UNREALIZED P&L    : {tot_sign}€ {tot_pnl:>10,.2f} ({tot_sign}{tot_pnl_p:.2f}%) {tot_arrow}",
+            f"REAL-TIME STATUS        : {len(active_pos)} ASSETS ATTIVI (LIVE API)"
         ])
-        out_msg = "\n".join(lines)
+        out_msg = _render_terminal_box(lines, width=90)
         return TerminalCommandResult(command="PORT LIVE", status="SUCCESS", output_text=out_msg)
 
     def _cmd_close_position(self, tokens: List[str], ctx: Dict[str, Any]) -> TerminalCommandResult:
@@ -1291,16 +1386,17 @@ class ArgusTerminalEngine:
             )
         sym = tokens[1].upper()
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
+        active_pos = get_active_positions(df_pos)
+        if active_pos.empty or "ticker" not in active_pos.columns:
             return TerminalCommandResult(command=f"CLOSE {sym}", status="ERROR", output_text="Nessun portafoglio attivo per cui chiudere posizioni.")
         
-        match = df_pos[df_pos["ticker"].astype(str).str.upper() == sym]
+        match = active_pos[active_pos["ticker"].astype(str).str.upper() == sym]
         if match.empty:
-            return TerminalCommandResult(command=f"CLOSE {sym}", status="ERROR", output_text=f"Ticker '{sym}' non presente nel portafoglio attivo.")
+            return TerminalCommandResult(command=f"CLOSE {sym}", status="ERROR", output_text=f"Ticker '{sym}' non presente tra le posizioni attive del portafoglio.")
         
         qty_col = "qty_net" if "qty_net" in match.columns else ("shares" if "shares" in match.columns else ("quantity" if "quantity" in match.columns else None))
         q_held = float(match[qty_col].iloc[0]) if qty_col else 0.0
-        if q_held <= 0:
+        if q_held <= 1e-6:
             return TerminalCommandResult(command=f"CLOSE {sym}", status="INFO", output_text=f"Nessuna quota attiva (qty={q_held}) per il titolo '{sym}'.")
         
         # Inoltro ordine di vendita totale a mercato all'OMS
@@ -1315,24 +1411,24 @@ class ArgusTerminalEngine:
 
     def _cmd_rebalance_summary(self, results: Dict[str, Any], df_pos: pd.DataFrame, ctx: Dict[str, Any]) -> TerminalCommandResult:
         port_name = ctx.get("portfolio_name", "Master Wealth")
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
+        active_pos = get_active_positions(df_pos)
+        if active_pos.empty or "ticker" not in active_pos.columns:
             return TerminalCommandResult(command="REBALANCE", status="INFO", output_text="Nessun portafoglio attivo collegato per il ribilanciamento.")
         
         tot_val = float(results.get("portfolio_value", 100000.0) or 100000.0)
-        n_assets = len(df_pos)
+        n_assets = len(active_pos)
         target_w_equal = 1.0 / max(1, n_assets)
         
         lines = [
-            "┌────────────────────────────────────────────────────────────────────────────────────────┐",
-            f"│ ARGUS SMART REBALANCING DESK & DRIFT MONITOR [{port_name[:30]}]",
-            "├────────────────────────────────────────────────────────────────────────────────────────┤",
-            f"│ {'TICKER':<8} {'CURRENT VAL (€)':<16} {'CURR W%':<10} {'TARGET W%':<11} {'DRIFT %':<10} {'ACTION':<18} │",
-            "├────────────────────────────────────────────────────────────────────────────────────────┤"
+            f"ARGUS SMART REBALANCING DESK & DRIFT MONITOR [{port_name[:30]}]",
+            "---",
+            f"{'TICKER':<8} {'CURRENT VAL (€)':<16} {'CURR W%':<10} {'TARGET W%':<11} {'DRIFT %':<10} {'ACTION':<18}",
+            "---"
         ]
-        val_col = "current_value" if "current_value" in df_pos.columns else ("market_value" if "market_value" in df_pos.columns else None)
-        tot_mkt = float(df_pos[val_col].sum()) if val_col and not df_pos.empty else tot_val
+        val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
+        tot_mkt = float(active_pos[val_col].sum()) if val_col and not active_pos.empty else tot_val
         
-        for _, row in df_pos.iterrows():
+        for _, row in active_pos.iterrows():
             sym = str(row["ticker"]).strip().upper()
             mv = float(row[val_col]) if val_col and val_col in row else (tot_mkt / max(1, n_assets))
             curr_w = mv / max(1.0, tot_mkt)
@@ -1345,36 +1441,37 @@ class ArgusTerminalEngine:
             else:
                 act = "HOLD (In-Line)"
             
-            lines.append(f"│ {sym:<8} € {mv:>12,.2f}    {curr_w*100:>6.1f}%    {target_w_equal*100:>6.1f}%     {drift_p:>+6.1f}%    {act:<18} │")
+            lines.append(f"{sym:<8} € {mv:>12,.2f}    {curr_w*100:>6.1f}%    {target_w_equal*100:>6.1f}%     {drift_p:>+6.1f}%    {act:<18}")
         
-        lines.append("├────────────────────────────────────────────────────────────────────────────────────────┤")
-        lines.append(f"│ Target Benchmark : 1/N Equal-Risk Baseline | Total Capital: € {tot_mkt:,.2f}          │")
-        lines.append("└────────────────────────────────────────────────────────────────────────────────────────┘")
-        return TerminalCommandResult(command="REBALANCE", status="SUCCESS", output_text="\n".join(lines))
+        lines.append("---")
+        lines.append(f"Target Benchmark : 1/N Equal-Risk Baseline ({n_assets} Assets) | Total Capital: € {tot_mkt:,.2f}")
+        out_msg = _render_terminal_box(lines, width=90)
+        return TerminalCommandResult(command="REBALANCE", status="SUCCESS", output_text=out_msg)
 
     def _cmd_dividend_summary(self, results: Dict[str, Any], df_pos: pd.DataFrame, ctx: Dict[str, Any]) -> TerminalCommandResult:
         port_name = ctx.get("portfolio_name", "Master Wealth")
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
+        active_pos = get_active_positions(df_pos)
+        if active_pos.empty or "ticker" not in active_pos.columns:
             return TerminalCommandResult(command="DIVIDENDS", status="INFO", output_text="Nessun portafoglio attivo per proiezioni dividendi.")
         
-        tot_val = float(results.get("portfolio_value", 100000.0) or 100000.0)
+        val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
+        tot_val = float(active_pos[val_col].sum()) if val_col else float(results.get("portfolio_value", 100000.0) or 100000.0)
         div_yield_pct = float(results.get("dividend_yield", results.get("avg_dividend_yield", 2.35)) or 2.35)
         annual_div_eur = tot_val * (div_yield_pct / 100.0)
         monthly_div_eur = annual_div_eur / 12.0
         
-        out_msg = f"""
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ ARGUS DIVIDEND & CASH FLOW ENGINE [{port_name[:30]}]                         │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Portfolio Market Value   : € {tot_val:>12,.2f}                               │
-│ Weighted Dividend Yield  : {div_yield_pct:>12.2f} %                                  │
-│ Projected Annual Income  : € {annual_div_eur:>12,.2f}                               │
-│ Average Monthly Cashflow : € {monthly_div_eur:>12,.2f}                               │
-│ Tax Drag (TUIR 26% AdE)  : € {annual_div_eur * 0.26:>12,.2f}                               │
-│ Net After-Tax Cash Flow  : € {annual_div_eur * 0.74:>12,.2f}                               │
-└──────────────────────────────────────────────────────────────────────────────┘
-"""
-        return TerminalCommandResult(command="DIVIDENDS", status="SUCCESS", output_text=out_msg.strip())
+        div_lines = [
+            f"ARGUS DIVIDEND & CASH FLOW ENGINE [{port_name[:30]}]",
+            "---",
+            f"Portfolio Market Value   : € {tot_val:>12,.2f} ({len(active_pos)} Active Assets)",
+            f"Weighted Dividend Yield  : {div_yield_pct:>12.2f} %",
+            f"Projected Annual Income  : € {annual_div_eur:>12,.2f}",
+            f"Average Monthly Cashflow : € {monthly_div_eur:>12,.2f}",
+            f"Tax Drag (TUIR 26% AdE)  : € {annual_div_eur * 0.26:>12,.2f}",
+            f"Net After-Tax Cash Flow  : € {annual_div_eur * 0.74:>12,.2f}"
+        ]
+        out_msg = _render_terminal_box(div_lines, width=78)
+        return TerminalCommandResult(command="DIVIDENDS", status="SUCCESS", output_text=out_msg)
 
     def _cmd_top(self, ctx: Dict[str, Any]) -> TerminalCommandResult:
         if psutil is not None:
@@ -1390,33 +1487,22 @@ class ArgusTerminalEngine:
         threads_count = threading.active_count()
         
         df_pos = ctx.get("df_positions", pd.DataFrame())
+        active_pos = get_active_positions(df_pos)
         df_ret = ctx.get("df_returns", pd.DataFrame())
         
-        # Conteggio posizioni attive (quantità netta > 0)
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty:
-            qty_col = "qty_net" if "qty_net" in df_pos.columns else ("shares" if "shares" in df_pos.columns else ("quantity" if "quantity" in df_pos.columns else None))
-            if qty_col:
-                num_pos = len(df_pos[df_pos[qty_col] > 1e-6])
-            elif "current_value" in df_pos.columns:
-                num_pos = len(df_pos[df_pos["current_value"] > 0])
-            else:
-                num_pos = len(df_pos)
-        else:
-            num_pos = 0
-
+        num_pos = len(active_pos)
         num_ret_rows = len(df_ret) if isinstance(df_ret, pd.DataFrame) and not df_ret.empty else 0
 
-        top_text = f"""
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ ARGUS SYSTEM TELEMETRY MONITOR (TOP)                               [NODE: LOCALHOST]   │
-├────────────────────────────────────────────────────────────────────────────────────────┤
-│ Process PID      : {os.getpid():<10} │ Process RAM RSS  : {ram_mb:>7.2f} MB                  │
-│ Active Threads   : {threads_count:<10} │ CPU Usage        : {cpu_pct:>7.1f} %                   │
-│ Active Assets    : {num_pos:<10} │ Historical Days  : {num_ret_rows:>7d} obs                  │
-│ Active Buffers   : {len(self._ring_buffers):<10} │ OMS Blotter Size : {len(self.oms_blotter):>7d} orders               │
-│ Cache Shield L2  : ONLINE (24h TTL) │ DuckDB Engine    : EMBEDDED C++ SIMD             │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-"""
+        top_lines = [
+            "ARGUS SYSTEM TELEMETRY MONITOR (TOP)                               [NODE: LOCALHOST]",
+            "---",
+            f"Process PID      : {os.getpid():<10} │ Process RAM RSS  : {ram_mb:>7.2f} MB",
+            f"Active Threads   : {threads_count:<10} │ CPU Usage        : {cpu_pct:>7.1f} %",
+            f"Active Assets    : {num_pos:<10} │ Historical Days  : {num_ret_rows:>7d} obs",
+            f"Active Buffers   : {len(self._ring_buffers):<10} │ OMS Blotter Size : {len(self.oms_blotter):>7d} orders",
+            "Cache Shield L2  : ONLINE (24h TTL) │ DuckDB Engine    : EMBEDDED C++ SIMD"
+        ]
+        top_text = _render_terminal_box(top_lines, width=88)
         return TerminalCommandResult(
             command="TOP",
             status="SUCCESS",
@@ -1485,8 +1571,9 @@ class ArgusTerminalEngine:
         # Determina prezzo stimato di mercato
         mkt_px = 100.0
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty and "ticker" in df_pos.columns:
-            m = df_pos[df_pos["ticker"].astype(str).str.upper() == ticker]
+        active_pos = get_active_positions(df_pos)
+        if not active_pos.empty and "ticker" in active_pos.columns:
+            m = active_pos[active_pos["ticker"].astype(str).str.upper() == ticker]
             if not m.empty:
                 px_col = "current_price" if "current_price" in m.columns else ("last_price" if "last_price" in m.columns else ("wacp" if "wacp" in m.columns else None))
                 if px_col and float(m[px_col].iloc[0]) > 0:
@@ -1547,8 +1634,9 @@ Estimated Slip : {slippage_bps:.1f} bps
 
         mkt_px = 150.0
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty and "ticker" in df_pos.columns:
-            m = df_pos[df_pos["ticker"].astype(str).str.upper() == ticker]
+        active_pos = get_active_positions(df_pos)
+        if not active_pos.empty and "ticker" in active_pos.columns:
+            m = active_pos[active_pos["ticker"].astype(str).str.upper() == ticker]
             if not m.empty:
                 px_col = "current_price" if "current_price" in m.columns else ("last_price" if "last_price" in m.columns else ("wacp" if "wacp" in m.columns else None))
                 if px_col and float(m[px_col].iloc[0]) > 0:
@@ -1617,13 +1705,14 @@ Status         : SLICING [1/{slices} Tranches Working]
             return TerminalCommandResult(command="SQL", status="INFO", output_text="Specifica una query SQL. Esempio: 'SQL SELECT ticker, market_value, pnl_pct FROM df_positions'")
 
         df_pos = ctx.get("df_positions", pd.DataFrame())
+        active_pos = get_active_positions(df_pos)
         df_ret = ctx.get("df_returns", pd.DataFrame())
         df_prices = ctx.get("df_prices", pd.DataFrame())
 
         try:
             con = duckdb.connect(database=":memory:")
-            if isinstance(df_pos, pd.DataFrame) and not df_pos.empty:
-                con.register("df_positions", df_pos)
+            if isinstance(active_pos, pd.DataFrame) and not active_pos.empty:
+                con.register("df_positions", active_pos)
             if isinstance(df_ret, pd.DataFrame) and not df_ret.empty:
                 con.register("df_returns", df_ret)
             if isinstance(df_prices, pd.DataFrame) and not df_prices.empty:
@@ -1646,11 +1735,12 @@ Status         : SLICING [1/{slices} Tranches Working]
             return TerminalCommandResult(command="EQS", status="INFO", output_text="Specifica una condizione EQS. Esempio: 'EQS Piotroski >= 7 AND Altman > 2.9'")
 
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty:
-            return TerminalCommandResult(command="EQS", status="INFO", output_text="Nessun dataset di posizioni attivo per la valutazione EQS.")
+        active_pos = get_active_positions(df_pos)
+        if not isinstance(active_pos, pd.DataFrame) or active_pos.empty:
+            return TerminalCommandResult(command="EQS", status="INFO", output_text="Nessun dataset di posizioni attive per la valutazione EQS.")
 
         try:
-            matches_df, is_valid, err_msg = evaluate_custom_screener_query(df_pos, eqs_expr)
+            matches_df, is_valid, err_msg = evaluate_custom_screener_query(active_pos, eqs_expr)
             if not is_valid:
                 return TerminalCommandResult(command="EQS", status="ERROR", output_text=f"Errore sintassi EQS: {err_msg}")
 
@@ -1658,7 +1748,7 @@ Status         : SLICING [1/{slices} Tranches Working]
                 return TerminalCommandResult(
                     command="EQS",
                     status="INFO",
-                    output_text=f"[EQS FILTER: '{eqs_expr}']\nNessun asset soddisfa i criteri impostati."
+                    output_text=f"[EQS FILTER: '{eqs_expr}']\nNessun asset attivo soddisfa i criteri impostati."
                 )
             
             cols_to_show = [c for c in ["ticker", "company_name", "market_value", "pnl_pct", "argus_score"] if c in matches_df.columns]
@@ -1666,7 +1756,7 @@ Status         : SLICING [1/{slices} Tranches Working]
             return TerminalCommandResult(
                 command="EQS",
                 status="SUCCESS",
-                output_text=f"[EQS MATCHES: {len(matches_df)} Assets Found]\nCondizione: {eqs_expr}\n\n{table_str}",
+                output_text=f"[EQS MATCHES: {len(matches_df)} Active Assets Found]\nCondizione: {eqs_expr}\n\n{table_str}",
                 structured_data={"df": matches_df}
             )
         except Exception as e:
@@ -1675,6 +1765,7 @@ Status         : SLICING [1/{slices} Tranches Working]
     def _cmd_var(self, tokens: List[str], results: Dict[str, Any], df_pos: pd.DataFrame, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
         ctx = ctx or {}
         port_name = ctx.get("portfolio_name", "Master Wealth")
+        active_pos = get_active_positions(df_pos)
         conf = "95%"
         if len(tokens) >= 2 and ("99" in tokens[1]):
             conf = "99%"
@@ -1688,29 +1779,28 @@ Status         : SLICING [1/{slices} Tranches Working]
             cvar_pct = float(results.get("cvar_99", results.get("cvar_99_pct", cvar_pct * 1.35)) or cvar_pct * 1.35)
         
         tot_val = float(results.get("portfolio_value", 0.0) or 0.0)
-        if tot_val <= 0 and isinstance(df_pos, pd.DataFrame) and not df_pos.empty:
-            val_col = "current_value" if "current_value" in df_pos.columns else ("market_value" if "market_value" in df_pos.columns else None)
+        if tot_val <= 0 and not active_pos.empty:
+            val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
             if val_col:
-                tot_val = float(df_pos[val_col].sum())
+                tot_val = float(active_pos[val_col].sum())
         if tot_val <= 0:
             tot_val = 100000.0
 
         var_eur = tot_val * (var_pct / 100.0)
         cvar_eur = tot_val * (cvar_pct / 100.0)
 
-        out_msg = f"""
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ ARGUS VALUE AT RISK & EXPECTED SHORTFALL [{port_name[:30]}] ({conf})         │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Connected Portfolio   : {port_name:<30}                       │
-│ Portfolio Total Value : € {tot_val:>12,.2f}                                  │
-│ 1-Day Historical VaR  : € {var_eur:>12,.2f} ({var_pct:>5.2f} %)              │
-│ 1-Day CVaR / ES       : € {cvar_eur:>12,.2f} ({cvar_pct:>5.2f} %)            │
-│ 10-Day Projected VaR  : € {var_eur * np.sqrt(10):>12,.2f} (Basel III Scaled)        │
-│ Kupiec Backtest Zone  : GREEN (0 Breaches / 252 Obs)                         │
-└──────────────────────────────────────────────────────────────────────────────┘
-"""
-        return TerminalCommandResult(command=f"VAR {conf}", status="SUCCESS", output_text=out_msg.strip())
+        var_lines = [
+            f"ARGUS VALUE AT RISK & EXPECTED SHORTFALL [{port_name[:30]}] ({conf})",
+            "---",
+            f"Connected Portfolio   : {port_name:<30}",
+            f"Portfolio Total Value : € {tot_val:>12,.2f} ({len(active_pos)} Active Assets)",
+            f"1-Day Historical VaR  : € {var_eur:>12,.2f} ({var_pct:>5.2f} %)",
+            f"1-Day CVaR / ES       : € {cvar_eur:>12,.2f} ({cvar_pct:>5.2f} %)",
+            f"10-Day Projected VaR  : € {var_eur * np.sqrt(10):>12,.2f} (Basel III Scaled)",
+            "Kupiec Backtest Zone  : GREEN (0 Breaches / 252 Obs)"
+        ]
+        out_msg = _render_terminal_box(var_lines, width=78)
+        return TerminalCommandResult(command=f"VAR {conf}", status="SUCCESS", output_text=out_msg)
 
     def _cmd_metric(self, metric_name: str, results: Dict[str, Any], ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
         ctx = ctx or {}
@@ -1730,10 +1820,67 @@ Status         : SLICING [1/{slices} Tranches Working]
             output_text=f"[{port_name}] {metric_name} Portfolio Level: {val_str}"
         )
 
-    def _cmd_correlation(self, tokens: List[str], df_ret: pd.DataFrame) -> TerminalCommandResult:
-        if len(tokens) < 3:
-            return TerminalCommandResult(command="CORR", status="ERROR", output_text="Specifica due ticker. Esempio: 'CORR AAPL MSFT'")
-        
+    def _cmd_correlation(self, tokens: List[str], df_ret: pd.DataFrame, df_pos: Optional[pd.DataFrame] = None) -> TerminalCommandResult:
+        # Gestione CORR MATRIX / CORR ALL / CORR senza argomenti
+        if len(tokens) == 1 or (len(tokens) >= 2 and tokens[1].upper() in ("MATRIX", "MAT", "ALL", "TABLE")):
+            return self._cmd_corr_matrix(df_ret, df_pos)
+
+        # Gestione CORR <TICKER> (Analisi del singolo ticker verso tutti gli altri titoli del portafoglio)
+        if len(tokens) == 2:
+            t1 = tokens[1].upper()
+            if not isinstance(df_ret, pd.DataFrame) or df_ret.empty:
+                return TerminalCommandResult(command="CORR", status="INFO", output_text="Serie storiche dei rendimenti non caricate nella sessione.")
+            
+            # Cerca la colonna corrispondente a t1
+            col1 = next((c for c in df_ret.columns if c.upper() == t1), None)
+            if not col1:
+                return TerminalCommandResult(command="CORR", status="ERROR", output_text=f"Ticker '{t1}' non presente nelle serie storiche dei rendimenti.")
+
+            # Identifica gli altri ticker attivi
+            active_pos = get_active_positions(df_pos) if df_pos is not None else pd.DataFrame()
+            if not active_pos.empty and "ticker" in active_pos.columns:
+                target_syms = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip().upper() != t1]
+                sub_cols = [c for c in df_ret.columns if c.upper() in target_syms]
+            else:
+                sub_cols = [c for c in df_ret.columns if c != col1 and c not in ("Date", "Benchmark", "BENCHMARK", "SPY", "^GSPC")]
+
+            if not sub_cols:
+                return TerminalCommandResult(command="CORR", status="INFO", output_text=f"Nessun altro asset attivo trovato con cui calcolare la correlazione per '{t1}'.")
+
+            corr_items = []
+            r1 = df_ret[col1].dropna()
+            for other_col in sub_cols:
+                r2 = df_ret[other_col].dropna()
+                c_idx = r1.index.intersection(r2.index)
+                if len(c_idx) >= 10:
+                    p_val = float(r1.loc[c_idx].corr(r2.loc[c_idx], method="pearson"))
+                    corr_items.append((other_col, p_val, len(c_idx)))
+
+            if not corr_items:
+                return TerminalCommandResult(command="CORR", status="ERROR", output_text=f"Dati storici sovrapposti insufficienti per correlare '{t1}' con altri asset.")
+
+            corr_items.sort(key=lambda x: x[1], reverse=True)
+            lines = [
+                f"CORRELATION BREAKDOWN FOR {t1:<12} (VS ALL CONNECTED ASSETS)",
+                "---",
+                f"{'ASSET':<10} {'PEARSON (r)':<14} {'OBS':<8} {'DIVERSIFICATION / HEDGE ROLE':<40}",
+                "---"
+            ]
+            for sym, r_val, obs in corr_items:
+                if r_val > 0.70:
+                    role = "POOR (High systemic co-movement)"
+                elif r_val > 0.30:
+                    role = "MODERATE (Standard equity beta)"
+                elif r_val >= 0.0:
+                    role = "GOOD (Low positive correlation)"
+                else:
+                    role = "EXCELLENT HEDGE (Negative decorrelation)"
+                lines.append(f"{sym:<10} {r_val:>+10.4f}     {obs:>5d}   {role:<40}")
+
+            out_msg = _render_terminal_box(lines, width=88)
+            return TerminalCommandResult(command=f"CORR {t1}", status="SUCCESS", output_text=out_msg)
+
+        # Gestione CORR <T1> <T2> (Coppia specifica)
         t1, t2 = tokens[1].upper(), tokens[2].upper()
         if not isinstance(df_ret, pd.DataFrame) or df_ret.empty:
             return TerminalCommandResult(command="CORR", status="INFO", output_text="Serie storiche rendimenti non caricate nella sessione.")
@@ -1781,47 +1928,49 @@ Growth Edge (g)   : +{half_kelly * 0.08 * 100:.2f} % Geometric CAGR Boost
     def _cmd_health_score(self, results: Dict[str, Any], df_pos: pd.DataFrame, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
         ctx = ctx or {}
         port_name = ctx.get("portfolio_name", "Master Wealth")
+        active_pos = get_active_positions(df_pos)
         score = int(results.get("health_score", 84) or 84)
         verdict = "HEALTHY & COMPLIANT 🟢" if score >= 75 else ("MONITOR ATTENTION 🟡" if score >= 50 else "DISTRESS RISK 🔴")
-        n_pos = len(df_pos) if isinstance(df_pos, pd.DataFrame) and not df_pos.empty else 0
+        n_pos = len(active_pos)
         
-        tot_val = float(results.get("portfolio_value", 0.0) or 0.0)
+        val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
+        tot_val = float(active_pos[val_col].sum()) if val_col and not active_pos.empty else float(results.get("portfolio_value", 0.0) or 0.0)
         hhi = float(results.get("hhi", 0.08) or 0.08)
         div_ratio = float(results.get("diversification_ratio", 1.34) or 1.34)
         
-        out_msg = f"""
-┌──────────────────────────────────────────────────────────────────────────────┐
-│ ARGUS PORTFOLIO HEALTH & COMPLIANCE COCKPIT [{port_name[:30]}]              │
-├──────────────────────────────────────────────────────────────────────────────┤
-│ Global Health Score : {score:>3d} / 100  [{verdict}]                         │
-│ Active Holdings     : {n_pos:>3d} Assets | Total Notional: € {tot_val:>12,.2f}      │
-│ Diversification     : HHI = {hhi:.3f} (Choueifaty Diversification Ratio = {div_ratio:.2f})  │
-│ Early Warning State : ALL RISK RULES PASSED (UCITS / MiFID II Compliant)     │
-└──────────────────────────────────────────────────────────────────────────────┘
-"""
-        return TerminalCommandResult(command="HEALTH", status="SUCCESS", output_text=out_msg.strip())
+        health_lines = [
+            f"ARGUS PORTFOLIO HEALTH & COMPLIANCE COCKPIT [{port_name[:30]}]",
+            "---",
+            f"Global Health Score : {score:>3d} / 100  [{verdict}]",
+            f"Active Holdings     : {n_pos:>3d} Assets | Total Notional: € {tot_val:>12,.2f}",
+            f"Diversification     : HHI = {hhi:.3f} (Choueifaty Diversification Ratio = {div_ratio:.2f})",
+            "Early Warning State : ALL RISK RULES PASSED (UCITS / MiFID II Compliant)"
+        ]
+        out_msg = _render_terminal_box(health_lines, width=78)
+        return TerminalCommandResult(command="HEALTH", status="SUCCESS", output_text=out_msg)
 
     def _cmd_ticker_des(self, ticker: str, df_pos: pd.DataFrame) -> TerminalCommandResult:
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
+        active_pos = get_active_positions(df_pos)
+        if not isinstance(active_pos, pd.DataFrame) or active_pos.empty or "ticker" not in active_pos.columns:
             return TerminalCommandResult(
                 command=f"{ticker} DES",
                 status="INFO",
                 output_text=f"[DESCRIPTION: {ticker}]\nAsset monitorato. Carica un portafoglio per visualizzare quote e costi di carico FIFO."
             )
 
-        match = df_pos[df_pos["ticker"].astype(str).str.upper() == ticker.upper()]
+        match = active_pos[active_pos["ticker"].astype(str).str.upper() == ticker.upper()]
         if match.empty:
             return TerminalCommandResult(
                 command=f"{ticker} DES",
                 status="INFO",
-                output_text=f"[DESCRIPTION: {ticker}]\nTitolo non presente nel portafoglio attivo."
+                output_text=f"[DESCRIPTION: {ticker}]\nTitolo non presente tra le posizioni attive del portafoglio."
             )
 
         row = match.iloc[0]
-        qty = float(row.get("quantity", 0.0))
-        wacp = float(row.get("wacp", row.get("buy_price", 0.0)))
+        qty = float(row.get("qty_net", row.get("quantity", row.get("shares", 0.0))))
+        wacp = float(row.get("avg_cost", row.get("wacp", row.get("buy_price", 0.0))))
         last_p = float(row.get("current_price", wacp))
-        mkt_val = float(row.get("market_value", qty * last_p))
+        mkt_val = float(row.get("current_value", row.get("market_value", qty * last_p)))
         pnl = float(row.get("pnl", mkt_val - (qty * wacp)))
         pnl_pct = float(row.get("pnl_pct", (pnl / (qty * wacp) * 100.0) if qty * wacp > 0 else 0.0))
         name = str(row.get("company_name", ticker))
@@ -1832,7 +1981,7 @@ Growth Edge (g)   : +{half_kelly * 0.08 * 100:.2f} % Geometric CAGR Boost
 │ {ticker:<6} - {name[:35]:<35} │ {sec[:25]:<25} │
 ├──────────────────────────────────────────────────────────────────────────────┤
 │ Current Price : ${last_p:>10.2f} │ FIFO Cost Basis (WACP): ${wacp:>10.2f}    │
-│ Quantity      : {qty:>11.2f} │ Market Notional Value : €{mkt_val:>10.2f}    │
+│ Active Qty    : {qty:>11.2f} │ Market Notional Value : €{mkt_val:>10.2f}    │
 │ Net PnL       : €{pnl:>+10.2f} │ Total Return          : {pnl_pct:>+9.2f} %    │
 └──────────────────────────────────────────────────────────────────────────────┘
 """
@@ -1869,11 +2018,12 @@ Delta-Hedge 100% Put Notional: € 1,420.00 / 100 Shares (Strike OTM -5%)
     def _cmd_portfolio_summary(self, results: Dict[str, Any], df_pos: pd.DataFrame, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
         ctx = ctx or {}
         port_name = ctx.get("portfolio_name", "Master Wealth")
+        active_pos = get_active_positions(df_pos)
         tot_val = float(results.get("portfolio_value", 0.0) or 0.0)
-        if tot_val <= 0 and isinstance(df_pos, pd.DataFrame) and not df_pos.empty:
-            val_col = "current_value" if "current_value" in df_pos.columns else ("market_value" if "market_value" in df_pos.columns else None)
+        if tot_val <= 0 and not active_pos.empty:
+            val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)
             if val_col:
-                tot_val = float(df_pos[val_col].sum())
+                tot_val = float(active_pos[val_col].sum())
         if tot_val <= 0:
             tot_val = 100000.0
 
@@ -1886,7 +2036,7 @@ Delta-Hedge 100% Put Notional: € 1,420.00 / 100 Shares (Strike OTM -5%)
         day_pnl = float(results.get("day_pnl", 0.0) or 0.0)
         unrealized_pnl = float(results.get("unrealized_pnl", results.get("total_gain_eur", 0.0)) or 0.0)
         
-        n_pos = len(df_pos) if isinstance(df_pos, pd.DataFrame) and not df_pos.empty else 0
+        n_pos = len(active_pos)
         base_curr = ctx.get("base_currency", "EUR")
 
         d_sign = "+" if day_pnl >= 0 else ""
@@ -1896,7 +2046,7 @@ Delta-Hedge 100% Put Notional: € 1,420.00 / 100 Shares (Strike OTM -5%)
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ ARGUS PORTFOLIO RISK & PERFORMANCE COCKPIT [{port_name[:30]}]               │
 ├──────────────────────────────────────────────────────────────────────────────┤
-│ Connected Portfolio   : {port_name:<30} ({n_pos} Assets)             │
+│ Connected Portfolio   : {port_name:<30} ({n_pos} Active Assets)      │
 │ Portfolio Market Value: € {tot_val:>12,.2f} [{base_curr}]                       │
 │ Intraday Day PnL      : {d_sign}€ {day_pnl:>11,.2f}                                  │
 │ Total Unrealized PnL  : {u_sign}€ {unrealized_pnl:>11,.2f}                                  │
@@ -1959,18 +2109,17 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
             raw_news = []
 
         lines = [
-            f"┌────────────────────────────────────────────────────────────────────────────────────────┐",
-            f"│ FINANCIAL NEWS STREAM & MARKET SENTIMENT: {sym:<44} │",
-            f"├────────────────────────────────────────────────────────────────────────────────────────┤"
+            f"FINANCIAL NEWS STREAM & MARKET SENTIMENT: {sym:<44}",
+            "---"
         ]
 
         if not raw_news:
             lines.extend([
-                f"│ [INFO] Feed news in tempo reale al momento non disponibile per {sym:<23} │",
-                f"│ Verificare la connettività di rete o la quotazione del simbolo.                        │",
-                f"└────────────────────────────────────────────────────────────────────────────────────────┘"
+                f"[INFO] Feed news in tempo reale al momento non disponibile per {sym}",
+                "Verificare la connettività di rete o la quotazione del simbolo."
             ])
-            return TerminalCommandResult(command=f"NEWS {sym}", status="INFO", output_text="\n".join(lines))
+            out_msg = _render_terminal_box(lines, width=88)
+            return TerminalCommandResult(command=f"NEWS {sym}", status="INFO", output_text=out_msg)
 
         for idx, item in enumerate(raw_news[:4], 1):
             title = str(item.get("title", "News")).strip()
@@ -1989,13 +2138,13 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
             if len(title) > 65:
                 title = title[:62] + "..."
 
-            lines.append(f"│ #{idx} [{time_str}] {sent_badge} | {publisher:<18} │")
-            lines.append(f"│    {title:<83} │")
+            lines.append(f"#{idx} [{time_str}] {sent_badge} | {publisher}")
+            lines.append(f"   {title}")
             if idx < min(4, len(raw_news)):
-                lines.append(f"│ ······················································································ │")
+                lines.append("---")
 
-        lines.append(f"└────────────────────────────────────────────────────────────────────────────────────────┘")
-        return TerminalCommandResult(command=f"NEWS {sym}", status="SUCCESS", output_text="\n".join(lines))
+        out_msg = _render_terminal_box(lines, width=88)
+        return TerminalCommandResult(command=f"NEWS {sym}", status="SUCCESS", output_text=out_msg)
 
     def _cmd_shock(self, tokens: List[str], ctx: Dict[str, Any]) -> TerminalCommandResult:
         pct_val = -5.0
@@ -2007,11 +2156,9 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
                 pct_val = -5.0
 
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
-            return TerminalCommandResult(command="SHOCK", status="ERROR", output_text="Portafoglio vuoto. Impossibile simulare lo stress test.")
-
-        qty_col = "qty_net" if "qty_net" in df_pos.columns else ("shares" if "shares" in df_pos.columns else ("quantity" if "quantity" in df_pos.columns else None))
-        active_pos = df_pos[df_pos[qty_col] > 1e-6] if qty_col else df_pos
+        active_pos = get_active_positions(df_pos)
+        if not isinstance(active_pos, pd.DataFrame) or active_pos.empty or "ticker" not in active_pos.columns:
+            return TerminalCommandResult(command="SHOCK", status="ERROR", output_text="Portafoglio privo di posizioni attive. Impossibile simulare lo stress test.")
 
         port_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()]
         quotes_map = fetch_multiple_live_quotes(port_tickers)
@@ -2021,11 +2168,10 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
         mult = 1.0 + (pct_val / 100.0)
 
         lines = [
-            f"┌────────────────────────────────────────────────────────────────────────────────────────┐",
-            f"│ PORTFOLIO MARKET STRESS TEST (SHOCK {pct_val:+.1f}%)                                          │",
-            f"├────────────────────────────────────────────────────────────────────────────────────────┤",
-            f"│ TICKER   LIVE VAL (€)    SHOCKED VAL (€)     DELTA P&L (€)    SHOCK %                  │",
-            f"├────────────────────────────────────────────────────────────────────────────────────────┤"
+            f"PORTFOLIO MARKET STRESS TEST (SHOCK {pct_val:+.1f}%)",
+            "---",
+            f"{'TICKER':<8} {'LIVE VAL (€)':<15} {'SHOCKED VAL (€)':<17} {'DELTA P&L (€)':<15} {'SHOCK %':<10}",
+            "---"
         ]
 
         for _, row in active_pos.iterrows():
@@ -2044,27 +2190,25 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
             shocked_live_val += shocked_val
 
             d_sgn = "+" if delta_eur >= 0 else ""
-            lines.append(f"│ {sym:<8} € {val_eur:>10,.2f}    € {shocked_val:>12,.2f}    {d_sgn}€ {delta_eur:>10,.2f}    {pct_val:>+6.1f}%                 │")
+            lines.append(f"{sym:<8} € {val_eur:>11,.2f}     € {shocked_val:>13,.2f}     {d_sgn}€ {delta_eur:>11,.2f}     {pct_val:>+6.1f}%")
 
         tot_delta = shocked_live_val - total_live_val
         tot_sgn = "+" if tot_delta >= 0 else ""
 
         lines.extend([
-            f"├────────────────────────────────────────────────────────────────────────────────────────┤",
-            f"│ VALORE ATTUALE SPOT     : € {total_live_val:>12,.2f}                                         │",
-            f"│ VALORE DOPO SHOCK       : € {shocked_live_val:>12,.2f}                                         │",
-            f"│ IMPATTO MONETARIO TOTALE: {tot_sgn}€ {tot_delta:>12,.2f} ({pct_val:+.2f}%)                               │",
-            f"└────────────────────────────────────────────────────────────────────────────────────────┘"
+            "---",
+            f"VALORE ATTUALE SPOT     : € {total_live_val:>12,.2f}",
+            f"VALORE DOPO SHOCK       : € {shocked_live_val:>12,.2f}",
+            f"IMPATTO MONETARIO TOTALE: {tot_sgn}€ {tot_delta:>12,.2f} ({pct_val:+.2f}%)"
         ])
-        return TerminalCommandResult(command=f"SHOCK {pct_val:+.1f}%", status="SUCCESS", output_text="\n".join(lines))
+        out_msg = _render_terminal_box(lines, width=88)
+        return TerminalCommandResult(command=f"SHOCK {pct_val:+.1f}%", status="SUCCESS", output_text=out_msg)
 
     def _cmd_snap(self, ctx: Dict[str, Any]) -> TerminalCommandResult:
         df_pos = ctx.get("df_positions", pd.DataFrame())
-        if not isinstance(df_pos, pd.DataFrame) or df_pos.empty or "ticker" not in df_pos.columns:
+        active_pos = get_active_positions(df_pos)
+        if not isinstance(active_pos, pd.DataFrame) or active_pos.empty or "ticker" not in active_pos.columns:
             return TerminalCommandResult(command="SNAP", status="INFO", output_text="Nessuna posizione attiva per cui generare lo snapshot.")
-
-        qty_col = "qty_net" if "qty_net" in df_pos.columns else ("shares" if "shares" in df_pos.columns else ("quantity" if "quantity" in df_pos.columns else None))
-        active_pos = df_pos[df_pos[qty_col] > 1e-6] if qty_col else df_pos
 
         port_tickers = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()]
         quotes_map = fetch_multiple_live_quotes(port_tickers)
@@ -2094,36 +2238,96 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
         if not isinstance(df_ret, pd.DataFrame) or df_ret.empty or len(df_ret.columns) < 2:
             return TerminalCommandResult(command="CORR MATRIX", status="ERROR", output_text="Serie storiche insufficienti per costruire la matrice di correlazione.")
 
-        # Se df_pos è presente, filtra per i ticker di portafoglio
-        if isinstance(df_pos, pd.DataFrame) and not df_pos.empty and "ticker" in df_pos.columns:
-            p_ticks = [str(t).strip().upper() for t in df_pos["ticker"].unique() if str(t).strip()]
-            sub_cols = [c for c in df_ret.columns if c.upper() in p_ticks][:8]
-        else:
-            sub_cols = []
+        active_pos = get_active_positions(df_pos) if df_pos is not None else pd.DataFrame()
+
+        # Mappatura rigorosa di TUTTI i ticker attivi del portafoglio (senza troncamento hardcoded)
+        sub_cols = []
+        if not active_pos.empty and "ticker" in active_pos.columns:
+            p_ticks = [str(t).strip().upper() for t in active_pos["ticker"].unique() if str(t).strip()]
+            # Match case-insensitive con colonne di df_ret
+            for c in df_ret.columns:
+                c_up = c.upper()
+                # Controllo esatto o prefisso comune (es. ENI vs ENI.MI)
+                if c_up in p_ticks or any(p == c_up or c_up.startswith(p + ".") or p.startswith(c_up + ".") for p in p_ticks):
+                    if c not in sub_cols:
+                        sub_cols.append(c)
 
         if len(sub_cols) < 2:
-            sub_cols = [c for c in df_ret.columns if c not in ["Date", "Benchmark", "BENCHMARK", "SPY", "^GSPC"]][:8]
+            sub_cols = [c for c in df_ret.columns if c not in ["Date", "DATE", "date", "Benchmark", "BENCHMARK", "SPY", "^GSPC"]]
         if len(sub_cols) < 2:
-            sub_cols = [c for c in df_ret.columns if c not in ["Date"]][:8]
+            sub_cols = [c for c in df_ret.columns if c.lower() != "date"]
             
         if len(sub_cols) < 2:
-            return TerminalCommandResult(command="CORR MATRIX", status="ERROR", output_text="Almeno 2 asset necessari per la matrice di correlazione.")
+            return TerminalCommandResult(command="CORR MATRIX", status="ERROR", output_text="Almeno 2 asset necessari per costruire la matrice di correlazione.")
 
-        corr = df_ret[sub_cols].corr()
+        corr = df_ret[sub_cols].corr(method="pearson")
+        n_assets = len(sub_cols)
+
+        # Calcolo metriche aggregate di correlazione: media off-diagonal, max pair, min pair (best hedge)
+        off_diag_vals = []
+        max_pair = (None, None, -2.0)
+        min_pair = (None, None, 2.0)
+
+        for i in range(n_assets):
+            for j in range(i + 1, n_assets):
+                c1, c2 = sub_cols[i], sub_cols[j]
+                v = float(corr.loc[c1, c2])
+                if not np.isnan(v):
+                    off_diag_vals.append(v)
+                    if v > max_pair[2]:
+                        max_pair = (c1, c2, v)
+                    if v < min_pair[2]:
+                        min_pair = (c1, c2, v)
+
+        avg_rho = np.mean(off_diag_vals) if off_diag_vals else 0.0
+
+        if avg_rho < 0.30:
+            div_status = "EXCELLENT (Strong cross-asset decorrelation) 🟢"
+        elif avg_rho < 0.60:
+            div_status = "MODERATE (Standard balanced equity co-movement) 🟡"
+        else:
+            div_status = "HIGH SYSTEMIC OVERLAP (Elevated co-dependence) 🔴"
+
+        # Costruzione tabella formattata
+        header_col_width = 8
+        col_div = "─────────┬"
+        top_div = "─────────┬" + col_div * n_assets
+        mid_div = "─────────┼" + "─────────┼" * n_assets
+        bot_div = "─────────┴" + "─────────┴" * n_assets
 
         lines = [
-            "┌────────────────────────────────────────────────────────────────────────────────────────┐",
-            "│ CONNECTED PORTFOLIO CORRELATION MATRIX (PEARSON HISTORICAL RETURNS)                   │",
-            "├──────────┬" + "──────────┬" * len(sub_cols),
-            "│ ASSET    │ " + " │ ".join([f"{c[:8]:^8}" for c in sub_cols]) + " │",
-            "├──────────┼" + "──────────┼" * len(sub_cols)
+            "┌" + "─" * (10 + 10 * n_assets) + "┐",
+            f"│ CONNECTED PORTFOLIO CORRELATION MATRIX ({n_assets} ACTIVE ASSETS) Pearson (r) │",
+            "├" + top_div,
+            "│ ASSET   │ " + " │ ".join([f"{c[:7]:^7}" for c in sub_cols]) + " │",
+            "├" + mid_div
         ]
         for row_c in sub_cols:
-            vals = [f"{corr.loc[row_c, col_c]:>+7.2f}" for col_c in sub_cols]
-            lines.append(f"│ {row_c[:8]:<8} │ " + " │ ".join([f"{v:^8}" for v in vals]) + " │")
+            vals = [f"{corr.loc[row_c, col_c]:>+6.2f}" if not np.isnan(corr.loc[row_c, col_c]) else "   N/A" for col_c in sub_cols]
+            lines.append(f"│ {row_c[:7]:<7} │ " + " │ ".join([f"{v:^7}" for v in vals]) + " │")
 
-        lines.append("└──────────┴" + "──────────┴" * len(sub_cols))
-        return TerminalCommandResult(command="CORR MATRIX", status="SUCCESS", output_text="\n".join(lines))
+        lines.append("└" + bot_div)
+        
+        # Summary footer
+        lines.append(f"\n[CORRELATION DESK DIAGNOSTICS - {n_assets} ASSETS ANALYZED]")
+        lines.append(f"  • Mean Portfolio Off-Diagonal (rho): {avg_rho:+.4f} [{div_status}]")
+        if max_pair[0] and max_pair[1]:
+            lines.append(f"  • Highest Overlap Pair              : {max_pair[0]} - {max_pair[1]} ({max_pair[2]:+.4f})")
+        if min_pair[0] and min_pair[1]:
+            lines.append(f"  • Best Decorrelator / Hedge Pair    : {min_pair[0]} - {min_pair[1]} ({min_pair[2]:+.4f})")
+
+        return TerminalCommandResult(
+            command="CORR MATRIX",
+            status="SUCCESS",
+            output_text="\n".join(lines),
+            structured_data={
+                "matrix": corr.to_dict(),
+                "assets": sub_cols,
+                "avg_rho": round(float(avg_rho), 4),
+                "max_pair": {"asset1": max_pair[0], "asset2": max_pair[1], "rho": round(float(max_pair[2]), 4)},
+                "min_pair": {"asset1": min_pair[0], "asset2": min_pair[1], "rho": round(float(min_pair[2]), 4)}
+            }
+        )
 
 
 # Singleton Istanza Globale del Terminal Engine
@@ -2135,3 +2339,4 @@ def get_terminal_engine() -> ArgusTerminalEngine:
     if _GLOBAL_TERMINAL_ENGINE is None:
         _GLOBAL_TERMINAL_ENGINE = ArgusTerminalEngine()
     return _GLOBAL_TERMINAL_ENGINE
+

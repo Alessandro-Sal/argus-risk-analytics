@@ -1,19 +1,17 @@
 import streamlit as st
+
+st.set_page_config(page_title="Analisi Rischio | ARGUS", page_icon="🔴", layout="wide")
+
 import pandas as pd
 import numpy as np
 import scipy.stats as stats
 import plotly.graph_objects as go
 import plotly.express as px
-import importlib
 import core.ui_utils
 import core.risk_engine
-importlib.reload(core.ui_utils)
-importlib.reload(core.risk_engine)
 from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner, render_garch_fhs_modal
 from core.regime_switching import compute_market_regime_states
 
-
-st.set_page_config(page_title="Analisi Rischio | ARGUS", page_icon="🔴", layout="wide")
 inject_custom_css()
 
 from core.sidebar import render_sidebar
@@ -150,20 +148,20 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+# Risoluzione robusta del Beta aggregato a livello di pagina
+b_val_display = mk.get('beta')
+if b_val_display is None or (abs(float(b_val_display) - 1.0) < 1e-4 and not pos.empty):
+    valid_p = pos[pos.get("current_value", 0) > 0]
+    if "beta" in valid_p.columns and "weight_pct" in valid_p.columns:
+        w_sum = valid_p["weight_pct"].sum()
+        if w_sum > 0:
+            b_val_display = float((valid_p["weight_pct"] * valid_p["beta"]).sum() / w_sum)
+b_val_display = float(b_val_display) if b_val_display is not None else 1.0
+
 # ==============================================================================
 # TAB 1: PROFILO DEL RISCHIO & FAMA-FRENCH
 # ==============================================================================
 if active_risk_tab == "📊 Profilo del Rischio & Fama-French":
-    # Risoluzione robusta del Beta aggregato
-    b_val_display = mk.get('beta')
-    if b_val_display is None or (abs(float(b_val_display) - 1.0) < 1e-4 and not pos.empty):
-        valid_p = pos[pos.get("current_value", 0) > 0]
-        if "beta" in valid_p.columns and "weight_pct" in valid_p.columns:
-            w_sum = valid_p["weight_pct"].sum()
-            if w_sum > 0:
-                b_val_display = float((valid_p["weight_pct"] * valid_p["beta"]).sum() / w_sum)
-    b_val_display = float(b_val_display) if b_val_display is not None else 1.0
-
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         metric_card(

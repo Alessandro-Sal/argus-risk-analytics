@@ -23,7 +23,7 @@ def _classify_tr_tx_type(type_and_name: str) -> Optional[str]:
     tn = type_and_name.lower()
     if any(k in tn for k in ["dividend", "dividende", "dividendo", "ausschüttung", "cedola", "distribution"]):
         return "dividend"
-    if any(k in tn for k in ["split", "frazionamento"]):
+    if any(k in tn for k in ["split", "frazionamento", "aktienteilung", "raggruppamento", "reverse split", "fusione", "merger", "spinoff", "scissione"]):
         return "split"
     if any(k in tn for k in ["sell", "verkauf", "vendita"]):
         return "sell"

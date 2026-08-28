@@ -10,7 +10,8 @@ from core.terminal_engine import (
     ArgusTerminalEngine,
     TerminalCommandResult,
     OMSOrder,
-    get_terminal_engine
+    get_terminal_engine,
+    get_active_positions
 )
 
 
@@ -501,6 +502,127 @@ def test_terminal_engine_portfolio_linkage(mock_session_context):
     assert "PORTFOLIO POSITION CLOSE" in res_close.output_text
     assert "AAPL" in res_close.output_text
     assert any(o.ticker == "AAPL" and o.side == "SELL" for o in engine.oms_blotter)
+
+
+def test_get_active_positions_filtering():
+    """Verifica che get_active_positions filtri rigorosamente solo posizioni con qty > 0."""
+    df_raw = pd.DataFrame({
+        "ticker": ["AAPL", "TSLA", "MSFT", "GOOG", "AMZN", None],
+        "qty_net": [50.0, 0.0, -5.0, 10.0, 0.0000001, 100.0],
+        "current_value": [10000.0, 0.0, -500.0, 2000.0, 0.0, 5000.0]
+    })
+    active = get_active_positions(df_raw)
+    assert len(active) == 2
+    assert set(active["ticker"]) == {"AAPL", "GOOG"}
+
+    # Test con nomi colonna alternativi (shares, units, market_value)
+    df_alt = pd.DataFrame({
+        "ticker": ["NVDA", "META", "IBM"],
+        "shares": [20.0, 0.0, 15.0],
+        "market_value": [2500.0, 0.0, 1800.0]
+    })
+    active_alt = get_active_positions(df_alt)
+    assert len(active_alt) == 2
+    assert set(active_alt["ticker"]) == {"NVDA", "IBM"}
+
+
+def test_terminal_engine_closed_positions_isolation():
+    """Verifica che posizioni chiuse (qty=0) non appaiano nei comandi operativi o di rischio."""
+    engine = ArgusTerminalEngine()
+    df_pos_mixed = pd.DataFrame({
+        "ticker": ["AAPL", "CLOSED_XYZ", "MSFT"],
+        "company_name": ["Apple", "Old Trade", "Microsoft"],
+        "qty_net": [100.0, 0.0, 50.0],
+        "quantity": [100.0, 0.0, 50.0],
+        "avg_cost": [150.0, 200.0, 300.0],
+        "wacp": [150.0, 200.0, 300.0],
+        "current_price": [220.0, 210.0, 420.0],
+        "current_value": [22000.0, 0.0, 21000.0],
+        "market_value": [22000.0, 0.0, 21000.0]
+    })
+    ctx = {
+        "df_positions": df_pos_mixed,
+        "portfolio_name": "Active Only Test Port",
+        "results": {"portfolio_value": 43000.0}
+    }
+
+    # PORT LIVE: CLOSED_XYZ non deve comparire
+    res_live = engine.execute_command("PORT LIVE", ctx)
+    assert "CLOSED_XYZ" not in res_live.output_text
+    assert "AAPL" in res_live.output_text
+    assert "MSFT" in res_live.output_text
+
+    # CLOSE CLOSED_XYZ deve restituire errore perché non attiva
+    res_close = engine.execute_command("CLOSE CLOSED_XYZ", ctx)
+    assert res_close.status in ("ERROR", "INFO")
+
+    # REBALANCE non deve allocare target a posizioni a zero
+    res_rebal = engine.execute_command("REBAL", ctx)
+    assert "CLOSED_XYZ" not in res_rebal.output_text
+
+
+def test_terminal_engine_corr_matrix_no_truncation():
+    """Verifica che CORR MATRIX analizzi TUTTI i ticker attivi presenti nelle serie storiche (senza troncamento a 8)."""
+    engine = ArgusTerminalEngine()
+    tickers = ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "BRK-B", "JPM", "V", "JNJ", "WMT"]
+    
+    dates = pd.date_range("2024-01-01", periods=100, freq="B")
+    ret_dict = {t: np.random.normal(0.001, 0.02, len(dates)) for t in tickers}
+    df_ret_12 = pd.DataFrame(ret_dict, index=dates)
+
+    df_pos_12 = pd.DataFrame({
+        "ticker": tickers,
+        "qty_net": [10.0] * len(tickers),
+        "quantity": [10.0] * len(tickers),
+        "current_value": [1000.0] * len(tickers)
+    })
+
+    ctx = {
+        "df_positions": df_pos_12,
+        "df_returns": df_ret_12
+    }
+
+    res_corr = engine.execute_command("CORR MATRIX", ctx)
+    assert res_corr.status == "SUCCESS"
+    assert "12 ACTIVE ASSETS" in res_corr.output_text
+    assert "Mean Portfolio Off-Diagonal" in res_corr.output_text
+    assert "Highest Overlap Pair" in res_corr.output_text
+    assert "Best Decorrelator / Hedge Pair" in res_corr.output_text
+    assert res_corr.structured_data is not None
+    assert len(res_corr.structured_data["assets"]) == 12
+
+
+def test_terminal_engine_corr_single_and_pair():
+    """Verifica che CORR <T1> e CORR <T1> <T2> funzionino correttamente."""
+    engine = ArgusTerminalEngine()
+    dates = pd.date_range("2024-01-01", periods=50, freq="B")
+    df_ret = pd.DataFrame({
+        "AAPL": np.random.normal(0.001, 0.02, len(dates)),
+        "MSFT": np.random.normal(0.001, 0.02, len(dates)),
+        "NVDA": np.random.normal(0.002, 0.03, len(dates))
+    }, index=dates)
+
+    df_pos = pd.DataFrame({
+        "ticker": ["AAPL", "MSFT", "NVDA"],
+        "qty_net": [50.0, 30.0, 40.0],
+        "quantity": [50.0, 30.0, 40.0],
+        "current_value": [10000.0, 12000.0, 5000.0]
+    })
+    ctx = {"df_positions": df_pos, "df_returns": df_ret}
+
+    # Test CORR AAPL MSFT
+    res_pair = engine.execute_command("CORR AAPL MSFT", ctx)
+    assert res_pair.status == "SUCCESS"
+    assert "CORRELATION ANALYSIS: AAPL vs MSFT" in res_pair.output_text
+    assert "Pearson (r)" in res_pair.output_text
+
+    # Test CORR AAPL (single ticker vs all)
+    res_single = engine.execute_command("CORR AAPL", ctx)
+    assert res_single.status == "SUCCESS"
+    assert "CORRELATION BREAKDOWN FOR AAPL" in res_single.output_text
+    assert "MSFT" in res_single.output_text
+    assert "NVDA" in res_single.output_text
+
 
 
 

@@ -37,7 +37,7 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
 
     pos = positions[positions["qty_net"] > 0].copy() if "qty_net" in positions.columns else positions.copy()
     total_port_val = float(pos["current_value"].sum()) if "current_value" in pos.columns else 0.0
-    hist_div_total = float(pos["dividends_total"].sum()) if "dividends_total" in pos.columns else 0.0
+    hist_div_total = float(positions["dividends_total"].sum()) if "dividends_total" in positions.columns else 0.0
 
     if total_port_val <= 0 or pos.empty:
         return {

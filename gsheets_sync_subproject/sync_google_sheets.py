@@ -320,17 +320,9 @@ def sync_single_tab(
     portfolio_id = 1
     if not offline_mode and db_engine:
         from sqlalchemy import text as sqlt
+        from core.db_exporter import get_or_create_portfolio_id
         with db_engine.begin() as conn:
-            conn.execute(sqlt("""
-                INSERT INTO portfolios (name, owner, base_currency, created_at)
-                VALUES (:name, 'gsheets_cron', 'EUR', NOW())
-                ON DUPLICATE KEY UPDATE name=VALUES(name)
-            """), {"name": portfolio_name})
-            
-            portfolio_id = conn.execute(
-                sqlt("SELECT portfolio_id FROM portfolios WHERE name=:n"),
-                {"n": portfolio_name}
-            ).scalar() or 1
+            portfolio_id = get_or_create_portfolio_id(conn, name=portfolio_name, owner="gsheets_cron", base_currency="EUR")
 
             conn.execute(sqlt("DELETE FROM transactions WHERE portfolio_id = :pid"), {"pid": portfolio_id})
 

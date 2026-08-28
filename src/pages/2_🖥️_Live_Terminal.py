@@ -9,19 +9,25 @@ import time
 import datetime
 import html
 import streamlit as st
+
+st.set_page_config(
+    page_title="ARGUS - Live Terminal & Market Desk",
+    page_icon="🖥️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+import io
+import time
+import datetime
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import importlib
 
 import core.ui_utils as ui_utils
 import core.streaming_engine as streaming_engine
 import core.terminal_engine as terminal_engine
-
-# Ricarica dinamica garantita dei moduli core in ambiente Streamlit a caldo
-importlib.reload(streaming_engine)
-importlib.reload(terminal_engine)
 
 from core.sidebar import render_sidebar
 from core.ui_utils import (
@@ -34,6 +40,7 @@ from core.ui_utils import (
 )
 from core.terminal_engine import (
     get_terminal_engine,
+    get_active_positions,
     TerminalCommandResult,
     OMSOrder,
     DeskRiskLimits,
@@ -48,13 +55,6 @@ from core.terminal_engine import (
     fetch_multiple_live_quotes
 )
 
-st.set_page_config(
-    page_title="ARGUS - Live Terminal & Market Desk",
-    page_icon="🖥️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 inject_custom_css()
 
 # ── Sidebar & Ingestion Gate ─────────────────────────────────────────────────
@@ -63,6 +63,7 @@ render_command_bar()
 
 results, has_real_portfolio = ensure_risk_bundle_loaded()
 pos = results.get("positions", pd.DataFrame()) if results else pd.DataFrame()
+active_pos = get_active_positions(pos)
 df_rets = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()
 df_prices = results.get("df_prices", pd.DataFrame()) if results else pd.DataFrame()
 df_tx = results.get("df_tx", pd.DataFrame()) if results else pd.DataFrame()
@@ -75,17 +76,33 @@ render_page_header(
 )
 
 # Barra di Stato Desk & Auto-Refresh Configurabile
-col_hdr_status, col_hdr_refresh = st.columns([3.2, 1.4], vertical_alignment="center")
-with col_hdr_status:
-    st.markdown("<div style='font-size:12px; color:#8b949e;'><span style='display:inline-block; width:8px; height:8px; border-radius:50%; background:#3fb950; margin-right:6px; box-shadow:0 0 6px #3fb950;'></span><b>DESK FEED STATUS:</b> Streaming Real-Time Quotazioni & Cross FX Attivo</div>", unsafe_allow_html=True)
+col_hdr_status, col_hdr_refresh = st.columns([2.8, 1.4], vertical_alignment="center")
 with col_hdr_refresh:
     autorefresh_sel = st.selectbox(
-        "⏱️ Auto-Refresh Streaming Feed:",
+        "⏱️ Auto-Refresh Feed:",
         options=["Disattivato", "5s", "10s", "30s", "60s"],
         index=0,
         key="sel_live_autorefresh_rate",
-        label_visibility="collapsed"
+        help="Attiva l'aggiornamento automatico periodico del book L2, dei grafici intraday e del market tape."
     )
+
+with col_hdr_status:
+    if autorefresh_sel != "Disattivato":
+        st.markdown(
+            f"<div style='font-size:12px; color:#c9d1d9; padding-top: 14px;'>"
+            f"<span style='display:inline-block; width:8px; height:8px; border-radius:50%; background:#3fb950; margin-right:6px; box-shadow:0 0 6px #3fb950;'></span>"
+            f"<b>DESK FEED STATUS:</b> <span style='color:#3fb950; font-weight:700;'>Streaming Real-Time Attivo ({autorefresh_sel})</span> • Cross FX & Quotazioni Live"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+    else:
+        st.markdown(
+            "<div style='font-size:12px; color:#8b949e; padding-top: 14px;'>"
+            "<span style='display:inline-block; width:8px; height:8px; border-radius:50%; background:#e3b341; margin-right:6px;'></span>"
+            "<b>DESK FEED STATUS:</b> <span style='color:#e3b341; font-weight:600;'>Feed Standby (Manuale)</span> • Aggiornamento su richiesta / Click"
+            "</div>",
+            unsafe_allow_html=True
+        )
 if "argus_terminal_engine" not in st.session_state:
     st.session_state["argus_terminal_engine"] = get_terminal_engine()
 
@@ -93,7 +110,7 @@ term_eng = st.session_state["argus_terminal_engine"]
 
 session_context = {
     "results": results or {},
-    "df_positions": pos,
+    "df_positions": active_pos,
     "df_returns": df_rets,
     "df_prices": df_prices,
     "df_transactions": df_tx,
@@ -123,8 +140,8 @@ cb_status_text = "TRIGGERED 🛑 (BUY Blocked)" if cb_triggered else "NORMAL �
 
 max_pos_w = 0.0
 top_w_sym = "N/A"
-if not pos.empty and "current_value" in pos.columns:
-    max_row = pos.sort_values("current_value", ascending=False).iloc[0]
+if not active_pos.empty and "current_value" in active_pos.columns:
+    max_row = active_pos.sort_values("current_value", ascending=False).iloc[0]
     max_pos_w = float(max_row["current_value"]) / max(1.0, tot_port_val)
     top_w_sym = str(max_row.get("ticker", "N/A"))
 
@@ -141,8 +158,8 @@ st.markdown(desk_hud_html, unsafe_allow_html=True)
 # ── SEZIONE 1: LIVE MARKET TAPE & LEVEL-2 BOOK (FULL-WIDTH ROW) ──────────────
 st.markdown("#### ⚡ Live Market Tape & Real-Time Streaming API")
 
-# Universo Ticker Selezionabili (Portafoglio + Benchmark Globali)
-base_tickers = list(pos["ticker"].unique()) if not pos.empty and "ticker" in pos.columns else []
+# Universo Ticker Selezionabili (Portafoglio Attivo + Benchmark Globali)
+base_tickers = list(active_pos["ticker"].unique()) if not active_pos.empty and "ticker" in active_pos.columns else []
 for bmk in ["AAPL", "MSFT", "NVDA", "SPY", "QQQ", "BTC-USD", "ETH-USD", "GC=F", "CL=F", "EURUSD=X"]:
     if bmk not in base_tickers:
         base_tickers.append(bmk)
@@ -175,13 +192,30 @@ with col_tape_ctrl:
 
     ring_buf = term_eng.get_or_create_ring_buffer(ticker=active_tape_ticker, initial_price=last_px, capacity=500)
     
+    # Se lo streaming auto-refresh è attivo, inietta un micro-tick di mercato per animare book e grafici
+    if autorefresh_sel != "Disattivato" and ring_buf:
+        base_p = ring_buf.ticks[-1].price if len(ring_buf.ticks) > 0 else last_px
+        shock = np.random.normal(0, 0.0008) * base_p
+        new_p = max(0.01, base_p + shock)
+        t = terminal_engine.MarketTick(
+            timestamp=datetime.datetime.now(datetime.timezone.utc),
+            ticker=active_tape_ticker,
+            price=round(new_p, 2),
+            size=round(np.random.uniform(50, 350), 0),
+            bid=round(new_p - 0.02, 2),
+            ask=round(new_p + 0.02, 2),
+            volume=live_q.get('volume', 1000.0) or 1000.0
+        )
+        ring_buf.append(t)
+
     # Bottoni di controllo streaming e refresh live
     col_tick_btn, col_ref_btn = st.columns([1.0, 1.0])
     with col_tick_btn:
         if st.button("⚡ Invia Tick Live", key="btn_push_sim_tick_page2", use_container_width=True):
             if ring_buf:
-                shock = np.random.normal(0, 0.0015) * last_px
-                new_p = max(0.01, last_px + shock)
+                base_p = ring_buf.ticks[-1].price if len(ring_buf.ticks) > 0 else last_px
+                shock = np.random.normal(0, 0.0015) * base_p
+                new_p = max(0.01, base_p + shock)
                 t = terminal_engine.MarketTick(
                     timestamp=datetime.datetime.now(datetime.timezone.utc),
                     ticker=active_tape_ticker,
@@ -189,7 +223,7 @@ with col_tape_ctrl:
                     size=round(np.random.uniform(50, 400), 0),
                     bid=round(new_p - 0.02, 2),
                     ask=round(new_p + 0.02, 2),
-                    volume=live_q['volume'] or 1000.0
+                    volume=live_q.get('volume', 1000.0) or 1000.0
                 )
                 ring_buf.append(t)
             st.rerun()
@@ -977,14 +1011,23 @@ st.divider()
 st.markdown("#### ⌨️ Console Interattiva Bloomberg CLI")
 
 port_name_display = st.session_state.get("portfolio_name", "Master Wealth") or "Master Wealth"
-n_pos_count = len(pos) if isinstance(pos, pd.DataFrame) and not pos.empty else 0
+n_pos_count = len(active_pos) if isinstance(active_pos, pd.DataFrame) and not active_pos.empty else 0
 pos_badge_color = "#3fb950" if n_pos_count > 0 else "#ff9900"
-pos_badge_text = f"🟢 COLLEGATA A: {port_name_display.upper()} ({n_pos_count} ASSETS • € {tot_port_val:,.2f})" if n_pos_count > 0 else "🟡 MODALITÀ SANDBOX (NESSUN PORTAFOGLIO CARICATO)"
+pos_badge_text = "🟢 CONNESSO AL PORTAFOGLIO" if n_pos_count > 0 else "🟡 MODALITÀ SANDBOX"
 
 st.markdown(f"""
-<div style="background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-left: 4px solid {pos_badge_color}; border-radius: 6px; padding: 7px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-family: monospace;">
-    <div>💼 <b>CONSOLE PORTFOLIO CONTEXT:</b> <span style="color:#58a6ff; font-weight:700;">{port_name_display}</span> &bull; <span style="color:#c9d1d9;">{n_pos_count} Titoli in Memoria</span> &bull; <span style="color:#3fb950; font-weight:700;">Valore: € {tot_port_val:,.2f}</span></div>
-    <div style="color:{pos_badge_color}; font-weight:700; background:rgba(255,255,255,0.05); padding:2px 8px; border-radius:10px;">{pos_badge_text}</div>
+<div style="background: rgba(13,17,23,0.95); border: 1px solid #30363d; border-left: 4px solid {pos_badge_color}; border-radius: 6px; padding: 8px 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; font-family: monospace;">
+    <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <span>💼 <b>CONSOLE PORTFOLIO CONTEXT:</b></span>
+        <span style="color:#58a6ff; font-weight:700;">{port_name_display}</span>
+        <span style="color:#8b949e;">&bull;</span>
+        <span style="color:#c9d1d9;"><b>{n_pos_count}</b> Titoli Attivi</span>
+        <span style="color:#8b949e;">&bull;</span>
+        <span style="color:#3fb950; font-weight:700;">Valore: € {tot_port_val:,.2f}</span>
+    </div>
+    <div style="color:{pos_badge_color}; font-weight:700; background:rgba(255,255,255,0.05); padding:3px 10px; border-radius:12px; font-size:11px; white-space:nowrap; border:1px solid rgba(255,255,255,0.08);">
+        {pos_badge_text}
+    </div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1144,5 +1187,11 @@ st.markdown(top_hud_html, unsafe_allow_html=True)
 if autorefresh_sel != "Disattivato":
     sec_lookup = {"5s": 5, "10s": 10, "30s": 30, "60s": 60}
     w_sec = sec_lookup.get(autorefresh_sel, 10)
+    st.markdown(
+        f"<div style='text-align:center; font-size:11px; color:#8b949e; margin-top:14px;'>"
+        f"⚡ <b>Auto-Streaming Attivo:</b> aggiornamento live e calcolo metriche ogni <b>{w_sec}s</b> • <span style='color:#3fb950;'>Next tick in sync...</span>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
     time.sleep(w_sec)
     st.rerun()

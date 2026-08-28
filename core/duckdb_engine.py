@@ -244,6 +244,8 @@ def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dic
 
     df_clean = df_positions.copy()
     # Normalizza colonne essenziali
+    if "asset_currency" in df_clean.columns:
+        df_clean["currency"] = df_clean["asset_currency"].fillna(df_clean.get("currency", "EUR")).astype(str)
     for col in ["asset_class", "sector", "currency"]:
         if col not in df_clean.columns:
             df_clean[col] = "Altro"

@@ -1,13 +1,14 @@
 import streamlit as st
+
+st.set_page_config(page_title="Modelli Quantitativi | ARGUS", page_icon="🔬", layout="wide")
+
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
-import importlib
 import uuid
 
 import core.ui_utils
-importlib.reload(core.ui_utils)
 
 try:
     from core.ui_utils import fmt_eur_it
@@ -45,10 +46,9 @@ from core.yield_curve import (
     get_institutional_yield_curve
 )
 
-st.set_page_config(page_title="Modelli Quantitativi | ARGUS", page_icon="🔬", layout="wide")
 inject_custom_css()
 
-# Cache bust
+# Sidebar
 from core.sidebar import render_sidebar
 render_sidebar()
 import core.risk_engine
@@ -56,11 +56,6 @@ import core.options_hedging
 import core.volatility_surface
 import core.factor_library
 import core.reinforcement_learning
-importlib.reload(core.risk_engine)
-importlib.reload(core.options_hedging)
-importlib.reload(core.volatility_surface)
-importlib.reload(core.factor_library)
-importlib.reload(core.reinforcement_learning)
 from core.ui_utils import ensure_risk_bundle_loaded, render_sandbox_banner
 from core.reinforcement_learning import train_and_evaluate_rl_portfolio
 

@@ -164,3 +164,50 @@ def test_validator_csv_with_split_type():
     assert df_clean is not None
     assert len(report["errors"]) == 0
     assert "split" in df_clean["tx_type"].values
+
+
+def test_reverse_split_and_cost_basis_invariance():
+    """Verifica la corretta gestione di un Reverse Stock Split (raggruppamento 1:8 come GE)."""
+    tx_data = [
+        {"tx_id": 1, "tx_date": "2021-01-15", "ticker": "GE", "tx_type": "buy", "quantity": 80.0, "price": 12.5, "currency": "EUR"},
+        {"tx_id": 2, "tx_date": "2021-09-01", "ticker": "GE", "tx_type": "sell", "quantity": 5.0, "price": 110.0, "currency": "EUR"},
+    ]
+    df_tx = pd.DataFrame(tx_data)
+    custom_splits = {
+        "GE": [{"date": "2021-08-02", "ratio": 0.125, "desc": "1:8 Reverse Split"}]
+    }
+    df_adj, audit = adjust_transactions_for_splits(df_tx, auto_fetch=False, custom_splits=custom_splits)
+
+    assert len(audit) == 1
+    assert audit[0]["shares_before"] == 80.0
+    assert audit[0]["shares_after"] == 10.0
+    assert audit[0]["split_type"] == "Reverse Split / Raggruppamento"
+
+    fifo_res = _fifo_engine(df_adj)
+    # 80 quote @ 12.5€ (1000€) -> 10 quote @ 100€ (1000€)
+    # Vendita 5 quote @ 110€ -> PnL realizzato = 5 * (110 - 100) = 50€
+    assert fifo_res["qty_net"] == 5.0
+    assert pytest.approx(fifo_res["avg_cost"], abs=1e-4) == 100.0
+    assert pytest.approx(fifo_res["realized_pnl"], abs=1e-2) == 50.0
+
+
+def test_explicit_corporate_actions_aliases():
+    """Verifica che tutte le tipologie di corporate actions (fusione, raggruppamento, spinoff) siano accettate."""
+    from core.adapters.directa import _classify_directa_tx_type
+    from core.adapters.fineco import _classify_fineco_tx_type
+    from core.adapters.scalable import _classify_scalable_tx_type
+    from core.adapters.traderepublic import _classify_tr_tx_type
+    from core.adapters.revolut import _classify_revolut_tx_type
+
+    assert _classify_directa_tx_type("Frazionamento / Split") == "split"
+    assert _classify_directa_tx_type("Raggruppamento Azionario") == "split"
+    assert _classify_directa_tx_type("Fusione per Incorporazione") == "split"
+    assert _classify_directa_tx_type("Scissione / Spinoff") == "split"
+
+    assert _classify_fineco_tx_type("Raggruppamento azioni") == "split"
+    assert _classify_fineco_tx_type("Scambio azioni per fusione") == "split"
+
+    assert _classify_scalable_tx_type("Aktienteilung / Split") == "split"
+    assert _classify_tr_tx_type("Aktienteilung") == "split"
+    assert _classify_revolut_tx_type("Stock Split") == "split"
+

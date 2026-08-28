@@ -189,9 +189,9 @@ def get_current_page_name() -> str:
 
 def switch_to_page(target_page_file: str):
     """
-    Esegue la navigazione senza errori:
+    Esegue la navigazione fluida e istantanea senza errori o flash transitori:
     - Se siamo già sulla pagina di destinazione, esegue st.rerun() per riflettere il tab aggiornato.
-    - Se siamo su un'altra pagina, esegue st.switch_page() gestendo i percorsi Streamlit.
+    - Se siamo su un'altra pagina, calcola la rotta canonica esatta ed esegue st.switch_page() direttamente.
     """
     cur_page = get_current_page_name()
     target_clean = os.path.basename(target_page_file)
@@ -201,33 +201,25 @@ def switch_to_page(target_page_file: str):
         st.rerun()
         return
 
-    # Percorsi di fallback per st.switch_page
+    # Percorso canonico risolto da workspace_manager
     from core.workspace_manager import resolve_page_path
     resolved = resolve_page_path(target_page_file)
     
-    variants = []
-    if "0_Control_Room" in target_clean:
-        variants = [
-            "0_Control_Room.py",
-            "src/0_Control_Room.py",
-            resolved,
-            target_page_file
-        ]
-    else:
-        variants = [
-            f"pages/{target_clean}",
-            f"src/pages/{target_clean}",
-            resolved,
-            target_page_file,
-            target_clean
-        ]
+    try:
+        st.switch_page(resolved)
+        return
+    except Exception:
+        pass
 
-    for v in variants:
+    # Fallback deterministico secondario
+    fallback = "0_Control_Room.py" if "0_Control_Room" in target_clean else f"pages/{target_clean}"
+    if fallback != resolved:
         try:
-            st.switch_page(v)
+            st.switch_page(fallback)
             return
         except Exception:
             pass
+
     st.rerun()
 
 
@@ -508,72 +500,7 @@ def render_sidebar():
         </div>
         """, unsafe_allow_html=True)
 
-        with st.expander("⚙️ Parametri Engine & DB", expanded=False):
-            st.toggle("Modalità Offline (Senza DB)", value=st.session_state.offline_mode, key="sb_offline_toggle")
-
-            if not st.session_state.offline_mode:
-                st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 4px 0 2px;">Connessione MySQL</div>', unsafe_allow_html=True)
-                col_h, col_p = st.columns([2, 1.2])
-                with col_h:
-                    st.text_input("Host", value=st.session_state.db_host, key="sb_db_host")
-                with col_p:
-                    st.number_input("Port", value=st.session_state.db_port, step=1, key="sb_db_port")
-                
-                col_u, col_pw = st.columns(2)
-                with col_u:
-                    st.text_input("User", value=st.session_state.db_user, key="sb_db_user")
-                with col_pw:
-                    st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
-                
-                db_options = ["wealth", "investment_risk_bi", "Custom..."]
-                current_db = st.session_state.get("db_name", "wealth")
-                db_idx = db_options.index(current_db) if current_db in ["wealth", "investment_risk_bi"] else db_options.index("Custom...")
-                sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
-                if sel_db == "Custom...":
-                    custom_db = st.text_input("Nome DB Custom", value="" if current_db in ["wealth", "investment_risk_bi"] else current_db, key="sb_custom_db").strip()
-                    if custom_db:
-                        st.session_state.db_name = custom_db
-            else:
-                st.info("☁️ **Modalità In-Memory**: i calcoli avvengono in RAM/Cache senza connessione MySQL.")
-
-            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Benchmark</div>', unsafe_allow_html=True)
-            st.text_input("Nome Portafoglio", value=st.session_state.portfolio_name, key="sb_port_name")
-            
-            col_curr, col_bench = st.columns([1.1, 1.9])
-            with col_curr:
-                curr_options = ["EUR", "USD", "GBP", "CHF"]
-                curr_current = st.session_state.get("base_currency", "EUR")
-                curr_idx = curr_options.index(curr_current) if curr_current in curr_options else 0
-                st.selectbox("Valuta", curr_options, index=curr_idx, key="sb_base_currency")
-            
-            with col_bench:
-                bench_options = ["SPY", "QQQ", "VWRL.L", "^GSPC", "^STOXX50E", "VWCE.MI", "URTH", "BTC-USD", "Custom..."]
-                current_bench = st.session_state.get("benchmark", "SPY")
-                b_idx = bench_options.index(current_bench) if current_bench in bench_options[:-1] else bench_options.index("Custom...")
-                sel_b = st.selectbox("Benchmark", bench_options, index=b_idx, key="sb_bench_select")
-            
-            if sel_b == "Custom...":
-                cust_b = st.text_input("Ticker Benchmark Custom", value="" if current_bench in bench_options[:-1] else current_bench, key="sb_custom_bench").strip().upper()
-                if cust_b:
-                    st.session_state.benchmark = cust_b
-
-            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Tasso Privo di Rischio (Risk-Free)</div>', unsafe_allow_html=True)
-            col_rf_m, col_rf_v = st.columns([1.3, 1.0])
-            with col_rf_m:
-                rf_mode_opts = ["Auto (Live Market)", "Manuale"]
-                rf_mode_idx = 0 if st.session_state.rf_mode == "Auto (Live Market)" else 1
-                st.selectbox("Modalità Rf", rf_mode_opts, index=rf_mode_idx, key="sb_rf_mode")
-
-            with col_rf_v:
-                if st.session_state.rf_mode == "Manuale":
-                    st.number_input("Tasso %", min_value=0.0, max_value=25.0, value=float(st.session_state.custom_rf_rate_pct), step=0.25, key="sb_custom_rf")
-                else:
-                    st.text_input("Tasso Live", value=f"{active_rf_info['rate_pct']:.2f}%", disabled=True)
-
-            from core.ui_utils import render_risk_free_modal
-            render_risk_free_modal(currency=st.session_state.base_currency, use_popover=True, button_label="ℹ️ Info Metodologia Risk-Free")
-
-        st.markdown('<div class="sidebar-section-header" style="margin-top: 18px; margin-bottom: 8px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-section-header" style="margin-top: 14px; margin-bottom: 8px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
 
         def _is_mod_active(mod_dict: dict, cur_page_str: str) -> bool:
             import re
@@ -654,7 +581,73 @@ def render_sidebar():
 
         st.divider()
 
-        # ── 3. PULIZIA CACHE & RESET SESSIONE ─────────────────────────
+        # ── 3. PARAMETRI ENGINE & DB (CONFIGURAZIONE) ─────────────────
+        with st.expander("⚙️ Parametri Engine & DB", expanded=False):
+            st.toggle("Modalità Offline (Senza DB)", value=st.session_state.offline_mode, key="sb_offline_toggle")
+
+            if not st.session_state.offline_mode:
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 4px 0 2px;">Connessione MySQL</div>', unsafe_allow_html=True)
+                col_h, col_p = st.columns([2, 1.2])
+                with col_h:
+                    st.text_input("Host", value=st.session_state.db_host, key="sb_db_host")
+                with col_p:
+                    st.number_input("Port", value=st.session_state.db_port, step=1, key="sb_db_port")
+                
+                col_u, col_pw = st.columns(2)
+                with col_u:
+                    st.text_input("User", value=st.session_state.db_user, key="sb_db_user")
+                with col_pw:
+                    st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
+                
+                db_options = ["wealth", "investment_risk_bi", "Custom..."]
+                current_db = st.session_state.get("db_name", "wealth")
+                db_idx = db_options.index(current_db) if current_db in ["wealth", "investment_risk_bi"] else db_options.index("Custom...")
+                sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
+                if sel_db == "Custom...":
+                    custom_db = st.text_input("Nome DB Custom", value="" if current_db in ["wealth", "investment_risk_bi"] else current_db, key="sb_custom_db").strip()
+                    if custom_db:
+                        st.session_state.db_name = custom_db
+            else:
+                st.info("☁️ **Modalità In-Memory**: i calcoli avvengono in RAM/Cache senza connessione MySQL.")
+
+            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Benchmark</div>', unsafe_allow_html=True)
+            st.text_input("Nome Portafoglio", value=st.session_state.portfolio_name, key="sb_port_name")
+            
+            col_curr, col_bench = st.columns([1.1, 1.9])
+            with col_curr:
+                curr_options = ["EUR", "USD", "GBP", "CHF"]
+                curr_current = st.session_state.get("base_currency", "EUR")
+                curr_idx = curr_options.index(curr_current) if curr_current in curr_options else 0
+                st.selectbox("Valuta", curr_options, index=curr_idx, key="sb_base_currency")
+            
+            with col_bench:
+                bench_options = ["SPY", "QQQ", "VWRL.L", "^GSPC", "^STOXX50E", "VWCE.MI", "URTH", "BTC-USD", "Custom..."]
+                current_bench = st.session_state.get("benchmark", "SPY")
+                b_idx = bench_options.index(current_bench) if current_bench in bench_options[:-1] else bench_options.index("Custom...")
+                sel_b = st.selectbox("Benchmark", bench_options, index=b_idx, key="sb_bench_select")
+            
+            if sel_b == "Custom...":
+                cust_b = st.text_input("Ticker Benchmark Custom", value="" if current_bench in bench_options[:-1] else current_bench, key="sb_custom_bench").strip().upper()
+                if cust_b:
+                    st.session_state.benchmark = cust_b
+
+            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Tasso Privo di Rischio (Risk-Free)</div>', unsafe_allow_html=True)
+            col_rf_m, col_rf_v = st.columns([1.3, 1.0])
+            with col_rf_m:
+                rf_mode_opts = ["Auto (Live Market)", "Manuale"]
+                rf_mode_idx = 0 if st.session_state.rf_mode == "Auto (Live Market)" else 1
+                st.selectbox("Modalità Rf", rf_mode_opts, index=rf_mode_idx, key="sb_rf_mode")
+
+            with col_rf_v:
+                if st.session_state.rf_mode == "Manuale":
+                    st.number_input("Tasso %", min_value=0.0, max_value=25.0, value=float(st.session_state.custom_rf_rate_pct), step=0.25, key="sb_custom_rf")
+                else:
+                    st.text_input("Tasso Live", value=f"{active_rf_info['rate_pct']:.2f}%", disabled=True)
+
+            from core.ui_utils import render_risk_free_modal
+            render_risk_free_modal(currency=st.session_state.base_currency, use_popover=True, button_label="ℹ️ Info Metodologia Risk-Free")
+
+        # ── 4. PULIZIA CACHE & RESET SESSIONE ─────────────────────────
         if st.button("♻️ Svuota Cache & Reset Sessione", use_container_width=True):
             from core.workspace_manager import clear_session_cache
             clear_session_cache()

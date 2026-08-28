@@ -1114,49 +1114,49 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
         # Azioni e Sicurezza Singola
         "DES": {
             "title": "Security Description & Fondamentali",
-            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "page": "pages/6_🏛️_Valutazione_Aziendale.py",
             "tab_key": "val_segmented_tab",
             "target": "📊 Bilanci & Solvibilità (Altman & DuPont)",
             "context_type": "ticker"
         },
         "FA": {
             "title": "Financial Analysis & SEC 10-K Filings",
-            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "page": "pages/6_🏛️_Valutazione_Aziendale.py",
             "tab_key": "val_segmented_tab",
             "target": "📊 Bilanci & Solvibilità (Altman & DuPont)",
             "context_type": "ticker"
         },
         "DCF": {
             "title": "Valutazione Intrinseca DCF Monte Carlo",
-            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "page": "pages/6_🏛️_Valutazione_Aziendale.py",
             "tab_key": "val_segmented_tab",
             "target": "🧮 Valutazione Intrinseca DCF Monte Carlo",
             "context_type": "ticker"
         },
         "ANR": {
             "title": "Analyst Recommendations & Consensus",
-            "page": "pages/5_🏛️_Valutazione_Aziendale.py",
+            "page": "pages/6_🏛️_Valutazione_Aziendale.py",
             "tab_key": "val_segmented_tab",
             "target": "🏛️ Fair Value & Consensus Analisti",
             "context_type": "ticker"
         },
         "HP": {
             "title": "Historical Prices & Candlestick Cockpit",
-            "page": "pages/8_📈_Analisi_Tecnica.py",
+            "page": "pages/9_📈_Analisi_Tecnica.py",
             "tab_key": "tech_active_subtab",
             "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
             "context_type": "ticker_tech"
         },
         "TECH": {
             "title": "Analisi Tecnica & Volume Profile POC",
-            "page": "pages/8_📈_Analisi_Tecnica.py",
+            "page": "pages/9_📈_Analisi_Tecnica.py",
             "tab_key": "tech_active_subtab",
             "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)",
             "context_type": "ticker_tech"
         },
         "VOLS": {
             "title": "Superficie Volatilità 3D & SABR Skew",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🛡️ Hedging Tattico & Tail Risk",
             "context_type": "ticker"
@@ -1164,84 +1164,84 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
         # Portafoglio e Rischio
         "PORT": {
             "title": "Portfolio Risk & Decomposizione VaR",
-            "page": "pages/2_🔴_Analisi_Rischio.py",
+            "page": "pages/3_🔴_Analisi_Rischio.py",
             "tab_key": "risk_active_tab",
             "target": "📉 VaR, CVaR & Backtesting Kupiec",
             "context_type": "portfolio"
         },
         "RISK": {
             "title": "VaR, CVaR & Kupiec POF Backtest",
-            "page": "pages/2_🔴_Analisi_Rischio.py",
+            "page": "pages/3_🔴_Analisi_Rischio.py",
             "tab_key": "risk_active_tab",
             "target": "📉 VaR, CVaR & Backtesting Kupiec",
             "context_type": "portfolio"
         },
         "ATTR": {
             "title": "Performance Attribution (Brinson & Carino)",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🎯 Attribuzione Brinson-Fachler",
             "context_type": "portfolio"
         },
         "TAX": {
             "title": "Tax-Loss Harvesting & Step-Up TUIR",
-            "page": "pages/4_📋_Posizioni_e_Dettagli.py",
+            "page": "pages/5_📋_Posizioni_e_Dettagli.py",
             "tab_key": "positions_active_tab",
             "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
             "context_type": "portfolio"
         },
         "REBAL": {
             "title": "Rebalancing Sandbox & Markowitz Frontier",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "📊 Frontiera Markowitz & Rebalancing",
             "context_type": "portfolio"
         },
         "HRP": {
             "title": "Hierarchical Risk Parity (López de Prado)",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "📊 Frontiera Markowitz & Rebalancing",
             "context_type": "portfolio"
         },
         "BARRA": {
             "title": "Modello Multi-Fattoriale MSCI Barra & Black-Litterman",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🎯 Attribuzione & Fattori",
             "context_type": "portfolio"
         },
         "COPULA": {
             "title": "Asymmetric Tail Copula & Kelly Sizing",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🧬 Tail Copula & Kelly",
             "context_type": "portfolio"
         },
         "MC": {
             "title": "Monte Carlo 10k Paths & Merton Jump",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🎲 Monte Carlo & Merton",
             "context_type": "portfolio"
         },
         "STRESS": {
             "title": "Stress Testing & Scenari di Crisi",
-            "page": "pages/6_🌪️_Stress_Testing.py",
+            "page": "pages/7_🌪️_Stress_Testing.py",
             "tab_key": "stress_active_tab",
             "target": "⚡ Matrice Comparativa MSCI Barra",
             "context_type": "portfolio"
         },
         "FIFO": {
             "title": "Registro FIFO Lotti & Graveyard Analytics",
-            "page": "pages/4_📋_Posizioni_e_Dettagli.py",
+            "page": "pages/5_📋_Posizioni_e_Dettagli.py",
             "tab_key": "positions_active_tab",
             "target": "🪦 Posizioni Chiuse & Graveyard",
             "context_type": "portfolio"
         },
         "DIV": {
             "title": "Calendario & Flusso Dividendi",
-            "page": "pages/4_📋_Posizioni_e_Dettagli.py",
+            "page": "pages/5_📋_Posizioni_e_Dettagli.py",
             "tab_key": "positions_active_tab",
             "target": "📅 Proiezione Dividendi",
             "context_type": "portfolio"
@@ -1249,42 +1249,42 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
         # Macro, Tassi e Mercato
         "YCRV": {
             "title": "Nelson-Siegel-Svensson Yield Curves",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "📊 Markowitz & Rebalancing",
             "context_type": "rates"
         },
         "YAS": {
             "title": "Yield & Spread Analysis (YTM, Duration, Convexity, Z-Spread)",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🏛️ Fixed Income & Z-Spread",
             "context_type": "fixed_income"
         },
         "FI": {
             "title": "Fixed Income & Sovereign Debt Monitor",
-            "page": "pages/3_🔬_Modelli_Quantitativi.py",
+            "page": "pages/4_🔬_Modelli_Quantitativi.py",
             "tab_key": "quant_active_tab",
             "target": "🏛️ Fixed Income & Z-Spread",
             "context_type": "fixed_income"
         },
         "CDS": {
             "title": "Credit Default Swap & Default Probability Matrix",
-            "page": "pages/2_🔴_Analisi_Rischio.py",
+            "page": "pages/3_🔴_Analisi_Rischio.py",
             "tab_key": "risk_active_tab",
             "target": "📉 VaR, CVaR & Backtesting Kupiec",
             "context_type": "credit"
         },
         "STREAM": {
             "title": "Real-Time In-Memory Market Feed & Order Flow",
-            "page": "pages/8_📈_Analisi_Tecnica.py",
+            "page": "pages/9_📈_Analisi_Tecnica.py",
             "tab_key": "tech_active_subtab",
             "target": "⚡ Real-Time Streaming",
             "context_type": "streaming"
         },
         "EQS": {
             "title": "Equity & Multi-Asset Screener Universale",
-            "page": "pages/9_🔍_Screener_Opportunita.py",
+            "page": "pages/10_🔍_Screener_Opportunita.py",
             "tab_key": "screener_segmented_subtab",
             "target": "🔍 Screener Multi-Fattoriale & Archetipi",
             "context_type": "screener"
@@ -1305,72 +1305,72 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
         },
         "BQUANT": {
             "title": "BQuant Python Interactive Console (Bloomberg Style)",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "page": "pages/11_💻_BQuant_e_Launchpad.py",
             "tab_key": "bquant_active_tab",
             "target": "🐍 ARGUS BQuant Python Sandbox",
             "context_type": "bquant"
         },
         "PY": {
             "title": "BQuant Python Interactive Console (Bloomberg Style)",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "page": "pages/11_💻_BQuant_e_Launchpad.py",
             "tab_key": "bquant_active_tab",
             "target": "🐍 ARGUS BQuant Python Sandbox",
             "context_type": "bquant"
         },
         "LAUNCHPAD": {
             "title": "Launchpad & Role Workspace Customizer",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "page": "pages/11_💻_BQuant_e_Launchpad.py",
             "tab_key": "bquant_active_tab",
             "target": "🎛️ Launchpad & Workspace Customizer",
             "context_type": "workspace"
         },
         "WS": {
             "title": "Launchpad & Role Workspace Customizer",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "page": "pages/11_💻_BQuant_e_Launchpad.py",
             "tab_key": "bquant_active_tab",
             "target": "🎛️ Launchpad & Workspace Customizer",
             "context_type": "workspace"
         },
         "XL": {
             "title": "Excel Live Connector & Bloomberg RTD Builder",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "page": "pages/11_💻_BQuant_e_Launchpad.py",
             "tab_key": "bquant_active_tab",
             "target": "📊 Excel Live Connector & RTD",
             "context_type": "excel"
         },
         "EXCEL": {
             "title": "Excel Live Connector & Bloomberg RTD Builder",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
+            "page": "pages/11_💻_BQuant_e_Launchpad.py",
             "tab_key": "bquant_active_tab",
             "target": "📊 Excel Live Connector & RTD",
             "context_type": "excel"
         },
         "LIVE": {
             "title": "ARGUS Live Terminal & Interactive CLI Desk",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
-            "tab_key": "bquant_active_tab",
-            "target": "🖥️ Terminale Live & Interactive CLI",
+            "page": "pages/2_🖥️_Live_Terminal.py",
+            "tab_key": None,
+            "target": None,
             "context_type": "terminal"
         },
         "TERM": {
             "title": "ARGUS Live Terminal & Interactive CLI Desk",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
-            "tab_key": "bquant_active_tab",
-            "target": "🖥️ Terminale Live & Interactive CLI",
+            "page": "pages/2_🖥️_Live_Terminal.py",
+            "tab_key": None,
+            "target": None,
             "context_type": "terminal"
         },
         "CLI": {
             "title": "ARGUS Live Terminal & Interactive CLI Desk",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
-            "tab_key": "bquant_active_tab",
-            "target": "🖥️ Terminale Live & Interactive CLI",
+            "page": "pages/2_🖥️_Live_Terminal.py",
+            "tab_key": None,
+            "target": None,
             "context_type": "terminal"
         },
         "TERMINAL": {
             "title": "ARGUS Live Terminal & Interactive CLI Desk",
-            "page": "pages/10_💻_BQuant_e_Launchpad.py",
-            "tab_key": "bquant_active_tab",
-            "target": "🖥️ Terminale Live & Interactive CLI",
+            "page": "pages/2_🖥️_Live_Terminal.py",
+            "tab_key": None,
+            "target": None,
             "context_type": "terminal"
         }
     }
@@ -1494,35 +1494,41 @@ def render_spotlight_palette():
             {"title": "🎛️ Control Room & Ingestione CSV", "page": "0_Control_Room.py", "tab_key": None, "target": None, "keywords": "control room upload csv degiro database ingestione parametri mysql offline cr"},
             # Dashboard
             {"title": "📈 Dashboard Generale & Copilot", "page": "pages/1_📈_Dashboard_Generale.py", "tab_key": None, "target": None, "keywords": "dashboard cagr sharpe rendimento cumulato benchmark max drawdown kpi dash"},
+            # Live Terminal
+            {"title": "🖥️ Live Terminal & Real-Time Market Desk", "page": "pages/2_🖥️_Live_Terminal.py", "tab_key": None, "target": None, "keywords": "terminal live quote market tape bloomberg cli desk tape live order book"},
             # Rischio
-            {"title": "🔴 Rischio ➔ VaR, CVaR & Marginal VaR", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "var cvar cornish fisher marginal component lvar rischio perdita risk port"},
-            {"title": "🔴 Rischio ➔ Backtesting VaR & Test Kupiec", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "kupiec basel backtesting violazioni var test p-value"},
-            {"title": "🔴 Rischio ➔ Modello Fama-French & Carhart", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "fama french carhart smb hml mom wml fattori regressione alpha beta"},
-            {"title": "🔴 Rischio ➔ Limiti di Rischio & Conformità UCITS", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "limiti concentrazione ucits mifid conformità breach stop loss"},
-            {"title": "🔴 Rischio ➔ Rilevamento Anomalie ML (Isolation Forest)", "page": "pages/2_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)", "keywords": "isolation forest machine learning anomalie outlier cluster ml"},
+            {"title": "🔴 Rischio ➔ VaR, CVaR & Marginal VaR", "page": "pages/3_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "var cvar cornish fisher marginal component lvar rischio perdita risk port"},
+            {"title": "🔴 Rischio ➔ Backtesting VaR & Test Kupiec", "page": "pages/3_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📉 VaR, CVaR & Backtesting Kupiec", "keywords": "kupiec basel backtesting violazioni var test p-value"},
+            {"title": "🔴 Rischio ➔ Modello Fama-French & Carhart", "page": "pages/3_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "fama french carhart smb hml mom wml fattori regressione alpha beta"},
+            {"title": "🔴 Rischio ➔ Limiti di Rischio & Conformità UCITS", "page": "pages/3_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "📊 Profilo del Rischio & Fama-French", "keywords": "limiti concentrazione ucits mifid conformità breach stop loss"},
+            {"title": "🔴 Rischio ➔ Rilevamento Anomalie ML (Isolation Forest)", "page": "pages/3_🔴_Analisi_Rischio.py", "tab_key": "risk_active_tab", "target": "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)", "keywords": "isolation forest machine learning anomalie outlier cluster ml"},
             # Quant
-            {"title": "🔬 Quant ➔ Frontiera Markowitz & Rebalancing", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "markowitz frontiera efficiente ledoit wolf sandbox ribilanciamento pesi sharpe rebal"},
-            {"title": "🔬 Quant ➔ Hierarchical Risk Parity (HRP)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "hrp hierarchical risk parity lopez de prado clustering dendrogramma"},
-            {"title": "🔬 Quant ➔ Tail Copula & Kelly Sizing", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🧬 Tail Copula & Kelly Sizing", "keywords": "tail copula clayton gumbel kelly criterion sizing half kelly crash contagion copula"},
-            {"title": "🔬 Quant ➔ Monte Carlo 10k Paths & Merton", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)", "keywords": "monte carlo merton jump diffusion student-t cholesky simulazione stocastica mc"},
-            {"title": "🔬 Quant ➔ Opzioni Black-Scholes & SABR Skew", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🛡️ Hedging Tattico & Tail Risk", "keywords": "opzioni black scholes call put greeks delta gamma theta vega hedge vols"},
-            {"title": "🔬 Quant ➔ Performance Attribution (Brinson & Carino)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎯 Attribuzione Brinson-Fachler", "keywords": "brinson fachler carino menchero allocazione selezione interazione attribution attr"},
-            {"title": "🔬 Quant ➔ Modelli Fattoriali (Carhart & Barra 5F)", "page": "pages/3_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML", "keywords": "carhart barra fama french black litterman fattori regressione ml"},
+            {"title": "🔬 Quant ➔ Frontiera Markowitz & Rebalancing", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "markowitz frontiera efficiente ledoit wolf sandbox ribilanciamento pesi sharpe rebal"},
+            {"title": "🔬 Quant ➔ Hierarchical Risk Parity (HRP)", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "📊 Frontiera Markowitz & Rebalancing", "keywords": "hrp hierarchical risk parity lopez de prado clustering dendrogramma"},
+            {"title": "🔬 Quant ➔ Tail Copula & Kelly Sizing", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🧬 Tail Copula & Kelly Sizing", "keywords": "tail copula clayton gumbel kelly criterion sizing half kelly crash contagion copula"},
+            {"title": "🔬 Quant ➔ Monte Carlo 10k Paths & Merton", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎲 Simulazioni Stocastiche (Monte Carlo & Merton)", "keywords": "monte carlo merton jump diffusion student-t cholesky simulazione stocastica mc"},
+            {"title": "🔬 Quant ➔ Opzioni Black-Scholes & SABR Skew", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🛡️ Hedging Tattico & Tail Risk", "keywords": "opzioni black scholes call put greeks delta gamma theta vega hedge vols"},
+            {"title": "🔬 Quant ➔ Performance Attribution (Brinson & Carino)", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🎯 Attribuzione Brinson-Fachler", "keywords": "brinson fachler carino menchero allocazione selezione interazione attribution attr"},
+            {"title": "🔬 Quant ➔ Modelli Fattoriali (Carhart & Barra 5F)", "page": "pages/4_🔬_Modelli_Quantitativi.py", "tab_key": "quant_active_tab", "target": "🏛️ Modelli Fattoriali, Black-Litterman & ML", "keywords": "carhart barra fama french black litterman fattori regressione ml"},
             # Posizioni
-            {"title": "📋 Posizioni ➔ FIFO Realized & Graveyard", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "🪦 Posizioni Chiuse & Graveyard", "keywords": "posizioni fifo plusvalenze minusvalenze pnl book ordini titoli graveyard"},
-            {"title": "📋 Posizioni ➔ Fisco Italiano TUIR Art. 67 & Step-Up", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)", "keywords": "fisco tasse tuir imposte minusvalenze capital gain 26% tax harvesting step-up tax"},
-            {"title": "📋 Posizioni ➔ Calendario Dividendi & Yield", "page": "pages/4_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "📅 Proiezione Dividendi", "keywords": "dividendi stacco yield cedole proiezioni calendario div"},
+            {"title": "📋 Posizioni ➔ FIFO Realized & Graveyard", "page": "pages/5_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "🪦 Posizioni Chiuse & Graveyard", "keywords": "posizioni fifo plusvalenze minusvalenze pnl book ordini titoli graveyard"},
+            {"title": "📋 Posizioni ➔ Fisco Italiano TUIR Art. 67 & Step-Up", "page": "pages/5_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "💰 Ottimizzazione Fiscale (TUIR Art. 67)", "keywords": "fisco tasse tuir imposte minusvalenze capital gain 26% tax harvesting step-up tax"},
+            {"title": "📋 Posizioni ➔ Calendario Dividendi & Yield", "page": "pages/5_📋_Posizioni_e_Dettagli.py", "tab_key": "positions_active_tab", "target": "📅 Proiezione Dividendi", "keywords": "dividendi stacco yield cedole proiezioni calendario div"},
             # Valutazione
-            {"title": "🏛️ Valutazione ➔ DCF Monte Carlo & WACC", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🧮 Valutazione Intrinseca DCF Monte Carlo", "keywords": "dcf discounted cash flow wacc capm fair value intrinseco monte carlo"},
-            {"title": "🏛️ Valutazione ➔ Solvibilità Altman & Beneish", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)", "keywords": "altman z score dupont bilanci solvibilita beneish m score sloan des fa"},
-            {"title": "🏛️ Valutazione ➔ Consensus Analisti & Target Price", "page": "pages/5_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🏛️ Fair Value & Consensus Analisti", "keywords": "consensus analisti target price price target anr stime"},
+            {"title": "🏛️ Valutazione ➔ DCF Monte Carlo & WACC", "page": "pages/6_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🧮 Valutazione Intrinseca DCF Monte Carlo", "keywords": "dcf discounted cash flow wacc capm fair value intrinseco monte carlo"},
+            {"title": "🏛️ Valutazione ➔ Solvibilità Altman & Beneish", "page": "pages/6_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "📊 Bilanci & Solvibilità (Altman & DuPont)", "keywords": "altman z score dupont bilanci solvibilita beneish m score sloan des fa"},
+            {"title": "🏛️ Valutazione ➔ Consensus Analisti & Target Price", "page": "pages/6_🏛️_Valutazione_Aziendale.py", "tab_key": "val_segmented_tab", "target": "🏛️ Fair Value & Consensus Analisti", "keywords": "consensus analisti target price price target anr stime"},
             # Stress
-            {"title": "🌪️ Stress Testing ➔ Matrice Scenari MSCI Barra", "page": "pages/6_🌪️_Stress_Testing.py", "tab_key": "stress_active_tab", "target": "⚡ Matrice Comparativa MSCI Barra", "keywords": "stress testing msci barra scenari storici crisi 2008 covid crollo stress"},
+            {"title": "🌪️ Stress Testing ➔ Matrice Scenari MSCI Barra", "page": "pages/7_🌪️_Stress_Testing.py", "tab_key": "stress_active_tab", "target": "⚡ Matrice Comparativa MSCI Barra", "keywords": "stress testing msci barra scenari storici crisi 2008 covid crollo stress"},
+            # Analisi Temporale
+            {"title": "📊 Analisi Temporale ➔ Storicizzazione Multi-Snapshot", "page": "pages/8_📊_Analisi_Temporale.py", "tab_key": None, "target": None, "keywords": "analisi temporale snapshot storicizzazione drawdown rolling timeline"},
             # Tecnica
-            {"title": "📈 Tecnica ➔ Candlestick & Volume Profile (POC)", "page": "pages/8_📈_Analisi_Tecnica.py", "tab_key": "tech_active_subtab", "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)", "keywords": "analisi tecnica candlestick volume profile poc vah val rsi macd hp tech"},
+            {"title": "📈 Tecnica ➔ Candlestick & Volume Profile (POC)", "page": "pages/9_📈_Analisi_Tecnica.py", "tab_key": "tech_active_subtab", "target": "📊 Cockpit Completo (Candlestick + Overlays + Volume Profile)", "keywords": "analisi tecnica candlestick volume profile poc vah val rsi macd hp tech"},
             # Screener
-            {"title": "🔍 Screener ➔ Screener Opportunità (EQS)", "page": "pages/9_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🔍 Screener Multi-Fattoriale & Archetipi", "keywords": "screener filtri opportunita momentum value growth dividendi qualita eqs"},
-            {"title": "🔍 Screener ➔ Pre-Trade Impact Simulator", "page": "pages/9_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🧪 Pre-Trade Portfolio Impact Simulator", "keywords": "pre-trade simulatore impatto nuovo acquisto asset candidato"}
+            {"title": "🔍 Screener ➔ Screener Opportunità (EQS)", "page": "pages/10_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🔍 Screener Multi-Fattoriale & Archetipi", "keywords": "screener filtri opportunita momentum value growth dividendi qualita eqs"},
+            {"title": "🔍 Screener ➔ Pre-Trade Impact Simulator", "page": "pages/10_🔍_Screener_Opportunita.py", "tab_key": "screener_segmented_subtab", "target": "🧪 Pre-Trade Portfolio Impact Simulator", "keywords": "pre-trade simulatore impatto nuovo acquisto asset candidato"},
+            # BQuant
+            {"title": "💻 BQuant ➔ Python Sandbox & Launchpad", "page": "pages/11_💻_BQuant_e_Launchpad.py", "tab_key": "bquant_active_tab", "target": "🐍 ARGUS BQuant Python Sandbox", "keywords": "bquant python console sandbox script launchpad excel rtd workspace"}
         ]
 
         matched = []
@@ -3461,6 +3467,11 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
         st.info("Nessuna posizione attiva disponibile per l'aggregazione DuckDB OLAP.")
         return
 
+    df_positions = df_positions[(df_positions.get("qty_net", 1) > 1e-6) & (df_positions.get("current_value", 1) > 1e-6)].copy()
+    if df_positions.empty:
+        st.info("Nessuna posizione attiva disponibile per l'aggregazione DuckDB OLAP.")
+        return
+
     from core.duckdb_engine import (
         compute_duckdb_asset_sector_currency_cube,
         compute_duckdb_sector_rankings
@@ -3543,7 +3554,8 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
         top_sec_pnl = float(top_sec_row["pnl_latente_totale"])
 
     # Esposizione Valutaria
-    df_curr = df_positions.groupby("currency")["current_value"].sum().reset_index() if "currency" in df_positions.columns and "current_value" in df_positions.columns else pd.DataFrame()
+    curr_col = "asset_currency" if ("asset_currency" in df_positions.columns and df_positions["asset_currency"].nunique() > 1) else ("currency" if "currency" in df_positions.columns else None)
+    df_curr = df_positions.groupby(curr_col)["current_value"].sum().reset_index().rename(columns={curr_col: "currency"}) if curr_col and "current_value" in df_positions.columns else pd.DataFrame()
     top_curr_name = "EUR"
     top_curr_pct = 100.0
     if not df_curr.empty:
@@ -3658,6 +3670,8 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
 
     with tab_treemap:
         df_tree = df_positions.copy()
+        if "asset_currency" in df_tree.columns:
+            df_tree["currency"] = df_tree["asset_currency"].fillna(df_tree.get("currency", "EUR")).astype(str)
         for col in ["asset_class", "sector", "currency", "ticker"]:
             if col not in df_tree.columns:
                 df_tree[col] = "Altro"

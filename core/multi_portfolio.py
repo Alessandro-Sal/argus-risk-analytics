@@ -103,7 +103,7 @@ from core.metadata_resolver import resolve_asset_metadata
 
 
 def _normalize_positions_list(positions_raw) -> List[dict]:
-    """Converte positions da DataFrame o lista in una lista uniforme di dizionari con tutti i campi quantitativi."""
+    """Converte positions da DataFrame o lista in una lista uniforme di dizionari con tutti i campi quantitativi, isolando rigorosamente le posizioni ATTIVE."""
     if positions_raw is None:
         return []
     records = []
@@ -113,10 +113,32 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
             return []
         for _, row in positions_raw.iterrows():
             t = str(row.get("ticker", "")).strip()
-            if not t:
+            if not t or t.lower() in ("nan", "none", "null"):
                 continue
+            
             mv = float(row.get("current_value", row.get("market_value", 0.0)))
-            shares = float(row.get("qty_net", row.get("shares", row.get("quantity", 0.0))))
+            
+            # Rilevamento quantità rigoroso
+            has_qty = False
+            qty_val = 0.0
+            for qk in ["qty_net", "shares", "quantity", "qty", "units"]:
+                if qk in row and pd.notna(row[qk]):
+                    try:
+                        qty_val = float(row[qk])
+                        has_qty = True
+                        break
+                    except Exception:
+                        pass
+            
+            if has_qty:
+                if qty_val <= 1e-6:
+                    continue
+                shares = qty_val
+            else:
+                if mv <= 1e-6:
+                    continue
+                shares = 0.0
+
             cost = float(row.get("cost_basis", row.get("total_cost", 0.0)))
             if cost == 0.0 and shares > 0:
                 cost = float(row.get("avg_cost", 0.0)) * shares
@@ -170,10 +192,31 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
         for p in positions_raw:
             if isinstance(p, dict):
                 t = str(p.get("ticker", "")).strip()
-                if not t:
+                if not t or t.lower() in ("nan", "none", "null"):
                     continue
+                
                 mv = float(p.get("current_value", p.get("market_value", 0.0)))
-                shares = float(p.get("qty_net", p.get("shares", p.get("quantity", 0.0))))
+                
+                has_qty = False
+                qty_val = 0.0
+                for qk in ["qty_net", "shares", "quantity", "qty", "units"]:
+                    if qk in p and p[qk] is not None:
+                        try:
+                            qty_val = float(p[qk])
+                            has_qty = True
+                            break
+                        except Exception:
+                            pass
+                
+                if has_qty:
+                    if qty_val <= 1e-6:
+                        continue
+                    shares = qty_val
+                else:
+                    if mv <= 1e-6:
+                        continue
+                    shares = 0.0
+                    
                 cost = float(p.get("cost_basis", p.get("total_cost", 0.0)))
                 if cost == 0.0 and shares > 0:
                     cost = float(p.get("avg_cost", 0.0)) * shares
