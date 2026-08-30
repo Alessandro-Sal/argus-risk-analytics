@@ -777,11 +777,19 @@ def _infer_asset_class(info: dict, ticker: str) -> str:
     if quote_type in mapping:
         return mapping[quote_type]
 
-    # Fallback: crypto da ticker
-    if "-USD" in ticker or "-EUR" in ticker or "-BTC" in ticker:
+    # Fallback: crypto da pattern ticker o registry multi-exchange
+    if "-USD" in ticker or "-EUR" in ticker or "-BTC" in ticker or "-USDT" in ticker:
         return "crypto"
 
+    try:
+        from core.crypto_provider import is_crypto_symbol
+        if is_crypto_symbol(ticker):
+            return "crypto"
+    except Exception:
+        pass
+
     return "stock"  # default sicuro
+
 
 
 # ── Pretty print report ───────────────────────────────────────

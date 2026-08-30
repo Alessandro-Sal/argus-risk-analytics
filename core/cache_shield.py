@@ -124,7 +124,7 @@ def get_cached_ticker_history(
 
 
 def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_date: Optional[str]) -> Optional[pd.DataFrame]:
-    """Scarica i prezzi da yfinance con gestione dei tentativi e attenuazione del rate limiting."""
+    """Scarica i prezzi da yfinance con fallback trasparente a Crypto Multi-Exchange Engine per crypto."""
     import yfinance as yf
 
     max_retries = 3
@@ -154,7 +154,19 @@ def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_dat
                 time.sleep(sleep_time)
             else:
                 break
+
+    # Fallback su Crypto Multi-Exchange Provider (Binance, Kraken, CoinGecko)
+    try:
+        from core.crypto_provider import is_crypto_symbol, fetch_crypto_history_unified
+        if is_crypto_symbol(ticker):
+            df_crypto = fetch_crypto_history_unified(ticker, start_date=start_date, end_date=end_date)
+            if df_crypto is not None and not df_crypto.empty:
+                return df_crypto
+    except Exception:
+        pass
+
     return None
+
 
 
 def get_cached_ticker_info(
