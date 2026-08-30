@@ -494,6 +494,7 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
     """
     Costruisce la curva dei rendimenti istituzionale completa (1M .. 30Y)
     con parametri Nelson-Siegel calibrati, estensione Svensson e fattori di sconto.
+    Integra in tempo reale i dati ufficiali di FRED (USA) e BCE (Eurozona) se disponibili.
     """
     c_upper = str(currency or "EUR").strip().upper()
     active_rf = get_active_risk_free_rate(c_upper)
@@ -503,21 +504,56 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
     maturities = np.array([1/12, 3/12, 6/12, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0])
     maturity_labels = ["1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y"]
 
-    # Term premium empirico per valuta (pendenza tipica normale)
-    if c_upper == "USD":
-        long_rate = max(0.035, short_rate + 0.004)
-        mid_bump = 0.002
-    elif c_upper == "EUR":
-        long_rate = max(0.025, short_rate + 0.005)
-        mid_bump = 0.001
-    elif c_upper == "GBP":
-        long_rate = max(0.040, short_rate + 0.003)
-        mid_bump = 0.002
-    else:  # CHF / Default
-        long_rate = max(0.008, short_rate + 0.006)
-        mid_bump = 0.001
+    sample_yields = None
+    curve_source = active_rf["source"]
 
-    sample_yields = short_rate + (long_rate - short_rate) * (1.0 - np.exp(-maturities / 4.0)) + mid_bump * (maturities / 5.0) * np.exp(-maturities / 5.0)
+    # 1. Tentativo Ingestion Live Curve da FRED (USD) o BCE (EUR)
+    try:
+        if c_upper == "USD":
+            from core.macro_provider import fetch_us_treasury_term_structure
+            us_live = fetch_us_treasury_term_structure()
+            if us_live and len(us_live) >= 5:
+                y_list = []
+                for lbl in maturity_labels:
+                    if lbl in us_live:
+                        y_list.append(us_live[lbl] / 100.0)
+                    else:
+                        y_list.append(short_rate)
+                sample_yields = np.array(y_list)
+                curve_source = "Live FRED (Federal Reserve Bank of St. Louis Treasury Curve)"
+        elif c_upper == "EUR":
+            from core.macro_provider import fetch_ecb_yield_curve
+            ecb_live = fetch_ecb_yield_curve()
+            if ecb_live and len(ecb_live) >= 5:
+                y_list = []
+                for lbl in maturity_labels:
+                    if lbl in ecb_live:
+                        y_list.append(ecb_live[lbl] / 100.0)
+                    else:
+                        y_list.append(short_rate)
+                sample_yields = np.array(y_list)
+                curve_source = "Live ECB (European Central Bank AAA Yield Curve)"
+    except Exception:
+        sample_yields = None
+
+    # 2. Fallback parametrico prudenziale se offline o per altre valute
+    if sample_yields is None:
+        if c_upper == "USD":
+            long_rate = max(0.035, short_rate + 0.004)
+            mid_bump = 0.002
+        elif c_upper == "EUR":
+            long_rate = max(0.025, short_rate + 0.005)
+            mid_bump = 0.001
+        elif c_upper == "GBP":
+            long_rate = max(0.040, short_rate + 0.003)
+            mid_bump = 0.002
+        else:  # CHF / Default
+            long_rate = max(0.008, short_rate + 0.006)
+            mid_bump = 0.001
+
+        sample_yields = short_rate + (long_rate - short_rate) * (1.0 - np.exp(-maturities / 4.0)) + mid_bump * (maturities / 5.0) * np.exp(-maturities / 5.0)
+    else:
+        long_rate = float(sample_yields[-1])
 
     ns_params = fit_nelson_siegel_curve(maturities, sample_yields)
     nss_params = fit_nelson_siegel_svensson_curve(maturities, sample_yields)
@@ -536,10 +572,11 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
     return {
         "currency": c_upper,
         "as_of_date": datetime.now().strftime("%Y-%m-%d"),
-        "source": active_rf["source"],
+        "source": curve_source,
         "short_term_rate_pct": round(short_rate * 100.0, 2),
         "long_term_rate_pct": round(long_rate * 100.0, 2),
         "nelson_siegel_params": ns_params,
         "svensson_params": nss_params,
         "df_curve": df_curve
     }
+
