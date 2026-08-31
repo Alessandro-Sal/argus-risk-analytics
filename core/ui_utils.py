@@ -820,9 +820,9 @@ def inject_custom_css():
             padding: 0 !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-            padding: 5px 10px !important;
-            min-height: 30px !important;
-            height: 30px !important;
+            padding: 6px 10px !important;
+            min-height: 32px !important;
+            height: auto !important;
             font-size: 11.5px !important;
             font-weight: 600 !important;
             color: #c9d1d9 !important;
@@ -830,6 +830,14 @@ def inject_custom_css():
             transition: all 0.15s ease !important;
             display: flex !important;
             align-items: center !important;
+            white-space: nowrap !important;
+        }}
+        section[data-testid="stSidebar"] [data-testid="stExpander"] summary p {{
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            margin: 0 !important;
+            font-size: 11.5px !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{
             background: rgba(255, 255, 255, 0.06) !important;
