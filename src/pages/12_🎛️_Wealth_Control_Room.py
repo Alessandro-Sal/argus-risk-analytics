@@ -21,14 +21,14 @@ importlib.reload(core.wealth.wealth_engine)
 
 from core.fetcher import get_engine
 from core.ui_utils import (
-
     inject_custom_css,
     section,
     metric_card,
     fmt_eur,
     fmt_pct,
     render_wealth_command_bar,
-    render_wealth_executive_badges
+    render_wealth_executive_badges,
+    render_wealth_control_room_hero
 )
 from core.wealth.wealth_engine import compute_consolidated_net_worth
 from core.sidebar import render_sidebar
@@ -204,22 +204,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-st.markdown("""
-<div class="wealth-cockpit-header">
-    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-        <div>
-            <div class="wealth-cockpit-title">
-                <span>🎛️</span>
-                <span>WEALTH CONTROL ROOM</span>
-                <span class="wealth-pill-badge">PORTALE WEALTH & CASH FLOW</span>
-            </div>
-            <div class="wealth-cockpit-sub">
-                Cabina di regia istituzionale per consolidamento Net Worth, sincronizzazione Google Sheets, libro mastro spese ed estratti conto bancari.
-            </div>
-        </div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid)
 
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
 p_bar_c1, p_bar_c2, p_bar_c3, p_bar_c4 = st.columns([3.2, 1.1, 1.1, 1.4])

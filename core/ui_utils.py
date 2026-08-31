@@ -3632,6 +3632,64 @@ def render_control_room_hero():
     st.markdown(hero_html, unsafe_allow_html=True)
 
 
+def render_wealth_control_room_hero(profile_map: dict = None, current_pid: int = None):
+    """Renderizza la Hero Card Istituzionale della Wealth Control Room con l'Occhio di Argus Emerald animato e telemetria Wealth live."""
+    accent = "#10b981"
+    eye_svg = get_argus_eye_svg(size=85, animated=True, accent=accent)
+    
+    prof_name = None
+    if profile_map and current_pid in profile_map:
+        prof_name = profile_map[current_pid]
+    elif current_pid:
+        prof_name = f"Profilo #{current_pid}"
+    else:
+        prof_name = st.session_state.get("portfolio_name") or "Famiglia & Personale"
+
+    currency = st.session_state.get("base_currency", "EUR")
+    w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
+    w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30.0))
+    w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20.0))
+    rule_str = f"{w_needs}/{w_wants}/{w_savings}"
+    swr = float(st.session_state.get("wealth_fire_swr", 4.0))
+    ret_age = int(st.session_state.get("wealth_target_retirement_age", 67))
+
+    is_offline = st.session_state.get("offline_mode", False)
+    mode_text = "OFFLINE" if is_offline else "PORTALE WEALTH & CASH FLOW"
+    mode_color = "#ff9900" if is_offline else "#34d399"
+    mode_bg = "rgba(255, 153, 0, 0.15)" if is_offline else "rgba(16, 185, 129, 0.15)"
+
+    hero_html = (
+        f'<div style="background:rgba(22,27,34,0.7);border:1px solid rgba(255,255,255,0.08);border-left:4px solid {accent};border-radius:14px;padding:16px 20px;margin-bottom:16px;backdrop-filter:blur(14px);box-shadow:0 6px 20px rgba(0,0,0,0.3);">'
+        f'<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">'
+        f'<div style="display:flex;align-items:center;gap:16px;">'
+        f'<div>{eye_svg}</div>'
+        f'<div>'
+        f'<div style="display:flex;align-items:center;gap:10px;">'
+        f'<span style="font-size:20px;font-weight:800;color:#ffffff;letter-spacing:0.5px;">WEALTH CONTROL ROOM</span>'
+        f'<span style="font-size:10px;font-weight:800;color:{mode_color};background:{mode_bg};padding:2px 8px;border-radius:12px;letter-spacing:0.5px;">{mode_text}</span>'
+        f'</div>'
+        f'<div style="font-size:12px;color:#8b949e;margin-top:4px;max-width:580px;">'
+        f'Cabina di regia istituzionale per consolidamento Net Worth, sincronizzazione Google Sheets, libro mastro spese ed estratti conto bancari.'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+        f'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        f'<div style="background:rgba(13,17,23,0.6);border:1px solid rgba(255,255,255,0.06);padding:6px 12px;border-radius:8px;font-size:11px;">'
+        f'<span style="color:#8b949e;">Profilo:</span> <b style="color:#ffffff;">{prof_name}</b>'
+        f'</div>'
+        f'<div style="background:rgba(13,17,23,0.6);border:1px solid rgba(255,255,255,0.06);padding:6px 12px;border-radius:8px;font-size:11px;">'
+        f'<span style="color:#8b949e;">FX / Regola:</span> <b style="color:#ffffff;">{currency} &bull; {rule_str}</b>'
+        f'</div>'
+        f'<div style="background:rgba(13,17,23,0.6);border:1px solid rgba(255,255,255,0.06);padding:6px 12px;border-radius:8px;font-size:11px;">'
+        f'<span>🔥 SWR: <b style="color:#f59e0b;">{swr:.1f}%</b> &bull; 🎯 Pensione: <b style="color:#38bdf8;">{ret_age}a</b></span>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(hero_html, unsafe_allow_html=True)
+
+
 def ensure_risk_bundle_loaded(default_preset: str = "🏦 Bilanciato Istituzionale (60/40 Equity/Bond)") -> tuple:
     """
     Assicura che un bundle di rischio (reale o sandbox) sia disponibile in session_state.
