@@ -511,52 +511,90 @@ with tab_trend:
         is_tr_trend = (
             (df_trend_src["direction"].astype(str).str.lower() == "transfer") |
             (df_trend_src["nature"].astype(str).str.lower() == "transfer") |
-            (df_trend_src["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+            (df_trend_src["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False)) |
+            (df_trend_src["notes"].astype(str).str.contains(r"\[transfer\]", case=False, na=False))
         )
-        df_trend_real = df_trend_src[~is_tr_trend].copy()
+        is_inv_trend = (
+            (df_trend_src["category_name"].astype(str).str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
+            (df_trend_src["notes"].astype(str).str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False))
+        ) & (~is_tr_trend)
 
-        m_in = df_trend_real[df_trend_real["direction"] == "inflow"].groupby("year_month")["amount"].sum()
-        m_out = df_trend_real[df_trend_real["direction"] == "outflow"].groupby("year_month")["amount"].sum()
-        
-        all_ym = sorted(list(set(m_in.index).union(set(m_out.index))))
-        df_monthly = pd.DataFrame({"year_month": all_ym})
-        df_monthly["Entrate"] = df_monthly["year_month"].map(m_in).fillna(0.0)
-        df_monthly["Uscite"] = df_monthly["year_month"].map(m_out).fillna(0.0)
-        df_monthly["Risparmio_Netto"] = df_monthly["Entrate"] - df_monthly["Uscite"]
-        df_monthly["Savings_Rate_Pct"] = np.where(
-            df_monthly["Entrate"] > 0,
-            (df_monthly["Risparmio_Netto"] / df_monthly["Entrate"]) * 100.0,
-            0.0
-        )
-        df_monthly["MoM_Uscite_Pct"] = df_monthly["Uscite"].pct_change() * 100.0
+        is_ref_trend = (
+            (df_trend_src["category_name"].astype(str).str.contains("rimbors|settled from|bulk settlement|storno|reso", case=False, na=False)) |
+            (df_trend_src["merchant"].astype(str).str.contains("settled from|bulk settlement|refund|rimborso", case=False, na=False)) |
+            (df_trend_src["notes"].astype(str).str.contains(r"\[refund\]|settled from|bulk settlement", case=False, na=False))
+        ) & (~is_tr_trend)
 
-        # Grafico Trend Barre + Linea
+        all_ym = sorted(list(df_trend_src["year_month"].unique()))
+        rows_m = []
+        for ym in all_ym:
+            sub = df_trend_src[df_trend_src["year_month"] == ym]
+            
+            # Entrate Operative reali (senza disinvestimenti né rimborsi)
+            in_op = float(sub[(sub["direction"] == "inflow") & (~is_tr_trend) & (~is_inv_trend) & (~is_ref_trend)]["amount"].sum())
+            # Rimborsi amici ricevuti
+            ref_in = float(sub[(sub["direction"] == "inflow") & is_ref_trend]["amount"].sum())
+            
+            # Spese di consumo vive lorde (Needs 50% + Wants 30%)
+            exp_cons_gross = float(sub[(sub["direction"] == "outflow") & (~is_tr_trend) & (~is_inv_trend)]["amount"].sum())
+            # Spese di consumo nette (al netto dei rimborsi ricevuti da terzi)
+            exp_cons_net = max(0.0, exp_cons_gross - ref_in)
+            
+            # Investimenti e PAC azionari / crypto (Risparmio Investito)
+            inv_out = float(sub[(sub["direction"] == "outflow") & is_inv_trend]["amount"].sum())
+            
+            # Risparmio Operativo Libero generato dal reddito (Entrate - Spese Vive)
+            net_savings = in_op - exp_cons_net
+            
+            # Tasso di Risparmio Operativo Reale
+            sr_pct = round((net_savings / in_op * 100.0), 1) if in_op > 0 else 0.0
+            
+            rows_m.append({
+                "year_month": ym,
+                "Entrate": round(in_op, 2),
+                "Spese_Consumo": round(exp_cons_net, 2),
+                "Investimenti_PAC": round(inv_out, 2),
+                "Risparmio_Netto": round(net_savings, 2),
+                "Savings_Rate_Pct": sr_pct
+            })
+
+        df_monthly = pd.DataFrame(rows_m)
+        df_monthly["MoM_Consumi_Pct"] = df_monthly["Spese_Consumo"].pct_change() * 100.0
+
+        # Grafico Trend Barre + Linea a 4 Componenti Istituzionali
         fig_trend = go.Figure()
         fig_trend.add_trace(go.Bar(
             x=df_monthly["year_month"],
             y=df_monthly["Entrate"],
-            name="Entrate (€)",
+            name="Entrate Operative (€)",
             marker_color="#10b981",
             hovertemplate="<b>%{x}</b><br>Entrate: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Bar(
             x=df_monthly["year_month"],
-            y=df_monthly["Uscite"],
-            name="Uscite (€)",
+            y=df_monthly["Spese_Consumo"],
+            name="Spese di Consumo (€)",
             marker_color="#f43f5e",
-            hovertemplate="<b>%{x}</b><br>Uscite: <b>€ %{y:,.2f}</b><extra></extra>"
+            hovertemplate="<b>%{x}</b><br>Consumi Vivi: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_trend.add_trace(go.Bar(
+            x=df_monthly["year_month"],
+            y=df_monthly["Investimenti_PAC"],
+            name="Investito (PAC/Crypto) (€)",
+            marker_color="#818cf8",
+            hovertemplate="<b>%{x}</b><br>Investito: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Bar(
             x=df_monthly["year_month"],
             y=df_monthly["Risparmio_Netto"],
-            name="Risparmio Netto (€)",
+            name="Risparmio Netto Operativo (€)",
             marker_color="#38bdf8",
-            hovertemplate="<b>%{x}</b><br>Risparmio: <b>€ %{y:,.2f}</b><extra></extra>"
+            hovertemplate="<b>%{x}</b><br>Risparmio Libero: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Scatter(
             x=df_monthly["year_month"],
             y=df_monthly["Savings_Rate_Pct"],
-            name="Savings Rate (%)",
+            name="Savings Rate Reale (%)",
             yaxis="y2",
             mode="lines+markers",
             line=dict(color="#f59e0b", width=2.5),
@@ -577,24 +615,26 @@ with tab_trend:
         )
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
-        tr_c1, tr_c2 = st.columns([1.2, 1.1])
+        tr_c1, tr_c2 = st.columns([1.3, 1.0])
         with tr_c1:
-            st.markdown("##### 📋 Tabella MoM Mese per Mese")
+            st.markdown("##### 📋 Tabella MoM Mese per Mese (Depurata)")
             df_m_show = df_monthly.copy()
             df_m_show["Mese"] = df_m_show["year_month"]
             df_m_show["Entrate_fmt"] = df_m_show["Entrate"].apply(lambda v: f"€ {v:,.2f}")
-            df_m_show["Uscite_fmt"] = df_m_show["Uscite"].apply(lambda v: f"€ {v:,.2f}")
+            df_m_show["Consumi_fmt"] = df_m_show["Spese_Consumo"].apply(lambda v: f"€ {v:,.2f}")
+            df_m_show["Inv_fmt"] = df_m_show["Investimenti_PAC"].apply(lambda v: f"€ {v:,.2f}")
             df_m_show["Netto_fmt"] = df_m_show["Risparmio_Netto"].apply(lambda v: f"€ {v:,.2f}")
             df_m_show["SR_fmt"] = df_m_show["Savings_Rate_Pct"].apply(lambda v: f"{v:.1f}%")
-            df_m_show["MoM_fmt"] = df_m_show["MoM_Uscite_Pct"].apply(lambda v: f"{v:+.1f}%" if pd.notna(v) else "-")
+            df_m_show["MoM_fmt"] = df_m_show["MoM_Consumi_Pct"].apply(lambda v: f"{v:+.1f}%" if pd.notna(v) else "-")
 
             st.dataframe(
-                df_m_show[["Mese", "Entrate_fmt", "Uscite_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
-                    "Entrate_fmt": "Entrate",
-                    "Uscite_fmt": "Uscite",
+                df_m_show[["Mese", "Entrate_fmt", "Consumi_fmt", "Inv_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
+                    "Entrate_fmt": "Entrate Op.",
+                    "Consumi_fmt": "Spese Consumo",
+                    "Inv_fmt": "Investito PAC",
                     "Netto_fmt": "Risparmio Netto",
                     "SR_fmt": "Savings Rate",
-                    "MoM_fmt": "Δ Uscite MoM"
+                    "MoM_fmt": "Δ Consumi MoM"
                 }),
                 hide_index=True,
                 use_container_width=True
