@@ -1068,22 +1068,32 @@ with tab_whatif:
     st.markdown("### 🔄 Simulatore di Conversione: Spese Superflue ➔ PAC Azionario")
     st.caption("Simulatore 'What-If': Calcola la crescita esponenziale del patrimonio se tagli una quota di desideri/lifestyle e la investi a lungo termine.")
     
-    r_wants = cf_analytics.get("rule_50_30_20", {}).get("wants_amount", 500.0)
+    # Calcola la base mensilizzata delle spese discrezionali (Wants)
+    n_m_cf = 1
+    if "tx_date" in df_cf_filtered.columns and not df_cf_filtered.empty:
+        df_cf_filtered_dt = pd.to_datetime(df_cf_filtered["tx_date"])
+        n_m_cf = max(1, df_cf_filtered_dt.dt.strftime("%Y-%m").nunique())
+    
+    r_wants_tot = cf_analytics.get("rule_50_30_20", {}).get("wants_amount", 500.0)
+    r_wants_monthly = max(50.0, r_wants_tot / n_m_cf)
     
     w_col1, w_col2, w_col3 = st.columns(3)
     with w_col1:
-        cut_pct = st.slider("Taglio Spese Discrezionali (Wants) %:", min_value=5, max_value=60, value=20, step=5, format="%d%%")
+        cut_pct = st.slider(
+            f"Taglio Spese Discrezionali (Wants ~{fmt_eur(r_wants_monthly)}/m) %:",
+            min_value=5, max_value=60, value=20, step=5, format="%d%%"
+        )
     with w_col2:
         ret_rate = st.slider("Rendimento Annuo Stimato PAC / ETF %:", min_value=3.0, max_value=12.0, value=7.0, step=0.5, format="%.1f%%")
     with w_col3:
         sim_years = st.slider("Orizzonte di Accumulo (Anni):", min_value=5, max_value=35, value=25, step=5, format="%d Anni")
 
-    monthly_boost = max(10.0, (r_wants * (cut_pct / 100.0)))
+    monthly_boost = max(10.0, round(r_wants_monthly * (cut_pct / 100.0), 2))
     sim_res = compute_cashflow_whatif_reinvestment(monthly_boost, annual_return_rate=ret_rate/100.0, max_years=sim_years)
 
     wk1, wk2, wk3, wk4 = st.columns(4)
     with wk1:
-        metric_card("Risparmio Extra / Mese", fmt_eur(monthly_boost), delta=f"-{cut_pct}% su Svago & Wants", delta_color="normal")
+        metric_card("Risparmio Extra / Mese", fmt_eur(monthly_boost), delta=f"-{cut_pct}% su Svago & Lifestyle", delta_color="normal")
     with wk2:
         metric_card("Patrimonio a 10 Anni", fmt_eur(sim_res["val_10y"]), delta=f"Rendimento {ret_rate:.1f}% annuo", delta_color="normal")
     with wk3:
