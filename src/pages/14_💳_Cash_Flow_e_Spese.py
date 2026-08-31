@@ -817,15 +817,21 @@ with tab_envelope:
         tot_diff = tot_budget - tot_actual
         over_count = len(df_envelope[df_envelope["pct_used"] > 100.0])
         
+        # Stima numero mesi del periodo
+        n_m_env = 1
+        if "tx_date" in df_cf_filtered.columns and not df_cf_filtered.empty:
+            df_cf_filtered_dt = pd.to_datetime(df_cf_filtered["tx_date"])
+            n_m_env = max(1, df_cf_filtered_dt.dt.strftime("%Y-%m").nunique())
+        
         ek1, ek2, ek3, ek4 = st.columns(4)
         with ek1:
-            metric_card("Budget Allocato Periodo", fmt_eur(tot_budget), delta="Plafond Complessivo", delta_color="normal")
+            metric_card("Budget Allocato Periodo", fmt_eur(tot_budget), delta=f"Plafond Totale ({n_m_env} Mesi)", delta_color="normal")
         with ek2:
-            metric_card("Spesa Effettiva", fmt_eur(tot_actual), delta="Uscite Consuntivate", delta_color="inverse")
+            metric_card("Spesa Consumi Effettiva", fmt_eur(tot_actual), delta="Uscite Consuntivate", delta_color="inverse")
         with ek3:
             d_col = "normal" if tot_diff >= 0 else "inverse"
             d_lbl = "Risparmio Residuo" if tot_diff >= 0 else "Sforamento Globale"
-            metric_card(d_lbl, fmt_eur(abs(tot_diff)), delta=f"{(tot_actual/tot_budget*100.0):.1f}% Utilizzato", delta_color=d_col)
+            metric_card(d_lbl, fmt_eur(abs(tot_diff)), delta=f"{(tot_actual/max(0.01, tot_budget)*100.0):.1f}% Utilizzato", delta_color=d_col)
         with ek4:
             s_col = "normal" if over_count == 0 else "inverse"
             metric_card("Categorie Fuori Budget", f"{over_count} Categorie", delta="Sforamento > 100%", delta_color=s_col)
@@ -836,17 +842,19 @@ with tab_envelope:
             c_name = r["category_name"]
             c_act = r["actual_spent"]
             c_lim = r["budget_limit"]
+            c_mon = r.get("monthly_budget", c_lim / max(1, n_m_env))
             c_pct = r["pct_used"]
             c_stat = r["status"]
             c_rem = r["remaining_budget"]
             
             p_val = min(1.0, max(0.0, c_pct / 100.0))
-            col_b1, col_b2, col_b3 = st.columns([2.0, 1.2, 1.0])
+            col_b1, col_b2, col_b3 = st.columns([2.0, 1.4, 1.0])
             with col_b1:
                 st.markdown(f"**{c_name}** ({r['nature'].upper()})")
                 st.progress(p_val)
             with col_b2:
-                st.markdown(f"Speso: **{fmt_eur(c_act)}** / Budget: **{fmt_eur(c_lim)}**")
+                mon_str = f" *(~{fmt_eur(c_mon)}/m)*" if n_m_env > 1 else ""
+                st.markdown(f"Speso: **{fmt_eur(c_act)}** / Budget: **{fmt_eur(c_lim)}**{mon_str}")
             with col_b3:
                 rem_text = f"+{fmt_eur(c_rem)} liberi" if c_rem >= 0 else f"-{fmt_eur(abs(c_rem))} sforati"
                 st.markdown(f"{c_stat} `({c_pct:.0f}%)` | *{rem_text}*")
