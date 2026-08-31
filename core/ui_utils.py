@@ -861,7 +861,8 @@ def inject_custom_css():
             color: #8b949e !important;
             text-transform: uppercase !important;
             letter-spacing: 0.4px !important;
-            margin-bottom: -2px !important;
+            margin-bottom: 2px !important;
+            white-space: nowrap !important;
         }}
         section[data-testid="stSidebar"] input {{
             font-size: 12px !important;
