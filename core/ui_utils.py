@@ -1006,6 +1006,56 @@ def inject_custom_css():
             margin: 2px 3px 2px 0;
         }}
 
+        /* Wealth KPI Metric Cards */
+        .wealth-kpi-card {{
+            background: rgba(22, 27, 34, 0.75) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-top: 3px solid #10b981 !important;
+            border-radius: 12px !important;
+            padding: 14px 16px !important;
+            transition: all 0.25s ease !important;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3) !important;
+            min-height: 100px !important;
+        }}
+        .wealth-kpi-card:hover {{
+            border-color: rgba(16, 185, 129, 0.6) !important;
+            box-shadow: 0 6px 22px rgba(16, 185, 129, 0.2) !important;
+            transform: translateY(-2px) !important;
+        }}
+        .wealth-kpi-header {{
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            margin-bottom: 6px !important;
+        }}
+        .wealth-kpi-title {{
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.8px !important;
+            color: #94a3b8 !important;
+        }}
+        .wealth-kpi-val {{
+            font-family: 'JetBrains Mono', 'Roboto Mono', monospace !important;
+            font-size: 22px !important;
+            font-weight: 800 !important;
+            color: #ffffff !important;
+            letter-spacing: -0.5px !important;
+            margin-bottom: 6px !important;
+        }}
+        .wealth-kpi-pill {{
+            display: inline-flex !important;
+            align-items: center !important;
+            gap: 4px !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            color: #34d399 !important;
+            background: rgba(16, 185, 129, 0.12) !important;
+            padding: 2px 8px !important;
+            border-radius: 6px !important;
+            border: 1px solid rgba(16, 185, 129, 0.25) !important;
+        }}
+
         #MainMenu {{visibility: hidden;}}
         footer {{visibility: hidden;}}
         header, [data-testid="stHeader"] {{ visibility: visible !important; display: block !important; }}
@@ -4332,20 +4382,20 @@ def render_wealth_executive_badges(net_worth_summary):
     """Renderizza la striscia di badge quantitativi sintetici in stile Private Banking perfettamente allineata al Risk Core."""
     nw = net_worth_summary
     
-    # 1. Health Score Badge
+    # 1. Health Score Badge (>=75 Ottima, >=50 Adeguata, <50 da Consolidare)
     score = nw.wealth_health_score
-    if score >= 80:
-        score_badge = f'<span class="executive-badge badge-green">🟢 Solidità Eccellente ({score:.0f}/100)</span>'
-    elif score >= 60:
-        score_badge = f'<span class="executive-badge badge-yellow">🟡 Solidità Moderata ({score:.0f}/100)</span>'
+    if score >= 75:
+        score_badge = f'<span class="executive-badge badge-green">🟢 Solidità Ottima ({score:.0f}/100)</span>'
+    elif score >= 50:
+        score_badge = f'<span class="executive-badge badge-yellow">🟡 Solidità Adeguata ({score:.0f}/100)</span>'
     else:
         score_badge = f'<span class="executive-badge badge-red">🔴 Solidità da Consolidare ({score:.0f}/100)</span>'
 
-    # 2. Runway Badge
+    # 2. Runway Badge (Fondo Emergenza: >=6m Solido, >=3m Adeguato, <3m Vulnerabile)
     runway = nw.runway_months
-    if runway >= 12.0:
+    if runway >= 6.0:
         runway_badge = f'<span class="executive-badge badge-green">🛡️ Runway Solido ({runway:.1f} Mesi)</span>'
-    elif runway >= 6.0:
+    elif runway >= 3.0:
         runway_badge = f'<span class="executive-badge badge-yellow">🟡 Runway Adeguato ({runway:.1f} Mesi)</span>'
     else:
         runway_badge = f'<span class="executive-badge badge-red">🔴 Riserva Vulnerabile ({runway:.1f} Mesi)</span>'
@@ -4365,7 +4415,7 @@ def render_wealth_executive_badges(net_worth_summary):
     # 5. Security Pill
     sec_badge = '<span class="executive-badge badge-gray">🔒 Zero-Cloud Crittografia Locale</span>'
 
-    st.markdown(f'<div style="margin-top: 4px; margin-bottom: 8px;">{nw_badge}{score_badge}{runway_badge}{sav_badge}{sec_badge}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div style="margin-top: 4px; margin-bottom: 12px; display:flex; flex-wrap:wrap; gap:6px;">{nw_badge}{score_badge}{runway_badge}{sav_badge}{sec_badge}</div>', unsafe_allow_html=True)
 
 
 
