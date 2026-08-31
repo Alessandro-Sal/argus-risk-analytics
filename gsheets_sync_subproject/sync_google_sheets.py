@@ -13,8 +13,13 @@ import json
 import logging
 import datetime
 import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
+try:
+    import gspread
+    from google.oauth2.service_account import Credentials
+except ImportError:
+    gspread = None
+    Credentials = None
+
 
 # Adjust path to import core modules from parent directory
 SUBPROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
