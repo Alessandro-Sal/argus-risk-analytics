@@ -1,7 +1,11 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
+import textwrap
+from datetime import datetime, date
 import streamlit as st
 import pandas as pd
 import numpy as np
+
+
 
 def inject_custom_css():
     theme = st.session_state.get("ui_theme", "Midnight Obsidian")
@@ -32,10 +36,11 @@ def inject_custom_css():
         }}
 
         /* Monospace Tabular Figures for All Quantitative Values */
-        .metric-value, [data-testid="stMetricValue"], [data-testid="stMetricDelta"], code, .mono-num, td, th {{
+        .metric-value, [data-testid="stMetricValue"], [data-testid="stMetricDelta"], code, .mono-num, td.mono-num, th.mono-num {{
             font-family: 'JetBrains Mono', 'Outfit', monospace !important;
             font-feature-settings: "tnum" 1, "zero" 1 !important;
         }}
+
 
         /* Institutional Typography Hierarchy */
         h1, [data-testid="stHeading"] h1, [data-testid="stHeader"] h1 {{
@@ -283,6 +288,11 @@ def inject_custom_css():
             -webkit-backdrop-filter: blur(10px);
             transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            overflow: hidden !important;
+            min-height: 104px !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            flex-direction: column !important;
         }}
 
         .metric-card::before {{
@@ -294,7 +304,9 @@ def inject_custom_css():
             width: 3px;
             background: {accent_gradient};
             box-shadow: 0 0 10px {accent_color};
-            opacity: 0.85;
+            opacity: 0.9;
+            border-top-left-radius: 12px;
+            border-bottom-left-radius: 12px;
         }}
 
         .metric-card:hover {{
@@ -304,26 +316,55 @@ def inject_custom_css():
         }}
 
         .metric-label {{ 
-            color: #8b949e; 
-            font-size: 11px; 
-            font-weight: 600; 
-            letter-spacing: 0.4px; 
+            color: #94a3b8; 
+            font-size: 11.5px; 
+            font-weight: 650; 
+            letter-spacing: 0.5px; 
             text-transform: uppercase;
             line-height: 1.2;
-        }}
-        
-        .metric-value {{ 
-            background: linear-gradient(90deg, #ffffff, #c9d1d9);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-size: clamp(14px, 1.25vw, 21px); 
-            font-weight: 700; 
-            margin-top: 5px;
-            letter-spacing: -0.3px;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }}
+        
+        .metric-value {{ 
+            background: linear-gradient(90deg, #ffffff 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: clamp(20px, 1.6vw, 26px); 
+            font-weight: 800; 
+            margin: 0;
+            letter-spacing: -0.5px;
+            line-height: 1.15;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
+
+
+        .metric-delta-pos {{
+            color: #10b981 !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            margin-top: 4px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            line-height: 1.2 !important;
+        }}
+
+        .metric-delta-neg {{
+            color: #ef4444 !important;
+            font-size: 11px !important;
+            font-weight: 600 !important;
+            margin-top: 4px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            line-height: 1.2 !important;
+        }}
+
 
         /* Streamlit Main Canvas Controls & Input Fields */
         [data-testid="stMain"] [data-baseweb="select"] > div {{
@@ -412,6 +453,11 @@ def inject_custom_css():
         .badge-green {{ background: rgba(63, 185, 80, 0.12); color: #3fb950; border-color: rgba(63, 185, 80, 0.25); }}
         .badge-yellow {{ background: rgba(210, 153, 34, 0.12); color: #d29922; border-color: rgba(210, 153, 34, 0.25); }}
         .badge-red {{ background: rgba(248, 81, 73, 0.12); color: #f85149; border-color: rgba(248, 81, 73, 0.25); }}
+        .badge-blue {{ background: rgba(56, 189, 248, 0.12); color: #38bdf8; border-color: rgba(56, 189, 248, 0.25); }}
+        .badge-purple {{ background: rgba(167, 139, 250, 0.12); color: #a78bfa; border-color: rgba(167, 139, 250, 0.25); }}
+        .badge-gray {{ background: rgba(255, 255, 255, 0.05); color: #94a3b8; border-color: rgba(255, 255, 255, 0.10); }}
+        .badge-emerald {{ background: rgba(16, 185, 129, 0.14); color: #34d399; border-color: rgba(16, 185, 129, 0.30); }}
+
 
         /* Section Header */
         .section-header {{
@@ -609,36 +655,59 @@ def inject_custom_css():
             color: #ffb74d !important;
         }}
 
-        /* Legacy Radio Fallback (Hidden) */
+        /* Institutional Radio Buttons Styling */
         div[data-testid="stRadio"] > div[role="radiogroup"] {{
-            display: inline-flex !important;
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 6px !important;
+            background: transparent !important;
+            border: none !important;
+            padding: 2px 0 !important;
+            margin: 6px 0 16px 0 !important;
+            width: 100% !important;
+        }}
+
+        /* Horizontal Radios */
+        div[data-testid="stRadio"] > div[role="radiogroup"][style*="flex-direction: row"],
+        div[data-testid="stRadio"] > div[role="radiogroup"][aria-orientation="horizontal"] {{
+            flex-direction: row !important;
             flex-wrap: wrap !important;
             align-items: center !important;
-            gap: 4px !important;
             background: rgba(13, 17, 23, 0.85) !important;
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 10px !important;
             padding: 4px !important;
-            margin: 6px 0 16px 0 !important;
         }}
 
         div[data-testid="stRadio"] > div[role="radiogroup"] > label {{
-            background: transparent !important;
-            border: 1px solid transparent !important;
-            border-radius: 7px !important;
-            padding: 6px 14px !important;
+            background: rgba(22, 27, 34, 0.6) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 8px !important;
+            padding: 8px 14px !important;
             cursor: pointer !important;
             transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
             margin: 0 !important;
-            display: inline-flex !important;
+            display: flex !important;
             align-items: center !important;
-            justify-content: center !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }}
+
+        div[data-testid="stRadio"] > div[role="radiogroup"][style*="flex-direction: row"] > label,
+        div[data-testid="stRadio"] > div[role="radiogroup"][aria-orientation="horizontal"] > label {{
+            background: transparent !important;
+            border: 1px solid transparent !important;
+            width: auto !important;
+            padding: 6px 14px !important;
         }}
 
         div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {{
-            background: rgba(255, 255, 255, 0.05) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(255, 255, 255, 0.06) !important;
+            border-color: rgba(255, 255, 255, 0.18) !important;
         }}
+
+
 
         /* 100% Elimination of Radio Circles, Inputs & Dots */
         div[data-testid="stRadio"] [role="radiogroup"] input[type="radio"],
@@ -1040,7 +1109,7 @@ def get_display_portfolio_name():
 
 
 def render_command_bar():
-    """Renderizza la barra di stato e comando ARGUS v5.24.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
+    """Renderizza la barra di stato e comando ARGUS v6.0.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
     try:
         from core.workspace_manager import sync_url_state
         sync_url_state()
@@ -2271,6 +2340,7 @@ def resolve_metric_knowledge(label: str, help_text: str = None) -> str:
 
 
 def metric_card(label: str, value: str, delta: str = None, positive: bool = True, help_text: str = None, is_positive: bool = None, delta_color: str = None):
+    has_explicit_sentiment = (is_positive is not None) or (delta_color is not None)
     if is_positive is not None:
         positive = is_positive
     elif delta_color is not None:
@@ -2280,6 +2350,7 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
             positive = False
         elif delta_color == "normal":
             positive = True
+
     import re
     import random
     
@@ -2287,12 +2358,24 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
     
     delta_html = ""
     if delta:
-        if positive is None:
-            delta_html = f'<div style="color: #8b949e; font-size: 11.5px; font-weight: 500; margin-top: 3px;">{delta}</div>'
+        d_str = str(delta).strip()
+        has_sign_prefix = d_str.startswith(("+", "-", "↑", "↓"))
+        
+        # Se non è specificato esplicitamente un colore o sentimento ed è un testo descrittivo senza +/-/↑/↓
+        if positive is None or (not has_sign_prefix and not has_explicit_sentiment):
+            delta_html = f'<div style="color: #8b949e; font-size: 11.5px; font-weight: 500; margin-top: 3px;">{d_str}</div>'
         else:
+            # Pulisci il testo per evitare collisioni di freccia e segno (+/-)
+            clean_d = d_str
+            if clean_d.startswith(("↑", "↓")):
+                clean_d = clean_d[1:].strip()
+            if clean_d.startswith(("+", "-")):
+                clean_d = clean_d[1:].strip()
+
             cls = "metric-delta-pos" if positive else "metric-delta-neg"
             arrow = "↑" if positive else "↓"
-            delta_html = f'<div class="{cls}">{arrow} {delta}</div>'
+            delta_html = f'<div class="{cls}">{arrow} {clean_d}</div>'
+
     
     modal_html = ""
     # Risolvi sempre il contenuto a 5 sezioni
@@ -2415,12 +2498,19 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
 </div>"""
     label_html = f'<div class="metric-label" style="display:flex; align-items:center; justify-content:space-between; gap:6px;"><span>{label}</span><label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
 
-    st.markdown(f"""{modal_html}
-<div class="metric-card">
-    {label_html}
-    <div class="metric-value">{value}</div>
-    {delta_html}
-</div>""", unsafe_allow_html=True)
+    card_html = (
+        f"{modal_html}"
+        f'<div class="metric-card">'
+        f'{label_html}'
+        f'<div style="flex: 1; display: flex; flex-direction: column; justify-content: center; margin: 4px 0 2px 0;">'
+        f'<div class="metric-value">{value}</div>'
+        f'{delta_html}'
+        f'</div>'
+        f'</div>'
+    )
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
 
 def section(title: str):
     st.markdown(f'<div class="section-header">{title}</div>', unsafe_allow_html=True)
@@ -2460,11 +2550,12 @@ def fmt_eur(v):
     sign = "-" if val < 0 else ""
     abs_v = abs(val)
     if abs_v >= 1_000_000_000:
-        return f"{sign}€{abs_v / 1_000_000_000:,.2f}B"
+        return f"{sign}€ {abs_v / 1_000_000_000:,.2f}B"
     elif abs_v >= 1_000_000:
-        return f"{sign}€{abs_v / 1_000_000:,.2f}M"
+        return f"{sign}€ {abs_v / 1_000_000:,.2f}M"
     else:
-        return f"{sign}€{abs_v:,.2f}"
+        return f"{sign}€ {abs_v:,.2f}"
+
 
 def fmt_eur_it(v, decimals: int = 0) -> str:
     """Formatta un controvalore monetario in standard italiano (punto come separatore delle migliaia)."""
@@ -3176,9 +3267,15 @@ def get_argus_eye_svg(size: int = 140, animated: bool = True, accent: str = None
     return svg
 
 
+def _clean_html(raw_html: str) -> str:
+    """Rimuove l'indentazione iniziale e le righe vuote per impedire a Markdown di interpretare l'HTML come blocco di codice."""
+    return "\n".join(line.strip() for line in raw_html.splitlines() if line.strip())
+
+
 def render_splash_screen(force_show: bool = False) -> bool:
     """
-    Renderizza la Schermata di Avvio Istituzionale (Splash Screen) con l'Occhio di Argus e il Boot Telemetrico.
+    Renderizza la Schermata di Avvio Istituzionale (Splash Screen) con l'Occhio di Argus,
+    il Boot Telemetrico stile Terminale macOS/Bloomberg e le schede dei due portali (Risk & Wealth).
     Restituisce True se la splash screen è attiva (bloccando il resto della pagina finché non si accede).
     """
     if "splash_dismissed" not in st.session_state:
@@ -3191,40 +3288,294 @@ def render_splash_screen(force_show: bool = False) -> bool:
         return False
 
     theme = st.session_state.get("ui_theme", "Midnight Obsidian")
-    accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#ff9900")
-    eye_svg = get_argus_eye_svg(size=140, animated=True, accent=accent)
+    accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#f59e0b")
+    eye_svg = get_argus_eye_svg(size=130, animated=True, accent=accent)
 
-    hide_sidebar_css = (
-        f'<style>'
-        f'section[data-testid="stSidebar"], [data-testid="stSidebar"], [data-testid="collapsedControl"] {{ display: none !important; }}'
-        f'</style>'
-    )
-    st.markdown(hide_sidebar_css, unsafe_allow_html=True)
+    hide_sidebar_css = """
+    <style>
+    section[data-testid="stSidebar"], [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0px !important;
+        height: 0px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    
+    /* Splash Container Animations & Styles */
+    .splash-container {
+        max-width: 900px;
+        margin: 10px auto 25px auto;
+        background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.96) 60%, rgba(10, 15, 29, 0.98) 100%);
+        border: 1px solid rgba(245, 158, 11, 0.35);
+        border-radius: 20px;
+        padding: 30px 28px 24px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 50px rgba(245, 158, 11, 0.10);
+        backdrop-filter: blur(20px);
+        text-align: center;
+    }
+    .splash-title {
+        font-size: 34px;
+        font-weight: 900;
+        letter-spacing: 6px;
+        background: linear-gradient(135deg, #ffffff 40%, #fbbf24 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 4px;
+    }
+    .splash-subtitle {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #f59e0b;
+        letter-spacing: 2.5px;
+        text-transform: uppercase;
+        margin-bottom: 12px;
+    }
+    .splash-desc {
+        font-size: 13px;
+        color: #94a3b8;
+        max-width: 660px;
+        margin: 0 auto 16px auto;
+        line-height: 1.5;
+    }
+    .splash-badge-ribbon {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+    .splash-pill {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        padding: 3px 10px;
+        border-radius: 12px;
+        font-size: 11px;
+        color: #cbd5e1;
+        font-weight: 500;
+    }
 
-    html_content = (
-        f'<div style="max-width:700px;margin:20px auto 30px auto;background:rgba(22,27,34,0.88);border:1px solid rgba(255,153,0,0.35);border-radius:18px;padding:32px 28px;box-shadow:0 16px 48px rgba(0,0,0,0.6), 0 0 30px {accent}22;backdrop-filter:blur(16px);text-align:center;">'
-        f'<div style="margin-bottom:16px;">{eye_svg}</div>'
-        f'<div style="font-size:32px;font-weight:800;letter-spacing:4px;color:#ffffff;margin-bottom:4px;">A R G U S</div>'
-        f'<div style="font-size:11px;font-weight:700;color:{accent};letter-spacing:2px;text-transform:uppercase;margin-bottom:12px;">INSTITUTIONAL RISK INTELLIGENCE &amp; VALUATION PLATFORM</div>'
-        f'<div style="font-size:12px;color:#8b949e;max-width:520px;margin:0 auto 20px auto;line-height:1.5;">Piattaforma quantitativa multi-asset per il monitoraggio del rischio di portafoglio, analisi econometrica Fama-French, stress testing storico e valutazione fondamentale.</div>'
-        f'<div style="background:rgba(13,17,23,0.8);border:1px solid rgba(255,255,255,0.08);border-radius:10px;padding:14px 18px;text-align:left;font-family:monospace;font-size:11px;color:#8b949e;margin-bottom:24px;line-height:1.8;">'
-        f'<div style="color:#3fb950;">[✓] Dual Data Ingestion Pipeline (Stocks &amp; Crypto) Online</div>'
-        f'<div style="color:#3fb950;">[✓] GIPS Standard Calendar Engine (365.25d Solar Span) Active</div>'
-        f'<div style="color:#3fb950;">[✓] Multi-Factor Risk Matrix (Carhart, Fama-French, MSCI Barra) Initialized</div>'
-        f'<div style="color:#3fb950;">[✓] Ledoit-Wolf Shrinkage &amp; FIFO Accounting Reconciliation Ready</div>'
-        f'<div style="color:{accent};font-weight:bold;">[●] ARGUS Terminal Ready for Operations</div>'
-        f'</div>'
-        f'</div>'
-    )
-    st.markdown(html_content, unsafe_allow_html=True)
+    /* Terminal Console Window */
+    .terminal-window {
+        background: rgba(10, 14, 23, 0.92);
+        border: 1px solid rgba(255, 255, 255, 0.10);
+        border-radius: 12px;
+        padding: 0;
+        text-align: left;
+        margin-bottom: 22px;
+        box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        overflow: hidden;
+    }
+    .terminal-header {
+        background: rgba(255, 255, 255, 0.04);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        padding: 7px 12px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .terminal-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+    .dot-green { background: #10b981; }
+    .terminal-title {
+        font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+        font-size: 10px;
+        color: #64748b;
+        margin-left: 8px;
+    }
+    .terminal-body {
+        padding: 12px 16px;
+        font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
+        font-size: 11px;
+        line-height: 1.8;
+    }
 
-    col_l, col_btn, col_r = st.columns([1, 2, 1])
-    with col_btn:
-        if st.button("🚀 ENTRA NEL TERMINALE →", key="btn_dismiss_splash_main", type="primary", use_container_width=True):
+    /* Portal Cards */
+    .portal-card-risk {
+        background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 0.85) 75%);
+        border: 1px solid rgba(99, 102, 241, 0.40);
+        border-top: 3px solid #6366f1;
+        border-radius: 16px;
+        padding: 20px 22px;
+        min-height: 205px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .portal-card-risk:hover {
+        border-color: #818cf8;
+        box-shadow: 0 12px 32px rgba(99, 102, 241, 0.25);
+        transform: translateY(-3px);
+    }
+
+    .portal-card-wealth {
+        background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.85) 75%);
+        border: 1px solid rgba(16, 185, 129, 0.40);
+        border-top: 3px solid #10b981;
+        border-radius: 16px;
+        padding: 20px 22px;
+        min-height: 205px;
+        margin-bottom: 14px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .portal-card-wealth:hover {
+        border-color: #34d399;
+        box-shadow: 0 12px 32px rgba(16, 185, 129, 0.25);
+        transform: translateY(-3px);
+    }
+
+    .portal-chips-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+    }
+    .portal-chip {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        padding: 2px 8px;
+        font-size: 10px;
+        font-weight: 600;
+        color: #cbd5e1;
+    }
+
+    /* Buttons */
+    div[data-testid="stButton"] button[key="btn_splash_risk"] {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+        border: 1px solid rgba(245, 158, 11, 0.8) !important;
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        font-size: 13px !important;
+        letter-spacing: 0.6px !important;
+        border-radius: 10px !important;
+        padding: 10px 20px !important;
+        box-shadow: 0 4px 18px rgba(245, 158, 11, 0.4) !important;
+        transition: all 0.25s ease !important;
+    }
+    div[data-testid="stButton"] button[key="btn_splash_risk"]:hover {
+        background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 24px rgba(245, 158, 11, 0.6) !important;
+    }
+
+    div[data-testid="stButton"] button[key="btn_splash_wealth"] {
+        background: linear-gradient(135deg, #10b981 0%, #0d9488 100%) !important;
+        border: 1px solid rgba(16, 185, 129, 0.8) !important;
+        color: #ffffff !important;
+        font-weight: 800 !important;
+        font-size: 13px !important;
+        letter-spacing: 0.6px !important;
+        border-radius: 10px !important;
+        padding: 10px 20px !important;
+        box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4) !important;
+        transition: all 0.25s ease !important;
+    }
+    div[data-testid="stButton"] button[key="btn_splash_wealth"]:hover {
+        background: linear-gradient(135deg, #34d399 0%, #059669 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.6) !important;
+    }
+    </style>
+    """
+    st.markdown(_clean_html(hide_sidebar_css), unsafe_allow_html=True)
+
+    html_content = f"""
+    <div class="splash-container">
+        <div style="margin-bottom:12px; filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.35));">{eye_svg}</div>
+        <div class="splash-title">A R G U S</div>
+        <div class="splash-subtitle">FINANCIAL ECOSYSTEM &amp; QUANTITATIVE INTELLIGENCE</div>
+        <div class="splash-desc">
+            Suite istituzionale integrata per l'analisi avanzata del rischio di portafoglio, stress testing macroeconomico, consolidamento del patrimonio netto e simulazione dell'indipendenza finanziaria.
+        </div>
+        
+        <div class="splash-badge-ribbon">
+            <span class="splash-pill">🟢 <b>v6.0.0</b> Institutional Ecosystem</span>
+            <span class="splash-pill">⚡ <b>21 Moduli</b> Istituzionali</span>
+            <span class="splash-pill">🔒 <b>Zero-Cloud Leak</b> Crittografia Locale</span>
+            <span class="splash-pill">🗄️ <b>MySQL 8.0 &amp; DuckDB</b> Dual-Engine</span>
+        </div>
+
+        <div class="terminal-window">
+            <div class="terminal-header">
+                <span class="terminal-dot dot-red"></span>
+                <span class="terminal-dot dot-yellow"></span>
+                <span class="terminal-dot dot-green"></span>
+                <span class="terminal-title">argus-kernel --environment production --telemetry ok</span>
+            </div>
+            <div class="terminal-body">
+                <div style="color:#34d399;"><span style="color:#64748b;">[✓]</span> <b>RISK CORE:</b> Dual Ingestion (Stocks &amp; Crypto) &bull; VaR/CVaR, Copula &amp; Markowitz Frontier Online</div>
+                <div style="color:#38bdf8;"><span style="color:#64748b;">[✓]</span> <b>WEALTH CORE:</b> Consolidated Multi-Account Ledger &bull; 50/30/20 &amp; Pension Monte Carlo Active</div>
+                <div style="color:#a78bfa;"><span style="color:#64748b;">[✓]</span> <b>TAX &amp; ESTATE:</b> IVAFE / Quadro RW, Zainetto Minus &bull; Ammortamento Mutui &amp; Successione Online</div>
+                <div style="color:#fbbf24; font-weight:bold;"><span style="color:#f59e0b;">[⚡]</span> <b>BOOT READY:</b> Seleziona l'Ambiente Operativo sottostante per Iniziare la Sessione</div>
+            </div>
+        </div>
+    </div>
+    """
+    st.markdown(_clean_html(html_content), unsafe_allow_html=True)
+
+    col_risk, col_wealth = st.columns(2)
+    with col_risk:
+        risk_card_html = """
+        <div class="portal-card-risk">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                <span style="font-size: 17px; font-weight: 800; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
+                <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">11 MODULI QUANT</span>
+            </div>
+            <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
+                Piattaforma quantitativa per analisi del rischio di portafoglio, backtesting Kupiec, stress testing MSCI Barra, frontiera efficiente e BQuant Launchpad.
+            </div>
+            <div class="portal-chips-row">
+                <span class="portal-chip">📉 VaR &amp; CVaR</span>
+                <span class="portal-chip">🔬 Markowitz &amp; Copula</span>
+                <span class="portal-chip">🌪️ Stress Testing</span>
+                <span class="portal-chip">🔍 Screener Multi-Fattore</span>
+                <span class="portal-chip">💻 BQuant Sandbox</span>
+            </div>
+        </div>
+        """
+        st.markdown(_clean_html(risk_card_html), unsafe_allow_html=True)
+        if st.button("🚀 ENTRA IN RISK ANALYTICS →", key="btn_splash_risk", type="primary", use_container_width=True):
             st.session_state.splash_dismissed = True
+            st.session_state.argus_portal_mode = "📊 Risk Analytics"
             st.rerun()
 
+    with col_wealth:
+        wealth_card_html = """
+        <div class="portal-card-wealth">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                <span style="font-size: 17px; font-weight: 800; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
+                <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">10 MODULI WEALTH</span>
+            </div>
+            <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
+                Consolidamento patrimoniale olistico, budget 50/30/20, caveau orologi, previdenza, fiscalità Quadro RW, mutui &amp; immobili, successione e AI Copilot.
+            </div>
+            <div class="portal-chips-row">
+                <span class="portal-chip">🏛️ Net Worth</span>
+                <span class="portal-chip">💳 Cash Flow</span>
+                <span class="portal-chip">📑 Quadro RW</span>
+                <span class="portal-chip">🏡 Immobili &amp; Mutui</span>
+                <span class="portal-chip">⚖️ Successione</span>
+                <span class="portal-chip">🤖 AI Copilot</span>
+            </div>
+        </div>
+        """
+        st.markdown(_clean_html(wealth_card_html), unsafe_allow_html=True)
+
+        if st.button("💎 ENTRA IN WEALTH MANAGEMENT →", key="btn_splash_wealth", use_container_width=True):
+            st.session_state.splash_dismissed = True
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+            st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
+
     return True
+
+
+
+
+
 
 
 def render_control_room_hero():
@@ -3806,5 +4157,139 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
             )
         else:
             st.info("Nessun dato di ranking settoriale disponibile.")
+
+
+# ── WEALTH INSTITUTIONAL DIRECTIVES & UX HELPERS ─────────────
+
+def ensure_wealth_bundle_loaded(engine, default_profile_name: str = "Marco Rossi (Family Office)") -> tuple:
+    """
+    Assicura che un profilo patrimoniale Wealth valido sia attivo in session_state.
+    Se nessun profilo esiste nel DB, inizializza automaticamente il profilo demo istituzionale.
+    Ritorna (portfolio_id, profile_name, is_demo, net_worth_summary).
+    """
+    from core.wealth.wealth_db import get_wealth_portfolios, create_wealth_portfolio, init_wealth_db
+    from core.wealth.wealth_engine import compute_consolidated_net_worth
+    
+    init_wealth_db(engine)
+    df_prof = get_wealth_portfolios(engine)
+    
+    if df_prof.empty:
+        pid = create_wealth_portfolio(engine, name=default_profile_name, owner="Family Office Principal", base_currency="EUR")
+        st.session_state["wealth_active_portfolio_id"] = pid
+        df_prof = get_wealth_portfolios(engine)
+        is_demo = True
+    else:
+        pid = st.session_state.get("wealth_active_portfolio_id")
+        if pid is None or pid not in df_prof["portfolio_id"].values:
+            pid = int(df_prof.iloc[0]["portfolio_id"])
+            st.session_state["wealth_active_portfolio_id"] = pid
+        is_demo = False
+
+    prof_name = str(df_prof.loc[df_prof["portfolio_id"] == pid, "name"].values[0]) if not df_prof.empty and pid in df_prof["portfolio_id"].values else default_profile_name
+    nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+    
+    return pid, prof_name, is_demo, nw
+
+
+def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suffix: str = "w"):
+    """Renderizza la command bar istituzionale ARGUS Wealth v6.0.0 in cima a ciascuna pagina Wealth."""
+    base_curr = st.session_state.get("base_currency", "EUR")
+    
+    col_bar1, col_bar2 = st.columns([1.3, 1.1])
+    with col_bar1:
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; gap: 8px; padding: 2px 0; height: 38px;">
+            <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981;"></span>
+            <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+                ARGUS WEALTH
+            </span>
+            <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
+            <span style="color:#34d399; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <span>🏛️</span> {prof_name}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_bar2:
+        c_pills, c_btn = st.columns([1.7, 1.0])
+        with c_pills:
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 38px;">
+                <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
+                <div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">
+                    🏷️ <b>50/30/20</b>
+                </div>
+                <div class="argus-command-pill" style="background:rgba(56, 189, 248, 0.10); border-color:rgba(56, 189, 248, 0.28); color:#38bdf8;">
+                    <span style="width:6px; height:6px; border-radius:50%; background:#38bdf8; display:inline-block; margin-right:5px;"></span>FAMILY OFFICE
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        with c_btn:
+            with st.popover("📥 Master Excel", use_container_width=True, help="Esporta il Dossier Master Excel a 10 fogli (Net Worth, Spese, Immobili, Previdenza e Successione)"):
+                st.markdown("##### 📥 Esporta Master Dossier Excel")
+                st.caption(f"Profilo: **{prof_name}** | Formato: **Excel Multi-Sheet (.xlsx)**")
+                if st.button("⚡ Genera ed Esporta Dossier (.xlsx)", key=f"btn_gen_excel_{key_suffix}", type="primary", use_container_width=True):
+                    try:
+                        import importlib
+                        import core.wealth.wealth_engine
+                        import core.wealth.wealth_exporter
+                        importlib.reload(core.wealth.wealth_engine)
+                        importlib.reload(core.wealth.wealth_exporter)
+                        from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
+                        excel_bytes = export_wealth_master_excel_workbook(engine, portfolio_id=current_pid)
+                        st.download_button(
+                            "💾 Clicca qui per Scaricare .XLSX",
+                            data=excel_bytes.getvalue(),
+                            file_name=f"argus_wealth_master_{prof_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key=f"btn_dl_wealth_master_ready_{key_suffix}",
+                            use_container_width=True
+                        )
+                    except Exception as ex:
+                        st.error(f"Errore durante l'esportazione: {ex}")
+
+
+
+
+def render_wealth_executive_badges(net_worth_summary):
+    """Renderizza la striscia di badge quantitativi sintetici in stile Private Banking perfettamente allineata al Risk Core."""
+    nw = net_worth_summary
+    
+    # 1. Health Score Badge
+    score = nw.wealth_health_score
+    if score >= 80:
+        score_badge = f'<span class="executive-badge badge-green">🟢 Solidità Eccellente ({score:.0f}/100)</span>'
+    elif score >= 60:
+        score_badge = f'<span class="executive-badge badge-yellow">🟡 Solidità Moderata ({score:.0f}/100)</span>'
+    else:
+        score_badge = f'<span class="executive-badge badge-red">🔴 Solidità da Consolidare ({score:.0f}/100)</span>'
+
+    # 2. Runway Badge
+    runway = nw.runway_months
+    if runway >= 12.0:
+        runway_badge = f'<span class="executive-badge badge-green">🛡️ Runway Solido ({runway:.1f} Mesi)</span>'
+    elif runway >= 6.0:
+        runway_badge = f'<span class="executive-badge badge-yellow">🟡 Runway Adeguato ({runway:.1f} Mesi)</span>'
+    else:
+        runway_badge = f'<span class="executive-badge badge-red">🔴 Riserva Vulnerabile ({runway:.1f} Mesi)</span>'
+
+    # 3. Savings Rate Badge
+    sav = nw.savings_rate_pct
+    if sav >= 20.0:
+        sav_badge = f'<span class="executive-badge badge-green">📈 Risparmio Elevato ({sav:.1f}%)</span>'
+    elif sav >= 10.0:
+        sav_badge = f'<span class="executive-badge badge-yellow">🟡 Risparmio Moderato ({sav:.1f}%)</span>'
+    else:
+        sav_badge = f'<span class="executive-badge badge-red">🔴 Risparmio Ridotto ({sav:.1f}%)</span>'
+
+    # 4. Net Worth Pill
+    nw_badge = f'<span class="executive-badge badge-emerald">🏛️ Net Worth: <b>€ {nw.total_net_worth:,.2f}</b></span>'
+
+    # 5. Security Pill
+    sec_badge = '<span class="executive-badge badge-gray">🔒 Zero-Cloud Crittografia Locale</span>'
+
+    st.markdown(f'<div style="margin-top: 4px; margin-bottom: 8px;">{nw_badge}{score_badge}{runway_badge}{sav_badge}{sec_badge}</div>', unsafe_allow_html=True)
+
+
 
 

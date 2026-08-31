@@ -1,11 +1,11 @@
-# ARGUS - Risk Analytics Platform
+# ARGUS - Risk Analytics & Wealth Intelligence Platform
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-5.24.0-blue.svg)
+![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-250%2F250%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-309%2F309%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -58,7 +58,9 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 
 ---
 
-## 🚀 Caratteristiche Chiave & Moduli Operativi (12 Moduli Operativi)
+## 🚀 Caratteristiche Chiave & Moduli Operativi (21 Moduli Istituzionali)
+
+### 🏛️ SEZIONE 1: QUANTITATIVE RISK & PORTFOLIO BI (Moduli 0 – 11)
 
 ### 0. 🎛️ Control Room & Total Wealth Hub (`src/0_Control_Room.py`)
 * **⚡ Motore Analitico Embedded DuckDB & SQL Sandbox**: Esecuzione in-process vettorizzata SIMD per aggregazioni OLAP sub-millisecondo, preset istituzionali 1-click (Cubi Multi-Dimensionali, Window Functions `QUALIFY`, Storico Volumi/Commissioni, Matrice FX), console SQL interattiva ed esportazione compressa in formato **Apache Parquet**.
@@ -148,6 +150,65 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🐍 Console Python Interattiva In-App (Bloomberg BQuant Style)**: Editor di codice Python integrato con iniezione dinamica in-memory dei DataFrame di sessione (`df_positions`, `df_returns`, `df_prices`, `results`), query SQL vettoriali ad alta velocità con DuckDB in-process, cattura automatica di stdout, tabelle `df_out` con download CSV e grafici Plotly interattivi con 5 snippet quantitativi istituzionali preimpostati.
 * **🎛️ ARGUS Launchpad & Role Workspace Customizer**: Configurazione rapida dell'ambiente operativo basata su 5 profili istituzionali predefiniti (*Trading Desk & Execution*, *Risk Officer & Compliance*, *Portfolio Manager & CIO*, *Quantitative Analyst & Data Scientist*, *Corporate Treasurer & Fixed Income*) con 1-Click Fast Teleportation verso i moduli primari, Live Role KPI Cockpit e persistenza delle preferenze su SQLite locale.
 * **📊 Excel Live Connector & Bloomberg RTD Formula Generator**: Costruttore visuale di formule Excel compatibili Bloomberg Terminal (`=ARGUS_BDP`, `=ARGUS_BDH`, `=ARGUS_RISK`), generatore di codice VBA Desktop (`.bas`), Microsoft Office Scripts TypeScript (`.ts`) per Excel 365/Web ed esportatore di workbook istituzionali multi-foglio formattati (`Executive_Summary`, `Positions_Portfolio`, `Fixed_Income_YAS`, `Execution_Schedule`).
+
+---
+
+### 💎 SEZIONE 2: WEALTH MANAGEMENT & PERSONAL FINANCE (Moduli 12 – 21)
+
+### 12. 🎛️ Wealth Control Room (`src/pages/12_🎛️_Wealth_Control_Room.py`)
+* **🏛️ Master Wealth Hub & Multi-Account Management**: Centro di comando unificato per la gestione di conti correnti, depositi, conti titoli, carte e passività con switch dinamico tra profili patrimoniali.
+* **🔄 Live Sync Google Sheets & Transazioni**: Sincronizzazione automatica da fogli Google con categorizzazione semantica, supporto multi-banca e associazione automatica conti.
+* **🩺 Diagnostica di Bilancio & Master Excel Workbook**: Health Check del bilancio personale ed esportazione del Master Workbook Excel multi-tab (.xlsx) con bilancio patrimoniale consolidato.
+
+### 13. 🏛️ Patrimonio & Net Worth Consolidato (`src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)
+* **🏛️ Consolidamento a 5 Livelli**: Aggregazione in tempo reale di Liquidità, Investimenti Finanziari (collegamento dinamico a portafogli Risk), Asset Fisici/Caveau, Previdenza Integrativa e Passività.
+* **🏆 Wealth Health Score (0-100)**: Punteggio sintetico di salute patrimoniale calcolato su 5 pilastri: Riserva di Liquidità, Tasso di Risparmio, Diversificazione, Copertura Previdenziale e Grado di Indebitamento (DTI).
+* **📊 Trend Storico & Snapshot Temporali**: Storicizzazione dei bilanci patrimoniali e monitoraggio della crescita del capitale nel tempo.
+
+### 14. 💳 Cash Flow, Budgeting 50/30/20 & Spese (`src/pages/14_💳_Cash_Flow_e_Spese.py`)
+* **📊 Libro Mastro Entrate & Uscite**: Analisi granulare dei flussi di cassa, scomposizione per categorie di spesa e monitoraggio del tasso di risparmio mensile.
+* **⚖️ Regola del 50/30/20 & Zero-Based Budgeting**: Valutazione automatica della ripartizione tra Bisogni Primari (50%), Desideri/Discrezionali (30%) e Risparmio/Investimenti (20%).
+* **🔁 Subscription Sentinel & Cumulative Opportunity Drag**: Rilevamento automatico degli abbonamenti ricorrenti e delle rate a termine (da `Config_FixedExpenses`), con stima del capitale perso se investito al 7% annuo su 5, 10 e 20 anni.
+* **🔮 Rolling Cash Flow Forecast & Z-Score Anomalies**: Proiezioni probabilistiche di cassa a 3 e 6 mesi (bande P10/P50/P90) e rilevamento statistico delle uscite straordinarie anomale ($Z \ge 1.8$).
+
+### 15. ⌚ Asset Illiquidi, Caveau & Orologi di Lusso (`src/pages/15_⌚_Asset_Illiquidi_e_Orologi.py`)
+* **🪙 Caveau Metalli Preziosi**: Gestione metalli da investimento (Oro 18K/24K, Argento) con rivalutazione automatica al prezzo spot e calcolo plusvalenze.
+* **⌚ Collezione Orologi di Lusso**: Inventario orologi da collezione (Rolex, Omega, Patek Philippe, ecc.) con tracciamento referenza, corredo, grado di conservazione e pricing di mercato.
+* **💧 Matrice di Liquidabilità**: Mappatura del tempo medio di smobilizzo (Days-to-Cash) e haircut prudenziale in caso di liquidazione rapida.
+
+### 16. 🛡️ Previdenza & Pension Planning (`src/pages/16_🛡️_Previdenza_e_Pension_Planning.py`)
+* **🎲 Simulazione Monte Carlo Fondo Pensione**: Proiezione stocastica del montante pensionistico a 10.000 scenari con calcolo rendita mensile attesa post-tassazione agevolata (15% $\rightarrow$ 9%).
+* **💼 Rivalutazione TFR (Trattamento di Fine Rapporto)**: Calcolo contabile della rivalutazione annuale di legge ($1.5\% + 75\% \text{ FOI}$) e confronto rendimento TFR in azienda vs Fondo Pensione negoziale/aperto.
+* **🏛️ Gap Previdenziale & Tasso di Sostituzione**: Stima della pensione pubblica INPS attesa e quantificazione del gap reddituale rispetto all'ultimo stipendio.
+
+### 17. 🔥 Indipendenza Finanziaria & FIRE Engine (`src/pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py`)
+* **🧮 Calcolatore FIRE Dinamico**: Determinazione del FIRE Number per 4 archetipi (*Standard FIRE 100%*, *Lean FIRE 70%*, *Fat FIRE 135%*, *Coast FIRE*).
+* **🌪️ Ponte Wealth ⇄ Risk Management**:
+  * **Fondo Anti-Forced Selling (Liquidity-at-Risk)**: Calibrazione dinamica dei mesi di runway in funzione del 95% CVaR e della volatilità di mercato per azzerare il rischio di vendite forzate in drawdown.
+  * **Net Worth-at-Risk (NWaR)**: Stress test macroeconomico consolidato su shock sistemici (*Crisi 2008*, *Stagflazione*, *Crypto Winter*, *Job Loss*).
+  * **Dynamic Safe Withdrawal Rate (SWR)**: Tasso di prelievo sicuro con regime switching anticiclico (*3.2% Crisi*, *3.8% Normale*, *4.2% Bull Market*).
+* **🎯 Goal-Based 3-Bucket Allocator**: Allocazione temporale del capitale su 3 bucket (*Sicurezza 0-2a*, *Obiettivi 2-7a*, *Crescita >7a*) e monitoraggio traguardi di vita.
+
+### 18. 📑 Fiscalità, Quadro RW & Tax-Loss Harvesting (`src/pages/18_📑_Fiscalita_e_Quadro_RW.py`)
+* **🏛️ Ripartizione Fiscale Italia vs Estero**: Monitoraggio dell'incidenza tributaria patrimoniale (Imposta di Bollo IT 0,20% vs IVAFE estera).
+* **🌾 Motore di Tax-Loss Harvesting**: Identificazione quantitativa delle posizioni in perdita latente da realizzare strategicamente entro il 31 dicembre per compensare lo zainetto fiscale quadriennale.
+* **🛡️ Simulatore Deduzione IRPEF Fondo Pensione**: Calcolo del credito IRPEF recuperabile in busta paga (Modello 730) saturando il plafond di € 5.164,57 per gli scaglioni al 23%, 35% e 43%.
+* **📑 Monitoraggio Monitoraggio Fiscale Quadro RW & Criptovalute**.
+
+### 19. 🏡 Immobili, Mutui & Buy vs Rent (`src/pages/19_🏡_Immobili_e_Mutui.py`)
+* **📐 Piani di Ammortamento Mutuo**: Simulatore mutui a tasso fisso e variabile con calcolo quota capitale, quota interessi, debito residuo e impatto di estinzioni anticipate parziali.
+* **🏢 Real Estate ROI & Cap Rate**: Valutazione del rendimento lordo/netto da locazione, Cash-on-Cash Return e incidenza imposte (Cedolare Secca vs IRPEF, IMU).
+* **⚖️ Buy vs Rent Analyzer**: Modello comparativo a valore attuale netto (NPV) tra acquisto prima casa con mutuo vs affitto con investimento del capitale risparmiato.
+
+### 20. ⚖️ Pianificazione Successoria & Asse Ereditario (`src/pages/20_⚖️_Pianificazione_Successoria.py`)
+* **📜 Asse Ereditario & Quote di Legittima**: Calcolo automatico della quota di riserva e della quota disponibile secondo il Codice Civile per coniuge, figli e ascendenti.
+* **🏛️ Calcolo Imposte di Successione & Donazione**: Stima delle imposte applicabili con franchigie di legge (€ 1.000.000 per parenti in linea retta, € 100.000 per fratelli/sorelle) e imposte ipo-catastali.
+* **🛡️ Strumenti di Protezione Patrimoniale**: Analisi di polizze vita (esenti da imposta di successione), patti di famiglia, holding familiari e trust.
+
+### 21. 🤖 AI Wealth Copilot & Advisor (`src/pages/21_🤖_AI_Copilot_e_Advisor.py`)
+* **🧠 Diagnostica Patrimoniale AI**: Analisi automatica in linguaggio naturale dello stato di salute patrimoniale, cash flow ed esposizione al rischio.
+* **💬 Assistente Finanziario Interattivo**: Chatbot avanzato con accesso in tempo reale al bilancio consolidato, budget e simulazioni FIRE.
+* **📄 Generatore Report Istituzionali**: Creazione di Tear Sheet patrimoniali completi e sintesi esecutive stampabili.
 
 ---
 
@@ -272,6 +333,16 @@ argus-risk-analytics/
 │   │   ├── revolut.py
 │   │   ├── scalable.py
 │   │   └── traderepublic.py
+│   ├── wealth/                  # Wealth Management & Personal Finance Subsystem
+│   │   ├── __init__.py
+│   │   ├── wealth_db.py         # Database SQLite/MySQL & Layer relazionale Wealth
+│   │   ├── wealth_engine.py     # Motore analitico FIRE, Ammortamenti, Real Estate & NWaR
+│   │   ├── wealth_exporter.py   # Esportatore Master Workbook Excel (.xlsx)
+│   │   ├── wealth_importer.py   # Parser universale estratti conto bancari
+│   │   ├── wealth_models.py     # Schemi e dataclass di bilancio personale
+│   │   ├── wealth_snapshot.py   # Gestione snapshot patrimoniali temporali
+│   │   ├── wealth_sync.py       # Sincronizzazione Google Sheets & Config_FixedExpenses
+│   │   └── wealth_validator.py  # Validazione template e formati bancari italiani
 │   ├── advanced_quant.py        # Tail Copulas, Kelly Criterion & Equal Risk Contribution (ERC)
 │   ├── advisor.py               # ARGUS Quant Advisor & Health Score Engine
 │   ├── ai_analyst.py            # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
@@ -281,6 +352,7 @@ argus-risk-analytics/
 │   ├── cache_shield.py          # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
 │   ├── closed_trades.py         # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
 │   ├── corporate_actions.py     # Corporate Actions, Stock Splits & Stock Dividends Engine
+│   ├── crypto_provider.py       # Aggregatore multi-provider crypto (Binance, Kraken, CoinGecko)
 │   ├── crypto_tax_engine.py     # Fisco Cripto-Attività, Quadri RT/RW/IVAFE & Zainetto Cripto
 │   ├── db_exporter.py           # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
 │   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
@@ -298,6 +370,7 @@ argus-risk-analytics/
 │   ├── hedging.py               # Copertura Beta-Neutral & Tail Risk Protection
 │   ├── hrp_optimizer.py         # Hierarchical Risk Parity (HRP - Marcos López de Prado)
 │   ├── html_exporter.py         # Exporter Report Standalone HTML
+│   ├── macro_provider.py        # Connettore dati macroeconomici FRED, BCE & Term Structure
 │   ├── metadata_resolver.py     # Risoluzione metadati e anagrafiche asset
 │   ├── models.py                # Schema ORM SQLAlchemy (MySQL & SQLite)
 │   ├── multi_portfolio.py       # Total Wealth Multi-Account Registry, Scorecard & Consolidator
@@ -311,7 +384,7 @@ argus-risk-analytics/
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── sidebar.py               # Navigation Rail v5.24.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v6.0.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
@@ -325,6 +398,7 @@ argus-risk-analytics/
 ├── data/                        # Dataset di input & database SQLite fallback
 │   ├── portfolio_transactions_realistic.csv # Dataset realistico multi-asset multi-valuta (EUR, USD, GBP, CHF)
 │   ├── argus_workspaces.db      # Database SQLite per persistenza profili Launchpad
+│   ├── argus_wealth.db          # Database SQLite locale Wealth Ecosystem
 │   └── .gitkeep
 ├── docker/                      # File di containerizzazione Docker
 │   └── Dockerfile
@@ -332,7 +406,7 @@ argus-risk-analytics/
 │   ├── CSV_Format_Specification.md # Specifica tecnica formato CSV & DeGiro
 │   ├── DESIGN.md                # Design System & UI Specs
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v5.18.0)
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v6.0.0)
 │   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
@@ -346,7 +420,8 @@ argus-risk-analytics/
 ├── notebooks/                   # Jupyter Notebooks di prototyping quantitativo
 │   └── test_pipeline.ipynb
 ├── scripts/                     # Script di Build, Schema SQL e Pacchettizzazione
-│   ├── DB.sql                   # Schema DDL Data Warehouse MySQL 8.0
+│   ├── DB.sql                   # Schema DDL Data Warehouse MySQL 8.0 (Risk & Assets)
+│   ├── DB_wealth.sql            # Schema DDL Wealth Management MySQL 8.0
 │   ├── build_desktop_app.py     # Automazione compilazione PyInstaller (.exe)
 │   ├── create_desktop_shortcut.py # Generatore collegamento Desktop con icona (.lnk)
 │   ├── export_star_schema.py    # Generatore pacchetto ZIP Star Schema per Power BI
@@ -354,20 +429,31 @@ argus-risk-analytics/
 │   ├── generate_icon.py         # Generatore icona ICO multi-risoluzione
 │   ├── package_release.py       # Pacchettizzatore Release ZIP
 │   └── test_run.py              # Script di esecuzione e verifica rapida
-├── src/                         # Codice sorgente dell'applicazione Streamlit (11 Moduli Operativi)
+├── src/                         # Codice sorgente dell'applicazione Streamlit (21 Moduli Operativi)
 │   ├── 0_Control_Room.py        # Entry point principale, Total Wealth Hub & Control Room
-│   └── pages/                   # Moduli e viste (1..10) della dashboard
+│   └── pages/                   # Moduli e viste della dashboard (1..21)
 │       ├── 1_📈_Dashboard_Generale.py
-│       ├── 2_🔴_Analisi_Rischio.py
-│       ├── 3_🔬_Modelli_Quantitativi.py
-│       ├── 4_📋_Posizioni_e_Dettagli.py
-│       ├── 5_🏛️_Valutazione_Aziendale.py
-│       ├── 6_🌪️_Stress_Testing.py
-│       ├── 7_📊_Analisi_Temporale.py
-│       ├── 8_📈_Analisi_Tecnica.py
-│       ├── 9_🔍_Screener_Opportunita.py
-│       └── 10_💻_BQuant_e_Launchpad.py
-├── tests/                       # Test suite automatizzata PyTest (217 Test su 50 File)
+│       ├── 2_🖥️_Live_Terminal.py
+│       ├── 3_🔴_Analisi_Rischio.py
+│       ├── 4_🔬_Modelli_Quantitativi.py
+│       ├── 5_📋_Posizioni_e_Dettagli.py
+│       ├── 6_🏛️_Valutazione_Aziendale.py
+│       ├── 7_🌪️_Stress_Testing.py
+│       ├── 8_📊_Analisi_Temporale.py
+│       ├── 9_📈_Analisi_Tecnica.py
+│       ├── 10_🔍_Screener_Opportunita.py
+│       ├── 11_💻_BQuant_e_Launchpad.py
+│       ├── 12_🎛️_Wealth_Control_Room.py
+│       ├── 13_🏛️_Patrimonio_e_NetWorth.py
+│       ├── 14_💳_Cash_Flow_e_Spese.py
+│       ├── 15_⌚_Asset_Illiquidi_e_Orologi.py
+│       ├── 16_🛡️_Previdenza_e_Pension_Planning.py
+│       ├── 17_🔥_Indipendenza_Finanziaria_e_FIRE.py
+│       ├── 18_📑_Fiscalita_e_Quadro_RW.py
+│       ├── 19_🏡_Immobili_e_Mutui.py
+│       ├── 20_⚖️_Pianificazione_Successoria.py
+│       └── 21_🤖_AI_Copilot_e_Advisor.py
+├── tests/                       # Test suite automatizzata PyTest (309 Test su 55 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_quant.py
 │   ├── test_advisor.py
@@ -380,6 +466,7 @@ argus-risk-analytics/
 │   ├── test_cache_shield_and_diagnostics.py
 │   ├── test_closed_trades.py
 │   ├── test_corporate_actions.py
+│   ├── test_crypto_provider.py
 │   ├── test_crypto_tax.py
 │   ├── test_custom_stress.py
 │   ├── test_diversification.py
@@ -399,6 +486,7 @@ argus-risk-analytics/
 │   ├── test_hrp_optimizer.py
 │   ├── test_html_exporter.py
 │   ├── test_kmeans_elbow.py
+│   ├── test_macro_provider.py
 │   ├── test_merton_and_isolation_forest.py
 │   ├── test_ml_and_3d_features.py
 │   ├── test_monte_carlo_ui.py
@@ -412,13 +500,19 @@ argus-risk-analytics/
 │   ├── test_screener_engine.py
 │   ├── test_sec_rag.py
 │   ├── test_tax_engine.py
+│   ├── test_tax_engine_deep_stress.py
 │   ├── test_tax_engine_edge_cases.py
 │   ├── test_technical_analysis.py
+│   ├── test_temporal_engine.py
+│   ├── test_terminal_engine.py
 │   ├── test_validator.py
 │   ├── test_var_backtest.py
 │   ├── test_var_cvar.py
 │   ├── test_var_lookback.py
 │   ├── test_volatility_surface.py
+│   ├── test_wealth_engine.py
+│   ├── test_wealth_sync.py
+│   ├── test_wealth_validator.py
 │   ├── test_workspace_manager.py
 │   └── test_yield_curve.py
 ├── .env.example                 # Esempio configurazione variabili d'ambiente
@@ -441,7 +535,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **250 test automatizzati PyTest** distribuiti su 54 file di test con copertura end-to-end del 100%:
+Il progetto include **309 test automatizzati PyTest** distribuiti su 55 file di test con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -449,7 +543,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 250 passed in ~38.00s =============================
+============================= 309 passed in ~130.00s =============================
 ```
 
 ---
@@ -460,4 +554,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk Intelligence, AI Analytics & Portfolio Platform v5.23.0.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.0.0.*

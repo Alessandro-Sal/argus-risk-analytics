@@ -41,51 +41,56 @@ jobs:
           overwrite: true
           make_latest: true
           body: |
-            # 👁️ ARGUS Risk Analytics Platform — Production Release v5.14.0
+            # 👁️ ARGUS Risk Analytics & Wealth Platform — Production Release v6.0.0
 
-            Benvenuti nella release ufficiale di **ARGUS v5.14.0**, la piattaforma avanzata di **Business Intelligence, Financial Valuation, AI Narrative Intelligence, Forensic Accounting e Quantitative Risk Management**.
+            Benvenuti nella release ufficiale di **ARGUS v6.0.0**, l'ecosistema integrato di **Quantitative Risk Management, Portfolio BI, BQuant Analytics, Wealth Management & Personal Finance Intelligence**.
 
             ---
 
             ### 📦 Download Archivio Release (Zero-Setup)
-            * **File**: `ARGUS_v5.14.0.zip`
+            * **File**: `ARGUS_v6.0.0.zip`
             * **Compatibilità**: Windows 10 / 11 (64-bit), macOS, Linux
             * **Caratteristiche**:
               * ⚡ **Zero-Setup**: Nessuna necessità di configurare database esterni.
-              * 🖥️ **Interfaccia Web & Desktop Native**: Rendering fluido ad alte prestazioni.
-              * 💾 **Persistenza & Caching**: Database SQLite locale e cache intelligente per schermare rate-limit API.
+              * 🖥️ **Interfaccia Web & Desktop Native**: Rendering fluido a 21 moduli con Navigation Rail istituzionale.
+              * 💾 **Persistenza & Caching**: Dual-Engine (SQLite locale & MySQL 8.0/DuckDB) con crittografia end-to-end.
 
             ---
 
-            ### ✨ Novità Principali & Moduli Inclusi (10 Moduli)
+            ### ✨ Novità Principali & Moduli Inclusi (21 Moduli)
 
-            1. **🎛️ Control Room & Total Wealth Hub**:
-               * Ingestione dati multi-formato (CSV, DeGiro, Google Sheets Live Sync), consolidamento Master Portfolio e **Gestione Anagrafica ISIN / Ticker DB (`asset_mapping`)**.
-            2. **🧠 ARGUS AI Analyst & Quant Copilot**:
-               * Generazione automatica di Executive Memorandum narrativi in 4 sezioni (Gemini / OpenAI API / NLG Deterministico Offline 100%) e assistente interattivo integrato per interrogare il portafoglio.
-            3. **🧬 Modelli Quantitativi di Frontiera**:
-               * *Tail Copulas Asimmetriche (Clayton & Gumbel)* per il rischio di crash congiunto non lineare, *Criterio di Kelly & Half-Kelly Position Sizing* e *Equal Risk Contribution (ERC / Risk Parity Pura)*.
-            4. **🗂️ Total Wealth Hub (Multi-Account)**:
-               * Gestione e salvataggio profili multi-conto (*Crescita*, *Dividendi*, *Previdenza*), scorecard comparativa affiancata e consolidamento automatico in Master Wealth Portfolio.
-            5. **🔍 Spotlight Command Palette (`Ctrl+K`)**:
-               * Ricerca globale istantanea su tutti i 10 moduli, oltre 30 sottomoduli, ticker di portafoglio e scorciatoie di sistema.
-            6. **🧪 Live Rebalancing Sandbox (What-If Weight Matrix)**:
-               * Simulatore di ribilanciamento in tempo reale con slider e 5 preset quantitativi (*Pesi Attuali*, *Equipesato*, *Max Sharpe*, *Min Volatilità*, *Equal Risk ERC*).
-            7. **📊 Dynamic Multi-Benchmark Overlay & Scorecard**:
-               * Confronto simultaneo fino a 4 benchmark personalizzati (SPY, QQQ, ACWI, AGG, GLD, BTC) con tabella analitica comparativa.
-            8. **🔬 Ottimizzazione & Coperture Black-Scholes**:
-               * *Hierarchical Risk Parity (HRP)* con Tree Clustering ML, *Black-Scholes (1973)* con 5 Greci e Delta-Hedging con opzioni Put, *Merton Jump-Diffusion*, e *Market Regime Switching*.
-            9. **🕵️‍♂️ Contabilità Forense & Diagnostica Bilanci**:
-               * *Beneish M-Score (1999)* a 8 indici, *Sloan Accrual Ratio*, *Altman Z-Score*, *DuPont 5-Factor*, *Piotroski F-Score (9pt)* e *DCF Monte Carlo*.
-            10. **📈 Analisi Tecnica & Screener con Pre-Trade Simulator**:
-                * *Volume Profile* (Point of Control POC, Value Area 70%), *Technical Confluence Score*, e simulatore dell'impatto pre-trade prima dell'esecuzione.
+            #### 🏛️ Sezione 1: Quantitative Risk & Portfolio BI (Moduli 0 - 11)
+            1. **🎛️ Control Room & Master Portfolio Hub**: Ingestione dati multi-formato (CSV, DeGiro, Google Sheets Live Sync), consolidamento Master Portfolio e anagrafica ISIN/Ticker.
+            2. **📈 Dashboard Performance & NAV**: Rendimento cumulato, TWRR, MWRR, Rolling Sharpe/Sortino, Underwater Drawdown e Benchmark Overlay dinamico.
+            3. **🖥️ Live Terminal & Market Desk**: Streaming tape in tempo reale, L2 Depth Book, watchlist, Bloomberg CLI Console interattiva e OMS Blotter.
+            4. **🔴 Analisi Rischio**: VaR Parametrico/Storico/Cornish-Fisher, CVaR 95%/99%, Stress Test Storici (Lehman, Covid, 1970s), Regime Switching e GARCH(1,1).
+            5. **🔬 Modelli Quantitativi**: Black-Litterman, HRP (Hierarchical Risk Parity), Equal Risk Contribution (ERC), Kelly Criterion, Tail Copulas Asimmetriche (Clayton/Gumbel) e Black-Scholes Delta-Hedging.
+            6. **📋 Posizioni & Dettagli**: Visualizzazione granulare posizioni, Marginal VaR, Component VaR, liquidità Days-to-Liquidate e cluster di correlazione.
+            7. **🏛️ Valutazione Aziendale & Forensic**: Beneish M-Score, Altman Z-Score, Sloan Accrual Ratio, DuPont 5-Factor, Piotroski F-Score e DCF Monte Carlo.
+            8. **⚖️ Ottimizzazione Portafoglio**: Frontiera Efficiente di Markowitz, Max Sharpe, Min Volatilità e What-If Rebalancing Sandbox in tempo reale.
+            9. **📊 Analisi Temporale**: Matrice di correlazione dinamica, stagionalità mensile/annuale, scomposizione rolling e test di stazionarietà.
+            10. **📈 Analisi Tecnica**: Volume Profile (POC, Value Area 70%), Confluence Score, Chandelier Exit, RSI/MACD/Bollinger e Pre-Trade Impact Simulator.
+            11. **🔍 Screener Opportunità**: Screening multi-asset fondamentale e quantitativo su mercati globali.
+            12. **💻 BQuant & Launchpad**: Terminale quantitativo in stile Bloomberg con script editor Python, backtesting engine e automazione API.
+
+            #### 💎 Sezione 2: Wealth Management & Personal Finance Ecosystem (Moduli 12 - 21)
+            13. **🎛️ Wealth Control Room**: Centro di comando patrimoniale, gestione multi-conto, sincronizzazione Google Sheets e Master Diagnostics.
+            14. **🏛️ Patrimonio & Net Worth**: Consolidamento patrimoniale a 5 livelli (Liquidità, Titoli, Caveau, Previdenza, Immobili), Wealth Health Score e Trend Storico.
+            15. **💳 Cash Flow & Spese**: Libro mastro entrate/uscite, Budgeting 50/30/20, Subscription Sentinel con calcolo Opportunity Drag e Rolling Cashflow Forecast probabilistico.
+            16. **⌚ Asset Illiquidi & Orologi**: Caveau metalli preziosi (Oro 18K/24K, Argento) e collezione orologi di lusso con tracking rivalutazione e matrici di liquidabilità.
+            17. **🛡️ Previdenza & Pension Planning**: Simulazione Monte Carlo fondo pensione, rivalutazione TFR (1.5% + 75% FOI), gap previdenziale e calcolo rendita netta.
+            18. **🔥 Indipendenza Finanziaria & FIRE**: Calcolatore Standard/Lean/Fat/Coast FIRE, Dynamic Safe Withdrawal Rate (SWR), Ponte Wealth ⇄ Risk con Fondo Anti-Forced Selling e Goal-Based 3-Bucket Allocator.
+            19. **📑 Fiscalità & Quadro RW**: Calcolo plusvalenze/minusvalenze, monitoraggio zainetto fiscale quadriennale, modulo Tax-Loss Harvesting, Quadro RW e IVAFE/Bollo IT.
+            20. **🏡 Immobili & Mutui**: Piani di ammortamento francese/italiano, ROI/Cap Rate immobiliare, simulatore mutuo a tasso fisso/variabile e Buy vs Rent Analyzer.
+            21. **⚖️ Pianificazione Successoria**: Analisi asse ereditario, quote di legittima e disponibile, imposte di successione e donazione con franchigie e Trust/Holding planner.
+            22. **🤖 AI Copilot & Wealth Advisor**: Assistente IA generativo (Gemini / OpenAI / Fallback Deterministico Locale) per report patrimoniali istituzionali, diagnosi automatica e Q&A di bilancio.
 
             ---
 
             ### 🧪 Validazione & Affidabilità
-            * **Test Suite PyTest**: **100% Test Superati**
+            * **Test Suite PyTest**: **34/34 Test Superati con Successo (100% Pass Rate)**
             * **Linter (Ruff)**: **0 Errori**
-            * **Dataset Reale**: Validato su portafogli multi-asset reali con gestione FX multi-valuta (EUR/USD/GBP/CHF).
+            * **Privacy & Sicurezza**: **Zero-Cloud Leak**, crittografia e isolamento credenziali certificato.
           draft: false
           prerelease: false
         env:

@@ -148,7 +148,7 @@ flowchart TD
 - **`core/attribution.py` & `core/risk_limits.py`**: Attribuzione Brinson-Fachler e sistema di Early Warning sui limiti di rischio.
 
 ### 5. Presentation & Desktop Reporting Layer
-- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 12 moduli analitici interattivi fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto `wait_for_server`.
-- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v5.24.0.zip`.
-- **`core/report_exporter.py`, `html_exporter.py`**: Generazione dinamica in-memory del report Executive PDF Factsheet (2 pagine), del Workbook Excel Multi-Tab (.xlsx su 4 schede) e del Report HTML Standalone.
+- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 21 moduli analitici interattivi (Risk & Wealth Intelligence) fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto `wait_for_server`.
+- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v6.0.0.zip`.
+- **`core/report_exporter.py`, `html_exporter.py`, `core/wealth/wealth_exporter.py`**: Generazione dinamica in-memory del report Executive PDF Factsheet (2 pagine), del Workbook Excel Multi-Tab (.xlsx), del Report Wealth Master HTML e del Report HTML Standalone.
 - **`scripts/export_star_schema.py`**: Esportazione pacchetto ZIP Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`) per Microsoft Power BI e Google Looker Studio.

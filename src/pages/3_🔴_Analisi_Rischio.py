@@ -2576,7 +2576,8 @@ elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Fore
         metric_card("Score Anomalia Massimo", f"{min_score:.3f}", "Più negativo = Più grave", positive=(min_score > -0.15))
     with c_iso4:
         worst_day = iso_res["anomaly_df"].iloc[0]["Data"] if not iso_res["anomaly_df"].empty else "Nessuna"
-        st.metric("Peggior Data Anomala", f"{worst_day}")
+        metric_card("Peggior Data Anomala", f"{worst_day}", delta="Outlier ML", positive=(worst_day == "Nessuna"))
+
 
     if not df_full_iso.empty:
         fig_iso = go.Figure()
