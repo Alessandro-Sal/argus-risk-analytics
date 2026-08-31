@@ -794,7 +794,7 @@ def render_sidebar():
             if is_wealth_mode:
                 # ── WEALTH & PERSONAL FINANCE SETTINGS ──
                 st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Valuta Wealth</div>', unsafe_allow_html=True)
-                col_wp, col_wcurr = st.columns([2, 1.2])
+                col_wp, col_wcurr = st.columns([1.5, 1.5])
                 with col_wp:
                     st.text_input("Nome Profilo", value=st.session_state.portfolio_name, key="sb_port_name")
                 with col_wcurr:
@@ -832,11 +832,11 @@ def render_sidebar():
 
                 col_n, col_w, col_s = st.columns(3)
                 with col_n:
-                    n_val = st.number_input("% Needs (🏠)", min_value=5.0, max_value=90.0, value=float(st.session_state.wealth_budget_needs_pct), step=5.0, key="sb_wb_needs")
+                    n_val = st.number_input("Needs %", min_value=5.0, max_value=90.0, value=float(st.session_state.wealth_budget_needs_pct), step=5.0, key="sb_wb_needs", help="🏠 Bisogni Primari / Spese Fisse Essenziali")
                 with col_w:
-                    w_val = st.number_input("% Wants (🍽️)", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_wants_pct), step=5.0, key="sb_wb_wants")
+                    w_val = st.number_input("Wants %", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_wants_pct), step=5.0, key="sb_wb_wants", help="🍽️ Desideri, Stile di Vita & Svago")
                 with col_s:
-                    s_val = st.number_input("% Savings (📈)", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_savings_pct), step=5.0, key="sb_wb_savings")
+                    s_val = st.number_input("Savings %", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_savings_pct), step=5.0, key="sb_wb_savings", help="📈 Risparmio, PAC & Investimenti")
                 
                 st.session_state.wealth_budget_needs_pct = n_val
                 st.session_state.wealth_budget_wants_pct = w_val
@@ -849,7 +849,7 @@ def render_sidebar():
                     st.caption(f"⚠️ **Totale: {total_alloc:.0f}%** (La somma ideale è 100%)")
 
                 st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">🔥 Parametri FIRE & Previdenza</div>', unsafe_allow_html=True)
-                col_swr, col_age = st.columns([1.2, 1.2])
+                col_swr, col_age = st.columns([1.1, 1.1])
                 with col_swr:
                     swr_val = st.number_input("SWR FIRE %", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, key="sb_wealth_swr_input", help="Safe Withdrawal Rate annuo per la regola del 4% / FIRE")
                     st.session_state.wealth_fire_swr = swr_val
@@ -863,7 +863,7 @@ def render_sidebar():
                 sel_tax = st.selectbox("Regime Fiscale Predefinito", tax_regimes, index=t_idx, key="sb_wealth_tax_regime")
                 st.session_state.wealth_tax_regime = sel_tax
 
-                with st.popover("ℹ️ Guida Metodologica Wealth & 50/30/20"):
+                with st.popover("ℹ️ Guida Metodologica Wealth", use_container_width=True):
                     st.markdown("""
                     **🏛️ Modello di Pianificazione Patrimoniale ARGUS**
                     * **50% Bisogni Primari (Needs)**: Casa, mutuo/affitto, utenze, spesa alimentare, trasporti essenziali, salute.
@@ -878,7 +878,7 @@ def render_sidebar():
                 st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Benchmark</div>', unsafe_allow_html=True)
                 st.text_input("Nome Portafoglio", value=st.session_state.portfolio_name, key="sb_port_name")
                 
-                col_curr, col_bench = st.columns([1.1, 1.9])
+                col_curr, col_bench = st.columns([1.3, 1.7])
                 with col_curr:
                     curr_options = ["EUR", "USD", "GBP", "CHF"]
                     curr_current = st.session_state.get("base_currency", "EUR")
