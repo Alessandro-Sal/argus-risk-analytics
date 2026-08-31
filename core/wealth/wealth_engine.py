@@ -175,20 +175,52 @@ def compute_cashflow_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     df["tx_date"] = pd.to_datetime(df["tx_date"])
     df["year_month"] = df["tx_date"].dt.strftime("%Y-%m")
 
-    # Identificazione rigorosa Giroconti & Trasferimenti Interni (NON sono né entrate né uscite di spesa)
+    cat_ser = df["category_name"].astype(str) if "category_name" in df.columns else pd.Series([""] * len(df), index=df.index)
+    merch_ser = df["merchant"].astype(str) if "merchant" in df.columns else pd.Series([""] * len(df), index=df.index)
+    notes_ser = df["notes"].astype(str) if "notes" in df.columns else pd.Series([""] * len(df), index=df.index)
+    nat_ser = df["nature"].astype(str) if "nature" in df.columns else pd.Series([""] * len(df), index=df.index)
+    dir_ser = df["direction"].astype(str) if "direction" in df.columns else pd.Series([""] * len(df), index=df.index)
+
+    # 1. Identificazione rigorosa Giroconti & Trasferimenti Interni
     is_transfer = (
-        (df["direction"].astype(str).str.lower() == "transfer") |
-        (df["nature"].astype(str).str.lower() == "transfer") |
-        (df["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        (dir_ser.str.lower() == "transfer") |
+        (nat_ser.str.lower() == "transfer") |
+        (cat_ser.str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
     )
 
-    # Inflow vs Outflow REALI (esclusi giroconti)
-    inflows = df[(df["direction"] == "inflow") & (~is_transfer)]
-    outflows = df[(df["direction"] == "outflow") & (~is_transfer)]
+    # 2. Identificazione Rimborsi & Spese Saldate da Terzi (Storni di spesa, NON reddito da lavoro)
+    is_refund = (
+        (cat_ser.str.contains("rimbors|settled from|bulk settlement|storno|reso", case=False, na=False)) |
+        (merch_ser.str.contains("settled from|bulk settlement|refund|rimborso", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[refund\]|settled from|bulk settlement", case=False, na=False))
+    ) & (~is_transfer)
+
+    # 3. Identificazione Disinvestimenti / Rientro di Capitale (Spostamento patrimoniale da Asset a Cassa)
+    is_capital_liquidation = (
+        (dir_ser.str.lower() == "inflow") &
+        (
+            (cat_ser.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
+            (notes_ser.str.contains(r"\[investment\]|vendita|disinvestiment|chiusura pac", case=False, na=False)) |
+            (merch_ser.str.contains("vendita|disinvestiment|degiro|binance|directa", case=False, na=False))
+        ) &
+        (~cat_ser.str.contains("dividendi|cedol", case=False, na=False)) &
+        (~is_transfer)
+    )
+
+    # Flussi Inflow/Outflow depurati e separati
+    inflows_operating = df[(df["direction"] == "inflow") & (~is_transfer) & (~is_refund) & (~is_capital_liquidation)]
+    refunds_inflow = df[(df["direction"] == "inflow") & (is_refund) & (~is_transfer)]
+    capital_liq = df[is_capital_liquidation]
+    outflows_gross_df = df[(df["direction"] == "outflow") & (~is_transfer)]
     transfers = df[is_transfer]
 
-    total_inflow = float(inflows["amount"].sum())
-    total_outflow = float(outflows["amount"].sum())
+    total_inflow = float(inflows_operating["amount"].sum())
+    total_refunds = float(refunds_inflow["amount"].sum())
+    total_capital_liquidation = float(capital_liq["amount"].sum())
+    total_outflow_gross = float(outflows_gross_df["amount"].sum())
+    
+    # Spesa netta reale = Uscite Lorde - Rimborsi ricevuti da amici/colleghi
+    total_outflow = max(0.0, total_outflow_gross - total_refunds)
     total_transfers = float(transfers["amount"].sum())
     net_savings = total_inflow - total_outflow
     savings_rate_pct = round((net_savings / total_inflow * 100.0), 2) if total_inflow > 0 else 0.0
@@ -198,9 +230,11 @@ def compute_cashflow_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     avg_monthly_income = round(total_inflow / num_months, 2)
     avg_monthly_expense = round(total_outflow / num_months, 2)
 
-    # Ripartizione 50/30/20 su spese ed entrate REALI
+    # Ripartizione 50/30/20 su spese ed entrate REALI NETTE
     needs_amount = float(df[(df["nature"] == CategoryNature.ESSENTIAL_NEED.value) & (~is_transfer)]["amount"].sum())
-    wants_amount = float(df[(df["nature"] == CategoryNature.DISCRETIONARY_WANT.value) & (~is_transfer)]["amount"].sum())
+    wants_gross = float(df[(df["nature"] == CategoryNature.DISCRETIONARY_WANT.value) & (~is_transfer)]["amount"].sum())
+    # Applica i rimborsi prioritariamente alle spese discrezionali anticipate (es. cene/pizze/viaggi)
+    wants_amount = max(0.0, wants_gross - total_refunds)
     savings_amount = float(df[(df["nature"] == CategoryNature.SAVING_INVESTMENT.value) & (~is_transfer)]["amount"].sum()) + max(0.0, net_savings)
 
     base_budget = total_inflow if total_inflow > 0 else (needs_amount + wants_amount + savings_amount)
@@ -223,6 +257,9 @@ def compute_cashflow_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     return {
         "total_inflow": round(total_inflow, 2),
         "total_outflow": round(total_outflow, 2),
+        "total_outflow_gross": round(total_outflow_gross, 2),
+        "total_refunds": round(total_refunds, 2),
+        "total_capital_liquidation": round(total_capital_liquidation, 2),
         "total_transfers": round(total_transfers, 2),
         "net_savings": round(net_savings, 2),
         "net_cash_flow": round(net_savings, 2),
