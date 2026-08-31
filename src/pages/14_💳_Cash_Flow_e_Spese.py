@@ -508,8 +508,15 @@ with tab_trend:
     if not df_trend_src.empty:
         df_trend_src["year_month"] = df_trend_src["tx_date"].dt.strftime("%Y-%m")
         
-        m_in = df_trend_src[df_trend_src["direction"] == "inflow"].groupby("year_month")["amount"].sum()
-        m_out = df_trend_src[df_trend_src["direction"] == "outflow"].groupby("year_month")["amount"].sum()
+        is_tr_trend = (
+            (df_trend_src["direction"].astype(str).str.lower() == "transfer") |
+            (df_trend_src["nature"].astype(str).str.lower() == "transfer") |
+            (df_trend_src["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        )
+        df_trend_real = df_trend_src[~is_tr_trend].copy()
+
+        m_in = df_trend_real[df_trend_real["direction"] == "inflow"].groupby("year_month")["amount"].sum()
+        m_out = df_trend_real[df_trend_real["direction"] == "outflow"].groupby("year_month")["amount"].sum()
         
         all_ym = sorted(list(set(m_in.index).union(set(m_out.index))))
         df_monthly = pd.DataFrame({"year_month": all_ym})
@@ -1002,7 +1009,11 @@ with tab_ledger:
             with fc1:
                 tx_d = st.date_input("Data Transazione *", value=date.today())
                 tx_amt = st.number_input("Importo (€) *", min_value=0.01, value=50.0, step=1.0)
-                tx_dir = st.selectbox("Direzione *", [("outflow", "Uscita / Spesa"), ("inflow", "Entrata / Accredito")], format_func=lambda x: x[1])
+                tx_dir = st.selectbox("Direzione / Tipologia *", [
+                    ("outflow", "🔴 Uscita / Spesa"),
+                    ("inflow", "🟢 Entrata / Accredito"),
+                    ("transfer", "🔄 Giroconto / Trasferimento Interno")
+                ], format_func=lambda x: x[1])
             with fc2:
                 if not df_accs.empty:
                     acc_choices = {row["name"]: row["account_id"] for _, row in df_accs.iterrows()}
@@ -1015,8 +1026,8 @@ with tab_ledger:
                 else:
                     tx_cat = None
             with fc3:
-                tx_merch = st.text_input("Beneficiario / Merchant", placeholder="es. Esselunga, Amazon, Stipendio...")
-                tx_notes = st.text_input("Note / Descrizione", placeholder="es. Spesa settimanale")
+                tx_merch = st.text_input("Beneficiario / Merchant", placeholder="es. Esselunga, Amazon, Stipendio, ISP to Revolut...")
+                tx_notes = st.text_input("Note / Descrizione", placeholder="es. Spesa settimanale, Spostamento fondi")
 
             btn_save_tx = st.form_submit_button("💾 Registra Transazione", use_container_width=True)
             if btn_save_tx:
@@ -1047,10 +1058,25 @@ with tab_ledger:
                 key="btn_dl_cashflow_ledger_csv"
             )
 
+        df_disp_ledger = df_cf_filtered.copy()
+        
+        def format_dir_badge(row):
+            d = str(row.get("direction", "")).lower()
+            cat = str(row.get("category_name", "")).lower()
+            nat = str(row.get("nature", "")).lower()
+            if d == "transfer" or nat == "transfer" or "girocont" in cat or "trasferiment" in cat:
+                return "🔄 Giroconto"
+            elif d == "inflow":
+                return "🟢 Entrata"
+            elif d == "outflow":
+                return "🔴 Uscita"
+            return d.upper()
+
+        df_disp_ledger["Tipo"] = df_disp_ledger.apply(format_dir_badge, axis=1)
+
         st.dataframe(
-            df_cf_filtered[["tx_date", "direction", "amount", "category_name", "merchant", "account_name", "notes"]].rename(columns={
+            df_disp_ledger[["tx_date", "Tipo", "amount", "category_name", "merchant", "account_name", "notes"]].rename(columns={
                 "tx_date": "Data",
-                "direction": "Tipo",
                 "amount": "Importo (€)",
                 "category_name": "Categoria",
                 "merchant": "Beneficiario / Merchant",

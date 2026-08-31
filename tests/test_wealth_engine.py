@@ -801,6 +801,66 @@ def test_compute_wealth_risk_integrated_analytics(sqlite_engine):
     assert swr["monthly_safe_budget_eur"] == pytest.approx(swr["annual_safe_income_eur"] / 12.0, 0.01)
 
 
+def test_compute_cashflow_analytics_strict_transfers_exclusion():
+    """Verifica che i giroconti e trasferimenti interni NON siano conteggiati come entrate né uscite."""
+    from core.wealth.wealth_engine import (
+        compute_cashflow_analytics,
+        compute_merchant_pareto_analytics,
+        compute_seasonality_matrix,
+        compute_envelope_budget_analytics,
+        compute_cashflow_whatif_reinvestment
+    )
+
+    df_test = pd.DataFrame([
+        {"tx_date": "2026-01-10", "direction": "inflow", "amount": 2500.0, "nature": "income", "category_name": "Stipendio", "merchant": "Azienda SpA"},
+        {"tx_date": "2026-01-15", "direction": "outflow", "amount": 800.0, "nature": "need", "category_name": "Casa & Affitto", "merchant": "Proprietario"},
+        {"tx_date": "2026-01-18", "direction": "outflow", "amount": 200.0, "nature": "want", "category_name": "Ristoranti", "merchant": "Pizzeria"},
+        # Giroconto 1: direction transfer
+        {"tx_date": "2026-01-20", "direction": "transfer", "amount": 500.0, "nature": "transfer", "category_name": "Giroconti & Trasferimenti Interni", "merchant": "ISP to Revolut"},
+        # Giroconto 2: direction outflow ma categoria giroconto
+        {"tx_date": "2026-01-22", "direction": "outflow", "amount": 1000.0, "nature": "transfer", "category_name": "Giroconti & Trasferimenti Interni", "merchant": "Giroconto Conto Deposito"},
+        # Giroconto 3: direction inflow ma categoria trasferimento
+        {"tx_date": "2026-01-22", "direction": "inflow", "amount": 1000.0, "nature": "transfer", "category_name": "Trasferimento Interno", "merchant": "Accredito da Conto Corrente"}
+    ])
+
+    cf_res = compute_cashflow_analytics(df_test)
+    # Entrate reali devono essere ESATTAMENTE 2500 (non 3500)
+    assert cf_res["total_inflow"] == 2500.0
+    # Uscite reali devono essere ESATTAMENTE 1000 (800 + 200, non 2500)
+    assert cf_res["total_outflow"] == 1000.0
+    # Risparmio netto deve essere 1500 (2500 - 1000)
+    assert cf_res["net_savings"] == 1500.0
+    # Tasso di risparmio 60%
+    assert cf_res["savings_rate_pct"] == 60.0
+    # Giroconti totali tracciati
+    assert cf_res["total_transfers"] == 2500.0
+
+    # Test Pareto: i giroconti non devono apparire tra i merchant di spesa
+    pareto = compute_merchant_pareto_analytics(df_test)
+    assert pareto["total_outflow"] == 1000.0
+    assert len(pareto["merchants"]) == 2
+    merch_names = list(pareto["merchants"]["clean_merchant"])
+    assert "ISP to Revolut" not in merch_names
+    assert "Giroconto Conto Deposito" not in merch_names
+
+    # Test Seasonality: solo 2 categorie reali
+    seas = compute_seasonality_matrix(df_test)
+    assert "Giroconti & Trasferimenti Interni" not in seas.index
+    assert "Trasferimento Interno" not in seas.index
+    assert seas["Totale Anno"].sum() == 1000.0
+
+    # Test Envelope: solo 2 categorie reali
+    env = compute_envelope_budget_analytics(df_test)
+    assert len(env) == 2
+    assert "Giroconti & Trasferimenti Interni" not in list(env["category_name"])
+
+    # Test What-If Reinvestment
+    whatif = compute_cashflow_whatif_reinvestment(100.0, annual_return_rate=0.07, max_years=10)
+    assert whatif["val_10y"] > 12000.0 # 100*120 + compounding
+    assert len(whatif["timeline"]) == 10
+
+
+
 
 
 
