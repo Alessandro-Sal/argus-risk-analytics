@@ -10,6 +10,7 @@ from core.wealth.wealth_models import (
     PhysicalAssetItem,
     PensionPlanItem,
     NetWorthSummary,
+    WealthConsolidatedSummary,
     AccountType,
     CategoryNature,
     PhysicalAssetCategory

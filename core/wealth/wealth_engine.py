@@ -1066,7 +1066,7 @@ def compute_buy_vs_rent_comparison(
 # ── MOTORE PIANIFICAZIONE SUCCESSORIA (ESTATE PLANNING) ───────
 
 def compute_estate_planning_analytics(
-    net_worth_summary: WealthConsolidatedSummary,
+    net_worth_summary: NetWorthSummary,
     family_situation: str = "spouse_and_children",
     children_count: int = 2,
     has_spouse: bool = True,

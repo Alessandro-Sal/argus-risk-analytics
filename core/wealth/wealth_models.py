@@ -132,3 +132,8 @@ class NetWorthSummary:
     savings_rate_pct: float = 0.0
     wealth_health_score: float = 0.0
     as_of_date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
+
+
+# Alias per compatibilità
+WealthConsolidatedSummary = NetWorthSummary
+
