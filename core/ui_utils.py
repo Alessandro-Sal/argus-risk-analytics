@@ -4262,6 +4262,22 @@ def ensure_wealth_bundle_loaded(engine, default_profile_name: str = "Marco Rossi
 def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suffix: str = "w"):
     """Renderizza la command bar istituzionale ARGUS Wealth v6.0.0 in cima a ciascuna pagina Wealth."""
     base_curr = st.session_state.get("base_currency", "EUR")
+    w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
+    w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30.0))
+    w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20.0))
+    rule_label = f"{w_needs}/{w_wants}/{w_savings}"
+
+    offline = st.session_state.get("offline_mode", False)
+    mode_str = "OFFLINE" if offline else "LIVE DB"
+    mode_color = "#e3b341" if offline else "#34d399"
+    mode_bg = "rgba(227, 179, 65, 0.10)" if offline else "rgba(16, 185, 129, 0.12)"
+    mode_border = "rgba(227, 179, 65, 0.28)" if offline else "rgba(16, 185, 129, 0.3)"
+
+    has_prof = bool(current_pid and prof_name and prof_name != "Nessun Profilo")
+    if has_prof:
+        prof_html = f'<span style="color:#34d399; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span>🏛️</span> {prof_name}</span>'
+    else:
+        prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic;">⏳ Nessun Profilo (In attesa)</span>'
     
     col_bar1, col_bar2 = st.columns([1.3, 1.1])
     with col_bar1:
@@ -4272,9 +4288,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
                 ARGUS WEALTH
             </span>
             <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
-            <span style="color:#34d399; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                <span>🏛️</span> {prof_name}
-            </span>
+            {prof_html}
         </div>
         """, unsafe_allow_html=True)
     
@@ -4285,10 +4299,10 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 38px;">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 <div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">
-                    🏷️ <b>50/30/20</b>
+                    🏷️ <b>{rule_label}</b>
                 </div>
-                <div class="argus-command-pill" style="background:rgba(56, 189, 248, 0.10); border-color:rgba(56, 189, 248, 0.28); color:#38bdf8;">
-                    <span style="width:6px; height:6px; border-radius:50%; background:#38bdf8; display:inline-block; margin-right:5px;"></span>FAMILY OFFICE
+                <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
+                    <span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}
                 </div>
             </div>
             """, unsafe_allow_html=True)
