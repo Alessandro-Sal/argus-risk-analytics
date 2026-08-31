@@ -837,7 +837,45 @@ with tab_envelope:
             metric_card("Categorie Fuori Budget", f"{over_count} Categorie", delta="Sforamento > 100%", delta_color=s_col)
 
         st.write("")
-        st.markdown("##### 📊 Avanzamento Plafond per Categoria")
+        
+        # Grafico a Barre Orizzontali Budget vs Speso
+        st.markdown("##### 📈 Confronto Grafico: Spesa Effettiva vs Budget Plafond")
+        top_cats = df_envelope.sort_values(by="actual_spent", ascending=True)
+        fig_env = go.Figure()
+        fig_env.add_trace(go.Bar(
+            y=top_cats["category_name"],
+            x=top_cats["budget_limit"],
+            name="Budget Plafond (€)",
+            orientation="h",
+            marker_color="rgba(99, 102, 241, 0.4)",
+            marker_line=dict(width=1, color="#6366f1"),
+            hovertemplate="<b>%{y}</b><br>Budget: <b>€ %{x:,.2f}</b><extra></extra>"
+        ))
+        fig_env.add_trace(go.Bar(
+            y=top_cats["category_name"],
+            x=top_cats["actual_spent"],
+            name="Spesa Effettiva (€)",
+            orientation="h",
+            marker_color=top_cats["color"],
+            hovertemplate="<b>%{y}</b><br>Speso: <b>€ %{x:,.2f}</b><extra></extra>"
+        ))
+        fig_env.update_layout(
+            barmode="group",
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=max(320, len(top_cats) * 26),
+            margin=dict(l=10, r=10, t=20, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(title="Importo (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+            yaxis=dict(title="", showgrid=False)
+        )
+        st.plotly_chart(fig_env, use_container_width=True, config={'displayModeBar': False})
+
+        st.markdown("---")
+        st.markdown("##### 📊 Avanzamento Plafond Dettagliato per Categoria")
+        
+        # Tabella / Dettaglio Categorie
         for _, r in df_envelope.iterrows():
             c_name = r["category_name"]
             c_act = r["actual_spent"]
@@ -846,15 +884,16 @@ with tab_envelope:
             c_pct = r["pct_used"]
             c_stat = r["status"]
             c_rem = r["remaining_budget"]
+            c_color = r["color"]
             
             p_val = min(1.0, max(0.0, c_pct / 100.0))
-            col_b1, col_b2, col_b3 = st.columns([2.0, 1.4, 1.0])
+            col_b1, col_b2, col_b3 = st.columns([2.2, 1.4, 1.0])
             with col_b1:
-                st.markdown(f"**{c_name}** ({r['nature'].upper()})")
+                st.markdown(f"**{c_name}** <span style='font-size:11px; color:#94a3b8;'>({r['nature'].upper()})</span>", unsafe_allow_html=True)
                 st.progress(p_val)
             with col_b2:
-                mon_str = f" *(~{fmt_eur(c_mon)}/m)*" if n_m_env > 1 else ""
-                st.markdown(f"Speso: **{fmt_eur(c_act)}** / Budget: **{fmt_eur(c_lim)}**{mon_str}")
+                mon_str = f" <span style='color:#64748b; font-size:12px;'>(~{fmt_eur(c_mon)}/m)</span>" if n_m_env > 1 else ""
+                st.markdown(f"Speso: **{fmt_eur(c_act)}** / Budget: **{fmt_eur(c_lim)}**{mon_str}", unsafe_allow_html=True)
             with col_b3:
                 rem_text = f"+{fmt_eur(c_rem)} liberi" if c_rem >= 0 else f"-{fmt_eur(abs(c_rem))} sforati"
                 st.markdown(f"{c_stat} `({c_pct:.0f}%)` | *{rem_text}*")
