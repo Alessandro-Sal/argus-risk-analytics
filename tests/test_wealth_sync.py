@@ -6,6 +6,7 @@
 import pytest
 from unittest.mock import MagicMock, patch
 from sqlalchemy import create_engine
+import gsheets_sync_subproject.sync_google_sheets
 from core.wealth.wealth_sync import (
     sync_expenses_tracker_2026_from_gsheets,
     GSHEET_CATEGORY_MAPPING

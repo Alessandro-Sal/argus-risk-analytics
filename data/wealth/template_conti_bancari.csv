@@ -1,0 +1,6 @@
+Nome_Conto,Istituto,Tipo_Conto,Saldo,Valuta,IBAN,Note
+Fineco Conto Principale,FinecoBank,checking,12500.00,EUR,IT60X0542811101000000123456,Conto principale per stipendio e spese
+Illimity Deposito Risparmio,Illimity Bank,savings,20000.00,EUR,IT75Y0306909606100000065432,Conto deposito vincolato 3%
+Fondo Emergenza Mediolanum,Banca Mediolanum,emergency_fund,10000.00,EUR,IT12A0306209606100000098765,Riserva di liquidità per emergenze (6 mesi)
+Revolut Daily & Viaggi,Revolut,checking,1850.00,EUR,LT123456789012345678,Carta per spese quotidiane e all'estero
+Carta di Credito Fineco,FinecoBank,credit_card,-450.00,EUR,IT60X0542811101000000123456,Plafond carta a saldo fine mese

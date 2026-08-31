@@ -1,0 +1,8 @@
+Data,Importo,Descrizione,Direzione,Categoria,Conto,Metodo_Pagamento,Note
+2026-08-01,2800.00,Stipendio e Compensi Mese,inflow,Stipendio / Compensi,Fineco Conto Principale,Bonifico,Accredito stipendio mensile
+2026-08-02,120.50,Spesa Alimentare Esselunga,outflow,Spesa Alimentare & Supermercato,Fineco Conto Principale,Carta,Spesa settimanale
+2026-08-03,65.00,Cena Ristorante Da Mario,outflow,"Ristoranti, Bar & Delivery",Revolut Daily & Viaggi,Carta,Cena con amici
+2026-08-05,85.00,Rifornimento Carburante Eni,outflow,"Trasporti, Carburante & Mezzi",Fineco Conto Principale,Carta,Benzina auto
+2026-08-08,17.99,Abbonamento Netflix Premium,outflow,"Abbonamenti, Tech & Streaming",Revolut Daily & Viaggi,Carta,Streaming 4K
+2026-08-10,400.00,Versamento PAC ETF Titoli,outflow,PAC / Investimenti Titoli,Fineco Conto Principale,Bonifico,PAC Mensile Azionario
+2026-08-15,110.00,Bolletta Luce e Gas Enel,outflow,"Bollette & Utenze (Luce/Gas/Internet)",Fineco Conto Principale,SDD,Utenze bimestrali
