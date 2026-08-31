@@ -2212,35 +2212,64 @@ def compute_envelope_budget_analytics(
 ) -> pd.DataFrame:
     """
     Calcola il confronto Budget vs Actual (Envelope Budgeting) per ciascuna categoria di spesa reale.
+    Il budget viene correttamente scalato in base al numero di mesi del periodo analizzato.
     """
     if df_cf_period is None or df_cf_period.empty:
         return pd.DataFrame()
 
+    notes_ser = df_cf_period["notes"].astype(str) if "notes" in df_cf_period.columns else pd.Series("", index=df_cf_period.index)
+    cat_ser = df_cf_period["category_name"].astype(str) if "category_name" in df_cf_period.columns else pd.Series("", index=df_cf_period.index)
+    nat_ser = df_cf_period["nature"].astype(str) if "nature" in df_cf_period.columns else pd.Series("", index=df_cf_period.index)
+    dir_ser = df_cf_period["direction"].astype(str) if "direction" in df_cf_period.columns else pd.Series("", index=df_cf_period.index)
+
     is_tr = (
-        (df_cf_period["direction"].astype(str).str.lower() == "transfer") |
-        (df_cf_period["nature"].astype(str).str.lower() == "transfer") |
-        (df_cf_period["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        (dir_ser.str.lower() == "transfer") |
+        (nat_ser.str.lower() == "transfer") |
+        (cat_ser.str.contains("girocont|trasferiment|sistemazion", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[transfer\]", case=False, na=False))
     )
-    df_out = df_cf_period[(df_cf_period["direction"] == "outflow") & (~is_tr)].copy()
+    is_inv = (
+        (cat_ser.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False))
+    )
+    df_out = df_cf_period[(dir_ser == "outflow") & (~is_tr) & (~is_inv)].copy()
     if df_out.empty:
         return pd.DataFrame()
 
+    # Conta il numero di mesi unici compresi nel periodo
+    if "tx_date" in df_out.columns:
+        df_out["tx_date_dt"] = pd.to_datetime(df_out["tx_date"])
+        n_period_months = max(1, df_out["tx_date_dt"].dt.strftime("%Y-%m").nunique())
+    else:
+        n_period_months = 1
+
     spent_by_cat = df_out.groupby(["category_name", "nature"])["amount"].sum().reset_index()
 
-    # Stima budget di default dallo storico se non fornito esplicitamente
-    hist_avg = {}
+    # Stima budget mensile dallo storico se non fornito esplicitamente
+    hist_monthly_avg = {}
     if df_cf_historical is not None and not df_cf_historical.empty:
+        h_notes = df_cf_historical["notes"].astype(str) if "notes" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
+        h_cat = df_cf_historical["category_name"].astype(str) if "category_name" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
+        h_nat = df_cf_historical["nature"].astype(str) if "nature" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
+        h_dir = df_cf_historical["direction"].astype(str) if "direction" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
+
         is_tr_h = (
-            (df_cf_historical["direction"].astype(str).str.lower() == "transfer") |
-            (df_cf_historical["nature"].astype(str).str.lower() == "transfer") |
-            (df_cf_historical["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+            (h_dir.str.lower() == "transfer") |
+            (h_nat.str.lower() == "transfer") |
+            (h_cat.str.contains("girocont|trasferiment|sistemazion", case=False, na=False)) |
+            (h_notes.str.contains(r"\[transfer\]", case=False, na=False))
         )
-        df_h = df_cf_historical[(df_cf_historical["direction"] == "outflow") & (~is_tr_h)].copy()
-        df_h["tx_date"] = pd.to_datetime(df_h["tx_date"])
-        df_h["year_month"] = df_h["tx_date"].dt.strftime("%Y-%m")
-        n_m = max(1, df_h["year_month"].nunique())
-        h_sum = df_h.groupby("category_name")["amount"].sum()
-        hist_avg = (h_sum / n_m).to_dict()
+        is_inv_h = (
+            (h_cat.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
+            (h_notes.str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False))
+        )
+        df_h = df_cf_historical[(h_dir == "outflow") & (~is_tr_h) & (~is_inv_h)].copy()
+        if not df_h.empty:
+            df_h["tx_date_dt"] = pd.to_datetime(df_h["tx_date"])
+            df_h["year_month"] = df_h["tx_date_dt"].dt.strftime("%Y-%m")
+            n_m = max(1, df_h["year_month"].nunique())
+            h_sum = df_h.groupby("category_name")["amount"].sum()
+            hist_monthly_avg = (h_sum / n_m).to_dict()
 
     rows = []
     custom_budgets = custom_budgets or {}
@@ -2250,12 +2279,16 @@ def compute_envelope_budget_analytics(
         nature = r["nature"]
         actual = float(r["amount"])
         
+        # Budget mensile stimato o personalizzato
         if cat in custom_budgets:
-            b_target = float(custom_budgets[cat])
-        elif cat in hist_avg and hist_avg[cat] > 0:
-            b_target = round(hist_avg[cat] * 1.05, 2)
+            monthly_b = float(custom_budgets[cat])
+        elif cat in hist_monthly_avg and hist_monthly_avg[cat] > 0:
+            monthly_b = round(hist_monthly_avg[cat] * 1.05, 2)
         else:
-            b_target = round(actual * 1.15, 2)
+            monthly_b = round((actual / n_period_months) * 1.10, 2)
+
+        # Budget totale scalato per i mesi del periodo analizzato
+        b_target = round(monthly_b * n_period_months, 2)
 
         pct_used = round((actual / max(0.01, b_target)) * 100.0, 1)
         diff = round(b_target - actual, 2)
@@ -2263,7 +2296,7 @@ def compute_envelope_budget_analytics(
         if pct_used > 100.0:
             status = "🔴 SFORATO"
             color = "#f43f5e"
-        elif pct_used >= 80.0:
+        elif pct_used >= 85.0:
             status = "🟡 ATTENZIONE"
             color = "#f59e0b"
         else:
@@ -2273,6 +2306,7 @@ def compute_envelope_budget_analytics(
         rows.append({
             "category_name": cat,
             "nature": nature,
+            "monthly_budget": monthly_b,
             "budget_limit": b_target,
             "actual_spent": actual,
             "pct_used": pct_used,
