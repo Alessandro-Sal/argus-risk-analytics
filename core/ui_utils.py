@@ -820,10 +820,10 @@ def inject_custom_css():
             padding: 0 !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] summary {{
-            padding: 6px 10px !important;
-            min-height: 32px !important;
+            padding: 7px 12px !important;
+            min-height: 36px !important;
             height: auto !important;
-            font-size: 11.5px !important;
+            font-size: 13px !important;
             font-weight: 600 !important;
             color: #c9d1d9 !important;
             border-radius: 6px !important;
@@ -837,7 +837,8 @@ def inject_custom_css():
             overflow: hidden !important;
             text-overflow: ellipsis !important;
             margin: 0 !important;
-            font-size: 11.5px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {{
             background: rgba(255, 255, 255, 0.06) !important;
@@ -850,12 +851,12 @@ def inject_custom_css():
             border-left: 3px solid #ff9900 !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
-            padding: 4px 6px 5px 6px !important;
+            padding: 6px 8px 6px 8px !important;
             background: rgba(13, 17, 23, 0.5) !important;
             border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
         }}
         section[data-testid="stSidebar"] label p {{
-            font-size: 10px !important;
+            font-size: 10.5px !important;
             font-weight: 700 !important;
             color: #8b949e !important;
             text-transform: uppercase !important;
@@ -863,32 +864,32 @@ def inject_custom_css():
             margin-bottom: -2px !important;
         }}
         section[data-testid="stSidebar"] input {{
-            font-size: 11.5px !important;
-            padding: 4px 8px !important;
+            font-size: 12px !important;
+            padding: 5px 8px !important;
             border-radius: 6px !important;
             background: rgba(22, 27, 34, 0.8) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             color: #ffffff !important;
         }}
         section[data-testid="stSidebar"] div[data-baseweb="select"] {{
-            font-size: 11.5px !important;
+            font-size: 12px !important;
             border-radius: 6px !important;
             background: rgba(22, 27, 34, 0.8) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            min-height: 30px !important;
+            min-height: 32px !important;
         }}
         section[data-testid="stSidebar"] div[data-baseweb="select"] * {{
-            font-size: 11.5px !important;
+            font-size: 12px !important;
         }}
 
         /* Direct Top-Level Navigation Buttons (Matching Expanders) */
         section[data-testid="stSidebar"] > div > div > div > .stButton > button,
         section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div > .stButton > button,
         section[data-testid="stSidebar"] .stButton > button {{
-            padding: 5px 10px !important;
-            min-height: 30px !important;
-            height: 30px !important;
-            font-size: 11.5px !important;
+            padding: 7px 12px !important;
+            min-height: 36px !important;
+            height: 36px !important;
+            font-size: 13px !important;
             font-weight: 600 !important;
             margin: 2px 0 !important;
             border-radius: 7px !important;
@@ -928,11 +929,11 @@ def inject_custom_css():
         section[data-testid="stSidebar"] [data-testid="stExpander"] button,
         section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stBaseButton-secondary"],
         section[data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stBaseButton-primary"] {{
-            padding: 3px 8px !important;
-            min-height: 24px !important;
-            height: 24px !important;
-            line-height: 18px !important;
-            font-size: 11px !important;
+            padding: 4px 10px !important;
+            min-height: 26px !important;
+            height: 26px !important;
+            line-height: 20px !important;
+            font-size: 11.5px !important;
             font-weight: 500 !important;
             margin: 1px 0 !important;
             border-radius: 5px !important;
