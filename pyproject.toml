@@ -1,7 +1,7 @@
 [project]
 name = "argus-risk-analytics"
-version = "5.24.0"
-description = "ARGUS Risk Analytics Platform — Quantitative Risk Management & BI"
+version = "6.0.0"
+description = "ARGUS Risk Analytics & Wealth Intelligence Platform — Quantitative Risk Management & BI"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}

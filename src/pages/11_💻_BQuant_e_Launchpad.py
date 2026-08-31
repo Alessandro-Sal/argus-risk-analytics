@@ -327,8 +327,27 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
                 "benchmark_ticker": st.session_state.get("benchmark", "SPY"),
                 "base_currency": st.session_state.get("base_currency", "EUR")
             }
+            try:
+                from core.wealth.wealth_db import get_wealth_accounts, get_cashflow_records, get_physical_assets, get_pension_plans
+                from core.wealth.wealth_engine import compute_consolidated_net_worth
+                from core.fetcher import get_engine
+                db_u = st.session_state.get("db_user", "root")
+                db_p = st.session_state.get("db_pass", "root")
+                db_h = st.session_state.get("db_host", "localhost")
+                db_prt = int(st.session_state.get("db_port", 3306))
+                db_nm = st.session_state.get("db_name", "investment_risk_bi")
+                eng_w = get_engine(db_u, db_p, db_h, db_prt, db_nm)
+                w_pid = st.session_state.get("wealth_active_portfolio_id", 1)
+                exec_ctx["df_wealth_accounts"] = get_wealth_accounts(eng_w, portfolio_id=w_pid)
+                exec_ctx["df_wealth_cashflow"] = get_cashflow_records(eng_w, portfolio_id=w_pid)
+                exec_ctx["df_wealth_physical"] = get_physical_assets(eng_w, portfolio_id=w_pid)
+                exec_ctx["df_wealth_pension"] = get_pension_plans(eng_w, portfolio_id=w_pid)
+                exec_ctx["wealth_net_worth"] = compute_consolidated_net_worth(eng_w, portfolio_id=w_pid)
+            except Exception:
+                pass
             res_exec = execute_bquant_script(user_code, exec_ctx)
             st.session_state["last_bquant_result"] = res_exec
+
         else:
             res_exec = st.session_state["last_bquant_result"]
 

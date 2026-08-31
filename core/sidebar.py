@@ -1,6 +1,7 @@
 """
 ARGUS — Risk Analytics & Quantitative Platform
-Core Module: Sidebar & Institutional Navigation Rail v5.24.0
+Core Module: Sidebar & Institutional Navigation Rail v6.0.0
+Argus Institutional Risk & Wealth Analytics Platform
 Provides top-level execution mode configuration, zero-recalc session persistence,
 and direct hierarchical navigation with exact sub-tab binding.
 """
@@ -12,8 +13,8 @@ import sys
 from core.workspace_manager import ensure_session_restored
 
 
-# Definizione dei moduli workspace: Control Room e Dashboard sono 1-click (senza tendina), gli altri hanno schede interne esatte
-NAV_MODULES = [
+# Moduli Risk Analytics (11 Pagine Istituzionali)
+NAV_MODULES_RISK = [
     {
         "title": "Control Room & Setup",
         "icon": "🎛️",
@@ -173,6 +174,106 @@ NAV_MODULES = [
     }
 ]
 
+# Moduli Wealth Management (Control Room & Ingestion, Patrimonio, Cash Flow, Orologi, Pensione)
+NAV_MODULES_WEALTH = [
+    {
+        "title": "Control Room & Ingestion",
+        "icon": "🎛️",
+        "page_file": "pages/12_🎛️_Wealth_Control_Room.py",
+        "key": "12_Wealth_Control_Room",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Patrimonio & Net Worth",
+        "icon": "🏛️",
+        "page_file": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+        "key": "13_Patrimonio_e_NetWorth",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Cash Flow & Spese",
+        "icon": "💳",
+        "page_file": "pages/14_💳_Cash_Flow_e_Spese.py",
+        "key": "14_Cash_Flow_e_Spese",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Asset Illiquidi & Orologi",
+        "icon": "⌚",
+        "page_file": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
+        "key": "15_Asset_Illiquidi_e_Orologi",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Previdenza & Pensione",
+        "icon": "🛡️",
+        "page_file": "pages/16_🛡️_Previdenza_e_Pension_Planning.py",
+        "key": "16_Previdenza_e_Pension_Planning",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Indipendenza & FIRE",
+        "icon": "🔥",
+        "page_file": "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py",
+        "key": "17_Indipendenza_Finanziaria_e_FIRE",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Fiscalità & Quadro RW",
+        "icon": "📑",
+        "page_file": "pages/18_📑_Fiscalita_e_Quadro_RW.py",
+        "key": "18_Fiscalita_e_Quadro_RW",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Immobili & Mutui",
+        "icon": "🏡",
+        "page_file": "pages/19_🏡_Immobili_e_Mutui.py",
+        "key": "19_Immobili_e_Mutui",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "Pianificazione Successoria",
+        "icon": "⚖️",
+        "page_file": "pages/20_⚖️_Pianificazione_Successoria.py",
+        "key": "20_Pianificazione_Successoria",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    },
+    {
+        "title": "AI Copilot & Advisor",
+        "icon": "🤖",
+        "page_file": "pages/21_🤖_AI_Copilot_e_Advisor.py",
+        "key": "21_AI_Copilot_e_Advisor",
+        "has_subtabs": False,
+        "tab_key": None,
+        "subtabs": []
+    }
+]
+
+
+
+NAV_MODULES = NAV_MODULES_RISK
+
+
+
 
 def get_current_page_name() -> str:
     """Rileva con precisione il file della pagina Streamlit attualmente in esecuzione."""
@@ -240,7 +341,7 @@ def _detect_default_port(host, default_port=3306):
 
 
 def render_sidebar():
-    """Renderizza la Sidebar Istituzionale v5.14.0 con Modalità Esecuzione in alto e Navigation Rail ad albero."""
+    """Renderizza la Sidebar Istituzionale v6.0.0 con Modalità Esecuzione in alto e Navigation Rail ad albero."""
     ensure_session_restored()
 
     current_page = get_current_page_name()
@@ -469,38 +570,83 @@ def render_sidebar():
         port_text_style = "color:#ffffff; font-weight:700;" if has_port else "color:#e3b341; font-style:italic; font-weight:600;"
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
 
-        is_offline = st.session_state.offline_mode
-        status_bg = "rgba(255, 153, 0, 0.08)" if is_offline else "rgba(35, 134, 54, 0.10)"
-        status_border = "rgba(255, 153, 0, 0.35)" if is_offline else "rgba(46, 160, 67, 0.35)"
-        status_badge_bg = "rgba(255, 153, 0, 0.15)" if is_offline else "rgba(46, 160, 67, 0.20)"
-        status_badge_color = "#ff9900" if is_offline else "#3fb950"
-        status_text = "OFFLINE" if is_offline else "LIVE DB"
-        status_icon = "🟡" if is_offline else "🟢"
-        active_db_label = "In-Memory" if is_offline else f"{st.session_state.db_name}"
+        cur_page_name = get_current_page_name()
+        if "argus_portal_mode" not in st.session_state:
+            if any(w in cur_page_name for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"]):
+                st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+            else:
+                st.session_state.argus_portal_mode = "📊 Risk Analytics"
 
-        st.markdown(f"""
-        <div style="background:{status_bg}; border:1px solid {status_border}; border-radius:10px; padding: 10px 12px; margin-bottom: 8px; backdrop-filter: blur(10px);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
-                <span style="font-size:10px; font-weight:700; color:#8b949e; letter-spacing:0.6px; text-transform:uppercase;">Stato Engine</span>
-                <span style="font-size:10px; font-weight:800; color:{status_badge_color}; background:{status_badge_bg}; padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">
-                    {status_icon} {status_text}
-                </span>
-            </div>
-            <div style="font-size:11.5px; {port_text_style} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
-                💼 {active_port_label}
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
-                <span>🗄️ <b style="color:#c9d1d9;">{active_db_label}</b></span>
-                <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🎯 <b style="color:#c9d1d9;">{st.session_state.benchmark}</b></span>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 4px;">
-                <span>🏛️ Risk-Free <b style="color:#ff9900;">{active_rf_info['rate_pct']:.2f}%</b></span>
-                <span style="color:#8b949e; font-size:9.5px;">{active_rf_info['currency']} ({'Live' if active_rf_info.get('is_live') else 'BCE/Fed'})</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
-        st.markdown('<div class="sidebar-section-header" style="margin-top: 14px; margin-bottom: 8px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
+
+        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth Management")
+
+        if is_wealth_mode:
+            st.markdown(f"""
+            <div style="background:rgba(16, 185, 129, 0.10); border:1px solid rgba(16, 185, 129, 0.35); border-radius:10px; padding: 10px 12px; margin-bottom: 8px; backdrop-filter: blur(10px);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                    <span style="font-size:10px; font-weight:700; color:#8b949e; letter-spacing:0.6px; text-transform:uppercase;">Portale Attivo</span>
+                    <span style="font-size:10px; font-weight:800; color:#34d399; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">
+                        🏛️ WEALTH
+                    </span>
+                </div>
+                <div style="font-size:11.5px; color:#ffffff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
+                    🏛️ Wealth &amp; Personal Finance
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
+                    <span>🗄️ <b style="color:#c9d1d9;">wealth</b></span>
+                    <span>💱 <b style="color:#c9d1d9;">EUR</b> &bull; 🏷️ <b style="color:#c9d1d9;">50/30/20</b></span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            is_offline = st.session_state.offline_mode
+            status_bg = "rgba(255, 153, 0, 0.08)" if is_offline else "rgba(35, 134, 54, 0.10)"
+            status_border = "rgba(255, 153, 0, 0.35)" if is_offline else "rgba(46, 160, 67, 0.35)"
+            status_badge_bg = "rgba(255, 153, 0, 0.15)" if is_offline else "rgba(46, 160, 67, 0.20)"
+            status_badge_color = "#ff9900" if is_offline else "#3fb950"
+            status_text = "OFFLINE" if is_offline else "LIVE DB"
+            status_icon = "🟡" if is_offline else "🟢"
+            active_db_label = "In-Memory" if is_offline else f"{st.session_state.db_name}"
+
+            st.markdown(f"""
+            <div style="background:{status_bg}; border:1px solid {status_border}; border-radius:10px; padding: 10px 12px; margin-bottom: 8px; backdrop-filter: blur(10px);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
+                    <span style="font-size:10px; font-weight:700; color:#8b949e; letter-spacing:0.6px; text-transform:uppercase;">Stato Engine</span>
+                    <span style="font-size:10px; font-weight:800; color:{status_badge_color}; background:{status_badge_bg}; padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">
+                        {status_icon} {status_text}
+                    </span>
+                </div>
+                <div style="font-size:11.5px; {port_text_style} white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
+                    💼 {active_port_label}
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
+                    <span>🗄️ <b style="color:#c9d1d9;">{active_db_label}</b></span>
+                    <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🎯 <b style="color:#c9d1d9;">{st.session_state.benchmark}</b></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 4px;">
+                    <span>🏛️ Risk-Free <b style="color:#ff9900;">{active_rf_info['rate_pct']:.2f}%</b></span>
+                    <span style="color:#8b949e; font-size:9.5px;">{active_rf_info['currency']} ({'Live' if active_rf_info.get('is_live') else 'BCE/Fed'})</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown('<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 4px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">CAMBIA AMBIENTE</div>', unsafe_allow_html=True)
+
+        # Switch rapido tra i due moduli
+        if is_wealth_mode:
+            if st.button("📊 Passa a Risk Analytics", key="sb_btn_switch_to_risk", use_container_width=True):
+                st.session_state.argus_portal_mode = "📊 Risk Analytics"
+                switch_to_page("0_Control_Room.py")
+        else:
+            if st.button("🏛️ Passa a Wealth Management", key="sb_btn_switch_to_wealth", use_container_width=True):
+                st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+                switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+
+        active_nav_modules = NAV_MODULES_WEALTH if is_wealth_mode else NAV_MODULES_RISK
+
+        st.markdown('<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 8px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">NAVIGAZIONE WORKSPACE</div>', unsafe_allow_html=True)
+
 
         def _is_mod_active(mod_dict: dict, cur_page_str: str) -> bool:
             import re
@@ -525,7 +671,7 @@ def render_sidebar():
             return False
 
         # ── 1.1 SINCRONIZZAZIONE BIDIREZIONALE SUBTABS ───────────────
-        for mod_item in NAV_MODULES:
+        for mod_item in active_nav_modules:
             if mod_item.get("has_subtabs") and mod_item.get("tab_key"):
                 tk = mod_item["tab_key"]
                 sb_k = f"{tk}_selectbox"
@@ -539,8 +685,9 @@ def render_sidebar():
                     st.session_state[sb_k] = st.session_state[tk]
 
         # ── 2. RENDERING MODULI NAVIGAZIONE ─────────────────────────────
-        for mod in NAV_MODULES:
+        for mod in active_nav_modules:
             is_active = _is_mod_active(mod, current_page)
+
 
             # Se il modulo non ha sotto-schede (Control Room e Dashboard), renderizza un pulsante diretto a 1 riga
             if not mod["has_subtabs"]:
@@ -649,20 +796,41 @@ def render_sidebar():
 
         # ── 4. PULIZIA CACHE & RESET SESSIONE ─────────────────────────
         if st.button("♻️ Svuota Cache & Reset Sessione", use_container_width=True):
+            # Rileva esattamente se l'utente si trova nel modulo Wealth o Risk
+            cur_p = get_current_page_name()
+            in_wealth = is_wealth_mode or any(w in cur_p for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"])
+
+
             from core.workspace_manager import clear_session_cache
             clear_session_cache()
             st.cache_data.clear()
+            st.cache_resource.clear()
             for k in list(st.session_state.keys()):
                 if k not in ["splash_dismissed"]:
                     del st.session_state[k]
+
             st.session_state["session_cleared"] = True
+            st.session_state["results"] = None
+            st.session_state["portfolio_name"] = None
+            st.session_state["active_portfolio_id"] = None
+            st.session_state["selected_portfolio_id"] = None
+            st.session_state["wealth_active_portfolio_id"] = None
+            st.session_state["pipeline_done"] = False
+
             modules_to_reload = [m for m in sys.modules if m.startswith('core.')]
             for m in modules_to_reload:
                 try:
                     del sys.modules[m]
                 except Exception:
                     pass
-            switch_to_page("0_Control_Room.py")
+
+            if in_wealth:
+                st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
+                switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+            else:
+                st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
+                switch_to_page("0_Control_Room.py")
+
 
         if st.button("👁️ Schermata di Avvio (Splash)", key="btn_sidebar_show_splash", use_container_width=True):
             st.session_state["splash_dismissed"] = False
@@ -673,7 +841,7 @@ def render_sidebar():
 
         st.markdown("""
         <div style="text-align: center; padding: 10px 0 2px; border-top: 1px solid rgba(255,255,255,0.06); margin-top: 10px;">
-            <div style="font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: 0.5px;">ARGUS RISK INTELLIGENCE</div>
-            <div style="font-size: 10px; font-weight: 600; color: #ff9900; margin-top: 2px;">Versione 5.24.0 Institutional Engine</div>
+            <div style="font-size: 11px; font-weight: 700; color: #8b949e; letter-spacing: 0.5px;">ARGUS RISK & WEALTH INTELLIGENCE</div>
+            <div style="font-size: 10px; font-weight: 600; color: #ff9900; margin-top: 2px;">Versione 6.0.0 Institutional Ecosystem</div>
         </div>
         """, unsafe_allow_html=True)

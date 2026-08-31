@@ -1,6 +1,6 @@
 # ==============================================================================
 # src/pages/2_🖥️_Live_Terminal.py
-# ARGUS Institutional Live Terminal & Market Desk v5.24.0
+# ARGUS Institutional Live Terminal & Market Desk v6.0.0
 # Real-Time Streaming Tape • L2 Depth Book • Portfolio & Watchlist Live Monitor • Bloomberg CLI Console • OMS Blotter
 # ==============================================================================
 

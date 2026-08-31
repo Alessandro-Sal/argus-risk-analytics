@@ -1,6 +1,6 @@
 # ============================================================
 # 0_Control_Room.py (Main Entry Point)
-# ARGUS Risk Analytics Platform | Control Room v5.24.0
+# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v6.0.0
 # ============================================================
 
 import sys
@@ -13,12 +13,29 @@ if _root_dir not in sys.path:
 
 import streamlit as st
 
+is_splash_active = not st.session_state.get("splash_dismissed", False)
+
 st.set_page_config(
     page_title="Control Room | ARGUS Risk Analytics",
     page_icon="👁️",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed" if is_splash_active else "expanded"
 )
+
+if is_splash_active:
+    st.markdown("""
+    <style>
+    section[data-testid="stSidebar"], [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+        display: none !important;
+        visibility: hidden !important;
+        width: 0px !important;
+        height: 0px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 
 import pandas as pd
 import numpy as np
@@ -89,8 +106,9 @@ except Exception:
 db_user = st.session_state.get("db_user", "root")
 db_pass = st.session_state.get("db_pass", "root")
 db_name = st.session_state.get("db_name", "investment_risk_bi")
-portfolio_name = st.session_state.get("portfolio_name", "Master Wealth")
+portfolio_name = st.session_state.get("portfolio_name", "")
 run_name = st.session_state.get("run_name", "")
+
 benchmark = st.session_state.get("benchmark", "SPY")
 
 # ── Funzioni di Supporto Database ─────────────────────────────
@@ -143,6 +161,7 @@ if not offline_mode:
         db_error = e
 
 # ── SEZIONE: Storico Analisi (Recall da Database) ────────────
+
 with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get('db_name', 'investment_risk_bi')})", expanded=not st.session_state.get("pipeline_done")):
     if offline_mode:
         st.info("ℹ️ **Modalità Offline Attiva.** Lo storico delle analisi salvate nel Database non è disponibile in questa modalità In-Memory. Disattiva la modalità offline nella barra laterale a sinistra per connetterti a MySQL e visualizzare lo storico.")

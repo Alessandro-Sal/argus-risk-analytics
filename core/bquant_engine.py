@@ -321,6 +321,73 @@ if df_positions is not None and not df_positions.empty and df_returns is not Non
         )
         df_out = df_comp
 """
+    },
+
+    "wealth_monte_carlo": {
+
+        "title": "🏛️ Wealth Net Worth & Stochastic Cashflow Simulation",
+        "description": "Simula la traiettoria stocastica a 30 anni del Patrimonio Netto Consolidato integrando inflazione, risparmio mensile da flussi di cassa reali e volatilità dei mercati finanziari.",
+        "category": "Wealth Management & Financial Planning",
+        "code": """# ARGUS BQuant Snippet: Stochastic Wealth Net Worth Simulation
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+
+print("🏛️ Simulazione Stocastica del Patrimonio Netto Consolidato a 30 Anni...")
+
+# Parametri base
+initial_wealth = float(getattr(wealth_net_worth, "total_net_worth", 150000.0)) if wealth_net_worth is not None else 150000.0
+annual_savings = float(getattr(wealth_net_worth, "savings_rate_pct", 25.0)) * 500.0 * 12.0 / 100.0 if wealth_net_worth is not None else 12000.0
+
+n_years = 30
+n_sims = 500
+dt = 1.0
+mu = 0.075     # Rendimento atteso nominale medio (7.5%)
+sigma = 0.125  # Volatilità annua (12.5%)
+inflation = 0.02
+
+# Matrice di traiettorie
+paths = np.zeros((n_years + 1, n_sims))
+paths[0, :] = initial_wealth
+
+for t in range(1, n_years + 1):
+    z = np.random.standard_normal(n_sims)
+    # Drift geometrico con iniezione di risparmio annuo rivalutato
+    returns = np.exp((mu - 0.5 * sigma**2) * dt + sigma * np.sqrt(dt) * z)
+    inflow = annual_savings * ((1.0 + inflation) ** t)
+    paths[t, :] = paths[t-1, :] * returns + inflow
+
+years = np.arange(0, n_years + 1)
+p10 = np.percentile(paths, 10, axis=1)
+p50 = np.percentile(paths, 50, axis=1)
+p90 = np.percentile(paths, 90, axis=1)
+
+print(f"💰 Capitale Iniziale: € {initial_wealth:,.2f}")
+print(f"📈 Patrimonio Mediano a 10 Anni: € {p50[10]:,.2f}")
+print(f"🚀 Patrimonio Mediano a 20 Anni: € {p50[20]:,.2f}")
+print(f"🏆 Patrimonio Mediano a 30 Anni: € {p50[30]:,.2f}")
+
+fig = go.Figure()
+# Fan chart percentili
+fig.add_trace(go.Scatter(x=years, y=p90, mode='lines', line=dict(width=0), showlegend=False))
+fig.add_trace(go.Scatter(x=years, y=p10, mode='lines', fill='tonexty', fillcolor='rgba(16, 185, 129, 0.18)', line=dict(width=0), name='Intervallo 10° - 90° Percentile'))
+fig.add_trace(go.Scatter(x=years, y=p50, mode='lines+markers', line=dict(color='#10b981', width=3), name='Mediana (50° Percentile)'))
+
+fig.update_layout(
+    title="🏛️ Proiezione Monte Carlo Patrimonio Netto (30 Anni)",
+    xaxis_title="Orizzonte Temporale (Anni)",
+    yaxis_title="Patrimonio Netto Consolidato (€)",
+    template="plotly_dark",
+    height=450
+)
+
+df_out = pd.DataFrame({
+    "Anno": [0, 5, 10, 15, 20, 25, 30],
+    "Scenario Pessimistico (10°)": [f"€ {p10[i]:,.2f}" for i in [0, 5, 10, 15, 20, 25, 30]],
+    "Scenario Base Mediano (50°)": [f"€ {p50[i]:,.2f}" for i in [0, 5, 10, 15, 20, 25, 30]],
+    "Scenario Ottimistico (90°)": [f"€ {p90[i]:,.2f}" for i in [0, 5, 10, 15, 20, 25, 30]]
+})
+"""
     }
 }
 
@@ -352,6 +419,13 @@ def execute_bquant_script(
     base_currency = ctx.get("base_currency", results_obj.get("base_currency", "EUR"))
     portfolio_value = float(df_positions["current_value"].sum()) if (df_positions is not None and isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "current_value" in df_positions.columns) else 0.0
     
+    # Dataset Wealth integrati
+    df_wealth_accounts = ctx.get("df_wealth_accounts", pd.DataFrame())
+    df_wealth_cashflow = ctx.get("df_wealth_cashflow", pd.DataFrame())
+    df_wealth_physical = ctx.get("df_wealth_physical", pd.DataFrame())
+    df_wealth_pension = ctx.get("df_wealth_pension", pd.DataFrame())
+    wealth_net_worth = ctx.get("wealth_net_worth", None)
+
     # Configurazione del Namespace di esecuzione
     namespace = {
         "__name__": "__bquant__",
@@ -368,6 +442,11 @@ def execute_bquant_script(
         "df_prices": df_prices,
         "df_returns": df_returns,
         "df_tx": df_tx,
+        "df_wealth_accounts": df_wealth_accounts,
+        "df_wealth_cashflow": df_wealth_cashflow,
+        "df_wealth_physical": df_wealth_physical,
+        "df_wealth_pension": df_wealth_pension,
+        "wealth_net_worth": wealth_net_worth,
         "portfolio_name": portfolio_name,
         "portfolio_return": portfolio_return,
         "portfolio_returns": portfolio_return,
@@ -379,6 +458,7 @@ def execute_bquant_script(
         "df_out": None,
         "fig": None
     }
+
     
     # Cattura stdout e stderr
     stdout_capture = io.StringIO()

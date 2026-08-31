@@ -53,7 +53,7 @@
       "label": "ARGUS Control Room",
       "sublabel": "Multi-Account & ISIN DB",
       "brand": "python",
-      "tag": "v5.14.0 Core Hub",
+      "tag": "v6.0.0 Core Hub",
       "sources": [
         { "path": "src/0_Control_Room.py", "label": "Control Room Hub" },
         { "path": "app.py", "label": "Application Entrypoint" }
@@ -329,7 +329,7 @@
       "dot": "cyan",
       "title": "Ingestion & Interface",
       "items": [
-        "Control Room v5.14.0 with 10 analytical modules",
+        "Control Room v6.0.0 with 21 analytical modules",
         "Dual Google Sheets Live Sync (Stocks + Crypto)",
         "Automated ISIN / Ticker Database Resolver & Multi-Currency FX Engine"
       ]
