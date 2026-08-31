@@ -44,7 +44,11 @@ from core.wealth.wealth_engine import (
     compute_cashflow_analytics,
     compute_consolidated_net_worth,
     compute_recurring_subscriptions_analytics,
-    compute_cashflow_forecast_and_anomalies
+    compute_cashflow_forecast_and_anomalies,
+    compute_merchant_pareto_analytics,
+    compute_seasonality_matrix,
+    compute_envelope_budget_analytics,
+    compute_cashflow_whatif_reinvestment
 )
 
 
@@ -358,14 +362,18 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_sankey, tab_trend, tab_subs, tab_fc, tab_ledger = st.tabs([
-    "🌊 Diagramma Sankey & Flussi",
-    "📊 Trend Mensile & Statistiche MoM",
-    "🔁 Abbonamenti & Costi Fissi (Sentinel)",
+tab_sankey, tab_trend, tab_merchants, tab_envelope, tab_subs, tab_whatif, tab_fc, tab_ledger = st.tabs([
+    "🌊 Sankey & Flussi",
+    "📊 Trend & Stagionalità MoM",
+    "🏷️ Top Merchant & Pareto (80/20)",
+    "🎯 Budget vs Consuntivo (Envelope)",
+    "🔁 Abbonamenti & Costi Fissi",
+    "🔄 Ottimizzazione PAC & What-If",
     "🔮 Previsione Cassa & Anomalie",
     "📜 Libro Mastro & Inserimento"
 ])
 
+# ── 1. SANKEY & FLUSSI ──────────────────────────────────────
 with tab_sankey:
     section("🌊 Diagramma Sankey dei Flussi Finanziari")
     sankey = cf_analytics.get("sankey_data", {})
@@ -486,11 +494,11 @@ with tab_sankey:
         st.progress(min(1.0, max(0.0, savings_p / 100.0)))
 
 
+# ── 2. TREND MENSILE & STAGIONALITÀ MoM ─────────────────────
 with tab_trend:
     st.markdown("### 📊 Evoluzione Mensile & Statistiche MoM (Month-over-Month)")
-    st.caption("Confronto dinamico delle entrate, uscite, tasso di risparmio e ripartizione di spesa mese su mese.")
+    st.caption("Confronto dinamico delle entrate, uscite, tasso di risparmio e stagionalità di spesa nei 12 mesi.")
     
-    # Dataset per il trend (usa df_cf dell'anno selezionato o globale)
     df_trend_src = df_cf.copy() if not df_cf.empty else pd.DataFrame()
     if not df_trend_src.empty and sel_year_str != "🌐 Tutto lo Storico":
         df_trend_src = df_trend_src[df_trend_src["tx_date"].dt.year == int(sel_year_str)]
@@ -500,7 +508,6 @@ with tab_trend:
     if not df_trend_src.empty:
         df_trend_src["year_month"] = df_trend_src["tx_date"].dt.strftime("%Y-%m")
         
-        # Aggregazione mensile
         m_in = df_trend_src[df_trend_src["direction"] == "inflow"].groupby("year_month")["amount"].sum()
         m_out = df_trend_src[df_trend_src["direction"] == "outflow"].groupby("year_month")["amount"].sum()
         
@@ -563,10 +570,9 @@ with tab_trend:
         )
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
-        # Sezione Dettaglio & Top Categories
-        tr_c1, tr_c2 = st.columns([1.3, 1.0])
+        tr_c1, tr_c2 = st.columns([1.2, 1.1])
         with tr_c1:
-            st.markdown("##### 📋 Riepilogo Mese per Mese")
+            st.markdown("##### 📋 Tabella MoM Mese per Mese")
             df_m_show = df_monthly.copy()
             df_m_show["Mese"] = df_m_show["year_month"]
             df_m_show["Entrate_fmt"] = df_m_show["Entrate"].apply(lambda v: f"€ {v:,.2f}")
@@ -588,37 +594,178 @@ with tab_trend:
             )
 
         with tr_c2:
-            st.markdown("##### 🏆 Top 10 Categorie di Spesa")
-            df_outflows = df_cf_filtered[df_cf_filtered["direction"] == "outflow"]
-            if not df_outflows.empty:
-                cat_agg = df_outflows.groupby("category_name")["amount"].sum().reset_index()
-                cat_agg = cat_agg.sort_values(by="amount", ascending=False).head(10)
-                
-                fig_top_cat = px.bar(
-                    cat_agg,
-                    x="amount",
-                    y="category_name",
-                    orientation="h",
-                    color="amount",
-                    color_continuous_scale="Blues",
-                    labels={"amount": "Speso (€)", "category_name": "Categoria"}
+            st.markdown("##### 🗓️ Heatmap Stagionalità di Spesa nei 12 Mesi")
+            df_seas = compute_seasonality_matrix(df_trend_src)
+            if not df_seas.empty:
+                df_seas_plot = df_seas.drop(columns=["Totale Anno"], errors="ignore")
+                fig_heat = px.imshow(
+                    df_seas_plot,
+                    labels=dict(x="Mese", y="Categoria", color="Spesa (€)"),
+                    color_continuous_scale="Viridis",
+                    aspect="auto"
                 )
-                fig_top_cat.update_layout(
+                fig_heat.update_layout(
                     template="plotly_dark",
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     height=280,
-                    margin=dict(l=10, r=10, t=10, b=10),
-                    yaxis=dict(autorange="reversed"),
-                    coloraxis_showscale=False
+                    margin=dict(l=10, r=10, t=10, b=10)
                 )
-                st.plotly_chart(fig_top_cat, use_container_width=True, config={'displayModeBar': False})
+                st.plotly_chart(fig_heat, use_container_width=True, config={'displayModeBar': False})
             else:
-                st.info("Nessuna uscita registrata per il periodo selezionato.")
+                st.info("Dati insufficienti per generare la mappa di stagionalità.")
     else:
         st.info("Nessun dato storico per elaborare il trend mensile.")
 
 
+# ── 3. TOP MERCHANT & PARETO (80/20) ────────────────────────
+with tab_merchants:
+    st.markdown("### 🏷️ Top Merchant, Esercenti & Analisi di Pareto (80/20)")
+    st.caption("Individuazione analitica dei fornitori e beneficiari in cui si concentra la maggior parte delle uscite.")
+    
+    pareto_data = compute_merchant_pareto_analytics(df_cf_filtered)
+    
+    pk1, pk2, pk3, pk4 = st.columns(4)
+    with pk1:
+        metric_card("Totale Spese Filtrate", fmt_eur(pareto_data["total_outflow"]), delta="Uscite Complessive", delta_color="inverse")
+    with pk2:
+        tot_m_count = len(pareto_data["merchants"])
+        metric_card("Fornitori / Merchant", f"{tot_m_count} Esercenti", delta="Beneficiari Registrati", delta_color="normal")
+    with pk3:
+        p_c80 = pareto_data["pareto_count_80"]
+        metric_card("Soglia Pareto 80%", f"{p_c80} Esercenti", delta="Generano l'80% delle spese", delta_color="inverse")
+    with pk4:
+        p_sh = pareto_data["pareto_share_pct"]
+        metric_card("Indice di Concentrazione", f"{p_sh}% Fornitori", delta="Rapporto 80/20", delta_color="inverse")
+
+    st.write("")
+    if not pareto_data["merchants"].empty:
+        pm_col1, pm_col2 = st.columns([1.5, 1.0])
+        with pm_col1:
+            st.markdown("##### 📈 Curva Cumulativa di Pareto (Top 15 Merchant)")
+            top_15 = pareto_data["merchants"].head(15)
+            fig_p = go.Figure()
+            fig_p.add_trace(go.Bar(
+                x=top_15["clean_merchant"],
+                y=top_15["total_spent"],
+                name="Spesa Totale (€)",
+                marker_color="#6366f1",
+                hovertemplate="<b>%{x}</b><br>Spesa: <b>€ %{y:,.2f}</b><extra></extra>"
+            ))
+            fig_p.add_trace(go.Scatter(
+                x=top_15["clean_merchant"],
+                y=top_15["cumulative_pct"],
+                name="% Cumulativa",
+                yaxis="y2",
+                mode="lines+markers",
+                line=dict(color="#f59e0b", width=2.5),
+                marker=dict(size=6),
+                hovertemplate="<b>%{x}</b><br>Cumulativa: <b>%{y:.1f}%</b><extra></extra>"
+            ))
+            fig_p.add_hline(y=80, line_dash="dash", line_color="#ef4444", yref="y2", annotation_text="Soglia 80% Pareto", annotation_position="top left")
+            fig_p.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=320,
+                margin=dict(l=10, r=10, t=30, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                yaxis=dict(title="Spesa (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+                yaxis2=dict(title="% Cumulativa", overlaying="y", side="right", showgrid=False, range=[0, 105])
+            )
+            st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
+
+        with pm_col2:
+            st.markdown("##### 🍩 Quota di Spesa per Merchant (Top 8)")
+            top_8 = pareto_data["merchants"].head(8)
+            fig_p_donut = go.Figure(data=[go.Pie(
+                labels=top_8["clean_merchant"],
+                values=top_8["total_spent"],
+                hole=0.6,
+                textinfo="percent",
+                hovertemplate="<b>%{label}</b><br>Totale: <b>€ %{value:,.2f}</b> (%{percent})<extra></extra>"
+            )])
+            fig_p_donut.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=320,
+                margin=dict(l=10, r=10, t=10, b=10),
+                legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
+            )
+            st.plotly_chart(fig_p_donut, use_container_width=True, config={'displayModeBar': False})
+
+        st.markdown("##### 📋 Classifica Completa Merchant & Ticket Medio")
+        st.dataframe(
+            pareto_data["merchants"][["clean_merchant", "category", "total_spent", "pct_of_total", "tx_count", "avg_ticket", "max_ticket"]],
+            column_config={
+                "clean_merchant": st.column_config.TextColumn("Beneficiario / Merchant", width="medium"),
+                "category": st.column_config.TextColumn("Categoria Prevalente", width="small"),
+                "total_spent": st.column_config.NumberColumn("Spesa Totale (€)", format="€ %,.2f", width="small"),
+                "pct_of_total": st.column_config.NumberColumn("Quota (%)", format="%.1f%%", width="small"),
+                "tx_count": st.column_config.NumberColumn("Transazioni", format="%d", width="small"),
+                "avg_ticket": st.column_config.NumberColumn("Scontrino Medio", format="€ %,.2f", width="small"),
+                "max_ticket": st.column_config.NumberColumn("Spesa Max", format="€ %,.2f", width="small")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+    else:
+        st.info("Nessuna transazione per visualizzare l'analisi esercenti.")
+
+
+# ── 4. BUDGET PREVENTIVO VS CONSUNTIVO (ENVELOPE) ────────────
+with tab_envelope:
+    st.markdown("### 🎯 Budget Preventivo vs Consuntivo (Envelope / Plafond)")
+    st.caption("Controllo in tempo reale dei limiti di spesa allocati per ciascuna categoria e monitoraggio degli sforamenti.")
+    
+    df_envelope = compute_envelope_budget_analytics(df_cf_filtered, df_cf_historical=df_cf)
+    
+    if not df_envelope.empty:
+        tot_budget = df_envelope["budget_limit"].sum()
+        tot_actual = df_envelope["actual_spent"].sum()
+        tot_diff = tot_budget - tot_actual
+        over_count = len(df_envelope[df_envelope["pct_used"] > 100.0])
+        
+        ek1, ek2, ek3, ek4 = st.columns(4)
+        with ek1:
+            metric_card("Budget Allocato Periodo", fmt_eur(tot_budget), delta="Plafond Complessivo", delta_color="normal")
+        with ek2:
+            metric_card("Spesa Effettiva", fmt_eur(tot_actual), delta="Uscite Consuntivate", delta_color="inverse")
+        with ek3:
+            d_col = "normal" if tot_diff >= 0 else "inverse"
+            d_lbl = "Risparmio Residuo" if tot_diff >= 0 else "Sforamento Globale"
+            metric_card(d_lbl, fmt_eur(abs(tot_diff)), delta=f"{(tot_actual/tot_budget*100.0):.1f}% Utilizzato", delta_color=d_col)
+        with ek4:
+            s_col = "normal" if over_count == 0 else "inverse"
+            metric_card("Categorie Fuori Budget", f"{over_count} Categorie", delta="Sforamento > 100%", delta_color=s_col)
+
+        st.write("")
+        st.markdown("##### 📊 Avanzamento Plafond per Categoria")
+        for _, r in df_envelope.iterrows():
+            c_name = r["category_name"]
+            c_act = r["actual_spent"]
+            c_lim = r["budget_limit"]
+            c_pct = r["pct_used"]
+            c_stat = r["status"]
+            c_rem = r["remaining_budget"]
+            
+            p_val = min(1.0, max(0.0, c_pct / 100.0))
+            col_b1, col_b2, col_b3 = st.columns([2.0, 1.2, 1.0])
+            with col_b1:
+                st.markdown(f"**{c_name}** ({r['nature'].upper()})")
+                st.progress(p_val)
+            with col_b2:
+                st.markdown(f"Speso: **{fmt_eur(c_act)}** / Budget: **{fmt_eur(c_lim)}**")
+            with col_b3:
+                rem_text = f"+{fmt_eur(c_rem)} liberi" if c_rem >= 0 else f"-{fmt_eur(abs(c_rem))} sforati"
+                st.markdown(f"{c_stat} `({c_pct:.0f}%)` | *{rem_text}*")
+            st.write("")
+    else:
+        st.info("Nessuna uscita registrata per il periodo selezionato.")
+
+
+# ── 5. ABBONAMENTI & COSTI FISSI ────────────────────────────
 with tab_subs:
     st.markdown("### 🔁 Subscription Sentinel & Costo Opportunità a Lungo Termine")
     st.caption("Rilevamento autonomo dei costi fissi e degli abbonamenti ricorrenti con calcolo del capitale perso se investito al 7% annuo.")
@@ -641,8 +788,6 @@ with tab_subs:
         st.markdown("##### 📋 Registro Abbonamenti & Costi Fissi Rilevati")
         if subs_data["subscriptions"]:
             df_s_disp = pd.DataFrame(subs_data["subscriptions"])
-            
-            # Ordine colonne ideale
             cols_to_show = []
             if "status_badge" in df_s_disp.columns:
                 cols_to_show.append("status_badge")
@@ -650,7 +795,6 @@ with tab_subs:
             if "payment_day" in df_s_disp.columns:
                 cols_to_show.append("payment_day")
             cols_to_show.extend(["monthly_amount", "annual_amount", "opportunity_cost_10y"])
-            
             cols_to_show = [c for c in cols_to_show if c in df_s_disp.columns]
                 
             st.dataframe(
@@ -702,6 +846,70 @@ with tab_subs:
             st.plotly_chart(fig_sub_pie, use_container_width=True, config={'displayModeBar': False})
 
 
+# ── 6. OTTIMIZZAZIONE PAC & WHAT-IF ─────────────────────────
+with tab_whatif:
+    st.markdown("### 🔄 Simulatore di Conversione: Spese Superflue ➔ PAC Azionario")
+    st.caption("Simulatore 'What-If': Calcola la crescita esponenziale del patrimonio se tagli una quota di desideri/lifestyle e la investi a lungo termine.")
+    
+    r_wants = cf_analytics.get("rule_50_30_20", {}).get("wants_amount", 500.0)
+    
+    w_col1, w_col2, w_col3 = st.columns(3)
+    with w_col1:
+        cut_pct = st.slider("Taglio Spese Discrezionali (Wants) %:", min_value=5, max_value=60, value=20, step=5, format="%d%%")
+    with w_col2:
+        ret_rate = st.slider("Rendimento Annuo Stimato PAC / ETF %:", min_value=3.0, max_value=12.0, value=7.0, step=0.5, format="%.1f%%")
+    with w_col3:
+        sim_years = st.slider("Orizzonte di Accumulo (Anni):", min_value=5, max_value=35, value=25, step=5, format="%d Anni")
+
+    monthly_boost = max(10.0, (r_wants * (cut_pct / 100.0)))
+    sim_res = compute_cashflow_whatif_reinvestment(monthly_boost, annual_return_rate=ret_rate/100.0, max_years=sim_years)
+
+    wk1, wk2, wk3, wk4 = st.columns(4)
+    with wk1:
+        metric_card("Risparmio Extra / Mese", fmt_eur(monthly_boost), delta=f"-{cut_pct}% su Svago & Wants", delta_color="normal")
+    with wk2:
+        metric_card("Patrimonio a 10 Anni", fmt_eur(sim_res["val_10y"]), delta=f"Rendimento {ret_rate:.1f}% annuo", delta_color="normal")
+    with wk3:
+        metric_card("Patrimonio a 20 Anni", fmt_eur(sim_res["val_20y"]), delta="Effetto Interesse Composto", delta_color="normal")
+    with wk4:
+        metric_card(f"Patrimonio a {sim_years} Anni", fmt_eur(sim_res.get(f"val_{sim_years}y", sim_res["timeline"]["patrimonio_totale"].iloc[-1])), delta="Capitale Accumulato Finale", delta_color="normal")
+
+    st.write("")
+    df_wt = sim_res["timeline"]
+    fig_w = go.Figure()
+    fig_w.add_trace(go.Scatter(
+        x=df_wt["anno"],
+        y=df_wt["capitale_versato"],
+        mode="lines",
+        name="Capitale Versato (Effort Diretto)",
+        line=dict(color="#38bdf8", width=2),
+        fill="tozeroy",
+        fillcolor="rgba(56, 189, 248, 0.15)",
+        hovertemplate="<b>Anno %{x}</b><br>Versato: <b>€ %{y:,.2f}</b><extra></extra>"
+    ))
+    fig_w.add_trace(go.Scatter(
+        x=df_wt["anno"],
+        y=df_wt["patrimonio_totale"],
+        mode="lines+markers",
+        name="Patrimonio Totale (+ Interessi Composti)",
+        line=dict(color="#10b981", width=3),
+        fill="tonexty",
+        fillcolor="rgba(16, 185, 129, 0.20)",
+        hovertemplate="<b>Anno %{x}</b><br>Totale: <b>€ %{y:,.2f}</b><extra></extra>"
+    ))
+    fig_w.update_layout(
+        title=dict(text=f"Proiezione di Crescita Patrimoniale con PAC di {fmt_eur(monthly_boost)}/mese al {ret_rate:.1f}% annuo", font=dict(size=14, color="#ffffff")),
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        height=330,
+        margin=dict(l=10, r=10, t=50, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar': False})
+
+
+# ── 7. PREVISIONE CASSA & ANOMALIE ──────────────────────────
 with tab_fc:
     st.markdown("### 🔮 Previsione Cassa Rolling & Rilevamento Anomalie Z-Score")
     st.caption("Proiezione probabilistica della liquidità a 3 e 6 mesi e identificazione automatica di spike o uscite straordinarie.")
@@ -719,7 +927,6 @@ with tab_fc:
         metric_card("Previsione Cassa (6 Mesi)", fmt_eur(fc_data["projected_liquidity_6m"]), delta=f"{fmt_eur(d_6m)} Momentum", delta_color="normal" if d_6m >= 0 else "inverse")
 
     st.write("")
-    # Grafico di previsione Fan Chart
     df_fc_timeline = pd.DataFrame(fc_data["forecast_timeline"])
     if not df_fc_timeline.empty:
         fig_fc = go.Figure()
@@ -784,6 +991,7 @@ with tab_fc:
         st.success("🟢 Nessuna spesa anomala rilevata rispetto ai pattern storici del profilo.")
 
 
+# ── 8. LIBRO MASTRO & INSERIMENTO ───────────────────────────
 with tab_ledger:
     df_accs = get_wealth_accounts(engine)
     df_cats = get_wealth_categories(engine)
@@ -826,9 +1034,21 @@ with tab_ledger:
                     st.rerun()
 
     st.markdown("##### 📜 Libro Mastro Movimenti Completo")
-    if not df_cf.empty:
+    if not df_cf_filtered.empty:
+        col_dl_l, col_dl_r = st.columns([3.5, 1.5])
+        with col_dl_r:
+            csv_ledger = df_cf_filtered.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Scarica Estratto Filtrato (.CSV)",
+                data=csv_ledger,
+                file_name=f"argus_cashflow_{sel_year_str}_{sel_month_num}_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="btn_dl_cashflow_ledger_csv"
+            )
+
         st.dataframe(
-            df_cf[["tx_date", "direction", "amount", "category_name", "merchant", "account_name", "notes"]].rename(columns={
+            df_cf_filtered[["tx_date", "direction", "amount", "category_name", "merchant", "account_name", "notes"]].rename(columns={
                 "tx_date": "Data",
                 "direction": "Tipo",
                 "amount": "Importo (€)",
@@ -841,5 +1061,5 @@ with tab_ledger:
             hide_index=True
         )
     else:
-        st.info("Nessuna transazione presente nel libro mastro.")
+        st.info("Nessuna transazione presente nel libro mastro per i filtri selezionati.")
 

@@ -2024,6 +2024,212 @@ def compute_wealth_risk_integrated_analytics(engine, wealth_portfolio_id: int = 
     }
 
 
+def compute_merchant_pareto_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Analisi di Pareto (80/20) e classifica dettagliata degli esercenti/beneficiari di spesa.
+    """
+    if df_cf is None or df_cf.empty:
+        return {
+            "merchants": pd.DataFrame(),
+            "total_outflow": 0.0,
+            "pareto_count_80": 0,
+            "pareto_share_pct": 0.0,
+            "top_10": pd.DataFrame()
+        }
+
+    df = df_cf[df_cf["direction"] == "outflow"].copy()
+    if df.empty:
+        return {
+            "merchants": pd.DataFrame(),
+            "total_outflow": 0.0,
+            "pareto_count_80": 0,
+            "pareto_share_pct": 0.0,
+            "top_10": pd.DataFrame()
+        }
+
+    # Pulizia Merchant
+    df["clean_merchant"] = df["merchant"].fillna("").astype(str).str.strip()
+    df.loc[df["clean_merchant"] == "", "clean_merchant"] = df["category_name"].fillna("Varie").astype(str)
+
+    agg = df.groupby("clean_merchant").agg(
+        total_spent=("amount", "sum"),
+        tx_count=("amount", "count"),
+        avg_ticket=("amount", "mean"),
+        max_ticket=("amount", "max"),
+        category=("category_name", lambda s: s.mode().iloc[0] if not s.empty else "Varie")
+    ).reset_index()
+
+    agg = agg.sort_values(by="total_spent", ascending=False).reset_index(drop=True)
+    total_outflow = float(agg["total_spent"].sum())
+
+    if total_outflow > 0:
+        agg["pct_of_total"] = (agg["total_spent"] / total_outflow) * 100.0
+        agg["cumulative_pct"] = agg["pct_of_total"].cumsum()
+        pareto_subset = agg[agg["cumulative_pct"] <= 80.0]
+        pareto_count = max(1, len(pareto_subset)) if not pareto_subset.empty else 1
+    else:
+        agg["pct_of_total"] = 0.0
+        agg["cumulative_pct"] = 0.0
+        pareto_count = 0
+
+    return {
+        "merchants": agg,
+        "total_outflow": round(total_outflow, 2),
+        "pareto_count_80": pareto_count,
+        "pareto_share_pct": round((pareto_count / max(1, len(agg))) * 100.0, 1),
+        "top_10": agg.head(10).copy()
+    }
+
+
+def compute_seasonality_matrix(df_cf: pd.DataFrame) -> pd.DataFrame:
+    """
+    Costruisce la matrice di stagionalità delle uscite per Categoria nei 12 mesi dell'anno.
+    """
+    if df_cf is None or df_cf.empty:
+        return pd.DataFrame()
+
+    df = df_cf[df_cf["direction"] == "outflow"].copy()
+    if df.empty:
+        return pd.DataFrame()
+
+    df["tx_date"] = pd.to_datetime(df["tx_date"])
+    df["month"] = df["tx_date"].dt.month
+
+    pivot = df.pivot_table(
+        index="category_name",
+        columns="month",
+        values="amount",
+        aggfunc="sum",
+        fill_value=0.0
+    )
+
+    # Assicura tutte le 12 colonne
+    for m in range(1, 13):
+        if m not in pivot.columns:
+            pivot[m] = 0.0
+    
+    pivot = pivot[sorted(pivot.columns)]
+    pivot["Totale Anno"] = pivot.sum(axis=1)
+    pivot = pivot.sort_values(by="Totale Anno", ascending=False)
+    
+    month_names = {
+        1: "Gen", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mag", 6: "Giu",
+        7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
+    }
+    rename_cols = {m: month_names[m] for m in range(1, 13)}
+    pivot = pivot.rename(columns=rename_cols)
+    return pivot
+
+
+def compute_envelope_budget_analytics(
+    df_cf_period: pd.DataFrame,
+    custom_budgets: Dict[str, float] = None,
+    df_cf_historical: pd.DataFrame = None
+) -> pd.DataFrame:
+    """
+    Calcola il confronto Budget vs Actual (Envelope Budgeting) per ciascuna categoria.
+    """
+    if df_cf_period is None or df_cf_period.empty:
+        return pd.DataFrame()
+
+    df_out = df_cf_period[df_cf_period["direction"] == "outflow"].copy()
+    if df_out.empty:
+        return pd.DataFrame()
+
+    spent_by_cat = df_out.groupby(["category_name", "nature"])["amount"].sum().reset_index()
+
+    # Stima budget di default dallo storico se non fornito esplicitamente
+    hist_avg = {}
+    if df_cf_historical is not None and not df_cf_historical.empty:
+        df_h = df_cf_historical[df_cf_historical["direction"] == "outflow"].copy()
+        df_h["tx_date"] = pd.to_datetime(df_h["tx_date"])
+        df_h["year_month"] = df_h["tx_date"].dt.strftime("%Y-%m")
+        n_m = max(1, df_h["year_month"].nunique())
+        h_sum = df_h.groupby("category_name")["amount"].sum()
+        hist_avg = (h_sum / n_m).to_dict()
+
+    rows = []
+    custom_budgets = custom_budgets or {}
+
+    for _, r in spent_by_cat.iterrows():
+        cat = r["category_name"]
+        nature = r["nature"]
+        actual = float(r["amount"])
+        
+        if cat in custom_budgets:
+            b_target = float(custom_budgets[cat])
+        elif cat in hist_avg and hist_avg[cat] > 0:
+            b_target = round(hist_avg[cat] * 1.05, 2)
+        else:
+            b_target = round(actual * 1.15, 2)
+
+        pct_used = round((actual / max(0.01, b_target)) * 100.0, 1)
+        diff = round(b_target - actual, 2)
+        
+        if pct_used > 100.0:
+            status = "🔴 SFORATO"
+            color = "#f43f5e"
+        elif pct_used >= 80.0:
+            status = "🟡 ATTENZIONE"
+            color = "#f59e0b"
+        else:
+            status = "🟢 OK"
+            color = "#10b981"
+
+        rows.append({
+            "category_name": cat,
+            "nature": nature,
+            "budget_limit": b_target,
+            "actual_spent": actual,
+            "pct_used": pct_used,
+            "remaining_budget": diff,
+            "status": status,
+            "color": color
+        })
+
+    df_res = pd.DataFrame(rows)
+    if not df_res.empty:
+        df_res = df_res.sort_values(by="pct_used", ascending=False).reset_index(drop=True)
+    return df_res
+
+
+def compute_cashflow_whatif_reinvestment(
+    monthly_savings_boost: float,
+    annual_return_rate: float = 0.07,
+    max_years: int = 30
+) -> Dict[str, Any]:
+    """
+    Simula la crescita patrimoniale derivante dal reinvestimento in PAC azionario/ETF
+    di una quota di risparmio mensile ottimizzata da tagli spese superflue.
+    """
+    boost = max(1.0, float(monthly_savings_boost))
+    r_m = (1.0 + annual_return_rate) ** (1.0 / 12.0) - 1.0
+
+    timeline = []
+    for y in range(1, max_years + 1):
+        n_m = y * 12
+        fv = boost * (((1.0 + r_m) ** n_m - 1.0) / r_m)
+        principal = boost * n_m
+        gains = fv - principal
+        timeline.append({
+            "anno": y,
+            "capitale_versato": round(principal, 2),
+            "interessi_composti": round(gains, 2),
+            "patrimonio_totale": round(fv, 2)
+        })
+
+    df_t = pd.DataFrame(timeline)
+    return {
+        "monthly_boost": boost,
+        "annual_return_pct": round(annual_return_rate * 100.0, 1),
+        "timeline": df_t,
+        "val_5y": float(df_t.loc[df_t["anno"] == 5, "patrimonio_totale"].values[0]) if len(df_t) >= 5 else 0.0,
+        "val_10y": float(df_t.loc[df_t["anno"] == 10, "patrimonio_totale"].values[0]) if len(df_t) >= 10 else 0.0,
+        "val_20y": float(df_t.loc[df_t["anno"] == 20, "patrimonio_totale"].values[0]) if len(df_t) >= 20 else 0.0,
+        "val_30y": float(df_t.loc[df_t["anno"] == 30, "patrimonio_totale"].values[0]) if len(df_t) >= 30 else 0.0
+    }
+
+
 
 
 
