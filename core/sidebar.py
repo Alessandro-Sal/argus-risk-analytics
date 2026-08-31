@@ -762,8 +762,7 @@ def render_sidebar():
         st.divider()
 
         # ── 3. PARAMETRI ENGINE & DB (CONFIGURAZIONE DINAMICA) ────────
-        expander_title = "⚙️ Impostazioni Wealth" if is_wealth_mode else "⚙️ Parametri Risk"
-        with st.expander(expander_title, expanded=False):
+        with st.expander("⚙️ Impostazioni", expanded=False):
             st.toggle("Modalità Offline (Senza DB)", value=st.session_state.offline_mode, key="sb_offline_toggle")
 
             if not st.session_state.offline_mode:
