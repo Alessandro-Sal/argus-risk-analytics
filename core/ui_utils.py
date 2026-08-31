@@ -3650,13 +3650,11 @@ def render_wealth_control_room_hero(profile_map: dict = None, current_pid: int =
     w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30.0))
     w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20.0))
     rule_str = f"{w_needs}/{w_wants}/{w_savings}"
-    swr = float(st.session_state.get("wealth_fire_swr", 4.0))
-    ret_age = int(st.session_state.get("wealth_target_retirement_age", 67))
 
     is_offline = st.session_state.get("offline_mode", False)
-    mode_text = "OFFLINE" if is_offline else "PORTALE WEALTH & CASH FLOW"
-    mode_color = "#ff9900" if is_offline else "#34d399"
-    mode_bg = "rgba(255, 153, 0, 0.15)" if is_offline else "rgba(16, 185, 129, 0.15)"
+    mode_text = "OFFLINE" if is_offline else "LIVE DB"
+    mode_color = "#ff9900" if is_offline else "#3fb950"
+    mode_bg = "rgba(255, 153, 0, 0.15)" if is_offline else "rgba(46, 160, 67, 0.15)"
 
     hero_html = (
         f'<div style="background:rgba(22,27,34,0.7);border:1px solid rgba(255,255,255,0.08);border-left:4px solid {accent};border-radius:14px;padding:16px 20px;margin-bottom:16px;backdrop-filter:blur(14px);box-shadow:0 6px 20px rgba(0,0,0,0.3);">'
@@ -3678,10 +3676,7 @@ def render_wealth_control_room_hero(profile_map: dict = None, current_pid: int =
         f'<span style="color:#8b949e;">Profilo:</span> <b style="color:#ffffff;">{prof_name}</b>'
         f'</div>'
         f'<div style="background:rgba(13,17,23,0.6);border:1px solid rgba(255,255,255,0.06);padding:6px 12px;border-radius:8px;font-size:11px;">'
-        f'<span style="color:#8b949e;">FX / Regola:</span> <b style="color:#ffffff;">{currency} &bull; {rule_str}</b>'
-        f'</div>'
-        f'<div style="background:rgba(13,17,23,0.6);border:1px solid rgba(255,255,255,0.06);padding:6px 12px;border-radius:8px;font-size:11px;">'
-        f'<span>🔥 SWR: <b style="color:#f59e0b;">{swr:.1f}%</b> &bull; 🎯 Pensione: <b style="color:#38bdf8;">{ret_age}a</b></span>'
+        f'<span style="color:#8b949e;">FX / Modello:</span> <b style="color:#ffffff;">{currency} &bull; {rule_str}</b>'
         f'</div>'
         f'</div>'
         f'</div>'
