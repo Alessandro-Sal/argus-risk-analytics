@@ -2086,12 +2086,24 @@ def compute_merchant_pareto_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
             "top_10": pd.DataFrame()
         }
 
+    notes_ser = df_cf["notes"].astype(str) if "notes" in df_cf.columns else pd.Series("", index=df_cf.index)
+    merch_ser = df_cf["merchant"].astype(str) if "merchant" in df_cf.columns else pd.Series("", index=df_cf.index)
+    cat_ser = df_cf["category_name"].astype(str) if "category_name" in df_cf.columns else pd.Series("", index=df_cf.index)
+    nat_ser = df_cf["nature"].astype(str) if "nature" in df_cf.columns else pd.Series("", index=df_cf.index)
+    dir_ser = df_cf["direction"].astype(str) if "direction" in df_cf.columns else pd.Series("", index=df_cf.index)
+
     is_tr = (
-        (df_cf["direction"].astype(str).str.lower() == "transfer") |
-        (df_cf["nature"].astype(str).str.lower() == "transfer") |
-        (df_cf["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        (dir_ser.str.lower() == "transfer") |
+        (nat_ser.str.lower() == "transfer") |
+        (cat_ser.str.contains("girocont|trasferiment|sistemazion", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[transfer\]", case=False, na=False))
     )
-    df = df_cf[(df_cf["direction"] == "outflow") & (~is_tr)].copy()
+    is_inv = (
+        (cat_ser.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False)) |
+        (merch_ser.str.contains(r"degiro|binance|directa|scalable|interactive brokers", case=False, na=False))
+    )
+    df = df_cf[(dir_ser == "outflow") & (~is_tr) & (~is_inv)].copy()
     if df.empty:
         return {
             "merchants": pd.DataFrame(),
@@ -2102,8 +2114,11 @@ def compute_merchant_pareto_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
         }
 
     # Pulizia Merchant
-    df["clean_merchant"] = df["merchant"].fillna("").astype(str).str.strip()
-    df.loc[df["clean_merchant"] == "", "clean_merchant"] = df["category_name"].fillna("Varie").astype(str)
+    df["clean_merchant"] = df["merchant"].fillna("").astype(str).str.strip() if "merchant" in df.columns else ""
+    if "clean_merchant" not in df.columns or (df["clean_merchant"] == "").all():
+        df["clean_merchant"] = df["category_name"].fillna("Varie").astype(str)
+    else:
+        df.loc[df["clean_merchant"] == "", "clean_merchant"] = df["category_name"].fillna("Varie").astype(str)
 
     agg = df.groupby("clean_merchant").agg(
         total_spent=("amount", "sum"),
@@ -2142,12 +2157,22 @@ def compute_seasonality_matrix(df_cf: pd.DataFrame) -> pd.DataFrame:
     if df_cf is None or df_cf.empty:
         return pd.DataFrame()
 
+    notes_ser = df_cf["notes"].astype(str) if "notes" in df_cf.columns else pd.Series("", index=df_cf.index)
+    cat_ser = df_cf["category_name"].astype(str) if "category_name" in df_cf.columns else pd.Series("", index=df_cf.index)
+    nat_ser = df_cf["nature"].astype(str) if "nature" in df_cf.columns else pd.Series("", index=df_cf.index)
+    dir_ser = df_cf["direction"].astype(str) if "direction" in df_cf.columns else pd.Series("", index=df_cf.index)
+
     is_tr = (
-        (df_cf["direction"].astype(str).str.lower() == "transfer") |
-        (df_cf["nature"].astype(str).str.lower() == "transfer") |
-        (df_cf["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        (dir_ser.str.lower() == "transfer") |
+        (nat_ser.str.lower() == "transfer") |
+        (cat_ser.str.contains("girocont|trasferiment|sistemazion", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[transfer\]", case=False, na=False))
     )
-    df = df_cf[(df_cf["direction"] == "outflow") & (~is_tr)].copy()
+    is_inv = (
+        (cat_ser.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
+        (notes_ser.str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False))
+    )
+    df = df_cf[(dir_ser == "outflow") & (~is_tr) & (~is_inv)].copy()
     if df.empty:
         return pd.DataFrame()
 
