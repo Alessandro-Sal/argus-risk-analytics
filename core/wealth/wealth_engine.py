@@ -2212,7 +2212,7 @@ def compute_envelope_budget_analytics(
 ) -> pd.DataFrame:
     """
     Calcola il confronto Budget vs Actual (Envelope Budgeting) per ciascuna categoria di spesa reale.
-    Il budget viene correttamente scalato in base al numero di mesi del periodo analizzato.
+    Il budget viene scalato dinamicamente in base alla durata del periodo selezionato.
     """
     if df_cf_period is None or df_cf_period.empty:
         return pd.DataFrame()
@@ -2232,7 +2232,12 @@ def compute_envelope_budget_analytics(
         (cat_ser.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
         (notes_ser.str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False))
     )
-    df_out = df_cf_period[(dir_ser == "outflow") & (~is_tr) & (~is_inv)].copy()
+    is_inflow_cat = (
+        (cat_ser.str.contains("entrata|stipendio|bonus|introiti|borse di studio|supporto famiglia|compensi|dividendi", case=False, na=False)) |
+        (nat_ser.str.startswith("inflow"))
+    )
+
+    df_out = df_cf_period[(dir_ser == "outflow") & (~is_tr) & (~is_inv) & (~is_inflow_cat)].copy()
     if df_out.empty:
         return pd.DataFrame()
 
@@ -2245,31 +2250,33 @@ def compute_envelope_budget_analytics(
 
     spent_by_cat = df_out.groupby(["category_name", "nature"])["amount"].sum().reset_index()
 
-    # Stima budget mensile dallo storico se non fornito esplicitamente
-    hist_monthly_avg = {}
-    if df_cf_historical is not None and not df_cf_historical.empty:
-        h_notes = df_cf_historical["notes"].astype(str) if "notes" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
-        h_cat = df_cf_historical["category_name"].astype(str) if "category_name" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
-        h_nat = df_cf_historical["nature"].astype(str) if "nature" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
-        h_dir = df_cf_historical["direction"].astype(str) if "direction" in df_cf_historical.columns else pd.Series("", index=df_cf_historical.index)
+    # Budget benchmark predefiniti mensili
+    BENCHMARK_BUDGETS = {
+        "casa": 500.0, "affitto": 500.0, "utenze": 150.0,
+        "spesa alimentar": 350.0, "supermercat": 350.0,
+        "trasport": 200.0, "carburant": 200.0, "benzin": 200.0,
+        "ristorant": 250.0, "pizzeri": 250.0, "sushi": 250.0,
+        "serat": 150.0, "aperitiv": 150.0, "bar": 150.0,
+        "viagg": 200.0, "vacanz": 200.0,
+        "istruzion": 250.0, "cors": 250.0, "libr": 250.0,
+        "shopping": 150.0, "abbigliamento": 150.0,
+        "regali": 100.0, "eventi": 100.0, "laure": 100.0,
+        "salute": 80.0, "farmaci": 80.0, "visite": 80.0,
+        "abbonament": 35.0, "streaming": 35.0, "spotify": 35.0, "icloud": 35.0,
+        "abitudini": 60.0, "heets": 60.0,
+        "cura personal": 50.0, "parrucchier": 50.0,
+        "tempo liber": 80.0, "cinema": 80.0,
+        "elettronic": 80.0, "pc": 80.0, "gadget": 80.0,
+        "famiglia": 100.0, "tasse": 100.0, "imposte": 100.0, "commissioni": 50.0,
+        "imprevisti": 100.0
+    }
 
-        is_tr_h = (
-            (h_dir.str.lower() == "transfer") |
-            (h_nat.str.lower() == "transfer") |
-            (h_cat.str.contains("girocont|trasferiment|sistemazion", case=False, na=False)) |
-            (h_notes.str.contains(r"\[transfer\]", case=False, na=False))
-        )
-        is_inv_h = (
-            (h_cat.str.contains("investiment|titoli|azioni|criptovalut|crypto", case=False, na=False)) |
-            (h_notes.str.contains(r"\[investment\]|pac |degiro|binance", case=False, na=False))
-        )
-        df_h = df_cf_historical[(h_dir == "outflow") & (~is_tr_h) & (~is_inv_h)].copy()
-        if not df_h.empty:
-            df_h["tx_date_dt"] = pd.to_datetime(df_h["tx_date"])
-            df_h["year_month"] = df_h["tx_date_dt"].dt.strftime("%Y-%m")
-            n_m = max(1, df_h["year_month"].nunique())
-            h_sum = df_h.groupby("category_name")["amount"].sum()
-            hist_monthly_avg = (h_sum / n_m).to_dict()
+    def _get_benchmark(c_name: str) -> float:
+        c_low = str(c_name).lower()
+        for k, v in BENCHMARK_BUDGETS.items():
+            if k in c_low:
+                return v
+        return 100.0
 
     rows = []
     custom_budgets = custom_budgets or {}
@@ -2282,10 +2289,8 @@ def compute_envelope_budget_analytics(
         # Budget mensile stimato o personalizzato
         if cat in custom_budgets:
             monthly_b = float(custom_budgets[cat])
-        elif cat in hist_monthly_avg and hist_monthly_avg[cat] > 0:
-            monthly_b = round(hist_monthly_avg[cat] * 1.05, 2)
         else:
-            monthly_b = round((actual / n_period_months) * 1.10, 2)
+            monthly_b = _get_benchmark(cat)
 
         # Budget totale scalato per i mesi del periodo analizzato
         b_target = round(monthly_b * n_period_months, 2)
@@ -2296,7 +2301,7 @@ def compute_envelope_budget_analytics(
         if pct_used > 100.0:
             status = "🔴 SFORATO"
             color = "#f43f5e"
-        elif pct_used >= 85.0:
+        elif pct_used >= 90.0:
             status = "🟡 ATTENZIONE"
             color = "#f59e0b"
         else:
