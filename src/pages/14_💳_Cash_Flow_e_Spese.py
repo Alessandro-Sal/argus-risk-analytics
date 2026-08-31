@@ -105,7 +105,7 @@ render_page_header(
     icon="💳"
 )
 
-col_f1, col_f2 = st.columns([1.5, 1.5])
+col_f1, col_f2, col_f3, col_f4 = st.columns([1.3, 0.9, 1.1, 1.1])
 with col_f1:
     if len(prof_map) > 1:
         sel_pid = st.selectbox(
@@ -118,37 +118,90 @@ with col_f1:
         if sel_pid != current_pid:
             st.session_state["wealth_active_portfolio_id"] = sel_pid
             st.rerun()
+    else:
+        st.selectbox("Profilo Patrimoniale:", [f"📁 {prof_title}"], disabled=True, key="cf_profile_single")
+
 with col_f2:
     year_opts = ["🌐 Tutto lo Storico"] + [str(y) for y in available_years]
     def_idx = year_opts.index("2026") if "2026" in year_opts else 0
     sel_year_str = st.selectbox("Anno di Analisi:", year_opts, index=def_idx, key="cf_year_selector_widget")
 
-# Filtra per anno selezionato
-if sel_year_str != "🌐 Tutto lo Storico" and not df_cf.empty:
-    sel_y = int(sel_year_str)
-    df_cf_filtered = df_cf[df_cf["tx_date"].dt.year == sel_y].copy()
-else:
-    df_cf_filtered = df_cf.copy() if not df_cf.empty else pd.DataFrame()
+with col_f3:
+    month_names_map = {
+        0: "🌐 Tutto l'Anno",
+        1: "01 - Gennaio",
+        2: "02 - Febbraio",
+        3: "03 - Marzo",
+        4: "04 - Aprile",
+        5: "05 - Maggio",
+        6: "06 - Giugno",
+        7: "07 - Luglio",
+        8: "08 - Agosto",
+        9: "09 - Settembre",
+        10: "10 - Ottobre",
+        11: "11 - Novembre",
+        12: "12 - Dicembre"
+    }
+    month_opts = list(month_names_map.keys())
+    sel_month_num = st.selectbox(
+        "Mese di Analisi:",
+        options=month_opts,
+        format_func=lambda m: month_names_map[m],
+        index=0,
+        key="cf_month_selector_widget"
+    )
+
+with col_f4:
+    available_accs = ["🌐 Tutti i Conti"]
+    if not df_cf.empty and "account_name" in df_cf.columns:
+        acc_list = sorted([str(a) for a in df_cf["account_name"].dropna().unique()])
+        available_accs.extend(acc_list)
+    sel_acc = st.selectbox("Conto / Carta:", available_accs, index=0, key="cf_account_selector_widget")
+
+# Filtra dataset Cash Flow
+df_cf_filtered = df_cf.copy() if not df_cf.empty else pd.DataFrame()
+if not df_cf_filtered.empty:
+    if sel_year_str != "🌐 Tutto lo Storico":
+        sel_y = int(sel_year_str)
+        df_cf_filtered = df_cf_filtered[df_cf_filtered["tx_date"].dt.year == sel_y]
+    if sel_month_num != 0:
+        df_cf_filtered = df_cf_filtered[df_cf_filtered["tx_date"].dt.month == sel_month_num]
+    if sel_acc != "🌐 Tutti i Conti":
+        df_cf_filtered = df_cf_filtered[df_cf_filtered["account_name"] == sel_acc]
 
 cf_analytics = compute_cashflow_analytics(df_cf_filtered)
 
-
 # ── TOP KPI ROW ─────────────────────────────────────────────
 c1, c2, c3, c4, c5 = st.columns(5)
+is_single_month = (sel_month_num != 0)
+month_label = month_names_map[sel_month_num].split(" - ")[-1] if is_single_month else ""
+
 with c1:
-    metric_card("Entrate Totali", fmt_eur(cf_analytics.get("total_inflow", 0.0)), delta="Accrediti & Compensi", delta_color="normal")
+    kpi_title_in = f"Entrate {month_label}" if is_single_month else "Entrate Totali"
+    metric_card(kpi_title_in, fmt_eur(cf_analytics.get("total_inflow", 0.0)), delta="Accrediti & Compensi", delta_color="normal")
 with c2:
-    metric_card("Uscite Totali", fmt_eur(cf_analytics.get("total_outflow", 0.0)), delta="Spese & Oneri", delta_color="inverse")
+    kpi_title_out = f"Uscite {month_label}" if is_single_month else "Uscite Totali"
+    metric_card(kpi_title_out, fmt_eur(cf_analytics.get("total_outflow", 0.0)), delta="Spese & Oneri", delta_color="inverse")
 with c3:
     net_cf = cf_analytics.get("net_savings", cf_analytics.get("net_cash_flow", 0.0))
     net_col = "normal" if net_cf >= 0 else "inverse"
     sav_r = cf_analytics.get("savings_rate_pct", cf_analytics.get("savings_rate", 0.0))
-    metric_card("Risparmio Netto", fmt_eur(net_cf), delta=f"{sav_r:.1f}% Savings Rate", delta_color=net_col)
+    kpi_title_net = f"Risparmio {month_label}" if is_single_month else "Risparmio Netto"
+    metric_card(kpi_title_net, fmt_eur(net_cf), delta=f"{sav_r:.1f}% Savings Rate", delta_color=net_col)
 with c4:
-    burn_r = cf_analytics.get("avg_monthly_expense", cf_analytics.get("monthly_burn_rate", 0.0))
-    metric_card("Burn Rate Medio", fmt_eur(burn_r), delta="Spesa Mensile Media", delta_color="inverse")
+    if is_single_month:
+        tot_out = cf_analytics.get("total_outflow", 0.0)
+        daily_burn = tot_out / 30.0
+        metric_card("Burn Rate Giornaliero", fmt_eur(daily_burn), delta="Spesa Media / Giorno", delta_color="inverse")
+    else:
+        burn_r = cf_analytics.get("avg_monthly_expense", cf_analytics.get("monthly_burn_rate", 0.0))
+        metric_card("Burn Rate Medio", fmt_eur(burn_r), delta="Spesa Mensile Media", delta_color="inverse")
 with c5:
-    metric_card("Entrata Media Mensile", fmt_eur(cf_analytics.get("avg_monthly_income", 0.0)), delta="Cash Inflow Medio", delta_color="normal")
+    if is_single_month:
+        tx_count = len(df_cf_filtered)
+        metric_card("Attività Mese", f"{tx_count} Movimenti", delta="Transazioni Registrate", delta_color="normal")
+    else:
+        metric_card("Entrata Media Mensile", fmt_eur(cf_analytics.get("avg_monthly_income", 0.0)), delta="Cash Inflow Medio", delta_color="normal")
 
 st.divider()
 
@@ -305,8 +358,9 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_sankey, tab_subs, tab_fc, tab_ledger = st.tabs([
+tab_sankey, tab_trend, tab_subs, tab_fc, tab_ledger = st.tabs([
     "🌊 Diagramma Sankey & Flussi",
+    "📊 Trend Mensile & Statistiche MoM",
     "🔁 Abbonamenti & Costi Fissi (Sentinel)",
     "🔮 Previsione Cassa & Anomalie",
     "📜 Libro Mastro & Inserimento"
@@ -430,6 +484,139 @@ with tab_sankey:
         </div>
         """, unsafe_allow_html=True)
         st.progress(min(1.0, max(0.0, savings_p / 100.0)))
+
+
+with tab_trend:
+    st.markdown("### 📊 Evoluzione Mensile & Statistiche MoM (Month-over-Month)")
+    st.caption("Confronto dinamico delle entrate, uscite, tasso di risparmio e ripartizione di spesa mese su mese.")
+    
+    # Dataset per il trend (usa df_cf dell'anno selezionato o globale)
+    df_trend_src = df_cf.copy() if not df_cf.empty else pd.DataFrame()
+    if not df_trend_src.empty and sel_year_str != "🌐 Tutto lo Storico":
+        df_trend_src = df_trend_src[df_trend_src["tx_date"].dt.year == int(sel_year_str)]
+    if not df_trend_src.empty and sel_acc != "🌐 Tutti i Conti":
+        df_trend_src = df_trend_src[df_trend_src["account_name"] == sel_acc]
+
+    if not df_trend_src.empty:
+        df_trend_src["year_month"] = df_trend_src["tx_date"].dt.strftime("%Y-%m")
+        
+        # Aggregazione mensile
+        m_in = df_trend_src[df_trend_src["direction"] == "inflow"].groupby("year_month")["amount"].sum()
+        m_out = df_trend_src[df_trend_src["direction"] == "outflow"].groupby("year_month")["amount"].sum()
+        
+        all_ym = sorted(list(set(m_in.index).union(set(m_out.index))))
+        df_monthly = pd.DataFrame({"year_month": all_ym})
+        df_monthly["Entrate"] = df_monthly["year_month"].map(m_in).fillna(0.0)
+        df_monthly["Uscite"] = df_monthly["year_month"].map(m_out).fillna(0.0)
+        df_monthly["Risparmio_Netto"] = df_monthly["Entrate"] - df_monthly["Uscite"]
+        df_monthly["Savings_Rate_Pct"] = np.where(
+            df_monthly["Entrate"] > 0,
+            (df_monthly["Risparmio_Netto"] / df_monthly["Entrate"]) * 100.0,
+            0.0
+        )
+        df_monthly["MoM_Uscite_Pct"] = df_monthly["Uscite"].pct_change() * 100.0
+
+        # Grafico Trend Barre + Linea
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Bar(
+            x=df_monthly["year_month"],
+            y=df_monthly["Entrate"],
+            name="Entrate (€)",
+            marker_color="#10b981",
+            hovertemplate="<b>%{x}</b><br>Entrate: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_trend.add_trace(go.Bar(
+            x=df_monthly["year_month"],
+            y=df_monthly["Uscite"],
+            name="Uscite (€)",
+            marker_color="#f43f5e",
+            hovertemplate="<b>%{x}</b><br>Uscite: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_trend.add_trace(go.Bar(
+            x=df_monthly["year_month"],
+            y=df_monthly["Risparmio_Netto"],
+            name="Risparmio Netto (€)",
+            marker_color="#38bdf8",
+            hovertemplate="<b>%{x}</b><br>Risparmio: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_trend.add_trace(go.Scatter(
+            x=df_monthly["year_month"],
+            y=df_monthly["Savings_Rate_Pct"],
+            name="Savings Rate (%)",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color="#f59e0b", width=2.5),
+            marker=dict(size=6),
+            hovertemplate="<b>%{x}</b><br>Savings Rate: <b>%{y:.1f}%</b><extra></extra>"
+        ))
+
+        fig_trend.update_layout(
+            barmode="group",
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=340,
+            margin=dict(l=10, r=10, t=30, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            yaxis=dict(title="Importo (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+            yaxis2=dict(title="Savings Rate (%)", overlaying="y", side="right", showgrid=False, range=[-20, 100])
+        )
+        st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
+
+        # Sezione Dettaglio & Top Categories
+        tr_c1, tr_c2 = st.columns([1.3, 1.0])
+        with tr_c1:
+            st.markdown("##### 📋 Riepilogo Mese per Mese")
+            df_m_show = df_monthly.copy()
+            df_m_show["Mese"] = df_m_show["year_month"]
+            df_m_show["Entrate_fmt"] = df_m_show["Entrate"].apply(lambda v: f"€ {v:,.2f}")
+            df_m_show["Uscite_fmt"] = df_m_show["Uscite"].apply(lambda v: f"€ {v:,.2f}")
+            df_m_show["Netto_fmt"] = df_m_show["Risparmio_Netto"].apply(lambda v: f"€ {v:,.2f}")
+            df_m_show["SR_fmt"] = df_m_show["Savings_Rate_Pct"].apply(lambda v: f"{v:.1f}%")
+            df_m_show["MoM_fmt"] = df_m_show["MoM_Uscite_Pct"].apply(lambda v: f"{v:+.1f}%" if pd.notna(v) else "-")
+
+            st.dataframe(
+                df_m_show[["Mese", "Entrate_fmt", "Uscite_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
+                    "Entrate_fmt": "Entrate",
+                    "Uscite_fmt": "Uscite",
+                    "Netto_fmt": "Risparmio Netto",
+                    "SR_fmt": "Savings Rate",
+                    "MoM_fmt": "Δ Uscite MoM"
+                }),
+                hide_index=True,
+                use_container_width=True
+            )
+
+        with tr_c2:
+            st.markdown("##### 🏆 Top 10 Categorie di Spesa")
+            df_outflows = df_cf_filtered[df_cf_filtered["direction"] == "outflow"]
+            if not df_outflows.empty:
+                cat_agg = df_outflows.groupby("category_name")["amount"].sum().reset_index()
+                cat_agg = cat_agg.sort_values(by="amount", ascending=False).head(10)
+                
+                fig_top_cat = px.bar(
+                    cat_agg,
+                    x="amount",
+                    y="category_name",
+                    orientation="h",
+                    color="amount",
+                    color_continuous_scale="Blues",
+                    labels={"amount": "Speso (€)", "category_name": "Categoria"}
+                )
+                fig_top_cat.update_layout(
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=280,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    yaxis=dict(autorange="reversed"),
+                    coloraxis_showscale=False
+                )
+                st.plotly_chart(fig_top_cat, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("Nessuna uscita registrata per il periodo selezionato.")
+    else:
+        st.info("Nessun dato storico per elaborare il trend mensile.")
 
 
 with tab_subs:
