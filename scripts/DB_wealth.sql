@@ -1,8 +1,14 @@
-﻿-- ============================================================
+-- ============================================================
 -- scripts/DB_wealth.sql
 -- ARGUS — Wealth Management & Personal Finance Schema
 -- Multi-Account, Multi-Currency, Cash Flow & Net Worth
 -- ============================================================
+
+CREATE DATABASE IF NOT EXISTS wealth
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE wealth;
 
 -- ------------------------------------------------------------
 -- 1. WEALTH ACCOUNTS (Conti Correnti, Risparmio, Carte, Debiti)

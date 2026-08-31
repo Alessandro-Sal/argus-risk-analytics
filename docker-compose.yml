@@ -27,6 +27,8 @@ services:
       - MYSQL_DATABASE=investment_risk_bi
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./scripts/DB.sql:/docker-entrypoint-initdb.d/01_DB.sql:ro
+      - ./scripts/DB_wealth.sql:/docker-entrypoint-initdb.d/02_DB_wealth.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       timeout: 20s
