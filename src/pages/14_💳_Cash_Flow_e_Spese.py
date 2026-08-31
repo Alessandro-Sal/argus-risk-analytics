@@ -873,33 +873,113 @@ with tab_envelope:
         st.plotly_chart(fig_env, use_container_width=True, config={'displayModeBar': False})
 
         st.markdown("---")
-        st.markdown("##### 📊 Avanzamento Plafond Dettagliato per Categoria")
         
-        # Tabella / Dettaglio Categorie
-        for _, r in df_envelope.iterrows():
-            c_name = r["category_name"]
-            c_act = r["actual_spent"]
-            c_lim = r["budget_limit"]
-            c_mon = r.get("monthly_budget", c_lim / max(1, n_m_env))
-            c_pct = r["pct_used"]
-            c_stat = r["status"]
-            c_rem = r["remaining_budget"]
-            c_color = r["color"]
-            
-            p_val = min(1.0, max(0.0, c_pct / 100.0))
-            col_b1, col_b2, col_b3 = st.columns([2.2, 1.4, 1.0])
-            with col_b1:
-                st.markdown(f"**{c_name}** <span style='font-size:11px; color:#94a3b8;'>({r['nature'].upper()})</span>", unsafe_allow_html=True)
-                st.progress(p_val)
-            with col_b2:
-                mon_str = f" <span style='color:#64748b; font-size:12px;'>(~{fmt_eur(c_mon)}/m)</span>" if n_m_env > 1 else ""
-                st.markdown(f"Speso: **{fmt_eur(c_act)}** / Budget: **{fmt_eur(c_lim)}**{mon_str}", unsafe_allow_html=True)
-            with col_b3:
-                rem_text = f"+{fmt_eur(c_rem)} liberi" if c_rem >= 0 else f"-{fmt_eur(abs(c_rem))} sforati"
-                st.markdown(f"{c_stat} `({c_pct:.0f}%)` | *{rem_text}*")
-            st.write("")
-    else:
-        st.info("Nessuna uscita registrata per il periodo selezionato.")
+        # Filtro Stato & Intestazione
+        env_f1, env_f2 = st.columns([2.0, 1.0])
+        with env_f1:
+            st.markdown("##### 📊 Avanzamento Plafond Dettagliato per Categoria")
+        with env_f2:
+            stat_filter = st.selectbox(
+                "Filtra per Stato:",
+                ["🌐 Tutte le Categorie", "🔴 Solo Sforate (>100%)", "🟡 In Attenzione (90-100%)", "🟢 Sotto Controllo (<90%)"],
+                key="env_status_filter_select"
+            )
+
+        df_env_filtered = df_envelope.copy()
+        if stat_filter.startswith("🔴"):
+            df_env_filtered = df_env_filtered[df_env_filtered["pct_used"] > 100.0]
+        elif stat_filter.startswith("🟡"):
+            df_env_filtered = df_env_filtered[(df_env_filtered["pct_used"] >= 90.0) & (df_env_filtered["pct_used"] <= 100.0)]
+        elif stat_filter.startswith("🟢"):
+            df_env_filtered = df_env_filtered[df_env_filtered["pct_used"] < 90.0]
+
+        def _get_cat_icon(c_name: str) -> str:
+            cn = str(c_name).lower()
+            if "casa" in cn or "affitto" in cn or "utenze" in cn: return "🏠"
+            if "spesa" in cn or "alimentar" in cn or "supermercat" in cn: return "🛒"
+            if "trasport" in cn or "benzin" in cn or "auto" in cn or "macchina" in cn: return "🚗"
+            if "ristorant" in cn or "pizzeri" in cn or "sushi" in cn: return "🍽️"
+            if "serat" in cn or "bar" in cn or "aperitiv" in cn: return "🍹"
+            if "viagg" in cn or "vol" in cn or "vacanz" in cn: return "✈️"
+            if "istruzion" in cn or "cors" in cn or "libr" in cn: return "🎓"
+            if "shopping" in cn or "abbigliamento" in cn: return "🛍️"
+            if "regali" in cn or "laure" in cn or "eventi" in cn: return "🎁"
+            if "salute" in cn or "farmaci" in cn or "visite" in cn: return "🏥"
+            if "abbonament" in cn or "streaming" in cn or "spotify" in cn or "icloud" in cn: return "📱"
+            if "abitudini" in cn or "heets" in cn: return "🚬"
+            if "cura personal" in cn or "parrucchier" in cn: return "💇"
+            if "tempo liber" in cn or "cinema" in cn: return "🎟️"
+            if "elettronic" in cn or "pc" in cn or "gadget" in cn: return "💻"
+            if "famiglia" in cn: return "👨‍👩‍👧"
+            if "tasse" in cn or "imposte" in cn or "commissioni" in cn: return "🏛️"
+            return "🏷️"
+
+        # Render Griglia a 2 Colonne
+        if not df_env_filtered.empty:
+            cols = st.columns(2)
+            for idx, (_, r) in enumerate(df_env_filtered.iterrows()):
+                col_target = cols[idx % 2]
+                c_name = r["category_name"]
+                c_act = r["actual_spent"]
+                c_lim = r["budget_limit"]
+                c_mon = r.get("monthly_budget", c_lim / max(1, n_m_env))
+                c_pct = r["pct_used"]
+                c_rem = r["remaining_budget"]
+                c_nat = str(r["nature"]).lower()
+                c_icon = _get_cat_icon(c_name)
+
+                # Natura styling
+                if "need" in c_nat:
+                    nat_label, nat_col, nat_bg = "Needs (50%)", "#38bdf8", "rgba(56, 189, 248, 0.12)"
+                elif "want" in c_nat:
+                    nat_label, nat_col, nat_bg = "Wants (30%)", "#fbbf24", "rgba(251, 191, 36, 0.12)"
+                else:
+                    nat_label, nat_col, nat_bg = "Tasse & Oneri", "#a78bfa", "rgba(167, 139, 250, 0.12)"
+
+                # Status styling
+                if c_pct > 100.0:
+                    stat_badge = f"🔴 SFORATO ({c_pct:.0f}%)"
+                    s_col, s_bg, s_border = "#f43f5e", "rgba(244, 63, 94, 0.15)", "rgba(244, 63, 94, 0.3)"
+                    grad_fill = "linear-gradient(90deg, #e11d48, #f43f5e)"
+                    diff_html = f"<span style='color:#f43f5e; font-weight:600;'>-€ {abs(c_rem):,.2f} sforati</span>"
+                elif c_pct >= 90.0:
+                    stat_badge = f"🟡 ATTENZIONE ({c_pct:.0f}%)"
+                    s_col, s_bg, s_border = "#f59e0b", "rgba(245, 158, 11, 0.15)", "rgba(245, 158, 11, 0.3)"
+                    grad_fill = "linear-gradient(90deg, #d97706, #f59e0b)"
+                    diff_html = f"<span style='color:#f59e0b; font-weight:600;'>+€ {c_rem:,.2f} residui</span>"
+                else:
+                    stat_badge = f"🟢 OK ({c_pct:.0f}%)"
+                    s_col, s_bg, s_border = "#10b981", "rgba(16, 185, 129, 0.15)", "rgba(16, 185, 129, 0.3)"
+                    grad_fill = "linear-gradient(90deg, #059669, #10b981)"
+                    diff_html = f"<span style='color:#10b981; font-weight:600;'>+€ {c_rem:,.2f} liberi</span>"
+
+                bar_fill_pct = min(100.0, max(2.0, c_pct))
+                mon_str = f"<span style='color:#64748b; font-size:11px;'> (~{fmt_eur(c_mon)}/m)</span>" if n_m_env > 1 else ""
+
+                with col_target:
+                    st.markdown(f"""
+                    <div style="background:rgba(15, 23, 42, 0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px 16px; margin-bottom:12px; box-shadow:0 4px 12px rgba(0,0,0,0.15);">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:18px;">{c_icon}</span>
+                                <div>
+                                    <div style="font-size:14px; font-weight:600; color:#f8fafc;">{c_name}</div>
+                                    <span style="font-size:10px; font-weight:600; color:{nat_col}; background:{nat_bg}; padding:2px 6px; border-radius:4px; text-transform:uppercase;">{nat_label}</span>
+                                </div>
+                            </div>
+                            <span style="font-size:11px; font-weight:700; color:{s_col}; background:{s_bg}; padding:3px 8px; border-radius:12px; border:1px solid {s_border}; white-space:nowrap;">{stat_badge}</span>
+                        </div>
+                        <div style="width:100%; background:rgba(255,255,255,0.08); height:7px; border-radius:4px; overflow:hidden; margin:8px 0;">
+                            <div style="width:{bar_fill_pct}%; background:{grad_fill}; height:100%; border-radius:4px;"></div>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:6px;">
+                            <div style="color:#94a3b8;">Speso: <b style="color:#ffffff;">{fmt_eur(c_act)}</b> <span style="color:#64748b;">/ {fmt_eur(c_lim)}</span>{mon_str}</div>
+                            <div>{diff_html}</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        else:
+            st.info("Nessuna categoria corrisponde al filtro selezionato.")
 
 
 # ── 5. ABBONAMENTI & COSTI FISSI ────────────────────────────
