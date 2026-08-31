@@ -517,6 +517,16 @@ def render_sidebar():
         if "base_currency" not in st.session_state: st.session_state.base_currency = "EUR"
         if "ui_theme" not in st.session_state: st.session_state.ui_theme = "Midnight Obsidian"
 
+        # Wealth Specific Settings Defaults
+        if "wealth_budget_preset" not in st.session_state: st.session_state.wealth_budget_preset = "50/30/20 Standard"
+        if "wealth_budget_needs_pct" not in st.session_state: st.session_state.wealth_budget_needs_pct = 50.0
+        if "wealth_budget_wants_pct" not in st.session_state: st.session_state.wealth_budget_wants_pct = 30.0
+        if "wealth_budget_savings_pct" not in st.session_state: st.session_state.wealth_budget_savings_pct = 20.0
+        if "wealth_fire_swr" not in st.session_state: st.session_state.wealth_fire_swr = 4.0
+        if "wealth_target_retirement_age" not in st.session_state: st.session_state.wealth_target_retirement_age = 67
+        if "wealth_tax_regime" not in st.session_state: st.session_state.wealth_tax_regime = "Ordinario (26%)"
+        if "wealth_pension_deduction_limit" not in st.session_state: st.session_state.wealth_pension_deduction_limit = 5164.57
+
         # Sincronizzazione reattiva immediata prima del rendering del badge
         if "sb_offline_toggle" in st.session_state:
             st.session_state.offline_mode = st.session_state.sb_offline_toggle
@@ -551,6 +561,19 @@ def render_sidebar():
         if "sb_port_name" in st.session_state:
             st.session_state.portfolio_name = st.session_state.sb_port_name
 
+        if "sb_wb_needs" in st.session_state:
+            st.session_state.wealth_budget_needs_pct = float(st.session_state.sb_wb_needs)
+        if "sb_wb_wants" in st.session_state:
+            st.session_state.wealth_budget_wants_pct = float(st.session_state.sb_wb_wants)
+        if "sb_wb_savings" in st.session_state:
+            st.session_state.wealth_budget_savings_pct = float(st.session_state.sb_wb_savings)
+        if "sb_wealth_swr_input" in st.session_state:
+            st.session_state.wealth_fire_swr = float(st.session_state.sb_wealth_swr_input)
+        if "sb_wealth_age_input" in st.session_state:
+            st.session_state.wealth_target_retirement_age = int(st.session_state.sb_wealth_age_input)
+        if "sb_wealth_tax_regime" in st.session_state:
+            st.session_state.wealth_tax_regime = st.session_state.sb_wealth_tax_regime
+
         from core.yield_curve import get_active_risk_free_rate
         if "rf_mode" not in st.session_state: st.session_state.rf_mode = "Auto (Live Market)"
         if "custom_rf_rate_pct" not in st.session_state: st.session_state.custom_rf_rate_pct = 2.75
@@ -571,17 +594,23 @@ def render_sidebar():
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
 
         cur_page_name = get_current_page_name()
+        in_wealth_page = any(w in cur_page_name for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"])
+        
         if "argus_portal_mode" not in st.session_state:
-            if any(w in cur_page_name for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"]):
-                st.session_state.argus_portal_mode = "🏛️ Wealth Management"
-            else:
-                st.session_state.argus_portal_mode = "📊 Risk Analytics"
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management" if in_wealth_page else "📊 Risk Analytics"
+        elif in_wealth_page and st.session_state.argus_portal_mode != "🏛️ Wealth Management":
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+        elif not in_wealth_page and any(w in cur_page_name for w in ["0_", "1_", "2_", "3_", "4_", "5_", "6_", "7_", "8_", "9_", "10_", "11_"]) and st.session_state.argus_portal_mode != "📊 Risk Analytics":
+            st.session_state.argus_portal_mode = "📊 Risk Analytics"
 
-
-
-        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth Management")
+        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth Management") or in_wealth_page
 
         if is_wealth_mode:
+            w_needs = int(st.session_state.wealth_budget_needs_pct)
+            w_wants = int(st.session_state.wealth_budget_wants_pct)
+            w_savings = int(st.session_state.wealth_budget_savings_pct)
+            w_rule_label = f"{w_needs}/{w_wants}/{w_savings}"
+            
             st.markdown(f"""
             <div style="background:rgba(16, 185, 129, 0.10); border:1px solid rgba(16, 185, 129, 0.35); border-radius:10px; padding: 10px 12px; margin-bottom: 8px; backdrop-filter: blur(10px);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
@@ -594,8 +623,12 @@ def render_sidebar():
                     🏛️ Wealth &amp; Personal Finance
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
-                    <span>🗄️ <b style="color:#c9d1d9;">wealth</b></span>
-                    <span>💱 <b style="color:#c9d1d9;">EUR</b> &bull; 🏷️ <b style="color:#c9d1d9;">50/30/20</b></span>
+                    <span>🗄️ <b style="color:#c9d1d9;">{st.session_state.db_name}</b></span>
+                    <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🏷️ <b style="color:#34d399;">{w_rule_label}</b></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 4px;">
+                    <span>🔥 SWR <b style="color:#f59e0b;">{st.session_state.wealth_fire_swr:.1f}%</b></span>
+                    <span style="color:#8b949e; font-size:9.5px;">🎯 Pensione: <b style="color:#38bdf8;">{st.session_state.wealth_target_retirement_age}a</b></span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -728,12 +761,14 @@ def render_sidebar():
 
         st.divider()
 
-        # ── 3. PARAMETRI ENGINE & DB (CONFIGURAZIONE) ─────────────────
-        with st.expander("⚙️ Parametri Engine & DB", expanded=False):
+        # ── 3. PARAMETRI ENGINE & DB (CONFIGURAZIONE DINAMICA) ────────
+        expander_title = "⚙️ Impostazioni Wealth & Budget" if is_wealth_mode else "⚙️ Parametri Risk & Portfolio"
+        with st.expander(expander_title, expanded=False):
             st.toggle("Modalità Offline (Senza DB)", value=st.session_state.offline_mode, key="sb_offline_toggle")
 
             if not st.session_state.offline_mode:
-                st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 4px 0 2px;">Connessione MySQL</div>', unsafe_allow_html=True)
+                hdr_color = "#34d399" if is_wealth_mode else "#ff9900"
+                st.markdown(f'<div style="font-size:10px; font-weight:700; color:{hdr_color}; letter-spacing:0.5px; text-transform:uppercase; margin: 4px 0 2px;">Connessione MySQL</div>', unsafe_allow_html=True)
                 col_h, col_p = st.columns([2, 1.2])
                 with col_h:
                     st.text_input("Host", value=st.session_state.db_host, key="sb_db_host")
@@ -747,7 +782,7 @@ def render_sidebar():
                     st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
                 
                 db_options = ["wealth", "investment_risk_bi", "Custom..."]
-                current_db = st.session_state.get("db_name", "wealth")
+                current_db = st.session_state.get("db_name", "wealth" if is_wealth_mode else "investment_risk_bi")
                 db_idx = db_options.index(current_db) if current_db in ["wealth", "investment_risk_bi"] else db_options.index("Custom...")
                 sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
                 if sel_db == "Custom...":
@@ -757,42 +792,126 @@ def render_sidebar():
             else:
                 st.info("☁️ **Modalità In-Memory**: i calcoli avvengono in RAM/Cache senza connessione MySQL.")
 
-            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Benchmark</div>', unsafe_allow_html=True)
-            st.text_input("Nome Portafoglio", value=st.session_state.portfolio_name, key="sb_port_name")
-            
-            col_curr, col_bench = st.columns([1.1, 1.9])
-            with col_curr:
-                curr_options = ["EUR", "USD", "GBP", "CHF"]
-                curr_current = st.session_state.get("base_currency", "EUR")
-                curr_idx = curr_options.index(curr_current) if curr_current in curr_options else 0
-                st.selectbox("Valuta", curr_options, index=curr_idx, key="sb_base_currency")
-            
-            with col_bench:
-                bench_options = ["SPY", "QQQ", "VWRL.L", "^GSPC", "^STOXX50E", "VWCE.MI", "URTH", "BTC-USD", "Custom..."]
-                current_bench = st.session_state.get("benchmark", "SPY")
-                b_idx = bench_options.index(current_bench) if current_bench in bench_options[:-1] else bench_options.index("Custom...")
-                sel_b = st.selectbox("Benchmark", bench_options, index=b_idx, key="sb_bench_select")
-            
-            if sel_b == "Custom...":
-                cust_b = st.text_input("Ticker Benchmark Custom", value="" if current_bench in bench_options[:-1] else current_bench, key="sb_custom_bench").strip().upper()
-                if cust_b:
-                    st.session_state.benchmark = cust_b
+            if is_wealth_mode:
+                # ── WEALTH & PERSONAL FINANCE SETTINGS ──
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Valuta Wealth</div>', unsafe_allow_html=True)
+                col_wp, col_wcurr = st.columns([2, 1.2])
+                with col_wp:
+                    st.text_input("Nome Profilo", value=st.session_state.portfolio_name, key="sb_port_name")
+                with col_wcurr:
+                    curr_options = ["EUR", "USD", "GBP", "CHF"]
+                    curr_current = st.session_state.get("base_currency", "EUR")
+                    curr_idx = curr_options.index(curr_current) if curr_current in curr_options else 0
+                    st.selectbox("Valuta", curr_options, index=curr_idx, key="sb_base_currency")
 
-            st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Tasso Privo di Rischio (Risk-Free)</div>', unsafe_allow_html=True)
-            col_rf_m, col_rf_v = st.columns([1.3, 1.0])
-            with col_rf_m:
-                rf_mode_opts = ["Auto (Live Market)", "Manuale"]
-                rf_mode_idx = 0 if st.session_state.rf_mode == "Auto (Live Market)" else 1
-                st.selectbox("Modalità Rf", rf_mode_opts, index=rf_mode_idx, key="sb_rf_mode")
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">⚖️ Regola di Budget & Risparmio</div>', unsafe_allow_html=True)
+                preset_options = [
+                    "50/30/20 Standard",
+                    "40/20/40 Aggressivo FIRE",
+                    "60/25/15 Prudenziale",
+                    "30/15/55 Super Frugale",
+                    "Personalizzato (Custom %)"
+                ]
+                preset_map = {
+                    "50/30/20 Standard": (50.0, 30.0, 20.0),
+                    "40/20/40 Aggressivo FIRE": (40.0, 20.0, 40.0),
+                    "60/25/15 Prudenziale": (60.0, 25.0, 15.0),
+                    "30/15/55 Super Frugale": (30.0, 15.0, 55.0),
+                }
 
-            with col_rf_v:
-                if st.session_state.rf_mode == "Manuale":
-                    st.number_input("Tasso %", min_value=0.0, max_value=25.0, value=float(st.session_state.custom_rf_rate_pct), step=0.25, key="sb_custom_rf")
+                current_preset = st.session_state.get("wealth_budget_preset", "50/30/20 Standard")
+                p_idx = preset_options.index(current_preset) if current_preset in preset_options else 0
+                
+                sel_preset = st.selectbox("Modello di Ripartizione", preset_options, index=p_idx, key="sb_wealth_preset_sel")
+                if sel_preset in preset_map and sel_preset != st.session_state.get("_prev_wealth_preset"):
+                    p_n, p_w, p_s = preset_map[sel_preset]
+                    st.session_state.wealth_budget_preset = sel_preset
+                    st.session_state.wealth_budget_needs_pct = p_n
+                    st.session_state.wealth_budget_wants_pct = p_w
+                    st.session_state.wealth_budget_savings_pct = p_s
+                    st.session_state["_prev_wealth_preset"] = sel_preset
+
+                col_n, col_w, col_s = st.columns(3)
+                with col_n:
+                    n_val = st.number_input("% Needs (🏠)", min_value=5.0, max_value=90.0, value=float(st.session_state.wealth_budget_needs_pct), step=5.0, key="sb_wb_needs")
+                with col_w:
+                    w_val = st.number_input("% Wants (🍽️)", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_wants_pct), step=5.0, key="sb_wb_wants")
+                with col_s:
+                    s_val = st.number_input("% Savings (📈)", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_savings_pct), step=5.0, key="sb_wb_savings")
+                
+                st.session_state.wealth_budget_needs_pct = n_val
+                st.session_state.wealth_budget_wants_pct = w_val
+                st.session_state.wealth_budget_savings_pct = s_val
+                
+                total_alloc = n_val + w_val + s_val
+                if abs(total_alloc - 100.0) < 0.01:
+                    st.caption(f"🟢 **Allocazione 100% Bilanciata** ({n_val:.0f}% Bisogni / {w_val:.0f}% Svago / {s_val:.0f}% Risparmio)")
                 else:
-                    st.text_input("Tasso Live", value=f"{active_rf_info['rate_pct']:.2f}%", disabled=True)
+                    st.caption(f"⚠️ **Totale: {total_alloc:.0f}%** (La somma ideale è 100%)")
 
-            from core.ui_utils import render_risk_free_modal
-            render_risk_free_modal(currency=st.session_state.base_currency, use_popover=True, button_label="ℹ️ Info Metodologia Risk-Free")
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">🔥 Parametri FIRE & Previdenza</div>', unsafe_allow_html=True)
+                col_swr, col_age = st.columns([1.2, 1.2])
+                with col_swr:
+                    swr_val = st.number_input("SWR FIRE %", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, key="sb_wealth_swr_input", help="Safe Withdrawal Rate annuo per la regola del 4% / FIRE")
+                    st.session_state.wealth_fire_swr = swr_val
+                with col_age:
+                    age_val = st.number_input("Età Target", min_value=30, max_value=75, value=int(st.session_state.get("wealth_target_retirement_age", 67)), step=1, key="sb_wealth_age_input", help="Età target desiderata per la pensione o FIRE")
+                    st.session_state.wealth_target_retirement_age = age_val
+
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">🏛️ Fisco & Deducibilità</div>', unsafe_allow_html=True)
+                tax_regimes = ["Ordinario (26%)", "Riforma Unificata 2026 (26%)", "Agevolato Titoli Stato (12.5%)", "Dichiarativo / Quadro RW"]
+                t_idx = tax_regimes.index(st.session_state.get("wealth_tax_regime", "Ordinario (26%)")) if st.session_state.get("wealth_tax_regime") in tax_regimes else 0
+                sel_tax = st.selectbox("Regime Fiscale Predefinito", tax_regimes, index=t_idx, key="sb_wealth_tax_regime")
+                st.session_state.wealth_tax_regime = sel_tax
+
+                with st.popover("ℹ️ Guida Metodologica Wealth & 50/30/20"):
+                    st.markdown("""
+                    **🏛️ Modello di Pianificazione Patrimoniale ARGUS**
+                    * **50% Bisogni Primari (Needs)**: Casa, mutuo/affitto, utenze, spesa alimentare, trasporti essenziali, salute.
+                    * **30% Desideri & Svago (Wants)**: Ristoranti, viaggi, shopping, abbonamenti streaming, hobby.
+                    * **20% Risparmio & Investimenti (Savings)**: PAC azionario/obbligazionario, fondi pensione, incremento liquidità.
+                    * **Safe Withdrawal Rate (SWR)**: Percentuale annua prelevabile dal patrimonio investito per sostenere le spese per 30+ anni (Trinity Study).
+                    * **Deducibilità Fondo Pensione**: Fino a **€ 5.164,57** annui deducibili dall'imponibile IRPEF (art. 51 TUIR).
+                    """)
+
+            else:
+                # ── RISK & QUANT SPECIFIC SETTINGS ──
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Profilo & Benchmark</div>', unsafe_allow_html=True)
+                st.text_input("Nome Portafoglio", value=st.session_state.portfolio_name, key="sb_port_name")
+                
+                col_curr, col_bench = st.columns([1.1, 1.9])
+                with col_curr:
+                    curr_options = ["EUR", "USD", "GBP", "CHF"]
+                    curr_current = st.session_state.get("base_currency", "EUR")
+                    curr_idx = curr_options.index(curr_current) if curr_current in curr_options else 0
+                    st.selectbox("Valuta", curr_options, index=curr_idx, key="sb_base_currency")
+                
+                with col_bench:
+                    bench_options = ["SPY", "QQQ", "VWRL.L", "^GSPC", "^STOXX50E", "VWCE.MI", "URTH", "BTC-USD", "Custom..."]
+                    current_bench = st.session_state.get("benchmark", "SPY")
+                    b_idx = bench_options.index(current_bench) if current_bench in bench_options[:-1] else bench_options.index("Custom...")
+                    sel_b = st.selectbox("Benchmark", bench_options, index=b_idx, key="sb_bench_select")
+                
+                if sel_b == "Custom...":
+                    cust_b = st.text_input("Ticker Benchmark Custom", value="" if current_bench in bench_options[:-1] else current_bench, key="sb_custom_bench").strip().upper()
+                    if cust_b:
+                        st.session_state.benchmark = cust_b
+
+                st.markdown('<div style="font-size:10px; font-weight:700; color:#ff9900; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">Tasso Privo di Rischio (Risk-Free)</div>', unsafe_allow_html=True)
+                col_rf_m, col_rf_v = st.columns([1.3, 1.0])
+                with col_rf_m:
+                    rf_mode_opts = ["Auto (Live Market)", "Manuale"]
+                    rf_mode_idx = 0 if st.session_state.rf_mode == "Auto (Live Market)" else 1
+                    st.selectbox("Modalità Rf", rf_mode_opts, index=rf_mode_idx, key="sb_rf_mode")
+
+                with col_rf_v:
+                    if st.session_state.rf_mode == "Manuale":
+                        st.number_input("Tasso %", min_value=0.0, max_value=25.0, value=float(st.session_state.custom_rf_rate_pct), step=0.25, key="sb_custom_rf")
+                    else:
+                        st.text_input("Tasso Live", value=f"{active_rf_info['rate_pct']:.2f}%", disabled=True)
+
+                from core.ui_utils import render_risk_free_modal
+                render_risk_free_modal(currency=st.session_state.base_currency, use_popover=True, button_label="ℹ️ Info Metodologia Risk-Free")
 
         # ── 4. PULIZIA CACHE & RESET SESSIONE ─────────────────────────
         if st.button("♻️ Svuota Cache & Reset Sessione", use_container_width=True):

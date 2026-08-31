@@ -146,7 +146,8 @@ with tab_fire:
     fc1, fc2, fc3, fc4 = st.columns(4)
     with fc1:
         age_in = st.slider("Età Attuale", min_value=18, max_value=60, value=28)
-        swr_in = st.slider("Safe Withdrawal Rate (%)", min_value=2.5, max_value=5.0, value=4.0, step=0.1)
+        swr_val_default = float(st.session_state.get("wealth_fire_swr", 4.0))
+        swr_in = st.slider("Safe Withdrawal Rate (%)", min_value=2.0, max_value=6.0, value=swr_val_default, step=0.1)
     with fc2:
         exp_ret_in = st.slider("Rendimento Portafoglio Atteso (%)", min_value=3.0, max_value=12.0, value=7.5, step=0.5)
         inf_in = st.slider("Inflazione Attesa (%)", min_value=1.0, max_value=6.0, value=2.0, step=0.5)
