@@ -725,60 +725,65 @@ with tab_merchants:
 
     st.write("")
     if not pareto_data["merchants"].empty:
-        pm_col1, pm_col2 = st.columns([1.5, 1.0])
-        with pm_col1:
-            st.markdown("##### 📈 Curva Cumulativa di Pareto (Top 15 Merchant)")
-            top_15 = pareto_data["merchants"].head(15)
-            fig_p = go.Figure()
-            fig_p.add_trace(go.Bar(
-                x=top_15["clean_merchant"],
-                y=top_15["total_spent"],
-                name="Spesa Totale (€)",
-                marker_color="#6366f1",
-                hovertemplate="<b>%{x}</b><br>Spesa: <b>€ %{y:,.2f}</b><extra></extra>"
-            ))
-            fig_p.add_trace(go.Scatter(
-                x=top_15["clean_merchant"],
-                y=top_15["cumulative_pct"],
-                name="% Cumulativa",
-                yaxis="y2",
-                mode="lines+markers",
-                line=dict(color="#f59e0b", width=2.5),
-                marker=dict(size=6),
-                hovertemplate="<b>%{x}</b><br>Cumulativa: <b>%{y:.1f}%</b><extra></extra>"
-            ))
-            fig_p.add_hline(y=80, line_dash="dash", line_color="#ef4444", yref="y2", annotation_text="Soglia 80% Pareto", annotation_position="top left")
-            fig_p.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                height=320,
-                margin=dict(l=10, r=10, t=30, b=10),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                yaxis=dict(title="Spesa (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
-                yaxis2=dict(title="% Cumulativa", overlaying="y", side="right", showgrid=False, range=[0, 105])
-            )
-            st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
+        # RIGA 1: Curva Cumulativa di Pareto a tutta larghezza
+        st.markdown("##### 📈 Curva Cumulativa di Pareto (Top 15 Esercenti di Spesa)")
+        top_15 = pareto_data["merchants"].head(15)
+        fig_p = go.Figure()
+        fig_p.add_trace(go.Bar(
+            x=top_15["clean_merchant"],
+            y=top_15["total_spent"],
+            name="Spesa Totale (€)",
+            marker_color="#6366f1",
+            hovertemplate="<b>%{x}</b><br>Spesa: <b>€ %{y:,.2f}</b><extra></extra>"
+        ))
+        fig_p.add_trace(go.Scatter(
+            x=top_15["clean_merchant"],
+            y=top_15["cumulative_pct"],
+            name="% Cumulativa",
+            yaxis="y2",
+            mode="lines+markers",
+            line=dict(color="#f59e0b", width=2.5),
+            marker=dict(size=6),
+            hovertemplate="<b>%{x}</b><br>Cumulativa: <b>%{y:.1f}%</b><extra></extra>"
+        ))
+        fig_p.add_hline(y=80, line_dash="dash", line_color="#ef4444", yref="y2", annotation_text="Soglia 80% Pareto", annotation_position="top left")
+        fig_p.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=340,
+            margin=dict(l=10, r=10, t=30, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            xaxis=dict(tickangle=-25),
+            yaxis=dict(title="Spesa (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
+            yaxis2=dict(title="% Cumulativa", overlaying="y", side="right", showgrid=False, range=[0, 105])
+        )
+        st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
 
-        with pm_col2:
-            st.markdown("##### 🍩 Quota di Spesa per Merchant (Top 8)")
-            top_8 = pareto_data["merchants"].head(8)
-            fig_p_donut = go.Figure(data=[go.Pie(
-                labels=top_8["clean_merchant"],
-                values=top_8["total_spent"],
-                hole=0.6,
-                textinfo="percent",
-                hovertemplate="<b>%{label}</b><br>Totale: <b>€ %{value:,.2f}</b> (%{percent})<extra></extra>"
-            )])
-            fig_p_donut.update_layout(
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                height=320,
-                margin=dict(l=10, r=10, t=10, b=10),
-                legend=dict(orientation="h", yanchor="top", y=-0.1, xanchor="center", x=0.5)
-            )
-            st.plotly_chart(fig_p_donut, use_container_width=True, config={'displayModeBar': False})
+        st.markdown("---")
+
+        # RIGA 2: Quota di Spesa per Esercente (Top 10) a tutta larghezza
+        st.markdown("##### 🍩 Quota di Spesa per Esercente (Top 10)")
+        top_10_m = pareto_data["merchants"].head(10)
+        fig_p_donut = go.Figure(data=[go.Pie(
+            labels=top_10_m["clean_merchant"],
+            values=top_10_m["total_spent"],
+            hole=0.55,
+            textinfo="percent+label",
+            textposition="inside",
+            hovertemplate="<b>%{label}</b><br>Totale Speso: <b>€ %{value:,.2f}</b> (%{percent})<extra></extra>"
+        )])
+        fig_p_donut.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=340,
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(orientation="h", yanchor="top", y=-0.08, xanchor="center", x=0.5)
+        )
+        st.plotly_chart(fig_p_donut, use_container_width=True, config={'displayModeBar': False})
+
+        st.markdown("---")
 
         st.markdown("##### 📋 Classifica Completa Merchant & Ticket Medio")
         st.dataframe(
