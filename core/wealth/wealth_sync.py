@@ -95,22 +95,23 @@ def classify_category_semantic(raw_cat: str, raw_details: str = "", raw_type: st
     """
     text = f"{raw_cat} {raw_details} {raw_type}".lower()
 
-    # 1. Investimenti & Crypto
-    if any(k in text for k in ["crypto", "bitcoin", "binance", "ethereum"]):
-        return "Investimenti Criptovalute"
-    if any(k in text for k in ["stocks", "azioni", "degiro", "googl", "corsair", "pac ", "pac isp", "chiusura pac"]):
-        return "Investimenti Titoli & Azioni"
-
-    # 2. Trasferimenti interni & Giroconti
+    # 1. Trasferimenti interni, Giroconti & Sistemazioni di Cassa
     if any(k in text for k in [
         "transfer", "trasferimenti", "giroconto", "sistemazion", "prelievo", "atm", "on the go - isp",
         "isp to revolut", "isp - revolut", "isp - on the go", "isp to n26", "buddy - n26", "isp - buddy"
     ]):
         return "Giroconti & Trasferimenti Interni"
 
+    # 2. Investimenti & Crypto
+    if any(k in text for k in ["crypto", "bitcoin", "binance", "ethereum"]):
+        return "Investimenti Criptovalute"
+    if any(k in text for k in ["stocks", "azioni", "degiro", "googl", "corsair", "pac ", "pac isp", "chiusura pac", "titoli"]):
+        return "Investimenti Titoli & Azioni"
+
+    # 3. Entrate & Redditi Attivi
     if any(k in text for k in ["salary", "stipendio", "sixtema", "sidera", "macelleria lavoro", "14esima"]):
         return "Stipendio & Compensi"
-    if any(k in text for k in ["scholarship", "borsa di studio", "ergo", "unimore", "bs"]):
+    if any(k in text for k in ["scholarship", "borsa di studio", "ergo", "unimore", "borsa studio"]) or re.search(r"\b(bs)\b", text):
         return "Borse di Studio & Premi"
     if re.search(r"\b(parents in|family in|papà|papa|mamma|nonno|zia|zio|edyta|salvadenaio|parenti|famiglia)\b", text):
         if "family out" not in text and "mamma ordine" not in text and "spray mamma" not in text and "bnb" not in text:
