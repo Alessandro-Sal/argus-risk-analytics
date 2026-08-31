@@ -1,27 +1,50 @@
+# Environments & Secrets
+.env
+.env.*
+.streamlit/secrets.toml
+*credentials*.json
+*service_account*.json
+credentials/
+*.pem
+*.key
+
+# Git & Agent Metadata
 .git
-.gitignore
-.venv
-venv/
-env/
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-.pytest_cache
-.DS_Store
-dist/
-build/
-*.spec
-data/*.db
-data/*.sqlite
-data/*.sqlite3
-data/*.csv
-!data/.gitkeep
-exports/*.csv
-exports/*.xlsx
-exports/*.pdf
+.github
+.agents
+.dsp
 scratch/
 logs/
 *.log
-.agents/
-.dsp/
+
+# Python cache & build
+__pycache__/
+*.py[cod]
+*.class
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# Local databases & runtime caches
+*.sqlite
+*.sqlite3
+*.db
+data/argus_local.db
+data/argus_workspaces.db
+data/argus_wealth.db
+data/yfinance_cache.db
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Exports
+exports/*.xlsx
+exports/*.pdf
+exports/*.zip
+exports/*.csv
+!exports/.gitkeep
