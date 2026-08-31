@@ -383,7 +383,12 @@ with tab_sankey:
         st.info("Nessuna transazione per il periodo selezionato.")
 
     st.write("")
-    section("⚖️ Bilanciamento Budget & Destinazione Spese (Regola 50/30/20)")
+    tgt_needs = float(st.session_state.get("wealth_budget_needs_pct", 50.0))
+    tgt_wants = float(st.session_state.get("wealth_budget_wants_pct", 30.0))
+    tgt_savings = float(st.session_state.get("wealth_budget_savings_pct", 20.0))
+    rule_str = f"{tgt_needs:.0f}/{tgt_wants:.0f}/{tgt_savings:.0f}"
+
+    section(f"⚖️ Bilanciamento Budget & Destinazione Spese (Regola {rule_str})")
     r50 = cf_analytics.get("rule_50_30_20", {})
     needs_p = r50.get("needs_pct", 0.0)
     wants_p = r50.get("wants_pct", 0.0)
@@ -395,7 +400,7 @@ with tab_sankey:
         <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #f59e0b; border-radius:10px; padding:14px 18px; min-height:108px; display:flex; flex-direction:column; justify-content:space-between;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; color:#ffffff; font-size:14px;">🏠 Bisogni Primari (Needs)</span>
-                <span style="font-weight:700; color:#f59e0b; font-size:15px;">{needs_p:.1f}% <span style="font-size:11px; color:#8b949e;">(Target 50%)</span></span>
+                <span style="font-weight:700; color:#f59e0b; font-size:15px;">{needs_p:.1f}% <span style="font-size:11px; color:#8b949e;">(Target {tgt_needs:.0f}%)</span></span>
             </div>
             <div style="font-size:13px; color:#8b949e; margin-top:6px;">Totale Speso: <b style="color:#ffffff; font-size:15px;">{fmt_eur(r50.get('needs_amount', 0.0))}</b></div>
         </div>
@@ -407,7 +412,7 @@ with tab_sankey:
         <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #ec4899; border-radius:10px; padding:14px 18px; min-height:108px; display:flex; flex-direction:column; justify-content:space-between;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; color:#ffffff; font-size:14px;">🍽️ Desideri & Svago (Wants)</span>
-                <span style="font-weight:700; color:#ec4899; font-size:15px;">{wants_p:.1f}% <span style="font-size:11px; color:#8b949e;">(Target 30%)</span></span>
+                <span style="font-weight:700; color:#ec4899; font-size:15px;">{wants_p:.1f}% <span style="font-size:11px; color:#8b949e;">(Target {tgt_wants:.0f}%)</span></span>
             </div>
             <div style="font-size:13px; color:#8b949e; margin-top:6px;">Totale Speso: <b style="color:#ffffff; font-size:15px;">{fmt_eur(r50.get('wants_amount', 0.0))}</b></div>
         </div>
@@ -419,7 +424,7 @@ with tab_sankey:
         <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #06b6d4; border-radius:10px; padding:14px 18px; min-height:108px; display:flex; flex-direction:column; justify-content:space-between;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; color:#ffffff; font-size:14px;">📈 Risparmio & Investimenti</span>
-                <span style="font-weight:700; color:#06b6d4; font-size:15px;">{savings_p:.1f}% <span style="font-size:11px; color:#8b949e;">(Target 20%)</span></span>
+                <span style="font-weight:700; color:#06b6d4; font-size:15px;">{savings_p:.1f}% <span style="font-size:11px; color:#8b949e;">(Target {tgt_savings:.0f}%)</span></span>
             </div>
             <div style="font-size:13px; color:#8b949e; margin-top:6px;">Totale Accumulato: <b style="color:#ffffff; font-size:15px;">{fmt_eur(r50.get('savings_amount', 0.0))}</b></div>
         </div>
