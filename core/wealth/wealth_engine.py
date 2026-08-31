@@ -175,12 +175,21 @@ def compute_cashflow_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     df["tx_date"] = pd.to_datetime(df["tx_date"])
     df["year_month"] = df["tx_date"].dt.strftime("%Y-%m")
 
-    # Inflow vs Outflow
-    inflows = df[df["direction"] == "inflow"]
-    outflows = df[df["direction"] == "outflow"]
+    # Identificazione rigorosa Giroconti & Trasferimenti Interni (NON sono né entrate né uscite di spesa)
+    is_transfer = (
+        (df["direction"].astype(str).str.lower() == "transfer") |
+        (df["nature"].astype(str).str.lower() == "transfer") |
+        (df["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+    )
+
+    # Inflow vs Outflow REALI (esclusi giroconti)
+    inflows = df[(df["direction"] == "inflow") & (~is_transfer)]
+    outflows = df[(df["direction"] == "outflow") & (~is_transfer)]
+    transfers = df[is_transfer]
 
     total_inflow = float(inflows["amount"].sum())
     total_outflow = float(outflows["amount"].sum())
+    total_transfers = float(transfers["amount"].sum())
     net_savings = total_inflow - total_outflow
     savings_rate_pct = round((net_savings / total_inflow * 100.0), 2) if total_inflow > 0 else 0.0
 
@@ -189,10 +198,10 @@ def compute_cashflow_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     avg_monthly_income = round(total_inflow / num_months, 2)
     avg_monthly_expense = round(total_outflow / num_months, 2)
 
-    # Ripartizione 50/30/20
-    needs_amount = float(df[df["nature"] == CategoryNature.ESSENTIAL_NEED.value]["amount"].sum())
-    wants_amount = float(df[df["nature"] == CategoryNature.DISCRETIONARY_WANT.value]["amount"].sum())
-    savings_amount = float(df[df["nature"] == CategoryNature.SAVING_INVESTMENT.value]["amount"].sum()) + max(0.0, net_savings)
+    # Ripartizione 50/30/20 su spese ed entrate REALI
+    needs_amount = float(df[(df["nature"] == CategoryNature.ESSENTIAL_NEED.value) & (~is_transfer)]["amount"].sum())
+    wants_amount = float(df[(df["nature"] == CategoryNature.DISCRETIONARY_WANT.value) & (~is_transfer)]["amount"].sum())
+    savings_amount = float(df[(df["nature"] == CategoryNature.SAVING_INVESTMENT.value) & (~is_transfer)]["amount"].sum()) + max(0.0, net_savings)
 
     base_budget = total_inflow if total_inflow > 0 else (needs_amount + wants_amount + savings_amount)
     needs_pct = round((needs_amount / base_budget * 100.0), 1) if base_budget > 0 else 0.0
@@ -202,16 +211,19 @@ def compute_cashflow_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     # Dati Sankey Diagram
     sankey = _build_sankey_data(df)
 
-    # Tabella mensile raggruppata
-    monthly_df = df.groupby(["year_month", "direction"])["amount"].sum().unstack(fill_value=0.0).reset_index()
-    if "inflow" not in monthly_df.columns: monthly_df["inflow"] = 0.0
-    if "outflow" not in monthly_df.columns: monthly_df["outflow"] = 0.0
-    monthly_df["net"] = monthly_df["inflow"] - monthly_df["outflow"]
-    monthly_df["savings_rate_pct"] = np.where(monthly_df["inflow"] > 0, (monthly_df["net"] / monthly_df["inflow"]) * 100.0, 0.0)
+    # Tabella mensile raggruppata sui flussi reali
+    df_real = df[~is_transfer].copy()
+    monthly_df = df_real.groupby(["year_month", "direction"])["amount"].sum().unstack(fill_value=0.0).reset_index() if not df_real.empty else pd.DataFrame()
+    if not monthly_df.empty:
+        if "inflow" not in monthly_df.columns: monthly_df["inflow"] = 0.0
+        if "outflow" not in monthly_df.columns: monthly_df["outflow"] = 0.0
+        monthly_df["net"] = monthly_df["inflow"] - monthly_df["outflow"]
+        monthly_df["savings_rate_pct"] = np.where(monthly_df["inflow"] > 0, (monthly_df["net"] / monthly_df["inflow"]) * 100.0, 0.0)
 
     return {
         "total_inflow": round(total_inflow, 2),
         "total_outflow": round(total_outflow, 2),
+        "total_transfers": round(total_transfers, 2),
         "net_savings": round(net_savings, 2),
         "net_cash_flow": round(net_savings, 2),
         "savings_rate_pct": savings_rate_pct,
@@ -2026,7 +2038,7 @@ def compute_wealth_risk_integrated_analytics(engine, wealth_portfolio_id: int = 
 
 def compute_merchant_pareto_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
     """
-    Analisi di Pareto (80/20) e classifica dettagliata degli esercenti/beneficiari di spesa.
+    Analisi di Pareto (80/20) e classifica dettagliata degli esercenti/beneficiari di spesa (esclusi giroconti).
     """
     if df_cf is None or df_cf.empty:
         return {
@@ -2037,7 +2049,12 @@ def compute_merchant_pareto_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
             "top_10": pd.DataFrame()
         }
 
-    df = df_cf[df_cf["direction"] == "outflow"].copy()
+    is_tr = (
+        (df_cf["direction"].astype(str).str.lower() == "transfer") |
+        (df_cf["nature"].astype(str).str.lower() == "transfer") |
+        (df_cf["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+    )
+    df = df_cf[(df_cf["direction"] == "outflow") & (~is_tr)].copy()
     if df.empty:
         return {
             "merchants": pd.DataFrame(),
@@ -2083,12 +2100,17 @@ def compute_merchant_pareto_analytics(df_cf: pd.DataFrame) -> Dict[str, Any]:
 
 def compute_seasonality_matrix(df_cf: pd.DataFrame) -> pd.DataFrame:
     """
-    Costruisce la matrice di stagionalità delle uscite per Categoria nei 12 mesi dell'anno.
+    Costruisce la matrice di stagionalità delle uscite reali per Categoria nei 12 mesi dell'anno.
     """
     if df_cf is None or df_cf.empty:
         return pd.DataFrame()
 
-    df = df_cf[df_cf["direction"] == "outflow"].copy()
+    is_tr = (
+        (df_cf["direction"].astype(str).str.lower() == "transfer") |
+        (df_cf["nature"].astype(str).str.lower() == "transfer") |
+        (df_cf["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+    )
+    df = df_cf[(df_cf["direction"] == "outflow") & (~is_tr)].copy()
     if df.empty:
         return pd.DataFrame()
 
@@ -2127,12 +2149,17 @@ def compute_envelope_budget_analytics(
     df_cf_historical: pd.DataFrame = None
 ) -> pd.DataFrame:
     """
-    Calcola il confronto Budget vs Actual (Envelope Budgeting) per ciascuna categoria.
+    Calcola il confronto Budget vs Actual (Envelope Budgeting) per ciascuna categoria di spesa reale.
     """
     if df_cf_period is None or df_cf_period.empty:
         return pd.DataFrame()
 
-    df_out = df_cf_period[df_cf_period["direction"] == "outflow"].copy()
+    is_tr = (
+        (df_cf_period["direction"].astype(str).str.lower() == "transfer") |
+        (df_cf_period["nature"].astype(str).str.lower() == "transfer") |
+        (df_cf_period["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+    )
+    df_out = df_cf_period[(df_cf_period["direction"] == "outflow") & (~is_tr)].copy()
     if df_out.empty:
         return pd.DataFrame()
 
@@ -2141,7 +2168,12 @@ def compute_envelope_budget_analytics(
     # Stima budget di default dallo storico se non fornito esplicitamente
     hist_avg = {}
     if df_cf_historical is not None and not df_cf_historical.empty:
-        df_h = df_cf_historical[df_cf_historical["direction"] == "outflow"].copy()
+        is_tr_h = (
+            (df_cf_historical["direction"].astype(str).str.lower() == "transfer") |
+            (df_cf_historical["nature"].astype(str).str.lower() == "transfer") |
+            (df_cf_historical["category_name"].astype(str).str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        )
+        df_h = df_cf_historical[(df_cf_historical["direction"] == "outflow") & (~is_tr_h)].copy()
         df_h["tx_date"] = pd.to_datetime(df_h["tx_date"])
         df_h["year_month"] = df_h["tx_date"].dt.strftime("%Y-%m")
         n_m = max(1, df_h["year_month"].nunique())
