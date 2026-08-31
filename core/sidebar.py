@@ -832,11 +832,14 @@ def render_sidebar():
 
                 col_n, col_w, col_s = st.columns(3)
                 with col_n:
-                    n_val = st.number_input("Needs %", min_value=5.0, max_value=90.0, value=float(st.session_state.wealth_budget_needs_pct), step=5.0, key="sb_wb_needs", help="🏠 Bisogni Primari / Spese Fisse Essenziali")
+                    st.markdown('<div style="font-size:9.5px; font-weight:700; color:#8b949e; text-align:center; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; margin-bottom:3px;">🏠 NEEDS %</div>', unsafe_allow_html=True)
+                    n_val = st.number_input("Needs %", min_value=5.0, max_value=90.0, value=float(st.session_state.wealth_budget_needs_pct), step=5.0, key="sb_wb_needs", label_visibility="collapsed")
                 with col_w:
-                    w_val = st.number_input("Wants %", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_wants_pct), step=5.0, key="sb_wb_wants", help="🍽️ Desideri, Stile di Vita & Svago")
+                    st.markdown('<div style="font-size:9.5px; font-weight:700; color:#8b949e; text-align:center; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; margin-bottom:3px;">🍽️ WANTS %</div>', unsafe_allow_html=True)
+                    w_val = st.number_input("Wants %", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_wants_pct), step=5.0, key="sb_wb_wants", label_visibility="collapsed")
                 with col_s:
-                    s_val = st.number_input("Savings %", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_savings_pct), step=5.0, key="sb_wb_savings", help="📈 Risparmio, PAC & Investimenti")
+                    st.markdown('<div style="font-size:9.5px; font-weight:700; color:#8b949e; text-align:center; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; margin-bottom:3px;">📈 SAVINGS %</div>', unsafe_allow_html=True)
+                    s_val = st.number_input("Savings %", min_value=0.0, max_value=90.0, value=float(st.session_state.wealth_budget_savings_pct), step=5.0, key="sb_wb_savings", label_visibility="collapsed")
                 
                 st.session_state.wealth_budget_needs_pct = n_val
                 st.session_state.wealth_budget_wants_pct = w_val
@@ -849,12 +852,14 @@ def render_sidebar():
                     st.caption(f"⚠️ **Totale: {total_alloc:.0f}%** (La somma ideale è 100%)")
 
                 st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">🔥 Parametri FIRE & Previdenza</div>', unsafe_allow_html=True)
-                col_swr, col_age = st.columns([1.1, 1.1])
+                col_swr, col_age = st.columns(2)
                 with col_swr:
-                    swr_val = st.number_input("SWR FIRE %", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, key="sb_wealth_swr_input", help="Safe Withdrawal Rate annuo per la regola del 4% / FIRE")
+                    st.markdown('<div style="font-size:9.5px; font-weight:700; color:#8b949e; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; margin-bottom:3px;">🔥 SWR FIRE %</div>', unsafe_allow_html=True)
+                    swr_val = st.number_input("SWR FIRE %", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, key="sb_wealth_swr_input", label_visibility="collapsed")
                     st.session_state.wealth_fire_swr = swr_val
                 with col_age:
-                    age_val = st.number_input("Età Target", min_value=30, max_value=75, value=int(st.session_state.get("wealth_target_retirement_age", 67)), step=1, key="sb_wealth_age_input", help="Età target desiderata per la pensione o FIRE")
+                    st.markdown('<div style="font-size:9.5px; font-weight:700; color:#8b949e; text-transform:uppercase; letter-spacing:0.3px; white-space:nowrap; margin-bottom:3px;">🎯 ETÀ TARGET</div>', unsafe_allow_html=True)
+                    age_val = st.number_input("Età Target", min_value=30, max_value=75, value=int(st.session_state.get("wealth_target_retirement_age", 67)), step=1, key="sb_wealth_age_input", label_visibility="collapsed")
                     st.session_state.wealth_target_retirement_age = age_val
 
                 st.markdown('<div style="font-size:10px; font-weight:700; color:#34d399; letter-spacing:0.5px; text-transform:uppercase; margin: 8px 0 2px;">🏛️ Fisco & Deducibilità</div>', unsafe_allow_html=True)
