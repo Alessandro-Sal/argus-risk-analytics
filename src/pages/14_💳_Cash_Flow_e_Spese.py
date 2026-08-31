@@ -496,17 +496,38 @@ with tab_sankey:
 
 # ── 2. TREND MENSILE & STAGIONALITÀ MoM ─────────────────────
 with tab_trend:
-    st.markdown("### 📊 Evoluzione Mensile & Statistiche MoM (Month-over-Month)")
-    st.caption("Confronto dinamico delle entrate, uscite, tasso di risparmio e stagionalità di spesa nei 12 mesi.")
+    st.markdown("### 📊 Evoluzione Finanziaria & Statistiche Temporali")
+    st.caption("Confronto dinamico delle entrate operative, spese di consumo, investimenti patrimoniali e tasso di risparmio.")
     
     df_trend_src = df_cf.copy() if not df_cf.empty else pd.DataFrame()
-    if not df_trend_src.empty and sel_year_str != "🌐 Tutto lo Storico":
+    is_multi_year = (sel_year_str == "🌐 Tutto lo Storico")
+    
+    if not df_trend_src.empty and not is_multi_year:
         df_trend_src = df_trend_src[df_trend_src["tx_date"].dt.year == int(sel_year_str)]
     if not df_trend_src.empty and sel_acc != "🌐 Tutti i Conti":
         df_trend_src = df_trend_src[df_trend_src["account_name"] == sel_acc]
 
     if not df_trend_src.empty:
-        df_trend_src["year_month"] = df_trend_src["tx_date"].dt.strftime("%Y-%m")
+        # Toggle Granularità: Annuale (Macro) di default su tutto lo storico, Mensile (Micro) su singolo anno
+        col_g1, col_g2 = st.columns([2.5, 1.5])
+        with col_g1:
+            granularity_options = ["📅 Aggregazione Annuale (Macro Trend)", "📊 Dettaglio Mese per Mese (Micro)"] if is_multi_year else ["📊 Dettaglio Mese per Mese (Micro)", "📅 Aggregazione Annuale (Macro Trend)"]
+            granularity = st.radio(
+                "Granularità Temporale:",
+                options=granularity_options,
+                horizontal=True,
+                index=0,
+                key="cf_trend_granularity_toggle"
+            )
+        
+        is_annual_view = granularity.startswith("📅 Aggregazione Annuale")
+
+        if is_annual_view:
+            df_trend_src["time_bucket"] = df_trend_src["tx_date"].dt.year.astype(str)
+            bucket_label = "Anno"
+        else:
+            df_trend_src["time_bucket"] = df_trend_src["tx_date"].dt.strftime("%Y-%m")
+            bucket_label = "Mese"
         
         is_tr_trend = (
             (df_trend_src["direction"].astype(str).str.lower() == "transfer") |
@@ -525,10 +546,10 @@ with tab_trend:
             (df_trend_src["notes"].astype(str).str.contains(r"\[refund\]|settled from|bulk settlement", case=False, na=False))
         ) & (~is_tr_trend)
 
-        all_ym = sorted(list(df_trend_src["year_month"].unique()))
+        all_buckets = sorted(list(df_trend_src["time_bucket"].unique()))
         rows_m = []
-        for ym in all_ym:
-            sub = df_trend_src[df_trend_src["year_month"] == ym]
+        for tb in all_buckets:
+            sub = df_trend_src[df_trend_src["time_bucket"] == tb]
             
             # Entrate Operative reali (senza disinvestimenti né rimborsi)
             in_op = float(sub[(sub["direction"] == "inflow") & (~is_tr_trend) & (~is_inv_trend) & (~is_ref_trend)]["amount"].sum())
@@ -550,7 +571,7 @@ with tab_trend:
             sr_pct = round((net_savings / in_op * 100.0), 1) if in_op > 0 else 0.0
             
             rows_m.append({
-                "year_month": ym,
+                "time_bucket": tb,
                 "Entrate": round(in_op, 2),
                 "Spese_Consumo": round(exp_cons_net, 2),
                 "Investimenti_PAC": round(inv_out, 2),
@@ -564,77 +585,91 @@ with tab_trend:
         # Grafico Trend Barre + Linea a 4 Componenti Istituzionali
         fig_trend = go.Figure()
         fig_trend.add_trace(go.Bar(
-            x=df_monthly["year_month"],
+            x=df_monthly["time_bucket"],
             y=df_monthly["Entrate"],
             name="Entrate Operative (€)",
             marker_color="#10b981",
             hovertemplate="<b>%{x}</b><br>Entrate: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Bar(
-            x=df_monthly["year_month"],
+            x=df_monthly["time_bucket"],
             y=df_monthly["Spese_Consumo"],
             name="Spese di Consumo (€)",
             marker_color="#f43f5e",
             hovertemplate="<b>%{x}</b><br>Consumi Vivi: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Bar(
-            x=df_monthly["year_month"],
+            x=df_monthly["time_bucket"],
             y=df_monthly["Investimenti_PAC"],
             name="Investito (PAC/Crypto) (€)",
             marker_color="#818cf8",
             hovertemplate="<b>%{x}</b><br>Investito: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Bar(
-            x=df_monthly["year_month"],
+            x=df_monthly["time_bucket"],
             y=df_monthly["Risparmio_Netto"],
             name="Risparmio Netto Operativo (€)",
             marker_color="#38bdf8",
             hovertemplate="<b>%{x}</b><br>Risparmio Libero: <b>€ %{y:,.2f}</b><extra></extra>"
         ))
         fig_trend.add_trace(go.Scatter(
-            x=df_monthly["year_month"],
+            x=df_monthly["time_bucket"],
             y=df_monthly["Savings_Rate_Pct"],
             name="Savings Rate Reale (%)",
             yaxis="y2",
             mode="lines+markers",
             line=dict(color="#f59e0b", width=2.5),
             marker=dict(size=6),
+            connectgaps=True,
             hovertemplate="<b>%{x}</b><br>Savings Rate: <b>%{y:.1f}%</b><extra></extra>"
         ))
 
-        fig_trend.update_layout(
+        layout_kwargs = dict(
             barmode="group",
             template="plotly_dark",
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            height=340,
+            height=360,
             margin=dict(l=10, r=10, t=30, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             yaxis=dict(title="Importo (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
             yaxis2=dict(title="Savings Rate (%)", overlaying="y", side="right", showgrid=False, range=[-20, 100])
         )
+        
+        # Aggiungi RangeSlider se in modalità micro mensile su tutto lo storico
+        if not is_annual_view and len(df_monthly) > 24:
+            layout_kwargs["xaxis"] = dict(
+                rangeslider=dict(visible=True, thickness=0.08),
+                type="category"
+            )
+            layout_kwargs["height"] = 400
+
+        fig_trend.update_layout(**layout_kwargs)
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
         tr_c1, tr_c2 = st.columns([1.3, 1.0])
         with tr_c1:
-            st.markdown("##### 📋 Tabella MoM Mese per Mese (Depurata)")
+            table_title = "📋 Tabella Annuale Storica" if is_annual_view else "📋 Tabella MoM Mese per Mese"
+            st.markdown(f"##### {table_title}")
             df_m_show = df_monthly.copy()
-            df_m_show["Mese"] = df_m_show["year_month"]
+            df_m_show["Periodo"] = df_m_show["time_bucket"]
             df_m_show["Entrate_fmt"] = df_m_show["Entrate"].apply(lambda v: f"€ {v:,.2f}")
             df_m_show["Consumi_fmt"] = df_m_show["Spese_Consumo"].apply(lambda v: f"€ {v:,.2f}")
             df_m_show["Inv_fmt"] = df_m_show["Investimenti_PAC"].apply(lambda v: f"€ {v:,.2f}")
             df_m_show["Netto_fmt"] = df_m_show["Risparmio_Netto"].apply(lambda v: f"€ {v:,.2f}")
             df_m_show["SR_fmt"] = df_m_show["Savings_Rate_Pct"].apply(lambda v: f"{v:.1f}%")
+            delta_col_name = "Δ Consumi YoY" if is_annual_view else "Δ Consumi MoM"
             df_m_show["MoM_fmt"] = df_m_show["MoM_Consumi_Pct"].apply(lambda v: f"{v:+.1f}%" if pd.notna(v) else "-")
 
             st.dataframe(
-                df_m_show[["Mese", "Entrate_fmt", "Consumi_fmt", "Inv_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
+                df_m_show[["Periodo", "Entrate_fmt", "Consumi_fmt", "Inv_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
+                    "Periodo": bucket_label,
                     "Entrate_fmt": "Entrate Op.",
                     "Consumi_fmt": "Spese Consumo",
                     "Inv_fmt": "Investito PAC",
                     "Netto_fmt": "Risparmio Netto",
                     "SR_fmt": "Savings Rate",
-                    "MoM_fmt": "Δ Consumi MoM"
+                    "MoM_fmt": delta_col_name
                 }),
                 hide_index=True,
                 use_container_width=True
