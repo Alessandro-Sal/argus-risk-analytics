@@ -42,6 +42,8 @@ logs/
 data/*
 !data/.gitkeep
 !data/portfolio_transactions_realistic.csv
+!data/wealth/
+!data/wealth/*.csv
 exports/*.csv
 exports/*.xlsx
 exports/*.pdf
