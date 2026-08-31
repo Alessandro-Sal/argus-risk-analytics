@@ -647,55 +647,58 @@ with tab_trend:
         fig_trend.update_layout(**layout_kwargs)
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
-        tr_c1, tr_c2 = st.columns([1.3, 1.0])
-        with tr_c1:
-            table_title = "📋 Tabella Annuale Storica" if is_annual_view else "📋 Tabella MoM Mese per Mese"
-            st.markdown(f"##### {table_title}")
-            df_m_show = df_monthly.copy()
-            df_m_show["Periodo"] = df_m_show["time_bucket"]
-            df_m_show["Entrate_fmt"] = df_m_show["Entrate"].apply(lambda v: f"€ {v:,.2f}")
-            df_m_show["Consumi_fmt"] = df_m_show["Spese_Consumo"].apply(lambda v: f"€ {v:,.2f}")
-            df_m_show["Inv_fmt"] = df_m_show["Investimenti_PAC"].apply(lambda v: f"€ {v:,.2f}")
-            df_m_show["Netto_fmt"] = df_m_show["Risparmio_Netto"].apply(lambda v: f"€ {v:,.2f}")
-            df_m_show["SR_fmt"] = df_m_show["Savings_Rate_Pct"].apply(lambda v: f"{v:.1f}%")
-            delta_col_name = "Δ Consumi YoY" if is_annual_view else "Δ Consumi MoM"
-            df_m_show["MoM_fmt"] = df_m_show["MoM_Consumi_Pct"].apply(lambda v: f"{v:+.1f}%" if pd.notna(v) else "-")
+        st.markdown("---")
+        
+        # RIGA 1: Tabella Dati Full Width
+        table_title = "📋 Tabella Annuale Storica (Depurata)" if is_annual_view else "📋 Tabella MoM Mese per Mese (Depurata)"
+        st.markdown(f"##### {table_title}")
+        df_m_show = df_monthly.copy()
+        df_m_show["Periodo"] = df_m_show["time_bucket"]
+        df_m_show["Entrate_fmt"] = df_m_show["Entrate"].apply(lambda v: f"€ {v:,.2f}")
+        df_m_show["Consumi_fmt"] = df_m_show["Spese_Consumo"].apply(lambda v: f"€ {v:,.2f}")
+        df_m_show["Inv_fmt"] = df_m_show["Investimenti_PAC"].apply(lambda v: f"€ {v:,.2f}")
+        df_m_show["Netto_fmt"] = df_m_show["Risparmio_Netto"].apply(lambda v: f"€ {v:,.2f}")
+        df_m_show["SR_fmt"] = df_m_show["Savings_Rate_Pct"].apply(lambda v: f"{v:.1f}%")
+        delta_col_name = "Δ Consumi YoY" if is_annual_view else "Δ Consumi MoM"
+        df_m_show["MoM_fmt"] = df_m_show["MoM_Consumi_Pct"].apply(lambda v: f"{v:+.1f}%" if pd.notna(v) else "-")
 
-            st.dataframe(
-                df_m_show[["Periodo", "Entrate_fmt", "Consumi_fmt", "Inv_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
-                    "Periodo": bucket_label,
-                    "Entrate_fmt": "Entrate Op.",
-                    "Consumi_fmt": "Spese Consumo",
-                    "Inv_fmt": "Investito PAC",
-                    "Netto_fmt": "Risparmio Netto",
-                    "SR_fmt": "Savings Rate",
-                    "MoM_fmt": delta_col_name
-                }),
-                hide_index=True,
-                use_container_width=True
+        st.dataframe(
+            df_m_show[["Periodo", "Entrate_fmt", "Consumi_fmt", "Inv_fmt", "Netto_fmt", "SR_fmt", "MoM_fmt"]].rename(columns={
+                "Periodo": bucket_label,
+                "Entrate_fmt": "Entrate Op.",
+                "Consumi_fmt": "Spese Consumo",
+                "Inv_fmt": "Investito PAC",
+                "Netto_fmt": "Risparmio Netto",
+                "SR_fmt": "Savings Rate",
+                "MoM_fmt": delta_col_name
+            }),
+            hide_index=True,
+            use_container_width=True
+        )
+
+        st.markdown("---")
+
+        # RIGA 2: Heatmap Stagionalità Full Width
+        st.markdown("##### 🗓️ Heatmap Stagionalità di Spesa nei 12 Mesi")
+        df_seas = compute_seasonality_matrix(df_trend_src)
+        if not df_seas.empty:
+            df_seas_plot = df_seas.drop(columns=["Totale Anno"], errors="ignore")
+            fig_heat = px.imshow(
+                df_seas_plot,
+                labels=dict(x="Mese", y="Categoria", color="Spesa (€)"),
+                color_continuous_scale="Viridis",
+                aspect="auto"
             )
-
-        with tr_c2:
-            st.markdown("##### 🗓️ Heatmap Stagionalità di Spesa nei 12 Mesi")
-            df_seas = compute_seasonality_matrix(df_trend_src)
-            if not df_seas.empty:
-                df_seas_plot = df_seas.drop(columns=["Totale Anno"], errors="ignore")
-                fig_heat = px.imshow(
-                    df_seas_plot,
-                    labels=dict(x="Mese", y="Categoria", color="Spesa (€)"),
-                    color_continuous_scale="Viridis",
-                    aspect="auto"
-                )
-                fig_heat.update_layout(
-                    template="plotly_dark",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    height=280,
-                    margin=dict(l=10, r=10, t=10, b=10)
-                )
-                st.plotly_chart(fig_heat, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("Dati insufficienti per generare la mappa di stagionalità.")
+            fig_heat.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=320,
+                margin=dict(l=10, r=10, t=10, b=10)
+            )
+            st.plotly_chart(fig_heat, use_container_width=True, config={'displayModeBar': False})
+        else:
+            st.info("Dati insufficienti per generare la mappa di stagionalità.")
     else:
         st.info("Nessun dato storico per elaborare il trend mensile.")
 
