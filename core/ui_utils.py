@@ -3347,9 +3347,9 @@ def _clean_html(raw_html: str) -> str:
 
 def render_splash_screen(force_show: bool = False) -> bool:
     """
-    Renderizza la Schermata di Avvio Istituzionale (Splash Screen) con l'Occhio di Argus,
-    il Boot Telemetrico stile Terminale macOS/Bloomberg e le schede dei due portali (Risk & Wealth).
-    Restituisce True se la splash screen è attiva (bloccando il resto della pagina finché non si accede).
+    Renderizza la Schermata di Avvio Istituzionale (Launch Screen / Splash Screen) con l'Occhio di Argus,
+    il Boot Telemetrico stile Bloomberg Terminal, micro-progress bar animata e schede Bento Grid dei Portali.
+    Restituisce True se la splash screen è attiva (bloccando il resto della pagina finché l'utente non accede).
     """
     if "splash_dismissed" not in st.session_state:
         st.session_state.splash_dismissed = False
@@ -3361,229 +3361,343 @@ def render_splash_screen(force_show: bool = False) -> bool:
         return False
 
     theme = st.session_state.get("ui_theme", "Midnight Obsidian")
-    accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#f59e0b")
-    eye_svg = get_argus_eye_svg(size=130, animated=True, accent=accent)
+    if theme == "Cyberpunk Neon":
+        accent = "#00f3ff"
+        accent_secondary = "#ff007f"
+        glow_color = "rgba(0, 243, 255, 0.25)"
+    elif theme == "Emerald Wealth":
+        accent = "#00c853"
+        accent_secondary = "#ffd700"
+        glow_color = "rgba(0, 200, 83, 0.25)"
+    else:  # Midnight Obsidian
+        accent = "#f59e0b"
+        accent_secondary = "#6366f1"
+        glow_color = "rgba(245, 158, 11, 0.22)"
 
-    hide_sidebar_css = """
+    eye_svg = get_argus_eye_svg(size=135, animated=True, accent=accent)
+
+    hide_sidebar_and_splash_css = f"""
     <style>
-    section[data-testid="stSidebar"], [data-testid="stSidebar"], [data-testid="collapsedControl"] {
+    /* Maschera preventiva della Sidebar e Header Streamlit durante lo Splash */
+    section[data-testid="stSidebar"], 
+    [data-testid="stSidebar"], 
+    [data-testid="collapsedControl"],
+    header[data-testid="stHeader"] {{
         display: none !important;
         visibility: hidden !important;
         width: 0px !important;
         height: 0px !important;
         opacity: 0 !important;
         pointer-events: none !important;
-    }
+    }}
     
-    /* Splash Container Animations & Styles */
-    .splash-container {
-        max-width: 900px;
-        margin: 10px auto 25px auto;
-        background: radial-gradient(circle at 50% 0%, rgba(245, 158, 11, 0.12) 0%, rgba(15, 23, 42, 0.96) 60%, rgba(10, 15, 29, 0.98) 100%);
-        border: 1px solid rgba(245, 158, 11, 0.35);
-        border-radius: 20px;
-        padding: 30px 28px 24px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 50px rgba(245, 158, 11, 0.10);
-        backdrop-filter: blur(20px);
+    /* ── Contenitore Master Splash Screen Glassmorphic ── */
+    .splash-master-wrapper {{
+        max-width: 980px;
+        margin: 5px auto 20px auto;
+        background: radial-gradient(circle at 50% 0%, {glow_color} 0%, rgba(15, 23, 42, 0.96) 50%, rgba(8, 12, 22, 0.99) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-top: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 24px;
+        padding: 34px 32px 28px;
+        box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 60px {glow_color};
+        backdrop-filter: blur(28px);
+        -webkit-backdrop-filter: blur(28px);
         text-align: center;
-    }
-    .splash-title {
-        font-size: 34px;
+        position: relative;
+        overflow: hidden;
+        animation: splashFadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }}
+
+    @keyframes splashFadeIn {{
+        0% {{ opacity: 0; transform: translateY(12px) scale(0.985); }}
+        100% {{ opacity: 1; transform: translateY(0) scale(1); }}
+    }}
+
+    .splash-logo-container {{
+        margin-bottom: 12px;
+        filter: drop-shadow(0 0 24px {glow_color});
+        transition: transform 0.3s ease;
+    }}
+    .splash-logo-container:hover {{
+        transform: scale(1.03);
+    }}
+
+    .splash-title {{
+        font-size: 36px;
         font-weight: 900;
-        letter-spacing: 6px;
-        background: linear-gradient(135deg, #ffffff 40%, #fbbf24 100%);
+        letter-spacing: 8px;
+        background: linear-gradient(135deg, #ffffff 40%, {accent} 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin-bottom: 4px;
-    }
-    .splash-subtitle {
+        text-transform: uppercase;
+    }}
+
+    .splash-subtitle {{
         font-size: 11.5px;
         font-weight: 700;
-        color: #f59e0b;
-        letter-spacing: 2.5px;
+        color: {accent};
+        letter-spacing: 3px;
         text-transform: uppercase;
         margin-bottom: 12px;
-    }
-    .splash-desc {
-        font-size: 13px;
+        opacity: 0.95;
+    }}
+
+    .splash-desc {{
+        font-size: 13.5px;
         color: #94a3b8;
-        max-width: 660px;
-        margin: 0 auto 16px auto;
-        line-height: 1.5;
-    }
-    .splash-badge-ribbon {
+        max-width: 720px;
+        margin: 0 auto 18px auto;
+        line-height: 1.6;
+    }}
+
+    /* ── Badge Ribbon Istituzionale ── */
+    .splash-badge-ribbon {{
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
         flex-wrap: wrap;
-        margin-bottom: 20px;
-    }
-    .splash-pill {
-        background: rgba(255, 255, 255, 0.05);
+        margin-bottom: 22px;
+    }}
+
+    .splash-pill {{
+        background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.10);
-        padding: 3px 10px;
-        border-radius: 12px;
+        padding: 4px 12px;
+        border-radius: 20px;
         font-size: 11px;
         color: #cbd5e1;
         font-weight: 500;
-    }
+        font-family: 'JetBrains Mono', 'Outfit', monospace;
+        letter-spacing: 0.2px;
+        transition: all 0.25s ease;
+    }}
+    .splash-pill:hover {{
+        background: rgba(255, 255, 255, 0.08);
+        border-color: {accent};
+        color: #ffffff;
+    }}
 
-    /* Terminal Console Window */
-    .terminal-window {
-        background: rgba(10, 14, 23, 0.92);
+    /* ── Terminal Console & Telemetry Bar ── */
+    .terminal-window {{
+        background: rgba(7, 10, 18, 0.95);
         border: 1px solid rgba(255, 255, 255, 0.10);
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 0;
         text-align: left;
         margin-bottom: 22px;
-        box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        box-shadow: inset 0 2px 10px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.4);
         overflow: hidden;
-    }
-    .terminal-header {
-        background: rgba(255, 255, 255, 0.04);
+    }}
+
+    .terminal-header {{
+        background: rgba(255, 255, 255, 0.03);
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        padding: 7px 12px;
+        padding: 8px 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }}
+    .terminal-dots-group {{
         display: flex;
         align-items: center;
         gap: 6px;
-    }
-    .terminal-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
-    .dot-red { background: #ef4444; }
-    .dot-yellow { background: #f59e0b; }
-    .dot-green { background: #10b981; }
-    .terminal-title {
-        font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-        font-size: 10px;
-        color: #64748b;
-        margin-left: 8px;
-    }
-    .terminal-body {
-        padding: 12px 16px;
-        font-family: 'JetBrains Mono', 'Roboto Mono', monospace;
-        font-size: 11px;
-        line-height: 1.8;
-    }
+    }}
+    .terminal-dot {{ width: 9px; height: 9px; border-radius: 50%; display: inline-block; }}
+    .dot-red {{ background: #ef4444; }}
+    .dot-yellow {{ background: #f59e0b; }}
+    .dot-green {{ background: #10b981; }}
 
-    /* Portal Cards */
-    .portal-card-risk {
-        background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, rgba(15, 23, 42, 0.85) 75%);
+    .terminal-title {{
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10.5px;
+        color: #64748b;
+        margin-left: 6px;
+    }}
+
+    .terminal-status-badge {{
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 10px;
+        font-weight: 700;
+        color: #10b981;
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.35);
+        padding: 2px 8px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }}
+
+    .terminal-body {{
+        padding: 14px 18px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11px;
+        line-height: 1.85;
+    }}
+
+    /* Micro-Progress Bar a Gradiente Liquido */
+    .splash-progress-track {{
+        width: 100%;
+        height: 5px;
+        background: rgba(255, 255, 255, 0.06);
+        border-radius: 999px;
+        overflow: hidden;
+        margin: 10px 0 4px 0;
+        position: relative;
+    }}
+
+    .splash-progress-fill {{
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #6366f1 0%, {accent} 50%, #10b981 100%);
+        border-radius: 999px;
+        box-shadow: 0 0 12px {accent};
+        animation: progressPulse 2.5s ease-in-out infinite alternate;
+    }}
+
+    @keyframes progressPulse {{
+        0% {{ filter: brightness(1) drop-shadow(0 0 4px {accent}); }}
+        100% {{ filter: brightness(1.25) drop-shadow(0 0 10px {accent}); }}
+    }}
+
+    /* ── Bento Grid Schede Portali ── */
+    .portal-card-risk {{
+        background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.16) 0%, rgba(15, 23, 42, 0.90) 75%);
         border: 1px solid rgba(99, 102, 241, 0.40);
         border-top: 3px solid #6366f1;
-        border-radius: 16px;
-        padding: 20px 22px;
-        min-height: 205px;
+        border-radius: 18px;
+        padding: 22px 24px;
+        min-height: 215px;
         margin-bottom: 14px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .portal-card-risk:hover {
+        box-shadow: 0 12px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    .portal-card-risk:hover {{
         border-color: #818cf8;
-        box-shadow: 0 12px 32px rgba(99, 102, 241, 0.25);
-        transform: translateY(-3px);
-    }
+        box-shadow: 0 16px 36px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+        transform: translateY(-4px);
+    }}
 
-    .portal-card-wealth {
-        background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.15) 0%, rgba(15, 23, 42, 0.85) 75%);
+    .portal-card-wealth {{
+        background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.16) 0%, rgba(15, 23, 42, 0.90) 75%);
         border: 1px solid rgba(16, 185, 129, 0.40);
         border-top: 3px solid #10b981;
-        border-radius: 16px;
-        padding: 20px 22px;
-        min-height: 205px;
+        border-radius: 18px;
+        padding: 22px 24px;
+        min-height: 215px;
         margin-bottom: 14px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .portal-card-wealth:hover {
+        box-shadow: 0 12px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1);
+        transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }}
+    .portal-card-wealth:hover {{
         border-color: #34d399;
-        box-shadow: 0 12px 32px rgba(16, 185, 129, 0.25);
-        transform: translateY(-3px);
-    }
+        box-shadow: 0 16px 36px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+        transform: translateY(-4px);
+    }}
 
-    .portal-chips-row {
+    .portal-chips-row {{
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        margin-top: 12px;
-    }
-    .portal-chip {
-        background: rgba(255, 255, 255, 0.06);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 6px;
-        padding: 2px 8px;
-        font-size: 10px;
+        margin-top: 14px;
+    }}
+    .portal-chip {{
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 8px;
+        padding: 3px 9px;
+        font-size: 10.5px;
         font-weight: 600;
         color: #cbd5e1;
-    }
+        font-family: 'JetBrains Mono', monospace;
+    }}
 
-    /* Buttons */
-    div[data-testid="stButton"] button[key="btn_splash_risk"] {
+    /* ── Pulsanti CTA Istituzionali ── */
+    div[data-testid="stButton"] button[key="btn_splash_risk"] {{
         background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
-        border: 1px solid rgba(245, 158, 11, 0.8) !important;
+        border: 1px solid rgba(245, 158, 11, 0.9) !important;
         color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 13px !important;
-        letter-spacing: 0.6px !important;
-        border-radius: 10px !important;
-        padding: 10px 20px !important;
-        box-shadow: 0 4px 18px rgba(245, 158, 11, 0.4) !important;
-        transition: all 0.25s ease !important;
-    }
-    div[data-testid="stButton"] button[key="btn_splash_risk"]:hover {
+        font-weight: 850 !important;
+        font-size: 13.5px !important;
+        letter-spacing: 0.8px !important;
+        border-radius: 12px !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45) !important;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }}
+    div[data-testid="stButton"] button[key="btn_splash_risk"]:hover {{
         background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%) !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 24px rgba(245, 158, 11, 0.6) !important;
-    }
+        box-shadow: 0 8px 28px rgba(245, 158, 11, 0.65) !important;
+    }}
 
-    div[data-testid="stButton"] button[key="btn_splash_wealth"] {
+    div[data-testid="stButton"] button[key="btn_splash_wealth"] {{
         background: linear-gradient(135deg, #10b981 0%, #0d9488 100%) !important;
-        border: 1px solid rgba(16, 185, 129, 0.8) !important;
+        border: 1px solid rgba(16, 185, 129, 0.9) !important;
         color: #ffffff !important;
-        font-weight: 800 !important;
-        font-size: 13px !important;
-        letter-spacing: 0.6px !important;
-        border-radius: 10px !important;
-        padding: 10px 20px !important;
-        box-shadow: 0 4px 18px rgba(16, 185, 129, 0.4) !important;
-        transition: all 0.25s ease !important;
-    }
-    div[data-testid="stButton"] button[key="btn_splash_wealth"]:hover {
+        font-weight: 850 !important;
+        font-size: 13.5px !important;
+        letter-spacing: 0.8px !important;
+        border-radius: 12px !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45) !important;
+        transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }}
+    div[data-testid="stButton"] button[key="btn_splash_wealth"]:hover {{
         background: linear-gradient(135deg, #34d399 0%, #059669 100%) !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 24px rgba(16, 185, 129, 0.6) !important;
-    }
+        box-shadow: 0 8px 28px rgba(16, 185, 129, 0.65) !important;
+    }}
     </style>
     """
-    st.markdown(_clean_html(hide_sidebar_css), unsafe_allow_html=True)
+    st.markdown(_clean_html(hide_sidebar_and_splash_css), unsafe_allow_html=True)
 
     html_content = f"""
-    <div class="splash-container">
-        <div style="margin-bottom:12px; filter: drop-shadow(0 0 16px rgba(245, 158, 11, 0.35));">{eye_svg}</div>
+    <div class="splash-master-wrapper">
+        <div class="splash-logo-container">{eye_svg}</div>
         <div class="splash-title">A R G U S</div>
         <div class="splash-subtitle">FINANCIAL ECOSYSTEM &amp; QUANTITATIVE INTELLIGENCE</div>
         <div class="splash-desc">
-            Suite istituzionale integrata per l'analisi avanzata del rischio di portafoglio, stress testing macroeconomico, consolidamento del patrimonio netto e simulazione dell'indipendenza finanziaria.
+            Suite istituzionale integrata per l'analisi avanzata del rischio di portafoglio, stress testing macroeconomico, consolidamento del patrimonio netto e intelligenza decisionale quantitativa.
         </div>
         
         <div class="splash-badge-ribbon">
-            <span class="splash-pill">🟢 <b>v6.0.0</b> Institutional Ecosystem</span>
-            <span class="splash-pill">⚡ <b>21 Moduli</b> Istituzionali</span>
+            <span class="splash-pill">🟢 <b>v6.0.0</b> Institutional</span>
+            <span class="splash-pill">⚡ <b>21 Moduli</b> Quant &amp; Wealth</span>
             <span class="splash-pill">🔒 <b>Zero-Cloud Leak</b> Crittografia Locale</span>
-            <span class="splash-pill">🗄️ <b>MySQL 8.0 &amp; DuckDB</b> Dual-Engine</span>
+            <span class="splash-pill">🗄️ <b>MySQL &amp; DuckDB</b> Dual-Engine</span>
         </div>
 
         <div class="terminal-window">
             <div class="terminal-header">
-                <span class="terminal-dot dot-red"></span>
-                <span class="terminal-dot dot-yellow"></span>
-                <span class="terminal-dot dot-green"></span>
-                <span class="terminal-title">argus-kernel --environment production --telemetry ok</span>
+                <div class="terminal-dots-group">
+                    <span class="terminal-dot dot-red"></span>
+                    <span class="terminal-dot dot-yellow"></span>
+                    <span class="terminal-dot dot-green"></span>
+                    <span class="terminal-title">argus-kernel --environment production --telemetry ok</span>
+                </div>
+                <div class="terminal-status-badge">
+                    <span>●</span> 100% OPERATIONAL
+                </div>
             </div>
             <div class="terminal-body">
                 <div style="color:#34d399;"><span style="color:#64748b;">[✓]</span> <b>RISK CORE:</b> Dual Ingestion (Stocks &amp; Crypto) &bull; VaR/CVaR, Copula &amp; Markowitz Frontier Online</div>
-                <div style="color:#38bdf8;"><span style="color:#64748b;">[✓]</span> <b>WEALTH CORE:</b> Consolidated Multi-Account Ledger &bull; 50/30/20 &amp; Pension Monte Carlo Active</div>
+                <div style="color:#38bdf8;"><span style="color:#64748b;">[✓]</span> <b>WEALTH CORE:</b> Consolidated Multi-Account Ledger &bull; 50/30/20, Real Estate &amp; Pension Monte Carlo Active</div>
                 <div style="color:#a78bfa;"><span style="color:#64748b;">[✓]</span> <b>TAX &amp; ESTATE:</b> IVAFE / Quadro RW, Zainetto Minus &bull; Ammortamento Mutui &amp; Successione Online</div>
                 <div style="color:#fbbf24; font-weight:bold;"><span style="color:#f59e0b;">[⚡]</span> <b>BOOT READY:</b> Seleziona l'Ambiente Operativo sottostante per Iniziare la Sessione</div>
+                
+                <div class="splash-progress-track">
+                    <div class="splash-progress-fill"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -3594,18 +3708,20 @@ def render_splash_screen(force_show: bool = False) -> bool:
     with col_risk:
         risk_card_html = """
         <div class="portal-card-risk">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                <span style="font-size: 17px; font-weight: 800; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
-                <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">11 MODULI QUANT</span>
-            </div>
-            <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
-                Piattaforma quantitativa per analisi del rischio di portafoglio, backtesting Kupiec, stress testing MSCI Barra, frontiera efficiente e BQuant Launchpad.
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <span style="font-size: 17.5px; font-weight: 800; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
+                    <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">11 MODULI QUANT</span>
+                </div>
+                <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 8px;">
+                    Piattaforma quantitativa per analisi del rischio di portafoglio, backtesting Kupiec, stress testing MSCI Barra, frontiera efficiente e BQuant Launchpad.
+                </div>
             </div>
             <div class="portal-chips-row">
                 <span class="portal-chip">📉 VaR &amp; CVaR</span>
                 <span class="portal-chip">🔬 Markowitz &amp; Copula</span>
                 <span class="portal-chip">🌪️ Stress Testing</span>
-                <span class="portal-chip">🔍 Screener Multi-Fattore</span>
+                <span class="portal-chip">🔍 Multi-Factor Screener</span>
                 <span class="portal-chip">💻 BQuant Sandbox</span>
             </div>
         </div>
@@ -3619,12 +3735,14 @@ def render_splash_screen(force_show: bool = False) -> bool:
     with col_wealth:
         wealth_card_html = """
         <div class="portal-card-wealth">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                <span style="font-size: 17px; font-weight: 800; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
-                <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">10 MODULI WEALTH</span>
-            </div>
-            <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
-                Consolidamento patrimoniale olistico, budget 50/30/20, caveau orologi, previdenza, fiscalità Quadro RW, mutui &amp; immobili, successione e AI Copilot.
+            <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <span style="font-size: 17.5px; font-weight: 800; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
+                    <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 8px;">10 MODULI WEALTH</span>
+                </div>
+                <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 8px;">
+                    Consolidamento patrimoniale olistico, budget 50/30/20, caveau orologi, previdenza, fiscalità Quadro RW, mutui &amp; immobili, successione e AI Copilot.
+                </div>
             </div>
             <div class="portal-chips-row">
                 <span class="portal-chip">🏛️ Net Worth</span>
