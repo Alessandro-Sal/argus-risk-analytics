@@ -317,14 +317,25 @@ def inject_custom_css():
 
         .metric-label {{ 
             color: #94a3b8; 
-            font-size: 11.5px; 
+            font-size: 11px; 
             font-weight: 650; 
-            letter-spacing: 0.5px; 
+            letter-spacing: 0.4px; 
             text-transform: uppercase;
             line-height: 1.2;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            gap: 4px !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+        }}
+        .metric-label-text {{
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            flex: 1 1 auto !important;
+            min-width: 0 !important;
         }}
         
         .metric-value {{ 
@@ -2527,22 +2538,24 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
 }}
 .info-icon-{unique_id} {{
     cursor: pointer; 
-    font-size: 13px; 
+    font-size: 11px; 
     color: #ff9900;
-    background: rgba(255, 153, 0, 0.1);
+    background: rgba(255, 153, 0, 0.12);
     border-radius: 50%;
-    width: 20px;
-    height: 20px;
+    width: 17px;
+    height: 17px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    margin-left: 8px;
+    flex-shrink: 0 !important;
+    margin-left: 4px;
     transition: all 0.2s;
-    border: 1px solid transparent;
+    border: 1px solid rgba(255, 153, 0, 0.3);
+    box-sizing: border-box !important;
 }}
 .info-icon-{unique_id}:hover {{
-    background: rgba(255, 153, 0, 0.2);
-    border-color: rgba(255, 153, 0, 0.5);
+    background: rgba(255, 153, 0, 0.25);
+    border-color: rgba(255, 153, 0, 0.7);
     transform: scale(1.1);
 }}
 </style>
@@ -2556,7 +2569,7 @@ def metric_card(label: str, value: str, delta: str = None, positive: bool = True
         <div style="font-size: 14px; line-height: 1.55; margin: 0; color: #c9d1d9;">{safe_help_text}</div>
     </div>
 </div>"""
-    label_html = f'<div class="metric-label" style="display:flex; align-items:center; justify-content:space-between; gap:6px;"><span>{label}</span><label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
+    label_html = f'<div class="metric-label"><span class="metric-label-text">{label}</span><label for="modal-toggle-{unique_id}" class="info-icon-{unique_id}" title="Clicca per approfondire">ⓘ</label></div>'
 
     card_html = (
         f"{modal_html}"
