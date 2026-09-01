@@ -4,6 +4,11 @@
 # Net Worth Consolidation, Cash Flow Analytics, 50/30/20 & Health Score
 # ============================================================
 
+import os
+import io
+import shutil
+import tempfile
+import subprocess
 import logging
 import numpy as np
 import pandas as pd
