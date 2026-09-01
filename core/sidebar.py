@@ -488,18 +488,38 @@ def render_sidebar():
         </style>
         """, unsafe_allow_html=True)
 
-        # Header del Brand ARGUS con Logo Vettoriale Dinamico
+        # Rilevamento portale attivo (Wealth vs Risk)
+        cur_page_name = get_current_page_name()
+        in_wealth_page = any(w in cur_page_name for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"])
+        if "argus_portal_mode" not in st.session_state:
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management" if in_wealth_page else "📊 Risk Analytics"
+        elif in_wealth_page and st.session_state.argus_portal_mode != "🏛️ Wealth Management":
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+        elif not in_wealth_page and any(w in cur_page_name for w in ["0_", "1_", "2_", "3_", "4_", "5_", "6_", "7_", "8_", "9_", "10_", "11_"]) and st.session_state.argus_portal_mode != "📊 Risk Analytics":
+            st.session_state.argus_portal_mode = "📊 Risk Analytics"
+
+        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth Management") or in_wealth_page
+
+        # Header del Brand ARGUS con Logo Vettoriale Dinamico (Stesso Occhio della Control Room)
         theme = st.session_state.get("ui_theme", "Midnight Obsidian")
-        accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#ff9900")
+        if is_wealth_mode:
+            accent = "#10b981"  # Smeraldo Wealth identico alla Wealth Control Room
+            brand_title = "ARGUS WEALTH"
+            brand_sub = "WEALTH & PERSONAL FINANCE"
+        else:
+            accent = "#00f3ff" if theme == "Cyberpunk Neon" else ("#00c853" if theme == "Emerald Wealth" else "#ff9900")
+            brand_title = "ARGUS"
+            brand_sub = "INSTITUTIONAL RISK INTELLIGENCE"
+
         from core.ui_utils import get_argus_eye_svg
-        eye_sidebar_svg = get_argus_eye_svg(size=30, animated=True, accent=accent, unique_id="sidebar_brand_eye")
+        eye_sidebar_svg = get_argus_eye_svg(size=32, animated=True, accent=accent, unique_id=f"sb_brand_eye_{'wealth' if is_wealth_mode else 'risk'}")
         
         st.markdown(f"""
         <div style="display:flex; align-items:center; gap: 10px; margin-bottom: 8px; padding: 2px 0;">
             <div style="flex-shrink: 0; display: flex; align-items: center;">{eye_sidebar_svg}</div>
             <div>
-                <div style="font-size: 15px; font-weight: 800; color: #ffffff; letter-spacing: 0.8px; line-height: 1.1;">ARGUS</div>
-                <div style="font-size: 9px; font-weight: 700; color: {accent}; letter-spacing: 0.5px; text-transform: uppercase;">INSTITUTIONAL RISK INTELLIGENCE</div>
+                <div style="font-size: 15px; font-weight: 800; color: #ffffff; letter-spacing: 0.8px; line-height: 1.1;">{brand_title}</div>
+                <div style="font-size: 9px; font-weight: 700; color: {accent}; letter-spacing: 0.5px; text-transform: uppercase;">{brand_sub}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -592,18 +612,6 @@ def render_sidebar():
         port_label, has_port = get_display_portfolio_name()
         port_text_style = "color:#ffffff; font-weight:700;" if has_port else "color:#e3b341; font-style:italic; font-weight:600;"
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
-
-        cur_page_name = get_current_page_name()
-        in_wealth_page = any(w in cur_page_name for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"])
-        
-        if "argus_portal_mode" not in st.session_state:
-            st.session_state.argus_portal_mode = "🏛️ Wealth Management" if in_wealth_page else "📊 Risk Analytics"
-        elif in_wealth_page and st.session_state.argus_portal_mode != "🏛️ Wealth Management":
-            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
-        elif not in_wealth_page and any(w in cur_page_name for w in ["0_", "1_", "2_", "3_", "4_", "5_", "6_", "7_", "8_", "9_", "10_", "11_"]) and st.session_state.argus_portal_mode != "📊 Risk Analytics":
-            st.session_state.argus_portal_mode = "📊 Risk Analytics"
-
-        is_wealth_mode = (st.session_state.argus_portal_mode == "🏛️ Wealth Management") or in_wealth_page
 
         if is_wealth_mode:
             w_needs = int(st.session_state.wealth_budget_needs_pct)
