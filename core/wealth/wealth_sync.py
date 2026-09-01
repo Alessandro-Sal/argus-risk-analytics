@@ -495,7 +495,7 @@ def _sync_others_illiquid_assets_sheet(engine: Engine, spreadsheet: Any, portfol
         peso = r[2].strip() if len(r) > 2 else ""
         prezzo_g = r[3].strip() if len(r) > 3 else ""
         prezzo_oggi = _clean_amount(r[4]) if len(r) > 4 else 0.0
-        prezzo_acq = _clean_amount(r[5]) if len(r) > 5 and r[5].strip() else prezzo_oggi
+        prezzo_acq = _clean_amount(r[5]) if len(r) > 5 and r[5].strip() else 0.0
 
         # Categorizzazione semantica automatica e brand extraction
         og_lower = oggetto.lower()
