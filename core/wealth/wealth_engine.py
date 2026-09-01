@@ -1497,6 +1497,102 @@ def generate_executive_tear_sheet_html(engine, portfolio_id: int = 1) -> str:
     return html
 
 
+def generate_executive_tear_sheet_pdf(engine, portfolio_id: int = 1) -> bytes:
+    """
+    Genera il file PDF binario dell'Executive Tear Sheet A4.
+    Utilizza Edge/Chrome headless per un rendering tipografico pixel-perfect nativo,
+    con fallback robusto in ReportLab in-memory.
+    """
+    html_content = generate_executive_tear_sheet_html(engine, portfolio_id=portfolio_id)
+    
+    # 1. Tentativo con Browser Headless (Microsoft Edge / Google Chrome / Chromium)
+    browser_candidates = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        "msedge",
+        "chrome",
+        "google-chrome",
+        "chromium"
+    ]
+    
+    found_browser = None
+    for b in browser_candidates:
+        if os.path.isabs(b) and os.path.exists(b):
+            found_browser = b
+            break
+        elif not os.path.isabs(b):
+            import shutil
+            p = shutil.which(b)
+            if p:
+                found_browser = p
+                break
+
+    if found_browser:
+        tmp_html = None
+        tmp_pdf = None
+        try:
+            import tempfile, subprocess
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
+                f.write(html_content)
+                tmp_html = f.name
+            tmp_pdf = tmp_html.replace(".html", ".pdf")
+            
+            cmd = [
+                found_browser,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-pdf-header-footer",
+                f"--print-to-pdf={tmp_pdf}",
+                tmp_html
+            ]
+            subprocess.run(cmd, capture_output=True, timeout=12)
+            if os.path.exists(tmp_pdf) and os.path.getsize(tmp_pdf) > 0:
+                with open(tmp_pdf, "rb") as f_pdf:
+                    return f_pdf.read()
+        except Exception as e:
+            logger.warning(f"Headless PDF generation failed ({e}), falling back to ReportLab...")
+        finally:
+            if tmp_html and os.path.exists(tmp_html):
+                try: os.remove(tmp_html)
+                except Exception: pass
+            if tmp_pdf and os.path.exists(tmp_pdf):
+                try: os.remove(tmp_pdf)
+                except Exception: pass
+
+    # 2. Fallback ReportLab In-Memory
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    df_prof = get_wealth_portfolios(engine)
+    prof_name = "Personale"
+    if not df_prof.empty and portfolio_id in df_prof["portfolio_id"].values:
+        prof_name = str(df_prof.loc[df_prof["portfolio_id"] == portfolio_id, "name"].values[0])
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+    
+    story = [
+        Paragraph("<b>ARGUS WEALTH MANAGEMENT</b>", styles["Title"]),
+        Paragraph(f"Executive Tear Sheet &bull; Profilo: <b>{prof_name.upper()}</b>", styles["Heading2"]),
+        Spacer(1, 15),
+        Paragraph(f"<b>Patrimonio Netto Consolidato:</b> &euro; {nw.total_net_worth:,.2f}", styles["Normal"]),
+        Paragraph(f"<b>Liquidit&agrave;:</b> &euro; {nw.liquid_cash:,.2f} &bull; <b>Investimenti:</b> &euro; {nw.financial_investments:,.2f}", styles["Normal"]),
+        Paragraph(f"<b>Caveau &amp; Fisico:</b> &euro; {nw.physical_assets:,.2f} &bull; <b>Previdenza:</b> &euro; {nw.pension_total:,.2f}", styles["Normal"]),
+        Paragraph(f"<b>Wealth Health Score:</b> {nw.wealth_health_score:.0f}/100 &bull; <b>Runway:</b> {nw.runway_months:.1f} Mesi", styles["Normal"]),
+        Spacer(1, 20),
+        Paragraph("Documento generato localmente da ARGUS Financial Ecosystem.", styles["Italic"])
+    ]
+    doc.build(story)
+    return buf.getvalue()
+
+
 # ============================================================
 # ── ANALISI TRANSAZIONI: SUBSCRIPTION SENTINEL & COSTO OPPORTUNITÀ
 # ============================================================

@@ -70,6 +70,7 @@ from core.wealth.wealth_engine import (
     compute_estate_planning_analytics,
     compute_ai_wealth_diagnostics,
     generate_executive_tear_sheet_html,
+    generate_executive_tear_sheet_pdf,
     compute_recurring_subscriptions_analytics,
     compute_cashflow_forecast_and_anomalies,
     compute_tax_loss_harvesting_and_latent_taxes,
