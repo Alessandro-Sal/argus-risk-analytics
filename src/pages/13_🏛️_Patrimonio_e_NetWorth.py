@@ -188,25 +188,37 @@ with c6:
 st.divider()
 
 # ── EXECUTIVE TEAR SHEET REPORT TOOLBAR ──────────────────────
-col_ts1, col_ts2 = st.columns([3, 1.5])
-with col_ts1:
-    st.markdown("""
-    <div style="font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:8px;">
-        <span>📄 <b>Executive Tear Sheet Dossier:</b> Report patrimoniale formattato per stampa A4 o salvataggio PDF stile Private Banking.</span>
+tear_sheet_html = generate_executive_tear_sheet_html(engine, portfolio_id=current_pid)
+
+st.markdown("""
+<div style="background:rgba(22,27,34,0.75); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #10b981; border-radius:10px; padding:12px 16px; margin-bottom:10px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+        <div style="width:34px; height:34px; border-radius:8px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">
+            📑
+        </div>
+        <div>
+            <div style="font-size:13.5px; font-weight:750; color:#ffffff; letter-spacing:0.3px;">Executive Tear Sheet Dossier (Private Banking Style)</div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:1px;">Report patrimoniale consolidato ad alta definizione, impaginato per stampa A4 o salvataggio PDF.</div>
+        </div>
     </div>
-    """, unsafe_allow_html=True)
-with col_ts2:
-    tear_sheet_html = generate_executive_tear_sheet_html(engine, portfolio_id=current_pid)
+</div>
+""", unsafe_allow_html=True)
+
+ts_c1, ts_c2 = st.columns([1.2, 1.0])
+with ts_c1:
     st.download_button(
-        label="📄 Scarica Executive Tear Sheet (PDF/HTML)",
+        label="📥 Scarica Report Executive (PDF/HTML)",
         data=tear_sheet_html.encode("utf-8"),
         file_name=f"argus_executive_tear_sheet_{prof_map.get(current_pid, 'portfolio')}_{datetime.now().strftime('%Y%m%d')}.html",
         mime="text/html",
-        use_container_width=True
+        use_container_width=True,
+        type="primary"
     )
+with ts_c2:
+    show_ts_preview = st.toggle("📑 Anteprima Documento Live", value=False, key="toggle_ts_preview_p13")
 
-with st.expander("👁️ Anteprima Live Executive Tear Sheet (Goldman Sachs Style)", expanded=False):
-    st.components.v1.html(tear_sheet_html, height=520, scrolling=True)
+if show_ts_preview:
+    st.components.v1.html(tear_sheet_html, height=560, scrolling=True)
 
 st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
