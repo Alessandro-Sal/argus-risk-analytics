@@ -212,83 +212,98 @@ st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 
 
-# ── WEALTH HEALTH SCORE & ASSET ALLOCATION ───────────────────
-col_alloc, col_score = st.columns([3.2, 1.8])
+# ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO ─────────────
+head_a1, head_a2 = st.columns([2.5, 1.5])
+with head_a1:
+    section("📊 Allocazione Globale del Patrimonio")
+with head_a2:
+    chart_view = st.radio(
+        "Visualizzazione:",
+        options=["🥧 Sunburst", "🥞 Treemap", "🍩 Macro"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="alloc_chart_view_mode"
+    )
 
-with col_alloc:
-    head_a1, head_a2 = st.columns([2.2, 1.8])
-    with head_a1:
-        section("📊 Allocazione Globale del Patrimonio")
-    with head_a2:
-        chart_view = st.radio(
-            "Visualizzazione:",
-            options=["🥧 Sunburst", "🥞 Treemap", "🍩 Macro"],
-            horizontal=True,
-            label_visibility="collapsed",
-            key="alloc_chart_view_mode"
-        )
-    
-    # Costruzione gerarchica precisa per branchvalues='total'
-    labels = []
-    parents = []
-    values = []
-    colors = []
-    
-    # 1. Macro-Gruppi
-    macros_def = [
-        ("Investimenti Finanziari", fin_inv, "#4f46e5"),
-        ("Liquidità & Cash", liq_cash, "#059669"),
-        ("Asset Caveau", phys_assets, "#b45309"),
-        ("Previdenza", pens_val, "#be185d")
-    ]
-    for m_name, m_val, m_col in macros_def:
-        if m_val > 0:
-            labels.append(m_name)
-            parents.append("")
-            values.append(m_val)
-            colors.append(m_col)
+# Costruzione gerarchica precisa per branchvalues='total'
+labels = []
+parents = []
+values = []
+colors = []
 
-    # 2. Investimenti Finanziari (Risk Portfolios)
-    if is_snapshot_mode:
-        snap_risk = details.get("linked_risk_portfolios", [])
-        for rk in snap_risk:
+# 1. Macro-Gruppi
+macros_def = [
+    ("Investimenti Finanziari", fin_inv, "#4f46e5"),
+    ("Liquidità & Cash", liq_cash, "#059669"),
+    ("Asset Caveau", phys_assets, "#b45309"),
+    ("Previdenza", pens_val, "#be185d")
+]
+for m_name, m_val, m_col in macros_def:
+    if m_val > 0:
+        labels.append(m_name)
+        parents.append("")
+        values.append(m_val)
+        colors.append(m_col)
+
+# 2. Investimenti Finanziari (Risk Portfolios)
+if is_snapshot_mode:
+    snap_risk = details.get("linked_risk_portfolios", [])
+    for rk in snap_risk:
+        v = float(rk.get("latest_value", 0.0))
+        if v > 0:
+            name = "Azioni & ETF" if "stock" in rk.get("name", "").lower() else ("Criptovalute" if "crypto" in rk.get("name", "").lower() else rk.get("name"))
+            col = "#6366f1" if "azioni" in name.lower() or "stock" in name.lower() else "#8b5cf6"
+            labels.append(name)
+            parents.append("Investimenti Finanziari")
+            values.append(v)
+            colors.append(col)
+    if not snap_risk and fin_inv > 0:
+        labels.append("Portafogli Finanziari")
+        parents.append("Investimenti Finanziari")
+        values.append(fin_inv)
+        colors.append("#6366f1")
+else:
+    _, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=current_pid)
+    if not df_linked_risk.empty:
+        for _, rk in df_linked_risk.iterrows():
             v = float(rk.get("latest_value", 0.0))
             if v > 0:
-                name = "Azioni & ETF" if "stock" in rk.get("name", "").lower() else ("Criptovalute" if "crypto" in rk.get("name", "").lower() else rk.get("name"))
+                r_name = str(rk.get("name", ""))
+                name = "Azioni & ETF" if "stock" in r_name.lower() else ("Criptovalute" if "crypto" in r_name.lower() else r_name)
                 col = "#6366f1" if "azioni" in name.lower() or "stock" in name.lower() else "#8b5cf6"
                 labels.append(name)
                 parents.append("Investimenti Finanziari")
                 values.append(v)
                 colors.append(col)
-        if not snap_risk and fin_inv > 0:
-            labels.append("Portafogli Finanziari")
-            parents.append("Investimenti Finanziari")
-            values.append(fin_inv)
-            colors.append("#6366f1")
-    else:
-        _, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=current_pid)
-        if not df_linked_risk.empty:
-            for _, rk in df_linked_risk.iterrows():
-                v = float(rk.get("latest_value", 0.0))
-                if v > 0:
-                    r_name = str(rk.get("name", ""))
-                    name = "Azioni & ETF" if "stock" in r_name.lower() else ("Criptovalute" if "crypto" in r_name.lower() else r_name)
-                    col = "#6366f1" if "azioni" in name.lower() or "stock" in name.lower() else "#8b5cf6"
-                    labels.append(name)
-                    parents.append("Investimenti Finanziari")
-                    values.append(v)
-                    colors.append(col)
-        elif fin_inv > 0:
-            labels.append("Portafogli Finanziari")
-            parents.append("Investimenti Finanziari")
-            values.append(fin_inv)
-            colors.append("#6366f1")
+    elif fin_inv > 0:
+        labels.append("Portafogli Finanziari")
+        parents.append("Investimenti Finanziari")
+        values.append(fin_inv)
+        colors.append("#6366f1")
 
-    # 3. Liquidità & Cash (Raggruppamento intelligente micro-conti < 1.000€)
-    if is_snapshot_mode:
-        snap_accs = details.get("accounts", [])
+# 3. Liquidità & Cash (Raggruppamento intelligente micro-conti < 1.000€)
+if is_snapshot_mode:
+    snap_accs = details.get("accounts", [])
+    other_cash_val = 0.0
+    for a in snap_accs:
+        b = float(a.get("balance", 0.0))
+        a_name = str(a.get("name", "Conto"))
+        if b >= 1000:
+            labels.append(a_name)
+            parents.append("Liquidità & Cash")
+            values.append(b)
+            colors.append("#10b981" if "intesa" in a_name.lower() else "#14b8a6")
+        elif b > 0:
+            other_cash_val += b
+    if other_cash_val > 0:
+        labels.append("Altri Conti & Wallet")
+        parents.append("Liquidità & Cash")
+        values.append(other_cash_val)
+        colors.append("#06b6d4")
+else:
+    if not df_accounts.empty:
         other_cash_val = 0.0
-        for a in snap_accs:
+        for _, a in df_accounts.iterrows():
             b = float(a.get("balance", 0.0))
             a_name = str(a.get("name", "Conto"))
             if b >= 1000:
@@ -303,34 +318,34 @@ with col_alloc:
             parents.append("Liquidità & Cash")
             values.append(other_cash_val)
             colors.append("#06b6d4")
-    else:
-        if not df_accounts.empty:
-            other_cash_val = 0.0
-            for _, a in df_accounts.iterrows():
-                b = float(a.get("balance", 0.0))
-                a_name = str(a.get("name", "Conto"))
-                if b >= 1000:
-                    labels.append(a_name)
-                    parents.append("Liquidità & Cash")
-                    values.append(b)
-                    colors.append("#10b981" if "intesa" in a_name.lower() else "#14b8a6")
-                elif b > 0:
-                    other_cash_val += b
-            if other_cash_val > 0:
-                labels.append("Altri Conti & Wallet")
-                parents.append("Liquidità & Cash")
-                values.append(other_cash_val)
-                colors.append("#06b6d4")
-        elif liq_cash > 0:
-            labels.append("Liquidità & Depositi")
-            parents.append("Liquidità & Cash")
-            values.append(liq_cash)
-            colors.append("#10b981")
+    elif liq_cash > 0:
+        labels.append("Liquidità & Depositi")
+        parents.append("Liquidità & Cash")
+        values.append(liq_cash)
+        colors.append("#10b981")
 
-    # 4. Asset Caveau
-    if is_snapshot_mode:
-        snap_phys = details.get("physical_assets", [])
-        for pa in snap_phys:
+# 4. Asset Caveau
+if is_snapshot_mode:
+    snap_phys = details.get("physical_assets", [])
+    for pa in snap_phys:
+        v = float(pa.get("current_market_value", 0.0))
+        if v > 0:
+            p_name = str(pa.get("name", "Asset"))
+            name = "Oro 18K (Bracciali)" if "braccial" in p_name.lower() or "oro" in p_name.lower() else ("Seiko Automatic" if "seiko" in p_name.lower() else p_name)
+            col = "#f59e0b" if "oro" in name.lower() or pa.get("asset_category") == "precious_metals" else "#d97706"
+            labels.append(name)
+            parents.append("Asset Caveau")
+            values.append(v)
+            colors.append(col)
+    if not snap_phys and phys_assets > 0:
+        labels.append("Asset Fisici")
+        parents.append("Asset Caveau")
+        values.append(phys_assets)
+        colors.append("#f59e0b")
+else:
+    df_phys = get_physical_assets(engine, portfolio_id=current_pid)
+    if not df_phys.empty:
+        for _, pa in df_phys.iterrows():
             v = float(pa.get("current_market_value", 0.0))
             if v > 0:
                 p_name = str(pa.get("name", "Asset"))
@@ -340,115 +355,101 @@ with col_alloc:
                 parents.append("Asset Caveau")
                 values.append(v)
                 colors.append(col)
-        if not snap_phys and phys_assets > 0:
-            labels.append("Asset Fisici")
-            parents.append("Asset Caveau")
-            values.append(phys_assets)
-            colors.append("#f59e0b")
-    else:
-        df_phys = get_physical_assets(engine, portfolio_id=current_pid)
-        if not df_phys.empty:
-            for _, pa in df_phys.iterrows():
-                v = float(pa.get("current_market_value", 0.0))
-                if v > 0:
-                    p_name = str(pa.get("name", "Asset"))
-                    name = "Oro 18K (Bracciali)" if "braccial" in p_name.lower() or "oro" in p_name.lower() else ("Seiko Automatic" if "seiko" in p_name.lower() else p_name)
-                    col = "#f59e0b" if "oro" in name.lower() or pa.get("asset_category") == "precious_metals" else "#d97706"
-                    labels.append(name)
-                    parents.append("Asset Caveau")
-                    values.append(v)
-                    colors.append(col)
-        elif phys_assets > 0:
-            labels.append("Asset Fisici")
-            parents.append("Asset Caveau")
-            values.append(phys_assets)
-            colors.append("#f59e0b")
+    elif phys_assets > 0:
+        labels.append("Asset Fisici")
+        parents.append("Asset Caveau")
+        values.append(phys_assets)
+        colors.append("#f59e0b")
 
-    # 5. Previdenza
-    if is_snapshot_mode:
-        snap_pens = details.get("pension_plans", [])
-        for pp in snap_pens:
+# 5. Previdenza
+if is_snapshot_mode:
+    snap_pens = details.get("pension_plans", [])
+    for pp in snap_pens:
+        v = float(pp.get("accumulated_value", 0.0))
+        if v > 0:
+            labels.append("Fondo Pensione")
+            parents.append("Previdenza")
+            values.append(v)
+            colors.append("#ec4899")
+    if not snap_pens and pens_val > 0:
+        labels.append("Fondo Pensione")
+        parents.append("Previdenza")
+        values.append(pens_val)
+        colors.append("#ec4899")
+else:
+    df_pens = get_pension_plans(engine, portfolio_id=current_pid)
+    if not df_pens.empty:
+        for _, pp in df_pens.iterrows():
             v = float(pp.get("accumulated_value", 0.0))
             if v > 0:
                 labels.append("Fondo Pensione")
                 parents.append("Previdenza")
                 values.append(v)
                 colors.append("#ec4899")
-        if not snap_pens and pens_val > 0:
-            labels.append("Fondo Pensione")
-            parents.append("Previdenza")
-            values.append(pens_val)
-            colors.append("#ec4899")
-    else:
-        df_pens = get_pension_plans(engine, portfolio_id=current_pid)
-        if not df_pens.empty:
-            for _, pp in df_pens.iterrows():
-                v = float(pp.get("accumulated_value", 0.0))
-                if v > 0:
-                    labels.append("Fondo Pensione")
-                    parents.append("Previdenza")
-                    values.append(v)
-                    colors.append("#ec4899")
-        elif pens_val > 0:
-            labels.append("Fondo Pensione")
-            parents.append("Previdenza")
-            values.append(pens_val)
-            colors.append("#ec4899")
+    elif pens_val > 0:
+        labels.append("Fondo Pensione")
+        parents.append("Previdenza")
+        values.append(pens_val)
+        colors.append("#ec4899")
 
-    if labels and values:
-        if "Treemap" in chart_view:
-            fig_alloc = go.Figure(go.Treemap(
-                labels=labels,
-                parents=parents,
-                values=values,
-                branchvalues="total",
-                marker=dict(colors=colors, line=dict(color="#0e1117", width=1.5)),
-                hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota sul Totale: <b>%{percentRoot:.1%}</b><extra></extra>"
-            ))
-        elif "Macro" in chart_view:
-            macro_labels = [m[0] for m in macros_def if m[1] > 0]
-            macro_vals = [m[1] for m in macros_def if m[1] > 0]
-            macro_cols = [m[2] for m in macros_def if m[1] > 0]
-            fig_alloc = go.Figure(go.Pie(
-                labels=macro_labels,
-                values=macro_vals,
-                hole=0.55,
-                marker=dict(colors=macro_cols, line=dict(color="#0e1117", width=2)),
-                hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota: <b>%{percent}</b><extra></extra>"
-            ))
-        else: # Sunburst
-            fig_alloc = go.Figure(go.Sunburst(
-                labels=labels,
-                parents=parents,
-                values=values,
-                branchvalues="total",
-                marker=dict(colors=colors, line=dict(color="#0e1117", width=1.5)),
-                insidetextorientation="auto",
-                hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota sul Patrimonio: <b>%{percentRoot:.1%}</b><extra></extra>"
-            ))
-        
-        fig_alloc.update_layout(
-            margin=dict(t=10, l=10, r=10, b=10),
-            height=370,
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="Outfit, sans-serif", color="#c9d1d9")
-        )
-        st.plotly_chart(fig_alloc, use_container_width=True)
-    else:
-        st.info("Nessun dato di allocazione disponibile. Aggiungi conti o asset fisici.")
-
-
-with col_score:
-    section("🛡️ Wealth Health Score")
+if labels and values:
+    if "Treemap" in chart_view:
+        fig_alloc = go.Figure(go.Treemap(
+            labels=labels,
+            parents=parents,
+            values=values,
+            branchvalues="total",
+            marker=dict(colors=colors, line=dict(color="#0e1117", width=1.5)),
+            hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota sul Totale: <b>%{percentRoot:.1%}</b><extra></extra>"
+        ))
+    elif "Macro" in chart_view:
+        macro_labels = [m[0] for m in macros_def if m[1] > 0]
+        macro_vals = [m[1] for m in macros_def if m[1] > 0]
+        macro_cols = [m[2] for m in macros_def if m[1] > 0]
+        fig_alloc = go.Figure(go.Pie(
+            labels=macro_labels,
+            values=macro_vals,
+            hole=0.55,
+            marker=dict(colors=macro_cols, line=dict(color="#0e1117", width=2)),
+            hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota: <b>%{percent}</b><extra></extra>"
+        ))
+    else: # Sunburst
+        fig_alloc = go.Figure(go.Sunburst(
+            labels=labels,
+            parents=parents,
+            values=values,
+            branchvalues="total",
+            marker=dict(colors=colors, line=dict(color="#0e1117", width=1.5)),
+            insidetextorientation="auto",
+            hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota sul Patrimonio: <b>%{percentRoot:.1%}</b><extra></extra>"
+        ))
     
+    fig_alloc.update_layout(
+        margin=dict(t=15, l=10, r=10, b=15),
+        height=450,
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Outfit, sans-serif", color="#c9d1d9")
+    )
+    st.plotly_chart(fig_alloc, use_container_width=True)
+else:
+    st.info("Nessun dato di allocazione disponibile. Aggiungi conti o asset fisici.")
+
+st.divider()
+
+# ── RIGA 2: WEALTH HEALTH SCORE & ROBUSTEZZA FINANZIARIA ─────
+section("🛡️ Wealth Health Score & Indici di Robustezza Finanziaria")
+
+col_gauge, col_score_cards = st.columns([1.5, 2.5])
+
+with col_gauge:
     score_val = round(health_sc, 1)
     score_color = "#10b981" if score_val >= 75 else ("#f59e0b" if score_val >= 50 else "#ef4444")
     
     fig_gauge = go.Figure(go.Indicator(
         mode="gauge+number",
         value=score_val,
-        number={'suffix': "/100", 'font': {'size': 36, 'color': '#ffffff', 'family': 'Outfit, sans-serif'}},
+        number={'suffix': "/100", 'font': {'size': 38, 'color': '#ffffff', 'family': 'Outfit, sans-serif'}},
         domain={'x': [0, 1], 'y': [0, 1]},
         title={'text': "Indice di Robustezza Finanziaria", 'font': {'size': 13, 'color': '#8b949e'}},
         gauge={
@@ -470,35 +471,37 @@ with col_score:
         }
     ))
     fig_gauge.update_layout(
-        height=220,
-        margin=dict(t=20, b=0, l=15, r=15),
+        height=260,
+        margin=dict(t=25, b=10, l=15, r=15),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)"
     )
     st.plotly_chart(fig_gauge, use_container_width=True)
-    
+
+with col_score_cards:
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
     st.markdown(f"""
-    <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-        <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #10b981; border-radius: 8px; padding: 8px 12px; display:flex; justify-content:space-between; align-items:center;">
+    <div style="display:flex; flex-direction:column; gap:12px;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #10b981; border-radius: 10px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <div style="font-size:10.5px; color:#8b949e; text-transform:uppercase; font-weight:600;">Tasso di Risparmio</div>
-                <div style="font-size:14.5px; font-weight:700; color:#ffffff;">{sav_rate:.1f}%</div>
+                <div style="font-size:11px; color:#8b949e; text-transform:uppercase; font-weight:700; letter-spacing:0.3px;">Tasso di Risparmio (Savings Rate)</div>
+                <div style="font-size:17px; font-weight:800; color:#ffffff; margin-top:2px;">{sav_rate:.1f}%</div>
             </div>
-            <div style="background:rgba(16,185,129,0.15); color:#10b981; font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:10px;">{'🟢 Ottimo' if sav_rate >= 20 else ('🟡 In crescita' if sav_rate >= 5 else '⚪ Base')}</div>
+            <div style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); color:#34d399; font-size:11px; font-weight:700; padding:4px 10px; border-radius:12px;">{'🟢 Ottimo (≥20%)' if sav_rate >= 20 else ('🟡 In crescita (≥5%)' if sav_rate >= 5 else '⚪ Base (<5%)')}</div>
         </div>
-        <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #6366f1; border-radius: 8px; padding: 8px 12px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #6366f1; border-radius: 10px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <div style="font-size:10.5px; color:#8b949e; text-transform:uppercase; font-weight:600;">Autonomia Liquidità (Runway)</div>
-                <div style="font-size:14.5px; font-weight:700; color:#ffffff;">{runway_m:.1f} Mesi</div>
+                <div style="font-size:11px; color:#8b949e; text-transform:uppercase; font-weight:700; letter-spacing:0.3px;">Autonomia Liquidità (Runway Emergenze)</div>
+                <div style="font-size:17px; font-weight:800; color:#ffffff; margin-top:2px;">{runway_m:.1f} Mesi</div>
             </div>
-            <div style="background:rgba(99,102,241,0.15); color:#818cf8; font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:10px;">{'🛡️ Copertura Sicura' if runway_m >= 6 else '⚖️ Fondo Emergenza'}</div>
+            <div style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:11px; font-weight:700; padding:4px 10px; border-radius:12px;">{'🛡️ Copertura Solida (≥6m)' if runway_m >= 6 else ('⚖️ Fondo Adeguato (≥3m)' if runway_m >= 3 else '🔴 Riserva Vulnerabile (<3m)')}</div>
         </div>
-        <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 3px solid #f59e0b; border-radius: 8px; padding: 8px 12px; display:flex; justify-content:space-between; align-items:center;">
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #f59e0b; border-radius: 10px; padding: 12px 16px; display:flex; justify-content:space-between; align-items:center;">
             <div>
-                <div style="font-size:10.5px; color:#8b949e; text-transform:uppercase; font-weight:600;">Passività & Debiti</div>
-                <div style="font-size:14.5px; font-weight:700; color:#ffffff;">{fmt_eur(liab_val)}</div>
+                <div style="font-size:11px; color:#8b949e; text-transform:uppercase; font-weight:700; letter-spacing:0.3px;">Passività, Prestiti & Debiti Residui</div>
+                <div style="font-size:17px; font-weight:800; color:#ffffff; margin-top:2px;">{fmt_eur(liab_val)}</div>
             </div>
-            <div style="background:rgba(245,158,11,0.15); color:#f59e0b; font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:10px;">{'✅ Zero Debiti' if liab_val == 0 else '⚠️ Esposizione'}</div>
+            <div style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.3); color:#fbbf24; font-size:11px; font-weight:700; padding:4px 10px; border-radius:12px;">{'✅ Zero Debiti (100% Solvibile)' if liab_val == 0 else '⚠️ Esposizione Debitoria Attiva'}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
