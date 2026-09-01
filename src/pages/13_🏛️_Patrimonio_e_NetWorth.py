@@ -170,21 +170,24 @@ with head_c2:
 
 
 
-# ── TOP KPI ROW ─────────────────────────────────────────────
+# ── TOP KPI ROW (DUE RIGHE X 3 COLONNE) ─────────────────────
+r1_c1, r1_c2, r1_c3 = st.columns(3)
+with r1_c1:
+    metric_card("Patrimonio Netto", fmt_eur(tot_nw), delta="Consolidato Globale", delta_color="normal")
+with r1_c2:
+    metric_card("Liquidità & Cash", fmt_eur(liq_cash), delta=f"Runway {runway_m:.1f} Mesi", delta_color="normal")
+with r1_c3:
+    metric_card("Investimenti Finanziari", fmt_eur(fin_inv), delta="Portafogli Titoli + Crypto", delta_color="normal")
 
-c1, c2, c3, c4, c5, c6 = st.columns(6)
-with c1:
-    metric_card("Patrimonio Netto", fmt_eur(tot_nw), delta="Consolidato", delta_color="normal")
-with c2:
-    metric_card("Liquidità & Cash", fmt_eur(liq_cash), delta=f"Runway {runway_m:.1f}m", delta_color="normal")
-with c3:
-    metric_card("Investimenti", fmt_eur(fin_inv), delta="Stocks + Crypto", delta_color="normal")
-with c4:
-    metric_card("Asset Caveau", fmt_eur(phys_assets), delta=f"Orologi: {fmt_eur(watches_val)}", delta_color="normal")
-with c5:
-    metric_card("Previdenza", fmt_eur(pens_val), delta="Fondi Pensione", delta_color="normal")
-with c6:
-    metric_card("Health Score", f"{health_sc:.0f}/100", delta="Solidità", delta_color="normal")
+st.markdown("<div style='margin-bottom: 6px;'></div>", unsafe_allow_html=True)
+
+r2_c1, r2_c2, r2_c3 = st.columns(3)
+with r2_c1:
+    metric_card("Asset Caveau & Fisici", fmt_eur(phys_assets), delta=f"Orologi: {fmt_eur(watches_val)}", delta_color="normal")
+with r2_c2:
+    metric_card("Previdenza Integrativa", fmt_eur(pens_val), delta="Fondi Pensione & PIP", delta_color="normal")
+with r2_c3:
+    metric_card("Wealth Health Score", f"{health_sc:.0f} / 100", delta="Indice di Solidità", delta_color="normal")
 
 st.divider()
 
