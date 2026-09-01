@@ -213,18 +213,19 @@ st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 
 # ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO ─────────────
-# ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO ─────────────
-head_a1, head_a2 = st.columns([2.2, 1.8])
+head_a1, head_a2 = st.columns([1.8, 1.4])
 with head_a1:
     section("📊 Allocazione Globale del Patrimonio")
 with head_a2:
-    chart_view = st.radio(
-        "Visualizzazione:",
-        options=["🍩 Donut Istituzionale", "🥧 Sunburst", "🥞 Treemap"],
-        horizontal=True,
+    chart_view = st.segmented_control(
+        "Visualizzazione Grafico:",
+        options=["🍩 Donut", "🥧 Sunburst", "🥞 Treemap"],
+        default="🍩 Donut",
         label_visibility="collapsed",
-        key="alloc_chart_view_mode"
+        key="alloc_chart_view_mode_seg"
     )
+    if not chart_view:
+        chart_view = "🍩 Donut"
 
 # Costruzione dettagliata foglie e macro-gruppi
 breakdown_items = []
