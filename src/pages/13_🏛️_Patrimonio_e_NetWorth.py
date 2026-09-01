@@ -147,15 +147,10 @@ prof_title = prof_map.get(current_pid, "Personale")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p13")
 render_wealth_executive_badges(nw)
 
-head_c1, head_c2 = st.columns([3.5, 1.5])
+head_c1, head_c2 = st.columns([3.8, 1.2])
 with head_c1:
     st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
-    st.markdown(f"""
-    <div style='display:flex; align-items:center; gap:12px; margin-top:-8px; margin-bottom:12px;'>
-        <span style='color:#8b949e; font-size:13px;'>Consolidamento olistico del patrimonio netto (Liquidità, Portafogli Titoli, Crypto, Caveau e Previdenza).</span>
-        <span style='background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.25); padding:2px 8px; border-radius:12px; font-size:11px; color:#34d399;'>🟢 Live Market Sync: {datetime.now().strftime('%d/%m/%Y %H:%M')}</span>
-    </div>
-    """, unsafe_allow_html=True)
+    st.caption(f"Consolidamento olistico del patrimonio netto (Liquidità, Portafogli Titoli, Crypto, Caveau e Previdenza) • Sincronizzato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 with head_c2:
     st.write("")
     if not is_snapshot_mode and len(prof_map) > 1:
