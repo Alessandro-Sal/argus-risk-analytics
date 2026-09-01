@@ -35,7 +35,8 @@ from core.ui_utils import (
 from core.sidebar import render_sidebar
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
-    generate_executive_tear_sheet_html
+    generate_executive_tear_sheet_html,
+    generate_executive_tear_sheet_pdf
 )
 
 
@@ -189,6 +190,9 @@ st.divider()
 
 # ── EXECUTIVE TEAR SHEET REPORT TOOLBAR ──────────────────────
 tear_sheet_html = generate_executive_tear_sheet_html(engine, portfolio_id=current_pid)
+tear_sheet_pdf = generate_executive_tear_sheet_pdf(engine, portfolio_id=current_pid)
+date_slug = datetime.now().strftime('%Y%m%d')
+prof_slug = str(prof_map.get(current_pid, 'portfolio')).lower().replace(' ', '_')
 
 st.markdown("""
 <div style="background:rgba(22,27,34,0.75); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #10b981; border-radius:10px; padding:12px 16px; margin-bottom:10px;">
@@ -198,24 +202,32 @@ st.markdown("""
         </div>
         <div>
             <div style="font-size:13.5px; font-weight:750; color:#ffffff; letter-spacing:0.3px;">Executive Tear Sheet Dossier (Private Banking Style)</div>
-            <div style="font-size:11px; color:#94a3b8; margin-top:1px;">Report patrimoniale consolidato ad alta definizione, impaginato per stampa A4 o salvataggio PDF.</div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:1px;">Report patrimoniale consolidato ad alta definizione, impaginato per stampa A4 o salvataggio PDF diretto.</div>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-ts_c1, ts_c2 = st.columns([1.2, 1.0])
+ts_c1, ts_c2, ts_c3 = st.columns([1.3, 0.9, 1.0])
 with ts_c1:
     st.download_button(
-        label="📥 Scarica Report Executive (PDF/HTML)",
-        data=tear_sheet_html.encode("utf-8"),
-        file_name=f"argus_executive_tear_sheet_{prof_map.get(current_pid, 'portfolio')}_{datetime.now().strftime('%Y%m%d')}.html",
-        mime="text/html",
+        label="📥 Scarica Dossier PDF (A4)",
+        data=tear_sheet_pdf,
+        file_name=f"argus_executive_tear_sheet_{prof_slug}_{date_slug}.pdf",
+        mime="application/pdf",
         use_container_width=True,
         type="primary"
     )
 with ts_c2:
-    show_ts_preview = st.toggle("📑 Anteprima Documento Live", value=False, key="toggle_ts_preview_p13")
+    st.download_button(
+        label="🌐 Versione HTML",
+        data=tear_sheet_html.encode("utf-8"),
+        file_name=f"argus_executive_tear_sheet_{prof_slug}_{date_slug}.html",
+        mime="text/html",
+        use_container_width=True
+    )
+with ts_c3:
+    show_ts_preview = st.toggle("📑 Anteprima Live", value=False, key="toggle_ts_preview_p13")
 
 if show_ts_preview:
     st.components.v1.html(tear_sheet_html, height=560, scrolling=True)
