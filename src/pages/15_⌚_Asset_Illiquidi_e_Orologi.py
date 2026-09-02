@@ -268,134 +268,138 @@ with st.expander("➕ Aggiungi Nuovo Orologio, Immobile o Asset Fisico"):
 
 st.divider()
 
-# ── SEZIONE PRIVATE EQUITY, VENTURE CAPITAL & J-CURVE ────────
-section("💼 Private Equity, Venture Capital & J-Curve Waterfall")
-st.caption("Monitoraggio delle partecipazioni societarie illiquide, chiamate di capitale (Capital Calls), distribuzioni (DPI) e modellazione stocastica della J-Curve di rendimento atteso.")
+# ── DESK SIMULATORE: PRIVATE EQUITY, VENTURE CAPITAL & PRIVATE DEBT ────
+with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Capital & Private Debt (J-Curve & Covenants)", expanded=False):
+    st.info("💡 **Desk di Modellazione & Previsione Deal:** Nel tuo profilo non risultano attualmente partecipazioni societarie illiquide o quote di credito privato. Questo desk consente di simulare chiamate di capitale (Capital Calls), distribuzioni (DPI), curva J-Curve (XIRR/MOIC) e stress test dei covenants creditizi prima di sottoscrivere un nuovo fondo o club deal.")
 
-pe_res = compute_private_equity_deal_metrics()
+    # ── SEZIONE PRIVATE EQUITY, VENTURE CAPITAL & J-CURVE ────────
+    section("💼 Private Equity, Venture Capital & J-Curve Waterfall (Simulazione)")
+    st.caption("Monitoraggio delle partecipazioni societarie illiquide, chiamate di capitale (Capital Calls), distribuzioni (DPI) e modellazione stocastica della J-Curve di rendimento atteso.")
 
-pe_c1, pe_c2, pe_c3, pe_c4 = st.columns(4)
-with pe_c1:
-    metric_card("Capitale Impegnato", fmt_eur(pe_res["total_committed_eur"]), delta=f"{pe_res['deals_count']} Deal Attivi", delta_color="normal")
-with pe_c2:
-    metric_card("Capitale Versato (Called)", fmt_eur(pe_res["total_called_eur"]), delta=f"Unfunded: {fmt_eur(pe_res['unfunded_commitment_eur'])}", delta_color="normal")
-with pe_c3:
-    metric_card("MOIC / TVPI Multiplo", f"{pe_res['portfolio_moic_tvpi']:.2f}x", delta=f"DPI: {pe_res['portfolio_dpi']:.2f}x | RVPI: {pe_res['portfolio_rvpi']:.2f}x", delta_color="normal")
-with pe_c4:
-    metric_card("XIRR Netto di Portafoglio", f"{pe_res['portfolio_xirr_pct']:+.1f}%", delta="Rendimento Attualizzato Flussi", delta_color="normal" if pe_res["portfolio_xirr_pct"] >= 0 else "inverse")
+    pe_res = compute_private_equity_deal_metrics()
 
-st.write("")
+    pe_c1, pe_c2, pe_c3, pe_c4 = st.columns(4)
+    with pe_c1:
+        metric_card("Capitale Impegnato", fmt_eur(pe_res["total_committed_eur"]), delta=f"{pe_res['deals_count']} Deal Attivi", delta_color="normal")
+    with pe_c2:
+        metric_card("Capitale Versato (Called)", fmt_eur(pe_res["total_called_eur"]), delta=f"Unfunded: {fmt_eur(pe_res['unfunded_commitment_eur'])}", delta_color="normal")
+    with pe_c3:
+        metric_card("MOIC / TVPI Multiplo", f"{pe_res['portfolio_moic_tvpi']:.2f}x", delta=f"DPI: {pe_res['portfolio_dpi']:.2f}x | RVPI: {pe_res['portfolio_rvpi']:.2f}x", delta_color="normal")
+    with pe_c4:
+        metric_card("XIRR Netto di Portafoglio", f"{pe_res['portfolio_xirr_pct']:+.1f}%", delta="Rendimento Attualizzato Flussi", delta_color="normal" if pe_res["portfolio_xirr_pct"] >= 0 else "inverse")
 
-c_pe_left, c_pe_right = st.columns([3, 2])
-with c_pe_left:
-    st.markdown("##### 🏛️ Registro Partecipazioni & Club Deal")
-    st.dataframe(
-        pe_res["deals_df"][["name", "asset_class", "vintage_year", "called_capital_eur", "distributions_received_eur", "current_nav_estimated_eur", "moic_multiple", "irr_net_pct", "status"]].rename(columns={
-            "name": "Nome Deal / Fondo",
-            "asset_class": "Tipologia",
-            "vintage_year": "Vintage",
-            "called_capital_eur": "Versato (€)",
-            "distributions_received_eur": "Distribuzioni (€)",
-            "current_nav_estimated_eur": "NAV Stimato (€)",
-            "moic_multiple": "MOIC (x)",
-            "irr_net_pct": "XIRR (%)",
-            "status": "Stato"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.write("")
 
-with c_pe_right:
-    st.markdown("##### 📈 Modellazione J-Curve di Portafoglio")
-    import plotly.graph_objects as go
-    df_j = pe_res["j_curve_df"]
-    fig_j = go.Figure()
-    fig_j.add_trace(go.Scatter(
-        x=df_j["Anno di Vita Deal"],
-        y=df_j["Valore Netto Portafoglio PE (€)"],
-        mode="lines+markers",
-        name="Valore Netto (J-Curve)",
-        line=dict(color="#6366f1", width=3)
-    ))
-    fig_j.add_trace(go.Scatter(
-        x=df_j["Anno di Vita Deal"],
-        y=df_j["Capitale Versato Cumulativo (€)"],
-        mode="lines",
-        name="Capitale Versato Base",
-        line=dict(color="#94a3b8", width=1.5, dash="dash")
-    ))
-    fig_j.update_layout(
-        xaxis_title="Anno di Vita del Deal",
-        yaxis_title="Valore (€)",
-        height=280,
-        margin=dict(t=15, l=10, r=10, b=10),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-    )
-    apply_plotly_theme(fig_j)
-    st.plotly_chart(fig_j, use_container_width=True, config={'displayModeBar': False})
+    c_pe_left, c_pe_right = st.columns([3, 2])
+    with c_pe_left:
+        st.markdown("##### 🏛️ Registro Partecipazioni & Club Deal")
+        st.dataframe(
+            pe_res["deals_df"][["name", "asset_class", "vintage_year", "called_capital_eur", "distributions_received_eur", "current_nav_estimated_eur", "moic_multiple", "irr_net_pct", "status"]].rename(columns={
+                "name": "Nome Deal / Fondo",
+                "asset_class": "Tipologia",
+                "vintage_year": "Vintage",
+                "called_capital_eur": "Versato (€)",
+                "distributions_received_eur": "Distribuzioni (€)",
+                "current_nav_estimated_eur": "NAV Stimato (€)",
+                "moic_multiple": "MOIC (x)",
+                "irr_net_pct": "XIRR (%)",
+                "status": "Stato"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
 
-st.divider()
+    with c_pe_right:
+        st.markdown("##### 📈 Modellazione J-Curve di Portafoglio")
+        import plotly.graph_objects as go
+        df_j = pe_res["j_curve_df"]
+        fig_j = go.Figure()
+        fig_j.add_trace(go.Scatter(
+            x=df_j["Anno di Vita Deal"],
+            y=df_j["Valore Netto Portafoglio PE (€)"],
+            mode="lines+markers",
+            name="Valore Netto (J-Curve)",
+            line=dict(color="#6366f1", width=3)
+        ))
+        fig_j.add_trace(go.Scatter(
+            x=df_j["Anno di Vita Deal"],
+            y=df_j["Capitale Versato Cumulativo (€)"],
+            mode="lines",
+            name="Capitale Versato Base",
+            line=dict(color="#94a3b8", width=1.5, dash="dash")
+        ))
+        fig_j.update_layout(
+            xaxis_title="Anno di Vita del Deal",
+            yaxis_title="Valore (€)",
+            height=280,
+            margin=dict(t=15, l=10, r=10, b=10),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        apply_plotly_theme(fig_j)
+        st.plotly_chart(fig_j, use_container_width=True, config={'displayModeBar': False})
 
-# ── PRIVATE DEBT & DIRECT LENDING WATERFALL DESK ────────────
-st.markdown("### 🏛️ Private Debt, Direct Lending & Credit Waterfall Desk")
-st.caption("Analisi della cascata di pagamenti multi-tranche per investimenti in credito privato, monitoraggio contrattuale dei covenants (Leva Net Debt/EBITDA, ICR, DSCR) e capitalizzazione interessi PIK.")
+    st.divider()
 
-from core.private_debt_engine import compute_private_debt_waterfall_and_covenants, get_standard_private_debt_deals
+    # ── PRIVATE DEBT & DIRECT LENDING WATERFALL DESK ────────────
+    st.markdown("### 🏛️ Private Debt, Direct Lending & Credit Waterfall Desk")
+    st.caption("Analisi della cascata di pagamenti multi-tranche per investimenti in credito privato, monitoraggio contrattuale dei covenants (Leva Net Debt/EBITDA, ICR, DSCR) e capitalizzazione interessi PIK.")
 
-deals_list = get_standard_private_debt_deals()
-deal_names = [d["borrower_name"] for d in deals_list]
+    from core.private_debt_engine import compute_private_debt_waterfall_and_covenants, get_standard_private_debt_deals
 
-col_pd_sel1, col_pd_sel2 = st.columns([2, 1])
-with col_pd_sel1:
-    sel_deal_name = st.selectbox("Seleziona Struttura Private Debt:", deal_names, index=0)
-with col_pd_sel2:
-    stress_ebitda_in = st.slider("Stress Test EBITDA Borrower (%):", -40.0, 10.0, 0.0, 5.0)
+    deals_list = get_standard_private_debt_deals()
+    deal_names = [d["borrower_name"] for d in deals_list]
 
-chosen_deal = next(d for d in deals_list if d["borrower_name"] == sel_deal_name)
-pd_analysis = compute_private_debt_waterfall_and_covenants(deal_data=chosen_deal, ebitda_stress_pct=stress_ebitda_in)
-cr_m = pd_analysis["credit_metrics"]
+    col_pd_sel1, col_pd_sel2 = st.columns([2, 1])
+    with col_pd_sel1:
+        sel_deal_name = st.selectbox("Seleziona Struttura Private Debt:", deal_names, index=0)
+    with col_pd_sel2:
+        stress_ebitda_in = st.slider("Stress Test EBITDA Borrower (%):", -40.0, 10.0, 0.0, 5.0)
 
-pdk1, pdk2, pdk3, pdk4 = st.columns(4)
-with pdk1:
-    metric_card("Stato Covenants", pd_analysis["covenant_status"], delta=f"Leva {cr_m['leverage_net_debt_ebitda']:.2f}x vs {cr_m['max_leverage_allowed']:.1f}x", delta_color="normal" if pd_analysis["is_covenant_compliant"] else "inverse")
-with pdk2:
-    metric_card("Facility Totale Deal", fmt_eur(pd_analysis["total_facility_eur"]), delta=f"Settore: {pd_analysis['sector']}", delta_color="normal")
-with pdk3:
-    metric_card("Rendimento All-In Medio", f"{pd_analysis['weighted_all_in_yield_pct']:.2f}%", delta="Cash + PIK", delta_color="normal")
-with pdk4:
-    metric_card("Copertura Interessi (ICR)", f"{cr_m['interest_coverage_ratio_icr']:.2f}x", delta=f"Min Richiesto: {cr_m['min_icr_allowed']:.2f}x", delta_color="normal" if not cr_m['icr_breached'] else "inverse")
+    chosen_deal = next(d for d in deals_list if d["borrower_name"] == sel_deal_name)
+    pd_analysis = compute_private_debt_waterfall_and_covenants(deal_data=chosen_deal, ebitda_stress_pct=stress_ebitda_in)
+    cr_m = pd_analysis["credit_metrics"]
 
-st.write("")
+    pdk1, pdk2, pdk3, pdk4 = st.columns(4)
+    with pdk1:
+        metric_card("Stato Covenants", pd_analysis["covenant_status"], delta=f"Leva {cr_m['leverage_net_debt_ebitda']:.2f}x vs {cr_m['max_leverage_allowed']:.1f}x", delta_color="normal" if pd_analysis["is_covenant_compliant"] else "inverse")
+    with pdk2:
+        metric_card("Facility Totale Deal", fmt_eur(pd_analysis["total_facility_eur"]), delta=f"Settore: {pd_analysis['sector']}", delta_color="normal")
+    with pdk3:
+        metric_card("Rendimento All-In Medio", f"{pd_analysis['weighted_all_in_yield_pct']:.2f}%", delta="Cash + PIK", delta_color="normal")
+    with pdk4:
+        metric_card("Copertura Interessi (ICR)", f"{cr_m['interest_coverage_ratio_icr']:.2f}x", delta=f"Min Richiesto: {cr_m['min_icr_allowed']:.2f}x", delta_color="normal" if not cr_m['icr_breached'] else "inverse")
 
-col_pd_l, col_pd_r = st.columns([3, 2])
-with col_pd_l:
-    st.markdown("##### 📝 Scomposizione Tranche & Struttura del Capitale")
-    st.dataframe(
-        pd_analysis["tranches_df"][["tranche_name", "seniority", "notional_eur", "cash_coupon_pct", "pik_coupon_pct", "all_in_yield_pct", "attachment_leverage", "detachment_leverage"]].rename(columns={
-            "tranche_name": "Tranche di Debito",
-            "seniority": "Seniority",
-            "notional_eur": "Notionale (€)",
-            "cash_coupon_pct": "Cedola Cash (%)",
-            "pik_coupon_pct": "Cedola PIK (%)",
-            "all_in_yield_pct": "Rendimento Totale (%)",
-            "attachment_leverage": "Attach Leverage",
-            "detachment_leverage": "Detach Leverage"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
+    st.write("")
 
-with col_pd_r:
-    st.markdown("##### 🛡️ Monitoraggio Covenants & DSCR")
-    st.markdown(f"""
-    <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(99, 102, 241, 0.25); border-left: 4px solid #6366f1; border-radius: 10px; padding: 14px 18px;">
-        <b style="color: #6366f1; font-size: 14px;">Quadro di Solidità Creditizia:</b><br>
-        <span style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
-        • <b>EBITDA Stressed:</b> € {pd_analysis['stressed_ebitda_eur']:,.2f}<br>
-        • <b>Interessi Cash Annui:</b> € {pd_analysis['total_cash_interest_eur']:,.2f}<br>
-        • <b>Interessi PIK Capitalizzati:</b> € {pd_analysis['total_pik_capitalized_eur']:,.2f}<br>
-        • <b>Debt Service Coverage (DSCR):</b> {cr_m['dscr_ratio']:.2f}x (Soglia minima contrattuale: {cr_m['min_dscr_allowed']:.2f}x)<br>
-        <b style="color: {'#10b981' if pd_analysis['is_covenant_compliant'] else '#ef4444'};">Esito Monitoraggio: {pd_analysis['covenant_status']}</b>
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
+    col_pd_l, col_pd_r = st.columns([3, 2])
+    with col_pd_l:
+        st.markdown("##### 📝 Scomposizione Tranche & Struttura del Capitale")
+        st.dataframe(
+            pd_analysis["tranches_df"][["tranche_name", "seniority", "notional_eur", "cash_coupon_pct", "pik_coupon_pct", "all_in_yield_pct", "attachment_leverage", "detachment_leverage"]].rename(columns={
+                "tranche_name": "Tranche di Debito",
+                "seniority": "Seniority",
+                "notional_eur": "Notionale (€)",
+                "cash_coupon_pct": "Cedola Cash (%)",
+                "pik_coupon_pct": "Cedola PIK (%)",
+                "all_in_yield_pct": "Rendimento Totale (%)",
+                "attachment_leverage": "Attach Leverage",
+                "detachment_leverage": "Detach Leverage"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with col_pd_r:
+        st.markdown("##### 🛡️ Monitoraggio Covenants & DSCR")
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(99, 102, 241, 0.25); border-left: 4px solid #6366f1; border-radius: 10px; padding: 14px 18px;">
+            <b style="color: #6366f1; font-size: 14px;">Quadro di Solidità Creditizia:</b><br>
+            <span style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+            • <b>EBITDA Stressed:</b> € {pd_analysis['stressed_ebitda_eur']:,.2f}<br>
+            • <b>Interessi Cash Annui:</b> € {pd_analysis['total_cash_interest_eur']:,.2f}<br>
+            • <b>Interessi PIK Capitalizzati:</b> € {pd_analysis['total_pik_capitalized_eur']:,.2f}<br>
+            • <b>Debt Service Coverage (DSCR):</b> {cr_m['dscr_ratio']:.2f}x (Soglia minima contrattuale: {cr_m['min_dscr_allowed']:.2f}x)<br>
+            <b style="color: {'#10b981' if pd_analysis['is_covenant_compliant'] else '#ef4444'};">Esito Monitoraggio: {pd_analysis['covenant_status']}</b>
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
