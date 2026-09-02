@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # tests/test_wealth_reporting_hub.py
 # Unit tests for Wealth Reporting Hub & Multi-Format Exporters
 # ============================================================
@@ -77,3 +77,26 @@ def test_voice_script_generation_for_reporting_hub():
     assert len(vb["full_text_transcript"]) > 100
     assert "dialogue_script" in vb
     assert len(vb["dialogue_script"]) >= 2
+
+
+def test_wealth_spotlight_palette_and_mnemonics():
+    from core.ui_utils import parse_terminal_command, render_wealth_spotlight_palette
+    
+    cmd_nw = parse_terminal_command("NETWORTH")
+    assert cmd_nw is not None
+    assert "Patrimonial" in cmd_nw["title"]
+    assert "13_" in cmd_nw["page"]
+
+    cmd_cf = parse_terminal_command("CASHFLOW")
+    assert cmd_cf is not None
+    assert "14_" in cmd_cf["page"]
+
+    cmd_wt = parse_terminal_command("WTIME")
+    assert cmd_wt is not None
+    assert "13_" in cmd_wt["page"]
+
+    cmd_rep = parse_terminal_command("REPORTS")
+    assert cmd_rep is not None
+    assert "12_" in cmd_rep["page"]
+
+    assert callable(render_wealth_spotlight_palette)
