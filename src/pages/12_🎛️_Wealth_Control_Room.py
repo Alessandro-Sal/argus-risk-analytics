@@ -393,10 +393,13 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
                 st.dataframe(disp_df, use_container_width=True, hide_index=True)
 
 
+from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
+
 # ── STRUTTURA A TAB ORGANIZZATA & PULITA ────────────────────
-tab_pipeline, tab_mgmt = st.tabs([
+tab_pipeline, tab_mgmt, tab_exports = st.tabs([
     "🚀 1. Pipeline Ingestione & Calcolo Wealth (Processo Guidato)",
-    "🏦 2. Gestione Conti, Portafogli Risk & Categorie"
+    "🏦 2. Gestione Conti, Portafogli Risk & Categorie",
+    "📑 3. Hub di Reportistica & Esportazioni Istituzionali"
 ])
 
 
@@ -1037,4 +1040,14 @@ with tab_mgmt:
                 use_container_width=True,
                 hide_index=True
             )
+
+# =============================================================
+# TAB 3: HUB DI REPORTISTICA ED ESPORTAZIONI ISTITUZIONALI
+# =============================================================
+with tab_exports:
+    render_wealth_reporting_and_exports_hub(
+        engine=engine,
+        portfolio_id=current_pid,
+        prof_name=profile_map.get(current_pid, "Principale")
+    )
 

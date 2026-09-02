@@ -5,7 +5,7 @@
 ![Version](https://img.shields.io/badge/version-6.3.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-348%2F348%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-354%2F354%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -70,6 +70,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **⚡ Machine Learning Hidden Markov Models (HMM) Regime Detection (`HMM` / `REGIME ML`)**: Rilevamento non supervisionato a 3 stati latenti di mercato (Bull, Range-Bound, Crisis), matrice di transizione dinamica e raccomandazioni tattiche anticicliche.
 * **🎙️ AI Voice Executive Briefing & Wealth Audio Podcast (`VOICE BRIEF` / `AUDIO`)**: Generatore automatico di audio briefing esecutivi e copioni broadcast a 2 voci (Chief Investment Officer & Chief Risk Officer) sincronizzati sui dati reali di bilancio.
 * **📊 Wealth Temporal Analytics & Net Worth Dynamics (`WEALTH TIME` / `WTIME`)**: Suite temporale completa per il patrimonio con traiettoria storica a 24 mesi per asset class, matrice mensile dei flussi di risparmio (Gen..Dic + Totale Annuo), curva Underwater di drawdown patrimoniale vs High-Water Mark, metriche rolling a 6 mesi (Growth %, Volatilità %, Liquid Share %) e diagnosi di stagionalità dei flussi.
+* **📑 Hub di Reportistica & Esportazioni Istituzionali Multi-Formato (9 Formati)**: Centro unificato di export per Family Office e HNWI con White-Label Client Quarterly PDF ReportLab, Advisory Pitchbook a 6 pagine, Tear-Sheet Sintetica (PDF/HTML), Master Excel Dossier (.xlsx a 10 fogli con formule), Parquet Analytical Database, Prospetto Fiscale Quadro RW/RT (.csv), Registro Transazioni (.csv), Snapshot JSON e Copione Audio Podcast (.txt).
 * **🎓 Wealth Educational Modals & IFRS/GIPS Dialogs (`@st.dialog`)**: Modali informativi interattivi in alta risoluzione distribuiti su tutti i moduli Wealth per guidare l'utente su metodologia di bilancio, regola 50/30/20, perizie illiquidi, modello di Merton SPI %, ammortamento mutui e successioni.
 * **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 21 moduli, oltre 50 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
 
