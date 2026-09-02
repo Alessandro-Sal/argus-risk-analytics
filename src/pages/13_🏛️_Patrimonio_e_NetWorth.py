@@ -326,7 +326,7 @@ with main_tab_alloc:
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO MULTI-DIMENSIONE ─────
-    head_a1, head_a2, head_a3 = st.columns([1.1, 1.2, 0.9])
+    head_a1, head_a2, head_a3 = st.columns([0.85, 1.25, 1.25])
     with head_a1:
         section("📊 Allocazione Globale")
     with head_a2:
