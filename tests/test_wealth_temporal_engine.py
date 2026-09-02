@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # tests/test_wealth_temporal_engine.py
 # Unit tests for ARGUS Wealth Temporal Analytics & Modals
 # ============================================================
@@ -12,20 +12,44 @@ from core.wealth.wealth_temporal_engine import (
     compute_wealth_monthly_matrix,
     compute_wealth_rolling_metrics,
     compute_wealth_underwater_drawdowns,
-    compute_wealth_seasonality_patterns
+    compute_wealth_seasonality_patterns,
+    compute_wealth_growth_attribution,
+    compute_wealth_benchmark_comparison
 )
 from core.terminal_engine import get_terminal_engine
 
 
 def test_wealth_temporal_progression():
     engine = get_engine()
-    res = compute_wealth_temporal_progression(engine, portfolio_id=1)
+    res = compute_wealth_temporal_progression(engine, portfolio_id=1, timeframe_months=12)
+    assert res["months_count"] == 13
 
-    assert "history_df" in res
-    assert not res["history_df"].empty
-    assert res["months_count"] >= 12
-    assert res["final_net_worth_eur"] > 0
-    assert "total_growth_eur" in res
+    res24_real = compute_wealth_temporal_progression(engine, portfolio_id=1, timeframe_months=24, adjust_inflation=True)
+    assert res24_real["is_inflation_adjusted"] is True
+    assert res24_real["months_count"] == 25
+
+
+def test_wealth_growth_attribution():
+    engine = get_engine()
+    res = compute_wealth_growth_attribution(engine, portfolio_id=1, timeframe_months=24)
+    assert "attribution_df" in res
+    assert not res["attribution_df"].empty
+    assert "cumulative_savings_eur" in res
+    assert "cumulative_market_pnl_eur" in res
+    assert "savings_share_pct" in res
+    assert "market_share_pct" in res
+
+
+def test_wealth_benchmark_comparison():
+    engine = get_engine()
+    res = compute_wealth_benchmark_comparison(engine, portfolio_id=1, timeframe_months=24)
+    assert "comparison_df" in res
+    assert not res["comparison_df"].empty
+    assert "nw_cumulative_return_pct" in res
+    assert "bm_cumulative_return_pct" in res
+    assert "outperformance_pct" in res
+    assert "wealth_beta" in res
+    assert res["wealth_beta"] > 0
 
 
 def test_wealth_monthly_matrix():
@@ -76,3 +100,4 @@ def test_wealth_time_terminal_command():
     res = term.execute_command("WEALTH TIME", ctx)
     assert res.status == "SUCCESS"
     assert "WEALTH TEMPORAL ANALYTICS" in res.output_text
+

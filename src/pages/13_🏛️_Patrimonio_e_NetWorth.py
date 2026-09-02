@@ -843,40 +843,79 @@ st.divider()
 
 # ── SEZIONE: ANALISI TEMPORALE & DINAMICA STORICA DEL PATRIMONIO ────
 section("📊 Analisi Temporale & Dinamica Storica del Patrimonio (Wealth Temporal Desk)")
-st.caption("Evoluzione di lungo termine del Net Worth, matrici mensili dei flussi di risparmio, rolling growth, curva underwater di contrazione e pattern stagionali.")
+st.caption("Evoluzione di lungo termine del Net Worth, scomposizione della crescita (Risparmio vs Mercato), benchmark 60/40, matrici mensili e drawdown.")
 
 from core.wealth.wealth_temporal_engine import (
     compute_wealth_temporal_progression,
+    compute_wealth_growth_attribution,
+    compute_wealth_benchmark_comparison,
     compute_wealth_monthly_matrix,
     compute_wealth_rolling_metrics,
     compute_wealth_underwater_drawdowns,
     compute_wealth_seasonality_patterns
 )
 
-prog_res = compute_wealth_temporal_progression(engine, portfolio_id=current_pid)
-roll_df = compute_wealth_rolling_metrics(engine, portfolio_id=current_pid)
-under_res = compute_wealth_underwater_drawdowns(engine, portfolio_id=current_pid)
+# Control Bar Interattiva
+c_tf, c_inf, c_sty = st.columns([1.3, 1.3, 1.8])
+with c_tf:
+    sel_tf_label = st.segmented_control(
+        "⏱️ Orizzonte Temporale:",
+        options=["1 Anno (1Y)", "2 Anni (2Y)", "3 Anni (3Y)", "5 Anni (5Y)"],
+        default="2 Anni (2Y)",
+        key="wealth_temporal_timeframe"
+    ) or "2 Anni (2Y)"
+with c_inf:
+    sel_val_mode = st.segmented_control(
+        "💶 Modalità Valore:",
+        options=["Nominale (€)", "Reale (Netto Inflazione)"],
+        default="Nominale (€)",
+        key="wealth_temporal_val_mode"
+    ) or "Nominale (€)"
+with c_sty:
+    sel_view_style = st.segmented_control(
+        "📊 Stile Traiettoria:",
+        options=["Linee Assolute (€)", "Area 100% Ponderata", "Base 100 (% Cumulata)"],
+        default="Linee Assolute (€)",
+        key="wealth_temporal_view_style"
+    ) or "Linee Assolute (€)"
+
+# Parsing opzioni
+tf_map = {"1 Anno (1Y)": 12, "2 Anni (2Y)": 24, "3 Anni (3Y)": 36, "5 Anni (5Y)": 60}
+active_tf_months = tf_map.get(sel_tf_label, 24)
+is_real_inflation = (sel_val_mode == "Reale (Netto Inflazione)")
+
+prog_res = compute_wealth_temporal_progression(engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation)
+attr_res = compute_wealth_growth_attribution(engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation)
+bench_res = compute_wealth_benchmark_comparison(engine, portfolio_id=current_pid, timeframe_months=active_tf_months)
+roll_df = compute_wealth_rolling_metrics(engine, portfolio_id=current_pid, timeframe_months=active_tf_months)
+under_res = compute_wealth_underwater_drawdowns(engine, portfolio_id=current_pid, timeframe_months=active_tf_months)
 seas_res = compute_wealth_seasonality_patterns(engine, portfolio_id=current_pid)
 matrix_df = compute_wealth_monthly_matrix(engine, portfolio_id=current_pid)
 
 # Top KPI temporali
 wt_k1, wt_k2, wt_k3, wt_k4, wt_k5 = st.columns(5)
+growth_title = f"Crescita ({sel_tf_label.split()[0]} {sel_tf_label.split()[1]})"
+if is_real_inflation:
+    growth_title += " Reale"
+
 with wt_k1:
-    metric_card("Crescita (24 Mesi)", fmt_eur(prog_res["total_growth_eur"]), delta=f"{prog_res['total_growth_pct']:+.1f}% Totale", delta_color="normal")
+    metric_card(growth_title, fmt_eur(prog_res["total_growth_eur"]), delta=f"{prog_res['total_growth_pct']:+.1f}% Totale", delta_color="normal")
 with wt_k2:
-    metric_card("Max Drawdown", f"{under_res['max_drawdown_pct']:.1f}%", delta=fmt_eur(under_res['max_drawdown_eur']), delta_color="inverse")
+    metric_card("Quota da Risparmio", fmt_eur(attr_res["cumulative_savings_eur"]), delta=f"{attr_res['savings_share_pct']:.1f}% della Crescita", delta_color="normal")
 with wt_k3:
-    metric_card("Drawdown Attuale", f"{under_res['current_drawdown_pct']:.1f}%", delta="Dal Massimo (HWM)", delta_color="normal" if under_res['current_drawdown_pct'] == 0 else "inverse")
+    metric_card("Quota da Mercato", fmt_eur(attr_res["cumulative_market_pnl_eur"]), delta=f"{attr_res['market_share_pct']:.1f}% PnL / Alpha", delta_color="normal")
 with wt_k4:
-    metric_card("Miglior Mese", seas_res["best_accumulation_month"], delta="Picco Inflows / Risparmio", delta_color="normal")
+    metric_card("Max Drawdown", f"{under_res['max_drawdown_pct']:.1f}%", delta=fmt_eur(under_res['max_drawdown_eur']), delta_color="inverse")
 with wt_k5:
-    metric_card("Maggior Spesa", seas_res["heaviest_spending_month"], delta="Picco Drenaggio Cassa", delta_color="inverse")
+    metric_card("Beta vs 60/40", f"{bench_res['wealth_beta']:.2f}", delta=f"Alpha: {bench_res['outperformance_pct']:+.1f}%", delta_color="normal" if bench_res['outperformance_pct'] >= 0 else "inverse")
 
 st.write("")
 
 # Sottotab temporali
-tab_traj, tab_mat, tab_under, tab_roll, tab_seas = st.tabs([
+tab_traj, tab_attr, tab_bench, tab_mat, tab_under, tab_roll, tab_seas = st.tabs([
     "📈 Traiettoria & Asset Classes",
+    "🔬 Attribuzione Crescita (Risparmio vs Mercato)",
+    "⚖️ Resilienza vs Benchmark 60/40",
     "🗓️ Matrice Mensile di Risparmio",
     "📉 Curva Underwater & High-Water Mark",
     "🔄 Metriche Rolling (6 Mesi)",
@@ -884,49 +923,187 @@ tab_traj, tab_mat, tab_under, tab_roll, tab_seas = st.tabs([
 ])
 
 with tab_traj:
-    st.markdown("##### 📈 Evoluzione Storica del Patrimonio per Asset Class")
     df_h = prog_res["history_df"].reset_index()
     fig_hist = go.Figure()
-    fig_hist.add_trace(go.Scatter(
-        x=df_h["date"], y=df_h["total_net_worth"], 
-        name="Patrimonio Netto", 
-        line=dict(color="#10b981", width=3.5, shape="spline", smoothing=0.8),
-        hovertemplate="€ %{y:,.2f}"
-    ))
-    fig_hist.add_trace(go.Scatter(
-        x=df_h["date"], y=df_h["financial_investments"], 
-        name="Investimenti Quotati", 
-        line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8),
-        hovertemplate="€ %{y:,.2f}"
-    ))
-    fig_hist.add_trace(go.Scatter(
-        x=df_h["date"], y=df_h["liquid_cash"], 
-        name="Liquidità & Riserve", 
-        line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8),
-        hovertemplate="€ %{y:,.2f}"
-    ))
-    fig_hist.add_trace(go.Scatter(
-        x=df_h["date"], y=df_h["real_estate"], 
-        name="Immobili (Net Equity)", 
-        line=dict(color="#f59e0b", width=1.8, shape="spline", smoothing=0.8),
-        hovertemplate="€ %{y:,.2f}"
-    ))
-    fig_hist.add_trace(go.Scatter(
-        x=df_h["date"], y=df_h["illiquid_and_pension"], 
-        name="Asset Fisici & Previdenza", 
-        line=dict(color="#a855f7", width=1.5, shape="spline", smoothing=0.8),
-        hovertemplate="€ %{y:,.2f}"
-    ))
-    fig_hist.update_layout(
-        xaxis_title="Data",
-        yaxis_title="Valore (€)",
-        height=380,
-        margin=dict(t=35, l=10, r=10, b=10),
-        hovermode="x unified",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
-    )
+
+    if sel_view_style == "Area 100% Ponderata":
+        st.markdown("##### 📈 Composizione Percentuale del Patrimonio nel Tempo (100% Stacked)")
+        total_assets = df_h["financial_investments"] + df_h["liquid_cash"] + df_h["real_estate"] + df_h["illiquid_and_pension"]
+        total_assets = total_assets.replace(0, 1)
+
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=(df_h["financial_investments"] / total_assets) * 100.0,
+            name="Investimenti Quotati", stackgroup='one', line=dict(width=0.5, color="#6366f1"),
+            fillcolor="rgba(99, 102, 241, 0.70)", hovertemplate="%{y:.1f}%"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=(df_h["liquid_cash"] / total_assets) * 100.0,
+            name="Liquidità & Riserve", stackgroup='one', line=dict(width=0.5, color="#38bdf8"),
+            fillcolor="rgba(56, 189, 248, 0.70)", hovertemplate="%{y:.1f}%"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=(df_h["real_estate"] / total_assets) * 100.0,
+            name="Immobili (Net Equity)", stackgroup='one', line=dict(width=0.5, color="#f59e0b"),
+            fillcolor="rgba(245, 158, 11, 0.70)", hovertemplate="%{y:.1f}%"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=(df_h["illiquid_and_pension"] / total_assets) * 100.0,
+            name="Asset Fisici & Previdenza", stackgroup='one', line=dict(width=0.5, color="#a855f7"),
+            fillcolor="rgba(168, 85, 247, 0.70)", hovertemplate="%{y:.1f}%"
+        ))
+        fig_hist.update_layout(
+            xaxis_title="Data", yaxis_title="Quota sul Totale Asset (%)",
+            yaxis_range=[0, 100], height=380, margin=dict(t=35, l=10, r=10, b=10),
+            hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+        )
+    elif sel_view_style == "Base 100 (% Cumulata)":
+        st.markdown("##### 📈 Rendimento e Dinamica Cumulativa (Base 100)")
+        nw_b100 = (df_h["total_net_worth"] / df_h["total_net_worth"].iloc[0]) * 100.0
+        inv_b100 = (df_h["financial_investments"] / max(1.0, df_h["financial_investments"].iloc[0])) * 100.0
+        liq_b100 = (df_h["liquid_cash"] / max(1.0, df_h["liquid_cash"].iloc[0])) * 100.0
+
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=nw_b100, name="Patrimonio Netto",
+            line=dict(color="#10b981", width=3.5, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=inv_b100, name="Investimenti Quotati",
+            line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=liq_b100, name="Liquidità & Riserve",
+            line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
+        ))
+        fig_hist.update_layout(
+            xaxis_title="Data", yaxis_title="Indice (Base 100)",
+            height=380, margin=dict(t=35, l=10, r=10, b=10),
+            hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+        )
+    else:
+        st.markdown("##### 📈 Evoluzione Storica del Patrimonio per Asset Class (€)")
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=df_h["total_net_worth"], 
+            name="Patrimonio Netto", 
+            line=dict(color="#10b981", width=3.5, shape="spline", smoothing=0.8),
+            hovertemplate="€ %{y:,.2f}"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=df_h["financial_investments"], 
+            name="Investimenti Quotati", 
+            line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8),
+            hovertemplate="€ %{y:,.2f}"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=df_h["liquid_cash"], 
+            name="Liquidità & Riserve", 
+            line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8),
+            hovertemplate="€ %{y:,.2f}"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=df_h["real_estate"], 
+            name="Immobili (Net Equity)", 
+            line=dict(color="#f59e0b", width=1.8, shape="spline", smoothing=0.8),
+            hovertemplate="€ %{y:,.2f}"
+        ))
+        fig_hist.add_trace(go.Scatter(
+            x=df_h["date"], y=df_h["illiquid_and_pension"], 
+            name="Asset Fisici & Previdenza", 
+            line=dict(color="#a855f7", width=1.5, shape="spline", smoothing=0.8),
+            hovertemplate="€ %{y:,.2f}"
+        ))
+        fig_hist.update_layout(
+            xaxis_title="Data",
+            yaxis_title="Valore (€)",
+            height=380,
+            margin=dict(t=35, l=10, r=10, b=10),
+            hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+        )
+
     apply_plotly_theme(fig_hist)
     st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": False})
+
+with tab_attr:
+    col_at_g, col_at_t = st.columns([13, 10])
+    with col_at_g:
+        st.markdown("##### 🔬 Scomposizione della Crescita Patrimoniale Cumulata")
+        df_at = attr_res["attribution_df"].reset_index()
+        fig_attr = go.Figure()
+        fig_attr.add_trace(go.Bar(
+            x=df_at["date"], y=df_at["Risparmio_Cumulato"],
+            name="Risparmio da Lavoro (Inflows)", marker_color="#10b981", hovertemplate="€ %{y:,.2f}"
+        ))
+        fig_attr.add_trace(go.Bar(
+            x=df_at["date"], y=df_at["Mercato_PnL_Cumulato"],
+            name="Rendimento di Mercato (PnL)", marker_color="#6366f1", hovertemplate="€ %{y:,.2f}"
+        ))
+        if df_at["Altri_Asset_Cumulato"].abs().sum() > 0:
+            fig_attr.add_trace(go.Bar(
+                x=df_at["date"], y=df_at["Altri_Asset_Cumulato"],
+                name="Rivalutazione Altri Asset / Debiti", marker_color="#f59e0b", hovertemplate="€ %{y:,.2f}"
+            ))
+        fig_attr.update_layout(
+            barmode="relative", xaxis_title="Data", yaxis_title="Contributo Cumulato (€)",
+            height=340, margin=dict(t=35, l=10, r=10, b=10), hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+        )
+        apply_plotly_theme(fig_attr)
+        st.plotly_chart(fig_attr, use_container_width=True, config={"displayModeBar": False})
+
+    with col_at_t:
+        st.markdown("##### 📋 Riepilogo Fonti di Crescita")
+        metric_card("Totale Crescita Periodo", fmt_eur(attr_res["total_growth_eur"]), delta="100.0% Variazione Net Worth", delta_color="normal")
+        st.write("")
+        st.markdown(f"""
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 16px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #10b981; font-weight: 600;">🟢 Risparmio da Lavoro (Inflows):</span>
+                <span style="font-weight: 700;">{fmt_eur(attr_res['cumulative_savings_eur'])} ({attr_res['savings_share_pct']:.1f}%)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                <span style="color: #6366f1; font-weight: 600;">🟣 Rendimento Mercato (PnL):</span>
+                <span style="font-weight: 700;">{fmt_eur(attr_res['cumulative_market_pnl_eur'])} ({attr_res['market_share_pct']:.1f}%)</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+                <span style="color: #f59e0b; font-weight: 600;">🟡 Rivalutazione Asset / Debiti:</span>
+                <span style="font-weight: 700;">{fmt_eur(attr_res['cumulative_other_eur'])} ({attr_res['other_share_pct']:.1f}%)</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+with tab_bench:
+    col_bm_g, col_bm_t = st.columns([13, 10])
+    with col_bm_g:
+        st.markdown("##### ⚖️ Dinamica vs Benchmark Globale 60/40 (Base 100)")
+        df_bc = bench_res["comparison_df"].reset_index()
+        fig_bench = go.Figure()
+        fig_bench.add_trace(go.Scatter(
+            x=df_bc["date"], y=df_bc["Patrimonio_Base100"],
+            name="Patrimonio Net Worth", line=dict(color="#10b981", width=3.2, shape="spline", smoothing=0.8),
+            hovertemplate="%{y:.2f}"
+        ))
+        fig_bench.add_trace(go.Scatter(
+            x=df_bc["date"], y=df_bc["Benchmark_60_40_Base100"],
+            name="Benchmark 60/40 (MSCI World + Global Agg)", line=dict(color="#94a3b8", width=2, dash="dot", shape="spline", smoothing=0.8),
+            hovertemplate="%{y:.2f}"
+        ))
+        fig_bench.update_layout(
+            xaxis_title="Data", yaxis_title="Indice Base 100", height=340,
+            margin=dict(t=35, l=10, r=10, b=10), hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
+        )
+        apply_plotly_theme(fig_bench)
+        st.plotly_chart(fig_bench, use_container_width=True, config={"displayModeBar": False})
+
+    with col_bm_t:
+        st.markdown("##### 📊 Metriche Comparative di Resilienza")
+        df_bm_table = pd.DataFrame([
+            {"Metrica": "Rendimento Cumulativo", "Patrimonio": f"{bench_res['nw_cumulative_return_pct']:+.2f}%", "Benchmark 60/40": f"{bench_res['bm_cumulative_return_pct']:+.2f}%", "Differenziale (Alpha)": f"{bench_res['outperformance_pct']:+.2f}%"},
+            {"Metrica": "Volatilità Annualizzata", "Patrimonio": f"{bench_res['nw_volatility_annual_pct']:.2f}%", "Benchmark 60/40": f"{bench_res['bm_volatility_annual_pct']:.2f}%", "Differenziale (Alpha)": f"{bench_res['nw_volatility_annual_pct'] - bench_res['bm_volatility_annual_pct']:+.2f}%"},
+            {"Metrica": "Max Drawdown Storico", "Patrimonio": f"-{bench_res['nw_max_drawdown_pct']:.2f}%", "Benchmark 60/40": f"-{bench_res['bm_max_drawdown_pct']:.2f}%", "Differenziale (Alpha)": f"{bench_res['bm_max_drawdown_pct'] - bench_res['nw_max_drawdown_pct']:+.2f}%"},
+            {"Metrica": "Beta Patrimoniale", "Patrimonio": f"{bench_res['wealth_beta']:.2f}", "Benchmark 60/40": "1.00", "Differenziale (Alpha)": f"{bench_res['wealth_beta'] - 1.0:+.2f}"}
+        ])
+        st.dataframe(df_bm_table, use_container_width=True, hide_index=True)
 
 with tab_mat:
     st.markdown("##### 🗓️ Matrice Mensile dei Flussi Netti di Risparmio (€)")
