@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from datetime import datetime
 import importlib
 import core.ui_utils
@@ -217,7 +218,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-ts_c1, ts_c2, ts_c3, ts_c4 = st.columns([1.3, 1.1, 0.8, 0.8])
+from core.wealth.wealth_modals import render_wealth_methodology_modal
+
+ts_c1, ts_c2, ts_c3, ts_c4, ts_c5 = st.columns([1.3, 1.1, 0.8, 0.8, 1.1])
 with ts_c1:
     st.download_button(
         label="📥 Scarica Pitchbook PDF",
@@ -245,6 +248,9 @@ with ts_c3:
     )
 with ts_c4:
     show_ts_preview = st.toggle("📑 Anteprima", value=False, key="toggle_ts_preview_p13")
+with ts_c5:
+    if st.button("ℹ️ Guida IFRS/GIPS", key="btn_modal_methodology_p13", use_container_width=True):
+        render_wealth_methodology_modal()
 
 if show_ts_preview:
     st.components.v1.html(tear_sheet_html, height=600, scrolling=True)
@@ -823,4 +829,128 @@ st.dataframe(
     use_container_width=True,
     hide_index=True
 )
+
+st.divider()
+
+# ── SEZIONE: ANALISI TEMPORALE & DINAMICA STORICA DEL PATRIMONIO ────
+section("📊 Analisi Temporale & Dinamica Storica del Patrimonio (Wealth Temporal Desk)")
+st.caption("Evoluzione di lungo termine del Net Worth, matrici mensili dei flussi di risparmio, rolling growth, curva underwater di contrazione e pattern stagionali.")
+
+from core.wealth.wealth_temporal_engine import (
+    compute_wealth_temporal_progression,
+    compute_wealth_monthly_matrix,
+    compute_wealth_rolling_metrics,
+    compute_wealth_underwater_drawdowns,
+    compute_wealth_seasonality_patterns
+)
+
+prog_res = compute_wealth_temporal_progression(engine, portfolio_id=current_pid)
+roll_df = compute_wealth_rolling_metrics(engine, portfolio_id=current_pid)
+under_res = compute_wealth_underwater_drawdowns(engine, portfolio_id=current_pid)
+seas_res = compute_wealth_seasonality_patterns(engine, portfolio_id=current_pid)
+matrix_df = compute_wealth_monthly_matrix(engine, portfolio_id=current_pid)
+
+# Top KPI temporali
+wt_k1, wt_k2, wt_k3, wt_k4, wt_k5 = st.columns(5)
+with wt_k1:
+    metric_card("Crescita Net Worth (24m)", fmt_eur(prog_res["total_growth_eur"]), delta=f"{prog_res['total_growth_pct']:+.1f}% Totale", delta_color="normal")
+with wt_k2:
+    metric_card("Max Contrazione Storica", f"{under_res['max_drawdown_pct']:.1f}%", delta=fmt_eur(under_res['max_drawdown_eur']), delta_color="inverse")
+with wt_k3:
+    metric_card("Contrazione Attuale", f"{under_res['current_drawdown_pct']:.1f}%", delta="Dal Massimo Storico (HWM)", delta_color="normal" if under_res['current_drawdown_pct'] == 0 else "inverse")
+with wt_k4:
+    metric_card("Mese Miglior Risparmio", seas_res["best_accumulation_month"], delta="Picco Inflows / Risparmio", delta_color="normal")
+with wt_k5:
+    metric_card("Mese Maggior Spesa", seas_res["heaviest_spending_month"], delta="Picco Drenaggio Cassa", delta_color="inverse")
+
+st.write("")
+
+# Sottotab temporali
+tab_traj, tab_mat, tab_under, tab_roll, tab_seas = st.tabs([
+    "📈 Traiettoria & Asset Classes",
+    "🗓️ Matrice Mensile di Risparmio",
+    "📉 Curva Underwater & High-Water Mark",
+    "🔄 Metriche Rolling (6 Mesi)",
+    "🍂 Pattern di Stagionalità"
+])
+
+with tab_traj:
+    st.markdown("##### 📈 Evoluzione Storica del Patrimonio per Asset Class")
+    df_h = prog_res["history_df"].reset_index()
+    fig_hist = go.Figure()
+    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["total_net_worth"], name="Patrimonio Netto Consolidato", line=dict(color="#10b981", width=3.5)))
+    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["financial_investments"], name="Investimenti Quotati", line=dict(color="#6366f1", width=2)))
+    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["liquid_cash"], name="Liquidità & Riserve", line=dict(color="#38bdf8", width=1.8)))
+    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["real_estate"], name="Immobili (Net Equity)", line=dict(color="#f59e0b", width=1.8)))
+    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["illiquid_and_pension"], name="Asset Fisici & Previdenza", line=dict(color="#a855f7", width=1.5)))
+    fig_hist.update_layout(
+        xaxis_title="Data",
+        yaxis_title="Valore (€)",
+        height=380,
+        margin=dict(t=15, l=10, r=10, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    apply_plotly_theme(fig_hist)
+    st.plotly_chart(fig_hist, use_container_width=True)
+
+with tab_mat:
+    st.markdown("##### 🗓️ Matrice Mensile dei Flussi Netti di Risparmio (€)")
+    st.dataframe(
+        matrix_df.style.format("€ {:,.2f}", na_rep="-").background_gradient(cmap="Greens", subset=[c for c in matrix_df.columns if c not in ["Totale Annuo (€)", "Media Mensile (€)"]]),
+        use_container_width=True
+    )
+
+with tab_under:
+    st.markdown("##### 📉 Curva Underwater di Contrazione Patrimoniale (Drawdown vs High-Water Mark)")
+    col_u_g, col_u_t = st.columns([3, 2])
+    with col_u_g:
+        df_u = under_res["underwater_df"].reset_index()
+        fig_under = go.Figure()
+        fig_under.add_trace(go.Scatter(x=df_u["date"], y=df_u["Drawdown_Pct"], name="Drawdown (%)", fill="tozeroy", line=dict(color="#ef4444", width=2)))
+        fig_under.update_layout(
+            xaxis_title="Data",
+            yaxis_title="Contrazione dal Massimo (%)",
+            height=320,
+            margin=dict(t=15, l=10, r=10, b=10)
+        )
+        apply_plotly_theme(fig_under)
+        st.plotly_chart(fig_under, use_container_width=True)
+    with col_u_t:
+        st.markdown("###### 🔍 Episodi Storici di Contrazione")
+        st.dataframe(
+            under_res["episodes_df"].rename(columns={
+                "peak_date": "Data Picco (HWM)",
+                "trough_date": "Data Minimo",
+                "recovery_date": "Data Recupero",
+                "drawdown_pct": "Max Drawdown (%)",
+                "is_recovered": "Recuperato"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+with tab_roll:
+    st.markdown("##### 🔄 Metriche Rolling a Finestra Mobile (6 Mesi)")
+    df_r = roll_df.reset_index()
+    fig_roll = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=["Tasso di Crescita Rolling Net Worth (% Ann.)", "Volatilità Rolling del Patrimonio (% Ann.)"])
+    fig_roll.add_trace(go.Scatter(x=df_r["date"], y=df_r["Rolling_Growth_Pct"], name="Crescita Rolling %", line=dict(color="#10b981", width=2)), row=1, col=1)
+    fig_roll.add_trace(go.Scatter(x=df_r["date"], y=df_r["Rolling_Wealth_Vol_Pct"], name="Volatilità Rolling %", line=dict(color="#f59e0b", width=2)), row=2, col=1)
+    fig_roll.update_layout(height=360, margin=dict(t=30, l=10, r=10, b=10), showlegend=False)
+    apply_plotly_theme(fig_roll)
+    st.plotly_chart(fig_roll, use_container_width=True)
+
+with tab_seas:
+    st.markdown("##### 🍂 Stagionalità dei Flussi di Cassa & Tasso di Risparmio Medio Mensile")
+    st.dataframe(
+        seas_res["seasonality_df"][["month_name", "avg_inflow_eur", "avg_outflow_eur", "avg_net_savings_eur", "savings_rate_pct", "status"]].rename(columns={
+            "month_name": "Mese",
+            "avg_inflow_eur": "Entrate Medie (€)",
+            "avg_outflow_eur": "Uscite Medie (€)",
+            "avg_net_savings_eur": "Risparmio Netto (€)",
+            "savings_rate_pct": "Tasso di Risparmio (%)",
+            "status": "Valutazione Stagionale"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
 

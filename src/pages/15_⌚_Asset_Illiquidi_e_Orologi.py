@@ -76,11 +76,12 @@ render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title,
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)
 
-head_c1, head_c2 = st.columns([3.5, 1.5])
+from core.wealth.wealth_modals import render_illiquids_methodology_modal
+
+head_c1, head_c2, head_c3 = st.columns([3.0, 1.2, 1.0])
 with head_c1:
     st.title("⌚ ARGUS Wealth — Caveau & Asset Fisici")
-
-    st.caption("Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili, Metalli Preziosi e Collezionismo.")
+    st.caption("Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili, Metalli Preziosi, Private Equity e Private Debt.")
 
 with head_c2:
     st.write("")
@@ -95,6 +96,12 @@ with head_c2:
         if sel_pid != current_pid:
             st.session_state["wealth_active_portfolio_id"] = sel_pid
             st.rerun()
+
+with head_c3:
+    st.write("")
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    if st.button("ℹ️ Metodologia Perizie", key="btn_modal_illiquid_p15", use_container_width=True):
+        render_illiquids_methodology_modal()
 
 df_assets = get_physical_assets(engine, portfolio_id=current_pid)
 

@@ -77,11 +77,12 @@ render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title,
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)
 
-head_c1, head_c2 = st.columns([3.5, 1.5])
+from core.wealth.wealth_modals import render_goal_methodology_modal
+
+head_c1, head_c2, head_c3 = st.columns([3.0, 1.2, 1.0])
 with head_c1:
     st.title("🛡️ ARGUS Wealth — Previdenza & Pensione")
-
-    st.caption("Ottimizzazione fiscale art. 51 TUIR (€ 5.164,57), simulazione Monte Carlo e montante pensionistico.")
+    st.caption("Ottimizzazione fiscale art. 51 TUIR (€ 5.164,57), simulazione Monte Carlo, Target-Date Glide Path e montante pensionistico.")
 
 with head_c2:
     st.write("")
@@ -96,6 +97,12 @@ with head_c2:
         if sel_pid != current_pid:
             st.session_state["wealth_active_portfolio_id"] = sel_pid
             st.rerun()
+
+with head_c3:
+    st.write("")
+    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+    if st.button("ℹ️ Guida Previdenza", key="btn_modal_pension_p16", use_container_width=True):
+        render_goal_methodology_modal()
 
 df_plans = get_pension_plans(engine, portfolio_id=current_pid)
 

@@ -86,13 +86,19 @@ render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title,
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)
 
-# Header
-render_page_header(
-    title="ARGUS Wealth — Immobili, Mutui & Buy vs Rent",
-    subtitle="Ammortamento alla Francese con Estinzione Anticipata, Rendimenti da Locazione (Cap Rate) e Modello Costo Opportunità Affitto vs Acquisto.",
-    icon="🏡"
-)
+from core.wealth.wealth_modals import render_real_estate_methodology_modal
 
+col_re_h1, col_re_h2 = st.columns([3.5, 1.2])
+with col_re_h1:
+    render_page_header(
+        title="ARGUS Wealth — Immobili, Mutui & Buy vs Rent",
+        subtitle="Ammortamento alla Francese con Estinzione Anticipata, Rendimenti da Locazione (Cap Rate) e Modello Costo Opportunità Affitto vs Acquisto.",
+        icon="🏡"
+    )
+with col_re_h2:
+    st.markdown("<div style='height: 18px;'></div>", unsafe_allow_html=True)
+    if st.button("ℹ️ Guida LTV & Mutui", key="btn_modal_re_p19", use_container_width=True):
+        render_real_estate_methodology_modal()
 
 re_ltv_summary = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=current_pid)
 
