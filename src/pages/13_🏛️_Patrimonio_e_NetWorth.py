@@ -883,16 +883,42 @@ with tab_traj:
     st.markdown("##### 📈 Evoluzione Storica del Patrimonio per Asset Class")
     df_h = prog_res["history_df"].reset_index()
     fig_hist = go.Figure()
-    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["total_net_worth"], name="Patrimonio Netto Consolidato", line=dict(color="#10b981", width=3.5)))
-    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["financial_investments"], name="Investimenti Quotati", line=dict(color="#6366f1", width=2)))
-    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["liquid_cash"], name="Liquidità & Riserve", line=dict(color="#38bdf8", width=1.8)))
-    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["real_estate"], name="Immobili (Net Equity)", line=dict(color="#f59e0b", width=1.8)))
-    fig_hist.add_trace(go.Scatter(x=df_h["date"], y=df_h["illiquid_and_pension"], name="Asset Fisici & Previdenza", line=dict(color="#a855f7", width=1.5)))
+    fig_hist.add_trace(go.Scatter(
+        x=df_h["date"], y=df_h["total_net_worth"], 
+        name="Patrimonio Netto", 
+        line=dict(color="#10b981", width=3.5),
+        hovertemplate="€ %{y:,.2f}"
+    ))
+    fig_hist.add_trace(go.Scatter(
+        x=df_h["date"], y=df_h["financial_investments"], 
+        name="Investimenti Quotati", 
+        line=dict(color="#6366f1", width=2),
+        hovertemplate="€ %{y:,.2f}"
+    ))
+    fig_hist.add_trace(go.Scatter(
+        x=df_h["date"], y=df_h["liquid_cash"], 
+        name="Liquidità & Riserve", 
+        line=dict(color="#38bdf8", width=1.8),
+        hovertemplate="€ %{y:,.2f}"
+    ))
+    fig_hist.add_trace(go.Scatter(
+        x=df_h["date"], y=df_h["real_estate"], 
+        name="Immobili (Net Equity)", 
+        line=dict(color="#f59e0b", width=1.8),
+        hovertemplate="€ %{y:,.2f}"
+    ))
+    fig_hist.add_trace(go.Scatter(
+        x=df_h["date"], y=df_h["illiquid_and_pension"], 
+        name="Asset Fisici & Previdenza", 
+        line=dict(color="#a855f7", width=1.5),
+        hovertemplate="€ %{y:,.2f}"
+    ))
     fig_hist.update_layout(
         xaxis_title="Data",
         yaxis_title="Valore (€)",
         height=380,
         margin=dict(t=35, l=10, r=10, b=10),
+        hovermode="x unified",
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
     apply_plotly_theme(fig_hist)
@@ -925,12 +951,19 @@ with tab_under:
     with col_u_g:
         df_u = under_res["underwater_df"].reset_index()
         fig_under = go.Figure()
-        fig_under.add_trace(go.Scatter(x=df_u["date"], y=df_u["Drawdown_Pct"], name="Drawdown (%)", fill="tozeroy", line=dict(color="#ef4444", width=2)))
+        fig_under.add_trace(go.Scatter(
+            x=df_u["date"], y=df_u["Drawdown_Pct"], 
+            name="Drawdown", 
+            fill="tozeroy", 
+            line=dict(color="#ef4444", width=2),
+            hovertemplate="%{y:.2f}%"
+        ))
         fig_under.update_layout(
             xaxis_title="Data",
             yaxis_title="Contrazione dal Massimo (%)",
             height=320,
-            margin=dict(t=15, l=10, r=10, b=10)
+            margin=dict(t=25, l=10, r=10, b=10),
+            hovermode="x unified"
         )
         apply_plotly_theme(fig_under)
         st.plotly_chart(fig_under, use_container_width=True)
@@ -952,9 +985,24 @@ with tab_roll:
     st.markdown("##### 🔄 Metriche Rolling a Finestra Mobile (6 Mesi)")
     df_r = roll_df.reset_index()
     fig_roll = make_subplots(rows=2, cols=1, shared_xaxes=True, subplot_titles=["Tasso di Crescita Rolling Net Worth (% Ann.)", "Volatilità Rolling del Patrimonio (% Ann.)"])
-    fig_roll.add_trace(go.Scatter(x=df_r["date"], y=df_r["Rolling_Growth_Pct"], name="Crescita Rolling %", line=dict(color="#10b981", width=2)), row=1, col=1)
-    fig_roll.add_trace(go.Scatter(x=df_r["date"], y=df_r["Rolling_Wealth_Vol_Pct"], name="Volatilità Rolling %", line=dict(color="#f59e0b", width=2)), row=2, col=1)
-    fig_roll.update_layout(height=360, margin=dict(t=30, l=10, r=10, b=10), showlegend=False)
+    fig_roll.add_trace(go.Scatter(
+        x=df_r["date"], y=df_r["Rolling_Growth_Pct"], 
+        name="Crescita Ann.", 
+        line=dict(color="#10b981", width=2),
+        hovertemplate="%{y:+.2f}%"
+    ), row=1, col=1)
+    fig_roll.add_trace(go.Scatter(
+        x=df_r["date"], y=df_r["Rolling_Wealth_Vol_Pct"], 
+        name="Volatilità Ann.", 
+        line=dict(color="#f59e0b", width=2),
+        hovertemplate="%{y:.2f}%"
+    ), row=2, col=1)
+    fig_roll.update_layout(
+        height=360, 
+        margin=dict(t=30, l=10, r=10, b=10), 
+        showlegend=False,
+        hovermode="x unified"
+    )
     apply_plotly_theme(fig_roll)
     st.plotly_chart(fig_roll, use_container_width=True)
 
