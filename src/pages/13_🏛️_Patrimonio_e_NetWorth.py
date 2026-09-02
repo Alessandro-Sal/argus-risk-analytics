@@ -322,155 +322,258 @@ with main_tab_alloc:
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
-    # ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO ─────────────
-    head_a1, head_a2 = st.columns([1.8, 1.4])
+    # ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO MULTI-DIMENSIONE ─────
+    head_a1, head_a2, head_a3 = st.columns([1.6, 1.4, 1.0])
     with head_a1:
         section("📊 Allocazione Globale del Patrimonio")
     with head_a2:
+        alloc_dim = st.segmented_control(
+            "Dimensione Analitica:",
+            options=["🏷️ Macro-Classi", "💧 Profilo Liquidità", "🎯 Destinazione Strategica"],
+            default="🏷️ Macro-Classi",
+            label_visibility="collapsed",
+            key="alloc_dim_selector_seg"
+        ) or "🏷️ Macro-Classi"
+    with head_a3:
         chart_view = st.segmented_control(
             "Visualizzazione Grafico:",
             options=["🍩 Donut", "🥧 Sunburst", "🥞 Treemap"],
             default="🍩 Donut",
             label_visibility="collapsed",
             key="alloc_chart_view_mode_seg"
-        )
-        if not chart_view:
-            chart_view = "🍩 Donut"
+        ) or "🍩 Donut"
 
-    # Costruzione dettagliata foglie e macro-gruppi
+    # Costruzione atomica e granulare di tutti i singoli asset
     breakdown_items = []
-    labels = []
-    parents = []
-    values = []
-    colors = []
 
-    # 1. Macro-Gruppi
-    macros_def = [
-        ("Investimenti Finanziari", fin_inv, "#4f46e5"),
-        ("Liquidità & Cash", liq_cash, "#059669"),
-        ("Asset Caveau", phys_assets, "#b45309"),
-        ("Previdenza", pens_val, "#be185d")
-    ]
-    for m_name, m_val, m_col in macros_def:
-        if m_val > 0:
-            labels.append(m_name)
-            parents.append("")
-            values.append(m_val)
-            colors.append(m_col)
+    # 1. Liquidità & Cash / Depositi
+    if is_snapshot_mode:
+        snap_accs = details.get("accounts", [])
+        for a in snap_accs:
+            b = float(a.get("balance", 0.0))
+            if b > 0:
+                a_name = str(a.get("name", "Conto Bancario"))
+                a_type = str(a.get("account_type", "checking")).lower()
+                is_deposit = ("deposito" in a_name.lower() or "savings" in a_type)
+                breakdown_items.append({
+                    "name": a_name,
+                    "macro": "Liquidità & Depositi",
+                    "liquidity": "📅 T+30 (Differita / Vincolata)" if is_deposit else "⚡ T0 (Liquidità Immediata)",
+                    "strategic": "🛡️ Fondo Sicurezza & Riserve",
+                    "risk": "Basso",
+                    "val": b,
+                    "color": "#14b8a6" if is_deposit else "#10b981",
+                    "icon": "🏦" if is_deposit else "💳"
+                })
+        if not snap_accs and liq_cash > 0:
+            breakdown_items.append({
+                "name": "Liquidità & Depositi Bancari",
+                "macro": "Liquidità & Depositi",
+                "liquidity": "⚡ T0 (Liquidità Immediata)",
+                "strategic": "🛡️ Fondo Sicurezza & Riserve",
+                "risk": "Basso",
+                "val": liq_cash,
+                "color": "#10b981",
+                "icon": "💳"
+            })
+    else:
+        if not df_accounts.empty:
+            for _, a in df_accounts.iterrows():
+                b = float(a.get("balance", 0.0))
+                if b > 0:
+                    a_name = str(a.get("name", "Conto Bancario"))
+                    a_type = str(a.get("account_type", "checking")).lower()
+                    is_deposit = ("deposito" in a_name.lower() or "savings" in a_type or "vincolato" in a_name.lower())
+                    breakdown_items.append({
+                        "name": a_name,
+                        "macro": "Liquidità & Depositi",
+                        "liquidity": "📅 T+30 (Differita / Vincolata)" if is_deposit else "⚡ T0 (Liquidità Immediata)",
+                        "strategic": "🛡️ Fondo Sicurezza & Riserve",
+                        "risk": "Basso",
+                        "val": b,
+                        "color": "#14b8a6" if is_deposit else "#10b981",
+                        "icon": "🏦" if is_deposit else "💳"
+                    })
+        elif liq_cash > 0:
+            breakdown_items.append({
+                "name": "Liquidità & Depositi Bancari",
+                "macro": "Liquidità & Depositi",
+                "liquidity": "⚡ T0 (Liquidità Immediata)",
+                "strategic": "🛡️ Fondo Sicurezza & Riserve",
+                "risk": "Basso",
+                "val": liq_cash,
+                "color": "#10b981",
+                "icon": "💳"
+            })
 
-    # 2. Investimenti Finanziari (Risk Portfolios)
+    # 2. Investimenti Finanziari (Quotati, ETF, Bond, Crypto)
     if is_snapshot_mode:
         snap_risk = details.get("linked_risk_portfolios", [])
         for rk in snap_risk:
             v = float(rk.get("latest_value", 0.0))
             if v > 0:
-                r_raw = str(rk.get("name", ""))
-                name = "Azioni & ETF" if "stock" in r_raw.lower() else ("Criptovalute" if "crypto" in r_raw.lower() else r_raw)
-                col = "#6366f1" if "azioni" in name.lower() or "stock" in name.lower() else "#8b5cf6"
-                ic = "📈" if "azioni" in name.lower() or "stock" in name.lower() else "🪙"
-                labels.append(name)
-                parents.append("Investimenti Finanziari")
-                values.append(v)
-                colors.append(col)
-                breakdown_items.append({"name": name, "macro": "Investimenti Finanziari", "val": v, "color": col, "icon": ic})
+                r_raw = str(rk.get("name", "Portafoglio"))
+                r_low = r_raw.lower()
+                if "crypto" in r_low or "bitcoin" in r_low or "btc" in r_low:
+                    m_cls = "Criptovalute & Digital Assets"
+                    l_cls = "⏱️ T+2 (Breve Termine)"
+                    s_cls = "🚀 Capitale di Crescita"
+                    r_lvl = "Alto"
+                    c_col = "#8b5cf6"
+                    c_ic = "🪙"
+                elif "bond" in r_low or "obbligaz" in r_low or "btp" in r_low or "fixed" in r_low:
+                    m_cls = "Obbligazioni & Fixed Income"
+                    l_cls = "⏱️ T+2 (Breve Termine)"
+                    s_cls = "⚖️ Protezione & Beni Rifugio"
+                    r_lvl = "Basso/Medio"
+                    c_col = "#0284c7"
+                    c_ic = "🏛️"
+                else:
+                    m_cls = "Investimenti Finanziari (Azioni/ETF)"
+                    l_cls = "⏱️ T+2 (Breve Termine)"
+                    s_cls = "🚀 Capitale di Crescita"
+                    r_lvl = "Medio/Alto"
+                    c_col = "#6366f1"
+                    c_ic = "📈"
+
+                breakdown_items.append({
+                    "name": r_raw,
+                    "macro": m_cls,
+                    "liquidity": l_cls,
+                    "strategic": s_cls,
+                    "risk": r_lvl,
+                    "val": v,
+                    "color": c_col,
+                    "icon": c_ic
+                })
         if not snap_risk and fin_inv > 0:
-            labels.append("Portafogli Finanziari")
-            parents.append("Investimenti Finanziari")
-            values.append(fin_inv)
-            colors.append("#6366f1")
-            breakdown_items.append({"name": "Portafogli Finanziari", "macro": "Investimenti Finanziari", "val": fin_inv, "color": "#6366f1", "icon": "📈"})
+            breakdown_items.append({
+                "name": "Investimenti Finanziari (Quotati)",
+                "macro": "Investimenti Finanziari (Azioni/ETF)",
+                "liquidity": "⏱️ T+2 (Breve Termine)",
+                "strategic": "🚀 Capitale di Crescita",
+                "risk": "Medio/Alto",
+                "val": fin_inv,
+                "color": "#6366f1",
+                "icon": "📈"
+            })
     else:
         _, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=current_pid)
         if not df_linked_risk.empty:
             for _, rk in df_linked_risk.iterrows():
                 v = float(rk.get("latest_value", 0.0))
                 if v > 0:
-                    r_name = str(rk.get("name", ""))
-                    name = "Azioni & ETF" if "stock" in r_name.lower() else ("Criptovalute" if "crypto" in r_name.lower() else r_name)
-                    col = "#6366f1" if "azioni" in name.lower() or "stock" in name.lower() else "#8b5cf6"
-                    ic = "📈" if "azioni" in name.lower() or "stock" in name.lower() else "🪙"
-                    labels.append(name)
-                    parents.append("Investimenti Finanziari")
-                    values.append(v)
-                    colors.append(col)
-                    breakdown_items.append({"name": name, "macro": "Investimenti Finanziari", "val": v, "color": col, "icon": ic})
+                    r_name = str(rk.get("name", "Portafoglio"))
+                    r_low = r_name.lower()
+                    if "crypto" in r_low or "bitcoin" in r_low or "btc" in r_low:
+                        m_cls = "Criptovalute & Digital Assets"
+                        l_cls = "⏱️ T+2 (Breve Termine)"
+                        s_cls = "🚀 Capitale di Crescita"
+                        r_lvl = "Alto"
+                        c_col = "#8b5cf6"
+                        c_ic = "🪙"
+                    elif "bond" in r_low or "obbligaz" in r_low or "btp" in r_low or "fixed" in r_low:
+                        m_cls = "Obbligazioni & Fixed Income"
+                        l_cls = "⏱️ T+2 (Breve Termine)"
+                        s_cls = "⚖️ Protezione & Beni Rifugio"
+                        r_lvl = "Basso/Medio"
+                        c_col = "#0284c7"
+                        c_ic = "🏛️"
+                    else:
+                        m_cls = "Investimenti Finanziari (Azioni/ETF)"
+                        l_cls = "⏱️ T+2 (Breve Termine)"
+                        s_cls = "🚀 Capitale di Crescita"
+                        r_lvl = "Medio/Alto"
+                        c_col = "#6366f1"
+                        c_ic = "📈"
+
+                    breakdown_items.append({
+                        "name": r_name,
+                        "macro": m_cls,
+                        "liquidity": l_cls,
+                        "strategic": s_cls,
+                        "risk": r_lvl,
+                        "val": v,
+                        "color": c_col,
+                        "icon": c_ic
+                    })
         elif fin_inv > 0:
-            labels.append("Portafogli Finanziari")
-            parents.append("Investimenti Finanziari")
-            values.append(fin_inv)
-            colors.append("#6366f1")
-            breakdown_items.append({"name": "Portafogli Finanziari", "macro": "Investimenti Finanziari", "val": fin_inv, "color": "#6366f1", "icon": "📈"})
+            breakdown_items.append({
+                "name": "Investimenti Finanziari (Quotati)",
+                "macro": "Investimenti Finanziari (Azioni/ETF)",
+                "liquidity": "⏱️ T+2 (Breve Termine)",
+                "strategic": "🚀 Capitale di Crescita",
+                "risk": "Medio/Alto",
+                "val": fin_inv,
+                "color": "#6366f1",
+                "icon": "📈"
+            })
 
-    # 3. Liquidità & Cash
-    if is_snapshot_mode:
-        snap_accs = details.get("accounts", [])
-        other_cash_val = 0.0
-        for a in snap_accs:
-            b = float(a.get("balance", 0.0))
-            a_name = str(a.get("name", "Conto"))
-            if b >= 1000:
-                c_acc = "#10b981" if "intesa" in a_name.lower() else "#14b8a6"
-                labels.append(a_name)
-                parents.append("Liquidità & Cash")
-                values.append(b)
-                colors.append(c_acc)
-                breakdown_items.append({"name": a_name, "macro": "Liquidità & Cash", "val": b, "color": c_acc, "icon": "💳"})
-            elif b > 0:
-                other_cash_val += b
-        if other_cash_val > 0:
-            labels.append("Altri Conti & Wallet")
-            parents.append("Liquidità & Cash")
-            values.append(other_cash_val)
-            colors.append("#06b6d4")
-            breakdown_items.append({"name": "Altri Conti & Wallet", "macro": "Liquidità & Cash", "val": other_cash_val, "color": "#06b6d4", "icon": "⚡"})
-    else:
-        if not df_accounts.empty:
-            other_cash_val = 0.0
-            for _, a in df_accounts.iterrows():
-                b = float(a.get("balance", 0.0))
-                a_name = str(a.get("name", "Conto"))
-                if b >= 1000:
-                    c_acc = "#10b981" if "intesa" in a_name.lower() else "#14b8a6"
-                    labels.append(a_name)
-                    parents.append("Liquidità & Cash")
-                    values.append(b)
-                    colors.append(c_acc)
-                    breakdown_items.append({"name": a_name, "macro": "Liquidità & Cash", "val": b, "color": c_acc, "icon": "💳"})
-                elif b > 0:
-                    other_cash_val += b
-            if other_cash_val > 0:
-                labels.append("Altri Conti & Wallet")
-                parents.append("Liquidità & Cash")
-                values.append(other_cash_val)
-                colors.append("#06b6d4")
-                breakdown_items.append({"name": "Altri Conti & Wallet", "macro": "Liquidità & Cash", "val": other_cash_val, "color": "#06b6d4", "icon": "⚡"})
-        elif liq_cash > 0:
-            labels.append("Liquidità & Depositi")
-            parents.append("Liquidità & Cash")
-            values.append(liq_cash)
-            colors.append("#10b981")
-            breakdown_items.append({"name": "Liquidità & Depositi", "macro": "Liquidità & Cash", "val": liq_cash, "color": "#10b981", "icon": "💳"})
+    # 3. Immobili & Real Estate (Net Equity)
+    if re_val > 0:
+        breakdown_items.append({
+            "name": "Immobili & Proprietà (Net Equity)",
+            "macro": "Immobili & Real Estate",
+            "liquidity": "🔒 Illiquido / Strutturale",
+            "strategic": "🚀 Capitale di Crescita",
+            "risk": "Medio",
+            "val": re_val,
+            "color": "#f59e0b",
+            "icon": "🏠"
+        })
 
-    # 4. Asset Caveau
+    # 4. Asset Caveau & Metalli Preziosi & Orologi
     if is_snapshot_mode:
         snap_phys = details.get("physical_assets", [])
         for pa in snap_phys:
             v = float(pa.get("current_market_value", 0.0))
             if v > 0:
                 p_name = str(pa.get("name", "Asset"))
-                name = "Oro 18K (Bracciali)" if "braccial" in p_name.lower() or "oro" in p_name.lower() else ("Seiko Automatic" if "seiko" in p_name.lower() else p_name)
-                col = "#f59e0b" if "oro" in name.lower() or pa.get("asset_category") == "precious_metals" else "#d97706"
-                labels.append(name)
-                parents.append("Asset Caveau")
-                values.append(v)
-                colors.append(col)
-                breakdown_items.append({"name": name, "macro": "Asset Caveau", "val": v, "color": col, "icon": "👑"})
+                p_cat = str(pa.get("asset_category", "")).lower()
+                p_low = p_name.lower()
+                if "oro" in p_low or "gold" in p_low or "silver" in p_low or "metalli" in p_cat or "metal" in p_low:
+                    m_cls = "Metalli Preziosi & Caveau"
+                    l_cls = "📅 T+30 (Differita / Vincolata)"
+                    s_cls = "⚖️ Protezione & Beni Rifugio"
+                    r_lvl = "Medio (Hedge)"
+                    c_col = "#eab308"
+                    c_ic = "👑"
+                elif "orolog" in p_low or "watch" in p_cat or "rolex" in p_low or "seiko" in p_low or "omega" in p_low or "patek" in p_low:
+                    m_cls = "Orologi di Lusso & Collezioni"
+                    l_cls = "📅 T+30 (Differita / Vincolata)"
+                    s_cls = "⚖️ Protezione & Beni Rifugio"
+                    r_lvl = "Medio/Alto"
+                    c_col = "#d97706"
+                    c_ic = "⌚"
+                else:
+                    m_cls = "Beni Fisici & Collezionismo"
+                    l_cls = "🔒 Illiquido / Strutturale"
+                    s_cls = "⚖️ Protezione & Beni Rifugio"
+                    r_lvl = "Medio"
+                    c_col = "#ca8a04"
+                    c_ic = "🏺"
+
+                breakdown_items.append({
+                    "name": p_name,
+                    "macro": m_cls,
+                    "liquidity": l_cls,
+                    "strategic": s_cls,
+                    "risk": r_lvl,
+                    "val": v,
+                    "color": c_col,
+                    "icon": c_ic
+                })
         if not snap_phys and phys_assets > 0:
-            labels.append("Asset Fisici")
-            parents.append("Asset Caveau")
-            values.append(phys_assets)
-            colors.append("#f59e0b")
-            breakdown_items.append({"name": "Asset Fisici", "macro": "Asset Caveau", "val": phys_assets, "color": "#f59e0b", "icon": "👑"})
+            breakdown_items.append({
+                "name": "Asset Caveau & Metalli",
+                "macro": "Metalli Preziosi & Caveau",
+                "liquidity": "📅 T+30 (Differita / Vincolata)",
+                "strategic": "⚖️ Protezione & Beni Rifugio",
+                "risk": "Medio",
+                "val": phys_assets,
+                "color": "#eab308",
+                "icon": "👑"
+            })
     else:
         df_phys = get_physical_assets(engine, portfolio_id=current_pid)
         if not df_phys.empty:
@@ -478,96 +581,219 @@ with main_tab_alloc:
                 v = float(pa.get("current_market_value", 0.0))
                 if v > 0:
                     p_name = str(pa.get("name", "Asset"))
-                    name = "Oro 18K (Bracciali)" if "braccial" in p_name.lower() or "oro" in p_name.lower() else ("Seiko Automatic" if "seiko" in p_name.lower() else p_name)
-                    col = "#f59e0b" if "oro" in name.lower() or pa.get("asset_category") == "precious_metals" else "#d97706"
-                    labels.append(name)
-                    parents.append("Asset Caveau")
-                    values.append(v)
-                    colors.append(col)
-                    breakdown_items.append({"name": name, "macro": "Asset Caveau", "val": v, "color": col, "icon": "👑"})
-        elif phys_assets > 0:
-            labels.append("Asset Fisici")
-            parents.append("Asset Caveau")
-            values.append(phys_assets)
-            colors.append("#f59e0b")
-            breakdown_items.append({"name": "Asset Fisici", "macro": "Asset Caveau", "val": phys_assets, "color": "#f59e0b", "icon": "👑"})
+                    p_cat = str(pa.get("asset_category", "")).lower()
+                    p_low = p_name.lower()
+                    if "oro" in p_low or "gold" in p_low or "silver" in p_low or "metalli" in p_cat or "metal" in p_low:
+                        m_cls = "Metalli Preziosi & Caveau"
+                        l_cls = "📅 T+30 (Differita / Vincolata)"
+                        s_cls = "⚖️ Protezione & Beni Rifugio"
+                        r_lvl = "Medio (Hedge)"
+                        c_col = "#eab308"
+                        c_ic = "👑"
+                    elif "orolog" in p_low or "watch" in p_cat or "rolex" in p_low or "seiko" in p_low or "omega" in p_low or "patek" in p_low:
+                        m_cls = "Orologi di Lusso & Collezioni"
+                        l_cls = "📅 T+30 (Differita / Vincolata)"
+                        s_cls = "⚖️ Protezione & Beni Rifugio"
+                        r_lvl = "Medio/Alto"
+                        c_col = "#d97706"
+                        c_ic = "⌚"
+                    else:
+                        m_cls = "Beni Fisici & Collezionismo"
+                        l_cls = "🔒 Illiquido / Strutturale"
+                        s_cls = "⚖️ Protezione & Beni Rifugio"
+                        r_lvl = "Medio"
+                        c_col = "#ca8a04"
+                        c_ic = "🏺"
 
-    # 5. Previdenza
+                    breakdown_items.append({
+                        "name": p_name,
+                        "macro": m_cls,
+                        "liquidity": l_cls,
+                        "strategic": s_cls,
+                        "risk": r_lvl,
+                        "val": v,
+                        "color": c_col,
+                        "icon": c_ic
+                    })
+        elif phys_assets > 0:
+            breakdown_items.append({
+                "name": "Asset Caveau & Metalli",
+                "macro": "Metalli Preziosi & Caveau",
+                "liquidity": "📅 T+30 (Differita / Vincolata)",
+                "strategic": "⚖️ Protezione & Beni Rifugio",
+                "risk": "Medio",
+                "val": phys_assets,
+                "color": "#eab308",
+                "icon": "👑"
+            })
+
+    # 5. Previdenza Integrativa & Fondi Pensione
     if is_snapshot_mode:
         snap_pens = details.get("pension_plans", [])
         for pp in snap_pens:
             v = float(pp.get("accumulated_value", 0.0))
             if v > 0:
-                labels.append("Fondo Pensione")
-                parents.append("Previdenza")
-                values.append(v)
-                colors.append("#ec4899")
-                breakdown_items.append({"name": "Fondo Pensione", "macro": "Previdenza", "val": v, "color": "#ec4899", "icon": "🛡️"})
+                p_name = str(pp.get("fund_name", pp.get("name", "Fondo Pensione")))
+                breakdown_items.append({
+                    "name": p_name,
+                    "macro": "Previdenza Integrativa",
+                    "liquidity": "🔒 Illiquido / Strutturale",
+                    "strategic": "🔮 Patrimonio Previdenziale",
+                    "risk": "Medio",
+                    "val": v,
+                    "color": "#ec4899",
+                    "icon": "🛡️"
+                })
         if not snap_pens and pens_val > 0:
-            labels.append("Fondo Pensione")
-            parents.append("Previdenza")
-            values.append(pens_val)
-            colors.append("#ec4899")
-            breakdown_items.append({"name": "Fondo Pensione", "macro": "Previdenza", "val": pens_val, "color": "#ec4899", "icon": "🛡️"})
+            breakdown_items.append({
+                "name": "Previdenza Integrativa & PIP",
+                "macro": "Previdenza Integrativa",
+                "liquidity": "🔒 Illiquido / Strutturale",
+                "strategic": "🔮 Patrimonio Previdenziale",
+                "risk": "Medio",
+                "val": pens_val,
+                "color": "#ec4899",
+                "icon": "🛡️"
+            })
     else:
         df_pens = get_pension_plans(engine, portfolio_id=current_pid)
         if not df_pens.empty:
             for _, pp in df_pens.iterrows():
                 v = float(pp.get("accumulated_value", 0.0))
                 if v > 0:
-                    labels.append("Fondo Pensione")
-                    parents.append("Previdenza")
-                    values.append(v)
-                    colors.append("#ec4899")
-                    breakdown_items.append({"name": "Fondo Pensione", "macro": "Previdenza", "val": v, "color": "#ec4899", "icon": "🛡️"})
+                    p_name = str(pp.get("fund_name", pp.get("name", "Fondo Pensione")))
+                    breakdown_items.append({
+                        "name": p_name,
+                        "macro": "Previdenza Integrativa",
+                        "liquidity": "🔒 Illiquido / Strutturale",
+                        "strategic": "🔮 Patrimonio Previdenziale",
+                        "risk": "Medio",
+                        "val": v,
+                        "color": "#ec4899",
+                        "icon": "🛡️"
+                    })
         elif pens_val > 0:
-            labels.append("Fondo Pensione")
-            parents.append("Previdenza")
-            values.append(pens_val)
-            colors.append("#ec4899")
-            breakdown_items.append({"name": "Fondo Pensione", "macro": "Previdenza", "val": pens_val, "color": "#ec4899", "icon": "🛡️"})
+            breakdown_items.append({
+                "name": "Previdenza Integrativa & PIP",
+                "macro": "Previdenza Integrativa",
+                "liquidity": "🔒 Illiquido / Strutturale",
+                "strategic": "🔮 Patrimonio Previdenziale",
+                "risk": "Medio",
+                "val": pens_val,
+                "color": "#ec4899",
+                "icon": "🛡️"
+            })
 
     if breakdown_items and tot_nw > 0:
-        col_chart, col_breakdown = st.columns([1.5, 1.5])
+        # Raggruppamento dinamico in base alla dimensione selezionata
+        dim_key_map = {
+            "🏷️ Macro-Classi": "macro",
+            "💧 Profilo Liquidità": "liquidity",
+            "🎯 Destinazione Strategica": "strategic"
+        }
+        active_dim_key = dim_key_map.get(alloc_dim, "macro")
+
+        # Palette colore coerente per dimensione
+        dim_color_palette = {
+            "Liquidità & Depositi": "#10b981",
+            "Investimenti Finanziari (Azioni/ETF)": "#6366f1",
+            "Obbligazioni & Fixed Income": "#0284c7",
+            "Criptovalute & Digital Assets": "#8b5cf6",
+            "Immobili & Real Estate": "#f59e0b",
+            "Metalli Preziosi & Caveau": "#eab308",
+            "Orologi di Lusso & Collezioni": "#d97706",
+            "Beni Fisici & Collezionismo": "#ca8a04",
+            "Previdenza Integrativa": "#ec4899",
+            "⚡ T0 (Liquidità Immediata)": "#10b981",
+            "⏱️ T+2 (Breve Termine)": "#6366f1",
+            "📅 T+30 (Differita / Vincolata)": "#f59e0b",
+            "🔒 Illiquido / Strutturale": "#ec4899",
+            "🛡️ Fondo Sicurezza & Riserve": "#10b981",
+            "🚀 Capitale di Crescita": "#6366f1",
+            "⚖️ Protezione & Beni Rifugio": "#f59e0b",
+            "🔮 Patrimonio Previdenziale": "#ec4899"
+        }
+
+        # Calcolo aggregati per gruppo
+        group_totals = {}
+        group_items = {}
+        for it in breakdown_items:
+            g = it[active_dim_key]
+            group_totals[g] = group_totals.get(g, 0.0) + it["val"]
+            if g not in group_items:
+                group_items[g] = []
+            group_items[g].append(it)
+
+        col_chart, col_breakdown = st.columns([1.4, 1.6])
 
         with col_chart:
             if "Treemap" in chart_view:
+                tm_labels = []
+                tm_parents = []
+                tm_values = []
+                tm_colors = []
+                for g_name, g_val in group_totals.items():
+                    tm_labels.append(g_name)
+                    tm_parents.append("")
+                    tm_values.append(g_val)
+                    tm_colors.append(dim_color_palette.get(g_name, "#6366f1"))
+                    for sub in group_items[g_name]:
+                        tm_labels.append(f"{sub['name']}")
+                        tm_parents.append(g_name)
+                        tm_values.append(sub["val"])
+                        tm_colors.append(sub["color"])
+
                 fig_alloc = go.Figure(go.Treemap(
-                    labels=labels,
-                    parents=parents,
-                    values=values,
+                    labels=tm_labels,
+                    parents=tm_parents,
+                    values=tm_values,
                     branchvalues="total",
-                    marker=dict(colors=colors, line=dict(color="#0e1117", width=1.5)),
-                    hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota sul Totale: <b>%{percentRoot:.1%}</b><extra></extra>"
+                    marker=dict(colors=tm_colors, line=dict(color="#0e1117", width=1.5)),
+                    hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota: <b>%{percentRoot:.1%}</b><extra></extra>"
                 ))
                 fig_alloc.update_layout(
                     margin=dict(t=10, l=10, r=10, b=10),
-                    height=380,
+                    height=390,
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font=dict(family="Outfit, sans-serif", color="#c9d1d9")
                 )
             elif "Sunburst" in chart_view:
+                sb_labels = []
+                sb_parents = []
+                sb_values = []
+                sb_colors = []
+                for g_name, g_val in group_totals.items():
+                    sb_labels.append(g_name)
+                    sb_parents.append("")
+                    sb_values.append(g_val)
+                    sb_colors.append(dim_color_palette.get(g_name, "#6366f1"))
+                    for sub in group_items[g_name]:
+                        sb_labels.append(f"{sub['name']}")
+                        sb_parents.append(g_name)
+                        sb_values.append(sub["val"])
+                        sb_colors.append(sub["color"])
+
                 fig_alloc = go.Figure(go.Sunburst(
-                    labels=labels,
-                    parents=parents,
-                    values=values,
+                    labels=sb_labels,
+                    parents=sb_parents,
+                    values=sb_values,
                     branchvalues="total",
-                    marker=dict(colors=colors, line=dict(color="#0e1117", width=1.5)),
+                    marker=dict(colors=sb_colors, line=dict(color="#0e1117", width=1.5)),
                     insidetextorientation="auto",
-                    hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota sul Patrimonio: <b>%{percentRoot:.1%}</b><extra></extra>"
+                    hovertemplate="<b>%{label}</b><br>Controvalore: <b>€%{value:,.2f}</b><br>Quota: <b>%{percentRoot:.1%}</b><extra></extra>"
                 ))
                 fig_alloc.update_layout(
                     margin=dict(t=10, l=10, r=10, b=10),
-                    height=380,
+                    height=390,
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font=dict(family="Outfit, sans-serif", color="#c9d1d9")
                 )
             else: # Donut Istituzionale (Default)
-                d_labels = [it["name"] for it in breakdown_items]
-                d_vals = [it["val"] for it in breakdown_items]
-                d_cols = [it["color"] for it in breakdown_items]
+                d_labels = list(group_totals.keys())
+                d_vals = list(group_totals.values())
+                d_cols = [dim_color_palette.get(k, "#6366f1") for k in d_labels]
 
                 fig_alloc = go.Figure(go.Pie(
                     labels=d_labels,
@@ -577,19 +803,19 @@ with main_tab_alloc:
                     textinfo="percent",
                     textposition="outside",
                     textfont=dict(size=11, color="#94a3b8"),
-                    hovertemplate="<b>%{label}</b><br>Controvalore: <b>€ %{value:,.2f}</b><br>Quota sul Patrimonio: <b>%{percent}</b><extra></extra>"
+                    hovertemplate="<b>%{label}</b><br>Controvalore: <b>€ %{value:,.2f}</b><br>Quota: <b>%{percent}</b><extra></extra>"
                 ))
 
                 fig_alloc.update_layout(
                     showlegend=False,
                     margin=dict(t=20, l=20, r=20, b=20),
-                    height=380,
+                    height=390,
                     paper_bgcolor="rgba(0,0,0,0)",
                     plot_bgcolor="rgba(0,0,0,0)",
                     font=dict(family="Outfit, sans-serif", color="#c9d1d9"),
                     annotations=[
                         dict(
-                            text=f"<b style='font-size:22px; color:#ffffff;'>€ {tot_nw:,.0f}</b><br><span style='font-size:10.5px; color:#94a3b8; letter-spacing:0.8px; font-weight:700;'>PATRIMONIO NETTO</span>",
+                            text=f"<b style='font-size:22px; color:#ffffff;'>€ {tot_nw:,.0f}</b><br><span style='font-size:10px; color:#94a3b8; letter-spacing:0.8px; font-weight:700;'>PATRIMONIO NETTO</span>",
                             x=0.5, y=0.5,
                             font_size=14,
                             showarrow=False
@@ -600,30 +826,48 @@ with main_tab_alloc:
 
         with col_breakdown:
             st.markdown(f"""
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <span style="font-size:13px; font-weight:700; color:#ffffff; text-transform:uppercase; letter-spacing:0.3px;">Dettaglio Asset Classes</span>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                <span style="font-size:13px; font-weight:700; color:#ffffff; text-transform:uppercase; letter-spacing:0.3px;">Ripartizione ({alloc_dim})</span>
                 <span style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">{len(breakdown_items)} Voci Attive</span>
             </div>
             """, unsafe_allow_html=True)
 
-            sorted_breakdown = sorted(breakdown_items, key=lambda x: x["val"], reverse=True)
-            for it in sorted_breakdown:
-                pct_share = (it["val"] / tot_nw) * 100.0
+            sorted_groups = sorted(group_totals.items(), key=lambda x: x[1], reverse=True)
+            for g_name, g_val in sorted_groups:
+                g_share = (g_val / tot_nw) * 100.0
+                g_col = dim_color_palette.get(g_name, "#6366f1")
+                subs = group_items[g_name]
+
                 st.markdown(f"""
-                <div style="background:rgba(22, 27, 34, 0.85); border:1px solid rgba(255,255,255,0.06); border-radius:10px; padding:10px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <div style="width:10px; height:10px; border-radius:50%; background:{it['color']}; box-shadow:0 0 6px {it['color']};"></div>
-                        <div>
-                            <div style="font-size:13.5px; font-weight:700; color:#f8fafc;">{it['icon']} {it['name']}</div>
-                            <div style="font-size:10.5px; color:#94a3b8; font-weight:500;">{it['macro']}</div>
-                        </div>
+                <div style="background:rgba(22, 27, 34, 0.85); border:1px solid rgba(255,255,255,0.06); border-left:4px solid {g_col}; border-radius:8px; padding:8px 12px; margin-bottom:6px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:13px; font-weight:700; color:#ffffff;">{g_name}</span>
+                        <span style="font-size:13px; font-weight:800; color:#ffffff;">€ {g_val:,.2f} <span style="font-size:11px; color:{g_col}; font-weight:700;">({g_share:.1f}%)</span></span>
                     </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:14px; font-weight:800; color:#ffffff;">€ {it['val']:,.2f}</div>
-                        <div style="font-size:11px; font-weight:700; color:{it['color']};">{pct_share:.1f}%</div>
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;">
+                        {' '.join([f"<span style='font-size:10px; color:#cbd5e1; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:1px 6px; border-radius:4px;'>{s['icon']} {s['name']}: €{s['val']:,.0f}</span>" for s in subs])}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
+
+        with st.expander("📋 Tabella Istituzionale di Sintesi Asset Allocation & Pesi", expanded=False):
+            df_alloc_table = pd.DataFrame([
+                {
+                    "Attivo / Voce": f"{it['icon']} {it['name']}",
+                    "Macro Asset Class": it["macro"],
+                    "Profilo Liquidità (IFRS 13)": it["liquidity"],
+                    "Destinazione Strategica": it["strategic"],
+                    "Livello Rischio": it["risk"],
+                    "Controvalore (€)": it["val"],
+                    "Peso sul Net Worth (%)": (it["val"] / tot_nw) * 100.0
+                }
+                for it in sorted(breakdown_items, key=lambda x: x["val"], reverse=True)
+            ])
+            styler_alloc = df_alloc_table.style.format({
+                "Controvalore (€)": "€ {:,.2f}",
+                "Peso sul Net Worth (%)": "{:.1f}%"
+            })
+            st.dataframe(styler_alloc, use_container_width=True, hide_index=True)
     else:
         st.info("Nessun dato di allocazione disponibile. Aggiungi conti o asset fisici.")
 
