@@ -34,13 +34,14 @@ from core.ui_utils import (
 
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
-from core.wealth import (
-    get_wealth_portfolios,
+from core.wealth.wealth_engine import (
     compute_mortgage_amortization,
     compute_real_estate_roi,
     compute_buy_vs_rent_comparison,
-    compute_consolidated_net_worth
+    compute_consolidated_net_worth,
+    compute_real_estate_net_equity_and_ltv
 )
+from core.wealth.wealth_db import get_wealth_portfolios
 
 
 st.set_page_config(page_title="Immobili & Mutui | ARGUS Wealth", page_icon="🏡", layout="wide")
@@ -93,13 +94,95 @@ render_page_header(
 )
 
 
-tab_mortgage, tab_roi, tab_bvr = st.tabs([
+re_ltv_summary = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=current_pid)
+
+tab_equity, tab_mortgage, tab_roi, tab_bvr = st.tabs([
+    "🏡 Home Equity & LTV Reale",
     "🏦 Simulatore Mutuo & Ammortamento",
     "📈 Redditività Immobiliare (Cap Rate & Cash Flow)",
     "⚖️ Buy vs Rent (Affitto vs Acquisto)"
 ])
 
-# ── TAB 1: AMMORTAMENTO MUTUO ───────────────────────────────
+# ── TAB 1: HOME EQUITY & DYNAMIC LTV ───────────────────────
+with tab_equity:
+    st.markdown("### 🏡 Net Home Equity & Posizione Finanziaria Immobiliare")
+    st.caption("Integrazione in tempo reale tra il valore di mercato degli immobili registrati nel Caveau/Fisici e il debito residuo dei mutui.")
+
+    eq_c1, eq_c2, eq_c3, eq_c4 = st.columns(4)
+    with eq_c1:
+        metric_card("Valore Immobili", fmt_eur(re_ltv_summary["total_property_market_value"]), delta=f"{re_ltv_summary['property_count']} Immobili Registrati", delta_color="normal")
+    with eq_c2:
+        metric_card("Debito Mutui Residuo", fmt_eur(re_ltv_summary["total_mortgage_debt_remaining"]), delta=f"{re_ltv_summary['mortgage_count']} Finanziamenti Attivi", delta_color="normal")
+    with eq_c3:
+        metric_card("Net Home Equity", fmt_eur(re_ltv_summary["net_home_equity_eur"]), delta="Capitale Reale Posseduto", delta_color="normal")
+    with eq_c4:
+        metric_card("Loan-to-Value (LTV)", f"{re_ltv_summary['weighted_ltv_pct']:.1f}%", delta=re_ltv_summary["ltv_status"], delta_color="normal")
+
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+    # Grafico a barre orizzontali Market Value vs Debito vs Equity
+    if re_ltv_summary["total_property_market_value"] > 0:
+        col_g1, col_g2 = st.columns([1.5, 1.0])
+        with col_g1:
+            section("📊 Composizione Valore Immobiliare vs Debito Residuo")
+            fig_bar = go.Figure()
+            fig_bar.add_trace(go.Bar(
+                name="Net Home Equity (Capitale Tuo)",
+                y=["Patrimonio Immobiliare"],
+                x=[re_ltv_summary["net_home_equity_eur"]],
+                orientation='h',
+                marker=dict(color="#10b981")
+            ))
+            fig_bar.add_trace(go.Bar(
+                name="Debito Mutui (Banca)",
+                y=["Patrimonio Immobiliare"],
+                x=[re_ltv_summary["total_mortgage_debt_remaining"]],
+                orientation='h',
+                marker=dict(color="#ef4444")
+            ))
+            fig_bar.update_layout(
+                barmode='stack',
+                height=220,
+                margin=dict(l=20, r=20, t=30, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            apply_plotly_theme(fig_bar)
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        with col_g2:
+            section("🛡️ Stress Test Solidità Finanziaria")
+            ltv_val = re_ltv_summary["weighted_ltv_pct"]
+            if ltv_val <= 50.0:
+                st.success(f"**LTV al {ltv_val:.1f}% — Profilo Virtuoso:** Il patrimonio immobiliare è protetto da un cuscinetto di equity superiore al 50%. Basso rischio di insolvenza o margin call creditizia.")
+            elif ltv_val <= 80.0:
+                st.info(f"**LTV al {ltv_val:.1f}% — Profilo Standard:** Indebitamento conforme ai benchmark bancari (sotto l'80%).")
+            else:
+                st.warning(f"**LTV al {ltv_val:.1f}% — Elevato Indebitamento:** Si consiglia di valutare estinzioni anticipate parziali o accantonamenti di liquidità.")
+            
+            if re_ltv_summary["estimated_monthly_mortgage_payment"] > 0:
+                st.metric("Rata Mensile Stimata Mutuo", fmt_eur(re_ltv_summary["estimated_monthly_mortgage_payment"]))
+    else:
+        st.info("Nessun immobile censito in questo profilo patrimoniale. Puoi registrarne uno nella pagina **15. Asset Illiquidi & Caveau**.")
+
+    # Dettaglio immobili
+    if re_ltv_summary["properties_detail"]:
+        st.markdown("#### 🏢 Dettaglio Immobili & Ripartizione Debito")
+        st.dataframe(
+            re_ltv_summary["properties_df"],
+            column_config={
+                "name": "Nome Immobile",
+                "market_value": st.column_config.NumberColumn("Valore Mercato", format="€ %,.2f"),
+                "allocated_debt": st.column_config.NumberColumn("Debito Allocato", format="€ %,.2f"),
+                "net_equity": st.column_config.NumberColumn("Home Equity Netto", format="€ %,.2f"),
+                "ltv_pct": st.column_config.NumberColumn("LTV %", format="%.1f%%"),
+                "location": "Ubicazione",
+                "notes": "Note"
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+
+# ── TAB 2: AMMORTAMENTO MUTUO ───────────────────────────────
 with tab_mortgage:
     st.markdown("### 🏦 Piano di Ammortamento alla Francese & Estinzione Anticipata")
     

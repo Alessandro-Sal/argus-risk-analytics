@@ -201,3 +201,30 @@ class EstatePlanResult:
 # Alias per compatibilità
 WealthConsolidatedSummary = NetWorthSummary
 
+
+@dataclass
+class RebalanceDriftItem:
+    asset_name: str
+    asset_class: str
+    current_value_eur: float
+    current_weight_pct: float
+    target_weight_pct: float
+    drift_pct: float
+    drift_status: str  # "CRITICAL", "MODERATE", "IN_LINE"
+    action_type: str   # "BUY", "SELL", "HOLD"
+    target_delta_eur: float
+    is_tax_advantaged: bool = False
+    notes: Optional[str] = None
+
+
+@dataclass
+class RealEstateEquitySummary:
+    total_property_market_value: float = 0.0
+    total_mortgage_debt_remaining: float = 0.0
+    net_home_equity_eur: float = 0.0
+    weighted_ltv_pct: float = 0.0
+    total_monthly_mortgage_cost: float = 0.0
+    property_count: int = 0
+    mortgage_count: int = 0
+    properties_detail: List[Dict[str, Any]] = field(default_factory=list)
+

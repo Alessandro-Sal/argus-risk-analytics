@@ -18,7 +18,9 @@ from core.wealth.wealth_models import (
     HeirRelationship,
     EstateHeirItem,
     EstatePlanResult,
-    NetWorthSummary
+    NetWorthSummary,
+    AccountType,
+    PhysicalAssetCategory
 )
 from core.wealth.wealth_db import (
     init_wealth_db,
@@ -52,7 +54,11 @@ from core.wealth.wealth_engine import (
     compute_goal_based_monte_carlo,
     compute_dynamic_glide_path,
     compute_portfolio_tco_and_fee_drag,
-    compute_advanced_estate_planning
+    compute_advanced_estate_planning,
+    compute_tax_smart_rebalancing_watchdog,
+    compute_real_estate_net_equity_and_ltv,
+    generate_advisory_pitchbook_html,
+    generate_advisory_pitchbook_pdf
 )
 from core.wealth.wealth_importer import (
     parse_universal_statement,
@@ -1004,6 +1010,99 @@ def test_compute_advanced_estate_planning_engine():
     for h in res["heir_breakdown"]:
         assert h["franchise_eur"] == 1000000.0
         assert h["tax_rate_pct"] == 4.0
+
+
+def test_compute_tax_smart_rebalancing_watchdog(sqlite_engine):
+    """Test del Watchdog di Ribilanciamento, Drift Monitor e Cash Drag Alert."""
+    init_wealth_db(sqlite_engine)
+    # Salviamo conto con eccesso di liquidità
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Corrente Principale",
+        "account_type": AccountType.CHECKING.value,
+        "balance": 150000.0,
+        "institution": "Banca Intesa"
+    })
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Risparmio",
+        "account_type": AccountType.SAVINGS.value,
+        "balance": 50000.0,
+        "institution": "Directa"
+    })
+
+    watchdog = compute_tax_smart_rebalancing_watchdog(sqlite_engine, portfolio_id=1)
+    assert "drift_table" in watchdog
+    assert not watchdog["drift_df"].empty
+    assert watchdog["total_investable_assets_eur"] == 200000.0
+    # 200k liquidità vs 10% target -> Cash Drag Alert
+    assert watchdog["cash_drag_alert"] is True
+    assert watchdog["excess_cash_eur"] > 0.0
+    assert watchdog["critical_drifts_count"] > 0
+
+
+def test_compute_real_estate_net_equity_and_ltv(sqlite_engine):
+    """Test del calcolo dell'Home Equity e del Loan-to-Value (LTV %)."""
+    init_wealth_db(sqlite_engine)
+    # Immobile da 300.000€
+    save_physical_asset(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Appartamento Centro",
+        "asset_category": PhysicalAssetCategory.REAL_ESTATE.value,
+        "current_market_value": 300000.0,
+        "purchase_price": 270000.0,
+        "brand_or_location": "Milano"
+    })
+    # Mutuo residuo da 180.000€
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Mutuo Prima Casa",
+        "account_type": AccountType.MORTGAGE.value,
+        "balance": -180000.0,
+        "institution": "Crédit Agricole"
+    })
+
+    re_summary = compute_real_estate_net_equity_and_ltv(sqlite_engine, portfolio_id=1)
+    assert re_summary["total_property_market_value"] == 300000.0
+    assert re_summary["total_mortgage_debt_remaining"] == 180000.0
+    # Net Equity = 300k - 180k = 120.000€
+    assert re_summary["net_home_equity_eur"] == 120000.0
+    # LTV = 180k / 300k = 60.0%
+    assert re_summary["weighted_ltv_pct"] == 60.0
+    assert re_summary["property_count"] == 1
+    assert re_summary["mortgage_count"] == 1
+    assert re_summary["estimated_monthly_mortgage_payment"] > 0.0
+
+
+def test_generate_advisory_pitchbook_pdf_engine(sqlite_engine):
+    """Test della generazione del report Pitchbook Multipagina (HTML e PDF binario)."""
+    init_wealth_db(sqlite_engine)
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Corrente",
+        "account_type": AccountType.CHECKING.value,
+        "balance": 25000.0,
+        "institution": "Fineco"
+    })
+    save_wealth_goal(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Fondo Emergenza",
+        "category": GoalCategory.EMERGENCY_BUFFER.value,
+        "target_amount": 30000.0,
+        "target_date": "2027-12-31",
+        "current_amount": 25000.0,
+        "monthly_contribution": 200.0
+    })
+
+    html_str = generate_advisory_pitchbook_html(sqlite_engine, portfolio_id=1)
+    assert "ARGUS" in html_str
+    assert "Executive Wealth Pitchbook" in html_str
+    assert "Fondo Emergenza" in html_str
+
+    pdf_bytes = generate_advisory_pitchbook_pdf(sqlite_engine, portfolio_id=1)
+    assert isinstance(pdf_bytes, (bytes, bytearray))
+    assert len(pdf_bytes) > 100
+    assert pdf_bytes.startswith(b"%PDF")
 
 
 

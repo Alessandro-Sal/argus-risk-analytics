@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-315%2F315%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-318%2F318%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -56,7 +56,9 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Financial Statement & Forensic Accounting**: Suite completa per la valutazione della solvibilità e del valore intrinseco aziendale mediante modelli *Altman Z-Score*, decomposizione *DuPont a 5 fattori*, *Piotroski F-Score (9pt)*, **Contabilità Forense Beneish M-Score (1999)** a 8 indici econometrici per il rilevamento di frodi contabili e manipolazione degli utili, **Sloan Accrual Ratio (1996)** per la qualità dei flussi di cassa, stima del *WACC (CAPM)*, *DCF stocastico a due stadi* e classificatore *Random Forest Distress Risk*.
 * **🎯 Goal-Based Investing & Multi-Life-Goal Engine (Merton Jump-Diffusion SPI %)**: Modulo di pianificazione per traguardi di vita (*FIRE, anticipo prima casa, università figli, rendita previdenziale*) con simulazione stocastica su 5.000 cammini a salti di Poisson, calcolo del **Success Probability Index (SPI %)**, coni di confidenza a ventaglio ($P5, P25, P50, P75, P95$), stima dello shortfall e risolutore dell'apporto mensile PAC raccomandato per raggiungere $\text{SPI} \ge 85\%$.
 * **📉 Target-Date Dynamic Glide Path & TCO / Fee Drag Lookthrough**: Algoritmo sigmoideo di de-risking progressivo (*Equity $\to$ Fixed Income $\to$ Cash/Alts*) combinato con l'analizzatore di **Total Cost of Ownership (TCO)** per misurare l'erosione da costi di gestione (TER medio ponderato) su orizzonti di 5, 10, 20 e 30 anni rispetto a benchmark indicizzati a basso costo (0.15%).
-* **⚖️ Advanced Estate Planning & Successioni (D.Lgs. 346/1990)**: Motore di calcolo dell'asse ereditario netto con quote di legittima e disponibile (Codice Civile artt. 536 e ss.), applicazione delle franchigie per grado di parentela (1M€ coniuge/figli, 100k€ fratelli, 1.5M€ disabili) ed esenzione legale per Titoli di Stato BTP, Polizze Vita Ramo I/III e Fondi Pensione.
+* **📑 Client-Ready Advisory Pitchbook (PDF Multipagina Istituzionale)**: Generatore esecutivo di dossier PDF A4 a 6 pagine per Family Office e Private Banking con impaginazione pixel-perfect (Edge/Chrome headless e ReportLab in-memory), Stato Patrimoniale 360°, Health Score Radar a 5 pilastri, Goal-Based tracking, TCO MiFID II ex-post e Action Plan.
+* **⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor**: Monitoraggio in tempo reale dello scostamento dell'asset allocation patrimoniale rispetto ai pesi target, rilevamento automatico del Cash Drag (con quantificazione del costo opportunità annuo) e generazione degli ordini di riallineamento a minimo impatto fiscale (TUIR Art. 67).
+* **🏡 Real Estate Net Equity & Dynamic LTV Integration**: Collegamento dinamico tra gli immobili registrati e i debiti residui dei mutui per il calcolo in tempo reale del Net Home Equity, del Loan-to-Value (LTV %) medio ponderato e della rata di ammortamento stimata.
 * **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti gli 11 moduli, oltre 35 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
 
 ---

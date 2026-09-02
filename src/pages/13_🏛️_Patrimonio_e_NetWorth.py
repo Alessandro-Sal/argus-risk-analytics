@@ -36,7 +36,9 @@ from core.sidebar import render_sidebar
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     generate_executive_tear_sheet_html,
-    generate_executive_tear_sheet_pdf
+    generate_executive_tear_sheet_pdf,
+    generate_advisory_pitchbook_html,
+    generate_advisory_pitchbook_pdf
 )
 
 
@@ -191,9 +193,10 @@ with r2_c3:
 
 st.divider()
 
-# ── EXECUTIVE TEAR SHEET REPORT TOOLBAR ──────────────────────
-tear_sheet_html = generate_executive_tear_sheet_html(engine, portfolio_id=current_pid)
+# ── EXECUTIVE TEAR SHEET & ADVISORY PITCHBOOK TOOLBAR ──────────
+pitchbook_pdf = generate_advisory_pitchbook_pdf(engine, portfolio_id=current_pid)
 tear_sheet_pdf = generate_executive_tear_sheet_pdf(engine, portfolio_id=current_pid)
+tear_sheet_html = generate_advisory_pitchbook_html(engine, portfolio_id=current_pid)
 date_slug = datetime.now().strftime('%Y%m%d')
 prof_slug = str(prof_map.get(current_pid, 'portfolio')).lower().replace(' ', '_')
 
@@ -204,36 +207,44 @@ st.markdown("""
             📑
         </div>
         <div>
-            <div style="font-size:13.5px; font-weight:750; color:#ffffff; letter-spacing:0.3px;">Executive Tear Sheet Dossier (Private Banking Style)</div>
-            <div style="font-size:11px; color:#94a3b8; margin-top:1px;">Report patrimoniale consolidato ad alta definizione, impaginato per stampa A4 o salvataggio PDF diretto.</div>
+            <div style="font-size:13.5px; font-weight:750; color:#ffffff; letter-spacing:0.3px;">Executive Advisory Dossier &amp; Pitchbook (Family Office / Private Banking)</div>
+            <div style="font-size:11px; color:#94a3b8; margin-top:1px;">Report patrimoniale istituzionale multipagina con Stato Patrimoniale 360°, Goal-Based Probability, Real Estate LTV e Tax-Smart Rebalancing.</div>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-ts_c1, ts_c2, ts_c3 = st.columns([1.3, 0.9, 1.0])
+ts_c1, ts_c2, ts_c3, ts_c4 = st.columns([1.3, 1.1, 0.8, 0.8])
 with ts_c1:
     st.download_button(
-        label="📥 Scarica Dossier PDF (A4)",
-        data=tear_sheet_pdf,
-        file_name=f"argus_executive_tear_sheet_{prof_slug}_{date_slug}.pdf",
+        label="📥 Scarica Pitchbook PDF",
+        data=pitchbook_pdf,
+        file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
         mime="application/pdf",
         use_container_width=True,
         type="primary"
     )
 with ts_c2:
     st.download_button(
-        label="🌐 Versione HTML",
-        data=tear_sheet_html.encode("utf-8"),
-        file_name=f"argus_executive_tear_sheet_{prof_slug}_{date_slug}.html",
-        mime="text/html",
+        label="📑 Tear-Sheet Sintetica",
+        data=tear_sheet_pdf,
+        file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
+        mime="application/pdf",
         use_container_width=True
     )
 with ts_c3:
-    show_ts_preview = st.toggle("📑 Anteprima Live", value=False, key="toggle_ts_preview_p13")
+    st.download_button(
+        label="🌐 HTML",
+        data=tear_sheet_html.encode("utf-8"),
+        file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.html",
+        mime="text/html",
+        use_container_width=True
+    )
+with ts_c4:
+    show_ts_preview = st.toggle("📑 Anteprima", value=False, key="toggle_ts_preview_p13")
 
 if show_ts_preview:
-    st.components.v1.html(tear_sheet_html, height=560, scrolling=True)
+    st.components.v1.html(tear_sheet_html, height=600, scrolling=True)
 
 st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
