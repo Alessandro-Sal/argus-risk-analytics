@@ -1098,6 +1098,20 @@ with main_tab_temporal:
 
     with tab_traj:
         df_h = prog_res["history_df"].reset_index()
+        # Fallback difensivo per cache Streamlit o DataFrame legacy
+        if "physical_assets" not in df_h.columns:
+            df_h["physical_assets"] = df_h.get("illiquid_and_pension", pd.Series(0.0, index=df_h.index))
+        if "pension_plans" not in df_h.columns:
+            df_h["pension_plans"] = pd.Series(0.0, index=df_h.index)
+        if "real_estate" not in df_h.columns:
+            df_h["real_estate"] = pd.Series(0.0, index=df_h.index)
+        if "financial_investments" not in df_h.columns:
+            df_h["financial_investments"] = pd.Series(0.0, index=df_h.index)
+        if "liquid_cash" not in df_h.columns:
+            df_h["liquid_cash"] = pd.Series(0.0, index=df_h.index)
+        if "total_net_worth" not in df_h.columns:
+            df_h["total_net_worth"] = pd.Series(0.0, index=df_h.index)
+
         fig_hist = go.Figure()
 
         if "100%" in sel_view_style or "Stacked" in sel_view_style or "Area" in sel_view_style:
