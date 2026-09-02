@@ -14,11 +14,15 @@ import importlib
 import core.ui_utils
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
+import core.wealth.wealth_temporal_engine
+import core.wealth.wealth_reporting_hub
 import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
+importlib.reload(core.wealth.wealth_temporal_engine)
+importlib.reload(core.wealth.wealth_reporting_hub)
 importlib.reload(core.wealth)
 
 from core.fetcher import get_engine
