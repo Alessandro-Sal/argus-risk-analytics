@@ -323,17 +323,17 @@ with main_tab_alloc:
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     # ── RIGA 1: ALLOCAZIONE GLOBALE DEL PATRIMONIO MULTI-DIMENSIONE ─────
-    head_a1, head_a2, head_a3 = st.columns([1.6, 1.4, 1.0])
+    head_a1, head_a2, head_a3 = st.columns([1.1, 1.2, 0.9])
     with head_a1:
-        section("📊 Allocazione Globale del Patrimonio")
+        section("📊 Allocazione Globale")
     with head_a2:
         alloc_dim = st.segmented_control(
             "Dimensione Analitica:",
-            options=["🏷️ Macro-Classi", "💧 Profilo Liquidità", "🎯 Destinazione Strategica"],
-            default="🏷️ Macro-Classi",
+            options=["🏷️ Macro", "💧 Liquidità", "🎯 Strategia"],
+            default="🏷️ Macro",
             label_visibility="collapsed",
             key="alloc_dim_selector_seg"
-        ) or "🏷️ Macro-Classi"
+        ) or "🏷️ Macro"
     with head_a3:
         chart_view = st.segmented_control(
             "Visualizzazione Grafico:",
@@ -687,11 +687,21 @@ with main_tab_alloc:
     if breakdown_items and tot_nw > 0:
         # Raggruppamento dinamico in base alla dimensione selezionata
         dim_key_map = {
+            "🏷️ Macro": "macro",
+            "💧 Liquidità": "liquidity",
+            "🎯 Strategia": "strategic",
             "🏷️ Macro-Classi": "macro",
             "💧 Profilo Liquidità": "liquidity",
             "🎯 Destinazione Strategica": "strategic"
         }
         active_dim_key = dim_key_map.get(alloc_dim, "macro")
+
+        dim_title_map = {
+            "🏷️ Macro": "Macro Asset Classes",
+            "💧 Liquidità": "Profilo di Liquidità (IFRS 13)",
+            "🎯 Strategia": "Destinazione Strategica"
+        }
+        dim_label_display = dim_title_map.get(alloc_dim, alloc_dim)
 
         # Palette colore coerente per dimensione
         dim_color_palette = {
@@ -827,7 +837,7 @@ with main_tab_alloc:
         with col_breakdown:
             st.markdown(f"""
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                <span style="font-size:13px; font-weight:700; color:#ffffff; text-transform:uppercase; letter-spacing:0.3px;">Ripartizione ({alloc_dim})</span>
+                <span style="font-size:13px; font-weight:700; color:#ffffff; text-transform:uppercase; letter-spacing:0.3px;">Ripartizione ({dim_label_display})</span>
                 <span style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); color:#818cf8; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px;">{len(breakdown_items)} Voci Attive</span>
             </div>
             """, unsafe_allow_html=True)
