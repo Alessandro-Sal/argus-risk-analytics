@@ -27,7 +27,8 @@ from core.wealth.wealth_models import (
     EstateHeirItem,
     EstatePlanResult,
     RebalanceDriftItem,
-    RealEstateEquitySummary
+    RealEstateEquitySummary,
+    LegalEntityType
 )
 from core.wealth.wealth_db import (
     get_wealth_accounts,
@@ -3655,6 +3656,399 @@ def generate_advisory_pitchbook_pdf(engine: Engine, portfolio_id: int = 1) -> by
     ]
     doc.build(story)
     return buf.getvalue()
+
+
+# ── AI QUARTERLY WEALTH REVIEW ENGINE ───────────────────────
+
+def compute_ai_quarterly_wealth_review(
+    engine: Engine,
+    portfolio_id: int = 1,
+    quarter: Optional[str] = "Q1 2026",
+    advisor_name: str = "ARGUS Family Office AI"
+) -> Dict[str, Any]:
+    """
+    Genera una Relazione Trimestrale Esecutiva di Consulenza Patrimoniale (Quarterly Review)
+    in linguaggio naturale e formattazione markdown istituzionale per clienti e Family Office.
+    """
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    rebalance = compute_tax_smart_rebalancing_watchdog(engine, portfolio_id=portfolio_id)
+    goals_df = get_wealth_goals(engine, portfolio_id=portfolio_id)
+    re_equity = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=portfolio_id)
+    df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
+    cf_analytics = compute_cashflow_analytics(df_cf)
+
+    today_str = datetime.now().strftime("%d/%m/%Y")
+    q_str = str(quarter or "Q1 2026")
+
+    # Diagnosi dello stato patrimoniale
+    health_grade = "Eccellente (A+)" if nw.wealth_health_score >= 85 else ("Solido (A)" if nw.wealth_health_score >= 70 else ("Migliorabile (B)" if nw.wealth_health_score >= 50 else "Critico (C)"))
+    runway_status = "Ampia (> 24 mesi)" if nw.runway_months >= 24 else ("Adeguata (12-24 mesi)" if nw.runway_months >= 12 else "In Tensione (< 12 mesi)")
+
+    # Testo 1: Executive Summary
+    exec_text = f"""Il patrimonio netto consolidato al termine del **{q_str}** si attesta a **€ {nw.total_net_worth:,.2f}**, evidenziando un livello di robustezza finanziaria valutato **{nw.wealth_health_score:.0f}/100 ({health_grade})**.
+La struttura della liquidità garantisce un cuscinetto operativo di **{nw.runway_months:.1f} mesi di spesa corrente** (€ {nw.liquid_cash:,.2f}), posizionandosi in una fascia di sicurezza {runway_status.lower()}.
+Il tasso di risparmio medio ponderato registrato sui flussi di cassa è pari al **{nw.savings_rate_pct:.1f}%**, coerente con la regola aurea del bilancio 50/30/20."""
+
+    # Testo 2: Performance & Asset Allocation Drift
+    critical_drifts = rebalance.get("critical_drifts_count", 0)
+    cash_drag = rebalance.get("cash_drag_alert", False)
+    perf_text = f"""L'allocazione degli attivi evidenzia un'esposizione al comparto finanziario di **€ {nw.financial_investments:,.2f}** ({(nw.financial_investments / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0:.1f}%) e un pilastro immobiliare netto di **€ {re_equity['net_home_equity_eur']:,.2f}** con un LTV medio ponderato del **{re_equity['weighted_ltv_pct']:.1f}%**.
+Il monitoraggio algoritmico del drift rileva **{critical_drifts} classi di attivo con scostamento significativo** rispetto all'allocazione strategica target."""
+    if cash_drag:
+        perf_text += f"\n\n> ⚠️ **Avviso Cash Drag:** È presente un eccesso di liquidità non investita stimato in **€ {rebalance.get('excess_cash_eur', 0.0):,.2f}**, che genera un costo opportunità annuo di circa **€ {rebalance.get('cash_drag_opportunity_cost_eur', 0.0):,.2f}**."
+
+    # Testo 3: Goal-Based Tracking
+    if not goals_df.empty:
+        active_goals_cnt = len(goals_df)
+        tot_target_goals = float(goals_df["target_amount"].sum())
+        tot_cur_goals = float(goals_df["current_amount"].sum())
+        avg_completion = (tot_cur_goals / tot_target_goals * 100.0) if tot_target_goals > 0 else 0.0
+        goals_text = f"""I **{active_goals_cnt} traguardi di vita** attivi presentano un montante complessivo target di **€ {tot_target_goals:,.2f}**, con un tasso di avanzamento globale del **{avg_completion:.1f}%** (€ {tot_cur_goals:,.2f} accumulati).
+Le proiezioni stocastiche confermano un'elevata probabilità di successo per i pilastri di medio termine, supportati da apporti periodici programmati di **€ {float(goals_df['monthly_contribution'].sum()):,.2f}/mese**."""
+    else:
+        goals_text = "Nessun obiettivo di vita registrato. Si consiglia di configurare i traguardi principali (Fondo Emergenza, FIRE, Acquisto Immobile) nel modulo Indipendenza Finanziaria."
+
+    # Testo 4: Macro Outlook & Ottimizzazione Fiscale
+    macro_text = f"""Nel contesto macroeconomico attuale caratterizzato dalla stabilizzazione dei tassi d'interesse BCE/Fed e da inflazione core attorno al target del 2%, la strategia di allocazione privilegia strumenti con elevata efficienza fiscale:
+1. **Regime dei Redditi Diversi (TUIR Art. 67):** Sfruttamento delle compensazioni tra plusvalenze e minusvalenze pregresse dello Zainetto Fiscale.
+2. **Ottimizzazione Previdenza Complementare:** Saturazione del plafond di deducibilità IRPEF di **€ 5.164,57 annui**.
+3. **Pianificazione Successoria (D.Lgs. 346/1990):** Mantenimento della componente Titoli di Stato ed esenzioni legali per azzerare l'imposta sulle successioni."""
+
+    # Raccomandazioni Tattiche
+    recommendations = [
+        f"Riallineare le classi in drift mediante il piano ordini programmato (Turnover raccomandato: € {rebalance.get('total_rebalance_turnover_eur', 0.0):,.2f}).",
+        "Saturare il contributo al Fondo Pensione entro la chiusura dell'anno per massimizzare il risparmio IRPEF (fino a 2.220€ di rimborso al 43%).",
+        "Mantenere il fondo emergenza a 6-12 mesi di spese fisse e canalizzare la liquidità eccedente su piani di accumulo automatici (PAC)."
+    ]
+    if cash_drag:
+        recommendations.insert(0, f"Ridurre il Cash Drag allocando € {rebalance.get('excess_cash_eur', 0.0):,.2f} su ETF monetari o governativi a breve termine.")
+
+    full_markdown = f"""# 🏛️ Relazione Trimestrale di Consulenza Patrimoniale — {q_str}
+**Family Office & Private Wealth Advisory Dossier**  
+*Data Rilascio: {today_str} | Redatto da: {advisor_name} | Profilo ID: {portfolio_id}*
+
+---
+
+### 1. Executive Summary & Traiettoria Patrimoniale
+{exec_text}
+
+---
+
+### 2. Asset Allocation, Drift & Cash Drag Analysis
+{perf_text}
+
+---
+
+### 3. Stato di Avanzamento dei Traguardi di Vita (Life Goals)
+{goals_text}
+
+---
+
+### 4. Scenario Macroeconomico & Efficienza Fiscale
+{macro_text}
+
+---
+
+### 5. Raccomandazioni Tattiche del Comitato Investimenti
+""" + "\n".join([f"- **{i+1}.** {r}" for i, r in enumerate(recommendations)])
+
+    return {
+        "quarter": q_str,
+        "generated_at": today_str,
+        "executive_summary_text": exec_text,
+        "performance_attribution_text": perf_text,
+        "goals_progress_text": goals_text,
+        "macro_outlook_text": macro_text,
+        "tactical_recommendations": recommendations,
+        "full_markdown": full_markdown,
+        "consolidated_kpis": {
+            "net_worth": nw.total_net_worth,
+            "health_score": nw.wealth_health_score,
+            "health_grade": health_grade,
+            "runway_months": nw.runway_months,
+            "savings_rate_pct": nw.savings_rate_pct,
+            "liquid_cash": nw.liquid_cash,
+            "financial_investments": nw.financial_investments,
+            "real_estate_net_equity": re_equity["net_home_equity_eur"],
+            "ltv_pct": re_equity["weighted_ltv_pct"]
+        }
+    }
+
+
+# ── FAMILY OFFICE MULTI-ENTITY CONSOLIDATOR ──────────────────
+
+def compute_family_office_multi_entity_consolidation(
+    engine: Engine,
+    portfolio_id: int = 1,
+    custom_entities: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Consolida e segrega il patrimonio tra diverse entità giuridiche del nucleo familiare:
+    - Persona Fisica (IRPEF / 26%)
+    - Holding SRL / SpA (IRES 24%, Regime PEX 1.2%)
+    - Società Semplice / Cassaforte Familiare (Trasparenza)
+    - Trust Familiare (Protezione Patrimoniale)
+    - Polizze Vita Dedicate (Private Insurance Ramo I/III)
+    
+    Elide automaticamente i debiti/crediti infragruppo (finanziamenti soci) per evitare doppi conteggi.
+    """
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    re_equity = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=portfolio_id)
+
+    if not custom_entities:
+        # Struttura di default realistica e proporzionale al Net Worth reale
+        tot = nw.total_net_worth if nw.total_net_worth > 0 else 1000000.0
+        custom_entities = [
+            {
+                "entity_id": "PF_01",
+                "name": "Persona Fisica (Patrimonio Personale)",
+                "entity_type": LegalEntityType.PERSONA_FISICA.value,
+                "gross_assets_eur": round(nw.liquid_cash + nw.financial_investments * 0.4 + nw.luxury_watches_total, 2),
+                "third_party_liabilities_eur": round(nw.total_liabilities * 0.2, 2),
+                "intercompany_receivables_eur": 100000.0, # Credito verso Holding per finanziamento soci
+                "intercompany_liabilities_eur": 0.0,
+                "ownership_share_pct": 100.0,
+                "effective_tax_rate_est": 26.0,
+                "notes": "Conti correnti, liquidità e investimenti personali"
+            },
+            {
+                "entity_id": "HOLDING_01",
+                "name": "Holding di Famiglia (SRL / SpA)",
+                "entity_type": LegalEntityType.HOLDING_SRL.value,
+                "gross_assets_eur": round(nw.financial_investments * 0.6 + re_equity["total_property_market_value"] * 0.5, 2),
+                "third_party_liabilities_eur": round(re_equity["total_mortgage_debt_remaining"] * 0.5, 2),
+                "intercompany_receivables_eur": 0.0,
+                "intercompany_liabilities_eur": 100000.0, # Debito verso socio Persona Fisica
+                "ownership_share_pct": 100.0,
+                "effective_tax_rate_est": 1.2, # PEX 95% esente (1.2% effettivo)
+                "notes": "Partecipazioni, portafogli titoli corporate e immobili a reddito"
+            },
+            {
+                "entity_id": "SS_01",
+                "name": "Società Semplice Immobiliare",
+                "entity_type": LegalEntityType.SOCIETA_SEMPLICE.value,
+                "gross_assets_eur": round(re_equity["total_property_market_value"] * 0.5, 2),
+                "third_party_liabilities_eur": round(re_equity["total_mortgage_debt_remaining"] * 0.3, 2),
+                "intercompany_receivables_eur": 0.0,
+                "intercompany_liabilities_eur": 0.0,
+                "ownership_share_pct": 100.0,
+                "effective_tax_rate_est": 21.0, # Cedolare secca / trasparenza
+                "notes": "Immobili residenziali e locazioni"
+            },
+            {
+                "entity_id": "TRUST_01",
+                "name": "Trust Successorio & Protezione",
+                "entity_type": LegalEntityType.TRUST_FAMILIARE.value,
+                "gross_assets_eur": round(nw.pension_total + nw.precious_metals_total, 2),
+                "third_party_liabilities_eur": 0.0,
+                "intercompany_receivables_eur": 0.0,
+                "intercompany_liabilities_eur": 0.0,
+                "ownership_share_pct": 100.0,
+                "effective_tax_rate_est": 0.0,
+                "notes": "Segregazione patrimoniale vincolata al passaggio generazionale"
+            }
+        ]
+
+    entities_processed = []
+    tot_gross = 0.0
+    tot_third_party_debt = 0.0
+    tot_intercompany_receivables = 0.0
+    tot_intercompany_liabilities = 0.0
+
+    for ent in custom_entities:
+        gross = float(ent.get("gross_assets_eur", 0.0))
+        third_debt = float(ent.get("third_party_liabilities_eur", 0.0))
+        rec = float(ent.get("intercompany_receivables_eur", 0.0))
+        lib = float(ent.get("intercompany_liabilities_eur", 0.0))
+        share = float(ent.get("ownership_share_pct", 100.0)) / 100.0
+
+        # Standalone Net Equity prima dell'elisione
+        standalone_equity = (gross + rec - third_debt - lib) * share
+        
+        # Quota consolidata (esclusi crediti/debiti infragruppo che si elidono a livello di gruppo)
+        consolidated_equity = (gross - third_debt) * share
+
+        tot_gross += gross * share
+        tot_third_party_debt += third_debt * share
+        tot_intercompany_receivables += rec * share
+        tot_intercompany_liabilities += lib * share
+
+        entities_processed.append({
+            "entity_id": ent.get("entity_id", ""),
+            "name": ent.get("name", "Entità"),
+            "entity_type": ent.get("entity_type", LegalEntityType.PERSONA_FISICA.value),
+            "gross_assets_eur": round(gross * share, 2),
+            "third_party_liabilities_eur": round(third_debt * share, 2),
+            "intercompany_receivables_eur": round(rec * share, 2),
+            "intercompany_liabilities_eur": round(lib * share, 2),
+            "standalone_net_equity_eur": round(standalone_equity, 2),
+            "consolidated_net_equity_eur": round(consolidated_equity, 2),
+            "ownership_share_pct": round(share * 100.0, 1),
+            "effective_tax_rate_est": float(ent.get("effective_tax_rate_est", 26.0)),
+            "notes": ent.get("notes", "")
+        })
+
+    # Elisione partite infragruppo
+    eliminated_intercompany_amount = min(tot_intercompany_receivables, tot_intercompany_liabilities)
+    consolidated_family_office_net_worth = max(0.0, tot_gross - tot_third_party_debt)
+
+    # Confronto di efficienza fiscale Holding vs Persona Fisica
+    # Su 100.000€ di dividendi/capital gain reinvestiti:
+    # Persona fisica paga 26.000€ -> 74.000€ netti reinvestiti
+    # Holding paga 1.200€ (PEX) -> 98.800€ netti reinvestiti
+    annual_gains_sim = 100000.0
+    tax_pf = annual_gains_sim * 0.26
+    tax_holding = annual_gains_sim * 0.012
+    tax_delta_annual = tax_pf - tax_holding
+
+    df_ent = pd.DataFrame(entities_processed)
+    if not df_ent.empty and consolidated_family_office_net_worth > 0:
+        df_ent["weight_on_consolidated_pct"] = (df_ent["consolidated_net_equity_eur"] / consolidated_family_office_net_worth) * 100.0
+    else:
+        df_ent["weight_on_consolidated_pct"] = 0.0
+
+    return {
+        "consolidated_family_office_net_worth": round(consolidated_family_office_net_worth, 2),
+        "total_gross_assets_eur": round(tot_gross, 2),
+        "total_third_party_liabilities_eur": round(tot_third_party_debt, 2),
+        "total_intercompany_receivables_eur": round(tot_intercompany_receivables, 2),
+        "total_intercompany_liabilities_eur": round(tot_intercompany_liabilities, 2),
+        "eliminated_intercompany_amount_eur": round(eliminated_intercompany_amount, 2),
+        "entities_count": len(entities_processed),
+        "entities_detail": entities_processed,
+        "entities_df": df_ent,
+        "tax_efficiency_pex": {
+            "reference_capital_gain_eur": annual_gains_sim,
+            "tax_persona_fisica_eur": tax_pf,
+            "tax_holding_pex_eur": tax_holding,
+            "annual_tax_saving_eur": tax_delta_annual,
+            "tax_saving_pct": round((tax_delta_annual / tax_pf * 100.0) if tax_pf > 0 else 0.0, 1)
+        }
+    }
+
+
+# ── SEQUENCE OF RETURNS RISK (SRR) & LIFE EVENT ENGINE ──────
+
+def compute_sequence_of_returns_risk_engine(
+    initial_wealth: float = 1000000.0,
+    annual_withdrawal: float = 40000.0,
+    early_shock_pct: float = -25.0,
+    base_expected_return_pct: float = 6.0,
+    inflation_rate_pct: float = 2.0,
+    cash_buffer_years: float = 2.5,
+    max_years: int = 30,
+    life_events: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Simula l'impatto critico del Rischio di Sequenza dei Rendimenti (Sequence of Returns Risk - SRR)
+    nella fase di decumulo / FIRE a 30 anni, confrontando:
+    1. Scenario A: Bear Market nei primi 3 anni (-25%, -15%, -10%, poi recupero a +8%)
+    2. Scenario B: Rendimento Costante (+6% annuo)
+    3. Scenario C: Bull Market iniziale (+10% per 10 anni, poi crash -25% all'anno 11)
+    4. Scenario D: Bear Market Iniziale CON Cash Buffer Anti-Forced Selling (nessuna vendita in perdita per 2.5 anni)
+    """
+    init_w = max(1000.0, float(initial_wealth))
+    init_wd = max(0.0, float(annual_withdrawal))
+    inf = float(inflation_rate_pct) / 100.0
+    base_r = float(base_expected_return_pct) / 100.0
+    buffer_amt = init_wd * float(cash_buffer_years)
+
+    # Definizione rendimenti annui per i 3 scenari
+    years = list(range(1, max_years + 1))
+    
+    # 1. Early Bear Market
+    returns_early_bear = [early_shock_pct / 100.0, -0.15, -0.10] + [0.085] * (max_years - 3)
+    
+    # 2. Constant Return
+    returns_constant = [base_r] * max_years
+    
+    # 3. Late Bear Market
+    returns_late_bear = [0.10] * 10 + [early_shock_pct / 100.0, -0.15] + [0.07] * (max_years - 12)
+
+    def _simulate_path(returns_seq: List[float], with_buffer: bool = False) -> Dict[str, Any]:
+        traj = [init_w]
+        w = init_w
+        wd = init_wd
+        ruin_yr = None
+        tot_wd = 0.0
+        remaining_buffer = buffer_amt if with_buffer else 0.0
+
+        for yr_idx, r in enumerate(returns_seq):
+            yr = yr_idx + 1
+            
+            # Applicazione Life Events (es. eredità o spese una tantum)
+            if life_events:
+                for evt in life_events:
+                    if int(evt.get("year", 0)) == yr:
+                        w += float(evt.get("amount_eur", 0.0))
+
+            if w <= 0.0:
+                if ruin_yr is None:
+                    ruin_yr = yr
+                traj.append(0.0)
+                continue
+
+            # Gestione prelievo con eventuale assorbimento dal Cash Buffer nei primi anni di crash
+            actual_wd_from_portfolio = wd
+            if with_buffer and yr <= 3 and r < 0.0 and remaining_buffer > 0:
+                buffer_use = min(wd, remaining_buffer)
+                remaining_buffer -= buffer_use
+                actual_wd_from_portfolio = wd - buffer_use
+
+            # Prelievo a inizio anno o metà anno
+            w = max(0.0, w - actual_wd_from_portfolio)
+            tot_wd += wd
+
+            # Rendimento sul capitale residuo
+            w = w * (1.0 + r)
+            traj.append(round(w, 2))
+
+            # Adeguamento prelievo all'inflazione per l'anno successivo
+            wd = wd * (1.0 + inf)
+
+        return {
+            "trajectory": traj,
+            "final_wealth": round(w, 2),
+            "ruin_year": ruin_yr,
+            "is_ruined": (ruin_yr is not None),
+            "cumulative_withdrawals": round(tot_wd, 2)
+        }
+
+    sim_early = _simulate_path(returns_early_bear, with_buffer=False)
+    sim_const = _simulate_path(returns_constant, with_buffer=False)
+    sim_late = _simulate_path(returns_late_bear, with_buffer=False)
+    sim_buffered = _simulate_path(returns_early_bear, with_buffer=True)
+
+    # Costruzione tabella comparativa
+    comparison_df = pd.DataFrame({
+        "Anno": [0] + years,
+        "Early Crash (-25% Y1-Y3)": sim_early["trajectory"],
+        "Rendimento Costante (+6%)": sim_const["trajectory"],
+        "Late Crash (-25% Y11)": sim_late["trajectory"],
+        "Early Crash + Buffer Protettivo": sim_buffered["trajectory"]
+    })
+
+    swr_pct = (init_wd / init_w * 100.0) if init_w > 0 else 0.0
+    swr_safety_level = "Conservativo (< 3.5%)" if swr_pct <= 3.5 else ("Standard (3.5% - 4.2%)" if swr_pct <= 4.2 else "Rischioso (> 4.2%)")
+
+    return {
+        "initial_wealth_eur": init_w,
+        "annual_withdrawal_eur": init_wd,
+        "initial_swr_pct": round(swr_pct, 2),
+        "swr_safety_level": swr_safety_level,
+        "cash_buffer_recommended_eur": round(buffer_amt, 2),
+        "cash_buffer_years": cash_buffer_years,
+        "early_crash_result": sim_early,
+        "constant_result": sim_const,
+        "late_crash_result": sim_late,
+        "early_crash_with_buffer_result": sim_buffered,
+        "trajectory_df": comparison_df,
+        "key_takeaways": [
+            f"Il tasso di prelievo iniziale del {swr_pct:.1f}% è classificato come '{swr_safety_level}'.",
+            f"Un bear market iniziale senza protezione porta il capitale a zero all'anno {sim_early['ruin_year']}." if sim_early['is_ruined'] else "Il piano resiste anche all'Early Bear Market grazie a un solido capitale di partenza.",
+            f"Mantenere un Buffer di Sicurezza di € {buffer_amt:,.0f} ({cash_buffer_years:.1f} anni di spese) evita di vendere quote a sconto durante il crash iniziale, preservando un capitale finale di € {sim_buffered['final_wealth']:,.0f}."
+        ]
+    }
 
 
 

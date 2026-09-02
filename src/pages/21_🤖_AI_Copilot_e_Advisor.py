@@ -37,7 +37,8 @@ from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_ai_wealth_diagnostics,
     compute_cashflow_analytics,
-    compute_tax_smart_rebalancing_watchdog
+    compute_tax_smart_rebalancing_watchdog,
+    compute_ai_quarterly_wealth_review
 )
 from core.wealth.wealth_db import (
     get_wealth_portfolios,
@@ -145,10 +146,11 @@ with k4:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_diag, tab_rebal, tab_life, tab_chat = st.tabs([
+tab_diag, tab_rebal, tab_life, tab_review, tab_chat = st.tabs([
     "🔍 Diagnostica & Colli di Bottiglia",
     "⚖️ Motore di Ribilanciamento Target",
     "🔮 Life Event & Decision Simulator",
+    "📑 Executive Quarterly Review (NLG)",
     "💬 Assistente Finanziario Diretto"
 ])
 
@@ -322,8 +324,29 @@ with tab_life:
 
         if new_runway < 6.0:
             st.error(f"⚠️ **Attenzione**: Questa operazione ridurrebbe il tuo Fondo Emergenza a **{new_runway} mesi**, portandolo al di sotto della soglia di sicurezza consigliata (6 mesi).")
-        else:
-            st.success(f"🟢 **Sostenibilità Verificata**: Il tuo patrimonio e la riserva liquida ({new_runway} mesi) sono in grado di assorbire l'evento senza compromettere la stabilità finanziaria.")
+with tab_review:
+    st.markdown("### 📑 AI Executive Quarterly Review (NLG & Client Commentary)")
+    st.caption("Genera una relazione esecutiva trimestrale istituzionale in linguaggio naturale, pronta per la consultazione del Family Office o per presentazioni a clienti.")
+
+    col_q1, col_q2 = st.columns([2, 1])
+    with col_q1:
+        sel_quarter = st.selectbox("Seleziona Trimestre di Riferimento:", ["Q1 2026", "Q4 2025", "Q3 2025", "Q2 2025", "Q1 2025"], index=0)
+    with col_q2:
+        advisor_title = st.text_input("Firma / Team di Advisory:", value="ARGUS Family Office & Wealth Advisory")
+
+    review_res = compute_ai_quarterly_wealth_review(engine, portfolio_id=sel_profile_id, quarter=sel_quarter, advisor_name=advisor_title)
+
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown(review_res["full_markdown"])
+
+    st.download_button(
+        label=f"📥 Esporta Relazione {sel_quarter} (Markdown)",
+        data=review_res["full_markdown"],
+        file_name=f"ARGUS_Executive_Review_{sel_quarter.replace(' ','_')}.md",
+        mime="text/markdown",
+        use_container_width=True
+    )
+
 
 with tab_chat:
     st.markdown("### 💬 Assistente Finanziario & Domande Rapide")

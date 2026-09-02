@@ -38,7 +38,8 @@ from core.wealth.wealth_engine import (
     generate_executive_tear_sheet_html,
     generate_executive_tear_sheet_pdf,
     generate_advisory_pitchbook_html,
-    generate_advisory_pitchbook_pdf
+    generate_advisory_pitchbook_pdf,
+    compute_family_office_multi_entity_consolidation
 )
 
 
@@ -695,4 +696,57 @@ else:
         st.write("")
         if st.button("🎛️ Gestisci Portafogli in Control Room →", type="secondary", use_container_width=True, key="btn_goto_wcr_risk_link"):
             st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
+
+st.divider()
+
+# ── FAMILY OFFICE MULTI-ENTITY & HOLDING CONSOLIDATOR ───────
+section("🏢 Family Office Multi-Entity & Holding Consolidator")
+st.caption("Consolidamento patrimoniale tra diverse entità giuridiche del nucleo familiare (Persona Fisica, Holding SRL, Società Semplice, Trust) con elisione automatica delle partite infragruppo (finanziamenti soci) e analisi convenienza fiscale PEX (1.2% vs 26%).")
+
+fo_data = compute_family_office_multi_entity_consolidation(engine, portfolio_id=current_pid)
+
+fo_k1, fo_k2, fo_k3, fo_k4 = st.columns(4)
+with fo_k1:
+    metric_card("Patrimonio Consolidato Gruppo", fmt_eur(fo_data["consolidated_family_office_net_worth"]), delta=f"{fo_data['entities_count']} Entità Segregate", delta_color="normal")
+with fo_k2:
+    metric_card("Attivi Lordi Totali", fmt_eur(fo_data["total_gross_assets_eur"]), delta="Somma Lorda Entità", delta_color="normal")
+with fo_k3:
+    metric_card("Partite Infragruppo Elise", fmt_eur(fo_data["eliminated_intercompany_amount_eur"]), delta="Elisione Finanziamenti Soci", delta_color="normal")
+with fo_k4:
+    metric_card("Risparmio Fiscale PEX Annuo", fmt_eur(fo_data["tax_efficiency_pex"]["annual_tax_saving_eur"]), delta=f"{fo_data['tax_efficiency_pex']['tax_saving_pct']:.1f}% vs Persona Fisica", delta_color="normal")
+
+st.write("")
+
+c_fo_t, c_fo_p = st.columns([3, 2])
+with c_fo_t:
+    st.markdown("##### 🏛️ Dettaglio Entità Giuridiche del Nucleo Familiare")
+    st.dataframe(
+        fo_data["entities_df"][["name", "entity_type", "gross_assets_eur", "third_party_liabilities_eur", "intercompany_receivables_eur", "intercompany_liabilities_eur", "consolidated_net_equity_eur", "weight_on_consolidated_pct", "effective_tax_rate_est"]].rename(columns={
+            "name": "Denominazione Entità",
+            "entity_type": "Forma Giuridica",
+            "gross_assets_eur": "Attivo Lordo (€)",
+            "third_party_liabilities_eur": "Debiti Terzi (€)",
+            "intercompany_receivables_eur": "Crediti Infragruppo (€)",
+            "intercompany_liabilities_eur": "Debiti Infragruppo (€)",
+            "consolidated_net_equity_eur": "Net Equity Consolidata (€)",
+            "weight_on_consolidated_pct": "Peso Gruppo (%)",
+            "effective_tax_rate_est": "Tax Rate (%)"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+
+with c_fo_p:
+    st.markdown("##### 💡 Analisi Fiscale Comparativa (PEX Art. 87 TUIR)")
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 14px 18px;">
+        <b style="color: #38bdf8; font-size: 14px;">Vantaggio Fiscale Holding di Famiglia:</b><br>
+        <span style="font-size: 12px; color: #cbd5e1;">
+        Su una base imponibile di <b>€ {fo_data['tax_efficiency_pex']['reference_capital_gain_eur']:,.0f}</b> di dividendi e plusvalenze societarie reinvestite:<br>
+        • <b>Persona Fisica (Ritenuta 26%):</b> Imposta € {fo_data['tax_efficiency_pex']['tax_persona_fisica_eur']:,.2f} &rarr; Netti reinvestibili: € {fo_data['tax_efficiency_pex']['reference_capital_gain_eur'] - fo_data['tax_efficiency_pex']['tax_persona_fisica_eur']:,.2f}<br>
+        • <b>Holding SRL (PEX 1.2% effettivo):</b> Imposta € {fo_data['tax_efficiency_pex']['tax_holding_pex_eur']:,.2f} &rarr; Netti reinvestibili: € {fo_data['tax_efficiency_pex']['reference_capital_gain_eur'] - fo_data['tax_efficiency_pex']['tax_holding_pex_eur']:,.2f}<br>
+        <b style="color: #34d399;">Risparmio Fiscale per Ciclo: € {fo_data['tax_efficiency_pex']['annual_tax_saving_eur']:,.2f} ({fo_data['tax_efficiency_pex']['tax_saving_pct']:.1f}% di sgravio)</b>
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
 

@@ -13,7 +13,11 @@ from core.wealth.wealth_models import (
     WealthConsolidatedSummary,
     AccountType,
     CategoryNature,
-    PhysicalAssetCategory
+    PhysicalAssetCategory,
+    LegalEntityType,
+    FamilyOfficeEntityItem,
+    SRRScenarioResult,
+    QuarterlyReviewResult
 )
 from core.wealth.wealth_db import (
     init_wealth_db,
@@ -51,11 +55,6 @@ from core.wealth.wealth_db import (
     clear_wealth_fixed_expenses
 )
 
-
-
-
-
-
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_cashflow_analytics,
@@ -74,7 +73,14 @@ from core.wealth.wealth_engine import (
     compute_recurring_subscriptions_analytics,
     compute_cashflow_forecast_and_anomalies,
     compute_tax_loss_harvesting_and_latent_taxes,
-    compute_wealth_risk_integrated_analytics
+    compute_wealth_risk_integrated_analytics,
+    compute_tax_smart_rebalancing_watchdog,
+    compute_real_estate_net_equity_and_ltv,
+    generate_advisory_pitchbook_html,
+    generate_advisory_pitchbook_pdf,
+    compute_ai_quarterly_wealth_review,
+    compute_family_office_multi_entity_consolidation,
+    compute_sequence_of_returns_risk_engine
 )
 
 

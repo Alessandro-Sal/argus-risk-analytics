@@ -48,7 +48,8 @@ from core.wealth.wealth_engine import (
     compute_wealth_risk_integrated_analytics,
     compute_goal_based_monte_carlo,
     compute_dynamic_glide_path,
-    compute_portfolio_tco_and_fee_drag
+    compute_portfolio_tco_and_fee_drag,
+    compute_sequence_of_returns_risk_engine
 )
 
 
@@ -139,10 +140,11 @@ with c4:
 st.divider()
 
 # ── NAVIGAZIONE A TAB ───────────────────────────────────────
-tab_fire, tab_stress, tab_goals, tab_tco = st.tabs([
+tab_fire, tab_stress, tab_goals, tab_srr, tab_tco = st.tabs([
     "🔥 Simulatore FIRE & Traiettorie",
     "🌪️ Wealth Macro Stress Testing",
     "🎯 Goal-Based Multi-Traguardo & SPI %",
+    "🔮 Sequence of Returns Risk (SRR)",
     "💸 Costi Nascosti & TER Drag"
 ])
 
@@ -679,7 +681,93 @@ with tab_goals:
 
 
 # ============================================================
-# TAB 4: COSTI NASCOSTI, TER LOOKTHROUGH & FEE DRAG (TCO)
+# TAB 4: SEQUENCE OF RETURNS RISK (SRR) & DECUMULATION CRASH TEST
+# ============================================================
+with tab_srr:
+    st.markdown("### 🔮 Sequence of Returns Risk (SRR) & Stress Test di Decumulo")
+    st.caption("Simulazione avanzata dell'impatto di un Bear Market concentrato nei primi 3 anni di pensionamento/FIRE vs rendimenti stabili, e dimensionamento del Glide Cash Buffer per prevenire liquidazioni forzate.")
+    st.write("")
+
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    with sc1:
+        srr_init_w = st.number_input("Capitale a Inizio Decumulo (€)", value=float(nw_summary.total_net_worth if nw_summary.total_net_worth > 50000 else 1000000.0), step=50000.0, format="%.2f")
+    with sc2:
+        srr_wd = st.number_input("Prelievo Annuo Desiderato (€)", value=float(nw_summary.monthly_burn_rate * 12.0 if nw_summary.monthly_burn_rate > 0 else 40000.0), step=5000.0, format="%.2f")
+    with sc3:
+        srr_shock = st.slider("Shock Anno 1-3 (Early Crash %)", min_value=-45.0, max_value=-10.0, value=-25.0, step=5.0)
+    with sc4:
+        srr_buf_yrs = st.slider("Cuscinetto Cash Buffer (Anni di Spese)", min_value=1.0, max_value=5.0, value=2.5, step=0.5)
+
+    srr_res = compute_sequence_of_returns_risk_engine(
+        initial_wealth=srr_init_w,
+        annual_withdrawal=srr_wd,
+        early_shock_pct=srr_shock,
+        cash_buffer_years=srr_buf_yrs,
+        max_years=30
+    )
+
+    sk1, sk2, sk3, sk4 = st.columns(4)
+    with sk1:
+        metric_card("Initial SWR", f"{srr_res['initial_swr_pct']:.2f}%", delta=srr_res["swr_safety_level"], delta_color="normal" if "Conservativo" in srr_res["swr_safety_level"] else "inverse")
+    with sk2:
+        metric_card("Cash Buffer Consigliato", fmt_eur(srr_res["cash_buffer_recommended_eur"]), delta=f"{srr_buf_yrs:.1f} Anni Spese Protette", delta_color="normal")
+    with sk3:
+        ruin_status = f"🔴 Rovina Anno {srr_res['early_crash_result']['ruin_year']}" if srr_res['early_crash_result']['is_ruined'] else "🟢 Nessuna Rovina"
+        metric_card("Early Crash Sproteggi", fmt_eur(srr_res["early_crash_result"]["final_wealth"]), delta=ruin_status, delta_color="inverse" if srr_res['early_crash_result']['is_ruined'] else "normal")
+    with sk4:
+        metric_card("Early Crash + Buffer", fmt_eur(srr_res["early_crash_with_buffer_result"]["final_wealth"]), delta="🟢 Capitale Protetto", delta_color="normal")
+
+    st.write("")
+    
+    # Grafico Traiettorie SRR a 30 anni
+    df_srr_traj = srr_res["trajectory_df"]
+    fig_srr = go.Figure()
+    fig_srr.add_trace(go.Scatter(
+        x=df_srr_traj["Anno"],
+        y=df_srr_traj["Early Crash (-25% Y1-Y3)"],
+        mode="lines",
+        name="1. Early Bear Market (Senza Buffer)",
+        line=dict(color="#ef4444", width=3, dash="dot")
+    ))
+    fig_srr.add_trace(go.Scatter(
+        x=df_srr_traj["Anno"],
+        y=df_srr_traj["Rendimento Costante (+6%)"],
+        mode="lines",
+        name="2. Rendimento Costante (+6%/a)",
+        line=dict(color="#3b82f6", width=2)
+    ))
+    fig_srr.add_trace(go.Scatter(
+        x=df_srr_traj["Anno"],
+        y=df_srr_traj["Late Crash (-25% Y11)"],
+        mode="lines",
+        name="3. Late Bear Market (Crash ad Anno 11)",
+        line=dict(color="#8b5cf6", width=2)
+    ))
+    fig_srr.add_trace(go.Scatter(
+        x=df_srr_traj["Anno"],
+        y=df_srr_traj["Early Crash + Buffer Protettivo"],
+        mode="lines",
+        name="4. Early Crash CON Glide Buffer",
+        line=dict(color="#10b981", width=3.5)
+    ))
+    fig_srr.update_layout(
+        title="Traiettoria del Capitale a 30 Anni sotto Diversi Regimi di Sequenza Rendimenti",
+        xaxis_title="Anno di Decumulo / Pensionamento",
+        yaxis_title="Patrimonio Residuo (€)",
+        height=380,
+        margin=dict(t=35, l=15, r=15, b=20),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    apply_plotly_theme(fig_srr)
+    st.plotly_chart(fig_srr, use_container_width=True, config={'displayModeBar': False})
+
+    st.markdown("##### 💡 Analisi Chiave del Sequence of Returns Risk")
+    for takeaway in srr_res["key_takeaways"]:
+        st.info(f"📌 {takeaway}")
+
+
+# ============================================================
+# TAB 5: COSTI NASCOSTI, TER LOOKTHROUGH & FEE DRAG (TCO)
 # ============================================================
 with tab_tco:
     st.markdown("### 💸 Total Cost of Ownership (TCO) & Analisi del Fee Drag")
