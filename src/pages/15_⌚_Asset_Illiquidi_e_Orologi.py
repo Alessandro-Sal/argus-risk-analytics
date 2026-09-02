@@ -326,3 +326,69 @@ with c_pe_right:
     )
     apply_plotly_theme(fig_j)
     st.plotly_chart(fig_j, use_container_width=True, config={'displayModeBar': False})
+
+st.divider()
+
+# ── PRIVATE DEBT & DIRECT LENDING WATERFALL DESK ────────────
+st.markdown("### 🏛️ Private Debt, Direct Lending & Credit Waterfall Desk")
+st.caption("Analisi della cascata di pagamenti multi-tranche per investimenti in credito privato, monitoraggio contrattuale dei covenants (Leva Net Debt/EBITDA, ICR, DSCR) e capitalizzazione interessi PIK.")
+
+from core.private_debt_engine import compute_private_debt_waterfall_and_covenants, get_standard_private_debt_deals
+
+deals_list = get_standard_private_debt_deals()
+deal_names = [d["borrower_name"] for d in deals_list]
+
+col_pd_sel1, col_pd_sel2 = st.columns([2, 1])
+with col_pd_sel1:
+    sel_deal_name = st.selectbox("Seleziona Struttura Private Debt:", deal_names, index=0)
+with col_pd_sel2:
+    stress_ebitda_in = st.slider("Stress Test EBITDA Borrower (%):", -40.0, 10.0, 0.0, 5.0)
+
+chosen_deal = next(d for d in deals_list if d["borrower_name"] == sel_deal_name)
+pd_analysis = compute_private_debt_waterfall_and_covenants(deal_data=chosen_deal, ebitda_stress_pct=stress_ebitda_in)
+cr_m = pd_analysis["credit_metrics"]
+
+pdk1, pdk2, pdk3, pdk4 = st.columns(4)
+with pdk1:
+    metric_card("Stato Covenants", pd_analysis["covenant_status"], delta=f"Leva {cr_m['leverage_net_debt_ebitda']:.2f}x vs {cr_m['max_leverage_allowed']:.1f}x", delta_color="normal" if pd_analysis["is_covenant_compliant"] else "inverse")
+with pdk2:
+    metric_card("Facility Totale Deal", fmt_eur(pd_analysis["total_facility_eur"]), delta=f"Settore: {pd_analysis['sector']}", delta_color="normal")
+with pdk3:
+    metric_card("Rendimento All-In Medio", f"{pd_analysis['weighted_all_in_yield_pct']:.2f}%", delta="Cash + PIK", delta_color="normal")
+with pdk4:
+    metric_card("Copertura Interessi (ICR)", f"{cr_m['interest_coverage_ratio_icr']:.2f}x", delta=f"Min Richiesto: {cr_m['min_icr_allowed']:.2f}x", delta_color="normal" if not cr_m['icr_breached'] else "inverse")
+
+st.write("")
+
+col_pd_l, col_pd_r = st.columns([3, 2])
+with col_pd_l:
+    st.markdown("##### 📝 Scomposizione Tranche & Struttura del Capitale")
+    st.dataframe(
+        pd_analysis["tranches_df"][["tranche_name", "seniority", "notional_eur", "cash_coupon_pct", "pik_coupon_pct", "all_in_yield_pct", "attachment_leverage", "detachment_leverage"]].rename(columns={
+            "tranche_name": "Tranche di Debito",
+            "seniority": "Seniority",
+            "notional_eur": "Notionale (€)",
+            "cash_coupon_pct": "Cedola Cash (%)",
+            "pik_coupon_pct": "Cedola PIK (%)",
+            "all_in_yield_pct": "Rendimento Totale (%)",
+            "attachment_leverage": "Attach Leverage",
+            "detachment_leverage": "Detach Leverage"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+
+with col_pd_r:
+    st.markdown("##### 🛡️ Monitoraggio Covenants & DSCR")
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(99, 102, 241, 0.25); border-left: 4px solid #6366f1; border-radius: 10px; padding: 14px 18px;">
+        <b style="color: #6366f1; font-size: 14px;">Quadro di Solidità Creditizia:</b><br>
+        <span style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+        • <b>EBITDA Stressed:</b> € {pd_analysis['stressed_ebitda_eur']:,.2f}<br>
+        • <b>Interessi Cash Annui:</b> € {pd_analysis['total_cash_interest_eur']:,.2f}<br>
+        • <b>Interessi PIK Capitalizzati:</b> € {pd_analysis['total_pik_capitalized_eur']:,.2f}<br>
+        • <b>Debt Service Coverage (DSCR):</b> {cr_m['dscr_ratio']:.2f}x (Soglia minima contrattuale: {cr_m['min_dscr_allowed']:.2f}x)<br>
+        <b style="color: {'#10b981' if pd_analysis['is_covenant_compliant'] else '#ef4444'};">Esito Monitoraggio: {pd_analysis['covenant_status']}</b>
+        </span>
+    </div>
+    """, unsafe_allow_html=True)

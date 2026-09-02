@@ -83,6 +83,13 @@ POSITIONS_MODELS_CATALOG = {
         "badge_color": "#34d399",
         "category": "Sostenibilità & ESG",
         "desc": "Classificazione dei fondi secondo il Regolamento UE 2019/2088 (SFDR Art. 6/8/9), intensità carbonica ponderata (tCO2e/M€) e screening controversie."
+    },
+    "🤖 Implementation Shortfall & Execution": {
+        "title": "Algorithmic Trade Execution & Implementation Shortfall (Perold 1988)",
+        "badge": "Perold 1988 • Slippage • Market vs Algo",
+        "badge_color": "#3b82f6",
+        "category": "Esecuzione Quantitativa",
+        "desc": "Scomposizione esatta dell'Implementation Shortfall (Delay, Market Impact, Commissioni, Costo Opportunità) e confronto comparato tra Market Order, TWAP, VWAP e Adaptive IS."
     }
 }
 
@@ -2731,3 +2738,51 @@ elif active_pos_tab == "🌿 Sostenibilità ESG & SFDR Desk":
             use_container_width=True,
             hide_index=True
         )
+
+# ── TAB 7: IMPLEMENTATION SHORTFALL & EXECUTION ─────────────
+elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
+    st.markdown("### 🤖 Algorithmic Trade Execution & Implementation Shortfall (Perold 1988)")
+    st.caption("Scomposizione analitica del costo totale di transazione (Delay Cost, Market Impact, Commissioni, Opportunity Cost) e benchmark di efficienza comparata tra ordini a mercato, TWAP, VWAP e Adaptive IS.")
+
+    from core.execution_algo_engine import compute_implementation_shortfall_and_execution_benchmarks
+
+    col_is_in1, col_is_in2, col_is_in3 = st.columns(3)
+    with col_is_in1:
+        is_ticker_in = st.text_input("Ticker Strumento:", value="SWDA.MI")
+    with col_is_in2:
+        is_shares_in = st.number_input("Numero Quote da Eseguire:", min_value=10, value=5000, step=500)
+    with col_is_in3:
+        is_side_in = st.selectbox("Direzione Ordine:", ["BUY", "SELL"], index=0)
+
+    is_res = compute_implementation_shortfall_and_execution_benchmarks(
+        ticker=is_ticker_in,
+        total_shares=is_shares_in,
+        side=is_side_in
+    )
+    pb = is_res["perold_breakdown"]
+
+    ik1, ik2, ik3, ik4 = st.columns(4)
+    with ik1:
+        metric_card("Shortfall Totale (IS)", fmt_eur(pb["total_shortfall_eur"]), delta=f"{pb['total_shortfall_bps']:.1f} bps Controvalore", delta_color="inverse")
+    with ik2:
+        metric_card("Impatto di Mercato", fmt_eur(pb["market_impact_cost_eur"]), delta=f"{pb['market_impact_bps']:.1f} bps", delta_color="inverse")
+    with ik3:
+        metric_card("Costo di Ritardo (Delay)", fmt_eur(pb["delay_cost_eur"]), delta=f"{pb['delay_cost_bps']:.1f} bps", delta_color="inverse")
+    with ik4:
+        metric_card("Risparmio Algoritmico Max", fmt_eur(is_res["max_potential_savings_eur"]), delta=f"con {is_res['best_strategy'][:18]}...", delta_color="normal")
+
+    st.write("")
+    st.markdown("##### 📊 Benchmark Comparativo delle Strategie di Esecuzione")
+    st.dataframe(
+        is_res["strategies_df"][["strategy", "avg_exec_price_eur", "slippage_bps", "total_execution_cost_eur", "savings_vs_market_eur", "execution_speed", "risk_profile"]].rename(columns={
+            "strategy": "Strategia di Esecuzione",
+            "avg_exec_price_eur": "Prezzo Medio Eseguito (€)",
+            "slippage_bps": "Slippage (bps)",
+            "total_execution_cost_eur": "Costo Totale (€)",
+            "savings_vs_market_eur": "Risparmio vs Market (€)",
+            "execution_speed": "Velocità Esecuzione",
+            "risk_profile": "Profilo di Rischio"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )

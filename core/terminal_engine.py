@@ -1149,6 +1149,24 @@ class ArgusTerminalEngine:
         if first_token in ("REPORT", "DOSSIER") and any(t in ("QTR", "QUARTER", "PDF", "CLIENT") for t in tokens):
             return self._cmd_report_qtr(ctx)
 
+        # ---------------------------------------------------------
+        # 10. ADVANCED CREDIT, EXECUTION ALGO, TAX & ML REGIMES
+        # ---------------------------------------------------------
+        if first_token in ("PDEBT", "COVENANT", "DIRECTLENDING", "CREDIT"):
+            return self._cmd_private_debt(tokens, ctx)
+
+        if first_token in ("ALGO", "IMPACT", "SHORTFALL", "EXECUTION") or (first_token == "ALGO" and "EXEC" in tokens):
+            return self._cmd_execution_algo(tokens, results, df_pos, ctx)
+
+        if first_token in ("GLOBAL", "CROSSBORDER", "RESIDENCY", "NEORES") or (first_token == "GLOBAL" and "TAX" in tokens):
+            return self._cmd_cross_border_tax(ctx)
+
+        if first_token in ("HMM", "REGIMEML", "REGIME"):
+            return self._cmd_hmm_regime(results, df_pos, ctx)
+
+        if first_token in ("VOICE", "AUDIO", "PODCAST", "BRIEFING") or (first_token == "VOICE" and "BRIEF" in tokens):
+            return self._cmd_voice_brief(ctx)
+
         # Scorciatoie a singolo carattere
         if len(tokens) == 1 and len(first_token) == 1:
             if first_token in ("H", "?"):
@@ -2788,6 +2806,125 @@ ESITO SCENARI DI STRESS A 30 ANNI:
             return TerminalCommandResult(command="REPORT QTR", status="SUCCESS", output_text="\n".join(lines))
         except Exception as e:
             return TerminalCommandResult(command="REPORT QTR", status="ERROR", output_text=f"Errore Report QTR: {e}")
+
+    def _cmd_private_debt(self, tokens: Optional[List[str]] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.private_debt_engine import compute_private_debt_waterfall_and_covenants
+            stress_in = 0.0
+            if tokens and len(tokens) > 1:
+                try:
+                    stress_in = float(tokens[1])
+                except ValueError:
+                    pass
+            pd_res = compute_private_debt_waterfall_and_covenants(ebitda_stress_pct=stress_in)
+            cr = pd_res["credit_metrics"]
+            lines = [
+                f"[PRIVATE DEBT, DIRECT LENDING & COVENANTS DESK]",
+                f"Emittente / Borrower          : {pd_res['borrower_name']} ({pd_res['sector']})",
+                f"Facility Totale Emissione      : € {pd_res['total_facility_eur']:,.2f}",
+                f"EBITDA di Riferimento          : € {pd_res['stressed_ebitda_eur']:,.2f} ({pd_res['ebitda_stress_pct']:+.1f}% Stress)",
+                f"Stato Covenants Contrattuali   : {pd_res['covenant_status']}",
+                f"Leva Finanziaria (Debt/EBITDA) : {cr['leverage_net_debt_ebitda']:.2f}x (Limite Max: {cr['max_leverage_allowed']:.2f}x)",
+                f"Interest Coverage Ratio (ICR)  : {cr['interest_coverage_ratio_icr']:.2f}x (Soglia Min: {cr['min_icr_allowed']:.2f}x)",
+                f"Debt Service Coverage (DSCR)   : {cr['dscr_ratio']:.2f}x (Soglia Min: {cr['min_dscr_allowed']:.2f}x)",
+                f"Rendimento Medio All-In        : {pd_res['weighted_all_in_yield_pct']:.2f}% (Cash € {pd_res['total_cash_interest_eur']:,.0f} + PIK € {pd_res['total_pik_capitalized_eur']:,.0f})",
+                "",
+                f"{'TRANCHE':<28} | {'SEN':<3} | {'NOTIONALE (€)':<14} | {'CASH %':<7} | {'PIK %':<6} | {'ATTACH':<7} | {'DETACH'}"
+            ]
+            lines.append("-" * 88)
+            for tr in pd_res.get("tranches_list", []):
+                lines.append(f"{tr['tranche_name'][:27]:<28} | {tr['seniority']:>3} | € {tr['notional_eur']:>10,.0f} | {tr['cash_coupon_pct']:>5.2f}% | {tr['pik_coupon_pct']:>4.2f}% | {tr['attachment_leverage']:>5.2f}x | {tr['detachment_leverage']:>5.2f}x")
+            return TerminalCommandResult(command="PDEBT", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="PDEBT", status="ERROR", output_text=f"Errore Private Debt: {e}")
+
+    def _cmd_execution_algo(self, tokens: Optional[List[str]] = None, results: Optional[Dict[str, Any]] = None, df_pos: Optional[pd.DataFrame] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.execution_algo_engine import compute_implementation_shortfall_and_execution_benchmarks
+            tk = "SWDA.MI"
+            if tokens and len(tokens) > 1 and tokens[1] not in ("EXEC", "IMPACT"):
+                tk = tokens[1].upper()
+            ex = compute_implementation_shortfall_and_execution_benchmarks(ticker=tk, total_shares=5000, decision_price=100.0)
+            pb = ex["perold_breakdown"]
+            lines = [
+                f"[ALGORITHMIC TRADE EXECUTION & IMPLEMENTATION SHORTFALL (PEROLD 1988)]",
+                f"Ordine Target                  : {ex['side']} {ex['shares_count']:,} quote su {ex['ticker']} (Controvalore: € {ex['notional_order_eur']:,.2f})",
+                f"Prezzo Decisione / Arrivo      : € {ex['decision_price_eur']:.2f} / € {ex['arrival_price_eur']:.2f}",
+                f"Scomposizione Shortfall Totale : € {pb['total_shortfall_eur']:,.2f} ({pb['total_shortfall_bps']:.1f} bps)",
+                f"  • Costo di Ritardo (Delay)   : € {pb['delay_cost_eur']:,.2f} ({pb['delay_cost_bps']:.1f} bps)",
+                f"  • Impatto di Mercato (Impact): € {pb['market_impact_cost_eur']:,.2f} ({pb['market_impact_bps']:.1f} bps)",
+                f"  • Commissioni & Broker       : € {pb['commissions_eur']:,.2f}",
+                f"Risparmio Max Algoritmico      : € {ex['max_potential_savings_eur']:,.2f} con {ex['best_strategy']}",
+                "",
+                f"{'STRATEGIA DI ESECUZIONE':<36} | {'PREZZO MEDIO (€)':<17} | {'SLIPPAGE':<9} | {'COSTO TOT (€)'}"
+            ]
+            lines.append("-" * 80)
+            for st in ex.get("strategies_comparison", []):
+                lines.append(f"{st['strategy'][:35]:<36} | € {st['avg_exec_price_eur']:>13.3f} | {st['slippage_bps']:>6.1f} bps | € {st['total_execution_cost_eur']:>10,.2f}")
+            return TerminalCommandResult(command="ALGO EXEC", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="ALGO EXEC", status="ERROR", output_text=f"Errore Execution Algo: {e}")
+
+    def _cmd_cross_border_tax(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.cross_border_tax_engine import compute_cross_border_wealth_tax_comparison
+            cb = compute_cross_border_wealth_tax_comparison(total_wealth_eur=10000000.0, annual_capital_gain_eur=400000.0, annual_foreign_income_eur=250000.0)
+            lines = [
+                f"[CROSS-BORDER TAX & GLOBAL WEALTH STRUCTURING]",
+                f"Patrimonio Simulato            : € {cb['simulated_wealth_eur']:,.2f} (Plusvalenze € {cb['annual_capital_gain_eur']:,.0f} + Rendite € {cb['annual_income_eur']:,.0f})",
+                f"Giurisdizione Ottimale         : {cb['lowest_tax_jurisdiction']}",
+                f"Risparmio Annuo Massimo vs IT  : € {cb['max_annual_tax_savings_eur']:,.2f}",
+                "",
+                f"{'GIURISDIZIONE / REGIME':<35} | {'CGT (€)':<10} | {'DIV (€)':<10} | {'PATR (€)':<10} | {'TOTALE ANNUO (€)':<17} | {'ALIQUOTA'}"
+            ]
+            lines.append("-" * 96)
+            for r in cb.get("comparison_list", []):
+                lines.append(f"{r['name'][:34]:<35} | € {r['annual_cgt_eur']:>7,.0f} | € {r['annual_income_tax_eur']:>7,.0f} | € {r['annual_wealth_tax_eur']:>7,.0f} | € {r['total_annual_tax_eur']:>13,.2f} | {r['effective_annual_tax_rate_pct']:>6.1f}%")
+            return TerminalCommandResult(command="GLOBAL TAX", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="GLOBAL TAX", status="ERROR", output_text=f"Errore Cross-Border Tax: {e}")
+
+    def _cmd_hmm_regime(self, results: Optional[Dict[str, Any]] = None, df_pos: Optional[pd.DataFrame] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.hmm_regime_engine import compute_hmm_market_regime_detection
+            sr_ret = (results or {}).get("portfolio_return")
+            hmm = compute_hmm_market_regime_detection(sr_returns=sr_ret)
+            rec = hmm["tactical_recommendation"]
+            lines = [
+                f"[MACHINE LEARNING HIDDEN MARKOV MODELS (HMM) REGIME DETECTOR]",
+                f"Regime Attuale Rilevato        : {hmm['current_regime_name']}",
+                f"Persistenza Probabile Regime   : {hmm['regime_persistence_pct']:.1f}% (Durata attesa residua: ~{hmm['expected_remaining_duration_days']} giorni)",
+                f"Allocazione Tattica Consigliata: {rec['allocation']}",
+                f"Azione Operativa Raccomandata  : {rec['action']}",
+                "",
+                f"{'STATO REGIME':<26} | {'FREQ %':<7} | {'REND ANNUO %':<13} | {'VOLATILITÀ %':<13} | {'SHARPE':<7} | {'PERSIST %'}"
+            ]
+            lines.append("-" * 88)
+            for st in hmm.get("state_profiles", []):
+                lines.append(f"{st['state_name'][:25]:<26} | {st['frequency_pct']:>5.1f}% | {st['annualized_return_pct']:>+11.2f}% | {st['annualized_volatility_pct']:>11.2f}% | {st['sharpe_ratio']:>6.2f} | {st['persistence_prob_pct']:>7.1f}%")
+            return TerminalCommandResult(command="HMM", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="HMM", status="ERROR", output_text=f"Errore HMM: {e}")
+
+    def _cmd_voice_brief(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+            engine = (ctx or {}).get("engine") or get_engine()
+            vb = generate_ai_voice_executive_briefing(engine, portfolio_id=1)
+            lines = [
+                f"[AI VOICE EXECUTIVE BRIEFING & AUDIO PODCAST]",
+                f"Titolo Briefing               : {vb['title']}",
+                f"Data e Durata Stimata          : {vb['as_of_date']} • Durata: {vb['estimated_duration_formatted']} ({vb['word_count']} parole)",
+                f"Format Trasmissione            : Copione a 2 Voci (CIO & Chief Risk Officer)",
+                "",
+                f"Estratto Script Vocale:"
+            ]
+            for dia in vb.get("dialogue_script", [])[:2]:
+                lines.append(f"  🎙️ [{dia['speaker']}]: {dia['text'][:90]}...")
+            return TerminalCommandResult(command="VOICE BRIEF", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="VOICE BRIEF", status="ERROR", output_text=f"Errore Voice Brief: {e}")
 
 
 # Singleton Istanza Globale del Terminal Engine
