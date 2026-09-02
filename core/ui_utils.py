@@ -249,20 +249,20 @@ def inject_custom_css():
         /* Seamless Non-wrapping Segmented Controls across all viewports */
         div[data-testid="stSegmentedControl"],
         [data-testid="stSegmentedControl"] > div,
-        [data-testid="stSegmentedControl"] [role="radiogroup"] {
+        [data-testid="stSegmentedControl"] [role="radiogroup"] {{
             display: flex !important;
             flex-wrap: nowrap !important;
             width: 100% !important;
-        }
+        }}
         div[data-testid="stSegmentedControl"] button,
-        [data-testid="stSegmentedControl"] button {
+        [data-testid="stSegmentedControl"] button {{
             white-space: nowrap !important;
             flex: 1 1 auto !important;
             padding-left: 6px !important;
             padding-right: 6px !important;
             min-width: 0 !important;
             font-size: 12.5px !important;
-        }
+        }}
 
         /* Native Streamlit Metric Cards - Linear / Terminal Glass Deck */
         [data-testid="stMetric"] {{
