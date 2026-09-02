@@ -926,7 +926,7 @@ with tab_traj:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
     apply_plotly_theme(fig_hist)
-    st.plotly_chart(fig_hist, use_container_width=True)
+    st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
 with tab_mat:
     st.markdown("##### 🗓️ Matrice Mensile dei Flussi Netti di Risparmio (€)")
@@ -966,11 +966,11 @@ with tab_under:
             xaxis_title="Data",
             yaxis_title="Contrazione dal Massimo (%)",
             height=320,
-            margin=dict(t=25, l=10, r=10, b=10),
+            margin=dict(t=35, l=10, r=10, b=10),
             hovermode="x unified"
         )
         apply_plotly_theme(fig_under)
-        st.plotly_chart(fig_under, use_container_width=True)
+        st.plotly_chart(fig_under, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
     with col_u_t:
         st.markdown("###### 🔍 Episodi Storici di Contrazione")
         st.dataframe(
@@ -1003,12 +1003,12 @@ with tab_roll:
     ), row=2, col=1)
     fig_roll.update_layout(
         height=360, 
-        margin=dict(t=30, l=10, r=10, b=10), 
+        margin=dict(t=35, l=10, r=10, b=10), 
         showlegend=False,
         hovermode="x unified"
     )
     apply_plotly_theme(fig_roll)
-    st.plotly_chart(fig_roll, use_container_width=True)
+    st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
 with tab_seas:
     st.markdown("##### 🍂 Stagionalità dei Flussi di Cassa & Tasso di Risparmio Medio Mensile")
