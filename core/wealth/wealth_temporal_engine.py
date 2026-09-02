@@ -54,7 +54,9 @@ def compute_wealth_temporal_progression(
     cur_liquid = float(nw_curr.liquid_cash)
     cur_invest = float(nw_curr.financial_investments)
     cur_re = float(nw_curr.real_estate_total)
-    cur_illiquid = float(nw_curr.physical_assets + nw_curr.pension_total)
+    cur_physical = float(nw_curr.physical_assets)
+    cur_pension = float(nw_curr.pension_total)
+    cur_illiquid = float(cur_physical + cur_pension)
     cur_liab = float(nw_curr.total_liabilities)
 
     df_snaps = get_wealth_snapshots_history(engine, portfolio_id=portfolio_id)
@@ -64,6 +66,8 @@ def compute_wealth_temporal_progression(
     liquid_vals = []
     invest_vals = []
     re_vals = []
+    physical_vals = []
+    pension_vals = []
     illiquid_vals = []
     liab_vals = []
 
@@ -83,7 +87,11 @@ def compute_wealth_temporal_progression(
             liquid_vals.append(float(r.get("liquid_cash", cur_liquid)))
             invest_vals.append(float(r.get("financial_investments", cur_invest)))
             re_vals.append(float(r.get("real_estate_total", cur_re)))
-            illiquid_vals.append(float(r.get("physical_assets_total", cur_illiquid)))
+            p_val = float(r.get("physical_assets_total", cur_physical))
+            pe_val = float(r.get("pension_total", cur_pension))
+            physical_vals.append(p_val)
+            pension_vals.append(pe_val)
+            illiquid_vals.append(p_val + pe_val)
             liab_vals.append(float(r.get("total_liabilities", cur_liab)))
     else:
         today = date.today()
@@ -98,7 +106,11 @@ def compute_wealth_temporal_progression(
             liquid_vals.append(round(cur_liquid * max(0.4, 0.85 + (mult * 0.15) + (np.sin(i * 0.8) * 0.02)), 2))
             invest_vals.append(round(cur_invest * max(0.4, mult * 1.02), 2))
             re_vals.append(round(cur_re, 2))
-            illiquid_vals.append(round(cur_illiquid * max(0.5, 0.90 + (mult * 0.10)), 2))
+            p_val = round(cur_physical * max(0.5, 0.90 + (mult * 0.10)), 2)
+            pe_val = round(cur_pension * max(0.4, 0.88 + (mult * 0.12)), 2)
+            physical_vals.append(p_val)
+            pension_vals.append(pe_val)
+            illiquid_vals.append(round(p_val + pe_val, 2))
             liab_vals.append(round(cur_liab * max(0.4, 1.0 + (m_offset * 0.004)), 2))
 
         # Punto odierno live consolidato
@@ -107,7 +119,9 @@ def compute_wealth_temporal_progression(
         liquid_vals.append(round(cur_liquid, 2))
         invest_vals.append(round(cur_invest, 2))
         re_vals.append(round(cur_re, 2))
-        illiquid_vals.append(round(cur_illiquid, 2))
+        physical_vals.append(round(cur_physical, 2))
+        pension_vals.append(round(cur_pension, 2))
+        illiquid_vals.append(round(cur_physical + cur_pension, 2))
         liab_vals.append(round(cur_liab, 2))
 
     df_hist = pd.DataFrame({
@@ -116,6 +130,8 @@ def compute_wealth_temporal_progression(
         "liquid_cash": liquid_vals,
         "financial_investments": invest_vals,
         "real_estate": re_vals,
+        "physical_assets": physical_vals,
+        "pension_plans": pension_vals,
         "illiquid_and_pension": illiquid_vals,
         "liabilities": liab_vals
     }).set_index("date").sort_index()
