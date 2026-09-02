@@ -1167,6 +1167,9 @@ class ArgusTerminalEngine:
         if first_token in ("VOICE", "AUDIO", "PODCAST", "BRIEFING") or (first_token == "VOICE" and "BRIEF" in tokens):
             return self._cmd_voice_brief(ctx)
 
+        if first_token in ("WTIME", "WEALTHTIME") or (first_token in ("WEALTH", "NETWORTH") and "TIME" in tokens):
+            return self._cmd_wealth_temporal(ctx)
+
         # Scorciatoie a singolo carattere
         if len(tokens) == 1 and len(first_token) == 1:
             if first_token in ("H", "?"):
@@ -2925,6 +2928,37 @@ ESITO SCENARI DI STRESS A 30 ANNI:
             return TerminalCommandResult(command="VOICE BRIEF", status="SUCCESS", output_text="\n".join(lines))
         except Exception as e:
             return TerminalCommandResult(command="VOICE BRIEF", status="ERROR", output_text=f"Errore Voice Brief: {e}")
+
+    def _cmd_wealth_temporal(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_temporal_engine import (
+                compute_wealth_temporal_progression,
+                compute_wealth_underwater_drawdowns,
+                compute_wealth_seasonality_patterns
+            )
+            engine = (ctx or {}).get("engine") or get_engine()
+            prog = compute_wealth_temporal_progression(engine, portfolio_id=1)
+            under = compute_wealth_underwater_drawdowns(engine, portfolio_id=1)
+            seas = compute_wealth_seasonality_patterns(engine, portfolio_id=1)
+
+            lines = [
+                f"[WEALTH TEMPORAL ANALYTICS & NET WORTH DYNAMICS]",
+                f"Patrimonio Netto Attuale      : € {prog['final_net_worth_eur']:,.2f}",
+                f"Crescita Storica Net Worth     : € {prog['total_growth_eur']:+,.2f} ({prog['total_growth_pct']:+.1f}% su {prog['months_count']} mesi)",
+                f"Max Contrazione Storica (DD)   : {under['max_drawdown_pct']:.1f}% (€ {under['max_drawdown_eur']:,.2f})",
+                f"Contrazione Attuale dal Massimo: {under['current_drawdown_pct']:.1f}%",
+                f"Mese Miglior Risparmio (Picco) : {seas['best_accumulation_month']}",
+                f"Mese Maggior Spesa (Drenaggio) : {seas['heaviest_spending_month']}",
+                "",
+                f"Dettaglio Traiettoria Recente:"
+            ]
+            for idx, r in prog["history_df"].tail(4).iterrows():
+                dt_str = str(idx.date() if hasattr(idx, 'date') else idx)
+                lines.append(f"  📅 {dt_str}: Net Worth € {r['total_net_worth']:>11,.0f} | Liq € {r['liquid_cash']:>9,.0f} | Invest € {r['financial_investments']:>9,.0f} | Immobili € {r['real_estate']:>9,.0f}")
+            return TerminalCommandResult(command="WEALTH TIME", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="WEALTH TIME", status="ERROR", output_text=f"Errore Wealth Temporal: {e}")
 
 
 # Singleton Istanza Globale del Terminal Engine

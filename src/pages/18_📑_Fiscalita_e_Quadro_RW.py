@@ -90,17 +90,26 @@ render_page_header(
     icon="📑"
 )
 
-if len(prof_map) > 1:
-    sel_pid = st.selectbox(
-        "Profilo Patrimoniale:",
-        options=list(prof_map.keys()),
-        format_func=lambda pid: f"📁 {prof_map[pid]}",
-        index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-        key="fiscal_profile_selector_widget"
-    )
-    if sel_pid != current_pid:
-        st.session_state["wealth_active_portfolio_id"] = sel_pid
-        st.rerun()
+from core.wealth.wealth_modals import render_fiscal_methodology_modal
+
+col_fisc_h1, col_fisc_h2 = st.columns([3.5, 1.2])
+with col_fisc_h1:
+    if len(prof_map) > 1:
+        sel_pid = st.selectbox(
+            "Profilo Patrimoniale:",
+            options=list(prof_map.keys()),
+            format_func=lambda pid: f"📁 {prof_map[pid]}",
+            index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
+            key="fiscal_profile_selector_widget"
+        )
+        if sel_pid != current_pid:
+            st.session_state["wealth_active_portfolio_id"] = sel_pid
+            st.rerun()
+
+with col_fisc_h2:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    if st.button("ℹ️ Guida Quadro RW & TUIR", key="btn_modal_fisc_p18", use_container_width=True):
+        render_fiscal_methodology_modal()
 
 fiscal = compute_fiscal_analytics(engine, portfolio_id=current_pid)
 

@@ -95,17 +95,26 @@ render_page_header(
     icon="🤖"
 )
 
-if len(prof_map) > 1:
-    sel_pid = st.selectbox(
-        "Profilo Patrimoniale:",
-        options=list(prof_map.keys()),
-        format_func=lambda pid: f"📁 {prof_map[pid]}",
-        index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-        key="ai_profile_selector_widget"
-    )
-    if sel_pid != current_pid:
-        st.session_state["wealth_active_portfolio_id"] = sel_pid
-        st.rerun()
+from core.wealth.wealth_modals import render_ai_health_score_modal
+
+col_ai_h1, col_ai_h2 = st.columns([3.5, 1.2])
+with col_ai_h1:
+    if len(prof_map) > 1:
+        sel_pid = st.selectbox(
+            "Profilo Patrimoniale:",
+            options=list(prof_map.keys()),
+            format_func=lambda pid: f"📁 {prof_map[pid]}",
+            index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
+            key="ai_profile_selector_widget"
+        )
+        if sel_pid != current_pid:
+            st.session_state["wealth_active_portfolio_id"] = sel_pid
+            st.rerun()
+
+with col_ai_h2:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    if st.button("ℹ️ Guida Health Score AI", key="btn_modal_ai_p21", use_container_width=True):
+        render_ai_health_score_modal()
 
 # Model Selector Toolbar
 col_mod1, col_mod2 = st.columns([3, 1])

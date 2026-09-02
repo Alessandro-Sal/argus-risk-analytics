@@ -110,7 +110,9 @@ render_page_header(
     icon="💳"
 )
 
-col_f1, col_f2, col_f3, col_f4 = st.columns([1.3, 0.9, 1.1, 1.1])
+from core.wealth.wealth_modals import render_budget_rule_methodology_modal
+
+col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.2, 0.8, 1.0, 1.0, 1.0])
 with col_f1:
     if len(prof_map) > 1:
         sel_pid = st.selectbox(
@@ -162,6 +164,11 @@ with col_f4:
         acc_list = sorted([str(a) for a in df_cf["account_name"].dropna().unique()])
         available_accs.extend(acc_list)
     sel_acc = st.selectbox("Conto / Carta:", available_accs, index=0, key="cf_account_selector_widget")
+
+with col_f5:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    if st.button("ℹ️ Guida 50/30/20", key="btn_modal_budget_p14", use_container_width=True):
+        render_budget_rule_methodology_modal()
 
 # Filtra dataset Cash Flow
 df_cf_filtered = df_cf.copy() if not df_cf.empty else pd.DataFrame()
