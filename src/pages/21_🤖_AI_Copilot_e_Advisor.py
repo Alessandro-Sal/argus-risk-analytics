@@ -334,7 +334,7 @@ with tab_review:
     with col_q2:
         advisor_title = st.text_input("Firma / Team di Advisory:", value="ARGUS Family Office & Wealth Advisory")
 
-    review_res = compute_ai_quarterly_wealth_review(engine, portfolio_id=sel_profile_id, quarter=sel_quarter, advisor_name=advisor_title)
+    review_res = compute_ai_quarterly_wealth_review(engine, portfolio_id=current_pid, quarter=sel_quarter, advisor_name=advisor_title)
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     st.markdown(review_res["full_markdown"])
