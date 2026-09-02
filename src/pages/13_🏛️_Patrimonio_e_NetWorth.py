@@ -890,31 +890,31 @@ with tab_traj:
     fig_hist.add_trace(go.Scatter(
         x=df_h["date"], y=df_h["total_net_worth"], 
         name="Patrimonio Netto", 
-        line=dict(color="#10b981", width=3.5),
+        line=dict(color="#10b981", width=3.5, shape="spline", smoothing=0.8),
         hovertemplate="€ %{y:,.2f}"
     ))
     fig_hist.add_trace(go.Scatter(
         x=df_h["date"], y=df_h["financial_investments"], 
         name="Investimenti Quotati", 
-        line=dict(color="#6366f1", width=2),
+        line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8),
         hovertemplate="€ %{y:,.2f}"
     ))
     fig_hist.add_trace(go.Scatter(
         x=df_h["date"], y=df_h["liquid_cash"], 
         name="Liquidità & Riserve", 
-        line=dict(color="#38bdf8", width=1.8),
+        line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8),
         hovertemplate="€ %{y:,.2f}"
     ))
     fig_hist.add_trace(go.Scatter(
         x=df_h["date"], y=df_h["real_estate"], 
         name="Immobili (Net Equity)", 
-        line=dict(color="#f59e0b", width=1.8),
+        line=dict(color="#f59e0b", width=1.8, shape="spline", smoothing=0.8),
         hovertemplate="€ %{y:,.2f}"
     ))
     fig_hist.add_trace(go.Scatter(
         x=df_h["date"], y=df_h["illiquid_and_pension"], 
         name="Asset Fisici & Previdenza", 
-        line=dict(color="#a855f7", width=1.5),
+        line=dict(color="#a855f7", width=1.5, shape="spline", smoothing=0.8),
         hovertemplate="€ %{y:,.2f}"
     ))
     fig_hist.update_layout(
@@ -926,7 +926,7 @@ with tab_traj:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
     apply_plotly_theme(fig_hist)
-    st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+    st.plotly_chart(fig_hist, use_container_width=True, config={"displayModeBar": False})
 
 with tab_mat:
     st.markdown("##### 🗓️ Matrice Mensile dei Flussi Netti di Risparmio (€)")
@@ -950,37 +950,43 @@ with tab_mat:
     st.dataframe(styler_mat, use_container_width=True)
 
 with tab_under:
-    st.markdown("##### 📉 Curva Underwater di Contrazione Patrimoniale (Drawdown vs High-Water Mark)")
-    col_u_g, col_u_t = st.columns([3, 2])
+    col_u_g, col_u_t = st.columns([13, 10])
     with col_u_g:
+        st.markdown("##### 📉 Curva Underwater (Drawdown vs HWM)")
         df_u = under_res["underwater_df"].reset_index()
         fig_under = go.Figure()
         fig_under.add_trace(go.Scatter(
             x=df_u["date"], y=df_u["Drawdown_Pct"], 
             name="Drawdown", 
             fill="tozeroy", 
-            line=dict(color="#ef4444", width=2),
+            fillcolor="rgba(239, 68, 68, 0.20)",
+            line=dict(color="#ef4444", width=2.2, shape="spline", smoothing=0.9),
             hovertemplate="%{y:.2f}%"
         ))
         fig_under.update_layout(
             xaxis_title="Data",
             yaxis_title="Contrazione dal Massimo (%)",
             height=320,
-            margin=dict(t=35, l=10, r=10, b=10),
+            margin=dict(t=15, l=10, r=10, b=10),
             hovermode="x unified"
         )
         apply_plotly_theme(fig_under)
-        st.plotly_chart(fig_under, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+        st.plotly_chart(fig_under, use_container_width=True, config={"displayModeBar": False})
     with col_u_t:
-        st.markdown("###### 🔍 Episodi Storici di Contrazione")
+        st.markdown("##### 🔍 Episodi Storici di Drawdown")
+        df_ep_disp = under_res["episodes_df"].rename(columns={
+            "peak_date": "Picco (HWM)",
+            "trough_date": "Minimo",
+            "recovery_date": "Recupero",
+            "drawdown_pct": "Max DD (%)",
+            "is_recovered": "Stato"
+        })
+        df_ep_disp["Stato"] = df_ep_disp["Stato"].apply(lambda x: "✅ Risolto" if x is True or str(x).lower() == 'true' else "⏳ In Corso")
+        styler_ep = df_ep_disp.style.format({
+            "Max DD (%)": "-{:.2f}%"
+        })
         st.dataframe(
-            under_res["episodes_df"].rename(columns={
-                "peak_date": "Data Picco (HWM)",
-                "trough_date": "Data Minimo",
-                "recovery_date": "Data Recupero",
-                "drawdown_pct": "Max Drawdown (%)",
-                "is_recovered": "Recuperato"
-            }),
+            styler_ep,
             use_container_width=True,
             hide_index=True
         )
@@ -992,23 +998,23 @@ with tab_roll:
     fig_roll.add_trace(go.Scatter(
         x=df_r["date"], y=df_r["Rolling_Growth_Pct"], 
         name="Crescita Ann.", 
-        line=dict(color="#10b981", width=2),
+        line=dict(color="#10b981", width=2, shape="spline", smoothing=0.8),
         hovertemplate="%{y:+.2f}%"
     ), row=1, col=1)
     fig_roll.add_trace(go.Scatter(
         x=df_r["date"], y=df_r["Rolling_Wealth_Vol_Pct"], 
         name="Volatilità Ann.", 
-        line=dict(color="#f59e0b", width=2),
+        line=dict(color="#f59e0b", width=2, shape="spline", smoothing=0.8),
         hovertemplate="%{y:.2f}%"
     ), row=2, col=1)
     fig_roll.update_layout(
         height=360, 
-        margin=dict(t=35, l=10, r=10, b=10), 
+        margin=dict(t=30, l=10, r=10, b=10), 
         showlegend=False,
         hovermode="x unified"
     )
     apply_plotly_theme(fig_roll)
-    st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+    st.plotly_chart(fig_roll, use_container_width=True, config={"displayModeBar": False})
 
 with tab_seas:
     st.markdown("##### 🍂 Stagionalità dei Flussi di Cassa & Tasso di Risparmio Medio Mensile")
