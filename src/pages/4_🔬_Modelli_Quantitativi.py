@@ -3084,6 +3084,93 @@ elif active_quant_tab == "🛡️ Hedging & Opzioni":
                     hide_index=True
                 )
 
+        st.divider()
+
+        # ── MULTI-LEG OPTIONS STRATEGY WORKBENCH & PAYOFF ────────────
+        st.markdown("##### 📈 Multi-Leg Options Strategy Workbench & Payoff Desk")
+        st.caption("Costruttore interattivo di strategie su derivati multi-gamba (Iron Condor, Protective Collar, Spreads, Straddle) con analisi delle Greche aggregate e profilo di PnL a scadenza e anticipato.")
+
+        from core.options_workbench import build_options_strategy_payoff, get_options_strategy_presets
+
+        col_w1, col_w2, col_w3, col_w4 = st.columns(4)
+        with col_w1:
+            strat_choice = st.selectbox("Seleziona Struttura Opzioni:", get_options_strategy_presets(), index=1)
+        with col_w2:
+            spot_input = st.number_input("Prezzo Sottostante (€):", min_value=1.0, value=float(bm_spot_in), step=5.0)
+        with col_w3:
+            iv_opt_in = st.slider("Volatilità Implicita IV (%):", 5.0, 80.0, float(iv_in * 100.0), 1.0) / 100.0
+        with col_w4:
+            dte_input = st.slider("Giorni a Scadenza (DTE):", 7, 180, 45, 5)
+
+        opt_bench_res = build_options_strategy_payoff(
+            strategy_name=strat_choice,
+            underlying_price=spot_input,
+            strike_offset_pct=5.0,
+            iv=iv_opt_in,
+            days_to_exp=dte_input,
+            contracts=1
+        )
+        grk = opt_bench_res["greeks"]
+
+        ow1, ow2, ow3, ow4 = st.columns(4)
+        with ow1:
+            metric_card("Costo Netto / Incasso", f"€ {abs(opt_bench_res['net_debit_credit_eur']):,.2f}", delta="Net Credit 🟢" if opt_bench_res["is_credit_strategy"] else "Net Debit 🔴", delta_color="normal")
+        with ow2:
+            metric_card("Max Profit Atteso", f"€ {opt_bench_res['max_profit_eur']:,.2f}", delta="Guadagno Massimo", delta_color="normal")
+        with ow3:
+            metric_card("Max Loss Rischio", f"€ {opt_bench_res['max_loss_eur']:,.2f}", delta="Perdita Massima", delta_color="inverse")
+        with ow4:
+            metric_card("Greche di Portafoglio", f"Δ {grk['net_delta']:+.2f} | Γ {grk['net_gamma']:+.3f}", delta=f"Θ {grk['net_theta_per_day']:+.2f}€/g | V {grk['net_vega_per_pct']:+.2f}€/%", delta_color="normal")
+
+        st.write("")
+
+        col_pf_chart, col_pf_legs = st.columns([3, 2])
+        with col_pf_chart:
+            st.markdown("###### 📊 Profilo di Payoff (Scadenza vs Mid-Term)")
+            df_pay = opt_bench_res["payoff_df"]
+            fig_payoff = go.Figure()
+            fig_payoff.add_trace(go.Scatter(
+                x=df_pay["spot_price"],
+                y=df_pay["pnl_expiry_eur"],
+                mode="lines",
+                name="PnL a Scadenza (T=0)",
+                line=dict(color="#10b981", width=3)
+            ))
+            fig_payoff.add_trace(go.Scatter(
+                x=df_pay["spot_price"],
+                y=df_pay["pnl_mid_term_eur"],
+                mode="lines",
+                name=f"PnL Anticipato ({dte_input//2} gg)",
+                line=dict(color="#6366f1", width=1.8, dash="dash")
+            ))
+            fig_payoff.add_hline(y=0.0, line_dash="dot", line_color="rgba(255,255,255,0.3)", line_width=1)
+            fig_payoff.update_layout(
+                xaxis_title="Prezzo Sottostante (€)",
+                yaxis_title="Profit / Loss (€)",
+                height=300,
+                margin=dict(t=15, l=10, r=10, b=10),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            apply_plotly_theme(fig_payoff)
+            st.plotly_chart(fig_payoff, use_container_width=True, config={'displayModeBar': False})
+
+        with col_pf_legs:
+            st.markdown("###### 🧩 Gambe della Struttura")
+            st.dataframe(
+                pd.DataFrame(opt_bench_res["legs"]).rename(columns={
+                    "leg_type": "Tipo",
+                    "action": "Azione",
+                    "strike_eur": "Strike (€)",
+                    "premium_unit_eur": "Premio Unit (€)",
+                    "delta": "Delta",
+                    "gamma": "Gamma",
+                    "theta": "Theta",
+                    "vega": "Vega"
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
 # ── TAB 5: ATTRIBUZIONE BRINSON & FATTORI MULTI-FATTORIALI ────────
 elif active_quant_tab == "🎯 Attribuzione & Fattori":
     section("🎯 Attribuzione della Performance & Modelli Multi-Fattoriali (Brinson, Barra & ML)")

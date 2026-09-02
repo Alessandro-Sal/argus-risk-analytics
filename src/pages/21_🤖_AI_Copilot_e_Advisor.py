@@ -339,13 +339,26 @@ with tab_review:
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     st.markdown(review_res["full_markdown"])
 
-    st.download_button(
-        label=f"📥 Esporta Relazione {sel_quarter} (Markdown)",
-        data=review_res["full_markdown"],
-        file_name=f"ARGUS_Executive_Review_{sel_quarter.replace(' ','_')}.md",
-        mime="text/markdown",
-        use_container_width=True
-    )
+    from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
+    pdf_bytes = generate_white_label_quarterly_pdf_report(engine, portfolio_id=current_pid, client_name="Family Office & HNWI Client", quarter=sel_quarter, advisor_firm=advisor_title)
+
+    col_btn_md, col_btn_pdf = st.columns(2)
+    with col_btn_md:
+        st.download_button(
+            label=f"📥 Esporta Relazione {sel_quarter} (Markdown)",
+            data=review_res["full_markdown"],
+            file_name=f"ARGUS_Executive_Review_{sel_quarter.replace(' ','_')}.md",
+            mime="text/markdown",
+            use_container_width=True
+        )
+    with col_btn_pdf:
+        st.download_button(
+            label=f"📄 Scarica Dossier Stampabile {sel_quarter} (PDF)",
+            data=pdf_bytes,
+            file_name=f"ARGUS_Client_Report_{sel_quarter.replace(' ','_')}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
 
 
 with tab_chat:

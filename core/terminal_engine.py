@@ -1039,6 +1039,9 @@ class ArgusTerminalEngine:
         if first_token in ("HEALTH", "SCORE", "DIAG"):
             return self._cmd_health_score(results, active_pos, ctx)
 
+        if first_token in ("STRESS", "MACROSTRESS") and any(t in ("MACRO", "EBA", "CCAR", "FED") for t in tokens):
+            return self._cmd_macro_stress(results, df_pos, ctx)
+
         if first_token in ("SHOCK", "STRESS"):
             return self._cmd_shock(tokens, ctx)
 
@@ -1121,6 +1124,30 @@ class ArgusTerminalEngine:
 
         if first_token in ("RECON", "MATCH", "RECONCILE"):
             return self._cmd_wealth_recon(ctx)
+
+        # ---------------------------------------------------------
+        # 9. INSTITUTIONAL QUANT, ESG, DERIVATIVES & ADVISORY
+        # ---------------------------------------------------------
+        if first_token in ("STRESS", "MACROSTRESS") and any(t in ("MACRO", "EBA", "CCAR", "FED") for t in tokens):
+            return self._cmd_macro_stress(results, df_pos, ctx)
+
+        if first_token in ("RSTRESS", "REVERSESTRESS", "REV_STRESS"):
+            return self._cmd_reverse_stress(results, df_pos, tokens, ctx)
+
+        if (first_token == "PROP" and any(t in ("REBAL", "TRADE", "ORDERS") for t in tokens)) or first_token in ("AUTOREBAL", "PROPOSAL"):
+            return self._cmd_rebal_proposal(results, df_pos, ctx)
+
+        if first_token in ("MIFID", "SUITABILITY", "COMPLIANCE"):
+            return self._cmd_mifid_check(results, df_pos, ctx)
+
+        if first_token in ("ESG", "CARBON", "SFDR", "SUSTAINABILITY"):
+            return self._cmd_esg_summary(results, df_pos, ctx)
+
+        if first_token in ("OPTS", "PAYOFF", "CONDOR", "COLLAR", "SPREAD") or (first_token == "PAYOFF"):
+            return self._cmd_options_payoff(tokens, ctx)
+
+        if first_token in ("REPORT", "DOSSIER") and any(t in ("QTR", "QUARTER", "PDF", "CLIENT") for t in tokens):
+            return self._cmd_report_qtr(ctx)
 
         # Scorciatoie a singolo carattere
         if len(tokens) == 1 and len(first_token) == 1:
@@ -2606,6 +2633,161 @@ ESITO SCENARI DI STRESS A 30 ANNI:
             return TerminalCommandResult(command="RECON", status="SUCCESS", output_text="\n".join(lines))
         except Exception as e:
             return TerminalCommandResult(command="RECON", status="ERROR", output_text=f"Errore Reconciliation: {e}")
+
+    def _cmd_macro_stress(self, results: Dict[str, Any], df_pos: Optional[pd.DataFrame] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.macro_stress_engine import compute_macro_scenario_stress_test
+            st_res = compute_macro_scenario_stress_test(df_positions=df_pos, results=results)
+            lines = [
+                f"[INSTITUTIONAL MACRO FACTOR STRESS TESTING (EBA & FED CCAR)]",
+                f"Valore di Base Portafoglio    : € {st_res['initial_portfolio_value_eur']:,.2f}",
+                f"Scenario Peggiore Identificato: {st_res['worst_case_scenario']}",
+                f"Drawdown Massimo Previsto     : {st_res['worst_case_drawdown_pct']:+.2f}% (Perdita: € {st_res['worst_case_loss_eur']:,.2f})",
+                "",
+                f"{'SCENARIO NORMATIVO':<32} | {'EQ SHOCK':<9} | {'TASSI (bps)':<11} | {'PORTAFOGLIO %':<14} | {'PERDITA (€)'}"
+            ]
+            lines.append("-" * 88)
+            for sc in st_res.get("scenario_results", []):
+                lines.append(f"{sc['scenario_name'][:31]:<32} | {sc['equity_shock_pct']:>+7.1f}% | {sc['rate_shock_bps']:>+9.0f} | {sc['portfolio_return_pct']:>+12.2f}% | € {sc['pnl_impact_eur']:>10,.2f}")
+            return TerminalCommandResult(command="STRESS MACRO", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="STRESS MACRO", status="ERROR", output_text=f"Errore Macro Stress: {e}")
+
+    def _cmd_reverse_stress(self, results: Dict[str, Any], df_pos: Optional[pd.DataFrame] = None, tokens: Optional[List[str]] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.macro_stress_engine import compute_reverse_stress_test
+            target_dd = -20.0
+            if tokens and len(tokens) > 1:
+                try:
+                    target_dd = -abs(float(tokens[1]))
+                except ValueError:
+                    pass
+            rev = compute_reverse_stress_test(df_positions=df_pos, results=results, target_drawdown_pct=target_dd)
+            sol = rev["break_even_solutions"]
+            lines = [
+                f"[REVERSE STRESS TESTING & INSOLVENCY SOLVER]",
+                f"Drawdown Target di Rottura    : {rev['target_drawdown_pct']:.1f}% (Perdita: € {rev['target_loss_eur']:,.2f})",
+                f"Probabilità / Frequenza Ricon.: Z-Score {rev['implied_z_score']} ({rev['implied_frequency_estimate']})",
+                "",
+                f"Soglie Minime per Innesco Drawdown Target:",
+                f"• Pure Equity Crash Necessario : {sol['pure_equity_crash_pct']:.1f}% (a tassi invariati)",
+                f"• Pure Rate Shock Necessario   : +{sol['pure_rate_shock_bps']:.0f} bps (a mercato azionario fermo)",
+                f"• Scenario Congiunto (50/50)   : Equity {sol['combined_scenario']['equity_crash_pct']:.1f}% CON Tassi +{sol['combined_scenario']['rate_shock_bps']:.0f} bps"
+            ]
+            return TerminalCommandResult(command="RSTRESS", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="RSTRESS", status="ERROR", output_text=f"Errore Reverse Stress: {e}")
+
+    def _cmd_rebal_proposal(self, results: Dict[str, Any], df_pos: Optional[pd.DataFrame] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.autonomous_rebalancer import generate_autonomous_rebalancing_proposal
+            reb = generate_autonomous_rebalancing_proposal(df_positions=df_pos, results=results)
+            lines = [
+                f"[AUTONOMOUS REBALANCING & TRADE PROPOSAL GENERATOR]",
+                f"Valore Totale Portafoglio      : € {reb['portfolio_total_value_eur']:,.2f}",
+                f"Turnover Proposto              : {reb['turnover_pct']:.1f}% (Limite Max: {reb['max_allowed_turnover_pct']:.1f}%)",
+                f"Volume Acquisti / Vendite      : € {reb['total_buy_volume_eur']:,.2f} / € {reb['total_sell_volume_eur']:,.2f}",
+                f"Impatto Fiscale Stimato (CGT)  : € {reb['estimated_tax_liability_eur']:,.2f}",
+                "",
+                f"{'TICKER':<10} | {'AZIONE':<6} | {'PESO ATT':<9} | {'PESO TGT':<9} | {'QUOTE':<8} | {'CONTROVALORE (€)'}"
+            ]
+            lines.append("-" * 75)
+            for tr in reb.get("trades_list", []):
+                lines.append(f"{tr['ticker']:<10} | {tr['action']:<6} | {tr['current_weight_pct']:>7.1f}% | {tr['target_weight_pct']:>7.1f}% | {tr['suggested_shares']:>8} | € {tr['trade_notional_eur']:>14,.2f}")
+            return TerminalCommandResult(command="PROP REBAL", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="PROP REBAL", status="ERROR", output_text=f"Errore Rebal Proposal: {e}")
+
+    def _cmd_mifid_check(self, results: Dict[str, Any], df_pos: Optional[pd.DataFrame] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.autonomous_rebalancer import check_mifid_suitability_and_limits
+            mif = check_mifid_suitability_and_limits(df_positions=df_pos, results=results)
+            lines = [
+                f"[MIFID II SUITABILITY & CONCENTRATION GATE]",
+                f"Esito Gate di Conformità      : {mif['status']}",
+                f"Profilo di Rischio Assegnato   : {mif['risk_profile']}",
+                f"Violazioni / Avvisi Rilevati   : {mif['violations_count']} violazioni | {mif['warnings_count']} avvisi",
+                f"Limite Concentrazione Emittente: Max {mif['max_issuer_limit_pct']:.1f}%"
+            ]
+            if mif["violations"]:
+                lines.append("\nViolazioni Gravi:")
+                for v in mif["violations"]:
+                    lines.append(f"  ❌ [{v['type']}] Ticker: {v.get('ticker', 'N/D')} -> Peso {v.get('weight_pct', 0)}% vs Limite {v.get('limit_pct', 0)}%")
+            if mif["warnings"]:
+                lines.append("\nAvvertenze Prudenziali:")
+                for w in mif["warnings"]:
+                    lines.append(f"  ⚠️ {w.get('message', '')}")
+            return TerminalCommandResult(command="MIFID CHECK", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="MIFID CHECK", status="ERROR", output_text=f"Errore MiFID: {e}")
+
+    def _cmd_esg_summary(self, results: Dict[str, Any], df_pos: Optional[pd.DataFrame] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.esg_engine import compute_portfolio_esg_and_sfdr_metrics
+            esg = compute_portfolio_esg_and_sfdr_metrics(df_positions=df_pos, results=results)
+            sfdr = esg["sfdr_breakdown"]
+            lines = [
+                f"[ESG & SFDR SUSTAINABILITY DESK]",
+                f"Punteggio ESG Complessivo      : {esg['portfolio_esg_score']}/100 (Rating {esg['esg_rating_band']})",
+                f"Pilastri E / S / G             : E {esg['environmental_pillar_score']} | S {esg['social_pillar_score']} | G {esg['governance_pillar_score']}",
+                f"Intensità Carbonica Ponderata  : {esg['weighted_carbon_intensity_tco2e_per_m_eur']:.1f} tCO2e / M€ investito",
+                f"Ripartizione Normativa SFDR    : Art. 6: {sfdr['art_6_conventional_pct']:.1f}% | Art. 8: {sfdr['art_8_esg_promoting_pct']:.1f}% | Art. 9: {sfdr['art_9_dark_green_impact_pct']:.1f}%",
+                "",
+                f"{'TICKER':<10} | {'NOME':<24} | {'PESO %':<7} | {'ESG':<5} | {'SFDR':<8} | {'CARBON (tCO2e)'}"
+            ]
+            lines.append("-" * 75)
+            for h in esg.get("holdings_esg_list", [])[:8]:
+                lines.append(f"{h['ticker']:<10} | {h['name'][:23]:<24} | {h['weight_pct']:>5.1f}% | {h['esg_score']:>5.1f} | {h['sfdr_classification']:<8} | {h['carbon_intensity_tco2e']:>11.1f}")
+            return TerminalCommandResult(command="ESG", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="ESG", status="ERROR", output_text=f"Errore ESG: {e}")
+
+    def _cmd_options_payoff(self, tokens: Optional[List[str]] = None, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.options_workbench import build_options_strategy_payoff
+            strat = "Iron Condor"
+            if tokens and len(tokens) > 1:
+                t_sub = tokens[1].upper()
+                if "COLLAR" in t_sub: strat = "Protective Collar"
+                elif "SPREAD" in t_sub: strat = "Bull Call Spread"
+                elif "STRADDLE" in t_sub: strat = "Long Straddle"
+                elif "COVER" in t_sub: strat = "Covered Call"
+
+            opt = build_options_strategy_payoff(strategy_name=strat, underlying_price=100.0, strike_offset_pct=5.0)
+            gr = opt["greeks"]
+            lines = [
+                f"[OPTIONS STRATEGY WORKBENCH & PAYOFF DESK]",
+                f"Strategia Selezionata          : {opt['strategy_name']} (Sottostante: € {opt['underlying_price']:.2f})",
+                f"Costo / Incasso Netto (Debit)  : € {opt['net_debit_credit_eur']:,.2f} ({'Net Credit' if opt['is_credit_strategy'] else 'Net Debit'})",
+                f"Profilo Max Profit / Max Loss  : +€ {opt['max_profit_eur']:,.2f} / € {opt['max_loss_eur']:,.2f}",
+                f"Greche Aggregate Portafoglio   : Delta {gr['net_delta']:+.2f} | Gamma {gr['net_gamma']:+.4f} | Theta {gr['net_theta_per_day']:+.2f}€/g | Vega {gr['net_vega_per_pct']:+.2f}€/%",
+                f"Punti di Pareggio (Breakeven)  : {', '.join(['€ ' + str(b) for b in opt['breakeven_points']]) if opt['breakeven_points'] else 'Nessun pareggio secco'}",
+                "",
+                f"{'GAMBA':<6} | {'AZIONE':<6} | {'STRIKE (€)':<12} | {'PREMIO UNIT (€)':<16} | {'DELTA'}"
+            ]
+            lines.append("-" * 65)
+            for leg in opt.get("legs", []):
+                lines.append(f"{leg['leg_type']:<6} | {leg['action']:<6} | € {leg['strike_eur']:>9.2f} | € {leg['premium_unit_eur']:>13.2f} | {leg['delta']:>+6.3f}")
+            return TerminalCommandResult(command="OPTS BUILD", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="OPTS BUILD", status="ERROR", output_text=f"Errore Options Workbench: {e}")
+
+    def _cmd_report_qtr(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
+            engine = (ctx or {}).get("engine") or get_engine()
+            pdf_bytes = generate_white_label_quarterly_pdf_report(engine, portfolio_id=1, client_name="Family Office Master", quarter="Q1 2026")
+            lines = [
+                f"[WHITE-LABEL CLIENT QUARTERLY PDF REPORT GENERATOR]",
+                f"Status Generazione            : COMPLETATA CON SUCCESSO 🟢",
+                f"Dimensione File PDF Generato  : {len(pdf_bytes):,} bytes ({len(pdf_bytes)/1024:.1f} KB)",
+                f"Moduli Inclusi nel Dossier    : Bilancio Net Worth, Brinson Multi-Asset, EBA Stress Test, SFDR ESG Scorecard",
+                f"Pronto per il Download        : Disponibile da interfaccia Streamlit (Modulo 21 AI Copilot / Modulo 13 Net Worth)."
+            ]
+            return TerminalCommandResult(command="REPORT QTR", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="REPORT QTR", status="ERROR", output_text=f"Errore Report QTR: {e}")
 
 
 # Singleton Istanza Globale del Terminal Engine

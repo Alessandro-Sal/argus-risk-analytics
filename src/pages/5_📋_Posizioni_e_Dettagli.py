@@ -69,6 +69,20 @@ POSITIONS_MODELS_CATALOG = {
         "badge_color": "#a855f7",
         "category": "Esecuzione & Cassa",
         "desc": "Controllo del cash buffer, stima del costo opportunità della liquidità inattiva (Cash Drag) e generazione distinta ordini per broker con sizing calibrato sui tick di mercato."
+    },
+    "⚖️ Ribilanciamento Autonomo & MiFID II": {
+        "title": "Autonomous Rebalancing Engine, Trade Proposal & MiFID II Suitability Gate",
+        "badge": "MiFID II • Tax-Smart • Trade Blotter",
+        "badge_color": "#10b981",
+        "category": "Advisory & Compliance",
+        "desc": "Generazione automatica di proposte d'ordine per riallineare i pesi di portafoglio, verifica dei limiti di concentrazione MiFID II e stima dell'impatto fiscale delle vendite."
+    },
+    "🌿 Sostenibilità ESG & SFDR Desk": {
+        "title": "European SFDR Sustainability Desk, Carbon Footprint & ESG Tri-Pillar Score",
+        "badge": "SFDR Art. 6/8/9 • Carbon • ESG Tri-Pillar",
+        "badge_color": "#34d399",
+        "category": "Sostenibilità & ESG",
+        "desc": "Classificazione dei fondi secondo il Regolamento UE 2019/2088 (SFDR Art. 6/8/9), intensità carbonica ponderata (tCO2e/M€) e screening controversie."
     }
 }
 
@@ -2616,3 +2630,104 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
 
     else:
         st.info("Impossibile calcolare il modello Almgren-Chriss: posizioni attive o dati di volume non sufficienti.")
+
+# ── TAB 5: RIBILANCIAMENTO AUTONOMO & MIFID II ───────────────
+elif active_pos_tab == "⚖️ Ribilanciamento Autonomo & MiFID II":
+    st.markdown("### ⚖️ Autonomous AI Rebalancing & MiFID II Suitability Gate")
+    st.caption("Generazione automatica di proposte d'ordine per riallineare i pesi agli obiettivi strategici, verifica del turnover, stima delle plusvalenze/minusvalenze fiscali e controllo di adeguatezza MiFID II.")
+
+    from core.autonomous_rebalancer import generate_autonomous_rebalancing_proposal, check_mifid_suitability_and_limits
+
+    col_reb_opt1, col_reb_opt2 = st.columns([2, 1])
+    with col_reb_opt1:
+        prof_sel = st.selectbox("Profilo di Rischio Cliente (MiFID II):", ["Conservative", "Moderate", "Aggressive"], index=1)
+    with col_reb_opt2:
+        max_turn = st.slider("Massimo Turnover Ammesso (%):", 5.0, 50.0, 25.0, 5.0)
+
+    mifid_res = check_mifid_suitability_and_limits(df_positions=pos, results=results, risk_profile=prof_sel)
+    rebal_res = generate_autonomous_rebalancing_proposal(df_positions=pos, results=results, max_turnover_pct=max_turn)
+
+    rc1, rc2, rc3, rc4 = st.columns(4)
+    with rc1:
+        metric_card("Stato Gate MiFID II", mifid_res["status"], delta=f"{mifid_res['violations_count']} Violazioni", delta_color="normal" if mifid_res["is_mifid_compliant"] else "inverse")
+    with rc2:
+        metric_card("Turnover Proposto", f"{rebal_res['turnover_pct']:.1f}%", delta=f"Max Consentito: {max_turn:.0f}%", delta_color="normal" if rebal_res["is_turnover_compliant"] else "inverse")
+    with rc3:
+        metric_card("Volume Acquisti / Vendite", f"€ {rebal_res['total_buy_volume_eur']:,.0f}", delta=f"Vendite: € {rebal_res['total_sell_volume_eur']:,.0f}", delta_color="normal")
+    with rc4:
+        metric_card("Imposta CGT Stimata", fmt_eur(rebal_res["estimated_tax_liability_eur"]), delta="Capital Gain Tax", delta_color="inverse" if rebal_res["estimated_tax_liability_eur"] > 0 else "normal")
+
+    st.write("")
+
+    if not rebal_res["trades_df"].empty:
+        st.markdown("##### 📝 Distinta Ordini di Ribilanciamento (Trade Blotter)")
+        st.dataframe(
+            rebal_res["trades_df"][["ticker", "action", "current_weight_pct", "target_weight_pct", "suggested_shares", "estimated_price", "trade_notional_eur", "estimated_tax_impact_eur", "status"]].rename(columns={
+                "ticker": "Strumento",
+                "action": "Azione",
+                "current_weight_pct": "Peso Attuale (%)",
+                "target_weight_pct": "Peso Target (%)",
+                "suggested_shares": "Quote Consigliate",
+                "estimated_price": "Prezzo Stimato (€)",
+                "trade_notional_eur": "Controvalore Ordine (€)",
+                "estimated_tax_impact_eur": "Imposta Stimata (€)",
+                "status": "Stato Ordine"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.success("🟢 **Portafoglio Perfettamente Allineato**: Nessun ordine di riallineamento necessario rispetto ai pesi target impostati.")
+
+# ── TAB 6: SOSTENIBILITÀ ESG & SFDR DESK ─────────────────────
+elif active_pos_tab == "🌿 Sostenibilità ESG & SFDR Desk":
+    st.markdown("### 🌿 European SFDR Sustainability Desk & Carbon Footprint")
+    st.caption("Diagnosi di sostenibilità conforme al Regolamento UE 2019/2088 (SFDR), intensità carbonica ponderata (Scope 1+2 tCO2e/M€) e tri-pillar score Environmental, Social & Governance.")
+
+    from core.esg_engine import compute_portfolio_esg_and_sfdr_metrics
+
+    esg_res = compute_portfolio_esg_and_sfdr_metrics(df_positions=pos, results=results)
+    sfdr = esg_res["sfdr_breakdown"]
+
+    ec1, ec2, ec3, ec4 = st.columns(4)
+    with ec1:
+        metric_card("ESG Overall Score", f"{esg_res['portfolio_esg_score']}/100", delta=f"Rating {esg_res['esg_rating_band']}", delta_color="normal")
+    with ec2:
+        metric_card("Punteggio Ambientale (E)", f"{esg_res['environmental_pillar_score']}/100", delta="Transizione Climatica", delta_color="normal")
+    with ec3:
+        metric_card("Punteggio Social & Gov (S/G)", f"S: {esg_res['social_pillar_score']} | G: {esg_res['governance_pillar_score']}", delta="Governance Etica", delta_color="normal")
+    with ec4:
+        metric_card("Intensità Carbonica", f"{esg_res['weighted_carbon_intensity_tco2e_per_m_eur']:.1f}", delta="tCO2e / M€ Investito", delta_color="normal")
+
+    st.write("")
+
+    col_sfdr_l, col_sfdr_r = st.columns([2, 3])
+    with col_sfdr_l:
+        st.markdown("##### 🏛️ Ripartizione Fondi SFDR (Reg. UE 2019/2088)")
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(52, 211, 153, 0.25); border-left: 4px solid #34d399; border-radius: 10px; padding: 14px 18px;">
+            <b style="color: #34d399; font-size: 14px;">Allineamento Regolamentare SFDR:</b><br>
+            <span style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+            • <b>Articolo 6 (Tradizionali):</b> {sfdr['art_6_conventional_pct']:.1f}% del Portafoglio<br>
+            • <b>Articolo 8 (Promozione ESG):</b> {sfdr['art_8_esg_promoting_pct']:.1f}% del Portafoglio<br>
+            • <b>Articolo 9 (Impatto Sostenibile / Dark Green):</b> {sfdr['art_9_dark_green_impact_pct']:.1f}% del Portafoglio<br>
+            <b style="color: {'#34d399' if esg_res['is_esg_leader'] else '#fbbf24'};">Qualifica Portafoglio: {'Leader di Sostenibilità ESG 🟢' if esg_res['is_esg_leader'] else 'In Transizione 🟡'}</b>
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_sfdr_r:
+        st.markdown("##### 📊 Dettaglio ESG per Singolo Titolo")
+        st.dataframe(
+            esg_res["holdings_esg_df"][["ticker", "name", "weight_pct", "esg_score", "sfdr_classification", "carbon_intensity_tco2e", "controversy_level"]].rename(columns={
+                "ticker": "Ticker",
+                "name": "Denominazione",
+                "weight_pct": "Peso (%)",
+                "esg_score": "Score ESG",
+                "sfdr_classification": "SFDR",
+                "carbon_intensity_tco2e": "Carbon (tCO2e)",
+                "controversy_level": "Controversie"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
