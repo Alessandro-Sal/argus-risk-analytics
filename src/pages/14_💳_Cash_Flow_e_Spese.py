@@ -48,7 +48,8 @@ from core.wealth.wealth_engine import (
     compute_merchant_pareto_analytics,
     compute_seasonality_matrix,
     compute_envelope_budget_analytics,
-    compute_cashflow_whatif_reinvestment
+    compute_cashflow_whatif_reinvestment,
+    compute_smart_cashflow_reconciliation
 )
 
 
@@ -1308,4 +1309,39 @@ with tab_ledger:
         )
     else:
         st.info("Nessuna transazione presente nel libro mastro per i filtri selezionati.")
+
+st.divider()
+
+# ── SMART CASHFLOW RECONCILIATION & AUTO-MATCHING ───────────
+section("🔍 Smart Cashflow Reconciliation & Auto-Matching")
+st.caption("Riconciliazione automatica con intelligenza semantica tra estratti conto bancari e impegni ricorrenti (stipendi, rate mutuo, abbonamenti), con individuazione immediata di transazioni duplicate o non abbinate.")
+
+recon_data = compute_smart_cashflow_reconciliation(engine, portfolio_id=current_pid)
+
+rc_k1, rc_k2, rc_k3, rc_k4 = st.columns(4)
+with rc_k1:
+    metric_card("Transazioni Elaborate", f"{recon_data['total_transactions_processed']}", delta="Flusso Bancario Totale", delta_color="normal")
+with rc_k2:
+    metric_card("Tasso di Riconciliazione", f"{recon_data['reconciliation_rate_pct']:.1f}%", delta=f"{recon_data['matched_transactions_count']} Abbinate con Successo", delta_color="normal")
+with rc_k3:
+    metric_card("Transazioni Pendenti", f"{recon_data['unmatched_transactions_count']}", delta="Da Riconciliare / Revisionare", delta_color="normal" if recon_data['unmatched_transactions_count'] == 0 else "inverse")
+with rc_k4:
+    metric_card("Duplicati Rilevati", f"{recon_data['duplicates_flagged_count']}", delta="Possibili Doppi Addebiti ⚠️" if recon_data['duplicates_flagged_count'] > 0 else "Nessun Duplicato 🟢", delta_color="inverse" if recon_data['duplicates_flagged_count'] > 0 else "normal")
+
+st.write("")
+
+if not recon_data["matches_df"].empty:
+    st.dataframe(
+        recon_data["matches_df"][["tx_date", "description", "amount_eur", "matched_category", "match_confidence_pct", "match_source", "is_duplicate"]].rename(columns={
+            "tx_date": "Data Contabile",
+            "description": "Descrizione Movimento",
+            "amount_eur": "Importo (€)",
+            "matched_category": "Categoria / Impegno Riconciliato",
+            "match_confidence_pct": "Confidenza (%)",
+            "match_source": "Sorgente Regola",
+            "is_duplicate": "Duplicato Sospetto"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
 

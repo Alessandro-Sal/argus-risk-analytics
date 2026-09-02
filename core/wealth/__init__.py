@@ -17,7 +17,18 @@ from core.wealth.wealth_models import (
     LegalEntityType,
     FamilyOfficeEntityItem,
     SRRScenarioResult,
-    QuarterlyReviewResult
+    QuarterlyReviewResult,
+    PrivateEquityDealItem,
+    PECashflowItem,
+    PEDealMetrics,
+    FXExposureItem,
+    FXHedgingResult,
+    FamilyGovernancePlan,
+    PattoFamigliaResult,
+    BrinsonWealthBucketItem,
+    BrinsonWealthResult,
+    ReconciliationMatchItem,
+    ReconciliationResult
 )
 from core.wealth.wealth_db import (
     init_wealth_db,
@@ -77,10 +88,14 @@ from core.wealth.wealth_engine import (
     compute_tax_smart_rebalancing_watchdog,
     compute_real_estate_net_equity_and_ltv,
     generate_advisory_pitchbook_html,
-    generate_advisory_pitchbook_pdf,
     compute_ai_quarterly_wealth_review,
     compute_family_office_multi_entity_consolidation,
-    compute_sequence_of_returns_risk_engine
+    compute_sequence_of_returns_risk_engine,
+    compute_private_equity_deal_metrics,
+    compute_multi_currency_fx_hedging_engine,
+    compute_family_governance_and_patti_di_famiglia,
+    compute_total_wealth_brinson_attribution,
+    compute_smart_cashflow_reconciliation
 )
 
 

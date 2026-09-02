@@ -1107,6 +1107,21 @@ class ArgusTerminalEngine:
         if first_token in ("HOLDING", "FAMILY", "FO"):
             return self._cmd_wealth_holding(ctx)
 
+        if first_token in ("PE", "DEAL", "VENTURE", "VC"):
+            return self._cmd_wealth_pe(ctx)
+
+        if first_token in ("FXHEDGE", "FX", "CURR", "CURRENCY"):
+            return self._cmd_wealth_fx_hedge(ctx)
+
+        if first_token in ("GOVERN", "PATTO", "SUCCESSION"):
+            return self._cmd_wealth_govern(ctx)
+
+        if first_token in ("ATTR", "BRINSON") and any(t in ("WEALTH", "TOTAL", "PORT", "ALL") for t in tokens):
+            return self._cmd_wealth_brinson(ctx)
+
+        if first_token in ("RECON", "MATCH", "RECONCILE"):
+            return self._cmd_wealth_recon(ctx)
+
         # Scorciatoie a singolo carattere
         if len(tokens) == 1 and len(first_token) == 1:
             if first_token in ("H", "?"):
@@ -2479,6 +2494,118 @@ ESITO SCENARI DI STRESS A 30 ANNI:
             return TerminalCommandResult(command="HOLDING", status="SUCCESS", output_text="\n".join(lines))
         except Exception as e:
             return TerminalCommandResult(command="HOLDING", status="ERROR", output_text=f"Errore Holding: {e}")
+
+    def _cmd_wealth_pe(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.wealth.wealth_engine import compute_private_equity_deal_metrics
+            pe = compute_private_equity_deal_metrics()
+            lines = [
+                f"[PRIVATE EQUITY, VENTURE CAPITAL & REAL ASSETS DESK]",
+                f"Capitale Impegnato (Committed) : € {pe['total_committed_eur']:,.2f} ({pe['deals_count']} Deals Attivi)",
+                f"Capitale Versato (Called)      : € {pe['total_called_eur']:,.2f} (Unfunded € {pe['unfunded_commitment_eur']:,.2f})",
+                f"Distribuzioni Ricevute         : € {pe['total_distributed_eur']:,.2f} (DPI {pe['portfolio_dpi']:.2f}x)",
+                f"NAV Stimato Attuale            : € {pe['total_current_nav_eur']:,.2f} (RVPI {pe['portfolio_rvpi']:.2f}x)",
+                f"Performance Netta Portafoglio  : MOIC / TVPI {pe['portfolio_moic_tvpi']:.2f}x | XIRR {pe['portfolio_xirr_pct']:.1f}%",
+                "",
+                f"{'DEAL':<28} | {'CLASSE':<16} | {'CALLED':<11} | {'NAV':<11} | {'MOIC':<6} | {'XIRR'}"
+            ]
+            lines.append("-" * 86)
+            for d in pe.get("deals_list", []):
+                lines.append(f"{d['name'][:27]:<28} | {d['asset_class'][:15]:<16} | € {d['called_capital_eur']:>8,.0f} | € {d['current_nav_estimated_eur']:>8,.0f} | {d['moic_multiple']:>5.2f}x | {d['irr_net_pct']:>5.1f}%")
+            return TerminalCommandResult(command="PE", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="PE", status="ERROR", output_text=f"Errore Private Equity: {e}")
+
+    def _cmd_wealth_fx_hedge(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_multi_currency_fx_hedging_engine
+            engine = (ctx or {}).get("engine") or get_engine()
+            fx = compute_multi_currency_fx_hedging_engine(engine, portfolio_id=1)
+            lines = [
+                f"[MULTI-CURRENCY FX EXPOSURE & FORWARD HEDGING OVERLAY]",
+                f"Patrimonio Totale Riferimento  : € {fx['total_wealth_eur']:,.2f} (Valuta Base: {fx['base_currency']})",
+                f"Esposizione Valute Estere      : € {fx['foreign_exposure_eur']:,.2f} ({fx['foreign_exposure_pct']:.1f}% del Patrimonio)",
+                f"Costo Annuo Hedging Stimato    : € {fx['annual_hedging_cost_eur']:,.2f}/anno",
+                f"Rischio Drawdown FX (-15% Val) : € {fx['unhedged_fx_shock_loss_eur']:,.2f} (Unhedged) vs € {fx['hedged_fx_shock_loss_eur']:,.2f} (Hedged)",
+                "",
+                f"{'VALUTA':<8} | {'NOMINALE (€)':<14} | {'PESO %':<8} | {'TASSO LOC %':<12} | {'COSTO FWD %':<12} | {'HEDGE %'}"
+            ]
+            lines.append("-" * 75)
+            for it in fx.get("exposures_list", []):
+                lines.append(f"{it['currency']:<8} | € {it['nominal_amount_eur']:>11,.0f} | {it['weight_pct']:>6.1f}% | {it['local_interest_rate_pct']:>10.2f}% | {it['annual_forward_points_cost_pct']:>+10.2f}% | {it['hedged_ratio_pct']:>6.1f}%")
+            return TerminalCommandResult(command="FXHEDGE", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="FXHEDGE", status="ERROR", output_text=f"Errore FX Hedge: {e}")
+
+    def _cmd_wealth_govern(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_family_governance_and_patti_di_famiglia
+            engine = (ctx or {}).get("engine") or get_engine()
+            gov = compute_family_governance_and_patti_di_famiglia(engine, portfolio_id=1)
+            lines = [
+                f"[FAMILY GOVERNANCE & PATTO DI FAMIGLIA (ART. 768-BIS C.C.)]",
+                f"Valore Azienda / Holding       : € {gov['business_value_eur']:,.2f}",
+                f"Erede Assegnatario del Controllo: {gov['assigned_heir_name']} ({gov['assigned_quota_pct']:.0f}% Quota)",
+                f"Liquidazione Totale Legittimari: € {gov['total_compensation_due_eur']:,.2f}",
+                f"Esenzione Fiscale Art. 768-bis : {'SÌ (0% Imposta se controllo mantenuto 5 anni)' if gov['tax_exempt_under_art_768_bis'] else 'NO'}",
+                f"Scudo Azione Riduzione/Collaz. : {'ATTIVO 🟢 (Immunità Ereditaria Blindata)' if gov['is_legitimate_shielded'] else 'NO'}",
+                "",
+                f"{'EREDE NON ASSEGNATARIO':<30} | {'QUOTA RISERVA':<15} | {'COMPENSAZIONE DOVUTA':<22}"
+            ]
+            lines.append("-" * 75)
+            for h in gov.get("non_assigned_heirs", []):
+                lines.append(f"{h['heir_name']:<30} | {h['statutory_legitimate_share_pct']:>12.1f}% | € {h['compensation_due_eur']:>19,.2f}")
+            return TerminalCommandResult(command="GOVERN", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="GOVERN", status="ERROR", output_text=f"Errore Governance: {e}")
+
+    def _cmd_wealth_brinson(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_total_wealth_brinson_attribution
+            engine = (ctx or {}).get("engine") or get_engine()
+            br = compute_total_wealth_brinson_attribution(engine, portfolio_id=1)
+            lines = [
+                f"[TOTAL WEALTH BRINSON-FACHLER MULTI-ASSET ATTRIBUTION]",
+                f"Rendimento Totale Patrimonio   : {br['portfolio_total_return_pct']:+.2f}%",
+                f"Rendimento Benchmark Composito : {br['benchmark_total_return_pct']:+.2f}%",
+                f"Extra-Rendimento Netto (Alpha) : {br['excess_return_pct']:+.2f}%",
+                f"Effetto Allocazione Strategica : {br['allocation_effect_total_pct']:+.2f}%",
+                f"Effetto Selezione Strumenti    : {br['selection_effect_total_pct']:+.2f}%",
+                f"Effetto Interazione Residua    : {br['interaction_effect_total_pct']:+.2f}%",
+                "",
+                f"{'ASSET CLASS':<32} | {'PESO P':<8} | {'PESO B':<8} | {'RET P':<8} | {'RET B':<8} | {'TOT CONTRIB'}"
+            ]
+            lines.append("-" * 84)
+            for b in br.get("breakdown_list", []):
+                lines.append(f"{b['asset_class'][:31]:<32} | {b['portfolio_weight_pct']:>6.1f}% | {b['benchmark_weight_pct']:>6.1f}% | {b['portfolio_return_pct']:>+6.1f}% | {b['benchmark_return_pct']:>+6.1f}% | {b['total_contribution_pct']:>+9.2f}%")
+            return TerminalCommandResult(command="ATTR WEALTH", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="ATTR WEALTH", status="ERROR", output_text=f"Errore Brinson Wealth: {e}")
+
+    def _cmd_wealth_recon(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_smart_cashflow_reconciliation
+            engine = (ctx or {}).get("engine") or get_engine()
+            rc = compute_smart_cashflow_reconciliation(engine, portfolio_id=1)
+            lines = [
+                f"[SMART CASHFLOW RECONCILIATION & AUTO-MATCHING ENGINE]",
+                f"Transazioni Elaborate          : {rc['total_transactions_processed']}",
+                f"Transazioni Riconciliate       : {rc['matched_transactions_count']} ({rc['reconciliation_rate_pct']:.1f}% Match Rate)",
+                f"Duplicati Sospetti Rilevati    : {rc['duplicates_flagged_count']}",
+                "",
+                f"{'DATA':<11} | {'IMPORTO (€)':<12} | {'CATEGORIA ABBINATA':<25} | {'CONF %':<7} | {'FONTE'}"
+            ]
+            lines.append("-" * 75)
+            for m in rc.get("matches_list", [])[:10]:
+                dupe_flag = " [DUPE ⚠️]" if m.get("is_duplicate") else ""
+                lines.append(f"{m['tx_date']:<11} | € {m['amount_eur']:>9,.2f} | {m['matched_category'][:24] + dupe_flag:<25} | {m['match_confidence_pct']:>5.0f}% | {m['match_source']}")
+            return TerminalCommandResult(command="RECON", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="RECON", status="ERROR", output_text=f"Errore Reconciliation: {e}")
 
 
 # Singleton Istanza Globale del Terminal Engine

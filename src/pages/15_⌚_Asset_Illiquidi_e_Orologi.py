@@ -29,7 +29,8 @@ from core.wealth import (
     get_physical_assets,
     save_physical_asset,
     get_wealth_portfolios,
-    compute_consolidated_net_worth
+    compute_consolidated_net_worth,
+    compute_private_equity_deal_metrics
 )
 
 
@@ -257,3 +258,71 @@ with st.expander("➕ Aggiungi Nuovo Orologio, Immobile o Asset Fisico"):
                 st.rerun()
             else:
                 st.error("Inserisci il Nome Identificativo dell'asset.")
+
+st.divider()
+
+# ── SEZIONE PRIVATE EQUITY, VENTURE CAPITAL & J-CURVE ────────
+section("💼 Private Equity, Venture Capital & J-Curve Waterfall")
+st.caption("Monitoraggio delle partecipazioni societarie illiquide, chiamate di capitale (Capital Calls), distribuzioni (DPI) e modellazione stocastica della J-Curve di rendimento atteso.")
+
+pe_res = compute_private_equity_deal_metrics()
+
+pe_c1, pe_c2, pe_c3, pe_c4 = st.columns(4)
+with pe_c1:
+    metric_card("Capitale Impegnato", fmt_eur(pe_res["total_committed_eur"]), delta=f"{pe_res['deals_count']} Deal Attivi", delta_color="normal")
+with pe_c2:
+    metric_card("Capitale Versato (Called)", fmt_eur(pe_res["total_called_eur"]), delta=f"Unfunded: {fmt_eur(pe_res['unfunded_commitment_eur'])}", delta_color="normal")
+with pe_c3:
+    metric_card("MOIC / TVPI Multiplo", f"{pe_res['portfolio_moic_tvpi']:.2f}x", delta=f"DPI: {pe_res['portfolio_dpi']:.2f}x | RVPI: {pe_res['portfolio_rvpi']:.2f}x", delta_color="normal")
+with pe_c4:
+    metric_card("XIRR Netto di Portafoglio", f"{pe_res['portfolio_xirr_pct']:+.1f}%", delta="Rendimento Attualizzato Flussi", delta_color="normal" if pe_res["portfolio_xirr_pct"] >= 0 else "inverse")
+
+st.write("")
+
+c_pe_left, c_pe_right = st.columns([3, 2])
+with c_pe_left:
+    st.markdown("##### 🏛️ Registro Partecipazioni & Club Deal")
+    st.dataframe(
+        pe_res["deals_df"][["name", "asset_class", "vintage_year", "called_capital_eur", "distributions_received_eur", "current_nav_estimated_eur", "moic_multiple", "irr_net_pct", "status"]].rename(columns={
+            "name": "Nome Deal / Fondo",
+            "asset_class": "Tipologia",
+            "vintage_year": "Vintage",
+            "called_capital_eur": "Versato (€)",
+            "distributions_received_eur": "Distribuzioni (€)",
+            "current_nav_estimated_eur": "NAV Stimato (€)",
+            "moic_multiple": "MOIC (x)",
+            "irr_net_pct": "XIRR (%)",
+            "status": "Stato"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+
+with c_pe_right:
+    st.markdown("##### 📈 Modellazione J-Curve di Portafoglio")
+    import plotly.graph_objects as go
+    df_j = pe_res["j_curve_df"]
+    fig_j = go.Figure()
+    fig_j.add_trace(go.Scatter(
+        x=df_j["Anno di Vita Deal"],
+        y=df_j["Valore Netto Portafoglio PE (€)"],
+        mode="lines+markers",
+        name="Valore Netto (J-Curve)",
+        line=dict(color="#6366f1", width=3)
+    ))
+    fig_j.add_trace(go.Scatter(
+        x=df_j["Anno di Vita Deal"],
+        y=df_j["Capitale Versato Cumulativo (€)"],
+        mode="lines",
+        name="Capitale Versato Base",
+        line=dict(color="#94a3b8", width=1.5, dash="dash")
+    ))
+    fig_j.update_layout(
+        xaxis_title="Anno di Vita del Deal",
+        yaxis_title="Valore (€)",
+        height=280,
+        margin=dict(t=15, l=10, r=10, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    apply_plotly_theme(fig_j)
+    st.plotly_chart(fig_j, use_container_width=True, config={'displayModeBar': False})

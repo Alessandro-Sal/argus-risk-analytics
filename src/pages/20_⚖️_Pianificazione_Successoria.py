@@ -36,7 +36,8 @@ from core.fetcher import get_engine
 from core.wealth import (
     get_wealth_portfolios,
     compute_consolidated_net_worth,
-    compute_estate_planning_analytics
+    compute_estate_planning_analytics,
+    compute_family_governance_and_patti_di_famiglia
 )
 
 
@@ -142,10 +143,11 @@ with ek5:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_shares, tab_taxes, tab_shield = st.tabs([
+tab_shares, tab_taxes, tab_shield, tab_patto = st.tabs([
     "🍰 Ripartizione Quote di Legittima",
     "🧾 Calcolo Imposta & Franchigie",
-    "🛡️ Strumenti di Protezione Patrimoniale"
+    "🛡️ Strumenti di Protezione Patrimoniale",
+    "🏛️ Family Governance & Patti di Famiglia"
 ])
 
 with tab_shares:
@@ -299,4 +301,63 @@ with tab_shield:
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+with tab_patto:
+    st.markdown("### 🏛️ Family Governance & Patti di Famiglia (Art. 768-bis c.c.)")
+    st.caption("Pianificazione del passaggio del controllo aziendale e societario, calcolo della compensazione liquidatoria per i legittimari non assegnatari e scudo contro future azioni di riduzione.")
+
+    gov_data = compute_family_governance_and_patti_di_famiglia(
+        engine,
+        portfolio_id=current_pid,
+        business_value_eur=float(estate["tot_patrimonio_netto"] if estate["tot_patrimonio_netto"] > 100000 else 2000000.0),
+        heir_count=num_children,
+        has_spouse=has_spouse
+    )
+
+    gk1, gk2, gk3, gk4 = st.columns(4)
+    with gk1:
+        metric_card("Valore Azienda / Holding", fmt_eur(gov_data["business_value_eur"]), delta="Asset Oggetto del Patto", delta_color="normal")
+    with gk2:
+        metric_card("Erede Designato", gov_data["assigned_heir_name"], delta=f"{gov_data['assigned_quota_pct']:.0f}% Quote Trasferite", delta_color="normal")
+    with gk3:
+        metric_card("Liquidazione Legittimari", fmt_eur(gov_data["total_compensation_due_eur"]), delta="Compensazione non Assegnatari", delta_color="normal")
+    with gk4:
+        metric_card("Scudo Riduzione/Collazione", "ATTIVO 🟢", delta="Immunità Ereditaria Blindata", delta_color="normal")
+
+    st.write("")
+
+    g_col_l, g_col_r = st.columns([3, 2])
+    with g_col_l:
+        st.markdown("##### 👥 Prospetto Liquidazione Legittimari non Assegnatari")
+        df_heirs = pd.DataFrame(gov_data["non_assigned_heirs"])
+        if not df_heirs.empty:
+            st.dataframe(
+                df_heirs[["heir_name", "relationship", "statutory_legitimate_share_pct", "compensation_due_eur", "payment_method"]].rename(columns={
+                    "heir_name": "Soggetto Legittimario",
+                    "relationship": "Grado Parentela",
+                    "statutory_legitimate_share_pct": "Quota Riserva (%)",
+                    "compensation_due_eur": "Compensazione Dovuta (€)",
+                    "payment_method": "Modalità di Regolamento"
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
+        st.markdown("##### 📅 Piano di Donazioni Scaglionate su Orizzonte Pluriennale")
+        st.dataframe(
+            pd.DataFrame(gov_data["staggered_donations_schedule"]).rename(columns={
+                "anno": "Anno",
+                "importo_donato_eur": "Importo Donato (€)",
+                "franchigia_usata_eur": "Franchigia Utilizzata (€)",
+                "imposta_donazione_eur": "Imposta Donazione (€)",
+                "note": "Note Operative"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with g_col_r:
+        st.markdown("##### 📋 Checklist di Conformità Notarile")
+        for chk in gov_data["governance_checklist"]:
+            st.info(f"⚖️ {chk}")
 

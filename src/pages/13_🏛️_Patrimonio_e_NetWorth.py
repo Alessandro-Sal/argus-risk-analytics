@@ -39,7 +39,9 @@ from core.wealth.wealth_engine import (
     generate_executive_tear_sheet_pdf,
     generate_advisory_pitchbook_html,
     generate_advisory_pitchbook_pdf,
-    compute_family_office_multi_entity_consolidation
+    compute_family_office_multi_entity_consolidation,
+    compute_multi_currency_fx_hedging_engine,
+    compute_total_wealth_brinson_attribution
 )
 
 
@@ -749,4 +751,76 @@ with c_fo_p:
         </span>
     </div>
     """, unsafe_allow_html=True)
+
+st.divider()
+
+# ── RISCHIO DI CAMBIO & FX FORWARD HEDGING OVERLAY ───────────
+section("💱 Rischio di Cambio & FX Forward Hedging Overlay")
+st.caption("Mappatura dell'esposizione valutaria estera (USD, GBP, CHF, JPY), stima del costo dei Forward Points (Covered Interest Parity) e simulazione di strategie di copertura a confronto.")
+
+fx_res = compute_multi_currency_fx_hedging_engine(engine, portfolio_id=current_pid)
+
+fx_k1, fx_k2, fx_k3, fx_k4 = st.columns(4)
+with fx_k1:
+    metric_card("Esposizione Valute Estere", fmt_eur(fx_res["foreign_exposure_eur"]), delta=f"{fx_res['foreign_exposure_pct']:.1f}% del Patrimonio", delta_color="normal")
+with fx_k2:
+    metric_card("Costo Annuo Hedging Stimato", fmt_eur(fx_res["annual_hedging_cost_eur"]), delta="Differenziale Tassi Interbancari", delta_color="normal")
+with fx_k3:
+    metric_card("Drawdown Shock FX (-15%)", fmt_eur(fx_res["unhedged_fx_shock_loss_eur"]), delta="Senza Copertura (Unhedged)", delta_color="inverse")
+with fx_k4:
+    metric_card("Drawdown con Hedging", fmt_eur(fx_res["hedged_fx_shock_loss_eur"]), delta="Con Copertura Parziale 50%", delta_color="normal")
+
+st.write("")
+
+if not fx_res["exposures_df"].empty:
+    st.dataframe(
+        fx_res["exposures_df"][["currency", "nominal_amount_eur", "weight_pct", "local_interest_rate_pct", "annual_forward_points_cost_pct", "hedged_ratio_pct", "annual_cost_eur"]].rename(columns={
+            "currency": "Divisa Estera",
+            "nominal_amount_eur": "Controvalore (€)",
+            "weight_pct": "Peso (%)",
+            "local_interest_rate_pct": "Tasso Locale (%)",
+            "annual_forward_points_cost_pct": "Costo Fwd Points (%)",
+            "hedged_ratio_pct": "Quota Coperta (%)",
+            "annual_cost_eur": "Costo Annuo Copertura (€)"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+else:
+    st.info("Patrimonio interamente denominato in Euro (EUR). Rischio di cambio nullo.")
+
+st.divider()
+
+# ── ATTRIBUZIONE DI PERFORMANCE BRINSON MULTI-ASSET ──────────
+section("🎯 Attribuzione di Performance Brinson Multi-Asset (Total Wealth)")
+st.caption("Scomposizione matematica dell'extra-rendimento patrimoniale (Alpha) rispetto a un Composite Benchmark Strategico in Effetto Allocazione (Asset Class), Effetto Selezione (Strumenti) ed Effetto Interazione.")
+
+br_res = compute_total_wealth_brinson_attribution(engine, portfolio_id=current_pid)
+
+br_k1, br_k2, br_k3, br_k4 = st.columns(4)
+with br_k1:
+    metric_card("Rendimento Patrimonio", f"{br_res['portfolio_total_return_pct']:+.2f}%", delta=f"Benchmark: {br_res['benchmark_total_return_pct']:+.2f}%", delta_color="normal")
+with br_k2:
+    metric_card("Extra-Rendimento (Alpha)", f"{br_res['excess_return_pct']:+.2f}%", delta="Rendimento Netto Attivo", delta_color="normal" if br_res["excess_return_pct"] >= 0 else "inverse")
+with br_k3:
+    metric_card("Effetto Allocazione", f"{br_res['allocation_effect_total_pct']:+.2f}%", delta="Scelta Macro Asset Classes", delta_color="normal" if br_res["allocation_effect_total_pct"] >= 0 else "inverse")
+with br_k4:
+    metric_card("Effetto Selezione", f"{br_res['selection_effect_total_pct']:+.2f}%", delta="Scelta Singoli Strumenti", delta_color="normal" if br_res["selection_effect_total_pct"] >= 0 else "inverse")
+
+st.write("")
+
+st.dataframe(
+    br_res["breakdown_df"][["asset_class", "portfolio_weight_pct", "benchmark_weight_pct", "portfolio_return_pct", "benchmark_return_pct", "allocation_effect_pct", "selection_effect_pct", "total_contribution_pct"]].rename(columns={
+        "asset_class": "Classe di Attivo",
+        "portfolio_weight_pct": "Peso Portafoglio (%)",
+        "benchmark_weight_pct": "Peso Benchmark (%)",
+        "portfolio_return_pct": "Rendimento Portafoglio (%)",
+        "benchmark_return_pct": "Rendimento Benchmark (%)",
+        "allocation_effect_pct": "Effetto Allocazione (%)",
+        "selection_effect_pct": "Effetto Selezione (%)",
+        "total_contribution_pct": "Contributo Totale (%)"
+    }),
+    use_container_width=True,
+    hide_index=True
+)
 
