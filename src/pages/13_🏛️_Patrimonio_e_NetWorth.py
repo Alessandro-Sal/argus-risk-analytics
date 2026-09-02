@@ -900,10 +900,24 @@ with tab_traj:
 
 with tab_mat:
     st.markdown("##### 🗓️ Matrice Mensile dei Flussi Netti di Risparmio (€)")
-    st.dataframe(
-        matrix_df.style.format("€ {:,.2f}", na_rep="-").background_gradient(cmap="Greens", subset=[c for c in matrix_df.columns if c not in ["Totale Annuo (€)", "Media Mensile (€)"]]),
-        use_container_width=True
-    )
+    
+    def color_wealth_flows(val):
+        if pd.isna(val) or val == 0:
+            return "color: #484f58; background-color: rgba(255,255,255,0.02);"
+        if val > 0:
+            intensity = min(0.55, max(0.10, val / 5000.0))
+            return f"background-color: rgba(16, 185, 129, {intensity:.2f}); color: #ffffff; font-weight: 600;"
+        else:
+            intensity = min(0.55, max(0.10, abs(val) / 5000.0))
+            return f"background-color: rgba(239, 68, 68, {intensity:.2f}); color: #ffffff; font-weight: 600;"
+
+    styler_mat = matrix_df.style.format("€ {:,.2f}", na_rep="-")
+    if hasattr(styler_mat, "map"):
+        styler_mat = styler_mat.map(color_wealth_flows)
+    elif hasattr(styler_mat, "applymap"):
+        styler_mat = styler_mat.applymap(color_wealth_flows)
+
+    st.dataframe(styler_mat, use_container_width=True)
 
 with tab_under:
     st.markdown("##### 📉 Curva Underwater di Contrazione Patrimoniale (Drawdown vs High-Water Mark)")
