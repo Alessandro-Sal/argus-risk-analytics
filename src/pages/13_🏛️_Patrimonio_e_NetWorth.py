@@ -201,13 +201,13 @@ prof_title = prof_map.get(current_pid, "Personale")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p13")
 render_wealth_executive_badges(nw)
 
-head_c1, head_c2 = st.columns([3.8, 1.2])
-with head_c1:
-    st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
-    st.caption(f"Consolidamento olistico del patrimonio netto (Liquidità, Portafogli Titoli, Crypto, Caveau e Previdenza) • Sincronizzato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
-with head_c2:
-    st.write("")
-    if not is_snapshot_mode and len(prof_map) > 1:
+if not is_snapshot_mode and len(prof_map) > 1:
+    head_c1, head_c2 = st.columns([3.8, 1.2])
+    with head_c1:
+        st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
+        st.caption(f"Consolidamento olistico del patrimonio netto • Aggiornato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    with head_c2:
+        st.write("")
         sel_pid = st.selectbox(
             "Profilo Patrimoniale:",
             options=list(prof_map.keys()),
@@ -218,6 +218,9 @@ with head_c2:
         if sel_pid != current_pid:
             st.session_state["wealth_active_portfolio_id"] = sel_pid
             st.rerun()
+else:
+    st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
+    st.caption(f"Consolidamento olistico del patrimonio netto • Aggiornato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
 
 
 
