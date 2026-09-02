@@ -58,7 +58,10 @@ from core.wealth.wealth_engine import (
     compute_tax_smart_rebalancing_watchdog,
     compute_real_estate_net_equity_and_ltv,
     generate_advisory_pitchbook_html,
-    generate_advisory_pitchbook_pdf
+    generate_advisory_pitchbook_pdf,
+    compute_ai_quarterly_wealth_review,
+    compute_family_office_multi_entity_consolidation,
+    compute_sequence_of_returns_risk_engine
 )
 from core.wealth.wealth_importer import (
     parse_universal_statement,
@@ -1103,6 +1106,66 @@ def test_generate_advisory_pitchbook_pdf_engine(sqlite_engine):
     assert isinstance(pdf_bytes, (bytes, bytearray))
     assert len(pdf_bytes) > 100
     assert pdf_bytes.startswith(b"%PDF")
+
+
+def test_compute_ai_quarterly_wealth_review(sqlite_engine):
+    """Test della generazione del report narrativo trimestrale per Family Office e Clienti."""
+    init_wealth_db(sqlite_engine)
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Corrente",
+        "account_type": AccountType.CHECKING.value,
+        "balance": 80000.0,
+        "institution": "Fineco"
+    })
+
+    review = compute_ai_quarterly_wealth_review(sqlite_engine, portfolio_id=1, quarter="Q1 2026")
+    assert review["quarter"] == "Q1 2026"
+    assert "full_markdown" in review
+    assert "Relazione Trimestrale" in review["full_markdown"]
+    assert len(review["tactical_recommendations"]) > 0
+    assert review["consolidated_kpis"]["net_worth"] == 80000.0
+
+
+def test_compute_family_office_multi_entity_consolidation(sqlite_engine):
+    """Test del Consolidatore Family Office Multi-Entity con elisione infragruppo e PEX 1.2%."""
+    init_wealth_db(sqlite_engine)
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Holding",
+        "account_type": AccountType.CHECKING.value,
+        "balance": 500000.0,
+        "institution": "Intesa Sanpaolo"
+    })
+
+    fo = compute_family_office_multi_entity_consolidation(sqlite_engine, portfolio_id=1)
+    assert fo["consolidated_family_office_net_worth"] > 0.0
+    assert fo["entities_count"] >= 4
+    assert fo["eliminated_intercompany_amount_eur"] > 0.0
+    assert "tax_efficiency_pex" in fo
+    assert fo["tax_efficiency_pex"]["annual_tax_saving_eur"] > 0.0
+    assert fo["tax_efficiency_pex"]["tax_saving_pct"] > 90.0  # PEX 1.2% vs 26% IRPEF
+
+
+def test_compute_sequence_of_returns_risk_engine():
+    """Test del simulatore di decumulo 30y e Sequence of Returns Risk (SRR)."""
+    res = compute_sequence_of_returns_risk_engine(
+        initial_wealth=1000000.0,
+        annual_withdrawal=40000.0,
+        early_shock_pct=-25.0,
+        cash_buffer_years=2.5,
+        max_years=30
+    )
+
+    assert res["initial_wealth_eur"] == 1000000.0
+    assert res["initial_swr_pct"] == 4.0
+    assert res["cash_buffer_recommended_eur"] == 100000.0  # 40k * 2.5
+    assert "trajectory_df" in res
+    assert not res["trajectory_df"].empty
+    assert not res["constant_result"]["is_ruined"]
+    assert res["constant_result"]["final_wealth"] > 1000000.0
+    # Lo scenario con buffer protettivo estende la sopravvivenza o previene la rovina rispetto allo scenario sprotetto
+    assert (res["early_crash_with_buffer_result"]["ruin_year"] or 99) > (res["early_crash_result"]["ruin_year"] or 0)
 
 
 

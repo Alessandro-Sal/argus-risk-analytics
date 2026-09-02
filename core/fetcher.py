@@ -70,7 +70,7 @@ LOOKBACK_EXTRA_DAYS = 365
 
 # ── Connessione MySQL ────────────────────────────────────────
 
-def get_engine(user: str, password: str, host: str,
+def get_engine(user: str = "root", password: str = "", host: str = "localhost",
                port: int = 3306, db: str = "investment_risk_bi", database: str = None):
     """
     Restituisce un engine SQLAlchemy per MySQL. Se MySQL non è disponibile (es. Docker disattivato),

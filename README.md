@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.1.1-blue.svg)
+![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-318%2F318%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-322%2F322%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -168,7 +168,9 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 ### 13. 🏛️ Patrimonio & Net Worth Consolidato (`src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)
 * **🏛️ Consolidamento a 5 Livelli**: Aggregazione in tempo reale di Liquidità, Investimenti Finanziari (collegamento dinamico a portafogli Risk), Asset Fisici/Caveau, Previdenza Integrativa e Passività.
 * **🏆 Wealth Health Score (0-100)**: Punteggio sintetico di salute patrimoniale calcolato su 5 pilastri: Riserva di Liquidità, Tasso di Risparmio, Diversificazione, Copertura Previdenziale e Grado di Indebitamento (DTI).
+* **🏢 Family Office Multi-Entity & Holding Consolidator**: Consolidamento patrimoniale e societario tra diverse entità giuridiche del nucleo familiare (*Persona Fisica, Holding SRL, Società Semplice, Trust Familiare, Polizze Dedicate*) con elisione automatica delle partite infragruppo (finanziamenti soci ed equity intercompany) e analisi di convenienza fiscale **PEX (Participation Exemption Art. 87 TUIR: 1,2% effettivo vs 26% IRPEF)**.
 * **📊 Trend Storico & Snapshot Temporali**: Storicizzazione dei bilanci patrimoniali e monitoraggio della crescita del capitale nel tempo.
+* **📑 Client-Ready Advisory Pitchbook**: Generazione ed esportazione di dossier multipagina esecutivi in formato PDF e HTML per clientela Private Banking e Family Office.
 
 ### 14. 💳 Cash Flow, Budgeting 50/30/20 & Spese (`src/pages/14_💳_Cash_Flow_e_Spese.py`)
 * **📊 Libro Mastro Entrate & Uscite**: Analisi granulare dei flussi di cassa, scomposizione per categorie di spesa e monitoraggio del tasso di risparmio mensile.
@@ -196,6 +198,9 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
   * Gestione e persistenza su DB di $N$ traguardi di vita (*Casa, FIRE, Studi, Auto, Pensione*).
   * Simulazioni Monte Carlo su 5.000 scenari stocastici a salti di Poisson con ventaglio $P5-P95$, stima dello shortfall e calcolo dell'apporto mensile PAC ottimale per raggiungere un **Success Probability Index (SPI $\ge 85\%$)**.
   * **Dynamic Glide Path**: Curva sigmoidea di de-risking temporale (Equity $\to$ Bonds $\to$ Cash $\to$ Oro).
+* **🔮 Sequence of Returns Risk (SRR) & Decumulation Crash Test**:
+  * Simulatore di decumulo patrimoniale a 30 anni sotto 4 regimi di sequenza rendimenti (*Early Crash -25% Y1-Y3*, *Rendimento Costante +6%*, *Late Crash Y11*, *Early Crash CON Glide Buffer*).
+  * Dimensionamento algoritmico del **Glide Cash Buffer** ($SWR \times 2.5\text{ anni}$) per azzerare le liquidazioni forzate in bear market.
 * **💸 Total Cost of Ownership (TCO) & Fee Drag Breakdown**:
   * Stima del TER medio ponderato degli strumenti e quantificazione dell'erosione patrimoniale cumulativa da commissioni a 5, 10, 20 e 30 anni vs benchmark ETF low-cost (0.15%).
 
@@ -219,6 +224,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 
 ### 21. 🤖 AI Wealth Copilot & Advisor (`src/pages/21_🤖_AI_Copilot_e_Advisor.py`)
 * **🧠 Diagnostica Patrimoniale AI**: Analisi automatica in linguaggio naturale dello stato di salute patrimoniale, cash flow ed esposizione al rischio.
+* **📑 Executive Quarterly Review (NLG)**: Generazione automatica di Relazioni Trimestrali Istituzionali in Markdown per Family Office e clienti Private Banking, strutturate in 5 sezioni (*Executive Summary*, *Asset Allocation & Drift*, *Goal Progress*, *Macro & Fiscal Outlook*, *Raccomandazioni Tattiche*).
 * **💬 Assistente Finanziario Interattivo**: Chatbot avanzato con accesso in tempo reale al bilancio consolidato, budget e simulazioni FIRE.
 * **📄 Generatore Report Istituzionali**: Creazione di Tear Sheet patrimoniali completi e sintesi esecutive stampabili.
 
@@ -547,7 +553,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **309 test automatizzati PyTest** distribuiti su 55 file di test con copertura end-to-end del 100%:
+Il progetto include **322 test automatizzati PyTest** distribuiti su 55 file di test con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -555,7 +561,7 @@ py -m pytest
 
 Output atteso:
 ```text
-============================= 309 passed in ~130.00s =============================
+======================= 322 passed in ~98.00s (100%) =======================
 ```
 
 ---
@@ -566,4 +572,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.0.0.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.2.0.*

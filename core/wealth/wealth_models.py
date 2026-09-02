@@ -228,3 +228,49 @@ class RealEstateEquitySummary:
     mortgage_count: int = 0
     properties_detail: List[Dict[str, Any]] = field(default_factory=list)
 
+
+class LegalEntityType(str, Enum):
+    PERSONA_FISICA = "persona_fisica"             # Persona fisica residente (IRPEF / 26%)
+    HOLDING_SRL = "holding_srl"                   # Holding di partecipazioni SRL / SpA (IRES 24%, PEX 1.2%)
+    SOCIETA_SEMPLICE = "societa_semplice"         # Società Semplice / Cassaforte Familiare (trasparenza)
+    TRUST_FAMILIARE = "trust_familiare"           # Trust di protezione patrimoniale e successoria
+    POLIZZA_ISTITUZIONALE = "polizza_dedicata"     # Polizza vita Ramo I/III Private Insurance
+
+
+@dataclass
+class FamilyOfficeEntityItem:
+    entity_id: str
+    name: str
+    entity_type: str = LegalEntityType.PERSONA_FISICA.value
+    gross_assets_eur: float = 0.0
+    third_party_liabilities_eur: float = 0.0
+    intercompany_receivables_eur: float = 0.0  # Crediti verso altre entità del gruppo
+    intercompany_liabilities_eur: float = 0.0  # Debiti verso soci / altre entità del gruppo
+    ownership_share_pct: float = 100.0         # Quota di possesso del nucleo familiare
+    effective_tax_rate_est: float = 26.0       # Aliquota media stimata su redditi di capitale
+    jurisdiction: str = "Italia"
+    notes: Optional[str] = None
+
+
+@dataclass
+class SRRScenarioResult:
+    scenario_name: str
+    final_wealth_eur: float
+    ruin_year: Optional[int]
+    is_ruined: bool
+    wealth_trajectory: List[float]
+    cumulative_withdrawals_eur: float
+    glide_buffer_recommended_eur: float
+
+
+@dataclass
+class QuarterlyReviewResult:
+    quarter: str
+    generated_at: str
+    executive_summary_text: str
+    macro_outlook_text: str
+    performance_attribution_text: str
+    goals_progress_text: str
+    tactical_recommendations: List[str]
+    consolidated_kpis: Dict[str, Any]
+

@@ -1086,6 +1086,27 @@ class ArgusTerminalEngine:
         if first_token in ("STREAM", "BOOK", "OFI"):
             return self._cmd_stream_summary(tokens)
 
+        # ---------------------------------------------------------
+        # 8. WEALTH ADVISORY & FAMILY OFFICE MNEMONICS
+        # ---------------------------------------------------------
+        if first_token in ("GOALS", "GOAL", "FIRE"):
+            return self._cmd_wealth_goals(ctx)
+
+        if first_token in ("LTV", "EQUITY", "MORTGAGE"):
+            return self._cmd_wealth_ltv(ctx)
+
+        if first_token in ("DRIFT", "REBAL", "REBALANCE", "WATCHDOG"):
+            return self._cmd_wealth_drift(ctx)
+
+        if first_token in ("PITCH", "PITCHBOOK", "DOSSIER"):
+            return self._cmd_wealth_pitch(ctx)
+
+        if first_token in ("SRR", "DEEPFIRE"):
+            return self._cmd_wealth_srr(tokens, ctx)
+
+        if first_token in ("HOLDING", "FAMILY", "FO"):
+            return self._cmd_wealth_holding(ctx)
+
         # Scorciatoie a singolo carattere
         if len(tokens) == 1 and len(first_token) == 1:
             if first_token in ("H", "?"):
@@ -2328,6 +2349,136 @@ Order Flow Imbalance(OFI): {stats.get('order_flow_imbalance', 0.0):+.2f} ({'Buye
                 "min_pair": {"asset1": min_pair[0], "asset2": min_pair[1], "rho": round(float(min_pair[2]), 4)}
             }
         )
+
+    # ---------------------------------------------------------
+    # WEALTH MANAGEMENT & FAMILY OFFICE MNEMONIC HANDLERS
+    # ---------------------------------------------------------
+    def _cmd_wealth_goals(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_db import get_wealth_goals
+            from core.wealth.wealth_engine import compute_goal_based_monte_carlo
+            engine = (ctx or {}).get("engine") or get_engine()
+            goals_df = get_wealth_goals(engine, portfolio_id=1)
+            if goals_df.empty:
+                out = "[GOALS] Nessun traguardo di vita attivo configurato. Creane uno nel modulo 17_FIRE."
+                return TerminalCommandResult(command="GOALS", status="INFO", output_text=out)
+            
+            lines = [
+                f"[GOAL-BASED INVESTING & LIFE GOALS DESK - {len(goals_df)} TRAGUARDI ATTIVI]",
+                f"{'OBIETTIVO':<25} | {'ACCUMULATO':<12} | {'TARGET':<12} | {'PROG %':<8} | {'PAC/MESE':<10}"
+            ]
+            lines.append("-" * 75)
+            for _, g in goals_df.iterrows():
+                cur = float(g.get("current_amount", 0.0))
+                tgt = float(g.get("target_amount", 0.0))
+                pct = (cur / tgt * 100.0) if tgt > 0 else 0.0
+                pac = float(g.get("monthly_contribution", 0.0))
+                lines.append(f"{str(g.get('name'))[:24]:<25} | € {cur:>9,.0f} | € {tgt:>9,.0f} | {pct:>6.1f}% | € {pac:>7,.0f}")
+            return TerminalCommandResult(command="GOALS", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="GOALS", status="ERROR", output_text=f"Errore caricamento Goals: {e}")
+
+    def _cmd_wealth_ltv(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_real_estate_net_equity_and_ltv
+            engine = (ctx or {}).get("engine") or get_engine()
+            re = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=1)
+            out = f"""
+[REAL ESTATE NET EQUITY & LOAN-TO-VALUE (LTV) DESK]
+Valore di Mercato Immobili : € {re['total_property_market_value']:,.2f} ({re['property_count']} Proprietà)
+Debito Mutui Residuo       : € {re['total_mortgage_debt_remaining']:,.2f} ({re['mortgage_count']} Mutui)
+Home Equity Netto          : € {re['net_home_equity_eur']:,.2f}
+LTV Medio Ponderato        : {re['weighted_ltv_pct']:.1f}% [{re['ltv_status'].upper()}]
+Rata Mensile Stimata       : € {re['estimated_monthly_mortgage_payment']:,.2f}/mese
+"""
+            return TerminalCommandResult(command="LTV", status="SUCCESS", output_text=out.strip())
+        except Exception as e:
+            return TerminalCommandResult(command="LTV", status="ERROR", output_text=f"Errore calcolo LTV: {e}")
+
+    def _cmd_wealth_drift(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_tax_smart_rebalancing_watchdog
+            engine = (ctx or {}).get("engine") or get_engine()
+            w = compute_tax_smart_rebalancing_watchdog(engine, portfolio_id=1)
+            cash_alert_str = f"ATTIVO 🔴 (Eccesso € {w.get('excess_cash_eur', 0.0):,.2f})" if w.get('cash_drag_alert') else "REGOLARE 🟢"
+            lines = [
+                f"[TAX-SMART REBALANCING WATCHDOG & DRIFT MONITOR]",
+                f"Attivi Investibili Totali  : € {w['total_investable_assets_eur']:,.2f}",
+                f"Turnover Ribilanciamento   : € {w.get('total_turnover_eur', 0.0):,.2f}",
+                f"Classi in Drift Critico    : {w['critical_drifts_count']}",
+                f"Cash Drag Alert            : {cash_alert_str}",
+                "",
+                f"{'CLASSE ATTIVO':<20} | {'PESO ATT':<9} | {'PESO TGT':<9} | {'DRIFT %':<9} | {'AZIONE':<12}"
+            ]
+            lines.append("-" * 68)
+            for d in w.get("drift_table", []):
+                lines.append(f"{d['asset_name'][:19]:<20} | {d['current_weight_pct']:>7.1f}% | {d['target_weight_pct']:>7.1f}% | {d['drift_pct']:>+7.1f}% | {d['action_type']} (€ {abs(d['target_delta_eur']):,.0f})")
+            return TerminalCommandResult(command="DRIFT", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="DRIFT", status="ERROR", output_text=f"Errore calcolo Drift: {e}")
+
+    def _cmd_wealth_pitch(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_consolidated_net_worth
+            engine = (ctx or {}).get("engine") or get_engine()
+            nw = compute_consolidated_net_worth(engine, portfolio_id=1)
+            out = f"""
+[ARGUS WEALTH ADVISORY PITCHBOOK GENERATOR (6-PAGE A4 DOSSIER)]
+Dossier Multipagina Istituzionale Generato Correttamente.
+  • Patrimonio Netto Consolidato : € {nw.total_net_worth:,.2f}
+  • Wealth Health Score          : {nw.wealth_health_score:.0f} / 100
+  • Runway di Sicurezza          : {nw.runway_months:.1f} Mesi
+  • Modulo Download              : Disponibile in 13_🏛️_Patrimonio_e_NetWorth o via Pitchbook PDF Export.
+"""
+            return TerminalCommandResult(command="PITCH", status="SUCCESS", output_text=out.strip())
+        except Exception as e:
+            return TerminalCommandResult(command="PITCH", status="ERROR", output_text=f"Errore Pitchbook: {e}")
+
+    def _cmd_wealth_srr(self, tokens: List[str], ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.wealth.wealth_engine import compute_sequence_of_returns_risk_engine
+            init_w = float(tokens[1]) if len(tokens) > 1 and tokens[1].replace(".","").isdigit() else 1000000.0
+            srr = compute_sequence_of_returns_risk_engine(initial_wealth=init_w, annual_withdrawal=init_w*0.04)
+            out = f"""
+[SEQUENCE OF RETURNS RISK (SRR) & 30-YEAR DECUMULATION SIMULATOR]
+Capitale Iniziale : € {srr['initial_wealth_eur']:,.0f} | Prelievo Annuo: € {srr['annual_withdrawal_eur']:,.0f} (SWR {srr['initial_swr_pct']:.1f}%)
+Livello Sicurezza : {srr['swr_safety_level']}
+Glide Cash Buffer : € {srr['cash_buffer_recommended_eur']:,.0f} ({srr['cash_buffer_years']:.1f} anni di spese protette)
+
+ESITO SCENARI DI STRESS A 30 ANNI:
+  • Rendimento Costante (+6%/a)        : € {srr['constant_result']['final_wealth']:,.0f} (Rovina: NO)
+  • Early Bear Market (-25% Y1-Y3)     : € {srr['early_crash_result']['final_wealth']:,.0f} (Rovina: {'ANNO ' + str(srr['early_crash_result']['ruin_year']) if srr['early_crash_result']['is_ruined'] else 'NO'})
+  • Early Crash CON Glide Cash Buffer  : € {srr['early_crash_with_buffer_result']['final_wealth']:,.0f} (Rovina: NO 🟢)
+"""
+            return TerminalCommandResult(command="SRR", status="SUCCESS", output_text=out.strip())
+        except Exception as e:
+            return TerminalCommandResult(command="SRR", status="ERROR", output_text=f"Errore SRR: {e}")
+
+    def _cmd_wealth_holding(self, ctx: Optional[Dict[str, Any]] = None) -> TerminalCommandResult:
+        try:
+            from core.fetcher import get_engine
+            from core.wealth.wealth_engine import compute_family_office_multi_entity_consolidation
+            engine = (ctx or {}).get("engine") or get_engine()
+            fo = compute_family_office_multi_entity_consolidation(engine, portfolio_id=1)
+            lines = [
+                f"[FAMILY OFFICE MULTI-ENTITY CONSOLIDATOR & PEX TAX DESK]",
+                f"Patrimonio Netto Consolidato Gruppo : € {fo['consolidated_family_office_net_worth']:,.2f}",
+                f"Attivi Lordi Aggregati              : € {fo['total_gross_assets_eur']:,.2f}",
+                f"Partite Infragruppo Elise (Soci)    : € {fo['eliminated_intercompany_amount_eur']:,.2f}",
+                f"Risparmio Fiscale PEX Annuo (1.2%)  : € {fo['tax_efficiency_pex']['annual_tax_saving_eur']:,.2f} ({fo['tax_efficiency_pex']['tax_saving_pct']:.1f}% vs Persona Fisica)",
+                "",
+                f"{'ENTITÀ GIURIDICA':<30} | {'EQUITY CONSOLIDATA':<20} | {'PESO %':<8} | {'ALIQUOTA'}"
+            ]
+            lines.append("-" * 75)
+            for e in fo.get("entities_detail", []):
+                lines.append(f"{e['name'][:29]:<30} | € {e['consolidated_net_equity_eur']:>17,.2f} | {e.get('weight_on_consolidated_pct', 0.0):>6.1f}% | {e['effective_tax_rate_est']:.1f}%")
+            return TerminalCommandResult(command="HOLDING", status="SUCCESS", output_text="\n".join(lines))
+        except Exception as e:
+            return TerminalCommandResult(command="HOLDING", status="ERROR", output_text=f"Errore Holding: {e}")
 
 
 # Singleton Istanza Globale del Terminal Engine

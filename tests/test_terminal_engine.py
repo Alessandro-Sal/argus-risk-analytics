@@ -624,6 +624,45 @@ def test_terminal_engine_corr_single_and_pair():
     assert "NVDA" in res_single.output_text
 
 
+def test_terminal_engine_wealth_mnemonics(mock_session_context):
+    """Test dei mnemonici Bloomberg dedicati a Wealth Management & Family Office."""
+    from core.terminal_engine import get_terminal_engine
+    engine = get_terminal_engine()
+
+    # 1. GOALS
+    res_goals = engine.execute_command("GOALS <GO>", mock_session_context)
+    assert res_goals.status in ("SUCCESS", "INFO")
+    assert "GOALS" in res_goals.output_text or "TRAGUARDI" in res_goals.output_text
+
+    # 2. LTV
+    res_ltv = engine.execute_command("LTV <GO>", mock_session_context)
+    assert res_ltv.status == "SUCCESS"
+    assert "LOAN-TO-VALUE" in res_ltv.output_text
+    assert "Home Equity" in res_ltv.output_text
+
+    # 3. DRIFT / REBAL
+    res_drift = engine.execute_command("DRIFT <GO>", mock_session_context)
+    assert res_drift.status == "SUCCESS"
+    assert "REBALANCING WATCHDOG" in res_drift.output_text
+
+    # 4. PITCH
+    res_pitch = engine.execute_command("PITCH <GO>", mock_session_context)
+    assert res_pitch.status == "SUCCESS"
+    assert "PITCHBOOK" in res_pitch.output_text
+
+    # 5. SRR
+    res_srr = engine.execute_command("SRR 1000000 <GO>", mock_session_context)
+    assert res_srr.status == "SUCCESS"
+    assert "SEQUENCE OF RETURNS RISK" in res_srr.output_text
+    assert "Early Bear Market" in res_srr.output_text
+
+    # 6. HOLDING / FAMILY
+    res_holding = engine.execute_command("HOLDING <GO>", mock_session_context)
+    assert res_holding.status == "SUCCESS"
+    assert "FAMILY OFFICE" in res_holding.output_text
+    assert "PEX" in res_holding.output_text
+
+
 
 
 
