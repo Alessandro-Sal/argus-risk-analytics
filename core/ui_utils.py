@@ -1227,11 +1227,7 @@ def render_command_bar():
             """, unsafe_allow_html=True)
         with c_btn:
             if st.button("🔍 Spotlight", key="btn_open_spotlight", use_container_width=True, help="Cerca pagine, schede, ticker o lancia comandi rapidi (Ctrl+K)"):
-                st.session_state["show_spotlight_palette"] = True
-
-    # Rendering della Command Palette se attivata
-    if st.session_state.get("show_spotlight_palette", False):
-        render_spotlight_palette()
+                render_spotlight_palette()
 
 
 def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
@@ -1685,12 +1681,13 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
     return None
 
 
+@st.dialog("⚡ ARGUS RISK & QUANT COMMAND DESK", width="large")
 def render_spotlight_palette():
-    """Renderizza la Bloomberg-Style Command Line Gateway con parser mnemonico e search unificata."""
+    """Renderizza la Bloomberg-Style Command Line Gateway come vero modale @st.dialog con parser mnemonico e search unificata."""
     from core.sidebar import switch_to_page
     
     st.markdown("""
-    <div style="background: linear-gradient(135deg, rgba(20, 24, 30, 0.98) 0%, rgba(10, 13, 18, 1.0) 100%); border: 1.5px solid #ff9900; border-radius: 10px; padding: 10px 16px; margin: 8px 0 14px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(255,153,0,0.2);">
+    <div style="background: linear-gradient(135deg, rgba(20, 24, 30, 0.98) 0%, rgba(10, 13, 18, 1.0) 100%); border: 1.5px solid #ff9900; border-radius: 10px; padding: 10px 16px; margin: 0 0 14px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(255,153,0,0.2);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div style="font-size:12.5px; font-weight:800; color:#ff9900; letter-spacing:0.8px; display:inline-flex; align-items:center; gap:8px;">
                 <span>⚡</span> ARGUS TERMINAL COMMAND GATEWAY
@@ -1703,7 +1700,7 @@ def render_spotlight_palette():
     </div>
     """, unsafe_allow_html=True)
 
-    col_q, col_exec, col_close = st.columns([5.0, 1.2, 0.8])
+    col_q, col_exec = st.columns([4.8, 1.2])
     with col_q:
         query = st.text_input(
             "Terminal Command", 
@@ -1728,15 +1725,9 @@ def render_spotlight_palette():
                     st.session_state[parsed_cmd["tab_key"]] = parsed_cmd["target"]
                     st.session_state[f"target_subtab_{parsed_cmd['tab_key']}"] = parsed_cmd["target"]
                     st.session_state["global_target_subtab"] = parsed_cmd["target"]
-                st.session_state["show_spotlight_palette"] = False
                 switch_to_page(parsed_cmd["page"])
             else:
                 st.warning("Comando non riconosciuto. Digita es. `AAPL DES` o `YCRV`.")
-
-    with col_close:
-        if st.button("✕ Esc", key="btn_close_spotlight", use_container_width=True):
-            st.session_state["show_spotlight_palette"] = False
-            st.rerun()
 
     # Visual Feedback del comando riconosciuto
     if parsed_cmd:
@@ -1877,15 +1868,16 @@ def render_spotlight_palette():
     st.divider()
 
 
+@st.dialog("🏛️ ARGUS WEALTH COMMAND GATEWAY", width="large")
 def render_wealth_spotlight_palette():
-    """Renderizza la Command Line Gateway specificamente dedicata ad ARGUS Wealth con parser mnemonico patrimoniale ed estetica Emerald."""
+    """Renderizza la Command Line Gateway specificamente dedicata ad ARGUS Wealth come vero modale @st.dialog con parser mnemonico patrimoniale ed estetica Emerald."""
     from core.sidebar import switch_to_page
     
     st.markdown("""
-    <div style="background: linear-gradient(135deg, rgba(16, 28, 24, 0.98) 0%, rgba(10, 18, 14, 1.0) 100%); border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 16px; margin: 8px 0 14px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(16, 185, 129, 0.25);">
+    <div style="background: linear-gradient(135deg, rgba(16, 28, 24, 0.98) 0%, rgba(10, 18, 14, 1.0) 100%); border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 16px; margin: 0 0 14px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(16, 185, 129, 0.25);">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
             <div style="font-size:12.5px; font-weight:800; color:#10b981; letter-spacing:0.8px; display:inline-flex; align-items:center; gap:8px;">
-                <span>🏛️</span> ARGUS WEALTH COMMAND GATEWAY
+                <span>🏛️</span> ARGUS WEALTH COMMAND DESK
                 <span style="font-size:9.5px; padding:1px 6px; background:#10b981; color:#000000; border-radius:3px; font-weight:900; letter-spacing:0.5px;">WEALTH PARITY</span>
             </div>
             <div style="font-size:11px; color:#8b949e; font-family:monospace;">
@@ -1895,7 +1887,7 @@ def render_wealth_spotlight_palette():
     </div>
     """, unsafe_allow_html=True)
 
-    col_q, col_exec, col_close = st.columns([5.0, 1.2, 0.8])
+    col_q, col_exec = st.columns([4.8, 1.2])
     with col_q:
         query = st.text_input(
             "Wealth Command", 
@@ -1914,15 +1906,9 @@ def render_wealth_spotlight_palette():
                     st.session_state[parsed_cmd["tab_key"]] = parsed_cmd["target"]
                     st.session_state[f"target_subtab_{parsed_cmd['tab_key']}"] = parsed_cmd["target"]
                     st.session_state["global_target_subtab"] = parsed_cmd["target"]
-                st.session_state["show_wealth_spotlight_palette"] = False
                 switch_to_page(parsed_cmd["page"])
             else:
                 st.warning("Comando Wealth non riconosciuto. Digita es. `NETWORTH`, `CASHFLOW`, `WTIME` o `REPORTS`.")
-
-    with col_close:
-        if st.button("✕ Esc", key="btn_close_wealth_spotlight", use_container_width=True):
-            st.session_state["show_wealth_spotlight_palette"] = False
-            st.rerun()
 
     # Visual Feedback del comando riconosciuto
     if parsed_cmd:
@@ -1941,7 +1927,7 @@ def render_wealth_spotlight_palette():
 
     # ── COLONNA 1: SCHEDE & MODULI PATRIMONIALI ──────────────────────
     with col_w1:
-        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#10b981; margin-bottom:6px; letter-spacing:0.5px;">🏛️ MODULI & STRUMENTI WEALTH</div>', unsafe_allow_html=True)
+        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#10b981; margin-bottom:6px; letter-spacing:0.5px;">🏛️ MODULI &amp; STRUMENTI WEALTH</div>', unsafe_allow_html=True)
         
         wealth_search_index = [
             {"title": "🎛️ Control Room & Ingestione Wealth", "page": "pages/12_🎛️_Wealth_Control_Room.py", "tab_key": None, "target": None, "keywords": "control room upload csv estratti conto sincronizzazione gsheets saldi conti wcr"},
@@ -1975,7 +1961,6 @@ def render_wealth_spotlight_palette():
                         st.session_state[item["tab_key"]] = item["target"]
                         st.session_state[f"target_subtab_{item['tab_key']}"] = item["target"]
                         st.session_state["global_target_subtab"] = item["target"]
-                    st.session_state["show_wealth_spotlight_palette"] = False
                     switch_to_page(item["page"])
         else:
             st.caption("Nessun modulo patrimoniale trovato.")
@@ -1999,20 +1984,9 @@ def render_wealth_spotlight_palette():
             ("📑 REPORTS", "pages/12_🎛️_Wealth_Control_Room.py", "Hub Esportazioni")
         ]
 
-        # 2 columns of quick action buttons
-        for i in range(0, min(8, len(w_actions)), 2):
-            c_a1, c_a2 = st.columns(2)
-            lbl1, pg1, _ = w_actions[i]
-            with c_a1:
-                if st.button(lbl1, key=f"spot_w_btn_{lbl1}", use_container_width=True):
-                    st.session_state["show_wealth_spotlight_palette"] = False
-                    switch_to_page(pg1)
-            if i + 1 < len(w_actions):
-                lbl2, pg2, _ = w_actions[i+1]
-                with c_a2:
-                    if st.button(lbl2, key=f"spot_w_btn_{lbl2}", use_container_width=True):
-                        st.session_state["show_wealth_spotlight_palette"] = False
-                        switch_to_page(pg2)
+        for lbl, pg, _ in w_actions[:6]:
+            if st.button(lbl, key=f"spot_w_btn_{lbl}", use_container_width=True):
+                switch_to_page(pg)
 
     # ── COLONNA 3: SHORTCUTS CHEAT SHEET WEALTH ───────────────────────
     with col_w3:
@@ -2022,9 +1996,9 @@ def render_wealth_spotlight_palette():
         <div style="font-family:monospace; font-size:11px; color:#8b949e; line-height:1.6;">
             <div><strong style="color:#34d399;">NW</strong> Net Worth 360°</div>
             <div><strong style="color:#34d399;">CF</strong> Cash Flow 50/30/20</div>
-            <div><strong style="color:#34d399;">TIME</strong> Matrice & DD</div>
+            <div><strong style="color:#34d399;">TIME</strong> Matrice &amp; DD</div>
             <div><strong style="color:#34d399;">WATCH</strong> Caveau Orologi</div>
-            <div><strong style="color:#34d399;">RE</strong> Immobili & LTV</div>
+            <div><strong style="color:#34d399;">RE</strong> Immobili &amp; LTV</div>
             <div><strong style="color:#34d399;">FIRE</strong> Indipendenza 4%</div>
             <div><strong style="color:#34d399;">RW</strong> Quadro RW / RT</div>
             <div><strong style="color:#34d399;">REPORTS</strong> 9 Esportazioni</div>
@@ -4785,11 +4759,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             """, unsafe_allow_html=True)
         with c_btn:
             if st.button("🔍 Spotlight", key=f"btn_open_spotlight_{key_suffix}", use_container_width=True, help="Cerca pagine, schede o lancia comandi rapidi Wealth (Ctrl+K)"):
-                st.session_state["show_wealth_spotlight_palette"] = True
-
-    # Rendering della Command Palette Wealth se attivata
-    if st.session_state.get("show_wealth_spotlight_palette", False):
-        render_wealth_spotlight_palette()
+                render_wealth_spotlight_palette()
 
 
 
