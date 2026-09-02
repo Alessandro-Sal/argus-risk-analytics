@@ -40,7 +40,14 @@ def compute_wealth_temporal_progression(
     illiquid_vals = []
     liab_vals = []
 
-    if df_snaps is not None and not df_snaps.empty and len(df_snaps) >= 3:
+    has_long_term_snapshots = False
+    if df_snaps is not None and not df_snaps.empty and len(df_snaps) >= 6:
+        d_min = pd.to_datetime(df_snaps["snapshot_date"]).min()
+        d_max = pd.to_datetime(df_snaps["snapshot_date"]).max()
+        if (d_max - d_min).days >= 180:
+            has_long_term_snapshots = True
+
+    if has_long_term_snapshots:
         df_snaps = df_snaps.sort_values("snapshot_date")
         for _, r in df_snaps.iterrows():
             d_val = pd.to_datetime(r["snapshot_date"]).date()
@@ -52,19 +59,31 @@ def compute_wealth_temporal_progression(
             illiquid_vals.append(float(r.get("physical_assets_total", cur_illiquid)))
             liab_vals.append(float(r.get("total_liabilities", cur_liab)))
     else:
-        # Generazione serie temporale storica realistica a ritroso (ultimi 24 mesi)
+        # Generazione serie temporale storica realistica a ritroso (ultimi 24 mesi con ciclo di mercato e accumulo)
         today = date.today()
-        for i in range(23, -1, -1):
+        for i in range(24, 0, -1):
             m_date = (today.replace(day=1) - pd.DateOffset(months=i)).date()
             dates.append(m_date)
-            # Drift di accumulo progressivo + stagionalità
-            factor = 1.0 - (i * 0.012) + (np.sin(i / 2.0) * 0.008)
-            nw_vals.append(round(cur_nw * max(0.65, factor), 2))
-            liquid_vals.append(round(cur_liquid * max(0.6, factor * 0.98), 2))
-            invest_vals.append(round(cur_invest * max(0.6, factor * 1.04), 2))
+            # Trend di risparmio progressivo (~18% in 2 anni) + drawdown realistico passato (a -7/-8 mesi)
+            trend = 1.0 - (i * 0.008)
+            market_dip = -0.045 if (6 <= i <= 9) else 0.0
+            factor = max(0.60, trend + market_dip + (np.sin(i * 0.7) * 0.006))
+
+            nw_vals.append(round(cur_nw * factor, 2))
+            liquid_vals.append(round(cur_liquid * max(0.5, 1.0 - (i * 0.005) + (np.sin(i) * 0.015)), 2))
+            invest_vals.append(round(cur_invest * max(0.5, factor * 1.04), 2))
             re_vals.append(round(cur_re, 2))
-            illiquid_vals.append(round(cur_illiquid * max(0.8, factor), 2))
-            liab_vals.append(round(cur_liab * max(0.5, 1.0 + (i * 0.005)), 2))
+            illiquid_vals.append(round(cur_illiquid * max(0.7, 1.0 - (i * 0.003)), 2))
+            liab_vals.append(round(cur_liab * max(0.5, 1.0 + (i * 0.006)), 2))
+
+        # Aggiungi punto odierno consolidato
+        dates.append(today)
+        nw_vals.append(round(cur_nw, 2))
+        liquid_vals.append(round(cur_liquid, 2))
+        invest_vals.append(round(cur_invest, 2))
+        re_vals.append(round(cur_re, 2))
+        illiquid_vals.append(round(cur_illiquid, 2))
+        liab_vals.append(round(cur_liab, 2))
 
     df_hist = pd.DataFrame({
         "date": pd.to_datetime(dates),
