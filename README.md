@@ -2,7 +2,7 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-6.1.2-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
 ![PyTest Suite](https://img.shields.io/badge/PyTest-322%2F322%20PASSED%20(100%25)-brightgreen)
@@ -572,4 +572,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.2.0.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.1.2.*
