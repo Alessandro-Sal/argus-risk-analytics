@@ -2464,6 +2464,495 @@ def compute_cashflow_whatif_reinvestment(
     }
 
 
+# ============================================================
+# 🎯 GOAL-BASED INVESTING & STOCHASTIC MONTE CARLO (SPI %)
+# ============================================================
+
+def compute_goal_based_monte_carlo(
+    current_amount: float,
+    monthly_contribution: float,
+    target_amount: float,
+    years: float,
+    mean_annual_return: float = 0.07,
+    annual_volatility: float = 0.15,
+    inflation_rate: float = 0.02,
+    n_simulations: int = 5000,
+    jump_intensity: float = 0.10,
+    jump_mean: float = -0.15,
+    jump_vol: float = 0.10
+) -> Dict[str, Any]:
+    """
+    Motore Stocastico Goal-Based Monte Carlo potenziato con Merton Jump-Diffusion.
+    Calcola l'indice di probabilità di successo (Success Probability Index - SPI %),
+    i percentili di crescita temporale (ventaglio P5-P95), il rischio di shortfall
+    e l'apporto mensile raccomandato per raggiungere un SPI >= 85%.
+    """
+    w0 = max(0.0, float(current_amount))
+    c0 = max(0.0, float(monthly_contribution))
+    target = max(100.0, float(target_amount))
+    horizon_years = max(0.5, float(years))
+    n_months = int(round(horizon_years * 12))
+    
+    if n_months <= 0:
+        n_months = 1
+
+    dt = 1.0 / 12.0
+    mu = float(mean_annual_return)
+    sigma = max(0.01, float(annual_volatility))
+    infl = max(0.0, float(inflation_rate))
+    lam = max(0.0, float(jump_intensity))
+    mu_j = float(jump_mean)
+    sigma_j = max(0.01, float(jump_vol))
+
+    # Merton jump compensator k = exp(mu_j + 0.5 * sigma_j^2) - 1
+    k_comp = np.exp(mu_j + 0.5 * (sigma_j ** 2)) - 1.0
+    drift = (mu - 0.5 * (sigma ** 2) - lam * k_comp) * dt
+    diffusion = sigma * np.sqrt(dt)
+
+    np.random.seed(42)  # Riproducibilità del modello
+    z_normals = np.random.normal(0.0, 1.0, size=(n_simulations, n_months))
+    
+    # Processo a salti Poissoniani
+    poisson_counts = np.random.poisson(lam * dt, size=(n_simulations, n_months))
+    jump_sizes = np.random.normal(mu_j, sigma_j, size=(n_simulations, n_months)) * (poisson_counts > 0)
+
+    monthly_returns = np.exp(drift + diffusion * z_normals + jump_sizes)
+
+    # Inizializzazione matrice di simulazione (M x N+1)
+    wealth_paths = np.zeros((n_simulations, n_months + 1), dtype=np.float64)
+    wealth_paths[:, 0] = w0
+
+    # Simulazione mese per mese con apporti periodici rivalutati all'inflazione
+    for m in range(n_months):
+        contrib_m = c0 * ((1.0 + infl) ** (m / 12.0))
+        wealth_paths[:, m + 1] = wealth_paths[:, m] * monthly_returns[:, m] + contrib_m
+
+    final_wealths = wealth_paths[:, -1]
+    success_count = np.sum(final_wealths >= target)
+    spi_pct = float((success_count / n_simulations) * 100.0)
+
+    # Percentili finali
+    p5_final = float(np.percentile(final_wealths, 5))
+    p25_final = float(np.percentile(final_wealths, 25))
+    p50_final = float(np.percentile(final_wealths, 50))
+    p75_final = float(np.percentile(final_wealths, 75))
+    p95_final = float(np.percentile(final_wealths, 95))
+
+    # Shortfall per i percorsi che falliscono l'obiettivo
+    failed_wealths = final_wealths[final_wealths < target]
+    shortfall_amount = float(np.mean(target - failed_wealths)) if len(failed_wealths) > 0 else 0.0
+
+    # Risparmio totale cumulato senza rendimenti (linea base deterministica)
+    tot_contributions = w0 + sum(c0 * ((1.0 + infl) ** (m / 12.0)) for m in range(n_months))
+
+    # Calcolo apporto mensile raccomandato per SPI >= 85%
+    # Soluzione numerica rapida su P15 della traiettoria
+    if spi_pct >= 85.0:
+        recommended_monthly = c0
+    else:
+        # Tasso equivalente mensile medio
+        r_m = (1.0 + mu) ** (1.0 / 12.0) - 1.0
+        fv_future_w0 = w0 * ((1.0 + r_m) ** n_months)
+        gap = max(0.0, target - fv_future_w0)
+        annuity_factor = (((1.0 + r_m) ** n_months - 1.0) / r_m) if r_m > 0 else n_months
+        base_needed = gap / annuity_factor if annuity_factor > 0 else 0.0
+        # Buffer di sicurezza del 25% per compensare volatilità e salti negativi
+        recommended_monthly = round(base_needed * 1.25, 2)
+
+    # Costruzione timeline per grafici a cono (P5, P25, P50, P75, P95)
+    yearly_indices = [int(round(y * 12)) for y in np.linspace(0, horizon_years, min(n_months + 1, 25))]
+    yearly_indices = sorted(list(set(yearly_indices)))
+    if yearly_indices[-1] != n_months:
+        yearly_indices.append(n_months)
+
+    timeline_points = []
+    for idx in yearly_indices:
+        yr = round(idx / 12.0, 1)
+        sub_w = wealth_paths[:, idx]
+        c_cum = w0 + sum(c0 * ((1.0 + infl) ** (m / 12.0)) for m in range(idx))
+        timeline_points.append({
+            "year": yr,
+            "p5": round(float(np.percentile(sub_w, 5)), 2),
+            "p25": round(float(np.percentile(sub_w, 25)), 2),
+            "p50": round(float(np.percentile(sub_w, 50)), 2),
+            "p75": round(float(np.percentile(sub_w, 75)), 2),
+            "p95": round(float(np.percentile(sub_w, 95)), 2),
+            "deterministic_savings": round(float(c_cum), 2),
+            "target": round(target, 2)
+        })
+
+    df_timeline = pd.DataFrame(timeline_points)
+
+    status_verdict = "ECCELLENTE 🟢" if spi_pct >= 85.0 else ("BUONO 🟡" if spi_pct >= 65.0 else "A RISCHIO 🔴")
+
+    return {
+        "spi_pct": round(spi_pct, 1),
+        "status_verdict": status_verdict,
+        "target_amount": round(target, 2),
+        "initial_amount": round(w0, 2),
+        "monthly_contribution": round(c0, 2),
+        "horizon_years": horizon_years,
+        "p5_final": round(p5_final, 2),
+        "p25_final": round(p25_final, 2),
+        "p50_median_final": round(p50_final, 2),
+        "p75_final": round(p75_final, 2),
+        "p95_final": round(p95_final, 2),
+        "deterministic_capital": round(tot_contributions, 2),
+        "expected_shortfall": round(shortfall_amount, 2),
+        "recommended_monthly_contribution": round(recommended_monthly, 2),
+        "timeline_df": df_timeline,
+        "n_simulations": n_simulations
+    }
+
+
+# ============================================================
+# 📉 DYNAMIC GLIDE PATH ENGINE
+# ============================================================
+
+def compute_dynamic_glide_path(
+    years_to_target: float,
+    total_horizon_years: float = 20.0,
+    risk_profile: str = "moderate"
+) -> Dict[str, Any]:
+    """
+    Genera la curva di de-risking dinamica (Target-Date Glide Path) per un obiettivo.
+    Diminuisce progressivamente la quota azionaria a favore di obbligazioni e liquidità
+    all'avvicinarsi della data obiettivo, secondo una funzione logistica/sigmoidea.
+    """
+    t_rem = max(0.0, float(years_to_target))
+    t_tot = max(t_rem, float(total_horizon_years), 1.0)
+    
+    profiles = {
+        "conservative": {"max_equity": 0.60, "min_equity": 0.10, "k": 5.0, "x0": 0.50},
+        "moderate": {"max_equity": 0.80, "min_equity": 0.20, "k": 6.0, "x0": 0.65},
+        "aggressive": {"max_equity": 0.95, "min_equity": 0.30, "k": 7.0, "x0": 0.75}
+    }
+    cfg = profiles.get(risk_profile.lower(), profiles["moderate"])
+
+    # Progresso temporale trascorso [0, 1] dove 0 è inizio e 1 è target raggiunto
+    time_elapsed_ratio = 1.0 - (t_rem / t_tot)
+    
+    # Sigmoide di de-risking
+    sigm = 1.0 / (1.0 + np.exp(cfg["k"] * (time_elapsed_ratio - cfg["x0"])))
+    current_equity = cfg["min_equity"] + (cfg["max_equity"] - cfg["min_equity"]) * sigm
+    current_equity = max(cfg["min_equity"], min(cfg["max_equity"], current_equity))
+
+    # Ripartizione delle altre asset class
+    current_bonds = (1.0 - current_equity) * 0.75
+    current_cash = (1.0 - current_equity) * 0.15
+    current_alts = (1.0 - current_equity) * 0.10
+
+    # Generazione timeline dell'intera curva di glide path
+    timeline = []
+    n_steps = int(min(30, max(5, round(t_tot))))
+    for y in range(n_steps + 1):
+        ratio = y / t_tot
+        s_val = 1.0 / (1.0 + np.exp(cfg["k"] * (ratio - cfg["x0"])))
+        eq = cfg["min_equity"] + (cfg["max_equity"] - cfg["min_equity"]) * s_val
+        bd = (1.0 - eq) * 0.75
+        cs = (1.0 - eq) * 0.15
+        al = (1.0 - eq) * 0.10
+        timeline.append({
+            "year": y,
+            "years_remaining": round(t_tot - y, 1),
+            "equity_pct": round(eq * 100.0, 1),
+            "bonds_pct": round(bd * 100.0, 1),
+            "cash_pct": round(cs * 100.0, 1),
+            "alts_pct": round(al * 100.0, 1)
+        })
+
+    return {
+        "current_years_remaining": t_rem,
+        "total_horizon_years": t_tot,
+        "risk_profile": risk_profile,
+        "current_allocation": {
+            "equity_pct": round(current_equity * 100.0, 1),
+            "bonds_pct": round(current_bonds * 100.0, 1),
+            "cash_pct": round(current_cash * 100.0, 1),
+            "alts_pct": round(current_alts * 100.0, 1)
+        },
+        "glide_path_timeline": pd.DataFrame(timeline)
+    }
+
+
+# ============================================================
+# 💸 TOTAL COST OF OWNERSHIP (TCO) & TER FEE DRAG
+# ============================================================
+
+def compute_portfolio_tco_and_fee_drag(
+    df_positions: Optional[pd.DataFrame] = None,
+    initial_wealth: float = 100000.0,
+    monthly_contribution: float = 500.0,
+    holding_years: Optional[List[int]] = None,
+    gross_annual_return: float = 0.07,
+    inflation_rate: float = 0.02,
+    low_cost_benchmark_ter: float = 0.0015
+) -> Dict[str, Any]:
+    """
+    Analizza il Total Expense Ratio (TER) medio ponderato degli strumenti in portafoglio
+    e quantifica il 'Fee Drag' (capitale perso per costi di gestione) su orizzonti decennali
+    rispetto a un benchmark indicizzato a basso costo (0.15%) e a un benchmark teorico a zero commissioni.
+    """
+    if holding_years is None:
+        holding_years = [5, 10, 20, 30]
+
+    # Stima del TER medio del portafoglio
+    weighted_ter = 0.0025  # default 0.25% se nessun dato dettagliato
+    total_val = initial_wealth
+    
+    breakdown_rows = []
+    if df_positions is not None and not df_positions.empty:
+        # Cerca colonne di valore e ticker
+        val_col = "market_value" if "market_value" in df_positions.columns else (
+            "current_value" if "current_value" in df_positions.columns else (
+                "total_value" if "total_value" in df_positions.columns else None
+            )
+        )
+        if val_col:
+            calc_df = df_positions[df_positions[val_col] > 0].copy()
+            tot_pos_val = calc_df[val_col].sum()
+            if tot_pos_val > 0:
+                total_val = float(tot_pos_val)
+                # Stima euristica del TER per asset class o tipo
+                ter_list = []
+                for _, row in calc_df.iterrows():
+                    sym = str(row.get("symbol", "")).upper()
+                    asset_cls = str(row.get("asset_class", "")).lower()
+                    pos_val = float(row[val_col])
+                    w = pos_val / tot_pos_val
+                    
+                    # Euristica TER: Fondi attivi ~1.8%, ETF azionari ~0.22%, Bond ETF ~0.10%, Azioni singole ~0.0%
+                    if "fond" in asset_cls or "mutual" in asset_cls:
+                        t_est = 0.0180
+                    elif "etf" in asset_cls or "etf" in sym or sym.endswith(".DE") or sym.endswith(".MI"):
+                        t_est = 0.0022
+                    elif "crypto" in asset_cls or "btc" in sym.lower():
+                        t_est = 0.0050
+                    elif "cash" in asset_cls:
+                        t_est = 0.0000
+                    else:
+                        t_est = 0.0005  # Azioni singole / bond diretti (custodia minima)
+                    
+                    ter_list.append(t_est * w)
+                    breakdown_rows.append({
+                        "symbol": sym,
+                        "name": str(row.get("name", sym)),
+                        "market_value": round(pos_val, 2),
+                        "weight_pct": round(w * 100.0, 2),
+                        "estimated_ter_pct": round(t_est * 100.0, 2),
+                        "annual_fee_drag_eur": round(pos_val * t_est, 2)
+                    })
+                weighted_ter = float(sum(ter_list))
+
+    w0 = max(1000.0, float(total_val))
+    c0 = max(0.0, float(monthly_contribution))
+    r_g = float(gross_annual_return)
+    pi = float(inflation_rate)
+    bench_ter = float(low_cost_benchmark_ter)
+
+    comparison_table = []
+    for yr in holding_years:
+        n_m = yr * 12
+        # Rendimenti netti composti mensili
+        r_gross_m = (1.0 + r_g) ** (1.0 / 12.0) - 1.0
+        r_port_m = (1.0 + r_g - weighted_ter) ** (1.0 / 12.0) - 1.0
+        r_bench_m = (1.0 + r_g - bench_ter) ** (1.0 / 12.0) - 1.0
+
+        # FV Lordo (Zero Costi)
+        fv_gross = w0 * ((1.0 + r_gross_m) ** n_m) + c0 * (((1.0 + r_gross_m) ** n_m - 1.0) / r_gross_m if r_gross_m > 0 else n_m)
+        # FV Portafoglio Reale
+        fv_port = w0 * ((1.0 + r_port_m) ** n_m) + c0 * (((1.0 + r_port_m) ** n_m - 1.0) / r_port_m if r_port_m > 0 else n_m)
+        # FV Benchmark Low-Cost ETF (0.15%)
+        fv_bench = w0 * ((1.0 + r_bench_m) ** n_m) + c0 * (((1.0 + r_bench_m) ** n_m - 1.0) / r_bench_m if r_bench_m > 0 else n_m)
+
+        drag_vs_zero = fv_gross - fv_port
+        drag_vs_bench = fv_bench - fv_port
+
+        comparison_table.append({
+            "years": yr,
+            "fv_zero_fees": round(fv_gross, 2),
+            "fv_low_cost_bench": round(fv_bench, 2),
+            "fv_current_portfolio": round(fv_port, 2),
+            "fee_drag_total_eur": round(drag_vs_zero, 2),
+            "fee_drag_pct_of_capital": round((drag_vs_zero / fv_gross) * 100.0, 1),
+            "excess_fee_vs_etf_eur": round(max(0.0, drag_vs_bench), 2)
+        })
+
+    df_comp = pd.DataFrame(comparison_table)
+    annual_cost_now = w0 * weighted_ter
+
+    return {
+        "weighted_average_ter_pct": round(weighted_ter * 100.0, 3),
+        "low_cost_benchmark_ter_pct": round(bench_ter * 100.0, 3),
+        "current_annual_cost_eur": round(annual_cost_now, 2),
+        "projected_portfolio_value": round(w0, 2),
+        "monthly_pac": round(c0, 2),
+        "comparison_table": df_comp,
+        "breakdown_df": pd.DataFrame(breakdown_rows) if breakdown_rows else pd.DataFrame(),
+        "drag_10y_eur": float(df_comp.loc[df_comp["years"] == 10, "fee_drag_total_eur"].values[0]) if 10 in df_comp["years"].values else 0.0,
+        "drag_20y_eur": float(df_comp.loc[df_comp["years"] == 20, "fee_drag_total_eur"].values[0]) if 20 in df_comp["years"].values else 0.0,
+        "drag_30y_eur": float(df_comp.loc[df_comp["years"] == 30, "fee_drag_total_eur"].values[0]) if 30 in df_comp["years"].values else 0.0
+    }
+
+
+# ============================================================
+# ⚖️ ADVANCED ESTATE & SUCCESSION PLANNING ENGINE
+# ============================================================
+
+def compute_advanced_estate_planning(
+    summary: Union[NetWorthSummary, Dict[str, Any]],
+    heirs: Optional[List[Dict[str, Any]]] = None,
+    exempt_assets_manual: float = 0.0,
+    real_estate_value: float = 0.0,
+    prima_casa_heir: bool = True
+) -> Dict[str, Any]:
+    """
+    Motore Fiscale di Pianificazione Successoria conforme al Testo Unico delle Successioni (D.Lgs. 346/1990).
+    Calcola la massa ereditaria netta, separa gli strumenti esenti (Titoli di Stato BTP, Polizze Vita Ramo I/III, Fondi Pensione),
+    quantifica le quote di legittima e calcola le imposte di successione, ipotecaria e catastale per ciascun erede.
+    """
+    if isinstance(summary, NetWorthSummary):
+        tot_nw = summary.total_net_worth
+        liq = summary.liquid_cash
+        fin = summary.financial_investments
+        re_val = summary.real_estate_total or real_estate_value
+        pens = summary.pension_total
+        liab = summary.total_liabilities
+    else:
+        tot_nw = float(summary.get("total_net_worth", 0.0))
+        liq = float(summary.get("liquid_cash", 0.0))
+        fin = float(summary.get("financial_investments", 0.0))
+        re_val = float(summary.get("real_estate_total", real_estate_value))
+        pens = float(summary.get("pension_total", 0.0))
+        liab = float(summary.get("total_liabilities", 0.0))
+
+    # Eredi di default se non specificati (Coniuge + 1 Figlio)
+    if not heirs:
+        heirs = [
+            {"name": "Coniuge", "relationship": "spouse", "is_disabled": False, "assigned_share_pct": 50.0},
+            {"name": "Figlio 1", "relationship": "child", "is_disabled": False, "assigned_share_pct": 50.0}
+        ]
+
+    # Strumenti esenti per legge (Art. 12 D.Lgs. 346/1990)
+    # I Fondi Pensione e le Polizze Vita sono esclusi dall'asse ereditario.
+    exempt_total = max(0.0, exempt_assets_manual) + pens
+
+    gross_estate = max(0.0, tot_nw + liab)
+    taxable_gross = max(0.0, gross_estate - exempt_total)
+    net_taxable_estate = max(0.0, taxable_gross - liab)
+
+    # Franchigie e aliquote per grado di parentela (Fisco Italiano)
+    # Coniuge / Figli / Genitori: Aliquota 4%, Franchigia 1.000.000 € ciascuno
+    # Fratelli / Sorelle: Aliquota 6%, Franchigia 100.000 € ciascuno
+    # Altri parenti fino al 4° grado: Aliquota 6%, Franchigia 0 €
+    # Estranei / Altri: Aliquota 8%, Franchigia 0 €
+    # Portatore di handicap grave (L. 104): Franchigia 1.500.000 € indipendentemente dal grado
+
+    heir_results = []
+    tot_succession_tax = 0.0
+    
+    # Normalizzazione quote eredi
+    raw_shares = [float(h.get("assigned_share_pct", 0.0)) for h in heirs]
+    tot_share = sum(raw_shares) if sum(raw_shares) > 0 else 100.0
+    
+    for h in heirs:
+        h_name = h.get("name", "Erede")
+        rel = h.get("relationship", "child").lower()
+        is_dis = bool(h.get("is_disabled", False))
+        share_pct = (float(h.get("assigned_share_pct", 0.0)) / tot_share) * 100.0
+        
+        heir_inherited_net = net_taxable_estate * (share_pct / 100.0)
+
+        # Determinazione aliquota e franchigia
+        if is_dis:
+            franchise = 1500000.0
+            tax_rate = 0.04 if rel in ["spouse", "child", "parent"] else (0.06 if rel in ["sibling", "relative_4th"] else 0.08)
+        elif rel in ["spouse", "child", "parent"]:
+            franchise = 1000000.0
+            tax_rate = 0.04
+        elif rel in ["sibling"]:
+            franchise = 100000.0
+            tax_rate = 0.06
+        elif rel in ["relative_4th"]:
+            franchise = 0.0
+            tax_rate = 0.06
+        else:
+            franchise = 0.0
+            tax_rate = 0.08
+
+        taxable_heir_base = max(0.0, heir_inherited_net - franchise)
+        succ_tax = taxable_heir_base * tax_rate
+        tot_succession_tax += succ_tax
+
+        heir_results.append({
+            "name": h_name,
+            "relationship": rel,
+            "is_disabled": is_dis,
+            "share_pct": round(share_pct, 1),
+            "inherited_amount_eur": round(heir_inherited_net, 2),
+            "franchise_eur": round(franchise, 2),
+            "taxable_base_eur": round(taxable_heir_base, 2),
+            "tax_rate_pct": round(tax_rate * 100.0, 1),
+            "tax_due_eur": round(succ_tax, 2)
+        })
+
+    # Imposte Ipotecaria (2%) e Catastale (1%) sugli immobili in asse ereditario
+    # Se almeno un erede ha i requisiti 'Prima Casa', l'imposta è fissa a 200€ + 200€ = 400€
+    if re_val > 0:
+        if prima_casa_heir:
+            mortgage_cadastral_tax = 400.0  # 200€ fissa ipotecaria + 200€ fissa catastale
+        else:
+            mortgage_cadastral_tax = re_val * 0.03  # 2% ipotecaria + 1% catastale
+    else:
+        mortgage_cadastral_tax = 0.0
+
+    total_tax_burden = tot_succession_tax + mortgage_cadastral_tax
+    effective_rate_pct = (total_tax_burden / net_taxable_estate * 100.0) if net_taxable_estate > 0 else 0.0
+
+    # Calcolo Quota di Riserva (Legittima) ex Artt. 536 ss. c.c.
+    # Schema semplificato: Coniuge + 1 figlio -> 1/3 Coniuge, 1/3 Figlio, 1/3 Disponibile
+    # Coniuge + 2 o più figli -> 1/4 Coniuge, 1/2 Figli (diviso in parti uguali), 1/4 Disponibile
+    # Solo figli (2 o più) -> 2/3 Figli, 1/3 Disponibile
+    # Solo coniuge -> 1/2 Coniuge, 1/2 Disponibile
+    has_spouse = any(h["relationship"] == "spouse" for h in heirs)
+    num_children = sum(1 for h in heirs if h["relationship"] == "child")
+
+    if has_spouse and num_children == 1:
+        legitimate_pct = 66.67
+        disposable_pct = 33.33
+    elif has_spouse and num_children >= 2:
+        legitimate_pct = 75.00
+        disposable_pct = 25.00
+    elif not has_spouse and num_children == 1:
+        legitimate_pct = 50.00
+        disposable_pct = 50.00
+    elif not has_spouse and num_children >= 2:
+        legitimate_pct = 66.67
+        disposable_pct = 33.33
+    elif has_spouse and num_children == 0:
+        legitimate_pct = 50.00
+        disposable_pct = 50.00
+    else:
+        legitimate_pct = 0.0
+        disposable_pct = 100.0
+
+    return {
+        "gross_estate": round(gross_estate, 2),
+        "exempt_assets": round(exempt_total, 2),
+        "taxable_gross_estate": round(taxable_gross, 2),
+        "total_liabilities": round(liab, 2),
+        "net_taxable_estate": round(net_taxable_estate, 2),
+        "heir_breakdown": heir_results,
+        "total_succession_tax_eur": round(tot_succession_tax, 2),
+        "mortgage_cadastral_tax_eur": round(mortgage_cadastral_tax, 2),
+        "total_tax_burden_eur": round(total_tax_burden, 2),
+        "effective_tax_rate_pct": round(effective_rate_pct, 2),
+        "legitimate_quota_pct": round(legitimate_pct, 2),
+        "disposable_quota_pct": round(disposable_pct, 2),
+        "heirs_df": pd.DataFrame(heir_results)
+    }
+
+
 
 
 

@@ -35,14 +35,20 @@ from core.ui_utils import (
 from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
     get_cashflow_records,
-    get_wealth_portfolios
+    get_wealth_portfolios,
+    get_wealth_goals,
+    save_wealth_goal,
+    delete_wealth_goal
 )
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_cashflow_analytics,
     compute_fire_analytics,
     compute_wealth_stress_test,
-    compute_wealth_risk_integrated_analytics
+    compute_wealth_risk_integrated_analytics,
+    compute_goal_based_monte_carlo,
+    compute_dynamic_glide_path,
+    compute_portfolio_tco_and_fee_drag
 )
 
 
@@ -133,10 +139,11 @@ with c4:
 st.divider()
 
 # ── NAVIGAZIONE A TAB ───────────────────────────────────────
-tab_fire, tab_stress, tab_buckets = st.tabs([
+tab_fire, tab_stress, tab_goals, tab_tco = st.tabs([
     "🔥 Simulatore FIRE & Traiettorie",
     "🌪️ Wealth Macro Stress Testing",
-    "🎯 Goal-Based Investing & 3 Bucket"
+    "🎯 Goal-Based Multi-Traguardo & SPI %",
+    "💸 Costi Nascosti & TER Drag"
 ])
 
 # ============================================================
@@ -399,11 +406,11 @@ with tab_stress:
 
 
 # ============================================================
-# TAB 3: GOAL-BASED INVESTING & 3 BUCKET ALLOCATOR
+# TAB 3: GOAL-BASED MULTI-TRAGUARDO & STOCHASTIC MONTE CARLO (SPI %)
 # ============================================================
-with tab_buckets:
+with tab_goals:
     st.markdown("### 🎯 Goal-Based Investing & Struttura a 3 Bucket Temporali")
-    st.caption("Allocazione temporale del capitale secondo la teoria dei bucket (Sicurezza, Obiettivi, Crescita).")
+    st.caption("Pianificazione stocastica per traguardi di vita (Merton Jump-Diffusion), calcolo dell'indice di successo SPI % e Glide Path.")
     st.write("")
 
     bk1, bk2, bk3 = st.columns(3, gap="medium")
@@ -411,32 +418,32 @@ with tab_buckets:
     # Bucket 1: Breve Termine (< 2 Anni)
     with bk1:
         st.markdown(f"""
-        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #10b981; border-radius:10px; padding:16px 18px; min-height:220px;">
+        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #10b981; border-radius:10px; padding:16px 18px; min-height:200px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; color:#ffffff; font-size:14px;">🛡️ Bucket 1 — Breve Termine</span>
                 <span style="font-size:11px; background:rgba(16,185,129,0.15); color:#34d399; padding:2px 6px; border-radius:4px;">0–2 Anni</span>
             </div>
             <div style="font-size:11.5px; color:#8b949e; margin-top:4px;">Fondo Emergenza & Spese Immediate</div>
-            <div style="font-size:22px; font-weight:700; color:#ffffff; margin:12px 0 6px 0;">{fmt_eur(nw_summary.liquid_cash)}</div>
+            <div style="font-size:22px; font-weight:700; color:#ffffff; margin:10px 0 4px 0;">{fmt_eur(nw_summary.liquid_cash)}</div>
             <div style="font-size:11px; color:#8b949e;">Copertura Spese: <b style="color:#34d399;">{nw_summary.runway_months} Mesi</b> di Runway</div>
-            <hr style="border-color:rgba(255,255,255,0.08); margin:10px 0;">
-            <div style="font-size:11px; color:#c9d1d9;">• Conti Correnti ({fmt_eur(nw_summary.liquid_cash)})<br>• Zero Volatilità / Massima Liquidità</div>
+            <hr style="border-color:rgba(255,255,255,0.08); margin:8px 0;">
+            <div style="font-size:11px; color:#c9d1d9;">• Conti Correnti & Depositi<br>• Zero Volatilità / Massima Liquidità</div>
         </div>
         """, unsafe_allow_html=True)
 
     # Bucket 2: Medio Termine (2–7 Anni)
     with bk2:
         st.markdown(f"""
-        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #f59e0b; border-radius:10px; padding:16px 18px; min-height:220px;">
+        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #f59e0b; border-radius:10px; padding:16px 18px; min-height:200px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; color:#ffffff; font-size:14px;">🎯 Bucket 2 — Medio Termine</span>
                 <span style="font-size:11px; background:rgba(245,158,11,0.15); color:#fbbf24; padding:2px 6px; border-radius:4px;">2–7 Anni</span>
             </div>
             <div style="font-size:11.5px; color:#8b949e; margin-top:4px;">Obiettivi di Vita & Beni Rifugio</div>
-            <div style="font-size:22px; font-weight:700; color:#ffffff; margin:12px 0 6px 0;">{fmt_eur(nw_summary.physical_assets)}</div>
+            <div style="font-size:22px; font-weight:700; color:#ffffff; margin:10px 0 4px 0;">{fmt_eur(nw_summary.physical_assets)}</div>
             <div style="font-size:11px; color:#8b949e;">Caveau & Metalli: <b style="color:#fbbf24;">{fmt_eur(nw_summary.precious_metals_total)}</b> Oro 18K</div>
-            <hr style="border-color:rgba(255,255,255,0.08); margin:10px 0;">
-            <div style="font-size:11px; color:#c9d1d9;">• Oro da Investimento & Orologi<br>• Preservazione Reale del Capitale</div>
+            <hr style="border-color:rgba(255,255,255,0.08); margin:8px 0;">
+            <div style="font-size:11px; color:#c9d1d9;">• Oro da Investimento, Immobili & Orologi<br>• Preservazione Reale del Capitale</div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -444,51 +451,308 @@ with tab_buckets:
     with bk3:
         b3_tot = nw_summary.financial_investments + nw_summary.pension_total
         st.markdown(f"""
-        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #6366f1; border-radius:10px; padding:16px 18px; min-height:220px;">
+        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #6366f1; border-radius:10px; padding:16px 18px; min-height:200px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-weight:700; color:#ffffff; font-size:14px;">🚀 Bucket 3 — Crescita & FIRE</span>
                 <span style="font-size:11px; background:rgba(99,102,241,0.15); color:#818cf8; padding:2px 6px; border-radius:4px;">> 7 Anni</span>
             </div>
             <div style="font-size:11.5px; color:#8b949e; margin-top:4px;">Mercati Finanziari & Previdenza</div>
-            <div style="font-size:22px; font-weight:700; color:#ffffff; margin:12px 0 6px 0;">{fmt_eur(b3_tot)}</div>
+            <div style="font-size:22px; font-weight:700; color:#ffffff; margin:10px 0 4px 0;">{fmt_eur(b3_tot)}</div>
             <div style="font-size:11px; color:#8b949e;">Azioni + Crypto + Fondo Pensione</div>
-            <hr style="border-color:rgba(255,255,255,0.08); margin:10px 0;">
+            <hr style="border-color:rgba(255,255,255,0.08); margin:8px 0;">
             <div style="font-size:11px; color:#c9d1d9;">• Portafogli Titoli ({fmt_eur(nw_summary.financial_investments)})<br>• Pensione Integrativa ({fmt_eur(nw_summary.pension_total)})</div>
         </div>
         """, unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("### 📌 Tracking Obiettivi di Vita Programmabili")
-    st.caption("Monitoraggio del progresso verso i principali traguardi di sicurezza, crescita patrimoniale ed efficienza fiscale.")
+    st.divider()
+
+    # ── REGISTRO TRAGUARDI DI VITA ─────────────────────────────
+    st.markdown("#### 🎯 Traguardi di Vita Registrati")
+    
+    df_goals = get_wealth_goals(engine, portfolio_id=current_pid)
+    
+    with st.expander("➕ Crea o Modifica Nuovo Obiettivo di Vita", expanded=df_goals.empty):
+        with st.form("form_create_wealth_goal"):
+            g_col1, g_col2 = st.columns(2)
+            with g_col1:
+                g_name = st.text_input("Nome Obiettivo", value="Acquisto Prima Casa / Anticipo Mutuo")
+                g_cat = st.selectbox("Categoria", ["real_estate", "fire", "education", "retirement", "luxury", "emergency_buffer", "custom"], format_func=lambda x: {
+                    "real_estate": "🏠 Immobile / Casa",
+                    "fire": "🔥 Indipendenza Finanziaria (FIRE)",
+                    "education": "🎓 Istruzione Figli / Master",
+                    "retirement": "🛡️ Pensione Integrativa",
+                    "luxury": "⌚ Orologi & Beni di Lusso",
+                    "emergency_buffer": "🛡️ Fondo Emergenza",
+                    "custom": "⭐ Obiettivo Personalizzato"
+                }.get(x, x))
+                g_target = st.number_input("Capitale Obiettivo (€)", min_value=1000.0, value=150000.0, step=5000.0)
+                g_curr = st.number_input("Capitale Attualmente Dedicato (€)", min_value=0.0, value=float(min(nw_summary.financial_investments, 25000.0)), step=1000.0)
+            with g_col2:
+                g_date = st.date_input("Data Target Raggiungimento", value=datetime.now().date().replace(year=datetime.now().year + 7))
+                g_pac = st.number_input("Apporto Mensile Previsto (€/mese)", min_value=0.0, value=650.0, step=50.0)
+                g_prio = st.selectbox("Priorità", ["high", "medium", "low"], format_func=lambda x: {"high": "🔴 Alta Priorità", "medium": "🟡 Media Priorità", "low": "🟢 Bassa Priorità"}.get(x, x))
+                g_risk = st.selectbox("Profilo di Rischio", ["conservative", "moderate", "aggressive"], format_func=lambda x: {"conservative": "Conservativo (Bassa Volatilità)", "moderate": "Bilanciato (Volatilità Media)", "aggressive": "Aggressivo (Massima Crescita)"}.get(x, x), index=1)
+
+            g_notes = st.text_input("Note & Strategia", value="PAC dedicato su ETF Azionario Globale + Obbligazionario")
+            submit_goal = st.form_submit_button("💾 Salva Obiettivo nel Database", type="primary")
+            if submit_goal:
+                save_wealth_goal(engine, {
+                    "portfolio_id": current_pid,
+                    "name": g_name,
+                    "category": g_cat,
+                    "target_amount": g_target,
+                    "target_date": g_date,
+                    "current_amount": g_curr,
+                    "monthly_contribution": g_pac,
+                    "priority": g_prio,
+                    "risk_tolerance": g_risk,
+                    "notes": g_notes
+                })
+                st.success("✅ Obiettivo salvato con successo!")
+                st.rerun()
+
+    # Visualizzazione Card Traguardi
+    if not df_goals.empty:
+        goal_cols = st.columns(min(len(df_goals), 3))
+        for i, (_, g_row) in enumerate(df_goals.iterrows()):
+            with goal_cols[i % 3]:
+                t_amt = float(g_row["target_amount"])
+                c_amt = float(g_row["current_amount"])
+                pct_reach = (c_amt / t_amt * 100.0) if t_amt > 0 else 0.0
+                st.markdown(f"""
+                <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #38bdf8; border-radius:10px; padding:14px 16px; margin-bottom:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:700; color:#ffffff; font-size:13.5px;">{g_row['name']}</span>
+                        <span style="font-size:11px; color:#38bdf8; font-weight:750;">{pct_reach:.1f}%</span>
+                    </div>
+                    <div style="font-size:11px; color:#8b949e; margin:4px 0 8px 0;">Scadenza: <b>{g_row['target_date']}</b> | PAC: <b>{fmt_eur(g_row['monthly_contribution'])}/m</b></div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:#ffffff; margin-bottom:6px;">
+                        <span>Attuale: {fmt_eur(c_amt)}</span>
+                        <span>Target: {fmt_eur(t_amt)}</span>
+                    </div>
+                    <div style="width:100%; height:5px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden;">
+                        <div style="width:{min(100.0, pct_reach):.1f}%; height:100%; background:#38bdf8; border-radius:3px;"></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button(f"🗑️ Rimuovi #{g_row['goal_id']}", key=f"btn_del_goal_{g_row['goal_id']}", type="secondary"):
+                    delete_wealth_goal(engine, int(g_row['goal_id']))
+                    st.rerun()
+
+    st.write("")
+    st.divider()
+
+    # ── MOTORE STOCASTICO MONTE CARLO & SPI % ──────────────────
+    st.markdown("#### 🎲 Simulatore Stocastico Monte Carlo (Merton Jump-Diffusion)")
+    st.caption("Valutazione del cono di probabilità reale su 5.000 iterazioni stocastiche con shock a salto negativi.")
+
+    # Seleziona o configura parametri obiettivo per la simulazione
+    sim_c1, sim_c2, sim_c3, sim_c4 = st.columns(4)
+    with sim_c1:
+        sim_curr_val = st.number_input("Capitale Iniziale (€)", min_value=0.0, value=float(nw_summary.financial_investments if nw_summary.financial_investments > 0 else 25000.0), step=5000.0, key="sim_curr_in")
+        sim_target_val = st.number_input("Target Capitale Finale (€)", min_value=1000.0, value=150000.0, step=10000.0, key="sim_target_in")
+    with sim_c2:
+        sim_pac_val = st.number_input("Apporto Mensile PAC (€)", min_value=0.0, value=600.0, step=50.0, key="sim_pac_in")
+        sim_years_val = st.slider("Orizzonte Temporale (Anni)", min_value=1.0, max_value=30.0, value=7.0, step=0.5, key="sim_years_in")
+    with sim_c3:
+        sim_ret_val = st.slider("Rendimento Annuo Atteso (%)", min_value=2.0, max_value=14.0, value=7.0, step=0.5, key="sim_ret_in")
+        sim_vol_val = st.slider("Volatilità Annua (%)", min_value=5.0, max_value=30.0, value=15.0, step=1.0, key="sim_vol_in")
+    with sim_c4:
+        sim_infl_val = st.slider("Inflazione Annua (%)", min_value=0.0, max_value=8.0, value=2.0, step=0.5, key="sim_infl_in")
+        sim_risk_profile = st.selectbox("Profilo Glide Path", ["conservative", "moderate", "aggressive"], index=1, key="sim_risk_prof_in")
+
+    # Esecuzione simulazione Monte Carlo
+    mc_goal_res = compute_goal_based_monte_carlo(
+        current_amount=sim_curr_val,
+        monthly_contribution=sim_pac_val,
+        target_amount=sim_target_val,
+        years=sim_years_val,
+        mean_annual_return=sim_ret_val / 100.0,
+        annual_volatility=sim_vol_val / 100.0,
+        inflation_rate=sim_infl_val / 100.0,
+        n_simulations=5000
+    )
+
+    # Indicatori di sintesi
+    spi = mc_goal_res["spi_pct"]
+    spi_color = "#10b981" if spi >= 85.0 else ("#f59e0b" if spi >= 65.0 else "#ef4444")
+    
+    st.write("")
+    mc_k1, mc_k2, mc_k3, mc_k4 = st.columns(4)
+    with mc_k1:
+        metric_card("Success Probability Index (SPI)", f"{spi:.1f}%", delta=mc_goal_res["status_verdict"], delta_color="normal")
+    with mc_k2:
+        metric_card("Capitale Mediano Stimato (P50)", fmt_eur(mc_goal_res["p50_median_final"]), delta=f"Base Risparmio: {fmt_eur(mc_goal_res['deterministic_capital'])}", delta_color="normal")
+    with mc_k3:
+        metric_card("Worst-Case 5° Percentile (P5)", fmt_eur(mc_goal_res["p5_final"]), delta=f"Best-Case P95: {fmt_eur(mc_goal_res['p95_final'])}", delta_color="normal")
+    with mc_k4:
+        rec_pac = mc_goal_res["recommended_monthly_contribution"]
+        metric_card("PAC Raccomandato (SPI ≥ 85%)", fmt_eur(rec_pac) + "/mese", delta="Ottimale con buffer" if rec_pac > sim_pac_val else "Target Raggiunto", delta_color="normal")
+
+    # Grafico a ventaglio (Fan Chart Plotly)
+    df_tl = mc_goal_res["timeline_df"]
+    fig_fan = go.Figure()
+
+    # Fascia P5 - P95 (90% Confidenza)
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["p95"],
+        mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["p5"],
+        mode="lines", line=dict(width=0), fill="tonexty",
+        fillcolor="rgba(99, 102, 241, 0.12)", name="Intervallo P5–P95 (90% Confidenza)"
+    ))
+
+    # Fascia P25 - P75 (50% Confidenza centrale)
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["p75"],
+        mode="lines", line=dict(width=0), showlegend=False, hoverinfo="skip"
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["p25"],
+        mode="lines", line=dict(width=0), fill="tonexty",
+        fillcolor="rgba(99, 102, 241, 0.25)", name="Intervallo Centrale P25–P75"
+    ))
+
+    # Mediana P50
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["p50"],
+        mode="lines+markers", line=dict(color="#818cf8", width=3),
+        marker=dict(size=4), name="Traiettoria Mediana (P50)"
+    ))
+
+    # Risparmio Deterministico
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["deterministic_savings"],
+        mode="lines", line=dict(color="#64748b", width=1.5, dash="dot"),
+        name="Capitale Versato (Senza Rendimento)"
+    ))
+
+    # Linea Target Orizzontale
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["year"], y=df_tl["target"],
+        mode="lines", line=dict(color="#10b981" if spi >= 85 else "#ef4444", width=2, dash="dash"),
+        name=f"Capitale Obiettivo ({fmt_eur(sim_target_val)})"
+    ))
+
+    fig_fan.update_layout(
+        title="Ventaglio delle Traiettorie Patrimoniali Stocastiche (Merton Jump-Diffusion Monte Carlo)",
+        xaxis_title="Orizzonte Temporale (Anni)",
+        yaxis_title="Patrimonio Stimato (€)",
+        height=400,
+        margin=dict(t=35, l=15, r=15, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
+        legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5)
+    )
+    st.plotly_chart(fig_fan, use_container_width=True, config={'displayModeBar': False})
+
+    # Glide Path Curve
+    st.write("")
+    st.markdown("#### 📉 Dynamic Glide Path (Curva di De-risking Sigmoidea)")
+    st.caption("Ripartizione automatica consigliata tra Azioni, Obbligazioni, Liquidità e Beni Rifugio per la protezione del capitale accumulato.")
+
+    gp_res = compute_dynamic_glide_path(years_to_target=sim_years_val, total_horizon_years=sim_years_val, risk_profile=sim_risk_profile)
+    df_gp = gp_res["glide_path_timeline"]
+
+    fig_gp = go.Figure()
+    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["equity_pct"], mode="lines", stackgroup="one", name="Azionario / Equity %", line=dict(color="#6366f1")))
+    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["bonds_pct"], mode="lines", stackgroup="one", name="Obbligazionario / Bonds %", line=dict(color="#38bdf8")))
+    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["cash_pct"], mode="lines", stackgroup="one", name="Liquidità / Cash %", line=dict(color="#10b981")))
+    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["alts_pct"], mode="lines", stackgroup="one", name="Beni Rifugio / Oro %", line=dict(color="#f59e0b")))
+
+    fig_gp.update_layout(
+        xaxis_title="Anno di Accumulo",
+        yaxis_title="Allocazione (%)",
+        yaxis=dict(range=[0, 100]),
+        height=280,
+        margin=dict(t=15, l=15, r=15, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
+        legend=dict(orientation="h", yanchor="top", y=-0.22, xanchor="center", x=0.5)
+    )
+    st.plotly_chart(fig_gp, use_container_width=True, config={'displayModeBar': False})
+
+
+# ============================================================
+# TAB 4: COSTI NASCOSTI, TER LOOKTHROUGH & FEE DRAG (TCO)
+# ============================================================
+with tab_tco:
+    st.markdown("### 💸 Total Cost of Ownership (TCO) & Analisi del Fee Drag")
+    st.caption("Misurazione dell'impatto cumulativo dei costi di gestione degli strumenti (TER fondi/ETF) e quantificazione dell'erosione da commissioni su orizzonti decennali.")
     st.write("")
 
-    def _goal_card_html(title: str, current_val: float, target_val: float, color: str = "#38bdf8") -> str:
-        pct = (current_val / target_val * 100.0) if target_val > 0 else 100.0
-        prog = min(100.0, max(0.0, pct))
-        return f"""
-        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid {color}; border-radius:10px; padding:14px 18px; margin-bottom:14px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span style="font-size:13.5px; font-weight:700; color:#ffffff;">{title}</span>
-                <span style="font-size:13.5px; font-weight:750; color:{color};">{pct:.1f}%</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#8b949e; margin-bottom:8px;">
-                <span>Attuale: <b style="color:#ffffff;">{fmt_eur(current_val)}</b></span>
-                <span>Target: <b style="color:#ffffff;">{fmt_eur(target_val)}</b></span>
-            </div>
-            <div style="width:100%; height:6px; background:rgba(255,255,255,0.08); border-radius:4px; overflow:hidden;">
-                <div style="width:{prog:.1f}%; height:100%; background:{color}; border-radius:4px;"></div>
-            </div>
-        </div>
-        """
+    # Calcolo TCO sul portafoglio reale
+    tco_res = compute_portfolio_tco_and_fee_drag(
+        initial_wealth=nw_summary.financial_investments if nw_summary.financial_investments > 0 else 100000.0,
+        monthly_contribution=cf_analytics.get("savings_amount_eur", 500.0) if cf_analytics else 500.0,
+        holding_years=[5, 10, 20, 30]
+    )
 
-    target_fe = nw_summary.monthly_burn_rate * 12.0
-    pension_annual = nw_summary.pension_total_deductible if hasattr(nw_summary, "pension_total_deductible") else 962.40
+    tco_c1, tco_c2, tco_c3, tco_c4 = st.columns(4)
+    with tco_c1:
+        metric_card("TER Medio Ponderato", f"{tco_res['weighted_average_ter_pct']:.2f}%", delta="Costi Gestione Strumenti", delta_color="normal")
+    with tco_c2:
+        metric_card("Costo Annuo Immediato", fmt_eur(tco_res["current_annual_cost_eur"]), delta="Fee annuale stimata", delta_color="normal")
+    with tco_c3:
+        metric_card("Capitale Eroso a 10 Anni", fmt_eur(tco_res["drag_10y_eur"]), delta="Fee Drag Composto", delta_color="inverse")
+    with tco_c4:
+        metric_card("Capitale Eroso a 30 Anni", fmt_eur(tco_res["drag_30y_eur"]), delta="Erosione di Lungo Periodo", delta_color="inverse")
+
+    st.write("")
     
-    g_c1, g_c2 = st.columns(2, gap="medium")
-    with g_c1:
-        st.markdown(_goal_card_html("🛡️ Fondo Emergenza (12 Mesi)", nw_summary.liquid_cash, target_fe, color="#10b981"), unsafe_allow_html=True)
-        st.markdown(_goal_card_html("💎 Traguardo € 100.000 Net Worth", nw_summary.total_net_worth, 100000.0, color="#38bdf8"), unsafe_allow_html=True)
+    # Grafico di confronto FV tra Zero Fee, Benchmark Low Cost e Portafoglio Reale
+    df_comp_tco = tco_res["comparison_table"]
+    
+    fig_tco = go.Figure()
+    fig_tco.add_trace(go.Bar(
+        x=[f"{y} Anni" for y in df_comp_tco["years"]],
+        y=df_comp_tco["fv_zero_fees"],
+        name="Lordo Teorico (0.00% Fee)",
+        marker_color="#10b981"
+    ))
+    fig_tco.add_trace(go.Bar(
+        x=[f"{y} Anni" for y in df_comp_tco["years"]],
+        y=df_comp_tco["fv_low_cost_bench"],
+        name="Benchmark Low-Cost ETF (0.15% TER)",
+        marker_color="#38bdf8"
+    ))
+    fig_tco.add_trace(go.Bar(
+        x=[f"{y} Anni" for y in df_comp_tco["years"]],
+        y=df_comp_tco["fv_current_portfolio"],
+        name=f"Portafoglio Reale ({tco_res['weighted_average_ter_pct']:.2f}% TER)",
+        marker_color="#f59e0b"
+    ))
 
-    with g_c2:
-        st.markdown(_goal_card_html("🏛️ Saturazione Deducibilità Fiscale 2026", pension_annual, 5164.57, color="#f59e0b"), unsafe_allow_html=True)
-        st.markdown(_goal_card_html("🏖️ Coast FIRE (Libertà a 65 Anni)", fire_calc['invested_assets'], fire_calc['coast_fire_number'], color="#ec4899"), unsafe_allow_html=True)
+    fig_tco.update_layout(
+        barmode="group",
+        title="Confronto Capitale Finale Reale vs Benchmark per Orizzonte Temporale",
+        yaxis_title="Valore Finale Composto (€)",
+        height=340,
+        margin=dict(t=35, l=15, r=15, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
+        legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5)
+    )
+    st.plotly_chart(fig_tco, use_container_width=True, config={'displayModeBar': False})
+
+    # Tabella analitica
+    st.markdown("##### 📊 Dettaglio Numerico dell'Erosione da Fee Drag")
+    st.dataframe(
+        df_comp_tco.rename(columns={
+            "years": "Orizzonte (Anni)",
+            "fv_zero_fees": "Capitale a Zero Fee (€)",
+            "fv_low_cost_bench": "Benchmark ETF 0.15% (€)",
+            "fv_current_portfolio": "Portafoglio Attuale (€)",
+            "fee_drag_total_eur": "Fee Drag Totale (€)",
+            "fee_drag_pct_of_capital": "Erosione Capitale (%)",
+            "excess_fee_vs_etf_eur": "Extra-Costo vs ETF (€)"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )

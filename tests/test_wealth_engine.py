@@ -8,7 +8,18 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine
 
-from core.wealth.wealth_models import WealthAccount, PhysicalAssetItem, PensionPlanItem, CategoryNature
+from core.wealth.wealth_models import (
+    WealthAccount,
+    PhysicalAssetItem,
+    PensionPlanItem,
+    CategoryNature,
+    GoalCategory,
+    WealthGoalItem,
+    HeirRelationship,
+    EstateHeirItem,
+    EstatePlanResult,
+    NetWorthSummary
+)
 from core.wealth.wealth_db import (
     init_wealth_db,
     save_wealth_account,
@@ -28,18 +39,20 @@ from core.wealth.wealth_db import (
     clear_wealth_accounts,
     reset_wealth_portfolio_data,
     reset_all_wealth_database,
-    cleanup_empty_wealth_portfolios
+    cleanup_empty_wealth_portfolios,
+    save_wealth_goal,
+    get_wealth_goals,
+    delete_wealth_goal
 )
-
-
-
-
-
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_cashflow_analytics,
     compute_wealth_health_score,
-    simulate_pension_projection
+    simulate_pension_projection,
+    compute_goal_based_monte_carlo,
+    compute_dynamic_glide_path,
+    compute_portfolio_tco_and_fee_drag,
+    compute_advanced_estate_planning
 )
 from core.wealth.wealth_importer import (
     parse_universal_statement,
@@ -858,6 +871,139 @@ def test_compute_cashflow_analytics_strict_transfers_exclusion():
     whatif = compute_cashflow_whatif_reinvestment(100.0, annual_return_rate=0.07, max_years=10)
     assert whatif["val_10y"] > 12000.0 # 100*120 + compounding
     assert len(whatif["timeline"]) == 10
+
+
+def test_wealth_goals_crud(sqlite_engine):
+    """Test inserimento, lettura, aggiornamento ed eliminazione obiettivi di vita."""
+    init_wealth_db(sqlite_engine)
+    gid = save_wealth_goal(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Acquisto Casa",
+        "category": GoalCategory.REAL_ESTATE.value,
+        "target_amount": 200000.0,
+        "target_date": "2032-12-31",
+        "current_amount": 30000.0,
+        "monthly_contribution": 800.0,
+        "priority": "high",
+        "risk_tolerance": "moderate",
+        "notes": "Target anticipo mutuo e ristrutturazione"
+    })
+    assert gid > 0
+
+    df_g = get_wealth_goals(sqlite_engine, portfolio_id=1)
+    assert not df_g.empty
+    assert len(df_g) == 1
+    row = df_g.iloc[0]
+    assert row["name"] == "Acquisto Casa"
+    assert row["target_amount"] == 200000.0
+
+    # Aggiornamento
+    save_wealth_goal(sqlite_engine, {
+        "goal_id": gid,
+        "portfolio_id": 1,
+        "name": "Acquisto Casa Modificato",
+        "target_amount": 220000.0,
+        "target_date": "2032-12-31",
+        "current_amount": 35000.0,
+        "monthly_contribution": 900.0
+    })
+    df_g2 = get_wealth_goals(sqlite_engine, portfolio_id=1)
+    assert df_g2.iloc[0]["target_amount"] == 220000.0
+    assert df_g2.iloc[0]["name"] == "Acquisto Casa Modificato"
+
+    # Eliminazione
+    res_del = delete_wealth_goal(sqlite_engine, gid)
+    assert res_del is True
+    df_g3 = get_wealth_goals(sqlite_engine, portfolio_id=1)
+    assert df_g3.empty
+
+
+def test_compute_goal_based_monte_carlo_engine():
+    """Test del motore stocastico Merton Jump-Diffusion per Goal-Based Planning."""
+    res = compute_goal_based_monte_carlo(
+        current_amount=20000.0,
+        monthly_contribution=500.0,
+        target_amount=100000.0,
+        years=10.0,
+        mean_annual_return=0.07,
+        annual_volatility=0.15,
+        n_simulations=1000
+    )
+    assert "spi_pct" in res
+    assert 0.0 <= res["spi_pct"] <= 100.0
+    assert res["p50_median_final"] > 20000.0
+    assert res["p95_final"] >= res["p50_median_final"] >= res["p5_final"]
+    assert "timeline_df" in res
+    assert not res["timeline_df"].empty
+    assert res["recommended_monthly_contribution"] > 0.0
+
+
+def test_compute_dynamic_glide_path_engine():
+    """Test della curva sigmoidea di de-risking lungo l'orizzonte temporale."""
+    gp_start = compute_dynamic_glide_path(years_to_target=20.0, total_horizon_years=20.0, risk_profile="moderate")
+    gp_end = compute_dynamic_glide_path(years_to_target=1.0, total_horizon_years=20.0, risk_profile="moderate")
+
+    # A inizio orizzonte l'azionario deve essere alto (~80%)
+    assert gp_start["current_allocation"]["equity_pct"] > 70.0
+    # A fine orizzonte l'azionario deve scendere (~20%)
+    assert gp_end["current_allocation"]["equity_pct"] < 35.0
+    # Obbligazioni + liquidità devono salire
+    assert gp_end["current_allocation"]["bonds_pct"] + gp_end["current_allocation"]["cash_pct"] > 60.0
+    assert not gp_start["glide_path_timeline"].empty
+
+
+def test_compute_portfolio_tco_and_fee_drag_engine():
+    """Test del calcolo del Total Cost of Ownership e dell'erosione da costi (Fee Drag)."""
+    df_pos = pd.DataFrame([
+        {"symbol": "VWCE.DE", "name": "Vanguard FTSE All-World", "asset_class": "etf", "market_value": 70000.0},
+        {"symbol": "LU123456", "name": "Fondo Attivo Bilanciato", "asset_class": "mutual_fund", "market_value": 30000.0}
+    ])
+    tco = compute_portfolio_tco_and_fee_drag(
+        df_positions=df_pos,
+        initial_wealth=100000.0,
+        monthly_contribution=500.0,
+        holding_years=[5, 10, 20, 30]
+    )
+    assert tco["weighted_average_ter_pct"] > 0.0
+    assert tco["drag_10y_eur"] > 0.0
+    assert tco["drag_30y_eur"] > tco["drag_10y_eur"]
+    assert len(tco["comparison_table"]) == 4
+    assert not tco["breakdown_df"].empty
+
+
+def test_compute_advanced_estate_planning_engine():
+    """Test della pianificazione successoria secondo la normativa italiana D.Lgs. 346/1990."""
+    nw_mock = NetWorthSummary(
+        total_net_worth=2500000.0,
+        liquid_cash=300000.0,
+        financial_investments=1200000.0,
+        real_estate_total=1000000.0,
+        pension_total=200000.0,  # Esente ex lege
+        total_liabilities=100000.0
+    )
+    heirs = [
+        {"name": "Coniuge", "relationship": "spouse", "is_disabled": False, "assigned_share_pct": 50.0},
+        {"name": "Figlio 1", "relationship": "child", "is_disabled": False, "assigned_share_pct": 50.0}
+    ]
+
+    res = compute_advanced_estate_planning(
+        summary=nw_mock,
+        heirs=heirs,
+        exempt_assets_manual=0.0,
+        real_estate_value=1000000.0,
+        prima_casa_heir=True
+    )
+
+    assert res["gross_estate"] > 0.0
+    assert res["exempt_assets"] >= 200000.0  # Fondo pensione escluso
+    assert res["legitimate_quota_pct"] == 66.67
+    assert res["disposable_quota_pct"] == 33.33
+    assert res["mortgage_cadastral_tax_eur"] == 400.0  # Prima casa fissa 200+200
+    assert len(res["heir_breakdown"]) == 2
+    # Ciascun erede eredita ~1.15M, con franchigia 1.0M -> base imponibile ~150k -> imposta 4% = ~6k
+    for h in res["heir_breakdown"]:
+        assert h["franchise_eur"] == 1000000.0
+        assert h["tax_rate_pct"] == 4.0
 
 
 

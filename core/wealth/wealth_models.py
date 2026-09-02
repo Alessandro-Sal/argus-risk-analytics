@@ -134,6 +134,70 @@ class NetWorthSummary:
     as_of_date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
 
 
+
+class GoalCategory(str, Enum):
+    FIRE = "fire"
+    REAL_ESTATE = "real_estate"
+    EDUCATION = "education"
+    RETIREMENT = "retirement"
+    LUXURY = "luxury"
+    EMERGENCY_BUFFER = "emergency_buffer"
+    CUSTOM = "custom"
+
+
+@dataclass
+class WealthGoalItem:
+    goal_id: Optional[int]
+    name: str
+    target_amount: float
+    target_date: date
+    portfolio_id: int = 1
+    current_amount: float = 0.0
+    monthly_contribution: float = 0.0
+    category: str = GoalCategory.CUSTOM.value
+    priority: str = "medium"  # high, medium, low
+    risk_tolerance: str = "moderate"  # conservative, moderate, aggressive
+    inflation_rate: float = 0.02
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class HeirRelationship(str, Enum):
+    SPOUSE = "spouse"                    # Coniuge (Franchigia 1.000.000€, aliquota 4%)
+    CHILD = "child"                      # Figlio / Discendente in linea retta (Franchigia 1.000.000€, aliquota 4%)
+    PARENT = "parent"                    # Genitore / Ascendente in linea retta (Franchigia 1.000.000€, aliquota 4%)
+    SIBLING = "sibling"                  # Fratello / Sorella (Franchigia 100.000€, aliquota 6%)
+    RELATIVE_4TH = "relative_4th"        # Altri parenti fino al 4° grado / affini (Nessuna franchigia, aliquota 6%)
+    OTHER = "other"                      # Altri soggetti / estranei (Nessuna franchigia, aliquota 8%)
+    DISABLED = "disabled"                # Portatore di handicap grave L. 104 (Franchigia 1.500.000€)
+
+
+@dataclass
+class EstateHeirItem:
+    heir_id: Optional[int]
+    name: str
+    relationship: str = HeirRelationship.CHILD.value
+    is_disabled: bool = False
+    assigned_share_pct: float = 0.0  # Quota testamentaria assegnata (%)
+    notes: Optional[str] = None
+
+
+@dataclass
+class EstatePlanResult:
+    gross_estate: float = 0.0
+    exempt_assets: float = 0.0  # BTP, Titoli di Stato, Polizze Vita, Fondi Pensione
+    taxable_estate: float = 0.0
+    total_liabilities: float = 0.0
+    net_taxable_estate: float = 0.0
+    heir_breakdowns: List[Dict[str, Any]] = field(default_factory=list)
+    total_inheritance_tax: float = 0.0
+    total_mortgage_cadastral_tax: float = 0.0
+    total_tax_burden: float = 0.0
+    effective_tax_rate_pct: float = 0.0
+    disposable_quota_pct: float = 0.0
+    legitimate_quota_pct: float = 0.0
+
+
 # Alias per compatibilità
 WealthConsolidatedSummary = NetWorthSummary
 
