@@ -4572,44 +4572,135 @@ def compute_smart_cashflow_reconciliation(
     matched_count = 0
 
     known_patterns = {
-        "mutuo": ("Mutuo Casa", 98.0, "MORTGAGE"),
-        "stipendio": ("Entrate Primarie", 99.0, "SALARY"),
-        "netflix": ("Abbonamenti Digitali", 95.0, "RECURRING_EXPENSE"),
-        "spotify": ("Abbonamenti Digitali", 95.0, "RECURRING_EXPENSE"),
-        "esselunga": ("Spesa Alimentare", 90.0, "SUPERMARKET"),
-        "pac": ("Investimenti Ricorrenti", 95.0, "INVESTMENT_PAC")
+        "mutuo": ("Mutuo Casa & Finanziamenti", 98.0, "MORTGAGE"),
+        "prestito": ("Mutuo Casa & Finanziamenti", 98.0, "MORTGAGE"),
+        "finanziamento": ("Mutuo Casa & Finanziamenti", 98.0, "MORTGAGE"),
+        "stipendio": ("Entrate Primarie / Stipendio", 99.0, "SALARY"),
+        "salary": ("Entrate Primarie / Stipendio", 99.0, "SALARY"),
+        "busta paga": ("Entrate Primarie / Stipendio", 99.0, "SALARY"),
+        "emolumenti": ("Entrate Primarie / Stipendio", 99.0, "SALARY"),
+        "affitto": ("Casa, Affitto & Utenze", 98.0, "RENT"),
+        "housing": ("Casa, Affitto & Utenze", 98.0, "RENT"),
+        "condominio": ("Casa, Affitto & Utenze", 95.0, "RENT"),
+        "netflix": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "spotify": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "prime": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "disney": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "chatgpt": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "openai": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "icloud": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "apple.com": ("Abbonamenti Digitali", 94.0, "RECURRING_EXPENSE"),
+        "google storage": ("Abbonamenti Digitali", 96.0, "RECURRING_EXPENSE"),
+        "esselunga": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "conad": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "coop": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "carrefour": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "lidl": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "eurospin": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "pam": ("Spesa Alimentare", 94.0, "SUPERMARKET"),
+        "supermercato": ("Spesa Alimentare", 92.0, "SUPERMARKET"),
+        "ristorante": ("Ristorazione & Bar", 92.0, "DINING"),
+        "pizzeria": ("Ristorazione & Bar", 92.0, "DINING"),
+        "pizze": ("Ristorazione & Bar", 92.0, "DINING"),
+        "sushi": ("Ristorazione & Bar", 92.0, "DINING"),
+        "gelato": ("Ristorazione & Bar", 92.0, "DINING"),
+        "trattoria": ("Ristorazione & Bar", 92.0, "DINING"),
+        "deliveroo": ("Ristorazione & Consegne", 94.0, "DELIVERY"),
+        "just eat": ("Ristorazione & Consegne", 94.0, "DELIVERY"),
+        "glovo": ("Ristorazione & Consegne", 94.0, "DELIVERY"),
+        "uber eats": ("Ristorazione & Consegne", 94.0, "DELIVERY"),
+        "benzina": ("Trasporti & Carburante", 95.0, "TRANSPORT"),
+        "eni": ("Trasporti & Carburante", 95.0, "TRANSPORT"),
+        "q8": ("Trasporti & Carburante", 95.0, "TRANSPORT"),
+        "tamoil": ("Trasporti & Carburante", 95.0, "TRANSPORT"),
+        "ip ": ("Trasporti & Carburante", 95.0, "TRANSPORT"),
+        "autostrade": ("Trasporti & Pedaggi", 95.0, "TRANSPORT"),
+        "telepass": ("Trasporti & Pedaggi", 95.0, "TRANSPORT"),
+        "trenitalia": ("Trasporti & Viaggi", 95.0, "TRANSPORT"),
+        "italo": ("Trasporti & Viaggi", 95.0, "TRANSPORT"),
+        "pac": ("Investimenti Ricorrenti", 95.0, "INVESTMENT_PAC"),
+        "fineco": ("Investimenti & Trading", 95.0, "INVESTMENT_PAC"),
+        "degiro": ("Investimenti & Trading", 95.0, "INVESTMENT_PAC"),
+        "directa": ("Investimenti & Trading", 95.0, "INVESTMENT_PAC"),
+        "trade republic": ("Investimenti & Trading", 95.0, "INVESTMENT_PAC"),
+        "enel": ("Utenze Luce & Gas", 95.0, "UTILITIES"),
+        "plenitude": ("Utenze Luce & Gas", 95.0, "UTILITIES"),
+        "a2a": ("Utenze Luce & Gas", 95.0, "UTILITIES"),
+        "iren": ("Utenze Luce & Gas", 95.0, "UTILITIES"),
+        "vodafone": ("Telefonia & Internet", 95.0, "UTILITIES"),
+        "iliad": ("Telefonia & Internet", 95.0, "UTILITIES"),
+        "tim": ("Telefonia & Internet", 95.0, "UTILITIES"),
+        "windtre": ("Telefonia & Internet", 95.0, "UTILITIES"),
+        "fastweb": ("Telefonia & Internet", 95.0, "UTILITIES"),
+        "farmacia": ("Salute & Farmacia", 92.0, "HEALTHCARE"),
+        "medico": ("Salute & Farmacia", 92.0, "HEALTHCARE"),
+        "dentista": ("Salute & Farmacia", 92.0, "HEALTHCARE"),
+        "settled": ("Rimborsi & Spese Saldate", 90.0, "REFUND"),
+        "rimborso": ("Rimborsi & Spese Saldate", 90.0, "REFUND"),
+        "regalo": ("Regali, Eventi & Lauree", 90.0, "GIFTS"),
+        "comple": ("Regali, Eventi & Lauree", 90.0, "GIFTS"),
     }
 
     for tx in txs:
-        d_str = str(tx.get("date", ""))
-        desc = str(tx.get("description", ""))
+        d_raw = tx.get("tx_date") or tx.get("date") or ""
+        d_str = str(d_raw)[:10] if d_raw else ""
+        
+        merchant = str(tx.get("merchant") or "").strip()
+        notes = str(tx.get("notes") or "").strip()
+        raw_desc = str(tx.get("description") or "").strip()
+        desc = merchant if merchant else (notes if notes else raw_desc)
+        
         amt = float(tx.get("amount", 0.0))
+        cat_ledger = str(tx.get("category_name") or tx.get("category") or "").strip()
+        acc = str(tx.get("account_name") or tx.get("account_id") or "")
+        direction = str(tx.get("direction") or "")
 
-        # Rilevamento duplicati (stesso importo e stessa descrizione all'interno della sessione contabile)
-        h_key = f"{desc.lower().strip()[:20]}_{amt:.2f}"
+        # Rilevamento duplicati accurato: stessa causale/merchant, stesso importo, conto e data identica o entro 2 giorni
+        base_key = f"{desc.lower().strip()}_{amt:.2f}_{acc}_{direction}"
         is_dupe = False
-        if h_key in seen_hashes:
-            is_dupe = True
-            dupes_count += 1
-        seen_hashes[h_key] = True
+        try:
+            curr_d = pd.to_datetime(d_str).date() if d_str else None
+        except Exception:
+            curr_d = None
 
-        # Matching categoria
-        matched_cat = "Altro Discrezionale"
+        if base_key in seen_hashes:
+            prev_d = seen_hashes[base_key]
+            if curr_d and prev_d and abs((curr_d - prev_d).days) <= 2:
+                is_dupe = True
+                dupes_count += 1
+            elif not curr_d or not prev_d:
+                is_dupe = True
+                dupes_count += 1
+        seen_hashes[base_key] = curr_d
+
+        # Matching categoria e confidenza
+        matched_cat = ""
         confidence = 50.0
         match_src = "MANUAL"
 
-        desc_lower = desc.lower()
+        search_text = f"{desc} {notes} {raw_desc}".lower()
         for pat, (cat_name, conf, src) in known_patterns.items():
-            if pat in desc_lower:
+            if pat in search_text:
                 matched_cat = cat_name
                 confidence = conf
                 match_src = src
                 matched_count += 1
                 break
 
+        if not matched_cat:
+            if cat_ledger and cat_ledger.lower() not in ["", "uncategorized", "altro", "non categorizzato", "none"]:
+                matched_cat = cat_ledger
+                confidence = 88.0
+                match_src = "LEDGER_CATEGORY"
+                matched_count += 1
+            else:
+                matched_cat = "Altro Discrezionale"
+                confidence = 50.0
+                match_src = "MANUAL"
+
         matched_items.append({
             "tx_date": d_str,
-            "description": desc,
+            "description": desc if desc else "Movimento Bancario",
             "amount_eur": round(amt, 2),
             "matched_category": matched_cat,
             "match_confidence_pct": confidence,
