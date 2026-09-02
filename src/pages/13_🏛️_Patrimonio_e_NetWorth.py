@@ -1112,6 +1112,12 @@ with main_tab_temporal:
         if "total_net_worth" not in df_h.columns:
             df_h["total_net_worth"] = pd.Series(0.0, index=df_h.index)
 
+        has_inv = bool(df_h["financial_investments"].max() > 0)
+        has_liq = bool(df_h["liquid_cash"].max() > 0)
+        has_re = bool(df_h["real_estate"].max() > 0)
+        has_phys = bool(df_h["physical_assets"].max() > 0)
+        has_pens = bool(df_h["pension_plans"].max() > 0)
+
         fig_hist = go.Figure()
 
         if "100%" in sel_view_style or "Stacked" in sel_view_style or "Area" in sel_view_style:
@@ -1119,31 +1125,36 @@ with main_tab_temporal:
             total_assets = df_h["financial_investments"] + df_h["liquid_cash"] + df_h["real_estate"] + df_h["physical_assets"] + df_h["pension_plans"]
             total_assets = total_assets.replace(0, 1)
 
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=(df_h["financial_investments"] / total_assets) * 100.0,
-                name="Investimenti Quotati", stackgroup='one', line=dict(width=0.5, color="#6366f1"),
-                fillcolor="rgba(99, 102, 241, 0.70)", hovertemplate="%{y:.1f}%"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=(df_h["liquid_cash"] / total_assets) * 100.0,
-                name="Liquidità & Riserve", stackgroup='one', line=dict(width=0.5, color="#38bdf8"),
-                fillcolor="rgba(56, 189, 248, 0.70)", hovertemplate="%{y:.1f}%"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=(df_h["real_estate"] / total_assets) * 100.0,
-                name="Immobili (Net Equity)", stackgroup='one', line=dict(width=0.5, color="#f59e0b"),
-                fillcolor="rgba(245, 158, 11, 0.70)", hovertemplate="%{y:.1f}%"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=(df_h["physical_assets"] / total_assets) * 100.0,
-                name="Asset Caveau & Fisici", stackgroup='one', line=dict(width=0.5, color="#eab308"),
-                fillcolor="rgba(234, 179, 8, 0.70)", hovertemplate="%{y:.1f}%"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=(df_h["pension_plans"] / total_assets) * 100.0,
-                name="Previdenza Integrativa", stackgroup='one', line=dict(width=0.5, color="#ec4899"),
-                fillcolor="rgba(236, 72, 153, 0.70)", hovertemplate="%{y:.1f}%"
-            ))
+            if has_inv:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=(df_h["financial_investments"] / total_assets) * 100.0,
+                    name="Investimenti Quotati", stackgroup='one', line=dict(width=0.5, color="#6366f1"),
+                    fillcolor="rgba(99, 102, 241, 0.70)", hovertemplate="%{y:.1f}%"
+                ))
+            if has_liq:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=(df_h["liquid_cash"] / total_assets) * 100.0,
+                    name="Liquidità & Riserve", stackgroup='one', line=dict(width=0.5, color="#38bdf8"),
+                    fillcolor="rgba(56, 189, 248, 0.70)", hovertemplate="%{y:.1f}%"
+                ))
+            if has_re:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=(df_h["real_estate"] / total_assets) * 100.0,
+                    name="Immobili (Net Equity)", stackgroup='one', line=dict(width=0.5, color="#f59e0b"),
+                    fillcolor="rgba(245, 158, 11, 0.70)", hovertemplate="%{y:.1f}%"
+                ))
+            if has_phys:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=(df_h["physical_assets"] / total_assets) * 100.0,
+                    name="Asset Caveau & Fisici", stackgroup='one', line=dict(width=0.5, color="#eab308"),
+                    fillcolor="rgba(234, 179, 8, 0.70)", hovertemplate="%{y:.1f}%"
+                ))
+            if has_pens:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=(df_h["pension_plans"] / total_assets) * 100.0,
+                    name="Previdenza Integrativa", stackgroup='one', line=dict(width=0.5, color="#ec4899"),
+                    fillcolor="rgba(236, 72, 153, 0.70)", hovertemplate="%{y:.1f}%"
+                ))
             fig_hist.update_layout(
                 xaxis_title="Data", yaxis_title="Quota sul Totale Asset (%)",
                 yaxis_range=[0, 100], height=380, margin=dict(t=35, l=10, r=10, b=10),
@@ -1151,30 +1162,38 @@ with main_tab_temporal:
             )
         elif "Base 100" in sel_view_style:
             st.markdown("##### 📈 Rendimento e Dinamica Cumulativa (Base 100)")
-            nw_b100 = (df_h["total_net_worth"] / df_h["total_net_worth"].iloc[0]) * 100.0
-            inv_b100 = (df_h["financial_investments"] / max(1.0, df_h["financial_investments"].iloc[0])) * 100.0
-            liq_b100 = (df_h["liquid_cash"] / max(1.0, df_h["liquid_cash"].iloc[0])) * 100.0
+            nw_b100 = (df_h["total_net_worth"] / max(1.0, df_h["total_net_worth"].iloc[0])) * 100.0
 
             fig_hist.add_trace(go.Scatter(
                 x=df_h["date"], y=nw_b100, name="Patrimonio Netto",
                 line=dict(color="#10b981", width=3.5, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
             ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=inv_b100, name="Investimenti Quotati",
-                line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=liq_b100, name="Liquidità & Riserve",
-                line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
-            ))
-            if df_h["physical_assets"].iloc[-1] > 0:
-                phys_b100 = (df_h["physical_assets"] / max(1.0, df_h["physical_assets"].iloc[0])) * 100.0
+            if has_inv and df_h["financial_investments"].iloc[0] > 0:
+                inv_b100 = (df_h["financial_investments"] / df_h["financial_investments"].iloc[0]) * 100.0
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=inv_b100, name="Investimenti Quotati",
+                    line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
+                ))
+            if has_liq and df_h["liquid_cash"].iloc[0] > 0:
+                liq_b100 = (df_h["liquid_cash"] / df_h["liquid_cash"].iloc[0]) * 100.0
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=liq_b100, name="Liquidità & Riserve",
+                    line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
+                ))
+            if has_re and df_h["real_estate"].iloc[0] > 0:
+                re_b100 = (df_h["real_estate"] / df_h["real_estate"].iloc[0]) * 100.0
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=re_b100, name="Immobili (Net Equity)",
+                    line=dict(color="#f59e0b", width=1.8, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
+                ))
+            if has_phys and df_h["physical_assets"].iloc[0] > 0:
+                phys_b100 = (df_h["physical_assets"] / df_h["physical_assets"].iloc[0]) * 100.0
                 fig_hist.add_trace(go.Scatter(
                     x=df_h["date"], y=phys_b100, name="Asset Caveau & Fisici",
                     line=dict(color="#eab308", width=1.8, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
                 ))
-            if df_h["pension_plans"].iloc[-1] > 0:
-                pens_b100 = (df_h["pension_plans"] / max(1.0, df_h["pension_plans"].iloc[0])) * 100.0
+            if has_pens and df_h["pension_plans"].iloc[0] > 0:
+                pens_b100 = (df_h["pension_plans"] / df_h["pension_plans"].iloc[0]) * 100.0
                 fig_hist.add_trace(go.Scatter(
                     x=df_h["date"], y=pens_b100, name="Previdenza Integrativa",
                     line=dict(color="#ec4899", width=1.8, shape="spline", smoothing=0.8), hovertemplate="%{y:.2f} (Base 100)"
@@ -1192,36 +1211,41 @@ with main_tab_temporal:
                 line=dict(color="#10b981", width=3.5, shape="spline", smoothing=0.8),
                 hovertemplate="€ %{y:,.2f}"
             ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=df_h["financial_investments"],
-                name="Investimenti Quotati",
-                line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8),
-                hovertemplate="€ %{y:,.2f}"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=df_h["liquid_cash"],
-                name="Liquidità & Riserve",
-                line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8),
-                hovertemplate="€ %{y:,.2f}"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=df_h["real_estate"],
-                name="Immobili (Net Equity)",
-                line=dict(color="#f59e0b", width=1.8, shape="spline", smoothing=0.8),
-                hovertemplate="€ %{y:,.2f}"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=df_h["physical_assets"],
-                name="Asset Caveau & Fisici",
-                line=dict(color="#eab308", width=1.8, shape="spline", smoothing=0.8),
-                hovertemplate="€ %{y:,.2f}"
-            ))
-            fig_hist.add_trace(go.Scatter(
-                x=df_h["date"], y=df_h["pension_plans"],
-                name="Previdenza Integrativa",
-                line=dict(color="#ec4899", width=1.8, shape="spline", smoothing=0.8),
-                hovertemplate="€ %{y:,.2f}"
-            ))
+            if has_inv:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=df_h["financial_investments"],
+                    name="Investimenti Quotati",
+                    line=dict(color="#6366f1", width=2, shape="spline", smoothing=0.8),
+                    hovertemplate="€ %{y:,.2f}"
+                ))
+            if has_liq:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=df_h["liquid_cash"],
+                    name="Liquidità & Riserve",
+                    line=dict(color="#38bdf8", width=1.8, shape="spline", smoothing=0.8),
+                    hovertemplate="€ %{y:,.2f}"
+                ))
+            if has_re:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=df_h["real_estate"],
+                    name="Immobili (Net Equity)",
+                    line=dict(color="#f59e0b", width=1.8, shape="spline", smoothing=0.8),
+                    hovertemplate="€ %{y:,.2f}"
+                ))
+            if has_phys:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=df_h["physical_assets"],
+                    name="Asset Caveau & Fisici",
+                    line=dict(color="#eab308", width=1.8, shape="spline", smoothing=0.8),
+                    hovertemplate="€ %{y:,.2f}"
+                ))
+            if has_pens:
+                fig_hist.add_trace(go.Scatter(
+                    x=df_h["date"], y=df_h["pension_plans"],
+                    name="Previdenza Integrativa",
+                    line=dict(color="#ec4899", width=1.8, shape="spline", smoothing=0.8),
+                    hovertemplate="€ %{y:,.2f}"
+                ))
             fig_hist.update_layout(
                 xaxis_title="Data",
                 yaxis_title="Valore (€)",
