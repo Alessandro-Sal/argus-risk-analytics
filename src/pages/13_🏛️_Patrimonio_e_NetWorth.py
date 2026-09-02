@@ -1012,16 +1012,33 @@ with tab_roll:
 
 with tab_seas:
     st.markdown("##### 🍂 Stagionalità dei Flussi di Cassa & Tasso di Risparmio Medio Mensile")
-    st.dataframe(
-        seas_res["seasonality_df"][["month_name", "avg_inflow_eur", "avg_outflow_eur", "avg_net_savings_eur", "savings_rate_pct", "status"]].rename(columns={
-            "month_name": "Mese",
-            "avg_inflow_eur": "Entrate Medie (€)",
-            "avg_outflow_eur": "Uscite Medie (€)",
-            "avg_net_savings_eur": "Risparmio Netto (€)",
-            "savings_rate_pct": "Tasso di Risparmio (%)",
-            "status": "Valutazione Stagionale"
-        }),
-        use_container_width=True,
-        hide_index=True
-    )
+    df_seas_disp = seas_res["seasonality_df"][["month_name", "avg_inflow_eur", "avg_outflow_eur", "avg_net_savings_eur", "savings_rate_pct", "status"]].rename(columns={
+        "month_name": "Mese",
+        "avg_inflow_eur": "Entrate Medie (€)",
+        "avg_outflow_eur": "Uscite Medie (€)",
+        "avg_net_savings_eur": "Risparmio Netto (€)",
+        "savings_rate_pct": "Tasso di Risparmio (%)",
+        "status": "Valutazione Stagionale"
+    })
+    styler_seas = df_seas_disp.style.format({
+        "Entrate Medie (€)": "€ {:,.2f}",
+        "Uscite Medie (€)": "€ {:,.2f}",
+        "Risparmio Netto (€)": "€ {:+,.2f}",
+        "Tasso di Risparmio (%)": "{:+.1f}%"
+    })
+
+    def color_seas_savings(val):
+        if isinstance(val, (int, float)):
+            if val > 0:
+                return "color: #10b981; font-weight: 600;"
+            elif val < 0:
+                return "color: #ef4444; font-weight: 600;"
+        return ""
+
+    if hasattr(styler_seas, "map"):
+        styler_seas = styler_seas.map(color_seas_savings, subset=["Risparmio Netto (€)", "Tasso di Risparmio (%)"])
+    elif hasattr(styler_seas, "applymap"):
+        styler_seas = styler_seas.applymap(color_seas_savings, subset=["Risparmio Netto (€)", "Tasso di Risparmio (%)"])
+
+    st.dataframe(styler_seas, use_container_width=True, hide_index=True)
 
