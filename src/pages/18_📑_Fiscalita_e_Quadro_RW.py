@@ -121,12 +121,13 @@ with k5:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_rw, tab_minus, tab_harvest, tab_split, tab_strat = st.tabs([
+tab_rw, tab_minus, tab_harvest, tab_split, tab_strat, tab_cross = st.tabs([
     "📑 Prospetto Quadro RW / RT",
     "📉 Zainetto Fiscale & Scadenze",
     "🌾 Tax-Loss Harvesting & Plusvalenze",
     "⚖️ Ripartizione Italia vs Estero",
-    "💡 Strategie di Efficienza Fiscale"
+    "💡 Strategie di Efficienza Fiscale",
+    "🌍 Fiscalità Internazionale & Cross-Border"
 ])
 
 
@@ -386,4 +387,48 @@ with tab_strat:
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+with tab_cross:
+    st.markdown("### 🌍 Cross-Border Tax & Global Wealth Structuring Engine")
+    st.caption("Confronto comparato del carico fiscale e successorio su grandi patrimoni tra regimi e giurisdizioni internazionali (Italia Ordinaria, Art. 24-bis Neo-Residenti, Svizzera Zugo, Lussemburgo SOPARFI, Dubai Zero-Tax).")
+
+    from core.cross_border_tax_engine import compute_cross_border_wealth_tax_comparison
+
+    col_cb_in1, col_cb_in2, col_cb_in3 = st.columns(3)
+    with col_cb_in1:
+        cb_wealth_in = st.number_input("Patrimonio Complessivo (€):", min_value=500000.0, value=10000000.0, step=500000.0, format="%.2f")
+    with col_cb_in2:
+        cb_cgt_in = st.number_input("Plusvalenze Realizzate Annue (€):", min_value=0.0, value=400000.0, step=50000.0, format="%.2f")
+    with col_cb_in3:
+        cb_div_in = st.number_input("Rendite / Dividendi Esteri Annui (€):", min_value=0.0, value=250000.0, step=25000.0, format="%.2f")
+
+    cb_res = compute_cross_border_wealth_tax_comparison(
+        total_wealth_eur=cb_wealth_in,
+        annual_capital_gain_eur=cb_cgt_in,
+        annual_foreign_income_eur=cb_div_in
+    )
+
+    cb_k1, cb_k2, cb_k3 = st.columns(3)
+    with cb_k1:
+        metric_card("Giurisdizione Ottimale", cb_res["lowest_tax_jurisdiction"], delta="Minimo Carico Fiscale", delta_color="normal")
+    with cb_k2:
+        metric_card("Risparmio Annuo Max vs IT", fmt_eur(cb_res["max_annual_tax_savings_eur"]), delta="Tax Alpha Annuo", delta_color="normal")
+    with cb_k3:
+        metric_card("Patrimonio Simulato", fmt_eur(cb_res["simulated_wealth_eur"]), delta="Total Wealth Base", delta_color="normal")
+
+    st.write("")
+    st.markdown("##### 📊 Benchmark Comparativo dei Regimi Fiscali Internazionali")
+    st.dataframe(
+        cb_res["comparison_df"][["name", "annual_cgt_eur", "annual_income_tax_eur", "annual_wealth_tax_eur", "total_annual_tax_eur", "effective_annual_tax_rate_pct", "estimated_estate_succession_tax_eur"]].rename(columns={
+            "name": "Giurisdizione / Regime Fiscale",
+            "annual_cgt_eur": "Imposta CGT (€)",
+            "annual_income_tax_eur": "Imposta Dividendi (€)",
+            "annual_wealth_tax_eur": "Imposta Patrimoniale (€)",
+            "total_annual_tax_eur": "Totale Imposte Annue (€)",
+            "effective_annual_tax_rate_pct": "Aliquota Effettiva (%)",
+            "estimated_estate_succession_tax_eur": "Imposta Successione (€)"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
 

@@ -146,12 +146,13 @@ with k4:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_diag, tab_rebal, tab_life, tab_review, tab_chat = st.tabs([
+tab_diag, tab_rebal, tab_life, tab_review, tab_chat, tab_voice = st.tabs([
     "🔍 Diagnostica & Colli di Bottiglia",
     "⚖️ Motore di Ribilanciamento Target",
     "🔮 Life Event & Decision Simulator",
     "📑 Executive Quarterly Review (NLG)",
-    "💬 Assistente Finanziario Diretto"
+    "💬 Assistente Finanziario Diretto",
+    "🎙️ AI Voice Briefing & Audio Podcast"
 ])
 
 with tab_diag:
@@ -407,3 +408,41 @@ with tab_chat:
             Con la liquidità attuale nei conti correnti (€ {nw.liquid_cash:,.2f}) e un tasso di spesa mensile di € {nw.monthly_burn_rate:,.2f}, puoi coprire esattamente <b>{nw.runway_months:.1f} mesi</b> di spese a entrate zero.
         </div>
         """, unsafe_allow_html=True)
+
+with tab_voice:
+    st.markdown("### 🎙️ AI Voice Executive Briefing & Wealth Audio Podcast")
+    st.caption("Genera un briefing audio e un copione esecutivo a due voci (Chief Investment Officer & Chief Risk Officer) sincronizzato sui dati reali del patrimonio.")
+
+    from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+
+    vb_res = generate_ai_voice_executive_briefing(engine, portfolio_id=current_pid, client_name=prof_title)
+
+    vk1, vk2, vk3 = st.columns(3)
+    with vk1:
+        metric_card("Durata Briefing", vb_res["estimated_duration_formatted"], delta=f"{vb_res['word_count']} parole", delta_color="normal")
+    with vk2:
+        metric_card("Data Aggiornamento", vb_res["as_of_date"], delta="Live Snapshot", delta_color="normal")
+    with vk3:
+        metric_card("Formato Trasmissione", "Podcast a 2 Voci (CIO & CRO)", delta="Broadcast Ready", delta_color="normal")
+
+    st.write("")
+    st.markdown("##### 🎧 Copione Broadcast & Dialogo Esecutivo")
+
+    for dia in vb_res["dialogue_script"]:
+        is_cio = "CIO" in dia["speaker"]
+        avatar_icon = "👔" if is_cio else "🛡️"
+        border_col = "#6366f1" if is_cio else "#38bdf8"
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {border_col}; border-radius: 10px; padding: 14px 18px; margin-bottom: 12px;">
+            <b style="color: {border_col}; font-size: 13.5px;">{avatar_icon} {dia['speaker']}:</b><br>
+            <span style="font-size: 13px; color: #e2e8f0; line-height: 1.6;">"{dia['text']}"</span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.download_button(
+        label="📥 Esporta Copione Audio (Testo per Sintesi TTS / Podcast)",
+        data=vb_res["full_text_transcript"],
+        file_name=f"ARGUS_Voice_Briefing_{prof_title.replace(' ','_')}.txt",
+        mime="text/plain",
+        use_container_width=True
+    )

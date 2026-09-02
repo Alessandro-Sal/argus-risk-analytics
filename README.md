@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-6.3.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-336%2F336%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-342%2F342%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -64,6 +64,11 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🌿 European SFDR Sustainability Desk & Carbon Footprint (`ESG` / `CARBON`)**: Diagnosi di sostenibilità conforme al Regolamento UE 2019/2088 (SFDR Art. 6/8/9), intensità carbonica ponderata ($t\text{CO}_2e/\text{M€}$) e screening controversie internazionali.
 * **📈 Multi-Leg Options Strategy Workbench & Payoff Desk (`OPTS BUILD` / `PAYOFF`)**: Costruttore interattivo di strategie su derivati multi-gamba (Iron Condor, Protective Collar, Bull/Bear Spreads, Straddle) con analisi delle Greche aggregate (Delta, Gamma, Theta, Vega) e profilo di PnL a scadenza e anticipato.
 * **📄 Universal White-Label Client Quarterly PDF Report Generator (`REPORT QTR`)**: Motore di reporting esecutivo multipagina ad alta risoluzione (PDF) per Family Office & HNWI con bilancio consolidato, attribuzione di performance Brinson, stress testing ed ESG scorecard.
+* **🏛️ Private Debt, Direct Lending & Credit Waterfall Desk (`PDEBT` / `COVENANT`)**: Modello multi-tranche per investimenti in credito illiquido (Senior Secured, Unitranche, Mezzanine), monitoraggio contrattuale dei covenants (Debt/EBITDA, ICR, DSCR) e capitalizzazione interessi PIK (*Payment-in-Kind*).
+* **🤖 Algorithmic Trade Execution & Implementation Shortfall (`ALGO EXEC` / `IMPACT`)**: Scomposizione analitica dei costi di transazione istituzionali (Perold 1988) tra Delay, Market Impact, Commissioni e Costo Opportunità, con benchmark comparato tra ordini a mercato, TWAP, VWAP e Adaptive IS.
+* **🌍 Cross-Border Tax & Global Wealth Structuring Engine (`GLOBAL TAX` / `RESIDENCY`)**: Simulatore tributario comparato per patrimoni internazionali (Italia Ordinaria, Art. 24-bis Neo-Residenti 100k/200k, Svizzera Zugo, Lussemburgo SOPARFI, Dubai Zero-Tax) e ottimizzazione ritenute estere DTT.
+* **⚡ Machine Learning Hidden Markov Models (HMM) Regime Detection (`HMM` / `REGIME ML`)**: Rilevamento non supervisionato a 3 stati latenti di mercato (Bull, Range-Bound, Crisis), matrice di transizione dinamica e raccomandazioni tattiche anticicliche.
+* **🎙️ AI Voice Executive Briefing & Wealth Audio Podcast (`VOICE BRIEF` / `AUDIO`)**: Generatore automatico di audio briefing esecutivi e copioni broadcast a 2 voci (Chief Investment Officer & Chief Risk Officer) sincronizzati sui dati reali di bilancio.
 * **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 21 moduli, oltre 50 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
 
 ---

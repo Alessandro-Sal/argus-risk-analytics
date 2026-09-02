@@ -186,6 +186,13 @@ QUANT_MODELS_CATALOG = {
         "badge_color": "#eab308",
         "category": "Obbligazionario",
         "desc": "Valutazione obbligazionaria avanzata: Duration Modificata, Convessità, Bootstrapping curva Zero-Coupon e spread di credito (Z-Spread) rispetto al benchmark."
+    },
+    "⚡ Machine Learning HMM Regimes": {
+        "title": "Machine Learning Hidden Markov Models (HMM) & Regime Detection",
+        "badge": "HMM • Regime Shift • ML Overlay",
+        "badge_color": "#f43f5e",
+        "category": "Machine Learning",
+        "desc": "Classificazione non supervisionata a 3 stati latenti (Bull, Range-Bound, Crisis), matrice di transizione di stato e raccomandazioni tattiche anticicliche."
     }
 }
 
@@ -4317,5 +4324,52 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
         use_container_width=True,
         hide_index=True
     )
+
+# ── TAB 8: MACHINE LEARNING HMM REGIMES ──────────────────────
+elif active_quant_tab == "⚡ Machine Learning HMM Regimes":
+    section("⚡ Machine Learning Hidden Markov Models (HMM) & Regime Detection")
+    st.caption("Classificazione probabilistica non supervisionata della serie dei rendimenti in 3 stati latenti (Low-Vol Bull, Range-Bound Drift, High-Vol Crisis) e calcolo della matrice di transizione.")
+
+    from core.hmm_regime_engine import compute_hmm_market_regime_detection
+
+    sr_port_ret = results.get("portfolio_return") if results else None
+    hmm_res = compute_hmm_market_regime_detection(sr_returns=sr_port_ret)
+    rec = hmm_res["tactical_recommendation"]
+
+    hk1, hk2, hk3, hk4 = st.columns(4)
+    with hk1:
+        metric_card("Regime Attuale Stimato", hmm_res["current_regime_name"], delta="Stato Latente Attivo", delta_color="normal")
+    with hk2:
+        metric_card("Persistenza del Regime", f"{hmm_res['regime_persistence_pct']:.1f}%", delta="Probabilità di Permanenza", delta_color="normal")
+    with hk3:
+        metric_card("Durata Attesa Residua", f"~{hmm_res['expected_remaining_duration_days']} gg", delta="Trading Days", delta_color="normal")
+    with hk4:
+        metric_card("Allocazione Consigliata", rec["allocation"][:24], delta="Overlay Tattico ML", delta_color="normal")
+
+    st.write("")
+
+    col_hmm_l, col_hmm_r = st.columns([3, 2])
+    with col_hmm_l:
+        st.markdown("##### 📊 Profilo Statistico dei 3 Regimi Latenti")
+        st.dataframe(
+            hmm_res["state_profiles_df"][["state_name", "frequency_pct", "annualized_return_pct", "annualized_volatility_pct", "sharpe_ratio", "persistence_prob_pct", "expected_duration_days"]].rename(columns={
+                "state_name": "Regime di Mercato",
+                "frequency_pct": "Frequenza Storica (%)",
+                "annualized_return_pct": "Rendimento Annuo (%)",
+                "annualized_volatility_pct": "Volatilità Annua (%)",
+                "sharpe_ratio": "Sharpe Ratio",
+                "persistence_prob_pct": "Persistenza (%)",
+                "expected_duration_days": "Durata Media (gg)"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with col_hmm_r:
+        st.markdown("##### 🔄 Matrice di Transizione di Stato (%)")
+        st.dataframe(
+            hmm_res["transition_matrix_pct_df"],
+            use_container_width=True
+        )
 
 
