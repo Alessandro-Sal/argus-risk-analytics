@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.1.2-blue.svg)
+![Version](https://img.shields.io/badge/version-6.1.3-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-322%2F322%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-327%2F327%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -169,18 +169,22 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🏛️ Consolidamento a 5 Livelli**: Aggregazione in tempo reale di Liquidità, Investimenti Finanziari (collegamento dinamico a portafogli Risk), Asset Fisici/Caveau, Previdenza Integrativa e Passività.
 * **🏆 Wealth Health Score (0-100)**: Punteggio sintetico di salute patrimoniale calcolato su 5 pilastri: Riserva di Liquidità, Tasso di Risparmio, Diversificazione, Copertura Previdenziale e Grado di Indebitamento (DTI).
 * **🏢 Family Office Multi-Entity & Holding Consolidator**: Consolidamento patrimoniale e societario tra diverse entità giuridiche del nucleo familiare (*Persona Fisica, Holding SRL, Società Semplice, Trust Familiare, Polizze Dedicate*) con elisione automatica delle partite infragruppo (finanziamenti soci ed equity intercompany) e analisi di convenienza fiscale **PEX (Participation Exemption Art. 87 TUIR: 1,2% effettivo vs 26% IRPEF)**.
+* **💱 Multi-Currency FX Exposure & Forward Hedging Overlay**: Mappatura dell'esposizione a valute estere (USD, GBP, CHF, JPY), calcolo dei Forward Points e costo annuo di copertura secondo la Covered Interest Parity (CIP) e simulazione di scenari di shock valutario (-15%) a confronto tra strategie Unhedged, 50% e 100% Hedged.
+* **🎯 Total Wealth Brinson-Fachler Multi-Asset Attribution**: Scomposizione del rendimento attivo patrimoniale (Alpha) rispetto a un benchmark strategico composito in Effetto Allocazione, Effetto Selezione ed Effetto Interazione su tutto il patrimonio consolidato.
 * **📊 Trend Storico & Snapshot Temporali**: Storicizzazione dei bilanci patrimoniali e monitoraggio della crescita del capitale nel tempo.
 * **📑 Client-Ready Advisory Pitchbook**: Generazione ed esportazione di dossier multipagina esecutivi in formato PDF e HTML per clientela Private Banking e Family Office.
 
 ### 14. 💳 Cash Flow, Budgeting 50/30/20 & Spese (`src/pages/14_💳_Cash_Flow_e_Spese.py`)
 * **📊 Libro Mastro Entrate & Uscite**: Analisi granulare dei flussi di cassa, scomposizione per categorie di spesa e monitoraggio del tasso di risparmio mensile.
 * **⚖️ Regola del 50/30/20 & Zero-Based Budgeting**: Valutazione automatica della ripartizione tra Bisogni Primari (50%), Desideri/Discrezionali (30%) e Risparmio/Investimenti (20%).
+* **🔍 Smart Cashflow Reconciliation & Auto-Matching**: Algoritmo di pattern matching semantico tra flussi contabili bancari ed impegni contrattuali ricorrenti (mutui, stipendi, abbonamenti), con calcolo del tasso di riconciliazione e rilevamento istantaneo di doppi addebiti sospetti.
 * **🔁 Subscription Sentinel & Cumulative Opportunity Drag**: Rilevamento automatico degli abbonamenti ricorrenti e delle rate a termine (da `Config_FixedExpenses`), con stima del capitale perso se investito al 7% annuo su 5, 10 e 20 anni.
 * **🔮 Rolling Cash Flow Forecast & Z-Score Anomalies**: Proiezioni probabilistiche di cassa a 3 e 6 mesi (bande P10/P50/P90) e rilevamento statistico delle uscite straordinarie anomale ($Z \ge 1.8$).
 
 ### 15. ⌚ Asset Illiquidi, Caveau & Orologi di Lusso (`src/pages/15_⌚_Asset_Illiquidi_e_Orologi.py`)
 * **🪙 Caveau Metalli Preziosi**: Gestione metalli da investimento (Oro 18K/24K, Argento) con rivalutazione automatica al prezzo spot e calcolo plusvalenze.
 * **⌚ Collezione Orologi di Lusso**: Inventario orologi da collezione (Rolex, Omega, Patek Philippe, ecc.) con tracciamento referenza, corredo, grado di conservazione e pricing di mercato.
+* **💼 Private Equity, Venture Capital & J-Curve Waterfall**: Monitoraggio di quote societarie non quotate, club deal e fondi chiusi con tracking di Capitale Impegnato (Committed), Richiamato (Called) e Unfunded, metriche standard ILPA (**MOIC/TVPI**, **DPI**, **RVPI**, **XIRR**) e modellazione stocastica della J-Curve a 8 anni.
 * **💧 Matrice di Liquidabilità**: Mappatura del tempo medio di smobilizzo (Days-to-Cash) e haircut prudenziale in caso di liquidazione rapida.
 
 ### 16. 🛡️ Previdenza & Pension Planning (`src/pages/16_🛡️_Previdenza_e_Pension_Planning.py`)
@@ -220,7 +224,8 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🏛️ Motore Fiscale Successioni (D.Lgs. 346/1990)**:
   * Determinazione dell'asse ereditario netto con esclusione ex lege di Titoli di Stato BTP, Polizze Vita Ramo I/III e Fondi Pensione.
   * Applicazione automatica delle franchigie per grado di parentela (1.000.000€ per coniuge e figli al 4%, 100.000€ per fratelli al 6%, 1.500.000€ per soggetti con disabilità grave L. 104) e imposte ipotecarie/catastali (fissa 400€ prima casa).
-* **🛡️ Strumenti di Protezione Patrimoniale**: Analisi di polizze vita (esenti da imposta di successione), patti di famiglia, holding familiari e trust.
+* **🏛️ Family Governance & Patti di Famiglia (Art. 768-bis c.c.)**: Simulazione del trasferimento del controllo d'impresa o quote di holding all'erede designato, determinazione del valore di liquidazione compensativa per i legittimari non assegnatari, attivazione dello scudo legale contro future azioni di riduzione/collazione e checklist notarile.
+* **🛡️ Strumenti di Protezione Patrimoniale**: Analisi di polizze vita (esenti da imposta di successione), trust di scopo e donazioni scaglionate su orizzonte pluriennale.
 
 ### 21. 🤖 AI Wealth Copilot & Advisor (`src/pages/21_🤖_AI_Copilot_e_Advisor.py`)
 * **🧠 Diagnostica Patrimoniale AI**: Analisi automatica in linguaggio naturale dello stato di salute patrimoniale, cash flow ed esposizione al rischio.

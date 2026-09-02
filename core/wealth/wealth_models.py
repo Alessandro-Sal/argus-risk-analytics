@@ -274,3 +274,139 @@ class QuarterlyReviewResult:
     tactical_recommendations: List[str]
     consolidated_kpis: Dict[str, Any]
 
+
+# ── PRIVATE EQUITY & REAL ASSETS MODELS ──────────────────────
+
+@dataclass
+class PECashflowItem:
+    date: str
+    amount_eur: float  # Negativo per investimenti/capital call, positivo per distribuzioni
+    cashflow_type: str  # "CAPITAL_CALL", "DISTRIBUTION", "DIVIDEND", "EXIT"
+    note: Optional[str] = None
+
+
+@dataclass
+class PrivateEquityDealItem:
+    deal_id: str
+    name: str
+    asset_class: str = "Venture Capital"  # "Private Equity", "Venture Capital", "Real Estate Deal", "Club Deal"
+    committed_capital_eur: float = 100000.0
+    called_capital_eur: float = 80000.0
+    distributions_received_eur: float = 30000.0
+    current_nav_estimated_eur: float = 95000.0
+    vintage_year: int = 2021
+    status: str = "ACTIVE"  # "ACTIVE", "EXITED", "WRITTEN_OFF"
+    irr_net_pct: Optional[float] = None
+    moic_multiple: Optional[float] = None
+    cashflows: List[PECashflowItem] = field(default_factory=list)
+
+
+@dataclass
+class PEDealMetrics:
+    total_committed_eur: float
+    total_called_eur: float
+    total_distributed_eur: float
+    total_current_nav_eur: float
+    unfunded_commitment_eur: float
+    portfolio_xirr_pct: float
+    portfolio_moic_tvpi: float
+    dpi_multiple: float
+    rvpi_multiple: float
+    deals_count: int
+    j_curve_df: Any = None
+
+
+# ── MULTI-CURRENCY FX HEDGING MODELS ─────────────────────────
+
+@dataclass
+class FXExposureItem:
+    currency: str
+    nominal_amount_eur: float
+    weight_pct: float
+    local_interest_rate_pct: float
+    annual_forward_points_cost_pct: float
+    hedged_ratio_pct: float = 0.0
+
+
+@dataclass
+class FXHedgingResult:
+    total_wealth_eur: float
+    base_currency: str
+    foreign_exposure_eur: float
+    foreign_exposure_pct: float
+    exposures: List[FXExposureItem]
+    annual_hedging_cost_eur: float
+    unhedged_drawdown_risk_eur: float  # Shock -15% FX
+    hedged_scenario_comparison: Dict[str, Any]
+
+
+# ── FAMILY GOVERNANCE & PATTO DI FAMIGLIA MODELS ─────────────
+
+@dataclass
+class PattoFamigliaResult:
+    business_value_eur: float
+    assigned_heir_name: str
+    assigned_quota_pct: float
+    non_assigned_heirs: List[Dict[str, Any]]
+    total_compensation_due_eur: float
+    tax_exempt_under_art_768_bis: bool
+    is_legitimate_shielded: bool
+    governance_checklist: List[str]
+
+
+@dataclass
+class FamilyGovernancePlan:
+    total_family_wealth_eur: float
+    staggered_donations_schedule: List[Dict[str, Any]]
+    total_tax_savings_vs_direct_inheritance_eur: float
+    patto_di_famiglia: Optional[PattoFamigliaResult]
+
+
+# ── MULTI-ASSET TOTAL WEALTH BRINSON ATTRIBUTION ─────────────
+
+@dataclass
+class BrinsonWealthBucketItem:
+    asset_class: str
+    portfolio_weight_pct: float
+    benchmark_weight_pct: float
+    portfolio_return_pct: float
+    benchmark_return_pct: float
+    allocation_effect_pct: float
+    selection_effect_pct: float
+    interaction_effect_pct: float
+    total_contribution_pct: float
+
+
+@dataclass
+class BrinsonWealthResult:
+    portfolio_total_return_pct: float
+    benchmark_total_return_pct: float
+    excess_return_pct: float
+    allocation_effect_total_pct: float
+    selection_effect_total_pct: float
+    interaction_effect_total_pct: float
+    breakdown_table: List[BrinsonWealthBucketItem]
+
+
+# ── SMART CASHFLOW RECONCILIATION MODELS ─────────────────────
+
+@dataclass
+class ReconciliationMatchItem:
+    tx_date: str
+    description: str
+    amount_eur: float
+    matched_category: str
+    match_confidence_pct: float
+    match_source: str  # "RECURRING_EXPENSE", "MORTGAGE", "SALARY", "MANUAL"
+    is_duplicate: bool = False
+
+
+@dataclass
+class ReconciliationResult:
+    total_transactions_processed: int
+    matched_transactions_count: int
+    unmatched_transactions_count: int
+    duplicates_flagged_count: int
+    reconciliation_rate_pct: float
+    matches: List[ReconciliationMatchItem]
+

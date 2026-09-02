@@ -28,7 +28,18 @@ from core.wealth.wealth_models import (
     EstatePlanResult,
     RebalanceDriftItem,
     RealEstateEquitySummary,
-    LegalEntityType
+    LegalEntityType,
+    PrivateEquityDealItem,
+    PECashflowItem,
+    PEDealMetrics,
+    FXExposureItem,
+    FXHedgingResult,
+    FamilyGovernancePlan,
+    PattoFamigliaResult,
+    BrinsonWealthBucketItem,
+    BrinsonWealthResult,
+    ReconciliationMatchItem,
+    ReconciliationResult
 )
 from core.wealth.wealth_db import (
     get_wealth_accounts,
@@ -4048,6 +4059,577 @@ def compute_sequence_of_returns_risk_engine(
             f"Un bear market iniziale senza protezione porta il capitale a zero all'anno {sim_early['ruin_year']}." if sim_early['is_ruined'] else "Il piano resiste anche all'Early Bear Market grazie a un solido capitale di partenza.",
             f"Mantenere un Buffer di Sicurezza di € {buffer_amt:,.0f} ({cash_buffer_years:.1f} anni di spese) evita di vendere quote a sconto durante il crash iniziale, preservando un capitale finale di € {sim_buffered['final_wealth']:,.0f}."
         ]
+    }
+
+
+# ============================================================
+# 1. PRIVATE EQUITY, REAL ASSETS & J-CURVE ENGINE
+# ============================================================
+
+def _calculate_deal_xirr(cashflows: List[Tuple[float, float]], guess: float = 0.10) -> float:
+    """
+    Risolutore numerico XIRR per flussi di cassa irregolari (anni, importo).
+    cashflows: lista di tuple (anni_trascorsi, importo_flusso).
+    """
+    if not cashflows or len(cashflows) < 2:
+        return 0.0
+
+    # Controlla presenza di almeno un flusso negativo e uno positivo
+    has_pos = any(cf[1] > 0 for cf in cashflows)
+    has_neg = any(cf[1] < 0 for cf in cashflows)
+    if not (has_pos and has_neg):
+        return 0.0
+
+    def npv(r: float) -> float:
+        val = 0.0
+        for t, amt in cashflows:
+            val += amt / ((1.0 + r) ** t)
+        return val
+
+    # Metodo di Bisezione / Newton per stabilità
+    r_low, r_high = -0.90, 3.0
+    for _ in range(60):
+        r_mid = (r_low + r_high) / 2.0
+        npv_mid = npv(r_mid)
+        if abs(npv_mid) < 1e-4:
+            return round(r_mid * 100.0, 2)
+        npv_low = npv(r_low)
+        if (npv_low * npv_mid) <= 0:
+            r_high = r_mid
+        else:
+            r_low = r_mid
+
+    return round(((r_low + r_high) / 2.0) * 100.0, 2)
+
+
+def compute_private_equity_deal_metrics(deals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    """
+    Calcola le metriche istituzionali di performance per investimenti in Private Equity,
+    Venture Capital, Club Deal e Real Estate illiquido (XIRR, MOIC/TVPI, DPI, RVPI, J-Curve).
+    """
+    default_deals = [
+        {
+            "deal_id": "PE-001",
+            "name": "FinTech Seed Fund III",
+            "asset_class": "Venture Capital",
+            "committed_capital_eur": 150000.0,
+            "called_capital_eur": 120000.0,
+            "distributions_received_eur": 45000.0,
+            "current_nav_estimated_eur": 165000.0,
+            "vintage_year": 2021,
+            "status": "ACTIVE",
+            "cashflows": [
+                {"year_offset": 0.0, "amount_eur": -60000.0},
+                {"year_offset": 1.0, "amount_eur": -60000.0},
+                {"year_offset": 2.5, "amount_eur": 45000.0}
+            ]
+        },
+        {
+            "deal_id": "PE-002",
+            "name": "Logistics Real Estate Fund",
+            "asset_class": "Real Estate Deal",
+            "committed_capital_eur": 200000.0,
+            "called_capital_eur": 200000.0,
+            "distributions_received_eur": 60000.0,
+            "current_nav_estimated_eur": 210000.0,
+            "vintage_year": 2020,
+            "status": "ACTIVE",
+            "cashflows": [
+                {"year_offset": 0.0, "amount_eur": -200000.0},
+                {"year_offset": 2.0, "amount_eur": 30000.0},
+                {"year_offset": 4.0, "amount_eur": 30000.0}
+            ]
+        },
+        {
+            "deal_id": "PE-003",
+            "name": "B2B SaaS Scaleup Club Deal",
+            "asset_class": "Private Equity",
+            "committed_capital_eur": 100000.0,
+            "called_capital_eur": 80000.0,
+            "distributions_received_eur": 10000.0,
+            "current_nav_estimated_eur": 130000.0,
+            "vintage_year": 2022,
+            "status": "ACTIVE",
+            "cashflows": [
+                {"year_offset": 0.0, "amount_eur": -50000.0},
+                {"year_offset": 1.0, "amount_eur": -30000.0},
+                {"year_offset": 2.0, "amount_eur": 10000.0}
+            ]
+        }
+    ]
+
+    active_deals = deals if deals is not None else default_deals
+
+    processed_deals = []
+    tot_committed = 0.0
+    tot_called = 0.0
+    tot_distributed = 0.0
+    tot_nav = 0.0
+
+    current_yr = 2026
+
+    for d in active_deals:
+        comm = float(d.get("committed_capital_eur", 0.0))
+        called = float(d.get("called_capital_eur", 0.0))
+        dist = float(d.get("distributions_received_eur", 0.0))
+        nav = float(d.get("current_nav_estimated_eur", 0.0))
+        unfunded = max(0.0, comm - called)
+
+        tot_committed += comm
+        tot_called += called
+        tot_distributed += dist
+        tot_nav += nav
+
+        # Calcolo MOIC / TVPI
+        moic = (dist + nav) / called if called > 0 else 1.0
+        dpi = dist / called if called > 0 else 0.0
+        rvpi = nav / called if called > 0 else 0.0
+
+        # Calcolo XIRR deal
+        cfs = []
+        raw_cfs = d.get("cashflows", [])
+        deal_age = max(1.0, float(current_yr - int(d.get("vintage_year", 2022))))
+        if raw_cfs:
+            for c in raw_cfs:
+                cfs.append((float(c.get("year_offset", 0.0)), float(c.get("amount_eur", 0.0))))
+            # Aggiunta NAV finale terminale come flusso positivo all'anno corrente
+            cfs.append((deal_age, nav))
+        else:
+            cfs = [(0.0, -called), (deal_age, dist + nav)]
+
+        irr = _calculate_deal_xirr(cfs)
+
+        processed_deals.append({
+            "deal_id": d.get("deal_id", "DEAL"),
+            "name": d.get("name", "Unnamed Deal"),
+            "asset_class": d.get("asset_class", "Private Equity"),
+            "vintage_year": d.get("vintage_year", 2022),
+            "committed_capital_eur": round(comm, 2),
+            "called_capital_eur": round(called, 2),
+            "unfunded_commitment_eur": round(unfunded, 2),
+            "distributions_received_eur": round(dist, 2),
+            "current_nav_estimated_eur": round(nav, 2),
+            "moic_multiple": round(moic, 2),
+            "dpi_multiple": round(dpi, 2),
+            "rvpi_multiple": round(rvpi, 2),
+            "irr_net_pct": round(irr, 1),
+            "status": d.get("status", "ACTIVE")
+        })
+
+    port_moic = (tot_distributed + tot_nav) / tot_called if tot_called > 0 else 1.0
+    port_dpi = tot_distributed / tot_called if tot_called > 0 else 0.0
+    port_rvpi = tot_nav / tot_called if tot_called > 0 else 0.0
+
+    # Calcolo XIRR aggregato di portafoglio
+    port_cfs = [(0.0, -tot_called), (3.5, tot_distributed + tot_nav)]
+    port_irr = _calculate_deal_xirr(port_cfs)
+
+    # Costruzione J-Curve
+    j_years = [0, 1, 2, 3, 4, 5, 6, 7]
+    # Modellazione classica J-Curve: assorbimento iniziale cassa fino ad anno 2-3, poi monetizzazione
+    j_nav_pct = [-0.15, -0.22, -0.10, +0.15, +0.45, +0.75, +1.05, +1.30]
+    j_curve_values = [round(tot_called * (1.0 + p), 2) for p in j_nav_pct]
+
+    df_jcurve = pd.DataFrame({
+        "Anno di Vita Deal": j_years,
+        "Valore Netto Portafoglio PE (€)": j_curve_values,
+        "Capitale Versato Cumulativo (€)": [tot_called] * len(j_years)
+    })
+
+    df_deals = pd.DataFrame(processed_deals)
+
+    return {
+        "total_committed_eur": round(tot_committed, 2),
+        "total_called_eur": round(tot_called, 2),
+        "total_distributed_eur": round(tot_distributed, 2),
+        "total_current_nav_eur": round(tot_nav, 2),
+        "unfunded_commitment_eur": round(tot_committed - tot_called, 2),
+        "portfolio_xirr_pct": round(port_irr, 1),
+        "portfolio_moic_tvpi": round(port_moic, 2),
+        "portfolio_dpi": round(port_dpi, 2),
+        "portfolio_rvpi": round(port_rvpi, 2),
+        "deals_count": len(processed_deals),
+        "deals_df": df_deals,
+        "deals_list": processed_deals,
+        "j_curve_df": df_jcurve
+    }
+
+
+# ============================================================
+# 2. MULTI-CURRENCY FX HEDGING & FORWARD POINTS OVERLAY
+# ============================================================
+
+def compute_multi_currency_fx_hedging_engine(
+    engine: Engine,
+    portfolio_id: int = 1,
+    manual_exposures: Optional[Dict[str, float]] = None,
+    hedging_ratios: Optional[Dict[str, float]] = None
+) -> Dict[str, Any]:
+    """
+    Analizza l'esposizione al rischio di cambio per il patrimonio consolidato,
+    calcola il costo dei Forward Points (Covered Interest Parity) e simula strategie di hedging.
+    """
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    tot_w = max(1000.0, nw.total_net_worth)
+
+    # Tassi di interesse monetari centrali di riferimento (BCE, Fed, BoE, SNB, BoJ)
+    rates = {
+        "EUR": 3.50,  # €STR
+        "USD": 5.25,  # SOFR
+        "GBP": 5.00,  # SONIA
+        "CHF": 1.50,  # SARON
+        "JPY": 0.25   # TONAR
+    }
+
+    # Se non specificato, stima esposizione naturale dai portafogli e asset
+    default_exp = {
+        "EUR": tot_w * 0.65,
+        "USD": tot_w * 0.25,
+        "GBP": tot_w * 0.05,
+        "CHF": tot_w * 0.05
+    }
+    exp_dict = manual_exposures if manual_exposures else default_exp
+    tot_exp = sum(exp_dict.values())
+    if tot_exp <= 0:
+        tot_exp = tot_w
+
+    h_ratios = hedging_ratios if hedging_ratios else {"USD": 0.50, "GBP": 0.50, "CHF": 0.0, "JPY": 0.0}
+
+    eur_rate = rates["EUR"]
+    items = []
+    tot_foreign_eur = 0.0
+    tot_hedging_cost_eur = 0.0
+
+    for curr, amt in exp_dict.items():
+        if curr == "EUR":
+            continue
+        tot_foreign_eur += amt
+        weight_pct = (amt / tot_exp) * 100.0
+        local_r = rates.get(curr, 3.50)
+        # Costo annuo di copertura per un investitore EUR: r_EUR - r_FOREIGN
+        # Se r_USD > r_EUR, la copertura costa (differenziale negativo)
+        fwd_cost_pct = (eur_rate - local_r)  # es. 3.50 - 5.25 = -1.75%
+        hedge_ratio = h_ratios.get(curr, 0.0)
+        hedged_amt = amt * hedge_ratio
+        cost_eur = abs(fwd_cost_pct / 100.0) * hedged_amt
+        tot_hedging_cost_eur += cost_eur
+
+        items.append({
+            "currency": curr,
+            "nominal_amount_eur": round(amt, 2),
+            "weight_pct": round(weight_pct, 1),
+            "local_interest_rate_pct": round(local_r, 2),
+            "annual_forward_points_cost_pct": round(fwd_cost_pct, 2),
+            "hedged_ratio_pct": round(hedge_ratio * 100.0, 1),
+            "hedged_amount_eur": round(hedged_amt, 2),
+            "annual_cost_eur": round(cost_eur, 2)
+        })
+
+    foreign_pct = (tot_foreign_eur / tot_exp) * 100.0
+    # Shock FX -15% su tutte le valute estere
+    shock_unhedged_loss = tot_foreign_eur * 0.15
+    shock_hedged_loss = sum(it["nominal_amount_eur"] * (1.0 - (it["hedged_ratio_pct"] / 100.0)) * 0.15 for it in items)
+
+    df_fx = pd.DataFrame(items)
+
+    return {
+        "total_wealth_eur": round(tot_exp, 2),
+        "base_currency": "EUR",
+        "foreign_exposure_eur": round(tot_foreign_eur, 2),
+        "foreign_exposure_pct": round(foreign_pct, 1),
+        "exposures_df": df_fx,
+        "exposures_list": items,
+        "annual_hedging_cost_eur": round(tot_hedging_cost_eur, 2),
+        "unhedged_fx_shock_loss_eur": round(shock_unhedged_loss, 2),
+        "hedged_fx_shock_loss_eur": round(shock_hedged_loss, 2),
+        "hedged_scenario_comparison": {
+            "0%_Unhedged": {"annual_cost_eur": 0.0, "shock_drawdown_eur": round(shock_unhedged_loss, 2)},
+            "50%_Rule_Of_Thumb": {"annual_cost_eur": round(tot_foreign_eur * 0.5 * 0.0175, 2), "shock_drawdown_eur": round(shock_unhedged_loss * 0.5, 2)},
+            "100%_Fully_Hedged": {"annual_cost_eur": round(tot_foreign_eur * 0.0175, 2), "shock_drawdown_eur": 0.0}
+        }
+    }
+
+
+# ============================================================
+# 3. FAMILY GOVERNANCE & PATTO DI FAMIGLIA (ART. 768-BIS C.C.)
+# ============================================================
+
+def compute_family_governance_and_patti_di_famiglia(
+    engine: Engine,
+    portfolio_id: int = 1,
+    business_value_eur: float = 2000000.0,
+    assigned_heir_name: str = "Erede Operativo (Figlio A)",
+    assigned_quota_pct: float = 100.0,
+    heir_count: int = 2,
+    has_spouse: bool = True
+) -> Dict[str, Any]:
+    """
+    Modella il passaggio generazionale dell'azienda/holding familiare tramite Patto di Famiglia
+    (Art. 768-bis e ss. c.c.) e pianifica la rateizzazione delle donazioni per ottimizzare le franchigie.
+    """
+    biz_val = max(1000.0, float(business_value_eur))
+    n_heirs = max(1, int(heir_count))
+
+    # Calcolo della quota di legittima astratta che spetterebbe ai legittimari sull'azienda
+    # Con coniuge e 2+ figli: Quota Riserva Coniuge = 1/4, Figli = 2/4 (1/2 diviso n_figli), Disponibile = 1/4
+    if has_spouse:
+        quota_spouse_eur = biz_val * 0.25
+        quota_per_child_eur = (biz_val * 0.50) / n_heirs
+    else:
+        quota_spouse_eur = 0.0
+        quota_per_child_eur = (biz_val * (2.0 / 3.0)) / n_heirs
+
+    non_assigned_list = []
+    tot_compensation = 0.0
+
+    # Liquidazione dei legittimari non assegnatari dell'azienda
+    if has_spouse:
+        non_assigned_list.append({
+            "heir_name": "Coniuge",
+            "relationship": "Coniuge",
+            "statutory_legitimate_share_pct": 25.0,
+            "compensation_due_eur": round(quota_spouse_eur, 2),
+            "payment_method": "Polizza Vita / Liquidità Segregata"
+        })
+        tot_compensation += quota_spouse_eur
+
+    for i in range(1, n_heirs):
+        non_assigned_list.append({
+            "heir_name": f"Figlio non assegnatario {i}",
+            "relationship": "Figlio",
+            "statutory_legitimate_share_pct": round((50.0 / n_heirs) if has_spouse else (66.6 / n_heirs), 1),
+            "compensation_due_eur": round(quota_per_child_eur, 2),
+            "payment_method": "Immobili / Portafoglio Titoli"
+        })
+        tot_compensation += quota_per_child_eur
+
+    # Piano di donazioni scaglionate su orizzonte pluriennale
+    staggered_plan = [
+        {"anno": 2026, "importo_donato_eur": min(biz_val * 0.5, 1000000.0), "franchigia_usata_eur": min(biz_val * 0.5, 1000000.0), "imposta_donazione_eur": 0.0, "note": "Cessione iniziale nuda proprietà con riserva di usufrutto"},
+        {"anno": 2028, "importo_donato_eur": max(0.0, biz_val - 1000000.0), "franchigia_usata_eur": max(0.0, biz_val - 1000000.0), "imposta_donazione_eur": max(0.0, (biz_val - 1000000.0) * 0.04), "note": "Completamento passaggio quote con consolidamento usufrutto"}
+    ]
+
+    return {
+        "business_value_eur": round(biz_val, 2),
+        "assigned_heir_name": assigned_heir_name,
+        "assigned_quota_pct": assigned_quota_pct,
+        "non_assigned_heirs": non_assigned_list,
+        "total_compensation_due_eur": round(tot_compensation, 2),
+        "tax_exempt_under_art_768_bis": True,  # Esenzione imposta donazione se mantenuto controllo per 5 anni
+        "is_legitimate_shielded": True,        # Immunità da futura azione di riduzione o collazione
+        "governance_checklist": [
+            "Atto pubblico notarile con presenza contestuale di tutti i legittimari.",
+            "Impegno espresso dell'assegnatario a mantenere il controllo per almeno 5 anni (art. 3 c. 4-ter D.Lgs. 346/90).",
+            "Liquidazione contestuale o differita della quota di legittima ai fratelli/coniuge con beni extra-aziendali.",
+            "Clausola di arbitrato per la risoluzione delle controversie endo-familiari."
+        ],
+        "staggered_donations_schedule": staggered_plan
+    }
+
+
+# ============================================================
+# 4. TOTAL WEALTH BRINSON-FACHLER MULTI-ASSET ATTRIBUTION
+# ============================================================
+
+def compute_total_wealth_brinson_attribution(
+    engine: Engine,
+    portfolio_id: int = 1,
+    custom_returns: Optional[Dict[str, float]] = None,
+    custom_benchmark: Optional[Dict[str, float]] = None
+) -> Dict[str, Any]:
+    """
+    Esegue l'attribuzione di performance Brinson-Fachler estesa a tutto il patrimonio consolidato
+    (Titoli, Immobili, Previdenza, Oro, Liquidità) rispetto a un Composite Benchmark Strategico.
+    """
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    tot_assets = max(1000.0, nw.liquid_cash + nw.financial_investments + nw.physical_assets + nw.pension_total)
+
+    # Pesi effettivi del portafoglio
+    w_port = {
+        "Investimenti Finanziari (Azioni/ETF)": (nw.financial_investments / tot_assets) * 100.0,
+        "Immobili (Real Estate)": (nw.real_estate_total / tot_assets) * 100.0,
+        "Previdenza Integrativa & Bond": (nw.pension_total / tot_assets) * 100.0,
+        "Metalli Preziosi & Orologi": ((nw.luxury_watches_total + nw.precious_metals_total) / tot_assets) * 100.0,
+        "Liquidità & Riserva": (nw.liquid_cash / tot_assets) * 100.0
+    }
+
+    # Pesi di riferimento Benchmark Composito Strategico
+    default_bmk_weights = {
+        "Investimenti Finanziari (Azioni/ETF)": 50.0,
+        "Immobili (Real Estate)": 25.0,
+        "Previdenza Integrativa & Bond": 15.0,
+        "Metalli Preziosi & Orologi": 5.0,
+        "Liquidità & Riserva": 5.0
+    }
+    w_bmk = custom_benchmark if custom_benchmark else default_bmk_weights
+
+    # Rendimenti stimati annualizzati di portafoglio e benchmark
+    default_port_ret = {
+        "Investimenti Finanziari (Azioni/ETF)": 11.4,
+        "Immobili (Real Estate)": 4.8,
+        "Previdenza Integrativa & Bond": 4.2,
+        "Metalli Preziosi & Orologi": 8.0,
+        "Liquidità & Riserva": 3.4
+    }
+    default_bmk_ret = {
+        "Investimenti Finanziari (Azioni/ETF)": 9.2,   # MSCI World
+        "Immobili (Real Estate)": 4.5,                 # Real Estate Index
+        "Previdenza Integrativa & Bond": 3.8,          # Global Agg
+        "Metalli Preziosi & Orologi": 7.5,             # Gold Spot
+        "Liquidità & Riserva": 3.2                     # €STR
+    }
+
+    r_port = custom_returns if custom_returns else default_port_ret
+    r_bmk = default_bmk_ret
+
+    buckets = []
+    tot_alloc_effect = 0.0
+    tot_select_effect = 0.0
+    tot_interact_effect = 0.0
+
+    port_total_return = 0.0
+    bmk_total_return = 0.0
+
+    for name in w_port.keys():
+        wp = w_port.get(name, 0.0) / 100.0
+        wb = w_bmk.get(name, 0.0) / 100.0
+        rp = r_port.get(name, 0.0) / 100.0
+        rb = r_bmk.get(name, 0.0) / 100.0
+
+        port_total_return += wp * rp
+        bmk_total_return += wb * rb
+
+        # Scomposizione Brinson-Fachler
+        alloc = (wp - wb) * rb
+        select = wb * (rp - rb)
+        interact = (wp - wb) * (rp - rb)
+        tot_contrib = alloc + select + interact
+
+        tot_alloc_effect += alloc
+        tot_select_effect += select
+        tot_interact_effect += interact
+
+        buckets.append({
+            "asset_class": name,
+            "portfolio_weight_pct": round(wp * 100.0, 1),
+            "benchmark_weight_pct": round(wb * 100.0, 1),
+            "portfolio_return_pct": round(rp * 100.0, 2),
+            "benchmark_return_pct": round(rb * 100.0, 2),
+            "allocation_effect_pct": round(alloc * 100.0, 2),
+            "selection_effect_pct": round(select * 100.0, 2),
+            "interaction_effect_pct": round(interact * 100.0, 2),
+            "total_contribution_pct": round(tot_contrib * 100.0, 2)
+        })
+
+    excess_ret = port_total_return - bmk_total_return
+    df_brinson = pd.DataFrame(buckets)
+
+    return {
+        "portfolio_total_return_pct": round(port_total_return * 100.0, 2),
+        "benchmark_total_return_pct": round(bmk_total_return * 100.0, 2),
+        "excess_return_pct": round(excess_ret * 100.0, 2),
+        "allocation_effect_total_pct": round(tot_alloc_effect * 100.0, 2),
+        "selection_effect_total_pct": round(tot_select_effect * 100.0, 2),
+        "interaction_effect_total_pct": round(tot_interact_effect * 100.0, 2),
+        "breakdown_df": df_brinson,
+        "breakdown_list": buckets
+    }
+
+
+# ============================================================
+# 5. SMART CASHFLOW RECONCILIATION & AUTO-MATCHING ENGINE
+# ============================================================
+
+def compute_smart_cashflow_reconciliation(
+    engine: Engine,
+    portfolio_id: int = 1,
+    transactions_list: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+    """
+    Riconcilia i flussi bancari grezzi abbinandoli automaticamente a impegni ricorrenti
+    (stipendi, mutui, abbonamenti) e rilevando duplicati e anomalie.
+    """
+    df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
+    
+    # Se vuoto, usa transazioni simulate
+    if transactions_list is not None:
+        txs = transactions_list
+    elif not df_cf.empty:
+        txs = df_cf.to_dict(orient="records")
+    else:
+        txs = [
+            {"date": "2026-03-01", "description": "Bonifico Stipendio Datore Lavoro", "amount": 3200.0, "category": "Stipendio"},
+            {"date": "2026-03-05", "description": "Addebito Rata Mutuo Intesa Sanpaolo", "amount": -850.0, "category": "Casa"},
+            {"date": "2026-03-06", "description": "Abbonamento Netflix Mensile", "amount": -17.99, "category": "Abbonamenti"},
+            {"date": "2026-03-07", "description": "Spesa Supermercato Esselunga", "amount": -124.50, "category": "Alimentari"},
+            {"date": "2026-03-08", "description": "Spesa Supermercato Esselunga", "amount": -124.50, "category": "Alimentari"},  # Duplicato
+            {"date": "2026-03-12", "description": "Bonifico PAC ETF Fineco Bank", "amount": -500.0, "category": "Investimenti"}
+        ]
+
+    matched_items = []
+    seen_hashes = {}
+    dupes_count = 0
+    matched_count = 0
+
+    known_patterns = {
+        "mutuo": ("Mutuo Casa", 98.0, "MORTGAGE"),
+        "stipendio": ("Entrate Primarie", 99.0, "SALARY"),
+        "netflix": ("Abbonamenti Digitali", 95.0, "RECURRING_EXPENSE"),
+        "spotify": ("Abbonamenti Digitali", 95.0, "RECURRING_EXPENSE"),
+        "esselunga": ("Spesa Alimentare", 90.0, "SUPERMARKET"),
+        "pac": ("Investimenti Ricorrenti", 95.0, "INVESTMENT_PAC")
+    }
+
+    for tx in txs:
+        d_str = str(tx.get("date", ""))
+        desc = str(tx.get("description", ""))
+        amt = float(tx.get("amount", 0.0))
+
+        # Rilevamento duplicati (stesso importo e stessa descrizione all'interno della sessione contabile)
+        h_key = f"{desc.lower().strip()[:20]}_{amt:.2f}"
+        is_dupe = False
+        if h_key in seen_hashes:
+            is_dupe = True
+            dupes_count += 1
+        seen_hashes[h_key] = True
+
+        # Matching categoria
+        matched_cat = "Altro Discrezionale"
+        confidence = 50.0
+        match_src = "MANUAL"
+
+        desc_lower = desc.lower()
+        for pat, (cat_name, conf, src) in known_patterns.items():
+            if pat in desc_lower:
+                matched_cat = cat_name
+                confidence = conf
+                match_src = src
+                matched_count += 1
+                break
+
+        matched_items.append({
+            "tx_date": d_str,
+            "description": desc,
+            "amount_eur": round(amt, 2),
+            "matched_category": matched_cat,
+            "match_confidence_pct": confidence,
+            "match_source": match_src,
+            "is_duplicate": is_dupe
+        })
+
+    tot_tx = len(matched_items)
+    recon_rate = (matched_count / tot_tx * 100.0) if tot_tx > 0 else 0.0
+
+    df_recon = pd.DataFrame(matched_items)
+
+    return {
+        "total_transactions_processed": tot_tx,
+        "matched_transactions_count": matched_count,
+        "unmatched_transactions_count": tot_tx - matched_count,
+        "duplicates_flagged_count": dupes_count,
+        "reconciliation_rate_pct": round(recon_rate, 1),
+        "matches_df": df_recon,
+        "matches_list": matched_items
     }
 
 

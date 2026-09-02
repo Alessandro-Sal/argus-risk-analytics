@@ -61,7 +61,12 @@ from core.wealth.wealth_engine import (
     generate_advisory_pitchbook_pdf,
     compute_ai_quarterly_wealth_review,
     compute_family_office_multi_entity_consolidation,
-    compute_sequence_of_returns_risk_engine
+    compute_sequence_of_returns_risk_engine,
+    compute_private_equity_deal_metrics,
+    compute_multi_currency_fx_hedging_engine,
+    compute_family_governance_and_patti_di_famiglia,
+    compute_total_wealth_brinson_attribution,
+    compute_smart_cashflow_reconciliation
 )
 from core.wealth.wealth_importer import (
     parse_universal_statement,
@@ -1166,6 +1171,92 @@ def test_compute_sequence_of_returns_risk_engine():
     assert res["constant_result"]["final_wealth"] > 1000000.0
     # Lo scenario con buffer protettivo estende la sopravvivenza o previene la rovina rispetto allo scenario sprotetto
     assert (res["early_crash_with_buffer_result"]["ruin_year"] or 99) > (res["early_crash_result"]["ruin_year"] or 0)
+
+
+def test_compute_private_equity_deal_metrics():
+    """Test del motore Private Equity & Venture Capital (XIRR, MOIC, DPI, RVPI, J-Curve)."""
+    res = compute_private_equity_deal_metrics()
+    assert res["total_committed_eur"] > 0
+    assert res["total_called_eur"] > 0
+    assert res["portfolio_moic_tvpi"] >= 1.0
+    assert res["portfolio_dpi"] >= 0.0
+    assert res["portfolio_rvpi"] >= 0.0
+    assert res["deals_count"] == 3
+    assert not res["deals_df"].empty
+    assert "j_curve_df" in res
+    assert len(res["j_curve_df"]) == 8
+
+
+def test_compute_multi_currency_fx_hedging_engine(sqlite_engine):
+    """Test del motore di analisi esposizione FX e copertura Forward Points."""
+    init_wealth_db(sqlite_engine)
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Liquidità USD",
+        "account_type": AccountType.CHECKING.value,
+        "balance": 200000.0,
+        "institution": "Interactive Brokers"
+    })
+
+    fx = compute_multi_currency_fx_hedging_engine(sqlite_engine, portfolio_id=1)
+    assert fx["total_wealth_eur"] > 0
+    assert fx["foreign_exposure_eur"] > 0
+    assert fx["foreign_exposure_pct"] > 0
+    assert fx["annual_hedging_cost_eur"] >= 0
+    assert fx["unhedged_fx_shock_loss_eur"] > 0
+    assert "hedged_scenario_comparison" in fx
+
+
+def test_compute_family_governance_and_patti_di_famiglia(sqlite_engine):
+    """Test del simulatore di Family Governance e Patto di Famiglia (Art. 768-bis c.c.)."""
+    init_wealth_db(sqlite_engine)
+    gov = compute_family_governance_and_patti_di_famiglia(
+        sqlite_engine,
+        portfolio_id=1,
+        business_value_eur=3000000.0,
+        assigned_heir_name="Erede Operativo",
+        heir_count=3,
+        has_spouse=True
+    )
+    assert gov["business_value_eur"] == 3000000.0
+    assert gov["total_compensation_due_eur"] > 0
+    assert len(gov["non_assigned_heirs"]) == 3  # Coniuge + 2 figli non assegnatari
+    assert gov["tax_exempt_under_art_768_bis"] is True
+    assert gov["is_legitimate_shielded"] is True
+    assert len(gov["governance_checklist"]) >= 4
+
+
+def test_compute_total_wealth_brinson_attribution(sqlite_engine):
+    """Test dell'attribuzione di performance Brinson-Fachler estesa a tutto il patrimonio consolidato."""
+    init_wealth_db(sqlite_engine)
+    save_wealth_account(sqlite_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Corrente",
+        "account_type": AccountType.CHECKING.value,
+        "balance": 50000.0,
+        "institution": "Fineco"
+    })
+
+    br = compute_total_wealth_brinson_attribution(sqlite_engine, portfolio_id=1)
+    assert "portfolio_total_return_pct" in br
+    assert "benchmark_total_return_pct" in br
+    assert "excess_return_pct" in br
+    assert "breakdown_df" in br
+    assert len(br["breakdown_list"]) == 5
+    # La somma degli effetti deve essere pari all'extra-rendimento (Alpha)
+    sum_effects = br["allocation_effect_total_pct"] + br["selection_effect_total_pct"] + br["interaction_effect_total_pct"]
+    assert abs(sum_effects - br["excess_return_pct"]) < 0.05
+
+
+def test_compute_smart_cashflow_reconciliation(sqlite_engine):
+    """Test della riconciliazione automatica con rilevamento duplicati e matching impegni."""
+    init_wealth_db(sqlite_engine)
+    recon = compute_smart_cashflow_reconciliation(sqlite_engine, portfolio_id=1)
+    assert recon["total_transactions_processed"] > 0
+    assert recon["matched_transactions_count"] > 0
+    assert recon["reconciliation_rate_pct"] > 0
+    assert recon["duplicates_flagged_count"] >= 1
+    assert not recon["matches_df"].empty
 
 
 

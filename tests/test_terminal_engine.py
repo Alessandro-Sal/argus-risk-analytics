@@ -662,6 +662,33 @@ def test_terminal_engine_wealth_mnemonics(mock_session_context):
     assert "FAMILY OFFICE" in res_holding.output_text
     assert "PEX" in res_holding.output_text
 
+    # 7. PE / DEAL
+    res_pe = engine.execute_command("PE <GO>", mock_session_context)
+    assert res_pe.status == "SUCCESS"
+    assert "PRIVATE EQUITY" in res_pe.output_text
+    assert "MOIC" in res_pe.output_text
+
+    # 8. FXHEDGE
+    res_fx = engine.execute_command("FXHEDGE <GO>", mock_session_context)
+    assert res_fx.status == "SUCCESS"
+    assert "FORWARD HEDGING" in res_fx.output_text
+
+    # 9. GOVERN / PATTO
+    res_gov = engine.execute_command("GOVERN <GO>", mock_session_context)
+    assert res_gov.status == "SUCCESS"
+    assert "FAMILY GOVERNANCE" in res_gov.output_text
+    assert "PATTO DI FAMIGLIA" in res_gov.output_text
+
+    # 10. ATTR WEALTH
+    res_attr = engine.execute_command("ATTR WEALTH <GO>", mock_session_context)
+    assert res_attr.status == "SUCCESS"
+    assert "BRINSON-FACHLER" in res_attr.output_text
+
+    # 11. RECON
+    res_recon = engine.execute_command("RECON <GO>", mock_session_context)
+    assert res_recon.status == "SUCCESS"
+    assert "RECONCILIATION" in res_recon.output_text
+
 
 
 
