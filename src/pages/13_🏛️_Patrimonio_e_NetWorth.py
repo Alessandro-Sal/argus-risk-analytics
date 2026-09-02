@@ -858,15 +858,15 @@ matrix_df = compute_wealth_monthly_matrix(engine, portfolio_id=current_pid)
 # Top KPI temporali
 wt_k1, wt_k2, wt_k3, wt_k4, wt_k5 = st.columns(5)
 with wt_k1:
-    metric_card("Crescita Net Worth (24m)", fmt_eur(prog_res["total_growth_eur"]), delta=f"{prog_res['total_growth_pct']:+.1f}% Totale", delta_color="normal")
+    metric_card("Crescita (24 Mesi)", fmt_eur(prog_res["total_growth_eur"]), delta=f"{prog_res['total_growth_pct']:+.1f}% Totale", delta_color="normal")
 with wt_k2:
-    metric_card("Max Contrazione Storica", f"{under_res['max_drawdown_pct']:.1f}%", delta=fmt_eur(under_res['max_drawdown_eur']), delta_color="inverse")
+    metric_card("Max Drawdown", f"{under_res['max_drawdown_pct']:.1f}%", delta=fmt_eur(under_res['max_drawdown_eur']), delta_color="inverse")
 with wt_k3:
-    metric_card("Contrazione Attuale", f"{under_res['current_drawdown_pct']:.1f}%", delta="Dal Massimo Storico (HWM)", delta_color="normal" if under_res['current_drawdown_pct'] == 0 else "inverse")
+    metric_card("Drawdown Attuale", f"{under_res['current_drawdown_pct']:.1f}%", delta="Dal Massimo (HWM)", delta_color="normal" if under_res['current_drawdown_pct'] == 0 else "inverse")
 with wt_k4:
-    metric_card("Mese Miglior Risparmio", seas_res["best_accumulation_month"], delta="Picco Inflows / Risparmio", delta_color="normal")
+    metric_card("Miglior Mese", seas_res["best_accumulation_month"], delta="Picco Inflows / Risparmio", delta_color="normal")
 with wt_k5:
-    metric_card("Mese Maggior Spesa", seas_res["heaviest_spending_month"], delta="Picco Drenaggio Cassa", delta_color="inverse")
+    metric_card("Maggior Spesa", seas_res["heaviest_spending_month"], delta="Picco Drenaggio Cassa", delta_color="inverse")
 
 st.write("")
 
@@ -892,8 +892,8 @@ with tab_traj:
         xaxis_title="Data",
         yaxis_title="Valore (€)",
         height=380,
-        margin=dict(t=15, l=10, r=10, b=10),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        margin=dict(t=35, l=10, r=10, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
     apply_plotly_theme(fig_hist)
     st.plotly_chart(fig_hist, use_container_width=True)
