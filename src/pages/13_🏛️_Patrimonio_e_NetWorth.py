@@ -79,7 +79,7 @@ def _load_cached_family_office_suite(_engine, portfolio_id: int):
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: int, adjust_inflation: bool):
+def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: int, adjust_inflation: bool, cache_bust: str = "v3_exact_split_phys_pens"):
     prog = compute_wealth_temporal_progression(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months, adjust_inflation=adjust_inflation)
     attr = compute_wealth_growth_attribution(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months, adjust_inflation=adjust_inflation)
     bench = compute_wealth_benchmark_comparison(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months)
@@ -1098,11 +1098,21 @@ with main_tab_temporal:
 
     with tab_traj:
         df_h = prog_res["history_df"].reset_index()
-        # Fallback difensivo per cache Streamlit o DataFrame legacy
-        if "physical_assets" not in df_h.columns:
-            df_h["physical_assets"] = df_h.get("illiquid_and_pension", pd.Series(0.0, index=df_h.index))
-        if "pension_plans" not in df_h.columns:
-            df_h["pension_plans"] = pd.Series(0.0, index=df_h.index)
+        # Fallback difensivo proporzionale per cache Streamlit o DataFrame legacy
+        if "physical_assets" not in df_h.columns or "pension_plans" not in df_h.columns:
+            tot_illiq = df_h.get("illiquid_and_pension", pd.Series(0.0, index=df_h.index))
+            tot_act = phys_assets + pens_val
+            if tot_act > 0:
+                p_ratio = phys_assets / tot_act
+                pe_ratio = pens_val / tot_act
+            else:
+                p_ratio = 1.0
+                pe_ratio = 0.0
+            if "physical_assets" not in df_h.columns:
+                df_h["physical_assets"] = tot_illiq * p_ratio
+            if "pension_plans" not in df_h.columns:
+                df_h["pension_plans"] = tot_illiq * pe_ratio
+
         if "real_estate" not in df_h.columns:
             df_h["real_estate"] = pd.Series(0.0, index=df_h.index)
         if "financial_investments" not in df_h.columns:
