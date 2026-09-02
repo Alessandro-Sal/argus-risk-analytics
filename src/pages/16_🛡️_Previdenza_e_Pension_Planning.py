@@ -79,14 +79,13 @@ render_wealth_executive_badges(nw_curr)
 
 from core.wealth.wealth_modals import render_goal_methodology_modal
 
-head_c1, head_c2, head_c3 = st.columns([3.0, 1.2, 1.0])
-with head_c1:
-    st.title("🛡️ ARGUS Wealth — Previdenza & Pensione")
-    st.caption("Ottimizzazione fiscale art. 51 TUIR (€ 5.164,57), simulazione Monte Carlo, Target-Date Glide Path e montante pensionistico.")
-
-with head_c2:
-    st.write("")
-    if len(prof_map) > 1:
+if len(prof_map) > 1:
+    head_c1, head_c2, head_c3 = st.columns([3.5, 1.3, 1.2])
+    with head_c1:
+        st.title("🛡️ ARGUS Wealth — Previdenza & Pensione")
+        st.caption("Ottimizzazione fiscale art. 51 TUIR (€ 5.164,57), simulazione Monte Carlo e montante pensionistico.")
+    with head_c2:
+        st.write("")
         sel_pid = st.selectbox(
             "Profilo Patrimoniale:",
             options=list(prof_map.keys()),
@@ -97,12 +96,21 @@ with head_c2:
         if sel_pid != current_pid:
             st.session_state["wealth_active_portfolio_id"] = sel_pid
             st.rerun()
-
-with head_c3:
-    st.write("")
-    st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-    if st.button("ℹ️ Guida Previdenza", key="btn_modal_pension_p16", use_container_width=True):
-        render_goal_methodology_modal()
+    with head_c3:
+        st.write("")
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+        if st.button("ℹ️ Guida Previdenza", key="btn_modal_pension_p16", use_container_width=True):
+            render_goal_methodology_modal()
+else:
+    head_c1, head_c2 = st.columns([4.2, 0.8])
+    with head_c1:
+        st.title("🛡️ ARGUS Wealth — Previdenza & Pensione")
+        st.caption("Ottimizzazione fiscale art. 51 TUIR (€ 5.164,57), simulazione Monte Carlo e montante pensionistico.")
+    with head_c2:
+        st.write("")
+        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
+        if st.button("ℹ️ Guida Previdenza", key="btn_modal_pension_p16", use_container_width=True):
+            render_goal_methodology_modal()
 
 df_plans = get_pension_plans(engine, portfolio_id=current_pid)
 
