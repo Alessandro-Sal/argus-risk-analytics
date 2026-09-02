@@ -10,24 +10,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
-import importlib
-import core.ui_utils
-import core.wealth.wealth_db
-import core.wealth.wealth_engine
-import core.wealth.wealth_temporal_engine
-import core.wealth.wealth_reporting_hub
-import core.wealth
-
-importlib.reload(core.ui_utils)
-importlib.reload(core.wealth.wealth_db)
-importlib.reload(core.wealth.wealth_engine)
-importlib.reload(core.wealth.wealth_temporal_engine)
-importlib.reload(core.wealth.wealth_reporting_hub)
-importlib.reload(core.wealth)
 
 from core.fetcher import get_engine
 from core.ui_utils import (
-
     inject_custom_css,
     section,
     metric_card,
@@ -48,8 +33,15 @@ from core.wealth.wealth_engine import (
     compute_multi_currency_fx_hedging_engine,
     compute_total_wealth_brinson_attribution
 )
-
-
+from core.wealth.wealth_temporal_engine import (
+    compute_wealth_temporal_progression,
+    compute_wealth_growth_attribution,
+    compute_wealth_benchmark_comparison,
+    compute_wealth_monthly_matrix,
+    compute_wealth_rolling_metrics,
+    compute_wealth_underwater_drawdowns,
+    compute_wealth_seasonality_patterns
+)
 from core.wealth.wealth_db import (
     get_wealth_accounts,
     save_wealth_account,
@@ -61,6 +53,55 @@ from core.wealth.wealth_db import (
 from core.wealth.wealth_snapshot import get_wealth_snapshots_history
 
 
+# ── HIGH-PERFORMANCE STREAMLIT CACHING LAYER ─────────────────
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_wealth_portfolios(_engine):
+    return get_wealth_portfolios(_engine)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_consolidated_net_worth(_engine, portfolio_id: int):
+    return compute_consolidated_net_worth(_engine, portfolio_id=portfolio_id)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_wealth_accounts(_engine, portfolio_id: int):
+    return get_wealth_accounts(_engine, portfolio_id=portfolio_id)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_family_office_suite(_engine, portfolio_id: int):
+    fo = compute_family_office_multi_entity_consolidation(_engine, portfolio_id=portfolio_id)
+    fx = compute_multi_currency_fx_hedging_engine(_engine, portfolio_id=portfolio_id)
+    br = compute_total_wealth_brinson_attribution(_engine, portfolio_id=portfolio_id)
+    return fo, fx, br
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: int, adjust_inflation: bool):
+    prog = compute_wealth_temporal_progression(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months, adjust_inflation=adjust_inflation)
+    attr = compute_wealth_growth_attribution(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months, adjust_inflation=adjust_inflation)
+    bench = compute_wealth_benchmark_comparison(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months)
+    roll = compute_wealth_rolling_metrics(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months)
+    under = compute_wealth_underwater_drawdowns(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months)
+    seas = compute_wealth_seasonality_patterns(_engine, portfolio_id=portfolio_id)
+    matrix = compute_wealth_monthly_matrix(_engine, portfolio_id=portfolio_id)
+    return prog, attr, bench, roll, under, seas, matrix
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_pitchbook_pdf(_engine, pid: int) -> bytes:
+    return generate_advisory_pitchbook_pdf(_engine, portfolio_id=pid)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_tear_sheet_pdf(_engine, pid: int) -> bytes:
+    return generate_executive_tear_sheet_pdf(_engine, portfolio_id=pid)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_pitchbook_html(_engine, pid: int) -> str:
+    return generate_advisory_pitchbook_html(_engine, portfolio_id=pid)
 
 
 st.set_page_config(page_title="Patrimonio & Net Worth | ARGUS Wealth", page_icon="🏛️", layout="wide")
@@ -97,6 +138,7 @@ if is_snapshot_mode:
     """, unsafe_allow_html=True)
     if st.button("🔄 Ripristina Dati Live / Esci da Snapshot Storico", type="secondary", key="btn_exit_snap_nw"):
         st.session_state.pop("wealth_active_snapshot", None)
+        st.cache_data.clear()
         st.rerun()
 
     tot_nw = float(summary.get("total_net_worth", act_snap.get("total_net_worth", 0.0)))
@@ -114,8 +156,8 @@ if is_snapshot_mode:
 
     df_accounts = pd.DataFrame(details.get("accounts", []))
 else:
-    # Modalità Live
-    df_prof = get_wealth_portfolios(engine)
+    # Modalità Live ad alte prestazioni con Caching
+    df_prof = _load_cached_wealth_portfolios(engine)
     prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
     current_pid = st.session_state.get("wealth_active_portfolio_id")
 
@@ -138,7 +180,7 @@ else:
             st.rerun()
         st.stop()
 
-    nw = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
+    nw = _load_cached_consolidated_net_worth(engine, portfolio_id=current_pid)
     tot_nw = nw.total_net_worth
     liq_cash = nw.liquid_cash
     fin_inv = nw.financial_investments
@@ -152,7 +194,7 @@ else:
     runway_m = nw.runway_months
     sav_rate = nw.savings_rate_pct
 
-    df_accounts = get_wealth_accounts(engine, portfolio_id=current_pid)
+    df_accounts = _load_cached_wealth_accounts(engine, portfolio_id=current_pid)
 
 prof_title = prof_map.get(current_pid, "Personale")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p13")
@@ -202,9 +244,9 @@ with r2_c3:
 st.divider()
 
 # ── EXECUTIVE TEAR SHEET & ADVISORY PITCHBOOK TOOLBAR ──────────
-pitchbook_pdf = generate_advisory_pitchbook_pdf(engine, portfolio_id=current_pid)
-tear_sheet_pdf = generate_executive_tear_sheet_pdf(engine, portfolio_id=current_pid)
-tear_sheet_html = generate_advisory_pitchbook_html(engine, portfolio_id=current_pid)
+pitchbook_pdf = _get_cached_pitchbook_pdf(engine, current_pid)
+tear_sheet_pdf = _get_cached_tear_sheet_pdf(engine, current_pid)
+tear_sheet_html = _get_cached_pitchbook_html(engine, current_pid)
 date_slug = datetime.now().strftime('%Y%m%d')
 prof_slug = str(prof_map.get(current_pid, 'portfolio')).lower().replace(' ', '_')
 
@@ -720,7 +762,7 @@ st.divider()
 section("🏢 Family Office Multi-Entity & Holding Consolidator")
 st.caption("Consolidamento patrimoniale tra diverse entità giuridiche del nucleo familiare (Persona Fisica, Holding SRL, Società Semplice, Trust) con elisione automatica delle partite infragruppo (finanziamenti soci) e analisi convenienza fiscale PEX (1.2% vs 26%).")
 
-fo_data = compute_family_office_multi_entity_consolidation(engine, portfolio_id=current_pid)
+fo_data, fx_res, br_res = _load_cached_family_office_suite(engine, portfolio_id=current_pid)
 
 fo_k1, fo_k2, fo_k3, fo_k4 = st.columns(4)
 with fo_k1:
@@ -773,8 +815,6 @@ st.divider()
 section("💱 Rischio di Cambio & FX Forward Hedging Overlay")
 st.caption("Mappatura dell'esposizione valutaria estera (USD, GBP, CHF, JPY), stima del costo dei Forward Points (Covered Interest Parity) e simulazione di strategie di copertura a confronto.")
 
-fx_res = compute_multi_currency_fx_hedging_engine(engine, portfolio_id=current_pid)
-
 fx_k1, fx_k2, fx_k3, fx_k4 = st.columns(4)
 with fx_k1:
     metric_card("Esposizione Valute Estere", fmt_eur(fx_res["foreign_exposure_eur"]), delta=f"{fx_res['foreign_exposure_pct']:.1f}% del Patrimonio", delta_color="normal")
@@ -810,8 +850,6 @@ st.divider()
 section("🎯 Attribuzione di Performance Brinson Multi-Asset (Total Wealth)")
 st.caption("Scomposizione matematica dell'extra-rendimento patrimoniale (Alpha) rispetto a un Composite Benchmark Strategico in Effetto Allocazione (Asset Class), Effetto Selezione (Strumenti) ed Effetto Interazione.")
 
-br_res = compute_total_wealth_brinson_attribution(engine, portfolio_id=current_pid)
-
 br_k1, br_k2, br_k3, br_k4 = st.columns(4)
 with br_k1:
     metric_card("Rendimento Patrimonio", f"{br_res['portfolio_total_return_pct']:+.2f}%", delta=f"Benchmark: {br_res['benchmark_total_return_pct']:+.2f}%", delta_color="normal")
@@ -845,16 +883,6 @@ st.divider()
 section("📊 Analisi Temporale & Dinamica Storica del Patrimonio (Wealth Temporal Desk)")
 st.caption("Evoluzione di lungo termine del Net Worth, scomposizione della crescita (Risparmio vs Mercato), benchmark 60/40, matrici mensili e drawdown.")
 
-from core.wealth.wealth_temporal_engine import (
-    compute_wealth_temporal_progression,
-    compute_wealth_growth_attribution,
-    compute_wealth_benchmark_comparison,
-    compute_wealth_monthly_matrix,
-    compute_wealth_rolling_metrics,
-    compute_wealth_underwater_drawdowns,
-    compute_wealth_seasonality_patterns
-)
-
 # Control Bar Interattiva
 c_tf, c_inf, c_sty = st.columns([1.3, 1.3, 1.8])
 with c_tf:
@@ -884,13 +912,9 @@ tf_map = {"1 Anno (1Y)": 12, "2 Anni (2Y)": 24, "3 Anni (3Y)": 36, "5 Anni (5Y)"
 active_tf_months = tf_map.get(sel_tf_label, 24)
 is_real_inflation = (sel_val_mode == "Reale (Netto Inflazione)")
 
-prog_res = compute_wealth_temporal_progression(engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation)
-attr_res = compute_wealth_growth_attribution(engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation)
-bench_res = compute_wealth_benchmark_comparison(engine, portfolio_id=current_pid, timeframe_months=active_tf_months)
-roll_df = compute_wealth_rolling_metrics(engine, portfolio_id=current_pid, timeframe_months=active_tf_months)
-under_res = compute_wealth_underwater_drawdowns(engine, portfolio_id=current_pid, timeframe_months=active_tf_months)
-seas_res = compute_wealth_seasonality_patterns(engine, portfolio_id=current_pid)
-matrix_df = compute_wealth_monthly_matrix(engine, portfolio_id=current_pid)
+prog_res, attr_res, bench_res, roll_df, under_res, seas_res, matrix_df = _load_cached_temporal_suite(
+    engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation
+)
 
 # Top KPI temporali
 wt_k1, wt_k2, wt_k3, wt_k4, wt_k5 = st.columns(5)

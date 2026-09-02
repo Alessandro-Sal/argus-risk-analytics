@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # core/wealth/wealth_reporting_hub.py
 # ARGUS — Wealth Reporting & Comprehensive Institutional Exports Hub
 # Multi-Format: White-Label PDF, Pitchbook, Tear-Sheet, Excel, Parquet, CSV, JSON & Audio
@@ -30,6 +30,26 @@ from core.wealth.wealth_db import (
     get_wealth_accounts
 )
 from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_quarterly_pdf(_engine, pid: int, client_name: str, quarter: str) -> bytes:
+    return generate_white_label_quarterly_pdf_report(_engine, portfolio_id=pid, client_name=client_name, quarter=quarter)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_pitchbook_pdf(_engine, pid: int) -> bytes:
+    return generate_advisory_pitchbook_pdf(_engine, portfolio_id=pid)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_tear_sheet_pdf(_engine, pid: int) -> bytes:
+    return generate_executive_tear_sheet_pdf(_engine, portfolio_id=pid)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_master_excel(_engine, pid: int) -> bytes:
+    return export_wealth_master_excel_workbook(_engine, portfolio_id=pid).getvalue()
 
 
 def render_wealth_reporting_and_exports_hub(
@@ -88,7 +108,7 @@ def render_wealth_reporting_and_exports_hub(
             </div>
             """, unsafe_allow_html=True)
             try:
-                pdf_qtr = generate_white_label_quarterly_pdf_report(engine, portfolio_id=portfolio_id, client_name=prof_name, quarter="Q1 2026")
+                pdf_qtr = _get_cached_quarterly_pdf(engine, pid=portfolio_id, client_name=prof_name, quarter="Q1 2026")
                 st.download_button(
                     label="📥 Scarica Quarterly Report PDF",
                     data=pdf_qtr,
@@ -113,7 +133,7 @@ def render_wealth_reporting_and_exports_hub(
             </div>
             """, unsafe_allow_html=True)
             try:
-                pdf_pitch = generate_advisory_pitchbook_pdf(engine, portfolio_id=portfolio_id)
+                pdf_pitch = _get_cached_pitchbook_pdf(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Pitchbook PDF",
                     data=pdf_pitch,
@@ -137,7 +157,7 @@ def render_wealth_reporting_and_exports_hub(
             </div>
             """, unsafe_allow_html=True)
             try:
-                pdf_ts = generate_executive_tear_sheet_pdf(engine, portfolio_id=portfolio_id)
+                pdf_ts = _get_cached_tear_sheet_pdf(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Tear-Sheet PDF",
                     data=pdf_ts,
@@ -168,10 +188,10 @@ def render_wealth_reporting_and_exports_hub(
             </div>
             """, unsafe_allow_html=True)
             try:
-                xl_bytes = export_wealth_master_excel_workbook(engine, portfolio_id=portfolio_id)
+                xl_bytes = _get_cached_master_excel(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Master Excel (.xlsx)",
-                    data=xl_bytes.getvalue(),
+                    data=xl_bytes,
                     file_name=f"argus_wealth_master_{prof_slug}_{date_slug}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
