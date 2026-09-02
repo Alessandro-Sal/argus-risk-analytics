@@ -883,34 +883,34 @@ st.divider()
 section("📊 Analisi Temporale & Dinamica Storica del Patrimonio (Wealth Temporal Desk)")
 st.caption("Evoluzione di lungo termine del Net Worth, scomposizione della crescita (Risparmio vs Mercato), benchmark 60/40, matrici mensili e drawdown.")
 
-# Control Bar Interattiva
-c_tf, c_inf, c_sty = st.columns([1.3, 1.3, 1.8])
+# Control Bar Interattiva ad Alto Impatto Visivo
+c_tf, c_inf, c_sty = st.columns([1.1, 1.35, 1.55])
 with c_tf:
     sel_tf_label = st.segmented_control(
-        "⏱️ Orizzonte Temporale:",
-        options=["1 Anno (1Y)", "2 Anni (2Y)", "3 Anni (3Y)", "5 Anni (5Y)"],
-        default="2 Anni (2Y)",
+        "⏱️ Orizzonte:",
+        options=["1Y", "2Y", "3Y", "5Y"],
+        default="2Y",
         key="wealth_temporal_timeframe"
-    ) or "2 Anni (2Y)"
+    ) or "2Y"
 with c_inf:
     sel_val_mode = st.segmented_control(
-        "💶 Modalità Valore:",
-        options=["Nominale (€)", "Reale (Netto Inflazione)"],
+        "💶 Modalità Valuta:",
+        options=["Nominale (€)", "Reale (Netto Infl.)"],
         default="Nominale (€)",
         key="wealth_temporal_val_mode"
     ) or "Nominale (€)"
 with c_sty:
     sel_view_style = st.segmented_control(
         "📊 Stile Traiettoria:",
-        options=["Linee Assolute (€)", "Area 100% Ponderata", "Base 100 (% Cumulata)"],
-        default="Linee Assolute (€)",
+        options=["Assoluta (€)", "100% Stacked", "Base 100"],
+        default="Assoluta (€)",
         key="wealth_temporal_view_style"
-    ) or "Linee Assolute (€)"
+    ) or "Assoluta (€)"
 
 # Parsing opzioni
-tf_map = {"1 Anno (1Y)": 12, "2 Anni (2Y)": 24, "3 Anni (3Y)": 36, "5 Anni (5Y)": 60}
+tf_map = {"1Y": 12, "2Y": 24, "3Y": 36, "5Y": 60, "1 Anno (1Y)": 12, "2 Anni (2Y)": 24, "3 Anni (3Y)": 36, "5 Anni (5Y)": 60}
 active_tf_months = tf_map.get(sel_tf_label, 24)
-is_real_inflation = (sel_val_mode == "Reale (Netto Inflazione)")
+is_real_inflation = ("Reale" in sel_val_mode)
 
 prog_res, attr_res, bench_res, roll_df, under_res, seas_res, matrix_df = _load_cached_temporal_suite(
     engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation
@@ -918,7 +918,7 @@ prog_res, attr_res, bench_res, roll_df, under_res, seas_res, matrix_df = _load_c
 
 # Top KPI temporali
 wt_k1, wt_k2, wt_k3, wt_k4, wt_k5 = st.columns(5)
-growth_title = f"Crescita ({sel_tf_label.split()[0]} {sel_tf_label.split()[1]})"
+growth_title = f"Crescita ({sel_tf_label})"
 if is_real_inflation:
     growth_title += " Reale"
 
@@ -950,7 +950,7 @@ with tab_traj:
     df_h = prog_res["history_df"].reset_index()
     fig_hist = go.Figure()
 
-    if sel_view_style == "Area 100% Ponderata":
+    if "100%" in sel_view_style or "Stacked" in sel_view_style or "Area" in sel_view_style:
         st.markdown("##### 📈 Composizione Percentuale del Patrimonio nel Tempo (100% Stacked)")
         total_assets = df_h["financial_investments"] + df_h["liquid_cash"] + df_h["real_estate"] + df_h["illiquid_and_pension"]
         total_assets = total_assets.replace(0, 1)
@@ -980,7 +980,7 @@ with tab_traj:
             yaxis_range=[0, 100], height=380, margin=dict(t=35, l=10, r=10, b=10),
             hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
         )
-    elif sel_view_style == "Base 100 (% Cumulata)":
+    elif "Base 100" in sel_view_style:
         st.markdown("##### 📈 Rendimento e Dinamica Cumulativa (Base 100)")
         nw_b100 = (df_h["total_net_worth"] / df_h["total_net_worth"].iloc[0]) * 100.0
         inv_b100 = (df_h["financial_investments"] / max(1.0, df_h["financial_investments"].iloc[0])) * 100.0
