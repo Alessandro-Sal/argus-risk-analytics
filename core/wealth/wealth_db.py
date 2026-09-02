@@ -200,6 +200,23 @@ def init_wealth_db(engine: Engine) -> None:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """))
+            conn.execute(sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_goals (
+                    goal_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    portfolio_id INTEGER NOT NULL DEFAULT 1,
+                    name TEXT NOT NULL,
+                    category TEXT NOT NULL DEFAULT 'custom',
+                    target_amount REAL NOT NULL DEFAULT 0.0,
+                    target_date DATE NOT NULL,
+                    current_amount REAL NOT NULL DEFAULT 0.0,
+                    monthly_contribution REAL NOT NULL DEFAULT 0.0,
+                    priority TEXT NOT NULL DEFAULT 'medium',
+                    risk_tolerance TEXT NOT NULL DEFAULT 'moderate',
+                    inflation_rate REAL NOT NULL DEFAULT 0.02,
+                    notes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """))
 
         else:
             # MySQL DDL
@@ -346,6 +363,24 @@ def init_wealth_db(engine: Engine) -> None:
                     is_active BOOLEAN NOT NULL DEFAULT TRUE,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_fixed_port (portfolio_id, is_active)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """))
+            conn.execute(sqlt("""
+                CREATE TABLE IF NOT EXISTS wealth_goals (
+                    goal_id INT AUTO_INCREMENT PRIMARY KEY,
+                    portfolio_id INT NOT NULL DEFAULT 1,
+                    name VARCHAR(150) NOT NULL,
+                    category VARCHAR(50) NOT NULL DEFAULT 'custom',
+                    target_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                    target_date DATE NOT NULL,
+                    current_amount DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                    monthly_contribution DECIMAL(18,2) NOT NULL DEFAULT 0.00,
+                    priority VARCHAR(20) NOT NULL DEFAULT 'medium',
+                    risk_tolerance VARCHAR(20) NOT NULL DEFAULT 'moderate',
+                    inflation_rate DECIMAL(6,4) NOT NULL DEFAULT 0.0200,
+                    notes TEXT NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_goals_port (portfolio_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """))
 
@@ -1359,6 +1394,86 @@ def clear_wealth_fixed_expenses(engine: Engine, portfolio_id: Optional[int] = No
     with engine.begin() as conn:
         res = conn.execute(sqlt(query), params)
         return res.rowcount or 0
+
+
+# ── GOAL-BASED WEALTH PLANNING CRUD ────────────────────────
+
+def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
+    """Crea o aggiorna un traguardo/obiettivo patrimoniale (Goal-Based Planning)."""
+    init_wealth_db(engine)
+    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    gid = goal_data.get("goal_id")
+    
+    t_date = goal_data.get("target_date")
+    if isinstance(t_date, str):
+        try:
+            t_date = datetime.strptime(t_date, "%Y-%m-%d").date()
+        except Exception:
+            pass
+
+    params = {
+        "pid": int(goal_data.get("portfolio_id", 1) or 1),
+        "name": str(goal_data.get("name", "Nuovo Obiettivo")),
+        "category": str(goal_data.get("category", "custom")),
+        "target_amount": float(goal_data.get("target_amount", 0.0)),
+        "target_date": t_date,
+        "current_amount": float(goal_data.get("current_amount", 0.0)),
+        "monthly_contribution": float(goal_data.get("monthly_contribution", 0.0)),
+        "priority": str(goal_data.get("priority", "medium")),
+        "risk_tolerance": str(goal_data.get("risk_tolerance", "moderate")),
+        "inflation_rate": float(goal_data.get("inflation_rate", 0.02)),
+        "notes": goal_data.get("notes")
+    }
+
+    with engine.begin() as conn:
+        if gid:
+            params["gid"] = int(gid)
+            conn.execute(sqlt("""
+                UPDATE wealth_goals
+                SET portfolio_id = :pid, name = :name, category = :category,
+                    target_amount = :target_amount, target_date = :target_date,
+                    current_amount = :current_amount, monthly_contribution = :monthly_contribution,
+                    priority = :priority, risk_tolerance = :risk_tolerance,
+                    inflation_rate = :inflation_rate, notes = :notes
+                WHERE goal_id = :gid
+            """), params)
+            return int(gid)
+        else:
+            q_ins = """
+                INSERT INTO wealth_goals 
+                (portfolio_id, name, category, target_amount, target_date, current_amount, monthly_contribution, priority, risk_tolerance, inflation_rate, notes)
+                VALUES (:pid, :name, :category, :target_amount, :target_date, :current_amount, :monthly_contribution, :priority, :risk_tolerance, :inflation_rate, :notes)
+            """
+            res = conn.execute(sqlt(q_ins), params)
+            if is_sqlite:
+                return conn.execute(sqlt("SELECT last_insert_rowid()")).scalar() or 0
+            else:
+                return res.lastrowid or 0
+
+
+def get_wealth_goals(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
+    """Recupera tutti i traguardi/obiettivi patrimoniali memorizzati."""
+    init_wealth_db(engine)
+    query = "SELECT * FROM wealth_goals"
+    params = {}
+    if portfolio_id is not None:
+        query += " WHERE (portfolio_id = :pid OR portfolio_id = 1)"
+        params["pid"] = int(portfolio_id)
+    query += " ORDER BY target_date ASC, priority DESC, goal_id ASC"
+
+    with engine.connect() as conn:
+        df = pd.read_sql(sqlt(query), conn, params=params)
+        if not df.empty and "target_date" in df.columns:
+            df["target_date"] = pd.to_datetime(df["target_date"]).dt.date
+        return df
+
+
+def delete_wealth_goal(engine: Engine, goal_id: int) -> bool:
+    """Elimina un traguardo patrimoniale tramite ID."""
+    init_wealth_db(engine)
+    with engine.begin() as conn:
+        res = conn.execute(sqlt("DELETE FROM wealth_goals WHERE goal_id = :gid"), {"gid": int(goal_id)})
+        return bool(res.rowcount and res.rowcount > 0)
 
 
 

@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-6.1.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-309%2F309%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-315%2F315%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -54,6 +54,9 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Motore Quantitativo & Portfolio Engineering di Frontiera**: Risoluzione analitica della Frontiera Efficiente di Markowitz affiancata da stimatori *Ledoit-Wolf Shrinkage*, **Equal Risk Contribution (ERC / Parità di Rischio Pura)**, **Dipendenza di Coda Asimmetrica con Tail Copulas (Clayton & Gumbel)** per rilevare il rischio di crash congiunto non lineare, **Simulatore Interattivo Trade-Level Kelly Criterion & Half-Kelly Position Sizing** (pre-popolato con Win Rate e Payoff Ratio reali del Graveyard), **Live Rebalancing Sandbox** interattivo, allocazione mediante Machine Learning con **Hierarchical Risk Parity (HRP - Marcos López de Prado)**, copertura analitica con **Black-Scholes (1973)** con calcolo dei 5 Greci e Delta-Hedging con opzioni Put, generazione di rendimento passivo con *Covered Call Yield Enhancer*, modelli econometrici a 3 fattori di Fama-French (con regressione OLS multivariata), Carhart a 4 fattori, modello macro-fattoriale *MSCI Barra a 5 fattori ortogonalizzati*, simulazioni stocastiche *Merton Jump-Diffusion*, classificazione di regime macro con **Market Regime Switching (3-State Markov Model)**, rilevatore di anomalie di mercato via *Machine Learning Isolation Forest* e proiezioni stocastiche *Monte Carlo* (con decomposizione di Cholesky e distribuzioni *Student-t* a code grasse).
 * **AI & LLM Narrative Intelligence (ARGUS AI Analyst & Copilot)**: Motore di sintesi narrativa automatica a due livelli (**LLM Online** con Google Gemini / OpenAI e **NLG Deterministico Offline 100%**) per generare Executive Memorandum istituzionali e rispondere in tempo reale a domande complesse sul portafoglio via chat interattiva.
 * **Financial Statement & Forensic Accounting**: Suite completa per la valutazione della solvibilità e del valore intrinseco aziendale mediante modelli *Altman Z-Score*, decomposizione *DuPont a 5 fattori*, *Piotroski F-Score (9pt)*, **Contabilità Forense Beneish M-Score (1999)** a 8 indici econometrici per il rilevamento di frodi contabili e manipolazione degli utili, **Sloan Accrual Ratio (1996)** per la qualità dei flussi di cassa, stima del *WACC (CAPM)*, *DCF stocastico a due stadi* e classificatore *Random Forest Distress Risk*.
+* **🎯 Goal-Based Investing & Multi-Life-Goal Engine (Merton Jump-Diffusion SPI %)**: Modulo di pianificazione per traguardi di vita (*FIRE, anticipo prima casa, università figli, rendita previdenziale*) con simulazione stocastica su 5.000 cammini a salti di Poisson, calcolo del **Success Probability Index (SPI %)**, coni di confidenza a ventaglio ($P5, P25, P50, P75, P95$), stima dello shortfall e risolutore dell'apporto mensile PAC raccomandato per raggiungere $\text{SPI} \ge 85\%$.
+* **📉 Target-Date Dynamic Glide Path & TCO / Fee Drag Lookthrough**: Algoritmo sigmoideo di de-risking progressivo (*Equity $\to$ Fixed Income $\to$ Cash/Alts*) combinato con l'analizzatore di **Total Cost of Ownership (TCO)** per misurare l'erosione da costi di gestione (TER medio ponderato) su orizzonti di 5, 10, 20 e 30 anni rispetto a benchmark indicizzati a basso costo (0.15%).
+* **⚖️ Advanced Estate Planning & Successioni (D.Lgs. 346/1990)**: Motore di calcolo dell'asse ereditario netto con quote di legittima e disponibile (Codice Civile artt. 536 e ss.), applicazione delle franchigie per grado di parentela (1M€ coniuge/figli, 100k€ fratelli, 1.5M€ disabili) ed esenzione legale per Titoli di Stato BTP, Polizze Vita Ramo I/III e Fondi Pensione.
 * **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti gli 11 moduli, oltre 35 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
 
 ---
@@ -181,13 +184,18 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **💼 Rivalutazione TFR (Trattamento di Fine Rapporto)**: Calcolo contabile della rivalutazione annuale di legge ($1.5\% + 75\% \text{ FOI}$) e confronto rendimento TFR in azienda vs Fondo Pensione negoziale/aperto.
 * **🏛️ Gap Previdenziale & Tasso di Sostituzione**: Stima della pensione pubblica INPS attesa e quantificazione del gap reddituale rispetto all'ultimo stipendio.
 
-### 17. 🔥 Indipendenza Finanziaria & FIRE Engine (`src/pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py`)
+### 17. 🔥 Indipendenza Finanziaria, FIRE & Goal-Based Engine (`src/pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py`)
 * **🧮 Calcolatore FIRE Dinamico**: Determinazione del FIRE Number per 4 archetipi (*Standard FIRE 100%*, *Lean FIRE 70%*, *Fat FIRE 135%*, *Coast FIRE*).
 * **🌪️ Ponte Wealth ⇄ Risk Management**:
   * **Fondo Anti-Forced Selling (Liquidity-at-Risk)**: Calibrazione dinamica dei mesi di runway in funzione del 95% CVaR e della volatilità di mercato per azzerare il rischio di vendite forzate in drawdown.
   * **Net Worth-at-Risk (NWaR)**: Stress test macroeconomico consolidato su shock sistemici (*Crisi 2008*, *Stagflazione*, *Crypto Winter*, *Job Loss*).
   * **Dynamic Safe Withdrawal Rate (SWR)**: Tasso di prelievo sicuro con regime switching anticiclico (*3.2% Crisi*, *3.8% Normale*, *4.2% Bull Market*).
-* **🎯 Goal-Based 3-Bucket Allocator**: Allocazione temporale del capitale su 3 bucket (*Sicurezza 0-2a*, *Obiettivi 2-7a*, *Crescita >7a*) e monitoraggio traguardi di vita.
+* **🎯 Goal-Based Multi-Traguardo & Stocastico Merton Jump-Diffusion (SPI %)**:
+  * Gestione e persistenza su DB di $N$ traguardi di vita (*Casa, FIRE, Studi, Auto, Pensione*).
+  * Simulazioni Monte Carlo su 5.000 scenari stocastici a salti di Poisson con ventaglio $P5-P95$, stima dello shortfall e calcolo dell'apporto mensile PAC ottimale per raggiungere un **Success Probability Index (SPI $\ge 85\%$)**.
+  * **Dynamic Glide Path**: Curva sigmoidea di de-risking temporale (Equity $\to$ Bonds $\to$ Cash $\to$ Oro).
+* **💸 Total Cost of Ownership (TCO) & Fee Drag Breakdown**:
+  * Stima del TER medio ponderato degli strumenti e quantificazione dell'erosione patrimoniale cumulativa da commissioni a 5, 10, 20 e 30 anni vs benchmark ETF low-cost (0.15%).
 
 ### 18. 📑 Fiscalità, Quadro RW & Tax-Loss Harvesting (`src/pages/18_📑_Fiscalita_e_Quadro_RW.py`)
 * **🏛️ Ripartizione Fiscale Italia vs Estero**: Monitoraggio dell'incidenza tributaria patrimoniale (Imposta di Bollo IT 0,20% vs IVAFE estera).
@@ -201,8 +209,10 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **⚖️ Buy vs Rent Analyzer**: Modello comparativo a valore attuale netto (NPV) tra acquisto prima casa con mutuo vs affitto con investimento del capitale risparmiato.
 
 ### 20. ⚖️ Pianificazione Successoria & Asse Ereditario (`src/pages/20_⚖️_Pianificazione_Successoria.py`)
-* **📜 Asse Ereditario & Quote di Legittima**: Calcolo automatico della quota di riserva e della quota disponibile secondo il Codice Civile per coniuge, figli e ascendenti.
-* **🏛️ Calcolo Imposte di Successione & Donazione**: Stima delle imposte applicabili con franchigie di legge (€ 1.000.000 per parenti in linea retta, € 100.000 per fratelli/sorelle) e imposte ipo-catastali.
+* **📜 Asse Ereditario & Quote di Legittima**: Calcolo automatico della quota di riserva e della quota disponibile secondo il Codice Civile (artt. 536 e ss.) per coniuge, figli e ascendenti con riunione fittizia e donazioni pregresse.
+* **🏛️ Motore Fiscale Successioni (D.Lgs. 346/1990)**:
+  * Determinazione dell'asse ereditario netto con esclusione ex lege di Titoli di Stato BTP, Polizze Vita Ramo I/III e Fondi Pensione.
+  * Applicazione automatica delle franchigie per grado di parentela (1.000.000€ per coniuge e figli al 4%, 100.000€ per fratelli al 6%, 1.500.000€ per soggetti con disabilità grave L. 104) e imposte ipotecarie/catastali (fissa 400€ prima casa).
 * **🛡️ Strumenti di Protezione Patrimoniale**: Analisi di polizze vita (esenti da imposta di successione), patti di famiglia, holding familiari e trust.
 
 ### 21. 🤖 AI Wealth Copilot & Advisor (`src/pages/21_🤖_AI_Copilot_e_Advisor.py`)
