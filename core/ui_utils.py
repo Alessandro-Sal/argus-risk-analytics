@@ -1512,6 +1512,140 @@ def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
             "tab_key": None,
             "target": None,
             "context_type": "terminal"
+        },
+        # Wealth Management Mnemonics
+        "WEALTH": {
+            "title": "Stato Patrimoniale & Net Worth Consolidato",
+            "page": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "NETWORTH": {
+            "title": "Stato Patrimoniale & Net Worth Consolidato",
+            "page": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "WTIME": {
+            "title": "Wealth Temporal Desk & Dinamica Storica Net Worth",
+            "page": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "CASHFLOW": {
+            "title": "Cash Flow, Spese & Budgeting 50/30/20",
+            "page": "pages/14_💳_Cash_Flow_e_Spese.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "BUDGET": {
+            "title": "Cash Flow, Spese & Budgeting 50/30/20",
+            "page": "pages/14_💳_Cash_Flow_e_Spese.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "CAVEAU": {
+            "title": "Caveau Asset Fisici, Orologi & Illiquidi",
+            "page": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "WATCHES": {
+            "title": "Caveau Orologi di Lusso & Perizie",
+            "page": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "PDEBT": {
+            "title": "Private Debt & Direct Lending Waterfall",
+            "page": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "PENSION": {
+            "title": "Previdenza Integrativa, Fondi Pensione & Goal Planning",
+            "page": "pages/16_🛡️_Previdenza_e_Pension_Planning.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "FIRE": {
+            "title": "Indipendenza Finanziaria, FIRE & SWR Monte Carlo",
+            "page": "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "RW": {
+            "title": "Fiscalità, Monitoraggio Estero & Quadro RW/RT",
+            "page": "pages/18_📑_Fiscalita_e_Quadro_RW.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "GLOBALTAX": {
+            "title": "Cross-Border Tax & Global Wealth Structuring",
+            "page": "pages/18_📑_Fiscalita_e_Quadro_RW.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "REALESTATE": {
+            "title": "Immobili, Mutui Ammortamento & Buy vs Rent",
+            "page": "pages/19_🏡_Immobili_e_Mutui.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "MORTGAGE": {
+            "title": "Simulatore Mutuo Ammortamento alla Francese",
+            "page": "pages/19_🏡_Immobili_e_Mutui.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "ESTATE": {
+            "title": "Pianificazione Successoria & Patti di Famiglia",
+            "page": "pages/20_⚖️_Pianificazione_Successoria.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "WCOPILOT": {
+            "title": "AI Copilot & Advisor Patrimoniale Intelligente",
+            "page": "pages/21_🤖_AI_Copilot_e_Advisor.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "VOICE": {
+            "title": "AI Voice Advisor & Podcast Briefing a 2 Voci",
+            "page": "pages/21_🤖_AI_Copilot_e_Advisor.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "WCR": {
+            "title": "Wealth Control Room & Data Ingestion",
+            "page": "pages/12_🎛️_Wealth_Control_Room.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
+        },
+        "REPORTS": {
+            "title": "Hub di Reportistica & Esportazioni Istituzionali",
+            "page": "pages/12_🎛️_Wealth_Control_Room.py",
+            "tab_key": None,
+            "target": None,
+            "context_type": "wealth"
         }
     }
 
@@ -4483,28 +4617,12 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             </div>
             """, unsafe_allow_html=True)
         with c_btn:
-            with st.popover("📥 Master Excel", use_container_width=True, help="Esporta il Dossier Master Excel a 10 fogli (Net Worth, Spese, Immobili, Previdenza e Successione)"):
-                st.markdown("##### 📥 Esporta Master Dossier Excel")
-                st.caption(f"Profilo: **{prof_name}** | Formato: **Excel Multi-Sheet (.xlsx)**")
-                if st.button("⚡ Genera ed Esporta Dossier (.xlsx)", key=f"btn_gen_excel_{key_suffix}", type="primary", use_container_width=True):
-                    try:
-                        import importlib
-                        import core.wealth.wealth_engine
-                        import core.wealth.wealth_exporter
-                        importlib.reload(core.wealth.wealth_engine)
-                        importlib.reload(core.wealth.wealth_exporter)
-                        from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
-                        excel_bytes = export_wealth_master_excel_workbook(engine, portfolio_id=current_pid)
-                        st.download_button(
-                            "💾 Clicca qui per Scaricare .XLSX",
-                            data=excel_bytes.getvalue(),
-                            file_name=f"argus_wealth_master_{prof_name.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"btn_dl_wealth_master_ready_{key_suffix}",
-                            use_container_width=True
-                        )
-                    except Exception as ex:
-                        st.error(f"Errore durante l'esportazione: {ex}")
+            if st.button("🔍 Spotlight", key=f"btn_open_spotlight_{key_suffix}", use_container_width=True, help="Cerca pagine, schede, ticker o lancia comandi rapidi (Ctrl+K)"):
+                st.session_state["show_spotlight_palette"] = True
+
+    # Rendering della Command Palette se attivata
+    if st.session_state.get("show_spotlight_palette", False):
+        render_spotlight_palette()
 
 
 

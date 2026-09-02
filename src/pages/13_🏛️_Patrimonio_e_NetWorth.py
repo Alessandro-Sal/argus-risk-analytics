@@ -255,6 +255,11 @@ with ts_c5:
 if show_ts_preview:
     st.components.v1.html(tear_sheet_html, height=600, scrolling=True)
 
+from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
+
+with st.expander("📑 Hub Esportazioni Istituzionali & Dossier Multi-Formato (9 Formati)", expanded=False):
+    render_wealth_reporting_and_exports_hub(engine, portfolio_id=current_pid, prof_name=prof_title)
+
 st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
 
