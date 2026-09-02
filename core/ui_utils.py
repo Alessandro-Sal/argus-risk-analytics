@@ -1877,6 +1877,173 @@ def render_spotlight_palette():
     st.divider()
 
 
+def render_wealth_spotlight_palette():
+    """Renderizza la Command Line Gateway specificamente dedicata ad ARGUS Wealth con parser mnemonico patrimoniale ed estetica Emerald."""
+    from core.sidebar import switch_to_page
+    
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, rgba(16, 28, 24, 0.98) 0%, rgba(10, 18, 14, 1.0) 100%); border: 1.5px solid #10b981; border-radius: 10px; padding: 10px 16px; margin: 8px 0 14px 0; box-shadow: 0 12px 35px rgba(0,0,0,0.8), 0 0 20px rgba(16, 185, 129, 0.25);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div style="font-size:12.5px; font-weight:800; color:#10b981; letter-spacing:0.8px; display:inline-flex; align-items:center; gap:8px;">
+                <span>🏛️</span> ARGUS WEALTH COMMAND GATEWAY
+                <span style="font-size:9.5px; padding:1px 6px; background:#10b981; color:#000000; border-radius:3px; font-weight:900; letter-spacing:0.5px;">WEALTH PARITY</span>
+            </div>
+            <div style="font-size:11px; color:#8b949e; font-family:monospace;">
+                Sintassi Wealth: <span style="color:#e6edf3;">&lt;COMANDO&gt;</span> • es. <code style="color:#34d399; background:rgba(16,185,129,0.12); padding:1px 4px; border-radius:3px;">NETWORTH</code>, <code style="color:#34d399; background:rgba(16,185,129,0.12); padding:1px 4px; border-radius:3px;">CASHFLOW</code>, <code style="color:#34d399; background:rgba(16,185,129,0.12); padding:1px 4px; border-radius:3px;">WTIME</code>, <code style="color:#34d399; background:rgba(16,185,129,0.12); padding:1px 4px; border-radius:3px;">REPORTS</code>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    col_q, col_exec, col_close = st.columns([5.0, 1.2, 0.8])
+    with col_q:
+        query = st.text_input(
+            "Wealth Command", 
+            placeholder="⌨️ Digita comando: es. NETWORTH, CASHFLOW, BUDGET, CAVEAU, PENSION, FIRE, RW, REALESTATE, ESTATE, WCOPILOT, WTIME, REPORTS...", 
+            key="spotlight_wealth_search_box", 
+            label_visibility="collapsed"
+        ).strip()
+    
+    parsed_cmd = parse_terminal_command(query)
+
+    with col_exec:
+        exec_label = f"▶ <GO> ({parsed_cmd['mnemonic']})" if parsed_cmd else "▶ <GO>"
+        if st.button(exec_label, key="btn_exec_wealth_command_go", use_container_width=True, type="primary" if parsed_cmd else "secondary"):
+            if parsed_cmd:
+                if parsed_cmd.get("tab_key") and parsed_cmd.get("target"):
+                    st.session_state[parsed_cmd["tab_key"]] = parsed_cmd["target"]
+                    st.session_state[f"target_subtab_{parsed_cmd['tab_key']}"] = parsed_cmd["target"]
+                    st.session_state["global_target_subtab"] = parsed_cmd["target"]
+                st.session_state["show_wealth_spotlight_palette"] = False
+                switch_to_page(parsed_cmd["page"])
+            else:
+                st.warning("Comando Wealth non riconosciuto. Digita es. `NETWORTH`, `CASHFLOW`, `WTIME` o `REPORTS`.")
+
+    with col_close:
+        if st.button("✕ Esc", key="btn_close_wealth_spotlight", use_container_width=True):
+            st.session_state["show_wealth_spotlight_palette"] = False
+            st.rerun()
+
+    # Visual Feedback del comando riconosciuto
+    if parsed_cmd:
+        st.markdown(f"""
+        <div style="background: rgba(16, 185, 129, 0.12); border-left: 3px solid #10b981; padding: 6px 12px; margin-bottom: 12px; font-size: 12px; color: #e6edf3; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <span style="font-weight:700; color:#34d399;">COMANDO PATRIMONIALE RICONOSCIUTO:</span> 
+                <code style="color:#34d399; background:#161b22; padding:2px 6px; border-radius:3px;">{parsed_cmd.get('raw_command', query)}</code> ➔ 
+                <strong>{parsed_cmd['title']}</strong> ({parsed_cmd['page']})
+            </div>
+            <div style="font-size:11px; color:#8b949e;">Premi <strong>&lt;GO&gt;</strong> per eseguire</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    col_w1, col_w2, col_w3 = st.columns([1.6, 1.4, 1.0])
+
+    # ── COLONNA 1: SCHEDE & MODULI PATRIMONIALI ──────────────────────
+    with col_w1:
+        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#10b981; margin-bottom:6px; letter-spacing:0.5px;">🏛️ MODULI & STRUMENTI WEALTH</div>', unsafe_allow_html=True)
+        
+        wealth_search_index = [
+            {"title": "🎛️ Control Room & Ingestione Wealth", "page": "pages/12_🎛️_Wealth_Control_Room.py", "tab_key": None, "target": None, "keywords": "control room upload csv estratti conto sincronizzazione gsheets saldi conti wcr"},
+            {"title": "🏛️ Patrimonio & Net Worth Consolidato", "page": "pages/13_🏛️_Patrimonio_e_NetWorth.py", "tab_key": None, "target": None, "keywords": "stato patrimoniale net worth attivo passivo liquidita investimenti salute networth nw wealth"},
+            {"title": "📊 Wealth Temporal Desk (Matrici & Drawdown)", "page": "pages/13_🏛️_Patrimonio_e_NetWorth.py", "tab_key": None, "target": None, "keywords": "analisi temporale progressione storica matrice mensile underwater rolling stagionalita wtime time"},
+            {"title": "💳 Cash Flow, Spese & Budgeting 50/30/20", "page": "pages/14_💳_Cash_Flow_e_Spese.py", "tab_key": None, "target": None, "keywords": "cash flow uscite entrate 50 30 20 buste envelope abbonamenti riclassificazione cashflow budget cf"},
+            {"title": "⌚ Caveau Asset Fisici, Orologi & Illiquidi", "page": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py", "tab_key": None, "target": None, "keywords": "caveau orologi rolex patek arte metalli oro private equity debt perizie watches illiquid pdebt"},
+            {"title": "🛡️ Previdenza, Fondi Pensione & Goal SPI", "page": "pages/16_🛡️_Previdenza_e_Pension_Planning.py", "tab_key": None, "target": None, "keywords": "previdenza integrativa fondi pensione tfr merton obiettivi glide path deducibilita pension goal"},
+            {"title": "🔥 Indipendenza Finanziaria, FIRE & SWR", "page": "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py", "tab_key": None, "target": None, "keywords": "fire financial independence safe withdrawal rate 4% monte carlo sequenza rendimenti coast lean"},
+            {"title": "📑 Fiscalità, Monitoraggio Estero & Quadro RW", "page": "pages/18_📑_Fiscalita_e_Quadro_RW.py", "tab_key": None, "target": None, "keywords": "fisco quadro rw ivafe mod redditi minusvalenze zainetto neo residenti cross border rw globaltax tax"},
+            {"title": "🏡 Immobili, Mutui Ammortamento & Buy vs Rent", "page": "pages/19_🏡_Immobili_e_Mutui.py", "tab_key": None, "target": None, "keywords": "immobili mutui ammortamento francese cap rate rendita locativa ltv buy rent realestate re mortgage"},
+            {"title": "⚖️ Pianificazione Successoria & Patti Famiglia", "page": "pages/20_⚖️_Pianificazione_Successoria.py", "tab_key": None, "target": None, "keywords": "successione eredita legittima asse ereditario patti famiglia holding protezione estate succession"},
+            {"title": "🤖 AI Copilot & Advisor Intelligente", "page": "pages/21_🤖_AI_Copilot_e_Advisor.py", "tab_key": None, "target": None, "keywords": "ai advisor copilot health score memorandum life event podcast briefing wcopilot advisor voice"},
+            {"title": "📑 Hub di Reportistica & 9 Esportazioni", "page": "pages/12_🎛️_Wealth_Control_Room.py", "tab_key": None, "target": None, "keywords": "esportazioni pdf pitchbook excel master parquet csv json reportistica reports export"}
+        ]
+
+        matched_w = []
+        q_lower = query.lower()
+        for item in wealth_search_index:
+            if not query:
+                matched_w.append(item)
+            else:
+                q_words = q_lower.split()
+                if any(w in item["title"].lower() or w in item["keywords"].lower() for w in q_words):
+                    matched_w.append(item)
+
+        if matched_w:
+            for item in matched_w[:6]:
+                if st.button(item["title"], key=f"spot_w_idx_{item['title']}", use_container_width=True):
+                    if item["tab_key"] and item["target"]:
+                        st.session_state[item["tab_key"]] = item["target"]
+                        st.session_state[f"target_subtab_{item['tab_key']}"] = item["target"]
+                        st.session_state["global_target_subtab"] = item["target"]
+                    st.session_state["show_wealth_spotlight_palette"] = False
+                    switch_to_page(item["page"])
+        else:
+            st.caption("Nessun modulo patrimoniale trovato.")
+
+    # ── COLONNA 2: AZIONI RAPIDE & MNEMONICI WEALTH ──────────────────
+    with col_w2:
+        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#10b981; margin-bottom:6px; letter-spacing:0.5px;">💎 MNEMONICI PATRIMONIALI RAPIDI</div>', unsafe_allow_html=True)
+        
+        w_actions = [
+            ("🏛️ NETWORTH", "pages/13_🏛️_Patrimonio_e_NetWorth.py", "Stato Patrimoniale"),
+            ("📊 WTIME", "pages/13_🏛️_Patrimonio_e_NetWorth.py", "Analisi Temporale"),
+            ("💳 CASHFLOW", "pages/14_💳_Cash_Flow_e_Spese.py", "Rendiconto Spese"),
+            ("⌚ CAVEAU", "pages/15_⌚_Asset_Illiquidi_e_Orologi.py", "Caveau Orologi & PE"),
+            ("🛡️ PENSION", "pages/16_🛡️_Previdenza_e_Pension_Planning.py", "Previdenza Integrativa"),
+            ("🔥 FIRE", "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py", "Simulatore FIRE"),
+            ("📑 RW", "pages/18_📑_Fiscalita_e_Quadro_RW.py", "Quadro RW & Fisco"),
+            ("🏡 REALESTATE", "pages/19_🏡_Immobili_e_Mutui.py", "Immobili & Mutui"),
+            ("⚖️ ESTATE", "pages/20_⚖️_Pianificazione_Successoria.py", "Successioni & Patti"),
+            ("🤖 WCOPILOT", "pages/21_🤖_AI_Copilot_e_Advisor.py", "Diagnostica AI"),
+            ("🎙️ VOICE", "pages/21_🤖_AI_Copilot_e_Advisor.py", "Podcast Briefing"),
+            ("📑 REPORTS", "pages/12_🎛️_Wealth_Control_Room.py", "Hub Esportazioni")
+        ]
+
+        # 2 columns of quick action buttons
+        for i in range(0, min(8, len(w_actions)), 2):
+            c_a1, c_a2 = st.columns(2)
+            lbl1, pg1, _ = w_actions[i]
+            with c_a1:
+                if st.button(lbl1, key=f"spot_w_btn_{lbl1}", use_container_width=True):
+                    st.session_state["show_wealth_spotlight_palette"] = False
+                    switch_to_page(pg1)
+            if i + 1 < len(w_actions):
+                lbl2, pg2, _ = w_actions[i+1]
+                with c_a2:
+                    if st.button(lbl2, key=f"spot_w_btn_{lbl2}", use_container_width=True):
+                        st.session_state["show_wealth_spotlight_palette"] = False
+                        switch_to_page(pg2)
+
+    # ── COLONNA 3: SHORTCUTS CHEAT SHEET WEALTH ───────────────────────
+    with col_w3:
+        st.markdown('<div style="font-size:11.5px; font-weight:700; color:#10b981; margin-bottom:6px; letter-spacing:0.5px;">⌨️ SHORTCUTS WEALTH</div>', unsafe_allow_html=True)
+        
+        st.markdown("""
+        <div style="font-family:monospace; font-size:11px; color:#8b949e; line-height:1.6;">
+            <div><strong style="color:#34d399;">NW</strong> Net Worth 360°</div>
+            <div><strong style="color:#34d399;">CF</strong> Cash Flow 50/30/20</div>
+            <div><strong style="color:#34d399;">TIME</strong> Matrice & DD</div>
+            <div><strong style="color:#34d399;">WATCH</strong> Caveau Orologi</div>
+            <div><strong style="color:#34d399;">RE</strong> Immobili & LTV</div>
+            <div><strong style="color:#34d399;">FIRE</strong> Indipendenza 4%</div>
+            <div><strong style="color:#34d399;">RW</strong> Quadro RW / RT</div>
+            <div><strong style="color:#34d399;">REPORTS</strong> 9 Esportazioni</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("♻️ Reset Cache Wealth", key="spot_clean_cache_wealth", use_container_width=True):
+            from core.workspace_manager import clear_session_cache
+            clear_session_cache()
+            st.cache_data.clear()
+            for k in list(st.session_state.keys()):
+                if k not in ["splash_dismissed"]:
+                    del st.session_state[k]
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+            switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+    
+    st.divider()
+
+
 def render_workflow_stepper(current_step: int = 1):
     """Renderizza uno stepper grafico a 3 fasi per l'ingestione dati."""
     s1_style = "border-color: #ff9900; background: rgba(255, 153, 0, 0.15); color: #ffffff;" if current_step >= 1 else "color: #8b949e;"
@@ -4617,12 +4784,12 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             </div>
             """, unsafe_allow_html=True)
         with c_btn:
-            if st.button("🔍 Spotlight", key=f"btn_open_spotlight_{key_suffix}", use_container_width=True, help="Cerca pagine, schede, ticker o lancia comandi rapidi (Ctrl+K)"):
-                st.session_state["show_spotlight_palette"] = True
+            if st.button("🔍 Spotlight", key=f"btn_open_spotlight_{key_suffix}", use_container_width=True, help="Cerca pagine, schede o lancia comandi rapidi Wealth (Ctrl+K)"):
+                st.session_state["show_wealth_spotlight_palette"] = True
 
-    # Rendering della Command Palette se attivata
-    if st.session_state.get("show_spotlight_palette", False):
-        render_spotlight_palette()
+    # Rendering della Command Palette Wealth se attivata
+    if st.session_state.get("show_wealth_spotlight_palette", False):
+        render_wealth_spotlight_palette()
 
 
 
