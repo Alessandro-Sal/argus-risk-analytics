@@ -622,3 +622,60 @@ elif active_stress_tab == "🛠️ Simulatore What-if Custom":
         metric_card("Punto Peggiore sulla Superficie", fmt_eur(surface_data["worst_pnl_eur"]), positive=False, help_text="La massima perdita stimata sulla griglia di shock tassi x volatilità")
     with col_s2:
         metric_card("Punto Migliore sulla Superficie", fmt_eur(surface_data["best_pnl_eur"]), positive=True, help_text="Il massimo guadagno stimato sulla griglia di shock tassi x volatilità")
+
+st.divider()
+
+# ── SEZIONE STRESS TEST MACRO NORMATIVO (EBA / FED CCAR) & REVERSE STRESS ──
+st.markdown("### 🏛️ Macro Factor Stress Testing Normativo (EBA / Fed CCAR) & Reverse Stress")
+st.caption("Valutazione del portafoglio sotto scenari macroeconomici istituzionali congiunti (European Banking Authority, Federal Reserve) e calcolo delle soglie di rottura tramite Reverse Stress Testing.")
+
+from core.macro_stress_engine import compute_macro_scenario_stress_test, compute_reverse_stress_test
+
+macro_res = compute_macro_scenario_stress_test(df_positions=pos, results=results)
+
+m_c1, m_c2, m_c3, m_c4 = st.columns(4)
+with m_c1:
+    metric_card("Capitale Sottoposto a Test", fmt_eur(macro_res["initial_portfolio_value_eur"]), delta="Valutazione Base", delta_color="normal")
+with m_c2:
+    metric_card("Scenario Più Severo", macro_res["worst_case_scenario"][:24], delta="EBA / Fed Stress", delta_color="normal")
+with m_c3:
+    metric_card("Drawdown Max Normativo", f"{macro_res['worst_case_drawdown_pct']:+.2f}%", delta="Shock Combinato Macro", delta_color="inverse")
+with m_c4:
+    metric_card("Perdita Stimata Max", fmt_eur(macro_res["worst_case_loss_eur"]), delta="Worst Case Loss", delta_color="inverse")
+
+st.write("")
+
+c_m_l, c_m_r = st.columns([3, 2])
+with c_m_l:
+    st.markdown("##### 📋 Risultati Scenari Macroeconomici Istituzionali")
+    st.dataframe(
+        macro_res["scenarios_df"][["scenario_name", "equity_shock_pct", "rate_shock_bps", "credit_spread_bps", "commodities_shock_pct", "portfolio_return_pct", "pnl_impact_eur"]].rename(columns={
+            "scenario_name": "Scenario Istituzionale",
+            "equity_shock_pct": "Equity Shock (%)",
+            "rate_shock_bps": "Tassi (bps)",
+            "credit_spread_bps": "Spread (bps)",
+            "commodities_shock_pct": "Materie Prime (%)",
+            "portfolio_return_pct": "Impatto Portafoglio (%)",
+            "pnl_impact_eur": "PnL (€)"
+        }),
+        use_container_width=True,
+        hide_index=True
+    )
+
+with c_m_r:
+    st.markdown("##### 🎯 Reverse Stress Testing (Break-Even Solver)")
+    target_dd_input = st.slider("Seleziona Drawdown Target di Rottura (%):", min_value=-50.0, max_value=-5.0, value=-20.0, step=5.0)
+    rev_res = compute_reverse_stress_test(df_positions=pos, results=results, target_drawdown_pct=target_dd_input)
+    sol = rev_res["break_even_solutions"]
+
+    st.markdown(f"""
+    <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(239, 68, 68, 0.3); border-left: 4px solid #ef4444; border-radius: 10px; padding: 14px 18px;">
+        <b style="color: #f87171; font-size: 14px;">Soglie Minime per Causare {target_dd_input:.0f}% di Perdita ({fmt_eur(rev_res['target_loss_eur'])}):</b><br>
+        <span style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
+        • <b>Solo Azionario:</b> Crollo del <b>{sol['pure_equity_crash_pct']:.1f}%</b> (a tassi invariati)<br>
+        • <b>Solo Tassi d'Interesse:</b> Impennata di <b>+{sol['pure_rate_shock_bps']:.0f} bps</b> (a equity stabile)<br>
+        • <b>Scenario Congiunto (50/50):</b> Crollo Azionario <b>{sol['combined_scenario']['equity_crash_pct']:.1f}%</b> CON Tassi <b>+{sol['combined_scenario']['rate_shock_bps']:.0f} bps</b><br>
+        <b style="color: #38bdf8;">Rarità Statistica Stimata: {rev_res['implied_frequency_estimate']} (Z-Score: {rev_res['implied_z_score']})</b>
+        </span>
+    </div>
+    """, unsafe_allow_html=True)

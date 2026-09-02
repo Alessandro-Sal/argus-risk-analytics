@@ -2,10 +2,10 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.1.3-blue.svg)
+![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-327%2F327%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-336%2F336%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
@@ -59,7 +59,12 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **📑 Client-Ready Advisory Pitchbook (PDF Multipagina Istituzionale)**: Generatore esecutivo di dossier PDF A4 a 6 pagine per Family Office e Private Banking con impaginazione pixel-perfect (Edge/Chrome headless e ReportLab in-memory), Stato Patrimoniale 360°, Health Score Radar a 5 pilastri, Goal-Based tracking, TCO MiFID II ex-post e Action Plan.
 * **⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor**: Monitoraggio in tempo reale dello scostamento dell'asset allocation patrimoniale rispetto ai pesi target, rilevamento automatico del Cash Drag (con quantificazione del costo opportunità annuo) e generazione degli ordini di riallineamento a minimo impatto fiscale (TUIR Art. 67).
 * **🏡 Real Estate Net Equity & Dynamic LTV Integration**: Collegamento dinamico tra gli immobili registrati e i debiti residui dei mutui per il calcolo in tempo reale del Net Home Equity, del Loan-to-Value (LTV %) medio ponderato e della rata di ammortamento stimata.
-* **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti gli 11 moduli, oltre 35 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
+* **🌪️ Macro Factor Stress Testing Normativo & Reverse Stress (`STRESS MACRO` / `RSTRESS`)**: Scenari macroeconomici congiunti (EBA Regulatory Adverse 2026, Fed CCAR Severe, Stagflazione, Geopolitica Risk-Off) e risolutore numerico di Reverse Stress per identificare le soglie minime di crash necessarie a violare la solvibilità.
+* **⚖️ Autonomous AI Rebalancer & MiFID II Suitability Gate (`PROP REBAL` / `MIFID CHECK`)**: Generatore automatico di distinte ordini (Trade Blotter) per riallineare il portafoglio ai pesi target con vincoli di turnover, stima dell'imposta capital gain (TUIR) e verifica di adeguatezza MiFID II e limiti di concentrazione (UCITS 5/10/40).
+* **🌿 European SFDR Sustainability Desk & Carbon Footprint (`ESG` / `CARBON`)**: Diagnosi di sostenibilità conforme al Regolamento UE 2019/2088 (SFDR Art. 6/8/9), intensità carbonica ponderata ($t\text{CO}_2e/\text{M€}$) e screening controversie internazionali.
+* **📈 Multi-Leg Options Strategy Workbench & Payoff Desk (`OPTS BUILD` / `PAYOFF`)**: Costruttore interattivo di strategie su derivati multi-gamba (Iron Condor, Protective Collar, Bull/Bear Spreads, Straddle) con analisi delle Greche aggregate (Delta, Gamma, Theta, Vega) e profilo di PnL a scadenza e anticipato.
+* **📄 Universal White-Label Client Quarterly PDF Report Generator (`REPORT QTR`)**: Motore di reporting esecutivo multipagina ad alta risoluzione (PDF) per Family Office & HNWI con bilancio consolidato, attribuzione di performance Brinson, stress testing ed ESG scorecard.
+* **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 21 moduli, oltre 50 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
 
 ---
 
