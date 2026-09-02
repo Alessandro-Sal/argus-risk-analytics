@@ -296,12 +296,33 @@ def compute_wealth_seasonality_patterns(
     df_tx = get_cashflow_records(engine, portfolio_id=portfolio_id)
     seasonality_rows = []
 
+    if df_tx is not None and not df_tx.empty and len(df_tx) >= 5:
+        df_clean = df_tx.copy()
+        df_clean["tx_date"] = pd.to_datetime(df_clean["tx_date"])
+        # Escludi giroconti e trasferimenti interni
+        df_clean = df_clean[df_clean["direction"].isin(["inflow", "outflow"])]
+        if "category" in df_clean.columns:
+            df_clean = df_clean[~df_clean["category"].astype(str).str.lower().str.contains("giroconto|trasferimento|transfer", na=False)]
+        n_years = max(1, df_clean["tx_date"].dt.year.nunique())
+    else:
+        df_clean = pd.DataFrame()
+        n_years = 1
+
     for m_num, m_name in month_names.items():
-        if df_tx is not None and not df_tx.empty and len(df_tx) >= 5:
-            m_tx = df_tx[pd.to_datetime(df_tx["tx_date"]).dt.month == m_num]
-            avg_in = float(m_tx[m_tx["direction"] == "inflow"]["amount"].sum())
-            avg_out = float(m_tx[m_tx["direction"] == "outflow"]["amount"].sum())
-            avg_sav = avg_in - avg_out
+        if not df_clean.empty:
+            m_tx = df_clean[df_clean["tx_date"].dt.month == m_num]
+            tot_in = float(m_tx[m_tx["direction"] == "inflow"]["amount"].sum())
+            tot_out = float(m_tx[m_tx["direction"] == "outflow"]["amount"].sum())
+            if tot_in > 0 or tot_out > 0:
+                avg_in = tot_in / n_years
+                avg_out = tot_out / n_years
+                avg_sav = avg_in - avg_out
+            else:
+                base_in = 3500.0 + (1500.0 if m_num in (6, 12) else 0.0)
+                base_out = 2000.0 + (600.0 if m_num == 8 else 800.0 if m_num == 12 else 0.0)
+                avg_in = base_in
+                avg_out = base_out
+                avg_sav = base_in - base_out
         else:
             # Profilo mensile sintetico
             base_in = 3500.0 + (1500.0 if m_num in (6, 12) else 0.0)
