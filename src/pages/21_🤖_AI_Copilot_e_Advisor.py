@@ -33,11 +33,14 @@ from core.ui_utils import (
 )
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
-from core.wealth import (
-    get_wealth_portfolios,
+from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_ai_wealth_diagnostics,
     compute_cashflow_analytics,
+    compute_tax_smart_rebalancing_watchdog
+)
+from core.wealth.wealth_db import (
+    get_wealth_portfolios,
     get_cashflow_records
 )
 
@@ -185,66 +188,82 @@ with tab_diag:
         st.success("🎉 **Nessun collo di bottiglia critico rilevato!** Il tuo profilo patrimoniale rispetta pienamente tutti i parametri di liquidità, risparmio 50/30/20 e diversificazione.")
 
 with tab_rebal:
-    st.markdown(f"### ⚖️ Ordini di Ribilanciamento vs **{target_model_sel}**")
-    st.caption("Confronto tra pesi effettivi e target di portafoglio con calcolo dei flussi di capitale necessari.")
+    st.markdown(f"### ⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor")
+    st.caption("Monitoraggio in tempo reale dello scostamento (drift) dall'Asset Allocation Target con ottimizzazione fiscale vincolante (TUIR Art. 67).")
+
+    watchdog_res = compute_tax_smart_rebalancing_watchdog(engine, portfolio_id=current_pid)
+
+    wb_c1, wb_c2, wb_c3, wb_c4 = st.columns(4)
+    with wb_c1:
+        metric_card("Indice di Allineamento", f"{watchdog_res['portfolio_health_alignment_pct']:.1f}%", delta="Sintonia con il Target", delta_color="normal")
+    with wb_c2:
+        metric_card("Drift Critici", f"{watchdog_res['critical_drifts_count']}", delta="Asset con Drift > 4.5%" if watchdog_res['critical_drifts_count'] > 0 else "Nessun Drift Critico", delta_color="inverse" if watchdog_res['critical_drifts_count'] > 0 else "normal")
+    with wb_c3:
+        metric_card("Turnover Necessario", fmt_eur(watchdog_res['total_turnover_eur']), delta="Capitale da Ribilanciare", delta_color="normal")
+    with wb_c4:
+        cd_col = "inverse" if watchdog_res['cash_drag_alert'] else "normal"
+        cd_txt = f"Eccesso {fmt_eur(watchdog_res['excess_cash_eur'])}" if watchdog_res['cash_drag_alert'] else "Livello Ottimale"
+        metric_card("Cash Drag Alert", "⚠️ Rilevato" if watchdog_res['cash_drag_alert'] else "✅ Assente", delta=cd_txt, delta_color=cd_col)
+
+    if watchdog_res['cash_drag_alert']:
+        st.warning(f"**Attenzione Cash Drag:** Rilevata liquidità in eccesso per **{fmt_eur(watchdog_res['excess_cash_eur'])}**. L'impatto stimato in mancato rendimento da costo opportunità è di circa **{fmt_eur(watchdog_res['estimated_annual_cash_drag_eur'])} / anno**.")
+
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
 
     c_chart, c_orders = st.columns([1.15, 1.1])
     with c_chart:
-        curr_keys = list(ai_diag["current_allocation"].keys())
-        curr_vals = list(ai_diag["current_allocation"].values())
-        target_map = ai_diag.get("target_allocation", {})
-        target_vals = [target_map.get(k, 0.0) for k in curr_keys]
-        
-        fig_drift = go.Figure(data=[
-            go.Bar(
-                name="Allocazione Attuale",
-                x=curr_keys,
-                y=curr_vals,
-                marker_color="#38bdf8",
-                hovertemplate="<b>%{x}</b><br>Allocazione Attuale: <b>%{y:.1f}%</b><extra></extra>"
-            ),
-            go.Bar(
-                name="Target Modello",
-                x=curr_keys,
-                y=target_vals,
-                marker_color="#34d399",
-                hovertemplate="<b>%{x}</b><br>Target Modello: <b>%{y:.1f}%</b><extra></extra>"
+        df_d = watchdog_res["drift_df"]
+        if not df_d.empty:
+            fig_drift = go.Figure(data=[
+                go.Bar(
+                    name="Allocazione Attuale (%)",
+                    x=df_d["asset_name"],
+                    y=df_d["current_weight_pct"],
+                    marker_color="#38bdf8",
+                    hovertemplate="<b>%{x}</b><br>Attuale: <b>%{y:.1f}%</b><extra></extra>"
+                ),
+                go.Bar(
+                    name="Target Modello (%)",
+                    x=df_d["asset_name"],
+                    y=df_d["target_weight_pct"],
+                    marker_color="#34d399",
+                    hovertemplate="<b>%{x}</b><br>Target: <b>%{y:.1f}%</b><extra></extra>"
+                )
+            ])
+            fig_drift.update_layout(
+                barmode="group",
+                title=dict(text="Drift tra Asset Allocation Attuale e Target", font=dict(size=14, color="#ffffff")),
+                height=350,
+                xaxis_title="",
+                yaxis_title="Percentuale (%)",
+                margin=dict(l=10, r=10, t=40, b=20),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
-        ])
-        fig_drift.update_layout(
-            barmode="group",
-            title=dict(text="Drift tra Asset Allocation Attuale e Target", font=dict(size=14, color="#ffffff")),
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            height=370,
-            xaxis_title="",
-            yaxis_title="Percentuale (%)",
-            margin=dict(l=10, r=10, t=50, b=20),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-        )
-        st.plotly_chart(fig_drift, use_container_width=True, config={'displayModeBar': False})
+            apply_plotly_theme(fig_drift)
+            st.plotly_chart(fig_drift, use_container_width=True, config={'displayModeBar': False})
 
     with c_orders:
-        st.markdown("##### 📋 Ordini di Esecuzione Consigliati")
-        if ai_diag["rebalance_orders"]:
-            for o in ai_diag["rebalance_orders"]:
-                is_buy = "ACQUISTA" in o["azione_suggerita"]
-                badge_c = "#34d399" if is_buy else "#fbbf24"
-                border_c = "rgba(52, 211, 153, 0.25)" if is_buy else "rgba(251, 191, 36, 0.25)"
+        st.markdown("##### 📋 Piano Ordini con Ottimizzazione Fiscale")
+        for d in watchdog_res.get("drift_table", []):
+            if d["action_type"] != "HOLD":
+                is_buy = d["action_type"] == "BUY"
+                b_color = "#34d399" if is_buy else "#f87171"
                 st.markdown(f"""
-                <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid {border_c}; border-left: 4px solid {badge_c}; padding: 11px 15px; border-radius: 9px; margin-bottom: 8px;">
+                <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {b_color}; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <b style="color:#ffffff; font-size:13.5px;">{o['asset_class']}</b>
-                        <span class="mono-num" style="color:{badge_c}; font-weight:800; font-size:13.5px;">{o['azione_suggerita']} € {o['importo_ribilanciamento']:,.2f}</span>
+                        <b style="color:#ffffff; font-size:13px;">{d['asset_name']}</b>
+                        <span style="color:{b_color}; font-weight:800; font-size:13px;">{d['action_type']} € {abs(d['target_delta_eur']):,.2f}</span>
                     </div>
-                    <div style="font-size:11.5px; color:#94a3b8; margin-top:3px;">
-                        Attuale: <b style="color:#e2e8f0;">{o['allocazione_attuale']}</b> &rarr; Target: <b style="color:#e2e8f0;">{o['allocazione_target']}</b> (Scostamento: <span style="color:{badge_c};">{o['scostamento']}</span>)
+                    <div style="font-size:11px; color:#94a3b8; margin-top:2px;">
+                        Attuale: <b>{d['current_weight_pct']:.1f}%</b> &rarr; Target: <b>{d['target_weight_pct']:.1f}%</b> (Drift: <span style="color:{b_color}; font-weight:bold;">{d['drift_pct']:+.1f}%</span>)
+                    </div>
+                    <div style="font-size:10.5px; color:#cbd5e1; margin-top:4px; font-style:italic;">
+                        💡 {d['notes']}
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-        else:
-            st.info("Portafoglio perfettamente bilanciato rispetto al modello target!")
+        if all(d["action_type"] == "HOLD" for d in watchdog_res.get("drift_table", [])):
+            st.success("✅ Portafoglio perfettamente allineato! Nessun ordine di ribilanciamento richiesto.")
 
 
 with tab_life:

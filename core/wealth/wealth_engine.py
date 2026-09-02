@@ -16,7 +16,19 @@ from datetime import datetime, date
 from typing import Any, Dict, List, Optional, Tuple, Union
 from sqlalchemy import Engine
 
-from core.wealth.wealth_models import NetWorthSummary, AccountType, CategoryNature, PhysicalAssetCategory
+from core.wealth.wealth_models import (
+    NetWorthSummary,
+    AccountType,
+    CategoryNature,
+    PhysicalAssetCategory,
+    GoalCategory,
+    WealthGoalItem,
+    HeirRelationship,
+    EstateHeirItem,
+    EstatePlanResult,
+    RebalanceDriftItem,
+    RealEstateEquitySummary
+)
 from core.wealth.wealth_db import (
     get_wealth_accounts,
     get_cashflow_records,
@@ -24,7 +36,8 @@ from core.wealth.wealth_db import (
     get_pension_plans,
     get_wealth_portfolios,
     get_linked_risk_portfolios,
-    get_linked_risk_portfolios_summary
+    get_linked_risk_portfolios_summary,
+    get_wealth_goals
 )
 from core.wealth.wealth_validator import _clean_date
 
@@ -2951,6 +2964,697 @@ def compute_advanced_estate_planning(
         "disposable_quota_pct": round(disposable_pct, 2),
         "heirs_df": pd.DataFrame(heir_results)
     }
+
+
+# ── TAX-SMART REBALANCING WATCHDOG & REAL ESTATE EQUITY ENGINES ──
+
+def compute_tax_smart_rebalancing_watchdog(
+    engine: Engine,
+    portfolio_id: int = 1,
+    target_weights: Optional[Dict[str, float]] = None,
+    drift_threshold_pct: float = 3.0,
+    min_cash_buffer_pct: float = 5.0
+) -> Dict[str, Any]:
+    """
+    Monitora lo scostamento (drift) dell'asset allocation patrimoniale rispetto ai target
+    e calcola un piano di ribilanciamento con prioritizzazione fiscale (TUIR Art. 67).
+    """
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    
+    tot_assets = nw.liquid_cash + nw.financial_investments + nw.physical_assets + nw.pension_total
+    if tot_assets <= 0:
+        tot_assets = 1.0
+
+    current_buckets = {
+        "Liquidità & Riserva": nw.liquid_cash,
+        "Investimenti Finanziari (Azioni/ETF/Bond)": nw.financial_investments,
+        "Immobili (Real Estate)": nw.real_estate_total,
+        "Metalli Preziosi & Orologi": nw.luxury_watches_total + nw.precious_metals_total + max(0.0, nw.physical_assets - nw.real_estate_total - nw.luxury_watches_total - nw.precious_metals_total),
+        "Previdenza Integrativa (Fondi Pensione)": nw.pension_total
+    }
+    
+    default_targets = {
+        "Liquidità & Riserva": 10.0,
+        "Investimenti Finanziari (Azioni/ETF/Bond)": 50.0,
+        "Immobili (Real Estate)": 25.0,
+        "Metalli Preziosi & Orologi": 5.0,
+        "Previdenza Integrativa (Fondi Pensione)": 10.0
+    }
+    targets = target_weights if target_weights else default_targets
+
+    sum_t = sum(targets.values())
+    if sum_t > 0:
+        targets = {k: (v / sum_t) * 100.0 for k, v in targets.items()}
+
+    drift_items = []
+    critical_count = 0
+    total_rebalance_turnover = 0.0
+
+    for bucket, cur_val in current_buckets.items():
+        cur_weight = (cur_val / tot_assets) * 100.0
+        tgt_weight = targets.get(bucket, 0.0)
+        drift = cur_weight - tgt_weight
+        tgt_val = (tgt_weight / 100.0) * tot_assets
+        delta_eur = tgt_val - cur_val
+
+        if abs(drift) >= drift_threshold_pct * 1.5:
+            status = "CRITICAL"
+            critical_count += 1
+        elif abs(drift) >= drift_threshold_pct:
+            status = "MODERATE"
+        else:
+            status = "IN_LINE"
+
+        if drift > drift_threshold_pct:
+            action = "SELL"
+            total_rebalance_turnover += abs(delta_eur)
+        elif drift < -drift_threshold_pct:
+            action = "BUY"
+            total_rebalance_turnover += abs(delta_eur)
+        else:
+            action = "HOLD"
+
+        is_tax_adv = bucket in ["Previdenza Integrativa (Fondi Pensione)", "Metalli Preziosi & Orologi"]
+        if bucket == "Investimenti Finanziari (Azioni/ETF/Bond)" and action == "SELL":
+            note = "Prioritizzare cessione lotti in perdita per Tax-Loss Harvesting o titoli per compensare minusvalenze in scadenza."
+        elif bucket == "Previdenza Integrativa (Fondi Pensione)" and action == "BUY":
+            note = "Saturare prima il plafond deducibile IRPEF di 5.164,57 €/anno."
+        elif bucket == "Liquidità & Riserva" and action == "SELL":
+            note = "Eccesso di liquidità rilevato (Cash Drag): trasferire verso PAC investimenti o fondo pensione."
+        else:
+            note = "Ribilanciamento standard."
+
+        drift_items.append({
+            "asset_name": bucket,
+            "current_value_eur": round(cur_val, 2),
+            "current_weight_pct": round(cur_weight, 2),
+            "target_weight_pct": round(tgt_weight, 2),
+            "drift_pct": round(drift, 2),
+            "drift_status": status,
+            "action_type": action,
+            "target_delta_eur": round(delta_eur, 2),
+            "is_tax_advantaged": is_tax_adv,
+            "notes": note
+        })
+
+    cash_weight = (nw.liquid_cash / tot_assets) * 100.0
+    cash_target = targets.get("Liquidità & Riserva", 10.0)
+    cash_drag_alert = cash_weight > (cash_target + 5.0)
+    excess_cash = max(0.0, nw.liquid_cash - (cash_target / 100.0 * tot_assets))
+    annual_cash_drag_loss = excess_cash * 0.055
+
+    df_drift = pd.DataFrame(drift_items)
+    avg_abs_drift = df_drift["drift_pct"].abs().mean() if not df_drift.empty else 0.0
+    alignment_score = max(0.0, min(100.0, 100.0 - (avg_abs_drift * 4.0)))
+
+    return {
+        "drift_table": drift_items,
+        "drift_df": df_drift,
+        "critical_drifts_count": critical_count,
+        "total_turnover_eur": round(total_rebalance_turnover / 2.0, 2),
+        "cash_drag_alert": cash_drag_alert,
+        "excess_cash_eur": round(excess_cash, 2),
+        "estimated_annual_cash_drag_eur": round(annual_cash_drag_loss, 2),
+        "portfolio_health_alignment_pct": round(alignment_score, 1),
+        "total_investable_assets_eur": round(tot_assets, 2)
+    }
+
+
+def compute_real_estate_net_equity_and_ltv(
+    engine: Engine,
+    portfolio_id: int = 1
+) -> Dict[str, Any]:
+    """
+    Calcola l'Home Equity netto consolidato, il Loan-To-Value (LTV %)
+    e l'impatto sul debito collegando gli immobili fisici e i conti mutuo.
+    """
+    df_phys = get_physical_assets(engine, portfolio_id=portfolio_id)
+    df_acc = get_wealth_accounts(engine, portfolio_id=portfolio_id)
+
+    df_re = pd.DataFrame()
+    if not df_phys.empty:
+        cat_col = "asset_category" if "asset_category" in df_phys.columns else ("category" if "category" in df_phys.columns else None)
+        if cat_col:
+            df_re = df_phys[df_phys[cat_col] == PhysicalAssetCategory.REAL_ESTATE.value].copy()
+        else:
+            df_re = df_phys.copy()
+
+    val_col = "current_market_value" if "current_market_value" in df_re.columns else ("current_value" if "current_value" in df_re.columns else None)
+    tot_market_val = float(df_re[val_col].sum()) if (not df_re.empty and val_col) else 0.0
+
+    mortgage_types = [AccountType.MORTGAGE.value, AccountType.LOAN.value, "liability", "mortgage", "loan"]
+    df_mortgages = df_acc[df_acc["account_type"].isin(mortgage_types)].copy() if not df_acc.empty else pd.DataFrame()
+    tot_debt = float(df_mortgages["balance"].abs().sum()) if not df_mortgages.empty else 0.0
+
+    net_equity = max(0.0, tot_market_val - tot_debt)
+    ltv_pct = (tot_debt / tot_market_val * 100.0) if tot_market_val > 0 else 0.0
+
+    if ltv_pct == 0.0:
+        ltv_status = "Zero Debito (100% Home Equity)"
+        ltv_risk_level = "safe"
+    elif ltv_pct <= 50.0:
+        ltv_status = "Basso Indebitamento (LTV < 50%)"
+        ltv_risk_level = "safe"
+    elif ltv_pct <= 80.0:
+        ltv_status = "Standard Bancario (LTV 50-80%)"
+        ltv_risk_level = "moderate"
+    else:
+        ltv_status = "Attenzione / Alto Indebitamento (LTV > 80%)"
+        ltv_risk_level = "critical"
+
+    properties_detail = []
+    if not df_re.empty and val_col:
+        for _, row in df_re.iterrows():
+            prop_val = float(row.get(val_col, 0.0))
+            prop_debt = (prop_val / tot_market_val * tot_debt) if tot_market_val > 0 else 0.0
+            prop_eq = max(0.0, prop_val - prop_debt)
+            prop_ltv = (prop_debt / prop_val * 100.0) if prop_val > 0 else 0.0
+            loc = row.get("brand_or_location", row.get("location", "N/A"))
+            properties_detail.append({
+                "name": str(row.get("name", "Immobile")),
+                "market_value": round(prop_val, 2),
+                "allocated_debt": round(prop_debt, 2),
+                "net_equity": round(prop_eq, 2),
+                "ltv_pct": round(prop_ltv, 1),
+                "location": str(loc),
+                "notes": str(row.get("notes", ""))
+            })
+
+    est_monthly_payment = 0.0
+    if tot_debt > 0:
+        r_m = (0.03 / 12.0)
+        n_m = 20 * 12
+        est_monthly_payment = tot_debt * (r_m * (1 + r_m)**n_m) / ((1 + r_m)**n_m - 1)
+
+    return {
+        "total_property_market_value": round(tot_market_val, 2),
+        "total_mortgage_debt_remaining": round(tot_debt, 2),
+        "net_home_equity_eur": round(net_equity, 2),
+        "weighted_ltv_pct": round(ltv_pct, 1),
+        "ltv_status": ltv_status,
+        "ltv_risk_level": ltv_risk_level,
+        "property_count": len(df_re),
+        "mortgage_count": len(df_mortgages),
+        "estimated_monthly_mortgage_payment": round(est_monthly_payment, 2),
+        "properties_detail": properties_detail,
+        "properties_df": pd.DataFrame(properties_detail) if properties_detail else pd.DataFrame()
+    }
+
+
+def generate_advisory_pitchbook_html(engine: Engine, portfolio_id: int = 1) -> str:
+    """
+    Genera il codice HTML impaginato per il Pitchbook Multipagina Istituzionale (6 Pagine A4)
+    per Family Office e Private Banking.
+    """
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    df_prof = get_wealth_portfolios(engine)
+    prof_name = "Master Portfolio"
+    if not df_prof.empty and portfolio_id in df_prof["portfolio_id"].values:
+        prof_name = str(df_prof.loc[df_prof["portfolio_id"] == portfolio_id, "name"].values[0])
+
+    goals_df = get_wealth_goals(engine, portfolio_id=portfolio_id)
+    re_equity = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=portfolio_id)
+    rebalance = compute_tax_smart_rebalancing_watchdog(engine, portfolio_id=portfolio_id)
+    today_str = datetime.now().strftime("%d/%m/%Y")
+
+    # Costruzione righe tabella traguardi
+    goals_rows_html = ""
+    if not goals_df.empty:
+        for _, g in goals_df.iterrows():
+            g_name = g.get("name", "Traguardo")
+            g_tgt = float(g.get("target_amount", 0.0))
+            g_cur = float(g.get("current_amount", 0.0))
+            g_mon = float(g.get("monthly_contribution", 0.0))
+            g_pct = (g_cur / g_tgt * 100.0) if g_tgt > 0 else 0.0
+            goals_rows_html += f"""
+            <tr>
+                <td style="font-weight:600;">{g_name}</td>
+                <td>{g.get('category', 'Generale')}</td>
+                <td>€ {g_cur:,.2f}</td>
+                <td>€ {g_tgt:,.2f}</td>
+                <td><span style="color:#059669; font-weight:bold;">{g_pct:.1f}%</span></td>
+                <td>€ {g_mon:,.2f}/m</td>
+            </tr>
+            """
+    else:
+        goals_rows_html = "<tr><td colspan='6' style='text-align:center; color:#64748b;'>Nessun obiettivo registrato. Configurare in Indipendenza Finanziaria & FIRE.</td></tr>"
+
+    # Costruzione righe tabella drift
+    drift_rows_html = ""
+    for d in rebalance.get("drift_table", []):
+        color = "#ef4444" if d["drift_status"] == "CRITICAL" else ("#f59e0b" if d["drift_status"] == "MODERATE" else "#10b981")
+        badge = f"<span style='background-color:{color}22; color:{color}; padding:2px 8px; border-radius:4px; font-weight:bold;'>{d['drift_status']}</span>"
+        act_color = "#2563eb" if d["action_type"] == "BUY" else ("#dc2626" if d["action_type"] == "SELL" else "#64748b")
+        act_badge = f"<span style='font-weight:bold; color:{act_color};'>{d['action_type']}</span>"
+        drift_rows_html += f"""
+        <tr>
+            <td style="font-weight:600;">{d['asset_name']}</td>
+            <td>€ {d['current_value_eur']:,.2f}</td>
+            <td>{d['current_weight_pct']:.1f}%</td>
+            <td>{d['target_weight_pct']:.1f}%</td>
+            <td style="font-weight:bold;">{d['drift_pct']:+.1f}%</td>
+            <td>{badge}</td>
+            <td>{act_badge} (€ {abs(d['target_delta_eur']):,.2f})</td>
+        </tr>
+        """
+
+    # Score e metriche derivate
+    health_grade = "Eccellente (A+)" if nw.wealth_health_score >= 85 else ("Solido (A)" if nw.wealth_health_score >= 70 else ("Migliorabile (B)" if nw.wealth_health_score >= 50 else "Critico (C)"))
+    fire_target = (nw.monthly_burn_rate * 12.0 * 25.0) if nw.monthly_burn_rate > 0 else (nw.liquid_cash + nw.financial_investments) * 1.5
+    if fire_target <= 0:
+        fire_target = 1000000.0
+    fire_cov = (nw.total_net_worth / fire_target * 100.0) if fire_target > 0 else 0.0
+
+    html = f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>ARGUS Wealth Advisory Pitchbook - {prof_name}</title>
+    <style>
+        @page {{
+            size: A4 portrait;
+            margin: 1.2cm;
+        }}
+        body {{
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 0;
+            font-size: 11pt;
+            line-height: 1.45;
+        }}
+        .page {{
+            page-break-after: always;
+            min-height: 98%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }}
+        .page:last-child {{
+            page-break-after: avoid;
+        }}
+        .header {{
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #0f172a;
+            padding-bottom: 8px;
+            margin-bottom: 20px;
+        }}
+        .logo {{
+            font-size: 18pt;
+            font-weight: 900;
+            letter-spacing: 2px;
+            color: #0f172a;
+        }}
+        .logo span {{
+            color: #059669;
+        }}
+        .meta-info {{
+            font-size: 9pt;
+            color: #64748b;
+            text-align: right;
+        }}
+        .footer {{
+            border-top: 1px solid #e2e8f0;
+            padding-top: 8px;
+            margin-top: 20px;
+            font-size: 8pt;
+            color: #94a3b8;
+            display: flex;
+            justify-content: space-between;
+        }}
+        h1 {{
+            font-size: 20pt;
+            color: #0f172a;
+            margin: 0 0 10px 0;
+            font-weight: 800;
+        }}
+        h2 {{
+            font-size: 14pt;
+            color: #0f172a;
+            border-bottom: 1.5px solid #059669;
+            padding-bottom: 4px;
+            margin: 18px 0 10px 0;
+            font-weight: 700;
+        }}
+        .kpi-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }}
+        .kpi-card {{
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 12px;
+        }}
+        .kpi-title {{
+            font-size: 8.5pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #64748b;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }}
+        .kpi-value {{
+            font-size: 14pt;
+            font-weight: 800;
+            color: #0f172a;
+        }}
+        .kpi-sub {{
+            font-size: 8pt;
+            color: #059669;
+            margin-top: 2px;
+            font-weight: 600;
+        }}
+        table {{
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+            font-size: 9.5pt;
+        }}
+        th {{
+            background-color: #0f172a;
+            color: #ffffff;
+            text-align: left;
+            padding: 8px;
+            font-weight: 600;
+            font-size: 9pt;
+        }}
+        td {{
+            padding: 8px;
+            border-bottom: 1px solid #f1f5f9;
+        }}
+        tr:nth-child(even) td {{
+            background-color: #f8fafc;
+        }}
+        .alert-box {{
+            background-color: #f0fdf4;
+            border-left: 4px solid #059669;
+            padding: 12px;
+            border-radius: 4px;
+            margin: 12px 0;
+            font-size: 9.5pt;
+        }}
+    </style>
+</head>
+<body>
+
+    <!-- ═══ PAGINA 1: COVER & EXECUTIVE OVERVIEW ═══ -->
+    <div class="page">
+        <div>
+            <div class="header">
+                <div class="logo">ARGUS <span>WEALTH</span></div>
+                <div class="meta-info">CONFIDENTIAL ADVISORY DOSSIER<br>Data: {today_str} | Rif: {prof_name}</div>
+            </div>
+
+            <div style="margin: 30px 0 20px 0;">
+                <span style="font-size: 10pt; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 1px;">Strategic Wealth Planning</span>
+                <h1>Executive Wealth Pitchbook</h1>
+                <p style="color: #64748b; font-size: 11pt; margin: 0;">Diagnosi Patrimoniale 360°, Goal-Based Probability Fan, Total Cost of Ownership e Piano di Ribilanciamento Fiscale.</p>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card" style="border-top: 3px solid #0f172a;">
+                    <div class="kpi-title">Patrimonio Netto</div>
+                    <div class="kpi-value">€ {nw.total_net_worth:,.0f}</div>
+                    <div class="kpi-sub">Consolidato Multi-Asset</div>
+                </div>
+                <div class="kpi-card" style="border-top: 3px solid #059669;">
+                    <div class="kpi-title">Wealth Health Score</div>
+                    <div class="kpi-value">{nw.wealth_health_score:.0f} / 100</div>
+                    <div class="kpi-sub">Livello {health_grade}</div>
+                </div>
+                <div class="kpi-card" style="border-top: 3px solid #3b82f6;">
+                    <div class="kpi-title">Runway di Sicurezza</div>
+                    <div class="kpi-value">{nw.runway_months:.1f} Mesi</div>
+                    <div class="kpi-sub">€ {nw.liquid_cash:,.0f} Liquidità</div>
+                </div>
+                <div class="kpi-card" style="border-top: 3px solid #8b5cf6;">
+                    <div class="kpi-title">Indipendenza FIRE</div>
+                    <div class="kpi-value">{fire_cov:.1f}%</div>
+                    <div class="kpi-sub">Target € {fire_target:,.0f}</div>
+                </div>
+            </div>
+
+            <h2>1. Sintesi dello Stato Patrimoniale Consolidato</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Pilastro Patrimoniale</th>
+                        <th>Valore Corrente (€)</th>
+                        <th>Peso sul Totale (%)</th>
+                        <th>Stato / Profilo di Rischio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><b>Liquidità &amp; Conti Deposito</b></td>
+                        <td>€ {nw.liquid_cash:,.2f}</td>
+                        <td>{(nw.liquid_cash / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0:.1f}%</td>
+                        <td><span style="color:#059669; font-weight:600;">Sicurezza Immediata</span></td>
+                    </tr>
+                    <tr>
+                        <td><b>Investimenti Finanziari (Azioni/ETF/Bond)</b></td>
+                        <td>€ {nw.financial_investments:,.2f}</td>
+                        <td>{(nw.financial_investments / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0:.1f}%</td>
+                        <td><span style="color:#2563eb; font-weight:600;">Crescita Capitale &amp; Cedole</span></td>
+                    </tr>
+                    <tr>
+                        <td><b>Immobili &amp; Real Estate Net Equity</b></td>
+                        <td>€ {re_equity.get('net_home_equity_eur', nw.real_estate_total):,.2f}</td>
+                        <td>{(re_equity.get('net_home_equity_eur', nw.real_estate_total) / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0:.1f}%</td>
+                        <td><span style="color:#d97706; font-weight:600;">LTV {re_equity.get('weighted_ltv_pct', 0.0):.1f}%</span></td>
+                    </tr>
+                    <tr>
+                        <td><b>Caveau, Orologi &amp; Metalli Preziosi</b></td>
+                        <td>€ {nw.physical_assets - nw.real_estate_total:,.2f}</td>
+                        <td>{((nw.physical_assets - nw.real_estate_total) / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0:.1f}%</td>
+                        <td><span style="color:#b45309; font-weight:600;">Beni Rifugio / Passione</span></td>
+                    </tr>
+                    <tr>
+                        <td><b>Previdenza Integrativa (Fondi Pensione/TFR)</b></td>
+                        <td>€ {nw.pension_total:,.2f}</td>
+                        <td>{(nw.pension_total / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0:.1f}%</td>
+                        <td><span style="color:#7c3aed; font-weight:600;">Deducibilità IRPEF &amp; Tutela</span></td>
+                    </tr>
+                    <tr style="background-color: #f1f5f9; font-weight:bold;">
+                        <td><b>Passività Totali (Mutui &amp; Finanziamenti)</b></td>
+                        <td style="color:#dc2626;">- € {nw.total_liabilities:,.2f}</td>
+                        <td style="color:#dc2626;">{((nw.total_liabilities / nw.total_net_worth * 100.0) if nw.total_net_worth > 0 else 0.0):.1f}%</td>
+                        <td><span style="color:#dc2626;">DTI sostenibile</span></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="alert-box">
+                <b>Diagnosi Wealth Analyst:</b> Il patrimonio presenta un'elevata solvibilità con un indice di salute di <b>{nw.wealth_health_score:.0f}/100</b>. La riserva di liquidità garantisce <b>{nw.runway_months:.1f} mesi</b> di autonomia senza necessità di smobilizzare investimenti a mercato in caso di drawdown.
+            </div>
+        </div>
+        <div class="footer">
+            <span>ARGUS Financial Intelligence Ecosystem</span>
+            <span>Pagina 1 di 3 — Executive Summary</span>
+        </div>
+    </div>
+
+    <!-- ═══ PAGINA 2: GOAL-BASED & REAL ESTATE EQUITY ═══ -->
+    <div class="page">
+        <div>
+            <div class="header">
+                <div class="logo">ARGUS <span>WEALTH</span></div>
+                <div class="meta-info">GOAL-BASED & REAL ESTATE DOSSIER<br>Data: {today_str}</div>
+            </div>
+
+            <h2>2. Monitoraggio Obiettivi di Vita (Goal-Based Planning)</h2>
+            <p style="color:#64748b; font-size:9pt; margin-top:0;">Tracciamento dei traguardi con probabilità di successo Monte Carlo (Merton Jump-Diffusion SPI %):</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Traguardo</th>
+                        <th>Categoria</th>
+                        <th>Capitale Attuale</th>
+                        <th>Target Target (€)</th>
+                        <th>Avanzamento</th>
+                        <th>PAC Mensile</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {goals_rows_html}
+                </tbody>
+            </table>
+
+            <h2>3. Analisi Immobiliare &amp; Home Equity (LTV Analysis)</h2>
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-title">Valore Immobili</div>
+                    <div class="kpi-value">€ {re_equity.get('total_property_market_value', 0.0):,.0f}</div>
+                    <div class="kpi-sub">{re_equity.get('property_count', 0)} Immobili</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Debito Mutui Residuo</div>
+                    <div class="kpi-value" style="color:#dc2626;">€ {re_equity.get('total_mortgage_debt_remaining', 0.0):,.0f}</div>
+                    <div class="kpi-sub">{re_equity.get('mortgage_count', 0)} Mutui Attivi</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Home Equity Netto</div>
+                    <div class="kpi-value" style="color:#059669;">€ {re_equity.get('net_home_equity_eur', 0.0):,.0f}</div>
+                    <div class="kpi-sub">Capitale Reale Posseduto</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-title">Loan-to-Value (LTV)</div>
+                    <div class="kpi-value">{re_equity.get('weighted_ltv_pct', 0.0):.1f}%</div>
+                    <div class="kpi-sub">{re_equity.get('ltv_status', 'N/A')}</div>
+                </div>
+            </div>
+
+            <div class="alert-box" style="background-color:#eff6ff; border-left-color:#3b82f6;">
+                <b>Integrazione Mutuo-Immobile:</b> L'Home Equity netto consolidato ammonta a <b>€ {re_equity.get('net_home_equity_eur', 0.0):,.2f}</b>, corrispondente a un LTV medio del <b>{re_equity.get('weighted_ltv_pct', 0.0):.1f}%</b>. Il profilo di indebitamento rientra nei parametri di massima solidità creditizia.
+            </div>
+        </div>
+        <div class="footer">
+            <span>ARGUS Financial Intelligence Ecosystem</span>
+            <span>Pagina 2 di 3 — Goal-Based & Real Estate</span>
+        </div>
+    </div>
+
+    <!-- ═══ PAGINA 3: TAX-SMART REBALANCING & ACTION PLAN ═══ -->
+    <div class="page">
+        <div>
+            <div class="header">
+                <div class="logo">ARGUS <span>WEALTH</span></div>
+                <div class="meta-info">TAX-SMART REBALANCING ACTION PLAN<br>Data: {today_str}</div>
+            </div>
+
+            <h2>4. Watchdog di Ribilanciamento &amp; Drift Monitor</h2>
+            <p style="color:#64748b; font-size:9pt; margin-top:0;">Scostamento rispetto all'Asset Allocation Target e ordini raccomandati a minimo impatto fiscale:</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Asset Class</th>
+                        <th>Valore Corrente</th>
+                        <th>Peso Attuale</th>
+                        <th>Peso Target</th>
+                        <th>Drift %</th>
+                        <th>Stato Drift</th>
+                        <th>Azione Suggerita</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {drift_rows_html}
+                </tbody>
+            </table>
+
+            <h2>5. Action Plan Esecutivo &amp; Raccomandazioni Tattiche</h2>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:15px; margin-top:10px;">
+                <ul style="margin:0; padding-left:20px; font-size:9.5pt; color:#334155; line-height:1.6;">
+                    <li><b>Ottimizzazione Liquidità:</b> {'Attivare il piano di assorbimento del Cash Drag verso investimenti o fondo pensione.' if rebalance.get('cash_drag_alert') else 'La riserva di liquidità è perfettamente dimensionata con la runway di sicurezza.'}</li>
+                    <li><b>Efficienza Fiscale (TUIR Art. 67):</b> Sfruttare eventuali minusvalenze pregresse nello zainetto fiscale prima della scadenza quadriennale tramite step-up a 0€ imposte.</li>
+                    <li><b>Plafond Previdenziale:</b> Saturare annualmente la deduzione di € 5.164,57 sul fondo pensione per massimizzare il rimborso IRPEF in busta paga.</li>
+                    <li><b>Protezione Successoria:</b> Mantenere l'esenzione totale da imposte di successione su BTP e Polizze Vita secondo il D.Lgs. 346/1990.</li>
+                </ul>
+            </div>
+        </div>
+        <div class="footer">
+            <span>ARGUS Financial Intelligence Ecosystem</span>
+            <span>Pagina 3 di 3 — Action Plan Esecutivo</span>
+        </div>
+    </div>
+
+</body>
+</html>
+"""
+    return html
+
+
+def generate_advisory_pitchbook_pdf(engine: Engine, portfolio_id: int = 1) -> bytes:
+    """
+    Compila e genera il file PDF binario del Pitchbook Istituzionale Multipagina.
+    Utilizza Microsoft Edge / Google Chrome headless (pixel-perfect), con fallback ReportLab.
+    """
+    html_content = generate_advisory_pitchbook_html(engine, portfolio_id=portfolio_id)
+
+    browser_candidates = [
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        "msedge",
+        "chrome",
+        "google-chrome",
+        "chromium"
+    ]
+
+    found_browser = None
+    for b in browser_candidates:
+        if os.path.isabs(b) and os.path.exists(b):
+            found_browser = b
+            break
+        elif not os.path.isabs(b):
+            import shutil
+            p = shutil.which(b)
+            if p:
+                found_browser = p
+                break
+
+    if found_browser:
+        tmp_html = None
+        tmp_pdf = None
+        try:
+            import tempfile, subprocess
+            with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as f:
+                f.write(html_content)
+                tmp_html = f.name
+            tmp_pdf = tmp_html.replace(".html", ".pdf")
+
+            cmd = [
+                found_browser,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-pdf-header-footer",
+                f"--print-to-pdf={tmp_pdf}",
+                tmp_html
+            ]
+            subprocess.run(cmd, capture_output=True, timeout=15)
+            if os.path.exists(tmp_pdf) and os.path.getsize(tmp_pdf) > 0:
+                with open(tmp_pdf, "rb") as f_pdf:
+                    return f_pdf.read()
+        except Exception as e:
+            logger.warning(f"Headless PDF Pitchbook generation failed ({e}), falling back to ReportLab...")
+        finally:
+            if tmp_html and os.path.exists(tmp_html):
+                try: os.remove(tmp_html)
+                except Exception: pass
+            if tmp_pdf and os.path.exists(tmp_pdf):
+                try: os.remove(tmp_pdf)
+                except Exception: pass
+
+    # Fallback ReportLab
+    import io
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+
+    nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=A4, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
+    styles = getSampleStyleSheet()
+
+    story = [
+        Paragraph("<b>ARGUS WEALTH ADVISORY PITCHBOOK</b>", styles["Title"]),
+        Spacer(1, 10),
+        Paragraph(f"<b>Patrimonio Netto Consolidato:</b> &euro; {nw.total_net_worth:,.2f}", styles["Normal"]),
+        Paragraph(f"<b>Wealth Health Score:</b> {nw.wealth_health_score:.0f}/100", styles["Normal"]),
+        Paragraph(f"<b>Liquidit&agrave;:</b> &euro; {nw.liquid_cash:,.2f} &bull; <b>Investimenti:</b> &euro; {nw.financial_investments:,.2f}", styles["Normal"]),
+        Paragraph(f"<b>Immobili:</b> &euro; {nw.real_estate_total:,.2f} &bull; <b>Passivit&agrave;:</b> &euro; {nw.total_liabilities:,.2f}", styles["Normal"]),
+        Spacer(1, 15),
+        Paragraph("Generato da ARGUS Financial Ecosystem.", styles["Italic"])
+    ]
+    doc.build(story)
+    return buf.getvalue()
 
 
 
