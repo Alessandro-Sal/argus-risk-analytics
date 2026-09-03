@@ -3667,7 +3667,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
         accent_secondary = "#6366f1"
         glow_color = "rgba(245, 158, 11, 0.22)"
 
-    eye_svg = get_argus_eye_svg(size=110, animated=True, accent=accent)
+    eye_svg = get_argus_eye_svg(size=125, animated=True, accent=accent)
 
     hide_sidebar_and_splash_css = f"""
     <style>
@@ -3689,23 +3689,23 @@ def render_splash_screen(force_show: bool = False) -> bool:
     div[data-testid="stAppViewBlockContainer"],
     .main .block-container,
     section.main > div {{
-        padding-top: 0.5rem !important;
-        padding-bottom: 0.8rem !important;
+        padding-top: 0.35rem !important;
+        padding-bottom: 0.6rem !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
-        max-width: 1180px !important;
+        max-width: 1260px !important;
     }}
     
     /* ── Contenitore Master Splash Screen Glassmorphic ── */
     .splash-master-wrapper {{
-        max-width: 1140px;
+        max-width: 1220px;
         margin: 0px auto 14px auto;
         background: radial-gradient(circle at 50% 0%, {glow_color} 0%, rgba(15, 23, 42, 0.96) 50%, rgba(8, 12, 22, 0.99) 100%);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-top: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 20px;
-        padding: 22px 28px 18px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.85), 0 0 50px {glow_color};
+        border-radius: 22px;
+        padding: 24px 32px 20px;
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.85), 0 0 55px {glow_color};
         backdrop-filter: blur(28px);
         -webkit-backdrop-filter: blur(28px);
         text-align: center;
@@ -3721,7 +3721,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
 
     .splash-logo-container {{
         margin-bottom: 6px;
-        filter: drop-shadow(0 0 18px {glow_color});
+        filter: drop-shadow(0 0 20px {glow_color});
         transition: transform 0.3s ease;
     }}
     .splash-logo-container:hover {{
@@ -3729,9 +3729,9 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
 
     .splash-title {{
-        font-size: 32px;
+        font-size: 35px;
         font-weight: 900;
-        letter-spacing: 7px;
+        letter-spacing: 8px;
         background: linear-gradient(135deg, #ffffff 40%, {accent} 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -3741,21 +3741,21 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
 
     .splash-subtitle {{
-        font-size: 11px;
+        font-size: 11.5px;
         font-weight: 700;
         color: {accent};
-        letter-spacing: 3px;
+        letter-spacing: 3.2px;
         text-transform: uppercase;
         margin-bottom: 8px;
         opacity: 0.95;
     }}
 
     .splash-desc {{
-        font-size: 13px;
+        font-size: 13.5px;
         color: #94a3b8;
-        max-width: 820px;
+        max-width: 860px;
         margin: 0 auto 12px auto;
-        line-height: 1.5;
+        line-height: 1.55;
     }}
 
     /* ── Badge Ribbon Istituzionale ── */
@@ -3763,7 +3763,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 10px;
+        gap: 11px;
         flex-wrap: wrap;
         margin-bottom: 14px;
     }}
@@ -3771,9 +3771,9 @@ def render_splash_screen(force_show: bool = False) -> bool:
     .splash-pill {{
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.10);
-        padding: 3px 12px;
-        border-radius: 16px;
-        font-size: 11px;
+        padding: 3.5px 13px;
+        border-radius: 18px;
+        font-size: 11.5px;
         color: #cbd5e1;
         font-weight: 500;
         font-family: 'JetBrains Mono', 'Outfit', monospace;
@@ -3790,7 +3790,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
     .terminal-window {{
         background: rgba(7, 10, 18, 0.95);
         border: 1px solid rgba(255, 255, 255, 0.10);
-        border-radius: 12px;
+        border-radius: 13px;
         padding: 0;
         text-align: left;
         margin-bottom: 12px;
@@ -3818,19 +3818,19 @@ def render_splash_screen(force_show: bool = False) -> bool:
 
     .terminal-title {{
         font-family: 'JetBrains Mono', monospace;
-        font-size: 10px;
+        font-size: 10.5px;
         color: #64748b;
         margin-left: 5px;
     }}
 
     .terminal-status-badge {{
         font-family: 'JetBrains Mono', monospace;
-        font-size: 9.5px;
+        font-size: 10px;
         font-weight: 700;
         color: #10b981;
         background: rgba(16, 185, 129, 0.15);
         border: 1px solid rgba(16, 185, 129, 0.35);
-        padding: 2px 7px;
+        padding: 2px 8px;
         border-radius: 5px;
         display: flex;
         align-items: center;
@@ -3838,16 +3838,16 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
 
     .terminal-body {{
-        padding: 10px 16px 8px 16px;
+        padding: 11px 18px 9px 18px;
         font-family: 'JetBrains Mono', monospace;
-        font-size: 10.5px;
-        line-height: 1.7;
+        font-size: 10.8px;
+        line-height: 1.75;
     }}
 
     /* Micro-Progress Bar a Gradiente Liquido */
     .splash-progress-track {{
         width: 100%;
-        height: 4px;
+        height: 4.5px;
         background: rgba(255, 255, 255, 0.06);
         border-radius: 999px;
         overflow: hidden;
@@ -3874,9 +3874,9 @@ def render_splash_screen(force_show: bool = False) -> bool:
         background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.16) 0%, rgba(15, 23, 42, 0.90) 75%);
         border: 1px solid rgba(99, 102, 241, 0.40);
         border-top: 3px solid #6366f1;
-        border-radius: 16px;
-        padding: 16px 20px;
-        min-height: 140px;
+        border-radius: 17px;
+        padding: 18px 22px;
+        min-height: 152px;
         margin-bottom: 8px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3894,9 +3894,9 @@ def render_splash_screen(force_show: bool = False) -> bool:
         background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.16) 0%, rgba(15, 23, 42, 0.90) 75%);
         border: 1px solid rgba(16, 185, 129, 0.40);
         border-top: 3px solid #10b981;
-        border-radius: 16px;
-        padding: 16px 20px;
-        min-height: 140px;
+        border-radius: 17px;
+        padding: 18px 22px;
+        min-height: 152px;
         margin-bottom: 8px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -3906,22 +3906,22 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
     .portal-card-wealth:hover {{
         border-color: #34d399;
-        box-shadow: 0 12px 28px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+        box-shadow: 0 10px 24px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
         transform: translateY(-2px);
     }}
 
     .portal-chips-row {{
         display: flex;
         flex-wrap: wrap;
-        gap: 5px;
-        margin-top: 8px;
+        gap: 6px;
+        margin-top: 10px;
     }}
     .portal-chip {{
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.09);
         border-radius: 7px;
-        padding: 3px 8px;
-        font-size: 10px;
+        padding: 3px 9px;
+        font-size: 10.5px;
         font-weight: 600;
         color: #cbd5e1;
         font-family: 'JetBrains Mono', monospace;
@@ -3933,10 +3933,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
         border: 1px solid rgba(245, 158, 11, 0.9) !important;
         color: #ffffff !important;
         font-weight: 850 !important;
-        font-size: 13px !important;
-        letter-spacing: 0.7px !important;
-        border-radius: 11px !important;
-        padding: 10px 20px !important;
+        font-size: 13.5px !important;
+        letter-spacing: 0.8px !important;
+        border-radius: 12px !important;
+        padding: 11px 22px !important;
         box-shadow: 0 5px 16px rgba(245, 158, 11, 0.40) !important;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }}
@@ -3951,10 +3951,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
         border: 1px solid rgba(16, 185, 129, 0.9) !important;
         color: #ffffff !important;
         font-weight: 850 !important;
-        font-size: 13px !important;
-        letter-spacing: 0.7px !important;
-        border-radius: 11px !important;
-        padding: 10px 20px !important;
+        font-size: 13.5px !important;
+        letter-spacing: 0.8px !important;
+        border-radius: 12px !important;
+        padding: 11px 22px !important;
         box-shadow: 0 5px 16px rgba(16, 185, 129, 0.40) !important;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }}
@@ -4016,10 +4016,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
         <div class="portal-card-risk">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <span style="font-size: 16.5px; font-weight: 800; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
-                    <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 10px; font-weight: 800; padding: 2.5px 8px; border-radius: 6px;">11 MODULI QUANT</span>
+                    <span style="font-size: 17.5px; font-weight: 800; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
+                    <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 6px;">11 MODULI QUANT</span>
                 </div>
-                <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
+                <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 8px;">
                     Piattaforma quantitativa per analisi del rischio di portafoglio, backtesting Kupiec, stress testing MSCI Barra, frontiera efficiente e BQuant Launchpad.
                 </div>
             </div>
@@ -4043,10 +4043,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
         <div class="portal-card-wealth">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <span style="font-size: 16.5px; font-weight: 800; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
-                    <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 10px; font-weight: 800; padding: 2.5px 8px; border-radius: 6px;">10 MODULI WEALTH</span>
+                    <span style="font-size: 17.5px; font-weight: 800; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
+                    <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 6px;">10 MODULI WEALTH</span>
                 </div>
-                <div style="font-size: 12px; color: #cbd5e1; line-height: 1.5; margin-bottom: 8px;">
+                <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 8px;">
                     Consolidamento patrimoniale olistico, budget 50/30/20, caveau orologi, previdenza, fiscalità Quadro RW, mutui &amp; immobili, successione e AI Copilot.
                 </div>
             </div>
