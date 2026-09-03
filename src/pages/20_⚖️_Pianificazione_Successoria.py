@@ -275,41 +275,93 @@ with tab_taxes:
         st.warning(f"⚠️ **Imposta di Successione Dovuta**: Imposta totale calcolata pari a **€ {estate['total_succession_tax']:,.2f}**.")
 
 with tab_shield:
-    st.markdown("### 🛡️ Asset Protection & Strumenti Giuridici di Tutela")
-    st.caption("Strumenti civilistici e fiscali per la protezione patrimoniale, l'ottimizzazione del passaggio generazionale e l'esenzione successoria.")
-    
-    st.markdown(f"""
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; margin-top: 10px;">
-        <!-- Card 1 -->
-        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(52, 211, 153, 0.25); border-left: 4px solid #34d399; border-radius: 12px; padding: 18px 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column;">
-            <h5 style="color:#34d399; margin:0 0 10px 0; font-size: 14.5px; font-weight: 750;">1. Polizze Vita Caso Morte (Art. 1923 c.c.)</h5>
-            <p style="color:#cbd5e1; font-size:13px; margin:0; line-height:1.6; flex: 1;">
-                I capitali liquidati a fronte di polizze vita caso morte <b>non rientrano nell'asse ereditario</b>, sono <b>esenti da imposta di successione</b> e risultano <b>impignorabili e insequestrabili</b> (art. 1923 c.c.), consentendo la tutela di beneficiari specifici.
-            </p>
+    st.markdown("### 🛡️ Asset Protection, Trust & Holding Familiare Simulator")
+    st.caption("Analisi quantitativa e giuridica per la segregazione dei rischi patrimoniali, la protezione dai creditori e la pianificazione tramite Trust o Società Semplice (S.s.).")
+
+    from core.wealth.asset_protection_engine import AssetProtectionEngine
+
+    summary_prot_dict = {
+        "total_net_worth": float(estate["tot_patrimonio_netto"]),
+        "real_estate_total": float(estate.get("real_estate_total", 0.0)),
+        "financial_investments": float(estate.get("financial_investments", 0.0)),
+        "physical_assets": float(estate.get("physical_assets", 0.0))
+    }
+
+    prot_res = AssetProtectionEngine.evaluate_protection_matrix(summary_prot_dict)
+
+    pk1, pk2, pk3, pk4 = st.columns(4)
+    with pk1:
+        metric_card("Fondo Patrimoniale (167 c.c.)", "Score 65 / 100", delta="Protezione Media", delta_color="normal")
+    with pk2:
+        metric_card("Holding Società Semplice", "Score 85 / 100", delta=f"PEX Risparmio: € {prot_res['estimated_annual_pex_savings']:,.0f}/y", delta_color="normal")
+    with pk3:
+        metric_card("Trust Familiare (Aja 1985)", "Score 92 / 100", delta="Segregazione Totale", delta_color="normal")
+    with pk4:
+        metric_card("Scudo Revocatoria", "5 Anni (2901 c.c.)", delta="Consolidamento Giuridico", delta_color="normal")
+
+    st.write("")
+    st.markdown("##### 🏛️ Confronto Strutturale dei Veicoli di Protezione")
+    st.dataframe(
+        prot_res["comparison_df"],
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.write("")
+    c_veh1, c_veh2, c_veh3 = st.columns(3)
+    with c_veh1:
+        fp_item = prot_res["fondo_patrimoniale"]
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(56, 189, 248, 0.25); border-left: 4px solid #38bdf8; border-radius: 12px; padding: 16px; min-height: 280px;">
+            <b style="color:#38bdf8; font-size:14px;">{fp_item.vehicle_name}</b><br>
+            <span style="font-size:11px; color:#8b949e;">{fp_item.legal_basis}</span>
+            <div style="margin: 8px 0; font-size:12px; color:#cbd5e1;">
+                <b>Livello Tutela:</b> {fp_item.creditor_shield_level}<br>
+                <b>Costi Costituzione:</b> {fp_item.setup_cost_range_eur}<br>
+                <b>Costi Annui:</b> {fp_item.annual_maintenance_eur}
+            </div>
+            <div style="font-size:11.5px; color:#94a3b8;">
+                <b>Vantaggio Chiave:</b> {fp_item.key_advantages[0]}<br>
+                <b>Vulnerabilità:</b> <span style="color:#f87171;">{fp_item.critical_vulnerabilities[0]}</span>
+            </div>
         </div>
-        <!-- Card 2 -->
-        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(56, 189, 248, 0.25); border-left: 4px solid #38bdf8; border-radius: 12px; padding: 18px 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column;">
-            <h5 style="color:#38bdf8; margin:0 0 10px 0; font-size: 14.5px; font-weight: 750;">2. Fondi Pensione Integrativi (Art. 12 TUS)</h5>
-            <p style="color:#cbd5e1; font-size:13px; margin:0; line-height:1.6; flex: 1;">
-                La posizione previdenziale integrativa maturata (attualmente: <b>€ {estate['exempt_pension']:,.2f}</b>) è <b>completamente esente dall'imposta di successione</b> e viene riscossa direttamente dai beneficiari designati senza passare per l'asse ereditario.
-            </p>
+        """, unsafe_allow_html=True)
+
+    with c_veh2:
+        ss_item = prot_res["societa_semplice"]
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(52, 211, 153, 0.25); border-left: 4px solid #34d399; border-radius: 12px; padding: 16px; min-height: 280px;">
+            <b style="color:#34d399; font-size:14px;">{ss_item.vehicle_name}</b><br>
+            <span style="font-size:11px; color:#8b949e;">{ss_item.legal_basis}</span>
+            <div style="margin: 8px 0; font-size:12px; color:#cbd5e1;">
+                <b>Livello Tutela:</b> {ss_item.creditor_shield_level}<br>
+                <b>Costi Costituzione:</b> {ss_item.setup_cost_range_eur}<br>
+                <b>Costi Annui:</b> {ss_item.annual_maintenance_eur}
+            </div>
+            <div style="font-size:11.5px; color:#94a3b8;">
+                <b>Vantaggio Chiave:</b> {ss_item.key_advantages[1]}<br>
+                <b>Vulnerabilità:</b> <span style="color:#f87171;">{ss_item.critical_vulnerabilities[0]}</span>
+            </div>
         </div>
-        <!-- Card 3 -->
-        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(251, 191, 36, 0.25); border-left: 4px solid #fbbf24; border-radius: 12px; padding: 18px 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column;">
-            <h5 style="color:#fbbf24; margin:0 0 10px 0; font-size: 14.5px; font-weight: 750;">3. Titoli di Stato Italiani ed Esteri White List</h5>
-            <p style="color:#cbd5e1; font-size:13px; margin:0; line-height:1.6; flex: 1;">
-                I BTP, BOT, CCT e i titoli pubblici emessi da Stati membri dell'UE sono <b>esclusi dalla base imponibile successoria</b> (art. 12 D.Lgs. 346/1990).
-            </p>
+        """, unsafe_allow_html=True)
+
+    with c_veh3:
+        tr_item = prot_res["trust"]
+        st.markdown(f"""
+        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(167, 139, 250, 0.25); border-left: 4px solid #a78bfa; border-radius: 12px; padding: 16px; min-height: 280px;">
+            <b style="color:#a78bfa; font-size:14px;">{tr_item.vehicle_name}</b><br>
+            <span style="font-size:11px; color:#8b949e;">{tr_item.legal_basis}</span>
+            <div style="margin: 8px 0; font-size:12px; color:#cbd5e1;">
+                <b>Livello Tutela:</b> {tr_item.creditor_shield_level}<br>
+                <b>Costi Costituzione:</b> {tr_item.setup_cost_range_eur}<br>
+                <b>Costi Annui:</b> {tr_item.annual_maintenance_eur}
+            </div>
+            <div style="font-size:11.5px; color:#94a3b8;">
+                <b>Vantaggio Chiave:</b> {tr_item.key_advantages[0]}<br>
+                <b>Vulnerabilità:</b> <span style="color:#f87171;">{tr_item.critical_vulnerabilities[0]}</span>
+            </div>
         </div>
-        <!-- Card 4 -->
-        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.9) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(167, 139, 250, 0.25); border-left: 4px solid #a78bfa; border-radius: 12px; padding: 18px 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column;">
-            <h5 style="color:#a78bfa; margin:0 0 10px 0; font-size: 14.5px; font-weight: 750;">4. Patto di Famiglia &amp; Trust (Art. 768-bis c.c.)</h5>
-            <p style="color:#cbd5e1; font-size:13px; margin:0; line-height:1.6; flex: 1;">
-                Per il passaggio generazionale di partecipazioni societarie o aziende, il Patto di Famiglia permette di trasferire quote aziendali a uno o più discendenti bloccando future azioni di riduzione per lesione di legittima.
-            </p>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
 with tab_patto:
     st.markdown("### 🏛️ Family Governance & Patti di Famiglia (Art. 768-bis c.c.)")
