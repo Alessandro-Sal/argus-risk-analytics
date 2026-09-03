@@ -281,10 +281,10 @@ with tab_shield:
     from core.wealth.asset_protection_engine import AssetProtectionEngine
 
     summary_prot_dict = {
-        "total_net_worth": float(estate["tot_patrimonio_netto"]),
-        "real_estate_total": float(estate.get("real_estate_total", 0.0)),
-        "financial_investments": float(estate.get("financial_investments", 0.0)),
-        "physical_assets": float(estate.get("physical_assets", 0.0))
+        "total_net_worth": float(getattr(nw, "total_net_worth", estate.get("total_wealth", 1000000.0))),
+        "real_estate_total": float(getattr(nw, "real_estate_total", 0.0)),
+        "financial_investments": float(getattr(nw, "financial_investments", 0.0)),
+        "physical_assets": float(getattr(nw, "physical_assets", 0.0))
     }
 
     prot_res = AssetProtectionEngine.evaluate_protection_matrix(summary_prot_dict)
@@ -367,10 +367,11 @@ with tab_patto:
     st.markdown("### 🏛️ Family Governance & Patti di Famiglia (Art. 768-bis c.c.)")
     st.caption("Pianificazione del passaggio del controllo aziendale e societario, calcolo della compensazione liquidatoria per i legittimari non assegnatari e scudo contro future azioni di riduzione.")
 
+    biz_val_calc = float(getattr(nw, "total_net_worth", estate.get("total_wealth", 2000000.0)))
     gov_data = compute_family_governance_and_patti_di_famiglia(
         engine,
         portfolio_id=current_pid,
-        business_value_eur=float(estate["tot_patrimonio_netto"] if estate["tot_patrimonio_netto"] > 100000 else 2000000.0),
+        business_value_eur=biz_val_calc if biz_val_calc > 100000 else 2000000.0,
         heir_count=num_children,
         has_spouse=has_spouse
     )
