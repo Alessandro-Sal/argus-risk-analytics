@@ -1198,7 +1198,7 @@ def get_display_portfolio_name():
 
 
 def render_command_bar():
-    """Renderizza la barra di stato e comando ARGUS v6.0.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
+    """Renderizza la barra di stato e comando ARGUS v6.3.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
     try:
         from core.workspace_manager import sync_url_state
         sync_url_state()
@@ -3977,7 +3977,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
         </div>
         
         <div class="splash-badge-ribbon">
-            <span class="splash-pill">🟢 <b>v6.0.0</b> Institutional</span>
+            <span class="splash-pill">🟢 <b>v6.3.0</b> Institutional</span>
             <span class="splash-pill">⚡ <b>21 Moduli</b> Quant &amp; Wealth</span>
             <span class="splash-pill">🔒 <b>Zero-Cloud Leak</b> Crittografia Locale</span>
             <span class="splash-pill">🗄️ <b>MySQL &amp; DuckDB</b> Dual-Engine</span>
@@ -4742,7 +4742,7 @@ def ensure_wealth_bundle_loaded(engine, default_profile_name: str = "Marco Rossi
 
 
 def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suffix: str = "w"):
-    """Renderizza la command bar istituzionale ARGUS Wealth v6.0.0 in cima a ciascuna pagina Wealth."""
+    """Renderizza la command bar istituzionale ARGUS Wealth v6.3.0 in cima a ciascuna pagina Wealth."""
     base_curr = st.session_state.get("base_currency", "EUR")
     w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
     w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30.0))

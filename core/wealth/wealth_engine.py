@@ -1518,7 +1518,7 @@ def generate_executive_tear_sheet_html(engine, portfolio_id: int = 1) -> str:
         </table>
 
         <div class="footer">
-            Documento Istituzionale generato da ARGUS Financial Ecosystem &amp; Wealth Analytics v6.0.0.<br>
+            Documento Istituzionale generato da ARGUS Financial Ecosystem &amp; Wealth Analytics v6.3.0.<br>
             Tutti i dati sono elaborati localmente con crittografia end-to-end e zero-cloud transmission.
         </div>
     </body>

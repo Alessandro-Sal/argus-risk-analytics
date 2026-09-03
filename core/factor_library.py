@@ -71,7 +71,7 @@ def _download_and_parse_zip_csv(url: str, header_keyword: str) -> pd.DataFrame:
     """Scarica un archivio ZIP ed estrae il dataset CSV Kenneth French filtrando header e footer descrittivi."""
     req = urllib.request.Request(
         url,
-        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ARGUS/6.0.0"}
+        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ARGUS/6.3.0"}
     )
     with urllib.request.urlopen(req, timeout=10) as response:
         zip_bytes = response.read()
