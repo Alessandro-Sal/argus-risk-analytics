@@ -245,7 +245,7 @@ def fit_nelson_siegel_curve(
         }
 
     if tau_grid is None:
-        tau_grid = np.linspace(0.2, 5.0, 50)
+        tau_grid = np.linspace(0.05, 8.0, 120)
 
     best_r2 = -np.inf
     best_params = {}
