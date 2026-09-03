@@ -2605,6 +2605,166 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
         "why_useful": "Rilevare cluster di anomalie di mercato prima che si trasformino in perdite permanenti di capitale.",
         "argus_calc": "Pipeline integrata in scikit-learn con parametro di contaminazione del 5% su tutta la cronologia disponibile.",
         "how_to_read": "• 🔴 ANOMALIA (Punteggio negativo marcato, dinamica anomala)<br>• 🟢 Normale (Fluttuazione coerente con la serie storica)."
+    },
+    "wealth_health_score": {
+        "title": "🛡️ Wealth Health Score (Indice di Salute Patrimoniale)",
+        "what_is": "Punteggio sintetico multidimensionale da 0 a 100 che valuta la solidità, solvibilità, diversificazione, cuscinetto di liquidità e sostenibilità del debito dell'intero patrimonio.",
+        "how_calc": "<b>Score</b> = 40% Cuscinetto di Liquidità (Runway) + 25% Diversificazione Asset Class + 20% Copertura Previdenziale + 15% Sostenibilità Debito (Debt-to-Asset)",
+        "why_useful": "Fornire al Family Office o al singolo investitore un indicatore sintetico immediato per diagnosticare vulnerabilità strutturali prima che impattino il patrimonio netto.",
+        "argus_calc": "Valutato in tempo reale aggregando i saldi bancari, le categorie patrimoniali attive, i mesi di autonomia, il rapporto LTV dei mutui e le proiezioni pensionistiche.",
+        "how_to_read": "• 🟢 80 - 100 (Salute patrimoniale eccellente, resiliente a shock e ben protetta)<br>• 🟡 60 - 79 (Salute buona con margini di ottimizzazione su liquidità o previdenza)<br>• 🔴 < 60 (Criticità strutturale: eccesso di debito, bassa liquidità o concentrazione elevata)."
+    },
+    "net_worth": {
+        "title": "🏛️ Patrimonio Netto Consolidato (Consolidated Net Worth)",
+        "what_is": "Il valore economico totale di tutte le attività possedute (finanziarie, cassa, immobiliari, caveau/fisiche e previdenziali) al netto di tutte le passività e debiti residui.",
+        "how_calc": "<b>Net Worth</b> = Totale Attività &minus; Totale Passività = (Cassa + Investimenti + Caveau + Immobili + Previdenza) &minus; (Mutui + Prestiti + Carte)",
+        "why_useful": "Rappresenta la metrica cardine della ricchezza personale o familiare, riflettendo la reale solvibilità economica al di là del reddito transitorio.",
+        "argus_calc": "Consolidamento multi-conto continuo in valuta base (EUR) con conversione tassi di cambio BCE live, rivalutazione asset caveau e ammortamento mutui residui.",
+        "how_to_read": "• 🟢 Trend crescente costante (Accumulazione solida e rendimento positivo)<br>• 🟡 Stabile (Fase di transizione o ribilanciamento)<br>• 🔴 Trend decrescente prolungato (Overspending o drawdown degli asset)."
+    },
+    "liquid_assets": {
+        "title": "💧 Liquidità & Fondo di Emergenza (Liquid Assets & Cash Buffer)",
+        "what_is": "Il capitale prontamente disponibile in contanti, depositi a vista, conti correnti o strumenti monetari a rischio zero convertibili in cash entro 24 ore.",
+        "how_calc": "<b>Liquidità</b> = &sum; Saldi Conti Correnti + Conti Deposito Svincolabili + Strumenti Monetari Liquidi (XEON/CNAV)",
+        "why_useful": "Assorbire spese impreviste (spese mediche, guasti, interruzioni di reddito) evitando di dover liquidare forzatamente investimenti azionari durante cali di mercato.",
+        "argus_calc": "Aggregazione istantanea di tutti i conti bancari attivi e fondi monetari liquidi del profilo patrimoniale.",
+        "how_to_read": "• 🟢 3 - 6 mesi di spese mensili (Fondo di sicurezza ottimale)<br>• 🟡 1 - 3 mesi (Liquidità minima, rischio in caso di shock)<br>• 🔴 > 12 mesi o < 1 mese (Eccesso di cassa improduttiva / Drag da inflazione o illiquidità critica)."
+    },
+    "financial_investments": {
+        "title": "📈 Investimenti Finanziari (Financial Assets Portfolio)",
+        "what_is": "Il controvalore di mercato di tutti gli strumenti finanziari quotati e non quotati (Azioni, ETF, Obbligazioni, Fondi, Crypto, Derivati).",
+        "how_calc": "<b>Investimenti</b> = &sum; (Quantità<sub>i</sub> &times; Prezzo di Mercato<sub>i</sub> &times; FX<sub>i</sub>)",
+        "why_useful": "Generare crescita del capitale a lungo termine, rendite da dividendi/cedole e proteggere il potere d'acquisto dall'inflazione.",
+        "argus_calc": "Sincronizzazione in tempo reale con il Quantitative Risk Engine per calcolare VaR, Sharpe, frontiera efficiente e collegamenti multi-conto.",
+        "how_to_read": "• 🟢 Allocazione allineata con l'orizzonte temporale e il profilo di rischio<br>• 🟡 Necessità di ribilanciamento periodico<br>• 🔴 Concentrazione eccessiva su singolo titolo/emittente (>15%)."
+    },
+    "physical_assets": {
+        "title": "⌚ Caveau & Asset Fisici di Pregio (Luxury & Physical Assets)",
+        "what_is": "Beni tangibili da collezione o investimento (orologi di lusso Rolex/Patek/AP, oro fisico/bullion, gioielli, metalli preziosi, opere d'arte).",
+        "how_calc": "<b>Valore Caveau</b> = &sum; (Prezzo di Acquisto o Fair Market Value da perizia/Chrono24 + Apprezzamento Storico)",
+        "why_useful": "Diversificazione non correlata ai mercati finanziari, riserva di valore tangibile in scenari di crisi sistemica e protezione patrimoniale intergenerazionale.",
+        "argus_calc": "Tracciamento matriciale per singolo pezzo (seriale, anno, condizioni, corredo B&P, quotazione di mercato stimata, plusvalenza latente).",
+        "how_to_read": "• 🟢 5% - 15% del Net Worth (Quota equilibrata per asset tangibili)<br>• 🟡 15% - 25% (Esposizione significativa)<br>• 🔴 > 25% (Illiquidità elevata e costi di custodia/assicurazione gravosi)."
+    },
+    "real_estate_equity": {
+        "title": "🏡 Immobili & Net Equity Immobiliare (Real Estate Net Equity)",
+        "what_is": "Il valore netto del patrimonio immobiliare detenuto (residenziale, commerciale, a reddito), al netto dei mutui e finanziamenti ipotecari gravanti.",
+        "how_calc": "<b>Net Equity Immobiliare</b> = Valore di Mercato Immobili &minus; Debito Ipotecario Residuo (Mutui)",
+        "why_useful": "Misurare la reale ricchezza immobiliare non vincolata a debiti bancari e stimare i flussi di cassa da canoni di locazione (Cap Rate).",
+        "argus_calc": "Calcolo automatico del piano di ammortamento mutui (francese/italiano) e rivalutazione catastale/commerciale degli immobili registrati.",
+        "how_to_read": "• 🟢 LTV < 50% (Patrimonio immobiliare solido e poco indebitato)<br>• 🟡 LTV 50% - 75% (Leva moderata standard per mutui prima casa)<br>• 🔴 LTV > 80% (Elevata vulnerabilità a rialzo tassi o calo prezzi immobiliari)."
+    },
+    "pension_total": {
+        "title": "🛡️ Previdenza & Fondi Pensione (Pension & Retirement Planning)",
+        "what_is": "Il montante accumulato nei pilastri di previdenza complementare (Fondi Pensione Negoziali, Aperti, PIP, TFR pregresso accantonato).",
+        "how_calc": "<b>Previdenza</b> = &sum; Posizioni Fondi Pensione (Quote &times; NAV) + Contributi Deducibili Annui &minus; Ritenute",
+        "why_useful": "Garantire un adeguato tasso di sostituzione del reddito al pensionamento e beneficiare della deducibilità fiscale fino a € 5.164,57 annui (TUIR Art. 10).",
+        "argus_calc": "Simulazione Monte Carlo stocastica (1,000 traiettorie) integrata con inflazione ISTAT, coefficienti di trasformazione INPS e rendimento netto linee d'investimento.",
+        "how_to_read": "• 🟢 Tasso di sostituzione stimato > 75% (Pensionamento sereno)<br>• 🟡 60% - 75% (Copertura discreta con piccolo gap da colmare)<br>• 🔴 < 60% (Forte gap previdenziale: incrementare i versamenti annui)."
+    },
+    "total_liabilities": {
+        "title": "📉 Passività & Debiti Totali (Total Liabilities)",
+        "what_is": "L'ammontare complessivo delle obbligazioni e dei debiti finanziari in essere (mutui ipotecari, prestiti personali, finanziamenti auto, leasing, carte di credito revolving).",
+        "how_calc": "<b>Passività</b> = Debito Residuo Mutui + Capitale Residuo Finanziamenti + Saldo Passivo Carte",
+        "why_useful": "Monitorare il grado di indebitamento per evitare situazioni di stress finanziario e ottimizzare il costo medio del debito.",
+        "argus_calc": "Tracciamento continuo delle rate mensili, separazione quota capitale/interessi e calcolo DSTI (Debt Service to Income ratio).",
+        "how_to_read": "• 🟢 DSTI < 25% del reddito mensile (Debito pienamente sostenibile)<br>• 🟡 25% - 35% (Soglia bancaria ordinaria)<br>• 🔴 > 35% (Sovraindebitamento a rischio insolvenza)."
+    },
+    "savings_rate": {
+        "title": "💰 Tasso di Risparmio (Savings Rate)",
+        "what_is": "La quota percentuale del reddito netto mensile che viene risparmiata o investita dopo aver coperto tutte le spese correnti.",
+        "how_calc": "<b>Savings Rate</b> = [ (Entrate Nette &minus; Uscite Totali) / Entrate Nette ] &times; 100",
+        "why_useful": "È il principale motore di accumulazione patrimoniale: un alto tasso di risparmio riduce drasticamente gli anni necessari a raggiungere l'indipendenza finanziaria (FIRE).",
+        "argus_calc": "Estratto automaticamente dall'analisi del Cash Flow con esclusione dei giroconti e trasferimenti interni tra conti propri.",
+        "how_to_read": "• 🟢 > 25% (Accumulazione rapida e disciplina eccellente)<br>• 🟡 15% - 25% (Risparmio sano coerente con la regola 50/30/20)<br>• 🔴 < 10% (Capacità di accumulo fragile, vulnerabile a imprevisti)."
+    },
+    "runway_months": {
+        "title": "⏳ Runway di Emergenza (Mesi di Autonomia Finanziaria)",
+        "what_is": "Il numero di mesi durante i quali è possibile sostenere il tenore di vita attuale a reddito zero, attingendo unicamente alla liquidità disponibile.",
+        "how_calc": "<b>Runway</b> = Liquidità Disponibile / Media Spese Fisse & Necessarie Mensili",
+        "why_useful": "Fornire tranquillità psicologica e protezione assoluta contro shock lavorativi, interruzioni di reddito o crisi temporanee.",
+        "argus_calc": "Rapporto tra la cassa disponibile e il burn rate mensile medio calcolato sulle ultime 6 mensilità di cashflow.",
+        "how_to_read": "• 🟢 > 6 mesi (Elevata serenità e indipendenza di breve termine)<br>• 🟡 3 - 6 mesi (Autonomia standard adeguata)<br>• 🔴 < 3 mesi (Pericolo di liquidità: ricostituire prioritariamente il fondo cassa)."
+    },
+    "debt_to_asset": {
+        "title": "⚖️ Rapporto Debito / Patrimonio (Debt-to-Asset Ratio)",
+        "what_is": "Misura del grado di leva finanziaria del patrimonio personale: la percentuale del totale attività finanziata tramite debito.",
+        "how_calc": "<b>Debt-to-Asset</b> = (Totale Passività / Totale Attività Lorde) &times; 100",
+        "why_useful": "Valutare la vulnerabilità del patrimonio a shock economici e definire la capacità di indebitamento residua.",
+        "argus_calc": "Confronto matriciale tra totale passività (mutui/prestiti) e totale attivo lordo consolidato.",
+        "how_to_read": "• 🟢 < 20% (Struttura patrimoniale molto solida e conservativa)<br>• 🟡 20% - 40% (Leva fisiologica per acquisto prima casa)<br>• 🔴 > 50% (Elevata dipendenza dal debito, rischio tassi)."
+    },
+    "budget_50_30_20": {
+        "title": "📊 Regola di Budgeting 50 / 30 / 20 (Needs, Wants, Savings)",
+        "what_is": "Modello di gestione delle finanze personali che suddivide le entrate in 50% Necessità (Needs), 30% Desideri (Wants) e 20% Risparmi/Investimenti (Savings).",
+        "how_calc": "<b>Needs:</b> Spese fisse, affitto/mutuo, bollette, cibo &le; 50%<br><b>Wants:</b> Svago, viaggi, ristoranti &le; 30%<br><b>Savings:</b> Investimenti, PAC, fondi pensione &ge; 20%",
+        "why_useful": "Mantenere un perfetto equilibrio tra qualità della vita presente e costruzione della sicurezza finanziaria futura.",
+        "argus_calc": "Classificazione automatica tramite NLP semantico di tutte le transazioni bancarie categorizzate in Needs, Wants o Savings.",
+        "how_to_read": "• 🟢 Needs &le; 50%, Wants &le; 30%, Savings &ge; 20% (Budget ottimale)<br>• 🟡 Needs 50%-60% (Budget tirato ma gestibile)<br>• 🔴 Needs > 60% o Savings < 10% (Struttura di spesa rigida a rischio insolvenza)."
+    },
+    "ivafe_quadro_rw": {
+        "title": "📑 IVAFE & Quadro RW (Monitoraggio Fiscale Attività Estere)",
+        "what_is": "Obbligo dichiarativo e tributario italiano per attività finanziarie detenute all'estero o wallet crypto (Imposta sul Valore delle Attività Finanziarie all'Estero).",
+        "how_calc": "<b>IVAFE Conti:</b> Imposta fissa € 34,20 se giacenza media > € 5.000<br><b>IVAFE Prodotti Finanziari:</b> 0.20% (o 0.40% Paesi Blacklist) sul valore al 31/12<br><b>Cripto-attività:</b> 0.20% annuo sul valore complessivo",
+        "why_useful": "Evitare pesanti sanzioni dell'Agenzia delle Entrate per omessa compilazione del Quadro RW (dal 3% al 15% del non dichiarato).",
+        "argus_calc": "Modulo Fiscale dedicato che calcola giacenze medie, controvalori al 31/12 e compila automaticamente il facsimile dei righi RW (Codici 1, 14, 21).",
+        "how_to_read": "• 🟢 Quadro RW allineato e IVAFE calcolata al centesimo<br>• 🟡 Saldi esteri vicini alle soglie di monitoraggio<br>• 🔴 Conti esteri non censiti o documentati."
+    },
+    "xirr_pe": {
+        "title": "💼 XIRR (Extended Internal Rate of Return - Private Equity & Illiquidi)",
+        "what_is": "Tasso interno di rendimento annualizzato calcolato su flussi di cassa irregolari nel tempo (Capital Calls, Distribuzioni e Valore Residuo NAV).",
+        "how_calc": "&sum;<sub>i=1</sub><sup>N</sup> [ C<sub>i</sub> / (1 + XIRR)<sup>(d<sub>i</sub> &minus; d<sub>0</sub>)/365</sup> ] = 0",
+        "why_useful": "Misurare la redditività reale di investimenti illiquidi, Private Equity, Real Estate e fondi chiusi considerando l'esatto momento temporale di ogni apporto/ritiro.",
+        "argus_calc": "Risoluzione iterativa con metodo Newton-Raphson su tutti i flussi di cassa datati registrati per ciascun deal o fondo illiquido.",
+        "how_to_read": "• 🟢 XIRR > 15.0% (Rendimento eccellente in linea con benchmark Private Equity)<br>• 🟡 8.0% - 15.0% (Performance soddisfacente)<br>• 🔴 < 8.0% (Rendimento insufficiente per il premio al rischio di illiquidità)."
+    },
+    "moic_pe": {
+        "title": "💎 MOIC / TVPI (Multiple on Invested Capital / Total Value to Paid-In)",
+        "what_is": "Il multiplo del capitale investito: rapporto tra il valore totale generato dall'investimento (distribuzioni incassate + valore residuo) e il capitale effettivamente versato.",
+        "how_calc": "<b>MOIC (TVPI)</b> = (Distribuzioni Cumulative + NAV Residuo) / Capitale Totale Versato (Capital Calls)",
+        "why_useful": "Indicare quanti euro sono stati generati in termini assoluti per ogni singolo euro investito nel deal.",
+        "argus_calc": "Aggregazione istantanea di tutti i flussi di Private Equity, venture capital e collezionismo dal modulo Asset Illiquidi.",
+        "how_to_read": "• 🟢 MOIC > 2.0x (Raddoppio del capitale investito)<br>• 🟡 1.3x - 2.0x (Crescita solida del capitale)<br>• 🔴 < 1.0x (Capitale in perdita rispetto al versato)."
+    },
+    "fire_number": {
+        "title": "🔥 FIRE Number & Indipendenza Finanziaria (Financial Independence Retire Early)",
+        "what_is": "Il patrimonio complessivo necessario per vivere indefinitamente di rendita passiva senza più bisogno di reddito da lavoro dipendente o autonomo.",
+        "how_calc": "<b>FIRE Target</b> = Spese Annue Desiderate / SWR = Spese Annue &times; 25 (con SWR = 4%)",
+        "why_useful": "Fissare un obiettivo patrimoniale chiaro e calcolare l'esatta data stimata di libertà finanziaria (Freedom Date) in base al tasso di risparmio e rendimento atteso.",
+        "argus_calc": "Motore attuariale Monte Carlo che simula inflazione, longevità e sequenza dei rendimenti per stimare la probabilità di successo FIRE a 30-50 anni.",
+        "how_to_read": "• 🟢 Patrimonio Netto &ge; 100% del FIRE Target (Indipendenza finanziaria raggiunta!)<br>• 🟡 50% - 99% (Fase avanzata di accumulazione)<br>• 🔴 < 50% (Fase iniziale: massimizzare tasso di risparmio e rendimento composto)."
+    },
+    "swr_fire": {
+        "title": "🛡️ Safe Withdrawal Rate (Tasso di Prelievo Sicuro / Trinity Study)",
+        "what_is": "La percentuale massima di patrimonio che può essere prelevata ogni anno (adeguata all'inflazione) senza rischiare di esaurire il capitale prima del termine della vita.",
+        "how_calc": "<b>Prelievo Anno 1</b> = Patrimonio &times; SWR (es. 3.5% - 4.0%)<br><b>Anni Successivi:</b> Prelievo Anno Prec. &times; (1 + Inflazione)",
+        "why_useful": "Pianificare la fase di decumulo del capitale durante la pensione o il prepensionamento evitando il rischio di longevità.",
+        "argus_calc": "Stress test stocastico sul Sequence of Returns Risk (SRR) per calibrare lo SWR ideale in base all'allocazione azionaria/obbligazionaria.",
+        "how_to_read": "• 🟢 3.0% - 3.5% (Ultra-conservativo e sicuro per orizzonti > 35 anni)<br>• 🟡 3.5% - 4.0% (Standard Trinity Study per 30 anni)<br>• 🔴 > 4.5% (Elevato rischio di esaurimento del capitale in scenari di crisi iniziale)."
+    },
+    "tco_fee_drag": {
+        "title": "💸 TCO & Fee Drag (Costo Totale di Possesso e Drag Commissionale)",
+        "what_is": "L'impatto economico complessivo delle commissioni (TER fondi, costi di gestione, performance fees, costi di custodia) sull'accumulazione patrimoniale a 20-30 anni.",
+        "how_calc": "<b>Capitale Perso per Fee Drag</b> = V<sub>finale</sub>(senza costi) &minus; V<sub>finale</sub>(con costi TCO)",
+        "why_useful": "Evidenziare come una commissione apparentemente piccola (es. 2.0% annuo di fondi attivi) possa erodere oltre il 40% del capitale finale rispetto a ETF low-cost (0.15%).",
+        "argus_calc": "Simulatore Monte Carlo TCO che calcola l'impatto composto netto e la differenza di rendimento finale per ciascuna linea d'investimento.",
+        "how_to_read": "• 🟢 TCO < 0.30% annuo (Ottima efficienza con ETF passivi)<br>• 🟡 0.30% - 1.00% (Accettabile per strategie bilanciate)<br>• 🔴 > 1.50% annuo (Fee drag distruttivo: convertire verso strumenti efficienti)."
+    },
+    "estate_planning": {
+        "title": "⚖️ Estate Planning & Ottimizzazione Successoria (Passaggio Generazionale)",
+        "what_is": "Analisi della devoluzione del patrimonio ereditario in base al diritto civile italiano (quote di legittima e disponibile) e calcolo delle imposte di successione/donazione.",
+        "how_calc": "<b>Imposta Successione (Coniuge/Figli)</b> = max(0, Asse Ereditario &minus; Franchigia € 1.000.000) &times; 4%<br><b>Imposta Donazione Fratelli:</b> max(0, Asse &minus; Franchigia € 100.000) &times; 6%",
+        "why_useful": "Pianificare il passaggio generazionale, tutelare gli eredi legittimari ed evitare liti familiari o un carico fiscale punitivo.",
+        "argus_calc": "Algoritmo di simulazione asse ereditario con verifica quote di riserva, applicazione franchigie di legge ed esenzione per Titoli di Stato e Polizze Vita Caso Morte.",
+        "how_to_read": "• 🟢 Asse ereditario capiente entro le franchigie (Zero imposte dovute)<br>• 🟡 Imposta successoria contenuta con strumenti esenti attivi<br>• 🔴 Lesione potenziale di legittima o carico fiscale elevato da ottimizzare."
+    },
+    "cvar_95": {
+        "title": "🛡️ Conditional Value at Risk (CVaR 95% / Expected Shortfall)",
+        "what_is": "La perdita media attesa nei casi estremi in cui la perdita supera la soglia critica del Value at Risk (misura coerente di rischio di coda).",
+        "how_calc": "<b>CVaR<sub>95%</sub></b> = E[ R | R &le; &minus;VaR<sub>95%</sub> ]",
+        "why_useful": "Catturare la gravità effettiva dei crolli di mercato nelle code della distribuzione, superando i limiti del VaR ordinario.",
+        "argus_calc": "Media ponderata delle perdite storiche o simulate che ricadono nel 5% peggiore della distribuzione dei rendimenti.",
+        "how_to_read": "• 🟢 < 2.50% (Code sottili, basso rischio di crash sistemico)<br>• 🟡 2.50% - 4.50% (Rischio di coda nella norma)<br>• 🔴 > 4.50% (Code grasse e grave vulnerabilità a cigni neri)."
     }
 }
 
@@ -2625,14 +2785,128 @@ def resolve_metric_knowledge(label: str, help_text: str = None) -> str:
     import re
     cleaned_label = re.sub(r'[^a-zA-Z0-9]', '', label).lower()
     
-    # Mappatura chiavi
+    # Mappatura chiavi completa (Quant + Wealth + Tax + Estate)
     alias_map = {
+        # Wealth Health & Net Worth
+        "healthscore": "wealth_health_score",
+        "wealthhealth": "wealth_health_score",
+        "salutepatrimoniale": "wealth_health_score",
+        "scoresalute": "wealth_health_score",
+        "health": "wealth_health_score",
+        "networth": "net_worth",
+        "patrimonionetto": "net_worth",
+        "patrimonioconsolidato": "net_worth",
+        "totalwealth": "net_worth",
+        "patrimonio": "net_worth",
+        # Liquidità & Cassa
+        "liquidita": "liquid_assets",
+        "cassa": "liquid_assets",
+        "liquidassets": "liquid_assets",
+        "emergencyfund": "liquid_assets",
+        "cuscinetto": "liquid_assets",
+        "fondocassa": "liquid_assets",
+        "cash": "liquid_assets",
+        # Investimenti Finanziari
+        "investimentifinanziari": "financial_investments",
+        "investimenti": "financial_investments",
+        "financialinvestments": "financial_investments",
+        "portafogliotitoli": "financial_investments",
+        "financialassets": "financial_investments",
+        # Caveau & Orologi
+        "assetfisici": "physical_assets",
+        "caveau": "physical_assets",
+        "physicalassets": "physical_assets",
+        "orologi": "physical_assets",
+        "luxurywatches": "physical_assets",
+        "oro": "physical_assets",
+        "metalli": "physical_assets",
+        "gold": "physical_assets",
+        # Immobili & Real Estate
+        "immobili": "real_estate_equity",
+        "realestate": "real_estate_equity",
+        "netequityimmobiliare": "real_estate_equity",
+        "immobiliaritotale": "real_estate_equity",
+        "valoreimmobili": "real_estate_equity",
+        "equityimmobiliare": "real_estate_equity",
+        # Previdenza & Pensione
+        "previdenza": "pension_total",
+        "pension": "pension_total",
+        "fondopensione": "pension_total",
+        "previdenzaintegrativa": "pension_total",
+        "tfr": "pension_total",
+        "pensionamento": "pension_total",
+        # Passività & Debiti
+        "passivita": "total_liabilities",
+        "liabilities": "total_liabilities",
+        "debiti": "total_liabilities",
+        "mutui": "total_liabilities",
+        "finanziamenti": "total_liabilities",
+        "debitoresiduo": "total_liabilities",
+        "debt": "total_liabilities",
+        # Risparmio & Runway
+        "savingsrate": "savings_rate",
+        "tassorisparmio": "savings_rate",
+        "risparmiomensile": "savings_rate",
+        "capacitadirisparmio": "savings_rate",
+        "risparmio": "savings_rate",
+        "runway": "runway_months",
+        "runwaymonths": "runway_months",
+        "mesidiautonomia": "runway_months",
+        "autonomiafinanziaria": "runway_months",
+        "autonomia": "runway_months",
+        # Ratios Patrimoniali
+        "debttoasset": "debt_to_asset",
+        "rapportodebitopatrimonio": "debt_to_asset",
+        "leveragepatrimoniale": "debt_to_asset",
+        "rapportoindebitamento": "debt_to_asset",
+        "leva": "debt_to_asset",
+        "503020": "budget_50_30_20",
+        "regola503020": "budget_50_30_20",
+        "budget503020": "budget_50_30_20",
+        "needswantssavings": "budget_50_30_20",
+        # Fisco & Quadro RW
+        "ivafe": "ivafe_quadro_rw",
+        "quadrorw": "ivafe_quadro_rw",
+        "quadrow": "ivafe_quadro_rw",
+        "monitoraggiofiscale": "ivafe_quadro_rw",
+        "criptotasse": "ivafe_quadro_rw",
+        "tuir": "tuir_67",
+        "minusvalenze": "tuir_67",
+        "fiscale": "tuir_67",
+        "zainetto": "tuir_67",
+        # Private Equity & Illiquidi
+        "xirr": "xirr_pe",
+        "irr": "xirr_pe",
+        "tassointernodirendimento": "xirr_pe",
+        "moic": "moic_pe",
+        "multipleoninvestedcapital": "moic_pe",
+        "tvpi": "moic_pe",
+        # FIRE & Decumulo
+        "fire": "fire_number",
+        "firenumber": "fire_number",
+        "firetarget": "fire_number",
+        "indipendenzafinanziaria": "fire_number",
+        "swr": "swr_fire",
+        "safewithdrawalrate": "swr_fire",
+        "regola4percento": "swr_fire",
+        # Costi & Successione
+        "tco": "tco_fee_drag",
+        "feedrag": "tco_fee_drag",
+        "ter": "tco_fee_drag",
+        "successione": "estate_planning",
+        "estateplanning": "estate_planning",
+        "franchigiasuccessoria": "estate_planning",
+        "eredita": "estate_planning",
+        "impostasuccessione": "estate_planning",
+        # Quant & Risk Metrics
         "rendimento": "rendimento_atteso",
         "cagr": "rendimento_atteso",
         "expectedreturn": "rendimento_atteso",
         "volatilita": "volatilita_annua",
         "volatility": "volatilita_annua",
         "deviazionestandard": "volatilita_annua",
+        "cvar": "cvar_95",
+        "expectedshortfall": "cvar_95",
         "var": "var_95",
         "valueatrisk": "var_95",
         "sharpe": "sharpe_ratio",
@@ -2657,9 +2931,6 @@ def resolve_metric_knowledge(label: str, help_text: str = None) -> str:
         "tracking": "tracking_error",
         "omega": "omega_ratio",
         "ulcer": "ulcer_index",
-        "tuir": "tuir_67",
-        "minusvalenze": "tuir_67",
-        "fiscale": "tuir_67",
         "anomalie": "isolation_forest",
         "isolation": "isolation_forest"
     }
@@ -2692,7 +2963,19 @@ def resolve_metric_knowledge(label: str, help_text: str = None) -> str:
                 how_to_read=d["how_to_read"]
             )
             
-    fallback_desc = help_text.strip() if help_text else f"Indicatore di performance e controllo quantitativo per {label}."
+    fallback_desc = help_text.strip() if help_text else f"Indicatore di monitoraggio e controllo quantitativo per {label}."
+    is_wealth_domain = any(w in cleaned_label for w in ["wealth", "patrimon", "cassa", "spes", "immob", "orolog", "pens", "debit", "cont", "bilanc"])
+    
+    if is_wealth_domain:
+        return format_institutional_5point_html(
+            title=f"🏛️ {label}",
+            what_is=fallback_desc,
+            how_calc="Calcolato attraverso l'aggregazione certificata dei conti, transazioni e valutazioni patrimoniali attive.",
+            why_useful="Fornire trasparenza, controllo analitico e solidità decisionale nella gestione olistica del patrimonio.",
+            argus_calc="Elaborazione continua del Wealth Engine con conversione tassi di cambio live e rivalutazione multi-asset.",
+            how_to_read="• 🟢 Valore ottimale allineato con gli obiettivi strategici del profilo<br>• 🟡 Fascia di oscillazione standard<br>• 🔴 Soglia di attenzione o squilibrio da monitorare."
+        )
+
     return format_institutional_5point_html(
         title=f"📊 {label}",
         what_is=fallback_desc,
