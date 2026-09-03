@@ -652,32 +652,31 @@ with tab_goals:
     )
     st.plotly_chart(fig_fan, use_container_width=True, config={'displayModeBar': False})
 
-    # Glide Path Curve
+    # Glide Path Curve & Dynamic Allocation Schedule
     st.write("")
-    st.markdown("#### 📉 Dynamic Glide Path (Curva di De-risking Sigmoidea)")
-    st.caption("Ripartizione automatica consigliata tra Azioni, Obbligazioni, Liquidità e Beni Rifugio per la protezione del capitale accumulato.")
+    st.markdown("#### 📉 Dynamic Glide Path 3D (Curva di De-risking & Allocazione Temporale)")
+    st.caption("Ripartizione automatica progressiva tra Azioni, Obbligazioni e Liquidità/XEON all'avvicinarsi della data dell'evento per garantire probabilità di successo ≥ 85%.")
 
-    gp_res = compute_dynamic_glide_path(years_to_target=sim_years_val, total_horizon_years=sim_years_val, risk_profile=sim_risk_profile)
-    df_gp = gp_res["glide_path_timeline"]
+    from core.wealth.glidepath_engine import DynamicGlidePathEngine, LifeGoal
 
-    fig_gp = go.Figure()
-    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["equity_pct"], mode="lines", stackgroup="one", name="Azionario / Equity %", line=dict(color="#6366f1")))
-    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["bonds_pct"], mode="lines", stackgroup="one", name="Obbligazionario / Bonds %", line=dict(color="#38bdf8")))
-    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["cash_pct"], mode="lines", stackgroup="one", name="Liquidità / Cash %", line=dict(color="#10b981")))
-    fig_gp.add_trace(go.Scatter(x=df_gp["year"], y=df_gp["alts_pct"], mode="lines", stackgroup="one", name="Beni Rifugio / Oro %", line=dict(color="#f59e0b")))
-
-    fig_gp.update_layout(
-        xaxis_title="Anno di Accumulo",
-        yaxis_title="Allocazione (%)",
-        yaxis=dict(range=[0, 100]),
-        height=280,
-        margin=dict(t=15, l=15, r=15, b=20),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
-        legend=dict(orientation="h", yanchor="top", y=-0.22, xanchor="center", x=0.5)
+    goal_obj = LifeGoal(
+        goal_id="g_sim",
+        name="Traguardo Selezionato",
+        target_amount=sim_target_val,
+        horizon_years=int(sim_years_val),
+        initial_capital=sim_curr_val,
+        monthly_contribution=sim_pac_val
     )
-    st.plotly_chart(fig_gp, use_container_width=True, config={'displayModeBar': False})
+    gp_engine_out = DynamicGlidePathEngine.compute_goal_glide_path(goal_obj)
+
+    st.plotly_chart(gp_engine_out["plot_figure"], use_container_width=True, config={'displayModeBar': False})
+
+    with st.expander("📊 Tabella di Asset Allocation Glide Path Anno per Anno", expanded=False):
+        st.dataframe(
+            gp_engine_out["glide_path_df"],
+            use_container_width=True,
+            hide_index=True
+        )
 
 
 # ============================================================

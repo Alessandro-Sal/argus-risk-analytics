@@ -372,51 +372,101 @@ with tab_review:
 
 
 with tab_chat:
-    st.markdown("### 💬 Assistente Finanziario & Domande Rapide")
-    st.caption("Fai domande istantanee sui tuoi dati reali memorizzati nel database.")
+    st.markdown("### 🧠 Neural Wealth Advisor & Conversational Action Memo")
+    st.caption("Consulente patrimoniale neurale connesso in tempo reale ai tuoi dati di bilancio. Esegue simulazioni 'What-If' istantanee e redige Action Memo esecutivi.")
 
-    quick_q = st.selectbox(
-        "💡 Domande Frequenti Preimpostate:",
-        options=[
-            "Seleziona una domanda rapida...",
-            "Qual è il mio tasso di risparmio e rispetto la regola 50/30/20?",
-            "Quanto capitale posso investire subito senza rischiare la riserva?",
-            "Qual è la mia esposizione a mercati volatili (Azioni + Crypto)?",
-            "Quanto tempo potrei vivere senza stipendio con la mia liquidità attuale?"
-        ]
+    from core.wealth.neural_advisor_engine import NeuralWealthAdvisor
+
+    summary_ai_dict = {
+        "total_net_worth": float(nw.total_net_worth),
+        "liquid_cash": float(nw.liquid_cash),
+        "financial_investments": float(nw.financial_investments),
+        "real_estate_total": float(nw.real_estate_total),
+        "real_estate_equity": float(nw.real_estate_equity),
+        "physical_assets": float(nw.physical_assets),
+        "pension_total": float(nw.pension_total),
+        "total_liabilities": float(nw.total_liabilities),
+        "wealth_health_score": float(ai_diag["health_score"]),
+        "runway_months": float(nw.runway_months)
+    }
+
+    # Query Chips
+    col_chip1, col_chip2, col_chip3, col_chip4 = st.columns(4)
+    with col_chip1:
+        if st.button("⚖️ Ottimizza Zainetto Fiscale", use_container_width=True, key="chip_tax"):
+            st.session_state["neural_advisor_query_input"] = "ottimizza zainetto fiscale e minusvalenze"
+    with col_chip2:
+        if st.button("🏡 Simula Acquisto Immobile", use_container_width=True, key="chip_re"):
+            st.session_state["neural_advisor_query_input"] = "simula acquisto immobile con mutuo 80%"
+    with col_chip3:
+        if st.button("⌚ Estinzione Debito con Caveau", use_container_width=True, key="chip_phys"):
+            st.session_state["neural_advisor_query_input"] = "liquidazione orologi caveau per estinzione debito"
+    with col_chip4:
+        if st.button("🔥 Roadmap Verso il FIRE", use_container_width=True, key="chip_fire"):
+            st.session_state["neural_advisor_query_input"] = "pianifica indipendenza finanziaria e rendita FIRE"
+
+    user_query = st.text_input(
+        "💬 Chiedi al Neural Advisor o scrivi una simulazione personalizzata:",
+        value=st.session_state.get("neural_advisor_query_input", "Qual è lo stato di salute e la resilienza del mio patrimonio?"),
+        key="neural_advisor_text_box",
+        placeholder="es. Cosa succede se spendo 50.000€ per comprare casa? Oppure: come azzero le minusvalenze?"
     )
 
-    if quick_q == "Qual è il mio tasso di risparmio e rispetto la regola 50/30/20?":
+    if user_query:
+        sim_res = NeuralWealthAdvisor.evaluate_scenario_query(user_query, summary_ai_dict)
+
         st.markdown(f"""
-        <div style="background:rgba(15,23,42,0.8); border-left:4px solid #38bdf8; padding:14px 18px; border-radius:8px;">
-            <b>Analisi 50/30/20:</b><br>
-            Il tuo attuale tasso di risparmio è pari al <b>{nw.savings_rate_pct:.1f}%</b>. La regola raccomanda almeno il 20% destinato a risparmi e investimenti. Con questo ritmo di accumulazione, il tuo patrimonio è in una traiettoria di crescita solida.
+        <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-left: 4px solid #10b981; border-radius: 12px; padding: 16px 20px; margin: 15px 0;">
+            <div style="font-size: 15px; font-weight: 800; color: #34d399; margin-bottom: 4px;">
+                🎯 {sim_res['title']}
+            </div>
+            <div style="font-size: 13px; color: #e2e8f0; line-height: 1.6;">
+                {sim_res['summary_text']}
+            </div>
         </div>
         """, unsafe_allow_html=True)
-    elif quick_q == "Quanto capitale posso investire subito senza rischiare la riserva?":
-        safe_cash = nw.monthly_burn_rate * 6.0
-        investable = max(0.0, nw.liquid_cash - safe_cash)
-        st.markdown(f"""
-        <div style="background:rgba(15,23,42,0.8); border-left:4px solid #34d399; padding:14px 18px; border-radius:8px;">
-            <b>Capitale Investibile in Sicurezza:</b><br>
-            La tua riserva minima di sicurezza a 6 mesi ammonta a <b>€ {safe_cash:,.2f}</b>. Avendo una liquidità totale di <b>€ {nw.liquid_cash:,.2f}</b>, puoi investire immediatamente fino a <b>€ {investable:,.2f}</b> senza intaccare il cuscinetto di emergenza.
-        </div>
-        """, unsafe_allow_html=True)
-    elif quick_q == "Qual è la mia esposizione a mercati volatili (Azioni + Crypto)?":
-        vol_pct = (nw.financial_investments / (nw.total_net_worth or 1)) * 100.0
-        st.markdown(f"""
-        <div style="background:rgba(15,23,42,0.8); border-left:4px solid #fbbf24; padding:14px 18px; border-radius:8px;">
-            <b>Esposizione Volatilità:</b><br>
-            I tuoi investimenti finanziari ammontano a <b>€ {nw.financial_investments:,.2f}</b>, rappresentando il <b>{vol_pct:.1f}%</b> del tuo patrimonio netto complessivo.
-        </div>
-        """, unsafe_allow_html=True)
-    elif quick_q == "Quanto tempo potrei vivere senza stipendio con la mia liquidità attuale?":
-        st.markdown(f"""
-        <div style="background:rgba(15,23,42,0.8); border-left:4px solid #a78bfa; padding:14px 18px; border-radius:8px;">
-            <b>Autonomia Finanziaria (Runway):</b><br>
-            Con la liquidità attuale nei conti correnti (€ {nw.liquid_cash:,.2f}) e un tasso di spesa mensile di € {nw.monthly_burn_rate:,.2f}, puoi coprire esattamente <b>{nw.runway_months:.1f} mesi</b> di spese a entrate zero.
-        </div>
-        """, unsafe_allow_html=True)
+
+        # KPI Proiettati
+        qk1, qk2, qk3 = st.columns(3)
+        with qk1:
+            delta_nw = sim_res["projected_nw"] - sim_res["pre_shock_nw"]
+            metric_card("Net Worth Proiettato", fmt_eur(sim_res["projected_nw"]), delta=f"Delta: {fmt_eur(delta_nw)}", delta_color="normal" if delta_nw >= 0 else "inverse")
+        with qk2:
+            delta_run = sim_res["projected_runway"] - float(nw.runway_months)
+            metric_card("Runway Proiettato", f"{sim_res['projected_runway']:.1f} Mesi", delta=f"Pre: {nw.runway_months:.1f} Mesi", delta_color="normal" if sim_res["projected_runway"] >= 6.0 else "inverse")
+        with qk3:
+            delta_h = sim_res["projected_health"] - float(ai_diag["health_score"])
+            metric_card("Health Score Proiettato", f"{sim_res['projected_health']:.0f} / 100", delta=f"Pre: {ai_diag['health_score']:.0f}/100", delta_color="normal" if delta_h >= 0 else "inverse")
+
+        st.markdown("##### 📌 Metriche & Parametri di Scenario")
+        col_m1, col_m2 = st.columns(2)
+        m_items = list(sim_res["key_metrics"].items())
+        mid_pt = (len(m_items) + 1) // 2
+        with col_m1:
+            for k, v in m_items[:mid_pt]:
+                st.markdown(f"- **{k}:** `{v}`")
+        with col_m2:
+            for k, v in m_items[mid_pt:]:
+                st.markdown(f"- **{k}:** `{v}`")
+
+        st.markdown("##### 📋 Piano d'Azione Consigliato (Sequence of Execution)")
+        for act in sim_res["action_plan"]:
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #38bdf8; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 12.5px; color: #cbd5e1;">
+                {act}
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.divider()
+        memo_content = NeuralWealthAdvisor.generate_executive_action_memo(summary_ai_dict, [sim_res], prof_name=prof_title)
+        st.download_button(
+            label="📥 Scarica Executive Action Memo (.MD)",
+            data=memo_content,
+            file_name=f"ARGUS_Action_Memo_{prof_title.replace(' ','_')}_{datetime.now().strftime('%Y%m%d')}.md",
+            mime="text/markdown",
+            use_container_width=True,
+            type="primary"
+        )
 
 with tab_voice:
     st.markdown("### 🎙️ AI Voice Executive Briefing & Wealth Audio Podcast")

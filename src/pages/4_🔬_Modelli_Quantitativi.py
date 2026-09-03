@@ -193,6 +193,13 @@ QUANT_MODELS_CATALOG = {
         "badge_color": "#f43f5e",
         "category": "Machine Learning",
         "desc": "Classificazione non supervisionata a 3 stati latenti (Bull, Range-Bound, Crisis), matrice di transizione di stato e raccomandazioni tattiche anticicliche."
+    },
+    "⚖️ Tax-Aware Rebalancer & Execution": {
+        "title": "Ribilanciatore Tax-Aware, Matrice di Attrito & Zero-Tax PAC",
+        "badge": "Friction Matrix • Trade Execution • Zero-Tax PAC",
+        "badge_color": "#34d399",
+        "category": "Esecuzione & Fiscale",
+        "desc": "Calcolo della Trade Execution List esatta con frizione reale (commissioni fisse/percentuali, bid-ask spread, imposte capital gain 26%/12.5% e compensazione minusvalenze) oppure ribilanciamento a impatto fiscale zero tramite flussi di cassa/PAC."
     }
 }
 
@@ -4371,5 +4378,129 @@ elif active_quant_tab == "⚡ Machine Learning HMM Regimes":
             hmm_res["transition_matrix_pct_df"],
             use_container_width=True
         )
+
+
+# ── TAB 9: TAX-AWARE REBALANCER & EXECUTION ──────────────────
+elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
+    section("⚖️ Ribilanciatore Tax-Aware, Matrice di Attrito & Zero-Tax PAC")
+    st.caption("Ottimizzazione dell'esecuzione degli ordini con frizioni reali (commissioni broker, bid-ask spread, imposte capital gain 26%/12.5% e compensazione minusvalenze) oppure ribilanciamento asintotico a zero imposte tramite nuovi versamenti.")
+
+    from core.tax_aware_rebalancer import TaxAwarePortfolioRebalancer, FrictionConfig
+
+    # Recupera posizioni attuali
+    if has_portfolio and opt and opt.get("tickers"):
+        cur_tks = opt["tickers"]
+        cur_v = float(opt.get("portfolio_val", 100000.0))
+        cur_weights_list = opt.get("weights", [1.0 / len(cur_tks)] * len(cur_tks))
+        df_cur_pos = pd.DataFrame({
+            "ticker": cur_tks,
+            "market_value": [cur_v * w for w in cur_weights_list]
+        })
+    else:
+        cur_tks = ["SWDA.MI", "EIMI.MI", "XEON.DE", "BTP-10Y", "GLD"]
+        cur_v = 150000.0
+        df_cur_pos = pd.DataFrame([
+            {"ticker": "SWDA.MI", "market_value": 90000.0},
+            {"ticker": "EIMI.MI", "market_value": 15000.0},
+            {"ticker": "XEON.DE", "market_value": 30000.0},
+            {"ticker": "BTP-10Y", "market_value": 10000.0},
+            {"ticker": "GLD", "market_value": 5000.0}
+        ])
+
+    col_reb_cfg1, col_reb_cfg2, col_reb_cfg3 = st.columns(3)
+    with col_reb_cfg1:
+        f_comm = st.number_input("Commissione Fissa Broker (€)", min_value=0.0, value=2.95, step=0.5, key="f_comm_in")
+        pct_comm = st.number_input("Commissione Variabile (%)", min_value=0.0, value=0.19, step=0.01, key="pct_comm_in") / 100.0
+    with col_reb_cfg2:
+        spread_bps = st.number_input("Bid-Ask Spread Medio (bps)", min_value=0, value=10, step=2, key="spread_bps_in") / 10000.0
+        minus_val = st.number_input("Minusvalenze Pregresse (€)", min_value=0.0, value=1500.0, step=250.0, key="minus_val_in")
+    with col_reb_cfg3:
+        pac_val = st.number_input("Versamento Mensile PAC (€)", min_value=100.0, value=1200.0, step=100.0, key="pac_val_in")
+        target_preset = st.selectbox("Preset Allocazione Target:", ["Bilanciato 60/40 Equity/Bond", "Aggressive Growth 80/20", "Ray Dalio All-Weather", "Equal Weight 1/N"], key="reb_preset_sel")
+
+    # Target weights map
+    if target_preset == "Aggressive Growth 80/20":
+        target_w_map = {"SWDA.MI": 0.65, "EIMI.MI": 0.15, "XEON.DE": 0.05, "BTP-10Y": 0.10, "GLD": 0.05}
+    elif target_preset == "Ray Dalio All-Weather":
+        target_w_map = {"SWDA.MI": 0.30, "EIMI.MI": 0.00, "XEON.DE": 0.15, "BTP-10Y": 0.40, "GLD": 0.15}
+    elif target_preset == "Equal Weight 1/N":
+        n_t = len(df_cur_pos["ticker"].tolist())
+        target_w_map = {t: 1.0 / n_t for t in df_cur_pos["ticker"].tolist()}
+    else:  # Bilanciato 60/40
+        target_w_map = {"SWDA.MI": 0.50, "EIMI.MI": 0.10, "XEON.DE": 0.10, "BTP-10Y": 0.25, "GLD": 0.05}
+
+    f_config = FrictionConfig(
+        fixed_commission_eur=f_comm,
+        pct_commission=pct_comm,
+        bid_ask_spread_pct=spread_bps,
+        capital_gain_tax_rate=0.26,
+        gov_bond_tax_rate=0.125
+    )
+
+    full_reb = TaxAwarePortfolioRebalancer.compute_full_rebalance_plan(
+        df_cur_pos, target_w_map, cur_v, existing_minusvalenze=minus_val, config=f_config
+    )
+    zero_tax_reb = TaxAwarePortfolioRebalancer.compute_zero_tax_cashflow_rebalance(
+        df_cur_pos, target_w_map, cur_v, monthly_inflow_eur=pac_val
+    )
+
+    st.write("")
+    tab_full_reb, tab_zero_tax = st.tabs([
+        "⚡ 1. Full Rebalance Immediato (Trade Execution List)",
+        "🌱 2. Cashflow Rebalance a Impatto Fiscale Zero (PAC)"
+    ])
+
+    with tab_full_reb:
+        rk1, rk2, rk3, rk4 = st.columns(4)
+        with rk1:
+            metric_card("Turnover Lordo", fmt_eur(full_reb["gross_turnover_eur"]), delta=f"{full_reb['gross_turnover_pct']:.1f}% del Portafoglio", delta_color="normal")
+        with rk2:
+            metric_card("Commissioni Totali", fmt_eur(full_reb["total_commissions_eur"]), delta=f"Spread: {fmt_eur(full_reb['total_spread_cost_eur'])}", delta_color="normal")
+        with rk3:
+            metric_card("Imposta Capital Gain", fmt_eur(full_reb["estimated_tax_eur"]), delta=f"Minus residue: {fmt_eur(full_reb['remaining_minusvalenze_eur'])}", delta_color="normal" if full_reb["estimated_tax_eur"] == 0 else "inverse")
+        with rk4:
+            metric_card("Costo Frizione Totale", fmt_eur(full_reb["total_friction_drag_eur"]), delta="Impatto su Performance", delta_color="inverse")
+
+        st.write("")
+        st.markdown("##### 📋 Trade Execution List (Distinta Ordini Pronta per il Broker)")
+        df_exec = full_reb["trade_execution_list_df"]
+        if not df_exec.empty:
+            st.dataframe(
+                df_exec,
+                use_container_width=True,
+                hide_index=True
+            )
+            col_d_csv, _ = st.columns([1.5, 3.5])
+            with col_d_csv:
+                st.download_button(
+                    label="📥 Esporta Distinta Ordini CSV",
+                    data=df_exec.to_csv(index=False).encode('utf-8'),
+                    file_name=f"trade_execution_list_{datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    type="primary"
+                )
+        else:
+            st.success("✅ Portafoglio già perfettamente allineato ai pesi target!")
+
+    with tab_zero_tax:
+        zk1, zk2, zk3, zk4 = st.columns(4)
+        with zk1:
+            metric_card("Tempo Stimato di Allineamento", f"~{zero_tax_reb['months_to_full_alignment']} Mesi", delta="Con PAC di " + fmt_eur(pac_val) + "/m", delta_color="normal")
+        with zk2:
+            metric_card("Tasse Evitate (Capital Gain)", fmt_eur(zero_tax_reb["tax_saved_eur"]), delta="Zero Ritenute Subite", delta_color="normal")
+        with zk3:
+            metric_card("Risparmio Commissioni Vendita", fmt_eur(zero_tax_reb["turnover_savings_eur"]), delta="Zero Turnover Vendita", delta_color="normal")
+        with zk4:
+            metric_card("Efficienza Fiscale", "100.0%", delta="Tax-Free Rebalance", delta_color="normal")
+
+        st.write("")
+        st.markdown("##### 🎯 Piano di Allocazione Mensile PAC (Zero Vendite)")
+        st.dataframe(
+            zero_tax_reb["cashflow_plan_df"],
+            use_container_width=True,
+            hide_index=True
+        )
+
 
 
