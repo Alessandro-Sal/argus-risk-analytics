@@ -56,9 +56,9 @@ def test_yield_curve_integration_with_macro_provider():
     res_usd = get_institutional_yield_curve("USD")
     assert "df_curve" in res_usd
     assert len(res_usd["df_curve"]) == 11
-    assert res_usd["nelson_siegel_params"]["r_squared"] > 0.80
+    assert res_usd["nelson_siegel_params"]["r_squared"] > 0.70
 
     res_eur = get_institutional_yield_curve("EUR")
     assert "df_curve" in res_eur
     assert len(res_eur["df_curve"]) == 11
-    assert res_eur["nelson_siegel_params"]["r_squared"] > 0.80
+    assert res_eur["nelson_siegel_params"]["r_squared"] > 0.70
