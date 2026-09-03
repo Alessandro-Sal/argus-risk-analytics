@@ -377,17 +377,21 @@ with tab_chat:
 
     from core.wealth.neural_advisor_engine import NeuralWealthAdvisor
 
+    re_tot_val = float(getattr(nw, "real_estate_total", 0.0))
+    liab_tot_val = float(getattr(nw, "total_liabilities", 0.0))
+    re_eq_val = max(0.0, re_tot_val - liab_tot_val)
+
     summary_ai_dict = {
-        "total_net_worth": float(nw.total_net_worth),
-        "liquid_cash": float(nw.liquid_cash),
-        "financial_investments": float(nw.financial_investments),
-        "real_estate_total": float(nw.real_estate_total),
-        "real_estate_equity": float(nw.real_estate_equity),
-        "physical_assets": float(nw.physical_assets),
-        "pension_total": float(nw.pension_total),
-        "total_liabilities": float(nw.total_liabilities),
-        "wealth_health_score": float(ai_diag["health_score"]),
-        "runway_months": float(nw.runway_months)
+        "total_net_worth": float(getattr(nw, "total_net_worth", 0.0)),
+        "liquid_cash": float(getattr(nw, "liquid_cash", 0.0)),
+        "financial_investments": float(getattr(nw, "financial_investments", 0.0)),
+        "real_estate_total": re_tot_val,
+        "real_estate_equity": re_eq_val,
+        "physical_assets": float(getattr(nw, "physical_assets", 0.0)),
+        "pension_total": float(getattr(nw, "pension_total", 0.0)),
+        "total_liabilities": liab_tot_val,
+        "wealth_health_score": float(ai_diag.get("health_score", 85.0)),
+        "runway_months": float(getattr(nw, "runway_months", 6.0))
     }
 
     # Query Chips

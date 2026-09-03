@@ -133,6 +133,10 @@ class NetWorthSummary:
     wealth_health_score: float = 0.0
     as_of_date: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d"))
 
+    @property
+    def real_estate_equity(self) -> float:
+        return max(0.0, self.real_estate_total - self.total_liabilities)
+
 
 
 class GoalCategory(str, Enum):
