@@ -201,8 +201,26 @@ prof_title = prof_map.get(current_pid, "Personale")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p13")
 render_wealth_executive_badges(nw)
 
+# ── SMART FINANCIAL WATCHDOG SENTINEL ────────────────────────
+from core.wealth.wealth_watchdog import WealthWatchdog, render_wealth_watchdog_banner
+summary_watchdog_dict = {
+    "total_net_worth": tot_nw,
+    "liquid_cash": liq_cash,
+    "financial_investments": fin_inv,
+    "physical_assets": phys_assets,
+    "real_estate_total": re_val,
+    "real_estate_equity": re_val - liab_val,
+    "pension_total": pens_val,
+    "total_liabilities": liab_val,
+    "wealth_health_score": health_sc,
+    "runway_months": runway_m,
+    "savings_rate_pct": sav_rate
+}
+watchdog_alerts = WealthWatchdog.evaluate_all_alerts(summary_watchdog_dict)
+render_wealth_watchdog_banner(watchdog_alerts)
+
 if not is_snapshot_mode and len(prof_map) > 1:
-    head_c1, head_c2 = st.columns([3.8, 1.2])
+    head_c1, head_c2, head_c3 = st.columns([3.2, 1.0, 1.0])
     with head_c1:
         st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
         st.caption(f"Consolidamento olistico del patrimonio netto • Aggiornato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
@@ -218,13 +236,133 @@ if not is_snapshot_mode and len(prof_map) > 1:
         if sel_pid != current_pid:
             st.session_state["wealth_active_portfolio_id"] = sel_pid
             st.rerun()
+    with head_c3:
+        st.write("")
+        boardroom_mode = st.toggle("🏛️ Boardroom", value=st.session_state.get("wealth_boardroom_mode", False), key="wealth_boardroom_toggle", help="Attiva la modalità presentazione esecutiva per CDA e riunioni di famiglia.")
+        st.session_state["wealth_boardroom_mode"] = boardroom_mode
 else:
-    st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
-    st.caption(f"Consolidamento olistico del patrimonio netto • Aggiornato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    head_c1, head_c2 = st.columns([4.0, 1.2])
+    with head_c1:
+        st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
+        st.caption(f"Consolidamento olistico del patrimonio netto • Aggiornato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    with head_c2:
+        st.write("")
+        boardroom_mode = st.toggle("🏛️ Boardroom Mode", value=st.session_state.get("wealth_boardroom_mode", False), key="wealth_boardroom_toggle_single", help="Attiva la modalità presentazione esecutiva per CDA e riunioni di famiglia.")
+        st.session_state["wealth_boardroom_mode"] = boardroom_mode
 
+if st.session_state.get("wealth_boardroom_mode", False):
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(22,27,34,0.98) 100%); border: 1px solid rgba(255, 153, 0, 0.4); border-radius: 16px; padding: 24px 30px; margin: 15px 0 25px 0; box-shadow: 0 20px 50px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🏛️</span>
+                <div>
+                    <div style="font-size: 18px; font-weight: 800; color: #ff9900; letter-spacing: 1px;">ARGUS FAMILY OFFICE &bull; EXECUTIVE BOARDROOM</div>
+                    <div style="font-size: 12px; color: #8b949e;">Presentazione Istituzionale Consolidata &bull; Profilo: <b>{prof_title}</b> &bull; Data: <b>{datetime.now().strftime('%d/%m/%Y')}</b></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 20px;">
+                    🛡️ Health Score: {health_sc:.0f}/100
+                </div>
+            </div>
+        </div>
+        <div style="text-align: center; padding: 20px 0; border-top: 1px solid rgba(255,255,255,0.06); border-bottom: 1px solid rgba(255,255,255,0.06);">
+            <div style="font-size: 13px; font-weight: 600; color: #8b949e; letter-spacing: 1.5px; text-transform: uppercase;">Patrimonio Netto Consolidato Globale</div>
+            <div style="font-size: 46px; font-weight: 850; color: #f0f6fc; font-family: 'Outfit', sans-serif; letter-spacing: -0.5px; margin: 4px 0;">{fmt_eur(tot_nw)}</div>
+            <div style="font-size: 13px; color: #34d399; font-weight: 600;">💧 Runway Liquidità: <b>{runway_m:.1f} Mesi</b> &nbsp;|&nbsp; 💰 Tasso di Risparmio: <b>{sav_rate:.1f}%</b> &nbsp;|&nbsp; 📉 Debito/Attivo: <b>{(liab_val / max(1.0, tot_nw + liab_val) * 100):.1f}%</b></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
+    # 6 Monumental Bento Cards
+    bc1, bc2, bc3 = st.columns(3)
+    with bc1:
+        metric_card("💧 Liquidità & Depositi a Vista", fmt_eur(liq_cash), delta=f"{liq_cash/max(1.0, tot_nw)*100:.1f}% del Net Worth", delta_color="normal")
+    with bc2:
+        metric_card("📈 Investimenti Finanziari (Titoli/Crypto)", fmt_eur(fin_inv), delta=f"{fin_inv/max(1.0, tot_nw)*100:.1f}% del Net Worth", delta_color="normal")
+    with bc3:
+        metric_card("🏡 Net Equity Immobiliare", fmt_eur(re_val - liab_val), delta=f"Lordo: {fmt_eur(re_val)} | Debiti: {fmt_eur(liab_val)}", delta_color="normal")
 
+    st.write("")
+    bc4, bc5, bc6 = st.columns(3)
+    with bc4:
+        metric_card("⌚ Caveau, Orologi & Metalli", fmt_eur(phys_assets), delta=f"Orologi: {fmt_eur(watches_val)}", delta_color="normal")
+    with bc5:
+        metric_card("🛡️ Previdenza Complementare", fmt_eur(pens_val), delta="Fondi Pensione & PIP", delta_color="normal")
+    with bc6:
+        metric_card("📉 Passività & Mutui Residui", fmt_eur(liab_val), delta=f"DSTI Sostenibile", delta_color="inverse" if liab_val > 0 else "normal")
 
+    st.write("")
+    # Grafici Istituzionali Boardroom
+    col_bg1, col_bg2 = st.columns([1.2, 1.8])
+    with col_bg1:
+        st.markdown("##### 🌐 Allocazione Olistica del Patrimonio")
+        labels = ["Liquidità", "Investimenti", "Immobili", "Caveau", "Previdenza"]
+        values = [max(0.0, liq_cash), max(0.0, fin_inv), max(0.0, re_val - liab_val), max(0.0, phys_assets), max(0.0, pens_val)]
+        colors = ["#38bdf8", "#818cf8", "#10b981", "#fbbf24", "#a78bfa"]
+        fig_donut = go.Figure(data=[go.Pie(
+            labels=labels, values=values, hole=0.55,
+            marker=dict(colors=colors),
+            textinfo="label+percent",
+            hoverinfo="label+value+percent"
+        )])
+        fig_donut.update_layout(
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=320,
+            showlegend=False
+        )
+        st.plotly_chart(fig_donut, use_container_width=True)
+
+    with col_bg2:
+        st.markdown("##### 🏛️ Stato Patrimoniale & Solvibilità (Attivo vs Passivo)")
+        fig_bar = go.Figure()
+        fig_bar.add_trace(go.Bar(name="Attività Totali", x=["Patrimonio"], y=[tot_nw + liab_val], marker_color="#10b981", text=[fmt_eur(tot_nw + liab_val)], textposition="auto"))
+        fig_bar.add_trace(go.Bar(name="Debiti / Mutui", x=["Patrimonio"], y=[liab_val], marker_color="#ef4444", text=[fmt_eur(liab_val)], textposition="auto"))
+        fig_bar.add_trace(go.Bar(name="Patrimonio Netto", x=["Patrimonio"], y=[tot_nw], marker_color="#ff9900", text=[fmt_eur(tot_nw)], textposition="auto"))
+        fig_bar.update_layout(
+            barmode="group",
+            template="plotly_dark",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=10, r=10, t=10, b=10),
+            height=320,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+    # Toolbar Esportazione e Uscita Boardroom
+    st.divider()
+    col_b_act1, col_b_act2, col_b_act3 = st.columns([1.5, 1.5, 1.0])
+    with col_b_act1:
+        pitchbook_pdf = _get_cached_pitchbook_pdf(engine, current_pid)
+        date_slug = datetime.now().strftime('%Y%m%d')
+        st.download_button(
+            label="📥 Scarica Advisory Pitchbook PDF (300 DPI)",
+            data=pitchbook_pdf,
+            file_name=f"argus_boardroom_dossier_{date_slug}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary"
+        )
+    with col_b_act2:
+        tear_sheet_pdf = _get_cached_tear_sheet_pdf(engine, current_pid)
+        st.download_button(
+            label="📑 Scarica Executive Tear Sheet (PDF)",
+            data=tear_sheet_pdf,
+            file_name=f"argus_tear_sheet_{date_slug}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
+    with col_b_act3:
+        if st.button("❌ Esci da Boardroom Mode", use_container_width=True):
+            st.session_state["wealth_boardroom_mode"] = False
+            st.rerun()
+
+    st.stop()
 
 # ── TOP KPI ROW (DUE RIGHE X 3 COLONNE) ─────────────────────
 r1_c1, r1_c2, r1_c3 = st.columns(3)
@@ -248,12 +386,13 @@ with r2_c3:
 st.divider()
 
 # ── MACRO-TAB DEL PATRIMONIO PER MASSIMA EFFICIENZA & CHIAREZZA ───
-main_tab_alloc, main_tab_sheet, main_tab_temporal, main_tab_fo, main_tab_fx = st.tabs([
+main_tab_alloc, main_tab_sheet, main_tab_temporal, main_tab_fo, main_tab_fx, main_tab_stress = st.tabs([
     "🏛️ Bilancio & Allocazione",
     "📋 Stato Patrimoniale & Conti",
     "📊 Wealth Temporal Desk",
     "🏢 Family Office & Holding",
-    "💱 Rischio FX & Attribuzione Brinson"
+    "💱 Rischio FX & Attribuzione Brinson",
+    "🌪️ Global Wealth Stress-Testing"
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -1603,5 +1742,134 @@ with main_tab_fx:
         use_container_width=True,
         hide_index=True
     )
+
+
+# ══════════════════════════════════════════════════════════════
+# TAB 6: GLOBAL WEALTH STRESS-TESTING & RESILIENZA
+# ══════════════════════════════════════════════════════════════
+with main_tab_stress:
+    from core.wealth.wealth_stress_engine import (
+        PRESET_STRESS_SCENARIOS,
+        run_wealth_stress_test,
+        create_wealth_waterfall_chart,
+        simulate_wealth_recovery_trajectories
+    )
+
+    st.markdown("""
+    <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-left: 4px solid #ef4444; border-radius: 10px; padding: 14px 18px; margin-bottom: 15px;">
+        <div style="font-size: 14.5px; font-weight: 750; color: #f87171;">🌪️ Global Wealth Stress-Testing 3D &amp; Waterfall Breakdown</div>
+        <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Simula l'impatto di shock macroeconomici estremi e congiunti (crisi immobiliare, stagflazione, cigno nero, shock reddituale) su tutte le componenti del patrimonio.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    scen_keys = list(PRESET_STRESS_SCENARIOS.keys()) + ["CUSTOM"]
+    scen_labels = {k: PRESET_STRESS_SCENARIOS[k]["name"] for k in PRESET_STRESS_SCENARIOS}
+    scen_labels["CUSTOM"] = "⚙️ Scenario Personalizzato (Custom Shocks)"
+
+    col_sc_picker, col_sc_info = st.columns([1.5, 2.5])
+    with col_sc_picker:
+        sel_scen_key = st.selectbox(
+            "Seleziona Scenario di Stress:",
+            options=scen_keys,
+            format_func=lambda k: scen_labels[k],
+            key="nw_stress_scen_picker"
+        )
+
+    if sel_scen_key != "CUSTOM":
+        active_params = dict(PRESET_STRESS_SCENARIOS[sel_scen_key])
+        with col_sc_info:
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-top: 5px; font-size: 12px; color: #c9d1d9;">
+                <b>Dettagli Scenario:</b> {active_params['description']}<br>
+                <span style="color:#8b949e;">Durata prevista: <b>{active_params.get('duration_months', 12)} mesi</b> &bull; Shock Azioni: <b style="color:#ef4444;">{active_params['equity_shock_pct']:+.1f}%</b> &bull; Immobili: <b style="color:#ef4444;">{active_params['real_estate_shock_pct']:+.1f}%</b> &bull; Tassi: <b style="color:#fbbf24;">+{active_params['mortgage_rate_hike_bps']:.0f} bps</b></span>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        with col_sc_info:
+            st.markdown("""
+            <div style="background: rgba(255,153,0,0.06); border: 1px solid rgba(255,153,0,0.2); border-radius: 8px; padding: 10px 14px; margin-top: 5px; font-size: 12px; color: #ffb74d;">
+                <b>Configurazione Parametrica:</b> Calibra gli slider sottostanti per testare qualsiasi shock combinato.
+            </div>
+            """, unsafe_allow_html=True)
+
+        c_sl1, c_sl2, c_sl3, c_sl4 = st.columns(4)
+        with c_sl1:
+            eq_s = st.slider("📉 Shock Azionario (%):", -60.0, 20.0, -25.0, 5.0, key="sl_eq_s")
+            bnd_s = st.slider("📉 Shock Obbligazionario (%):", -30.0, 10.0, -10.0, 2.0, key="sl_bnd_s")
+        with c_sl2:
+            re_s = st.slider("🏡 Shock Immobili (%):", -40.0, 20.0, -15.0, 5.0, key="sl_re_s")
+            gold_s = st.slider("⌚ Oro / Caveau (%):", -30.0, 50.0, 10.0, 5.0, key="sl_gold_s")
+        with c_sl3:
+            pen_s = st.slider("🛡️ Shock Previdenza (%):", -50.0, 10.0, -15.0, 5.0, key="sl_pen_s")
+            rate_s = st.slider("📈 Rialzo Tassi Mutuo (bps):", 0, 500, 200, 25, key="sl_rate_s")
+        with c_sl4:
+            exp_s = st.slider("🛒 Aumento Spese Fisse (%):", 0.0, 30.0, 10.0, 2.0, key="sl_exp_s")
+            extra_c = st.number_input("⚡ Spesa Extra Cash (€):", 0.0, 100000.0, 10000.0, 5000.0, key="sl_extra_c")
+
+        active_params = {
+            "name": "Scenario Personalizzato",
+            "equity_shock_pct": eq_s,
+            "bonds_shock_pct": bnd_s,
+            "real_estate_shock_pct": re_s,
+            "physical_gold_shock_pct": gold_s,
+            "pension_shock_pct": pen_s,
+            "mortgage_rate_hike_bps": rate_s,
+            "living_expenses_hike_pct": exp_s,
+            "extra_expense_cash": extra_c,
+            "duration_months": 12
+        }
+
+    stress_summary_dict = {
+        "total_net_worth": tot_nw,
+        "liquid_cash": liq_cash,
+        "financial_investments": fin_inv,
+        "physical_assets": phys_assets,
+        "real_estate_total": re_val,
+        "real_estate_equity": re_val - liab_val,
+        "pension_total": pens_val,
+        "total_liabilities": liab_val,
+        "wealth_health_score": health_sc,
+        "monthly_expenses": max(500.0, liq_cash / max(0.1, runway_m))
+    }
+
+    stress_out = run_wealth_stress_test(stress_summary_dict, active_params)
+
+    # KPI Pre vs Post Stress
+    st.write("")
+    sk1, sk2, sk3, sk4 = st.columns(4)
+    with sk1:
+        metric_card(
+            "Net Worth Post-Shock",
+            fmt_eur(stress_out["post_shock"]["net_worth"]),
+            delta=f"{stress_out['deltas']['net_worth_pct']:+.1f}% ({fmt_eur(stress_out['deltas']['net_worth'])})",
+            delta_color="inverse"
+        )
+    with sk2:
+        metric_card(
+            "Cassa Residua Post-Stress",
+            fmt_eur(stress_out["post_shock"]["liquid_cash"]),
+            delta=f"Runway {stress_out['post_shock']['runway_months']:.1f} Mesi",
+            delta_color="normal" if stress_out["post_shock"]["runway_months"] >= 6 else "inverse"
+        )
+    with sk3:
+        metric_card(
+            "Investimenti Post-Shock",
+            fmt_eur(stress_out["post_shock"]["financial_investments"]),
+            delta=fmt_eur(stress_out["deltas"]["financial_investments"]),
+            delta_color="inverse"
+        )
+    with sk4:
+        metric_card(
+            "Health Score Stressato",
+            f"{stress_out['post_shock']['health_score']:.0f} / 100",
+            delta=f"Pre: {stress_out['pre_shock']['health_score']:.0f}/100",
+            delta_color="normal" if stress_out["post_shock"]["health_score"] >= 70 else "inverse"
+        )
+
+    st.write("")
+    st.plotly_chart(create_wealth_waterfall_chart(stress_out), use_container_width=True)
+
+    st.write("")
+    st.plotly_chart(simulate_wealth_recovery_trajectories(stress_out["post_shock"]["net_worth"]), use_container_width=True)
 
 

@@ -1267,6 +1267,106 @@ with tab_ledger:
     df_accs = get_wealth_accounts(engine)
     df_cats = get_wealth_categories(engine)
 
+    from core.wealth.universal_bank_parser import parse_bank_statement_file
+
+    with st.expander("⚡ Importazione Automatica Estratti Conto (Multi-Bank Zero-Config)", expanded=True):
+        st.markdown("""
+        <div style="font-size:12.5px; color:#8b949e; margin-bottom:10px;">
+            Trascina qui l'estratto conto o il file movimenti (<b>CSV, Excel, TSV</b>) di qualsiasi banca o broker (<i>Intesa Sanpaolo, Fineco, UniCredit, Mediolanum, BBVA, Revolut, N26, Degiro, Interactive Brokers, Trade Republic</i>). Il sistema riconoscerà automaticamente la struttura, le date e le categorie di spesa.
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_up_acc, col_up_file = st.columns([1.2, 2.8])
+        with col_up_acc:
+            acc_choices_map = {row["name"]: row["account_id"] for _, row in df_accs.iterrows()} if not df_accs.empty else {"Conto Principale": 1}
+            sel_target_acc_name = st.selectbox("Assegna al Conto:", list(acc_choices_map.keys()), key="cf_upload_target_acc")
+            target_acc_id = acc_choices_map[sel_target_acc_name]
+
+        with col_up_file:
+            uploaded_stmt = st.file_uploader(
+                "Carica Estratto Conto (CSV / XLSX / XLS):",
+                type=["csv", "xlsx", "xls", "txt"],
+                key="cf_universal_stmt_uploader"
+            )
+
+        if uploaded_stmt is not None:
+            file_bytes = uploaded_stmt.getvalue()
+            parsed_res = parse_bank_statement_file(file_bytes, filename=uploaded_stmt.name, account_name=sel_target_acc_name)
+
+            if parsed_res["success"]:
+                df_parsed = parsed_res["df_normalized"]
+                bank_name = parsed_res["bank_detected"]
+                tot_in = parsed_res["total_inflow"]
+                tot_out = parsed_res["total_outflow"]
+                tr_cnt = parsed_res["transfers_count"]
+                n_rows = parsed_res["rows_count"]
+
+                st.markdown(f"""
+                <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 12px 16px; margin: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <span style="font-size: 13.5px; font-weight: 700; color: #34d399;">🏦 Formato Riconosciuto: <b>{bank_name}</b></span>
+                        <span style="font-size: 12px; color: #f0f6fc; font-weight: 600;">📊 {n_rows} Movimenti Estratti</span>
+                    </div>
+                    <div style="display: flex; gap: 20px; font-size: 12px; color: #8b949e;">
+                        <div>🟢 Entrate Rilevate: <b style="color: #10b981;">€ {tot_in:,.2f}</b></div>
+                        <div>🔴 Uscite Rilevate: <b style="color: #ef4444;">€ {tot_out:,.2f}</b></div>
+                        <div>🔄 Giroconti Interni: <b style="color: #38bdf8;">{tr_cnt} rilevati</b></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.dataframe(
+                    df_parsed[["date", "description", "amount", "category", "pillar", "is_transfer"]].rename(columns={
+                        "date": "Data",
+                        "description": "Descrizione",
+                        "amount": "Importo (€)",
+                        "category": "Categoria Prevista",
+                        "pillar": "Pilastro 50/30/20",
+                        "is_transfer": "Giroconto"
+                    }),
+                    use_container_width=True,
+                    height=200,
+                    hide_index=True
+                )
+
+                if st.button("💾 Conferma & Inserisci Tutte le Transazioni nel Database", type="primary", use_container_width=True, key="btn_confirm_universal_import"):
+                    cat_name_to_id = {}
+                    if not df_cats.empty:
+                        for _, cr in df_cats.iterrows():
+                            cat_name_to_id[cr["name"].lower()] = cr["category_id"]
+
+                    default_cat_id = list(cat_name_to_id.values())[0] if cat_name_to_id else 1
+                    inserted_cnt = 0
+
+                    for _, r in df_parsed.iterrows():
+                        r_amt = abs(float(r["amount"]))
+                        r_is_tr = int(r.get("is_transfer", 0)) == 1
+                        r_dir = "transfer" if r_is_tr else ("inflow" if float(r["amount"]) > 0 else "outflow")
+                        
+                        # Match category
+                        assigned_cid = default_cat_id
+                        clean_cat_str = str(r["category"]).lower()
+                        for c_name, c_id in cat_name_to_id.items():
+                            if c_name in clean_cat_str or clean_cat_str in c_name:
+                                assigned_cid = c_id
+                                break
+
+                        insert_cashflow_tx(engine, {
+                            "account_id": target_acc_id,
+                            "category_id": assigned_cid,
+                            "tx_date": str(r["date"]),
+                            "amount": r_amt,
+                            "direction": r_dir,
+                            "merchant": str(r["description"])[:80],
+                            "notes": f"Auto-Imported: {bank_name}"
+                        })
+                        inserted_cnt += 1
+
+                    st.success(f"✅ {inserted_cnt} transazioni importate e riconciliate con successo!")
+                    st.rerun()
+            else:
+                st.error(f"Errore nel parsing: {parsed_res.get('error_msg', 'Formato non supportato')}")
+
     with st.expander("✍️ Inserimento Manuale Nuova Transazione", expanded=False):
         with st.form("form_add_cashflow_manual"):
             fc1, fc2, fc3 = st.columns(3)
