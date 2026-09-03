@@ -335,6 +335,8 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
         else:
             st.markdown(f"<div style='font-size: 11.5px; color: #8b949e; margin-bottom: 6px;'>🎯 Trovati <b>{len(filtered_df)}</b> snapshot su {len(df_all_snaps)} totali</div>", unsafe_allow_html=True)
 
+            # ── TABELLA RIASSUNTIVA SNAPSHOT (STILE MODULO QUANT) ──
+            disp_rows = []
             snap_options = {}
             for _, r in filtered_df.iterrows():
                 sid = int(r["snapshot_id"])
@@ -343,17 +345,85 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
                 s_name = r.get("snapshot_name") or "Snapshot Standard"
                 tot_nw_val = float(r.get("total_net_worth", 0.0))
                 liq_val = float(r.get("liquid_assets", 0.0))
+                inv_val = float(r.get("financial_investments", 0.0))
+                phys_val = float(r.get("physical_assets_total", 0.0))
+                pen_val = float(r.get("pension_total", 0.0))
+                deb_val = float(r.get("total_liabilities", 0.0))
+                health_val = f"{float(r.get('wealth_health_score', 0.0)):.0f}/100" if r.get("wealth_health_score") is not None else "N/A"
                 run_id_val = r.get("run_id") or f"ID #{sid}"
-                
+
+                disp_rows.append({
+                    "Data": dt_str,
+                    "Profilo": p_name_display,
+                    "Tipologia": s_name,
+                    "Net Worth (€)": tot_nw_val,
+                    "Liquidità (€)": liq_val,
+                    "Investimenti (€)": inv_val,
+                    "Asset Caveau (€)": phys_val,
+                    "Previdenza (€)": pen_val,
+                    "Passività (€)": deb_val,
+                    "Health Score": health_val,
+                    "Run ID": run_id_val
+                })
+
                 label = f"{dt_str} · {p_name_display} · {s_name} (Net Worth: {fmt_eur(tot_nw_val)} | Cassa: {fmt_eur(liq_val)} | {run_id_val})"
                 snap_options[label] = sid
 
+            df_disp = pd.DataFrame(disp_rows)
+            st.dataframe(
+                df_disp.style.format({
+                    "Net Worth (€)": "€ {:,.2f}",
+                    "Liquidità (€)": "€ {:,.2f}",
+                    "Investimenti (€)": "€ {:,.2f}",
+                    "Asset Caveau (€)": "€ {:,.2f}",
+                    "Previdenza (€)": "€ {:,.2f}",
+                    "Passività (€)": "€ {:,.2f}"
+                }),
+                use_container_width=True,
+                height=160,
+                hide_index=True
+            )
+
             selected_snap_label = st.selectbox(
-                "📸 Seleziona lo Snapshot da richiamare o gestire:",
+                "🎯 Seleziona lo Snapshot da Ricaricare o Gestire:",
                 options=list(snap_options.keys()),
-                key="wealth_select_snapshot_recall"
+                key="wealth_select_snapshot_recall",
+                help="Seleziona la sessione o lo snapshot patrimoniale da ripristinare nella Dashboard."
             )
             sel_sid = snap_options[selected_snap_label]
+
+            # ── CARD DI ANTEPRIMA SNAPSHOT SELEZIONATO (STILE QUANT) ──
+            sel_row = filtered_df[filtered_df["snapshot_id"] == sel_sid].iloc[0]
+            sel_dt = str(sel_row.get("snapshot_date", ""))
+            sel_port = sel_row.get("portfolio_name") if sel_row.get("portfolio_name") else f"Profilo #{sel_row.get('portfolio_id', 1)}"
+            sel_snap_name = sel_row.get("snapshot_name") if sel_row.get("snapshot_name") else "Snapshot Standard"
+            sel_nw = fmt_eur(float(sel_row.get("total_net_worth", 0.0)))
+            sel_liq = fmt_eur(float(sel_row.get("liquid_assets", 0.0)))
+            sel_inv = fmt_eur(float(sel_row.get("financial_investments", 0.0)))
+            sel_phys = fmt_eur(float(sel_row.get("physical_assets_total", 0.0)))
+            sel_pens = fmt_eur(float(sel_row.get("pension_total", 0.0)))
+            sel_deb = fmt_eur(float(sel_row.get("total_liabilities", 0.0)))
+            sel_score = f"{float(sel_row.get('wealth_health_score', 0.0)):.0f}/100" if sel_row.get("wealth_health_score") is not None else "N/A"
+            sel_run_id = sel_row.get("run_id") or f"ID #{sel_sid}"
+
+            st.markdown(f"""
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 12px 16px; margin: 10px 0 14px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+                    <span style="font-size: 13px; font-weight: 700; color: #f0f6fc;">🏛️ {sel_port} &bull; <span style="color:#10b981;">{sel_snap_name}</span></span>
+                    <span style="font-size: 11px; color: #8b949e; font-family: monospace;">{sel_run_id}</span>
+                </div>
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; font-size: 12px; color: #8b949e;">
+                    <div>📅 Data: <b style="color:#f0f6fc;">{sel_dt}</b></div>
+                    <div>💰 Net Worth: <b style="color:#34d399;">{sel_nw}</b></div>
+                    <div>💧 Liquidità: <b style="color:#38bdf8;">{sel_liq}</b></div>
+                    <div>📈 Investimenti: <b style="color:#a78bfa;">{sel_inv}</b></div>
+                    <div>⌚ Caveau: <b style="color:#fbbf24;">{sel_phys}</b></div>
+                    <div>🛡️ Previdenza: <b style="color:#60a5fa;">{sel_pens}</b></div>
+                    <div>📉 Debiti: <b style="color:#ef4444;">{sel_deb}</b></div>
+                    <div>🛡️ Health Score: <b style="color:#10b981;">{sel_score}</b></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
             col_recall, col_del_snap, col_goto_dash = st.columns([2.5, 1.3, 1.8])
             with col_recall:
@@ -378,19 +448,6 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
             with col_goto_dash:
                 if st.button("🏛️ Vai alla Dashboard Net Worth →", type="secondary", use_container_width=True, key="btn_goto_nw_from_recall"):
                     st.switch_page("pages/13_🏛️_Patrimonio_e_NetWorth.py")
-            # Tabella di riepilogo
-            with st.expander("📋 Mostra Tabella Dettagliata Snapshot"):
-                disp_df = filtered_df[[
-                    "snapshot_id", "snapshot_date", "portfolio_name", "snapshot_name", "run_id",
-                    "total_net_worth", "liquid_assets", "financial_investments", "physical_assets_total",
-                    "pension_total", "total_liabilities", "wealth_health_score"
-                ]].copy()
-                disp_df.columns = [
-                    "ID", "Data", "Profilo", "Nome Snapshot", "Run ID",
-                    "Net Worth (€)", "Liquidità (€)", "Investimenti (€)", "Asset Caveau (€)",
-                    "Previdenza (€)", "Passività (€)", "Health Score"
-                ]
-                st.dataframe(disp_df, use_container_width=True, hide_index=True)
 
 
 from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
