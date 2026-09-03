@@ -420,7 +420,7 @@ argus-risk-analytics/
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── sidebar.py               # Navigation Rail v6.0.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v6.3.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
@@ -442,7 +442,7 @@ argus-risk-analytics/
 │   ├── CSV_Format_Specification.md # Specifica tecnica formato CSV & DeGiro
 │   ├── DESIGN.md                # Design System & UI Specs
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v6.0.0)
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v6.3.0)
 │   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
@@ -590,4 +590,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.0.0 Institutional.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.3.0 Institutional.*

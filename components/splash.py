@@ -266,7 +266,7 @@ def render_card_html(
 def show_splash_screen(
     app_title: str = "A R G U S",
     subtitle: str = "QUANTITATIVE RISK & WEALTH ECOSYSTEM",
-    version_tag: str = "v6.0.0 Institutional",
+    version_tag: str = "v6.3.0 Institutional",
     accent_color: str = "#f59e0b",
     boot_tasks: Optional[List[Tuple[str, Callable[[], None]]]] = None,
     min_step_duration: float = 0.35,
