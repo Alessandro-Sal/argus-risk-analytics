@@ -3667,7 +3667,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
         accent_secondary = "#6366f1"
         glow_color = "rgba(245, 158, 11, 0.22)"
 
-    eye_svg = get_argus_eye_svg(size=125, animated=True, accent=accent)
+    eye_svg = get_argus_eye_svg(size=140, animated=True, accent=accent)
 
     hide_sidebar_and_splash_css = f"""
     <style>
@@ -3689,23 +3689,23 @@ def render_splash_screen(force_show: bool = False) -> bool:
     div[data-testid="stAppViewBlockContainer"],
     .main .block-container,
     section.main > div {{
-        padding-top: 0.35rem !important;
-        padding-bottom: 0.6rem !important;
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.5rem !important;
         padding-left: 2rem !important;
         padding-right: 2rem !important;
-        max-width: 1260px !important;
+        max-width: 1400px !important;
     }}
     
     /* ── Contenitore Master Splash Screen Glassmorphic ── */
     .splash-master-wrapper {{
-        max-width: 1220px;
+        max-width: 1360px;
         margin: 0px auto 14px auto;
         background: radial-gradient(circle at 50% 0%, {glow_color} 0%, rgba(15, 23, 42, 0.96) 50%, rgba(8, 12, 22, 0.99) 100%);
         border: 1px solid rgba(255, 255, 255, 0.12);
         border-top: 1px solid rgba(255, 255, 255, 0.25);
-        border-radius: 22px;
-        padding: 24px 32px 20px;
-        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.85), 0 0 55px {glow_color};
+        border-radius: 24px;
+        padding: 26px 36px 20px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.90), 0 0 60px {glow_color};
         backdrop-filter: blur(28px);
         -webkit-backdrop-filter: blur(28px);
         text-align: center;
@@ -3720,8 +3720,8 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
 
     .splash-logo-container {{
-        margin-bottom: 6px;
-        filter: drop-shadow(0 0 20px {glow_color});
+        margin-bottom: 8px;
+        filter: drop-shadow(0 0 24px {glow_color});
         transition: transform 0.3s ease;
     }}
     .splash-logo-container:hover {{
@@ -3729,33 +3729,33 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
 
     .splash-title {{
-        font-size: 35px;
+        font-size: 38px;
         font-weight: 900;
-        letter-spacing: 8px;
+        letter-spacing: 9px;
         background: linear-gradient(135deg, #ffffff 40%, {accent} 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 2px;
+        margin-bottom: 3px;
         line-height: 1.15;
         text-transform: uppercase;
     }}
 
     .splash-subtitle {{
-        font-size: 11.5px;
+        font-size: 12px;
         font-weight: 700;
         color: {accent};
-        letter-spacing: 3.2px;
+        letter-spacing: 3.5px;
         text-transform: uppercase;
-        margin-bottom: 8px;
+        margin-bottom: 10px;
         opacity: 0.95;
     }}
 
     .splash-desc {{
-        font-size: 13.5px;
+        font-size: 14px;
         color: #94a3b8;
-        max-width: 860px;
-        margin: 0 auto 12px auto;
-        line-height: 1.55;
+        max-width: 920px;
+        margin: 0 auto 14px auto;
+        line-height: 1.6;
     }}
 
     /* ── Badge Ribbon Istituzionale ── */
@@ -3763,17 +3763,17 @@ def render_splash_screen(force_show: bool = False) -> bool:
         display: flex;
         justify-content: center;
         align-items: center;
-        gap: 11px;
+        gap: 12px;
         flex-wrap: wrap;
-        margin-bottom: 14px;
+        margin-bottom: 16px;
     }}
 
     .splash-pill {{
         background: rgba(255, 255, 255, 0.04);
         border: 1px solid rgba(255, 255, 255, 0.10);
-        padding: 3.5px 13px;
+        padding: 4px 14px;
         border-radius: 18px;
-        font-size: 11.5px;
+        font-size: 12px;
         color: #cbd5e1;
         font-weight: 500;
         font-family: 'JetBrains Mono', 'Outfit', monospace;
@@ -3790,10 +3790,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
     .terminal-window {{
         background: rgba(7, 10, 18, 0.95);
         border: 1px solid rgba(255, 255, 255, 0.10);
-        border-radius: 13px;
+        border-radius: 14px;
         padding: 0;
         text-align: left;
-        margin-bottom: 12px;
+        margin-bottom: 14px;
         box-shadow: inset 0 2px 8px rgba(0,0,0,0.6), 0 6px 18px rgba(0,0,0,0.35);
         overflow: hidden;
     }}
@@ -3801,7 +3801,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
     .terminal-header {{
         background: rgba(255, 255, 255, 0.03);
         border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        padding: 6px 14px;
+        padding: 7px 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -3811,47 +3811,47 @@ def render_splash_screen(force_show: bool = False) -> bool:
         align-items: center;
         gap: 6px;
     }}
-    .terminal-dot {{ width: 8.5px; height: 8.5px; border-radius: 50%; display: inline-block; }}
+    .terminal-dot {{ width: 9px; height: 9px; border-radius: 50%; display: inline-block; }}
     .dot-red {{ background: #ef4444; }}
     .dot-yellow {{ background: #f59e0b; }}
     .dot-green {{ background: #10b981; }}
 
     .terminal-title {{
         font-family: 'JetBrains Mono', monospace;
-        font-size: 10.5px;
+        font-size: 11px;
         color: #64748b;
-        margin-left: 5px;
+        margin-left: 6px;
     }}
 
     .terminal-status-badge {{
         font-family: 'JetBrains Mono', monospace;
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 700;
         color: #10b981;
         background: rgba(16, 185, 129, 0.15);
         border: 1px solid rgba(16, 185, 129, 0.35);
-        padding: 2px 8px;
-        border-radius: 5px;
+        padding: 2.5px 9px;
+        border-radius: 6px;
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: 5px;
     }}
 
     .terminal-body {{
-        padding: 11px 18px 9px 18px;
+        padding: 12px 20px 10px 20px;
         font-family: 'JetBrains Mono', monospace;
-        font-size: 10.8px;
-        line-height: 1.75;
+        font-size: 11.5px;
+        line-height: 1.8;
     }}
 
     /* Micro-Progress Bar a Gradiente Liquido */
     .splash-progress-track {{
         width: 100%;
-        height: 4.5px;
+        height: 5px;
         background: rgba(255, 255, 255, 0.06);
         border-radius: 999px;
         overflow: hidden;
-        margin: 8px 0 3px 0;
+        margin: 9px 0 4px 0;
         position: relative;
     }}
 
@@ -3860,13 +3860,13 @@ def render_splash_screen(force_show: bool = False) -> bool:
         width: 100%;
         background: linear-gradient(90deg, #6366f1 0%, {accent} 50%, #10b981 100%);
         border-radius: 999px;
-        box-shadow: 0 0 10px {accent};
+        box-shadow: 0 0 12px {accent};
         animation: progressPulse 2.5s ease-in-out infinite alternate;
     }}
 
     @keyframes progressPulse {{
         0% {{ filter: brightness(1) drop-shadow(0 0 4px {accent}); }}
-        100% {{ filter: brightness(1.25) drop-shadow(0 0 8px {accent}); }}
+        100% {{ filter: brightness(1.25) drop-shadow(0 0 10px {accent}); }}
     }}
 
     /* ── Bento Grid Schede Portali ── */
@@ -3874,11 +3874,11 @@ def render_splash_screen(force_show: bool = False) -> bool:
         background: radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.16) 0%, rgba(15, 23, 42, 0.90) 75%);
         border: 1px solid rgba(99, 102, 241, 0.40);
         border-top: 3px solid #6366f1;
-        border-radius: 17px;
-        padding: 18px 22px;
-        min-height: 152px;
+        border-radius: 18px;
+        padding: 20px 24px;
+        min-height: 165px;
         margin-bottom: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
+        box-shadow: 0 10px 26px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
@@ -3886,7 +3886,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
     .portal-card-risk:hover {{
         border-color: #818cf8;
-        box-shadow: 0 12px 28px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+        box-shadow: 0 14px 32px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
         transform: translateY(-2px);
     }}
 
@@ -3894,11 +3894,11 @@ def render_splash_screen(force_show: bool = False) -> bool:
         background: radial-gradient(circle at 100% 0%, rgba(16, 185, 129, 0.16) 0%, rgba(15, 23, 42, 0.90) 75%);
         border: 1px solid rgba(16, 185, 129, 0.40);
         border-top: 3px solid #10b981;
-        border-radius: 17px;
-        padding: 18px 22px;
-        min-height: 152px;
+        border-radius: 18px;
+        padding: 20px 24px;
+        min-height: 165px;
         margin-bottom: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
+        box-shadow: 0 10px 26px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.1);
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
         display: flex;
         flex-direction: column;
@@ -3906,22 +3906,22 @@ def render_splash_screen(force_show: bool = False) -> bool:
     }}
     .portal-card-wealth:hover {{
         border-color: #34d399;
-        box-shadow: 0 10px 24px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
+        box-shadow: 0 12px 30px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
         transform: translateY(-2px);
     }}
 
     .portal-chips-row {{
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 7px;
         margin-top: 10px;
     }}
     .portal-chip {{
         background: rgba(255, 255, 255, 0.05);
         border: 1px solid rgba(255, 255, 255, 0.09);
-        border-radius: 7px;
-        padding: 3px 9px;
-        font-size: 10.5px;
+        border-radius: 8px;
+        padding: 3.5px 10px;
+        font-size: 11px;
         font-weight: 600;
         color: #cbd5e1;
         font-family: 'JetBrains Mono', monospace;
@@ -3933,17 +3933,17 @@ def render_splash_screen(force_show: bool = False) -> bool:
         border: 1px solid rgba(245, 158, 11, 0.9) !important;
         color: #ffffff !important;
         font-weight: 850 !important;
-        font-size: 13.5px !important;
+        font-size: 14px !important;
         letter-spacing: 0.8px !important;
         border-radius: 12px !important;
-        padding: 11px 22px !important;
-        box-shadow: 0 5px 16px rgba(245, 158, 11, 0.40) !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 6px 18px rgba(245, 158, 11, 0.40) !important;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }}
     div[data-testid="stButton"] button[key="btn_splash_risk"]:hover {{
         background: linear-gradient(135deg, #fbbf24 0%, #ea580c 100%) !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 7px 22px rgba(245, 158, 11, 0.60) !important;
+        box-shadow: 0 8px 24px rgba(245, 158, 11, 0.60) !important;
     }}
 
     div[data-testid="stButton"] button[key="btn_splash_wealth"] {{
@@ -3951,17 +3951,17 @@ def render_splash_screen(force_show: bool = False) -> bool:
         border: 1px solid rgba(16, 185, 129, 0.9) !important;
         color: #ffffff !important;
         font-weight: 850 !important;
-        font-size: 13.5px !important;
+        font-size: 14px !important;
         letter-spacing: 0.8px !important;
         border-radius: 12px !important;
-        padding: 11px 22px !important;
-        box-shadow: 0 5px 16px rgba(16, 185, 129, 0.40) !important;
+        padding: 12px 24px !important;
+        box-shadow: 0 6px 18px rgba(16, 185, 129, 0.40) !important;
         transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
     }}
     div[data-testid="stButton"] button[key="btn_splash_wealth"]:hover {{
         background: linear-gradient(135deg, #34d399 0%, #059669 100%) !important;
         transform: translateY(-2px) !important;
-        box-shadow: 0 7px 22px rgba(16, 185, 129, 0.60) !important;
+        box-shadow: 0 8px 24px rgba(16, 185, 129, 0.60) !important;
     }}
     </style>
     """
@@ -4016,10 +4016,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
         <div class="portal-card-risk">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <span style="font-size: 17.5px; font-weight: 800; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
-                    <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 6px;">11 MODULI QUANT</span>
+                    <span style="font-size: 18.5px; font-weight: 850; color: #ffffff;">📊 Risk Analytics &amp; Portfolios</span>
+                    <span style="background: rgba(99, 102, 241, 0.25); border: 1px solid rgba(99, 102, 241, 0.5); color: #a5b4fc; font-size: 11px; font-weight: 800; padding: 3.5px 10px; border-radius: 7px;">11 MODULI QUANT</span>
                 </div>
-                <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 8px;">
+                <div style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 10px;">
                     Piattaforma quantitativa per analisi del rischio di portafoglio, backtesting Kupiec, stress testing MSCI Barra, frontiera efficiente e BQuant Launchpad.
                 </div>
             </div>
@@ -4043,10 +4043,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
         <div class="portal-card-wealth">
             <div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-                    <span style="font-size: 17.5px; font-weight: 800; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
-                    <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 6px;">10 MODULI WEALTH</span>
+                    <span style="font-size: 18.5px; font-weight: 850; color: #ffffff;">🏛️ Wealth Management &amp; Family Office</span>
+                    <span style="background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.5); color: #6ee7b7; font-size: 11px; font-weight: 800; padding: 3.5px 10px; border-radius: 7px;">10 MODULI WEALTH</span>
                 </div>
-                <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.55; margin-bottom: 8px;">
+                <div style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-bottom: 10px;">
                     Consolidamento patrimoniale olistico, budget 50/30/20, caveau orologi, previdenza, fiscalità Quadro RW, mutui &amp; immobili, successione e AI Copilot.
                 </div>
             </div>
