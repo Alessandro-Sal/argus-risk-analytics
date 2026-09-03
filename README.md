@@ -590,4 +590,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.1.2.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v6.0.0 Institutional.*
