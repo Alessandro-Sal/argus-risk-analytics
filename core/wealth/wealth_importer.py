@@ -192,7 +192,7 @@ def bulk_import_statement(
     df_categorized: pd.DataFrame,
     portfolio_id: int = 1
 ) -> int:
-    """Scrive le transazioni categorizzate nel database di Wealth Management."""
+    """Scrive le transazioni categorizzate nel database di Wealth Management con deduplicazione idempotente."""
     imported_count = 0
     for _, row in df_categorized.iterrows():
         tx_dict = {
@@ -207,10 +207,12 @@ def bulk_import_statement(
             "notes": row.get("notes"),
             "payment_method": row.get("payment_method", "Importazione CSV"),
             "is_recurring": False,
-            "tags": "import_csv"
+            "tags": "import_csv",
+            "tx_hash": row.get("tx_hash"),
         }
-        insert_cashflow_tx(engine, tx_dict)
-        imported_count += 1
+        res = insert_cashflow_tx(engine, tx_dict, deduplicate=True)
+        if res is not None:
+            imported_count += 1
 
     return imported_count
 

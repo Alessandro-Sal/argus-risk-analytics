@@ -75,10 +75,26 @@ def get_engine(user: str = "root", password: str = "", host: str = "localhost",
     """
     Restituisce un engine SQLAlchemy per MySQL. Se MySQL non è disponibile (es. Docker disattivato),
     effettua il fallback automatico su un database locale SQLite (data/argus_local.db).
+    Legge prioritariamente le credenziali dalle variabili d'ambiente (MYSQL_USER, MYSQL_PASSWORD, ecc.).
     """
+    import os
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except ImportError:
+        pass
+
+    # Priorità a variabili d'ambiente rispetto ai default (supporta sia MYSQL_ che STREAMLIT_DB_)
+    user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user
+    password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password
+    host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host
+    port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
+    port = int(port_env) if port_env else port
     if database is not None:
         db = database
-    import os
+    else:
+        db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
+
     try:
         import pymysql
         sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"

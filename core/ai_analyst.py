@@ -356,7 +356,8 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
 
     for version in versions:
         for m in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/{version}/models/{m}:generateContent?key={cleaned_key}"
+            # Rimossa la chiave dai query parameters URL per evitare log leakage; autenticazione sicura tramite header x-goog-api-key
+            url = f"https://generativelanguage.googleapis.com/{version}/models/{m}:generateContent"
             req = urllib.request.Request(
                 url,
                 data=data_bytes,

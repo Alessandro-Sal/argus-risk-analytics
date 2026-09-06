@@ -31,6 +31,7 @@ from core.wealth.wealth_db import (
     get_wealth_portfolios,
     get_linked_risk_portfolios_summary
 )
+from core.security_engine import sanitize_for_export, mask_iban
 
 
 def _safe_num(val, default=0.0) -> float:
@@ -46,7 +47,7 @@ def _safe_num(val, default=0.0) -> float:
         return default
 
 
-def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -> io.BytesIO:
+def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, mask_sensitive: bool = False) -> io.BytesIO:
     """
     Genera un Master Dossier Excel (.xlsx) a 10 fogli istituzionale per Family Office & Private Banking:
     1. Executive Summary & Net Worth (Stato Patrimoniale Consolidato)
@@ -59,6 +60,7 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -
     8. Immobili & Mutui (Piano Ammortamento & Cap Rate)
     9. Successione & Eredi (Quote di Legittima e Franchigie)
     10. AI Diagnostics & Rebalance (Colli di Bottiglia e Ribilanciamento)
+    Include sanitizzazione contro Formula Injection (CWE-1236) e mascheramento PII facoltativo.
     """
     output = io.BytesIO()
     workbook = xlsxwriter.Workbook(output, {'in_memory': True, 'nan_inf_to_errors': True})
@@ -86,17 +88,6 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -
     f_date = workbook.add_format({'num_format': 'yyyy-mm-dd', 'align': 'center'})
 
     # ── RECUPERO DATI CORE WEALTH ──
-    from core.wealth.wealth_engine import (
-        compute_consolidated_net_worth,
-        compute_cashflow_analytics,
-        simulate_pension_projection,
-        compute_fire_analytics,
-        compute_fiscal_analytics,
-        compute_mortgage_amortization,
-        compute_real_estate_roi,
-        compute_estate_planning_analytics,
-        compute_ai_wealth_diagnostics
-    )
     nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
     df_acc = get_wealth_accounts(engine, portfolio_id=portfolio_id)
     df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
@@ -111,7 +102,6 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -
     estate = compute_estate_planning_analytics(net_worth_summary=nw)
     ai_diag = compute_ai_wealth_diagnostics(engine, portfolio_id=portfolio_id)
     _, df_risk_linked = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=portfolio_id)
-
 
     # ── SHEET 1: EXECUTIVE SUMMARY & NET WORTH ───────────────────
     ws1 = workbook.add_worksheet("1_Executive_NetWorth")
@@ -168,12 +158,12 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -
         for r_idx, (_, row) in enumerate(df_cf.iterrows(), start=4):
             ws2.write(r_idx, 0, int(row.get("tx_id", r_idx)))
             ws2.write(r_idx, 1, str(row.get("tx_date", ""))[:10], f_date)
-            ws2.write(r_idx, 2, str(row.get("payment_method", "Bonifico / Carta")))
-            ws2.write(r_idx, 3, str(row.get("direction", "outflow")).upper())
+            ws2.write(r_idx, 2, sanitize_for_export(str(row.get("payment_method", "Bonifico / Carta"))))
+            ws2.write(r_idx, 3, sanitize_for_export(str(row.get("direction", "outflow")).upper()))
             ws2.write(r_idx, 4, _safe_num(row.get("amount", 0.0)), f_currency)
-            ws2.write(r_idx, 5, str(row.get("category_name", "Generale")))
-            ws2.write(r_idx, 6, str(row.get("nature", "Necessità Primaria")))
-            ws2.write(r_idx, 7, str(row.get("merchant", "") or row.get("notes", "")))
+            ws2.write(r_idx, 5, sanitize_for_export(str(row.get("category_name", "Generale"))))
+            ws2.write(r_idx, 6, sanitize_for_export(str(row.get("nature", "Necessità Primaria"))))
+            ws2.write(r_idx, 7, sanitize_for_export(str(row.get("merchant", "") or row.get("notes", ""))))
     ws2.autofit()
 
     # ── SHEET 3: CONTI CORRENTI & DEPOSITI ───────────────────────
@@ -188,13 +178,14 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -
         for r_idx, (_, row) in enumerate(df_acc.iterrows(), start=4):
             iban = str(row.get("iban", "") or "").upper()
             is_foreign = bool(iban and not iban.startswith("IT"))
+            iban_display = mask_iban(iban) if (iban and mask_sensitive) else (iban if iban else "N/D")
             ws3.write(r_idx, 0, int(row.get("account_id", r_idx)))
-            ws3.write(r_idx, 1, str(row.get("name", "")))
-            ws3.write(r_idx, 2, str(row.get("institution", "")))
-            ws3.write(r_idx, 3, str(row.get("account_type", "")))
-            ws3.write(r_idx, 4, iban if iban else "N/D")
+            ws3.write(r_idx, 1, sanitize_for_export(str(row.get("name", ""))))
+            ws3.write(r_idx, 2, sanitize_for_export(str(row.get("institution", ""))))
+            ws3.write(r_idx, 3, sanitize_for_export(str(row.get("account_type", ""))))
+            ws3.write(r_idx, 4, sanitize_for_export(iban_display))
             ws3.write(r_idx, 5, _safe_num(row.get("balance", 0.0)), f_currency)
-            ws3.write(r_idx, 6, str(row.get("currency", "EUR")))
+            ws3.write(r_idx, 6, sanitize_for_export(str(row.get("currency", "EUR"))))
             ws3.write(r_idx, 7, "Estero (Quadro RW / IVAFE)" if is_foreign else "Italia (Imposta Bollo)")
     ws3.autofit()
 
@@ -212,11 +203,13 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1) -
             mkt = _safe_num(row.get("current_market_value", 0.0))
             gain = mkt - cost
             gain_pct = (gain / cost) if cost > 0 else 0.0
+            ref_val = str(row.get("reference_number", "") or row.get("model_or_specs", ""))
+            ref_display = "****" if (ref_val and mask_sensitive) else ref_val
             ws4.write(r_idx, 0, int(row.get("asset_id", r_idx)))
-            ws4.write(r_idx, 1, str(row.get("name", "")))
-            ws4.write(r_idx, 2, str(row.get("asset_category", "")))
-            ws4.write(r_idx, 3, str(row.get("brand_or_location", "")))
-            ws4.write(r_idx, 4, str(row.get("reference_number", "") or row.get("model_or_specs", "")))
+            ws4.write(r_idx, 1, sanitize_for_export(str(row.get("name", ""))))
+            ws4.write(r_idx, 2, sanitize_for_export(str(row.get("asset_category", ""))))
+            ws4.write(r_idx, 3, sanitize_for_export(str(row.get("brand_or_location", ""))))
+            ws4.write(r_idx, 4, sanitize_for_export(ref_display))
             ws4.write(r_idx, 5, cost, f_currency)
             ws4.write(r_idx, 6, mkt, f_currency)
             ws4.write(r_idx, 7, gain, f_currency)
