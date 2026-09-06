@@ -20,13 +20,20 @@ from core.adapters.isin_resolver import (
 from core.adapters.scalable import parse_scalable_transactions
 from core.adapters.traderepublic import parse_traderepublic_transactions
 
-from core.data_quality_gate import (
-    DataQualityGate,
-    CanonicalTradeRecord,
-    QualityGateReport,
-    TransactionType,
-    AssetClass,
-)
+try:
+    from core.data_quality_gate import (
+        DataQualityGate,
+        CanonicalTradeRecord,
+        QualityGateReport,
+        TransactionType,
+        AssetClass,
+    )
+except ImportError:
+    DataQualityGate = None  # type: ignore
+    CanonicalTradeRecord = None  # type: ignore
+    QualityGateReport = None  # type: ignore
+    TransactionType = None  # type: ignore
+    AssetClass = None  # type: ignore
 
 __all__ = [
     "SUPPORTED_BROKERS",

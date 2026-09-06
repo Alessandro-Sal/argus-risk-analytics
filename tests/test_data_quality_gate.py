@@ -6,6 +6,7 @@
 from datetime import date, timedelta
 import pandas as pd
 import pytest
+pydantic = pytest.importorskip("pydantic")
 from pydantic import ValidationError
 
 from core.data_quality_gate import (
