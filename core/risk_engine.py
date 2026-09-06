@@ -192,6 +192,7 @@ def compute_risk(portfolio_id: int,
 
     # Calcolo RSI 14 per ciascuna posizione
     if isinstance(df_prices, pd.DataFrame) and not df_prices.empty and "ticker" in df_prices.columns and "close" in df_prices.columns:
+        rsi_map = {}
         for tk in df_positions["ticker"].unique():
             px_sub = df_prices[df_prices["ticker"] == tk].sort_values("price_date")
             if not px_sub.empty and len(px_sub) >= 2:
@@ -204,53 +205,65 @@ def compute_risk(portfolio_id: int,
                 rs = avg_gain / (avg_loss + 1e-9)
                 rsi14 = 100.0 - (100.0 / (1.0 + rs))
                 if not rsi14.empty and pd.notna(rsi14.iloc[-1]):
-                    df_positions.loc[df_positions["ticker"] == tk, "rsi_14"] = float(rsi14.iloc[-1])
+                    rsi_map[tk] = float(rsi14.iloc[-1])
+        if rsi_map:
+            df_positions["rsi_14"] = df_positions["ticker"].map(rsi_map)
 
-    # Metriche Fondamentali, Multipli e Forensic Accounting su Posizioni
+    # Metriche Fondamentali, Multipli e Forensic Accounting su Posizioni (vettorizzato)
     try:
         if isinstance(df_positions, pd.DataFrame) and not df_positions.empty:
-            for idx, row in df_positions.iterrows():
-                tk = row.get("ticker")
-                ac = str(row.get("asset_class", "stock")).lower()
-                if ac == "crypto" or "crypto" in str(row.get("sector", "")).lower():
-                    continue
-                
-                mkt_cap = row.get("market_cap")
-                ebitda = row.get("ebitda")
-                deb_eq = row.get("debt_to_equity")
-                roe_val = row.get("roe")
-                p_margin = row.get("profit_margins")
-                
-                # EV/EBITDA
-                if pd.notna(mkt_cap) and pd.notna(ebitda) and float(ebitda) > 0:
-                    df_positions.loc[df_positions["ticker"] == tk, "ev_to_ebitda"] = float(mkt_cap) / float(ebitda)
-                    
-                # Free Cash Flow Yield approssimato da EBITDA / Market Cap
-                if pd.notna(mkt_cap) and pd.notna(ebitda) and float(mkt_cap) > 0:
-                    fcf_est = float(ebitda) * 0.7
-                    df_positions.loc[df_positions["ticker"] == tk, "free_cash_flow_yield"] = (fcf_est / float(mkt_cap)) * 100.0
-                    
-                # Altman Z-Score & Piotroski Score
-                if pd.notna(deb_eq) and pd.notna(p_margin):
-                    pm_float = float(p_margin) * 100 if abs(float(p_margin)) <= 1.0 else float(p_margin)
-                    de_float = float(deb_eq) / 100.0 if float(deb_eq) > 5.0 else float(deb_eq)
-                    z_score = 1.8 + (pm_float / 15.0) * 0.8 + (1.0 / max(0.2, de_float)) * 0.4
-                    if pd.notna(roe_val):
-                        roe_float = float(roe_val) * 100 if abs(float(roe_val)) <= 1.0 else float(roe_val)
-                        if roe_float > 15.0: z_score += 0.4
-                    df_positions.loc[df_positions["ticker"] == tk, "altman_z_score"] = float(z_score)
-                    
-                p_score = 6
-                if pd.notna(roe_val):
-                    roe_fl = float(roe_val) * 100 if abs(float(roe_val)) <= 1.0 else float(roe_val)
-                    if roe_fl > 10.0: p_score += 1
-                if pd.notna(deb_eq) and float(deb_eq) < 1.0: p_score += 1
-                p_score = min(9, max(1, p_score))
-                df_positions.loc[df_positions["ticker"] == tk, "piotroski_f_score"] = float(p_score)
-                
-                # Forensic Beneish & Sloan baseline
-                df_positions.loc[df_positions["ticker"] == tk, "beneish_m_score"] = -2.45
-                df_positions.loc[df_positions["ticker"] == tk, "sloan_accrual_ratio"] = 0.035
+            ac_s = df_positions["asset_class"].fillna("stock").astype(str).str.lower() if "asset_class" in df_positions.columns else pd.Series("stock", index=df_positions.index)
+            sec_s = df_positions["sector"].fillna("").astype(str).str.lower() if "sector" in df_positions.columns else pd.Series("", index=df_positions.index)
+            is_crypto = (ac_s == "crypto") | sec_s.str.contains("crypto", na=False)
+            valid_mask = ~is_crypto
+
+            # Baseline forensics
+            df_positions.loc[valid_mask, "beneish_m_score"] = -2.45
+            df_positions.loc[valid_mask, "sloan_accrual_ratio"] = 0.035
+
+            mkt_cap = pd.to_numeric(df_positions["market_cap"], errors="coerce") if "market_cap" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
+            ebitda = pd.to_numeric(df_positions["ebitda"], errors="coerce") if "ebitda" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
+            deb_eq = pd.to_numeric(df_positions["debt_to_equity"], errors="coerce") if "debt_to_equity" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
+            roe_val = pd.to_numeric(df_positions["roe"], errors="coerce") if "roe" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
+            p_margin = pd.to_numeric(df_positions["profit_margins"], errors="coerce") if "profit_margins" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
+
+            # EV/EBITDA
+            ev_mask = valid_mask & mkt_cap.notna() & ebitda.notna() & (ebitda > 0)
+            if ev_mask.any():
+                df_positions.loc[ev_mask, "ev_to_ebitda"] = mkt_cap[ev_mask] / ebitda[ev_mask]
+
+            # Free Cash Flow Yield approssimato da EBITDA / Market Cap
+            fcf_mask = valid_mask & mkt_cap.notna() & ebitda.notna() & (mkt_cap > 0)
+            if fcf_mask.any():
+                df_positions.loc[fcf_mask, "free_cash_flow_yield"] = ((ebitda[fcf_mask] * 0.7) / mkt_cap[fcf_mask]) * 100.0
+
+            # Altman Z-Score
+            altman_mask = valid_mask & deb_eq.notna() & p_margin.notna()
+            if altman_mask.any():
+                pm = p_margin[altman_mask].values
+                pm_float = np.where(np.abs(pm) <= 1.0, pm * 100.0, pm)
+                de = deb_eq[altman_mask].values
+                de_float = np.where(de > 5.0, de / 100.0, de)
+                z_score = 1.8 + (pm_float / 15.0) * 0.8 + (1.0 / np.maximum(0.2, de_float)) * 0.4
+
+                roe_sub = roe_val[altman_mask].values
+                roe_boost = np.where(
+                    ~np.isnan(roe_sub) & (np.where(np.abs(roe_sub) <= 1.0, roe_sub * 100.0, roe_sub) > 15.0),
+                    0.4,
+                    0.0
+                )
+                df_positions.loc[altman_mask, "altman_z_score"] = z_score + roe_boost
+
+            # Piotroski F-Score
+            if valid_mask.any():
+                p_score = np.full(len(df_positions), 6.0)
+                roe_all = roe_val.values
+                roe_fl = np.where(np.abs(roe_all) <= 1.0, roe_all * 100.0, roe_all)
+                p_score += np.where(~np.isnan(roe_all) & (roe_fl > 10.0), 1.0, 0.0)
+                deb_all = deb_eq.values
+                p_score += np.where(~np.isnan(deb_all) & (deb_all < 1.0), 1.0, 0.0)
+                p_score = np.clip(p_score, 1.0, 9.0)
+                df_positions.loc[valid_mask, "piotroski_f_score"] = p_score[valid_mask]
     except Exception:
         pass
 
@@ -341,31 +354,37 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
     Il FIFO processa buy/sell in ordine cronologico (tx_date, tx_id).
     Per ogni sell consuma i lotti pi vecchi prima.
     """
+    from collections import deque
     grp = grp.sort_values(["tx_date", "tx_id"] if "tx_id" in grp.columns else ["tx_date"])
 
-    queue     = []   # [[qty_rimasta, prezzo_carico_eur], ...]
+    n_rows = len(grp)
+    if n_rows == 0:
+        return {"qty_net": 0.0, "avg_cost": 0.0, "realized_pnl": 0.0, "dividends_total": 0.0}
+
+    queue     = deque()   # deque of [qty_rimasta, prezzo_carico_eur]
     realized  = 0.0
     dividends = 0.0
 
-    for _, row in grp.iterrows():
-        tx   = row["tx_type"].lower().strip()
-        qty  = float(row["quantity"])
-        
-        # Tasso di cambio per transazioni non in EUR (i prezzi in EUR non vanno riconvertiti)
-        tx_currency = str(row.get("currency", "EUR")).upper().strip()
-        fx_rate = 1.0
-        if tx_currency not in ["EUR", "", "NAN", "NONE"] and fx_series is not None and not fx_series.empty:
-            tx_date = pd.to_datetime(row["tx_date"])
-            try:
-                idx = fx_series.index.get_indexer([tx_date], method='ffill')[0]
-                if idx >= 0:
-                    fx_rate = float(fx_series.iloc[idx])
-                else:
-                    fx_rate = float(fx_series.iloc[0])
-            except Exception:
-                pass
-                
-        price_eur = float(row["price"]) * fx_rate
+    prices = grp["price"].to_numpy(dtype=np.float64)
+    quantities = grp["quantity"].to_numpy(dtype=np.float64)
+    tx_types = grp["tx_type"].astype(str).str.lower().str.strip().values
+    currencies = grp["currency"].astype(str).str.upper().str.strip().values if "currency" in grp.columns else np.array(["EUR"] * n_rows)
+
+    if fx_series is not None and not fx_series.empty:
+        tx_dates = pd.to_datetime(grp["tx_date"].values)
+        fx_indices = fx_series.index.get_indexer(tx_dates, method='ffill')
+        fx_vals = np.where(fx_indices >= 0, fx_series.values[fx_indices], fx_series.iloc[0])
+        non_eur_mask = ~np.isin(currencies, ["EUR", "", "NAN", "NONE"])
+        fx_multipliers = np.where(non_eur_mask, fx_vals, 1.0)
+    else:
+        fx_multipliers = np.ones(n_rows, dtype=np.float64)
+
+    prices_eur = prices * fx_multipliers
+
+    for i in range(n_rows):
+        tx = tx_types[i]
+        qty = quantities[i]
+        price_eur = prices_eur[i]
 
         if tx == "buy":
             queue.append([qty, price_eur])
@@ -373,36 +392,35 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
         elif tx == "sell":
             qty_to_sell = qty
             while qty_to_sell > 1e-9 and queue:
-                lot_qty, lot_price_eur = queue[0]
-                if lot_qty <= qty_to_sell + 1e-9:
-                    realized     += lot_qty * (price_eur - lot_price_eur)
-                    qty_to_sell  -= lot_qty
-                    queue.pop(0)
+                lot = queue[0]
+                if lot[0] <= qty_to_sell + 1e-9:
+                    realized     += lot[0] * (price_eur - lot[1])
+                    qty_to_sell  -= lot[0]
+                    queue.popleft()
                 else:
-                    realized     += qty_to_sell * (price_eur - lot_price_eur)
-                    queue[0][0]  -= qty_to_sell
+                    realized     += qty_to_sell * (price_eur - lot[1])
+                    lot[0]       -= qty_to_sell
                     qty_to_sell   = 0.0
 
         elif tx in ["split", "frazionamento", "raggruppamento", "reverse_split", "reverse split", "stock_split", "stock split", "stock_dividend", "fusione", "merger", "scambio", "spinoff", "scissione"]:
-            split_ratio = float(row.get("quantity") or row.get("price") or 1.0)
+            split_ratio = float(quantities[i] or prices[i] or 1.0)
             if split_ratio > 0.0 and split_ratio != 1.0:
                 for lot in queue:
                     lot[0] = lot[0] * split_ratio
                     lot[1] = lot[1] / split_ratio
 
         elif tx == "dividend":
-            # Nel CSV: quantity=1, price=importo totale incassato
             dividends += price_eur
 
-    qty_net  = sum(q for q, _ in queue)
-    cost_rem = sum(q * p for q, p in queue)
+    qty_net  = sum(lot[0] for lot in queue)
+    cost_rem = sum(lot[0] * lot[1] for lot in queue)
     avg_cost = cost_rem / qty_net if qty_net > 1e-9 else 0.0
 
     return {
-        "qty_net":         round(qty_net, 8),
-        "avg_cost":        round(avg_cost, 6),
-        "realized_pnl":    round(realized, 2),
-        "dividends_total": round(dividends, 2),
+        "qty_net":         round(float(qty_net), 8),
+        "avg_cost":        round(float(avg_cost), 6),
+        "realized_pnl":    round(float(realized), 2),
+        "dividends_total": round(float(dividends), 2),
     }
 
 
@@ -1029,8 +1047,10 @@ def run_advanced_monte_carlo_simulation(
             eigvals = np.maximum(eigvals, 1e-8)
             L = eigvecs @ np.diag(np.sqrt(eigvals))
     
-    # 2. Random Shocks Generation
+    # 2. Random Shocks Generation & Vectorized Simulation
     num_assets = len(common_tickers)
+    w_L = np.ascontiguousarray(weights @ L).reshape(1, num_assets)
+    port_mu = float(np.dot(weights, mean_daily))
     
     if distribution_type == "student_t":
         # Student-t with nu=5 degrees of freedom (fat tails)
@@ -1040,24 +1060,14 @@ def run_advanced_monte_carlo_simulation(
     else:
         z_raw = np.random.normal(0, 1, size=(horizon_days, num_assets, n_simulations))
         
-    # 3. Simulate Trajectories
-    # Path matrix: shape (horizon_days + 1, n_simulations)
-    paths_val = np.zeros((horizon_days + 1, n_simulations))
-    paths_val[0, :] = total_val_initial
+    # 3. Simulate Trajectories via Vectorized Matrix Multiplication & Cumulative Product
+    z_reshaped = z_raw.swapaxes(0, 1).reshape(num_assets, horizon_days * n_simulations)
+    port_shocks = (w_L @ z_reshaped).reshape(horizon_days, n_simulations)
+    daily_port_returns = 1.0 + port_mu + port_shocks
     
-    for t in range(horizon_days):
-        # Correlated shocks for all simulations at day t: (num_assets, n_simulations)
-        shocks_t = z_raw[t, :, :] # (num_assets, n_simulations)
-        corr_shocks = L @ shocks_t # (num_assets, n_simulations)
-        
-        # Asset daily returns: (num_assets, n_simulations)
-        asset_rets_t = mean_daily[:, np.newaxis] + corr_shocks
-        
-        # Portfolio daily return for each simulation: (n_simulations,)
-        port_ret_t = np.dot(weights, asset_rets_t)
-        
-        # Update portfolio value
-        paths_val[t + 1, :] = paths_val[t, :] * (1.0 + port_ret_t)
+    paths_val = np.empty((horizon_days + 1, n_simulations), dtype=np.float64)
+    paths_val[0, :] = total_val_initial
+    paths_val[1:, :] = total_val_initial * np.cumprod(daily_port_returns, axis=0)
         
     # 4. Percentiles over time (horizon_days + 1)
     p99 = np.percentile(paths_val, 99, axis=1)

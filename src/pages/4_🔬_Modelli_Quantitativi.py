@@ -2173,15 +2173,20 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
                 dist_type = st.radio("Distribuzione Shock:", ["Gaussiana (Normale)", "Student-t (Code Grasse)"], horizontal=True)
                 dist_key = "student_t" if "Student-t" in dist_type else "gaussian"
 
-        # Esecuzione della Simulazione Monte Carlo
-        mc_adv = run_advanced_monte_carlo_simulation(
-            results_dict=results,
-            horizon_days=horizon_opt,
-            volatility_multiplier=vol_mult,
-            drift_shift_pct=drift_shift,
-            distribution_type=dist_key,
-            n_simulations=3000
-        )
+        # Esecuzione della Simulazione Monte Carlo con caching di sessione
+        mc_cache_key = f"mc_adv_{horizon_opt}_{vol_mult}_{drift_shift}_{dist_key}_{results.get('run_id', '')}"
+        if mc_cache_key in st.session_state:
+            mc_adv = st.session_state[mc_cache_key]
+        else:
+            mc_adv = run_advanced_monte_carlo_simulation(
+                results_dict=results,
+                horizon_days=horizon_opt,
+                volatility_multiplier=vol_mult,
+                drift_shift_pct=drift_shift,
+                distribution_type=dist_key,
+                n_simulations=3000
+            )
+            st.session_state[mc_cache_key] = mc_adv
 
         if mc_adv:
             # Head KPI Cards

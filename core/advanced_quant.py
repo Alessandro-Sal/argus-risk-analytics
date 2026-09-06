@@ -57,35 +57,26 @@ def compute_tail_copula_matrix(
     # 1. Trasformazione alle marginali uniformi (Rank Transformation empirical CDF)
     uniforms = clean_df.rank(axis=0) / (t_len + 1.0)
 
-    lambda_lower = np.zeros((n, n))
-    lambda_upper = np.zeros((n, n))
-    clayton_lambda_l = np.zeros((n, n))
-
     q = max(0.01, min(0.20, quantile_threshold))
 
+    # 1. Matrici indicatrici booleane e prodotto matriciale BLAS B^T @ B
+    U_mat = uniforms.to_numpy(dtype=np.float64)
+    B_lower = (U_mat <= q).astype(np.float64)
+    B_upper = (U_mat >= (1.0 - q)).astype(np.float64)
+
+    joint_lower = B_lower.T @ B_lower
+    joint_upper = B_upper.T @ B_upper
+
+    counts_lower = np.diag(joint_lower)[:, np.newaxis]
+    counts_upper = np.diag(joint_upper)[:, np.newaxis]
+
+    emp_lambda_l = np.divide(joint_lower, counts_lower, out=np.zeros((n, n)), where=counts_lower > 0)
+    emp_lambda_u = np.divide(joint_upper, counts_upper, out=np.zeros((n, n)), where=counts_upper > 0)
+
+    # 2. Clayton Copula: calcolo solo triangolo superiore con mirroring simmetrico
+    clayton_lambda_l = np.eye(n, dtype=np.float64)
     for i in range(n):
-        for j in range(n):
-            if i == j:
-                lambda_lower[i, j] = 1.0
-                lambda_upper[i, j] = 1.0
-                clayton_lambda_l[i, j] = 1.0
-                continue
-
-            u_i = uniforms.iloc[:, i].values
-            u_j = uniforms.iloc[:, j].values
-
-            # Dipendenza Empirica Coda Inferiore (Joint Crash Probability)
-            # P(U_j <= q | U_i <= q) = P(U_i <= q, U_j <= q) / q
-            both_lower = np.sum((u_i <= q) & (u_j <= q))
-            i_lower = np.sum(u_i <= q)
-            emp_lambda_l = (both_lower / i_lower) if i_lower > 0 else 0.0
-
-            # Dipendenza Empirica Coda Superiore (Joint Boom Probability)
-            both_upper = np.sum((u_i >= 1.0 - q) & (u_j >= 1.0 - q))
-            i_upper = np.sum(u_i >= 1.0 - q)
-            emp_lambda_u = (both_upper / i_upper) if i_upper > 0 else 0.0
-
-            # Clayton Copula (Parametrica tramite Kendall Tau)
+        for j in range(i + 1, n):
             try:
                 tau, _ = stats.kendalltau(clean_df.iloc[:, i], clean_df.iloc[:, j])
                 if np.isnan(tau):
@@ -97,14 +88,14 @@ def compute_tail_copula_matrix(
                     clay_l = 0.0
             except Exception:
                 clay_l = 0.0
-
-            # Blend robusto empirico + parametrico
-            final_l = float(np.clip(0.6 * emp_lambda_l + 0.4 * clay_l, 0.0, 1.0))
-            final_u = float(np.clip(emp_lambda_u, 0.0, 1.0))
-
-            lambda_lower[i, j] = final_l
-            lambda_upper[i, j] = final_u
             clayton_lambda_l[i, j] = clay_l
+            clayton_lambda_l[j, i] = clay_l
+
+    # 3. Blend robusto empirico + parametrico vettorizzato
+    lambda_lower = np.clip(0.6 * emp_lambda_l + 0.4 * clayton_lambda_l, 0.0, 1.0)
+    lambda_upper = np.clip(emp_lambda_u, 0.0, 1.0)
+    np.fill_diagonal(lambda_lower, 1.0)
+    np.fill_diagonal(lambda_upper, 1.0)
 
     lambda_lower_df = pd.DataFrame(lambda_lower, index=tickers, columns=tickers)
     lambda_upper_df = pd.DataFrame(lambda_upper, index=tickers, columns=tickers)

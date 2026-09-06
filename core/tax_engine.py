@@ -150,9 +150,10 @@ def compute_tax_and_harvesting(
                     sub = df_prices[df_prices["ticker"] == fxt].sort_values("price_date")
                     fx_dict[fxt] = pd.Series(sub["close"].values, index=pd.to_datetime(sub["price_date"]))
 
+            from collections import deque
             yearly_stats = {}
             for ticker, grp in df_tx.groupby('ticker'):
-                queue = []
+                queue = deque()
                 grp = grp.sort_values(["tx_date", "tx_id"] if "tx_id" in grp.columns else ["tx_date"])
                 
                 for _, row in grp.iterrows():
@@ -204,14 +205,14 @@ def compute_tax_and_harvesting(
                     elif txtype == 'sell':
                         qty_to_sell = qty
                         while qty_to_sell > 1e-9 and queue:
-                            lot_qty, lot_price = queue[0]
-                            if lot_qty <= qty_to_sell + 1e-9:
-                                pnl = lot_qty * (price - lot_price)
-                                qty_to_sell -= lot_qty
-                                queue.pop(0)
+                            lot = queue[0]
+                            if lot[0] <= qty_to_sell + 1e-9:
+                                pnl = lot[0] * (price - lot[1])
+                                qty_to_sell -= lot[0]
+                                queue.popleft()
                             else:
-                                pnl = qty_to_sell * (price - lot_price)
-                                queue[0][0] -= qty_to_sell
+                                pnl = qty_to_sell * (price - lot[1])
+                                lot[0] -= qty_to_sell
                                 qty_to_sell = 0.0
                             
                             if pnl > 0:
