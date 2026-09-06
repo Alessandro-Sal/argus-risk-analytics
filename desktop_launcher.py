@@ -63,6 +63,14 @@ def find_python_executable():
     return "python"
 
 def main():
+    # 0. Disaster recovery: Snapshot preventivo del database locale su avvio
+    try:
+        from core.backup_engine import perform_hot_backup
+        perform_hot_backup()
+        print("[ARGUS Desktop] Snapshot di sicurezza database completato con successo.")
+    except Exception as ex_b:
+        print(f"[ARGUS Desktop] Avviso backup preventivo (non bloccante): {ex_b}")
+
     # 1. Configura una cartella utente WebView2 dedicata e isolata per evitare conflitti 0x800700AA
     udf_dir = os.path.join(tempfile.gettempdir(), f"argus_wv2_{os.getpid()}")
     try:
@@ -89,39 +97,69 @@ def main():
     process = None
     port = None
 
-    # Tenta l'avvio su fino a 3 porte dinamiche libere
-    for attempt in range(1, 4):
-        port = find_free_port()
-        print(f"[ARGUS Desktop] Tentativo {attempt}/3: Avvio server su http://127.0.0.1:{port}...")
-        
-        cmd = [
-            python_exe, "-m", "streamlit", "run", entry_point,
-            f"--server.port={port}",
-            "--server.headless=true",
-            "--server.address=127.0.0.1",
-            "--global.developmentMode=false",
-            "--browser.gatherUsageStats=false"
-        ]
+    # Tenta prima via subprocess (se Python disponibile)
+    if python_exe and shutil.which(python_exe) or os.path.exists(str(python_exe)):
+        for attempt in range(1, 4):
+            port = find_free_port()
+            print(f"[ARGUS Desktop] Tentativo {attempt}/3: Avvio server su http://127.0.0.1:{port}...")
+            
+            cmd = [
+                python_exe, "-m", "streamlit", "run", entry_point,
+                f"--server.port={port}",
+                "--server.headless=true",
+                "--server.address=127.0.0.1",
+                "--global.developmentMode=false",
+                "--browser.gatherUsageStats=false"
+            ]
 
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=creation_flags
-        )
-
-        if wait_for_server(port, timeout=12):
-            server_ready = True
-            break
-        else:
-            print(f"[ARGUS Desktop] Tentativo {attempt} fallito. Chiusura processo e retry...")
             try:
-                process.terminate()
-            except Exception:
-                pass
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    creationflags=creation_flags
+                )
+
+                if wait_for_server(port, timeout=12):
+                    server_ready = True
+                    break
+                else:
+                    print(f"[ARGUS Desktop] Tentativo {attempt} fallito. Chiusura processo e retry...")
+                    try:
+                        process.terminate()
+                    except Exception:
+                        pass
+            except Exception as e_proc:
+                print(f"[ARGUS Desktop] Avvio subprocess non riuscito: {e_proc}")
+                break
+
+    # Fallback su thread in-process se nessun interprete esterno e' disponibile (standalone PyInstaller)
+    if not server_ready:
+        print("[ARGUS Desktop] Avvio server Streamlit embedded via bootstrap in-process...")
+        try:
+            import threading
+            from streamlit.web import bootstrap
+            port = find_free_port()
+            flag_opts = {
+                "server.port": port,
+                "server.headless": True,
+                "server.address": "127.0.0.1",
+                "global.developmentMode": False,
+                "browser.gatherUsageStats": False,
+            }
+            th = threading.Thread(
+                target=bootstrap.run,
+                args=(entry_point, False, [], flag_opts),
+                daemon=True
+            )
+            th.start()
+            if wait_for_server(port, timeout=15):
+                server_ready = True
+        except Exception as e_th:
+            print(f"[ARGUS Desktop] Avvio embedded fallito: {e_th}")
 
     if not server_ready:
-        print("[ARGUS Desktop] Errore critico: Impossibile connettersi al server Streamlit locale dopo 3 tentativi.")
+        print("[ARGUS Desktop] Errore critico: Impossibile connettersi al server Streamlit locale.")
         return
 
     app_url = f"http://127.0.0.1:{port}"

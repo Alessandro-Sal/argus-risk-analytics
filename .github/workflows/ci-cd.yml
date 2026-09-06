@@ -1,0 +1,178 @@
+name: ARGUS — CI/CD Production Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  # ── FASE 1: CODE QUALITY & LINTING ────────────────────────────
+  lint:
+    name: 🔍 Linting & Code Hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Linting Tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff flake8
+
+      - name: Run Ruff Linter
+        run: ruff check core/ tests/ src/ --ignore E501,E402,F401
+
+  # ── FASE 2: TEST SUITE & COVERAGE ─────────────────────────────
+  test:
+    name: 🧪 Automated Tests & Headless Smoke Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgl1-mesa-glx
+
+      - name: Install Project Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-cov pydantic pywebview
+
+      - name: Run Pytest Suite (All 394+ Tests)
+        run: |
+          python -m pytest --cov=core --cov-report=term-missing --cov-report=xml tests/
+
+      - name: Upload Test Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
+
+  # ── FASE 3: DOCKER CONTAINER BUILD & PUSH ─────────────────────
+  docker-build:
+    name: 🐳 Docker Multi-Arch Build & GHCR Publish
+    needs: test
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/argus-web
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── FASE 4: STANDALONE DESKTOP PACKAGING (WINDOWS) ───────────
+  desktop-package-windows:
+    name: 🪟 Build Windows Desktop Executable (PyInstaller)
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install Packaging Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller pywebview pydantic
+
+      - name: Compile Standalone Windows Binary with PyInstaller
+        run: |
+          python -m PyInstaller argus_desktop.spec
+
+      - name: Compress Desktop Release Archive
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/ARGUS_Desktop -DestinationPath ARGUS_Windows_x64_${{ github.ref_name }}.zip
+
+      - name: Upload Windows Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARGUS_Windows_x64
+          path: ARGUS_Windows_x64_${{ github.ref_name }}.zip
+
+  # ── FASE 5: GITHUB RELEASE PUBLISHING ─────────────────────────
+  publish-release:
+    name: 🚀 Publish GitHub Release with Desktop Bundle
+    needs: [docker-build, desktop-package-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ARGUS_Windows_x64
+
+      - name: Create Official GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ARGUS_Windows_x64_*.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
