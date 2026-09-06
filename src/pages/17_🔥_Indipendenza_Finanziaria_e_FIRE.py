@@ -531,17 +531,22 @@ with tab_goals:
         sim_infl_val = st.slider("Inflazione Annua (%)", min_value=0.0, max_value=8.0, value=2.0, step=0.5, key="sim_infl_in")
         sim_risk_profile = st.selectbox("Profilo Glide Path", ["conservative", "moderate", "aggressive"], index=1, key="sim_risk_prof_in")
 
-    # Esecuzione simulazione Monte Carlo
-    mc_goal_res = compute_goal_based_monte_carlo(
-        current_amount=sim_curr_val,
-        monthly_contribution=sim_pac_val,
-        target_amount=sim_target_val,
-        years=sim_years_val,
-        mean_annual_return=sim_ret_val / 100.0,
-        annual_volatility=sim_vol_val / 100.0,
-        inflation_rate=sim_infl_val / 100.0,
-        n_simulations=5000
-    )
+    # Esecuzione simulazione Monte Carlo con caching di sessione
+    mc_fire_key = f"mc_fire_{sim_curr_val}_{sim_pac_val}_{sim_target_val}_{sim_years_val}_{sim_ret_val}_{sim_vol_val}_{sim_infl_val}"
+    if mc_fire_key in st.session_state:
+        mc_goal_res = st.session_state[mc_fire_key]
+    else:
+        mc_goal_res = compute_goal_based_monte_carlo(
+            current_amount=sim_curr_val,
+            monthly_contribution=sim_pac_val,
+            target_amount=sim_target_val,
+            years=sim_years_val,
+            mean_annual_return=sim_ret_val / 100.0,
+            annual_volatility=sim_vol_val / 100.0,
+            inflation_rate=sim_infl_val / 100.0,
+            n_simulations=5000
+        )
+        st.session_state[mc_fire_key] = mc_goal_res
 
     # Indicatori di sintesi
     spi = mc_goal_res["spi_pct"]
