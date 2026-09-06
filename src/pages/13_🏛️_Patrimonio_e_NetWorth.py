@@ -16,12 +16,18 @@ from core.fetcher import get_engine
 from core.sidebar import render_sidebar
 from core.ui_utils import (
     apply_plotly_theme,
+    apply_chart_theme,
     fmt_eur,
     fmt_pct,
     inject_custom_css,
     metric_card,
+    render_kpi_card,
+    render_omni_command_bar,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    ensure_portal_context,
+    render_data_table,
+    render_segmented_tabs,
     section,
 )
 from core.wealth.wealth_db import (
@@ -163,23 +169,13 @@ else:
     current_pid = st.session_state.get("wealth_active_portfolio_id")
 
     if current_pid is None or current_pid not in prof_map:
-        st.title("🏛️ ARGUS Wealth — Patrimonio & Net Worth")
-        st.markdown("""
-        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-            <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Selezionato</h4>
-            <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Seleziona un profilo attivo per caricare i dati e visualizzare le metriche del Patrimonio Netto.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        sel_box = st.selectbox(
-            "Seleziona Profilo Patrimoniale:",
-            options=[None] + list(prof_map.keys()),
-            format_func=lambda pid: "👉 Seleziona un Profilo..." if pid is None else f"📁 {prof_map[pid]} (ID #{pid})",
-            key="nw_unselected_profile_picker"
-        )
-        if sel_box is not None:
-            st.session_state["wealth_active_portfolio_id"] = sel_box
-            st.rerun()
-        st.stop()
+        if prof_map:
+            current_pid = list(prof_map.keys())[0]
+            st.session_state["wealth_active_portfolio_id"] = current_pid
+        else:
+            ctx = ensure_portal_context(module="wealth")
+            current_pid = ctx["portfolio_id"]
+            prof_map = ctx["profile_map"]
 
     nw = _load_cached_consolidated_net_worth(engine, portfolio_id=current_pid)
     tot_nw = nw.total_net_worth
@@ -198,7 +194,7 @@ else:
     df_accounts = _load_cached_wealth_accounts(engine, portfolio_id=current_pid)
 
 prof_title = prof_map.get(current_pid, "Personale")
-render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p13")
+render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p13")
 render_wealth_executive_badges(nw)
 
 # ── SMART FINANCIAL WATCHDOG SENTINEL ────────────────────────
@@ -307,14 +303,8 @@ if st.session_state.get("wealth_boardroom_mode", False):
             textinfo="label+percent",
             hoverinfo="label+value+percent"
         )])
-        fig_donut.update_layout(
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=10, t=10, b=10),
-            height=320,
-            showlegend=False
-        )
+        fig_donut.update_layout(height=320, showlegend=False)
+        apply_chart_theme(fig_donut, portal_mode="wealth")
         st.plotly_chart(fig_donut, use_container_width=True)
 
     with col_bg2:
@@ -325,13 +315,10 @@ if st.session_state.get("wealth_boardroom_mode", False):
         fig_bar.add_trace(go.Bar(name="Patrimonio Netto", x=["Patrimonio"], y=[tot_nw], marker_color="#ff9900", text=[fmt_eur(tot_nw)], textposition="auto"))
         fig_bar.update_layout(
             barmode="group",
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=10, r=10, t=10, b=10),
             height=320,
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
+        apply_chart_theme(fig_bar, portal_mode="wealth")
         st.plotly_chart(fig_bar, use_container_width=True)
 
     # Toolbar Esportazione e Uscita Boardroom

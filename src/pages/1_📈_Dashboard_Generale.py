@@ -8,7 +8,25 @@ import plotly.graph_objects as go
 import core.ui_utils
 import core.risk_engine
 import core.duckdb_engine
-from core.ui_utils import inject_custom_css, section, metric_card, fmt_pct, fmt_eur, glossary_modal, render_executive_badges, render_command_bar, apply_plotly_theme, render_factor_radar_chart, render_info_modal, ensure_risk_bundle_loaded, render_sandbox_banner
+from core.ui_utils import (
+    inject_custom_css,
+    section,
+    metric_card,
+    render_kpi_card,
+    fmt_pct,
+    fmt_eur,
+    glossary_modal,
+    render_executive_badges,
+    render_command_bar,
+    render_omni_command_bar,
+    render_standard_hero,
+    apply_plotly_theme,
+    apply_chart_theme,
+    render_factor_radar_chart,
+    render_info_modal,
+    ensure_risk_bundle_loaded,
+    render_sandbox_banner
+)
 from core.excel_generator import generate_excel_in_memory
 
 inject_custom_css()
@@ -24,14 +42,21 @@ sr_port = results.get("portfolio_return", pd.Series(dtype=float))
 sr_bm   = results.get("benchmark_return", pd.Series(dtype=float))
 pos = results.get("positions", pd.DataFrame())
 
-render_command_bar()
+render_omni_command_bar(portal="risk")
 render_sandbox_banner(page_key="p1")
 
-st.title("📈 Dashboard Generale | Executive Cockpit")
 if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Quadro sintetico ad alta densità su performance, allocazione, impronta di rischio e conformità regolamentare.")
+    sub_text = f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Quadro sintetico ad alta densità su performance, allocazione, impronta di rischio e conformità regolamentare."
 elif results.get("is_sandbox"):
-    st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
+    sub_text = f"🧪 Modalità Sandbox Attiva: {results.get('sandbox_name', 'Benchmark Demo')} ({len(pos)} asset) • Capitale Simulato: $100,000"
+else:
+    sub_text = "Quadro sintetico ad alta densità su performance, allocazione, impronta di rischio e conformità regolamentare."
+
+render_standard_hero(
+    title="Dashboard Generale | Executive Cockpit",
+    subtitle=sub_text,
+    icon="📈"
+)
 
 render_executive_badges(m)
 

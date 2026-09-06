@@ -181,27 +181,47 @@ NAV_MODULES_WEALTH = [
         "icon": "🎛️",
         "page_file": "pages/12_🎛️_Wealth_Control_Room.py",
         "key": "12_Wealth_Control_Room",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_cr_active_tab",
+        "subtabs": [
+            {"label": "📥 Data Pipeline", "target": "📥 Data Pipeline & Ingestion"},
+            {"label": "⚙️ Gestione Conti", "target": "⚙️ Gestione Conti & Categorie"},
+            {"label": "📑 Hub Reportistica", "target": "📑 Hub Reportistica & Esportazioni"}
+        ]
     },
     {
         "title": "Patrimonio & Net Worth",
         "icon": "🏛️",
         "page_file": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
         "key": "13_Patrimonio_e_NetWorth",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_nw_active_tab",
+        "subtabs": [
+            {"label": "🌐 Bilancio & Allocazione", "target": "🏛️ Bilancio & Allocazione"},
+            {"label": "📜 Stato Patrimoniale", "target": "📋 Stato Patrimoniale & Conti"},
+            {"label": "⏳ Wealth Temporal", "target": "📊 Wealth Temporal Desk"},
+            {"label": "🏛️ Family Office", "target": "🏢 Family Office & Holding"},
+            {"label": "💱 Rischio FX & Brinson", "target": "💱 Rischio FX & Attribuzione Brinson"},
+            {"label": "🌪️ Stress Testing", "target": "🌪️ Global Wealth Stress-Testing"}
+        ]
     },
     {
         "title": "Cash Flow & Spese",
         "icon": "💳",
         "page_file": "pages/14_💳_Cash_Flow_e_Spese.py",
         "key": "14_Cash_Flow_e_Spese",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_cf_active_tab",
+        "subtabs": [
+            {"label": "🌊 Flusso Sankey", "target": "🌊 Sankey & Flussi"},
+            {"label": "📈 Trend & Mensile", "target": "📊 Trend & Stagionalità MoM"},
+            {"label": "🏬 Commercianti", "target": "🏷️ Top Merchant & Pareto (80/20)"},
+            {"label": "✉️ Budget & Buste", "target": "🎯 Budget vs Consuntivo (Envelope)"},
+            {"label": "📅 Abbonamenti", "target": "🔁 Abbonamenti & Costi Fissi"},
+            {"label": "🛠️ Simulatore What-if", "target": "🔄 Ottimizzazione PAC & What-If"},
+            {"label": "🔮 Previsioni & Anomalie", "target": "🔮 Previsione Cassa & Anomalie"},
+            {"label": "📑 Registro Movimenti", "target": "📜 Libro Mastro & Inserimento"}
+        ]
     },
     {
         "title": "Asset Illiquidi & Orologi",
@@ -226,45 +246,75 @@ NAV_MODULES_WEALTH = [
         "icon": "🔥",
         "page_file": "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py",
         "key": "17_Indipendenza_Finanziaria_e_FIRE",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_fire_active_tab",
+        "subtabs": [
+            {"label": "🔥 Calcolatore FIRE", "target": "🔥 Calcolatore FIRE & SWR"},
+            {"label": "🌪️ Stress Testing", "target": "🌪️ Stress Testing & Crisi"},
+            {"label": "🎯 Obiettivi di Vita", "target": "🎯 Obiettivi & Merton Model"},
+            {"label": "⏳ Sequence of Returns", "target": "⏳ Sequence of Returns (SRR)"},
+            {"label": "💸 Fee Drag & TCO", "target": "💸 Fee Drag & TCO"}
+        ]
     },
     {
         "title": "Fiscalità & Quadro RW",
         "icon": "📑",
         "page_file": "pages/18_📑_Fiscalita_e_Quadro_RW.py",
         "key": "18_Fiscalita_e_Quadro_RW",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_tax_active_tab",
+        "subtabs": [
+            {"label": "📑 Monitoraggio RW", "target": "📑 Monitoraggio Quadro RW"},
+            {"label": "🪦 Zainetto Minusvalenze", "target": "🪦 Zainetto Fiscale Minusvalenze"},
+            {"label": "🌾 Tax-Loss Harvesting", "target": "🌾 Tax-Loss Harvesting"},
+            {"label": "⚖️ Asset Location", "target": "⚖️ Asset Location & Split Fiscale"},
+            {"label": "🛡️ Ottimizzazione", "target": "🛡️ Strategie di Ottimizzazione"},
+            {"label": "🌐 Cross-Border", "target": "🌐 Cross-Border & Doppia Imposizione"}
+        ]
     },
     {
         "title": "Immobili & Mutui",
         "icon": "🏡",
         "page_file": "pages/19_🏡_Immobili_e_Mutui.py",
         "key": "19_Immobili_e_Mutui",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_re_active_tab",
+        "subtabs": [
+            {"label": "🏡 Net Home Equity", "target": "🏡 Net Equity & Composizione"},
+            {"label": "📉 Piani Ammortamento", "target": "📉 Piani Ammortamento & Mutui"},
+            {"label": "📈 Rendita Locazioni", "target": "📈 Redditività da Locazione"},
+            {"label": "⚖️ Buy vs Rent", "target": "⚖️ Buy vs Rent Analyzer"}
+        ]
     },
     {
         "title": "Pianificazione Successoria",
         "icon": "⚖️",
         "page_file": "pages/20_⚖️_Pianificazione_Successoria.py",
         "key": "20_Pianificazione_Successoria",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_estate_active_tab",
+        "subtabs": [
+            {"label": "📊 Quote Legittima", "target": "📊 Quote Ereditarie & Legittima"},
+            {"label": "💰 Imposte Successione", "target": "💰 Calcolo Imposte Successione"},
+            {"label": "🛡️ Protezione Patrimonio", "target": "🛡️ Strumenti di Protezione Patrimoniale"},
+            {"label": "📜 Patto di Famiglia", "target": "📜 Patto di Famiglia & Governance"}
+        ]
     },
     {
         "title": "AI Copilot & Advisor",
         "icon": "🤖",
         "page_file": "pages/21_🤖_AI_Copilot_e_Advisor.py",
         "key": "21_AI_Copilot_e_Advisor",
-        "has_subtabs": False,
-        "tab_key": None,
-        "subtabs": []
+        "has_subtabs": True,
+        "tab_key": "wealth_copilot_active_tab",
+        "subtabs": [
+            {"label": "🔍 Diagnosi Olistica", "target": "🔍 Diagnosi Olistica"},
+            {"label": "⚖️ Rebalancing Watchdog", "target": "⚖️ Rebalancing Watchdog"},
+            {"label": "🎯 Life Goal Planner", "target": "🎯 Life Goal Planner"},
+            {"label": "📑 Quarterly Review", "target": "📑 Quarterly Wealth Review"},
+            {"label": "💬 Chat Advisor", "target": "💬 Chat Finanziaria"},
+            {"label": "🎙️ Voice Briefing", "target": "🎙️ Voice Briefing"}
+        ]
     }
 ]
 

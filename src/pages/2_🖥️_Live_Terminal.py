@@ -33,10 +33,15 @@ from core.sidebar import render_sidebar
 from core.ui_utils import (
     inject_custom_css,
     render_command_bar,
+    render_omni_command_bar,
     metric_card,
+    render_kpi_card,
     glossary_modal,
     ensure_risk_bundle_loaded,
-    render_page_header
+    render_page_header,
+    render_standard_hero,
+    apply_plotly_theme,
+    apply_chart_theme
 )
 from core.terminal_engine import (
     get_terminal_engine,
@@ -59,7 +64,7 @@ inject_custom_css()
 
 # ── Sidebar & Ingestion Gate ─────────────────────────────────────────────────
 render_sidebar()
-render_command_bar()
+render_omni_command_bar(portal="risk")
 
 results, has_real_portfolio = ensure_risk_bundle_loaded()
 pos = results.get("positions", pd.DataFrame()) if results else pd.DataFrame()
@@ -69,8 +74,8 @@ df_prices = results.get("df_prices", pd.DataFrame()) if results else pd.DataFram
 df_tx = results.get("df_tx", pd.DataFrame()) if results else pd.DataFrame()
 
 # ── Page Header ──────────────────────────────────────────────────────────────
-render_page_header(
-    title="ARGUS Live Terminal & Real-Time Market Desk",
+render_standard_hero(
+    title="Live Terminal & Real-Time Market Desk",
     subtitle="Console Interattiva Bloomberg CLI • Quotazioni Real-Time Streaming & Book Depth L2 • Monitor Prezzi Live Portafoglio & Watchlist Multi-Asset • OMS Execution Blotter",
     icon="🖥️"
 )
@@ -416,6 +421,7 @@ with col_tape_book:
                 xaxis=dict(showgrid=False, title=None, tickfont=dict(size=8.5, family="monospace", color="#8b949e")),
                 yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", title=None, side="right", tickprefix=tape_sym_curr, tickfont=dict(size=9.5, family="monospace", color="#8b949e"))
             )
+            apply_chart_theme(fig_intra, portal_mode="risk")
             st.plotly_chart(fig_intra, use_container_width=True, config={"displayModeBar": False})
         else:
             st.caption("Buffer streaming in avvio. Clicca su '⚡ Invia Tick Live' per generare dati nel grafico intraday.")
@@ -457,6 +463,7 @@ with col_tape_book:
             xaxis=dict(title=dict(text="Prezzo L2", font=dict(size=10, color="#8b949e")), tickprefix=tape_sym_curr, showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace", color="#8b949e")),
             yaxis=dict(title=dict(text="Vol Cumulativo", font=dict(size=10, color="#8b949e")), side="right", showgrid=True, gridcolor="rgba(255,255,255,0.06)", tickfont=dict(size=9, family="monospace", color="#8b949e"))
         )
+        apply_chart_theme(fig_depth, portal_mode="risk")
         st.plotly_chart(fig_depth, use_container_width=True, config={"displayModeBar": False})
 
 st.divider()
@@ -756,6 +763,7 @@ with tab_heatmap_live:
             ),
             coloraxis_colorbar=dict(title="Var 1D (%)", tickfont=dict(size=10, family="monospace"))
         )
+        apply_chart_theme(fig_heat, portal_mode="risk")
         st.plotly_chart(fig_heat, use_container_width=True, config={"displayModeBar": False})
 
 with tab_rel_perf:
@@ -835,6 +843,7 @@ with tab_rel_perf:
         xaxis=dict(showgrid=False, tickfont=dict(size=10, family="monospace", color="#8b949e")),
         yaxis=dict(showgrid=True, gridcolor="rgba(255,255,255,0.06)", ticksuffix="%", side="right", tickfont=dict(size=10, family="monospace", color="#8b949e"))
     )
+    apply_chart_theme(fig_rel, portal_mode="risk")
     st.plotly_chart(fig_rel, use_container_width=True, config={"displayModeBar": False})
 
     # Tabella Comparativa Matrice di Performance Relativa & Alpha vs Benchmark

@@ -14,15 +14,20 @@ importlib.reload(core.ui_utils)
 
 from core.fetcher import get_engine
 from core.ui_utils import (
-
     inject_custom_css,
     section,
     metric_card,
+    render_kpi_card,
     fmt_eur,
     fmt_pct,
+    render_omni_command_bar,
     render_wealth_command_bar,
     render_wealth_executive_badges,
-    apply_plotly_theme
+    render_standard_hero,
+    apply_plotly_theme,
+    apply_chart_theme,
+    ensure_portal_context,
+    render_data_table
 )
 from core.sidebar import render_sidebar
 from core.wealth import (
@@ -32,84 +37,30 @@ from core.wealth import (
     compute_consolidated_net_worth,
     compute_private_equity_deal_metrics
 )
+from core.wealth.wealth_modals import render_illiquids_methodology_modal
 
 
 st.set_page_config(page_title="Asset Illiquidi & Orologi | ARGUS Wealth", page_icon="⌚", layout="wide")
-inject_custom_css()
-render_sidebar()
 
-st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+ctx = ensure_portal_context(module="wealth")
+engine = ctx["engine"]
+current_pid = ctx["portfolio_id"]
+prof_title = ctx["profile_name"]
+prof_map = ctx["profile_map"]
+nw_curr = ctx["net_worth"]
 
-db_user = st.session_state.get("db_user", "root")
-db_pass = st.session_state.get("db_pass", "root")
-db_host = st.session_state.get("db_host", "localhost")
-db_port = int(st.session_state.get("db_port", 3306))
-db_name = st.session_state.get("db_name", "investment_risk_bi")
-
-engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
-
-df_prof = get_wealth_portfolios(engine)
-prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
-current_pid = st.session_state.get("wealth_active_portfolio_id")
-
-if current_pid is None or current_pid not in prof_map:
-    st.title("⌚ ARGUS Wealth — Caveau & Asset Fisici")
-    st.markdown("""
-    <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-        <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Selezionato</h4>
-        <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Seleziona un profilo attivo per visualizzare gli asset fisici, orologi e metalli preziosi in custodia.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    sel_box = st.selectbox(
-        "Seleziona Profilo Patrimoniale:",
-        options=[None] + list(prof_map.keys()),
-        format_func=lambda pid: "👉 Seleziona un Profilo..." if pid is None else f"📁 {prof_map[pid]} (ID #{pid})",
-        key="phys_unselected_profile_picker"
-    )
-    if sel_box is not None:
-        st.session_state["wealth_active_portfolio_id"] = sel_box
-        st.rerun()
-    st.stop()
-
-prof_title = prof_map.get(current_pid, "Personale")
-render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p15")
-nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
+render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p15")
 render_wealth_executive_badges(nw_curr)
 
-from core.wealth.wealth_modals import render_illiquids_methodology_modal
-
-if len(prof_map) > 1:
-    head_c1, head_c2, head_c3 = st.columns([3.5, 1.3, 1.2])
-    with head_c1:
-        st.title("⌚ ARGUS Wealth — Caveau & Asset Fisici")
-        st.caption("Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili e Metalli Preziosi.")
-    with head_c2:
-        st.write("")
-        sel_pid = st.selectbox(
-            "Profilo Patrimoniale:",
-            options=list(prof_map.keys()),
-            format_func=lambda pid: f"📁 {prof_map[pid]}",
-            index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-            key="phys_profile_selector_widget"
-        )
-        if sel_pid != current_pid:
-            st.session_state["wealth_active_portfolio_id"] = sel_pid
-            st.rerun()
-    with head_c3:
-        st.write("")
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        if st.button("ℹ️ Metodologia Perizie", key="btn_modal_illiquid_p15", use_container_width=True):
-            render_illiquids_methodology_modal()
-else:
-    head_c1, head_c2 = st.columns([4.2, 0.8])
-    with head_c1:
-        st.title("⌚ ARGUS Wealth — Caveau & Asset Fisici")
-        st.caption("Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili e Metalli Preziosi.")
-    with head_c2:
-        st.write("")
-        st.markdown("<div style='height: 4px;'></div>", unsafe_allow_html=True)
-        if st.button("ℹ️ Metodologia Perizie", key="btn_modal_illiquid_p15", use_container_width=True):
-            render_illiquids_methodology_modal()
+render_standard_hero(
+    title="Caveau & Asset Fisici",
+    subtitle="Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili e Metalli Preziosi.",
+    icon="⌚",
+    profile_map=prof_map,
+    current_pid=current_pid,
+    dialog_callback=render_illiquids_methodology_modal,
+    dialog_btn_label="ℹ️ Metodologia Perizie"
+)
 
 df_assets = get_physical_assets(engine, portfolio_id=current_pid)
 
@@ -343,7 +294,7 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
             margin=dict(t=15, l=10, r=10, b=10),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
-        apply_plotly_theme(fig_j)
+        apply_chart_theme(fig_j, portal_mode="wealth")
         st.plotly_chart(fig_j, use_container_width=True, config={'displayModeBar': False})
 
     st.divider()
