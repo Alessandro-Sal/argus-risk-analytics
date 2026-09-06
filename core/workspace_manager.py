@@ -37,6 +37,16 @@ PAGE_ROUTE_MAP = {
     "9_Analisi_Tecnica": "pages/9_📈_Analisi_Tecnica.py",
     "10_Screener_Opportunita": "pages/10_🔍_Screener_Opportunita.py",
     "11_BQuant_e_Launchpad": "pages/11_💻_BQuant_e_Launchpad.py",
+    "12_Wealth_Control_Room": "pages/12_🎛️_Wealth_Control_Room.py",
+    "13_Patrimonio_e_NetWorth": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+    "14_Cash_Flow_e_Spese": "pages/14_💳_Cash_Flow_e_Spese.py",
+    "15_Asset_Illiquidi_e_Orologi": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
+    "16_Previdenza_e_Pension_Planning": "pages/16_🛡️_Previdenza_e_Pension_Planning.py",
+    "17_Indipendenza_Finanziaria_e_FIRE": "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py",
+    "18_Fiscalita_e_Quadro_RW": "pages/18_📑_Fiscalita_e_Quadro_RW.py",
+    "19_Immobili_e_Mutui": "pages/19_🏡_Immobili_e_Mutui.py",
+    "20_Pianificazione_Successoria": "pages/20_⚖️_Pianificazione_Successoria.py",
+    "21_AI_Copilot_e_Advisor": "pages/21_🤖_AI_Copilot_e_Advisor.py",
     # Legacy & name-based aliases
     "Live_Terminal": "pages/2_🖥️_Live_Terminal.py",
     "Analisi_Rischio": "pages/3_🔴_Analisi_Rischio.py",
@@ -48,6 +58,16 @@ PAGE_ROUTE_MAP = {
     "Analisi_Tecnica": "pages/9_📈_Analisi_Tecnica.py",
     "Screener_Opportunita": "pages/10_🔍_Screener_Opportunita.py",
     "BQuant_e_Launchpad": "pages/11_💻_BQuant_e_Launchpad.py",
+    "Wealth_Control_Room": "pages/12_🎛️_Wealth_Control_Room.py",
+    "Patrimonio_e_NetWorth": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
+    "Cash_Flow_e_Spese": "pages/14_💳_Cash_Flow_e_Spese.py",
+    "Asset_Illiquidi_e_Orologi": "pages/15_⌚_Asset_Illiquidi_e_Orologi.py",
+    "Previdenza_e_Pension_Planning": "pages/16_🛡️_Previdenza_e_Pension_Planning.py",
+    "Indipendenza_Finanziaria_e_FIRE": "pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py",
+    "Fiscalita_e_Quadro_RW": "pages/18_📑_Fiscalita_e_Quadro_RW.py",
+    "Immobili_e_Mutui": "pages/19_🏡_Immobili_e_Mutui.py",
+    "Pianificazione_Successoria": "pages/20_⚖️_Pianificazione_Successoria.py",
+    "AI_Copilot_e_Advisor": "pages/21_🤖_AI_Copilot_e_Advisor.py",
 }
 
 

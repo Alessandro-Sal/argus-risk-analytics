@@ -25,12 +25,18 @@ from core.ui_utils import (
     inject_custom_css,
     section,
     metric_card,
+    render_kpi_card,
     fmt_eur,
     fmt_pct,
+    render_omni_command_bar,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_standard_hero,
     render_page_header,
-    apply_plotly_theme
+    apply_plotly_theme,
+    apply_chart_theme,
+    ensure_portal_context,
+    render_data_table
 )
 from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
@@ -54,65 +60,24 @@ from core.wealth.wealth_engine import (
 
 
 st.set_page_config(page_title="Indipendenza & FIRE | ARGUS Wealth", page_icon="🔥", layout="wide")
-inject_custom_css()
-render_sidebar()
 
-st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+ctx = ensure_portal_context(module="wealth")
+engine = ctx["engine"]
+current_pid = ctx["portfolio_id"]
+prof_title = ctx["profile_name"]
+prof_map = ctx["profile_map"]
+nw_curr = ctx["net_worth"]
 
-db_user = st.session_state.get("db_user", "root")
-db_pass = st.session_state.get("db_pass", "root")
-db_host = st.session_state.get("db_host", "localhost")
-db_port = int(st.session_state.get("db_port", 3306))
-db_name = st.session_state.get("db_name", "wealth")
-
-engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
-
-df_prof = get_wealth_portfolios(engine)
-prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
-current_pid = st.session_state.get("wealth_active_portfolio_id")
-
-if current_pid is None or current_pid not in prof_map:
-    st.title("🔥 ARGUS Wealth — Indipendenza Finanziaria & FIRE")
-    st.markdown("""
-    <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-        <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Selezionato</h4>
-        <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Seleziona un profilo attivo per calcolare il target FIRE, i bucket temporali e lo stress testing macroeconomico.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    sel_box = st.selectbox(
-        "Seleziona Profilo Patrimoniale:",
-        options=[None] + list(prof_map.keys()),
-        format_func=lambda pid: "👉 Seleziona un Profilo..." if pid is None else f"📁 {prof_map[pid]} (ID #{pid})",
-        key="fire_unselected_profile_picker"
-    )
-    if sel_box is not None:
-        st.session_state["wealth_active_portfolio_id"] = sel_box
-        st.rerun()
-    st.stop()
-
-prof_title = prof_map.get(current_pid, "Personale")
-render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p17")
-nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
+render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p17")
 render_wealth_executive_badges(nw_curr)
 
-# Header
-render_page_header(
-    title="ARGUS Wealth — Indipendenza Finanziaria, FIRE & Risk Bridge",
+render_standard_hero(
+    title="Indipendenza Finanziaria, FIRE & Risk Bridge",
     subtitle="Simulatore FIRE (Trinity Study / 4% SWR), Liquidity-at-Risk (Anti-Forced Selling), Net Worth-at-Risk e Stress Testing Macro.",
-    icon="🔥"
+    icon="🔥",
+    profile_map=prof_map,
+    current_pid=current_pid
 )
-
-if len(prof_map) > 1:
-    sel_pid = st.selectbox(
-        "Profilo Patrimoniale:",
-        options=list(prof_map.keys()),
-        format_func=lambda pid: f"📁 {prof_map[pid]}",
-        index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-        key="fire_profile_selector_widget"
-    )
-    if sel_pid != current_pid:
-        st.session_state["wealth_active_portfolio_id"] = sel_pid
-        st.rerun()
 
 
 # Recupera dati patrimoniali e cash flow
@@ -265,6 +230,7 @@ with tab_fire:
         font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
         legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
     )
+    apply_chart_theme(fig_fire, portal_mode="wealth")
     st.plotly_chart(fig_fire, use_container_width=True)
 
 # ============================================================
@@ -404,6 +370,7 @@ with tab_stress:
         font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
         legend=dict(orientation="h", yanchor="top", y=-0.15, xanchor="center", x=0.5)
     )
+    apply_chart_theme(fig_stress_bar, portal_mode="wealth")
     st.plotly_chart(fig_stress_bar, use_container_width=True, config={'displayModeBar': False})
 
 
@@ -650,6 +617,7 @@ with tab_goals:
         font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
         legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5)
     )
+    apply_chart_theme(fig_fan, portal_mode="wealth")
     st.plotly_chart(fig_fan, use_container_width=True, config={'displayModeBar': False})
 
     # Glide Path Curve & Dynamic Allocation Schedule
@@ -669,6 +637,7 @@ with tab_goals:
     )
     gp_engine_out = DynamicGlidePathEngine.compute_goal_glide_path(goal_obj)
 
+    apply_chart_theme(gp_engine_out["plot_figure"], portal_mode="wealth")
     st.plotly_chart(gp_engine_out["plot_figure"], use_container_width=True, config={'displayModeBar': False})
 
     with st.expander("📊 Tabella di Asset Allocation Glide Path Anno per Anno", expanded=False):
@@ -757,7 +726,7 @@ with tab_srr:
         margin=dict(t=35, l=15, r=15, b=20),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
-    apply_plotly_theme(fig_srr)
+    apply_chart_theme(fig_srr, portal_mode="wealth")
     st.plotly_chart(fig_srr, use_container_width=True, config={'displayModeBar': False})
 
     st.markdown("##### 💡 Analisi Chiave del Sequence of Returns Risk")
@@ -826,6 +795,7 @@ with tab_tco:
         font=dict(family="Outfit, sans-serif", color="#c9d1d9", size=11),
         legend=dict(orientation="h", yanchor="top", y=-0.18, xanchor="center", x=0.5)
     )
+    apply_chart_theme(fig_tco, portal_mode="wealth")
     st.plotly_chart(fig_tco, use_container_width=True, config={'displayModeBar': False})
 
     # Tabella analitica

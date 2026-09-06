@@ -25,12 +25,17 @@ from core.ui_utils import (
     inject_custom_css,
     section,
     metric_card,
+    render_kpi_card,
     fmt_eur,
     fmt_pct,
+    render_omni_command_bar,
     render_wealth_command_bar,
     render_wealth_executive_badges,
     render_page_header,
-    apply_plotly_theme
+    apply_plotly_theme,
+    apply_chart_theme,
+    ensure_portal_context,
+    render_data_table
 )
 from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
@@ -52,55 +57,25 @@ from core.wealth.wealth_engine import (
     compute_smart_cashflow_reconciliation
 )
 
-
+# ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────
 st.set_page_config(page_title="Cash Flow & Spese | ARGUS Wealth", page_icon="💳", layout="wide")
-inject_custom_css()
-render_sidebar()
-
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
 
-db_user = st.session_state.get("db_user", "root")
-db_pass = st.session_state.get("db_pass", "root")
-db_host = st.session_state.get("db_host", "localhost")
-db_port = int(st.session_state.get("db_port", 3306))
-db_name = st.session_state.get("db_name", "wealth")
-
-engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
-
-df_prof = get_wealth_portfolios(engine)
-prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
-current_pid = st.session_state.get("wealth_active_portfolio_id")
-
-if current_pid is None or current_pid not in prof_map:
-    st.title("💳 ARGUS Wealth — Cash Flow & Spese")
-    st.markdown("""
-    <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-        <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Selezionato</h4>
-        <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Seleziona un profilo attivo per visualizzare le entrate, le uscite e il bilancio mensile.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    sel_box = st.selectbox(
-        "Seleziona Profilo Patrimoniale:",
-        options=[None] + list(prof_map.keys()),
-        format_func=lambda pid: "👉 Seleziona un Profilo..." if pid is None else f"📁 {prof_map[pid]} (ID #{pid})",
-        key="cf_unselected_profile_picker"
-    )
-    if sel_box is not None:
-        st.session_state["wealth_active_portfolio_id"] = sel_box
-        st.rerun()
-    st.stop()
+ctx = ensure_portal_context(module="wealth")
+engine = ctx["engine"]
+current_pid = ctx["portfolio_id"]
+prof_title = ctx["profile_name"]
+prof_map = ctx["profile_map"]
+nw_curr = ctx["net_worth"]
 
 df_cf = get_cashflow_records(engine, portfolio_id=current_pid)
 if not df_cf.empty:
     df_cf["tx_date"] = pd.to_datetime(df_cf["tx_date"])
     available_years = sorted([int(y) for y in df_cf["tx_date"].dt.year.dropna().unique()], reverse=True)
-
 else:
     available_years = [2026]
 
-prof_title = prof_map.get(current_pid, "Personale")
-render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p14")
-nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
+render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p14")
 render_wealth_executive_badges(nw_curr)
 
 # Header
@@ -332,6 +307,7 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
         )
         fig_m.update_xaxes(showgrid=True, gridwidth=1, gridcolor="rgba(255,255,255,0.05)")
         fig_m.update_yaxes(showgrid=True, gridwidth=1, gridcolor="rgba(255,255,255,0.05)")
+        apply_chart_theme(fig_m, portal_mode="wealth")
         st.plotly_chart(fig_m, use_container_width=True)
 
     # Registro Movimenti
@@ -419,6 +395,7 @@ with tab_sankey:
                 font=dict(family="Outfit, sans-serif", size=12, color="#ffffff")
             )
         )
+        apply_chart_theme(fig_sankey, portal_mode="wealth")
         chart_select = st.plotly_chart(
             fig_sankey,
             use_container_width=True,
@@ -654,6 +631,7 @@ with tab_trend:
             layout_kwargs["height"] = 400
 
         fig_trend.update_layout(**layout_kwargs)
+        apply_chart_theme(fig_trend, portal_mode="wealth")
         st.plotly_chart(fig_trend, use_container_width=True, config={'displayModeBar': False})
 
         st.markdown("---")
@@ -705,6 +683,7 @@ with tab_trend:
                 height=320,
                 margin=dict(l=10, r=10, t=10, b=10)
             )
+            apply_chart_theme(fig_heat, portal_mode="wealth")
             st.plotly_chart(fig_heat, use_container_width=True, config={'displayModeBar': False})
         else:
             st.info("Dati insufficienti per generare la mappa di stagionalità.")
@@ -767,6 +746,7 @@ with tab_merchants:
             yaxis=dict(title="Spesa (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
             yaxis2=dict(title="% Cumulativa", overlaying="y", side="right", showgrid=False, range=[0, 105])
         )
+        apply_chart_theme(fig_p, portal_mode="wealth")
         st.plotly_chart(fig_p, use_container_width=True, config={'displayModeBar': False})
 
         st.markdown("---")
@@ -790,6 +770,7 @@ with tab_merchants:
             margin=dict(l=10, r=10, t=10, b=10),
             legend=dict(orientation="h", yanchor="top", y=-0.08, xanchor="center", x=0.5)
         )
+        apply_chart_theme(fig_p_donut, portal_mode="wealth")
         st.plotly_chart(fig_p_donut, use_container_width=True, config={'displayModeBar': False})
 
         st.markdown("---")
@@ -879,6 +860,7 @@ with tab_envelope:
             xaxis=dict(title="Importo (€)", showgrid=True, gridcolor="rgba(255,255,255,0.06)"),
             yaxis=dict(title="", showgrid=False)
         )
+        apply_chart_theme(fig_env, portal_mode="wealth")
         st.plotly_chart(fig_env, use_container_width=True, config={'displayModeBar': False})
 
         st.markdown("---")
@@ -1069,6 +1051,7 @@ with tab_subs:
                     x=0.5, y=0.5, font_size=12, showarrow=False
                 )]
             )
+            apply_chart_theme(fig_sub_pie, portal_mode="wealth")
             st.plotly_chart(fig_sub_pie, use_container_width=True, config={'displayModeBar': False})
 
 
@@ -1142,6 +1125,7 @@ with tab_whatif:
         margin=dict(l=10, r=10, t=50, b=20),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
+    apply_chart_theme(fig_w, portal_mode="wealth")
     st.plotly_chart(fig_w, use_container_width=True, config={'displayModeBar': False})
 
 
@@ -1203,6 +1187,7 @@ with tab_fc:
             margin=dict(l=10, r=10, t=50, b=20),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
+        apply_chart_theme(fig_fc, portal_mode="wealth")
         st.plotly_chart(fig_fc, use_container_width=True, config={'displayModeBar': False})
 
     st.write("")

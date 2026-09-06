@@ -394,6 +394,63 @@ def inject_custom_css():
             line-height: 1.2 !important;
         }}
 
+        .metric-delta-neutral {{
+            color: #8b949e !important;
+            font-size: 11px !important;
+            font-weight: 500 !important;
+            margin-top: 4px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            line-height: 1.2 !important;
+        }}
+
+        /* ARGUS Clean Standard KPI Card (Zero Inline Styles) */
+        .argus-clean-kpi-card {{
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.85) 0%, rgba(13, 17, 23, 0.95) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 12px 14px;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+            min-height: 104px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }}
+        .argus-clean-kpi-card:hover {{
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }}
+        .argus-kpi-label {{
+            color: #8b949e;
+            font-size: 11px;
+            font-weight: 650;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 4px;
+        }}
+        .argus-kpi-value {{
+            font-family: 'JetBrains Mono', monospace !important;
+            font-feature-settings: "tnum" 1, "zero" 1 !important;
+            font-size: clamp(20px, 1.5vw, 25px);
+            font-weight: 800;
+            color: #f0f6fc;
+            margin: 4px 0 2px 0;
+            letter-spacing: -0.5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }}
+
 
         /* Streamlit Main Canvas Controls & Input Fields */
         [data-testid="stMain"] [data-baseweb="select"] > div {{
@@ -2168,7 +2225,12 @@ def optimize_plotly_figure_memory(fig, precision: int = 4):
     return fig
 
 
-def apply_plotly_theme(fig, theme_name=None):
+ARGUS_CHART_PALETTES = {
+    "risk": ["#ff9900", "#ff5555", "#58a6ff", "#3fb950", "#bc8cff", "#f0883e"],
+    "wealth": ["#10b981", "#38bdf8", "#818cf8", "#fbbf24", "#a78bfa", "#f43f5e"]
+}
+
+def apply_plotly_theme(fig, theme_name=None, portal_mode="auto"):
     """Applica uno stile dark vettoriale con tooltip luminosi al grafico Plotly e ottimizza la memoria."""
     if fig is None:
         return fig
@@ -2176,7 +2238,11 @@ def apply_plotly_theme(fig, theme_name=None):
     if not theme_name:
         theme_name = st.session_state.get("ui_theme", "Midnight Obsidian")
 
-    accent = "#ff9900" if theme_name == "Midnight Obsidian" else ("#00f3ff" if theme_name == "Cyberpunk Neon" else "#00c853")
+    is_wealth = (portal_mode == "wealth" or (portal_mode == "auto" and st.session_state.get("argus_portal_mode") == "🏛️ Wealth Management"))
+    if is_wealth:
+        accent = "#10b981"
+    else:
+        accent = "#ff9900" if theme_name == "Midnight Obsidian" else ("#00f3ff" if theme_name == "Cyberpunk Neon" else "#00c853")
 
     fig.update_layout(
         template="plotly_dark",
@@ -2197,6 +2263,8 @@ def apply_plotly_theme(fig, theme_name=None):
     # Comprime e ottimizza i float per ridurre il footprint in RAM
     optimize_plotly_figure_memory(fig, precision=4)
     return fig
+
+apply_chart_theme = apply_plotly_theme
 
 
 def render_factor_radar_chart(results: dict):
@@ -5116,6 +5184,328 @@ def render_wealth_executive_badges(net_worth_summary):
     sec_badge = '<span class="executive-badge badge-gray">🔒 Zero-Cloud Crittografia Locale</span>'
 
     st.markdown(f'<div style="margin-top: 4px; margin-bottom: 12px; display:flex; flex-wrap:wrap; gap:6px;">{nw_badge}{score_badge}{runway_badge}{sav_badge}{sec_badge}</div>', unsafe_allow_html=True)
+
+
+# ── ARGUS UNIFIED ARCHITECTURE & DESIGN SYSTEM v6.3.0+ ─────────────
+
+def ensure_portal_context(module: str = "risk") -> dict:
+    """
+    Inizializza in modo trasparente e garantito il contesto dati per il modulo richiesto ('risk' o 'wealth').
+    Elimina decine di righe di boilerplate ripetute su ogni pagina.
+    """
+    from core.ui_utils import inject_custom_css
+    inject_custom_css()
+    
+    from core.sidebar import render_sidebar
+    render_sidebar()
+    
+    from core.fetcher import get_engine
+    db_user = st.session_state.get("db_user", "root")
+    db_pass = st.session_state.get("db_pass", "root")
+    db_host = st.session_state.get("db_host", "localhost")
+    try:
+        db_port = int(st.session_state.get("db_port", 3306))
+    except Exception:
+        db_port = 3306
+    db_name = st.session_state.get("db_name", "investment_risk_bi")
+    engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
+    
+    if module.lower() == "wealth":
+        from core.wealth.wealth_db import init_wealth_db, get_wealth_portfolios, create_wealth_portfolio
+        from core.wealth.wealth_engine import compute_consolidated_net_worth
+        init_wealth_db(engine)
+        df_prof = get_wealth_portfolios(engine)
+        if df_prof.empty:
+            pid = create_wealth_portfolio(engine, name="Marco Rossi (Family Office)", owner="Family Office Principal", base_currency="EUR")
+            st.session_state["wealth_active_portfolio_id"] = pid
+            df_prof = get_wealth_portfolios(engine)
+        
+        pid = st.session_state.get("wealth_active_portfolio_id")
+        if pid is None or pid not in df_prof["portfolio_id"].values:
+            pid = int(df_prof.iloc[0]["portfolio_id"])
+            st.session_state["wealth_active_portfolio_id"] = pid
+            
+        prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
+        prof_name = prof_map.get(pid, "Marco Rossi (Family Office)")
+        st.session_state["wealth_active_profile_name"] = prof_name
+        
+        nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+        return {
+            "engine": engine,
+            "portfolio_id": pid,
+            "profile_name": prof_name,
+            "profile_map": prof_map,
+            "net_worth": nw,
+            "is_wealth": True
+        }
+    else:
+        from core.ui_utils import ensure_risk_bundle_loaded
+        results, has_real = ensure_risk_bundle_loaded()
+        return {
+            "engine": engine,
+            "results": results,
+            "has_real_data": has_real,
+            "metrics": results.get("metrics", {}),
+            "positions": results.get("positions", pd.DataFrame()),
+            "portfolio_value": results.get("portfolio_value", 0.0),
+            "is_wealth": False
+        }
+
+
+def render_omni_command_bar(
+    portal: str = "auto", 
+    context_name: Optional[str] = None,
+    key_suffix: str = "core"
+):
+    """
+    Barra dei comandi e telemetria universale ARGUS v6.3.0+.
+    Supporta la commutazione dinamica tra Risk e Wealth, con token cromatici coordinati.
+    """
+    try:
+        from core.workspace_manager import sync_url_state
+        sync_url_state()
+    except Exception:
+        pass
+
+    if portal == "auto":
+        is_wealth = (st.session_state.get("argus_portal_mode") == "🏛️ Wealth Management")
+    else:
+        is_wealth = (portal.lower() == "wealth")
+        
+    accent_color = "#10b981" if is_wealth else "#ff9900"
+    portal_label = "ARGUS WEALTH" if is_wealth else "ARGUS ENGINE"
+    icon = "🏛️" if is_wealth else "💼"
+    
+    if not context_name:
+        if is_wealth:
+            context_name = st.session_state.get("wealth_active_profile_name")
+            if not context_name:
+                context_name = "Profilo Patrimoniale"
+        else:
+            name, has_data = get_display_portfolio_name()
+            context_name = name
+            
+    base_curr = st.session_state.get("base_currency", "EUR")
+    offline = st.session_state.get("offline_mode", False)
+    mode_str = "OFFLINE" if offline else "LIVE DB"
+    mode_color = "#e3b341" if offline else accent_color
+    mode_bg = "rgba(227, 179, 65, 0.10)" if offline else f"rgba({('16, 185, 129' if is_wealth else '255, 153, 0')}, 0.12)"
+    mode_border = "rgba(227, 179, 65, 0.28)" if offline else f"rgba({('16, 185, 129' if is_wealth else '255, 153, 0')}, 0.3)"
+
+    col_bar1, col_bar2 = st.columns([1.3, 1.1])
+    with col_bar1:
+        st.markdown(f"""
+        <div style="display:flex; align-items:center; gap: 8px; padding: 2px 0; height: 38px;">
+            <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px;"></span>
+            <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+                {portal_label}
+            </span>
+            <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
+            <span style="color:{accent_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                <span>{icon}</span> {context_name}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+        
+    with col_bar2:
+        c_pills, c_btn = st.columns([1.7, 1.0])
+        with c_pills:
+            extra_pill = ""
+            if is_wealth:
+                w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
+                w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30.0))
+                w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20.0))
+                extra_pill = f'<div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">🏷️ <b>{w_needs}/{w_wants}/{w_savings}</b></div>'
+            else:
+                bench = st.session_state.get("benchmark", "SPY")
+                extra_pill = f'<div class="argus-command-pill">📊 <b>{bench}</b></div>'
+                
+            st.markdown(f"""
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 38px;">
+                <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
+                {extra_pill}
+                <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
+                    <span style="width:6px; height:6px; border-radius:50%; background:{mode_color}; display:inline-block; margin-right:5px;"></span>{mode_str}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        with c_btn:
+            if st.button("🔍 Spotlight", key=f"omni_btn_spotlight_{key_suffix}", use_container_width=True, help="Cerca pagine, comandi o ticker (Ctrl+K)"):
+                if is_wealth:
+                    render_wealth_spotlight_palette()
+                else:
+                    render_spotlight_palette()
+
+
+def render_standard_hero(
+    title: str,
+    subtitle: str = "",
+    icon: str = "📈",
+    profile_map: Optional[Dict[int, str]] = None,
+    current_pid: Optional[int] = None,
+    dialog_callback: Optional[Any] = None,
+    dialog_btn_label: str = "ℹ️ Metodologia"
+):
+    """
+    Header di pagina standard istituzionale conforme ad ARGUS Design System.
+    Include opzionalmente selettore profilo sincronizzato e pulsante di apertura modale @st.dialog.
+    """
+    has_profile_picker = bool(profile_map and len(profile_map) > 1 and current_pid is not None)
+    has_dialog = bool(dialog_callback is not None)
+    
+    clean_id = "".join(c for c in title if c.isalnum() or c in "_-")[:12].lower()
+
+    if has_profile_picker and has_dialog:
+        c_title, c_prof, c_dlg = st.columns([3.4, 1.2, 1.0])
+    elif has_profile_picker:
+        c_title, c_prof = st.columns([3.8, 1.4])
+    elif has_dialog:
+        c_title, c_dlg = st.columns([4.2, 1.0])
+    else:
+        c_title = st.container()
+
+    with c_title:
+        st.markdown(f"""
+        <div style="margin: 4px 0 10px 0;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:24px;">{icon}</span>
+                <span style="font-size:22px; font-weight:800; color:#f0f6fc; letter-spacing:-0.4px; font-family:'Outfit', sans-serif;">{title}</span>
+            </div>
+            {f'<div style="font-size:12.5px; color:#8b949e; margin-top:2px; margin-left:32px;">{subtitle}</div>' if subtitle else ''}
+        </div>
+        """, unsafe_allow_html=True)
+
+    if has_profile_picker:
+        with c_prof:
+            st.write("")
+            sel_pid = st.selectbox(
+                "Profilo Attivo:",
+                options=list(profile_map.keys()),
+                format_func=lambda pid: f"📁 {profile_map[pid]}",
+                index=list(profile_map.keys()).index(current_pid) if current_pid in profile_map else 0,
+                key=f"hero_prof_sel_{clean_id}",
+                label_visibility="collapsed"
+            )
+            if sel_pid != current_pid:
+                st.session_state["wealth_active_portfolio_id"] = sel_pid
+                st.rerun()
+
+    if has_dialog:
+        with c_dlg:
+            st.write("")
+            st.markdown("<div style='height:4px;'></div>", unsafe_allow_html=True)
+            if st.button(dialog_btn_label, key=f"btn_hero_dialog_{clean_id}", use_container_width=True):
+                dialog_callback()
+
+
+def render_kpi_card(
+    label: str,
+    value: Union[str, float, int],
+    delta: Optional[str] = None,
+    sentiment: str = "normal",
+    help_text: Optional[str] = None,
+    theme_accent: str = "auto"
+):
+    """
+    Card KPI ad alte prestazioni priva di iniezioni CSS inline.
+    Utilizza le classi globali del tema di ARGUS per massimo rendimento del browser.
+    """
+    delta_html = ""
+    if delta is not None and str(delta).strip():
+        d_str = str(delta).strip()
+        if sentiment in ["positive", "normal"] and (d_str.startswith("+") or "↑" in d_str):
+            cls = "metric-delta-pos"
+        elif sentiment in ["negative", "inverse"] or (d_str.startswith("-") or "↓" in d_str):
+            cls = "metric-delta-neg"
+        else:
+            cls = "metric-delta-neutral"
+            
+        arrow = "↑ " if ("+" in d_str and "↑" not in d_str) else ("↓ " if ("-" in d_str and "↓" not in d_str) else "")
+        clean_d = d_str.replace("+", "").replace("-", "")
+        delta_html = f'<div class="{cls}">{arrow}{clean_d}</div>'
+
+    info_trigger = ""
+    if help_text:
+        safe_help = str(help_text).replace('"', '&quot;')
+        info_trigger = f'<span title="{safe_help}" style="cursor:help; color:#8b949e; font-size:11px; margin-left:4px;">ⓘ</span>'
+
+    accent_border = "var(--argus-accent, #ff9900)"
+    if theme_accent == "wealth" or (theme_accent == "auto" and st.session_state.get("argus_portal_mode") == "🏛️ Wealth Management"):
+        accent_border = "#10b981"
+    elif theme_accent == "risk":
+        accent_border = "#ff9900"
+
+    card_html = f"""
+    <div class="argus-clean-kpi-card" style="border-left: 3px solid {accent_border};">
+        <div class="argus-kpi-label">
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{label}</span>
+            {info_trigger}
+        </div>
+        <div class="argus-kpi-value">{value}</div>
+        {delta_html}
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
+
+
+def render_data_table(
+    df: pd.DataFrame,
+    currency_cols: Optional[list] = None,
+    pct_cols: Optional[list] = None,
+    hide_index: bool = True,
+    height: int = 380,
+    download_filename: Optional[str] = None
+):
+    """
+    Renderizza una tabella dati conforme allo standard istituzionale ARGUS:
+    - Numeri tabulari monospace
+    - Configurazione automatica di valute e percentuali con st.column_config
+    - Download CSV integrato
+    """
+    if df is None or df.empty:
+        st.info("Nessun record da visualizzare.")
+        return
+
+    col_config: Dict[str, Any] = {}
+    base_curr = st.session_state.get("base_currency", "EUR")
+    curr_symbol = "€" if base_curr == "EUR" else ("$" if base_curr == "USD" else ("£" if base_curr == "GBP" else "CHF" if base_curr == "CHF" else base_curr))
+
+    if currency_cols:
+        for c in currency_cols:
+            if c in df.columns:
+                col_config[c] = st.column_config.NumberColumn(
+                    c,
+                    format=f"{curr_symbol} %.2f",
+                    help=f"Importo espresso in {base_curr}"
+                )
+
+    if pct_cols:
+        for c in pct_cols:
+            if c in df.columns:
+                col_config[c] = st.column_config.NumberColumn(
+                    c,
+                    format="%.2f%%",
+                    help="Valore percentuale"
+                )
+
+    st.dataframe(
+        df,
+        column_config=col_config,
+        hide_index=hide_index,
+        height=height,
+        use_container_width=True
+    )
+    
+    if download_filename:
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Esporta CSV",
+            data=csv,
+            file_name=f"{download_filename}.csv",
+            mime="text/csv",
+            key=f"dl_btn_{download_filename}"
+        )
+
 
 
 

@@ -24,11 +24,16 @@ from core.ui_utils import (
     inject_custom_css,
     section,
     metric_card,
+    render_kpi_card,
     fmt_eur,
     fmt_pct,
+    render_omni_command_bar,
     render_wealth_command_bar,
     render_wealth_executive_badges,
-    render_wealth_control_room_hero
+    render_wealth_control_room_hero,
+    ensure_portal_context,
+    render_segmented_tabs,
+    render_data_table
 )
 from core.wealth.wealth_engine import compute_consolidated_net_worth
 from core.sidebar import render_sidebar
@@ -83,32 +88,16 @@ from core.wealth.wealth_sync import (
 
 # ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────
 st.set_page_config(page_title="Wealth Control Room | ARGUS", page_icon="🎛️", layout="wide")
-inject_custom_css()
-render_sidebar()
-
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
 
-# Connessione Database Wealth
-db_user = st.session_state.get("db_user", "root")
-db_pass = st.session_state.get("db_pass", "root")
-db_host = st.session_state.get("db_host", "localhost")
-db_port = int(st.session_state.get("db_port", 3306))
-db_name = st.session_state.get("db_name", "investment_risk_bi")
+ctx = ensure_portal_context(module="wealth")
+engine = ctx["engine"]
+current_pid = ctx["portfolio_id"]
+active_p_name = ctx["profile_name"]
+profile_map = ctx["profile_map"]
+nw_curr = ctx["net_worth"]
 
-engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
-init_wealth_db(engine)
-
-# ── PROFILI PATRIMONIALI (MULTI-PORTFOLIO) ───────────────────
-df_profiles = get_wealth_portfolios(engine)
-profile_map = {row["portfolio_id"]: row["name"] for _, row in df_profiles.iterrows()}
-current_pid = st.session_state.get("wealth_active_portfolio_id")
-if current_pid is not None and current_pid not in profile_map:
-    current_pid = None
-    st.session_state["wealth_active_portfolio_id"] = None
-
-
-active_p_name = profile_map.get(current_pid, "Nessun Profilo") if current_pid else "Nessun Profilo"
-render_wealth_command_bar(engine, current_pid=current_pid or 1, prof_name=active_p_name, key_suffix="p12")
+render_omni_command_bar(portal="wealth", context_name=active_p_name, key_suffix="p12")
 render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid)
 
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
@@ -453,18 +442,16 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
 from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
 
 # ── STRUTTURA A TAB ORGANIZZATA & PULITA ────────────────────
-tab_pipeline, tab_mgmt, tab_exports = st.tabs([
-    "🚀 1. Pipeline Ingestione & Calcolo Wealth (Processo Guidato)",
-    "🏦 2. Gestione Conti, Portafogli Risk & Categorie",
-    "📑 3. Hub di Reportistica & Esportazioni Istituzionali"
-])
-
-
+active_cr_tab = render_segmented_tabs([
+    "📥 Data Pipeline & Ingestion",
+    "⚙️ Gestione Conti & Categorie",
+    "📑 Hub Reportistica & Esportazioni"
+], key="wealth_cr_active_tab")
 
 # =============================================================
 # TAB 1: PIPELINE GUIDATA A STEP
 # =============================================================
-with tab_pipeline:
+if active_cr_tab == "📥 Data Pipeline & Ingestion":
     st.markdown(f"""
     <div style="background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(99, 102, 241, 0.06) 100%); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 14px 18px; margin-bottom: 20px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -869,7 +856,7 @@ with tab_pipeline:
 # =============================================================
 # TAB 2: GESTIONE CONTI, PORTAFOGLI RISK & CATEGORIE
 # =============================================================
-with tab_mgmt:
+elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
     subtab_accs, tab_risk_sub, subtab_cats = st.tabs([
         "🏦 Anagrafica Conti Bancari",
         "🔗 Portafogli Risk Analytics",
@@ -1101,7 +1088,7 @@ with tab_mgmt:
 # =============================================================
 # TAB 3: HUB DI REPORTISTICA ED ESPORTAZIONI ISTITUZIONALI
 # =============================================================
-with tab_exports:
+else:
     render_wealth_reporting_and_exports_hub(
         engine=engine,
         portfolio_id=current_pid,
