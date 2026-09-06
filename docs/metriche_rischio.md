@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo (`core/risk_engine.py`, `core/wealth/wealth_engine.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`) di **ARGUS Risk & Wealth Analytics Platform v6.0.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/risk_engine.py`, `core/wealth/wealth_engine.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`, `core/backup_engine.py`, `core/security_engine.py`, `core/data_quality_gate.py`) di **ARGUS Risk & Wealth Analytics Platform v6.4.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -129,6 +129,46 @@ $$
 \text{UI} = \sqrt{\frac{1}{N} \sum_{t=1}^N (\text{Drawdown}_t \times 100)^2}
 $$
 
+### Indice di Sharpe Annualizzato
+Quantifica l'extra-rendimento medio per unità di volatilità totale (rischio sistematico e specifico):
+
+$$
+\text{Sharpe} = \frac{\overline{R - R_{f,d}}}{\sigma_d} \times \sqrt{252}
+$$
+
+dove $R_{f,d}$ è il tasso risk-free giornaliero calibrato sulla valuta base di portafoglio (BCE €STR per EUR, Treasury Bill 3M per USD, BoE SONIA per GBP, SNB SARON per CHF).
+
+### Indice di Sortino Continuo (Standard CFA & Plantinga et al. 2001)
+Misura l'efficienza rispetto alla sola volatilità negativa (*Downside Risk*). ARGUS implementa la **semi-deviazione continua** calcolata sull'intero orizzonte temporale $N$ (non condizionata ai soli giorni negativi $N_{\text{down}}$), eliminando distorsioni statistiche:
+
+$$
+\delta_t = \min(0, R_t - R_{f,d})
+$$
+
+$$
+\sigma_{\text{downside}} = \sqrt{\frac{1}{N} \sum_{t=1}^N \delta_t^2} \times \sqrt{252}
+$$
+
+$$
+\text{Sortino} = \frac{\overline{R - R_{f,d}}}{\sigma_{\text{downside}}} \times \sqrt{252}
+$$
+
+### Calmar Ratio & Conservazione del Segno ($CAGR / |MaxDD|$)
+Rapporto tra tasso di crescita geometrico annualizzato e massimo drawdown storico:
+
+$$
+\text{Calmar} = \frac{\text{CAGR}}{|\text{Max Drawdown}|}
+$$
+
+**Garanzia di Coerenza Finanziaria:** L'adozione del valore assoluto al denominatore garantisce che quando $\text{CAGR} < 0$, il Calmar risulti coerentemente **negativo** ($\text{Calmar} < 0$), segnalando una distruzione reale di valore invece di produrre un rapporto positivo ingannevole.
+
+### Information Ratio (IR)
+Rapporto tra extra-rendimento attivo medio rispetto al benchmark ($R_b$) e volatilità del tracking error ($\text{TE}$):
+
+$$
+\text{IR} = \frac{\overline{R_p - R_b}}{\text{TE}} \times \sqrt{252}
+$$
+
 ---
 
 ## 3. Value at Risk (VaR) & Conditional VaR (CVaR)
@@ -154,7 +194,7 @@ VaR_{\text{Parametrico}}(1, \alpha) = - q_{\text{Param}} = -\mu + |Z_\alpha| \cd
 $$
 
 ### 3. VaR Cornish-Fisher (Modello Asimmetrico & Code Spesse)
-Incorpora Asimmetria ($S$) e Curtosi ($K$) tramite l'espansione di Cornish-Fisher per correggere la stima in presenza di code non gaussiane:
+Incorpora Asimmetria ($S$) e Curtosi ($K$) tramite l'espansione di Cornish-Fisher per correggere la stima in presenza di code non gaussiane, con clamping preventivo ($S \in [-3.0, 3.0], K \in [-1.0, 10.0]$):
 
 $$
 Z_{CF} = Z_\alpha + \frac{1}{6}(Z_\alpha^2 - 1)S + \frac{1}{24}(Z_\alpha^3 - 3Z_\alpha)K - \frac{1}{36}(2Z_\alpha^3 - 5Z_\alpha)S^2
@@ -175,12 +215,39 @@ $$
 VaR(T, \alpha) = VaR(1, \alpha) \times \sqrt{T}
 $$
 
-### Conditional VaR (CVaR / Expected Shortfall)
+### 4. Conditional VaR (CVaR / Expected Shortfall)
 Misura la perdita media attesa nell'ipotesi in cui la perdita superi la soglia del VaR:
 
+- **CVaR Storico (Empirico)**:
 $$
-CVaR(1, \alpha) = - E[R_t \mid R_t \le -VaR(1, \alpha)]
+CVaR_{\text{Storico}}(1, \alpha) = - \mathbb{E}[R_t \mid R_t \le -VaR_{\text{Storico}}(1, \alpha)]
 $$
+
+- **CVaR Parametrico (Gaussiano)**:
+$$
+CVaR_{\text{Parametrico}}(1, \alpha) = -\mu + \sigma_d \cdot \frac{\phi(Z_\alpha)}{\alpha}
+$$
+
+- **CVaR Cornish-Fisher / Modified Expected Shortfall ($mES_\alpha$) (Boudt, Peterson & Croux, 2008)**:
+Formulazione analitica che corregge l'Expected Shortfall integrando i momenti superiori (Asimmetria $S$ e Curtosi $K$):
+
+$$
+mES_\alpha = -\mu - \frac{\sigma_d}{\alpha} \cdot e(\alpha)
+$$
+
+dove $e(\alpha)$ è il termine polinomiale ponderato sulla densità gaussiana $\phi(Z_\alpha)$:
+
+$$
+e(\alpha) = \phi(Z_\alpha) \left[ 1 + \frac{S}{6} Z_\alpha + \frac{K}{24} (Z_\alpha^2 - 1) - \frac{S^2}{36} (2 Z_\alpha^3 - 5 Z_\alpha + Z_\alpha) \right]
+$$
+
+**Guardrail di Monotonicità e Rischio Coerente**:
+1. **Clamping Parametri**: L'asimmetria $S$ è limitata nell'intervallo $[-3.0, 3.0]$ e la curtosi in $[-1.0, 10.0]$ per escludere divergenze algebriche.
+2. **Monotonicità $mES \ge VaR_{CF}$**: Poiché per qualsiasi misura coerente di rischio l'Expected Shortfall deve essere almeno pari al VaR, qualora per anomalie numeriche $mES_\alpha < VaR_{CF, \alpha}$, il motore impone automaticamente:
+$$
+mES_\alpha = \max(VaR_{CF, \alpha} \times 1.05, VaR_{CF, \alpha})
+$$
+3. **Monotonicità di Confidenza**: $CVaR_{99\%} \ge CVaR_{95\%}$.
 
 ---
 
@@ -294,6 +361,32 @@ Per ogni asset $i$, le quote da negoziare per raggiungere il peso ottimale $w_{i
 $$
 \Delta Q_i = \frac{V_{\text{totale}} \cdot w_{i, \text{ott}} - V_{i, \text{attuale}}}{P_{i, \text{corrente}}}
 $$
+
+### Modello di Black-Litterman & Formulazione Duale di Woodbury
+Integra l'equilibrio implicito di mercato (*Reverse Optimization CAPM*, $\Pi = \lambda \Sigma w_{\text{mkt}}$) con le visioni tattiche dell'investitore ($P \cdot E[R] = Q + \epsilon$, con $\epsilon \sim \mathcal{N}(0, \Omega)$).
+
+Per garantire stabilità numerica e prestazioni ad alte dimensioni ($N$ asset, $K$ visioni), ARGUS adotta la **formulazione duale basata sull'Identità Matriciale di Woodbury**, che opera l'inversione nello spazio delle visioni $K \times K$ invece dello spazio completo dei titoli $N \times N$ ($O(K^3)$ vs $O(N^3)$ con $K \ll N$):
+
+$$
+E[R]_{BL} = \Pi + \tau \Sigma P^T \left( P \tau \Sigma P^T + \Omega \right)^{-1} (Q - P \Pi)
+$$
+
+$$
+M = \tau \Sigma - \tau \Sigma P^T \left( P \tau \Sigma P^T + \Omega \right)^{-1} P \tau \Sigma
+$$
+
+$$
+\Sigma_{BL} = \Sigma + M
+$$
+
+dove:
+- $\Pi$: Vettore dei rendimenti di equilibrio impliciti ($\Pi = \lambda \Sigma_{LW} w_{\text{mkt}}$).
+- $\tau$: Scalare di incertezza sulla stima a priori (default $\tau = 0.05$).
+- $P$: Matrice di picking $K \times N$ che mappa i titoli coinvolti in ciascuna view.
+- $Q$: Vettore $K \times 1$ dei rendimenti attesi espressi nelle view.
+- $\Omega$: Matrice diagonale $K \times K$ dell'incertezza delle view ($\Omega = \text{diag}(P (\tau \Sigma) P^T)$).
+
+I rendimenti e la covarianza posteriore $E[R]_{BL}$ e $\Sigma_{BL}$ vengono successivamente passati all'ottimizzatore SLSQP vincolato (long-only $\sum w_i = 1, w_i \ge 0$) per ricavare l'allocazione ottima.
 
 ---
 

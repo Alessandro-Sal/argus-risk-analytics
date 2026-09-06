@@ -2,19 +2,22 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-6.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-6.4.0-blue.svg)
 ![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
 ![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-354%2F354%20PASSED%20(100%25)-brightgreen)
+![PyTest Suite](https://img.shields.io/badge/PyTest-394%2F394%20PASSED%20(100%25)-brightgreen)
 ![Docker](https://img.shields.io/badge/docker-ready-blue)
 
 ---
 
 ## 📌 Panoramica del Progetto
 
-**ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è una piattaforma integrata di **Business Intelligence, Financial Valuation, Forensic Accounting, AI Narrative Intelligence e Quantitative Risk Management** potenziata con standard **Bloomberg Terminal Parity**. Progettata con un'interfaccia ad alta densità informativa di livello istituzionale, la soluzione offre un ecosistema avanzato per la diagnosi contabile, la profilazione del rischio e la protezione strategica di portafogli d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto e Cash*).
+**ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è una piattaforma integrata di **Business Intelligence, Financial Valuation, Forensic Accounting, AI Narrative Intelligence, Data Engineering e Quantitative Risk Management** potenziata con standard **Bloomberg Terminal Parity**. Progettata con un'interfaccia ad alta densità informativa di livello istituzionale, la soluzione offre un ecosistema avanzato per la diagnosi contabile, la profilazione del rischio e la protezione strategica di portafogli d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto e Cash*).
 
 Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGUS** converte registri di negoziazione eterogenei (file CSV generici, esportazioni native da broker quali **DeGiro**, **Directa SIM**, **Fineco Bank**, **Interactive Brokers / IBKR**, **Trade Republic**, **Scalable Capital**, **eToro**, **Revolut Trading** e sincronizzazioni live da **Google Sheets** con estrazione duale separata di *Stocks & Crypto*) in un framework analitico strutturato. La piattaforma integra:
+* **🛡️ Cybersecurity, Data Vault & Anti-Formula Injection (`core/security_engine.py`)**: Difesa in profondità (*Defense-in-Depth*) contro attacchi **CWE-1236 (Formula Injection)** con sanitizzazione di ogni cella esportata in CSV e XLSX multi-foglio (neutralizzazione prefissi `=`, `+`, `-`, `@`, `\t`, `\r`), de-identificazione e mascheramento dinamico PII (IBAN, Codice Fiscale e conti correnti conformi a GDPR Art. 5/32), cifratura dei dati sensibili a riposo **ArgusDataVault** (algoritmo Fernet AES-128/256 CBC con autenticazione HMAC-SHA256 e derivazione chiave PBKDF2 a 100.000 iterazioni) e sanitizzazione preventiva delle credenziali nei prompt inoltrati ai modelli LLM esterni.
+* **🔄 Zero-Downtime Hot Backup & Disaster Recovery Atomico (`core/backup_engine.py`)**: Motore di continuità operativa e resilienza basato sulle API C native `sqlite3_backup_init` per snapshot consistenti a caldo del database patrimoniale senza interruzione dei servizi, checkpointing preventivo del Write-Ahead Logging (`PRAGMA wal_checkpoint(TRUNCATE)`), doppio audit di integrità (`PRAGMA integrity_check` & `PRAGMA foreign_key_check`), compressione trasparente gzip con rotazione e retention temporale, e procedura di ripristino atomico point-in-time protetta da copia di rollback automatico `.emergency_pre_restore`. Integrato come hook di pre-flight in `desktop_launcher.py`.
+* **🚦 Enterprise Data Quality Gate & Middleware Ingestion (`core/data_quality_gate.py`)**: Middleware di validazione e riconciliazione contabile pre-ingestion basato su schemi dichiarativi **Pydantic v2** (`CanonicalTradeRecord`, `QualityGateReport`), regole semantiche avanzate (blocco posizioni corte accidentali, rilevamento trade in giorni festivi/weekend, validazione cross-currency FX), riconciliazione automatica ISIN/Ticker e deduplicazione deterministica a chiave naturale SHA-256 (`tx_hash`) per garantire l'idempotenza assoluta nei ricaricamenti multipli di estratti conto.
 * **⚡ Bloomberg Terminal Command Gateway & Mnemonic Parser**: Barra di comando istituzionale globale con sintassi a codici rapidi (`<TICKER> <MNEMONIC> <GO>`, es. `AAPL DES`, `MSFT FA`, `NVDA VOLS`, `PORT RISK`, `YCRV`, `BTP YAS`, `US10Y FI`, `CDS`, `STREAM`, `ATTR`, `TAX`, `EQS`, `BQUANT`, `LAUNCHPAD`, `XL`, `LIVE`, `TERM`, `CLI`), autocompletamento fuzzy, visual command feedback in tempo reale, sincronizzazione bidirezionale perfetta con la Navigation Rail e navigazione rapida senza mouse.
 * **🖥️ ARGUS Live Terminal & Interactive CLI Execution Desk (`LIVE` / `TERM`)**: Console operativa interattiva in-app con prompt comandi Bloomberg (`ARGUS:LIVE>`), motore streaming Level-2 Depth Book con calcolo del Microprice di Stoikov (2018) e Order Flow Imbalance (OFI), simulatore Order Management System (OMS) Blotter con order slicing algoritmico TWAP/VWAP e telemetria di sistema in tempo reale (`TOP` Monitor CPU, RAM RSS, Ring Buffer, DB).
 * **🤖 Smart Order Routing & Algoritmi di Esecuzione TWAP / VWAP**: Motore istituzionale di order slicing intraday (09:00 - 17:30) per grandi blocchi ed ordini di ribilanciamento con profilazione della curva di liquidità a "U", **TWAP** uniforme con jitter stocastico anti-frontrunning, **VWAP** ponderato sui volumi con tetto di partecipazione (POV Cap al 15%), stima dello slippage atteso e calcolo del risparmio netto rispetto all'ordine a mercato immediato.
@@ -383,6 +386,7 @@ argus-risk-analytics/
 │   ├── advisor.py               # ARGUS Quant Advisor & Health Score Engine
 │   ├── ai_analyst.py            # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
 │   ├── attribution.py           # Brinson-Fachler, Carino Multi-Period & Karnosky-Singer FX
+│   ├── backup_engine.py         # Zero-Downtime Hot Backup, WAL Checkpoint, PRAGMA Audit & Rollback
 │   ├── bquant_engine.py         # ARGUS BQuant In-App Python Sandbox & DuckDB In-Memory SQL
 │   ├── broker_detector.py       # Multi-Broker Ingestion Hub & Auto-Detector Formati
 │   ├── cache_shield.py          # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
@@ -390,6 +394,7 @@ argus-risk-analytics/
 │   ├── corporate_actions.py     # Corporate Actions, Stock Splits & Stock Dividends Engine
 │   ├── crypto_provider.py       # Aggregatore multi-provider crypto (Binance, Kraken, CoinGecko)
 │   ├── crypto_tax_engine.py     # Fisco Cripto-Attività, Quadri RT/RW/IVAFE & Zainetto Cripto
+│   ├── data_quality_gate.py     # Pydantic v2 Ingestion Gate, Semantic Sanity & SHA-256 Deduplication
 │   ├── db_exporter.py           # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
 │   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
 │   ├── dividend_engine.py       # Cash Flow Forecast & Dividend Calendar
@@ -420,7 +425,8 @@ argus-risk-analytics/
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
 │   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── sidebar.py               # Navigation Rail v6.3.0, Execution Mode & Spotlight Search
+│   ├── security_engine.py       # CWE-1236 Anti-Formula Injection, PII Masking & ArgusDataVault AES
+│   ├── sidebar.py               # Navigation Rail v6.4.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
@@ -437,12 +443,12 @@ argus-risk-analytics/
 │   ├── argus_wealth.db          # Database SQLite locale Wealth Ecosystem
 │   └── .gitkeep
 ├── docker/                      # File di containerizzazione Docker
-│   └── Dockerfile
+│   └── Dockerfile               # Multi-stage build hardening (non-root unprivileged user)
 ├── docs/                        # Documentazione Tecnica & Specifica Architetturale
 │   ├── CSV_Format_Specification.md # Specifica tecnica formato CSV & DeGiro
 │   ├── DESIGN.md                # Design System & UI Specs
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v6.3.0)
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v6.4.0)
 │   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
@@ -489,13 +495,15 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py
 │       ├── 20_⚖️_Pianificazione_Successoria.py
 │       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (309 Test su 55 File)
+├── tests/                       # Test suite automatizzata PyTest (394 Test su 71 File)
 │   ├── test_adapters.py
+│   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
 │   ├── test_advisor.py
 │   ├── test_ai_analyst.py
 │   ├── test_attribution.py
 │   ├── test_backtest.py
+│   ├── test_backup_engine.py
 │   ├── test_black_litterman_fama_french.py
 │   ├── test_bloomberg_terminal_features.py
 │   ├── test_broker_adapters.py
@@ -505,10 +513,12 @@ argus-risk-analytics/
 │   ├── test_crypto_provider.py
 │   ├── test_crypto_tax.py
 │   ├── test_custom_stress.py
+│   ├── test_data_quality_gate.py
 │   ├── test_diversification.py
 │   ├── test_duckdb_engine.py
 │   ├── test_enhancements.py
 │   ├── test_excel.py
+│   ├── test_execution_algo.py
 │   ├── test_factor_library.py
 │   ├── test_fase3_screener_almgren_factors.py
 │   ├── test_fase4_bquant_launchpad_excel.py
@@ -521,6 +531,8 @@ argus-risk-analytics/
 │   ├── test_history_analytics.py
 │   ├── test_hrp_optimizer.py
 │   ├── test_html_exporter.py
+│   ├── test_institutional_expansion.py
+│   ├── test_institutional_expansion_v63.py
 │   ├── test_kmeans_elbow.py
 │   ├── test_macro_provider.py
 │   ├── test_merton_and_isolation_forest.py
@@ -529,12 +541,16 @@ argus-risk-analytics/
 │   ├── test_multi_portfolio.py
 │   ├── test_new_quant_features.py
 │   ├── test_optimization.py
+│   ├── test_quant_audit_gates.py
 │   ├── test_quant_tax_graveyard_enhancements.py
 │   ├── test_rebalancer_and_advisor.py
 │   ├── test_regime_and_options.py
+│   ├── test_reinforcement_learning.py
 │   ├── test_risk_engine.py
 │   ├── test_screener_engine.py
 │   ├── test_sec_rag.py
+│   ├── test_security_engine.py
+│   ├── test_sqlite_upsert_and_quality_gate.py
 │   ├── test_tax_engine.py
 │   ├── test_tax_engine_deep_stress.py
 │   ├── test_tax_engine_edge_cases.py
@@ -547,7 +563,10 @@ argus-risk-analytics/
 │   ├── test_var_lookback.py
 │   ├── test_volatility_surface.py
 │   ├── test_wealth_engine.py
+│   ├── test_wealth_enhancements.py
+│   ├── test_wealth_reporting_hub.py
 │   ├── test_wealth_sync.py
+│   ├── test_wealth_temporal_engine.py
 │   ├── test_wealth_validator.py
 │   ├── test_workspace_manager.py
 │   └── test_yield_curve.py
@@ -556,12 +575,13 @@ argus-risk-analytics/
 ├── CONTRIBUTING.md              # Guida ai contributi
 ├── LICENSE.md                   # Licenza Open Source MIT
 ├── README.md                    # Documentazione Principale del Progetto
-├── SECURITY.md                  # Politica di Sicurezza
+├── SECURITY.md                  # Politica di Sicurezza & Compliance
 ├── app.py                       # Launcher alias per l'applicazione Streamlit
-├── desktop_launcher.py          # Entry point nativo Desktop App (PyWebView + Edge WebView2)
+├── argus_desktop.spec           # Spec PyInstaller per build standalone con isolamento percorsi
+├── desktop_launcher.py          # Entry point nativo Desktop App (PyWebView + Backup pre-flight)
 ├── docker-compose.yml           # Configurazione Docker Compose (App + MySQL 8.0)
 ├── pyproject.toml               # Configurazione tool (PyTest, Ruff)
-├── requirements.txt             # Dipendenze Python
+├── requirements.txt             # Dipendenze Python (inclusi pydantic>=2.0.0, cryptography)
 ├── setup_desktop.bat            # Script di setup 1-Click per ambiente Desktop Windows
 ├── start_dashboard.bat          # Script d'avvio rapido per Windows
 └── start_dashboard.sh           # Script d'avvio per Linux/macOS
@@ -571,7 +591,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **322 test automatizzati PyTest** distribuiti su 55 file di test con copertura end-to-end del 100%:
+Il progetto include **394 test automatizzati PyTest** distribuiti su 71 file di test con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -579,7 +599,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 322 passed in ~98.00s (100%) =======================
+======================= 394 passed in ~110.00s (100%) =======================
 ```
 
 ---
