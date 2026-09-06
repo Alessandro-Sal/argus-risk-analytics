@@ -77,21 +77,38 @@ def compute_consolidated_net_worth(
     # 1. Liquidità & Passività da Conti
     df_acc = get_wealth_accounts(engine, portfolio_id=portfolio_id)
     if not df_acc.empty:
-        # Liquidità attiva (conti correnti, depositi, contanti)
+        from core.terminal_engine import get_fx_rate_to_eur
+        
+        # Calcolo saldi normalizzati in EUR al cambio spot
+        if "currency" in df_acc.columns:
+            df_acc["balance_eur"] = df_acc.apply(
+                lambda r: float(r.get("balance", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
+                axis=1
+            )
+        else:
+            df_acc["balance_eur"] = df_acc["balance"].astype(float)
+
+        # Liquidità attiva (conti correnti, depositi, contanti) con saldo positivo
         liquid_types = [AccountType.CHECKING.value, AccountType.SAVINGS.value, AccountType.EMERGENCY_FUND.value]
-        df_liquid = df_acc[df_acc["account_type"].isin(liquid_types) & (df_acc["balance"] > 0)]
-        summary.liquid_cash = float(df_liquid["balance"].sum())
+        df_liquid = df_acc[df_acc["account_type"].isin(liquid_types) & (df_acc["balance_eur"] > 0)]
+        summary.liquid_cash = float(df_liquid["balance_eur"].sum())
 
         # Fondo emergenza specifico
-        df_emerg = df_acc[df_acc["account_type"] == AccountType.EMERGENCY_FUND.value]
-        summary.emergency_fund_amount = float(df_emerg["balance"].sum())
+        df_emerg = df_acc[(df_acc["account_type"] == AccountType.EMERGENCY_FUND.value) & (df_acc["balance_eur"] > 0)]
+        summary.emergency_fund_amount = float(df_emerg["balance_eur"].sum()) if not df_emerg.empty else 0.0
 
-        # Passività da conti (mutui, prestiti, carte con saldo negativo o tipo passività)
+        # Passività da conti:
+        # A. Debiti e finanziamenti espliciti (mutui, prestiti, carte di credito)
         liability_types = [AccountType.LOAN.value, AccountType.MORTGAGE.value, AccountType.CREDIT_CARD.value]
         df_liab = df_acc[df_acc["account_type"].isin(liability_types)]
-        liab_from_types = float(df_liab["balance"].abs().sum())
-        liab_from_negative = float(df_acc[df_acc["balance"] < 0]["balance"].abs().sum())
-        summary.total_liabilities = max(liab_from_types, liab_from_negative)
+        liab_from_types = float(df_liab["balance_eur"].abs().sum())
+
+        # B. Scoperti di conto corrente / conti non-debito con saldo negativo esigibile
+        df_overdraft = df_acc[(~df_acc["account_type"].isin(liability_types)) & (df_acc["balance_eur"] < 0)]
+        liab_from_overdraft = float(df_overdraft["balance_eur"].abs().sum())
+
+        # Totale passività effettivo: debito strutturale + scoperti operativi
+        summary.total_liabilities = liab_from_types + liab_from_overdraft
 
     # 2. Portafogli Finanziari (Titoli & Crypto dal modulo Risk Analytics)
     active_risk_pids = risk_portfolio_ids
@@ -128,31 +145,48 @@ def compute_consolidated_net_worth(
     brokerage_val = 0.0
     if not df_acc.empty:
         brokerage_types = [AccountType.BROKERAGE_CASH.value, "brokerage", "crypto_exchange", "trading", "investment", "investments"]
-        df_brokerage = df_acc[df_acc["account_type"].isin(brokerage_types)]
-        if not df_brokerage.empty and df_brokerage["balance"].sum() > 0:
-            brokerage_val = float(df_brokerage["balance"].sum())
+        df_brokerage = df_acc[df_acc["account_type"].isin(brokerage_types) & (df_acc["balance_eur"] > 0)]
+        if not df_brokerage.empty:
+            brokerage_val = float(df_brokerage["balance_eur"].sum())
 
     summary.financial_investments = risk_val if risk_val > 0 else brokerage_val
 
 
-    # 3. Asset Fisici (Orologi, Immobili, Metalli)
+    # 3. Asset Fisici (Orologi, Immobili, Metalli) con FX spot
     df_phys = get_physical_assets(engine, portfolio_id=portfolio_id)
     if not df_phys.empty:
-        summary.physical_assets = float(df_phys["current_market_value"].sum())
+        from core.terminal_engine import get_fx_rate_to_eur
+        if "currency" in df_phys.columns:
+            df_phys["market_val_eur"] = df_phys.apply(
+                lambda r: float(r.get("current_market_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
+                axis=1
+            )
+        else:
+            df_phys["market_val_eur"] = df_phys["current_market_value"].astype(float)
+
+        summary.physical_assets = float(df_phys["market_val_eur"].sum())
         
         df_watches = df_phys[df_phys["asset_category"] == PhysicalAssetCategory.LUXURY_WATCHES.value]
-        summary.luxury_watches_total = float(df_watches["current_market_value"].sum())
+        summary.luxury_watches_total = float(df_watches["market_val_eur"].sum()) if not df_watches.empty else 0.0
 
         df_re = df_phys[df_phys["asset_category"] == PhysicalAssetCategory.REAL_ESTATE.value]
-        summary.real_estate_total = float(df_re["current_market_value"].sum())
+        summary.real_estate_total = float(df_re["market_val_eur"].sum()) if not df_re.empty else 0.0
 
         df_met = df_phys[df_phys["asset_category"] == PhysicalAssetCategory.PRECIOUS_METALS.value]
-        summary.precious_metals_total = float(df_met["current_market_value"].sum())
+        summary.precious_metals_total = float(df_met["market_val_eur"].sum()) if not df_met.empty else 0.0
 
-    # 4. Previdenza Integrativa & Fondi Pensione
+    # 4. Previdenza Integrativa & Fondi Pensione con FX spot
     df_pens = get_pension_plans(engine, portfolio_id=portfolio_id)
     if not df_pens.empty:
-        summary.pension_total = float(df_pens["accumulated_value"].sum())
+        from core.terminal_engine import get_fx_rate_to_eur
+        if "currency" in df_pens.columns:
+            df_pens["accum_eur"] = df_pens.apply(
+                lambda r: float(r.get("accumulated_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
+                axis=1
+            )
+        else:
+            df_pens["accum_eur"] = df_pens["accumulated_value"].astype(float)
+        summary.pension_total = float(df_pens["accum_eur"].sum())
 
     # 5. Totale Patrimonio Netto
     total_assets = (

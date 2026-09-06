@@ -1368,23 +1368,50 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         # Parametrico: quantile q = mu + z * sigma dove z = norm.ppf(1-conf) < 0
         z = stats.norm.ppf(1 - conf)
         q_param = float(r.mean() + z * vol_daily) if vol_daily > 0 else 0.0
-        var[f"var_parametric_{conf_k}"] = round(abs(min(0.0, q_param)) * 100, 4)
+        var_param_val = round(abs(min(0.0, q_param)) * 100, 4)
+        var[f"var_parametric_{conf_k}"] = var_param_val
+
+        # Parametrico Gaussiano CVaR: E[R | R <= q_param] = mu - vol_daily * (phi(z) / (1-conf))
+        alpha = 1.0 - conf
+        phi_z = stats.norm.pdf(z)
+        cvar_param_ret = float(r.mean() - vol_daily * (phi_z / alpha)) if (vol_daily > 0 and alpha > 0) else q_param
+        cvar_param_val = round(abs(min(0.0, cvar_param_ret)) * 100, 4)
+        if cvar_param_val < var_param_val:
+            cvar_param_val = var_param_val
+        cvar[f"cvar_parametric_{conf_k}"] = cvar_param_val
         
-        # Cornish-Fisher: quantile q_cf = mu + z_cf * sigma
-        z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
+        # Cornish-Fisher: quantile q_cf = mu + z_cf * sigma con guard rails di monotonicita
+        s_clamped = float(np.clip(skewness, -3.0, 3.0))
+        k_clamped = float(np.clip(kurtosis, -1.0, 10.0))
+        z_cf = z + (1/6)*(z**2 - 1)*s_clamped + (1/24)*(z**3 - 3*z)*k_clamped - (1/36)*(2*z**3 - 5*z)*(s_clamped**2)
+        if (alpha < 0.5 and z_cf > 0.0) or (alpha > 0.5 and z_cf < 0.0):
+            z_cf = z
         q_cf = float(r.mean() + z_cf * vol_daily) if vol_daily > 0 else 0.0
         var_cf_val = round(abs(min(0.0, q_cf)) * 100, 4)
         var[f"var_cf_{conf_k}"] = var_cf_val
         
-        # Cornish-Fisher CVaR (Coherent modified expected shortfall)
-        ratio = (cvar_hist_val / max(var_hist_val, 0.001)) if var_hist_val > 0 else 1.25
-        cvar_cf_val = round(max(var_cf_val * ratio, var_cf_val * 1.10), 4)
+        # Cornish-Fisher CVaR analitico (Boudt, Peterson, Croux 2008 Modified Expected Shortfall)
+        if vol_daily > 0 and alpha > 0:
+            i1 = phi_z
+            i2 = z * phi_z
+            i3 = (z**2 - 1.0) * phi_z
+            i4 = (z**3 - 3.0 * z) * phi_z
+            e_term = i1 + (s_clamped / 6.0) * i2 + (k_clamped / 24.0) * i3 - (s_clamped**2 / 36.0) * (2.0 * i4 + i2)
+            cvar_cf_ret = float(r.mean() - (vol_daily / alpha) * e_term)
+            cvar_cf_val = round(abs(min(0.0, cvar_cf_ret)) * 100, 4)
+        else:
+            cvar_cf_val = var_cf_val
+        if cvar_cf_val < var_cf_val:
+            cvar_cf_val = round(max(var_cf_val * 1.05, var_cf_val), 4)
         cvar[f"cvar_cf_{conf_k}"] = cvar_cf_val
 
     # Coherent Risk Measures Monotonicity Check
     if "cvar_99" in cvar and "cvar_95" in cvar:
         if cvar["cvar_99"] < cvar["cvar_95"]:
             cvar["cvar_99"] = round(max(cvar["cvar_95"] * 1.25, var.get("var_99", cvar["cvar_95"])), 4)
+    if "cvar_cf_99" in cvar and "cvar_cf_95" in cvar:
+        if cvar["cvar_cf_99"] < cvar["cvar_cf_95"]:
+            cvar["cvar_cf_99"] = round(max(cvar["cvar_cf_95"] * 1.25, var.get("var_cf_99", cvar["cvar_cf_95"])), 4)
 
     beta = corr = r_squared = None
     if rb.std() > 0:
@@ -1505,9 +1532,13 @@ def _calc_market_risk(sr_portfolio: pd.Series,
 
 def _calc_return_metrics(sr_portfolio: pd.Series,
                          sr_benchmark: pd.Series,
-                         df_tx: pd.DataFrame,
-                         df_positions: pd.DataFrame,
+                         df_tx: Optional[pd.DataFrame] = None,
+                         df_positions: Optional[pd.DataFrame] = None,
                          risk_free_rate: float = None) -> dict:
+    if df_tx is None:
+        df_tx = pd.DataFrame()
+    if df_positions is None:
+        df_positions = pd.DataFrame()
     r  = sr_portfolio.dropna()
     rb = sr_benchmark.reindex(r.index).fillna(0.0) if (sr_benchmark is not None and not sr_benchmark.empty) else pd.Series(0.0, index=r.index)
 
@@ -1535,8 +1566,9 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     else:
         sharpe = 0.0
 
-    downside = r[r < rfr_daily] - rfr_daily
-    if len(downside) > 1:
+    # Downside semi-deviation continua calcolata sull'intero orizzonte temporale N
+    downside = np.minimum(0.0, excess)
+    if len(r) > 1:
         down_std = float(np.sqrt((downside ** 2).mean()))
         if down_std > 1e-4:
             raw_sortino = float(excess.mean() / down_std * np.sqrt(TRADING_DAYS_YEAR))
@@ -1550,8 +1582,8 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     roll_mx = cum.cummax()
     max_dd  = float(((cum - roll_mx) / roll_mx).min()) if len(cum) > 0 else 0.0
     if cagr is not None and abs(max_dd) > 1e-4:
-        raw_calmar = float(abs(cagr / max_dd))
-        calmar = min(raw_calmar, 999.9999)
+        raw_calmar = float(cagr / abs(max_dd))
+        calmar = max(min(raw_calmar, 999.9999), -999.9999)
     else:
         calmar = None
 
@@ -2225,15 +2257,31 @@ def compute_black_litterman_optimization(
         if np.linalg.det(omega) == 0:
             omega += np.eye(k) * 1e-6
 
-        inv_tau_sigma = np.linalg.inv(tau * sigma)
-        inv_omega = np.linalg.inv(omega)
+        # Formulazione duale He & Litterman / Woodbury (inverte solo la matrice K x K delle viste):
+        # E[R] = Pi + tau * Sigma * P^T * (P * tau * Sigma * P^T + Omega)^(-1) * (Q - P * Pi)
+        tau_sigma_Pt = tau * (sigma @ P.T)
+        kernel_k = P @ tau_sigma_Pt + omega
+        # Regolarizzazione Tikhonov per garantire stabilita numerica
+        kernel_k += np.eye(k) * 1e-8
+        
+        delta_views = Q - P @ pi
+        try:
+            M_views = np.linalg.solve(kernel_k, delta_views)
+            inv_kernel = np.linalg.inv(kernel_k)
+        except np.linalg.LinAlgError:
+            inv_kernel = np.linalg.pinv(kernel_k)
+            M_views = inv_kernel @ delta_views
 
-        M = np.linalg.inv(inv_tau_sigma + P.T @ inv_omega @ P)
-        bl_returns = M @ (inv_tau_sigma @ pi + P.T @ inv_omega @ Q)
-        bl_cov = sigma + M
+        bl_returns = pi + (tau_sigma_Pt @ M_views).ravel()
+        # Matrice di covarianza a posteriori via identita di Woodbury
+        M_cov = tau * sigma - tau_sigma_Pt @ inv_kernel @ tau_sigma_Pt.T
+        bl_cov = sigma + M_cov
 
-    # Optimal Black-Litterman Weights
-    inv_cov = np.linalg.inv(bl_cov)
+    # Optimal Black-Litterman Weights con fallback a pseudo-inversa
+    try:
+        inv_cov = np.linalg.inv(bl_cov)
+    except np.linalg.LinAlgError:
+        inv_cov = np.linalg.pinv(bl_cov)
     w_bl = inv_cov @ bl_returns / risk_aversion
     w_bl = np.maximum(w_bl, 0.0)
     if np.sum(w_bl) > 0:
