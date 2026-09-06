@@ -43,7 +43,14 @@ import datetime
 import json
 import os
 import re
+import html
 import requests
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 from core.validator import validate_csv
 from core.fetcher import fetch_and_store, get_engine
@@ -935,7 +942,7 @@ with tab_ingest:
 
             if fr.get("errors"):
                 for e in fr["errors"]:
-                    st.markdown(f'<div class="error-box">🔴 {e}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="error-box">🔴 {html.escape(str(e))}</div>', unsafe_allow_html=True)
 
             # Fast Navigation Ribbon
             st.markdown("##### 🧭 Navigazione Rapida Moduli Analitici")

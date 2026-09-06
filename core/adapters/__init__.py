@@ -20,6 +20,14 @@ from core.adapters.isin_resolver import (
 from core.adapters.scalable import parse_scalable_transactions
 from core.adapters.traderepublic import parse_traderepublic_transactions
 
+from core.data_quality_gate import (
+    DataQualityGate,
+    CanonicalTradeRecord,
+    QualityGateReport,
+    TransactionType,
+    AssetClass,
+)
+
 __all__ = [
     "SUPPORTED_BROKERS",
     "detect_broker_format",
@@ -33,4 +41,9 @@ __all__ = [
     "parse_ibkr_transactions",
     "parse_traderepublic_transactions",
     "parse_scalable_transactions",
+    "DataQualityGate",
+    "CanonicalTradeRecord",
+    "QualityGateReport",
+    "TransactionType",
+    "AssetClass",
 ]

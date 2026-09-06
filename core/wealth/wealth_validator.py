@@ -117,6 +117,31 @@ def _clean_date(val: Any) -> Optional[date]:
 
 
 
+import hashlib
+
+def compute_tx_hash(
+    account_ref: Any,
+    tx_date: Any,
+    amount: float,
+    direction: str,
+    merchant: str,
+    external_id: str = ""
+) -> str:
+    """
+    Calcola l'hash SHA-256 canonico e deterministico della transazione per garantire
+    l'idempotenza ed eliminare duplicazioni nei ricaricamenti degli estratti conto.
+    """
+    can_acc = str(account_ref or "").strip().lower()
+    can_date = str(tx_date)[:10]
+    can_amt = f"{float(amount):.2f}"
+    can_dir = str(direction or "").strip().lower()
+    can_merch = str(merchant or "").strip().lower()
+    can_ext = str(external_id or "").strip().lower()
+    
+    canonical = f"{can_acc}|{can_date}|{can_amt}|{can_dir}|{can_merch}|{can_ext}"
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
 def validate_cashflow_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.DataFrame]:
     """
     Valida e normalizza un DataFrame di Cash Flow / Estratto Conto.
@@ -180,7 +205,8 @@ def validate_cashflow_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
             "category_name": cat_val,
             "account_name": acc_val,
             "payment_method": pay_val,
-            "notes": note_val
+            "notes": note_val,
+            "tx_hash": compute_tx_hash(acc_val, p_date, abs_amount, direction, raw_desc[:120])
         })
 
     if not records:

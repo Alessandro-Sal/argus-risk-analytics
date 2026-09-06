@@ -117,6 +117,7 @@ def init_wealth_db(engine: Engine) -> None:
                     is_recurring INTEGER NOT NULL DEFAULT 0,
                     payment_method TEXT NOT NULL DEFAULT 'Carta / Bonifico',
                     tags TEXT,
+                    tx_hash TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (account_id) REFERENCES wealth_accounts(account_id),
                     FOREIGN KEY (category_id) REFERENCES wealth_categories(category_id)
@@ -273,6 +274,7 @@ def init_wealth_db(engine: Engine) -> None:
                     is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
                     payment_method VARCHAR(50) NOT NULL DEFAULT 'Carta / Bonifico',
                     tags VARCHAR(255) NULL,
+                    tx_hash VARCHAR(64) NULL,
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     CONSTRAINT fk_wf_account FOREIGN KEY (account_id)
                         REFERENCES wealth_accounts (account_id) ON DELETE CASCADE,
@@ -280,7 +282,8 @@ def init_wealth_db(engine: Engine) -> None:
                         REFERENCES wealth_categories (category_id) ON DELETE RESTRICT,
                     INDEX idx_cashflow_date (tx_date),
                     INDEX idx_cashflow_acc_date (account_id, tx_date DESC),
-                    INDEX idx_cashflow_cat_date (category_id, tx_date DESC)
+                    INDEX idx_cashflow_cat_date (category_id, tx_date DESC),
+                    INDEX idx_cashflow_tx_hash (account_id, tx_hash)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """))
             conn.execute(sqlt("""
@@ -483,6 +486,27 @@ def init_wealth_db(engine: Engine) -> None:
                         INDEX idx_wprl_r (risk_portfolio_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
                 """))
+        except Exception:
+            pass
+
+        # ── OTTIMIZZAZIONI DI INDICIZZAZIONE TIME-SERIES (SQLite & MySQL) ──
+        try:
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_cf_acct_date ON wealth_cashflow(account_id, tx_date DESC);"))
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_cf_cat_date ON wealth_cashflow(category_id, tx_date DESC);"))
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_snap_port_date ON wealth_networth_snapshots(portfolio_id, snapshot_date DESC);"))
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_phys_port ON wealth_physical_assets(portfolio_id);"))
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_pens_port ON wealth_pension_plans(portfolio_id);"))
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_acct_port ON wealth_accounts(portfolio_id);"))
+        except Exception:
+            pass
+
+        # Migrazione colonna tx_hash per deduplicazione idempotente su wealth_cashflow
+        try:
+            conn.execute(sqlt("ALTER TABLE wealth_cashflow ADD COLUMN tx_hash VARCHAR(64) NULL;"))
+        except Exception:
+            pass
+        try:
+            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_cf_tx_hash ON wealth_cashflow(account_id, tx_hash);"))
         except Exception:
             pass
 
@@ -1011,9 +1035,14 @@ def get_cashflow_records(
         return pd.read_sql(sqlt(query), conn, params=params)
 
 
-def insert_cashflow_tx(engine: Engine, tx_data: Dict[str, Any]) -> int:
-    """Inserisce una nuova transazione nel libro mastro e aggiorna il saldo del conto."""
+def insert_cashflow_tx(engine: Engine, tx_data: Dict[str, Any], deduplicate: bool = False) -> Optional[int]:
+    """
+    Inserisce una nuova transazione nel libro mastro e aggiorna il saldo del conto.
+    Se deduplicate=True ed esiste già una transazione con lo stesso tx_hash per il conto,
+    ritorna None evitando duplicazioni e senza alterare il saldo.
+    """
     init_wealth_db(engine)
+    tx_hash = tx_data.get("tx_hash")
     params = {
         "portfolio_id": int(tx_data.get("portfolio_id", 1) or 1),
         "account_id": int(tx_data["account_id"]),
@@ -1027,11 +1056,20 @@ def insert_cashflow_tx(engine: Engine, tx_data: Dict[str, Any]) -> int:
         "is_recurring": 1 if tx_data.get("is_recurring") else 0,
         "payment_method": tx_data.get("payment_method", "Carta / Bonifico"),
         "tags": tx_data.get("tags"),
+        "tx_hash": tx_hash,
     }
     with engine.begin() as conn:
+        if deduplicate and tx_hash:
+            existing = conn.execute(
+                sqlt("SELECT tx_id FROM wealth_cashflow WHERE account_id = :aid AND tx_hash = :thash LIMIT 1"),
+                {"aid": params["account_id"], "thash": tx_hash}
+            ).fetchone()
+            if existing:
+                return None
+
         conn.execute(sqlt("""
-            INSERT INTO wealth_cashflow (portfolio_id, account_id, category_id, tx_date, amount, currency, direction, merchant, notes, is_recurring, payment_method, tags)
-            VALUES (:portfolio_id, :account_id, :category_id, :tx_date, :amount, :currency, :direction, :merchant, :notes, :is_recurring, :payment_method, :tags)
+            INSERT INTO wealth_cashflow (portfolio_id, account_id, category_id, tx_date, amount, currency, direction, merchant, notes, is_recurring, payment_method, tags, tx_hash)
+            VALUES (:portfolio_id, :account_id, :category_id, :tx_date, :amount, :currency, :direction, :merchant, :notes, :is_recurring, :payment_method, :tags, :tx_hash)
         """), params)
         tx_id = _get_last_insert_id(conn, engine)
 

@@ -43,7 +43,7 @@ data/*
 !data/.gitkeep
 !data/portfolio_transactions_realistic.csv
 !data/wealth/
-!data/wealth/*.csv
+!data/wealth/template_*.csv
 exports/*.csv
 exports/*.xlsx
 exports/*.pdf
