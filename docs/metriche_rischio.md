@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/risk_engine.py`, `core/wealth/wealth_engine.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`, `core/backup_engine.py`, `core/security_engine.py`, `core/data_quality_gate.py`) di **ARGUS Risk & Wealth Analytics Platform v6.4.0**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/risk_engine.py`, `core/wealth/unified_stress_bridge.py`, `core/wealth/tax_aware_location.py`, `core/autonomous_rebalancer.py`, `core/wealth/wealth_engine.py`, `core/wealth/wealth_stress_engine.py`, `core/workspace_context.py`, `core/reporting_design_system.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`, `core/backup_engine.py`, `core/security_engine.py`, `core/data_quality_gate.py`) di **ARGUS Risk & Wealth Analytics Platform v7.0.0 Enterprise Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -2450,19 +2450,268 @@ $$
 
 ---
 
-## 67. Riferimenti Bibliografici & Standard Istituzionali
+## 67. Modellazione Macro Stress Congiunto, Ammortamento non Lineare dei Mutui & Liquidity Squeeze Protocol
+
+Il modulo `core/wealth/wealth_stress_engine.py` formalizza la trasmissione integrata degli shock macroeconomici dai mercati finanziari al bilancio patrimoniale della famiglia o del Family Office, unificando l'impatto sul capitale mobiliare, sul debito immobiliare e sulla solvibilità del fondo di emergenza.
+
+### 1. Dinamica Non Lineare del Debito Immobiliare (Ammortamento alla Francese)
+Nei mutui a tasso variabile con ammortamento progressivo a rata costante (alla francese), la rata mensile $PMT(r)$ per un debito residuo $P$, tasso annuo nominale $r$, e $n$ mensilità residue è determinata da:
+
+$$
+PMT(r) = P \cdot \frac{r/12}{1 - \left(1 + \frac{r}{12}\right)^{-n}}
+$$
+
+Sotto uno shock restrittivo della banca centrale di ampiezza $\Delta r$ (es. $+200 \text{ bps}$ o $+300 \text{ bps}$), il nuovo livello della rata e il corrispondente incremento monetario mensile $\Delta PMT$ sono dati da:
+
+$$
+\Delta PMT = PMT(r + \Delta r) - PMT(r) = P \cdot \left[ \frac{(r + \Delta r)/12}{1 - \left(1 + \frac{r + \Delta r}{12}\right)^{-n}} - \frac{r/12}{1 - \left(1 + \frac{r}{12}\right)^{-n}} \right]
+$$
+
+La funzione $PMT(r)$ è convessa rispetto al tasso d'interesse ($\frac{\partial^2 PMT}{\partial r^2} > 0$), producendo incrementi marginali via via più severi all'aumentare della duration residua $n$ del finanziamento.
+
+### 2. Modello di Liquidity Squeeze & Point of Forced Liquidation ($t^*$)
+La resilienza del patrimonio a shock congiunti (es. crollo dei corsi azionari combinato con perdita parziale di reddito e aumento dei costi di servizio del debito) viene formalizzata attraverso la traiettoria temporale della riserva liquida $E(t)$ (fondo di emergenza).
+
+Dati:
+- $E_0$: Fondo di emergenza iniziale.
+- $S(t)$: Flussi di cassa in entrata (redditi da lavoro o dividendi post-shock).
+- $C_{\text{base}}$: Spese vive ordinarie.
+- $\pi_{\text{shock}}$: Tasso addizionale di inflazione sui consumi.
+- $PMT_{\text{stressed}}$: Nuova rata mensile del debito immobiliare.
+
+Il fabbisogno monetario mensile totale diventa:
+
+$$
+C_{\text{tot}}(t) = C_{\text{base}} \cdot (1 + \pi_{\text{shock}}) + PMT(r + \Delta r)
+$$
+
+Il tasso di variazione netto di cassa mensile (Cash Burn Rate) è:
+
+$$
+\Delta \text{Cash} = S(t) - C_{\text{tot}}(t)
+$$
+
+Se $\Delta \text{Cash} < 0$, il fondo di emergenza si decrementa linearmente nel tempo discreto:
+
+$$
+E(t) = E_0 + t \cdot \Delta \text{Cash} = E_0 - t \cdot |S - C_{\text{tot}}|
+$$
+
+Il **Point of Forced Liquidation ($t^*$)**, ovvero il tempo (in mesi) in cui la liquidità di sicurezza si esaurisce completamente costringendo l'investitore a smobilizzare asset illiquidi o azioni in portafoglio, è definito analiticamente da:
+
+$$
+t^* = \begin{cases}
+\displaystyle \frac{E_0}{C_{\text{tot}} - S}, & \text{se } C_{\text{tot}} > S \\
++\infty, & \text{se } S \ge C_{\text{tot}} \text{ (Solvibile)}
+\end{cases}
+$$
+
+### 3. Perdita Irreversibile da Liquidazione Forzata (Permanent Capital Loss)
+Qualora $t^* < T_{\text{recovery}}$ (dove $T_{\text{recovery}}$ è il tempo necessario ai mercati finanziari per recuperare il drawdown dello shock), l'investitore è costretto a vendere quote azionarie sui minimi di mercato per finanziare il disavanzo corrente. Il capitale nominale che deve essere smobilizzato per coprire un deficit monetario cumulato $\text{Deficit}(T)$ sotto un drawdown di portafoglio $DD_p \in (-1, 0)$ è pari a:
+
+$$
+V_{\text{venduto}} = \frac{\text{Deficit}(T)}{1 - |DD_p|}
+$$
+
+La perdita monetaria irreversibile permanente (*Permanent Capital Destruction*) provocata dal mancato godimento del rimbalzo futuro è:
+
+$$
+L_{\text{irreversibile}} = V_{\text{venduto}} \cdot |DD_p| = \text{Deficit}(T) \cdot \frac{|DD_p|}{1 - |DD_p|}
+$$
+
+Questo modello dimostra matematicamente l'importanza del dimensionamento preventivo del fondo di emergenza come barriera contro il *Sequence of Returns Risk*.
+
+### 4. Dynamic Safe Withdrawal Rate (Guyton-Klinger Rules)
+Nei modelli di indipendenza finanziaria (FIRE), il tasso di prelievo sicuro (*Safe Withdrawal Rate - SWR*) non può rimanere statico durante shock congiunti. Il sistema adotta l'adeguamento dinamico secondo le regole prudenziali di Guyton-Klinger:
+
+- **Capital Preservation Rule**: Se il tasso di prelievo corrente $WR_t = \frac{W_t}{V_{\text{port}, t}}$ supera del 20% il tasso iniziale di riferimento $SWR_0$:
+  $$WR_t > 1.20 \cdot SWR_0 \implies W_{t+1} = W_t \cdot (1 - 0.10)$$
+  riducendo il prelievo del 10% per prevenire l'esaurimento anticipato del patrimonio.
+- **Prosperity Rule**: Se al contrario i mercati performano positivamente riducendo il tasso di prelievo effettivo oltre il 20%:
+  $$WR_t < 0.80 \cdot SWR_0 \implies W_{t+1} = W_t \cdot (1 + 0.10)$$
+  il prelievo può essere incrementato del 10%.
+- **Spese Indifferibili (Hard Floor)**: In ogni circostanza, il prelievo non può scendere al di sotto delle spese primarie essenziali di sopravvivenza ($W_{t} \ge W_{\min, \text{essenziali}}$).
+
+---
+
+## 68. Liquidity-Adjusted Value at Risk (L-VaR) e Rischio di Illiquidità Esogena (Bangia et al. 1999)
+
+Il modello classico del Value at Risk assume che l'intero portafoglio possa essere liquidato istantaneamente ai prezzi mid-market senza incorrere in attriti di mercato o sconti di esecuzione. Nei mercati reali o durante tensioni finanziarie, lo smobilizzo di posizioni comporta un costo di liquidità dovuto all'allargamento del bid-ask spread.
+
+Il motore `core/advanced_quant.py` (`compute_liquidity_adjusted_var`) e `core/risk_engine.py` implementano il modello istituzionale di **Liquidity-Adjusted Value at Risk (L-VaR)** derivato da Bangia, Diebold, Schuermann e Stroughair (1999):
+
+### 1. Scomposizione Additiva del Rischio
+L'L-VaR monetario al livello di confidenza $\alpha$ su un orizzonte di detenzione $T$ è dato dalla somma del VaR di mercato standard e del costo di liquidità esogeno ($LC$):
+
+$$
+\text{L-VaR}_{\alpha}(T) = \text{VaR}_{\alpha}(T) + \text{LC}_{\alpha}
+$$
+
+### 2. Modellazione Stocastica del Bid-Ask Spread
+Dato il vettore dei pesi di portafoglio $\mathbf{w}$, per ciascun asset $i$ con spread relativo $S_i = \frac{P_{\text{ask}, i} - P_{\text{bid}, i}}{P_{\text{mid}, i}}$, lo spread è trattato come una variabile casuale con media empirica $\mu_{S, i}$ e deviazione standard $\sigma_{S, i}$.
+
+Il costo di liquidazione prudenziale all'estremo percentile $\alpha$ (solitamente $95\%$ o $99\%$, con quantile normale $z_{\alpha}$) per liquidare metà spread è definito da:
+
+$$
+\text{LC}_{\alpha} = \frac{1}{2} V_{\text{port}} \sum_{i=1}^N w_i \left( \mu_{S, i} + z_{\alpha} \cdot \sigma_{S, i} \right)
+$$
+
+### 3. Orizzonte di Liquidazione Ordinata & Scaling
+Qualora le posizioni richiedano un orizzonte di smobilizzo ordinato di $T_{\text{liq}} > 1$ giorni per non superare la soglia di partecipazione al volume di mercato $ADV_i$, il VaR di mercato scala con la radice quadrata del tempo ($\sqrt{T_{\text{liq}}}$) e il costo di spread riflette la durata di esecuzione:
+
+$$
+\text{L-VaR}_{\alpha}(T_{\text{liq}}) = \text{VaR}_{\alpha}(1\text{d}) \cdot \sqrt{T_{\text{liq}}} + \text{LC}_{\alpha}
+$$
+
+Il differenziale $\Delta_{\text{liq}} = \text{L-VaR}_{\alpha} - \text{VaR}_{\alpha} = \text{LC}_{\alpha}$ quantifica l'*Haircut di Illiquidità* del portafoglio.
+
+---
+
+## 69. Curva dei Tassi a Pronti Nelson-Siegel & Key Rate Durations (KRD)
+
+Nei mercati a reddito fisso, l'analisi del rischio di tasso non può essere limitata a traslazioni parallele della curva (Macaulay o Modified Duration). La struttura per scadenza dei tassi subisce continuamente rotazioni (*twist/steepening/flattening*) e deformazioni di curvatura (*butterfly*).
+
+I moduli `core/fixed_income.py` e `core/yield_curve.py` implementano la calibrazione parametrica della curva zero-coupon di Nelson-Siegel e la scomposizione delle **Key Rate Durations (KRD)**:
+
+### 1. Funzione di Struttura a Termine Nelson-Siegel (1987)
+Il tasso a pronti continuo zero-coupon $y(\tau)$ a scadenza $\tau$ (espressa in anni) è parametrizzato da 4 parametri $(\beta_0, \beta_1, \beta_2, \lambda)$:
+
+$$
+y(\tau) = \beta_0 + \beta_1 \left( \frac{1 - e^{-\tau/\lambda}}{\tau/\lambda} \right) + \beta_2 \left( \frac{1 - e^{-\tau/\lambda}}{\tau/\lambda} - e^{-\tau/\lambda} \right)
+$$
+
+dove:
+- $\beta_0$: Livello asintotico di lungo termine ($y(\infty)$).
+- $\beta_1$: Componente di pendenza a breve termine (poiché per $\tau \to 0$, $y(0) = \beta_0 + \beta_1$).
+- $\beta_2$: Curvatura a medio termine, con picco attorno a $\tau \approx \lambda$.
+- $\lambda$: Parametro di scala temporale che governa la posizione del gobbo (*hump*).
+
+### 2. Pricing Esatto dei Flussi di Cassa
+Dato un generico strumento obbligazionario che genera una sequenza di flussi di cassa $CF_j$ alle scadenze $\tau_j$, il prezzo pulito attualizzato sulla curva continua è calcolato da:
+
+$$
+P = \sum_{j=1}^M CF_j \cdot e^{-y(\tau_j) \cdot \tau_j}
+$$
+
+### 3. Key Rate Durations su Nodi Istituzionali
+Per valutare la sensibilità del prezzo obbligazionario a shock locali della curva, vengono selezionati 5 nodi cardine istituzionali: $\mathbf{T}_{\text{key}} = [1\text{Y}, 2\text{Y}, 5\text{Y}, 10\text{Y}, 30\text{Y}]$.
+
+Ciascuna Key Rate Duration $\text{KRD}_k$ misura la derivata parziale del prezzo rispetto a uno spostamento unitario triangolare o locale del tasso sul nodo $k$ ($\Delta y_k = +1 \text{ bps} = 0.0001$):
+
+$$
+\text{KRD}_k = -\frac{1}{P} \frac{\partial P}{\partial y_k} \approx -\frac{1}{P} \frac{P(y + \Delta y_k) - P(y - \Delta y_k)}{2 \Delta y_k}
+$$
+
+La somma di tutte le Key Rate Durations eguaglia esattamente la Modified Duration effettiva dell'obbligazione:
+
+$$
+\sum_{k=1}^5 \text{KRD}_k = \text{MD}_{\text{effettiva}}
+$$
+
+Questo permette di identificare immediatamente se un portafoglio obbligazionario è esposto prevalentemente al rischio di irrigidimento a breve termine, al ventre della curva (5Y) o all'inversione sui tassi a lungo termine (30Y).
+
+---
+
+## 70. Unified Multi-Asset Factor Stress-Testing Engine (Cross-Asset Macro Bridge)
+
+Nei portafogli di Private Banking e Family Office, il rischio non risiede esclusivamente nelle posizioni mobiliari quotate. Gli shock macroeconomici si propagano simultaneamente su:
+1. Portafoglio azionario/obbligazionario liquido.
+2. Valutazione del patrimonio immobiliare (*Real Estate Valuation*).
+3. Oneri di servizio del debito (mutui a tasso fisso o variabile).
+4. Potere d'acquisto e fabbisogno di spesa corrente (*Inflation Drift*).
+
+Il motore `core/wealth/unified_stress_bridge.py` formalizza questa integrazione con il modello del **Cross-Asset Macro Bridge**:
+
+### 1. Definizione dello Shock Multi-Fattoriale Macro
+Uno scenario di stress è rappresentato dal vettore di perturbazione $\mathbf{f}$:
+
+$$
+\mathbf{f} = \begin{bmatrix} \Delta r_{\text{rates}} \\ \Delta S_{\text{equity}} \\ \Delta \pi_{\text{inflation}} \\ \Delta P_{\text{real\_estate}} \\ \Delta s_{\text{credit}} \end{bmatrix}
+$$
+
+### 2. Trasmissione del Rischio sul Patrimonio Totale (Net Worth)
+La variazione monetaria totale del patrimonio netto ($\Delta \text{NW}$) è data dalla somma algebrica dei singoli impatti:
+
+$$
+\Delta \text{NW}(\mathbf{f}) = \Delta V_{\text{Liquid}}(\mathbf{f}) + \Delta V_{\text{RealEstate}}(\mathbf{f}) - \Delta \text{Debito}(\mathbf{f}) - \Delta \text{CashBurn}(\mathbf{f})
+$$
+
+dove:
+- **Impatto Portafoglio Mobiliare**:
+  $$
+  \Delta V_{\text{Liquid}} = V_{\text{port}} \cdot \left[ \beta_{\text{equity}} \cdot \Delta S_{\text{equity}} - \text{MD}_{\text{port}} \cdot \Delta r_{\text{rates}} - \text{CSD}_{\text{port}} \cdot \Delta s_{\text{credit}} \right]
+  $$
+- **Impatto Immobiliare**:
+  $$
+  \Delta V_{\text{RealEstate}} = \sum_{k} V_{\text{imm}, k} \cdot \Delta P_{\text{real\_estate}}
+  $$
+- **Impatto Servizio del Debito Mutui**:
+  Incremento del valore attuale delle rate residue su mutui a tasso variabile tramite attualizzazione al nuovo saggio di interesse $r + \Delta r_{\text{rates}}$.
+- **Impatto Fabbisogno di Spesa (Cash Burn)**:
+  Erosione addizionale della liquidità per effetto dell'inflazione $\Delta \pi$ applicata al paniere delle spese indifferibili.
+
+---
+
+## 71. Tax-Aware Asset Location & Ribilanciamento Frictional-Aware con Minusvalenze Pregresse
+
+La massimizzazione del rendimento netto di un investitore privato dipende in larga misura dall'efficienza fiscale dell'allocazione (*Asset Location*) tra diversi conti con differenti regimi impositivi, nonché dall'ottimizzazione delle vendite per compensare minusvalenze in scadenza (*Zainetto Fiscale*).
+
+I moduli `core/wealth/tax_aware_location.py` e `core/autonomous_rebalancer.py` implementano questa logica:
+
+### 1. Tassazione Asimmetrica TUIR e Scelta del Contenitore Ottimo
+Nell'ordinamento italiano (D.P.R. 917/1986):
+- **Conto Tassabile Ordinario (Regime Amministrato/Dichiarativo)**: Tassazione al $26\%$ su plusvalenze (aliquota agevolata al $12.5\%$ per titoli di Stato). I redditi di capitale (cedole, dividendi ed ETF) non possono compensare minusvalenze pregresse, mentre i redditi diversi (azioni singole, certificati, ETC su materie prime) generano crediti d'imposta utilizzabili entro 4 anni.
+- **Fondo Pensione / Previdenza Complementare**: Tassazione agevolata al $20\%$ sul rendimento maturato, deducibilità IRPEF fino a €5.164,57 annui, e tassazione finale sul capitale al $15\%-9\%$.
+- **Piani Individuali di Risparmio (PIR)**: Esenzione totale da imposte su capital gain se mantenuti per almeno 5 anni.
+
+L'algoritmo di **Tax-Aware Asset Location** ordina le classi di attivo per *Indice di Inefficienza Fiscale ($IFI$)*:
+
+$$
+IFI_i = \frac{\tau_i \cdot \left( y_{\text{yield}, i} + g_{\text{turnover}, i} \cdot g_{\text{gain}, i} \right)}{1 - \tau_i}
+$$
+
+Assegnando con priorità gli asset con massimo $IFI$ (obbligazioni societarie ad alto rendimento, fondi a distribuzione) ai veicoli fiscalmente protetti, e posizionando gli asset a bassa inefficienza o con capacità di generare redditi diversi compensabili nel conto ordinario.
+
+### 2. Ribilanciamento con Compensazione del Credito d'Imposta
+In presenza di uno zainetto fiscale con minusvalenze residue accreditate $M_{\text{disp}}$, quando l'ottimizzatore propone la vendita di un lotto azionario o ETC con plusvalenza lorda $G = q \cdot (P_{\text{sell}} - \text{WACP}) > 0$:
+
+1. Se $G \le M_{\text{disp}}$:
+   L'imposta dovuta è identicamente zero ($\text{Tax} = 0$), e il credito residuo si riduce a $M_{\text{disp}}' = M_{\text{disp}} - G$.
+2. Se $G > M_{\text{disp}}$:
+   L'imposta viene applicata unicamente sull'eccedenza:
+   $$
+   \text{Imposta Netta} = (G - M_{\text{disp}}) \cdot \tau_{\text{asset}}
+   $$
+   con azzeramento delle minusvalenze residue.
+
+Il modulo di ribilanciamento autonomo (`generate_autonomous_rebalancing_proposal`) minimizza la funzione di costo comprendente il tracking error, le commissioni di transazione e il carico fiscale netto generato:
+
+$$
+\min_{\Delta \mathbf{w}} \left\{ (\mathbf{w} + \Delta \mathbf{w} - \mathbf{w}^*)^T \mathbf{\Sigma} (\mathbf{w} + \Delta \mathbf{w} - \mathbf{w}^*) + \lambda_{\text{cost}} \sum_i c_i |\Delta w_i| + \lambda_{\text{tax}} \cdot \text{TaxNet}(\Delta \mathbf{w}, \text{WACP}, M_{\text{disp}}) \right\}
+$$
+
+---
+
+## 72. Riferimenti Bibliografici & Standard Istituzionali
 
 1. **Almgren, R., & Chriss, N. (2000)**. *Optimal execution of portfolio transactions*. Journal of Risk, 3(2), 5-40.
 2. **Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005)**. *Direct estimation of equity market impact*. Risk, 18(7), 58-62.
-3. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
-4. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
-5. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
-6. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
-7. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
-8. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
-9. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
-10. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
-11. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
-12. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
-13. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+3. **Bangia, A., Diebold, F. X., Schuermann, T., & Stroughair, J. D. (1999)**. *Modeling Liquidity Risk, With Implications for Traditional Market Risk Measurement and Management*. Working Paper, Financial Institutions Center, The Wharton School.
+4. **Blanchett, D. (2014)**. *Exploring the Retirement Consumption Puzzle*. Journal of Financial Planning, 27(5), 34-42.
+5. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
+6. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
+7. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
+8. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
+9. **Damodaran, A. (2012)**. *Investment Valuation: Tools and Techniques for Determining the Value of Any Asset*. John Wiley & Sons.
+10. **Guyton, J. T., & Klinger, W. J. (2006)**. *Decision rules and maximum initial withdrawal rates for college-educated retirees*. Journal of Financial Planning, 19(10), 48-58.
+11. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
+12. **Ho, T. S., & Mudryk, S. (2005)**. *Key Rate Duration: A Modern Approach to Yield Curve Risk Management*. Fixed Income Valuation and Risk, 12(3), 45-62.
+13. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
+14. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
+15. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
+16. **Nelson, C. R., & Siegel, A. F. (1987)**. *Parsimonious Modeling of Yield Curves*. The Journal of Business, 60(4), 473-489.
+17. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
+18. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
+19. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+
 

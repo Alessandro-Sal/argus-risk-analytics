@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # core/autonomous_rebalancer.py
 # ARGUS — Autonomous AI Rebalancer & MiFID II Suitability Gate
 # Generatore di ordini tattici, ottimizzazione fiscale e gate di conformità
@@ -96,11 +96,15 @@ def generate_autonomous_rebalancing_proposal(
     results: Optional[Dict[str, Any]] = None,
     target_weights: Optional[Dict[str, float]] = None,
     max_turnover_pct: float = 25.0,
-    min_trade_eur: float = 500.0
+    min_trade_eur: float = 500.0,
+    available_minusvalenze_eur: float = 0.0
 ) -> Dict[str, Any]:
     """
     Genera una proposta automatica di ordini di ribilanciamento (Trade Proposal)
     ottimizzata fiscalmente e conforme ai vincoli MiFID II.
+    
+    Integra il calcolo analitico delle plusvalenze/minusvalenze sul Prezzo Medio di Carico (PMC)
+    reale e l'assorbimento delle minusvalenze capienti nello zainetto fiscale (art. 67 TUIR).
     """
     total_val = 0.0
     if df_positions is not None and not df_positions.empty and "controvalore" in df_positions.columns:
@@ -126,13 +130,17 @@ def generate_autonomous_rebalancing_proposal(
 
     current_positions = {}
     prices = {}
+    pmcs = {}
     if df_positions is not None and not df_positions.empty:
         for _, r in df_positions.iterrows():
             t = str(r.get("ticker", "")).strip()
             val = float(r.get("controvalore", 0.0))
             p = float(r.get("prezzo_corrente", r.get("prezzo_medio_carico", 100.0)))
+            pmc_val = float(r.get("prezzo_medio_carico", r.get("pmc_fiscale", 0.0)))
             current_positions[t] = val
             prices[t] = max(0.01, p)
+            if pmc_val > 0:
+                pmcs[t] = pmc_val
 
     # Elenco unificato di ticker
     all_tickers = sorted(list(set(list(targets.keys()) + list(current_positions.keys()))))
@@ -141,6 +149,8 @@ def generate_autonomous_rebalancing_proposal(
     total_buy_eur = 0.0
     total_sell_eur = 0.0
     estimated_tax_impact_eur = 0.0
+    remaining_minus_eur = float(max(0.0, available_minusvalenze_eur))
+    total_tax_saved_eur = 0.0
 
     for t in all_tickers:
         cur_val = current_positions.get(t, 0.0)
@@ -156,12 +166,43 @@ def generate_autonomous_rebalancing_proposal(
             if diff_eur > 0:
                 action = "BUY"
                 total_buy_eur += notional
-                tax_impact = 0.0  # Nessun impatto fiscale su acquisti
+                tax_impact = 0.0
+                gross_gain = 0.0
+                offset_used = 0.0
+                tax_saved = 0.0
             else:
                 action = "SELL"
                 total_sell_eur += notional
-                # Stima prudenziale imposta capital gain 26% su ipotetico 15% di plusvalenza
-                tax_impact = notional * 0.15 * 0.26
+
+                # Calcolo fiscale analitico su PMC se disponibile
+                pmc = pmcs.get(t, 0.0)
+                if pmc > 0:
+                    gross_gain = float(shares * (px_val - pmc))
+                else:
+                    # Stima prudenziale storica 15% di capital gain
+                    gross_gain = float(notional * 0.15)
+
+                if gross_gain > 0:
+                    # Plusvalenza: verifica compensabilità con minusvalenze capienti
+                    if remaining_minus_eur > 0:
+                        offset_used = min(remaining_minus_eur, gross_gain)
+                        taxable_gain = gross_gain - offset_used
+                        remaining_minus_eur -= offset_used
+                        tax_impact = taxable_gain * 0.26
+                        tax_saved = offset_used * 0.26
+                        total_tax_saved_eur += tax_saved
+                    else:
+                        offset_used = 0.0
+                        tax_saved = 0.0
+                        tax_impact = gross_gain * 0.26
+                else:
+                    # Minusvalenza generata dalla vendita: alimenta lo zainetto
+                    new_minus = abs(gross_gain)
+                    remaining_minus_eur += new_minus
+                    tax_impact = 0.0
+                    offset_used = 0.0
+                    tax_saved = 0.0
+
                 estimated_tax_impact_eur += tax_impact
 
             trades.append({
@@ -173,7 +214,10 @@ def generate_autonomous_rebalancing_proposal(
                 "suggested_shares": shares,
                 "estimated_price": round(px_val, 2),
                 "trade_notional_eur": round(notional, 2),
+                "gross_capital_gain_eur": round(gross_gain, 2),
+                "minus_offset_used_eur": round(offset_used, 2),
                 "estimated_tax_impact_eur": round(tax_impact, 2),
+                "tax_saved_eur": round(tax_saved, 2),
                 "status": "READY_TO_EXECUTE"
             })
 
@@ -181,8 +225,6 @@ def generate_autonomous_rebalancing_proposal(
     turnover_pct = (turnover_eur / total_val * 100.0) if total_val > 0 else 0.0
 
     df_trades = pd.DataFrame(trades)
-
-    # Verifica vincolo turnover
     turnover_exceeded = turnover_pct > max_turnover_pct
 
     return {
@@ -193,7 +235,11 @@ def generate_autonomous_rebalancing_proposal(
         "turnover_pct": round(turnover_pct, 1),
         "max_allowed_turnover_pct": max_turnover_pct,
         "is_turnover_compliant": not turnover_exceeded,
+        "initial_minusvalenze_eur": round(available_minusvalenze_eur, 2),
+        "remaining_minusvalenze_eur": round(remaining_minus_eur, 2),
+        "total_tax_saved_by_harvesting_eur": round(total_tax_saved_eur, 2),
         "estimated_tax_liability_eur": round(estimated_tax_impact_eur, 2),
         "trades_list": trades,
         "trades_df": df_trades
     }
+

@@ -412,11 +412,9 @@ if st.session_state.get("pipeline_done"):
     with col_act2:
         if st.button("🔄 Reset / Nuova Analisi", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
             from core.workspace_manager import clear_session_cache
+            from core.workspace_context import WorkspaceContext
             clear_session_cache()
-            for key in ["pipeline_done", "portfolio_id", "results", "run_id", "fetch_report"]:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.session_state["session_cleared"] = True
+            WorkspaceContext.get_current().flush_risk_domain()
             st.rerun()
 
 # ── COMMAND TABS DELLA CONTROL ROOM ──────────────────────────
@@ -575,15 +573,21 @@ with tab_ingest:
     else:
         uploaded_file = st.file_uploader(
             "Trascina qui il tuo file CSV esportato dal broker (o usa il template ARGUS):",
-            type=["csv"],
-            help="Carica il file in formato CSV. L'Auto-Detector riconoscerà automaticamente la struttura del broker."
+            type=["csv", "xlsx", "xls", "txt"],
+            help="Carica il file in formato CSV, Excel o TXT. L'Auto-Detector riconoscerà automaticamente la struttura del broker."
         )
         if uploaded_file:
-            df_raw = pd.read_csv(uploaded_file, dtype=str)
-            st.session_state.pop("session_cleared", None)
-            if not st.session_state.get("portfolio_name") or st.session_state.get("portfolio_name") == "Nessun Portafoglio (In attesa)":
-                auto_name = os.path.splitext(uploaded_file.name)[0].replace("_", " ").replace("-", " ").title()
-                st.session_state["portfolio_name"] = auto_name
+            from core.ingestion_utils import read_tabular_stream
+            try:
+                df_raw = read_tabular_stream(uploaded_file.getvalue(), filename=uploaded_file.name).astype(str)
+            except Exception as e_stream:
+                st.error(f"Errore lettura file: {e_stream}")
+                df_raw = None
+            if df_raw is not None and not df_raw.empty:
+                st.session_state.pop("session_cleared", None)
+                if not st.session_state.get("portfolio_name") or st.session_state.get("portfolio_name") == "Nessun Portafoglio (In attesa)":
+                    auto_name = os.path.splitext(uploaded_file.name)[0].replace("_", " ").replace("-", " ").title()
+                    st.session_state["portfolio_name"] = auto_name
 
     if st.session_state.get("pipeline_done"):
         current_wf_step = 3
@@ -808,19 +812,39 @@ with tab_ingest:
                             )
                             conn.execute(sqlt("DELETE FROM transactions WHERE portfolio_id = :pid"), {"pid": portfolio_id})
 
+                            is_sqlite = "sqlite" in str(engine.url)
                             for _, row in df_clean.iterrows():
-                                conn.execute(sqlt("""
-                                    INSERT INTO assets (ticker, name, asset_class, currency)
-                                    VALUES (:ticker, :ticker, :asset_class, :currency)
-                                    ON DUPLICATE KEY UPDATE name=VALUES(name), asset_class=VALUES(asset_class), currency=VALUES(currency)
-                                """), {
-                                    "ticker":      row["ticker"],
-                                    "asset_class": "stock" if pd.isna(row.get("asset_class")) else row.get("asset_class"),
-                                    "currency":    row["currency"],
-                                })
+                                t_sym = str(row["ticker"]).strip().upper()
+                                a_class = "stock" if pd.isna(row.get("asset_class")) else row.get("asset_class")
+                                curr = row["currency"]
+                                
+                                if is_sqlite:
+                                    conn.execute(sqlt("""
+                                        INSERT INTO assets (ticker, name, asset_class, currency)
+                                        VALUES (:ticker, :ticker, :asset_class, :currency)
+                                        ON CONFLICT(ticker) DO UPDATE SET 
+                                            name = excluded.name, 
+                                            asset_class = excluded.asset_class, 
+                                            currency = excluded.currency
+                                    """), {
+                                        "ticker":      t_sym,
+                                        "asset_class": a_class,
+                                        "currency":    curr,
+                                    })
+                                else:
+                                    conn.execute(sqlt("""
+                                        INSERT INTO assets (ticker, name, asset_class, currency)
+                                        VALUES (:ticker, :ticker, :asset_class, :currency)
+                                        ON DUPLICATE KEY UPDATE name=VALUES(name), asset_class=VALUES(asset_class), currency=VALUES(currency)
+                                    """), {
+                                        "ticker":      t_sym,
+                                        "asset_class": a_class,
+                                        "currency":    curr,
+                                    })
+
                                 asset_id = conn.execute(
                                     sqlt("SELECT asset_id FROM assets WHERE ticker=:t"),
-                                    {"t": row["ticker"]}
+                                    {"t": t_sym}
                                 ).scalar()
 
                                 conn.execute(sqlt("""

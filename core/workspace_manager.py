@@ -110,8 +110,17 @@ def set_url_params(**kwargs):
 def save_session_snapshot_to_cache():
     """
     Salva l'intero bundle di sessione (risultati completi, DataFrame, Serie e metadati)
-    per renderlo accessibile istantaneamente a qualunque nuova scheda o finestra del browser.
+    utilizzando WorkspaceContext con isolamento per session_id e fallback legacy ad altissima fedeltà.
     """
+    try:
+        from core.workspace_context import WorkspaceContext, prune_stale_session_caches
+        ctx = WorkspaceContext.get_current()
+        if ctx.save_session_cache():
+            prune_stale_session_caches(max_age_hours=24)
+            return
+    except Exception:
+        pass
+
     try:
         results = st.session_state.get("results")
         if not results or not isinstance(results, dict):
@@ -160,6 +169,13 @@ def save_session_snapshot_to_cache():
 
 def clear_session_cache():
     """Elimina i file di snapshot di sessione su disco per un reset pulito."""
+    try:
+        from core.workspace_context import WorkspaceContext
+        ctx = WorkspaceContext.get_current()
+        ctx.clear_persisted_cache()
+    except Exception:
+        pass
+
     for path in [WORKSPACE_CACHE_PKL, WORKSPACE_CACHE_JSON]:
         if os.path.exists(path):
             try:
@@ -190,7 +206,16 @@ def try_restore_session_from_cache(force: bool = False) -> bool:
     except Exception:
         pass
 
-    # 1. Prova prima dal bundle binario pickle (fedeltà 100%)
+    # 1. Tenta il ripristino tramite WorkspaceContext (isolamento multi-sessione)
+    try:
+        from core.workspace_context import WorkspaceContext
+        ctx = WorkspaceContext.get_current()
+        if ctx.restore_session_cache(force=force):
+            return True
+    except Exception:
+        pass
+
+    # 2. Prova dal bundle binario pickle legacy (fedeltà 100%)
     if os.path.exists(WORKSPACE_CACHE_PKL):
         try:
             with open(WORKSPACE_CACHE_PKL, "rb") as f:
@@ -206,7 +231,7 @@ def try_restore_session_from_cache(force: bool = False) -> bool:
         except Exception:
             pass
 
-    # 2. Fallback da JSON se pickle non disponibile
+    # 3. Fallback da JSON se pickle non disponibile
     if os.path.exists(WORKSPACE_CACHE_JSON):
         try:
             with open(WORKSPACE_CACHE_JSON, "r", encoding="utf-8") as jf:

@@ -24,59 +24,57 @@ flowchart TD
         direction TB
         CSV[/"📄 File CSV Utente Generico"/]:::source
         DEGIRO[/"📄 Export Broker DeGiro CSV"/]:::source
+        BANKS[/"🏦 Estratti Conto Bancari Multi-Banca (CSV / XLSX)"/]:::source
         GSHEETS[/"🌐 Google Sheets Live Dual Sync (Stocks & Crypto)"/]:::source
-        YF(("🌐 yfinance API (Prezzi & Metadati)")):::source
+        YF(("🌐 yfinance API (Prezzi, Metadati & FX)")):::source
     end
 
     subgraph Layer2 ["⚙️ 2. ETL & VALIDATION PIPELINE"]
         direction TB
-        ADAPT{"🔌 core/adapters/degiro.py\n(DeGiro Parser)"}:::script
+        ADAPT{"🔌 core/adapters/ (DeGiro, Directa, Fineco, IBKR)"}:::script
+        INGEST{"🔌 core/ingestion_utils.py & universal_bank_parser.py\n(Heuristic Layout Sniffer & Adapters)"}:::script
+        GATE{"🚦 core/data_quality_gate.py\n(Pydantic v2 Gate & SHA-256 Deduplication)"}:::script
         VAL{"⚙️ core/validator.py\n(Cleaning & Normalization)"}:::script
-        SCH{"🛡️ core/schemas.py\n(Pydantic Data Contracts)"}:::script
         FETCH{"⚙️ core/fetcher.py\n(Market & FX Enrichment)"}:::script
         CACHE{"⚡ core/cache_shield.py\n(Multi-Tier LRU & SQLite Cache Shield)"}:::script
     end
 
-    subgraph Layer3 ["🗄️ 3. DATA WAREHOUSE (MySQL / SQLite)"]
+    subgraph Layer3 ["🗄️ 3. DATA WAREHOUSE & STORAGE (MySQL / SQLite / DuckDB)"]
         direction TB
         DB_RAW[("Tabelle Grezze ORM\n(portfolios, assets, transactions, market_prices)")]:::storage
         DB_SNAP[("Tabelle Snapshot Metriche\n(portfolio_snapshots, snapshot_positions)")]:::storage
+        DB_WEALTH[("Wealth DB (argus_wealth.db)\n(accounts, cash_flow, assets, mortgages, simulations)")]:::storage
+        DUCK[("DuckDB OLAP Engine\n(In-Process SIMD & Parquet Storage)")]:::storage
     end
 
-    subgraph Layer4 ["🧠 4. ANALYTICS & QUANTITATIVE ENGINE"]
+    subgraph Layer4 ["🧠 4. ANALYTICS, WEALTH & QUANTITATIVE ENGINE"]
         direction TB
+        CTX{"🧱 core/workspace_context.py\n(Typed Contexts, Session Persistence & Flush)"}:::engine
         RE{"⚙️ core/risk_engine.py\n(FIFO Basis, VaR Cornish-Fisher, Kupiec Test,\nLedoit-Wolf SLSQP, Black-Litterman, Carhart 4-Factor,\nMSCI Barra 5-Factor, Merton Jump-Diffusion,\nATR Chandelier Exits, 3D Stress Surface, Almgren-Chriss, Cholesky MC)"}:::engine
+        WEALTH_ENG{"🏛️ core/wealth/wealth_engine.py\n(Net Worth Consolidation, FIRE SWR, Mutui, Successione)"}:::engine
+        WEALTH_STRESS{"🌪️ core/wealth/wealth_stress_engine.py\n(Macro Stress, Mutui Francese, Liquidity Squeeze & SWR)"}:::engine
+        BRIDGE{"🌉 core/wealth/unified_stress_bridge.py\n(Cross-Asset Macro Bridge & Multi-Asset Factors)"}:::engine
+        TAX_LOC{"🏛️ core/wealth/tax_aware_location.py\n(Tax-Aware Asset Location & Friction Optimizer)"}:::engine
         TERM_ENG{"🖥️ core/terminal_engine.py\n(Desk Risk Limits, Pre-Trade Circuit Breakers,\nOMS Blotter TWAP/VWAP Slicing, Intraday PnL Attribution,\nRelative Performance Overlay & Macro Catalysts)"}:::engine
-        AI_ANL{"🧠 core/ai_analyst.py\n(Dual-Engine AI Analyst Memorandum & Copilot)"}:::engine
-        ADV_Q{"🧬 core/advanced_quant.py\n(Asymmetric Tail Copulas, Kelly Sizing, ERC)"}:::engine
+        AI_ANL{"🧠 core/ai_analyst.py\n(AI Analyst Memorandum & MiFID II / TUF Guardrails)"}:::engine
+        SEC_RAG{"🔍 core/sec_rag_engine.py\n(Semantic Window Chunking & RRF Local Vector Store)"}:::engine
+        VOICE{"🎙️ core/voice_advisor_engine.py\n(Dual-Voice Executive Briefing CIO/CRO)"}:::engine
+        ADV_Q{"🧬 core/advanced_quant.py\n(Asymmetric Tail Copulas, Kelly Sizing, ERC, L-VaR Bangia)"}:::engine
         MULTI{"🗂️ core/multi_portfolio.py\n(Total Wealth Multi-Portfolio Hub & Consolidator)"}:::engine
-        HRP{"🧬 core/hrp_optimizer.py\n(Hierarchical Risk Parity ML,\nTree Clustering & Recursive Bisection)"}:::engine
-        OPT{"🛡️ core/options_hedging.py\n(Black-Scholes 1973, 5 Greci,\nPut Delta-Hedging & Covered Call)"}:::engine
-        REG{"🌊 core/regime_switching.py\n(Market Regime 3-State Markov Model)"}:::engine
-        FORENSIC{"🕵️‍♂️ core/forensic_accounting.py\n(Beneish M-Score & Sloan Accruals)"}:::engine
-        TA{"📈 core/technical_analysis.py\n(EMA/SMA, MACD, RSI 14, Bollinger Squeeze,\nVolume Profile POC/VAH/VAL, Candlestick Pattern Recognition,\nTechnical Confluence Score 0-100, Multi-Timeframe Trend)"}:::engine
-        FIN{"🏛️ core/financial_analysis.py\n(Altman Z-Score, DuPont, Piotroski F-Score,\nWACC CAPM, DCF Monte Carlo, ML Isolation Forest Anomaly Detector, 10-K)"}:::engine
-        DIAG{"🩺 core/diagnostics.py\n(Engine Latency Benchmark & Health Check)"}:::engine
-        ADV{"🛡️ core/advisor.py\n(ARGUS Quant Advisor & Health Score)"}:::engine
-        HEDGE{"🛡️ core/hedging.py\n(Beta-Neutral Hedging & Tail Protection)"}:::engine
-        ATTR{"🎯 core/attribution.py\n(Brinson-Fachler Performance Attribution)"}:::engine
-        LIMITS{"🚨 core/risk_limits.py\n(Risk Limits & Early Warning Engine)"}:::engine
-        TAX{"💰 core/tax_engine.py\n(Tax Optimization & TUIR Art. 67 ETF Rules)"}:::engine
+        FIN{"🏛️ core/financial_analysis.py\n(Altman Z-Score, DuPont, Piotroski, WACC, DCF Monte Carlo, 10-K)"}:::engine
+        TA{"📈 core/technical_analysis.py\n(Volume Profile POC/VAH/VAL, Confluence Score 0-100, Streaming)"}:::engine
+        TAX{"💰 core/tax_engine.py & crypto_tax_engine.py\n(TUIR Art. 67, Step-Up Wizard & Quadri RT/RW)"}:::engine
         REBAL{"⚖️ core/rebalancer.py\n(Smart Rebalancer & Order Generator)"}:::engine
-        DIV{"📅 core/dividend_engine.py\n(Dividend Forecast & Company Cash Schedule)"}:::engine
-        SCREENER{"🔍 core/screener_engine.py\n(Multi-Factor Asset Discovery, Quality/Value/Momentum,\nStrategy Presets & Pre-Trade Impact Simulator)"}:::engine
-        DBEXP{"⚙️ core/db_exporter.py\n(Storicizzazione DB & Multi-Snapshot)"}:::script
+        AUTOREBAL{"🤖 core/autonomous_rebalancer.py\n(Autonomous Rebalancer with Real PMC & Minusvalenze)"}:::engine
     end
 
-    subgraph Layer5 ["📊 5. PRESENTATION & DESKTOP REPORTING LAYER"]
+    subgraph Layer5 ["📊 5. PRESENTATION & INSTITUTIONAL REPORTING LAYER"]
         direction TB
-        APP("💻 Streamlit App / Control Room (10 Moduli Live)"):::frontend
+        APP("💻 Streamlit App / Control Room (21 Moduli Live)"):::frontend
         DESK("🖥️ Native Desktop App\n(desktop_launcher.py + WebView2)"):::frontend
-        EXE("📦 Standalone Executable\n(dist/ARGUS_Desktop/ARGUS.exe)"):::frontend
-        REPEXP{"📄 core/report_exporter.py\n(PDF Factsheet, Excel & HTML)"}:::script
+        DESIGN_SYS{"📄 core/reporting_design_system.py & modular_factsheet_builder.py\n(Obsidian Sovereign PDF & Numbered Canvas)"}:::script
+        EXCEL_EXP{"📊 core/excel_generator.py & excel_connector.py\n(ListObject Tables, Live Formulas & RTD)"}:::script
         STARZIP{"🗃️ scripts/export_star_schema.py\n(Power BI Star Schema ZIP Package)"}:::script
-        RELZIP{"📦 scripts/package_release.py\n(GitHub Release ZIP Package)"}:::script
-        BIEXP{"📤 core/exporter.py\n(Esportatore CSV Denormalizzati)"}:::script
         POWERBI[/"📈 Power BI / Looker Studio\n(Executive Dashboards)"/]:::frontend
     end
 
@@ -84,37 +82,39 @@ flowchart TD
     %% CONNESSIONI E FLUSSI (Routing)
     %% -------------------------------------
     DEGIRO ==>|Parse| ADAPT
-    ADAPT --> VAL
+    BANKS ==>|Sniff & Parse| INGEST
     CSV ==>|Upload| VAL
-    VAL --> SCH
-    SCH --> FETCH
+    ADAPT --> GATE
+    INGEST --> GATE
+    VAL --> GATE
+    GATE --> FETCH
     YF <==>|Request Storici & Tassi FX| FETCH
     FETCH ==>|Insert IGNORE / SQLite| DB_RAW
+    INGEST ==>|Sync| DB_WEALTH
 
     DB_RAW ==>|Query ORM| RE
     DB_RAW ==>|Query Fondamentali 10-K| FIN
-    RE --> ADV
-    RE --> REBAL
-    RE --> DIV
-    RE --> TAX
-    RE --> ATTR
-    RE --> LIMITS
-    RE --> HEDGE
-    RE -->|Genera Snapshot| DBEXP
-    DBEXP ==>|Storicizza| DB_SNAP
+    DB_WEALTH ==>|Query Patrimoniale| WEALTH_ENG
+    RE <==>|Reattivo In-Memory| CTX
+    WEALTH_ENG <==>|Reattivo In-Memory| CTX
+    CTX ==>|Macro Shock & Stress| WEALTH_STRESS
+
+    RE --> AI_ANL
+    WEALTH_STRESS --> AI_ANL
+    AI_ANL --> VOICE
+    FIN --> SEC_RAG
 
     RE ==>|Session State Dataframes| APP
-    FIN ==>|Valutazioni & Solvibilità| APP
-    ADV ==>|Health Score & Alerts| APP
-    REBAL ==>|Orders Table| APP
-    DIV ==>|Company Cash Flow| APP
-    RE ==>|Dati In-Memory| REPEXP
-    RE ==>|Dati Denormalizzati| BIEXP
+    WEALTH_ENG ==>|Stato Patrimoniale| APP
+    WEALTH_STRESS ==>|Stress Results| APP
+    CTX ==>|State Sync & Domain Flush| APP
 
-    REPEXP -->|Download PDF/Excel/HTML| APP
-    BIEXP -->|Esporta CSV| POWERBI
-    STARZIP -->|Import ZIP Schema| POWERBI
-    DB_SNAP -.->|Direct Query SQL| POWERBI
+    CTX ==>|Dati In-Memory| DESIGN_SYS
+    CTX ==>|Dati Denormalizzati| EXCEL_EXP
+    DESIGN_SYS -->|Download PDF Factsheet / Pitchbook| APP
+    EXCEL_EXP -->|Download Workbook .xlsx| APP
+    DB_RAW -.->|Export ZIP| STARZIP
+    STARZIP -->|Import Schema| POWERBI
 ```
 
 ---
@@ -123,32 +123,30 @@ flowchart TD
 
 ### 1. Data Sources & Ingestion
 - **CSV Generico Utente**: File di input contenente le transazioni finanziarie storiche.
-- **DeGiro Export Adapter**: File CSV nativo esportato dalla piattaforma DeGiro, parsato e convertito automaticamente nello schema standard del sistema via `core/adapters/degiro.py`.
+- **DeGiro & Multi-Broker Adapters**: Parser automatici per DeGiro, Directa SIM, Fineco Bank, Interactive Brokers (IBKR), Trade Republic, Scalable Capital, eToro e Revolut Trading.
+- **Universal Bank Ingestion**: Ingestione di estratti conto bancari eterogenei con layout sniffer euristico per rilevamento automatico di intestazioni, separatori decimali e codifica caratteri.
 - **yfinance API**: Fonte dati di mercato live per il recupero delle serie storiche dei prezzi di chiusura rettificati (*Adjusted Close*), metadati aziendali (GICS Sector, Country), tassi di cambio multi-valuta (EUR/USD, GBP/EUR, DKK/EUR) e bilanci ufficiali 10-K.
 
 ### 2. ETL & Validation Pipeline
+- **`core/data_quality_gate.py`**: Middleware di validazione basato su schemi dichiarativi Pydantic v2 (`CanonicalTradeRecord`, `QualityGateReport`), controlli semantici di integrità e deduplicazione a chiave naturale deterministica SHA-256 (`tx_hash`).
 - **`core/validator.py`**: Pipeline a 11 passaggi per la bonifica dei dati (sanitizzazione stringhe, normalizzazione date in formato ISO `YYYY-MM-DD`, correzione ticker crypto e valute).
-- **`core/schemas.py`**: Validazione rigorosa a runtime dei contratti dati mediante modelli Pydantic / Dataclasses per intercettare incongruenze prima dell'ingestione.
-- **`core/fetcher.py`**: Gestione del lookback window a 365 giorni precedenti alla prima transazione, mapping automatico ISIN $\rightarrow$ Ticker tramite `config.json` e chiamate ottimizzate a Yahoo Finance con conversione valutaria verso la valuta di base selezionata.
+- **`core/fetcher.py`**: Gestione del lookback window dinamico, mapping automatico ISIN $\rightarrow$ Ticker tramite `config.json` e chiamate ottimizzate a Yahoo Finance con conversione valutaria verso la valuta di base selezionata.
 
-### 3. Data Warehouse (MySQL / SQLite)
-- **`core/models.py`**: Struttura relazionale gestita tramite classi dichiarative SQLAlchemy ORM.
-  - *Tabelle Grezze*: `portfolios`, `assets`, `transactions`, `market_prices` (con vincolo `UNIQUE(asset_id, price_date)`).
-  - *Tabelle Snapshot*: `portfolio_snapshots`, `snapshot_positions` per il tracciamento temporale delle metriche di rischio e dei cluster calcolati ad ogni esecuzione.
-  - *Fallback SQLite*: Autonomia nativa 100% su database SQLite locale (`data/argus_local.db`) in assenza di MySQL.
+### 3. Data Warehouse & Storage (MySQL / SQLite / DuckDB)
+- **`core/models.py` & `wealth_db.py`**: Struttura relazionale gestita tramite classi dichiarative SQLAlchemy ORM.
+  - *Tabelle Grezze*: `portfolios`, `assets`, `transactions`, `market_prices`.
+  - *Tabelle Snapshot*: `portfolio_snapshots`, `snapshot_positions` per il tracciamento temporale delle metriche di rischio.
+  - *Wealth DB*: Star Schema dedicato a conti correnti, cash flow, passività, immobili e perizie beni fisici.
+  - *DuckDB OLAP Engine*: Motore colonnare vettorizzato SIMD in-process per aggregazioni analitiche sub-millisecondo ed esportazione Apache Parquet.
 
-### 4. Analytics & Quantitative Engine
-- **`core/risk_engine.py`**: Il cervello quantitativo dell'applicazione (FIFO Engine, VaR Cornish-Fisher, Kupiec Test, Markowitz SLSQP, Ledoit-Wolf Shrinkage, Black-Litterman Optimization, Monte Carlo Cholesky & Student-t, Fama-French 3-Factor, Carhart 4-Factor Model, ATR Trailing Stop-Loss & Chandelier Exit, Macro Scenario Builder, Almgren-Chriss Market Impact, K-Means Clustering).
-- **`core/terminal_engine.py`**: Motore del Live Trading Desk (Desk Compliance Limits, Pre-Trade Circuit Breakers, OMS Execution Blotter TWAP/VWAP, Intraday Multi-Currency PnL Attribution Price vs FX, Relative Performance Base 0% Overlay e Live News Catalysts).
-- **`core/financial_analysis.py`**: Modulo di valutazione fondamentale e solvibilità aziendale (Altman Z-Score, Scomposizione DuPont 3 e 5 fattori, Piotroski F-Score 9pt, WACC CAPM, DCF Monte Carlo 2-stage, Bilanci 10-K e Comparativa Multiaziendale).
-- **`core/advisor.py`**: Motore di diagnostica quantitativa e calcolo dello Health Score (0-100).
-- **`core/rebalancer.py`**: Generatore di ordini di trading in € e n° quote intere per l'allineamento a strategie target.
-- **`core/dividend_engine.py`**: Calcolo del Dividend Yield medio, dividendi storici reali e proiezione del calendario di incassi mensili per singola azienda pagatrice.
-- **`core/tax_engine.py`**: Calcolatore fiscale secondo la normativa italiana TUIR Art. 67 (aliquote 12.5% / 26.0%, regola plusvalenze ETF, Tax-Loss Harvesting).
-- **`core/attribution.py` & `core/risk_limits.py`**: Attribuzione Brinson-Fachler e sistema di Early Warning sui limiti di rischio.
+### 4. Analytics, Wealth & Quantitative Engine
+- **`core/workspace_context.py`**: State management centralizzato a sottocontesti tipizzati (`RiskSubContext`, `WealthSubContext`, `UIViewState`) con persistenza sessione e bonifica selettiva delle chiavi orfane (`flush_risk_domain()`).
+- **`core/wealth/wealth_stress_engine.py`**: Motore congiunto di macro stress testing con ammortamento non lineare dei mutui francesi ($\Delta PMT$), identificazione analitica del *Point of Forced Liquidation* ($t^*$), stima della distruzione irreversibile di capitale e ricalcolo dinamico FIRE SWR con regole Guyton-Klinger.
+- **`core/risk_engine.py`**: Motore quantitativo di rischio (FIFO Engine, VaR Cornish-Fisher, Kupiec Test, Markowitz SLSQP, Ledoit-Wolf Shrinkage, Black-Litterman, Monte Carlo Cholesky & Student-t, Carhart 4-Factor, MSCI Barra 5-Factor, Almgren-Chriss).
+- **`core/ai_analyst.py`, `core/sec_rag_engine.py` & `core/voice_advisor_engine.py`**: Narrative intelligence istituzionale con guardrails normativi MiFID II / Art. 21 TUF, validatore di grounding numerico, RAG semantico 10-K a finestra scorrevole con fusione RRF ed executive audio podcast a due voci.
 
-### 5. Presentation & Desktop Reporting Layer
-- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 21 moduli analitici interattivi (Risk & Wealth Intelligence) fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**, gestione del ciclo di vita dei processi ed avvio protetto `wait_for_server`.
-- **Standalone Executable & Release Pipeline (`scripts/build_desktop_app.py` & `scripts/package_release.py`)**: Pacchetto eseguibile standalone `ARGUS.exe` e generatore dell'archivio distribuiscibile `ARGUS_v6.0.0.zip`.
-- **`core/report_exporter.py`, `html_exporter.py`, `core/wealth/wealth_exporter.py`**: Generazione dinamica in-memory del report Executive PDF Factsheet (2 pagine), del Workbook Excel Multi-Tab (.xlsx), del Report Wealth Master HTML e del Report HTML Standalone.
-- **`scripts/export_star_schema.py`**: Esportazione pacchetto ZIP Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`) per Microsoft Power BI e Google Looker Studio.
+### 5. Presentation & Institutional Reporting Layer
+- **Streamlit App & Desktop Launcher (`desktop_launcher.py` & `app.py`)**: Dashboard a 21 moduli analitici interattivi (Risk & Wealth Intelligence) fruibile via browser o come **Applicazione Desktop Nativa Windows** (`pywebview` + Edge WebView2) con l'icona dell'**Occhio di Argus**.
+- **Institutional Reporting Design System (`core/reporting_design_system.py` & `core/modular_factsheet_builder.py`)**: Generazione PDF vettoriale in-memory con palette *Obsidian Sovereign*, canvas a due passaggi `InstitutionalNumberedCanvas` con numerazione "Pagina X di Y" e grafici donut vettoriali privi di memory leak.
+- **Excel Interactive Models (`core/excel_generator.py` & `core/excel_connector.py`)**: Esportazione di cartelle di lavoro Excel arricchite con tabelle native `ListObject`, formule vive (`SUM`, `XIRR`) e protezione anti-formula injection CWE-1236.
+- **Power BI Integration (`scripts/export_star_schema.py`)**: Esportazione pacchetto ZIP Star Schema (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`).

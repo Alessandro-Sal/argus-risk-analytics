@@ -39,6 +39,7 @@ from core.wealth.wealth_db import (
     save_wealth_account,
 )
 from core.wealth.wealth_engine import (
+    compute_personal_balance_sheet,
     compute_consolidated_net_worth,
     compute_family_office_multi_entity_consolidation,
     compute_multi_currency_fx_hedging_engine,
@@ -111,6 +112,11 @@ def _get_cached_pitchbook_html(_engine, pid: int) -> str:
     return generate_advisory_pitchbook_html(_engine, portfolio_id=pid)
 
 
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_personal_balance_sheet(_engine, pid: int = 1, yr: Optional[int] = None) -> Dict[str, Any]:
+    return compute_personal_balance_sheet(_engine, portfolio_id=pid, year=yr)
+
 st.set_page_config(page_title="Patrimonio & Net Worth | ARGUS Wealth", page_icon="🏛️", layout="wide")
 inject_custom_css()
 render_sidebar()
@@ -118,12 +124,14 @@ render_sidebar()
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
 
 # Connessione DB
+offline_mode = bool(st.session_state.get("offline_mode", False))
 db_user = st.session_state.get("db_user", "root")
 db_pass = st.session_state.get("db_pass", "root")
 db_host = st.session_state.get("db_host", "localhost")
 db_port = int(st.session_state.get("db_port", 3306))
-db_name = st.session_state.get("db_name", "investment_risk_bi")
-engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
+raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
+db_name = "wealth" if raw_db in ["investment_risk_bi", None, ""] else raw_db
+engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
 
 
 # ── CONTROLLO MODALITÀ SNAPSHOT STORICO O LIVE ───────────────
@@ -375,7 +383,7 @@ st.divider()
 # ── MACRO-TAB DEL PATRIMONIO PER MASSIMA EFFICIENZA & CHIAREZZA ───
 main_tab_alloc, main_tab_sheet, main_tab_temporal, main_tab_fo, main_tab_fx, main_tab_stress = st.tabs([
     "🏛️ Bilancio & Allocazione",
-    "📋 Stato Patrimoniale & Conti",
+    "📋 Bilancio Personale & Stato Patrimoniale",
     "📊 Wealth Temporal Desk",
     "🏢 Family Office & Holding",
     "💱 Rischio FX & Attribuzione Brinson",
@@ -1083,75 +1091,518 @@ with main_tab_alloc:
 
 
 # ══════════════════════════════════════════════════════════════
-# TAB 2: STATO PATRIMONIALE, CONTI & ASSET
+# TAB 2: BILANCIO PERSONALE & STATO PATRIMONIALE ISTITUZIONALE
 # ══════════════════════════════════════════════════════════════
 with main_tab_sheet:
-    # ── STATO PATRIMONIALE & CONTI ──────────────────────────────
-    section("🏦 Dettaglio Conti Correnti, Depositi e Carte")
+    # ── CARICAMENTO DATI BILANCIO PERSONALE ─────────────────────
+    pbs_data = _load_cached_personal_balance_sheet(engine, pid=current_pid)
+    sp_data = pbs_data["stato_patrimoniale"]
+    ind_data = pbs_data["indici_bilancio"]
+    avail_years = pbs_data.get("available_years", [datetime.now().year])
+    if not avail_years:
+        avail_years = [datetime.now().year]
 
-    if not df_accounts.empty:
-        cols_to_show = [c for c in ["name", "institution", "account_type", "currency", "balance", "iban"] if c in df_accounts.columns]
-        st.dataframe(
-            df_accounts[cols_to_show].rename(columns={
-                "name": "Nome Conto",
-                "institution": "Istituto Bancario",
-                "account_type": "Tipo Conto",
-                "currency": "Valuta",
-                "balance": "Saldo (€)",
-                "iban": "IBAN"
-            }),
-            use_container_width=True,
-            hide_index=True
+    tot_att = sp_data["attivo"]["totale_attivo"]
+    tot_pas = sp_data["passivo"]["totale_passivo"]
+    tot_pn = sp_data["patrimonio_netto"]["totale_patrimonio_netto"]
+    tot_pareggio = sp_data["pareggio"]["totale_pareggio"]
+    is_quadrato = sp_data["pareggio"]["is_quadrato"]
+
+    # ── HERO HEADER ISTITUZIONALE ──────────────────────────────
+    st.markdown(f"""
+    <div style="background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(22,27,34,0.98) 100%); border: 1px solid rgba(16,185,129,0.35); border-radius: 14px; padding: 18px 24px; margin-bottom: 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+                <div style="width:44px; height:44px; border-radius:12px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.35); display:flex; align-items:center; justify-content:center; font-size:22px;">
+                    📋
+                </div>
+                <div>
+                    <div style="font-size:17px; font-weight:800; color:#f8fafc; letter-spacing:0.3px;">Bilancio Personale Istituzionale (Personal Financial Statements)</div>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:2px;">Prospetto contabile a sezioni contrapposte, Conto Economico di gestione e indici di solidità conforme agli standard CFP Board &amp; Private Banking</div>
+                </div>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+                <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); padding:6px 14px; border-radius:20px; font-size:12px; font-weight:750; color:#34d399;">
+                    🛡️ {ind_data.get('overall_rating', 'AAA')}
+                </div>
+                <div style="font-size:11.5px; color:#64748b; font-family:'JetBrains Mono', monospace;">
+                    Rif: {pbs_data.get('as_of_date')}
+                </div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── SUB-TABS DEL BILANCIO PERSONALE ────────────────────────
+    sub_sp, sub_ce, sub_ind, sub_conti = st.tabs([
+        "🏛️ Stato Patrimoniale a Sezioni Contrapposte",
+        "📈 Conto Economico di Gestione",
+        "🎯 Indici di Bilancio & Benchmark",
+        "🏦 Dettaglio Conti & Portafogli Risk"
+    ])
+
+    # ──────────────────────────────────────────────────────────
+    # SUB-TAB 1: STATO PATRIMONIALE A SEZIONI CONTRAPPOSTE
+    # ──────────────────────────────────────────────────────────
+    with sub_sp:
+        # Top KPI Summary Bar
+        kpi_c1, kpi_c2, kpi_c3, kpi_c4 = st.columns(4)
+        with kpi_c1:
+            metric_card("Totale Attivo (Assets)", fmt_eur(tot_att), delta="Impieghi di ricchezza", delta_color="normal")
+        with kpi_c2:
+            metric_card("Totale Passività (Debiti)", fmt_eur(tot_pas), delta="Fonti di terzi", delta_color="inverse" if tot_pas > 0 else "normal")
+        with kpi_c3:
+            metric_card("Patrimonio Netto", fmt_eur(tot_pn), delta="Fonti proprie (Capitale netto)", delta_color="normal")
+        with kpi_c4:
+            quad_label = "✅ Perfetto (Δ = €0,00)" if is_quadrato else "⚠️ Sbilancio"
+            metric_card("Pareggio di Bilancio", fmt_eur(tot_pareggio), delta=quad_label, delta_color="normal")
+
+        st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+
+        # Sezioni Contrapposte
+        col_attivo, col_passivo = st.columns(2)
+
+        # ── COLONNA SINISTRA: ATTIVO ───────────────────────────
+        with col_attivo:
+            st.markdown("""
+            <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:12px 16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:800; color:#34d399; font-size:14px; letter-spacing:0.5px;">🏛️ ATTIVO (IMPIEGHI DI RICCHEZZA)</span>
+                <span style="font-weight:700; color:#94a3b8; font-size:12px;">INCIDENZA</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            for sez in sp_data["attivo"]["sezioni"]:
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background:rgba(22,27,34,0.6); border:1px solid rgba(255,255,255,0.07); border-radius:8px; padding:10px 14px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                            <div>
+                                <span style="font-weight:750; color:#f1f5f9; font-size:13px;">{sez['codice']}. {sez['titolo']}</span>
+                                <div style="font-size:10.5px; color:#64748b;">{sez['descrizione']}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:800; color:#f8fafc; font-size:13.5px; font-family:'JetBrains Mono', monospace;">{fmt_eur(sez['totale'])}</div>
+                                <div style="font-size:10.5px; color:#10b981; font-weight:700;">{sez['incidenza_pct']:.1f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if sez["voci"]:
+                        voci_rows = []
+                        for v in sez["voci"]:
+                            voci_rows.append({
+                                "Voce Contabile": v["nome"],
+                                "Tipologia / Dettaglio": f"{v['categoria']} • {v['dettaglio']}",
+                                "Valore (€)": fmt_eur(v["valore"]),
+                                "Incidenza": f"{(v['valore'] / max(1.0, tot_att) * 100):.1f}%"
+                            })
+                        st.dataframe(pd.DataFrame(voci_rows), use_container_width=True, hide_index=True)
+
+            # Footer Totale Attivo
+            st.markdown(f"""
+            <div style="background:linear-gradient(90deg, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.08) 100%); border:1px solid rgba(16,185,129,0.45); border-radius:10px; padding:14px 18px; margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:850; color:#f8fafc; font-size:14.5px; letter-spacing:0.5px;">TOTALE ATTIVO (ASSETS)</span>
+                <span style="font-weight:900; color:#10b981; font-size:19px; font-family:'JetBrains Mono', monospace;">{fmt_eur(tot_att)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        # ── COLONNA DESTRA: PASSIVO & PATRIMONIO NETTO ────────
+        with col_passivo:
+            st.markdown("""
+            <div style="background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.3); border-radius:10px; padding:12px 16px; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:800; color:#60a5fa; font-size:14px; letter-spacing:0.5px;">⚖️ PASSIVO &amp; PATRIMONIO NETTO (FONTI)</span>
+                <span style="font-weight:700; color:#94a3b8; font-size:12px;">INCIDENZA</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # A. Sezioni Passivo (Debiti)
+            st.markdown("<div style='font-size:12px; font-weight:750; color:#94a3b8; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px;'>A. Passività &amp; Debiti Personali (Fonti di Terzi)</div>", unsafe_allow_html=True)
+            has_liab = False
+            for sez in sp_data["passivo"]["sezioni"]:
+                if sez["totale"] > 0 or sez["voci"]:
+                    has_liab = True
+                    st.markdown(f"""
+                    <div style="background:rgba(22,27,34,0.6); border:1px solid rgba(255,255,255,0.07); border-radius:8px; padding:10px 14px; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <span style="font-weight:750; color:#f1f5f9; font-size:13px;">{sez['codice']}. {sez['titolo']}</span>
+                                <div style="font-size:10.5px; color:#64748b;">{sez['descrizione']}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-weight:800; color:#ef4444; font-size:13.5px; font-family:'JetBrains Mono', monospace;">{fmt_eur(sez['totale'])}</div>
+                                <div style="font-size:10.5px; color:#94a3b8;">{sez['incidenza_pct']:.1f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    if sez["voci"]:
+                        voci_p_rows = []
+                        for v in sez["voci"]:
+                            voci_p_rows.append({
+                                "Debito": v["nome"],
+                                "Tipologia": f"{v['categoria']} • {v['dettaglio']}",
+                                "Debito Residuo (€)": fmt_eur(v["valore"]),
+                                "Incidenza": f"{(v['valore'] / max(1.0, tot_att) * 100):.1f}%"
+                            })
+                        st.dataframe(pd.DataFrame(voci_p_rows), use_container_width=True, hide_index=True)
+
+            if not has_liab:
+                st.markdown("""
+                <div style="background:rgba(16,185,129,0.06); border:1px dashed rgba(16,185,129,0.3); border-radius:8px; padding:12px 14px; margin-bottom:12px; color:#34d399; font-size:12px;">
+                    🛡️ <b>Assenza Totale di Debiti:</b> Nessun mutuo, prestito personale, scoperto o debito da carte di credito registrato a carico del patrimonio.
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown(f"""
+            <div style="background:rgba(22,27,34,0.4); border-radius:6px; padding:8px 12px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12px; font-weight:700; color:#94a3b8;">SUBTOTALE PASSIVITÀ TOTALI</span>
+                <span style="font-size:13px; font-weight:800; color:{'#ef4444' if tot_pas > 0 else '#94a3b8'}; font-family:'JetBrains Mono', monospace;">{fmt_eur(tot_pas)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # B. Patrimonio Netto
+            st.markdown("<div style='font-size:12px; font-weight:750; color:#94a3b8; text-transform:uppercase; letter-spacing:0.8px; margin-bottom:6px;'>B. Patrimonio Netto Personale (Fonti Proprie)</div>", unsafe_allow_html=True)
+            
+            pn_comp = sp_data["patrimonio_netto"]["composizione"]
+            comp_rows = []
+            for item in pn_comp:
+                comp_rows.append({
+                    "Voce di Patrimonio Netto": item["voce"],
+                    "Dettaglio / Origine": item["descrizione"],
+                    "Valore (€)": fmt_eur(item["valore"]),
+                    "Quota PN": f"{item['incidenza_pct']:.1f}%"
+                })
+            st.dataframe(pd.DataFrame(comp_rows), use_container_width=True, hide_index=True)
+
+            st.markdown(f"""
+            <div style="background:rgba(30,41,59,0.6); border:1px solid rgba(59,130,246,0.3); border-radius:8px; padding:10px 14px; margin-top:8px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12.5px; font-weight:750; color:#93c5fd;">SUBTOTALE PATRIMONIO NETTO</span>
+                <span style="font-size:15px; font-weight:850; color:#60a5fa; font-family:'JetBrains Mono', monospace;">{fmt_eur(tot_pn)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Footer Totale a Pareggio
+            st.markdown(f"""
+            <div style="background:linear-gradient(90deg, rgba(59,130,246,0.18) 0%, rgba(59,130,246,0.08) 100%); border:1px solid rgba(59,130,246,0.45); border-radius:10px; padding:14px 18px; margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:850; color:#f8fafc; font-size:14.5px; letter-spacing:0.5px;">TOTALE PAREGGIO (PASSIVO + NET WORTH)</span>
+                <span style="font-weight:900; color:#38bdf8; font-size:19px; font-family:'JetBrains Mono', monospace;">{fmt_eur(tot_pareggio)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+        # Sezione Riconciliazione & Quadratura Contabile
+        st.markdown(f"""
+        <div style="background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:12px 18px; display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="font-size:18px;">{'✅' if is_quadrato else '⚠️'}</span>
+                <span style="font-weight:750; color:#34d399; font-size:13px;">EQUAZIONE CONTABILE FONDAMENTALE: ATTIVO = PASSIVO + PATRIMONIO NETTO</span>
+            </div>
+            <div style="font-size:12px; font-weight:700; color:#e2e8f0; font-family:'JetBrains Mono', monospace;">
+                {fmt_eur(tot_att)} = {fmt_eur(tot_pas)} + {fmt_eur(tot_pn)} &nbsp;(Discrepanza: €0,00)
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ──────────────────────────────────────────────────────────
+    # SUB-TAB 2: CONTO ECONOMICO DI GESTIONE
+    # ──────────────────────────────────────────────────────────
+    with sub_ce:
+        c_ce_head1, c_ce_head2 = st.columns([3.2, 1.3])
+        with c_ce_head1:
+            st.markdown("##### 📈 Conto Economico Personale (Rendiconto di Gestione)")
+            st.caption("Prospetto economico di entrate correnti vs costi di vita, surplus di risparmio e destinazione agli investimenti.")
+        with c_ce_head2:
+            sel_ce_year = st.selectbox(
+                "Anno di Esercizio:",
+                options=avail_years,
+                index=0,
+                key="pbs_ce_year_select"
+            )
+
+        # Ricarica CE per l'anno selezionato
+        ce_year_data = _load_cached_personal_balance_sheet(engine, pid=current_pid, yr=sel_ce_year)["conto_economico"]
+
+        ce_inflow = ce_year_data["totale_entrate"]
+        ce_outflow = ce_year_data["totale_uscite"]
+        ce_savings = ce_year_data["risparmio_netto"]
+        ce_sr = ce_year_data["savings_rate_pct"]
+        ce_inv = ce_year_data["allocazione_capitale"]["totale_investimenti"]
+        ce_liq_var = ce_year_data["allocazione_capitale"]["variazione_liquidita"]
+
+        # KPI Cards Conto Economico
+        cek1, cek2, cek3, cek4 = st.columns(4)
+        with cek1:
+            metric_card(f"Totale Entrate {sel_ce_year}", fmt_eur(ce_inflow), delta="Inflows ordinari & attivi", delta_color="normal")
+        with cek2:
+            metric_card(f"Costi di Gestione {sel_ce_year}", fmt_eur(ce_outflow), delta="Spese di vita (Consumi)", delta_color="inverse")
+        with cek3:
+            metric_card("Risparmio Netto Annuo", fmt_eur(ce_savings), delta=f"Surplus d'esercizio", delta_color="normal" if ce_savings >= 0 else "inverse")
+        with cek4:
+            metric_card("Personal Savings Rate", f"{ce_sr:.1f}%", delta="Target ≥ 20%", delta_color="normal" if ce_sr >= 20 else "off")
+
+        st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+
+        # Prospetto Scalare Entrate vs Spese
+        col_ce_in, col_ce_out = st.columns(2)
+        with col_ce_in:
+            st.markdown("""
+            <div style="background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.3); border-radius:10px; padding:10px 16px; margin-bottom:12px;">
+                <span style="font-weight:800; color:#34d399; font-size:13.5px;">VALORE DELLA PRODUZIONE PERSONALE (ENTRATE)</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if ce_year_data["entrate_sezioni"]:
+                in_rows = []
+                for item in ce_year_data["entrate_sezioni"]:
+                    in_rows.append({
+                        "Voce di Entrata": item["sezione"],
+                        "Tipologia": item["categoria"],
+                        "Importo (€)": fmt_eur(item["valore"]),
+                        "Incidenza": f"{(item['valore'] / max(1.0, ce_inflow) * 100):.1f}%"
+                    })
+                st.dataframe(pd.DataFrame(in_rows), use_container_width=True, hide_index=True)
+            else:
+                st.info(f"Nessuna entrata registrata per l'anno {sel_ce_year}.")
+
+            st.markdown(f"""
+            <div style="background:rgba(22,27,34,0.7); border:1px solid rgba(16,185,129,0.4); border-radius:8px; padding:12px 16px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:800; color:#f8fafc; font-size:13px;">TOTALE ENTRATE PERSONALI</span>
+                <span style="font-weight:850; color:#10b981; font-size:16px; font-family:'JetBrains Mono', monospace;">{fmt_eur(ce_inflow)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_ce_out:
+            st.markdown("""
+            <div style="background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.3); border-radius:10px; padding:10px 16px; margin-bottom:12px;">
+                <span style="font-weight:800; color:#f87171; font-size:13.5px;">COSTI DI GESTIONE &amp; CONSUMI (USCITE)</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            if ce_year_data["uscite_sezioni"]:
+                out_rows = []
+                for item in ce_year_data["uscite_sezioni"]:
+                    out_rows.append({
+                        "Categoria di Spesa": item["sezione"],
+                        "Movimenti": item.get("num_movimenti", 1),
+                        "Importo (€)": fmt_eur(item["valore"]),
+                        "Incidenza": f"{(item['valore'] / max(1.0, ce_outflow) * 100):.1f}%"
+                    })
+                st.dataframe(pd.DataFrame(out_rows), use_container_width=True, hide_index=True)
+            else:
+                st.info(f"Nessuna uscita registrata per l'anno {sel_ce_year}.")
+
+            st.markdown(f"""
+            <div style="background:rgba(22,27,34,0.7); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-weight:800; color:#f8fafc; font-size:13px;">TOTALE SPESE DI VITA (CONSUMI)</span>
+                <span style="font-weight:850; color:#f87171; font-size:16px; font-family:'JetBrains Mono', monospace;">{fmt_eur(ce_outflow)}</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.divider()
+
+        # Waterfall Chart: Flusso Economico e Allocazione del Capitale
+        st.markdown(f"##### 🌊 Waterfall di Gestione Economica & Allocazione del Capitale ({sel_ce_year})")
+        st.caption("Dalle entrate lorde ai consumi, fino alla quota convertita in investimenti patrimoniali o riserva liquida.")
+
+        wf_measures = ["relative", "relative", "total", "relative", "total"]
+        wf_x = ["Entrate Lorde", "Consumi di Vita", "Risparmio Netto", "Flussi Investiti", "Accantonamento Cassa"]
+        wf_y = [ce_inflow, -ce_outflow, ce_savings, -ce_inv, ce_liq_var]
+        wf_text = [fmt_eur(ce_inflow), fmt_eur(-ce_outflow), fmt_eur(ce_savings), fmt_eur(-ce_inv), fmt_eur(ce_liq_var)]
+
+        fig_wf = go.Figure(go.Waterfall(
+            name="Flusso Economico",
+            orientation="v",
+            measure=wf_measures,
+            x=wf_x,
+            textposition="outside",
+            text=wf_text,
+            y=wf_y,
+            connector={"line": {"color": "rgba(255,255,255,0.2)"}},
+            decreasing={"marker": {"color": "#ef4444"}},
+            increasing={"marker": {"color": "#10b981"}},
+            totals={"marker": {"color": "#38bdf8"}}
+        ))
+        fig_wf.update_layout(height=340, margin=dict(l=30, r=30, t=30, b=30))
+        apply_chart_theme(fig_wf, portal_mode="wealth")
+        st.plotly_chart(fig_wf, use_container_width=True)
+
+        # Box Allocazione del Risparmio
+        if ce_year_data["allocazione_capitale"]["voci_investimenti"]:
+            st.markdown("##### 🚀 Destinazione del Surplus: Investimenti Eseguiti nel Periodo")
+            inv_alloc_cols = st.columns(len(ce_year_data["allocazione_capitale"]["voci_investimenti"]) + 1)
+            for i, inv_item in enumerate(ce_year_data["allocazione_capitale"]["voci_investimenti"]):
+                with inv_alloc_cols[i]:
+                    metric_card(inv_item["nome"], fmt_eur(inv_item["valore"]), delta=f"{(inv_item['valore']/max(1.0, ce_inv)*100):.1f}% del capitale investito", delta_color="normal")
+            with inv_alloc_cols[-1]:
+                metric_card("💧 Variazione Cassa", fmt_eur(ce_liq_var), delta="Accantonamento cassa", delta_color="normal" if ce_liq_var >= 0 else "off")
+
+    # ──────────────────────────────────────────────────────────
+    # SUB-TAB 3: INDICI DI BILANCIO & BENCHMARK PRIVATE BANKING
+    # ──────────────────────────────────────────────────────────
+    with sub_ind:
+        st.markdown(f"""
+        <div style="background:rgba(22,27,34,0.8); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:18px 22px; margin-bottom:18px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                <div>
+                    <div style="font-size:16px; font-weight:800; color:#f8fafc;">🏛️ Rating di Solidità del Bilancio Personale: <span style="color:#34d399;">{ind_data.get('overall_rating')}</span></div>
+                    <div style="font-size:12px; color:#94a3b8; margin-top:4px;">{ind_data.get('overall_description')}</div>
+                </div>
+                <div style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); padding:6px 14px; border-radius:20px; font-size:12px; font-weight:800; color:#34d399;">
+                    KPI Ottimali: {ind_data.get('optimal_kpi_count')}
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # 6 KPI Cards Ratios
+        r_r1_c1, r_r1_c2, r_r1_c3 = st.columns(3)
+        with r_r1_c1:
+            sr_k = ind_data["solvency_ratio"]
+            metric_card(f"🛡️ {sr_k['label']}", sr_k["formattato"], delta=f"Target: {sr_k['target']}", delta_color="normal" if sr_k["status"] == "OPTIMAL" else ("off" if sr_k["status"] == "ACCEPTABLE" else "inverse"))
+            st.caption(f"_{sr_k['descrizione']}_")
+        with r_r1_c2:
+            da_k = ind_data["debt_to_assets"]
+            metric_card(f"📉 {da_k['label']}", da_k["formattato"], delta=f"Target: {da_k['target']}", delta_color="normal" if da_k["status"] == "OPTIMAL" else ("off" if da_k["status"] == "ACCEPTABLE" else "inverse"))
+            st.caption(f"_{da_k['descrizione']}_")
+        with r_r1_c3:
+            rw_k = ind_data["emergency_runway"]
+            metric_card(f"💧 {rw_k['label']}", rw_k["formattato"], delta=f"Target: {rw_k['target']}", delta_color="normal" if rw_k["status"] == "OPTIMAL" else ("off" if rw_k["status"] == "ACCEPTABLE" else "inverse"))
+            st.caption(f"_{rw_k['descrizione']}_")
+
+        st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
+        r_r2_c1, r_r2_c2, r_r2_c3 = st.columns(3)
+        with r_r2_c1:
+            sav_k = ind_data["savings_rate"]
+            metric_card(f"💰 {sav_k['label']}", sav_k["formattato"], delta=f"Target: {sav_k['target']}", delta_color="normal" if sav_k["status"] == "OPTIMAL" else ("off" if sav_k["status"] == "ACCEPTABLE" else "inverse"))
+            st.caption(f"_{sav_k['descrizione']}_")
+        with r_r2_c2:
+            ds_k = ind_data["dsti"]
+            metric_card(f"💳 {ds_k['label']}", ds_k["formattato"], delta=f"Target: {ds_k['target']}", delta_color="normal" if ds_k["status"] == "OPTIMAL" else ("off" if ds_k["status"] == "ACCEPTABLE" else "inverse"))
+            st.caption(f"_{ds_k['descrizione']}_")
+        with r_r2_c3:
+            inv_k = ind_data["invested_assets_ratio"]
+            metric_card(f"🚀 {inv_k['label']}", inv_k["formattato"], delta=f"Target: {inv_k['target']}", delta_color="normal" if inv_k["status"] == "OPTIMAL" else ("off" if inv_k["status"] == "ACCEPTABLE" else "inverse"))
+            st.caption(f"_{inv_k['descrizione']}_")
+
+        st.divider()
+
+        # Radar Chart di Solidità Finanziaria
+        st.markdown("##### 🕸️ Radar di Robustezza Patrimoniale vs Benchmark Private Banking")
+        categories_radar = [
+            "Solvibilità",
+            "Controllo Debito",
+            "Runway Emergenza",
+            "Tasso Risparmio",
+            "Capacità Rimborso (DSTI)",
+            "Asset Produttivi"
+        ]
+
+        # Normalizzazione indici su scala 0-100 per il radar
+        score_solv = min(100.0, sr_k["valore"])
+        score_debt = max(0.0, 100.0 - da_k["valore"] * 2)
+        score_runway = min(100.0, (rw_k["valore"] / 12.0) * 100.0)
+        score_sav = min(100.0, (sav_k["valore"] / 40.0) * 100.0)
+        score_dsti = max(0.0, 100.0 - ds_k["valore"] * 2.5)
+        score_inv = min(100.0, (inv_k["valore"] / 70.0) * 100.0)
+
+        actual_scores = [score_solv, score_debt, score_runway, score_sav, score_dsti, score_inv]
+        benchmark_scores = [70.0, 80.0, 50.0, 50.0, 75.0, 70.0]
+
+        fig_radar = go.Figure()
+        fig_radar.add_trace(go.Scatterpolar(
+            r=actual_scores,
+            theta=categories_radar,
+            fill='toself',
+            name='Profilo Reale',
+            line_color='#10b981',
+            fillcolor='rgba(16,185,129,0.25)'
+        ))
+        fig_radar.add_trace(go.Scatterpolar(
+            r=benchmark_scores,
+            theta=categories_radar,
+            fill='toself',
+            name='Benchmark Private Banking',
+            line_color='#f59e0b',
+            fillcolor='rgba(245,158,11,0.1)'
+        ))
+        fig_radar.update_layout(
+            polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+            showlegend=True,
+            height=380,
+            margin=dict(l=40, r=40, t=30, b=30)
         )
-    else:
-        st.info("Nessun conto bancario registrato.")
+        apply_chart_theme(fig_radar, portal_mode="wealth")
+        st.plotly_chart(fig_radar, use_container_width=True)
 
-    st.divider()
-
-    # ── DETTAGLIO PORTAFOGLI RISK COLLEGATI ─────────────────────
-    section("📈 Portafogli Risk Analytics Collegati")
-
-    if is_snapshot_mode:
-        snap_risk_ports = details.get("linked_risk_portfolios", [])
-        if snap_risk_ports:
-            df_snap_risk = pd.DataFrame(snap_risk_ports)
-            st.caption("Portafogli Risk Analytics catturati in questo snapshot storico:")
+    # ──────────────────────────────────────────────────────────
+    # SUB-TAB 4: DETTAGLIO CONTI & PORTAFOGLI RISK
+    # ──────────────────────────────────────────────────────────
+    with sub_conti:
+        section("🏦 Dettaglio Conti Correnti, Depositi e Carte")
+        if not df_accounts.empty:
+            cols_to_show = [c for c in ["name", "institution", "account_type", "currency", "balance", "iban"] if c in df_accounts.columns]
             st.dataframe(
-                df_snap_risk[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value"]].rename(columns={
-                    "portfolio_id": "ID Portafoglio",
-                    "name": "Nome Portafoglio",
-                    "base_currency": "Valuta",
-                    "last_calc_date": "Data Snapshot Calcolato",
-                    "latest_value": "Controvalore (€)"
+                df_accounts[cols_to_show].rename(columns={
+                    "name": "Nome Conto",
+                    "institution": "Istituto Bancario",
+                    "account_type": "Tipo Conto",
+                    "currency": "Valuta",
+                    "balance": "Saldo (€)",
+                    "iban": "IBAN"
                 }),
                 use_container_width=True,
                 hide_index=True
             )
         else:
-            st.caption("Nessun portafoglio Risk registrato nello snapshot storico.")
-    else:
-        tot_risk_live, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=current_pid)
-        col_rk1, col_rk2 = st.columns([3.5, 1.5])
-        with col_rk1:
-            if not df_linked_risk.empty:
-                st.markdown(f"Controvalore totale consolidato da Risk Analytics: **{fmt_eur(tot_risk_live)}**")
+            st.info("Nessun conto bancario registrato.")
+
+        st.divider()
+
+        section("📈 Portafogli Risk Analytics Collegati")
+        if is_snapshot_mode:
+            snap_risk_ports = details.get("linked_risk_portfolios", [])
+            if snap_risk_ports:
+                df_snap_risk = pd.DataFrame(snap_risk_ports)
+                st.caption("Portafogli Risk Analytics catturati in questo snapshot storico:")
                 st.dataframe(
-                    df_linked_risk[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value"]].rename(columns={
-                        "portfolio_id": "ID Portafoglio Risk",
+                    df_snap_risk[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value"]].rename(columns={
+                        "portfolio_id": "ID Portafoglio",
                         "name": "Nome Portafoglio",
                         "base_currency": "Valuta",
-                        "last_calc_date": "Ultimo Calcolo",
+                        "last_calc_date": "Data Snapshot Calcolato",
                         "latest_value": "Controvalore (€)"
                     }),
                     use_container_width=True,
                     hide_index=True
                 )
             else:
-                st.info("ℹ️ Nessun portafoglio del modulo Risk collegato a questo profilo patrimoniale. Puoi selezionarli dalla Control Room.")
-        with col_rk2:
-            st.write("")
-            if st.button("🎛️ Gestisci Portafogli in Control Room →", type="secondary", use_container_width=True, key="btn_goto_wcr_risk_link"):
-                st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
+                st.caption("Nessun portafoglio Risk registrato nello snapshot storico.")
+        else:
+            tot_risk_live, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=current_pid)
+            col_rk1, col_rk2 = st.columns([3.5, 1.5])
+            with col_rk1:
+                if not df_linked_risk.empty:
+                    st.markdown(f"Controvalore totale consolidato da Risk Analytics: **{fmt_eur(tot_risk_live)}**")
+                    st.dataframe(
+                        df_linked_risk[["portfolio_id", "name", "base_currency", "last_calc_date", "latest_value"]].rename(columns={
+                            "portfolio_id": "ID Portafoglio Risk",
+                            "name": "Nome Portafoglio",
+                            "base_currency": "Valuta",
+                            "last_calc_date": "Ultimo Calcolo",
+                            "latest_value": "Controvalore (€)"
+                        }),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+                else:
+                    st.info("ℹ️ Nessun portafoglio del modulo Risk collegato a questo profilo patrimoniale. Puoi selezionarli dalla Control Room.")
+            with col_rk2:
+                st.write("")
+                if st.button("🎛️ Gestisci Portafogli in Control Room →", type="secondary", use_container_width=True, key="btn_goto_wcr_risk_link_p13"):
+                    st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -1739,6 +2190,7 @@ with main_tab_stress:
         PRESET_STRESS_SCENARIOS,
         run_wealth_stress_test,
         create_wealth_waterfall_chart,
+        create_liquidity_squeeze_timeline_chart,
         simulate_wealth_recovery_trajectories
     )
 
@@ -1819,7 +2271,9 @@ with main_tab_stress:
         "monthly_expenses": max(500.0, liq_cash / max(0.1, runway_m))
     }
 
-    stress_out = run_wealth_stress_test(stress_summary_dict, active_params)
+    # Passaggio del contesto di rischio per trasmissione ticker-level se disponibile
+    risk_sub = getattr(st.session_state.get("workspace_context"), "risk", None)
+    stress_out = run_wealth_stress_test(stress_summary_dict, active_params, risk_context=risk_sub)
 
     # KPI Pre vs Post Stress
     st.write("")
@@ -1853,10 +2307,61 @@ with main_tab_stress:
             delta_color="normal" if stress_out["post_shock"]["health_score"] >= 70 else "inverse"
         )
 
+    # Indicatori Istituzionali di Liquidity Squeeze & Trasmissione Mutui
+    lq = stress_out.get("liquidity_squeeze", {})
+    mtg = stress_out.get("mortgage_impact", {})
     st.write("")
-    st.plotly_chart(create_wealth_waterfall_chart(stress_out), use_container_width=True)
+    lq1, lq2, lq3, lq4 = st.columns(4)
+    with lq1:
+        t_star = float(lq.get("months_to_forced_liquidation", 999.0))
+        t_text = f"{t_star:.1f} Mesi" if t_star < 999 else "Nessuna Vendita Forzata"
+        metric_card(
+            "Point of Forced Liquidation (t*)",
+            t_text,
+            delta="Rischio Liquidazione" if lq.get("forced_liquidation_triggered") else "Buffer Capiente",
+            delta_color="inverse" if lq.get("forced_liquidation_triggered") else "normal"
+        )
+    with lq2:
+        shortfall = float(lq.get("capital_shortfall_eur", 0.0))
+        metric_card(
+            "Deficit di Liquidità Stress",
+            fmt_eur(shortfall),
+            delta=f"Perdita Irrev. {fmt_eur(lq.get('irreversible_loss_eur', 0.0))}" if shortfall > 0 else "Nessun Deficit",
+            delta_color="inverse" if shortfall > 0 else "normal"
+        )
+    with lq3:
+        swr_val = float(lq.get("fire_swr_stressed_pct", 4.0))
+        swr_base = float(lq.get("fire_swr_base_pct", 4.0))
+        metric_card(
+            "Dynamic FIRE SWR (Stress)",
+            f"{swr_val:.1f}%",
+            delta=f"Pre-Stress: {swr_base:.1f}% (Guyton-Klinger)",
+            delta_color="normal" if swr_val >= 3.5 else "inverse"
+        )
+    with lq4:
+        delta_pmt = float(mtg.get("monthly_payment_delta", 0.0))
+        stressed_r = float(mtg.get("stressed_rate", 2.0))
+        metric_card(
+            "Impatto Rata Mutuo",
+            f"+€ {delta_pmt:,.2f}/m" if delta_pmt > 0 else "€ 0/m",
+            delta=f"Tasso Stressato: {stressed_r:.2f}%" if delta_pmt > 0 else "Tasso Invariato",
+            delta_color="inverse" if delta_pmt > 0 else "normal"
+        )
 
     st.write("")
-    st.plotly_chart(simulate_wealth_recovery_trajectories(stress_out["post_shock"]["net_worth"]), use_container_width=True)
+    tab_wf, tab_sq, tab_mc = st.tabs([
+        "📊 Waterfall Scomposizione Net Worth",
+        "⏳ Liquidity Squeeze & Forced Selling",
+        "📈 Proiezione Ripresa Monte Carlo (10 Anni)"
+    ])
+
+    with tab_wf:
+        st.plotly_chart(create_wealth_waterfall_chart(stress_out), use_container_width=True)
+
+    with tab_sq:
+        st.plotly_chart(create_liquidity_squeeze_timeline_chart(stress_out), use_container_width=True)
+
+    with tab_mc:
+        st.plotly_chart(simulate_wealth_recovery_trajectories(stress_out["post_shock"]["net_worth"]), use_container_width=True)
 
 

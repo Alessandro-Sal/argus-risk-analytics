@@ -34,6 +34,33 @@ def _tokenize(text: str) -> List[str]:
     return [t for t in tokens if t not in stopwords]
 
 
+FINANCIAL_LEXICON_SYNONYMS = {
+    "fornitura": ["supply", "chain", "manufacturing", "foundry", "suppliers", "production"],
+    "fornitori": ["suppliers", "foundry", "manufacturing", "vendors"],
+    "debito": ["debt", "notes", "commercial", "paper", "maturities", "leverage", "covenants"],
+    "rischio": ["risk", "factors", "threats", "antitrust", "regulatory", "headwinds"],
+    "rischi": ["risks", "threats", "regulatory", "headwinds", "exposure"],
+    "margini": ["margin", "margins", "profitability", "gross", "operating"],
+    "cassa": ["cash", "liquidity", "flow", "equivalents", "securities"],
+    "antitrust": ["regulatory", "monopoly", "scrutiny", "commissions", "litigation"],
+    "concorrenza": ["competition", "competitive", "moat", "market"],
+    "ricavi": ["revenue", "sales", "growth", "segment"],
+    "utile": ["income", "operating", "margin", "earnings"]
+}
+
+
+def expand_query_with_financial_lexicon(query: str) -> str:
+    """Arricchisce la query con termini finanziari bilingui IT/EN per superare il vocabulary mismatch."""
+    tokens = [re.sub(r"[^\w]", "", w.lower()) for w in query.split() if w.strip()]
+    synonyms_added = []
+    for w in tokens:
+        if w in FINANCIAL_LEXICON_SYNONYMS:
+            synonyms_added.extend(FINANCIAL_LEXICON_SYNONYMS[w])
+    if synonyms_added:
+        return query + " " + " ".join(synonyms_added)
+    return query
+
+
 def _calc_bm25_score(
     q_tokens: List[str],
     doc_tokens: List[str],
@@ -146,7 +173,8 @@ class LocalFilingVectorStore:
         if not self.chunks:
             return []
 
-        q_tokens = _tokenize(query)
+        expanded_q = expand_query_with_financial_lexicon(query)
+        q_tokens = _tokenize(expanded_q)
         if not q_tokens:
             return []
 
@@ -236,6 +264,57 @@ def _get_preset_sec_texts(ticker_upper: str) -> Dict[str, str]:
     }
 
 
+def chunk_financial_section(
+    text: str,
+    ticker: str,
+    section_key: str,
+    section_name: str
+) -> List[Dict[str, Any]]:
+    """
+    Chunking semantico a finestra scorrevole per testi e note di bilancio SEC 10-K/10-Q.
+    Preserva l'integrità contestuale di tabelle, passività fuori bilancio e covenant.
+    """
+    sentences = [s.strip() for s in text.split(". ") if s.strip()]
+    if not sentences:
+        return []
+
+    if len(sentences) <= 3:
+        content = text.strip()
+        if not content.endswith("."):
+            content += "."
+        return [{
+            "ticker": ticker.upper(),
+            "section_key": section_key,
+            "section": section_name,
+            "filing_type": "Form 10-K (Annual Report)",
+            "fiscal_year": "2024",
+            "content": content
+        }]
+
+    chunks = []
+    step = 2
+    window = 3
+    for i in range(0, len(sentences), step):
+        slice_s = sentences[i : i + window]
+        if not slice_s:
+            break
+        chunk_content = ". ".join(slice_s)
+        if not chunk_content.endswith("."):
+            chunk_content += "."
+        chunks.append({
+            "ticker": ticker.upper(),
+            "section_key": section_key,
+            "section": section_name,
+            "filing_type": "Form 10-K (Annual Report)",
+            "fiscal_year": "2024",
+            "content": chunk_content
+        })
+        if i + window >= len(sentences):
+            break
+
+    return chunks
+
+
 def _generate_filing_corpus_for_ticker(ticker: str) -> List[Dict[str, Any]]:
     """Genera sezioni di bilancio 10-K e 10-Q dettagliate e realistiche basate sul profilo societario."""
     t_u = ticker.upper().strip()
@@ -244,20 +323,8 @@ def _generate_filing_corpus_for_ticker(ticker: str) -> List[Dict[str, Any]]:
     chunks = []
     for sec_key, text in sec_texts.items():
         sec_name = SEC_SECTIONS.get(sec_key, sec_key)
-        sentences = [s.strip() for s in text.split(". ") if s.strip()]
-        chunk_size = 2
-        for i in range(0, len(sentences), chunk_size):
-            chunk_content = ". ".join(sentences[i:i + chunk_size])
-            if not chunk_content.endswith("."):
-                chunk_content += "."
-            chunks.append({
-                "ticker": t_u,
-                "section_key": sec_key,
-                "section": sec_name,
-                "filing_type": "Form 10-K (Annual Report)",
-                "fiscal_year": "2024",
-                "content": chunk_content
-            })
+        sec_chunks = chunk_financial_section(text, t_u, sec_key, sec_name)
+        chunks.extend(sec_chunks)
 
     return chunks
 

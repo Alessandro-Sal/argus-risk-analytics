@@ -121,26 +121,48 @@ def compute_consolidated_net_worth(
 
     risk_val = 0.0
     if active_risk_pids and len(active_risk_pids) > 0:
+        # Verifica se WorkspaceContext contiene un portafoglio Risk live in memoria collegato a questo profilo Wealth
+        live_risk_pid = None
+        live_risk_equity = 0.0
         try:
-            with engine.connect() as conn:
-                from sqlalchemy import text as sqlt
-                placeholders = ",".join([f":p{i}" for i in range(len(active_risk_pids))])
-                params = {f"p{i}": int(pid) for i, pid in enumerate(active_risk_pids)}
-                q = f"""
-                    SELECT SUM(s.total_value) as total_val
-                    FROM portfolio_snapshots s
-                    INNER JOIN (
-                        SELECT portfolio_id, MAX(snapshot_id) as max_sid
-                        FROM portfolio_snapshots
-                        WHERE portfolio_id IN ({placeholders})
-                        GROUP BY portfolio_id
-                    ) m ON s.snapshot_id = m.max_sid
-                """
-                r_val = conn.execute(sqlt(q), params).scalar()
-                if r_val is not None and float(r_val) > 0:
-                    risk_val = float(r_val)
+            from core.workspace_context import WorkspaceContext
+            ws_ctx = WorkspaceContext.get_current()
+            if ws_ctx.risk.is_live_active and ws_ctx.risk.results:
+                live_eq = ws_ctx.risk.get_total_equity()
+                if live_eq > 0:
+                    cand_pid = ws_ctx.risk.portfolio_id
+                    if cand_pid is not None and int(cand_pid) in [int(p) for p in active_risk_pids]:
+                        live_risk_pid = int(cand_pid)
+                        live_risk_equity = live_eq
         except Exception:
-            risk_val = 0.0
+            pass
+
+        # Interrogazione snapshot su database per i portafogli collegati (escluso l'eventuale live in memoria)
+        pids_for_db = [p for p in active_risk_pids if live_risk_pid is None or int(p) != live_risk_pid]
+        db_snap_val = 0.0
+        if pids_for_db:
+            try:
+                with engine.connect() as conn:
+                    from sqlalchemy import text as sqlt
+                    placeholders = ",".join([f":p{i}" for i in range(len(pids_for_db))])
+                    params = {f"p{i}": int(pid) for i, pid in enumerate(pids_for_db)}
+                    q = f"""
+                        SELECT SUM(s.total_value) as total_val
+                        FROM portfolio_snapshots s
+                        INNER JOIN (
+                            SELECT portfolio_id, MAX(snapshot_id) as max_sid
+                            FROM portfolio_snapshots
+                            WHERE portfolio_id IN ({placeholders})
+                            GROUP BY portfolio_id
+                        ) m ON s.snapshot_id = m.max_sid
+                    """
+                    r_val = conn.execute(sqlt(q), params).scalar()
+                    if r_val is not None and float(r_val) > 0:
+                        db_snap_val = float(r_val)
+            except Exception:
+                db_snap_val = 0.0
+
+        risk_val = round(db_snap_val + live_risk_equity, 2)
 
     brokerage_val = 0.0
     if not df_acc.empty:
@@ -2177,7 +2199,9 @@ def compute_wealth_risk_integrated_analytics(engine, wealth_portfolio_id: int = 
         shk_fin = fin_inv * (1.0 + sc_params["fin_shock"])
         shk_re = re_val * (1.0 + sc_params["re_shock"])
         shk_gold = gold_val * (1.0 + sc_params["gold_shock"])
-        shk_cash = max(0.0, nw.liquid_cash - (nw.monthly_burn_rate * sc_params["burn_rate_shock"] * 3))
+        e_bp = float(sc_params.get("euribor_bp", 0.0))
+        debt_drain = max(0.0, nw.total_liabilities * (e_bp / 10000.0) * (3.0 / 12.0)) if e_bp > 0 else 0.0
+        shk_cash = max(0.0, nw.liquid_cash - (nw.monthly_burn_rate * sc_params["burn_rate_shock"] * 3) - debt_drain)
         
         post_nw = shk_fin + shk_re + shk_gold + shk_cash + nw.pension_total - nw.total_liabilities
         nw_loss = nw.total_net_worth - post_nw
@@ -4756,6 +4780,13 @@ def compute_smart_cashflow_reconciliation(
         "matches_df": df_recon,
         "matches_list": matched_items
     }
+
+
+# ============================================================
+# BILANCIO PERSONALE ISTITUZIONALE (PERSONAL FINANCIAL STATEMENTS)
+# ============================================================
+from core.wealth.personal_balance_sheet import compute_personal_balance_sheet
+
 
 
 

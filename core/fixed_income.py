@@ -385,3 +385,125 @@ INSTITUTIONAL_BOND_PRESETS: Dict[str, Dict[str, Any]] = {
         "cds_5y_bps": 65.0
     }
 }
+
+
+# ── 6. NELSON-SIEGEL CASHFLOW PRICING & KEY RATE DURATION ─────────
+
+def price_bond_cashflows_nelson_siegel(
+    cashflows: List[Tuple[float, float]],
+    ns_params: Dict[str, float],
+    compounding_freq: int = 2
+) -> Dict[str, Any]:
+    """
+    Calcola il prezzo teorico analitico, la Duration di Macaulay e la Convessità
+    scontando ciascun flusso (t, CF_t) sui tassi spot della curva Nelson-Siegel o Svensson.
+    """
+    if not cashflows:
+        return {"fair_price": 0.0, "macaulay_duration": 0.0, "modified_duration": 0.0, "convexity": 0.0}
+
+    from core.yield_curve import evaluate_nelson_siegel_curve, evaluate_nelson_siegel_svensson_curve
+
+    is_svensson = "beta3" in ns_params or "tau2" in ns_params
+    eval_fn = evaluate_nelson_siegel_svensson_curve if is_svensson else evaluate_nelson_siegel_curve
+
+    freq = max(1, int(compounding_freq))
+    maturities = np.array([t for t, _ in cashflows], dtype=float)
+    amounts = np.array([cf for _, cf in cashflows], dtype=float)
+
+    # Tassi spot annualizzati percentuali dalla curva -> convertiti in decimali
+    spot_rates_pct = eval_fn(maturities, ns_params)
+    spot_rates = np.maximum(0.0001, spot_rates_pct / 100.0)
+
+    # Fattori di sconto composti
+    discount_factors = (1.0 + spot_rates / freq) ** (-freq * maturities)
+    pv_cashflows = amounts * discount_factors
+    fair_price = float(np.sum(pv_cashflows))
+
+    if fair_price <= 0:
+        return {"fair_price": 0.0, "macaulay_duration": 0.0, "modified_duration": 0.0, "convexity": 0.0}
+
+    # Macaulay Duration ponderata sui flussi attualizzati
+    mac_duration = float(np.sum(maturities * pv_cashflows) / fair_price)
+    # Tasso medio ponderato per la modified duration
+    avg_yield = float(np.sum(spot_rates * pv_cashflows) / fair_price)
+    mod_duration = mac_duration / (1.0 + avg_yield / freq)
+
+    # Convessità discreta
+    convexity = float(np.sum(maturities * (maturities + 1.0 / freq) * pv_cashflows) / (fair_price * (1.0 + avg_yield / freq) ** 2))
+
+    return {
+        "fair_price": round(fair_price, 4),
+        "macaulay_duration": round(mac_duration, 3),
+        "modified_duration": round(mod_duration, 3),
+        "convexity": round(convexity, 3),
+        "weighted_spot_yield_pct": round(avg_yield * 100.0, 3)
+    }
+
+
+def compute_key_rate_durations(
+    face_value: float,
+    coupon_rate: float,
+    maturity_years: float,
+    ns_params: Dict[str, float],
+    key_rates: Optional[List[float]] = None,
+    coupon_freq: int = 2,
+    shift_bps: float = 10.0
+) -> Dict[str, float]:
+    """
+    Calcola le Key Rate Durations (KRD) sui nodi della curva specificati (default: 2Y, 5Y, 10Y, 30Y).
+    Misura la sensibilità del prezzo a shock localizzati su singoli segmenti della curva dei tassi.
+    """
+    nodes = key_rates or [2.0, 5.0, 10.0, 30.0]
+    freq = max(1, int(coupon_freq))
+    cfs = compute_bond_cash_flows(face_value, coupon_rate, maturity_years, freq)
+    base_res = price_bond_cashflows_nelson_siegel(cfs, ns_params, freq)
+    p0 = base_res["fair_price"]
+    if p0 <= 0:
+        return {f"{int(n) if n.is_integer() else n}Y": 0.0 for n in nodes}
+
+    h = shift_bps / 10000.0  # Shock in decimale (es. 10 bps = 0.0010)
+    krd_results = {}
+
+    from core.yield_curve import evaluate_nelson_siegel_curve, evaluate_nelson_siegel_svensson_curve
+    is_svensson = "beta3" in ns_params or "tau2" in ns_params
+    eval_fn = evaluate_nelson_siegel_svensson_curve if is_svensson else evaluate_nelson_siegel_curve
+
+    maturities = np.array([t for t, _ in cfs], dtype=float)
+    amounts = np.array([cf for _, cf in cfs], dtype=float)
+    base_spots = np.maximum(0.0001, eval_fn(maturities, ns_params) / 100.0)
+
+    # Interpolazione triangolare dello shock locale attorno a ciascun nodo
+    extended_nodes = [0.0] + sorted(nodes) + [nodes[-1] + 10.0]
+
+    for i in range(1, len(extended_nodes) - 1):
+        node = extended_nodes[i]
+        left_node = extended_nodes[i - 1]
+        right_node = extended_nodes[i + 1]
+
+        # Costruisci i pesi dello shock triangolare
+        w_shock = np.zeros_like(maturities)
+        # Segmento sinistro
+        mask_left = (maturities >= left_node) & (maturities < node)
+        if node > left_node:
+            w_shock[mask_left] = (maturities[mask_left] - left_node) / (node - left_node)
+        # Segmento destro
+        mask_right = (maturities >= node) & (maturities <= right_node)
+        if right_node > node:
+            w_shock[mask_right] = (right_node - maturities[mask_right]) / (right_node - node)
+
+        # Repricing con bump up e bump down
+        spot_up = base_spots + (h * w_shock)
+        df_up = (1.0 + spot_up / freq) ** (-freq * maturities)
+        p_up = float(np.sum(amounts * df_up))
+
+        spot_down = np.maximum(0.00001, base_spots - (h * w_shock))
+        df_down = (1.0 + spot_down / freq) ** (-freq * maturities)
+        p_down = float(np.sum(amounts * df_down))
+
+        # Formula centrale KRD
+        krd = -(p_up - p_down) / (2.0 * p0 * h)
+        label = f"{int(node) if node.is_integer() else node}Y"
+        krd_results[label] = round(float(krd), 3)
+
+    return krd_results
+

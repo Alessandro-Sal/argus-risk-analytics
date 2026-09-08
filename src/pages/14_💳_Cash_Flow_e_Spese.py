@@ -41,6 +41,7 @@ from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
     get_cashflow_records,
     insert_cashflow_tx,
+    bulk_insert_cashflow_tx,
     get_wealth_accounts,
     get_wealth_categories,
     get_wealth_portfolios
@@ -1321,33 +1322,39 @@ with tab_ledger:
                             cat_name_to_id[cr["name"].lower()] = cr["category_id"]
 
                     default_cat_id = list(cat_name_to_id.values())[0] if cat_name_to_id else 1
-                    inserted_cnt = 0
+                    records_to_insert = []
 
                     for _, r in df_parsed.iterrows():
                         r_amt = abs(float(r["amount"]))
                         r_is_tr = int(r.get("is_transfer", 0)) == 1
-                        r_dir = "transfer" if r_is_tr else ("inflow" if float(r["amount"]) > 0 else "outflow")
+                        r_dir = r.get("direction") or ("transfer" if r_is_tr else ("inflow" if float(r["amount"]) > 0 else "outflow"))
                         
                         # Match category
                         assigned_cid = default_cat_id
-                        clean_cat_str = str(r["category"]).lower()
+                        clean_cat_str = str(r.get("category", "")).lower()
                         for c_name, c_id in cat_name_to_id.items():
                             if c_name in clean_cat_str or clean_cat_str in c_name:
                                 assigned_cid = c_id
                                 break
 
-                        insert_cashflow_tx(engine, {
+                        records_to_insert.append({
+                            "portfolio_id": current_pid,
                             "account_id": target_acc_id,
                             "category_id": assigned_cid,
-                            "tx_date": str(r["date"]),
+                            "tx_date": str(r.get("tx_date") or r.get("date")),
                             "amount": r_amt,
                             "direction": r_dir,
-                            "merchant": str(r["description"])[:80],
-                            "notes": f"Auto-Imported: {bank_name}"
+                            "merchant": str(r.get("merchant") or r.get("description", ""))[:120],
+                            "notes": str(r.get("notes") or f"Auto-Imported: {bank_name}"),
+                            "payment_method": str(r.get("payment_method", "Estratto Conto")),
+                            "tx_hash": r.get("tx_hash", None)
                         })
-                        inserted_cnt += 1
 
-                    st.success(f"✅ {inserted_cnt} transazioni importate e riconciliate con successo!")
+                    ins_cnt, dup_cnt = bulk_insert_cashflow_tx(engine, records_to_insert, deduplicate=True)
+                    if dup_cnt > 0:
+                        st.success(f"✅ {ins_cnt} transazioni importate ({dup_cnt} duplicati già presenti ignorati).")
+                    else:
+                        st.success(f"✅ {ins_cnt} transazioni importate e riconciliate con successo!")
                     st.rerun()
             else:
                 st.error(f"Errore nel parsing: {parsed_res.get('error_msg', 'Formato non supportato')}")

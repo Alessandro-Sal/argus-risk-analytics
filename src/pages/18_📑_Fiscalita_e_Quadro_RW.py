@@ -50,33 +50,30 @@ st.session_state.argus_portal_mode = "🏛️ Wealth Management"
 db_user = st.session_state.get("db_user", "root")
 db_pass = st.session_state.get("db_pass", "root")
 db_host = st.session_state.get("db_host", "localhost")
+db_name = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
+offline_mode = bool(st.session_state.get("offline_mode", False))
 db_port = int(st.session_state.get("db_port", 3306))
-db_name = st.session_state.get("db_name", "wealth")
 
-engine = get_engine(db_user, db_pass, db_host, db_port, db_name)
+engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
 
 df_prof = get_wealth_portfolios(engine)
 prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
 current_pid = st.session_state.get("wealth_active_portfolio_id")
 
 if current_pid is None or current_pid not in prof_map:
-    st.title("📑 ARGUS Wealth — Fiscalità & Quadro RW / RT")
-    st.markdown("""
-    <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-        <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Selezionato</h4>
-        <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Seleziona un profilo attivo per calcolare l'IVAFE, l'Imposta di Bollo e lo Zainetto Fiscale.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    sel_box = st.selectbox(
-        "Seleziona Profilo Patrimoniale:",
-        options=[None] + list(prof_map.keys()),
-        format_func=lambda pid: "👉 Seleziona un Profilo..." if pid is None else f"📁 {prof_map[pid]} (ID #{pid})",
-        key="fiscal_unselected_profile_picker"
-    )
-    if sel_box is not None:
-        st.session_state["wealth_active_portfolio_id"] = sel_box
-        st.rerun()
-    st.stop()
+    if prof_map:
+        pers_matches = [pid for pid, nm in prof_map.items() if nm == "Personale"]
+        current_pid = pers_matches[0] if pers_matches else list(prof_map.keys())[0]
+        st.session_state["wealth_active_portfolio_id"] = current_pid
+    else:
+        st.title("📑 ARGUS Wealth — Fiscalità & Quadro RW / RT")
+        st.markdown("""
+        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
+            <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Trovato</h4>
+            <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Crea un profilo nella Wealth Control Room per calcolare l'IVAFE e lo Zainetto Fiscale.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
 
 prof_title = prof_map.get(current_pid, "Personale")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p18")
