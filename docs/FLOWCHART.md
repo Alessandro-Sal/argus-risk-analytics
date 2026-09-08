@@ -39,18 +39,24 @@ flowchart TD
         CACHE{"⚡ core/cache_shield.py\n(Multi-Tier LRU & SQLite Cache Shield)"}:::script
     end
 
-    subgraph Layer3 ["🗄️ 3. DATA WAREHOUSE & STORAGE (MySQL / SQLite / DuckDB)"]
+    subgraph Layer3 ["🗄️ 3. DATA WAREHOUSE & STORAGE (MySQL / SQLite / DuckDB / PyArrow)"]
         direction TB
         DB_RAW[("Tabelle Grezze ORM\n(portfolios, assets, transactions, market_prices)")]:::storage
         DB_SNAP[("Tabelle Snapshot Metriche\n(portfolio_snapshots, snapshot_positions)")]:::storage
         DB_WEALTH[("Wealth DB (argus_wealth.db)\n(accounts, cash_flow, assets, mortgages, simulations)")]:::storage
         DUCK[("DuckDB OLAP Engine\n(In-Process SIMD & Parquet Storage)")]:::storage
+        ONE_LEDGER[("🏛️ Universal One-Ledger\n(core/universal_ledger.py Double-Entry Fact\n& Zero-Copy PyArrow RecordBatches)")]:::storage
     end
 
     subgraph Layer4 ["🧠 4. ANALYTICS, WEALTH & QUANTITATIVE ENGINE"]
         direction TB
         CTX{"🧱 core/workspace_context.py\n(Typed Contexts, Session Persistence & Flush)"}:::engine
         RE{"⚙️ core/risk_engine.py\n(FIFO Basis, VaR Cornish-Fisher, Kupiec Test,\nLedoit-Wolf SLSQP, Black-Litterman, Carhart 4-Factor,\nMSCI Barra 5-Factor, Merton Jump-Diffusion,\nATR Chandelier Exits, 3D Stress Surface, Almgren-Chriss, Cholesky MC)"}:::engine
+        BARRA{"🔬 core/msci_barra_risk_engine.py\n(MSCI Barra Factor Risk, Euler MCTR/PCTR = 100%,\nActive Tilts & Multi-Scenario Factor Stress)"}:::engine
+        HUMAN_CAP{"🌐 core/wealth/human_capital_engine.py\n(Nelson-Siegel Human Capital, Quasi-Equity/Bond,\nTotal Balance Sheet VaR 95% & Runway)"}:::engine
+        TBS_MC{"🎲 core/wealth/tbs_monte_carlo.py\n(5,000 Path Lifetime TBS Simulation,\nRuin Probability & Safe Spending Corridor)"}:::engine
+        PRESCRIPTIVE{"⚖️ core/prescriptive_rebalancer.py\n(Multi-Objective Conic SLSQP, Minusvalenze Harvesting,\n& FIX Protocol 4.4 Standard Execution Blotter)"}:::engine
+        TRI_AGENT{"🏛️ core/ai_analyst.py\n(Tri-Agent Governance Council:\nQuant Risk, Tax Efficiency, Macro Execution)"}:::engine
         WEALTH_ENG{"🏛️ core/wealth/wealth_engine.py\n(Net Worth Consolidation, FIRE SWR, Mutui, Successione)"}:::engine
         WEALTH_STRESS{"🌪️ core/wealth/wealth_stress_engine.py\n(Macro Stress, Mutui Francese, Liquidity Squeeze & SWR)"}:::engine
         BRIDGE{"🌉 core/wealth/unified_stress_bridge.py\n(Cross-Asset Macro Bridge & Multi-Asset Factors)"}:::engine

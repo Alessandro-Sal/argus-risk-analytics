@@ -303,4 +303,30 @@ La salute del bilancio personale è sintetizzata tramite 6 indici con benchmark 
 6. **Invested Assets Ratio** ($\frac{\text{Investimenti} + \text{Previdenza}}{\text{Patrimonio Netto}}$): Target $\ge 50\%$.
 * **Radar Chart di Solidità:** Proiezione su coordinate polari normalizzate a 100 per il confronto istantaneo del profilo reale dell'utente rispetto al Benchmark di Private Banking.
 
+---
+
+## 14. Institutional UI/UX Patterns for Enterprise Next-Level Architecture (v8.1)
+
+Con la trasformazione Next-Level Tier-1, il design system di ARGUS introduce 4 nuovi pattern visuali interattivi allineati agli standard BlackRock Aladdin, Bloomberg AIM e MSCI Barra:
+
+### 14.1 MSCI Barra Multi-Asset Factor Risk Decomposition (`src/pages/4_🔬_Modelli_Quantitativi.py`)
+* **Waterfall Chart di Varianza:** Visualizzazione a cascata del rischio totale di portafoglio, distinguendo la quota di Varianza Sistematica Fattoriale ($w^T X F X^T w$) dalla Varianza Idiosincratica/Specifica ($w^T \Delta w$) con palette bicolore (Cyan `#00f3ff` per i fattori di stile e Corallo `#f85149` per il rischio specifico).
+* **Active Style Factor Tilts Radar Chart:** Grafico a coordinate polari centrato su zero per evidenziare le scommesse attive di stile ($X^T (w - w_{\text{bench}})$) rispetto al benchmark (Market, Value, Size, Momentum, Quality, Low Volatility).
+* **Tabella MCTR & PCTR di Eulero:** Data table ad alta densità con gradiente dinamico per PCTR asset ($\sum \text{PCTR}_i = 100\%$) e alert di concentrazione sui titoli con contributo marginale anomalo.
+
+### 14.2 Total Balance Sheet & Human Capital Cockpit (`src/pages/7_🌪️_Stress_Testing.py`)
+* **Holistic Net Worth Breakdown Card:** Visualizzazione aggregata a 3 pilastri (Portafoglio Liquido, Real Estate, Capitale Umano Attuariale Nelson-Siegel) con calcolo live del TBS-VaR 95% e TBS-CVaR 95%.
+* **Emergency Runway Health Meter:** Indicatore di autonomia finanziaria mensile a stipendio azzerato con soglia critica di sicurezza a 6 mesi.
+* **Catastrophic Correlation Trap Alert:** Banner reattivo di avviso in caso di eccessiva correlazione ($\rho > 0.60$) tra settore di impiego lavorativo e asset azionari in portafoglio, con prescrizione quantitativa di de-risking.
+
+### 14.3 Prescriptive Conic Rebalancer & Tri-Agent Council Blotter (`src/pages/21_🤖_AI_Copilot_e_Advisor.py`)
+* **Tri-Agent Deliberative Cards:** 3 container affiancati con avatar dedicati (`QuantRiskAuditor`, `TaxEfficiencySpecialist`, `MacroExecutionStrategist`), punteggi individuali (/100) e motivazioni analitiche in linguaggio naturale istituzionale.
+* **Consensus Score Gauge:** Indicatore di delibera collegiale (Approved $\ge 70$, Conditional Approval 50-69, Rejected $< 50$) con verbale esecutivo conforme ai requisiti di auditabilità MiFID II.
+* **Terminal Blotter FIX Protocol 4.4:** Visualizzatore in monospace scuro ad alto contrasto dei messaggi d'ordine conformi a FIX Protocol 4.4 (`35=D`, `54=Side`, `38=Qty`, `44=LimitPx`, `59=TIF`, `10=Checksum`), con pulsante nativo per copia negli appunti e download del file di routing broker.
+
+### 14.4 Lifetime Total Balance Sheet Monte Carlo Fan Chart
+* **Stochastic Area Bands ($P_{10}-P_{90}$):** Fascia semi-trasparente per le traiettorie stocastiche di decumulazione patrimoniale su 5.000 simulazioni fino a 95 anni di età.
+* **Median Trajectory Line ($P_{50}$):** Linea continua in verde smeraldo che traccia l'aspettativa mediana di patrimonio netto aggregato.
+* **Safe Spending Corridor Overlay:** Linea tratteggiata in oro ambrato che delimita il tetto massimo di spesa annua sostenibile al 95° percentile senza rischio di rovina finanziaria precoce.
+
 
