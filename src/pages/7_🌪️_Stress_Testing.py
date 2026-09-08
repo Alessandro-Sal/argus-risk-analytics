@@ -2,6 +2,7 @@ import streamlit as st
 
 st.set_page_config(page_title="Stress Testing | ARGUS", page_icon="🌪️", layout="wide")
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go

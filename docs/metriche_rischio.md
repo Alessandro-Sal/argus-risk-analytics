@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/risk_engine.py`, `core/wealth/unified_stress_bridge.py`, `core/wealth/tax_aware_location.py`, `core/autonomous_rebalancer.py`, `core/wealth/wealth_engine.py`, `core/wealth/wealth_stress_engine.py`, `core/workspace_context.py`, `core/reporting_design_system.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`, `core/backup_engine.py`, `core/security_engine.py`, `core/data_quality_gate.py`) di **ARGUS Risk & Wealth Analytics Platform v7.0.0 Enterprise Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/universal_ledger.py`, `core/wealth/human_capital_engine.py`, `core/prescriptive_rebalancer.py`, `core/msci_barra_risk_engine.py`, `core/wealth/tbs_monte_carlo.py`, `core/risk_engine.py`, `core/wealth/unified_stress_bridge.py`, `core/wealth/tax_aware_location.py`, `core/autonomous_rebalancer.py`, `core/wealth/wealth_engine.py`, `core/wealth/wealth_stress_engine.py`, `core/workspace_context.py`, `core/reporting_design_system.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`, `core/backup_engine.py`, `core/security_engine.py`, `core/data_quality_gate.py`) di **ARGUS Risk & Wealth Analytics Platform v8.1.0 Enterprise Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -2692,26 +2692,289 @@ $$
 
 ---
 
-## 72. Riferimenti Bibliografici & Standard Istituzionali
+## 73. Universal One-Ledger Core (Fact/Dimension Architecture & Vectorized WACP Engine)
+
+Il modulo contabile unificato (`core/universal_ledger.py`) supera la dicotomia tra posizioni di mercato e patrimonio totale mediante uno schema a stella a partita doppia implementato in DuckDB in-memory con supporto Parquet:
+
+### Schema Dati a Stella (Star Schema)
+1. **`dim_entity`**: Anagrafica persone fisiche, trust, corporate e mandati di gestione.
+2. **`dim_asset_master`**: Master anagrafico universale per strumenti quotati (azioni, ETF, obbligazioni, derivati) e asset fisici/illiquidi (Real Estate, Oro, Orologi da collezione, Polizze, Partecipazioni societarie).
+3. **`fact_ledger_entry`**: Registro immutabile a partita doppia di ogni transazione con vincolo contabile di quadratura:
+   $$
+   \sum_{e \in \text{Tx}} \text{Debit}_e = \sum_{e \in \text{Tx}} \text{Credit}_e
+   $$
+
+### Determinazione Analitica Vettorizzata di Prezzo Medio di Carico (WACP) e FIFO
+Il Prezzo Medio di Carico ponderato per la quantità residua viene aggiornato dinamicamente all'ingresso di ogni lotto d'acquisto:
+$$
+\text{WACP}_t = \frac{\text{WACP}_{t-1} \cdot Q_{t-1} + p_t \cdot \Delta Q_t}{Q_{t-1} + \Delta Q_t}
+$$
+In fase di estrazione snapshot, l'allocazione e i prezzi di carico vengono risolti tramite query analitiche DuckDB SQL con costrutto analitico ad alta velocità:
+```sql
+SELECT asset_id, entity_id, cumulative_qty, wacp_price, realized_pnl, booking_date
+FROM fact_ledger_entry
+QUALIFY ROW_NUMBER() OVER (PARTITION BY asset_id, entity_id ORDER BY booking_date DESC, entry_id DESC) = 1
+```
+L'estrazione verso i motori di calcolo avviene tramite `pyarrow.Table` con buffer zero-copy, garantendo throughput superiore a 1.000.000 righe/sec.
+
+---
+
+## 74. Capitale Umano Attuariale & Total Balance Sheet VaR (TBS-VaR 95%)
+
+Il modulo `core/wealth/human_capital_engine.py` formalizza l'integrazione del Capitale Umano ($HC$) all'interno del bilancio consolidato della famiglia.
+
+### Modello di Attualizzazione Attuariale Nelson-Siegel
+Il valore attuale del capitale umano ($HC_0$) è calcolato attualizzando la serie dei redditi netti da lavoro previsti fino all'età di pensionamento attesa ($T_{\text{retire}}$):
+$$
+HC_0 = \sum_{t=1}^{T_{\text{retire}} - \text{Age}} \frac{Y_0 (1 + g)^t \cdot (1 - \pi_{\text{unemp}})^t}{\prod_{s=1}^t \left(1 + y(s) + \lambda_{\text{sector}}\right)}
+$$
+dove:
+- $Y_0$: reddito netto annuale corrente.
+- $g$: tasso di crescita salariale reale stimato.
+- $\pi_{\text{unemp}}$: tasso di disoccupazione strutturale specifico del settore/regione.
+- $y(s)$: tasso risk-free attuariale ricavato dalla curva dei rendimenti sovrani mediante parametrizzazione Nelson-Siegel:
+  $$
+  y(s) = \beta_0 + \beta_1 \left( \frac{1 - e^{-s/\tau}}{s/\tau} \right) + \beta_2 \left( \frac{1 - e^{-s/\tau}}{s/\tau} - e^{-s/\tau} \right)
+  $$
+- $\lambda_{\text{sector}}$: premio al rischio specifico di stabilità del settore occupazionale.
+
+### Scomposizione Sintetica in Quasi-Equity e Quasi-Bond
+Per comprendere l'esposizione al rischio sistemico del lavoro dell'individuo, il capitale umano viene proiettato sinteticamente sulle classi di attivo:
+$$
+HC_{\text{Equity}} = HC_0 \cdot \beta_{\text{sector}}, \quad HC_{\text{Bond}} = HC_0 \cdot (1 - \beta_{\text{sector}})
+$$
+dove $\beta_{\text{sector}}$ è il beta regressionale del settore lavorativo rispetto all'indice azionario generale (es. Finanza/Tech $\beta \approx 0.85$, Pubblica Amministrazione/Medicina $\beta \approx 0.15$).
+
+### Total Balance Sheet Net Worth & TBS-VaR 95%
+Il patrimonio netto olistico aggregato è definito da:
+$$
+\text{TBS Net Worth} = W_{\text{liquid}} + HC_0 + V_{\text{RealEstate}} - D_{\text{Mortgage}}
+$$
+Definendo il vettore dei pesi delle macro-componenti patrimoniali $\mathbf{w}_{\text{TBS}} = \begin{bmatrix} w_{\text{liq}} & w_{HC} & w_{RE} \end{bmatrix}^T$ e la matrice di covarianza allargata $3 \times 3$:
+$$
+\mathbf{\Sigma}_{\text{TBS}} = \begin{bmatrix}
+\sigma_{\text{liq}}^2 & \rho_{\text{liq}, HC} \sigma_{\text{liq}} \sigma_{HC} & \rho_{\text{liq}, RE} \sigma_{\text{liq}} \sigma_{RE} \\
+\rho_{HC, \text{liq}} \sigma_{HC} \sigma_{\text{liq}} & \sigma_{HC}^2 & \rho_{HC, RE} \sigma_{HC} \sigma_{RE} \\
+\rho_{RE, \text{liq}} \sigma_{RE} \sigma_{\text{liq}} & \rho_{RE, HC} \sigma_{RE} \sigma_{HC} & \sigma_{RE}^2
+\end{bmatrix}
+$$
+La deviazione standard del patrimonio consolidato è:
+$$
+\sigma_{\text{TBS}} = \sqrt{\mathbf{w}_{\text{TBS}}^T \mathbf{\Sigma}_{\text{TBS}} \mathbf{w}_{\text{TBS}}}
+$$
+Il Total Balance Sheet Value at Risk parametrico al livello di confidenza $(1 - \alpha)$ (standard istituzionale 95%) su orizzonte temporale $\Delta t$ è dato da:
+$$
+\text{TBS-VaR}_{\alpha} = \text{TBS Net Worth} \cdot z_{\alpha} \cdot \sigma_{\text{TBS}} \sqrt{\Delta t}
+$$
+con Conditional Value at Risk (CVaR / Expected Shortfall):
+$$
+\text{TBS-CVaR}_{\alpha} = \text{TBS Net Worth} \cdot \frac{\phi(z_{\alpha})}{\alpha} \cdot \sigma_{\text{TBS}} \sqrt{\Delta t}
+$$
+
+### Emergency Runway & Catastrophic Correlation Trap
+Il cuscinetto di liquidità di emergenza (misurato in mesi di autonomia a reddito lavorativo azzerato) è calcolato come:
+$$
+\text{Emergency Runway} = \frac{\text{Liquid Cash Equivalents}}{\text{Monthly Fixed Living Expenses} + \text{Monthly Debt Service}}
+$$
+Se $\rho(R_{\text{portfolio}}, R_{\text{industry}}) > 0.60$, il sistema rileva la condizione di **Catastrophic Correlation Trap** (rischio congiunto di perdita dell'impiego e crollo del portafoglio) e prescrive automaticamente una riduzione tattica del peso degli asset appartenenti al settore di impiego del cliente.
+
+---
+
+## 75. Prescriptive Conic Rebalancing con Funzione di Costo Convessa & Blotter FIX Protocol 4.4
+
+Il motore prescrittivo (`core/prescriptive_rebalancer.py`) calcola il vettore ottimale di riallocazione pesi $\mathbf{w}^*$ risolvendo un problema di ottimizzazione convessa/SLSQP multi-obiettivo:
+
+### Formulazione dell'Ottimizzazione
+$$
+\min_{\mathbf{w}} \mathcal{L}(\mathbf{w}) = \lambda_{\text{TE}} (\mathbf{w} - \mathbf{w}_{\text{target}})^T \mathbf{\Sigma} (\mathbf{w} - \mathbf{w}_{\text{target}}) + \lambda_{\text{TO}} \|\mathbf{w} - \mathbf{w}_0\|_1 + \lambda_{\text{tax}} \text{TaxDrag}(\mathbf{w}) + \lambda_{\text{imp}} \text{AlmgrenChriss}(|\mathbf{w} - \mathbf{w}_0|)
+$$
+sotto i vincoli:
+$$
+\sum_{i=1}^N w_i = 1.0, \quad 0 \le w_i \le w_{\max}, \quad \forall i
+$$
+dove:
+- **Tracking Error**: penalizza lo scostamento di varianza rispetto all'asset allocation target di lungo periodo.
+- **Turnover ($\|\mathbf{w} - \mathbf{w}_0\|_1$)**: penalizza la rotazione eccessiva del portafoglio per preservare efficienza operativa.
+- **Tax Drag con Compensazione Minusvalenze**:
+  $$
+  \text{TaxDrag}(\mathbf{w}) = \sum_{i: w_i < w_{0, i}} \max\left(0, (P_i - \text{WACP}_i) \cdot Q_i^{\text{sold}} - M_{\text{active}}\right) \cdot \tau_i
+  $$
+  assorbendo analiticamente le minusvalenze fiscali pregresse disponibili prima della scadenza quadriennale (art. 67-68 TUIR).
+- **Market Impact Almgren-Chriss**: stima del costo di impatto di mercato permanente e temporaneo sui titoli meno liquidi rispetto al loro volume medio giornaliero ($ADV_i$).
+
+### Generazione Blotter Esecutivo FIX Protocol 4.4
+Il ribilanciatore serializza la lista dei singoli ordini esecutivi nello standard universale di messaggistica finanziaria **FIX Protocol 4.4** (`MsgType (35) = D` New Order Single):
+```text
+8=FIX.4.4|9=142|35=D|49=ARGUS_PORTAL|56=BROKER_DESK|34=101|52=20260908-21:30:00|11=ORD_1001|55=CSPX.MI|54=1|38=120|40=2|44=512.40|59=0|10=184|
+```
+Campi mappati:
+- `Tag 35`: Tipo Messaggio (`D` = New Order Single).
+- `Tag 54`: Side (`1` = Buy, `2` = Sell).
+- `Tag 38`: OrderQty (quantità intera o frazionata di quote/azioni).
+- `Tag 44`: Price (prezzo limite di esecuzione stimato).
+- `Tag 40`: OrdType (`2` = Limit Order).
+- `Tag 59`: TimeInForce (`0` = Day).
+- `Tag 10`: Checksum a 3 cifre calcolato modulo 256 sui byte del messaggio.
+
+---
+
+## 76. Tri-Agent Quantitative Governance Council & Algoritmo di Consenso MiFID II
+
+Il processo deliberativo per l'autorizzazione all'esecuzione degli ordini di ribilanciamento è affidato a un comitato autonomo multi-agente (`core/ai_analyst.py`):
+
+1. **`QuantRiskAuditor`**:
+   - Ispezione del Tracking Error ($TE < 3.0\%$).
+   - Concentrazione massima sul singolo emittente ($\max w_i \le 20\%$).
+   - Impatto sui profili di coda (VaR e CVaR delta post-ribilanciamento).
+2. **`TaxEfficiencySpecialist`**:
+   - Tasso di utilizzo delle minusvalenze in scadenza ($\ge 50\%$).
+   - Controllo dell'indice di efficienza fiscale (Rapporto tra Plusvalenze compensate e Imposte versate).
+   - Verifica dell'assenza di vendite fittizie (*wash-sale rules*).
+3. **`MacroExecutionStrategist`**:
+   - Partecipazione massima all'Average Daily Volume ($\text{OrderQty}_i / ADV_i \le 10\%$).
+   - Controllo di congruità del Market Impact Almgren-Chriss ($< 15 \text{ bps}$).
+   - Validazione strutturale dei tag FIX 4.4 e del checksum.
+
+### Algoritmo di Consenso Collegiale e Score di Governance
+Il punteggio ponderato complessivo di governance è dato da:
+$$
+\text{Score}_{\text{Council}} = 0.40 \cdot S_{\text{Risk}} + 0.35 \cdot S_{\text{Tax}} + 0.25 \cdot S_{\text{Exec}}
+$$
+La delibera esecutiva è formalizzata con verbale di conformità MiFID II:
+$$
+\text{Status} = \begin{cases} 
+\text{APPROVED} & \text{se } \text{Score}_{\text{Council}} \ge 70 \land \text{Risk}=\text{OK} \land \text{Exec}=\text{OK} \\
+\text{CONDITIONAL APPROVAL} & \text{se } 50 \le \text{Score}_{\text{Council}} < 70 \text{ con prescrizioni di deroga} \\
+\text{REJECTED} & \text{se } \text{Score}_{\text{Council}} < 50 \lor \text{Violazione vincoli mandati}
+\end{cases}
+$$
+
+---
+
+## 77. Decomposizione del Rischio Multi-Fattoriale MSCI Barra & Teorema di Eulero
+
+Il motore `core/msci_barra_risk_engine.py` implementa lo standard industriale istituzionale per la scomposizione del rischio di portafoglio su fattori macro e di stile (MSCI Barra model).
+
+### Modello Strutturale di Rischio Fattoriale
+La matrice di covarianza degli asset $\mathbf{\Sigma} \in \mathbb{R}^{N \times N}$ è fattorizzata nella forma:
+$$
+\mathbf{\Sigma} = \mathbf{X} \mathbf{F} \mathbf{X}^T + \mathbf{\Delta}
+$$
+dove:
+- $\mathbf{X} \in \mathbb{R}^{N \times K}$ è la matrice delle esposizioni fattoriali (*Factor Loadings*) per $K$ fattori di stile (Market/Beta, Value, Size, Momentum, Quality, Low Volatility).
+- $\mathbf{F} \in \mathbb{R}^{K \times K}$ è la matrice di covarianza tra i fattori di stile.
+- $\mathbf{\Delta} = \text{diag}(\delta_1^2, \delta_2^2, \dots, \delta_N^2)$ è la matrice diagonale delle varianze idiosincratiche/specifiche di ciascun asset.
+
+### Decomposizione Varianza di Portafoglio
+Dato il vettore dei pesi $\mathbf{w} \in \mathbb{R}^N$, la varianza totale di portafoglio $\sigma_p^2 = \mathbf{w}^T \mathbf{\Sigma} \mathbf{w}$ si decompone esattamente in:
+$$
+\sigma_p^2 = \underbrace{\mathbf{w}^T \mathbf{X} \mathbf{F} \mathbf{X}^T \mathbf{w}}_{\text{Varianza Sistematica Fattoriale}} + \underbrace{\mathbf{w}^T \mathbf{\Delta} \mathbf{w}}_{\text{Varianza Idiosincratica Specifica}}
+$$
+
+### Contribuzione Marginale e Percentuale al Rischio (Teorema di Eulero)
+Essendo la volatilità di portafoglio $\sigma_p = \sqrt{\mathbf{w}^T \mathbf{\Sigma} \mathbf{w}}$ una funzione omogenea di primo grado rispetto ai pesi $\mathbf{w}$, in virtù del **Teorema delle funzioni omogenee di Eulero**:
+$$
+\sigma_p = \sum_{i=1}^N w_i \frac{\partial \sigma_p}{\partial w_i}
+$$
+Definiamo il **Marginal Contribution to Risk** ($\text{MCTR}_i$) del titolo $i$:
+$$
+\text{MCTR}_i = \frac{\partial \sigma_p}{\partial w_i} = \frac{(\mathbf{\Sigma} \mathbf{w})_i}{\sigma_p}
+$$
+e il **Percentage Contribution to Risk** ($\text{PCTR}_i$):
+$$
+\text{PCTR}_i = \frac{w_i \cdot \text{MCTR}_i}{\sigma_p} = \frac{w_i (\mathbf{\Sigma} \mathbf{w})_i}{\sigma_p^2}
+$$
+con la proprietà esatta di conservazione al 100%:
+$$
+\sum_{i=1}^N \text{PCTR}_i = 100.0\%
+$$
+
+### Scomposizione Fattoriale del Rischio (Factor PCTR)
+L'esposizione aggregata di portafoglio al fattore $k$-esimo è $b_k = (\mathbf{X}^T \mathbf{w})_k$. Il contributo percentuale al rischio del fattore $k$ è dato da:
+$$
+\text{PCTR}_k^{\text{Factor}} = \frac{b_k \cdot (\mathbf{F} \mathbf{b})_k}{\sigma_p^2}
+$$
+la cui somma su tutti i $K$ fattori eguaglia esattamente la quota percentuale di rischio sistemico:
+$$
+\sum_{k=1}^K \text{PCTR}_k^{\text{Factor}} = \frac{\mathbf{w}^T \mathbf{X} \mathbf{F} \mathbf{X}^T \mathbf{w}}{\sigma_p^2} = \% \text{ Factor Variance}
+$$
+
+### Active Style Factor Tilts
+Le esposizioni attive di stile rispetto al benchmark prescelto $\mathbf{w}_{\text{bench}}$ sono calcolate come:
+$$
+\mathbf{\theta}_{\text{active}} = \mathbf{X}^T (\mathbf{w} - \mathbf{w}_{\text{bench}})
+$$
+e rappresentate tramite grafici a radar nella dashboard quantitativa.
+
+---
+
+## 78. Lifetime Total Balance Sheet Monte Carlo Simulator & Fragility Analysis
+
+Il motore `core/wealth/tbs_monte_carlo.py` esegue simulazioni stocastiche vettorializzate su 5.000 traiettorie annuali per l'intero arco temporale vitale dell'investitore ($t \in [0, T_{\max}]$, con $T_{\max} = 95 - \text{Current Age}$).
+
+### Equazioni Differenziali Stocastiche Multi-Asset
+Ad ogni passo temporale annuale $\Delta t = 1$, il portafoglio finanziario liquido e il valore immobiliare evolvono secondo moti browniani geometrici correlati:
+$$
+S_{t+1} = S_t \cdot \exp\left( (\mu_p - \frac{1}{2}\sigma_p^2) \Delta t + \sigma_p \sqrt{\Delta t} Z_{1, t} \right) + \text{Savings}_t - \text{Withdrawals}_t
+$$
+$$
+RE_{t+1} = RE_t \cdot \exp\left( (\mu_{RE} - \frac{1}{2}\sigma_{RE}^2) \Delta t + \sigma_{RE} \sqrt{\Delta t} Z_{2, t} \right)
+$$
+dove $Z_{1, t}$ e $Z_{2, t}$ sono variabili normali standard correlate con coefficiente $\rho_{\text{liq}, RE}$.
+
+### Evoluzione del Capitale Umano e Ammortamento del Debito
+- Fino al pensionamento ($t < T_{\text{retire}}$):
+  $$
+  HC_t = \sum_{s=t+1}^{T_{\text{retire}}} \frac{Y_t (1+g)^{s-t} \cdot (1 - \pi_{\text{unemp}})^{s-t}}{\prod_{u=t+1}^s (1 + y(u))} \cdot \xi_t
+  $$
+  dove $\xi_t \sim \text{Lognormal}(0, \sigma_{HC}^2)$ introduce shock stocastici di reddito.
+- Al pensionamento ($t \ge T_{\text{retire}}$), $HC_t = 0$ e inizia il regime di decumulazione pensionistica con spesa parametrata all'inflazione.
+- Il debito residuo $D_t$ decresce secondo il piano di ammortamento alla francese a tasso fisso o variabile stressato.
+
+### Metriche di Rovina e Corridoio di Spesa Sostenibile
+1. **Lifetime Ruin Probability**:
+   $$
+   P_{\text{ruin}} = P\left( \exists t \in [0, T_{\max}] : \text{TBS Net Worth}_t \le 0 \right)
+   $$
+2. **Punto di Massima Fragilità**:
+   $$
+   t^* = \arg\min_t \left( \text{Percentile}_{10}(\text{Liquid Wealth}_t) \right)
+   $$
+   in genere situato nei primi 3-5 anni successivi al pensionamento a causa del *Sequence of Returns Risk*.
+3. **Safe Spending Corridor (95% Confidence)**:
+   La massima spesa annuale prelevabile $C_t^*$ tale per cui la probabilità di sopravvivenza del patrimonio rimanga $\ge 95\%$:
+   $$
+   C_t^* = \max \left\{ C : P(\text{TBS}_T > 0 \mid \text{Withdrawal}=C) \ge 0.95 \right\}
+   $$
+
+---
+
+## 79. Riferimenti Bibliografici & Standard Istituzionali
 
 1. **Almgren, R., & Chriss, N. (2000)**. *Optimal execution of portfolio transactions*. Journal of Risk, 3(2), 5-40.
 2. **Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005)**. *Direct estimation of equity market impact*. Risk, 18(7), 58-62.
 3. **Bangia, A., Diebold, F. X., Schuermann, T., & Stroughair, J. D. (1999)**. *Modeling Liquidity Risk, With Implications for Traditional Market Risk Measurement and Management*. Working Paper, Financial Institutions Center, The Wharton School.
 4. **Blanchett, D. (2014)**. *Exploring the Retirement Consumption Puzzle*. Journal of Financial Planning, 27(5), 34-42.
-5. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
-6. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
-7. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
-8. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
-9. **Damodaran, A. (2012)**. *Investment Valuation: Tools and Techniques for Determining the Value of Any Asset*. John Wiley & Sons.
-10. **Guyton, J. T., & Klinger, W. J. (2006)**. *Decision rules and maximum initial withdrawal rates for college-educated retirees*. Journal of Financial Planning, 19(10), 48-58.
-11. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
-12. **Ho, T. S., & Mudryk, S. (2005)**. *Key Rate Duration: A Modern Approach to Yield Curve Risk Management*. Fixed Income Valuation and Risk, 12(3), 45-62.
-13. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
-14. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
-15. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
-16. **Nelson, C. R., & Siegel, A. F. (1987)**. *Parsimonious Modeling of Yield Curves*. The Journal of Business, 60(4), 473-489.
-17. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
-18. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
-19. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+5. **Bodie, Z., Treussard, J., & Willen, P. (2007)**. *The Theory of Life-Cycle Saving and Investing*. Public Policy Discussion Paper, Federal Reserve Bank of Boston.
+6. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
+7. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
+8. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
+9. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
+10. **Damodaran, A. (2012)**. *Investment Valuation: Tools and Techniques for Determining the Value of Any Asset*. John Wiley & Sons.
+11. **Euler, L. (1736)**. *Institutiones Calculi Differentialis* (Homogeneous functions and Euler's decomposition theorem).
+12. **FIX Trading Community (2006)**. *FIX Protocol Specification Version 4.4 with Errata*.
+13. **Guyton, J. T., & Klinger, W. J. (2006)**. *Decision rules and maximum initial withdrawal rates for college-educated retirees*. Journal of Financial Planning, 19(10), 48-58.
+14. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
+15. **Ho, T. S., & Mudryk, S. (2005)**. *Key Rate Duration: A Modern Approach to Yield Curve Risk Management*. Fixed Income Valuation and Risk, 12(3), 45-62.
+16. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
+17. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
+18. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
+19. **Merton, R. C. (1971)**. *Optimum consumption and portfolio rules in a continuous-time model*. Journal of Economic Theory, 3(4), 373-413.
+20. **MSCI Barra (2011)**. *Barra Equity Risk Model Handbook & Factor Risk Decomposition*. MSCI Research.
+21. **Nelson, C. R., & Siegel, A. F. (1987)**. *Parsimonious Modeling of Yield Curves*. The Journal of Business, 60(4), 473-489.
+22. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
+23. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
+24. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+
 
 
