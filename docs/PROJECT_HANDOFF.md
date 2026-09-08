@@ -1,4 +1,4 @@
-# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.0.0 Enterprise Release)
+# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.1.0 Enterprise Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.0.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.1.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Data Quality Gate (Pydantic v2), Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), Backup Engine, Security Vault, AI Analyst (Dual-Engine LLM/NLG con Guardrails MiFID II / Art. 21 TUF), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML/Parquet, Plotly Institutional Framework e Design System.
@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **461 test automatizzati (100% passed)** su 84 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **466 test automatizzati (100% passed)** su 86 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -46,6 +46,8 @@ Persistenza Dati & Continuità Operativa:
 Computational Core:
  ├── core/universal_ledger.py  ──► Vectorized Transaction Ledger & WACP FIFO Cost Basis
  ├── core/wealth/human_capital_engine.py ──► Human Capital Actuarial Valuation, TBS-VaR & Debt Stress
+ ├── core/wealth/tbs_monte_carlo.py      ──► Total Balance Sheet Lifetime Solvency Monte Carlo Engine
+ ├── core/msci_barra_risk_engine.py      ──► Asset-Level Factor Risk Decomposition (MSCI Barra GEM3/USE4)
  ├── core/prescriptive_rebalancer.py     ──► Conic/SLSQP Multi-Objective Rebalancer & FIX 4.4 Order Blotter
  ├── core/risk_engine.py       ──► FIFO Engine, Cornish-Fisher CVaR, Euler VaR, L-VaR Bangia, Almgren-Chriss
  ├── core/advanced_quant.py    ──► Tail Copulas, Kelly Criterion, ERC, Liquidity-Adjusted VaR (L-VaR)
