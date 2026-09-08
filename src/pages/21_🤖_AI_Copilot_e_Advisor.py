@@ -601,6 +601,148 @@ with tab_life:
 
         if new_runway < 6.0:
             st.error(f"⚠️ **Attenzione**: Questa operazione ridurrebbe il tuo Fondo Emergenza a **{new_runway} mesi**, portandolo al di sotto della soglia di sicurezza consigliata (6 mesi).")
+
+    st.divider()
+    st.markdown("### 🏛️ Total Balance Sheet Lifetime Solvency & Ruin Simulator (TBS-MC)")
+    st.caption("Simulatore stocastico Monte Carlo a ciclo di vita (fino a 90 anni). Mappa l'evoluzione correlata del Portafoglio Liquido, Capitale Umano, Valore Immobiliare e Mutuo per stimare la Probabilità di Rovina e l'Età di Massima Fragilità.")
+
+    from core.wealth.tbs_monte_carlo import TBSLifecycleConfig, TBSMonteCarloEngine
+
+    c_mc1, c_mc2, c_mc3 = st.columns([1.1, 1.1, 1.1])
+    with c_mc1:
+        st.markdown("##### 👤 Parametri Ciclo di Vita")
+        mc_cur_age = st.slider("Età Attuale:", 20, 60, 35, key="p21_mc_age")
+        mc_ret_age = st.slider("Età Pensionamento Target:", 55, 75, 67, key="p21_mc_ret")
+        mc_term_age = st.slider("Orizzonte di Vita Finale:", 75, 100, 90, key="p21_mc_term")
+    with c_mc2:
+        st.markdown("##### 💶 Flussi Redditizi & Spese")
+        mc_inc = st.number_input("Reddito Netto Annuo (€):", 15000.0, 500000.0, 55000.0, 5000.0, key="p21_mc_inc")
+        mc_exp = st.number_input("Spese Annue di Sostentamento (€):", 10000.0, 300000.0, 28000.0, 2000.0, key="p21_mc_exp")
+        mc_rep = st.slider("Tasso di Sostituzione Pensione (%):", 40, 90, 70, key="p21_mc_rep") / 100.0
+    with c_mc3:
+        st.markdown("##### 📈 Rendimenti & Volatilità Reale")
+        mc_ret_mean = st.slider("Rendimento Reale Portafoglio (%/anno):", 1.0, 9.0, 4.5, 0.25, key="p21_mc_ret_mean") / 100.0
+        mc_vol = st.slider("Volatilità Annua Portafoglio (%):", 5.0, 30.0, 15.0, 1.0, key="p21_mc_vol") / 100.0
+        mc_re_apprec = st.slider("Apprezzamento Reale Immobili (%/anno):", 0.0, 4.0, 1.0, 0.25, key="p21_mc_re_apprec") / 100.0
+
+    init_liq = max(10000.0, float(getattr(nw, "liquid_cash", 120000.0) + getattr(nw, "financial_investments", 0.0)))
+    init_re = max(0.0, float(getattr(nw, "real_estate_total", 320000.0)))
+    init_debt = max(0.0, float(getattr(nw, "total_liabilities", 130000.0)))
+
+    mc_cfg = TBSLifecycleConfig(
+        current_age=int(mc_cur_age),
+        retirement_age=int(mc_ret_age),
+        terminal_age=int(mc_term_age),
+        current_annual_net_income=float(mc_inc),
+        annual_living_expenses=float(mc_exp),
+        pension_replacement_ratio=float(mc_rep),
+        initial_liquid_wealth=init_liq,
+        liquid_wealth_real_return_mean=float(mc_ret_mean),
+        liquid_wealth_volatility=float(mc_vol),
+        initial_real_estate_value=init_re,
+        real_estate_real_appreciation=float(mc_re_apprec),
+        initial_mortgage_debt=init_debt,
+        num_simulations=1500
+    )
+
+    tbs_mc_eng = TBSMonteCarloEngine(mc_cfg)
+    mc_res = tbs_mc_eng.simulate_lifetime_solvency()
+
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+
+    mk1, mk2, mk3, mk4 = st.columns(4)
+    with mk1:
+        r_pct = mc_res["total_ruin_probability_pct"]
+        r_col = "normal" if r_pct <= 5.0 else ("off" if r_pct <= 15.0 else "inverse")
+        metric_card("Probabilità di Rovina a Vita", f"{r_pct:.1f}%", delta="P(Liquidità <= 0€)", delta_color=r_col, help_text="Percentuale di cammini stocastici in cui la liquidità si esaurisce prima dell'età terminale.")
+    with mk2:
+        metric_card("Età di Massima Fragilità", f"Età: {mc_res['point_of_maximum_fragility_age']} Anni", delta="Picco Vulnerabilità Solvibilità", delta_color="normal")
+    with mk3:
+        metric_card("Patrimonio Netto Terminale (P50)", fmt_eur(mc_res["median_terminal_net_worth_eur"]), delta=f"Valore a {mc_term_age} anni", delta_color="normal")
+    with mk4:
+        metric_card("Spesa Sostenibile Raccomandata", fmt_eur(mc_res["recommended_annual_spending_eur"]), delta="Max Tetto Spesa / Anno (95% Conf)", delta_color="normal" if not mc_res["spending_adjustment_needed"] else "inverse")
+
+    if mc_res["spending_adjustment_needed"]:
+        st.warning(f"⚠️ **Rischio di Sovraspesa Rilevato:** La probabilità di rovina patrimoniale ({r_pct:.1f}%) supera la soglia di tolleranza prudenziale (5.0%). Si raccomanda di contenere la spesa annuale a **{fmt_eur(mc_res['recommended_annual_spending_eur'])}** (risparmio annuo suggerito: {fmt_eur(mc_res['recommended_spending_cut_eur'])}).")
+    else:
+        st.success(f"✅ **Piano di Solvibilità Sostenibile:** Il piano di vita presenta un margine di sicurezza eccellente (probabilità di rovina {r_pct:.1f}% &le; 5.0%).")
+
+    df_tl = mc_res["timeline_df"]
+    fig_fan = go.Figure()
+
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["age"],
+        y=df_tl["net_worth_p90"],
+        mode='lines',
+        line=dict(color='rgba(56, 189, 248, 0.05)'),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["age"],
+        y=df_tl["net_worth_p10"],
+        mode='lines',
+        line=dict(color='rgba(56, 189, 248, 0.05)'),
+        fill='tonexty',
+        fillcolor='rgba(56, 189, 248, 0.12)',
+        name='Cono 80% (P10 - P90)',
+        hoverinfo='skip'
+    ))
+
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["age"],
+        y=df_tl["net_worth_p75"],
+        mode='lines',
+        line=dict(color='rgba(56, 189, 248, 0.1)'),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["age"],
+        y=df_tl["net_worth_p25"],
+        mode='lines',
+        line=dict(color='rgba(56, 189, 248, 0.1)'),
+        fill='tonexty',
+        fillcolor='rgba(56, 189, 248, 0.22)',
+        name='Intervallo Interquartile (P25 - P75)',
+        hoverinfo='skip'
+    ))
+
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["age"],
+        y=df_tl["net_worth_p50"],
+        mode='lines+markers',
+        line=dict(color='#38bdf8', width=3),
+        marker=dict(size=4),
+        name='Patrimonio Netto Mediano (P50)',
+        hovertemplate='<b>Età: %{x} anni</b><br>Patrimonio Mediano: € %{y:,.0f}<extra></extra>'
+    ))
+
+    fig_fan.add_trace(go.Scatter(
+        x=df_tl["age"],
+        y=df_tl["liquid_wealth_median"],
+        mode='lines',
+        line=dict(color='#34d399', width=2, dash='dot'),
+        name='Liquidità Mediana Disponibile',
+        hovertemplate='<b>Età: %{x} anni</b><br>Liquidità: € %{y:,.0f}<extra></extra>'
+    ))
+
+    fig_fan.add_hline(y=0, line_dash="dash", line_color="#ef4444", annotation_text="Soglia Rovina (0€)", annotation_position="bottom right")
+
+    fig_fan.update_layout(
+        title="Proiezione Monte Carlo a Ciclo di Vita: Fan Chart del Patrimonio Netto Olistico (€)",
+        template="plotly_dark",
+        height=420,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis=dict(title="Patrimonio Netto Reale (€)", gridcolor="rgba(255,255,255,0.06)", tickprefix="€ "),
+        xaxis=dict(title="Età dell'Investitore (Anni)", gridcolor="rgba(255,255,255,0.06)"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    apply_plotly_theme(fig_fan)
+    st.plotly_chart(fig_fan, use_container_width=True)
+
 with tab_review:
     st.markdown("### 📑 AI Executive Quarterly Review (NLG & Client Commentary)")
     st.caption("Genera una relazione esecutiva trimestrale istituzionale in linguaggio naturale, pronta per la consultazione del Family Office o per presentazioni a clienti.")

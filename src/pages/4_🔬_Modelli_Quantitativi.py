@@ -4080,6 +4080,151 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
         else:
             st.info(fq_res.get("message", "Dati non sufficienti per calcolare il backtest a quintili."))
 
+        st.divider()
+
+        # ── SEZIONE MSCI BARRA ASSET-LEVEL FACTOR RISK DECOMPOSITION (GEM3/USE4) ──
+        st.markdown("### 🏛️ Decomposizione del Rischio Multi-Fattoriale MSCI Barra (GEM3/USE4)")
+        st.caption("Standard Tier-1 (BlackRock Aladdin / MSCI Barra): scomposizione analitica della matrice di covarianza &Sigma; = X F X<sup>T</sup> + &Delta; tra Rischio Sistemico Fattoriale e Rischio Idiosincratico Residuo, con Marginal Risk Contribution (MCTR) e Percent Risk Contribution (PCTR) conformi al Teorema di Eulero.")
+
+        from core.msci_barra_risk_engine import (
+            BarraMultiAssetRiskEngine,
+            AssetFactorProfile,
+            STYLE_FACTORS,
+            GICS_SECTORS
+        )
+
+        barra_eng = BarraMultiAssetRiskEngine()
+        barra_profiles = []
+
+        if not pos.empty and "ticker" in pos.columns:
+            sub_pos = pos.copy()
+            if "qty_net" in sub_pos.columns:
+                sub_pos = sub_pos[sub_pos["qty_net"] > 1e-6]
+            tot_val = sub_pos["current_value"].sum() if "current_value" in sub_pos.columns and sub_pos["current_value"].sum() > 0 else 1.0
+
+            for _, row_a in sub_pos.iterrows():
+                tk = str(row_a["ticker"])
+                if tk.endswith("=X"):
+                    continue
+                c_val = float(row_a.get("current_value", 10000.0))
+                w_a = c_val / tot_val if tot_val > 0 else 1.0 / len(sub_pos)
+                name_a = str(row_a.get("name", tk))
+                barra_profiles.append(
+                    barra_eng.estimate_default_exposures_for_ticker(tk, name=name_a, weight=w_a, current_value=c_val)
+                )
+
+        if len(barra_profiles) < 2:
+            barra_profiles = [
+                barra_eng.estimate_default_exposures_for_ticker("CSPX.MI", name="iShares Core S&P 500", weight=0.40, current_value=40000.0),
+                barra_eng.estimate_default_exposures_for_ticker("MEUD.PA", name="Amundi Stoxx Europe 600", weight=0.25, current_value=25000.0),
+                barra_eng.estimate_default_exposures_for_ticker("BTP-10Y", name="BTP Benchmark 10Y", weight=0.20, current_value=20000.0),
+                barra_eng.estimate_default_exposures_for_ticker("XOM", name="ExxonMobil Energy", weight=0.10, current_value=10000.0),
+                barra_eng.estimate_default_exposures_for_ticker("JNJ", name="Johnson & Johnson", weight=0.05, current_value=5000.0)
+            ]
+
+        barra_res = barra_eng.decompose_portfolio_factor_risk(barra_profiles)
+
+        bm1, bm2, bm3, bm4 = st.columns(4)
+        with bm1:
+            metric_card("Volatilità Totale Annua", f"{barra_res['volatility_total_annual']*100:.2f}%", delta="Rischio Complessivo", delta_color="normal")
+        with bm2:
+            metric_card("Rischio Fattoriale Sistemico", f"{barra_res['volatility_factor_annual']*100:.2f}%", delta=f"{barra_res['factor_risk_contribution_pct']:.1f}% della Varianza", delta_color="normal")
+        with bm3:
+            metric_card("Rischio Specifico / Idiosincratico", f"{barra_res['volatility_specific_annual']*100:.2f}%", delta=f"{barra_res['specific_risk_contribution_pct']:.1f}% della Varianza", delta_color="normal")
+        with bm4:
+            metric_card("Verifica Somma Eulero", f"{barra_res['euler_sum_pctr']:.1f}%", delta="&Sigma; PCTR = 100.0% Exact", delta_color="normal")
+
+        st.markdown("<div style='margin-top: 12px;'></div>", unsafe_allow_html=True)
+
+        c_radar, c_bar = st.columns([1.1, 1.25])
+        with c_radar:
+            st.markdown("##### 🕸️ Active Factor Tilts vs Benchmark (Radar)")
+            # Radar chart of style & macro factor bets
+            tilts = barra_res["active_style_tilts"]
+            r_factors = list(tilts.keys())
+            r_vals = [tilts[f] for f in r_factors]
+            # Close radar loop
+            r_factors_loop = r_factors + [r_factors[0]]
+            r_vals_loop = r_vals + [r_vals[0]]
+
+            fig_radar = go.Figure()
+            fig_radar.add_trace(go.Scatterpolar(
+                r=r_vals_loop,
+                theta=r_factors_loop,
+                fill='toself',
+                name='Portafoglio Attuale',
+                line=dict(color='#38bdf8', width=2),
+                fillcolor='rgba(56, 189, 248, 0.25)'
+            ))
+            fig_radar.add_trace(go.Scatterpolar(
+                r=[0.0] * len(r_factors_loop),
+                theta=r_factors_loop,
+                name='Benchmark Neutro (MSCI World)',
+                line=dict(color='#8b949e', width=1, dash='dash')
+            ))
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(visible=True, range=[-1.5, 2.5], gridcolor='rgba(255,255,255,0.1)'),
+                    angularaxis=dict(gridcolor='rgba(255,255,255,0.1)')
+                ),
+                template="plotly_dark",
+                height=350,
+                margin=dict(l=30, r=30, t=30, b=30),
+                paper_bgcolor="rgba(0,0,0,0)",
+                legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5)
+            )
+            apply_plotly_theme(fig_radar)
+            st.plotly_chart(fig_radar, use_container_width=True)
+
+        with c_bar:
+            st.markdown("##### 📊 Scomposizione Rischio per Fattore (Factor PCTR %)")
+            df_f = barra_res["factor_attribution_df"].head(10).copy()
+            fig_f_bar = go.Figure(go.Bar(
+                x=df_f["factor_pctr"],
+                y=df_f["factor_name"],
+                orientation='h',
+                marker=dict(
+                    color=df_f["factor_pctr"].apply(lambda v: '#34d399' if v >= 0 else '#f87171')
+                ),
+                text=df_f["factor_pctr"].apply(lambda v: f"{v:+.1f}%"),
+                textposition='outside'
+            ))
+            fig_f_bar.update_layout(
+                template="plotly_dark",
+                height=350,
+                margin=dict(l=20, r=40, t=20, b=20),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                xaxis=dict(title="% Contributo al Rischio Totale (PCTR)", gridcolor="rgba(255,255,255,0.06)"),
+                yaxis=dict(autorange="reversed")
+            )
+            apply_plotly_theme(fig_f_bar)
+            st.plotly_chart(fig_f_bar, use_container_width=True)
+
+        st.markdown("##### 📋 Contributo di Rischio Marginale (MCTR) e Percentuale (PCTR) per Posizione")
+        df_a_disp = barra_res["asset_risk_df"].copy()
+        st.dataframe(
+            df_a_disp.rename(columns={
+                "ticker": "Ticker",
+                "asset_name": "Strumento",
+                "weight_pct": "Peso (%)",
+                "mctr": "MCTR",
+                "pctr_total": "PCTR Totale (%)",
+                "pctr_factor": "PCTR Fattoriale (%)",
+                "pctr_specific": "PCTR Specifico (%)",
+                "specific_vol_annual": "Vol Idiosincratica"
+            }).style.format({
+                "Peso (%)": "{:.2f}%",
+                "MCTR": "{:.4f}",
+                "PCTR Totale (%)": "{:.2f}%",
+                "PCTR Fattoriale (%)": "{:.2f}%",
+                "PCTR Specifico (%)": "{:.2f}%",
+                "Vol Idiosincratica": "{:.2%}"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
 # ── TAB 6: FIXED INCOME, YTM & Z-SPREAD (YAS) ──────────────────────
 elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
     col_fi_h1, col_fi_h2 = st.columns([3.0, 1.3])
