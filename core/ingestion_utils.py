@@ -46,13 +46,19 @@ def read_tabular_stream(
     elif isinstance(file_bytes_or_buffer, io.StringIO):
         decoded_text = file_bytes_or_buffer.getvalue()
     elif isinstance(file_bytes_or_buffer, str):
-        p = Path(file_bytes_or_buffer)
-        if p.exists() and p.is_file():
-            filename = filename or p.name
-            with open(p, "rb") as f:
-                raw_bytes = f.read()
-        else:
+        if "\n" in file_bytes_or_buffer or "\r" in file_bytes_or_buffer or len(file_bytes_or_buffer) > 250:
             decoded_text = file_bytes_or_buffer
+        else:
+            try:
+                p = Path(file_bytes_or_buffer)
+                if p.exists() and p.is_file():
+                    filename = filename or p.name
+                    with open(p, "rb") as f:
+                        raw_bytes = f.read()
+                else:
+                    decoded_text = file_bytes_or_buffer
+            except (OSError, ValueError):
+                decoded_text = file_bytes_or_buffer
     elif hasattr(file_bytes_or_buffer, "read"):
         content = file_bytes_or_buffer.read()
         if hasattr(file_bytes_or_buffer, "seek"):
