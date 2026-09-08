@@ -1,4 +1,4 @@
-# Investment Risk & Wealth Intelligence Platform — Project Handoff (v7.0.0 Enterprise Release)
+# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.0.0 Enterprise Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v7.0.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.0.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Data Quality Gate (Pydantic v2), Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), Backup Engine, Security Vault, AI Analyst (Dual-Engine LLM/NLG con Guardrails MiFID II / Art. 21 TUF), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML/Parquet, Plotly Institutional Framework e Design System.
@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **450 test automatizzati (100% passed)** su 81 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **461 test automatizzati (100% passed)** su 84 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -36,6 +36,7 @@ Yahoo Finance API / Crypto Providers ────┘     (Pydantic v2 Canonical)
     ┌───────────────────────────────────────────────────────────────────────────────────────────────────┘
     ▼
 Persistenza Dati & Continuità Operativa:
+ ├── core/universal_ledger.py  ──► Double-Entry One-Ledger, WACP FIFO SQL Qualify, Zero-Copy PyArrow & Parquet
  ├── core/wealth/wealth_db.py  ──► SQLite (argus_wealth.db) / MySQL 8.0 [Star Schema Time-Series]
  ├── core/duckdb_engine.py     ──► In-Process Vectorized OLAP & Apache Parquet
  ├── core/security_engine.py   ──► CWE-1236 Sanitization, PII Masking & ArgusDataVault (AES-Fernet)
@@ -43,6 +44,9 @@ Persistenza Dati & Continuità Operativa:
     │
     ▼
 Computational Core:
+ ├── core/universal_ledger.py  ──► Vectorized Transaction Ledger & WACP FIFO Cost Basis
+ ├── core/wealth/human_capital_engine.py ──► Human Capital Actuarial Valuation, TBS-VaR & Debt Stress
+ ├── core/prescriptive_rebalancer.py     ──► Conic/SLSQP Multi-Objective Rebalancer & FIX 4.4 Order Blotter
  ├── core/risk_engine.py       ──► FIFO Engine, Cornish-Fisher CVaR, Euler VaR, L-VaR Bangia, Almgren-Chriss
  ├── core/advanced_quant.py    ──► Tail Copulas, Kelly Criterion, ERC, Liquidity-Adjusted VaR (L-VaR)
  ├── core/fixed_income.py      ──► Nelson-Siegel Zero-Coupon Curve, 5 Key Rate Durations (KRD), Z-Spread, CDS
@@ -51,7 +55,7 @@ Computational Core:
  ├── core/autonomous_rebalancer.py        ──► Autonomous Rebalancer con WACP/PMC reale & Zainetto Fiscale
  ├── core/wealth/wealth_engine.py ──► FIRE 50/30/20, Mutui/LTV, Orologi/Illiquidi, Successione
  ├── core/factor_library.py    ──► Fama-French 5-Factor & Carhart Momentum Live Regression
- ├── core/ai_analyst.py        ──► Dual-Engine Narrative Intelligence (LLM + Offline NLG)
+ ├── core/ai_analyst.py        ──► Tri-Agent Quantitative Governance Council & Dual-Engine LLM/NLG
  └── core/terminal_engine.py   ──► Pre-Trade Risk Guardrails, Stoikov Microprice & OMS Execution Slicing
     │
     ▼

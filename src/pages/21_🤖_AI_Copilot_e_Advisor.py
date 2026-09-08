@@ -147,9 +147,10 @@ with k4:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_diag, tab_rebal, tab_life, tab_review, tab_chat, tab_voice = st.tabs([
+tab_diag, tab_rebal, tab_council, tab_life, tab_review, tab_chat, tab_voice = st.tabs([
     "🔍 Diagnostica & Colli di Bottiglia",
     "⚖️ Motore di Ribilanciamento Target",
+    "🏛️ Tri-Agent Governance & Conic Rebalancer",
     "🔮 Life Event & Decision Simulator",
     "📑 Executive Quarterly Review (NLG)",
     "💬 Assistente Finanziario Diretto",
@@ -269,6 +270,280 @@ with tab_rebal:
         if all(d["action_type"] == "HOLD" for d in watchdog_res.get("drift_table", [])):
             st.success("✅ Portafoglio perfettamente allineato! Nessun ordine di ribilanciamento richiesto.")
 
+with tab_council:
+    st.markdown("### 🏛️ Tri-Agent Quantitative Governance Council & Prescriptive Conic Rebalancer")
+    st.caption("Comitato di investimento multi-agente autonomo (Tier-1 Institutional standard: BlackRock Aladdin & Bloomberg AIM). Ottimizzazione convessa vincolata su Tracking Error, Minusvalenze e Slippage Almgren-Chriss.")
+
+    from core.prescriptive_rebalancer import (
+        PositionLot,
+        TaxWalletState,
+        RebalanceConstraints,
+        PrescriptiveConicRebalancer
+    )
+    from core.ai_analyst import TriAgentQuantitativeGovernance
+
+    col_cfg1, col_cfg2, col_cfg3 = st.columns([1.2, 1.2, 1.2])
+    with col_cfg1:
+        st.markdown("##### 💼 Zainetto Fiscale & Tassazione")
+        minus_eur = st.number_input(
+            "Minusvalenze Pregresse Disponibili (€):",
+            min_value=0.0,
+            max_value=500000.0,
+            value=3200.0,
+            step=500.0,
+            key="p21_minus_input"
+        )
+        tax_rate_sel = st.selectbox(
+            "Regime Fiscale Ordinario:",
+            options=["Italiano TUIR (26% Azioni / 12.5% Titoli di Stato)", "Flat Tax 26%", "Esenzione Istituzionale (0%)"],
+            index=0,
+            key="p21_tax_sel"
+        )
+    with col_cfg2:
+        st.markdown("##### 💧 Liquidità & Riserva Minima")
+        cash_avail_eur = st.number_input(
+            "Liquidità Libera Disponibile sul Conto (€):",
+            min_value=0.0,
+            max_value=1000000.0,
+            value=15000.0,
+            step=1000.0,
+            key="p21_cash_avail"
+        )
+        min_cash_buf = st.number_input(
+            "Buffer di Cassa Indispensabile (€):",
+            min_value=500.0,
+            max_value=100000.0,
+            value=3000.0,
+            step=500.0,
+            key="p21_min_cash"
+        )
+    with col_cfg3:
+        st.markdown("##### ⚙️ Vincoli di Ribilanciamento")
+        max_turnover_lim = st.slider(
+            "Limite Massimo di Turnover (%):",
+            min_value=10.0,
+            max_value=100.0,
+            value=45.0,
+            step=5.0,
+            key="p21_turnover_lim"
+        )
+        max_asset_w = st.slider(
+            "Tetto Massimo Singolo Titolo (%):",
+            min_value=10.0,
+            max_value=60.0,
+            value=35.0,
+            step=5.0,
+            key="p21_max_w"
+        )
+
+    # Posizioni candidate
+    sample_lots = []
+    res_bundle = st.session_state.get("results", {})
+    pos_df = res_bundle.get("positions", pd.DataFrame()) if isinstance(res_bundle, dict) else pd.DataFrame()
+
+    if not pos_df.empty and "ticker" in pos_df.columns and "current_value" in pos_df.columns:
+        for _, r in pos_df.iterrows():
+            tkr = str(r["ticker"])
+            px = float(r.get("price", r.get("current_price", 100.0)))
+            val = float(r["current_value"])
+            sh = float(r.get("shares", val / max(px, 1.0)))
+            pmc_val = float(r.get("pmc", px * 0.92))
+            ac = "Bond_Gov" if "BTP" in tkr or "T-BOND" in tkr else "Equity"
+            sample_lots.append(PositionLot(
+                ticker=tkr,
+                shares=sh,
+                current_price=px,
+                pmc=pmc_val,
+                asset_class=ac,
+                adv_eur=10_000_000.0,
+                bid_ask_spread_bps=4.0
+            ))
+
+    if not sample_lots:
+        sample_lots = [
+            PositionLot(ticker="CSPX.MI", shares=80, current_price=540.0, pmc=460.0, asset_class="Equity", adv_eur=35_000_000.0, bid_ask_spread_bps=3.0),
+            PositionLot(ticker="MEUD.PA", shares=250, current_price=175.0, pmc=160.0, asset_class="Equity", adv_eur=20_000_000.0, bid_ask_spread_bps=4.0),
+            PositionLot(ticker="BTP-10Y.MI", shares=180, current_price=101.5, pmc=98.0, asset_class="Bond_Gov", adv_eur=50_000_000.0, bid_ask_spread_bps=2.5),
+            PositionLot(ticker="EMIM.AS", shares=350, current_price=32.0, pmc=34.5, asset_class="Equity", adv_eur=15_000_000.0, bid_ask_spread_bps=5.0),
+            PositionLot(ticker="XEON.MI", shares=70, current_price=142.0, pmc=140.0, asset_class="Bond_Corp", adv_eur=12_000_000.0, bid_ask_spread_bps=2.0)
+        ]
+
+    target_weights_map = {}
+    if "80/20" in target_model_sel:
+        target_weights_map = {"CSPX.MI": 0.50, "MEUD.PA": 0.20, "EMIM.AS": 0.10, "BTP-10Y.MI": 0.10, "XEON.MI": 0.05}
+    elif "All-Weather" in target_model_sel:
+        target_weights_map = {"CSPX.MI": 0.30, "MEUD.PA": 0.10, "BTP-10Y.MI": 0.40, "XEON.MI": 0.10, "EMIM.AS": 0.05}
+    else:
+        target_weights_map = {"CSPX.MI": 0.35, "MEUD.PA": 0.15, "EMIM.AS": 0.10, "BTP-10Y.MI": 0.25, "XEON.MI": 0.10}
+
+    for p in sample_lots:
+        if p.ticker not in target_weights_map:
+            target_weights_map[p.ticker] = 1.0 / len(sample_lots)
+
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    btn_exec_council = st.button("🚀 Esegui Ribilanciamento Prescrittivo Conico & Convocazione Tri-Agente", type="primary", use_container_width=True, key="btn_run_triagent_rebal")
+
+    if btn_exec_council or "triagent_last_results" in st.session_state:
+        if btn_exec_council:
+            tax_w = TaxWalletState(minusvalenze_available_eur=float(minus_eur))
+            rebal_eng = PrescriptiveConicRebalancer(tax_wallet=tax_w)
+            cons_obj = RebalanceConstraints(
+                min_cash_buffer_eur=float(min_cash_buf),
+                max_turnover_pct=float(max_turnover_lim),
+                max_single_weight=float(max_asset_w) / 100.0
+            )
+
+            reb_res = rebal_eng.optimize_rebalance(
+                positions=sample_lots,
+                target_weights=target_weights_map,
+                available_cash_eur=float(cash_avail_eur),
+                constraints=cons_obj
+            )
+
+            council = TriAgentQuantitativeGovernance()
+            gov_audit = council.audit_rebalance_plan(
+                portfolio_context={"portfolio_value_eur": reb_res["total_wealth_eur"]},
+                rebalance_results=reb_res
+            )
+
+            st.session_state["triagent_last_results"] = {
+                "reb_res": reb_res,
+                "gov_audit": gov_audit
+            }
+
+        cached = st.session_state.get("triagent_last_results")
+        if cached:
+            reb_res = cached["reb_res"]
+            gov_audit = cached["gov_audit"]
+
+            st.divider()
+
+            v_badge = gov_audit["consensus_badge"]
+            v_score = gov_audit["consensus_score"]
+            bg_col = "rgba(63, 185, 80, 0.15)" if "APPROVATO ALL'UNANIMITÀ" in v_badge else ("rgba(245, 158, 11, 0.15)" if "CONDIZIONATA" in v_badge else "rgba(239, 68, 68, 0.15)")
+            border_col = "#3fb950" if "APPROVATO ALL'UNANIMITÀ" in v_badge else ("#f59e0b" if "CONDIZIONATA" in v_badge else "#ef4444")
+
+            st.markdown(f"""
+            <div style="background: {bg_col}; border: 1px solid {border_col}66; border-left: 6px solid {border_col}; border-radius: 10px; padding: 16px 20px; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 800; color: #ffffff;">{v_badge}</div>
+                        <div style="font-size: 13px; color: #cbd5e1; margin-top: 4px;">Deliberazione collegiale del Comitato di Quantitative Governance MiFID II</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 26px; font-weight: 900; color: {border_col};">{v_score:.1f}</span>
+                        <span style="font-size: 14px; color: #94a3b8;">/ 100</span>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            ag_c1, ag_c2, ag_c3 = st.columns(3)
+            with ag_c1:
+                ra = gov_audit["agents"]["risk_auditor"]
+                ra_col = "#3fb950" if ra["verdict"] == "APPROVED" else "#f59e0b"
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid rgba(255,255,255,0.08); border-top: 4px solid {ra_col}; border-radius: 8px; padding: 12px 16px; height: 100%;">
+                    <b style="color: #38bdf8; font-size: 14px;">🛡️ {ra['name']}</b>
+                    <div style="display: flex; justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
+                        <span style="font-size: 11px; font-weight: 700; color: {ra_col}; background: {ra_col}22; padding: 2px 8px; border-radius: 6px;">{ra['verdict']}</span>
+                        <span style="font-size: 12px; font-weight: 700; color: #ffffff;">Score: {ra['score']:.0f}/100</span>
+                    </div>
+                    <div style="font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                        {'<br>'.join(['• ' + f for f in ra['findings']])}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with ag_c2:
+                ta = gov_audit["agents"]["tax_specialist"]
+                ta_col = "#3fb950" if ta["verdict"] == "APPROVED" else "#f59e0b"
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid rgba(255,255,255,0.08); border-top: 4px solid {ta_col}; border-radius: 8px; padding: 12px 16px; height: 100%;">
+                    <b style="color: #a855f7; font-size: 14px;">💼 {ta['name']}</b>
+                    <div style="display: flex; justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
+                        <span style="font-size: 11px; font-weight: 700; color: {ta_col}; background: {ta_col}22; padding: 2px 8px; border-radius: 6px;">{ta['verdict']}</span>
+                        <span style="font-size: 12px; font-weight: 700; color: #ffffff;">Score: {ta['score']:.0f}/100</span>
+                    </div>
+                    <div style="font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                        {'<br>'.join(['• ' + f for f in ta['findings']])}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with ag_c3:
+                ma = gov_audit["agents"]["macro_execution"]
+                ma_col = "#3fb950" if ma["verdict"] == "APPROVED" else "#f59e0b"
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.9); border: 1px solid rgba(255,255,255,0.08); border-top: 4px solid {ma_col}; border-radius: 8px; padding: 12px 16px; height: 100%;">
+                    <b style="color: #34d399; font-size: 14px;">⚡ {ma['name']}</b>
+                    <div style="display: flex; justify-content: space-between; margin-top: 6px; margin-bottom: 8px;">
+                        <span style="font-size: 11px; font-weight: 700; color: {ma_col}; background: {ma_col}22; padding: 2px 8px; border-radius: 6px;">{ma['verdict']}</span>
+                        <span style="font-size: 12px; font-weight: 700; color: #ffffff;">Score: {ma['score']:.0f}/100</span>
+                    </div>
+                    <div style="font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                        {'<br>'.join(['• ' + f for f in ma['findings']])}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.write("")
+            st.markdown("##### 📊 Metriche Sintetiche del Ribilanciamento")
+            rk1, rk2, rk3, rk4, rk5 = st.columns(5)
+            with rk1:
+                metric_card("Turnover Ottimizzato", f"{reb_res['turnover_pct']:.1f}%", delta="Inerzia Preservata", delta_color="normal")
+            with rk2:
+                metric_card("Minus Assorbite", fmt_eur(reb_res['total_minusvalenze_absorbed_eur']), delta="Compensazione Fiscale", delta_color="normal")
+            with rk3:
+                metric_card("Imposta Capital Gain", fmt_eur(reb_res['total_tax_due_eur']), delta="Tax Drag Effettivo", delta_color="normal" if reb_res['total_tax_due_eur'] == 0 else "inverse")
+            with rk4:
+                metric_card("Slippage Almgren-Chriss", fmt_eur(reb_res['total_market_impact_slippage_eur']), delta="Impatto di Mercato", delta_color="normal")
+            with rk5:
+                metric_card("Cassa Residua Stimata", fmt_eur(reb_res['projected_cash_after_eur']), delta="Buffer Liquido Post-Trade", delta_color="normal")
+
+            st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+            st.markdown("##### 📋 Blotter Ordini Prescrittivo (Execution Plan)")
+            if not reb_res["trades_df"].empty:
+                df_tr_disp = reb_res["trades_df"].copy()
+                st.dataframe(
+                    df_tr_disp[[
+                        "cl_ord_id", "ticker", "side", "shares", "market_price",
+                        "limit_price", "trade_eur", "minus_absorbed_eur", "tax_bill_eur", "slippage_eur"
+                    ]].rename(columns={
+                        "cl_ord_id": "Order ID",
+                        "ticker": "Ticker",
+                        "side": "Verso",
+                        "shares": "Quantità",
+                        "market_price": "Prezzo Mercato (€)",
+                        "limit_price": "Prezzo Limite (€)",
+                        "trade_eur": "Controvalore (€)",
+                        "minus_absorbed_eur": "Minus Assorbita (€)",
+                        "tax_bill_eur": "Imposta (€)",
+                        "slippage_eur": "Slippage (€)"
+                    }).style.format({
+                        "Prezzo Mercato (€)": "€ {:,.2f}",
+                        "Prezzo Limite (€)": "€ {:,.2f}",
+                        "Controvalore (€)": "€ {:,.2f}",
+                        "Minus Assorbita (€)": "€ {:,.2f}",
+                        "Imposta (€)": "€ {:,.2f}",
+                        "Slippage (€)": "€ {:,.2f}"
+                    }),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("Nessuna compravendita necessaria: l'allocazione attuale è ottimale rispetto ai vincoli.")
+
+            with st.expander("📡 Visualizza Flusso Ordini Serializzato FIX Protocol 4.4 (Bloomberg AIM / OMS Ready)"):
+                st.code(reb_res["fix_blotter_raw"] or "Nessun ordine FIX generato.", language="text")
+
+            st.download_button(
+                label="📥 Esporta Verbale di Deliberazione Esecutiva MiFID II (.MD)",
+                data=gov_audit["signoff_memo"],
+                file_name=f"ARGUS_Governance_Council_Signoff_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
 
 with tab_life:
     st.markdown("### 🔮 Life Event & Decision Simulator")
