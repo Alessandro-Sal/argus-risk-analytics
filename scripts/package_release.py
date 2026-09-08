@@ -9,16 +9,25 @@ import sys
 import zipfile
 import re
 
-def create_secure_release_zip():
+def create_secure_release_zip(version: str = ""):
     project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     dist_dir = os.path.join(project_dir, "dist")
     os.makedirs(dist_dir, exist_ok=True)
     
-    zip_filename = "ARGUS_v6.0.0.zip"
+    if not version:
+        version = os.environ.get("ARGUS_VERSION", "")
+    if not version and len(sys.argv) > 1:
+        version = sys.argv[1]
+    if not version:
+        version = "v8.1.0"
+    if not version.startswith("v"):
+        version = f"v{version}"
+    
+    zip_filename = f"ARGUS_{version}.zip"
     zip_path = os.path.join(dist_dir, zip_filename)
     
     print("=" * 70)
-    print(" [ARGUS v6.0.0] Generazione Archivio Release ZIP con Audit di Sicurezza")
+    print(f" [ARGUS {version}] Generazione Archivio Release ZIP con Audit di Sicurezza")
     print("=" * 70)
     
     # Cartelle e file rigorosamente ESCLUSI
@@ -118,12 +127,12 @@ def create_secure_release_zip():
         
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for full_p, rel_p in files_to_zip:
-            archive_name = f"ARGUS_v6.0.0/{rel_p}"
+            archive_name = f"ARGUS_{version}/{rel_p}"
             zf.write(full_p, archive_name)
             
     zip_size_mb = os.path.getsize(zip_path) / (1024 * 1024)
     print("\n" + "=" * 70)
-    print(f" [OK] ARCHIVIO ZIP DELLA RELEASE V.6.0.0 CREATO CON SUCCESSO!")
+    print(f" [OK] ARCHIVIO ZIP DELLA RELEASE {version} CREATO CON SUCCESSO!")
     print(f"      Percorso:    {zip_path}")
     print(f"      Dimensione:  {zip_size_mb:.2f} MB")
     print(f"      File inclusi: {len(files_to_zip)}")
