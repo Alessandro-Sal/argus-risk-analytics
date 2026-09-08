@@ -108,6 +108,13 @@ STRESS_MODELS_CATALOG = {
         "badge_color": "#38bdf8",
         "category": "Simulazione What-If",
         "desc": "Configuratore interattivo di shock ipotetici: imposta variazioni arbitrarie su indici azionari, curva dei tassi d'interesse, spread creditizi e volatilità con calcolo istantaneo del P&L marginale."
+    },
+    "🌐 Total Balance Sheet & Human Capital Stress": {
+        "title": "Holistic Total Balance Sheet VaR & Stress Test Capitale Umano (MSCI Barra / BlackRock Aladdin)",
+        "badge": "TBS-VaR • Human Capital • Mutui",
+        "badge_color": "#a855f7",
+        "category": "Integrazione Olistica Wealth-Risk",
+        "desc": "Integrazione attuariale del Capitale Umano (quasi-equity/quasi-bond) con gli asset liquidi e illiquidi (Real Estate, Mutui a tasso variabile). Calcolo del Total Balance Sheet VaR (TBS-VaR 95%), Emergency Runway e sovraesposizione settoriale."
     }
 }
 
@@ -622,6 +629,254 @@ elif active_stress_tab == "🛠️ Simulatore What-if Custom":
         metric_card("Punto Peggiore sulla Superficie", fmt_eur(surface_data["worst_pnl_eur"]), positive=False, help_text="La massima perdita stimata sulla griglia di shock tassi x volatilità")
     with col_s2:
         metric_card("Punto Migliore sulla Superficie", fmt_eur(surface_data["best_pnl_eur"]), positive=True, help_text="Il massimo guadagno stimato sulla griglia di shock tassi x volatilità")
+
+# ── TAB 4: TOTAL BALANCE SHEET & HUMAN CAPITAL STRESS ─────────
+elif active_stress_tab == "🌐 Total Balance Sheet & Human Capital Stress":
+    col_tb1, col_tb2 = st.columns([3.2, 1.1])
+    with col_tb1:
+        st.markdown("#### 🌐 Total Balance Sheet & Human Capital Stress Testing")
+        st.caption("Modello olistico di classe BlackRock Aladdin: integra Capitale Umano (quasi-equity/quasi-bond), Real Estate e debito ipotecario con il portafoglio titoli.")
+    with col_tb2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("ℹ️ Guida al Total Balance Sheet VaR (TBS-VaR)", """
+<div style="font-size: 13.5px; line-height: 1.45;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #a855f7; margin-bottom: 3px;">📌 Cos'è il Total Balance Sheet VaR</div>
+  <div>Supera l'approccio miope del solo portafoglio finanziario. L'investitore reale possiede Capitale Umano (stipendi futuri scontati), immobili e mutui. Il TBS-VaR calcola la perdita potenziale aggregata considerando le correlazioni incrociate tra mercato azionario, settore professionale e mercato immobiliare.</div>
+</div>
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #a855f7; margin-bottom: 3px;">💼 Capitale Umano come Quasi-Equity vs Quasi-Bond</div>
+  <div>Se lavori nel settore Tech o Finanza, il tuo stipendio e i tuoi bonus sono correlati all'andamento del mercato azionario (alto Beta: Quasi-Equity). Se lavori nel settore pubblico o nella sanità, il tuo reddito è assimilabile a un BTP o Treasury indicizzato (Quasi-Bond).</div>
+</div>
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
+  <div style="font-weight: 700; color: #a855f7; margin-bottom: 3px;">⚠️ Correlazione Catastrofica (Income-Portfolio Shock)</div>
+  <div>Avere il 70% del portafoglio in titoli tecnologici lavorando in una Big Tech crea un rischio sistemico: un crollo settoriale mette a repentaglio contemporaneamente il capitale investito e la sicurezza del posto di lavoro.</div>
+</div>
+</div>
+""", button_label="💡 Come funziona il TBS-VaR?")
+
+    from core.wealth.human_capital_engine import (
+        LaborIncomeProfile,
+        TotalBalanceSheetState,
+        HolisticBalanceSheetEngine
+    )
+
+    SECTORS_META = {
+        "Tecnologia & Software (Big Tech, Start-up)": {"beta": 1.25, "sector": "Technology"},
+        "Servizi Finanziari & Investment Banking": {"beta": 1.15, "sector": "Financials"},
+        "Consumi Ciclici & Retail": {"beta": 0.85, "sector": "Consumer Cyclicals"},
+        "Manifattura Industriale & Automotive": {"beta": 0.90, "sector": "Industrials"},
+        "Sanità, Farmaceutico & Biotech": {"beta": 0.45, "sector": "Healthcare"},
+        "Pubblica Amministrazione, Istruzione & Difesa": {"beta": 0.08, "sector": "Public Sector"},
+        "Consulenza & Libera Professione": {"beta": 1.05, "sector": "Professional Services"}
+    }
+
+    c_inputs, c_outputs = st.columns([1.1, 2.1])
+
+    with c_inputs:
+        st.markdown("##### 👤 Profilo Professionale & Reddito")
+        selected_sector_label = st.selectbox(
+            "Settore Lavorativo:",
+            options=list(SECTORS_META.keys()),
+            index=0,
+            key="tbs_sector_sel"
+        )
+        sector_info = SECTORS_META[selected_sector_label]
+        
+        income_annual = st.number_input(
+            "Reddito Netto Annuo (€):",
+            min_value=10000.0,
+            max_value=1000000.0,
+            value=55000.0,
+            step=5000.0,
+            key="tbs_income_input"
+        )
+        years_retire = st.slider(
+            "Anni al Pensionamento:",
+            min_value=1,
+            max_value=45,
+            value=22,
+            key="tbs_years_retire"
+        )
+        growth_rate = st.slider(
+            "Crescita Reale Annua Stipendio (%):",
+            min_value=0.0,
+            max_value=6.0,
+            value=1.5,
+            step=0.25,
+            key="tbs_growth_rate"
+        ) / 100.0
+
+        st.markdown("##### 🏡 Patrimonio Illiquido & Debito")
+        re_val = st.number_input(
+            "Valore di Mercato Immobili (€):",
+            min_value=0.0,
+            max_value=5000000.0,
+            value=350000.0,
+            step=25000.0,
+            key="tbs_re_val"
+        )
+        mortgage_val = st.number_input(
+            "Debito Residuo Mutuo (€):",
+            min_value=0.0,
+            max_value=2000000.0,
+            value=130000.0,
+            step=10000.0,
+            key="tbs_mortgage_val"
+        )
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            is_var_rate = st.checkbox("Mutuo a Tasso Variabile", value=True, key="tbs_is_var")
+        with col_m2:
+            mortgage_dur = st.number_input("Duration Mutuo (anni):", min_value=1.0, max_value=30.0, value=7.5, step=0.5, key="tbs_mortgage_dur")
+
+        unavoidable_exp = st.number_input(
+            "Spese Indispensabili Annue (€):",
+            min_value=5000.0,
+            max_value=200000.0,
+            value=26000.0,
+            step=2000.0,
+            key="tbs_unavoidable_exp"
+        )
+
+    # Engine execution
+    lab_prof = LaborIncomeProfile(
+        current_annual_net_income=float(income_annual),
+        years_to_retirement=int(years_retire),
+        income_growth_rate=float(growth_rate),
+        industry_sector=sector_info["sector"],
+        sector_beta=sector_info["beta"]
+    )
+
+    liq_val = float(portfolio_value) if portfolio_value > 0 else 100000.0
+    w_vec = np.ones(1)
+    cov_mat = np.array([[0.0002]])
+    if not pos.empty and "current_value" in pos.columns and liq_val > 0:
+        w_vec = (pos["current_value"] / liq_val).to_numpy()
+        n_a = len(w_vec)
+        cov_mat = np.eye(n_a) * 0.00025
+
+    tbs_state = TotalBalanceSheetState(
+        liquid_portfolio_value=liq_val,
+        liquid_portfolio_weights=w_vec,
+        liquid_covariance_matrix=cov_mat,
+        real_estate_value=float(re_val),
+        real_estate_volatility=0.08,
+        real_estate_beta=0.25,
+        mortgage_debt_outstanding=float(mortgage_val),
+        mortgage_duration=float(mortgage_dur),
+        is_variable_rate=is_var_rate,
+        annual_unavoidable_expenses=float(unavoidable_exp),
+        labor_profile=lab_prof
+    )
+
+    holistic_eng = HolisticBalanceSheetEngine(risk_free_rate=0.03, equity_risk_premium=0.05)
+    tbs_res = holistic_eng.compute_total_balance_sheet_var(tbs_state, confidence=0.95, horizon_years=1.0)
+
+    with c_outputs:
+        st.markdown("##### 🏛️ Bilancio Patrimoniale Olistico Integrato (TBS KPIs)")
+        kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
+        with kpi_col1:
+            metric_card("Patrimonio Netto Totale", fmt_eur(tbs_res["total_net_worth_eur"]), delta="Attivi - Debito", delta_color="normal")
+        with kpi_col2:
+            metric_card("Valore Capitale Umano", fmt_eur(tbs_res["human_capital_pv_eur"]), delta=f"{years_retire} anni flusso attualizzato", delta_color="normal")
+        with kpi_col3:
+            metric_card("Volatilità Annua Attivo", f"{tbs_res['total_assets_annual_volatility']*100:.1f}%", delta="Rischio Olistico Blended", delta_color="inverse")
+
+        kpi2_col1, kpi2_col2, kpi2_col3 = st.columns(3)
+        with kpi2_col1:
+            metric_card("TBS-VaR 95% (1 Anno)", fmt_eur(tbs_res["tbs_var_eur"]), delta=f"{tbs_res['tbs_var_pct_net_worth']:.1f}% del Patrimonio", delta_color="inverse")
+        with kpi2_col2:
+            metric_card("TBS-CVaR 95% (Shortfall)", fmt_eur(tbs_res["tbs_cvar_eur"]), delta=f"{tbs_res['tbs_cvar_pct_net_worth']:.1f}% del Patrimonio", delta_color="inverse")
+        with kpi2_col3:
+            metric_card("Emergency Runway", f"{tbs_res['emergency_runway_months']:.1f} Mesi", delta="Autonomia di Cassa", delta_color="normal" if tbs_res['emergency_runway_months'] >= 6 else "inverse")
+
+        # Visualizzazione Waterfall del Bilancio
+        st.markdown("###### 📊 Scomposizione del Bilancio Patrimoniale Olistico (€)")
+        wf_measures = ["relative", "relative", "relative", "relative", "total"]
+        wf_x = ["Portafoglio Liquido", "Immobili", "Capitale Umano", "Debito / Mutuo", "Patrimonio Netto"]
+        wf_y = [liq_val, float(re_val), tbs_res["human_capital_pv_eur"], -float(mortgage_val), tbs_res["total_net_worth_eur"]]
+        wf_text = [fmt_eur(v) for v in wf_y]
+
+        fig_tbs_wf = go.Figure(go.Waterfall(
+            name="TBS",
+            orientation="v",
+            measure=wf_measures,
+            x=wf_x,
+            textposition="outside",
+            text=wf_text,
+            y=wf_y,
+            connector={"line": {"color": "rgba(255,255,255,0.25)", "dash": "dot"}},
+            decreasing={"marker": {"color": "#f85149"}},
+            totals={"marker": {"color": "#a855f7"}},
+            increasing={"marker": {"color": "#38bdf8"}},
+            width=0.45,
+            cliponaxis=False
+        ))
+        fig_tbs_wf.update_layout(
+            template="plotly_dark",
+            height=320,
+            margin=dict(l=20, r=20, t=30, b=20),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(title="Euro (€)", gridcolor="rgba(255,255,255,0.06)", tickprefix="€ "),
+            xaxis=dict(showgrid=False)
+        )
+        apply_plotly_theme(fig_tbs_wf)
+        st.plotly_chart(fig_tbs_wf, use_container_width=True)
+
+        # Decomposizione Capitale Umano: Quasi-Equity vs Quasi-Bond & Alert
+        c_don, c_alt = st.columns([1, 1.4])
+        with c_don:
+            fig_hc_pie = go.Figure(go.Pie(
+                labels=["Quasi-Equity (Rischio Azionario)", "Quasi-Bond (Difensivo/Stabile)"],
+                values=[tbs_res["human_capital_quasi_equity_eur"], tbs_res["human_capital_quasi_bond_eur"]],
+                hole=0.55,
+                marker=dict(colors=["#f85149", "#3fb950"]),
+                textinfo="label+percent"
+            ))
+            fig_hc_pie.update_layout(
+                title="Natura del Capitale Umano",
+                template="plotly_dark",
+                height=240,
+                margin=dict(l=10, r=10, t=35, b=10),
+                paper_bgcolor="rgba(0,0,0,0)",
+                showlegend=False
+            )
+            apply_plotly_theme(fig_hc_pie)
+            st.plotly_chart(fig_hc_pie, use_container_width=True)
+
+        with c_alt:
+            st.markdown("###### 🛡️ Prescrizioni di Hedging & Vulnerabilità")
+            if tbs_res["sector_hedging_needed"]:
+                st.markdown(f"""
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #ef4444; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+                    <b style="color: #f87171; font-size: 13px;">⚠️ Rischio di Correlazione Catastrofica Rilevato!</b><br>
+                    <span style="font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                    Il tuo settore lavorativo (<b>{sector_info['sector']}</b>, Beta: {sector_info['beta']:.2f}) espone il tuo Capitale Umano a un rischio implicito azionario pari a <b>{fmt_eur(tbs_res['human_capital_quasi_equity_eur'])}</b>.<br>
+                    <b>Raccomandazione di Prescrizione:</b> Sottopesare il settore nel portafoglio liquido di almeno <b>{fmt_eur(tbs_res['recommended_sector_underweight_eur'])}</b> per immunizzare la correlazione lavoro-investimenti.
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div style="background: rgba(63, 185, 80, 0.1); border: 1px solid rgba(63, 185, 80, 0.35); border-left: 4px solid #3fb950; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+                    <b style="color: #3fb950; font-size: 13px;">✅ Capitale Umano a Basso Beta Sistemico</b><br>
+                    <span style="font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                    La tua professione in <b>{sector_info['sector']}</b> genera flussi di cassa stabili (Quasi-Bond: {tbs_res['weights_breakdown']['human_capital_pct']:.1f}% dell'attivo). Puoi assumere una quota maggiore di rischio azionario nel portafoglio liquido senza compromettere la resilienza del bilancio.
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+
+            if is_var_rate and tbs_res["debt_stress_component_eur"] > 0:
+                st.markdown(f"""
+                <div style="background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.35); border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px 14px;">
+                    <b style="color: #fbbf24; font-size: 13px;">⚡ Shock Rate Stress su Mutuo (+200 bps)</b><br>
+                    <span style="font-size: 12px; color: #cbd5e1; line-height: 1.45;">
+                    Un rialzo di 200 punti base incrementa il costo attualizzato del debito di <b>{fmt_eur(tbs_res['debt_stress_component_eur'])}</b> (incluso nel TBS-VaR).
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
 
 st.divider()
 
