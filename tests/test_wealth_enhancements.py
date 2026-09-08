@@ -18,7 +18,10 @@ from core.wealth.wealth_stress_engine import (
     run_wealth_stress_test,
     PRESET_STRESS_SCENARIOS,
     create_wealth_waterfall_chart,
-    simulate_wealth_recovery_trajectories
+    simulate_wealth_recovery_trajectories,
+    create_liquidity_squeeze_timeline_chart,
+    calculate_stressed_mortgage_impact,
+    UnifiedMacroStressEngine
 )
 
 
@@ -124,6 +127,17 @@ def test_wealth_stress_engine_stagflation():
     assert res["deltas"]["physical_assets"] > 0  # Oro sale in stagflazione
     assert res["post_shock"]["health_score"] <= 88.0
 
+    # Verifica calcolo mutuo non-lineare
+    assert "mortgage_impact" in res
+    assert res["mortgage_impact"]["monthly_payment_delta"] > 0
+    assert res["mortgage_impact"]["annual_extra_interest"] > 0
+
+    # Verifica Liquidity Squeeze & Dynamic SWR
+    assert "liquidity_squeeze" in res
+    lq = res["liquidity_squeeze"]
+    assert lq["months_to_forced_liquidation"] > 0
+    assert lq["fire_swr_stressed_pct"] < 4.0
+
     # Verifica generazione grafici Plotly
     fig_waterfall = create_wealth_waterfall_chart(res)
     assert fig_waterfall is not None
@@ -132,3 +146,45 @@ def test_wealth_stress_engine_stagflation():
     fig_montecarlo = simulate_wealth_recovery_trajectories(res["post_shock"]["net_worth"])
     assert fig_montecarlo is not None
     assert len(fig_montecarlo.data) == 3
+
+    fig_timeline = create_liquidity_squeeze_timeline_chart(res)
+    assert fig_timeline is not None
+    assert len(fig_timeline.data) >= 1
+
+
+def test_unified_macro_stress_engine_with_risk_positions():
+    """Verifica l'integrazione Risk -> Wealth con ticker e beta azionari reali."""
+    class MockRiskSubContext:
+        def __init__(self):
+            self.df_positions = pd.DataFrame([
+                {"ticker": "AAPL", "current_value": 150000.0, "qty_net": 100},
+                {"ticker": "NVDA", "current_value": 100000.0, "qty_net": 200}
+            ])
+            self.df_returns = None
+
+    class MockWorkspaceContext:
+        def __init__(self):
+            self.risk = MockRiskSubContext()
+
+    mock_ws = MockWorkspaceContext()
+    engine = UnifiedMacroStressEngine(workspace_context=mock_ws)
+
+    mock_summary = {
+        "total_net_worth": 600000.0,
+        "liquid_cash": 60000.0,
+        "financial_investments": 250000.0,
+        "physical_assets": 40000.0,
+        "real_estate_total": 300000.0,
+        "pension_total": 50000.0,
+        "total_liabilities": 100000.0,
+        "wealth_health_score": 90.0,
+        "monthly_expenses": 3500.0
+    }
+
+    res = engine.execute_stress_test(mock_summary, "STAGFLATION")
+    assert res["post_shock"]["net_worth"] < res["pre_shock"]["net_worth"]
+    assert len(res["ticker_breakdown"]) == 2
+    tickers = [t["ticker"] for t in res["ticker_breakdown"]]
+    assert "AAPL" in tickers and "NVDA" in tickers
+    assert res["deltas"]["financial_investments"] == pytest.approx(-62500.0, 1.0)
+

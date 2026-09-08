@@ -435,3 +435,111 @@ def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame, risk_fre
         "risk_contributions_pct": rc_pct_dict,
         "success": bool(opt_res.success)
     }
+
+
+# ==============================================================================
+# 4. LIQUIDITY-ADJUSTED VALUE AT RISK (L-VaR) & ENDOGENOUS LIQUIDATION HORIZON
+# ==============================================================================
+
+def compute_liquidity_adjusted_var(
+    position_values: Any,
+    daily_returns: Optional[pd.DataFrame] = None,
+    bid_ask_spreads: Optional[Any] = None,
+    spread_volatilities: Optional[Any] = None,
+    daily_volumes_eur: Optional[Any] = None,
+    confidence: float = 0.95,
+    max_adv_participation: float = 0.10,
+    cov_matrix: Optional[np.ndarray] = None
+) -> Dict[str, Any]:
+    """
+    Calcola il Liquidity-Adjusted VaR (L-VaR) secondo il modello Bangia / Almgren-Chriss.
+    
+    Supera l'assunzione di liquidabilità immediata e gratuita integrando:
+    1. Costo esogeno di allargamento dello spread bid-ask sotto stress:
+       Cost_exog = 0.5 * sum(V_i * (S_bar_i + z_alpha * sigma_S_i))
+    2. Orizzonte endogeno di smobilizzo ordinato per non superare max_adv_participation (default 10% ADV):
+       T_eff = max(V_i / (max_adv_participation * ADV_i))
+    3. Scaling del VaR di mercato su T_eff giorni (Square-Root of Time):
+       VaR_scaled = VaR_1D * sqrt(T_eff)
+    4. L-VaR totale = VaR_scaled + Cost_exog
+    """
+    pos_arr = np.array(position_values, dtype=float)
+    if len(pos_arr) == 0 or np.sum(pos_arr) <= 0:
+        return {
+            "standard_var_eur": 0.0,
+            "exogenous_spread_cost_eur": 0.0,
+            "effective_liquidation_days": 1,
+            "l_var_total_eur": 0.0,
+            "l_var_premium_pct": 0.0,
+            "liquidity_haircut_eur": 0.0
+        }
+
+    total_val = float(np.sum(pos_arr))
+    weights = pos_arr / total_val
+    n_assets = len(pos_arr)
+
+    # 1. Calcolo Volatilità di Portafoglio e VaR Standard
+    if cov_matrix is not None and cov_matrix.shape == (n_assets, n_assets):
+        port_vol = np.sqrt(max(1e-8, float(weights.T @ cov_matrix @ weights)))
+    elif daily_returns is not None and not daily_returns.empty:
+        clean_ret = daily_returns.dropna()
+        if len(clean_ret) >= 5 and clean_ret.shape[1] == n_assets:
+            cov_est = clean_ret.cov().values
+            port_vol = np.sqrt(max(1e-8, float(weights.T @ cov_est @ weights)))
+        else:
+            port_vol = 0.0125  # ~20% annualizzata default
+    else:
+        port_vol = 0.0125
+
+    z_alpha = float(stats.norm.ppf(confidence))
+    standard_var_eur = total_val * (z_alpha * port_vol)
+
+    # 2. Costo Esogeno di Spread (Bid-Ask Expansion under Stress)
+    if bid_ask_spreads is not None:
+        spreads = np.array(bid_ask_spreads, dtype=float)
+        if len(spreads) != n_assets:
+            spreads = np.full(n_assets, 0.0015)
+    else:
+        spreads = np.full(n_assets, 0.0015)  # 15 bps default
+
+    if spread_volatilities is not None:
+        spread_vols = np.array(spread_volatilities, dtype=float)
+        if len(spread_vols) != n_assets:
+            spread_vols = spreads * 0.5
+    else:
+        spread_vols = spreads * 0.5  # Dev. std spread stimata pari al 50% dello spread medio
+
+    stressed_spreads = np.maximum(0.0001, spreads + z_alpha * spread_vols)
+    exogenous_spread_cost = float(0.5 * np.sum(pos_arr * stressed_spreads))
+
+    # 3. Orizzonte Endogeno di Liquidazione Prudenziale
+    if daily_volumes_eur is not None:
+        vols = np.array(daily_volumes_eur, dtype=float)
+        if len(vols) == n_assets:
+            adv_cap = np.maximum(1000.0, vols * max_adv_participation)
+            days_per_asset = np.maximum(1.0, pos_arr / adv_cap)
+            effective_days = float(np.max(days_per_asset))
+        else:
+            effective_days = 1.0
+    else:
+        effective_days = 1.0
+
+    # Limite prudenziale orizzonte (max 60 giorni lavorativi per non divergere)
+    effective_days = min(60.0, max(1.0, effective_days))
+
+    # 4. Scaling del VaR e Calcolo L-VaR
+    scaled_var_eur = standard_var_eur * np.sqrt(effective_days)
+    l_var_total_eur = scaled_var_eur + exogenous_spread_cost
+    liquidity_haircut_eur = l_var_total_eur - standard_var_eur
+    l_var_premium_pct = ((l_var_total_eur / max(0.01, standard_var_eur)) - 1.0) * 100.0
+
+    return {
+        "confidence": confidence,
+        "standard_var_eur": round(standard_var_eur, 2),
+        "exogenous_spread_cost_eur": round(exogenous_spread_cost, 2),
+        "effective_liquidation_days": int(np.ceil(effective_days)),
+        "l_var_total_eur": round(l_var_total_eur, 2),
+        "liquidity_haircut_eur": round(liquidity_haircut_eur, 2),
+        "l_var_premium_pct": round(l_var_premium_pct, 2)
+    }
+

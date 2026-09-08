@@ -614,7 +614,13 @@ def cleanup_empty_wealth_portfolios(engine: Engine) -> int:
         return res.rowcount if hasattr(res, "rowcount") else 0
 
 
-def create_wealth_portfolio(engine: Engine, name: str, description: Optional[str] = None, owner: str = "user") -> int:
+def create_wealth_portfolio(
+    engine: Engine,
+    name: str,
+    description: Optional[str] = None,
+    owner: str = "user",
+    base_currency: str = "EUR"
+) -> int:
     """Crea un nuovo profilo patrimoniale dedicato nella tabella wealth_profiles."""
     init_wealth_db(engine)
     clean_name = (name or "").strip()
@@ -630,8 +636,8 @@ def create_wealth_portfolio(engine: Engine, name: str, description: Optional[str
 
         conn.execute(sqlt("""
             INSERT INTO wealth_profiles (name, owner, base_currency, description, created_at)
-            VALUES (:name, :owner, 'EUR', :desc, CURRENT_TIMESTAMP)
-        """), {"name": clean_name, "owner": owner, "desc": description or ""})
+            VALUES (:name, :owner, :bcurr, :desc, CURRENT_TIMESTAMP)
+        """), {"name": clean_name, "owner": owner, "bcurr": base_currency or "EUR", "desc": description or ""})
         return _get_last_insert_id(conn, engine)
 
 
@@ -1079,6 +1085,97 @@ def insert_cashflow_tx(engine: Engine, tx_data: Dict[str, Any], deduplicate: boo
         return tx_id
 
 
+def bulk_insert_cashflow_tx(
+    engine: Engine,
+    tx_records: List[Dict[str, Any]],
+    deduplicate: bool = True
+) -> Tuple[int, int]:
+    """
+    Inserimento ATOMICO a batch (Unit of Work) di una lista di transazioni nel libro mastro.
+    1. Esegue l'intera operazione in una singola transazione (with engine.begin() as conn).
+    2. Se deduplicate=True, recupera gli hash esistenti per i conti coinvolti e filtra i duplicati
+       sia rispetto al DB sia intra-batch.
+    3. Esegue l'INSERT a blocchi multi-riga.
+    4. Aggiorna i saldi dei conti con una singola operazione aggregata per conto.
+    5. Restituisce (inserted_count, duplicates_suppressed).
+    """
+    if not tx_records:
+        return 0, 0
+
+    init_wealth_db(engine)
+
+    with engine.begin() as conn:
+        account_ids = list({int(r["account_id"]) for r in tx_records if "account_id" in r and r["account_id"] is not None})
+        existing_hashes = set()
+
+        if deduplicate and account_ids:
+            for aid in account_ids:
+                rows = conn.execute(
+                    sqlt("SELECT tx_hash FROM wealth_cashflow WHERE account_id = :aid AND tx_hash IS NOT NULL"),
+                    {"aid": aid}
+                ).fetchall()
+                for r in rows:
+                    if r[0]:
+                        existing_hashes.add(r[0])
+
+        valid_params = []
+        intra_batch_hashes = set()
+        duplicates_count = 0
+        balance_deltas_per_account: Dict[int, float] = {}
+
+        for tx in tx_records:
+            aid = int(tx["account_id"])
+            h = tx.get("tx_hash")
+
+            if deduplicate and h:
+                if h in existing_hashes or h in intra_batch_hashes:
+                    duplicates_count += 1
+                    continue
+                intra_batch_hashes.add(h)
+
+            p_dict = {
+                "portfolio_id": int(tx.get("portfolio_id", 1) or 1),
+                "account_id": aid,
+                "category_id": int(tx.get("category_id", 1) or 1),
+                "tx_date": str(tx["tx_date"]),
+                "amount": float(tx["amount"]),
+                "currency": tx.get("currency", "EUR"),
+                "direction": str(tx.get("direction", "outflow")),
+                "merchant": tx.get("merchant"),
+                "notes": tx.get("notes"),
+                "is_recurring": 1 if tx.get("is_recurring") else 0,
+                "payment_method": tx.get("payment_method", "Carta / Bonifico"),
+                "tags": tx.get("tags"),
+                "tx_hash": h,
+            }
+            valid_params.append(p_dict)
+
+            amt = p_dict["amount"]
+            d = p_dict["direction"].lower()
+            if d == "inflow":
+                balance_deltas_per_account[aid] = balance_deltas_per_account.get(aid, 0.0) + amt
+            elif d == "outflow":
+                balance_deltas_per_account[aid] = balance_deltas_per_account.get(aid, 0.0) - amt
+
+        if not valid_params:
+            return 0, duplicates_count
+
+        conn.execute(sqlt("""
+            INSERT INTO wealth_cashflow 
+            (portfolio_id, account_id, category_id, tx_date, amount, currency, direction, merchant, notes, is_recurring, payment_method, tags, tx_hash)
+            VALUES (:portfolio_id, :account_id, :category_id, :tx_date, :amount, :currency, :direction, :merchant, :notes, :is_recurring, :payment_method, :tags, :tx_hash)
+        """), valid_params)
+
+        for aid, delta in balance_deltas_per_account.items():
+            if abs(delta) > 1e-6:
+                conn.execute(
+                    sqlt("UPDATE wealth_accounts SET balance = balance + :delta WHERE account_id = :aid"),
+                    {"delta": delta, "aid": aid}
+                )
+
+        return len(valid_params), duplicates_count
+
+
 # ── PHYSICAL ASSETS & WATCHES CRUD ─────────────────────────
 
 def get_physical_assets(
@@ -1512,6 +1609,93 @@ def delete_wealth_goal(engine: Engine, goal_id: int) -> bool:
     with engine.begin() as conn:
         res = conn.execute(sqlt("DELETE FROM wealth_goals WHERE goal_id = :gid"), {"gid": int(goal_id)})
         return bool(res.rowcount and res.rowcount > 0)
+
+
+# ── SINCRONIZZAZIONE DIRETTA MYSQL ⇄ SQLITE LOCALE ─────────────
+
+def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Engine) -> dict:
+    """
+    Sincronizza in modo sicuro ed efficiente le tabelle del modulo Wealth da un engine a un altro
+    (es. da MySQL online a SQLite locale o viceversa).
+    Tollera differenze di colonne tra dialetti inserendo solo le colonne condivise
+    e normalizza i formati data per la compatibilità con i driver SQLite e MySQL.
+    """
+    from sqlalchemy import inspect as sqla_inspect, text as sqlt
+    import pandas as pd
+    
+    init_wealth_db(target_engine)
+    
+    tables_to_sync = [
+        "wealth_profiles",
+        "wealth_accounts",
+        "wealth_categories",
+        "wealth_cashflow",
+        "wealth_physical_assets",
+        "wealth_pension_plans",
+        "wealth_fixed_expenses",
+        "wealth_goals",
+        "wealth_networth_snapshots",
+        "wealth_portfolio_risk_links",
+        "portfolios",
+        "assets",
+        "portfolio_snapshots",
+        "snapshot_positions",
+    ]
+    
+    results = {}
+    src_insp = sqla_inspect(source_engine)
+    tgt_insp = sqla_inspect(target_engine)
+    src_tables = set(src_insp.get_table_names())
+    tgt_tables = set(tgt_insp.get_table_names())
+    is_tgt_sqlite = (getattr(target_engine, "dialect", None) is not None and target_engine.dialect.name == "sqlite")
+    
+    for tbl in tables_to_sync:
+        if tbl not in src_tables or tbl not in tgt_tables:
+            continue
+        try:
+            df = pd.read_sql_table(tbl, source_engine)
+            if df is None:
+                continue
+            
+            tgt_cols = {col["name"] for col in tgt_insp.get_columns(tbl)}
+            common_cols = [c for c in df.columns if c in tgt_cols]
+            
+            if not common_cols:
+                continue
+                
+            df_to_insert = df[common_cols].copy()
+            
+            if is_tgt_sqlite:
+                for col in df_to_insert.columns:
+                    col_l = col.lower()
+                    if "date" in col_l and not ("created_at" in col_l or "updated_at" in col_l or "calc_date" in col_l):
+                        df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime("%Y-%m-%d")
+                    elif "created_at" in col_l or "updated_at" in col_l or "calc_date" in col_l:
+                        df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
+            
+            with target_engine.begin() as conn:
+                conn.execute(sqlt(f"DELETE FROM {tbl}"))
+                if not df_to_insert.empty:
+                    df_to_insert.to_sql(tbl, conn, if_exists="append", index=False)
+            results[tbl] = len(df_to_insert)
+        except Exception as ex:
+            results[tbl] = f"Error: {ex}"
+            
+    return results
+
+
+def sync_mysql_to_sqlite(db_user: str = "root", db_pass: str = "root", db_host: str = "localhost",
+                         db_port: int = 3306, db_name: str = "wealth", sqlite_path: str = "data/argus_local.db") -> dict:
+    """
+    Utility per travasare con 1-click tutti i dati Wealth da MySQL al database locale SQLite.
+    Permette l'operatività completa offline con gli stessi identici saldi e movimenti.
+    """
+    from core.fetcher import get_engine
+    eng_mysql = get_engine(user=db_user, password=db_pass, host=db_host, port=db_port, db=db_name, database=db_name)
+    eng_sqlite = get_engine(offline=True, sqlite_path=sqlite_path)
+    return sync_wealth_tables_between_engines(eng_mysql, eng_sqlite)
+
+
 
 
 

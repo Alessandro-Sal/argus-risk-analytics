@@ -580,7 +580,10 @@ def render_sidebar():
         if "db_port" not in st.session_state: st.session_state.db_port = _detect_default_port(st.session_state.db_host, 3306)
         if "db_user" not in st.session_state: st.session_state.db_user = os.getenv("STREAMLIT_DB_USER", "root")
         if "db_pass" not in st.session_state: st.session_state.db_pass = os.getenv("STREAMLIT_DB_PASS", "root")
-        if "db_name" not in st.session_state: st.session_state.db_name = os.getenv("STREAMLIT_DB_NAME", "wealth")
+        if "wealth_db_name" not in st.session_state: st.session_state.wealth_db_name = os.getenv("STREAMLIT_DB_NAME", "wealth")
+        if "risk_db_name" not in st.session_state: st.session_state.risk_db_name = "investment_risk_bi"
+        if "db_name" not in st.session_state:
+            st.session_state.db_name = st.session_state.wealth_db_name if is_wealth_mode else st.session_state.risk_db_name
         if "portfolio_name" not in st.session_state: st.session_state.portfolio_name = "Master Wealth"
         if "run_name" not in st.session_state: st.session_state.run_name = ""
         if "benchmark" not in st.session_state: st.session_state.benchmark = "SPY"
@@ -668,20 +671,25 @@ def render_sidebar():
             w_wants = int(st.session_state.wealth_budget_wants_pct)
             w_savings = int(st.session_state.wealth_budget_savings_pct)
             w_rule_label = f"{w_needs}/{w_wants}/{w_savings}"
+            is_offline = st.session_state.offline_mode
+            w_status_badge = (
+                '<span style="font-size:10px; font-weight:800; color:#ff9900; background:rgba(255, 153, 0, 0.15); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟡 OFFLINE</span>'
+                if is_offline else
+                '<span style="font-size:10px; font-weight:800; color:#34d399; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟢 LIVE DB</span>'
+            )
+            w_db_label = "SQLite Locale" if is_offline else f"{st.session_state.db_name}"
             
             st.markdown(f"""
             <div style="background:rgba(16, 185, 129, 0.10); border:1px solid rgba(16, 185, 129, 0.35); border-radius:10px; padding: 10px 12px; margin-bottom: 8px; backdrop-filter: blur(10px);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
                     <span style="font-size:10px; font-weight:700; color:#8b949e; letter-spacing:0.6px; text-transform:uppercase;">Portale Attivo</span>
-                    <span style="font-size:10px; font-weight:800; color:#34d399; background:rgba(16, 185, 129, 0.20); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">
-                        🏛️ WEALTH
-                    </span>
+                    {w_status_badge}
                 </div>
                 <div style="font-size:11.5px; color:#ffffff; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom: 4px;">
                     🏛️ Wealth &amp; Personal Finance
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
-                    <span>🗄️ <b style="color:#c9d1d9;">{st.session_state.db_name}</b></span>
+                    <span>🗄️ <b style="color:#c9d1d9;">{w_db_label}</b></span>
                     <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🏷️ <b style="color:#34d399;">{w_rule_label}</b></span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 4px;">
@@ -728,10 +736,12 @@ def render_sidebar():
         if is_wealth_mode:
             if st.button("📊 Passa a Risk Analytics", key="sb_btn_switch_to_risk", use_container_width=True):
                 st.session_state.argus_portal_mode = "📊 Risk Analytics"
+                st.session_state.db_name = st.session_state.get("risk_db_name", "investment_risk_bi")
                 switch_to_page("0_Control_Room.py")
         else:
             if st.button("🏛️ Passa a Wealth Management", key="sb_btn_switch_to_wealth", use_container_width=True):
                 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+                st.session_state.db_name = st.session_state.get("wealth_db_name", "wealth")
                 switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
 
         active_nav_modules = NAV_MODULES_WEALTH if is_wealth_mode else NAV_MODULES_RISK
@@ -821,7 +831,20 @@ def render_sidebar():
 
         # ── 3. PARAMETRI ENGINE & DB (CONFIGURAZIONE DINAMICA) ────────
         with st.expander("⚙️ Impostazioni", expanded=False):
-            st.toggle("Modalità Offline (Senza DB)", value=st.session_state.offline_mode, key="sb_offline_toggle")
+            if is_wealth_mode:
+                st.toggle(
+                    "Modalità Offline (SQLite)",
+                    value=st.session_state.offline_mode,
+                    key="sb_offline_toggle",
+                    help="Usa il database locale embedded SQLite (data/argus_local.db) senza dipendere da MySQL."
+                )
+            else:
+                st.toggle(
+                    "Modalità Offline (RAM)",
+                    value=st.session_state.offline_mode,
+                    key="sb_offline_toggle",
+                    help="Simulazione in memoria RAM con dataset sintetici senza database MySQL."
+                )
 
             if not st.session_state.offline_mode:
                 hdr_color = "#34d399" if is_wealth_mode else "#ff9900"
@@ -839,15 +862,53 @@ def render_sidebar():
                     st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
                 
                 db_options = ["wealth", "investment_risk_bi", "Custom..."]
-                current_db = st.session_state.get("db_name", "wealth" if is_wealth_mode else "investment_risk_bi")
+                current_db = "wealth" if is_wealth_mode else "investment_risk_bi"
+                stored_db = st.session_state.get("wealth_db_name" if is_wealth_mode else "risk_db_name")
+                if stored_db and stored_db in db_options:
+                    current_db = stored_db
+                elif "db_name" in st.session_state and st.session_state.db_name in db_options:
+                    if is_wealth_mode and st.session_state.db_name != "investment_risk_bi":
+                        current_db = st.session_state.db_name
+                    elif not is_wealth_mode and st.session_state.db_name != "wealth":
+                        current_db = st.session_state.db_name
+                
                 db_idx = db_options.index(current_db) if current_db in ["wealth", "investment_risk_bi"] else db_options.index("Custom...")
                 sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
                 if sel_db == "Custom...":
                     custom_db = st.text_input("Nome DB Custom", value="" if current_db in ["wealth", "investment_risk_bi"] else current_db, key="sb_custom_db").strip()
                     if custom_db:
                         st.session_state.db_name = custom_db
+                        if is_wealth_mode: st.session_state.wealth_db_name = custom_db
+                        else: st.session_state.risk_db_name = custom_db
+                else:
+                    st.session_state.db_name = sel_db
+                    if is_wealth_mode: st.session_state.wealth_db_name = sel_db
+                    else: st.session_state.risk_db_name = sel_db
+
+                if is_wealth_mode:
+                    if st.button("📥 Allinea DB Locale SQLite", key="sb_btn_sync_sqlite", use_container_width=True, help="Copia tutti i conti, movimenti e orologi da MySQL al database locale SQLite per lavorare offline."):
+                        try:
+                            from core.wealth.wealth_db import sync_mysql_to_sqlite
+                            sync_res = sync_mysql_to_sqlite(
+                                db_user=st.session_state.db_user,
+                                db_pass=st.session_state.db_pass,
+                                db_host=st.session_state.db_host,
+                                db_port=st.session_state.db_port,
+                                db_name=st.session_state.db_name
+                            )
+                            cf_n = sync_res.get('wealth_cashflow', 0)
+                            acc_n = sync_res.get('wealth_accounts', 0)
+                            st.success(f"Allineamento completato: {cf_n} movimenti e {acc_n} conti salvati in SQLite locale!")
+                        except Exception as ex:
+                            st.error(f"Errore sincronizzazione: {ex}")
             else:
-                st.info("☁️ **Modalità In-Memory**: i calcoli avvengono in RAM/Cache senza connessione MySQL.")
+                if is_wealth_mode:
+                    st.info("💾 **Modalità Offline (SQLite)**: Dati persistiti sul database locale SQLite (`data/argus_local.db`). Non serve MySQL attivo.")
+                    if st.button("🔄 Ricarica Dati da SQLite", key="sb_btn_reload_sqlite", use_container_width=True):
+                        st.cache_data.clear()
+                        st.rerun()
+                else:
+                    st.info("☁️ **Modalità In-Memory**: i calcoli avvengono in RAM/Cache senza connessione MySQL.")
 
             if is_wealth_mode:
                 # ── WEALTH & PERSONAL FINANCE SETTINGS ──

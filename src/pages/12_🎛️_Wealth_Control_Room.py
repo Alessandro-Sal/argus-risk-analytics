@@ -103,18 +103,25 @@ render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
 p_bar_c1, p_bar_c2, p_bar_c3, p_bar_c4 = st.columns([3.2, 1.1, 1.1, 1.4])
 with p_bar_c1:
-    opts = [None] + list(profile_map.keys())
-    curr_idx = opts.index(current_pid) if current_pid in opts else 0
-    selected_pid = st.selectbox(
-        "💼 Profilo Patrimoniale Attivo:",
-        options=opts,
-        format_func=lambda pid: "👉 Seleziona un Profilo..." if pid is None else f"📁 {profile_map[pid]} (ID #{pid})",
-        index=curr_idx,
-        key="wealth_profile_selector_widget"
-    )
-    if selected_pid != current_pid:
-        st.session_state["wealth_active_portfolio_id"] = selected_pid
-        st.rerun()
+    opts = list(profile_map.keys())
+    if opts:
+        curr_idx = opts.index(current_pid) if current_pid in opts else 0
+        if st.session_state.get("wealth_profile_selector_widget") != current_pid and current_pid in opts:
+            st.session_state["wealth_profile_selector_widget"] = current_pid
+
+        def _on_wealth_profile_change():
+            new_val = st.session_state.get("wealth_profile_selector_widget")
+            if new_val is not None and new_val in profile_map:
+                st.session_state["wealth_active_portfolio_id"] = new_val
+
+        selected_pid = st.selectbox(
+            "💼 Profilo Patrimoniale Attivo:",
+            options=opts,
+            format_func=lambda pid: f"📁 {profile_map[pid]} (ID #{pid})",
+            index=curr_idx,
+            key="wealth_profile_selector_widget",
+            on_change=_on_wealth_profile_change
+        )
 
 with p_bar_c2:
     st.write("")

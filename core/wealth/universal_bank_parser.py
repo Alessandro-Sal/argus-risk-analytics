@@ -5,11 +5,14 @@
 
 import io
 import re
-from datetime import datetime
+import hashlib
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+
+from core.ingestion_utils import read_tabular_stream
 
 
 # ── BANCHE & BROKER SIGNATURE DEFINITIONS ──
@@ -348,61 +351,7 @@ def parse_bank_statement_file(
     un DataFrame pulito e normalizzato pronto per il salvataggio nel database patrimoniale.
     """
     try:
-        raw_text = ""
-        df_raw = None
-
-        if isinstance(file_bytes_or_buffer, bytes):
-            buffer = io.BytesIO(file_bytes_or_buffer)
-        elif isinstance(file_bytes_or_buffer, str):
-            buffer = io.StringIO(file_bytes_or_buffer)
-            raw_text = file_bytes_or_buffer
-        else:
-            buffer = file_bytes_or_buffer
-
-        is_excel = filename.lower().endswith((".xlsx", ".xls"))
-        if not is_excel and isinstance(file_bytes_or_buffer, bytes) and len(file_bytes_or_buffer) >= 4:
-            if file_bytes_or_buffer.startswith(b"PK\x03\x04") or file_bytes_or_buffer.startswith(b"\xd0\xcf\x11\xe0"):
-                is_excel = True
-
-        if is_excel:
-            try:
-                df_raw = pd.read_excel(buffer)
-            except Exception:
-                buffer.seek(0)
-                df_raw = pd.read_excel(buffer, engine="openpyxl")
-        else:
-            if hasattr(buffer, "getvalue"):
-                raw_bytes = buffer.getvalue()
-                for enc in ["utf-8", "latin-1", "cp1252", "iso-8859-1"]:
-                    try:
-                        raw_text = raw_bytes.decode(enc)
-                        break
-                    except Exception:
-                        continue
-            elif hasattr(buffer, "read"):
-                raw_text = buffer.read()
-                if isinstance(raw_text, bytes):
-                    raw_text = raw_text.decode("utf-8", errors="ignore")
-
-            lines = [l for l in raw_text.splitlines() if l.strip()]
-            header_idx = 0
-            best_sep = ";" if raw_text.count(";") > raw_text.count(",") else ","
-            if raw_text.count("	") > max(raw_text.count(";"), raw_text.count(",")):
-                best_sep = "	"
-
-            for i, line in enumerate(lines[:15]):
-                l_low = line.lower()
-                if any(w in l_low for w in ["data", "date", "importo", "amount", "descrizione", "description", "saldo"]):
-                    header_idx = i
-                    break
-
-            buffer_clean = io.StringIO("\n".join(lines[header_idx:]))
-            try:
-                df_raw = pd.read_csv(buffer_clean, sep=best_sep, dtype=str, on_bad_lines="skip")
-            except Exception:
-                buffer_clean.seek(0)
-                df_raw = pd.read_csv(buffer_clean, sep=None, engine="python", dtype=str)
-
+        df_raw = read_tabular_stream(file_bytes_or_buffer, filename=filename)
         if df_raw is None or df_raw.empty:
             return {
                 "success": False,
@@ -411,7 +360,10 @@ def parse_bank_statement_file(
                 "bank_detected": "Sconosciuto"
             }
 
-        df_raw.columns = [str(c).strip() for c in df_raw.columns]
+        # Estrazione testo campione per rilevamento firma bancaria
+        cols_text = " ".join([str(c) for c in df_raw.columns])
+        sample_vals = " ".join([str(v) for v in df_raw.iloc[:15].values.flatten() if pd.notna(v)])
+        raw_text = f"{cols_text} {sample_vals}"
         bank_id, bank_cfg = detect_bank_format(df_raw, raw_text)
 
         col_date = None
@@ -491,23 +443,35 @@ def parse_bank_statement_file(
                 continue
 
             cat_name, pillar, is_tr = categorize_transaction(raw_desc, amt)
+            r_amt = round(abs(amt), 2)
+            r_dir = "transfer" if is_tr else ("inflow" if amt > 0 else "outflow")
 
             if is_tr:
                 tr_cnt += 1
             elif amt > 0:
-                tot_in += amt
+                tot_in += r_amt
             else:
-                tot_out += abs(amt)
+                tot_out += r_amt
+
+            # Calcolo hash deterministico univoco per deduplicazione idempotente
+            raw_hash_key = f"{account_name}|{clean_dt}|{r_amt:.2f}|{r_dir}|{raw_desc.strip().lower()}"
+            rec_hash = hashlib.sha256(raw_hash_key.encode("utf-8")).hexdigest()
 
             normalized_records.append({
                 "date": clean_dt,
+                "tx_date": clean_dt,
                 "description": raw_desc,
-                "amount": round(amt, 2),
+                "merchant": raw_desc[:120],
+                "amount": r_amt,
+                "direction": r_dir,
                 "category": cat_name,
                 "pillar": pillar,
                 "is_transfer": 1 if is_tr else 0,
                 "account_name": account_name,
-                "currency": "EUR"
+                "currency": "EUR",
+                "notes": f"{bank_cfg.get('name', 'Banca')}: {raw_desc[:150]}",
+                "payment_method": "Estratto Conto Bancario",
+                "tx_hash": rec_hash
             })
 
         df_norm = pd.DataFrame(normalized_records)
@@ -519,7 +483,7 @@ def parse_bank_statement_file(
                 "bank_detected": bank_cfg.get("name", "Sconosciuto")
             }
 
-        df_norm = df_norm.sort_values(by="date", ascending=False).reset_index(drop=True)
+        df_norm = df_norm.reset_index(drop=True)
 
         return {
             "success": True,
@@ -539,3 +503,83 @@ def parse_bank_statement_file(
             "df_normalized": pd.DataFrame(),
             "bank_detected": "Errore"
         }
+
+
+def reconcile_internal_transfers(df_tx: pd.DataFrame, max_days_diff: int = 2) -> Tuple[pd.DataFrame, int]:
+    """
+    Riconciliazione automatica giroconti interni a 2 vie tra conti correnti diversi.
+    Identifica movimenti speculari (|importo_A| == |importo_B|, direzioni opposte, |data_A - data_B| <= max_days_diff)
+    e li marca come giroconti per neutralizzare il doppio conteggio nel budget 50/30/20.
+    """
+    if df_tx is None or df_tx.empty or len(df_tx) < 2:
+        return df_tx, 0
+
+    df = df_tx.copy()
+    acc_col = "account_name" if "account_name" in df.columns else ("account_id" if "account_id" in df.columns else None)
+    if not acc_col:
+        return df, 0
+
+    date_col = "tx_date" if "tx_date" in df.columns else "date"
+    amt_col = "amount"
+    dir_col = "direction"
+
+    # Conversione date per calcolo differenze temporali
+    dt_series = pd.to_datetime(df[date_col], errors="coerce")
+    matched_indices = set()
+    pairs_found = 0
+
+    for i in range(len(df)):
+        if i in matched_indices:
+            continue
+
+        row_a = df.iloc[i]
+        dt_a = dt_series.iloc[i]
+        if pd.isna(dt_a):
+            continue
+
+        amt_a = abs(float(row_a[amt_col]))
+        dir_a = str(row_a.get(dir_col, "")).lower()
+        acc_a = str(row_a[acc_col])
+
+        # Cerca un movimento speculare nei record successivi
+        for j in range(i + 1, len(df)):
+            if j in matched_indices:
+                continue
+
+            row_b = df.iloc[j]
+            acc_b = str(row_b[acc_col])
+            if acc_a == acc_b:
+                continue  # Stesso conto, non è un giroconto tra conti diversi
+
+            dt_b = dt_series.iloc[j]
+            if pd.isna(dt_b):
+                continue
+
+            if abs((dt_a - dt_b).days) > max_days_diff:
+                continue
+
+            amt_b = abs(float(row_b[amt_col]))
+            if round(amt_a, 2) != round(amt_b, 2):
+                continue
+
+            dir_b = str(row_b.get(dir_col, "")).lower()
+            # Devono avere direzioni opposte (uno entrata/inflow, l'altro uscita/outflow)
+            is_opposite = (
+                (dir_a in ["inflow", "entrate"] and dir_b in ["outflow", "uscite"]) or
+                (dir_a in ["outflow", "uscite"] and dir_b in ["inflow", "entrate"])
+            )
+
+            if is_opposite:
+                matched_indices.add(i)
+                matched_indices.add(j)
+                pairs_found += 1
+                break
+
+    if matched_indices:
+        df.loc[list(matched_indices), "is_transfer"] = 1
+        df.loc[list(matched_indices), "direction"] = "transfer"
+        df.loc[list(matched_indices), "pillar"] = "Transfer"
+        df.loc[list(matched_indices), "category"] = "🔄 Giroconto Interno"
+
+    return df, pairs_found
+

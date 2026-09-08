@@ -71,10 +71,11 @@ LOOKBACK_EXTRA_DAYS = 365
 # ── Connessione MySQL ────────────────────────────────────────
 
 def get_engine(user: str = "root", password: str = "", host: str = "localhost",
-               port: int = 3306, db: str = "investment_risk_bi", database: str = None):
+               port: int = 3306, db: str = "investment_risk_bi", database: str = None,
+               offline: bool = False, sqlite_path: str = "data/argus_local.db"):
     """
-    Restituisce un engine SQLAlchemy per MySQL. Se MySQL non è disponibile (es. Docker disattivato),
-    effettua il fallback automatico su un database locale SQLite (data/argus_local.db).
+    Restituisce un engine SQLAlchemy per MySQL. Se MySQL non è disponibile (es. Docker disattivato)
+    o se offline=True, restituisce direttamente un database locale SQLite (data/argus_local.db).
     Legge prioritariamente le credenziali dalle variabili d'ambiente (MYSQL_USER, MYSQL_PASSWORD, ecc.).
     """
     import os
@@ -84,31 +85,43 @@ def get_engine(user: str = "root", password: str = "", host: str = "localhost",
     except ImportError:
         pass
 
-    # Priorità a variabili d'ambiente rispetto ai default (supporta sia MYSQL_ che STREAMLIT_DB_)
-    user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user
-    password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password
-    host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host
-    port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
-    port = int(port_env) if port_env else port
-    if database is not None:
-        db = database
-    else:
-        db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
-
-    try:
-        import pymysql
-        sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
-        sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
-        with sys_engine.begin() as conn:
-            conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
-        
-        url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
-        engine = create_engine(url, echo=False)
-    except Exception:
-        os.makedirs("data", exist_ok=True)
-        sqlite_url = "sqlite:///data/argus_local.db"
+    if offline:
+        os.makedirs(os.path.dirname(sqlite_path) or ".", exist_ok=True)
+        sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
         engine = create_engine(sqlite_url, echo=False)
-        event.listen(engine, "connect", _set_sqlite_pragmas)
+        try:
+            event.listen(engine, "connect", _set_sqlite_pragmas)
+        except Exception:
+            pass
+    else:
+        # Priorità a variabili d'ambiente rispetto ai default (supporta sia MYSQL_ che STREAMLIT_DB_)
+        user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user
+        password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password
+        host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host
+        port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
+        port = int(port_env) if port_env else port
+        if database is not None:
+            db = database
+        elif db == "investment_risk_bi":
+            db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
+
+        try:
+            import pymysql
+            sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
+            sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
+            with sys_engine.begin() as conn:
+                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+            
+            url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
+            engine = create_engine(url, echo=False)
+        except Exception:
+            os.makedirs("data", exist_ok=True)
+            sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
+            engine = create_engine(sqlite_url, echo=False)
+            try:
+                event.listen(engine, "connect", _set_sqlite_pragmas)
+            except Exception:
+                pass
 
     if engine.dialect.name == "sqlite":
         try:

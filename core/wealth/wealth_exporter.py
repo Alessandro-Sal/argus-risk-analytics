@@ -122,24 +122,25 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
         ws1.write(r_idx, 0, cat)
         ws1.write(r_idx, 1, det)
         ws1.write(r_idx, 2, _safe_num(val), f_currency)
-        ws1.write(r_idx, 3, _safe_num(weight), f_pct)
+        # Formula dinamica peso su Net Worth consolidato
+        ws1.write_formula(r_idx, 3, f"=IF($C$11>0, C{r_idx+1}/$C$11, 0)", f_pct)
         ws1.write(r_idx, 4, liq)
 
     ws1.write(8, 0, "TOTALE ATTIVO PATRIMONIALE", f_bold)
     ws1.write(8, 1, "Consolidato Lordo", f_bold)
-    ws1.write(8, 2, _safe_num(nw.total_net_worth + nw.total_liabilities), f_bold_currency)
-    ws1.write(8, 3, 1.0, f_bold_pct)
+    ws1.write_formula(8, 2, "=SUM(C5:C8)", f_bold_currency)
+    ws1.write_formula(8, 3, "=IF($C$11>0, C9/$C$11, 1)", f_bold_pct)
     ws1.write(8, 4, "Consolidato", f_bold)
 
     ws1.write(9, 0, "Passività & Debiti Residui", f_bold)
     ws1.write(9, 1, "Mutui e Finanziamenti", f_bold)
     ws1.write(9, 2, _safe_num(nw.total_liabilities), f_currency)
-    ws1.write(9, 3, _safe_num(nw.total_liabilities / (nw.total_net_worth or 1)), f_pct)
+    ws1.write_formula(9, 3, "=IF($C$11>0, C10/$C$11, 0)", f_pct)
     ws1.write(9, 4, "Debito Finanziario")
 
     ws1.write(10, 0, "PATRIMONIO NETTO EFFETTIVO (NET WORTH)", f_bold)
     ws1.write(10, 1, "Attivo Netto Consolidato", f_bold)
-    ws1.write(10, 2, _safe_num(nw.total_net_worth), f_bold_currency)
+    ws1.write_formula(10, 2, "=C9-C10", f_bold_currency)
     ws1.write(10, 3, 1.0, f_bold_pct)
     ws1.write(10, 4, f"Health Score: {nw.wealth_health_score:.0f}/100", f_bold)
 

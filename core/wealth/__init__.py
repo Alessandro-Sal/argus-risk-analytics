@@ -95,7 +95,8 @@ from core.wealth.wealth_engine import (
     compute_multi_currency_fx_hedging_engine,
     compute_family_governance_and_patti_di_famiglia,
     compute_total_wealth_brinson_attribution,
-    compute_smart_cashflow_reconciliation
+    compute_smart_cashflow_reconciliation,
+    compute_personal_balance_sheet
 )
 
 
@@ -120,6 +121,13 @@ from core.wealth.wealth_exporter import (
     export_wealth_master_excel_workbook
 )
 
-
-
-
+from core.wealth.wealth_stress_engine import (
+    PRESET_STRESS_SCENARIOS,
+    calculate_stressed_mortgage_impact,
+    calculate_liquidity_squeeze,
+    run_wealth_stress_test,
+    UnifiedMacroStressEngine,
+    create_wealth_waterfall_chart,
+    create_liquidity_squeeze_timeline_chart,
+    simulate_wealth_recovery_trajectories
+)

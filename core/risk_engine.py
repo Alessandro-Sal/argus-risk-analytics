@@ -180,6 +180,20 @@ def compute_risk(portfolio_id: int,
     except Exception:
         fixed_income_summary = {}
 
+    # Liquidity-Adjusted VaR (L-VaR)
+    lvar_summary = {}
+    try:
+        from core.advanced_quant import compute_liquidity_adjusted_var
+        if "current_value" in df_positions.columns:
+            pos_vals = df_positions["current_value"].values
+            lvar_summary = compute_liquidity_adjusted_var(pos_vals, daily_returns=df_returns)
+            if lvar_summary and "market_risk" in metrics:
+                metrics["market_risk"]["l_var_95_eur"] = lvar_summary.get("l_var_total_eur", 0.0)
+                metrics["market_risk"]["liquidity_haircut_eur"] = lvar_summary.get("liquidity_haircut_eur", 0.0)
+                metrics["market_risk"]["effective_liquidation_days"] = lvar_summary.get("effective_liquidation_days", 1)
+    except Exception:
+        lvar_summary = {}
+
     # Stop Loss ATR, Chandelier Exit & RSI
     atr_exits = compute_atr_chandelier_exits(df_prices, df_positions)
     if isinstance(atr_exits, dict) and "summary" in atr_exits and isinstance(df_positions, pd.DataFrame) and not df_positions.empty:
@@ -289,6 +303,7 @@ def compute_risk(portfolio_id: int,
         "regime_summary":      regime_summary,
         "tax_summary":         tax_summary,
         "fixed_income_summary": fixed_income_summary,
+        "l_var_summary":        lvar_summary,
         "risk_contribution":   risk_contrib,
         "stress_tests":        _calc_stress_tests(df_returns, df_positions, sr_benchmark),
         "optimization":        _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),

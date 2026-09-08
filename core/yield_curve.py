@@ -215,6 +215,9 @@ def evaluate_yield_term_structure(
     return np.maximum(yields, 0.0001)
 
 
+evaluate_nelson_siegel_curve = evaluate_yield_term_structure
+
+
 def fit_nelson_siegel_curve(
     maturities_years: Any,
     yields: Any,

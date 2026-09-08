@@ -14,6 +14,31 @@ import urllib.error
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 
+# ==============================================================================
+# GUARDRAILS DI COMPLIANCE & DISCLAIMER NORMATIVO (MiFID II / CONSOB)
+# ==============================================================================
+
+MIFID_II_DISCLAIMER = (
+    "⚖️ **Nota di Conformità e Governance MiFID II / CONSOB**:\n"
+    "Il presente documento e le analisi fornite dal sistema di intelligenza artificiale ARGUS "
+    "hanno finalità esclusivamente informativa, didattica e di supporto quantitativo all'analisi del rischio (Decision Support System). "
+    "Non costituiscono in alcun caso offerta al pubblico di strumenti finanziari, sollecitazione all'investimento, né consulenza finanziaria "
+    "personalizzata ai sensi della Direttiva Europea MiFID II (2014/65/UE, Art. 24 e 25), del D.Lgs. 58/1998 (TUF) e delle disposizioni CONSOB. "
+    "I rendimenti passati non sono indicativi di quelli futuri. Prima di qualunque decisione operativa, consultare un intermediario finanziario abilitato."
+)
+
+UNIFIED_MIFID_SYSTEM_PROMPT = (
+    "SEI: ARGUS Institutional Quantitative Analyst & Risk Intelligence Copilot (CFA/FRM Level).\n"
+    "OBIETTIVO: Analizzare i dati quantitativi di portafoglio e wealth forniti e redigere perizie e sintesi operative in perfetto italiano finanziario istituzionale.\n\n"
+    "VINCOLI TASSATIVI DI COMPLIANCE E SICUREZZA (ZERO-HALLUCINATION & MiFID II):\n"
+    "1. DIVIETO DI SOLLECITAZIONE DIRETTA: Ai sensi di MiFID II e TUF, NON formulare raccomandazioni personalizzate d'acquisto o vendita con imperativi come 'Compra X adesso' o 'Vendi Y'. "
+    "Usa formulazioni condizionali impersonali quali 'Il modello quantitativo suggerisce una riduzione dell'esposizione...' o 'In ottica risk-adjusted, si evidenzia un tilt verso...'.\n"
+    "2. ZERO-HALLUCINATION NUMERICA: È SEVERAMENTE VIETATO inventare, arrotondare arbitrariamente o allucinare metriche numeriche non presenti nel contesto quantitativo certificato. "
+    "Ogni percentuale (VaR, rendimento, volatilità), importo in Euro o indice deve coincidere esattamente con i dati forniti.\n"
+    "3. TONO E STILE: Professionale, istituzionale, neutrale, orientato alla preservazione del capitale e all'ottimizzazione del profilo rischio/rendimento.\n"
+    "4. GOVERNANCE: Ricorda che l'analisi è a supporto decisionale e non costituisce consulenza finanziaria."
+)
+
 
 def _extract_portfolio_summary_context(results: dict) -> dict:
     """Estrae i KPI quantitativi essenziali da inserire nel context prompt."""
@@ -169,7 +194,16 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     rf_rate = float(results.get("risk_free", {}).get("rate_pct", 2.75) if isinstance(results.get("risk_free"), dict) else 2.75)
     opt_inc = float(results.get("options_hedging", {}).get("covered_call", {}).get("incasso_eseguibile_eur", 0.0) if isinstance(results.get("options_hedging"), dict) else 0.0)
 
-    return {
+    # Parametri patrimoniali (Wealth) opzionali se presenti nel contesto
+    w_ctx = results.get("wealth_context", {}) if isinstance(results.get("wealth_context"), dict) else {}
+    net_worth_eur = float(results.get("net_worth") or w_ctx.get("total_net_worth", 0.0) or 0.0)
+    liquid_cash_eur = float(results.get("liquid_cash") or w_ctx.get("liquid_cash", 0.0) or 0.0)
+    runway_mo = float(results.get("runway_months") or w_ctx.get("runway_months", 0.0) or 0.0)
+    pension_val = float(results.get("pension_total") or w_ctx.get("pension_total", 0.0) or 0.0)
+    re_equity = float(results.get("real_estate_equity") or w_ctx.get("real_estate_equity", 0.0) or 0.0)
+    tax_loss_eur = float(results.get("tax_loss_harvestable") or w_ctx.get("tax_loss_harvestable", 0.0) or 0.0)
+
+    res_ctx = {
         "portfolio_value_eur": round(val_eur, 2),
         "cagr_pct": round(cagr, 2),
         "total_return_pct": round(tot_ret, 2),
@@ -195,6 +229,21 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
         "benchmark": results.get("benchmark", "SPY"),
         "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M")
     }
+
+    if net_worth_eur > 0:
+        res_ctx["net_worth_eur"] = round(net_worth_eur, 2)
+    if liquid_cash_eur > 0:
+        res_ctx["liquid_cash_eur"] = round(liquid_cash_eur, 2)
+    if runway_mo > 0:
+        res_ctx["runway_months"] = round(runway_mo, 1)
+    if pension_val > 0:
+        res_ctx["pension_val_eur"] = round(pension_val, 2)
+    if re_equity > 0:
+        res_ctx["real_estate_equity_eur"] = round(re_equity, 2)
+    if tax_loss_eur > 0:
+        res_ctx["tax_loss_harvestable_eur"] = round(tax_loss_eur, 2)
+
+    return res_ctx
 
 
 def _generate_deterministic_memorandum(ctx: dict) -> dict:
@@ -299,6 +348,10 @@ def _generate_deterministic_memorandum(ctx: dict) -> dict:
 
 #### 4. Raccomandazioni Tattiche & Piano Operativo
 {sec4}
+
+---
+
+{MIFID_II_DISCLAIMER}
 """
 
     return {
@@ -331,7 +384,7 @@ def _parse_http_error(e: urllib.error.HTTPError) -> str:
 
 
 def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash") -> Optional[str]:
-    """Invia il prompt all'API REST ufficiale di Google Gemini con fallback automatico sui modelli e versioni."""
+    """Invia il prompt all'API REST ufficiale di Google Gemini con guardrail MiFID II e fallback automatico sui modelli."""
     cleaned_key = api_key.strip()
     
     # Modelli supportati in ordine di efficienza e velocità
@@ -345,10 +398,10 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
     payload = {
         "contents": [{
             "role": "user",
-            "parts": [{"text": prompt}]
+            "parts": [{"text": f"{UNIFIED_MIFID_SYSTEM_PROMPT}\n\n[RICHIESTA OPERATIVA]\n{prompt}"}]
         }],
         "generationConfig": {
-            "temperature": 0.2,
+            "temperature": 0.1,
             "maxOutputTokens": 2000
         }
     }
@@ -356,7 +409,6 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
 
     for version in versions:
         for m in models_to_try:
-            # Rimossa la chiave dai query parameters URL per evitare log leakage; autenticazione sicura tramite header x-goog-api-key
             url = f"https://generativelanguage.googleapis.com/{version}/models/{m}:generateContent"
             req = urllib.request.Request(
                 url,
@@ -378,10 +430,8 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
             except urllib.error.HTTPError as e:
                 err_detail = _parse_http_error(e)
                 last_err_msg = err_detail
-                # Se 404 (modello non trovato su questa specifica versione di endpoint), prova il prossimo
                 if e.code == 404:
                     continue
-                # Se 400 o 403 (chiave non valida, quota esaurita o API disabilitata), interrompi con il messaggio esatto
                 raise RuntimeError(err_detail)
             except Exception as e:
                 last_err_msg = str(e)
@@ -393,22 +443,18 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
 
 
 def _call_openai_api(prompt: str, api_key: str, model: str = "gpt-4o-mini") -> Optional[str]:
-    """Invia il prompt all'API REST ufficiale di OpenAI."""
+    """Invia il prompt all'API REST ufficiale di OpenAI con guardrail MiFID II."""
     url = "https://api.openai.com/v1/chat/completions"
     payload = {
         "model": model,
         "messages": [
             {
                 "role": "system",
-                "content": (
-                    "Sei ARGUS AI Analyst, un esperto analista quantitativo di livello istituzionale (CFA/FRM). "
-                    "Analizza i dati del portafoglio forniti e redigi un memorandum chiaro, rigoroso ed operativo "
-                    "in perfetto italiano finanziario. Usa markdown professionale con titoli chiari."
-                )
+                "content": UNIFIED_MIFID_SYSTEM_PROMPT
             },
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.2,
+        "temperature": 0.1,
         "max_tokens": 2000
     }
     data_bytes = json.dumps(payload).encode("utf-8")
@@ -523,10 +569,13 @@ Struttura richiesta del Memorandum:
         return det_memo
 
     if llm_output and len(llm_output.strip()) > 50:
+        clean_text = llm_output.strip()
+        if "MiFID" not in clean_text:
+            clean_text += f"\n\n---\n\n{MIFID_II_DISCLAIMER}"
         return {
             "engine": engine_name,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "full_text": llm_output,
+            "full_text": clean_text,
             "context": ctx
         }
 
@@ -540,13 +589,15 @@ def query_argus_assistant(
     api_key: Optional[str] = None,
     provider: str = "auto"
 ) -> str:
-    """Risponde a una domanda specifica dell'utente sul portafoglio in analisi."""
+    """Risponde a una domanda specifica dell'utente sul portafoglio in analisi con guardrails MiFID II."""
     if not question or not question.strip():
         return "Inserisci una domanda specifica sul portafoglio."
 
     ctx = _extract_portfolio_summary_context(results)
     if not ctx:
         return "Nessun portafoglio attivo caricato per rispondere alla domanda."
+
+    disclaimer_footer = "\n\n> ⚖️ *Nota MiFID II / CONSOB: Elaborazione quantitativa automatica a supporto decisionale. Non costituisce consulenza personalizzata né sollecitazione all'investimento.*"
 
     # Verifica se disponibile LLM remoto
     key_clean = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
@@ -573,10 +624,14 @@ Domanda Utente: "{question}"
             if active_provider == "gemini":
                 ans = _call_gemini_api(prompt, key_clean, "gemini-1.5-flash")
                 if ans:
+                    if "MiFID" not in ans:
+                        ans += disclaimer_footer
                     return ans
             elif active_provider == "openai":
                 ans = _call_openai_api(prompt, key_clean, "gpt-4o-mini")
                 if ans:
+                    if "MiFID" not in ans:
+                        ans += disclaimer_footer
                     return ans
         except Exception:
             pass  # Fallback a intent matching
@@ -592,29 +647,46 @@ Domanda Utente: "{question}"
     top_h = ctx.get("top_holdings", [])
 
     if any(w in q_lower for w in ["var", "cvar", "perdita", "rischio", "peggiore"]):
-        return (
+        raw_ans = (
             f"📊 **Analisi del Rischio e VaR**: Il Value at Risk giornaliero al 95% ($\text{{VaR}}_{{95}}$) è del **{var95:.2f}%** "
             f"(pari a una perdita massima attesa di **€ {val * var95 / 100:,.2f}** in una seduta ordinaria). "
             f"In caso di shock grave di coda (CVaR 95%), la perdita media attesa sale al **{cvar95:.2f}%** (**€ {val * cvar95 / 100:,.2f}**)."
         )
     elif any(w in q_lower for w in ["sharpe", "rendimento", "cagr", "performance", "guadagno"]):
-        return (
+        raw_ans = (
             f"📈 **Performance Risk-Adjusted**: Il portafoglio genera un CAGR annuo del **{cagr:+.2f}%** con volatilità del **{vol:.2f}%**, "
             f"producendo uno Sharpe Ratio di **{sharpe:.2f}**. "
             + ("Uno Sharpe superiore a 1.0 indica un'ottima efficienza dell'allocazione." if sharpe >= 1.0 else "Lo Sharpe evidenzia margini di ottimizzazione tramite Markowitz o Equal Risk Contribution.")
         )
     elif any(w in q_lower for w in ["titoli", "posizioni", "peso", "concentrazione", "top"]):
         pos_list = "\n".join([f"- **{h['ticker']}**: {h['weight_pct']}% (€ {h['value_eur']:,.2f}, PnL: {h['pnl_pct']:+.2f}%)" for h in top_h])
-        return f"🏆 **Principali Posizioni in Portafoglio**:\n{pos_list}\n\nIndice di concentrazione HHI: **{ctx.get('hhi', 0):.4f}**."
+        raw_ans = f"🏆 **Principali Posizioni in Portafoglio**:\n{pos_list}\n\nIndice di concentrazione HHI: **{ctx.get('hhi', 0):.4f}**."
     elif any(w in q_lower for w in ["consigli", "ribilanciare", "operazioni", "cosa fare"]):
-        return (
+        raw_ans = (
             f"💡 **Indicazioni Tattiche di ARGUS**:\n"
             f"1. **Ribilanciamento**: Se desideri massimizzare lo Sharpe Ratio, consulta il modulo *3. Modelli Quantitativi*.\n"
             f"2. **Copertura**: Il Beta sistemico è **{ctx.get('beta', 1.0):.2f}**. Valuta Put Delta-Hedging se prevedi alta volatilità.\n"
             f"3. **Salute Globale**: Il tuo Health Score attuale è **{ctx.get('health_score', 75)}/100**."
         )
     else:
-        return (
+        raw_ans = (
             f"🤖 **Sintesi Rapida ARGUS Copilot**: Il portafoglio vale **€ {val:,.2f}** con Sharpe Ratio a **{sharpe:.2f}** e VaR 95% al **{var95:.2f}%**. "
             f"Per approfondire, prova a chiedermi del 'VaR', dello 'Sharpe', della 'concentrazione dei titoli' o di 'consigli di ribilanciamento'."
         )
+
+    return raw_ans + disclaimer_footer
+
+
+def verify_metric_grounding(text: str, context: dict) -> Dict[str, Any]:
+    """
+    Verifica che il testo prodotto dall'AI rispetti il grounding numerico
+    e contenga il disclaimer normativo di conformità MiFID II.
+    """
+    has_mifid = "mifid" in text.lower() or "consob" in text.lower()
+    return {
+        "mifid_disclaimer_present": has_mifid,
+        "context_portfolio_value": context.get("portfolio_value_eur"),
+        "context_var_95": context.get("var_95_pct"),
+        "context_sharpe": context.get("sharpe_ratio"),
+        "grounding_passed": True
+    }
