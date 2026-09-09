@@ -79,7 +79,12 @@ class TBSMonteCarloEngine:
             [1.00, 0.25],
             [0.25, 1.00]
         ])
-        chol = np.linalg.cholesky(corr_matrix)
+        try:
+            chol = np.linalg.cholesky(corr_matrix)
+        except np.linalg.LinAlgError:
+            eigvals, eigvecs = np.linalg.eigh(corr_matrix)
+            eigvals = np.maximum(eigvals, 1e-6)
+            chol = eigvecs @ np.diag(np.sqrt(eigvals))
 
         # Matrici per gli stati patrimoniali: [Simulazioni x Anni]
         # Anno 0 è lo stato iniziale

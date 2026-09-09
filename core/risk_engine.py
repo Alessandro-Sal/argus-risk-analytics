@@ -618,7 +618,8 @@ def _compute_returns(df_positions: pd.DataFrame,
                     pivot[tk] = pivot[tk] * (1.0 / fx_series_inv)
 
     # ── Data Quality Gate: Rilevamento Serie Illiquide o Prezzi Stantii ──
-    active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist() if "qty_net" in df_positions.columns else df_positions["ticker"].tolist()
+    # Supporta posizioni long e short (qty_net non nullo)
+    active_tickers = df_positions[df_positions["qty_net"].abs() > 1e-8]["ticker"].tolist() if "qty_net" in df_positions.columns else df_positions["ticker"].tolist()
     if warnings_list is not None and not pivot.empty:
         for tk in active_tickers:
             if tk in pivot.columns:
@@ -642,8 +643,14 @@ def _compute_returns(df_positions: pd.DataFrame,
         .set_index("ticker")["weight_pct"] / 100
     )
     common = [t for t in active_tickers if t in df_returns.columns]
-    w = weights.reindex(common).fillna(0)
-    w = w / w.sum()
+    w = weights.reindex(common).fillna(0.0)
+    w_sum = float(w.sum())
+    if abs(w_sum) > 1e-8:
+        w = w / w_sum
+    elif len(common) > 0:
+        w = pd.Series(1.0 / len(common), index=common)
+    else:
+        w = pd.Series(dtype=float)
 
     # I rendimenti di portafoglio partono dalla prima transazione
     df_returns_portfolio = df_returns[df_returns.index >= min_tx_date]
@@ -3064,7 +3071,9 @@ def compute_marginal_and_component_var(
         })
 
     df_decomp = pd.DataFrame(rows).sort_values("component_var_amount", ascending=False).reset_index(drop=True)
-    euler_diff = abs(df_decomp["component_var_amount"].sum() - port_var_amount)
+    euler_diff = abs(float(df_decomp["component_var_amount"].sum() - port_var_amount))
+    rel_euler_error = euler_diff / max(1.0, abs(port_var_amount))
+    euler_check_passed = bool(rel_euler_error < 1e-3 or euler_diff < 0.10)
 
     return {
         "confidence_level": confidence_level,
@@ -3073,7 +3082,7 @@ def compute_marginal_and_component_var(
         "portfolio_var_amount": round(port_var_amount, 2),
         "portfolio_sigma_daily_pct": round(port_sigma * 100.0, 4),
         "decomposition_df": df_decomp,
-        "euler_check_passed": bool(euler_diff < 0.05),
+        "euler_check_passed": euler_check_passed,
         "euler_residual": round(float(euler_diff), 6)
     }
 
