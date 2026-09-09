@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **466 test automatizzati (100% passed)** su 86 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **475 test automatizzati (100% passed)** su 85 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -74,7 +74,7 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**450/450 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**475/475 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
@@ -144,12 +144,17 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Smart Sizing Optimizer & Pre-Trade Impact Simulator**: Simulazione d'impatto pre-trade con massimizzazione dell'indice di Sharpe o del Diversification Ratio (Choueifaty 2008), determinazione del peso ottimo del candidato $w^*$ e curva continua di frontiera Sharpe.
 - **Normalizzazione Istituzionale Dividend Yield %**: Calcolo normalizzato su $\frac{\text{dividendRate}}{\text{last\_price}}\times 100$, pricing sintetico per stablecoin ed ETF europei.
 
-### `core/tax_engine.py` — ✅ Ottimizzazione Fiscale & Tax-Loss Harvesting Wizard (TUIR Art. 67)
-- **Tassazione Normativa Italiana**: Tassazione al 12.5% sui Titoli di Stato (White List) e 26.0% su Azioni, Obbligazioni, ETF e Cripto.
-- **Regola ETF vs Titoli Singoli**: Plusvalenze da ETF considerate *Redditi di Capitale* e non compensabili con minusvalenze (*Redditi Diversi*).
-- **Tax-Loss Harvesting & Step-Up Wizard**:
-  - *Step-Up Fiscale a 0€ Imposte*: Calcolo esatto per vendere e ricomprare posizioni in utile su *Redditi Diversi*, azzerando minusvalenze in scadenza senza esborso fiscale e alzando il prezzo di carico a zero tasse.
-  - *Raccolta Minusvalenze*: Individuazione posizioni in perdita latente da monetizzare per generare scudi fiscali quadriennali.
+### `core/tax_engine.py` — ✅ Ottimizzazione Fiscale, Modello Redditi PF & Tax-Loss Harvesting (TUIR Artt. 44, 67, 68)
+- **Tassazione Normativa Italiana & Aliquote Differenziate**: Tassazione agevolata al 12.5% sui Titoli di Stato ed enti sovranazionali (White List D.M. 04/09/1996) e 26.0% su Azioni, Obbligazioni societarie, ETF, Derivati e Cripto-attività (L. 197/2022).
+- **Asimmetria Normativa ETF vs Titoli Singoli**: Rigorosa distinzione codificata tra *Redditi di Capitale* (Art. 44 TUIR, plusvalenze da ETF armonizzati non compensabili con minus pregresse) e *Redditi Diversi negativi* (Art. 67-68 TUIR, minusvalenze da ETF accreditabili a zainetto fiscale quadriennale e compensabili solo da titoli azionari, obbligazionari, ETC o derivati).
+- **Integrazione Motori di Rebalancing Tax-Aware (`tax_aware_rebalancer.py`, `prescriptive_rebalancer.py`)**: Vincolo matematico che inibisce la compensazione indebita di minusvalenze pregresse su realizzi in utile di ETF.
+- **Prospetto Fiscale Modello Redditi PF (Persone Fisiche)**:
+  - **Quadro RT**: Sezione II (Plusvalenze/Minusvalenze su partecipazioni e titoli azionari/obbligazionari/derivati) e Sezione II-B (Plusvalenze su Cripto-attività ex L. 197/2022 con verifica soglia di realizzo a 2.000€).
+  - **Quadro RW**: Monitoraggio fiscale investimenti esteri e conti correnti offshore (es. Degiro, IBKR, Revolut). Algoritmo di calcolo ponderato della **Giacenza Media** ($\bar{G} > 5.000€$ per assoggettamento all'imposta fissa IVAFE di 34,20€) e tracciamento del **Picco Massimo** intraday ($> 15.000€$ per obbligo di monitoraggio esente da IVAFE). Aliquota IVAFE Paesi Black List (D.M. 04/05/1999) elevata allo 0,40% (4 per mille) ai sensi della L. 213/2023.
+  - **Quadro RM**: Sezione V (Rigo RM12) per proventi da capitale e dividendi esteri percepiti tramite intermediari non residenti senza ritenuta alla fonte a titolo d'imposta (tassazione sostitutiva al 26% su "Netto Frontiera" ex Art. 18 TUIR).
+- **Tax-Loss Harvesting & Step-Up Wizard (Art. 10-bis L. 212/2000)**:
+  - *Step-Up Fiscale a 0€ Imposte*: Calcolo per vendere e ricomprare posizioni in utile su *Redditi Diversi*, azzerando minusvalenze in scadenza senza esborso fiscale ed elevando il prezzo medio di carico.
+  - *Raccolta Minusvalenze & Proxy Substitution*: Individuazione posizioni in perdita latente da monetizzare per generare scudi fiscali, con raccomandazione di sostituzione su Proxy Asset benchmark-correlati (es. cambio ETF/ETC analogo) per preservare l'esposizione di mercato ed evitare fattispecie di abuso del diritto o wash-sale risk.
 
 ### `core/attribution.py` — ✅ Attribuzione Performance Brinson-Fachler
 - Scomposizione dell'extra-rendimento rispetto al benchmark nei 3 fattori: **Allocation Effect**, **Selection Effect** ed **Interaction Effect**.
@@ -275,7 +280,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 16. **`15_⌚_Asset_Illiquidi_e_Orologi.py`**: Gestione asset fisici e collezionabili (orologi di lusso, metalli preziosi, opere d'arte) con storico rivalutazioni, perizie e liquidity haircut.
 17. **`16_🛡️_Previdenza_e_Pension_Planning.py`**: Simulazione pensione pubblica (INPS) e integrativa, stima del tasso di sostituzione, gap pensionistico e deducibilità fiscale contributi (€5.164,57 annui).
 18. **`17_🔥_Indipendenza_Finanziaria_e_FIRE.py`**: Analizzatore di indipendenza finanziaria (FatFIRE, LeanFIRE, CoastFIRE), simulazione stocastica Merton Jump-Diffusion SPI %, Safe Withdrawal Rate (SWR 3%-4%) e target age.
-19. **`18_📑_Fiscalita_e_Quadro_RW.py`**: Compilazione pre-dichiarativa per monitoraggio fiscale estero (Quadro RW, Quadro RT, tributo 1100, IVAFE/IVIE) e ottimizzazione delle minusvalenze.
+19. **`18_📑_Fiscalita_e_Quadro_RW.py`**: Compilazione pre-dichiarativa per monitoraggio fiscale estero (Quadro RW con giacenza media e picco max, Quadro RT, Quadro RM per dividendi esteri a tassazione sostitutiva, tributo 1100, IVAFE ordinaria 0,20% e Black List 0,40%) e ottimizzazione minusvalenze/step-up fiscale.
 20. **`19_🏡_Immobili_e_Mutui.py`**: Registro patrimonio immobiliare, simulazione piani di ammortamento a rate costanti (francese), calcolo LTV dinamico e Net Home Equity.
 21. **`20_⚖️_Pianificazione_Successoria.py`**: Simulazione asse ereditario, quote di legittima e disponibile secondo il Codice Civile, calcolo imposte di successione e donazione con franchigie e strumenti di protezione (Trust, Polizze Vita, Patti di Famiglia).
 22. **`21_🤖_AI_Copilot_e_Advisor.py`**: Assistente patrimoniale conversazionale con accesso contestuale ai dati di bilancio consolidato, validazione di aderenza numerica, guardrails MiFID II / Art. 21 TUF ed Executive Voice Briefing a due voci (CIO & CRO).
@@ -284,7 +289,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **450 test automatizzati passano con successo (100%)** distribuiti su 81 file di test:
+Tutti i **475 test automatizzati passano con successo (100%)** distribuiti su 85 file di test:
 
 ```bash
 py -m pytest
@@ -292,9 +297,9 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 450 passed in ~95.00s (100%) =======================
+======================= 475 passed in ~102.00s (100%) =======================
 ```
 
 ---
 
-*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v7.0.0 Enterprise Release.*
+*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v8.1.0 Enterprise Release.*
