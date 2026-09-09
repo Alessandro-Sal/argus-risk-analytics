@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **487 test automatizzati (100% passed)** su 86 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **499 test automatizzati (100% passed)** su 87 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -74,7 +74,7 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**487/487 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**499/499 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
@@ -258,10 +258,19 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
   - *Conto Economico di Gestione*: Rendiconto annuale delle Entrate (Lavoro, Capitale, Donazioni, Rimborsi) e Costi di Vita/Consumi con margine di Risparmio Netto e Savings Rate %.
   - *Rendiconto di Allocazione del Capitale*: Scomposizione del surplus tra investimenti in asset produttivi (PAC Titoli/ETF, Cripto, Fondi Pensione) e riserva liquida.
   - *6 Indici di Bilancio & Rating*: Solvency Ratio ($\ge 70\%$), Debt-to-Assets ($\le 30\%$), Emergency Runway ($\ge 6\text{ mesi}$), Personal Savings Rate ($\ge 20\%$), DSTI ($\le 33\%$), Invested Assets Ratio ($\ge 50\%$) con Radar Chart e rating Private Banking (AAA/AA/A).
-- **`wealth_engine.py`**: Modelli computazionali per indipendenza finanziaria (FIRE), simulazione mutui/ammortamenti, calcolo Net Worth at Risk (NWaR) e successioni.
+- **`wealth_engine.py`**: Modelli computazionali per indipendenza finanziaria (FIRE), simulazione mutui/ammortamenti, calcolo Net Worth at Risk (NWaR), successioni e pianificazione generazionale conforme ad Artt. 536-564 c.c.
+- **`asset_protection_engine.py`**: Motore di tutela del patrimonio e **`GenerationalTransferOptimizer`** istituzionale per Family Office HNWI:
+  - *Riunione Fittizia (Art. 556 c.c.)*: $\text{Asse} = \max(0, \text{Relictum} - \text{Debiti}) + \text{Donatum}$.
+  - *Quote di Riserva e Disponibile (Artt. 536-544 c.c.)*: Risoluzione per tutte le configurazioni (coniuge, figli, ascendenti) con diritto di abitazione art. 540 c.c.
+  - *Diagnostica Azione di Riduzione (Artt. 553-564 c.c.)*: Rilevamento lesioni e simulazione conguagli.
+  - *Fiscalità Successoria & Donazioni (D.Lgs. 346/1990 TUS)*: Aliquote 4%/6%/8%, franchigie 1M€ / 100k€ e maggiorata ad € 1.500.000 per handicap grave L. 104/1992.
+  - *Imposte Ipo-Catastali (D.Lgs. 347/1990)*: 2% + 1% ordinarie o fisse € 400 (€ 200 + € 200) Prima Casa.
+  - *Tabella Attuariale Usufrutto (D.P.R. 131/1986)*: Calcolo coefficienti ministeriali usufrutto vitalizio e nuda proprietà per età donante.
+  - *Simulazione Dinamica Ante vs. Post*: 4 leve di ottimizzazione (Polizze Vita Ramo I/III esenti art. 12 TUS / art. 1923 c.c., Patto di Famiglia ex art. 768-bis c.c. con esenzione totale art. 3 c. 4-ter TUS, Donazione nuda proprietà, Cointestazione 50% art. 1298 c.c.) e generazione Memorandum Markdown.
 - **`wealth_stress_engine.py`**: Motore congiunto di macro stress testing che modella la trasmissione dello shock tassi sull'ammortamento non-lineare dei mutui alla francese ($\Delta PMT$), identifica il *Point of Forced Liquidation* ($t^*$) sul fondo di emergenza, stima la perdita irreversibile da liquidazione forzata di asset depressi e ricalcola il Safe Withdrawal Rate dinamico con regole di Guyton-Klinger.
 - **`wealth_importer.py` & `wealth_validator.py`**: Parser universale con tolleranza a format drift e riconciliazione automatica con `DataQualityGate`.
 - **`wealth_exporter.py`**: Generazione del Master Workbook Excel (.xlsx multi-tab) sanitizzato con bilancio consolidato e tabelle `ListObject` con formule live.
+
 
 ---
 
@@ -290,14 +299,14 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 18. **`17_🔥_Indipendenza_Finanziaria_e_FIRE.py`**: Analizzatore di indipendenza finanziaria (FatFIRE, LeanFIRE, CoastFIRE), simulazione stocastica Merton Jump-Diffusion SPI %, Safe Withdrawal Rate (SWR 3%-4%) e target age.
 19. **`18_📑_Fiscalita_e_Quadro_RW.py`**: Compilazione pre-dichiarativa per monitoraggio fiscale estero (Quadro RW con giacenza media e picco max, Quadro RT, Quadro RM per dividendi esteri a tassazione sostitutiva, tributo 1100, IVAFE ordinaria 0,20% e Black List 0,40%) e ottimizzazione minusvalenze/step-up fiscale.
 20. **`19_🏡_Immobili_e_Mutui.py`**: Registro patrimonio immobiliare, simulazione piani di ammortamento a rate costanti (francese), calcolo LTV dinamico e Net Home Equity.
-21. **`20_⚖️_Pianificazione_Successoria.py`**: Simulazione asse ereditario, quote di legittima e disponibile secondo il Codice Civile, calcolo imposte di successione e donazione con franchigie e strumenti di protezione (Trust, Polizze Vita, Patti di Famiglia).
+21. **`20_⚖️_Pianificazione_Successoria.py`**: Simulazione asse ereditario con Riunione Fittizia ex art. 556 c.c., quote di legittima e disponibile secondo il Codice Civile (artt. 536-544 c.c.), diagnosi azione di riduzione (artt. 553-564 c.c.), calcolo imposte di successione (D.Lgs. 346/1990) con franchigie ordinarie e maggiorata L. 104 ad € 1.500.000, imposte ipo-catastali e **Generational Transfer Optimizer (Ante vs. Post)** con 4 leve di ottimizzazione (Polizze Vita esenti art. 12 TUS / art. 1923 c.c., Patto di Famiglia art. 768-bis c.c. con esenzione totale art. 3 c. 4-ter TUS, Donazione Nuda Proprietà con tabella usufrutto per età D.P.R. 131/1986, Cointestazione 50% art. 1298 c.c.) e Memorandum Markdown Family Office.
 22. **`21_🤖_AI_Copilot_e_Advisor.py`**: Assistente patrimoniale conversazionale con accesso contestuale ai dati di bilancio consolidato, validazione di aderenza numerica, guardrails MiFID II / Art. 21 TUF ed Executive Voice Briefing a due voci (CIO & CRO).
 
 ---
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **487 test automatizzati passano con successo (100%)** distribuiti su 86 file di test (inclusi i test di resilienza SRE Circuit Breaker e Full Jitter Retry):
+Tutti i **499 test automatizzati passano con successo (100%)** distribuiti su 87 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter e il nuovo modulo `tests/test_estate_planning_optimizer.py`):
 
 ```bash
 py -m pytest
@@ -305,7 +314,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 487 passed in ~88.00s (100%) =======================
+======================= 499 passed in ~59.00s (100%) =======================
 ```
 
 ---

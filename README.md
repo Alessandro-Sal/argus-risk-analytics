@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-487%2F487%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-499%2F499%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
@@ -262,13 +262,21 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🏢 Real Estate ROI & Cap Rate**: Valutazione del rendimento lordo/netto da locazione, Cash-on-Cash Return e incidenza imposte (Cedolare Secca vs IRPEF, IMU).
 * **⚖️ Buy vs Rent Analyzer**: Modello comparativo a valore attuale netto (NPV) tra acquisto prima casa con mutuo vs affitto con investimento del capitale risparmiato.
 
-### 20. ⚖️ Pianificazione Successoria & Asse Ereditario (`src/pages/20_⚖️_Pianificazione_Successoria.py`)
-* **📜 Asse Ereditario & Quote di Legittima**: Calcolo automatico della quota di riserva e della quota disponibile secondo il Codice Civile (artt. 536 e ss.) per coniuge, figli e ascendenti con riunione fittizia e donazioni pregresse.
-* **🏛️ Motore Fiscale Successioni (D.Lgs. 346/1990)**:
-  * Determinazione dell'asse ereditario netto con esclusione ex lege di Titoli di Stato BTP, Polizze Vita Ramo I/III e Fondi Pensione.
-  * Applicazione automatica delle franchigie per grado di parentela (1.000.000€ per coniuge e figli al 4%, 100.000€ per fratelli al 6%, 1.500.000€ per soggetti con disabilità grave L. 104) e imposte ipotecarie/catastali (fissa 400€ prima casa).
-* **🏛️ Family Governance & Patti di Famiglia (Art. 768-bis c.c.)**: Simulazione del trasferimento del controllo d'impresa o quote di holding all'erede designato, determinazione del valore di liquidazione compensativa per i legittimari non assegnatari, attivazione dello scudo legale contro future azioni di riduzione/collazione e checklist notarile.
-* **🛡️ Strumenti di Protezione Patrimoniale**: Analisi di polizze vita (esenti da imposta di successione), trust di scopo e donazioni scaglionate su orizzonte pluriennale.
+### 20. ⚖️ Pianificazione Successoria, Generational Transfer & Asset Protection (`src/pages/20_⚖️_Pianificazione_Successoria.py`)
+* **📜 Asse Ereditario & Riunione Fittizia (Art. 556 c.c.)**: Formalizzazione contabile dell'attivo ereditario $\text{Asse} = \max(0, \text{Relictum} - \text{Debiti}) + \text{Donatum}$ con deducibilità passività e divieto di erosione del donatum sotto zero (Cass. Civ. 12919/2012).
+* **🍰 Quote di Riserva e Disponibile (Codice Civile Artt. 536-544 c.c.)**: Ripartizione matematica per tutte le configurazioni familiari: coniuge solo (50% riserva + diritto abitazione art. 540 c.c.), coniuge + 1 figlio (1/3 ciascuno), coniuge + $\ge 2$ figli (25% coniuge, 50% figli), solo figli (50% unico, 66.67% multipli), concorso coniuge (50%) + ascendenti (25%) ex art. 544 c.c., e soli ascendenti (33.33% art. 538 c.c.).
+* **🛡️ Diagnostica Azione di Riduzione (Artt. 553-564 c.c.)**: Rilevamento in tempo reale delle lesioni di legittima su disposizioni testamentarie e donazioni pregresse a ritroso.
+* **🧾 Motore Fiscale Successioni e Donazioni (D.Lgs. 346/1990 - TUS & D.Lgs. 347/1990)**:
+  * Mappatura aliquote e franchigie per grado di parentela: 4% oltre 1.000.000€ (coniuge/linea retta), 6% oltre 100.000€ (fratelli/sorelle), 6% senza franchigia (parenti entro 4° grado), 8% (terzi estranei).
+  * Franchigia maggiorata a **1.500.000€** per soggetti con disabilità grave riconosciuta ex L. 104/1992 (art. 2 c. 49-bis D.L. 262/2006).
+  * Imposte ipotecarie (2%) e catastali (1%) con calcolo forfettario fisso a **€ 400 totali** (€ 200 + € 200) per agevolazione "Prima Casa" (L. 342/2000).
+* **🚀 Generational Transfer Optimizer (Ante vs. Post Pianificazione HNWI)**:
+  * Simulatore quantitativo per confrontare lo *Status Quo* (inerzia successoria) contro la *Pianificazione Attiva*.
+  * **Leva Polizze Vita Ramo I/III**: Capitale esente da imposta successoria (art. 12 lett. c TUS), impignorabile/insequestrabile (art. 1923 c.c.) e liquidabile agli eredi entro 30 giorni per azzerare il *Succession Liquidity Crunch*.
+  * **Leva Patto di Famiglia & Holding Familiare (Società Semplice)**: Esenzione totale al 100% da imposta di successione/donazione per quote di controllo societario ($\ge 50\%+1$) ex art. 3 c. 4-ter TUS con prosecuzione quinquennale e blindatura legale da collazione e riduzione (art. 768-quater c.c.).
+  * **Leva Donazione Nuda Proprietà Immobili**: Applicazione della tabella ministeriale attuariale dei coefficienti di usufrutto a vita per età del donante (D.P.R. 131/1986) con abbattimento immediato della base imponibile e consolidamento automatico a costo zero alla morte.
+  * **Leva Cointestazione Conti**: Presunzione paritetica 50% ex art. 1298 c.c. con liquidità immediatamente disponibile agli eredi.
+  * Cruscotto interattivo KPI con delta imposte risparmiate (€ e %), Liquidity Coverage Ratio (LCR), Score di Protezione Patrimoniale (0-100) ed esportazione dell'**Executive Succession Memorandum** in Markdown.
 
 ### 21. 🤖 AI Wealth Copilot & Advisor (`src/pages/21_🤖_AI_Copilot_e_Advisor.py`)
 * **🧠 Diagnostica Patrimoniale AI**: Analisi automatica in linguaggio naturale dello stato di salute patrimoniale, cash flow ed esposizione al rischio.
@@ -606,7 +614,7 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py
 │       ├── 20_⚖️_Pianificazione_Successoria.py
 │       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (487 Test su 86 File)
+├── tests/                       # Test suite automatizzata PyTest (499 Test su 87 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
@@ -714,7 +722,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **487 test automatizzati PyTest** distribuiti su 86 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022 e test di resilienza SRE Circuit Breaker/Jitter) con copertura end-to-end del 100%:
+Il progetto include **499 test automatizzati PyTest** distribuiti su 87 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter e simulazioni successorie del Codice Civile / TUS) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -722,7 +730,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 487 passed in ~88.00s (100%) =======================
+======================= 499 passed in ~59.00s (100%) =======================
 ```
 
 ---
