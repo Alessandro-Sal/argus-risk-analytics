@@ -90,8 +90,15 @@ from core.diagnostics import (
     optimize_database_storage,
     clean_expired_cache_records,
     reindex_databases,
+    setup_logging,
+    get_recent_logs,
+    generate_support_bundle,
+    get_hardware_and_environment_specs,
 )
 from core.cache_shield import clear_cache
+
+# Inizializzazione Centralizzata Logging SRE & Sanitizzazione PII
+setup_logging()
 
 inject_custom_css()
 
@@ -1512,10 +1519,12 @@ with tab_diagnostics:
     st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
 
     # Tabs Tematiche per Diagnostica
-    tab_diag_db, tab_diag_cache, tab_diag_lat = st.tabs([
+    tab_diag_db, tab_diag_cache, tab_diag_lat, tab_diag_logs, tab_diag_bundle = st.tabs([
         "🗄️ Storage & Memoria DB (Footprint)",
         "🛡️ Multi-Tier Cache Shield (Yahoo Finance)",
-        "⚡ Benchmark Latenza Motori Quantitativi"
+        "⚡ Benchmark Latenza Motori Quantitativi",
+        "📜 Log di Sistema & Audit Contabile",
+        "📦 Export Support Bundle & Diagnostica"
     ])
 
     with tab_diag_db:
@@ -1624,6 +1633,118 @@ with tab_diagnostics:
         * **Pandas Version**: `{env_dict['pandas_version']}`
         * **Determinismo Seed Stocastico**: `{'🟢 Confermato (Numpy 100% Deterministico)' if diag_res['seed_deterministic'] else '🔴 Non Deterministico'}`
         """)
+
+    with tab_diag_logs:
+        st.markdown("##### 📜 Registro Eventi Strutturato & Audit Trail Contabile")
+        col_l_chan, col_l_level, col_l_limit, col_l_ref = st.columns([1.5, 1.2, 1.0, 0.8])
+        with col_l_chan:
+            sel_channel = st.selectbox(
+                "Canale Registro",
+                options=["system", "audit"],
+                format_func=lambda x: "💻 Sistema & Ops (argus_system.jsonl)" if x == "system" else "🏛️ Audit Contabile (argus_audit.jsonl)",
+                key="diag_sel_channel"
+            )
+        with col_l_level:
+            sel_level = st.selectbox(
+                "Livello Minimo",
+                options=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+                index=1,
+                key="diag_sel_level"
+            )
+        with col_l_limit:
+            sel_limit = st.selectbox(
+                "Righe Max",
+                options=[25, 50, 100, 250],
+                index=1,
+                key="diag_sel_limit"
+            )
+        with col_l_ref:
+            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+            if st.button("🔄 Ricarica", key="diag_btn_reload_logs", use_container_width=True):
+                st.rerun()
+
+        st.caption("🔒 **Filtro di Redazione Attivo**: IBAN, Codici Fiscali, numeri di carte, controvalori e credenziali vengono automaticamente oscurati a monte.")
+
+        recent_logs = get_recent_logs(channel=sel_channel, limit=sel_limit, min_level=sel_level)
+        if not recent_logs:
+            st.info(f"Nessun evento registrato per il canale `{sel_channel}` con livello `>= {sel_level}`.")
+        else:
+            rows_display = []
+            for r in recent_logs:
+                lvl = r.get("level", "INFO")
+                icon = "🟢" if lvl == "INFO" else ("🟡" if lvl == "WARNING" else ("🔴" if lvl in ("ERROR", "CRITICAL") else "⚪"))
+                rows_display.append({
+                    "Stato": f"{icon} {lvl}",
+                    "Timestamp (UTC)": r.get("timestamp", "").replace("T", " ")[:19],
+                    "Modulo": r.get("module", "N/A"),
+                    "Funzione": r.get("function", "N/A"),
+                    "Messaggio Sanificato": r.get("message", ""),
+                    "Latenza (ms)": f"{r['execution_time_ms']:.1f}" if "execution_time_ms" in r else "-"
+                })
+            df_logs = pd.DataFrame(rows_display)
+            st.dataframe(df_logs, use_container_width=True, hide_index=True)
+
+            with st.expander("🔍 Ispezione JSON Strutturato Grezzo (Ultimi Eventi)"):
+                st.json(recent_logs[:10])
+
+    with tab_diag_bundle:
+        st.markdown("##### 📦 Self-Service Diagnostics & Esportazione Support Bundle")
+        st.markdown("""
+        Genera un archivio compresso **ZIP completo e sanificato** contenente metriche hardware, benchmark motori,
+        stato dei database embedded e gli ultimi log. Il pacchetto è pronto per essere allegato a ticket di supporto o issue GitHub.
+        """)
+
+        specs = get_hardware_and_environment_specs()
+        
+        c_b1, c_b2, c_b3 = st.columns(3)
+        with c_b1:
+            st.markdown(f"""
+            **🖥️ Piattaforma & CPU**
+            * OS: `{specs.get('os_system')} {specs.get('os_release')}`
+            * Architettura: `{specs.get('machine')}`
+            * Core Fisici / Logici: `{specs.get('cpu', {}).get('physical_cores')}` / `{specs.get('cpu', {}).get('logical_cores')}`
+            """)
+        with c_b2:
+            st.markdown(f"""
+            **🧠 Memoria & Storage**
+            * RAM Totale: `{specs.get('memory', {}).get('total_gb')} GB`
+            * RAM Disponibile: `{specs.get('memory', {}).get('available_gb')} GB`
+            * Disco Libero: `{specs.get('disk', {}).get('free_gb')} GB`
+            """)
+        with c_b3:
+            st.markdown(f"""
+            **🐍 Runtime & Versioni**
+            * Python: `{specs.get('python_version')}`
+            * SQLite: `{specs.get('packages', {}).get('sqlite3')}`
+            * DuckDB: `{specs.get('packages', {}).get('duckdb')}`
+            * Streamlit: `{specs.get('packages', {}).get('streamlit')}`
+            """)
+
+        st.markdown("""
+        <div style="background: rgba(46, 160, 67, 0.08); border: 1px solid rgba(46, 160, 67, 0.3); border-radius: 8px; padding: 12px; margin: 12px 0;">
+            <span style="color: #3fb950; font-weight: 700;">🔒 Garanzia di Riservatezza & Conformità GDPR Art. 32 / PCI-DSS:</span><br>
+            <span style="color: #c9d1d9; font-size: 12.5px;">
+            Il generatore del Support Bundle esegue una doppia sanitizzazione. Nessun dato personale (Codice Fiscale, email, telefoni),
+            coordinata bancaria (IBAN), numero di carta di credito, password o controvalore monetario patrimoniale viene esportato.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        include_logs_opt = st.checkbox("Includi gli ultimi 500 eventi di log sanificati (Sistema & Audit)", value=True, key="chk_include_logs_bundle")
+        
+        bundle_bytes = generate_support_bundle(include_logs=include_logs_opt, max_log_lines=500)
+        now_bundle_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        bundle_name = f"argus_support_bundle_{now_bundle_str}.zip"
+
+        st.download_button(
+            label=f"📥 Scarica Support Bundle ({len(bundle_bytes) / 1024.0:.1f} KB)",
+            data=bundle_bytes,
+            file_name=bundle_name,
+            mime="application/zip",
+            use_container_width=True,
+            type="primary",
+            key="btn_download_support_bundle"
+        )
 
 # =============================================================
 # TAB 5: MOTORE ANALITICO EMBEDDED DUCKDB (OLAP & SQL SANDBOX)
