@@ -131,3 +131,16 @@ from core.wealth.wealth_stress_engine import (
     create_liquidity_squeeze_timeline_chart,
     simulate_wealth_recovery_trajectories
 )
+
+from core.wealth.asset_protection_engine import (
+    ProtectionVehicleAnalysis,
+    FamilyHeir,
+    FamilyProfile,
+    StatutoryShareItem,
+    SuccessionSharesResult,
+    PlanningLevers,
+    OptimizationComparisonResult,
+    GenerationalTransferOptimizer,
+    AssetProtectionEngine
+)
+

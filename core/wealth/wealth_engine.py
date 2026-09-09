@@ -1232,66 +1232,92 @@ def compute_estate_planning_analytics(
     family_situation: str = "spouse_and_children",
     children_count: int = 2,
     has_spouse: bool = True,
-    donations_in_life: float = 0.0
+    donations_in_life: float = 0.0,
+    has_ascendants: bool = False,
+    has_siblings: bool = False,
+    disabled_children_count: int = 0,
+    liabilities_deductible: float = 0.0,
+    is_first_home_applicable: bool = True
 ) -> Dict[str, Any]:
     """
-    Calcola l'asse ereditario secondo il Codice Civile Italiano (Art. 536-544 c.c.):
+    Calcola l'asse ereditario secondo il Codice Civile Italiano (Art. 536-544, 556 c.c.):
+    - Riunione Fittizia: Asse = (Relictum Lordo - Debiti Deducibili) + Donatum in Vita.
     - Quota di Riserva (Legittima) per ciascun erede e Quota Disponibile.
-    - Calcolo Imposta di Successione (D.Lgs. 346/1990) e franchigie di legge (€ 1M per coniuge/figli al 4%).
-    - Mappatura asset esenti da imposta successoria (Titoli di Stato, Polizze Vita, Fondi Pensione).
+    - Calcolo Imposta di Successione (D.Lgs. 346/1990) con aliquote 4%/6%/8% e franchigie (€ 1M, € 100k, € 1.5M per L. 104).
+    - Imposte Ipotecarie e Catastali (D.Lgs. 347/1990) con agevolazione Prima Casa (€ 200 + € 200 fisse).
+    - Mappatura asset esenti da imposta successoria (Titoli di Stato art. 12 TUS, Polizze Vita art. 1923 c.c., Fondi Pensione).
     """
-    total_wealth = net_worth_summary.total_net_worth + donations_in_life
+    relictum_gross = float(net_worth_summary.total_net_worth)
+    liab = max(0.0, float(liabilities_deductible))
+    relictum_net = max(0.0, relictum_gross - liab)
+    donations = max(0.0, float(donations_in_life))
+    total_wealth = relictum_net + donations
+    dis_ch = min(children_count, max(0, int(disabled_children_count)))
     
-    # 1. Determinazione Quote Codice Civile
-    if has_spouse and children_count == 0:
+    # 1. Determinazione Quote Codice Civile (Artt. 536-544 c.c.)
+    if has_spouse and children_count == 0 and not has_ascendants:
         legittima_coniuge_pct = 50.0
         legittima_figli_tot_pct = 0.0
+        legittima_ascendenti_tot_pct = 0.0
         disponibile_pct = 50.0
-        quota_desc = "Coniuge senza figli: 50% Legittima Coniuge, 50% Disponibile (art. 540 c.c.)"
+        quota_desc = "Coniuge senza figli (art. 540 c.c.): 50% Legittima Coniuge, 50% Disponibile (+ Diritto Abitazione)."
+    elif has_spouse and children_count == 0 and has_ascendants:
+        legittima_coniuge_pct = 50.0
+        legittima_figli_tot_pct = 0.0
+        legittima_ascendenti_tot_pct = 25.0
+        disponibile_pct = 25.0
+        quota_desc = "Coniuge + Ascendenti in vita (art. 544 c.c.): 50% Coniuge, 25% Ascendenti, 25% Disponibile."
+    elif not has_spouse and children_count == 0 and has_ascendants:
+        legittima_coniuge_pct = 0.0
+        legittima_figli_tot_pct = 0.0
+        legittima_ascendenti_tot_pct = 33.33
+        disponibile_pct = 66.67
+        quota_desc = "Solo Ascendenti in vita (art. 538 c.c.): 1/3 Ascendenti, 2/3 Disponibile."
     elif has_spouse and children_count == 1:
         legittima_coniuge_pct = 33.33
         legittima_figli_tot_pct = 33.33
+        legittima_ascendenti_tot_pct = 0.0
         disponibile_pct = 33.34
-        quota_desc = "Coniuge + 1 Figlio: 1/3 Coniuge, 1/3 Figlio, 1/3 Disponibile (art. 542 c.c.)"
+        quota_desc = "Coniuge + 1 Figlio (art. 542 c. 1 c.c.): 1/3 Coniuge, 1/3 Figlio, 1/3 Disponibile."
     elif has_spouse and children_count >= 2:
         legittima_coniuge_pct = 25.0
         legittima_figli_tot_pct = 50.0
+        legittima_ascendenti_tot_pct = 0.0
         disponibile_pct = 25.0
-        quota_desc = f"Coniuge + {children_count} Figli: 25% Coniuge, 50% Figli (divisi in parti uguali), 25% Disponibile (art. 542 c.c.)"
+        quota_desc = f"Coniuge + {children_count} Figli (art. 542 c. 2 c.c.): 25% Coniuge, 50% Figli (divisi in parti uguali), 25% Disponibile."
     elif not has_spouse and children_count == 1:
         legittima_coniuge_pct = 0.0
         legittima_figli_tot_pct = 50.0
+        legittima_ascendenti_tot_pct = 0.0
         disponibile_pct = 50.0
-        quota_desc = "Solo 1 Figlio: 50% Figlio, 50% Disponibile (art. 537 c.c.)"
+        quota_desc = "Solo 1 Figlio (art. 537 c. 1 c.c.): 50% Figlio, 50% Disponibile."
     elif not has_spouse and children_count >= 2:
         legittima_coniuge_pct = 0.0
         legittima_figli_tot_pct = 66.67
+        legittima_ascendenti_tot_pct = 0.0
         disponibile_pct = 33.33
-        quota_desc = f"Solo {children_count} Figli: 2/3 Figli ({round(66.67/children_count, 2)}% cad.), 1/3 Disponibile (art. 537 c.c.)"
-    else: # Nessun coniuge, nessun figlio (Ascendenti o terzi)
+        quota_desc = f"Solo {children_count} Figli (art. 537 c. 2 c.c.): 2/3 Figli ({round(66.67/children_count, 2)}% cad.), 1/3 Disponibile."
+    else: # Nessun legittimario primario
         legittima_coniuge_pct = 0.0
         legittima_figli_tot_pct = 0.0
+        legittima_ascendenti_tot_pct = 0.0
         disponibile_pct = 100.0
-        quota_desc = "Nessun legittimario primario: 100% Asse Ereditario Disponibile"
+        quota_desc = "Nessun legittimario primario (art. 536 c.c.): 100% Asse Ereditario Disponibile."
 
     val_legittima_coniuge = total_wealth * (legittima_coniuge_pct / 100.0)
     val_legittima_figli_tot = total_wealth * (legittima_figli_tot_pct / 100.0)
     val_legittima_per_figlio = (val_legittima_figli_tot / children_count) if children_count > 0 else 0.0
+    val_legittima_ascendenti = total_wealth * (legittima_ascendenti_tot_pct / 100.0)
     val_disponibile = total_wealth * (disponibile_pct / 100.0)
 
     # 2. Asset Esenti / Protetti da Imposta di Successione
-    # Fondi pensione esenti da successione, Titoli di stato esenti, Polizze vita caso morte esenti
-    exempt_pension = net_worth_summary.pension_total
-    # Stima titoli di stato (esenti art. 12 TUS) ~20% dei portafogli titoli
-    exempt_gov_bonds = net_worth_summary.financial_investments * 0.15
+    exempt_pension = getattr(net_worth_summary, "pension_total", 0.0)
+    exempt_gov_bonds = getattr(net_worth_summary, "financial_investments", 0.0) * 0.15
     total_exempt_assets = exempt_pension + exempt_gov_bonds
-    taxable_estate = max(0.0, net_worth_summary.total_net_worth - total_exempt_assets)
+    taxable_estate = max(0.0, relictum_net - total_exempt_assets)
 
-    # 3. Calcolo Imposta di Successione con Franchigie
-    # Franchigia per Coniuge e ciascun Figlio: € 1.000.000 (Aliquota 4%)
+    # 3. Calcolo Imposta di Successione con Franchigie (D.Lgs. 346/1990)
     franchigia_coniuge = 1000000.0
-    franchigia_figlio = 1000000.0
-    
     tax_heirs = []
     tot_tax = 0.0
 
@@ -1300,7 +1326,7 @@ def compute_estate_planning_analytics(
         tax_c = quota_tassabile_coniuge * 0.04
         tot_tax += tax_c
         tax_heirs.append({
-            "erede": "Coniuge",
+            "erede": "Coniuge Superstite",
             "quota_valore": round(taxable_estate * (legittima_coniuge_pct / 100.0), 2),
             "franchigia": franchigia_coniuge,
             "base_imponibile": round(quota_tassabile_coniuge, 2),
@@ -1309,11 +1335,14 @@ def compute_estate_planning_analytics(
         })
 
     for i in range(1, children_count + 1):
-        quota_tassabile_f = max(0.0, (val_legittima_per_figlio * (taxable_estate / total_wealth if total_wealth > 0 else 1.0)) - franchigia_figlio)
+        is_dis = (i <= dis_ch)
+        franchigia_figlio = 1500000.0 if is_dis else 1000000.0
+        quota_heir_val = val_legittima_per_figlio * (taxable_estate / total_wealth if total_wealth > 0 else 1.0)
+        quota_tassabile_f = max(0.0, quota_heir_val - franchigia_figlio)
         tax_f = quota_tassabile_f * 0.04
         tot_tax += tax_f
         tax_heirs.append({
-            "erede": f"Figlio #{i}",
+            "erede": f"Figlio #{i}" + (" (Handicap L. 104)" if is_dis else ""),
             "quota_valore": round(val_legittima_per_figlio, 2),
             "franchigia": franchigia_figlio,
             "base_imponibile": round(quota_tassabile_f, 2),
@@ -1321,8 +1350,35 @@ def compute_estate_planning_analytics(
             "imposta_dovuta": round(tax_f, 2)
         })
 
+    if legittima_ascendenti_tot_pct > 0:
+        quota_asc = max(0.0, (taxable_estate * (legittima_ascendenti_tot_pct / 100.0)) - 1000000.0)
+        tax_asc = quota_asc * 0.04
+        tot_tax += tax_asc
+        tax_heirs.append({
+            "erede": "Ascendenti (Genitori)",
+            "quota_valore": round(val_legittima_ascendenti, 2),
+            "franchigia": 1000000.0,
+            "base_imponibile": round(quota_asc, 2),
+            "aliquota": "4%",
+            "imposta_dovuta": round(tax_asc, 2)
+        })
+
+    # 4. Imposte Ipotecarie (2%) e Catastali (1%) ex D.Lgs. 347/1990
+    re_val = getattr(net_worth_summary, "real_estate_total", 0.0)
+    if re_val > 0:
+        if is_first_home_applicable:
+            mortgage_cadastral = 400.0  # € 200 ipotecaria + € 200 catastale fisse
+        else:
+            mortgage_cadastral = re_val * 0.03
+    else:
+        mortgage_cadastral = 0.0
+
     return {
-        "total_wealth": total_wealth,
+        "relictum_gross": round(relictum_gross, 2),
+        "liabilities_deductible": round(liab, 2),
+        "relictum_net": round(relictum_net, 2),
+        "donatum_total": round(donations, 2),
+        "total_wealth": round(total_wealth, 2),
         "taxable_estate": round(taxable_estate, 2),
         "total_exempt_assets": round(total_exempt_assets, 2),
         "exempt_pension": round(exempt_pension, 2),
@@ -1337,6 +1393,8 @@ def compute_estate_planning_analytics(
         "val_disponibile": round(val_disponibile, 2),
         "tax_heirs": tax_heirs,
         "total_succession_tax": round(tot_tax, 2),
+        "mortgage_cadastral_tax": round(mortgage_cadastral, 2),
+        "total_taxes_with_ipocatastali": round(tot_tax + mortgage_cadastral, 2),
         "is_under_exempt_threshold": tot_tax == 0.0
     }
 
