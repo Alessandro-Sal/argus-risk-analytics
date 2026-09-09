@@ -679,17 +679,12 @@ with tab_ingest:
         # Mappatura ISIN / Yahoo Ticker
         @st.cache_data(show_spinner=False)
         def fetch_yahoo_ticker_for_isin(isin: str) -> str:
-            url = f"https://query2.finance.yahoo.com/v1/finance/search?q={isin}"
-            headers = {'User-Agent': 'Mozilla/5.0'}
+            from core.adapters.isin_resolver import search_yahoo_isin_details
             try:
-                res = requests.get(url, headers=headers, timeout=5)
-                data = res.json()
-                quotes = data.get('quotes', [])
-                if quotes:
-                    return quotes[0].get('symbol', "")
+                sym, _ = search_yahoo_isin_details(isin, timeout=5)
+                return sym
             except Exception:
-                pass
-            return ""
+                return ""
 
         ISIN_PATTERN = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
         unmapped_isins = [t for t in s["tickers"] if ISIN_PATTERN.match(t)]
@@ -1286,12 +1281,9 @@ with tab_isin_mapping:
         if btn_resolve_isin and input_isin_code:
             with st.spinner(f"Ricerca ticker Yahoo per {input_isin_code}..."):
                 try:
-                    url_srch = f"https://query2.finance.yahoo.com/v1/finance/search?q={input_isin_code}"
-                    res_srch = requests.get(url_srch, headers={'User-Agent': 'Mozilla/5.0'}, timeout=5).json()
-                    quotes = res_srch.get('quotes', [])
-                    if quotes:
-                        sug_sym = quotes[0].get('symbol', '')
-                        long_name = quotes[0].get('longname', quotes[0].get('shortname', ''))
+                    from core.adapters.isin_resolver import search_yahoo_isin_details
+                    sug_sym, long_name = search_yahoo_isin_details(input_isin_code, timeout=5)
+                    if sug_sym:
                         st.success(f"🎯 Risolto con successo: **`{sug_sym}`** {f'({long_name})' if long_name else ''}")
                         st.session_state["suggested_yf_val"] = sug_sym
                         if not input_asset_desc and long_name:

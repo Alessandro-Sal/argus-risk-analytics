@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **475 test automatizzati (100% passed)** su 85 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **487 test automatizzati (100% passed)** su 86 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -74,7 +74,7 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**475/475 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**487/487 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
@@ -179,6 +179,14 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ### `core/cache_shield.py` — ✅ Multi-Tier Caching & Rate-Limit Shield
 - Architettura a 2 livelli (L1 RAM LRU + L2 SQLite `data/yfinance_cache.db` con TTL a 24h).
+- Fallback automatico su Stooq Data Provider per azioni ed indici in caso di congestione su Yahoo Finance.
+
+### `core/resilient_market_engine.py` — ✅ Enterprise SRE Market Data Resilience Engine
+- **Circuit Breaker a 3 Stati (`CLOSED`, `OPEN`, `HALF_OPEN`)**: Macchina a stati finiti thread-safe conforme allo standard Netflix Hystrix per prevenire il sovraccarico di endpoint in throttling (429/503) garantendo il Fast-Fail a 0ms su provider secondari o cache locale.
+- **Retry Policy con Full Jitter (AWS Architecture Pattern)**: Algoritmo di backoff esponenziale con decorrelazione uniforme casuale $t = \text{random}(0.1, \min(T_{\max}, T_{\text{base}} \cdot 2^{\text{attempt}}))$ per azzerare l'effetto "Thundering Herd" e rispetto dell'header `Retry-After`.
+- **Stooq Free Fallback Engine**: Connettore mondiale per quotazioni azionarie, ETF, indici e valute senza vincoli di chiavi API.
+- **Market-Aware Freshness & Staleness Evaluator**: Classificazione formale della freschezza dei dati sincronizzata con il calendario di mercato borsistico reale (`LIVE_REALTIME`, `END_OF_DAY_FRESH`, `MARKET_CLOSED_BENIGN`, `STALE_WARNING`, `OFFLINE_EMERGENCY`).
+- **Data Envelope `MarketDataEnvelope`**: Busta di trasporto dati con indicazione di latenza in ms, timestamp di acquisizione e warning informativi per la dashboard.
 ### `core/bquant_engine.py` — ✅ BQuant In-Memory Python Sandbox & DuckDB SQL
 - **In-Memory Sandboxed Execution**: Esecuzione dinamica sicura di script Python con iniezione del bundle di sessione (`df_positions`, `df_returns`, `df_prices`, `results`, `duckdb`).
 - **DuckDB SQL Integration**: Registrazione automatica dei DataFrame in sessione in-memory per query analitiche SQL con sintassi ANSI e aggregazioni OLAP sub-millisecondo.
@@ -289,7 +297,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **475 test automatizzati passano con successo (100%)** distribuiti su 85 file di test:
+Tutti i **487 test automatizzati passano con successo (100%)** distribuiti su 86 file di test (inclusi i test di resilienza SRE Circuit Breaker e Full Jitter Retry):
 
 ```bash
 py -m pytest
@@ -297,7 +305,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 475 passed in ~102.00s (100%) =======================
+======================= 487 passed in ~88.00s (100%) =======================
 ```
 
 ---
