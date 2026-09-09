@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-538%2F538%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-543%2F543%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
@@ -627,7 +627,7 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py
 │       ├── 20_⚖️_Pianificazione_Successoria.py
 │       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (538 Test su 91 File)
+├── tests/                       # Test suite automatizzata PyTest (543 Test su 92 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
@@ -717,7 +717,8 @@ argus-risk-analytics/
 │   ├── test_tax_engine_normative_audit.py
 │   ├── test_resilient_market_engine.py
 │   ├── test_structured_logging_and_support_bundle.py
-│   └── test_realistic_portfolio_generator.py
+│   ├── test_realistic_portfolio_generator.py
+│   └── test_tca_and_optimal_execution.py
 ├── .env.example                 # Esempio configurazione variabili d'ambiente
 ├── CODE_OF_CONDUCT.md           # Codice di Condotta
 ├── CONTRIBUTING.md              # Guida ai contributi
@@ -739,7 +740,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **538 test automatizzati PyTest** distribuiti su 91 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, e la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`) con copertura end-to-end del 100%:
+Il progetto include **543 test automatizzati PyTest** distribuiti su 92 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, e il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -747,7 +748,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 538 passed in ~63.00s (100%) =======================
+======================= 543 passed in ~86.00s (100%) =======================
 ```
 
 ---

@@ -1,4 +1,4 @@
-# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.2.0 Enterprise Release)
+# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.3.0 Enterprise Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.2.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.3.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Data Quality Gate (Pydantic v2), Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), Backup Engine, Security Vault, AI Analyst (Dual-Engine LLM/NLG con Guardrails MiFID II / Art. 21 TUF), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML/Parquet, Plotly Institutional Framework e Design System.
@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **538 test automatizzati (100% passed)** su 91 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **543 test automatizzati (100% passed)** su 92 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -168,6 +168,25 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ### `core/advisor.py` — ✅ ARGUS Quant Advisor & Health Score
 - Punteggio sintetico di salute del portafoglio (0-100) calcolato analizzando concentrazione HHI, contributi al rischio di perdita estrema (Component VaR > 25%), multipli di valutazione elevati (P/E > 45x) ed opportunità di incremento dello Sharpe Ratio via Markowitz.
+
+### `core/execution_algo.py` & `core/execution_algo_engine.py` — ✅ Institutional Algorithmic Execution, TCA & Multi-Broker Router
+- **Modellazione Microstrutturale dell'Impatto di Mercato (Square-Root Law)**:
+  - *Impatto Temporaneo*: $I_{\text{temp}} = \text{half\_spread} + \eta \cdot \sigma_{\text{daily}} \cdot (v_t / V_t)^\alpha$ con calibrazione empirica per mercati azionari UE/US ($\eta \approx 0.142$, $\alpha = 0.5$).
+  - *Impatto Permanente*: $I_{\text{perm}} = \gamma \cdot \sigma_{\text{daily}} \cdot (Q / \text{ADV})$ ($\gamma \approx 0.314$), quantificando l'informazione incorporata permanentemente nel book di negoziazione.
+  - *Profilo Intraday a U*: Generazione del profilo di volume bimodalmente distribuito con apertura sostenuta (`open_rush_factor`) e concentrazione nell'asta di chiusura / Market-on-Close (`close_rush_factor` MOC).
+- **Schedulazione Ottimale degli Ordini (TWAP, VWAP & Almgren-Chriss Basket)**:
+  - *TWAP*: Ripartizione temporale a ritmo costante calibrata sui costi di liquidazione e volatilità istantanea.
+  - *VWAP*: Allineamento dinamico alla curva di liquidità intraday con riduzione dell'impatto nelle ore di picco volumetrico.
+  - *Almgren-Chriss (2000) Multi-Asset Basket Optimizer*: Risoluzione analitica esatta in forma chiusa della traiettoria ottimale $x_i(t) = X_{0,i} \frac{\sinh(\kappa_i(T-t))}{\sinh(\kappa_i T)}$ con velocità di liquidazione $\kappa_i = \sqrt{\frac{\lambda \sigma_i^2}{\eta_i}}$ per trade-off tra costo d'impatto rapido e rischio di mercato (holding cost variance), calcolo di Execution VaR al 95% e 99%.
+- **Pre-Trade & Post-Trade Transaction Cost Analysis (TCA)**:
+  - *Pre-Trade TCA (`compute_pre_trade_tca`)*: Decomposizione analitica ex-ante tra Commissioni Broker esplicite, Costo di Mezzo Spread, Impatto Temporaneo, Impatto Permanente, Timing Risk ($\sigma_{\text{exec}}$), Execution VaR (95%/99%) e intervalli di confidenza probabilistici ($P_{10}, P_{50}, P_{90}$).
+  - *Post-Trade TCA (`compute_post_trade_tca`)*: Riconciliazione ex-post con benchmark di mercato (Arrival Price, Market VWAP, Market Close), scomposizione di Perold (1988) dell'Implementation Shortfall (Delay Cost, Slippage/Impact, Commissioni, Opportunity Cost), attribuzione dell'Alpha Preservation % ed Execution Quality Score istituzionale (0–100).
+- **Multi-Broker Order Routing Exporters**:
+  - *FIX 4.4 Tag-Value Protocol (`generate_fix44_blotter`)*: Generazione di messaggi d'ordine conformi allo standard FIX 4.4 (`35=D`, `Tag 11 ClOrdID`, `Tag 55 Symbol`, `Tag 54 Side`, `Tag 38 OrderQty`, `Tag 40 OrdType`, `Tag 44 Price`, `Tag 10 CheckSum`).
+  - *Interactive Brokers TWS Basket Trader CSV (`export_ibkr_basket_csv`)*: File batch pronto per l'importazione diretta in TWS Basket Trader con campi specifici (`Action`, `Quantity`, `Symbol`, `SecType`, `OrderType`, `LmtPrice`, `Currency`).
+  - *Directa SIM FlashBook / D-Lite CSV (`export_directa_csv`)*: File di caricamento ordini massivi conforme alle specifiche Directa SIM (`TIPO_ORDINE`, `OPERAZIONE`, `TITOLO`, `QUANTITA`, `PREZZO`).
+- **Modello Commissionale Broker Dinamico (`compute_broker_commissions`)**:
+  - Piani commissionali integrati per Directa SIM (variabile 0,19% min €1,50 max €18 / fisso €5), Interactive Brokers (Tiered vs Fixed), DEGIRO e broker retail standard.
 
 ### `core/rebalancer.py` — ✅ Smart Rebalancer & Generatore Ordini
 - Generatore esatto di ordini di trading ($BUY / SELL$) in € e numero di quote intere per l'allineamento a strategie target (*Max Sharpe*, *Min Volatility*, *Equal Weight*, *Custom*) con gestione del buffer di cassa residuo.
@@ -359,7 +378,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **538 test automatizzati passano con successo (100%)** distribuiti su 91 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py`, la suite DBRE `tests/test_migration_manager.py`, il modulo `tests/test_structured_logging_and_support_bundle.py`, la suite di simulazione quantitativa `tests/test_realistic_portfolio_generator.py` e la suite di internazionalizzazione e cambi `tests/test_i18n_and_fx_engine.py`):
+Tutti i **543 test automatizzati passano con successo (100%)** distribuiti su 92 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py`, la suite DBRE `tests/test_migration_manager.py`, il modulo `tests/test_structured_logging_and_support_bundle.py`, la suite di simulazione quantitativa `tests/test_realistic_portfolio_generator.py`, la suite di internazionalizzazione e cambi `tests/test_i18n_and_fx_engine.py` e la suite di esecuzione algoritmica e TCA `tests/test_tca_and_optimal_execution.py`):
 
 ```bash
 py -m pytest
@@ -367,9 +386,9 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 538 passed in ~63.00s (100%) =======================
+======================= 543 passed in ~86.00s (100%) =======================
 ```
 
 ---
 
-*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v8.2.0 Enterprise Release.*
+*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v8.3.0 Enterprise Release.*

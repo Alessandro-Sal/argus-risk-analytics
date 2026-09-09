@@ -13,7 +13,21 @@ import core.duckdb_engine
 import core.execution_algo
 from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
-from core.execution_algo import compute_twap_schedule, compute_vwap_schedule, compare_execution_strategies, generate_intraday_volume_profile
+from core.execution_algo import (
+    compute_twap_schedule,
+    compute_vwap_schedule,
+    compare_execution_strategies,
+    generate_intraday_volume_profile,
+    compute_almgren_chriss_basket_schedule,
+    generate_fix44_blotter,
+    export_ibkr_basket_csv,
+    export_directa_csv
+)
+from core.execution_algo_engine import (
+    compute_implementation_shortfall_and_execution_benchmarks,
+    compute_pre_trade_tca,
+    compute_post_trade_tca
+)
 
 inject_custom_css()
 render_sidebar()
@@ -2741,18 +2755,22 @@ elif active_pos_tab == "🌿 Sostenibilità ESG & SFDR Desk":
 
 # ── TAB 7: IMPLEMENTATION SHORTFALL & EXECUTION ─────────────
 elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
-    st.markdown("### 🤖 Algorithmic Trade Execution & Implementation Shortfall (Perold 1988)")
-    st.caption("Scomposizione analitica del costo totale di transazione (Delay Cost, Market Impact, Commissioni, Opportunity Cost) e benchmark di efficienza comparata tra ordini a mercato, TWAP, VWAP e Adaptive IS.")
+    st.markdown("### 🤖 Algorithmic Trade Execution & Institutional TCA (Transaction Cost Analysis)")
+    st.caption("Scomposizione analitica del costo di transazione (Perold 1988, Almgren-Chriss 2000, Square-Root Law), stima Pre-Trade TCA, schedulazione ottimale ed esportazione ordini per broker (FIX 4.4, IBKR, Directa).")
 
-    from core.execution_algo_engine import compute_implementation_shortfall_and_execution_benchmarks
-
-    col_is_in1, col_is_in2, col_is_in3 = st.columns(3)
+    col_is_in1, col_is_in2, col_is_in3, col_is_in4, col_is_in5 = st.columns(5)
     with col_is_in1:
         is_ticker_in = st.text_input("Ticker Strumento:", value="SWDA.MI")
     with col_is_in2:
-        is_shares_in = st.number_input("Numero Quote da Eseguire:", min_value=10, value=5000, step=500)
+        is_shares_in = st.number_input("Numero Quote:", min_value=10, value=5000, step=500)
     with col_is_in3:
         is_side_in = st.selectbox("Direzione Ordine:", ["BUY", "SELL"], index=0)
+    with col_is_in4:
+        is_broker_in = st.selectbox("Profilo Broker:", ["DEFAULT", "DIRECTA", "IBKR", "DEGIRO"], index=1)
+    with col_is_in5:
+        is_urg_label = st.selectbox("Avversione Rischio (λ):", ["Bassa (TWAP)", "Moderata (Standard)", "Alta (Aggressivo)"], index=1)
+
+    lambda_val = 1e-7 if "Bassa" in is_urg_label else (1e-6 if "Moderata" in is_urg_label else 1e-5)
 
     is_res = compute_implementation_shortfall_and_execution_benchmarks(
         ticker=is_ticker_in,
@@ -2761,13 +2779,31 @@ elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
     )
     pb = is_res["perold_breakdown"]
 
+    # Run Pre-Trade TCA with selected broker fee structure
+    tca_pre = compute_pre_trade_tca(
+        orders=[{
+            "ticker": is_ticker_in,
+            "action": is_side_in,
+            "quantity": is_shares_in,
+            "price": is_res["decision_price_eur"],
+            "adv": 500000.0,
+            "volatility_daily": 0.012,
+            "half_spread_bps": 1.5
+        }],
+        broker=is_broker_in,
+        risk_aversion_lambda=lambda_val,
+        horizon_days=1.0,
+        n_intervals=16
+    )
+    tca_sum = tca_pre["summary"]
+
     ik1, ik2, ik3, ik4 = st.columns(4)
     with ik1:
         metric_card("Shortfall Totale (IS)", fmt_eur(pb["total_shortfall_eur"]), delta=f"{pb['total_shortfall_bps']:.1f} bps Controvalore", delta_color="inverse")
     with ik2:
         metric_card("Impatto di Mercato", fmt_eur(pb["market_impact_cost_eur"]), delta=f"{pb['market_impact_bps']:.1f} bps", delta_color="inverse")
     with ik3:
-        metric_card("Costo di Ritardo (Delay)", fmt_eur(pb["delay_cost_eur"]), delta=f"{pb['delay_cost_bps']:.1f} bps", delta_color="inverse")
+        metric_card("Execution VaR (95%)", fmt_eur(tca_sum["execution_var_95_eur"]), delta=f"Timing Risk {fmt_eur(tca_sum['timing_risk_std_eur'])}", delta_color="inverse")
     with ik4:
         metric_card("Risparmio Algoritmico Max", fmt_eur(is_res["max_potential_savings_eur"]), delta=f"con {is_res['best_strategy'][:18]}...", delta_color="normal")
 
@@ -2786,3 +2822,99 @@ elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
         use_container_width=True,
         hide_index=True
     )
+
+    st.write("")
+    col_tca_l, col_tca_r = st.columns([1, 1])
+    with col_tca_l:
+        st.markdown("##### 🔬 Scomposizione Pre-Trade TCA")
+        ci = tca_sum["confidence_intervals"]
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(88, 166, 255, 0.25); border-left: 4px solid #58a6ff; border-radius: 10px; padding: 14px 18px;">
+            <b style="color: #58a6ff; font-size: 14px;">Attributi di Costo Istituzionali ({is_broker_in}):</b><br>
+            <span style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
+            • <b>Commissioni Broker Esplicite:</b> {tca_sum['commissions_eur']:.2f} € ({tca_sum['commissions_bps']:.1f} bps)<br>
+            • <b>Costo Bid-Ask Half-Spread:</b> {tca_sum['spread_cost_eur']:.2f} € ({tca_sum['spread_cost_bps']:.1f} bps)<br>
+            • <b>Impatto Temporaneo (Square-Root):</b> {tca_sum['temp_impact_eur']:.2f} € ({tca_sum['temp_impact_bps']:.1f} bps)<br>
+            • <b>Impatto Permanente (Kyle/Almgren):</b> {tca_sum['perm_impact_eur']:.2f} € ({tca_sum['perm_impact_bps']:.1f} bps)<br>
+            • <b>Costo Atteso Totale:</b> <b style="color: #f87171;">{tca_sum['total_expected_cost_eur']:.2f} €</b> ({tca_sum['total_expected_cost_bps']:.1f} bps)<br>
+            • <b>Intervallo di Confidenza Costo:</b> P10: {ci['p10_eur']:.2f} € | P50: {ci['p50_eur']:.2f} € | P90: {ci['p90_eur']:.2f} €
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_tca_r:
+        st.markdown("##### 📑 Schedulazione & Routing Ordini Broker")
+        st.caption("Esporta le distinte d'ordine generate per il routing diretto verso i trading desk o le piattaforme dei broker supportati.")
+        
+        sched_df = tca_pre["almgren_chriss_schedule"]["schedule_df"]
+        if not sched_df.empty:
+            raw_fix = generate_fix44_blotter(sched_df)
+            raw_ibkr = export_ibkr_basket_csv(sched_df)
+            raw_directa = export_directa_csv(sched_df)
+
+            cb1, cb2, cb3 = st.columns(3)
+            with cb1:
+                st.download_button("📥 Export FIX 4.4 (.fix)", data=raw_fix, file_name=f"orders_{is_ticker_in}.fix", mime="text/plain", use_container_width=True)
+            with cb2:
+                st.download_button("📥 IBKR Basket (.csv)", data=raw_ibkr, file_name=f"ibkr_{is_ticker_in}.csv", mime="text/csv", use_container_width=True)
+            with cb3:
+                st.download_button("📥 Directa SIM (.csv)", data=raw_directa, file_name=f"directa_{is_ticker_in}.csv", mime="text/csv", use_container_width=True)
+
+    st.write("")
+    with st.expander("🔍 Dettaglio Tranche Slicing Almgren-Chriss (16 Intervalli)"):
+        if not sched_df.empty:
+            st.dataframe(
+                sched_df[["tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_qty", "cum_progress_pct", "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "remaining_shares"]].rename(columns={
+                    "tranche_idx": "Tranche #",
+                    "timestamp": "Orario",
+                    "ticker": "Ticker",
+                    "action": "Azione",
+                    "slice_qty": "Quote Tranche",
+                    "cum_qty": "Quote Cumulate",
+                    "cum_progress_pct": "% Progresso",
+                    "order_notional_eur": "Controvalore (€)",
+                    "benchmark_price_eur": "Prezzo Base (€)",
+                    "est_exec_price_eur": "Prezzo Stimato (€)",
+                    "est_slippage_bps": "Slippage (bps)",
+                    "remaining_shares": "Quote Residue"
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
+    with st.expander("🧪 Simulatore Post-Trade TCA (Ex-Post Execution Quality)"):
+        st.caption("Verifica la qualità dell'esecuzione confrontando i fill reali con i benchmark istituzionali (Arrival Price, Market VWAP, Market Close).")
+        pt_col1, pt_col2, pt_col3 = st.columns(3)
+        with pt_col1:
+            sim_avg_px = st.number_input("Prezzo Medio Eseguito (€):", value=float(round(is_res["arrival_price_eur"] * 1.0008, 3)), step=0.01)
+        with pt_col2:
+            sim_mkt_vwap = st.number_input("Market VWAP di Giornata (€):", value=float(round(is_res["arrival_price_eur"] * 1.0012, 3)), step=0.01)
+        with pt_col3:
+            sim_mkt_close = st.number_input("Prezzo di Chiusura MOC (€):", value=float(round(is_res["arrival_price_eur"] * 1.0018, 3)), step=0.01)
+
+        sim_fills = [{"shares": is_shares_in, "price": sim_avg_px}]
+        post_res = compute_post_trade_tca(
+            executed_trades=sim_fills,
+            decision_price=is_res["decision_price_eur"],
+            arrival_price=is_res["arrival_price_eur"],
+            side=is_side_in,
+            market_vwap=sim_mkt_vwap,
+            market_close=sim_mkt_close,
+            total_ordered_shares=is_shares_in,
+            commissions_paid_eur=tca_sum["commissions_eur"]
+        )
+
+        psum = post_res["summary"]
+        sb = post_res["slippage_benchmarks"]
+        ppb = post_res["perold_breakdown"]
+
+        pk1, pk2, pk3, pk4 = st.columns(4)
+        with pk1:
+            metric_card("Execution Quality Score", f"{psum['execution_quality_score']:.1f} / 100", delta=psum["execution_rating"][:15], delta_color="normal")
+        with pk2:
+            metric_card("Slippage vs Arrival Price", f"{sb['vs_arrival_price']['slippage_bps']:.1f} bps", delta=fmt_eur(sb['vs_arrival_price']['slippage_eur']), delta_color="inverse")
+        with pk3:
+            vwap_beat = sb["vs_market_vwap"]["outperformed_vwap"]
+            metric_card("Slippage vs Market VWAP", f"{sb['vs_market_vwap']['slippage_bps']:.1f} bps", delta="Outperformed VWAP 🟢" if vwap_beat else "Underperformed VWAP 🔴", delta_color="normal" if vwap_beat else "inverse")
+        with pk4:
+            metric_card("Alpha Preservation", f"{psum['alpha_preservation_pct']:.2f}%", delta=f"Shortfall {fmt_eur(ppb['total_implementation_shortfall_eur'])}", delta_color="normal")
