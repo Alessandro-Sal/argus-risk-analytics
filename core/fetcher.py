@@ -22,12 +22,13 @@ from datetime import datetime, timedelta
 
 
 def _set_sqlite_pragmas(dbapi_connection, connection_record):
-    """Abilita la modalità WAL e ottimizzazioni di concorrenza per SQLite."""
+    """Abilita la modalità WAL, foreign keys e ottimizzazioni di concorrenza per SQLite."""
     try:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode = WAL")
         cursor.execute("PRAGMA synchronous = NORMAL")
         cursor.execute("PRAGMA busy_timeout = 10000")
+        cursor.execute("PRAGMA foreign_keys = ON")
         cursor.close()
     except Exception:
         pass
@@ -126,6 +127,11 @@ def get_engine(user: str = "root", password: str = "", host: str = "localhost",
     if engine.dialect.name == "sqlite":
         try:
             event.listen(engine, "connect", _set_sqlite_pragmas)
+        except Exception:
+            pass
+        try:
+            from core.database_migration_manager import bootstrap_and_migrate_db
+            bootstrap_and_migrate_db(sqlite_path)
         except Exception:
             pass
 

@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **499 test automatizzati (100% passed)** su 87 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **510 test automatizzati (100% passed)** su 88 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -38,6 +38,7 @@ Yahoo Finance API / Crypto Providers ────┘     (Pydantic v2 Canonical)
 Persistenza Dati & Continuità Operativa:
  ├── core/universal_ledger.py  ──► Double-Entry One-Ledger, WACP FIFO SQL Qualify, Zero-Copy PyArrow & Parquet
  ├── core/wealth/wealth_db.py  ──► SQLite (argus_wealth.db) / MySQL 8.0 [Star Schema Time-Series]
+ ├── core/database_migration_manager.py ──► DBRE Dual-Versioning (PRAGMA user_version & schema_migrations), Pre-Flight Backup & Drift Inspector
  ├── core/duckdb_engine.py     ──► In-Process Vectorized OLAP & Apache Parquet
  ├── core/security_engine.py   ──► CWE-1236 Sanitization, PII Masking & ArgusDataVault (AES-Fernet)
  └── core/backup_engine.py     ──► Hot Backup (SQLite Backup API), WAL Checkpoint & Atomic Restore Rollback
@@ -74,7 +75,7 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**499/499 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**510/510 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
@@ -208,6 +209,13 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Integrità & Retention**: Doppio audit `PRAGMA integrity_check` e `PRAGMA foreign_key_check`, compressione gzip trasparente con pruning basato su anzianità.
 - **Rollback Atomico**: Salvataggio automatico di una copia d'emergenza `.emergency_pre_restore` prima di ogni ripristino per annullare all'istante snapshot corrotti.
 
+### `core/database_migration_manager.py` — ✅ DBRE Database Migration & Schema Reliability Manager
+- **Dual-Layer Schema Versioning**: Lettura $O(1)$ a livello di file header con `PRAGMA user_version` (check di avvio sub-millisecondo senza overhead) combinata con la tabella di audit `schema_migrations` (checksum crittografici SHA-256 anti-manomissione, execution time in ms, audit trail e flag di rollback).
+- **Pre-Flight Silent Shadow Backup**: Generazione automatica di snapshot a caldo prima di qualsiasi DDL (`.db.gz` o shadow copy) e validazione preventiva con `PRAGMA integrity_check`.
+- **Transazionalità Atomica DDL & Disaster Recovery Rollback**: Esecuzione in blocchi `BEGIN IMMEDIATE` / `COMMIT` con rollback automatico immediato e ripristino istantaneo dello snapshot di sicurezza in caso di eccezioni DDL a metà esecuzione.
+- **Schema Drift Inspector**: Ispezione automatica dei cataloghi fisici SQLite contro i modelli SQLAlchemy ORM (`core/models.py`) e modelli Wealth (`core/wealth/wealth_models.py`), controllo orfani referenziali `PRAGMA foreign_key_check` e diagnostica con severità `INFO`, `WARNING`, `CRITICAL`.
+- **Indici Compositi Analitici & Integrazione DuckDB C++**: Deploy idempotente di indici compositi coprenti (`transactions`, `market_prices`, `wealth_cashflow`, `portfolio_snapshots`) per accelerare query multidimensionali e compatibilità al 100% con l'attach nativo DuckDB (`ATTACH '...' (TYPE SQLITE)`).
+
 ### `core/security_engine.py` — ✅ Cybersecurity, Anti-Formula Injection & ArgusDataVault
 - **CWE-1236 Formula Injection Defense**: Sanitizzazione sistematica con prefisso apostrofo (`'`) per stringhe che iniziano con `=`, `+`, `-`, `@`, `\t` o `\r` esportate in CSV e XLSX.
 - **Data Minimization & PII Masking**: Mascheramento dinamico a standard GDPR (Art. 5/32) per IBAN (`IT60****************1234`), Codici Fiscali e numeri di conto bancario.
@@ -306,7 +314,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **499 test automatizzati passano con successo (100%)** distribuiti su 87 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter e il nuovo modulo `tests/test_estate_planning_optimizer.py`):
+Tutti i **510 test automatizzati passano con successo (100%)** distribuiti su 88 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py` e la suite DBRE `tests/test_migration_manager.py`):
 
 ```bash
 py -m pytest
@@ -314,7 +322,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 499 passed in ~59.00s (100%) =======================
+======================= 510 passed in ~59.00s (100%) =======================
 ```
 
 ---

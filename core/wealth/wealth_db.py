@@ -63,6 +63,15 @@ def init_wealth_db(engine: Engine) -> None:
     """Inizializza automaticamente le tabelle del Wealth Management se non presenti."""
     is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
 
+    if is_sqlite:
+        try:
+            db_file = getattr(getattr(engine, "url", None), "database", None)
+            if db_file and db_file != ":memory:":
+                from core.database_migration_manager import bootstrap_and_migrate_db
+                bootstrap_and_migrate_db(db_file)
+        except Exception:
+            pass
+
     with engine.begin() as conn:
         if is_sqlite:
             conn.execute(sqlt("""

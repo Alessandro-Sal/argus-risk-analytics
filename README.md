@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-499%2F499%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-510%2F510%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
@@ -35,6 +35,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **📊 Institutional Financial Reporting Design System (`core/reporting_design_system.py`, `core/modular_factsheet_builder.py`, `core/pdf_generator.py`, `core/excel_generator.py`)**: Suite grafica unificata basata sulla palette istituzionale *Obsidian Sovereign*, canvas ReportLab A4 a due passaggi (`InstitutionalNumberedCanvas`) con numerazione continua "Pagina X di Y", grafici a ciambella vettoriali in-memory senza dipendenze esterne o memory leak, ed esportazioni Excel interattive con tabelle native `ListObject` e formule dinamiche live (`XIRR`, somme condizionali).
 * **🛡️ Cybersecurity, Data Vault & Anti-Formula Injection (`core/security_engine.py`)**: Difesa in profondità (*Defense-in-Depth*) contro attacchi **CWE-1236 (Formula Injection)** con sanitizzazione di ogni cella esportata in CSV e XLSX multi-foglio (neutralizzazione prefissi `=`, `+`, `-`, `@`, `\t`, `\r`), de-identificazione e mascheramento dinamico PII (IBAN, Codice Fiscale e conti correnti conformi a GDPR Art. 5/32), cifratura dei dati sensibili a riposo **ArgusDataVault** (algoritmo Fernet AES-128/256 CBC con autenticazione HMAC-SHA256 e derivazione chiave PBKDF2 a 100.000 iterazioni) e sanitizzazione preventiva delle credenziali nei prompt inoltrati ai modelli LLM esterni.
 * **🔄 Zero-Downtime Hot Backup & Disaster Recovery Atomico (`core/backup_engine.py`)**: Motore di continuità operativa e resilienza basato sulle API C native `sqlite3_backup_init` per snapshot consistenti a caldo del database patrimoniale senza interruzione dei servizi, checkpointing preventivo del Write-Ahead Logging (`PRAGMA wal_checkpoint(TRUNCATE)`), doppio audit di integrità (`PRAGMA integrity_check` & `PRAGMA foreign_key_check`), compressione trasparente gzip con rotazione e retention temporale, e procedura di ripristino atomico point-in-time protetta da copia di rollback automatico `.emergency_pre_restore`. Integrato come hook di pre-flight in `desktop_launcher.py`.
+* **🗄️ Database Reliability Engineering & Embedded Schema Migration Engine (`core/database_migration_manager.py`)**: Framework evolutivo embedded per database client-side (SQLite & DuckDB) a zero dipendenze esterne pesanti. Implementa Dual-Layer Schema Versioning ($O(1)$ con `PRAGMA user_version` + audit ledger crittografico `schema_migrations` con hash SHA-256 anti-manomissione), pre-flight shadow backup atomico prima di modifiche DDL, fail-safe disaster recovery con rollback automatico immediato e ripristino dallo snapshot su eccezione, schema drift inspector continuo contro i modelli Python (`core/models.py`, `core/wealth/wealth_models.py`), rilevamento orfani referenziali (`PRAGMA foreign_key_check`) e indici compositi analitici per l'accelerazione vettorizzata di query OLAP e attach nativo in DuckDB C++.
 * **🚦 Enterprise Data Quality Gate & Middleware Ingestion (`core/data_quality_gate.py`)**: Middleware di validazione e riconciliazione contabile pre-ingestion basato su schemi dichiarativi **Pydantic v2** (`CanonicalTradeRecord`, `QualityGateReport`), regole semantiche avanzate (blocco posizioni corte accidentali, rilevamento trade in giorni festivi/weekend, validazione cross-currency FX), riconciliazione automatica ISIN/Ticker e deduplicazione deterministica a chiave naturale SHA-256 (`tx_hash`) per garantire l'idempotenza assoluta nei ricaricamenti multipli di estratti conto.
 * **⚡ Bloomberg Terminal Command Gateway & Mnemonic Parser**: Barra di comando istituzionale globale con sintassi a codici rapidi (`<TICKER> <MNEMONIC> <GO>`, es. `AAPL DES`, `MSFT FA`, `NVDA VOLS`, `PORT RISK`, `YCRV`, `BTP YAS`, `US10Y FI`, `CDS`, `STREAM`, `ATTR`, `TAX`, `EQS`, `BQUANT`, `LAUNCHPAD`, `XL`, `LIVE`, `TERM`, `CLI`), autocompletamento fuzzy, visual command feedback in tempo reale, sincronizzazione bidirezionale perfetta con la Navigation Rail e navigazione rapida senza mouse.
 * **🖥️ ARGUS Live Terminal & Interactive CLI Execution Desk (`LIVE` / `TERM`)**: Console operativa interattiva in-app con prompt comandi Bloomberg (`ARGUS:LIVE>`), motore streaming Level-2 Depth Book con calcolo del Microprice di Stoikov (2018) e Order Flow Imbalance (OFI), simulatore Order Management System (OMS) Blotter con order slicing algoritmico TWAP/VWAP e telemetria di sistema in tempo reale (`TOP` Monitor CPU, RAM RSS, Ring Buffer, DB).
@@ -493,6 +494,7 @@ argus-risk-analytics/
 │   ├── crypto_provider.py       # Aggregatore multi-provider crypto (Binance, Kraken, CoinGecko)
 │   ├── crypto_tax_engine.py     # Fisco Cripto-Attività, Quadri RT/RW/IVAFE & Zainetto Cripto
 │   ├── data_quality_gate.py     # Pydantic v2 Ingestion Gate, Semantic Sanity & SHA-256 Deduplication
+│   ├── database_migration_manager.py # DBRE Migration Engine, Dual Versioning, Shadow Backup & Drift Inspector
 │   ├── db_exporter.py           # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
 │   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
 │   ├── dividend_engine.py       # Cash Flow Forecast & Dividend Calendar
@@ -614,7 +616,7 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py
 │       ├── 20_⚖️_Pianificazione_Successoria.py
 │       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (499 Test su 87 File)
+├── tests/                       # Test suite automatizzata PyTest (510 Test su 88 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
@@ -659,6 +661,7 @@ argus-risk-analytics/
 │   ├── test_macro_provider.py
 │   ├── test_merton_and_isolation_forest.py
 │   ├── test_metric_knowledge_modals.py
+│   ├── test_migration_manager.py
 │   ├── test_ml_and_3d_features.py
 │   ├── test_monte_carlo_ui.py
 │   ├── test_multi_portfolio.py
@@ -722,7 +725,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **499 test automatizzati PyTest** distribuiti su 87 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter e simulazioni successorie del Codice Civile / TUS) con copertura end-to-end del 100%:
+Il progetto include **510 test automatizzati PyTest** distribuiti su 88 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS e test DBRE di migrazione/rollback/disaster recovery) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -730,7 +733,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 499 passed in ~59.00s (100%) =======================
+======================= 510 passed in ~59.00s (100%) =======================
 ```
 
 ---
