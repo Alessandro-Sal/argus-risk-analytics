@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-470%2F470%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-475%2F475%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
@@ -708,7 +708,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **470 test automatizzati PyTest** distribuiti su 84 file di test (inclusi test property-based con **Hypothesis**) con copertura end-to-end del 100%:
+Il progetto include **475 test automatizzati PyTest** distribuiti su 85 file di test (inclusi test property-based con **Hypothesis** e audit normativo fiscale TUIR/L. 197/2022) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -716,7 +716,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 470 passed in ~100.00s (100%) =======================
+======================= 475 passed in ~100.00s (100%) =======================
 ```
 
 ---

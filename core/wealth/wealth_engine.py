@@ -843,23 +843,30 @@ def compute_fiscal_analytics(engine, portfolio_id: int = 1) -> Dict[str, Any]:
             elif any(f_key in inst for f_key in ["revolut", "n26", "degiro", "interactive brokers", "ibkr", "wise", "binance", "kraken", "trade republic"]):
                 is_foreign = True
 
+            g_media = float(acc.get("average_balance") or acc.get("giacenza_media") or bal)
+            m_bal = float(acc.get("peak_balance") or acc.get("max_balance") or max(bal, g_media))
+
             acc_info = {
                 "name": acc.get("name") or acc.get("account_name"),
                 "institution": acc.get("institution"),
                 "iban": iban if iban else "N/D",
                 "balance": bal,
+                "giacenza_media": g_media,
+                "max_balance": m_bal,
                 "is_foreign": is_foreign
             }
 
             if is_foreign:
                 foreign_accounts.append(acc_info)
                 total_foreign_cash += bal
-                if bal > 5000.0:
+                # IVAFE 34.20€ dovuta solo se la giacenza media annua supera 5.000€
+                if g_media > 5000.0:
                     ivafe_cash += 34.20
             else:
                 domestic_accounts.append(acc_info)
                 total_domestic_cash += bal
-                if bal > 5000.0:
+                # Imposta di bollo 34.20€ dovuta solo se la giacenza media annua supera 5.000€
+                if g_media > 5000.0:
                     bollo_cash += 34.20
 
     # Attività finanziarie collegate (Risk links)
@@ -904,14 +911,31 @@ def compute_fiscal_analytics(engine, portfolio_id: int = 1) -> Dict[str, Any]:
     quadro_rw_rows = []
     codice_conto = 1
     for f_acc in foreign_accounts:
+        g_media = f_acc.get("giacenza_media", f_acc["balance"])
+        m_bal = f_acc.get("max_balance", f_acc["balance"])
+        is_ivafe_due = g_media > 5000.0
+
+        if is_ivafe_due:
+            mon_flag = "No"
+            ivafe_val = 34.20
+        elif m_bal > 15000.0:
+            mon_flag = "Sì (Picco > 15k)"
+            ivafe_val = 0.0
+        else:
+            mon_flag = "Esonerato (Sotto soglie)"
+            ivafe_val = 0.0
+
         quadro_rw_rows.append({
             "rigo": f"RW{codice_conto}",
             "descrizione": f"{f_acc['institution']} — {f_acc['name']}",
-            "codice_investimento": 1 if "crypto" not in f_acc['institution'].lower() else 21,
-            "codice_stato_estero": "018 (GB)" if "revolut" in f_acc['institution'].lower() else "014 (DE)",
-            "valore_finale": f_acc["balance"],
-            "ivafe_dovuta": 34.20 if f_acc["balance"] > 5000 else 0.0,
-            "monitoraggio_solo": "No"
+            "codice_investimento": 1 if "crypto" not in str(f_acc['institution']).lower() else 21,
+            "codice_stato_estero": "018 (GB)" if "revolut" in str(f_acc['institution']).lower() else "014 (DE)",
+            "valore_iniziale": round(g_media, 2),
+            "valore_finale": round(f_acc["balance"], 2),
+            "valore_massimo": round(m_bal, 2),
+            "giacenza_media": round(g_media, 2),
+            "ivafe_dovuta": ivafe_val,
+            "monitoraggio_solo": mon_flag
         })
         codice_conto += 1
 
@@ -921,7 +945,10 @@ def compute_fiscal_analytics(engine, portfolio_id: int = 1) -> Dict[str, Any]:
             "descrizione": "Dossier Investimenti / Broker Esteri & Crypto",
             "codice_investimento": 2,
             "codice_stato_estero": "014 (DE) / 018 (GB)",
+            "valore_iniziale": round(foreign_inv_val, 2),
             "valore_finale": round(foreign_inv_val, 2),
+            "valore_massimo": round(foreign_inv_val, 2),
+            "giacenza_media": round(foreign_inv_val, 2),
             "ivafe_dovuta": round(ivafe_investments, 2),
             "monitoraggio_solo": "No"
         })
@@ -2066,18 +2093,26 @@ def compute_tax_loss_harvesting_and_latent_taxes(engine, portfolio_id: int = 1) 
 
     harvesting_trades = [
         {
-            "asset": "Azioni / ETF Emergenti",
-            "tipo": "Equity / ETF",
+            "asset": "Azioni Singole / ETC in Utile",
+            "tipo": "Equity / ETC (Redditi Diversi)",
+            "minus_latente": 0.0,
+            "azione_consigliata": "Step-Up Fiscale a imposta 0€: Vendi & Ricompra per consumare minus in scadenza al 4° anno",
+            "risparmio_fiscale_26": round(min(unrealized_equity_gain, existing_minus) * 0.26, 2),
+            "priorita": "ALTA (Consuma minusvalenze quadriennali senza imposta)"
+        },
+        {
+            "asset": "Azioni / ETF in Perdita Latente",
+            "tipo": "Equity / ETF (Minusvalenze)",
             "minus_latente": round(unrealized_losses * 0.60, 2),
-            "azione_consigliata": "Vendi & Re-investi su indice affine",
+            "azione_consigliata": "Vendi & Re-investi su indice affine (Proxy) per alimentare lo zainetto fiscale",
             "risparmio_fiscale_26": round(unrealized_losses * 0.60 * 0.26, 2),
-            "priorita": "ALTA (Compensa plusvalenze in scadenza)"
+            "priorita": "ALTA (Genera credito fiscale futuro)"
         },
         {
             "asset": "Posizioni Altcoin Crypto",
-            "tipo": "Crypto Asset",
+            "tipo": "Crypto Asset (L. 197/2022)",
             "minus_latente": round(unrealized_losses * 0.40, 2),
-            "azione_consigliata": "Realizza minusvalenza fiscale (Legge Bilancio 2023)",
+            "azione_consigliata": "Realizza minusvalenza fiscale sopra soglia 2.000€ per zainetto crypto",
             "risparmio_fiscale_26": round(unrealized_losses * 0.40 * 0.26, 2),
             "priorita": "MEDIA"
         }
