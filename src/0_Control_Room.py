@@ -452,6 +452,61 @@ with tab_ingest:
 2022-08-20,AAPL,sell,5,162.50,USD,1.50,stock,Presa profitto
 2023-03-01,AAPL,dividend,0,0.23,USD,0.00,stock,Dividendo Q1"""
 
+    with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Caricamento 1-Click)", expanded=False):
+        st.caption("Carica istantaneamente un portafoglio pluriennale sintetico realistico con solvibilità e date borsistiche garantite. Ideale per didattica e collaudo immediato.")
+        arch_c1, arch_c2, arch_c3 = st.columns(3)
+        with arch_c1:
+            st.markdown("""
+            **🚀 Giovane Accumulatore**
+            - **Rischio**: Aggressivo (25 anni)
+            - **Asset**: Global ETF, QQQ, Big Tech, Crypto
+            - **PAC**: €850/mese su stipendio in crescita
+            """)
+            if st.button("Carica Giovane Accumulatore", key="btn_load_arch_young", use_container_width=True):
+                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine
+                with st.spinner("⏳ Generazione portafoglio quantitativo in corso..."):
+                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+                    res_arch = sim_eng.simulate("young_accumulator", years=3)
+                    st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
+                    st.session_state["portfolio_name"] = "Archetipo: Giovane Accumulatore"
+                    st.session_state.pop("session_cleared", None)
+                    st.session_state.pop("pipeline_done", None)
+                    st.rerun()
+        with arch_c2:
+            st.markdown("""
+            **🏖️ FIRE / Decumulo**
+            - **Rischio**: Conservativo / Cedolare
+            - **Asset**: Dividend Aristocrats, BND Bond, Value
+            - **Decumulo**: SWR 3.5% costante, zero debiti
+            """)
+            if st.button("Carica FIRE Decumulo", key="btn_load_arch_fire", use_container_width=True):
+                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine
+                with st.spinner("⏳ Generazione portafoglio quantitativo in corso..."):
+                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+                    res_arch = sim_eng.simulate("fire_decumulation", years=3)
+                    st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
+                    st.session_state["portfolio_name"] = "Archetipo: FIRE Decumulo"
+                    st.session_state.pop("session_cleared", None)
+                    st.session_state.pop("pipeline_done", None)
+                    st.rerun()
+        with arch_c3:
+            st.markdown("""
+            **👑 HNWI / Famiglia**
+            - **Rischio**: Multi-Asset Istituzionale (€4.0M)
+            - **Asset**: Big Tech, Global ETF, Bond, Gold, Watches
+            - **Wealth**: Mutuo francese, affitti, max pensione
+            """)
+            if st.button("Carica HNWI Famiglia", key="btn_load_arch_hnwi", use_container_width=True):
+                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine
+                with st.spinner("⏳ Generazione portafoglio quantitativo in corso..."):
+                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+                    res_arch = sim_eng.simulate("hnwi_family", years=3)
+                    st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
+                    st.session_state["portfolio_name"] = "Archetipo: HNWI Famiglia"
+                    st.session_state.pop("session_cleared", None)
+                    st.session_state.pop("pipeline_done", None)
+                    st.rerun()
+
     col_ds_sel, col_ds_modal, col_ds_tpl = st.columns([2.6, 1.0, 1.0])
     with col_ds_sel:
         data_source = st.selectbox(
@@ -584,6 +639,7 @@ with tab_ingest:
             help="Carica il file in formato CSV, Excel o TXT. L'Auto-Detector riconoscerà automaticamente la struttura del broker."
         )
         if uploaded_file:
+            st.session_state.pop("df_raw_injected", None)
             from core.ingestion_utils import read_tabular_stream
             try:
                 df_raw = read_tabular_stream(uploaded_file.getvalue(), filename=uploaded_file.name).astype(str)
@@ -595,6 +651,9 @@ with tab_ingest:
                 if not st.session_state.get("portfolio_name") or st.session_state.get("portfolio_name") == "Nessun Portafoglio (In attesa)":
                     auto_name = os.path.splitext(uploaded_file.name)[0].replace("_", " ").replace("-", " ").title()
                     st.session_state["portfolio_name"] = auto_name
+        elif st.session_state.get("df_raw_injected") is not None:
+            df_raw = st.session_state["df_raw_injected"].copy().astype(str)
+            st.info(f"🧪 **Scenario Didattico Attivo**: `{st.session_state.get('portfolio_name', 'Archetipo')}` con **{len(df_raw)} transazioni** simulate con solvibilità e date borsistiche conformi.")
 
     if st.session_state.get("pipeline_done"):
         current_wf_step = 3

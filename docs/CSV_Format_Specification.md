@@ -85,3 +85,46 @@ tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
 2023-09-20,AAPL,sell,5,175.00,USD,1.50,Stock,Presa di beneficio parziale
 2024-01-15,BTC-USD,buy,0.05,42000.00,USD,5.00,Crypto,Allocazione alternativa
 ```
+
+---
+
+## 6. Generazione di Dataset Sintetici & Archetipi Didattici (`scripts/generate_realistic_portfolio.py`)
+
+La piattaforma include un generatore avanzato a riga di comando per creare cronologie di trading e patrimoniali pluriennali complete, perfettamente conformi alle specifiche di input di ARGUS:
+
+```bash
+# Esempio: Generazione portafoglio Young Accumulator (5 anni) ed iniezione nel DB locale
+py scripts/generate_realistic_portfolio.py --archetype young_accumulator --years 5 --output data/portfolio_young.csv --populate-db
+```
+
+### Parametri CLI Supportati
+
+| Flag | Tipo | Default | Descrizione |
+| :--- | :---: | :---: | :--- |
+| `--archetype` | Stringa | `young_accumulator` | Profilo didattico: `young_accumulator`, `fire_decumulation`, `hnwi_family`. |
+| `--years` | Intero | `5` | Durata storica della simulazione in anni solari (es. `3`, `5`, `10`). |
+| `--output` | Percorso | `data/test_portfolio_realistic.csv` | File CSV di destinazione per le transazioni di trading. |
+| `--populate-db` | Flag | `False` | Se specificato, popola atomicamente `data/argus_local.db` con l'ecosistema wealth. |
+| `--db-path` | Percorso | `data/argus_local.db` | Percorso alternativo del database SQLite target. |
+| `--no-market-data` | Flag | `False` | Forza la generazione offline con Moto Browniano Geometrico (senza chiamate yfinance). |
+
+### I 3 Archetipi Preconfigurati
+
+1. **`young_accumulator` (Giovane Accumulatore)**:
+   - **Obiettivo**: Crescita aggressiva a lungo termine (20+ anni).
+   - **Asset Allocation**: 100% Equity & Alternative (VWCE.DE, QDVE.DE, BTC-USD, ETH-USD).
+   - **Dinamica di Cassa**: Stipendio mensile €2.200, spese fisse/discrezionali controllate, PAC mensile disciplinato (€1.000/mese), zero immobili, zero mutui.
+2. **`fire_decumulation` (FIRE / Decumulo)**:
+   - **Obiettivo**: Preservazione del capitale e generazione di flussi di cassa costanti.
+   - **Asset Allocation**: Portafoglio a cedola (BTP decennali, corporate bond, aristocrat dividend stocks come ENI, ISP, JNJ).
+   - **Dinamica di Cassa**: Assenza di stipendio attivo, incasso dividendi e cedole, prelievo mensile calibrato su Safe Withdrawal Rate (SWR 3.5%), mutuo già estinto.
+3. **`hnwi_family` (Imprenditore / Family Office)**:
+   - **Obiettivo**: Tutela patrimoniale intergenerazionale, efficienza fiscale e diversificazione multi-asset.
+   - **Asset Allocation**: Core azionario/obbligazionario, immobili a reddito locativo, mutuo bancario ad ammortamento francese, collezionabili di lusso (orologi Rolex con perizie periodiche e haircut), holding e fondo pensione deducibile.
+
+### Proprietà Invarianti Garantite dal Generatore
+
+- **Solvibilità di Cassa Rigorosa ($C_t \ge 0$)**: Nessun PAC o spesa discrezionale viene eseguita se eccede la liquidità di cassa disponibile in data $t$.
+- **Allineamento al Calendario di Borsa**: Tutte le transazioni mobiliari avvengono rigorosamente nei giorni di borsa aperta (lunedì-venerdì, con rollover automatico in caso di festività).
+- **Ammortamento Francese Esatto**: Le rate del mutuo rispettano la formula ad ammortamento progressivo a rata costante ($PMT$).
+- **Conformità Schema al 100%**: Il CSV generato può essere caricato in qualsiasi momento nella Control Room o elaborato dal `DataQualityGate` con zero errori di validazione.

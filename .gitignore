@@ -54,6 +54,7 @@ credentials/
 *.json
 !config.json
 !docs/argus-architecture.json
+!core/i18n/locales/*.json
 google_service_account.json
 gsheets_sync_subproject/*.json
 gsheets_sync_subproject/google_service_account.json
