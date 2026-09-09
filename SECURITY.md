@@ -6,9 +6,9 @@ La sicurezza e l'integrità dei dati patrimoniali e finanziari degli utenti sono
 
 | Versione | Stato Supporto | Note di Sicurezza |
 | :--- | :---: | :--- |
-| **6.4.x / 6.3.x** | :white_check_mark: **Attivo** | Suite di sicurezza completa, protezione CWE-1236, PII masking, Fernet Vault |
-| **6.0.x – 6.2.x** | :warning: Manutenzione | Solo patch critiche; raccomandato l'aggiornamento |
-| **< 6.0** | :x: Deprecato | Fine supporto ciclo vitale |
+| **8.1.x** | :white_check_mark: **Attivo** | Suite di sicurezza completa, Universal Ledger, protezione CWE-1236, PII masking, Fernet Vault |
+| **7.x** | :warning: Manutenzione | Solo patch critiche; raccomandato l'aggiornamento |
+| **< 7.0** | :x: Deprecato | Fine supporto ciclo vitale |
 
 ---
 

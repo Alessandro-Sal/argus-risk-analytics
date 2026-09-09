@@ -1,14 +1,35 @@
 [project]
 name = "argus-risk-analytics"
-version = "6.3.0"
-description = "ARGUS Risk Analytics & Wealth Intelligence Platform — Quantitative Risk Management & BI"
+version = "8.1.0"
+description = "ARGUS Risk Analytics & Wealth Intelligence Platform — Tier-1 Quantitative Risk, Wealth & BI Ecosystem"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
+authors = [
+    {name = "Alessandro Sal"}
+]
+keywords = [
+    "quantitative-finance",
+    "risk-management",
+    "portfolio-analytics",
+    "wealth-management",
+    "msci-barra",
+    "conic-optimization",
+    "fixed-income",
+    "streamlit",
+    "duckdb",
+    "pyarrow"
+]
+
+[project.urls]
+Homepage = "https://alessandro-sal.github.io/argus-risk-analytics/"
+Documentation = "https://alessandro-sal.github.io/argus-risk-analytics/"
+Repository = "https://github.com/Alessandro-Sal/argus-risk-analytics.git"
+Issues = "https://github.com/Alessandro-Sal/argus-risk-analytics/issues"
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [

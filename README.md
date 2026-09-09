@@ -2,11 +2,14 @@
 
 ![ARGUS Banner](docs/argus_banner.jpg)
 
-![Version](https://img.shields.io/badge/version-8.1.0-blue.svg)
-![Python Version](https://img.shields.io/badge/python-3.11%2B-green.svg)
-![License](https://img.shields.io/badge/license-MIT-purple.svg)
-![PyTest Suite](https://img.shields.io/badge/PyTest-466%2F466%20PASSED%20(100%25)-brightgreen)
-![Docker](https://img.shields.io/badge/docker-ready-blue)
+[![CI Pipeline](https://github.com/Alessandro-Sal/argus-risk-analytics/actions/workflows/ci.yml/badge.svg)](https://github.com/Alessandro-Sal/argus-risk-analytics/actions/workflows/ci.yml)
+[![GitHub Pages](https://github.com/Alessandro-Sal/argus-risk-analytics/actions/workflows/deploy-pages.yml/badge.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
+[![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
+[![Test Suite](https://img.shields.io/badge/PyTest-466%2F466%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+[![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
 ---
 
@@ -369,6 +372,68 @@ flowchart TD
 
 ---
 
+## 🚀 Quick Start & Modalità di Esecuzione
+
+ARGUS è progettato con un'architettura ibrida a zero-frizione che supporta quattro diverse modalità di esecuzione:
+
+### 🖥️ Opzione 1: Launcher Desktop Nativo 1-Click (Windows)
+Per la massima comodità su ambienti Windows 10/11 senza digitare comandi da terminale:
+1. **Setup Iniziale (1-Click)**: Fai doppio clic su `setup_desktop.bat` per installare le dipendenze e generare l'icona sul Desktop.
+2. **Avvio Applicativo**: Fai doppio clic su `start_dashboard.bat`. Lo script rileva automaticamente l'interprete Python del sistema e avvia la finestra nativa accelerata via hardware (PyWebView2) con fallback trasparente sul browser web predefinito.
+
+---
+
+### 🐍 Opzione 2: Ambiente Virtuale Locale (Linux / macOS / Windows)
+Per sviluppatori e quant researcher che utilizzano il terminale standard:
+
+```bash
+# 1. Clona il repository
+git clone https://github.com/Alessandro-Sal/argus-risk-analytics.git
+cd argus-risk-analytics
+
+# 2. Crea e attiva l'ambiente virtuale (Python 3.11 o 3.12 raccomandato)
+python -m venv .venv
+
+# Su Linux/macOS:
+source .venv/bin/activate
+# Su Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# Su Windows (CMD):
+.venv\Scripts\activate.bat
+
+# 3. Installa le dipendenze con ruote binarie ottimizzate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
+
+# 4. Avvia la Control Room istituzionale
+streamlit run src/0_Control_Room.py
+```
+La dashboard si aprirà automaticamente all'indirizzo `http://localhost:8501`.
+
+---
+
+### 🐳 Opzione 3: Container Docker & Docker Compose (Isolamento Totale)
+Per distribuire l'applicazione in un ambiente containerizzato production-ready con database relazionale MySQL 8.0:
+
+```bash
+# Avvia l'infrastruttura completa (Web App + MySQL 8.0 Data Warehouse)
+docker compose up --build -d
+
+# Visualizza i log in tempo reale
+docker compose logs -f argus-app
+```
+L'applicazione risponde su `http://localhost:8501` e il database su porta `3306`.
+
+---
+
+### ☁️ Opzione 4: Streamlit Community Cloud (Zero-Ops)
+1. Forka o collega il repository al tuo account [Streamlit Community Cloud](https://share.streamlit.io/).
+2. Configura il Main file path su: `src/0_Control_Room.py`.
+3. Inserisci le eventuali credenziali opzionali (Gemini, OpenAI) nella sezione *App Settings -> Secrets*.
+4. Clicca su **Deploy**.
+
+---
+
 ## 📂 Struttura del Repository
 
 ```text
@@ -438,9 +503,11 @@ argus-risk-analytics/
 │   ├── metadata_resolver.py     # Risoluzione metadati e anagrafiche asset
 │   ├── models.py                # Schema ORM SQLAlchemy (MySQL & SQLite)
 │   ├── modular_factsheet_builder.py # Institutional Factsheet Generator & Section Compositor
+│   ├── msci_barra_risk_engine.py # MSCI Barra Structural Factor Risk & Euler Decomposition (GEM3)
 │   ├── multi_portfolio.py       # Total Wealth Multi-Account Registry, Scorecard & Consolidator
 │   ├── options_hedging.py       # Black-Scholes 1973, 5 Greci, Delta-Hedging & Covered Call
 │   ├── pdf_generator.py         # Exporter Factsheet PDF (ReportLab)
+│   ├── prescriptive_rebalancer.py # Prescriptive Conic Rebalancer & FIX 4.4 Protocol Blotter
 │   ├── rebalancer.py            # Smart Rebalancer & Generatore Ordini
 │   ├── regime_switching.py      # Market Regime Switching (3-State Markov Model)
 │   ├── report_exporter.py       # Manager Centralizzato Esportazione Report
@@ -457,12 +524,15 @@ argus-risk-analytics/
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
 │   ├── terminal_engine.py       # Live Terminal Desk, Pre-Trade Risk Checks, OMS Blotter & PnL Attribution
 │   ├── ui_utils.py              # Helper Grafici Plotly, Modali Informativi Istituzionali & Vector SVG Icons
+│   ├── universal_ledger.py      # Universal One-Ledger Core, Star Schema & Vectorized PyArrow/DuckDB
 │   ├── validator.py             # Pipeline di Bonifica & Normalizzazione Dati
 │   ├── voice_advisor_engine.py  # Executive Voice Briefing & Script a 2 Voci (CIO & CRO)
 │   ├── volatility_surface.py    # Superficie di Volatilità Implicita 3D, Skew & Smile Calibration
 │   ├── wealth/                  # Moduli Wealth Ecosystem (DB, Engine, Stress, Ingestion)
+│   │   ├── human_capital_engine.py # Human Capital Actuarial Valuation & Total Balance Sheet VaR
 │   │   ├── personal_balance_sheet.py # Personal Balance Sheet & Net Worth Reconciliation
 │   │   ├── tax_aware_location.py # Tax-Aware Asset Location & Frictional Optimization
+│   │   ├── tbs_monte_carlo.py   # Lifetime Total Balance Sheet Monte Carlo Engine (5000 Paths)
 │   │   ├── unified_stress_bridge.py # Cross-Asset Macro Factor Stress Bridge Engine
 │   │   ├── universal_bank_parser.py # Universal Bank Ingestion Hub & Layout Sniffer
 │   │   ├── wealth_db.py         # SQLite / MySQL Star Schema & Snapshot Storicizzati
@@ -628,7 +698,7 @@ argus-risk-analytics/
 ├── desktop_launcher.py          # Entry point nativo Desktop App (PyWebView + Backup pre-flight)
 ├── docker-compose.yml           # Configurazione Docker Compose (App + MySQL 8.0)
 ├── pyproject.toml               # Configurazione tool (PyTest, Ruff)
-├── requirements.txt             # Dipendenze Python (inclusi pydantic>=2.0.0, cryptography)
+├── requirements.txt             # Dipendenze Python (inclusi pyarrow>=14.0.0, pydantic>=2.0.0, cryptography)
 ├── setup_desktop.bat            # Script di setup 1-Click per ambiente Desktop Windows
 ├── start_dashboard.bat          # Script d'avvio rapido per Windows
 └── start_dashboard.sh           # Script d'avvio per Linux/macOS
@@ -638,7 +708,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **450 test automatizzati PyTest** distribuiti su 81 file di test con copertura end-to-end del 100%:
+Il progetto include **466 test automatizzati PyTest** distribuiti su 81 file di test con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -646,7 +716,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 450 passed in ~95.00s (100%) =======================
+======================= 466 passed in ~90.00s (100%) =======================
 ```
 
 ---
@@ -657,4 +727,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v7.0.0 Institutional Enterprise Release.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v8.1.0 Institutional Enterprise Release.*

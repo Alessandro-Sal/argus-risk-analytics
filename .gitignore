@@ -62,10 +62,18 @@ gsheets_sync_subproject/google_service_account.json
 build/
 dist/
 *.spec
+!argus_desktop.spec
+
+# Test & Code Coverage
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
 
 # Specific documentation ignored
 docs/POWER_BI_GUIDE.md
 docs/EXECUTIVE_REPORT_OUTLINE.md
 docs/PRESENTATION_SLIDES.md
+
 
 
