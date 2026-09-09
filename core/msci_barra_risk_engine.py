@@ -198,10 +198,14 @@ class BarraMultiAssetRiskEngine:
 
         tickers = [p.ticker for p in asset_profiles]
         weights = np.array([p.weight for p in asset_profiles], dtype=float)
-        # Normalizza pesi a 1.0 se la somma e' positiva
-        w_sum = np.sum(weights)
-        if w_sum > 0:
+        # Normalizza pesi: se somma netta positiva normalizza su w_sum;
+        # se dollar-neutral (somma ~0), normalizza sulla leva lorda sum(|w|) per preservare le posizioni short
+        w_sum = float(np.sum(weights))
+        gross_sum = float(np.sum(np.abs(weights)))
+        if abs(w_sum) > 1e-8:
             w = weights / w_sum
+        elif gross_sum > 1e-8:
+            w = weights / gross_sum
         else:
             w = np.full(n_assets, 1.0 / n_assets)
 
