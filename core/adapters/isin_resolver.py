@@ -7,8 +7,9 @@ Gestione e risoluzione dei codici ISIN in Ticker Yahoo Finance e normalizzazione
 import json
 import logging
 import re
+import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import pandas as pd
 import requests
@@ -111,22 +112,54 @@ def save_isin_to_config(isin: str, ticker: str) -> None:
         logger.warning(f"Impossibile salvare l'associazione ISIN nel config.json: {e}")
 
 
+try:
+    from core.resilient_market_engine import isin_circuit_breaker
+except ImportError:
+    isin_circuit_breaker = None
+
+
+def search_yahoo_isin_details(clean_isin: str, timeout: float = 5.0) -> Tuple[str, str]:
+    """
+    Interroga l'endpoint di ricerca Yahoo Finance per un codice ISIN restituendo (symbol, name).
+    Protetto da Circuit Breaker e retry automatico.
+    """
+    clean_isin = str(clean_isin).strip().upper()
+    if isin_circuit_breaker and not isin_circuit_breaker.allow_request():
+        return "", ""
+
+    url = f"https://query2.finance.yahoo.com/v1/finance/search?q={clean_isin}"
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+    for attempt in range(2):
+        try:
+            resp = requests.get(url, headers=headers, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                quotes = data.get("quotes", [])
+                if quotes and len(quotes) > 0:
+                    symbol = quotes[0].get("symbol", "").strip().upper()
+                    name = quotes[0].get("longname", quotes[0].get("shortname", ""))
+                    if isin_circuit_breaker:
+                        isin_circuit_breaker.record_success()
+                    return symbol, name
+                return "", ""
+            elif resp.status_code == 429:
+                if isin_circuit_breaker:
+                    isin_circuit_breaker.record_failure("Yahoo ISIN 429")
+                time.sleep(1.0 * (attempt + 1))
+            else:
+                break
+        except Exception as ex:
+            if isin_circuit_breaker:
+                isin_circuit_breaker.record_failure(str(ex))
+            break
+    return "", ""
+
+
 def _search_yahoo_isin(clean_isin: str) -> Optional[str]:
-    """Interroga l'endpoint di ricerca Yahoo Finance per un codice ISIN."""
-    try:
-        url = f"https://query2.finance.yahoo.com/v1/finance/search?q={clean_isin}"
-        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
-        resp = requests.get(url, headers=headers, timeout=5)
-        if resp.status_code == 200:
-            data = resp.json()
-            quotes = data.get("quotes", [])
-            if quotes and len(quotes) > 0:
-                symbol = quotes[0].get("symbol", "").strip().upper()
-                if symbol:
-                    return symbol
-    except Exception as ex:
-        logger.debug(f"Ricerca Yahoo Finance fallita per ISIN {clean_isin}: {ex}")
-    return None
+    """Interroga l'endpoint di ricerca Yahoo Finance per un codice ISIN con protezione Circuit Breaker."""
+    sym, _ = search_yahoo_isin_details(clean_isin)
+    return sym if sym else None
 
 
 def resolve_isin_to_ticker(isin: str, fallback_symbol: Optional[str] = None) -> str:

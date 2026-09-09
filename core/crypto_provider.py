@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # core/crypto_provider.py
 # ARGUS — Risk Analytics & BI Platform
 # Resilient Multi-Exchange Crypto Market Data Engine
@@ -86,30 +86,60 @@ def normalize_crypto_pair(ticker: str) -> Tuple[str, str]:
     return t, "EUR"
 
 
+import threading
+
+try:
+    from core.resilient_market_engine import crypto_circuit_breaker
+except ImportError:
+    crypto_circuit_breaker = None
+
+_COINGECKO_LOCK = threading.Lock()
+_LAST_COINGECKO_TIME = 0.0
+
+
+def _coingecko_throttle():
+    """Enforces minimum 2.0s delay between CoinGecko calls to respect Free Tier rate limits."""
+    global _LAST_COINGECKO_TIME
+    with _COINGECKO_LOCK:
+        now = time.time()
+        elapsed = now - _LAST_COINGECKO_TIME
+        if elapsed < 2.0:
+            time.sleep(2.0 - elapsed)
+        _LAST_COINGECKO_TIME = time.time()
+
+
 def fetch_binance_ohlcv(base: str, quote: str = "EUR", limit: int = 1000, timeout: float = 5.0) -> Optional[pd.DataFrame]:
     """
     Scarica le candele giornaliere da Binance Public Market Data API.
     Se la coppia diretta in EUR non esiste, tenta la coppia in USDT e converte.
     """
+    if crypto_circuit_breaker and not crypto_circuit_breaker.allow_request():
+        return None
+
     base = base.upper()
     quote = quote.upper()
     direct_symbol = f"{base}{quote}"
 
     url = f"https://api.binance.com/api/v3/klines?symbol={direct_symbol}&interval=1d&limit={limit}"
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=timeout)
-        if resp.status_code == 200:
-            data = resp.json()
-            if isinstance(data, list) and len(data) > 0:
-                return _parse_binance_klines(data)
-    except Exception:
-        pass
+    for attempt in range(2):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                if isinstance(data, list) and len(data) > 0:
+                    if crypto_circuit_breaker:
+                        crypto_circuit_breaker.record_success()
+                    return _parse_binance_klines(data)
+            elif resp.status_code in (429, 418, 500, 503):
+                time.sleep(1.0 * (attempt + 1))
+        except Exception:
+            pass
 
     # Tentativo con coppia USDT se quote == EUR e coppia diretta fallita (es. SEI, FDUSD)
     if quote == "EUR":
         usdt_symbol = f"{base}USDT"
         url_usdt = f"https://api.binance.com/api/v3/klines?symbol={usdt_symbol}&interval=1d&limit={limit}"
-        url_eurusdt = "https://api.binance.com/api/v3/klines?symbol=EURUSDT&interval=1d&limit={limit}"
+        url_eurusdt = f"https://api.binance.com/api/v3/klines?symbol=EURUSDT&interval=1d&limit={limit}"
         try:
             r_asset = requests.get(url_usdt, headers=HEADERS, timeout=timeout)
             r_fx = requests.get(url_eurusdt, headers=HEADERS, timeout=timeout)
@@ -124,6 +154,8 @@ def fetch_binance_ohlcv(base: str, quote: str = "EUR", limit: int = 1000, timeou
                             fx_series = fx_series.fillna(1.08)  # fallback exchange rate
                             for col in ["open", "high", "low", "close"]:
                                 df_asset[col] = df_asset[col] / fx_series
+                    if crypto_circuit_breaker:
+                        crypto_circuit_breaker.record_success()
                     return df_asset
         except Exception:
             pass
@@ -156,6 +188,9 @@ def _parse_binance_klines(klines: List[List[Any]]) -> Optional[pd.DataFrame]:
 
 def fetch_kraken_ohlcv(base: str, quote: str = "EUR", timeout: float = 5.0) -> Optional[pd.DataFrame]:
     """Scarica le candele giornaliere da Kraken Public Market Data API."""
+    if crypto_circuit_breaker and not crypto_circuit_breaker.allow_request():
+        return None
+
     pair_key = f"{base.upper()}-{quote.upper()}"
     kraken_pair = KRAKEN_PAIRS.get(pair_key, f"{base.upper()}{quote.upper()}")
     url = f"https://api.kraken.com/0/public/OHLC?pair={kraken_pair}&interval=1440"
@@ -163,12 +198,18 @@ def fetch_kraken_ohlcv(base: str, quote: str = "EUR", timeout: float = 5.0) -> O
         resp = requests.get(url, headers=HEADERS, timeout=timeout)
         if resp.status_code == 200:
             data = resp.json()
+            # Controllo errori espliciti Kraken (es. Rate Limit o Invalid Pair)
+            errors = data.get("error", [])
+            if errors and len(errors) > 0:
+                if crypto_circuit_breaker and any("Rate limit" in str(e) for e in errors):
+                    crypto_circuit_breaker.record_failure(f"Kraken Rate Limit: {errors}")
+                return None
+
             res_dict = data.get("result", {})
             for k, val in res_dict.items():
                 if k != "last" and isinstance(val, list) and len(val) > 0:
                     records = []
                     for row in val:
-                        # row[0] = time (s), 1=open, 2=high, 3=low, 4=close, 6=volume
                         dt = pd.to_datetime(row[0], unit="s").floor("D")
                         records.append({
                             "date": dt,
@@ -179,6 +220,8 @@ def fetch_kraken_ohlcv(base: str, quote: str = "EUR", timeout: float = 5.0) -> O
                             "volume": float(row[6]),
                         })
                     if records:
+                        if crypto_circuit_breaker:
+                            crypto_circuit_breaker.record_success()
                         return pd.DataFrame(records).drop_duplicates(subset=["date"]).set_index("date").sort_index()
     except Exception:
         pass
@@ -186,34 +229,48 @@ def fetch_kraken_ohlcv(base: str, quote: str = "EUR", timeout: float = 5.0) -> O
 
 
 def fetch_coingecko_ohlcv(base: str, quote: str = "eur", days: int = 730, timeout: float = 6.0) -> Optional[pd.DataFrame]:
-    """Scarica i prezzi storici da CoinGecko (supporta oltre 10.000 token)."""
+    """Scarica i prezzi storici da CoinGecko con Token Bucket Throttle (2.0s) anti-429."""
+    if crypto_circuit_breaker and not crypto_circuit_breaker.allow_request():
+        return None
+
+    _coingecko_throttle()
     coin_id = COINGECKO_IDS.get(base.upper(), base.lower())
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart?vs_currency={quote.lower()}&days={days}"
-    try:
-        resp = requests.get(url, headers=HEADERS, timeout=timeout)
-        if resp.status_code == 200:
-            data = resp.json()
-            prices = data.get("prices", [])
-            volumes = data.get("total_volumes", [])
-            if prices:
-                df_p = pd.DataFrame(prices, columns=["ts", "close"])
-                df_p["date"] = pd.to_datetime(df_p["ts"], unit="ms").dt.floor("D")
-                df_p = df_p.drop_duplicates(subset=["date"]).set_index("date")
 
-                if volumes:
-                    df_v = pd.DataFrame(volumes, columns=["ts", "volume"])
-                    df_v["date"] = pd.to_datetime(df_v["ts"], unit="ms").dt.floor("D")
-                    df_v = df_v.drop_duplicates(subset=["date"]).set_index("date")
-                    df_p["volume"] = df_v["volume"]
-                else:
-                    df_p["volume"] = 0.0
+    for attempt in range(2):
+        try:
+            resp = requests.get(url, headers=HEADERS, timeout=timeout)
+            if resp.status_code == 200:
+                data = resp.json()
+                prices = data.get("prices", [])
+                volumes = data.get("total_volumes", [])
+                if prices:
+                    df_p = pd.DataFrame(prices, columns=["ts", "close"])
+                    df_p["date"] = pd.to_datetime(df_p["ts"], unit="ms").dt.floor("D")
+                    df_p = df_p.drop_duplicates(subset=["date"]).set_index("date")
 
-                df_p["open"] = df_p["close"]
-                df_p["high"] = df_p["close"]
-                df_p["low"] = df_p["close"]
-                return df_p[["open", "high", "low", "close", "volume"]].sort_index()
-    except Exception:
-        pass
+                    if volumes:
+                        df_v = pd.DataFrame(volumes, columns=["ts", "volume"])
+                        df_v["date"] = pd.to_datetime(df_v["ts"], unit="ms").dt.floor("D")
+                        df_v = df_v.drop_duplicates(subset=["date"]).set_index("date")
+                        df_p["volume"] = df_v["volume"]
+                    else:
+                        df_p["volume"] = 0.0
+
+                    df_p["open"] = df_p["close"]
+                    df_p["high"] = df_p["close"]
+                    df_p["low"] = df_p["close"]
+                    if crypto_circuit_breaker:
+                        crypto_circuit_breaker.record_success()
+                    return df_p[["open", "high", "low", "close", "volume"]].sort_index()
+            elif resp.status_code == 429:
+                if crypto_circuit_breaker:
+                    crypto_circuit_breaker.record_failure("CoinGecko 429 Too Many Requests")
+                time.sleep(2.5 * (attempt + 1))
+            else:
+                break
+        except Exception:
+            pass
     return None
 
 

@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-475%2F475%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-487%2F487%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
@@ -515,6 +515,7 @@ argus-risk-analytics/
 │   ├── regime_switching.py      # Market Regime Switching (3-State Markov Model)
 │   ├── report_exporter.py       # Manager Centralizzato Esportazione Report
 │   ├── reporting_design_system.py # Obsidian Sovereign Design System & Numbered Canvas
+│   ├── resilient_market_engine.py # Enterprise SRE Circuit Breaker, Jittered Retry & Multi-Provider Engine
 │   ├── risk_engine.py           # Motore FIFO, VaR/CVaR Euler, L-VaR Bangia, Almgren-Chriss, Kupiec
 │   ├── risk_limits.py           # Early Warning System & Controlli di Rischio UCITS/MiFID
 │   ├── schemas.py               # Data Contracts & Validazione Pydantic
@@ -605,7 +606,7 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py
 │       ├── 20_⚖️_Pianificazione_Successoria.py
 │       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (450 Test su 81 File)
+├── tests/                       # Test suite automatizzata PyTest (487 Test su 86 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
@@ -689,7 +690,9 @@ argus-risk-analytics/
 │   ├── test_wealth_validator.py
 │   ├── test_workspace_context.py
 │   ├── test_workspace_manager.py
-│   └── test_yield_curve.py
+│   ├── test_yield_curve.py
+│   ├── test_tax_engine_normative_audit.py
+│   └── test_resilient_market_engine.py
 ├── .env.example                 # Esempio configurazione variabili d'ambiente
 ├── CODE_OF_CONDUCT.md           # Codice di Condotta
 ├── CONTRIBUTING.md              # Guida ai contributi
@@ -711,7 +714,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **475 test automatizzati PyTest** distribuiti su 85 file di test (inclusi test property-based con **Hypothesis** e audit normativo fiscale TUIR/L. 197/2022) con copertura end-to-end del 100%:
+Il progetto include **487 test automatizzati PyTest** distribuiti su 86 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022 e test di resilienza SRE Circuit Breaker/Jitter) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -719,7 +722,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 475 passed in ~100.00s (100%) =======================
+======================= 487 passed in ~88.00s (100%) =======================
 ```
 
 ---

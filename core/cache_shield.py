@@ -124,38 +124,53 @@ def get_cached_ticker_history(
 
 
 def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_date: Optional[str]) -> Optional[pd.DataFrame]:
-    """Scarica i prezzi da yfinance con fallback trasparente a Crypto Multi-Exchange Engine per crypto."""
+    """Scarica i prezzi da yfinance con Circuit Breaker e fallback a Stooq (equities/FX) e Crypto Engine."""
     import yfinance as yf
 
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            # Polite throttling per evitare spike di traffico simultanei
-            time.sleep(random.uniform(0.05, 0.15))
-            yf_obj = yf.Ticker(ticker)
-            kwargs = {}
-            if start_date:
-                kwargs["start"] = start_date
-            if end_date:
-                kwargs["end"] = end_date
-            if not kwargs:
-                kwargs["period"] = "2y"
+    try:
+        from core.resilient_market_engine import yahoo_circuit_breaker, StooqDataProvider, stooq_circuit_breaker
+    except ImportError:
+        yahoo_circuit_breaker = None
+        StooqDataProvider = None
+        stooq_circuit_breaker = None
 
-            df = yf_obj.history(**kwargs)
-            if df is not None and not df.empty:
-                # Normalizza le colonne in minuscolo
-                df.columns = [c.lower() for c in df.columns]
-                return df
-        except Exception as e:
-            err_msg = str(e).lower()
-            if "too many requests" in err_msg or "429" in err_msg or "rate limit" in err_msg:
-                # Exponential backoff con jitter casuale
-                sleep_time = (2 ** attempt) + random.uniform(0.1, 0.5)
-                time.sleep(sleep_time)
-            else:
-                break
+    yf_success = False
+    if yahoo_circuit_breaker is None or yahoo_circuit_breaker.allow_request():
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                # Polite throttling per evitare spike di traffico simultanei
+                time.sleep(random.uniform(0.04, 0.10))
+                yf_obj = yf.Ticker(ticker)
+                kwargs = {}
+                if start_date:
+                    kwargs["start"] = start_date
+                if end_date:
+                    kwargs["end"] = end_date
+                if not kwargs:
+                    kwargs["period"] = "2y"
 
-    # Fallback su Crypto Multi-Exchange Provider (Binance, Kraken, CoinGecko)
+                df = yf_obj.history(**kwargs)
+                if df is not None and not df.empty:
+                    # Normalizza le colonne in minuscolo
+                    df.columns = [c.lower() for c in df.columns]
+                    if yahoo_circuit_breaker:
+                        yahoo_circuit_breaker.record_success()
+                    yf_success = True
+                    return df
+            except Exception as e:
+                err_msg = str(e).lower()
+                if "too many requests" in err_msg or "429" in err_msg or "rate limit" in err_msg:
+                    # Exponential backoff con jitter casuale
+                    sleep_time = (2 ** attempt) + random.uniform(0.1, 0.5)
+                    time.sleep(sleep_time)
+                else:
+                    break
+
+        if not yf_success and yahoo_circuit_breaker:
+            yahoo_circuit_breaker.record_failure(f"Fallimento yfinance per {ticker}")
+
+    # Fallback 1: Crypto Multi-Exchange Provider (Binance, Kraken, CoinGecko)
     try:
         from core.crypto_provider import is_crypto_symbol, fetch_crypto_history_unified
         if is_crypto_symbol(ticker):
@@ -164,6 +179,24 @@ def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_dat
                 return df_crypto
     except Exception:
         pass
+
+    # Fallback 2: Stooq Free Historical Data Provider per non-crypto (azioni, ETF, indici, cambi FX)
+    try:
+        from core.crypto_provider import is_crypto_symbol
+        is_crypto = is_crypto_symbol(ticker)
+    except Exception:
+        is_crypto = "-" in ticker or "/" in ticker
+
+    if not is_crypto and StooqDataProvider and (stooq_circuit_breaker is None or stooq_circuit_breaker.allow_request()):
+        try:
+            df_stooq = StooqDataProvider.fetch_history(ticker, start_date=start_date, end_date=end_date)
+            if df_stooq is not None and not df_stooq.empty:
+                if stooq_circuit_breaker:
+                    stooq_circuit_breaker.record_success()
+                return df_stooq
+        except Exception as e_stooq:
+            if stooq_circuit_breaker:
+                stooq_circuit_breaker.record_failure(str(e_stooq))
 
     return None
 
