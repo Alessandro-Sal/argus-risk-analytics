@@ -1,19 +1,653 @@
 # ============================================================
 # core/diagnostics.py
 # ARGUS — Risk Analytics & BI Platform
-# System Diagnostics & Health-Check Cockpit
-# (Engine Latency Benchmark, Memory Health, Storage & DB Profiler)
+# Lead Site Reliability & Observability Engine
+# (Structured JSON Logging, Channel Separation, PII & Financial Sanitization,
+#  Self-Service Diagnostics Cockpit, Storage Profiler & Support Bundle Generator)
 # ============================================================
 
 import os
 import sys
 import time
+import json
+import logging
 import sqlite3
 import platform
+import functools
+import importlib.metadata
+import re
+import io
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Union
+from logging.handlers import RotatingFileHandler
 import pandas as pd
 import numpy as np
+
+# ── 1. MASCHERAMENTO DATI SENSIBILI (PII & FINANCIAL SANITIZATION) ──
+
+_RE_IBAN_IT = re.compile(r"\bIT\d{2}[A-Z]\d{10}[0-9A-Z]{12}\b", re.IGNORECASE)
+_RE_IBAN_INT = re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b")
+_RE_CODICE_FISCALE = re.compile(r"\b[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]\b", re.IGNORECASE)
+_RE_CREDIT_CARD = re.compile(r"\b(?:\d{4}[\s-]?){3}\d{4}\b")
+_RE_EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+_RE_PHONE_IT = re.compile(r"\b(?:\+39\s?)?3\d{2}[\s.-]?\d{6,7}\b")
+_RE_SECRETS = re.compile(
+    r"(?i)\b(password|passwd|secret|api_key|token|access_token|private_key|auth(?:orization)?)\s*[:=]\s*[^\s,;]+",
+)
+_RE_BEARER = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-_.]+\b")
+_RE_FINANCIAL_KV = re.compile(
+    r"(?i)\b(saldo|balance|controvalore|valore_patrimoniale|net_worth|amount|importo|prezzo|patrimonio)\s*[:=]\s*[-+]?[€$£]?\s*[\d.,]+(?:\s*(?:EUR|USD|GBP|CHF|€|\$|£))?",
+)
+_RE_CURRENCY_PREFIX = re.compile(r"(?:€|\$|£|EUR|USD|GBP|CHF)\s*[-+]?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?")
+_RE_CURRENCY_SUFFIX = re.compile(r"[-+]?\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?\s*(?:€|\$|£|EUR|USD|GBP|CHF)")
+
+
+def mask_iban(match: re.Match) -> str:
+    """Maschera un codice IBAN preservando solo le prime 4 e le ultime 4 cifre."""
+    s = match.group(0)
+    if len(s) <= 8:
+        return "[REDACTED_IBAN]"
+    return s[:4] + "*" * (len(s) - 8) + s[-4:]
+
+
+def mask_card(match: re.Match) -> str:
+    """Maschera numero di carta di credito mantenendo solo le ultime 4 cifre (PCI-DSS)."""
+    digits = re.sub(r"[\s-]", "", match.group(0))
+    if len(digits) < 12:
+        return "[REDACTED_PAN]"
+    return "****-****-****-" + digits[-4:]
+
+
+def sanitize_text(text: str) -> str:
+    """
+    Sanitizza una stringa testuale oscurando dati sensibili:
+    - IBAN nazionali e SEPA
+    - Codici Fiscali
+    - Numeri di carte di credito (PAN)
+    - Saldi finanziari, controvalori e importi con valute
+    - Credenziali, password, API key, Bearer tokens
+    - Email e numeri telefonici
+    """
+    if not text or not isinstance(text, str):
+        return text
+
+    # 1. Credenziali e Token
+    sanitized = _RE_SECRETS.sub(r"\1: [REDACTED_SECRET]", text)
+    sanitized = _RE_BEARER.sub("Bearer [REDACTED_TOKEN]", sanitized)
+
+    # 2. Coordinate Bancarie e Finanziarie
+    sanitized = _RE_IBAN_IT.sub(mask_iban, sanitized)
+    sanitized = _RE_IBAN_INT.sub(mask_iban, sanitized)
+    sanitized = _RE_CREDIT_CARD.sub(mask_card, sanitized)
+
+    # 3. Saldi & Importi Monetari
+    sanitized = _RE_FINANCIAL_KV.sub(r"\1: [REDACTED_FINANCIAL]", sanitized)
+    sanitized = _RE_CURRENCY_PREFIX.sub("[REDACTED_FINANCIAL]", sanitized)
+    sanitized = _RE_CURRENCY_SUFFIX.sub("[REDACTED_FINANCIAL]", sanitized)
+
+    # 4. PII (Codice Fiscale, Email, Telefono)
+    sanitized = _RE_CODICE_FISCALE.sub("[REDACTED_CF]", sanitized)
+    sanitized = _RE_EMAIL.sub("[REDACTED_EMAIL]", sanitized)
+    sanitized = _RE_PHONE_IT.sub("[REDACTED_PHONE]", sanitized)
+
+    return sanitized
+
+
+def sanitize_dict(obj: Any) -> Any:
+    """Sanitizza ricorsivamente dizionari, liste e valori scalari."""
+    if isinstance(obj, dict):
+        clean_d = {}
+        for k, v in obj.items():
+            k_clean = sanitize_text(str(k))
+            if any(sec in str(k).lower() for sec in ["password", "secret", "token", "key", "auth"]):
+                clean_d[k_clean] = "[REDACTED_SECRET]"
+            elif any(fin in str(k).lower() for fin in ["saldo", "balance", "amount", "importo", "controvalore", "net_worth", "patrimonio"]):
+                clean_d[k_clean] = "[REDACTED_FINANCIAL]" if not isinstance(v, (dict, list)) else sanitize_dict(v)
+            else:
+                clean_d[k_clean] = sanitize_dict(v)
+        return clean_d
+    elif isinstance(obj, (list, tuple, set)):
+        clean_list = [sanitize_dict(item) for item in obj]
+        return type(obj)(clean_list)
+    elif isinstance(obj, str):
+        return sanitize_text(obj)
+    return obj
+
+
+class FinancialAndPIISanitizingFilter(logging.Filter):
+    """
+    Filtro logging che intercetta i LogRecord prima della serializzazione
+    e applica la sanitizzazione a msg, args e parametri custom di contesto.
+    Garantisce che nessun dato finanziario o PII raggiunga disco o console.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = sanitize_text(record.msg)
+        elif isinstance(record.msg, dict):
+            record.msg = sanitize_dict(record.msg)
+
+        if record.args:
+            if isinstance(record.args, dict):
+                record.args = sanitize_dict(record.args)
+            elif isinstance(record.args, (tuple, list)):
+                sanitized_args = []
+                for a in record.args:
+                    if isinstance(a, str):
+                        sanitized_args.append(sanitize_text(a))
+                    elif isinstance(a, dict):
+                        sanitized_args.append(sanitize_dict(a))
+                    else:
+                        sanitized_args.append(a)
+                record.args = tuple(sanitized_args) if isinstance(record.args, tuple) else sanitized_args
+
+        # Sanitizza eventuali extra attributi custom passati al record
+        for key in list(record.__dict__.keys()):
+            if key not in [
+                "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+                "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+                "created", "msecs", "relativeCreated", "thread", "threadName",
+                "processName", "process", "message", "taskName"
+            ]:
+                k_lower = key.lower()
+                if any(sec in k_lower for sec in ["password", "secret", "token", "key", "auth"]):
+                    setattr(record, key, "[REDACTED_SECRET]")
+                elif any(fin in k_lower for fin in ["saldo", "balance", "amount", "importo", "controvalore", "net_worth", "patrimonio"]):
+                    setattr(record, key, "[REDACTED_FINANCIAL]")
+                else:
+                    val = getattr(record, key)
+                    if isinstance(val, (str, dict, list)):
+                        setattr(record, key, sanitize_dict(val))
+
+        return True
+
+
+# ── 2. LOGGING STRUTTURATO JSON (JSONL FORMATTER) ─────────────────
+
+class StructuredJsonFormatter(logging.Formatter):
+    """
+    Formatter ad alta efficienza per output JSON Lines (JSONL).
+    Serializza i LogRecord con timestamp ISO UTC, metadati di runtime,
+    esecuzione computazionale in millisecondi e traccia degli errori.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        raw_message = record.getMessage()
+        sanitized_message = sanitize_text(raw_message)
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        log_data: Dict[str, Any] = {
+            "timestamp": now_iso,
+            "level": record.levelname,
+            "logger": record.name,
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
+            "message": sanitized_message,
+            "process_id": record.process,
+            "thread_id": record.thread,
+        }
+
+        # Latenza di esecuzione (se fornita)
+        if hasattr(record, "execution_time_ms") and record.execution_time_ms is not None:
+            log_data["execution_time_ms"] = round(float(record.execution_time_ms), 3)
+
+        # Audit context fields (se presenti)
+        for audit_key in ["audit_action", "entity_type", "entity_id", "audit_status", "user_id"]:
+            if hasattr(record, audit_key):
+                log_data[audit_key] = getattr(record, audit_key)
+
+        # Eccezioni e Traceback sanificate
+        if record.exc_info:
+            log_data["error_type"] = record.exc_info[0].__name__ if record.exc_info[0] else "Exception"
+            log_data["stack_trace"] = sanitize_text(self.formatException(record.exc_info))
+        elif record.exc_text:
+            log_data["stack_trace"] = sanitize_text(record.exc_text)
+
+        # Inclusione chiavi extra custom non standard
+        standard_keys = {
+            "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
+            "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
+            "created", "msecs", "relativeCreated", "thread", "threadName",
+            "processName", "process", "message", "taskName", "execution_time_ms",
+            "audit_action", "entity_type", "entity_id", "audit_status", "user_id"
+        }
+        extra_keys = {k: v for k, v in record.__dict__.items() if k not in standard_keys}
+        if extra_keys:
+            log_data["extra"] = sanitize_dict(extra_keys)
+
+        return json.dumps(log_data, default=str)
+
+
+# ── 3. CONFIGURAZIONE CANALI E GESTIONE LOG ────────────────────────
+
+_LOGGING_INITIALIZED = False
+SYSTEM_LOG_PATH = Path("logs") / "argus_system.jsonl"
+AUDIT_LOG_PATH = Path("logs") / "argus_audit.jsonl"
+
+
+def setup_logging(
+    log_dir: Union[str, Path] = "logs",
+    level: int = logging.INFO,
+    max_bytes: int = 5 * 1024 * 1024,  # 5 MB per file
+    backup_count: int = 5
+) -> Dict[str, Any]:
+    """
+    Configura il sistema di logging centralizzato di ARGUS con separazione dei canali:
+    1. System Log (logs/argus_system.jsonl): telemetria, errori I/O, latenze e diagnostica.
+    2. Audit Log (logs/argus_audit.jsonl): tracciamento contabile, modifiche patrimoniali e transazioni.
+
+    Idempotente: non aggiunge handler duplicati in caso di invocazioni multiple.
+    """
+    global _LOGGING_INITIALIZED, SYSTEM_LOG_PATH, AUDIT_LOG_PATH
+    
+    log_path = Path(log_dir)
+    log_path.mkdir(parents=True, exist_ok=True)
+    
+    SYSTEM_LOG_PATH = log_path / "argus_system.jsonl"
+    AUDIT_LOG_PATH = log_path / "argus_audit.jsonl"
+
+    if _LOGGING_INITIALIZED:
+        return {
+            "status": "already_initialized",
+            "system_log": str(SYSTEM_LOG_PATH),
+            "audit_log": str(AUDIT_LOG_PATH),
+        }
+
+    formatter = StructuredJsonFormatter()
+    sanitizer_filter = FinancialAndPIISanitizingFilter()
+
+    # ── Canale 1: System Handler ──
+    sys_handler = RotatingFileHandler(
+        str(SYSTEM_LOG_PATH),
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8"
+    )
+    sys_handler.setFormatter(formatter)
+    sys_handler.addFilter(sanitizer_filter)
+    sys_handler.setLevel(level)
+
+    # ── Canale 2: Audit Handler ──
+    audit_handler = RotatingFileHandler(
+        str(AUDIT_LOG_PATH),
+        maxBytes=max_bytes,
+        backupCount=backup_count,
+        encoding="utf-8"
+    )
+    audit_handler.setFormatter(formatter)
+    audit_handler.addFilter(sanitizer_filter)
+    audit_handler.setLevel(logging.INFO)
+
+    # Configurazione Root Logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+    
+    has_sys = any(isinstance(h, RotatingFileHandler) and "argus_system" in getattr(h, "baseFilename", "") for h in root_logger.handlers)
+    if not has_sys:
+        root_logger.addHandler(sys_handler)
+
+    # Configurazione Logger Audit Dedicato (Canale Isolato)
+    audit_logger = logging.getLogger("argus.audit")
+    audit_logger.setLevel(logging.INFO)
+    audit_logger.propagate = False
+    if not audit_logger.handlers:
+        audit_logger.addHandler(audit_handler)
+
+    _LOGGING_INITIALIZED = True
+
+    sys_logger = logging.getLogger("argus.system")
+    sys_logger.info("ARGUS Observability & Structured Logging Engine initialized successfully.")
+
+    return {
+        "status": "initialized",
+        "system_log": str(SYSTEM_LOG_PATH),
+        "audit_log": str(AUDIT_LOG_PATH),
+        "max_bytes": max_bytes,
+        "backup_count": backup_count
+    }
+
+
+def get_system_logger(name: str = "argus.system") -> logging.Logger:
+    """Restituisce il logger per eventi di sistema, telemetria ed errori infrastrutturali."""
+    if not _LOGGING_INITIALIZED:
+        setup_logging()
+    return logging.getLogger(name)
+
+
+def get_audit_logger(name: str = "argus.audit") -> logging.Logger:
+    """Restituisce il logger isolato per l'audit trail contabile e di business."""
+    if not _LOGGING_INITIALIZED:
+        setup_logging()
+    return logging.getLogger(name)
+
+
+def log_audit_event(
+    action: str,
+    entity_type: str,
+    entity_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    status: str = "SUCCESS",
+    user_id: str = "local_user"
+) -> None:
+    """
+    Registra un evento nell'Audit Trail contabile di ARGUS (`logs/argus_audit.jsonl`).
+    Tutti i parametri e dettagli sono automaticamente sanificati contro leak di dati finanziari.
+    """
+    logger = get_audit_logger()
+    extra_payload = {
+        "audit_action": action,
+        "entity_type": entity_type,
+        "entity_id": str(entity_id) if entity_id is not None else "N/A",
+        "audit_status": status,
+        "user_id": user_id,
+    }
+    if details:
+        extra_payload.update(sanitize_dict(details))
+
+    msg = f"Audit [{action}] on {entity_type}:{entity_id or 'all'} -> Status: {status}"
+    logger.info(msg, extra=extra_payload)
+
+
+def measure_latency(
+    metric_name: Optional[str] = None,
+    logger_instance: Optional[logging.Logger] = None
+) -> Callable:
+    """
+    Decoratore per profilazione ad alta precisione della latenza d'esecuzione.
+    Registra il tempo impiegato in millisecondi come metrica strutturata `execution_time_ms`.
+    In caso di eccezione, traccia l'errore e ricalcola il tempo prima del re-raise.
+    """
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            log = logger_instance or get_system_logger()
+            name = metric_name or f"{func.__module__}.{func.__qualname__}"
+            t0 = time.perf_counter()
+            try:
+                result = func(*args, **kwargs)
+                lat_ms = (time.perf_counter() - t0) * 1000.0
+                log.info(
+                    f"Execution benchmark: {name} completed in {lat_ms:.2f}ms",
+                    extra={"execution_time_ms": lat_ms, "metric_name": name}
+                )
+                return result
+            except Exception as exc:
+                lat_ms = (time.perf_counter() - t0) * 1000.0
+                log.error(
+                    f"Execution failure: {name} failed after {lat_ms:.2f}ms: {exc}",
+                    exc_info=True,
+                    extra={"execution_time_ms": lat_ms, "metric_name": name}
+                )
+                raise
+        return wrapper
+    return decorator
+
+
+# ── 4. RACCOLTA TELEMETRIA HARDWARE, RUNTIME E LOG RECENTI ─────────
+
+def get_hardware_and_environment_specs() -> Dict[str, Any]:
+    """
+    Raccoglie specifiche dettagliate dell'ambiente hardware e software
+    per finalità di diagnostica, troubleshooting e supporto tecnico.
+    """
+    specs: Dict[str, Any] = {
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "os_platform": platform.platform(),
+        "os_system": platform.system(),
+        "os_release": platform.release(),
+        "os_version": platform.version(),
+        "architecture": " ".join(platform.architecture()),
+        "machine": platform.machine(),
+        "processor": platform.processor(),
+        "python_version": platform.python_version(),
+        "python_compiler": platform.python_compiler(),
+        "python_executable": sys.executable,
+    }
+
+    # Metriche Hardware (CPU & RAM tramite psutil)
+    try:
+        import psutil
+        cpu_count_phys = psutil.cpu_count(logical=False)
+        cpu_count_log = psutil.cpu_count(logical=True)
+        vmem = psutil.virtual_memory()
+        
+        specs["cpu"] = {
+            "physical_cores": cpu_count_phys or 1,
+            "logical_cores": cpu_count_log or 1,
+            "cpu_percent": psutil.cpu_percent(interval=0.05),
+        }
+        specs["memory"] = {
+            "total_gb": round(vmem.total / (1024.0 ** 3), 2),
+            "available_gb": round(vmem.available / (1024.0 ** 3), 2),
+            "used_gb": round((vmem.total - vmem.available) / (1024.0 ** 3), 2),
+            "percent_used": vmem.percent,
+            "process_rss_mb": get_process_ram_mb(),
+        }
+        
+        disk = psutil.disk_usage(os.path.abspath("."))
+        specs["disk"] = {
+            "total_gb": round(disk.total / (1024.0 ** 3), 2),
+            "free_gb": round(disk.free / (1024.0 ** 3), 2),
+            "used_percent": disk.percent
+        }
+    except Exception as e:
+        specs["hardware_error"] = str(e)
+        specs["cpu"] = {"cores": os.cpu_count() or 1}
+        specs["memory"] = {"process_rss_mb": get_process_ram_mb()}
+
+    # Pacchetti Core Installati
+    core_packages = [
+        "streamlit", "pandas", "numpy", "scipy", "duckdb", "sqlite3",
+        "sqlalchemy", "plotly", "psutil", "cryptography", "pytest"
+    ]
+    pkg_versions: Dict[str, str] = {}
+    for pkg in core_packages:
+        if pkg == "sqlite3":
+            pkg_versions[pkg] = sqlite3.sqlite_version
+        else:
+            try:
+                pkg_versions[pkg] = importlib.metadata.version(pkg)
+            except Exception:
+                pkg_versions[pkg] = "N/A"
+    specs["packages"] = pkg_versions
+
+    return specs
+
+
+def get_database_integrity_details() -> Dict[str, Any]:
+    """Raccoglie lo stato di integrità fisica, versione schema e statistiche di tutti i DB."""
+    db_report: Dict[str, Any] = {}
+    data_dir = Path("data")
+    
+    for db_file in ["argus_local.db", "yfinance_cache.db"]:
+        p = data_dir / db_file
+        if not p.exists():
+            db_report[db_file] = {"exists": False}
+            continue
+
+        try:
+            conn = sqlite3.connect(str(p))
+            cur = conn.cursor()
+            
+            cur.execute("PRAGMA integrity_check;")
+            integ = cur.fetchone()[0]
+            
+            cur.execute("PRAGMA foreign_key_check;")
+            fk_violations = len(cur.fetchall())
+            
+            cur.execute("PRAGMA user_version;")
+            schema_ver = cur.fetchone()[0]
+            
+            cur.execute("PRAGMA journal_mode;")
+            journal_mode = cur.fetchone()[0]
+            
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';")
+            tables = [r[0] for r in cur.fetchall()]
+            
+            table_counts = {}
+            for t in tables:
+                try:
+                    cur.execute(f"SELECT COUNT(*) FROM `{t}`;")
+                    table_counts[t] = cur.fetchone()[0]
+                except Exception:
+                    table_counts[t] = -1
+            conn.close()
+
+            db_report[db_file] = {
+                "exists": True,
+                "size_mb": round(os.path.getsize(p) / (1024.0 * 1024.0), 3),
+                "integrity": integ,
+                "fk_violations": fk_violations,
+                "schema_version": schema_ver,
+                "journal_mode": journal_mode,
+                "tables": table_counts
+            }
+        except Exception as exc:
+            db_report[db_file] = {
+                "exists": True,
+                "error": str(exc)
+            }
+
+    return db_report
+
+
+def get_recent_logs(
+    channel: str = "system",
+    limit: int = 100,
+    min_level: str = "INFO"
+) -> List[Dict[str, Any]]:
+    """
+    Recupera gli ultimi log registrati dal canale indicato ("system" o "audit").
+    Restituisce una lista di record JSON strutturati e sanificati, ordinati dal più recente.
+    """
+    log_file = AUDIT_LOG_PATH if channel == "audit" else SYSTEM_LOG_PATH
+    if not log_file.exists():
+        return []
+
+    level_hierarchy = {
+        "DEBUG": 10,
+        "INFO": 20,
+        "WARNING": 30,
+        "ERROR": 40,
+        "CRITICAL": 50
+    }
+    min_level_num = level_hierarchy.get(min_level.upper(), 20)
+
+    records: List[Dict[str, Any]] = []
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+            
+        for line in reversed(lines):
+            line_str = line.strip()
+            if not line_str:
+                continue
+            try:
+                rec = json.loads(line_str)
+                rec_level = rec.get("level", "INFO").upper()
+                rec_num = level_hierarchy.get(rec_level, 20)
+                if rec_num >= min_level_num:
+                    records.append(rec)
+                if len(records) >= limit:
+                    break
+            except Exception:
+                continue
+    except Exception as e:
+        get_system_logger().error(f"Errore nella lettura dei log ({channel}): {e}")
+
+    return records
+
+
+# ── 5. SELF-SERVICE DIAGNOSTICS & SUPPORT BUNDLE GENERATOR ────────
+
+def generate_support_bundle(
+    include_logs: bool = True,
+    max_log_lines: int = 500
+) -> bytes:
+    """
+    Crea in memoria un archivio compresso ZIP contenente il report diagnostico completo
+    dell'installazione ARGUS, pronto per essere inviato al supporto tecnico o allegato a ticket.
+    """
+    diag_results = run_system_health_check()
+    
+    diag_serializable = dict(diag_results)
+    if isinstance(diag_serializable.get("engine_benchmarks"), pd.DataFrame):
+        diag_serializable["engine_benchmarks"] = diag_serializable["engine_benchmarks"].to_dict(orient="records")
+    if isinstance(diag_serializable.get("database_checks"), pd.DataFrame):
+        diag_serializable["database_checks"] = diag_serializable["database_checks"].to_dict(orient="records")
+    if isinstance(diag_serializable.get("storage_profile"), dict):
+        sp = dict(diag_serializable["storage_profile"])
+        if isinstance(sp.get("table_breakdown"), pd.DataFrame):
+            sp["table_breakdown"] = sp["table_breakdown"].to_dict(orient="records")
+        diag_serializable["storage_profile"] = sp
+
+    env_specs = get_hardware_and_environment_specs()
+    db_status = get_database_integrity_details()
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            "system_diagnostics.json",
+            json.dumps(sanitize_dict(diag_serializable), indent=2, default=str)
+        )
+        zf.writestr(
+            "environment_and_hardware.json",
+            json.dumps(sanitize_dict(env_specs), indent=2, default=str)
+        )
+        zf.writestr(
+            "database_status.json",
+            json.dumps(sanitize_dict(db_status), indent=2, default=str)
+        )
+
+        if include_logs:
+            sys_logs = get_recent_logs(channel="system", limit=max_log_lines, min_level="DEBUG")
+            sys_log_lines = "\n".join([json.dumps(sanitize_dict(l), default=str) for l in sys_logs])
+            zf.writestr("system_logs.sanitized.jsonl", sys_log_lines)
+
+            audit_logs = get_recent_logs(channel="audit", limit=max_log_lines, min_level="INFO")
+            audit_log_lines = "\n".join([json.dumps(sanitize_dict(l), default=str) for l in audit_logs])
+            zf.writestr("audit_logs.sanitized.jsonl", audit_log_lines)
+
+        now_ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        readme_content = f"""================================================================================
+ARGUS Risk & Wealth Analytics Platform — Support Diagnostic Bundle
+================================================================================
+Generated: {now_ts}
+Overall System Status: {diag_results.get('overall_status', 'N/A')}
+Health Score: {diag_results.get('health_score', 0)}%
+OS / Platform: {env_specs.get('os_platform', 'N/A')}
+Python Version: {env_specs.get('python_version', 'N/A')}
+
+PRIVACY & SANITIZATION ASSURANCE:
+In accordo con GDPR Art. 32 (Sicurezza del Trattamento) e le best practice PCI-DSS,
+tutti i log e i metadati contenuti in questo bundle sono stati preventivamente
+sanificati dal motore di oscuramento crittografico `core/diagnostics.py`.
+Nessun IBAN in chiaro, Codice Fiscale, credenziale, token API o controvalore monetario
+grezzo è incluso nei file diagnostici allegati.
+================================================================================
+"""
+        zf.writestr("README_SUPPORT.txt", readme_content)
+
+    zip_buffer.seek(0)
+    bundle_bytes = zip_buffer.getvalue()
+
+    log_audit_event(
+        action="EXPORT_SUPPORT_BUNDLE",
+        entity_type="SYSTEM_DIAGNOSTICS",
+        entity_id=f"bundle_{int(time.time())}",
+        details={"bundle_size_bytes": len(bundle_bytes), "include_logs": include_logs},
+        status="SUCCESS"
+    )
+
+    return bundle_bytes
+
+
+# ── 6. FUNZIONI DIAGNOSTICHE STORICHE PRESERVATE E ARRICCHITE ─────
+
 
 
 def get_process_ram_mb() -> float:

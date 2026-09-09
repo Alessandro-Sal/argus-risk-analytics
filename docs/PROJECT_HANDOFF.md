@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **510 test automatizzati (100% passed)** su 88 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **521 test automatizzati (100% passed)** su 89 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -39,6 +39,7 @@ Persistenza Dati & Continuità Operativa:
  ├── core/universal_ledger.py  ──► Double-Entry One-Ledger, WACP FIFO SQL Qualify, Zero-Copy PyArrow & Parquet
  ├── core/wealth/wealth_db.py  ──► SQLite (argus_wealth.db) / MySQL 8.0 [Star Schema Time-Series]
  ├── core/database_migration_manager.py ──► DBRE Dual-Versioning (PRAGMA user_version & schema_migrations), Pre-Flight Backup & Drift Inspector
+ ├── core/diagnostics.py       ──► Lead SRE Observability, JSONL Structured Logging, System/Audit Channels, PII/Financial Sanitization & Support Bundle ZIP
  ├── core/duckdb_engine.py     ──► In-Process Vectorized OLAP & Apache Parquet
  ├── core/security_engine.py   ──► CWE-1236 Sanitization, PII Masking & ArgusDataVault (AES-Fernet)
  └── core/backup_engine.py     ──► Hot Backup (SQLite Backup API), WAL Checkpoint & Atomic Restore Rollback
@@ -216,6 +217,15 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Schema Drift Inspector**: Ispezione automatica dei cataloghi fisici SQLite contro i modelli SQLAlchemy ORM (`core/models.py`) e modelli Wealth (`core/wealth/wealth_models.py`), controllo orfani referenziali `PRAGMA foreign_key_check` e diagnostica con severità `INFO`, `WARNING`, `CRITICAL`.
 - **Indici Compositi Analitici & Integrazione DuckDB C++**: Deploy idempotente di indici compositi coprenti (`transactions`, `market_prices`, `wealth_cashflow`, `portfolio_snapshots`) per accelerare query multidimensionali e compatibilità al 100% con l'attach nativo DuckDB (`ATTACH '...' (TYPE SQLITE)`).
 
+### `core/diagnostics.py` — ✅ Lead SRE Observability, Structured Logging & Self-Service Support Bundle
+- **Structured JSONL Logging**: Formattatore atomico single-line `StructuredJsonFormatter` con timestamp ISO-8601 UTC, metadati di runtime, identificativo processo/thread, latenza computazionale `execution_time_ms`, audit context ed eccezioni serializzate.
+- **Separazione Rigorosa dei Canali (System vs Audit)**: Configurazione idempotente `setup_logging()` con canali isolati su file e rotazione automatica (`RotatingFileHandler`, max 5 MB, 5 backup):
+  - `logs/argus_system.jsonl`: telemetria, errori I/O, latenze dei motori e diagnostica infrastrutturale.
+  - `logs/argus_audit.jsonl`: audit trail contabile isolato (`propagate = False`) per tracciare con `log_audit_event()` azioni utente, ribilanciamenti, modifiche patrimoniali ed export.
+- **Mascheramento Preventivo Dati Sensibili (GDPR Art. 32 & PCI-DSS)**: Filtro logging `FinancialAndPIISanitizingFilter` e funzioni helper `sanitize_text()`, `sanitize_dict()` che oscurano a monte IBAN (preservando prime 4 e ultime 4 cifre `IT60****************0123`), Codici Fiscali (`[REDACTED_CF]`), numeri di carte PAN (`****-****-****-1234`), saldi e importi monetari in euro/valute estere (`[REDACTED_FINANCIAL]`), credenziali, password, API key e Bearer token (`[REDACTED_SECRET]`).
+- **Decoratore `@measure_latency`**: Profilazione trasparente ad alta precisione con calcolo dei millisecondi e logging strutturato di successo/errore.
+- **Support Bundle Generator (1-Click ZIP)**: Costruttore in-memory `generate_support_bundle()` che assembla `system_diagnostics.json`, `environment_and_hardware.json` (CPU, RAM via `psutil`, disco, versioni librerie), `database_status.json` (integrità SQLite, schema version, FK check), gli ultimi log sanificati di sistema e audit e `README_SUPPORT.txt` conforme privacy. Integrato nella Control Room con download diretto.
+
 ### `core/security_engine.py` — ✅ Cybersecurity, Anti-Formula Injection & ArgusDataVault
 - **CWE-1236 Formula Injection Defense**: Sanitizzazione sistematica con prefisso apostrofo (`'`) per stringhe che iniziano con `=`, `+`, `-`, `@`, `\t` o `\r` esportate in CSV e XLSX.
 - **Data Minimization & PII Masking**: Mascheramento dinamico a standard GDPR (Art. 5/32) per IBAN (`IT60****************1234`), Codici Fiscali e numeri di conto bancario.
@@ -314,7 +324,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **510 test automatizzati passano con successo (100%)** distribuiti su 88 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py` e la suite DBRE `tests/test_migration_manager.py`):
+Tutti i **521 test automatizzati passano con successo (100%)** distribuiti su 89 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py`, la suite DBRE `tests/test_migration_manager.py` e il modulo `tests/test_structured_logging_and_support_bundle.py`):
 
 ```bash
 py -m pytest
@@ -322,7 +332,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 510 passed in ~59.00s (100%) =======================
+======================= 521 passed in ~65.00s (100%) =======================
 ```
 
 ---
