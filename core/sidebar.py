@@ -588,6 +588,8 @@ def render_sidebar():
         if "run_name" not in st.session_state: st.session_state.run_name = ""
         if "benchmark" not in st.session_state: st.session_state.benchmark = "SPY"
         if "base_currency" not in st.session_state: st.session_state.base_currency = "EUR"
+        if "locale" not in st.session_state: st.session_state.locale = "it"
+        if "accounting_notation" not in st.session_state: st.session_state.accounting_notation = "standard"
         if "ui_theme" not in st.session_state: st.session_state.ui_theme = "Midnight Obsidian"
 
         # Wealth Specific Settings Defaults
@@ -630,6 +632,10 @@ def render_sidebar():
 
         if "sb_base_currency" in st.session_state:
             st.session_state.base_currency = st.session_state.sb_base_currency
+        if "sb_locale_select" in st.session_state:
+            st.session_state.locale = "en" if "English" in st.session_state.sb_locale_select else "it"
+        if "sb_accounting_select" in st.session_state:
+            st.session_state.accounting_notation = "parentheses" if "Wall Street" in st.session_state.sb_accounting_select else "standard"
 
         if "sb_port_name" in st.session_state:
             st.session_state.portfolio_name = st.session_state.sb_port_name
@@ -831,6 +837,18 @@ def render_sidebar():
 
         # ── 3. PARAMETRI ENGINE & DB (CONFIGURAZIONE DINAMICA) ────────
         with st.expander("⚙️ Impostazioni", expanded=False):
+            hdr_color = "#34d399" if is_wealth_mode else "#ff9900"
+            st.markdown(f'<div style="font-size:10px; font-weight:700; color:{hdr_color}; letter-spacing:0.5px; text-transform:uppercase; margin: 2px 0 2px;">🌍 Lingua & Notazione Contabile</div>', unsafe_allow_html=True)
+            col_lang, col_notat = st.columns([1.4, 1.6])
+            with col_lang:
+                lang_opts = ["🇮🇹 Italiano", "🇬🇧 English"]
+                curr_lang_idx = 1 if st.session_state.get("locale", "it") == "en" else 0
+                st.selectbox("Lingua", lang_opts, index=curr_lang_idx, key="sb_locale_select")
+            with col_notat:
+                notat_opts = ["Standard (-1.234 €)", "Wall Street ((1.234) €)"]
+                curr_notat_idx = 1 if st.session_state.get("accounting_notation", "standard") == "parentheses" else 0
+                st.selectbox("Notazione", notat_opts, index=curr_notat_idx, key="sb_accounting_select")
+
             if is_wealth_mode:
                 st.toggle(
                     "Modalità Offline (SQLite)",

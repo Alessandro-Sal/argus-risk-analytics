@@ -475,9 +475,65 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
     </div>
     """, unsafe_allow_html=True)
 
-    # ── STEP 1: SORGENTE DATI & FILE ────────────────────────
     section("① Scegli la Sorgente Dati")
     
+    with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Iniezione 1-Click su DB)", expanded=False):
+        st.caption("Inietta istantaneamente un intero ecosistema patrimoniale realistico (conti, cashflow pluriennale solvibile, mutui francesi, perizie e fondo pensione) nel database locale senza caricare file esterni.")
+        w_col1, w_col2, w_col3 = st.columns(3)
+        with w_col1:
+            st.markdown("""
+            **🚀 Giovane Accumulatore**
+            - **Patrimonio**: €116k (Orizzonte 25 anni)
+            - **Conti**: Checking, Risparmio, Emergenza, Broker
+            - **Wealth**: Zero debiti/immobili, stipendio indicizzato, PAC €850
+            """)
+            if st.button("Inietta Giovane Accumulatore", key="btn_w_arch_young", use_container_width=True):
+                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
+                with st.spinner("⏳ Simulazione quantitativa e iniezione su DB in corso..."):
+                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+                    res_arch = sim_eng.simulate("young_accumulator", years=3)
+                    db_res = populate_argus_database(res_arch)
+                    st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
+                    st.session_state.pop("wealth_profile_selector_widget", None)
+                    st.success(f"✅ Profilo '{res_arch.archetype.name}' iniettato con successo (ID #{db_res['wealth_profile_id']})!")
+                    st.rerun()
+
+        with w_col2:
+            st.markdown("""
+            **🏖️ FIRE / Decumulo**
+            - **Patrimonio**: €1.7M (Orizzonte 35 anni)
+            - **Conti**: Liquidità cuscinetto, Brokerage cedolare
+            - **Wealth**: Villa proprietà (€420k, 0 mutui), SWR 3.5%, dividendi
+            """)
+            if st.button("Inietta FIRE Decumulo", key="btn_w_arch_fire", use_container_width=True):
+                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
+                with st.spinner("⏳ Simulazione quantitativa e iniezione su DB in corso..."):
+                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+                    res_arch = sim_eng.simulate("fire_decumulation", years=3)
+                    db_res = populate_argus_database(res_arch)
+                    st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
+                    st.session_state.pop("wealth_profile_selector_widget", None)
+                    st.success(f"✅ Profilo '{res_arch.archetype.name}' iniettato con successo (ID #{db_res['wealth_profile_id']})!")
+                    st.rerun()
+
+        with w_col3:
+            st.markdown("""
+            **👑 HNWI / Famiglia**
+            - **Patrimonio**: €4.0M+ (Istituzionale)
+            - **Conti**: Private Banking, Depositi, Broker
+            - **Wealth**: Mutuo francese (€420k), orologi & oro, affitto, max pensione
+            """)
+            if st.button("Inietta HNWI Famiglia", key="btn_w_arch_hnwi", use_container_width=True):
+                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
+                with st.spinner("⏳ Simulazione quantitativa e iniezione su DB in corso..."):
+                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+                    res_arch = sim_eng.simulate("hnwi_family", years=3)
+                    db_res = populate_argus_database(res_arch)
+                    st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
+                    st.session_state.pop("wealth_profile_selector_widget", None)
+                    st.success(f"✅ Profilo '{res_arch.archetype.name}' iniettato con successo (ID #{db_res['wealth_profile_id']})!")
+                    st.rerun()
+
     src_options = [
         "🌐 Google Sheets — Sincronizzazione Veloce 2026 ('Expenses Tracker 2026' & 'Net Worth OGGI')",
         "🌐 Google Sheets — Archivio Storico Multi-Anno (2021 – 2026, oltre 4.000 transazioni)",

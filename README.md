@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-521%2F521%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-538%2F538%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
 
@@ -38,6 +38,8 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **🗄️ Database Reliability Engineering & Embedded Schema Migration Engine (`core/database_migration_manager.py`)**: Framework evolutivo embedded per database client-side (SQLite & DuckDB) a zero dipendenze esterne pesanti. Implementa Dual-Layer Schema Versioning ($O(1)$ con `PRAGMA user_version` + audit ledger crittografico `schema_migrations` con hash SHA-256 anti-manomissione), pre-flight shadow backup atomico prima di modifiche DDL, fail-safe disaster recovery con rollback automatico immediato e ripristino dallo snapshot su eccezione, schema drift inspector continuo contro i modelli Python (`core/models.py`, `core/wealth/wealth_models.py`), rilevamento orfani referenziali (`PRAGMA foreign_key_check`) e indici compositi analitici per l'accelerazione vettorizzata di query OLAP e attach nativo in DuckDB C++.
 * **🩺 Lead SRE Observability, Structured JSON Logging & Self-Service Support Bundle Engine (`core/diagnostics.py`, `src/0_Control_Room.py`)**: Framework istituzionale di telemetria, logging sicuro e supporto diagnostico client-side. Implementa formattazione JSONL atomica (`StructuredJsonFormatter`), separazione fisica a canali isolati con rotazione controllata (`logs/argus_system.jsonl` per ops/latenze/errori e `logs/argus_audit.jsonl` per audit trail contabile di business con `log_audit_event`), filtro di mascheramento dati sensibili `FinancialAndPIISanitizingFilter` a conformità GDPR Art. 32 / PCI-DSS (oscuramento irreversibile di IBAN, Codici Fiscali, numeri di carte PAN, importi monetari e token/credenziali), decoratore `@measure_latency`, visualizzatore live dei log con filtri per severità e generatore 1-click di **Support Bundle ZIP** (`generate_support_bundle`) con diagnostica hardware (CPU, RAM via `psutil`, disco), stato integrità database SQLite, versioni pacchetti e log recenti sanificati.
 * **🚦 Enterprise Data Quality Gate & Middleware Ingestion (`core/data_quality_gate.py`)**: Middleware di validazione e riconciliazione contabile pre-ingestion basato su schemi dichiarativi **Pydantic v2** (`CanonicalTradeRecord`, `QualityGateReport`), regole semantiche avanzate (blocco posizioni corte accidentali, rilevamento trade in giorni festivi/weekend, validazione cross-currency FX), riconciliazione automatica ISIN/Ticker e deduplicazione deterministica a chiave naturale SHA-256 (`tx_hash`) per garantire l'idempotenza assoluta nei ricaricamenti multipli di estratti conto.
+* **🎲 Quantitative Simulation Engine & Educational Archetypes Generator (`scripts/generate_realistic_portfolio.py`)**: Motore di simulazione vettorizzato per la generazione di dataset finanziari sintetici ad alto realismo. Modella storie pluriennali con PAC mensili, dividendi periodici, split azionari, spese ricorrenti, mutui ad ammortamento francese ($\Delta PMT$), asset illiquidi con perizie e haircut di mercato, e vincolo ferreo di solvibilità di cassa ($C_t \ge 0$). Include 3 archetipi educativi preconfigurati (*Young Accumulator*, *FIRE / Decumulation*, *HNWI / Family Office*) con iniezione atomica 1-click in sessione e su database SQLite (`data/argus_local.db`).
+* **🌍 Internationalization (i18n), Localization (L10n) & Multi-Currency FX Engine (`core/i18n/`, `core/sidebar.py`)**: Framework istituzionale di internazionalizzazione, traduzione gerarchica $O(1)$ (`translator.py`) con supporto ad interpolazione dinamica e session state Streamlit (`st.session_state["locale"]`), formattatori regionali ad alta densità (`formatters.py`) per convenzioni europee, anglosassoni e svizzere con notazione contabile Wall Street a parentesi `(1.234,56 €)` / `($1,234.56)`, formati compatti e Pandas Styler helpers, connettore tassi ufficiali BCE con forward-fill TARGET2, matrice di cross-rate ad arbitraggio triangolare (`fx_engine.py`) e scomposizione analitica esatta del rischio valutario (FX Risk) su rendimento, varianza ($2\,\text{Cov}$), *Natural Hedge* e riconciliazione monetaria esatta del PnL ($\Delta \equiv 0$).
 * **⚡ Bloomberg Terminal Command Gateway & Mnemonic Parser**: Barra di comando istituzionale globale con sintassi a codici rapidi (`<TICKER> <MNEMONIC> <GO>`, es. `AAPL DES`, `MSFT FA`, `NVDA VOLS`, `PORT RISK`, `YCRV`, `BTP YAS`, `US10Y FI`, `CDS`, `STREAM`, `ATTR`, `TAX`, `EQS`, `BQUANT`, `LAUNCHPAD`, `XL`, `LIVE`, `TERM`, `CLI`), autocompletamento fuzzy, visual command feedback in tempo reale, sincronizzazione bidirezionale perfetta con la Navigation Rail e navigazione rapida senza mouse.
 * **🖥️ ARGUS Live Terminal & Interactive CLI Execution Desk (`LIVE` / `TERM`)**: Console operativa interattiva in-app con prompt comandi Bloomberg (`ARGUS:LIVE>`), motore streaming Level-2 Depth Book con calcolo del Microprice di Stoikov (2018) e Order Flow Imbalance (OFI), simulatore Order Management System (OMS) Blotter con order slicing algoritmico TWAP/VWAP e telemetria di sistema in tempo reale (`TOP` Monitor CPU, RAM RSS, Ring Buffer, DB).
 * **🤖 Smart Order Routing & Algoritmi di Esecuzione TWAP / VWAP**: Motore istituzionale di order slicing intraday (09:00 - 17:30) per grandi blocchi ed ordini di ribilanciamento con profilazione della curva di liquidità a "U", **TWAP** uniforme con jitter stocastico anti-frontrunning, **VWAP** ponderato sui volumi con tetto di partecipazione (POV Cap al 15%), stima dello slippage atteso e calcolo del risparmio netto rispetto all'ordine a mercato immediato.
@@ -113,6 +115,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **Dual Pipeline Google Sheets Live**: Ingestione simultanea e separata di `History B/S Stocks` e `History B/S Crypto`, conversione multi-valuta e creazione automatica dei portafogli dedicati con persistenza locale e su MySQL.
 * **Database & Memory Storage Cockpit**: Dashboard diagnostica con 4 KPI superiori (*Stato Piattaforma*, *Storage Totale Disco*, *RAM Processo*, *Cache Shield*), grafico Donut Plotly di ripartizione dello storage per tabella e file, e pulsanti di manutenzione 1-click (*VACUUM & Compatta DB*, *Pulisci Cache Scaduta TTL > 24h*, *Rigenera Indici B-Tree*).
 * **Selezione Database & Multi-Valuta**: Switch dinamico tra database (`investment_risk_bi` vs `wealth`), modalità Offline in-memory e selezione valuta base (EUR, USD, GBP, CHF).
+* **🎲 Archetipi Didattici & Portafogli Realistici 1-Click**: Selettore rapido ad espansione per caricare all'istante portafogli di trading realistici pluriennali (*Young Accumulator*, *FIRE Decumulation*, *HNWI Family Office*) direttamente nel motore di rischio e nella pipeline di analisi della piattaforma.
 * **Diagnostica di Sistema & Multi-Tier Caching**: Monitoraggio in tempo reale delle latenze dei 26 motori computazionali e dello scudo anti-rate limit della cache locale SQLite.
 
 ### 1. 📈 Dashboard Generale & AI Analyst (`src/pages/1_📈_Dashboard_Generale.py`)
@@ -201,6 +204,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 
 ### 12. 🎛️ Wealth Control Room (`src/pages/12_🎛️_Wealth_Control_Room.py`)
 * **🏛️ Master Wealth Hub & Multi-Account Management**: Centro di comando unificato per la gestione di conti correnti, depositi, conti titoli, carte e passività con switch dinamico tra profili patrimoniali.
+* **🎲 Archetipi Patrimoniali Didattici 1-Click**: Modulo di iniezione transazionale atomica per popolare il database patrimoniale locale (`argus_local.db` / `argus_wealth.db`) con l'intero ecosistema finanziario (*Young Accumulator*, *FIRE Decumulation*, *HNWI Family Office*) inclusi conti, flussi di cassa, mutui con ammortamento francese, asset illiquidi con perizie periodiche, fondi pensione e snapshot storici.
 * **🔄 Live Sync Google Sheets & Transazioni**: Sincronizzazione automatica da fogli Google con categorizzazione semantica, supporto multi-banca e associazione automatica conti.
 * **🩺 Diagnostica di Bilancio & Master Excel Workbook**: Health Check del bilancio personale ed esportazione del Master Workbook Excel multi-tab (.xlsx) con bilancio patrimoniale consolidato.
 
@@ -512,6 +516,11 @@ argus-risk-analytics/
 │   ├── hedging.py               # Copertura Beta-Neutral & Tail Risk Protection
 │   ├── hrp_optimizer.py         # Hierarchical Risk Parity (HRP - Marcos López de Prado)
 │   ├── html_exporter.py         # Exporter Report Standalone HTML
+│   ├── i18n/                    # Framework Internazionalizzazione, L10n & Multi-Currency FX Engine
+│   │   ├── formatters.py        # Regional Number/Date Formatters, Wall Street Accounting & Compact Currencies
+│   │   ├── fx_engine.py         # ECB Official Historical Rates, Triangular Arbitrage & FX Risk Decomposition
+│   │   ├── translator.py        # O(1) Key-Path Translation Engine con Interpolazione & Fallback
+│   │   └── locales/             # Dizionari Linguistici Strutturati (it.json, en.json)
 │   ├── ingestion_utils.py       # Universal Bank Ingestion, Sniffer & Encoding Detection
 │   ├── macro_provider.py        # Connettore dati macroeconomici FRED, BCE & Term Structure
 │   ├── metadata_resolver.py     # Risoluzione metadati e anagrafiche asset
@@ -591,6 +600,7 @@ argus-risk-analytics/
 │   ├── export_star_schema.py    # Generatore pacchetto ZIP Star Schema per Power BI
 │   ├── generate_excel_model.py  # Generatore standalone modello Excel
 │   ├── generate_icon.py         # Generatore icona ICO multi-risoluzione
+│   ├── generate_realistic_portfolio.py # Quantitative Simulation Engine (3 Archetipi, PAC, Mutui, Solvibilità)
 │   ├── package_release.py       # Pacchettizzatore Release ZIP
 │   └── test_run.py              # Script di esecuzione e verifica rapida
 ├── src/                         # Codice sorgente dell'applicazione Streamlit (21 Moduli Operativi)
@@ -617,7 +627,7 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py
 │       ├── 20_⚖️_Pianificazione_Successoria.py
 │       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (510 Test su 88 File)
+├── tests/                       # Test suite automatizzata PyTest (538 Test su 91 File)
 │   ├── test_adapters.py
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
@@ -655,6 +665,7 @@ argus-risk-analytics/
 │   ├── test_history_analytics.py
 │   ├── test_hrp_optimizer.py
 │   ├── test_html_exporter.py
+│   ├── test_i18n_and_fx_engine.py
 │   ├── test_institutional_expansion.py
 │   ├── test_institutional_expansion_v63.py
 │   ├── test_institutional_metric_modals.py
@@ -705,8 +716,8 @@ argus-risk-analytics/
 │   ├── test_yield_curve.py
 │   ├── test_tax_engine_normative_audit.py
 │   ├── test_resilient_market_engine.py
-│   ├── test_migration_manager.py
-│   └── test_structured_logging_and_support_bundle.py
+│   ├── test_structured_logging_and_support_bundle.py
+│   └── test_realistic_portfolio_generator.py
 ├── .env.example                 # Esempio configurazione variabili d'ambiente
 ├── CODE_OF_CONDUCT.md           # Codice di Condotta
 ├── CONTRIBUTING.md              # Guida ai contributi
@@ -728,7 +739,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **521 test automatizzati PyTest** distribuiti su 89 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback e la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle) con copertura end-to-end del 100%:
+Il progetto include **538 test automatizzati PyTest** distribuiti su 91 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, e la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -736,7 +747,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 521 passed in ~65.00s (100%) =======================
+======================= 538 passed in ~63.00s (100%) =======================
 ```
 
 ---
@@ -747,4 +758,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v8.1.0 Institutional Enterprise Release.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v8.2.0 Institutional Enterprise Release.*
