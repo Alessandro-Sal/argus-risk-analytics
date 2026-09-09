@@ -151,9 +151,11 @@ with tab_rw:
                 "descrizione": st.column_config.TextColumn("Descrizione / Intermediario", width="large"),
                 "codice_investimento": st.column_config.NumberColumn("Cod. Investimento", width="small"),
                 "codice_stato_estero": st.column_config.TextColumn("Paese Estero", width="medium"),
+                "giacenza_media": st.column_config.NumberColumn("Giacenza Media (€)", format="€ %,.2f", width="medium"),
+                "valore_massimo": st.column_config.NumberColumn("Picco Max (€)", format="€ %,.2f", width="medium"),
                 "valore_finale": st.column_config.NumberColumn("Valore al 31/12 (€)", format="€ %,.2f", width="medium"),
                 "ivafe_dovuta": st.column_config.NumberColumn("IVAFE Dovuta (€)", format="€ %,.2f", width="medium"),
-                "monitoraggio_solo": st.column_config.TextColumn("Solo Monitoraggio", width="small")
+                "monitoraggio_solo": st.column_config.TextColumn("Monitoraggio", width="medium")
             },
             hide_index=True,
             use_container_width=True

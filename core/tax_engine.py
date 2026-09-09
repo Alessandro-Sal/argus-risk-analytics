@@ -745,6 +745,11 @@ def compute_modello_redditi_pf(
                 cod_paese = "069 (Stati Uniti d'America)"
                 ivafe_rate = 0.002
 
+            # Riconoscimento Paesi a Fiscalità Privilegiata / Black List ex D.M. 04/05/1999 (L. 213/2023: IVAFE elevata allo 0,40%)
+            if any(bl in t_up for bl in ["PANAMA", "CAYMAN", "BAHAMAS", "BERMUDA", "BVI", "VIRGIN", "GIBRALTAR", "SEYCHELLES"]):
+                ivafe_rate = 0.004
+                cod_paese = f"{cod_paese} [BlackList 0.40%]"
+
             ivafe_val = val_eur * ivafe_rate
             rw_rows.append({
                 "rigo": f"RW{len(rw_rows) + 1}",
@@ -763,13 +768,57 @@ def compute_modello_redditi_pf(
     tot_ivafe = float(df_rw["ivafe_calcolata_eur"].sum()) if not df_rw.empty else 0.0
     tot_ivafe_due = tot_ivafe if tot_ivafe >= 12.0 else 0.0 # Esenzione per importi inferiori a 12€
 
+    # ── QUADRO RM (Sezione V - Proventi da OICR Esteri & Dividendi senza Sostituto Residente) ──
+    # Art. 18 TUIR: Tassazione al 26% sul Netto Frontiera per dividendi e proventi da intermediari non residenti
+    rm_rows = []
+    tot_div_gross = 0.0
+    tot_foreign_wht = 0.0
+    tot_netto_frontiera = 0.0
+    tot_tax_rm = 0.0
+
+    try:
+        wht_res = compute_withholding_tax_analysis(results)
+        df_wht = wht_res.get("df_withholding", pd.DataFrame())
+        if not df_wht.empty and "ticker" in df_wht.columns:
+            # Esclude titoli italiani Borsa Italiana (.MI) che scontano la ritenuta d'imposta 26% alla fonte
+            foreign_divs = df_wht[~df_wht["ticker"].astype(str).str.upper().str.endswith(".MI")]
+            if not foreign_divs.empty:
+                tot_div_gross = float(foreign_divs["dividendo_lordo_eur"].sum())
+                tot_foreign_wht = float(foreign_divs["ritenuta_estera_wht_eur"].sum())
+                tot_netto_frontiera = float(foreign_divs["netto_frontiera_eur"].sum())
+                tot_tax_rm = float(foreign_divs["imposta_italiana_26_eur"].sum())
+    except Exception:
+        pass
+
+    if tot_div_gross > 0.01:
+        rm_rows = [
+            {"rigo": "RM12_A", "descrizione": "Proventi lordi di fonte estera (Dividendi azionari & proventi ETF)", "valore_eur": round(tot_div_gross, 2)},
+            {"rigo": "RM12_B", "descrizione": "Ritenute estere applicate alla fonte (Withholding Tax convenzionale)", "valore_eur": round(tot_foreign_wht, 2)},
+            {"rigo": "RM12_C", "descrizione": "Ammontare netto frontiera imponibile in Italia", "valore_eur": round(tot_netto_frontiera, 2)},
+            {"rigo": "RM12_D", "descrizione": "Aliquota imposta sostitutiva italiana (%)", "valore_eur": 26.0},
+            {"rigo": "RM12_E", "descrizione": "Imposta sostitutiva dovuta al 26% (Modello F24 - Codice 1242)", "valore_eur": round(tot_tax_rm, 2)},
+        ]
+    else:
+        rm_rows = [
+            {"rigo": "RM12_A", "descrizione": "Proventi lordi di fonte estera (Nessun dividendo estero rilevato)", "valore_eur": 0.0},
+            {"rigo": "RM12_B", "descrizione": "Ritenute estere applicate alla fonte", "valore_eur": 0.0},
+            {"rigo": "RM12_C", "descrizione": "Ammontare netto frontiera imponibile", "valore_eur": 0.0},
+            {"rigo": "RM12_D", "descrizione": "Aliquota imposta sostitutiva italiana (%)", "valore_eur": 26.0},
+            {"rigo": "RM12_E", "descrizione": "Imposta sostitutiva dovuta al 26%", "valore_eur": 0.0},
+        ]
+    df_rm = pd.DataFrame(rm_rows)
+
+    totale_debito_dichiarativo = imposta_sostitutiva + tot_ivafe_due + tot_tax_rm
+
     return {
         "df_quadro_rt": df_rt,
         "df_quadro_rw": df_rw,
+        "df_quadro_rm": df_rm,
         "summary": {
             "imposta_sostitutiva_rt_eur": round(imposta_sostitutiva, 2),
             "totale_ivafe_rw_eur": round(tot_ivafe_due, 2),
-            "totale_debito_dichiarativo_eur": round(imposta_sostitutiva + tot_ivafe_due, 2),
+            "imposta_sostitutiva_rm_eur": round(tot_tax_rm, 2),
+            "totale_debito_dichiarativo_eur": round(totale_debito_dichiarativo, 2),
             "minusvalenze_riportabili_eur": round(minus_riportabile, 2),
             "esenzione_ivafe_applicata": (tot_ivafe < 12.0 and tot_ivafe > 0.0)
         }

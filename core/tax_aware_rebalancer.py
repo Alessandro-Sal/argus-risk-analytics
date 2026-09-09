@@ -45,11 +45,13 @@ class TaxAwarePortfolioRebalancer:
         tot_realized_loss = 0.0
 
         current_val_map = {}
+        asset_class_map = {}
         if not current_holdings.empty and "ticker" in current_holdings.columns:
             for _, r in current_holdings.iterrows():
                 t = str(r["ticker"]).upper()
                 v = float(r.get("market_value", r.get("value", 0.0)))
                 current_val_map[t] = v
+                asset_class_map[t] = str(r.get("asset_class", ""))
 
         all_tickers = sorted(list(set(list(target_weights.keys()) + list(current_val_map.keys()))))
         usable_minus = float(existing_minusvalenze)
@@ -73,18 +75,26 @@ class TaxAwarePortfolioRebalancer:
             tot_spread_cost += spread
 
             est_tax = 0.0
+            from core.tax_engine import is_etf
+            is_etf_item = is_etf(asset_class_map.get(ticker, ""), ticker)
+
             if action == "SELL":
                 # Stima 15% di plusvalenza media per asset venduti in profitto
                 gain = trade_amt * 0.15
                 if gain > 0:
                     tot_realized_gain += gain
-                    if usable_minus > 0:
-                        offset = min(usable_minus, gain)
-                        usable_minus -= offset
-                        taxable = gain - offset
-                    else:
+                    tax_rate = config.gov_bond_tax_rate if any(b in ticker for b in ["BTP", "BOT", "CCT", "CTZ", "BUND", "OAT", "BONOS", "UST", "GOV", "TREASURY"]) else config.capital_gain_tax_rate
+                    if is_etf_item:
+                        # Normativa Italiana TUIR Art. 44: Proventi ETF = Redditi di Capitale (NON compensabili con minusvalenze)
                         taxable = gain
-                    tax_rate = config.gov_bond_tax_rate if any(b in ticker for b in ["BTP", "BUND", "UST", "GOV"]) else config.capital_gain_tax_rate
+                    else:
+                        # TUIR Art. 67: Azioni/Bond/ETC = Redditi Diversi (Compensabili con minusvalenze pregresse ex Art. 68 c. 5)
+                        if usable_minus > 0:
+                            offset = min(usable_minus, gain)
+                            usable_minus -= offset
+                            taxable = gain - offset
+                        else:
+                            taxable = gain
                     est_tax = taxable * tax_rate
 
             trades.append({
@@ -99,7 +109,8 @@ class TaxAwarePortfolioRebalancer:
             })
 
         df_trades = pd.DataFrame(trades)
-        net_friction_total = tot_commissions + tot_spread_cost + max(0.0, (tot_realized_gain - existing_minusvalenze) * config.capital_gain_tax_rate)
+        total_estimated_tax = float(sum(t["Impatto Fiscale (€)"] for t in trades))
+        net_friction_total = tot_commissions + tot_spread_cost + total_estimated_tax
 
         return {
             "trade_execution_list_df": df_trades,
@@ -107,7 +118,7 @@ class TaxAwarePortfolioRebalancer:
             "gross_turnover_pct": round(gross_turnover / max(1.0, total_portfolio_value) * 100.0, 2),
             "total_commissions_eur": round(tot_commissions, 2),
             "total_spread_cost_eur": round(tot_spread_cost, 2),
-            "estimated_tax_eur": round(max(0.0, (tot_realized_gain - existing_minusvalenze) * config.capital_gain_tax_rate), 2),
+            "estimated_tax_eur": round(total_estimated_tax, 2),
             "total_friction_drag_eur": round(net_friction_total, 2),
             "remaining_minusvalenze_eur": round(usable_minus, 2)
         }

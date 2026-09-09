@@ -248,8 +248,12 @@ class PrescriptiveConicRebalancer:
                 tax_rate = self.tax_wallet.gov_bond_tax_rate if "Gov" in p.asset_class else self.tax_wallet.capital_gains_tax_rate
                 
                 if realized_pnl > 0:
-                    # Plusvalenza: compensabile se equity/ETF con minus disponibili
-                    if remaining_minus > 0:
+                    # Plusvalenza: compensabile se equity/ETC/bond con minus disponibili (TUIR Art. 67)
+                    # Gli ETF generano Redditi di Capitale (TUIR Art. 44) e NON possono assorbire minusvalenze
+                    from core.tax_engine import is_etf
+                    is_etf_flag = "ETF" in str(p.asset_class).upper() or is_etf(p.asset_class, p.ticker)
+
+                    if not is_etf_flag and remaining_minus > 0:
                         absorbed = min(remaining_minus, realized_pnl)
                         minus_absorbed = absorbed
                         remaining_minus -= absorbed
