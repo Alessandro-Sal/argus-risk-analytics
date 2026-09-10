@@ -1793,7 +1793,7 @@ with tab_diagnostics:
         include_logs_opt = st.checkbox("Includi gli ultimi 500 eventi di log sanificati (Sistema & Audit)", value=True, key="chk_include_logs_bundle")
         
         bundle_bytes = generate_support_bundle(include_logs=include_logs_opt, max_log_lines=500)
-        now_bundle_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        now_bundle_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         bundle_name = f"argus_support_bundle_{now_bundle_str}.zip"
 
         st.download_button(
