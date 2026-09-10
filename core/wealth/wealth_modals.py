@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # core/wealth/wealth_modals.py
 # ARGUS — Wealth Informative & Educational Modals (@st.dialog)
 # Modali informativi, metodologie di calcolo e guide per i moduli Wealth
@@ -10,12 +10,12 @@ import streamlit as st
 @st.dialog("🏛️ Metodologia Stato Patrimoniale & Net Worth Consolidato", width="large")
 def render_wealth_methodology_modal():
     """Modale informativo sulla metodologia di calcolo del Patrimonio Netto Consolidato."""
-    st.markdown("""
+    st.markdown(r"""
     ### 🏛️ Architettura del Patrimonio Netto Consolidato (Net Worth)
     
     Il **Patrimonio Netto Consolidato** di ARGUS aggrega la totalità degli attivi e delle passività secondo i principi di contabilità patrimoniale internazionale (**IFRS / GIPS Wealth Guidelines**):
 
-    $$\\text{Net Worth} = \\text{Liquidità} + \\text{Investimenti Quotati} + \\text{Immobili Net Equity} + \\text{Asset Illiquidi} + \\text{Previdenza} - \\text{Passività}$$
+    $$\text{Net Worth} = \text{Liquidità} + \text{Investimenti Quotati} + \text{Immobili Net Equity} + \text{Asset Illiquidi} + \text{Previdenza} - \text{Passività}$$
 
     #### 📊 I 5 Pilastri del Wealth Health Score (0 - 100):
     1. **Liquidità & Runway (Peso 25%)**: Copertura autonoma del fondo di emergenza su base mensile ($> 6$ mesi = punteggio massimo).
@@ -30,7 +30,7 @@ def render_wealth_methodology_modal():
 @st.dialog("💸 Guida Metodologica: Cash Flow, 50/30/20 & Envelope Budgeting", width="large")
 def render_budget_rule_methodology_modal():
     """Modale informativo sulla regola 50/30/20 e l'Envelope Budgeting."""
-    st.markdown("""
+    st.markdown(r"""
     ### 💸 Metodologia di Gestione Flussi di Cassa & Budgeting
     
     #### ⚖️ La Regola Aurea 50 / 30 / 20:
@@ -47,7 +47,7 @@ def render_budget_rule_methodology_modal():
 @st.dialog("⌚ Metodologia Valutazione Asset Illiquidi, PE & Private Debt", width="large")
 def render_illiquids_methodology_modal():
     """Modale informativo per la valutazione di orologi di lusso, private equity e private debt."""
-    st.markdown("""
+    st.markdown(r"""
     ### ⌚ Valutazione Asset Illiquidi, Private Markets & Caveau
     
     #### 🔍 Metodologie di Perizia Applicate:
@@ -56,7 +56,7 @@ def render_illiquids_methodology_modal():
        - **J-Curve Modeling**: Tracciamento del drawdown iniziale nei primi anni di investimento dovuto ai richiami di capitale e commissioni di gestione, seguito dalla fase di realizzo e maturazione dell'IRR.
        - **Metriche Istituzionali**: MOIC (*Multiple on Invested Capital*), DPI (*Distributed to Paid-In*) e RVPI (*Residual Value to Paid-In*).
     3. **Private Debt & Direct Lending**:
-       - **Cash Flow Waterfall**: Priorità di pagamento sequenziale (Senior Secured $\\to$ Unitranche $\\to$ Mezzanino $\\to$ Equity).
+       - **Cash Flow Waterfall**: Priorità di pagamento sequenziale (Senior Secured $\to$ Unitranche $\to$ Mezzanino $\to$ Equity).
        - **Covenants Tracking**: Monitoraggio continuo di Leva (Net Debt/EBITDA), Copertura Interessi (ICR) e Debt Service Coverage (DSCR).
     """)
 
@@ -64,13 +64,13 @@ def render_illiquids_methodology_modal():
 @st.dialog("🎯 Metodologia Goal-Based Investing & Merton Jump-Diffusion", width="large")
 def render_goal_methodology_modal():
     """Modale informativo per Goal-Based Investing e Merton Model."""
-    st.markdown("""
+    st.markdown(r"""
     ### 🎯 Goal-Based Investing & Success Probability Index (SPI %)
     
     #### 🎲 Simulazione Stocastica a 5.000 Scenari:
     Il motore stocastico ARGUS modella l'accumulazione patrimoniale per ciascun traguardo di vita mediante il **Processo di Diffusione con Salti di Merton (1976)**:
 
-    $$dS_t = \\mu S_t dt + \\sigma S_t dW_t + J_t S_t dN_t$$
+    $$dS_t = \mu S_t dt + \sigma S_t dW_t + J_t S_t dN_t$$
 
     - $dW_t$: Moto Browniano Standard (fluttuazione ordinaria di mercato).
     - $dN_t$: Processo di Poisson per crash e shock di mercato asimmetrici.
@@ -84,11 +84,11 @@ def render_goal_methodology_modal():
 @st.dialog("🏡 Metodologia Real Estate Net Equity & Dynamic LTV", width="large")
 def render_real_estate_methodology_modal():
     """Modale informativo per la gestione immobiliare e mutui."""
-    st.markdown("""
+    st.markdown(r"""
     ### 🏡 Immobili, Net Equity & Sostenibilità Finanziaria
     
     #### 📐 Calcolo del Net Home Equity:
-    $$\\text{Net Home Equity} = \\text{Valore di Mercato Attuale dell'Immobile} - \\text{Debito Residuo del Mutuo}$$
+    $$\text{Net Home Equity} = \text{Valore di Mercato Attuale dell'Immobile} - \text{Debito Residuo del Mutuo}$$
 
     #### 📊 Indicatori Chiave di Rischio:
     - **Loan-to-Value (LTV %)**: Rapporto percentuale tra debito residuo e valore di perizia attuale ($< 60\%$ = soglia di sicurezza bancaria).
@@ -100,7 +100,7 @@ def render_real_estate_methodology_modal():
 @st.dialog("📑 Metodologia Fiscalità, Quadro RW & Scudo Fiscale", width="large")
 def render_fiscal_methodology_modal():
     """Modale informativo sulla fiscalità patrimoniale e internazionale."""
-    st.markdown("""
+    st.markdown(r"""
     ### 📑 Fiscalità Patrimoniale, Monitoraggio Fiscale & Tax Alpha
     
     #### 🇮🇹 Regime Fiscale Italiano (TUIR):
@@ -118,7 +118,7 @@ def render_fiscal_methodology_modal():
 @st.dialog("👨‍👩‍👧‍👦 Metodologia Successione, Patti di Famiglia & Holding", width="large")
 def render_succession_methodology_modal():
     """Modale informativo sulla pianificazione successoria e family office."""
-    st.markdown("""
+    st.markdown(r"""
     ### 👨‍👩‍👧‍👦 Passaggio Generazionale & Strutture di Holding
     
     #### ⚖️ Imposte di Successione & Franchigie (Italia):
@@ -136,7 +136,7 @@ def render_succession_methodology_modal():
 @st.dialog("🤖 Metodologia AI Wealth Copilot & Diagnostica Autonoma", width="large")
 def render_ai_health_score_modal():
     """Modale informativo per l'AI Copilot e Wealth Health Score."""
-    st.markdown("""
+    st.markdown(r"""
     ### 🤖 Intelligenza Artificiale Applicata alla Gestione Patrimoniale
     
     #### 🔍 Motore Diagnostico a Due Livelli:

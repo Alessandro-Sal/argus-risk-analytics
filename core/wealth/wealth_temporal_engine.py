@@ -71,28 +71,54 @@ def compute_wealth_temporal_progression(
     illiquid_vals = []
     liab_vals = []
 
+    target_points = timeframe_months + 1
     has_long_term_snapshots = False
-    if df_snaps is not None and not df_snaps.empty and len(df_snaps) >= 6:
-        d_min = pd.to_datetime(df_snaps["snapshot_date"]).min()
-        d_max = pd.to_datetime(df_snaps["snapshot_date"]).max()
-        if (d_max - d_min).days >= max(180, timeframe_months * 20):
+    df_snaps_sliced = None
+
+    if df_snaps is not None and not df_snaps.empty and len(df_snaps) >= target_points:
+        df_snaps_copy = df_snaps.copy()
+        df_snaps_copy["_snap_dt"] = pd.to_datetime(df_snaps_copy["snapshot_date"])
+        df_snaps_copy = df_snaps_copy.sort_values("_snap_dt")
+        df_snaps_copy["_month_key"] = df_snaps_copy["_snap_dt"].dt.to_period("M")
+        df_monthly = df_snaps_copy.drop_duplicates(subset=["_month_key"], keep="last")
+        if len(df_monthly) >= target_points:
+            df_snaps_sliced = df_monthly.iloc[-target_points:].copy()
             has_long_term_snapshots = True
 
-    if has_long_term_snapshots:
-        df_snaps = df_snaps.sort_values("snapshot_date")
-        for _, r in df_snaps.iterrows():
+    if has_long_term_snapshots and df_snaps_sliced is not None:
+        for _, r in df_snaps_sliced.iterrows():
             d_val = pd.to_datetime(r["snapshot_date"]).date()
             dates.append(d_val)
-            nw_vals.append(float(r.get("net_worth", cur_nw)))
-            liquid_vals.append(float(r.get("liquid_cash", cur_liquid)))
-            invest_vals.append(float(r.get("financial_investments", cur_invest)))
-            re_vals.append(float(r.get("real_estate_total", cur_re)))
-            p_val = float(r.get("physical_assets_total", cur_physical))
-            pe_val = float(r.get("pension_total", cur_pension))
+            
+            nw_raw = r.get("total_net_worth") if "total_net_worth" in r and pd.notna(r["total_net_worth"]) else r.get("net_worth")
+            nw_val = float(nw_raw) if nw_raw is not None and pd.notna(nw_raw) else cur_nw
+            nw_vals.append(nw_val)
+            
+            liq_raw = r.get("liquid_assets") if "liquid_assets" in r and pd.notna(r["liquid_assets"]) else r.get("liquid_cash")
+            liq_val = float(liq_raw) if liq_raw is not None and pd.notna(liq_raw) else cur_liquid
+            liquid_vals.append(liq_val)
+
+            inv_raw = r.get("financial_investments")
+            inv_val = float(inv_raw) if inv_raw is not None and pd.notna(inv_raw) else cur_invest
+            invest_vals.append(inv_val)
+
+            re_raw = r.get("real_estate_total") if "real_estate_total" in r and pd.notna(r["real_estate_total"]) else r.get("real_estate")
+            re_val = float(re_raw) if re_raw is not None and pd.notna(re_raw) else cur_re
+            re_vals.append(re_val)
+
+            p_raw = r.get("physical_assets_total") if "physical_assets_total" in r and pd.notna(r["physical_assets_total"]) else r.get("physical_assets")
+            p_val = float(p_raw) if p_raw is not None and pd.notna(p_raw) else cur_physical
             physical_vals.append(p_val)
+
+            pe_raw = r.get("pension_total") if "pension_total" in r and pd.notna(r["pension_total"]) else r.get("pension_plans")
+            pe_val = float(pe_raw) if pe_raw is not None and pd.notna(pe_raw) else cur_pension
             pension_vals.append(pe_val)
+
             illiquid_vals.append(p_val + pe_val)
-            liab_vals.append(float(r.get("total_liabilities", cur_liab)))
+
+            liab_raw = r.get("total_liabilities") if "total_liabilities" in r and pd.notna(r["total_liabilities"]) else r.get("liabilities")
+            liab_val = float(liab_raw) if liab_raw is not None and pd.notna(liab_raw) else cur_liab
+            liab_vals.append(liab_val)
     else:
         today = date.today()
         multipliers = _generate_synthetic_multipliers(timeframe_months)
@@ -278,10 +304,11 @@ def compute_wealth_benchmark_comparison(
 
     nw_m_rets = nw.pct_change().dropna()
     bm_m_rets = pd.Series(bm_rets[1:], index=nw_m_rets.index)
-    if len(nw_m_rets) > 2 and np.var(bm_m_rets) > 1e-6:
-        cov = np.cov(nw_m_rets, bm_m_rets)[0, 1]
-        var_bm = np.var(bm_m_rets)
-        wealth_beta = float(cov / var_bm)
+    if len(nw_m_rets) > 2 and np.var(bm_m_rets) > 1e-6 and np.var(nw_m_rets) > 1e-6:
+        cov = float(np.cov(nw_m_rets, bm_m_rets)[0, 1])
+        var_bm = float(np.var(bm_m_rets))
+        raw_beta = cov / var_bm if var_bm > 1e-8 else 0.85
+        wealth_beta = float(raw_beta) if (raw_beta > 0.01 and not np.isnan(raw_beta)) else 0.85
     else:
         wealth_beta = 0.85
 
