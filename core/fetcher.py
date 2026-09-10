@@ -71,7 +71,7 @@ LOOKBACK_EXTRA_DAYS = 365
 
 # ── Connessione MySQL ────────────────────────────────────────
 
-def get_engine(user: str = "root", password: str = "", host: str = "localhost",
+def get_engine(user: str = "root", password: str = "root", host: str = "localhost",
                port: int = 3306, db: str = "investment_risk_bi", database: str = None,
                offline: bool = False, sqlite_path: str = "data/argus_local.db"):
     """
@@ -97,7 +97,7 @@ def get_engine(user: str = "root", password: str = "", host: str = "localhost",
     else:
         # Priorità a variabili d'ambiente rispetto ai default (supporta sia MYSQL_ che STREAMLIT_DB_)
         user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user
-        password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password
+        password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password or "root"
         host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host
         port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
         port = int(port_env) if port_env else port

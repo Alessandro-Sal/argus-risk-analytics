@@ -34,6 +34,7 @@ from core.ui_utils import (
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
 from core.wealth import (
+    init_wealth_db,
     get_wealth_portfolios,
     compute_consolidated_net_worth,
     compute_estate_planning_analytics,
@@ -56,10 +57,13 @@ db_user = st.session_state.get("db_user", "root")
 db_pass = st.session_state.get("db_pass", "root")
 db_host = st.session_state.get("db_host", "localhost")
 db_name = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
+st.session_state.wealth_db_name = db_name
+st.session_state.db_name = db_name
 offline_mode = bool(st.session_state.get("offline_mode", False))
 db_port = int(st.session_state.get("db_port", 3306))
 
 engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
+init_wealth_db(engine)
 
 df_prof = get_wealth_portfolios(engine)
 prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}

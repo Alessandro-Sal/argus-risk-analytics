@@ -13,6 +13,23 @@ import sys
 from core.workspace_manager import ensure_session_restored
 
 
+@st.cache_data(ttl=30, show_spinner=False)
+def _get_available_mysql_dbs(host: str, port: int, user: str, password: str) -> list:
+    """Rileva dinamicamente i database utente attivi su MySQL escludendo gli schemi di sistema."""
+    try:
+        from sqlalchemy import create_engine, text
+        import pymysql
+        sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
+        eng = create_engine(sys_url, connect_args={"connect_timeout": 2})
+        with eng.connect() as conn:
+            res = conn.execute(text("SHOW DATABASES;"))
+            ignored = {"information_schema", "mysql", "performance_schema", "sys"}
+            dbs = [row[0] for row in res if row[0] not in ignored]
+            return dbs
+    except Exception:
+        return []
+
+
 # Moduli Risk Analytics (11 Pagine Istituzionali)
 NAV_MODULES_RISK = [
     {
@@ -584,6 +601,17 @@ def render_sidebar():
         if "risk_db_name" not in st.session_state: st.session_state.risk_db_name = "investment_risk_bi"
         if "db_name" not in st.session_state:
             st.session_state.db_name = st.session_state.wealth_db_name if is_wealth_mode else st.session_state.risk_db_name
+
+        # Sincronizza il database attivo con il portale corrente al cambio di contesto
+        current_portal_key = "wealth" if is_wealth_mode else "risk"
+        last_portal_key = st.session_state.get("_last_rendered_portal")
+        if last_portal_key != current_portal_key:
+            if is_wealth_mode:
+                st.session_state.db_name = st.session_state.get("wealth_db_name", "wealth")
+            else:
+                st.session_state.db_name = st.session_state.get("risk_db_name", "investment_risk_bi")
+            st.session_state["_last_rendered_portal"] = current_portal_key
+
         if "portfolio_name" not in st.session_state: st.session_state.portfolio_name = "Master Wealth"
         if "run_name" not in st.session_state: st.session_state.run_name = ""
         if "benchmark" not in st.session_state: st.session_state.benchmark = "SPY"
@@ -620,9 +648,19 @@ def render_sidebar():
 
         if "sb_db_select" in st.session_state:
             if st.session_state.sb_db_select != "Custom...":
-                st.session_state.db_name = st.session_state.sb_db_select
-            elif "sb_custom_db" in st.session_state and st.session_state.sb_custom_db:
-                st.session_state.db_name = st.session_state.sb_custom_db
+                target_db = st.session_state.sb_db_select
+                st.session_state.db_name = target_db
+                if is_wealth_mode:
+                    st.session_state.wealth_db_name = target_db
+                else:
+                    st.session_state.risk_db_name = target_db
+            elif "sb_custom_db" in st.session_state and st.session_state.sb_custom_db.strip():
+                target_db = st.session_state.sb_custom_db.strip()
+                st.session_state.db_name = target_db
+                if is_wealth_mode:
+                    st.session_state.wealth_db_name = target_db
+                else:
+                    st.session_state.risk_db_name = target_db
 
         if "sb_bench_select" in st.session_state:
             if st.session_state.sb_bench_select != "Custom...":
@@ -666,6 +704,25 @@ def render_sidebar():
         active_rf_info = get_active_risk_free_rate(currency=st.session_state.base_currency, custom_override=custom_rf_dec)
         st.session_state.active_rf_rate = active_rf_info["rate"]
         st.session_state.active_rf_info = active_rf_info
+
+        # Rileva cambio di database o offline_mode per invalidare cache e profili orfani
+        curr_active_db = st.session_state.get("wealth_db_name" if is_wealth_mode else "risk_db_name", st.session_state.get("db_name"))
+        curr_offline = bool(st.session_state.get("offline_mode", False))
+        prev_active_db = st.session_state.get("_prev_active_db")
+        prev_offline = st.session_state.get("_prev_offline_mode")
+
+        if prev_active_db is not None and (prev_active_db != curr_active_db or prev_offline != curr_offline):
+            st.session_state["wealth_active_portfolio_id"] = None
+            st.session_state.pop("wealth_profile_selector_widget", None)
+            st.session_state.pop("cf_profile_selector_widget", None)
+            st.session_state.pop("wealth_active_snapshot", None)
+            try:
+                st.cache_data.clear()
+            except Exception:
+                pass
+
+        st.session_state["_prev_active_db"] = curr_active_db
+        st.session_state["_prev_offline_mode"] = curr_offline
 
         from core.ui_utils import get_display_portfolio_name
         port_label, has_port = get_display_portfolio_name()
@@ -879,29 +936,62 @@ def render_sidebar():
                 with col_pw:
                     st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
                 
-                db_options = ["wealth", "investment_risk_bi", "Custom..."]
-                current_db = "wealth" if is_wealth_mode else "investment_risk_bi"
-                stored_db = st.session_state.get("wealth_db_name" if is_wealth_mode else "risk_db_name")
-                if stored_db and stored_db in db_options:
-                    current_db = stored_db
-                elif "db_name" in st.session_state and st.session_state.db_name in db_options:
-                    if is_wealth_mode and st.session_state.db_name != "investment_risk_bi":
-                        current_db = st.session_state.db_name
-                    elif not is_wealth_mode and st.session_state.db_name != "wealth":
-                        current_db = st.session_state.db_name
-                
-                db_idx = db_options.index(current_db) if current_db in ["wealth", "investment_risk_bi"] else db_options.index("Custom...")
+                active_db = st.session_state.wealth_db_name if is_wealth_mode else st.session_state.risk_db_name
+                if not active_db:
+                    active_db = "wealth" if is_wealth_mode else "investment_risk_bi"
+
+                found_dbs = _get_available_mysql_dbs(
+                    st.session_state.db_host,
+                    st.session_state.db_port,
+                    st.session_state.db_user,
+                    st.session_state.db_pass
+                )
+
+                base_defaults = ["wealth", "wealth_app", "wealth_data", "investment_risk_bi"] if is_wealth_mode else ["investment_risk_bi", "wealth"]
+                db_options = []
+                for d in base_defaults:
+                    if d in found_dbs and d not in db_options:
+                        db_options.append(d)
+                for d in found_dbs:
+                    if d not in db_options:
+                        db_options.append(d)
+                for d in base_defaults:
+                    if d not in db_options:
+                        db_options.append(d)
+
+                if active_db and active_db not in db_options and active_db != "Custom...":
+                    db_options.append(active_db)
+
+                db_options.append("Custom...")
+
+                # Calcolo indice
+                if st.session_state.get("sb_db_select") == "Custom...":
+                    db_idx = db_options.index("Custom...")
+                elif active_db in db_options:
+                    db_idx = db_options.index(active_db)
+                else:
+                    db_idx = db_options.index("Custom...")
+
                 sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
                 if sel_db == "Custom...":
-                    custom_db = st.text_input("Nome DB Custom", value="" if current_db in ["wealth", "investment_risk_bi"] else current_db, key="sb_custom_db").strip()
+                    custom_db = st.text_input(
+                        "Nome DB Custom",
+                        value=active_db if active_db not in db_options[:-1] else "",
+                        key="sb_custom_db",
+                        placeholder="es. family_office_db"
+                    ).strip()
                     if custom_db:
                         st.session_state.db_name = custom_db
-                        if is_wealth_mode: st.session_state.wealth_db_name = custom_db
-                        else: st.session_state.risk_db_name = custom_db
+                        if is_wealth_mode:
+                            st.session_state.wealth_db_name = custom_db
+                        else:
+                            st.session_state.risk_db_name = custom_db
                 else:
                     st.session_state.db_name = sel_db
-                    if is_wealth_mode: st.session_state.wealth_db_name = sel_db
-                    else: st.session_state.risk_db_name = sel_db
+                    if is_wealth_mode:
+                        st.session_state.wealth_db_name = sel_db
+                    else:
+                        st.session_state.risk_db_name = sel_db
 
                 if is_wealth_mode:
                     if st.button("📥 Allinea DB Locale SQLite", key="sb_btn_sync_sqlite", use_container_width=True, help="Copia tutti i conti, movimenti e orologi da MySQL al database locale SQLite per lavorare offline."):

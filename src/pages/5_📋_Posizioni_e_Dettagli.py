@@ -1313,7 +1313,8 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
     if engine is None:
         try:
             from core.fetcher import get_engine
-            engine = get_engine("root", "root", "localhost", 3306, "wealth")
+            db_nm = st.session_state.get("wealth_db_name", "wealth")
+            engine = get_engine("root", "root", "localhost", 3306, db_nm, database=db_nm)
         except Exception:
             engine = None
 
