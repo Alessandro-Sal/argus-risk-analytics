@@ -490,51 +490,55 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
     expander_is_open = bool(st.session_state.get("keep_archetype_expander_open", False) or active_code)
     with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Iniezione 1-Click su DB)", expanded=expander_is_open):
         st.caption("Inietta istantaneamente un intero ecosistema patrimoniale realistico (conti, cashflow pluriennale solvibile, mutui francesi, perizie e fondo pensione) nel database e sincronizzalo automaticamente sia con il Wealth Management che con il Risk Analytics.")
+        
+        w_status_placeholder = st.empty()
+
+        def _execute_wealth_archetype(arch_code: str, label_name: str):
+            with w_status_placeholder.container():
+                with st.spinner("⏳ Generazione quantitativa e iniezione cross-modulo in corso..."):
+                    db_res = execute_unified_archetype_load(arch_code, auto_run=False, source_module="wealth")
+                    st.success(f"✅ Profilo '{label_name}' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
+                    st.rerun()
+
         w_col1, w_col2, w_col3 = st.columns(3)
         with w_col1:
-            badge_young = " :green[**[● ATTIVO]**]" if active_code == "young_accumulator" else ""
-            st.markdown(f"""
-            **🚀 Giovane Accumulatore**{badge_young}
-            - **Patrimonio**: €116k (Orizzonte 25 anni)
-            - **Conti**: Checking, Risparmio, Emergenza, Broker
-            - **Wealth**: Zero debiti/immobili, stipendio indicizzato, PAC €850
-            """, unsafe_allow_html=True)
-            lbl_y = "Ricarica Giovane Accumulatore" if active_code == "young_accumulator" else "Inietta Giovane Accumulatore"
-            if st.button(lbl_y, key="btn_w_arch_young", use_container_width=True):
-                with st.spinner("⏳ Simulazione quantitativa e iniezione cross-modulo in corso..."):
-                    db_res = execute_unified_archetype_load("young_accumulator", auto_run=False, source_module="wealth")
-                    st.success(f"✅ Profilo 'Giovane Accumulatore' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
-                    st.rerun()
+            with st.container(border=True):
+                badge_young = " :green[**[● ATTIVO]**]" if active_code == "young_accumulator" else ""
+                st.markdown(f"""
+                **🚀 Giovane Accumulatore**{badge_young}
+                - **Patrimonio**: €116k (Orizzonte 25 anni)
+                - **Conti**: Checking, Risparmio, Emergenza, Broker
+                - **Wealth**: Zero debiti/immobili, stipendio indicizzato, PAC €850
+                """, unsafe_allow_html=True)
+                lbl_y = "Ricarica Giovane Accumulatore" if active_code == "young_accumulator" else "Inietta Giovane Accumulatore"
+                if st.button(lbl_y, key="btn_w_arch_young", use_container_width=True):
+                    _execute_wealth_archetype("young_accumulator", "Giovane Accumulatore")
 
         with w_col2:
-            badge_fire = " :green[**[● ATTIVO]**]" if active_code == "fire_decumulation" else ""
-            st.markdown(f"""
-            **🏖️ FIRE / Decumulo**{badge_fire}
-            - **Patrimonio**: €1.7M (Orizzonte 35 anni)
-            - **Conti**: Liquidità cuscinetto, Brokerage cedolare
-            - **Wealth**: Villa proprietà (€420k, 0 mutui), SWR 3.5%, dividendi
-            """, unsafe_allow_html=True)
-            lbl_f = "Ricarica FIRE Decumulo" if active_code == "fire_decumulation" else "Inietta FIRE Decumulo"
-            if st.button(lbl_f, key="btn_w_arch_fire", use_container_width=True):
-                with st.spinner("⏳ Simulazione quantitativa e iniezione cross-modulo in corso..."):
-                    db_res = execute_unified_archetype_load("fire_decumulation", auto_run=False, source_module="wealth")
-                    st.success(f"✅ Profilo 'FIRE / Decumulo' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
-                    st.rerun()
+            with st.container(border=True):
+                badge_fire = " :green[**[● ATTIVO]**]" if active_code == "fire_decumulation" else ""
+                st.markdown(f"""
+                **🏖️ FIRE / Decumulo**{badge_fire}
+                - **Patrimonio**: €1.7M (Orizzonte 35 anni)
+                - **Conti**: Liquidità cuscinetto, Brokerage cedolare
+                - **Wealth**: Villa proprietà (€420k, 0 mutui), SWR 3.5%, dividendi
+                """, unsafe_allow_html=True)
+                lbl_f = "Ricarica FIRE Decumulo" if active_code == "fire_decumulation" else "Inietta FIRE Decumulo"
+                if st.button(lbl_f, key="btn_w_arch_fire", use_container_width=True):
+                    _execute_wealth_archetype("fire_decumulation", "FIRE / Decumulo")
 
         with w_col3:
-            badge_hnwi = " :green[**[● ATTIVO]**]" if active_code == "hnwi_family" else ""
-            st.markdown(f"""
-            **👑 HNWI / Famiglia**{badge_hnwi}
-            - **Patrimonio**: €4.0M+ (Istituzionale)
-            - **Conti**: Private Banking, Depositi, Broker
-            - **Wealth**: Mutuo francese (€420k), orologi & oro, affitto, max pensione
-            """, unsafe_allow_html=True)
-            lbl_h = "Ricarica HNWI Famiglia" if active_code == "hnwi_family" else "Inietta HNWI Famiglia"
-            if st.button(lbl_h, key="btn_w_arch_hnwi", use_container_width=True):
-                with st.spinner("⏳ Simulazione quantitativa e iniezione cross-modulo in corso..."):
-                    db_res = execute_unified_archetype_load("hnwi_family", auto_run=False, source_module="wealth")
-                    st.success(f"✅ Profilo 'HNWI / Famiglia' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
-                    st.rerun()
+            with st.container(border=True):
+                badge_hnwi = " :green[**[● ATTIVO]**]" if active_code == "hnwi_family" else ""
+                st.markdown(f"""
+                **👑 HNWI / Famiglia**{badge_hnwi}
+                - **Patrimonio**: €4.0M+ (Istituzionale)
+                - **Conti**: Private Banking, Depositi, Broker
+                - **Wealth**: Mutuo francese (€420k), orologi & oro, affitto, max pensione
+                """, unsafe_allow_html=True)
+                lbl_h = "Ricarica HNWI Famiglia" if active_code == "hnwi_family" else "Inietta HNWI Famiglia"
+                if st.button(lbl_h, key="btn_w_arch_hnwi", use_container_width=True):
+                    _execute_wealth_archetype("hnwi_family", "HNWI / Famiglia")
 
     src_options = [
         "🌐 Google Sheets — Sincronizzazione Veloce 2026 ('Expenses Tracker 2026' & 'Net Worth OGGI')",
