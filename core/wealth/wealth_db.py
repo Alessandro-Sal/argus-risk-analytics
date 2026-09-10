@@ -1632,6 +1632,11 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
     from sqlalchemy import inspect as sqla_inspect, text as sqlt
     import pandas as pd
     
+    from core.models import Base
+    try:
+        Base.metadata.create_all(target_engine)
+    except Exception:
+        pass
     init_wealth_db(target_engine)
     
     tables_to_sync = [
@@ -1647,6 +1652,7 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
         "wealth_portfolio_risk_links",
         "portfolios",
         "assets",
+        "transactions",
         "portfolio_snapshots",
         "snapshot_positions",
     ]

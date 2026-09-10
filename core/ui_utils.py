@@ -6615,24 +6615,11 @@ def ensure_portal_context(module: str = "risk") -> dict:
     except Exception:
         db_port = 3306
 
-    if is_wealth:
-        raw_db = st.session_state.get("wealth_db_name")
-        if not raw_db:
-            raw_db = st.session_state.get("db_name")
-            if raw_db == "investment_risk_bi":
-                raw_db = "wealth"
-        db_name = raw_db if raw_db else "wealth"
-        st.session_state.wealth_db_name = db_name
-        st.session_state.db_name = db_name
-    else:
-        raw_db = st.session_state.get("risk_db_name")
-        if not raw_db:
-            raw_db = st.session_state.get("db_name")
-            if raw_db == "wealth":
-                raw_db = "investment_risk_bi"
-        db_name = raw_db if raw_db else "investment_risk_bi"
-        st.session_state.risk_db_name = db_name
-        st.session_state.db_name = db_name
+    raw_db = st.session_state.get("db_name") or st.session_state.get("wealth_db_name") or st.session_state.get("risk_db_name") or "wealth"
+    db_name = raw_db
+    st.session_state.db_name = db_name
+    st.session_state.wealth_db_name = db_name
+    st.session_state.risk_db_name = db_name
 
     engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
     
