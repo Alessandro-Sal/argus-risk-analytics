@@ -533,13 +533,13 @@ with tab_ingest:
 
         arch_c1, arch_c2, arch_c3 = st.columns(3)
         with arch_c1:
-            badge_young = " <span style='color:#3fb950; font-size:11px; font-weight:700;'>[● ATTIVO]</span>" if active_code == "young_accumulator" else ""
+            badge_young = " :green[**[● ATTIVO]**]" if active_code == "young_accumulator" else ""
             st.markdown(f"""
             **🚀 Giovane Accumulatore**{badge_young}
             - **Rischio**: Aggressivo (25 anni)
             - **Asset**: Global ETF, QQQ, Big Tech, Crypto
             - **PAC**: €850/mese su stipendio in crescita
-            """)
+            """, unsafe_allow_html=True)
             col_b1_a, col_b1_b = st.columns([1.2, 1])
             with col_b1_a:
                 if st.button("⚡ 1-Click Analisi", key="btn_load_run_young", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
@@ -550,13 +550,13 @@ with tab_ingest:
                     _execute_archetype_load("young_accumulator", auto_run=False)
 
         with arch_c2:
-            badge_fire = " <span style='color:#3fb950; font-size:11px; font-weight:700;'>[● ATTIVO]</span>" if active_code == "fire_decumulation" else ""
+            badge_fire = " :green[**[● ATTIVO]**]" if active_code == "fire_decumulation" else ""
             st.markdown(f"""
             **🏖️ FIRE / Decumulo**{badge_fire}
             - **Rischio**: Conservativo / Cedolare
             - **Asset**: Dividend Aristocrats, BND Bond, Value
             - **Decumulo**: SWR 3.5% costante, zero debiti
-            """)
+            """, unsafe_allow_html=True)
             col_b2_a, col_b2_b = st.columns([1.2, 1])
             with col_b2_a:
                 if st.button("⚡ 1-Click Analisi", key="btn_load_run_fire", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
@@ -567,13 +567,13 @@ with tab_ingest:
                     _execute_archetype_load("fire_decumulation", auto_run=False)
 
         with arch_c3:
-            badge_hnwi = " <span style='color:#3fb950; font-size:11px; font-weight:700;'>[● ATTIVO]</span>" if active_code == "hnwi_family" else ""
+            badge_hnwi = " :green[**[● ATTIVO]**]" if active_code == "hnwi_family" else ""
             st.markdown(f"""
             **👑 HNWI / Famiglia**{badge_hnwi}
             - **Rischio**: Multi-Asset Istituzionale (€4.0M)
             - **Asset**: Big Tech, Global ETF, Bond, Gold, Watches
             - **Wealth**: Mutuo francese, affitti, max pensione
-            """)
+            """, unsafe_allow_html=True)
             col_b3_a, col_b3_b = st.columns([1.2, 1])
             with col_b3_a:
                 if st.button("⚡ 1-Click Analisi", key="btn_load_run_hnwi", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
