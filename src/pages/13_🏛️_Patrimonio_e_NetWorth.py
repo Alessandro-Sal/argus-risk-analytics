@@ -32,6 +32,7 @@ from core.ui_utils import (
     section,
 )
 from core.wealth.wealth_db import (
+    init_wealth_db,
     get_linked_risk_portfolios_summary,
     get_pension_plans,
     get_physical_assets,
@@ -131,8 +132,11 @@ db_pass = st.session_state.get("db_pass", "root")
 db_host = st.session_state.get("db_host", "localhost")
 db_port = int(st.session_state.get("db_port", 3306))
 raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
-db_name = "wealth" if raw_db in ["investment_risk_bi", None, ""] else raw_db
+db_name = raw_db if raw_db else "wealth"
+st.session_state.wealth_db_name = db_name
+st.session_state.db_name = db_name
 engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
+init_wealth_db(engine)
 
 
 # ── CONTROLLO MODALITÀ SNAPSHOT STORICO O LIVE ───────────────

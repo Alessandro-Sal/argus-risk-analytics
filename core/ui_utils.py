@@ -6616,13 +6616,22 @@ def ensure_portal_context(module: str = "risk") -> dict:
         db_port = 3306
 
     if is_wealth:
-        # Per Wealth il database prioritario è 'wealth' (non deve mai ereditare per errore 'investment_risk_bi')
-        raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
-        db_name = "wealth" if raw_db in ["investment_risk_bi", None, ""] else raw_db
+        raw_db = st.session_state.get("wealth_db_name")
+        if not raw_db:
+            raw_db = st.session_state.get("db_name")
+            if raw_db == "investment_risk_bi":
+                raw_db = "wealth"
+        db_name = raw_db if raw_db else "wealth"
+        st.session_state.wealth_db_name = db_name
         st.session_state.db_name = db_name
     else:
-        raw_db = st.session_state.get("risk_db_name") or st.session_state.get("db_name") or "investment_risk_bi"
-        db_name = "investment_risk_bi" if raw_db in ["wealth", None, ""] else raw_db
+        raw_db = st.session_state.get("risk_db_name")
+        if not raw_db:
+            raw_db = st.session_state.get("db_name")
+            if raw_db == "wealth":
+                raw_db = "investment_risk_bi"
+        db_name = raw_db if raw_db else "investment_risk_bi"
+        st.session_state.risk_db_name = db_name
         st.session_state.db_name = db_name
 
     engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
@@ -6638,7 +6647,7 @@ def ensure_portal_context(module: str = "risk") -> dict:
                 # Se siamo passati ad offline e SQLite locale è vuoto, sincronizza al volo da MySQL se raggiungibile
                 try:
                     from core.wealth.wealth_db import sync_mysql_to_sqlite
-                    sync_mysql_to_sqlite(db_user=db_user, db_pass=db_pass, db_host=db_host, db_port=db_port, db_name="wealth")
+                    sync_mysql_to_sqlite(db_user=db_user, db_pass=db_pass, db_host=db_host, db_port=db_port, db_name=db_name)
                     df_prof = get_wealth_portfolios(engine)
                 except Exception:
                     pass
