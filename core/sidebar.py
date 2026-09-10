@@ -597,20 +597,18 @@ def render_sidebar():
         if "db_port" not in st.session_state: st.session_state.db_port = _detect_default_port(st.session_state.db_host, 3306)
         if "db_user" not in st.session_state: st.session_state.db_user = os.getenv("STREAMLIT_DB_USER", "root")
         if "db_pass" not in st.session_state: st.session_state.db_pass = os.getenv("STREAMLIT_DB_PASS", "root")
-        if "wealth_db_name" not in st.session_state: st.session_state.wealth_db_name = os.getenv("STREAMLIT_DB_NAME", "wealth")
-        if "risk_db_name" not in st.session_state: st.session_state.risk_db_name = "investment_risk_bi"
         if "db_name" not in st.session_state:
-            st.session_state.db_name = st.session_state.wealth_db_name if is_wealth_mode else st.session_state.risk_db_name
+            st.session_state.db_name = os.getenv("STREAMLIT_DB_NAME", "wealth")
+        if "wealth_db_name" not in st.session_state:
+            st.session_state.wealth_db_name = st.session_state.db_name
+        if "risk_db_name" not in st.session_state:
+            st.session_state.risk_db_name = st.session_state.db_name
 
-        # Sincronizza il database attivo con il portale corrente al cambio di contesto
-        current_portal_key = "wealth" if is_wealth_mode else "risk"
-        last_portal_key = st.session_state.get("_last_rendered_portal")
-        if last_portal_key != current_portal_key:
-            if is_wealth_mode:
-                st.session_state.db_name = st.session_state.get("wealth_db_name", "wealth")
-            else:
-                st.session_state.db_name = st.session_state.get("risk_db_name", "investment_risk_bi")
-            st.session_state["_last_rendered_portal"] = current_portal_key
+        # Sincronizzazione globale unificata: Risk e Wealth condividono sempre lo stesso database attivo
+        active_unified_db = st.session_state.get("db_name") or st.session_state.get("wealth_db_name") or st.session_state.get("risk_db_name") or "wealth"
+        st.session_state.db_name = active_unified_db
+        st.session_state.wealth_db_name = active_unified_db
+        st.session_state.risk_db_name = active_unified_db
 
         if "portfolio_name" not in st.session_state: st.session_state.portfolio_name = "Master Wealth"
         if "run_name" not in st.session_state: st.session_state.run_name = ""
@@ -650,17 +648,13 @@ def render_sidebar():
             if st.session_state.sb_db_select != "Custom...":
                 target_db = st.session_state.sb_db_select
                 st.session_state.db_name = target_db
-                if is_wealth_mode:
-                    st.session_state.wealth_db_name = target_db
-                else:
-                    st.session_state.risk_db_name = target_db
+                st.session_state.wealth_db_name = target_db
+                st.session_state.risk_db_name = target_db
             elif "sb_custom_db" in st.session_state and st.session_state.sb_custom_db.strip():
                 target_db = st.session_state.sb_custom_db.strip()
                 st.session_state.db_name = target_db
-                if is_wealth_mode:
-                    st.session_state.wealth_db_name = target_db
-                else:
-                    st.session_state.risk_db_name = target_db
+                st.session_state.wealth_db_name = target_db
+                st.session_state.risk_db_name = target_db
 
         if "sb_bench_select" in st.session_state:
             if st.session_state.sb_bench_select != "Custom...":
@@ -799,12 +793,10 @@ def render_sidebar():
         if is_wealth_mode:
             if st.button("📊 Passa a Risk Analytics", key="sb_btn_switch_to_risk", use_container_width=True):
                 st.session_state.argus_portal_mode = "📊 Risk Analytics"
-                st.session_state.db_name = st.session_state.get("risk_db_name", "investment_risk_bi")
                 switch_to_page("0_Control_Room.py")
         else:
             if st.button("🏛️ Passa a Wealth Management", key="sb_btn_switch_to_wealth", use_container_width=True):
                 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
-                st.session_state.db_name = st.session_state.get("wealth_db_name", "wealth")
                 switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
 
         active_nav_modules = NAV_MODULES_WEALTH if is_wealth_mode else NAV_MODULES_RISK
@@ -982,16 +974,12 @@ def render_sidebar():
                     ).strip()
                     if custom_db:
                         st.session_state.db_name = custom_db
-                        if is_wealth_mode:
-                            st.session_state.wealth_db_name = custom_db
-                        else:
-                            st.session_state.risk_db_name = custom_db
+                        st.session_state.wealth_db_name = custom_db
+                        st.session_state.risk_db_name = custom_db
                 else:
                     st.session_state.db_name = sel_db
-                    if is_wealth_mode:
-                        st.session_state.wealth_db_name = sel_db
-                    else:
-                        st.session_state.risk_db_name = sel_db
+                    st.session_state.wealth_db_name = sel_db
+                    st.session_state.risk_db_name = sel_db
 
                 if is_wealth_mode:
                     if st.button("📥 Allinea DB Locale SQLite", key="sb_btn_sync_sqlite", use_container_width=True, help="Copia tutti i conti, movimenti e orologi da MySQL al database locale SQLite per lavorare offline."):

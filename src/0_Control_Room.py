@@ -455,81 +455,28 @@ with tab_ingest:
 2022-08-20,AAPL,sell,5,162.50,USD,1.50,stock,Presa profitto
 2023-03-01,AAPL,dividend,0,0.23,USD,0.00,stock,Dividendo Q1"""
 
-    # ── Helper Iniezione Archetipo ──────────────────────────────
+    # ── Helper Iniezione Archetipo Unificato ─────────────────────
+    from core.archetype_manager import (
+        execute_unified_archetype_load,
+        clear_unified_archetype,
+        render_unified_archetype_hud,
+    )
+
     def _execute_archetype_load(arch_code: str, auto_run: bool = False):
-        from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
-        with st.spinner(f"⏳ Simulazione quantitativa e salvataggio su database dell'archetipo..."):
-            sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-            res_arch = sim_eng.simulate(arch_code, years=3)
-            db_res = populate_argus_database(res_arch)
-            
-            st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
-            st.session_state["portfolio_name"] = f"Archetipo: {res_arch.archetype.name}"
-            st.session_state["portfolio_id"] = db_res["risk_portfolio_id"]
-            st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
-            st.session_state["active_archetype_code"] = arch_code
-            st.session_state["active_archetype_name"] = res_arch.archetype.name
-            st.session_state["active_archetype_tx_count"] = len(res_arch.trading_transactions_df)
-            st.session_state["active_archetype_db_ids"] = db_res
-            st.session_state["keep_archetype_expander_open"] = True
-            st.session_state["archetype_just_injected"] = True
-            st.session_state.pop("session_cleared", None)
-            st.session_state.pop("pipeline_done", None)
-            st.session_state.pop("results", None)
-            st.session_state.pop("fetch_report", None)
-            if auto_run:
-                st.session_state["auto_run_pipeline_requested"] = True
+        with st.spinner("⏳ Simulazione quantitativa e salvataggio cross-modulo dell'archetipo..."):
+            execute_unified_archetype_load(arch_code, auto_run=auto_run, source_module="risk")
             st.rerun()
 
     def _clear_active_archetype():
-        for k in [
-            "df_raw_injected", "active_archetype_code", "active_archetype_name",
-            "active_archetype_tx_count", "active_archetype_db_ids",
-            "keep_archetype_expander_open", "archetype_just_injected",
-            "auto_run_pipeline_requested", "pipeline_done", "results", "fetch_report"
-        ]:
-            st.session_state.pop(k, None)
-        st.session_state["portfolio_name"] = ""
-        st.rerun()
+        clear_unified_archetype()
 
     expander_is_open = bool(st.session_state.get("keep_archetype_expander_open", False) or st.session_state.get("active_archetype_code"))
     with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Caricamento 1-Click)", expanded=expander_is_open):
-        st.caption("Carica istantaneamente un portafoglio pluriennale sintetico realistico con solvibilità e date borsistiche garantite. Ideale per didattica e collaudo immediato.")
+        st.caption("Carica istantaneamente un portafoglio pluriennale sintetico realistico con solvibilità e date borsistiche garantite. Ideale per didattica e collaudo immediato sia su Risk Analytics che su Wealth Management.")
         
         active_code = st.session_state.get("active_archetype_code")
         if active_code:
-            active_name = st.session_state.get("active_archetype_name", "Scenario")
-            tx_count = st.session_state.get("active_archetype_tx_count", 0)
-            db_ids = st.session_state.get("active_archetype_db_ids", {})
-            r_id = db_ids.get("risk_portfolio_id", st.session_state.get("portfolio_id", 1))
-            w_id = db_ids.get("wealth_profile_id", st.session_state.get("wealth_active_portfolio_id", 1))
-            
-            st.markdown(f"""
-            <div style="background: rgba(46, 160, 67, 0.14); border: 1px solid rgba(46, 160, 67, 0.4); border-left: 4px solid #2ea043; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                    <div>
-                        <div style="font-weight: 700; color: #3fb950; font-size: 14.5px;">
-                            ✅ Scenario Didattico Attivo: <b>{active_name}</b>
-                        </div>
-                        <div style="color: #c9d1d9; font-size: 12px; margin-top: 3px;">
-                            • <b>{tx_count} transazioni</b> simulate | Database SQLite: <code>Portfolio #{r_id}</code> • <code>Wealth Profile #{w_id}</code><br>
-                            • Dati registrati nel Database e inviati a <b>Step ② (Data Health HUD)</b>.
-                        </div>
-                    </div>
-                    <span class="argus-command-pill" style="border-color: rgba(46,160,67,0.5); color: #3fb950; font-weight:700;">ATTIVO IN SESSIONE</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            c_arch_act1, c_arch_act2 = st.columns([2.5, 1.5])
-            with c_arch_act1:
-                if st.button("🚀 Avvia Subito Analisi Quantitativa ARGUS", key="btn_run_active_archetype_now", type="primary", use_container_width=True):
-                    st.session_state["auto_run_pipeline_requested"] = True
-                    st.rerun()
-            with c_arch_act2:
-                if st.button("🗑️ Rimuovi Scenario / Resetta", key="btn_clear_active_archetype", type="secondary", use_container_width=True):
-                    _clear_active_archetype()
-            st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+            render_unified_archetype_hud(current_module="risk")
 
         arch_c1, arch_c2, arch_c3 = st.columns(3)
         with arch_c1:

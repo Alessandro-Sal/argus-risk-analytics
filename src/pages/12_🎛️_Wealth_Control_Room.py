@@ -84,6 +84,12 @@ from core.wealth.wealth_sync import (
     sync_expenses_tracker_2026_from_gsheets,
     sync_all_historical_expenses_from_gsheets
 )
+from core.archetype_manager import (
+    execute_unified_archetype_load,
+    clear_unified_archetype,
+    render_unified_archetype_hud,
+)
+
 
 
 # ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────
@@ -475,63 +481,59 @@ if active_cr_tab == "📥 Data Pipeline & Ingestion":
     </div>
     """, unsafe_allow_html=True)
 
+    active_code = st.session_state.get("active_archetype_code")
+    if active_code:
+        render_unified_archetype_hud(current_module="wealth")
+
     section("① Scegli la Sorgente Dati")
     
-    with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Iniezione 1-Click su DB)", expanded=False):
-        st.caption("Inietta istantaneamente un intero ecosistema patrimoniale realistico (conti, cashflow pluriennale solvibile, mutui francesi, perizie e fondo pensione) nel database locale senza caricare file esterni.")
+    expander_is_open = bool(st.session_state.get("keep_archetype_expander_open", False) or active_code)
+    with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Iniezione 1-Click su DB)", expanded=expander_is_open):
+        st.caption("Inietta istantaneamente un intero ecosistema patrimoniale realistico (conti, cashflow pluriennale solvibile, mutui francesi, perizie e fondo pensione) nel database e sincronizzalo automaticamente sia con il Wealth Management che con il Risk Analytics.")
         w_col1, w_col2, w_col3 = st.columns(3)
         with w_col1:
-            st.markdown("""
-            **🚀 Giovane Accumulatore**
+            badge_young = " :green[**[● ATTIVO]**]" if active_code == "young_accumulator" else ""
+            st.markdown(f"""
+            **🚀 Giovane Accumulatore**{badge_young}
             - **Patrimonio**: €116k (Orizzonte 25 anni)
             - **Conti**: Checking, Risparmio, Emergenza, Broker
             - **Wealth**: Zero debiti/immobili, stipendio indicizzato, PAC €850
-            """)
-            if st.button("Inietta Giovane Accumulatore", key="btn_w_arch_young", use_container_width=True):
-                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
-                with st.spinner("⏳ Simulazione quantitativa e iniezione su DB in corso..."):
-                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-                    res_arch = sim_eng.simulate("young_accumulator", years=3)
-                    db_res = populate_argus_database(res_arch)
-                    st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
-                    st.session_state.pop("wealth_profile_selector_widget", None)
-                    st.success(f"✅ Profilo '{res_arch.archetype.name}' iniettato con successo (ID #{db_res['wealth_profile_id']})!")
+            """, unsafe_allow_html=True)
+            lbl_y = "Ricarica Giovane Accumulatore" if active_code == "young_accumulator" else "Inietta Giovane Accumulatore"
+            if st.button(lbl_y, key="btn_w_arch_young", use_container_width=True):
+                with st.spinner("⏳ Simulazione quantitativa e iniezione cross-modulo in corso..."):
+                    db_res = execute_unified_archetype_load("young_accumulator", auto_run=False, source_module="wealth")
+                    st.success(f"✅ Profilo 'Giovane Accumulatore' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
                     st.rerun()
 
         with w_col2:
-            st.markdown("""
-            **🏖️ FIRE / Decumulo**
+            badge_fire = " :green[**[● ATTIVO]**]" if active_code == "fire_decumulation" else ""
+            st.markdown(f"""
+            **🏖️ FIRE / Decumulo**{badge_fire}
             - **Patrimonio**: €1.7M (Orizzonte 35 anni)
             - **Conti**: Liquidità cuscinetto, Brokerage cedolare
             - **Wealth**: Villa proprietà (€420k, 0 mutui), SWR 3.5%, dividendi
-            """)
-            if st.button("Inietta FIRE Decumulo", key="btn_w_arch_fire", use_container_width=True):
-                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
-                with st.spinner("⏳ Simulazione quantitativa e iniezione su DB in corso..."):
-                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-                    res_arch = sim_eng.simulate("fire_decumulation", years=3)
-                    db_res = populate_argus_database(res_arch)
-                    st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
-                    st.session_state.pop("wealth_profile_selector_widget", None)
-                    st.success(f"✅ Profilo '{res_arch.archetype.name}' iniettato con successo (ID #{db_res['wealth_profile_id']})!")
+            """, unsafe_allow_html=True)
+            lbl_f = "Ricarica FIRE Decumulo" if active_code == "fire_decumulation" else "Inietta FIRE Decumulo"
+            if st.button(lbl_f, key="btn_w_arch_fire", use_container_width=True):
+                with st.spinner("⏳ Simulazione quantitativa e iniezione cross-modulo in corso..."):
+                    db_res = execute_unified_archetype_load("fire_decumulation", auto_run=False, source_module="wealth")
+                    st.success(f"✅ Profilo 'FIRE / Decumulo' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
                     st.rerun()
 
         with w_col3:
-            st.markdown("""
-            **👑 HNWI / Famiglia**
+            badge_hnwi = " :green[**[● ATTIVO]**]" if active_code == "hnwi_family" else ""
+            st.markdown(f"""
+            **👑 HNWI / Famiglia**{badge_hnwi}
             - **Patrimonio**: €4.0M+ (Istituzionale)
             - **Conti**: Private Banking, Depositi, Broker
             - **Wealth**: Mutuo francese (€420k), orologi & oro, affitto, max pensione
-            """)
-            if st.button("Inietta HNWI Famiglia", key="btn_w_arch_hnwi", use_container_width=True):
-                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
-                with st.spinner("⏳ Simulazione quantitativa e iniezione su DB in corso..."):
-                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-                    res_arch = sim_eng.simulate("hnwi_family", years=3)
-                    db_res = populate_argus_database(res_arch)
-                    st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
-                    st.session_state.pop("wealth_profile_selector_widget", None)
-                    st.success(f"✅ Profilo '{res_arch.archetype.name}' iniettato con successo (ID #{db_res['wealth_profile_id']})!")
+            """, unsafe_allow_html=True)
+            lbl_h = "Ricarica HNWI Famiglia" if active_code == "hnwi_family" else "Inietta HNWI Famiglia"
+            if st.button(lbl_h, key="btn_w_arch_hnwi", use_container_width=True):
+                with st.spinner("⏳ Simulazione quantitativa e iniezione cross-modulo in corso..."):
+                    db_res = execute_unified_archetype_load("hnwi_family", auto_run=False, source_module="wealth")
+                    st.success(f"✅ Profilo 'HNWI / Famiglia' sincronizzato con successo (Wealth #{db_res['wealth_profile_id']} • Risk #{db_res['risk_portfolio_id']})!")
                     st.rerun()
 
     src_options = [
