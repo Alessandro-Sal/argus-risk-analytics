@@ -426,12 +426,13 @@ if st.session_state.get("pipeline_done"):
 
 # ── COMMAND TABS DELLA CONTROL ROOM ──────────────────────────
 
-tab_ingest, tab_wealth, tab_isin_mapping, tab_diagnostics, tab_duckdb = st.tabs([
+tab_ingest, tab_wealth, tab_isin_mapping, tab_diagnostics, tab_duckdb, tab_bitemporal = st.tabs([
     "🚀 1. Ingestione Dati & Calcolo Pipeline",
     "🗂️ 2. Total Wealth Hub (Multi-Portafoglio)",
     "🏷️ 3. Anagrafica & Mappatura ISIN / Ticker DB",
     "🩺 4. Telemetria di Sistema & Storage Profiler",
-    "⚡ 5. Motore Analitico Embedded DuckDB (OLAP & SQL)"
+    "⚡ 5. Motore Analitico Embedded DuckDB (OLAP & SQL)",
+    "🕰️ 6. Bitemporal Time-Travel & Audit Ledger"
 ])
 
 # =============================================================
@@ -1917,3 +1918,236 @@ with tab_duckdb:
             st.dataframe(last_res["df"], use_container_width=True)
         else:
             st.error(f"❌ Errore durante l'esecuzione della query SQL: {last_res['error']}")
+
+
+# =============================================================
+# TAB 6: BITEMPORAL TIME-TRAVEL & AUDIT LEDGER
+# =============================================================
+with tab_bitemporal:
+    st.markdown("### 🕰️ Motore di Persistenza Bitemporale & Audit Trail Crittografico")
+    st.caption("Standard ISO/IEC 9075:2011 SQL Temporal, MiFID II / AIFMD Compliance & Certificazione Merkle Tree per Family Office e SGR.")
+
+    from core.bitemporal_engine import BitemporalLedgerEngine
+
+    if "bitemp_engine" not in st.session_state:
+        st.session_state["bitemp_engine"] = BitemporalLedgerEngine()
+        st.session_state["bitemp_seed_info"] = st.session_state["bitemp_engine"].seed_demonstration_scenario()
+
+    b_engine: BitemporalLedgerEngine = st.session_state["bitemp_engine"]
+
+    # Banner concettuale sulle due dimensioni ortogonali
+    st.markdown("""
+    <div style="background: rgba(13, 17, 23, 0.7); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="color: #58a6ff; font-weight: 700; font-size: 14px;">📐 Le Due Dimensioni Ortogonali del Tempo di Bilancio:</span>
+            <span style="font-size: 12px; color: #8b949e;">ISO/IEC 9075:2011 • Append-Only Ledger</span>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px; color: #c9d1d9;">
+            <div style="background: rgba(56, 189, 248, 0.08); padding: 10px 14px; border-radius: 8px; border-left: 3px solid #38bdf8;">
+                <b style="color: #38bdf8;">1. Valid Time (Data Evento Reale / As-At):</b><br>
+                Quando il fatto è accaduto nella realtà economica (es. stacco dividendo il 15 Marzo, data perizia immobile, data stipula mutuo).
+            </div>
+            <div style="background: rgba(245, 158, 11, 0.08); padding: 10px 14px; border-radius: 8px; border-left: 3px solid #f59e0b;">
+                <b style="color: #f59e0b;">2. System Time (Data Conoscenza / As-Of):</b><br>
+                Quando il sistema informativo ha registrato tale affermazione (es. estratto conto broker pervenuto il 20 Marzo alle 18:30).
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Verifica stato catena crittografica
+    chain_ok, chain_msg, chain_cnt = b_engine.verify_audit_chain_integrity()
+    tx_total_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_transactions").fetchone()[0] if b_engine.con else 0
+    app_total_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_asset_appraisals").fetchone()[0] if b_engine.con else 0
+
+    col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
+    with col_kpi1:
+        metric_card("Catena Crittografica", "🟢 Integra (100%)" if chain_ok else "🔴 Manomessa", f"{chain_cnt} Blocchi Hash Verificati", positive=chain_ok)
+    with col_kpi2:
+        metric_card("Transazioni Bitemporali", f"{tx_total_cnt} Record", "Intervalli [VT, TT)", True)
+    with col_kpi3:
+        metric_card("Perizie Illiquidi", f"{app_total_cnt} Stime", "Immobili & Caveau", True)
+    with col_kpi4:
+        metric_card("Audit Log Immutabile", f"{chain_cnt} Decisioni", "Append-Only SHA-256", True)
+
+    st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
+
+    # Sub-tabs tematiche
+    sub_tt, sub_drift, sub_audit = st.tabs([
+        "🕰️ Time-Travel Machine (Point-in-Time Query)",
+        "🔍 Riconciliazione Forense & Drift Tardivi",
+        "🛡️ Audit Trail Immutabile & Merkle Root"
+    ])
+
+    # -------------------------------------------------------------
+    # SUB-TAB 1: TIME-TRAVEL MACHINE
+    # -------------------------------------------------------------
+    with sub_tt:
+        st.markdown("##### 🕰️ Ricostruzione del Portafoglio a un Punto Bitemporale Esatto")
+        st.caption("Interroga il sistema combinando la data dell'evento reale (Valid Time) con la data di conoscenza del database (System Time).")
+
+        col_preset, col_reseed = st.columns([3, 1.5])
+        with col_reseed:
+            if st.button("🔄 Re-Inizializza Scenario Didattico", use_container_width=True, help="Ripristina lo scenario didattico con BTP, dividendo VWCE tardivo e perizia immobiliare."):
+                st.session_state["bitemp_seed_info"] = b_engine.seed_demonstration_scenario()
+                st.success("Scenario didattico ripristinato con successo!")
+                st.rerun()
+
+        col_tt1, col_tt2 = st.columns(2)
+        with col_tt1:
+            st.markdown("**1. Data Evento Economico (Valid Time / As-At):**")
+            vt_choice = st.selectbox(
+                "Seleziona la data dell'evento reale da analizzare:",
+                [
+                    "2026-03-15 23:59:59 (Data Stacco Dividendo VWCE)",
+                    "2026-03-18 23:59:59 (Riunione Comitato Rischi)",
+                    "2026-03-25 23:59:59 (Fine Mese Marzo)",
+                    "Personalizzato..."
+                ],
+                index=0,
+                key="sb_vt_choice"
+            )
+            if vt_choice.startswith("2026-03-15"):
+                valid_time_input = "2026-03-15 23:59:59"
+            elif vt_choice.startswith("2026-03-18"):
+                valid_time_input = "2026-03-18 23:59:59"
+            elif vt_choice.startswith("2026-03-25"):
+                valid_time_input = "2026-03-25 23:59:59"
+            else:
+                valid_time_input = st.text_input("Inserisci Valid Time (YYYY-MM-DD HH:MM:SS):", value="2026-03-15 23:59:59")
+
+        with col_tt2:
+            st.markdown("**2. Stato di Conoscenza del Sistema (System Time / As-Of):**")
+            tt_choice = st.selectbox(
+                "Cosa sapeva il sistema informativo a questa data?",
+                [
+                    "2026-03-18 10:00:00 (Stato cognitivo alla Riunione - Dividendo non ancora noto)",
+                    "2026-03-21 10:00:00 (Stato cognitivo dopo ricezione estratto conto broker del 20 Marzo)",
+                    "Oggi / Live (Massima conoscenza attuale)",
+                    "Personalizzato..."
+                ],
+                index=0,
+                key="sb_tt_choice"
+            )
+            if "2026-03-18" in tt_choice:
+                sys_time_input = "2026-03-18 10:00:00"
+            elif "2026-03-21" in tt_choice:
+                sys_time_input = "2026-03-21 10:00:00"
+            elif "Oggi" in tt_choice:
+                sys_time_input = None
+            else:
+                sys_time_input = st.text_input("Inserisci System Time (YYYY-MM-DD HH:MM:SS):", value="2026-03-18 10:00:00")
+
+        # Esecuzione della ricostruzione
+        recon = b_engine.reconstruct_portfolio_at_times("DEMO_FAMILY_OFFICE", valid_time_input, sys_time_input)
+        df_tt = b_engine.time_travel_query("DEMO_FAMILY_OFFICE", valid_time_input, sys_time_input)
+
+        # Alert didattico sul dividendo tardivo
+        has_dividend = "TX_DIV_VWCE_004" in df_tt["tx_business_id"].values if not df_tt.empty else False
+        if not has_dividend:
+            st.markdown("""
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 10px 14px; margin: 10px 0;">
+                <b style="color: #ef4444;">🛡️ Audit Replay Certificato:</b><br>
+                <span style="font-size: 13px; color: #c9d1d9;">
+                Alla data di conoscenza del <b>18 Marzo ore 10:00</b>, il dividendo di € 1.250 staccato il 15 Marzo <b>NON ERA NOTO AL SISTEMA</b>.
+                La query bitemporale lo esclude rigorosamente, comprovando la diligenza del gestore nella riunione di comitato.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 10px 14px; margin: 10px 0;">
+                <b style="color: #10b981;">✅ Conoscenza Acquisita (Post-Ricezione):</b><br>
+                <span style="font-size: 13px; color: #c9d1d9;">
+                Alla data di conoscenza del <b>21 Marzo</b>, il file broker pervenuto il 20 Marzo è stato integrato.
+                Il dividendo di € 1.250 è retroattivamente incluso e visibile sul 15 Marzo, garantendo la corretta quadratura fiscale.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+        with col_res1:
+            metric_card("Saldo Cassa", f"€ {recon['cash_balance_eur']:,.2f}", f"{recon['tx_count']} Movimenti Validi", True)
+        with col_res2:
+            metric_card("Asset Illiquidi", f"€ {recon['illiquid_appraisals_eur']:,.2f}", f"{recon['appraisals_count']} Perizie Attive", True)
+        with col_res3:
+            metric_card("Valore Contabile Book", f"€ {recon['total_book_value_eur']:,.2f}", "Cassa + Costo Posizioni + Immobili", True)
+        with col_res4:
+            metric_card("Posizioni in Portafoglio", f"{recon['positions_count']} Titoli", "Consistenze WACP", True)
+
+        st.markdown("##### 📋 Transazioni Valide Estratte dalla Time-Travel Machine:")
+        if not df_tt.empty:
+            df_show = df_tt.copy()
+            df_show["valid_from"] = df_show["valid_from"].astype(str)
+            df_show["sys_from"] = df_show["sys_from"].astype(str)
+            st.dataframe(df_show, use_container_width=True)
+        else:
+            st.info("Nessuna transazione soddisfa i vincoli bitemporali specificati.")
+
+    # -------------------------------------------------------------
+    # SUB-TAB 2: DRIFT FORENSICS
+    # -------------------------------------------------------------
+    with sub_drift:
+        st.markdown("##### 🔍 Riconciliazione Forense tra Due Stati di Conoscenza del Sistema")
+        st.caption("Confronta cosa sapeva il database a due date distinte (es. 18 Marzo vs 21 Marzo) rispetto alla medesima data evento (15 Marzo).")
+
+        col_d1, col_d2, col_d3 = st.columns(3)
+        with col_d1:
+            drift_vt = st.text_input("Data Evento Reale (Valid Time):", value="2026-03-15 23:59:59", key="drift_vt")
+        with col_d2:
+            drift_s1 = st.text_input("Stato Conoscenza T1 (Prima):", value="2026-03-18 10:00:00", key="drift_s1")
+        with col_d3:
+            drift_s2 = st.text_input("Stato Conoscenza T2 (Dopo):", value="2026-03-21 10:00:00", key="drift_s2")
+
+        drift_res = b_engine.detect_retroactive_drifts("DEMO_FAMILY_OFFICE", drift_vt, drift_s1, drift_s2)
+
+        if drift_res["has_drift"]:
+            st.warning(f"⚠️ **Rilevato Drift Retroattivo**: Trovate **{drift_res['new_transactions_count']} nuove transazioni tardive** e **{drift_res['modified_transactions_count']} transazioni rettificate** tra T1 e T2!")
+            
+            if drift_res["new_transactions"]:
+                st.markdown("**Nuove Transazioni Ingestite Retroattivamente (Late-Arriving Data):**")
+                st.dataframe(pd.DataFrame(drift_res["new_transactions"]), use_container_width=True)
+            
+            if drift_res["modified_transactions"]:
+                st.markdown("**Transazioni Modificate Retroattivamente (Restatements):**")
+                st.dataframe(pd.DataFrame(drift_res["modified_transactions"]), use_container_width=True)
+        else:
+            st.success("✅ Nessun drift retroattivo rilevato tra le due date di conoscenza.")
+
+    # -------------------------------------------------------------
+    # SUB-TAB 3: AUDIT TRAIL IMMUTABILE & MERKLE TREE
+    # -------------------------------------------------------------
+    with sub_audit:
+        st.markdown("##### 🛡️ Audit Trail Immutabile ad Append-Only Hash Chaining")
+        st.caption("Ogni cambio di target allocation, modifica parametri di rischio o override di prezzo è sigillato con hash a catena crittografica SHA-256.")
+
+        btn_verify = st.button("🛡️ Esegui Audit Computazionale di Integrità (Tamper Detection)", type="primary", use_container_width=True)
+        if btn_verify:
+            is_valid, msg, count = b_engine.verify_audit_chain_integrity()
+            if is_valid:
+                st.success(f"✅ {msg}")
+            else:
+                st.error(f"❌ {msg}")
+
+        # Tabella dell'audit trail
+        df_audit = b_engine.con.execute("""
+            SELECT sequence_id, decision_type, actor_id, rationale, sys_timestamp,
+                   prev_record_hash, entry_hash
+            FROM audit_decision_log ORDER BY sequence_id ASC
+        """).df()
+
+        if not df_audit.empty:
+            st.dataframe(df_audit, use_container_width=True)
+        else:
+            st.info("Audit log vuoto.")
+
+        st.markdown("---")
+        st.markdown("##### 🌲 Certificazione Merkle Tree per Report Patrimoniali Esportati")
+        st.caption("Costruisce un albero Merkle foglia-per-foglia sulle consistenze attive e imprime il Root Hash nel piè di pagina della reportistica istituzionale.")
+
+        active_txs = b_engine.con.execute("SELECT * FROM bitemporal_transactions WHERE sys_to = ?::TIMESTAMP", [b_engine.INFINITY_TIMESTAMP]).fetchdf()
+        merkle_root = b_engine.generate_merkle_root(active_txs.to_dict(orient="records"))
+
+        st.code(f"MERKLE_ROOT_SEAL = \"{merkle_root}\"", language="python")
+        st.caption(f"Sigillo di integrità calcolato su {len(active_txs)} transazioni contabili attive. Verificabile in tempo sub-millisecondo.")
+

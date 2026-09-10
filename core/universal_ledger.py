@@ -493,3 +493,53 @@ class UniversalLedgerEngine:
         except Exception as e:
             logger.error(f"Errore esportazione Parquet: {e}")
             return False
+
+    def sync_to_bitemporal_engine(self, bitemporal_engine: Any, entity_id: str = "DEFAULT_ENTITY") -> int:
+        """
+        Sincronizza le transazioni contabili del One-Ledger nel motore bitemporale,
+        generando per ciascuna la marcatura temporale e l'hash di integrità di riga.
+        """
+        if self.con is None or bitemporal_engine is None:
+            return 0
+
+        df = self.con.execute("""
+            SELECT entry_id, entity_id, booking_date, value_date, asset_id,
+                   operation_type, quantity, unit_price, gross_amount,
+                   transaction_fees, withholding_tax, net_amount, currency,
+                   fx_rate_to_base, net_amount_base_eur
+            FROM fact_ledger_entry
+            WHERE entity_id = $1
+            ORDER BY booking_date ASC
+        """, [entity_id]).fetchdf()
+
+        if df.empty:
+            return 0
+
+        synced = 0
+        for _, row in df.iterrows():
+            v_date_str = pd.to_datetime(row['value_date']).strftime("%Y-%m-%d %H:%M:%S")
+            bitemporal_engine.record_transaction(
+                tx_business_id=str(row["entry_id"]),
+                portfolio_id=str(row["entity_id"]),
+                asset_id=str(row["asset_id"]),
+                operation_type=str(row["operation_type"]),
+                quantity=float(row["quantity"]),
+                unit_price=float(row["unit_price"]),
+                valid_from=v_date_str,
+                recorded_by="UNIVERSAL_ONE_LEDGER_SYNC",
+                fees=float(row.get("transaction_fees", 0.0) or 0.0),
+                taxes=float(row.get("withholding_tax", 0.0) or 0.0),
+                currency=str(row.get("currency", "EUR")),
+                fx_rate_to_base=float(row.get("fx_rate_to_base", 1.0) or 1.0),
+                source_doc_ref=f"LEDGER_ENTRY_{str(row['entry_id'])[:8]}"
+            )
+            synced += 1
+
+        bitemporal_engine.log_decision(
+            decision_type="LEDGER_BITEMPORAL_SYNC",
+            entity_id=entity_id,
+            actor_id="SYSTEM:UniversalLedgerEngine",
+            rationale=f"Sincronizzazione contabile batch di {synced} transazioni dal One-Ledger",
+            payload={"entity_id": entity_id, "records_synced": synced}
+        )
+        return synced

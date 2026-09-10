@@ -53,9 +53,13 @@ if HAS_REPORTLAB:
         Two-pass canvas per la generazione automatica di:
         1. Intestazione fiduciaria continua (Running Header)
         2. Numerazione dinamica 'Pagina X di Y' (Running Footer)
-        3. Dicitura di riservatezza e marcatura temporale ISO/fiduciaria
+        3. Dicitura di riservatezza, marcatura temporale ISO e sigillo crittografico Merkle Tree
         """
+        merkle_seal: Optional[str] = None
+
         def __init__(self, *args, **kwargs):
+            if "merkle_seal" in kwargs:
+                self.merkle_seal = kwargs.pop("merkle_seal")
             super(InstitutionalNumberedCanvas, self).__init__(*args, **kwargs)
             self._saved_page_states = []
 
@@ -90,14 +94,22 @@ if HAS_REPORTLAB:
             self.setLineWidth(0.5)
             self.line(32, page_h - 32, page_w - 32, page_h - 32)
 
-            # Running Footer
+            # Running Footer con eventuale Merkle Seal
             self.line(32, 34, page_w - 32, 34)
             self.setFont("Helvetica", 6.5)
             self.setFillColor(colors.HexColor(InstitutionalPalette.TEXT_MUTED))
-            self.drawString(32, 22, "STRETTAMENTE RISERVATO — AD ESCLUSIVO USO FIDUCIARIO / PRIVATE BANKING (Art. 24-25 MiFID II)")
+            
+            seal_info = f" • MERKLE SEAL: {self.merkle_seal[:16]}..." if self.merkle_seal else ""
+            self.drawString(32, 22, f"STRETTAMENTE RISERVATO — AD ESCLUSIVO USO FIDUCIARIO / PRIVATE BANKING (Art. 24-25 MiFID II){seal_info}")
             self.drawRightString(page_w - 32, 22, f"Pagina {self._pageNumber} di {page_count}")
             
             self.restoreState()
+
+    def get_institutional_canvas_with_merkle_seal(merkle_root_hash: str):
+        """Genera una classe canvas dinamica con Merkle Root integrato nel running footer."""
+        class SealedCanvas(InstitutionalNumberedCanvas):
+            merkle_seal = merkle_root_hash
+        return SealedCanvas
 
 
     def get_institutional_reportlab_styles() -> Dict[str, ParagraphStyle]:
