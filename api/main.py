@@ -421,7 +421,7 @@ def create_app() -> FastAPI:
 
 
 # Application singleton
-app = create_app()
+app = create_app() if HAS_FASTAPI else None
 
 if __name__ == "__main__":
     import uvicorn
