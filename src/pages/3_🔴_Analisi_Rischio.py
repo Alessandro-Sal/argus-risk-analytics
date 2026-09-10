@@ -915,12 +915,17 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 
     col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
     with col_ctrl1:
+        conf_opts = [0.90, 0.95, 0.99]
+        curr_conf = float(st.session_state.get("confidence_level", 0.95))
+        c_idx = conf_opts.index(curr_conf) if curr_conf in conf_opts else 1
         conf_level = st.selectbox(
             "Livello di Confidenza (c = 1 - α)",
-            options=[0.90, 0.95, 0.99],
-            index=1,
-            format_func=lambda x: f"{int(x*100)}%"
+            options=conf_opts,
+            index=c_idx,
+            format_func=lambda x: f"{int(x*100)}%",
+            key="inpage_conf_level_p3"
         )
+        st.session_state.confidence_level = conf_level
     with col_ctrl2:
         holding_period = st.slider(
             "Orizzonte Temporale (Giorni lavorativi - T)",
