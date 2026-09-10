@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **550 test automatizzati (100% passed)** su 93 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **556 test automatizzati (100% passed)** su 94 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -61,8 +61,15 @@ Computational Core:
  ├── core/factor_library.py    ──► Fama-French 5-Factor & Carhart Momentum Live Regression
  ├── core/ai_analyst.py        ──► Tri-Agent Quantitative Governance Council & Dual-Engine LLM/NLG
  ├── core/terminal_engine.py   ──► Pre-Trade Risk Guardrails, Stoikov Microprice & OMS Execution Slicing
+ ├── core/bitemporal_engine.py ──► ISO/IEC 9075:2011 Bitemporal Engine, SHA-256 Chaining & Merkle Tree
  ├── core/i18n/                ──► Multi-Currency FX Engine, ECB Official Rates, FX Risk Decomposition & L10n Formatters
  └── scripts/generate_realistic_portfolio.py ──► Quantitative Simulation Engine, Educational Archetypes & French Mortgage / Solvency Ledger
+    │
+    ▼
+Developer Ecosystem & Delivery (Headless & REST API):
+ ├── api/main.py               ──► FastAPI Microservice (/health, /risk/metrics, /optimize/hrp, /ledger/timetravel)
+ ├── mkdocs.yml & docs/        ──► Material for MkDocs Institutional Documentation Portal (KaTeX, Mermaid, CI/CD)
+ └── pyproject.toml            ──► PEP 517/621 Modular Packaging (argus-risk[api,ui,dev,all])
     │
     ▼
 Presentation Layer (21 Moduli Streamlit / PyWebView):

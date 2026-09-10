@@ -1,0 +1,82 @@
+site_name: ARGUS Quantitative Risk Engine & Analytics
+site_description: Institutional Quantitative Risk, Machine-Learning Portfolio Optimization & Bitemporal Audit Trail
+site_author: Alessandro Sal
+site_url: https://alessandro-sal.github.io/argus-risk-analytics/
+repo_url: https://github.com/Alessandro-Sal/argus-risk-analytics
+repo_name: Alessandro-Sal/argus-risk-analytics
+
+theme:
+  name: material
+  palette:
+    # Slate dark palette matching Obsidian Sovereign UI
+    - scheme: slate
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+    - scheme: default
+      primary: deep orange
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.arithmatex:
+      generic: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Quickstart (5-line HRP): getting-started/quickstart.md
+      - Installation & Packaging: getting-started/installation.md
+  - Quantitative Methodology:
+      - Non-Gaussian Tail Risk (Cornish-Fisher): methodology/risk_engine.md
+      - Hierarchical Risk Parity (HRP): methodology/hrp.md
+      - Optimal Algorithmic Execution: methodology/execution.md
+      - Bitemporal Ledger & Merkle Audit: methodology/bitemporal.md
+      - Mathematical Reference: metriche_rischio.md
+  - Institutional Compliance:
+      - Technical Whitepaper: compliance/whitepaper.md
+      - CSV Data Specification: CSV_Format_Specification.md
+      - Executive Report Outline: EXECUTIVE_REPORT_OUTLINE.md
+  - BI & Architecture:
+      - Design System (Obsidian Sovereign): DESIGN.md
+      - Execution Flowchart: FLOWCHART.md
+      - Power BI Integration Guide: POWER_BI_GUIDE.md
+      - Presentation Deck: PRESENTATION_SLIDES.md
+      - Project Handoff (v8.4.0): PROJECT_HANDOFF.md

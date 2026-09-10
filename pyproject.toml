@@ -1,7 +1,11 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "argus-risk-analytics"
-version = "8.1.0"
-description = "ARGUS Risk Analytics & Wealth Intelligence Platform — Tier-1 Quantitative Risk, Wealth & BI Ecosystem"
+name = "argus-risk"
+version = "8.4.0"
+description = "ARGUS — Headless Quantitative Risk Engine, Portfolio Optimization & Bitemporal Analytics"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -13,12 +17,58 @@ keywords = [
     "risk-management",
     "portfolio-analytics",
     "wealth-management",
-    "msci-barra",
-    "conic-optimization",
-    "fixed-income",
-    "streamlit",
-    "duckdb",
-    "pyarrow"
+    "hrp",
+    "var",
+    "cvar",
+    "almgren-chriss",
+    "bitemporal",
+    "duckdb"
+]
+dependencies = [
+    "numpy>=1.26.4",
+    "pandas>=2.2.0",
+    "scipy>=1.12.0",
+    "scikit-learn>=1.4.0",
+    "duckdb>=1.0.0",
+    "pyarrow>=14.0.0",
+    "pydantic>=2.0.0",
+    "cryptography>=42.0.0",
+    "python-dotenv>=1.0.1",
+    "SQLAlchemy>=2.0.25",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+    "httpx>=0.27.0",
+]
+ui = [
+    "streamlit>=1.30.0",
+    "plotly>=5.18.0",
+    "openpyxl>=3.1.2",
+    "xlsxwriter>=3.2.0",
+    "reportlab>=4.1.0",
+    "yfinance>=0.2.36",
+    "PyMySQL[rsa]>=1.1.0",
+    "gspread>=5.12.0",
+    "google-auth>=2.20.0",
+    "psutil>=5.9.0",
+    "pywebview>=4.4.0",
+    "pyinstaller>=6.3.0",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "hypothesis>=6.90.0",
+    "ruff>=0.1.0",
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "pymdown-extensions>=10.7",
+]
+all = [
+    "argus-risk[api,ui,dev]",
 ]
 
 [project.urls]
@@ -26,6 +76,10 @@ Homepage = "https://alessandro-sal.github.io/argus-risk-analytics/"
 Documentation = "https://alessandro-sal.github.io/argus-risk-analytics/"
 Repository = "https://github.com/Alessandro-Sal/argus-risk-analytics.git"
 Issues = "https://github.com/Alessandro-Sal/argus-risk-analytics/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["core*", "api*"]
 
 [tool.ruff]
 line-length = 120
