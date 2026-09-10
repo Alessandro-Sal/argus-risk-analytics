@@ -419,6 +419,12 @@ def init_settings_session_state(is_wealth_mode: bool = False) -> None:
     if "offline_mode" not in st.session_state: st.session_state.offline_mode = False
     if "ui_theme" not in st.session_state: st.session_state.ui_theme = "Midnight Obsidian"
 
+    # Inizializzazione protetta chiavi widget
+    if st.session_state.get("sb_base_currency") is None: st.session_state.sb_base_currency = st.session_state.base_currency
+    if st.session_state.get("sb_confidence_level") is None: st.session_state.sb_confidence_level = st.session_state.confidence_level
+    if st.session_state.get("sb_locale_select") is None: st.session_state.sb_locale_select = st.session_state.locale
+    if st.session_state.get("sb_accounting_select") is None: st.session_state.sb_accounting_select = st.session_state.accounting_notation
+
     # DB Connection & Sync Defaults
     if "db_host" not in st.session_state: st.session_state.db_host = os.getenv("STREAMLIT_DB_HOST", "localhost")
     if "db_port" not in st.session_state: st.session_state.db_port = _detect_default_port(st.session_state.db_host, 3306)
@@ -759,6 +765,8 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
             curr_opts = ["EUR", "USD", "CHF", "GBP"]
             curr_active = st.session_state.get("base_currency", "EUR")
             curr_default = curr_active if curr_active in curr_opts else "EUR"
+            if st.session_state.get("sb_base_currency") not in curr_opts:
+                st.session_state.sb_base_currency = curr_default
             sel_curr = st.segmented_control(
                 "Valuta Base",
                 curr_opts,
@@ -776,6 +784,8 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
             conf_opts = [0.90, 0.95, 0.99]
             conf_active = float(st.session_state.get("confidence_level", 0.95))
             conf_default = conf_active if conf_active in conf_opts else 0.95
+            if st.session_state.get("sb_confidence_level") not in conf_opts:
+                st.session_state.sb_confidence_level = conf_default
             sel_conf = st.segmented_control(
                 "Livello Confidenza (VaR)",
                 conf_opts,
@@ -796,6 +806,8 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
                 lang_opts = ["it", "en"]
                 curr_lang = st.session_state.get("locale", "it")
                 lang_default = curr_lang if curr_lang in lang_opts else "it"
+                if st.session_state.get("sb_locale_select") not in lang_opts:
+                    st.session_state.sb_locale_select = lang_default
                 sel_lang = st.segmented_control(
                     "Lingua",
                     lang_opts,
@@ -814,6 +826,8 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
                 notat_opts = ["standard", "parentheses"]
                 curr_notat = st.session_state.get("accounting_notation", "standard")
                 notat_default = curr_notat if curr_notat in notat_opts else "standard"
+                if st.session_state.get("sb_accounting_select") not in notat_opts:
+                    st.session_state.sb_accounting_select = notat_default
                 sel_notat = st.segmented_control(
                     "Notazione",
                     notat_opts,
@@ -1347,57 +1361,105 @@ def render_sidebar():
             elif "sb_custom_bench" in st.session_state and st.session_state.sb_custom_bench:
                 st.session_state.benchmark = st.session_state.sb_custom_bench
 
-        if "sb_base_currency" in st.session_state:
+        if st.session_state.get("sb_base_currency"):
             st.session_state.base_currency = st.session_state.sb_base_currency
-        if "sb_confidence_level" in st.session_state:
-            st.session_state.confidence_level = float(st.session_state.sb_confidence_level)
-        if "sb_locale_select" in st.session_state:
-            st.session_state.locale = "en" if "English" in st.session_state.sb_locale_select else "it"
-        if "sb_accounting_select" in st.session_state:
-            st.session_state.accounting_notation = "parentheses" if "Wall Street" in st.session_state.sb_accounting_select else "standard"
-        if "sb_data_environment" in st.session_state:
+        else:
+            st.session_state.sb_base_currency = st.session_state.get("base_currency", "EUR")
+
+        if st.session_state.get("sb_confidence_level") is not None:
+            try:
+                st.session_state.confidence_level = float(st.session_state.sb_confidence_level)
+            except (ValueError, TypeError):
+                st.session_state.confidence_level = 0.95
+                st.session_state.sb_confidence_level = 0.95
+        else:
+            st.session_state.sb_confidence_level = float(st.session_state.get("confidence_level", 0.95))
+
+        if st.session_state.get("sb_locale_select"):
+            loc_val = str(st.session_state.sb_locale_select).lower()
+            st.session_state.locale = "en" if ("en" in loc_val or "english" in loc_val) else "it"
+        else:
+            st.session_state.sb_locale_select = st.session_state.get("locale", "it")
+
+        if st.session_state.get("sb_accounting_select"):
+            acc_val = str(st.session_state.sb_accounting_select).lower()
+            st.session_state.accounting_notation = "parentheses" if ("parentheses" in acc_val or "wall" in acc_val) else "standard"
+        else:
+            st.session_state.sb_accounting_select = st.session_state.get("accounting_notation", "standard")
+
+        if st.session_state.get("sb_data_environment"):
             st.session_state.data_environment = st.session_state.sb_data_environment
 
-        if "sb_risk_method" in st.session_state:
+        if st.session_state.get("sb_risk_method"):
             st.session_state.risk_estimation_method = st.session_state.sb_risk_method
-        if "sb_risk_lookback" in st.session_state:
+        if st.session_state.get("sb_risk_lookback"):
             st.session_state.risk_lookback_period = st.session_state.sb_risk_lookback
-        if "sb_risk_decay" in st.session_state:
-            st.session_state.risk_decay_factor = float(st.session_state.sb_risk_decay)
+        if st.session_state.get("sb_risk_decay") is not None:
+            try:
+                st.session_state.risk_decay_factor = float(st.session_state.sb_risk_decay)
+            except (ValueError, TypeError):
+                st.session_state.risk_decay_factor = 0.94
 
-        if "sb_wealth_horizon" in st.session_state:
-            st.session_state.wealth_planning_horizon_years = int(st.session_state.sb_wealth_horizon)
-        if "sb_wealth_exp_return" in st.session_state:
-            st.session_state.wealth_expected_return_pct = float(st.session_state.sb_wealth_exp_return)
-        if "sb_wealth_inflation" in st.session_state:
-            st.session_state.wealth_inflation_rate_pct = float(st.session_state.sb_wealth_inflation)
-        if "sb_wealth_stress" in st.session_state:
+        if st.session_state.get("sb_wealth_horizon") is not None:
+            try:
+                st.session_state.wealth_planning_horizon_years = int(st.session_state.sb_wealth_horizon)
+            except (ValueError, TypeError):
+                st.session_state.wealth_planning_horizon_years = 25
+        if st.session_state.get("sb_wealth_exp_return") is not None:
+            try:
+                st.session_state.wealth_expected_return_pct = float(st.session_state.sb_wealth_exp_return)
+            except (ValueError, TypeError):
+                st.session_state.wealth_expected_return_pct = 6.50
+        if st.session_state.get("sb_wealth_inflation") is not None:
+            try:
+                st.session_state.wealth_inflation_rate_pct = float(st.session_state.sb_wealth_inflation)
+            except (ValueError, TypeError):
+                st.session_state.wealth_inflation_rate_pct = 2.00
+        if st.session_state.get("sb_wealth_stress"):
             st.session_state.wealth_stress_scenario = st.session_state.sb_wealth_stress
 
-        if "sb_port_name" in st.session_state:
+        if st.session_state.get("sb_port_name"):
             st.session_state.portfolio_name = st.session_state.sb_port_name
 
-        if "sb_wb_needs" in st.session_state:
-            st.session_state.wealth_budget_needs_pct = float(st.session_state.sb_wb_needs)
-        if "sb_wb_wants" in st.session_state:
-            st.session_state.wealth_budget_wants_pct = float(st.session_state.sb_wb_wants)
-        if "sb_wb_savings" in st.session_state:
-            st.session_state.wealth_budget_savings_pct = float(st.session_state.sb_wb_savings)
-        if "sb_wealth_swr_input" in st.session_state:
-            st.session_state.wealth_fire_swr = float(st.session_state.sb_wealth_swr_input)
-        if "sb_wealth_age_input" in st.session_state:
-            st.session_state.wealth_target_retirement_age = int(st.session_state.sb_wealth_age_input)
-        if "sb_wealth_tax_regime" in st.session_state:
+        if st.session_state.get("sb_wb_needs") is not None:
+            try:
+                st.session_state.wealth_budget_needs_pct = float(st.session_state.sb_wb_needs)
+            except (ValueError, TypeError):
+                pass
+        if st.session_state.get("sb_wb_wants") is not None:
+            try:
+                st.session_state.wealth_budget_wants_pct = float(st.session_state.sb_wb_wants)
+            except (ValueError, TypeError):
+                pass
+        if st.session_state.get("sb_wb_savings") is not None:
+            try:
+                st.session_state.wealth_budget_savings_pct = float(st.session_state.sb_wb_savings)
+            except (ValueError, TypeError):
+                pass
+        if st.session_state.get("sb_wealth_swr_input") is not None:
+            try:
+                st.session_state.wealth_fire_swr = float(st.session_state.sb_wealth_swr_input)
+            except (ValueError, TypeError):
+                st.session_state.wealth_fire_swr = 4.0
+        if st.session_state.get("sb_wealth_age_input") is not None:
+            try:
+                st.session_state.wealth_target_retirement_age = int(st.session_state.sb_wealth_age_input)
+            except (ValueError, TypeError):
+                st.session_state.wealth_target_retirement_age = 67
+        if st.session_state.get("sb_wealth_tax_regime"):
             st.session_state.wealth_tax_regime = st.session_state.sb_wealth_tax_regime
 
         from core.yield_curve import get_active_risk_free_rate
         if "rf_mode" not in st.session_state: st.session_state.rf_mode = "Auto (Live Market)"
         if "custom_rf_rate_pct" not in st.session_state: st.session_state.custom_rf_rate_pct = 2.75
 
-        if "sb_rf_mode" in st.session_state:
+        if st.session_state.get("sb_rf_mode"):
             st.session_state.rf_mode = st.session_state.sb_rf_mode
-        if "sb_custom_rf" in st.session_state:
-            st.session_state.custom_rf_rate_pct = float(st.session_state.sb_custom_rf)
+        if st.session_state.get("sb_custom_rf") is not None:
+            try:
+                st.session_state.custom_rf_rate_pct = float(st.session_state.sb_custom_rf)
+            except (ValueError, TypeError):
+                st.session_state.custom_rf_rate_pct = 2.75
 
         custom_rf_dec = (st.session_state.custom_rf_rate_pct / 100.0) if st.session_state.rf_mode != "Auto (Live Market)" else None
         active_rf_info = get_active_risk_free_rate(currency=st.session_state.base_currency, custom_override=custom_rf_dec)
