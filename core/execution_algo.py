@@ -21,9 +21,27 @@ def generate_intraday_volume_profile(
     close_rush_factor: float = 1.55
 ) -> np.ndarray:
     """
-    Generates a realistic normalized U-shaped intraday volume distribution
-    for equity markets (high at market open 09:00-10:30, low at midday 12:00-14:00,
-    peak at close 16:30-17:30 MOC).
+    Generates a realistic normalized U-shaped intraday volume distribution for equity markets.
+
+    Models high liquidity at market open (09:00-10:30 CET/EST), lower trading velocity
+    at midday lunch lull (12:00-14:00), and peak closing volume at Market-on-Close (16:30-17:30 MOC).
+
+    Parameters:
+        n_intervals (int, default=16): Number of intraday discrete execution buckets.
+        open_rush_factor (float, default=1.35): Volume multiplier for opening auction and early rush.
+        close_rush_factor (float, default=1.55): Volume multiplier for closing auction (MOC).
+
+    Returns:
+        np.ndarray: Normalized volume fractions across buckets summing to 1.0.
+
+    Examples:
+        >>> profile = generate_intraday_volume_profile(16)
+        >>> len(profile)
+        16
+        >>> round(float(sum(profile)), 4)
+        1.0
+        >>> bool(profile[0] > profile[7])
+        True
     """
     n_intervals = max(4, int(n_intervals))
     t = np.linspace(0, 1, n_intervals)
@@ -55,11 +73,52 @@ def estimate_microstructure_market_impact(
     gamma: float = 0.314,
     alpha: float = 0.5
 ) -> Dict[str, float]:
-    """
-    Estimates market impact according to the institutional Square-Root Law of market impact:
-    - Half-Spread Cost: touch cost of crossing the bid-ask spread
-    - Temporary Impact: dissipative concave impact during execution interval (I_temp = eta * sigma * (v_t/V_t)^alpha)
-    - Permanent Impact: informational linear impact on closing price (I_perm = gamma * sigma * (Q/ADV))
+    r"""
+    Estimates market impact according to the institutional Square-Root Law of market impact.
+
+    Market microstructure decomposition:
+    1. **Half-Spread Cost**:
+       Touch cost of crossing the bid-ask spread:
+       $$\text{Cost}_{\text{spread}} = \frac{1}{2} s$$
+    2. **Temporary Market Impact**:
+       Dissipative concave instantaneous price pressure:
+       $$I_{\text{temp}} = \eta \cdot \sigma \cdot \left(\frac{v_t}{V_t}\right)^\alpha$$
+    3. **Permanent Market Impact**:
+       Informational linear shift on the closing price:
+       $$I_{\text{perm}} = \gamma \cdot \sigma \cdot \left(\frac{Q}{\text{ADV}}\right)$$
+
+    Parameters:
+        slice_qty (float): Quantity executed in the current intraday interval $v_t$.
+        interval_volume (float): Expected market volume in the interval $V_t$.
+        total_qty (float): Total order size across the entire trading day $Q$.
+        adv (float): Average Daily Volume of the security ($\text{ADV}$).
+        daily_volatility (float, default=0.015): Daily asset return standard deviation $\sigma$.
+        half_spread_bps (float, default=1.5): Effective half-spread in basis points.
+        eta (float, default=0.142): Almgren temporary impact coefficient.
+        gamma (float, default=0.314): Almgren permanent impact coefficient.
+        alpha (float, default=0.5): Concave power exponent (0.5 represents the Square-Root Law).
+
+    Returns:
+        Dict[str, float]:
+            Dictionary containing:
+            - `half_spread_bps` (float): Half-spread cost in bps.
+            - `temporary_impact_bps` (float): Temporary slippage in bps.
+            - `permanent_impact_bps` (float): Permanent price drift in bps.
+            - `total_slippage_bps` (float): Sum of spread, temporary, and permanent slippage.
+            - `pov_rate_pct` (float): Instantaneous Percentage of Volume (POV) rate.
+
+    Examples:
+        >>> res = estimate_microstructure_market_impact(
+        ...     slice_qty=1000,
+        ...     interval_volume=50000,
+        ...     total_qty=10000,
+        ...     adv=500000,
+        ...     daily_volatility=0.02
+        ... )
+        >>> res['total_slippage_bps'] > 0
+        True
+        >>> res['half_spread_bps']
+        1.5
     """
     slice_qty = max(0.0, float(slice_qty))
     interval_volume = max(1.0, float(interval_volume))

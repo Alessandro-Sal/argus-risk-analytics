@@ -7,9 +7,50 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-550%2F550%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-556%2F556%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
+[![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
+
+---
+
+## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v8.4.0)
+
+ARGUS v8.4.0 introduce il **disaccoppiamento completo del motore quantitativo dal front-end Streamlit**, trasformando ARGUS in un **Headless Analytical Package** installabile e integrabile in pipeline di produzione, notebook Jupyter e architetture a microservizi:
+
+* **📦 Python Package Headless (`argus-risk`)**:
+  ```bash
+  # Motore analitico puro (zero dipendenze web)
+  pip install argus-risk
+  
+  # Con microservizio REST API (FastAPI + Uvicorn)
+  pip install "argus-risk[api]"
+  
+  # Suite completa con dashboard Streamlit e visual analytics
+  pip install "argus-risk[all]"
+  ```
+
+* **⚡ Microservizio REST API ad Alte Prestazioni (`api/main.py`)**:
+  Server asincrono ASGI (`uvicorn api.main:app --port 8000`) con contratti dichiarativi Pydantic v2 e documentazione OpenAPI Swagger interattiva (`/docs`, `/redoc`):
+  - `GET /health`: Health-check, diagnostica del motore e disponibilità DuckDB C++.
+  - `POST /api/v1/risk/metrics`: Calcolo istantaneo di VaR/CVaR Cornish-Fisher, Sharpe, Sortino, Drawdown e momenti superiori.
+  - `POST /api/v1/optimize/hrp`: Ottimizzazione di portafoglio con algoritmo Hierarchical Risk Parity (López de Prado 2016).
+  - `POST /api/v1/ledger/timetravel`: Ricostruzione contabile bitemporale Point-in-Time con sigillo crittografico Merkle Tree.
+
+* **📚 Portale di Documentazione Interattivo (Material for MkDocs)**:
+  Portale istituzionale ad alta leggibilità ospitato su GitHub Pages con supporto KaTeX/MathJax per formule matematiche, code-copy, navigazione a schede e whitepaper tecnico:
+  👉 **[Consulta la Documentazione Live](https://alessandro-sal.github.io/argus-risk-analytics/)**
+
+* **🎯 Quickstart in 5 Righe (Ottimizzazione HRP da CSV)**:
+  ```python
+  import pandas as pd
+  from core.hrp_optimizer import compute_hrp_portfolio
+  
+  df_returns = pd.read_csv("returns.csv", index_col="Date", parse_dates=True)
+  result = compute_hrp_portfolio(df_returns, linkage_method="single")
+  print(result["df_weights"])
+  ```
 
 ---
 
