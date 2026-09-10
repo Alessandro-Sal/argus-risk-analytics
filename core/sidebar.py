@@ -901,11 +901,87 @@ def render_settings_dialog(current_module: str = "risk") -> None:
             st.rerun()
 
 
+def _execute_full_session_reset(is_wealth_mode: bool = False) -> None:
+    """Esegue il reset completo di cache, memoria L1/L2, archetipi e session state mantenendo solo le preferenze di sistema."""
+    cur_p = get_current_page_name()
+    in_wealth = is_wealth_mode or any(w in cur_p for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"])
+
+    from core.workspace_manager import clear_session_cache
+    from core.workspace_context import WorkspaceContext
+    from core.archetype_manager import clear_unified_archetype
+
+    # 1. Pulisce cache Streamlit, memoria L1 e persistenza L2
+    clear_session_cache()
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    try:
+        from core.cache_shield import clear_cache as clear_disk_cache
+        clear_disk_cache()
+    except Exception:
+        pass
+
+    # 2. Reset dominio e archetipi
+    try:
+        WorkspaceContext.get_current().flush_risk_domain()
+    except Exception:
+        pass
+    try:
+        clear_unified_archetype()
+    except Exception:
+        pass
+
+    # 3. Pulisce Session State preservando configurazioni di sistema e database
+    preserved_keys = {
+        "splash_dismissed", "sidebar_expanded", "theme", "argus_portal_mode",
+        "base_currency", "confidence_level", "locale", "accounting_notation",
+        "data_environment", "offline_mode", "db_host", "db_port", "db_user",
+        "db_pass", "db_name", "wealth_db_name", "risk_db_name",
+        "risk_estimation_method", "risk_lookback_period", "risk_decay_factor",
+        "benchmark", "rf_mode", "custom_rf_rate_pct",
+        "wealth_planning_horizon_years", "wealth_expected_return_pct",
+        "wealth_inflation_rate_pct", "wealth_tax_regime", "wealth_stress_scenario",
+        "wealth_budget_preset", "wealth_budget_needs_pct", "wealth_budget_wants_pct",
+        "wealth_budget_savings_pct", "wealth_fire_swr", "wealth_target_retirement_age",
+        "wealth_pension_deduction_limit",
+        "sb_base_currency", "sb_confidence_level", "sb_locale_select",
+        "sb_accounting_select", "sb_data_environment", "sb_offline_toggle",
+        "sb_db_host", "sb_db_port", "sb_db_user", "sb_db_pass", "sb_db_select",
+        "sb_risk_method", "sb_risk_lookback", "sb_risk_decay", "sb_bench_select",
+        "sb_rf_mode", "sb_wealth_horizon", "sb_wealth_exp_return", "sb_wealth_inflation",
+        "sb_wealth_tax_regime", "sb_wealth_stress", "sb_wealth_preset_sel",
+        "sb_wb_needs", "sb_wb_wants", "sb_wb_savings", "sb_wealth_swr_input", "sb_wealth_age_input"
+    }
+
+    for k in list(st.session_state.keys()):
+        if k not in preserved_keys:
+            del st.session_state[k]
+
+    st.session_state["session_cleared"] = True
+    st.session_state["results"] = None
+    st.session_state["portfolio_name"] = "Portafoglio Principale" if not in_wealth else "Master Wealth"
+    st.session_state["active_portfolio_id"] = None
+    st.session_state["selected_portfolio_id"] = None
+    st.session_state["wealth_active_portfolio_id"] = None
+    st.session_state["pipeline_done"] = False
+
+    try:
+        st.toast("⚡ Sessione e Cache completamente ripristinate!", icon="♻️")
+    except Exception:
+        pass
+
+    if in_wealth:
+        st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
+        switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+    else:
+        st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
+        switch_to_page("0_Control_Room.py")
+
+
 def render_settings_sidebar(current_module: str = "risk") -> None:
     """
     Renderizza l'area 'Impostazioni Globali & Utility' in formato compatto e non invasivo:
     - Pulsante '⚙️ Impostazioni Globali & Parametri' che apre il modale centralizzato @st.dialog.
-    - Riga micro-azioni compatte '🔄 Reset' e '🧹 Svuota Cache'.
+    - Riga micro-azioni bilanciate '🧹 Svuota Cache' e '♻️ Reset Sessione'.
     """
     init_settings_session_state(is_wealth_mode=(current_module == "wealth"))
 
@@ -915,10 +991,7 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
     # Micro-azioni rapide
     col_btn1, col_btn2 = st.columns(2)
     with col_btn1:
-        if st.button("🔄 Reset", key="sb_btn_reset_defaults", use_container_width=True, help="Ripristina i parametri di calcolo e workspace ai valori predefiniti istituzionali."):
-            reset_settings_to_defaults(module=current_module)
-    with col_btn2:
-        if st.button("🧹 Svuota Cache", key="sb_btn_clean_cache_light", use_container_width=True, help="Invalida la cache di calcolo e i prezzi di mercato in memoria per forzare il ricalcolo immediato."):
+        if st.button("🧹 Svuota Cache", key="sb_btn_clean_cache_light", use_container_width=True, help="Invalida la cache di calcolo e i prezzi di mercato in memoria senza perdere il portafoglio caricato."):
             st.cache_data.clear()
             st.cache_resource.clear()
             try:
@@ -927,10 +1000,19 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
             except Exception:
                 pass
             try:
+                from core.workspace_manager import clear_session_cache
+                clear_session_cache()
+            except Exception:
+                pass
+            try:
                 st.toast("⚡ Cache dati e pricing svuotata con successo!", icon="🧹")
             except Exception:
                 pass
             st.rerun()
+
+    with col_btn2:
+        if st.button("♻️ Reset Sessione", key="sb_btn_reset_session_compact", use_container_width=True, help="Elimina tutti i risultati di calcolo, la cache di mercato e i dati caricati, mantenendo le configurazioni di sistema e database."):
+            _execute_full_session_reset(is_wealth_mode=(current_module == "wealth"))
 
 
 def render_sidebar():
@@ -1439,83 +1521,6 @@ def render_sidebar():
         # ── 3. PARAMETRI ENGINE & IMPOSTAZIONI CONTESTUALI ────────────
         current_mod_key = "wealth" if is_wealth_mode else "risk"
         render_settings_sidebar(current_module=current_mod_key)
-
-        # ── 4. PULIZIA CACHE & RESET SESSIONE ─────────────────────────
-        if st.button("♻️ Svuota Cache & Reset Sessione", use_container_width=True, help="Elimina tutti i risultati di calcolo, la cache di mercato e i dati caricati, mantenendo le configurazioni di sistema e database."):
-            # Rileva esattamente se l'utente si trova nel modulo Wealth o Risk
-            cur_p = get_current_page_name()
-            in_wealth = is_wealth_mode or any(w in cur_p for w in ["12_", "13_", "14_", "15_", "16_", "17_", "18_", "19_", "20_", "21_"])
-
-            from core.workspace_manager import clear_session_cache
-            from core.workspace_context import WorkspaceContext
-            from core.archetype_manager import clear_unified_archetype
-
-            # 1. Pulisce cache Streamlit, memoria L1 e persistenza L2
-            clear_session_cache()
-            st.cache_data.clear()
-            st.cache_resource.clear()
-            try:
-                from core.cache_shield import clear_cache as clear_disk_cache
-                clear_disk_cache()
-            except Exception:
-                pass
-
-            # 2. Reset dominio e archetipi
-            try:
-                WorkspaceContext.get_current().flush_risk_domain()
-            except Exception:
-                pass
-            try:
-                clear_unified_archetype()
-            except Exception:
-                pass
-
-            # 3. Pulisce Session State preservando configurazioni di sistema e database
-            preserved_keys = {
-                "splash_dismissed", "sidebar_expanded", "theme", "argus_portal_mode",
-                "base_currency", "confidence_level", "locale", "accounting_notation",
-                "data_environment", "offline_mode", "db_host", "db_port", "db_user",
-                "db_pass", "db_name", "wealth_db_name", "risk_db_name",
-                "risk_estimation_method", "risk_lookback_period", "risk_decay_factor",
-                "benchmark", "rf_mode", "custom_rf_rate_pct",
-                "wealth_planning_horizon_years", "wealth_expected_return_pct",
-                "wealth_inflation_rate_pct", "wealth_tax_regime", "wealth_stress_scenario",
-                "wealth_budget_preset", "wealth_budget_needs_pct", "wealth_budget_wants_pct",
-                "wealth_budget_savings_pct", "wealth_fire_swr", "wealth_target_retirement_age",
-                "wealth_pension_deduction_limit",
-                "sb_base_currency", "sb_confidence_level", "sb_locale_select",
-                "sb_accounting_select", "sb_data_environment", "sb_offline_toggle",
-                "sb_db_host", "sb_db_port", "sb_db_user", "sb_db_pass", "sb_db_select",
-                "sb_risk_method", "sb_risk_lookback", "sb_risk_decay", "sb_bench_select",
-                "sb_rf_mode", "sb_wealth_horizon", "sb_wealth_exp_return", "sb_wealth_inflation",
-                "sb_wealth_tax_regime", "sb_wealth_stress", "sb_wealth_preset_sel",
-                "sb_wb_needs", "sb_wb_wants", "sb_wb_savings", "sb_wealth_swr_input", "sb_wealth_age_input"
-            }
-
-            for k in list(st.session_state.keys()):
-                if k not in preserved_keys:
-                    del st.session_state[k]
-
-            st.session_state["session_cleared"] = True
-            st.session_state["results"] = None
-            st.session_state["portfolio_name"] = "Portafoglio Principale" if not in_wealth else "Master Wealth"
-            st.session_state["active_portfolio_id"] = None
-            st.session_state["selected_portfolio_id"] = None
-            st.session_state["wealth_active_portfolio_id"] = None
-            st.session_state["pipeline_done"] = False
-
-            try:
-                st.toast("⚡ Sessione e Cache completamente ripristinate!", icon="♻️")
-            except Exception:
-                pass
-
-            if in_wealth:
-                st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
-                switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
-            else:
-                st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
-                switch_to_page("0_Control_Room.py")
-
 
         if st.button("👁️ Schermata di Avvio (Splash)", key="btn_sidebar_show_splash", use_container_width=True):
             st.session_state["splash_dismissed"] = False
