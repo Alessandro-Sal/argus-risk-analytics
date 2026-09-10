@@ -462,10 +462,13 @@ with tab_ingest:
         render_unified_archetype_hud,
     )
 
+    arch_status_placeholder = st.empty()
+
     def _execute_archetype_load(arch_code: str, auto_run: bool = False):
-        with st.spinner("⏳ Simulazione quantitativa e salvataggio cross-modulo dell'archetipo..."):
-            execute_unified_archetype_load(arch_code, auto_run=auto_run, source_module="risk")
-            st.rerun()
+        with arch_status_placeholder.container():
+            with st.spinner("⏳ Generazione quantitativa e salvataggio cross-modulo dell'archetipo in corso..."):
+                execute_unified_archetype_load(arch_code, auto_run=auto_run, source_module="risk")
+                st.rerun()
 
     def _clear_active_archetype():
         clear_unified_archetype()
@@ -480,55 +483,58 @@ with tab_ingest:
 
         arch_c1, arch_c2, arch_c3 = st.columns(3)
         with arch_c1:
-            badge_young = " :green[**[● ATTIVO]**]" if active_code == "young_accumulator" else ""
-            st.markdown(f"""
-            **🚀 Giovane Accumulatore**{badge_young}
-            - **Rischio**: Aggressivo (25 anni)
-            - **Asset**: Global ETF, QQQ, Big Tech, Crypto
-            - **PAC**: €850/mese su stipendio in crescita
-            """, unsafe_allow_html=True)
-            col_b1_a, col_b1_b = st.columns([1.2, 1])
-            with col_b1_a:
-                if st.button("⚡ 1-Click Analisi", key="btn_load_run_young", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
-                    _execute_archetype_load("young_accumulator", auto_run=True)
-            with col_b1_b:
-                lbl_y = "Ricarica" if active_code == "young_accumulator" else "Carica Dati"
-                if st.button(lbl_y, key="btn_load_arch_young", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
-                    _execute_archetype_load("young_accumulator", auto_run=False)
+            with st.container(border=True):
+                badge_young = " :green[**[● ATTIVO]**]" if active_code == "young_accumulator" else ""
+                st.markdown(f"""
+                **🚀 Giovane Accumulatore**{badge_young}
+                - **Rischio**: Aggressivo (25 anni)
+                - **Asset**: Global ETF, QQQ, Big Tech, Crypto
+                - **PAC**: €850/mese su stipendio in crescita
+                """, unsafe_allow_html=True)
+                col_b1_a, col_b1_b = st.columns([1.1, 0.9])
+                with col_b1_a:
+                    if st.button("⚡ 1-Click Analisi", key="btn_load_run_young", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
+                        _execute_archetype_load("young_accumulator", auto_run=True)
+                with col_b1_b:
+                    lbl_y = "Ricarica" if active_code == "young_accumulator" else "Carica Dati"
+                    if st.button(lbl_y, key="btn_load_arch_young", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
+                        _execute_archetype_load("young_accumulator", auto_run=False)
 
         with arch_c2:
-            badge_fire = " :green[**[● ATTIVO]**]" if active_code == "fire_decumulation" else ""
-            st.markdown(f"""
-            **🏖️ FIRE / Decumulo**{badge_fire}
-            - **Rischio**: Conservativo / Cedolare
-            - **Asset**: Dividend Aristocrats, BND Bond, Value
-            - **Decumulo**: SWR 3.5% costante, zero debiti
-            """, unsafe_allow_html=True)
-            col_b2_a, col_b2_b = st.columns([1.2, 1])
-            with col_b2_a:
-                if st.button("⚡ 1-Click Analisi", key="btn_load_run_fire", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
-                    _execute_archetype_load("fire_decumulation", auto_run=True)
-            with col_b2_b:
-                lbl_f = "Ricarica" if active_code == "fire_decumulation" else "Carica Dati"
-                if st.button(lbl_f, key="btn_load_arch_fire", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
-                    _execute_archetype_load("fire_decumulation", auto_run=False)
+            with st.container(border=True):
+                badge_fire = " :green[**[● ATTIVO]**]" if active_code == "fire_decumulation" else ""
+                st.markdown(f"""
+                **🏖️ FIRE / Decumulo**{badge_fire}
+                - **Rischio**: Conservativo / Cedolare
+                - **Asset**: Dividend Aristocrats, BND Bond, Value
+                - **Decumulo**: SWR 3.5% costante, zero debiti
+                """, unsafe_allow_html=True)
+                col_b2_a, col_b2_b = st.columns([1.1, 0.9])
+                with col_b2_a:
+                    if st.button("⚡ 1-Click Analisi", key="btn_load_run_fire", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
+                        _execute_archetype_load("fire_decumulation", auto_run=True)
+                with col_b2_b:
+                    lbl_f = "Ricarica" if active_code == "fire_decumulation" else "Carica Dati"
+                    if st.button(lbl_f, key="btn_load_arch_fire", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
+                        _execute_archetype_load("fire_decumulation", auto_run=False)
 
         with arch_c3:
-            badge_hnwi = " :green[**[● ATTIVO]**]" if active_code == "hnwi_family" else ""
-            st.markdown(f"""
-            **👑 HNWI / Famiglia**{badge_hnwi}
-            - **Rischio**: Multi-Asset Istituzionale (€4.0M)
-            - **Asset**: Big Tech, Global ETF, Bond, Gold, Watches
-            - **Wealth**: Mutuo francese, affitti, max pensione
-            """, unsafe_allow_html=True)
-            col_b3_a, col_b3_b = st.columns([1.2, 1])
-            with col_b3_a:
-                if st.button("⚡ 1-Click Analisi", key="btn_load_run_hnwi", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
-                    _execute_archetype_load("hnwi_family", auto_run=True)
-            with col_b3_b:
-                lbl_h = "Ricarica" if active_code == "hnwi_family" else "Carica Dati"
-                if st.button(lbl_h, key="btn_load_arch_hnwi", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
-                    _execute_archetype_load("hnwi_family", auto_run=False)
+            with st.container(border=True):
+                badge_hnwi = " :green[**[● ATTIVO]**]" if active_code == "hnwi_family" else ""
+                st.markdown(f"""
+                **👑 HNWI / Famiglia**{badge_hnwi}
+                - **Rischio**: Multi-Asset Istituzionale (€4.0M)
+                - **Asset**: Big Tech, Global ETF, Bond, Gold, Watches
+                - **Wealth**: Mutuo francese, affitti, max pensione
+                """, unsafe_allow_html=True)
+                col_b3_a, col_b3_b = st.columns([1.1, 0.9])
+                with col_b3_a:
+                    if st.button("⚡ 1-Click Analisi", key="btn_load_run_hnwi", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
+                        _execute_archetype_load("hnwi_family", auto_run=True)
+                with col_b3_b:
+                    lbl_h = "Ricarica" if active_code == "hnwi_family" else "Carica Dati"
+                    if st.button(lbl_h, key="btn_load_arch_hnwi", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
+                        _execute_archetype_load("hnwi_family", auto_run=False)
 
     col_ds_sel, col_ds_modal, col_ds_tpl = st.columns([2.6, 1.0, 1.0])
     with col_ds_sel:
