@@ -808,18 +808,18 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
 
             col_n, col_w, col_s = st.columns(3)
             with col_n:
-                n_val = st.number_input("Needs %", min_value=5.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_needs_pct", 50.0)), step=5.0, format="%d%%", key="sb_wb_needs")
+                n_val = st.number_input("Needs %", min_value=5.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_needs_pct", 50.0)), step=5.0, format="%.0f", key="sb_wb_needs")
             with col_w:
-                w_val = st.number_input("Wants %", min_value=0.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_wants_pct", 30.0)), step=5.0, format="%d%%", key="sb_wb_wants")
+                w_val = st.number_input("Wants %", min_value=0.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_wants_pct", 30.0)), step=5.0, format="%.0f", key="sb_wb_wants")
             with col_s:
-                s_val = st.number_input("Savings %", min_value=0.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_savings_pct", 20.0)), step=5.0, format="%d%%", key="sb_wb_savings")
+                s_val = st.number_input("Savings %", min_value=0.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_savings_pct", 20.0)), step=5.0, format="%.0f", key="sb_wb_savings")
             st.session_state.wealth_budget_needs_pct = n_val
             st.session_state.wealth_budget_wants_pct = w_val
             st.session_state.wealth_budget_savings_pct = s_val
 
             col_swr, col_age = st.columns(2)
             with col_swr:
-                swr_val = st.number_input("SWR FIRE %", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, format="%.1f%%", key="sb_wealth_swr_input")
+                swr_val = st.number_input("SWR FIRE %", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, format="%.1f", key="sb_wealth_swr_input")
                 st.session_state.wealth_fire_swr = swr_val
             with col_age:
                 age_val = st.number_input("Età Target", min_value=30, max_value=75, value=int(st.session_state.get("wealth_target_retirement_age", 67)), step=1, key="sb_wealth_age_input")
