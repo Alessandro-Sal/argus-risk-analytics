@@ -525,120 +525,137 @@ def render_settings_status_hud(current_module: str = "risk") -> None:
     """, unsafe_allow_html=True)
 
 
-def render_settings_sidebar(current_module: str = "risk") -> None:
-    """
-    Renderizza l'area 'Impostazioni Globali & Utility' in formato compatto e non invasivo:
-    - Popover '⚙️ Impostazioni Globali' per Valuta, Lingua, Notazione, Sorgente Dati e Connessione DB.
-    - Riga micro-azioni compatte '🔄 Reset' e '🧹 Svuota Cache'.
-    """
+@st.dialog("⚙️ Impostazioni Globali & Database", width="large")
+def render_settings_dialog(current_module: str = "risk") -> None:
+    """Modale istituzionale centralizzato e perfettamente visibile per le configurazioni globali."""
     init_settings_session_state(is_wealth_mode=(current_module == "wealth"))
     is_wealth = (current_module == "wealth")
 
-    with st.popover("⚙️ Impostazioni Globali", use_container_width=True):
-        render_settings_status_hud(current_module=current_module)
+    render_settings_status_hud(current_module=current_module)
 
-        tab_pref, tab_conn = st.tabs(["🎨 Preferenze", "🌐 Database & Rete"])
+    tab_pref, tab_conn = st.tabs(["🎨 Preferenze", "🌐 Database & Rete"])
 
-        with tab_pref:
-            col_g1, col_g2 = st.columns(2)
-            with col_g1:
-                curr_opts = ["EUR", "USD", "CHF", "GBP"]
-                curr_active = st.session_state.get("base_currency", "EUR")
-                curr_idx = curr_opts.index(curr_active) if curr_active in curr_opts else 0
-                sel_curr = st.selectbox("Valuta Base", curr_opts, index=curr_idx, key="sb_base_currency")
-                st.session_state.base_currency = sel_curr
+    with tab_pref:
+        col_g1, col_g2 = st.columns(2)
+        with col_g1:
+            curr_opts = ["EUR", "USD", "CHF", "GBP"]
+            curr_active = st.session_state.get("base_currency", "EUR")
+            curr_idx = curr_opts.index(curr_active) if curr_active in curr_opts else 0
+            sel_curr = st.selectbox("Valuta Base", curr_opts, index=curr_idx, key="sb_base_currency")
+            st.session_state.base_currency = sel_curr
 
-            with col_g2:
-                lang_opts = ["it", "en"]
-                curr_lang = 1 if st.session_state.get("locale", "it") == "en" else 0
-                sel_lang = st.selectbox(
-                    "Lingua",
-                    lang_opts,
-                    index=curr_lang,
-                    format_func=lambda x: "🇮🇹 IT" if x == "it" else "🇬🇧 EN",
-                    key="sb_locale_select"
-                )
-                st.session_state.locale = sel_lang
-
-            notat_opts = ["standard", "parentheses"]
-            curr_notat = 1 if st.session_state.get("accounting_notation", "standard") == "parentheses" else 0
-            sel_notat = st.selectbox(
-                "Notazione Numerica",
-                notat_opts,
-                index=curr_notat,
-                format_func=lambda x: "Standard (-€100)" if x == "standard" else "Wall Street ((€100))",
-                key="sb_accounting_select"
+        with col_g2:
+            lang_opts = ["it", "en"]
+            curr_lang = 1 if st.session_state.get("locale", "it") == "en" else 0
+            sel_lang = st.selectbox(
+                "Lingua",
+                lang_opts,
+                index=curr_lang,
+                format_func=lambda x: "🇮🇹 IT" if x == "it" else "🇬🇧 EN",
+                key="sb_locale_select"
             )
-            st.session_state.accounting_notation = sel_notat
+            st.session_state.locale = sel_lang
 
-        with tab_conn:
-            env_opts = ["Auto (Ibrido)", "Live Yahoo Finance", "DuckDB Veloce", "Local SQLite"]
-            curr_env = st.session_state.get("data_environment", "Auto (Ibrido)")
-            env_idx = env_opts.index(curr_env) if curr_env in env_opts else 0
-            sel_env = st.selectbox("Sorgente Dati", env_opts, index=env_idx, key="sb_data_environment")
-            st.session_state.data_environment = sel_env
+        notat_opts = ["standard", "parentheses"]
+        curr_notat = 1 if st.session_state.get("accounting_notation", "standard") == "parentheses" else 0
+        sel_notat = st.selectbox(
+            "Notazione Numerica",
+            notat_opts,
+            index=curr_notat,
+            format_func=lambda x: "Standard (-€100)" if x == "standard" else "Wall Street ((€100))",
+            key="sb_accounting_select"
+        )
+        st.session_state.accounting_notation = sel_notat
 
-            off_lbl = "Modalità Offline (SQLite Locale)" if is_wealth else "Modalità Offline (RAM)"
-            off_hlp = "Usa il database locale embedded SQLite senza dipendere da MySQL." if is_wealth else "Simulazione in memoria RAM con dataset sintetici senza dipendenze esterne."
-            sel_off = st.toggle(
-                off_lbl,
-                value=bool(st.session_state.get("offline_mode", False)),
-                key="sb_offline_toggle",
-                help=off_hlp
-            )
-            st.session_state.offline_mode = sel_off
+    with tab_conn:
+        env_opts = ["Auto (Ibrido)", "Live Yahoo Finance", "DuckDB Veloce", "Local SQLite"]
+        curr_env = st.session_state.get("data_environment", "Auto (Ibrido)")
+        env_idx = env_opts.index(curr_env) if curr_env in env_opts else 0
+        sel_env = st.selectbox("Sorgente Dati", env_opts, index=env_idx, key="sb_data_environment")
+        st.session_state.data_environment = sel_env
 
-            # Gestione Connessione MySQL (se non in modalità offline)
-            if not st.session_state.offline_mode:
-                with st.expander("🔌 Connessione & Schema Database", expanded=False):
-                    col_h, col_p = st.columns([2, 1.2])
-                    with col_h:
-                        st.session_state.db_host = st.text_input("Host", value=st.session_state.db_host, key="sb_db_host")
-                    with col_p:
-                        st.session_state.db_port = int(st.number_input("Port", value=st.session_state.db_port, step=1, key="sb_db_port"))
+        off_lbl = "Modalità Offline (SQLite Locale)" if is_wealth else "Modalità Offline (RAM)"
+        off_hlp = "Usa il database locale embedded SQLite senza dipendere da MySQL." if is_wealth else "Simulazione in memoria RAM con dataset sintetici senza dipendenze esterne."
+        sel_off = st.toggle(
+            off_lbl,
+            value=bool(st.session_state.get("offline_mode", False)),
+            key="sb_offline_toggle",
+            help=off_hlp
+        )
+        st.session_state.offline_mode = sel_off
 
-                    col_u, col_pw = st.columns(2)
-                    with col_u:
-                        st.session_state.db_user = st.text_input("User", value=st.session_state.db_user, key="sb_db_user")
-                    with col_pw:
-                        st.session_state.db_pass = st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
+        # Gestione Connessione MySQL (se non in modalità offline)
+        if not st.session_state.offline_mode:
+            with st.expander("🔌 Connessione & Schema Database", expanded=False):
+                col_h, col_p = st.columns([2, 1.2])
+                with col_h:
+                    st.session_state.db_host = st.text_input("Host", value=st.session_state.db_host, key="sb_db_host")
+                with col_p:
+                    st.session_state.db_port = int(st.number_input("Port", value=st.session_state.db_port, step=1, key="sb_db_port"))
 
-                    active_db = st.session_state.get("db_name", "wealth")
-                    found_dbs = _get_available_mysql_dbs(st.session_state.db_host, st.session_state.db_port, st.session_state.db_user, st.session_state.db_pass)
+                col_u, col_pw = st.columns(2)
+                with col_u:
+                    st.session_state.db_user = st.text_input("User", value=st.session_state.db_user, key="sb_db_user")
+                with col_pw:
+                    st.session_state.db_pass = st.text_input("Password", type="password", value=st.session_state.db_pass, key="sb_db_pass")
 
-                    db_options = []
-                    base_defaults = ["wealth", "wealth_app", "wealth_data", "investment_risk_bi"]
-                    for d in base_defaults:
-                        if d in found_dbs and d not in db_options: db_options.append(d)
-                    for d in found_dbs:
-                        if d not in db_options: db_options.append(d)
-                    for d in base_defaults:
-                        if d not in db_options: db_options.append(d)
-                    if active_db and active_db not in db_options and active_db != "Custom...":
-                        db_options.append(active_db)
-                    db_options.append("Custom...")
+                active_db = st.session_state.get("db_name", "wealth")
+                found_dbs = _get_available_mysql_dbs(st.session_state.db_host, st.session_state.db_port, st.session_state.db_user, st.session_state.db_pass)
 
-                    db_idx = db_options.index(active_db) if active_db in db_options else (len(db_options) - 1)
-                    sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
-                    if sel_db == "Custom...":
-                        custom_db = st.text_input("Nome DB Custom", value=active_db if active_db not in db_options[:-1] else "", key="sb_custom_db", placeholder="es. family_office_db").strip()
-                        if custom_db:
-                            st.session_state.db_name = custom_db
-                            st.session_state.wealth_db_name = custom_db
-                            st.session_state.risk_db_name = custom_db
-                    else:
-                        st.session_state.db_name = sel_db
-                        st.session_state.wealth_db_name = sel_db
-                        st.session_state.risk_db_name = sel_db
+                db_options = []
+                base_defaults = ["wealth", "wealth_app", "wealth_data", "investment_risk_bi"]
+                for d in base_defaults:
+                    if d in found_dbs and d not in db_options: db_options.append(d)
+                for d in found_dbs:
+                    if d not in db_options: db_options.append(d)
+                for d in base_defaults:
+                    if d not in db_options: db_options.append(d)
+                if active_db and active_db not in db_options and active_db != "Custom...":
+                    db_options.append(active_db)
+                db_options.append("Custom...")
 
-                    if is_wealth:
-                        if st.button("📥 Allinea DB Locale SQLite", key="sb_btn_sync_sqlite", use_container_width=True, help="Copia tutti i dati e movimenti da MySQL al database locale SQLite per lavorare offline."):
-                            try:
-                                from core.wealth.wealth_db import sync_mysql_to_sqlite
-                                sync_res = sync_mysql_to_sqlite(st.session_state.db_user, st.session_state.db_pass, st.session_state.db_host, st.session_state.db_port, st.session_state.db_name)
-                                st.success(f"Allineati {sync_res.get('wealth_cashflow', 0)} movimenti e {sync_res.get('wealth_accounts', 0)} conti in SQLite!")
-                            except Exception as ex:
-                                st.error(f"Errore sincronizzazione: {ex}")
+                db_idx = db_options.index(active_db) if active_db in db_options else (len(db_options) - 1)
+                sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
+                if sel_db == "Custom...":
+                    custom_db = st.text_input("Nome DB Custom", value=active_db if active_db not in db_options[:-1] else "", key="sb_custom_db", placeholder="es. family_office_db").strip()
+                    if custom_db:
+                        st.session_state.db_name = custom_db
+                        st.session_state.wealth_db_name = custom_db
+                        st.session_state.risk_db_name = custom_db
+                else:
+                    st.session_state.db_name = sel_db
+                    st.session_state.wealth_db_name = sel_db
+                    st.session_state.risk_db_name = sel_db
+
+                if is_wealth:
+                    if st.button("📥 Allinea DB Locale SQLite", key="sb_btn_sync_sqlite", use_container_width=True, help="Copia tutti i dati e movimenti da MySQL al database locale SQLite per lavorare offline."):
+                        try:
+                            from core.wealth.wealth_db import sync_mysql_to_sqlite
+                            sync_res = sync_mysql_to_sqlite(st.session_state.db_user, st.session_state.db_pass, st.session_state.db_host, st.session_state.db_port, st.session_state.db_name)
+                            st.success(f"Allineati {sync_res.get('wealth_cashflow', 0)} movimenti e {sync_res.get('wealth_accounts', 0)} conti in SQLite!")
+                        except Exception as ex:
+                            st.error(f"Errore sincronizzazione: {ex}")
+
+    st.markdown("<hr style='margin: 12px 0 8px; border: none; border-top: 1px solid rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+    col_d1, col_d2 = st.columns([1, 1])
+    with col_d1:
+        if st.button("🔄 Ripristina Default", key="dlg_btn_reset_defaults", use_container_width=True):
+            reset_settings_to_defaults(module=current_module)
+    with col_d2:
+        if st.button("✅ Applica & Chiudi", type="primary", key="dlg_btn_apply_close", use_container_width=True):
+            st.rerun()
+
+
+def render_settings_sidebar(current_module: str = "risk") -> None:
+    """
+    Renderizza l'area 'Impostazioni Globali & Utility' in formato compatto e non invasivo:
+    - Pulsante '⚙️ Impostazioni Globali' che apre il modale centralizzato @st.dialog.
+    - Riga micro-azioni compatte '🔄 Reset' e '🧹 Svuota Cache'.
+    """
+    init_settings_session_state(is_wealth_mode=(current_module == "wealth"))
+
+    if st.button("⚙️ Impostazioni Globali", key="sb_btn_open_settings_dialog", use_container_width=True, help="Apri le impostazioni di sistema, preferenze e database in un modale centralizzato a schermo intero."):
+        render_settings_dialog(current_module=current_module)
 
     # Micro-azioni rapide
     col_btn1, col_btn2 = st.columns(2)
