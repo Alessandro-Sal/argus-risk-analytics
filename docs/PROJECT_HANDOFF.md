@@ -1,4 +1,4 @@
-# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.3.0 Enterprise Release)
+# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.4.0 Enterprise Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,7 +6,7 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.3.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.4.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Data Quality Gate (Pydantic v2), Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), Backup Engine, Security Vault, AI Analyst (Dual-Engine LLM/NLG con Guardrails MiFID II / Art. 21 TUF), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML/Parquet, Plotly Institutional Framework e Design System.
@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **543 test automatizzati (100% passed)** su 92 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **550 test automatizzati (100% passed)** su 93 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -210,6 +210,21 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Stooq Free Fallback Engine**: Connettore mondiale per quotazioni azionarie, ETF, indici e valute senza vincoli di chiavi API.
 - **Market-Aware Freshness & Staleness Evaluator**: Classificazione formale della freschezza dei dati sincronizzata con il calendario di mercato borsistico reale (`LIVE_REALTIME`, `END_OF_DAY_FRESH`, `MARKET_CLOSED_BENIGN`, `STALE_WARNING`, `OFFLINE_EMERGENCY`).
 - **Data Envelope `MarketDataEnvelope`**: Busta di trasporto dati con indicazione di latenza in ms, timestamp di acquisizione e warning informativi per la dashboard.
+### `core/bitemporal_engine.py` — ✅ Bitemporal Persistence, Immutable Cryptographic Audit & Time-Travel Machine
+- **Modellazione Bitemporale Ortogonale (Standard ISO/IEC 9075:2011 SQL Temporal)**:
+  - *Valid Time (VT / Business Time)*: Intervallo $[\text{valid\_from}, \text{valid\_to})$ che definisce quando un evento o flusso finanziario è vero nel mondo reale.
+  - *System Time (TT / Knowledge Time)*: Intervallo $[\text{sys\_from}, \text{sys\_to})$ rigorosamente monotono, generato dal database, immutabile ed append-only.
+  - *Gestione dei Fatti Tardivi (Late-Arriving Facts)*: Ingestione retroattiva esatta di dividendi, cedole o perizie senza alterare lo stato cognitivo passato del sistema.
+  - *Rettifiche Storiche Non-Distruttive (`correct_historical_transaction`)*: Chiusura della versione precedente con $\text{sys\_to} = \text{now()}$ e apertura della nuova versione con $\text{sys\_from} = \text{now()}$ e $\text{sys\_to} = \text{infinity}$.
+- **Audit Trail Crittografico ad Append-Only Hash Chaining (SHA-256)**:
+  - Collegamento crittografico continuo di ogni cambio di target allocation, modifica parametri di rischio o override manuale di prezzo: $H_k = \text{SHA-256}(H_{k-1} \parallel \text{EntryID}_k \parallel \text{Timestamp}_k \parallel \text{CanonicalJSON}_k)$.
+  - *Tamper Detection Computazionale (`verify_audit_chain_integrity`)*: Verifica matematica istantanea che rileva all'istante qualsiasi manomissione fisica retroattiva su file di database.
+- **Certificazione di Integrità Merkle Tree per la Reportistica**:
+  - Costruzione deterministica dell'albero Merkle su blocchi di transazioni contabili e calcolo del Root Hash a 64 caratteri esadecimali impresso nel running footer dei report PDF e nei metadati Parquet/Excel.
+- **Motore di Query Point-in-Time ("Time-Travel Machine")**:
+  - Risoluzione simultanea bidimensionale di query *Audit Replay* (Cosa sapevamo alla data $S$?) rispetto a *Economic Truth* (Cosa è accaduto alla data $T$?).
+  - *Riconciliazione Forense (`detect_retroactive_drifts`)*: Rilevamento automatico di divergenze, storni e dividendi tardivi tra due stati di conoscenza del sistema.
+
 ### `core/bquant_engine.py` — ✅ BQuant In-Memory Python Sandbox & DuckDB SQL
 - **In-Memory Sandboxed Execution**: Esecuzione dinamica sicura di script Python con iniezione del bundle di sessione (`df_positions`, `df_returns`, `df_prices`, `results`, `duckdb`).
 - **DuckDB SQL Integration**: Registrazione automatica dei DataFrame in sessione in-memory per query analitiche SQL con sintassi ANSI e aggregazioni OLAP sub-millisecondo.
@@ -378,7 +393,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **543 test automatizzati passano con successo (100%)** distribuiti su 92 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py`, la suite DBRE `tests/test_migration_manager.py`, il modulo `tests/test_structured_logging_and_support_bundle.py`, la suite di simulazione quantitativa `tests/test_realistic_portfolio_generator.py`, la suite di internazionalizzazione e cambi `tests/test_i18n_and_fx_engine.py` e la suite di esecuzione algoritmica e TCA `tests/test_tca_and_optimal_execution.py`):
+Tutti i **550 test automatizzati passano con successo (100%)** distribuiti su 93 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py`, la suite DBRE `tests/test_migration_manager.py`, il modulo `tests/test_structured_logging_and_support_bundle.py`, la suite di simulazione quantitativa `tests/test_realistic_portfolio_generator.py`, la suite di internazionalizzazione e cambi `tests/test_i18n_and_fx_engine.py`, la suite di esecuzione algoritmica e TCA `tests/test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `tests/test_bitemporal_engine.py`):
 
 ```bash
 py -m pytest
@@ -386,9 +401,9 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 543 passed in ~86.00s (100%) =======================
+======================= 550 passed in ~88.00s (100%) =======================
 ```
 
 ---
 
-*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v8.3.0 Enterprise Release.*
+*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v8.4.0 Enterprise Release.*
