@@ -33,7 +33,7 @@ jobs:
           python scripts/package_release.py ${{ github.ref_name }}
 
       - name: Create or Update GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: dist/ARGUS_*.zip
           name: ARGUS Risk Analytics ${{ github.ref_name }} — Institutional Production Release
