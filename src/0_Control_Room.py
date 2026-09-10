@@ -420,6 +420,8 @@ if st.session_state.get("pipeline_done"):
         if st.button("🔄 Reset / Nuova Analisi", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
             from core.workspace_manager import clear_session_cache
             from core.workspace_context import WorkspaceContext
+            for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested"]:
+                st.session_state.pop(k, None)
             clear_session_cache()
             WorkspaceContext.get_current().flush_risk_domain()
             st.rerun()
@@ -453,60 +455,133 @@ with tab_ingest:
 2022-08-20,AAPL,sell,5,162.50,USD,1.50,stock,Presa profitto
 2023-03-01,AAPL,dividend,0,0.23,USD,0.00,stock,Dividendo Q1"""
 
-    with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Caricamento 1-Click)", expanded=False):
+    # ── Helper Iniezione Archetipo ──────────────────────────────
+    def _execute_archetype_load(arch_code: str, auto_run: bool = False):
+        from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
+        with st.spinner(f"⏳ Simulazione quantitativa e salvataggio su database dell'archetipo..."):
+            sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
+            res_arch = sim_eng.simulate(arch_code, years=3)
+            db_res = populate_argus_database(res_arch)
+            
+            st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
+            st.session_state["portfolio_name"] = f"Archetipo: {res_arch.archetype.name}"
+            st.session_state["portfolio_id"] = db_res["risk_portfolio_id"]
+            st.session_state["wealth_active_portfolio_id"] = db_res["wealth_profile_id"]
+            st.session_state["active_archetype_code"] = arch_code
+            st.session_state["active_archetype_name"] = res_arch.archetype.name
+            st.session_state["active_archetype_tx_count"] = len(res_arch.trading_transactions_df)
+            st.session_state["active_archetype_db_ids"] = db_res
+            st.session_state["keep_archetype_expander_open"] = True
+            st.session_state["archetype_just_injected"] = True
+            st.session_state.pop("session_cleared", None)
+            st.session_state.pop("pipeline_done", None)
+            st.session_state.pop("results", None)
+            st.session_state.pop("fetch_report", None)
+            if auto_run:
+                st.session_state["auto_run_pipeline_requested"] = True
+            st.rerun()
+
+    def _clear_active_archetype():
+        for k in [
+            "df_raw_injected", "active_archetype_code", "active_archetype_name",
+            "active_archetype_tx_count", "active_archetype_db_ids",
+            "keep_archetype_expander_open", "archetype_just_injected",
+            "auto_run_pipeline_requested", "pipeline_done", "results", "fetch_report"
+        ]:
+            st.session_state.pop(k, None)
+        st.session_state["portfolio_name"] = ""
+        st.rerun()
+
+    expander_is_open = bool(st.session_state.get("keep_archetype_expander_open", False) or st.session_state.get("active_archetype_code"))
+    with st.expander("🧪 Scenari Didattici & Archetipi Pre-configurati (Caricamento 1-Click)", expanded=expander_is_open):
         st.caption("Carica istantaneamente un portafoglio pluriennale sintetico realistico con solvibilità e date borsistiche garantite. Ideale per didattica e collaudo immediato.")
+        
+        active_code = st.session_state.get("active_archetype_code")
+        if active_code:
+            active_name = st.session_state.get("active_archetype_name", "Scenario")
+            tx_count = st.session_state.get("active_archetype_tx_count", 0)
+            db_ids = st.session_state.get("active_archetype_db_ids", {})
+            r_id = db_ids.get("risk_portfolio_id", st.session_state.get("portfolio_id", 1))
+            w_id = db_ids.get("wealth_profile_id", st.session_state.get("wealth_active_portfolio_id", 1))
+            
+            st.markdown(f"""
+            <div style="background: rgba(46, 160, 67, 0.14); border: 1px solid rgba(46, 160, 67, 0.4); border-left: 4px solid #2ea043; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                        <div style="font-weight: 700; color: #3fb950; font-size: 14.5px;">
+                            ✅ Scenario Didattico Attivo: <b>{active_name}</b>
+                        </div>
+                        <div style="color: #c9d1d9; font-size: 12px; margin-top: 3px;">
+                            • <b>{tx_count} transazioni</b> simulate | Database SQLite: <code>Portfolio #{r_id}</code> • <code>Wealth Profile #{w_id}</code><br>
+                            • Dati registrati nel Database e inviati a <b>Step ② (Data Health HUD)</b>.
+                        </div>
+                    </div>
+                    <span class="argus-command-pill" style="border-color: rgba(46,160,67,0.5); color: #3fb950; font-weight:700;">ATTIVO IN SESSIONE</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            c_arch_act1, c_arch_act2 = st.columns([2.5, 1.5])
+            with c_arch_act1:
+                if st.button("🚀 Avvia Subito Analisi Quantitativa ARGUS", key="btn_run_active_archetype_now", type="primary", use_container_width=True):
+                    st.session_state["auto_run_pipeline_requested"] = True
+                    st.rerun()
+            with c_arch_act2:
+                if st.button("🗑️ Rimuovi Scenario / Resetta", key="btn_clear_active_archetype", type="secondary", use_container_width=True):
+                    _clear_active_archetype()
+            st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+
         arch_c1, arch_c2, arch_c3 = st.columns(3)
         with arch_c1:
-            st.markdown("""
-            **🚀 Giovane Accumulatore**
+            badge_young = " <span style='color:#3fb950; font-size:11px; font-weight:700;'>[● ATTIVO]</span>" if active_code == "young_accumulator" else ""
+            st.markdown(f"""
+            **🚀 Giovane Accumulatore**{badge_young}
             - **Rischio**: Aggressivo (25 anni)
             - **Asset**: Global ETF, QQQ, Big Tech, Crypto
             - **PAC**: €850/mese su stipendio in crescita
             """)
-            if st.button("Carica Giovane Accumulatore", key="btn_load_arch_young", use_container_width=True):
-                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine
-                with st.spinner("⏳ Generazione portafoglio quantitativo in corso..."):
-                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-                    res_arch = sim_eng.simulate("young_accumulator", years=3)
-                    st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
-                    st.session_state["portfolio_name"] = "Archetipo: Giovane Accumulatore"
-                    st.session_state.pop("session_cleared", None)
-                    st.session_state.pop("pipeline_done", None)
-                    st.rerun()
+            col_b1_a, col_b1_b = st.columns([1.2, 1])
+            with col_b1_a:
+                if st.button("⚡ 1-Click Analisi", key="btn_load_run_young", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
+                    _execute_archetype_load("young_accumulator", auto_run=True)
+            with col_b1_b:
+                lbl_y = "Ricarica" if active_code == "young_accumulator" else "Carica Dati"
+                if st.button(lbl_y, key="btn_load_arch_young", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
+                    _execute_archetype_load("young_accumulator", auto_run=False)
+
         with arch_c2:
-            st.markdown("""
-            **🏖️ FIRE / Decumulo**
+            badge_fire = " <span style='color:#3fb950; font-size:11px; font-weight:700;'>[● ATTIVO]</span>" if active_code == "fire_decumulation" else ""
+            st.markdown(f"""
+            **🏖️ FIRE / Decumulo**{badge_fire}
             - **Rischio**: Conservativo / Cedolare
             - **Asset**: Dividend Aristocrats, BND Bond, Value
             - **Decumulo**: SWR 3.5% costante, zero debiti
             """)
-            if st.button("Carica FIRE Decumulo", key="btn_load_arch_fire", use_container_width=True):
-                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine
-                with st.spinner("⏳ Generazione portafoglio quantitativo in corso..."):
-                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-                    res_arch = sim_eng.simulate("fire_decumulation", years=3)
-                    st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
-                    st.session_state["portfolio_name"] = "Archetipo: FIRE Decumulo"
-                    st.session_state.pop("session_cleared", None)
-                    st.session_state.pop("pipeline_done", None)
-                    st.rerun()
+            col_b2_a, col_b2_b = st.columns([1.2, 1])
+            with col_b2_a:
+                if st.button("⚡ 1-Click Analisi", key="btn_load_run_fire", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
+                    _execute_archetype_load("fire_decumulation", auto_run=True)
+            with col_b2_b:
+                lbl_f = "Ricarica" if active_code == "fire_decumulation" else "Carica Dati"
+                if st.button(lbl_f, key="btn_load_arch_fire", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
+                    _execute_archetype_load("fire_decumulation", auto_run=False)
+
         with arch_c3:
-            st.markdown("""
-            **👑 HNWI / Famiglia**
+            badge_hnwi = " <span style='color:#3fb950; font-size:11px; font-weight:700;'>[● ATTIVO]</span>" if active_code == "hnwi_family" else ""
+            st.markdown(f"""
+            **👑 HNWI / Famiglia**{badge_hnwi}
             - **Rischio**: Multi-Asset Istituzionale (€4.0M)
             - **Asset**: Big Tech, Global ETF, Bond, Gold, Watches
             - **Wealth**: Mutuo francese, affitti, max pensione
             """)
-            if st.button("Carica HNWI Famiglia", key="btn_load_arch_hnwi", use_container_width=True):
-                from scripts.generate_realistic_portfolio import PortfolioSimulationEngine
-                with st.spinner("⏳ Generazione portafoglio quantitativo in corso..."):
-                    sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
-                    res_arch = sim_eng.simulate("hnwi_family", years=3)
-                    st.session_state["df_raw_injected"] = res_arch.trading_transactions_df
-                    st.session_state["portfolio_name"] = "Archetipo: HNWI Famiglia"
-                    st.session_state.pop("session_cleared", None)
-                    st.session_state.pop("pipeline_done", None)
-                    st.rerun()
+            col_b3_a, col_b3_b = st.columns([1.2, 1])
+            with col_b3_a:
+                if st.button("⚡ 1-Click Analisi", key="btn_load_run_hnwi", type="primary", use_container_width=True, help="Genera l'archetipo, registra su DB ed esegue immediatamente l'analisi completa."):
+                    _execute_archetype_load("hnwi_family", auto_run=True)
+            with col_b3_b:
+                lbl_h = "Ricarica" if active_code == "hnwi_family" else "Carica Dati"
+                if st.button(lbl_h, key="btn_load_arch_hnwi", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
+                    _execute_archetype_load("hnwi_family", auto_run=False)
 
     col_ds_sel, col_ds_modal, col_ds_tpl = st.columns([2.6, 1.0, 1.0])
     with col_ds_sel:
@@ -634,13 +709,21 @@ with tab_ingest:
                 except Exception as ex:
                     st.error(f"❌ Errore durante la sincronizzazione Google Sheets: {ex}")
     else:
+        is_arch_active = bool(st.session_state.get("active_archetype_code") or st.session_state.get("df_raw_injected") is not None)
+        if is_arch_active and st.session_state.get("df_raw_injected") is not None:
+            df_raw = st.session_state["df_raw_injected"].copy().astype(str)
+            st.info(f"🧪 **Scenario Didattico Attivo**: `{st.session_state.get('portfolio_name', 'Archetipo')}` con **{len(df_raw)} transazioni** simulate con solvibilità e date borsistiche conformi.")
+
         uploaded_file = st.file_uploader(
             "Trascina qui il tuo file CSV esportato dal broker (o usa il template ARGUS):",
             type=["csv", "xlsx", "xls", "txt"],
             help="Carica il file in formato CSV, Excel o TXT. L'Auto-Detector riconoscerà automaticamente la struttura del broker."
         )
-        if uploaded_file:
+        if uploaded_file and not st.session_state.get("archetype_just_injected"):
             st.session_state.pop("df_raw_injected", None)
+            st.session_state.pop("active_archetype_code", None)
+            st.session_state.pop("active_archetype_name", None)
+            st.session_state.pop("keep_archetype_expander_open", None)
             from core.ingestion_utils import read_tabular_stream
             try:
                 df_raw = read_tabular_stream(uploaded_file.getvalue(), filename=uploaded_file.name).astype(str)
@@ -652,9 +735,8 @@ with tab_ingest:
                 if not st.session_state.get("portfolio_name") or st.session_state.get("portfolio_name") == "Nessun Portafoglio (In attesa)":
                     auto_name = os.path.splitext(uploaded_file.name)[0].replace("_", " ").replace("-", " ").title()
                     st.session_state["portfolio_name"] = auto_name
-        elif st.session_state.get("df_raw_injected") is not None:
-            df_raw = st.session_state["df_raw_injected"].copy().astype(str)
-            st.info(f"🧪 **Scenario Didattico Attivo**: `{st.session_state.get('portfolio_name', 'Archetipo')}` con **{len(df_raw)} transazioni** simulate con solvibilità e date borsistiche conformi.")
+        elif uploaded_file and st.session_state.get("archetype_just_injected"):
+            st.caption("ℹ️ Un file è presente nel caricatore, ma lo Scenario Didattico ha la precedenza. Clicca su 'Rimuovi Scenario' nell'expander in alto se desideri analizzare il file.")
 
     if st.session_state.get("pipeline_done"):
         current_wf_step = 3
@@ -681,7 +763,11 @@ with tab_ingest:
         }
         selected_broker_key = broker_key_map.get(data_source, "auto")
 
-        if selected_broker_key != "standard":
+        is_archetype = bool(st.session_state.get("active_archetype_code") or st.session_state.get("df_raw_injected") is not None)
+        if is_archetype:
+            arch_pname = st.session_state.get("active_archetype_name") or st.session_state.get("portfolio_name", "Archetipo")
+            st.success(f"✅ Scenario Didattico Verificato: **🧪 {arch_pname}** ({len(df_raw)} transazioni normalizzate per standard ARGUS).")
+        elif selected_broker_key != "standard":
             from core.adapters.broker_hub import parse_broker_csv
             try:
                 with st.spinner("⏳ Analisi struttura broker e normalizzazione ISIN via Multi-Broker Hub..."):
@@ -847,8 +933,9 @@ with tab_ingest:
 
             st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
             run_fetch = st.button("🚀 Avvia Analisi Quantitativa ARGUS", type="primary", use_container_width=True, key="btn_run_argus_pipeline")
+            auto_run = st.session_state.pop("auto_run_pipeline_requested", False)
 
-            if run_fetch:
+            if run_fetch or auto_run:
                 if not offline_mode:
                     try:
                         engine = get_db_engine(db_user, db_pass, db_host, int(db_port), db_name)
