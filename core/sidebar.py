@@ -525,48 +525,303 @@ def render_settings_status_hud(current_module: str = "risk") -> None:
     """, unsafe_allow_html=True)
 
 
-@st.dialog("⚙️ Impostazioni Globali & Database", width="large")
+@st.dialog("⚙️ Impostazioni Globali & Parametri Engine", width="large")
 def render_settings_dialog(current_module: str = "risk") -> None:
-    """Modale istituzionale centralizzato e perfettamente visibile per le configurazioni globali."""
+    """Modale istituzionale centralizzato e perfettamente visibile per le configurazioni globali e dei motori Risk/Wealth."""
     init_settings_session_state(is_wealth_mode=(current_module == "wealth"))
     is_wealth = (current_module == "wealth")
+    badge_tab = "🏛️ Parametri Wealth" if is_wealth else "📊 Parametri Risk"
 
     render_settings_status_hud(current_module=current_module)
 
-    tab_pref, tab_conn = st.tabs(["🎨 Preferenze", "🌐 Database & Rete"])
+    tab_pref, tab_mod, tab_conn = st.tabs(["🎨 Preferenze Globali", badge_tab, "🌐 Database & Rete"])
 
+    # ── TAB 1: PREFERENZE GLOBALI ─────────────────────────────
     with tab_pref:
         col_g1, col_g2 = st.columns(2)
         with col_g1:
             curr_opts = ["EUR", "USD", "CHF", "GBP"]
             curr_active = st.session_state.get("base_currency", "EUR")
             curr_idx = curr_opts.index(curr_active) if curr_active in curr_opts else 0
-            sel_curr = st.selectbox("Valuta Base", curr_opts, index=curr_idx, key="sb_base_currency")
+            sel_curr = st.selectbox(
+                "Valuta Base Contabile",
+                curr_opts,
+                index=curr_idx,
+                key="sb_base_currency",
+                help="Valuta contabile e di reporting per il calcolo di controvalori e VaR."
+            )
             st.session_state.base_currency = sel_curr
 
         with col_g2:
+            conf_opts = [0.90, 0.95, 0.99]
+            conf_active = float(st.session_state.get("confidence_level", 0.95))
+            conf_idx = conf_opts.index(conf_active) if conf_active in conf_opts else 1
+            sel_conf = st.selectbox(
+                "Livello Confidenza VaR Globale",
+                conf_opts,
+                index=conf_idx,
+                format_func=lambda x: f"{int(round(x * 100))}%",
+                key="sb_confidence_level",
+                help="Livello di confidenza statistica predefinito per il calcolo di Value at Risk ed Expected Shortfall."
+            )
+            st.session_state.confidence_level = float(sel_conf)
+
+        col_g3, col_g4 = st.columns(2)
+        with col_g3:
             lang_opts = ["it", "en"]
             curr_lang = 1 if st.session_state.get("locale", "it") == "en" else 0
             sel_lang = st.selectbox(
-                "Lingua",
+                "Lingua Interfaccia",
                 lang_opts,
                 index=curr_lang,
                 format_func=lambda x: "🇮🇹 IT" if x == "it" else "🇬🇧 EN",
-                key="sb_locale_select"
+                key="sb_locale_select",
+                help="Lingua interfaccia e localizzazione date/numeri."
             )
             st.session_state.locale = sel_lang
 
-        notat_opts = ["standard", "parentheses"]
-        curr_notat = 1 if st.session_state.get("accounting_notation", "standard") == "parentheses" else 0
-        sel_notat = st.selectbox(
-            "Notazione Numerica",
-            notat_opts,
-            index=curr_notat,
-            format_func=lambda x: "Standard (-€100)" if x == "standard" else "Wall Street ((€100))",
-            key="sb_accounting_select"
-        )
-        st.session_state.accounting_notation = sel_notat
+        with col_g4:
+            notat_opts = ["standard", "parentheses"]
+            curr_notat = 1 if st.session_state.get("accounting_notation", "standard") == "parentheses" else 0
+            sel_notat = st.selectbox(
+                "Notazione Numerica Contabile",
+                notat_opts,
+                index=curr_notat,
+                format_func=lambda x: "Standard (-€100)" if x == "standard" else "Wall Street ((€100))",
+                key="sb_accounting_select",
+                help="Standard: -€1.000 | Wall Street: (€1.000) per valori contabili negativi."
+            )
+            st.session_state.accounting_notation = sel_notat
 
+    # ── TAB 2: PARAMETRI SPECIFICI ENGINE (RISK / WEALTH) ─────
+    with tab_mod:
+        if not is_wealth:
+            # ── PARAMETRI SPECIFICI RISK ANALYTICS ──
+            col_r0, col_r1 = st.columns([1.2, 1.2])
+            with col_r0:
+                p_name = st.text_input(
+                    "Nome Portafoglio",
+                    value=st.session_state.get("portfolio_name", "Portafoglio Principale"),
+                    key="sb_port_name",
+                    help="Nome identificativo del portafoglio analizzato."
+                )
+                if p_name:
+                    st.session_state.portfolio_name = p_name
+
+            with col_r1:
+                method_opts = [
+                    "Parametrico (Cornish-Fisher)",
+                    "Storico (Historical Simulation)",
+                    "Monte Carlo (Geometric Brownian)"
+                ]
+                curr_method = st.session_state.get("risk_estimation_method", "Parametrico (Cornish-Fisher)")
+                m_idx = method_opts.index(curr_method) if curr_method in method_opts else 0
+                sel_method = st.selectbox(
+                    "Metodo Stima VaR Principale",
+                    method_opts,
+                    index=m_idx,
+                    key="sb_risk_method",
+                    help="Algoritmo di calcolo per Value at Risk ed Expected Shortfall."
+                )
+                st.session_state.risk_estimation_method = sel_method
+
+            col_r2, col_r3 = st.columns(2)
+            with col_r2:
+                lb_opts = ["Ultimo Anno (252g)", "Ultimi 3 Anni (756g)", "Ultimi 5 Anni (1260g)", "Storico Completo"]
+                curr_lb = st.session_state.get("risk_lookback_period", "Ultimo Anno (252g)")
+                lb_idx = lb_opts.index(curr_lb) if curr_lb in lb_opts else 0
+                sel_lb = st.selectbox(
+                    "Lookback Period",
+                    lb_opts,
+                    index=lb_idx,
+                    key="sb_risk_lookback",
+                    help="Finestra temporale storica utilizzata per calcolare volatilità e covarianze."
+                )
+                st.session_state.risk_lookback_period = sel_lb
+
+            with col_r3:
+                curr_decay = float(st.session_state.get("risk_decay_factor", 0.94))
+                sel_decay = st.slider(
+                    "Decay Fattore Volatilità EWMA (λ)",
+                    min_value=0.80,
+                    max_value=0.99,
+                    value=curr_decay,
+                    step=0.01,
+                    key="sb_risk_decay",
+                    help="Fattore di decadimento esponenziale EWMA per ponderare i rendimenti più recenti."
+                )
+                st.session_state.risk_decay_factor = sel_decay
+
+            col_b1, col_b2 = st.columns([1.1, 1.1])
+            with col_b1:
+                bench_options = ["SPY", "QQQ", "VWRL.L", "^GSPC", "^STOXX50E", "VWCE.MI", "URTH", "BTC-USD", "Custom..."]
+                current_bench = st.session_state.get("benchmark", "SPY")
+                b_idx = bench_options.index(current_bench) if current_bench in bench_options[:-1] else bench_options.index("Custom...")
+                sel_b = st.selectbox("Benchmark di Riferimento", bench_options, index=b_idx, key="sb_bench_select")
+                if sel_b == "Custom...":
+                    cust_b = st.text_input("Ticker Custom", value="" if current_bench in bench_options[:-1] else current_bench, key="sb_custom_bench").strip().upper()
+                    if cust_b:
+                        st.session_state.benchmark = cust_b
+                else:
+                    st.session_state.benchmark = sel_b
+
+            with col_b2:
+                from core.yield_curve import get_active_risk_free_rate
+                rf_mode_opts = ["Auto (Live Market)", "Manuale"]
+                rf_idx = 0 if st.session_state.get("rf_mode", "Auto (Live Market)") == "Auto (Live Market)" else 1
+                sel_rf_m = st.selectbox("Modalità Risk-Free (Rf)", rf_mode_opts, index=rf_idx, key="sb_rf_mode")
+                st.session_state.rf_mode = sel_rf_m
+
+            if st.session_state.rf_mode == "Manuale":
+                sel_rf_v = st.number_input(
+                    "Tasso Risk-Free Manuale %",
+                    min_value=0.0,
+                    max_value=25.0,
+                    value=float(st.session_state.get("custom_rf_rate_pct", 2.75)),
+                    step=0.25,
+                    format="%.2f",
+                    key="sb_custom_rf"
+                )
+                st.session_state.custom_rf_rate_pct = sel_rf_v
+            else:
+                active_rf_info = get_active_risk_free_rate(currency=st.session_state.base_currency)
+                st.caption(f"🏛️ Tasso Attivo: **{active_rf_info.get('rate_pct', 2.75):.2f}%** ({active_rf_info.get('currency', 'EUR')} - {'Live Yield Curve' if active_rf_info.get('is_live') else 'BCE/Fed reference'})")
+
+            with st.expander("ℹ️ Metodologia Tasso Privo di Rischio (Rf)", expanded=False):
+                st.markdown("""
+                **🏛️ Risk-Free Rate di Mercato ARGUS**
+                * **EUR**: BCE €STR (Euro Short-Term Rate) / Bund 3M (XEON.DE).
+                * **USD**: US 3M Treasury Bill (^IRX) / SOFR.
+                * **GBP**: Bank of England SONIA (CSH2.L).
+                * **CHF**: SNB SARON Swiss Overnight Rate.
+                * *Impatto*: Utilizzato come hurdle rate per Sharpe, Sortino, Treynor, Jensen's Alpha, Black-Scholes e WACC.
+                """)
+
+        else:
+            # ── PARAMETRI SPECIFICI WEALTH MANAGEMENT ──
+            p_name = st.text_input(
+                "Nome Profilo Patrimoniale",
+                value=st.session_state.get("portfolio_name", "Master Wealth"),
+                key="sb_port_name",
+                help="Nome identificativo dell'analisi patrimoniale e finanziaria."
+            )
+            if p_name:
+                st.session_state.portfolio_name = p_name
+
+            col_w1, col_w2 = st.columns(2)
+            with col_w1:
+                curr_horizon = int(st.session_state.get("wealth_planning_horizon_years", 25))
+                sel_horizon = st.slider("Orizzonte di Pianificazione (Anni)", min_value=5, max_value=50, value=curr_horizon, step=1, key="sb_wealth_horizon")
+                st.session_state.wealth_planning_horizon_years = sel_horizon
+            with col_w2:
+                curr_exp_ret = float(st.session_state.get("wealth_expected_return_pct", 6.50))
+                sel_exp_ret = st.slider("Rendimento Nominale Atteso (%)", min_value=0.0, max_value=15.0, value=curr_exp_ret, step=0.25, key="sb_wealth_exp_return")
+                st.session_state.wealth_expected_return_pct = sel_exp_ret
+
+            col_w3, col_w4 = st.columns([1.1, 0.9])
+            with col_w3:
+                curr_infl = float(st.session_state.get("wealth_inflation_rate_pct", 2.00))
+                sel_infl = st.slider("Inflazione Attesa (%)", min_value=0.0, max_value=10.0, value=curr_infl, step=0.25, key="sb_wealth_inflation")
+                st.session_state.wealth_inflation_rate_pct = sel_infl
+            with col_w4:
+                real_ret = sel_exp_ret - sel_infl
+                real_col = "#34d399" if real_ret >= 0 else "#f87171"
+                st.markdown(f"""
+                <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:10px; text-align:center; margin-top:14px;">
+                    <div style="font-size:9.5px; color:#94a3b8; text-transform:uppercase; font-weight:700;">Rendimento Reale Atteso</div>
+                    <div style="font-size:14px; font-weight:700; color:{real_col};">{real_ret:+.2f}% / anno</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            col_w5, col_w6 = st.columns(2)
+            with col_w5:
+                tax_regimes = ["Ordinario (26%)", "Riforma Unificata 2026 (26%)", "Agevolato Titoli Stato (12.5%)", "Dichiarativo / Quadro RW"]
+                t_idx = tax_regimes.index(st.session_state.get("wealth_tax_regime", "Ordinario (26%)")) if st.session_state.get("wealth_tax_regime") in tax_regimes else 0
+                sel_tax = st.selectbox("Regime Fiscale di Riferimento", tax_regimes, index=t_idx, key="sb_wealth_tax_regime")
+                st.session_state.wealth_tax_regime = sel_tax
+
+            with col_w6:
+                stress_scenarios = [
+                    "Base (Nessuno Shock)",
+                    "Stagflazione & Crisi Energetica",
+                    "Crisi Immobiliare & Stretta Creditizia",
+                    "Cigno Nero Sistemico (-40%)",
+                    "Shock Reddituale & Spesa Improvvisa"
+                ]
+                curr_stress = st.session_state.get("wealth_stress_scenario", "Base (Nessuno Shock)")
+                s_idx = stress_scenarios.index(curr_stress) if curr_stress in stress_scenarios else 0
+                sel_stress = st.selectbox("Scenario di Stress Predefinito", stress_scenarios, index=s_idx, key="sb_wealth_stress")
+                st.session_state.wealth_stress_scenario = sel_stress
+
+            # Modello di Budgeting & Regola FIRE
+            st.markdown("<hr style='margin: 10px 0 8px; border: none; border-top: 1px solid rgba(255,255,255,0.06);'>", unsafe_allow_html=True)
+            preset_options = ["50/30/20 Standard", "40/20/40 Aggressivo FIRE", "60/25/15 Prudenziale", "30/15/55 Super Frugale", "Personalizzato (Custom %)"]
+            preset_map = {
+                "50/30/20 Standard": (50.0, 30.0, 20.0),
+                "40/20/40 Aggressivo FIRE": (40.0, 20.0, 40.0),
+                "60/25/15 Prudenziale": (60.0, 25.0, 15.0),
+                "30/15/55 Super Frugale": (30.0, 15.0, 55.0),
+            }
+            current_preset = st.session_state.get("wealth_budget_preset", "50/30/20 Standard")
+            p_idx = preset_options.index(current_preset) if current_preset in preset_options else 0
+
+            def _on_dlg_preset_change():
+                sel_p = st.session_state.get("sb_wealth_preset_sel")
+                if sel_p in preset_map:
+                    pn, pw, ps = preset_map[sel_p]
+                    st.session_state.wealth_budget_preset = sel_p
+                    st.session_state.wealth_budget_needs_pct = pn
+                    st.session_state.wealth_budget_wants_pct = pw
+                    st.session_state.wealth_budget_savings_pct = ps
+                    st.session_state["sb_wb_needs"] = pn
+                    st.session_state["sb_wb_wants"] = pw
+                    st.session_state["sb_wb_savings"] = ps
+
+            sel_preset = st.selectbox(
+                "Modello di Budgeting Cash Flow",
+                preset_options,
+                index=p_idx,
+                key="sb_wealth_preset_sel",
+                on_change=_on_dlg_preset_change,
+                help="Template istituzionale per la suddivisione ideale del cash flow netto."
+            )
+
+            col_n, col_w, col_s = st.columns(3)
+            with col_n:
+                n_val = st.number_input("Needs % (Bisogni)", min_value=5.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_needs_pct", 50.0)), step=5.0, format="%.0f", key="sb_wb_needs")
+                st.session_state.wealth_budget_needs_pct = n_val
+            with col_w:
+                w_val = st.number_input("Wants % (Svago)", min_value=0.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_wants_pct", 30.0)), step=5.0, format="%.0f", key="sb_wb_wants")
+                st.session_state.wealth_budget_wants_pct = w_val
+            with col_s:
+                s_val = st.number_input("Savings % (Risparmio)", min_value=0.0, max_value=90.0, value=float(st.session_state.get("wealth_budget_savings_pct", 20.0)), step=5.0, format="%.0f", key="sb_wb_savings")
+                st.session_state.wealth_budget_savings_pct = s_val
+
+            total_split = n_val + w_val + s_val
+            if abs(total_split - 100.0) > 0.01:
+                st.caption(f"⚠️ Somma attuale: **{total_split:.0f}%** (Target ideale: 100%)")
+            else:
+                st.caption("✅ Ripartizione bilanciata al 100%")
+
+            col_swr, col_age = st.columns(2)
+            with col_swr:
+                swr_val = st.number_input("SWR FIRE % (Safe Withdrawal Rate)", min_value=1.5, max_value=8.0, value=float(st.session_state.get("wealth_fire_swr", 4.0)), step=0.1, format="%.1f", key="sb_wealth_swr_input", help="Tasso di prelievo annuo sostenibile per il calcolo del target FIRE.")
+                st.session_state.wealth_fire_swr = swr_val
+            with col_age:
+                age_val = st.number_input("Età Target Pensionamento", min_value=30, max_value=75, value=int(st.session_state.get("wealth_target_retirement_age", 67)), step=1, key="sb_wealth_age_input", help="Età anagrafica prevista per l'uscita dal lavoro o rendita da capitale.")
+                st.session_state.wealth_target_retirement_age = age_val
+
+            with st.expander("ℹ️ Guida Metodologica Wealth & FIRE", expanded=False):
+                st.markdown("""
+                **🏛️ Modello di Pianificazione Patrimoniale ARGUS**
+                * **50% Bisogni (Needs)**: Casa, mutuo/affitto, utenze, spesa alimentare, salute.
+                * **30% Svago (Wants)**: Viaggi, ristoranti, hobby e tempo libero.
+                * **20% Risparmio (Savings)**: PAC azionario/obbligazionario, fondi pensione.
+                * **SWR (Safe Withdrawal Rate)**: Prelievo annuo sostenibile per 30+ anni (Trinity Study, def. 4.0%).
+                * **Deducibilità Pensione**: Fino a **€ 5.164,57** annui deducibili dall'imponibile IRPEF (art. 51 TUIR).
+                """)
+
+    # ── TAB 3: DATABASE & RETE ────────────────────────────────
     with tab_conn:
         env_opts = ["Auto (Ibrido)", "Live Yahoo Finance", "DuckDB Veloce", "Local SQLite"]
         curr_env = st.session_state.get("data_environment", "Auto (Ibrido)")
@@ -649,12 +904,12 @@ def render_settings_dialog(current_module: str = "risk") -> None:
 def render_settings_sidebar(current_module: str = "risk") -> None:
     """
     Renderizza l'area 'Impostazioni Globali & Utility' in formato compatto e non invasivo:
-    - Pulsante '⚙️ Impostazioni Globali' che apre il modale centralizzato @st.dialog.
+    - Pulsante '⚙️ Impostazioni Globali & Parametri' che apre il modale centralizzato @st.dialog.
     - Riga micro-azioni compatte '🔄 Reset' e '🧹 Svuota Cache'.
     """
     init_settings_session_state(is_wealth_mode=(current_module == "wealth"))
 
-    if st.button("⚙️ Impostazioni Globali", key="sb_btn_open_settings_dialog", use_container_width=True, help="Apri le impostazioni di sistema, preferenze e database in un modale centralizzato a schermo intero."):
+    if st.button("⚙️ Impostazioni Globali & Parametri", key="sb_btn_open_settings_dialog", use_container_width=True, help="Apri le impostazioni di sistema, preferenze e parametri dei motori in un modale centralizzato."):
         render_settings_dialog(current_module=current_module)
 
     # Micro-azioni rapide
@@ -916,6 +1171,40 @@ def render_sidebar():
         if "sb_data_environment" in st.session_state:
             st.session_state.data_environment = st.session_state.sb_data_environment
 
+        # Sincronizzazione parametri Risk Engine
+        if "sb_port_name" in st.session_state and st.session_state.sb_port_name:
+            st.session_state.portfolio_name = st.session_state.sb_port_name
+        if "sb_risk_method" in st.session_state:
+            st.session_state.risk_estimation_method = st.session_state.sb_risk_method
+        if "sb_risk_lookback" in st.session_state:
+            st.session_state.risk_lookback_period = st.session_state.sb_risk_lookback
+        if "sb_risk_decay" in st.session_state:
+            st.session_state.risk_decay_factor = float(st.session_state.sb_risk_decay)
+
+        # Sincronizzazione parametri Wealth Engine
+        if "sb_wealth_horizon" in st.session_state:
+            st.session_state.wealth_planning_horizon_years = int(st.session_state.sb_wealth_horizon)
+        if "sb_wealth_exp_return" in st.session_state:
+            st.session_state.wealth_expected_return_pct = float(st.session_state.sb_wealth_exp_return)
+        if "sb_wealth_inflation" in st.session_state:
+            st.session_state.wealth_inflation_rate_pct = float(st.session_state.sb_wealth_inflation)
+        if "sb_wealth_tax_regime" in st.session_state:
+            st.session_state.wealth_tax_regime = st.session_state.sb_wealth_tax_regime
+        if "sb_wealth_stress" in st.session_state:
+            st.session_state.wealth_stress_scenario = st.session_state.sb_wealth_stress
+        if "sb_wealth_preset_sel" in st.session_state:
+            st.session_state.wealth_budget_preset = st.session_state.sb_wealth_preset_sel
+        if "sb_wb_needs" in st.session_state:
+            st.session_state.wealth_budget_needs_pct = float(st.session_state.sb_wb_needs)
+        if "sb_wb_wants" in st.session_state:
+            st.session_state.wealth_budget_wants_pct = float(st.session_state.sb_wb_wants)
+        if "sb_wb_savings" in st.session_state:
+            st.session_state.wealth_budget_savings_pct = float(st.session_state.sb_wb_savings)
+        if "sb_wealth_swr_input" in st.session_state:
+            st.session_state.wealth_fire_swr = float(st.session_state.sb_wealth_swr_input)
+        if "sb_wealth_age_input" in st.session_state:
+            st.session_state.wealth_target_retirement_age = int(st.session_state.sb_wealth_age_input)
+
         from core.yield_curve import get_active_risk_free_rate
         if "rf_mode" not in st.session_state: st.session_state.rf_mode = "Auto (Live Market)"
         if "custom_rf_rate_pct" not in st.session_state: st.session_state.custom_rf_rate_pct = 2.75
@@ -955,6 +1244,10 @@ def render_sidebar():
         active_port_label = port_label if len(port_label) <= 26 else f"{port_label[:24]}..."
 
         if is_wealth_mode:
+            w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50))
+            w_wants = int(st.session_state.get("wealth_budget_wants_pct", 30))
+            w_savings = int(st.session_state.get("wealth_budget_savings_pct", 20))
+            w_rule_label = f"{w_needs}/{w_wants}/{w_savings}"
             is_offline = st.session_state.offline_mode
             w_status_badge = (
                 '<span style="font-size:10px; font-weight:800; color:#ff9900; background:rgba(255, 153, 0, 0.15); padding: 2px 7px; border-radius:12px; letter-spacing:0.5px;">🟡 OFFLINE</span>'
@@ -974,7 +1267,11 @@ def render_sidebar():
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:10.5px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 5px;">
                     <span>🗄️ <b style="color:#c9d1d9;">{w_db_label}</b></span>
-                    <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🏷️ <b style="color:#34d399;">50/30/20</b></span>
+                    <span>💱 <b style="color:#c9d1d9;">{st.session_state.base_currency}</b> &bull; 🏷️ <b style="color:#34d399;">{w_rule_label}</b></span>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:#8b949e; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 4px; margin-top: 4px;">
+                    <span>🔥 SWR <b style="color:#f59e0b;">{st.session_state.get('wealth_fire_swr', 4.0):.1f}%</b></span>
+                    <span style="color:#8b949e; font-size:9.5px;">🎯 Pensione: <b style="color:#38bdf8;">{st.session_state.get('wealth_target_retirement_age', 67)}a</b></span>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1041,10 +1338,6 @@ def render_sidebar():
                 </div>
             </div>
             """, unsafe_allow_html=True)
-
-            if not has_port:
-                if st.button("💼 Carica Portafoglio", key="sb_btn_goto_cr", use_container_width=True, type="primary", help="Apri la Control Room per caricare un portafoglio o selezionare un archetipo."):
-                    switch_to_page("0_Control_Room.py")
 
         st.markdown('<div class="sidebar-section-header" style="margin-top: 10px; margin-bottom: 4px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px;">CAMBIA AMBIENTE</div>', unsafe_allow_html=True)
 
