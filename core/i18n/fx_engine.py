@@ -107,7 +107,7 @@ class ECBRateProvider:
         import urllib.request
         url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "ARGUS/8.2.0 Financial Analytics"})
+            req = urllib.request.Request(url, headers={"User-Agent": "ARGUS/9.0.0 Financial Analytics"})
             with urllib.request.urlopen(req, timeout=4) as response:
                 content = response.read()
 

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-risk"
-version = "8.4.0"
+version = "9.0.0"
 description = "ARGUS — Headless Quantitative Risk Engine, Portfolio Optimization & Bitemporal Analytics"
 readme = "README.md"
 requires-python = ">=3.11"

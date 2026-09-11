@@ -217,7 +217,7 @@ def test_session_snapshot_json_export_and_import():
     snapshot = ctx.export_session_snapshot()
 
     assert isinstance(snapshot, dict)
-    assert snapshot["schema_version"] == "8.1.0"
+    assert snapshot["schema_version"] == "9.0.0"
     assert snapshot["risk"]["portfolio_name"] == "Quant Snapshot Portfolio"
     assert snapshot["risk"]["benchmark"] == "IWDA.AS"
     assert len(snapshot["risk"]["positions"]) == 2

@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-556%2F556%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-597%2F597%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -15,9 +15,9 @@
 
 ---
 
-## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v8.4.0)
+## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.0.0)
 
-ARGUS v8.4.0 introduce il **disaccoppiamento completo del motore quantitativo dal front-end Streamlit**, trasformando ARGUS in un **Headless Analytical Package** installabile e integrabile in pipeline di produzione, notebook Jupyter e architetture a microservizi:
+ARGUS v9.0.0 introduce il **disaccoppiamento completo del motore quantitativo dal front-end Streamlit**, trasformando ARGUS in un **Headless Analytical Package** installabile e integrabile in pipeline di produzione, notebook Jupyter e architetture a microservizi:
 
 * **📦 Python Package Headless (`argus-risk`)**:
   ```bash
@@ -583,7 +583,7 @@ argus-risk-analytics/
 │   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
 │   ├── security_engine.py       # CWE-1236 Anti-Formula Injection, PII Masking & ArgusDataVault AES
-│   ├── sidebar.py               # Navigation Rail v6.5.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v9.0.0, Execution Mode & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
@@ -620,7 +620,7 @@ argus-risk-analytics/
 │   ├── CSV_Format_Specification.md # Specifica tecnica formato CSV & DeGiro
 │   ├── DESIGN.md                # Design System & UI Specs
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v7.0.0)
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v9.0.0)
 │   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone
 │   ├── argus-architecture.json  # Specifica Architetturale JSON IR
 │   ├── argus_banner.jpg         # Banner grafico del progetto
@@ -801,4 +801,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v8.4.0 Institutional Enterprise Release.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v9.0.0 Institutional Enterprise Release.*
