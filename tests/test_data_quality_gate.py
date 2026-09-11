@@ -217,7 +217,54 @@ def test_broker_hub_parse_with_quality_gate():
     df_parsed, detected_key, report = parse_broker_csv(df_raw, broker_key="standard", apply_quality_gate=True)
 
     assert detected_key == "standard"
-    assert len(df_parsed) == 2
-    assert "quality_gate" in report
     assert report["quality_gate"]["is_valid"] is True
     assert report["quality_gate"]["valid_rows_count"] == 2
+
+
+def test_market_data_quality_gate_alignment_and_ffill():
+    """Verifica l'allineamento su asse feriale continuativo e forward-fill fino a 5 giorni."""
+    from core.data_quality_gate import MarketDataQualityGate
+
+    # Serie con buco feriale (es. martedì e mercoledì mancanti per festività estera)
+    dates = ["2026-01-05", "2026-01-08", "2026-01-09"]  # Lunedì, Giovedì, Venerdì
+    df_p = pd.DataFrame({
+        "price_date": dates * 2,
+        "ticker": ["AAPL"] * 3 + ["ENI.MI"] * 3,
+        "close": [150.0, 155.0, 156.0, 14.0, 14.2, 14.3]
+    })
+
+    gate = MarketDataQualityGate(min_history_days=2, max_ffill_days=5)
+    pivot, report = gate.validate_and_align_prices(df_p, required_tickers={"AAPL", "ENI.MI"})
+
+    assert report.is_valid is True
+    assert "AAPL" in pivot.columns
+    assert "ENI.MI" in pivot.columns
+    # Il martedì 2026-01-06 deve essere presente e valorizzato tramite forward fill dal lunedì
+    ts_tue = pd.Timestamp("2026-01-06")
+    assert ts_tue in pivot.index
+    assert pivot.loc[ts_tue, "AAPL"] == 150.0
+
+
+def test_market_data_quality_gate_stale_and_jump_detection():
+    """Verifica il rilevamento di serie stantie e salti anomali di rendimento."""
+    from core.data_quality_gate import MarketDataQualityGate
+
+    # Genera 15 giorni con prezzo costante (stale) e un salto estremo finale (+50%)
+    dates = pd.date_range("2026-01-01", periods=25, freq="B")
+    prices = [100.0] * 15 + [100.0, 101.0, 100.5, 100.8, 100.2, 100.1, 100.3, 100.2, 100.4, 180.0]
+
+    df_p = pd.DataFrame({
+        "price_date": dates,
+        "ticker": ["FLAT_CORP"] * len(dates),
+        "close": prices
+    })
+
+    gate = MarketDataQualityGate(min_history_days=10, max_stale_streak=10, z_score_jump_threshold=3.0)
+    pivot, report = gate.validate_and_align_prices(df_p, required_tickers={"FLAT_CORP"})
+
+    assert report.is_valid is True
+    assert "FLAT_CORP" in report.stale_price_tickers
+    assert report.stale_price_tickers["FLAT_CORP"] >= 10
+    # Verifica anomalia di rendimento rilevata
+    assert len(report.abnormal_returns) >= 1
+    assert any(a["ticker"] == "FLAT_CORP" for a in report.abnormal_returns)

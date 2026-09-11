@@ -505,6 +505,105 @@ class WorkspaceContext:
 
             return False
 
+    def export_session_snapshot(self) -> Dict[str, Any]:
+        """
+        Esporta lo stato completo del WorkspaceContext in un dizionario JSON-serializzabile puro.
+        Ideale per backup deterministico, audit contabile o condivisione multi-dispositivo senza pickle.
+        """
+        with self._LOCK:
+            if not self.risk.results:
+                self.sync_from_legacy_session_state()
+            pos = self.risk.results.get("positions") if (self.risk.results and isinstance(self.risk.results, dict)) else None
+            pos_records = pos.to_dict(orient="records") if isinstance(pos, pd.DataFrame) else []
+
+            df_tx = self.risk.results.get("df_tx") if (self.risk.results and isinstance(self.risk.results, dict)) else None
+            tx_records = df_tx.to_dict(orient="records") if isinstance(df_tx, pd.DataFrame) else []
+
+            metrics = self.risk.results.get("metrics", {}) if (self.risk.results and isinstance(self.risk.results, dict)) else {}
+
+            return {
+                "schema_version": "8.1.0",
+                "session_id": self.session_id,
+                "exported_at": datetime.now().isoformat(),
+                "risk": {
+                    "portfolio_id": self.risk.portfolio_id,
+                    "portfolio_name": self.risk.portfolio_name,
+                    "run_id": self.risk.run_id,
+                    "base_currency": self.risk.base_currency,
+                    "benchmark": self.risk.benchmark,
+                    "risk_free_rate": self.risk.risk_free_rate,
+                    "pipeline_done": self.risk.pipeline_done,
+                    "is_live_active": self.risk.is_live_active,
+                    "metrics": metrics,
+                    "positions": pos_records,
+                    "transactions": tx_records
+                },
+                "wealth": {
+                    "profile_id": self.wealth.profile_id,
+                    "profile_name": self.wealth.profile_name,
+                    "linked_risk_ids": self.wealth.linked_risk_ids
+                },
+                "ui": {
+                    "page_subtabs": dict(self.ui.page_subtabs),
+                    "active_filters": dict(self.ui.active_filters),
+                    "target_tickers": dict(self.ui.target_tickers),
+                    "selected_scenarios": list(self.ui.selected_scenarios)
+                }
+            }
+
+    def import_session_snapshot(self, snapshot: Dict[str, Any]) -> bool:
+        """
+        Ripristina lo stato completo del WorkspaceContext da uno snapshot JSON validato.
+        Garantisce compatibilità e isolamento senza passare da serializzazione binaria.
+        """
+        if not snapshot or not isinstance(snapshot, dict):
+            return False
+
+        with self._LOCK:
+            risk_data = snapshot.get("risk", {})
+            self.risk.portfolio_id = risk_data.get("portfolio_id")
+            self.risk.portfolio_name = risk_data.get("portfolio_name", "Portfolio")
+            self.risk.run_id = risk_data.get("run_id", "RESTORED")
+            self.risk.base_currency = risk_data.get("base_currency", "EUR")
+            self.risk.benchmark = risk_data.get("benchmark", "SPY")
+            self.risk.risk_free_rate = float(risk_data.get("risk_free_rate", 0.03))
+            self.risk.pipeline_done = bool(risk_data.get("pipeline_done", True))
+            self.risk.is_live_active = bool(risk_data.get("is_live_active", True))
+
+            # Ricostruzione risultati analitici
+            pos_records = risk_data.get("positions", [])
+            tx_records = risk_data.get("transactions", [])
+            df_pos = pd.DataFrame(pos_records) if pos_records else pd.DataFrame()
+            df_tx = pd.DataFrame(tx_records) if tx_records else pd.DataFrame()
+
+            self.risk.results = {
+                "positions": df_pos,
+                "df_tx": df_tx,
+                "metrics": risk_data.get("metrics", {}),
+                "portfolio_name": self.risk.portfolio_name,
+                "base_currency": self.risk.base_currency,
+                "benchmark": self.risk.benchmark
+            }
+            if not df_pos.empty or risk_data.get("metrics"):
+                self.risk.is_live_active = True
+                self.risk.pipeline_done = True
+
+            wealth_data = snapshot.get("wealth", {})
+            self.wealth.profile_id = wealth_data.get("profile_id", 1)
+            self.wealth.profile_name = wealth_data.get("profile_name", "Profilo Principale")
+            self.wealth.linked_risk_ids = wealth_data.get("linked_risk_ids", [])
+
+            ui_data = snapshot.get("ui", {})
+            self.ui.page_subtabs = ui_data.get("page_subtabs", {})
+            self.ui.active_filters = ui_data.get("active_filters", {})
+            self.ui.target_tickers = ui_data.get("target_tickers", {})
+            self.ui.selected_scenarios = ui_data.get("selected_scenarios", [])
+
+            self.version += 1
+            self.is_dirty = True
+            self.sync_to_legacy_session_state()
+            return True
+
     def clear_persisted_cache(self):
         """Elimina il file di cache associato a questa sessione."""
         with self._LOCK:
