@@ -231,3 +231,50 @@ def test_universal_ledger_sync_bridge():
     is_valid, _, cnt = b_engine.verify_audit_chain_integrity()
     assert is_valid is True
     assert cnt >= 1
+
+
+@pytest.mark.skipif(not HAS_DUCKDB, reason="DuckDB non installato nell'ambiente")
+def test_ingest_portfolio_dataframe_and_available_portfolios():
+    """Verifica l'ingestione diretta di un DataFrame utente e la scoperta dei portafogli."""
+    b_engine = BitemporalLedgerEngine(db_path=":memory:")
+    
+    # Inizialmente vuoto o solo demo
+    assert b_engine.get_available_portfolios() == []
+    
+    # Ingestione DataFrame con schema standard ARGUS
+    df_user = pd.DataFrame([
+        {"tx_date": "2025-01-15 10:00:00", "ticker": "CSSPX.MI", "tx_type": "buy", "quantity": 20.0, "price": 450.0, "currency": "EUR", "fees": 5.0},
+        {"tx_date": "2025-02-20 11:00:00", "ticker": "MEUD.PA", "tx_type": "buy", "quantity": 100.0, "price": 80.0, "currency": "EUR", "fees": 3.0},
+        {"tx_date": "2025-03-01 09:30:00", "ticker": "CSSPX.MI", "tx_type": "dividend", "quantity": 20.0, "price": 2.5, "currency": "EUR", "fees": 0.0},
+    ])
+    
+    rows = b_engine.ingest_portfolio_dataframe(df_user, portfolio_id="PORTAFOGLIO_ALESSANDRO")
+    assert rows == 3
+    
+    # Verifica elenco portafogli disponibili
+    available = b_engine.get_available_portfolios()
+    assert "PORTAFOGLIO_ALESSANDRO" in available
+    
+    # Verifica query time-travel prima e dopo il dividendo
+    # 1. Al 25 Febbraio (prima del dividendo del 1 Marzo)
+    df_feb = b_engine.time_travel_query("PORTAFOGLIO_ALESSANDRO", "2025-02-25 23:59:59")
+    # Include: 1 Cash Init + 2 Buy = 3 transazioni
+    assert len(df_feb) == 3
+    assert set(df_feb["asset_id"].tolist()) == {"EUR_CASH", "CSSPX.MI", "MEUD.PA"}
+    
+    # 2. Al 5 Marzo (dopo il dividendo)
+    df_mar = b_engine.time_travel_query("PORTAFOGLIO_ALESSANDRO", "2025-03-05 23:59:59")
+    assert len(df_mar) == 4
+    
+    # 3. Ricostruzione contabile Point-in-Time
+    recon = b_engine.reconstruct_portfolio_at_times("PORTAFOGLIO_ALESSANDRO", "2025-03-05 23:59:59")
+    assert recon["portfolio_id"] == "PORTAFOGLIO_ALESSANDRO"
+    assert recon["positions_count"] == 2  # CSSPX e MEUD
+    assert recon["cash_balance_eur"] > 0
+    assert recon["total_book_value_eur"] > 0
+    
+    # 4. Verifica integrità crittografica della catena
+    is_valid, msg, cnt = b_engine.verify_audit_chain_integrity()
+    assert is_valid is True
+    assert cnt >= 1
+

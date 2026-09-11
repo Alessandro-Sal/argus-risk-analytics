@@ -420,7 +420,7 @@ if st.session_state.get("pipeline_done"):
         if st.button("🔄 Reset / Nuova Analisi", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
             from core.workspace_manager import clear_session_cache
             from core.workspace_context import WorkspaceContext
-            for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested"]:
+            for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested", "df_clean", "selected_bitemp_port"]:
                 st.session_state.pop(k, None)
             clear_session_cache()
             WorkspaceContext.get_current().flush_risk_domain()
@@ -738,6 +738,7 @@ with tab_ingest:
 
         section("② Validazione Dati & Data Health HUD")
         df_clean, report = validate_csv(df_raw)
+        st.session_state["df_clean"] = df_clean
 
         render_validation_report(report)
 
@@ -1975,6 +1976,52 @@ with tab_bitemporal:
 
     b_engine: BitemporalLedgerEngine = st.session_state["bitemp_engine"]
 
+    # ── HELPER RECUPERO TRANSAZIONI ATTIVE UTENTE ──
+    def _get_active_user_transactions() -> tuple[pd.DataFrame | None, str]:
+        # 1. Controlla DataFrame validato in session state
+        if "df_clean" in st.session_state and st.session_state["df_clean"] is not None and not st.session_state["df_clean"].empty:
+            pname = st.session_state.get("portfolio_name") or "Portafoglio Attivo"
+            return st.session_state["df_clean"], pname
+
+        # 2. Controlla scenario didattico iniettato
+        if "df_raw_injected" in st.session_state and st.session_state["df_raw_injected"] is not None and not st.session_state["df_raw_injected"].empty:
+            pname = st.session_state.get("active_archetype_name") or st.session_state.get("portfolio_name") or "Scenario Archetipo"
+            try:
+                from core.validator import validate_csv
+                df_c, _ = validate_csv(st.session_state["df_raw_injected"])
+                if df_c is not None and not df_c.empty:
+                    return df_c, pname
+            except Exception:
+                pass
+
+        # 3. Controlla transazioni dal database SQL se presente
+        pid = st.session_state.get("portfolio_id")
+        eng = st.session_state.get("engine")
+        if pid and eng and pid != 999999:
+            try:
+                from sqlalchemy import text as sqlt
+                with eng.connect() as conn:
+                    sql = """
+                        SELECT t.tx_date, a.ticker, t.tx_type, t.quantity, t.price, t.currency, t.fees, t.notes
+                        FROM transactions t
+                        JOIN assets a ON t.asset_id = a.asset_id
+                        WHERE t.portfolio_id = :pid
+                        ORDER BY t.tx_date ASC
+                    """
+                    df_db = pd.read_sql(sqlt(sql), conn, params={"pid": pid})
+                    if not df_db.empty:
+                        pname = st.session_state.get("portfolio_name") or f"Portafoglio #{pid}"
+                        return df_db, pname
+            except Exception:
+                pass
+
+        return None, ""
+
+    active_df, active_pname = _get_active_user_transactions()
+    available_ports = b_engine.get_available_portfolios()
+    if "DEMO_FAMILY_OFFICE" not in available_ports:
+        available_ports.insert(0, "DEMO_FAMILY_OFFICE")
+
     # Banner concettuale sulle due dimensioni ortogonali
     st.markdown("""
     <div style="background: rgba(13, 17, 23, 0.7); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 14px 18px; margin-bottom: 16px;">
@@ -1995,20 +2042,105 @@ with tab_bitemporal:
     </div>
     """, unsafe_allow_html=True)
 
-    # Verifica stato catena crittografica
+    # ── BARRA DI SINCRONIZZAZIONE PORTAFOGLIO UTENTE ──
+    col_sync_info, col_sync_btn = st.columns([3.2, 1.3])
+    with col_sync_info:
+        if active_df is not None:
+            tx_min = str(active_df['tx_date'].min())[:10] if 'tx_date' in active_df.columns else 'N/D'
+            tx_max = str(active_df['tx_date'].max())[:10] if 'tx_date' in active_df.columns else 'N/D'
+            in_ledger = active_pname in available_ports
+            badge_sync = "🟢 Già sincronizzato nel Ledger" if in_ledger else "🟡 Non ancora sincronizzato nel Ledger"
+            st.markdown(f"""
+            <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 12px 16px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div style="font-size: 13.5px; color: #ffffff; font-weight: 600;">
+                        💼 Portafoglio Attivo in Sessione: <span style="color: #58a6ff;">{active_pname}</span>
+                    </div>
+                    <span style="font-size: 11px; color: {'#3fb950' if in_ledger else '#f59e0b'}; font-weight: 600; font-family: monospace;">{badge_sync}</span>
+                </div>
+                <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                    Rilevate <b>{len(active_df)}</b> transazioni contabili valide (intervallo: <code>{tx_min}</code> ➔ <code>{tx_max}</code>).
+                    Puoi sincronizzarlo nel motore bitemporale per condurre verifiche Point-in-Time sul tuo portafoglio.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 12px 16px;">
+                <div style="font-size: 13.5px; color: #ffffff; font-weight: 600;">
+                    📁 Portafoglio Utente: <span style="color: #8b949e;">Nessun file caricato in sessione</span>
+                </div>
+                <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
+                    Carica un file CSV nella <b>Tab 1</b> oppure seleziona uno scenario per sincronizzarlo nel Ledger Bitemporale.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_sync_btn:
+        st.markdown('<div style="height: 4px;"></div>', unsafe_allow_html=True)
+        if active_df is not None:
+            btn_sync_user = st.button(
+                "📥 Sincronizza nel Ledger",
+                type="primary",
+                use_container_width=True,
+                help=f"Ingerisce le {len(active_df)} transazioni di '{active_pname}' nel motore bitemporale con marcatura [VT, TT) e calcolo Merkle Tree.",
+                key="btn_sync_user_bitemporal"
+            )
+            if btn_sync_user:
+                with st.spinner(f"Sincronizzazione di '{active_pname}' nel Ledger Bitemporale..."):
+                    cnt = b_engine.ingest_portfolio_dataframe(active_df, portfolio_id=active_pname)
+                    st.session_state["selected_bitemp_port"] = active_pname
+                st.success(f"✅ Sincronizzate {cnt} transazioni contabili di '{active_pname}' nel Ledger Bitemporale!")
+                st.rerun()
+        else:
+            if st.button("🔄 Ripristina Demo VWCE", type="secondary", use_container_width=True, key="btn_reseed_demo_top"):
+                st.session_state["bitemp_seed_info"] = b_engine.seed_demonstration_scenario()
+                st.session_state["selected_bitemp_port"] = "DEMO_FAMILY_OFFICE"
+                st.rerun()
+
+    st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
+
+    # ── SELETTORE DEL PORTAFOGLIO DA ISPEZIONARE ──
+    col_sel_p, col_reseed_p = st.columns([3.2, 1.3])
+    with col_sel_p:
+        pref_sel = st.session_state.get("selected_bitemp_port")
+        if not pref_sel or pref_sel not in available_ports:
+            if active_pname and active_pname in available_ports:
+                pref_sel = active_pname
+            else:
+                pref_sel = available_ports[0] if available_ports else "DEMO_FAMILY_OFFICE"
+        sel_idx = available_ports.index(pref_sel) if pref_sel in available_ports else 0
+
+        selected_bitemp_pid = st.selectbox(
+            "📁 Seleziona Portafoglio da Ispezionare nella Time-Travel Machine:",
+            available_ports,
+            index=sel_idx,
+            key="sb_bitemp_selected_port"
+        )
+        st.session_state["selected_bitemp_port"] = selected_bitemp_pid
+
+    with col_reseed_p:
+        st.markdown('<div style="height: 28px;"></div>', unsafe_allow_html=True)
+        if st.button("🔄 Reset Demo", use_container_width=True, help="Ripristina lo scenario didattico VWCE/BTP/Immobile.", key="btn_reseed_demo_sub"):
+            st.session_state["bitemp_seed_info"] = b_engine.seed_demonstration_scenario()
+            st.session_state["selected_bitemp_port"] = "DEMO_FAMILY_OFFICE"
+            st.rerun()
+
+    # Verifica stato catena crittografica per il portafoglio selezionato
     chain_ok, chain_msg, chain_cnt = b_engine.verify_audit_chain_integrity()
-    tx_total_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_transactions").fetchone()[0] if b_engine.con else 0
-    app_total_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_asset_appraisals").fetchone()[0] if b_engine.con else 0
+    tx_port_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_transactions WHERE portfolio_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
+    app_port_cnt = b_engine.con.execute("SELECT COUNT(*) FROM bitemporal_asset_appraisals WHERE portfolio_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
+    audit_port_cnt = b_engine.con.execute("SELECT COUNT(*) FROM audit_decision_log WHERE entity_id = ?", [selected_bitemp_pid]).fetchone()[0] if b_engine.con else 0
 
     col_kpi1, col_kpi2, col_kpi3, col_kpi4 = st.columns(4)
     with col_kpi1:
         metric_card("Catena Crittografica", "🟢 Integra (100%)" if chain_ok else "🔴 Manomessa", f"{chain_cnt} Blocchi Hash Verificati", positive=chain_ok)
     with col_kpi2:
-        metric_card("Transazioni Bitemporali", f"{tx_total_cnt} Record", "Intervalli [VT, TT)", True)
+        metric_card("Transazioni Portafoglio", f"{tx_port_cnt} Record", f"Portafoglio: {selected_bitemp_pid[:15]}", True)
     with col_kpi3:
-        metric_card("Perizie Illiquidi", f"{app_total_cnt} Stime", "Immobili & Caveau", True)
+        metric_card("Perizie Illiquidi", f"{app_port_cnt} Stime", "Immobili & Illiquidi", True)
     with col_kpi4:
-        metric_card("Audit Log Immutabile", f"{chain_cnt} Decisioni", "Append-Only SHA-256", True)
+        metric_card("Audit Log Decisioni", f"{audit_port_cnt} Variazioni", f"Su {chain_cnt} totali sistema", True)
 
     st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
 
@@ -2023,87 +2155,137 @@ with tab_bitemporal:
     # SUB-TAB 1: TIME-TRAVEL MACHINE
     # -------------------------------------------------------------
     with sub_tt:
-        st.markdown("##### 🕰️ Ricostruzione del Portafoglio a un Punto Bitemporale Esatto")
+        st.markdown(f"##### 🕰️ Ricostruzione di '{selected_bitemp_pid}' a un Punto Bitemporale Esatto")
         st.caption("Interroga il sistema combinando la data dell'evento reale (Valid Time) con la data di conoscenza del database (System Time).")
 
-        col_preset, col_reseed = st.columns([3, 1.5])
-        with col_reseed:
-            if st.button("🔄 Re-Inizializza Scenario Didattico", use_container_width=True, help="Ripristina lo scenario didattico con BTP, dividendo VWCE tardivo e perizia immobiliare."):
-                st.session_state["bitemp_seed_info"] = b_engine.seed_demonstration_scenario()
-                st.success("Scenario didattico ripristinato con successo!")
-                st.rerun()
-
         col_tt1, col_tt2 = st.columns(2)
-        with col_tt1:
-            st.markdown("**1. Data Evento Economico (Valid Time / As-At):**")
-            vt_choice = st.selectbox(
-                "Seleziona la data dell'evento reale da analizzare:",
-                [
-                    "2026-03-15 23:59:59 (Data Stacco Dividendo VWCE)",
-                    "2026-03-18 23:59:59 (Riunione Comitato Rischi)",
-                    "2026-03-25 23:59:59 (Fine Mese Marzo)",
-                    "Personalizzato..."
-                ],
-                index=0,
-                key="sb_vt_choice"
-            )
-            if vt_choice.startswith("2026-03-15"):
-                valid_time_input = "2026-03-15 23:59:59"
-            elif vt_choice.startswith("2026-03-18"):
-                valid_time_input = "2026-03-18 23:59:59"
-            elif vt_choice.startswith("2026-03-25"):
-                valid_time_input = "2026-03-25 23:59:59"
-            else:
-                valid_time_input = st.text_input("Inserisci Valid Time (YYYY-MM-DD HH:MM:SS):", value="2026-03-15 23:59:59")
+        
+        is_demo = (selected_bitemp_pid == "DEMO_FAMILY_OFFICE")
 
-        with col_tt2:
-            st.markdown("**2. Stato di Conoscenza del Sistema (System Time / As-Of):**")
-            tt_choice = st.selectbox(
-                "Cosa sapeva il sistema informativo a questa data?",
-                [
-                    "2026-03-18 10:00:00 (Stato cognitivo alla Riunione - Dividendo non ancora noto)",
-                    "2026-03-21 10:00:00 (Stato cognitivo dopo ricezione estratto conto broker del 20 Marzo)",
-                    "Oggi / Live (Massima conoscenza attuale)",
-                    "Personalizzato..."
-                ],
-                index=0,
-                key="sb_tt_choice"
-            )
-            if "2026-03-18" in tt_choice:
-                sys_time_input = "2026-03-18 10:00:00"
-            elif "2026-03-21" in tt_choice:
-                sys_time_input = "2026-03-21 10:00:00"
-            elif "Oggi" in tt_choice:
-                sys_time_input = None
-            else:
-                sys_time_input = st.text_input("Inserisci System Time (YYYY-MM-DD HH:MM:SS):", value="2026-03-18 10:00:00")
+        if is_demo:
+            with col_tt1:
+                st.markdown("**1. Data Evento Economico (Valid Time / As-At):**")
+                vt_choice = st.selectbox(
+                    "Seleziona la data dell'evento reale da analizzare:",
+                    [
+                        "2026-03-15 23:59:59 (Data Stacco Dividendo VWCE)",
+                        "2026-03-18 23:59:59 (Riunione Comitato Rischi)",
+                        "2026-03-25 23:59:59 (Fine Mese Marzo)",
+                        "Personalizzato..."
+                    ],
+                    index=0,
+                    key="sb_vt_choice"
+                )
+                if vt_choice.startswith("2026-03-15"):
+                    valid_time_input = "2026-03-15 23:59:59"
+                elif vt_choice.startswith("2026-03-18"):
+                    valid_time_input = "2026-03-18 23:59:59"
+                elif vt_choice.startswith("2026-03-25"):
+                    valid_time_input = "2026-03-25 23:59:59"
+                else:
+                    valid_time_input = st.text_input("Inserisci Valid Time (YYYY-MM-DD HH:MM:SS):", value="2026-03-15 23:59:59", key="txt_vt_demo")
+
+            with col_tt2:
+                st.markdown("**2. Stato di Conoscenza del Sistema (System Time / As-Of):**")
+                tt_choice = st.selectbox(
+                    "Cosa sapeva il sistema informativo a questa data?",
+                    [
+                        "2026-03-18 10:00:00 (Stato cognitivo alla Riunione - Dividendo non ancora noto)",
+                        "2026-03-21 10:00:00 (Stato cognitivo dopo ricezione estratto conto broker del 20 Marzo)",
+                        "Oggi / Live (Massima conoscenza attuale)",
+                        "Personalizzato..."
+                    ],
+                    index=0,
+                    key="sb_tt_choice"
+                )
+                if "2026-03-18" in tt_choice:
+                    sys_time_input = "2026-03-18 10:00:00"
+                elif "2026-03-21" in tt_choice:
+                    sys_time_input = "2026-03-21 10:00:00"
+                elif "Oggi" in tt_choice:
+                    sys_time_input = None
+                else:
+                    sys_time_input = st.text_input("Inserisci System Time (YYYY-MM-DD HH:MM:SS):", value="2026-03-18 10:00:00", key="txt_tt_demo")
+        else:
+            # Calcolo date per il portafoglio utente
+            row_dates = b_engine.con.execute("""
+                SELECT MIN(valid_from), MAX(valid_from) 
+                FROM bitemporal_transactions 
+                WHERE portfolio_id = ?
+            """, [selected_bitemp_pid]).fetchone()
+            
+            min_vt_dt = row_dates[0] if row_dates and row_dates[0] else datetime.now()
+            max_vt_dt = row_dates[1] if row_dates and row_dates[1] else datetime.now()
+            min_vt_str = str(min_vt_dt)[:10] + " 23:59:59"
+            max_vt_str = str(max_vt_dt)[:10] + " 23:59:59"
+
+            with col_tt1:
+                st.markdown("**1. Data Evento Economico (Valid Time / As-At):**")
+                vt_choice = st.selectbox(
+                    "Seleziona il punto storico del portafoglio da ricostruire:",
+                    [
+                        f"{max_vt_str} (Data Ultima Transazione)",
+                        f"{min_vt_str} (Data Prima Transazione)",
+                        "Oggi / Tempo Reale",
+                        "Personalizzato..."
+                    ],
+                    index=0,
+                    key="sb_vt_user_choice"
+                )
+                if "(Data Ultima Transazione)" in vt_choice:
+                    valid_time_input = max_vt_str
+                elif "(Data Prima Transazione)" in vt_choice:
+                    valid_time_input = min_vt_str
+                elif "Oggi" in vt_choice:
+                    valid_time_input = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    valid_time_input = st.text_input("Inserisci Valid Time (YYYY-MM-DD HH:MM:SS):", value=max_vt_str, key="txt_vt_user")
+
+            with col_tt2:
+                st.markdown("**2. Stato di Conoscenza del Sistema (System Time / As-Of):**")
+                tt_choice = st.selectbox(
+                    "Quale stato di conoscenza del database vuoi interrogare?",
+                    [
+                        "Oggi / Live (Massima conoscenza attuale)",
+                        f"{max_vt_str} (Alla data dell'ultima operazione)",
+                        "Personalizzato..."
+                    ],
+                    index=0,
+                    key="sb_tt_user_choice"
+                )
+                if "Oggi" in tt_choice:
+                    sys_time_input = None
+                elif "ultima operazione" in tt_choice:
+                    sys_time_input = max_vt_str
+                else:
+                    sys_time_input = st.text_input("Inserisci System Time (YYYY-MM-DD HH:MM:SS):", value=max_vt_str, key="txt_tt_user")
 
         # Esecuzione della ricostruzione
-        recon = b_engine.reconstruct_portfolio_at_times("DEMO_FAMILY_OFFICE", valid_time_input, sys_time_input)
-        df_tt = b_engine.time_travel_query("DEMO_FAMILY_OFFICE", valid_time_input, sys_time_input)
+        recon = b_engine.reconstruct_portfolio_at_times(selected_bitemp_pid, valid_time_input, sys_time_input)
+        df_tt = b_engine.time_travel_query(selected_bitemp_pid, valid_time_input, sys_time_input)
 
-        # Alert didattico sul dividendo tardivo
-        has_dividend = "TX_DIV_VWCE_004" in df_tt["tx_business_id"].values if not df_tt.empty else False
-        if not has_dividend:
-            st.markdown("""
-            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 10px 14px; margin: 10px 0;">
-                <b style="color: #ef4444;">🛡️ Audit Replay Certificato:</b><br>
-                <span style="font-size: 13px; color: #c9d1d9;">
-                Alla data di conoscenza del <b>18 Marzo ore 10:00</b>, il dividendo di € 1.250 staccato il 15 Marzo <b>NON ERA NOTO AL SISTEMA</b>.
-                La query bitemporale lo esclude rigorosamente, comprovando la diligenza del gestore nella riunione di comitato.
-                </span>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 10px 14px; margin: 10px 0;">
-                <b style="color: #10b981;">✅ Conoscenza Acquisita (Post-Ricezione):</b><br>
-                <span style="font-size: 13px; color: #c9d1d9;">
-                Alla data di conoscenza del <b>21 Marzo</b>, il file broker pervenuto il 20 Marzo è stato integrato.
-                Il dividendo di € 1.250 è retroattivamente incluso e visibile sul 15 Marzo, garantendo la corretta quadratura fiscale.
-                </span>
-            </div>
-            """, unsafe_allow_html=True)
+        if is_demo:
+            has_dividend = "TX_DIV_VWCE_004" in df_tt["tx_business_id"].values if not df_tt.empty else False
+            if not has_dividend:
+                st.markdown("""
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 8px; padding: 10px 14px; margin: 10px 0;">
+                    <b style="color: #ef4444;">🛡️ Audit Replay Certificato:</b><br>
+                    <span style="font-size: 13px; color: #c9d1d9;">
+                    Alla data di conoscenza del <b>18 Marzo ore 10:00</b>, il dividendo di € 1.250 staccato il 15 Marzo <b>NON ERA NOTO AL SISTEMA</b>.
+                    La query bitemporale lo esclude rigorosamente, comprovando la diligenza del gestore nella riunione di comitato.
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 8px; padding: 10px 14px; margin: 10px 0;">
+                    <b style="color: #10b981;">✅ Conoscenza Acquisita (Post-Ricezione):</b><br>
+                    <span style="font-size: 13px; color: #c9d1d9;">
+                    Alla data di conoscenza del <b>21 Marzo</b>, il file broker pervenuto il 20 Marzo è stato integrato.
+                    Il dividendo di € 1.250 è retroattivamente incluso e visibile sul 15 Marzo, garantendo la corretta quadratura fiscale.
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
 
         col_res1, col_res2, col_res3, col_res4 = st.columns(4)
         with col_res1:
@@ -2115,31 +2297,56 @@ with tab_bitemporal:
         with col_res4:
             metric_card("Posizioni in Portafoglio", f"{recon['positions_count']} Titoli", "Consistenze WACP", True)
 
-        st.markdown("##### 📋 Transazioni Valide Estratte dalla Time-Travel Machine:")
+        if recon.get("positions"):
+            with st.expander(f"📊 Dettaglio Posizioni Contabili Ricostruite ({recon['positions_count']} titoli attivi al {valid_time_input[:10]})", expanded=True):
+                df_p = pd.DataFrame(recon["positions"]).rename(columns={
+                    "asset_id": "Asset / Ticker",
+                    "shares": "Quote / Quantità",
+                    "wacp_eur": "PMC / WACP (€)",
+                    "cost_value_eur": "Controvalore Carico (€)"
+                })
+                st.dataframe(df_p, use_container_width=True)
+
+        st.markdown(f"##### 📋 Transazioni Valide Ricostruite nel Ledger per '{selected_bitemp_pid}':")
         if not df_tt.empty:
             df_show = df_tt.copy()
             df_show["valid_from"] = df_show["valid_from"].astype(str)
             df_show["sys_from"] = df_show["sys_from"].astype(str)
             st.dataframe(df_show, use_container_width=True)
         else:
-            st.info("Nessuna transazione soddisfa i vincoli bitemporali specificati.")
+            st.info("Nessuna transazione soddisfa i vincoli bitemporali specificati per questo portafoglio.")
 
     # -------------------------------------------------------------
     # SUB-TAB 2: DRIFT FORENSICS
     # -------------------------------------------------------------
     with sub_drift:
-        st.markdown("##### 🔍 Riconciliazione Forense tra Due Stati di Conoscenza del Sistema")
-        st.caption("Confronta cosa sapeva il database a due date distinte (es. 18 Marzo vs 21 Marzo) rispetto alla medesima data evento (15 Marzo).")
+        st.markdown(f"##### 🔍 Riconciliazione Forense tra Due Stati di Conoscenza ({selected_bitemp_pid})")
+        st.caption("Confronta cosa sapeva il database a due date distinte (T1 vs T2) rispetto alla medesima data evento (Valid Time).")
+
+        is_demo = (selected_bitemp_pid == "DEMO_FAMILY_OFFICE")
+        if is_demo:
+            d_vt_val = "2026-03-15 23:59:59"
+            d_s1_val = "2026-03-18 10:00:00"
+            d_s2_val = "2026-03-21 10:00:00"
+        else:
+            row_d = b_engine.con.execute("""
+                SELECT MIN(valid_from), MAX(valid_from) 
+                FROM bitemporal_transactions 
+                WHERE portfolio_id = ?
+            """, [selected_bitemp_pid]).fetchone()
+            d_vt_val = str(row_d[1])[:10] + " 23:59:59" if row_d and row_d[1] else "2026-01-01 23:59:59"
+            d_s1_val = str(row_d[0])[:10] + " 10:00:00" if row_d and row_d[0] else "2025-01-01 10:00:00"
+            d_s2_val = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         col_d1, col_d2, col_d3 = st.columns(3)
         with col_d1:
-            drift_vt = st.text_input("Data Evento Reale (Valid Time):", value="2026-03-15 23:59:59", key="drift_vt")
+            drift_vt = st.text_input("Data Evento Reale (Valid Time):", value=d_vt_val, key="drift_vt")
         with col_d2:
-            drift_s1 = st.text_input("Stato Conoscenza T1 (Prima):", value="2026-03-18 10:00:00", key="drift_s1")
+            drift_s1 = st.text_input("Stato Conoscenza T1 (Prima):", value=d_s1_val, key="drift_s1")
         with col_d3:
-            drift_s2 = st.text_input("Stato Conoscenza T2 (Dopo):", value="2026-03-21 10:00:00", key="drift_s2")
+            drift_s2 = st.text_input("Stato Conoscenza T2 (Dopo):", value=d_s2_val, key="drift_s2")
 
-        drift_res = b_engine.detect_retroactive_drifts("DEMO_FAMILY_OFFICE", drift_vt, drift_s1, drift_s2)
+        drift_res = b_engine.detect_retroactive_drifts(selected_bitemp_pid, drift_vt, drift_s1, drift_s2)
 
         if drift_res["has_drift"]:
             st.warning(f"⚠️ **Rilevato Drift Retroattivo**: Trovate **{drift_res['new_transactions_count']} nuove transazioni tardive** e **{drift_res['modified_transactions_count']} transazioni rettificate** tra T1 e T2!")
@@ -2152,16 +2359,21 @@ with tab_bitemporal:
                 st.markdown("**Transazioni Modificate Retroattivamente (Restatements):**")
                 st.dataframe(pd.DataFrame(drift_res["modified_transactions"]), use_container_width=True)
         else:
-            st.success("✅ Nessun drift retroattivo rilevato tra le due date di conoscenza.")
+            st.success("✅ Nessun drift retroattivo rilevato tra le due date di conoscenza per questo portafoglio.")
 
     # -------------------------------------------------------------
     # SUB-TAB 3: AUDIT TRAIL IMMUTABILE & MERKLE TREE
     # -------------------------------------------------------------
     with sub_audit:
-        st.markdown("##### 🛡️ Audit Trail Immutabile ad Append-Only Hash Chaining")
-        st.caption("Ogni cambio di target allocation, modifica parametri di rischio o override di prezzo è sigillato con hash a catena crittografica SHA-256.")
+        st.markdown(f"##### 🛡️ Audit Trail Immutabile & Merkle Root ({selected_bitemp_pid})")
+        st.caption("Ogni cambio di allocazione, importazione batch o rettifica contabile è sigillato con hash a catena crittografica SHA-256.")
 
-        btn_verify = st.button("🛡️ Esegui Audit Computazionale di Integrità (Tamper Detection)", type="primary", use_container_width=True)
+        col_audit_btn, col_filter_chk = st.columns([3, 1.5])
+        with col_audit_btn:
+            btn_verify = st.button("🛡️ Esegui Audit Computazionale di Integrità (Tamper Detection)", type="primary", use_container_width=True, key="btn_verify_audit_trail")
+        with col_filter_chk:
+            show_all_audit = st.checkbox("Mostra audit di tutti i portafogli", value=False, help="Se deselezionato, mostra solo le decisioni collegate al portafoglio selezionato.")
+
         if btn_verify:
             is_valid, msg, count = b_engine.verify_audit_chain_integrity()
             if is_valid:
@@ -2170,24 +2382,37 @@ with tab_bitemporal:
                 st.error(f"❌ {msg}")
 
         # Tabella dell'audit trail
-        df_audit = b_engine.con.execute("""
-            SELECT sequence_id, decision_type, actor_id, rationale, sys_timestamp,
-                   prev_record_hash, entry_hash
-            FROM audit_decision_log ORDER BY sequence_id ASC
-        """).df()
+        if show_all_audit:
+            df_audit = b_engine.con.execute("""
+                SELECT sequence_id, entity_id, decision_type, actor_id, rationale, sys_timestamp,
+                       prev_record_hash, entry_hash
+                FROM audit_decision_log ORDER BY sequence_id ASC
+            """).df()
+        else:
+            df_audit = b_engine.con.execute("""
+                SELECT sequence_id, entity_id, decision_type, actor_id, rationale, sys_timestamp,
+                       prev_record_hash, entry_hash
+                FROM audit_decision_log 
+                WHERE entity_id = ?
+                ORDER BY sequence_id ASC
+            """, [selected_bitemp_pid]).df()
 
         if not df_audit.empty:
             st.dataframe(df_audit, use_container_width=True)
         else:
-            st.info("Audit log vuoto.")
+            st.info(f"Nessuna decisione registrata per '{selected_bitemp_pid}'.")
 
         st.markdown("---")
         st.markdown("##### 🌲 Certificazione Merkle Tree per Report Patrimoniali Esportati")
         st.caption("Costruisce un albero Merkle foglia-per-foglia sulle consistenze attive e imprime il Root Hash nel piè di pagina della reportistica istituzionale.")
 
-        active_txs = b_engine.con.execute("SELECT * FROM bitemporal_transactions WHERE sys_to = ?::TIMESTAMP", [b_engine.INFINITY_TIMESTAMP]).fetchdf()
+        active_txs = b_engine.con.execute("""
+            SELECT * FROM bitemporal_transactions 
+            WHERE portfolio_id = ? AND sys_to = ?::TIMESTAMP
+        """, [selected_bitemp_pid, b_engine.INFINITY_TIMESTAMP]).fetchdf()
+
         merkle_root = b_engine.generate_merkle_root(active_txs.to_dict(orient="records"))
 
         st.code(f"MERKLE_ROOT_SEAL = \"{merkle_root}\"", language="python")
-        st.caption(f"Sigillo di integrità calcolato su {len(active_txs)} transazioni contabili attive. Verificabile in tempo sub-millisecondo.")
+        st.caption(f"Sigillo di integrità calcolato su {len(active_txs)} transazioni contabili attive del portafoglio '{selected_bitemp_pid}'. Verificabile in tempo sub-millisecondo.")
 

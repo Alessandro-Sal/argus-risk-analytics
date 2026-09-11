@@ -689,6 +689,197 @@ class BitemporalLedgerEngine:
         }
 
     # =========================================================================
+    # INGESTIONE DINAMICA PORTAFOGLIO UTENTE & MULTI-PORTFOLIO DISCOVERY
+    # =========================================================================
+
+    def get_available_portfolios(self) -> List[str]:
+        """
+        Restituisce l'elenco dei portfolio_id univoci presenti nel ledger bitemporale.
+        """
+        if self.con is None:
+            return []
+        pids = set()
+        try:
+            res_tx = self.con.execute("SELECT DISTINCT portfolio_id FROM bitemporal_transactions").fetchall()
+            for r in res_tx:
+                if r[0]:
+                    pids.add(str(r[0]))
+            res_app = self.con.execute("SELECT DISTINCT portfolio_id FROM bitemporal_asset_appraisals").fetchall()
+            for r in res_app:
+                if r[0]:
+                    pids.add(str(r[0]))
+        except Exception as e:
+            logger.error(f"Errore recupero portfolio_id dal ledger bitemporale: {e}")
+        return sorted(list(pids))
+
+    def ingest_portfolio_dataframe(
+        self,
+        df_tx: pd.DataFrame,
+        portfolio_id: str,
+        recorded_by: str = "USER_UPLOAD",
+        starting_cash: Optional[float] = None,
+    ) -> int:
+        """
+        Ingerisce un DataFrame di transazioni utente nel ledger bitemporale immutabile.
+        
+        Parametri:
+            df_tx: DataFrame con transazioni (supporta formati ARGUS standard o multi-broker).
+            portfolio_id: Identificatore univoco del portafoglio nel ledger.
+            recorded_by: Etichetta dell'attore/sorgente di acquisizione.
+            starting_cash: Importo liquidità iniziale opzionale (se None, calcola un buffer congruo).
+            
+        Ritorna:
+            Numero di transazioni contabili registrate e sigillate con hash SHA-256.
+        """
+        if self.con is None or df_tx is None or df_tx.empty:
+            return 0
+
+        df = df_tx.copy()
+
+        # Normalizzazione nomi colonne
+        col_map = {}
+        for col in df.columns:
+            c_lower = str(col).lower().strip()
+            if c_lower in ["tx_date", "date", "data", "booking_date", "value_date"]:
+                col_map[col] = "tx_date"
+            elif c_lower in ["ticker", "symbol", "asset", "asset_id", "isin"]:
+                col_map[col] = "ticker"
+            elif c_lower in ["tx_type", "type", "operation_type", "operazione", "tipo"]:
+                col_map[col] = "tx_type"
+            elif c_lower in ["quantity", "shares", "quantita", "quote", "qty"]:
+                col_map[col] = "quantity"
+            elif c_lower in ["price", "unit_price", "prezzo"]:
+                col_map[col] = "price"
+            elif c_lower in ["fees", "commission", "commissions", "commissioni", "spese"]:
+                col_map[col] = "fees"
+            elif c_lower in ["taxes", "withholding_tax", "imposte", "ritenute"]:
+                col_map[col] = "taxes"
+            elif c_lower in ["currency", "valuta", "curr"]:
+                col_map[col] = "currency"
+            elif c_lower in ["notes", "note", "descrizione", "description"]:
+                col_map[col] = "notes"
+
+        df = df.rename(columns=col_map)
+
+        # Pulizia record pregressi per lo stesso portfolio_id per garantire idempotenza
+        self.con.execute("DELETE FROM bitemporal_transactions WHERE portfolio_id = ?", [portfolio_id])
+        self.con.execute("DELETE FROM bitemporal_asset_appraisals WHERE portfolio_id = ?", [portfolio_id])
+        self.con.execute("DELETE FROM audit_decision_log WHERE entity_id = ?", [portfolio_id])
+
+        # Parsing e ordinamento cronologico
+        if "tx_date" in df.columns:
+            df["tx_date_parsed"] = pd.to_datetime(df["tx_date"], errors="coerce")
+            df = df.sort_values(by="tx_date_parsed", ascending=True).reset_index(drop=True)
+            earliest_dt = df["tx_date_parsed"].dropna().min()
+        else:
+            df["tx_date_parsed"] = datetime.now()
+            earliest_dt = datetime.now()
+
+        if pd.isna(earliest_dt):
+            earliest_dt = datetime.now()
+
+        # Verifica presenza movimenti di cassa espliciti
+        has_cash_in = False
+        if "tx_type" in df.columns:
+            has_cash_in = df["tx_type"].astype(str).str.upper().str.contains("CASH_IN|DEPOSIT|VERSAMENTO|CONFERIMENTO").any()
+
+        # Calcolo liquidità iniziale
+        starting_cash_injected = 0.0
+        if starting_cash is not None and starting_cash > 0:
+            starting_cash_injected = float(starting_cash)
+        elif not has_cash_in:
+            total_buy_cost = 0.0
+            for _, r in df.iterrows():
+                op = str(r.get("tx_type", "BUY")).upper()
+                if "BUY" in op or "ACQUISTO" in op:
+                    q = float(r.get("quantity", 0.0) or 0.0)
+                    p = float(r.get("price", 0.0) or 0.0)
+                    f = float(r.get("fees", 0.0) or 0.0)
+                    total_buy_cost += (q * p) + f
+            if total_buy_cost > 0:
+                starting_cash_injected = round(total_buy_cost * 1.10, 2)
+
+        if starting_cash_injected > 0:
+            init_cash_vt = (earliest_dt - pd.Timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")
+            self.record_transaction(
+                tx_business_id=f"TX_{portfolio_id}_CASH_INIT",
+                portfolio_id=portfolio_id,
+                asset_id="EUR_CASH",
+                operation_type="CASH_IN",
+                quantity=1.0,
+                unit_price=starting_cash_injected,
+                valid_from=init_cash_vt,
+                recorded_by="CAPITAL_ALLOCATION_INITIAL",
+                custom_sys_from=init_cash_vt,
+            )
+
+        row_count = 0
+        sys_now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
+
+        for idx, row in df.iterrows():
+            raw_op = str(row.get("tx_type", "BUY")).upper()
+            if "BUY" in raw_op or "ACQUISTO" in raw_op:
+                op_type = "BUY"
+            elif "SELL" in raw_op or "VENDITA" in raw_op:
+                op_type = "SELL"
+            elif "DIVIDEND" in raw_op or "DIV" in raw_op:
+                op_type = "DIVIDEND"
+            elif "CASH_IN" in raw_op or "DEPOSIT" in raw_op or "VERSAMENTO" in raw_op:
+                op_type = "CASH_IN"
+            elif "CASH_OUT" in raw_op or "PRELIEVO" in raw_op:
+                op_type = "CASH_OUT"
+            else:
+                op_type = "BUY"
+
+            asset_id = str(row.get("ticker", f"ASSET_{idx+1}")).strip().upper()
+            qty = abs(float(row.get("quantity", 0.0) or 0.0))
+            price = float(row.get("price", 0.0) or 0.0)
+            fees = float(row.get("fees", 0.0) or 0.0) if pd.notna(row.get("fees")) else 0.0
+            taxes = float(row.get("taxes", 0.0) or 0.0) if pd.notna(row.get("taxes")) else 0.0
+            curr = str(row.get("currency", "EUR") or "EUR").upper()
+
+            raw_date = row.get("tx_date_parsed")
+            if pd.isna(raw_date):
+                raw_date = earliest_dt
+            vt_str = pd.to_datetime(raw_date).strftime("%Y-%m-%d %H:%M:%S")
+            tx_id = f"TX_{portfolio_id}_{idx+1:04d}"
+
+            self.record_transaction(
+                tx_business_id=tx_id,
+                portfolio_id=portfolio_id,
+                asset_id=asset_id,
+                operation_type=op_type,
+                quantity=qty,
+                unit_price=price,
+                valid_from=vt_str,
+                recorded_by=recorded_by,
+                fees=fees,
+                taxes=taxes,
+                currency=curr,
+                custom_sys_from=sys_now,
+                source_doc_ref=str(row.get("notes", "")) if pd.notna(row.get("notes")) else None
+            )
+            row_count += 1
+
+        # Audit decision log
+        tickers_list = sorted(list(set(df["ticker"].astype(str).tolist()))) if "ticker" in df.columns else []
+        self.log_decision(
+            decision_type="PORTFOLIO_INGESTION",
+            entity_id=portfolio_id,
+            actor_id="USER:Ingestion_Hub",
+            rationale=f"Ingestione di {row_count} transazioni per il portafoglio '{portfolio_id}' nel ledger bitemporale immutabile.",
+            payload={
+                "portfolio_id": portfolio_id,
+                "rows_ingested": row_count,
+                "tickers": tickers_list,
+                "starting_cash_eur": starting_cash_injected,
+            },
+            custom_sys_timestamp=sys_now,
+        )
+
+        return row_count
+
+    # =========================================================================
     # SCENARIO DIDATTICO & AUDIT REPLAY PRECONFIGURATO
     # =========================================================================
 
