@@ -624,19 +624,35 @@ def _compute_returns(df_positions: pd.DataFrame,
                     fx_series_inv = pivot[fx_ticker_inv].ffill().bfill()
                     pivot[tk] = pivot[tk] * (1.0 / fx_series_inv)
 
-    # ── Data Quality Gate: Rilevamento Serie Illiquide o Prezzi Stantii ──
-    # Supporta posizioni long e short (qty_net non nullo)
+    # ── Market Data Quality Gate: Rilevamento Serie Illiquide, Prezzi Stantii e Salti Anomali ──
     active_tickers = df_positions[df_positions["qty_net"].abs() > 1e-8]["ticker"].tolist() if "qty_net" in df_positions.columns else df_positions["ticker"].tolist()
     if warnings_list is not None and not pivot.empty:
-        for tk in active_tickers:
-            if tk in pivot.columns:
-                s_tk = pivot[tk].dropna()
-                if len(s_tk) > 5:
-                    zero_diff_streak = (s_tk.diff() == 0).astype(int).groupby((s_tk.diff() != 0).cumsum()).sum().max()
-                    if zero_diff_streak >= 10:
-                        warnings_list.append(f"Data Quality Alert: l'asset {tk} presenta una serie prezzi piatta/stantia per {zero_diff_streak} giorni consecutivi.")
-                elif len(s_tk) <= 3 and len(pivot) > 30:
-                    warnings_list.append(f"Data Quality Alert: l'asset {tk} ha solo {len(s_tk)} quotazioni storiche disponibili rispetto all'orizzonte di analisi.")
+        try:
+            for tk in active_tickers:
+                if tk in pivot.columns:
+                    s_tk = pivot[tk].dropna()
+                    if len(s_tk) > 5:
+                        zero_diff_streak = int((s_tk.diff() == 0).astype(int).groupby((s_tk.diff() != 0).cumsum()).sum().max())
+                        if zero_diff_streak >= 10:
+                            warnings_list.append(f"Data Quality Alert: l'asset {tk} presenta una serie prezzi piatta/stantia per {zero_diff_streak} giorni consecutivi.")
+                    elif len(s_tk) <= 3 and len(pivot) > 30:
+                        warnings_list.append(f"Data Quality Alert: l'asset {tk} ha solo {len(s_tk)} quotazioni storiche disponibili rispetto all'orizzonte di analisi.")
+
+            # Rilevamento salti estremi di rendimento (Z-score > 6.0)
+            pct_chg_check = pivot[[t for t in active_tickers if t in pivot.columns]].pct_change()
+            for tk in active_tickers:
+                if tk in pct_chg_check.columns:
+                    r_tk = pct_chg_check[tk].dropna()
+                    if len(r_tk) > 20:
+                        std_r = float(r_tk.std())
+                        if std_r > 1e-6:
+                            z_vals = (r_tk - r_tk.mean()) / std_r
+                            extreme_jumps = z_vals[z_vals.abs() > 6.0]
+                            if not extreme_jumps.empty:
+                                worst_dt = extreme_jumps.abs().idxmax()
+                                warnings_list.append(f"Data Quality Warning: salto anomalo su {tk} il {worst_dt.strftime('%Y-%m-%d')} ({r_tk[worst_dt]*100:.1f}%, Z-Score {z_vals[worst_dt]:.1f}).")
+        except Exception:
+            pass
 
     # Forward fill per mitigare discrepanze nei calendari festivi (es. USA vs Europa)
     pivot = pivot.ffill(limit=5)
@@ -1212,6 +1228,13 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     
     # Exact SLSQP Optimization with SciPy
     num_assets = len(common)
+    # Garanzia di perfetta simmetria e semidefinitezza positiva (PSD) con regolarizzazione ridge
+    cov_matrix = (cov_matrix + cov_matrix.T) / 2.0
+    eigvals = np.linalg.eigvalsh(cov_matrix)
+    min_eig = float(np.min(eigvals)) if len(eigvals) > 0 else 0.0
+    if min_eig < 1e-8:
+        cov_matrix += (abs(min_eig) + 1e-5) * np.eye(num_assets)
+
     init_weights = np.ones(num_assets) / num_assets
     bounds = tuple((0.0, 1.0) for _ in range(num_assets))
     constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1.0})
@@ -1219,24 +1242,28 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     # 1. Max Sharpe Ratio Optimization
     def neg_sharpe(weights):
         r = np.sum(mean_returns * weights)
-        vol = np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
-        return -(r - rf) / vol if vol > 0 else 0
+        var = float(np.dot(weights.T, np.dot(cov_matrix, weights)))
+        vol = np.sqrt(max(var, 1e-8))
+        return -(r - rf) / vol if vol > 1e-6 else 0.0
 
     opt_sharpe = sco.minimize(neg_sharpe, init_weights, method='SLSQP', bounds=bounds, constraints=constraints)
     opt_sharpe_weights = opt_sharpe.x
     opt_sharpe_return = np.sum(mean_returns * opt_sharpe_weights)
-    opt_sharpe_risk = np.sqrt(np.dot(opt_sharpe_weights.T, np.dot(cov_matrix, opt_sharpe_weights)))
-    opt_sharpe_ratio = (opt_sharpe_return - rf) / opt_sharpe_risk if opt_sharpe_risk > 0 else 0
+    opt_sharpe_var = float(np.dot(opt_sharpe_weights.T, np.dot(cov_matrix, opt_sharpe_weights)))
+    opt_sharpe_risk = np.sqrt(max(opt_sharpe_var, 1e-8))
+    opt_sharpe_ratio = (opt_sharpe_return - rf) / opt_sharpe_risk if opt_sharpe_risk > 1e-6 else 0.0
 
     # 2. Min Volatility Optimization
     def portfolio_vol(weights):
-        return np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights)))
+        var = float(np.dot(weights.T, np.dot(cov_matrix, weights)))
+        return np.sqrt(max(var, 1e-8))
 
     opt_vol = sco.minimize(portfolio_vol, init_weights, method='SLSQP', bounds=bounds, constraints=constraints)
     opt_vol_weights = opt_vol.x
     opt_vol_return = np.sum(mean_returns * opt_vol_weights)
-    opt_vol_risk = np.sqrt(np.dot(opt_vol_weights.T, np.dot(cov_matrix, opt_vol_weights)))
-    opt_vol_ratio = (opt_vol_return - rf) / opt_vol_risk if opt_vol_risk > 0 else 0
+    opt_vol_var = float(np.dot(opt_vol_weights.T, np.dot(cov_matrix, opt_vol_weights)))
+    opt_vol_risk = np.sqrt(max(opt_vol_var, 1e-8))
+    opt_vol_ratio = (opt_vol_return - rf) / opt_vol_risk if opt_vol_risk > 1e-6 else 0.0
 
     # Monte Carlo simulation for visual frontier and 3D risk surface plots (Multi-Alpha Dirichlet for full 3D envelope)
     num_portfolios = 5000
@@ -1256,10 +1283,11 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         w[idx_a] = 1.0
         weights_record.append(w)
         p_ret = float(np.sum(mean_returns * w))
-        p_std = float(np.sqrt(np.dot(w.T, np.dot(cov_matrix, w))))
+        p_var = float(np.dot(w.T, np.dot(cov_matrix, w)))
+        p_std = float(np.sqrt(max(p_var, 1e-8)))
         results[0, k] = p_std
         results[1, k] = p_ret
-        results[2, k] = (p_ret - rf) / p_std if p_std > 0 else 0
+        results[2, k] = (p_ret - rf) / p_std if p_std > 1e-6 else 0.0
         hhi_records[k] = 1.0
         cvar_records[k] = p_ret - 2.063 * p_std
         sortino_records[k] = (p_ret - rf) / max(0.001, p_std * 0.707)
@@ -1283,8 +1311,9 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         weights_record.append(weights)
         
         port_return = float(np.sum(mean_returns * weights))
-        port_std = float(np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))))
-        sharpe_ratio = (port_return - rf) / port_std if port_std > 0 else 0
+        port_var = float(np.dot(weights.T, np.dot(cov_matrix, weights)))
+        port_std = float(np.sqrt(max(port_var, 1e-8)))
+        sharpe_ratio = (port_return - rf) / port_std if port_std > 1e-6 else 0.0
         hhi_val = float(np.sum(weights ** 2))
         cvar_val = float(port_return - 2.063 * port_std)
         sortino_val = float((port_return - rf) / max(0.001, port_std * 0.707))

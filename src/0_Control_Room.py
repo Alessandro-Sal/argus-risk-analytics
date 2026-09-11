@@ -100,6 +100,16 @@ from core.cache_shield import clear_cache
 # Inizializzazione Centralizzata Logging SRE & Sanitizzazione PII
 setup_logging()
 
+# ── Mappatura ISIN / Yahoo Ticker (Module-Level Caching) ─────
+@st.cache_data(show_spinner=False, ttl=86400)
+def fetch_yahoo_ticker_for_isin(isin: str) -> str:
+    from core.adapters.isin_resolver import search_yahoo_isin_details
+    try:
+        sym, _ = search_yahoo_isin_details(isin, timeout=5)
+        return sym
+    except Exception:
+        return ""
+
 inject_custom_css()
 
 # ── Splash Screen (All'avvio) ─────────────────────────────────
@@ -783,16 +793,7 @@ with tab_ingest:
             })
             st.dataframe(df_display_renamed, use_container_width=True, height=200)
 
-        # Mappatura ISIN / Yahoo Ticker
-        @st.cache_data(show_spinner=False)
-        def fetch_yahoo_ticker_for_isin(isin: str) -> str:
-            from core.adapters.isin_resolver import search_yahoo_isin_details
-            try:
-                sym, _ = search_yahoo_isin_details(isin, timeout=5)
-                return sym
-            except Exception:
-                return ""
-
+        # Mappatura ISIN / Yahoo Ticker (utilizza la funzione cached a livello modulo)
         ISIN_PATTERN = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
         unmapped_isins = [t for t in s["tickers"] if ISIN_PATTERN.match(t)]
         

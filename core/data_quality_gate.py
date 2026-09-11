@@ -310,3 +310,146 @@ class DataQualityGate:
         )
 
         return df_validated, report
+
+
+# ── MARKET DATA QUALITY GATE (PRICE SERIES INTEGRITY) ─────────────────────────
+
+class MarketDataQualityReport(BaseModel):
+    """Report diagnostico e quantitativo sull'integrità delle serie storiche dei prezzi."""
+    is_valid: bool = True
+    active_tickers: List[str] = Field(default_factory=list)
+    missing_tickers: List[str] = Field(default_factory=list)
+    stale_price_tickers: Dict[str, int] = Field(default_factory=dict)
+    insufficient_history: Dict[str, int] = Field(default_factory=dict)
+    abnormal_returns: List[Dict[str, Any]] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    critical_errors: List[str] = Field(default_factory=list)
+
+
+class MarketDataQualityGate:
+    """
+    Quality Gate per la sanificazione, validazione e allineamento temporale dei prezzi storici.
+    Mitiga il disallineamento dei calendari di borsa (es. Borsa Italiana vs NYSE),
+    applica forward-fill controllato, individua titoli stantii o sospesi e salti anomali di prezzo.
+    """
+
+    def __init__(
+        self,
+        min_history_days: int = 30,
+        max_ffill_days: int = 5,
+        max_stale_streak: int = 10,
+        z_score_jump_threshold: float = 6.0
+    ):
+        self.min_history_days = min_history_days
+        self.max_ffill_days = max_ffill_days
+        self.max_stale_streak = max_stale_streak
+        self.z_score_jump_threshold = z_score_jump_threshold
+
+    def validate_and_align_prices(
+        self,
+        df_prices: pd.DataFrame,
+        required_tickers: Set[str],
+        reference_index: Optional[pd.DatetimeIndex] = None
+    ) -> Tuple[pd.DataFrame, MarketDataQualityReport]:
+        """
+        Allinea la matrice dei prezzi su un asse feriale continuativo e calcola la diagnostica.
+        Restituisce (pivot_table_aligned, report).
+        """
+        report = MarketDataQualityReport()
+
+        if df_prices is None or df_prices.empty:
+            report.is_valid = False
+            report.critical_errors.append("Dataset prezzi storici nullo o vuoto.")
+            return pd.DataFrame(), report
+
+        # Normalizzazione date e timezone
+        df = df_prices.copy()
+        df["price_date"] = pd.to_datetime(df["price_date"])
+        if getattr(df["price_date"].dt, "tz", None) is not None:
+            df["price_date"] = df["price_date"].dt.tz_localize(None)
+
+        # Selezione colonna prezzo (priorità ad adjusted_close se disponibile)
+        price_col = "adjusted_close" if "adjusted_close" in df.columns else "close"
+        if price_col not in df.columns:
+            report.is_valid = False
+            report.critical_errors.append(f"Colonna prezzo '{price_col}' non presente in df_prices.")
+            return pd.DataFrame(), report
+
+        df_filtered = df[df["ticker"].isin(required_tickers)][["price_date", "ticker", price_col]].dropna()
+        df_filtered = df_filtered.drop_duplicates(subset=["price_date", "ticker"], keep="last")
+
+        if df_filtered.empty:
+            report.is_valid = False
+            report.critical_errors.append("Nessun dato prezzo corrispondente ai ticker richiesti.")
+            return pd.DataFrame(), report
+
+        # Costruzione della pivot table
+        pivot = df_filtered.pivot(index="price_date", columns="ticker", values=price_col).sort_index()
+
+        available_tickers = set(pivot.columns)
+        missing = set(required_tickers) - available_tickers
+        if missing:
+            report.missing_tickers = sorted(list(missing))
+            report.warnings.append(
+                f"I seguenti ticker non hanno quotazioni storiche disponibili: {report.missing_tickers}."
+            )
+
+        # 1. Verifica profondità storica minima
+        for tk in available_tickers:
+            obs = int(pivot[tk].dropna().count())
+            if obs < self.min_history_days:
+                report.insufficient_history[tk] = obs
+                report.warnings.append(
+                    f"Asset '{tk}' con storico ridotto ({obs} quotazioni < soglia {self.min_history_days})."
+                )
+
+        # 2. Controllo serie prezzi stantie / congelate (illiquidità o delisting)
+        for tk in available_tickers:
+            s_clean = pivot[tk].dropna()
+            if len(s_clean) > self.max_stale_streak:
+                diffs = s_clean.diff()
+                streak = int((diffs == 0).astype(int).groupby((diffs != 0).cumsum()).sum().max())
+                if streak >= self.max_stale_streak:
+                    report.stale_price_tickers[tk] = streak
+                    report.warnings.append(
+                        f"Asset '{tk}' presenta quotazione identica per {streak} giorni consecutivi (possibile sospensione scambi)."
+                    )
+
+        # 3. Allineamento calendario & Forward Fill controllato
+        if reference_index is not None and len(reference_index) > 0:
+            ref_clean = pd.to_datetime(reference_index)
+            if getattr(ref_clean, "tz", None) is not None:
+                ref_clean = ref_clean.tz_localize(None)
+            pivot = pivot.reindex(ref_clean)
+        else:
+            full_b_index = pd.date_range(start=pivot.index.min(), end=pivot.index.max(), freq="B")
+            pivot = pivot.reindex(full_b_index)
+
+        # Forward fill fino al limite massimo (evita estrapolazioni indefinite)
+        pivot = pivot.ffill(limit=self.max_ffill_days)
+
+        # 4. Rilevamento anomalie di rendimento (Z-score su salti estremi)
+        pct_chg = pivot.pct_change()
+        for tk in available_tickers:
+            rets = pct_chg[tk].dropna()
+            if len(rets) > 20:
+                std_ret = float(rets.std())
+                if std_ret > 1e-8:
+                    z_scores = (rets - rets.mean()) / std_ret
+                    extreme_jumps = z_scores[z_scores.abs() > self.z_score_jump_threshold]
+                    for dt, val in extreme_jumps.items():
+                        report.abnormal_returns.append({
+                            "ticker": tk,
+                            "date": dt.strftime("%Y-%m-%d"),
+                            "z_score": round(float(val), 2),
+                            "daily_return_pct": round(float(rets[dt]) * 100, 2)
+                        })
+                        report.warnings.append(
+                            f"Salto anomalo di prezzo su '{tk}' in data {dt.strftime('%Y-%m-%d')}: "
+                            f"variazione {rets[dt]*100:.2f}% (Z-Score: {val:.1f})."
+                        )
+
+        report.active_tickers = sorted(list(available_tickers))
+        report.is_valid = len(report.active_tickers) > 0
+        return pivot, report
+

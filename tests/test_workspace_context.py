@@ -191,3 +191,49 @@ def test_session_cache_isolation_and_persistence():
     ctx_b.clear_persisted_cache()
     assert not os.path.exists(path_a)
     assert not os.path.exists(path_b)
+
+
+def test_session_snapshot_json_export_and_import():
+    """Verifica l'esportazione e l'importazione deterministica di snapshot di sessione in formato JSON."""
+    ctx = WorkspaceContext(session_id="export_test_uuid")
+    ctx.risk.portfolio_id = 99
+    ctx.risk.portfolio_name = "Quant Snapshot Portfolio"
+    ctx.risk.benchmark = "IWDA.AS"
+    ctx.risk.base_currency = "EUR"
+    ctx.risk.risk_free_rate = 0.025
+    ctx.ui.page_subtabs = {"tech_page": "Bollinger Bands"}
+    ctx.ui.active_filters = {"date_range": "3Y"}
+
+    df_pos = pd.DataFrame([
+        {"ticker": "NVDA", "quantity": 100.0, "current_value": 12000.0},
+        {"ticker": "MSFT", "quantity": 50.0, "current_value": 20000.0}
+    ])
+    ctx.risk.results = {
+        "positions": df_pos,
+        "metrics": {"portfolio_value": 32000.0, "sharpe_ratio": 1.45}
+    }
+
+    # 1. Esportazione dello snapshot
+    snapshot = ctx.export_session_snapshot()
+
+    assert isinstance(snapshot, dict)
+    assert snapshot["schema_version"] == "8.1.0"
+    assert snapshot["risk"]["portfolio_name"] == "Quant Snapshot Portfolio"
+    assert snapshot["risk"]["benchmark"] == "IWDA.AS"
+    assert len(snapshot["risk"]["positions"]) == 2
+    assert snapshot["ui"]["active_filters"]["date_range"] == "3Y"
+
+    # 2. Importazione in un contesto vuoto
+    new_ctx = WorkspaceContext(session_id="import_target_uuid")
+    success = new_ctx.import_session_snapshot(snapshot)
+
+    assert success is True
+    assert new_ctx.risk.portfolio_name == "Quant Snapshot Portfolio"
+    assert new_ctx.risk.benchmark == "IWDA.AS"
+    assert new_ctx.risk.risk_free_rate == 0.025
+    assert new_ctx.risk.is_live_active is True
+    assert isinstance(new_ctx.risk.results["positions"], pd.DataFrame)
+    assert len(new_ctx.risk.results["positions"]) == 2
+    assert new_ctx.ui.active_filters.get("date_range") == "3Y"
+    assert new_ctx.risk.get_total_equity() == 32000.0
+
