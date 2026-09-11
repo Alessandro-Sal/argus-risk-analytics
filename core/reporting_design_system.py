@@ -173,6 +173,15 @@ if HAS_REPORTLAB:
                 textColor=colors.HexColor(p.ACCENT_EMERALD),
                 alignment=1
             ),
+            "KpiValueCrimson": ParagraphStyle(
+                "KpiValueCrimson",
+                parent=base_styles["Normal"],
+                fontName="Helvetica-Bold",
+                fontSize=12,
+                leading=15,
+                textColor=colors.HexColor(p.ACCENT_CRIMSON),
+                alignment=1
+            ),
             "TableHeader": ParagraphStyle(
                 "TableHeader",
                 parent=base_styles["Normal"],

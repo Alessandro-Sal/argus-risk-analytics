@@ -412,7 +412,7 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                     st.success(f"Singola analisi `{sel_row.run_id}` eliminata con successo dal Database `{st.session_state.get('db_name')}`!")
                     st.rerun()
 
-# ── BANNER SESSIONE ATTIVA & RESET ──────────────────────────
+# ── BANNER SESSIONE ATTIVA & RESET / ONBOARDING ─────────────
 if st.session_state.get("pipeline_done"):
     col_act1, col_act2 = st.columns([3.2, 1.2])
     with col_act1:
@@ -434,6 +434,24 @@ if st.session_state.get("pipeline_done"):
                 st.session_state.pop(k, None)
             clear_session_cache()
             WorkspaceContext.get_current().flush_risk_domain()
+            st.rerun()
+else:
+    col_onb1, col_onb2 = st.columns([3.2, 1.2])
+    with col_onb1:
+        st.markdown("""
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px dashed rgba(56, 189, 248, 0.35); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display:flex; align-items:center; gap:10px;">
+            <span style="font-size:20px;">🛡️</span>
+            <div style="font-size:12.5px; color:#cbd5e1;">
+                <b>Primo Avvio / Nessun Portafoglio Attivo:</b> Vuoi esplorare subito l'intera suite senza caricare file?
+                <span style="color:#38bdf8;">Avvia lo scenario dimostrativo a 5 pilastri patrimoniali con un singolo click.</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_onb2:
+        if st.button("⚡ Carica Demo (5 Pilastri)", type="primary", use_container_width=True, help="Inizializza istantaneamente uno scenario completo con Azioni, BTP, Cassa, Immobile e Mutuo.", key="btn_onboarding_top_demo"):
+            from core.unified_demo_seeder import seed_unified_demo_scenario
+            seed_unified_demo_scenario()
+            st.toast("✅ Portafoglio Demo Istituzionale caricato con successo!", icon="🚀")
             st.rerun()
 
 # ── COMMAND TABS DELLA CONTROL ROOM ──────────────────────────
