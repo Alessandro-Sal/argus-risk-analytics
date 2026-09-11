@@ -230,7 +230,7 @@ class NeuralWealthAdvisor:
             "## ⚖️ 3. Nota di Conformità e Governance",
             "Il presente documento costituisce una perizia analitica e quantitativa a supporto delle decisioni strategiche del Family Office. Non costituisce consulenza personalizzata in materia di investimenti ex Art. 24-25 MiFID II / Art. 21 TUF. Tutte le indicazioni sono formulate nel rispetto del quadro tributario italiano (TUIR, D.Lgs. 346/1990) e dei principi di gestione prudenziale del rischio.",
             "",
-            "*ARGUS Institutional Intelligence Engine v6.3.0*"
+            "*ARGUS Institutional Intelligence Engine v9.0.0*"
         ])
 
         return "\n".join(lines)

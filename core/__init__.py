@@ -1,4 +1,6 @@
 # Core module
+__version__ = "9.0.0"
+
 from core.metadata_resolver import resolve_asset_metadata
 from core.duckdb_engine import (
     compute_duckdb_asset_sector_currency_cube,

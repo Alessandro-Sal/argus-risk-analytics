@@ -522,7 +522,7 @@ class WorkspaceContext:
             metrics = self.risk.results.get("metrics", {}) if (self.risk.results and isinstance(self.risk.results, dict)) else {}
 
             return {
-                "schema_version": "8.1.0",
+                "schema_version": "9.0.0",
                 "session_id": self.session_id,
                 "exported_at": datetime.now().isoformat(),
                 "risk": {

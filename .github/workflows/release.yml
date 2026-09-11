@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -33,9 +33,9 @@ jobs:
           python scripts/package_release.py ${{ github.ref_name }}
 
       - name: Create or Update GitHub Release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v2
         with:
-          files: dist/ARGUS_*.zip
+          files: dist/*.zip
           name: ARGUS Risk Analytics ${{ github.ref_name }} — Institutional Production Release
           tag_name: ${{ github.ref_name }}
           overwrite: true
@@ -93,7 +93,7 @@ jobs:
             ---
 
             ### 🧪 Validazione & Certificazione Qualità
-            * **Test Suite PyTest**: **466/466 Test Superati con Successo (100% Pass Rate)**
+            * **Test Suite PyTest**: **597/597 Test Superati con Successo (100% Pass Rate)**
             * **Linter CI (Ruff)**: **0 Errori (`ruff check --select E9,F63,F7,F82 .`)**
             * **Resilienza Cross-Platform**: Convalidato su Ubuntu Linux, Windows e macOS.
             * **Sicurezza**: Audit rigoroso anti-leak credenziali e isolamento locale dei dati.

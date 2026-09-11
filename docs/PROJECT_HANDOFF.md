@@ -1,4 +1,4 @@
-# Investment Risk & Wealth Intelligence Platform — Project Handoff (v8.4.0 Enterprise Release)
+# Investment Risk & Wealth Intelligence Platform — Project Handoff (v9.0.0 Enterprise Release)
 
 > File di contesto esaustivo per la manutenzione futura, lo sviluppo di moduli aggiuntivi o l'integrazione di ARGUS con infrastrutture di analisi terze.
 
@@ -6,12 +6,12 @@
 
 ## 1. Contesto Generale e Obiettivi del Progetto
 
-**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v8.4.0.
+**Piattaforma**: ARGUS — Quantitative Risk, AI Analytics, Portfolio BI, Wealth Ecosystem & Enterprise Resilience v9.0.0.
 
 **Stack Tecnologico del Sistema**:
 - **Python 3.11+ / 3.14**: Motore ETL, Data Quality Gate (Pydantic v2), Risk Engine quantitativo, Live Terminal Desk (Pre-Trade Checks & OMS Blotter), Backup Engine, Security Vault, AI Analyst (Dual-Engine LLM/NLG con Guardrails MiFID II / Art. 21 TUF), Modelli Econometrici e di Bilancio, Generazione PDF/Excel/HTML/Parquet, Plotly Institutional Framework e Design System.
 - **Embedded DuckDB & MySQL 8.0 / SQLite (SQLAlchemy ORM)**: Data Warehouse relazionale, calcolo analitico colonnare vettorizzato (C++ SIMD), indici B-Tree time-series compositi e storicizzazione snapshot (`data/argus_local.db`, `data/argus_wealth.db`).
-- **Streamlit**: Web Application Framework reattivo ad alta densità per 21 moduli istituzionali divisi tra Sezione Risk e Sezione Wealth con Navigation Rail ad albero bidirezionale, State Management isolato (`core/workspace_context.py`), Design System *Obsidian Sovereign* (`core/ui_utils.py`) e Plotly Chart Factory (`apply_custom_chart_layout`).
+- **Streamlit**: Web Application Framework reattivo ad alta densità per 22 moduli istituzionali divisi tra Sezione Risk e Sezione Wealth con Navigation Rail ad albero bidirezionale, State Management isolato (`core/workspace_context.py`), Design System *Obsidian Sovereign* (`core/ui_utils.py`) e Plotly Chart Factory (`apply_custom_chart_layout`).
 - **PyWebView & PyInstaller**: Architettura Desktop Nativa Windows (WebView2 engine, finestra dedicata, backup pre-flight, bootstrap in-process fallback, compilazione standalone portatile con `argus_desktop.spec`).
 - **Power BI & Google Looker Studio**: Executive Dashboards basate su pacchetto Star Schema ZIP (`dim_assets.csv`, `fact_positions.csv`, `fact_portfolio_summary.csv`).
 - **Excel (`openpyxl`/`xlsxwriter`)**: Modello tattico What-If, formule RTD Bloomberg (`=ARGUS_BDP`, `=ARGUS_BDH`, `=ARGUS_RISK`), tabelle native `ListObject` con formule live sanitizzate anti-formula injection.
@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **556 test automatizzati (100% passed)** su 94 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **597 test automatizzati (100% passed)** su 99 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -408,9 +408,9 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 550 passed in ~88.00s (100%) =======================
+======================= 597 passed in ~79.00s (100%) =======================
 ```
 
 ---
 
-*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v8.4.0 Enterprise Release.*
+*ARGUS Risk & Wealth Analytics Platform — Documento di Handoff Tecnico v9.0.0 Enterprise Release.*

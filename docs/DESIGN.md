@@ -329,4 +329,24 @@ Con la trasformazione Next-Level Tier-1, il design system di ARGUS introduce 4 n
 * **Median Trajectory Line ($P_{50}$):** Linea continua in verde smeraldo che traccia l'aspettativa mediana di patrimonio netto aggregato.
 * **Safe Spending Corridor Overlay:** Linea tratteggiata in oro ambrato che delimita il tetto massimo di spesa annua sostenibile al 95° percentile senza rischio di rovina finanziaria precoce.
 
+---
+
+## 15. Institutional Dual-Engine Architecture & Onboarding Experience (v9.0.0)
+
+La major release **v9.0.0** introduce un'evoluzione radicale dell'esperienza utente e dell'architettura di front-end istituzionale:
+
+### 15.1 Dual-Engine Sidebar & Navigation Rail Segregation
+* **Segregazione Rigorosa dei Domini**: Separazione fisica e visiva tra il modulo *Risk Analytics & Quantitative Intelligence* (11 pagine analitiche) e il modulo *Wealth Management, Cash Flow & Fiscalità* (11 pagine di pianificazione patrimoniale).
+* **Zero-Recalc Session Persistence**: Gestione dello stato tramite `WorkspaceContext` tipizzato con salvataggio isolato e ripristino istantaneo senza ricalcoli onerosi tra cambi di pagina o widget switch.
+* **Parametri Snelliti & Smart Defaults**: Raggruppamento dei controlli avanzati in container comprimibili (*"Impostazioni Avanzate di Calcolo"*), riducendo il rumore visivo iniziale e velocizzando l'operatività quotidiana.
+
+### 15.2 Empty-State Onboarding & 5-Pillar Demo Seeder
+* **Accoglienza al Primo Avvio**: Gestione elegante delle sessioni prive di portafoglio caricato, con card interattiva di benvenuto e guida al caricamento.
+* **One-Click Demo Seeder**: Iniezione istantanea di un portafoglio dimostrativo realistico basato sui 5 pilastri (*Liquidità, Obbligazioni Governative, Azioni Globali, Real Estate e Capitale Umano*) per esplorare l'intera piattaforma senza configurazioni preliminari.
+
+### 15.3 Vector Factsheet Engine & ReportLab MiFID II Compliance
+* **Separazione Plotly / Vettoriale**: Disaccoppiamento tra visualizzazione interattiva a schermo (Plotly WebGL) e rendering vettoriale per stampa/export (ReportLab A4 `InstitutionalNumberedCanvas`).
+* **Factsheet Conforme MiFID II & Quadro RW**: Generatore PDF istituzionale a 2 pagine con risk disclosure formale, matrici di rendimento, scomposizione della volatilità e riepilogo fiscale per il monitoraggio transfrontaliero.
+
+
 

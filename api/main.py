@@ -191,7 +191,7 @@ def create_app() -> FastAPI:
             "Cornish-Fisher VaR/CVaR, Hierarchical Risk Parity (HRP) portfolio optimization, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="8.4.0",
+        version="9.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -215,7 +215,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="8.4.0",
+            version="9.0.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
