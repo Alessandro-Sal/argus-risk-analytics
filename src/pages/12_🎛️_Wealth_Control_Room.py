@@ -93,7 +93,12 @@ from core.archetype_manager import (
 
 
 # ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────
-st.set_page_config(page_title="Wealth Control Room | ARGUS", page_icon="🎛️", layout="wide")
+st.set_page_config(
+    page_title="Wealth Control Room | ARGUS",
+    page_icon="🎛️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
 
 ctx = ensure_portal_context(module="wealth")
@@ -109,25 +114,26 @@ render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
 p_bar_c1, p_bar_c2, p_bar_c3, p_bar_c4 = st.columns([3.2, 1.1, 1.1, 1.4])
 with p_bar_c1:
-    opts = list(profile_map.keys())
-    if opts:
-        curr_idx = opts.index(current_pid) if current_pid in opts else 0
-        if st.session_state.get("wealth_profile_selector_widget") != current_pid and current_pid in opts:
-            st.session_state["wealth_profile_selector_widget"] = current_pid
+    opts = [None] + list(profile_map.keys())
+    curr_idx = opts.index(current_pid) if current_pid in opts else 0
+    if st.session_state.get("wealth_profile_selector_widget") != current_pid and current_pid in opts:
+        st.session_state["wealth_profile_selector_widget"] = current_pid
 
-        def _on_wealth_profile_change():
-            new_val = st.session_state.get("wealth_profile_selector_widget")
-            if new_val is not None and new_val in profile_map:
-                st.session_state["wealth_active_portfolio_id"] = new_val
+    def _on_wealth_profile_change():
+        new_val = st.session_state.get("wealth_profile_selector_widget")
+        if new_val is not None and new_val in profile_map:
+            st.session_state["wealth_active_portfolio_id"] = new_val
+        elif new_val is None:
+            st.session_state["wealth_active_portfolio_id"] = None
 
-        selected_pid = st.selectbox(
-            "💼 Profilo Patrimoniale Attivo:",
-            options=opts,
-            format_func=lambda pid: f"📁 {profile_map[pid]} (ID #{pid})",
-            index=curr_idx,
-            key="wealth_profile_selector_widget",
-            on_change=_on_wealth_profile_change
-        )
+    selected_pid = st.selectbox(
+        "💼 Profilo Patrimoniale Attivo:",
+        options=opts,
+        format_func=lambda pid: "-- Seleziona Profilo Patrimoniale --" if pid is None else f"📁 {profile_map[pid]} (ID #{pid})",
+        index=curr_idx,
+        key="wealth_profile_selector_widget",
+        on_change=_on_wealth_profile_change
+    )
 
 with p_bar_c2:
     st.write("")
@@ -166,12 +172,8 @@ with p_bar_c4:
             st.switch_page("pages/13_🏛️_Patrimonio_e_NetWorth.py")
 
 if current_pid is None:
-    st.markdown("""
-    <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-        <h4 style="color:#ffffff; margin:0 0 6px 0;">👋 Nessun Profilo Patrimoniale Selezionato</h4>
-        <p style="color:#94a3b8; font-size:13px; margin:0;">Seleziona un profilo dal menu a tendina in alto (es. <b>Personale</b>) oppure creane uno nuovo con <b>➕ Nuovo</b> per iniziare.</p>
-    </div>
-    """, unsafe_allow_html=True)
+    from core.ui_utils import render_wealth_profile_picker
+    render_wealth_profile_picker(engine, profile_map, key_prefix="p12_picker")
     st.stop()
 
 
@@ -433,7 +435,7 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
                     snap_data = load_wealth_snapshot_details(engine, sel_sid)
                     if snap_data:
                         st.session_state["wealth_active_snapshot"] = snap_data
-                        st.session_state["wealth_active_portfolio_id"] = snap_data.get("portfolio_id", 1)
+                        st.session_state["wealth_active_portfolio_id"] = snap_data.get("portfolio_id")
                         st.success(f"✅ Snapshot '{snap_data.get('snapshot_name')}' ({snap_data.get('snapshot_date')}) caricato con successo!")
                         st.rerun()
                     else:

@@ -27,6 +27,7 @@ from core.ui_utils import (
     render_wealth_command_bar,
     render_wealth_executive_badges,
     ensure_portal_context,
+    ensure_portfolio_loaded,
     render_data_table,
     render_segmented_tabs,
     section,
@@ -138,6 +139,8 @@ st.session_state.db_name = db_name
 engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
 init_wealth_db(engine)
 
+ensure_portfolio_loaded(module_type="wealth")
+
 
 # ── CONTROLLO MODALITÀ SNAPSHOT STORICO O LIVE ───────────────
 is_snapshot_mode = ("wealth_active_snapshot" in st.session_state and st.session_state["wealth_active_snapshot"] is not None)
@@ -182,13 +185,14 @@ else:
     current_pid = st.session_state.get("wealth_active_portfolio_id")
 
     if current_pid is None or current_pid not in prof_map:
-        if prof_map:
-            current_pid = list(prof_map.keys())[0]
-            st.session_state["wealth_active_portfolio_id"] = current_pid
-        else:
-            ctx = ensure_portal_context(module="wealth")
-            current_pid = ctx["portfolio_id"]
-            prof_map = ctx["profile_map"]
+        current_pid = None
+        st.session_state["wealth_active_portfolio_id"] = None
+
+    if current_pid is None:
+        render_omni_command_bar(portal="wealth", context_name="Nessun Profilo", key_suffix="p13")
+        from core.ui_utils import render_wealth_profile_picker
+        render_wealth_profile_picker(engine, prof_map, key_prefix="p13_picker")
+        st.stop()
 
     nw = _load_cached_consolidated_net_worth(engine, portfolio_id=current_pid)
     tot_nw = nw.total_net_worth
@@ -206,7 +210,7 @@ else:
 
     df_accounts = _load_cached_wealth_accounts(engine, portfolio_id=current_pid)
 
-prof_title = prof_map.get(current_pid, "Personale")
+prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p13")
 render_wealth_executive_badges(nw)
 

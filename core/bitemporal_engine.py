@@ -12,6 +12,7 @@ MiFID II, AIFMD e GIPS per Family Office, SGR e Wealth Management:
 4. Motore di query storiche Point-in-Time bidimensionali ("Time-Travel Machine") e rilevamento drift retroattivi.
 """
 
+from collections import deque
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -531,7 +532,7 @@ class BitemporalLedgerEngine:
               -- 2. System Time: cosa era noto alla data di conoscenza richiesta
               AND sys_from   <= ?::TIMESTAMP
               AND sys_to     >  ?::TIMESTAMP
-            ORDER BY valid_from ASC
+            ORDER BY valid_from ASC, tx_business_id ASC
         """
         return self.con.execute(query, [
             portfolio_id, as_at_valid_time, as_at_valid_time, sys_target, sys_target
@@ -579,7 +580,7 @@ class BitemporalLedgerEngine:
         df_tx = self.time_travel_query(portfolio_id, as_at_valid_time, as_of_system_time)
         df_app = self.time_travel_appraisals(portfolio_id, as_at_valid_time, as_of_system_time)
 
-        holdings: Dict[str, Dict[str, float]] = {}
+        holdings_lots: Dict[str, deque] = {}
         cash_balance_eur = 0.0
 
         for _, row in df_tx.iterrows():
@@ -596,28 +597,39 @@ class BitemporalLedgerEngine:
                 cash_balance_eur += net_eur
             elif op == "BUY":
                 cash_balance_eur -= net_eur
-                if asset not in holdings:
-                    holdings[asset] = {"shares": 0.0, "invested_eur": 0.0}
-                holdings[asset]["shares"] += qty
-                holdings[asset]["invested_eur"] += net_eur
+                if asset not in holdings_lots:
+                    holdings_lots[asset] = deque()
+                unit_cost = net_eur / qty if qty > 1e-9 else 0.0
+                holdings_lots[asset].append([qty, unit_cost])
             elif op == "SELL":
                 cash_balance_eur += net_eur
-                if asset in holdings:
-                    holdings[asset]["shares"] = max(0.0, holdings[asset]["shares"] - qty)
+                if asset in holdings_lots:
+                    qty_to_sell = qty
+                    while qty_to_sell > 1e-9 and holdings_lots[asset]:
+                        lot = holdings_lots[asset][0]
+                        if lot[0] <= qty_to_sell + 1e-9:
+                            qty_to_sell -= lot[0]
+                            holdings_lots[asset].popleft()
+                        else:
+                            lot[0] -= qty_to_sell
+                            qty_to_sell = 0.0
 
-        # Calcola WACP per gli asset in portafoglio
+        # Calcola consistenze e PMC/costo di carico per gli asset in portafoglio (FIFO fiscale TUIR Art. 68)
         positions_summary = []
-        for asset, data in holdings.items():
-            if data["shares"] > 1e-6:
-                pmc = (data["invested_eur"] / data["shares"]) if data["shares"] > 0 else 0.0
+        for asset, lots in holdings_lots.items():
+            tot_shares = sum(lot[0] for lot in lots)
+            if tot_shares > 1e-6:
+                tot_cost = sum(lot[0] * lot[1] for lot in lots)
+                pmc = (tot_cost / tot_shares) if tot_shares > 0 else 0.0
                 positions_summary.append({
                     "asset_id": asset,
-                    "shares": round(data["shares"], 4),
+                    "shares": round(tot_shares, 4),
                     "wacp_eur": round(pmc, 2),
-                    "cost_value_eur": round(data["invested_eur"], 2)
+                    "cost_value_eur": round(tot_cost, 2)
                 })
 
         illiquid_total = float(df_app["net_liquidation_value"].sum()) if not df_app.empty else 0.0
+        tot_positions_cost = sum(p["cost_value_eur"] for p in positions_summary)
 
         return {
             "portfolio_id": portfolio_id,
@@ -626,8 +638,9 @@ class BitemporalLedgerEngine:
             "cash_balance_eur": round(cash_balance_eur, 2),
             "positions_count": len(positions_summary),
             "positions": positions_summary,
+            "positions_cost_eur": round(tot_positions_cost, 2),
             "illiquid_appraisals_eur": round(illiquid_total, 2),
-            "total_book_value_eur": round(cash_balance_eur + sum(p["cost_value_eur"] for p in positions_summary) + illiquid_total, 2),
+            "total_book_value_eur": round(cash_balance_eur + tot_positions_cost + illiquid_total, 2),
             "tx_count": len(df_tx),
             "appraisals_count": len(df_app)
         }
@@ -744,7 +757,7 @@ class BitemporalLedgerEngine:
                 col_map[col] = "tx_date"
             elif c_lower in ["ticker", "symbol", "asset", "asset_id", "isin"]:
                 col_map[col] = "ticker"
-            elif c_lower in ["tx_type", "type", "operation_type", "operazione", "tipo"]:
+            elif c_lower in ["tx_type", "type", "operation_type", "operazione", "tipo", "action"]:
                 col_map[col] = "tx_type"
             elif c_lower in ["quantity", "shares", "quantita", "quote", "qty"]:
                 col_map[col] = "quantity"
@@ -766,10 +779,10 @@ class BitemporalLedgerEngine:
         self.con.execute("DELETE FROM bitemporal_asset_appraisals WHERE portfolio_id = ?", [portfolio_id])
         self.con.execute("DELETE FROM audit_decision_log WHERE entity_id = ?", [portfolio_id])
 
-        # Parsing e ordinamento cronologico
+        # Parsing e ordinamento cronologico stabile (preserva la sequenza di operazioni intraday)
         if "tx_date" in df.columns:
             df["tx_date_parsed"] = pd.to_datetime(df["tx_date"], errors="coerce")
-            df = df.sort_values(by="tx_date_parsed", ascending=True).reset_index(drop=True)
+            df = df.sort_values(by="tx_date_parsed", ascending=True, kind="stable").reset_index(drop=True)
             earliest_dt = df["tx_date_parsed"].dropna().min()
         else:
             df["tx_date_parsed"] = datetime.now()
@@ -785,19 +798,38 @@ class BitemporalLedgerEngine:
 
         # Calcolo liquidità iniziale
         starting_cash_injected = 0.0
-        if starting_cash is not None and starting_cash > 0:
-            starting_cash_injected = float(starting_cash)
+        if starting_cash is not None:
+            starting_cash_injected = max(0.0, float(starting_cash))
         elif not has_cash_in:
-            total_buy_cost = 0.0
+            # Calcolo del fabbisogno reale di cassa iniziale (Peak Cash Deficit)
+            # Invece di iniettare un multiplo forfettario di tutti gli acquisti storici (che raddoppierebbe
+            # fittiziamente il book value ad ogni vendita), calcoliamo l'esatto capitale iniziale minimo
+            # necessario affinché il conto di tesoreria non vada mai a scoperto durante l'intera storia.
+            cum_cash = 0.0
+            min_cash = 0.0
             for _, r in df.iterrows():
-                op = str(r.get("tx_type", "BUY")).upper()
-                if "BUY" in op or "ACQUISTO" in op:
-                    q = float(r.get("quantity", 0.0) or 0.0)
-                    p = float(r.get("price", 0.0) or 0.0)
-                    f = float(r.get("fees", 0.0) or 0.0)
-                    total_buy_cost += (q * p) + f
-            if total_buy_cost > 0:
-                starting_cash_injected = round(total_buy_cost * 1.10, 2)
+                raw_op = str(r.get("tx_type", "BUY")).upper()
+                q = abs(float(r.get("quantity", 0.0) or 0.0))
+                p = float(r.get("price", 0.0) or 0.0)
+                f = float(r.get("fees", 0.0) or 0.0) if pd.notna(r.get("fees")) else 0.0
+                t = float(r.get("taxes", 0.0) or 0.0) if pd.notna(r.get("taxes")) else 0.0
+
+                if "BUY" in raw_op or "ACQUISTO" in raw_op:
+                    cum_cash -= ((q * p) + f + t)
+                elif "SELL" in raw_op or "VENDITA" in raw_op:
+                    cum_cash += ((q * p) - f - t)
+                elif "DIVIDEND" in raw_op or "DIV" in raw_op:
+                    cum_cash += (p - f - t) if p > 0 else 0.0
+                elif "CASH_IN" in raw_op or "DEPOSIT" in raw_op:
+                    cum_cash += (p - f - t) if p > 0 else (q - f - t)
+                elif "CASH_OUT" in raw_op or "PRELIEVO" in raw_op:
+                    cum_cash -= (p + f + t) if p > 0 else (q + f + t)
+
+                if cum_cash < min_cash:
+                    min_cash = cum_cash
+
+            if min_cash < -1e-6:
+                starting_cash_injected = round(-min_cash, 2)
 
         if starting_cash_injected > 0:
             init_cash_vt = (earliest_dt - pd.Timedelta(minutes=5)).strftime("%Y-%m-%d %H:%M:%S")

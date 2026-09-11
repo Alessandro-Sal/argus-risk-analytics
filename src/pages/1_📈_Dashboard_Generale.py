@@ -24,7 +24,7 @@ from core.ui_utils import (
     apply_chart_theme,
     render_factor_radar_chart,
     render_info_modal,
-    ensure_risk_bundle_loaded,
+    ensure_portfolio_loaded,
     render_sandbox_banner
 )
 from core.excel_generator import generate_excel_in_memory
@@ -34,7 +34,7 @@ inject_custom_css()
 from core.sidebar import render_sidebar
 render_sidebar()
 
-results, has_real = ensure_risk_bundle_loaded()
+results, has_real = ensure_portfolio_loaded(module_type="risk")
 m   = results.get("metrics", {})
 ret = m.get("returns", {})
 mk  = m.get("market_risk", {})

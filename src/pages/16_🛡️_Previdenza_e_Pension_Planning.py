@@ -60,21 +60,13 @@ prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
 current_pid = st.session_state.get("wealth_active_portfolio_id")
 
 if current_pid is None or current_pid not in prof_map:
-    if prof_map:
-        pers_matches = [pid for pid, nm in prof_map.items() if nm == "Personale"]
-        current_pid = pers_matches[0] if pers_matches else list(prof_map.keys())[0]
-        st.session_state["wealth_active_portfolio_id"] = current_pid
-    else:
-        st.title("🛡️ ARGUS Wealth — Previdenza & Pensione")
-        st.markdown("""
-        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(16,185,129,0.3); border-left:4px solid #10b981; border-radius:10px; padding:18px 22px; margin: 18px 0;">
-            <h4 style="color:#ffffff; margin:0 0 6px 0;">📁 Nessun Profilo Patrimoniale Trovato</h4>
-            <p style="color:#94a3b8; font-size:13px; margin:0 0 14px 0;">Crea un profilo nella Wealth Control Room per visualizzare i fondi pensione e le proiezioni.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.stop()
+    current_pid = None
+    st.session_state["wealth_active_portfolio_id"] = None
+    from core.ui_utils import render_wealth_profile_picker
+    render_wealth_profile_picker(engine, prof_map, key_prefix="p16_picker")
+    st.stop()
 
-prof_title = prof_map.get(current_pid, "Personale")
+prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p16")
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)

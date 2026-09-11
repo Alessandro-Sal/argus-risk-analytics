@@ -35,6 +35,7 @@ from core.ui_utils import (
     apply_plotly_theme,
     apply_chart_theme,
     ensure_portal_context,
+    ensure_portfolio_loaded,
     render_data_table
 )
 from core.sidebar import render_sidebar
@@ -63,11 +64,18 @@ st.set_page_config(page_title="Cash Flow & Spese | ARGUS Wealth", page_icon="�
 st.session_state.argus_portal_mode = "🏛️ Wealth Management"
 
 ctx = ensure_portal_context(module="wealth")
+ensure_portfolio_loaded(module_type="wealth")
 engine = ctx["engine"]
 current_pid = ctx["portfolio_id"]
 prof_title = ctx["profile_name"]
 prof_map = ctx["profile_map"]
 nw_curr = ctx["net_worth"]
+
+if current_pid is None:
+    render_omni_command_bar(portal="wealth", context_name="Nessun Profilo", key_suffix="p14")
+    from core.ui_utils import render_wealth_profile_picker
+    render_wealth_profile_picker(engine, prof_map, key_prefix="p14_picker")
+    st.stop()
 
 df_cf = get_cashflow_records(engine, portfolio_id=current_pid)
 if not df_cf.empty:

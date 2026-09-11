@@ -27,6 +27,7 @@ from core.ui_utils import (
     apply_plotly_theme,
     apply_chart_theme,
     ensure_portal_context,
+    ensure_portfolio_loaded,
     render_data_table
 )
 from core.sidebar import render_sidebar
@@ -43,11 +44,18 @@ from core.wealth.wealth_modals import render_illiquids_methodology_modal
 st.set_page_config(page_title="Asset Illiquidi & Orologi | ARGUS Wealth", page_icon="⌚", layout="wide")
 
 ctx = ensure_portal_context(module="wealth")
+ensure_portfolio_loaded(module_type="wealth")
 engine = ctx["engine"]
 current_pid = ctx["portfolio_id"]
 prof_title = ctx["profile_name"]
 prof_map = ctx["profile_map"]
 nw_curr = ctx["net_worth"]
+
+if current_pid is None:
+    render_omni_command_bar(portal="wealth", context_name="Nessun Profilo", key_suffix="p15")
+    from core.ui_utils import render_wealth_profile_picker
+    render_wealth_profile_picker(engine, prof_map, key_prefix="p15_picker")
+    st.stop()
 
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p15")
 render_wealth_executive_badges(nw_curr)

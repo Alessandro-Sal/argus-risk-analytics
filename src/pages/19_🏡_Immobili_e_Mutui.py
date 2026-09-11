@@ -67,16 +67,13 @@ prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
 current_pid = st.session_state.get("wealth_active_portfolio_id")
 
 if current_pid is None or current_pid not in prof_map:
-    # Auto-resolve to Personale or first available profile
-    for pid_candidate, pname in prof_map.items():
-        if pname.strip().lower() == "personale":
-            current_pid = pid_candidate
-            break
-    if current_pid is None and prof_map:
-        current_pid = list(prof_map.keys())[0]
-    st.session_state["wealth_active_portfolio_id"] = current_pid
+    current_pid = None
+    st.session_state["wealth_active_portfolio_id"] = None
+    from core.ui_utils import render_wealth_profile_picker
+    render_wealth_profile_picker(engine, prof_map, key_prefix="p19_picker")
+    st.stop()
 
-prof_title = prof_map.get(current_pid, "Personale")
+prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p19")
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)

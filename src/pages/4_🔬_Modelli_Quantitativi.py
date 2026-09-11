@@ -57,10 +57,10 @@ import core.options_hedging
 import core.volatility_surface
 import core.factor_library
 import core.reinforcement_learning
-from core.ui_utils import ensure_risk_bundle_loaded, render_sandbox_banner
+from core.ui_utils import ensure_portfolio_loaded, render_sandbox_banner
 from core.reinforcement_learning import train_and_evaluate_rl_portfolio
 
-results, has_real = ensure_risk_bundle_loaded()
+results, has_real = ensure_portfolio_loaded(module_type="risk")
 has_portfolio = results is not None and isinstance(results, dict) and bool(results.get("positions") is not None and not results.get("positions").empty)
 m = results.get("metrics", {})
 pos = results.get("positions", pd.DataFrame())

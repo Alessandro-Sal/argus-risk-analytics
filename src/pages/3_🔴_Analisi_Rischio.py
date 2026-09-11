@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import core.ui_utils
 import core.risk_engine
-from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner, render_garch_fhs_modal
+from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_portfolio_loaded, render_sandbox_banner, render_garch_fhs_modal
 from core.regime_switching import compute_market_regime_states
 
 inject_custom_css()
@@ -18,7 +18,7 @@ from core.sidebar import render_sidebar
 render_sidebar()
 render_command_bar()
 
-results, has_real = ensure_risk_bundle_loaded()
+results, has_real = ensure_portfolio_loaded(module_type="risk")
 mk = results.get("metrics", {}).get("market_risk", {})
 con = results.get("metrics", {}).get("concentration", {})
 df_returns = results.get("returns", pd.DataFrame())

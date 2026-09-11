@@ -278,3 +278,193 @@ def test_ingest_portfolio_dataframe_and_available_portfolios():
     assert is_valid is True
     assert cnt >= 1
 
+
+@pytest.mark.skipif(not HAS_DUCKDB, reason="DuckDB non installato nell'ambiente")
+def test_ingest_gsheets_portfolio_and_time_travel():
+    """Verifica l'ingestione e la ricostruzione bitemporale di portafogli strutturati da Google Sheets."""
+    b_engine = BitemporalLedgerEngine(db_path=":memory:")
+    b_engine.seed_demonstration_scenario()
+    
+    # DataFrame con schema tipico restituito dall'ETL Google Sheets / Multi-Portfolio
+    df_gsheets = pd.DataFrame([
+        {
+            "tx_id": 1,
+            "tx_date": "2024-03-10",
+            "tx_type": "BUY",
+            "quantity": 10.0,
+            "price": 150.0,
+            "currency": "EUR",
+            "fees": 2.5,
+            "ticker": "AAPL",
+            "asset_class": "stock",
+            "notes": "Total GSheet (Stocks): 1502.50 EUR"
+        },
+        {
+            "tx_id": 2,
+            "tx_date": "2024-05-15",
+            "tx_type": "BUY",
+            "quantity": 5.0,
+            "price": 300.0,
+            "currency": "EUR",
+            "fees": 3.0,
+            "ticker": "MSFT",
+            "asset_class": "stock",
+            "notes": "Total GSheet (Stocks): 1503.00 EUR"
+        },
+        {
+            "tx_id": 3,
+            "tx_date": "2024-08-20",
+            "tx_type": "BUY",
+            "quantity": 0.5,
+            "price": 50000.0,
+            "currency": "EUR",
+            "fees": 15.0,
+            "ticker": "BTC-EUR",
+            "asset_class": "crypto",
+            "notes": "Total GSheet (Crypto): 25015.00 EUR"
+        },
+        {
+            "tx_id": 4,
+            "tx_date": "2024-11-01",
+            "tx_type": "DIVIDEND",
+            "quantity": 10.0,
+            "price": 1.25,
+            "currency": "EUR",
+            "fees": 0.0,
+            "ticker": "AAPL",
+            "asset_class": "stock",
+            "notes": "Dividendo Q3 AAPL"
+        }
+    ])
+    
+    # Ingestione portafoglio Google Sheets Master
+    pname_master = "Master Wealth Google Sheets"
+    cnt_master = b_engine.ingest_portfolio_dataframe(df_gsheets, portfolio_id=pname_master, recorded_by="GSHEETS_LIVE_SYNC")
+    assert cnt_master == 4
+    
+    # Ingestione sotto-portafoglio Crypto separato
+    df_crypto_sub = df_gsheets[df_gsheets["asset_class"] == "crypto"].copy()
+    pname_crypto = "Wealth Crypto Portfolio"
+    cnt_crypto = b_engine.ingest_portfolio_dataframe(df_crypto_sub, portfolio_id=pname_crypto, recorded_by="GSHEETS_CRYPTO")
+    assert cnt_crypto == 1
+    
+    # Verifica elenco portafogli disponibili contemporaneamente
+    available = b_engine.get_available_portfolios()
+    assert "DEMO_FAMILY_OFFICE" in available
+    assert pname_master in available
+    assert pname_crypto in available
+    
+    # Ricostruzione Point-in-Time al 1 Giugno 2024 (prima di BTC e del dividendo AAPL)
+    recon_jun = b_engine.reconstruct_portfolio_at_times(pname_master, "2024-06-01 23:59:59")
+    assert recon_jun["portfolio_id"] == pname_master
+    assert recon_jun["positions_count"] == 2  # Solo AAPL e MSFT
+    tickers_jun = {p["asset_id"] for p in recon_jun["positions"]}
+    assert tickers_jun == {"AAPL", "MSFT"}
+    assert recon_jun["cash_balance_eur"] > 0
+    assert recon_jun["total_book_value_eur"] > 0
+    
+    # Ricostruzione Point-in-Time a fine anno 2024 (tutti gli asset inclusi)
+    recon_dec = b_engine.reconstruct_portfolio_at_times(pname_master, "2024-12-31 23:59:59")
+    assert recon_dec["positions_count"] == 3  # AAPL, MSFT, BTC-EUR
+    tickers_dec = {p["asset_id"] for p in recon_dec["positions"]}
+    assert tickers_dec == {"AAPL", "MSFT", "BTC-EUR"}
+    
+    # Sigillo Merkle Tree su transazioni Google Sheets
+    txs_master = b_engine.con.execute(
+        "SELECT * FROM bitemporal_transactions WHERE portfolio_id = ? AND sys_to = ?::TIMESTAMP",
+        [pname_master, b_engine.INFINITY_TIMESTAMP]
+    ).fetchdf()
+    merkle_seal = b_engine.generate_merkle_root(txs_master.to_dict(orient="records"))
+    assert len(merkle_seal) == 64
+    assert all(c in "0123456789abcdef" for c in merkle_seal)
+    
+    # Catena crittografica SHA-256 integra
+    is_valid, msg, block_cnt = b_engine.verify_audit_chain_integrity()
+    assert is_valid is True
+    assert block_cnt >= 5
+
+
+@pytest.mark.skipif(not HAS_DUCKDB, reason="DuckDB non installato nell'ambiente")
+def test_bitemporal_reconstruction_fifo_sales():
+    """Verifica che vendite parziali deducano correttamente il PMC e il costo secondo logica FIFO."""
+    b_engine = BitemporalLedgerEngine(db_path=":memory:")
+    
+    df_lots = pd.DataFrame([
+        # Lotto 1: 10 quote a 100 EUR = 1000 EUR
+        {"date": "2024-01-01", "action": "BUY", "quantity": 10.0, "price": 100.0, "currency": "EUR", "fees": 0.0, "ticker": "TEST"},
+        # Lotto 2: 10 quote a 200 EUR = 2000 EUR
+        {"date": "2024-01-02", "action": "BUY", "quantity": 10.0, "price": 200.0, "currency": "EUR", "fees": 0.0, "ticker": "TEST"},
+        # Vendita: 5 quote (consuma 5 quote dal lotto 1 a 100 EUR)
+        {"date": "2024-01-03", "action": "SELL", "quantity": 5.0, "price": 250.0, "currency": "EUR", "fees": 0.0, "ticker": "TEST"},
+    ])
+    
+    b_engine.ingest_portfolio_dataframe(df_lots, portfolio_id="FIFO_TEST")
+    recon = b_engine.reconstruct_portfolio_at_times("FIFO_TEST", "2024-01-04")
+    
+    assert recon["positions_count"] == 1
+    pos = recon["positions"][0]
+    # Rimanenti: 5 quote lotto 1 (5*100=500) + 10 quote lotto 2 (10*200=2000) = 2500 EUR
+    # Totale quote: 15. PMC atteso = 2500 / 15 = 166.67 EUR
+    assert pos["shares"] == 15.0
+    assert pos["cost_value_eur"] == 2500.0
+    assert pos["wacp_eur"] == 166.67
+
+
+@pytest.mark.skipif(not HAS_DUCKDB, reason="DuckDB non installato nell'ambiente")
+def test_stable_sorting_intraday_trades_eliminates_phantom_holdings():
+    """
+    Verifica che operazioni intraday dello stesso giorno (es. BUY 100 -> SELL 100 -> BUY 200 -> SELL 200)
+    preservino il loro ordine relativo tramite stable sort e che la posizione finale si azzeri a 0 titoli
+    senza generare posizioni fantasma.
+    """
+    b_engine = BitemporalLedgerEngine(db_path=":memory:")
+    
+    df_intraday = pd.DataFrame([
+        {"tx_date": "2023-12-08", "ticker": "USDT-EUR", "tx_type": "buy", "quantity": 1074.92, "price": 0.930302, "fees": 0.0},
+        {"tx_date": "2023-12-08", "ticker": "USDT-EUR", "tx_type": "sell", "quantity": 1074.92, "price": 0.929725, "fees": 0.0},
+        {"tx_date": "2023-12-08", "ticker": "USDT-EUR", "tx_type": "buy", "quantity": 1098.41, "price": 0.930135, "fees": 0.0},
+        {"tx_date": "2023-12-08", "ticker": "USDT-EUR", "tx_type": "sell", "quantity": 1098.41, "price": 0.929735, "fees": 0.0},
+    ])
+    
+    b_engine.ingest_portfolio_dataframe(df_intraday, portfolio_id="INTRADAY_ZERO_TEST")
+    recon = b_engine.reconstruct_portfolio_at_times("INTRADAY_ZERO_TEST", "2023-12-09 00:00:00")
+    
+    # Nessun titolo residuo aperto
+    assert recon["positions_count"] == 0
+    assert len(recon["positions"]) == 0
+    assert recon["positions_cost_eur"] == 0.0
+
+
+@pytest.mark.skipif(not HAS_DUCKDB, reason="DuckDB non installato nell'ambiente")
+def test_peak_cash_deficit_model_prevents_artificial_inflation():
+    """
+    Verifica che il modello Peak Cash Deficit inietti esattamente il fabbisogno reale di cassa
+    senza moltiplicare forfettariamente per 110% tutti gli acquisti lordi della storia del portafoglio.
+    """
+    b_engine = BitemporalLedgerEngine(db_path=":memory:")
+    
+    # Esempio: Compra 100 a 100 (€ 10.000), vende a 120 (€ 12.000), ricompra con il ricavato 100 a 110 (€ 11.000)
+    # Totale acquisti lordi: € 21.000. Il vecchio modello iniettava € 23.100.
+    # Il deficit massimo reale è € 10.000 (all'acquisto iniziale).
+    df_reinvest = pd.DataFrame([
+        {"tx_date": "2024-01-01", "ticker": "ASSET_A", "tx_type": "buy", "quantity": 100.0, "price": 100.0, "fees": 0.0},
+        {"tx_date": "2024-01-10", "ticker": "ASSET_A", "tx_type": "sell", "quantity": 100.0, "price": 120.0, "fees": 0.0},
+        {"tx_date": "2024-01-20", "ticker": "ASSET_B", "tx_type": "buy", "quantity": 100.0, "price": 110.0, "fees": 0.0},
+    ])
+    
+    b_engine.ingest_portfolio_dataframe(df_reinvest, portfolio_id="REINVEST_TEST")
+    recon = b_engine.reconstruct_portfolio_at_times("REINVEST_TEST", "2024-01-25 00:00:00")
+    
+    # Posizione aperta: 100 ASSET_B a 110 = 11.000 EUR
+    assert recon["positions_count"] == 1
+    assert recon["positions_cost_eur"] == 11000.0
+    
+    # Saldo cassa residuo: 10.000 (capitale iniziale iniettato) - 10.000 + 12.000 - 11.000 = 1.000 EUR (profitto netto)
+    assert recon["cash_balance_eur"] == 1000.0
+    
+    # Valore contabile book: Cassa (€ 1.000) + Costo Posizioni (€ 11.000) = € 12.000
+    assert recon["total_book_value_eur"] == 12000.0
+
+
+
+

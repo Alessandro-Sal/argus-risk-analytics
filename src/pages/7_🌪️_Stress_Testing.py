@@ -8,7 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import core.ui_utils
 import core.risk_engine
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs, ensure_risk_bundle_loaded, render_sandbox_banner
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs, ensure_portfolio_loaded, render_sandbox_banner
 
 inject_custom_css()
 
@@ -16,7 +16,7 @@ from core.sidebar import render_sidebar
 render_sidebar()
 render_command_bar()
 
-results, has_real = ensure_risk_bundle_loaded()
+results, has_real = ensure_portfolio_loaded(module_type="risk")
 stress = results.get("stress_tests")
 pos = results.get("positions", pd.DataFrame())
 portfolio_value = pos["current_value"].sum() if not pos.empty and "current_value" in pos.columns else 0

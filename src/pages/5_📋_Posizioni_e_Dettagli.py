@@ -11,7 +11,7 @@ import core.risk_engine
 import core.crypto_tax_engine
 import core.duckdb_engine
 import core.execution_algo
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_risk_bundle_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_portfolio_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
 from core.sidebar import render_sidebar
 from core.execution_algo import (
     compute_twap_schedule,
@@ -33,7 +33,7 @@ inject_custom_css()
 render_sidebar()
 render_command_bar()
 
-results, has_real = ensure_risk_bundle_loaded()
+results, has_real = ensure_portfolio_loaded(module_type="risk")
 pos = results.get("positions", pd.DataFrame())
 con = results.get("metrics", {}).get("concentration", {})
 portfolio_name = st.session_state.get("portfolio_name", results.get("sandbox_name", "Portfolio"))

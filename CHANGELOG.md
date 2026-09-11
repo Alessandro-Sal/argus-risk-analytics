@@ -14,6 +14,13 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 Questa major release formalizza l'evoluzione di **ARGUS** da piattaforma monolitica a **Ecosistema Quantitativo Istituzionale di Classe Tier-1**, introducendo la completa segregazione operativa tra Risk Management e Wealth Intelligence, una suite esaustiva di validazione dei modelli conformi a **Federal Reserve SR 11-7**, il modulo di reporting vettoriale MiFID II a 2 pagine e l'onboarding interattivo per nuovi utenti.
 
 ### Aggiunto (Added)
+- **Institutional Splash Screen & Dual-Portal Gateway (`components/splash.py`)**:
+  - Bootloader e splash screen istituzionale con design system Obsidian Dark Glass / Bento Grid Monolith.
+  - Soppressione totale dell'header e delle freccette di espansione sidebar (`stExpandSidebarButton` in Streamlit 1.59+ e legacy `collapsedControl`) per una visualizzazione a schermo intero priva di distrazioni.
+  - Apertura automatica reattiva della sidebar con trigger JavaScript multi-stadio al click su uno dei due ambienti operativi.
+  - Console telemetrica in tempo reale stile Bloomberg B-PIPE con verifica del cluster dual-engine, latenza e storage fabric DuckDB SIMD + SQLite ACID.
+  - Bento Grid monolitica con schede descrittive a 4 righe di metriche e pulsanti CTA fusi senza interruzioni ad altissimo contrasto cromatico.
+  - Certificazione rigorosa dei **22 Moduli Operativi Totali** (12 Moduli Risk & Quant Desk + 10 Moduli Wealth & Advisory Suite).
 - **Dual-Engine Sidebar Navigation Rail**:
   - Segregazione strutturale tra il modulo *Risk Analytics & Quantitative Intelligence* (11 pagine) e il modulo *Wealth Management & Fiscalità Patrimoniale* (11 pagine).
   - Navigation Rail ad albero con sottomenu e sub-tab binding deterministico bidirezionale.

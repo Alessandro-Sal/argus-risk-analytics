@@ -337,7 +337,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
                 db_prt = int(st.session_state.get("db_port", 3306))
                 db_nm = st.session_state.get("db_name", "investment_risk_bi")
                 eng_w = get_engine(db_u, db_p, db_h, db_prt, db_nm)
-                w_pid = st.session_state.get("wealth_active_portfolio_id", 1)
+                w_pid = st.session_state.get("wealth_active_portfolio_id")
                 exec_ctx["df_wealth_accounts"] = get_wealth_accounts(eng_w, portfolio_id=w_pid)
                 exec_ctx["df_wealth_cashflow"] = get_cashflow_records(eng_w, portfolio_id=w_pid)
                 exec_ctx["df_wealth_physical"] = get_physical_assets(eng_w, portfolio_id=w_pid)

@@ -13,28 +13,40 @@ if _root_dir not in sys.path:
 
 import streamlit as st
 
-is_splash_active = not st.session_state.get("splash_dismissed", False)
+
+# Gestione parametri URL e calcolo stato sidebar (collassata all'avvio su splash, aperta nei moduli)
+_qp = getattr(st, "query_params", None)
+_is_splash = not st.session_state.get("_app_initialized", False) and not st.session_state.get("splash_dismissed", False)
+if _qp is not None:
+    if any(k in _qp for k in ("reset", "clear_cache", "reset_cache", "splash")):
+        _is_splash = True
+    elif "skip_splash" in _qp:
+        _is_splash = False
 
 st.set_page_config(
     page_title="Control Room | ARGUS Risk Analytics",
     page_icon="👁️",
     layout="wide",
-    initial_sidebar_state="collapsed" if is_splash_active else "expanded"
+    initial_sidebar_state="collapsed" if _is_splash else "expanded"
 )
 
-if is_splash_active:
-    st.markdown("""
-    <style>
-    section[data-testid="stSidebar"], [data-testid="stSidebar"], [data-testid="collapsedControl"] {
-        display: none !important;
-        visibility: hidden !important;
-        width: 0px !important;
-        height: 0px !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+if _qp is not None:
+    if any(k in _qp for k in ("reset", "clear_cache", "reset_cache")):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.session_state["_app_initialized"] = False
+        st.session_state["splash_dismissed"] = False
+    elif "splash" in _qp:
+        st.session_state["_app_initialized"] = False
+        st.session_state["splash_dismissed"] = False
+
+# ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
+from components.splash import render_splash_screen as render_argus_splash, auto_expand_sidebar
+if render_argus_splash(app_version="9.0.0"):
+    st.stop()
+
+# Apertura automatica della sidebar una volta entrati nella Control Room
+auto_expand_sidebar()
 
 
 import pandas as pd
@@ -45,6 +57,9 @@ import os
 import re
 import html
 import requests
+import logging
+
+logger = logging.getLogger("argus.control_room")
 
 try:
     from dotenv import load_dotenv
@@ -70,12 +85,12 @@ from core.ui_utils import (
     render_validation_report,
     glossary_modal,
     render_info_modal,
-    render_splash_screen,
     render_control_room_hero,
     get_display_portfolio_name,
     render_broker_hub_modal,
     render_duckdb_modal,
 )
+from components.splash import render_splash_screen as render_argus_splash
 import core.multi_portfolio
 from core.multi_portfolio import (
     save_portfolio_profile,
@@ -111,10 +126,6 @@ def fetch_yahoo_ticker_for_isin(isin: str) -> str:
         return ""
 
 inject_custom_css()
-
-# ── Splash Screen (All'avvio) ─────────────────────────────────
-if render_splash_screen():
-    st.stop()
 
 # ── Sidebar (Caricata solo dopo l'accesso al terminale) ───────
 from core.sidebar import render_sidebar
@@ -673,6 +684,39 @@ with tab_ingest:
                         st.session_state["run_id"] = run_id_sync
                         st.session_state["fetch_report"] = f_rep
                         st.session_state.pop("session_cleared", None)
+
+                        # Preservazione consistenza DataFrame transazioni per l'intera sessione
+                        df_tx_sync = None
+                        if isinstance(res_sync, dict):
+                            df_tx_sync = res_sync.get("df_tx") if isinstance(res_sync.get("df_tx"), pd.DataFrame) else res_sync.get("df_tx_raw")
+                        if df_tx_sync is not None and not df_tx_sync.empty:
+                            st.session_state["df_clean"] = df_tx_sync
+                            st.session_state["df_tx"] = df_tx_sync
+
+                        # Sincronizzazione automatica immediata nel Ledger Bitemporale DuckDB
+                        try:
+                            from core.bitemporal_engine import BitemporalLedgerEngine
+                            if "bitemp_engine" not in st.session_state or not isinstance(st.session_state.get("bitemp_engine"), BitemporalLedgerEngine):
+                                st.session_state["bitemp_engine"] = BitemporalLedgerEngine()
+                                st.session_state["bitemp_seed_info"] = st.session_state["bitemp_engine"].seed_demonstration_scenario()
+                            b_eng = st.session_state["bitemp_engine"]
+                            
+                            p_target_name = st.session_state["portfolio_name"]
+                            if df_tx_sync is not None and not df_tx_sync.empty:
+                                b_eng.ingest_portfolio_dataframe(df_tx_sync, portfolio_id=p_target_name, recorded_by="GSHEETS_LIVE_SYNC")
+                                st.session_state["selected_bitemp_port"] = p_target_name
+
+                            # Se presente sincronizzazione duale, ingerisci anche i singoli tab Stocks e Crypto
+                            if dual_info and isinstance(dual_info, dict):
+                                for sub_k in ("stocks", "crypto"):
+                                    sub_d = dual_info.get(sub_k)
+                                    if isinstance(sub_d, dict):
+                                        s_df = sub_d.get("results", {}).get("df_tx")
+                                        s_name = sub_d.get("portfolio_name")
+                                        if isinstance(s_df, pd.DataFrame) and not s_df.empty and s_name:
+                                            b_eng.ingest_portfolio_dataframe(s_df, portfolio_id=s_name, recorded_by=f"GSHEETS_{sub_k.upper()}")
+                        except Exception as e_bitemp_auto:
+                            logger.warning(f"Auto-ingest bitemporale Google Sheets: {e_bitemp_auto}")
                         
                         if dual_info and "stocks" in dual_info and "crypto" in dual_info:
                             st.session_state["gs_dual_sync_success"] = {
@@ -1992,61 +2036,160 @@ with tab_bitemporal:
     importlib.reload(core.bitemporal_engine)
     from core.bitemporal_engine import BitemporalLedgerEngine
 
+    CURRENT_BITEMP_ENGINE_VERSION = "2026.09.11_v3_peak_deficit_stable"
     if (
         "bitemp_engine" not in st.session_state
+        or st.session_state.get("bitemp_engine_version") != CURRENT_BITEMP_ENGINE_VERSION
         or not hasattr(st.session_state["bitemp_engine"], "get_available_portfolios")
         or not hasattr(st.session_state["bitemp_engine"], "ingest_portfolio_dataframe")
     ):
         st.session_state["bitemp_engine"] = BitemporalLedgerEngine()
         st.session_state["bitemp_seed_info"] = st.session_state["bitemp_engine"].seed_demonstration_scenario()
+        st.session_state["bitemp_ingested_portfolios"] = set()
+        st.session_state["bitemp_engine_version"] = CURRENT_BITEMP_ENGINE_VERSION
 
     b_engine: BitemporalLedgerEngine = st.session_state["bitemp_engine"]
 
-    # ── HELPER RECUPERO TRANSAZIONI ATTIVE UTENTE ──
-    def _get_active_user_transactions() -> tuple[pd.DataFrame | None, str]:
-        # 1. Controlla DataFrame validato in session state
-        if "df_clean" in st.session_state and st.session_state["df_clean"] is not None and not st.session_state["df_clean"].empty:
-            pname = st.session_state.get("portfolio_name") or "Portafoglio Attivo"
-            return st.session_state["df_clean"], pname
+    # ── HELPER RECUPERO E SCOPERTA MULTI-PORTAFOGLIO UTENTE ──
+    def _get_all_available_user_portfolios() -> dict[str, pd.DataFrame]:
+        """
+        Rileva e cataloga tutti i portafogli e serie di transazioni accessibili nell'ambiente ARGUS:
+        1. st.session_state["df_clean"] (upload CSV o file manuale)
+        2. st.session_state["results"]["df_tx"] (output sincrono pipeline / Google Sheets)
+        3. st.session_state["df_tx"] (assegnazioni dirette di sessione)
+        4. WorkspaceContext attivo
+        5. Directory multi-portafogli su disco: data/multi_portfolios/*.pkl (inclusi tutti i sync Google Sheets salvati)
+        6. Tabelle database SQL ('portfolios' & 'transactions')
+        7. Scenario didattico / archetipo iniettato in sessione
+        """
+        ports: dict[str, pd.DataFrame] = {}
 
-        # 2. Controlla scenario didattico iniettato
-        if "df_raw_injected" in st.session_state and st.session_state["df_raw_injected"] is not None and not st.session_state["df_raw_injected"].empty:
-            pname = st.session_state.get("active_archetype_name") or st.session_state.get("portfolio_name") or "Scenario Archetipo"
-            try:
-                from core.validator import validate_csv
-                df_c, _ = validate_csv(st.session_state["df_raw_injected"])
-                if df_c is not None and not df_c.empty:
-                    return df_c, pname
-            except Exception:
-                pass
+        # 1. Session State df_clean
+        if "df_clean" in st.session_state and isinstance(st.session_state["df_clean"], pd.DataFrame) and not st.session_state["df_clean"].empty:
+            pname = st.session_state.get("portfolio_name") or "Portafoglio Attivo (CSV)"
+            ports[pname] = st.session_state["df_clean"]
 
-        # 3. Controlla transazioni dal database SQL se presente
-        pid = st.session_state.get("portfolio_id")
+        # 2. Session State results["df_tx"] o results["df_tx_raw"]
+        if "results" in st.session_state and isinstance(st.session_state["results"], dict):
+            res = st.session_state["results"]
+            df_tx_res = res.get("df_tx") if isinstance(res.get("df_tx"), pd.DataFrame) else (res.get("df_tx_raw") if isinstance(res.get("df_tx_raw"), pd.DataFrame) else None)
+            if df_tx_res is not None and not df_tx_res.empty:
+                pname = st.session_state.get("portfolio_name") or res.get("portfolio_name") or "Portafoglio Google Sheets"
+                ports[pname] = df_tx_res
+
+        # 3. Session State df_tx
+        if "df_tx" in st.session_state and isinstance(st.session_state["df_tx"], pd.DataFrame) and not st.session_state["df_tx"].empty:
+            pname = st.session_state.get("portfolio_name") or "Portafoglio Transazioni"
+            if pname not in ports:
+                ports[pname] = st.session_state["df_tx"]
+
+        # 4. WorkspaceContext
+        try:
+            from core.workspace_context import WorkspaceContext
+            ws = WorkspaceContext.get_current()
+            if ws and ws.risk and ws.risk.results and isinstance(ws.risk.results, dict):
+                df_tx_ws = ws.risk.results.get("df_tx") if isinstance(ws.risk.results.get("df_tx"), pd.DataFrame) else (ws.risk.results.get("df_tx_raw") if isinstance(ws.risk.results.get("df_tx_raw"), pd.DataFrame) else None)
+                if df_tx_ws is not None and not df_tx_ws.empty:
+                    pname = ws.portfolio_name or st.session_state.get("portfolio_name") or "Portafoglio Workspace"
+                    if pname not in ports:
+                        ports[pname] = df_tx_ws
+        except Exception:
+            pass
+
+        # 5. Profili persistiti in data/multi_portfolios/*.pkl (inclusi tutti i sync GSheets eseguiti)
+        try:
+            import os, pickle
+            from core.multi_portfolio import PORTFOLIOS_DIR
+            if os.path.exists(PORTFOLIOS_DIR):
+                for fn in sorted(os.listdir(PORTFOLIOS_DIR)):
+                    if fn.endswith(".pkl"):
+                        fp = os.path.join(PORTFOLIOS_DIR, fn)
+                        try:
+                            with open(fp, "rb") as f:
+                                pdata = pickle.load(f)
+                            rf = pdata.get("results_full", {}) if isinstance(pdata.get("results_full"), dict) else {}
+                            df_tx_f = rf.get("df_tx") if isinstance(rf.get("df_tx"), pd.DataFrame) else (rf.get("df_tx_raw") if isinstance(rf.get("df_tx_raw"), pd.DataFrame) else None)
+                            if df_tx_f is not None and not df_tx_f.empty:
+                                p_label = pdata.get("name") or fn.replace(".pkl", "")
+                                if p_label not in ports:
+                                    ports[p_label] = df_tx_f
+                        except Exception:
+                            continue
+        except Exception:
+            pass
+
+        # 6. Database SQL
         eng = st.session_state.get("engine")
-        if pid and eng and pid != 999999:
+        if eng:
             try:
                 from sqlalchemy import text as sqlt
                 with eng.connect() as conn:
-                    sql = """
-                        SELECT t.tx_date, a.ticker, t.tx_type, t.quantity, t.price, t.currency, t.fees, t.notes
-                        FROM transactions t
-                        JOIN assets a ON t.asset_id = a.asset_id
-                        WHERE t.portfolio_id = :pid
-                        ORDER BY t.tx_date ASC
-                    """
-                    df_db = pd.read_sql(sqlt(sql), conn, params={"pid": pid})
-                    if not df_db.empty:
-                        pname = st.session_state.get("portfolio_name") or f"Portafoglio #{pid}"
-                        return df_db, pname
+                    sql_p = "SELECT DISTINCT p.portfolio_id, p.name FROM portfolios p JOIN transactions t ON p.portfolio_id = t.portfolio_id"
+                    df_plist = pd.read_sql(sqlt(sql_p), conn)
+                    for _, prow in df_plist.iterrows():
+                        db_pid = prow["portfolio_id"]
+                        db_pname = prow["name"] or f"Portafoglio #{db_pid}"
+                        if db_pname not in ports:
+                            sql_tx = """
+                                SELECT t.tx_date, a.ticker, t.tx_type, t.quantity, t.price, t.currency, t.fees, t.notes
+                                FROM transactions t
+                                JOIN assets a ON t.asset_id = a.asset_id
+                                WHERE t.portfolio_id = :pid
+                                ORDER BY t.tx_date ASC
+                            """
+                            df_db = pd.read_sql(sqlt(sql_tx), conn, params={"pid": db_pid})
+                            if not df_db.empty:
+                                ports[db_pname] = df_db
             except Exception:
                 pass
 
-        return None, ""
+        # 7. Scenario didattico iniettato
+        if "df_raw_injected" in st.session_state and isinstance(st.session_state["df_raw_injected"], pd.DataFrame) and not st.session_state["df_raw_injected"].empty:
+            pname = st.session_state.get("active_archetype_name") or "Scenario Archetipo"
+            if pname not in ports:
+                try:
+                    from core.validator import validate_csv
+                    df_c, _ = validate_csv(st.session_state["df_raw_injected"])
+                    if df_c is not None and not df_c.empty:
+                        ports[pname] = df_c
+                except Exception:
+                    pass
 
-    active_df, active_pname = _get_active_user_transactions()
+        return ports
+
+    user_portfolios_catalog = _get_all_available_user_portfolios()
+
+    # Ingestione automatica trasparente nel Ledger Bitemporale DuckDB
+    if "bitemp_ingested_portfolios" not in st.session_state:
+        st.session_state["bitemp_ingested_portfolios"] = set()
+
+    for p_name_item, p_df_item in user_portfolios_catalog.items():
+        p_sig = f"{p_name_item}_{len(p_df_item)}_{CURRENT_BITEMP_ENGINE_VERSION}"
+        if p_sig not in st.session_state["bitemp_ingested_portfolios"]:
+            try:
+                b_engine.ingest_portfolio_dataframe(p_df_item, portfolio_id=p_name_item, recorded_by="AUTO_SYNC_CATALOG")
+                st.session_state["bitemp_ingested_portfolios"].add(p_sig)
+            except Exception as e_auto_item:
+                logger.warning(f"Auto-ingest portafoglio '{p_name_item}': {e_auto_item}")
+
+    # Portafogli disponibili nel ledger
     available_ports = b_engine.get_available_portfolios()
     if "DEMO_FAMILY_OFFICE" not in available_ports:
         available_ports.insert(0, "DEMO_FAMILY_OFFICE")
+
+    # Identificazione del portafoglio primario attivo
+    preferred_active = st.session_state.get("portfolio_name")
+    if preferred_active and preferred_active in user_portfolios_catalog:
+        active_pname = preferred_active
+    elif user_portfolios_catalog:
+        if "Master Wealth Google Sheets" in user_portfolios_catalog:
+            active_pname = "Master Wealth Google Sheets"
+        else:
+            active_pname = list(user_portfolios_catalog.keys())[0]
+    else:
+        active_pname = ""
+
+    active_df = user_portfolios_catalog.get(active_pname)
 
     # Banner concettuale sulle due dimensioni ortogonali
     st.markdown("""
@@ -2075,18 +2218,20 @@ with tab_bitemporal:
             tx_min = str(active_df['tx_date'].min())[:10] if 'tx_date' in active_df.columns else 'N/D'
             tx_max = str(active_df['tx_date'].max())[:10] if 'tx_date' in active_df.columns else 'N/D'
             in_ledger = active_pname in available_ports
-            badge_sync = "🟢 Già sincronizzato nel Ledger" if in_ledger else "🟡 Non ancora sincronizzato nel Ledger"
+            badge_sync = "🟢 Sincronizzato nel Ledger" if in_ledger else "🟡 Non ancora sincronizzato nel Ledger"
+            other_ports_count = len(user_portfolios_catalog) - 1
+            extra_msg = f" • Trovati altri <b>{other_ports_count}</b> portafogli utente nel catalogo." if other_ports_count > 0 else ""
             st.markdown(f"""
             <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 12px 16px;">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div style="font-size: 13.5px; color: #ffffff; font-weight: 600;">
-                        💼 Portafoglio Attivo in Sessione: <span style="color: #58a6ff;">{active_pname}</span>
+                        💼 Portafoglio Rilevato: <span style="color: #58a6ff;">{active_pname}</span>
                     </div>
                     <span style="font-size: 11px; color: {'#3fb950' if in_ledger else '#f59e0b'}; font-weight: 600; font-family: monospace;">{badge_sync}</span>
                 </div>
                 <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
-                    Rilevate <b>{len(active_df)}</b> transazioni contabili valide (intervallo: <code>{tx_min}</code> ➔ <code>{tx_max}</code>).
-                    Puoi sincronizzarlo nel motore bitemporale per condurre verifiche Point-in-Time sul tuo portafoglio.
+                    Rilevate <b>{len(active_df)}</b> transazioni contabili valide (intervallo: <code>{tx_min}</code> ➔ <code>{tx_max}</code>){extra_msg}.
+                    Puoi sincronizzarlo nel motore bitemporale o forzare una nuova ingestione.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -2094,10 +2239,10 @@ with tab_bitemporal:
             st.markdown("""
             <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; padding: 12px 16px;">
                 <div style="font-size: 13.5px; color: #ffffff; font-weight: 600;">
-                    📁 Portafoglio Utente: <span style="color: #8b949e;">Nessun file caricato in sessione</span>
+                    📁 Portafoglio Utente: <span style="color: #8b949e;">Nessun portafoglio caricato in sessione o su disco</span>
                 </div>
                 <div style="font-size: 12px; color: #8b949e; margin-top: 4px;">
-                    Carica un file CSV nella <b>Tab 1</b> oppure seleziona uno scenario per sincronizzarlo nel Ledger Bitemporale.
+                    Carica un file CSV nella <b>Tab 1</b> oppure sincronizza da Google Sheets per vederlo apparire nel Ledger Bitemporale.
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -2106,15 +2251,17 @@ with tab_bitemporal:
         st.markdown('<div style="height: 4px;"></div>', unsafe_allow_html=True)
         if active_df is not None:
             btn_sync_user = st.button(
-                "📥 Sincronizza nel Ledger",
-                type="primary",
+                "🔄 Re-sincronizza nel Ledger" if active_pname in available_ports else "📥 Sincronizza nel Ledger",
+                type="primary" if active_pname not in available_ports else "secondary",
                 use_container_width=True,
                 help=f"Ingerisce le {len(active_df)} transazioni di '{active_pname}' nel motore bitemporale con marcatura [VT, TT) e calcolo Merkle Tree.",
                 key="btn_sync_user_bitemporal"
             )
             if btn_sync_user:
                 with st.spinner(f"Sincronizzazione di '{active_pname}' nel Ledger Bitemporale..."):
-                    cnt = b_engine.ingest_portfolio_dataframe(active_df, portfolio_id=active_pname)
+                    cnt = b_engine.ingest_portfolio_dataframe(active_df, portfolio_id=active_pname, recorded_by="USER_MANUAL_SYNC")
+                    st.session_state["bitemp_ingested_portfolios"].add(active_pname)
+                    st.session_state["bitemp_ingested_portfolios"].add(f"{active_pname}_{len(active_df)}_{CURRENT_BITEMP_ENGINE_VERSION}")
                     st.session_state["selected_bitemp_port"] = active_pname
                 st.success(f"✅ Sincronizzate {cnt} transazioni contabili di '{active_pname}' nel Ledger Bitemporale!")
                 st.rerun()
@@ -2240,8 +2387,8 @@ with tab_bitemporal:
                 WHERE portfolio_id = ?
             """, [selected_bitemp_pid]).fetchone()
             
-            min_vt_dt = row_dates[0] if row_dates and row_dates[0] else datetime.now()
-            max_vt_dt = row_dates[1] if row_dates and row_dates[1] else datetime.now()
+            min_vt_dt = row_dates[0] if row_dates and row_dates[0] else datetime.datetime.now()
+            max_vt_dt = row_dates[1] if row_dates and row_dates[1] else datetime.datetime.now()
             min_vt_str = str(min_vt_dt)[:10] + " 23:59:59"
             max_vt_str = str(max_vt_dt)[:10] + " 23:59:59"
 
@@ -2263,7 +2410,7 @@ with tab_bitemporal:
                 elif "(Data Prima Transazione)" in vt_choice:
                     valid_time_input = min_vt_str
                 elif "Oggi" in vt_choice:
-                    valid_time_input = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    valid_time_input = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 else:
                     valid_time_input = st.text_input("Inserisci Valid Time (YYYY-MM-DD HH:MM:SS):", value=max_vt_str, key="txt_vt_user")
 
@@ -2313,14 +2460,16 @@ with tab_bitemporal:
                 </div>
                 """, unsafe_allow_html=True)
 
-        col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+        col_res1, col_res2, col_res3, col_res4, col_res5 = st.columns(5)
         with col_res1:
             metric_card("Saldo Cassa", f"€ {recon['cash_balance_eur']:,.2f}", f"{recon['tx_count']} Movimenti Validi", True)
         with col_res2:
-            metric_card("Asset Illiquidi", f"€ {recon['illiquid_appraisals_eur']:,.2f}", f"{recon['appraisals_count']} Perizie Attive", True)
+            metric_card("Controvalore Carico", f"€ {recon.get('positions_cost_eur', sum(p['cost_value_eur'] for p in recon.get('positions', []))):,.2f}", "Carico FIFO (TUIR Art. 68)", True)
         with col_res3:
-            metric_card("Valore Contabile Book", f"€ {recon['total_book_value_eur']:,.2f}", "Cassa + Costo Posizioni + Immobili", True)
+            metric_card("Asset Illiquidi", f"€ {recon['illiquid_appraisals_eur']:,.2f}", f"{recon['appraisals_count']} Perizie Attive", True)
         with col_res4:
+            metric_card("Valore Contabile Book", f"€ {recon['total_book_value_eur']:,.2f}", "Cassa + Costo Titoli + Immobili", True)
+        with col_res5:
             metric_card("Posizioni in Portafoglio", f"{recon['positions_count']} Titoli", "Consistenze WACP", True)
 
         if recon.get("positions"):
@@ -2362,7 +2511,7 @@ with tab_bitemporal:
             """, [selected_bitemp_pid]).fetchone()
             d_vt_val = str(row_d[1])[:10] + " 23:59:59" if row_d and row_d[1] else "2026-01-01 23:59:59"
             d_s1_val = str(row_d[0])[:10] + " 10:00:00" if row_d and row_d[0] else "2025-01-01 10:00:00"
-            d_s2_val = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            d_s2_val = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         col_d1, col_d2, col_d3 = st.columns(3)
         with col_d1:
