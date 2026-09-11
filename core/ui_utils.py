@@ -120,7 +120,10 @@ def inject_custom_css():
         [data-testid="collapsedControl"],
         button[data-testid="stSidebarCollapsedControl"],
         div[data-testid="collapsedControl"],
-        [data-testid="stHeader"] [data-testid="collapsedControl"] {{
+        [data-testid="stExpandSidebarButton"],
+        button[data-testid="stExpandSidebarButton"],
+        [data-testid="stHeader"] [data-testid="collapsedControl"],
+        [data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {{
             display: flex !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -129,7 +132,9 @@ def inject_custom_css():
             z-index: 999999 !important;
         }}
         [data-testid="collapsedControl"] button,
-        button[data-testid="stSidebarCollapsedControl"] {{
+        button[data-testid="stSidebarCollapsedControl"],
+        [data-testid="stExpandSidebarButton"],
+        button[data-testid="stExpandSidebarButton"] {{
             display: inline-flex !important;
             visibility: visible !important;
             color: #ff9900 !important;
@@ -139,7 +144,9 @@ def inject_custom_css():
             padding: 4px 8px !important;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
         }}
-        [data-testid="collapsedControl"] button:hover {{
+        [data-testid="collapsedControl"] button:hover,
+        [data-testid="stExpandSidebarButton"]:hover,
+        button[data-testid="stExpandSidebarButton"]:hover {{
             border-color: #ff9900 !important;
             background: rgba(33, 38, 45, 1) !important;
         }}
@@ -4018,11 +4025,76 @@ KNOWN_METRICS_KNOWLEDGE_BASE = {
         'how_to_read': '• 🟢 &gt; 0.75 (Gestione attiva eccezionale, alpha costante e controllato)<br>• 🟡 0.40 - 0.75 (Buona efficienza gestionale)<br>• 🔴 &lt; 0.40 o negativo (Rischio attivo non remunerato rispetto alla replica passiva).',
         'limitations': "Se il gestore adotta uno stile di investimento fortemente decorrelato dal benchmark, il Tracking Error elevato comprime l'IR anche in presenza di ottimi rendimenti assoluti.",
     },
+    'valore_contabile_book': {
+        'title': '📘 Valore Contabile Book (Total Carrying Book Value)',
+        'what_is': 'Consistenza patrimoniale complessiva iscritta a libro contabile, determinata secondo la rigorosa contabilità bitemporale e il criterio del costo storico ammortizzato/rettificato.',
+        'how_calc': '<b>Valore Contabile Book (&euro;)</b> = Saldo Cassa Liquida + &sum; Costo Fiscale Carico (FIFO) + &sum; Perizie Asset Illiquidi',
+        'why_useful': 'Certificare la massa patrimoniale totale effettivamente allocata o detenuta nel portafoglio a valori di libro contabile, fungendo da base certa per la riconciliazione tra flussi storici e controvalore corrente di mercato (NAV).',
+        'argus_calc': 'Calcolato dal motore bitemporale DuckDB aggregando le transazioni valide nel tempo reale (Valid Time) e note al sistema (System Time), valorizzando le posizioni aperte al costo storico FIFO ed eliminando ogni componente mark-to-market volatile.',
+        'how_to_read': '• 💶 <b>Grandezza Contabile di Consistenza Patrimoniale:</b> Rappresenta un valore monetario assoluto di bilancio (non presenta indicatori a semaforo sulla card).<br>• 📊 <b>Interpretazione Finanziaria:</b> Rispetto al NAV di mercato, la differenza esprime il Capital Gain/Loss complessivo latente. Un Valore Book stabile o in crescita coerente con i risparmi/conferimenti attesta la corretta quadratura dei capitali allocati.',
+        'limitations': 'Riflette i costi storici di carico e le stime peritali registrate. Non incorpora le oscillazioni di mercato né il valore di liquidazione forzata in assenza di perizie aggiornate.'
+    },
+    'saldo_cassa': {
+        'title': '💶 Saldo Cassa & Liquidità di Regolamento (Cash Balance)',
+        'what_is': 'Disponibilità monetaria liquida accreditata sul conto di tesoreria/regolamento al netto di tutti i flussi di acquisto, vendita, dividendi e versamenti/prelievi registrati.',
+        'how_calc': '<b>Saldo Cassa (&euro;)</b> = Cassa Iniziale + Flussi CASH_IN + &sum; Vendite Lorde + &sum; Dividendi &minus; &sum; Acquisti Lordi &minus; Flussi CASH_OUT',
+        'why_useful': 'Monitorare la capacità di regolamento degli impegni finanziari immediati, le opportunità di acquisto e il cuscinetto di tesoreria senza dover ricorrere a smobilizzi forzati.',
+        'argus_calc': 'Determinato dal motore bitemporale tracciando cronologicamente ogni movimento di liquidità e contropartita monetaria con marcatura oraria immutabile su DuckDB.',
+        'how_to_read': '• 💶 <b>Grandezza Contabile di Bilancio:</b> Misura la liquidità nominale effettiva (nessun indicatore a semaforo sulla card).<br>• 🛡️ <b>Interpretazione Gestionale:</b> Un saldo positivo garantisce flessibilità operativa e copertura margin calls; un saldo prossimo a zero o negativo richiede un versamento o ribilanciamento tempestivo.',
+        'limitations': 'Non include linee di credito revocabili (scoperti) o impegni di spesa futuri contrattualizzati ma non ancora regolati per cassa.'
+    },
+    'asset_illiquidi': {
+        'title': '🏢 Asset Illiquidi & Perizie Cespiti (Illiquid Assets & Appraisals)',
+        'what_is': "Valore contabile dei cespiti non quotati (immobili, private equity, collezionabili o opere d'arte) determinato sulla base di perizie asseverate o stime documentate.",
+        'how_calc': '<b>Asset Illiquidi (&euro;)</b> = &sum; Valore Periziale Netto = &sum; [ Valore Lordo &times; (1 &minus; Liquidity Haircut) ]',
+        'why_useful': 'Integrare nel bilancio complessivo i cespiti patrimoniali tangibili e non quotati con opportuno scarto prudenziale di liquidità (haircut).',
+        'argus_calc': 'Estratto dalla tabella bitemporale "bitemporal_asset_appraisals" considerando le sole perizie valide alla data point-in-time richiesta.',
+        'how_to_read': '• 🏛️ <b>Consistenza Patrimoniale Tangibile:</b> Valore nominale stimato periziato (nessun indicatore a semaforo sulla card).<br>• 📉 <b>Interpretazione Finanziaria:</b> Misura la frazione di patrimonio immobilizzata in cespiti non prontamente liquidabili a breve termine senza concessioni di prezzo.',
+        'limitations': 'Soggetto a rischio di stima peritale, asimmetria informativa e ritardi di aggiornamento in assenza di perizie periodiche annuali.'
+    },
+    'posizioni_in_portafoglio': {
+        'title': '📋 Posizioni Attive in Portafoglio (Active Holdings Count)',
+        'what_is': 'Numero complessivo di strumenti finanziari distinti che presentano una consistenza residua aperta (> 0 quote) nel ledger contabile.',
+        'how_calc': '<b>Posizioni in Portafoglio</b> = Conteggio Asset con Quote Residue > 0 al Timestamp Valido',
+        'why_useful': "Verificare l'ampiezza dell'inventario dei titoli detenuti e monitorare il grado di frazionamento e diversificazione operativa del portafoglio.",
+        'argus_calc': 'Elaborato dalla ricostruzione point-in-time dei lotti FIFO attivi al timestamp specificato.',
+        'how_to_read': '• 🔢 <b>Conteggio Quantitativo di Inventario:</b> Indica il numero puntuale di linee aperte (nessun indicatore a semaforo sulla card).<br>• 🌐 <b>Interpretazione Allocativa:</b> Un portafoglio ben strutturato conta tipicamente tra 15 e 30 posizioni; valori inferiori a 10 indicano forte rischio specifico, superiori a 40 comportano frammentazione e aumento dei costi di transazione.',
+        'limitations': "Conta i titoli in modo equiponderato; non misura la reale concentrazione del capitale (misurata invece dall'Indice HHI o dal peso dei top asset)."
+    },
+    'transazioni_portafoglio': {
+        'title': '📑 Transazioni Valide Registrate (Validated Ledger Transactions)',
+        'what_is': 'Numero totale di operazioni contabili (BUY, SELL, DIVIDEND, CASH_IN, CASH_OUT) validate e sigillate crittograficamente nel registro bitemporale.',
+        'how_calc': '<b>Transazioni Valide</b> = &sum; Record con sys_from &le; T<sub>sys</sub> AND valid_from &le; T<sub>valid</sub>',
+        'why_useful': "Attestare la completezza e l'auditabilità della storia operativa del portafoglio, garantendo che ogni singolo movimento monetario o di quote sia tracciato.",
+        'argus_calc': 'Query SQL bitemporale su DuckDB ordinata cronologicamente e sigillata tramite hash chain SHA-256.',
+        'how_to_read': '• 🔢 <b>Misura Quantitativa di Volume Contabile:</b> Misura la numerosità dei movimenti a registro (nessun indicatore a semaforo sulla card).<br>• 🛡️ <b>Garanzia di Integrità:</b> La conformità dei record con i documenti fiscali sorgente garantisce quadratura contabile assoluta.',
+        'limitations': 'Rappresenta il conteggio formale delle scritture; non distingue operazioni ad alto controvalore da micro-frazioni.'
+    },
+    'controvalore_carico': {
+        'title': '🏷️ Controvalore Fiscale di Carico (Carrying Cost Basis)',
+        'what_is': 'Costo complessivo storico di acquisto delle quote attualmente detenute in portafoglio, calcolato secondo il metodo FIFO fiscale (TUIR Art. 68).',
+        'how_calc': '<b>Controvalore Carico (&euro;)</b> = &sum; (Quote Residue Lotto<sub>i</sub> &times; Prezzo Unitario Lotto<sub>i</sub>)',
+        'why_useful': 'Costituire la base fiscale e contabile certa per determinare il Prezzo Medio di Carico (PMC) e calcolare plusvalenze/minusvalenze in caso di vendita.',
+        'argus_calc': 'Tracciato per singolo lotto di acquisto dal motore di scarico FIFO; a ogni vendita parziale vengono dedotti i lotti cronologicamente più remoti.',
+        'how_to_read': '• 💶 <b>Grandezza Contabile di Carico:</b> Rappresenta il capitale storico residuo impiegato (nessun indicatore a semaforo sulla card).<br>• 📈 <b>Confronto con Mercato:</b> Se il Controvalore di Mercato > Controvalore Carico la posizione è in plusvalenza latente; viceversa è in minusvalenza potenziale.',
+        'limitations': "Rappresenta il costo di acquisto storico non attualizzato per l'inflazione o per oscillazioni valutarie successive alla data di regolamento."
+    },
 }
 
 
 PHRASE_RULES = [
     # Explicit compound phrases (specific ones first)
+    (r"\bvalore\s+contabile(?:\s+book)?\b", "valore_contabile_book"),
+    (r"\bbook\s+value\b", "valore_contabile_book"),
+    (r"\bsaldo\s+cassa\b", "saldo_cassa"),
+    (r"\bcassa\s+liquida\b", "saldo_cassa"),
+    (r"\basset\s+illiquidi\b", "asset_illiquidi"),
+    (r"\bperizie\s+illiquidi\b", "asset_illiquidi"),
+    (r"\bposizioni(?:\s+in\s+portafoglio)?\b", "posizioni_in_portafoglio"),
+    (r"\btitoli\s+in\s+portafoglio\b", "posizioni_in_portafoglio"),
+    (r"\btransazioni(?:\s+portafoglio|\s+valide)?\b", "transazioni_portafoglio"),
+    (r"\bcontrovalore\s+carico\b", "controvalore_carico"),
+    (r"\bcosto\s+carico\b", "controvalore_carico"),
     (r"\b(?:parametric\s+)?var\s*99%?\b", "var_parametric_99"),
     (r"\bvar\s+storico\s*95%?\b", "var_historical_95"),
     (r"\bvar\s+storico\s*99%?\b", "var_historical_99"),
@@ -4213,17 +4285,25 @@ def _generate_dynamic_fallback_5point(label: str, help_text: str = None) -> str:
         engine = "Analytics & Quantitative Engine ARGUS con monitoraggio in tempo reale"
         limitations = "La misura riflette i dati storici disponibili e le convenzioni di calcolo adottate; non tiene conto di eventi sistemici esogeni non ancora riflessi nelle serie temporali."
 
+    # Deduzione Tipo di Grandezza e Formula Matematica
+    is_inverted = any(w in lbl_lower for w in ["burn", "drawdown", "deficit", "perdita", "rischio", "errore", "tass", "impost", "shortfall", "drag", "slippage", "costo", "spesa", "debito"])
+    is_ratio = any(w in lbl_lower for w in ["%", "tasso", "rate", "ratio", "percentuale", "quota", "incidenza", "rendimento"])
+    is_duration = any(w in lbl_lower for w in ["mesi", "giorni", "anni", "tempo", "durata", "periodo", "holding"])
+    is_count = any(w in lbl_lower for w in ["numero", "conteggio", "titoli", "operazioni", "transazioni", "posizioni", "candidati", "duplicati", "anomalie", "righe", "record", "voci", "stime", "perizie", "tabelle", "mappati", "unici", "attivi", "distinti"])
+    is_meta_or_date = any(w in lbl_lower for w in ["data", "date", "inizio", "fine", "stato", "versione", "version", "mapping", "simd", "threads", "parquet", "compressione", "config", "registro", "motore", "valute"])
+    is_currency = any(w in lbl_lower for w in ["€", "eur", "capitale", "valore", "saldo", "entrata", "flusso", "risparmio", "prezzo", "controvalore", "ricavo", "montante", "patrimonio", "cassa", "illiquid", "book", "nav"]) or ("costo" in lbl_lower and not any(w in lbl_lower for w in ["drag", "slippage", "burn"]))
+
     # Definizione Cos'è (priorità a help_text puntuale)
     if help_text and len(help_text.strip()) > 5:
         what_is = help_text.strip()
+    elif is_currency:
+        what_is = f"Consistenza monetaria o grandezza contabile espressa in valuta per la voce '{lbl_clean}'."
+    elif is_count:
+        what_is = f"Misura quantitativa e conteggio di inventario operativo per '{lbl_clean}'."
+    elif is_meta_or_date:
+        what_is = f"Parametro temporale o dato informativo di configurazione di sistema per '{lbl_clean}'."
     else:
         what_is = f"Indicatore quantitativo di controllo e monitoraggio specializzato per la metrica '{lbl_clean}'."
-
-    # Deduzione Tipo di Grandezza e Formula Matematica
-    is_ratio = any(w in lbl_lower for w in ["%", "tasso", "rate", "ratio", "percentuale", "quota", "incidenza", "rendimento"])
-    is_currency = any(w in lbl_lower for w in ["€", "costo", "spesa", "capitale", "valore", "saldo", "entrata", "flusso", "risparmio", "prezzo", "controvalore", "ricavo", "debito", "imposta", "perdita", "profitto", "montante"])
-    is_duration = any(w in lbl_lower for w in ["mesi", "giorni", "anni", "tempo", "durata", "periodo", "holding"])
-    is_count = any(w in lbl_lower for w in ["numero", "conteggio", "titoli", "operazioni", "transazioni", "posizioni", "candidati", "duplicati", "anomalie"])
 
     if is_ratio:
         how_calc = f"<b>{lbl_clean} (%)</b> = (Grandezza Primaria / Parametro di Riferimento o Benchmark) &times; 100"
@@ -4233,22 +4313,38 @@ def _generate_dynamic_fallback_5point(label: str, help_text: str = None) -> str:
         how_calc = f"<b>{lbl_clean}</b> = Stock o Fabbisogno Cumulato / Velocità di Flusso Periodale (Burn/Esecuzione)"
     elif is_count:
         how_calc = f"<b>{lbl_clean}</b> = &sum; Occorrenze o Record Verificati nel Database"
+    elif is_meta_or_date:
+        how_calc = f"<b>{lbl_clean}</b> = Timestamp o Parametro Tecnico Estratto dai Registri di Sistema"
     else:
         how_calc = f"<b>{lbl_clean}</b> = Misura quantitativa determinata per aggregazione analitica dei parametri di riferimento"
 
-    # Guida di Lettura e Semafori Contestuali (Direzione Inversa vs Diretta)
-    is_inverted = any(w in lbl_lower for w in ["cost", "spesa", "burn", "drawdown", "deficit", "perdita", "rischio", "errore", "tass", "impost", "shortfall", "drag", "debito", "slippage"])
-    
-    if is_inverted:
+    # Guida di Lettura e Valori Guida Contestuali (distinzione tra grandezze contabili/inventario e indicatori di rischio)
+    if is_inverted and not any(w in lbl_lower for w in ["valore contabile", "saldo cassa", "patrimonio", "montante", "controvalore", "carico"]):
         how_to_read = f"• 🟢 Valori bassi o contenuti (Ottimale: impatto o vulnerabilità minimizzata per {lbl_clean})<br>• 🟡 Fascia di oscillazione moderata entro le tolleranze ammesse<br>• 🔴 Valori elevati o anomali (Trigger di revisione attiva: costo o rischio sopra soglia)."
     elif is_ratio:
         how_to_read = f"• 🟢 Valore superiore al target strategico o al benchmark di riferimento<br>• 🟡 In linea con la media storica di periodo<br>• 🔴 Valore al di sotto della soglia minima prudenziale richiesta."
     elif is_duration:
         how_to_read = f"• 🟢 Orizzonte ampio e capiente (Margine di sicurezza temporale elevato)<br>• 🟡 Orizzonte intermedio da presidiare<br>• 🔴 Orizzonte compresso (Intervento prioritario richiesto)."
+    elif is_currency:
+        how_to_read = (
+            f"• 💶 <b>Grandezza Contabile di Consistenza Patrimoniale:</b> Rappresenta un valore monetario assoluto di bilancio / saldo contabile certificato (non presenta indicatori semaforici sulla card).<br>"
+            f"• 📊 <b>Interpretazione Finanziaria:</b> Misura la consistenza effettiva di stock o il controvalore economico a libro per '{lbl_clean}', fungendo da base oggettiva per la riconciliazione e il controllo patrimoniale."
+        )
     elif is_count:
-        how_to_read = f"• 🟢 Conteggio coerente con la regolare operatività del periodo<br>• 🟡 Variazione moderata rispetto alla media<br>• 🔴 Scostamento significativo dai volumi operativi attesi."
+        how_to_read = (
+            f"• 🔢 <b>Misura Quantitativa di Inventario:</b> Rappresenta il conteggio puntuale degli elementi o registrazioni attive nel perimetro contabile (non presenta indicatori semaforici sulla card).<br>"
+            f"• 📋 <b>Interpretazione Operativa:</b> Misura l'ampiezza e la granularità del dataset per '{lbl_clean}'; la corrispondenza con i registri sorgente ne attesta la completezza gestionale."
+        )
+    elif is_meta_or_date:
+        how_to_read = (
+            f"• ℹ️ <b>Parametro Descrittivo / Dato di Sistema:</b> Informazione tecnica o riferimento temporale di configurazione operativa (non soggetto a fasce di tolleranza o semafori).<br>"
+            f"• ⏱️ <b>Riferimento Applicativo:</b> Definisce le coordinate temporali o lo stato dell'infrastruttura di calcolo attiva per '{lbl_clean}'."
+        )
     else:
-        how_to_read = f"• 🟢 Livello ottimale allineato con gli standard patrimoniali e di rischio<br>• 🟡 Fascia di oscillazione ordinaria<br>• 🔴 Valore anomalo o fuori dai parametri di tolleranza prefissati."
+        how_to_read = (
+            f"• 📊 <b>Misura Descrittiva Puntuale:</b> Grandezza analitica elaborata dal sistema per '{lbl_clean}'.<br>"
+            f"• 🔍 <b>Guida all'Analisi:</b> Il valore riflette lo stato corrente del sistema; per grandezze nominali o contabili non sono previsti indicatori semaforici sulla card, mentre per indici quantitativi l'interpretazione avviene in rapporto ai benchmark di riferimento."
+        )
 
     return format_institutional_5point_html(
         title=f"{icon} {lbl_clean}",
@@ -5400,7 +5496,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
     Restituisce True se la splash screen è attiva (bloccando il resto della pagina finché l'utente non accede).
     """
     if "splash_dismissed" not in st.session_state:
-        st.session_state.splash_dismissed = False
+        st.session_state.splash_dismissed = True
 
     if force_show:
         st.session_state.splash_dismissed = False
@@ -5426,18 +5522,7 @@ def render_splash_screen(force_show: bool = False) -> bool:
 
     hide_sidebar_and_splash_css = f"""
     <style>
-    /* Maschera preventiva della Sidebar e Header Streamlit durante lo Splash */
-    section[data-testid="stSidebar"], 
-    [data-testid="stSidebar"], 
-    [data-testid="collapsedControl"],
-    header[data-testid="stHeader"] {{
-        display: none !important;
-        visibility: hidden !important;
-        width: 0px !important;
-        height: 0px !important;
-        opacity: 0 !important;
-        pointer-events: none !important;
-    }}
+    /* Contenitore a tutto schermo durante lo Splash */
 
     /* Posiziona lo splash in alto eliminando il vuoto superiore nativo */
     .block-container,
@@ -5885,7 +5970,7 @@ def render_wealth_control_room_hero(profile_map: dict = None, current_pid: int =
     elif current_pid:
         prof_name = f"Profilo #{current_pid}"
     else:
-        prof_name = st.session_state.get("portfolio_name") or "Famiglia & Personale"
+        prof_name = "-- Nessun Profilo Selezionato --"
 
     currency = st.session_state.get("base_currency", "EUR")
     w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
@@ -5927,12 +6012,112 @@ def render_wealth_control_room_hero(profile_map: dict = None, current_pid: int =
     st.markdown(hero_html, unsafe_allow_html=True)
 
 
-def ensure_risk_bundle_loaded(default_preset: str = "🏦 Bilanciato Istituzionale (60/40 Equity/Bond)") -> tuple:
+def render_wealth_profile_picker(engine, profile_map: dict, key_prefix: str = "wpp"):
+    """
+    Renderizza una schermata istituzionale di selezione del profilo patrimoniale.
+    Permette all'utente di scegliere esplicitamente quale profilo aprire (o crearne uno nuovo),
+    anziché vedersi imposto il primo profilo disponibile.
+    """
+    import streamlit as st
+    from core.wealth.wealth_db import get_wealth_portfolios, create_wealth_portfolio
+
+    st.markdown(f"""
+    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(16, 185, 129, 0.25); border-left: 4px solid #10b981; border-radius: 12px; padding: 20px 24px; margin: 16px 0 24px 0; backdrop-filter: blur(12px);">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+            <div>
+                <h3 style="color: #ffffff; margin: 0 0 6px 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                    <span>💼</span> Seleziona un Profilo Patrimoniale
+                </h3>
+                <p style="color: #94a3b8; font-size: 13px; margin: 0; line-height: 1.5;">
+                    Nessun profilo attivo per questa sessione. Scegli uno dei profili patrimoniali sottostanti oppure creane uno nuovo per visualizzare il Net Worth consolidato, i conti bancari e il libro mastro spese.
+                </p>
+            </div>
+            <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 6px 14px; font-size: 12px; color: #34d399; font-weight: 600;">
+                📁 {len(profile_map)} Profil{'o' if len(profile_map)==1 else 'i'} Disponibil{'e' if len(profile_map)==1 else 'i'}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    df_prof = get_wealth_portfolios(engine)
+
+    col_count = min(3, max(1, len(profile_map) + 1))
+    cols = st.columns(col_count)
+
+    for idx, (pid, pname) in enumerate(profile_map.items()):
+        col = cols[idx % col_count]
+        with col:
+            owner_txt = "Titolare Principale"
+            curr_txt = "EUR"
+            if not df_prof.empty and pid in df_prof["portfolio_id"].values:
+                row = df_prof.loc[df_prof["portfolio_id"] == pid].iloc[0]
+                owner_txt = str(row.get("owner", "Titolare Principale") or "Titolare Principale")
+                curr_txt = str(row.get("base_currency", "EUR") or "EUR")
+
+            st.markdown(f"""
+            <div style="background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 18px; margin-bottom: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.12); padding: 2px 8px; border-radius: 6px;">ID #{pid}</span>
+                    <span style="font-size: 11px; color: #8b949e;">{curr_txt}</span>
+                </div>
+                <div style="font-size: 16px; font-weight: 700; color: #ffffff; margin-bottom: 4px;">{pname}</div>
+                <div style="font-size: 12px; color: #94a3b8; margin-bottom: 10px;">👤 {owner_txt}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            if st.button(f"▶ Apri '{pname}'", key=f"{key_prefix}_open_{pid}", type="primary", use_container_width=True):
+                st.session_state["wealth_active_portfolio_id"] = pid
+                st.session_state["wealth_active_profile_name"] = pname
+                st.session_state["wealth_profile_selector_widget"] = pid
+                st.session_state["sb_wealth_profile_selector"] = pid
+                st.rerun()
+
+    new_col = cols[len(profile_map) % col_count]
+    with new_col:
+        st.markdown(f"""
+        <div style="background: rgba(17, 24, 39, 0.4); border: 1px dashed rgba(255, 255, 255, 0.15); border-radius: 12px; padding: 18px; margin-bottom: 12px; text-align: center;">
+            <div style="font-size: 24px; margin-bottom: 6px;">➕</div>
+            <div style="font-size: 15px; font-weight: 700; color: #ffffff; margin-bottom: 4px;">Nuovo Profilo</div>
+            <div style="font-size: 12px; color: #8b949e; margin-bottom: 10px;">Crea un profilo patrimoniale dedicato</div>
+        </div>
+        """, unsafe_allow_html=True)
+        with st.popover("➕ Crea Profilo", use_container_width=True):
+            np_name = st.text_input("Nome Profilo *", placeholder="es. Famiglia, Holding...", key=f"{key_prefix}_new_name")
+            np_owner = st.text_input("Proprietario / Titolare", placeholder="es. Famiglia Rossi", key=f"{key_prefix}_new_owner")
+            if st.button("Conferma Creazione", type="primary", use_container_width=True, key=f"{key_prefix}_btn_confirm"):
+                if np_name.strip():
+                    try:
+                        n_pid = create_wealth_portfolio(engine, np_name.strip(), owner=np_owner.strip() if np_owner else "Principal", base_currency="EUR")
+                        st.session_state["wealth_active_portfolio_id"] = n_pid
+                        st.session_state["wealth_active_profile_name"] = np_name.strip()
+                        st.session_state["wealth_profile_selector_widget"] = n_pid
+                        st.session_state["sb_wealth_profile_selector"] = n_pid
+                        st.success(f"Profilo '{np_name.strip()}' creato e selezionato!")
+                        st.rerun()
+                    except Exception as ex:
+                        st.error(f"Errore creazione profilo: {ex}")
+
+
+
+from core.onboarding_guard import (
+    ensure_portfolio_loaded,
+    render_empty_state_screen,
+    empty_state_guard
+)
+
+
+def ensure_risk_bundle_loaded(
+    default_preset: str = "🏦 Bilanciato Istituzionale (60/40 Equity/Bond)",
+    require_loaded: bool = False
+) -> tuple:
     """
     Assicura che un bundle di rischio (reale o sandbox) sia disponibile in session_state.
-    Se nessun portafoglio reale è presente, costruisce il bundle Sandbox demo istantaneo.
+    Se require_loaded=True, invoca ensure_portfolio_loaded('risk') mostrando l'empty state e bloccando l'esecuzione se assente.
+    Se require_loaded=False, costruisce il bundle Sandbox demo istantaneo come fallback per moduli standalone.
     Ritorna (results, has_real_portfolio).
     """
+    if require_loaded:
+        return ensure_portfolio_loaded(module_type="risk")
+
     results = st.session_state.get("results")
     has_real = (
         results is not None 
@@ -6480,19 +6665,20 @@ def ensure_wealth_bundle_loaded(engine, default_profile_name: str = "Marco Rossi
     
     if df_prof.empty:
         pid = create_wealth_portfolio(engine, name=default_profile_name, owner="Family Office Principal", base_currency="EUR")
-        st.session_state["wealth_active_portfolio_id"] = pid
+        st.session_state["wealth_active_portfolio_id"] = None
         df_prof = get_wealth_portfolios(engine)
         is_demo = True
     else:
         pid = st.session_state.get("wealth_active_portfolio_id")
-        if pid is None or pid not in df_prof["portfolio_id"].values:
-            pid = int(df_prof.iloc[0]["portfolio_id"])
-            st.session_state["wealth_active_portfolio_id"] = pid
+        if pid is not None and pid in df_prof["portfolio_id"].values:
+            prof_name = str(df_prof.loc[df_prof["portfolio_id"] == pid, "name"].values[0])
+            nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+        else:
+            pid = None
+            prof_name = "Nessun Profilo Selezionato"
+            nw = None
         is_demo = False
 
-    prof_name = str(df_prof.loc[df_prof["portfolio_id"] == pid, "name"].values[0]) if not df_prof.empty and pid in df_prof["portfolio_id"].values else default_profile_name
-    nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
-    
     return pid, prof_name, is_demo, nw
 
 
@@ -6641,27 +6827,25 @@ def ensure_portal_context(module: str = "risk") -> dict:
 
             if df_prof.empty:
                 pid = create_wealth_portfolio(engine, name="Marco Rossi (Family Office)", owner="Family Office Principal", base_currency="EUR")
-                st.session_state["wealth_active_portfolio_id"] = pid
+                st.session_state["wealth_active_portfolio_id"] = None
                 df_prof = get_wealth_portfolios(engine)
         
-        pid = st.session_state.get("wealth_active_portfolio_id")
-        if pid is None or pid not in df_prof["portfolio_id"].values:
-            # Privilegia il profilo con nome "Personale" se presente
-            pers_rows = df_prof[df_prof["name"] == "Personale"]
-            if not pers_rows.empty:
-                pid = int(pers_rows.iloc[0]["portfolio_id"])
-            else:
-                pid = int(df_prof.iloc[0]["portfolio_id"])
-            st.session_state["wealth_active_portfolio_id"] = pid
-            
         prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
-        prof_name = prof_map.get(pid, "Profilo Patrimoniale")
-        st.session_state["wealth_active_profile_name"] = prof_name
-        
-        nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+        pid = st.session_state.get("wealth_active_portfolio_id")
+        if pid is not None and pid in prof_map:
+            prof_name = prof_map[pid]
+            st.session_state["wealth_active_profile_name"] = prof_name
+            nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
+        else:
+            pid = None
+            prof_name = None
+            st.session_state["wealth_active_portfolio_id"] = None
+            st.session_state.pop("wealth_active_profile_name", None)
+            nw = None
+
         ws_ctx = WorkspaceContext.get_current()
         ws_ctx.wealth.profile_id = pid
-        ws_ctx.wealth.profile_name = prof_name
+        ws_ctx.wealth.profile_name = prof_name or "Nessun Profilo Selezionato"
         ws_ctx.wealth.profile_map = prof_map
         ws_ctx.wealth.net_worth_cached = nw
 
@@ -6671,6 +6855,7 @@ def ensure_portal_context(module: str = "risk") -> dict:
             "profile_name": prof_name,
             "profile_map": prof_map,
             "net_worth": nw,
+            "df_profiles": df_prof,
             "is_wealth": True,
             "is_offline": offline_mode,
             "workspace_context": ws_ctx
@@ -6726,7 +6911,7 @@ def render_omni_command_bar(
         if is_wealth:
             context_name = st.session_state.get("wealth_active_profile_name")
             if not context_name:
-                context_name = "Profilo Patrimoniale"
+                context_name = "-- Nessun Profilo Selezionato --"
         else:
             name, has_data = get_display_portfolio_name()
             context_name = name

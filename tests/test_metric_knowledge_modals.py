@@ -122,3 +122,39 @@ def test_dynamic_fallback_differentiation():
     
     # La durata deve avere semaforo su orizzonte temporale
     assert "Orizzonte" in res_days
+
+
+def test_accounting_metrics_no_phantom_traffic_lights():
+    """Verifica che metriche contabili, saldi e conteggi non mostrino semafori fittizi 🟢/🟡/🔴 nella guida."""
+    accounting_labels = [
+        "Valore Contabile Book",
+        "Saldo Cassa",
+        "Asset Illiquidi",
+        "Posizioni in Portafoglio",
+        "Transazioni Portafoglio",
+        "Controvalore Carico",
+        "Righe Valide",
+        "Ticker Unici",
+        "Data Inizio",
+        "Stato Motore DuckDB"
+    ]
+    
+    for lbl in accounting_labels:
+        html = resolve_metric_knowledge(lbl)
+        # Deve contenere tutti i 5 punti
+        assert "📌 Cos'è:" in html
+        assert "📐 Come si calcola:" in html
+        assert "🎯 A cosa serve:" in html
+        assert "⚙️ Come viene calcolato da ARGUS:" in html
+        assert "🔍 Come leggerlo:" in html
+        
+        # Nel blocco 'Come leggerlo:', non deve contenere il vecchio testo boilerplate con semaforo
+        assert "Livello ottimale allineato con gli standard patrimoniali" not in html
+        assert "Fascia di oscillazione ordinaria" not in html
+        assert "Valore anomalo o fuori dai parametri" not in html
+        
+        # Per le grandezze contabili e di inventario deve esplicitare la natura reale
+        how_to_read_part = html.split("🔍 Come leggerlo:")[1].split("</div>")[0]
+        assert any(term in how_to_read_part for term in ["Grandezza Contabile", "Consistenza Patrimoniale", "Misura Quantitativa", "Conteggio", "Volume Contabile", "Parametro Descrittivo", "Dato di Sistema"]), f"Mancata indicazione contabile per '{lbl}'"
+
+

@@ -29,7 +29,8 @@ from core.ui_utils import (
     render_wealth_command_bar,
     render_wealth_executive_badges,
     render_page_header,
-    apply_plotly_theme
+    apply_plotly_theme,
+    ensure_portfolio_loaded
 )
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
@@ -65,20 +66,20 @@ db_port = int(st.session_state.get("db_port", 3306))
 engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
 init_wealth_db(engine)
 
+ensure_portfolio_loaded(module_type="wealth")
+
 df_prof = get_wealth_portfolios(engine)
 prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
 current_pid = st.session_state.get("wealth_active_portfolio_id")
 
 if current_pid is None or current_pid not in prof_map:
-    for pid_candidate, pname in prof_map.items():
-        if pname.strip().lower() == "personale":
-            current_pid = pid_candidate
-            break
-    if current_pid is None and prof_map:
-        current_pid = list(prof_map.keys())[0]
-    st.session_state["wealth_active_portfolio_id"] = current_pid
+    current_pid = None
+    st.session_state["wealth_active_portfolio_id"] = None
+    from core.ui_utils import render_wealth_profile_picker
+    render_wealth_profile_picker(engine, prof_map, key_prefix="p20_picker")
+    st.stop()
 
-prof_title = prof_map.get(current_pid, "Personale")
+prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p20")
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)

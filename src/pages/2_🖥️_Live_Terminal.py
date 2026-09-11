@@ -1085,7 +1085,7 @@ for item in term_eng.output_buffer[:12]:
         f"<span style='color:{status_color}; font-weight:700;'>ARGUS:LIVE [{port_name_display}]&gt;</span> "
         f"<span style='color:#e6edf3; font-weight:600;'>{esc_cmd}</span>"
         f"</div>"
-        f"<div style='font-family: monospace; font-size: 11.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.4; padding-left: 2px;'>{esc_out}</div>"
+        f"<div style=\"font-family: 'Consolas', 'JetBrains Mono', 'Fira Code', 'Courier New', monospace; font-size: 11.5px; color: #c9d1d9; white-space: pre; overflow-x: auto; line-height: 1.4; padding-left: 2px;\">{esc_out}</div>"
         f"<div style='border-bottom: 1px dashed rgba(255,255,255,0.08); margin-top: 12px;'></div>"
         f"</div>"
     )
@@ -1093,7 +1093,7 @@ for item in term_eng.output_buffer[:12]:
 terminal_screen_html = "".join(terminal_screen_lines)
 
 terminal_box_html = (
-    f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 18px; font-family: monospace; height: 420px; overflow-y: auto; overflow-x: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85);">'
+    f'<div style="background: #090d13; border: 1.5px solid #30363d; border-radius: 8px; padding: 14px 18px; font-family: \'Consolas\', \'JetBrains Mono\', \'Fira Code\', \'Courier New\', monospace; height: 420px; overflow-y: auto; overflow-x: auto; box-shadow: inset 0 2px 12px rgba(0,0,0,0.85);">'
     f'{terminal_screen_html}'
     f'</div>'
 )

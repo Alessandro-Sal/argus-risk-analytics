@@ -52,6 +52,37 @@ def _pad_visual(s: str, target_w: int) -> str:
     return s + ' ' * (target_w - curr)
 
 
+_BOX_EMOJI_MAP = {
+    "💼": ">>",
+    "⚠️": "[!]",
+    "🟢": "[OK]",
+    "🟡": "[WARN]",
+    "🔴": "[ALERT]",
+    "🛑": "[STOP]",
+    "✅": "[OK]",
+    "❌": "[X]",
+    "⚡": "[LIVE]",
+    "🛡️": "[SEC]",
+    "📊": "[STAT]",
+    "📋": "[LIST]",
+    "🏛️": "[BANK]",
+}
+
+
+def _clean_box_line(s: str) -> str:
+    """Sostituisce emoji con tag ASCII compatti per evitare sfasature di visual width monospace nel browser."""
+    for em, rep in _BOX_EMOJI_MAP.items():
+        if em in s:
+            s = s.replace(em, rep)
+    cleaned = []
+    for ch in s:
+        if ord(ch) >= 0x1F300 or (0x2600 <= ord(ch) <= 0x27BF and ch not in ('▲', '▼', '●', '─', '┌', '┐', '└', '┘', '├', '┤', '│')):
+            cleaned.append(" ")
+        else:
+            cleaned.append(ch)
+    return "".join(cleaned)
+
+
 def _render_terminal_box(lines: List[str], width: int = 100) -> str:
     """Costruisce un blocco ASCII perfettamente allineato con bordi Unicode precisi e zero sfasature."""
     top = '┌' + '─' * (width + 2) + '┐'
@@ -61,7 +92,8 @@ def _render_terminal_box(lines: List[str], width: int = 100) -> str:
         if line == '---':
             res.append('├' + '─' * (width + 2) + '┤')
         else:
-            res.append('│ ' + _pad_visual(line, width) + ' │')
+            clean_l = _clean_box_line(line)
+            res.append('│ ' + _pad_visual(clean_l, width) + ' │')
     res.append(bot)
     return '\n'.join(res)
 
@@ -1220,9 +1252,9 @@ class ArgusTerminalEngine:
         
         if n_assets > 0:
             port_name_display = (port_name[:28] + "...") if len(port_name) > 30 else port_name
-            link_banner = f"💼 CONNESSO AL PORTAFOGLIO: {port_name_display} | {n_assets} ASSETS ATTIVI | VALORE: € {tot_val:,.2f} [{base_curr}]"
+            link_banner = f">> CONNESSO AL PORTAFOGLIO: {port_name_display} | {n_assets} ASSETS ATTIVI | VALORE: € {tot_val:,.2f} [{base_curr}]"
         else:
-            link_banner = "⚠️ MODALITÀ SANDBOX GLOBALE: Nessun portafoglio attivo caricato"
+            link_banner = ">> MODALITÀ SANDBOX GLOBALE: Nessun portafoglio attivo caricato"
 
         help_lines = [
             "ARGUS INSTITUTIONAL TERMINAL & CLI DESK".center(102),
@@ -2014,7 +2046,7 @@ Growth Edge (g)   : +{half_kelly * 0.08 * 100:.2f} % Geometric CAGR Boost
         port_name = ctx.get("portfolio_name", "Master Wealth")
         active_pos = get_active_positions(df_pos)
         score = int(results.get("health_score", 84) or 84)
-        verdict = "HEALTHY & COMPLIANT 🟢" if score >= 75 else ("MONITOR ATTENTION 🟡" if score >= 50 else "DISTRESS RISK 🔴")
+        verdict = "HEALTHY & COMPLIANT [OK]" if score >= 75 else ("MONITOR ATTENTION [WARN]" if score >= 50 else "DISTRESS RISK [ALERT]")
         n_pos = len(active_pos)
         
         val_col = "current_value" if "current_value" in active_pos.columns else ("market_value" if "market_value" in active_pos.columns else None)

@@ -926,6 +926,10 @@ def _execute_full_session_reset(is_wealth_mode: bool = False) -> None:
     except Exception:
         pass
     try:
+        WorkspaceContext.get_current().flush_wealth_domain()
+    except Exception:
+        pass
+    try:
         clear_unified_archetype()
     except Exception:
         pass
@@ -957,6 +961,8 @@ def _execute_full_session_reset(is_wealth_mode: bool = False) -> None:
             del st.session_state[k]
 
     st.session_state["session_cleared"] = True
+    st.session_state["_app_initialized"] = False
+    st.session_state["splash_dismissed"] = False
     st.session_state["results"] = None
     st.session_state["portfolio_name"] = "Portafoglio Principale" if not in_wealth else "Master Wealth"
     st.session_state["active_portfolio_id"] = None
@@ -1018,6 +1024,11 @@ def render_settings_sidebar(current_module: str = "risk") -> None:
 def render_sidebar():
     """Renderizza la Sidebar Istituzionale v9.0.0 con Modalità Esecuzione in alto e Navigation Rail ad albero."""
     ensure_session_restored()
+    try:
+        from components.splash import auto_expand_sidebar
+        auto_expand_sidebar()
+    except Exception:
+        pass
 
     current_page = get_current_page_name()
 
@@ -1062,7 +1073,10 @@ def render_sidebar():
             [data-testid="collapsedControl"],
             button[data-testid="stSidebarCollapsedControl"],
             div[data-testid="collapsedControl"],
-            [data-testid="stHeader"] [data-testid="collapsedControl"] {
+            [data-testid="stExpandSidebarButton"],
+            button[data-testid="stExpandSidebarButton"],
+            [data-testid="stHeader"] [data-testid="collapsedControl"],
+            [data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
                 display: flex !important;
                 visibility: visible !important;
                 opacity: 1 !important;
@@ -1071,7 +1085,9 @@ def render_sidebar():
                 z-index: 999999 !important;
             }
             [data-testid="collapsedControl"] button,
-            button[data-testid="stSidebarCollapsedControl"] {
+            button[data-testid="stSidebarCollapsedControl"],
+            [data-testid="stExpandSidebarButton"],
+            button[data-testid="stExpandSidebarButton"] {
                 display: inline-flex !important;
                 visibility: visible !important;
                 color: #ff9900 !important;
@@ -1081,7 +1097,9 @@ def render_sidebar():
                 padding: 4px 8px !important;
                 box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
             }
-            [data-testid="collapsedControl"] button:hover {
+            [data-testid="collapsedControl"] button:hover,
+            [data-testid="stExpandSidebarButton"]:hover,
+            button[data-testid="stExpandSidebarButton"]:hover {
                 border-color: #ff9900 !important;
                 background: rgba(33, 38, 45, 1) !important;
             }
@@ -1360,28 +1378,30 @@ def render_sidebar():
 
             # Selettore Rapido Profilo Wealth se presenti profili salvati
             try:
-                from core.wealth.wealth_db import get_wealth_portfolios, get_wealth_engine
-                w_eng = get_wealth_engine(sqlite_only=is_offline)
+                from core.fetcher import get_engine
+                from core.wealth.wealth_db import get_wealth_portfolios
+                raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
+                w_eng = get_engine(database=raw_db, offline=is_offline)
                 df_wports = get_wealth_portfolios(w_eng)
-                if not df_wports.empty and len(df_wports) > 1:
-                    w_opts = df_wports["id"].tolist()
-                    w_names = dict(zip(df_wports["id"], df_wports["name"]))
+                if not df_wports.empty and len(df_wports) >= 1:
+                    col_id = "portfolio_id" if "portfolio_id" in df_wports.columns else ("id" if "id" in df_wports.columns else df_wports.columns[0])
+                    pids = df_wports[col_id].tolist()
+                    w_opts = [None] + pids
+                    w_names = dict(zip(df_wports[col_id], df_wports["name"]))
                     active_w_pid = st.session_state.get("wealth_active_portfolio_id")
-                    if active_w_pid not in w_opts:
-                        active_w_pid = w_opts[0]
-                        st.session_state["wealth_active_portfolio_id"] = active_w_pid
+                    if active_w_pid not in pids:
+                        active_w_pid = None
                     
                     w_idx = w_opts.index(active_w_pid)
                     def _on_sb_wealth_prof_change():
                         sel = st.session_state.get("sb_wealth_profile_selector")
-                        if sel:
-                            st.session_state["wealth_active_portfolio_id"] = sel
-                            st.session_state["wealth_profile_selector_widget"] = sel
+                        st.session_state["wealth_active_portfolio_id"] = sel
+                        st.session_state["wealth_profile_selector_widget"] = sel
                     
                     st.selectbox(
                         "👤 Profilo Patrimoniale",
                         options=w_opts,
-                        format_func=lambda pid: f"📁 {w_names.get(pid, f'Profilo #{pid}')}",
+                        format_func=lambda pid: "-- Seleziona Profilo --" if pid is None else f"📁 {w_names.get(pid, f'Profilo #{pid}')}",
                         index=w_idx,
                         key="sb_wealth_profile_selector",
                         on_change=_on_sb_wealth_prof_change,
@@ -1524,6 +1544,7 @@ def render_sidebar():
 
         if st.button("👁️ Schermata di Avvio (Splash)", key="btn_sidebar_show_splash", use_container_width=True):
             st.session_state["splash_dismissed"] = False
+            st.session_state["_app_initialized"] = False
             try:
                 st.switch_page("0_Control_Room.py")
             except Exception:

@@ -348,5 +348,13 @@ La major release **v9.0.0** introduce un'evoluzione radicale dell'esperienza ute
 * **Separazione Plotly / Vettoriale**: Disaccoppiamento tra visualizzazione interattiva a schermo (Plotly WebGL) e rendering vettoriale per stampa/export (ReportLab A4 `InstitutionalNumberedCanvas`).
 * **Factsheet Conforme MiFID II & Quadro RW**: Generatore PDF istituzionale a 2 pagine con risk disclosure formale, matrici di rendimento, scomposizione della volatilità e riepilogo fiscale per il monitoraggio transfrontaliero.
 
+### 15.4 Institutional Splash Screen & Dual-Portal Bento Monolith (`components/splash.py`)
+* **Quantum Orbit Dynamic Vector Logo**: Logo SVG ad alta risoluzione con reticoli concentrici, mirino quantitativo e gradiente di rifrazione dorato su sfondo Dark Obsidian.
+* **Bloomberg-Style Real-Time Telemetry Bar**: Finestra di stato del cluster dual-engine con indicatori macOS semaforici sfumati, badge live 100% operational e barra di avanzamento a gradiente liquido.
+* **Streamlit 1.59+ Fullscreen Shield**: Soppressione completa dell'header e di tutte le freccette di espansione sidebar (`stExpandSidebarButton`, `collapsedControl`) per una visualizzazione a schermo intero priva di distrazioni.
+* **Bento Grid Monolith & Fused CTAs**: Schede portale monolitiche a raggio continuo con azzeramento del gap verso i pulsanti d'azione (Oro Ambrato per Risk Desk, Verde Smeraldo per Wealth Suite), arricchite da matrici a 4 righe di metriche operative per ciascun dominio.
+* **Auto-Expanding Sidebar Gateway**: Apertura automatica immediata della sidebar con trigger JavaScript multi-fase non appena l'utente effettua l'ingresso in uno dei due portali.
+
+
 
 

@@ -31,7 +31,7 @@ def test_workspace_context_initialization():
     assert ctx.risk.portfolio_name == "Nessun Portafoglio"
     assert ctx.risk.base_currency == "EUR"
     assert ctx.risk.get_total_equity() == 0.0
-    assert ctx.wealth.profile_id == 1
+    assert ctx.wealth.profile_id is None
     assert isinstance(ctx.ui, UIViewState)
 
     # Test get_total_equity con DataFrame di posizioni

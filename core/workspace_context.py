@@ -101,8 +101,8 @@ class RiskSubContext:
 @dataclass
 class WealthSubContext:
     """Modello fortemente tipizzato per il dominio Wealth Management."""
-    profile_id: Optional[int] = 1
-    profile_name: str = "Profilo Principale"
+    profile_id: Optional[int] = None
+    profile_name: str = "Nessun Profilo Selezionato"
     profile_map: Dict[int, str] = field(default_factory=dict)
     linked_risk_ids: List[int] = field(default_factory=list)
     net_worth_cached: Optional[Any] = None
@@ -237,8 +237,12 @@ class WorkspaceContext:
             # Sincronizzazione Dominio Wealth
             if "wealth_active_portfolio_id" in st_state:
                 self.wealth.profile_id = st_state.get("wealth_active_portfolio_id")
+            else:
+                self.wealth.profile_id = None
             if "wealth_active_profile_name" in st_state:
-                self.wealth.profile_name = st_state.get("wealth_active_profile_name", "Profilo Principale")
+                self.wealth.profile_name = st_state.get("wealth_active_profile_name", "Nessun Profilo Selezionato")
+            else:
+                self.wealth.profile_name = "Nessun Profilo Selezionato"
 
     def sync_to_legacy_session_state(self):
         """Propaga lo stato tipizzato alle chiavi legacy di st.session_state per garantire retrocompatibilità."""
@@ -257,10 +261,8 @@ class WorkspaceContext:
             st_state["pipeline_done"] = self.risk.pipeline_done
             st_state["fetch_report"] = self.risk.fetch_report
 
-            if self.wealth.profile_id is not None:
-                st_state["wealth_active_portfolio_id"] = self.wealth.profile_id
-            if self.wealth.profile_name:
-                st_state["wealth_active_profile_name"] = self.wealth.profile_name
+            st_state["wealth_active_portfolio_id"] = self.wealth.profile_id
+            st_state["wealth_active_profile_name"] = self.wealth.profile_name
 
     # ── DOMAIN FLUSHING & GHOST STATE ELIMINATION ──────────────
 
@@ -306,9 +308,17 @@ class WorkspaceContext:
             self.wealth = WealthSubContext()
             st_state = self._get_st_session_state()
             if st_state is not None:
-                for key in ["wealth_profile_selector_widget", "wealth_active_profile_name"]:
+                for key in [
+                    "wealth_profile_selector_widget",
+                    "wealth_active_profile_name",
+                    "wealth_active_portfolio_id",
+                    "sb_wealth_profile_selector",
+                    "wealth_active_snapshot"
+                ]:
                     if key in st_state:
                         del st_state[key]
+                st_state["wealth_active_portfolio_id"] = None
+                st_state["wealth_active_profile_name"] = None
             self.version += 1
             self.is_dirty = True
 
@@ -328,7 +338,9 @@ class WorkspaceContext:
             self.sync_from_legacy_session_state()
             from core.wealth.wealth_db import get_linked_risk_portfolios, get_available_risk_portfolios
 
-            w_pid = self.wealth.profile_id or 1
+            w_pid = self.wealth.profile_id
+            if w_pid is None:
+                return 0.0
             active_links = linked_risk_ids if linked_risk_ids is not None else get_linked_risk_portfolios(engine, w_pid)
             if not active_links:
                 return 0.0
@@ -470,8 +482,8 @@ class WorkspaceContext:
 
                         w_data = bundle.get("wealth", {})
                         if w_data:
-                            self.wealth.profile_id = w_data.get("profile_id", 1)
-                            self.wealth.profile_name = w_data.get("profile_name", "Profilo Principale")
+                            self.wealth.profile_id = w_data.get("profile_id", None)
+                            self.wealth.profile_name = w_data.get("profile_name", "Nessun Profilo Selezionato")
                             self.wealth.linked_risk_ids = w_data.get("linked_risk_ids", [])
 
                         ui_data = bundle.get("ui", {})
@@ -589,8 +601,8 @@ class WorkspaceContext:
                 self.risk.pipeline_done = True
 
             wealth_data = snapshot.get("wealth", {})
-            self.wealth.profile_id = wealth_data.get("profile_id", 1)
-            self.wealth.profile_name = wealth_data.get("profile_name", "Profilo Principale")
+            self.wealth.profile_id = wealth_data.get("profile_id", None)
+            self.wealth.profile_name = wealth_data.get("profile_name", "Nessun Profilo Selezionato")
             self.wealth.linked_risk_ids = wealth_data.get("linked_risk_ids", [])
 
             ui_data = snapshot.get("ui", {})

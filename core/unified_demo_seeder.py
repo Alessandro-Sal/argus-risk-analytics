@@ -173,4 +173,151 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
     except Exception:
         pass
 
+    try:
+        from core.fetcher import get_engine
+        from core.wealth.wealth_db import (
+            init_wealth_db,
+            create_wealth_portfolio,
+            save_wealth_account,
+            save_physical_asset,
+            save_pension_plan,
+            insert_cashflow_tx,
+            get_wealth_categories
+        )
+        engine = get_engine(database="wealth", offline=True)
+        init_wealth_db(engine)
+
+        pid = create_wealth_portfolio(
+            engine,
+            name=target_portfolio_name,
+            description="Demo Family Office Multi-Asset (5 Pilastri)",
+            owner="Demo User",
+            base_currency="EUR"
+        )
+        try:
+            import streamlit as st
+            if hasattr(st, "session_state"):
+                st.session_state["wealth_active_portfolio_id"] = pid
+                st.session_state["session_cleared"] = False
+        except Exception:
+            pass
+
+        # Check existing accounts for this profile to prevent duplication
+        with engine.connect() as conn:
+            from sqlalchemy import text as sqlt
+            res_cnt = conn.execute(
+                sqlt("SELECT COUNT(*) FROM wealth_accounts WHERE portfolio_id = :pid"),
+                {"pid": pid}
+            ).scalar()
+
+        if not res_cnt:
+            acc_chk_id = save_wealth_account(engine, {
+                "name": "Conto Corrente Principale",
+                "institution": "Intesa Sanpaolo",
+                "account_type": "checking",
+                "currency": "EUR",
+                "balance": 45000.0,
+                "portfolio_id": pid,
+                "notes": "Liquidità operativa di cassa"
+            })
+            save_wealth_account(engine, {
+                "name": "Conto Deposito Rendimento",
+                "institution": "Illimity Bank",
+                "account_type": "savings",
+                "currency": "EUR",
+                "balance": 50000.0,
+                "portfolio_id": pid,
+                "notes": "Fondo emergenza e remunerazione liquidità"
+            })
+            save_wealth_account(engine, {
+                "name": "Mutuo Ipotecario Casa Milano",
+                "institution": "Banco BPM",
+                "account_type": "loan",
+                "currency": "EUR",
+                "balance": -220000.0,
+                "portfolio_id": pid,
+                "notes": "Debito ipotecario residuo prima casa"
+            })
+
+            # Physical Assets (Immobile Milano €650k, Rolex Daytona €24.5k)
+            save_physical_asset(engine, {
+                "name": "Immobile Residenziale Milano Centro",
+                "asset_category": "real_estate",
+                "brand_or_location": "Milano, Porta Nuova",
+                "model_or_specs": "Quadrilocale 140 mq con box",
+                "purchase_price": 580000.0,
+                "current_market_value": 650000.0,
+                "portfolio_id": pid,
+                "notes": "Abitazione principale"
+            })
+            save_physical_asset(engine, {
+                "name": "Rolex Daytona Cosmograph 116500LN",
+                "asset_category": "luxury_watches",
+                "brand_or_location": "Rolex",
+                "model_or_specs": "Acciaio Oyster, Quadrante Bianco, Ghiera Cerachrom",
+                "reference_number": "116500LN",
+                "purchase_price": 18500.0,
+                "current_market_value": 24500.0,
+                "portfolio_id": pid,
+                "notes": "Collezione personale con garanzia e scatola originale"
+            })
+
+            # Pension Plan (Fondo Cometa €38k)
+            save_pension_plan(engine, {
+                "plan_name": "Fondo Pensione Cometa / Fonchim",
+                "provider": "Fondo Pensione Negoziale",
+                "plan_type": "fondo_pensione_aperto",
+                "accumulated_value": 38000.0,
+                "monthly_employee_contrib": 250.0,
+                "monthly_employer_contrib": 250.0,
+                "tax_deductible_annual": 5164.57,
+                "portfolio_id": pid,
+                "notes": "Comparto Crescita / Azionario Bilanciato"
+            })
+
+            # Sample cash flows
+            today_d = datetime.now().date()
+            cats_df = get_wealth_categories(engine)
+            inc_cat = 1
+            exp_cat = 6
+            if cats_df is not None and not cats_df.empty:
+                inc_matches = cats_df[cats_df["flow_type"] == "income"]
+                if not inc_matches.empty:
+                    inc_cat = int(inc_matches.iloc[0]["category_id"])
+                exp_matches = cats_df[cats_df["flow_type"] == "expense"]
+                if not exp_matches.empty:
+                    exp_cat = int(exp_matches.iloc[0]["category_id"])
+
+            if acc_chk_id:
+                try:
+                    insert_cashflow_tx(engine, {
+                        "account_id": acc_chk_id,
+                        "category_id": inc_cat,
+                        "tx_date": today_d.strftime("%Y-%m-%d"),
+                        "amount": 6500.0,
+                        "direction": "inflow",
+                        "merchant": "Datore di Lavoro SpA",
+                        "notes": "Stipendio Mensile Dirigente",
+                        "portfolio_id": pid
+                    })
+                    insert_cashflow_tx(engine, {
+                        "account_id": acc_chk_id,
+                        "category_id": exp_cat,
+                        "tx_date": today_d.strftime("%Y-%m-%d"),
+                        "amount": 1450.0,
+                        "direction": "outflow",
+                        "merchant": "Banco BPM",
+                        "notes": "Rata Mensile Mutuo",
+                        "portfolio_id": pid
+                    })
+                    with engine.begin() as wconn:
+                        wconn.execute(
+                            sqlt("UPDATE wealth_accounts SET balance = 45000.0 WHERE account_id = :aid"),
+                            {"aid": acc_chk_id}
+                        )
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     return results_bundle

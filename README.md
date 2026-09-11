@@ -141,13 +141,14 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 * **📊 Wealth Temporal Analytics & Net Worth Dynamics (`WEALTH TIME` / `WTIME`)**: Suite temporale completa per il patrimonio con traiettoria storica a 24 mesi per asset class, matrice mensile dei flussi di risparmio (Gen..Dic + Totale Annuo), curva Underwater di drawdown patrimoniale vs High-Water Mark, metriche rolling a 6 mesi (Growth %, Volatilità %, Liquid Share %) e diagnosi di stagionalità dei flussi.
 * **📑 Hub di Reportistica & Esportazioni Istituzionali Multi-Formato (9 Formati)**: Centro unificato di export per Family Office e HNWI con White-Label Client Quarterly PDF ReportLab, Advisory Pitchbook a 6 pagine, Tear-Sheet Sintetica (PDF/HTML), Master Excel Dossier (.xlsx a 10 fogli con formule), Parquet Analytical Database, Prospetto Fiscale Quadro RW/RT (.csv), Registro Transazioni (.csv), Snapshot JSON e Copione Audio Podcast (.txt).
 * **🎓 Wealth Educational Modals & IFRS/GIPS Dialogs (`@st.dialog`)**: Modali informativi interattivi in alta risoluzione distribuiti su tutti i moduli Wealth per guidare l'utente su metodologia di bilancio, regola 50/30/20, perizie illiquidi, modello di Merton SPI %, ammortamento mutui e successioni.
-* **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 21 moduli, oltre 50 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
+* **Interfaccia Istituzionale, Navigation Rail Bidirezionale & Spotlight (`Ctrl+K`)**: Sincronizzazione automatica tra Sidebar ed elementi attivi delle pagine, **Spotlight Command Palette** integrata per ricerca globale istantanea su tutti i 22 moduli, oltre 50 sottomoduli, ticker e comandi di sistema, comparatore **Multi-Benchmark Overlay** fino a 4 indici contemporanei con scorecard di Alpha e Sharpe, e architettura *Zero-Recalc* con reattività istantanea.
+* **🌐 Institutional Splash Screen & Dual-Portal Gateway (`components/splash.py`)**: Gateway di benvenuto istituzionale con design Obsidian Dark Glass / Bento Grid Monolith, soppressione completa dei controlli sidebar e freccette collassate (`stExpandSidebarButton`) all'avvio, telemetria Bloomberg-style in tempo reale, conteggio certificato dei 22 moduli operativi (12 Risk & Quant + 10 Wealth & Advisory) e apertura automatica ed immediata della sidebar all'ingresso nel modulo prescelto.
 
 ---
 
-## 🚀 Caratteristiche Chiave & Moduli Operativi (21 Moduli Istituzionali)
+## 🚀 Caratteristiche Chiave & Moduli Operativi (22 Moduli Istituzionali)
 
-### 🏛️ SEZIONE 1: QUANTITATIVE RISK & PORTFOLIO BI (Moduli 0 – 11)
+### 🏛️ SEZIONE 1: QUANTITATIVE RISK & PORTFOLIO BI (12 Moduli: 0 – 11)
 
 ### 0. 🎛️ Control Room & Total Wealth Hub (`src/0_Control_Room.py`)
 * **⚡ Motore Analitico Embedded DuckDB & SQL Sandbox**: Esecuzione in-process vettorizzata SIMD per aggregazioni OLAP sub-millisecondo, preset istituzionali 1-click (Cubi Multi-Dimensionali, Window Functions `QUALIFY`, Storico Volumi/Commissioni, Matrice FX), console SQL interattiva ed esportazione compressa in formato **Apache Parquet**.
@@ -241,7 +242,7 @@ Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGU
 
 ---
 
-### 💎 SEZIONE 2: WEALTH MANAGEMENT & PERSONAL FINANCE (Moduli 12 – 21)
+### 💎 SEZIONE 2: WEALTH MANAGEMENT & PERSONAL FINANCE (10 Moduli: 12 – 21)
 
 ### 12. 🎛️ Wealth Control Room (`src/pages/12_🎛️_Wealth_Control_Room.py`)
 * **🏛️ Master Wealth Hub & Multi-Account Management**: Centro di comando unificato per la gestione di conti correnti, depositi, conti titoli, carte e passività con switch dinamico tra profili patrimoniali.
@@ -384,7 +385,7 @@ flowchart TD
     end
 
     subgraph Layer5 ["📊 5. PRESENTATION & DESKTOP REPORTING LAYER"]
-        APP("💻 Streamlit App / Control Room (11 Moduli Live)")
+        APP("💻 Streamlit App / Dual Gateway Control Room (22 Moduli Live)")
         DESK("🖥️ Native Desktop App (desktop_launcher.py + WebView2)")
         SPOTLIGHT{"🔍 Spotlight Command Palette (Ctrl+K)"}
         REPEXP{"📄 core/report_exporter.py (PDF, Excel, HTML)"}
@@ -644,7 +645,7 @@ argus-risk-analytics/
 │   ├── generate_realistic_portfolio.py # Quantitative Simulation Engine (3 Archetipi, PAC, Mutui, Solvibilità)
 │   ├── package_release.py       # Pacchettizzatore Release ZIP
 │   └── test_run.py              # Script di esecuzione e verifica rapida
-├── src/                         # Codice sorgente dell'applicazione Streamlit (21 Moduli Operativi)
+├── src/                         # Codice sorgente dell'applicazione Streamlit (22 Moduli Operativi)
 │   ├── 0_Control_Room.py        # Entry point principale, Total Wealth Hub & Control Room
 │   └── pages/                   # Moduli e viste della dashboard (1..21)
 │       ├── 1_📈_Dashboard_Generale.py

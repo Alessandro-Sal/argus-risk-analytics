@@ -137,7 +137,7 @@ def render_unified_archetype_hud(current_module: str = "risk"):
     tx_count = st.session_state.get("active_archetype_tx_count", 0)
     db_ids = st.session_state.get("active_archetype_db_ids", {})
     r_id = db_ids.get("risk_portfolio_id", st.session_state.get("portfolio_id", 1))
-    w_id = db_ids.get("wealth_profile_id", st.session_state.get("wealth_active_portfolio_id", 1))
+    w_id = db_ids.get("wealth_profile_id", st.session_state.get("wealth_active_portfolio_id"))
 
     st.markdown(f"""
     <div style="background: rgba(46, 160, 67, 0.14); border: 1px solid rgba(46, 160, 67, 0.4); border-left: 4px solid #2ea043; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px;">

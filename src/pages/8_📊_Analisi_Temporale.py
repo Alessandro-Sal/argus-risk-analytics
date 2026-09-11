@@ -26,7 +26,7 @@ from core.db_exporter import get_all_snapshots_history, get_snapshot_positions_b
 from core.multi_portfolio import list_saved_portfolio_profiles, load_portfolio_profile
 from core.ui_utils import (
     apply_plotly_theme, inject_custom_css, render_command_bar, 
-    metric_card, ensure_risk_bundle_loaded, render_sandbox_banner
+    metric_card, ensure_portfolio_loaded, render_sandbox_banner
 )
 from core.temporal_engine import (
     compute_monthly_return_matrix,
@@ -43,7 +43,7 @@ render_sidebar()
 render_command_bar()
 
 # ── Load In-Memory Portfolio Bundle ───────────────────────────
-results, has_real = ensure_risk_bundle_loaded()
+results, has_real = ensure_portfolio_loaded(module_type="risk")
 
 raw_sr_port = results.get("portfolio_return", pd.Series(dtype=float))
 raw_sr_bm = results.get("benchmark_return", pd.Series(dtype=float))
