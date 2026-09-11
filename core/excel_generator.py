@@ -6,10 +6,11 @@ Generates fully recalculating .xlsx models with active formulas, data bars, and 
 
 import io
 import math
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 import xlsxwriter
-from typing import Optional
 
 
 def _safe_num(val, default=0.0) -> float:
@@ -50,7 +51,6 @@ def generate_excel_in_memory(df: pd.DataFrame) -> io.BytesIO:
     f_currency = workbook.add_format({'num_format': '€ #,##0.00'})
     f_bold_currency = workbook.add_format({'bold': True, 'num_format': '€ #,##0.00'})
     f_pct = workbook.add_format({'num_format': '0.00%'})
-    f_bold_pct = workbook.add_format({'bold': True, 'num_format': '0.00%'})
     f_bold = workbook.add_format({'bold': True})
     f_input = workbook.add_format({'bg_color': '#FEF3C7', 'border': 1, 'num_format': '0.00%', 'align': 'right'})
 
@@ -174,8 +174,64 @@ def generate_excel_in_memory(df: pd.DataFrame) -> io.BytesIO:
         'value': 0,
         'format': workbook.add_format({'bg_color': '#FEE2E2', 'font_color': '#991B1B'})
     })
-
     ws_sim.autofit()
+
+    # ── FOGLIO 3: PROSPETTO FISCALE QUADRO RW & IVAFE ───────────
+    ws_rw = workbook.add_worksheet("Quadro RW - Fisco")
+    ws_rw.write("A1", "ARGUS — PROSPETTO QUADRO RW & MONITORAGGIO IVAFE (DL 167/90)", f_title)
+    ws_rw.write("A2", "Riepilogo delle attività finanziarie estere con calcolo dell'imposta sul valore delle attività finanziarie all'estero (0.20%).", f_subtitle)
+
+    rw_start_row = 4
+    rw_rows = []
+    for _, row in df.iterrows():
+        tk = str(row.get('ticker', ''))
+        ac = str(row.get('asset_class', 'Equity') or 'Equity')
+        cv = _safe_num(row.get('current_value', 0.0))
+        cost = _safe_num(row.get('avg_cost', 0.0)) * _safe_num(row.get('qty_net', 1.0))
+        if cost <= 0:
+            cost = cv
+
+        # Mappatura codice investimento Quadro RW
+        cod_inv = 2 if "ETF" in tk.upper() or "ETF" in ac.upper() else 1
+        # Mappatura paese estero
+        country_code = "US" if not (tk.endswith(".MI") or tk.endswith(".DE") or tk.endswith(".PA")) else ("DE" if tk.endswith(".DE") else "IT")
+
+        rw_rows.append([tk, cod_inv, country_code, cost, cv, 1.0, 365, 0.0])
+
+    num_rw_rows = len(rw_rows)
+    columns_spec_rw = [
+        {'header': 'Asset / Ticker'},
+        {'header': 'Codice Investimento', 'format': workbook.add_format({'num_format': '0', 'align': 'center'})},
+        {'header': 'Codice Paese', 'format': workbook.add_format({'align': 'center'})},
+        {'header': 'Valore Iniziale (€)', 'format': f_currency},
+        {'header': 'Valore Finale (€)', 'format': f_currency},
+        {'header': 'Quota Possesso %', 'format': f_pct},
+        {'header': 'Giorni Detenzione', 'format': workbook.add_format({'num_format': '#,##0', 'align': 'center'})},
+        {'header': 'IVAFE Dovuta (0.20%)', 'format': f_currency}
+    ]
+
+    ws_rw.add_table(rw_start_row, 0, rw_start_row + num_rw_rows, len(columns_spec_rw) - 1, {
+        'name': 'TableQuadroRW',
+        'data': rw_rows,
+        'columns': columns_spec_rw,
+        'style': 'TableStyleMedium7',
+        'total_row': True
+    })
+
+    # Formule IVAFE = Valore Finale * 0.002 * (Giorni / 365) * Quota Possesso
+    for i in range(num_rw_rows):
+        r = rw_start_row + 1 + i
+        excel_row = r + 1
+        ws_rw.write_formula(r, 7, f"=E{excel_row}*0.002*(G{excel_row}/365)*F{excel_row}", f_currency)
+
+    # Totale riga chiusura Quadro RW
+    tot_rw_idx = rw_start_row + num_rw_rows + 1
+    ws_rw.write(tot_rw_idx, 0, "TOTALE", f_bold)
+    ws_rw.write_formula(tot_rw_idx, 3, f"=SUM(D{rw_start_row+2}:D{tot_rw_idx})", f_bold_currency)
+    ws_rw.write_formula(tot_rw_idx, 4, f"=SUM(E{rw_start_row+2}:E{tot_rw_idx})", f_bold_currency)
+    ws_rw.write_formula(tot_rw_idx, 7, f"=SUM(H{rw_start_row+2}:H{tot_rw_idx})", f_bold_currency)
+
+    ws_rw.autofit()
     workbook.close()
     output.seek(0)
     return output

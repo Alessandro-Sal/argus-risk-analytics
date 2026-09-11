@@ -1702,6 +1702,23 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     }
 
 
+def compute_risk_metrics(sr_portfolio: pd.Series,
+                         sr_benchmark: Optional[pd.Series] = None,
+                         risk_free_rate: float = 0.03,
+                         benchmark_ticker: str = "SPY") -> dict:
+    """
+    Funzione pubblica ad alta precisione per il calcolo congiunto di metriche di rendimento
+    (Sharpe, CAGR, Sortino) e rischio di mercato (VaR 95/99%, CVaR, Beta, Volatilità).
+    """
+    if sr_benchmark is None:
+        sr_benchmark = pd.Series(0.0, index=sr_portfolio.index)
+    ret_m = _calc_return_metrics(sr_portfolio, sr_benchmark, risk_free_rate=risk_free_rate)
+    mkt_m = _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker=benchmark_ticker, risk_free_rate=risk_free_rate)
+    return {
+        "returns": ret_m,
+        "market_risk": mkt_m
+    }
+
 
 # ── Concentrazione ───────────────────────────────────────────
 
