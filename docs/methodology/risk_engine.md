@@ -60,3 +60,38 @@ In every market condition, ARGUS guarantees the mathematical coherence constrain
 $$\text{CVaR}_\alpha \ge \text{VaR}_\alpha$$
 
 If non-linear numerical artefacts occur due to sparse sample tails, the engine automatically clamps $\text{CVaR}_\alpha = \max(\text{CVaR}_\alpha, 1.05 \cdot \text{VaR}_\alpha)$.
+
+---
+
+## Temporal Scaling & The Square-Root of Time ($\sqrt{t}$) Rule
+
+### Theoretical Foundations
+The standard square-root of time scaling rule for Value at Risk and Volatility:
+
+$$\sigma_{T} = \sigma_1 \times \sqrt{T}, \quad \text{VaR}_\alpha(T) = \text{VaR}_\alpha(1) \times \sqrt{T}$$
+
+is analytically exact **if and only if** consecutive asset returns $r_t$ satisfy:
+1. **Independent and Identically Distributed (i.i.d.)**: $\text{Cov}(r_t, r_{t-k}) = 0$ for all lag $k > 0$.
+2. **Finite Second Moments with Gaussian Stability**: Returns follow a stable Lévy distribution (specifically the Gaussian distribution, where the sum of normals is normal).
+
+### Statistical Limitations on Fat-Tailed & Clustered Series
+In empirical financial time series, the $\sqrt{t}$ rule suffers from known quantitative biases:
+- **Volatility Clustering (ARCH/GARCH effects)**: Conditional variance is serially correlated. A shock today increases volatility tomorrow, leading $\sqrt{t}$ to underestimate short-term multi-day risk during crisis regimes.
+- **Leptokurtosis & Central Limit Convergence**: Under independent fat-tailed distributions, the Central Limit Theorem (CLT) causes sum distributions over longer horizons ($T \ge 20$) to converge toward Gaussianity slower than $\sqrt{t}$ anticipates, leading to potential mis-estimation of multi-day tail quantiles.
+- **Mean Reversion & Auto-correlation**: High autocorrelation in illiquid or fixed income assets causes variance to scale at $T^\alpha$ where $\alpha \ne 0.5$.
+
+### ARGUS Solution: GARCH(1,1) & Filtered Historical Simulation (FHS)
+To overcome the structural deficiencies of crude $\sqrt{t}$ scaling for multi-horizon risk assessments, ARGUS provides:
+1. **GARCH(1,1) Dynamic Term-Structure**: Explicit forward volatility projection accounting for persistent variance regimes $\sigma_{t+h}^2 = \sigma_L^2 + (\alpha + \beta)^h (\sigma_t^2 - \sigma_L^2)$.
+2. **Filtered Historical Simulation (FHS - Barone-Adesi, Giannopoulos & Vosper 1999)**: Non-parametric bootstrapping on standardized residuals $\epsilon_t = \frac{r_t}{\sigma_t}$ combined with conditional volatility forecasts, preserving empirical tail dependence without imposing $\sqrt{t}$ Gaussian assumptions.
+
+---
+
+## Model Risk Management & Continuous Validation (SR 11-7)
+
+In alignment with **Federal Reserve SR 11-7 / OCC 2011-12** guidelines, the analytical engine is verified via automated quantitative unit tests (`tests/test_model_risk_audit.py`):
+1. **Axiomatic Coherence**: Monotonicity of historical and parametric VaR and CVaR.
+2. **Peak-to-Trough Drawdown**: Exact verification of Maximum Drawdown and High-Water Mark tracking against theoretical paths.
+3. **FIFO Accounting with Fees**: Verification of acquisition cost capitalization and selling fee deduction under Italian fiscal law (TUIR Art. 68 c. 6).
+4. **Covariance Robustness & PSD**: Numerical verification of symmetry, positive semi-definiteness, and Ledoit-Wolf shrinkage condition number regularization.
+5. **Amortization Exactness**: French constant payment loan schedule convergence to zero balance.

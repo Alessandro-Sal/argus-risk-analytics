@@ -194,6 +194,8 @@ def compute_tax_and_harvesting(
                             fx_rate = fallback_map.get(tx_curr, 1.0)
 
                     price = raw_price * fx_rate
+                    raw_fees = float(row.get('fees', 0.0) or 0.0) if pd.notna(row.get('fees', 0.0)) else 0.0
+                    fees_eur = raw_fees * fx_rate
                     
                     if yr not in yearly_stats:
                         yearly_stats[yr] = {'gains_diversi': 0.0, 'gains_etf': 0.0, 'losses': 0.0, 'dividends': 0.0}
@@ -201,18 +203,25 @@ def compute_tax_and_harvesting(
                     etf_flag = is_etf(ac, ticker)
                     
                     if txtype == 'buy':
-                        queue.append([qty, price])
+                        # TUIR Art. 68 c. 6: costo di carico incrementato degli oneri accessori (commissioni)
+                        lot_cost = (qty * price + fees_eur) / qty if qty > 1e-9 else price
+                        queue.append([qty, lot_cost])
                     elif txtype == 'sell':
+                        # TUIR Art. 68 c. 6: corrispettivo di vendita al netto degli oneri di vendita
                         qty_to_sell = qty
                         while qty_to_sell > 1e-9 and queue:
                             lot = queue[0]
                             if lot[0] <= qty_to_sell + 1e-9:
-                                pnl = lot[0] * (price - lot[1])
-                                qty_to_sell -= lot[0]
+                                sold_lot_qty = lot[0]
+                                fee_lot = fees_eur * (sold_lot_qty / qty) if qty > 1e-9 else 0.0
+                                pnl = sold_lot_qty * (price - lot[1]) - fee_lot
+                                qty_to_sell -= sold_lot_qty
                                 queue.popleft()
                             else:
-                                pnl = qty_to_sell * (price - lot[1])
-                                lot[0] -= qty_to_sell
+                                sold_lot_qty = qty_to_sell
+                                fee_lot = fees_eur * (sold_lot_qty / qty) if qty > 1e-9 else 0.0
+                                pnl = sold_lot_qty * (price - lot[1]) - fee_lot
+                                lot[0] -= sold_lot_qty
                                 qty_to_sell = 0.0
                             
                             if pnl > 0:

@@ -384,6 +384,7 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
     quantities = grp["quantity"].to_numpy(dtype=np.float64)
     tx_types = grp["tx_type"].astype(str).str.lower().str.strip().values
     currencies = grp["currency"].astype(str).str.upper().str.strip().values if "currency" in grp.columns else np.array(["EUR"] * n_rows)
+    fees = grp["fees"].fillna(0.0).to_numpy(dtype=np.float64) if "fees" in grp.columns else np.zeros(n_rows, dtype=np.float64)
 
     if fx_series is not None and not fx_series.empty:
         tx_dates = pd.to_datetime(grp["tx_date"].values)
@@ -395,16 +396,22 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
         fx_multipliers = np.ones(n_rows, dtype=np.float64)
 
     prices_eur = prices * fx_multipliers
+    fees_eur = fees * fx_multipliers
 
     for i in range(n_rows):
         tx = tx_types[i]
         qty = quantities[i]
         price_eur = prices_eur[i]
+        fee_eur = fees_eur[i]
 
         if tx == "buy":
-            queue.append([qty, price_eur])
+            # TUIR Art. 68 c. 6: costo di carico incrementato degli oneri accessori (commissioni)
+            unit_cost = (qty * price_eur + fee_eur) / qty if qty > 1e-9 else price_eur
+            queue.append([qty, unit_cost])
 
         elif tx == "sell":
+            # TUIR Art. 68 c. 6: corrispettivo di realizzo al netto degli oneri di vendita
+            realized -= fee_eur
             qty_to_sell = qty
             while qty_to_sell > 1e-9 and queue:
                 lot = queue[0]
