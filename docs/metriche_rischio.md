@@ -6,24 +6,35 @@ Questo documento illustra la metodologia, la formulazione matematica e le applic
 
 ## 1. Motore Contabile FIFO (First-In, First-Out)
 
-Per determinare accuratamente il costo di carico e i profitti/perdite realizzati su portafogli con acquisti e vendite frazionate nel tempo, il sistema implementa un **motore a code FIFO (`_fifo_engine`)**:
+Per determinare accuratamente il costo di carico e i profitti/perdite realizzati su portafogli con acquisti e vendite frazionate nel tempo, il sistema implementa un **motore a code FIFO (`_fifo_engine`)** pienamente conforme alla disciplina fiscale italiana (**TUIR Art. 68 c. 6**):
 
-1. **Gestione Acquisti**: Ogni operazione di acquisto (`buy`) aggiunge un lotto $(q_i, p_i)$ alla coda FIFO dell'asset.
-2. **Gestione Vendite**: Ogni operazione di vendita (`sell`) consuma le quote a partire dai lotti più vecchi nella coda:
-   
+1. **Gestione Acquisti & Capitalizzazione Oneri Accessori**: Ogni operazione di acquisto (`buy`) aggiunge un lotto $[q_i, p_{\text{carico}, i}]$ alla coda FIFO dell'asset. Il costo fiscale unitario di carico incorpora proporzionalmente le commissioni bancarie e gli oneri accessori di compravendita:
 
 $$
-\text{PnL Realizzato} = \sum_{k} q_{\text{venduti}, k} \cdot (p_{\text{vendita}} - p_{\text{acquisto}, k}) - \text{Commissioni}
+p_{\text{carico}, i} = \frac{q_i \cdot (p_i \cdot \text{FX}_i) + (\text{Fee}_i \cdot \text{FX}_i)}{q_i}
+$$
+
+dove $\text{FX}_i$ è il moltiplicatore di cambio storico spot verso EUR alla data di regolamento dell'operazione.
+
+2. **Gestione Vendite & Deduzione Spese di Negoziazione**: Ogni operazione di vendita (`sell`) consuma le quote a partire dai lotti più vecchi nella coda (*First-In, First-Out*). Il corrispettivo realizzato netto è calcolato deducendo le commissioni di vendita:
+
+$$
+\text{PnL Realizzato} = \sum_{k} q_{\text{venduti}, k} \cdot (p_{\text{vendita}} \cdot \text{FX} - p_{\text{carico}, k}) - (\text{Fee}_{\text{vendita}} \cdot \text{FX})
 $$
 
 3. **Prezzo Medio di Carico Residuo (Weighted Average Cost Basis - WACP)**:
-   
+Rappresenta il costo medio ponderato dei lotti ancora presenti in portafoglio:
 
 $$
-\text{WACP} = \frac{\sum_{m} q_{\text{residuo}, m} \cdot p_{\text{acquisto}, m}}{\sum_{m} q_{\text{residuo}, m}}
+\text{WACP} = \frac{\sum_{m} q_{\text{residuo}, m} \cdot p_{\text{carico}, m}}{\sum_{m} q_{\text{residuo}, m}}
 $$
 
-4. **Dividendi**: I dividendi storici incassati vengono sommati direttamente per determinare il PnL totale effettivo.
+4. **Operazioni Straordinarie su Capitale (Corporate Actions)**:
+In presenza di frazionamenti o raggruppamenti (*stock split* / *reverse split* con fattore $k$), ogni lotto in coda viene rettificato istantaneamente:
+$$q_{\text{nuovo}} = q \cdot k, \quad p_{\text{carico, nuovo}} = \frac{p_{\text{carico}}}{k}$$
+preservando la conservazione del controvalore fiscale di carico: $\sum q \cdot p_{\text{carico}} = \text{costante}$.
+
+5. **Dividendi**: I flussi per dividendi incassati vengono contabilizzati separatamente nella valuta di conto per determinare il rendimento totale (*Total Return*).
 
 ---
 
@@ -2949,32 +2960,86 @@ dove $Z_{1, t}$ e $Z_{2, t}$ sono variabili normali standard correlate con coeff
 
 ---
 
-## 79. Riferimenti Bibliografici & Standard Istituzionali
+## 79. Validazione Formale di Modello & Model Risk Management (SR 11-7 Protocol)
+
+In conformità alle linee guida internazionali di vigilanza bancaria e prudenziale (**Federal Reserve SR Letter 11-7 / OCC Bulletin 2011-12** - *Supervisory Guidance on Model Risk Management*), l'ecosistema analitico ARGUS è sottoposto a verifica formale continua attraverso una suite permanente di test di validazione quantitativa indipendente (`tests/test_model_risk_audit.py`).
+
+Il framework di audit copre 5 pilastri metodologici fondamentali:
+
+### 1. Coerenza Assiomatica e Monotonicità di VaR e Expected Shortfall (CVaR)
+In accordo con la teoria delle misure di rischio coerenti (**Artzner et al., 1999**), il modello garantisce:
+- **Subadditività e Dominanza**: Per qualsiasi livello di confidenza $\alpha \in (0, 1)$, l'Expected Shortfall deve dominare il Value at Risk:
+  $$
+  \text{CVaR}_\alpha \ge \text{VaR}_\alpha
+  $$
+- **Monotonicità per Livelli di Severità**: Al crescere del quantile di confidenza (es. dal 95% al 99%), le perdite attese stimate devono crescere monotonicamente:
+  $$
+  \text{VaR}_{0.99} \ge \text{VaR}_{0.95}, \quad \text{CVaR}_{0.99} \ge \text{CVaR}_{0.95}
+  $$
+- **Invarianza Parametrica vs Storica**: La formulazione gaussiana chiusa ($\mu - \sigma \frac{\phi(z_\alpha)}{\alpha}$) e la simulazione storica a quantili continui rispettano simultaneamente i requisiti assiomatici senza distorsioni da campioni asimmetrici.
+
+### 2. Ricostruzione Rigorosa Peak-to-Trough del Maximum Drawdown
+Il Maximum Drawdown non viene approssimato né calcolato per mera differenza lineare di rendimenti, bensì tramite tracciamento ricorsivo dell'High-Water Mark (HWM):
+$$
+\text{HWM}_t = \max_{s \le t} V_s, \quad \text{DD}_t = \frac{V_t - \text{HWM}_t}{\text{HWM}_t}, \quad \text{MDD} = \min_t \text{DD}_t
+$$
+La suite di test verifica che su traiettorie discontinue con rimbalzi intermedi (*bear market rallies*), il minimo assoluto corrisponda analiticamente alla massima perdita percentuale dal picco precedente.
+
+### 3. Contabilità Fiscale FIFO con Oneri Accessori e Segregazione Asimmetrica ETF
+Il modulo fiscale (`core/tax_engine.py`) e il motore contabile (`core/risk_engine.py`):
+- **Oneri di Negoziazione (TUIR Art. 68 c. 6)**: Capitalizzano integralmente le commissioni di acquisto nel PMC di carico ($p_{\text{carico}} = (q \cdot p + \text{fee})/q$) e deducono le commissioni di vendita dal corrispettivo lordo realizzato.
+- **Asimmetria Fiscale ETF (TUIR Art. 67-68)**: Segregano i capital gain su ETF/OICR come *Redditi di Capitale* (tassati al 26% senza facoltà di compensazione) rispetto a titoli azionari/obbligazionari (*Redditi Diversi*, compensabili con minusvalenze).
+- **Zainetto Fiscale Quadriennale**: Tracciano analiticamente lo scarico FIFO delle minusvalenze con scadenza perentoria al 31 dicembre del quarto anno successivo alla realizzazione.
+
+### 4. Robustezza Numerica della Matrice di Covarianza, Semidefinitezza Positiva (PSD) e Shrinkage
+I modelli di frontiera efficiente e VaR parametrico richiedono matrici di dispersione non singolari e simmetriche:
+- **Simmetria**: $\Sigma = \Sigma^T$ entro tolleranza di macchina ($10^{-14}$).
+- **Semidefinitezza Positiva**: $\lambda_{\min}(\Sigma) \ge 0$.
+- **Regolarizzazione Ledoit-Wolf**: In presenza di asset altamente collineari o serie temporali ad alta dimensionalità ($N \approx T$), l'algoritmo di shrinkage contrae la covarianza campionaria $S$ verso un target ben condizionato $F$:
+  $$
+  \Sigma_{\text{shrunk}} = (1 - \delta^*) S + \delta^* F, \quad \delta^* \in [0, 1]
+  $$
+  garantendo un abbattimento del *Condition Number* e prevenendo instabilità numeriche nell'inversione della matrice pesi.
+
+### 5. Ammortamento Francese a Rata Costante & Conservazione del Capitale
+Il modello di passività patrimoniali (`core/wealth/personal_balance_sheet.py` e `wealth_engine.py`) implementa la formula finanziaria esatta per mutui e prestiti:
+$$
+R = C \cdot \frac{i \cdot (1+i)^n}{(1+i)^n - 1}
+$$
+Verificato mese per mese affinché la scomposizione tra quota capitale e quota interessi rispetti l'equilibrio contabile ad ogni scadenza e il debito residuo converga esattamente a 0 a fine piano.
+
+---
+
+## 80. Riferimenti Bibliografici & Standard Istituzionali
 
 1. **Almgren, R., & Chriss, N. (2000)**. *Optimal execution of portfolio transactions*. Journal of Risk, 3(2), 5-40.
 2. **Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005)**. *Direct estimation of equity market impact*. Risk, 18(7), 58-62.
-3. **Bangia, A., Diebold, F. X., Schuermann, T., & Stroughair, J. D. (1999)**. *Modeling Liquidity Risk, With Implications for Traditional Market Risk Measurement and Management*. Working Paper, Financial Institutions Center, The Wharton School.
-4. **Blanchett, D. (2014)**. *Exploring the Retirement Consumption Puzzle*. Journal of Financial Planning, 27(5), 34-42.
-5. **Bodie, Z., Treussard, J., & Willen, P. (2007)**. *The Theory of Life-Cycle Saving and Investing*. Public Policy Discussion Paper, Federal Reserve Bank of Boston.
-6. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
-7. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
-8. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
-9. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
-10. **Damodaran, A. (2012)**. *Investment Valuation: Tools and Techniques for Determining the Value of Any Asset*. John Wiley & Sons.
-11. **Euler, L. (1736)**. *Institutiones Calculi Differentialis* (Homogeneous functions and Euler's decomposition theorem).
-12. **FIX Trading Community (2006)**. *FIX Protocol Specification Version 4.4 with Errata*.
-13. **Guyton, J. T., & Klinger, W. J. (2006)**. *Decision rules and maximum initial withdrawal rates for college-educated retirees*. Journal of Financial Planning, 19(10), 48-58.
-14. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
-15. **Ho, T. S., & Mudryk, S. (2005)**. *Key Rate Duration: A Modern Approach to Yield Curve Risk Management*. Fixed Income Valuation and Risk, 12(3), 45-62.
-16. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
-17. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
-18. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
-19. **Merton, R. C. (1971)**. *Optimum consumption and portfolio rules in a continuous-time model*. Journal of Economic Theory, 3(4), 373-413.
-20. **MSCI Barra (2011)**. *Barra Equity Risk Model Handbook & Factor Risk Decomposition*. MSCI Research.
-21. **Nelson, C. R., & Siegel, A. F. (1987)**. *Parsimonious Modeling of Yield Curves*. The Journal of Business, 60(4), 473-489.
-22. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
-23. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
-24. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+3. **Artzner, P., Delbaen, F., Eber, J. M., & Heath, D. (1999)**. *Coherent Measures of Risk*. Mathematical Finance, 9(3), 203-228.
+4. **Bangia, A., Diebold, F. X., Schuermann, T., & Stroughair, J. D. (1999)**. *Modeling Liquidity Risk, With Implications for Traditional Market Risk Measurement and Management*. Working Paper, Financial Institutions Center, The Wharton School.
+5. **Blanchett, D. (2014)**. *Exploring the Retirement Consumption Puzzle*. Journal of Financial Planning, 27(5), 34-42.
+6. **Board of Governors of the Federal Reserve System & Office of the Comptroller of the Currency (OCC)**. *Supervisory Guidance on Model Risk Management (SR Letter 11-7 / OCC Bulletin 2011-12)*.
+7. **Bodie, Z., Treussard, J., & Willen, P. (2007)**. *The Theory of Life-Cycle Saving and Investing*. Public Policy Discussion Paper, Federal Reserve Bank of Boston.
+8. **Bouchaud, J. P., Gefen, Y., Potters, M., & Wyart, M. (2008)**. *Fluctuations and response in financial markets: the subtle nature of "random" price changes*. Quantitative Finance, 4(2), 176-190.
+9. **Brinson, G. P., & Fachler, N. (1985)**. *Measuring non-US equity portfolio performance*. The Journal of Portfolio Management, 11(3), 73-77.
+10. **Carino, D. R. (1999)**. *Combining attribution effects over time*. The Journal of Performance Measurement, 3(4), 5-14.
+11. **Choueifaty, Y., & Coignard, Y. (2008)**. *Toward Maximum Diversification*. The Journal of Portfolio Management, 35(1), 40-51.
+12. **Damodaran, A. (2012)**. *Investment Valuation: Tools and Techniques for Determining the Value of Any Asset*. John Wiley & Sons.
+13. **Euler, L. (1736)**. *Institutiones Calculi Differentialis* (Homogeneous functions and Euler's decomposition theorem).
+14. **FIX Trading Community (2006)**. *FIX Protocol Specification Version 4.4 with Errata*.
+15. **Guyton, J. T., & Klinger, W. J. (2006)**. *Decision rules and maximum initial withdrawal rates for college-educated retirees*. Journal of Financial Planning, 19(10), 48-58.
+16. **Hasbrouck, J. (2007)**. *Empirical Market Microstructure: The Institutions, Economics, and Econometrics of Securities Trading*. Oxford University Press.
+17. **Ho, T. S., & Mudryk, S. (2005)**. *Key Rate Duration: A Modern Approach to Yield Curve Risk Management*. Fixed Income Valuation and Risk, 12(3), 45-62.
+18. **Karnosky, D. S., & Singer, B. D. (1994)**. *Global asset management and performance attribution*. The Research Foundation of the Institute of Chartered Financial Analysts.
+19. **Ledoit, O., & Wolf, M. (2004)**. *A well-conditioned estimator for large-dimensional covariance matrices*. Journal of Multivariate Analysis, 88(2), 365-411.
+20. **Markowitz, H. (1952)**. *Portfolio Selection*. The Journal of Finance, 7(1), 77-91.
+21. **López de Prado, M. (2016)**. *Building Diversified Portfolios that Outperform Out of Sample*. Journal of Portfolio Management, 42(4), 59-69.
+22. **Merton, R. C. (1971)**. *Optimum consumption and portfolio rules in a continuous-time model*. Journal of Economic Theory, 3(4), 373-413.
+23. **MSCI Barra (2011)**. *Barra Equity Risk Model Handbook & Factor Risk Decomposition*. MSCI Research.
+24. **Nelson, C. R., & Siegel, A. F. (1987)**. *Parsimonious Modeling of Yield Curves*. The Journal of Business, 60(4), 473-489.
+25. **Stoikov, S. (2018)**. *The Micro-Price: a High-Frequency Estimator of Future Prices*. Quantitative Finance, 18(12), 1959-1966.
+26. **Testo Unico delle Imposte sui Redditi (TUIR)**, D.P.R. 22 dicembre 1986, n. 917, Art. 67 & 68 (Plusvalenze finanziarie, compensazione minusvalenze quadriennali).
+27. **Legge 29 dicembre 2022, n. 197 (Legge di Bilancio 2023)** & **Circolare Agenzia delle Entrate n. 30/E del 27 ottobre 2023** (Fiscalità delle cripto-attività).
+
 
 
 

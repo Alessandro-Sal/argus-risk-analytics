@@ -38,7 +38,7 @@ def _ensure_test_data(engine, portfolio_id: int = 1):
     df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
     years = [2024, 2025, 2026]
     for yr in years:
-        has_yr_inflow = not df_cf.empty and ((df_cf["tx_date"].str.startswith(str(yr))) & (df_cf["direction"] == "inflow")).any()
+        has_yr_inflow = not df_cf.empty and ((df_cf["tx_date"].astype(str).str.startswith(str(yr))) & (df_cf["direction"] == "inflow")).any()
         if not has_yr_inflow:
             insert_cashflow_tx(engine, {
                 "portfolio_id": portfolio_id,
@@ -52,7 +52,7 @@ def _ensure_test_data(engine, portfolio_id: int = 1):
                 "notes": f"Stipendio {yr}",
                 "is_recurring": 1
             })
-        has_yr_outflow = not df_cf.empty and ((df_cf["tx_date"].str.startswith(str(yr))) & (df_cf["direction"] == "outflow")).any()
+        has_yr_outflow = not df_cf.empty and ((df_cf["tx_date"].astype(str).str.startswith(str(yr))) & (df_cf["direction"] == "outflow")).any()
         if not has_yr_outflow:
             insert_cashflow_tx(engine, {
                 "portfolio_id": portfolio_id,
