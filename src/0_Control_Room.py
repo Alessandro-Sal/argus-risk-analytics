@@ -1968,9 +1968,16 @@ with tab_bitemporal:
     st.markdown("### 🕰️ Motore di Persistenza Bitemporale & Audit Trail Crittografico")
     st.caption("Standard ISO/IEC 9075:2011 SQL Temporal, MiFID II / AIFMD Compliance & Certificazione Merkle Tree per Family Office e SGR.")
 
+    import importlib
+    import core.bitemporal_engine
+    importlib.reload(core.bitemporal_engine)
     from core.bitemporal_engine import BitemporalLedgerEngine
 
-    if "bitemp_engine" not in st.session_state:
+    if (
+        "bitemp_engine" not in st.session_state
+        or not hasattr(st.session_state["bitemp_engine"], "get_available_portfolios")
+        or not hasattr(st.session_state["bitemp_engine"], "ingest_portfolio_dataframe")
+    ):
         st.session_state["bitemp_engine"] = BitemporalLedgerEngine()
         st.session_state["bitemp_seed_info"] = st.session_state["bitemp_engine"].seed_demonstration_scenario()
 
