@@ -1069,39 +1069,34 @@ def render_sidebar():
                 border: none !important;
             }
 
-            /* Always keep Collapsed Control (Open Sidebar Button) Visible & Clickable */
+            /* Nascondi tassativamente tutte le freccette della sidebar (<< e >>) per interfaccia fissa desktop istituzionale */
             [data-testid="collapsedControl"],
             button[data-testid="stSidebarCollapsedControl"],
             div[data-testid="collapsedControl"],
             [data-testid="stExpandSidebarButton"],
             button[data-testid="stExpandSidebarButton"],
             [data-testid="stHeader"] [data-testid="collapsedControl"],
-            [data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
-                display: flex !important;
-                visibility: visible !important;
-                opacity: 1 !important;
-                cursor: pointer !important;
-                pointer-events: auto !important;
-                z-index: 999999 !important;
-            }
-            [data-testid="collapsedControl"] button,
-            button[data-testid="stSidebarCollapsedControl"],
-            [data-testid="stExpandSidebarButton"],
-            button[data-testid="stExpandSidebarButton"] {
-                display: inline-flex !important;
-                visibility: visible !important;
-                color: #ff9900 !important;
-                background: rgba(22, 27, 34, 0.95) !important;
-                border: 1px solid rgba(255, 153, 0, 0.4) !important;
-                border-radius: 8px !important;
-                padding: 4px 8px !important;
-                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
-            }
-            [data-testid="collapsedControl"] button:hover,
-            [data-testid="stExpandSidebarButton"]:hover,
-            button[data-testid="stExpandSidebarButton"]:hover {
-                border-color: #ff9900 !important;
-                background: rgba(33, 38, 45, 1) !important;
+            [data-testid="stHeader"] [data-testid="stExpandSidebarButton"],
+            [data-testid="stSidebarCollapseButton"],
+            button[data-testid="stSidebarCollapseButton"],
+            div[data-testid="stSidebarCollapseButton"],
+            div[data-testid="stSidebarHeader"] button,
+            button[aria-label*="collapse" i],
+            button[aria-label*="Sidebar" i],
+            button[title*="sidebar" i] {
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                width: 0px !important;
+                height: 0px !important;
+                max-height: 0px !important;
+                max-width: 0px !important;
+                margin: 0px !important;
+                padding: 0px !important;
+                pointer-events: none !important;
+                position: absolute !important;
+                top: -9999px !important;
+                left: -9999px !important;
             }
 
             /* Hide Streamlit Raw Page Nav */
@@ -1115,39 +1110,16 @@ def render_sidebar():
                 overflow: hidden !important;
             }
 
-            /* Compact Sidebar Header with Close (<) Button */
+            /* Azzeramento padding superiore della sidebar senza il blocco header vuoto */
             div[data-testid="stSidebarHeader"],
             [data-testid="stSidebarHeader"] {
-                min-height: 32px !important;
-                padding: 4px 8px 0px 8px !important;
+                display: none !important;
+                height: 0px !important;
+                min-height: 0px !important;
+                max-height: 0px !important;
+                padding: 0px !important;
                 margin: 0px !important;
-                display: flex !important;
-                justify-content: flex-end !important;
-                align-items: center !important;
-                background: transparent !important;
-                visibility: visible !important;
-            }
-
-            /* Sidebar Close Button */
-            [data-testid="stSidebarCollapseButton"],
-            button[data-testid="stSidebarCollapseButton"],
-            div[data-testid="stSidebarHeader"] button {
-                display: inline-flex !important;
-                visibility: visible !important;
-                color: #8b949e !important;
-                background: transparent !important;
-                border: none !important;
-                padding: 3px 6px !important;
-                margin: 0px !important;
-                cursor: pointer !important;
-                border-radius: 6px !important;
-                transition: all 0.15s ease !important;
-            }
-            [data-testid="stSidebarCollapseButton"]:hover,
-            button[data-testid="stSidebarCollapseButton"]:hover,
-            div[data-testid="stSidebarHeader"] button:hover {
-                color: #ffffff !important;
-                background: rgba(255, 255, 255, 0.12) !important;
+                visibility: hidden !important;
             }
 
             section[data-testid="stSidebar"],

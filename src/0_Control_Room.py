@@ -36,9 +36,19 @@ if _qp is not None:
         st.cache_resource.clear()
         st.session_state["_app_initialized"] = False
         st.session_state["splash_dismissed"] = False
+        for k in ("reset", "clear_cache", "reset_cache"):
+            if k in _qp:
+                try:
+                    del st.query_params[k]
+                except Exception:
+                    pass
     elif "splash" in _qp:
         st.session_state["_app_initialized"] = False
         st.session_state["splash_dismissed"] = False
+        try:
+            del st.query_params["splash"]
+        except Exception:
+            pass
 
 # ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
 from components.splash import render_splash_screen as render_argus_splash, auto_expand_sidebar

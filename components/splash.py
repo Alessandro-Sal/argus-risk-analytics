@@ -672,11 +672,19 @@ def render_splash_screen(
         </div>
         """)
         st.markdown(risk_card_html, unsafe_allow_html=True)
-        if st.button("🚀 ENTRA NEL DESK RISK ANALYTICS →", key="btn_splash_risk", use_container_width=True):
+        def _on_click_enter_risk():
             st.session_state["_app_initialized"] = True
             st.session_state["splash_dismissed"] = True
             st.session_state["splash_completed"] = True
             st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
+            try:
+                if hasattr(st, "query_params") and "splash" in st.query_params:
+                    del st.query_params["splash"]
+            except Exception:
+                pass
+
+        if st.button("🚀 ENTRA NEL DESK RISK ANALYTICS →", key="btn_splash_risk", on_click=_on_click_enter_risk, use_container_width=True):
+            _on_click_enter_risk()
             st.rerun()
 
     with col_wealth:
@@ -700,11 +708,19 @@ def render_splash_screen(
         </div>
         """)
         st.markdown(wealth_card_html, unsafe_allow_html=True)
-        if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", use_container_width=True):
+        def _on_click_enter_wealth():
             st.session_state["_app_initialized"] = True
             st.session_state["splash_dismissed"] = True
             st.session_state["splash_completed"] = True
             st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
+            try:
+                if hasattr(st, "query_params") and "splash" in st.query_params:
+                    del st.query_params["splash"]
+            except Exception:
+                pass
+
+        if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", on_click=_on_click_enter_wealth, use_container_width=True):
+            _on_click_enter_wealth()
             st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
 
     return True
