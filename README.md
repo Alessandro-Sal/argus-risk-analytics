@@ -15,11 +15,11 @@
 
 ---
 
-## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.0.0)
+## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.4.0)
 
-ARGUS v9.0.0 introduce il **disaccoppiamento completo del motore quantitativo dal front-end Streamlit**, trasformando ARGUS in un **Headless Analytical Package** installabile e integrabile in pipeline di produzione, notebook Jupyter e architetture a microservizi:
+ARGUS v9.4.0 introduce il **disaccoppiamento completo del motore quantitativo dal front-end Streamlit**, trasformando ARGUS in un **Headless Analytical Package** installabile e integrabile in pipeline di produzione, notebook Jupyter e architetture a microservizi:
 
-* **📦 Python Package Headless (`argus-risk`)**:
+* **📦 Python Package Headless & CLI Console Scripts (`argus-risk`)**:
   ```bash
   # Motore analitico puro (zero dipendenze web)
   pip install argus-risk
@@ -29,18 +29,23 @@ ARGUS v9.0.0 introduce il **disaccoppiamento completo del motore quantitativo da
   
   # Suite completa con dashboard Streamlit e visual analytics
   pip install "argus-risk[all]"
+
+  # Esecuzione immediata via CLI console scripts
+  argus-api      # Avvia il server REST FastAPI su http://127.0.0.1:8000
+  argus-ui       # Avvia la Control Room Streamlit su http://127.0.0.1:8501
   ```
 
 * **⚡ Microservizio REST API ad Alte Prestazioni (`api/main.py`)**:
   Server asincrono ASGI (`uvicorn api.main:app --port 8000`) alimentato dal disaccoppiato **Application Service Layer** (`core/services/`), con contratti dichiarativi Pydantic v2 e documentazione OpenAPI Swagger interattiva (`/docs`, `/redoc`):
-  - `GET /health`: Health-check, diagnostica del motore e disponibilità DuckDB C++.
+  - `GET /api/v1/health`: Health-check dedicato, diagnostica del motore e disponibilità DuckDB C++.
   - `POST /api/v1/risk/metrics`: Calcolo istantaneo di VaR/CVaR Cornish-Fisher, Sharpe, Sortino, Drawdown e momenti superiori.
   - `POST /api/v1/optimize/hrp`: Ottimizzazione di portafoglio con algoritmo Hierarchical Risk Parity (López de Prado 2016).
   - `GET /api/v1/wealth/networth`: Consolidamento istantaneo Net Worth, liquidità, solvency ratio e health score.
   - `POST /api/v1/ledger/timetravel`: Ricostruzione contabile bitemporale Point-in-Time con sigillo crittografico Merkle Tree.
 
 * **🏛️ Application Service Layer Headless (`core/services/`)**:
-  Architettura a servizi applicativi agnostici dall'interfaccia utente: `RiskService` (VaR, CVaR, HRP), `TaxService` (TUIR Art. 67, Crypto, Cross-Border) e `WealthService` (Net Worth, Solvency), condivisi identicamente da FastAPI e da tutte le 21 viste Streamlit.
+  Architettura a servizi applicativi agnostici dall'interfaccia utente: `RiskService` (VaR, CVaR, HRP, Monte Carlo stocastico), `TaxService` (TUIR Art. 67, Crypto, Cross-Border) e `WealthService` (Net Worth, Solvency, Stress Testing, Glide Path), condivisi identicamente da FastAPI e da tutte le 21 viste Streamlit.
+
 
 * **📚 Portale di Documentazione Interattivo (Material for MkDocs)**:
   Portale istituzionale ad alta leggibilità ospitato su GitHub Pages con supporto KaTeX/MathJax per formule matematiche, code-copy, navigazione a schede e whitepaper tecnico:

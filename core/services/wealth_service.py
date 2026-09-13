@@ -39,3 +39,35 @@ class WealthService:
             "solvency_ratio": float(getattr(nw, "solvency_ratio", 1.0)),
             "health_score": float(getattr(nw, "health_score", 75.0))
         }
+
+    @staticmethod
+    def simulate_stress_test(
+        summary_data: Dict[str, Any],
+        scenario_params: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Esegue la simulazione di stress test multi-asset su bilancio patrimoniale."""
+        from core.wealth.wealth_stress_engine import run_wealth_stress_test
+        return run_wealth_stress_test(summary_data, scenario_params)
+
+    @staticmethod
+    def evaluate_glidepath_goal(
+        goal_id: str,
+        name: str,
+        target_amount: float,
+        horizon_years: int,
+        initial_capital: float,
+        monthly_contribution: float,
+        n_sims: int = 1000
+    ) -> Dict[str, Any]:
+        """Calcola la traiettoria probabilistica Goal-Based con Glide Path dinamico."""
+        from core.wealth.glidepath_engine import DynamicGlidePathEngine, LifeGoal
+        goal = LifeGoal(
+            goal_id=goal_id,
+            name=name,
+            target_amount=target_amount,
+            horizon_years=horizon_years,
+            initial_capital=initial_capital,
+            monthly_contribution=monthly_contribution
+        )
+        return DynamicGlidePathEngine.compute_goal_glide_path(goal, n_sims=n_sims)
+

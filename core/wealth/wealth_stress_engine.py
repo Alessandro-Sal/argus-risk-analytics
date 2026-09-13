@@ -7,7 +7,15 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+
+try:
+    import plotly.graph_objects as go
+    HAS_PLOTLY = True
+except ImportError:
+    go = None
+    HAS_PLOTLY = False
+
+
 
 
 # ── SCENARI MACROECONOMICI ISTITUZIONALI PREDEFINITI ──
@@ -441,6 +449,9 @@ def create_wealth_waterfall_chart(stress_result: Dict[str, Any]) -> go.Figure:
         "total"
     ]
 
+    if not HAS_PLOTLY or go is None:
+        return None
+
     fig = go.Figure(go.Waterfall(
         name="Stress Breakdown",
         orientation="v",
@@ -467,9 +478,10 @@ def create_wealth_waterfall_chart(stress_result: Dict[str, Any]) -> go.Figure:
     return fig
 
 
-def create_liquidity_squeeze_timeline_chart(stress_result: Dict[str, Any]) -> go.Figure:
+def create_liquidity_squeeze_timeline_chart(stress_result: Dict[str, Any]) -> Optional[Any]:
     """
     Genera un grafico Plotly istituzionale dell'erosione temporale della liquidità
+
     e dell'eventuale Point of Forced Liquidation (t*).
     """
     lq = stress_result.get("liquidity_squeeze", {})

@@ -1,5 +1,6 @@
 # Core module
-__version__ = "9.0.0"
+__version__ = "9.4.0"
+
 
 from core.metadata_resolver import resolve_asset_metadata
 from core.duckdb_engine import (

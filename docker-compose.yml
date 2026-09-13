@@ -32,6 +32,12 @@ services:
       - STREAMLIT_DB_USER=root
       - STREAMLIT_DB_PASS=root
       - STREAMLIT_DB_NAME=investment_risk_bi
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health')"]
+      interval: 20s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
     depends_on:
       db:
         condition: service_healthy

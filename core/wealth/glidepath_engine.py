@@ -7,7 +7,14 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+
+try:
+    import plotly.graph_objects as go
+    HAS_PLOTLY = True
+except ImportError:
+    go = None
+    HAS_PLOTLY = False
+
 
 
 @dataclass
@@ -93,41 +100,15 @@ class DynamicGlidePathEngine:
         p50 = np.percentile(trajectories, 50, axis=0)
         p90 = np.percentile(trajectories, 90, axis=0)
 
-        # Grafico Plotly Proiezione e Glide Path
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=years, y=p90, mode="lines",
-            line=dict(color="rgba(16, 185, 129, 0.3)", width=1),
-            name="Scenario Favorevole (90° Pct)"
-        ))
-        fig.add_trace(go.Scatter(
-            x=years, y=p10, mode="lines",
-            line=dict(color="rgba(239, 68, 68, 0.3)", width=1),
-            fill="tonexty", fillcolor="rgba(255, 153, 0, 0.08)",
-            name="Scenario Prudente (10° Pct)"
-        ))
-        fig.add_trace(go.Scatter(
-            x=years, y=p50, mode="lines+markers",
-            line=dict(color="#ff9900", width=3),
-            name="Traiettoria Mediana Attesa (50° Pct)"
-        ))
-        fig.add_trace(go.Scatter(
-            x=[0, tot_years], y=[goal.target_amount, goal.target_amount],
-            mode="lines", line=dict(color="#ef4444", width=2, dash="dash"),
-            name=f"Target (€ {goal.target_amount:,.0f})"
-        ))
-
-        fig.update_layout(
-            title=f"<b>Proiezione Goal '{goal.name}' — Probabilità di Successo: {success_prob:.1f}%</b>",
-            xaxis_title="Orizzonte Temporale (Anni)",
-            yaxis_title="Capitale Accumulato (€)",
-            template="plotly_dark",
-            paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)",
-            margin=dict(l=20, r=20, t=50, b=30),
-            height=360,
-            font=dict(family="Outfit, sans-serif", color="#e6edf3")
-        )
+        fig = render_glidepath_chart(
+            goal=goal,
+            years=years,
+            tot_years=tot_years,
+            p10=p10,
+            p50=p50,
+            p90=p90,
+            success_prob=success_prob
+        ) if HAS_PLOTLY else None
 
         glide_df = pd.DataFrame({
             "Anno": years,
@@ -147,3 +128,54 @@ class DynamicGlidePathEngine:
             "plot_figure": fig,
             "glide_path_df": glide_df
         }
+
+
+def render_glidepath_chart(
+    goal: LifeGoal,
+    years: np.ndarray,
+    tot_years: int,
+    p10: np.ndarray,
+    p50: np.ndarray,
+    p90: np.ndarray,
+    success_prob: float
+) -> Optional[Any]:
+    """Genera la figura Plotly per il glide path di pianificazione finanziaria."""
+    if not HAS_PLOTLY or go is None:
+        return None
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=years, y=p90, mode="lines",
+        line=dict(color="rgba(16, 185, 129, 0.3)", width=1),
+        name="Scenario Favorevole (90° Pct)"
+    ))
+    fig.add_trace(go.Scatter(
+        x=years, y=p10, mode="lines",
+        line=dict(color="rgba(239, 68, 68, 0.3)", width=1),
+        fill="tonexty", fillcolor="rgba(255, 153, 0, 0.08)",
+        name="Scenario Prudente (10° Pct)"
+    ))
+    fig.add_trace(go.Scatter(
+        x=years, y=p50, mode="lines+markers",
+        line=dict(color="#ff9900", width=3),
+        name="Traiettoria Mediana Attesa (50° Pct)"
+    ))
+    fig.add_trace(go.Scatter(
+        x=[0, tot_years], y=[goal.target_amount, goal.target_amount],
+        mode="lines", line=dict(color="#ef4444", width=2, dash="dash"),
+        name=f"Target (€ {goal.target_amount:,.0f})"
+    ))
+
+    fig.update_layout(
+        title=f"<b>Proiezione Goal '{goal.name}' — Probabilità di Successo: {success_prob:.1f}%</b>",
+        xaxis_title="Orizzonte Temporale (Anni)",
+        yaxis_title="Capitale Accumulato (€)",
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=50, b=30),
+        height=360,
+        font=dict(family="Outfit, sans-serif", color="#e6edf3")
+    )
+    return fig
+
