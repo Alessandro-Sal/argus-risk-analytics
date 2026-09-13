@@ -37,7 +37,8 @@ from core.ui_utils import (
     metric_card,
     glossary_modal,
     ensure_risk_bundle_loaded,
-    render_page_header
+    render_page_header,
+    render_export_toolbar
 )
 from core.bquant_engine import (
     execute_bquant_script,
@@ -387,8 +388,12 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
             with col_df_h1:
                 st.markdown(f"##### 📊 Risultato Tabellare (`df_out` • {len(df_res)} righe)")
             with col_df_h2:
-                csv_out = df_res.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica Risultato CSV", data=csv_out, file_name="bquant_result.csv", mime="text/csv", use_container_width=True, key="btn_dl_bquant_df")
+                render_export_toolbar(
+                    df_res,
+                    file_prefix="bquant_result",
+                    key_suffix="bquant_res",
+                    table_title="Risultato BQuant"
+                )
             st.dataframe(df_res, use_container_width=True)
 
         # ── Visualizzazione Grafico Plotly risultante ──

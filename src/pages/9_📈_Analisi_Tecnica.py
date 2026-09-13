@@ -17,7 +17,8 @@ import core.risk_engine as risk_engine
 from core.sidebar import render_sidebar
 from core.ui_utils import (
     inject_custom_css, render_header, render_segmented_tabs, metric_card,
-    apply_plotly_theme, glossary_modal, ensure_risk_bundle_loaded, render_sandbox_banner
+    apply_plotly_theme, glossary_modal, ensure_risk_bundle_loaded, render_sandbox_banner,
+    render_export_toolbar
 )
 from core.workspace_manager import get_url_param, set_url_params, register_workspace_tab
 from core.technical_analysis import (
@@ -713,9 +714,8 @@ else:
                 with col_vh1:
                     st.markdown("##### 📊 Nodi di Prezzo & Fasce Volumetriche")
                 with col_vh2:
-                    csv_vp = df_prof.to_csv(index=False).encode('utf-8')
                     tk_slug = target_ticker.lower().replace(" ", "_").replace(":", "_").replace("/", "_")
-                    st.download_button("📥 Scarica CSV", data=csv_vp, file_name=f"volume_profile_{tk_slug}.csv", mime="text/csv", use_container_width=True, key="btn_download_volume_profile")
+                    render_export_toolbar(df_prof, file_prefix=f"volume_profile_{tk_slug}", key_suffix="vp_prof", table_title="Volume Profile")
 
                 df_table = pd.DataFrame({
                     "Livello Prezzo": df_prof["price_bin_mid"].map(lambda v: f"€ {v:.2f}"),
@@ -1072,8 +1072,7 @@ else:
                 df_bids = pd.DataFrame([{"Livello": f"Bid {i+1}", "Prezzo ($)": b.price, "Volume (Denaro)": b.size} for i, b in enumerate(bids_l2)])
                 df_asks = pd.DataFrame([{"Livello": f"Ask {i+1}", "Prezzo ($)": a.price, "Volume (Lettera)": a.size} for i, a in enumerate(asks_l2)])
                 df_l2_export = pd.concat([df_bids, df_asks], axis=1)
-                csv_l2 = df_l2_export.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica Book CSV", data=csv_l2, file_name=f"l2_book_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_l2_book")
+                render_export_toolbar(df_l2_export, file_prefix=f"l2_book_{target_ticker.lower()}", key_suffix="l2_book", table_title="L2 Order Book")
             
             l2_book = OrderBookL2(ticker=target_ticker, bids=bids_l2, asks=asks_l2)
             micro_p = l2_book.compute_microprice()
@@ -1104,8 +1103,7 @@ else:
             with col_reg_h1:
                 st.markdown("##### 📋 Registro Tick (Ring Buffer FIFO)")
             with col_reg_h2:
-                csv_ticks = df_stream.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica Tick CSV", data=csv_ticks, file_name=f"ticks_{target_ticker.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_stream_ticks")
+                render_export_toolbar(df_stream, file_prefix=f"ticks_{target_ticker.lower()}", key_suffix="stream_ticks", table_title="Registro Tick")
 
             df_display = df_stream[["ticker", "price", "size", "bid", "ask", "spread", "mid_price"]].tail(15).iloc[::-1]
             st.dataframe(

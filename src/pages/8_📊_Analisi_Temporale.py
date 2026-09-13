@@ -26,7 +26,7 @@ from core.db_exporter import get_all_snapshots_history, get_snapshot_positions_b
 from core.multi_portfolio import list_saved_portfolio_profiles, load_portfolio_profile
 from core.ui_utils import (
     apply_plotly_theme, inject_custom_css, render_command_bar, 
-    metric_card, ensure_portfolio_loaded, render_sandbox_banner
+    metric_card, ensure_portfolio_loaded, render_sandbox_banner, render_table_with_export
 )
 from core.temporal_engine import (
     compute_monthly_return_matrix,
@@ -1255,22 +1255,13 @@ elif active_time_tab == "⚖️ Confronto Side-by-Side & Snapshot DB":
             "weight_pct_A", "weight_pct_B", "delta_weight"
         ]
         
-        st.dataframe(
-            df_table_disp[cols_to_show],
+        render_table_with_export(
+            df=df_table_disp[cols_to_show],
+            table_title="Report Differenziale Side-by-Side",
+            file_prefix="ARGUS_SideBySide_Audit",
+            key_suffix=f"sbs_grid_{clean_key_suffix}",
             column_config=col_config_diff,
-            use_container_width=True,
-            hide_index=True,
-            key=f"sbs_grid_{clean_key_suffix}"
-        )
-
-        # Download CSV Audit Report
-        csv_diff_bytes = df_table_disp[cols_to_show].to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Esporta Report Differenziale (CSV)",
-            data=csv_diff_bytes,
-            file_name="ARGUS_SideBySide_Audit.csv",
-            mime="text/csv",
-            key=f"sbs_csv_btn_{clean_key_suffix}"
+            hide_index=True
         )
 
         # 6. 🔎 ISPEZIONE SINGOLO TITOLO (ASSET DRILL-DOWN & LOTTI FIFO)

@@ -25,7 +25,8 @@ from core.ui_utils import (
     render_factor_radar_chart,
     render_info_modal,
     ensure_portfolio_loaded,
-    render_sandbox_banner
+    render_sandbox_banner,
+    render_export_toolbar
 )
 from core.excel_generator import generate_excel_in_memory
 
@@ -850,8 +851,12 @@ if search_bm_sc:
     ]
 
 with col_sc_dl:
-    csv_sc = df_sc_filtered.to_csv(index=False).encode('utf-8')
-    st.download_button("📥 Scarica CSV", data=csv_sc, file_name="benchmark_scorecard_globale.csv", mime="text/csv", use_container_width=True, key="btn_download_bm_scorecard_glob")
+    render_export_toolbar(
+        df_sc_filtered,
+        file_prefix="benchmark_scorecard_globale",
+        key_suffix="dash_scorecard",
+        table_title="Benchmark Scorecard Globale"
+    )
 
 # Visualizzazione Table con column config e styling
 if df_sc_filtered.empty:
@@ -1466,10 +1471,14 @@ with col_rl1:
     """, unsafe_allow_html=True)
 
 with col_rl2:
-    col_rl_h1, col_rl_h2 = st.columns([3.5, 0.9])
+    col_rl_h1, col_rl_h2 = st.columns([3.5, 1.2])
     with col_rl_h2:
-        csv_eval = df_eval.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica CSV", data=csv_eval, file_name="risk_compliance_limits.csv", mime="text/csv", use_container_width=True)
+        render_export_toolbar(
+            df_eval,
+            file_prefix="risk_compliance_limits",
+            key_suffix="dash_compliance",
+            table_title="Limiti di Rischio e Conformità"
+        )
 
     df_eval_show = df_eval[["status_icon", "rule_name", "current_value", "limit_threshold", "unit"]].rename(columns={
         "status_icon": "Stato",
@@ -1885,28 +1894,32 @@ col_csv1, col_csv2 = st.columns(2)
 
 with col_csv1:
     if not pos.empty:
-        csv_pos = pos.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "📋 Esporta CSV Dettaglio Posizioni",
-            data=csv_pos,
-            file_name=f"posizioni_{st.session_state.get('portfolio_name', 'Portfolio')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+        c_p_t, c_p_e = st.columns([2, 1.2])
+        with c_p_t:
+            st.markdown("##### 📋 Dettaglio Posizioni")
+        with c_p_e:
+            render_export_toolbar(
+                pos,
+                file_prefix=f"posizioni_{st.session_state.get('portfolio_name', 'Portfolio').lower().replace(' ', '_')}",
+                key_suffix="dash_pos_export",
+                table_title="Dettaglio Posizioni"
+            )
 
 with col_csv2:
     if not sr_port.empty:
-        sr_bm_sliced = sr_bm.reindex(sr_port.index).fillna(0.0)
-        df_ret_exp = pd.DataFrame({
-            "date": sr_port.index.strftime("%Y-%m-%d"),
-            "portfolio_return_pct": (sr_port.values * 100).round(4),
-            "benchmark_return_pct": (sr_bm_sliced.values * 100).round(4)
-        })
-        csv_ret = df_ret_exp.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "📈 Esporta CSV Rendimenti Storici",
-            data=csv_ret,
-            file_name=f"rendimenti_{st.session_state.get('portfolio_name', 'Portfolio')}.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+        c_r_t, c_r_e = st.columns([2, 1.2])
+        with c_r_t:
+            st.markdown("##### 📈 Rendimenti Storici")
+        with c_r_e:
+            sr_bm_sliced = sr_bm.reindex(sr_port.index).fillna(0.0)
+            df_ret_exp = pd.DataFrame({
+                "date": sr_port.index.strftime("%Y-%m-%d"),
+                "portfolio_return_pct": (sr_port.values * 100).round(4),
+                "benchmark_return_pct": (sr_bm_sliced.values * 100).round(4)
+            })
+            render_export_toolbar(
+                df_ret_exp,
+                file_prefix=f"rendimenti_{st.session_state.get('portfolio_name', 'Portfolio').lower().replace(' ', '_')}",
+                key_suffix="dash_ret_export",
+                table_title="Rendimenti Storici"
+            )

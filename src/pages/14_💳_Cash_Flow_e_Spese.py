@@ -36,7 +36,8 @@ from core.ui_utils import (
     apply_chart_theme,
     ensure_portal_context,
     ensure_portfolio_loaded,
-    render_data_table
+    render_data_table,
+    render_export_toolbar
 )
 from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
@@ -341,15 +342,14 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
 
     st.dataframe(df_disp, use_container_width=True, hide_index=True)
 
-    csv_bytes = df_sub.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label=f"💾 Scarica Transazioni {node_name} (.CSV)",
-        data=csv_bytes,
-        file_name=f"argus_flusso_{node_name.replace(' ', '_').lower()}_{datetime.now().strftime('%Y%m%d')}.csv",
-        mime="text/csv",
-        use_container_width=True,
-        key=f"btn_dl_flow_modal_{node_name.replace(' ', '_')}"
-    )
+    c_m_sp, c_m_exp = st.columns([3.5, 1.5])
+    with c_m_exp:
+        render_export_toolbar(
+            df_disp,
+            file_prefix=f"argus_flusso_{node_name.replace(' ', '_').lower()}",
+            key_suffix=f"cf_modal_{node_name.replace(' ', '_')}",
+            table_title=f"Transazioni {node_name}"
+        )
 
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
@@ -1412,14 +1412,11 @@ with tab_ledger:
     if not df_cf_filtered.empty:
         col_dl_l, col_dl_r = st.columns([3.5, 1.5])
         with col_dl_r:
-            csv_ledger = df_cf_filtered.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Scarica Estratto Filtrato (.CSV)",
-                data=csv_ledger,
-                file_name=f"argus_cashflow_{sel_year_str}_{sel_month_num}_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                use_container_width=True,
-                key="btn_dl_cashflow_ledger_csv"
+            render_export_toolbar(
+                df_cf_filtered,
+                file_prefix=f"argus_cashflow_{sel_year_str}_{sel_month_num}",
+                key_suffix="cf_ledger",
+                table_title="Libro Mastro Movimenti"
             )
 
         df_disp_ledger = df_cf_filtered.copy()

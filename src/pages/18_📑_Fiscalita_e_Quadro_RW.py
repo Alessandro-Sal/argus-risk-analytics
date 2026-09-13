@@ -30,7 +30,8 @@ from core.ui_utils import (
     render_wealth_executive_badges,
     render_page_header,
     apply_plotly_theme,
-    ensure_portfolio_loaded
+    ensure_portfolio_loaded,
+    render_export_toolbar
 )
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
@@ -160,15 +161,13 @@ with tab_rw:
         )
 
         st.write("")
-        c_export, c_note = st.columns([1.3, 2.7])
+        c_export, c_note = st.columns([1.2, 2.8])
         with c_export:
-            csv_data = df_rw.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                "📥 Scarica CSV Quadro RW",
-                data=csv_data,
-                file_name=f"argus_quadro_rw_portfolio_{current_pid}_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv",
-                use_container_width=True
+            render_export_toolbar(
+                df_rw,
+                file_prefix=f"argus_quadro_rw_portfolio_{current_pid}",
+                key_suffix=f"p18_rw_{current_pid}",
+                table_title="Quadro RW"
             )
         with c_note:
             st.info("💡 **Nota Normativa**: I conti correnti esteri con giacenza media annua inferiore a € 5.000 e picco massimo non superiore a € 15.000 non richiedono versamento IVAFE.")
@@ -235,10 +234,18 @@ with tab_harvest:
 
     st.write("")
     st.write("")
-    # RIGA 1: Opportunità di Tax-Loss Harvesting (Full Width)
-    st.markdown("##### 🎯 Opportunità di Tax-Loss Harvesting Rilevate")
+    c_th_title, c_th_exp = st.columns([4, 1.2])
+    with c_th_title:
+        st.markdown("##### 🎯 Opportunità di Tax-Loss Harvesting Rilevate")
     if tlh["harvesting_opportunities"]:
         df_th = pd.DataFrame(tlh["harvesting_opportunities"])
+        with c_th_exp:
+            render_export_toolbar(
+                df_th,
+                file_prefix=f"tax_loss_harvesting_{current_pid}",
+                key_suffix=f"p18_tlh_{current_pid}",
+                table_title="Tax-Loss Harvesting"
+            )
         st.dataframe(
             df_th[["asset", "tipo", "minus_latente", "risparmio_fiscale_26", "azione_consigliata", "priorita"]],
             column_config={

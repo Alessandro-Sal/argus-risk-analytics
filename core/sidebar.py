@@ -1069,34 +1069,68 @@ def render_sidebar():
                 border: none !important;
             }
 
-            /* Nascondi tassativamente tutte le freccette della sidebar (<< e >>) per interfaccia fissa desktop istituzionale */
+            /* Mantieni il controllo di apertura sidebar (Panel Dock Expand) sempre visibile a sidebar chiusa */
             [data-testid="collapsedControl"],
             button[data-testid="stSidebarCollapsedControl"],
             div[data-testid="collapsedControl"],
             [data-testid="stExpandSidebarButton"],
             button[data-testid="stExpandSidebarButton"],
             [data-testid="stHeader"] [data-testid="collapsedControl"],
-            [data-testid="stHeader"] [data-testid="stExpandSidebarButton"],
-            [data-testid="stSidebarCollapseButton"],
-            button[data-testid="stSidebarCollapseButton"],
-            div[data-testid="stSidebarCollapseButton"],
-            div[data-testid="stSidebarHeader"] button,
-            button[aria-label*="collapse" i],
-            button[aria-label*="Sidebar" i],
-            button[title*="sidebar" i] {
+            [data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {
+                display: flex !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                cursor: pointer !important;
+                pointer-events: auto !important;
+                z-index: 999999 !important;
+            }
+            [data-testid="collapsedControl"] button,
+            button[data-testid="stSidebarCollapsedControl"],
+            [data-testid="stExpandSidebarButton"],
+            button[data-testid="stExpandSidebarButton"] {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                visibility: visible !important;
+                color: #ff9900 !important;
+                background: rgba(22, 27, 34, 0.95) !important;
+                border: 1px solid rgba(255, 153, 0, 0.4) !important;
+                border-radius: 8px !important;
+                padding: 4px 6px !important;
+                width: 32px !important;
+                height: 32px !important;
+                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
+                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            }
+            [data-testid="collapsedControl"] button svg,
+            button[data-testid="stSidebarCollapsedControl"] svg,
+            [data-testid="stExpandSidebarButton"] svg,
+            button[data-testid="stExpandSidebarButton"] svg {
                 display: none !important;
-                visibility: hidden !important;
-                opacity: 0 !important;
-                width: 0px !important;
-                height: 0px !important;
-                max-height: 0px !important;
-                max-width: 0px !important;
-                margin: 0px !important;
-                padding: 0px !important;
-                pointer-events: none !important;
-                position: absolute !important;
-                top: -9999px !important;
-                left: -9999px !important;
+            }
+            [data-testid="collapsedControl"] button::after,
+            button[data-testid="stSidebarCollapsedControl"]::after,
+            [data-testid="stExpandSidebarButton"]::after,
+            button[data-testid="stExpandSidebarButton"]::after {
+                content: "" !important;
+                display: block !important;
+                width: 18px !important;
+                height: 18px !important;
+                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9900' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m14 9 3 3-3 3'%3E%3C/path%3E%3C/svg%3E") center / 18px 18px no-repeat !important;
+                transition: all 0.2s ease !important;
+            }
+            [data-testid="collapsedControl"] button:hover,
+            [data-testid="stExpandSidebarButton"]:hover,
+            button[data-testid="stExpandSidebarButton"]:hover {
+                border-color: #ff9900 !important;
+                background: rgba(33, 38, 45, 1) !important;
+                box-shadow: 0 0 12px rgba(255, 153, 0, 0.35) !important;
+            }
+            [data-testid="collapsedControl"] button:hover::after,
+            button[data-testid="stSidebarCollapsedControl"]:hover::after,
+            [data-testid="stExpandSidebarButton"]:hover::after,
+            button[data-testid="stExpandSidebarButton"]:hover::after {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m14 9 3 3-3 3'%3E%3C/path%3E%3C/svg%3E") !important;
             }
 
             /* Hide Streamlit Raw Page Nav */
@@ -1110,16 +1144,70 @@ def render_sidebar():
                 overflow: hidden !important;
             }
 
-            /* Azzeramento padding superiore della sidebar senza il blocco header vuoto */
+            /* Header compatto della sidebar con pulsante di chiusura (Modern Panel Dock) */
             div[data-testid="stSidebarHeader"],
             [data-testid="stSidebarHeader"] {
-                display: none !important;
-                height: 0px !important;
-                min-height: 0px !important;
-                max-height: 0px !important;
-                padding: 0px !important;
+                min-height: 34px !important;
+                padding: 4px 8px 0px 8px !important;
                 margin: 0px !important;
-                visibility: hidden !important;
+                display: flex !important;
+                justify-content: flex-end !important;
+                align-items: center !important;
+                background: transparent !important;
+                visibility: visible !important;
+            }
+
+            /* Modern Panel Dock Collapse Button (Sostituisce il default <<) */
+            [data-testid="stSidebarCollapseButton"],
+            button[data-testid="stSidebarCollapseButton"],
+            div[data-testid="stSidebarCollapseButton"] button,
+            div[data-testid="stSidebarHeader"] button {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                visibility: visible !important;
+                opacity: 1 !important;
+                color: #8b949e !important;
+                background: rgba(22, 27, 34, 0.7) !important;
+                border: 1px solid rgba(255, 255, 255, 0.1) !important;
+                padding: 4px !important;
+                width: 28px !important;
+                height: 28px !important;
+                margin: 0px !important;
+                cursor: pointer !important;
+                border-radius: 6px !important;
+                transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+                box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+            }
+            [data-testid="stSidebarCollapseButton"] svg,
+            button[data-testid="stSidebarCollapseButton"] svg,
+            div[data-testid="stSidebarCollapseButton"] button svg,
+            div[data-testid="stSidebarHeader"] button svg {
+                display: none !important;
+            }
+            [data-testid="stSidebarCollapseButton"]::after,
+            button[data-testid="stSidebarCollapseButton"]::after,
+            div[data-testid="stSidebarCollapseButton"] button::after,
+            div[data-testid="stSidebarHeader"] button::after {
+                content: "" !important;
+                display: block !important;
+                width: 16px !important;
+                height: 16px !important;
+                background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m16 15-3-3 3-3'%3E%3C/path%3E%3C/svg%3E") center / 16px 16px no-repeat !important;
+                transition: all 0.2s ease !important;
+            }
+            [data-testid="stSidebarCollapseButton"]:hover,
+            button[data-testid="stSidebarCollapseButton"]:hover,
+            div[data-testid="stSidebarHeader"] button:hover {
+                color: #ff9900 !important;
+                background: rgba(255, 153, 0, 0.15) !important;
+                border-color: rgba(255, 153, 0, 0.4) !important;
+                box-shadow: 0 0 10px rgba(255, 153, 0, 0.25) !important;
+            }
+            [data-testid="stSidebarCollapseButton"]:hover::after,
+            button[data-testid="stSidebarCollapseButton"]:hover::after,
+            div[data-testid="stSidebarHeader"] button:hover::after {
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9900' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m16 15-3-3 3-3'%3E%3C/path%3E%3C/svg%3E") !important;
             }
 
             section[data-testid="stSidebar"],

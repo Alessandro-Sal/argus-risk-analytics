@@ -11,7 +11,7 @@ import core.risk_engine
 import core.crypto_tax_engine
 import core.duckdb_engine
 import core.execution_algo
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_portfolio_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_portfolio_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal, render_table_with_export, render_export_toolbar
 from core.sidebar import render_sidebar
 from core.execution_algo import (
     compute_twap_schedule,
@@ -367,8 +367,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             filter_ac = st.selectbox("🏷️ Asset Class:", classes_available, key="filter_main_pos_ac")
         with col_pos_f3:
             st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-            csv_pos = df_disp.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CSV", data=csv_pos, file_name="posizioni_portafoglio.csv", mime="text/csv", use_container_width=True)
+            render_export_toolbar(df_disp, file_prefix="posizioni_complete", key_suffix="filter_bar", table_title="Dataset Completo")
 
         df_disp_filt = df_disp.copy()
         if search_pos:
@@ -391,7 +390,14 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             "Yield on Cost (%)": st.column_config.ProgressColumn("Yield on Cost (%)", format="%.2f%%", min_value=0.0, max_value=20.0)
         }
 
-        st.dataframe(df_disp_filt, use_container_width=True, hide_index=True, column_config=column_config)
+        render_table_with_export(
+            df_disp_filt,
+            table_title="Mappa Analitica delle Posizioni Attive & PnL",
+            file_prefix="posizioni_attive",
+            key_suffix="main_pos_grid",
+            column_config=column_config,
+            height=420
+        )
 
         st.markdown("#### Ripartizione Liquidità del Portafoglio (ADV Days)")
         t1 = df_l[df_l["days_to_liquidate"] <= 1.0]["current_value"].sum()
@@ -960,8 +966,12 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     filter_outcome = st.selectbox("🎯 Esito:", outcomes, key="filter_gy_outcome")
                 with col_f4:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    csv_a = df_a_show.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica CSV", data=csv_a, file_name="graveyard_sintesi_asset.csv", mime="text/csv", use_container_width=True, key="btn_download_gy_assets")
+                    render_export_toolbar(
+                        df_a_show,
+                        file_prefix="graveyard_sintesi_asset",
+                        key_suffix="gy_assets",
+                        table_title="Graveyard Sintesi Asset"
+                    )
 
                 df_a_filt = df_a_show.copy()
                 if search_gy_a:
@@ -1018,8 +1028,12 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     filter_outcome_l = st.selectbox("🎯 Esito:", outcomes_l, key="filter_gy_outcome_lots")
                 with col_lf3:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    csv_l = df_l_show.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica CSV", data=csv_l, file_name="registro_analitico_lotti_chiusi.csv", mime="text/csv", use_container_width=True, key="btn_download_gy_lots")
+                    render_export_toolbar(
+                        df_l_show,
+                        file_prefix="registro_analitico_lotti_chiusi",
+                        key_suffix="gy_lots",
+                        table_title="Registro Lotti Chiusi"
+                    )
 
                 df_l_filt = df_l_show.copy()
                 if search_gy_l:
@@ -1138,8 +1152,12 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                     })
                     with col_m_btn:
                         st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                        csv_m = df_disp_ev.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Scarica CSV", data=csv_m, file_name="dividendi_per_mese.csv", mime="text/csv", use_container_width=True, key="btn_download_div_m_all")
+                        render_export_toolbar(
+                            df_disp_ev,
+                            file_prefix="dividendi_per_mese",
+                            key_suffix="div_m_all",
+                            table_title="Dividendi per Mese"
+                        )
 
                     ev_cfg = {
                         "Mese": st.column_config.TextColumn("Mese", width="small"),
@@ -1170,8 +1188,12 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                     })
                     with col_m_btn:
                         st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                        csv_m = df_disp_ev.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Scarica CSV", data=csv_m, file_name=f"dividendi_{selected_m.lower()}.csv", mime="text/csv", use_container_width=True, key=f"btn_download_div_m_{m_num}")
+                        render_export_toolbar(
+                            df_disp_ev,
+                            file_prefix=f"dividendi_{selected_m.lower()}",
+                            key_suffix=f"div_m_{m_num}",
+                            table_title=f"Dividendi {selected_m}"
+                        )
 
                     st.success(f"🗓️ **{selected_m}**: Incasso Totale Stimato di **€ {tot_m:,.2f}**")
                     ev_cfg = {
@@ -1235,8 +1257,12 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                 filter_freq = st.selectbox("⏳ Frequenza:", freqs, key="filter_div_freq")
             with col_df3:
                 st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                csv_div = df_table_show.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_div, file_name="calendario_dividendi_stimati.csv", mime="text/csv", use_container_width=True, key="btn_download_div_table")
+                render_export_toolbar(
+                    df_table_show,
+                    file_prefix="calendario_dividendi_stimati",
+                    key_suffix="div_calendar",
+                    table_title="Calendario Dividendi Stimati"
+                )
 
             df_table_filt = df_table_show.copy()
             if search_div:
@@ -1268,8 +1294,12 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
             with col_m1:
                 st.markdown('<div style="padding-top: 6px; font-size: 13.5px; color: #8b949e;">Importo monetario stimato (€) per ciascun mese dell\'anno solare:</div>', unsafe_allow_html=True)
             with col_m2:
-                csv_mat = df_matrix.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica Matrice CSV", data=csv_mat, file_name="matrice_annuale_dividendi.csv", mime="text/csv", use_container_width=True, key="btn_download_div_matrix")
+                render_export_toolbar(
+                    df_matrix,
+                    file_prefix="matrice_annuale_dividendi",
+                    key_suffix="div_matrix",
+                    table_title="Matrice Annuale Dividendi"
+                )
 
             matrix_config = {
                 "Ticker": st.column_config.TextColumn("Ticker", width="small"),
@@ -1485,8 +1515,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                     with col_hl1:
                         st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
                     with col_hl2:
-                        csv_hl = df_hl_disp.to_csv(index=False).encode('utf-8')
-                        st.download_button("📥 Scarica Ordini CSV", data=csv_hl, file_name="ordini_tax_loss_harvesting.csv", mime="text/csv", use_container_width=True, key="btn_download_orders_tax_harvest")
+                        render_export_toolbar(
+                            df_hl_disp,
+                            file_prefix="ordini_tax_loss_harvesting",
+                            key_suffix="tax_harvest_orders",
+                            table_title="Ordini Tax-Loss Harvesting"
+                        )
 
                     cfg_hl = {
                         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
@@ -1609,8 +1643,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             st.markdown("##### 📋 Quadro RT — Sezione II (Plusvalenze & Minusvalenze Finanziarie)")
             col_rt_d1, col_rt_d2 = st.columns([3.5, 1.2])
             with col_rt_d2:
-                csv_rt = df_rt_table.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica Quadro RT CSV", data=csv_rt, file_name="quadro_rt_precompilato.csv", mime="text/csv", use_container_width=True, key="btn_download_rt_csv")
+                render_export_toolbar(
+                    df_rt_table,
+                    file_prefix="quadro_rt_precompilato",
+                    key_suffix="rt_precomp",
+                    table_title="Quadro RT Precompilato"
+                )
 
             st.dataframe(
                 df_rt_table.rename(columns={"rigo": "Rigo", "descrizione": "Descrizione Ministeriale", "valore_eur": "Importo (€)"}),
@@ -1623,8 +1661,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             if not df_rw_table.empty:
                 col_rw_d1, col_rw_d2 = st.columns([3.5, 1.2])
                 with col_rw_d2:
-                    csv_rw = df_rw_table.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Quadro RW CSV", data=csv_rw, file_name="quadro_rw_precompilato.csv", mime="text/csv", use_container_width=True, key="btn_download_rw_csv")
+                    render_export_toolbar(
+                        df_rw_table,
+                        file_prefix="quadro_rw_precompilato",
+                        key_suffix="rw_precomp",
+                        table_title="Quadro RW Precompilato"
+                    )
 
                 st.dataframe(
                     df_rw_table.rename(columns={
@@ -1687,8 +1729,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 with col_wd1:
                     st.markdown("##### 🔍 Breakdown Fiscale per Singolo Asset a Distribuzione")
                 with col_wd2:
-                    csv_wht = df_wht.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Report WHT CSV", data=csv_wht, file_name="withholding_tax_report.csv", mime="text/csv", use_container_width=True, key="btn_download_wht_csv")
+                    render_export_toolbar(
+                        df_wht,
+                        file_prefix="withholding_tax_report",
+                        key_suffix="wht_report",
+                        table_title="Withholding Tax Report"
+                    )
 
                 st.dataframe(
                     df_wht.rename(columns={
@@ -1839,8 +1885,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             st.markdown("##### 📈 Quadro RT (Sezione II-B) — Plusvalenze su Cripto-Attività (Art. 67 c. 1 lett. c-sexies TUIR)")
         with col_rt_h2:
             if not df_c_rt.empty:
-                csv_rt = df_c_rt.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_rt, file_name="quadro_rt_cripto.csv", mime="text/csv", use_container_width=True, key="btn_download_quadro_rt")
+                render_export_toolbar(
+                    df_c_rt,
+                    file_prefix="quadro_rt_cripto",
+                    key_suffix="crypto_rt",
+                    table_title="Quadro RT Cripto"
+                )
 
         if not df_c_rt.empty:
             df_rt_show = df_c_rt.rename(columns={
@@ -1877,8 +1927,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             st.markdown("##### 🌐 Quadro RW — Prospetto Monitoraggio Fiscale Attività Estere & Self-Custody (Codice 21)")
         with col_rw_h2:
             if not df_c_rw.empty:
-                csv_rw = df_c_rw.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_rw, file_name="quadro_rw_cripto.csv", mime="text/csv", use_container_width=True, key="btn_download_quadro_rw")
+                render_export_toolbar(
+                    df_c_rw,
+                    file_prefix="quadro_rw_cripto",
+                    key_suffix="crypto_rw",
+                    table_title="Quadro RW Cripto"
+                )
 
         if not df_c_rw.empty:
             df_rw_show = df_c_rw.rename(columns={
@@ -1912,8 +1966,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             with col_cz_h1:
                 st.markdown("##### 📦 Zainetto Fiscale Cripto Separato (Minusvalenze Riportabili in 4 Anni)")
             with col_cz_h2:
-                csv_cz = df_c_zainetto.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_cz, file_name="zainetto_fiscale_cripto.csv", mime="text/csv", use_container_width=True, key="btn_download_zainetto_cripto")
+                render_export_toolbar(
+                    df_c_zainetto,
+                    file_prefix="zainetto_fiscale_cripto",
+                    key_suffix="crypto_zainetto",
+                    table_title="Zainetto Fiscale Cripto"
+                )
 
             df_cz_show = df_c_zainetto.rename(columns={
                 "origin_year": "Anno Origine",
@@ -1977,8 +2035,12 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         with col_t1:
             st.markdown("##### 📊 Profilo di Rischio Liquidità per Asset")
         with col_t2:
-            csv_ac = df_ac.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CSV", data=csv_ac, file_name="liquidita_almgren_chriss.csv", mime="text/csv", use_container_width=True, key="btn_download_almgren_chriss")
+            render_export_toolbar(
+                df_ac,
+                file_prefix="liquidita_almgren_chriss",
+                key_suffix="ac_liquidity",
+                table_title="Liquidità Almgren-Chriss"
+            )
 
         st.dataframe(
             df_ac,
@@ -2139,8 +2201,12 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
         with col_sch_h1:
             st.markdown("##### 📋 Tabella di Esecuzione a Scaglioni (Order Slicing Schedule)")
         with col_sch_h2:
-            csv_sched = df_sched.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica Schedule CSV", data=csv_sched, file_name=f"execution_schedule_{exec_horizon}d.csv", mime="text/csv", use_container_width=True, key="btn_dl_exec_sched")
+            render_export_toolbar(
+                df_sched,
+                file_prefix=f"execution_schedule_{exec_horizon}d",
+                key_suffix="ac_schedule",
+                table_title=f"Execution Schedule ({exec_horizon}d)"
+            )
 
         st.dataframe(
             df_sched,
@@ -2535,8 +2601,12 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 with col_vwap_h1:
                     st.markdown("##### 📋 Tabella Dettagliata Tranche VWAP")
                 with col_vwap_h2:
-                    csv_vwap = df_vwap_sched.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Ordini FIX/CSV", data=csv_vwap, file_name="vwap_orders_schedule.csv", mime="text/csv", use_container_width=True, key="btn_dl_vwap_sched")
+                    render_export_toolbar(
+                        df_vwap_sched,
+                        file_prefix="vwap_orders_schedule",
+                        key_suffix="vwap_sched",
+                        table_title="Tranche VWAP"
+                    )
 
                 st.dataframe(
                     df_vwap_sched[[
@@ -2625,8 +2695,12 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 with col_twap_h1:
                     st.markdown("##### 📋 Tabella Dettagliata Tranche TWAP (Uniform Time Jitter)")
                 with col_twap_h2:
-                    csv_twap = df_twap_sched.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Ordini TWAP CSV", data=csv_twap, file_name="twap_orders_schedule.csv", mime="text/csv", use_container_width=True, key="btn_dl_twap_sched")
+                    render_export_toolbar(
+                        df_twap_sched,
+                        file_prefix="twap_orders_schedule",
+                        key_suffix="twap_sched",
+                        table_title="Tranche TWAP"
+                    )
 
                 st.dataframe(
                     df_twap_sched[[

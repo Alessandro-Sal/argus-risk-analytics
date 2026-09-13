@@ -9,15 +9,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 
-import importlib
 import core.ui_utils
 import core.wealth.wealth_db
 import core.wealth.wealth_sync
 import core.wealth.wealth_engine
-importlib.reload(core.ui_utils)
-importlib.reload(core.wealth.wealth_db)
-importlib.reload(core.wealth.wealth_sync)
-importlib.reload(core.wealth.wealth_engine)
 
 from core.fetcher import get_engine
 from core.ui_utils import (

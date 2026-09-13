@@ -30,6 +30,7 @@ from core.wealth.wealth_db import (
     get_wealth_accounts
 )
 from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+from core.ui_export_utils import render_export_toolbar
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -240,7 +241,7 @@ def render_wealth_reporting_and_exports_hub(
             st.markdown("""
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <b style="color: #f59e0b; font-size: 13.5px;">📑 Prospetto Quadro RW / RT (.csv)</b>
+                    <b style="color: #f59e0b; font-size: 13.5px;">📑 Prospetto Quadro RW / RT (.xlsx / .csv)</b>
                     <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
                         Righi precompilati per il Modello Redditi PF con codice investimento, valore iniziale/finale e calcolo IVAFE per il commercialista.
                     </p>
@@ -250,14 +251,11 @@ def render_wealth_reporting_and_exports_hub(
             try:
                 fisc = compute_fiscal_analytics(engine, portfolio_id=portfolio_id)
                 df_rw = pd.DataFrame(fisc.get("quadro_rw_rows", []))
-                csv_rw = df_rw.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label="📥 Scarica Quadro RW (.csv)",
-                    data=csv_rw,
-                    file_name=f"argus_quadro_rw_{prof_slug}_{date_slug}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key="dl_rw_csv_hub"
+                render_export_toolbar(
+                    df_rw,
+                    file_prefix=f"argus_quadro_rw_{prof_slug}",
+                    key_suffix="hub_quadro_rw",
+                    table_title="Prospetto Quadro RW / RT"
                 )
             except Exception as e:
                 st.error(f"Errore Quadro RW: {e}")
@@ -266,7 +264,7 @@ def render_wealth_reporting_and_exports_hub(
             st.markdown("""
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <b style="color: #38bdf8; font-size: 13.5px;">📜 Registro Integrale Cash Flow (.csv)</b>
+                    <b style="color: #38bdf8; font-size: 13.5px;">📜 Registro Integrale Cash Flow (.xlsx / .csv)</b>
                     <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
                         Libro mastro completo di tutte le entrate e uscite con data contabile, importo, categoria semantica e natura 50/30/20.
                     </p>
@@ -275,14 +273,11 @@ def render_wealth_reporting_and_exports_hub(
             """, unsafe_allow_html=True)
             try:
                 df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
-                csv_cf = df_cf.to_csv(index=False).encode("utf-8")
-                st.download_button(
-                    label="📥 Scarica Libro Mastro (.csv)",
-                    data=csv_cf,
-                    file_name=f"argus_cashflow_ledger_{prof_slug}_{date_slug}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key="dl_cf_csv_hub"
+                render_export_toolbar(
+                    df_cf,
+                    file_prefix=f"argus_cashflow_ledger_{prof_slug}",
+                    key_suffix="hub_cashflow_ledger",
+                    table_title="Registro Integrale Cash Flow"
                 )
             except Exception as e:
                 st.error(f"Errore Cash Flow CSV: {e}")

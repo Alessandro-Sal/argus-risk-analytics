@@ -27,7 +27,7 @@ except ImportError:
         int_p, dec_p = formatted.split(".")
         return f"€ {int_p.replace(',', '.')},{dec_p}"
 
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, section, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal
+from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, section, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal, render_export_toolbar
 from core.hrp_optimizer import compute_hrp_portfolio
 from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
 from core.volatility_surface import build_volatility_surface, fit_volatility_smile
@@ -1179,14 +1179,11 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
 
                 with col_ord_f3:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    csv_orders = df_orders_disp.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Scarica CSV",
-                        data=csv_orders,
-                        file_name="distinta_ordini_ribilanciamento.csv",
-                        mime="text/csv",
-                        use_container_width=True,
-                        key="btn_download_unified_orders_csv"
+                    render_export_toolbar(
+                        df_orders_disp,
+                        file_prefix="distinta_ordini_ribilanciamento",
+                        key_suffix="mq_orders",
+                        table_title="Distinta Ordini Ribilanciamento"
                     )
 
                 if df_orders_disp.empty:
@@ -1320,8 +1317,12 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                         "hrp_weight": "Peso Frazionario",
                         "hrp_weight_pct": "Allocazione Ottima HRP %"
                     })
-                    csv_hrp = df_hrp_display.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica CSV", data=csv_hrp, file_name="pesi_ottimali_hrp.csv", mime="text/csv", use_container_width=True, key="btn_download_hrp_weights")
+                    render_export_toolbar(
+                        df_hrp_display,
+                        file_prefix="pesi_ottimali_hrp",
+                        key_suffix="mq_hrp",
+                        table_title="Pesi Ottimali HRP"
+                    )
                     st.dataframe(
                         df_hrp_display.style.format({
                             "Allocazione Ottima HRP %": "{:.2f}%",
@@ -1400,8 +1401,12 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     "erc_weight_pct": "Peso ERC (%)",
                     "risk_contrib_pct": "Contributo al Rischio (%)"
                 })
-                csv_erc = df_erc_disp.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_erc, file_name="pesi_ottimali_erc.csv", mime="text/csv", use_container_width=True, key="btn_download_erc_weights")
+                render_export_toolbar(
+                    df_erc_disp,
+                    file_prefix="pesi_ottimali_erc",
+                    key_suffix="mq_erc",
+                    table_title="Pesi Ottimali ERC"
+                )
                 st.dataframe(
                     df_erc_disp.style.format({
                         "Peso ERC (%)": "{:.2f}%",
@@ -1666,8 +1671,12 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                         {"Ticker": tk, "Peso RL Target (%)": round(rl_res["final_weights"].get(tk, 0.0) * 100.0, 2)}
                         for tk in rl_res["tickers"]
                     ])
-                    csv_rl_w = df_target_w.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica Pesi RL (CSV)", data=csv_rl_w, file_name="pesi_target_rl_agent.csv", mime="text/csv", use_container_width=True, key="btn_dl_rl_weights")
+                    render_export_toolbar(
+                        df_target_w,
+                        file_prefix="pesi_target_rl_agent",
+                        key_suffix="mq_rl_weights",
+                        table_title="Pesi Target RL Agent"
+                    )
 
                 # Costruisci confronto con pesi attuali con rilevamento ticker robusto
                 target_rows = []
@@ -1921,8 +1930,12 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
 
             with col_cont_h2:
                 st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-                csv_cont = df_cont.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_cont, file_name="coppie_contagio_tail_risk.csv", mime="text/csv", use_container_width=True)
+                render_export_toolbar(
+                    df_cont,
+                    file_prefix="coppie_contagio_tail_risk",
+                    key_suffix="mq_contagion",
+                    table_title="Coppie Contagio Tail Risk"
+                )
 
             cont_cfg = {
                 "Coppia Asset": st.column_config.TextColumn("Coppia Asset", width="medium"),
@@ -1976,13 +1989,11 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
 
             with col_k_f3:
                 st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                csv_k = df_k_filt.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="📥 Scarica CSV",
-                    data=csv_k,
-                    file_name="kelly_criterion_sizing.csv",
-                    mime="text/csv",
-                    use_container_width=True
+                render_export_toolbar(
+                    df_k_filt,
+                    file_prefix="kelly_criterion_sizing",
+                    key_suffix="mq_kelly",
+                    table_title="Kelly Criterion Sizing"
                 )
 
             if df_k_filt.empty:
@@ -2383,8 +2394,12 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
 
             with col_mo_h2:
                 st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-                csv_odds = df_odds.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_odds, file_name="monte_carlo_odds_matrix.csv", mime="text/csv", use_container_width=True)
+                render_export_toolbar(
+                    df_odds,
+                    file_prefix="monte_carlo_odds_matrix",
+                    key_suffix="mq_mc_odds",
+                    table_title="Matrice Odds Monte Carlo"
+                )
 
             odds_cfg = {
                 "Scenario Stocastico": st.column_config.TextColumn("Scenario Stocastico", width="medium"),
@@ -2598,8 +2613,12 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
             with col_cl_t2:
                 search_cl = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_km_cluster", label_visibility="collapsed")
             with col_cl_t3:
-                csv_cl = df_cl_table.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_cl, file_name="asset_clusters_kmeans.csv", mime="text/csv", use_container_width=True, key="btn_download_kmeans_clusters")
+                render_export_toolbar(
+                    df_cl_table,
+                    file_prefix="asset_clusters_kmeans",
+                    key_suffix="mq_kmeans",
+                    table_title="Cluster Asset K-Means"
+                )
 
             df_cl_filt = df_cl_table.copy()
             if search_cl:
@@ -3075,14 +3094,11 @@ elif active_quant_tab == "🛡️ Hedging & Opzioni":
 
                 with col_cc_f3:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    csv_cov = df_cov_show.to_csv(index=False).encode('utf-8')
-                    st.download_button(
-                        label="📥 Scarica CSV",
-                        data=csv_cov,
-                        file_name="strategia_covered_call.csv",
-                        mime="text/csv",
-                        use_container_width=True,
-                        key="btn_download_covered_call"
+                    render_export_toolbar(
+                        df_cov_show,
+                        file_prefix="strategia_covered_call",
+                        key_suffix="mq_cov_call",
+                        table_title="Strategia Covered Call"
                     )
 
                 cov_cfg = {
@@ -3370,8 +3386,12 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                     search_bl = st.text_input("🔍 Cerca Ticker nella Tabella Black-Litterman:", placeholder="Filtra per Ticker (es. GOOGL, BTC, ETH)...", key="search_bl_ticker")
                 with col_bl_f2:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    csv_bl = df_bl.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Scarica CSV", data=csv_bl, file_name="black_litterman_weights.csv", mime="text/csv", use_container_width=True)
+                    render_export_toolbar(
+                        df_bl,
+                        file_prefix="black_litterman_weights",
+                        key_suffix="mq_bl_weights",
+                        table_title="Pesi Black-Litterman"
+                    )
 
                 df_bl_filt = df_bl.copy()
                 if search_bl:
@@ -3601,8 +3621,12 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             with col_ff_h1:
                 st.markdown("##### 📋 Tabella Econometrica di Regressione OLS & Test di Ipotesi")
             with col_ff_h2:
-                csv_ff = df_ff_factors.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_ff, file_name="fama_french_factor_regression.csv", mime="text/csv", use_container_width=True)
+                render_export_toolbar(
+                    df_ff_factors,
+                    file_prefix="fama_french_factor_regression",
+                    key_suffix="mq_fama_french",
+                    table_title="Fama-French Factor Regression"
+                )
 
             df_ff_show = df_ff_factors.rename(columns={
                 "factor": "Fattore di Rischio",
@@ -3651,8 +3675,12 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                 )
             with col_rf2:
                 st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                csv_roll = df_roll_b.to_csv().encode('utf-8')
-                st.download_button("📥 Scarica Serie CSV", data=csv_roll, file_name="rolling_factor_betas_60d.csv", mime="text/csv", use_container_width=True)
+                render_export_toolbar(
+                    df_roll_b.reset_index() if isinstance(df_roll_b.index, pd.DatetimeIndex) else df_roll_b,
+                    file_prefix="rolling_factor_betas_60d",
+                    key_suffix="mq_roll_betas",
+                    table_title="Rolling Factor Betas 60D"
+                )
 
             factors_to_show = selected_factors if selected_factors else all_factors
 
@@ -3850,12 +3878,16 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             metric_card("Alpha Multi-Fattoriale (α)", f"{barra_res.get('alpha_annualized', 0.0)*100:+.2f}%", "MSCI Barra 5-Factor", True)
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        col_bar_h1, col_bar_h2 = st.columns([3.5, 0.9])
+        col_bar_h1, col_bar_h2 = st.columns([3.5, 1.2])
         with col_bar_h1:
             st.markdown("##### 📋 Tabella di Dettaglio dei Fattori MSCI Barra")
         with col_bar_h2:
-            csv_barra = df_barra.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CSV", data=csv_barra, file_name="msci_barra_factors.csv", mime="text/csv", use_container_width=True)
+            render_export_toolbar(
+                df_barra,
+                file_prefix="msci_barra_factors",
+                key_suffix="mq_msci_barra",
+                table_title="Fattori MSCI Barra"
+            )
 
         barra_cfg = {
             "Fattore Barra": st.column_config.TextColumn("Fattore Barra", width="medium"),
@@ -4053,14 +4085,11 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             with col_t_h1:
                 st.markdown("##### 📋 Tabella Comparativa di Performance e Rischio per Quintile")
             with col_t_h2:
-                csv_fq = fq_res["metrics_df"].to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    "📥 Scarica Analytics CSV",
-                    data=csv_fq,
-                    file_name=f"factor_quintile_analysis_{fact_choice}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    key="btn_dl_factor_quintiles"
+                render_export_toolbar(
+                    fq_res["metrics_df"],
+                    file_prefix=f"factor_quintile_{fact_choice.lower()}",
+                    key_suffix="mq_factor_quintiles",
+                    table_title=f"Factor Quintile ({fact_choice})"
                 )
 
             st.dataframe(
@@ -4433,8 +4462,12 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
         with col_cds_h1:
             st.markdown("##### 🛡️ Curva Default Implicita (CDS)")
         with col_cds_h2:
-            csv_cds = df_cds.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CDS CSV", data=csv_cds, file_name=f"cds_default_curve_{preset_choice.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_cds_curve")
+            render_export_toolbar(
+                df_cds,
+                file_prefix=f"cds_default_curve_{preset_choice.lower()}",
+                key_suffix="mq_cds_curve",
+                table_title="Curva Default Implicita (CDS)"
+            )
         st.caption(f"Term structure cumulativa di default basata sullo spread CDS di **{inp_cds:.0f} bps** (Recovery: 40%).")
         
         fig_cds = go.Figure()
@@ -4464,8 +4497,12 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
     with col_sens_h1:
         st.markdown("##### 📋 Matrice di Sensibilità Istituzionale a Shock di Tasso (Basis Points Shock)")
     with col_sens_h2:
-        csv_sens = df_sens.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica Sensibilità CSV", data=csv_sens, file_name=f"bond_sensitivity_{preset_choice.lower()}.csv", mime="text/csv", use_container_width=True, key="btn_dl_bond_sens")
+        render_export_toolbar(
+            df_sens,
+            file_prefix=f"bond_sensitivity_{preset_choice.lower()}",
+            key_suffix="mq_bond_sens",
+            table_title="Matrice Sensibilità Shock Tasso"
+        )
     
     sens_cfg = {
         "shift_bps": st.column_config.NumberColumn("Shock Tasso", format="%+d bps"),
@@ -4623,13 +4660,11 @@ elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
             )
             col_d_csv, _ = st.columns([1.5, 3.5])
             with col_d_csv:
-                st.download_button(
-                    label="📥 Esporta Distinta Ordini CSV",
-                    data=df_exec.to_csv(index=False).encode('utf-8'),
-                    file_name=f"trade_execution_list_{datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv",
-                    use_container_width=True,
-                    type="primary"
+                render_export_toolbar(
+                    df_exec,
+                    file_prefix="trade_execution_list",
+                    key_suffix="mq_trade_exec",
+                    table_title="Distinta Ordini Esecutivi"
                 )
         else:
             st.success("✅ Portafoglio già perfettamente allineato ai pesi target!")

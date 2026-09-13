@@ -7,6 +7,53 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.1.0] - 2026-09-13
+
+### 📊 Universal Financial Data Export Framework & Platform-Wide Multi-Format Standardization
+
+Questa release standardizza l'esperienza utente in tutta la piattaforma ARGUS introducendo un framework universale, ad alte prestazioni ed elegante per l'esportazione dei DataFrame, e sostituendo sistematicamente tutti i vecchi pulsanti isolati "Scarica CSV".
+
+### Aggiunto (Added)
+- **Universal Financial Data Export Framework (`core/ui_export_utils.py`)**:
+  - Esportazione dual-format immediata: **CSV conforme agli standard europei/italiani** (codifica UTF-8 con Byte Order Mark `utf-8-sig`) ed **Excel istituzionale styled (.xlsx via OpenPyXL)**.
+  - Styling professionale Excel: header *Dark Obsidian* (`#161B22`) con accento ambra ARGUS (`#FF9900`), testo bianco in grassetto, griglie contabili esplicite (`showGridLines = True`), auto-fit dinamico della larghezza colonne con padding, freeze panes della prima riga (`A2`) e formattazione numerica contabile intelligente (`€`, `%`, date, interi).
+  - Componente compatto popover `render_export_toolbar` a ingombro verticale zero con badge informativo di righe e colonne.
+  - Card wrapper unificato `render_table_with_export` con titolo, record count pill, toolbar integrata e griglia Streamlit.
+  - Caching binario ad alte prestazioni `@st.cache_data(show_spinner=False)` per generazione istantanea e zero lag sui re-run.
+  - Generazione di nomi file contestuali con pattern `{prefisso}_{nome_portafoglio}_{timestamp}.{ext}`.
+- **Suite di Test Unitari Dedicata (`tests/test_ui_export_utils.py`)**:
+  - Test per gestione MultiIndex, tipi annidati, codifica UTF-8-sig con accenti/€, styling openpyxl e conformità rendering Streamlit. Test suite complessiva estesa a **631 test passati al 100%**.
+
+### Modificato (Changed)
+- **Migrazione Completa delle Tabelle della Piattaforma (50+ Tabelle sui 22 Moduli)**:
+  - Sostituzione sistematica di tutti i legacy `st.download_button("📥 Scarica CSV", ...)` e integrazione della toolbar su tutte le tabelle in:
+    - `src/0_Control_Room.py` (Mappature ticker, query DuckDB OLAP, posizioni e transazioni bitemporali time-travel, audit trail).
+    - `src/pages/1_📈_Dashboard_Generale.py` (Benchmark scorecard, limiti compliance, asset allocation, rendimenti storici).
+    - `src/pages/3_🔴_Analisi_Rischio.py` (Contributo rischio, decomposizione di Eulero, LVaR smobilizzo, ATR stops, ML Isolation Forest).
+    - `src/pages/4_🔬_Modelli_Quantitativi.py` (17 tabelle: HRP, ERC, RL Actor-Critic, Contagion, Kelly, Monte Carlo, Barra, CDS, ecc.).
+    - `src/pages/5_📋_Posizioni_e_Dettagli.py` (Posizioni principali, graveyard, dividendi, tax-loss, Quadro RT/RW, Almgren-Chriss, TWAP/VWAP).
+    - `src/pages/6_🏛️_Valutazione_Aziendale.py` (Fair value models, DuPont, conto economico, stato patrimoniale, rendiconto).
+    - `src/pages/7_🌪️_Stress_Testing.py` (Matrice scenari, dettaglio stress posizioni, macro factor sensitivity).
+    - `src/pages/8_📊_Analisi_Temporale.py` (Audit report side-by-side).
+    - `src/pages/9_📈_Analisi_Tecnica.py` (Volume profile, Level 2 order book, tick stream).
+    - `src/pages/10_🔍_Screener_Opportunita.py` (Screener multi-fattoriale, watchlist tattica).
+    - `src/pages/11_💻_BQuant_e_Launchpad.py` (Risultati esecuzione script BQuant).
+    - `src/pages/13_🏛️_Patrimonio_e_NetWorth.py` (Asset allocation istituzionale & pesi).
+    - `src/pages/14_💳_Cash_Flow_e_Spese.py` (Modale dettaglio transazioni, cash flow ledger).
+    - `src/pages/15_⌚_Asset_Illiquidi_e_Orologi.py` (Asset fisici/orologi, Private Equity deal register, Private Debt tranches).
+    - `src/pages/17_🔥_Indipendenza_Finanziaria_e_FIRE.py` (Net Worth-at-Risk matrix, Glide Path allocation, Fee Drag table).
+    - `src/pages/18_📑_Fiscalita_e_Quadro_RW.py` (Quadro RW portfolio report, Tax-Loss harvesting).
+    - `src/pages/19_🏡_Immobili_e_Mutui.py` (Dettaglio patrimonio immobiliare, piano ammortamento mutuo).
+    - `src/pages/20_⚖️_Pianificazione_Successoria.py` (Simulazione imposte successione TUS, confronto veicoli di protezione).
+    - `src/pages/21_🤖_AI_Copilot_e_Advisor.py` (Blotter ordini prescrittivi di ribilanciamento).
+    - `core/ui_utils.py` (`render_data_table`, `render_duckdb_olap_cube_explorer`, `render_interactive_gics_sector_breakdown`).
+    - `core/wealth/wealth_reporting_hub.py` (Prospetto Quadro RW ed estratto integrale Cash Flow).
+- **Upgrade Visivo Splash Screen (`components/splash.py`)**:
+  - Eye logo ingrandito e potenziato con effetto glow ambra/indaco ad alta risoluzione.
+  - Sostituzione frecce `<<` nella sidebar con badge chevron istituzionale `◀ Riduci`.
+
+---
+
 ## [9.0.0] - 2026-09-11
 
 ### 🚀 Major Release — Dual-Engine Institutional Overhaul, Quantitative Model Validation & Production Readiness

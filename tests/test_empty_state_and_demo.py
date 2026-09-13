@@ -357,3 +357,31 @@ def test_splash_screen_not_active_on_cold_start_or_risk_launch():
     with patch("streamlit.markdown"), patch("streamlit.columns", return_value=(MagicMock(), MagicMock())):
         is_active_manual = render_splash_screen()
     assert is_active_manual is True, "Se richiesto esplicitamente lo splash deve attivarsi!"
+
+
+def test_render_wealth_profile_picker_click_does_not_modify_instantiated_widget_key():
+    """Verifica che render_wealth_profile_picker non tenti di modificare wealth_profile_selector_widget dopo l'istanziazione del widget."""
+    from unittest.mock import MagicMock, patch
+    from core.ui_utils import render_wealth_profile_picker
+
+    st.session_state.clear()
+    st.session_state["wealth_profile_selector_widget"] = None
+
+    def fake_button(label, **kwargs):
+        if "test_picker_open_1" in kwargs.get("key", ""):
+            return True
+        return False
+
+    with patch("streamlit.markdown"), \
+         patch("streamlit.columns", return_value=[MagicMock(), MagicMock(), MagicMock()]), \
+         patch("streamlit.button", side_effect=fake_button), \
+         patch("streamlit.rerun") as mock_rerun, \
+         patch("core.wealth.wealth_db.get_wealth_portfolios", return_value=pd.DataFrame()):
+        
+        # Non deve sollevare StreamlitAPIException
+        render_wealth_profile_picker(None, {1: "Profilo Alpha", 2: "Profilo Beta"}, key_prefix="test_picker")
+        
+        assert st.session_state.get("wealth_active_portfolio_id") == 1
+        assert st.session_state.get("wealth_active_profile_name") == "Profilo Alpha"
+        assert mock_rerun.called
+

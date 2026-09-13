@@ -29,7 +29,8 @@ from core.ui_utils import (
     render_wealth_command_bar,
     render_wealth_executive_badges,
     render_page_header,
-    apply_plotly_theme
+    apply_plotly_theme,
+    render_table_with_export,
 )
 
 from core.sidebar import render_sidebar
@@ -164,9 +165,11 @@ with tab_equity:
 
     # Dettaglio immobili
     if re_ltv_summary["properties_detail"]:
-        st.markdown("#### 🏢 Dettaglio Immobili & Ripartizione Debito")
-        st.dataframe(
+        render_table_with_export(
             re_ltv_summary["properties_df"],
+            table_title="Dettaglio Patrimonio Immobiliare & Mutui",
+            file_prefix="immobili_e_mutui",
+            key_suffix="p19_re_summary",
             column_config={
                 "name": "Nome Immobile",
                 "market_value": st.column_config.NumberColumn("Valore Mercato", format="€ %,.2f"),
@@ -175,9 +178,7 @@ with tab_equity:
                 "ltv_pct": st.column_config.NumberColumn("LTV %", format="%.1f%%"),
                 "location": "Ubicazione",
                 "notes": "Note"
-            },
-            hide_index=True,
-            use_container_width=True
+            }
         )
 
 # ── TAB 2: AMMORTAMENTO MUTUO ───────────────────────────────
@@ -256,6 +257,20 @@ with tab_mortgage:
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
         )
         st.plotly_chart(fig_sched, use_container_width=True, config={'displayModeBar': False})
+
+        with st.expander("📋 Tabella Piano di Ammortamento Anno per Anno", expanded=False):
+            render_table_with_export(
+                df_eff.rename(columns={
+                    "year": "Anno",
+                    "remaining_balance": "Debito Residuo (€)",
+                    "principal": "Quota Capitale (€)",
+                    "interest": "Quota Interessi (€)",
+                    "total_payment": "Rata Totale (€)"
+                }),
+                table_title="Piano di Ammortamento Dettagliato",
+                file_prefix="piano_ammortamento_mutuo",
+                key_suffix="p19_mortgage_sched"
+            )
 
     st.write("")
     st.markdown("##### 🌪️ Shock Test Tasso Variabile (Euribor Stress)")

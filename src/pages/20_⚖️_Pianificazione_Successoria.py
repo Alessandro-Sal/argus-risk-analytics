@@ -30,7 +30,8 @@ from core.ui_utils import (
     render_wealth_executive_badges,
     render_page_header,
     apply_plotly_theme,
-    ensure_portfolio_loaded
+    ensure_portfolio_loaded,
+    render_table_with_export,
 )
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
@@ -335,8 +336,11 @@ with tab_taxes:
 
     if estate["tax_heirs"]:
         df_tax = pd.DataFrame(estate["tax_heirs"])
-        st.dataframe(
+        render_table_with_export(
             df_tax,
+            table_title="Simulazione Imposte di Successione & Franchigie (TUS)",
+            file_prefix="imposte_successione",
+            key_suffix="p20_succession_tax",
             column_config={
                 "erede": st.column_config.TextColumn("Erede Legittimo", width="medium"),
                 "quota_valore": st.column_config.NumberColumn("Valore Quota Ereditaria (€)", format="€ %,.2f", width="medium"),
@@ -344,9 +348,7 @@ with tab_taxes:
                 "base_imponibile": st.column_config.NumberColumn("Base Imponibile Tassabile (€)", format="€ %,.2f", width="medium"),
                 "aliquota": st.column_config.TextColumn("Aliquota", width="small"),
                 "imposta_dovuta": st.column_config.NumberColumn("Imposta di Successione (€)", format="€ %,.2f", width="medium")
-            },
-            hide_index=True,
-            use_container_width=True
+            }
         )
     else:
         st.info("Nessuna imposta di successione applicabile.")
@@ -594,12 +596,11 @@ with tab_shield:
     with pk4:
         metric_card("Scudo Revocatoria", "5 Anni (2901 c.c.)", delta="Consolidamento Giuridico", delta_color="normal")
 
-    st.write("")
-    st.markdown("##### 🏛️ Confronto Strutturale dei Veicoli di Protezione")
-    st.dataframe(
+    render_table_with_export(
         prot_res["comparison_df"],
-        use_container_width=True,
-        hide_index=True
+        table_title="Confronto Strutturale dei Veicoli di Protezione",
+        file_prefix="veicoli_protezione_patrimoniale",
+        key_suffix="p20_prot_vehicles"
     )
 
     st.write("")

@@ -29,7 +29,8 @@ from core.ui_utils import (
     render_wealth_command_bar,
     render_wealth_executive_badges,
     render_page_header,
-    apply_plotly_theme
+    apply_plotly_theme,
+    render_table_with_export,
 )
 from core.sidebar import render_sidebar
 from core.fetcher import get_engine
@@ -506,7 +507,7 @@ with tab_council:
             st.markdown("##### 📋 Blotter Ordini Prescrittivo (Execution Plan)")
             if not reb_res["trades_df"].empty:
                 df_tr_disp = reb_res["trades_df"].copy()
-                st.dataframe(
+                render_table_with_export(
                     df_tr_disp[[
                         "cl_ord_id", "ticker", "side", "shares", "market_price",
                         "limit_price", "trade_eur", "minus_absorbed_eur", "tax_bill_eur", "slippage_eur"
@@ -521,16 +522,10 @@ with tab_council:
                         "minus_absorbed_eur": "Minus Assorbita (€)",
                         "tax_bill_eur": "Imposta (€)",
                         "slippage_eur": "Slippage (€)"
-                    }).style.format({
-                        "Prezzo Mercato (€)": "€ {:,.2f}",
-                        "Prezzo Limite (€)": "€ {:,.2f}",
-                        "Controvalore (€)": "€ {:,.2f}",
-                        "Minus Assorbita (€)": "€ {:,.2f}",
-                        "Imposta (€)": "€ {:,.2f}",
-                        "Slippage (€)": "€ {:,.2f}"
                     }),
-                    use_container_width=True,
-                    hide_index=True
+                    table_title="Blotter Ordini Prescrittivo (Execution Plan)",
+                    file_prefix="rebalance_orders_council",
+                    key_suffix="p21_council_orders"
                 )
             else:
                 st.info("Nessuna compravendita necessaria: l'allocazione attuale è ottimale rispetto ai vincoli.")
