@@ -157,3 +157,14 @@ def test_timetravel_endpoint_success(client):
     # Merkle root should be a 64-character hex string
     assert "merkle_root" in data
     assert len(data["merkle_root"]) == 64
+
+
+def test_wealth_networth_endpoint_success(client):
+    """Verifies that the wealth net worth endpoint returns consolidated metrics."""
+    response = client.get("/api/v1/wealth/networth")
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_net_worth" in data
+    assert "liquid_cash" in data
+    assert "financial_investments" in data
+    assert "solvency_ratio" in data

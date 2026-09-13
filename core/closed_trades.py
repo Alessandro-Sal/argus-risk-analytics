@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from datetime import datetime
+from collections import deque
 
 def _normalize_asset_class(ac_raw: str, ticker: str = "") -> str:
     """Normalizza la classe di attivo in etichette istituzionali standard in italiano."""
@@ -130,7 +131,7 @@ def compute_closed_trades_journal(
         if fx_series is None and fx_tk_inv in fx_dict:
             fx_series = 1.0 / fx_dict[fx_tk_inv]
 
-        queue = []  # [{ "date": date, "qty": qty, "price_eur": px_eur, "price_orig": px, "tx_id": id }]
+        queue = deque()  # [{ "date": date, "qty": qty, "price_eur": px_eur, "price_orig": px, "tx_id": id }]
         ticker_closed_lots = []
         dividends_collected = 0.0
         total_qty_sold = 0.0
@@ -139,12 +140,12 @@ def compute_closed_trades_journal(
         first_buy_date = None
         last_sell_date = None
 
-        for _, row in grp.iterrows():
-            tx_t = row["tx_type_clean"]
-            qty = float(row["quantity"])
-            tx_d = row["tx_date"]
-            tx_id = row.get("tx_id", None)
-            orig_price = float(row["price"])
+        for row in grp.itertuples(index=False):
+            tx_t = getattr(row, "tx_type_clean")
+            qty = float(getattr(row, "quantity"))
+            tx_d = getattr(row, "tx_date")
+            tx_id = getattr(row, "tx_id", None)
+            orig_price = float(getattr(row, "price"))
 
             # Calcolo tasso di cambio EUR
             fx_rate = 1.0
@@ -213,13 +214,13 @@ def compute_closed_trades_journal(
 
                     if lot_qty <= qty_to_sell + 1e-9:
                         qty_to_sell -= lot_qty
-                        queue.pop(0)
+                        queue.popleft()
                     else:
                         lot["qty"] -= qty_to_sell
                         qty_to_sell = 0.0
 
             elif tx_t in ["split", "frazionamento", "raggruppamento", "reverse_split", "reverse split", "stock_split", "stock split", "stock_dividend", "fusione", "merger", "scambio", "spinoff", "scissione"]:
-                sp_ratio = float(row.get("quantity") or row.get("price") or 1.0)
+                sp_ratio = float(getattr(row, "quantity", 1.0) or getattr(row, "price", 1.0) or 1.0)
                 if sp_ratio > 0.0 and sp_ratio != 1.0:
                     for lot in queue:
                         lot["qty"] = lot["qty"] * sp_ratio

@@ -45,6 +45,43 @@ def get_duckdb_system_info() -> Dict[str, Any]:
     }
 
 
+import threading
+
+_SHARED_CON = None
+_SHARED_LOCK = threading.Lock()
+
+
+def get_shared_duckdb_connection():
+    """Restituisce una connessione singleton thread-safe ad alte prestazioni per query analitiche in-process."""
+    global _SHARED_CON
+    if not HAS_DUCKDB:
+        return None
+    if _SHARED_CON is None:
+        with _SHARED_LOCK:
+            if _SHARED_CON is None:
+                _SHARED_CON = duckdb.connect(database=":memory:")
+                try:
+                    _SHARED_CON.execute("PRAGMA threads=4;")
+                    _SHARED_CON.execute("PRAGMA enable_object_cache=true;")
+                except Exception:
+                    pass
+    return _SHARED_CON
+
+
+def _register_dfs_optimized(con, context_dfs: Optional[Dict[str, pd.DataFrame]] = None) -> None:
+    """Registra i DataFrame nel catalogo DuckDB sfruttando PyArrow Zero-Copy se disponibile."""
+    if not con or not context_dfs:
+        return
+    for name, df in context_dfs.items():
+        if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+            try:
+                import pyarrow as pa
+                arrow_table = pa.Table.from_pandas(df)
+                con.register(name, arrow_table)
+            except Exception:
+                con.register(name, df)
+
+
 def get_in_memory_duckdb_connection(context_dfs: Optional[Dict[str, pd.DataFrame]] = None):
     """
     Crea o restituisce una connessione DuckDB in-memory registrando i DataFrame di portafoglio.
@@ -53,24 +90,22 @@ def get_in_memory_duckdb_connection(context_dfs: Optional[Dict[str, pd.DataFrame
         return None
 
     con = duckdb.connect(database=":memory:")
-    if context_dfs:
-        for name, df in context_dfs.items():
-            if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                df_clean = df.copy()
-                con.register(name, df_clean)
+    _register_dfs_optimized(con, context_dfs)
     return con
 
 
 def _run_duckdb_native(sql_query: str, con, context_dfs: Optional[Dict[str, pd.DataFrame]]) -> pd.DataFrame:
-    """Esegue la query nativa sul motore C++ DuckDB."""
-    temp_con = con if con is not None else get_in_memory_duckdb_connection(context_dfs)
-    if temp_con is None:
-        temp_con = duckdb.connect(database=":memory:")
-        if context_dfs:
-            for name, df in context_dfs.items():
-                if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
-                    temp_con.register(name, df)
-    return temp_con.execute(sql_query).fetchdf()
+    """Esegue la query nativa sul motore C++ DuckDB con supporto shared pool."""
+    if con is not None:
+        target_con = con
+        _register_dfs_optimized(target_con, context_dfs)
+    elif context_dfs:
+        target_con = get_in_memory_duckdb_connection(context_dfs)
+    else:
+        target_con = get_shared_duckdb_connection()
+        if target_con is None:
+            target_con = duckdb.connect(database=":memory:")
+    return target_con.execute(sql_query).fetchdf()
 
 
 def _run_sqlite_fallback(sql_query: str, context_dfs: Optional[Dict[str, pd.DataFrame]]) -> pd.DataFrame:

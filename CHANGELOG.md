@@ -7,6 +7,42 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.3.0] - 2026-09-13
+
+### 🏛️ Architectural Decoupling, Application Service Layer & Quantitative Engine Scalability
+
+Questa release porta a compimento la trasformazione architetturale enterprise di ARGUS, disaccoppiando completamente il motore quantitativo di calcolo dal front-end Streamlit, introducendo un Application Service Layer condiviso con l'API FastAPI headless, ottimizzando il motore OLAP DuckDB con PyArrow Zero-Copy e accelerando gli algoritmi contabili FIFO a $O(1)$.
+
+### Aggiunto (Added)
+- **Application Service Layer (`core/services/`)**:
+  - `RiskService`: orchestrazione headless del rischio di mercato, VaR/CVaR parametrici e Cornish-Fisher, metriche di rendimento e ottimizzazione di portafoglio HRP (López de Prado).
+  - `TaxService`: facade unificata per la fiscalità TUIR (Art. 67), conformità cripto-attività (L. 197/2022) e comparazione fiscale giurisdizionale cross-border.
+  - `WealthService`: consolidamento istantaneo del bilancio personale (Net Worth, solvency ratio, health score).
+- **Nuovo Endpoint REST Headless (`api/main.py`)**:
+  - `GET /api/v1/wealth/networth`: esposizione del bilancio patrimoniale consolidato e dei ratio di solvibilità per integrazioni programmatiche.
+- **Microservizio Headless su Docker Compose (`docker-compose.yml`)**:
+  - Aggiunto il container `api` (FastAPI / Uvicorn su porta 8000) orchestrato nativamente con `web` (Streamlit su porta 8501) e `db` (MySQL 8.0).
+- **Hardening della Sicurezza per Google Cloud Service Account**:
+  - Aggiunto template [google_service_account.json.example](gsheets_sync_subproject/google_service_account.json.example) e supporto prioritario alle variabili d'ambiente `GOOGLE_SERVICE_ACCOUNT_JSON` e `GOOGLE_APPLICATION_CREDENTIALS` in `gsheets_sync_subproject/sync_google_sheets.py`.
+
+### Modificato (Changed)
+- **Architectural Decoupling UI vs Core (`core/risk_engine.py` & `core/fetcher.py`)**:
+  - Eliminata l'inversione circolare di dipendenza dove `core/risk_engine.py` importava da `core.ui_utils`.
+  - Implementato `fetch_cached_benchmark_returns` headless con cache in-memory TTL in `core/fetcher.py`, con delega trasparente da `core/ui_utils.py` per piena retrocompatibilità.
+- **DuckDB In-Process Connection Pool & Zero-Copy Arrow (`core/duckdb_engine.py`)**:
+  - Introdotto connection pool singleton thread-safe `get_shared_duckdb_connection` con 4 thread SIMD ed abilitazione dell'object cache C++.
+  - Implementata la registrazione Zero-Copy dei DataFrame tramite tabelle Apache Arrow (`pyarrow.Table.from_pandas`), eliminando clonazioni ridondanti in RAM.
+- **Accelerazione Algoritmica FIFO Matching (`core/closed_trades.py`)**:
+  - Sostituito `queue.pop(0)` con `collections.deque.popleft()` per matching a complessità $O(1)$ e iterazione rapida con `itertuples(index=False)`.
+- **Refactoring Headless API (`api/main.py`)**:
+  - Sostituiti gli import da metodi privati con chiamate formali all'Application Service Layer.
+
+### Rimosso (Removed)
+- **Smoke Test Ridondante (`tests/test_frontend_smoke.py`)**:
+  - Rimosso file duplicato a favore del completo e robusto `tests/test_all_pages_smoke.py`, che valida formalmente tutte le 21 pagine Streamlit e il Control Room.
+
+---
+
 ## [9.2.0] - 2026-09-13
 
 ### 📈 ARGUS Institutional Plotly Design System & High-Performance Chart Framework

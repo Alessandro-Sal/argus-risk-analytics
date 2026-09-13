@@ -5031,41 +5031,9 @@ def render_formula_popover(label: str, title: str, formula_latex: str, descripti
 
 @st.cache_data(ttl=3600*12, show_spinner=False)
 def fetch_cached_benchmark_returns(ticker: str, start_str: str, end_str: str) -> pd.Series:
-    """Scarica i rendimenti giornalieri ufficiali reali da Yahoo Finance con caching automatico."""
-    import yfinance as yf
-    try:
-        alias_map = {
-            "BTC": "BTC-USD",
-            "BTC-USD": "BTC-USD",
-            "SPY": "SPY",
-            "QQQ": "QQQ",
-            "IWM": "IWM",
-            "ACWI": "ACWI",
-            "VGK": "VGK",
-            "EZU": "EZU",
-            "AAXJ": "AAXJ",
-            "EWJ": "EWJ",
-            "EEM": "EEM",
-            "AGG": "AGG",
-            "BND": "BND",
-            "GLD": "GLD"
-        }
-        yf_ticker = alias_map.get(ticker, ticker)
-        df = yf.download(yf_ticker, start=start_str, end=end_str, progress=False)
-        if df is not None and not df.empty:
-            if isinstance(df.columns, pd.MultiIndex):
-                close_col = df["Close"]
-                s = close_col.iloc[:, 0] if isinstance(close_col, pd.DataFrame) else close_col
-            else:
-                s = df["Close"] if "Close" in df.columns else df["close"]
-            s.index = pd.to_datetime(s.index).tz_localize(None).strftime("%Y-%m-%d")
-            s = s[~s.index.duplicated(keep='first')]
-            ret = s.pct_change().dropna()
-            ret.name = ticker
-            return ret
-    except Exception:
-        pass
-    return pd.Series(dtype=float)
+    """Proxy retrocompatibile Streamlit per fetch_cached_benchmark_returns implementato in core.fetcher."""
+    from core.fetcher import fetch_cached_benchmark_returns as _fetch_headless
+    return _fetch_headless(ticker, start_str, end_str)
 
 
 def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series:

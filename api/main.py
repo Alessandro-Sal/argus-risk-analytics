@@ -23,8 +23,9 @@ except ImportError:
     FastAPI = object  # Fallback for type hinting
 
 from core.bitemporal_engine import BitemporalLedgerEngine
-from core.hrp_optimizer import compute_hrp_portfolio
-from core.risk_engine import _calc_market_risk, _calc_return_metrics
+from core.services.risk_service import RiskService
+from core.services.tax_service import TaxService
+from core.services.wealth_service import WealthService
 
 logger = logging.getLogger("argus.api")
 
@@ -237,63 +238,17 @@ def create_app() -> FastAPI:
         - Higher empirical moments: Skewness and Fisher Kurtosis
         """
         try:
-            sr_portfolio = pd.Series(req.returns, dtype=float).dropna()
-            if len(sr_portfolio) < 2:
-                raise HTTPException(
-                    status_code=422,
-                    detail="Return series must contain at least 2 non-null observations."
-                )
-
-            if req.benchmark_returns is not None:
-                sr_bm = pd.Series(req.benchmark_returns, dtype=float).reindex(sr_portfolio.index).fillna(0.0)
-            else:
-                sr_bm = pd.Series(0.0, index=sr_portfolio.index)
-
-            mkt_risk = _calc_market_risk(
-                sr_portfolio=sr_portfolio,
-                sr_benchmark=sr_bm,
-                benchmark_ticker="BENCHMARK",
-                risk_free_rate=req.risk_free_rate
+            metrics_data = RiskService.compute_risk_metrics(
+                returns=req.returns,
+                benchmark_returns=req.benchmark_returns,
+                risk_free_rate=req.risk_free_rate,
+                confidence_levels=req.confidence_levels,
             )
-
-            ret_metrics = _calc_return_metrics(
-                sr_portfolio=sr_portfolio,
-                sr_benchmark=sr_bm,
-                risk_free_rate=req.risk_free_rate
-            )
-
-            var_raw = mkt_risk.get("var", {})
-            cvar_raw = mkt_risk.get("cvar", {})
-
-            var_hist = {f"{k}%": v for k, v in var_raw.items() if not k.startswith("var_parametric") and not k.startswith("var_cf")}
-            cvar_hist = {f"{k}%": v for k, v in cvar_raw.items() if not k.startswith("cvar_parametric") and not k.startswith("cvar_cf")}
-
-            var_param = {k.replace("var_parametric_", "") + "%": v for k, v in var_raw.items() if k.startswith("var_parametric_")}
-            cvar_param = {k.replace("cvar_parametric_", "") + "%": v for k, v in cvar_raw.items() if k.startswith("cvar_parametric_")}
-
-            var_cf = {k.replace("var_cf_", "") + "%": v for k, v in var_raw.items() if k.startswith("var_cf_")}
-            cvar_cf = {k.replace("cvar_cf_", "") + "%": v for k, v in cvar_raw.items() if k.startswith("cvar_cf_")}
-
-            vol_pct = float(mkt_risk.get("volatility_annual_pct", 0.0))
-
-            return RiskMetricsResponse(
-                var_historical=var_hist,
-                cvar_historical=cvar_hist,
-                var_parametric=var_param,
-                cvar_parametric=cvar_param,
-                var_cornish_fisher=var_cf,
-                cvar_cornish_fisher=cvar_cf,
-                sharpe_ratio=float(ret_metrics.get("sharpe", 0.0)),
-                sortino_ratio=float(ret_metrics.get("sortino", 0.0)),
-                max_drawdown=float(ret_metrics.get("max_drawdown", 0.0)),
-                volatility_annual=round(vol_pct / 100.0, 6),
-                volatility_annual_pct=round(vol_pct, 4),
-                cagr=ret_metrics.get("cagr"),
-                skewness=float(mkt_risk.get("skewness", 0.0)),
-                kurtosis=float(mkt_risk.get("kurtosis", 0.0)),
-            )
+            return RiskMetricsResponse(**metrics_data)
         except HTTPException:
             raise
+        except ValueError as v_err:
+            raise HTTPException(status_code=422, detail=str(v_err))
         except Exception as exc:
             logger.error("Error computing risk metrics: %s", exc, exc_info=True)
             raise HTTPException(
@@ -323,32 +278,38 @@ def create_app() -> FastAPI:
             )
 
         try:
-            df_returns = pd.DataFrame(req.asset_returns).dropna(axis=0, how="any")
-            if df_returns.shape[0] < 5:
-                df_returns = pd.DataFrame(req.asset_returns).fillna(0.0)
-
-            result = compute_hrp_portfolio(df_returns, linkage_method=req.linkage_method)
-            if not result or "weights" not in result:
-                raise HTTPException(
-                    status_code=400,
-                    detail="HRP optimization could not converge on provided asset returns."
-                )
-
-            return HRPOptimizeResponse(
-                weights={k: round(float(v), 6) for k, v in result["weights"].items()},
-                expected_return_pct=round(float(result.get("expected_return_pct", 0.0)), 4),
-                volatility_annual_pct=round(float(result.get("volatility_annual_pct", 0.0)), 4),
-                sharpe_ratio=round(float(result.get("sharpe_ratio", 0.0)), 4),
-                sorted_assets=result.get("sorted_assets", list(req.asset_returns.keys())),
+            hrp_res = RiskService.optimize_hrp(
+                asset_returns=req.asset_returns,
+                linkage_method=req.linkage_method
             )
+            return HRPOptimizeResponse(**hrp_res)
         except HTTPException:
             raise
+        except ValueError as v_err:
+            raise HTTPException(status_code=422, detail=str(v_err))
+        except RuntimeError as r_err:
+            raise HTTPException(status_code=400, detail=str(r_err))
         except Exception as exc:
             logger.error("HRP optimization failed: %s", exc, exc_info=True)
             raise HTTPException(
                 status_code=500,
                 detail=f"HRP optimization error: {str(exc)}"
             )
+
+    # ── Wealth Intelligence Net Worth Endpoint ────────────────────
+
+    @app.get(
+        "/api/v1/wealth/networth",
+        tags=["Wealth Intelligence"],
+        summary="Get Consolidated Balance Sheet & Net Worth"
+    )
+    def get_net_worth(portfolio_id: Optional[int] = None) -> Dict[str, Any]:
+        """Restituisce il Net Worth consolidato, solvibilità e ripartizione asset class."""
+        try:
+            return WealthService.get_consolidated_net_worth(db_engine=None, portfolio_id=portfolio_id)
+        except Exception as exc:
+            logger.error("Wealth net worth error: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=f"Wealth calculation failure: {str(exc)}")
 
     # ── Bitemporal Time-Travel Endpoint ──────────────────────────
 
