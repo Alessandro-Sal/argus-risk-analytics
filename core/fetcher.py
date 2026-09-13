@@ -7,6 +7,9 @@
 #         + asset metadata su tabella assets
 # ============================================================
 
+import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 import json
 import logging
 import math
@@ -14,8 +17,6 @@ import os
 from pathlib import Path
 import re
 import time
-from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
