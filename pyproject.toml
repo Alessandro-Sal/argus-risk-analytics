@@ -79,7 +79,7 @@ Issues = "https://github.com/Alessandro-Sal/argus-risk-analytics/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["core*", "api*"]
+include = ["core*", "api*", "components*"]
 
 [tool.ruff]
 line-length = 120

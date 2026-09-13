@@ -765,9 +765,9 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
                 bm_reindexed.name = ticker
                 return bm_reindexed
 
-    # 2. Tentativo di caricamento da core.ui_utils fetch_cached_benchmark_returns se disponibile
+    # 2. Tentativo di caricamento da core.fetcher fetch_cached_benchmark_returns (Headless & Decoupled)
     try:
-        from core.ui_utils import fetch_cached_benchmark_returns
+        from core.fetcher import fetch_cached_benchmark_returns
         from datetime import datetime, timedelta
         start_dt = str(dt_port_idx.min())[:10]
         end_dt = str(dt_port_idx.max())[:10]

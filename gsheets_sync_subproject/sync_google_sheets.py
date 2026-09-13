@@ -67,11 +67,25 @@ CRYPTO_SYMBOLS = {
 
 
 def get_gspread_client():
-    """Autentica il client con il Service Account JSON."""
-    if not os.path.exists(CREDENTIALS_PATH):
-        raise FileNotFoundError(f"File credenziali non trovato in: {CREDENTIALS_PATH}")
+    """Autentica il client con il Service Account JSON da ENV o file locale."""
+    env_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
+    if env_json:
+        import json
+        try:
+            info = json.loads(env_json)
+            creds = Credentials.from_service_account_info(info, scopes=SCOPES)
+            return gspread.authorize(creds)
+        except Exception as e:
+            logger.warning("Impossibile caricare GOOGLE_SERVICE_ACCOUNT_JSON: %s", e)
+
+    cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS_PATH)
+    if not os.path.exists(cred_path):
+        raise FileNotFoundError(
+            f"File credenziali Google Sheets non trovato in: {cred_path}. "
+            "Impostare la variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON oppure GOOGLE_APPLICATION_CREDENTIALS."
+        )
     
-    creds = Credentials.from_service_account_file(CREDENTIALS_PATH, scopes=SCOPES)
+    creds = Credentials.from_service_account_file(cred_path, scopes=SCOPES)
     client = gspread.authorize(creds)
     return client
 
