@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-631%2F631%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-655%2F655%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
