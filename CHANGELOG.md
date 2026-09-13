@@ -7,6 +7,42 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.4.0] - 2026-09-13
+
+### ⚡ Architectural Decoupling, Headless Safety, Fast Streaming Buffer & Multi-Container Healthcheck
+
+Questa release introduce una profonda razionalizzazione architetturale:
+- Disaccoppiamento definitivo del calcolo numerico e headless dalla libreria Plotly/Streamlit.
+- Ottimizzazione a bassissima latenza del motore di streaming intraday.
+- Espansione del Service Layer per una convergenza totale tra REST API e dashboard interattiva.
+- Risoluzione del problema di healthcheck nel container Docker FastAPI.
+
+### Aggiunto (Added)
+- **Console Scripts CLI (`pyproject.toml`)**:
+  - `argus-api`: comando console per l'avvio del server REST headless Uvicorn / FastAPI.
+  - `argus-ui`: comando console per l'avvio immediato della Control Room Streamlit.
+- **FastVectorRingBuffer a Zero Allocazione (`core/streaming_engine.py`)**:
+  - Implementato `FastVectorRingBuffer` basato sullo schema NumPy strutturato `DTYPE_MARKET_TICK` per ingestione tick L2 ad alta frequenza e calcolo VWAP SIMD vettorializzato.
+- **Espansione dell'Application Service Layer (`core/services/`)**:
+  - In `RiskService`: introdotto il metodo `run_monte_carlo()` per la simulazione stocastica multivariata con decomposizione di Cholesky e distribuzioni Student-t.
+  - In `WealthService`: introdotti i metodi `simulate_stress_test()` ed `evaluate_glidepath_goal()`.
+- **Inizializzazione Namespace Presentation Decoupled (`components/ui_core/`)**:
+  - Creato il package `components/ui_core/` per la progressiva migrazione dei componenti grafici al di fuori di `core/`.
+
+### Modificato (Changed)
+- **Headless Safety & Plotly Decoupling (`core/wealth/glidepath_engine.py` & `wealth_stress_engine.py`)**:
+  - Protetto l'import di Plotly (`HAS_PLOTLY`) per consentire l'esecuzione numerica in ambienti privi di dipendenze grafiche.
+  - Estratta la funzione `render_glidepath_chart()` in `glidepath_engine.py`, disaccoppiando la computazione dei percentili e delle probabilità dalla generazione delle figure.
+- **Docker Compose Healthcheck Fix (`docker-compose.yml`)**:
+  - Sovrascritto l'healthcheck del servizio `api` per interrogare `http://127.0.0.1:8000/api/v1/health` anziché ereditare l'endpoint Streamlit su porta 8501.
+- **Ottimizzazione delle Prestazioni di TickRingBuffer (`core/streaming_engine.py`)**:
+  - Riscritte `compute_vwap()` e `compute_order_flow_imbalance()` con iterazione diretta e calcolo vettorizzato, eliminando l'allocazione intermedia di DataFrame Pandas e dizionari.
+- **Code Hygiene & Structured Logging (`core/fetcher.py`)**:
+  - Rimosso l'import non utilizzato `concurrent.futures`.
+  - Configurato il logger standardizzato `argus.fetcher`.
+
+---
+
 ## [9.3.0] - 2026-09-13
 
 ### 🏛️ Architectural Decoupling, Application Service Layer & Quantitative Engine Scalability

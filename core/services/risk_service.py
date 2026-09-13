@@ -102,3 +102,26 @@ class RiskService:
             "sharpe_ratio": round(float(result.get("sharpe_ratio", 0.0)), 4),
             "sorted_assets": result.get("sorted_assets", list(asset_returns.keys())),
         }
+
+    @staticmethod
+    def run_monte_carlo(
+        results_dict: Dict[str, Any],
+        horizon_days: int = 252,
+        volatility_multiplier: float = 1.0,
+        drift_shift_pct: float = 0.0,
+        distribution_type: str = "gaussian",
+        n_simulations: int = 3000,
+        seed: int = 42
+    ) -> Dict[str, Any]:
+        """Esegue la simulazione stocastica Monte Carlo multivariata del portafoglio."""
+        from core.risk_engine import run_advanced_monte_carlo_simulation
+        return run_advanced_monte_carlo_simulation(
+            results_dict=results_dict,
+            horizon_days=horizon_days,
+            volatility_multiplier=volatility_multiplier,
+            drift_shift_pct=drift_shift_pct,
+            distribution_type=distribution_type,
+            n_simulations=n_simulations,
+            seed=seed
+        )
+

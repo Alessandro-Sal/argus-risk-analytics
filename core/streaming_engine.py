@@ -97,45 +97,56 @@ class TickRingBuffer:
         return pd.DataFrame(data)
 
     def compute_vwap(self) -> float:
-        """Calcola il Volume-Weighted Average Price (VWAP) sui tick presenti nel buffer."""
-        df = self.to_dataframe()
-        if df.empty or df["size"].sum() <= 0:
-            return 0.0
-        return float((df["price"] * df["size"]).sum() / df["size"].sum())
+        """Calcola il Volume-Weighted Average Price (VWAP) sui tick presenti nel buffer con performance O(N) zero-allocation."""
+        with self._lock:
+            if not self._buffer:
+                return 0.0
+            sum_prod = 0.0
+            total_size = 0.0
+            for t in self._buffer:
+                sum_prod += t.price * t.size
+                total_size += t.size
+            return float(sum_prod / total_size) if total_size > 0 else 0.0
 
     def compute_order_flow_imbalance(self) -> float:
         """
         Calcola l'Order Flow Imbalance (OFI) standard di Cont et al. (2014):
         Misura la pressione netta acquirente/venditrice sul book.
         """
-        df = self.to_dataframe()
-        if len(df) < 2:
-            return 0.0
+        with self._lock:
+            n = len(self._buffer)
+            if n < 2:
+                return 0.0
+            if n < self.capacity:
+                ordered = list(self._buffer)
+            else:
+                ordered = self._buffer[self._head:] + self._buffer[:self._head]
 
         ofi = 0.0
-        for i in range(1, len(df)):
-            curr = df.iloc[i]
-            prev = df.iloc[i - 1]
+        for i in range(1, len(ordered)):
+            curr = ordered[i]
+            prev = ordered[i - 1]
 
             # Variazione lato Bid
-            if curr["bid"] > prev["bid"]:
-                delta_bid = curr["size"]
-            elif curr["bid"] == prev["bid"]:
-                delta_bid = curr["size"] - prev["size"]
+            if curr.bid > prev.bid:
+                delta_bid = curr.size
+            elif curr.bid == prev.bid:
+                delta_bid = curr.size - prev.size
             else:
-                delta_bid = -prev["size"]
+                delta_bid = -prev.size
 
             # Variazione lato Ask
-            if curr["ask"] < prev["ask"]:
-                delta_ask = curr["size"]
-            elif curr["ask"] == prev["ask"]:
-                delta_ask = curr["size"] - prev["size"]
+            if curr.ask < prev.ask:
+                delta_ask = curr.size
+            elif curr.ask == prev.ask:
+                delta_ask = curr.size - prev.size
             else:
-                delta_ask = -prev["size"]
+                delta_ask = -prev.size
 
             ofi += (delta_bid - delta_ask)
 
         return float(ofi)
+
 
     def get_summary_statistics(self) -> Dict[str, Any]:
         """Restituisce un riepilogo in tempo reale di prezzo, VWAP, volatilità rolling e spread."""
@@ -173,7 +184,56 @@ class TickRingBuffer:
         }
 
 
+# Schema NumPy strutturato ad alte prestazioni per ingestione streaming L2 / HFT
+DTYPE_MARKET_TICK = np.dtype([
+    ("timestamp_ns", np.int64),
+    ("price", np.float64),
+    ("size", np.float64),
+    ("bid", np.float64),
+    ("ask", np.float64),
+    ("volume", np.float64)
+])
+
+
+class FastVectorRingBuffer:
+    """
+    Ring buffer vettorizzato ad alte prestazioni basato su NumPy structured array.
+    Zero allocazioni heap a regime per streaming L2 intraday e algoritmi di esecuzione.
+    """
+    def __init__(self, capacity: int = 10_000, ticker: str = "DEFAULT"):
+        self.capacity = max(10, capacity)
+        self.ticker = ticker
+        self._lock = threading.Lock()
+        self.data = np.zeros(self.capacity, dtype=DTYPE_MARKET_TICK)
+        self._head = 0
+        self._count = 0
+
+    def __len__(self) -> int:
+        with self._lock:
+            return min(self._count, self.capacity)
+
+    def append_tick(self, ts_ns: int, price: float, size: float, bid: float, ask: float, volume: float = 0.0) -> None:
+        """Inserisce un record tick direttamente nel buffer di memoria contigua C."""
+        with self._lock:
+            self.data[self._head] = (ts_ns, price, size, bid, ask, volume)
+            self._head = (self._head + 1) % self.capacity
+            self._count += 1
+
+    def compute_vwap(self) -> float:
+        """Calcola il VWAP mediante operazioni SIMD vettorializzate su NumPy."""
+        with self._lock:
+            n = min(self._count, self.capacity)
+            if n == 0:
+                return 0.0
+            valid = self.data[:n] if self._count <= self.capacity else self.data
+            total_size = float(np.sum(valid["size"]))
+            if total_size <= 0.0:
+                return 0.0
+            return float(np.sum(valid["price"] * valid["size"]) / total_size)
+
+
 @dataclass
+
 class OrderBookLevel:
     price: float
     size: float

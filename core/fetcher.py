@@ -7,18 +7,23 @@
 #         + asset metadata su tabella assets
 # ============================================================
 
-import pandas as pd
-import numpy as np
-import yfinance as yf
-import re
-import time
-import math
 import json
+import logging
+import math
 import os
 from pathlib import Path
-import concurrent.futures
-from sqlalchemy import create_engine, text, event
+import re
+import time
 from datetime import datetime, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import numpy as np
+import pandas as pd
+from sqlalchemy import create_engine, text, event
+import yfinance as yf
+
+logger = logging.getLogger("argus.fetcher")
+
 
 
 def _set_sqlite_pragmas(dbapi_connection, connection_record):

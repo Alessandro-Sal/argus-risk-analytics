@@ -384,6 +384,13 @@ def create_app() -> FastAPI:
 # Application singleton
 app = create_app() if HAS_FASTAPI else None
 
-if __name__ == "__main__":
+
+def run_api():
+    """CLI entrypoint for running the headless FastAPI microservice."""
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("api.main:app", host="0.0.0.0", port=8000, reload=False)
+
+
+if __name__ == "__main__":
+    run_api()
+
