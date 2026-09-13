@@ -103,3 +103,29 @@ def test_user_crypto_sheet_columns_a_to_h():
     assert round(btc_2026["price"], 2) == 70538.44
 
 
+def test_validate_service_account_placeholder_detection():
+    from gsheets_sync_subproject.sync_google_sheets import _validate_service_account_data
+
+    # Placeholder private key should raise ValueError
+    dummy_info = {
+        "type": "service_account",
+        "project_id": "test-project",
+        "private_key_id": "12345",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nYOUR_RSA_PRIVATE_KEY_HERE\n-----END PRIVATE KEY-----\n",
+        "client_email": "test@test-project.iam.gserviceaccount.com"
+    }
+    with pytest.raises(ValueError, match="segnaposto"):
+        _validate_service_account_data(dummy_info, "test dummy")
+
+    # Valid dictionary structure without placeholder should pass validation
+    valid_info = {
+        "type": "service_account",
+        "project_id": "real-project",
+        "private_key_id": "real-key-id",
+        "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n",
+        "client_email": "svc@real-project.iam.gserviceaccount.com"
+    }
+    _validate_service_account_data(valid_info, "test valid")
+
+
+

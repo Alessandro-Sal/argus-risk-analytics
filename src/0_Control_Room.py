@@ -749,6 +749,14 @@ with tab_ingest:
                         st.rerun()
                 except Exception as ex:
                     st.error(f"❌ Errore durante la sincronizzazione Google Sheets: {ex}")
+                    ex_str = str(ex).lower()
+                    if any(w in ex_str for w in ["segnaposto", "placeholder", "pem", "credenziali", "private_key", "invalidbyte"]):
+                        st.info(
+                            "🔑 **Come configurare le credenziali Google Sheets:**\n\n"
+                            "1. Il file `gsheets_sync_subproject/google_service_account.json` contiene attualmente valori segnaposto per sicurezza.\n"
+                            "2. Per abilitare la sincronizzazione, incolla le tue credenziali JSON reali (scaricate da Google Cloud Console) nel file `gsheets_sync_subproject/google_service_account.json` (il file è protetto e ignorato da Git via `.gitignore`).\n"
+                            "3. In alternativa, imposta la variabile d'ambiente `GOOGLE_SERVICE_ACCOUNT_JSON` o configurala in `.streamlit/secrets.toml`."
+                        )
     else:
         is_arch_active = bool(st.session_state.get("active_archetype_code") or st.session_state.get("df_raw_injected") is not None)
         if is_arch_active and st.session_state.get("df_raw_injected") is not None:

@@ -69,28 +69,96 @@ CRYPTO_SYMBOLS = {
 }
 
 
+def _validate_service_account_data(info: dict, source_desc: str = "credenziali") -> None:
+    """Verifica che le credenziali del service account non siano template segnaposto."""
+    if not isinstance(info, dict):
+        raise ValueError(f"Formato credenziali non valido per {source_desc}: atteso dizionario JSON.")
+
+    pk = str(info.get("private_key", ""))
+    client_email = str(info.get("client_email", ""))
+
+    # Riconoscimento placeholder di template
+    if (
+        "YOUR_RSA_PRIVATE_KEY_HERE" in pk
+        or "your-gcp-project-id" in client_email
+        or "your-private-key-id" in str(info.get("private_key_id", ""))
+        or not pk.strip()
+    ):
+        raise ValueError(
+            f"Le credenziali Google Service Account ({source_desc}) contengono valori segnaposto di template "
+            "('YOUR_RSA_PRIVATE_KEY_HERE'). Per sincronizzare Google Sheets, inserisci il file JSON reale scaricato da "
+            "Google Cloud Console in 'gsheets_sync_subproject/google_service_account.json' (il file è escluso da Git in .gitignore) "
+            "oppure definisci la variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON."
+        )
+
+
 def get_gspread_client():
-    """Autentica il client con il Service Account JSON da ENV o file locale."""
+    """Autentica il client con il Service Account JSON da Streamlit secrets, ENV o file locale."""
+    if gspread is None or Credentials is None:
+        raise ImportError(
+            "Le librerie 'gspread' e 'google-auth' sono richieste per la sincronizzazione Google Sheets. "
+            "Installale con: pip install gspread google-auth"
+        )
+
+    # 1. Tentativo da Streamlit Secrets (se presente nel contesto Streamlit)
+    try:
+        import streamlit as st
+
+        if hasattr(st, "secrets"):
+            if "gcp_service_account" in st.secrets:
+                s_info = dict(st.secrets["gcp_service_account"])
+                _validate_service_account_data(s_info, "Streamlit secrets [gcp_service_account]")
+                creds = Credentials.from_service_account_info(s_info, scopes=SCOPES)
+                return gspread.authorize(creds)
+            elif "GOOGLE_SERVICE_ACCOUNT_JSON" in st.secrets:
+                s_val = st.secrets["GOOGLE_SERVICE_ACCOUNT_JSON"]
+                s_info = json.loads(s_val) if isinstance(s_val, str) else dict(s_val)
+                _validate_service_account_data(s_info, "Streamlit secrets [GOOGLE_SERVICE_ACCOUNT_JSON]")
+                creds = Credentials.from_service_account_info(s_info, scopes=SCOPES)
+                return gspread.authorize(creds)
+    except ValueError:
+        raise
+    except Exception as e_sec:
+        logger.debug("Verifica Streamlit secrets non disponibile: %s", e_sec)
+
+    # 2. Tentativo da variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON
     env_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if env_json:
-        import json
         try:
             info = json.loads(env_json)
+            _validate_service_account_data(info, "variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON")
             creds = Credentials.from_service_account_info(info, scopes=SCOPES)
             return gspread.authorize(creds)
+        except ValueError:
+            raise
         except Exception as e:
             logger.warning("Impossibile caricare GOOGLE_SERVICE_ACCOUNT_JSON: %s", e)
 
+    # 3. Tentativo da file su disco (GOOGLE_APPLICATION_CREDENTIALS o CREDENTIALS_PATH)
     cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS_PATH)
     if not os.path.exists(cred_path):
         raise FileNotFoundError(
             f"File credenziali Google Sheets non trovato in: {cred_path}. "
-            "Impostare la variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON oppure GOOGLE_APPLICATION_CREDENTIALS."
+            "Impostare la variabile d'ambiente GOOGLE_SERVICE_ACCOUNT_JSON oppure posizionare il file "
+            "'gsheets_sync_subproject/google_service_account.json'."
         )
-    
-    creds = Credentials.from_service_account_file(cred_path, scopes=SCOPES)
-    client = gspread.authorize(creds)
-    return client
+
+    try:
+        with open(cred_path, "r", encoding="utf-8") as f:
+            file_info = json.load(f)
+        _validate_service_account_data(file_info, f"file locale '{os.path.basename(cred_path)}'")
+        creds = Credentials.from_service_account_info(file_info, scopes=SCOPES)
+        return gspread.authorize(creds)
+    except ValueError:
+        raise
+    except Exception as e_load:
+        err_msg = str(e_load)
+        if "Unable to load PEM" in err_msg or "InvalidByte" in err_msg:
+            raise ValueError(
+                f"La chiave privata RSA in '{os.path.basename(cred_path)}' non è valida o è danneggiata: {err_msg}. "
+                "Verifica che il file contenga la chiave privata reale scaricata da Google Cloud Console."
+            ) from e_load
+        raise
 
 
 def fetch_sheet_dataframe(spreadsheet_identifier: str = None, sheet_tab_name: str = DEFAULT_STOCKS_TAB) -> pd.DataFrame:
