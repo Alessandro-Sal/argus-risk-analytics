@@ -32,7 +32,8 @@ from core.ui_utils import (
     render_segmented_tabs,
     render_command_bar,
     ensure_risk_bundle_loaded,
-    render_sandbox_banner
+    render_sandbox_banner,
+    render_export_toolbar
 )
 from core.pdf_generator import generate_asset_factsheet_pdf
 
@@ -573,8 +574,7 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
     with col_sc_h1:
         st.markdown(f"<div style='margin-top: 6px; font-size: 15px; color: #e6edf3;'><b>Risultati dello Screening:</b> Trovate <b>{len(df_filtered)}</b> opportunità su {len(df_raw)} titoli esaminati.</div>", unsafe_allow_html=True)
     with col_sc_h2:
-        csv_sc = df_table.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica CSV", data=csv_sc, file_name="screener_opportunita.csv", mime="text/csv", use_container_width=True, key="btn_download_screener_main")
+        render_export_toolbar(df_table, file_prefix="screener_opportunita", key_suffix="scr_main", table_title="Screener Opportunità")
 
     scr_cfg = {
         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
@@ -1171,29 +1171,12 @@ elif active_screener_tab == "💾 Watchlist & Segnali Operativi":
 
         st.divider()
 
-        # Esportazione in CSV ed Excel
-        col_exp1, col_exp2 = st.columns(2)
-        with col_exp1:
-            csv_data = df_wl.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Scarica Watchlist in CSV",
-                data=csv_data,
-                file_name="ARGUS_Watchlist_Screener.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        with col_exp2:
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df_wl.to_excel(writer, index=False, sheet_name='Watchlist')
-                df_raw.to_excel(writer, index=False, sheet_name='Full_Universe')
-            st.download_button(
-                label="📊 Scarica Report Completo Screener (Excel)",
-                data=output.getvalue(),
-                file_name="ARGUS_Market_Screener_Report.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
+        # Esportazione universale Watchlist
+        col_exp_w1, col_exp_w2 = st.columns([3.2, 1.0])
+        with col_exp_w1:
+            st.markdown(f"<div style='font-size: 14px; color: #8b949e;'><b>Esporta Watchlist:</b> {len(df_wl)} titoli monitorati attivamente.</div>", unsafe_allow_html=True)
+        with col_exp_w2:
+            render_export_toolbar(df_wl, file_prefix="ARGUS_Watchlist_Screener", key_suffix="scr_wl", table_title="Watchlist Screener")
 
     else:
         st.info("Nessun titolo attualmente salvato nella Watchlist. Vai al Tab 1 (Screener) e seleziona i titoli preferiti per aggiungerli qui.")

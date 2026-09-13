@@ -8,10 +8,14 @@ import plotly.graph_objects as go
 import plotly.subplots as sp
 import plotly.io as pio
 import plotly.express as px
-
-
-
-
+from core.ui_export_utils import (
+    render_table_with_export,
+    render_export_toolbar,
+    to_csv_bytes,
+    to_excel_bytes,
+    generate_export_filename,
+    prepare_dataframe_for_export
+)
 def inject_custom_css():
     theme = st.session_state.get("ui_theme", "Midnight Obsidian")
     
@@ -116,46 +120,68 @@ def inject_custom_css():
             border: none !important;
         }}
 
-        /* Nascondi tassativamente tutte le freccette della sidebar (<< e >>) per interfaccia fissa desktop istituzionale */
+        /* Mantieni il controllo di apertura sidebar (Panel Dock Expand) sempre visibile a sidebar chiusa */
         [data-testid="collapsedControl"],
         button[data-testid="stSidebarCollapsedControl"],
         div[data-testid="collapsedControl"],
         [data-testid="stExpandSidebarButton"],
         button[data-testid="stExpandSidebarButton"],
         [data-testid="stHeader"] [data-testid="collapsedControl"],
-        [data-testid="stHeader"] [data-testid="stExpandSidebarButton"],
-        [data-testid="stSidebarCollapseButton"],
-        button[data-testid="stSidebarCollapseButton"],
-        div[data-testid="stSidebarCollapseButton"],
-        div[data-testid="stSidebarHeader"] button,
-        button[aria-label*="collapse" i],
-        button[aria-label*="Sidebar" i],
-        button[title*="sidebar" i] {{
-            display: none !important;
-            visibility: hidden !important;
-            opacity: 0 !important;
-            width: 0px !important;
-            height: 0px !important;
-            max-height: 0px !important;
-            max-width: 0px !important;
-            margin: 0px !important;
-            padding: 0px !important;
-            pointer-events: none !important;
-            position: absolute !important;
-            top: -9999px !important;
-            left: -9999px !important;
+        [data-testid="stHeader"] [data-testid="stExpandSidebarButton"] {{
+            display: flex !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            z-index: 999999 !important;
         }}
-
-        /* Azzeramento padding superiore della sidebar senza il blocco header vuoto */
-        div[data-testid="stSidebarHeader"],
-        [data-testid="stSidebarHeader"] {{
+        [data-testid="collapsedControl"] button,
+        button[data-testid="stSidebarCollapsedControl"],
+        [data-testid="stExpandSidebarButton"],
+        button[data-testid="stExpandSidebarButton"] {{
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            visibility: visible !important;
+            color: #ff9900 !important;
+            background: rgba(22, 27, 34, 0.95) !important;
+            border: 1px solid rgba(255, 153, 0, 0.4) !important;
+            border-radius: 8px !important;
+            padding: 4px 6px !important;
+            width: 32px !important;
+            height: 32px !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4) !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }}
+        [data-testid="collapsedControl"] button svg,
+        button[data-testid="stSidebarCollapsedControl"] svg,
+        [data-testid="stExpandSidebarButton"] svg,
+        button[data-testid="stExpandSidebarButton"] svg {{
             display: none !important;
-            height: 0px !important;
-            min-height: 0px !important;
-            max-height: 0px !important;
-            padding: 0px !important;
-            margin: 0px !important;
-            visibility: hidden !important;
+        }}
+        [data-testid="collapsedControl"] button::after,
+        button[data-testid="stSidebarCollapsedControl"]::after,
+        [data-testid="stExpandSidebarButton"]::after,
+        button[data-testid="stExpandSidebarButton"]::after {{
+            content: "" !important;
+            display: block !important;
+            width: 18px !important;
+            height: 18px !important;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9900' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m14 9 3 3-3 3'%3E%3C/path%3E%3C/svg%3E") center / 18px 18px no-repeat !important;
+            transition: all 0.2s ease !important;
+        }}
+        [data-testid="collapsedControl"] button:hover,
+        [data-testid="stExpandSidebarButton"]:hover,
+        button[data-testid="stExpandSidebarButton"]:hover {{
+            border-color: #ff9900 !important;
+            background: rgba(33, 38, 45, 1) !important;
+            box-shadow: 0 0 12px rgba(255, 153, 0, 0.35) !important;
+        }}
+        [data-testid="collapsedControl"] button:hover::after,
+        button[data-testid="stSidebarCollapsedControl"]:hover::after,
+        [data-testid="stExpandSidebarButton"]:hover::after,
+        button[data-testid="stExpandSidebarButton"]:hover::after {{
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m14 9 3 3-3 3'%3E%3C/svg%3E") !important;
         }}
 
         /* Hide Streamlit Raw Page Nav (replaced by institutional tree rail) */
@@ -169,10 +195,10 @@ def inject_custom_css():
             overflow: hidden !important;
         }}
 
-        /* Compact Sidebar Header containing the Close (<) Button */
-        div[data-testid="stSidebarHeader"],
-        [data-testid="stSidebarHeader"] {{
-            min-height: 32px !important;
+        /* Header compatto della sidebar con pulsante di chiusura (Modern Panel Dock) */
+        [data-testid="stSidebarHeader"],
+        div[data-testid="stSidebarHeader"] {{
+            min-height: 34px !important;
             padding: 4px 8px 0px 8px !important;
             margin: 0px !important;
             display: flex !important;
@@ -182,26 +208,57 @@ def inject_custom_css():
             visibility: visible !important;
         }}
 
-        /* Sidebar Close Button */
+        /* Modern Panel Dock Collapse Button (Sostituisce il default <<) */
         [data-testid="stSidebarCollapseButton"],
         button[data-testid="stSidebarCollapseButton"],
+        div[data-testid="stSidebarCollapseButton"] button,
         div[data-testid="stSidebarHeader"] button {{
             display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             visibility: visible !important;
+            opacity: 1 !important;
             color: #8b949e !important;
-            background: transparent !important;
-            border: none !important;
-            padding: 3px 6px !important;
+            background: rgba(22, 27, 34, 0.7) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            padding: 4px !important;
+            width: 28px !important;
+            height: 28px !important;
             margin: 0px !important;
             cursor: pointer !important;
             border-radius: 6px !important;
-            transition: all 0.15s ease !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+        }}
+        [data-testid="stSidebarCollapseButton"] svg,
+        button[data-testid="stSidebarCollapseButton"] svg,
+        div[data-testid="stSidebarCollapseButton"] button svg,
+        div[data-testid="stSidebarHeader"] button svg {{
+            display: none !important;
+        }}
+        [data-testid="stSidebarCollapseButton"]::after,
+        button[data-testid="stSidebarCollapseButton"]::after,
+        div[data-testid="stSidebarCollapseButton"] button::after,
+        div[data-testid="stSidebarHeader"] button::after {{
+            content: "" !important;
+            display: block !important;
+            width: 16px !important;
+            height: 16px !important;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m16 15-3-3 3-3'%3E%3C/path%3E%3C/svg%3E") center / 16px 16px no-repeat !important;
+            transition: all 0.2s ease !important;
         }}
         [data-testid="stSidebarCollapseButton"]:hover,
         button[data-testid="stSidebarCollapseButton"]:hover,
         div[data-testid="stSidebarHeader"] button:hover {{
-            color: #ffffff !important;
-            background: rgba(255, 255, 255, 0.12) !important;
+            color: #ff9900 !important;
+            background: rgba(255, 153, 0, 0.15) !important;
+            border-color: rgba(255, 153, 0, 0.4) !important;
+            box-shadow: 0 0 10px rgba(255, 153, 0, 0.25) !important;
+        }}
+        [data-testid="stSidebarCollapseButton"]:hover::after,
+        button[data-testid="stSidebarCollapseButton"]:hover::after,
+        div[data-testid="stSidebarHeader"] button:hover::after {{
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ff9900' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2'%3E%3C/rect%3E%3Cpath d='M9 3v18'%3E%3C/path%3E%3Cpath d='m16 15-3-3 3-3'%3E%3C/svg%3E") !important;
         }}
 
         /* Institutional Segmented Controls (Never Wrap & Expand Buttons) */
@@ -5879,14 +5936,10 @@ def render_splash_screen(force_show: bool = False) -> bool:
             </div>
         </div>
         """
-        def _on_click_ui_risk():
-            st.session_state["_app_initialized"] = True
-            st.session_state["splash_dismissed"] = True
-            st.session_state["splash_completed"] = True
-            st.session_state["argus_portal_mode"] = "📊 Risk Analytics"
-
-        if st.button("🚀 ENTRA IN RISK ANALYTICS →", key="btn_splash_risk", type="primary", on_click=_on_click_ui_risk, use_container_width=True):
-            _on_click_ui_risk()
+        st.markdown(_clean_html(risk_card_html), unsafe_allow_html=True)
+        if st.button("🚀 ENTRA IN RISK ANALYTICS →", key="btn_splash_risk", type="primary", use_container_width=True):
+            st.session_state.splash_dismissed = True
+            st.session_state.argus_portal_mode = "📊 Risk Analytics"
             st.rerun()
 
     with col_wealth:
@@ -5913,14 +5966,9 @@ def render_splash_screen(force_show: bool = False) -> bool:
         """
         st.markdown(_clean_html(wealth_card_html), unsafe_allow_html=True)
 
-        def _on_click_ui_wealth():
-            st.session_state["_app_initialized"] = True
-            st.session_state["splash_dismissed"] = True
-            st.session_state["splash_completed"] = True
-            st.session_state["argus_portal_mode"] = "🏛️ Wealth Management"
-
-        if st.button("💎 ENTRA IN WEALTH MANAGEMENT →", key="btn_splash_wealth", on_click=_on_click_ui_wealth, use_container_width=True):
-            _on_click_ui_wealth()
+        if st.button("💎 ENTRA IN WEALTH MANAGEMENT →", key="btn_splash_wealth", use_container_width=True):
+            st.session_state.splash_dismissed = True
+            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
             st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
 
     return True
@@ -6083,8 +6131,6 @@ def render_wealth_profile_picker(engine, profile_map: dict, key_prefix: str = "w
             if st.button(f"▶ Apri '{pname}'", key=f"{key_prefix}_open_{pid}", type="primary", use_container_width=True):
                 st.session_state["wealth_active_portfolio_id"] = pid
                 st.session_state["wealth_active_profile_name"] = pname
-                st.session_state["wealth_profile_selector_widget"] = pid
-                st.session_state["sb_wealth_profile_selector"] = pid
                 st.rerun()
 
     new_col = cols[len(profile_map) % col_count]
@@ -6105,8 +6151,6 @@ def render_wealth_profile_picker(engine, profile_map: dict, key_prefix: str = "w
                         n_pid = create_wealth_portfolio(engine, np_name.strip(), owner=np_owner.strip() if np_owner else "Principal", base_currency="EUR")
                         st.session_state["wealth_active_portfolio_id"] = n_pid
                         st.session_state["wealth_active_profile_name"] = np_name.strip()
-                        st.session_state["wealth_profile_selector_widget"] = n_pid
-                        st.session_state["sb_wealth_profile_selector"] = n_pid
                         st.success(f"Profilo '{np_name.strip()}' creato e selezionato!")
                         st.rerun()
                     except Exception as ex:
@@ -6359,14 +6403,11 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
             unsafe_allow_html=True
         )
     with col_h2:
-        csv_cube = df_cube.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Scarica CSV", 
-            data=csv_cube, 
-            file_name="cubo_olap_duckdb.csv", 
-            mime="text/csv", 
-            use_container_width=True, 
-            key=f"btn_dl_csv_cube_{key_prefix}"
+        render_export_toolbar(
+            df_cube,
+            file_prefix="cubo_olap_duckdb",
+            key_suffix=f"cube_olap_{key_prefix}",
+            table_title="Cubo OLAP DuckDB"
         )
     with col_h3:
         try:
@@ -6637,14 +6678,11 @@ def render_duckdb_olap_cube_widget(df_positions: pd.DataFrame, key_prefix: str =
             with col_r1:
                 st.caption(f"⚡ Calcolo Window Function in **{rank_res['latency_ms']:.2f} ms** (DuckDB `QUALIFY DENSE_RANK() ≤ 3` per Settore)")
             with col_r2:
-                csv_rank = df_rank.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    "📥 Scarica CSV Leader", 
-                    data=csv_rank, 
-                    file_name="leaderboard_settoriale_duckdb.csv", 
-                    mime="text/csv", 
-                    use_container_width=True, 
-                    key=f"btn_dl_rank_{key_prefix}"
+                render_export_toolbar(
+                    df_rank,
+                    file_prefix="leaderboard_settoriale_duckdb",
+                    key_suffix=f"gics_rank_{key_prefix}",
+                    table_title="Leaderboard Settoriale"
                 )
 
             rank_cfg = {
@@ -7269,18 +7307,59 @@ def render_data_table(
     progress_cols: Optional[Dict[str, Tuple[float, float]]] = None,
     hide_index: bool = True,
     height: int = 380,
-    download_filename: Optional[str] = None
+    download_filename: Optional[str] = None,
+    table_title: Optional[str] = None,
+    enable_export: bool = True
 ):
     """
     Renderizza una tabella dati conforme allo standard istituzionale ARGUS:
     - Numeri tabulari monospace
     - Configurazione automatica di valute e percentuali con st.column_config
     - Barre di riempimento orizzontali dinamiche via progress_cols
-    - Download CSV integrato
+    - Download multiformato (CSV UTF-8 BOM ed Excel .xlsx stilizzato) integrato
     """
     if df is None or df.empty:
+        if table_title:
+            st.markdown(f"##### {table_title}")
         st.info("Nessun record da visualizzare.")
         return
+
+    # Header bar con titolo e toolbar export compatto
+    if table_title or download_filename:
+        prefix = download_filename or "dati_tabella"
+        col_t, col_exp = st.columns([0.82, 0.18], gap="small")
+        with col_t:
+            if table_title:
+                st.markdown(
+                    f"""
+                    <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 2px;">
+                        <span style="font-size: 1.05rem; font-weight: 700; color: #ffffff; letter-spacing: -0.2px;">
+                            {table_title}
+                        </span>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #8b949e; background: rgba(255,255,255,0.06); padding: 1px 7px; border-radius: 4px;">
+                            {len(df):,} righe
+                        </span>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.markdown(
+                    f"""
+                    <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #8b949e; margin-top: 4px;">
+                        {len(df):,} record disponibili
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+        with col_exp:
+            render_export_toolbar(
+                df=df,
+                file_prefix=prefix,
+                key_suffix=prefix,
+                table_title=table_title,
+                show_row_count=False
+            )
 
     col_config: Dict[str, Any] = {}
     base_curr = st.session_state.get("base_currency", "EUR")
@@ -7322,16 +7401,6 @@ def render_data_table(
         height=height,
         use_container_width=True
     )
-    
-    if download_filename:
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Esporta CSV",
-            data=csv,
-            file_name=f"{download_filename}.csv",
-            mime="text/csv",
-            key=f"dl_btn_{download_filename}"
-        )
 
 
 # ==============================================================================

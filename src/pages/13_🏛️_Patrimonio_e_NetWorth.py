@@ -31,6 +31,7 @@ from core.ui_utils import (
     render_data_table,
     render_segmented_tabs,
     section,
+    render_export_toolbar
 )
 from core.wealth.wealth_db import (
     init_wealth_db,
@@ -1019,6 +1020,14 @@ with main_tab_alloc:
                 }
                 for it in sorted(breakdown_items, key=lambda x: x["val"], reverse=True)
             ])
+            c_al_t, c_al_exp = st.columns([3.5, 1.2])
+            with c_al_exp:
+                render_export_toolbar(
+                    df_alloc_table,
+                    file_prefix="asset_allocation_net_worth",
+                    key_suffix="nw_alloc_table",
+                    table_title="Asset Allocation Net Worth"
+                )
             styler_alloc = df_alloc_table.style.format({
                 "Controvalore (€)": "€ {:,.2f}",
                 "Peso sul Net Worth (%)": "{:.1f}%"

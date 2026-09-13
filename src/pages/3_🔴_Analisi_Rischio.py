@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import core.ui_utils
 import core.risk_engine
-from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_portfolio_loaded, render_sandbox_banner, render_garch_fhs_modal
+from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_portfolio_loaded, render_sandbox_banner, render_garch_fhs_modal, render_export_toolbar
 from core.regime_switching import compute_market_regime_states
 
 inject_custom_css()
@@ -531,8 +531,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
                 search_rc = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_contrib")
             with col_rc_h2:
                 st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                csv_rc = df_display.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_rc, file_name="scomposizione_rischio.csv", mime="text/csv", use_container_width=True)
+                render_export_toolbar(df_display, file_prefix="scomposizione_rischio", key_suffix="rc_main", table_title="Scomposizione Rischio")
 
             df_rc_filt = df_display.copy()
             if search_rc:
@@ -1933,8 +1932,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         with col_dec_h1:
             st.markdown("##### 📋 Dettaglio Decomposizione di Eulero per Asset")
         with col_dec_h2:
-            csv_decomp = df_decomp.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica Decomposizione CSV", data=csv_decomp, file_name="euler_risk_decomposition.csv", mime="text/csv", use_container_width=True, key="btn_dl_euler_decomp")
+            render_export_toolbar(df_decomp, file_prefix="euler_risk_decomposition", key_suffix="euler_decomp", table_title="Decomposizione di Eulero")
 
         decomp_cfg = {
             "ticker": st.column_config.TextColumn("Ticker", width="small"),
@@ -2020,8 +2018,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     with col_lvar_h1:
         st.markdown("##### 💧 Liquidity-Adjusted Value at Risk (LVaR - Bangia / Basel III)")
     with col_lvar_h2:
-        csv_lvar = df_lvar_export.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Scarica Report LVaR CSV", data=csv_lvar, file_name=f"lvar_report_{liq_days}d.csv", mime="text/csv", use_container_width=True, key="btn_dl_lvar_report")
+        render_export_toolbar(df_lvar_export, file_prefix=f"lvar_report_{liq_days}d", key_suffix="lvar_rep", table_title="Report LVaR")
 
     col_l1, col_l2, col_l3, col_l4 = st.columns(4)
     with col_l1:
@@ -2357,8 +2354,7 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
         with col_tb_h2:
             search_liq = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_liq", label_visibility="collapsed")
         with col_tb_h3:
-            csv_liq = df_liq_display.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Scarica CSV", data=csv_liq, file_name="liquidita_smobilizzo_portafoglio.csv", mime="text/csv", use_container_width=True, key="btn_download_risk_liq")
+            render_export_toolbar(df_liq_display, file_prefix="liquidita_smobilizzo_portafoglio", key_suffix="risk_liq", table_title="Smobilizzo e Liquidità")
 
         df_liq_filt = df_liq_display.copy()
         if search_liq:
@@ -2485,8 +2481,7 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
             with col_atr_tb2:
                 search_atr = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_risk_atr", label_visibility="collapsed")
             with col_atr_tb3:
-                csv_atr = df_atr_table.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_atr, file_name="atr_chandelier_stops.csv", mime="text/csv", use_container_width=True, key="btn_download_risk_atr")
+                render_export_toolbar(df_atr_table, file_prefix="atr_chandelier_stops", key_suffix="risk_atr", table_title="Chandelier Stops")
 
             df_atr_filt = df_atr_table.copy()
             if search_atr:
@@ -2622,8 +2617,7 @@ elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Fore
             with col_ano_h2:
                 search_ano = st.text_input("🔍 Cerca Data:", placeholder="Filtra data (YYYY-MM-DD)...", key="search_risk_anomaly", label_visibility="collapsed")
             with col_ano_h3:
-                csv_ano = df_ano.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 Scarica CSV", data=csv_ano, file_name="giornate_anomale_ml_isolation_forest.csv", mime="text/csv", use_container_width=True, key="btn_download_risk_anomaly")
+                render_export_toolbar(df_ano, file_prefix="giornate_anomale_ml", key_suffix="risk_ano", table_title="Giornate Anomale ML")
 
             df_ano_filt = df_ano.copy()
             if search_ano:

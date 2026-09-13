@@ -37,7 +37,8 @@ from core.ui_utils import (
     apply_chart_theme,
     ensure_portal_context,
     ensure_portfolio_loaded,
-    render_data_table
+    render_data_table,
+    render_table_with_export,
 )
 from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
@@ -281,10 +282,12 @@ with tab_stress:
     """, unsafe_allow_html=True)
 
     # 3. Tabella Scenari Macro Net Worth-at-Risk
-    st.markdown("##### 🏛️ Matrice di Stress Macroeconomico Consolidato (Net Worth-at-Risk)")
     df_nwar = pd.DataFrame(wr["net_worth_at_risk_scenarios"])
-    st.dataframe(
+    render_table_with_export(
         df_nwar[["scenario", "descrizione", "net_worth_post_shock", "perdita_patrimonio_eur", "impatto_pct", "runway_post_shock"]],
+        table_title="Matrice Stress Macroeconomico (Net Worth-at-Risk)",
+        file_prefix="fire_nwar_scenarios",
+        key_suffix="p17_nwar_matrix",
         column_config={
             "scenario": st.column_config.TextColumn("Scenario Storico", width="medium"),
             "descrizione": st.column_config.TextColumn("Dinamica Macro", width="large"),
@@ -292,9 +295,7 @@ with tab_stress:
             "perdita_patrimonio_eur": st.column_config.NumberColumn("Perdita Netta (€)", format="€ %,.2f", width="small"),
             "impatto_pct": st.column_config.NumberColumn("Impatto NW (%)", format="%.1f%%", width="small"),
             "runway_post_shock": st.column_config.NumberColumn("Runway Residua", format="%.1f Mesi", width="small")
-        },
-        hide_index=True,
-        use_container_width=True
+        }
     )
 
     st.write("")
@@ -654,10 +655,11 @@ with tab_goals:
     st.plotly_chart(gp_engine_out["plot_figure"], use_container_width=True, config={'displayModeBar': False})
 
     with st.expander("📊 Tabella di Asset Allocation Glide Path Anno per Anno", expanded=False):
-        st.dataframe(
+        render_table_with_export(
             gp_engine_out["glide_path_df"],
-            use_container_width=True,
-            hide_index=True
+            table_title="Asset Allocation Glide Path Anno per Anno",
+            file_prefix="glide_path_allocation",
+            key_suffix="p17_glide_path"
         )
 
 
@@ -811,9 +813,7 @@ with tab_tco:
     apply_chart_theme(fig_tco, portal_mode="wealth")
     st.plotly_chart(fig_tco, use_container_width=True, config={'displayModeBar': False})
 
-    # Tabella analitica
-    st.markdown("##### 📊 Dettaglio Numerico dell'Erosione da Fee Drag")
-    st.dataframe(
+    render_table_with_export(
         df_comp_tco.rename(columns={
             "years": "Orizzonte (Anni)",
             "fv_zero_fees": "Capitale a Zero Fee (€)",
@@ -823,6 +823,7 @@ with tab_tco:
             "fee_drag_pct_of_capital": "Erosione Capitale (%)",
             "excess_fee_vs_etf_eur": "Extra-Costo vs ETF (€)"
         }),
-        use_container_width=True,
-        hide_index=True
+        table_title="Dettaglio Numerico dell'Erosione da Fee Drag",
+        file_prefix="fee_drag_analysis",
+        key_suffix="p17_fee_drag"
     )

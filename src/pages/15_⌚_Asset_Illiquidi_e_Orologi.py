@@ -28,7 +28,8 @@ from core.ui_utils import (
     apply_chart_theme,
     ensure_portal_context,
     ensure_portfolio_loaded,
-    render_data_table
+    render_data_table,
+    render_table_with_export,
 )
 from core.sidebar import render_sidebar
 from core.wealth import (
@@ -173,14 +174,15 @@ if not df_other.empty:
         axis=1
     )
     
-    st.dataframe(
+    render_table_with_export(
         df_other_disp[["name", "Categoria", "brand_or_location", "model_or_specs", "Prezzo Acquisto", "Valore Attuale", "Plusvalenza", "Rivalutazione"]].rename(columns={
             "name": "Nome Asset",
             "brand_or_location": "Materiale / Maison",
             "model_or_specs": "Dettagli / Specifiche"
         }),
-        use_container_width=True,
-        hide_index=True
+        table_title="Asset Fisici, Orologi & Metalli Preziosi",
+        file_prefix="asset_fisici_caveau",
+        key_suffix="p15_physical_assets"
     )
 else:
     st.caption("Nessun immobile o metallo prezioso registrato.")
@@ -259,8 +261,7 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
 
     c_pe_left, c_pe_right = st.columns([3, 2])
     with c_pe_left:
-        st.markdown("##### 🏛️ Registro Partecipazioni & Club Deal")
-        st.dataframe(
+        render_table_with_export(
             pe_res["deals_df"][["name", "asset_class", "vintage_year", "called_capital_eur", "distributions_received_eur", "current_nav_estimated_eur", "moic_multiple", "irr_net_pct", "status"]].rename(columns={
                 "name": "Nome Deal / Fondo",
                 "asset_class": "Tipologia",
@@ -272,8 +273,9 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
                 "irr_net_pct": "XIRR (%)",
                 "status": "Stato"
             }),
-            use_container_width=True,
-            hide_index=True
+            table_title="Registro Partecipazioni & Club Deal",
+            file_prefix="pe_club_deals",
+            key_suffix="p15_pe_deals"
         )
 
     with c_pe_right:
@@ -340,8 +342,7 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
 
     col_pd_l, col_pd_r = st.columns([3, 2])
     with col_pd_l:
-        st.markdown("##### 📝 Scomposizione Tranche & Struttura del Capitale")
-        st.dataframe(
+        render_table_with_export(
             pd_analysis["tranches_df"][["tranche_name", "seniority", "notional_eur", "cash_coupon_pct", "pik_coupon_pct", "all_in_yield_pct", "attachment_leverage", "detachment_leverage"]].rename(columns={
                 "tranche_name": "Tranche di Debito",
                 "seniority": "Seniority",
@@ -352,8 +353,9 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
                 "attachment_leverage": "Attach Leverage",
                 "detachment_leverage": "Detach Leverage"
             }),
-            use_container_width=True,
-            hide_index=True
+            table_title="Scomposizione Tranche & Struttura del Capitale",
+            file_prefix="private_debt_tranches",
+            key_suffix="p15_pd_tranches"
         )
 
     with col_pd_r:

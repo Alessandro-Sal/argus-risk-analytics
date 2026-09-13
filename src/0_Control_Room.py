@@ -99,6 +99,8 @@ from core.ui_utils import (
     get_display_portfolio_name,
     render_broker_hub_modal,
     render_duckdb_modal,
+    render_export_toolbar,
+    render_table_with_export,
 )
 from components.splash import render_splash_screen as render_argus_splash
 import core.multi_portfolio
@@ -1610,14 +1612,11 @@ with tab_isin_mapping:
                     st.error(f"Errore sincronizzazione: {e_syn}")
 
     with col_save_m3:
-        csv_map_bytes = edited_mappings_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Esporta CSV Mappature",
-            data=csv_map_bytes,
-            file_name="asset_mapping_argus.csv",
-            mime="text/csv",
-            use_container_width=True,
-            key="dl_mappings_csv"
+        render_export_toolbar(
+            edited_mappings_df,
+            file_prefix="asset_mapping_argus",
+            key_suffix="ctrl_room_mapping",
+            table_title="Mappature Ticker"
         )
 
 
@@ -2029,7 +2028,12 @@ with tab_duckdb:
     if last_res:
         if last_res["success"]:
             st.success(f"⚡ Query eseguita con successo in **{last_res['latency_ms']:.3f} ms** | Restituite **{last_res['row_count']} righe**.")
-            st.dataframe(last_res["df"], use_container_width=True)
+            render_table_with_export(
+                last_res["df"],
+                table_title="Risultati Query DuckDB OLAP",
+                file_prefix="duckdb_query_result",
+                key_suffix="ctrl_room_duckdb_res"
+            )
         else:
             st.error(f"❌ Errore durante l'esecuzione della query SQL: {last_res['error']}")
 
@@ -2490,14 +2494,24 @@ with tab_bitemporal:
                     "wacp_eur": "PMC / WACP (€)",
                     "cost_value_eur": "Controvalore Carico (€)"
                 })
-                st.dataframe(df_p, use_container_width=True)
+                render_table_with_export(
+                    df_p,
+                    table_title=f"Posizioni Contabili Ricostruite ({recon['positions_count']} titoli)",
+                    file_prefix="bitemporal_positions",
+                    key_suffix="bitemp_recon_pos"
+                )
 
         st.markdown(f"##### 📋 Transazioni Valide Ricostruite nel Ledger per '{selected_bitemp_pid}':")
         if not df_tt.empty:
             df_show = df_tt.copy()
             df_show["valid_from"] = df_show["valid_from"].astype(str)
             df_show["sys_from"] = df_show["sys_from"].astype(str)
-            st.dataframe(df_show, use_container_width=True)
+            render_table_with_export(
+                df_show,
+                table_title=f"Transazioni Valide nel Ledger ({selected_bitemp_pid})",
+                file_prefix="bitemporal_transactions",
+                key_suffix="bitemp_tx_ledger"
+            )
         else:
             st.info("Nessuna transazione soddisfa i vincoli bitemporali specificati per questo portafoglio.")
 
@@ -2583,7 +2597,12 @@ with tab_bitemporal:
             """, [selected_bitemp_pid]).df()
 
         if not df_audit.empty:
-            st.dataframe(df_audit, use_container_width=True)
+            render_table_with_export(
+                df_audit,
+                table_title=f"Audit Trail Immutabile ({selected_bitemp_pid})",
+                file_prefix="audit_trail_ledger",
+                key_suffix="bitemp_audit_trail"
+            )
         else:
             st.info(f"Nessuna decisione registrata per '{selected_bitemp_pid}'.")
 
