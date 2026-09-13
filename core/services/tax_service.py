@@ -4,10 +4,12 @@ Unified interface for Italian TUIR taxation, crypto compliance, and cross-border
 """
 
 from typing import Any, Dict, List, Optional
+
 import pandas as pd
-from core.tax_engine import compute_tax_and_harvesting, get_asset_tax_rate, is_etf
-from core.crypto_tax_engine import compute_crypto_tax_report
+
 from core.cross_border_tax_engine import compute_cross_border_wealth_tax_comparison
+from core.crypto_tax_engine import compute_crypto_tax_report
+from core.tax_engine import compute_tax_and_harvesting, get_asset_tax_rate, is_etf
 
 
 class TaxService:
@@ -18,13 +20,13 @@ class TaxService:
         positions: pd.DataFrame,
         transactions: Optional[pd.DataFrame] = None,
         tax_year: Optional[int] = None,
-        db_engine: Any = None
+        db_engine: Any = None,
     ) -> Dict[str, Any]:
         """Esegue l'audit fiscale completo (regime dichiarativo/amministrato, zainetto fiscale, crypto, cross-border)."""
         mock_results = {
             "positions": positions if positions is not None else pd.DataFrame(),
             "df_tx": transactions if transactions is not None else pd.DataFrame(),
-            "portfolio_id": 1
+            "portfolio_id": 1,
         }
 
         # 1. Calcolo standard TUIR
@@ -40,7 +42,11 @@ class TaxService:
         # 3. Calcolo Cross-Border (Withholding Tax & Credito d'Imposta)
         cross_border = {}
         try:
-            tot_val = float(positions["current_value"].sum()) if not positions.empty and "current_value" in positions.columns else 1000000.0
+            tot_val = (
+                float(positions["current_value"].sum())
+                if not positions.empty and "current_value" in positions.columns
+                else 1000000.0
+            )
             cross_border = compute_cross_border_wealth_tax_comparison(total_wealth_eur=tot_val)
         except Exception:
             pass
@@ -51,8 +57,6 @@ class TaxService:
             "cross_border": cross_border,
             "harvesting_opportunities": std_tax.get("harvesting_opportunities", []),
             "total_estimated_liability_eur": round(
-                float(std_tax.get("estimated_tax_eur", 0.0)) +
-                float(crypto_report.get("tax_due_eur", 0.0)),
-                2
-            )
+                float(std_tax.get("estimated_tax_eur", 0.0)) + float(crypto_report.get("tax_due_eur", 0.0)), 2
+            ),
         }

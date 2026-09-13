@@ -5,23 +5,21 @@
 # Microstructure Models (Square-Root Law, Almgren-Chriss, Kyle 1985)
 # ============================================================
 
-from typing import Dict, Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
+
 import numpy as np
 import pandas as pd
+
 from core.execution_algo import (
-    generate_intraday_volume_profile,
-    estimate_microstructure_market_impact,
+    compute_almgren_chriss_basket_schedule,
     compute_twap_schedule,
     compute_vwap_schedule,
-    compute_almgren_chriss_basket_schedule
+    estimate_microstructure_market_impact,
+    generate_intraday_volume_profile,
 )
 
 
-def compute_broker_commissions(
-    notional_eur: float,
-    shares: float,
-    broker: str = "DEFAULT"
-) -> Dict[str, float]:
+def compute_broker_commissions(notional_eur: float, shares: float, broker: str = "DEFAULT") -> Dict[str, float]:
     """
     Computes broker execution fees according to published fee schedules:
     - DIRECTA: 0.19% variable (min €1.50, max €18.00) or flat €5.00
@@ -47,10 +45,7 @@ def compute_broker_commissions(
         comm = notional_eur * 0.0005
 
     bps = (comm / notional_eur * 10000.0) if notional_eur > 0 else 0.0
-    return {
-        "commission_eur": round(comm, 2),
-        "commission_bps": round(bps, 2)
-    }
+    return {"commission_eur": round(comm, 2), "commission_bps": round(bps, 2)}
 
 
 def compute_implementation_shortfall_and_execution_benchmarks(
@@ -59,7 +54,7 @@ def compute_implementation_shortfall_and_execution_benchmarks(
     decision_price: float = 100.0,
     side: str = "BUY",
     daily_volume: float = 50000.0,
-    volatility_daily_pct: float = 1.2
+    volatility_daily_pct: float = 1.2,
 ) -> Dict[str, Any]:
     """
     Calculates the analytical Perold (1988) Implementation Shortfall decomposition
@@ -78,15 +73,17 @@ def compute_implementation_shortfall_and_execution_benchmarks(
     s_arr = s_dec * (1.0 + drift)  # Price at routing
     s_close = s_dec * (1.0 + vol_daily * 0.35 * is_buy)
 
-    order_payload = [{
-        "ticker": ticker,
-        "action": side,
-        "quantity": q_tot,
-        "price": s_dec,
-        "adv": v_mkt,
-        "volatility_daily": vol_daily,
-        "half_spread_bps": 2.0
-    }]
+    order_payload = [
+        {
+            "ticker": ticker,
+            "action": side,
+            "quantity": q_tot,
+            "price": s_dec,
+            "adv": v_mkt,
+            "volatility_daily": vol_daily,
+            "half_spread_bps": 2.0,
+        }
+    ]
 
     # 1. Market Order: Full block immediate crossing
     # Half-spread (2.5 bps) + Kyle/Almgren square-root market impact
@@ -100,21 +97,29 @@ def compute_implementation_shortfall_and_execution_benchmarks(
 
     # 2. Benchmark: TWAP (16 tranches uniform slicing with U-shape profile)
     twap_res = compute_twap_schedule(order_payload, n_intervals=16)
-    twap_slip_bps = float(twap_res["summary"]["avg_slippage_bps"]) if not twap_res["schedule_df"].empty else (mkt_impact_bps * 0.45)
+    twap_slip_bps = (
+        float(twap_res["summary"]["avg_slippage_bps"]) if not twap_res["schedule_df"].empty else (mkt_impact_bps * 0.45)
+    )
     px_twap = s_arr * (1.0 + is_buy * (twap_slip_bps / 10000.0))
     comm_twap = compute_broker_commissions(q_tot * px_twap, q_tot, broker="DEFAULT")["commission_eur"]
     cost_twap_eur = (px_twap - s_dec) * is_buy * q_tot + comm_twap
 
     # 3. Benchmark: VWAP (16 tranches liquidity-matched U-shape curve)
     vwap_res = compute_vwap_schedule(order_payload, n_intervals=16, pov_cap_pct=0.15)
-    vwap_slip_bps = float(vwap_res["summary"]["avg_slippage_bps"]) if not vwap_res["schedule_df"].empty else (mkt_impact_bps * 0.35)
+    vwap_slip_bps = (
+        float(vwap_res["summary"]["avg_slippage_bps"]) if not vwap_res["schedule_df"].empty else (mkt_impact_bps * 0.35)
+    )
     px_vwap = s_arr * (1.0 + is_buy * (vwap_slip_bps / 10000.0))
     comm_vwap = compute_broker_commissions(q_tot * px_vwap, q_tot, broker="DEFAULT")["commission_eur"]
     cost_vwap_eur = (px_vwap - s_dec) * is_buy * q_tot + comm_vwap
 
     # 4. Benchmark: Adaptive Implementation Shortfall (Almgren-Chriss Optimal Slicing)
-    ac_res = compute_almgren_chriss_basket_schedule(order_payload, horizon_days=1.0, n_intervals=16, risk_aversion_lambda=1e-6)
-    ac_slip_bps = float(ac_res["summary"]["expected_cost_bps"]) if not ac_res["schedule_df"].empty else (mkt_impact_bps * 0.28)
+    ac_res = compute_almgren_chriss_basket_schedule(
+        order_payload, horizon_days=1.0, n_intervals=16, risk_aversion_lambda=1e-6
+    )
+    ac_slip_bps = (
+        float(ac_res["summary"]["expected_cost_bps"]) if not ac_res["schedule_df"].empty else (mkt_impact_bps * 0.28)
+    )
     px_is = s_arr * (1.0 + is_buy * (ac_slip_bps / 10000.0))
     comm_is = compute_broker_commissions(q_tot * px_is, q_tot, broker="DEFAULT")["commission_eur"]
     cost_is_eur = (px_is - s_dec) * is_buy * q_tot + comm_is
@@ -136,7 +141,7 @@ def compute_implementation_shortfall_and_execution_benchmarks(
             "total_execution_cost_eur": round(cost_mkt_eur, 2),
             "savings_vs_market_eur": 0.0,
             "execution_speed": "Istantanea (< 1s)",
-            "risk_profile": "Alto Slippage / Basso Rischio Prezzo"
+            "risk_profile": "Alto Slippage / Basso Rischio Prezzo",
         },
         {
             "strategy": "TWAP Uniform Slicing",
@@ -145,7 +150,7 @@ def compute_implementation_shortfall_and_execution_benchmarks(
             "total_execution_cost_eur": round(cost_twap_eur, 2),
             "savings_vs_market_eur": round(cost_mkt_eur - cost_twap_eur, 2),
             "execution_speed": "Lineare (Intera Giornata)",
-            "risk_profile": "Rischio Trend Moderato"
+            "risk_profile": "Rischio Trend Moderato",
         },
         {
             "strategy": "VWAP Curve Matching",
@@ -154,7 +159,7 @@ def compute_implementation_shortfall_and_execution_benchmarks(
             "total_execution_cost_eur": round(cost_vwap_eur, 2),
             "savings_vs_market_eur": round(cost_mkt_eur - cost_vwap_eur, 2),
             "execution_speed": "Ponderata Volumi U-Shape",
-            "risk_profile": "Benchmark Istituzionale Standard"
+            "risk_profile": "Benchmark Istituzionale Standard",
         },
         {
             "strategy": "Adaptive Implementation Shortfall (IS)",
@@ -163,8 +168,8 @@ def compute_implementation_shortfall_and_execution_benchmarks(
             "total_execution_cost_eur": round(cost_is_eur, 2),
             "savings_vs_market_eur": round(cost_mkt_eur - cost_is_eur, 2),
             "execution_speed": "Dinamica (Almgren-Chriss)",
-            "risk_profile": "Minimo Costo Totale Ottimizzato ⭐"
-        }
+            "risk_profile": "Minimo Costo Totale Ottimizzato ⭐",
+        },
     ]
 
     df_comp = pd.DataFrame(strategies_comp)
@@ -184,12 +189,12 @@ def compute_implementation_shortfall_and_execution_benchmarks(
             "commissions_eur": round(comm_cost_eur, 2),
             "opportunity_cost_eur": round(opportunity_cost_eur, 2),
             "total_shortfall_eur": round(total_is_eur, 2),
-            "total_shortfall_bps": round(total_is_bps, 1)
+            "total_shortfall_bps": round(total_is_bps, 1),
         },
         "best_strategy": "Adaptive Implementation Shortfall (IS)",
         "max_potential_savings_eur": round(cost_mkt_eur - cost_is_eur, 2),
         "strategies_comparison": strategies_comp,
-        "strategies_df": df_comp
+        "strategies_df": df_comp,
     }
 
 
@@ -197,12 +202,13 @@ def compute_implementation_shortfall_and_execution_benchmarks(
 # PRE-TRADE TRANSACTION COST ANALYSIS (PRE-TRADE TCA)
 # ==============================================================================
 
+
 def compute_pre_trade_tca(
     orders: Union[pd.DataFrame, List[Dict[str, Any]], Dict[str, Any]],
     broker: str = "DEFAULT",
     risk_aversion_lambda: float = 1e-6,
     horizon_days: float = 1.0,
-    n_intervals: int = 16
+    n_intervals: int = 16,
 ) -> Dict[str, Any]:
     """
     Ex-ante Pre-Trade Transaction Cost Analysis (Pre-Trade TCA).
@@ -224,17 +230,14 @@ def compute_pre_trade_tca(
                 "total_expected_cost_eur": 0.0,
                 "total_expected_cost_bps": 0.0,
                 "execution_var_95_eur": 0.0,
-                "execution_var_99_eur": 0.0
+                "execution_var_99_eur": 0.0,
             },
-            "breakdown_df": pd.DataFrame()
+            "breakdown_df": pd.DataFrame(),
         }
 
     # Run Almgren-Chriss basket optimization to get optimal trajectories
     ac_result = compute_almgren_chriss_basket_schedule(
-        df_ord,
-        horizon_days=horizon_days,
-        n_intervals=n_intervals,
-        risk_aversion_lambda=risk_aversion_lambda
+        df_ord, horizon_days=horizon_days, n_intervals=n_intervals, risk_aversion_lambda=risk_aversion_lambda
     )
 
     total_notional = 0.0
@@ -279,26 +282,28 @@ def compute_pre_trade_tca(
 
         # Timing risk variance
         tau = horizon_days / n_intervals
-        asset_var = (vol_daily ** 2) * tau * (qty ** 2) * (price ** 2) * 0.33 # Trajectory integral
+        asset_var = (vol_daily**2) * tau * (qty**2) * (price**2) * 0.33  # Trajectory integral
         total_variance += asset_var
         asset_std = float(np.sqrt(max(0.0, asset_var)))
 
-        rows.append({
-            "ticker": ticker,
-            "action": action,
-            "quantity": qty,
-            "price_eur": round(price, 2),
-            "notional_eur": round(notional, 2),
-            "commissions_eur": round(comm_eur, 2),
-            "spread_cost_eur": round(spread_eur, 2),
-            "temp_impact_eur": round(temp_eur, 2),
-            "perm_impact_eur": round(perm_eur, 2),
-            "total_expected_cost_eur": round(asset_cost, 2),
-            "total_expected_cost_bps": round(asset_cost_bps, 1),
-            "timing_risk_std_eur": round(asset_std, 2),
-            "execution_var_95_eur": round(asset_cost + 1.645 * asset_std, 2),
-            "participation_rate_pct": round(pov_total * 100.0, 2)
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "action": action,
+                "quantity": qty,
+                "price_eur": round(price, 2),
+                "notional_eur": round(notional, 2),
+                "commissions_eur": round(comm_eur, 2),
+                "spread_cost_eur": round(spread_eur, 2),
+                "temp_impact_eur": round(temp_eur, 2),
+                "perm_impact_eur": round(perm_eur, 2),
+                "total_expected_cost_eur": round(asset_cost, 2),
+                "total_expected_cost_bps": round(asset_cost_bps, 1),
+                "timing_risk_std_eur": round(asset_std, 2),
+                "execution_var_95_eur": round(asset_cost + 1.645 * asset_std, 2),
+                "participation_rate_pct": round(pov_total * 100.0, 2),
+            }
+        )
 
     df_breakdown = pd.DataFrame(rows)
     total_cost = total_comm + total_spread + total_temp + total_perm
@@ -334,17 +339,18 @@ def compute_pre_trade_tca(
             "confidence_intervals": {
                 "p10_eur": round(p10_eur, 2),
                 "p50_eur": round(p50_eur, 2),
-                "p90_eur": round(p90_eur, 2)
-            }
+                "p90_eur": round(p90_eur, 2),
+            },
         },
         "breakdown_df": df_breakdown,
-        "almgren_chriss_schedule": ac_result
+        "almgren_chriss_schedule": ac_result,
     }
 
 
 # ==============================================================================
 # POST-TRADE TRANSACTION COST ANALYSIS (POST-TRADE TCA)
 # ==============================================================================
+
 
 def compute_post_trade_tca(
     executed_trades: Union[pd.DataFrame, List[Dict[str, Any]]],
@@ -354,7 +360,7 @@ def compute_post_trade_tca(
     market_vwap: Optional[float] = None,
     market_close: Optional[float] = None,
     total_ordered_shares: Optional[float] = None,
-    commissions_paid_eur: float = 0.0
+    commissions_paid_eur: float = 0.0,
 ) -> Dict[str, Any]:
     """
     Ex-post Post-Trade Transaction Cost Analysis (Post-Trade TCA).
@@ -375,9 +381,7 @@ def compute_post_trade_tca(
     p_arr = float(arrival_price)
 
     if df_exec.empty or "shares" not in df_exec.columns or "price" not in df_exec.columns:
-        return {
-            "error": "Nessuna transazione eseguita fornita nel payload."
-        }
+        return {"error": "Nessuna transazione eseguita fornita nel payload."}
 
     total_shares_filled = float(df_exec["shares"].sum())
     if total_shares_filled <= 0:
@@ -459,26 +463,26 @@ def compute_post_trade_tca(
             "total_trade_notional_eur": round(total_trade_notional, 2),
             "execution_quality_score": round(quality_score, 1),
             "execution_rating": rating,
-            "alpha_preservation_pct": round(alpha_preservation_pct, 2)
+            "alpha_preservation_pct": round(alpha_preservation_pct, 2),
         },
         "slippage_benchmarks": {
             "vs_arrival_price": {
                 "slippage_bps": round(arrival_slippage_bps, 2),
-                "slippage_eur": round(arrival_slippage_eur, 2)
+                "slippage_eur": round(arrival_slippage_eur, 2),
             },
             "vs_market_vwap": {
                 "slippage_bps": round(vwap_slippage_bps, 2),
                 "slippage_eur": round(vwap_slippage_eur, 2),
-                "outperformed_vwap": (vwap_slippage_bps <= 0)
+                "outperformed_vwap": (vwap_slippage_bps <= 0),
             },
             "vs_decision_price": {
                 "slippage_bps": round(decision_slippage_bps, 2),
-                "slippage_eur": round(decision_slippage_eur, 2)
+                "slippage_eur": round(decision_slippage_eur, 2),
             },
             "vs_market_close": {
                 "slippage_bps": round(close_slippage_bps, 2),
-                "slippage_eur": round(close_slippage_eur, 2)
-            }
+                "slippage_eur": round(close_slippage_eur, 2),
+            },
         },
         "perold_breakdown": {
             "delay_cost_eur": round(delay_cost_eur, 2),
@@ -490,6 +494,6 @@ def compute_post_trade_tca(
             "opportunity_cost_eur": round(opp_cost_eur, 2),
             "opportunity_cost_bps": round(opp_cost_bps, 2),
             "total_implementation_shortfall_eur": round(total_is_eur, 2),
-            "total_implementation_shortfall_bps": round(total_is_bps, 2)
-        }
+            "total_implementation_shortfall_bps": round(total_is_bps, 2),
+        },
     }

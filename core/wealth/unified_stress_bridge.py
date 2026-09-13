@@ -6,6 +6,7 @@
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 
@@ -15,11 +16,12 @@ class MacroFactorShock:
     """
     Rappresenta un vettore di shock macroeconomico coerente.
     """
-    equity_mkt_pct: float = -0.20          # es. -0.20 (-20% azionario globale)
-    yield_curve_shift_bps: float = 150.0   # es. +150 bps rialzo tassi
-    inflation_rate_pct: float = 0.04       # es. +0.04 (+4% inflazione aggiuntiva)
-    fx_eur_usd_pct: float = 0.0            # es. -0.05 (-5% deprezzamento EUR)
-    credit_spread_bps: float = 50.0        # es. +50 bps allargamento spread
+
+    equity_mkt_pct: float = -0.20  # es. -0.20 (-20% azionario globale)
+    yield_curve_shift_bps: float = 150.0  # es. +150 bps rialzo tassi
+    inflation_rate_pct: float = 0.04  # es. +0.04 (+4% inflazione aggiuntiva)
+    fx_eur_usd_pct: float = 0.0  # es. -0.05 (-5% deprezzamento EUR)
+    credit_spread_bps: float = 50.0  # es. +50 bps allargamento spread
     scenario_name: str = "Macro Factor Shock"
 
 
@@ -30,11 +32,7 @@ class UnifiedCrossAssetStressEngine:
     familiare/aziendale (debito, immobili, liquidità di riserva e SWR).
     """
 
-    def __init__(
-        self,
-        portfolio_positions: Optional[pd.DataFrame] = None,
-        factor_betas: Optional[pd.DataFrame] = None
-    ):
+    def __init__(self, portfolio_positions: Optional[pd.DataFrame] = None, factor_betas: Optional[pd.DataFrame] = None):
         """
         :param portfolio_positions: DataFrame con colonne [ticker, weight/controvalore, asset_class, duration]
         :param factor_betas: DataFrame opzionale con [ticker, beta_mkt, beta_rates, beta_fx]
@@ -42,11 +40,7 @@ class UnifiedCrossAssetStressEngine:
         self.positions = portfolio_positions.copy() if portfolio_positions is not None else pd.DataFrame()
         self.betas = factor_betas.copy() if factor_betas is not None else pd.DataFrame()
 
-    def evaluate_integrated_shock(
-        self,
-        shock: MacroFactorShock,
-        wealth_snapshot: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def evaluate_integrated_shock(self, shock: MacroFactorShock, wealth_snapshot: Dict[str, Any]) -> Dict[str, Any]:
         """
         Valuta l'impatto economico olistico su tutte le componenti del Total Balance Sheet.
         """
@@ -64,9 +58,7 @@ class UnifiedCrossAssetStressEngine:
             # Default betas se non presenti
             if "beta_mkt" not in merged.columns:
                 merged["beta_mkt"] = np.where(
-                    merged.get("asset_class", "equity").str.lower().isin(["equity", "stock", "etf"]),
-                    1.0,
-                    0.15
+                    merged.get("asset_class", "equity").str.lower().isin(["equity", "stock", "etf"]), 1.0, 0.15
                 )
             if "beta_rates" not in merged.columns:
                 merged["beta_rates"] = 0.0
@@ -74,7 +66,7 @@ class UnifiedCrossAssetStressEngine:
                 merged["duration"] = np.where(
                     merged.get("asset_class", "equity").str.lower().isin(["bond", "fixed_income", "obbligazione"]),
                     5.5,
-                    0.0
+                    0.0,
                 )
 
             merged["beta_mkt"] = merged["beta_mkt"].fillna(1.0)
@@ -98,15 +90,15 @@ class UnifiedCrossAssetStressEngine:
 
             rate_impact = np.where(
                 bond_mask,
-                -merged["duration"] * rate_shift_dec + 0.5 * convexity_approx * (rate_shift_dec ** 2),
-                merged["beta_rates"] * rate_shift_dec
+                -merged["duration"] * rate_shift_dec + 0.5 * convexity_approx * (rate_shift_dec**2),
+                merged["beta_rates"] * rate_shift_dec,
             )
 
             # Contributo FX
             fx_impact = np.where(
                 merged.get("currency", "EUR").str.upper() == "USD",
                 -shock.fx_eur_usd_pct,  # Deprezzamento EUR = rivalutazione USD
-                0.0
+                0.0,
             )
 
             liquid_pnl_pct = float((eq_impact + merged["norm_weight"] * (rate_impact + fx_impact)).sum())
@@ -204,5 +196,5 @@ class UnifiedCrossAssetStressEngine:
             "fire_swr_stressed_pct": stressed_swr,
             "pre_stress_net_worth": round(pre_nw, 2),
             "post_stress_net_worth": round(stressed_nw, 2),
-            "total_net_worth_pnl_pct": round(((stressed_nw / max(1.0, pre_nw)) - 1.0) * 100.0, 2)
+            "total_net_worth_pnl_pct": round(((stressed_nw / max(1.0, pre_nw)) - 1.0) * 100.0, 2),
         }

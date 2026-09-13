@@ -17,18 +17,18 @@ Supports 3 Pre-configured User Archetypes:
 ============================================================
 """
 
-import os
-import sys
-import math
-import random
 import argparse
-from datetime import datetime, date, timedelta
+import math
+import os
+import random
+import sys
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 # Root path configuration
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -809,7 +809,7 @@ class PortfolioSimulationEngine:
             })
 
         # Holdings azionari attuali (quote)
-        current_holdings: Dict[str, float] = {t: 0.0 for t in cfg.trading_universe}
+        current_holdings: Dict[str, float] = dict.fromkeys(cfg.trading_universe, 0.0)
 
         # ── 1. ALLOCAZIONE INIZIALE PORTAFOGLIO TRADING ──
         first_trading_day = MarketCalendarHelper.get_next_trading_day(start_dt)
@@ -1229,7 +1229,7 @@ class PortfolioSimulationEngine:
             "final_pension_val": round(pension_accumulated, 2)
         }
 
-        print(f"   ✅ Generazione completata con successo:")
+        print("   ✅ Generazione completata con successo:")
         print(f"      • {len(df_trading)} operazioni di borsa (buy, sell, dividend)")
         print(f"      • {len(df_cashflow)} movimenti di cassa coerenti e solvibili")
         print(f"      • Net Worth finale simulato: € {summary['final_net_worth']:,.2f}")
@@ -1294,7 +1294,7 @@ def verify_simulation_invariants(res: SimulationResult):
     if errors:
         raise ValueError(f"Validazione Invarianti Fallita ({len(errors)} anomalie):\n" + "\n".join(errors[:10]))
 
-    print(f"   🛡️ Tutti gli invarianti di finanza quantitativa e solvibilità sono verificati al 100%!")
+    print("   🛡️ Tutti gli invarianti di finanza quantitativa e solvibilità sono verificati al 100%!")
 
 
 # ─────────────────────────────────────────────────────────────
@@ -1425,7 +1425,7 @@ def populate_argus_database(
 
         # Assicura le categorie in wealth_categories per evitare violazioni di foreign key
         cursor.execute("SELECT category_id FROM wealth_categories")
-        existing_cat_ids = set(r[0] for r in cursor.fetchall())
+        existing_cat_ids = {r[0] for r in cursor.fetchall()}
         for _, cf in res.wealth_cashflow_df.iterrows():
             cid = int(cf.get("category_id", 1))
             if cid not in existing_cat_ids:

@@ -2,37 +2,39 @@ import streamlit as st
 
 st.set_page_config(page_title="Executive Cockpit | ARGUS", page_icon="📈", layout="wide")
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
-import core.ui_utils
-import core.risk_engine
+
 import core.duckdb_engine
+import core.risk_engine
+import core.ui_utils
+from core.excel_generator import generate_excel_in_memory
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    render_kpi_card,
-    fmt_pct,
-    fmt_eur,
-    glossary_modal,
-    render_executive_badges,
-    render_command_bar,
-    render_omni_command_bar,
-    render_standard_hero,
-    apply_plotly_theme,
     apply_chart_theme,
+    apply_plotly_theme,
+    ensure_portfolio_loaded,
+    fmt_eur,
+    fmt_pct,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_executive_badges,
+    render_export_toolbar,
     render_factor_radar_chart,
     render_info_modal,
-    ensure_portfolio_loaded,
+    render_kpi_card,
+    render_omni_command_bar,
     render_sandbox_banner,
-    render_export_toolbar
+    render_standard_hero,
+    section,
 )
-from core.excel_generator import generate_excel_in_memory
 
 inject_custom_css()
 
 from core.sidebar import render_sidebar
+
 render_sidebar()
 
 results, has_real = ensure_portfolio_loaded(module_type="risk")
@@ -77,6 +79,7 @@ st.divider()
 
 # ⚡ Sintesi Esecutiva Quantitativa (Executive Callout Box)
 from core.risk_limits import check_risk_limits
+
 limits_res = check_risk_limits(results)
 comp_score = limits_res.get("compliance_pct", 100.0)
 cagr_val = float(ret.get("cagr_pct", ret.get("portfolio_cagr_pct", 0.0)) or 0.0)
@@ -100,8 +103,9 @@ rf_rate_pct = float(rf_info.get("rate_pct", active_rf_resolved["rate_pct"]))
 rf_source = rf_info.get("source", active_rf_resolved["source"])
 rf_currency = rf_info.get("currency", active_rf_resolved["currency"])
 
-import uuid
 import re
+import uuid
+
 from core.ui_utils import format_institutional_5point_html
 
 rf_modal_id = str(uuid.uuid4())[:8]
@@ -432,10 +436,12 @@ st.divider()
 
 # ── RENDIMENTO CUMULATO VS BENCHMARK (100% FULL-WIDTH CHART) ───
 from core.ui_utils import load_benchmark_returns
+
 df_prices_ref = results.get("df_prices", pd.DataFrame())
 
 # ── RENDIMENTO CUMULATO VS BENCHMARK (100% FULL-WIDTH CHART) ───
 from core.ui_utils import load_benchmark_returns
+
 df_prices_ref = results.get("df_prices", pd.DataFrame())
 
 # Definizione Catalogo Globale Benchmark Multi-Asset & Geografici
@@ -1356,6 +1362,7 @@ with col_head_adv2:
 """, button_label="💡 Come funziona il Quant Advisor?")
 
 from core.advisor import generate_quant_advisory_report
+
 advisor_data = generate_quant_advisory_report(results)
 health_score = advisor_data["health_score"]
 diagnostics = advisor_data["diagnostics"]
@@ -1456,6 +1463,7 @@ with col_head_lim2:
 """, button_label="💡 Spiegazione Limiti di Rischio")
 
 from core.risk_limits import check_risk_limits
+
 limits_data = check_risk_limits(results)
 comp_pct = limits_data["compliance_pct"]
 df_eval = limits_data["evaluations"]
@@ -1774,6 +1782,7 @@ col_exp_dossier, col_exp_pdf = st.columns([1.6, 1.4])
 with col_exp_dossier:
     try:
         import importlib
+
         import core.report_exporter
         importlib.reload(core.report_exporter)
         from core.report_exporter import generate_institutional_audit_dossier
@@ -1796,6 +1805,7 @@ with col_exp_dossier:
 with col_exp_pdf:
     try:
         import importlib
+
         import core.report_exporter
         importlib.reload(core.report_exporter)
         from core.report_exporter import generate_pdf_factsheet
@@ -1822,6 +1832,7 @@ col_exp_excel, col_exp_html, col_exp_bi = st.columns(3)
 with col_exp_excel:
     try:
         import importlib
+
         import core.report_exporter
         importlib.reload(core.report_exporter)
         from core.report_exporter import generate_excel_report
@@ -1847,6 +1858,7 @@ with col_exp_html:
     if st.button("🌐 Genera & Apri Factsheet HTML", use_container_width=True, key="btn_generate_html_on_demand"):
         try:
             import importlib
+
             import core.html_exporter
             importlib.reload(core.html_exporter)
             from core.html_exporter import generate_interactive_html_report
@@ -1875,6 +1887,7 @@ with col_exp_html:
 with col_exp_bi:
     try:
         import importlib
+
         import scripts.export_star_schema
         importlib.reload(scripts.export_star_schema)
         from scripts.export_star_schema import generate_star_schema_zip

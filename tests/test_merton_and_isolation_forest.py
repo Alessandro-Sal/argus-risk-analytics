@@ -1,8 +1,10 @@
-import pytest
-import pandas as pd
 import numpy as np
-from core.risk_engine import compute_merton_jump_diffusion_simulation
+import pandas as pd
+import pytest
+
 from core.financial_analysis import detect_portfolio_anomalies_isolation_forest
+from core.risk_engine import compute_merton_jump_diffusion_simulation
+
 
 def test_compute_merton_jump_diffusion_simulation():
     np.random.seed(42)

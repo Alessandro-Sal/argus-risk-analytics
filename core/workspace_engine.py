@@ -4,10 +4,10 @@
 # Role-based workspace profiles, widget orchestration and layout persistence.
 # ==============================================================================
 
-import os
 import json
+import os
 import sqlite3
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Institutional Role Profiles & Preset Configurations
@@ -23,14 +23,17 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "description": "Ottimizzato per trader istituzionali, execution desk e market maker. Focus su flussi streaming ad alta frequenza, order book L2, slippage Almgren-Chriss e coperture delta rapide.",
         "primary_pages": [
             {"name": "Live Terminal & Desk", "page": "2_🖥️_Live_Terminal", "tab": "Live Terminal & Market Desk"},
-            {"name": "Posizioni e Dettagli", "page": "5_📋_Posizioni_e_Dettagli", "tab": "⚡ Liquidità & Smart Order Router"},
+            {
+                "name": "Posizioni e Dettagli",
+                "page": "5_📋_Posizioni_e_Dettagli",
+                "tab": "⚡ Liquidità & Smart Order Router",
+            },
             {"name": "Analisi Tecnica", "page": "9_📈_Analisi_Tecnica", "tab": "🧱 Volume Profile Dettaglio"},
-            {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🛡️ Hedging & Opzioni"}
+            {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🛡️ Hedging & Opzioni"},
         ],
         "key_kpis": ["Order Flow Imbalance", "Microprice L2", "Slippage Stimato", "Execution VaR", "Delta Hedge Ratio"],
-        "recommended_refresh_rate": 5 # secondi
+        "recommended_refresh_rate": 5,  # secondi
     },
-
     "risk_officer": {
         "id": "risk_officer",
         "title": "🛡️ Risk Officer & Compliance",
@@ -42,12 +45,21 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
             {"name": "Analisi Rischio", "page": "3_🔴_Analisi_Rischio", "tab": "📉 VaR, CVaR & Backtesting Kupiec"},
             {"name": "Analisi Rischio", "page": "3_🔴_Analisi_Rischio", "tab": "📊 Profilo del Rischio & Fama-French"},
             {"name": "Stress Testing", "page": "7_🌪️_Stress_Testing", "tab": "⚡ Matrice Comparativa MSCI Barra"},
-            {"name": "Analisi Rischio", "page": "3_🔴_Analisi_Rischio", "tab": "🔗 Correlazioni, Liquidità & ATR Chandelier"}
+            {
+                "name": "Analisi Rischio",
+                "page": "3_🔴_Analisi_Rischio",
+                "tab": "🔗 Correlazioni, Liquidità & ATR Chandelier",
+            },
         ],
-        "key_kpis": ["Parametric VaR 95%", "Expected Shortfall (CVaR)", "GARCH Term Structure", "Basel Traffic Light Zone", "LVaR 5-Days"],
-        "recommended_refresh_rate": 60
+        "key_kpis": [
+            "Parametric VaR 95%",
+            "Expected Shortfall (CVaR)",
+            "GARCH Term Structure",
+            "Basel Traffic Light Zone",
+            "LVaR 5-Days",
+        ],
+        "recommended_refresh_rate": 60,
     },
-
     "portfolio_manager": {
         "id": "portfolio_manager",
         "title": "💼 Portfolio Manager & CIO",
@@ -59,12 +71,21 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
             {"name": "Dashboard Generale", "page": "1_📈_Dashboard_Generale", "tab": "Dashboard Generale"},
             {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "📊 Markowitz & Rebalancing"},
             {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🎯 Attribuzione & Fattori"},
-            {"name": "Screener Opportunità", "page": "10_🔍_Screener_Opportunita", "tab": "🔍 Screener Multi-Fattoriale & Archetipi"}
+            {
+                "name": "Screener Opportunità",
+                "page": "10_🔍_Screener_Opportunita",
+                "tab": "🔍 Screener Multi-Fattoriale & Archetipi",
+            },
         ],
-        "key_kpis": ["Sharpe Ratio", "Information Ratio", "Alpha Fama-French", "Spread Long-Short Q1-Q5", "Yield on Cost"],
-        "recommended_refresh_rate": 30
+        "key_kpis": [
+            "Sharpe Ratio",
+            "Information Ratio",
+            "Alpha Fama-French",
+            "Spread Long-Short Q1-Q5",
+            "Yield on Cost",
+        ],
+        "recommended_refresh_rate": 30,
     },
-
     "quant_analyst": {
         "id": "quant_analyst",
         "title": "🔬 Quantitative Analyst & Data Scientist",
@@ -76,12 +97,21 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
             {"name": "BQuant Python", "page": "11_💻_BQuant_e_Launchpad", "tab": "🐍 ARGUS BQuant Python Sandbox"},
             {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🎲 Monte Carlo & Merton"},
             {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🧬 Tail Copula & Kelly"},
-            {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🤖 AI Reinforcement Learning"}
+            {
+                "name": "Modelli Quantitativi",
+                "page": "4_🔬_Modelli_Quantitativi",
+                "tab": "🤖 AI Reinforcement Learning",
+            },
         ],
-        "key_kpis": ["Implied Volatility Smile", "Jump Intensity (λ)", "Spearman Monotonicity", "K-Means Silhouette", "Python Execution Time"],
-        "recommended_refresh_rate": 0 # Manual execution
+        "key_kpis": [
+            "Implied Volatility Smile",
+            "Jump Intensity (λ)",
+            "Spearman Monotonicity",
+            "K-Means Silhouette",
+            "Python Execution Time",
+        ],
+        "recommended_refresh_rate": 0,  # Manual execution
     },
-
     "corporate_treasurer": {
         "id": "corporate_treasurer",
         "title": "🏛️ Corporate Treasurer & Fixed Income",
@@ -91,13 +121,31 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
         "description": "Ottimizzato per direttori finanziari, tesorieri d'impresa e desk obbligazionari. Focus su YTM, Duration, Convexity, Z-Spread Nelson-Siegel, monitoraggio CDS sovrano/corporate e compensazione fiscale minusvalenze.",
         "primary_pages": [
             {"name": "Modelli Quantitativi", "page": "4_🔬_Modelli_Quantitativi", "tab": "🏛️ Fixed Income & Z-Spread"},
-            {"name": "Posizioni e Dettagli", "page": "5_📋_Posizioni_e_Dettagli", "tab": "💰 Ottimizzazione Fiscale (TUIR Art. 67)"},
-            {"name": "Valutazione Aziendale", "page": "6_🏛️_Valutazione_Aziendale", "tab": "🏛️ Fair Value & Consensus Analisti"},
-            {"name": "Excel Live Connector", "page": "11_💻_BQuant_e_Launchpad", "tab": "📊 Excel Live Connector & RTD"}
+            {
+                "name": "Posizioni e Dettagli",
+                "page": "5_📋_Posizioni_e_Dettagli",
+                "tab": "💰 Ottimizzazione Fiscale (TUIR Art. 67)",
+            },
+            {
+                "name": "Valutazione Aziendale",
+                "page": "6_🏛️_Valutazione_Aziendale",
+                "tab": "🏛️ Fair Value & Consensus Analisti",
+            },
+            {
+                "name": "Excel Live Connector",
+                "page": "11_💻_BQuant_e_Launchpad",
+                "tab": "📊 Excel Live Connector & RTD",
+            },
         ],
-        "key_kpis": ["Yield to Maturity (YTM)", "Modified Duration", "DV01 Total", "Z-Spread (bps)", "Credito Fiscale Zainetto"],
-        "recommended_refresh_rate": 120
-    }
+        "key_kpis": [
+            "Yield to Maturity (YTM)",
+            "Modified Duration",
+            "DV01 Total",
+            "Z-Spread (bps)",
+            "Credito Fiscale Zainetto",
+        ],
+        "recommended_refresh_rate": 120,
+    },
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -105,6 +153,7 @@ ROLE_PRESET_PROFILES: Dict[str, Dict[str, Any]] = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "argus_workspaces.db")
+
 
 def _init_workspace_db():
     """Inizializza la tabella SQLite per la memorizzazione dei layout personalizzati."""
@@ -120,20 +169,27 @@ def _init_workspace_db():
         """)
         conn.commit()
 
-def save_custom_workspace_layout(user_id: str, active_role: str, custom_widgets: Optional[Dict[str, Any]] = None) -> bool:
+
+def save_custom_workspace_layout(
+    user_id: str, active_role: str, custom_widgets: Optional[Dict[str, Any]] = None
+) -> bool:
     """Salva il layout personalizzato e il ruolo attivo dell'utente nel DB locale."""
     try:
         _init_workspace_db()
         widgets_json = json.dumps(custom_widgets or {})
         with sqlite3.connect(DB_PATH) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO user_workspaces (user_id, active_role, custom_widgets, updated_at)
                 VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-            """, (user_id, active_role, widgets_json))
+            """,
+                (user_id, active_role, widgets_json),
+            )
             conn.commit()
         return True
     except Exception:
         return False
+
 
 def load_custom_workspace_layout(user_id: str) -> Dict[str, Any]:
     """Carica il layout personalizzato dell'utente dal DB locale."""
@@ -148,20 +204,18 @@ def load_custom_workspace_layout(user_id: str) -> Dict[str, Any]:
                 return {
                     "active_role": role,
                     "custom_widgets": json.loads(widgets_str) if widgets_str else {},
-                    "found": True
+                    "found": True,
                 }
     except Exception:
         pass
-    return {
-        "active_role": "portfolio_manager",
-        "custom_widgets": {},
-        "found": False
-    }
+    return {"active_role": "portfolio_manager", "custom_widgets": {}, "found": False}
+
 
 def get_role_profile(role_key: str) -> Dict[str, Any]:
     """Restituisce la configurazione completa per il ruolo selezionato."""
     clean_k = str(role_key).lower().strip()
     return ROLE_PRESET_PROFILES.get(clean_k, ROLE_PRESET_PROFILES["portfolio_manager"])
+
 
 def get_available_roles() -> List[Dict[str, Any]]:
     """Restituisce la lista di tutti i profili di ruolo disponibili."""

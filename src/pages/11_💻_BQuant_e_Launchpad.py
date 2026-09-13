@@ -3,10 +3,11 @@
 # ARGUS BQuant Python Sandbox, Workspace Launchpad & Excel Live Connector
 # ==============================================================================
 
-import io
-import time
 import datetime
 import html
+import io
+import time
+
 import streamlit as st
 
 st.set_page_config(
@@ -16,53 +17,46 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+import datetime
 import io
 import time
-import datetime
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-import core.ui_utils as ui_utils
-import core.excel_connector as excel_connector
-import core.workspace_engine as workspace_engine
 import core.bquant_engine as bquant_engine
+import core.excel_connector as excel_connector
 import core.terminal_engine as terminal_engine
-
-from core.sidebar import render_sidebar
-from core.ui_utils import (
-    inject_custom_css,
-    render_command_bar,
-    metric_card,
-    glossary_modal,
-    ensure_risk_bundle_loaded,
-    render_page_header,
-    render_export_toolbar
+import core.ui_utils as ui_utils
+import core.workspace_engine as workspace_engine
+from core.bquant_engine import BQUANT_SNIPPETS, execute_bquant_script
+from core.excel_connector import (
+    EXCEL_PORTFOLIO_RISK_FIELDS,
+    EXCEL_SUPPORTED_FIELDS,
+    build_bloomberg_formula,
+    export_institutional_multisheet_excel,
+    generate_office_script_code,
+    generate_vba_macro_code,
 )
-from core.bquant_engine import (
-    execute_bquant_script,
-    BQUANT_SNIPPETS
+from core.sidebar import render_sidebar
+from core.terminal_engine import OMSOrder, TerminalCommandResult, get_terminal_engine
+from core.ui_utils import (
+    ensure_risk_bundle_loaded,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_export_toolbar,
+    render_page_header,
 )
 from core.workspace_engine import (
     ROLE_PRESET_PROFILES,
     get_available_roles,
     get_role_profile,
+    load_custom_workspace_layout,
     save_custom_workspace_layout,
-    load_custom_workspace_layout
-)
-from core.excel_connector import (
-    EXCEL_SUPPORTED_FIELDS,
-    EXCEL_PORTFOLIO_RISK_FIELDS,
-    build_bloomberg_formula,
-    generate_vba_macro_code,
-    generate_office_script_code,
-    export_institutional_multisheet_excel
-)
-from core.terminal_engine import (
-    get_terminal_engine,
-    TerminalCommandResult,
-    OMSOrder
 )
 
 inject_custom_css()
@@ -329,9 +323,14 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
                 "base_currency": st.session_state.get("base_currency", "EUR")
             }
             try:
-                from core.wealth.wealth_db import get_wealth_accounts, get_cashflow_records, get_physical_assets, get_pension_plans
-                from core.wealth.wealth_engine import compute_consolidated_net_worth
                 from core.fetcher import get_engine
+                from core.wealth.wealth_db import (
+                    get_cashflow_records,
+                    get_pension_plans,
+                    get_physical_assets,
+                    get_wealth_accounts,
+                )
+                from core.wealth.wealth_engine import compute_consolidated_net_worth
                 db_u = st.session_state.get("db_user", "root")
                 db_p = st.session_state.get("db_pass", "root")
                 db_h = st.session_state.get("db_host", "localhost")
@@ -364,7 +363,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
             </div>
             """, unsafe_allow_html=True)
         else:
-            st.markdown(f"""
+            st.markdown("""
             <div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 8px 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;">
                 <span style="color: #f87171; font-weight: 600; font-size: 13px;">❌ Errore durante l'esecuzione dello script</span>
                 <span style="color: #fca5a5; font-family: monospace; font-size: 12px;">EXCEPTION RAISED</span>
@@ -529,7 +528,7 @@ elif active_bquant_tab == "🎛️ Launchpad & Workspace Customizer":
                 </div>
                 """, unsafe_allow_html=True)
             with c_link2:
-                if st.button(f"🚀 Apri Modulo", key=f"btn_jump_to_{active_profile['id']}_{idx}", use_container_width=True):
+                if st.button("🚀 Apri Modulo", key=f"btn_jump_to_{active_profile['id']}_{idx}", use_container_width=True):
                     # Mappa scheda di destinazione
                     tab_name = p_item["tab"]
                     if "4_📋" in p_item["page"]:

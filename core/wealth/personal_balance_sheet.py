@@ -5,35 +5,33 @@
 # ============================================================
 
 import logging
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
-from sqlalchemy import Engine, text as sqlt
+from sqlalchemy import Engine
+from sqlalchemy import text as sqlt
 
+from core.terminal_engine import get_fx_rate_to_eur
+from core.wealth.wealth_db import (
+    get_cashflow_records,
+    get_linked_risk_portfolios,
+    get_pension_plans,
+    get_physical_assets,
+    get_wealth_accounts,
+)
 from core.wealth.wealth_models import (
-    NetWorthSummary,
     AccountType,
     CategoryNature,
+    NetWorthSummary,
     PhysicalAssetCategory,
 )
-from core.wealth.wealth_db import (
-    get_wealth_accounts,
-    get_cashflow_records,
-    get_physical_assets,
-    get_pension_plans,
-    get_linked_risk_portfolios,
-)
-from core.terminal_engine import get_fx_rate_to_eur
 
 logger = logging.getLogger("personal_balance_sheet")
 
 
-def compute_personal_balance_sheet(
-    engine: Engine,
-    portfolio_id: int = 1,
-    year: Optional[int] = None
-) -> Dict[str, Any]:
+def compute_personal_balance_sheet(engine: Engine, portfolio_id: int = 1, year: Optional[int] = None) -> Dict[str, Any]:
     """
     Costruisce il Bilancio Personale Istituzionale completo:
     1. Stato Patrimoniale a sezioni contrapposte (Attivo vs Passivo + Patrimonio Netto a pareggio)
@@ -57,7 +55,7 @@ def compute_personal_balance_sheet(
         if "currency" in df_acc.columns:
             df_acc["balance_eur"] = df_acc.apply(
                 lambda r: float(r.get("balance", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
-                axis=1
+                axis=1,
             )
         else:
             df_acc["balance_eur"] = df_acc["balance"].astype(float)
@@ -68,25 +66,33 @@ def compute_personal_balance_sheet(
     if not df_phys.empty:
         if "currency" in df_phys.columns:
             df_phys["market_val_eur"] = df_phys.apply(
-                lambda r: float(r.get("current_market_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
-                axis=1
+                lambda r: (
+                    float(r.get("current_market_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR")))
+                ),
+                axis=1,
             )
         else:
             df_phys["market_val_eur"] = df_phys["current_market_value"].astype(float)
     else:
-        df_phys = pd.DataFrame(columns=["asset_id", "name", "asset_category", "current_market_value", "market_val_eur", "currency"])
+        df_phys = pd.DataFrame(
+            columns=["asset_id", "name", "asset_category", "current_market_value", "market_val_eur", "currency"]
+        )
 
     # Normalizzazione Valutaria EUR per Previdenza
     if not df_pens.empty:
         if "currency" in df_pens.columns:
             df_pens["accum_eur"] = df_pens.apply(
-                lambda r: float(r.get("accumulated_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR"))),
-                axis=1
+                lambda r: (
+                    float(r.get("accumulated_value", 0.0) or 0.0) * get_fx_rate_to_eur(str(r.get("currency", "EUR")))
+                ),
+                axis=1,
             )
         else:
             df_pens["accum_eur"] = df_pens["accumulated_value"].astype(float)
     else:
-        df_pens = pd.DataFrame(columns=["plan_id", "plan_name", "provider", "accumulated_value", "accum_eur", "currency"])
+        df_pens = pd.DataFrame(
+            columns=["plan_id", "plan_name", "provider", "accumulated_value", "accum_eur", "currency"]
+        )
 
     # ==========================================================
     # 2. STATO PATRIMONIALE PERSONALE (STATEMENT OF FINANCIAL POSITION)
@@ -97,24 +103,33 @@ def compute_personal_balance_sheet(
     liquid_types = [AccountType.CHECKING.value, AccountType.SAVINGS.value, AccountType.EMERGENCY_FUND.value]
     df_liquid_acc = df_acc[df_acc["account_type"].isin(liquid_types) & (df_acc["balance_eur"] > 0)]
     for _, r in df_liquid_acc.iterrows():
-        tipo_lbl = "Conto Corrente" if r["account_type"] == AccountType.CHECKING.value else (
-            "Fondo Emergenza" if r["account_type"] == AccountType.EMERGENCY_FUND.value else "Conto Deposito"
+        tipo_lbl = (
+            "Conto Corrente"
+            if r["account_type"] == AccountType.CHECKING.value
+            else ("Fondo Emergenza" if r["account_type"] == AccountType.EMERGENCY_FUND.value else "Conto Deposito")
         )
-        liquid_voci.append({
-            "nome": r.get("account_name") or r.get("name") or "Conto Bancario",
-            "categoria": tipo_lbl,
-            "dettaglio": f"{r.get('institution', 'Banca')} ({r.get('currency', 'EUR')})",
-            "valore": round(float(r["balance_eur"]), 2)
-        })
+        liquid_voci.append(
+            {
+                "nome": r.get("account_name") or r.get("name") or "Conto Bancario",
+                "categoria": tipo_lbl,
+                "dettaglio": f"{r.get('institution', 'Banca')} ({r.get('currency', 'EUR')})",
+                "valore": round(float(r["balance_eur"]), 2),
+            }
+        )
 
-    brokerage_cash = df_acc[df_acc["account_type"].isin([AccountType.BROKERAGE_CASH.value, "brokerage", "trading"]) & (df_acc["balance_eur"] > 0)]
+    brokerage_cash = df_acc[
+        df_acc["account_type"].isin([AccountType.BROKERAGE_CASH.value, "brokerage", "trading"])
+        & (df_acc["balance_eur"] > 0)
+    ]
     for _, r in brokerage_cash.iterrows():
-        liquid_voci.append({
-            "nome": r.get("account_name") or r.get("name") or "Liquidità Broker",
-            "categoria": "Liquidità su Broker/Trading",
-            "dettaglio": f"{r.get('institution', 'Broker')} (Cassa non investita)",
-            "valore": round(float(r["balance_eur"]), 2)
-        })
+        liquid_voci.append(
+            {
+                "nome": r.get("account_name") or r.get("name") or "Liquidità Broker",
+                "categoria": "Liquidità su Broker/Trading",
+                "dettaglio": f"{r.get('institution', 'Broker')} (Cassa non investita)",
+                "valore": round(float(r["balance_eur"]), 2),
+            }
+        )
 
     tot_liquidita = sum(v["valore"] for v in liquid_voci)
 
@@ -148,27 +163,37 @@ def compute_personal_balance_sheet(
                 for row in res:
                     val = float(row.get("total_value") or 0.0)
                     p_name = row.get("name") or f"Portafoglio Risk #{row.get('portfolio_id')}"
-                    cat_lbl = "Cripto-attività" if "cripto" in p_name.lower() or "crypto" in p_name.lower() else "Portafoglio Titoli & Azioni"
+                    cat_lbl = (
+                        "Cripto-attività"
+                        if "cripto" in p_name.lower() or "crypto" in p_name.lower()
+                        else "Portafoglio Titoli & Azioni"
+                    )
                     if val > 0:
-                        invest_voci.append({
-                            "nome": p_name,
-                            "categoria": cat_lbl,
-                            "dettaglio": row.get("description") or "Portafoglio Quantitativo / Risk Modulo",
-                            "valore": round(val, 2)
-                        })
+                        invest_voci.append(
+                            {
+                                "nome": p_name,
+                                "categoria": cat_lbl,
+                                "dettaglio": row.get("description") or "Portafoglio Quantitativo / Risk Modulo",
+                                "valore": round(val, 2),
+                            }
+                        )
         except Exception as e:
             logger.warning(f"Errore caricamento dettagli portafogli collegati: {e}")
 
     # Se non ci sono voci da risk portfolio ma ci sono conti tipo investment
     if not invest_voci:
-        df_inv_acc = df_acc[df_acc["account_type"].isin(["investment", "investments", "crypto_exchange"]) & (df_acc["balance_eur"] > 0)]
+        df_inv_acc = df_acc[
+            df_acc["account_type"].isin(["investment", "investments", "crypto_exchange"]) & (df_acc["balance_eur"] > 0)
+        ]
         for _, r in df_inv_acc.iterrows():
-            invest_voci.append({
-                "nome": r.get("account_name") or r.get("name") or "Investimento Finanziario",
-                "categoria": "Titoli & Cripto",
-                "dettaglio": r.get("institution", "Intermediario"),
-                "valore": round(float(r["balance_eur"]), 2)
-            })
+            invest_voci.append(
+                {
+                    "nome": r.get("account_name") or r.get("name") or "Investimento Finanziario",
+                    "categoria": "Titoli & Cripto",
+                    "dettaglio": r.get("institution", "Intermediario"),
+                    "valore": round(float(r["balance_eur"]), 2),
+                }
+            )
 
     tot_investimenti = sum(v["valore"] for v in invest_voci)
 
@@ -177,31 +202,40 @@ def compute_personal_balance_sheet(
     for _, r in df_pens.iterrows():
         p_val = round(float(r["accum_eur"]), 2)
         if p_val > 0:
-            previdenza_voci.append({
-                "nome": r.get("plan_name") or "Fondo Pensione Integrativo",
-                "categoria": "Fondo Pensione / PIP",
-                "dettaglio": f"{r.get('provider', 'Gestore')} — Contributo: €{float(r.get('employer_monthly_contribution', 0.0) or 0.0):,.2f}/m",
-                "valore": p_val
-            })
+            previdenza_voci.append(
+                {
+                    "nome": r.get("plan_name") or "Fondo Pensione Integrativo",
+                    "categoria": "Fondo Pensione / PIP",
+                    "dettaglio": f"{r.get('provider', 'Gestore')} — Contributo: €{float(r.get('employer_monthly_contribution', 0.0) or 0.0):,.2f}/m",
+                    "valore": p_val,
+                }
+            )
     tot_previdenza = sum(v["valore"] for v in previdenza_voci)
 
     # --- A. ATTIVO: SEZIONE IV - ATTIVITÀ REALI & IMMOBILIZZAZIONI PERSONALI ---
     reali_voci = []
     for _, r in df_phys.iterrows():
         cat = str(r.get("asset_category", "")).lower()
-        cat_lbl = "Beni di Pregio & Orologi" if "watch" in cat else (
-            "Metalli Preziosi & Oro" if "metal" in cat else (
-                "Immobile di Proprietà" if "estate" in cat else "Beni Personali di Valore"
+        cat_lbl = (
+            "Beni di Pregio & Orologi"
+            if "watch" in cat
+            else (
+                "Metalli Preziosi & Oro"
+                if "metal" in cat
+                else ("Immobile di Proprietà" if "estate" in cat else "Beni Personali di Valore")
             )
         )
         val = round(float(r["market_val_eur"]), 2)
         if val > 0:
-            reali_voci.append({
-                "nome": r.get("name") or "Asset Fisico",
-                "categoria": cat_lbl,
-                "dettaglio": f"{r.get('location', '')} {r.get('notes', '')}".strip() or "Valutazione Peritale / Stima Mercato",
-                "valore": val
-            })
+            reali_voci.append(
+                {
+                    "nome": r.get("name") or "Asset Fisico",
+                    "categoria": cat_lbl,
+                    "dettaglio": f"{r.get('location', '')} {r.get('notes', '')}".strip()
+                    or "Valutazione Peritale / Stima Mercato",
+                    "valore": val,
+                }
+            )
     tot_attivita_reali = sum(v["valore"] for v in reali_voci)
 
     # --- A. ATTIVO: SEZIONE V - CREDITI PERSONALI & RATEI ATTIVI ---
@@ -220,7 +254,7 @@ def compute_personal_balance_sheet(
             "descrizione": "Conti correnti bancari, conti deposito, liquidità broker e fondo emergenza",
             "totale": tot_liquidita,
             "incidenza_pct": round(tot_liquidita / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": liquid_voci
+            "voci": liquid_voci,
         },
         {
             "codice": "II",
@@ -228,7 +262,7 @@ def compute_personal_balance_sheet(
             "descrizione": "Azioni, ETF, Titoli obbligazionari, Cripto-attività e portafogli gestiti",
             "totale": tot_investimenti,
             "incidenza_pct": round(tot_investimenti / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": invest_voci
+            "voci": invest_voci,
         },
         {
             "codice": "III",
@@ -236,7 +270,7 @@ def compute_personal_balance_sheet(
             "descrizione": "Fondi pensione negoziali, aperti, PIP e accantonamenti pensionistici",
             "totale": tot_previdenza,
             "incidenza_pct": round(tot_previdenza / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": previdenza_voci
+            "voci": previdenza_voci,
         },
         {
             "codice": "IV",
@@ -244,18 +278,20 @@ def compute_personal_balance_sheet(
             "descrizione": "Immobili di proprietà, collezionabili di lusso, orologi e metalli preziosi",
             "totale": tot_attivita_reali,
             "incidenza_pct": round(tot_attivita_reali / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": reali_voci
-        }
+            "voci": reali_voci,
+        },
     ]
     if tot_crediti > 0:
-        sezioni_attivo.append({
-            "codice": "V",
-            "titolo": "Crediti Personali & Ratei Attivi",
-            "descrizione": "Crediti personali esigibili, crediti d'imposta personali e depositi cauzionali",
-            "totale": tot_crediti,
-            "incidenza_pct": round(tot_crediti / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": crediti_voci
-        })
+        sezioni_attivo.append(
+            {
+                "codice": "V",
+                "titolo": "Crediti Personali & Ratei Attivi",
+                "descrizione": "Crediti personali esigibili, crediti d'imposta personali e depositi cauzionali",
+                "totale": tot_crediti,
+                "incidenza_pct": round(tot_crediti / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
+                "voci": crediti_voci,
+            }
+        )
 
     # --- B. PASSIVO & DEBITI PERSONALI (LIABILITIES) ---
     passivo_breve_voci = []
@@ -267,36 +303,53 @@ def compute_personal_balance_sheet(
         for _, r in df_cc.iterrows():
             val = abs(float(r["balance_eur"]))
             if val > 0:
-                passivo_breve_voci.append({
-                    "nome": r.get("account_name") or r.get("name") or "Carta di Credito",
-                    "categoria": "Debito Carta di Credito (Saldo fine mese)",
-                    "dettaglio": r.get("institution", "Istituto emittente"),
-                    "valore": round(val, 2)
-                })
+                passivo_breve_voci.append(
+                    {
+                        "nome": r.get("account_name") or r.get("name") or "Carta di Credito",
+                        "categoria": "Debito Carta di Credito (Saldo fine mese)",
+                        "dettaglio": r.get("institution", "Istituto emittente"),
+                        "valore": round(val, 2),
+                    }
+                )
 
         # Scoperti di conto corrente (balance < 0)
-        df_scoperti = df_acc[(~df_acc["account_type"].isin([AccountType.CREDIT_CARD.value, AccountType.LOAN.value, AccountType.MORTGAGE.value])) & (df_acc["balance_eur"] < 0)]
+        df_scoperti = df_acc[
+            (
+                ~df_acc["account_type"].isin(
+                    [AccountType.CREDIT_CARD.value, AccountType.LOAN.value, AccountType.MORTGAGE.value]
+                )
+            )
+            & (df_acc["balance_eur"] < 0)
+        ]
         for _, r in df_scoperti.iterrows():
             val = abs(float(r["balance_eur"]))
-            passivo_breve_voci.append({
-                "nome": f"Scoperto {r.get('name', 'Conto')}",
-                "categoria": "Scoperto di Conto Corrente",
-                "dettaglio": "Saldo operativo a debito",
-                "valore": round(val, 2)
-            })
+            passivo_breve_voci.append(
+                {
+                    "nome": f"Scoperto {r.get('name', 'Conto')}",
+                    "categoria": "Scoperto di Conto Corrente",
+                    "dettaglio": "Saldo operativo a debito",
+                    "valore": round(val, 2),
+                }
+            )
 
         # Mutui e finanziamenti a lungo termine
         df_mutui = df_acc[df_acc["account_type"].isin([AccountType.MORTGAGE.value, AccountType.LOAN.value])]
         for _, r in df_mutui.iterrows():
             val = abs(float(r["balance_eur"]))
             if val > 0:
-                cat_lbl = "Mutuo Ipotecario Residuo" if r["account_type"] == AccountType.MORTGAGE.value else "Finanziamento / Prestito Personale"
-                passivo_lungo_voci.append({
-                    "nome": r.get("account_name") or r.get("name") or "Finanziamento",
-                    "categoria": cat_lbl,
-                    "dettaglio": f"{r.get('institution', 'Banca')} (Debito residuo quota capitale)",
-                    "valore": round(val, 2)
-                })
+                cat_lbl = (
+                    "Mutuo Ipotecario Residuo"
+                    if r["account_type"] == AccountType.MORTGAGE.value
+                    else "Finanziamento / Prestito Personale"
+                )
+                passivo_lungo_voci.append(
+                    {
+                        "nome": r.get("account_name") or r.get("name") or "Finanziamento",
+                        "categoria": cat_lbl,
+                        "dettaglio": f"{r.get('institution', 'Banca')} (Debito residuo quota capitale)",
+                        "valore": round(val, 2),
+                    }
+                )
 
     tot_passivo_breve = sum(v["valore"] for v in passivo_breve_voci)
     tot_passivo_lungo = sum(v["valore"] for v in passivo_lungo_voci)
@@ -309,7 +362,7 @@ def compute_personal_balance_sheet(
             "descrizione": "Saldi carte di credito, scoperti bancari esigibili, rateizzazioni a breve",
             "totale": tot_passivo_breve,
             "incidenza_pct": round(tot_passivo_breve / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": passivo_breve_voci
+            "voci": passivo_breve_voci,
         },
         {
             "codice": "II",
@@ -317,8 +370,8 @@ def compute_personal_balance_sheet(
             "descrizione": "Mutui ipotecari residui (prima casa/altri immobili), prestiti personali, finanziamenti auto",
             "totale": tot_passivo_lungo,
             "incidenza_pct": round(tot_passivo_lungo / totale_attivo * 100, 2) if totale_attivo > 0 else 0.0,
-            "voci": passivo_lungo_voci
-        }
+            "voci": passivo_lungo_voci,
+        },
     ]
 
     # --- C. PATRIMONIO NETTO PERSONALE (NET WORTH / EQUITY) ---
@@ -357,16 +410,16 @@ def compute_personal_balance_sheet(
     composizione_patrimonio_netto = [
         {
             "voce": "Capitale di Partenza & Riserve da Risparmio Pregresso",
-            "descrizione": f"Ricchezza netta consolidata accumulata fino al 31/12/{int(selected_year)-1}",
+            "descrizione": f"Ricchezza netta consolidata accumulata fino al 31/12/{int(selected_year) - 1}",
             "valore": capitale_pregresso,
-            "incidenza_pct": round(capitale_pregresso / patrimonio_netto * 100, 2) if patrimonio_netto > 0 else 0.0
+            "incidenza_pct": round(capitale_pregresso / patrimonio_netto * 100, 2) if patrimonio_netto > 0 else 0.0,
         },
         {
             "voce": f"Risultato Economico d'Esercizio ({selected_year})",
             "descrizione": f"Surplus / Risparmio netto generato dalla gestione economica personale nel {selected_year}",
             "valore": risparmio_anno,
-            "incidenza_pct": round(risparmio_anno / patrimonio_netto * 100, 2) if patrimonio_netto > 0 else 0.0
-        }
+            "incidenza_pct": round(risparmio_anno / patrimonio_netto * 100, 2) if patrimonio_netto > 0 else 0.0,
+        },
     ]
 
     # ==========================================================
@@ -379,7 +432,7 @@ def compute_personal_balance_sheet(
         tot_liquidita=tot_liquidita,
         tot_investimenti=tot_investimenti,
         tot_previdenza=tot_previdenza,
-        ce_data=ce_data
+        ce_data=ce_data,
     )
 
     return {
@@ -411,11 +464,11 @@ def compute_personal_balance_sheet(
             "pareggio": {
                 "totale_pareggio": totale_pareggio,
                 "is_quadrato": is_quadrato,
-                "differenza": round(totale_attivo - totale_pareggio, 2)
-            }
+                "differenza": round(totale_attivo - totale_pareggio, 2),
+            },
         },
         "conto_economico": ce_data,
-        "indici_bilancio": indici
+        "indici_bilancio": indici,
     }
 
 
@@ -433,16 +486,14 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
             "savings_rate_pct": 0.0,
             "entrate_sezioni": [],
             "uscite_sezioni": [],
-            "allocazione_capitale": {
-                "totale_investimenti": 0.0,
-                "voci_investimenti": [],
-                "variazione_liquidita": 0.0
-            },
-            "waterfall_data": []
+            "allocazione_capitale": {"totale_investimenti": 0.0, "voci_investimenti": [], "variazione_liquidita": 0.0},
+            "waterfall_data": [],
         }
 
     df = df_year.copy()
-    cat_ser = df["category_name"].astype(str) if "category_name" in df.columns else pd.Series([""] * len(df), index=df.index)
+    cat_ser = (
+        df["category_name"].astype(str) if "category_name" in df.columns else pd.Series([""] * len(df), index=df.index)
+    )
     merch_ser = df["merchant"].astype(str) if "merchant" in df.columns else pd.Series([""] * len(df), index=df.index)
     notes_ser = df["notes"].astype(str) if "notes" in df.columns else pd.Series([""] * len(df), index=df.index)
     nat_ser = df["nature"].astype(str) if "nature" in df.columns else pd.Series([""] * len(df), index=df.index)
@@ -450,78 +501,94 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
 
     # 1. Esclusione Giroconti e Trasferimenti Interni
     is_transfer = (
-        (dir_ser.str.lower() == "transfer") |
-        (nat_ser.str.lower() == "transfer") |
-        (cat_ser.str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
+        (dir_ser.str.lower() == "transfer")
+        | (nat_ser.str.lower() == "transfer")
+        | (cat_ser.str.contains("girocont|trasferiment|sistemazion", case=False, na=False))
     )
 
     # 2. Identificazione Rimborsi
     is_refund = (
-        (cat_ser.str.contains("rimbors|settled from|bulk settlement|storno|reso", case=False, na=False)) |
-        (merch_ser.str.contains("settled from|bulk settlement|refund|rimborso", case=False, na=False)) |
-        (notes_ser.str.contains(r"\[refund\]|settled from|bulk settlement", case=False, na=False))
+        (cat_ser.str.contains("rimbors|settled from|bulk settlement|storno|reso", case=False, na=False))
+        | (merch_ser.str.contains("settled from|bulk settlement|refund|rimborso", case=False, na=False))
+        | (notes_ser.str.contains(r"\[refund\]|settled from|bulk settlement", case=False, na=False))
     ) & (~is_transfer)
 
     # 3. Identificazione Flussi di Investimento in Uscita (Capital Allocation, non consumi)
     is_investment_outflow = (
-        (dir_ser.str.lower() == "outflow") &
-        (
-            (nat_ser.str.lower() == "saving_investment") |
-            (cat_ser.str.contains("investiment|titoli|azioni|criptovalut|crypto|fondo pensione", case=False, na=False)) |
-            (notes_ser.str.contains(r"\[investment\]|acquisto quote|pac", case=False, na=False))
-        ) &
-        (~is_transfer)
+        (dir_ser.str.lower() == "outflow")
+        & (
+            (nat_ser.str.lower() == "saving_investment")
+            | (
+                cat_ser.str.contains(
+                    "investiment|titoli|azioni|criptovalut|crypto|fondo pensione", case=False, na=False
+                )
+            )
+            | (notes_ser.str.contains(r"\[investment\]|acquisto quote|pac", case=False, na=False))
+        )
+        & (~is_transfer)
     )
 
     # 4. ENTRATE (INFLOWS)
     df_in = df[(dir_ser.str.lower() == "inflow") & (~is_transfer)].copy()
-    
+
     # Raggruppamento Entrate
     entrate_voci = []
-    
+
     # A. Lavoro Dipendente, Autonomo & Compensi
-    mask_lavoro = df_in["category_name"].str.contains("stipendio|compens|parcell|fattur|premio|tfr|borsa|stage", case=False, na=False)
+    mask_lavoro = df_in["category_name"].str.contains(
+        "stipendio|compens|parcell|fattur|premio|tfr|borsa|stage", case=False, na=False
+    )
     tot_lavoro = float(df_in[mask_lavoro]["amount"].sum())
     if tot_lavoro > 0:
-        entrate_voci.append({
-            "sezione": "Redditi da Lavoro Dipendente & Autonomo",
-            "categoria": "Lavoro & Compensi",
-            "descrizione": "Stipendi netti, compensi professionali, 13a/14a e borse di studio",
-            "valore": round(tot_lavoro, 2)
-        })
+        entrate_voci.append(
+            {
+                "sezione": "Redditi da Lavoro Dipendente & Autonomo",
+                "categoria": "Lavoro & Compensi",
+                "descrizione": "Stipendi netti, compensi professionali, 13a/14a e borse di studio",
+                "valore": round(tot_lavoro, 2),
+            }
+        )
 
     # B. Supporto Famiglia & Donazioni
     mask_famiglia = df_in["category_name"].str.contains("supporto famigli|genitor|donazion|regal", case=False, na=False)
     tot_famiglia = float(df_in[mask_famiglia]["amount"].sum())
     if tot_famiglia > 0:
-        entrate_voci.append({
-            "sezione": "Supporto Famigliare & Donazioni Ricevute",
-            "categoria": "Trasferimenti Familiari",
-            "descrizione": "Aiuti finanziari, regali e contributi da parte della famiglia",
-            "valore": round(tot_famiglia, 2)
-        })
+        entrate_voci.append(
+            {
+                "sezione": "Supporto Famigliare & Donazioni Ricevute",
+                "categoria": "Trasferimenti Familiari",
+                "descrizione": "Aiuti finanziari, regali e contributi da parte della famiglia",
+                "valore": round(tot_famiglia, 2),
+            }
+        )
 
     # C. Rendite Finanziarie & Disinvestimenti
-    mask_rendite = df_in["category_name"].str.contains("dividend|cedol|interess|investiment|titoli|cripto", case=False, na=False)
+    mask_rendite = df_in["category_name"].str.contains(
+        "dividend|cedol|interess|investiment|titoli|cripto", case=False, na=False
+    )
     tot_rendite = float(df_in[mask_rendite]["amount"].sum())
     if tot_rendite > 0:
-        entrate_voci.append({
-            "sezione": "Proventi Finanziari & Rendite di Capitale",
-            "categoria": "Rendite di Capitale",
-            "descrizione": "Dividendi, cedole, interessi attivi e liquidazioni di asset",
-            "valore": round(tot_rendite, 2)
-        })
+        entrate_voci.append(
+            {
+                "sezione": "Proventi Finanziari & Rendite di Capitale",
+                "categoria": "Rendite di Capitale",
+                "descrizione": "Dividendi, cedole, interessi attivi e liquidazioni di asset",
+                "valore": round(tot_rendite, 2),
+            }
+        )
 
     # D. Rimborsi & Entrate Varie
     mask_altre = (~mask_lavoro) & (~mask_famiglia) & (~mask_rendite)
     tot_altre = float(df_in[mask_altre]["amount"].sum())
     if tot_altre > 0:
-        entrate_voci.append({
-            "sezione": "Rimborsi Spese & Altre Entrate Straordinarie",
-            "categoria": "Rimborsi & Varie",
-            "descrizione": "Rimborsi spese saldate da terzi, resi e introiti extra",
-            "valore": round(tot_altre, 2)
-        })
+        entrate_voci.append(
+            {
+                "sezione": "Rimborsi Spese & Altre Entrate Straordinarie",
+                "categoria": "Rimborsi & Varie",
+                "descrizione": "Rimborsi spese saldate da terzi, resi e introiti extra",
+                "valore": round(tot_altre, 2),
+            }
+        )
 
     totale_entrate = round(float(df_in["amount"].sum()), 2)
 
@@ -530,18 +597,24 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
     df_out_living = df[(dir_ser.str.lower() == "outflow") & (~is_transfer) & (~is_investment_outflow)].copy()
 
     uscite_categorie_mapping = [
-        ("Abitazione, Affitto & Utenze", ["casa", "affitto", "utenze", "luce", "gas", "condominio", "internet", "spese casa"]),
+        (
+            "Abitazione, Affitto & Utenze",
+            ["casa", "affitto", "utenze", "luce", "gas", "condominio", "internet", "spese casa"],
+        ),
         ("Spesa Alimentare & Supermercato", ["spesa alimentare", "supermercato", "alimentari"]),
         ("Ristoranti, Serate & Socialità", ["ristoranti", "pizzerie", "sushi", "serate", "bar", "aperitivi"]),
         ("Trasporti, Mobilità & Benzina", ["trasporti", "benzina", "carburante", "mezzi", "autostrada", "parcheggi"]),
         ("Istruzione, Formazione & Libri", ["istruzione", "corsi", "libri", "università", "formazione"]),
         ("Salute, Farmacia & Visite Mediche", ["salute", "farmacia", "visite", "medico", "dentista"]),
         ("Tempo Libero, Viaggi & Eventi", ["tempo libero", "cinema", "eventi", "viaggi", "voli", "vacanze", "hotel"]),
-        ("Shopping, Tecnologia & Cura Personale", ["shopping", "abbigliamento", "elettronica", "pc", "gadget", "cura personale", "parrucchiere", "abitudini"]),
+        (
+            "Shopping, Tecnologia & Cura Personale",
+            ["shopping", "abbigliamento", "elettronica", "pc", "gadget", "cura personale", "parrucchiere", "abitudini"],
+        ),
         ("Abbonamenti Digitali & Ricorrenti", ["abbonamenti", "streaming", "spotify", "icloud", "netflix"]),
         ("Regali, Eventi & Supporto Famiglia", ["regali", "lauree", "supporto famiglia", "spese per la famiglia"]),
         ("Imposte, Tasse & Commissioni Bancarie", ["tasse", "imposte", "commissioni", "bollo", "canone"]),
-        ("Spese Varie & Imprevisti Personali", ["spese varie", "imprevisti"])
+        ("Spese Varie & Imprevisti Personali", ["spese varie", "imprevisti"]),
     ]
 
     uscite_voci = []
@@ -549,27 +622,33 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
 
     for macro_nome, keywords in uscite_categorie_mapping:
         pat = "|".join(keywords)
-        mask = df_out_living["category_name"].str.contains(pat, case=False, na=False) & (~df_out_living.index.isin(matched_indices))
+        mask = df_out_living["category_name"].str.contains(pat, case=False, na=False) & (
+            ~df_out_living.index.isin(matched_indices)
+        )
         tot_sub = float(df_out_living[mask]["amount"].sum())
         if tot_sub > 0:
             matched_indices.update(df_out_living[mask].index)
-            uscite_voci.append({
-                "sezione": macro_nome,
-                "categoria": macro_nome.split(",")[0].strip(),
-                "valore": round(tot_sub, 2),
-                "num_movimenti": int(mask.sum())
-            })
+            uscite_voci.append(
+                {
+                    "sezione": macro_nome,
+                    "categoria": macro_nome.split(",")[0].strip(),
+                    "valore": round(tot_sub, 2),
+                    "num_movimenti": int(mask.sum()),
+                }
+            )
 
     # Eventuali spese residue non mappate
     unmatched_mask = ~df_out_living.index.isin(matched_indices)
     tot_unmatched = float(df_out_living[unmatched_mask]["amount"].sum())
     if tot_unmatched > 0:
-        uscite_voci.append({
-            "sezione": "Altre Spese Personali Non Classificate",
-            "categoria": "Varie",
-            "valore": round(tot_unmatched, 2),
-            "num_movimenti": int(unmatched_mask.sum())
-        })
+        uscite_voci.append(
+            {
+                "sezione": "Altre Spese Personali Non Classificate",
+                "categoria": "Varie",
+                "valore": round(tot_unmatched, 2),
+                "num_movimenti": int(unmatched_mask.sum()),
+            }
+        )
 
     # Ordina uscite per importo decrescente
     uscite_voci = sorted(uscite_voci, key=lambda x: x["valore"], reverse=True)
@@ -582,15 +661,12 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
     # 7. ALLOCAZIONE DEL RISPARMIO & INVESTIMENTI DEL PERIODO
     df_inv = df[is_investment_outflow].copy()
     totale_investimenti = round(float(df_inv["amount"].sum()), 2)
-    
+
     voci_inv = []
     if not df_inv.empty:
         inv_summary = df_inv.groupby("category_name")["amount"].sum().reset_index()
         for _, r in inv_summary.iterrows():
-            voci_inv.append({
-                "nome": r["category_name"],
-                "valore": round(float(r["amount"]), 2)
-            })
+            voci_inv.append({"nome": r["category_name"], "valore": round(float(r["amount"]), 2)})
 
     # Risparmio Liquido rimasto sul conto dopo gli investimenti eseguiti
     variazione_liquidita = round(risparmio_netto - totale_investimenti, 2)
@@ -601,7 +677,7 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
         {"measure": "relative", "x": "Spese di Vita (Consumi)", "y": -totale_uscite},
         {"measure": "total", "x": "Risparmio Netto", "y": risparmio_netto},
         {"measure": "relative", "x": "Investimenti Eseguiti (PAC/Crypto)", "y": -totale_investimenti},
-        {"measure": "total", "x": "Risparmio Liquido Accantonato", "y": variazione_liquidita}
+        {"measure": "total", "x": "Risparmio Liquido Accantonato", "y": variazione_liquidita},
     ]
 
     return {
@@ -615,9 +691,9 @@ def _compute_income_statement(df_year: pd.DataFrame, year: int) -> Dict[str, Any
         "allocazione_capitale": {
             "totale_investimenti": totale_investimenti,
             "voci_investimenti": voci_inv,
-            "variazione_liquidita": variazione_liquidita
+            "variazione_liquidita": variazione_liquidita,
         },
-        "waterfall_data": waterfall_data
+        "waterfall_data": waterfall_data,
     }
 
 
@@ -628,7 +704,7 @@ def _compute_personal_ratios(
     tot_liquidita: float,
     tot_investimenti: float,
     tot_previdenza: float,
-    ce_data: Dict[str, Any]
+    ce_data: Dict[str, Any],
 ) -> Dict[str, Any]:
     """
     Calcola i 6 Indici Fondamentali di Bilancio Personale:
@@ -666,7 +742,7 @@ def _compute_personal_ratios(
         runway_val = round(tot_liquidita / spesa_mensile, 1)
     else:
         runway_val = 99.0
-    
+
     if runway_val >= 6.0:
         runway_status, runway_color = "OPTIMAL", "#10b981"
     elif runway_val >= 3.0:
@@ -705,7 +781,9 @@ def _compute_personal_ratios(
         inv_status, inv_color = "WARNING", "#ef4444"
 
     # Health Rating complessivo del Bilancio Personale
-    optimal_count = sum(1 for s in [solv_status, debt_status, runway_status, sr_status, dsti_status, inv_status] if s == "OPTIMAL")
+    optimal_count = sum(
+        1 for s in [solv_status, debt_status, runway_status, sr_status, dsti_status, inv_status] if s == "OPTIMAL"
+    )
     if optimal_count >= 5:
         overall_rating = "AAA (Solidità Finanziaria Istituzionale)"
         overall_desc = "Struttura patrimoniale eccezionale: assenza o controllo totale del debito, elevata liquidità di sicurezza e formidabile capacità di accumulo."
@@ -714,7 +792,9 @@ def _compute_personal_ratios(
         overall_desc = "Ottimo profilo patrimoniale, patrimonio netto ampiamente positivo e gestione equilibrata delle uscite familiari."
     else:
         overall_rating = "A (Profilo in Consolidamento)"
-        overall_desc = "Profilo solido con margini di ottimizzazione su riserve di liquidità o quota di asset a reddito."
+        overall_desc = (
+            "Profilo solido con margini di ottimizzazione su riserve di liquidità o quota di asset a reddito."
+        )
 
     return {
         "overall_rating": overall_rating,
@@ -728,7 +808,7 @@ def _compute_personal_ratios(
             "formula": "Patrimonio Netto / Attivo Totale",
             "status": solv_status,
             "colore": solv_color,
-            "descrizione": "Misura la percentuale di patrimonio libero da qualsiasi vincolo o debito verso terzi."
+            "descrizione": "Misura la percentuale di patrimonio libero da qualsiasi vincolo o debito verso terzi.",
         },
         "debt_to_assets": {
             "valore": debt_assets_val,
@@ -738,7 +818,7 @@ def _compute_personal_ratios(
             "formula": "Passività Totali / Attivo Totale",
             "status": debt_status,
             "colore": debt_color,
-            "descrizione": "Rapporto tra l'indebitamento complessivo e il totale dei beni posseduti."
+            "descrizione": "Rapporto tra l'indebitamento complessivo e il totale dei beni posseduti.",
         },
         "emergency_runway": {
             "valore": runway_val,
@@ -748,7 +828,7 @@ def _compute_personal_ratios(
             "formula": "Liquidità Immediata / Spese Mensili Medie",
             "status": runway_status,
             "colore": runway_color,
-            "descrizione": "Autonomia finanziaria in caso di azzeramento improvviso di tutte le entrate correnti."
+            "descrizione": "Autonomia finanziaria in caso di azzeramento improvviso di tutte le entrate correnti.",
         },
         "savings_rate": {
             "valore": savings_rate_val,
@@ -758,7 +838,7 @@ def _compute_personal_ratios(
             "formula": "Risparmio Netto / Totale Entrate",
             "status": sr_status,
             "colore": sr_color,
-            "descrizione": "Percentuale del reddito convertita in nuovo patrimonio anziché consumata in spese correnti."
+            "descrizione": "Percentuale del reddito convertita in nuovo patrimonio anziché consumata in spese correnti.",
         },
         "dsti": {
             "valore": dsti_val,
@@ -768,7 +848,7 @@ def _compute_personal_ratios(
             "formula": "Rate di Debito Annue / Entrate Totali",
             "status": dsti_status,
             "colore": dsti_color,
-            "descrizione": "Percentuale delle entrate assorbita dal rimborso di finanziamenti o mutui."
+            "descrizione": "Percentuale delle entrate assorbita dal rimborso di finanziamenti o mutui.",
         },
         "invested_assets_ratio": {
             "valore": invested_ratio_val,
@@ -778,6 +858,6 @@ def _compute_personal_ratios(
             "formula": "(Investimenti + Previdenza) / Patrimonio Netto",
             "status": inv_status,
             "colore": inv_color,
-            "descrizione": "Percentuale del patrimonio investita in asset finanziari produttivi di rendimento composto."
-        }
+            "descrizione": "Percentuale del patrimonio investita in asset finanziari produttivi di rendimento composto.",
+        },
     }

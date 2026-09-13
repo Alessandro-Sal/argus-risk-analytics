@@ -4,18 +4,20 @@
 # ==============================================================================
 
 from datetime import date, timedelta
+
 import pandas as pd
 import pytest
+
 pydantic = pytest.importorskip("pydantic")
 from pydantic import ValidationError
 
+from core.adapters.broker_hub import parse_broker_csv
 from core.data_quality_gate import (
     CanonicalTradeRecord,
     DataQualityGate,
     QualityGateReport,
     TransactionType,
 )
-from core.adapters.broker_hub import parse_broker_csv
 
 
 def test_canonical_trade_record_valid():

@@ -16,7 +16,7 @@ def compute_market_regime_states(benchmark_returns: pd.Series) -> Dict[str, Any]
     - Regime 1 🟢: Bull Market / Low Volatility (Rendimenti positivi, dispersione contenuta)
     - Regime 2 🟡: Range-Bound / Transizione (Volatilità moderata, rendimenti laterali)
     - Regime 3 🔴: Crisis / Panic Selling (Forte volatilità, rendimenti negativi, shock di correlazione)
-    
+
     Utilizza un modello stocastico di Mixture Gaussiana / Softmax Posterior Probability
     sul piano bivariato (Rendimento Rolling 21g, Volatilità Rolling 21g).
     """
@@ -32,7 +32,7 @@ def compute_market_regime_states(benchmark_returns: pd.Series) -> Dict[str, Any]
             "historical_probabilities_df": empty_prob_df,
             "transition_matrix": pd.DataFrame(),
             "rolling_volatility": pd.Series(),
-            "regime_stats": pd.DataFrame()
+            "regime_stats": pd.DataFrame(),
         }
 
     s = benchmark_returns.dropna().astype(float)
@@ -65,12 +65,12 @@ def compute_market_regime_states(benchmark_returns: pd.Series) -> Dict[str, Any]
             regimes.append(int(np.argmax(probs)) + 1)
 
     df_raw_probs = pd.DataFrame(prob_matrix, index=s.index, columns=["p_bull", "p_neutral", "p_crisis"])
-    
+
     # Filtro Stocastico di Markov Smoothed Probabilities (Hamilton Filter)
     # L'EMA a 21 giorni filtra il rumore bianco giornaliero ed estrae i regimi macroeconomici strutturali
     df_probs = df_raw_probs.ewm(span=21, min_periods=1).mean()
     df_probs = df_probs.div(df_probs.sum(axis=1), axis=0)
-    
+
     regimes = (df_probs[["p_bull", "p_neutral", "p_crisis"]].values.argmax(axis=1) + 1).tolist()
     reg_series = pd.Series(regimes, index=s.index, name="market_regime")
     df_probs["market_regime"] = reg_series
@@ -98,7 +98,7 @@ def compute_market_regime_states(benchmark_returns: pd.Series) -> Dict[str, Any]
     # Matrice di Transizione Empirica di Markov (P_ij = P(S_t = j | S_{t-1} = i))
     trans_counts = np.zeros((3, 3))
     for t in range(1, len(regimes)):
-        i_from = regimes[t-1] - 1
+        i_from = regimes[t - 1] - 1
         j_to = regimes[t] - 1
         trans_counts[i_from, j_to] += 1
 
@@ -109,44 +109,42 @@ def compute_market_regime_states(benchmark_returns: pd.Series) -> Dict[str, Any]
     df_trans_matrix = pd.DataFrame(
         trans_probs.round(1),
         index=["🟢 Da Regime 1 (Bull)", "🟡 Da Regime 2 (Range)", "🔴 Da Regime 3 (Crisis)"],
-        columns=["🟢 A Regime 1 (Bull)", "🟡 A Regime 2 (Range)", "🔴 A Regime 3 (Crisis)"]
+        columns=["🟢 A Regime 1 (Bull)", "🟡 A Regime 2 (Range)", "🔴 A Regime 3 (Crisis)"],
     )
 
-    df_stats = pd.DataFrame([
-        {
-            "Stato / Regime Macro": "🟢 Regime 1 (Bull Low-Vol)",
-            "Dinamica & Profilo di Rischio": "Espansione macro, trend solido, bassa dispersione.",
-            "Probabilità Recente %": f"{p_bull:.1f}%",
-            "Allocazione Tattica Istituzionale": "Piena esposizione azionaria, fattore Momentum & Growth."
-        },
-        {
-            "Stato / Regime Macro": "🟡 Regime 2 (Range-Bound)",
-            "Dinamica & Profilo di Rischio": "Fase laterale, rotazione settoriale, incertezza.",
-            "Probabilità Recente %": f"{p_trans:.1f}%",
-            "Allocazione Tattica Istituzionale": "Ribilanciamento verso Quality, Value e dividendi difensivi."
-        },
-        {
-            "Stato / Regime Macro": "🔴 Regime 3 (Crisis / Stress)",
-            "Dinamica & Profilo di Rischio": "Crollo di mercato, spike di correlazione, volatilità estrema.",
-            "Probabilità Recente %": f"{p_crisis:.1f}%",
-            "Allocazione Tattica Istituzionale": "Aumento riserva liquidità, opzioni Put Hedging e bond governativi."
-        }
-    ])
+    df_stats = pd.DataFrame(
+        [
+            {
+                "Stato / Regime Macro": "🟢 Regime 1 (Bull Low-Vol)",
+                "Dinamica & Profilo di Rischio": "Espansione macro, trend solido, bassa dispersione.",
+                "Probabilità Recente %": f"{p_bull:.1f}%",
+                "Allocazione Tattica Istituzionale": "Piena esposizione azionaria, fattore Momentum & Growth.",
+            },
+            {
+                "Stato / Regime Macro": "🟡 Regime 2 (Range-Bound)",
+                "Dinamica & Profilo di Rischio": "Fase laterale, rotazione settoriale, incertezza.",
+                "Probabilità Recente %": f"{p_trans:.1f}%",
+                "Allocazione Tattica Istituzionale": "Ribilanciamento verso Quality, Value e dividendi difensivi.",
+            },
+            {
+                "Stato / Regime Macro": "🔴 Regime 3 (Crisis / Stress)",
+                "Dinamica & Profilo di Rischio": "Crollo di mercato, spike di correlazione, volatilità estrema.",
+                "Probabilità Recente %": f"{p_crisis:.1f}%",
+                "Allocazione Tattica Istituzionale": "Aumento riserva liquidità, opzioni Put Hedging e bond governativi.",
+            },
+        ]
+    )
 
     return {
         "current_regime": current_name,
         "current_regime_icon": current_icon,
         "current_color": current_color,
         "current_state_idx": curr_reg_val,
-        "regime_probabilities": {
-            "Bull Low-Vol": p_bull,
-            "Range-Bound": p_trans,
-            "Crisis High-Vol": p_crisis
-        },
+        "regime_probabilities": {"Bull Low-Vol": p_bull, "Range-Bound": p_trans, "Crisis High-Vol": p_crisis},
         "historical_regimes": reg_series,
         "historical_probabilities_df": df_probs,
         "transition_matrix": df_trans_matrix,
         "rolling_volatility": rolling_vol * 100.0,
         "rolling_return": rolling_ret * 100.0,
-        "regime_stats": df_stats
+        "regime_stats": df_stats,
     }

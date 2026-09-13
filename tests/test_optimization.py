@@ -1,7 +1,9 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
+
 from core.risk_engine import _compute_efficient_frontier
+
 
 def test_compute_efficient_frontier_scipy():
     # Mock return series for 3 assets

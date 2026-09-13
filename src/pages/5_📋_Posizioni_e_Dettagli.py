@@ -2,31 +2,47 @@ import streamlit as st
 
 st.set_page_config(page_title="Posizioni e Concentrazione | ARGUS", page_icon="📋", layout="wide")
 
-import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+import pandas as pd
 import plotly.express as px
-import core.ui_utils
-import core.risk_engine
+import plotly.graph_objects as go
+
 import core.crypto_tax_engine
 import core.duckdb_engine
 import core.execution_algo
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, section, glossary_modal, render_command_bar, render_segmented_tabs, apply_plotly_theme, ensure_portfolio_loaded, render_sandbox_banner, render_corporate_actions_modal, render_crypto_tax_modal, render_table_with_export, render_export_toolbar
-from core.sidebar import render_sidebar
+import core.risk_engine
+import core.ui_utils
 from core.execution_algo import (
+    compare_execution_strategies,
+    compute_almgren_chriss_basket_schedule,
     compute_twap_schedule,
     compute_vwap_schedule,
-    compare_execution_strategies,
-    generate_intraday_volume_profile,
-    compute_almgren_chriss_basket_schedule,
-    generate_fix44_blotter,
+    export_directa_csv,
     export_ibkr_basket_csv,
-    export_directa_csv
+    generate_fix44_blotter,
+    generate_intraday_volume_profile,
 )
 from core.execution_algo_engine import (
     compute_implementation_shortfall_and_execution_benchmarks,
+    compute_post_trade_tca,
     compute_pre_trade_tca,
-    compute_post_trade_tca
+)
+from core.sidebar import render_sidebar
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_portfolio_loaded,
+    fmt_eur,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_corporate_actions_modal,
+    render_crypto_tax_modal,
+    render_export_toolbar,
+    render_sandbox_banner,
+    render_segmented_tabs,
+    render_table_with_export,
+    section,
 )
 
 inject_custom_css()
@@ -1068,6 +1084,7 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
     st.caption("Analisi previsionale dettagliata dei flussi di cassa da cedole e dividendi: scopri chi paga, i mesi di stacco, la frequenza e gli importi stimati per ciascuna posizione.")
 
     import importlib
+
     import core.dividend_engine
     importlib.reload(core.dividend_engine)
     from core.dividend_engine import compute_dividend_forecast
@@ -1325,19 +1342,20 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
     st.caption("Analisi delle plusvalenze realizzate, della stima delle imposte (aliquote 26% / 12.5%), fiscalità Cripto (L. 197/2022) ed opportunità di Tax-Loss Harvesting.")
 
     import importlib
-    import core.tax_engine
+
     import core.crypto_tax_engine
+    import core.tax_engine
     importlib.reload(core.tax_engine)
     importlib.reload(core.crypto_tax_engine)
-    from core.tax_engine import (
-        compute_tax_and_harvesting,
-        generate_tax_loss_harvesting_strategy,
-        compute_riforma_fiscale_comparison,
-        compute_modello_redditi_pf,
-        compute_withholding_tax_analysis,
-        simulate_fifo_lot_sale
-    )
     from core.crypto_tax_engine import compute_crypto_tax_report
+    from core.tax_engine import (
+        compute_modello_redditi_pf,
+        compute_riforma_fiscale_comparison,
+        compute_tax_and_harvesting,
+        compute_withholding_tax_analysis,
+        generate_tax_loss_harvesting_strategy,
+        simulate_fifo_lot_sale,
+    )
 
     engine = st.session_state.get("db_engine", None)
     if engine is None:
@@ -1874,7 +1892,7 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
             franchigia_txt = "Esente (< 2.000€)" if (0 < net_cr_pnl <= 2000.0) else ("Soggetta a Imposta 26%" if net_cr_pnl > 2000.0 else "Nessuna Plusvalenza")
             metric_card("Plusvalenze Nette Cripto", f"€ {net_cr_pnl:,.2f}", franchigia_txt, net_cr_pnl <= 2000.0)
         with col_cr3:
-            metric_card(f"Imposta Quadro RT (26%)", f"€ {c_sum['total_tax_due_rt_eur']:,.2f}", "Imposta Sostitutiva Plusvalenze", False)
+            metric_card("Imposta Quadro RT (26%)", f"€ {c_sum['total_tax_due_rt_eur']:,.2f}", "Imposta Sostitutiva Plusvalenze", False)
         with col_cr4:
             metric_card("Imposta Valore / IVAFE (0,20%)", f"€ {c_sum['total_ivafe_rw_eur']:,.2f}", f"Totale Carico: € {c_sum['total_crypto_tax_burden_eur']:,.2f}", False)
 
@@ -2732,7 +2750,7 @@ elif active_pos_tab == "⚖️ Ribilanciamento Autonomo & MiFID II":
     st.markdown("### ⚖️ Autonomous AI Rebalancing & MiFID II Suitability Gate")
     st.caption("Generazione automatica di proposte d'ordine per riallineare i pesi agli obiettivi strategici, verifica del turnover, stima delle plusvalenze/minusvalenze fiscali e controllo di adeguatezza MiFID II.")
 
-    from core.autonomous_rebalancer import generate_autonomous_rebalancing_proposal, check_mifid_suitability_and_limits
+    from core.autonomous_rebalancer import check_mifid_suitability_and_limits, generate_autonomous_rebalancing_proposal
 
     col_reb_opt1, col_reb_opt2 = st.columns([2, 1])
     with col_reb_opt1:

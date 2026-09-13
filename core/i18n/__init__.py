@@ -2,7 +2,6 @@
 ARGUS — Internationalization (i18n), Localization (L10n) & FX Risk Architecture
 """
 
-from core.i18n.translator import I18nEngine, get_i18n, get_locale, set_locale, t
 from core.i18n.formatters import (
     LocaleConvention,
     format_currency,
@@ -12,11 +11,12 @@ from core.i18n.formatters import (
     get_dataframe_styler_formats,
 )
 from core.i18n.fx_engine import (
+    SUPPORTED_CURRENCIES,
     ECBRateProvider,
     FXConversionEngine,
     FXDecompositionResult,
-    SUPPORTED_CURRENCIES,
 )
+from core.i18n.translator import I18nEngine, get_i18n, get_locale, set_locale, t
 
 __all__ = [
     "I18nEngine",

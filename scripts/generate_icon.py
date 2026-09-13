@@ -2,9 +2,11 @@
 Script per generare l'icona ufficiale 'Occhio di Argus' (.ico) in alta risoluzione.
 """
 
-import os
 import math
+import os
+
 from PIL import Image, ImageDraw, ImageFont
+
 
 def generate_argus_icon(output_path="docs/argus_icon.ico"):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

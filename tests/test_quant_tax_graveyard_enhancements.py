@@ -1,14 +1,15 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
+from core.advanced_quant import compute_interactive_trade_kelly, compute_tail_copula_matrix
 from core.closed_trades import (
     compute_closed_trades_journal,
     compute_cumulative_realized_curve,
     compute_monthly_trading_calendar,
-    compute_sector_asset_class_breakdown
+    compute_sector_asset_class_breakdown,
 )
 from core.tax_engine import compute_tax_loss_harvesting_strategy
-from core.advanced_quant import compute_interactive_trade_kelly, compute_tail_copula_matrix
 
 
 def test_closed_trades_enhancements_sandbox():

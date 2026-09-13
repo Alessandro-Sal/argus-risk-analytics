@@ -3,9 +3,9 @@
 # ARGUS — Universal Zero-Config Banking & Broker Ingestion Engine
 # ==============================================================================
 
+import hashlib
 import io
 import re
-import hashlib
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 
 from core.ingestion_utils import read_tabular_stream
-
 
 # ── BANCHE & BROKER SIGNATURE DEFINITIONS ──
 BANK_SIGNATURES: Dict[str, Dict[str, Any]] = {
@@ -46,7 +45,17 @@ BANK_SIGNATURES: Dict[str, Dict[str, Any]] = {
     },
     "REVOLUT": {
         "name": "Revolut",
-        "keywords": ["type", "product", "started date", "completed date", "description", "amount", "fee", "currency", "state"],
+        "keywords": [
+            "type",
+            "product",
+            "started date",
+            "completed date",
+            "description",
+            "amount",
+            "fee",
+            "currency",
+            "state",
+        ],
         "date_cols": ["Completed Date", "Started Date", "Date", "Data"],
         "desc_cols": ["Description", "Descrizione", "Merchant"],
         "amount_cols": ["Amount", "Importo", "Total Amount"],
@@ -100,7 +109,15 @@ BANK_SIGNATURES: Dict[str, Dict[str, Any]] = {
     },
     "POSTE_ITALIANE": {
         "name": "Poste Italiane (BancoPosta / Postepay)",
-        "keywords": ["data contabile", "data valuta", "addebiti (euro)", "accrediti (euro)", "descrizione operazioni", "postepay", "bancoposta"],
+        "keywords": [
+            "data contabile",
+            "data valuta",
+            "addebiti (euro)",
+            "accrediti (euro)",
+            "descrizione operazioni",
+            "postepay",
+            "bancoposta",
+        ],
         "date_cols": ["Data Contabile", "Data Valuta", "Data Operazione", "Data"],
         "desc_cols": ["Descrizione Operazioni", "Descrizione", "Causale"],
         "amount_cols": ["Importo", "Importo in Euro"],
@@ -109,7 +126,13 @@ BANK_SIGNATURES: Dict[str, Dict[str, Any]] = {
     },
     "WISE": {
         "name": "Wise (TransferWise)",
-        "keywords": ["transferwise id", "source amount (after fees)", "target amount (after fees)", "direction", "created on"],
+        "keywords": [
+            "transferwise id",
+            "source amount (after fees)",
+            "target amount (after fees)",
+            "direction",
+            "created on",
+        ],
         "date_cols": ["Created on", "Finished on", "Date"],
         "desc_cols": ["Target name", "Reference", "Source name"],
         "amount_cols": ["Target amount (after fees)", "Amount", "Source amount (after fees)"],
@@ -136,7 +159,14 @@ BANK_SIGNATURES: Dict[str, Dict[str, Any]] = {
     },
     "INTERACTIVE_BROKERS": {
         "name": "Interactive Brokers (Cash / Activity)",
-        "keywords": ["cash report", "deposits & withdrawals", "dividends", "withholding tax", "transaction history", "statement of funds"],
+        "keywords": [
+            "cash report",
+            "deposits & withdrawals",
+            "dividends",
+            "withholding tax",
+            "transaction history",
+            "statement of funds",
+        ],
         "date_cols": ["Date", "Settle Date", "Data"],
         "desc_cols": ["Description", "Descrizione", "Activity Description"],
         "amount_cols": ["Amount", "Total", "Net Cash"],
@@ -160,68 +190,307 @@ BANK_SIGNATURES: Dict[str, Dict[str, Any]] = {
         "amount_cols": ["Amount", "Importo"],
         "credit_cols": [],
         "debit_cols": [],
-    }
+    },
 }
 
 
 # ── MOTORE DI CATEGORIZZAZIONE AUTOMATICA SEMANTICA ──
 CATEGORY_RULES: List[Tuple[str, str, List[str]]] = [
-    ("🍽️ Cibo & Spesa Alimentare", "Needs", [
-        "conad", "esselunga", "coop", "carrefour", "lidl", "eurospin", "iper", "pam", "penny",
-        "tigros", "despar", "alimentar", "supermercat", "grocery", "ristorant", "pizzeri",
-        "trattori", "bar ", "cafe", "caffe", "mcdonald", "burger king", "kfc", "sushi", "poke",
-        "deliveroo", "just eat", "glovo", "uber eats", "panifici", "macelleri", "pescheri"
-    ]),
-    ("🏠 Casa, Affitto & Utenze", "Needs", [
-        "affitto", "condomini", "enel", "eni ", "plenitude", "a2a", "edison", "servizio elettrico",
-        "iren", "sorgenia", "luce", "gas", "acqua", "tari", "imu", "mutuo", "rata mutuo",
-        "telecom", "tim ", "vodafone", "windtre", "iliad", "fastweb", "internet", "fibra"
-    ]),
-    ("🚗 Trasporti & Mobilità", "Needs", [
-        "eni station", "q8", "ip ", "tamoil", "esso", "carburant", "benzina", "diesel", "metano",
-        "telepass", "autostrade", "trenitalia", "italo", "atm milano", "atac", "metro", "bus",
-        "taxi", "uber", "freenow", "parcheggio", "parking", "garage", "bollo auto", "tagliando"
-    ]),
-    ("💊 Salute, Farmacia & Cure", "Needs", [
-        "farmaci", "parafarmaci", "visita medic", "dentist", "odontoiatr", "ospedale", "asl",
-        "ticket", "analisi", "laboratorio", "ottic", "occhiali", "sanitari", "medico"
-    ]),
-    ("🛡️ Assicurazioni & Protezione", "Needs", [
-        "assicurazion", "unipolsai", "generali", "allianz", "axa", "prima assicurazioni",
-        "zurich", "polizza", "rc auto", "cattolica"
-    ]),
-    ("✈️ Viaggi, Hotel & Vacanze", "Wants", [
-        "ryanair", "easyjet", "wizzair", "lufthansa", "air france", "booking.com", "airbnb",
-        "hotel", "resort", "b&b", "expedia", "trivago", "volo", "traghetto", "crociera"
-    ]),
-    ("🛍️ Shopping, Abbigliamento & Elettronica", "Wants", [
-        "amazon", "zara", "h&m", "zalando", "nike", "adidas", "apple", "mediaworld", "unieuro",
-        "shein", "asos", "yoox", "ebay", "aliexpress", "abbigliamento", "calzature", "profumeri",
-        "sephora", "douglas", "kiko"
-    ]),
-    ("🎮 Svago, Cinema & Abbonamenti", "Wants", [
-        "netflix", "spotify", "amazon prime", "disney", "dazn", "sky", "youtube", "playstation",
-        "xbox", "nintendo", "steam", "cinema", "teatro", "concerto", "ticketone", "palestra",
-        "gym", "fitness", "padel", "calcetto", "bowling", "club"
-    ]),
-    ("📈 Investimenti, PAC & Broker", "Savings", [
-        "degiro", "directa", "interactive brokers", "scalable", "trade republic", "fineco bank",
-        "pac ", "etf", "azioni", "acquisto quote", "reinvest", "crypto", "binance", "coinbase",
-        "kraken", "young platform", "anima sgr", "eurizon", "fondi comuni", "moneyfarm", "tinaba"
-    ]),
-    ("🛡️ Previdenza & Fondo Pensione", "Savings", [
-        "fondo pensione", "cometa", "fonte", "fonchim", "perseo", "laborfonds", "secondapensione",
-        "allianz insieme", "previdenza integrativa", "pip", "fondopensione", "tfr"
-    ]),
-    ("💼 Stipendio, Compensi & Entrate", "Income", [
-        "stipendio", "emolumenti", "salario", "retribuzione", "cedolino", "bonifico da datore",
-        "compenso", "fattura", "onorario", "prestazione", "incasso pos", "dividendo", "cedola",
-        "rendita", "pensione inps", "accredito stipendio", "rimborso 730"
-    ]),
-    ("🔄 Trasferimento / Giroconto", "Transfer", [
-        "giroconto", "giroconto da", "giroconto a", "trasferimento tra conti", "bonifico mio conto",
-        "ricarica carta", "ricarica prepagata", "alimentazione conto", "me stesso", "auto-bonifico"
-    ])
+    (
+        "🍽️ Cibo & Spesa Alimentare",
+        "Needs",
+        [
+            "conad",
+            "esselunga",
+            "coop",
+            "carrefour",
+            "lidl",
+            "eurospin",
+            "iper",
+            "pam",
+            "penny",
+            "tigros",
+            "despar",
+            "alimentar",
+            "supermercat",
+            "grocery",
+            "ristorant",
+            "pizzeri",
+            "trattori",
+            "bar ",
+            "cafe",
+            "caffe",
+            "mcdonald",
+            "burger king",
+            "kfc",
+            "sushi",
+            "poke",
+            "deliveroo",
+            "just eat",
+            "glovo",
+            "uber eats",
+            "panifici",
+            "macelleri",
+            "pescheri",
+        ],
+    ),
+    (
+        "🏠 Casa, Affitto & Utenze",
+        "Needs",
+        [
+            "affitto",
+            "condomini",
+            "enel",
+            "eni ",
+            "plenitude",
+            "a2a",
+            "edison",
+            "servizio elettrico",
+            "iren",
+            "sorgenia",
+            "luce",
+            "gas",
+            "acqua",
+            "tari",
+            "imu",
+            "mutuo",
+            "rata mutuo",
+            "telecom",
+            "tim ",
+            "vodafone",
+            "windtre",
+            "iliad",
+            "fastweb",
+            "internet",
+            "fibra",
+        ],
+    ),
+    (
+        "🚗 Trasporti & Mobilità",
+        "Needs",
+        [
+            "eni station",
+            "q8",
+            "ip ",
+            "tamoil",
+            "esso",
+            "carburant",
+            "benzina",
+            "diesel",
+            "metano",
+            "telepass",
+            "autostrade",
+            "trenitalia",
+            "italo",
+            "atm milano",
+            "atac",
+            "metro",
+            "bus",
+            "taxi",
+            "uber",
+            "freenow",
+            "parcheggio",
+            "parking",
+            "garage",
+            "bollo auto",
+            "tagliando",
+        ],
+    ),
+    (
+        "💊 Salute, Farmacia & Cure",
+        "Needs",
+        [
+            "farmaci",
+            "parafarmaci",
+            "visita medic",
+            "dentist",
+            "odontoiatr",
+            "ospedale",
+            "asl",
+            "ticket",
+            "analisi",
+            "laboratorio",
+            "ottic",
+            "occhiali",
+            "sanitari",
+            "medico",
+        ],
+    ),
+    (
+        "🛡️ Assicurazioni & Protezione",
+        "Needs",
+        [
+            "assicurazion",
+            "unipolsai",
+            "generali",
+            "allianz",
+            "axa",
+            "prima assicurazioni",
+            "zurich",
+            "polizza",
+            "rc auto",
+            "cattolica",
+        ],
+    ),
+    (
+        "✈️ Viaggi, Hotel & Vacanze",
+        "Wants",
+        [
+            "ryanair",
+            "easyjet",
+            "wizzair",
+            "lufthansa",
+            "air france",
+            "booking.com",
+            "airbnb",
+            "hotel",
+            "resort",
+            "b&b",
+            "expedia",
+            "trivago",
+            "volo",
+            "traghetto",
+            "crociera",
+        ],
+    ),
+    (
+        "🛍️ Shopping, Abbigliamento & Elettronica",
+        "Wants",
+        [
+            "amazon",
+            "zara",
+            "h&m",
+            "zalando",
+            "nike",
+            "adidas",
+            "apple",
+            "mediaworld",
+            "unieuro",
+            "shein",
+            "asos",
+            "yoox",
+            "ebay",
+            "aliexpress",
+            "abbigliamento",
+            "calzature",
+            "profumeri",
+            "sephora",
+            "douglas",
+            "kiko",
+        ],
+    ),
+    (
+        "🎮 Svago, Cinema & Abbonamenti",
+        "Wants",
+        [
+            "netflix",
+            "spotify",
+            "amazon prime",
+            "disney",
+            "dazn",
+            "sky",
+            "youtube",
+            "playstation",
+            "xbox",
+            "nintendo",
+            "steam",
+            "cinema",
+            "teatro",
+            "concerto",
+            "ticketone",
+            "palestra",
+            "gym",
+            "fitness",
+            "padel",
+            "calcetto",
+            "bowling",
+            "club",
+        ],
+    ),
+    (
+        "📈 Investimenti, PAC & Broker",
+        "Savings",
+        [
+            "degiro",
+            "directa",
+            "interactive brokers",
+            "scalable",
+            "trade republic",
+            "fineco bank",
+            "pac ",
+            "etf",
+            "azioni",
+            "acquisto quote",
+            "reinvest",
+            "crypto",
+            "binance",
+            "coinbase",
+            "kraken",
+            "young platform",
+            "anima sgr",
+            "eurizon",
+            "fondi comuni",
+            "moneyfarm",
+            "tinaba",
+        ],
+    ),
+    (
+        "🛡️ Previdenza & Fondo Pensione",
+        "Savings",
+        [
+            "fondo pensione",
+            "cometa",
+            "fonte",
+            "fonchim",
+            "perseo",
+            "laborfonds",
+            "secondapensione",
+            "allianz insieme",
+            "previdenza integrativa",
+            "pip",
+            "fondopensione",
+            "tfr",
+        ],
+    ),
+    (
+        "💼 Stipendio, Compensi & Entrate",
+        "Income",
+        [
+            "stipendio",
+            "emolumenti",
+            "salario",
+            "retribuzione",
+            "cedolino",
+            "bonifico da datore",
+            "compenso",
+            "fattura",
+            "onorario",
+            "prestazione",
+            "incasso pos",
+            "dividendo",
+            "cedola",
+            "rendita",
+            "pensione inps",
+            "accredito stipendio",
+            "rimborso 730",
+        ],
+    ),
+    (
+        "🔄 Trasferimento / Giroconto",
+        "Transfer",
+        [
+            "giroconto",
+            "giroconto da",
+            "giroconto a",
+            "trasferimento tra conti",
+            "bonifico mio conto",
+            "ricarica carta",
+            "ricarica prepagata",
+            "alimentazione conto",
+            "me stesso",
+            "auto-bonifico",
+        ],
+    ),
 ]
 
 
@@ -266,13 +535,20 @@ def parse_date_universal(val: Any) -> Optional[str]:
         return None
 
     formats = [
-        "%d/%m/%Y", "%d/%m/%y",
-        "%d-%m-%Y", "%d-%m-%y",
-        "%Y-%m-%d", "%Y/%m/%d",
-        "%d.%m.%Y", "%d.%m.%y",
-        "%d %b %Y", "%d %B %Y",
-        "%Y%m%d", "%d/%m/%Y %H:%M:%S",
-        "%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%SZ"
+        "%d/%m/%Y",
+        "%d/%m/%y",
+        "%d-%m-%Y",
+        "%d-%m-%y",
+        "%Y-%m-%d",
+        "%Y/%m/%d",
+        "%d.%m.%Y",
+        "%d.%m.%y",
+        "%d %b %Y",
+        "%d %B %Y",
+        "%Y%m%d",
+        "%d/%m/%Y %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%SZ",
     ]
 
     for fmt in formats:
@@ -281,7 +557,7 @@ def parse_date_universal(val: Any) -> Optional[str]:
             return dt.strftime("%Y-%m-%d")
         except Exception:
             continue
-            
+
     try:
         dt = pd.to_datetime(s, dayfirst=True)
         return dt.strftime("%Y-%m-%d")
@@ -296,14 +572,23 @@ def categorize_transaction(description: str, amount: float) -> Tuple[str, str, b
     Pillars: 'Needs', 'Wants', 'Savings', 'Income', 'Transfer'.
     """
     d_lower = str(description or "").lower()
-    
-    if any(k in d_lower for k in ["giroconto", "trasferimento conto", "ricarica prepagata", "alimentazione conto", "giroconto tra conti"]):
+
+    if any(
+        k in d_lower
+        for k in [
+            "giroconto",
+            "trasferimento conto",
+            "ricarica prepagata",
+            "alimentazione conto",
+            "giroconto tra conti",
+        ]
+    ):
         return "🔄 Giroconto Interno", "Transfer", True
 
     for cat_name, pillar, keywords in CATEGORY_RULES:
         for kw in keywords:
             if kw in d_lower:
-                is_tr = (pillar == "Transfer")
+                is_tr = pillar == "Transfer"
                 return cat_name, pillar, is_tr
 
     if amount > 0:
@@ -318,7 +603,7 @@ def detect_bank_format(df_sample: pd.DataFrame, file_text: str = "") -> Tuple[st
     Restituisce: (bank_id, config_dict).
     """
     combined_cols = " ".join([str(c).lower() for c in df_sample.columns])
-    combined_text = (file_text[:3000].lower() + " " + combined_cols)
+    combined_text = file_text[:3000].lower() + " " + combined_cols
 
     best_bank = "GENERIC_CSV"
     max_matches = 0
@@ -329,21 +614,22 @@ def detect_bank_format(df_sample: pd.DataFrame, file_text: str = "") -> Tuple[st
             max_matches = matches
             best_bank = bank_id
 
-    return best_bank, BANK_SIGNATURES.get(best_bank, {
-        "name": "Estratto Conto Standard",
-        "keywords": [],
-        "date_cols": ["Data", "Date", "Data Operazione", "Data Contabile"],
-        "desc_cols": ["Descrizione", "Description", "Causale", "Movimento", "Dettagli"],
-        "amount_cols": ["Importo", "Amount", "Valore", "Totale"],
-        "credit_cols": ["Entrate", "Accrediti", "Credit"],
-        "debit_cols": ["Uscite", "Addebiti", "Debit"]
-    })
+    return best_bank, BANK_SIGNATURES.get(
+        best_bank,
+        {
+            "name": "Estratto Conto Standard",
+            "keywords": [],
+            "date_cols": ["Data", "Date", "Data Operazione", "Data Contabile"],
+            "desc_cols": ["Descrizione", "Description", "Causale", "Movimento", "Dettagli"],
+            "amount_cols": ["Importo", "Amount", "Valore", "Totale"],
+            "credit_cols": ["Entrate", "Accrediti", "Credit"],
+            "debit_cols": ["Uscite", "Addebiti", "Debit"],
+        },
+    )
 
 
 def parse_bank_statement_file(
-    file_bytes_or_buffer: Union[bytes, io.BytesIO, str],
-    filename: str = "",
-    account_name: str = "Conto Corrente"
+    file_bytes_or_buffer: Union[bytes, io.BytesIO, str], filename: str = "", account_name: str = "Conto Corrente"
 ) -> Dict[str, Any]:
     """
     Ingestion Hub Universale Zero-Config:
@@ -357,7 +643,7 @@ def parse_bank_statement_file(
                 "success": False,
                 "error_msg": "File vuoto o formato non leggibile.",
                 "df_normalized": pd.DataFrame(),
-                "bank_detected": "Sconosciuto"
+                "bank_detected": "Sconosciuto",
             }
 
         # Estrazione testo campione per rilevamento firma bancaria
@@ -372,7 +658,14 @@ def parse_bank_statement_file(
         col_credit = None
         col_debit = None
 
-        for target in bank_cfg["date_cols"] + ["Data", "Date", "Data Operazione", "Data Valuta", "Data Registrazione", "Data Movimento"]:
+        for target in bank_cfg["date_cols"] + [
+            "Data",
+            "Date",
+            "Data Operazione",
+            "Data Valuta",
+            "Data Registrazione",
+            "Data Movimento",
+        ]:
             for c in df_raw.columns:
                 if target.lower() == c.lower() or target.lower() in c.lower():
                     col_date = c
@@ -380,7 +673,15 @@ def parse_bank_statement_file(
             if col_date:
                 break
 
-        for target in bank_cfg["desc_cols"] + ["Descrizione", "Description", "Causale", "Movimento", "Dettagli", "Payee", "Nome"]:
+        for target in bank_cfg["desc_cols"] + [
+            "Descrizione",
+            "Description",
+            "Causale",
+            "Movimento",
+            "Dettagli",
+            "Payee",
+            "Nome",
+        ]:
             for c in df_raw.columns:
                 if target.lower() == c.lower() or target.lower() in c.lower():
                     col_desc = c
@@ -388,7 +689,15 @@ def parse_bank_statement_file(
             if col_desc:
                 break
 
-        for target in bank_cfg["amount_cols"] + ["Importo", "Amount", "Valore", "Totale", "Netto", "Importo Euro", "Variazione"]:
+        for target in bank_cfg["amount_cols"] + [
+            "Importo",
+            "Amount",
+            "Valore",
+            "Totale",
+            "Netto",
+            "Importo Euro",
+            "Variazione",
+        ]:
             for c in df_raw.columns:
                 if target.lower() == c.lower() or target.lower() in c.lower():
                     col_amount = c
@@ -457,22 +766,24 @@ def parse_bank_statement_file(
             raw_hash_key = f"{account_name}|{clean_dt}|{r_amt:.2f}|{r_dir}|{raw_desc.strip().lower()}"
             rec_hash = hashlib.sha256(raw_hash_key.encode("utf-8")).hexdigest()
 
-            normalized_records.append({
-                "date": clean_dt,
-                "tx_date": clean_dt,
-                "description": raw_desc,
-                "merchant": raw_desc[:120],
-                "amount": r_amt,
-                "direction": r_dir,
-                "category": cat_name,
-                "pillar": pillar,
-                "is_transfer": 1 if is_tr else 0,
-                "account_name": account_name,
-                "currency": "EUR",
-                "notes": f"{bank_cfg.get('name', 'Banca')}: {raw_desc[:150]}",
-                "payment_method": "Estratto Conto Bancario",
-                "tx_hash": rec_hash
-            })
+            normalized_records.append(
+                {
+                    "date": clean_dt,
+                    "tx_date": clean_dt,
+                    "description": raw_desc,
+                    "merchant": raw_desc[:120],
+                    "amount": r_amt,
+                    "direction": r_dir,
+                    "category": cat_name,
+                    "pillar": pillar,
+                    "is_transfer": 1 if is_tr else 0,
+                    "account_name": account_name,
+                    "currency": "EUR",
+                    "notes": f"{bank_cfg.get('name', 'Banca')}: {raw_desc[:150]}",
+                    "payment_method": "Estratto Conto Bancario",
+                    "tx_hash": rec_hash,
+                }
+            )
 
         df_norm = pd.DataFrame(normalized_records)
         if df_norm.empty:
@@ -480,7 +791,7 @@ def parse_bank_statement_file(
                 "success": False,
                 "error_msg": "Nessuna transazione valida estratta dal file.",
                 "df_normalized": pd.DataFrame(),
-                "bank_detected": bank_cfg.get("name", "Sconosciuto")
+                "bank_detected": bank_cfg.get("name", "Sconosciuto"),
             }
 
         df_norm = df_norm.reset_index(drop=True)
@@ -493,7 +804,7 @@ def parse_bank_statement_file(
             "total_outflow": round(tot_out, 2),
             "transfers_count": tr_cnt,
             "rows_count": len(df_norm),
-            "error_msg": ""
+            "error_msg": "",
         }
 
     except Exception as e:
@@ -501,7 +812,7 @@ def parse_bank_statement_file(
             "success": False,
             "error_msg": f"Errore durante l'elaborazione del file: {str(e)}",
             "df_normalized": pd.DataFrame(),
-            "bank_detected": "Errore"
+            "bank_detected": "Errore",
         }
 
 
@@ -564,9 +875,8 @@ def reconcile_internal_transfers(df_tx: pd.DataFrame, max_days_diff: int = 2) ->
 
             dir_b = str(row_b.get(dir_col, "")).lower()
             # Devono avere direzioni opposte (uno entrata/inflow, l'altro uscita/outflow)
-            is_opposite = (
-                (dir_a in ["inflow", "entrate"] and dir_b in ["outflow", "uscite"]) or
-                (dir_a in ["outflow", "uscite"] and dir_b in ["inflow", "entrate"])
+            is_opposite = (dir_a in ["inflow", "entrate"] and dir_b in ["outflow", "uscite"]) or (
+                dir_a in ["outflow", "uscite"] and dir_b in ["inflow", "entrate"]
             )
 
             if is_opposite:
@@ -582,4 +892,3 @@ def reconcile_internal_transfers(df_tx: pd.DataFrame, max_days_diff: int = 2) ->
         df.loc[list(matched_indices), "category"] = "🔄 Giroconto Interno"
 
     return df, pairs_found
-

@@ -8,23 +8,22 @@
 # ============================================================
 
 import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
 import json
 import logging
 import math
 import os
-from pathlib import Path
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sqlalchemy import create_engine, text, event
 import yfinance as yf
+from sqlalchemy import create_engine, event, text
 
 logger = logging.getLogger("argus.fetcher")
-
 
 
 def _set_sqlite_pragmas(dbapi_connection, connection_record):
@@ -55,13 +54,15 @@ def _get_config_file_path() -> Path:
 
 
 def _clean_val(v):
-    if v is None: return None
+    if v is None:
+        return None
     try:
         if math.isnan(float(v)) or math.isinf(float(v)):
             return None
     except (TypeError, ValueError):
         pass
     return v
+
 
 # ── Costanti ────────────────────────────────────────────────
 
@@ -77,17 +78,25 @@ LOOKBACK_EXTRA_DAYS = 365
 
 # ── Connessione MySQL ────────────────────────────────────────
 
-def get_engine(user: str = "root", password: str = "root", host: str = "localhost",
-               port: int = 3306, db: str = "investment_risk_bi", database: str = None,
-               offline: bool = False, sqlite_path: str = "data/argus_local.db"):
+
+def get_engine(
+    user: str = "root",
+    password: str = "root",
+    host: str = "localhost",
+    port: int = 3306,
+    db: str = "investment_risk_bi",
+    database: str = None,
+    offline: bool = False,
+    sqlite_path: str = "data/argus_local.db",
+):
     """
     Restituisce un engine SQLAlchemy per MySQL. Se MySQL non è disponibile (es. Docker disattivato)
     o se offline=True, restituisce direttamente un database locale SQLite (data/argus_local.db).
     Legge prioritariamente le credenziali dalle variabili d'ambiente (MYSQL_USER, MYSQL_PASSWORD, ecc.).
     """
-    import os
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass
@@ -114,11 +123,14 @@ def get_engine(user: str = "root", password: str = "root", host: str = "localhos
 
         try:
             import pymysql
+
             sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
             sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
             with sys_engine.begin() as conn:
-                conn.execute(text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
-            
+                conn.execute(
+                    text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                )
+
             url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
             engine = create_engine(url, echo=False)
         except Exception:
@@ -137,13 +149,15 @@ def get_engine(user: str = "root", password: str = "root", host: str = "localhos
             pass
         try:
             from core.database_migration_manager import bootstrap_and_migrate_db
+
             bootstrap_and_migrate_db(sqlite_path)
         except Exception:
             pass
 
     from core.models import Base
+
     Base.metadata.create_all(engine)
-    
+
     with engine.begin() as conn:
         try:
             conn.execute(text("ALTER TABLE assets ADD COLUMN trailing_pe DECIMAL(10,2)"))
@@ -161,13 +175,23 @@ def get_engine(user: str = "root", password: str = "root", host: str = "localhos
             pass
 
         new_cols = [
-            "industry VARCHAR(100)", "exchange VARCHAR(50)", "recommendation_key VARCHAR(50)",
-            "market_cap BIGINT", "beta_5y DECIMAL(10,4)",
-            "fifty_two_week_high DECIMAL(18,6)", "fifty_two_week_low DECIMAL(18,6)",
-            "fifty_day_average DECIMAL(18,6)", "two_hundred_day_average DECIMAL(18,6)",
-            "profit_margins DECIMAL(10,4)", "gross_margins DECIMAL(10,4)", "operating_margins DECIMAL(10,4)",
-            "total_revenue BIGINT", "ebitda BIGINT", "debt_to_equity DECIMAL(10,4)",
-            "revenue_growth DECIMAL(10,4)", "earnings_growth DECIMAL(10,4)"
+            "industry VARCHAR(100)",
+            "exchange VARCHAR(50)",
+            "recommendation_key VARCHAR(50)",
+            "market_cap BIGINT",
+            "beta_5y DECIMAL(10,4)",
+            "fifty_two_week_high DECIMAL(18,6)",
+            "fifty_two_week_low DECIMAL(18,6)",
+            "fifty_day_average DECIMAL(18,6)",
+            "two_hundred_day_average DECIMAL(18,6)",
+            "profit_margins DECIMAL(10,4)",
+            "gross_margins DECIMAL(10,4)",
+            "operating_margins DECIMAL(10,4)",
+            "total_revenue BIGINT",
+            "ebitda BIGINT",
+            "debt_to_equity DECIMAL(10,4)",
+            "revenue_growth DECIMAL(10,4)",
+            "earnings_growth DECIMAL(10,4)",
         ]
         for col_def in new_cols:
             try:
@@ -180,10 +204,8 @@ def get_engine(user: str = "root", password: str = "root", host: str = "localhos
 
 # ── Funzione principale ──────────────────────────────────────
 
-def fetch_and_store(df_clean: pd.DataFrame,
-                    engine,
-                    portfolio_id: int = None,
-                    benchmark_ticker: str = "SPY"):
+
+def fetch_and_store(df_clean: pd.DataFrame, engine, portfolio_id: int = None, benchmark_ticker: str = "SPY"):
     """
     Scarica i prezzi storici e i metadati per tutti i ticker
     presenti in df_clean, poi li scrive su MySQL.
@@ -199,11 +221,11 @@ def fetch_and_store(df_clean: pd.DataFrame,
     report : dict con successi, warning ed errori per ticker
     """
     report = {
-        "success":  [],   # ticker scaricati correttamente
-        "skipped":  [],   # ISIN o ticker non supportati da yfinance
-        "errors":   [],   # ticker che hanno dato errore
-        "warnings": [],   # warning non bloccanti
-        "rows_written": 0
+        "success": [],  # ticker scaricati correttamente
+        "skipped": [],  # ISIN o ticker non supportati da yfinance
+        "errors": [],  # ticker che hanno dato errore
+        "warnings": [],  # warning non bloccanti
+        "rows_written": 0,
     }
 
     offline_assets = []
@@ -212,7 +234,6 @@ def fetch_and_store(df_clean: pd.DataFrame,
     # Data range: dal 2007 per consentire Stress Testing storici reali sugli asset esistenti
     start_date = "2007-01-01"
     end_date = datetime.today().strftime("%Y-%m-%d")
-
 
     # ── Mappatura Ticker (SaaS MVP: normalization) ────────────
     mapping_dict = {}
@@ -224,12 +245,12 @@ def fetch_and_store(df_clean: pd.DataFrame,
                 config = json.load(f)
                 if "ticker_mapping" in config:
                     mapping_dict.update(config["ticker_mapping"])
-                    
+
         if engine is not None:
             with engine.connect() as conn:
                 mapping_rows = conn.execute(text("SELECT input_ticker, yfinance_ticker FROM asset_mapping")).fetchall()
                 mapping_dict.update({row[0]: row[1] for row in mapping_rows})
-        
+
         if mapping_dict:
             df_clean["ticker"] = df_clean["ticker"].replace(mapping_dict)
             report["success"].append(f"Applicata mappatura ticker: {mapping_dict}")
@@ -237,7 +258,7 @@ def fetch_and_store(df_clean: pd.DataFrame,
         report["warnings"].append(f"Errore durante la lettura del mapping: {e}")
 
     tickers = df_clean["ticker"].unique().tolist()
-    
+
     # ── Forzatura Benchmark ──────────────────────────────
     if benchmark_ticker not in tickers:
         tickers.append(benchmark_ticker)
@@ -261,12 +282,14 @@ def fetch_and_store(df_clean: pd.DataFrame,
     if engine is not None:
         try:
             with engine.connect() as conn:
-                rows = conn.execute(text("""
+                rows = conn.execute(
+                    text("""
                     SELECT a.ticker, MAX(mp.price_date) 
                     FROM market_prices mp 
                     JOIN assets a ON mp.asset_id = a.asset_id 
                     GROUP BY a.ticker
-                """)).fetchall()
+                """)
+                ).fetchall()
                 max_dates = {row[0]: row[1] for row in rows if row[1] is not None}
         except Exception:
             pass
@@ -311,14 +334,15 @@ def fetch_and_store(df_clean: pd.DataFrame,
                     downloaded_data[t] = (None, None, None, str(e))
 
     for ticker in tickers:
-
         # ── Skip ISIN ───────────────────────────────────────
         if ISIN_PATTERN.match(ticker):
             # Estrae il nome del prodotto dalle note (se disponibile)
-            product_name = df_clean.loc[df_clean["ticker"] == ticker, "notes"].dropna().iloc[0] if not df_clean.loc[df_clean["ticker"] == ticker, "notes"].dropna().empty else "Nome sconosciuto"
-            report["skipped"].append(
-                f"{ticker} ({product_name}) — ISIN non mappato, skip yfinance"
+            product_name = (
+                df_clean.loc[df_clean["ticker"] == ticker, "notes"].dropna().iloc[0]
+                if not df_clean.loc[df_clean["ticker"] == ticker, "notes"].dropna().empty
+                else "Nome sconosciuto"
             )
+            report["skipped"].append(f"{ticker} ({product_name}) — ISIN non mappato, skip yfinance")
             if engine is None:
                 adict, d_p = _store_isin_price(ticker, df_clean, engine, report)
                 offline_assets.append(adict)
@@ -345,7 +369,7 @@ def fetch_and_store(df_clean: pd.DataFrame,
             if engine is None:
                 adict = _upsert_asset(ticker, yf_ticker, df_clean, engine, info)
                 offline_assets.append(adict)
-                
+
                 d_p = _store_prices(hist, None, engine, ticker=ticker)
                 offline_prices.append(d_p)
                 rows = len(d_p)
@@ -354,7 +378,7 @@ def fetch_and_store(df_clean: pd.DataFrame,
                 asset_id = _upsert_asset(ticker, yf_ticker, df_clean, engine, info)
                 rows = _store_prices(hist, asset_id, engine)
                 report["success"].append(f"{ticker}: {rows} righe scritte")
-            
+
             report["rows_written"] += rows
             print(f"[OK] {rows} righe")
 
@@ -363,11 +387,11 @@ def fetch_and_store(df_clean: pd.DataFrame,
             print(f"[X] {e}")
 
     _print_fetch_report(report)
-    
+
     if engine is None:
         df_assets = pd.DataFrame(offline_assets) if offline_assets else pd.DataFrame()
         df_prices = pd.concat(offline_prices, ignore_index=True) if offline_prices else pd.DataFrame()
-        
+
         df_tx = df_clean.copy()
         # Merge columns except 'currency' which will overlap, we rename asset's currency to asset_currency
         if not df_assets.empty:
@@ -381,20 +405,16 @@ def fetch_and_store(df_clean: pd.DataFrame,
                 df_tx["asset_currency"] = df_tx["currency"]
         else:
             df_tx["asset_currency"] = df_tx["currency"]
-            
+
         return report, df_tx, df_prices
 
     return report
 
 
-
 # ── Upsert asset metadata ────────────────────────────────────
 
-def _upsert_asset(ticker: str,
-                  yf_ticker,
-                  df_clean: pd.DataFrame,
-                  engine,
-                  info: dict = None):
+
+def _upsert_asset(ticker: str, yf_ticker, df_clean: pd.DataFrame, engine, info: dict = None):
     """
     Inserisce o aggiorna il record in `assets`.
     Restituisce l'asset_id.
@@ -409,91 +429,86 @@ def _upsert_asset(ticker: str,
         except Exception:
             pass
 
-
     # asset_class: dal CSV se presente, altrimenti da yfinance
     asset_class_from_csv = (
-        df_clean.loc[df_clean["ticker"] == ticker, "asset_class"]
-        .dropna()
-        .iloc[0]
-        if not df_clean.loc[
-            (df_clean["ticker"] == ticker) &
-            df_clean["asset_class"].notna()
-        ].empty
+        df_clean.loc[df_clean["ticker"] == ticker, "asset_class"].dropna().iloc[0]
+        if not df_clean.loc[(df_clean["ticker"] == ticker) & df_clean["asset_class"].notna()].empty
         else None
     )
 
     asset_class = asset_class_from_csv or _infer_asset_class(info, ticker)
-    currency    = info.get("currency", "USD")
-    name        = info.get("longName") or info.get("shortName") or ticker
-    
+    currency = info.get("currency", "USD")
+    name = info.get("longName") or info.get("shortName") or ticker
+
     from core.metadata_resolver import resolve_asset_metadata
+
     country_raw = info.get("country")
-    sector_raw  = info.get("sector")
+    sector_raw = info.get("sector")
     country, gics_sector = resolve_asset_metadata(ticker, asset_class, country_raw, sector_raw)
-    
+
     # ── Fondamentali (Valutazione Aziendale) ──
-    trailing_pe    = _clean_val(info.get("trailingPE"))
-    forward_pe     = _clean_val(info.get("forwardPE"))
-    price_to_book  = _clean_val(info.get("priceToBook"))
+    trailing_pe = _clean_val(info.get("trailingPE"))
+    forward_pe = _clean_val(info.get("forwardPE"))
+    price_to_book = _clean_val(info.get("priceToBook"))
     dividend_yield = _clean_val(info.get("dividendYield"))
-    roe            = _clean_val(info.get("returnOnEquity"))
-    target_mean    = _clean_val(info.get("targetMeanPrice"))
-    peg_ratio      = _clean_val(info.get("pegRatio"))
-    
+    roe = _clean_val(info.get("returnOnEquity"))
+    target_mean = _clean_val(info.get("targetMeanPrice"))
+    peg_ratio = _clean_val(info.get("pegRatio"))
+
     # ── Nuove metriche BI ──
-    industry          = info.get("industry")
-    exchange          = info.get("exchange")
-    recommendation_key= info.get("recommendationKey")
-    market_cap        = _clean_val(info.get("marketCap"))
-    beta_5y           = _clean_val(info.get("beta"))
+    industry = info.get("industry")
+    exchange = info.get("exchange")
+    recommendation_key = info.get("recommendationKey")
+    market_cap = _clean_val(info.get("marketCap"))
+    beta_5y = _clean_val(info.get("beta"))
     fifty_two_week_high = _clean_val(info.get("fiftyTwoWeekHigh"))
-    fifty_two_week_low  = _clean_val(info.get("fiftyTwoWeekLow"))
-    fifty_day_average   = _clean_val(info.get("fiftyDayAverage"))
+    fifty_two_week_low = _clean_val(info.get("fiftyTwoWeekLow"))
+    fifty_day_average = _clean_val(info.get("fiftyDayAverage"))
     two_hundred_day_average = _clean_val(info.get("twoHundredDayAverage"))
-    profit_margins    = _clean_val(info.get("profitMargins"))
-    gross_margins     = _clean_val(info.get("grossMargins"))
+    profit_margins = _clean_val(info.get("profitMargins"))
+    gross_margins = _clean_val(info.get("grossMargins"))
     operating_margins = _clean_val(info.get("operatingMargins"))
-    total_revenue     = _clean_val(info.get("totalRevenue"))
-    ebitda            = _clean_val(info.get("ebitda"))
-    debt_to_equity    = _clean_val(info.get("debtToEquity"))
-    revenue_growth    = _clean_val(info.get("revenueGrowth"))
-    earnings_growth   = _clean_val(info.get("earningsGrowth"))
+    total_revenue = _clean_val(info.get("totalRevenue"))
+    ebitda = _clean_val(info.get("ebitda"))
+    debt_to_equity = _clean_val(info.get("debtToEquity"))
+    revenue_growth = _clean_val(info.get("revenueGrowth"))
+    earnings_growth = _clean_val(info.get("earningsGrowth"))
 
     if engine is None:
         return {
-            "ticker":         ticker,
-            "name":           name[:200] if name else None,
-            "asset_class":    asset_class,
-            "currency":       currency[:3] if currency else "USD",
-            "gics_sector":    gics_sector,
-            "country":        country,
-            "trailing_pe":    trailing_pe,
-            "forward_pe":     forward_pe,
-            "price_to_book":  price_to_book,
+            "ticker": ticker,
+            "name": name[:200] if name else None,
+            "asset_class": asset_class,
+            "currency": currency[:3] if currency else "USD",
+            "gics_sector": gics_sector,
+            "country": country,
+            "trailing_pe": trailing_pe,
+            "forward_pe": forward_pe,
+            "price_to_book": price_to_book,
             "dividend_yield": dividend_yield,
-            "roe":            roe,
+            "roe": roe,
             "target_mean_price": target_mean,
-            "peg_ratio":      peg_ratio,
-            "industry":       industry,
-            "exchange":       exchange,
+            "peg_ratio": peg_ratio,
+            "industry": industry,
+            "exchange": exchange,
             "recommendation_key": recommendation_key,
-            "market_cap":     market_cap,
-            "beta_5y":        beta_5y,
+            "market_cap": market_cap,
+            "beta_5y": beta_5y,
             "fifty_two_week_high": fifty_two_week_high,
             "fifty_two_week_low": fifty_two_week_low,
             "fifty_day_average": fifty_day_average,
             "two_hundred_day_average": two_hundred_day_average,
             "profit_margins": profit_margins,
-            "gross_margins":  gross_margins,
+            "gross_margins": gross_margins,
             "operating_margins": operating_margins,
-            "total_revenue":  total_revenue,
-            "ebitda":         ebitda,
+            "total_revenue": total_revenue,
+            "ebitda": ebitda,
             "debt_to_equity": debt_to_equity,
             "revenue_growth": revenue_growth,
-            "earnings_growth": earnings_growth
+            "earnings_growth": earnings_growth,
         }
 
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
 
     if is_sqlite:
         sql = text("""
@@ -591,52 +606,50 @@ def _upsert_asset(ticker: str,
         """)
 
     with engine.begin() as conn:
-        conn.execute(sql, {
-            "ticker":         ticker,
-            "name":           name[:200] if name else None,
-            "asset_class":    asset_class,
-            "currency":       currency[:3] if currency else "USD",
-            "gics_sector":    gics_sector,
-            "country":        country,
-            "trailing_pe":    trailing_pe,
-            "forward_pe":     forward_pe,
-            "price_to_book":  price_to_book,
-            "dividend_yield": dividend_yield,
-            "roe":            roe,
-            "target_mean":    target_mean,
-            "peg":            peg_ratio,
-            "industry":       industry,
-            "exchange":       exchange,
-            "recommendation_key": recommendation_key,
-            "market_cap":     market_cap,
-            "beta_5y":        beta_5y,
-            "fifty_two_week_high": fifty_two_week_high,
-            "fifty_two_week_low": fifty_two_week_low,
-            "fifty_day_average": fifty_day_average,
-            "two_hundred_day_average": two_hundred_day_average,
-            "profit_margins": profit_margins,
-            "gross_margins":  gross_margins,
-            "operating_margins": operating_margins,
-            "total_revenue":  total_revenue,
-            "ebitda":         ebitda,
-            "debt_to_equity": debt_to_equity,
-            "revenue_growth": revenue_growth,
-            "earnings_growth": earnings_growth
-        })
-        asset_id = conn.execute(
-            text("SELECT asset_id FROM assets WHERE ticker = :t"),
-            {"t": ticker}
-        ).scalar()
+        conn.execute(
+            sql,
+            {
+                "ticker": ticker,
+                "name": name[:200] if name else None,
+                "asset_class": asset_class,
+                "currency": currency[:3] if currency else "USD",
+                "gics_sector": gics_sector,
+                "country": country,
+                "trailing_pe": trailing_pe,
+                "forward_pe": forward_pe,
+                "price_to_book": price_to_book,
+                "dividend_yield": dividend_yield,
+                "roe": roe,
+                "target_mean": target_mean,
+                "peg": peg_ratio,
+                "industry": industry,
+                "exchange": exchange,
+                "recommendation_key": recommendation_key,
+                "market_cap": market_cap,
+                "beta_5y": beta_5y,
+                "fifty_two_week_high": fifty_two_week_high,
+                "fifty_two_week_low": fifty_two_week_low,
+                "fifty_day_average": fifty_day_average,
+                "two_hundred_day_average": two_hundred_day_average,
+                "profit_margins": profit_margins,
+                "gross_margins": gross_margins,
+                "operating_margins": operating_margins,
+                "total_revenue": total_revenue,
+                "ebitda": ebitda,
+                "debt_to_equity": debt_to_equity,
+                "revenue_growth": revenue_growth,
+                "earnings_growth": earnings_growth,
+            },
+        )
+        asset_id = conn.execute(text("SELECT asset_id FROM assets WHERE ticker = :t"), {"t": ticker}).scalar()
 
     return asset_id
 
 
 # ── Store prezzi storici ─────────────────────────────────────
 
-def _store_prices(hist: pd.DataFrame,
-                  asset_id: int,
-                  engine,
-                  ticker: str = None):
+
+def _store_prices(hist: pd.DataFrame, asset_id: int, engine, ticker: str = None):
     """
     Scrive i prezzi storici su market_prices.
     Usa INSERT IGNORE (MySQL) o INSERT OR IGNORE (SQLite) per non duplicare righe già presenti
@@ -652,16 +665,19 @@ def _store_prices(hist: pd.DataFrame,
 
         price_date_str = date.strftime("%Y-%m-%d") if hasattr(date, "strftime") else str(date)[:10]
 
-        records.append({
-            "asset_id":   asset_id,
-            "price_date": price_date_str,
-            "close":      round(float(close), 6),
-            "volume":     int(volume) if volume and not pd.isna(volume) else None,
-            "source":     "yfinance",
-        })
+        records.append(
+            {
+                "asset_id": asset_id,
+                "price_date": price_date_str,
+                "close": round(float(close), 6),
+                "volume": int(volume) if volume and not pd.isna(volume) else None,
+                "source": "yfinance",
+            }
+        )
 
     if not records:
-        if engine is None: return pd.DataFrame(columns=["ticker", "price_date", "close", "volume"])
+        if engine is None:
+            return pd.DataFrame(columns=["ticker", "price_date", "close", "volume"])
         return 0
 
     if engine is None:
@@ -669,7 +685,7 @@ def _store_prices(hist: pd.DataFrame,
         df_p["ticker"] = ticker
         return df_p[["ticker", "price_date", "close", "volume"]]
 
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
     if is_sqlite:
         sql = text("""
             INSERT OR IGNORE INTO market_prices
@@ -693,10 +709,8 @@ def _store_prices(hist: pd.DataFrame,
 
 # ── Gestione ISIN (prezzi da CSV) ────────────────────────────
 
-def _store_isin_price(ticker: str,
-                      df_clean: pd.DataFrame,
-                      engine,
-                      report: dict):
+
+def _store_isin_price(ticker: str, df_clean: pd.DataFrame, engine, report: dict):
     """
     Per gli ISIN yfinance non funziona.
     Usiamo il prezzo presente nel CSV come unico punto dati.
@@ -705,34 +719,20 @@ def _store_isin_price(ticker: str,
     rows = df_clean[df_clean["ticker"] == ticker]
 
     # asset_class dal CSV, default bond per ISIN
-    asset_class = (
-        rows["asset_class"].dropna().iloc[0]
-        if not rows["asset_class"].dropna().empty
-        else "bond"
-    )
+    asset_class = rows["asset_class"].dropna().iloc[0] if not rows["asset_class"].dropna().empty else "bond"
     currency = rows["currency"].iloc[0] if not rows.empty else "EUR"
 
     if engine is None:
-        adict = {
-            "ticker": ticker,
-            "name": ticker,
-            "asset_class": asset_class,
-            "currency": currency[:3]
-        }
+        adict = {"ticker": ticker, "name": ticker, "asset_class": asset_class, "currency": currency[:3]}
         precords = []
         for _, r in rows.iterrows():
-            precords.append({
-                "ticker": ticker,
-                "price_date": str(r["tx_date"])[:10],
-                "close": float(r["price"]),
-                "volume": None
-            })
-        report["skipped"].append(
-            f"{ticker}: {len(precords)} prezzi da CSV (ISIN, no yfinance)"
-        )
+            precords.append(
+                {"ticker": ticker, "price_date": str(r["tx_date"])[:10], "close": float(r["price"]), "volume": None}
+            )
+        report["skipped"].append(f"{ticker}: {len(precords)} prezzi da CSV (ISIN, no yfinance)")
         return adict, pd.DataFrame(precords)
 
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
     if is_sqlite:
         sql_asset = text("""
             INSERT INTO assets (ticker, name, asset_class, currency, gics_sector, country)
@@ -767,23 +767,23 @@ def _store_isin_price(ticker: str,
     currency = rows["currency"].iloc[0] if not rows.empty else "EUR"
 
     with engine.begin() as conn:
-        conn.execute(sql_asset, {
-            "ticker":      ticker,
-            "name":        ticker,
-            "asset_class": asset_class,
-            "currency":    currency[:3],
-        })
-        asset_id = conn.execute(
-            text("SELECT asset_id FROM assets WHERE ticker = :t"),
-            {"t": ticker}
-        ).scalar()
+        conn.execute(
+            sql_asset,
+            {
+                "ticker": ticker,
+                "name": ticker,
+                "asset_class": asset_class,
+                "currency": currency[:3],
+            },
+        )
+        asset_id = conn.execute(text("SELECT asset_id FROM assets WHERE ticker = :t"), {"t": ticker}).scalar()
 
     # Inserisce i prezzi dal CSV (una riga per transazione)
     records = [
         {
-            "asset_id":   asset_id,
+            "asset_id": asset_id,
             "price_date": str(r["tx_date"])[:10],
-            "close":      float(r["price"]),
+            "close": float(r["price"]),
         }
         for _, r in rows.iterrows()
     ]
@@ -791,12 +791,11 @@ def _store_isin_price(ticker: str,
     with engine.begin() as conn:
         conn.execute(sql_price, records)
 
-    report["skipped"].append(
-        f"{ticker}: {len(records)} prezzi da CSV (ISIN, no yfinance)"
-    )
+    report["skipped"].append(f"{ticker}: {len(records)} prezzi da CSV (ISIN, no yfinance)")
 
 
 # ── Inferisce asset_class da yfinance info ───────────────────
+
 
 def _infer_asset_class(info: dict, ticker: str) -> str:
     """
@@ -806,13 +805,13 @@ def _infer_asset_class(info: dict, ticker: str) -> str:
     quote_type = info.get("quoteType", "").upper()
 
     mapping = {
-        "EQUITY":       "stock",
-        "ETF":          "etf",
-        "MUTUALFUND":   "etf",
-        "BOND":         "bond",
+        "EQUITY": "stock",
+        "ETF": "etf",
+        "MUTUALFUND": "etf",
+        "BOND": "bond",
         "FIXED_INCOME": "bond",
         "CRYPTOCURRENCY": "crypto",
-        "CURRENCY":     "cash",
+        "CURRENCY": "cash",
     }
 
     if quote_type in mapping:
@@ -824,6 +823,7 @@ def _infer_asset_class(info: dict, ticker: str) -> str:
 
     try:
         from core.crypto_provider import is_crypto_symbol
+
         if is_crypto_symbol(ticker):
             return "crypto"
     except Exception:
@@ -832,13 +832,13 @@ def _infer_asset_class(info: dict, ticker: str) -> str:
     return "stock"  # default sicuro
 
 
-
 # ── Pretty print report ───────────────────────────────────────
 
+
 def _print_fetch_report(report: dict) -> None:
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  FETCH REPORT")
-    print("="*60)
+    print("=" * 60)
 
     if report["success"]:
         print(f"\n[OK] SUCCESSO ({len(report['success'])}):")
@@ -861,7 +861,7 @@ def _print_fetch_report(report: dict) -> None:
             print(f"   • {w}")
 
     print(f"\n[DB] Totale righe scritte su MySQL: {report['rows_written']}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 # ── Headless Benchmark Returns Provider (Decoupled from UI) ──
@@ -893,7 +893,7 @@ def fetch_cached_benchmark_returns(ticker: str, start_str: str, end_str: str) ->
         "EEM": "EEM",
         "AGG": "AGG",
         "BND": "BND",
-        "GLD": "GLD"
+        "GLD": "GLD",
     }
     yf_ticker = alias_map.get(ticker, ticker)
     try:
@@ -905,7 +905,7 @@ def fetch_cached_benchmark_returns(ticker: str, start_str: str, end_str: str) ->
             else:
                 s = df["Close"] if "Close" in df.columns else df.get("close", pd.Series(dtype=float))
             s.index = pd.to_datetime(s.index).tz_localize(None).strftime("%Y-%m-%d")
-            s = s[~s.index.duplicated(keep='first')]
+            s = s[~s.index.duplicated(keep="first")]
             ret = s.pct_change().dropna()
             ret.name = ticker
             _BENCHMARK_CACHE[cache_key] = (now, ret.copy())

@@ -23,7 +23,20 @@ def _classify_scalable_tx_type(type_and_sec: str) -> Optional[str]:
     ts = type_and_sec.lower()
     if any(k in ts for k in ["dividend", "dividende", "dividendo", "ausschüttung", "ertrag", "cedola"]):
         return "dividend"
-    if any(k in ts for k in ["split", "frazionamento", "aktienteilung", "raggruppamento", "reverse split", "fusione", "merger", "spinoff", "scissione"]):
+    if any(
+        k in ts
+        for k in [
+            "split",
+            "frazionamento",
+            "aktienteilung",
+            "raggruppamento",
+            "reverse split",
+            "fusione",
+            "merger",
+            "spinoff",
+            "scissione",
+        ]
+    ):
         return "split"
     if any(k in ts for k in ["sell", "verkauf", "vendita", "orderausführung verkauf"]):
         return "sell"
@@ -73,8 +86,14 @@ def _parse_scalable_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optio
     if not curr or curr in ["NAN", "NONE", ""]:
         curr = "EUR"
 
-    asset_class = "crypto" if "crypto" in type_and_sec else (
-        "etf" if any(k in raw_sec.lower() for k in ["etf", "ucits", "ishares", "vanguard", "xtrackers", "amundi"]) else "stock"
+    asset_class = (
+        "crypto"
+        if "crypto" in type_and_sec
+        else (
+            "etf"
+            if any(k in raw_sec.lower() for k in ["etf", "ucits", "ishares", "vanguard", "xtrackers", "amundi"])
+            else "stock"
+        )
     )
 
     return {
@@ -86,7 +105,7 @@ def _parse_scalable_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optio
         "currency": curr,
         "fees": fees,
         "asset_class": asset_class,
-        "notes": f"Scalable: {raw_sec or ticker}"
+        "notes": f"Scalable: {raw_sec or ticker}",
     }
 
 
@@ -98,23 +117,52 @@ def parse_scalable_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
     df = df_raw.copy()
     df.columns = df.columns.astype(str).str.strip().str.lower()
 
-    date_col = next((c for c in df.columns if any(k in c for k in ["date", "datum", "data", "buchungstag", "valuta"])), None)
-    type_col = next((c for c in df.columns if any(k in c for k in ["type", "typ", "tipo", "transaktionsart", "order type"])), None)
+    date_col = next(
+        (c for c in df.columns if any(k in c for k in ["date", "datum", "data", "buchungstag", "valuta"])), None
+    )
+    type_col = next(
+        (c for c in df.columns if any(k in c for k in ["type", "typ", "tipo", "transaktionsart", "order type"])), None
+    )
     isin_col = next((c for c in df.columns if any(k in c for k in ["isin", "wkn", "identifier", "ticker"])), None)
-    sec_col = next((c for c in df.columns if any(k in c for k in ["security", "wertpapier", "name", "titolo", "bezeichnung"])), None)
-    shares_col = next((c for c in df.columns if any(k in c for k in ["shares", "stueck", "stück", "quantit", "quantity", "anzahl", "nominale"])), None)
-    price_col = next((c for c in df.columns if any(k in c for k in ["price", "kurs", "prezzo", "ausführungskurs"])), None)
-    amount_col = next((c for c in df.columns if any(k in c for k in ["amount", "betrag", "importo", "total", "kurswert"])), None)
-    fee_col = next((c for c in df.columns if any(k in c for k in ["fee", "gebuehr", "gebühr", "kosten", "spese", "commission"])), None)
+    sec_col = next(
+        (c for c in df.columns if any(k in c for k in ["security", "wertpapier", "name", "titolo", "bezeichnung"])),
+        None,
+    )
+    shares_col = next(
+        (
+            c
+            for c in df.columns
+            if any(k in c for k in ["shares", "stueck", "stück", "quantit", "quantity", "anzahl", "nominale"])
+        ),
+        None,
+    )
+    price_col = next(
+        (c for c in df.columns if any(k in c for k in ["price", "kurs", "prezzo", "ausführungskurs"])), None
+    )
+    amount_col = next(
+        (c for c in df.columns if any(k in c for k in ["amount", "betrag", "importo", "total", "kurswert"])), None
+    )
+    fee_col = next(
+        (c for c in df.columns if any(k in c for k in ["fee", "gebuehr", "gebühr", "kosten", "spese", "commission"])),
+        None,
+    )
     curr_col = next((c for c in df.columns if any(k in c for k in ["currency", "währung", "valuta", "divisa"])), None)
 
     if not date_col or (not isin_col and not sec_col):
-        raise ValueError("Il file non sembra un export valido di Scalable Capital (colonne Data o ISIN/Security mancanti).")
+        raise ValueError(
+            "Il file non sembra un export valido di Scalable Capital (colonne Data o ISIN/Security mancanti)."
+        )
 
     cols = {
-        "date": date_col, "type": type_col, "isin": isin_col, "sec": sec_col,
-        "shares": shares_col, "price": price_col, "amount": amount_col,
-        "fee": fee_col, "curr": curr_col
+        "date": date_col,
+        "type": type_col,
+        "isin": isin_col,
+        "sec": sec_col,
+        "shares": shares_col,
+        "price": price_col,
+        "amount": amount_col,
+        "fee": fee_col,
+        "curr": curr_col,
     }
 
     records = []

@@ -3,14 +3,10 @@ tests/test_msci_barra_risk_engine.py
 Unit tests for BarraMultiAssetRiskEngine (MSCI Barra Multi-Asset GEM3/USE4 Standard).
 """
 
-import pytest
 import numpy as np
-from core.msci_barra_risk_engine import (
-    BarraMultiAssetRiskEngine,
-    AssetFactorProfile,
-    STYLE_FACTORS,
-    GICS_SECTORS
-)
+import pytest
+
+from core.msci_barra_risk_engine import GICS_SECTORS, STYLE_FACTORS, AssetFactorProfile, BarraMultiAssetRiskEngine
 
 
 def test_barra_risk_engine_euler_decomposition():

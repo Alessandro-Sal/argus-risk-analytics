@@ -3,12 +3,10 @@ tests/test_tbs_monte_carlo.py
 Unit tests for Total Balance Sheet Lifetime Monte Carlo Simulation Engine.
 """
 
-import pytest
 import numpy as np
-from core.wealth.tbs_monte_carlo import (
-    TBSLifecycleConfig,
-    TBSMonteCarloEngine
-)
+import pytest
+
+from core.wealth.tbs_monte_carlo import TBSLifecycleConfig, TBSMonteCarloEngine
 
 
 def test_tbs_monte_carlo_baseline():

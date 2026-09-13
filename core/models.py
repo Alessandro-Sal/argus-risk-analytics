@@ -1,24 +1,25 @@
-from sqlalchemy import (
-    Column, Integer, BigInteger, String, Numeric, Date, DateTime, Text, ForeignKey, UniqueConstraint
-)
-from sqlalchemy.orm import declarative_base
 from datetime import datetime
+
+from sqlalchemy import BigInteger, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
+
 class Portfolio(Base):
-    __tablename__ = 'portfolios'
-    
+    __tablename__ = "portfolios"
+
     portfolio_id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String(100), nullable=False)
-    owner = Column(String(100), nullable=False, default='anonymous')
-    base_currency = Column(String(3), nullable=False, default='EUR')
+    owner = Column(String(100), nullable=False, default="anonymous")
+    base_currency = Column(String(3), nullable=False, default="EUR")
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     description = Column(Text, nullable=True)
 
+
 class Asset(Base):
-    __tablename__ = 'assets'
-    
+    __tablename__ = "assets"
+
     asset_id = Column(Integer, primary_key=True, autoincrement=True)
     ticker = Column(String(20), nullable=False, unique=True)
     name = Column(String(200), nullable=True)
@@ -51,12 +52,13 @@ class Asset(Base):
     revenue_growth = Column(Numeric(10, 4), nullable=True)
     earnings_growth = Column(Numeric(10, 4), nullable=True)
 
+
 class Transaction(Base):
-    __tablename__ = 'transactions'
-    
+    __tablename__ = "transactions"
+
     tx_id = Column(Integer, primary_key=True, autoincrement=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.portfolio_id', ondelete='CASCADE'), nullable=False)
-    asset_id = Column(Integer, ForeignKey('assets.asset_id', ondelete='RESTRICT'), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.portfolio_id", ondelete="CASCADE"), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id", ondelete="RESTRICT"), nullable=False)
     tx_date = Column(Date, nullable=False)
     tx_type = Column(String(20), nullable=False)
     quantity = Column(Numeric(18, 8), nullable=False)
@@ -65,35 +67,36 @@ class Transaction(Base):
     fees = Column(Numeric(10, 4), nullable=False, default=0.0000)
     notes = Column(String(255), nullable=True)
 
+
 class MarketPrice(Base):
-    __tablename__ = 'market_prices'
-    
+    __tablename__ = "market_prices"
+
     price_id = Column(Integer, primary_key=True, autoincrement=True)
-    asset_id = Column(Integer, ForeignKey('assets.asset_id', ondelete='CASCADE'), nullable=False)
+    asset_id = Column(Integer, ForeignKey("assets.asset_id", ondelete="CASCADE"), nullable=False)
     price_date = Column(Date, nullable=False)
     close = Column(Numeric(18, 6), nullable=False)
     volume = Column(BigInteger, nullable=True)
-    source = Column(String(50), nullable=False, default='yfinance')
-    
-    __table_args__ = (
-        UniqueConstraint('asset_id', 'price_date', name='uq_asset_date'),
-    )
+    source = Column(String(50), nullable=False, default="yfinance")
+
+    __table_args__ = (UniqueConstraint("asset_id", "price_date", name="uq_asset_date"),)
+
 
 class AssetMapping(Base):
-    __tablename__ = 'asset_mapping'
-    
+    __tablename__ = "asset_mapping"
+
     mapping_id = Column(Integer, primary_key=True, autoincrement=True)
     input_ticker = Column(String(50), nullable=False, unique=True)
     yfinance_ticker = Column(String(50), nullable=False)
     description = Column(String(255), nullable=True)
 
+
 class PortfolioSnapshot(Base):
-    __tablename__ = 'portfolio_snapshots'
-    
+    __tablename__ = "portfolio_snapshots"
+
     snapshot_id = Column(Integer, primary_key=True, autoincrement=True)
     run_id = Column(String(50), nullable=False)
     run_name = Column(String(100), nullable=True)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.portfolio_id', ondelete='CASCADE'), nullable=False)
+    portfolio_id = Column(Integer, ForeignKey("portfolios.portfolio_id", ondelete="CASCADE"), nullable=False)
     calc_date = Column(DateTime, nullable=False, default=datetime.utcnow)
     total_value = Column(Numeric(18, 6), nullable=True)
     total_pnl = Column(Numeric(18, 6), nullable=True)
@@ -162,11 +165,12 @@ class PortfolioSnapshot(Base):
     portfolio_convexity = Column(Numeric(10, 4), nullable=True)
     portfolio_ytm_weighted_pct = Column(Numeric(10, 4), nullable=True)
 
+
 class SnapshotPosition(Base):
-    __tablename__ = 'snapshot_positions'
-    
+    __tablename__ = "snapshot_positions"
+
     record_id = Column(Integer, primary_key=True, autoincrement=True)
-    snapshot_id = Column(Integer, ForeignKey('portfolio_snapshots.snapshot_id', ondelete='CASCADE'), nullable=False)
+    snapshot_id = Column(Integer, ForeignKey("portfolio_snapshots.snapshot_id", ondelete="CASCADE"), nullable=False)
     ticker = Column(String(20), nullable=False)
     asset_class = Column(String(50), nullable=True)
     sector = Column(String(100), nullable=True)
@@ -207,4 +211,3 @@ class SnapshotPosition(Base):
     chandelier_exit_long_eur = Column(Numeric(18, 6), nullable=True)
     rsi_14 = Column(Numeric(10, 2), nullable=True)
     total_return = Column(Numeric(18, 6), nullable=True)
-

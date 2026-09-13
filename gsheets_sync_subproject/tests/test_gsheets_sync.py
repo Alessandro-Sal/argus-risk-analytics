@@ -1,11 +1,12 @@
-import pytest
 import pandas as pd
+import pytest
+
 from gsheets_sync_subproject.sync_google_sheets import (
-    normalize_gsheet_columns,
-    DEFAULT_STOCKS_TAB,
+    DEFAULT_CRYPTO_PORTFOLIO,
     DEFAULT_CRYPTO_TAB,
     DEFAULT_STOCKS_PORTFOLIO,
-    DEFAULT_CRYPTO_PORTFOLIO
+    DEFAULT_STOCKS_TAB,
+    normalize_gsheet_columns,
 )
 
 

@@ -5,22 +5,20 @@ Provides full session state persistence across browser tabs, windows, and multi-
 using high-performance binary snapshot caching (pickle) and URL query parameters.
 """
 
-import streamlit as st
-import pandas as pd
-import pickle
 import json
 import os
-from typing import Dict, Any, List, Optional
+import pickle
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+import pandas as pd
+import streamlit as st
 
 WORKSPACE_CACHE_PKL = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "cache", "active_session_full.pkl"
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cache", "active_session_full.pkl"
 )
 WORKSPACE_CACHE_JSON = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "cache", "last_session_snapshot.json"
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "cache", "last_session_snapshot.json"
 )
 
 # Mappa canonica per i percorsi delle pagine Streamlit
@@ -114,6 +112,7 @@ def save_session_snapshot_to_cache():
     """
     try:
         from core.workspace_context import WorkspaceContext, prune_stale_session_caches
+
         ctx = WorkspaceContext.get_current()
         if ctx.save_session_cache():
             prune_stale_session_caches(max_age_hours=24)
@@ -140,7 +139,7 @@ def save_session_snapshot_to_cache():
             "db_user": st.session_state.get("db_user", "root"),
             "db_pass": st.session_state.get("db_pass", "root"),
             "db_name": st.session_state.get("db_name", "investment_risk_bi"),
-            "saved_at": datetime.now().isoformat()
+            "saved_at": datetime.now().isoformat(),
         }
 
         # Salvataggio binario ad altissima fedeltà
@@ -156,7 +155,7 @@ def save_session_snapshot_to_cache():
                 "run_id": st.session_state.get("run_id", "ACTIVE"),
                 "portfolio_name": st.session_state.get("portfolio_name", "Portfolio"),
                 "metrics": results.get("metrics", {}),
-                "positions": pos_records
+                "positions": pos_records,
             }
             with open(WORKSPACE_CACHE_JSON, "w", encoding="utf-8") as jf:
                 json.dump(json_meta, jf, ensure_ascii=False, default=str)
@@ -171,6 +170,7 @@ def clear_session_cache():
     """Elimina i file di snapshot di sessione su disco per un reset pulito."""
     try:
         from core.workspace_context import WorkspaceContext
+
         ctx = WorkspaceContext.get_current()
         ctx.clear_persisted_cache()
     except Exception:
@@ -199,6 +199,7 @@ def try_restore_session_from_cache(force: bool = False) -> bool:
     # non ripristiniamo automaticamente analisi residue da disco
     try:
         import inspect
+
         for frame in inspect.stack():
             fname = frame.filename.replace("\\", "/")
             if "0_Control_Room.py" in fname and not force and not st.session_state.get("pipeline_done", False):
@@ -209,6 +210,7 @@ def try_restore_session_from_cache(force: bool = False) -> bool:
     # 1. Tenta il ripristino tramite WorkspaceContext (isolamento multi-sessione)
     try:
         from core.workspace_context import WorkspaceContext
+
         ctx = WorkspaceContext.get_current()
         if ctx.restore_session_cache(force=force):
             return True
@@ -248,7 +250,7 @@ def try_restore_session_from_cache(force: bool = False) -> bool:
                     "returns": pd.DataFrame(),
                     "stress_tests": {},
                     "optimization": {},
-                    "warnings": []
+                    "warnings": [],
                 }
                 st.session_state["run_id"] = data.get("run_id", "RESTORED")
                 st.session_state["portfolio_name"] = data.get("portfolio_name", "Portfolio")
@@ -292,7 +294,13 @@ DEFAULT_WORKSPACE_TABS = [
     {"id": "ws_stress", "title": "Stress Testing", "page": "7_Stress_Testing", "icon": "🌪️", "pinned": False},
     {"id": "ws_time", "title": "Analisi Temporale", "page": "8_Analisi_Temporale", "icon": "📊", "pinned": False},
     {"id": "ws_tech", "title": "Analisi Tecnica", "page": "9_Analisi_Tecnica", "icon": "📈", "pinned": False},
-    {"id": "ws_screener", "title": "Screener Opportunità", "page": "10_Screener_Opportunita", "icon": "🔍", "pinned": False}
+    {
+        "id": "ws_screener",
+        "title": "Screener Opportunità",
+        "page": "10_Screener_Opportunita",
+        "icon": "🔍",
+        "pinned": False,
+    },
 ]
 
 
@@ -310,7 +318,9 @@ def get_workspace_tabs() -> List[Dict[str, Any]]:
     return st.session_state.workspace_tabs
 
 
-def register_workspace_tab(tab_id: str, title: str, page_name: str, params: dict = None, icon: str = "📑", pinned: bool = False):
+def register_workspace_tab(
+    tab_id: str, title: str, page_name: str, params: dict = None, icon: str = "📑", pinned: bool = False
+):
     """Aggiunge o attiva una scheda workspace."""
     init_workspace_state()
     tabs = st.session_state.workspace_tabs
@@ -321,14 +331,9 @@ def register_workspace_tab(tab_id: str, title: str, page_name: str, params: dict
         existing["params"] = params or {}
         existing["icon"] = icon
     else:
-        tabs.append({
-            "id": tab_id,
-            "title": title,
-            "page": page_name,
-            "params": params or {},
-            "icon": icon,
-            "pinned": pinned
-        })
+        tabs.append(
+            {"id": tab_id, "title": title, "page": page_name, "params": params or {}, "icon": icon, "pinned": pinned}
+        )
 
     st.session_state.active_workspace_id = tab_id
 

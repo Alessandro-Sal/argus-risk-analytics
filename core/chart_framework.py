@@ -14,6 +14,7 @@ Centralized enterprise visualization library for ARGUS Risk Analytics & Wealth M
 """
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -26,17 +27,17 @@ import plotly.subplots as sp
 # ==============================================================================
 
 ARGUS_COLORS: Dict[str, str] = {
-    "primary": "#3b82f6",       # Blue Core / Benchmark Primario
-    "accent": "#06b6d4",        # Cyan Horizon / Highlights
-    "bull": "#10b981",          # Emerald Bullish / Rendimenti Positivi
-    "bear": "#ef4444",          # Coral Bearish / Drawdown / Perdite
-    "warn": "#f59e0b",          # Amber Warning / Soglie limite
-    "neutral": "#64748b",       # Slate Gray Neutro
-    "benchmark": "#94a3b8",     # Benchmark Line Gray
-    "purple": "#8b5cf6",        # Royal Violet
-    "gold": "#f59e0b",          # Gold / Target FIRE
+    "primary": "#3b82f6",  # Blue Core / Benchmark Primario
+    "accent": "#06b6d4",  # Cyan Horizon / Highlights
+    "bull": "#10b981",  # Emerald Bullish / Rendimenti Positivi
+    "bear": "#ef4444",  # Coral Bearish / Drawdown / Perdite
+    "warn": "#f59e0b",  # Amber Warning / Soglie limite
+    "neutral": "#64748b",  # Slate Gray Neutro
+    "benchmark": "#94a3b8",  # Benchmark Line Gray
+    "purple": "#8b5cf6",  # Royal Violet
+    "gold": "#f59e0b",  # Gold / Target FIRE
     "dark_surface": "#111827",  # Surface Dark
-    "dark_bg": "#0b0f19",       # Canvas Dark
+    "dark_bg": "#0b0f19",  # Canvas Dark
     "grid_dark": "rgba(255, 255, 255, 0.06)",
     "grid_light": "rgba(0, 0, 0, 0.06)",
 }
@@ -55,18 +56,18 @@ ARGUS_FINANCIAL_PALETTE: List[str] = [
 ]
 
 ARGUS_ASSET_CLASS_COLORS: Dict[str, str] = {
-    "equity": "#38bdf8",        # Electric Blue / Cyan
+    "equity": "#38bdf8",  # Electric Blue / Cyan
     "fixed_income": "#10b981",  # Emerald Green
-    "commodities": "#f59e0b",   # Amber / Gold
-    "real_estate": "#8b5cf6",   # Royal Purple
-    "cash": "#64748b",          # Slate Gray
-    "crypto": "#d946ef",        # Fuchsia / Neon Violet
-    "private_equity": "#14b8a6",# Teal
-    "derivatives": "#f97316",   # Orange
-    "alternative": "#a855f7",   # Violet
-    "risk": "#ef4444",          # Crimson Red
-    "benchmark": "#94a3b8",     # Slate Light
-    "portfolio": "#ff9900",     # Amber / Orange Primary
+    "commodities": "#f59e0b",  # Amber / Gold
+    "real_estate": "#8b5cf6",  # Royal Purple
+    "cash": "#64748b",  # Slate Gray
+    "crypto": "#d946ef",  # Fuchsia / Neon Violet
+    "private_equity": "#14b8a6",  # Teal
+    "derivatives": "#f97316",  # Orange
+    "alternative": "#a855f7",  # Violet
+    "risk": "#ef4444",  # Crimson Red
+    "benchmark": "#94a3b8",  # Slate Light
+    "portfolio": "#ff9900",  # Amber / Orange Primary
 }
 
 # Scale sequenziali per gradienti di rendimento / rischio
@@ -75,29 +76,29 @@ ARGUS_SEQUENTIAL_RISK: List[str] = ["#451a03", "#78350f", "#b45309", "#d97706", 
 
 # Scala divergente istituzionale per matrici di correlazione (-1.0 -> 0.0 -> +1.0)
 ARGUS_DIVERGING_SCALE: List[List[Union[float, str]]] = [
-    [0.0, "#ef4444"],    # Max negativo (-1.0) Correlazione inversa / Drawdown
+    [0.0, "#ef4444"],  # Max negativo (-1.0) Correlazione inversa / Drawdown
     [0.25, "#991b1b"],
-    [0.5, "#1e293b"],    # Neutro (0.0) Decorrelato
+    [0.5, "#1e293b"],  # Neutro (0.0) Decorrelato
     [0.75, "#047857"],
-    [1.0, "#10b981"]     # Max positivo (+1.0) Co-movimento pieno
+    [1.0, "#10b981"],  # Max positivo (+1.0) Co-movimento pieno
 ]
 
 # Scala PnL stile Finviz (Rosso profondo -> Slate neutro -> Verde smeraldo brillante)
 FINVIZ_PNL_SCALE: List[List[Union[float, str]]] = [
-    [0.0, "#b91c1c"],    # Perdita grave (<= -3% o -10%)
-    [0.25, "#ef4444"],   # Perdita moderata
-    [0.5, "#1e293b"],    # Parità (0.0%)
-    [0.75, "#059669"],   # Guadagno moderato
-    [1.0, "#10b981"],    # Guadagno elevato (>= +3% o +10%)
+    [0.0, "#b91c1c"],  # Perdita grave (<= -3% o -10%)
+    [0.25, "#ef4444"],  # Perdita moderata
+    [0.5, "#1e293b"],  # Parità (0.0%)
+    [0.75, "#059669"],  # Guadagno moderato
+    [1.0, "#10b981"],  # Guadagno elevato (>= +3% o +10%)
 ]
 
 # Gradienti per bande di confidenza Monte Carlo
 ARGUS_GLOW_CONES: Dict[str, str] = {
-    "band_90": "rgba(56, 189, 248, 0.12)",   # P5 - P95
-    "band_50": "rgba(56, 189, 248, 0.24)",   # P25 - P75
-    "median_line": "#38bdf8",                 # P50 solid line
-    "target_line": "#f59e0b",                 # Target FIRE
-    "initial_line": "rgba(148, 163, 184, 0.6)"# Capitale iniziale
+    "band_90": "rgba(56, 189, 248, 0.12)",  # P5 - P95
+    "band_50": "rgba(56, 189, 248, 0.24)",  # P25 - P75
+    "median_line": "#38bdf8",  # P50 solid line
+    "target_line": "#f59e0b",  # Target FIRE
+    "initial_line": "rgba(148, 163, 184, 0.6)",  # Capitale iniziale
 }
 
 
@@ -164,6 +165,7 @@ def get_asset_color(asset_or_category: str) -> str:
 # 🛠️ 2. MEMORY OPTIMIZATION & PLOTLY TEMPLATES
 # ==============================================================================
 
+
 def optimize_plotly_figure_memory(fig: go.Figure, precision: int = 4) -> go.Figure:
     """
     Comprime la serializzazione JSON delle figure Plotly per minimizzare il footprint in RAM:
@@ -188,7 +190,7 @@ def optimize_plotly_figure_memory(fig: go.Figure, precision: int = 4) -> go.Figu
                     if isinstance(m_color, (list, tuple, np.ndarray, pd.Series)):
                         arr_c = np.asarray(m_color)
                         if np.issubdtype(arr_c.dtype, np.floating):
-                            setattr(trace.marker, "color", np.round(arr_c, precision).tolist())
+                            trace.marker.color = np.round(arr_c, precision).tolist()
     except Exception:
         pass
     return fig
@@ -201,46 +203,46 @@ def register_argus_plotly_templates() -> None:
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             colorway=ARGUS_FINANCIAL_PALETTE,
-            font=dict(
-                family="Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                color="#e2e8f0",
-                size=12
-            ),
-            xaxis=dict(
-                showgrid=True,
-                gridwidth=1,
-                gridcolor=ARGUS_COLORS["grid_dark"],
-                zeroline=True,
-                zerolinecolor="rgba(255, 255, 255, 0.12)",
-                linecolor="rgba(255, 255, 255, 0.10)",
-                tickfont=dict(family="'JetBrains Mono', monospace", color="#94a3b8", size=11),
-                title=dict(font=dict(family="Outfit, sans-serif", color="#cbd5e1", size=12))
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridwidth=1,
-                gridcolor=ARGUS_COLORS["grid_dark"],
-                zeroline=True,
-                zerolinecolor="rgba(255, 255, 255, 0.12)",
-                linecolor="rgba(255, 255, 255, 0.10)",
-                tickfont=dict(family="'JetBrains Mono', monospace", color="#94a3b8", size=11),
-                title=dict(font=dict(family="Outfit, sans-serif", color="#cbd5e1", size=12))
-            ),
-            hoverlabel=dict(
-                bgcolor="#111827",
-                bordercolor="#3b82f6",
-                font=dict(family="Outfit, sans-serif", color="#f8fafc", size=12)
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="top",
-                y=-0.16,
-                xanchor="center",
-                x=0.5,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Outfit, sans-serif", color="#94a3b8", size=11)
-            ),
-            margin=dict(l=40, r=20, t=40, b=40)
+            font={
+                "family": "Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                "color": "#e2e8f0",
+                "size": 12,
+            },
+            xaxis={
+                "showgrid": True,
+                "gridwidth": 1,
+                "gridcolor": ARGUS_COLORS["grid_dark"],
+                "zeroline": True,
+                "zerolinecolor": "rgba(255, 255, 255, 0.12)",
+                "linecolor": "rgba(255, 255, 255, 0.10)",
+                "tickfont": {"family": "'JetBrains Mono', monospace", "color": "#94a3b8", "size": 11},
+                "title": {"font": {"family": "Outfit, sans-serif", "color": "#cbd5e1", "size": 12}},
+            },
+            yaxis={
+                "showgrid": True,
+                "gridwidth": 1,
+                "gridcolor": ARGUS_COLORS["grid_dark"],
+                "zeroline": True,
+                "zerolinecolor": "rgba(255, 255, 255, 0.12)",
+                "linecolor": "rgba(255, 255, 255, 0.10)",
+                "tickfont": {"family": "'JetBrains Mono', monospace", "color": "#94a3b8", "size": 11},
+                "title": {"font": {"family": "Outfit, sans-serif", "color": "#cbd5e1", "size": 12}},
+            },
+            hoverlabel={
+                "bgcolor": "#111827",
+                "bordercolor": "#3b82f6",
+                "font": {"family": "Outfit, sans-serif", "color": "#f8fafc", "size": 12},
+            },
+            legend={
+                "orientation": "h",
+                "yanchor": "top",
+                "y": -0.16,
+                "xanchor": "center",
+                "x": 0.5,
+                "bgcolor": "rgba(0,0,0,0)",
+                "font": {"family": "Outfit, sans-serif", "color": "#94a3b8", "size": 11},
+            },
+            margin={"l": 40, "r": 20, "t": 40, "b": 40},
         )
     )
 
@@ -249,46 +251,46 @@ def register_argus_plotly_templates() -> None:
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             colorway=ARGUS_FINANCIAL_PALETTE,
-            font=dict(
-                family="Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-                color="#1e293b",
-                size=12
-            ),
-            xaxis=dict(
-                showgrid=True,
-                gridwidth=1,
-                gridcolor=ARGUS_COLORS["grid_light"],
-                zeroline=True,
-                zerolinecolor="rgba(0, 0, 0, 0.12)",
-                linecolor="rgba(0, 0, 0, 0.10)",
-                tickfont=dict(family="'JetBrains Mono', monospace", color="#64748b", size=11),
-                title=dict(font=dict(family="Outfit, sans-serif", color="#334155", size=12))
-            ),
-            yaxis=dict(
-                showgrid=True,
-                gridwidth=1,
-                gridcolor=ARGUS_COLORS["grid_light"],
-                zeroline=True,
-                zerolinecolor="rgba(0, 0, 0, 0.12)",
-                linecolor="rgba(0, 0, 0, 0.10)",
-                tickfont=dict(family="'JetBrains Mono', monospace", color="#64748b", size=11),
-                title=dict(font=dict(family="Outfit, sans-serif", color="#334155", size=12))
-            ),
-            hoverlabel=dict(
-                bgcolor="#ffffff",
-                bordercolor="#2563eb",
-                font=dict(family="Outfit, sans-serif", color="#0f172a", size=12)
-            ),
-            legend=dict(
-                orientation="h",
-                yanchor="top",
-                y=-0.16,
-                xanchor="center",
-                x=0.5,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Outfit, sans-serif", color="#64748b", size=11)
-            ),
-            margin=dict(l=40, r=20, t=40, b=40)
+            font={
+                "family": "Outfit, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                "color": "#1e293b",
+                "size": 12,
+            },
+            xaxis={
+                "showgrid": True,
+                "gridwidth": 1,
+                "gridcolor": ARGUS_COLORS["grid_light"],
+                "zeroline": True,
+                "zerolinecolor": "rgba(0, 0, 0, 0.12)",
+                "linecolor": "rgba(0, 0, 0, 0.10)",
+                "tickfont": {"family": "'JetBrains Mono', monospace", "color": "#64748b", "size": 11},
+                "title": {"font": {"family": "Outfit, sans-serif", "color": "#334155", "size": 12}},
+            },
+            yaxis={
+                "showgrid": True,
+                "gridwidth": 1,
+                "gridcolor": ARGUS_COLORS["grid_light"],
+                "zeroline": True,
+                "zerolinecolor": "rgba(0, 0, 0, 0.12)",
+                "linecolor": "rgba(0, 0, 0, 0.10)",
+                "tickfont": {"family": "'JetBrains Mono', monospace", "color": "#64748b", "size": 11},
+                "title": {"font": {"family": "Outfit, sans-serif", "color": "#334155", "size": 12}},
+            },
+            hoverlabel={
+                "bgcolor": "#ffffff",
+                "bordercolor": "#2563eb",
+                "font": {"family": "Outfit, sans-serif", "color": "#0f172a", "size": 12},
+            },
+            legend={
+                "orientation": "h",
+                "yanchor": "top",
+                "y": -0.16,
+                "xanchor": "center",
+                "x": 0.5,
+                "bgcolor": "rgba(0,0,0,0)",
+                "font": {"family": "Outfit, sans-serif", "color": "#64748b", "size": 11},
+            },
+            margin={"l": 40, "r": 20, "t": 40, "b": 40},
         )
     )
 
@@ -319,16 +321,11 @@ def get_argus_plotly_config(filename: str = "argus_chart", display_mode_bar: str
             "lasso2d",
             "toggleSpikelines",
             "hoverClosestCartesian",
-            "hoverCompareCartesian"
+            "hoverCompareCartesian",
         ],
-        "toImageButtonOptions": {
-            "format": "png",
-            "filename": filename,
-            "height": 720,
-            "width": 1280,
-            "scale": 2
-        }
+        "toImageButtonOptions": {"format": "png", "filename": filename, "height": 720, "width": 1280, "scale": 2},
     }
+
 
 # Alias per retrocompatibilità
 get_plotly_config = get_argus_plotly_config
@@ -350,7 +347,7 @@ def apply_argus_theme(
     hovermode: str = "x unified",
     show_spikes: bool = True,
     optimize_memory: bool = True,
-    precision: int = 4
+    precision: int = 4,
 ) -> go.Figure:
     """
     Applica il Design System istituzionale ARGUS a una figura Plotly:
@@ -377,54 +374,54 @@ def apply_argus_theme(
         "autosize": True,
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(0,0,0,0)",
-        "margin": dict(l=40, r=20, t=top_margin, b=bottom_margin)
+        "margin": {"l": 40, "r": 20, "t": top_margin, "b": bottom_margin},
     }
 
     if height is not None:
         layout_updates["height"] = height
 
     if title:
-        layout_updates["title"] = dict(
-            text=f"<b>{title}</b>",
-            font=dict(family="Outfit, sans-serif", size=15, color=text_color),
-            x=0.01,
-            y=0.98,
-            xanchor="left",
-            yanchor="top"
-        )
+        layout_updates["title"] = {
+            "text": f"<b>{title}</b>",
+            "font": {"family": "Outfit, sans-serif", "size": 15, "color": text_color},
+            "x": 0.01,
+            "y": 0.98,
+            "xanchor": "left",
+            "yanchor": "top",
+        }
 
     # Configurazione Legenda Standard
     if show_legend:
         if legend_position == "bottom":
-            layout_updates["legend"] = dict(
-                orientation=legend_orientation,
-                yanchor="top",
-                y=-0.16 if x_title else -0.12,
-                xanchor="center",
-                x=0.5,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Outfit, sans-serif", size=11, color=subtle_color)
-            )
+            layout_updates["legend"] = {
+                "orientation": legend_orientation,
+                "yanchor": "top",
+                "y": -0.16 if x_title else -0.12,
+                "xanchor": "center",
+                "x": 0.5,
+                "bgcolor": "rgba(0,0,0,0)",
+                "font": {"family": "Outfit, sans-serif", "size": 11, "color": subtle_color},
+            }
         elif legend_position == "top":
-            layout_updates["legend"] = dict(
-                orientation=legend_orientation,
-                yanchor="bottom",
-                y=1.02,
-                xanchor="right",
-                x=1.0,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Outfit, sans-serif", size=11, color=subtle_color)
-            )
+            layout_updates["legend"] = {
+                "orientation": legend_orientation,
+                "yanchor": "bottom",
+                "y": 1.02,
+                "xanchor": "right",
+                "x": 1.0,
+                "bgcolor": "rgba(0,0,0,0)",
+                "font": {"family": "Outfit, sans-serif", "size": 11, "color": subtle_color},
+            }
         else:  # right
-            layout_updates["legend"] = dict(
-                orientation="v",
-                yanchor="top",
-                y=1.0,
-                xanchor="left",
-                x=1.02,
-                bgcolor="rgba(0,0,0,0)",
-                font=dict(family="Outfit, sans-serif", size=11, color=subtle_color)
-            )
+            layout_updates["legend"] = {
+                "orientation": "v",
+                "yanchor": "top",
+                "y": 1.0,
+                "xanchor": "left",
+                "x": 1.02,
+                "bgcolor": "rgba(0,0,0,0)",
+                "font": {"family": "Outfit, sans-serif", "size": 11, "color": subtle_color},
+            }
     else:
         layout_updates["showlegend"] = False
 
@@ -433,22 +430,24 @@ def apply_argus_theme(
     # Configurazione Asse X
     x_kwargs: Dict[str, Any] = {}
     if x_title:
-        x_kwargs["title"] = dict(text=x_title, font=dict(family="Outfit, sans-serif", size=12, color=subtle_color))
+        x_kwargs["title"] = {"text": x_title, "font": {"family": "Outfit, sans-serif", "size": 12, "color": subtle_color}}
     if show_spikes:
-        x_kwargs.update({
-            "showspikes": True,
-            "spikethickness": 1,
-            "spikedash": "dot",
-            "spikemode": "across",
-            "spikecolor": "rgba(255, 255, 255, 0.25)" if dark_mode else "rgba(0, 0, 0, 0.25)"
-        })
+        x_kwargs.update(
+            {
+                "showspikes": True,
+                "spikethickness": 1,
+                "spikedash": "dot",
+                "spikemode": "across",
+                "spikecolor": "rgba(255, 255, 255, 0.25)" if dark_mode else "rgba(0, 0, 0, 0.25)",
+            }
+        )
     if x_kwargs:
         fig.update_xaxes(**x_kwargs)
 
     # Configurazione Asse Y
     y_kwargs: Dict[str, Any] = {}
     if y_title:
-        y_kwargs["title"] = dict(text=y_title, font=dict(family="Outfit, sans-serif", size=12, color=subtle_color))
+        y_kwargs["title"] = {"text": y_title, "font": {"family": "Outfit, sans-serif", "size": 12, "color": subtle_color}}
     if is_percentage:
         y_kwargs["tickformat"] = ",.2%"
     elif is_currency:
@@ -462,6 +461,7 @@ def apply_argus_theme(
 
     return fig
 
+
 # Alias per piena retrocompatibilità con core/ui_utils.py
 apply_custom_chart_layout = apply_argus_theme
 
@@ -470,15 +470,12 @@ apply_custom_chart_layout = apply_argus_theme
 # ⚡ 3. PERFORMANCE ENGINE: LTTB DOWNSAMPLING & WEBGL AUTO-SWITCHING
 # ==============================================================================
 
-def lttb_downsample(
-    x: Any,
-    y: Any,
-    n_buckets: int = 1000
-) -> Tuple[Any, Any]:
+
+def lttb_downsample(x: Any, y: Any, n_buckets: int = 1000) -> Tuple[Any, Any]:
     """
     Algoritmo LTTB (Largest Triangle Three Buckets) implementato in puro NumPy vettorizzato.
     Downsample time series dense preservando picchi, minimi locali e forma percettiva dell'onda.
-    
+
     - Supporta DatetimeIndex, Series con indice temporale, stringhe o array numerici.
     - Preserva rigorosamente il primo e l'ultimo punto della serie.
     - Esecuzione sub-millisecondo per migliaia di punti.
@@ -588,12 +585,7 @@ def lttb_downsample(
 
 
 def auto_webgl_trace(
-    x: Any,
-    y: Any,
-    mode: str = "lines",
-    threshold: int = 1000,
-    force_webgl: Optional[bool] = None,
-    **kwargs
+    x: Any, y: Any, mode: str = "lines", threshold: int = 1000, force_webgl: Optional[bool] = None, **kwargs
 ) -> Union[go.Scatter, go.Scattergl]:
     """
     Crea automaticamente una traccia go.Scattergl (accelerata via WebGL/Canvas GPU)
@@ -637,6 +629,7 @@ def convert_figure_to_webgl(fig: go.Figure, threshold: int = 1000) -> go.Figure:
 # 📊 4. THE FOUR PRODUCTION-READY WRAPPER CHARTS
 # ==============================================================================
 
+
 def create_timeseries_chart(
     series_dict: Optional[Union[pd.Series, Dict[str, Union[pd.Series, np.ndarray, Sequence[float]]]]] = None,
     nav_series: Optional[pd.Series] = None,
@@ -649,7 +642,7 @@ def create_timeseries_chart(
     height: int = 540,
     dark_mode: bool = True,
     max_points: int = 2000,
-    use_webgl: Union[bool, str] = "auto"
+    use_webgl: Union[bool, str] = "auto",
 ) -> go.Figure:
     """
     Wrapper ad alte prestazioni per serie storiche finanziarie (NAV, prezzi, portafoglio vs benchmark).
@@ -689,13 +682,7 @@ def create_timeseries_chart(
         drawdown_series = (primary_series - hwm) / hwm_safe * 100.0
 
     if has_dd_pane:
-        fig = sp.make_subplots(
-            rows=2,
-            cols=1,
-            shared_xaxes=True,
-            vertical_spacing=0.04,
-            row_heights=[0.72, 0.28]
-        )
+        fig = sp.make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.04, row_heights=[0.72, 0.28])
     else:
         fig = go.Figure()
 
@@ -720,22 +707,30 @@ def create_timeseries_chart(
         if len(x_vals) > max_points:
             x_vals, y_vals = lttb_downsample(x_vals, y_vals, n_buckets=max_points)
 
-        color = get_asset_color(name) if color_idx == 0 else ARGUS_FINANCIAL_PALETTE[color_idx % len(ARGUS_FINANCIAL_PALETTE)]
+        color = (
+            get_asset_color(name)
+            if color_idx == 0
+            else ARGUS_FINANCIAL_PALETTE[color_idx % len(ARGUS_FINANCIAL_PALETTE)]
+        )
         webgl_mode = (len(x_vals) >= 1000) if use_webgl == "auto" else bool(use_webgl)
 
         fmt_unit = "%" if is_percentage else f"{currency_symbol}"
-        hover_tmpl = f"<b>{name}</b>: %{{y:,.2f}} {fmt_unit}<extra></extra>" if is_percentage else f"<b>{name}</b>: {currency_symbol} %{{y:,.2f}}<extra></extra>"
+        hover_tmpl = (
+            f"<b>{name}</b>: %{{y:,.2f}} {fmt_unit}<extra></extra>"
+            if is_percentage
+            else f"<b>{name}</b>: {currency_symbol} %{{y:,.2f}}<extra></extra>"
+        )
 
         trace = auto_webgl_trace(
             x=x_vals,
             y=y_vals,
             mode="lines",
             name=name,
-            line=dict(color=color, width=2.2 if color_idx == 0 else 1.8),
+            line={"color": color, "width": 2.2 if color_idx == 0 else 1.8},
             fill="tozeroy" if color_idx == 0 and not has_dd_pane else None,
-            fillcolor=f"rgba(56, 189, 248, 0.08)" if color_idx == 0 else None,
+            fillcolor="rgba(56, 189, 248, 0.08)" if color_idx == 0 else None,
             hovertemplate=hover_tmpl,
-            force_webgl=webgl_mode
+            force_webgl=webgl_mode,
         )
 
         if has_dd_pane:
@@ -758,9 +753,9 @@ def create_timeseries_chart(
             y=b_y,
             mode="lines",
             name="Benchmark",
-            line=dict(color=ARGUS_COLORS["benchmark"], width=1.6, dash="dash"),
-            hovertemplate=f"<b>Benchmark</b>: %{{y:,.2f}}<extra></extra>",
-            force_webgl=b_webgl
+            line={"color": ARGUS_COLORS["benchmark"], "width": 1.6, "dash": "dash"},
+            hovertemplate="<b>Benchmark</b>: %{y:,.2f}<extra></extra>",
+            force_webgl=b_webgl,
         )
         if has_dd_pane:
             fig.add_trace(b_trace, row=1, col=1)
@@ -780,11 +775,11 @@ def create_timeseries_chart(
             y=dd_y,
             mode="lines",
             name="Drawdown",
-            line=dict(color=ARGUS_COLORS["bear"], width=1.4),
+            line={"color": ARGUS_COLORS["bear"], "width": 1.4},
             fill="tozeroy",
             fillcolor="rgba(239, 68, 68, 0.22)",
             hovertemplate="<b>Drawdown</b>: %{y:.2f}%<extra></extra>",
-            force_webgl=dd_webgl
+            force_webgl=dd_webgl,
         )
         fig.add_trace(dd_trace, row=2, col=1)
 
@@ -799,14 +794,14 @@ def create_timeseries_chart(
                     y=[min_dd],
                     mode="markers+text",
                     name="Max Drawdown",
-                    marker=dict(color=ARGUS_COLORS["bear"], size=8, symbol="diamond"),
+                    marker={"color": ARGUS_COLORS["bear"], "size": 8, "symbol": "diamond"},
                     text=[f"Max DD: {min_dd:.1f}%"],
                     textposition="bottom center",
-                    textfont=dict(family="'JetBrains Mono', monospace", size=10, color="#f87171"),
-                    hoverinfo="skip"
+                    textfont={"family": "'JetBrains Mono', monospace", "size": 10, "color": "#f87171"},
+                    hoverinfo="skip",
                 ),
                 row=2,
-                col=1
+                col=1,
             )
 
     apply_argus_theme(
@@ -816,7 +811,7 @@ def create_timeseries_chart(
         dark_mode=dark_mode,
         hovermode="x unified",
         show_legend=True,
-        legend_position="bottom"
+        legend_position="bottom",
     )
 
     if has_dd_pane:
@@ -826,24 +821,19 @@ def create_timeseries_chart(
             tickformat=",.2%" if is_percentage else ",.2f",
             tickprefix="" if is_percentage else f"{currency_symbol} ",
             row=1,
-            col=1
+            col=1,
         )
-        fig.update_yaxes(
-            title_text="Drawdown",
-            ticksuffix="%",
-            tickformat=",.1f",
-            row=2,
-            col=1
-        )
+        fig.update_yaxes(title_text="Drawdown", ticksuffix="%", tickformat=",.1f", row=2, col=1)
         fig.update_xaxes(row=2, col=1, title_text="Data")
     else:
         fig.update_yaxes(
             title_text="Rendimento" if is_percentage else f"Valore ({currency_symbol})",
             tickformat=",.2%" if is_percentage else ",.2f",
-            tickprefix="" if is_percentage else f"{currency_symbol} "
+            tickprefix="" if is_percentage else f"{currency_symbol} ",
         )
 
     return fig
+
 
 # Alias per retrocompatibilità
 create_equity_drawdown_chart = create_timeseries_chart
@@ -860,7 +850,7 @@ def create_montecarlo_fan_chart(
     dark_mode: bool = True,
     quantiles: Tuple[float, float, float, float] = (0.05, 0.25, 0.75, 0.95),
     max_points: int = 1500,
-    use_webgl: Union[bool, str] = "auto"
+    use_webgl: Union[bool, str] = "auto",
 ) -> go.Figure:
     """
     Genera un Fan Chart (cono probabilistico a ventaglio) per simulazioni Monte Carlo / FIRE:
@@ -921,59 +911,57 @@ def create_montecarlo_fan_chart(
     is_webgl = (len(x_axis) >= 1000) if use_webgl == "auto" else bool(use_webgl)
 
     # 1. Banda Esterna 90% (P5 - P95)
-    fig.add_trace(auto_webgl_trace(
-        x=x_axis,
-        y=p95,
-        mode="lines",
-        line=dict(width=0),
-        showlegend=False,
-        hoverinfo="skip",
-        force_webgl=is_webgl
-    ))
-    fig.add_trace(auto_webgl_trace(
-        x=x_axis,
-        y=p5,
-        mode="lines",
-        line=dict(width=0),
-        fill="tonexty",
-        fillcolor=ARGUS_GLOW_CONES["band_90"],
-        name=f"Intervallo 90% (P{int(q_low_outer*100)} - P{int(q_high_outer*100)})",
-        hovertemplate=f"P{int(q_low_outer*100)} (Pessimistico): <b>{currency_symbol} %{{y:,.0f}}</b><extra></extra>",
-        force_webgl=is_webgl
-    ))
+    fig.add_trace(
+        auto_webgl_trace(
+            x=x_axis, y=p95, mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip", force_webgl=is_webgl
+        )
+    )
+    fig.add_trace(
+        auto_webgl_trace(
+            x=x_axis,
+            y=p5,
+            mode="lines",
+            line={"width": 0},
+            fill="tonexty",
+            fillcolor=ARGUS_GLOW_CONES["band_90"],
+            name=f"Intervallo 90% (P{int(q_low_outer * 100)} - P{int(q_high_outer * 100)})",
+            hovertemplate=f"P{int(q_low_outer * 100)} (Pessimistico): <b>{currency_symbol} %{{y:,.0f}}</b><extra></extra>",
+            force_webgl=is_webgl,
+        )
+    )
 
     # 2. Banda Interna 50% Interquartile (P25 - P75)
-    fig.add_trace(auto_webgl_trace(
-        x=x_axis,
-        y=p75,
-        mode="lines",
-        line=dict(width=0),
-        showlegend=False,
-        hoverinfo="skip",
-        force_webgl=is_webgl
-    ))
-    fig.add_trace(auto_webgl_trace(
-        x=x_axis,
-        y=p25,
-        mode="lines",
-        line=dict(width=0),
-        fill="tonexty",
-        fillcolor=ARGUS_GLOW_CONES["band_50"],
-        name=f"Intervallo 50% (P{int(q_low_inner*100)} - P{int(q_high_inner*100)})",
-        hovertemplate=f"P{int(q_low_inner*100)}: <b>{currency_symbol} %{{y:,.0f}}</b><extra></extra>",
-        force_webgl=is_webgl
-    ))
+    fig.add_trace(
+        auto_webgl_trace(
+            x=x_axis, y=p75, mode="lines", line={"width": 0}, showlegend=False, hoverinfo="skip", force_webgl=is_webgl
+        )
+    )
+    fig.add_trace(
+        auto_webgl_trace(
+            x=x_axis,
+            y=p25,
+            mode="lines",
+            line={"width": 0},
+            fill="tonexty",
+            fillcolor=ARGUS_GLOW_CONES["band_50"],
+            name=f"Intervallo 50% (P{int(q_low_inner * 100)} - P{int(q_high_inner * 100)})",
+            hovertemplate=f"P{int(q_low_inner * 100)}: <b>{currency_symbol} %{{y:,.0f}}</b><extra></extra>",
+            force_webgl=is_webgl,
+        )
+    )
 
     # 3. Mediana P50
-    fig.add_trace(auto_webgl_trace(
-        x=x_axis,
-        y=p50,
-        mode="lines",
-        line=dict(color=ARGUS_GLOW_CONES["median_line"], width=2.6),
-        name="Mediana (P50)",
-        hovertemplate=f"<b>Mediana</b>: {currency_symbol} %{{y:,.0f}}<extra></extra>",
-        force_webgl=is_webgl
-    ))
+    fig.add_trace(
+        auto_webgl_trace(
+            x=x_axis,
+            y=p50,
+            mode="lines",
+            line={"color": ARGUS_GLOW_CONES["median_line"], "width": 2.6},
+            name="Mediana (P50)",
+            hovertemplate=f"<b>Mediana</b>: {currency_symbol} %{{y:,.0f}}<extra></extra>",
+            force_webgl=is_webgl,
+        )
+    )
 
     # Linea Capitale Iniziale
     if initial_value is not None:
@@ -984,7 +972,7 @@ def create_montecarlo_fan_chart(
             line_width=1.3,
             annotation_text=f"Base: {currency_symbol} {initial_value:,.0f}",
             annotation_position="bottom left",
-            annotation_font=dict(family="'JetBrains Mono', monospace", size=10, color="#94a3b8")
+            annotation_font={"family": "'JetBrains Mono', monospace", "size": 10, "color": "#94a3b8"},
         )
 
     # Target FIRE / Soglia Obiettivo
@@ -996,7 +984,7 @@ def create_montecarlo_fan_chart(
             line_width=1.6,
             annotation_text=f"Target: {currency_symbol} {target_value:,.0f}",
             annotation_position="top left",
-            annotation_font=dict(family="'JetBrains Mono', monospace", size=11, color="#fbbf24")
+            annotation_font={"family": "'JetBrains Mono', monospace", "size": 11, "color": "#fbbf24"},
         )
 
     apply_argus_theme(
@@ -1009,9 +997,10 @@ def create_montecarlo_fan_chart(
         height=height,
         dark_mode=dark_mode,
         hovermode="x unified",
-        legend_position="bottom"
+        legend_position="bottom",
     )
     return fig
+
 
 # Alias per retrocompatibilità
 create_monte_carlo_fan_chart = create_montecarlo_fan_chart
@@ -1027,7 +1016,7 @@ def create_asset_allocation_treemap(
     title: str = "Asset Allocation & Performance Map",
     currency_symbol: str = "€",
     height: int = 500,
-    dark_mode: bool = True
+    dark_mode: bool = True,
 ) -> go.Figure:
     """
     Genera un grafico gerarchico (Treemap o Sunburst) multi-livello per asset allocation:
@@ -1057,26 +1046,26 @@ def create_asset_allocation_treemap(
             color=color_col,
             color_continuous_scale=FINVIZ_PNL_SCALE,
             range_color=[-bound, bound],
-            color_continuous_midpoint=0.0
+            color_continuous_midpoint=0.0,
         )
         fig.update_traces(
             textinfo="label+percent entry",
-            insidetextfont=dict(family="Outfit, sans-serif", size=12),
+            insidetextfont={"family": "Outfit, sans-serif", "size": 12},
             hovertemplate=(
                 f"<b>%{{label}}</b><br>"
                 f"Controvalore: {currency_symbol} %{{value:,.2f}}<br>"
                 f"Quota Totale: %{{percentRoot:.1%}}<br>"
                 f"Rendimento PnL: <b>%{{color:+.2f}}%</b><extra></extra>"
-            )
+            ),
         )
         fig.update_coloraxes(
-            colorbar=dict(
-                title=dict(text="PnL %", font=dict(family="Outfit, sans-serif", size=11, color="#94a3b8")),
-                tickfont=dict(family="'JetBrains Mono', monospace", size=10, color="#94a3b8"),
-                ticksuffix="%",
-                len=0.75,
-                thickness=14
-            )
+            colorbar={
+                "title": {"text": "PnL %", "font": {"family": "Outfit, sans-serif", "size": 11, "color": "#94a3b8"}},
+                "tickfont": {"family": "'JetBrains Mono', monospace", "size": 10, "color": "#94a3b8"},
+                "ticksuffix": "%",
+                "len": 0.75,
+                "thickness": 14,
+            }
         )
     else:
         # Colorazione categorica basata sulla prima dimensione (Macro Class)
@@ -1084,34 +1073,23 @@ def create_asset_allocation_treemap(
         unique_macros = df_plot[first_level].unique()
         color_map = {str(m): get_asset_color(str(m)) for m in unique_macros}
 
-        fig = plot_fn(
-            df_plot,
-            path=path,
-            values=values_col,
-            color=first_level,
-            color_discrete_map=color_map
-        )
+        fig = plot_fn(df_plot, path=path, values=values_col, color=first_level, color_discrete_map=color_map)
         fig.update_traces(
             textinfo="label+percent entry",
-            insidetextfont=dict(family="Outfit, sans-serif", size=12),
+            insidetextfont={"family": "Outfit, sans-serif", "size": 12},
             hovertemplate=(
                 f"<b>%{{label}}</b><br>"
                 f"Controvalore: {currency_symbol} %{{value:,.2f}}<br>"
                 f"Quota Totale: %{{percentRoot:.1%}}<br>"
                 f"Quota sul Ramo: %{{percentEntry:.1%}}<extra></extra>"
-            )
+            ),
         )
 
     apply_argus_theme(
-        fig,
-        title=title,
-        height=height,
-        dark_mode=dark_mode,
-        show_legend=False,
-        hovermode="closest",
-        show_spikes=False
+        fig, title=title, height=height, dark_mode=dark_mode, show_legend=False, hovermode="closest", show_spikes=False
     )
     return fig
+
 
 # Alias per retrocompatibilità
 create_hierarchical_allocation_chart = create_asset_allocation_treemap
@@ -1125,7 +1103,7 @@ def create_waterfall_cashflow(
     currency_symbol: str = "€",
     height: int = 440,
     dark_mode: bool = True,
-    final_total_label: Optional[str] = "Patrimonio Finale"
+    final_total_label: Optional[str] = "Patrimonio Finale",
 ) -> go.Figure:
     """
     Genera un Waterfall Chart istituzionale per entrate, uscite, investimenti e chiusura patrimonio:
@@ -1146,31 +1124,31 @@ def create_waterfall_cashflow(
     else:
         measures = list(measures)
 
-    fig = go.Figure(go.Waterfall(
-        name="Cash Flow",
-        orientation="v",
-        measure=measures,
-        x=cats,
-        y=vals,
-        textposition="outside",
-        texttemplate=f"{currency_symbol} %{{y:+,.0f}}",
-        textfont=dict(family="'JetBrains Mono', monospace", size=11, color="#e2e8f0" if dark_mode else "#1e293b"),
-        connector=dict(
-            line=dict(
-                color="rgba(255, 255, 255, 0.18)" if dark_mode else "rgba(0, 0, 0, 0.18)",
-                width=1,
-                dash="dot"
-            )
-        ),
-        increasing=dict(marker=dict(color=ARGUS_COLORS["bull"])),
-        decreasing=dict(marker=dict(color=ARGUS_COLORS["bear"])),
-        totals=dict(marker=dict(color=ARGUS_COLORS["primary"])),
-        hovertemplate=(
-            f"<b>%{{x}}</b><br>"
-            f"Flusso: <b>{currency_symbol} %{{y:+,.2f}}</b><br>"
-            f"Cumulato: <b>{currency_symbol} %{{currentvalue:,.2f}}</b><extra></extra>"
+    fig = go.Figure(
+        go.Waterfall(
+            name="Cash Flow",
+            orientation="v",
+            measure=measures,
+            x=cats,
+            y=vals,
+            textposition="outside",
+            texttemplate=f"{currency_symbol} %{{y:+,.0f}}",
+            textfont={"family": "'JetBrains Mono', monospace", "size": 11, "color": "#e2e8f0" if dark_mode else "#1e293b"},
+            connector={
+                "line": {
+                    "color": "rgba(255, 255, 255, 0.18)" if dark_mode else "rgba(0, 0, 0, 0.18)", "width": 1, "dash": "dot"
+                }
+            },
+            increasing={"marker": {"color": ARGUS_COLORS["bull"]}},
+            decreasing={"marker": {"color": ARGUS_COLORS["bear"]}},
+            totals={"marker": {"color": ARGUS_COLORS["primary"]}},
+            hovertemplate=(
+                f"<b>%{{x}}</b><br>"
+                f"Flusso: <b>{currency_symbol} %{{y:+,.2f}}</b><br>"
+                f"Cumulato: <b>{currency_symbol} %{{currentvalue:,.2f}}</b><extra></extra>"
+            ),
         )
-    ))
+    )
 
     apply_argus_theme(
         fig,
@@ -1181,9 +1159,10 @@ def create_waterfall_cashflow(
         height=height,
         dark_mode=dark_mode,
         show_legend=False,
-        hovermode="closest"
+        hovermode="closest",
     )
     return fig
+
 
 # Alias per retrocompatibilità
 create_cashflow_waterfall_chart = create_waterfall_cashflow
@@ -1195,7 +1174,7 @@ def create_correlation_heatmap(
     show_values: bool = True,
     colorscale: Optional[List[Any]] = None,
     height: Optional[int] = None,
-    dark_mode: bool = True
+    dark_mode: bool = True,
 ) -> go.Figure:
     """
     Genera una Heatmap di correlazione cross-asset ad alto contrasto:
@@ -1211,7 +1190,7 @@ def create_correlation_heatmap(
         if corr_matrix.size == 0 or corr_matrix.ndim != 2:
             return go.Figure()
         n = corr_matrix.shape[0]
-        cols = [f"Asset {i+1}" for i in range(n)]
+        cols = [f"Asset {i + 1}" for i in range(n)]
         df_corr = pd.DataFrame(corr_matrix, index=cols, columns=cols)
     else:
         return go.Figure()
@@ -1224,26 +1203,28 @@ def create_correlation_heatmap(
     for row in z_vals:
         text_matrix.append([f"{v:+.2f}" if pd.notna(v) else "" for v in row])
 
-    fig = go.Figure(data=go.Heatmap(
-        z=z_vals,
-        x=labels,
-        y=labels,
-        zmin=-1.0,
-        zmax=1.0,
-        colorscale=scale,
-        text=text_matrix if show_values else None,
-        texttemplate="%{text}" if show_values else None,
-        textfont=dict(family="'JetBrains Mono', monospace", size=11, color="#ffffff"),
-        hovertemplate="<b>%{y} ↔ %{x}</b><br>Correlazione di Pearson: <b>%{z:+.3f}</b><extra></extra>",
-        colorbar=dict(
-            title=dict(text="Corr", font=dict(family="Outfit, sans-serif", size=11, color="#94a3b8")),
-            tickvals=[-1.0, -0.5, 0.0, 0.5, 1.0],
-            ticktext=["-1.0", "-0.5", "0.0", "+0.5", "+1.0"],
-            tickfont=dict(family="'JetBrains Mono', monospace", size=10, color="#94a3b8"),
-            len=0.85,
-            thickness=14
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=z_vals,
+            x=labels,
+            y=labels,
+            zmin=-1.0,
+            zmax=1.0,
+            colorscale=scale,
+            text=text_matrix if show_values else None,
+            texttemplate="%{text}" if show_values else None,
+            textfont={"family": "'JetBrains Mono', monospace", "size": 11, "color": "#ffffff"},
+            hovertemplate="<b>%{y} ↔ %{x}</b><br>Correlazione di Pearson: <b>%{z:+.3f}</b><extra></extra>",
+            colorbar={
+                "title": {"text": "Corr", "font": {"family": "Outfit, sans-serif", "size": 11, "color": "#94a3b8"}},
+                "tickvals": [-1.0, -0.5, 0.0, 0.5, 1.0],
+                "ticktext": ["-1.0", "-0.5", "0.0", "+0.5", "+1.0"],
+                "tickfont": {"family": "'JetBrains Mono', monospace", "size": 10, "color": "#94a3b8"},
+                "len": 0.85,
+                "thickness": 14,
+            },
         )
-    ))
+    )
 
     calc_height = height or max(380, len(labels) * 44 + 80)
     apply_argus_theme(
@@ -1253,7 +1234,7 @@ def create_correlation_heatmap(
         dark_mode=dark_mode,
         show_legend=False,
         hovermode="closest",
-        show_spikes=False
+        show_spikes=False,
     )
     return fig
 

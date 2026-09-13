@@ -3,20 +3,22 @@
 # Unit tests for Wealth Reporting Hub & Multi-Format Exporters
 # ============================================================
 
-import pytest
 import io
 import json
+
 import pandas as pd
+import pytest
+
 from core.fetcher import get_engine
-from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
-from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
 from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
+from core.voice_advisor_engine import generate_ai_voice_executive_briefing
 from core.wealth.wealth_engine import (
+    compute_fiscal_analytics,
     generate_advisory_pitchbook_pdf,
     generate_executive_tear_sheet_pdf,
-    compute_fiscal_analytics
 )
-from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
+from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
 
 
 def test_white_label_quarterly_pdf_generation():

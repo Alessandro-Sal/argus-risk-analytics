@@ -5,16 +5,16 @@
 # (Tier 1: Fast RAM LRU Cache | Tier 2: Persistent SQLite 24h TTL)
 # ============================================================
 
-import os
-import time
 import json
-import sqlite3
+import os
 import random
+import sqlite3
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
-import pandas as pd
-import numpy as np
 
+import numpy as np
+import pandas as pd
 
 CACHE_DB_PATH = Path("data") / "yfinance_cache.db"
 DEFAULT_TTL_SECONDS = 86400  # 24 Ore di validità
@@ -52,7 +52,7 @@ def get_cached_ticker_history(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     ttl_seconds: float = DEFAULT_TTL_SECONDS,
-    force_refresh: bool = False
+    force_refresh: bool = False,
 ) -> pd.DataFrame:
     """
     Recupera i dati storici dei prezzi con scudo multi-livello anti-429 Rate Limiting:
@@ -75,10 +75,7 @@ def get_cached_ticker_history(
     conn = _get_cache_connection()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT payload, cached_at, ttl_seconds FROM yfinance_cache WHERE cache_key = ?",
-            (cache_key,)
-        )
+        cur.execute("SELECT payload, cached_at, ttl_seconds FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
         row = cur.fetchone()
         if row and not force_refresh:
             payload_json, cached_at, row_ttl = row
@@ -99,10 +96,13 @@ def get_cached_ticker_history(
         try:
             payload_str = df_downloaded.to_json(date_format="iso")
             cur = conn.cursor()
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
                 VALUES (?, ?, 'history', ?, ?, ?)
-            """, (cache_key, clean_ticker, payload_str, now, ttl_seconds))
+            """,
+                (cache_key, clean_ticker, payload_str, now, ttl_seconds),
+            )
             conn.commit()
         except Exception:
             pass
@@ -123,12 +123,14 @@ def get_cached_ticker_history(
     return pd.DataFrame()
 
 
-def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_date: Optional[str]) -> Optional[pd.DataFrame]:
+def _fetch_yfinance_history_safe(
+    ticker: str, start_date: Optional[str], end_date: Optional[str]
+) -> Optional[pd.DataFrame]:
     """Scarica i prezzi da yfinance con Circuit Breaker e fallback a Stooq (equities/FX) e Crypto Engine."""
     import yfinance as yf
 
     try:
-        from core.resilient_market_engine import yahoo_circuit_breaker, StooqDataProvider, stooq_circuit_breaker
+        from core.resilient_market_engine import StooqDataProvider, stooq_circuit_breaker, yahoo_circuit_breaker
     except ImportError:
         yahoo_circuit_breaker = None
         StooqDataProvider = None
@@ -162,7 +164,7 @@ def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_dat
                 err_msg = str(e).lower()
                 if "too many requests" in err_msg or "429" in err_msg or "rate limit" in err_msg:
                     # Exponential backoff con jitter casuale
-                    sleep_time = (2 ** attempt) + random.uniform(0.1, 0.5)
+                    sleep_time = (2**attempt) + random.uniform(0.1, 0.5)
                     time.sleep(sleep_time)
                 else:
                     break
@@ -172,7 +174,8 @@ def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_dat
 
     # Fallback 1: Crypto Multi-Exchange Provider (Binance, Kraken, CoinGecko)
     try:
-        from core.crypto_provider import is_crypto_symbol, fetch_crypto_history_unified
+        from core.crypto_provider import fetch_crypto_history_unified, is_crypto_symbol
+
         if is_crypto_symbol(ticker):
             df_crypto = fetch_crypto_history_unified(ticker, start_date=start_date, end_date=end_date)
             if df_crypto is not None and not df_crypto.empty:
@@ -183,6 +186,7 @@ def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_dat
     # Fallback 2: Stooq Free Historical Data Provider per non-crypto (azioni, ETF, indici, cambi FX)
     try:
         from core.crypto_provider import is_crypto_symbol
+
         is_crypto = is_crypto_symbol(ticker)
     except Exception:
         is_crypto = "-" in ticker or "/" in ticker
@@ -201,11 +205,8 @@ def _fetch_yfinance_history_safe(ticker: str, start_date: Optional[str], end_dat
     return None
 
 
-
 def get_cached_ticker_info(
-    ticker: str,
-    ttl_seconds: float = DEFAULT_TTL_SECONDS,
-    force_refresh: bool = False
+    ticker: str, ttl_seconds: float = DEFAULT_TTL_SECONDS, force_refresh: bool = False
 ) -> Dict[str, Any]:
     """Recupera i metadati aziendali (settore, multipli, bilanci) con cache SQLite."""
     clean_ticker = str(ticker).strip().upper()
@@ -222,10 +223,7 @@ def get_cached_ticker_info(
     conn = _get_cache_connection()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT payload, cached_at, ttl_seconds FROM yfinance_cache WHERE cache_key = ?",
-            (cache_key,)
-        )
+        cur.execute("SELECT payload, cached_at, ttl_seconds FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
         row = cur.fetchone()
         if row and not force_refresh:
             payload_json, cached_at, row_ttl = row
@@ -238,13 +236,14 @@ def get_cached_ticker_info(
 
     # Fetch yfinance info
     import yfinance as yf
+
     info_data = {}
     for attempt in range(2):
         try:
             time.sleep(random.uniform(0.04, 0.12))
             yf_obj = yf.Ticker(clean_ticker)
             info_data = yf_obj.info or {}
-            
+
             # Se yf.info è vuoto o fallisce, prova fast_info come fallback leggero
             if not info_data or len(info_data) < 4:
                 try:
@@ -258,19 +257,22 @@ def get_cached_ticker_info(
                             "currency": getattr(fi, "currency", "USD"),
                             "fiftyDayAverage": getattr(fi, "fifty_day_average", None),
                             "twoHundredDayAverage": getattr(fi, "two_hundred_day_average", None),
-                            "shares": getattr(fi, "shares", None)
+                            "shares": getattr(fi, "shares", None),
                         }
                 except Exception:
                     pass
-                    
+
             if info_data:
                 _L1_CACHE[cache_key] = (now, info_data)
                 try:
                     cur = conn.cursor()
-                    cur.execute("""
+                    cur.execute(
+                        """
                         INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
                         VALUES (?, ?, 'info', ?, ?, ?)
-                    """, (cache_key, clean_ticker, json.dumps(info_data), now, ttl_seconds))
+                    """,
+                        (cache_key, clean_ticker, json.dumps(info_data), now, ttl_seconds),
+                    )
                     conn.commit()
                 except Exception:
                     pass
@@ -278,7 +280,7 @@ def get_cached_ticker_info(
         except Exception as e:
             err_msg = str(e).lower()
             if "too many requests" in err_msg or "429" in err_msg or "rate limit" in err_msg:
-                time.sleep((2 ** attempt) + random.uniform(0.1, 0.3))
+                time.sleep((2**attempt) + random.uniform(0.1, 0.3))
             else:
                 break
 
@@ -316,7 +318,7 @@ def get_cache_stats() -> Dict[str, Any]:
         "payload_size_kb": round(size_bytes / 1024.0, 2),
         "db_file_size_kb": round(db_size_kb, 2),
         "status": "🟢 Active & Shielded",
-        "shield_version": "2.0 (Dual-Tier LRU + SQLite)"
+        "shield_version": "2.0 (Dual-Tier LRU + SQLite)",
     }
 
 

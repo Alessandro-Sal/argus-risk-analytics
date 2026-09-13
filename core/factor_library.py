@@ -29,9 +29,7 @@ _CACHE_FACTORS_DF: Optional[pd.DataFrame] = None
 
 
 def _generate_synthetic_benchmark_factors(
-    start_date: str = "2020-01-01",
-    end_date: str = "2026-12-31",
-    sr_portfolio: Optional[pd.Series] = None
+    start_date: str = "2020-01-01", end_date: str = "2026-12-31", sr_portfolio: Optional[pd.Series] = None
 ) -> pd.DataFrame:
     """Genera serie storiche sintetiche stocasticamente realistiche calibrate sui parametri storici di Dartmouth."""
     if sr_portfolio is not None and len(sr_portfolio) > 15:
@@ -54,25 +52,16 @@ def _generate_synthetic_benchmark_factors(
     mom = np.random.normal(0.00022, 0.0078, n)
     rf = np.full(n, 0.0275 / 252.0)  # ~2.75% annuo
 
-    df = pd.DataFrame({
-        "Mkt-RF": mkt,
-        "SMB": smb,
-        "HML": hml,
-        "RMW": rmw,
-        "CMA": cma,
-        "MOM": mom,
-        "RF": rf
-    }, index=dates)
+    df = pd.DataFrame(
+        {"Mkt-RF": mkt, "SMB": smb, "HML": hml, "RMW": rmw, "CMA": cma, "MOM": mom, "RF": rf}, index=dates
+    )
     df.index.name = "Date"
     return df
 
 
 def _download_and_parse_zip_csv(url: str, header_keyword: str) -> pd.DataFrame:
     """Scarica un archivio ZIP ed estrae il dataset CSV Kenneth French filtrando header e footer descrittivi."""
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ARGUS/9.0.0"}
-    )
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ARGUS/9.0.0"})
     with urllib.request.urlopen(req, timeout=10) as response:
         zip_bytes = response.read()
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as z:
@@ -127,7 +116,9 @@ def fetch_kenneth_french_factors(use_cache: bool = True) -> pd.DataFrame:
             return df_combined.copy()
 
     except Exception as e:
-        logger.warning(f"Impossibile scaricare le serie live Kenneth French ({e}). Utilizzo serie calibrate di fallback.")
+        logger.warning(
+            f"Impossibile scaricare le serie live Kenneth French ({e}). Utilizzo serie calibrate di fallback."
+        )
 
     df_synth = _generate_synthetic_benchmark_factors()
     _CACHE_FACTORS_DF = df_synth
@@ -156,8 +147,8 @@ def _align_series_and_factors(sr_p: Any, factors_df: pd.DataFrame) -> pd.DataFra
         aligned = pd.concat([sr_p.rename("Portfolio"), synth_aligned], axis=1, join="inner").dropna()
 
     if len(aligned) < 15:
-        aligned = factors_df.iloc[:len(sr_p)].copy()
-        aligned["Portfolio"] = sr_p.values[:len(aligned)]
+        aligned = factors_df.iloc[: len(sr_p)].copy()
+        aligned["Portfolio"] = sr_p.values[: len(aligned)]
 
     return aligned
 
@@ -176,9 +167,7 @@ def _select_factor_columns(model_type: str, available_cols: List[str]) -> List[s
 
 
 def compute_fama_french_factor_model(
-    sr_portfolio: pd.Series,
-    model_type: str = "5_factor_mom",
-    factors_df: Optional[pd.DataFrame] = None
+    sr_portfolio: pd.Series, model_type: str = "5_factor_mom", factors_df: Optional[pd.DataFrame] = None
 ) -> Dict[str, Any]:
     """
     Esegue la regressione multivariata OLS del portafoglio sui fattori di Kenneth French.
@@ -212,7 +201,7 @@ def compute_fama_french_factor_model(
         resid = y_vec - y_pred
 
         ss_tot = np.sum((y_vec - np.mean(y_vec)) ** 2)
-        ss_res = np.sum(resid ** 2)
+        ss_res = np.sum(resid**2)
         r2 = max(0.0, 1.0 - (ss_res / (ss_tot + 1e-12)))
         adj_r2 = max(0.0, 1.0 - ((1.0 - r2) * (n - 1) / max(1, n - k)))
 
@@ -241,16 +230,18 @@ def compute_fama_french_factor_model(
             attrib_contrib = float(b_val * factor_mean_ann)
             attribution_dict[col_name] = attrib_contrib
 
-            factor_details.append({
-                "factor": col_name,
-                "beta": round(b_val, 4),
-                "std_err": round(se_val, 4),
-                "t_stat": round(t_val, 2),
-                "p_value": round(p_val, 4),
-                "ci_95": f"[{b_val - 1.96 * se_val:.3f}, {b_val + 1.96 * se_val:.3f}]",
-                "is_significant": bool(is_sig),
-                "annual_return_contrib_pct": round(attrib_contrib * 100, 2)
-            })
+            factor_details.append(
+                {
+                    "factor": col_name,
+                    "beta": round(b_val, 4),
+                    "std_err": round(se_val, 4),
+                    "t_stat": round(t_val, 2),
+                    "p_value": round(p_val, 4),
+                    "ci_95": f"[{b_val - 1.96 * se_val:.3f}, {b_val + 1.96 * se_val:.3f}]",
+                    "is_significant": bool(is_sig),
+                    "annual_return_contrib_pct": round(attrib_contrib * 100, 2),
+                }
+            )
 
         var_tot, var_exp = float(np.var(y_vec)), float(np.var(y_pred))
         sys_pct = round(min(100.0, max(0.0, (var_exp / (var_tot + 1e-12)) * 100)), 1)
@@ -271,7 +262,7 @@ def compute_fama_french_factor_model(
             "specific_risk_pct": round(100.0 - sys_pct, 1),
             "df_factors": pd.DataFrame(factor_details),
             "factor_attribution": attribution_dict,
-            "rolling_betas": rolling_betas_df
+            "rolling_betas": rolling_betas_df,
         }
 
     except Exception as e:
@@ -279,11 +270,7 @@ def compute_fama_french_factor_model(
         return _empty_factor_result(model_type)
 
 
-def _compute_rolling_factor_betas(
-    aligned_df: pd.DataFrame,
-    factor_cols: List[str],
-    window: int = 60
-) -> pd.DataFrame:
+def _compute_rolling_factor_betas(aligned_df: pd.DataFrame, factor_cols: List[str], window: int = 60) -> pd.DataFrame:
     """Calcola le esposizioni fattoriali dinamiche su finestra mobile (Rolling OLS)."""
     if len(aligned_df) < window + 10:
         return pd.DataFrame()
@@ -294,8 +281,8 @@ def _compute_rolling_factor_betas(
     dates = aligned_df.index
 
     for i in range(window, len(aligned_df)):
-        y_w = y_full[i - window:i]
-        X_w = np.column_stack([np.ones(window), X_full[i - window:i]])
+        y_w = y_full[i - window : i]
+        X_w = np.column_stack([np.ones(window), X_full[i - window : i]])
         try:
             b, _, _, _ = np.linalg.lstsq(X_w, y_w, rcond=None)
             rec = {"Date": dates[i], "Alpha (Ann)": b[0] * 252}
@@ -328,7 +315,7 @@ def _empty_factor_result(model_type: str) -> Dict[str, Any]:
         "specific_risk_pct": 0.0,
         "df_factors": pd.DataFrame(),
         "factor_attribution": {},
-        "rolling_betas": pd.DataFrame()
+        "rolling_betas": pd.DataFrame(),
     }
 
 
@@ -336,28 +323,28 @@ FACTOR_PRESET_DEFINITIONS: Dict[str, Dict[str, str]] = {
     "qmj": {
         "name": "💎 Quality-Minus-Junk (QMJ)",
         "description": "Portafogli ordinati per stabilità degli utili, alto Sharpe ratio storico e bassa volatilità residua.",
-        "rationale": "Le aziende ad alta qualità contabile e operativa generano premi di rischio persistenti rispetto ai titoli speculativi (Asness et al., 2019)."
+        "rationale": "Le aziende ad alta qualità contabile e operativa generano premi di rischio persistenti rispetto ai titoli speculativi (Asness et al., 2019).",
     },
     "low_beta": {
         "name": "🛡️ Betting Against Beta / Low-Beta (BAB)",
         "description": "Portafogli ordinati in base al Beta di mercato storico e alla varianza realizzata.",
-        "rationale": "I titoli a basso Beta offrono rendimenti corretti per il rischio superiori alla linea SML classica (Frazzini & Pedersen, 2014)."
+        "rationale": "I titoli a basso Beta offrono rendimenti corretti per il rischio superiori alla linea SML classica (Frazzini & Pedersen, 2014).",
     },
     "profitability": {
         "name": "📈 Gross Profitability & Free Cash Flow",
         "description": "Portafogli ordinati per rendimento composto cumulativo e stabilità dei flussi di cassa operativi.",
-        "rationale": "La redditività operativa lorda predice la redditività futura e l'Alpha di lungo termine (Novy-Marx, 2013)."
+        "rationale": "La redditività operativa lorda predice la redditività futura e l'Alpha di lungo termine (Novy-Marx, 2013).",
     },
     "momentum": {
         "name": "🚀 12M Price Momentum (WML)",
         "description": "Portafogli ordinati per forza relativa a 12 mesi con esclusione dell'ultimo mese di inversione (12-1 Momentum).",
-        "rationale": "I titoli con le migliori performance passate tendono a sovraperformare i titoli deboli nei 3-12 mesi successivi (Jegadeesh & Titman, 1993)."
+        "rationale": "I titoli con le migliori performance passate tendono a sovraperformare i titoli deboli nei 3-12 mesi successivi (Jegadeesh & Titman, 1993).",
     },
     "value": {
         "name": "🏛️ Deep Value & High Dividend Yield (HML)",
         "description": "Portafogli ordinati per sconto fondamentale, dividendo sostenibile e contenimento dei drawdown.",
-        "rationale": "I titoli value scambiati a multipli compressi generano un premio storicamente robusto rispetto ai titoli growth iper-valutati (Fama-French, 1992)."
-    }
+        "rationale": "I titoli value scambiati a multipli compressi generano un premio storicamente robusto rispetto ai titoli growth iper-valutati (Fama-French, 1992).",
+    },
 }
 
 
@@ -365,7 +352,7 @@ def run_factor_quintile_backtest(
     df_returns: Optional[pd.DataFrame] = None,
     factor_type: str = "qmj",
     rebalance_freq: str = "M",
-    lookback_window: int = 126
+    lookback_window: int = 126,
 ) -> Dict[str, Any]:
     """
     Motore Istituzionale di Backtesting per Strategie Multi-Fattoriali a 5 Quintili (Q1 High .. Q5 Low).
@@ -385,16 +372,18 @@ def run_factor_quintile_backtest(
         active_factor_key = "value"
     else:
         active_factor_key = "qmj"
-        
+
     meta = FACTOR_PRESET_DEFINITIONS.get(active_factor_key, FACTOR_PRESET_DEFINITIONS["qmj"])
-    
+
     # 1. Preparazione e Sanificazione del Dataset Rendimenti
     use_synthetic = False
     if df_returns is None or not isinstance(df_returns, pd.DataFrame) or df_returns.empty or len(df_returns) < 60:
         use_synthetic = True
     else:
         # Pulisci colonne non numeriche o FX
-        clean_cols = [c for c in df_returns.columns if not str(c).endswith("=X") and not str(c).lower().startswith("fx")]
+        clean_cols = [
+            c for c in df_returns.columns if not str(c).endswith("=X") and not str(c).lower().startswith("fx")
+        ]
         if len(clean_cols) < 5:
             use_synthetic = True
         else:
@@ -405,11 +394,11 @@ def run_factor_quintile_backtest(
             if not has_neg_returns and median_abs > 0.5:
                 # Sono serie storiche di prezzo: converti in variazioni percentuali giornaliere
                 df_work = df_work.pct_change().dropna(how="all")
-                
+
             # Assicura indice datetime
             df_work.index = pd.to_datetime(df_work.index)
             # Rimuovi timezone se presente
-            if getattr(df_work.index, 'tz', None) is not None:
+            if getattr(df_work.index, "tz", None) is not None:
                 df_work.index = df_work.index.tz_localize(None)
             # Clip di sicurezza sui rendimenti giornalieri (-15% / +15%) per escludere spike di split non rettificati
             df_rets = df_work.clip(lower=-0.15, upper=0.15).fillna(0.0)
@@ -420,7 +409,7 @@ def run_factor_quintile_backtest(
         dates = pd.date_range("2021-01-01", "2025-12-31", freq="B")
         np.random.seed(42)
         n_assets = 30
-        cols = [f"EQ_ASSET_{i+1:02d}" for i in range(n_assets)]
+        cols = [f"EQ_ASSET_{i + 1:02d}" for i in range(n_assets)]
         # Rendimenti simulati con struttura di correlazione e drift fattoriale
         base_market = np.random.normal(0.00035, 0.011, len(dates))
         asset_matrix = np.zeros((len(dates), n_assets))
@@ -431,10 +420,10 @@ def run_factor_quintile_backtest(
             drift_i = (0.5 - (i / n_assets)) * 0.00028
             asset_matrix[:, i] = beta_i * base_market + idio + drift_i
         df_rets = pd.DataFrame(asset_matrix, index=dates, columns=cols).clip(lower=-0.15, upper=0.15)
-        
+
     n_assets = df_rets.shape[1]
     n_days = len(df_rets)
-    
+
     # 2. Ribilanciamento periodico (Mensile ME / Trimestrale QE)
     freq_code = "QE" if rebalance_freq.upper() == "Q" else "ME"
     try:
@@ -443,30 +432,30 @@ def run_factor_quintile_backtest(
         grouped = df_rets.groupby(pd.Grouper(freq="ME"))
 
     rebal_dates = [group.index for _, group in grouped if len(group) > 0]
-    
+
     lb = min(lookback_window, max(30, n_days // 3))
-    
+
     q_daily_returns = {f"Q{q}": [] for q in range(1, 6)}
     dates_out = []
-    
+
     # Esegui la classificazione cross-sectional ad ogni periodo
     for p_dates in rebal_dates:
         t_start = p_dates[0]
         # Trova la finestra di lookback storica precedente a t_start
         historical_mask = df_rets.index < t_start
         lookback_slice = df_rets[historical_mask].iloc[-lb:]
-        
+
         if len(lookback_slice) < 20:
             # Finestra iniziale insufficiente: usa prima porzione disponibile
-            lookback_slice = df_rets.iloc[:max(20, lb)]
-            
+            lookback_slice = df_rets.iloc[: max(20, lb)]
+
         scores = {}
         for col in df_rets.columns:
             sr = lookback_slice[col]
             v = float(sr.std() * np.sqrt(252.0))
             v = max(0.02, v)
             m = float(sr.mean() * 252.0)
-            
+
             if active_factor_key == "qmj":
                 # Quality: Sharpe ratio + stabilita volatilita
                 scores[col] = float((m - 0.025) / v + 0.15 / v)
@@ -485,20 +474,20 @@ def run_factor_quintile_backtest(
                 cum = (1.0 + sr).cumprod()
                 dd = (cum - cum.cummax()) / cum.cummax()
                 scores[col] = float(dd.min())
-                
+
         # Ordinamento in 5 quintili (Q1 Top 20% .. Q5 Bottom 20%)
         sr_scores = pd.Series(scores).sort_values(ascending=False)
         n_tot = len(sr_scores)
         q_size = max(1, n_tot // 5)
-        
+
         q_assets = {
             "Q1": list(sr_scores.index[:q_size]),
-            "Q2": list(sr_scores.index[q_size:2*q_size]),
-            "Q3": list(sr_scores.index[2*q_size:3*q_size]),
-            "Q4": list(sr_scores.index[3*q_size:4*q_size]),
-            "Q5": list(sr_scores.index[4*q_size:])
+            "Q2": list(sr_scores.index[q_size : 2 * q_size]),
+            "Q3": list(sr_scores.index[2 * q_size : 3 * q_size]),
+            "Q4": list(sr_scores.index[3 * q_size : 4 * q_size]),
+            "Q5": list(sr_scores.index[4 * q_size :]),
         }
-        
+
         # Rendimenti giornalieri realizzati durante il periodo corrente
         period_df = df_rets.loc[p_dates]
         if not period_df.empty:
@@ -511,65 +500,65 @@ def run_factor_quintile_backtest(
                 else:
                     q_srs = pd.Series(0.0, index=period_df.index)
                 q_daily_returns[q_key].extend(q_srs.tolist())
-                
+
     df_out_rets = pd.DataFrame(q_daily_returns, index=dates_out)
     if df_out_rets.empty:
         return {"valid": False, "message": "Errore nella generazione delle serie dei quintili."}
-        
+
     # Calcolo Spread Long-Short giornaliero
     df_out_rets["Long_Short_Spread"] = (df_out_rets["Q1"] - df_out_rets["Q5"]).clip(-0.10, 0.10)
     df_out_rets["Equal_Weight_Univ"] = df_out_rets[["Q1", "Q2", "Q3", "Q4", "Q5"]].mean(axis=1)
-    
+
     # Curve Cumulative di Ricchezza (Base 100)
     df_cum = pd.DataFrame(index=df_out_rets.index)
     for col_name in df_out_rets.columns:
         df_cum[col_name] = (1.0 + df_out_rets[col_name]).cumprod() * 100.0
-        
+
     total_days = len(df_out_rets)
     years = max(0.2, total_days / 252.0)
-    
+
     # Calcolo Metriche Quantitative Istituzionali
-    rf = 0.0275 # Risk-free annuo 2.75%
+    rf = 0.0275  # Risk-free annuo 2.75%
     metrics_summary = []
     cagrs_list = []
-    
+
     for col_name in ["Q1", "Q2", "Q3", "Q4", "Q5", "Long_Short_Spread", "Equal_Weight_Univ"]:
         sr_r = df_out_rets[col_name]
-        
+
         # Rendimento medio annuo istituzionale
         ann_mean = float(sr_r.mean() * 252.0 * 100.0)
-        
+
         # CAGR Geometrico
         final_val = float(df_cum[col_name].iloc[-1])
         if final_val > 0 and years > 0:
             cagr_geom = float(((final_val / 100.0) ** (1.0 / years) - 1.0) * 100.0)
         else:
             cagr_geom = ann_mean
-            
+
         cagr_geom = round(float(np.clip(cagr_geom, -90.0, 150.0)), 2)
-        
+
         vol_ann = float(sr_r.std() * np.sqrt(252.0) * 100.0)
         vol_ann = max(0.1, vol_ann)
-        
+
         if col_name != "Long_Short_Spread":
             sharpe = (cagr_geom - rf * 100.0) / vol_ann
         else:
             sharpe = cagr_geom / vol_ann
         sharpe = round(float(np.clip(sharpe, -4.0, 5.0)), 2)
-        
+
         # Max Drawdown
         cum_s = df_cum[col_name]
         peak = cum_s.cummax()
         dd_s = (cum_s - peak) / peak
         max_dd = round(float(np.clip(dd_s.min() * 100.0, -100.0, 0.0)), 2)
-        
+
         # Win Rate mensile
         try:
             sr_m = (1.0 + sr_r).resample("ME").prod() - 1.0
             win_rate = round(float((sr_m > 0).mean() * 100.0), 1) if len(sr_m) > 0 else 50.0
         except Exception:
             win_rate = 50.0
-            
+
         # Information Ratio vs Benchmark Equi-Ponderato
         if col_name not in ["Long_Short_Spread", "Equal_Weight_Univ"]:
             active_diff = sr_r - df_out_rets["Equal_Weight_Univ"]
@@ -578,7 +567,7 @@ def run_factor_quintile_backtest(
             cagrs_list.append(cagr_geom)
         else:
             ir = np.nan
-            
+
         label_map = {
             "Q1": "Q1 (Top 20% · High Factor)",
             "Q2": "Q2 (Second Quintile)",
@@ -586,21 +575,23 @@ def run_factor_quintile_backtest(
             "Q4": "Q4 (Fourth Quintile)",
             "Q5": "Q5 (Bottom 20% · Junk)",
             "Long_Short_Spread": "⚡ Spread Long-Short (Q1 - Q5)",
-            "Equal_Weight_Univ": "🌐 Universo Equi-Ponderato (Benchmark)"
+            "Equal_Weight_Univ": "🌐 Universo Equi-Ponderato (Benchmark)",
         }
-        
-        metrics_summary.append({
-            "Quintile": label_map.get(col_name, col_name),
-            "Rendimento Annuo CAGR %": cagr_geom,
-            "Volatilità Annua %": round(vol_ann, 2),
-            "Sharpe Ratio": sharpe,
-            "Max Drawdown %": max_dd,
-            "Win Rate Mensile %": win_rate,
-            "Information Ratio vs Univ": ir
-        })
+
+        metrics_summary.append(
+            {
+                "Quintile": label_map.get(col_name, col_name),
+                "Rendimento Annuo CAGR %": cagr_geom,
+                "Volatilità Annua %": round(vol_ann, 2),
+                "Sharpe Ratio": sharpe,
+                "Max Drawdown %": max_dd,
+                "Win Rate Mensile %": win_rate,
+                "Information Ratio vs Univ": ir,
+            }
+        )
 
     df_metrics = pd.DataFrame(metrics_summary)
-    
+
     # Test di Monotonicità di Spearman (Rango 1..5 vs CAGR)
     ranks = [1, 2, 3, 4, 5]
     if len(cagrs_list) >= 5:
@@ -608,9 +599,9 @@ def run_factor_quintile_backtest(
         norm_monotonicity = -float(spearman_corr) if pd.notna(spearman_corr) else 0.0
     else:
         norm_monotonicity = 0.50
-        
+
     norm_monotonicity = round(float(np.clip(norm_monotonicity, -1.0, 1.0)), 2)
-    
+
     if norm_monotonicity >= 0.70:
         verdict = "🟢 Monotonicità Eccellente (Ordinamento decrescente robusto Q1 > Q2 > Q3 > Q4 > Q5)"
     elif norm_monotonicity >= 0.25:
@@ -638,6 +629,5 @@ def run_factor_quintile_backtest(
         "monotonicity_verdict": verdict,
         "q1_cagr": round(q1_val, 2),
         "q5_cagr": round(q5_val, 2),
-        "spread_cagr": spread_val
+        "spread_cagr": spread_val,
     }
-

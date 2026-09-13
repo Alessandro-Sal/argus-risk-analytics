@@ -7,36 +7,41 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import os
 from datetime import datetime, timedelta
 
-import core.ui_utils
-import core.duckdb_engine
-import core.temporal_engine
-import core.multi_portfolio
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+from sqlalchemy import text as sqlt
 
-from core.sidebar import render_sidebar
-from core.fetcher import get_engine
+import core.duckdb_engine
+import core.multi_portfolio
+import core.temporal_engine
+import core.ui_utils
 from core.db_exporter import get_all_snapshots_history, get_snapshot_positions_by_id
+from core.fetcher import get_engine
 from core.multi_portfolio import list_saved_portfolio_profiles, load_portfolio_profile
-from core.ui_utils import (
-    apply_plotly_theme, inject_custom_css, render_command_bar, 
-    metric_card, ensure_portfolio_loaded, render_sandbox_banner, render_table_with_export
-)
+from core.sidebar import render_sidebar
 from core.temporal_engine import (
     compute_monthly_return_matrix,
     compute_rolling_risk_metrics,
-    compute_underwater_drawdowns,
     compute_seasonality_patterns,
     compute_side_by_side_comparison,
+    compute_underwater_drawdowns,
     reconstruct_point_in_time_portfolio,
 )
-from sqlalchemy import text as sqlt
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_portfolio_loaded,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_sandbox_banner,
+    render_table_with_export,
+)
 
 inject_custom_css()
 render_sidebar()
@@ -469,7 +474,7 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
     st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
 
     # 1. Chart: Cumulative Equity Line Multi-Asset
-    st.markdown(f"##### 📈 Performance Comparativa Cumulata (Base 100)")
+    st.markdown("##### 📈 Performance Comparativa Cumulata (Base 100)")
     palette = ["#00e676", "#ff9900", "#38bdf8", "#bc8cff", "#f85149", "#e3b341", "#f0883e", "#2ea043", "#58a6ff", "#db61a2"]
     fig_equity = go.Figure()
 

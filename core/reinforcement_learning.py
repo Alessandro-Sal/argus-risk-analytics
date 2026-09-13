@@ -5,9 +5,10 @@ Implements Policy Gradient / Deep Q-inspired continuous-action policy optimizati
 trained to maximize Sortino / Sharpe utility with adaptive regime switching and transaction penalty.
 """
 
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
-from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class PortfolioEnv:
@@ -17,12 +18,13 @@ class PortfolioEnv:
     Action: Simplex portfolio weight allocation w in Delta^{N-1}
     Reward: Risk-adjusted Sortino/Sharpe utility minus turnover friction with diversification incentive.
     """
+
     def __init__(
         self,
         df_returns: pd.DataFrame,
         window_size: int = 25,
         reward_type: str = "sortino",
-        turnover_penalty: float = 0.0003
+        turnover_penalty: float = 0.0003,
     ):
         self.df_returns = df_returns.dropna().copy()
         self.tickers = self.df_returns.columns.tolist()
@@ -58,7 +60,7 @@ class PortfolioEnv:
         f_sharpe = _zscore(sharpes)
         f_mom = _zscore(mom)
         f_vol = _zscore(vols)
-        
+
         # Matrix of features per asset (N, 3) flattened to (N * 3,)
         feat_matrix = np.column_stack([f_sharpe, f_mom, f_vol])
         return np.clip(feat_matrix.flatten(), -3.0, 3.0)
@@ -80,7 +82,7 @@ class PortfolioEnv:
         net_ret = portfolio_ret - cost
 
         # Diversification incentive (1 - HHI is maximized when balanced)
-        div_bonus = 1.0 - float(np.sum(w ** 2))
+        div_bonus = 1.0 - float(np.sum(w**2))
 
         # Risk-adjusted reward calculation
         if self.reward_type == "sortino":
@@ -91,19 +93,14 @@ class PortfolioEnv:
             reward = (net_ret / vol_est) * 5.0 - cost * 30.0 + 0.10 * div_bonus
         else:
             # Min volatility
-            reward = net_ret * 50.0 - 2.0 * (portfolio_ret ** 2) * 100.0 - cost * 30.0 + 0.20 * div_bonus
+            reward = net_ret * 50.0 - 2.0 * (portfolio_ret**2) * 100.0 - cost * 30.0 + 0.20 * div_bonus
 
         self.prev_weights = w.copy()
         self.current_step += 1
         done = self.current_step >= self.max_steps
         next_state = self._get_state() if not done else np.zeros(self.n_assets * 3)
 
-        info = {
-            "net_return": net_ret,
-            "raw_return": portfolio_ret,
-            "turnover": turnover,
-            "weights": w.copy()
-        }
+        info = {"net_return": net_ret, "raw_return": portfolio_ret, "turnover": turnover, "weights": w.copy()}
         return next_state, reward, done, info
 
 
@@ -112,13 +109,9 @@ class RLPolicyAgent:
     Permutation-Equivariant Neural Policy Actor network for Continuous Portfolio Allocation.
     Trained with Shared Cross-Asset Scoring, Adam Optimization, and Entropy Regularization.
     """
+
     def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        lr: float = 0.025,
-        entropy_coeff: float = 0.02,
-        random_seed: int = 42
+        self, state_dim: int, action_dim: int, lr: float = 0.025, entropy_coeff: float = 0.02, random_seed: int = 42
     ):
         np.random.seed(random_seed)
         self.state_dim = state_dim
@@ -151,8 +144,8 @@ class RLPolicyAgent:
             feat = state
 
         # Shared layer forward pass for all assets simultaneously
-        h = np.tanh(np.dot(feat, self.W1) + self.b1) # (N, hidden_dim)
-        logits = (np.dot(h, self.W2) + self.b2).flatten() / max(0.2, temperature) # (N,)
+        h = np.tanh(np.dot(feat, self.W1) + self.b1)  # (N, hidden_dim)
+        logits = (np.dot(h, self.W2) + self.b2).flatten() / max(0.2, temperature)  # (N,)
 
         # Softmax over assets
         exp_logits = np.exp(logits - np.max(logits))
@@ -162,12 +155,7 @@ class RLPolicyAgent:
         w_clamped = 0.75 * weights + 0.25 * (np.ones(self.action_dim) / self.action_dim)
         return w_clamped / np.sum(w_clamped)
 
-    def update(
-        self,
-        states: List[np.ndarray],
-        actions: List[np.ndarray],
-        rewards: List[float]
-    ):
+    def update(self, states: List[np.ndarray], actions: List[np.ndarray], rewards: List[float]):
         self.t += 1
         T = len(rewards)
         if T == 0:
@@ -223,12 +211,12 @@ class RLPolicyAgent:
             (self.W1, g_W1, self.mW1, self.vW1),
             (self.b1, g_b1, self.mb1, self.vb1),
             (self.W2, g_W2, self.mW2, self.vW2),
-            (self.b2, g_b2, self.mb2, self.vb2)
+            (self.b2, g_b2, self.mb2, self.vb2),
         ]:
             m[:] = beta1 * m + (1.0 - beta1) * g
-            v[:] = beta2 * v + (1.0 - beta2) * (g ** 2)
-            m_hat = m / (1.0 - beta1 ** self.t)
-            v_hat = v / (1.0 - beta2 ** self.t)
+            v[:] = beta2 * v + (1.0 - beta2) * (g**2)
+            m_hat = m / (1.0 - beta1**self.t)
+            v_hat = v / (1.0 - beta2**self.t)
             p -= self.lr * m_hat / (np.sqrt(v_hat) + eps)
 
 
@@ -238,7 +226,7 @@ def train_and_evaluate_rl_portfolio(
     window_size: int = 25,
     reward_type: str = "sortino",
     turnover_penalty: float = 0.0003,
-    random_seed: int = 42
+    random_seed: int = 42,
 ) -> Dict[str, Any]:
     """
     Trains the Reinforcement Learning agent across historical episodes,
@@ -251,7 +239,7 @@ def train_and_evaluate_rl_portfolio(
             "learning_curve": pd.DataFrame(),
             "backtest_df": pd.DataFrame(),
             "weights_history": pd.DataFrame(),
-            "summary_metrics": {}
+            "summary_metrics": {},
         }
 
     rets = df_returns.dropna().copy()
@@ -260,18 +248,9 @@ def train_and_evaluate_rl_portfolio(
     state_dim = n_assets * 3
     action_dim = n_assets
 
-    env = PortfolioEnv(
-        rets,
-        window_size=window_size,
-        reward_type=reward_type,
-        turnover_penalty=turnover_penalty
-    )
+    env = PortfolioEnv(rets, window_size=window_size, reward_type=reward_type, turnover_penalty=turnover_penalty)
     agent = RLPolicyAgent(
-        state_dim=state_dim,
-        action_dim=action_dim,
-        lr=0.025,
-        entropy_coeff=0.02,
-        random_seed=random_seed
+        state_dim=state_dim, action_dim=action_dim, lr=0.025, entropy_coeff=0.02, random_seed=random_seed
     )
 
     learning_curve_data = []
@@ -302,29 +281,31 @@ def train_and_evaluate_rl_portfolio(
 
         # Batch policy gradient update
         agent.update(states_history, actions_history, rewards_history)
-        learning_curve_data.append({
-            "episode": ep,
-            "cumulative_reward": round(total_ep_reward, 2),
-            "avg_reward_per_step": round(total_ep_reward / max(1, len(rewards_history)), 4)
-        })
+        learning_curve_data.append(
+            {
+                "episode": ep,
+                "cumulative_reward": round(total_ep_reward, 2),
+                "avg_reward_per_step": round(total_ep_reward / max(1, len(rewards_history)), 4),
+            }
+        )
 
     # ── OUT-OF-SAMPLE EVALUATION RUN ──
     state = env.reset()
     eval_dates = rets.index[window_size:]
-    
+
     rl_returns = []
     ew_returns = []
     weights_records = []
-    
+
     ew_weight = np.ones(n_assets) / n_assets
 
     step_idx = 0
     while True:
-        action_w = agent.forward(state) # Deterministic exploitation
+        action_w = agent.forward(state)  # Deterministic exploitation
         next_state, reward, done, info = env.step(action_w)
-        
+
         rl_returns.append(info["net_return"])
-        
+
         # Benchmark 1/N
         step_rets = env.df_returns.iloc[env.current_step - 1].values
         ew_returns.append(float(np.dot(ew_weight, step_rets)))
@@ -341,11 +322,9 @@ def train_and_evaluate_rl_portfolio(
 
     # Build Backtest Curves
     n_pts = min(len(rl_returns), len(ew_returns), len(eval_dates))
-    df_backtest = pd.DataFrame({
-        "date": eval_dates[:n_pts],
-        "rl_net_return": rl_returns[:n_pts],
-        "ew_return": ew_returns[:n_pts]
-    })
+    df_backtest = pd.DataFrame(
+        {"date": eval_dates[:n_pts], "rl_net_return": rl_returns[:n_pts], "ew_return": ew_returns[:n_pts]}
+    )
     df_backtest["rl_equity_curve"] = (1.0 + df_backtest["rl_net_return"]).cumprod() * 100.0
     df_backtest["ew_equity_curve"] = (1.0 + df_backtest["ew_return"]).cumprod() * 100.0
 
@@ -367,7 +346,7 @@ def train_and_evaluate_rl_portfolio(
             "sharpe_ratio": round(sharpe, 2),
             "sortino_ratio": round(sortino, 2),
             "max_drawdown_pct": round(max_dd, 2),
-            "total_return_pct": round(cum_ret, 2)
+            "total_return_pct": round(cum_ret, 2),
         }
 
     rl_stats = calc_stats(np.array(rl_returns[:n_pts]))
@@ -384,5 +363,5 @@ def train_and_evaluate_rl_portfolio(
         "rl_stats": rl_stats,
         "ew_stats": ew_stats,
         "final_weights": {tickers[i]: round(float(agent.forward(state)[i]), 4) for i in range(n_assets)},
-        "alpha_over_ew_pct": round(rl_stats["total_return_pct"] - ew_stats["total_return_pct"], 2)
+        "alpha_over_ew_pct": round(rl_stats["total_return_pct"] - ew_stats["total_return_pct"], 2),
     }

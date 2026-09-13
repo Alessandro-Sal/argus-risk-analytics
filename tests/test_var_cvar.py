@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats as stats
 
+
 def calculate_risk_metrics(returns, conf_level=0.95, holding_period=1, total_value=100000):
     r = np.array(returns)
     alpha = 1 - conf_level

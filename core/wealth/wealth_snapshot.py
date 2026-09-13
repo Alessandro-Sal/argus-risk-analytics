@@ -3,22 +3,22 @@
 # ARGUS — Wealth Snapshot Persistence & Historical Recall Engine
 # ============================================================
 
-from typing import Any, Dict, List, Optional, Tuple, Union
 from datetime import date
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import pandas as pd
 from sqlalchemy import Engine
 
 from core.wealth.wealth_db import (
-    save_wealth_snapshot_to_db,
-    get_wealth_snapshots_history,
     delete_wealth_snapshot,
-    load_wealth_snapshot_details
+    get_wealth_snapshots_history,
+    load_wealth_snapshot_details,
+    save_wealth_snapshot_to_db,
 )
 
 __all__ = [
     "save_wealth_snapshot_to_db",
     "get_wealth_snapshots_history",
     "delete_wealth_snapshot",
-    "load_wealth_snapshot_details"
+    "load_wealth_snapshot_details",
 ]
-

@@ -10,6 +10,7 @@ import sqlite3
 import tempfile
 from pathlib import Path
 from typing import List, Type
+
 import pytest
 
 from core.database_migration_manager import (

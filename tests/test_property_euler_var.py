@@ -4,10 +4,12 @@
 # Validates mathematical invariant: sum(PCTR_i) == 100% and sum(Component_VaR) == Portfolio_VaR
 # ============================================================
 
-import pytest
 import numpy as np
 import pandas as pd
-from hypothesis import given, settings, strategies as st
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+
 from core.risk_engine import compute_marginal_and_component_var
 
 

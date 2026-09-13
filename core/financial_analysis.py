@@ -8,9 +8,11 @@ Includes:
   4. Cash Flow & Liquidity Conversion Engine
 """
 
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Optional, List
+
 
 def compute_altman_z_score(
     working_capital: float,
@@ -20,11 +22,11 @@ def compute_altman_z_score(
     sales: float,
     total_assets: float,
     total_liabilities: float,
-    is_manufacturing: bool = True
+    is_manufacturing: bool = True,
 ) -> Dict[str, Any]:
     """
     Computes Altman Z-Score for corporate insolvency risk prediction (2-year horizon).
-    
+
     Manufacturing Formula (Original 1968):
       Z = 1.2*X1 + 1.4*X2 + 3.3*X3 + 0.6*X4 + 0.999*X5
       Where:
@@ -33,7 +35,7 @@ def compute_altman_z_score(
         X3 = EBIT / Total Assets (Operating productivity)
         X4 = Market Value of Equity / Total Liabilities (Financial leverage)
         X5 = Sales / Total Assets (Asset turnover ratio)
-        
+
     Zones:
       Z > 2.99        => Safe Zone (🟢 Verde / Basso Rischio)
       1.81 <= Z <= 2.99 => Grey Zone (🟡 Giallo / Moderato Rischio)
@@ -45,9 +47,9 @@ def compute_altman_z_score(
             "zone": "N/A",
             "zone_icon": "⚪ N/A",
             "description": "Dati di bilancio insufficienti per il calcolo dell'Altman Z-Score.",
-            "components": {}
+            "components": {},
         }
-    
+
     x1 = working_capital / total_assets
     x2 = retained_earnings / total_assets
     x3 = ebit / total_assets
@@ -58,7 +60,7 @@ def compute_altman_z_score(
         z = 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 0.999 * x5
         safe_threshold = 2.99
         distress_threshold = 1.81
-    else: # Service / Non-Manufacturing model
+    else:  # Service / Non-Manufacturing model
         z = 6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4
         safe_threshold = 2.90
         distress_threshold = 1.23
@@ -88,25 +90,20 @@ def compute_altman_z_score(
             "x3_ebit_assets": round(x3, 4),
             "x4_equity_liabilities": round(x4, 4),
             "x5_sales_assets": round(x5, 4) if is_manufacturing else np.nan,
-        }
+        },
     }
 
 
 def compute_dupont_analysis(
-    net_income: float,
-    sales: float,
-    total_assets: float,
-    total_equity: float,
-    ebit: float = None,
-    ebt: float = None
+    net_income: float, sales: float, total_assets: float, total_equity: float, ebit: float = None, ebt: float = None
 ) -> Dict[str, Any]:
     """
     Decomposes Return on Equity (ROE) using DuPont 3-Factor or 5-Factor models.
-    
+
     3-Factor DuPont Model:
       ROE = Profit Margin * Asset Turnover * Equity Multiplier
       ROE = (Net Income / Sales) * (Sales / Assets) * (Assets / Equity)
-      
+
     5-Factor DuPont Model:
       ROE = Tax Burden * Interest Burden * Operating Margin * Asset Turnover * Equity Multiplier
       ROE = (Net Income / EBT) * (EBT / EBIT) * (EBIT / Sales) * (Sales / Assets) * (Assets / Equity)
@@ -117,7 +114,7 @@ def compute_dupont_analysis(
             "profit_margin_pct": np.nan,
             "asset_turnover": np.nan,
             "equity_multiplier": np.nan,
-            "model": "Insufficient Data"
+            "model": "Insufficient Data",
         }
 
     roe = (net_income / total_equity) * 100.0
@@ -135,15 +132,17 @@ def compute_dupont_analysis(
     # If EBIT and EBT are provided, compute 5-factor breakdown
     if ebit is not None and ebt is not None and ebit > 0 and ebt > 0:
         tax_burden = net_income / ebt  # Tax Retention Rate
-        interest_burden = ebt / ebit   # Interest Coverage Factor
+        interest_burden = ebt / ebit  # Interest Coverage Factor
         op_margin = (ebit / sales) * 100.0
-        
-        res.update({
-            "model": "5-Factor DuPont",
-            "tax_burden_pct": round(tax_burden * 100.0, 2),
-            "interest_burden_pct": round(interest_burden * 100.0, 2),
-            "operating_margin_pct": round(op_margin, 2),
-        })
+
+        res.update(
+            {
+                "model": "5-Factor DuPont",
+                "tax_burden_pct": round(tax_burden * 100.0, 2),
+                "interest_burden_pct": round(interest_burden * 100.0, 2),
+                "operating_margin_pct": round(op_margin, 2),
+            }
+        )
     else:
         res["model"] = "3-Factor DuPont"
 
@@ -162,7 +161,7 @@ def compute_financial_ratios(
     ebitda: float,
     net_income: float,
     sales: float,
-    total_assets: float
+    total_assets: float,
 ) -> Dict[str, Any]:
     """
     Computes a comprehensive suite of financial statement ratios.
@@ -203,9 +202,7 @@ def compute_financial_ratios(
             "net_margin_pct": round(net_margin, 2) if pd.notna(net_margin) else np.nan,
             "ebitda_margin_pct": round(ebitda_margin, 2) if pd.notna(ebitda_margin) else np.nan,
         },
-        "efficiency": {
-            "asset_turnover": round(asset_turnover, 2) if pd.notna(asset_turnover) else np.nan
-        }
+        "efficiency": {"asset_turnover": round(asset_turnover, 2) if pd.notna(asset_turnover) else np.nan},
     }
 
 
@@ -216,15 +213,16 @@ def extract_company_10k_metrics(ticker: str) -> Optional[Dict[str, float]]:
     """
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
         fin = t.financials
         bs = t.balance_sheet
         cf = t.cashflow
         inf = t.info or {}
-        
+
         if fin is None or fin.empty or bs is None or bs.empty:
             return None
-            
+
         def _get_val(df, candidates):
             for cand in candidates:
                 for idx in df.index:
@@ -233,28 +231,34 @@ def extract_company_10k_metrics(ticker: str) -> Optional[Dict[str, float]]:
                         if len(row) > 0 and pd.notna(row.iloc[0]):
                             return float(row.iloc[0])
             return None
-            
+
         sales = _get_val(fin, ["total revenue", "operating revenue", "revenue"])
         net_income = _get_val(fin, ["net income common stockholders", "net income continuous operations", "net income"])
         ebit = _get_val(fin, ["ebit", "operating income", "total operating income"])
         ebitda = _get_val(fin, ["ebitda", "normalized ebitda"]) or (ebit * 1.2 if ebit else None)
-        
+
         total_assets = _get_val(bs, ["total assets"])
-        total_equity = _get_val(bs, ["stockholders equity", "total equity gross minority interest", "common stock equity"])
+        total_equity = _get_val(
+            bs, ["stockholders equity", "total equity gross minority interest", "common stock equity"]
+        )
         total_liabilities = _get_val(bs, ["total liabilities net minority interest", "total liabilities"])
-        
+
         current_assets = _get_val(bs, ["current assets", "total current assets"])
         current_liabilities = _get_val(bs, ["current liabilities", "total current liabilities"])
-        working_capital = (current_assets - current_liabilities) if (current_assets is not None and current_liabilities is not None) else None
-        
+        working_capital = (
+            (current_assets - current_liabilities)
+            if (current_assets is not None and current_liabilities is not None)
+            else None
+        )
+
         retained_earnings = _get_val(bs, ["retained earnings"])
-        
+
         fcf = None
         if cf is not None and not cf.empty:
             fcf = _get_val(cf, ["free cash flow"])
-            
+
         mkt_cap = float(inf.get("marketCap") or (inf.get("currentPrice", 100.0) * inf.get("sharesOutstanding", 1e9)))
-        
+
         if sales and net_income and total_assets and total_equity:
             return {
                 "sales": abs(sales),
@@ -262,12 +266,16 @@ def extract_company_10k_metrics(ticker: str) -> Optional[Dict[str, float]]:
                 "net_income": net_income,
                 "total_assets": abs(total_assets),
                 "total_equity": max(1.0, abs(total_equity)),
-                "total_liabilities": abs(total_liabilities) if total_liabilities is not None else max(0.0, abs(total_assets) - abs(total_equity)),
+                "total_liabilities": abs(total_liabilities)
+                if total_liabilities is not None
+                else max(0.0, abs(total_assets) - abs(total_equity)),
                 "working_capital": working_capital if working_capital is not None else (abs(total_assets) * 0.15),
-                "retained_earnings": abs(retained_earnings) if retained_earnings is not None else (abs(total_equity) * 0.6),
+                "retained_earnings": abs(retained_earnings)
+                if retained_earnings is not None
+                else (abs(total_equity) * 0.6),
                 "ebitda": ebitda if ebitda is not None else (ebit * 1.2 if ebit else sales * 0.25),
                 "free_cash_flow": fcf if fcf is not None else (net_income * 1.05),
-                "market_cap": mkt_cap
+                "market_cap": mkt_cap,
             }
     except Exception:
         pass
@@ -281,14 +289,14 @@ def generate_company_financial_statement_analysis(
     pe_ratio: float = 25.0,
     roe_pct: float = 18.5,
     debt_equity: float = 0.75,
-    custom_metrics: Optional[Dict[str, float]] = None
+    custom_metrics: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
     """
     Generates a full financial statement analysis report for a given stock,
     extracting real 10-K numbers from Yahoo Finance or reconstructing structural metrics as fallback.
     """
     real_10k = extract_company_10k_metrics(ticker)
-    
+
     if real_10k:
         sales = real_10k["sales"]
         ebit = real_10k["ebit"]
@@ -334,7 +342,7 @@ def generate_company_financial_statement_analysis(
         sales=sales,
         total_assets=total_assets,
         total_liabilities=total_liabilities,
-        is_manufacturing=True
+        is_manufacturing=True,
     )
 
     dupont_res = compute_dupont_analysis(
@@ -343,7 +351,7 @@ def generate_company_financial_statement_analysis(
         total_assets=total_assets,
         total_equity=total_equity,
         ebit=ebit,
-        ebt=ebit * 0.90
+        ebt=ebit * 0.90,
     )
 
     ratios_res = compute_financial_ratios(
@@ -358,7 +366,7 @@ def generate_company_financial_statement_analysis(
         ebitda=ebitda,
         net_income=net_income,
         sales=sales,
-        total_assets=total_assets
+        total_assets=total_assets,
     )
 
     return {
@@ -373,11 +381,11 @@ def generate_company_financial_statement_analysis(
             "total_assets_eur": round(total_assets, 2),
             "total_liabilities_eur": round(total_liabilities, 2),
             "total_equity_eur": round(total_equity, 2),
-            "working_capital_eur": round(working_capital, 2)
+            "working_capital_eur": round(working_capital, 2),
         },
         "altman_z_score": z_res,
         "dupont_analysis": dupont_res,
-        "ratios": ratios_res
+        "ratios": ratios_res,
     }
 
 
@@ -404,17 +412,19 @@ KNOWN_TICKER_NAMES = {
     "VWCE.DE": "Vanguard FTSE All-World UCITS ETF",
 }
 
+
 def resolve_company_name(ticker: str, pos_name: Any = None) -> str:
     """Returns the real company name, resolving ticker-only fallbacks."""
     if pos_name and str(pos_name).strip() and str(pos_name).strip() != str(ticker).strip():
         return str(pos_name).strip()
-    
+
     t_upper = str(ticker).upper().strip()
     if t_upper in KNOWN_TICKER_NAMES:
         return KNOWN_TICKER_NAMES[t_upper]
-    
+
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
         inf = t.info
         name = inf.get("longName") or inf.get("shortName")
@@ -422,7 +432,7 @@ def resolve_company_name(ticker: str, pos_name: Any = None) -> str:
             return name
     except Exception:
         pass
-        
+
     return ticker
 
 
@@ -434,22 +444,23 @@ def fetch_detailed_financial_statements(ticker: str, years: Optional[int] = 5) -
     """
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
-        
+
         inc = t.financials
         bal = t.balance_sheet
-        cf  = t.cashflow
-        
+        cf = t.cashflow
+
         def _clean_df(df):
             if df is None or df.empty:
                 return pd.DataFrame()
             df_c = df.copy()
             df_c.columns = [c.strftime("%Y-%m-%d") if hasattr(c, "strftime") else str(c) for c in df_c.columns]
-            
+
             # Slice columns by requested number of years
             if years and isinstance(years, int) and years > 0 and len(df_c.columns) > years:
                 df_c = df_c.iloc[:, :years]
-                
+
             formatted_dict = {}
             for col in df_c.columns:
                 formatted_col = []
@@ -470,9 +481,9 @@ def fetch_detailed_financial_statements(ticker: str, years: Optional[int] = 5) -
                         except (ValueError, TypeError):
                             formatted_col.append(str(val))
                 formatted_dict[col] = formatted_col
-                
+
             return pd.DataFrame(formatted_dict, index=df_c.index)
-            
+
         def _raw_df(df):
             if df is None or df.empty:
                 return pd.DataFrame()
@@ -481,14 +492,14 @@ def fetch_detailed_financial_statements(ticker: str, years: Optional[int] = 5) -
             if years and isinstance(years, int) and years > 0 and len(df_c.columns) > years:
                 df_c = df_c.iloc[:, :years]
             return df_c
-            
+
         return {
             "income_statement": _clean_df(inc),
             "balance_sheet": _clean_df(bal),
             "cash_flow": _clean_df(cf),
             "raw_income_statement": _raw_df(inc),
             "raw_balance_sheet": _raw_df(bal),
-            "raw_cash_flow": _raw_df(cf)
+            "raw_cash_flow": _raw_df(cf),
         }
     except Exception:
         return {
@@ -497,7 +508,7 @@ def fetch_detailed_financial_statements(ticker: str, years: Optional[int] = 5) -
             "cash_flow": pd.DataFrame(),
             "raw_income_statement": pd.DataFrame(),
             "raw_balance_sheet": pd.DataFrame(),
-            "raw_cash_flow": pd.DataFrame()
+            "raw_cash_flow": pd.DataFrame(),
         }
 
 
@@ -510,75 +521,77 @@ def compare_multiple_companies(tickers: List[str], portfolio_df: Any = None) -> 
     dupont_list = []
     ratios_list = []
     raw_reports = {}
-    
+
     for tk in tickers:
         tk_str = str(tk).strip().upper()
         if not tk_str:
             continue
-            
+
         name = resolve_company_name(tk_str)
         mkt_cap, pe_val, roe_val, de_val = 100000000000.0, 25.0, 18.5, 0.75
-        
-        if portfolio_df is not None and hasattr(portfolio_df, 'empty') and not portfolio_df.empty:
+
+        if portfolio_df is not None and hasattr(portfolio_df, "empty") and not portfolio_df.empty:
             match = portfolio_df[portfolio_df["ticker"] == tk_str]
             if not match.empty:
                 r = match.iloc[0]
                 mkt_cap = float(r.get("market_cap", 100000000000.0) or 100000000000.0)
-                pe_val  = float(r.get("trailing_pe", 25.0) or 25.0)
+                pe_val = float(r.get("trailing_pe", 25.0) or 25.0)
                 roe_val = float(r.get("roe", 18.5) or 18.5)
-                if roe_val < 0.1 and roe_val > 0: roe_val *= 100.0
-                de_val  = float(r.get("debt_to_equity", 0.75) or 0.75)
-                
+                if roe_val < 0.1 and roe_val > 0:
+                    roe_val *= 100.0
+                de_val = float(r.get("debt_to_equity", 0.75) or 0.75)
+
         rep = generate_company_financial_statement_analysis(
-            ticker=tk_str,
-            company_name=name,
-            market_cap=mkt_cap,
-            pe_ratio=pe_val,
-            roe_pct=roe_val,
-            debt_equity=de_val
+            ticker=tk_str, company_name=name, market_cap=mkt_cap, pe_ratio=pe_val, roe_pct=roe_val, debt_equity=de_val
         )
         raw_reports[tk_str] = rep
-        
+
         z = rep["altman_z_score"]
         dp = rep["dupont_analysis"]
         r = rep["ratios"]
-        
-        zscore_list.append({
-            "Ticker": tk_str,
-            "Azienda": name,
-            "Altman Z-Score": round(z["z_score"], 2),
-            "Zona di Rischio": z["zone"],
-            "Stato Solvibilità": z["zone_icon"]
-        })
-        
-        dupont_list.append({
-            "Ticker": tk_str,
-            "Azienda": name,
-            "Profit Margin %": f"{dp['profit_margin_pct']:.2f}%",
-            "Asset Turnover": f"{dp['asset_turnover']:.2f}x",
-            "Equity Multiplier": f"{dp['equity_multiplier']:.2f}x",
-            "ROE Resultante %": f"{dp['roe_pct']:.2f}%"
-        })
-        
+
+        zscore_list.append(
+            {
+                "Ticker": tk_str,
+                "Azienda": name,
+                "Altman Z-Score": round(z["z_score"], 2),
+                "Zona di Rischio": z["zone"],
+                "Stato Solvibilità": z["zone_icon"],
+            }
+        )
+
+        dupont_list.append(
+            {
+                "Ticker": tk_str,
+                "Azienda": name,
+                "Profit Margin %": f"{dp['profit_margin_pct']:.2f}%",
+                "Asset Turnover": f"{dp['asset_turnover']:.2f}x",
+                "Equity Multiplier": f"{dp['equity_multiplier']:.2f}x",
+                "ROE Resultante %": f"{dp['roe_pct']:.2f}%",
+            }
+        )
+
         net_m = r["profitability"].get("net_margin_pct") or r["profitability"].get("net_profit_margin_pct") or 0.0
         ebitda_m = r["profitability"].get("ebitda_margin_pct") or 0.0
 
-        ratios_list.append({
-            "Ticker": tk_str,
-            "Azienda": name,
-            "Current Ratio": round(r["liquidity"].get("current_ratio", 0.0) or 0.0, 2),
-            "Quick Ratio": round(r["liquidity"].get("quick_ratio", 0.0) or 0.0, 2),
-            "Debt / Equity": round(r["solvency"].get("debt_to_equity", 0.0) or 0.0, 2),
-            "Interest Coverage": round(r["solvency"].get("interest_coverage", 0.0) or 0.0, 2),
-            "Net Margin %": f"{float(net_m):.2f}%",
-            "EBITDA Margin %": f"{float(ebitda_m):.2f}%"
-        })
-        
+        ratios_list.append(
+            {
+                "Ticker": tk_str,
+                "Azienda": name,
+                "Current Ratio": round(r["liquidity"].get("current_ratio", 0.0) or 0.0, 2),
+                "Quick Ratio": round(r["liquidity"].get("quick_ratio", 0.0) or 0.0, 2),
+                "Debt / Equity": round(r["solvency"].get("debt_to_equity", 0.0) or 0.0, 2),
+                "Interest Coverage": round(r["solvency"].get("interest_coverage", 0.0) or 0.0, 2),
+                "Net Margin %": f"{float(net_m):.2f}%",
+                "EBITDA Margin %": f"{float(ebitda_m):.2f}%",
+            }
+        )
+
     return {
         "zscore_table": pd.DataFrame(zscore_list),
         "dupont_table": pd.DataFrame(dupont_list),
         "ratios_table": pd.DataFrame(ratios_list),
-        "reports": raw_reports
+        "reports": raw_reports,
     }
 
 
@@ -595,75 +608,75 @@ def compute_dcf_monte_carlo_valuation(
     terminal_growth_mean: float = 0.025,
     terminal_growth_std: float = 0.005,
     n_simulations: int = 1000,
-    projection_years: int = 5
+    projection_years: int = 5,
 ) -> Dict[str, Any]:
     """
-    Computes a 2-Stage Discounted Cash Flow (DCF) Valuation Model with 
+    Computes a 2-Stage Discounted Cash Flow (DCF) Valuation Model with
     Stochastic Monte Carlo Simulation (1,000 runs) for intrinsic fair value estimation.
     """
     np.random.seed(42)
-    
+
     # Deterministic Base Case Calculation
     fcf_projections = []
     curr_fcf = fcf_base
     pv_fcf_base = 0.0
-    
+
     for t in range(1, projection_years + 1):
-        curr_fcf *= (1.0 + growth_rate_mean)
+        curr_fcf *= 1.0 + growth_rate_mean
         fcf_projections.append(curr_fcf)
         pv_fcf_base += curr_fcf / ((1.0 + wacc_mean) ** t)
-        
+
     tv_base = (fcf_projections[-1] * (1.0 + terminal_growth_mean)) / max(0.005, (wacc_mean - terminal_growth_mean))
     pv_tv_base = tv_base / ((1.0 + wacc_mean) ** projection_years)
-    
+
     ev_base = pv_fcf_base + pv_tv_base
     equity_val_base = ev_base + cash_and_equiv - total_debt
     fair_value_base = equity_val_base / max(1.0, shares_outstanding)
-    
+
     # Monte Carlo Simulations
     simulated_fair_values = []
-    
+
     g_samples = np.random.normal(growth_rate_mean, growth_rate_std, n_simulations)
     wacc_samples = np.random.normal(wacc_mean, wacc_std, n_simulations)
     term_g_samples = np.random.normal(terminal_growth_mean, terminal_growth_std, n_simulations)
-    
+
     for i in range(n_simulations):
         g = max(-0.10, min(0.35, g_samples[i]))
         w = max(0.04, min(0.20, wacc_samples[i]))
         tg = max(0.005, min(0.045, term_g_samples[i]))
         if w <= tg:
             w = tg + 0.01
-            
+
         pv_fcf = 0.0
         cf = fcf_base
         for t in range(1, projection_years + 1):
-            cf *= (1.0 + g)
+            cf *= 1.0 + g
             pv_fcf += cf / ((1.0 + w) ** t)
-            
+
         tv = (cf * (1.0 + tg)) / (w - tg)
         pv_tv = tv / ((1.0 + w) ** projection_years)
-        
+
         ev = pv_fcf + pv_tv
         eq_val = ev + cash_and_equiv - total_debt
         fv = eq_val / max(1.0, shares_outstanding)
         simulated_fair_values.append(fv)
-        
+
     sim_vals = np.array(simulated_fair_values)
     mean_fv = float(np.mean(sim_vals))
     median_fv = float(np.median(sim_vals))
     p10_fv = float(np.percentile(sim_vals, 10))
     p90_fv = float(np.percentile(sim_vals, 90))
-    
+
     prob_undervalued = float(np.mean(sim_vals > current_price) * 100.0)
     upside_downside_pct = float(((median_fv - current_price) / max(0.01, current_price)) * 100.0)
-    
+
     if upside_downside_pct > 15.0:
         recommendation = "🟢 SOTTOVALUTATO (Margin of Safety)"
     elif upside_downside_pct < -15.0:
         recommendation = "🔴 SOPRAVVALUTATO (High Premium)"
     else:
         recommendation = "🟡 FAIRLY VALUED (Prezzo in Linea)"
-        
+
     return {
         "fair_value_base": round(fair_value_base, 2),
         "fair_value_mean": round(mean_fv, 2),
@@ -684,8 +697,8 @@ def compute_dcf_monte_carlo_valuation(
             "growth_rate_mean_pct": growth_rate_mean * 100,
             "wacc_mean_pct": wacc_mean * 100,
             "terminal_growth_mean_pct": terminal_growth_mean * 100,
-            "n_simulations": n_simulations
-        }
+            "n_simulations": n_simulations,
+        },
     }
 
 
@@ -696,9 +709,10 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
     """
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
         inf = t.info or {}
-        
+
         price = None
         try:
             if hasattr(t, "fast_info") and t.fast_info is not None:
@@ -707,15 +721,19 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
                     price = float(fi_price)
         except Exception:
             pass
-        
+
         if price is None:
-            price = float(inf.get("currentPrice") or inf.get("regularMarketPrice") or inf.get("previousClose") or fallback_price)
+            price = float(
+                inf.get("currentPrice") or inf.get("regularMarketPrice") or inf.get("previousClose") or fallback_price
+            )
 
         mkt_cap = float(inf.get("marketCap") or (price * 1e9))
-        
+
         # Priority to impliedSharesOutstanding (total shares across Class A, B, C for dual-class stocks)
-        shares = float(inf.get("impliedSharesOutstanding") or inf.get("sharesOutstanding") or (mkt_cap / max(1.0, price)))
-        
+        shares = float(
+            inf.get("impliedSharesOutstanding") or inf.get("sharesOutstanding") or (mkt_cap / max(1.0, price))
+        )
+
         fcf = float(inf.get("freeCashflow") or (mkt_cap * 0.05))
         try:
             cf_df = t.cashflow
@@ -728,16 +746,16 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
                             break
         except Exception:
             pass
-            
+
         cash = float(inf.get("totalCash") or (mkt_cap * 0.08))
         debt = float(inf.get("totalDebt") or (mkt_cap * 0.06))
-        
+
         return {
             "price": round(price, 2),
             "fcf_m": max(100.0, round(fcf / 1e6, 2)),
             "shares_m": max(10.0, round(shares / 1e6, 2)),
             "cash_m": max(0.0, round(cash / 1e6, 2)),
-            "debt_m": max(0.0, round(debt / 1e6, 2))
+            "debt_m": max(0.0, round(debt / 1e6, 2)),
         }
     except Exception:
         return {
@@ -745,7 +763,7 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
             "fcf_m": 77665.0,
             "shares_m": 12230.0,
             "cash_m": 242474.0,
-            "debt_m": 120791.0
+            "debt_m": 120791.0,
         }
 
 
@@ -759,12 +777,14 @@ def compute_piotroski_f_score(ticker: str) -> Dict[str, Any]:
 
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
         fin = t.financials
         bs = t.balance_sheet
         cf = t.cashflow
 
         if fin is not None and not fin.empty and bs is not None and not bs.empty:
+
             def _get_row(df, candidate_keys):
                 if df is None or df.empty:
                     return None
@@ -784,94 +804,218 @@ def compute_piotroski_f_score(ticker: str) -> Dict[str, Any]:
             ca_row = _get_row(bs, ["current assets", "total current assets"])
             cl_row = _get_row(bs, ["current liabilities", "total current liabilities"])
             shares_row = _get_row(bs, ["ordinary shares number", "share issued"])
-            ocf_row = _get_row(cf, ["operating cash flow", "free cash flow"]) if cf is not None and not cf.empty else None
+            ocf_row = (
+                _get_row(cf, ["operating cash flow", "free cash flow"]) if cf is not None and not cf.empty else None
+            )
 
             # Year t (latest) and Year t-1 (previous)
             t_idx = 0
             t1_idx = 1 if len(fin.columns) > 1 else 0
 
-            ni_t = float(ni_row.iloc[t_idx]) if ni_row is not None and len(ni_row) > t_idx and pd.notna(ni_row.iloc[t_idx]) else 0.0
-            assets_t = float(assets_row.iloc[t_idx]) if assets_row is not None and len(assets_row) > t_idx and pd.notna(assets_row.iloc[t_idx]) else 1.0
-            assets_t1 = float(assets_row.iloc[t1_idx]) if assets_row is not None and len(assets_row) > t1_idx and pd.notna(assets_row.iloc[t1_idx]) else assets_t
+            ni_t = (
+                float(ni_row.iloc[t_idx])
+                if ni_row is not None and len(ni_row) > t_idx and pd.notna(ni_row.iloc[t_idx])
+                else 0.0
+            )
+            assets_t = (
+                float(assets_row.iloc[t_idx])
+                if assets_row is not None and len(assets_row) > t_idx and pd.notna(assets_row.iloc[t_idx])
+                else 1.0
+            )
+            assets_t1 = (
+                float(assets_row.iloc[t1_idx])
+                if assets_row is not None and len(assets_row) > t1_idx and pd.notna(assets_row.iloc[t1_idx])
+                else assets_t
+            )
 
             def _fmt_fin_val(val: float, curr: str = "€") -> str:
                 if abs(val) >= 1e9:
-                    return f"{curr} {val/1e9:,.2f} B"
+                    return f"{curr} {val / 1e9:,.2f} B"
                 elif abs(val) >= 1e6:
-                    return f"{curr} {val/1e6:,.1f} M"
+                    return f"{curr} {val / 1e6:,.1f} M"
                 elif abs(val) >= 1e3:
-                    return f"{curr} {val/1e3:,.1f} K"
+                    return f"{curr} {val / 1e3:,.1f} K"
                 else:
                     return f"{curr} {val:,.0f}"
 
             # 1. Positive Net Income
             p1 = 1 if ni_t > 0 else 0
             score += p1
-            details.append({"Critero": "1. Utile Netto Positivo (ROA > 0)", "Valore": _fmt_fin_val(ni_t), "Esito": "🟢 Superato (+1)" if p1 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "1. Utile Netto Positivo (ROA > 0)",
+                    "Valore": _fmt_fin_val(ni_t),
+                    "Esito": "🟢 Superato (+1)" if p1 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 2. Positive Operating Cash Flow
-            ocf_t = float(ocf_row.iloc[t_idx]) if ocf_row is not None and len(ocf_row) > t_idx and pd.notna(ocf_row.iloc[t_idx]) else ni_t * 1.1
+            ocf_t = (
+                float(ocf_row.iloc[t_idx])
+                if ocf_row is not None and len(ocf_row) > t_idx and pd.notna(ocf_row.iloc[t_idx])
+                else ni_t * 1.1
+            )
             p2 = 1 if ocf_t > 0 else 0
             score += p2
-            details.append({"Critero": "2. Cash Flow Operativo Positivo", "Valore": _fmt_fin_val(ocf_t), "Esito": "🟢 Superato (+1)" if p2 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "2. Cash Flow Operativo Positivo",
+                    "Valore": _fmt_fin_val(ocf_t),
+                    "Esito": "🟢 Superato (+1)" if p2 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 3. ROA Growth
             roa_t = ni_t / max(1.0, assets_t)
-            ni_t1 = float(ni_row.iloc[t1_idx]) if ni_row is not None and len(ni_row) > t1_idx and pd.notna(ni_row.iloc[t1_idx]) else 0.0
+            ni_t1 = (
+                float(ni_row.iloc[t1_idx])
+                if ni_row is not None and len(ni_row) > t1_idx and pd.notna(ni_row.iloc[t1_idx])
+                else 0.0
+            )
             roa_t1 = ni_t1 / max(1.0, assets_t1)
             p3 = 1 if roa_t >= roa_t1 else 0
             score += p3
-            details.append({"Critero": "3. Crescita del ROA (Return on Assets)", "Valore": f"{roa_t*100:.2f}% vs {roa_t1*100:.2f}%", "Esito": "🟢 Superato (+1)" if p3 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "3. Crescita del ROA (Return on Assets)",
+                    "Valore": f"{roa_t * 100:.2f}% vs {roa_t1 * 100:.2f}%",
+                    "Esito": "🟢 Superato (+1)" if p3 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 4. Quality of Earnings (OCF > Net Income)
             p4 = 1 if ocf_t >= ni_t else 0
             score += p4
-            details.append({"Critero": "4. Qualità degli Utili (OCF > Utile Netto)", "Valore": f"{_fmt_fin_val(ocf_t)} vs {_fmt_fin_val(ni_t)}", "Esito": "🟢 Superato (+1)" if p4 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "4. Qualità degli Utili (OCF > Utile Netto)",
+                    "Valore": f"{_fmt_fin_val(ocf_t)} vs {_fmt_fin_val(ni_t)}",
+                    "Esito": "🟢 Superato (+1)" if p4 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 5. Decreasing Long-Term Debt Ratio
-            ltd_t = float(lt_debt_row.iloc[t_idx]) if lt_debt_row is not None and len(lt_debt_row) > t_idx and pd.notna(lt_debt_row.iloc[t_idx]) else 0.0
-            ltd_t1 = float(lt_debt_row.iloc[t1_idx]) if lt_debt_row is not None and len(lt_debt_row) > t1_idx and pd.notna(lt_debt_row.iloc[t1_idx]) else ltd_t
+            ltd_t = (
+                float(lt_debt_row.iloc[t_idx])
+                if lt_debt_row is not None and len(lt_debt_row) > t_idx and pd.notna(lt_debt_row.iloc[t_idx])
+                else 0.0
+            )
+            ltd_t1 = (
+                float(lt_debt_row.iloc[t1_idx])
+                if lt_debt_row is not None and len(lt_debt_row) > t1_idx and pd.notna(lt_debt_row.iloc[t1_idx])
+                else ltd_t
+            )
             p5 = 1 if (ltd_t / max(1.0, assets_t)) <= (ltd_t1 / max(1.0, assets_t1)) else 0
             score += p5
-            details.append({"Critero": "5. Riduzione Debito a Lungo Termine / Attivo", "Valore": f"{(ltd_t/assets_t)*100:.2f}% vs {(ltd_t1/assets_t1)*100:.2f}%", "Esito": "🟢 Superato (+1)" if p5 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "5. Riduzione Debito a Lungo Termine / Attivo",
+                    "Valore": f"{(ltd_t / assets_t) * 100:.2f}% vs {(ltd_t1 / assets_t1) * 100:.2f}%",
+                    "Esito": "🟢 Superato (+1)" if p5 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 6. Improving Current Ratio
-            ca_t = float(ca_row.iloc[t_idx]) if ca_row is not None and len(ca_row) > t_idx and pd.notna(ca_row.iloc[t_idx]) else assets_t * 0.3
-            cl_t = float(cl_row.iloc[t_idx]) if cl_row is not None and len(cl_row) > t_idx and pd.notna(cl_row.iloc[t_idx]) else assets_t * 0.2
+            ca_t = (
+                float(ca_row.iloc[t_idx])
+                if ca_row is not None and len(ca_row) > t_idx and pd.notna(ca_row.iloc[t_idx])
+                else assets_t * 0.3
+            )
+            cl_t = (
+                float(cl_row.iloc[t_idx])
+                if cl_row is not None and len(cl_row) > t_idx and pd.notna(cl_row.iloc[t_idx])
+                else assets_t * 0.2
+            )
             cr_t = ca_t / max(1.0, cl_t)
-            
-            ca_t1 = float(ca_row.iloc[t1_idx]) if ca_row is not None and len(ca_row) > t1_idx and pd.notna(ca_row.iloc[t1_idx]) else assets_t1 * 0.3
-            cl_t1 = float(cl_row.iloc[t1_idx]) if cl_row is not None and len(cl_row) > t1_idx and pd.notna(cl_row.iloc[t1_idx]) else assets_t1 * 0.2
+
+            ca_t1 = (
+                float(ca_row.iloc[t1_idx])
+                if ca_row is not None and len(ca_row) > t1_idx and pd.notna(ca_row.iloc[t1_idx])
+                else assets_t1 * 0.3
+            )
+            cl_t1 = (
+                float(cl_row.iloc[t1_idx])
+                if cl_row is not None and len(cl_row) > t1_idx and pd.notna(cl_row.iloc[t1_idx])
+                else assets_t1 * 0.2
+            )
             cr_t1 = ca_t1 / max(1.0, cl_t1)
             p6 = 1 if cr_t >= cr_t1 else 0
             score += p6
-            details.append({"Critero": "6. Miglioramento della Liquidità (Current Ratio)", "Valore": f"{cr_t:.2f}x vs {cr_t1:.2f}x", "Esito": "🟢 Superato (+1)" if p6 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "6. Miglioramento della Liquidità (Current Ratio)",
+                    "Valore": f"{cr_t:.2f}x vs {cr_t1:.2f}x",
+                    "Esito": "🟢 Superato (+1)" if p6 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 7. No Equity Dilution
-            sh_t = float(shares_row.iloc[t_idx]) if shares_row is not None and len(shares_row) > t_idx and pd.notna(shares_row.iloc[t_idx]) else 1e9
-            sh_t1 = float(shares_row.iloc[t1_idx]) if shares_row is not None and len(shares_row) > t1_idx and pd.notna(shares_row.iloc[t1_idx]) else sh_t
+            sh_t = (
+                float(shares_row.iloc[t_idx])
+                if shares_row is not None and len(shares_row) > t_idx and pd.notna(shares_row.iloc[t_idx])
+                else 1e9
+            )
+            sh_t1 = (
+                float(shares_row.iloc[t1_idx])
+                if shares_row is not None and len(shares_row) > t1_idx and pd.notna(shares_row.iloc[t1_idx])
+                else sh_t
+            )
             p7 = 1 if sh_t <= sh_t1 * 1.01 else 0
             score += p7
-            details.append({"Critero": "7. Assenza di Diluizione Azionaria (No Shares Issue)", "Valore": f"{sh_t/1e6:,.0f}M vs {sh_t1/1e6:,.0f}M azioni", "Esito": "🟢 Superato (+1)" if p7 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "7. Assenza di Diluizione Azionaria (No Shares Issue)",
+                    "Valore": f"{sh_t / 1e6:,.0f}M vs {sh_t1 / 1e6:,.0f}M azioni",
+                    "Esito": "🟢 Superato (+1)" if p7 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 8. Improving Gross Margin
-            rev_t = float(rev_row.iloc[t_idx]) if rev_row is not None and len(rev_row) > t_idx and pd.notna(rev_row.iloc[t_idx]) else 1.0
-            gp_t = float(gp_row.iloc[t_idx]) if gp_row is not None and len(gp_row) > t_idx and pd.notna(gp_row.iloc[t_idx]) else rev_t * 0.5
+            rev_t = (
+                float(rev_row.iloc[t_idx])
+                if rev_row is not None and len(rev_row) > t_idx and pd.notna(rev_row.iloc[t_idx])
+                else 1.0
+            )
+            gp_t = (
+                float(gp_row.iloc[t_idx])
+                if gp_row is not None and len(gp_row) > t_idx and pd.notna(gp_row.iloc[t_idx])
+                else rev_t * 0.5
+            )
             gm_t = gp_t / max(1.0, rev_t)
 
-            rev_t1 = float(rev_row.iloc[t1_idx]) if rev_row is not None and len(rev_row) > t1_idx and pd.notna(rev_row.iloc[t1_idx]) else 1.0
-            gp_t1 = float(gp_row.iloc[t1_idx]) if gp_row is not None and len(gp_row) > t1_idx and pd.notna(gp_row.iloc[t1_idx]) else rev_t1 * 0.5
+            rev_t1 = (
+                float(rev_row.iloc[t1_idx])
+                if rev_row is not None and len(rev_row) > t1_idx and pd.notna(rev_row.iloc[t1_idx])
+                else 1.0
+            )
+            gp_t1 = (
+                float(gp_row.iloc[t1_idx])
+                if gp_row is not None and len(gp_row) > t1_idx and pd.notna(gp_row.iloc[t1_idx])
+                else rev_t1 * 0.5
+            )
             gm_t1 = gp_t1 / max(1.0, rev_t1)
             p8 = 1 if gm_t >= gm_t1 else 0
             score += p8
-            details.append({"Critero": "8. Espansione del Margine Lordo (Gross Margin)", "Valore": f"{gm_t*100:.2f}% vs {gm_t1*100:.2f}%", "Esito": "🟢 Superato (+1)" if p8 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "8. Espansione del Margine Lordo (Gross Margin)",
+                    "Valore": f"{gm_t * 100:.2f}% vs {gm_t1 * 100:.2f}%",
+                    "Esito": "🟢 Superato (+1)" if p8 else "🔴 Non Superato (0)",
+                }
+            )
 
             # 9. Improving Asset Turnover
             at_t = rev_t / max(1.0, assets_t)
             at_t1 = rev_t1 / max(1.0, assets_t1)
             p9 = 1 if at_t >= at_t1 else 0
             score += p9
-            details.append({"Critero": "9. Efficienza Patrimoniale (Asset Turnover)", "Valore": f"{at_t:.2f}x vs {at_t1:.2f}x", "Esito": "🟢 Superato (+1)" if p9 else "🔴 Non Superato (0)"})
+            details.append(
+                {
+                    "Critero": "9. Efficienza Patrimoniale (Asset Turnover)",
+                    "Valore": f"{at_t:.2f}x vs {at_t1:.2f}x",
+                    "Esito": "🟢 Superato (+1)" if p9 else "🔴 Non Superato (0)",
+                }
+            )
 
     except Exception:
         pass
@@ -887,7 +1031,7 @@ def compute_piotroski_f_score(ticker: str) -> Dict[str, Any]:
             {"Critero": "6. Liquidità Current Ratio", "Valore": "Adeguata", "Esito": "🟢 Superato (+1)"},
             {"Critero": "7. Assenza di Diluizione Azionaria", "Valore": "Nessuna Emiss.", "Esito": "🟢 Superato (+1)"},
             {"Critero": "8. Margine Lordo", "Valore": "Stabile", "Esito": "🔴 Non Superato (0)"},
-            {"Critero": "9. Asset Turnover", "Valore": "Stabile", "Esito": "🔴 Non Superato (0)"}
+            {"Critero": "9. Asset Turnover", "Valore": "Stabile", "Esito": "🔴 Non Superato (0)"},
         ]
 
     if score >= 8:
@@ -897,12 +1041,7 @@ def compute_piotroski_f_score(ticker: str) -> Dict[str, Any]:
     else:
         eval_text = "🔴 ELEVATO RISCHIO FINANZIARIO (F-Score Low 0-4)"
 
-    return {
-        "score": score,
-        "max_score": 9,
-        "evaluation": eval_text,
-        "details_df": pd.DataFrame(details)
-    }
+    return {"score": score, "max_score": 9, "evaluation": eval_text, "details_df": pd.DataFrame(details)}
 
 
 def compute_wacc_estimation(ticker: str, rf_rate: float = None, erp: float = 0.055) -> Dict[str, Any]:
@@ -911,12 +1050,14 @@ def compute_wacc_estimation(ticker: str, rf_rate: float = None, erp: float = 0.0
     using CAPM for Cost of Equity and effective tax-adjusted Cost of Debt.
     """
     from core.yield_curve import get_default_risk_free_rate
+
     if rf_rate is None:
         curr = "EUR" if any(ticker.upper().endswith(suf) for suf in [".MI", ".PA", ".MC", ".AS", ".DE"]) else "USD"
         rf_rate = get_default_risk_free_rate(curr)
 
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
         inf = t.info or {}
         fin = t.financials
@@ -964,7 +1105,7 @@ def compute_wacc_estimation(ticker: str, rf_rate: float = None, erp: float = 0.0
             "equity_risk_premium_pct": round(erp * 100.0, 2),
             "weight_equity_pct": round(w_equity * 100.0, 1),
             "weight_debt_pct": round(w_debt * 100.0, 1),
-            "effective_tax_rate_pct": round(tax_rate * 100.0, 1)
+            "effective_tax_rate_pct": round(tax_rate * 100.0, 1),
         }
     except Exception:
         return {
@@ -976,7 +1117,7 @@ def compute_wacc_estimation(ticker: str, rf_rate: float = None, erp: float = 0.0
             "equity_risk_premium_pct": 5.50,
             "weight_equity_pct": 92.5,
             "weight_debt_pct": 7.5,
-            "effective_tax_rate_pct": 21.0
+            "effective_tax_rate_pct": 21.0,
         }
 
 
@@ -987,6 +1128,7 @@ def compute_valuation_multiples_matrix(ticker: str) -> Dict[str, Any]:
     """
     try:
         import yfinance as yf
+
         t = yf.Ticker(ticker)
         inf = t.info or {}
 
@@ -999,29 +1141,81 @@ def compute_valuation_multiples_matrix(ticker: str) -> Dict[str, Any]:
         ps_ratio = float(inf.get("priceToSalesTrailing12Months") or 5.4)
 
         rows = [
-            {"Multiplo": "P/E Trailing (Utili Passati)", "Valore Attuale": f"{pe_trail:.2f}x", "Benchmark Fair": "15x - 25x", "Valutazione": "🟢 Moderato" if pe_trail < 25 else "🟡 Premium"},
-            {"Multiplo": "Forward P/E (Utili Futuri)", "Valore Attuale": f"{pe_fwd:.2f}x", "Benchmark Fair": "12x - 20x", "Valutazione": "🟢 Attrattivo" if pe_fwd < 20 else "🟡 In Linea"},
-            {"Multiplo": "PEG Ratio (P/E to Growth)", "Valore Attuale": f"{peg:.2f}x", "Benchmark Fair": "< 1.5x", "Valutazione": "🟢 Sottovalutato" if peg < 1.0 else ("🟡 Fair" if peg < 2.0 else "🔴 Caro")},
-            {"Multiplo": "EV / EBITDA", "Valore Attuale": f"{ev_ebitda:.2f}x", "Benchmark Fair": "10x - 18x", "Valutazione": "🟢 Buono" if ev_ebitda < 16 else "🟡 Nella Media"},
-            {"Multiplo": "EV / Sales (Fatturato)", "Valore Attuale": f"{ev_sales:.2f}x", "Benchmark Fair": "3x - 6x", "Valutazione": "🟢 Solido" if ev_sales < 6 else "🟡 Elevato"},
-            {"Multiplo": "Price / Book Value (P/B)", "Valore Attuale": f"{pb_ratio:.2f}x", "Benchmark Fair": "2x - 6x", "Valutazione": "🟢 Solido" if pb_ratio < 6 else "🟡 High Return Equity"},
-            {"Multiplo": "Price / Sales (P/S)", "Valore Attuale": f"{ps_ratio:.2f}x", "Benchmark Fair": "2x - 5x", "Valutazione": "🟢 In Linea" if ps_ratio < 5 else "🟡 Elevato"}
+            {
+                "Multiplo": "P/E Trailing (Utili Passati)",
+                "Valore Attuale": f"{pe_trail:.2f}x",
+                "Benchmark Fair": "15x - 25x",
+                "Valutazione": "🟢 Moderato" if pe_trail < 25 else "🟡 Premium",
+            },
+            {
+                "Multiplo": "Forward P/E (Utili Futuri)",
+                "Valore Attuale": f"{pe_fwd:.2f}x",
+                "Benchmark Fair": "12x - 20x",
+                "Valutazione": "🟢 Attrattivo" if pe_fwd < 20 else "🟡 In Linea",
+            },
+            {
+                "Multiplo": "PEG Ratio (P/E to Growth)",
+                "Valore Attuale": f"{peg:.2f}x",
+                "Benchmark Fair": "< 1.5x",
+                "Valutazione": "🟢 Sottovalutato" if peg < 1.0 else ("🟡 Fair" if peg < 2.0 else "🔴 Caro"),
+            },
+            {
+                "Multiplo": "EV / EBITDA",
+                "Valore Attuale": f"{ev_ebitda:.2f}x",
+                "Benchmark Fair": "10x - 18x",
+                "Valutazione": "🟢 Buono" if ev_ebitda < 16 else "🟡 Nella Media",
+            },
+            {
+                "Multiplo": "EV / Sales (Fatturato)",
+                "Valore Attuale": f"{ev_sales:.2f}x",
+                "Benchmark Fair": "3x - 6x",
+                "Valutazione": "🟢 Solido" if ev_sales < 6 else "🟡 Elevato",
+            },
+            {
+                "Multiplo": "Price / Book Value (P/B)",
+                "Valore Attuale": f"{pb_ratio:.2f}x",
+                "Benchmark Fair": "2x - 6x",
+                "Valutazione": "🟢 Solido" if pb_ratio < 6 else "🟡 High Return Equity",
+            },
+            {
+                "Multiplo": "Price / Sales (P/S)",
+                "Valore Attuale": f"{ps_ratio:.2f}x",
+                "Benchmark Fair": "2x - 5x",
+                "Valutazione": "🟢 In Linea" if ps_ratio < 5 else "🟡 Elevato",
+            },
         ]
 
-        return {
-            "multiples_table": pd.DataFrame(rows)
-        }
+        return {"multiples_table": pd.DataFrame(rows)}
     except Exception:
         return {
-            "multiples_table": pd.DataFrame([
-                {"Multiplo": "P/E Trailing", "Valore Attuale": "24.50x", "Benchmark Fair": "15x - 25x", "Valutazione": "🟢 Moderato"},
-                {"Multiplo": "Forward P/E", "Valore Attuale": "20.10x", "Benchmark Fair": "12x - 20x", "Valutazione": "🟢 Attrattivo"},
-                {"Multiplo": "PEG Ratio", "Valore Attuale": "1.20x", "Benchmark Fair": "< 1.5x", "Valutazione": "🟢 Fair"}
-            ])
+            "multiples_table": pd.DataFrame(
+                [
+                    {
+                        "Multiplo": "P/E Trailing",
+                        "Valore Attuale": "24.50x",
+                        "Benchmark Fair": "15x - 25x",
+                        "Valutazione": "🟢 Moderato",
+                    },
+                    {
+                        "Multiplo": "Forward P/E",
+                        "Valore Attuale": "20.10x",
+                        "Benchmark Fair": "12x - 20x",
+                        "Valutazione": "🟢 Attrattivo",
+                    },
+                    {
+                        "Multiplo": "PEG Ratio",
+                        "Valore Attuale": "1.20x",
+                        "Benchmark Fair": "< 1.5x",
+                        "Valutazione": "🟢 Fair",
+                    },
+                ]
+            )
         }
 
 
-def predict_ml_distress_and_volatility(df_prices: Optional[pd.DataFrame] = None, company_ratios: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+def predict_ml_distress_and_volatility(
+    df_prices: Optional[pd.DataFrame] = None, company_ratios: Optional[Dict[str, float]] = None
+) -> Dict[str, Any]:
     """
     Modello Predittivo di Machine Learning:
       1. Classifier Random Forest per la stima della probabilità di Distress / Rischio di Impatto Solvibilità.
@@ -1034,7 +1228,7 @@ def predict_ml_distress_and_volatility(df_prices: Optional[pd.DataFrame] = None,
         try:
             close_prices = df_prices["close"] if "close" in df_prices.columns else df_prices.iloc[:, -1]
             rets = close_prices.pct_change().dropna()
-            
+
             f_vol5 = float(rets.tail(5).std() * np.sqrt(252)) if len(rets) >= 5 else 0.20
             f_vol10 = float(rets.tail(10).std() * np.sqrt(252)) if len(rets) >= 10 else 0.20
             f_vol22 = float(rets.tail(22).std() * np.sqrt(252)) if len(rets) >= 22 else 0.20
@@ -1063,14 +1257,16 @@ def predict_ml_distress_and_volatility(df_prices: Optional[pd.DataFrame] = None,
     debt_equity = ratios.get("debt_equity", 0.6)
     net_margin = ratios.get("net_margin", 14.5)
 
-    X_clf_train = np.array([
-        [3.5, 9, 2.5, 0.3, 20.0],
-        [3.1, 8, 2.0, 0.4, 18.0],
-        [2.2, 6, 1.4, 0.9, 10.0],
-        [1.9, 5, 1.2, 1.2, 6.0],
-        [1.2, 3, 0.8, 2.5, -2.0],
-        [0.9, 2, 0.6, 3.2, -8.0],
-    ])
+    X_clf_train = np.array(
+        [
+            [3.5, 9, 2.5, 0.3, 20.0],
+            [3.1, 8, 2.0, 0.4, 18.0],
+            [2.2, 6, 1.4, 0.9, 10.0],
+            [1.9, 5, 1.2, 1.2, 6.0],
+            [1.2, 3, 0.8, 2.5, -2.0],
+            [0.9, 2, 0.6, 3.2, -8.0],
+        ]
+    )
     y_clf_train = np.array([0, 0, 1, 1, 2, 2])
 
     rf_clf = RandomForestClassifier(n_estimators=50, random_state=42)
@@ -1078,7 +1274,7 @@ def predict_ml_distress_and_volatility(df_prices: Optional[pd.DataFrame] = None,
 
     X_test = np.array([[z_val, f_score, current_ratio, debt_equity, net_margin]])
     probs = rf_clf.predict_proba(X_test)[0]
-    
+
     distress_prob_pct = float((probs[1] * 0.4 + probs[2] * 1.0) * 100.0) if len(probs) == 3 else 15.0
 
     if distress_prob_pct < 25.0:
@@ -1093,24 +1289,21 @@ def predict_ml_distress_and_volatility(df_prices: Optional[pd.DataFrame] = None,
 
     feature_names = ["Altman Z-Score", "Piotroski F-Score", "Current Ratio", "Debt / Equity", "Net Margin %"]
     importances = rf_clf.feature_importances_
-    feat_df = pd.DataFrame({
-        "Feature": feature_names,
-        "Importanza Relativa (%)": (importances * 100.0).round(2)
-    }).sort_values(by="Importanza Relativa (%)", ascending=False)
+    feat_df = pd.DataFrame(
+        {"Feature": feature_names, "Importanza Relativa (%)": (importances * 100.0).round(2)}
+    ).sort_values(by="Importanza Relativa (%)", ascending=False)
 
     return {
         "distress_probability_pct": distress_prob_pct,
         "predicted_volatility_30d_pct": pred_vol_30d,
         "risk_level": risk_level,
         "verdict": verdict,
-        "feature_importance_df": feat_df
+        "feature_importance_df": feat_df,
     }
 
 
 def detect_portfolio_anomalies_isolation_forest(
-    df_returns: pd.DataFrame = None,
-    sr_portfolio: pd.Series = None,
-    contamination: float = 0.05
+    df_returns: pd.DataFrame = None, sr_portfolio: pd.Series = None, contamination: float = 0.05
 ) -> dict:
     """
     Rilevatore di Anomalie di Mercato e Picchi di Correlazione (ML Isolation Forest):
@@ -1119,7 +1312,9 @@ def detect_portfolio_anomalies_isolation_forest(
     """
     from sklearn.ensemble import IsolationForest
 
-    clean_df = df_returns.dropna(how="all").fillna(0.0) if df_returns is not None and not df_returns.empty else pd.DataFrame()
+    clean_df = (
+        df_returns.dropna(how="all").fillna(0.0) if df_returns is not None and not df_returns.empty else pd.DataFrame()
+    )
 
     if clean_df.empty or len(clean_df) < 10:
         np.random.seed(42)
@@ -1192,15 +1387,17 @@ def detect_portfolio_anomalies_isolation_forest(
     scores = np.zeros(len(df_rets), dtype=float)
     scores[active_mask] = scores_active
 
-    df_res = pd.DataFrame({
-        "Data": df_rets.index.strftime("%Y-%m-%d"),
-        "Rendimento Portafoglio %": (port_series.values * 100.0).round(2),
-        "Volatilità Rolling 20d %": (feat_vol_20d * 100.0 * np.sqrt(252)).round(2),
-        "Correlazione Media": mean_corr.round(2),
-        "Drawdown %": (feat_dd * 100.0).round(2),
-        "Anomalia": ["🔴 ANOMALIA" if p == -1 else "🟢 Normale" for p in predictions],
-        "Score Anomalia": scores.round(3)
-    })
+    df_res = pd.DataFrame(
+        {
+            "Data": df_rets.index.strftime("%Y-%m-%d"),
+            "Rendimento Portafoglio %": (port_series.values * 100.0).round(2),
+            "Volatilità Rolling 20d %": (feat_vol_20d * 100.0 * np.sqrt(252)).round(2),
+            "Correlazione Media": mean_corr.round(2),
+            "Drawdown %": (feat_dd * 100.0).round(2),
+            "Anomalia": ["🔴 ANOMALIA" if p == -1 else "🟢 Normale" for p in predictions],
+            "Score Anomalia": scores.round(3),
+        }
+    )
 
     anomaly_df = df_res[df_res["Anomalia"] == "🔴 ANOMALIA"].sort_values(by="Score Anomalia")
     total_days = len(df_res)
@@ -1213,5 +1410,5 @@ def detect_portfolio_anomalies_isolation_forest(
         "total_days": total_days,
         "anomaly_count": anomaly_count,
         "anomaly_rate_pct": anomaly_rate_pct,
-        "contamination": contamination
+        "contamination": contamination,
     }

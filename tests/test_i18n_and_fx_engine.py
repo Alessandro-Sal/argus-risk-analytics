@@ -5,13 +5,13 @@ accounting parentheses notation, ECB reference rates, triangular cross-currency 
 and exact mathematical decomposition of foreign exchange risk.
 """
 
-from datetime import date, datetime
 import math
+from datetime import date, datetime
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from core.i18n.translator import I18nEngine, get_i18n, get_locale, set_locale, t
 from core.i18n.formatters import (
     format_currency,
     format_date,
@@ -20,12 +20,12 @@ from core.i18n.formatters import (
     get_dataframe_styler_formats,
 )
 from core.i18n.fx_engine import (
+    SUPPORTED_CURRENCIES,
     ECBRateProvider,
     FXConversionEngine,
     FXDecompositionResult,
-    SUPPORTED_CURRENCIES,
 )
-
+from core.i18n.translator import I18nEngine, get_i18n, get_locale, set_locale, t
 
 # ── 1. TEST TRANSLATOR & LOCALIZATION DICTIONARIES ──────────────────
 

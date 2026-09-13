@@ -5,11 +5,12 @@
 # Providers: FRED API (Federal Reserve), ECB Data Portal (BCE), BoE, SNB
 # ============================================================
 
-import os
 import io
+import os
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
 import requests
@@ -37,11 +38,11 @@ FRED_TREASURY_SERIES: Dict[str, str] = {
 
 # Mappatura Tassi Guida e Indicatori Macro FRED
 FRED_MACRO_SERIES: Dict[str, str] = {
-    "FEDFUNDS": "FEDFUNDS",       # US Effective Federal Funds Rate
-    "SOFR": "SOFR",               # Secured Overnight Financing Rate
-    "CPI": "CPIAUCSL",            # US Consumer Price Index
-    "BREAKEVEN_10Y": "T10YIE",    # 10-Year Breakeven Inflation Rate
-    "HIGH_YIELD_OAS": "BAMLH0A0HYM2", # ICE BofA US High Yield Index Option-Adjusted Spread
+    "FEDFUNDS": "FEDFUNDS",  # US Effective Federal Funds Rate
+    "SOFR": "SOFR",  # Secured Overnight Financing Rate
+    "CPI": "CPIAUCSL",  # US Consumer Price Index
+    "BREAKEVEN_10Y": "T10YIE",  # 10-Year Breakeven Inflation Rate
+    "HIGH_YIELD_OAS": "BAMLH0A0HYM2",  # ICE BofA US High Yield Index Option-Adjusted Spread
     "IG_CORP_OAS": "BAMLC0A0CM",  # ICE BofA US Corporate Index Option-Adjusted Spread
 }
 
@@ -61,11 +62,11 @@ ECB_YIELD_TENORS: Dict[str, str] = {
 }
 
 
-import json
 import concurrent.futures
+import json
 
 try:
-    from core.resilient_market_engine import fred_circuit_breaker, ecb_circuit_breaker
+    from core.resilient_market_engine import ecb_circuit_breaker, fred_circuit_breaker
 except ImportError:
     fred_circuit_breaker = None
     ecb_circuit_breaker = None
@@ -76,7 +77,7 @@ def fetch_fred_series(
     start_date: Optional[str] = None,
     api_key: Optional[str] = None,
     timeout: float = 6.0,
-    use_cache: bool = True
+    use_cache: bool = True,
 ) -> Optional[pd.Series]:
     """
     Recupera una serie storica da FRED con cache SQLite (24h TTL) e Circuit Breaker.
@@ -130,15 +131,10 @@ def fetch_fred_series(
     # 1. Tentativo con REST API ufficiale se API Key disponibile
     if api_key:
         try:
-            params = {
-                "series_id": clean_id,
-                "api_key": api_key,
-                "file_type": "json",
-                "sort_order": "asc"
-            }
+            params = {"series_id": clean_id, "api_key": api_key, "file_type": "json", "sort_order": "asc"}
             if start_date:
                 params["observation_start"] = start_date
-            
+
             resp = requests.get(FRED_BASE_URL, params=params, headers=headers, timeout=timeout)
             if resp.status_code == 200:
                 data = resp.json()
@@ -195,14 +191,14 @@ def fetch_fred_series(
         try:
             conn = _get_cache_connection()
             cur = conn.cursor()
-            records_to_cache = [
-                {"date": d.strftime("%Y-%m-%d"), "value": float(v)}
-                for d, v in series_result.items()
-            ]
-            cur.execute("""
+            records_to_cache = [{"date": d.strftime("%Y-%m-%d"), "value": float(v)} for d, v in series_result.items()]
+            cur.execute(
+                """
                 INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
                 VALUES (?, ?, 'macro_series', ?, ?, 86400)
-            """, (cache_key, clean_id, json.dumps(records_to_cache), now))
+            """,
+                (cache_key, clean_id, json.dumps(records_to_cache), now),
+            )
             conn.commit()
         except Exception:
             pass
@@ -272,10 +268,13 @@ def fetch_us_treasury_term_structure(timeout: float = 6.0, force_refresh: bool =
         try:
             conn = _get_cache_connection()
             cur = conn.cursor()
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
                 VALUES (?, 'US_TREASURY', 'yield_curve', ?, ?, 86400)
-            """, (cache_key, json.dumps(results), now))
+            """,
+                (cache_key, json.dumps(results), now),
+            )
             conn.commit()
         except Exception:
             pass
@@ -324,7 +323,8 @@ def fetch_ecb_yield_curve(timeout: float = 6.0, force_refresh: bool = False) -> 
             cur = conn.cursor()
             cur.execute("SELECT payload FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
             row = cur.fetchone()
-            if row: return json.loads(row[0])
+            if row:
+                return json.loads(row[0])
         except Exception:
             pass
         return {}
@@ -365,10 +365,13 @@ def fetch_ecb_yield_curve(timeout: float = 6.0, force_refresh: bool = False) -> 
         try:
             conn = _get_cache_connection()
             cur = conn.cursor()
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
                 VALUES (?, 'ECB_AAA', 'yield_curve', ?, ?, 86400)
-            """, (cache_key, json.dumps(results), now))
+            """,
+                (cache_key, json.dumps(results), now),
+            )
             conn.commit()
         except Exception:
             pass
@@ -382,7 +385,8 @@ def fetch_ecb_yield_curve(timeout: float = 6.0, force_refresh: bool = False) -> 
         cur = conn.cursor()
         cur.execute("SELECT payload FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
         row = cur.fetchone()
-        if row: return json.loads(row[0])
+        if row:
+            return json.loads(row[0])
     except Exception:
         pass
 
@@ -406,29 +410,29 @@ def get_live_central_bank_rates(timeout: float = 5.0) -> Dict[str, Any]:
             "sofr_rate_pct": 5.31,
             "t_bill_3m_pct": 4.35,
             "treasury_10y_pct": 4.25,
-            "source": "FRED (Federal Reserve Bank of St. Louis)"
+            "source": "FRED (Federal Reserve Bank of St. Louis)",
         },
         "EUR": {
             "policy_name": "BCE Deposit Facility Rate",
             "policy_rate_pct": 3.75,
             "estr_rate_pct": 2.75,
             "bund_10y_pct": 2.25,
-            "source": "European Central Bank (ECB Data Portal)"
+            "source": "European Central Bank (ECB Data Portal)",
         },
         "GBP": {
             "policy_name": "Bank of England Official Bank Rate",
             "policy_rate_pct": 5.00,
             "sonia_rate_pct": 4.75,
             "gilt_10y_pct": 4.10,
-            "source": "Bank of England & FRED"
+            "source": "Bank of England & FRED",
         },
         "CHF": {
             "policy_name": "Swiss National Bank Policy Rate",
             "policy_rate_pct": 1.25,
             "saron_rate_pct": 1.00,
             "swiss_10y_pct": 0.55,
-            "source": "SNB & Market Proxy"
-        }
+            "source": "SNB & Market Proxy",
+        },
     }
 
     # Aggiornamento live da FRED per USD
@@ -436,7 +440,7 @@ def get_live_central_bank_rates(timeout: float = 5.0) -> Dict[str, Any]:
         fed_funds = fetch_fred_series("FEDFUNDS", timeout=timeout)
         if fed_funds is not None and not fed_funds.empty:
             rates_data["USD"]["policy_rate_pct"] = round(float(fed_funds.iloc[-1]), 2)
-            
+
         sofr = fetch_fred_series("SOFR", timeout=timeout)
         if sofr is not None and not sofr.empty:
             rates_data["USD"]["sofr_rate_pct"] = round(float(sofr.iloc[-1]), 2)

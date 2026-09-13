@@ -18,7 +18,7 @@ def compute_beneish_m_score(
     depi: float = 1.0,
     sgai: float = 1.0,
     lvgi: float = 1.0,
-    tata: float = 0.0
+    tata: float = 0.0,
 ) -> Dict[str, Any]:
     """
     Calcola il Beneish M-Score (1999) per valutare la probabilità di manipolazione contabile/frode di bilancio.
@@ -46,6 +46,7 @@ def compute_beneish_m_score(
     # Calibrazione econometrica della probabilità di manipolazione ancorata alla soglia critica M = -1.78
     # Per M <= -1.78 (es. -2.12), la probabilità di frode è bassa (< 25%); per M > -1.78 sale verso 50%-99%
     import scipy.stats as stats
+
     z_score = (m_score - (-1.78)) / 0.50
     manipulation_prob = float(stats.norm.cdf(z_score) * 100.0)
     manipulation_prob = min(99.9, max(0.1, manipulation_prob))
@@ -59,16 +60,58 @@ def compute_beneish_m_score(
         status = "🟢 Sicuro"
         icon = "🟢"
 
-    indices_df = pd.DataFrame([
-        {"Indice": "DSRI (Days Sales in Receivables)", "Valore": f"{dsri:.2f}", "Benchmark Normale": "<= 1.05", "Descrizione": "Crescita anomala dei crediti commerciali vs ricavi."},
-        {"Indice": "GMI (Gross Margin Index)", "Valore": f"{gmi:.2f}", "Benchmark Normale": "<= 1.00", "Descrizione": "Deterioramento della marginalità lorda."},
-        {"Indice": "AQI (Asset Quality Index)", "Valore": f"{aqi:.2f}", "Benchmark Normale": "<= 1.00", "Descrizione": "Capitalizzazione anomala di costi intangibili non operativi."},
-        {"Indice": "SGI (Sales Growth Index)", "Valore": f"{sgi:.2f}", "Benchmark Normale": "<= 1.15", "Descrizione": "Tasso di espansione accelerato del fatturato."},
-        {"Indice": "DEPI (Depreciation Index)", "Valore": f"{depi:.2f}", "Benchmark Normale": "<= 1.00", "Descrizione": "Rallentamento artificioso dei piani di ammortamento."},
-        {"Indice": "SGAI (Sales General & Admin Index)", "Valore": f"{sgai:.2f}", "Benchmark Normale": "<= 1.00", "Descrizione": "Crescita dei costi commerciali e amministrativi."},
-        {"Indice": "LVGI (Leverage Index)", "Valore": f"{lvgi:.2f}", "Benchmark Normale": "<= 1.05", "Descrizione": "Incremento dell'indebitamento strutturale totale."},
-        {"Indice": "TATA (Total Accruals to Total Assets)", "Valore": f"{tata:.3f}", "Benchmark Normale": "<= 0.05", "Descrizione": "Differenza tra utile contabile e flusso di cassa reale."}
-    ])
+    indices_df = pd.DataFrame(
+        [
+            {
+                "Indice": "DSRI (Days Sales in Receivables)",
+                "Valore": f"{dsri:.2f}",
+                "Benchmark Normale": "<= 1.05",
+                "Descrizione": "Crescita anomala dei crediti commerciali vs ricavi.",
+            },
+            {
+                "Indice": "GMI (Gross Margin Index)",
+                "Valore": f"{gmi:.2f}",
+                "Benchmark Normale": "<= 1.00",
+                "Descrizione": "Deterioramento della marginalità lorda.",
+            },
+            {
+                "Indice": "AQI (Asset Quality Index)",
+                "Valore": f"{aqi:.2f}",
+                "Benchmark Normale": "<= 1.00",
+                "Descrizione": "Capitalizzazione anomala di costi intangibili non operativi.",
+            },
+            {
+                "Indice": "SGI (Sales Growth Index)",
+                "Valore": f"{sgi:.2f}",
+                "Benchmark Normale": "<= 1.15",
+                "Descrizione": "Tasso di espansione accelerato del fatturato.",
+            },
+            {
+                "Indice": "DEPI (Depreciation Index)",
+                "Valore": f"{depi:.2f}",
+                "Benchmark Normale": "<= 1.00",
+                "Descrizione": "Rallentamento artificioso dei piani di ammortamento.",
+            },
+            {
+                "Indice": "SGAI (Sales General & Admin Index)",
+                "Valore": f"{sgai:.2f}",
+                "Benchmark Normale": "<= 1.00",
+                "Descrizione": "Crescita dei costi commerciali e amministrativi.",
+            },
+            {
+                "Indice": "LVGI (Leverage Index)",
+                "Valore": f"{lvgi:.2f}",
+                "Benchmark Normale": "<= 1.05",
+                "Descrizione": "Incremento dell'indebitamento strutturale totale.",
+            },
+            {
+                "Indice": "TATA (Total Accruals to Total Assets)",
+                "Valore": f"{tata:.3f}",
+                "Benchmark Normale": "<= 0.05",
+                "Descrizione": "Differenza tra utile contabile e flusso di cassa reale.",
+            },
+        ]
+    )
 
     return {
         "m_score": float(m_score),
@@ -77,15 +120,11 @@ def compute_beneish_m_score(
         "icon": icon,
         "manipulation_probability_pct": manipulation_prob,
         "indices_df": indices_df,
-        "is_manipulator": m_score > -1.78
+        "is_manipulator": m_score > -1.78,
     }
 
 
-def compute_sloan_accrual_ratio(
-    net_income: float,
-    operating_cash_flow: float,
-    total_assets: float
-) -> Dict[str, Any]:
+def compute_sloan_accrual_ratio(net_income: float, operating_cash_flow: float, total_assets: float) -> Dict[str, Any]:
     """
     Calcola l'Accrual Ratio di Richard Sloan (1996) per quantificare la qualità degli utili.
 
@@ -118,5 +157,5 @@ def compute_sloan_accrual_ratio(
         "accrual_ratio_pct": float(accrual_ratio * 100.0),
         "quality": quality,
         "badge": badge,
-        "total_accruals": float(accruals)
+        "total_accruals": float(accruals),
     }

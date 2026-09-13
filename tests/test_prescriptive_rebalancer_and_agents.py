@@ -3,16 +3,17 @@ tests/test_prescriptive_rebalancer_and_agents.py
 Unit tests for PrescriptiveConicRebalancer and TriAgentQuantitativeGovernance.
 """
 
-import pytest
 import numpy as np
-from core.prescriptive_rebalancer import (
-    PositionLot,
-    TaxWalletState,
-    RebalanceConstraints,
-    FIXOrder,
-    PrescriptiveConicRebalancer
-)
+import pytest
+
 from core.ai_analyst import TriAgentQuantitativeGovernance
+from core.prescriptive_rebalancer import (
+    FIXOrder,
+    PositionLot,
+    PrescriptiveConicRebalancer,
+    RebalanceConstraints,
+    TaxWalletState,
+)
 
 
 def test_fix_order_formatting():

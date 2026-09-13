@@ -3,38 +3,39 @@
 # ARGUS Wealth Management — Pension Planning & Tax Optimization
 # ============================================================
 
-import streamlit as st
-import pandas as pd
+import importlib
+from datetime import datetime
+
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
-import importlib
+import streamlit as st
+
 import core.ui_utils
+
 importlib.reload(core.ui_utils)
 
 from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-
-    inject_custom_css,
-    section,
-    metric_card,
+    apply_plotly_theme,
     fmt_eur,
     fmt_pct,
+    inject_custom_css,
+    metric_card,
     render_wealth_command_bar,
     render_wealth_executive_badges,
-    apply_plotly_theme
+    section,
 )
-from core.sidebar import render_sidebar
 from core.wealth import (
-    init_wealth_db,
+    compute_consolidated_net_worth,
     get_pension_plans,
+    get_wealth_portfolios,
+    init_wealth_db,
     save_pension_plan,
     simulate_pension_projection,
-    get_wealth_portfolios,
-    compute_consolidated_net_worth
 )
-
 
 st.set_page_config(page_title="Previdenza & Pensione | ARGUS Wealth", page_icon="🛡️", layout="wide")
 inject_custom_css()

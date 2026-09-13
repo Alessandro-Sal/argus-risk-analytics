@@ -108,11 +108,13 @@ def compute_hrp_portfolio(df_returns: pd.DataFrame, linkage_method: str = "singl
     port_volatility = float(np.sqrt(max(1e-8, port_variance)))
     port_sharpe = float(port_expected_return / port_volatility) if port_volatility > 0 else 0.0
 
-    df_weights = pd.DataFrame({
-        "ticker": list(weights_series.index),
-        "hrp_weight": weights_series.values,
-        "hrp_weight_pct": weights_series.values * 100.0
-    }).sort_values(by="hrp_weight", ascending=False)
+    df_weights = pd.DataFrame(
+        {
+            "ticker": list(weights_series.index),
+            "hrp_weight": weights_series.values,
+            "hrp_weight_pct": weights_series.values * 100.0,
+        }
+    ).sort_values(by="hrp_weight", ascending=False)
 
     return {
         "weights": weights_series.to_dict(),
@@ -123,7 +125,7 @@ def compute_hrp_portfolio(df_returns: pd.DataFrame, linkage_method: str = "singl
         "sorted_assets": sorted_assets,
         "linkage_matrix": link,
         "correlation_matrix": corr,
-        "covariance_matrix": cov
+        "covariance_matrix": cov,
     }
 
 
@@ -203,7 +205,7 @@ def _get_rec_bisection(cov: pd.DataFrame, sorted_assets: List[str]) -> pd.Series
                 alpha = 1.0 - (var_left / total_var)
 
                 weights[left_cluster] *= alpha
-                weights[right_cluster] *= (1.0 - alpha)
+                weights[right_cluster] *= 1.0 - alpha
 
                 next_clusters.append(left_cluster)
                 next_clusters.append(right_cluster)

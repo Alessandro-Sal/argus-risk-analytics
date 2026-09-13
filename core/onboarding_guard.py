@@ -22,8 +22,14 @@ def _reconcile_bundle_betas(results: Optional[Dict[str, Any]]) -> None:
     if pos is None or not isinstance(pos, pd.DataFrame) or pos.empty:
         return
 
-    df_returns = results.get("returns") if isinstance(results.get("returns"), pd.DataFrame) else results.get("df_returns")
-    bm_returns = results.get("benchmark_return") if isinstance(results.get("benchmark_return"), pd.Series) else results.get("sr_benchmark")
+    df_returns = (
+        results.get("returns") if isinstance(results.get("returns"), pd.DataFrame) else results.get("df_returns")
+    )
+    bm_returns = (
+        results.get("benchmark_return")
+        if isinstance(results.get("benchmark_return"), pd.Series)
+        else results.get("sr_benchmark")
+    )
 
     # Popolamento o calibrazione Beta per ciascun asset se mancante o degenere
     if "beta" not in pos.columns or pos["beta"].isna().any() or pos["beta"].dropna().nunique() <= 1:
@@ -54,11 +60,19 @@ def _reconcile_bundle_betas(results: Optional[Dict[str, Any]]) -> None:
                 tk = str(r.get("ticker", "")).upper()
                 ac = str(r.get("asset_class", "")).lower()
                 if "crypto" in ac or any(c in tk.lower() for c in ["btc", "eth", "sol", "xrp", "ada", "fdusd"]):
-                    b_val = 1.85 if "BTC" in tk else (1.95 if "ETH" in tk else (2.10 if "SOL" in tk else (0.0 if "FDUSD" in tk else 1.80)))
+                    b_val = (
+                        1.85
+                        if "BTC" in tk
+                        else (1.95 if "ETH" in tk else (2.10 if "SOL" in tk else (0.0 if "FDUSD" in tk else 1.80)))
+                    )
                 elif "etf" in ac:
                     b_val = 0.88 if ("DFNS" in tk or "DFND" in tk) else (0.92 if "IMEA" in tk else 0.88)
                 elif tk in ["GOOGL", "AMZN", "META", "MSFT", "PYPL", "CRSR", "ENPH", "TDOC", "BABA", "NVDA", "AAPL"]:
-                    b_val = 1.60 if tk in ["ENPH", "TDOC", "NVDA"] else (1.25 if tk in ["AMZN", "META", "PYPL", "CRSR"] else 1.15)
+                    b_val = (
+                        1.60
+                        if tk in ["ENPH", "TDOC", "NVDA"]
+                        else (1.25 if tk in ["AMZN", "META", "PYPL", "CRSR"] else 1.15)
+                    )
                 elif tk in ["NOVO-B.CO", "BIIB", "PRX.AS"]:
                     b_val = 0.75 if "NOVO" in tk else 0.80
                 elif tk in ["ISP.MI", "UCG.MI"]:
@@ -70,7 +84,9 @@ def _reconcile_bundle_betas(results: Optional[Dict[str, Any]]) -> None:
                 pos.at[idx, "beta"] = b_val
 
     # Calibrazione Beta aggregato di portafoglio
-    valid_pos = pos[pos["beta"].notna() & (pos.get("current_value", 0) > 0)] if "beta" in pos.columns else pd.DataFrame()
+    valid_pos = (
+        pos[pos["beta"].notna() & (pos.get("current_value", 0) > 0)] if "beta" in pos.columns else pd.DataFrame()
+    )
     if not valid_pos.empty:
         tot_val = valid_pos["current_value"].sum()
         if tot_val > 0:
@@ -82,22 +98,23 @@ def _reconcile_bundle_betas(results: Optional[Dict[str, Any]]) -> None:
 
 
 def render_empty_state_screen(
-    portal: str = "risk",
-    custom_title: Optional[str] = None,
-    custom_desc: Optional[str] = None
+    portal: str = "risk", custom_title: Optional[str] = None, custom_desc: Optional[str] = None
 ) -> None:
     """
     Renderizza un placeholder grafico elegante e istituzionale con invito
     all'azione (One-Click Demo 5 Pilastri o Upload File CSV Broker).
     """
-    title = custom_title or ("Cockpit Quantitativo & Risk Analytics" if portal == "risk" else "Total Wealth & Family Office Hub")
+    title = custom_title or (
+        "Cockpit Quantitativo & Risk Analytics" if portal == "risk" else "Total Wealth & Family Office Hub"
+    )
     desc = custom_desc or (
         "Benvenuto in <b>ARGUS</b>. Per sbloccare l'intera potenza del motore di calcolo, esplora subito "
         "lo scenario dimostrativo a 5 pilastri patrimoniali oppure carica le transazioni dei tuoi broker."
     )
     portal_slug = portal.lower().replace(" ", "_")
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
         <div style="text-align: center; padding: 42px 24px; background: linear-gradient(180deg, rgba(15,23,42,0.6) 0%, rgba(15,23,42,0.2) 100%);
                     border: 1px dashed rgba(56,189,248,0.3); border-radius: 14px; margin-bottom: 28px; box-shadow: 0 4px 20px rgba(0,0,0,0.25);">
             <div style="font-size: 52px; margin-bottom: 12px; filter: drop-shadow(0 2px 8px rgba(56,189,248,0.4));">🛡️</div>
@@ -108,7 +125,9 @@ def render_empty_state_screen(
                 {desc}
             </p>
         </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     col_demo, col_upload = st.columns([1, 1], gap="large")
 
@@ -125,7 +144,12 @@ def render_empty_state_screen(
         """)
 
         st.markdown('<div style="height: 10px;"></div>', unsafe_allow_html=True)
-        if st.button("🚀 Carica Portafoglio Demo (5 Pilastri)", type="primary", use_container_width=True, key=f"btn_onboarding_seed_demo_{portal_slug}"):
+        if st.button(
+            "🚀 Carica Portafoglio Demo (5 Pilastri)",
+            type="primary",
+            use_container_width=True,
+            key=f"btn_onboarding_seed_demo_{portal_slug}",
+        ):
             with st.spinner("⏳ Inizializzazione dati quantitativi e patrimoniali multi-asset..."):
                 seed_unified_demo_scenario()
                 if hasattr(st, "session_state"):
@@ -140,20 +164,28 @@ def render_empty_state_screen(
         uploaded_file = st.file_uploader(
             "File CSV o Excel (Directa, DeGiro, IBKR, Fineco, Scalable):",
             type=["csv", "xlsx"],
-            key=f"onboarding_file_uploader_{portal_slug}"
+            key=f"onboarding_file_uploader_{portal_slug}",
         )
 
         if uploaded_file is not None:
             try:
                 from core.broker_hub import detect_broker_format, parse_broker_csv
+
                 file_bytes = uploaded_file.getvalue()
                 detected_broker = detect_broker_format(file_bytes)
                 st.success(f"🎯 Broker rilevato: **{detected_broker.upper()}**")
 
                 df_parsed = parse_broker_csv(file_bytes, broker=detected_broker)
                 if df_parsed is not None and not df_parsed.empty:
-                    st.info(f"📊 Righe valide lette: **{len(df_parsed)}** | Ticker unici: **{df_parsed['ticker'].nunique()}**")
-                    if st.button("📥 Importa ed Elabora con ARGUS", type="secondary", use_container_width=True, key=f"btn_onboarding_import_{portal_slug}"):
+                    st.info(
+                        f"📊 Righe valide lette: **{len(df_parsed)}** | Ticker unici: **{df_parsed['ticker'].nunique()}**"
+                    )
+                    if st.button(
+                        "📥 Importa ed Elabora con ARGUS",
+                        type="secondary",
+                        use_container_width=True,
+                        key=f"btn_onboarding_import_{portal_slug}",
+                    ):
                         st.session_state["positions_raw"] = df_parsed
                         st.session_state["pipeline_done"] = True
                         st.session_state["session_cleared"] = False
@@ -166,9 +198,7 @@ def render_empty_state_screen(
 
 
 def ensure_portfolio_loaded(
-    module_type: str = "risk",
-    custom_title: Optional[str] = None,
-    custom_desc: Optional[str] = None
+    module_type: str = "risk", custom_title: Optional[str] = None, custom_desc: Optional[str] = None
 ) -> Any:
     """
     Centralized Safe-Guard & Resilience Gatekeeper (FASE A & B Standard):
@@ -205,7 +235,14 @@ def ensure_portfolio_loaded(
             wealth_pid = st.session_state.get("wealth_active_portfolio_id")
             try:
                 from core.fetcher import get_engine
-                from core.wealth.wealth_db import init_wealth_db, get_wealth_portfolios, get_wealth_accounts, get_physical_assets, get_pension_plans
+                from core.wealth.wealth_db import (
+                    get_pension_plans,
+                    get_physical_assets,
+                    get_wealth_accounts,
+                    get_wealth_portfolios,
+                    init_wealth_db,
+                )
+
                 offline_mode = bool(st.session_state.get("offline_mode", False))
                 raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
                 engine = get_engine(database=raw_db, offline=offline_mode)
@@ -215,15 +252,27 @@ def ensure_portfolio_loaded(
                 if df_wprofs is not None and not df_wprofs.empty and len(df_wprofs) > 0:
                     has_wealth = True
                 else:
-                    df_acc = get_wealth_accounts(engine, portfolio_id=wealth_pid) if wealth_pid else get_wealth_accounts(engine)
+                    df_acc = (
+                        get_wealth_accounts(engine, portfolio_id=wealth_pid)
+                        if wealth_pid
+                        else get_wealth_accounts(engine)
+                    )
                     if df_acc is not None and not df_acc.empty and len(df_acc) > 0:
                         has_wealth = True
                     if not has_wealth:
-                        df_phys = get_physical_assets(engine, portfolio_id=wealth_pid) if wealth_pid else get_physical_assets(engine)
+                        df_phys = (
+                            get_physical_assets(engine, portfolio_id=wealth_pid)
+                            if wealth_pid
+                            else get_physical_assets(engine)
+                        )
                         if df_phys is not None and not df_phys.empty and len(df_phys) > 0:
                             has_wealth = True
                     if not has_wealth:
-                        df_pens = get_pension_plans(engine, portfolio_id=wealth_pid) if wealth_pid else get_pension_plans(engine)
+                        df_pens = (
+                            get_pension_plans(engine, portfolio_id=wealth_pid)
+                            if wealth_pid
+                            else get_pension_plans(engine)
+                        )
                         if df_pens is not None and not df_pens.empty and len(df_pens) > 0:
                             has_wealth = True
             except Exception:
@@ -236,11 +285,7 @@ def ensure_portfolio_loaded(
             return None, False
 
         _reconcile_bundle_betas(results)
-        has_real = (
-            results is not None
-            and isinstance(results, dict)
-            and not bool(results.get("is_sandbox", False))
-        )
+        has_real = results is not None and isinstance(results, dict) and not bool(results.get("is_sandbox", False))
         return results, has_real
 
     elif str(module_type).lower() == "wealth":
@@ -274,4 +319,3 @@ def empty_state_guard(portal: str = "risk") -> bool:
     if isinstance(res, tuple):
         return res[0] is not None
     return bool(res)
-

@@ -1,14 +1,16 @@
 """
 Unit test per components/splash.py - Redesign Splash Screen & Bootloader Istituzionale
 """
-import streamlit as st
 from unittest.mock import MagicMock, patch
+
+import streamlit as st
+
 from components.splash import (
-    render_splash_screen,
-    get_argus_vector_logo_svg,
-    render_splash_html,
     auto_collapse_sidebar,
     auto_expand_sidebar,
+    get_argus_vector_logo_svg,
+    render_splash_html,
+    render_splash_screen,
 )
 
 

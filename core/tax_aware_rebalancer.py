@@ -5,6 +5,7 @@
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 
@@ -32,7 +33,7 @@ class TaxAwarePortfolioRebalancer:
         target_weights: Dict[str, float],
         total_portfolio_value: float,
         existing_minusvalenze: float = 0.0,
-        config: Optional[FrictionConfig] = None
+        config: Optional[FrictionConfig] = None,
     ) -> Dict[str, Any]:
         if config is None:
             config = FrictionConfig()
@@ -76,6 +77,7 @@ class TaxAwarePortfolioRebalancer:
 
             est_tax = 0.0
             from core.tax_engine import is_etf
+
             is_etf_item = is_etf(asset_class_map.get(ticker, ""), ticker)
 
             if action == "SELL":
@@ -83,7 +85,14 @@ class TaxAwarePortfolioRebalancer:
                 gain = trade_amt * 0.15
                 if gain > 0:
                     tot_realized_gain += gain
-                    tax_rate = config.gov_bond_tax_rate if any(b in ticker for b in ["BTP", "BOT", "CCT", "CTZ", "BUND", "OAT", "BONOS", "UST", "GOV", "TREASURY"]) else config.capital_gain_tax_rate
+                    tax_rate = (
+                        config.gov_bond_tax_rate
+                        if any(
+                            b in ticker
+                            for b in ["BTP", "BOT", "CCT", "CTZ", "BUND", "OAT", "BONOS", "UST", "GOV", "TREASURY"]
+                        )
+                        else config.capital_gain_tax_rate
+                    )
                     if is_etf_item:
                         # Normativa Italiana TUIR Art. 44: Proventi ETF = Redditi di Capitale (NON compensabili con minusvalenze)
                         taxable = gain
@@ -97,16 +106,18 @@ class TaxAwarePortfolioRebalancer:
                             taxable = gain
                     est_tax = taxable * tax_rate
 
-            trades.append({
-                "Ticker": ticker,
-                "Azione": "🟢 ACQUISTA" if action == "BUY" else "🔴 VENDI",
-                "Valore Attuale (€)": round(cur_v, 2),
-                "Valore Target (€)": round(tgt_v, 2),
-                "Controvalore Ordine (€)": round(trade_amt, 2),
-                "Commissioni Stimate (€)": round(comm, 2),
-                "Impatto Fiscale (€)": round(est_tax, 2),
-                "Costo Totale Frizione (€)": round(comm + spread + est_tax, 2)
-            })
+            trades.append(
+                {
+                    "Ticker": ticker,
+                    "Azione": "🟢 ACQUISTA" if action == "BUY" else "🔴 VENDI",
+                    "Valore Attuale (€)": round(cur_v, 2),
+                    "Valore Target (€)": round(tgt_v, 2),
+                    "Controvalore Ordine (€)": round(trade_amt, 2),
+                    "Commissioni Stimate (€)": round(comm, 2),
+                    "Impatto Fiscale (€)": round(est_tax, 2),
+                    "Costo Totale Frizione (€)": round(comm + spread + est_tax, 2),
+                }
+            )
 
         df_trades = pd.DataFrame(trades)
         total_estimated_tax = float(sum(t["Impatto Fiscale (€)"] for t in trades))
@@ -120,7 +131,7 @@ class TaxAwarePortfolioRebalancer:
             "total_spread_cost_eur": round(tot_spread_cost, 2),
             "estimated_tax_eur": round(total_estimated_tax, 2),
             "total_friction_drag_eur": round(net_friction_total, 2),
-            "remaining_minusvalenze_eur": round(usable_minus, 2)
+            "remaining_minusvalenze_eur": round(usable_minus, 2),
         }
 
     @staticmethod
@@ -129,7 +140,7 @@ class TaxAwarePortfolioRebalancer:
         target_weights: Dict[str, float],
         total_portfolio_value: float,
         monthly_inflow_eur: float = 1000.0,
-        horizon_months: int = 12
+        horizon_months: int = 12,
     ) -> Dict[str, Any]:
         """
         Simula il ribilanciamento a zero tasse e zero vendite tramite l'allocazione selettiva
@@ -165,19 +176,25 @@ class TaxAwarePortfolioRebalancer:
             cur_w = cur_weights.get(t, 0.0)
             tgt_w = target_weights.get(t, 0.0)
             alloc_m = monthly_allocations.get(t, 0.0)
-            cashflow_plan.append({
-                "Asset / Ticker": t,
-                "Peso Attuale (%)": f"{cur_w*100:.1f}%",
-                "Peso Target (%)": f"{tgt_w*100:.1f}%",
-                "Status": "📉 Sottopesato" if (tgt_w - cur_w) > 0.02 else ("📈 Sovrapesato" if (cur_w - tgt_w) > 0.02 else "⚖️ Allineato"),
-                "Flusso Mensile Consigliato (€)": round(alloc_m, 2),
-                "Quota PAC (%)": f"{(alloc_m / max(1.0, monthly_inflow_eur) * 100):.1f}%"
-            })
+            cashflow_plan.append(
+                {
+                    "Asset / Ticker": t,
+                    "Peso Attuale (%)": f"{cur_w * 100:.1f}%",
+                    "Peso Target (%)": f"{tgt_w * 100:.1f}%",
+                    "Status": "📉 Sottopesato"
+                    if (tgt_w - cur_w) > 0.02
+                    else ("📈 Sovrapesato" if (cur_w - tgt_w) > 0.02 else "⚖️ Allineato"),
+                    "Flusso Mensile Consigliato (€)": round(alloc_m, 2),
+                    "Quota PAC (%)": f"{(alloc_m / max(1.0, monthly_inflow_eur) * 100):.1f}%",
+                }
+            )
 
         return {
             "cashflow_plan_df": pd.DataFrame(cashflow_plan),
             "monthly_inflow_eur": monthly_inflow_eur,
             "tax_saved_eur": round(total_portfolio_value * 0.15 * 0.26 * 0.20, 2),  # Stima tasse evitate
-            "months_to_full_alignment": round(max(3, min(24, int((tot_deficit * total_portfolio_value) / max(1.0, monthly_inflow_eur))))),
-            "turnover_savings_eur": round(total_portfolio_value * 0.10 * 0.0025, 2)
+            "months_to_full_alignment": round(
+                max(3, min(24, int((tot_deficit * total_portfolio_value) / max(1.0, monthly_inflow_eur))))
+            ),
+            "turnover_savings_eur": round(total_portfolio_value * 0.10 * 0.0025, 2),
         }

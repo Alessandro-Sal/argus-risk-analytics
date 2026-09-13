@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, Optional, Union
 @dataclass(frozen=True)
 class LocaleConvention:
     """Convenzioni tipografiche e contabili per una specifica regione/lingua."""
+
     code: str
     decimal_sep: str
     thousand_sep: str
@@ -86,6 +87,7 @@ def _resolve_convention(locale: Optional[str] = None) -> LocaleConvention:
     if not locale:
         try:
             import streamlit as st
+
             if hasattr(st, "session_state") and "locale" in st.session_state:
                 locale = str(st.session_state["locale"]).strip().lower()
         except Exception:
@@ -111,6 +113,7 @@ def _resolve_accounting_notation(accounting: Optional[bool] = None) -> bool:
         return bool(accounting)
     try:
         import streamlit as st
+
         if hasattr(st, "session_state"):
             val = st.session_state.get("accounting_notation", "standard")
             return val in ["accounting", "parentheses", True]
@@ -119,12 +122,7 @@ def _resolve_accounting_notation(accounting: Optional[bool] = None) -> bool:
     return False
 
 
-def _format_raw_number(
-    val: float,
-    decimals: int,
-    thousand_sep: str,
-    decimal_sep: str
-) -> str:
+def _format_raw_number(val: float, decimals: int, thousand_sep: str, decimal_sep: str) -> str:
     """Formatta un numero float assoluto con separatori specificati."""
     fmt_str = f"{{:,.{decimals}f}}"
     formatted = fmt_str.format(abs(val))
@@ -141,11 +139,9 @@ def _format_raw_number(
 
 # ── Public Formatting APIs ───────────────────────────────────────────
 
+
 def format_number(
-    value: Union[int, float, None],
-    locale: Optional[str] = None,
-    accounting: Optional[bool] = None,
-    decimals: int = 2
+    value: Union[int, float, None], locale: Optional[str] = None, accounting: Optional[bool] = None, decimals: int = 2
 ) -> str:
     """
     Formatta un valore numerico generico rispettando i separatori del locale
@@ -169,7 +165,7 @@ def format_currency(
     locale: Optional[str] = None,
     accounting: Optional[bool] = None,
     compact: bool = False,
-    decimals: int = 2
+    decimals: int = 2,
 ) -> str:
     """
     Formatta un importo monetario con simbolo valuta (prefisso/suffisso),
@@ -224,7 +220,7 @@ def format_percent(
     accounting: Optional[bool] = None,
     decimals: int = 2,
     signed: bool = True,
-    is_decimal_fraction: bool = False
+    is_decimal_fraction: bool = False,
 ) -> str:
     """
     Formatta una percentuale (es. 0.0525 con is_decimal_fraction=True o 5.25 standard).
@@ -249,11 +245,7 @@ def format_percent(
     return f"{num_str}%"
 
 
-def format_date(
-    dt: Union[datetime, date, str, None],
-    locale: Optional[str] = None,
-    fmt: str = "short"
-) -> str:
+def format_date(dt: Union[datetime, date, str, None], locale: Optional[str] = None, fmt: str = "short") -> str:
     """Formatta una data secondo la convenzione locale attiva."""
     if dt is None or dt == "":
         return "—"
@@ -288,7 +280,7 @@ def get_dataframe_styler_formats(
     columns_config: Dict[str, str],
     locale: Optional[str] = None,
     accounting: Optional[bool] = None,
-    base_currency: Optional[str] = None
+    base_currency: Optional[str] = None,
 ) -> Dict[str, Callable[[Any], str]]:
     """
     Genera un dizionario di callable di formattazione compatibile con df.style.format()
@@ -298,7 +290,9 @@ def get_dataframe_styler_formats(
     styler_map: Dict[str, Callable[[Any], str]] = {}
     for col, ctype in columns_config.items():
         if ctype == "currency":
-            styler_map[col] = lambda x, c=base_currency, l=locale, a=accounting: format_currency(x, currency=c, locale=l, accounting=a)
+            styler_map[col] = lambda x, c=base_currency, l=locale, a=accounting: format_currency(
+                x, currency=c, locale=l, accounting=a
+            )
         elif ctype == "percent":
             styler_map[col] = lambda x, l=locale, a=accounting: format_percent(x, locale=l, accounting=a, signed=False)
         elif ctype == "signed_percent":

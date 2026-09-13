@@ -3,20 +3,21 @@
 # Unit tests for ARGUS Wealth Temporal Analytics & Modals
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.fetcher import get_engine
+from core.terminal_engine import get_terminal_engine
 from core.wealth.wealth_temporal_engine import (
-    compute_wealth_temporal_progression,
+    compute_wealth_benchmark_comparison,
+    compute_wealth_growth_attribution,
     compute_wealth_monthly_matrix,
     compute_wealth_rolling_metrics,
-    compute_wealth_underwater_drawdowns,
     compute_wealth_seasonality_patterns,
-    compute_wealth_growth_attribution,
-    compute_wealth_benchmark_comparison
+    compute_wealth_temporal_progression,
+    compute_wealth_underwater_drawdowns,
 )
-from core.terminal_engine import get_terminal_engine
 
 
 def test_wealth_temporal_progression():

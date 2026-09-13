@@ -3,47 +3,47 @@
 # ARGUS Wealth — Immobili, Piani di Ammortamento Mutuo & Buy vs Rent
 # ============================================================
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime
 import importlib
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
 import core.ui_utils
+import core.wealth
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
-import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
+from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
+    apply_plotly_theme,
     fmt_eur,
     fmt_pct,
+    inject_custom_css,
+    metric_card,
+    render_page_header,
+    render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
-    render_page_header,
-    apply_plotly_theme,
-    render_table_with_export,
-)
-
-from core.sidebar import render_sidebar
-from core.fetcher import get_engine
-from core.wealth.wealth_engine import (
-    compute_mortgage_amortization,
-    compute_real_estate_roi,
-    compute_buy_vs_rent_comparison,
-    compute_consolidated_net_worth,
-    compute_real_estate_net_equity_and_ltv
+    section,
 )
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
-
+from core.wealth.wealth_engine import (
+    compute_buy_vs_rent_comparison,
+    compute_consolidated_net_worth,
+    compute_mortgage_amortization,
+    compute_real_estate_net_equity_and_ltv,
+    compute_real_estate_roi,
+)
 
 st.set_page_config(page_title="Immobili & Mutui | ARGUS Wealth", page_icon="🏡", layout="wide")
 inject_custom_css()

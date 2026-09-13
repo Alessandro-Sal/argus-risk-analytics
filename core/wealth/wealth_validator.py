@@ -5,20 +5,30 @@
 # ============================================================
 
 import re
-import pandas as pd
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import pandas as pd
 
 # Mappatura fuzzy degli alias di colonna per il Cash Flow
 CASHFLOW_COLUMN_ALIASES = {
     "Data": ["data", "date", "data operazione", "data valuta", "transaction date", "booking date", "tx_date"],
     "Importo": ["importo", "amount", "importo (eur)", "totale", "valore", "entrate/uscite", "importo eur"],
-    "Descrizione": ["descrizione", "description", "causale", "dettagli", "merchant", "beneficiario", "ordinante", "descrizione operazione"],
+    "Descrizione": [
+        "descrizione",
+        "description",
+        "causale",
+        "dettagli",
+        "merchant",
+        "beneficiario",
+        "ordinante",
+        "descrizione operazione",
+    ],
     "Direzione": ["direzione", "direction", "tipo", "tipo operazione", "flow_type", "segno"],
     "Categoria": ["categoria", "category", "categoria spesa", "category_name", "macro_categoria"],
     "Conto": ["conto", "account", "nome conto", "account_name", "banca", "istituto"],
     "Metodo_Pagamento": ["metodo", "metodo_pagamento", "payment_method", "tipo pagamento", "canale"],
-    "Note": ["note", "notes", "dettagli extra", "commenti", "tag", "tags"]
+    "Note": ["note", "notes", "dettagli extra", "commenti", "tag", "tags"],
 }
 
 PHYSICAL_ASSETS_ALIASES = {
@@ -28,10 +38,17 @@ PHYSICAL_ASSETS_ALIASES = {
     "Modello_Specifiche": ["modello", "model", "specifiche", "specs", "modello_specifiche"],
     "Referenza_Catasto": ["referenza", "reference", "ref", "catasto", "foglio_mappale", "reference_number"],
     "Prezzo_Acquisto": ["prezzo_acquisto", "purchase_price", "costo", "prezzo d'acquisto", "costo acquisto", "prezzo"],
-    "Valore_Attuale": ["valore_attuale", "current_value", "valutazione", "current_market_value", "valore stimato", "prezzo mercato"],
+    "Valore_Attuale": [
+        "valore_attuale",
+        "current_value",
+        "valutazione",
+        "current_market_value",
+        "valore stimato",
+        "prezzo mercato",
+    ],
     "Data_Acquisto": ["data_acquisto", "acquisition_date", "data", "date"],
     "Condizione_Set": ["condizione", "condition", "set", "condizione_set", "grade"],
-    "Note": ["note", "notes", "commenti"]
+    "Note": ["note", "notes", "commenti"],
 }
 
 ACCOUNTS_ALIASES = {
@@ -41,7 +58,7 @@ ACCOUNTS_ALIASES = {
     "Saldo": ["saldo", "balance", "saldo attuale", "importo", "valore"],
     "Valuta": ["valuta", "currency", "curr"],
     "IBAN": ["iban", "conto_iban", "coordinate"],
-    "Note": ["note", "notes"]
+    "Note": ["note", "notes"],
 }
 
 PENSION_ALIASES = {
@@ -52,7 +69,7 @@ PENSION_ALIASES = {
     "Versamento_Mensile": ["versamento_mensile", "monthly_employee_contrib", "contributo", "versamento lavoratore"],
     "Contributo_Datore": ["contributo_datore", "monthly_employer_contrib", "quota datore"],
     "Linea_Investimento": ["linea_investimento", "linea", "comparto", "investment_line"],
-    "Note": ["note", "notes"]
+    "Note": ["note", "notes"],
 }
 
 
@@ -60,7 +77,7 @@ def _match_column_aliases(df: pd.DataFrame, alias_dict: Dict[str, List[str]]) ->
     """Mappa le colonne del DataFrame ai nomi canonici dello schema standard."""
     col_map = {}
     df_cols_lower = {str(c).strip().lower(): c for c in df.columns}
-    
+
     for canonical, aliases in alias_dict.items():
         # Match esatto prima
         if canonical.lower() in df_cols_lower:
@@ -80,7 +97,7 @@ def _clean_amount(val: Any) -> Optional[float]:
         return None
     if isinstance(val, (int, float)):
         return float(val)
-    
+
     s = str(val).strip().replace("€", "").replace("$", "").replace("£", "").replace(" ", "")
     # Se contiene sia punto che virgola (es. 1.250,50 o 1,250.50)
     if "." in s and "," in s:
@@ -90,7 +107,7 @@ def _clean_amount(val: Any) -> Optional[float]:
             s = s.replace(",", "")
     elif "," in s:
         s = s.replace(",", ".")
-    
+
     try:
         return float(s)
     except ValueError:
@@ -116,16 +133,11 @@ def _clean_date(val: Any) -> Optional[date]:
         return None
 
 
-
 import hashlib
 
+
 def compute_tx_hash(
-    account_ref: Any,
-    tx_date: Any,
-    amount: float,
-    direction: str,
-    merchant: str,
-    external_id: str = ""
+    account_ref: Any, tx_date: Any, amount: float, direction: str, merchant: str, external_id: str = ""
 ) -> str:
     """
     Calcola l'hash SHA-256 canonico e deterministico della transazione per garantire
@@ -137,7 +149,7 @@ def compute_tx_hash(
     can_dir = str(direction or "").strip().lower()
     can_merch = str(merchant or "").strip().lower()
     can_ext = str(external_id or "").strip().lower()
-    
+
     canonical = f"{can_acc}|{can_date}|{can_amt}|{can_dir}|{can_merch}|{can_ext}"
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
@@ -152,7 +164,7 @@ def validate_cashflow_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
         return False, ["Il file o DataFrame è completamente vuoto."], pd.DataFrame()
 
     matched = _match_column_aliases(df_raw, CASHFLOW_COLUMN_ALIASES)
-    
+
     # Campi obbligatori
     if "Data" not in matched:
         errors.append("Colonna obbligatoria 'Data' non trovata.")
@@ -184,7 +196,11 @@ def validate_cashflow_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
         # Direzione: se esplicita usa quella, altrimenti deduce dal segno
         if "Direzione" in matched and pd.notna(row[matched["Direzione"]]):
             dir_raw = str(row[matched["Direzione"]]).strip().lower()
-            direction = "inflow" if ("in" in dir_raw or "entr" in dir_raw or "accred" in dir_raw or "+" in dir_raw) else "outflow"
+            direction = (
+                "inflow"
+                if ("in" in dir_raw or "entr" in dir_raw or "accred" in dir_raw or "+" in dir_raw)
+                else "outflow"
+            )
         else:
             direction = "inflow" if p_amt > 0 else "outflow"
 
@@ -192,22 +208,30 @@ def validate_cashflow_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
         if abs_amount == 0.0:
             continue
 
-        cat_val = str(row[matched["Categoria"]]) if "Categoria" in matched and pd.notna(row[matched["Categoria"]]) else None
+        cat_val = (
+            str(row[matched["Categoria"]]) if "Categoria" in matched and pd.notna(row[matched["Categoria"]]) else None
+        )
         acc_val = str(row[matched["Conto"]]) if "Conto" in matched and pd.notna(row[matched["Conto"]]) else None
-        pay_val = str(row[matched["Metodo_Pagamento"]]) if "Metodo_Pagamento" in matched and pd.notna(row[matched["Metodo_Pagamento"]]) else "Carta / Bonifico"
+        pay_val = (
+            str(row[matched["Metodo_Pagamento"]])
+            if "Metodo_Pagamento" in matched and pd.notna(row[matched["Metodo_Pagamento"]])
+            else "Carta / Bonifico"
+        )
         note_val = str(row[matched["Note"]]) if "Note" in matched and pd.notna(row[matched["Note"]]) else raw_desc
 
-        records.append({
-            "tx_date": p_date,
-            "amount": abs_amount,
-            "direction": direction,
-            "merchant": raw_desc[:120],
-            "category_name": cat_val,
-            "account_name": acc_val,
-            "payment_method": pay_val,
-            "notes": note_val,
-            "tx_hash": compute_tx_hash(acc_val, p_date, abs_amount, direction, raw_desc[:120])
-        })
+        records.append(
+            {
+                "tx_date": p_date,
+                "amount": abs_amount,
+                "direction": direction,
+                "merchant": raw_desc[:120],
+                "category_name": cat_val,
+                "account_name": acc_val,
+                "payment_method": pay_val,
+                "notes": note_val,
+                "tx_hash": compute_tx_hash(acc_val, p_date, abs_amount, direction, raw_desc[:120]),
+            }
+        )
 
     if not records:
         return False, ["Nessuna transazione valida estratta dopo la pulizia."] + errors, pd.DataFrame()
@@ -251,26 +275,52 @@ def validate_physical_assets_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], 
             errors.append(f"Riga {r_num}: Valore attuale non valido per '{name}'.")
             continue
 
-        cat = str(row[matched["Categoria"]]).strip().lower() if "Categoria" in matched and pd.notna(row[matched["Categoria"]]) else "luxury_watches"
-        brand = str(row[matched["Brand_Location"]]) if "Brand_Location" in matched and pd.notna(row[matched["Brand_Location"]]) else None
-        specs = str(row[matched["Modello_Specifiche"]]) if "Modello_Specifiche" in matched and pd.notna(row[matched["Modello_Specifiche"]]) else None
-        ref = str(row[matched["Referenza_Catasto"]]) if "Referenza_Catasto" in matched and pd.notna(row[matched["Referenza_Catasto"]]) else None
-        cond = str(row[matched["Condizione_Set"]]) if "Condizione_Set" in matched and pd.notna(row[matched["Condizione_Set"]]) else "Full Set"
-        acq_d = _clean_date(row[matched["Data_Acquisto"]]) if "Data_Acquisto" in matched and pd.notna(row[matched["Data_Acquisto"]]) else None
+        cat = (
+            str(row[matched["Categoria"]]).strip().lower()
+            if "Categoria" in matched and pd.notna(row[matched["Categoria"]])
+            else "luxury_watches"
+        )
+        brand = (
+            str(row[matched["Brand_Location"]])
+            if "Brand_Location" in matched and pd.notna(row[matched["Brand_Location"]])
+            else None
+        )
+        specs = (
+            str(row[matched["Modello_Specifiche"]])
+            if "Modello_Specifiche" in matched and pd.notna(row[matched["Modello_Specifiche"]])
+            else None
+        )
+        ref = (
+            str(row[matched["Referenza_Catasto"]])
+            if "Referenza_Catasto" in matched and pd.notna(row[matched["Referenza_Catasto"]])
+            else None
+        )
+        cond = (
+            str(row[matched["Condizione_Set"]])
+            if "Condizione_Set" in matched and pd.notna(row[matched["Condizione_Set"]])
+            else "Full Set"
+        )
+        acq_d = (
+            _clean_date(row[matched["Data_Acquisto"]])
+            if "Data_Acquisto" in matched and pd.notna(row[matched["Data_Acquisto"]])
+            else None
+        )
         notes = str(row[matched["Note"]]) if "Note" in matched and pd.notna(row[matched["Note"]]) else None
 
-        records.append({
-            "name": name,
-            "asset_category": cat,
-            "brand_or_location": brand,
-            "model_or_specs": specs,
-            "reference_number": ref,
-            "condition_grade": cond,
-            "purchase_price": cost,
-            "current_market_value": val,
-            "acquisition_date": acq_d,
-            "notes": notes
-        })
+        records.append(
+            {
+                "name": name,
+                "asset_category": cat,
+                "brand_or_location": brand,
+                "model_or_specs": specs,
+                "reference_number": ref,
+                "condition_grade": cond,
+                "purchase_price": cost,
+                "current_market_value": val,
+                "acquisition_date": acq_d,
+                "notes": notes,
+            }
+        )
 
     df_clean = pd.DataFrame(records)
     return (len(errors) == 0), errors, df_clean
@@ -304,21 +354,35 @@ def validate_accounts_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.Data
             errors.append(f"Riga {r_num}: Saldo non valido per conto '{name}'.")
             continue
 
-        inst = str(row[matched["Istituto"]]).strip() if "Istituto" in matched and pd.notna(row[matched["Istituto"]]) else "Banca"
-        acc_type = str(row[matched["Tipo_Conto"]]).strip().lower() if "Tipo_Conto" in matched and pd.notna(row[matched["Tipo_Conto"]]) else "checking"
-        curr = str(row[matched["Valuta"]]).strip().upper() if "Valuta" in matched and pd.notna(row[matched["Valuta"]]) else "EUR"
+        inst = (
+            str(row[matched["Istituto"]]).strip()
+            if "Istituto" in matched and pd.notna(row[matched["Istituto"]])
+            else "Banca"
+        )
+        acc_type = (
+            str(row[matched["Tipo_Conto"]]).strip().lower()
+            if "Tipo_Conto" in matched and pd.notna(row[matched["Tipo_Conto"]])
+            else "checking"
+        )
+        curr = (
+            str(row[matched["Valuta"]]).strip().upper()
+            if "Valuta" in matched and pd.notna(row[matched["Valuta"]])
+            else "EUR"
+        )
         iban = str(row[matched["IBAN"]]).strip() if "IBAN" in matched and pd.notna(row[matched["IBAN"]]) else None
         notes = str(row[matched["Note"]]).strip() if "Note" in matched and pd.notna(row[matched["Note"]]) else None
 
-        records.append({
-            "name": name,
-            "institution": inst,
-            "account_type": acc_type,
-            "currency": curr,
-            "balance": bal,
-            "iban": iban,
-            "notes": notes
-        })
+        records.append(
+            {
+                "name": name,
+                "institution": inst,
+                "account_type": acc_type,
+                "currency": curr,
+                "balance": bal,
+                "iban": iban,
+                "notes": notes,
+            }
+        )
 
     df_clean = pd.DataFrame(records)
     return (len(errors) == 0), errors, df_clean
@@ -352,25 +416,46 @@ def validate_pension_df(df_raw: pd.DataFrame) -> Tuple[bool, List[str], pd.DataF
             errors.append(f"Riga {r_num}: Valore accumulato non valido per '{name}'.")
             continue
 
-        prov = str(row[matched["Provider"]]).strip() if "Provider" in matched and pd.notna(row[matched["Provider"]]) else "Fondo Pensione"
-        p_type = str(row[matched["Tipo_Piano"]]).strip().lower() if "Tipo_Piano" in matched and pd.notna(row[matched["Tipo_Piano"]]) else "fondo_pensione_aperto"
-        c_emp = _clean_amount(row[matched["Versamento_Mensile"]]) if "Versamento_Mensile" in matched and pd.notna(row[matched["Versamento_Mensile"]]) else 0.0
-        c_empr = _clean_amount(row[matched["Contributo_Datore"]]) if "Contributo_Datore" in matched and pd.notna(row[matched["Contributo_Datore"]]) else 0.0
-        line = str(row[matched["Linea_Investimento"]]).strip() if "Linea_Investimento" in matched and pd.notna(row[matched["Linea_Investimento"]]) else "Azionario / Crescita"
+        prov = (
+            str(row[matched["Provider"]]).strip()
+            if "Provider" in matched and pd.notna(row[matched["Provider"]])
+            else "Fondo Pensione"
+        )
+        p_type = (
+            str(row[matched["Tipo_Piano"]]).strip().lower()
+            if "Tipo_Piano" in matched and pd.notna(row[matched["Tipo_Piano"]])
+            else "fondo_pensione_aperto"
+        )
+        c_emp = (
+            _clean_amount(row[matched["Versamento_Mensile"]])
+            if "Versamento_Mensile" in matched and pd.notna(row[matched["Versamento_Mensile"]])
+            else 0.0
+        )
+        c_empr = (
+            _clean_amount(row[matched["Contributo_Datore"]])
+            if "Contributo_Datore" in matched and pd.notna(row[matched["Contributo_Datore"]])
+            else 0.0
+        )
+        line = (
+            str(row[matched["Linea_Investimento"]]).strip()
+            if "Linea_Investimento" in matched and pd.notna(row[matched["Linea_Investimento"]])
+            else "Azionario / Crescita"
+        )
         notes = str(row[matched["Note"]]).strip() if "Note" in matched and pd.notna(row[matched["Note"]]) else None
 
-        records.append({
-            "plan_name": name,
-            "provider": prov,
-            "plan_type": p_type,
-            "accumulated_value": pot,
-            "monthly_employee_contrib": c_emp or 0.0,
-            "monthly_employer_contrib": c_empr or 0.0,
-            "tax_deductible_annual": (c_emp or 0.0) * 12.0,
-            "investment_line": line,
-            "notes": notes
-        })
+        records.append(
+            {
+                "plan_name": name,
+                "provider": prov,
+                "plan_type": p_type,
+                "accumulated_value": pot,
+                "monthly_employee_contrib": c_emp or 0.0,
+                "monthly_employer_contrib": c_empr or 0.0,
+                "tax_deductible_annual": (c_emp or 0.0) * 12.0,
+                "investment_line": line,
+                "notes": notes,
+            }
+        )
 
     df_clean = pd.DataFrame(records)
     return (len(errors) == 0), errors, df_clean
-

@@ -3,28 +3,27 @@ tests/test_bloomberg_terminal_features.py
 Unit tests for Institutional Bloomberg Terminal Parity enhancements (Phase 1).
 """
 
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
-from core.yield_curve import (
-    _nelson_siegel_svensson_basis,
-    evaluate_nelson_siegel_svensson_curve,
-    fit_nelson_siegel_svensson_curve,
-    compute_key_rate_durations,
-    get_institutional_yield_curve,
-)
 from core.attribution import (
     compute_brinson_attribution,
     compute_carino_multi_period_attribution,
     compute_karnosky_singer_currency_attribution,
 )
 from core.risk_engine import (
-    compute_marginal_and_component_var,
     compute_liquidity_adjusted_var,
+    compute_marginal_and_component_var,
 )
 from core.ui_utils import parse_terminal_command
-
+from core.yield_curve import (
+    _nelson_siegel_svensson_basis,
+    compute_key_rate_durations,
+    evaluate_nelson_siegel_svensson_curve,
+    fit_nelson_siegel_svensson_curve,
+    get_institutional_yield_curve,
+)
 
 # ── 1. TEST NELSON-SIEGEL-SVENSSON (NSS) & KEY RATE DURATIONS ───────
 

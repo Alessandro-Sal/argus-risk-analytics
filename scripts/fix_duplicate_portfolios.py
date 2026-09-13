@@ -1,5 +1,6 @@
 import os
 import sys
+
 from dotenv import load_dotenv
 from sqlalchemy import text as sqlt
 
@@ -13,6 +14,7 @@ if sys.platform.startswith('win'):
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv()
 from core.fetcher import get_engine
+
 
 def run_portfolio_deduplication(db_user=None, db_pass=None, db_host=None, db_port=None, db_name=None):
     db_user = db_user or os.getenv("DB_USER", "root")

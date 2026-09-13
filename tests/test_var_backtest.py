@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def get_basel_zone(exc_count, expected):
     if exc_count <= expected:

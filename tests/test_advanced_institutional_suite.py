@@ -3,12 +3,13 @@
 # ARGUS — Unit tests for Neural Advisor, Asset Protection, Glide Path & Tax Rebalancer
 # ==============================================================================
 
-import pytest
 import pandas as pd
-from core.wealth.neural_advisor_engine import NeuralWealthAdvisor
+import pytest
+
+from core.tax_aware_rebalancer import FrictionConfig, TaxAwarePortfolioRebalancer
 from core.wealth.asset_protection_engine import AssetProtectionEngine
 from core.wealth.glidepath_engine import DynamicGlidePathEngine, LifeGoal
-from core.tax_aware_rebalancer import TaxAwarePortfolioRebalancer, FrictionConfig
+from core.wealth.neural_advisor_engine import NeuralWealthAdvisor
 
 
 def test_neural_advisor_scenario_evaluation():

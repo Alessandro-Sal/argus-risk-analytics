@@ -11,25 +11,25 @@ Test suite per la validazione delle funzionalità di esportazione dati tabulari:
 ==============================================================================
 """
 
-import io
 import datetime
-import pytest
-import pandas as pd
+import io
+
 import numpy as np
 import openpyxl
+import pandas as pd
+import pytest
 
 from core.ui_export_utils import (
-    prepare_dataframe_for_export,
     generate_export_filename,
-    to_csv_bytes,
-    to_excel_bytes,
     get_cached_csv_bytes,
     get_cached_excel_bytes,
+    prepare_dataframe_for_export,
     render_export_toolbar,
-    render_table_with_export
+    render_table_with_export,
+    to_csv_bytes,
+    to_excel_bytes,
 )
 from core.ui_utils import render_data_table
-
 
 # ==============================================================================
 # 1. TEST PREPARAZIONE E SANITIZZAZIONE DATAFRAME

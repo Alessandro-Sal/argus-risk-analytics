@@ -2,19 +2,34 @@ import streamlit as st
 
 st.set_page_config(page_title="Analisi Rischio | ARGUS", page_icon="🔴", layout="wide")
 
-import pandas as pd
 import numpy as np
-import scipy.stats as stats
-import plotly.graph_objects as go
+import pandas as pd
 import plotly.express as px
-import core.ui_utils
+import plotly.graph_objects as go
+import scipy.stats as stats
+
 import core.risk_engine
-from core.ui_utils import inject_custom_css, fmt_pct, metric_card, glossary_modal, apply_plotly_theme, render_risk_heatmap, render_command_bar, render_segmented_tabs, ensure_portfolio_loaded, render_sandbox_banner, render_garch_fhs_modal, render_export_toolbar
+import core.ui_utils
 from core.regime_switching import compute_market_regime_states
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_portfolio_loaded,
+    fmt_pct,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_export_toolbar,
+    render_garch_fhs_modal,
+    render_risk_heatmap,
+    render_sandbox_banner,
+    render_segmented_tabs,
+)
 
 inject_custom_css()
 
 from core.sidebar import render_sidebar
+
 render_sidebar()
 render_command_bar()
 
@@ -1823,7 +1838,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 </div>
 """, button_label="💡 Guida Euler VaR")
 
-    from core.risk_engine import compute_marginal_and_component_var, compute_liquidity_adjusted_var
+    from core.risk_engine import compute_liquidity_adjusted_var, compute_marginal_and_component_var
     
     col_eul_sel1, col_eul_sel2 = st.columns([1.6, 2.4], vertical_alignment="center")
     with col_eul_sel1:
@@ -2099,7 +2114,7 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
         # Ordinamento dei ticker
         if "Clustering Gerarchico" in sort_mode and len(common_t) >= 3:
             try:
-                from scipy.cluster.hierarchy import linkage, leaves_list
+                from scipy.cluster.hierarchy import leaves_list, linkage
                 from scipy.spatial.distance import squareform
                 # Distanza di correlazione d = sqrt(0.5 * (1 - rho))
                 dist_matrix = np.sqrt(0.5 * np.maximum(0, 1.0 - raw_corr.clip(-1.0, 1.0)))

@@ -27,6 +27,7 @@ DEFAULT_BACKUP_DIR = Path("data/backups")
 
 # ── Modelli di Dati & Strutture di Diagnostica ─────────────
 
+
 class DriftSeverity(str, Enum):
     INFO = "INFO"
     WARNING = "WARNING"
@@ -97,7 +98,14 @@ class MigrationStatus:
 
 class MigrationExecutionError(RuntimeError):
     """Sollevata quando una migrazione fallisce e richiede o ha eseguito il rollback."""
-    def __init__(self, message: str, version: int, rollback_restored: bool = False, original_exception: Optional[Exception] = None):
+
+    def __init__(
+        self,
+        message: str,
+        version: int,
+        rollback_restored: bool = False,
+        original_exception: Optional[Exception] = None,
+    ):
         super().__init__(message)
         self.version = version
         self.rollback_restored = rollback_restored
@@ -106,11 +114,13 @@ class MigrationExecutionError(RuntimeError):
 
 # ── Interfaccia Base per Migrazioni Incrementali ────────────
 
+
 class BaseMigration(ABC):
     """
     Classe base astratta per una migrazione evolutiva dello schema dati.
     Ogni migrazione è atomica, versionata e provvista di routine di verifica post-esecuzione.
     """
+
     version: int
     name: str
     description: str
@@ -135,6 +145,7 @@ class BaseMigration(ABC):
 
 
 # ── Migrazioni Concrete Integrate in ARGUS ─────────────────
+
 
 class V001_BaselineSchema(BaseMigration):
     version = 1
@@ -356,7 +367,9 @@ class V001_BaselineSchema(BaseMigration):
 
     def verify(self, conn: sqlite3.Connection) -> bool:
         cur = conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('schema_migrations', 'portfolios', 'assets', 'transactions');")
+        cur.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('schema_migrations', 'portfolios', 'assets', 'transactions');"
+        )
         found = {row[0] for row in cur.fetchall()}
         return len(found) >= 4
 
@@ -400,7 +413,9 @@ class V002_AnalyticalCompositeIndexes(BaseMigration):
 class V003_AssetFundamentalsAndForensicColumns(BaseMigration):
     version = 3
     name = "asset_fundamentals_and_forensics"
-    description = "Aggiunge colonne fondamentali, metriche di bilancio e indicatori forensi su assets e snapshot_positions."
+    description = (
+        "Aggiunge colonne fondamentali, metriche di bilancio e indicatori forensi su assets e snapshot_positions."
+    )
 
     ASSET_COLUMNS = [
         ("industry", "TEXT"),
@@ -758,6 +773,7 @@ class V004_WealthEcosystemAudit(BaseMigration):
 
 # ── Database Migration Manager Engine ──────────────────────
 
+
 class DatabaseMigrationManager:
     """
     Manager architetturale DBRE per il ciclo di vita dello schema SQLite embedded.
@@ -779,7 +795,9 @@ class DatabaseMigrationManager:
     _instance: Optional["DatabaseMigrationManager"] = None
 
     @classmethod
-    def get_instance(cls, db_path: Optional[Union[str, Path]] = None, backup_dir: Optional[Union[str, Path]] = None) -> "DatabaseMigrationManager":
+    def get_instance(
+        cls, db_path: Optional[Union[str, Path]] = None, backup_dir: Optional[Union[str, Path]] = None
+    ) -> "DatabaseMigrationManager":
         if cls._instance is None:
             cls._instance = cls(db_path=db_path, backup_dir=backup_dir)
         return cls._instance
@@ -838,18 +856,22 @@ class DatabaseMigrationManager:
         """Recupera la cronologia di tutte le migrazioni già applicate."""
         self.ensure_migrations_table(conn)
         cur = conn.cursor()
-        cur.execute("SELECT version, name, checksum, applied_at, execution_time_ms, rollback_available, description FROM schema_migrations ORDER BY version ASC;")
+        cur.execute(
+            "SELECT version, name, checksum, applied_at, execution_time_ms, rollback_available, description FROM schema_migrations ORDER BY version ASC;"
+        )
         records = []
         for row in cur.fetchall():
-            records.append(MigrationRecord(
-                version=row[0],
-                name=row[1],
-                checksum=row[2],
-                applied_at=str(row[3]),
-                execution_time_ms=float(row[4]),
-                rollback_available=bool(row[5]),
-                description=row[6]
-            ))
+            records.append(
+                MigrationRecord(
+                    version=row[0],
+                    name=row[1],
+                    checksum=row[2],
+                    applied_at=str(row[3]),
+                    execution_time_ms=float(row[4]),
+                    rollback_available=bool(row[5]),
+                    description=row[6],
+                )
+            )
         return records
 
     def get_migration_status(self, conn: Optional[sqlite3.Connection] = None) -> MigrationStatus:
@@ -864,7 +886,7 @@ class DatabaseMigrationManager:
                     pending_count=len(self._registry),
                     applied_migrations=[],
                     pending_migrations=[f"v{v}_{m.name}" for v, m in sorted(self._registry.items())],
-                    is_up_to_date=False
+                    is_up_to_date=False,
                 )
             conn = sqlite3.connect(str(self.db_path), timeout=10.0)
             close_conn = True
@@ -873,11 +895,7 @@ class DatabaseMigrationManager:
             curr_v = self.get_user_version(conn)
             applied = self.get_applied_migrations(conn)
             applied_versions = {r.version for r in applied}
-            pending = [
-                f"v{v}_{m.name}"
-                for v, m in sorted(self._registry.items())
-                if v not in applied_versions
-            ]
+            pending = [f"v{v}_{m.name}" for v, m in sorted(self._registry.items()) if v not in applied_versions]
             return MigrationStatus(
                 current_version=curr_v,
                 target_version=self.target_version,
@@ -885,7 +903,7 @@ class DatabaseMigrationManager:
                 pending_count=len(pending),
                 applied_migrations=applied,
                 pending_migrations=pending,
-                is_up_to_date=(curr_v >= self.target_version and len(pending) == 0)
+                is_up_to_date=(curr_v >= self.target_version and len(pending) == 0),
             )
         finally:
             if close_conn and conn:
@@ -909,6 +927,7 @@ class DatabaseMigrationManager:
 
         try:
             from core.backup_engine import perform_hot_backup
+
             compressed = perform_hot_backup(db_path=self.db_path, backup_dir=self.backup_dir, max_retention_days=14)
             logger.info("Pre-flight Hot Backup completato con successo: %s", compressed)
             return compressed
@@ -947,6 +966,7 @@ class DatabaseMigrationManager:
         try:
             if backup_path.name.endswith(".gz"):
                 from core.backup_engine import restore_snapshot
+
                 return restore_snapshot(backup_path, target_db_path=self.db_path)
 
             shutil.copy2(str(backup_path), str(self.db_path))
@@ -980,10 +1000,7 @@ class DatabaseMigrationManager:
             init_conn.close()
 
         applied_versions = {r.version: r for r in applied_records}
-        pending_versions = [
-            v for v in sorted(self._registry.keys())
-            if v <= target_v and v not in applied_versions
-        ]
+        pending_versions = [v for v in sorted(self._registry.keys()) if v <= target_v and v not in applied_versions]
 
         if not pending_versions and curr_v >= target_v:
             logger.debug("Database già aggiornato alla versione v%d. Nessuna migrazione necessaria.", curr_v)
@@ -1031,11 +1048,14 @@ class DatabaseMigrationManager:
                         pass
 
                     # Registrazione audit trail
-                    conn.execute("""
+                    conn.execute(
+                        """
                         INSERT OR REPLACE INTO schema_migrations 
                         (version, name, checksum, execution_time_ms, rollback_available, description)
                         VALUES (?, ?, ?, ?, ?, ?);
-                    """, (v, migration.name, checksum, elapsed_ms, 1 if can_rollback else 0, migration.description))
+                    """,
+                        (v, migration.name, checksum, elapsed_ms, 1 if can_rollback else 0, migration.description),
+                    )
 
                     # Aggiornamento PRAGMA user_version
                     self.set_user_version(conn, v)
@@ -1050,7 +1070,7 @@ class DatabaseMigrationManager:
                         applied_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         execution_time_ms=elapsed_ms,
                         rollback_available=can_rollback,
-                        description=migration.description
+                        description=migration.description,
                     )
                     applied_now.append(rec)
                     logger.info("Migrazione v%d completata con successo in %.2f ms.", v, elapsed_ms)
@@ -1073,7 +1093,7 @@ class DatabaseMigrationManager:
                         f"Fallimento migrazione v{v}_{migration.name}: {ex_migration}",
                         version=v,
                         rollback_restored=restored,
-                        original_exception=ex_migration
+                        original_exception=ex_migration,
                     ) from ex_migration
 
             return applied_now
@@ -1094,15 +1114,16 @@ class DatabaseMigrationManager:
         try:
             curr_v = self.get_user_version(conn)
             if target_version >= curr_v:
-                logger.info("Target version %d >= current version %d. Nessun rollback necessario.", target_version, curr_v)
+                logger.info(
+                    "Target version %d >= current version %d. Nessun rollback necessario.", target_version, curr_v
+                )
                 return []
 
             applied = self.get_applied_migrations(conn)
             applied_map = {r.version: r for r in applied}
 
             to_rollback = [
-                v for v in sorted(self._registry.keys(), reverse=True)
-                if v > target_version and v in applied_map
+                v for v in sorted(self._registry.keys(), reverse=True) if v > target_version and v in applied_map
             ]
 
             rolled_back: List[MigrationRecord] = []
@@ -1148,15 +1169,17 @@ class DatabaseMigrationManager:
                 db_path=str(self.db_path),
                 is_healthy=False,
                 drift_count=1,
-                items=[DriftItem(
-                    table_name="*",
-                    field_or_index="*",
-                    issue_type="MISSING_DATABASE",
-                    severity=DriftSeverity.CRITICAL,
-                    detail=f"Database file {self.db_path} non presente su disco.",
-                    remediation_hint="Eseguire DatabaseMigrationManager.migrate() per generare lo schema iniziale."
-                )],
-                summary="Database file assente."
+                items=[
+                    DriftItem(
+                        table_name="*",
+                        field_or_index="*",
+                        issue_type="MISSING_DATABASE",
+                        severity=DriftSeverity.CRITICAL,
+                        detail=f"Database file {self.db_path} non presente su disco.",
+                        remediation_hint="Eseguire DatabaseMigrationManager.migrate() per generare lo schema iniziale.",
+                    )
+                ],
+                summary="Database file assente.",
             )
 
         items: List[DriftItem] = []
@@ -1169,16 +1192,19 @@ class DatabaseMigrationManager:
             # 1. Ispezione modelli SQLAlchemy (core/models.py)
             try:
                 from core.models import Base
+
                 for table_name, sa_table in Base.metadata.tables.items():
                     if table_name not in physical_tables:
-                        items.append(DriftItem(
-                            table_name=table_name,
-                            field_or_index="TABLE",
-                            issue_type="MISSING_TABLE",
-                            severity=DriftSeverity.CRITICAL,
-                            detail=f"Tabella '{table_name}' definita in core/models.py assente nel DB fisico.",
-                            remediation_hint="Applicare le migrazioni o Base.metadata.create_all()"
-                        ))
+                        items.append(
+                            DriftItem(
+                                table_name=table_name,
+                                field_or_index="TABLE",
+                                issue_type="MISSING_TABLE",
+                                severity=DriftSeverity.CRITICAL,
+                                detail=f"Tabella '{table_name}' definita in core/models.py assente nel DB fisico.",
+                                remediation_hint="Applicare le migrazioni o Base.metadata.create_all()",
+                            )
+                        )
                         continue
 
                     # Controllo colonne
@@ -1187,72 +1213,86 @@ class DatabaseMigrationManager:
 
                     for col in sa_table.columns:
                         if col.name not in phys_cols:
-                            items.append(DriftItem(
-                                table_name=table_name,
-                                field_or_index=col.name,
-                                issue_type="MISSING_COLUMN",
-                                severity=DriftSeverity.WARNING,
-                                detail=f"Colonna '{col.name}' presente nel modello ORM ma assente nella tabella '{table_name}'.",
-                                remediation_hint=f"Eseguire migrazione per aggiungere la colonna con ALTER TABLE {table_name} ADD COLUMN {col.name}"
-                            ))
+                            items.append(
+                                DriftItem(
+                                    table_name=table_name,
+                                    field_or_index=col.name,
+                                    issue_type="MISSING_COLUMN",
+                                    severity=DriftSeverity.WARNING,
+                                    detail=f"Colonna '{col.name}' presente nel modello ORM ma assente nella tabella '{table_name}'.",
+                                    remediation_hint=f"Eseguire migrazione per aggiungere la colonna con ALTER TABLE {table_name} ADD COLUMN {col.name}",
+                                )
+                            )
 
             except ImportError:
                 logger.debug("core.models.Base non disponibile per drift check.")
 
             # 2. Ispezione tabelle Wealth Management
             expected_wealth_tables = [
-                "wealth_accounts", "wealth_categories", "wealth_cashflow",
-                "wealth_physical_assets", "wealth_pension_plans", "wealth_networth_snapshots"
+                "wealth_accounts",
+                "wealth_categories",
+                "wealth_cashflow",
+                "wealth_physical_assets",
+                "wealth_pension_plans",
+                "wealth_networth_snapshots",
             ]
             for w_table in expected_wealth_tables:
                 if w_table not in physical_tables:
-                    items.append(DriftItem(
-                        table_name=w_table,
-                        field_or_index="TABLE",
-                        issue_type="MISSING_TABLE",
-                        severity=DriftSeverity.WARNING,
-                        detail=f"Tabella Wealth '{w_table}' assente.",
-                        remediation_hint="Eseguire init_wealth_db() o migrazione v4"
-                    ))
+                    items.append(
+                        DriftItem(
+                            table_name=w_table,
+                            field_or_index="TABLE",
+                            issue_type="MISSING_TABLE",
+                            severity=DriftSeverity.WARNING,
+                            detail=f"Tabella Wealth '{w_table}' assente.",
+                            remediation_hint="Eseguire init_wealth_db() o migrazione v4",
+                        )
+                    )
 
             # 3. Controllo indici compositi raccomandati
             cur.execute("SELECT name FROM sqlite_master WHERE type='index';")
             physical_indexes = {row[0] for row in cur.fetchall()}
             for idx_name, tbl_name, cols in V002_AnalyticalCompositeIndexes.INDEXES:
                 if tbl_name in physical_tables and idx_name not in physical_indexes:
-                    items.append(DriftItem(
-                        table_name=tbl_name,
-                        field_or_index=idx_name,
-                        issue_type="MISSING_INDEX",
-                        severity=DriftSeverity.INFO,
-                        detail=f"Indice analitico composito '{idx_name}' assente su {tbl_name}{cols}.",
-                        remediation_hint=f"CREATE INDEX IF NOT EXISTS {idx_name} ON {tbl_name} {cols};"
-                    ))
+                    items.append(
+                        DriftItem(
+                            table_name=tbl_name,
+                            field_or_index=idx_name,
+                            issue_type="MISSING_INDEX",
+                            severity=DriftSeverity.INFO,
+                            detail=f"Indice analitico composito '{idx_name}' assente su {tbl_name}{cols}.",
+                            remediation_hint=f"CREATE INDEX IF NOT EXISTS {idx_name} ON {tbl_name} {cols};",
+                        )
+                    )
 
             # 4. Controllo integrità referenziale e orfani (PRAGMA foreign_key_check)
             fk_violations = conn.execute("PRAGMA foreign_key_check;").fetchall()
             for v_row in fk_violations:
                 tbl, rowid, parent_tbl, fkid = v_row[0], v_row[1], v_row[2], v_row[3]
-                items.append(DriftItem(
-                    table_name=tbl,
-                    field_or_index=f"rowid={rowid}",
-                    issue_type="FOREIGN_KEY_VIOLATION",
-                    severity=DriftSeverity.WARNING,
-                    detail=f"Record orfano in '{tbl}' (rowid {rowid}) verso tabella genitore '{parent_tbl}'.",
-                    remediation_hint=f"Riconciliare o rimuovere record orfano in {tbl} dove rowid={rowid}."
-                ))
+                items.append(
+                    DriftItem(
+                        table_name=tbl,
+                        field_or_index=f"rowid={rowid}",
+                        issue_type="FOREIGN_KEY_VIOLATION",
+                        severity=DriftSeverity.WARNING,
+                        detail=f"Record orfano in '{tbl}' (rowid {rowid}) verso tabella genitore '{parent_tbl}'.",
+                        remediation_hint=f"Riconciliare o rimuovere record orfano in {tbl} dove rowid={rowid}.",
+                    )
+                )
 
             # 5. Integrità strutturale SQLite
             integ_res = conn.execute("PRAGMA integrity_check;").fetchone()
             if not integ_res or integ_res[0] != "ok":
-                items.append(DriftItem(
-                    table_name="*",
-                    field_or_index="PRAGMA integrity_check",
-                    issue_type="CORRUPTED_DATABASE",
-                    severity=DriftSeverity.CRITICAL,
-                    detail=f"Integrità del database compromessa: {integ_res}",
-                    remediation_hint="Ripristinare l'ultimo snapshot valido con restore_from_snapshot()."
-                ))
+                items.append(
+                    DriftItem(
+                        table_name="*",
+                        field_or_index="PRAGMA integrity_check",
+                        issue_type="CORRUPTED_DATABASE",
+                        severity=DriftSeverity.CRITICAL,
+                        detail=f"Integrità del database compromessa: {integ_res}",
+                        remediation_hint="Ripristinare l'ultimo snapshot valido con restore_from_snapshot().",
+                    )
+                )
 
             is_healthy = not any(it.severity == DriftSeverity.CRITICAL for it in items)
             summary = (
@@ -1267,7 +1307,7 @@ class DatabaseMigrationManager:
                 is_healthy=is_healthy,
                 drift_count=len(items),
                 items=items,
-                summary=summary
+                summary=summary,
             )
 
         finally:
@@ -1296,16 +1336,19 @@ class DatabaseMigrationManager:
                 escaped_path = str(self.db_path).replace("\\", "/")
                 con.execute(f"ATTACH '{escaped_path}' AS local_db (TYPE SQLITE);")
                 tables = con.execute("SHOW TABLES FROM local_db;").fetchall()
-                sample_count = con.execute("SELECT count(*) FROM local_db.sqlite_master WHERE type='table';").fetchone()[0]
+                sample_count = con.execute(
+                    "SELECT count(*) FROM local_db.sqlite_master WHERE type='table';"
+                ).fetchone()[0]
                 return {
                     "compatible": True,
                     "engine": "DuckDB Native C++ Scanner",
                     "tables_found": sample_count,
                     "tables": [t[0] for t in tables[:10]],
-                    "status": "PASS"
+                    "status": "PASS",
                 }
             except Exception as e_attach:
                 import pandas as pd
+
                 s_conn = sqlite3.connect(str(self.db_path))
                 df_meta = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table'", s_conn)
                 s_conn.close()
@@ -1316,13 +1359,14 @@ class DatabaseMigrationManager:
                     "engine": "DuckDB Pandas/Arrow In-Memory Bridge",
                     "tables_found": cnt,
                     "note": f"Native attach note: {e_attach}",
-                    "status": "PASS"
+                    "status": "PASS",
                 }
         except Exception as ex:
             return {"compatible": False, "error": str(ex), "status": "FAIL"}
 
 
 # ── Helper di Boot per Entrypoint ARGUS ─────────────────────
+
 
 def bootstrap_and_migrate_db(db_path: Optional[Union[str, Path]] = None) -> DatabaseMigrationManager:
     """
@@ -1334,7 +1378,9 @@ def bootstrap_and_migrate_db(db_path: Optional[Union[str, Path]] = None) -> Data
     if not status.is_up_to_date:
         logger.info(
             "Schema database alla v%d (target v%d). Applicazione di %d migrazioni pendenti...",
-            status.current_version, status.target_version, status.pending_count
+            status.current_version,
+            status.target_version,
+            status.pending_count,
         )
         applied = mgr.migrate()
         logger.info("Migrazioni applicate: %s", [f"v{m.version}_{m.name}" for m in applied])

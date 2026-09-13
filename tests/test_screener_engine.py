@@ -3,16 +3,18 @@ Tests for core/screener_engine.py
 Verifies Multi-Factor Screener and Pre-Trade Impact Simulator
 """
 
-import pytest
+from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
-from unittest.mock import patch
+import pytest
+
 from core.screener_engine import (
     MARKET_UNIVERSES,
     _compute_rsi,
     apply_strategy_preset,
     fetch_screener_universe_data,
-    simulate_pre_trade_impact
+    simulate_pre_trade_impact,
 )
 
 

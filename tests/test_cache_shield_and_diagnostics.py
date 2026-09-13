@@ -6,15 +6,12 @@
 
 import os
 import time
-import pytest
-import pandas as pd
+
 import numpy as np
-from core.cache_shield import (
-    get_cached_ticker_history,
-    get_cached_ticker_info,
-    get_cache_stats,
-    clear_cache
-)
+import pandas as pd
+import pytest
+
+from core.cache_shield import clear_cache, get_cache_stats, get_cached_ticker_history, get_cached_ticker_info
 from core.diagnostics import run_system_health_check
 
 
@@ -56,10 +53,10 @@ def test_system_diagnostics_health_check():
 def test_storage_and_memory_profiler_operations():
     """Verifica il profiler di memoria DB, vacuum, pulizia cache e reindexing."""
     from core.diagnostics import (
+        clean_expired_cache_records,
         get_detailed_storage_and_memory_profile,
         optimize_database_storage,
-        clean_expired_cache_records,
-        reindex_databases
+        reindex_databases,
     )
     prof = get_detailed_storage_and_memory_profile()
     assert "total_storage_mb" in prof
@@ -82,9 +79,10 @@ def test_storage_and_memory_profiler_operations():
 
 def test_sqlite_wal_pragmas():
     """Verifica che le connessioni SQLite abilitino la modalità WAL e timeout anti-lock."""
+    from sqlalchemy import text
+
     from core.cache_shield import _get_cache_connection
     from core.fetcher import get_engine
-    from sqlalchemy import text
 
     # Verifica connessione diretta cache SQLite
     conn = _get_cache_connection()

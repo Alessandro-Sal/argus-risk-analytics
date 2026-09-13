@@ -4,18 +4,18 @@ Core Module: Unified & Isolated Workspace Context Engine
 Thread-safe, multi-tenant ready, with deterministic lifecycle and zero cross-contamination.
 """
 
-import os
 import glob
 import json
-import time
-import uuid
+import os
 import pickle
 import threading
+import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, Any, List, Optional, Tuple, Set
-import pandas as pd
+from typing import Any, Dict, List, Optional, Set, Tuple
 
+import pandas as pd
 
 # ── STORAGE PATHS & CONSTANTS ────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,7 +36,7 @@ ANALYTICAL_ORPHAN_PREFIXES = (
     "black_litterman_",
     "opt_weights_",
     "subtab_",
-    "target_subtab_"
+    "target_subtab_",
 )
 
 ANALYTICAL_EXACT_KEYS = {
@@ -53,15 +53,17 @@ ANALYTICAL_EXACT_KEYS = {
     "stress_scenarios_selected",
     "custom_stress_multiplier",
     "bquant_active_cell",
-    "sandbox_preset_name"
+    "sandbox_preset_name",
 }
 
 
 # ── DOMAIN SUB-CONTEXT DATACLASSES ────────────────────────────
 
+
 @dataclass
 class RiskSubContext:
     """Modello fortemente tipizzato per il dominio Risk & Portfolio Analytics."""
+
     portfolio_id: Optional[int] = None
     portfolio_name: str = "Nessun Portafoglio"
     run_id: str = "IDLE"
@@ -101,6 +103,7 @@ class RiskSubContext:
 @dataclass
 class WealthSubContext:
     """Modello fortemente tipizzato per il dominio Wealth Management."""
+
     profile_id: Optional[int] = None
     profile_name: str = "Nessun Profilo Selezionato"
     profile_map: Dict[int, str] = field(default_factory=dict)
@@ -113,6 +116,7 @@ class WealthSubContext:
 @dataclass
 class UIViewState:
     """Isolamento dello stato di navigazione, filtri e tab per pagina."""
+
     page_subtabs: Dict[str, str] = field(default_factory=dict)
     active_filters: Dict[str, Any] = field(default_factory=dict)
     target_tickers: Dict[str, str] = field(default_factory=dict)
@@ -132,12 +136,14 @@ class UIViewState:
 
 # ── UNIFIED WORKSPACE CONTEXT CLASS ───────────────────────────
 
+
 class WorkspaceContext:
     """
     Contesto unificato e isolato per sessione utente / tab browser.
     Elimina la dipendenza da oltre 250 chiavi globali non coordinate in st.session_state
     fornendo una facciata bidirezionale trasparente e retrocompatibile al 100%.
     """
+
     _LOCK = threading.RLock()
     NAMESPACE_KEY = "_ARGUS_WORKSPACE_CONTEXT_"
     SESSION_UUID_KEY = "_ARGUS_SESSION_UUID_"
@@ -158,6 +164,7 @@ class WorkspaceContext:
         """Recupera in modo sicuro st.session_state se disponibile nel contesto d'esecuzione."""
         try:
             import streamlit as st
+
             if hasattr(st, "session_state"):
                 return st.session_state
         except Exception:
@@ -179,13 +186,13 @@ class WorkspaceContext:
                     ctx: WorkspaceContext = st_state[cls.NAMESPACE_KEY]
                     ctx.sync_from_legacy_session_state()
                     return ctx
-                
+
                 # Inizializzazione UUID di sessione
                 sid = session_id or st_state.get(cls.SESSION_UUID_KEY)
                 if not sid:
                     sid = str(uuid.uuid4())
                     st_state[cls.SESSION_UUID_KEY] = sid
-                
+
                 ctx = cls(session_id=sid)
                 ctx.sync_from_legacy_session_state()
                 st_state[cls.NAMESPACE_KEY] = ctx
@@ -279,7 +286,15 @@ class WorkspaceContext:
             st_state = self._get_st_session_state()
             if st_state is not None:
                 # 1. Rimozione delle chiavi di stato primarie
-                for key in ["results", "portfolio_id", "portfolio_name", "run_id", "pipeline_done", "fetch_report", "sandbox_preset_name"]:
+                for key in [
+                    "results",
+                    "portfolio_id",
+                    "portfolio_name",
+                    "run_id",
+                    "pipeline_done",
+                    "fetch_report",
+                    "sandbox_preset_name",
+                ]:
                     if key in st_state:
                         del st_state[key]
                 st_state["session_cleared"] = True
@@ -313,7 +328,7 @@ class WorkspaceContext:
                     "wealth_active_profile_name",
                     "wealth_active_portfolio_id",
                     "sb_wealth_profile_selector",
-                    "wealth_active_snapshot"
+                    "wealth_active_snapshot",
                 ]:
                     if key in st_state:
                         del st_state[key]
@@ -324,11 +339,7 @@ class WorkspaceContext:
 
     # ── REACTIVE TOTAL WEALTH CONSOLIDATION BRIDGE ─────────────
 
-    def get_consolidated_equity_for_wealth(
-        self,
-        engine,
-        linked_risk_ids: Optional[List[int]] = None
-    ) -> float:
+    def get_consolidated_equity_for_wealth(self, engine, linked_risk_ids: Optional[List[int]] = None) -> float:
         """
         Riconciliazione reattiva: integra in tempo reale il valore del portafoglio Risk
         attivo in memoria senza costringere a salvare prima uno snapshot su database.
@@ -336,7 +347,7 @@ class WorkspaceContext:
         """
         with self._LOCK:
             self.sync_from_legacy_session_state()
-            from core.wealth.wealth_db import get_linked_risk_portfolios, get_available_risk_portfolios
+            from core.wealth.wealth_db import get_available_risk_portfolios, get_linked_risk_portfolios
 
             w_pid = self.wealth.profile_id
             if w_pid is None:
@@ -398,18 +409,18 @@ class WorkspaceContext:
                     "base_currency": self.risk.base_currency,
                     "benchmark": self.risk.benchmark,
                     "risk_free_rate": self.risk.risk_free_rate,
-                    "pipeline_done": self.risk.pipeline_done
+                    "pipeline_done": self.risk.pipeline_done,
                 },
                 "wealth": {
                     "profile_id": self.wealth.profile_id,
                     "profile_name": self.wealth.profile_name,
-                    "linked_risk_ids": self.wealth.linked_risk_ids
+                    "linked_risk_ids": self.wealth.linked_risk_ids,
                 },
                 "ui": {
                     "page_subtabs": self.ui.page_subtabs,
                     "active_filters": self.ui.active_filters,
-                    "target_tickers": self.ui.target_tickers
-                }
+                    "target_tickers": self.ui.target_tickers,
+                },
             }
 
             try:
@@ -426,7 +437,7 @@ class WorkspaceContext:
                     "run_id": self.risk.run_id,
                     "base_currency": self.risk.base_currency,
                     "benchmark": self.risk.benchmark,
-                    "saved_at": datetime.now().isoformat()
+                    "saved_at": datetime.now().isoformat(),
                 }
                 with open(LEGACY_CACHE_PKL, "wb") as lf:
                     pickle.dump(legacy_bundle, lf, protocol=pickle.HIGHEST_PROTOCOL)
@@ -441,7 +452,7 @@ class WorkspaceContext:
                         "run_id": self.risk.run_id,
                         "portfolio_name": self.risk.portfolio_name,
                         "metrics": self.risk.results.get("metrics", {}),
-                        "positions": pos_rec
+                        "positions": pos_rec,
                     }
                     with open(LEGACY_CACHE_JSON, "w", encoding="utf-8") as jf:
                         json.dump(json_meta, jf, ensure_ascii=False, default=str)
@@ -525,13 +536,23 @@ class WorkspaceContext:
         with self._LOCK:
             if not self.risk.results:
                 self.sync_from_legacy_session_state()
-            pos = self.risk.results.get("positions") if (self.risk.results and isinstance(self.risk.results, dict)) else None
+            pos = (
+                self.risk.results.get("positions")
+                if (self.risk.results and isinstance(self.risk.results, dict))
+                else None
+            )
             pos_records = pos.to_dict(orient="records") if isinstance(pos, pd.DataFrame) else []
 
-            df_tx = self.risk.results.get("df_tx") if (self.risk.results and isinstance(self.risk.results, dict)) else None
+            df_tx = (
+                self.risk.results.get("df_tx") if (self.risk.results and isinstance(self.risk.results, dict)) else None
+            )
             tx_records = df_tx.to_dict(orient="records") if isinstance(df_tx, pd.DataFrame) else []
 
-            metrics = self.risk.results.get("metrics", {}) if (self.risk.results and isinstance(self.risk.results, dict)) else {}
+            metrics = (
+                self.risk.results.get("metrics", {})
+                if (self.risk.results and isinstance(self.risk.results, dict))
+                else {}
+            )
 
             return {
                 "schema_version": "9.0.0",
@@ -548,19 +569,19 @@ class WorkspaceContext:
                     "is_live_active": self.risk.is_live_active,
                     "metrics": metrics,
                     "positions": pos_records,
-                    "transactions": tx_records
+                    "transactions": tx_records,
                 },
                 "wealth": {
                     "profile_id": self.wealth.profile_id,
                     "profile_name": self.wealth.profile_name,
-                    "linked_risk_ids": self.wealth.linked_risk_ids
+                    "linked_risk_ids": self.wealth.linked_risk_ids,
                 },
                 "ui": {
                     "page_subtabs": dict(self.ui.page_subtabs),
                     "active_filters": dict(self.ui.active_filters),
                     "target_tickers": dict(self.ui.target_tickers),
-                    "selected_scenarios": list(self.ui.selected_scenarios)
-                }
+                    "selected_scenarios": list(self.ui.selected_scenarios),
+                },
             }
 
     def import_session_snapshot(self, snapshot: Dict[str, Any]) -> bool:
@@ -594,7 +615,7 @@ class WorkspaceContext:
                 "metrics": risk_data.get("metrics", {}),
                 "portfolio_name": self.risk.portfolio_name,
                 "base_currency": self.risk.base_currency,
-                "benchmark": self.risk.benchmark
+                "benchmark": self.risk.benchmark,
             }
             if not df_pos.empty or risk_data.get("metrics"):
                 self.risk.is_live_active = True

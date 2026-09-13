@@ -5,33 +5,34 @@
 
 import io
 import math
+from datetime import datetime
+from typing import Any, Dict, Optional
+
 import numpy as np
 import pandas as pd
 import xlsxwriter
-from datetime import datetime
-from typing import Any, Dict, Optional
 from sqlalchemy import Engine
 
+from core.security_engine import mask_iban, sanitize_for_export
+from core.wealth.wealth_db import (
+    get_cashflow_records,
+    get_linked_risk_portfolios_summary,
+    get_pension_plans,
+    get_physical_assets,
+    get_wealth_accounts,
+    get_wealth_portfolios,
+)
 from core.wealth.wealth_engine import (
-    compute_consolidated_net_worth,
+    compute_ai_wealth_diagnostics,
     compute_cashflow_analytics,
-    simulate_pension_projection,
+    compute_consolidated_net_worth,
+    compute_estate_planning_analytics,
     compute_fire_analytics,
     compute_fiscal_analytics,
     compute_mortgage_amortization,
     compute_real_estate_roi,
-    compute_estate_planning_analytics,
-    compute_ai_wealth_diagnostics
+    simulate_pension_projection,
 )
-from core.wealth.wealth_db import (
-    get_wealth_accounts,
-    get_cashflow_records,
-    get_physical_assets,
-    get_pension_plans,
-    get_wealth_portfolios,
-    get_linked_risk_portfolios_summary
-)
-from core.security_engine import sanitize_for_export, mask_iban
 
 
 def _safe_num(val, default=0.0) -> float:
@@ -47,7 +48,9 @@ def _safe_num(val, default=0.0) -> float:
         return default
 
 
-def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, mask_sensitive: bool = False) -> io.BytesIO:
+def export_wealth_master_excel_workbook(
+    engine: Engine, portfolio_id: int = 1, mask_sensitive: bool = False
+) -> io.BytesIO:
     """
     Genera un Master Dossier Excel (.xlsx) a 10 fogli istituzionale per Family Office & Private Banking:
     1. Executive Summary & Net Worth (Stato Patrimoniale Consolidato)
@@ -63,29 +66,39 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     Include sanitizzazione contro Formula Injection (CWE-1236) e mascheramento PII facoltativo.
     """
     output = io.BytesIO()
-    workbook = xlsxwriter.Workbook(output, {'in_memory': True, 'nan_inf_to_errors': True})
+    workbook = xlsxwriter.Workbook(output, {"in_memory": True, "nan_inf_to_errors": True})
 
     # ── FORMATI GRAFICI ISTITUZIONALI (Midnight Obsidian & Navy Blue) ──
-    f_hdr_navy = workbook.add_format({
-        'bold': True, 'bg_color': '#0f172a', 'font_color': '#ffffff',
-        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11
-    })
-    f_hdr_emerald = workbook.add_format({
-        'bold': True, 'bg_color': '#064e3b', 'font_color': '#ffffff',
-        'border': 1, 'align': 'center', 'valign': 'vcenter', 'font_size': 11
-    })
-    f_title = workbook.add_format({
-        'bold': True, 'font_size': 14, 'font_color': '#0f172a'
-    })
-    f_subtitle = workbook.add_format({
-        'italic': True, 'font_size': 10, 'font_color': '#64748b'
-    })
-    f_bold = workbook.add_format({'bold': True})
-    f_currency = workbook.add_format({'num_format': '€ #,##0.00'})
-    f_bold_currency = workbook.add_format({'bold': True, 'num_format': '€ #,##0.00', 'bg_color': '#f1f5f9'})
-    f_pct = workbook.add_format({'num_format': '0.00%'})
-    f_bold_pct = workbook.add_format({'bold': True, 'num_format': '0.00%'})
-    f_date = workbook.add_format({'num_format': 'yyyy-mm-dd', 'align': 'center'})
+    f_hdr_navy = workbook.add_format(
+        {
+            "bold": True,
+            "bg_color": "#0f172a",
+            "font_color": "#ffffff",
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter",
+            "font_size": 11,
+        }
+    )
+    f_hdr_emerald = workbook.add_format(
+        {
+            "bold": True,
+            "bg_color": "#064e3b",
+            "font_color": "#ffffff",
+            "border": 1,
+            "align": "center",
+            "valign": "vcenter",
+            "font_size": 11,
+        }
+    )
+    f_title = workbook.add_format({"bold": True, "font_size": 14, "font_color": "#0f172a"})
+    f_subtitle = workbook.add_format({"italic": True, "font_size": 10, "font_color": "#64748b"})
+    f_bold = workbook.add_format({"bold": True})
+    f_currency = workbook.add_format({"num_format": "€ #,##0.00"})
+    f_bold_currency = workbook.add_format({"bold": True, "num_format": "€ #,##0.00", "bg_color": "#f1f5f9"})
+    f_pct = workbook.add_format({"num_format": "0.00%"})
+    f_bold_pct = workbook.add_format({"bold": True, "num_format": "0.00%"})
+    f_date = workbook.add_format({"num_format": "yyyy-mm-dd", "align": "center"})
 
     # ── RECUPERO DATI CORE WEALTH ──
     nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
@@ -105,25 +118,59 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
 
     # ── SHEET 1: EXECUTIVE SUMMARY & NET WORTH ───────────────────
     ws1 = workbook.add_worksheet("1_Executive_NetWorth")
-    ws1.write("A1", f"ARGUS WEALTH MANAGEMENT — STATO PATRIMONIALE CONSOLIDATO", f_title)
-    ws1.write("A2", f"Profilo: {prof_name.upper()} | Data Generazione: {datetime.now().strftime('%d/%m/%Y %H:%M')}", f_subtitle)
+    ws1.write("A1", "ARGUS WEALTH MANAGEMENT — STATO PATRIMONIALE CONSOLIDATO", f_title)
+    ws1.write(
+        "A2",
+        f"Profilo: {prof_name.upper()} | Data Generazione: {datetime.now().strftime('%d/%m/%Y %H:%M')}",
+        f_subtitle,
+    )
 
-    headers1 = ["Macro Classe di Attivo", "Dettaglio Componente", "Valore Attuale (€)", "Peso sul Patrimonio (%)", "Liquidabilità / Profilo Rischio"]
+    headers1 = [
+        "Macro Classe di Attivo",
+        "Dettaglio Componente",
+        "Valore Attuale (€)",
+        "Peso sul Patrimonio (%)",
+        "Liquidabilità / Profilo Rischio",
+    ]
     for c, h in enumerate(headers1):
         ws1.write(3, c, h, f_hdr_navy)
 
     rows1 = [
-        ("Liquidità & Riserve", "Conti Correnti & Depositi a Vista", nw.liquid_cash, (nw.liquid_cash / (nw.total_net_worth or 1)), "Immediata (T+0) / Risk-Free"),
-        ("Investimenti Finanziari", "Portafogli Titoli, ETF & Crypto (Risk Link)", nw.financial_investments, (nw.financial_investments / (nw.total_net_worth or 1)), "Alta (T+2) / Market Volatility"),
-        ("Caveau & Beni Reali", "Orologi di Lusso, Oro da Investimento & Immobili", nw.physical_assets, (nw.physical_assets / (nw.total_net_worth or 1)), "Bassa / Illiquido da Collezione"),
-        ("Previdenza Integrativa", "Fondi Pensione Aperti, PIP & TFR", nw.pension_total, (nw.pension_total / (nw.total_net_worth or 1)), "Vincolata al Pensionamento / Protetto TUIR"),
+        (
+            "Liquidità & Riserve",
+            "Conti Correnti & Depositi a Vista",
+            nw.liquid_cash,
+            (nw.liquid_cash / (nw.total_net_worth or 1)),
+            "Immediata (T+0) / Risk-Free",
+        ),
+        (
+            "Investimenti Finanziari",
+            "Portafogli Titoli, ETF & Crypto (Risk Link)",
+            nw.financial_investments,
+            (nw.financial_investments / (nw.total_net_worth or 1)),
+            "Alta (T+2) / Market Volatility",
+        ),
+        (
+            "Caveau & Beni Reali",
+            "Orologi di Lusso, Oro da Investimento & Immobili",
+            nw.physical_assets,
+            (nw.physical_assets / (nw.total_net_worth or 1)),
+            "Bassa / Illiquido da Collezione",
+        ),
+        (
+            "Previdenza Integrativa",
+            "Fondi Pensione Aperti, PIP & TFR",
+            nw.pension_total,
+            (nw.pension_total / (nw.total_net_worth or 1)),
+            "Vincolata al Pensionamento / Protetto TUIR",
+        ),
     ]
     for r_idx, (cat, det, val, weight, liq) in enumerate(rows1, start=4):
         ws1.write(r_idx, 0, cat)
         ws1.write(r_idx, 1, det)
         ws1.write(r_idx, 2, _safe_num(val), f_currency)
         # Formula dinamica peso su Net Worth consolidato
-        ws1.write_formula(r_idx, 3, f"=IF($C$11>0, C{r_idx+1}/$C$11, 0)", f_pct)
+        ws1.write_formula(r_idx, 3, f"=IF($C$11>0, C{r_idx + 1}/$C$11, 0)", f_pct)
         ws1.write(r_idx, 4, liq)
 
     ws1.write(8, 0, "TOTALE ATTIVO PATRIMONIALE", f_bold)
@@ -151,7 +198,16 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     ws2.write("A1", "LIBRO MASTRO CASSA & ANALISI FLUSSI FINANZIARI", f_title)
     ws2.write("A2", "Storico Transazioni e Classificazione Regola 50/30/20", f_subtitle)
 
-    headers2 = ["ID Tx", "Data", "Conto / Metodo", "Direzione", "Importo (€)", "Categoria", "Natura (50/30/20)", "Esercente / Note"]
+    headers2 = [
+        "ID Tx",
+        "Data",
+        "Conto / Metodo",
+        "Direzione",
+        "Importo (€)",
+        "Categoria",
+        "Natura (50/30/20)",
+        "Esercente / Note",
+    ]
     for c, h in enumerate(headers2):
         ws2.write(3, c, h, f_hdr_emerald)
 
@@ -171,7 +227,16 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     ws3 = workbook.add_worksheet("3_Conti_e_Banche")
     ws3.write("A1", "ANAGRAFICA CONTI CORRENTI, DEPOSITI & BROKER", f_title)
 
-    headers3 = ["ID Conto", "Nome Conto", "Istituto Bancario", "Tipo Conto", "IBAN / Riferimento", "Saldo Live (€)", "Valuta", "Domiciliazione Fiscale"]
+    headers3 = [
+        "ID Conto",
+        "Nome Conto",
+        "Istituto Bancario",
+        "Tipo Conto",
+        "IBAN / Riferimento",
+        "Saldo Live (€)",
+        "Valuta",
+        "Domiciliazione Fiscale",
+    ]
     for c, h in enumerate(headers3):
         ws3.write(3, c, h, f_hdr_navy)
 
@@ -194,7 +259,17 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     ws4 = workbook.add_worksheet("4_Caveau_Asset_Fisici")
     ws4.write("A1", "INVENTARIO CAVEAU, OROLOGI DI LUSSO & METALLI", f_title)
 
-    headers4 = ["ID Asset", "Nome Asset", "Categoria", "Brand / Localizzazione", "Modello / Referenza", "Prezzo Acquisto (€)", "Valore di Mercato Live (€)", "Plusvalenza / Minus (€)", "Rendimento %"]
+    headers4 = [
+        "ID Asset",
+        "Nome Asset",
+        "Categoria",
+        "Brand / Localizzazione",
+        "Modello / Referenza",
+        "Prezzo Acquisto (€)",
+        "Valore di Mercato Live (€)",
+        "Plusvalenza / Minus (€)",
+        "Rendimento %",
+    ]
     for c, h in enumerate(headers4):
         ws4.write(3, c, h, f_hdr_navy)
 
@@ -221,13 +296,25 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     ws5 = workbook.add_worksheet("5_Previdenza_Fondi_Pensione")
     ws5.write("A1", "FONDI PENSIONE & PREVIDENZA COMPLEMENTARE (TUIR ART. 51)", f_title)
 
-    headers5 = ["ID Piano", "Nome Fondo", "Gestore / Provider", "Linea Investimento", "Montante Maturato (€)", "Versamento Dipendente (€/m)", "Versamento Datore (€/m)", "Tetto Deducibile Residuo (€)"]
+    headers5 = [
+        "ID Piano",
+        "Nome Fondo",
+        "Gestore / Provider",
+        "Linea Investimento",
+        "Montante Maturato (€)",
+        "Versamento Dipendente (€/m)",
+        "Versamento Datore (€/m)",
+        "Tetto Deducibile Residuo (€)",
+    ]
     for c, h in enumerate(headers5):
         ws5.write(3, c, h, f_hdr_emerald)
 
     if not df_pens.empty:
         for r_idx, (_, row) in enumerate(df_pens.iterrows(), start=4):
-            contrib_ann = (_safe_num(row.get("monthly_employee_contrib", 0.0)) + _safe_num(row.get("monthly_employer_contrib", 0.0))) * 12.0
+            contrib_ann = (
+                _safe_num(row.get("monthly_employee_contrib", 0.0))
+                + _safe_num(row.get("monthly_employer_contrib", 0.0))
+            ) * 12.0
             resid_deduct = max(0.0, 5164.57 - contrib_ann)
             ws5.write(r_idx, 0, int(row.get("plan_id", r_idx)))
             ws5.write(r_idx, 1, str(row.get("plan_name", "")))
@@ -243,7 +330,15 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     ws6 = workbook.add_worksheet("6_Fiscalita_Quadro_RW")
     ws6.write("A1", "PROSPETTO DI MONITORAGGIO FISCALE & QUADRO RW/RT", f_title)
 
-    headers6 = ["Rigo Quadro RW", "Descrizione Intermediario", "Codice Investimento", "Codice Stato Estero", "Valore Finale al 31/12 (€)", "IVAFE Dovuta (€)", "Solo Monitoraggio"]
+    headers6 = [
+        "Rigo Quadro RW",
+        "Descrizione Intermediario",
+        "Codice Investimento",
+        "Codice Stato Estero",
+        "Valore Finale al 31/12 (€)",
+        "IVAFE Dovuta (€)",
+        "Solo Monitoraggio",
+    ]
     for c, h in enumerate(headers6):
         ws6.write(3, c, h, f_hdr_navy)
 
@@ -261,7 +356,14 @@ def export_wealth_master_excel_workbook(engine: Engine, portfolio_id: int = 1, m
     ws7 = workbook.add_worksheet("7_Pianificazione_Successoria")
     ws7.write("A1", "MAPPATURA ASSE EREDITARIO & QUOTE DI LEGITTIMA (C.C.)", f_title)
 
-    headers7 = ["Soggetto Erede", "Valore Quota Spettante (€)", "Franchigia di Legge (€)", "Base Imponibile Netta (€)", "Aliquota Imposta", "Imposta di Successione Dovuta (€)"]
+    headers7 = [
+        "Soggetto Erede",
+        "Valore Quota Spettante (€)",
+        "Franchigia di Legge (€)",
+        "Base Imponibile Netta (€)",
+        "Aliquota Imposta",
+        "Imposta di Successione Dovuta (€)",
+    ]
     for c, h in enumerate(headers7):
         ws7.write(3, c, h, f_hdr_navy)
 

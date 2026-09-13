@@ -3,51 +3,52 @@
 # ARGUS Wealth — Pianificazione Successoria, Quote di Legittima & Estate Planning HNWI
 # ============================================================
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime
 import importlib
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
 import core.ui_utils
+import core.wealth
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
-import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
+from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    fmt_eur,
-    fmt_pct,
-    render_wealth_command_bar,
-    render_wealth_executive_badges,
-    render_page_header,
     apply_plotly_theme,
     ensure_portfolio_loaded,
+    fmt_eur,
+    fmt_pct,
+    inject_custom_css,
+    metric_card,
+    render_page_header,
     render_table_with_export,
+    render_wealth_command_bar,
+    render_wealth_executive_badges,
+    section,
 )
-from core.sidebar import render_sidebar
-from core.fetcher import get_engine
 from core.wealth import (
-    init_wealth_db,
-    get_wealth_portfolios,
+    AssetProtectionEngine,
+    FamilyHeir,
+    FamilyProfile,
+    GenerationalTransferOptimizer,
+    PlanningLevers,
     compute_consolidated_net_worth,
     compute_estate_planning_analytics,
     compute_family_governance_and_patti_di_famiglia,
-    GenerationalTransferOptimizer,
-    FamilyProfile,
-    FamilyHeir,
-    PlanningLevers,
-    AssetProtectionEngine
+    get_wealth_portfolios,
+    init_wealth_db,
 )
-
 
 st.set_page_config(page_title="Pianificazione Successoria | ARGUS Wealth", page_icon="⚖️", layout="wide")
 inject_custom_css()

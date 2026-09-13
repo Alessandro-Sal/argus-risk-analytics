@@ -5,17 +5,17 @@
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 
 try:
     import plotly.graph_objects as go
+
     HAS_PLOTLY = True
 except ImportError:
     go = None
     HAS_PLOTLY = False
-
-
 
 
 # ── SCENARI MACROECONOMICI ISTITUZIONALI PREDEFINITI ──
@@ -32,7 +32,7 @@ PRESET_STRESS_SCENARIOS = {
         "living_expenses_hike_pct": +15.0,
         "income_shock_pct": 0.0,
         "extra_expense_cash": 0.0,
-        "duration_months": 24
+        "duration_months": 24,
     },
     "REAL_ESTATE_CRISIS": {
         "name": "🏡 Crisi Immobiliare & Stretta Creditizia",
@@ -46,7 +46,7 @@ PRESET_STRESS_SCENARIOS = {
         "living_expenses_hike_pct": +5.0,
         "income_shock_pct": -10.0,
         "extra_expense_cash": 0.0,
-        "duration_months": 36
+        "duration_months": 36,
     },
     "BLACK_SWAN": {
         "name": "🦅 Cigno Nero Sistemico & Liquidity Freeze",
@@ -60,7 +60,7 @@ PRESET_STRESS_SCENARIOS = {
         "living_expenses_hike_pct": +8.0,
         "income_shock_pct": -20.0,
         "extra_expense_cash": 0.0,
-        "duration_months": 18
+        "duration_months": 18,
     },
     "INCOME_SHOCK": {
         "name": "⚡ Shock Reddituale & Spesa Straordinaria",
@@ -74,7 +74,7 @@ PRESET_STRESS_SCENARIOS = {
         "living_expenses_hike_pct": +10.0,
         "income_shock_pct": -100.0,
         "extra_expense_cash": 25000.0,
-        "duration_months": 12
+        "duration_months": 12,
     },
     "GFC_2008": {
         "name": "📉 Crisi Finanziaria Subprime 2008 (Deflazionaria)",
@@ -88,7 +88,7 @@ PRESET_STRESS_SCENARIOS = {
         "living_expenses_hike_pct": -2.0,
         "income_shock_pct": -15.0,
         "extra_expense_cash": 5000.0,
-        "duration_months": 24
+        "duration_months": 24,
     },
     "COVID_2020": {
         "name": "🦠 Crash Repentino COVID-19 & Rimbalzo",
@@ -102,18 +102,16 @@ PRESET_STRESS_SCENARIOS = {
         "living_expenses_hike_pct": +12.0,
         "income_shock_pct": -25.0,
         "extra_expense_cash": 10000.0,
-        "duration_months": 12
-    }
+        "duration_months": 12,
+    },
 }
 
 
 # ── CALCOLO NON-LINEARE DELL'AMMORTAMENTO MUTUO SOTTO STRESS ──
 
+
 def calculate_stressed_mortgage_impact(
-    total_liabilities: float,
-    rate_hike_bps: float,
-    base_rate: float = 2.0,
-    duration_years: int = 20
+    total_liabilities: float, rate_hike_bps: float, base_rate: float = 2.0, duration_years: int = 20
 ) -> Dict[str, Any]:
     """
     Calcola l'impatto non-lineare di uno shock sui tassi Euribor/mutuo applicando
@@ -128,7 +126,7 @@ def calculate_stressed_mortgage_impact(
             "post_monthly_payment": 0.0,
             "monthly_payment_delta": 0.0,
             "annual_extra_interest": 0.0,
-            "total_extra_interest_scenario": 0.0
+            "total_extra_interest_scenario": 0.0,
         }
 
     total_months = duration_years * 12
@@ -156,11 +154,12 @@ def calculate_stressed_mortgage_impact(
         "pre_monthly_payment": round(pmt0, 2),
         "post_monthly_payment": round(pmt1, 2),
         "monthly_payment_delta": round(monthly_delta, 2),
-        "annual_extra_interest": round(annual_extra, 2)
+        "annual_extra_interest": round(annual_extra, 2),
     }
 
 
 # ── LIQUIDITY SQUEEZE & ANTI-FORCED SELLING PROTOCOL ──
+
 
 def calculate_liquidity_squeeze(
     liquid_cash: float,
@@ -171,7 +170,7 @@ def calculate_liquidity_squeeze(
     income_shock_pct: float,
     extra_expense_cash: float,
     duration_months: int,
-    equity_shock_pct: float
+    equity_shock_pct: float,
 ) -> Dict[str, Any]:
     """
     Simula l'erosione mese per mese del fondo di liquidità per identificare:
@@ -232,16 +231,15 @@ def calculate_liquidity_squeeze(
         "capital_shortfall_eur": capital_shortfall_eur,
         "irreversible_loss_eur": irreversible_loss_eur,
         "fire_swr_base_pct": base_swr,
-        "fire_swr_stressed_pct": stressed_swr
+        "fire_swr_stressed_pct": stressed_swr,
     }
 
 
 # ── ESECUZIONE STRESS TEST PATRIMONIALE COMPLETO ──
 
+
 def run_wealth_stress_test(
-    summary_data: Dict[str, Any],
-    scenario_params: Dict[str, Any],
-    risk_context: Optional[Any] = None
+    summary_data: Dict[str, Any], scenario_params: Dict[str, Any], risk_context: Optional[Any] = None
 ) -> Dict[str, Any]:
     """
     Simula l'impatto economico completo di uno shock patrimoniale congiunto multi-asset.
@@ -281,13 +279,15 @@ def run_wealth_stress_test(
                 tk_shock = eq_shock
                 post_v = max(0.0, v * (1.0 + tk_shock))
                 post_inv += post_v
-                ticker_details.append({
-                    "ticker": tk,
-                    "pre_value": v,
-                    "post_value": round(post_v, 2),
-                    "shock_pct": round(tk_shock * 100.0, 1),
-                    "delta": round(post_v - v, 2)
-                })
+                ticker_details.append(
+                    {
+                        "ticker": tk,
+                        "pre_value": v,
+                        "post_value": round(post_v, 2),
+                        "shock_pct": round(tk_shock * 100.0, 1),
+                        "delta": round(post_v - v, 2),
+                    }
+                )
         else:
             post_inv = max(0.0, pre_inv * (1.0 + eq_shock))
     else:
@@ -306,10 +306,7 @@ def run_wealth_stress_test(
 
     # 3. Calcolo Impatto Mutuo / Debito Non-Lineare (Ammortamento alla Francese)
     mortgage_impact = calculate_stressed_mortgage_impact(
-        total_liabilities=pre_debts,
-        rate_hike_bps=rate_hike_bps,
-        base_rate=2.0,
-        duration_years=20
+        total_liabilities=pre_debts, rate_hike_bps=rate_hike_bps, base_rate=2.0, duration_years=20
     )
     monthly_debt_delta = mortgage_impact["monthly_payment_delta"]
     debt_extra_cost = max(0.0, monthly_debt_delta * duration_m)
@@ -324,7 +321,7 @@ def run_wealth_stress_test(
         income_shock_pct=income_shock,
         extra_expense_cash=extra_expense,
         duration_months=duration_m,
-        equity_shock_pct=scenario_params.get("equity_shock_pct", 0.0)
+        equity_shock_pct=scenario_params.get("equity_shock_pct", 0.0),
     )
 
     # 5. Calcolo Cassa Residua Post-Shock
@@ -356,7 +353,7 @@ def run_wealth_stress_test(
             "debts": pre_debts,
             "health_score": float(summary_data.get("wealth_health_score", 85.0)),
             "monthly_expenses": pre_expenses,
-            "monthly_income": pre_income
+            "monthly_income": pre_income,
         },
         "post_shock": {
             "net_worth": post_nw,
@@ -367,7 +364,7 @@ def run_wealth_stress_test(
             "pension": post_pen,
             "debts": post_debts,
             "health_score": round(post_health_score, 1),
-            "runway_months": round(post_runway, 1)
+            "runway_months": round(post_runway, 1),
         },
         "deltas": {
             "net_worth": delta_nw,
@@ -377,34 +374,31 @@ def run_wealth_stress_test(
             "physical_assets": delta_phys,
             "real_estate": delta_re,
             "pension": delta_pen,
-            "debts": delta_debts
+            "debts": delta_debts,
         },
         "mortgage_impact": mortgage_impact,
         "liquidity_squeeze": liquidity_squeeze,
-        "ticker_breakdown": ticker_details
+        "ticker_breakdown": ticker_details,
     }
 
 
 # ── UNIFIED MACRO STRESS ENGINE CLASS ──
+
 
 class UnifiedMacroStressEngine:
     """
     Classe istituzionale che orchestra l'integrazione Risk-Wealth per simulare
     scenari macro congiunti su portafoglio titoli, mutui, liquidità e FIRE SWR.
     """
+
     def __init__(self, workspace_context: Optional[Any] = None):
         self.ctx = workspace_context
 
-    def execute_stress_test(
-        self,
-        summary_data: Dict[str, Any],
-        scenario_key_or_params: Any
-    ) -> Dict[str, Any]:
+    def execute_stress_test(self, summary_data: Dict[str, Any], scenario_key_or_params: Any) -> Dict[str, Any]:
         """Esegue lo stress test integrato."""
         if isinstance(scenario_key_or_params, str):
             scenario_params = PRESET_STRESS_SCENARIOS.get(
-                scenario_key_or_params,
-                PRESET_STRESS_SCENARIOS["STAGFLATION"]
+                scenario_key_or_params, PRESET_STRESS_SCENARIOS["STAGFLATION"]
             )
         else:
             scenario_params = scenario_key_or_params
@@ -414,6 +408,7 @@ class UnifiedMacroStressEngine:
 
 
 # ── GENERAZIONE GRAFICI PLOTLY ISTITUZIONALI ──
+
 
 def create_wealth_waterfall_chart(stress_result: Dict[str, Any]) -> go.Figure:
     """Genera un grafico Waterfall Plotly istituzionale della scomposizione dello shock."""
@@ -428,7 +423,7 @@ def create_wealth_waterfall_chart(stress_result: Dict[str, Any]) -> go.Figure:
         "Caveau / Fisico",
         "Previdenza",
         "Cassa & Spese Extra",
-        "Net Worth Stressato"
+        "Net Worth Stressato",
     ]
     y_values = [
         pre_nw,
@@ -437,43 +432,37 @@ def create_wealth_waterfall_chart(stress_result: Dict[str, Any]) -> go.Figure:
         d["physical_assets"],
         d["pension"],
         d["liquid_cash"],
-        post_nw
+        post_nw,
     ]
-    measures = [
-        "absolute",
-        "relative",
-        "relative",
-        "relative",
-        "relative",
-        "relative",
-        "total"
-    ]
+    measures = ["absolute", "relative", "relative", "relative", "relative", "relative", "total"]
 
     if not HAS_PLOTLY or go is None:
         return None
 
-    fig = go.Figure(go.Waterfall(
-        name="Stress Breakdown",
-        orientation="v",
-        measure=measures,
-        x=x_labels,
-        y=y_values,
-        text=[f"€ {v:+,.0f}" if i not in [0, 6] else f"€ {v:,.0f}" for i, v in enumerate(y_values)],
-        textposition="outside",
-        connector={"line": {"color": "rgba(255, 255, 255, 0.2)", "dash": "dot"}},
-        decreasing={"marker": {"color": "#ef4444"}},
-        increasing={"marker": {"color": "#10b981"}},
-        totals={"marker": {"color": "#ff9900"}}
-    ))
+    fig = go.Figure(
+        go.Waterfall(
+            name="Stress Breakdown",
+            orientation="v",
+            measure=measures,
+            x=x_labels,
+            y=y_values,
+            text=[f"€ {v:+,.0f}" if i not in [0, 6] else f"€ {v:,.0f}" for i, v in enumerate(y_values)],
+            textposition="outside",
+            connector={"line": {"color": "rgba(255, 255, 255, 0.2)", "dash": "dot"}},
+            decreasing={"marker": {"color": "#ef4444"}},
+            increasing={"marker": {"color": "#10b981"}},
+            totals={"marker": {"color": "#ff9900"}},
+        )
+    )
 
     fig.update_layout(
         title=f"<b>Scomposizione dello Shock Patrimoniale — {stress_result['scenario_name']}</b>",
         template="plotly_dark",
         plot_bgcolor="rgba(10, 14, 20, 0.6)",
         paper_bgcolor="rgba(10, 14, 20, 0.0)",
-        margin=dict(l=20, r=20, t=50, b=30),
+        margin={"l": 20, "r": 20, "t": 50, "b": 30},
         height=380,
-        font=dict(family="Outfit, -apple-system, sans-serif", color="#e6edf3")
+        font={"family": "Outfit, -apple-system, sans-serif", "color": "#e6edf3"},
     )
     return fig
 
@@ -496,16 +485,18 @@ def create_liquidity_squeeze_timeline_chart(stress_result: Dict[str, Any]) -> Op
     fig = go.Figure()
 
     # Area di liquidità
-    fig.add_trace(go.Scatter(
-        x=months,
-        y=cash_trajectory,
-        mode="lines+markers",
-        line=dict(color="#3b82f6", width=2.5),
-        marker=dict(size=5, color="#60a5fa"),
-        name="Cassa Residua (€)",
-        fill="tozeroy",
-        fillcolor="rgba(59, 130, 246, 0.12)"
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=months,
+            y=cash_trajectory,
+            mode="lines+markers",
+            line={"color": "#3b82f6", "width": 2.5},
+            marker={"size": 5, "color": "#60a5fa"},
+            name="Cassa Residua (€)",
+            fill="tozeroy",
+            fillcolor="rgba(59, 130, 246, 0.12)",
+        )
+    )
 
     # Soglia critica di esaurimento (Zero Cassa)
     fig.add_hline(
@@ -514,7 +505,7 @@ def create_liquidity_squeeze_timeline_chart(stress_result: Dict[str, Any]) -> Op
         line_color="#ef4444",
         annotation_text="Soglia Zero Cassa (Vendita Forzata)",
         annotation_position="bottom right",
-        annotation_font=dict(color="#ef4444", size=11)
+        annotation_font={"color": "#ef4444", "size": 11},
     )
 
     # Annotazione Point of Forced Liquidation
@@ -526,15 +517,17 @@ def create_liquidity_squeeze_timeline_chart(stress_result: Dict[str, Any]) -> Op
             line_color="#f59e0b",
             annotation_text=f"Point of Forced Liquidation: {t_star:.1f} Mesi",
             annotation_position="top left",
-            annotation_font=dict(color="#f59e0b", size=11, family="Outfit")
+            annotation_font={"color": "#f59e0b", "size": 11, "family": "Outfit"},
         )
-        fig.add_trace(go.Scatter(
-            x=[t_star],
-            y=[0],
-            mode="markers",
-            marker=dict(color="#ef4444", size=12, symbol="x"),
-            name="Inizio Liquidazione Forzata"
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=[t_star],
+                y=[0],
+                mode="markers",
+                marker={"color": "#ef4444", "size": 12, "symbol": "x"},
+                name="Inizio Liquidazione Forzata",
+            )
+        )
 
     fig.update_layout(
         title=f"<b>Liquidity Squeeze Timeline & Point of Forced Liquidation — {stress_result['scenario_name']}</b>",
@@ -543,10 +536,10 @@ def create_liquidity_squeeze_timeline_chart(stress_result: Dict[str, Any]) -> Op
         template="plotly_dark",
         plot_bgcolor="rgba(10, 14, 20, 0.6)",
         paper_bgcolor="rgba(10, 14, 20, 0.0)",
-        margin=dict(l=20, r=20, t=50, b=30),
+        margin={"l": 20, "r": 20, "t": 50, "b": 30},
         height=380,
-        font=dict(family="Outfit, -apple-system, sans-serif", color="#e6edf3"),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+        font={"family": "Outfit, -apple-system, sans-serif", "color": "#e6edf3"},
+        legend={"orientation": "h", "yanchor": "bottom", "y": 1.02, "xanchor": "right", "x": 1},
     )
     return fig
 
@@ -556,19 +549,15 @@ def simulate_wealth_recovery_trajectories(
     base_cagr: float = 0.065,
     volatility: float = 0.12,
     horizon_years: int = 10,
-    n_sims: int = 1000
+    n_sims: int = 1000,
 ) -> go.Figure:
     """Simula 1,000 traiettorie Monte Carlo della ripresa del Net Worth post-stress."""
     dt = 1.0
     time_steps = np.arange(0, horizon_years + 1)
-    
+
     np.random.seed(42)
-    shocks = np.random.normal(
-        (base_cagr - 0.5 * volatility ** 2) * dt,
-        volatility * np.sqrt(dt),
-        (n_sims, horizon_years)
-    )
-    
+    shocks = np.random.normal((base_cagr - 0.5 * volatility**2) * dt, volatility * np.sqrt(dt), (n_sims, horizon_years))
+
     trajectories = np.zeros((n_sims, horizon_years + 1))
     trajectories[:, 0] = post_net_worth
     for t in range(1, horizon_years + 1):
@@ -579,19 +568,35 @@ def simulate_wealth_recovery_trajectories(
     p90 = np.percentile(trajectories, 90, axis=0)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=time_steps, y=p90, mode="lines", line=dict(color="rgba(16, 185, 129, 0.3)", width=1),
-        name="Scenario Ottimistico (90° Pct)"
-    ))
-    fig.add_trace(go.Scatter(
-        x=time_steps, y=p10, mode="lines", line=dict(color="rgba(239, 68, 68, 0.3)", width=1),
-        fill="tonexty", fillcolor="rgba(255, 153, 0, 0.08)",
-        name="Scenario Prudente (10° Pct)"
-    ))
-    fig.add_trace(go.Scatter(
-        x=time_steps, y=p50, mode="lines+markers", line=dict(color="#ff9900", width=3),
-        name="Traiettoria Mediana Attesa (50° Pct)"
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=time_steps,
+            y=p90,
+            mode="lines",
+            line={"color": "rgba(16, 185, 129, 0.3)", "width": 1},
+            name="Scenario Ottimistico (90° Pct)",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=time_steps,
+            y=p10,
+            mode="lines",
+            line={"color": "rgba(239, 68, 68, 0.3)", "width": 1},
+            fill="tonexty",
+            fillcolor="rgba(255, 153, 0, 0.08)",
+            name="Scenario Prudente (10° Pct)",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=time_steps,
+            y=p50,
+            mode="lines+markers",
+            line={"color": "#ff9900", "width": 3},
+            name="Traiettoria Mediana Attesa (50° Pct)",
+        )
+    )
 
     fig.update_layout(
         title="<b>Proiezione Monte Carlo della Ripresa del Net Worth a 10 Anni</b>",
@@ -600,8 +605,8 @@ def simulate_wealth_recovery_trajectories(
         template="plotly_dark",
         plot_bgcolor="rgba(10, 14, 20, 0.6)",
         paper_bgcolor="rgba(10, 14, 20, 0.0)",
-        margin=dict(l=20, r=20, t=50, b=30),
+        margin={"l": 20, "r": 20, "t": 50, "b": 30},
         height=360,
-        font=dict(family="Outfit, -apple-system, sans-serif", color="#e6edf3")
+        font={"family": "Outfit, -apple-system, sans-serif", "color": "#e6edf3"},
     )
     return fig

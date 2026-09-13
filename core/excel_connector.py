@@ -4,11 +4,12 @@
 # Bloomberg-Style BDP/BDH/RISK custom functions, VBA Macro generator & OpenPyXL exporter.
 # ==============================================================================
 
-import io
 import datetime
-from typing import Dict, Any, List, Optional
-import pandas as pd
+import io
+from typing import Any, Dict, List, Optional
+
 import numpy as np
+import pandas as pd
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. Bloomberg-Style Formula Definitions & Generator
@@ -30,7 +31,7 @@ EXCEL_SUPPORTED_FIELDS: Dict[str, Dict[str, str]] = {
     "MODIFIED_DURATION": {"desc": "Modified Duration (Sensibilità Tassi)", "category": "Fixed Income"},
     "CONVEXITY": {"desc": "Convessità di 2° Ordine", "category": "Fixed Income"},
     "DV01": {"desc": "Price Value of a Basis Point (€)", "category": "Fixed Income"},
-    "Z_SPREAD": {"desc": "Z-Spread su Curva Spot Sovrana (bps)", "category": "Fixed Income"}
+    "Z_SPREAD": {"desc": "Z-Spread su Curva Spot Sovrana (bps)", "category": "Fixed Income"},
 }
 
 EXCEL_PORTFOLIO_RISK_FIELDS: Dict[str, Dict[str, str]] = {
@@ -42,15 +43,22 @@ EXCEL_PORTFOLIO_RISK_FIELDS: Dict[str, Dict[str, str]] = {
     "PORTFOLIO_BETA": {"desc": "Beta Complessivo di Portafoglio"},
     "PORTFOLIO_MAX_DD": {"desc": "Max Drawdown Storico (%)"},
     "LVAR_5DAY": {"desc": "Liquidity-Adjusted VaR a 5 Giorni (€)"},
-    "GARCH_VOL_FORECAST": {"desc": "Previsione Volatilità GARCH(1,1) a 30D (%)"}
+    "GARCH_VOL_FORECAST": {"desc": "Previsione Volatilità GARCH(1,1) a 30D (%)"},
 }
 
-def build_bloomberg_formula(formula_type: str, ticker: str = "AAPL", field: str = "LAST_PRICE", start_date: str = "2024-01-01", end_date: str = "2026-08-01") -> str:
+
+def build_bloomberg_formula(
+    formula_type: str,
+    ticker: str = "AAPL",
+    field: str = "LAST_PRICE",
+    start_date: str = "2024-01-01",
+    end_date: str = "2026-08-01",
+) -> str:
     """Costruisce la stringa della formula Excel compatibile con il connettore ARGUS."""
     ftype = formula_type.upper().strip()
     tk = str(ticker).upper().strip()
     fld = str(field).upper().strip()
-    
+
     if ftype == "BDP":
         return f'=ARGUS_BDP("{tk}", "{fld}")'
     elif ftype == "BDH":
@@ -59,9 +67,11 @@ def build_bloomberg_formula(formula_type: str, ticker: str = "AAPL", field: str 
         return f'=ARGUS_RISK("{fld}")'
     return f'=ARGUS_BDP("{tk}", "{fld}")'
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. VBA Macro & Office Script Generator
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def generate_vba_macro_code() -> str:
     """Genera il codice VBA pronto per essere incollato in un modulo di Microsoft Excel."""
@@ -124,6 +134,7 @@ ErrHandler:
 End Function
 """
 
+
 def generate_office_script_code() -> str:
     """Genera il codice Microsoft Office Scripts (TypeScript) per Excel 365 e Web."""
     return """/**
@@ -172,9 +183,11 @@ async function main(workbook: ExcelScript.Workbook) {
 }
 """
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 3. Institutional Multi-Sheet Excel Exporter (OpenPyXL)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def export_institutional_multisheet_excel(results_bundle: Optional[Dict[str, Any]] = None) -> bytes:
     """
@@ -187,82 +200,156 @@ def export_institutional_multisheet_excel(results_bundle: Optional[Dict[str, Any
     """
     output = io.BytesIO()
     res = results_bundle or {}
-    
+
     # Estrazione DataFrame
     df_pos = res.get("positions", pd.DataFrame())
     metrics = res.get("metrics", {})
     m_risk = metrics.get("market_risk", {})
     m_ret = metrics.get("returns", {})
-    
+
     # 1. Executive Summary
-    tot_val = float(df_pos["current_value"].sum()) if not df_pos.empty and "current_value" in df_pos.columns else 100_000.0
+    tot_val = (
+        float(df_pos["current_value"].sum()) if not df_pos.empty and "current_value" in df_pos.columns else 100_000.0
+    )
     summary_data = [
         {"Metrica Istituzionale": "Data Calcolo", "Valore": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")},
         {"Metrica Istituzionale": "Controvalore Totale Portafoglio", "Valore": f"€ {tot_val:,.2f}"},
-        {"Metrica Istituzionale": "Numero Posizioni Attive", "Valore": len(df_pos[df_pos['current_value'] > 0]) if not df_pos.empty else 0},
+        {
+            "Metrica Istituzionale": "Numero Posizioni Attive",
+            "Valore": len(df_pos[df_pos["current_value"] > 0]) if not df_pos.empty else 0,
+        },
         {"Metrica Istituzionale": "Rendimento Annuo Storico (CAGR)", "Valore": f"{m_ret.get('cagr_pct', 12.5):.2f}%"},
-        {"Metrica Istituzionale": "Volatilità Annua Portafoglio", "Valore": f"{m_risk.get('volatility_annualized_pct', 18.0):.2f}%"},
+        {
+            "Metrica Istituzionale": "Volatilità Annua Portafoglio",
+            "Valore": f"{m_risk.get('volatility_annualized_pct', 18.0):.2f}%",
+        },
         {"Metrica Istituzionale": "Indice di Sharpe", "Valore": f"{m_risk.get('sharpe_ratio', 1.25):.2f}"},
         {"Metrica Istituzionale": "Beta vs Benchmark (SPY)", "Valore": f"{m_risk.get('beta', 1.05):.2f}"},
-        {"Metrica Istituzionale": "Parametric VaR 95% (1-Day)", "Valore": f"€ {m_risk.get('var_parametric_95_eur', tot_val * 0.0165):,.2f}"},
-        {"Metrica Istituzionale": "Expected Shortfall CVaR 95% (1-Day)", "Valore": f"€ {m_risk.get('cvar_95_eur', tot_val * 0.022):,.2f}"},
+        {
+            "Metrica Istituzionale": "Parametric VaR 95% (1-Day)",
+            "Valore": f"€ {m_risk.get('var_parametric_95_eur', tot_val * 0.0165):,.2f}",
+        },
+        {
+            "Metrica Istituzionale": "Expected Shortfall CVaR 95% (1-Day)",
+            "Valore": f"€ {m_risk.get('cvar_95_eur', tot_val * 0.022):,.2f}",
+        },
         {"Metrica Istituzionale": "Max Drawdown Storico", "Valore": f"{m_risk.get('max_drawdown_pct', -15.4):.2f}%"},
-        {"Metrica Istituzionale": "Tasso Risk-Free Attivo", "Valore": f"{res.get('risk_free', {}).get('rate_pct', 2.75):.2f}%"}
+        {
+            "Metrica Istituzionale": "Tasso Risk-Free Attivo",
+            "Valore": f"{res.get('risk_free', {}).get('rate_pct', 2.75):.2f}%",
+        },
     ]
     df_summary = pd.DataFrame(summary_data)
-    
+
     # 2. Posizioni
     if not df_pos.empty:
-        cols_pos_export = [c for c in ["ticker", "asset_class", "sector", "country", "qty_net", "avg_cost", "last_price", "current_value", "weight_pct", "unrealized_pnl", "unrealized_pnl_pct", "dividend_yield", "trailing_pe", "beta_5y"] if c in df_pos.columns]
+        cols_pos_export = [
+            c
+            for c in [
+                "ticker",
+                "asset_class",
+                "sector",
+                "country",
+                "qty_net",
+                "avg_cost",
+                "last_price",
+                "current_value",
+                "weight_pct",
+                "unrealized_pnl",
+                "unrealized_pnl_pct",
+                "dividend_yield",
+                "trailing_pe",
+                "beta_5y",
+            ]
+            if c in df_pos.columns
+        ]
         df_pos_exp = df_pos[cols_pos_export].copy()
     else:
         df_pos_exp = pd.DataFrame(columns=["ticker", "current_value", "weight_pct"])
-        
+
     # 3. Fixed Income Mock / Preset
     fi_data = [
-        {"Ticker": "IT10Y", "Nome": "BTP Decennale Repubblica Italiana", "Prezzo": 98.50, "Cedola": "4.00%", "YTM": "4.19%", "Mod_Duration": 7.82, "Convexity": 72.4, "DV01_EUR": 77.0, "Z_Spread_bps": 128.5},
-        {"Ticker": "DE10Y", "Nome": "Bund Decennale Germania (Benchmark)", "Prezzo": 101.20, "Cedola": "2.50%", "YTM": "2.36%", "Mod_Duration": 8.45, "Convexity": 81.0, "DV01_EUR": 85.5, "Z_Spread_bps": 0.0},
-        {"Ticker": "US10Y", "Nome": "US Treasury 10-Year Note", "Prezzo": 96.80, "Cedola": "3.875%", "YTM": "4.28%", "Mod_Duration": 7.95, "Convexity": 74.8, "DV01_EUR": 77.0, "Z_Spread_bps": 142.0},
-        {"Ticker": "CORP_ENI", "Nome": "ENI Sustainability-Linked 2030", "Prezzo": 99.10, "Cedola": "4.25%", "YTM": "4.41%", "Mod_Duration": 5.12, "Convexity": 32.8, "DV01_EUR": 50.7, "Z_Spread_bps": 165.0}
+        {
+            "Ticker": "IT10Y",
+            "Nome": "BTP Decennale Repubblica Italiana",
+            "Prezzo": 98.50,
+            "Cedola": "4.00%",
+            "YTM": "4.19%",
+            "Mod_Duration": 7.82,
+            "Convexity": 72.4,
+            "DV01_EUR": 77.0,
+            "Z_Spread_bps": 128.5,
+        },
+        {
+            "Ticker": "DE10Y",
+            "Nome": "Bund Decennale Germania (Benchmark)",
+            "Prezzo": 101.20,
+            "Cedola": "2.50%",
+            "YTM": "2.36%",
+            "Mod_Duration": 8.45,
+            "Convexity": 81.0,
+            "DV01_EUR": 85.5,
+            "Z_Spread_bps": 0.0,
+        },
+        {
+            "Ticker": "US10Y",
+            "Nome": "US Treasury 10-Year Note",
+            "Prezzo": 96.80,
+            "Cedola": "3.875%",
+            "YTM": "4.28%",
+            "Mod_Duration": 7.95,
+            "Convexity": 74.8,
+            "DV01_EUR": 77.0,
+            "Z_Spread_bps": 142.0,
+        },
+        {
+            "Ticker": "CORP_ENI",
+            "Nome": "ENI Sustainability-Linked 2030",
+            "Prezzo": 99.10,
+            "Cedola": "4.25%",
+            "YTM": "4.41%",
+            "Mod_Duration": 5.12,
+            "Convexity": 32.8,
+            "DV01_EUR": 50.7,
+            "Z_Spread_bps": 165.0,
+        },
     ]
     df_fi = pd.DataFrame(fi_data)
-    
+
     # 4. Almgren-Chriss Slicing Schedule
     ac_sched = []
     for k in range(1, 11):
         rem_pct = max(0.0, 100.0 * (1.0 - k / 10.0))
-        trade_eur = (tot_val / 10.0)
-        ac_sched.append({
-            "Fase": f"Scaglione T+{k}",
-            "Rimanenza (%)": f"{rem_pct:.1f}%",
-            "Volume da Smobilizzare (€)": f"€ {trade_eur:,.2f}",
-            "Costo Impatto Stimato (€)": f"€ {trade_eur * 0.0012:,.2f}",
-            "Execution VaR 95% (€)": f"€ {trade_eur * 0.0035:,.2f}"
-        })
+        trade_eur = tot_val / 10.0
+        ac_sched.append(
+            {
+                "Fase": f"Scaglione T+{k}",
+                "Rimanenza (%)": f"{rem_pct:.1f}%",
+                "Volume da Smobilizzare (€)": f"€ {trade_eur:,.2f}",
+                "Costo Impatto Stimato (€)": f"€ {trade_eur * 0.0012:,.2f}",
+                "Execution VaR 95% (€)": f"€ {trade_eur * 0.0035:,.2f}",
+            }
+        )
     df_ac_sched = pd.DataFrame(ac_sched)
-    
+
     # Scrittura con xlsxwriter
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         df_summary.to_excel(writer, sheet_name="Executive_Summary", index=False)
         df_pos_exp.to_excel(writer, sheet_name="Positions_Portfolio", index=False)
         df_fi.to_excel(writer, sheet_name="Fixed_Income_YAS", index=False)
         df_ac_sched.to_excel(writer, sheet_name="Execution_Schedule", index=False)
-        
+
         workbook = writer.book
-        header_fmt = workbook.add_format({
-            "bold": True,
-            "font_color": "#FFFFFF",
-            "bg_color": "#0D1117",
-            "border": 1,
-            "border_color": "#30363D"
-        })
-        
+        header_fmt = workbook.add_format(
+            {"bold": True, "font_color": "#FFFFFF", "bg_color": "#0D1117", "border": 1, "border_color": "#30363D"}
+        )
+
         # Applica formattazione e auto-fit a ciascun foglio
         for sheet_name, df_s in [
             ("Executive_Summary", df_summary),
             ("Positions_Portfolio", df_pos_exp),
             ("Fixed_Income_YAS", df_fi),
-            ("Execution_Schedule", df_ac_sched)
+            ("Execution_Schedule", df_ac_sched),
         ]:
             worksheet = writer.sheets[sheet_name]
             for col_num, col_name in enumerate(df_s.columns):
@@ -271,6 +358,6 @@ def export_institutional_multisheet_excel(results_bundle: Optional[Dict[str, Any
                 max_val_len = max(val_lens) if val_lens else 0
                 max_len = max(max_val_len, len(str(col_name)))
                 worksheet.set_column(col_num, col_num, min(max(max_len + 4, 15), 45))
-                
+
     output.seek(0)
     return output.getvalue()

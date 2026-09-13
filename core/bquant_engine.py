@@ -4,22 +4,26 @@
 # In-memory code executor with DuckDB, Pandas, Plotly and institutional presets.
 # ==============================================================================
 
-import sys
-import io
-import traceback
 import contextlib
+import io
+import sys
 import time
-from typing import Dict, Any, Optional, List, Tuple
-import pandas as pd
+import traceback
+from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
-import scipy
-from scipy import stats
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import scipy
+from scipy import stats
+
 try:
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     HAS_MATPLOTLIB = True
 except ImportError:
     plt = None
@@ -72,9 +76,8 @@ if df_returns is not None and not df_returns.empty and df_returns.shape[1] >= 2:
     df_out = corr_30d.reset_index().rename(columns={"index": "Ticker"})
 else:
     print("⚠️ Dati rendimenti non disponibili o con meno di 2 asset.")
-"""
+""",
     },
-    
     "duckdb_sql": {
         "title": "🦆 DuckDB SQL Analytics on Portfolio & Prices",
         "description": "Esegue query analitiche SQL ad alta velocità su DataFrame in-memory (df_positions, df_tx, df_prices) con calcolo aggregato di pesi, controvalori e concentrazione HHI.",
@@ -126,9 +129,8 @@ if not df_out.empty:
         template="plotly_dark"
     )
     fig.update_layout(height=420)
-"""
+""",
     },
-
     "factor_ols_hedge": {
         "title": "📐 Custom OLS Factor Regression & Optimal Hedge Ratio",
         "description": "Esegue una regressione lineare multivariata tra il portafoglio e i fattori di mercato per stimare Alpha, Beta, Tracking Error e Hedge Ratio ottimale con derivati.",
@@ -205,9 +207,8 @@ if df_returns is not None and not df_returns.empty:
         }])
     else:
         print("⚠️ Storico sovrapposto insufficiente tra portafoglio e benchmark (< 30 giorni).")
-"""
+""",
     },
-
     "drawdown_duration": {
         "title": "📉 Underwater & Drawdown Duration Analytics",
         "description": "Quantifica l'intensità e la durata temporale esatta dei periodi di perdita per ciascun asset in portafoglio, calcolando il tempo medio e massimo di recupero (Recovery Days).",
@@ -263,9 +264,8 @@ if df_returns is not None and not df_returns.empty:
         template="plotly_dark",
         height=450
     )
-"""
+""",
     },
-
     "risk_parity_rebal": {
         "title": "⚖️ Dynamic Risk-Parity Rebalancing Simulation",
         "description": "Simula un ribilanciamento ad Inverse-Volatility Risk Parity, calcolando i pesi ottimali, il delta rispetto all'allocazione attuale, il turnover e i costi di transazione stimati.",
@@ -320,11 +320,9 @@ if df_positions is not None and not df_positions.empty and df_returns is not Non
             height=430
         )
         df_out = df_comp
-"""
+""",
     },
-
     "wealth_monte_carlo": {
-
         "title": "🏛️ Wealth Net Worth & Stochastic Cashflow Simulation",
         "description": "Simula la traiettoria stocastica a 30 anni del Patrimonio Netto Consolidato integrando inflazione, risparmio mensile da flussi di cassa reali e volatilità dei mercati finanziari.",
         "category": "Wealth Management & Financial Planning",
@@ -387,24 +385,22 @@ df_out = pd.DataFrame({
     "Scenario Base Mediano (50°)": [f"€ {p50[i]:,.2f}" for i in [0, 5, 10, 15, 20, 25, 30]],
     "Scenario Ottimistico (90°)": [f"€ {p90[i]:,.2f}" for i in [0, 5, 10, 15, 20, 25, 30]]
 })
-"""
-    }
+""",
+    },
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 2. In-Memory Execution Engine & Sandbox
 # ─────────────────────────────────────────────────────────────────────────────
 
-def execute_bquant_script(
-    script_code: str,
-    context_bundle: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+
+def execute_bquant_script(script_code: str, context_bundle: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Esegue uno script Python analitico in-memory catturando output stdout/stderr,
     figure Plotly/Matplotlib, DataFrame pandas e variabili create.
     """
     t_start = time.perf_counter()
-    
+
     # Preparazione del context bundle
     ctx = context_bundle or {}
     results_obj = ctx.get("results", {})
@@ -417,8 +413,17 @@ def execute_bquant_script(
     benchmark_return = ctx.get("benchmark_return", results_obj.get("benchmark_return", pd.Series(dtype=float)))
     benchmark_ticker = ctx.get("benchmark_ticker", results_obj.get("benchmark_ticker", "SPY"))
     base_currency = ctx.get("base_currency", results_obj.get("base_currency", "EUR"))
-    portfolio_value = float(df_positions["current_value"].sum()) if (df_positions is not None and isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "current_value" in df_positions.columns) else 0.0
-    
+    portfolio_value = (
+        float(df_positions["current_value"].sum())
+        if (
+            df_positions is not None
+            and isinstance(df_positions, pd.DataFrame)
+            and not df_positions.empty
+            and "current_value" in df_positions.columns
+        )
+        else 0.0
+    )
+
     # Dataset Wealth integrati
     df_wealth_accounts = ctx.get("df_wealth_accounts", pd.DataFrame())
     df_wealth_cashflow = ctx.get("df_wealth_cashflow", pd.DataFrame())
@@ -456,53 +461,54 @@ def execute_bquant_script(
         "base_currency": base_currency,
         "portfolio_value": portfolio_value,
         "df_out": None,
-        "fig": None
+        "fig": None,
     }
 
-    
     # Cattura stdout e stderr
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
-    
+
     success = False
     error_msg = None
     output_df = None
     output_fig = None
-    
+
     try:
         # Reset stato matplotlib se disponibile
         if HAS_MATPLOTLIB and plt is not None:
             plt.close("all")
-        
+
         with contextlib.redirect_stdout(stdout_capture), contextlib.redirect_stderr(stderr_capture):
             exec(script_code, namespace)
-            
+
         success = True
-        
+
         # Rileva DataFrame in output
         if namespace.get("df_out") is not None and isinstance(namespace.get("df_out"), pd.DataFrame):
             output_df = namespace["df_out"]
         elif namespace.get("df_result") is not None and isinstance(namespace.get("df_result"), pd.DataFrame):
             output_df = namespace["df_result"]
-            
+
         # Rileva Figure Plotly in output
-        if namespace.get("fig") is not None and (isinstance(namespace.get("fig"), go.Figure) or hasattr(namespace.get("fig"), "to_dict")):
+        if namespace.get("fig") is not None and (
+            isinstance(namespace.get("fig"), go.Figure) or hasattr(namespace.get("fig"), "to_dict")
+        ):
             output_fig = namespace["fig"]
         elif namespace.get("figure") is not None and isinstance(namespace.get("figure"), go.Figure):
             output_fig = namespace["figure"]
-            
+
         # Se non c'è una figura Plotly ma c'è una figura Matplotlib attiva
         if output_fig is None and HAS_MATPLOTLIB and plt is not None and plt.get_fignums():
             output_fig = plt.gcf()
-            
+
     except Exception as e:
         success = False
         error_msg = f"{type(e).__name__}: {str(e)}\\n\\n{traceback.format_exc()}"
-        
+
     t_elapsed = time.perf_counter() - t_start
     stdout_text = stdout_capture.getvalue()
     stderr_text = stderr_capture.getvalue()
-    
+
     return {
         "success": success,
         "execution_time_sec": round(t_elapsed, 4),
@@ -511,8 +517,25 @@ def execute_bquant_script(
         "error": error_msg,
         "output_df": output_df,
         "output_fig": output_fig,
-        "variables_created": [k for k in namespace.keys() if k not in [
-            "__name__", "pd", "np", "scipy", "stats", "px", "go", "plt", "duckdb", 
-            "results", "df_positions", "df_prices", "df_returns", "df_tx"
-        ]]
+        "variables_created": [
+            k
+            for k in namespace.keys()
+            if k
+            not in [
+                "__name__",
+                "pd",
+                "np",
+                "scipy",
+                "stats",
+                "px",
+                "go",
+                "plt",
+                "duckdb",
+                "results",
+                "df_positions",
+                "df_prices",
+                "df_returns",
+                "df_tx",
+            ]
+        ],
     }

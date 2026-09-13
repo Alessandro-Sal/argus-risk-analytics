@@ -1,12 +1,14 @@
-import pytest
 import re
+
+import pytest
+
 from core.ui_utils import (
     KNOWN_METRICS_KNOWLEDGE_BASE,
-    resolve_metric_knowledge,
     format_institutional_5point_html,
-    render_metric_info_modal,
+    metric_card,
     render_info_tooltip,
-    metric_card
+    render_metric_info_modal,
+    resolve_metric_knowledge,
 )
 
 # Perimeter of metrics defined in the implementation plan

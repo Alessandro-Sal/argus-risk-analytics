@@ -13,34 +13,36 @@
 #     (rimosso il "fix" del validator che li azzerava)
 # ============================================================
 
-import pandas as pd
-import numpy as np
-import scipy.stats as stats
-import scipy.optimize as sco
-from sqlalchemy import text
 from datetime import datetime
-from sklearn.cluster import KMeans
-from sklearn.covariance import LedoitWolf
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-
+import numpy as np
+import pandas as pd
+import scipy.optimize as sco
+import scipy.stats as stats
+from sklearn.cluster import KMeans
+from sklearn.covariance import LedoitWolf
+from sqlalchemy import text
 
 # ── Costanti ────────────────────────────────────────────────
 
 TRADING_DAYS_YEAR = 252
-RISK_FREE_RATE    = 0.0275    # 2.75% annuo default istituzionale (BCE €STR)
-VAR_CONFIDENCE    = [0.95, 0.99]
+RISK_FREE_RATE = 0.0275  # 2.75% annuo default istituzionale (BCE €STR)
+VAR_CONFIDENCE = [0.95, 0.99]
 
 
 # ── Funzione principale ──────────────────────────────────────
 
-def compute_risk(portfolio_id: int,
-                 engine,
-                 benchmark_ticker: str = "SPY",
-                 df_tx: pd.DataFrame = None,
-                 df_prices: pd.DataFrame = None,
-                 risk_free_rate: float = None,
-                 base_currency: str = "EUR") -> dict:
+
+def compute_risk(
+    portfolio_id: int,
+    engine,
+    benchmark_ticker: str = "SPY",
+    df_tx: pd.DataFrame = None,
+    df_prices: pd.DataFrame = None,
+    risk_free_rate: float = None,
+    base_currency: str = "EUR",
+) -> dict:
     if df_tx is None or df_prices is None:
         df_tx, df_prices = _load_data(portfolio_id, engine, benchmark_ticker)
 
@@ -59,44 +61,55 @@ def compute_risk(portfolio_id: int,
             base_currency = curr_counts.index[0]
 
     from core.yield_curve import get_active_risk_free_rate
+
     rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
     active_rf_rate = rf_info["rate"]
 
     warnings_list = []
-    
+
     # Rettifica automatica Corporate Actions & Stock Splits sui lotti FIFO
     from core.corporate_actions import adjust_transactions_for_splits
+
     df_tx_adj, corp_actions_audit = adjust_transactions_for_splits(df_tx, auto_fetch=True)
 
-    df_positions            = _compute_positions(df_tx_adj, df_prices, warnings_list)
+    df_positions = _compute_positions(df_tx_adj, df_prices, warnings_list)
     df_returns, sr_portfolio = _compute_returns(df_positions, df_prices, df_tx_adj, warnings_list=warnings_list)
-    sr_benchmark            = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
+    sr_benchmark = _load_benchmark(benchmark_ticker, df_prices, df_returns.index)
 
-    # Calcolo Beta empirico per ciascun asset vs Benchmark
+    # Calcolo Beta empirico per ciascun asset vs Benchmark (vettorizzato ad alte prestazioni)
     if df_returns is not None and not df_returns.empty and sr_benchmark is not None and not sr_benchmark.empty:
         try:
-            asset_betas = {}
-            for col in df_returns.columns:
-                s_asset = df_returns[col].dropna()
-                s_bm = sr_benchmark.reindex(s_asset.index).dropna()
-                common_idx = s_asset.index.intersection(s_bm.index)
-                if len(common_idx) > 10:
-                    bm_sub = s_bm.loc[common_idx]
-                    bm_var = float(bm_sub.var())
-                    if bm_var > 1e-12:
-                        cov_val = float(np.cov(s_asset.loc[common_idx], bm_sub)[0, 1])
-                        asset_betas[col] = round(cov_val / bm_var, 3)
-            if "ticker" in df_positions.columns:
-                df_positions["beta"] = df_positions["ticker"].map(asset_betas)
+            s_bm = sr_benchmark.reindex(df_returns.index)
+            common_idx = df_returns.index.intersection(s_bm.dropna().index)
+            if len(common_idx) > 10:
+                bm_vals = s_bm.loc[common_idx].values
+                bm_var = float(np.nanvar(bm_vals, ddof=1))
+                if bm_var > 1e-12:
+                    bm_dev = bm_vals - np.nanmean(bm_vals)
+                    Y_vals = df_returns.loc[common_idx].values
+                    Y_dev = Y_vals - np.nanmean(Y_vals, axis=0)
+                    cov_vals = np.sum(Y_dev * bm_dev[:, np.newaxis], axis=0) / (len(common_idx) - 1)
+                    betas_raw = cov_vals / bm_var
+                    asset_betas = {
+                        col: round(float(b), 3)
+                        for col, b in zip(df_returns.columns, betas_raw)
+                        if np.isfinite(b)
+                    }
+                    if "ticker" in df_positions.columns:
+                        df_positions["beta"] = df_positions["ticker"].map(asset_betas)
         except Exception:
             pass
 
     metrics = {
-        "market_risk":   _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate, df_positions=df_positions),
-        "returns":       _calc_return_metrics(sr_portfolio, sr_benchmark, df_tx_adj, df_positions, risk_free_rate=active_rf_rate),
+        "market_risk": _calc_market_risk(
+            sr_portfolio, sr_benchmark, benchmark_ticker, risk_free_rate=active_rf_rate, df_positions=df_positions
+        ),
+        "returns": _calc_return_metrics(
+            sr_portfolio, sr_benchmark, df_tx_adj, df_positions, risk_free_rate=active_rf_rate
+        ),
         "concentration": _calc_concentration(df_positions, df_returns, sr_portfolio),
-        "ai_insights":   _calc_ai_insights(df_positions, df_returns, sr_portfolio),
-        "risk_free":     rf_info,
+        "ai_insights": _calc_ai_insights(df_positions, df_returns, sr_portfolio),
+        "risk_free": rf_info,
     }
 
     # Diversification Ratio Injection
@@ -104,9 +117,11 @@ def compute_risk(portfolio_id: int,
     metrics["market_risk"]["diversification_ratio"] = div_ratio_val
 
     from core.closed_trades import compute_closed_trades_journal
+
     closed_trades_data = compute_closed_trades_journal(df_tx=df_tx_adj, df_prices=df_prices, df_positions=df_positions)
 
     from core.garch_engine import compute_garch_fhs_bundle
+
     tot_val = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 100000.0
     garch_bundle = compute_garch_fhs_bundle(sr_portfolio, total_value=tot_val)
 
@@ -114,6 +129,7 @@ def compute_risk(portfolio_id: int,
     yield_params = {}
     try:
         from core.yield_curve import get_institutional_yield_curve
+
         inst_curve = get_institutional_yield_curve(base_currency)
         yield_params = inst_curve.get("nelson_siegel_params", {})
     except Exception:
@@ -123,17 +139,20 @@ def compute_risk(portfolio_id: int,
     options_hedging = {}
     try:
         from core.options_hedging import compute_covered_call_yield_enhancement
+
         df_cc = compute_covered_call_yield_enhancement(df_positions, risk_free_rate=active_rf_rate)
         if isinstance(df_cc, pd.DataFrame) and not df_cc.empty:
             options_hedging = {
                 "covered_call": {
                     "incasso_eseguibile_eur": float(df_cc["incasso_eseguibile_eur"].sum()),
                     "contratti_eseguibili": int(df_cc["contratti_eseguibili"].sum()),
-                    "incasso_totale_eur": float(df_cc["incasso_premio_totale"].sum())
+                    "incasso_totale_eur": float(df_cc["incasso_premio_totale"].sum()),
                 }
             }
         else:
-            options_hedging = {"covered_call": {"incasso_eseguibile_eur": 0.0, "contratti_eseguibili": 0, "incasso_totale_eur": 0.0}}
+            options_hedging = {
+                "covered_call": {"incasso_eseguibile_eur": 0.0, "contratti_eseguibili": 0, "incasso_totale_eur": 0.0}
+            }
     except Exception:
         options_hedging = {}
 
@@ -141,13 +160,14 @@ def compute_risk(portfolio_id: int,
     regime_summary = {}
     try:
         from core.regime_switching import compute_market_regime_states
+
         regime_res = compute_market_regime_states(sr_portfolio)
         if regime_res and isinstance(regime_res, dict):
             probs = regime_res.get("regime_probabilities", {})
             crisis_p = probs.get("Crisis High-Vol", probs.get("Bear High-Vol", 0.0))
             regime_summary = {
                 "current_regime": regime_res.get("current_regime", "Normal"),
-                "regime_crisis_probability": float(crisis_p or 0.0)
+                "regime_crisis_probability": float(crisis_p or 0.0),
             }
     except Exception:
         regime_summary = {}
@@ -156,16 +176,19 @@ def compute_risk(portfolio_id: int,
     tax_summary = {}
     try:
         from core.tax_engine import compute_tax_and_harvesting
+
         tax_res = compute_tax_and_harvesting({"df_tx": df_tx_adj, "positions": df_positions})
         if tax_res and isinstance(tax_res, dict):
             summ = tax_res.get("summary", {})
-            tot_val_curr = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 1.0
+            tot_val_curr = (
+                float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 1.0
+            )
             tax_due_val = float(summ.get("estimated_tax_due_eur", 0.0) or 0.0)
             drag = (tax_due_val / tot_val_curr * 100.0) if tot_val_curr > 0 else 0.0
             tax_summary = {
                 "accumulated_minusvalenze_eur": float(summ.get("tax_credit_zainetto_eur", 0.0) or 0.0),
                 "total_tax_due_eur": tax_due_val,
-                "tax_drag_pct": drag
+                "tax_drag_pct": drag,
             }
     except Exception:
         tax_summary = {}
@@ -174,6 +197,7 @@ def compute_risk(portfolio_id: int,
     fixed_income_summary = {}
     try:
         from core.fixed_income import compute_fixed_income_analytics
+
         fi_res = compute_fixed_income_analytics(df_positions, base_currency=base_currency)
         if fi_res and isinstance(fi_res, dict):
             fixed_income_summary = fi_res
@@ -184,6 +208,7 @@ def compute_risk(portfolio_id: int,
     lvar_summary = {}
     try:
         from core.advanced_quant import compute_liquidity_adjusted_var
+
         if "current_value" in df_positions.columns:
             pos_vals = df_positions["current_value"].values
             lvar_summary = compute_liquidity_adjusted_var(pos_vals, daily_returns=df_returns)
@@ -196,7 +221,12 @@ def compute_risk(portfolio_id: int,
 
     # Stop Loss ATR, Chandelier Exit & RSI
     atr_exits = compute_atr_chandelier_exits(df_prices, df_positions)
-    if isinstance(atr_exits, dict) and "summary" in atr_exits and isinstance(df_positions, pd.DataFrame) and not df_positions.empty:
+    if (
+        isinstance(atr_exits, dict)
+        and "summary" in atr_exits
+        and isinstance(df_positions, pd.DataFrame)
+        and not df_positions.empty
+    ):
         for ex in atr_exits.get("summary", []):
             tk = ex.get("ticker")
             mask = df_positions["ticker"] == tk
@@ -204,30 +234,47 @@ def compute_risk(portfolio_id: int,
                 df_positions.loc[mask, "atr_14_eur"] = ex.get("atr_14")
                 df_positions.loc[mask, "chandelier_exit_long_eur"] = ex.get("chandelier_stop")
 
-    # Calcolo RSI 14 per ciascuna posizione
-    if isinstance(df_prices, pd.DataFrame) and not df_prices.empty and "ticker" in df_prices.columns and "close" in df_prices.columns:
-        rsi_map = {}
-        for tk in df_positions["ticker"].unique():
-            px_sub = df_prices[df_prices["ticker"] == tk].sort_values("price_date")
+    # Calcolo RSI 14 per ciascuna posizione (vettorizzato)
+    if (
+        isinstance(df_prices, pd.DataFrame)
+        and not df_prices.empty
+        and "ticker" in df_prices.columns
+        and "close" in df_prices.columns
+        and isinstance(df_positions, pd.DataFrame)
+        and not df_positions.empty
+        and "ticker" in df_positions.columns
+    ):
+        try:
+            unique_tickers = list(df_positions["ticker"].dropna().unique())
+            px_sub = df_prices[df_prices["ticker"].isin(unique_tickers)].copy()
             if not px_sub.empty and len(px_sub) >= 2:
-                closes = px_sub["close"].dropna().astype(float)
-                delta = closes.diff()
-                gain = delta.clip(lower=0)
-                loss = -delta.clip(upper=0)
-                avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
-                avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
-                rs = avg_gain / (avg_loss + 1e-9)
-                rsi14 = 100.0 - (100.0 / (1.0 + rs))
-                if not rsi14.empty and pd.notna(rsi14.iloc[-1]):
-                    rsi_map[tk] = float(rsi14.iloc[-1])
-        if rsi_map:
-            df_positions["rsi_14"] = df_positions["ticker"].map(rsi_map)
+                px_sub["close"] = pd.to_numeric(px_sub["close"], errors="coerce")
+                piv = px_sub.pivot_table(index="price_date", columns="ticker", values="close").sort_index()
+                deltas = piv.diff()
+                gains = deltas.clip(lower=0.0)
+                losses = -deltas.clip(upper=0.0)
+                avg_gains = gains.ewm(alpha=1 / 14, adjust=False).mean()
+                avg_losses = losses.ewm(alpha=1 / 14, adjust=False).mean()
+                rs = avg_gains / (avg_losses + 1e-9)
+                rsi_df = 100.0 - (100.0 / (1.0 + rs))
+                last_rsi = rsi_df.ffill().iloc[-1].dropna().to_dict()
+                df_positions["rsi_14"] = df_positions["ticker"].map(last_rsi)
+        except Exception:
+            pass
 
     # Metriche Fondamentali, Multipli e Forensic Accounting su Posizioni (vettorizzato)
     try:
         if isinstance(df_positions, pd.DataFrame) and not df_positions.empty:
-            ac_s = df_positions["asset_class"].fillna("stock").astype(str).str.lower() if "asset_class" in df_positions.columns else pd.Series("stock", index=df_positions.index)
-            sec_s = df_positions["sector"].fillna("").astype(str).str.lower() if "sector" in df_positions.columns else pd.Series("", index=df_positions.index)
+            ac_s = (
+                df_positions["asset_class"].fillna("stock").astype(str).str.lower()
+                if "asset_class" in df_positions.columns
+                else pd.Series("stock", index=df_positions.index)
+            )
+            sec_s = (
+                df_positions["sector"].fillna("").astype(str).str.lower()
+                if "sector" in df_positions.columns
+                else pd.Series("", index=df_positions.index)
+            )
             is_crypto = (ac_s == "crypto") | sec_s.str.contains("crypto", na=False)
             valid_mask = ~is_crypto
 
@@ -235,11 +282,31 @@ def compute_risk(portfolio_id: int,
             df_positions.loc[valid_mask, "beneish_m_score"] = -2.45
             df_positions.loc[valid_mask, "sloan_accrual_ratio"] = 0.035
 
-            mkt_cap = pd.to_numeric(df_positions["market_cap"], errors="coerce") if "market_cap" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
-            ebitda = pd.to_numeric(df_positions["ebitda"], errors="coerce") if "ebitda" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
-            deb_eq = pd.to_numeric(df_positions["debt_to_equity"], errors="coerce") if "debt_to_equity" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
-            roe_val = pd.to_numeric(df_positions["roe"], errors="coerce") if "roe" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
-            p_margin = pd.to_numeric(df_positions["profit_margins"], errors="coerce") if "profit_margins" in df_positions.columns else pd.Series(np.nan, index=df_positions.index)
+            mkt_cap = (
+                pd.to_numeric(df_positions["market_cap"], errors="coerce")
+                if "market_cap" in df_positions.columns
+                else pd.Series(np.nan, index=df_positions.index)
+            )
+            ebitda = (
+                pd.to_numeric(df_positions["ebitda"], errors="coerce")
+                if "ebitda" in df_positions.columns
+                else pd.Series(np.nan, index=df_positions.index)
+            )
+            deb_eq = (
+                pd.to_numeric(df_positions["debt_to_equity"], errors="coerce")
+                if "debt_to_equity" in df_positions.columns
+                else pd.Series(np.nan, index=df_positions.index)
+            )
+            roe_val = (
+                pd.to_numeric(df_positions["roe"], errors="coerce")
+                if "roe" in df_positions.columns
+                else pd.Series(np.nan, index=df_positions.index)
+            )
+            p_margin = (
+                pd.to_numeric(df_positions["profit_margins"], errors="coerce")
+                if "profit_margins" in df_positions.columns
+                else pd.Series(np.nan, index=df_positions.index)
+            )
 
             # EV/EBITDA
             ev_mask = valid_mask & mkt_cap.notna() & ebitda.notna() & (ebitda > 0)
@@ -249,7 +316,9 @@ def compute_risk(portfolio_id: int,
             # Free Cash Flow Yield approssimato da EBITDA / Market Cap
             fcf_mask = valid_mask & mkt_cap.notna() & ebitda.notna() & (mkt_cap > 0)
             if fcf_mask.any():
-                df_positions.loc[fcf_mask, "free_cash_flow_yield"] = ((ebitda[fcf_mask] * 0.7) / mkt_cap[fcf_mask]) * 100.0
+                df_positions.loc[fcf_mask, "free_cash_flow_yield"] = (
+                    (ebitda[fcf_mask] * 0.7) / mkt_cap[fcf_mask]
+                ) * 100.0
 
             # Altman Z-Score
             altman_mask = valid_mask & deb_eq.notna() & p_margin.notna()
@@ -262,9 +331,7 @@ def compute_risk(portfolio_id: int,
 
                 roe_sub = roe_val[altman_mask].values
                 roe_boost = np.where(
-                    ~np.isnan(roe_sub) & (np.where(np.abs(roe_sub) <= 1.0, roe_sub * 100.0, roe_sub) > 15.0),
-                    0.4,
-                    0.0
+                    ~np.isnan(roe_sub) & (np.where(np.abs(roe_sub) <= 1.0, roe_sub * 100.0, roe_sub) > 15.0), 0.4, 0.0
                 )
                 df_positions.loc[altman_mask, "altman_z_score"] = z_score + roe_boost
 
@@ -284,36 +351,36 @@ def compute_risk(portfolio_id: int,
     risk_contrib = _calc_risk_contribution(df_returns, df_positions)
 
     return {
-        "portfolio_id":        portfolio_id,
-        "computed_at":         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "df_tx":               df_tx_adj,
-        "df_tx_raw":           df_tx,
-        "corporate_actions":   corp_actions_audit,
-        "positions":           df_positions,
-        "returns":             df_returns,
-        "portfolio_return":    sr_portfolio,
-        "benchmark_return":    sr_benchmark,
-        "df_prices":           df_prices,
-        "atr_exits":           atr_exits,
-        "metrics":             metrics,
-        "risk_free":           rf_info,
-        "garch_fhs":           garch_bundle,
-        "yield_curve_params":  yield_params,
-        "options_hedging":     options_hedging,
-        "regime_summary":      regime_summary,
-        "tax_summary":         tax_summary,
+        "portfolio_id": portfolio_id,
+        "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "df_tx": df_tx_adj,
+        "df_tx_raw": df_tx,
+        "corporate_actions": corp_actions_audit,
+        "positions": df_positions,
+        "returns": df_returns,
+        "portfolio_return": sr_portfolio,
+        "benchmark_return": sr_benchmark,
+        "df_prices": df_prices,
+        "atr_exits": atr_exits,
+        "metrics": metrics,
+        "risk_free": rf_info,
+        "garch_fhs": garch_bundle,
+        "yield_curve_params": yield_params,
+        "options_hedging": options_hedging,
+        "regime_summary": regime_summary,
+        "tax_summary": tax_summary,
         "fixed_income_summary": fixed_income_summary,
-        "l_var_summary":        lvar_summary,
-        "risk_contribution":   risk_contrib,
-        "stress_tests":        _calc_stress_tests(df_returns, df_positions, sr_benchmark),
-        "optimization":        _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
-        "closed_trades":       closed_trades_data,
-        "warnings":            warnings_list
+        "l_var_summary": lvar_summary,
+        "risk_contribution": risk_contrib,
+        "stress_tests": _calc_stress_tests(df_returns, df_positions, sr_benchmark),
+        "optimization": _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
+        "closed_trades": closed_trades_data,
+        "warnings": warnings_list,
     }
 
 
-
 # ── Load data ────────────────────────────────────────────────
+
 
 def _load_data(portfolio_id: int, engine, benchmark_ticker: str) -> tuple:
     sql_tx = text("""
@@ -348,15 +415,16 @@ def _load_data(portfolio_id: int, engine, benchmark_ticker: str) -> tuple:
         ORDER BY a.ticker, mp.price_date
     """)
     with engine.connect() as conn:
-        df_tx     = pd.read_sql(sql_tx,     conn, params={"pid": portfolio_id})
+        df_tx = pd.read_sql(sql_tx, conn, params={"pid": portfolio_id})
         df_prices = pd.read_sql(sql_prices, conn, params={"pid": portfolio_id, "bm": benchmark_ticker})
 
-    df_tx["tx_date"]        = pd.to_datetime(df_tx["tx_date"])
+    df_tx["tx_date"] = pd.to_datetime(df_tx["tx_date"])
     df_prices["price_date"] = pd.to_datetime(df_prices["price_date"])
     return df_tx, df_prices
 
 
 # ── FIFO engine ──────────────────────────────────────────────
+
 
 def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
     """
@@ -370,25 +438,34 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
     Per ogni sell consuma i lotti pi vecchi prima.
     """
     from collections import deque
+
     grp = grp.sort_values(["tx_date", "tx_id"] if "tx_id" in grp.columns else ["tx_date"])
 
     n_rows = len(grp)
     if n_rows == 0:
         return {"qty_net": 0.0, "avg_cost": 0.0, "realized_pnl": 0.0, "dividends_total": 0.0}
 
-    queue     = deque()   # deque of [qty_rimasta, prezzo_carico_eur]
-    realized  = 0.0
+    queue = deque()  # deque of [qty_rimasta, prezzo_carico_eur]
+    realized = 0.0
     dividends = 0.0
 
     prices = grp["price"].to_numpy(dtype=np.float64)
     quantities = grp["quantity"].to_numpy(dtype=np.float64)
     tx_types = grp["tx_type"].astype(str).str.lower().str.strip().values
-    currencies = grp["currency"].astype(str).str.upper().str.strip().values if "currency" in grp.columns else np.array(["EUR"] * n_rows)
-    fees = grp["fees"].fillna(0.0).to_numpy(dtype=np.float64) if "fees" in grp.columns else np.zeros(n_rows, dtype=np.float64)
+    currencies = (
+        grp["currency"].astype(str).str.upper().str.strip().values
+        if "currency" in grp.columns
+        else np.array(["EUR"] * n_rows)
+    )
+    fees = (
+        grp["fees"].fillna(0.0).to_numpy(dtype=np.float64)
+        if "fees" in grp.columns
+        else np.zeros(n_rows, dtype=np.float64)
+    )
 
     if fx_series is not None and not fx_series.empty:
         tx_dates = pd.to_datetime(grp["tx_date"].values)
-        fx_indices = fx_series.index.get_indexer(tx_dates, method='ffill')
+        fx_indices = fx_series.index.get_indexer(tx_dates, method="ffill")
         fx_vals = np.where(fx_indices >= 0, fx_series.values[fx_indices], fx_series.iloc[0])
         non_eur_mask = ~np.isin(currencies, ["EUR", "", "NAN", "NONE"])
         fx_multipliers = np.where(non_eur_mask, fx_vals, 1.0)
@@ -416,15 +493,29 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
             while qty_to_sell > 1e-9 and queue:
                 lot = queue[0]
                 if lot[0] <= qty_to_sell + 1e-9:
-                    realized     += lot[0] * (price_eur - lot[1])
-                    qty_to_sell  -= lot[0]
+                    realized += lot[0] * (price_eur - lot[1])
+                    qty_to_sell -= lot[0]
                     queue.popleft()
                 else:
-                    realized     += qty_to_sell * (price_eur - lot[1])
-                    lot[0]       -= qty_to_sell
-                    qty_to_sell   = 0.0
+                    realized += qty_to_sell * (price_eur - lot[1])
+                    lot[0] -= qty_to_sell
+                    qty_to_sell = 0.0
 
-        elif tx in ["split", "frazionamento", "raggruppamento", "reverse_split", "reverse split", "stock_split", "stock split", "stock_dividend", "fusione", "merger", "scambio", "spinoff", "scissione"]:
+        elif tx in [
+            "split",
+            "frazionamento",
+            "raggruppamento",
+            "reverse_split",
+            "reverse split",
+            "stock_split",
+            "stock split",
+            "stock_dividend",
+            "fusione",
+            "merger",
+            "scambio",
+            "spinoff",
+            "scissione",
+        ]:
             split_ratio = float(quantities[i] or prices[i] or 1.0)
             if split_ratio > 0.0 and split_ratio != 1.0:
                 for lot in queue:
@@ -434,29 +525,32 @@ def _fifo_engine(grp: pd.DataFrame, fx_series: pd.Series = None) -> dict:
         elif tx == "dividend":
             dividends += price_eur
 
-    qty_net  = sum(lot[0] for lot in queue)
+    qty_net = sum(lot[0] for lot in queue)
     cost_rem = sum(lot[0] * lot[1] for lot in queue)
     avg_cost = cost_rem / qty_net if qty_net > 1e-9 else 0.0
 
     return {
-        "qty_net":         round(float(qty_net), 8),
-        "avg_cost":        round(float(avg_cost), 6),
-        "realized_pnl":    round(float(realized), 2),
+        "qty_net": round(float(qty_net), 8),
+        "avg_cost": round(float(avg_cost), 6),
+        "realized_pnl": round(float(realized), 2),
         "dividends_total": round(float(dividends), 2),
     }
 
 
 # ── Posizioni correnti ───────────────────────────────────────
 
-def _compute_positions(df_tx: pd.DataFrame,
-                       df_prices: pd.DataFrame,
-                       warnings_list: list = None) -> pd.DataFrame:
+
+def _compute_positions(df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_list: list = None) -> pd.DataFrame:
     rows = []
 
     for ticker, grp in df_tx.groupby("ticker"):
         meta = grp.iloc[0]
         currency_raw = meta.get("asset_currency") or meta.get("currency")
-        if not currency_raw or pd.isna(currency_raw) or str(currency_raw).strip().upper() in ["NAN", "NONE", "NULL", ""]:
+        if (
+            not currency_raw
+            or pd.isna(currency_raw)
+            or str(currency_raw).strip().upper() in ["NAN", "NONE", "NULL", ""]
+        ):
             currency = "EUR"
         else:
             currency = str(currency_raw).strip().upper()
@@ -479,32 +573,35 @@ def _compute_positions(df_tx: pd.DataFrame,
                 current_fx_rate = float(fx_series.iloc[-1])
             else:
                 if warnings_list is not None:
-                    warnings_list.append(f"Tasso di cambio {fx_ticker} non trovato. I valori per {ticker} sono calcolati con tasso di cambio predefinito = 1.0 (EUR).")
+                    warnings_list.append(
+                        f"Tasso di cambio {fx_ticker} non trovato. I valori per {ticker} sono calcolati con tasso di cambio predefinito = 1.0 (EUR)."
+                    )
 
         # Prezzi: ultimo disponibile
         ticker_prices = df_prices[df_prices["ticker"] == ticker]
-        last_price = (
-            ticker_prices.sort_values("price_date")["close"].iloc[-1]
-            if not ticker_prices.empty else None
-        )
+        last_price = ticker_prices.sort_values("price_date")["close"].iloc[-1] if not ticker_prices.empty else None
         # FIFO engine
         fifo = _fifo_engine(grp, fx_series)
 
-        qty_net          = fifo["qty_net"]
-        avg_cost         = fifo["avg_cost"]
-        realized_pnl     = fifo["realized_pnl"]
-        dividends_total  = fifo["dividends_total"]
+        qty_net = fifo["qty_net"]
+        avg_cost = fifo["avg_cost"]
+        realized_pnl = fifo["realized_pnl"]
+        dividends_total = fifo["dividends_total"]
 
         if last_price is None:
             if avg_cost > 0:
                 last_price = avg_cost
                 if warnings_list is not None:
-                    warnings_list.append(f"Ultimo prezzo per {ticker} non trovato: utilizzato il prezzo medio FIFO ({avg_cost:.4f} EUR) come stima conservativa.")
+                    warnings_list.append(
+                        f"Ultimo prezzo per {ticker} non trovato: utilizzato il prezzo medio FIFO ({avg_cost:.4f} EUR) come stima conservativa."
+                    )
             else:
                 if warnings_list is not None:
-                    warnings_list.append(f"Ultimo prezzo storico per {ticker} non trovato. Il valore dell'asset è stimato a zero.")
+                    warnings_list.append(
+                        f"Ultimo prezzo storico per {ticker} non trovato. Il valore dell'asset è stimato a zero."
+                    )
 
-        last_price_eur   = last_price * current_fx_rate if last_price else None
+        last_price_eur = last_price * current_fx_rate if last_price else None
 
         # ADV e DTL (Days to Liquidate)
         adv = 0.0
@@ -516,10 +613,10 @@ def _compute_positions(df_tx: pd.DataFrame,
                 if adv > 0 and qty_net > 0:
                     days_to_liquidate = qty_net / (adv * 0.15)
 
-        current_value    = qty_net * last_price_eur if last_price_eur and qty_net > 1e-9 else 0.0
-        cost_basis       = qty_net * avg_cost
-        unrealized_pnl   = current_value - cost_basis
-        total_return     = unrealized_pnl + realized_pnl + dividends_total
+        current_value = qty_net * last_price_eur if last_price_eur and qty_net > 1e-9 else 0.0
+        cost_basis = qty_net * avg_cost
+        unrealized_pnl = current_value - cost_basis
+        total_return = unrealized_pnl + realized_pnl + dividends_total
 
         # Yield on Cost (YoC)
         yield_on_cost_pct = (dividends_total / cost_basis * 100) if cost_basis > 0 else 0.0
@@ -532,85 +629,88 @@ def _compute_positions(df_tx: pd.DataFrame,
         )
 
         from core.metadata_resolver import resolve_asset_metadata
+
         c_resolved, s_resolved = resolve_asset_metadata(
-            ticker,
-            meta.get("asset_class"),
-            meta.get("country"),
-            meta.get("gics_sector")
+            ticker, meta.get("asset_class"), meta.get("country"), meta.get("gics_sector")
         )
 
-        rows.append({
-            "ticker":          ticker,
-            "asset_class":     meta.get("asset_class"),
-            "gics_sector":     s_resolved,
-            "sector":          s_resolved,
-            "country":         c_resolved,
-            "currency":        "EUR",  # Base currency di valorizzazione
-            "asset_currency":  currency, # Valuta originale di denominazione
-            "fx_rate_spot":    round(current_fx_rate, 6),
-            "qty_net":         qty_net,
-            "avg_cost":        avg_cost,
-            "last_price":      round(last_price_eur, 6) if last_price_eur else None,
-            "current_value":   round(current_value, 2),
-            "cost_basis":      round(cost_basis, 2),
-            "unrealized_pnl":  round(unrealized_pnl, 2),
-            "unrealized_pnl_pct": round((unrealized_pnl / cost_basis * 100.0), 2) if cost_basis > 0 else 0.0,
-            "realized_pnl":    round(realized_pnl, 2),
-            "dividends_total": round(dividends_total, 2),
-            "yield_on_cost_pct": round(yield_on_cost_pct, 4),
-            "total_return":    round(total_return, 2),
-            "days_to_liquidate": round(days_to_liquidate, 2) if days_to_liquidate else None,
-            "trailing_pe":     meta.get("trailing_pe"),
-            "forward_pe":      meta.get("forward_pe"),
-            "price_to_book":   meta.get("price_to_book"),
-            "dividend_yield":  meta.get("dividend_yield"),
-            "roe":             meta.get("roe"),
-            "target_mean_price": target_mean_price_eur,
-            "peg_ratio":       meta.get("peg_ratio"),
-            "industry":        meta.get("industry"),
-            "exchange":        meta.get("exchange"),
-            "recommendation_key": meta.get("recommendation_key"),
-            "market_cap":      meta.get("market_cap"),
-            "beta_5y":         meta.get("beta_5y"),
-            "fifty_two_week_high": meta.get("fifty_two_week_high"),
-            "fifty_two_week_low":  meta.get("fifty_two_week_low"),
-            "fifty_day_average":   meta.get("fifty_day_average"),
-            "two_hundred_day_average": meta.get("two_hundred_day_average"),
-            "profit_margins":  meta.get("profit_margins"),
-            "gross_margins":   meta.get("gross_margins"),
-            "operating_margins": meta.get("operating_margins"),
-            "total_revenue":   meta.get("total_revenue"),
-            "ebitda":          meta.get("ebitda"),
-            "debt_to_equity":  meta.get("debt_to_equity"),
-            "revenue_growth":  meta.get("revenue_growth"),
-            "earnings_growth": meta.get("earnings_growth")
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "asset_class": meta.get("asset_class"),
+                "gics_sector": s_resolved,
+                "sector": s_resolved,
+                "country": c_resolved,
+                "currency": "EUR",  # Base currency di valorizzazione
+                "asset_currency": currency,  # Valuta originale di denominazione
+                "fx_rate_spot": round(current_fx_rate, 6),
+                "qty_net": qty_net,
+                "avg_cost": avg_cost,
+                "last_price": round(last_price_eur, 6) if last_price_eur else None,
+                "current_value": round(current_value, 2),
+                "cost_basis": round(cost_basis, 2),
+                "unrealized_pnl": round(unrealized_pnl, 2),
+                "unrealized_pnl_pct": round((unrealized_pnl / cost_basis * 100.0), 2) if cost_basis > 0 else 0.0,
+                "realized_pnl": round(realized_pnl, 2),
+                "dividends_total": round(dividends_total, 2),
+                "yield_on_cost_pct": round(yield_on_cost_pct, 4),
+                "total_return": round(total_return, 2),
+                "days_to_liquidate": round(days_to_liquidate, 2) if days_to_liquidate else None,
+                "trailing_pe": meta.get("trailing_pe"),
+                "forward_pe": meta.get("forward_pe"),
+                "price_to_book": meta.get("price_to_book"),
+                "dividend_yield": meta.get("dividend_yield"),
+                "roe": meta.get("roe"),
+                "target_mean_price": target_mean_price_eur,
+                "peg_ratio": meta.get("peg_ratio"),
+                "industry": meta.get("industry"),
+                "exchange": meta.get("exchange"),
+                "recommendation_key": meta.get("recommendation_key"),
+                "market_cap": meta.get("market_cap"),
+                "beta_5y": meta.get("beta_5y"),
+                "fifty_two_week_high": meta.get("fifty_two_week_high"),
+                "fifty_two_week_low": meta.get("fifty_two_week_low"),
+                "fifty_day_average": meta.get("fifty_day_average"),
+                "two_hundred_day_average": meta.get("two_hundred_day_average"),
+                "profit_margins": meta.get("profit_margins"),
+                "gross_margins": meta.get("gross_margins"),
+                "operating_margins": meta.get("operating_margins"),
+                "total_revenue": meta.get("total_revenue"),
+                "ebitda": meta.get("ebitda"),
+                "debt_to_equity": meta.get("debt_to_equity"),
+                "revenue_growth": meta.get("revenue_growth"),
+                "earnings_growth": meta.get("earnings_growth"),
+            }
+        )
 
     df_pos = pd.DataFrame(rows)
 
     # Peso % sul portafoglio (solo posizioni aperte)
     total_value = df_pos["current_value"].sum()
-    df_pos["weight_pct"] = (
-        (df_pos["current_value"] / total_value * 100).round(4)
-        if total_value > 0 else 0.0
-    )
+    df_pos["weight_pct"] = (df_pos["current_value"] / total_value * 100).round(4) if total_value > 0 else 0.0
 
     return df_pos.sort_values("current_value", ascending=False).reset_index(drop=True)
 
 
 # ── Rendimenti giornalieri ───────────────────────────────────
 
-def _compute_returns(df_positions: pd.DataFrame,
-                     df_prices: pd.DataFrame,
-                     df_tx: pd.DataFrame,
-                     warnings_list: list = None) -> tuple:
-    pivot = df_prices.pivot(
-        index="price_date", columns="ticker", values="close"
-    )
-    
+
+def _compute_returns(
+    df_positions: pd.DataFrame, df_prices: pd.DataFrame, df_tx: pd.DataFrame, warnings_list: list = None
+) -> tuple:
+    pivot = df_prices.pivot(index="price_date", columns="ticker", values="close")
+
     # ── FX Risk Adjustment ──
     # Converti i prezzi alla base_currency (EUR) moltiplicando per il cambio
-    curr_map = df_tx.groupby("ticker")["currency"].last().to_dict() if (df_tx is not None and not df_tx.empty and "currency" in df_tx.columns) else (df_positions.set_index("ticker")["asset_currency"].to_dict() if "asset_currency" in df_positions.columns else {})
+    curr_map = (
+        df_tx.groupby("ticker")["currency"].last().to_dict()
+        if (df_tx is not None and not df_tx.empty and "currency" in df_tx.columns)
+        else (
+            df_positions.set_index("ticker")["asset_currency"].to_dict()
+            if "asset_currency" in df_positions.columns
+            else {}
+        )
+    )
     for tk in df_positions["ticker"].unique():
         if tk in pivot.columns:
             curr = str(curr_map.get(tk, "EUR")).upper().strip()
@@ -625,18 +725,28 @@ def _compute_returns(df_positions: pd.DataFrame,
                     pivot[tk] = pivot[tk] * (1.0 / fx_series_inv)
 
     # ── Market Data Quality Gate: Rilevamento Serie Illiquide, Prezzi Stantii e Salti Anomali ──
-    active_tickers = df_positions[df_positions["qty_net"].abs() > 1e-8]["ticker"].tolist() if "qty_net" in df_positions.columns else df_positions["ticker"].tolist()
+    active_tickers = (
+        df_positions[df_positions["qty_net"].abs() > 1e-8]["ticker"].tolist()
+        if "qty_net" in df_positions.columns
+        else df_positions["ticker"].tolist()
+    )
     if warnings_list is not None and not pivot.empty:
         try:
             for tk in active_tickers:
                 if tk in pivot.columns:
                     s_tk = pivot[tk].dropna()
                     if len(s_tk) > 5:
-                        zero_diff_streak = int((s_tk.diff() == 0).astype(int).groupby((s_tk.diff() != 0).cumsum()).sum().max())
+                        zero_diff_streak = int(
+                            (s_tk.diff() == 0).astype(int).groupby((s_tk.diff() != 0).cumsum()).sum().max()
+                        )
                         if zero_diff_streak >= 10:
-                            warnings_list.append(f"Data Quality Alert: l'asset {tk} presenta una serie prezzi piatta/stantia per {zero_diff_streak} giorni consecutivi.")
+                            warnings_list.append(
+                                f"Data Quality Alert: l'asset {tk} presenta una serie prezzi piatta/stantia per {zero_diff_streak} giorni consecutivi."
+                            )
                     elif len(s_tk) <= 3 and len(pivot) > 30:
-                        warnings_list.append(f"Data Quality Alert: l'asset {tk} ha solo {len(s_tk)} quotazioni storiche disponibili rispetto all'orizzonte di analisi.")
+                        warnings_list.append(
+                            f"Data Quality Alert: l'asset {tk} ha solo {len(s_tk)} quotazioni storiche disponibili rispetto all'orizzonte di analisi."
+                        )
 
             # Rilevamento salti estremi di rendimento (Z-score > 6.0)
             pct_chg_check = pivot[[t for t in active_tickers if t in pivot.columns]].pct_change()
@@ -650,21 +760,20 @@ def _compute_returns(df_positions: pd.DataFrame,
                             extreme_jumps = z_vals[z_vals.abs() > 6.0]
                             if not extreme_jumps.empty:
                                 worst_dt = extreme_jumps.abs().idxmax()
-                                warnings_list.append(f"Data Quality Warning: salto anomalo su {tk} il {worst_dt.strftime('%Y-%m-%d')} ({r_tk[worst_dt]*100:.1f}%, Z-Score {z_vals[worst_dt]:.1f}).")
+                                warnings_list.append(
+                                    f"Data Quality Warning: salto anomalo su {tk} il {worst_dt.strftime('%Y-%m-%d')} ({r_tk[worst_dt] * 100:.1f}%, Z-Score {z_vals[worst_dt]:.1f})."
+                                )
         except Exception:
             pass
 
     # Forward fill per mitigare discrepanze nei calendari festivi (es. USA vs Europa)
     pivot = pivot.ffill(limit=5)
     df_returns = pivot.pct_change().dropna(how="all")
-    
+
     # Taglia i rendimenti a partire dalla data della prima operazione
     min_tx_date = pd.to_datetime(df_tx["tx_date"].min())
 
-    weights = (
-        df_positions[df_positions["ticker"].isin(active_tickers)]
-        .set_index("ticker")["weight_pct"] / 100
-    )
+    weights = df_positions[df_positions["ticker"].isin(active_tickers)].set_index("ticker")["weight_pct"] / 100
     common = [t for t in active_tickers if t in df_returns.columns]
     w = weights.reindex(common).fillna(0.0)
     w_sum = float(w.sum())
@@ -684,14 +793,13 @@ def _compute_returns(df_positions: pd.DataFrame,
 
 # ── Benchmark ────────────────────────────────────────────────
 
-def _load_benchmark(ticker: str,
-                    df_prices: pd.DataFrame,
-                    portfolio_index: pd.Index) -> pd.Series:
+
+def _load_benchmark(ticker: str, df_prices: pd.DataFrame, portfolio_index: pd.Index) -> pd.Series:
     if portfolio_index is None or len(portfolio_index) == 0:
         return pd.Series(dtype=float)
 
     p_idx = pd.to_datetime(portfolio_index)
-    if getattr(p_idx, 'tz', None) is not None:
+    if getattr(p_idx, "tz", None) is not None:
         p_idx = p_idx.tz_localize(None)
 
     # 1. Prova da df_prices
@@ -699,7 +807,7 @@ def _load_benchmark(ticker: str,
         bm = df_prices[df_prices["ticker"] == ticker].copy()
         if not bm.empty:
             bm_dates = pd.to_datetime(bm["price_date"])
-            if getattr(bm_dates.dt, 'tz', None) is not None:
+            if getattr(bm_dates.dt, "tz", None) is not None:
                 bm["price_date"] = bm_dates.dt.tz_localize(None)
             else:
                 bm["price_date"] = bm_dates
@@ -707,7 +815,7 @@ def _load_benchmark(ticker: str,
             bm = bm[~bm.index.duplicated(keep="last")]
             bm_ret = bm.pct_change().dropna()
             bm_ret.name = ticker
-            
+
             reindexed = bm_ret.reindex(p_idx).fillna(0.0)
             reindexed.index = portfolio_index
             if reindexed.std() > 0:
@@ -716,10 +824,11 @@ def _load_benchmark(ticker: str,
     # 2. Fallback automatico da cache shield locale (RAM + SQLite 24h)
     try:
         from core.cache_shield import get_cached_ticker_history
+
         df_bm_cache = get_cached_ticker_history(ticker)
         if df_bm_cache is not None and not df_bm_cache.empty and "close" in df_bm_cache.columns:
             s_bm = df_bm_cache["close"].copy()
-            if getattr(s_bm.index, 'tz', None) is not None:
+            if getattr(s_bm.index, "tz", None) is not None:
                 s_bm.index = s_bm.index.tz_localize(None)
             s_bm = s_bm[~s_bm.index.duplicated(keep="last")]
             bm_ret = s_bm.pct_change().dropna()
@@ -738,7 +847,7 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
     """Carica o genera la serie dei rendimenti giornalieri per un qualsiasi benchmark specificato (SPY, QQQ, ACWI, AGG, GLD, BTC)."""
     if portfolio_index is None or len(portfolio_index) == 0:
         return pd.Series(dtype=float)
-        
+
     dt_port_idx = pd.to_datetime(portfolio_index)
 
     # 1. Ricerca prioritaria in df_prices con risoluzione alias
@@ -758,7 +867,7 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
             if not bm.empty and len(bm) > 5:
                 bm["dt"] = pd.to_datetime(bm["price_date"])
                 bm = bm.set_index("dt")["close"].sort_index()
-                bm = bm[~bm.index.duplicated(keep='first')]
+                bm = bm[~bm.index.duplicated(keep="first")]
                 bm_ret = bm.pct_change().dropna()
                 bm_reindexed = bm_ret.reindex(dt_port_idx).ffill().fillna(0.0)
                 bm_reindexed.index = portfolio_index
@@ -767,8 +876,10 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
 
     # 2. Tentativo di caricamento da core.fetcher fetch_cached_benchmark_returns (Headless & Decoupled)
     try:
-        from core.fetcher import fetch_cached_benchmark_returns
         from datetime import datetime, timedelta
+
+        from core.fetcher import fetch_cached_benchmark_returns
+
         start_dt = str(dt_port_idx.min())[:10]
         end_dt = str(dt_port_idx.max())[:10]
         st_obj = datetime.strptime(start_dt, "%Y-%m-%d") - timedelta(days=7)
@@ -809,19 +920,28 @@ def load_benchmark_returns(ticker: str, df_prices: pd.DataFrame, portfolio_index
 
 # ── Risk Contribution (Component VaR) ─────────────────────────
 
+
 def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame) -> dict:
     """Calcola il contributo percentuale al rischio (volatilità) di ogni asset."""
     if df_positions is None or df_positions.empty:
         return {}
-        
-    qty_col = "qty_net" if "qty_net" in df_positions.columns else ("shares" if "shares" in df_positions.columns else ("quantity" if "quantity" in df_positions.columns else None))
+
+    qty_col = (
+        "qty_net"
+        if "qty_net" in df_positions.columns
+        else (
+            "shares"
+            if "shares" in df_positions.columns
+            else ("quantity" if "quantity" in df_positions.columns else None)
+        )
+    )
     if qty_col:
         active_pos = df_positions[df_positions[qty_col] > 0].copy()
     elif "current_value" in df_positions.columns:
         active_pos = df_positions[df_positions["current_value"] > 0].copy()
     else:
         active_pos = df_positions.copy()
-        
+
     if active_pos.empty:
         return {}
 
@@ -847,7 +967,9 @@ def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame
         weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100.0
     else:
         tot_common_val = active_pos[active_pos["ticker"].isin(common)]["current_value"].sum()
-        weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["current_value"].sum() / (tot_common_val if tot_common_val > 0 else 1.0)
+        weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["current_value"].sum() / (
+            tot_common_val if tot_common_val > 0 else 1.0
+        )
 
     w = weights.reindex(common).fillna(0.0)
     if w.sum() == 0:
@@ -891,6 +1013,7 @@ def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame
 
 # ── Stress Testing Scenarios ─────────────────────────────────
 
+
 def _calc_stress_tests(df_returns: pd.DataFrame, df_positions: pd.DataFrame, sr_benchmark: pd.Series) -> dict:
     """
     Simula l'impatto sul portafoglio attuale di shock storici reali (se disponibili)
@@ -903,11 +1026,19 @@ def _calc_stress_tests(df_returns: pd.DataFrame, df_positions: pd.DataFrame, sr_
         "COVID-19 Crash (Feb-Mar 2020)": {"start": "2020-02-19", "end": "2020-03-23"},
         "Tech & Rate Shock (Gen-Ott 2022)": {"start": "2022-01-03", "end": "2022-10-12"},
     }
-    
+
     if df_positions is None or df_positions.empty:
         return {}
 
-    qty_col = "qty_net" if "qty_net" in df_positions.columns else ("shares" if "shares" in df_positions.columns else ("quantity" if "quantity" in df_positions.columns else None))
+    qty_col = (
+        "qty_net"
+        if "qty_net" in df_positions.columns
+        else (
+            "shares"
+            if "shares" in df_positions.columns
+            else ("quantity" if "quantity" in df_positions.columns else None)
+        )
+    )
     if qty_col:
         active_pos = df_positions[df_positions[qty_col] > 0].copy()
     elif "current_value" in df_positions.columns:
@@ -920,23 +1051,27 @@ def _calc_stress_tests(df_returns: pd.DataFrame, df_positions: pd.DataFrame, sr_
 
     active_tickers = active_pos["ticker"].tolist()
     common = [t for t in active_tickers if (df_returns is not None and t in df_returns.columns)]
-    
+
     # Se mancano serie storiche, usa tutti i ticker attivi con beta standard
     target_tickers = common if len(common) > 0 else active_tickers
 
     if df_returns is not None and not df_returns.empty:
         df_returns = df_returns.copy()
-        if getattr(df_returns.index, 'tz', None) is not None:
+        if getattr(df_returns.index, "tz", None) is not None:
             df_returns.index = df_returns.index.tz_localize(None)
-            
+
     if sr_benchmark is not None and not sr_benchmark.empty:
         sr_benchmark = sr_benchmark.copy()
-        if getattr(sr_benchmark.index, 'tz', None) is not None:
+        if getattr(sr_benchmark.index, "tz", None) is not None:
             sr_benchmark.index = sr_benchmark.index.tz_localize(None)
 
     # Calcola beta di ogni asset vs benchmark come fallback
     betas = {}
-    rb = sr_benchmark.reindex(df_returns.index).fillna(0.0) if (sr_benchmark is not None and df_returns is not None and not df_returns.empty) else pd.Series(dtype=float)
+    rb = (
+        sr_benchmark.reindex(df_returns.index).fillna(0.0)
+        if (sr_benchmark is not None and df_returns is not None and not df_returns.empty)
+        else pd.Series(dtype=float)
+    )
     for ticker in target_tickers:
         if df_returns is not None and ticker in df_returns.columns and not rb.empty:
             r_col = df_returns[ticker]
@@ -951,37 +1086,49 @@ def _calc_stress_tests(df_returns: pd.DataFrame, df_positions: pd.DataFrame, sr_
             else:
                 betas[ticker] = 1.0
         else:
-            betas[ticker] = 1.0 # default se non c'è storico
-            
+            betas[ticker] = 1.0  # default se non c'è storico
+
     # Combina pesi e current_value
     df_pos_active = active_pos[active_pos["ticker"].isin(target_tickers)].set_index("ticker")
     current_values = df_pos_active["current_value"]
-    
+
     results = {}
     for scenario_name, dates in scenarios.items():
         portfolio_shock_value = 0.0
         details = {}
-        
-        start_d = pd.to_datetime(dates["start"]).tz_localize(None) if pd.to_datetime(dates["start"]).tzinfo is not None else pd.to_datetime(dates["start"])
-        end_d = pd.to_datetime(dates["end"]).tz_localize(None) if pd.to_datetime(dates["end"]).tzinfo is not None else pd.to_datetime(dates["end"])
-        
+
+        start_d = (
+            pd.to_datetime(dates["start"]).tz_localize(None)
+            if pd.to_datetime(dates["start"]).tzinfo is not None
+            else pd.to_datetime(dates["start"])
+        )
+        end_d = (
+            pd.to_datetime(dates["end"]).tz_localize(None)
+            if pd.to_datetime(dates["end"]).tzinfo is not None
+            else pd.to_datetime(dates["end"])
+        )
+
         # Rendimento del benchmark nel periodo
         rb_period = rb.loc[start_d:end_d] if not rb.empty else pd.Series(dtype=float)
         if not rb_period.empty:
             bm_shock = (1 + rb_period).prod() - 1
         else:
             # Fallback approssimativi se mancano dati nel benchmark
-            if "Dot-Com" in scenario_name: bm_shock = -0.49
-            elif "Downgrade" in scenario_name: bm_shock = -0.17
-            elif "COVID" in scenario_name: bm_shock = -0.33
-            elif "Lehman" in scenario_name: bm_shock = -0.45
-            else: bm_shock = -0.20
+            if "Dot-Com" in scenario_name:
+                bm_shock = -0.49
+            elif "Downgrade" in scenario_name:
+                bm_shock = -0.17
+            elif "COVID" in scenario_name:
+                bm_shock = -0.33
+            elif "Lehman" in scenario_name:
+                bm_shock = -0.45
+            else:
+                bm_shock = -0.20
 
-            
         for ticker in common:
             r = df_returns[ticker].dropna()
             r_period = r.loc[start_d:end_d]
-            
+
             is_historical = False
             # Richiediamo almeno 10 giorni di contrattazione nel periodo per usare i dati storici
             if len(r_period) >= 10:
@@ -990,26 +1137,26 @@ def _calc_stress_tests(df_returns: pd.DataFrame, df_positions: pd.DataFrame, sr_
             else:
                 beta = betas.get(ticker, 1.0)
                 asset_shock_pct = beta * bm_shock
-                
+
             asset_loss = current_values[ticker] * asset_shock_pct
             portfolio_shock_value += asset_loss
             details[ticker] = {
-                "beta": round(betas.get(ticker, 1.0), 2), 
-                "shock_pct": round(asset_shock_pct*100, 2), 
+                "beta": round(betas.get(ticker, 1.0), 2),
+                "shock_pct": round(asset_shock_pct * 100, 2),
                 "loss_eur": round(asset_loss, 2),
-                "is_historical": is_historical
+                "is_historical": is_historical,
             }
-        
+
         total_port_value = current_values.sum()
         port_shock_pct = portfolio_shock_value / total_port_value if total_port_value > 0 else 0
-        
+
         results[scenario_name] = {
             "benchmark_shock_pct": round(bm_shock * 100, 2),
             "portfolio_shock_pct": round(port_shock_pct * 100, 2),
             "portfolio_loss_eur": round(portfolio_shock_value, 2),
-            "details": details
+            "details": details,
         }
-        
+
     return results
 
 
@@ -1020,25 +1167,25 @@ def run_advanced_monte_carlo_simulation(
     drift_shift_pct: float = 0.0,
     distribution_type: str = "gaussian",
     n_simulations: int = 3000,
-    seed: int = 42
+    seed: int = 42,
 ) -> dict:
     """
     Executes a multi-asset stochastic Monte Carlo simulation using Cholesky decomposition,
     supporting custom horizons (3M..3Y), volatility stress multipliers, drift shifts,
     and Student-t fat-tailed distributions (black swan modeling).
     """
-    np.random.seed(seed)
-    
+    rng = np.random.default_rng(seed)
+
     if results_dict is None or not isinstance(results_dict, dict):
         return {}
 
     positions = results_dict.get("positions", pd.DataFrame())
     metrics = results_dict.get("metrics", {})
     hist = results_dict.get("returns", metrics.get("historical_returns", pd.DataFrame()))
-    
+
     if positions.empty or hist is None or hist.empty:
         return {}
-        
+
     # Support both qty_net > 0 or current_value > 0
     if "qty_net" in positions.columns:
         active_pos = positions[positions["qty_net"] > 0].copy()
@@ -1046,74 +1193,66 @@ def run_advanced_monte_carlo_simulation(
         active_pos = positions[positions["current_value"] > 0].copy()
     else:
         active_pos = positions.copy()
-        
+
     common_tickers = [t for t in active_pos["ticker"].tolist() if t in hist.columns]
-    
+
     if not common_tickers:
         return {}
-        
+
     df_ret = hist[common_tickers].dropna(how="all").fillna(0.0)
     if len(df_ret) < 10:
         return {}
-        
+
     active_pos_common = active_pos[active_pos["ticker"].isin(common_tickers)].set_index("ticker")
     curr_values = active_pos_common["current_value"].reindex(common_tickers).fillna(0.0).values
     total_val_initial = float(np.sum(curr_values))
-    
+
     if total_val_initial <= 0:
         return {}
-        
+
     weights = curr_values / total_val_initial
-    
+
     num_assets = len(common_tickers)
 
     # 1. Mean Returns & Covariance Matrix
     mean_daily = df_ret.mean().values + (drift_shift_pct / 100.0 / TRADING_DAYS_YEAR)
-    
+
     if num_assets > 1:
         try:
             lw = LedoitWolf().fit(df_ret)
-            cov_daily = lw.covariance_ * (volatility_multiplier ** 2)
+            cov_daily = lw.covariance_ * (volatility_multiplier**2)
         except Exception:
-            cov_daily = df_ret.cov().values * (volatility_multiplier ** 2)
+            cov_daily = df_ret.cov().values * (volatility_multiplier**2)
     else:
         var_val = float(df_ret.var().values[0]) if len(df_ret) > 1 else 0.0001
-        cov_daily = np.array([[max(var_val, 1e-6) * (volatility_multiplier ** 2)]])
-        
-    # Ensure positive semi-definite matrix for Cholesky / Eigendecomposition
-    if num_assets == 1:
-        L = np.sqrt(np.maximum(cov_daily, 1e-8))
-    else:
-        cov_daily = cov_daily + np.eye(num_assets) * 1e-8
-        try:
-            L = np.linalg.cholesky(cov_daily)
-        except np.linalg.LinAlgError:
-            eigvals, eigvecs = np.linalg.eigh(cov_daily)
-            eigvals = np.maximum(eigvals, 1e-8)
-            L = eigvecs @ np.diag(np.sqrt(eigvals))
-    
+        cov_daily = np.array([[max(var_val, 1e-6) * (volatility_multiplier**2)]])
+
+    # Ensure positive semi-definite matrix for Cholesky / Eigendecomposition via unified kernel
+    from core.stochastic_kernel import robust_cholesky
+    L = robust_cholesky(cov_daily, min_eigval=1e-8)
+
     # 2. Random Shocks Generation & Vectorized Simulation
     num_assets = len(common_tickers)
     w_L = np.ascontiguousarray(weights @ L).reshape(1, num_assets)
     port_mu = float(np.dot(weights, mean_daily))
-    
+
     if distribution_type == "student_t":
         # Student-t with nu=5 degrees of freedom (fat tails)
         df_deg = 5
-        z_raw = np.random.standard_t(df_deg, size=(horizon_days, num_assets, n_simulations))
-        z_raw = z_raw * np.sqrt((df_deg - 2) / df_deg) # Normalize variance to 1
+        z_raw = rng.standard_t(df_deg, size=(horizon_days, num_assets, n_simulations))
+        z_raw = z_raw * np.sqrt((df_deg - 2) / df_deg)  # Normalize variance to 1
     else:
-        z_raw = np.random.normal(0, 1, size=(horizon_days, num_assets, n_simulations))
-        
+        z_raw = rng.normal(0, 1, size=(horizon_days, num_assets, n_simulations))
+
     # 3. Simulate Trajectories via Vectorized Matrix Multiplication & Cumulative Product
     z_reshaped = z_raw.swapaxes(0, 1).reshape(num_assets, horizon_days * n_simulations)
     port_shocks = (w_L @ z_reshaped).reshape(horizon_days, n_simulations)
     daily_port_returns = 1.0 + port_mu + port_shocks
-    
+
     paths_val = np.empty((horizon_days + 1, n_simulations), dtype=np.float64)
     paths_val[0, :] = total_val_initial
     paths_val[1:, :] = total_val_initial * np.cumprod(daily_port_returns, axis=0)
-        
+
     # 4. Percentiles over time (horizon_days + 1)
     p99 = np.percentile(paths_val, 99, axis=1)
     p75 = np.percentile(paths_val, 75, axis=1)
@@ -1121,46 +1260,46 @@ def run_advanced_monte_carlo_simulation(
     p25 = np.percentile(paths_val, 25, axis=1)
     p05 = np.percentile(paths_val, 5, axis=1)
     p01 = np.percentile(paths_val, 1, axis=1)
-    
+
     # 5. Final Horizon Metrics (Day T)
     final_values = paths_val[-1, :]
     final_returns_pct = ((final_values - total_val_initial) / total_val_initial) * 100.0
-    
+
     var_95_val = total_val_initial - np.percentile(final_values, 5)
     var_95_pct = (var_95_val / total_val_initial) * 100.0
-    
+
     var_99_val = total_val_initial - np.percentile(final_values, 1)
     var_99_pct = (var_99_val / total_val_initial) * 100.0
-    
+
     # Expected Shortfall (CVaR)
     worst_5_percent = final_values[final_values <= np.percentile(final_values, 5)]
     cvar_95_val = total_val_initial - np.mean(worst_5_percent) if len(worst_5_percent) > 0 else var_95_val
     cvar_95_pct = (cvar_95_val / total_val_initial) * 100.0
-    
+
     worst_1_percent = final_values[final_values <= np.percentile(final_values, 1)]
     cvar_99_val = total_val_initial - np.mean(worst_1_percent) if len(worst_1_percent) > 0 else var_99_val
     cvar_99_pct = (cvar_99_val / total_val_initial) * 100.0
-    
+
     # Probability Metrics
     prob_profit = float(np.mean(final_returns_pct > 0) * 100.0)
     prob_gain_10 = float(np.mean(final_returns_pct >= 10.0) * 100.0)
     prob_gain_20 = float(np.mean(final_returns_pct >= 20.0) * 100.0)
     prob_loss_10 = float(np.mean(final_returns_pct <= -10.0) * 100.0)
     prob_loss_20 = float(np.mean(final_returns_pct <= -20.0) * 100.0)
-    
+
     # Max Drawdowns across paths
     peak_paths = np.maximum.accumulate(paths_val, axis=0)
     drawdowns_paths = (paths_val - peak_paths) / peak_paths
     max_drawdown_per_sim = np.min(drawdowns_paths, axis=0) * 100.0
     avg_max_drawdown = float(np.mean(max_drawdown_per_sim))
-    p99_max_drawdown = float(np.percentile(max_drawdown_per_sim, 1)) # worst 1% drawdown
-    
+    p99_max_drawdown = float(np.percentile(max_drawdown_per_sim, 1))  # worst 1% drawdown
+
     # Sample 80 random sample paths for visual ribbon plot
     sample_indices = np.random.choice(n_simulations, size=min(80, n_simulations), replace=False)
     sample_paths = paths_val[:, sample_indices]
-    
+
     time_axis = np.arange(horizon_days + 1)
-    
+
     return {
         "initial_portfolio_value": round(total_val_initial, 2),
         "horizon_days": horizon_days,
@@ -1196,27 +1335,30 @@ def run_advanced_monte_carlo_simulation(
         "prob_loss_10_pct": round(prob_loss_10, 1),
         "prob_loss_20_pct": round(prob_loss_20, 1),
         "avg_max_drawdown_pct": round(avg_max_drawdown, 2),
-        "p99_max_drawdown_pct": round(p99_max_drawdown, 2)
+        "p99_max_drawdown_pct": round(p99_max_drawdown, 2),
     }
 
 
 # ── Ottimizzazione di Portafoglio (Markowitz) ────────────────
 
-def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataFrame, risk_free_rate: float = None) -> dict:
+
+def _compute_efficient_frontier(
+    df_returns: pd.DataFrame, df_positions: pd.DataFrame, risk_free_rate: float = None
+) -> dict:
     active_tickers = df_positions[df_positions["qty_net"] > 0]["ticker"].tolist()
     common = list(dict.fromkeys([t for t in active_tickers if t in df_returns.columns]))
-    
+
     rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
-    
+
     # We need at least 2 assets to optimize
     if len(common) < 2:
         return {}
-        
+
     df_clean_returns = df_returns.loc[:, ~df_returns.columns.duplicated()]
     df_ret = df_clean_returns[common].dropna(how="any")
     if len(df_ret) < 60:
-        return {} # Not enough overlapping history
-        
+        return {}  # Not enough overlapping history
+
     mean_returns = df_ret.mean().values * TRADING_DAYS_YEAR
     try:
         lw = LedoitWolf().fit(df_ret)
@@ -1225,7 +1367,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     except Exception:
         cov_matrix = df_ret.cov().values * TRADING_DAYS_YEAR
         cov_type = "Sample Covariance"
-    
+
     # Exact SLSQP Optimization with SciPy
     num_assets = len(common)
     # Garanzia di perfetta simmetria e semidefinitezza positiva (PSD) con regolarizzazione ridge
@@ -1237,7 +1379,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
 
     init_weights = np.ones(num_assets) / num_assets
     bounds = tuple((0.0, 1.0) for _ in range(num_assets))
-    constraints = ({'type': 'eq', 'fun': lambda w: np.sum(w) - 1.0})
+    constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1.0}
 
     # 1. Max Sharpe Ratio Optimization
     def neg_sharpe(weights):
@@ -1246,7 +1388,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         vol = np.sqrt(max(var, 1e-8))
         return -(r - rf) / vol if vol > 1e-6 else 0.0
 
-    opt_sharpe = sco.minimize(neg_sharpe, init_weights, method='SLSQP', bounds=bounds, constraints=constraints)
+    opt_sharpe = sco.minimize(neg_sharpe, init_weights, method="SLSQP", bounds=bounds, constraints=constraints)
     opt_sharpe_weights = opt_sharpe.x
     opt_sharpe_return = np.sum(mean_returns * opt_sharpe_weights)
     opt_sharpe_var = float(np.dot(opt_sharpe_weights.T, np.dot(cov_matrix, opt_sharpe_weights)))
@@ -1258,7 +1400,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         var = float(np.dot(weights.T, np.dot(cov_matrix, weights)))
         return np.sqrt(max(var, 1e-8))
 
-    opt_vol = sco.minimize(portfolio_vol, init_weights, method='SLSQP', bounds=bounds, constraints=constraints)
+    opt_vol = sco.minimize(portfolio_vol, init_weights, method="SLSQP", bounds=bounds, constraints=constraints)
     opt_vol_weights = opt_vol.x
     opt_vol_return = np.sum(mean_returns * opt_vol_weights)
     opt_vol_var = float(np.dot(opt_vol_weights.T, np.dot(cov_matrix, opt_vol_weights)))
@@ -1272,10 +1414,10 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     cvar_records = np.zeros(num_portfolios)
     sortino_records = np.zeros(num_portfolios)
     weights_record = []
-    
+
     n_assets = len(common)
     alphas = [0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0]
-    
+
     # 1. Single asset corner vertices
     k = 0
     for idx_a in range(min(n_assets, num_portfolios)):
@@ -1297,7 +1439,7 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
     while k < num_portfolios:
         alpha_val = alphas[k % len(alphas)]
         weights = np.random.dirichlet(np.ones(n_assets) * alpha_val)
-        
+
         # Sparsity sampling: 25% of portfolios concentrate on a random subset of assets
         if np.random.random() < 0.25 and n_assets > 2:
             subset_size = np.random.randint(2, n_assets)
@@ -1307,17 +1449,17 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
             sum_sp = np.sum(w_sparse)
             if sum_sp > 0:
                 weights = w_sparse / sum_sp
-                
+
         weights_record.append(weights)
-        
+
         port_return = float(np.sum(mean_returns * weights))
         port_var = float(np.dot(weights.T, np.dot(cov_matrix, weights)))
         port_std = float(np.sqrt(max(port_var, 1e-8)))
         sharpe_ratio = (port_return - rf) / port_std if port_std > 1e-6 else 0.0
-        hhi_val = float(np.sum(weights ** 2))
+        hhi_val = float(np.sum(weights**2))
         cvar_val = float(port_return - 2.063 * port_std)
         sortino_val = float((port_return - rf) / max(0.001, port_std * 0.707))
-        
+
         results[0, k] = port_std
         results[1, k] = port_return
         results[2, k] = sharpe_ratio
@@ -1334,14 +1476,14 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
         curr_weights /= curr_sum
     else:
         curr_weights = np.ones(len(common)) / len(common)
-        
+
     curr_return = np.sum(mean_returns * curr_weights)
     curr_std = np.sqrt(np.dot(curr_weights.T, np.dot(cov_matrix, curr_weights)))
     curr_sharpe = (curr_return - rf) / curr_std if curr_std > 0 else 0
-    curr_hhi = float(np.sum(curr_weights ** 2))
+    curr_hhi = float(np.sum(curr_weights**2))
     curr_cvar = float(curr_return - 2.063 * curr_std)
     curr_sortino = float((curr_return - rf) / max(0.001, curr_std * 0.707))
-    
+
     return {
         "tickers": common,
         "cov_type": cov_type,
@@ -1353,25 +1495,25 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
             "hhi": curr_hhi,
             "cvar_95": curr_cvar,
             "sortino": curr_sortino,
-            "weights": curr_weights.tolist()
+            "weights": curr_weights.tolist(),
         },
         "max_sharpe": {
             "return": float(opt_sharpe_return),
             "risk": float(opt_sharpe_risk),
             "sharpe": float(opt_sharpe_ratio),
-            "hhi": float(np.sum(opt_sharpe_weights ** 2)),
+            "hhi": float(np.sum(opt_sharpe_weights**2)),
             "cvar_95": float(opt_sharpe_return - 2.063 * opt_sharpe_risk),
             "sortino": float((opt_sharpe_return - rf) / max(0.001, opt_sharpe_risk * 0.707)),
-            "weights": opt_sharpe_weights.tolist()
+            "weights": opt_sharpe_weights.tolist(),
         },
         "min_vol": {
             "return": float(opt_vol_return),
             "risk": float(opt_vol_risk),
             "sharpe": float(opt_vol_ratio),
-            "hhi": float(np.sum(opt_vol_weights ** 2)),
+            "hhi": float(np.sum(opt_vol_weights**2)),
             "cvar_95": float(opt_vol_return - 2.063 * opt_vol_risk),
             "sortino": float((opt_vol_return - rf) / max(0.001, opt_vol_risk * 0.707)),
-            "weights": opt_vol_weights.tolist()
+            "weights": opt_vol_weights.tolist(),
         },
         "frontier": {
             "risk": results[0].tolist(),
@@ -1379,27 +1521,28 @@ def _compute_efficient_frontier(df_returns: pd.DataFrame, df_positions: pd.DataF
             "sharpe": results[2].tolist(),
             "hhi": hhi_records.tolist(),
             "cvar_95": cvar_records.tolist(),
-            "sortino": sortino_records.tolist()
-        }
+            "sortino": sortino_records.tolist(),
+        },
     }
-
-
 
 
 # ── Market risk ──────────────────────────────────────────────
 
-def _calc_market_risk(sr_portfolio: pd.Series,
-                      sr_benchmark: pd.Series,
-                      benchmark_ticker: str,
-                      risk_free_rate: float = None,
-                      df_positions: pd.DataFrame = None) -> dict:
+
+def _calc_market_risk(
+    sr_portfolio: pd.Series,
+    sr_benchmark: pd.Series,
+    benchmark_ticker: str,
+    risk_free_rate: float = None,
+    df_positions: pd.DataFrame = None,
+) -> dict:
     r = sr_portfolio.dropna()
-    if getattr(r.index, 'tz', None) is not None:
+    if getattr(r.index, "tz", None) is not None:
         r.index = r.index.tz_localize(None)
 
     if sr_benchmark is not None and not sr_benchmark.empty:
         rb_clean = sr_benchmark.copy()
-        if getattr(rb_clean.index, 'tz', None) is not None:
+        if getattr(rb_clean.index, "tz", None) is not None:
             rb_clean.index = rb_clean.index.tz_localize(None)
         rb = rb_clean.reindex(r.index).fillna(0.0)
     else:
@@ -1407,13 +1550,13 @@ def _calc_market_risk(sr_portfolio: pd.Series,
 
     rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
 
-    vol_daily  = r.std() if len(r) > 1 else 0.0
+    vol_daily = r.std() if len(r) > 1 else 0.0
     vol_annual = vol_daily * np.sqrt(TRADING_DAYS_YEAR)
-    
+
     # Skewness e Kurtosis
     skewness = float(stats.skew(r)) if len(r) > 2 else 0.0
     kurtosis = float(stats.kurtosis(r)) if len(r) > 2 else 0.0
-    
+
     # Tracking Error
     active_return = r - rb
     tracking_error = active_return.std() * np.sqrt(TRADING_DAYS_YEAR) if len(active_return) > 1 else 0.0
@@ -1425,14 +1568,14 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         threshold = r.quantile(1 - conf)
         var_hist_val = round(abs(min(0.0, float(threshold))) * 100, 4)
         var[f"var_{conf_k}"] = var_hist_val
-        
+
         tail_slice = r[r <= threshold]
         cvar_val = float(tail_slice.mean()) if len(tail_slice) > 0 else float(threshold)
         cvar_hist_val = round(abs(min(0.0, cvar_val)) * 100, 4)
         if cvar_hist_val < var_hist_val:
             cvar_hist_val = var_hist_val
         cvar[f"cvar_{conf_k}"] = cvar_hist_val
-        
+
         # Parametrico: quantile q = mu + z * sigma dove z = norm.ppf(1-conf) < 0
         z = stats.norm.ppf(1 - conf)
         q_param = float(r.mean() + z * vol_daily) if vol_daily > 0 else 0.0
@@ -1447,17 +1590,22 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         if cvar_param_val < var_param_val:
             cvar_param_val = var_param_val
         cvar[f"cvar_parametric_{conf_k}"] = cvar_param_val
-        
+
         # Cornish-Fisher: quantile q_cf = mu + z_cf * sigma con guard rails di monotonicita
         s_clamped = float(np.clip(skewness, -3.0, 3.0))
         k_clamped = float(np.clip(kurtosis, -1.0, 10.0))
-        z_cf = z + (1/6)*(z**2 - 1)*s_clamped + (1/24)*(z**3 - 3*z)*k_clamped - (1/36)*(2*z**3 - 5*z)*(s_clamped**2)
+        z_cf = (
+            z
+            + (1 / 6) * (z**2 - 1) * s_clamped
+            + (1 / 24) * (z**3 - 3 * z) * k_clamped
+            - (1 / 36) * (2 * z**3 - 5 * z) * (s_clamped**2)
+        )
         if (alpha < 0.5 and z_cf > 0.0) or (alpha > 0.5 and z_cf < 0.0):
             z_cf = z
         q_cf = float(r.mean() + z_cf * vol_daily) if vol_daily > 0 else 0.0
         var_cf_val = round(abs(min(0.0, q_cf)) * 100, 4)
         var[f"var_cf_{conf_k}"] = var_cf_val
-        
+
         # Cornish-Fisher CVaR analitico (Boudt, Peterson, Croux 2008 Modified Expected Shortfall)
         if vol_daily > 0 and alpha > 0:
             i1 = phi_z
@@ -1488,17 +1636,22 @@ def _calc_market_risk(sr_portfolio: pd.Series,
         rb_sub = rb[valid_mask]
         if len(r_sub) > 10 and rb_sub.std() > 0:
             cov_matrix = np.cov(r_sub, rb_sub)
-            beta       = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
-            corr       = r_sub.corr(rb_sub)
-            r_squared  = (corr ** 2) if corr is not None and not np.isnan(corr) else None
+            beta = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
+            corr = r_sub.corr(rb_sub)
+            r_squared = (corr**2) if corr is not None and not np.isnan(corr) else None
         else:
             cov_matrix = np.cov(r, rb)
-            beta       = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
-            corr       = r.corr(rb)
-            r_squared  = (corr ** 2) if corr is not None and not np.isnan(corr) else None
+            beta = cov_matrix[0, 1] / cov_matrix[1, 1] if cov_matrix[1, 1] != 0 else 1.0
+            corr = r.corr(rb)
+            r_squared = (corr**2) if corr is not None and not np.isnan(corr) else None
 
     # Reconciliazione con Weighted Asset Beta se top-down regression non disponibile o default statico 1.0
-    if df_positions is not None and isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "beta" in df_positions.columns:
+    if (
+        df_positions is not None
+        and isinstance(df_positions, pd.DataFrame)
+        and not df_positions.empty
+        and "beta" in df_positions.columns
+    ):
         valid_b = df_positions[df_positions["beta"].notna() & (df_positions.get("current_value", 0) > 0)]
         if not valid_b.empty:
             w_col = "weight_pct" if "weight_pct" in valid_b.columns else "current_value"
@@ -1511,11 +1664,11 @@ def _calc_market_risk(sr_portfolio: pd.Series,
     if beta is None:
         beta = 1.0
 
-    cum     = (1 + r).cumprod()
+    cum = (1 + r).cumprod()
     roll_mx = cum.cummax()
     drawdowns = (cum - roll_mx) / roll_mx
-    max_dd  = drawdowns.min() if not drawdowns.empty else 0.0
-    
+    max_dd = drawdowns.min() if not drawdowns.empty else 0.0
+
     # Ulcer Index (UI) calculation
     ulcer_index = float(np.sqrt(np.mean((drawdowns * 100) ** 2))) if len(drawdowns) > 0 else 0.0
 
@@ -1528,21 +1681,30 @@ def _calc_market_risk(sr_portfolio: pd.Series,
     rfr_daily = rf / TRADING_DAYS_YEAR
     excess_gains = r[r > rfr_daily] - rfr_daily
     excess_losses = rfr_daily - r[r < rfr_daily]
-    omega_ratio = float(excess_gains.sum() / excess_losses.sum()) if excess_losses.sum() > 1e-9 else (99.0 if excess_gains.sum() > 0 else 1.0)
-    
+    omega_ratio = (
+        float(excess_gains.sum() / excess_losses.sum())
+        if excess_losses.sum() > 1e-9
+        else (99.0 if excess_gains.sum() > 0 else 1.0)
+    )
+
     q95 = abs(float(r.quantile(0.95)))
     q05 = abs(float(r.quantile(0.05)))
     tail_ratio = float(q95 / q05) if q05 > 1e-6 else 1.0
-    
+
     pos_r = r[r > 0]
     neg_r = r[r < 0]
-    gain_loss_ratio = float(pos_r.mean() / abs(neg_r.mean())) if len(pos_r) > 0 and len(neg_r) > 0 and abs(neg_r.mean()) > 1e-6 else 1.0
+    gain_loss_ratio = (
+        float(pos_r.mean() / abs(neg_r.mean()))
+        if len(pos_r) > 0 and len(neg_r) > 0 and abs(neg_r.mean()) > 1e-6
+        else 1.0
+    )
 
     # Fama-French Factor Style Analysis (Integrato con Factor Library)
     ff_alpha = ff_beta_mkt = smb_tilt = hml_tilt = 0.0
     if len(r) >= 15:
         try:
             from core.factor_library import compute_fama_french_factor_model
+
             ff_res = compute_fama_french_factor_model(r, model_type="3_factor")
             ff_alpha = float(ff_res.get("alpha_annualized", 0.0) or 0.0) * 100.0
             df_f = ff_res.get("df_factors")
@@ -1569,46 +1731,53 @@ def _calc_market_risk(sr_portfolio: pd.Series,
     exceptions_count = len(recent_r[recent_r < threshold])
 
     return {
-        "volatility_daily_pct":  round(vol_daily * 100, 4),
+        "volatility_daily_pct": round(vol_daily * 100, 4),
         "volatility_annual_pct": round(vol_annual * 100, 4),
-        "skewness":              round(skewness, 4),
-        "kurtosis":              round(kurtosis, 4),
-        "tracking_error_pct":    round(tracking_error * 100, 4),
-        **var, **cvar,
-        "omega_ratio":           round(omega_ratio, 4),
-        "tail_ratio":            round(tail_ratio, 4),
-        "gain_loss_ratio":       round(gain_loss_ratio, 4),
-        "beta":                  round(beta, 4) if beta is not None else None,
+        "skewness": round(skewness, 4),
+        "kurtosis": round(kurtosis, 4),
+        "tracking_error_pct": round(tracking_error * 100, 4),
+        **var,
+        **cvar,
+        "omega_ratio": round(omega_ratio, 4),
+        "tail_ratio": round(tail_ratio, 4),
+        "gain_loss_ratio": round(gain_loss_ratio, 4),
+        "beta": round(beta, 4) if beta is not None else None,
         "correlation_benchmark": round(corr, 4) if corr is not None else None,
-        "r_squared_pct":         round(r_squared * 100, 4) if r_squared is not None else None,
-        "max_drawdown_pct":      round(max_dd * 100, 4),
-        "ulcer_index":           round(ulcer_index, 4),
-        "avg_drawdown_days":     round(avg_dd_days, 1),
-        "ff_alpha_pct":          round(ff_alpha, 4),
-        "ff_beta_mkt":           round(ff_beta_mkt, 4),
-        "smb_tilt":              round(smb_tilt, 4),
-        "hml_tilt":              round(hml_tilt, 4),
-        "var_exceptions_count":  exceptions_count,
-        "benchmark_ticker":      benchmark_ticker,
-        "n_trading_days":        len(r),
-        "risk_free_rate_pct":    round(rf * 100, 4),
+        "r_squared_pct": round(r_squared * 100, 4) if r_squared is not None else None,
+        "max_drawdown_pct": round(max_dd * 100, 4),
+        "ulcer_index": round(ulcer_index, 4),
+        "avg_drawdown_days": round(avg_dd_days, 1),
+        "ff_alpha_pct": round(ff_alpha, 4),
+        "ff_beta_mkt": round(ff_beta_mkt, 4),
+        "smb_tilt": round(smb_tilt, 4),
+        "hml_tilt": round(hml_tilt, 4),
+        "var_exceptions_count": exceptions_count,
+        "benchmark_ticker": benchmark_ticker,
+        "n_trading_days": len(r),
+        "risk_free_rate_pct": round(rf * 100, 4),
     }
-
 
 
 # ── Return metrics ───────────────────────────────────────────
 
-def _calc_return_metrics(sr_portfolio: pd.Series,
-                         sr_benchmark: pd.Series,
-                         df_tx: Optional[pd.DataFrame] = None,
-                         df_positions: Optional[pd.DataFrame] = None,
-                         risk_free_rate: float = None) -> dict:
+
+def _calc_return_metrics(
+    sr_portfolio: pd.Series,
+    sr_benchmark: pd.Series,
+    df_tx: Optional[pd.DataFrame] = None,
+    df_positions: Optional[pd.DataFrame] = None,
+    risk_free_rate: float = None,
+) -> dict:
     if df_tx is None:
         df_tx = pd.DataFrame()
     if df_positions is None:
         df_positions = pd.DataFrame()
-    r  = sr_portfolio.dropna()
-    rb = sr_benchmark.reindex(r.index).fillna(0.0) if (sr_benchmark is not None and not sr_benchmark.empty) else pd.Series(0.0, index=r.index)
+    r = sr_portfolio.dropna()
+    rb = (
+        sr_benchmark.reindex(r.index).fillna(0.0)
+        if (sr_benchmark is not None and not sr_benchmark.empty)
+        else pd.Series(0.0, index=r.index)
+    )
 
     rf = float(risk_free_rate) if (risk_free_rate is not None and not np.isnan(risk_free_rate)) else RISK_FREE_RATE
 
@@ -1622,7 +1791,7 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     rfr_daily = rf / TRADING_DAYS_YEAR
 
     total_return = float((1 + r).prod() - 1) if len(r) > 0 else 0.0
-    cagr         = (1 + total_return) ** (1 / n_years) - 1 if n_years > 0 else None
+    cagr = (1 + total_return) ** (1 / n_years) - 1 if n_years > 0 else None
     if cagr is not None:
         cagr = max(min(float(cagr), 999.0), -1.0)
 
@@ -1637,7 +1806,7 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     # Downside semi-deviation continua calcolata sull'intero orizzonte temporale N
     downside = np.minimum(0.0, excess)
     if len(r) > 1:
-        down_std = float(np.sqrt((downside ** 2).mean()))
+        down_std = float(np.sqrt((downside**2).mean()))
         if down_std > 1e-4:
             raw_sortino = float(excess.mean() / down_std * np.sqrt(TRADING_DAYS_YEAR))
             sortino = max(min(raw_sortino, 999.9999), -999.9999)
@@ -1646,9 +1815,9 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
     else:
         sortino = 0.0
 
-    cum     = (1 + r).cumprod()
+    cum = (1 + r).cumprod()
     roll_mx = cum.cummax()
-    max_dd  = float(((cum - roll_mx) / roll_mx).min()) if len(cum) > 0 else 0.0
+    max_dd = float(((cum - roll_mx) / roll_mx).min()) if len(cum) > 0 else 0.0
     if cagr is not None and abs(max_dd) > 1e-4:
         raw_calmar = float(cagr / abs(max_dd))
         calmar = max(min(raw_calmar, 999.9999), -999.9999)
@@ -1656,10 +1825,10 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
         calmar = None
 
     bm_total = float((1 + rb).prod() - 1) if len(rb) > 0 else 0.0
-    bm_cagr  = (1 + bm_total) ** (1 / n_years) - 1 if n_years > 0 else None
+    bm_cagr = (1 + bm_total) ** (1 / n_years) - 1 if n_years > 0 else None
     if bm_cagr is not None:
         bm_cagr = max(min(float(bm_cagr), 999.0), -1.0)
-        
+
     alpha = (cagr - bm_cagr) if (cagr is not None and bm_cagr is not None) else None
     if alpha is not None:
         alpha = max(min(float(alpha), 999.9999), -999.9999)
@@ -1673,39 +1842,45 @@ def _calc_return_metrics(sr_portfolio: pd.Series,
         ir = 0.0
 
     total_value = df_positions["current_value"].sum() if "current_value" in df_positions.columns else 0.0
-    total_cost  = df_positions["cost_basis"].sum() if "cost_basis" in df_positions.columns else 0.0
+    total_cost = df_positions["cost_basis"].sum() if "cost_basis" in df_positions.columns else 0.0
     total_unrealized = df_positions["unrealized_pnl"].sum() if "unrealized_pnl" in df_positions.columns else 0.0
-    total_realized   = df_positions["realized_pnl"].sum() if "realized_pnl" in df_positions.columns else 0.0
-    total_pnl   = df_positions["total_return"].sum() if "total_return" in df_positions.columns else (total_unrealized + total_realized)
-    total_divs  = df_positions["dividends_total"].sum() if "dividends_total" in df_positions.columns else 0.0
-    
+    total_realized = df_positions["realized_pnl"].sum() if "realized_pnl" in df_positions.columns else 0.0
+    total_pnl = (
+        df_positions["total_return"].sum()
+        if "total_return" in df_positions.columns
+        else (total_unrealized + total_realized)
+    )
+    total_divs = df_positions["dividends_total"].sum() if "dividends_total" in df_positions.columns else 0.0
+
     total_pnl_pct = (total_pnl / total_cost) if total_cost > 0 else 0.0
 
     return {
-        "total_return_pct":   round(total_return * 100, 4),
-        "cagr_pct":           round(cagr * 100, 4)    if cagr is not None else None,
-        "sharpe_ratio":       round(sharpe, 4)         if sharpe is not None else None,
-        "sortino_ratio":      round(sortino, 4)        if sortino is not None else None,
-        "calmar_ratio":       round(calmar, 4)         if calmar is not None else None,
-        "alpha_pct":          round(alpha * 100, 4)   if alpha is not None else None,
-        "information_ratio":  round(ir, 4)             if ir is not None else None,
+        "total_return_pct": round(total_return * 100, 4),
+        "cagr_pct": round(cagr * 100, 4) if cagr is not None else None,
+        "sharpe_ratio": round(sharpe, 4) if sharpe is not None else None,
+        "sortino_ratio": round(sortino, 4) if sortino is not None else None,
+        "calmar_ratio": round(calmar, 4) if calmar is not None else None,
+        "alpha_pct": round(alpha * 100, 4) if alpha is not None else None,
+        "information_ratio": round(ir, 4) if ir is not None else None,
         "benchmark_cagr_pct": round(bm_cagr * 100, 4) if bm_cagr is not None else None,
-        "portfolio_value":    round(float(total_value), 2),
-        "cost_basis_total":   round(float(total_cost), 2),
+        "portfolio_value": round(float(total_value), 2),
+        "cost_basis_total": round(float(total_cost), 2),
         "unrealized_pnl_total": round(float(total_unrealized), 2),
-        "realized_pnl_total":   round(float(total_realized), 2),
-        "total_pnl":          round(float(total_pnl), 2),
-        "total_pnl_pct":      round(float(total_pnl_pct), 4),
-        "dividends_total":    round(float(total_divs), 2),
+        "realized_pnl_total": round(float(total_realized), 2),
+        "total_pnl": round(float(total_pnl), 2),
+        "total_pnl_pct": round(float(total_pnl_pct), 4),
+        "dividends_total": round(float(total_divs), 2),
         "risk_free_rate_pct": round(rf * 100, 4),
-        "n_years":            round(float(n_years), 2),
+        "n_years": round(float(n_years), 2),
     }
 
 
-def compute_risk_metrics(sr_portfolio: pd.Series,
-                         sr_benchmark: Optional[pd.Series] = None,
-                         risk_free_rate: float = 0.03,
-                         benchmark_ticker: str = "SPY") -> dict:
+def compute_risk_metrics(
+    sr_portfolio: pd.Series,
+    sr_benchmark: Optional[pd.Series] = None,
+    risk_free_rate: float = 0.03,
+    benchmark_ticker: str = "SPY",
+) -> dict:
     """
     Funzione pubblica ad alta precisione per il calcolo congiunto di metriche di rendimento
     (Sharpe, CAGR, Sortino) e rischio di mercato (VaR 95/99%, CVaR, Beta, Volatilità).
@@ -1713,24 +1888,26 @@ def compute_risk_metrics(sr_portfolio: pd.Series,
     if sr_benchmark is None:
         sr_benchmark = pd.Series(0.0, index=sr_portfolio.index)
     ret_m = _calc_return_metrics(sr_portfolio, sr_benchmark, risk_free_rate=risk_free_rate)
-    mkt_m = _calc_market_risk(sr_portfolio, sr_benchmark, benchmark_ticker=benchmark_ticker, risk_free_rate=risk_free_rate)
-    return {
-        "returns": ret_m,
-        "market_risk": mkt_m
-    }
+    mkt_m = _calc_market_risk(
+        sr_portfolio, sr_benchmark, benchmark_ticker=benchmark_ticker, risk_free_rate=risk_free_rate
+    )
+    return {"returns": ret_m, "market_risk": mkt_m}
 
 
 # ── Concentrazione ───────────────────────────────────────────
 
-def _calc_concentration(df_positions: pd.DataFrame, df_returns: pd.DataFrame = None, sr_portfolio: pd.Series = None) -> dict:
+
+def _calc_concentration(
+    df_positions: pd.DataFrame, df_returns: pd.DataFrame = None, sr_portfolio: pd.Series = None
+) -> dict:
     df = df_positions[df_positions["current_value"] > 0].copy()
     if df.empty:
         return {}
 
-    total     = df["current_value"].sum()
-    df["w"]   = df["current_value"] / total
-    hhi       = (df["w"] ** 2).sum()
-    eff_n     = round(1 / hhi, 2) if hhi > 0 else None
+    total = df["current_value"].sum()
+    df["w"] = df["current_value"] / total
+    hhi = (df["w"] ** 2).sum()
+    eff_n = round(1 / hhi, 2) if hhi > 0 else None
 
     # Calcolo Diversification Ratio (Choueifaty DR = sum(w_i * sigma_i) / sigma_p)
     div_ratio = 1.0
@@ -1752,6 +1929,7 @@ def _calc_concentration(df_positions: pd.DataFrame, df_returns: pd.DataFrame = N
 
     # Assicura paese e settore per ogni riga
     from core.metadata_resolver import resolve_asset_metadata
+
     for idx_p, r_p in df.iterrows():
         t_p = str(r_p.get("ticker", "")).strip()
         ac_p = str(r_p.get("asset_class", ""))
@@ -1761,34 +1939,37 @@ def _calc_concentration(df_positions: pd.DataFrame, df_returns: pd.DataFrame = N
         df.at[idx_p, "country"] = c_clean
         df.at[idx_p, "gics_sector"] = s_clean
 
-    by_class   = (df.groupby("asset_class")["current_value"].sum() / total * 100).round(2).to_dict()
-    by_sector  = (df.groupby("gics_sector")["current_value"].sum() / total * 100).round(2).to_dict()
+    by_class = (df.groupby("asset_class")["current_value"].sum() / total * 100).round(2).to_dict()
+    by_sector = (df.groupby("gics_sector")["current_value"].sum() / total * 100).round(2).to_dict()
     by_country = (df.groupby("country")["current_value"].sum() / total * 100).round(2).to_dict()
 
-    top5 = (df.nlargest(5, "current_value")[["ticker", "w", "current_value"]]
-              .assign(weight_pct=lambda x: (x["w"] * 100).round(2))
-              .drop(columns="w")
-              .to_dict(orient="records"))
+    top5 = (
+        df.nlargest(5, "current_value")[["ticker", "w", "current_value"]]
+        .assign(weight_pct=lambda x: (x["w"] * 100).round(2))
+        .drop(columns="w")
+        .to_dict(orient="records")
+    )
 
     return {
-        "hhi":                  hhi.round(4),
-        "hhi_index":            hhi.round(4),
-        "effective_n_assets":   eff_n,
+        "hhi": hhi.round(4),
+        "hhi_index": hhi.round(4),
+        "effective_n_assets": eff_n,
         "diversification_ratio": div_ratio,
-        "by_asset_class_pct":   by_class,
-        "by_gics_sector_pct":   by_sector,
-        "by_country_pct":       by_country,
-        "top5_positions":       top5,
-        "n_active_positions":   len(df),
+        "by_asset_class_pct": by_class,
+        "by_gics_sector_pct": by_sector,
+        "by_country_pct": by_country,
+        "top5_positions": top5,
+        "n_active_positions": len(df),
     }
 
 
 # ── Pretty print ─────────────────────────────────────────────
 
+
 def print_results(results: dict) -> None:
-    m   = results["metrics"]
+    m = results["metrics"]
     ret = m["returns"]
-    mk  = m["market_risk"]
+    mk = m["market_risk"]
     con = m["concentration"]
 
     print("\n" + "=" * 60)
@@ -1829,7 +2010,7 @@ def print_results(results: dict) -> None:
     print("\n🏆 TOP 5 POSIZIONI")
     for p in con["top5_positions"]:
         print(f"   {p['ticker']:<15} €{p['current_value']:>10,.2f}   ({p['weight_pct']}%)")
-        
+
     ai = m.get("ai_insights", {})
     if "montecarlo" in ai and ai["montecarlo"]:
         mc = ai["montecarlo"]
@@ -1843,12 +2024,17 @@ def print_results(results: dict) -> None:
 
 # ── AI & Machine Learning ────────────────────────────────────
 
+
 def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_portfolio: pd.Series) -> dict:
     insights = {}
-    
+
     # Filtro rigoroso: solo asset ATTUALMENTE APERTI in portafoglio (escludi posizioni liquidate e cambi valuta)
     if isinstance(df_positions, pd.DataFrame) and not df_positions.empty and "ticker" in df_positions.columns:
-        mask_active = (df_positions["qty_net"] > 1e-6) if "qty_net" in df_positions.columns else pd.Series(True, index=df_positions.index)
+        mask_active = (
+            (df_positions["qty_net"] > 1e-6)
+            if "qty_net" in df_positions.columns
+            else pd.Series(True, index=df_positions.index)
+        )
         if "current_value" in df_positions.columns:
             mask_active = mask_active & (df_positions["current_value"] > 0)
         active_tickers = [t for t in df_positions[mask_active]["ticker"].dropna().unique() if not str(t).endswith("=X")]
@@ -1856,34 +2042,34 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
         active_tickers = []
 
     common_tickers = [t for t in active_tickers if t in df_returns.columns]
-    
+
     # 1. K-Means Clustering on Assets (Risk vs Return)
     valid_returns = df_returns[common_tickers].replace([np.inf, -np.inf], np.nan).dropna(how="all")
     # Filtro spikes per evitare anomalie da split o valute
     valid_returns = valid_returns.clip(lower=-0.75, upper=2.0)
-    
+
     if not valid_returns.empty and len(common_tickers) >= 2:
         # Volatilità annua e CAGR stimato per asset (in scala decimale, es. 0.20 per 20%)
         asset_vol = (valid_returns.std() * np.sqrt(TRADING_DAYS_YEAR)).clip(0.001, 3.0)
         mean_r = valid_returns.mean().clip(lower=-0.05, upper=0.05)
         asset_cagr = ((1 + mean_r) ** TRADING_DAYS_YEAR - 1).clip(-0.90, 5.0)
-        
-        features = pd.DataFrame({'volatility': asset_vol, 'cagr': asset_cagr})
+
+        features = pd.DataFrame({"volatility": asset_vol, "cagr": asset_cagr})
         features = features.replace([np.inf, -np.inf], np.nan).dropna()
         features = features[np.isfinite(features).all(axis=1)]
         features.index.name = "ticker"
         if len(features) >= 2:
             try:
                 # Scalatura delle feature per equilibrare varianza e rendimento
-                X = features[['volatility', 'cagr']].values
+                X = features[["volatility", "cagr"]].values
                 std_X = X.std(axis=0)
                 std_X[std_X == 0] = 1.0
                 X_scaled = (X - X.mean(axis=0)) / std_X
-                
+
                 n_clusters = min(3, len(features))
                 kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-                features['cluster'] = kmeans.fit_predict(X_scaled)
-                
+                features["cluster"] = kmeans.fit_predict(X_scaled)
+
                 clusters_list = features.reset_index().to_dict(orient="records")
                 insights["asset_clusters"] = clusters_list
             except Exception:
@@ -1896,8 +2082,7 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
     # 2. Monte Carlo Simulation for Portfolio VaR (1 Year) via Multivariate Normal (Cholesky)
     df_sync = df_returns[common_tickers].dropna()
     weights_series = (
-        df_positions[df_positions["ticker"].isin(common_tickers)]
-        .groupby("ticker")["weight_pct"].sum() / 100
+        df_positions[df_positions["ticker"].isin(common_tickers)].groupby("ticker")["weight_pct"].sum() / 100
     )
     weights = weights_series.reindex(common_tickers).fillna(0).values
     weights = weights / weights.sum() if weights.sum() > 0 else weights
@@ -1905,23 +2090,23 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
     if not df_sync.empty and len(df_sync) > 30 and weights.sum() > 0:
         days = TRADING_DAYS_YEAR
         simulations = 10000
-        
+
         mu = df_sync.mean().values
         cov = df_sync.cov().values
-        
+
         np.random.seed(42)
         try:
             # Multivariate Normal Simulation (Cholesky)
             sim_returns_assets = np.random.multivariate_normal(mu, cov, size=simulations * days)
             sim_returns_assets = sim_returns_assets.reshape(simulations, days, len(common_tickers))
-            
+
             sim_port_returns = np.dot(sim_returns_assets, weights)
             sim_prices = np.exp(np.cumsum(sim_port_returns, axis=1))
             final_values = sim_prices[:, -1]
-            
+
             var_95_mc = (1 - np.percentile(final_values, 5)) * 100
             var_99_mc = (1 - np.percentile(final_values, 1)) * 100
-            
+
             # Esportiamo un campione di 100 percorsi per la UI per non appesantire il JSON
             n_paths_to_export = min(100, simulations)
             sampled_paths = []
@@ -1931,16 +2116,16 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
                 # Aggiungiamo 1.0 (o 100) all'inizio come base 100
                 base_100_paths = np.concatenate([np.ones((n_paths_to_export, 1)), subset], axis=1) * 100
                 sampled_paths = base_100_paths.tolist()
-            
+
             insights["montecarlo"] = {
                 "simulated_days": days,
                 "n_simulations": simulations,
                 "var_95_simulated_pct": round(float(var_95_mc), 4),
                 "var_99_simulated_pct": round(float(var_99_mc), 4),
                 "expected_return_1y_pct": round(float(np.mean(final_values) - 1) * 100, 4),
-                "paths": sampled_paths
+                "paths": sampled_paths,
             }
-        except Exception as e:
+        except Exception:
             insights["montecarlo"] = {}
     return insights
 
@@ -1954,16 +2139,16 @@ def compute_brinson_attribution(df_pos: pd.DataFrame, df_returns: pd.DataFrame, 
     """
     if df_pos is None or df_pos.empty or df_returns is None or df_returns.empty:
         return pd.DataFrame()
-        
+
     active_pos = df_pos[df_pos["current_value"] > 0].copy()
     if active_pos.empty:
         return pd.DataFrame()
-        
+
     active_pos["gics_sector"] = active_pos["gics_sector"].fillna("Unassigned")
     total_val = active_pos["current_value"].sum()
-    
+
     sector_weights = active_pos.groupby("gics_sector")["current_value"].sum() / total_val
-    
+
     sector_returns = {}
     for sector, group in active_pos.groupby("gics_sector"):
         sec_tickers = [t for t in group["ticker"] if t in df_returns.columns]
@@ -1975,30 +2160,36 @@ def compute_brinson_attribution(df_pos: pd.DataFrame, df_returns: pd.DataFrame, 
         else:
             sector_returns[sector] = 0.0
 
-    bm_tot_return = float(benchmark_series.mean() * 252 * 100) if benchmark_series is not None and not benchmark_series.empty else 0.0
-    
+    bm_tot_return = (
+        float(benchmark_series.mean() * 252 * 100)
+        if benchmark_series is not None and not benchmark_series.empty
+        else 0.0
+    )
+
     attribution_results = []
     n_sectors = max(1, len(sector_weights))
     for sector, wp in sector_weights.items():
         rp = sector_returns.get(sector, 0.0)
         wb = 1.0 / n_sectors
         rb = bm_tot_return
-        
+
         alloc = (wp - wb) * (rb - bm_tot_return)
         select = wb * (rp - rb)
         inter = (wp - wb) * (rp - rb)
         total_effect = alloc + select + inter
-        
-        attribution_results.append({
-            "Settore GICS": sector,
-            "Peso Portafoglio %": round(wp * 100, 2),
-            "Peso Benchmark %": round(wb * 100, 2),
-            "Allocation Effect %": round(alloc, 2),
-            "Selection Effect %": round(select, 2),
-            "Interaction Effect %": round(inter, 2),
-            "Alpha Totale %": round(total_effect, 2)
-        })
-        
+
+        attribution_results.append(
+            {
+                "Settore GICS": sector,
+                "Peso Portafoglio %": round(wp * 100, 2),
+                "Peso Benchmark %": round(wb * 100, 2),
+                "Allocation Effect %": round(alloc, 2),
+                "Selection Effect %": round(select, 2),
+                "Interaction Effect %": round(inter, 2),
+                "Alpha Totale %": round(total_effect, 2),
+            }
+        )
+
     return pd.DataFrame(attribution_results)
 
 
@@ -2009,52 +2200,52 @@ def compute_hierarchical_risk_parity(cov_matrix: pd.DataFrame):
     2. Single Linkage Hierarchical Tree Clustering
     3. Quasi-Diagonalization & Recursive Bisection Variance Allocation
     """
-    from scipy.cluster.hierarchy import linkage, leaves_list
     import numpy as np
-    
+    from scipy.cluster.hierarchy import leaves_list, linkage
+
     if cov_matrix is None or cov_matrix.empty or cov_matrix.shape[0] < 2:
         return {}
-        
+
     cov = cov_matrix.values
     std = np.sqrt(np.diag(cov))
     std[std == 0] = 1e-8
     corr = cov / np.outer(std, std)
     np.fill_diagonal(corr, 1.0)
-    
+
     dist = np.sqrt(np.maximum(0, 0.5 * (1.0 - corr)))
-    
+
     tri_u = np.triu_indices(dist.shape[0], k=1)
     condensed_dist = dist[tri_u]
-    
+
     if len(condensed_dist) == 0:
         return {}
-        
-    link = linkage(condensed_dist, method='single')
+
+    link = linkage(condensed_dist, method="single")
     sort_idx = leaves_list(link)
-    
+
     def get_rec_bisection(cov_mat, sort_ids):
         w = pd.Series(1.0, index=sort_ids)
         c_items = [sort_ids.tolist()]
-        
+
         while len(c_items) > 0:
             c_items = [i[j:k] for i in c_items for j, k in ((0, len(i) // 2), (len(i) // 2, len(i))) if len(i) > 1]
             for i in range(0, len(c_items), 2):
                 c_items1 = c_items[i]
                 c_items2 = c_items[i + 1]
-                
+
                 cov1 = cov_mat[np.ix_(c_items1, c_items1)]
                 v1 = 1.0 / np.diag(cov1)
                 w1 = v1 / np.sum(v1)
                 var1 = np.dot(np.dot(w1, cov1), w1)
-                
+
                 cov2 = cov_mat[np.ix_(c_items2, c_items2)]
                 v2 = 1.0 / np.diag(cov2)
                 w2 = v2 / np.sum(v2)
                 var2 = np.dot(np.dot(w2, cov2), w2)
-                
+
                 alpha = 1.0 - var1 / (var1 + var2) if (var1 + var2) > 0 else 0.5
                 w[c_items1] *= alpha
-                w[c_items2] *= (1.0 - alpha)
+                w[c_items2] *= 1.0 - alpha
         return w
 
     weights_series = get_rec_bisection(cov, sort_idx)
@@ -2062,7 +2253,7 @@ def compute_hierarchical_risk_parity(cov_matrix: pd.DataFrame):
     tickers = cov_matrix.columns
     for idx, w in weights_series.items():
         hrp_weights[tickers[idx]] = round(float(w), 4)
-        
+
     return hrp_weights
 
 
@@ -2074,32 +2265,34 @@ def compute_almgren_chriss_market_impact(df_pos: pd.DataFrame):
     """
     if df_pos is None or df_pos.empty:
         return pd.DataFrame()
-        
+
     df = df_pos[df_pos["current_value"] > 0].copy()
     if df.empty or "days_to_liquidate" not in df.columns:
         return pd.DataFrame()
-        
+
     results = []
     eta = 0.142
     gamma = 0.314
-    
+
     for _, row in df.iterrows():
         val = float(row.get("current_value", 0.0))
         days = float(row.get("days_to_liquidate", 1.0))
-        
-        temp_impact = eta * (days ** 0.5)
+
+        temp_impact = eta * (days**0.5)
         perm_impact = gamma * days
         total_impact_pct = min(15.0, temp_impact + perm_impact)
         impact_eur = val * (total_impact_pct / 100.0)
-        
-        results.append({
-            "Ticker": row.get("ticker"),
-            "Valore (€)": val,
-            "Giorni Liquidazione": round(days, 2),
-            "Slippage Stimato %": round(total_impact_pct, 2),
-            "Impatto Monetario (€)": round(impact_eur, 2)
-        })
-        
+
+        results.append(
+            {
+                "Ticker": row.get("ticker"),
+                "Valore (€)": val,
+                "Giorni Liquidazione": round(days, 2),
+                "Slippage Stimato %": round(total_impact_pct, 2),
+                "Impatto Monetario (€)": round(impact_eur, 2),
+            }
+        )
+
     return pd.DataFrame(results)
 
 
@@ -2112,7 +2305,7 @@ def compute_almgren_chriss_optimal_execution(
     risk_aversion_lambda: float = 1e-6,
     eta_param: float = 0.15,
     gamma_param: float = 0.25,
-    bid_ask_spread_bps: float = 10.0
+    bid_ask_spread_bps: float = 10.0,
 ) -> Dict[str, Any]:
     """
     Modello Istituzionale Almgren & Chriss (2000) per la Liquidazione Ottimale di Portafoglio.
@@ -2128,30 +2321,30 @@ def compute_almgren_chriss_optimal_execution(
     T = max(0.2, float(horizon_days))
     N = max(4, int(n_intervals))
     tau = T / N
-    
+
     sigma_daily = (volatility_ann_pct / 100.0) / np.sqrt(252.0)
     sigma_tau = sigma_daily * np.sqrt(tau)
-    
+
     # Parametri di impatto normalizzati sull'ADV
-    eta = max(1e-8, (eta_param * sigma_daily) / V) # Costo impatto temporaneo
-    gamma = max(1e-8, (gamma_param * sigma_daily) / V) # Costo impatto permanente
-    spread_cost_rate = (bid_ask_spread_bps / 10000.0) / 2.0 # Metà spread
-    
+    eta = max(1e-8, (eta_param * sigma_daily) / V)  # Costo impatto temporaneo
+    gamma = max(1e-8, (gamma_param * sigma_daily) / V)  # Costo impatto permanente
+    spread_cost_rate = (bid_ask_spread_bps / 10000.0) / 2.0  # Metà spread
+
     # Parametro di urgenza (kappa)
     # kappa*tau = arccosh( lambda * sigma^2 * tau^2 / (2*eta) + 1 )
-    arg = 1.0 + (risk_aversion_lambda * (sigma_daily ** 2) * (tau ** 2)) / (2.0 * eta)
+    arg = 1.0 + (risk_aversion_lambda * (sigma_daily**2) * (tau**2)) / (2.0 * eta)
     if arg < 1.00000001:
         # Approssimazione lineare per lambda -> 0 (TWAP)
-        kappa = np.sqrt(max(1e-12, (risk_aversion_lambda * (sigma_daily ** 2)) / eta))
+        kappa = np.sqrt(max(1e-12, (risk_aversion_lambda * (sigma_daily**2)) / eta))
     else:
         kappa = float(np.arccosh(arg) / tau)
-        
+
     kappa = max(1e-6, kappa)
     half_life_days = float(np.log(2.0) / kappa) if kappa > 1e-5 else float(T / 2.0)
-    
+
     # Generazione dei punti temporali t_j (j = 0 .. N)
     t_points = np.linspace(0, T, N + 1)
-    
+
     # 1. Traiettoria Ottimale
     if kappa * T > 50:
         # Evita overflow numerico di sinh
@@ -2164,11 +2357,11 @@ def compute_almgren_chriss_optimal_execution(
         x_opt = X0 * (np.sinh(kappa * (T - t_points)) / np.sinh(kappa * T))
     x_opt = np.clip(x_opt, 0.0, X0)
     x_opt[-1] = 0.0
-    
+
     # 2. Traiettoria TWAP (Lineare Risk-Neutral)
     x_twap = X0 * (1.0 - t_points / T)
     x_twap[-1] = 0.0
-    
+
     # 3. Traiettoria Aggressiva (High Urgency)
     kappa_agg = kappa * 3.5
     if kappa_agg * T > 50:
@@ -2177,66 +2370,72 @@ def compute_almgren_chriss_optimal_execution(
         x_agg = X0 * (np.sinh(kappa_agg * (T - t_points)) / np.sinh(kappa_agg * T))
     x_agg = np.clip(x_agg, 0.0, X0)
     x_agg[-1] = 0.0
-    
+
     # Calcolo trading velocity e costi per step
-    v_opt = -np.diff(x_opt) / tau # Quote/valore venduto per intervallo
+    v_opt = -np.diff(x_opt) / tau  # Quote/valore venduto per intervallo
     v_twap = -np.diff(x_twap) / tau
     v_agg = -np.diff(x_agg) / tau
-    
+
     # Costi Attesi E[x] = 0.5 * gamma * X0^2 + eta * tau * sum(v_j^2) + spread * X0
-    perm_cost = 0.5 * gamma * (X0 ** 2)
-    temp_cost_opt = float(eta * tau * np.sum(v_opt ** 2))
-    temp_cost_twap = float(eta * tau * np.sum(v_twap ** 2))
-    temp_cost_agg = float(eta * tau * np.sum(v_agg ** 2))
+    perm_cost = 0.5 * gamma * (X0**2)
+    temp_cost_opt = float(eta * tau * np.sum(v_opt**2))
+    temp_cost_twap = float(eta * tau * np.sum(v_twap**2))
+    temp_cost_agg = float(eta * tau * np.sum(v_agg**2))
     spread_cost = spread_cost_rate * X0
-    
+
     total_cost_opt = perm_cost + temp_cost_opt + spread_cost
     total_cost_twap = perm_cost + temp_cost_twap + spread_cost
     total_cost_agg = perm_cost + temp_cost_agg + spread_cost
-    
+
     # Varianza V[x] = sigma^2 * sum(tau * x_j^2)
     # x_mid_opt per integrazione trapezoidale o somme rettangolari
-    var_opt = (sigma_daily ** 2) * tau * float(np.sum(x_opt[:-1] ** 2))
-    var_twap = (sigma_daily ** 2) * tau * float(np.sum(x_twap[:-1] ** 2))
-    var_agg = (sigma_daily ** 2) * tau * float(np.sum(x_agg[:-1] ** 2))
-    
+    var_opt = (sigma_daily**2) * tau * float(np.sum(x_opt[:-1] ** 2))
+    var_twap = (sigma_daily**2) * tau * float(np.sum(x_twap[:-1] ** 2))
+    var_agg = (sigma_daily**2) * tau * float(np.sum(x_agg[:-1] ** 2))
+
     std_opt = float(np.sqrt(max(0.0, var_opt)))
     std_twap = float(np.sqrt(max(0.0, var_twap)))
     std_agg = float(np.sqrt(max(0.0, var_agg)))
-    
+
     # VaR di Esecuzione al 95% e 99%
     var_95_opt = total_cost_opt + 1.645 * std_opt
     var_99_opt = total_cost_opt + 2.326 * std_opt
-    
+
     # Creazione Schedule DataFrame
     schedule_rows = []
     cum_shares_sold = 0.0
     cum_cost = 0.0
-    
+
     for j in range(N):
         t_start = t_points[j]
         t_end = t_points[j + 1]
         shares_held = x_opt[j]
         shares_sold_step = v_opt[j] * tau
         cum_shares_sold += shares_sold_step
-        step_cost = (eta * (v_opt[j] ** 2) * tau) + (gamma * shares_sold_step * shares_held) + (spread_cost_rate * shares_sold_step)
+        step_cost = (
+            (eta * (v_opt[j] ** 2) * tau)
+            + (gamma * shares_sold_step * shares_held)
+            + (spread_cost_rate * shares_sold_step)
+        )
         cum_cost += step_cost
-        
-        schedule_rows.append({
-            "Intervallo": f"T{j+1}",
-            "Giorno": round(t_end, 2),
-            "Posizione Residua (€)": round(x_opt[j+1], 2),
-            "Flusso Liquidato (€)": round(shares_sold_step, 2),
-            "Velocità Vendita (€/giorno)": round(v_opt[j], 2),
-            "Costo Step (€)": round(step_cost, 2),
-            "Costo Cumulato (€)": round(cum_cost, 2),
-            "% Liquidata": round((cum_shares_sold / X0) * 100.0, 1),
-            "Traiettoria TWAP (€)": round(x_twap[j+1], 2),
-            "Traiettoria Aggressiva (€)": round(x_agg[j+1], 2)
-        })
-        
+
+        schedule_rows.append(
+            {
+                "Intervallo": f"T{j + 1}",
+                "Giorno": round(t_end, 2),
+                "Posizione Residua (€)": round(x_opt[j + 1], 2),
+                "Flusso Liquidato (€)": round(shares_sold_step, 2),
+                "Velocità Vendita (€/giorno)": round(v_opt[j], 2),
+                "Costo Step (€)": round(step_cost, 2),
+                "Costo Cumulato (€)": round(cum_cost, 2),
+                "% Liquidata": round((cum_shares_sold / X0) * 100.0, 1),
+                "Traiettoria TWAP (€)": round(x_twap[j + 1], 2),
+                "Traiettoria Aggressiva (€)": round(x_agg[j + 1], 2),
+            }
+        )
+
     df_schedule = pd.DataFrame(schedule_rows)
-    
+
     return {
         "order_value": X0,
         "adv_value": V,
@@ -2251,7 +2450,7 @@ def compute_almgren_chriss_optimal_execution(
         "cost_breakdown": {
             "temporary_impact_amount": temp_cost_opt,
             "permanent_impact_amount": perm_cost,
-            "spread_cost_amount": spread_cost
+            "spread_cost_amount": spread_cost,
         },
         "execution_std_amount": std_opt,
         "execution_var_95_amount": var_95_opt,
@@ -2260,12 +2459,14 @@ def compute_almgren_chriss_optimal_execution(
         "comparison": {
             "twap": {"cost": total_cost_twap, "std": std_twap, "var95": total_cost_twap + 1.645 * std_twap},
             "optimal": {"cost": total_cost_opt, "std": std_opt, "var95": var_95_opt},
-            "aggressive": {"cost": total_cost_agg, "std": std_agg, "var95": total_cost_agg + 1.645 * std_agg}
-        }
+            "aggressive": {"cost": total_cost_agg, "std": std_agg, "var95": total_cost_agg + 1.645 * std_agg},
+        },
     }
 
 
-def compute_private_equity_waterfall(capital_calls: float, distributions: float, nav: float, hurdle_rate: float = 0.08, carried_interest: float = 0.20):
+def compute_private_equity_waterfall(
+    capital_calls: float, distributions: float, nav: float, hurdle_rate: float = 0.08, carried_interest: float = 0.20
+):
     """
     Simulatore dei flussi di cassa Private Equity (J-Curve & Waterfall Allocation):
     - DPI (Distributed to Paid-In)
@@ -2275,14 +2476,14 @@ def compute_private_equity_waterfall(capital_calls: float, distributions: float,
     """
     if capital_calls <= 0:
         return {}
-        
+
     dpi = distributions / capital_calls
     rvpi = nav / capital_calls
     tvpi = dpi + rvpi
-    
+
     total_gain = (distributions + nav) - capital_calls
     hurdle_amount = capital_calls * hurdle_rate
-    
+
     if total_gain > hurdle_amount:
         gp_carried_interest = (total_gain - hurdle_amount) * carried_interest
         lp_gain = total_gain - gp_carried_interest
@@ -2297,16 +2498,16 @@ def compute_private_equity_waterfall(capital_calls: float, distributions: float,
         "tvpi_moic": round(tvpi, 2),
         "total_gain": round(total_gain, 2),
         "gp_carried_interest": round(gp_carried_interest, 2),
-        "lp_net_gain": round(lp_gain, 2)
+        "lp_net_gain": round(lp_gain, 2),
     }
 
 
 def compute_black_litterman_optimization(
-    cov_matrix: pd.DataFrame, 
-    market_weights: pd.Series, 
-    views_dict: dict = None, 
-    tau: float = 0.05, 
-    risk_aversion: float = 2.5
+    cov_matrix: pd.DataFrame,
+    market_weights: pd.Series,
+    views_dict: dict = None,
+    tau: float = 0.05,
+    risk_aversion: float = 2.5,
 ) -> dict:
     """
     Calcola l'ottimizzazione di portafoglio Black-Litterman:
@@ -2331,7 +2532,7 @@ def compute_black_litterman_optimization(
         k = len(views_dict)
         P = np.zeros((k, len(assets)))
         Q = np.zeros(k)
-        
+
         for idx, (t, val) in enumerate(views_dict.items()):
             if t in assets:
                 asset_idx = assets.index(t)
@@ -2348,7 +2549,7 @@ def compute_black_litterman_optimization(
         kernel_k = P @ tau_sigma_Pt + omega
         # Regolarizzazione Tikhonov per garantire stabilita numerica
         kernel_k += np.eye(k) * 1e-8
-        
+
         delta_views = Q - P @ pi
         try:
             M_views = np.linalg.solve(kernel_k, delta_views)
@@ -2375,7 +2576,7 @@ def compute_black_litterman_optimization(
     return {
         "implied_equilibrium_returns": pd.Series(pi, index=assets),
         "black_litterman_returns": pd.Series(bl_returns, index=assets),
-        "black_litterman_weights": pd.Series(w_bl, index=assets)
+        "black_litterman_weights": pd.Series(w_bl, index=assets),
     }
 
 
@@ -2408,7 +2609,7 @@ def compute_fama_french_exposures(sr_portfolio: pd.Series) -> dict:
             "beta_mkt": float(beta[1]),
             "beta_smb": float(beta[2]),
             "beta_hml": float(beta[3]),
-            "r_squared": float(r2)
+            "r_squared": float(r2),
         }
     except Exception:
         return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "r_squared": 0.0}
@@ -2445,13 +2646,15 @@ def compute_carhart_4factor_exposures(sr_portfolio: pd.Series) -> dict:
             "beta_smb": float(beta[2]),
             "beta_hml": float(beta[3]),
             "beta_wml": float(beta[4]),
-            "r_squared": float(r2)
+            "r_squared": float(r2),
         }
     except Exception:
         return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "beta_wml": 0.0, "r_squared": 0.0}
 
 
-def compute_atr_chandelier_exits(df_prices: pd.DataFrame, df_positions: pd.DataFrame, period: int = 14, multiplier: float = 3.0) -> dict:
+def compute_atr_chandelier_exits(
+    df_prices: pd.DataFrame, df_positions: pd.DataFrame, period: int = 14, multiplier: float = 3.0
+) -> dict:
     """
     Calcola il Chandelier Exit & ATR Trailing Stop-Loss dinamico per ciascun asset in portafoglio.
     Formula: Stop = Highest High (22g) - (Multiplier * ATR_14)
@@ -2472,17 +2675,29 @@ def compute_atr_chandelier_exits(df_prices: pd.DataFrame, df_positions: pd.DataF
     for idx, row in df_positions.iterrows():
         ticker = row.get("ticker", "")
         last_p = row.get("last_price", 0.0)
-        
+
         if last_p is None or pd.isna(last_p) or last_p <= 0:
             continue
 
-        px_sub = df_prices[df_prices["ticker"] == ticker].sort_values("price_date") if (not df_prices.empty and "ticker" in df_prices.columns) else pd.DataFrame()
-        
+        px_sub = (
+            df_prices[df_prices["ticker"] == ticker].sort_values("price_date")
+            if (not df_prices.empty and "ticker" in df_prices.columns)
+            else pd.DataFrame()
+        )
+
         if not px_sub.empty and "close" in px_sub.columns:
             close_s = px_sub["close"].dropna().values.astype(float)
-            high_s = px_sub["high"].dropna().values.astype(float) if ("high" in px_sub.columns and px_sub["high"].notna().any()) else close_s * 1.01
-            low_s = px_sub["low"].dropna().values.astype(float) if ("low" in px_sub.columns and px_sub["low"].notna().any()) else close_s * 0.99
-            
+            high_s = (
+                px_sub["high"].dropna().values.astype(float)
+                if ("high" in px_sub.columns and px_sub["high"].notna().any())
+                else close_s * 1.01
+            )
+            low_s = (
+                px_sub["low"].dropna().values.astype(float)
+                if ("low" in px_sub.columns and px_sub["low"].notna().any())
+                else close_s * 0.99
+            )
+
             # Normalizzazione valutaria/FX: adegua la serie storica alla valuta base di last_p (€)
             if len(close_s) > 0 and close_s[-1] > 0:
                 fx_scale = float(last_p) / float(close_s[-1])
@@ -2502,15 +2717,15 @@ def compute_atr_chandelier_exits(df_prices: pd.DataFrame, df_positions: pd.DataF
             for i in range(1, len(close_s)):
                 h_val = high_s[i] if i < len(high_s) else close_s[i] * 1.01
                 l_val = low_s[i] if i < len(low_s) else close_s[i] * 0.99
-                tr = max(
-                    h_val - l_val,
-                    abs(h_val - close_s[i-1]),
-                    abs(l_val - close_s[i-1])
-                )
+                tr = max(h_val - l_val, abs(h_val - close_s[i - 1]), abs(l_val - close_s[i - 1]))
                 tr_list.append(tr)
 
             atr_series = pd.Series(tr_list).ewm(span=period, adjust=False).mean()
-            atr_val = float(atr_series.iloc[-1]) if (not atr_series.empty and not pd.isna(atr_series.iloc[-1])) else (last_p * 0.02)
+            atr_val = (
+                float(atr_series.iloc[-1])
+                if (not atr_series.empty and not pd.isna(atr_series.iloc[-1]))
+                else (last_p * 0.02)
+            )
             highest_high_22 = float(np.max(high_s[-22:])) if len(high_s) >= 22 else float(np.max(high_s))
 
         chandelier_stop = max(0.01, highest_high_22 - (multiplier * atr_val))
@@ -2524,30 +2739,32 @@ def compute_atr_chandelier_exits(df_prices: pd.DataFrame, df_positions: pd.DataF
         else:
             status = "🟢 Sicuro"
 
-        results_list.append({
-            "ticker": ticker,
-            "last_price": last_p,
-            "atr_14": atr_val,
-            "highest_high_22": highest_high_22,
-            "chandelier_stop": chandelier_stop,
-            "distance_pct": distance_pct,
-            "stop_triggered": (last_p < chandelier_stop),
-            "status": status
-        })
+        results_list.append(
+            {
+                "ticker": ticker,
+                "last_price": last_p,
+                "atr_14": atr_val,
+                "highest_high_22": highest_high_22,
+                "chandelier_stop": chandelier_stop,
+                "distance_pct": distance_pct,
+                "stop_triggered": (last_p < chandelier_stop),
+                "status": status,
+            }
+        )
 
     return {
         "summary": results_list,
         "stop_triggered_count": triggered_count,
-        "summary_df": pd.DataFrame(results_list) if results_list else pd.DataFrame()
+        "summary_df": pd.DataFrame(results_list) if results_list else pd.DataFrame(),
     }
 
 
 def compute_custom_macro_stress(
-    df_positions: pd.DataFrame, 
-    rate_shock_bps: float = 0.0, 
-    fx_shock_pct: float = 0.0, 
-    oil_shock_pct: float = 0.0, 
-    equity_shock_pct: float = 0.0
+    df_positions: pd.DataFrame,
+    rate_shock_bps: float = 0.0,
+    fx_shock_pct: float = 0.0,
+    oil_shock_pct: float = 0.0,
+    equity_shock_pct: float = 0.0,
 ) -> dict:
     """
     Simula uno shock macroeconomico combinato multi-parametro sul valore del portafoglio:
@@ -2592,23 +2809,27 @@ def compute_custom_macro_stress(
             asset_pct = mkt_impact + rate_impact * 0.8 + fx_impact * 0.4
 
         asset_loss = val * asset_pct
-        details.append({
-            "ticker": tk,
-            "current_value": val,
-            "simulated_impact_pct": asset_pct * 100.0,
-            "simulated_loss_eur": asset_loss
-        })
+        details.append(
+            {
+                "ticker": tk,
+                "current_value": val,
+                "simulated_impact_pct": asset_pct * 100.0,
+                "simulated_loss_eur": asset_loss,
+            }
+        )
 
     return {
         "portfolio_val_before": tot_val,
         "portfolio_val_after": max(0.0, tot_val + loss_eur),
         "portfolio_loss_eur": loss_eur,
         "portfolio_impact_pct": combined_pct * 100.0,
-        "details_df": pd.DataFrame(details) if details else pd.DataFrame()
+        "details_df": pd.DataFrame(details) if details else pd.DataFrame(),
     }
 
 
-def compute_3d_stress_surface(df_positions: pd.DataFrame, rate_shocks_bps: list = None, vol_shocks_pct: list = None) -> dict:
+def compute_3d_stress_surface(
+    df_positions: pd.DataFrame, rate_shocks_bps: list = None, vol_shocks_pct: list = None
+) -> dict:
     """
     Genera una griglia 3D di impatto sul portafoglio (€ e %) variando contemporaneamente
     gli shock sui tassi d'interesse (bps) e gli shock sulla volatilità/VIX (%).
@@ -2624,22 +2845,30 @@ def compute_3d_stress_surface(df_positions: pd.DataFrame, rate_shocks_bps: list 
             "vol_grid": vol_shocks_pct,
             "z_pnl_eur": np.zeros((len(vol_shocks_pct), len(rate_shocks_bps))).tolist(),
             "z_impact_pct": np.zeros((len(vol_shocks_pct), len(rate_shocks_bps))).tolist(),
-            "worst_pnl_eur": 0.0, "worst_impact_pct": 0.0,
-            "best_pnl_eur": 0.0, "best_impact_pct": 0.0
+            "worst_pnl_eur": 0.0,
+            "worst_impact_pct": 0.0,
+            "best_pnl_eur": 0.0,
+            "best_impact_pct": 0.0,
         }
 
     if "qty_net" in df_positions.columns:
         df_positions = df_positions[df_positions["qty_net"] > 1e-6]
 
-    tot_val = float(df_positions["current_value"].sum()) if ("current_value" in df_positions.columns and not df_positions.empty) else 0.0
+    tot_val = (
+        float(df_positions["current_value"].sum())
+        if ("current_value" in df_positions.columns and not df_positions.empty)
+        else 0.0
+    )
     if tot_val <= 0:
         return {
             "rate_grid": rate_shocks_bps,
             "vol_grid": vol_shocks_pct,
             "z_pnl_eur": np.zeros((len(vol_shocks_pct), len(rate_shocks_bps))).tolist(),
             "z_impact_pct": np.zeros((len(vol_shocks_pct), len(rate_shocks_bps))).tolist(),
-            "worst_pnl_eur": 0.0, "worst_impact_pct": 0.0,
-            "best_pnl_eur": 0.0, "best_impact_pct": 0.0
+            "worst_pnl_eur": 0.0,
+            "worst_impact_pct": 0.0,
+            "best_pnl_eur": 0.0,
+            "best_impact_pct": 0.0,
         }
 
     z_pnl = np.zeros((len(vol_shocks_pct), len(rate_shocks_bps)))
@@ -2649,12 +2878,12 @@ def compute_3d_stress_surface(df_positions: pd.DataFrame, rate_shocks_bps: list 
         for j, rate_shock in enumerate(rate_shocks_bps):
             dr = rate_shock / 10000.0
             dvol = vol_shock / 100.0
-            
+
             # Non-linear interest rate duration + positive convexity
-            rate_effect = -4.5 * dr + 0.5 * 24.0 * (dr ** 2)
+            rate_effect = -4.5 * dr + 0.5 * 24.0 * (dr**2)
             # Volatility shock with asymmetric negative gamma & cross-coupling
-            vol_effect = -0.32 * dvol + 0.08 * (dvol ** 2) - 0.15 * dr * dvol
-            
+            vol_effect = -0.32 * dvol + 0.08 * (dvol**2) - 0.15 * dr * dvol
+
             combined_pct = (rate_effect + vol_effect) * 100.0
             pnl_eur = tot_val * (combined_pct / 100.0)
 
@@ -2669,7 +2898,7 @@ def compute_3d_stress_surface(df_positions: pd.DataFrame, rate_shocks_bps: list 
         "worst_pnl_eur": float(np.min(z_pnl)),
         "worst_impact_pct": float(np.min(z_pct)),
         "best_pnl_eur": float(np.max(z_pnl)),
-        "best_impact_pct": float(np.max(z_pct))
+        "best_impact_pct": float(np.max(z_pct)),
     }
 
 
@@ -2691,7 +2920,7 @@ def compute_msci_barra_multifactor_model(sr_portfolio: pd.Series, sr_market: pd.
             "r_squared": 0.88,
             "systematic_risk_pct": 88.0,
             "specific_risk_pct": 12.0,
-            "t_stats": {"MKT": 8.5, "SMB": 2.4, "HML": 1.8, "WML": -1.4, "TERM": -1.1}
+            "t_stats": {"MKT": 8.5, "SMB": 2.4, "HML": 1.8, "WML": -1.4, "TERM": -1.1},
         }
 
     clean_p = sr_portfolio.dropna()
@@ -2707,16 +2936,16 @@ def compute_msci_barra_multifactor_model(sr_portfolio: pd.Series, sr_market: pd.
 
     np.random.seed(42)
     # Generazione dei fattori stile come spread ortogonalizzati al mercato per eliminare la multicollinearità
-    smb_raw  = np.random.normal(0.0002, 0.005, N)
-    hml_raw  = np.random.normal(0.0001, 0.004, N)
-    wml_raw  = np.random.normal(-0.0001, 0.003, N)
+    smb_raw = np.random.normal(0.0002, 0.005, N)
+    hml_raw = np.random.normal(0.0001, 0.004, N)
+    wml_raw = np.random.normal(-0.0001, 0.003, N)
     term_raw = np.random.normal(-0.0001, 0.003, N)
 
     # Ortogonalizzazione rispetto a mkt via proiezione OLS (Gram-Schmidt)
     var_m = np.var(mkt, ddof=1) if np.var(mkt, ddof=1) > 0 else 1.0
-    smb  = smb_raw - (np.cov(smb_raw, mkt)[0, 1] / var_m) * mkt
-    hml  = hml_raw - (np.cov(hml_raw, mkt)[0, 1] / var_m) * mkt
-    wml  = wml_raw - (np.cov(wml_raw, mkt)[0, 1] / var_m) * mkt
+    smb = smb_raw - (np.cov(smb_raw, mkt)[0, 1] / var_m) * mkt
+    hml = hml_raw - (np.cov(hml_raw, mkt)[0, 1] / var_m) * mkt
+    wml = wml_raw - (np.cov(wml_raw, mkt)[0, 1] / var_m) * mkt
     term = term_raw - (np.cov(term_raw, mkt)[0, 1] / var_m) * mkt
 
     X = np.column_stack([mkt, smb, hml, wml, term])
@@ -2741,7 +2970,7 @@ def compute_msci_barra_multifactor_model(sr_portfolio: pd.Series, sr_market: pd.
 
     df_err = max(1, N - 6)
     mse = float(np.sum(residuals**2) / df_err)
-    
+
     try:
         cov_matrix = mse * np.linalg.inv(X.T @ X)
         se_betas = np.sqrt(np.diagonal(cov_matrix))
@@ -2759,7 +2988,7 @@ def compute_msci_barra_multifactor_model(sr_portfolio: pd.Series, sr_market: pd.
         "r_squared": float(r2),
         "systematic_risk_pct": systematic_pct,
         "specific_risk_pct": specific_pct,
-        "t_stats": t_stats_dict
+        "t_stats": t_stats_dict,
     }
 
 
@@ -2770,7 +2999,7 @@ def compute_merton_jump_diffusion_simulation(
     lambda_j: float = 1.5,
     mu_j: float = -0.08,
     sigma_j: float = 0.05,
-    initial_value: float = 100.0
+    initial_value: float = 100.0,
 ) -> dict:
     """
     Simulazione Stocastica Merton Jump-Diffusion Process per il Tail Risk:
@@ -2819,7 +3048,10 @@ def compute_merton_jump_diffusion_simulation(
     cvar_99_jump_pct = float(-np.mean(pct_returns[pct_returns <= -var_99_jump_pct]))
 
     from scipy.stats import norm
-    var_99_gauss_pct = float(-(mu * (time_horizon_days/252.0) - norm.ppf(0.99) * sigma * np.sqrt(time_horizon_days/252.0)))
+
+    var_99_gauss_pct = float(
+        -(mu * (time_horizon_days / 252.0) - norm.ppf(0.99) * sigma * np.sqrt(time_horizon_days / 252.0))
+    )
 
     p5 = np.percentile(paths, 5, axis=0).tolist()
     p25 = np.percentile(paths, 25, axis=0).tolist()
@@ -2841,7 +3073,7 @@ def compute_merton_jump_diffusion_simulation(
         "var_99_gauss_pct": float(var_99_gauss_pct * 100.0),
         "mean_jumps_per_year": float(np.mean(jump_counts_per_sim)),
         "drift_ann": mu,
-        "vol_ann": sigma
+        "vol_ann": sigma,
     }
 
 
@@ -2852,7 +3084,7 @@ def compute_sandbox_risk_bundle(
     benchmark_ticker: str = "SPY",
     sandbox_name: str = "Bilanciato Istituzionale (60/40)",
     risk_free_rate: float = None,
-    base_currency: str = "USD"
+    base_currency: str = "USD",
 ) -> dict:
     """
     Costruisce un bundle completo di analisi di rischio, ottimizzazione Ledoit-Wolf,
@@ -2860,14 +3092,14 @@ def compute_sandbox_risk_bundle(
     """
     from core.cache_shield import get_cached_ticker_history
     from core.yield_curve import get_active_risk_free_rate
-    
+
     rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
     active_rf_rate = rf_info["rate"]
-    
+
     clean_tickers = [str(t).strip().upper() for t in tickers if str(t).strip()]
     if not clean_tickers:
         clean_tickers = ["AAPL", "MSFT", "JNJ", "PG", "BND", "SPY"]
-        
+
     num_assets = len(clean_tickers)
     if weights is None or len(weights) != num_assets:
         w_arr = np.ones(num_assets) / num_assets
@@ -2877,7 +3109,7 @@ def compute_sandbox_risk_bundle(
             w_arr = w_arr / w_arr.sum()
         else:
             w_arr = np.ones(num_assets) / num_assets
-            
+
     # Scarica prezzi storici
     price_dict = {}
     for tk in clean_tickers:
@@ -2887,7 +3119,7 @@ def compute_sandbox_risk_bundle(
                 price_dict[tk] = df_h["close"]
         except Exception:
             pass
-            
+
     # Se per qualche asset non ci sono dati, fallback su asset liquidi
     if len(price_dict) < 2:
         for tk in ["AAPL", "MSFT", "SPY"]:
@@ -2897,33 +3129,33 @@ def compute_sandbox_risk_bundle(
                     price_dict[tk] = df_h["close"]
             except Exception:
                 pass
-                
+
     df_prices = pd.DataFrame(price_dict).dropna(how="all").ffill().dropna()
-    if not df_prices.empty and getattr(df_prices.index, 'tz', None) is not None:
+    if not df_prices.empty and getattr(df_prices.index, "tz", None) is not None:
         df_prices.index = df_prices.index.tz_localize(None)
-        
+
     valid_tickers = [t for t in clean_tickers if t in df_prices.columns]
     if len(valid_tickers) < 2:
         valid_tickers = list(df_prices.columns)
-        
+
     # Re-normalize weights for valid tickers
     w_valid = np.ones(len(valid_tickers)) / len(valid_tickers)
-    
+
     df_returns = df_prices[valid_tickers].pct_change().dropna()
     sr_portfolio = (df_returns * w_valid).sum(axis=1)
-    
+
     try:
         df_bm = get_cached_ticker_history(benchmark_ticker)
         if df_bm is not None and not df_bm.empty and "close" in df_bm.columns:
             s_bm = df_bm["close"].copy()
-            if getattr(s_bm.index, 'tz', None) is not None:
+            if getattr(s_bm.index, "tz", None) is not None:
                 s_bm.index = s_bm.index.tz_localize(None)
             sr_benchmark = s_bm.pct_change().dropna()
         else:
             sr_benchmark = sr_portfolio.copy()
     except Exception:
         sr_benchmark = sr_portfolio.copy()
-        
+
     # Allinea date benchmark e portafoglio
     common_idx = sr_portfolio.index.intersection(sr_benchmark.index)
     if not common_idx.empty:
@@ -2932,14 +3164,14 @@ def compute_sandbox_risk_bundle(
     else:
         sr_portfolio_aligned = sr_portfolio
         sr_benchmark_aligned = sr_portfolio
-        
+
     # Costruzione DataFrame Posizioni
     pos_rows = []
     for i, tk in enumerate(valid_tickers):
         last_px = float(df_prices[tk].iloc[-1]) if not df_prices[tk].empty else 100.0
         val = initial_capital * w_valid[i]
         qty = val / last_px if last_px > 0 else 10.0
-        
+
         # Sector / Asset class estimation
         if tk in ["BND", "TLT", "IEF", "AGG"]:
             ac = "Fixed Income"
@@ -2953,46 +3185,56 @@ def compute_sandbox_risk_bundle(
         else:
             ac = "Equity"
             sec = "Technology" if tk in ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA"] else "Diversified"
-            
-        pos_rows.append({
-            "ticker": tk,
-            "name": tk,
-            "qty_net": qty,
-            "wacp": last_px * 0.95,
-            "current_price": last_px,
-            "last_price": last_px,
-            "current_value": val,
-            "weight_pct": w_valid[i] * 100.0,
-            "pnl_realized": 0.0,
-            "pnl_unrealized": val * 0.05,
-            "days_to_liquidate": 0.5,
-            "yield_on_cost_pct": 2.1,
-            "asset_class": ac,
-            "currency": "EUR" if (".MI" in tk or ".PA" in tk or ".MC" in tk) else "USD",
-            "gics_sector": sec,
-            "sector": sec,
-            "country": "Italy" if ".MI" in tk else ("Europe" if any(x in tk for x in [".PA", ".MC", ".AS", ".DE"]) else "USA")
-        })
+
+        pos_rows.append(
+            {
+                "ticker": tk,
+                "name": tk,
+                "qty_net": qty,
+                "wacp": last_px * 0.95,
+                "current_price": last_px,
+                "last_price": last_px,
+                "current_value": val,
+                "weight_pct": w_valid[i] * 100.0,
+                "pnl_realized": 0.0,
+                "pnl_unrealized": val * 0.05,
+                "days_to_liquidate": 0.5,
+                "yield_on_cost_pct": 2.1,
+                "asset_class": ac,
+                "currency": "EUR" if (".MI" in tk or ".PA" in tk or ".MC" in tk) else "USD",
+                "gics_sector": sec,
+                "sector": sec,
+                "country": "Italy"
+                if ".MI" in tk
+                else ("Europe" if any(x in tk for x in [".PA", ".MC", ".AS", ".DE"]) else "USA"),
+            }
+        )
     df_positions = pd.DataFrame(pos_rows)
-    
+
     # Calcolo Metriche
     stress_tests = _calc_stress_tests(df_returns, df_positions, sr_benchmark_aligned)
     metrics = {
-        "market_risk": _calc_market_risk(sr_portfolio_aligned, sr_benchmark_aligned, benchmark_ticker, risk_free_rate=active_rf_rate),
-        "returns": _calc_return_metrics(sr_portfolio_aligned, sr_benchmark_aligned, pd.DataFrame(), df_positions, risk_free_rate=active_rf_rate),
+        "market_risk": _calc_market_risk(
+            sr_portfolio_aligned, sr_benchmark_aligned, benchmark_ticker, risk_free_rate=active_rf_rate
+        ),
+        "returns": _calc_return_metrics(
+            sr_portfolio_aligned, sr_benchmark_aligned, pd.DataFrame(), df_positions, risk_free_rate=active_rf_rate
+        ),
         "concentration": _calc_concentration(df_positions),
         "ai_insights": _calc_ai_insights(df_positions, df_returns, sr_portfolio_aligned),
         "risk_free": rf_info,
-        "stress_tests": stress_tests
+        "stress_tests": stress_tests,
     }
-    
+
     optimization = _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate)
     risk_contrib = _calc_risk_contribution(df_returns, df_positions)
-    
+
     from core.closed_trades import compute_closed_trades_journal
+
     closed_trades_data = compute_closed_trades_journal(df_tx=pd.DataFrame(), df_positions=df_positions, is_sandbox=True)
 
     from core.garch_engine import compute_garch_fhs_bundle
+
     tot_val_sb = float(df_positions["current_value"].sum()) if "current_value" in df_positions.columns else 100000.0
     garch_bundle_sb = compute_garch_fhs_bundle(sr_portfolio_aligned, total_value=tot_val_sb)
 
@@ -3014,18 +3256,19 @@ def compute_sandbox_risk_bundle(
         "risk_contribution": risk_contrib,
         "optimization": optimization,
         "closed_trades": closed_trades_data,
-        "warnings": []
+        "warnings": [],
     }
 
 
 # ── Decomposizione Istituzionale Marginal VaR & Component VaR ──
+
 
 def compute_marginal_and_component_var(
     df_returns: pd.DataFrame,
     df_positions: pd.DataFrame,
     confidence_level: float = 0.95,
     total_portfolio_value: Optional[float] = None,
-    time_horizon: int = 1
+    time_horizon: int = 1,
 ) -> Dict[str, Any]:
     """
     Calcola la decomposizione analitica istituzionale del Value at Risk (Bloomberg PORT / RiskMetrics Parity):
@@ -3039,10 +3282,12 @@ def compute_marginal_and_component_var(
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
             "decomposition_df": pd.DataFrame(),
-            "euler_check_passed": True
+            "euler_check_passed": True,
         }
 
-    qty_col = "qty_net" if "qty_net" in df_positions.columns else ("shares" if "shares" in df_positions.columns else None)
+    qty_col = (
+        "qty_net" if "qty_net" in df_positions.columns else ("shares" if "shares" in df_positions.columns else None)
+    )
     if qty_col:
         active_pos = df_positions[df_positions[qty_col] > 0].copy()
     elif "current_value" in df_positions.columns:
@@ -3055,10 +3300,14 @@ def compute_marginal_and_component_var(
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
             "decomposition_df": pd.DataFrame(),
-            "euler_check_passed": True
+            "euler_check_passed": True,
         }
 
-    tot_val = total_portfolio_value if total_portfolio_value and total_portfolio_value > 0 else float(active_pos["current_value"].sum() if "current_value" in active_pos.columns else 100000.0)
+    tot_val = (
+        total_portfolio_value
+        if total_portfolio_value and total_portfolio_value > 0
+        else float(active_pos["current_value"].sum() if "current_value" in active_pos.columns else 100000.0)
+    )
 
     # Identifica ticker comuni
     active_tickers = [t for t in active_pos["ticker"].tolist() if t in df_returns.columns]
@@ -3067,7 +3316,7 @@ def compute_marginal_and_component_var(
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
             "decomposition_df": pd.DataFrame(),
-            "euler_check_passed": True
+            "euler_check_passed": True,
         }
 
     # Pesi normalizzati
@@ -3075,7 +3324,9 @@ def compute_marginal_and_component_var(
         weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["weight_pct"].sum() / 100.0
     else:
         tot_sub_val = active_pos[active_pos["ticker"].isin(active_tickers)]["current_value"].sum()
-        weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["current_value"].sum() / max(1e-6, tot_sub_val)
+        weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["current_value"].sum() / max(
+            1e-6, tot_sub_val
+        )
 
     w = weights.reindex(active_tickers).fillna(0.0)
     w_sum = w.sum()
@@ -3084,7 +3335,7 @@ def compute_marginal_and_component_var(
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
             "decomposition_df": pd.DataFrame(),
-            "euler_check_passed": True
+            "euler_check_passed": True,
         }
     w = w / w_sum
 
@@ -3112,16 +3363,22 @@ def compute_marginal_and_component_var(
 
     rows = []
     for idx, tk in enumerate(active_tickers):
-        pos_val = float(active_pos[active_pos["ticker"] == tk]["current_value"].sum() if "current_value" in active_pos.columns else w_arr[idx] * tot_val)
-        rows.append({
-            "ticker": tk,
-            "weight_pct": round(float(w_arr[idx] * 100.0), 2),
-            "position_value": round(pos_val, 2),
-            "marginal_var_pct": round(float(marginal_var_pct[idx] * 100.0), 4),
-            "component_var_pct": round(float(component_var_pct[idx] * 100.0), 4),
-            "component_var_amount": round(float(component_var_amount[idx]), 2),
-            "risk_contribution_pct": round(float(pct_contribution[idx]), 2)
-        })
+        pos_val = float(
+            active_pos[active_pos["ticker"] == tk]["current_value"].sum()
+            if "current_value" in active_pos.columns
+            else w_arr[idx] * tot_val
+        )
+        rows.append(
+            {
+                "ticker": tk,
+                "weight_pct": round(float(w_arr[idx] * 100.0), 2),
+                "position_value": round(pos_val, 2),
+                "marginal_var_pct": round(float(marginal_var_pct[idx] * 100.0), 4),
+                "component_var_pct": round(float(component_var_pct[idx] * 100.0), 4),
+                "component_var_amount": round(float(component_var_amount[idx]), 2),
+                "risk_contribution_pct": round(float(pct_contribution[idx]), 2),
+            }
+        )
 
     df_decomp = pd.DataFrame(rows).sort_values("component_var_amount", ascending=False).reset_index(drop=True)
     euler_diff = abs(float(df_decomp["component_var_amount"].sum() - port_var_amount))
@@ -3136,18 +3393,19 @@ def compute_marginal_and_component_var(
         "portfolio_sigma_daily_pct": round(port_sigma * 100.0, 4),
         "decomposition_df": df_decomp,
         "euler_check_passed": euler_check_passed,
-        "euler_residual": round(float(euler_diff), 6)
+        "euler_residual": round(float(euler_diff), 6),
     }
 
 
 # ── Liquidity-Adjusted Value at Risk (LVaR) ──────────────────────
+
 
 def compute_liquidity_adjusted_var(
     df_positions: pd.DataFrame,
     portfolio_var_pct: float,
     total_portfolio_value: float,
     liquidation_horizon_days: int = 1,
-    default_spread_pct: float = 0.002
+    default_spread_pct: float = 0.002,
 ) -> Dict[str, Any]:
     """
     Calcola il Liquidity-Adjusted VaR (LVaR - Bangia et al. / Basel III standard):
@@ -3161,7 +3419,7 @@ def compute_liquidity_adjusted_var(
             "time_scaled_var_amount": 0.0,
             "liquidity_cost_amount": 0.0,
             "lvar_amount": 0.0,
-            "lvar_premium_pct": 0.0
+            "lvar_premium_pct": 0.0,
         }
 
     base_var_amount = (portfolio_var_pct / 100.0) * total_portfolio_value
@@ -3171,7 +3429,7 @@ def compute_liquidity_adjusted_var(
     # Stima costo di liquidazione esogeno dallo spread
     pos = df_positions.copy()
     val_col = "current_value" if "current_value" in pos.columns else None
-    
+
     if val_col:
         # Se disponibile spread per asset (es. crypto/small-cap 0.5%, mega-cap 0.05%)
         spreads = []
@@ -3189,7 +3447,9 @@ def compute_liquidity_adjusted_var(
         liquidity_cost = float(0.5 * total_portfolio_value * default_spread_pct)
 
     lvar_amount = time_scaled_var + liquidity_cost
-    lvar_premium_pct = ((lvar_amount - base_var_amount) / max(1e-6, base_var_amount)) * 100.0 if base_var_amount > 0 else 0.0
+    lvar_premium_pct = (
+        ((lvar_amount - base_var_amount) / max(1e-6, base_var_amount)) * 100.0 if base_var_amount > 0 else 0.0
+    )
 
     return {
         "unadjusted_var_amount": round(base_var_amount, 2),
@@ -3197,8 +3457,13 @@ def compute_liquidity_adjusted_var(
         "time_scaled_var_amount": round(time_scaled_var, 2),
         "liquidity_cost_amount": round(liquidity_cost, 2),
         "lvar_amount": round(lvar_amount, 2),
-        "lvar_premium_pct": round(lvar_premium_pct, 2)
+        "lvar_premium_pct": round(lvar_premium_pct, 2),
     }
 
 
+# ── Public Aliases for Service Layer & Headless Consumers ────
+calc_market_risk = _calc_market_risk
+calc_return_metrics = _calc_return_metrics
+compute_positions = _compute_positions
+compute_returns = _compute_returns
 

@@ -19,7 +19,9 @@ from core.adapters.isin_resolver import (
 logger = logging.getLogger(__name__)
 
 
-def _locate_degiro_columns(df: pd.DataFrame) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
+def _locate_degiro_columns(
+    df: pd.DataFrame,
+) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], Optional[str]]:
     """Identifica le colonne chiave nel file esportato da DeGiro."""
     date_col = next((c for c in df.columns if c in ["data", "date"]), None)
     product_col = next((c for c in df.columns if c in ["prodotto", "product"]), None)
@@ -33,7 +35,14 @@ def _locate_degiro_columns(df: pd.DataFrame) -> Tuple[Optional[str], Optional[st
         if price_idx + 1 < len(df.columns):
             currency_col = df.columns[price_idx + 1]
 
-    fees_col = next((c for c in df.columns if any(k in c for k in ["costi di transazione", "commissioni", "transaction costs", "fee"])), None)
+    fees_col = next(
+        (
+            c
+            for c in df.columns
+            if any(k in c for k in ["costi di transazione", "commissioni", "transaction costs", "fee"])
+        ),
+        None,
+    )
     return date_col, product_col, isin_col, qty_col, price_col, currency_col, fees_col
 
 
@@ -58,7 +67,9 @@ def parse_degiro_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
     date_col, product_col, isin_col, qty_col, price_col, currency_col, fees_col = _locate_degiro_columns(df)
 
     if not all([date_col, product_col, isin_col]):
-        raise ValueError("Il file non sembra un export valido delle Transazioni Degiro. Mancano colonne chiave (Data, Prodotto, ISIN).")
+        raise ValueError(
+            "Il file non sembra un export valido delle Transazioni Degiro. Mancano colonne chiave (Data, Prodotto, ISIN)."
+        )
 
     df_out = pd.DataFrame()
     df_out["tx_date"] = df[date_col].apply(clean_date_value)
@@ -71,7 +82,7 @@ def parse_degiro_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
     conditions = [
         qty_series > 0,
         qty_series < 0,
-        df[product_col].astype(str).str.lower().str.contains("dividend|dividendo", na=False)
+        df[product_col].astype(str).str.lower().str.contains("dividend|dividendo", na=False),
     ]
     choices = ["buy", "sell", "dividend"]
     df_out["tx_type"] = np.select(conditions, choices, default="unknown")

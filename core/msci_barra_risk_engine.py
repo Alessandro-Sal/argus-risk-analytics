@@ -18,9 +18,9 @@ Features:
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
-
 
 # 11 Settori GICS Standard
 GICS_SECTORS = [
@@ -34,23 +34,23 @@ GICS_SECTORS = [
     "Energy",
     "Utilities",
     "Real Estate",
-    "Materials"
+    "Materials",
 ]
 
 # 5 Fattori di Stile Fondamentali Barra
 STYLE_FACTORS = [
-    "Size",          # Log Market Cap (Large vs Small)
-    "Value",         # Book-to-Market / Earnings Yield
-    "Momentum",      # 12-1M Price Momentum
-    "Quality",       # High ROE, Low Leverage, Stable Earnings
-    "Low Volatility" # Low Historical Beta & Residual Volatility
+    "Size",  # Log Market Cap (Large vs Small)
+    "Value",  # Book-to-Market / Earnings Yield
+    "Momentum",  # 12-1M Price Momentum
+    "Quality",  # High ROE, Low Leverage, Stable Earnings
+    "Low Volatility",  # Low Historical Beta & Residual Volatility
 ]
 
 # 3 Fattori Macroeconomici Istituzionali
 MACRO_FACTORS = [
     "Term / Rates",  # Sensibilità alla Curva dei Tassi (Duration)
-    "Credit Spread", # Sensibilità allo spread corporate/HY
-    "Currency USD"   # Esposizione al dollaro USA vs EUR
+    "Credit Spread",  # Sensibilità allo spread corporate/HY
+    "Currency USD",  # Esposizione al dollaro USA vs EUR
 ]
 
 ALL_FACTORS = STYLE_FACTORS + GICS_SECTORS + MACRO_FACTORS
@@ -59,12 +59,13 @@ ALL_FACTORS = STYLE_FACTORS + GICS_SECTORS + MACRO_FACTORS
 @dataclass
 class AssetFactorProfile:
     """Profilo di esposizione fattoriale standardizzato (Z-score) di un singolo strumento."""
+
     ticker: str
     asset_name: str
     weight: float
     current_value: float
     style_exposures: Dict[str, float]  # Z-score tipicamente in [-3.0, +3.0]
-    sector: str                        # Uno degli 11 settori GICS
+    sector: str  # Uno degli 11 settori GICS
     macro_exposures: Dict[str, float]  # Sensibilità macro
     specific_volatility_annual: float = 0.18  # Volatilità idiosincratica residua
 
@@ -127,11 +128,7 @@ class BarraMultiAssetRiskEngine:
         return eigvecs @ np.diag(eigvals) @ eigvecs.T
 
     def estimate_default_exposures_for_ticker(
-        self,
-        ticker: str,
-        name: str = "",
-        weight: float = 1.0,
-        current_value: float = 10000.0
+        self, ticker: str, name: str = "", weight: float = 1.0, current_value: float = 10000.0
     ) -> AssetFactorProfile:
         """
         Stima o assegna un vettore di esposizione standardizzato per ticker noti o classi generiche.
@@ -177,13 +174,10 @@ class BarraMultiAssetRiskEngine:
             style_exposures=style,
             sector=sector,
             macro_exposures=macro,
-            specific_volatility_annual=spec_vol
+            specific_volatility_annual=spec_vol,
         )
 
-    def decompose_portfolio_factor_risk(
-        self,
-        asset_profiles: List[AssetFactorProfile]
-    ) -> Dict[str, Any]:
+    def decompose_portfolio_factor_risk(self, asset_profiles: List[AssetFactorProfile]) -> Dict[str, Any]:
         """
         Esegue la decomposizione completa del rischio fattoriale di portafoglio:
         1. Matrice di esposizione X (N x K)
@@ -226,7 +220,7 @@ class BarraMultiAssetRiskEngine:
                 if m_name in self.factors:
                     X[i, self.factors.index(m_name)] = val
 
-            delta_diag[i] = p.specific_volatility_annual ** 2
+            delta_diag[i] = p.specific_volatility_annual**2
 
         # 1. Matrice di covarianza fattoriale proiettata sugli asset
         # Sigma_factor = X @ F @ X.T
@@ -259,16 +253,18 @@ class BarraMultiAssetRiskEngine:
 
         asset_rows = []
         for i in range(n_assets):
-            asset_rows.append({
-                "ticker": tickers[i],
-                "asset_name": asset_profiles[i].asset_name,
-                "weight_pct": float(w[i] * 100.0),
-                "mctr": float(mctr_vec[i]),
-                "pctr_total": float(pctr_vec[i]),
-                "pctr_factor": float(pctr_factor_vec[i]),
-                "pctr_specific": float(pctr_specific_vec[i]),
-                "specific_vol_annual": float(asset_profiles[i].specific_volatility_annual)
-            })
+            asset_rows.append(
+                {
+                    "ticker": tickers[i],
+                    "asset_name": asset_profiles[i].asset_name,
+                    "weight_pct": float(w[i] * 100.0),
+                    "mctr": float(mctr_vec[i]),
+                    "pctr_total": float(pctr_vec[i]),
+                    "pctr_factor": float(pctr_factor_vec[i]),
+                    "pctr_specific": float(pctr_specific_vec[i]),
+                    "specific_vol_annual": float(asset_profiles[i].specific_volatility_annual),
+                }
+            )
 
         df_assets = pd.DataFrame(asset_rows)
 
@@ -283,13 +279,15 @@ class BarraMultiAssetRiskEngine:
         factor_rows = []
         for k_idx, f_name in enumerate(self.factors):
             f_cat = "Style" if f_name in STYLE_FACTORS else ("Sector" if f_name in GICS_SECTORS else "Macro")
-            factor_rows.append({
-                "factor_name": f_name,
-                "category": f_cat,
-                "portfolio_exposure": float(b[k_idx]),
-                "factor_pctr": float(pcfr[k_idx]),
-                "factor_volatility": float(np.sqrt(self.factor_cov[k_idx, k_idx]))
-            })
+            factor_rows.append(
+                {
+                    "factor_name": f_name,
+                    "category": f_cat,
+                    "portfolio_exposure": float(b[k_idx]),
+                    "factor_pctr": float(pcfr[k_idx]),
+                    "factor_volatility": float(np.sqrt(self.factor_cov[k_idx, k_idx])),
+                }
+            )
 
         df_factors = pd.DataFrame(factor_rows)
         # Ordina per impatto decrescente
@@ -313,5 +311,5 @@ class BarraMultiAssetRiskEngine:
             "factor_attribution_df": df_factors,
             "active_style_tilts": benchmark_tilts,
             "portfolio_factor_exposures": dict(zip(self.factors, b.tolist())),
-            "euler_sum_pctr": float(np.sum(pctr_vec))
+            "euler_sum_pctr": float(np.sum(pctr_vec)),
         }

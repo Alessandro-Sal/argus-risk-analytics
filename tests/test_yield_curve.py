@@ -137,9 +137,9 @@ def test_kelly_criterion_with_dynamic_rf():
 def test_nelson_siegel_curve_fitting_and_evaluation():
     """Verifica la calibrazione e la valutazione della curva dei rendimenti Nelson-Siegel."""
     from core.yield_curve import (
-        fit_nelson_siegel_curve,
-        evaluate_yield_term_structure,
         compute_discount_factors,
+        evaluate_yield_term_structure,
+        fit_nelson_siegel_curve,
         get_institutional_yield_curve,
     )
     maturities = np.array([0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0, 30.0])

@@ -1,6 +1,8 @@
-import pytest
 import pandas as pd
+import pytest
+
 from core.closed_trades import compute_closed_trades_journal
+
 
 def test_closed_trades_empty_and_sandbox():
     res_empty = compute_closed_trades_journal(pd.DataFrame(), is_sandbox=False)

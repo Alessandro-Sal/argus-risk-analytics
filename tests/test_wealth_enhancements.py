@@ -3,26 +3,28 @@
 # ARGUS — Unit Tests for Universal Bank Parser, Watchdog & Stress Engine
 # ==============================================================================
 
-import pytest
 import io
+
 import pandas as pd
+import pytest
+
 from core.wealth.universal_bank_parser import (
-    parse_bank_statement_file,
-    detect_bank_format,
+    categorize_transaction,
     clean_currency_amount,
+    detect_bank_format,
+    parse_bank_statement_file,
     parse_date_universal,
-    categorize_transaction
 )
-from core.wealth.wealth_watchdog import WealthWatchdog, WatchdogAlert
 from core.wealth.wealth_stress_engine import (
-    run_wealth_stress_test,
     PRESET_STRESS_SCENARIOS,
-    create_wealth_waterfall_chart,
-    simulate_wealth_recovery_trajectories,
-    create_liquidity_squeeze_timeline_chart,
+    UnifiedMacroStressEngine,
     calculate_stressed_mortgage_impact,
-    UnifiedMacroStressEngine
+    create_liquidity_squeeze_timeline_chart,
+    create_wealth_waterfall_chart,
+    run_wealth_stress_test,
+    simulate_wealth_recovery_trajectories,
 )
+from core.wealth.wealth_watchdog import WatchdogAlert, WealthWatchdog
 
 
 def test_clean_currency_amount():

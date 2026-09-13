@@ -10,9 +10,10 @@ Features:
 - Deterministic and robust optimization via SciPy SLSQP.
 """
 
+import datetime
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-import datetime
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
@@ -21,6 +22,7 @@ from scipy.optimize import minimize
 @dataclass
 class PositionLot:
     """Rappresentazione di una posizione con parametri di costo fiscale e liquidità di mercato."""
+
     ticker: str
     shares: float
     current_price: float
@@ -41,6 +43,7 @@ class PositionLot:
 @dataclass
 class TaxWalletState:
     """Zainetto fiscale con minusvalenze pregresse compensabili."""
+
     minusvalenze_available_eur: float = 0.0
     minusvalenze_expiry_year: int = 2028
     capital_gains_tax_rate: float = 0.26
@@ -50,6 +53,7 @@ class TaxWalletState:
 @dataclass
 class RebalanceConstraints:
     """Vincoli e pesi di penalizzazione della funzione obiettivo."""
+
     min_cash_buffer_eur: float = 2000.0
     max_turnover_pct: float = 50.0
     max_single_weight: float = 0.40
@@ -62,6 +66,7 @@ class RebalanceConstraints:
 @dataclass
 class FIXOrder:
     """Ordine conforme allo standard FIX Protocol 4.4 per sistemi OMS/EMS."""
+
     cl_ord_id: str
     symbol: str
     side: str  # 1 = BUY, 2 = SELL
@@ -71,7 +76,9 @@ class FIXOrder:
     estimated_tax_eur: float
     estimated_slippage_eur: float
     time_in_force: str = "0"  # 0 = DAY, 3 = IOC, 4 = FOK
-    sending_time: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H:%M:%S"))
+    sending_time: str = field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%d-%H:%M:%S")
+    )
 
     def to_fix_string(self) -> str:
         """Serializza in formato standard FIX delimitato da pipe (rappresentante SOH)."""
@@ -96,12 +103,7 @@ class PrescriptiveConicRebalancer:
         self.tax_wallet = tax_wallet or TaxWalletState()
 
     def _estimate_almgren_chriss_impact(
-        self,
-        trade_val_eur: float,
-        adv_eur: float,
-        vol_daily: float = 0.015,
-        gamma: float = 0.10,
-        eta: float = 0.15
+        self, trade_val_eur: float, adv_eur: float, vol_daily: float = 0.015, gamma: float = 0.10, eta: float = 0.15
     ) -> float:
         """
         Stima dell'impatto di mercato temporaneo e permanente secondo il modello Almgren-Chriss (2000).
@@ -110,7 +112,7 @@ class PrescriptiveConicRebalancer:
             return 0.0
         participation_rate = trade_val_eur / max(adv_eur, 1e-4)
         permanent_impact = gamma * vol_daily * participation_rate
-        temporary_impact = eta * vol_daily * (participation_rate ** 0.5)
+        temporary_impact = eta * vol_daily * (participation_rate**0.5)
         return trade_val_eur * (permanent_impact + temporary_impact)
 
     def optimize_rebalance(
@@ -119,7 +121,7 @@ class PrescriptiveConicRebalancer:
         target_weights: Dict[str, float],
         available_cash_eur: float,
         constraints: Optional[RebalanceConstraints] = None,
-        covariance_matrix: Optional[np.ndarray] = None
+        covariance_matrix: Optional[np.ndarray] = None,
     ) -> Dict[str, Any]:
         """
         Esegue l'ottimizzazione vincolata del ribilanciamento:
@@ -170,7 +172,11 @@ class PrescriptiveConicRebalancer:
                     sold_fraction = (initial_weights[i] - w[i]) / max(initial_weights[i], 1e-6)
                     sold_shares = sold_fraction * p.shares
                     gain = max(0.0, (p.current_price - p.pmc) * sold_shares)
-                    tax_rate = self.tax_wallet.gov_bond_tax_rate if "Gov" in p.asset_class else self.tax_wallet.capital_gains_tax_rate
+                    tax_rate = (
+                        self.tax_wallet.gov_bond_tax_rate
+                        if "Gov" in p.asset_class
+                        else self.tax_wallet.capital_gains_tax_rate
+                    )
                     tax_est += gain * tax_rate
 
             tax_pen = tax_est / total_wealth
@@ -184,10 +190,10 @@ class PrescriptiveConicRebalancer:
                 impact_pen += (impact + spread_cost) / total_wealth
 
             return (
-                cons.tracking_error_weight * tracking_error_pen +
-                cons.turnover_penalty_weight * turnover_pen +
-                cons.tax_penalty_weight * tax_pen +
-                cons.impact_penalty_weight * impact_pen
+                cons.tracking_error_weight * tracking_error_pen
+                + cons.turnover_penalty_weight * turnover_pen
+                + cons.tax_penalty_weight * tax_pen
+                + cons.impact_penalty_weight * impact_pen
             )
 
         # Vincoli SLSQP
@@ -195,7 +201,7 @@ class PrescriptiveConicRebalancer:
         bounds = [(0.0, min(cons.max_single_weight, 1.0)) for _ in range(n_assets)]
         scipy_cons = [
             {"type": "ineq", "fun": lambda w: max_investable_pct - np.sum(w)},
-            {"type": "ineq", "fun": lambda w: (cons.max_turnover_pct / 100.0) - np.sum(np.abs(w - initial_weights))}
+            {"type": "ineq", "fun": lambda w: (cons.max_turnover_pct / 100.0) - np.sum(np.abs(w - initial_weights))},
         ]
 
         # Soluzione iniziale = target w
@@ -209,7 +215,7 @@ class PrescriptiveConicRebalancer:
             method="SLSQP",
             bounds=bounds,
             constraints=scipy_cons,
-            options={"maxiter": 200, "ftol": 1e-7}
+            options={"maxiter": 200, "ftol": 1e-7},
         )
 
         final_w = res.x if res.success else x0
@@ -237,7 +243,9 @@ class PrescriptiveConicRebalancer:
                 continue
 
             trade_eur = trade_shares * p.current_price
-            slippage_eur = self._estimate_almgren_chriss_impact(trade_eur, p.adv_eur) + (trade_eur * p.bid_ask_spread_bps / 10000.0)
+            slippage_eur = self._estimate_almgren_chriss_impact(trade_eur, p.adv_eur) + (
+                trade_eur * p.bid_ask_spread_bps / 10000.0
+            )
             total_slippage_cost += slippage_eur
 
             # Calcolo Fiscale Esatto con Minusvalenze
@@ -245,12 +253,17 @@ class PrescriptiveConicRebalancer:
             minus_absorbed = 0.0
             if side == "SELL":
                 realized_pnl = (p.current_price - p.pmc) * trade_shares
-                tax_rate = self.tax_wallet.gov_bond_tax_rate if "Gov" in p.asset_class else self.tax_wallet.capital_gains_tax_rate
-                
+                tax_rate = (
+                    self.tax_wallet.gov_bond_tax_rate
+                    if "Gov" in p.asset_class
+                    else self.tax_wallet.capital_gains_tax_rate
+                )
+
                 if realized_pnl > 0:
                     # Plusvalenza: compensabile se equity/ETC/bond con minus disponibili (TUIR Art. 67)
                     # Gli ETF generano Redditi di Capitale (TUIR Art. 44) e NON possono assorbire minusvalenze
                     from core.tax_engine import is_etf
+
                     is_etf_flag = "ETF" in str(p.asset_class).upper() or is_etf(p.asset_class, p.ticker)
 
                     if not is_etf_flag and remaining_minus > 0:
@@ -267,9 +280,9 @@ class PrescriptiveConicRebalancer:
 
                 total_tax_due += tax_bill
                 total_minus_absorbed += minus_absorbed
-                net_cash_flow += (trade_eur - tax_bill - slippage_eur)
+                net_cash_flow += trade_eur - tax_bill - slippage_eur
             else:
-                net_cash_flow -= (trade_eur + slippage_eur)
+                net_cash_flow -= trade_eur + slippage_eur
 
             # Prezzo limite di esecuzione difensivo (±10 bps per limit order)
             limit_px = p.current_price * 1.001 if side == "BUY" else p.current_price * 0.999
@@ -283,26 +296,28 @@ class PrescriptiveConicRebalancer:
                 order_type="LIMIT",
                 limit_price=limit_px,
                 estimated_tax_eur=tax_bill,
-                estimated_slippage_eur=slippage_eur
+                estimated_slippage_eur=slippage_eur,
             )
             blotter.append(order)
 
-            trade_items.append({
-                "cl_ord_id": cl_ord_id,
-                "ticker": p.ticker,
-                "side": side,
-                "shares": trade_shares,
-                "market_price": p.current_price,
-                "limit_price": limit_px,
-                "trade_eur": trade_eur,
-                "realized_gain_eur": (p.current_price - p.pmc) * trade_shares if side == "SELL" else 0.0,
-                "minus_absorbed_eur": minus_absorbed,
-                "tax_bill_eur": tax_bill,
-                "slippage_eur": slippage_eur,
-                "weight_before_pct": initial_weights[i] * 100.0,
-                "weight_after_pct": final_w[i] * 100.0,
-                "fix_msg": order.to_fix_string()
-            })
+            trade_items.append(
+                {
+                    "cl_ord_id": cl_ord_id,
+                    "ticker": p.ticker,
+                    "side": side,
+                    "shares": trade_shares,
+                    "market_price": p.current_price,
+                    "limit_price": limit_px,
+                    "trade_eur": trade_eur,
+                    "realized_gain_eur": (p.current_price - p.pmc) * trade_shares if side == "SELL" else 0.0,
+                    "minus_absorbed_eur": minus_absorbed,
+                    "tax_bill_eur": tax_bill,
+                    "slippage_eur": slippage_eur,
+                    "weight_before_pct": initial_weights[i] * 100.0,
+                    "weight_after_pct": final_w[i] * 100.0,
+                    "fix_msg": order.to_fix_string(),
+                }
+            )
 
         projected_cash = available_cash_eur + net_cash_flow
         final_turnover_pct = float(np.sum(np.abs(final_w - initial_weights))) * 50.0
@@ -321,5 +336,5 @@ class PrescriptiveConicRebalancer:
             "trades_count": len(trade_items),
             "trades_df": pd.DataFrame(trade_items),
             "fix_blotter_raw": "\n".join([o.to_fix_string() for o in blotter]),
-            "optimized_weights": dict(zip(tickers, final_w.tolist()))
+            "optimized_weights": dict(zip(tickers, final_w.tolist())),
         }

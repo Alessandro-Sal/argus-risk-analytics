@@ -7,6 +7,49 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.5.0] - 2026-09-13
+
+### 🛡️ Unified Stochastic Kernel, BLAS Vectorization, Thread-Safe Monte Carlo & Credential Hardening
+
+Questa release introduce una profonda modernizzazione del motore computazionale stocastico e delle performance numeriche di ARGUS:
+- **Unified Stochastic Kernel (`core/stochastic_kernel.py`)**: Centralizzazione di tutte le simulazioni Monte Carlo su una decomposizione di Cholesky robusta con fallback spettrale a matrice semidefinita positiva (PSD) Nearest-Correlation e clipping autovalori positivi ($\lambda \ge 10^{-8}$).
+- **Vettorizzazione BLAS/SIMD (`core/risk_engine.py`)**: Riscritte le computazioni di Beta di portafoglio (OLS multivariato compatto senza loop) e dell'RSI 14 (calcolo EWMA su matrice pivot) azzerando i colli di bottiglia computazionali per portafogli ad alto numero di ticker.
+- **RNG Thread-Safe & Riproducibilità**: Adozione universale di generatori moderni `np.random.default_rng(seed)` in sostituzione del generatore globale legacy `np.random.seed()` / `np.random.randn()`, garantendo isolamento in ambienti multi-thread e asincroni.
+- **Accelerazione GARCH(1,1) (`core/garch_engine.py`)**: Precomputazione vettoriale di $\varepsilon_t^2$, ottimizzazione della log-verosimiglianza e decoratore `@njit(fastmath=True)` fallback per massima convergenza numerica.
+- **Service Layer Facade (`core/services/risk_service.py`)**: Implementata la facade pubblica `compute_full_portfolio_risk()` con disaccoppiamento dai moduli interni.
+- **Segregazione Dipendenze & CI/CD Hardening**: Separazione di `requirements.txt` (runtime headless essenziale) da `requirements-dev.txt` (testing, packaging, desktop e linter). Configurazione Ruff standardizzata e audit di conformità linting a zero errori (`0 errors`) su tutto il repository.
+- **Verifica Sicurezza Credenziali**: Audit completo dello storico git (`git log -S`) a conferma che nessuna credenziale o chiave RSA privata è mai stata esposta nei commit remoti.
+
+### Aggiunto (Added)
+- **Kernel Stocastico Centralizzato (`core/stochastic_kernel.py`)**:
+  - `robust_cholesky`: decomposizione con correzione di Higham / Spectral Projection PSD per matrici empiriche quasi-singolari o degenerate.
+  - `simulate_correlated_normal` & `simulate_correlated_student_t`: simulatore Monte Carlo vettorizzato con supporto thread-safe per code pesanti e multivariata.
+  - `calc_asset_betas_vectorized`: OLS vettoriale per calcolo simultaneo dei Beta degli asset rispetto al benchmark.
+  - `calc_rsi_vectorized`: indicatore RSI 14 vettorizzato su serie storiche multivariate.
+- **Dipendenze Dev Segregate (`requirements-dev.txt`)**:
+  - Isolamento delle librerie di sviluppo, test (`pytest`, `hypothesis`), reportistica (`reportlab`, `xlsxwriter`), GUI desktop (`pywebview`, `pyinstaller`) e linting (`ruff`).
+
+### Modificato (Changed)
+- **Motore di Rischio (`core/risk_engine.py`)**:
+  - Integrazione di `robust_cholesky` del kernel stocastico.
+  - Vettorizzazione del calcolo di Beta e RSI.
+  - Sostituzione del generatore RNG globale con istanze isolate `np.random.default_rng(seed)`.
+  - Pubblicazione di alias formali per piena retrocompatibilità (`calc_market_risk`, `calc_return_metrics`, `compute_risk`).
+- **Motore TBS Monte Carlo (`core/wealth/tbs_monte_carlo.py`)**:
+  - Sostituito l'algoritmo di Cholesky custom con il kernel condiviso `robust_cholesky`.
+  - Aggiornato `simulate_tbs_multivariate` con generatori di numeri pseudocasuali thread-safe.
+- **Motore GARCH (`core/garch_engine.py`)**:
+  - Vettorizzazione del loop di log-verosimiglianza con precalcolo residui al quadrato ed eventuale accelerazione Numba JIT.
+- **Application Service Layer (`core/services/risk_service.py`)**:
+  - Esposizione del metodo pubblico `compute_full_portfolio_risk(weights, returns, benchmark_returns)`.
+- **CI/CD Pipeline (`.github/workflows/ci.yml` & `release.yml`)**:
+  - Standardizzazione dell'esecuzione di Ruff linter in formato annotazioni GitHub (`ruff check --output-format=github .`).
+  - Utilizzo di `requirements-dev.txt` per il setup dell'ambiente di test.
+- **Versione Progetto (`pyproject.toml`)**:
+  - Incremento versione a `9.5.0`.
+
+---
+
 ## [9.4.0] - 2026-09-13
 
 ### ⚡ Architectural Decoupling, Headless Safety, Fast Streaming Buffer & Multi-Container Healthcheck

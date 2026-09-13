@@ -2,9 +2,9 @@
 Unit tests for AI Governance, MiFID II Guardrails, Numerical Grounding and Dynamic Voice Engine.
 """
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 
 from core.ai_analyst import (
@@ -14,13 +14,13 @@ from core.ai_analyst import (
     _generate_deterministic_memorandum,
     generate_portfolio_narrative_memorandum,
     query_argus_assistant,
-    verify_metric_grounding
+    verify_metric_grounding,
 )
 from core.sec_rag_engine import (
     chunk_financial_section,
     expand_query_with_financial_lexicon,
     index_ticker_sec_filings,
-    query_sec_filings_rag
+    query_sec_filings_rag,
 )
 from core.voice_advisor_engine import generate_ai_voice_executive_briefing
 from core.wealth.neural_advisor_engine import NeuralWealthAdvisor

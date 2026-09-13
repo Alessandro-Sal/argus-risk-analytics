@@ -4,9 +4,10 @@ Core Module: Tax Optimization & Tax-Loss Harvesting Engine
 Italian Fiscal Framework (TUIR Art. 67 - Regime Amministrato/Dichiarativo)
 """
 
-import pandas as pd
-import numpy as np
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import numpy as np
+import pandas as pd
 
 TAX_RATES = {
     "Government Bond": 0.125,
@@ -20,22 +21,36 @@ TAX_RATES = {
     "Default": 0.26,
 }
 
+
 def get_asset_tax_rate(asset_class: str, ticker: str = "") -> float:
     """Returns applicable tax rate (12.5% for sovereign/whitelist government bonds, 26% for equities/ETFs/crypto)."""
     if not asset_class:
         asset_class = ""
     ac_lower = str(asset_class).lower()
     t_upper = str(ticker).upper()
-    
-    gov_keywords = ["gov", "btp", "bot", "treasury", "stato", "sovereign", "titolo di stato", "bund", "oat", "bonos", "gilt"]
+
+    gov_keywords = [
+        "gov",
+        "btp",
+        "bot",
+        "treasury",
+        "stato",
+        "sovereign",
+        "titolo di stato",
+        "bund",
+        "oat",
+        "bonos",
+        "gilt",
+    ]
     if any(k in ac_lower for k in gov_keywords):
         return 0.125
-    
+
     gov_ticker_prefixes = ["BTP", "BOT", "CCT", "CTZ", "TREASURY", "UST", "BUND", "OAT", "BONOS", "GILT", "US-TREASURY"]
     if any(p in t_upper for p in gov_ticker_prefixes):
         return 0.125
 
     return 0.26
+
 
 def is_etf(asset_class: str, ticker: str = "") -> bool:
     """Returns True if asset is an ETF (Reddito di Capitale in Italy)."""
@@ -43,21 +58,18 @@ def is_etf(asset_class: str, ticker: str = "") -> bool:
     t_upper = str(ticker).upper()
     return "etf" in ac_lower or "etf" in t_upper or t_upper in ["CSPX", "VWCE", "IEMG", "AGGH", "EIMI", "MEUD", "XEON"]
 
-def compute_tax_and_harvesting(
-    results: Dict[str, Any],
-    db_engine = None,
-    tax_year: int = None
-) -> Dict[str, Any]:
+
+def compute_tax_and_harvesting(results: Dict[str, Any], db_engine=None, tax_year: int = None) -> Dict[str, Any]:
     """
     Computes overall and yearly tax liabilities on realized capital gains and identifies Tax-Loss Harvesting opportunities.
-    
+
     Italian Tax Regulations (TUIR Art. 67):
       - ETF Gains = Redditi di Capitale (Taxed at 26%, CANNOT be offset by past capital losses).
       - Stock/Bond Gains = Redditi Diversi (Taxed at 26% / 12.5%, CAN be offset by past capital losses).
       - ETF Losses & Stock Losses = Capital Losses (Zainetto Fiscale, valid 4 years).
     """
     pos = results.get("positions", pd.DataFrame())
-    
+
     # 1. Open positions analysis & Tax-Loss Harvesting
     tot_gain_diversi, tot_gain_etf, tot_loss, tot_tax_due = 0.0, 0.0, 0.0, 0.0
     harvest_rows = []
@@ -68,7 +80,7 @@ def compute_tax_and_harvesting(
             ac = row.get("asset_class", "")
             pnl_unrealized = float(row.get("pnl_unrealized", row.get("unrealized_pnl", 0.0)) or 0.0)
             pnl_realized = float(row.get("pnl_realized", row.get("realized_pnl", 0.0)) or 0.0)
-            
+
             rate = get_asset_tax_rate(ac, ticker)
             etf_flag = is_etf(ac, ticker)
 
@@ -82,14 +94,16 @@ def compute_tax_and_harvesting(
 
             # Tax Loss Harvesting Candidate: Unrealized loss on non-ETF asset (Reddito Diverso)
             if pnl_unrealized < 0 and not etf_flag:
-                harvest_rows.append({
-                    "ticker": ticker,
-                    "asset_class": ac,
-                    "pnl_unrealized": round(pnl_unrealized, 2),
-                    "potential_tax_saving_eur": round(abs(pnl_unrealized) * rate, 2),
-                    "tax_rate_pct": round(rate * 100.0, 1),
-                    "qualifying_type": "Redditi Diversi (Compensabile)"
-                })
+                harvest_rows.append(
+                    {
+                        "ticker": ticker,
+                        "asset_class": ac,
+                        "pnl_unrealized": round(pnl_unrealized, 2),
+                        "potential_tax_saving_eur": round(abs(pnl_unrealized) * rate, 2),
+                        "tax_rate_pct": round(rate * 100.0, 1),
+                        "qualifying_type": "Redditi Diversi (Compensabile)",
+                    }
+                )
 
     df_harvest = pd.DataFrame(harvest_rows)
     if not df_harvest.empty:
@@ -99,7 +113,7 @@ def compute_tax_and_harvesting(
     net_diversi = tot_gain_diversi - tot_loss
     tax_due_diversi = max(0.0, net_diversi * 0.26) if net_diversi > 0 else 0.0
     tax_due_etf = tot_gain_etf * 0.26
-    
+
     total_tax_due = tax_due_diversi + tax_due_etf
     tax_credit = abs(net_diversi) if net_diversi < 0 else 0.0
     potential_savings = float(df_harvest["potential_tax_saving_eur"].sum()) if not df_harvest.empty else 0.0
@@ -112,7 +126,7 @@ def compute_tax_and_harvesting(
         "net_realized_pnl_eur": round(tot_gain_diversi + tot_gain_etf - tot_loss, 2),
         "estimated_tax_due_eur": round(total_tax_due, 2),
         "tax_credit_zainetto_eur": round(tax_credit, 2),
-        "potential_tax_savings_eur": round(potential_savings, 2)
+        "potential_tax_savings_eur": round(potential_savings, 2),
     }
 
     # 2. Yearly Tax Breakdown (Cronistoria Fiscale per Anno Solare con Regola ETF e Conversione FX)
@@ -123,6 +137,7 @@ def compute_tax_and_harvesting(
     if (df_tx is None or df_tx.empty) and db_engine is not None and portfolio_id is not None:
         try:
             from sqlalchemy import text
+
             query = text("""
                 SELECT t.tx_id, t.tx_date, t.tx_type, t.quantity, t.price, t.currency, a.ticker, a.asset_class
                 FROM transactions t
@@ -138,8 +153,8 @@ def compute_tax_and_harvesting(
     if df_tx is not None and not df_tx.empty:
         try:
             df_tx = df_tx.copy()
-            df_tx['tx_date'] = pd.to_datetime(df_tx['tx_date'])
-            df_tx['year'] = df_tx['tx_date'].dt.year
+            df_tx["tx_date"] = pd.to_datetime(df_tx["tx_date"])
+            df_tx["year"] = df_tx["tx_date"].dt.year
 
             # Mappa tassi di cambio storici da df_prices se disponibili
             df_prices = results.get("df_prices", pd.DataFrame())
@@ -151,18 +166,19 @@ def compute_tax_and_harvesting(
                     fx_dict[fxt] = pd.Series(sub["close"].values, index=pd.to_datetime(sub["price_date"]))
 
             from collections import deque
+
             yearly_stats = {}
-            for ticker, grp in df_tx.groupby('ticker'):
+            for ticker, grp in df_tx.groupby("ticker"):
                 queue = deque()
                 grp = grp.sort_values(["tx_date", "tx_id"] if "tx_id" in grp.columns else ["tx_date"])
-                
+
                 for _, row in grp.iterrows():
-                    txtype = str(row['tx_type']).lower().strip()
-                    qty = float(row['quantity'])
-                    raw_price = float(row['price'])
-                    yr = int(row['year'])
-                    ac = str(row.get('asset_class', 'Stock'))
-                    
+                    txtype = str(row["tx_type"]).lower().strip()
+                    qty = float(row["quantity"])
+                    raw_price = float(row["price"])
+                    yr = int(row["year"])
+                    ac = str(row.get("asset_class", "Stock"))
+
                     # Conversione valuta transazione in EUR
                     tx_curr = str(row.get("currency", "EUR")).upper().strip()
                     fx_rate = 1.0
@@ -171,14 +187,14 @@ def compute_tax_and_harvesting(
                         fx_pair_inv = f"EUR{tx_curr}=X"
                         if fx_pair in fx_dict:
                             try:
-                                idx = fx_dict[fx_pair].index.get_indexer([row["tx_date"]], method='ffill')[0]
+                                idx = fx_dict[fx_pair].index.get_indexer([row["tx_date"]], method="ffill")[0]
                                 if idx >= 0:
                                     fx_rate = float(fx_dict[fx_pair].iloc[idx])
                             except Exception:
                                 pass
                         elif fx_pair_inv in fx_dict:
                             try:
-                                idx = fx_dict[fx_pair_inv].index.get_indexer([row["tx_date"]], method='ffill')[0]
+                                idx = fx_dict[fx_pair_inv].index.get_indexer([row["tx_date"]], method="ffill")[0]
                                 if idx >= 0:
                                     inv_r = float(fx_dict[fx_pair_inv].iloc[idx])
                                     if inv_r > 0:
@@ -187,26 +203,36 @@ def compute_tax_and_harvesting(
                                 pass
                         else:
                             fallback_map = {
-                                "USD": 0.92, "GBP": 1.17, "CHF": 1.06, "DKK": 0.134,
-                                "SEK": 0.088, "NOK": 0.086, "JPY": 0.0062, "CAD": 0.68,
-                                "AUD": 0.61, "HKD": 0.118, "SGD": 0.69, "CNY": 0.128, "MXN": 0.051
+                                "USD": 0.92,
+                                "GBP": 1.17,
+                                "CHF": 1.06,
+                                "DKK": 0.134,
+                                "SEK": 0.088,
+                                "NOK": 0.086,
+                                "JPY": 0.0062,
+                                "CAD": 0.68,
+                                "AUD": 0.61,
+                                "HKD": 0.118,
+                                "SGD": 0.69,
+                                "CNY": 0.128,
+                                "MXN": 0.051,
                             }
                             fx_rate = fallback_map.get(tx_curr, 1.0)
 
                     price = raw_price * fx_rate
-                    raw_fees = float(row.get('fees', 0.0) or 0.0) if pd.notna(row.get('fees', 0.0)) else 0.0
+                    raw_fees = float(row.get("fees", 0.0) or 0.0) if pd.notna(row.get("fees", 0.0)) else 0.0
                     fees_eur = raw_fees * fx_rate
-                    
+
                     if yr not in yearly_stats:
-                        yearly_stats[yr] = {'gains_diversi': 0.0, 'gains_etf': 0.0, 'losses': 0.0, 'dividends': 0.0}
-                        
+                        yearly_stats[yr] = {"gains_diversi": 0.0, "gains_etf": 0.0, "losses": 0.0, "dividends": 0.0}
+
                     etf_flag = is_etf(ac, ticker)
-                    
-                    if txtype == 'buy':
+
+                    if txtype == "buy":
                         # TUIR Art. 68 c. 6: costo di carico incrementato degli oneri accessori (commissioni)
                         lot_cost = (qty * price + fees_eur) / qty if qty > 1e-9 else price
                         queue.append([qty, lot_cost])
-                    elif txtype == 'sell':
+                    elif txtype == "sell":
                         # TUIR Art. 68 c. 6: corrispettivo di vendita al netto degli oneri di vendita
                         qty_to_sell = qty
                         while qty_to_sell > 1e-9 and queue:
@@ -223,27 +249,27 @@ def compute_tax_and_harvesting(
                                 pnl = sold_lot_qty * (price - lot[1]) - fee_lot
                                 lot[0] -= sold_lot_qty
                                 qty_to_sell = 0.0
-                            
+
                             if pnl > 0:
                                 if etf_flag:
-                                    yearly_stats[yr]['gains_etf'] += pnl
+                                    yearly_stats[yr]["gains_etf"] += pnl
                                 else:
-                                    yearly_stats[yr]['gains_diversi'] += pnl
+                                    yearly_stats[yr]["gains_diversi"] += pnl
                             else:
-                                yearly_stats[yr]['losses'] += abs(pnl)
-                    elif txtype == 'dividend':
-                        yearly_stats[yr]['dividends'] += price
+                                yearly_stats[yr]["losses"] += abs(pnl)
+                    elif txtype == "dividend":
+                        yearly_stats[yr]["dividends"] += price
 
             # Calcolo unificato anno per anno con deduzione FIFO delle minusvalenze pregresse (TUIR Art. 68 c. 5)
             y_rows = []
             buckets_tracking = []
-            
+
             for yr, s in sorted(yearly_stats.items()):
-                g_div = float(s['gains_diversi'])
-                g_etf = float(s['gains_etf'])
-                losses = float(s['losses'])
+                g_div = float(s["gains_diversi"])
+                g_etf = float(s["gains_etf"])
+                losses = float(s["losses"])
                 net_diversi = g_div - losses
-                
+
                 prior_deducted = 0.0
                 if net_diversi > 0:
                     excess_gain = net_diversi
@@ -260,34 +286,38 @@ def compute_tax_and_harvesting(
                 else:
                     net_loss = abs(net_diversi)
                     if net_loss > 1e-2:
-                        buckets_tracking.append({
-                            "origin_year": yr,
-                            "expiry_year": yr + 4,
-                            "initial": round(net_loss, 2),
-                            "compensated": 0.0,
-                            "residual": round(net_loss, 2)
-                        })
+                        buckets_tracking.append(
+                            {
+                                "origin_year": yr,
+                                "expiry_year": yr + 4,
+                                "initial": round(net_loss, 2),
+                                "compensated": 0.0,
+                                "residual": round(net_loss, 2),
+                            }
+                        )
                     taxable_diversi = 0.0
 
                 tax_diversi = taxable_diversi * 0.26
                 tax_etf = g_etf * 0.26
                 tax_total = tax_diversi + tax_etf
                 active_zainetto = sum(b["residual"] for b in buckets_tracking if yr <= b["expiry_year"])
-                
-                y_rows.append({
-                    "year": yr,
-                    "realized_gain_diversi_eur": round(g_div, 2),
-                    "realized_gain_etf_eur": round(g_etf, 2),
-                    "realized_gain_eur": round(g_div + g_etf, 2),
-                    "realized_loss_eur": round(losses, 2),
-                    "prior_minus_deducted_eur": round(prior_deducted, 2),
-                    "taxable_base_eur": round(taxable_diversi, 2),
-                    "net_pnl_eur": round(g_div + g_etf - losses, 2),
-                    "dividends_eur": round(s['dividends'], 2),
-                    "estimated_tax_due_eur": round(tax_total, 2),
-                    "estimated_tax_eur": round(tax_total, 2),
-                    "tax_credit_zainetto_eur": round(active_zainetto, 2)
-                })
+
+                y_rows.append(
+                    {
+                        "year": yr,
+                        "realized_gain_diversi_eur": round(g_div, 2),
+                        "realized_gain_etf_eur": round(g_etf, 2),
+                        "realized_gain_eur": round(g_div + g_etf, 2),
+                        "realized_loss_eur": round(losses, 2),
+                        "prior_minus_deducted_eur": round(prior_deducted, 2),
+                        "taxable_base_eur": round(taxable_diversi, 2),
+                        "net_pnl_eur": round(g_div + g_etf - losses, 2),
+                        "dividends_eur": round(s["dividends"], 2),
+                        "estimated_tax_due_eur": round(tax_total, 2),
+                        "estimated_tax_eur": round(tax_total, 2),
+                        "tax_credit_zainetto_eur": round(active_zainetto, 2),
+                    }
+                )
             df_yearly = pd.DataFrame(y_rows)
         except Exception:
             df_yearly = pd.DataFrame()
@@ -306,11 +336,13 @@ def compute_tax_and_harvesting(
             "net_realized_pnl_eur": float(yr_row["net_pnl_eur"]),
             "estimated_tax_due_eur": float(yr_row["estimated_tax_due_eur"]),
             "tax_credit_zainetto_eur": float(yr_row["tax_credit_zainetto_eur"]),
-            "potential_tax_savings_eur": round(potential_savings, 2)
+            "potential_tax_savings_eur": round(potential_savings, 2),
         }
     elif not df_yearly.empty:
         # Quando "Tutti gli Anni" è selezionato, somma le imposte effettive e mostra lo zainetto attivo corrente
-        current_active_zainetto = float(df_zainetto_timeline["residual_active_eur"].sum()) if not df_zainetto_timeline.empty else 0.0
+        current_active_zainetto = (
+            float(df_zainetto_timeline["residual_active_eur"].sum()) if not df_zainetto_timeline.empty else 0.0
+        )
         summary = {
             "total_realized_gain_diversi_eur": round(float(df_yearly["realized_gain_diversi_eur"].sum()), 2),
             "total_realized_gain_etf_eur": round(float(df_yearly["realized_gain_etf_eur"].sum()), 2),
@@ -319,7 +351,7 @@ def compute_tax_and_harvesting(
             "net_realized_pnl_eur": round(float(df_yearly["net_pnl_eur"].sum()), 2),
             "estimated_tax_due_eur": round(float(df_yearly["estimated_tax_due_eur"].sum()), 2),
             "tax_credit_zainetto_eur": round(current_active_zainetto, 2),
-            "potential_tax_savings_eur": round(potential_savings, 2)
+            "potential_tax_savings_eur": round(potential_savings, 2),
         }
 
     return {
@@ -328,7 +360,7 @@ def compute_tax_and_harvesting(
         "harvesting_candidates": df_harvest,
         "yearly_breakdown": df_yearly,
         "tax_by_year": df_yearly,
-        "zainetto_timeline": df_zainetto_timeline
+        "zainetto_timeline": df_zainetto_timeline,
     }
 
 
@@ -339,13 +371,22 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
     fino al 31 dicembre dell'anno T+4.
     """
     if df_yearly is None or df_yearly.empty:
-        return pd.DataFrame(columns=[
-            "origin_year", "expiry_year", "initial_minus_eur", 
-            "compensated_eur", "residual_active_eur", "expired_eur", 
-            "years_to_expiry", "status", "urgency"
-        ])
+        return pd.DataFrame(
+            columns=[
+                "origin_year",
+                "expiry_year",
+                "initial_minus_eur",
+                "compensated_eur",
+                "residual_active_eur",
+                "expired_eur",
+                "years_to_expiry",
+                "status",
+                "urgency",
+            ]
+        )
 
     import datetime
+
     if current_year is None:
         current_year = datetime.date.today().year
 
@@ -357,7 +398,7 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
         yr = int(row["year"])
         gains_div = float(row.get("realized_gain_diversi_eur", 0.0))
         losses = float(row.get("realized_loss_eur", 0.0))
-        
+
         if gains_div >= losses:
             # Plusvalenze dell'anno coprono le minusvalenze dell'anno stesso
             excess_gain = gains_div - losses
@@ -374,13 +415,15 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
             # Le minusvalenze superano le plusvalenze dell'anno: si genera un nuovo bucket netto
             net_new_minus = losses - gains_div
             if net_new_minus > 1e-2:
-                buckets.append({
-                    "origin_year": yr,
-                    "expiry_year": yr + 4,
-                    "initial": round(net_new_minus, 2),
-                    "compensated": 0.0,
-                    "residual": round(net_new_minus, 2)
-                })
+                buckets.append(
+                    {
+                        "origin_year": yr,
+                        "expiry_year": yr + 4,
+                        "initial": round(net_new_minus, 2),
+                        "compensated": 0.0,
+                        "residual": round(net_new_minus, 2),
+                    }
+                )
 
     # Costruzione tabella di stato finale
     timeline_rows = []
@@ -390,7 +433,7 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
         init = round(b["initial"], 2)
         comp = round(b["compensated"], 2)
         res = round(b["residual"], 2)
-        
+
         is_expired = current_year > exp and res > 1e-2
         expired_amt = res if is_expired else 0.0
         active_res = 0.0 if is_expired else res
@@ -412,28 +455,27 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
             status = f"🟢 Attivo (Scade il 31/12/{exp})"
             urgency = "MEDIUM"
 
-        timeline_rows.append({
-            "origin_year": orig,
-            "expiry_year": exp,
-            "initial_minus_eur": init,
-            "compensated_eur": comp,
-            "residual_active_eur": round(active_res, 2),
-            "expired_eur": round(expired_amt, 2),
-            "years_to_expiry": years_left,
-            "status": status,
-            "urgency": urgency
-        })
+        timeline_rows.append(
+            {
+                "origin_year": orig,
+                "expiry_year": exp,
+                "initial_minus_eur": init,
+                "compensated_eur": comp,
+                "residual_active_eur": round(active_res, 2),
+                "expired_eur": round(expired_amt, 2),
+                "years_to_expiry": years_left,
+                "status": status,
+                "urgency": urgency,
+            }
+        )
 
     return pd.DataFrame(timeline_rows)
 
 
-def compute_tax_loss_harvesting_strategy(
-    results: Dict[str, Any],
-    custom_zainetto_eur: float = None
-) -> Dict[str, Any]:
+def compute_tax_loss_harvesting_strategy(results: Dict[str, Any], custom_zainetto_eur: float = None) -> Dict[str, Any]:
     """
     Motore di Ottimizzazione Fiscale & Tax-Loss Harvesting Wizard (TUIR Art. 67).
-    
+
     Identifica con precisione:
     1. Strategie di Step-Up Fiscale a imposta 0€:
        Vendere e ricomprare posizioni in utile (Redditi Diversi: azioni singole, bond, ETC) per
@@ -450,14 +492,20 @@ def compute_tax_loss_harvesting_strategy(
             "df_harvest_loss": pd.DataFrame(),
             "total_tax_savings_eur": 0.0,
             "total_minus_consumable_eur": 0.0,
-            "summary": {}
+            "summary": {},
         }
 
     # Stima minusvalenze disponibili nello zainetto
     tax_res = compute_tax_and_harvesting(results) if results else {}
     df_timeline = tax_res.get("zainetto_timeline", pd.DataFrame())
-    active_minus = float(df_timeline["residual_active_eur"].sum()) if isinstance(df_timeline, pd.DataFrame) and not df_timeline.empty and "residual_active_eur" in df_timeline.columns else 0.0
-    
+    active_minus = (
+        float(df_timeline["residual_active_eur"].sum())
+        if isinstance(df_timeline, pd.DataFrame)
+        and not df_timeline.empty
+        and "residual_active_eur" in df_timeline.columns
+        else 0.0
+    )
+
     if custom_zainetto_eur is not None and custom_zainetto_eur >= 0:
         available_zainetto = float(custom_zainetto_eur)
     else:
@@ -493,7 +541,7 @@ def compute_tax_loss_harvesting_strategy(
         cost_basis_eur = float(row.get("cost_basis_eur", row.get("cost_basis", 0.0)) or 0.0)
         unrealized_pnl = float(row.get("unrealized_pnl", row.get("pnl_unrealized", 0.0)) or 0.0)
         unrealized_pct = float(row.get("unrealized_pnl_pct", 0.0) or 0.0)
-        
+
         etf_flag = is_etf(ac, ticker)
         tax_rate = get_asset_tax_rate(ac, ticker)
         proxy_asset = REPLACEMENT_PROXIES.get(ticker, f"Attendi 31 Giorni o ETF Settoriale ({ac})")
@@ -502,20 +550,22 @@ def compute_tax_loss_harvesting_strategy(
         if unrealized_pnl > 10.0 and not etf_flag and qty > 0 and curr_price > 0:
             consumable_gain = min(unrealized_pnl, remaining_zainetto) if remaining_zainetto > 0 else unrealized_pnl
             tax_saved = consumable_gain * tax_rate
-            
-            step_up_rows.append({
-                "ticker": ticker,
-                "asset_class": ac,
-                "qty_held": round(qty, 4),
-                "current_price_eur": round(curr_price, 2),
-                "unrealized_gain_eur": round(unrealized_pnl, 2),
-                "unrealized_gain_pct": round(unrealized_pct, 2),
-                "consumable_minus_eur": round(consumable_gain, 2),
-                "tax_saving_eur": round(tax_saved, 2),
-                "action": "🎯 Vendi & Ricompra (Step-Up 0€ Tasse)",
-                "replacement_proxy": "Riacquisto Immediato stesso Ticker",
-                "rationale": f"Monetizza € {consumable_gain:,.2f} di plusvalenza compensandola al 100% con lo zainetto. Il prezzo di carico sale a € {curr_price:.2f} con 0€ di imposta."
-            })
+
+            step_up_rows.append(
+                {
+                    "ticker": ticker,
+                    "asset_class": ac,
+                    "qty_held": round(qty, 4),
+                    "current_price_eur": round(curr_price, 2),
+                    "unrealized_gain_eur": round(unrealized_pnl, 2),
+                    "unrealized_gain_pct": round(unrealized_pct, 2),
+                    "consumable_minus_eur": round(consumable_gain, 2),
+                    "tax_saving_eur": round(tax_saved, 2),
+                    "action": "🎯 Vendi & Ricompra (Step-Up 0€ Tasse)",
+                    "replacement_proxy": "Riacquisto Immediato stesso Ticker",
+                    "rationale": f"Monetizza € {consumable_gain:,.2f} di plusvalenza compensandola al 100% con lo zainetto. Il prezzo di carico sale a € {curr_price:.2f} con 0€ di imposta.",
+                }
+            )
             if remaining_zainetto > 0:
                 remaining_zainetto = max(0.0, remaining_zainetto - consumable_gain)
 
@@ -524,21 +574,23 @@ def compute_tax_loss_harvesting_strategy(
             loss_amt = abs(unrealized_pnl)
             potential_tax_shield = loss_amt * tax_rate
             order_notional = qty * curr_price
-            
-            loss_harvest_rows.append({
-                "ticker": ticker,
-                "asset_class": ac,
-                "qty_held": round(qty, 4),
-                "current_price_eur": round(curr_price, 2),
-                "order_notional_eur": round(order_notional, 2),
-                "unrealized_loss_eur": round(unrealized_pnl, 2),
-                "unrealized_loss_pct": round(unrealized_pct, 2),
-                "loss_to_harvest_eur": round(loss_amt, 2),
-                "tax_shield_created_eur": round(potential_tax_shield, 2),
-                "action": "✂️ SELL HARVEST (Monetizza Minus)",
-                "replacement_proxy": proxy_asset,
-                "rationale": f"Vendi {qty:,.2f} quote per generare € {loss_amt:,.2f} di credito fiscale nello zainetto (€ {potential_tax_shield:,.2f} risparmio netto). Re-investi in {proxy_asset}."
-            })
+
+            loss_harvest_rows.append(
+                {
+                    "ticker": ticker,
+                    "asset_class": ac,
+                    "qty_held": round(qty, 4),
+                    "current_price_eur": round(curr_price, 2),
+                    "order_notional_eur": round(order_notional, 2),
+                    "unrealized_loss_eur": round(unrealized_pnl, 2),
+                    "unrealized_loss_pct": round(unrealized_pct, 2),
+                    "loss_to_harvest_eur": round(loss_amt, 2),
+                    "tax_shield_created_eur": round(potential_tax_shield, 2),
+                    "action": "✂️ SELL HARVEST (Monetizza Minus)",
+                    "replacement_proxy": proxy_asset,
+                    "rationale": f"Vendi {qty:,.2f} quote per generare € {loss_amt:,.2f} di credito fiscale nello zainetto (€ {potential_tax_shield:,.2f} risparmio netto). Re-investi in {proxy_asset}.",
+                }
+            )
 
     df_step_up = pd.DataFrame(step_up_rows)
     if not df_step_up.empty:
@@ -563,8 +615,8 @@ def compute_tax_loss_harvesting_strategy(
         "summary": {
             "n_step_up_candidates": len(df_step_up),
             "n_loss_candidates": len(df_harvest),
-            "estimated_net_benefit_eur": round(tot_tax_saved + tot_shield_created, 2)
-        }
+            "estimated_net_benefit_eur": round(tot_tax_saved + tot_shield_created, 2),
+        },
     }
 
 
@@ -576,10 +628,9 @@ generate_tax_loss_harvesting_strategy = compute_tax_loss_harvesting_strategy
 # 1. SIMULATORE RIFORMA FISCALE (ARMONIZZAZIONE ETF & COMPENSAZIONE TOTALE)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_riforma_fiscale_comparison(
-    results: Dict[str, Any],
-    tax_year: Optional[int] = None,
-    custom_zainetto_eur: Optional[float] = None
+    results: Dict[str, Any], tax_year: Optional[int] = None, custom_zainetto_eur: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Confronta il carico fiscale tra il Regime TUIR Attuale (asimmetrico: Plusvalenze ETF non compensabili)
@@ -587,11 +638,11 @@ def compute_riforma_fiscale_comparison(
     """
     tax_res = compute_tax_and_harvesting(results, tax_year=tax_year)
     tax_sum = tax_res.get("summary", {})
-    
+
     gain_diversi = float(tax_sum.get("total_realized_gain_diversi_eur", 0.0))
     gain_etf = float(tax_sum.get("total_realized_gain_etf_eur", 0.0))
     losses = float(tax_sum.get("total_realized_loss_eur", 0.0))
-    
+
     if custom_zainetto_eur is not None and custom_zainetto_eur >= 0:
         available_minus = losses + float(custom_zainetto_eur)
     else:
@@ -601,7 +652,7 @@ def compute_riforma_fiscale_comparison(
     net_diversi_curr = gain_diversi - available_minus
     taxable_diversi_curr = max(0.0, net_diversi_curr)
     tax_due_diversi_curr = taxable_diversi_curr * 0.26
-    
+
     # ETF tassati SEMPRE al 26% senza compensazione
     tax_due_etf_curr = gain_etf * 0.26
     total_tax_current = tax_due_diversi_curr + tax_due_etf_curr
@@ -627,7 +678,9 @@ def compute_riforma_fiscale_comparison(
             "taxable_base_eur": round(taxable_diversi_curr + gain_etf, 2),
             "tax_due_eur": round(total_tax_current, 2),
             "residual_minus_eur": round(residual_minus_current, 2),
-            "effective_tax_rate_pct": round((total_tax_current / max(1.0, total_gain_unified)) * 100.0, 2) if total_gain_unified > 0 else 0.0
+            "effective_tax_rate_pct": round((total_tax_current / max(1.0, total_gain_unified)) * 100.0, 2)
+            if total_gain_unified > 0
+            else 0.0,
         },
         "reformed_regime": {
             "total_gain_eur": round(total_gain_unified, 2),
@@ -635,14 +688,20 @@ def compute_riforma_fiscale_comparison(
             "taxable_base_eur": round(taxable_unified, 2),
             "tax_due_eur": round(total_tax_reformed, 2),
             "residual_minus_eur": round(residual_minus_reformed, 2),
-            "effective_tax_rate_pct": round((total_tax_reformed / max(1.0, total_gain_unified)) * 100.0, 2) if total_gain_unified > 0 else 0.0
+            "effective_tax_rate_pct": round((total_tax_reformed / max(1.0, total_gain_unified)) * 100.0, 2)
+            if total_gain_unified > 0
+            else 0.0,
         },
         "comparison": {
             "net_tax_savings_eur": round(tax_savings, 2),
-            "tax_drag_etf_asymmetry_eur": round(tax_due_etf_curr - max(0.0, (gain_etf - max(0.0, available_minus - gain_diversi))) * 0.26, 2),
+            "tax_drag_etf_asymmetry_eur": round(
+                tax_due_etf_curr - max(0.0, (gain_etf - max(0.0, available_minus - gain_diversi))) * 0.26, 2
+            ),
             "tax_drag_pct": tax_drag_pct,
-            "minus_utilization_improvement_eur": round(min(total_gain_unified, available_minus) - min(gain_diversi, available_minus), 2)
-        }
+            "minus_utilization_improvement_eur": round(
+                min(total_gain_unified, available_minus) - min(gain_diversi, available_minus), 2
+            ),
+        },
     }
 
 
@@ -650,11 +709,12 @@ def compute_riforma_fiscale_comparison(
 # 2. PROSPETTO PRECOMPILATO MODELLO REDDITI PF (QUADRO RT & QUADRO RW)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def compute_modello_redditi_pf(
     results: Dict[str, Any],
     tax_year: Optional[int] = None,
-    db_engine = None,
-    prior_minus_custom_eur: Optional[float] = None
+    db_engine=None,
+    prior_minus_custom_eur: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Genera i righi precompilati conformi al Modello Redditi Persone Fisiche (Regime Dichiarativo):
@@ -663,21 +723,21 @@ def compute_modello_redditi_pf(
     """
     pos = results.get("positions", pd.DataFrame())
     df_tx = results.get("df_tx", pd.DataFrame())
-    
+
     # ── QUADRO RT (Sezione II) ──
     tax_res = compute_tax_and_harvesting(results, db_engine=db_engine, tax_year=tax_year)
     tax_sum = tax_res.get("summary", {})
-    
+
     total_proceeds = 0.0
     total_cost_basis = 0.0
-    
+
     if df_tx is not None and not df_tx.empty:
         df_tx_calc = df_tx.copy()
         if "tx_date" in df_tx_calc.columns:
             df_tx_calc["year"] = pd.to_datetime(df_tx_calc["tx_date"]).dt.year
             if tax_year is not None:
                 df_tx_calc = df_tx_calc[df_tx_calc["year"] == int(tax_year)]
-                
+
         sells = df_tx_calc[df_tx_calc["tx_type"].astype(str).str.lower() == "sell"]
         if not sells.empty:
             total_proceeds = float((sells["quantity"] * sells["price"]).sum())
@@ -688,23 +748,53 @@ def compute_modello_redditi_pf(
         total_proceeds = max(gain, 1000.0) * 1.5
         total_cost_basis = total_proceeds - (gain - loss)
 
-    net_pnl = float(tax_sum.get("total_realized_gain_diversi_eur", 0.0)) - float(tax_sum.get("total_realized_loss_eur", 0.0))
+    net_pnl = float(tax_sum.get("total_realized_gain_diversi_eur", 0.0)) - float(
+        tax_sum.get("total_realized_loss_eur", 0.0)
+    )
     plusv_lorda = max(0.0, net_pnl)
     minusv_anno = abs(net_pnl) if net_pnl < 0 else 0.0
-    
-    prior_minus = float(prior_minus_custom_eur) if prior_minus_custom_eur is not None else float(tax_sum.get("tax_credit_zainetto_eur", 0.0))
+
+    prior_minus = (
+        float(prior_minus_custom_eur)
+        if prior_minus_custom_eur is not None
+        else float(tax_sum.get("tax_credit_zainetto_eur", 0.0))
+    )
     minus_dedotta = min(plusv_lorda, prior_minus)
     imponibile_netto = max(0.0, plusv_lorda - minus_dedotta)
     imposta_sostitutiva = imponibile_netto * 0.26
     minus_riportabile = (prior_minus - minus_dedotta) + minusv_anno
 
     rt_rows = [
-        {"rigo": "RT21", "descrizione": "Totale dei corrispettivi derivanti dalle cessioni a titolo oneroso", "valore_eur": round(total_proceeds, 2)},
-        {"rigo": "RT22", "descrizione": "Totale dei costi fiscalmente rilevanti o valori d'acquisto (FIFO)", "valore_eur": round(total_cost_basis, 2)},
-        {"rigo": "RT23", "descrizione": "Differenza positiva (Plusvalenze realizzate nell'anno fiscale)", "valore_eur": round(plusv_lorda, 2)},
-        {"rigo": "RT24", "descrizione": "Eccedenza di minusvalenze da esercizi precedenti dedotta nell'anno", "valore_eur": round(minus_dedotta, 2)},
-        {"rigo": "RT25", "descrizione": "Minusvalenze residue non compensate da riportare agli anni successivi", "valore_eur": round(minus_riportabile, 2)},
-        {"rigo": "RT26", "descrizione": "Imposta sostitutiva dovuta al 26% (da versare con Modello F24)", "valore_eur": round(imposta_sostitutiva, 2)},
+        {
+            "rigo": "RT21",
+            "descrizione": "Totale dei corrispettivi derivanti dalle cessioni a titolo oneroso",
+            "valore_eur": round(total_proceeds, 2),
+        },
+        {
+            "rigo": "RT22",
+            "descrizione": "Totale dei costi fiscalmente rilevanti o valori d'acquisto (FIFO)",
+            "valore_eur": round(total_cost_basis, 2),
+        },
+        {
+            "rigo": "RT23",
+            "descrizione": "Differenza positiva (Plusvalenze realizzate nell'anno fiscale)",
+            "valore_eur": round(plusv_lorda, 2),
+        },
+        {
+            "rigo": "RT24",
+            "descrizione": "Eccedenza di minusvalenze da esercizi precedenti dedotta nell'anno",
+            "valore_eur": round(minus_dedotta, 2),
+        },
+        {
+            "rigo": "RT25",
+            "descrizione": "Minusvalenze residue non compensate da riportare agli anni successivi",
+            "valore_eur": round(minus_riportabile, 2),
+        },
+        {
+            "rigo": "RT26",
+            "descrizione": "Imposta sostitutiva dovuta al 26% (da versare con Modello F24)",
+            "valore_eur": round(imposta_sostitutiva, 2),
+        },
     ]
     df_rt = pd.DataFrame(rt_rows)
 
@@ -716,7 +806,7 @@ def compute_modello_redditi_pf(
             ac = str(row.get("asset_class", "Equity"))
             val_eur = float(row.get("current_value", row.get("current_value_eur", 0.0)) or 0.0)
             cost_eur = float(row.get("cost_basis_eur", row.get("cost_basis", val_eur)) or val_eur)
-            
+
             if val_eur <= 0.01:
                 continue
 
@@ -755,27 +845,32 @@ def compute_modello_redditi_pf(
                 ivafe_rate = 0.002
 
             # Riconoscimento Paesi a Fiscalità Privilegiata / Black List ex D.M. 04/05/1999 (L. 213/2023: IVAFE elevata allo 0,40%)
-            if any(bl in t_up for bl in ["PANAMA", "CAYMAN", "BAHAMAS", "BERMUDA", "BVI", "VIRGIN", "GIBRALTAR", "SEYCHELLES"]):
+            if any(
+                bl in t_up
+                for bl in ["PANAMA", "CAYMAN", "BAHAMAS", "BERMUDA", "BVI", "VIRGIN", "GIBRALTAR", "SEYCHELLES"]
+            ):
                 ivafe_rate = 0.004
                 cod_paese = f"{cod_paese} [BlackList 0.40%]"
 
             ivafe_val = val_eur * ivafe_rate
-            rw_rows.append({
-                "rigo": f"RW{len(rw_rows) + 1}",
-                "ticker": ticker,
-                "asset_class": ac,
-                "codice_investimento": cod_inv,
-                "codice_paese": cod_paese,
-                "quota_possesso_pct": 100.0,
-                "giorni_detenzione": 365,
-                "valore_iniziale_eur": round(cost_eur, 2),
-                "valore_finale_eur": round(val_eur, 2),
-                "ivafe_calcolata_eur": round(ivafe_val, 2)
-            })
+            rw_rows.append(
+                {
+                    "rigo": f"RW{len(rw_rows) + 1}",
+                    "ticker": ticker,
+                    "asset_class": ac,
+                    "codice_investimento": cod_inv,
+                    "codice_paese": cod_paese,
+                    "quota_possesso_pct": 100.0,
+                    "giorni_detenzione": 365,
+                    "valore_iniziale_eur": round(cost_eur, 2),
+                    "valore_finale_eur": round(val_eur, 2),
+                    "ivafe_calcolata_eur": round(ivafe_val, 2),
+                }
+            )
 
     df_rw = pd.DataFrame(rw_rows)
     tot_ivafe = float(df_rw["ivafe_calcolata_eur"].sum()) if not df_rw.empty else 0.0
-    tot_ivafe_due = tot_ivafe if tot_ivafe >= 12.0 else 0.0 # Esenzione per importi inferiori a 12€
+    tot_ivafe_due = tot_ivafe if tot_ivafe >= 12.0 else 0.0  # Esenzione per importi inferiori a 12€
 
     # ── QUADRO RM (Sezione V - Proventi da OICR Esteri & Dividendi senza Sostituto Residente) ──
     # Art. 18 TUIR: Tassazione al 26% sul Netto Frontiera per dividendi e proventi da intermediari non residenti
@@ -801,15 +896,35 @@ def compute_modello_redditi_pf(
 
     if tot_div_gross > 0.01:
         rm_rows = [
-            {"rigo": "RM12_A", "descrizione": "Proventi lordi di fonte estera (Dividendi azionari & proventi ETF)", "valore_eur": round(tot_div_gross, 2)},
-            {"rigo": "RM12_B", "descrizione": "Ritenute estere applicate alla fonte (Withholding Tax convenzionale)", "valore_eur": round(tot_foreign_wht, 2)},
-            {"rigo": "RM12_C", "descrizione": "Ammontare netto frontiera imponibile in Italia", "valore_eur": round(tot_netto_frontiera, 2)},
+            {
+                "rigo": "RM12_A",
+                "descrizione": "Proventi lordi di fonte estera (Dividendi azionari & proventi ETF)",
+                "valore_eur": round(tot_div_gross, 2),
+            },
+            {
+                "rigo": "RM12_B",
+                "descrizione": "Ritenute estere applicate alla fonte (Withholding Tax convenzionale)",
+                "valore_eur": round(tot_foreign_wht, 2),
+            },
+            {
+                "rigo": "RM12_C",
+                "descrizione": "Ammontare netto frontiera imponibile in Italia",
+                "valore_eur": round(tot_netto_frontiera, 2),
+            },
             {"rigo": "RM12_D", "descrizione": "Aliquota imposta sostitutiva italiana (%)", "valore_eur": 26.0},
-            {"rigo": "RM12_E", "descrizione": "Imposta sostitutiva dovuta al 26% (Modello F24 - Codice 1242)", "valore_eur": round(tot_tax_rm, 2)},
+            {
+                "rigo": "RM12_E",
+                "descrizione": "Imposta sostitutiva dovuta al 26% (Modello F24 - Codice 1242)",
+                "valore_eur": round(tot_tax_rm, 2),
+            },
         ]
     else:
         rm_rows = [
-            {"rigo": "RM12_A", "descrizione": "Proventi lordi di fonte estera (Nessun dividendo estero rilevato)", "valore_eur": 0.0},
+            {
+                "rigo": "RM12_A",
+                "descrizione": "Proventi lordi di fonte estera (Nessun dividendo estero rilevato)",
+                "valore_eur": 0.0,
+            },
             {"rigo": "RM12_B", "descrizione": "Ritenute estere applicate alla fonte", "valore_eur": 0.0},
             {"rigo": "RM12_C", "descrizione": "Ammontare netto frontiera imponibile", "valore_eur": 0.0},
             {"rigo": "RM12_D", "descrizione": "Aliquota imposta sostitutiva italiana (%)", "valore_eur": 26.0},
@@ -829,14 +944,15 @@ def compute_modello_redditi_pf(
             "imposta_sostitutiva_rm_eur": round(tot_tax_rm, 2),
             "totale_debito_dichiarativo_eur": round(totale_debito_dichiarativo, 2),
             "minusvalenze_riportabili_eur": round(minus_riportabile, 2),
-            "esenzione_ivafe_applicata": (tot_ivafe < 12.0 and tot_ivafe > 0.0)
-        }
+            "esenzione_ivafe_applicata": (tot_ivafe < 12.0 and tot_ivafe > 0.0),
+        },
     }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 3. ANALIZZATORE WITHHOLDING TAX DIVIDENDI ESTERI (DOPPIA IMPOSIZIONE)
 # ══════════════════════════════════════════════════════════════════════════════
+
 
 def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -854,8 +970,8 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
                 "total_tax_paid_eur": 0.0,
                 "total_net_dividends_eur": 0.0,
                 "weighted_effective_tax_pct": 0.0,
-                "total_tax_drag_vs_accumulating_eur": 0.0
-            }
+                "total_tax_drag_vs_accumulating_eur": 0.0,
+            },
         }
 
     WHT_RATES = {
@@ -866,7 +982,7 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
         "DK": (0.27, "Danimarca (Udbytteskat: 27%)"),
         "UK": (0.00, "Regno Unito (0% WHT)"),
         "IT": (0.00, "Italia (0% WHT, 26% Sostitutiva)"),
-        "DEFAULT": (0.15, "Convenzione OCSE Standard (15%)")
+        "DEFAULT": (0.15, "Convenzione OCSE Standard (15%)"),
     }
 
     div_rows = []
@@ -878,7 +994,7 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
         val_eur = float(row.get("current_value", row.get("current_value_eur", 0.0)) or 0.0)
         div_hist = float(row.get("dividends_total", 0.0) or 0.0)
         div_yield_pct = float(row.get("dividend_yield", row.get("dividend_yield_pct", 0.0)) or 0.0)
-        
+
         # Stima dividendo annuo se storico assente
         if div_hist > 0:
             est_gross_div = div_hist
@@ -918,7 +1034,7 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
         italian_tax_paid = net_frontier * 0.26
         total_tax_paid = foreign_wht_paid + italian_tax_paid
         net_received = est_gross_div - total_tax_paid
-        
+
         effective_rate = (total_tax_paid / est_gross_div) * 100.0 if est_gross_div > 0 else 26.0
 
         # Confronto con ETF UCITS ad accumulazione (WHT interna 15% su USA + 0% imposta immediata fino a vendita)
@@ -931,20 +1047,22 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
         tot_net += net_received
         tot_drag += tax_drag_vs_acc
 
-        div_rows.append({
-            "ticker": ticker,
-            "asset_class": ac,
-            "paese_regime": wht_label,
-            "dividendo_lordo_eur": round(est_gross_div, 2),
-            "ritenuta_estera_wht_eur": round(foreign_wht_paid, 2),
-            "aliquota_wht_pct": round(wht_rate * 100.0, 1),
-            "netto_frontiera_eur": round(net_frontier, 2),
-            "imposta_italiana_26_eur": round(italian_tax_paid, 2),
-            "totale_imposte_eur": round(total_tax_paid, 2),
-            "dividendo_netto_incassato_eur": round(net_received, 2),
-            "aliquota_effettiva_combinata_pct": round(effective_rate, 2),
-            "tax_drag_vs_accumulo_eur": round(tax_drag_vs_acc, 2)
-        })
+        div_rows.append(
+            {
+                "ticker": ticker,
+                "asset_class": ac,
+                "paese_regime": wht_label,
+                "dividendo_lordo_eur": round(est_gross_div, 2),
+                "ritenuta_estera_wht_eur": round(foreign_wht_paid, 2),
+                "aliquota_wht_pct": round(wht_rate * 100.0, 1),
+                "netto_frontiera_eur": round(net_frontier, 2),
+                "imposta_italiana_26_eur": round(italian_tax_paid, 2),
+                "totale_imposte_eur": round(total_tax_paid, 2),
+                "dividendo_netto_incassato_eur": round(net_received, 2),
+                "aliquota_effettiva_combinata_pct": round(effective_rate, 2),
+                "tax_drag_vs_accumulo_eur": round(tax_drag_vs_acc, 2),
+            }
+        )
 
     df_div = pd.DataFrame(div_rows)
     if not df_div.empty:
@@ -962,8 +1080,8 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
             "total_tax_paid_eur": round(tot_wht + tot_it, 2),
             "total_net_dividends_eur": round(tot_net, 2),
             "weighted_effective_tax_pct": round(weighted_eff_rate, 2),
-            "total_tax_drag_vs_accumulating_eur": round(tot_drag, 2)
-        }
+            "total_tax_drag_vs_accumulating_eur": round(tot_drag, 2),
+        },
     }
 
 
@@ -971,11 +1089,9 @@ def compute_withholding_tax_analysis(results: Dict[str, Any]) -> Dict[str, Any]:
 # 4. SIMULATORE PRE-TRADE "TAX-SMART LOT SIZING" (LOTTI FIFO PUNTUALI)
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 def simulate_fifo_lot_sale(
-    results: Dict[str, Any],
-    ticker: str,
-    qty_to_sell: float,
-    sale_price: Optional[float] = None
+    results: Dict[str, Any], ticker: str, qty_to_sell: float, sale_price: Optional[float] = None
 ) -> Dict[str, Any]:
     """
     Simulatore Pre-Trade avanzato di vendita per lotti FIFO:
@@ -984,12 +1100,22 @@ def simulate_fifo_lot_sale(
     """
     pos = results.get("positions", pd.DataFrame())
     df_tx = results.get("df_tx", pd.DataFrame())
-    
+
     ticker_pos = pos[pos["ticker"] == ticker] if not pos.empty and "ticker" in pos.columns else pd.DataFrame()
-    curr_mkt_price = float(ticker_pos["current_price"].values[0]) if not ticker_pos.empty and "current_price" in ticker_pos.columns else 100.0
-    total_qty_held = float(ticker_pos["qty_net"].values[0]) if not ticker_pos.empty and "qty_net" in ticker_pos.columns else 0.0
-    ac = str(ticker_pos["asset_class"].values[0]) if not ticker_pos.empty and "asset_class" in ticker_pos.columns else "Equity"
-    
+    curr_mkt_price = (
+        float(ticker_pos["current_price"].values[0])
+        if not ticker_pos.empty and "current_price" in ticker_pos.columns
+        else 100.0
+    )
+    total_qty_held = (
+        float(ticker_pos["qty_net"].values[0]) if not ticker_pos.empty and "qty_net" in ticker_pos.columns else 0.0
+    )
+    ac = (
+        str(ticker_pos["asset_class"].values[0])
+        if not ticker_pos.empty and "asset_class" in ticker_pos.columns
+        else "Equity"
+    )
+
     exec_price = float(sale_price) if (sale_price is not None and sale_price > 0) else curr_mkt_price
     tax_rate = get_asset_tax_rate(ac, ticker)
     etf_flag = is_etf(ac, ticker)
@@ -997,13 +1123,15 @@ def simulate_fifo_lot_sale(
     # Ricostruzione della coda dei lotti d'acquisto FIFO aperti
     open_lots = []
     if df_tx is not None and not df_tx.empty and "ticker" in df_tx.columns:
-        sub_tx = df_tx[df_tx["ticker"] == ticker].sort_values(["tx_date", "tx_id"] if "tx_id" in df_tx.columns else ["tx_date"])
+        sub_tx = df_tx[df_tx["ticker"] == ticker].sort_values(
+            ["tx_date", "tx_id"] if "tx_id" in df_tx.columns else ["tx_date"]
+        )
         for _, tx in sub_tx.iterrows():
             ttype = str(tx.get("tx_type", "buy")).lower().strip()
             tqty = float(tx.get("quantity", 0.0))
             tprice = float(tx.get("price", 0.0))
             tdate = str(tx.get("tx_date", ""))[:10]
-            
+
             if ttype == "buy":
                 open_lots.append({"date": tdate, "qty": tqty, "price": tprice})
             elif ttype == "sell":
@@ -1018,13 +1146,17 @@ def simulate_fifo_lot_sale(
 
     # Fallback sintetico se non ci sono transazioni storiche nel database
     if not open_lots and total_qty_held > 0:
-        cost_basis = float(ticker_pos["cost_basis_eur"].values[0]) if "cost_basis_eur" in ticker_pos.columns else exec_price * 0.90
+        cost_basis = (
+            float(ticker_pos["cost_basis_eur"].values[0])
+            if "cost_basis_eur" in ticker_pos.columns
+            else exec_price * 0.90
+        )
         open_lots.append({"date": "Lotto Aperto (Storico)", "qty": total_qty_held, "price": cost_basis})
 
     # Simulazione scarico FIFO
     target_sell = min(float(qty_to_sell), total_qty_held) if total_qty_held > 0 else float(qty_to_sell)
     remaining_to_sell = target_sell
-    
+
     affected_lots = []
     total_proceeds = target_sell * exec_price
     total_cost_discharged = 0.0
@@ -1033,38 +1165,42 @@ def simulate_fifo_lot_sale(
     for lot in open_lots:
         if remaining_to_sell <= 1e-9:
             break
-        
+
         lot_qty = lot["qty"]
         lot_price = lot["price"]
         lot_date = lot["date"]
-        
+
         qty_from_lot = min(lot_qty, remaining_to_sell)
         lot_proceeds = qty_from_lot * exec_price
         lot_cost = qty_from_lot * lot_price
         lot_pnl = lot_proceeds - lot_cost
         lot_tax = max(0.0, lot_pnl * tax_rate) if lot_pnl > 0 else 0.0
-        
+
         total_cost_discharged += lot_cost
         total_realized_pnl += lot_pnl
         remaining_to_sell -= qty_from_lot
 
-        affected_lots.append({
-            "data_lotto": lot_date,
-            "quote_scaricate": round(qty_from_lot, 4),
-            "prezzo_carico_lotto_eur": round(lot_price, 2),
-            "prezzo_vendita_eur": round(exec_price, 2),
-            "controvalore_lotto_eur": round(lot_proceeds, 2),
-            "costo_fiscale_lotto_eur": round(lot_cost, 2),
-            "pnl_lotto_eur": round(lot_pnl, 2),
-            "pnl_lotto_pct": round(((exec_price - lot_price) / max(0.01, lot_price)) * 100.0, 2),
-            "imposta_stimata_eur": round(lot_tax, 2),
-            "tipo_reddito": "Redditi di Capitale (Non Compensabile)" if (etf_flag and lot_pnl > 0) else "Redditi Diversi (Compensabile)"
-        })
+        affected_lots.append(
+            {
+                "data_lotto": lot_date,
+                "quote_scaricate": round(qty_from_lot, 4),
+                "prezzo_carico_lotto_eur": round(lot_price, 2),
+                "prezzo_vendita_eur": round(exec_price, 2),
+                "controvalore_lotto_eur": round(lot_proceeds, 2),
+                "costo_fiscale_lotto_eur": round(lot_cost, 2),
+                "pnl_lotto_eur": round(lot_pnl, 2),
+                "pnl_lotto_pct": round(((exec_price - lot_price) / max(0.01, lot_price)) * 100.0, 2),
+                "imposta_stimata_eur": round(lot_tax, 2),
+                "tipo_reddito": "Redditi di Capitale (Non Compensabile)"
+                if (etf_flag and lot_pnl > 0)
+                else "Redditi Diversi (Compensabile)",
+            }
+        )
 
     df_affected = pd.DataFrame(affected_lots)
     realized_tax_due = max(0.0, total_realized_pnl * tax_rate) if total_realized_pnl > 0 else 0.0
     minusvalenza_generata = abs(total_realized_pnl) if total_realized_pnl < 0 else 0.0
-    
+
     residual_shares = max(0.0, total_qty_held - target_sell)
     residual_val = residual_shares * curr_mkt_price
 
@@ -1077,12 +1213,14 @@ def simulate_fifo_lot_sale(
         "total_cost_discharged_eur": round(total_cost_discharged, 2),
         "total_realized_pnl_eur": round(total_realized_pnl, 2),
         "realized_pnl_eur": round(total_realized_pnl, 2),
-        "realized_pnl_pct": round((total_realized_pnl / max(1.0, total_cost_discharged)) * 100.0, 2) if total_cost_discharged > 0 else 0.0,
+        "realized_pnl_pct": round((total_realized_pnl / max(1.0, total_cost_discharged)) * 100.0, 2)
+        if total_cost_discharged > 0
+        else 0.0,
         "applicable_tax_rate_pct": round(tax_rate * 100.0, 1),
         "estimated_tax_due_eur": round(realized_tax_due, 2),
         "minusvalenza_generata_eur": round(minusvalenza_generata, 2),
         "is_etf": etf_flag,
         "residual_shares": round(residual_shares, 4),
         "residual_value_eur": round(residual_val, 2),
-        "df_affected_lots": df_affected
+        "df_affected_lots": df_affected,
     }

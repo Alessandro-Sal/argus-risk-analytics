@@ -195,9 +195,9 @@ def test_explicit_corporate_actions_aliases():
     """Verifica che tutte le tipologie di corporate actions (fusione, raggruppamento, spinoff) siano accettate."""
     from core.adapters.directa import _classify_directa_tx_type
     from core.adapters.fineco import _classify_fineco_tx_type
+    from core.adapters.revolut import _classify_revolut_tx_type
     from core.adapters.scalable import _classify_scalable_tx_type
     from core.adapters.traderepublic import _classify_tr_tx_type
-    from core.adapters.revolut import _classify_revolut_tx_type
 
     assert _classify_directa_tx_type("Frazionamento / Split") == "split"
     assert _classify_directa_tx_type("Raggruppamento Azionario") == "split"

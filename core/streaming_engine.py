@@ -10,10 +10,11 @@
 #   - Real-Time Tick Streamer & Subscription Hub
 # ============================================================
 
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-import threading
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
 
@@ -21,6 +22,7 @@ import pandas as pd
 @dataclass
 class MarketTick:
     """Rappresentazione di un singolo tick di mercato ad alta frequenza."""
+
     timestamp: datetime
     ticker: str
     price: float
@@ -43,6 +45,7 @@ class TickRingBuffer:
     Ring buffer circolare thread-safe con capacità fissa a prestazioni O(1).
     Mantiene gli ultimi N tick in memoria per analisi intraday a bassissima latenza.
     """
+
     def __init__(self, capacity: int = 1000, ticker: str = "DEFAULT"):
         self.capacity = max(10, capacity)
         self.ticker = ticker
@@ -76,24 +79,27 @@ class TickRingBuffer:
         with self._lock:
             if not self._buffer:
                 return pd.DataFrame(columns=["timestamp", "ticker", "price", "size", "bid", "ask", "volume"])
-            
+
             if len(self._buffer) < self.capacity:
                 ordered = list(self._buffer)
             else:
                 # Riordina dal punto di testa
-                ordered = self._buffer[self._head:] + self._buffer[:self._head]
+                ordered = self._buffer[self._head :] + self._buffer[: self._head]
 
-        data = [{
-            "timestamp": t.timestamp,
-            "ticker": t.ticker,
-            "price": t.price,
-            "size": t.size,
-            "bid": t.bid,
-            "ask": t.ask,
-            "volume": t.volume,
-            "spread": t.spread,
-            "mid_price": t.mid_price
-        } for t in ordered]
+        data = [
+            {
+                "timestamp": t.timestamp,
+                "ticker": t.ticker,
+                "price": t.price,
+                "size": t.size,
+                "bid": t.bid,
+                "ask": t.ask,
+                "volume": t.volume,
+                "spread": t.spread,
+                "mid_price": t.mid_price,
+            }
+            for t in ordered
+        ]
         return pd.DataFrame(data)
 
     def compute_vwap(self) -> float:
@@ -120,7 +126,7 @@ class TickRingBuffer:
             if n < self.capacity:
                 ordered = list(self._buffer)
             else:
-                ordered = self._buffer[self._head:] + self._buffer[:self._head]
+                ordered = self._buffer[self._head :] + self._buffer[: self._head]
 
         ofi = 0.0
         for i in range(1, len(ordered)):
@@ -143,10 +149,9 @@ class TickRingBuffer:
             else:
                 delta_ask = -prev.size
 
-            ofi += (delta_bid - delta_ask)
+            ofi += delta_bid - delta_ask
 
         return float(ofi)
-
 
     def get_summary_statistics(self) -> Dict[str, Any]:
         """Restituisce un riepilogo in tempo reale di prezzo, VWAP, volatilità rolling e spread."""
@@ -159,13 +164,13 @@ class TickRingBuffer:
                 "vwap": 0.0,
                 "mean_spread": 0.0,
                 "rolling_volatility_pct": 0.0,
-                "order_flow_imbalance": 0.0
+                "order_flow_imbalance": 0.0,
             }
 
         last_p = float(df["price"].iloc[-1])
         vwap = self.compute_vwap()
         mean_spread = float(df["spread"].mean())
-        
+
         # Volatilità rolling sui rendimenti percentuali dei tick
         returns = df["price"].pct_change().dropna()
         rolling_vol = float(returns.std() * np.sqrt(252 * 390 * 60) * 100.0) if len(returns) > 2 else 0.0
@@ -180,19 +185,21 @@ class TickRingBuffer:
             "order_flow_imbalance": round(self.compute_order_flow_imbalance(), 2),
             "min_price": round(float(df["price"].min()), 4),
             "max_price": round(float(df["price"].max()), 4),
-            "total_volume": round(float(df["size"].sum()), 2)
+            "total_volume": round(float(df["size"].sum()), 2),
         }
 
 
 # Schema NumPy strutturato ad alte prestazioni per ingestione streaming L2 / HFT
-DTYPE_MARKET_TICK = np.dtype([
-    ("timestamp_ns", np.int64),
-    ("price", np.float64),
-    ("size", np.float64),
-    ("bid", np.float64),
-    ("ask", np.float64),
-    ("volume", np.float64)
-])
+DTYPE_MARKET_TICK = np.dtype(
+    [
+        ("timestamp_ns", np.int64),
+        ("price", np.float64),
+        ("size", np.float64),
+        ("bid", np.float64),
+        ("ask", np.float64),
+        ("volume", np.float64),
+    ]
+)
 
 
 class FastVectorRingBuffer:
@@ -200,6 +207,7 @@ class FastVectorRingBuffer:
     Ring buffer vettorizzato ad alte prestazioni basato su NumPy structured array.
     Zero allocazioni heap a regime per streaming L2 intraday e algoritmi di esecuzione.
     """
+
     def __init__(self, capacity: int = 10_000, ticker: str = "DEFAULT"):
         self.capacity = max(10, capacity)
         self.ticker = ticker
@@ -233,7 +241,6 @@ class FastVectorRingBuffer:
 
 
 @dataclass
-
 class OrderBookLevel:
     price: float
     size: float
@@ -243,6 +250,7 @@ class OrderBookLevel:
 @dataclass
 class OrderBookL2:
     """Rappresentazione snapshot di un Order Book Level-2 (Top 5 Bids & Asks)."""
+
     ticker: str
     bids: List[OrderBookLevel]
     asks: List[OrderBookLevel]
@@ -272,13 +280,13 @@ class OrderBookL2:
         """
         if not self.bids or not self.asks:
             return self.mid_price
-        
+
         q_bid = self.bids[0].size
         q_ask = self.asks[0].size
-        
+
         if (q_bid + q_ask) <= 0:
             return self.mid_price
-            
+
         return float((self.best_bid * q_ask + self.best_ask * q_bid) / (q_bid + q_ask))
 
     def compute_book_imbalance(self) -> float:
@@ -296,12 +304,13 @@ class OrderBookL2:
 
 # ── GENERATORE SINTETICO STREAMING PER SIMULAZIONE LIVE ────────────
 
+
 def generate_mock_streaming_ticks(
     ticker: str = "AAPL",
     initial_price: float = 185.0,
     num_ticks: int = 50,
     volatility: float = 0.002,
-    spread_pct: float = 0.0005
+    spread_pct: float = 0.0005,
 ) -> List[MarketTick]:
     """Genera una sequenza realistica di tick ad alta frequenza per simulazione e test."""
     ticks = []
@@ -323,7 +332,7 @@ def generate_mock_streaming_ticks(
             size=size,
             bid=round(bid, 4),
             ask=round(ask, 4),
-            volume=size
+            volume=size,
         )
         ticks.append(tick)
 

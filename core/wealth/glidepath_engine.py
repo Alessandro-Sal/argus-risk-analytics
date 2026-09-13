@@ -5,16 +5,17 @@
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 
 try:
     import plotly.graph_objects as go
+
     HAS_PLOTLY = True
 except ImportError:
     go = None
     HAS_PLOTLY = False
-
 
 
 @dataclass
@@ -90,7 +91,7 @@ class DynamicGlidePathEngine:
             port_mu = eq_w * mu_eq + bnd_w * mu_bnd + csh_w * mu_csh
             port_vol = np.sqrt((eq_w * vol_eq) ** 2 + (bnd_w * vol_bnd) ** 2 + (csh_w * vol_csh) ** 2)
 
-            shocks = np.random.normal(port_mu - 0.5 * port_vol ** 2, port_vol, n_sims)
+            shocks = np.random.normal(port_mu - 0.5 * port_vol**2, port_vol, n_sims)
             trajectories[:, t] = trajectories[:, t - 1] * np.exp(shocks) + annual_savings
 
         final_values = trajectories[:, -1]
@@ -100,24 +101,24 @@ class DynamicGlidePathEngine:
         p50 = np.percentile(trajectories, 50, axis=0)
         p90 = np.percentile(trajectories, 90, axis=0)
 
-        fig = render_glidepath_chart(
-            goal=goal,
-            years=years,
-            tot_years=tot_years,
-            p10=p10,
-            p50=p50,
-            p90=p90,
-            success_prob=success_prob
-        ) if HAS_PLOTLY else None
+        fig = (
+            render_glidepath_chart(
+                goal=goal, years=years, tot_years=tot_years, p10=p10, p50=p50, p90=p90, success_prob=success_prob
+            )
+            if HAS_PLOTLY
+            else None
+        )
 
-        glide_df = pd.DataFrame({
-            "Anno": years,
-            "Anni Residui": tot_years - years,
-            "Azioni (%)": [f"{w*100:.0f}%" for w in equity_weights],
-            "Obbligazioni (%)": [f"{w*100:.0f}%" for w in bond_weights],
-            "Liquidità / XEON (%)": [f"{w*100:.0f}%" for w in cash_weights],
-            "Capitale Mediano (€)": [f"€ {val:,.0f}" for val in p50]
-        })
+        glide_df = pd.DataFrame(
+            {
+                "Anno": years,
+                "Anni Residui": tot_years - years,
+                "Azioni (%)": [f"{w * 100:.0f}%" for w in equity_weights],
+                "Obbligazioni (%)": [f"{w * 100:.0f}%" for w in bond_weights],
+                "Liquidità / XEON (%)": [f"{w * 100:.0f}%" for w in cash_weights],
+                "Capitale Mediano (€)": [f"€ {val:,.0f}" for val in p50],
+            }
+        )
 
         return {
             "goal": goal,
@@ -126,7 +127,7 @@ class DynamicGlidePathEngine:
             "p10_final_value": float(p10[-1]),
             "p90_final_value": float(p90[-1]),
             "plot_figure": fig,
-            "glide_path_df": glide_df
+            "glide_path_df": glide_df,
         }
 
 
@@ -137,34 +138,51 @@ def render_glidepath_chart(
     p10: np.ndarray,
     p50: np.ndarray,
     p90: np.ndarray,
-    success_prob: float
+    success_prob: float,
 ) -> Optional[Any]:
     """Genera la figura Plotly per il glide path di pianificazione finanziaria."""
     if not HAS_PLOTLY or go is None:
         return None
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=years, y=p90, mode="lines",
-        line=dict(color="rgba(16, 185, 129, 0.3)", width=1),
-        name="Scenario Favorevole (90° Pct)"
-    ))
-    fig.add_trace(go.Scatter(
-        x=years, y=p10, mode="lines",
-        line=dict(color="rgba(239, 68, 68, 0.3)", width=1),
-        fill="tonexty", fillcolor="rgba(255, 153, 0, 0.08)",
-        name="Scenario Prudente (10° Pct)"
-    ))
-    fig.add_trace(go.Scatter(
-        x=years, y=p50, mode="lines+markers",
-        line=dict(color="#ff9900", width=3),
-        name="Traiettoria Mediana Attesa (50° Pct)"
-    ))
-    fig.add_trace(go.Scatter(
-        x=[0, tot_years], y=[goal.target_amount, goal.target_amount],
-        mode="lines", line=dict(color="#ef4444", width=2, dash="dash"),
-        name=f"Target (€ {goal.target_amount:,.0f})"
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=years,
+            y=p90,
+            mode="lines",
+            line={"color": "rgba(16, 185, 129, 0.3)", "width": 1},
+            name="Scenario Favorevole (90° Pct)",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=years,
+            y=p10,
+            mode="lines",
+            line={"color": "rgba(239, 68, 68, 0.3)", "width": 1},
+            fill="tonexty",
+            fillcolor="rgba(255, 153, 0, 0.08)",
+            name="Scenario Prudente (10° Pct)",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=years,
+            y=p50,
+            mode="lines+markers",
+            line={"color": "#ff9900", "width": 3},
+            name="Traiettoria Mediana Attesa (50° Pct)",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[0, tot_years],
+            y=[goal.target_amount, goal.target_amount],
+            mode="lines",
+            line={"color": "#ef4444", "width": 2, "dash": "dash"},
+            name=f"Target (€ {goal.target_amount:,.0f})",
+        )
+    )
 
     fig.update_layout(
         title=f"<b>Proiezione Goal '{goal.name}' — Probabilità di Successo: {success_prob:.1f}%</b>",
@@ -173,9 +191,8 @@ def render_glidepath_chart(
         template="plotly_dark",
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=20, r=20, t=50, b=30),
+        margin={"l": 20, "r": 20, "t": 50, "b": 30},
         height=360,
-        font=dict(family="Outfit, sans-serif", color="#e6edf3")
+        font={"family": "Outfit, sans-serif", "color": "#e6edf3"},
     )
     return fig
-

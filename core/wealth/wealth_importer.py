@@ -6,59 +6,157 @@
 
 import io
 import re
-import pandas as pd
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+import pandas as pd
 from sqlalchemy import Engine
 
-from core.wealth.wealth_db import get_wealth_categories, insert_cashflow_tx, bulk_insert_cashflow_tx
 from core.wealth.universal_bank_parser import parse_bank_statement_file
-
+from core.wealth.wealth_db import bulk_insert_cashflow_tx, get_wealth_categories, insert_cashflow_tx
 
 # Regole di auto-categorizzazione basate su parole chiave
 CATEGORY_KEYWORD_RULES: Dict[str, List[str]] = {
     "Spesa Alimentare & Supermercato": [
-        "esselunga", "conad", "coop", "carrefour", "lidl", "eurospin", "pam", "penny",
-        "supermercato", "alimentari", "panificio", "macelleria", "ipercoop", "despar"
+        "esselunga",
+        "conad",
+        "coop",
+        "carrefour",
+        "lidl",
+        "eurospin",
+        "pam",
+        "penny",
+        "supermercato",
+        "alimentari",
+        "panificio",
+        "macelleria",
+        "ipercoop",
+        "despar",
     ],
     "Ristoranti, Bar & Delivery": [
-        "ristorante", "trattoria", "pizzeria", "bar", "caffe", "mcdonald", "burger king",
-        "deliveroo", "just eat", "glovo", "uber eats", "osterie", "pub", "gelateria", "sushi"
+        "ristorante",
+        "trattoria",
+        "pizzeria",
+        "bar",
+        "caffe",
+        "mcdonald",
+        "burger king",
+        "deliveroo",
+        "just eat",
+        "glovo",
+        "uber eats",
+        "osterie",
+        "pub",
+        "gelateria",
+        "sushi",
     ],
     "Bollette & Utenze (Luce/Gas/Internet)": [
-        "enel", "eni", "a2a", "edison", "plenitude", "sorgenia", "telecom", "tim", "vodafone",
-        "iliad", "fastweb", "windtre", "servizio idrico", "tari", "utenza", "luce gas"
+        "enel",
+        "eni",
+        "a2a",
+        "edison",
+        "plenitude",
+        "sorgenia",
+        "telecom",
+        "tim",
+        "vodafone",
+        "iliad",
+        "fastweb",
+        "windtre",
+        "servizio idrico",
+        "tari",
+        "utenza",
+        "luce gas",
     ],
     "Trasporti, Carburante & Mezzi": [
-        "q8", "eni station", "ip", "tamoil", "esso", "distributore", "telepass", "autostrade",
-        "trenitalia", "italo", "atm", "atac", "uber", "taxi", "parcheggio", "easy park"
+        "q8",
+        "eni station",
+        "ip",
+        "tamoil",
+        "esso",
+        "distributore",
+        "telepass",
+        "autostrade",
+        "trenitalia",
+        "italo",
+        "atm",
+        "atac",
+        "uber",
+        "taxi",
+        "parcheggio",
+        "easy park",
     ],
     "Abbonamenti, Tech & Streaming": [
-        "netflix", "spotify", "amazon prime", "disney", "youtube", "apple", "google",
-        "icloud", "chatgpt", "openai", "github", "playstation", "xbox", "dazn", "sky"
+        "netflix",
+        "spotify",
+        "amazon prime",
+        "disney",
+        "youtube",
+        "apple",
+        "google",
+        "icloud",
+        "chatgpt",
+        "openai",
+        "github",
+        "playstation",
+        "xbox",
+        "dazn",
+        "sky",
     ],
     "Salute, Farmaci & Visite": [
-        "farmacia", "parafarmacia", "medico", "visita medica", "dentista", "clinica",
-        "ospedale", "laboratorio analisi", "ottico", "synlab"
+        "farmacia",
+        "parafarmacia",
+        "medico",
+        "visita medica",
+        "dentista",
+        "clinica",
+        "ospedale",
+        "laboratorio analisi",
+        "ottico",
+        "synlab",
     ],
     "Shopping & Abbigliamento": [
-        "zara", "h&m", "nike", "adidas", "amazon", "zalando", "decathlon", "uniqlo",
-        "intimissimi", "calzedonia", "negozio", "boutique", "mediaworld", "unieuro"
+        "zara",
+        "h&m",
+        "nike",
+        "adidas",
+        "amazon",
+        "zalando",
+        "decathlon",
+        "uniqlo",
+        "intimissimi",
+        "calzedonia",
+        "negozio",
+        "boutique",
+        "mediaworld",
+        "unieuro",
     ],
     "Stipendio / Compensi": [
-        "stipendio", "emolumenti", "salario", "retribuzione", "bonifico da datore",
-        "accredito stipendio", "compenso", "fattura n"
+        "stipendio",
+        "emolumenti",
+        "salario",
+        "retribuzione",
+        "bonifico da datore",
+        "accredito stipendio",
+        "compenso",
+        "fattura n",
     ],
     "PAC / Investimenti Titoli": [
-        "directa", "degiro", "scalable", "trade republic", "interactive brokers",
-        "acquisto quote", "pac fondo", "investimento", "binance deposit"
-    ]
+        "directa",
+        "degiro",
+        "scalable",
+        "trade republic",
+        "interactive brokers",
+        "acquisto quote",
+        "pac fondo",
+        "investimento",
+        "binance deposit",
+    ],
 }
 
 
 def parse_universal_statement(
-    file_bytes_or_buffer: Any,
-    filename: str = "statement.csv"
+    file_bytes_or_buffer: Any, filename: str = "statement.csv"
 ) -> Tuple[Optional[pd.DataFrame], List[str]]:
     """
     Riconosce ed estrae le transazioni da file CSV o Excel di qualunque banca italiana o estera
@@ -79,7 +177,7 @@ def auto_categorize_transactions(df_tx: pd.DataFrame, engine: Engine) -> pd.Data
     """Assegna automaticamente la categoria a ciascuna transazione in base al merchant/descrizione."""
     df_cat = get_wealth_categories(engine)
     cat_map = {row["name"]: row["category_id"] for _, row in df_cat.iterrows()}
-    
+
     # Categorie di default
     default_expense_cat_id = cat_map.get("Casa & Mutuo / Affitto", 6)
     default_income_cat_id = cat_map.get("Stipendio / Compensi", 1)
@@ -104,7 +202,7 @@ def auto_categorize_transactions(df_tx: pd.DataFrame, engine: Engine) -> pd.Data
                         assigned_cats.append(cat_map[cat_name])
                         matched = True
                         break
-        
+
         if not matched:
             if row.get("direction") == "inflow":
                 assigned_cats.append(default_income_cat_id)
@@ -116,12 +214,7 @@ def auto_categorize_transactions(df_tx: pd.DataFrame, engine: Engine) -> pd.Data
     return df_res
 
 
-def bulk_import_statement(
-    engine: Engine,
-    account_id: int,
-    df_categorized: pd.DataFrame,
-    portfolio_id: int = 1
-) -> int:
+def bulk_import_statement(engine: Engine, account_id: int, df_categorized: pd.DataFrame, portfolio_id: int = 1) -> int:
     """Scrive le transazioni categorizzate nel database di Wealth Management con deduplicazione idempotente."""
     if df_categorized is None or df_categorized.empty:
         return 0
@@ -148,4 +241,3 @@ def bulk_import_statement(
 
     inserted_count, _ = bulk_insert_cashflow_tx(engine, records, deduplicate=True)
     return inserted_count
-

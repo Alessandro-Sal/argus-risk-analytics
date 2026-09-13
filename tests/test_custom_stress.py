@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def simulate_stress_test(portfolio_value, port_beta, benchmark_shock, assets_data):
     port_shock_pct = port_beta * (benchmark_shock / 100)

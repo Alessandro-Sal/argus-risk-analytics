@@ -43,7 +43,7 @@ def _extract_ticker_from_etoro_details(details: str, isin: Optional[str] = None)
     # Rimuove prefissi comuni come "Buy ", "Sell ", "Open ", "Close "
     for prefix in ["buy ", "sell ", "open ", "close ", "acquisto ", "vendita "]:
         if d.lower().startswith(prefix):
-            d = d[len(prefix):].strip()
+            d = d[len(prefix) :].strip()
 
     # Rimuove suffissi es. " / USD", " / EUR"
     if " / " in d:
@@ -102,18 +102,22 @@ def _parse_etoro_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> List[Dic
     if _classify_etoro_action(raw_action or raw_details) == "dividend":
         tx_date = clean_date_value(row.get(cols["date"]) or row.get(cols["close_date"]) or row.get(cols["open_date"]))
         if tx_date:
-            div_amount = amount or abs(clean_numeric_value(row.get(cols["profit"]), default=0.0)) if cols["profit"] else amount
-            records.append({
-                "tx_date": tx_date,
-                "ticker": ticker,
-                "tx_type": "dividend",
-                "quantity": 1.0,
-                "price": div_amount,
-                "currency": curr,
-                "fees": fee,
-                "asset_class": asset_class,
-                "notes": f"eToro Dividend: {raw_details or ticker}"
-            })
+            div_amount = (
+                amount or abs(clean_numeric_value(row.get(cols["profit"]), default=0.0)) if cols["profit"] else amount
+            )
+            records.append(
+                {
+                    "tx_date": tx_date,
+                    "ticker": ticker,
+                    "tx_type": "dividend",
+                    "quantity": 1.0,
+                    "price": div_amount,
+                    "currency": curr,
+                    "fees": fee,
+                    "asset_class": asset_class,
+                    "notes": f"eToro Dividend: {raw_details or ticker}",
+                }
+            )
         return records
 
     # Caso 2: È una Closed Position con Open Date e Close Date (genera un Buy e un Sell)
@@ -126,29 +130,33 @@ def _parse_etoro_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> List[Dic
 
         if qty > 0:
             # Transazione Buy iniziale
-            records.append({
-                "tx_date": open_date,
-                "ticker": ticker,
-                "tx_type": "buy",
-                "quantity": qty,
-                "price": open_rate,
-                "currency": curr,
-                "fees": fee / 2.0 if fee > 0 else 0.0,
-                "asset_class": asset_class,
-                "notes": f"eToro Open: {raw_details or ticker}"
-            })
+            records.append(
+                {
+                    "tx_date": open_date,
+                    "ticker": ticker,
+                    "tx_type": "buy",
+                    "quantity": qty,
+                    "price": open_rate,
+                    "currency": curr,
+                    "fees": fee / 2.0 if fee > 0 else 0.0,
+                    "asset_class": asset_class,
+                    "notes": f"eToro Open: {raw_details or ticker}",
+                }
+            )
             # Transazione Sell successiva
-            records.append({
-                "tx_date": close_date,
-                "ticker": ticker,
-                "tx_type": "sell",
-                "quantity": qty,
-                "price": close_rate,
-                "currency": curr,
-                "fees": fee / 2.0 if fee > 0 else 0.0,
-                "asset_class": asset_class,
-                "notes": f"eToro Close: {raw_details or ticker}"
-            })
+            records.append(
+                {
+                    "tx_date": close_date,
+                    "ticker": ticker,
+                    "tx_type": "sell",
+                    "quantity": qty,
+                    "price": close_rate,
+                    "currency": curr,
+                    "fees": fee / 2.0 if fee > 0 else 0.0,
+                    "asset_class": asset_class,
+                    "notes": f"eToro Close: {raw_details or ticker}",
+                }
+            )
         return records
 
     # Caso 3: Record singolo di transazione
@@ -169,17 +177,19 @@ def _parse_etoro_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> List[Dic
     if qty == 0.0:
         return []
 
-    records.append({
-        "tx_date": single_date,
-        "ticker": ticker,
-        "tx_type": tx_type,
-        "quantity": qty,
-        "price": price,
-        "currency": curr,
-        "fees": fee,
-        "asset_class": asset_class,
-        "notes": f"eToro: {raw_details or ticker}"
-    })
+    records.append(
+        {
+            "tx_date": single_date,
+            "ticker": ticker,
+            "tx_type": tx_type,
+            "quantity": qty,
+            "price": price,
+            "currency": curr,
+            "fees": fee,
+            "asset_class": asset_class,
+            "notes": f"eToro: {raw_details or ticker}",
+        }
+    )
     return records
 
 

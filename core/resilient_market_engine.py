@@ -10,18 +10,18 @@
 # ==============================================================================
 
 import io
-import time
-import random
 import logging
+import random
 import threading
-from enum import Enum
+import time
 from dataclasses import dataclass, field
-from datetime import datetime, date, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar, Generic
+from datetime import date, datetime, timedelta
+from enum import Enum
 from pathlib import Path
+from typing import Any, Callable, Dict, Generic, List, Optional, Tuple, TypeVar
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import requests
 
 logger = logging.getLogger("ARGUS.ResilientMarketEngine")
@@ -29,17 +29,18 @@ logger = logging.getLogger("ARGUS.ResilientMarketEngine")
 
 # ── 1. GESTIONE STATI CIRCUIT BREAKER ──────────────────────────────────────────
 
+
 class CircuitState(Enum):
-    CLOSED = "CLOSED"        # Operativo: il traffico passa
-    OPEN = "OPEN"            # Guasto: fast-fail immediato su fallback
+    CLOSED = "CLOSED"  # Operativo: il traffico passa
+    OPEN = "OPEN"  # Guasto: fast-fail immediato su fallback
     HALF_OPEN = "HALF_OPEN"  # Test di recupero: consente una richiesta pilota
 
 
 @dataclass
 class CircuitBreakerConfig:
-    failure_threshold: int = 3          # N. errori consecutivi per aprire il circuito
-    recovery_timeout_sec: float = 60.0   # Tempo di attesa in stato OPEN prima di tentare HALF_OPEN
-    half_open_success_needed: int = 2   # Successi consecutivi in HALF_OPEN per chiudere il circuito
+    failure_threshold: int = 3  # N. errori consecutivi per aprire il circuito
+    recovery_timeout_sec: float = 60.0  # Tempo di attesa in stato OPEN prima di tentare HALF_OPEN
+    half_open_success_needed: int = 2  # Successi consecutivi in HALF_OPEN per chiudere il circuito
 
 
 class CircuitBreaker:
@@ -112,15 +113,20 @@ class CircuitBreaker:
 
 
 # Singleton breakers di sistema preconfigurati
-yahoo_circuit_breaker = CircuitBreaker("YahooFinance", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=45.0))
+yahoo_circuit_breaker = CircuitBreaker(
+    "YahooFinance", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=45.0)
+)
 stooq_circuit_breaker = CircuitBreaker("Stooq", CircuitBreakerConfig(failure_threshold=2, recovery_timeout_sec=30.0))
 fred_circuit_breaker = CircuitBreaker("FRED", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=45.0))
 ecb_circuit_breaker = CircuitBreaker("ECB", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=45.0))
-crypto_circuit_breaker = CircuitBreaker("CryptoExchanges", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=30.0))
+crypto_circuit_breaker = CircuitBreaker(
+    "CryptoExchanges", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=30.0)
+)
 isin_circuit_breaker = CircuitBreaker("YahooISIN", CircuitBreakerConfig(failure_threshold=3, recovery_timeout_sec=30.0))
 
 
 # ── 2. RETRY POLICY CON FULL JITTER ───────────────────────────────────────────
+
 
 @dataclass
 class RetryPolicy:
@@ -128,6 +134,7 @@ class RetryPolicy:
     Politica di retry con backoff esponenziale e Full Jitter (AWS Architecture pattern).
     Supporta il parsing dinamico dell'header HTTP 'Retry-After'.
     """
+
     max_retries: int = 3
     base_delay_sec: float = 0.5
     max_delay_sec: float = 8.0
@@ -137,11 +144,12 @@ class RetryPolicy:
         if retry_after is not None and retry_after > 0:
             return min(retry_after, self.max_delay_sec)
         # Full Jitter AWS Formula: t = random(0.1, min(max_delay, base * 2^attempt))
-        calculated = min(self.max_delay_sec, self.base_delay_sec * (2 ** attempt))
+        calculated = min(self.max_delay_sec, self.base_delay_sec * (2**attempt))
         return random.uniform(0.1, calculated)
 
 
 # ── 3. DATA ENVELOPE & STALENESS DETECTOR ──────────────────────────────────────
+
 
 class FreshnessLevel(Enum):
     LIVE_REALTIME = "LIVE_REALTIME"
@@ -154,6 +162,7 @@ class FreshnessLevel(Enum):
 @dataclass
 class MarketDataEnvelope:
     """Busta di trasporto dati con tracciabilità dell'origine e livello di freschezza."""
+
     ticker: str
     data: pd.DataFrame
     source: str
@@ -217,6 +226,7 @@ class MarketFreshnessEvaluator:
 
 # ── 4. CONNETTORE FALLBACK GRATUITO: STOOQ DATA PROVIDER ───────────────────────
 
+
 class StooqDataProvider:
     """Connettore ad alta affidabilità per dati storici giornalieri mondiali senza API Key."""
 
@@ -225,8 +235,10 @@ class StooqDataProvider:
     @staticmethod
     def _map_ticker(ticker: str) -> str:
         clean = ticker.strip().upper()
-        if clean in ["SPY", "^GSPC"]: return "^spx"
-        if clean in ["QQQ", "^IXIC"]: return "^ndx"
+        if clean in ["SPY", "^GSPC"]:
+            return "^spx"
+        if clean in ["QQQ", "^IXIC"]:
+            return "^ndx"
         if clean.endswith("=X"):
             return clean[:-2].lower()
         if clean.endswith(".MI"):
@@ -237,17 +249,13 @@ class StooqDataProvider:
             return f"{clean[:-3].lower()}.fr"
         if clean.endswith(".L"):
             return f"{clean[:-2].lower()}.uk"
-        if not "." in clean and not "-" in clean and not "=" in clean:
+        if "." not in clean and "-" not in clean and "=" not in clean:
             return f"{clean.lower()}.us"
         return clean.lower()
 
     @classmethod
     def fetch_history(
-        cls,
-        ticker: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        timeout: float = 6.0
+        cls, ticker: str, start_date: Optional[str] = None, end_date: Optional[str] = None, timeout: float = 6.0
     ) -> Optional[pd.DataFrame]:
         stooq_sym = cls._map_ticker(ticker)
         url = f"{cls.BASE_URL}?s={stooq_sym}&i=d"
@@ -259,10 +267,20 @@ class StooqDataProvider:
                 df = pd.read_csv(io.StringIO(resp.text))
                 if not df.empty and "Date" in df.columns:
                     df["Date"] = pd.to_datetime(df["Date"])
-                    df = df.rename(columns={
-                        "Date": "date", "Open": "open", "High": "high",
-                        "Low": "low", "Close": "close", "Volume": "volume"
-                    }).set_index("date").sort_index()
+                    df = (
+                        df.rename(
+                            columns={
+                                "Date": "date",
+                                "Open": "open",
+                                "High": "high",
+                                "Low": "low",
+                                "Close": "close",
+                                "Volume": "volume",
+                            }
+                        )
+                        .set_index("date")
+                        .sort_index()
+                    )
                     if start_date:
                         df = df[df.index >= pd.to_datetime(start_date)]
                     if end_date:
@@ -275,6 +293,7 @@ class StooqDataProvider:
 
 
 # ── 5. RESILIENT MARKET DATA FETCHER (FACADE CENTRALE) ─────────────────────────
+
 
 class ResilientMarketDataFetcher:
     """
@@ -316,7 +335,7 @@ class ResilientMarketDataFetcher:
         ticker: str,
         start_date: Optional[str] = "2020-01-01",
         end_date: Optional[str] = None,
-        force_refresh: bool = False
+        force_refresh: bool = False,
     ) -> MarketDataEnvelope:
         clean_ticker = str(ticker).strip().upper()
         t0 = time.time()
@@ -326,10 +345,15 @@ class ResilientMarketDataFetcher:
         if not force_refresh:
             try:
                 from core.cache_shield import get_cached_ticker_history
+
                 df_cache = get_cached_ticker_history(clean_ticker, start_date=start_date, end_date=end_date)
                 if df_cache is not None and not df_cache.empty:
                     freshness, as_of = MarketFreshnessEvaluator.evaluate(df_cache, clean_ticker, is_crypto)
-                    if freshness in (FreshnessLevel.LIVE_REALTIME, FreshnessLevel.END_OF_DAY_FRESH, FreshnessLevel.MARKET_CLOSED_BENIGN):
+                    if freshness in (
+                        FreshnessLevel.LIVE_REALTIME,
+                        FreshnessLevel.END_OF_DAY_FRESH,
+                        FreshnessLevel.MARKET_CLOSED_BENIGN,
+                    ):
                         return MarketDataEnvelope(
                             ticker=clean_ticker,
                             data=df_cache,
@@ -337,7 +361,7 @@ class ResilientMarketDataFetcher:
                             freshness=freshness,
                             as_of_date=as_of,
                             latency_ms=round((time.time() - t0) * 1000, 2),
-                            is_fallback=False
+                            is_fallback=False,
                         )
             except Exception:
                 pass
@@ -347,12 +371,16 @@ class ResilientMarketDataFetcher:
             for attempt in range(self.retry_policy.max_retries):
                 try:
                     import yfinance as yf
+
                     time.sleep(random.uniform(0.04, 0.08))
                     yf_t = yf.Ticker(clean_ticker)
                     kwargs = {}
-                    if start_date: kwargs["start"] = start_date
-                    if end_date: kwargs["end"] = end_date
-                    if not kwargs: kwargs["period"] = "2y"
+                    if start_date:
+                        kwargs["start"] = start_date
+                    if end_date:
+                        kwargs["end"] = end_date
+                    if not kwargs:
+                        kwargs["period"] = "2y"
 
                     df = yf_t.history(**kwargs)
                     if df is not None and not df.empty:
@@ -367,7 +395,7 @@ class ResilientMarketDataFetcher:
                             freshness=freshness,
                             as_of_date=as_of,
                             latency_ms=round((time.time() - t0) * 1000, 2),
-                            is_fallback=False
+                            is_fallback=False,
                         )
                 except Exception as e:
                     err_str = str(e).lower()
@@ -395,7 +423,7 @@ class ResilientMarketDataFetcher:
                         as_of_date=as_of,
                         latency_ms=round((time.time() - t0) * 1000, 2),
                         is_fallback=True,
-                        warning_msg="Dati acquisiti da Stooq per indisponibilità temporanea del provider primario."
+                        warning_msg="Dati acquisiti da Stooq per indisponibilità temporanea del provider primario.",
                     )
             except Exception as e_stooq:
                 stooq_circuit_breaker.record_failure(str(e_stooq))
@@ -412,15 +440,19 @@ class ResilientMarketDataFetcher:
                 as_of_date=as_of,
                 latency_ms=round((time.time() - t0) * 1000, 2),
                 is_fallback=True,
-                warning_msg=f"⚠️ Connettività esterna non disponibile. Prezzi storici offline fermi al {as_of}."
+                warning_msg=f"⚠️ Connettività esterna non disponibile. Prezzi storici offline fermi al {as_of}.",
             )
 
         # Ultimo tentativo: prova a leggere qualunque dato scaduto dalla cache SQLite
         try:
             from core.cache_shield import _get_cache_connection
+
             conn = _get_cache_connection()
             cur = conn.cursor()
-            cur.execute("SELECT payload FROM yfinance_cache WHERE ticker = ? AND data_type = 'history' ORDER BY cached_at DESC LIMIT 1", (clean_ticker,))
+            cur.execute(
+                "SELECT payload FROM yfinance_cache WHERE ticker = ? AND data_type = 'history' ORDER BY cached_at DESC LIMIT 1",
+                (clean_ticker,),
+            )
             row = cur.fetchone()
             if row:
                 df_stale = pd.read_json(row[0])
@@ -434,7 +466,7 @@ class ResilientMarketDataFetcher:
                         as_of_date=as_of,
                         latency_ms=round((time.time() - t0) * 1000, 2),
                         is_fallback=True,
-                        warning_msg=f"⚠️ Prezzi di emergenza estratti dalla cache locale (datazione: {as_of})."
+                        warning_msg=f"⚠️ Prezzi di emergenza estratti dalla cache locale (datazione: {as_of}).",
                     )
         except Exception:
             pass
@@ -447,16 +479,17 @@ class ResilientMarketDataFetcher:
             as_of_date="N/A",
             latency_ms=round((time.time() - t0) * 1000, 2),
             is_fallback=True,
-            warning_msg=f"Errore critico: impossibile reperire dati per {clean_ticker} su nessun provider."
+            warning_msg=f"Errore critico: impossibile reperire dati per {clean_ticker} su nessun provider.",
         )
 
 
 # ── 6. DECORATORE REUSABILE PER ENDPOINT E CHIAMATE GENERICHE ──────────────────
 
+
 def with_circuit_breaker(
     breaker: CircuitBreaker,
     retry_policy: Optional[RetryPolicy] = None,
-    fallback_fn: Optional[Callable[..., Any]] = None
+    fallback_fn: Optional[Callable[..., Any]] = None,
 ):
     """
     Decoratore SRE per funzioni di fetch di rete.
@@ -500,5 +533,7 @@ def with_circuit_breaker(
             if fallback_fn:
                 return fallback_fn(*args, **kwargs)
             return None
+
         return wrapper
+
     return decorator

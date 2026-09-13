@@ -4,26 +4,34 @@
 # Generator of Standalone Interactive HTML Portfolio Factsheets
 # ============================================================
 
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
+
 def generate_interactive_html_report(results: Dict[str, Any], output_path: str = None) -> str:
     """
-    Generates a high-tech standalone HTML executive factsheet with embedded 
+    Generates a high-tech standalone HTML executive factsheet with embedded
     interactive Plotly charts, metric cards, and positions table.
     """
     metrics = results.get("metrics", {}) if isinstance(results, dict) else {}
     m_risk = metrics.get("market_risk", {}) if isinstance(metrics, dict) else {}
     returns = metrics.get("returns", {}) if isinstance(metrics, dict) else {}
     pos = results.get("positions", pd.DataFrame()) if isinstance(results, dict) else pd.DataFrame()
-    
-    calc_date = results.get("computed_at", datetime.now().strftime("%Y-%m-%d %H:%M")) if isinstance(results, dict) else datetime.now().strftime("%Y-%m-%d %H:%M")
-    port_return = results.get("portfolio_return", pd.Series(dtype=float)) if isinstance(results, dict) else pd.Series(dtype=float)
-    
+
+    calc_date = (
+        results.get("computed_at", datetime.now().strftime("%Y-%m-%d %H:%M"))
+        if isinstance(results, dict)
+        else datetime.now().strftime("%Y-%m-%d %H:%M")
+    )
+    port_return = (
+        results.get("portfolio_return", pd.Series(dtype=float)) if isinstance(results, dict) else pd.Series(dtype=float)
+    )
+
     # 1. Plotly Performance Chart
     chart_perf_html = "<div>Nessun dato di performance disponibile</div>"
     try:
@@ -31,35 +39,43 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
         if isinstance(port_return, pd.Series) and not port_return.empty:
             cum_ret = (1 + port_return.fillna(0)).cumprod() - 1
             x_dates = [str(d)[:10] for d in cum_ret.index]
-            fig_perf.add_trace(go.Scatter(
-                x=x_dates, 
-                y=(cum_ret.values * 100).tolist(), 
-                mode='lines', 
-                name='Portafoglio ARGUS',
-                line=dict(color='#00f3ff', width=2.5)
-            ))
-        
-        benchmark_return = results.get("benchmark_return", pd.Series(dtype=float)) if isinstance(results, dict) else pd.Series(dtype=float)
+            fig_perf.add_trace(
+                go.Scatter(
+                    x=x_dates,
+                    y=(cum_ret.values * 100).tolist(),
+                    mode="lines",
+                    name="Portafoglio ARGUS",
+                    line={"color": "#00f3ff", "width": 2.5},
+                )
+            )
+
+        benchmark_return = (
+            results.get("benchmark_return", pd.Series(dtype=float))
+            if isinstance(results, dict)
+            else pd.Series(dtype=float)
+        )
         if isinstance(benchmark_return, pd.Series) and not benchmark_return.empty:
             cum_bm = (1 + benchmark_return.fillna(0)).cumprod() - 1
             x_bm_dates = [str(d)[:10] for d in cum_bm.index]
-            fig_perf.add_trace(go.Scatter(
-                x=x_bm_dates, 
-                y=(cum_bm.values * 100).tolist(), 
-                mode='lines', 
-                name='Benchmark (SPY)',
-                line=dict(color='#8b949e', width=1.5, dash='dash')
-            ))
-            
+            fig_perf.add_trace(
+                go.Scatter(
+                    x=x_bm_dates,
+                    y=(cum_bm.values * 100).tolist(),
+                    mode="lines",
+                    name="Benchmark (SPY)",
+                    line={"color": "#8b949e", "width": 1.5, "dash": "dash"},
+                )
+            )
+
         fig_perf.update_layout(
             title="Evoluzione Cumulativa Portafoglio vs Benchmark (%)",
             template="plotly_dark",
-            paper_bgcolor='rgba(13, 17, 23, 0.8)',
-            plot_bgcolor='rgba(13, 17, 23, 0.8)',
-            margin=dict(l=40, r=40, t=50, b=40),
-            height=380
+            paper_bgcolor="rgba(13, 17, 23, 0.8)",
+            plot_bgcolor="rgba(13, 17, 23, 0.8)",
+            margin={"l": 40, "r": 40, "t": 50, "b": 40},
+            height=380,
         )
-        chart_perf_html = fig_perf.to_html(full_html=False, include_plotlyjs='cdn')
+        chart_perf_html = fig_perf.to_html(full_html=False, include_plotlyjs="cdn")
     except Exception:
         pass
 
@@ -68,23 +84,29 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     try:
         fig_alloc = go.Figure()
         if isinstance(pos, pd.DataFrame) and not pos.empty:
-            val_col = "current_value" if "current_value" in pos.columns else ("market_value" if "market_value" in pos.columns else None)
+            val_col = (
+                "current_value"
+                if "current_value" in pos.columns
+                else ("market_value" if "market_value" in pos.columns else None)
+            )
             if val_col:
                 active_pos = pos[(pos.get("qty_net", 1) > 1e-6) & (pos[val_col] > 0)]
                 if not active_pos.empty:
-                    fig_alloc.add_trace(go.Pie(
-                        labels=[str(t) for t in active_pos["ticker"]], 
-                        values=active_pos[val_col].tolist(),
-                        hole=0.4,
-                        textinfo='label+percent'
-                    ))
+                    fig_alloc.add_trace(
+                        go.Pie(
+                            labels=[str(t) for t in active_pos["ticker"]],
+                            values=active_pos[val_col].tolist(),
+                            hole=0.4,
+                            textinfo="label+percent",
+                        )
+                    )
         fig_alloc.update_layout(
             title="Ripartizione Asset per Valore di Mercato",
             template="plotly_dark",
-            paper_bgcolor='rgba(13, 17, 23, 0.8)',
-            plot_bgcolor='rgba(13, 17, 23, 0.8)',
-            margin=dict(l=40, r=40, t=50, b=40),
-            height=380
+            paper_bgcolor="rgba(13, 17, 23, 0.8)",
+            plot_bgcolor="rgba(13, 17, 23, 0.8)",
+            margin={"l": 40, "r": 40, "t": 50, "b": 40},
+            height=380,
         )
         chart_alloc_html = fig_alloc.to_html(full_html=False, include_plotlyjs=False)
     except Exception:
@@ -93,23 +115,29 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     # 3. Position Rows HTML Table
     table_rows = ""
     if isinstance(pos, pd.DataFrame) and not pos.empty:
-        val_col = "current_value" if "current_value" in pos.columns else ("market_value" if "market_value" in pos.columns else None)
-        active_pos = pos[(pos.get("qty_net", 1) > 1e-6) & (pos[val_col] > 0)] if val_col else pos[pos.get("qty_net", 1) > 1e-6]
+        val_col = (
+            "current_value"
+            if "current_value" in pos.columns
+            else ("market_value" if "market_value" in pos.columns else None)
+        )
+        active_pos = (
+            pos[(pos.get("qty_net", 1) > 1e-6) & (pos[val_col] > 0)] if val_col else pos[pos.get("qty_net", 1) > 1e-6]
+        )
         for idx, row in active_pos.iterrows():
             ticker = str(row.get("ticker", "N/A"))
             ac = str(row.get("asset_class", "N/A"))
-            
+
             mv_raw = row.get("current_value", row.get("market_value", 0.0))
             mv = float(mv_raw) if mv_raw is not None and not pd.isna(mv_raw) else 0.0
-            
+
             w_raw = row.get("weight_pct", 0.0)
             weight = float(w_raw) if w_raw is not None and not pd.isna(w_raw) else 0.0
-            
+
             pnl_raw = row.get("unrealized_pnl", 0.0)
             pnl = float(pnl_raw) if pnl_raw is not None and not pd.isna(pnl_raw) else 0.0
-            
+
             pnl_color = "#00e676" if pnl >= 0 else "#ff5252"
-            
+
             table_rows += f"""
             <tr>
                 <td style="font-weight: 600; color: #ffffff;">{ticker}</td>
@@ -120,8 +148,16 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
             </tr>
             """
 
-    tot_val = float(pos["current_value"].sum()) if isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns else (float(pos["market_value"].sum()) if isinstance(pos, pd.DataFrame) and not pos.empty and "market_value" in pos.columns else 0.0)
-    
+    tot_val = (
+        float(pos["current_value"].sum())
+        if isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns
+        else (
+            float(pos["market_value"].sum())
+            if isinstance(pos, pd.DataFrame) and not pos.empty and "market_value" in pos.columns
+            else 0.0
+        )
+    )
+
     sharpe_raw = returns.get("sharpe_ratio", returns.get("sharpe", 0.0))
     sharpe = float(sharpe_raw) if sharpe_raw is not None and not pd.isna(sharpe_raw) else 0.0
 
@@ -237,7 +273,7 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
         </div>
         <div class="kpi-card">
             <div class="kpi-title">CAGR (Rendimento Annuo)</div>
-            <div class="kpi-value" style="color: {'#00e676' if cagr>=0 else '#ff5252'};">{cagr*100:+.2f}%</div>
+            <div class="kpi-value" style="color: {"#00e676" if cagr >= 0 else "#ff5252"};">{cagr * 100:+.2f}%</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-title">Sharpe Ratio</div>
@@ -245,7 +281,7 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
         </div>
         <div class="kpi-card">
             <div class="kpi-title">Value at Risk (VaR 95%)</div>
-            <div class="kpi-value" style="color: #ffab40;">{var95*100:.2f}%</div>
+            <div class="kpi-value" style="color: #ffab40;">{var95 * 100:.2f}%</div>
         </div>
     </div>
 
@@ -277,7 +313,7 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     if output_path:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(html_content)
-            
+
     return html_content
 
 

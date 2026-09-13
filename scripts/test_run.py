@@ -1,15 +1,19 @@
-import sys
 import os
+import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import datetime
+import warnings
+
 import pandas as pd
-from core.validator import validate_csv
+from sqlalchemy import text as sqlt
+
+from core.db_exporter import save_snapshot_to_db
 from core.fetcher import fetch_and_store, get_engine
 from core.risk_engine import compute_risk
-from core.db_exporter import save_snapshot_to_db
-import datetime
-from sqlalchemy import text as sqlt
-import warnings
+from core.validator import validate_csv
+
 warnings.filterwarnings('ignore')
 
 db_user = "root"
@@ -31,7 +35,7 @@ if report["errors"]:
     print("Errori di validazione:", report["errors"])
     exit(1)
 
-from core.db_exporter import save_snapshot_to_db, get_or_create_portfolio_id
+from core.db_exporter import get_or_create_portfolio_id, save_snapshot_to_db
 
 with engine.begin() as conn:
     portfolio_id = get_or_create_portfolio_id(conn, name=portfolio_name, owner='test_user', base_currency='EUR')
@@ -93,5 +97,5 @@ try:
     print("====================================")
 except Exception as e:
     import traceback
-    print(f"Errore durante compute_risk:")
+    print("Errore durante compute_risk:")
     traceback.print_exc()

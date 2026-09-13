@@ -1,31 +1,53 @@
 # ============================================================
 # validator.py
 # Investment Risk BI Platform
-# 
+#
 # Input:  DataFrame grezzo letto dal CSV
 # Output: (df_clean, report)
 #         df_clean → DataFrame normalizzato, pronto per MySQL
 #         report   → dict con errori bloccanti, warning, fix applicati
 # ============================================================
 
-import pandas as pd
-import numpy as np
 import re
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
 
 # ── Costanti ────────────────────────────────────────────────
 
 REQUIRED_COLS = ["tx_date", "ticker", "tx_type", "quantity", "price", "currency"]
 OPTIONAL_COLS = {"fees": 0.0, "asset_class": None, "notes": None}
 
-VALID_TX_TYPES    = {"buy", "sell", "dividend", "split"}
+VALID_TX_TYPES = {"buy", "sell", "dividend", "split"}
 VALID_ASSET_CLASS = {"stock", "etf", "bond", "crypto", "cash", "commodity"}
 
 # Codici ISO 4217 comuni + crypto principali
 VALID_CURRENCIES = {
-    "EUR","USD","GBP","CHF","JPY","CAD","AUD","SEK","NOK","DKK",
-    "HKD","SGD","NZD","MXN","BRL","INR","CNY","ZAR",
-    "BTC","ETH","USDT","BNB","XRP","SOL"
+    "EUR",
+    "USD",
+    "GBP",
+    "CHF",
+    "JPY",
+    "CAD",
+    "AUD",
+    "SEK",
+    "NOK",
+    "DKK",
+    "HKD",
+    "SGD",
+    "NZD",
+    "MXN",
+    "BRL",
+    "INR",
+    "CNY",
+    "ZAR",
+    "BTC",
+    "ETH",
+    "USDT",
+    "BNB",
+    "XRP",
+    "SOL",
 }
 
 # Pattern ISIN: 2 lettere + 10 alfanumerici
@@ -33,6 +55,7 @@ ISIN_PATTERN = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
 
 
 # ── Funzione principale ──────────────────────────────────────
+
 
 def validate_csv(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """
@@ -57,7 +80,9 @@ def validate_csv(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         return None, report
 
     if len(df_raw) > 50000:
-        report["errors"].append(f"Dimensione eccessiva del dataset: {len(df_raw)} righe superano il limite massimo consentito di 50.000 righe.")
+        report["errors"].append(
+            f"Dimensione eccessiva del dataset: {len(df_raw)} righe superano il limite massimo consentito di 50.000 righe."
+        )
         return None, report
 
     df = df_raw.copy()
@@ -67,18 +92,14 @@ def validate_csv(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
     missing_required = [c for c in REQUIRED_COLS if c not in df.columns]
     if missing_required:
-        report["errors"].append(
-            f"Colonne obbligatorie mancanti: {missing_required}"
-        )
+        report["errors"].append(f"Colonne obbligatorie mancanti: {missing_required}")
         return None, report
 
     # Aggiunge colonne opzionali mancanti con i default
     for col, default in OPTIONAL_COLS.items():
         if col not in df.columns:
             df[col] = default
-            report["fixes"].append(
-                f"Colonna '{col}' assente → aggiunta con default '{default}'"
-            )
+            report["fixes"].append(f"Colonna '{col}' assente → aggiunta con default '{default}'")
 
     # ── STEP 2: righe vuote ─────────────────────────────────
     n_before = len(df)
@@ -115,22 +136,18 @@ def validate_csv(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     unknown_currencies = df[~df["currency"].isin(VALID_CURRENCIES)]["currency"].unique()
     if len(unknown_currencies) > 0:
         report["warnings"].append(
-            f"Valute non riconosciute (potrebbero essere valide ma rare): "
-            f"{unknown_currencies.tolist()}"
+            f"Valute non riconosciute (potrebbero essere valide ma rare): {unknown_currencies.tolist()}"
         )
 
     # ── STEP 8: fees ────────────────────────────────────────
-    df["fees"] = pd.to_numeric(
-        df["fees"].astype(str).str.replace(",", ".", regex=False),
-        errors="coerce"
-    ).fillna(0.0)
+    df["fees"] = pd.to_numeric(df["fees"].astype(str).str.replace(",", ".", regex=False), errors="coerce").fillna(0.0)
     df["fees"] = df["fees"].clip(lower=0.0)
 
     # ── STEP 9: asset_class ──────────────────────────────────
     df, report = _normalize_asset_class(df, report)
 
     # ── STEP 10: dividend edge case ──────────────────────────
-    #df, report = _fix_dividend_quantity(df, report)
+    # df, report = _fix_dividend_quantity(df, report)
 
     # ── STEP 11: notes ───────────────────────────────────────
     df["notes"] = df["notes"].astype(str).str.strip().str[:255]
@@ -141,19 +158,20 @@ def validate_csv(df_raw: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
 
     # ── Stats ────────────────────────────────────────────────
     report["stats"] = {
-        "total_rows":       len(df),
-        "tx_type_counts":   df["tx_type"].value_counts().to_dict(),
-        "asset_classes":    df["asset_class"].value_counts(dropna=False).to_dict(),
-        "tickers":          sorted(df["ticker"].unique().tolist()),
-        "currencies":       sorted(df["currency"].unique().tolist()),
-        "date_range":       (df["tx_date"].min().strftime("%Y-%m-%d"), df["tx_date"].max().strftime("%Y-%m-%d")),
-        "is_valid":         len(report["errors"]) == 0,
+        "total_rows": len(df),
+        "tx_type_counts": df["tx_type"].value_counts().to_dict(),
+        "asset_classes": df["asset_class"].value_counts(dropna=False).to_dict(),
+        "tickers": sorted(df["ticker"].unique().tolist()),
+        "currencies": sorted(df["currency"].unique().tolist()),
+        "date_range": (df["tx_date"].min().strftime("%Y-%m-%d"), df["tx_date"].max().strftime("%Y-%m-%d")),
+        "is_valid": len(report["errors"]) == 0,
     }
 
     return df, report
 
 
 # ── Helper: date ─────────────────────────────────────────────
+
 
 def _normalize_dates(df: pd.DataFrame, report: dict) -> tuple:
     """
@@ -170,42 +188,35 @@ def _normalize_dates(df: pd.DataFrame, report: dict) -> tuple:
     mask_nat = df["tx_date"].isna()
     if mask_nat.any():
         df.loc[mask_nat, "tx_date"] = pd.to_datetime(
-            original[mask_nat].astype(str).str.strip(),
-            dayfirst=True,
-            errors="coerce"
+            original[mask_nat].astype(str).str.strip(), dayfirst=True, errors="coerce"
         )
 
     # Righe ancora NaT → tenta dayfirst=False (MM/DD/YYYY)
     mask_nat2 = df["tx_date"].isna()
     if mask_nat2.any():
         df.loc[mask_nat2, "tx_date"] = pd.to_datetime(
-            original[mask_nat2].astype(str).str.strip(),
-            dayfirst=False,
-            errors="coerce"
+            original[mask_nat2].astype(str).str.strip(), dayfirst=False, errors="coerce"
         )
 
     # Ancora NaT → errore bloccante
     still_nat = df["tx_date"].isna()
     if still_nat.any():
         bad = original[still_nat].unique().tolist()
-        report["errors"].append(
-            f"Formato data non riconoscibile in {still_nat.sum()} righe: {bad}"
-        )
+        report["errors"].append(f"Formato data non riconoscibile in {still_nat.sum()} righe: {bad}")
         return df, report
 
     # Date future → warning
     today = pd.Timestamp.today().normalize()
     future = df["tx_date"] > today
     if future.any():
-        report["warnings"].append(
-            f"{future.sum()} transazioni con data futura — controlla i dati"
-        )
+        report["warnings"].append(f"{future.sum()} transazioni con data futura — controlla i dati")
 
     report["fixes"].append("Date normalizzate a formato YYYY-MM-DD")
     return df, report
 
 
 # ── Helper: ticker ───────────────────────────────────────────
+
 
 def _normalize_tickers(df: pd.DataFrame, report: dict) -> tuple:
     """
@@ -216,35 +227,27 @@ def _normalize_tickers(df: pd.DataFrame, report: dict) -> tuple:
     df["ticker"] = df["ticker"].astype(str).str.strip().str.upper()
 
     crypto_mask = (
-        df["asset_class"].str.lower() == "crypto"
-        if "asset_class" in df.columns
-        else pd.Series(False, index=df.index)
+        df["asset_class"].str.lower() == "crypto" if "asset_class" in df.columns else pd.Series(False, index=df.index)
     )
 
     # Crypto senza suffisso valuta (es. BTC → BTC-USD)
     needs_fix = crypto_mask & ~df["ticker"].str.contains("-", na=False)
     if needs_fix.any():
-        df.loc[needs_fix, "ticker"] = (
-            df.loc[needs_fix, "ticker"] + "-" +
-            df.loc[needs_fix, "currency"].str.upper()
-        )
+        df.loc[needs_fix, "ticker"] = df.loc[needs_fix, "ticker"] + "-" + df.loc[needs_fix, "currency"].str.upper()
         fixed = df.loc[needs_fix, "ticker"].unique().tolist()
-        report["fixes"].append(
-            f"Ticker crypto corretti aggiungendo coppia valuta: {fixed}"
-        )
+        report["fixes"].append(f"Ticker crypto corretti aggiungendo coppia valuta: {fixed}")
 
     # ISIN → warning
     isin_mask = df["ticker"].str.match(ISIN_PATTERN)
     if isin_mask.any():
         isins = df.loc[isin_mask, "ticker"].unique().tolist()
-        report["warnings"].append(
-            f"Ticker ISIN rilevati (yfinance non supportato, prezzo da CSV): {isins}"
-        )
+        report["warnings"].append(f"Ticker ISIN rilevati (yfinance non supportato, prezzo da CSV): {isins}")
 
     return df, report
 
 
 # ── Helper: quantity e price ──────────────────────────────────
+
 
 def _normalize_numerics(df: pd.DataFrame, report: dict) -> tuple:
     """
@@ -252,40 +255,32 @@ def _normalize_numerics(df: pd.DataFrame, report: dict) -> tuple:
     Errore bloccante se non convertibili.
     """
     for col in ["quantity", "price"]:
-        df[col] = (
-            df[col].astype(str)
-            .str.strip()
-            .str.replace(",", ".", regex=False)
-        )
+        df[col] = df[col].astype(str).str.strip().str.replace(",", ".", regex=False)
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
         if df[col].isna().any():
             bad_count = df[col].isna().sum()
-            report["errors"].append(
-                f"'{col}' contiene {bad_count} valori non numerici"
-            )
+            report["errors"].append(f"'{col}' contiene {bad_count} valori non numerici")
 
         # quantity non può essere negativa
         if col == "quantity":
             neg = df["quantity"] < 0
             if neg.any():
                 report["errors"].append(
-                    f"'quantity' negativa in {neg.sum()} righe — "
-                    f"usa tx_type='sell' invece di quantity negativa"
+                    f"'quantity' negativa in {neg.sum()} righe — usa tx_type='sell' invece di quantity negativa"
                 )
 
         # price non può essere negativo (tranne dividend che può essere 0)
         if col == "price":
-            neg_price = (df["price"] < 0)
+            neg_price = df["price"] < 0
             if neg_price.any():
-                report["errors"].append(
-                    f"'price' negativo in {neg_price.sum()} righe"
-                )
+                report["errors"].append(f"'price' negativo in {neg_price.sum()} righe")
 
     return df, report
 
 
 # ── Helper: asset_class ───────────────────────────────────────
+
 
 def _normalize_asset_class(df: pd.DataFrame, report: dict) -> tuple:
     """
@@ -295,10 +290,7 @@ def _normalize_asset_class(df: pd.DataFrame, report: dict) -> tuple:
     df["asset_class"] = df["asset_class"].astype(str).str.strip().str.lower()
     df["asset_class"] = df["asset_class"].replace({"nan": None, "none": None, "": None})
 
-    unknown = df[
-        df["asset_class"].notna() &
-        ~df["asset_class"].isin(VALID_ASSET_CLASS)
-    ]["asset_class"].unique()
+    unknown = df[df["asset_class"].notna() & ~df["asset_class"].isin(VALID_ASSET_CLASS)]["asset_class"].unique()
 
     if len(unknown) > 0:
         report["warnings"].append(
@@ -311,6 +303,7 @@ def _normalize_asset_class(df: pd.DataFrame, report: dict) -> tuple:
 
 
 # ── Helper: dividend edge case ────────────────────────────────
+
 
 def _fix_dividend_quantity(df: pd.DataFrame, report: dict) -> tuple:
     """
@@ -326,8 +319,7 @@ def _fix_dividend_quantity(df: pd.DataFrame, report: dict) -> tuple:
     if div_qty1.any():
         df.loc[div_qty1, "quantity"] = 0.0
         report["fixes"].append(
-            f"{div_qty1.sum()} righe dividend con quantity=1 normalizzate a 0 "
-            f"(price interpretato come importo totale)"
+            f"{div_qty1.sum()} righe dividend con quantity=1 normalizzate a 0 (price interpretato come importo totale)"
         )
 
     # quantity>1 su dividendo → warning
@@ -343,11 +335,12 @@ def _fix_dividend_quantity(df: pd.DataFrame, report: dict) -> tuple:
 
 # ── Pretty print report ───────────────────────────────────────
 
+
 def print_report(report: dict) -> None:
     """Stampa il report di validazione in modo leggibile."""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("  VALIDATION REPORT")
-    print("="*60)
+    print("=" * 60)
 
     if report["errors"]:
         print(f"\n🔴 ERRORI BLOCCANTI ({len(report['errors'])}):")
@@ -366,7 +359,7 @@ def print_report(report: dict) -> None:
 
     if report.get("stats"):
         s = report["stats"]
-        print(f"\n📊 STATISTICHE:")
+        print("\n📊 STATISTICHE:")
         print(f"   Righe valide:  {s['total_rows']}")
         print(f"   Transazioni:   {s['tx_type_counts']}")
         print(f"   Asset class:   {s['asset_classes']}")
@@ -375,4 +368,4 @@ def print_report(report: dict) -> None:
         print(f"   Intervallo:    {s['date_range'][0]}  →  {s['date_range'][1]}")
         print(f"   Valido:        {'✅ SÌ' if s['is_valid'] else '❌ NO'}")
 
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")

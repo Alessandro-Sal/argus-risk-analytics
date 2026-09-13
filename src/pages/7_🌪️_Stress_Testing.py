@@ -6,13 +6,27 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import core.ui_utils
+
 import core.risk_engine
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs, ensure_portfolio_loaded, render_sandbox_banner, render_export_toolbar
+import core.ui_utils
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_portfolio_loaded,
+    fmt_eur,
+    fmt_pct,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_export_toolbar,
+    render_sandbox_banner,
+    render_segmented_tabs,
+)
 
 inject_custom_css()
 
 from core.sidebar import render_sidebar
+
 render_sidebar()
 render_command_bar()
 
@@ -653,11 +667,7 @@ elif active_stress_tab == "🌐 Total Balance Sheet & Human Capital Stress":
 </div>
 """, button_label="💡 Come funziona il TBS-VaR?")
 
-    from core.wealth.human_capital_engine import (
-        LaborIncomeProfile,
-        TotalBalanceSheetState,
-        HolisticBalanceSheetEngine
-    )
+    from core.wealth.human_capital_engine import HolisticBalanceSheetEngine, LaborIncomeProfile, TotalBalanceSheetState
 
     SECTORS_META = {
         "Tecnologia & Software (Big Tech, Start-up)": {"beta": 1.25, "sector": "Technology"},

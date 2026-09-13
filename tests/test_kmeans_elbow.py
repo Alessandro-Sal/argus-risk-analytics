@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.cluster import KMeans
 
+
 def test_kmeans_inertia_monotonic_decrease():
     # Mock dataset of 10 points in risk-return space (2D)
     np.random.seed(42)

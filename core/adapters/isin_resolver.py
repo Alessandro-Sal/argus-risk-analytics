@@ -21,21 +21,20 @@ BASE_ISIN_TO_TICKER: Dict[str, str] = {
     # ETF UCITS Comuni su Borsa Italiana / Xetra / Euronext
     "IE00B4L5Y983": "SWDA.MI",  # iShares Core MSCI World (Borsa Italiana)
     "IE00B3RBWM25": "VWCE.MI",  # Vanguard FTSE All-World (Borsa Italiana)
-    "IE00B5BMR087": "CSSPX.MI", # iShares Core S&P 500 (Borsa Italiana)
+    "IE00B5BMR087": "CSSPX.MI",  # iShares Core S&P 500 (Borsa Italiana)
     "IE00B1XNHC34": "INRG.MI",  # iShares Global Clean Energy
     "LU1681043599": "AMEM.MI",  # Amundi MSCI Emerging Markets
     "IE00B4K48X80": "IMEA.SW",  # iShares Core MSCI Europe
-    "IE00BZCQB185": "NDIA.L",   # iShares MSCI India
+    "IE00BZCQB185": "NDIA.L",  # iShares MSCI India
     "IE000YYE6WK5": "DFEN.DE",  # VanEck Defense UCITS ETF
     "IE000U9ODG19": "DFND.PA",  # HANetf Future of Defence
-    "DE0005190003": "BMW.DE",   # BMW AG
-    "IT0000072618": "ISP.MI",   # Intesa Sanpaolo
-    "IT0003132476": "ENI.MI",   # Eni SpA
+    "DE0005190003": "BMW.DE",  # BMW AG
+    "IT0000072618": "ISP.MI",  # Intesa Sanpaolo
+    "IT0003132476": "ENI.MI",  # Eni SpA
     "IT0003128367": "ENEL.MI",  # Enel SpA
     "IT0004176001": "RACE.MI",  # Ferrari NV
-    "NL0011585146": "FERG.L",   # Ferguson
+    "NL0011585146": "FERG.L",  # Ferguson
     "NL0011821202": "INGA.AS",  # ING Groep
-
     # Stock USA Popolari
     "US0378331005": "AAPL",
     "US5949181045": "MSFT",

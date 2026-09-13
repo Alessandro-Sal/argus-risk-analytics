@@ -4,17 +4,18 @@
 # ==============================================================================
 
 import pytest
+
 from core.wealth.asset_protection_engine import (
-    GenerationalTransferOptimizer,
+    AssetProtectionEngine,
     FamilyHeir,
     FamilyProfile,
+    GenerationalTransferOptimizer,
+    OptimizationComparisonResult,
     PlanningLevers,
     SuccessionSharesResult,
-    OptimizationComparisonResult,
-    AssetProtectionEngine
 )
-from core.wealth.wealth_models import NetWorthSummary
 from core.wealth.wealth_engine import compute_estate_planning_analytics
+from core.wealth.wealth_models import NetWorthSummary
 
 
 def test_relictum_donatum_balance_standard():

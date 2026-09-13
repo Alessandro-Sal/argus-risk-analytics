@@ -1,7 +1,9 @@
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.risk_engine import compute_black_litterman_optimization, compute_fama_french_exposures
+
 
 def test_compute_black_litterman_optimization():
     assets = ["AAPL", "MSFT", "GOOGL"]

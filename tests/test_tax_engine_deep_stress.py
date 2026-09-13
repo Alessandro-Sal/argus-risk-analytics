@@ -3,18 +3,19 @@ ARGUS — Risk Analytics Platform
 Comprehensive Deep Stress & Boundary Tests for Tax Suite
 """
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.tax_engine import (
-    get_asset_tax_rate,
-    is_etf,
+    compute_modello_redditi_pf,
+    compute_riforma_fiscale_comparison,
     compute_tax_and_harvesting,
+    compute_withholding_tax_analysis,
     compute_zainetto_timeline,
     generate_tax_loss_harvesting_strategy,
-    compute_riforma_fiscale_comparison,
-    compute_modello_redditi_pf,
-    compute_withholding_tax_analysis,
+    get_asset_tax_rate,
+    is_etf,
     simulate_fifo_lot_sale,
 )
 

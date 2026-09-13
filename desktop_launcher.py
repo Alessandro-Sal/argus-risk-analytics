@@ -8,13 +8,14 @@
 # ============================================================
 
 import os
-import sys
-import time
+import shutil
 import socket
 import subprocess
-import shutil
+import sys
 import tempfile
+import time
 import webbrowser
+
 
 def get_resource_path(relative_path):
     """Restituisce il percorso assoluto della risorsa, compatibile con PyInstaller."""
@@ -138,6 +139,7 @@ def main():
         print("[ARGUS Desktop] Avvio server Streamlit embedded via bootstrap in-process...")
         try:
             import threading
+
             from streamlit.web import bootstrap
             port = find_free_port()
             flag_opts = {
@@ -211,7 +213,7 @@ def main():
         try:
             webbrowser.open(app_url)
             print("=" * 60)
-            print(f"🚀 ARGUS e' attivo nel tuo browser all'indirizzo:")
+            print("🚀 ARGUS e' attivo nel tuo browser all'indirizzo:")
             print(f"   {app_url}")
             print("=" * 60)
             print("Premi Ctrl+C nella console per terminare la piattaforma.\n")

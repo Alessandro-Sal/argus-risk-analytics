@@ -26,18 +26,11 @@ def _norm_pdf(x: np.ndarray) -> np.ndarray:
 
 
 def _calc_bs_price_and_vega(
-    sig: float,
-    S: float,
-    K: float,
-    T: float,
-    r: float,
-    discount: float,
-    is_call: bool,
-    intrinsic: float
+    sig: float, S: float, K: float, T: float, r: float, discount: float, is_call: bool, intrinsic: float
 ) -> tuple:
     if sig <= 1e-6:
         return intrinsic, 1e-6
-    d1 = (np.log(S / K) + (r + 0.5 * sig ** 2) * T) / (sig * np.sqrt(T))
+    d1 = (np.log(S / K) + (r + 0.5 * sig**2) * T) / (sig * np.sqrt(T))
     d2 = d1 - sig * np.sqrt(T)
     pdf1 = _norm_pdf(d1)
     vega = S * pdf1 * np.sqrt(T)
@@ -67,7 +60,7 @@ def implied_volatility_solver(
     r: float,
     option_type: str = "put",
     max_iter: int = 100,
-    tol: float = 1e-6
+    tol: float = 1e-6,
 ) -> float:
     """
     Risolve numericamente per la Volatilità Implicita (IV) tramite Newton-Raphson
@@ -101,19 +94,16 @@ def implied_volatility_solver(
     try:
         sol = brentq(
             lambda sig: _calc_bs_price_and_vega(sig, S, K, T, r, discount, is_call, intrinsic)[0] - price,
-            0.001, 5.0, xtol=tol
+            0.001,
+            5.0,
+            xtol=tol,
         )
         return float(sol)
     except Exception:
         return float(np.clip(sigma, 0.05, 2.0))
 
 
-def fit_volatility_smile(
-    strikes: np.ndarray,
-    ivs: np.ndarray,
-    spot: float,
-    T: float
-) -> Dict[str, Any]:
+def fit_volatility_smile(strikes: np.ndarray, ivs: np.ndarray, spot: float, T: float) -> Dict[str, Any]:
     """
     Calibra una curva di Volatility Smile & Skew parametrica quadratica in funzione del log-moneyness:
 
@@ -134,7 +124,7 @@ def fit_volatility_smile(
         r_squared = 0.95
     else:
         m = np.log(k_val / spot)
-        X = np.column_stack([np.ones(len(m)), m, m ** 2])
+        X = np.column_stack([np.ones(len(m)), m, m**2])
         try:
             coeffs, _, _, _ = np.linalg.lstsq(X, iv_val, rcond=None)
             a, b, c = float(coeffs[0]), float(coeffs[1]), float(coeffs[2])
@@ -153,7 +143,7 @@ def fit_volatility_smile(
         if strike <= 0 or spot <= 0:
             return a
         log_m = np.log(strike / spot)
-        fitted_iv = a + b * log_m + c * (log_m ** 2)
+        fitted_iv = a + b * log_m + c * (log_m**2)
         return float(np.clip(fitted_iv, 0.05, 3.0))
 
     return {
@@ -163,7 +153,7 @@ def fit_volatility_smile(
         "r_squared": r_squared,
         "spot": spot,
         "T": T,
-        "eval_func": eval_iv
+        "eval_func": eval_iv,
     }
 
 
@@ -172,7 +162,7 @@ def build_volatility_surface(
     spot: float = 550.0,
     r: float = 0.045,
     base_atm_iv: float = 0.18,
-    expiries_months: Optional[List[float]] = None
+    expiries_months: Optional[List[float]] = None,
 ) -> Dict[str, Any]:
     """
     Costruisce la Superficie di Volatilità Implicita 3D (Strike x Scadenza -> IV).
@@ -198,21 +188,23 @@ def build_volatility_surface(
 
         # Generazione punti sintetici di mercato realistici
         log_m = np.log(strikes / spot)
-        ivs_t = atm_t + skew_t * log_m + curv_t * (log_m ** 2)
+        ivs_t = atm_t + skew_t * log_m + curv_t * (log_m**2)
         ivs_t = np.clip(ivs_t, 0.06, 2.0)
 
         smile_fit = fit_volatility_smile(strikes, ivs_t, spot, T)
         smile_models[f"{int(m_exp)}M"] = smile_fit
 
         for k, iv in zip(strikes, ivs_t, strict=False):
-            surface_data.append({
-                "expiry_months": m_exp,
-                "expiry_years": T,
-                "strike": k,
-                "strike_pct_spot": (k / spot) * 100.0,
-                "implied_vol_pct": iv * 100.0,
-                "implied_vol": iv
-            })
+            surface_data.append(
+                {
+                    "expiry_months": m_exp,
+                    "expiry_years": T,
+                    "strike": k,
+                    "strike_pct_spot": (k / spot) * 100.0,
+                    "implied_vol_pct": iv * 100.0,
+                    "implied_vol": iv,
+                }
+            )
 
     df_surface = pd.DataFrame(surface_data)
     matrix_iv = df_surface.pivot(index="expiry_months", columns="strike", values="implied_vol_pct")
@@ -226,5 +218,5 @@ def build_volatility_surface(
         "strikes": strikes,
         "df_surface": df_surface,
         "matrix_iv": matrix_iv,
-        "smile_models": smile_models
+        "smile_models": smile_models,
     }

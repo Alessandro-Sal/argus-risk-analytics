@@ -6,30 +6,28 @@ Permette il caricamento e la sincronizzazione 1-click di scenari didattici e arc
 realistici simultaneamente sia per il modulo Risk Analytics che per il modulo Wealth Management.
 """
 
-import streamlit as st
-import pandas as pd
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
+import pandas as pd
+import streamlit as st
 
 
 def execute_unified_archetype_load(
-    arch_code: str,
-    auto_run: bool = False,
-    source_module: str = "risk"
+    arch_code: str, auto_run: bool = False, source_module: str = "risk"
 ) -> Dict[str, Any]:
     """
     Esegue la simulazione quantitativa realistica e inietta l'archetipo sia su SQLite
     che su MySQL (se connesso), allineando simultaneamente lo stato di Risk Analytics
     e Wealth Management.
     """
-    from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
     from core.fetcher import get_engine
-    from core.wealth.wealth_db import init_wealth_db, sync_wealth_tables_between_engines
     from core.models import Base
+    from core.wealth.wealth_db import init_wealth_db, sync_wealth_tables_between_engines
+    from scripts.generate_realistic_portfolio import PortfolioSimulationEngine, populate_argus_database
 
     sim_eng = PortfolioSimulationEngine(offline=True, seed=42)
     res_arch = sim_eng.simulate(arch_code, years=3)
-    
+
     # 1. Popolamento database SQLite locale
     db_res = populate_argus_database(res_arch, sqlite_path="data/argus_local.db")
     risk_pid = db_res["risk_portfolio_id"]
@@ -47,7 +45,7 @@ def execute_unified_archetype_load(
 
             eng_mysql = get_engine(db_u, db_p, db_h, db_port, active_db, database=active_db, offline=False)
             eng_sqlite = get_engine(offline=True, sqlite_path="data/argus_local.db")
-            
+
             Base.metadata.create_all(eng_mysql)
             init_wealth_db(eng_mysql)
             sync_wealth_tables_between_engines(eng_sqlite, eng_mysql)
@@ -109,7 +107,7 @@ def clear_unified_archetype():
         "fetch_report",
         "wealth_active_snapshot",
         "wealth_profile_selector_widget",
-        "cf_profile_selector_widget"
+        "cf_profile_selector_widget",
     ]
     for k in keys_to_clear:
         st.session_state.pop(k, None)
@@ -139,7 +137,8 @@ def render_unified_archetype_hud(current_module: str = "risk"):
     r_id = db_ids.get("risk_portfolio_id", st.session_state.get("portfolio_id", 1))
     w_id = db_ids.get("wealth_profile_id", st.session_state.get("wealth_active_portfolio_id"))
 
-    st.markdown(f"""
+    st.markdown(
+        f"""
     <div style="background: rgba(46, 160, 67, 0.14); border: 1px solid rgba(46, 160, 67, 0.4); border-left: 4px solid #2ea043; border-radius: 8px; padding: 12px 16px; margin-bottom: 14px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div>
@@ -154,16 +153,28 @@ def render_unified_archetype_hud(current_module: str = "risk"):
             <span class="argus-command-pill" style="border-color: rgba(46,160,67,0.5); color: #3fb950; font-weight:700;">UNIFIED ECOSYSTEM ATTIVO</span>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
     if current_module == "risk":
         col_act1, col_act2, col_act3 = st.columns([2.2, 1.8, 1.2])
         with col_act1:
-            if st.button("🚀 Avvia Subito Analisi Quantitativa ARGUS", key="btn_hud_run_risk", type="primary", use_container_width=True):
+            if st.button(
+                "🚀 Avvia Subito Analisi Quantitativa ARGUS",
+                key="btn_hud_run_risk",
+                type="primary",
+                use_container_width=True,
+            ):
                 st.session_state["auto_run_pipeline_requested"] = True
                 st.rerun()
         with col_act2:
-            if st.button("🏛️ Esplora Patrimonio & Net Worth", key="btn_hud_goto_wealth", type="secondary", use_container_width=True):
+            if st.button(
+                "🏛️ Esplora Patrimonio & Net Worth",
+                key="btn_hud_goto_wealth",
+                type="secondary",
+                use_container_width=True,
+            ):
                 st.switch_page("pages/13_🏛️_Patrimonio_e_NetWorth.py")
         with col_act3:
             if st.button("🗑️ Rimuovi Scenario", key="btn_hud_clear_risk", type="secondary", use_container_width=True):
@@ -171,13 +182,23 @@ def render_unified_archetype_hud(current_module: str = "risk"):
     else:
         col_act1, col_act2, col_act3 = st.columns([2.2, 1.8, 1.2])
         with col_act1:
-            if st.button("🏛️ Esplora Patrimonio & Net Worth", key="btn_hud_w_goto_nw", type="primary", use_container_width=True):
+            if st.button(
+                "🏛️ Esplora Patrimonio & Net Worth", key="btn_hud_w_goto_nw", type="primary", use_container_width=True
+            ):
                 st.switch_page("pages/13_🏛️_Patrimonio_e_NetWorth.py")
         with col_act2:
-            if st.button("📊 Vai ad Analisi Rischio & Portafoglio", key="btn_hud_w_goto_risk", type="secondary", use_container_width=True):
+            if st.button(
+                "📊 Vai ad Analisi Rischio & Portafoglio",
+                key="btn_hud_w_goto_risk",
+                type="secondary",
+                use_container_width=True,
+            ):
                 st.switch_page("0_Control_Room.py")
         with col_act3:
             if st.button("🗑️ Rimuovi Scenario", key="btn_hud_clear_wealth", type="secondary", use_container_width=True):
                 clear_unified_archetype()
 
-    st.markdown("<hr style='margin: 12px 0; border: none; border-top: 1px solid rgba(255,255,255,0.08);'>", unsafe_allow_html=True)
+    st.markdown(
+        "<hr style='margin: 12px 0; border: none; border-top: 1px solid rgba(255,255,255,0.08);'>",
+        unsafe_allow_html=True,
+    )

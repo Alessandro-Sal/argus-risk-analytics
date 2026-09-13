@@ -1,10 +1,11 @@
-﻿# ============================================================
+# ============================================================
 # core/macro_stress_engine.py
 # ARGUS — Institutional Macro Stress Testing & Reverse Stress Engine
 # Aligned with EBA Adverse, Fed CCAR & Regulatory Multi-Factor Shocks
 # ============================================================
 
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 
@@ -20,7 +21,7 @@ def get_standard_macro_scenarios() -> Dict[str, Dict[str, Any]]:
             "credit_spread_shock_bps": 120.0,
             "commodities_shock_pct": -10.0,
             "fx_usd_shock_pct": 5.0,
-            "volatility_multiplier": 1.75
+            "volatility_multiplier": 1.75,
         },
         "Fed_CCAR_Severe": {
             "name": "Fed CCAR Severely Adverse",
@@ -30,7 +31,7 @@ def get_standard_macro_scenarios() -> Dict[str, Dict[str, Any]]:
             "credit_spread_shock_bps": 300.0,
             "commodities_shock_pct": -25.0,
             "fx_usd_shock_pct": -8.0,
-            "volatility_multiplier": 2.20
+            "volatility_multiplier": 2.20,
         },
         "Stagflation_Energy_Spike": {
             "name": "Stagflazione & Shock Energetico",
@@ -40,7 +41,7 @@ def get_standard_macro_scenarios() -> Dict[str, Dict[str, Any]]:
             "credit_spread_shock_bps": 180.0,
             "commodities_shock_pct": 40.0,
             "fx_usd_shock_pct": 10.0,
-            "volatility_multiplier": 1.60
+            "volatility_multiplier": 1.60,
         },
         "Geopolitical_Risk_Off": {
             "name": "Crisi Geopolitica Globale (Risk-Off)",
@@ -50,15 +51,15 @@ def get_standard_macro_scenarios() -> Dict[str, Dict[str, Any]]:
             "credit_spread_shock_bps": 350.0,
             "commodities_shock_pct": 30.0,
             "fx_usd_shock_pct": 12.0,
-            "volatility_multiplier": 2.50
-        }
+            "volatility_multiplier": 2.50,
+        },
     }
 
 
 def compute_macro_scenario_stress_test(
     df_positions: Optional[pd.DataFrame] = None,
     results: Optional[Dict[str, Any]] = None,
-    custom_scenarios: Optional[Dict[str, Dict[str, Any]]] = None
+    custom_scenarios: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """
     Calcola l'impatto sul valore di portafoglio sotto scenari macroeconomici istituzionali (EBA/Fed CCAR).
@@ -85,7 +86,12 @@ def compute_macro_scenario_stress_test(
                 ca_w = float(ac_grp.get("Liquidità", ac_grp.get("Cash", 0.0)))
                 sum_w = eq_w + bd_w + cm_w + ca_w
                 if sum_w > 0:
-                    weights = {"equity": eq_w / sum_w, "bonds": bd_w / sum_w, "commodities": cm_w / sum_w, "cash": ca_w / sum_w}
+                    weights = {
+                        "equity": eq_w / sum_w,
+                        "bonds": bd_w / sum_w,
+                        "commodities": cm_w / sum_w,
+                        "cash": ca_w / sum_w,
+                    }
 
     scenario_results = []
     duration_assumed = 5.5
@@ -100,28 +106,30 @@ def compute_macro_scenario_stress_test(
         bond_impact = -duration_assumed * bond_yield_delta
 
         port_return = (
-            weights["equity"] * eq_shock +
-            weights["bonds"] * bond_impact +
-            weights["commodities"] * comm_shock +
-            weights["cash"] * 0.0
+            weights["equity"] * eq_shock
+            + weights["bonds"] * bond_impact
+            + weights["commodities"] * comm_shock
+            + weights["cash"] * 0.0
         )
 
         loss_eur = total_val * port_return
         post_shock_val = total_val + loss_eur
 
-        scenario_results.append({
-            "scenario_key": sc_key,
-            "scenario_name": sc.get("name", sc_key),
-            "description": sc.get("description", ""),
-            "equity_shock_pct": sc.get("equity_shock_pct", 0.0),
-            "rate_shock_bps": rate_bps,
-            "credit_spread_bps": spread_bps,
-            "commodities_shock_pct": sc.get("commodities_shock_pct", 0.0),
-            "portfolio_return_pct": round(port_return * 100.0, 2),
-            "pnl_impact_eur": round(loss_eur, 2),
-            "post_shock_value_eur": round(post_shock_val, 2),
-            "volatility_multiplier": sc.get("volatility_multiplier", 1.5)
-        })
+        scenario_results.append(
+            {
+                "scenario_key": sc_key,
+                "scenario_name": sc.get("name", sc_key),
+                "description": sc.get("description", ""),
+                "equity_shock_pct": sc.get("equity_shock_pct", 0.0),
+                "rate_shock_bps": rate_bps,
+                "credit_spread_bps": spread_bps,
+                "commodities_shock_pct": sc.get("commodities_shock_pct", 0.0),
+                "portfolio_return_pct": round(port_return * 100.0, 2),
+                "pnl_impact_eur": round(loss_eur, 2),
+                "post_shock_value_eur": round(post_shock_val, 2),
+                "volatility_multiplier": sc.get("volatility_multiplier", 1.5),
+            }
+        )
 
     df_out = pd.DataFrame(scenario_results)
     worst = min(scenario_results, key=lambda x: x["portfolio_return_pct"]) if scenario_results else {}
@@ -134,14 +142,14 @@ def compute_macro_scenario_stress_test(
         "worst_case_scenario": worst.get("scenario_name", "N/D"),
         "worst_case_drawdown_pct": worst.get("portfolio_return_pct", 0.0),
         "worst_case_loss_eur": worst.get("pnl_impact_eur", 0.0),
-        "asset_weights_used": {k: round(v * 100.0, 1) for k, v in weights.items()}
+        "asset_weights_used": {k: round(v * 100.0, 1) for k, v in weights.items()},
     }
 
 
 def compute_reverse_stress_test(
     df_positions: Optional[pd.DataFrame] = None,
     results: Optional[Dict[str, Any]] = None,
-    target_drawdown_pct: float = -20.0
+    target_drawdown_pct: float = -20.0,
 ) -> Dict[str, Any]:
     """
     Reverse Stress Testing: Determina la combinazione minima di shock congiunti (Azionario & Tassi)
@@ -188,10 +196,10 @@ def compute_reverse_stress_test(
             "pure_rate_shock_bps": round(pure_rate_shock_bps, 0),
             "combined_scenario": {
                 "equity_crash_pct": round(comb_eq_crash, 1),
-                "rate_shock_bps": round(comb_rate_bps, 0)
-            }
+                "rate_shock_bps": round(comb_rate_bps, 0),
+            },
         },
         "implied_z_score": round(float(z_score), 2),
         "implied_frequency_estimate": implied_event_rarity,
-        "risk_weights": {"equity_pct": round(eq_weight * 100.0, 1), "bonds_pct": round(bd_weight * 100.0, 1)}
+        "risk_weights": {"equity_pct": round(eq_weight * 100.0, 1), "bonds_pct": round(bd_weight * 100.0, 1)},
     }

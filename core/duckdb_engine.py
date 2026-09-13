@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import duckdb
+
     HAS_DUCKDB = True
 except ImportError:
     duckdb = None
@@ -34,14 +35,14 @@ def get_duckdb_system_info() -> Dict[str, Any]:
             "version": "Fallback In-Memory / SQLite",
             "engine_mode": "Pure-Python Emulated",
             "vectorization": "Disabled",
-            "threads": 1
+            "threads": 1,
         }
     return {
         "available": True,
         "version": getattr(duckdb, "__version__", "1.x"),
         "engine_mode": "Vectorized Columnar (C++)",
         "vectorization": "SIMD AVX-2 / SSE4.2",
-        "threads": 4
+        "threads": 4,
     }
 
 
@@ -76,6 +77,7 @@ def _register_dfs_optimized(con, context_dfs: Optional[Dict[str, pd.DataFrame]] 
         if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
             try:
                 import pyarrow as pa
+
                 arrow_table = pa.Table.from_pandas(df)
                 con.register(name, arrow_table)
             except Exception:
@@ -111,6 +113,7 @@ def _run_duckdb_native(sql_query: str, con, context_dfs: Optional[Dict[str, pd.D
 def _run_sqlite_fallback(sql_query: str, context_dfs: Optional[Dict[str, pd.DataFrame]]) -> pd.DataFrame:
     """Fallback su SQLite / Pandas se DuckDB non è disponibile."""
     import sqlite3
+
     sqlite_con = sqlite3.connect(":memory:")
     if context_dfs:
         for name, df in context_dfs.items():
@@ -120,9 +123,7 @@ def _run_sqlite_fallback(sql_query: str, context_dfs: Optional[Dict[str, pd.Data
 
 
 def run_duckdb_olap_query(
-    sql_query: str,
-    con=None,
-    context_dfs: Optional[Dict[str, pd.DataFrame]] = None
+    sql_query: str, con=None, context_dfs: Optional[Dict[str, pd.DataFrame]] = None
 ) -> Dict[str, Any]:
     """
     Esegue una query analitica SQL ad altissima velocità sul database in-memory DuckDB.
@@ -134,7 +135,7 @@ def run_duckdb_olap_query(
             "error": "Query SQL non specificata o vuota.",
             "latency_ms": 0.0,
             "row_count": 0,
-            "df": pd.DataFrame()
+            "df": pd.DataFrame(),
         }
 
     t0 = time.perf_counter()
@@ -151,7 +152,7 @@ def run_duckdb_olap_query(
             "error": None,
             "latency_ms": round(elapsed_ms, 3),
             "row_count": len(res_df),
-            "df": res_df
+            "df": res_df,
         }
     except Exception as e:
         elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -160,7 +161,7 @@ def run_duckdb_olap_query(
             "error": str(e),
             "latency_ms": round(elapsed_ms, 3),
             "row_count": 0,
-            "df": pd.DataFrame()
+            "df": pd.DataFrame(),
         }
 
 
@@ -187,7 +188,7 @@ def get_preset_olap_queries() -> Dict[str, Dict[str, str]]:
                 "    ()\n"
                 ")\n"
                 "ORDER BY controvalore_totale DESC;"
-            )
+            ),
         },
         "sector_ranking": {
             "title": "🏆 Ranking Titoli & Window Functions (Top Performer con QUALIFY)",
@@ -205,7 +206,7 @@ def get_preset_olap_queries() -> Dict[str, Dict[str, str]]:
                 "FROM positions\n"
                 "WHERE sector IS NOT NULL AND sector != 'N/A'\n"
                 "ORDER BY sector ASC, pnl_pct DESC;"
-            )
+            ),
         },
         "monthly_tx_rollup": {
             "title": "💰 Analisi Storica Transazioni & Volumi per Mese",
@@ -220,7 +221,7 @@ def get_preset_olap_queries() -> Dict[str, Dict[str, str]]:
                 "FROM transactions\n"
                 "GROUP BY SUBSTR(CAST(tx_date AS VARCHAR), 1, 7), tx_type\n"
                 "ORDER BY mese_anno DESC, volume_scambiato DESC;"
-            )
+            ),
         },
         "fx_exposure_matrix": {
             "title": "📊 Esposizione Valutaria e Rischio di Cambio (FX Matrix)",
@@ -235,8 +236,8 @@ def get_preset_olap_queries() -> Dict[str, Dict[str, str]]:
                 "FROM positions\n"
                 "GROUP BY currency\n"
                 "ORDER BY controvalore_totale DESC;"
-            )
-        }
+            ),
+        },
     }
 
 
@@ -262,11 +263,7 @@ def get_parquet_compression_ratio(df: pd.DataFrame) -> Dict[str, Any]:
     parquet_bytes = len(export_portfolio_to_parquet(df))
     saved_pct = max(0.0, (1.0 - (parquet_bytes / max(1, csv_bytes))) * 100.0)
 
-    return {
-        "csv_bytes": csv_bytes,
-        "parquet_bytes": parquet_bytes,
-        "space_saved_pct": round(saved_pct, 1)
-    }
+    return {"csv_bytes": csv_bytes, "parquet_bytes": parquet_bytes, "space_saved_pct": round(saved_pct, 1)}
 
 
 def compute_duckdb_asset_sector_currency_cube(df_positions: pd.DataFrame) -> Dict[str, Any]:

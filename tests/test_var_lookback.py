@@ -1,5 +1,6 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def slice_returns_series(sr_port, lookback_sel):
     r = sr_port.dropna()

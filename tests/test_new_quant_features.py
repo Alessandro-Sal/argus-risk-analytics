@@ -4,14 +4,16 @@
 # Unit Tests for Carhart 4-Factor, ATR Chandelier Exit & Macro Stress
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.risk_engine import (
-    compute_carhart_4factor_exposures,
     compute_atr_chandelier_exits,
-    compute_custom_macro_stress
+    compute_carhart_4factor_exposures,
+    compute_custom_macro_stress,
 )
+
 
 def test_carhart_4factor_exposures():
     np.random.seed(42)

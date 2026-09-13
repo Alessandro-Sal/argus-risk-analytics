@@ -6,36 +6,34 @@
 
 import io
 import json
-from datetime import datetime, date
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
+
 import pandas as pd
 import streamlit as st
 from sqlalchemy import Engine
 
 from core.fetcher import get_engine
+from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
+from core.ui_export_utils import render_export_toolbar
+from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+from core.wealth.wealth_db import get_cashflow_records, get_pension_plans, get_physical_assets, get_wealth_accounts
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_fiscal_analytics,
     compute_real_estate_net_equity_and_ltv,
-    generate_advisory_pitchbook_pdf,
     generate_advisory_pitchbook_html,
-    generate_executive_tear_sheet_pdf
+    generate_advisory_pitchbook_pdf,
+    generate_executive_tear_sheet_pdf,
 )
-from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
 from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
-from core.wealth.wealth_db import (
-    get_cashflow_records,
-    get_physical_assets,
-    get_pension_plans,
-    get_wealth_accounts
-)
-from core.voice_advisor_engine import generate_ai_voice_executive_briefing
-from core.ui_export_utils import render_export_toolbar
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _get_cached_quarterly_pdf(_engine, pid: int, client_name: str, quarter: str) -> bytes:
-    return generate_white_label_quarterly_pdf_report(_engine, portfolio_id=pid, client_name=client_name, quarter=quarter)
+    return generate_white_label_quarterly_pdf_report(
+        _engine, portfolio_id=pid, client_name=client_name, quarter=quarter
+    )
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -54,9 +52,7 @@ def _get_cached_master_excel(_engine, pid: int) -> bytes:
 
 
 def render_wealth_reporting_and_exports_hub(
-    engine: Engine,
-    portfolio_id: int = 1,
-    prof_name: str = "Family Office Master"
+    engine: Engine, portfolio_id: int = 1, prof_name: str = "Family Office Master"
 ):
     """
     Renderizza il Centro Istituzionale di Reportistica ed Esportazioni Multi-Formato per ARGUS Wealth.
@@ -65,7 +61,8 @@ def render_wealth_reporting_and_exports_hub(
     date_slug = datetime.now().strftime("%Y%m%d")
     prof_slug = prof_name.lower().replace(" ", "_")
 
-    st.markdown("""
+    st.markdown(
+        """
     <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.98) 100%); border: 1px solid rgba(16, 185, 129, 0.3); border-left: 4px solid #10b981; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
@@ -81,24 +78,31 @@ def render_wealth_reporting_and_exports_hub(
             </div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """,
+        unsafe_allow_html=True,
+    )
 
-    tab_pdf, tab_data, tab_fisc, tab_media = st.tabs([
-        "📑 Dossier PDF & Client Reports",
-        "📊 Master Excel & Database Parquet",
-        "⚖️ Fisco, Libro Mastro & Quadro RW",
-        "🎙️ Executive Audio & Backup JSON"
-    ])
+    tab_pdf, tab_data, tab_fisc, tab_media = st.tabs(
+        [
+            "📑 Dossier PDF & Client Reports",
+            "📊 Master Excel & Database Parquet",
+            "⚖️ Fisco, Libro Mastro & Quadro RW",
+            "🎙️ Executive Audio & Backup JSON",
+        ]
+    )
 
     # ── TAB 1: PDF & CLIENT DOSSIERS ────────────────────────────
     with tab_pdf:
         st.markdown("##### 📄 Dossier Multipagina & Pitchbook Istituzionali")
-        st.caption("Documenti ad alta risoluzione pronti per la stampa, comitati consultivi e clienti di private banking.")
+        st.caption(
+            "Documenti ad alta risoluzione pronti per la stampa, comitati consultivi e clienti di private banking."
+        )
 
         c_pdf1, c_pdf2, c_pdf3 = st.columns(3)
 
         with c_pdf1:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #38bdf8; font-size: 13.5px;">📄 Quarterly Client Report (PDF)</b>
@@ -107,7 +111,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 pdf_qtr = _get_cached_quarterly_pdf(engine, pid=portfolio_id, client_name=prof_name, quarter="Q1 2026")
                 st.download_button(
@@ -117,13 +123,14 @@ def render_wealth_reporting_and_exports_hub(
                     mime="application/pdf",
                     use_container_width=True,
                     type="primary",
-                    key="dl_qtr_pdf_hub"
+                    key="dl_qtr_pdf_hub",
                 )
             except Exception as e:
                 st.error(f"Errore PDF QTR: {e}")
 
         with c_pdf2:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #34d399; font-size: 13.5px;">🏢 Advisory Pitchbook (PDF 6 Pag.)</b>
@@ -132,7 +139,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 pdf_pitch = _get_cached_pitchbook_pdf(engine, pid=portfolio_id)
                 st.download_button(
@@ -141,13 +150,14 @@ def render_wealth_reporting_and_exports_hub(
                     file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
-                    key="dl_pitch_pdf_hub"
+                    key="dl_pitch_pdf_hub",
                 )
             except Exception as e:
                 st.error(f"Errore Pitchbook: {e}")
 
         with c_pdf3:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #fbbf24; font-size: 13.5px;">📑 Tear-Sheet Sintetica (PDF/HTML)</b>
@@ -156,7 +166,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 pdf_ts = _get_cached_tear_sheet_pdf(engine, pid=portfolio_id)
                 st.download_button(
@@ -165,7 +177,7 @@ def render_wealth_reporting_and_exports_hub(
                     file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
-                    key="dl_ts_pdf_hub"
+                    key="dl_ts_pdf_hub",
                 )
             except Exception as e:
                 st.error(f"Errore Tear-Sheet: {e}")
@@ -178,7 +190,8 @@ def render_wealth_reporting_and_exports_hub(
         c_dat1, c_dat2 = st.columns(2)
 
         with c_dat1:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #10b981; font-size: 13.5px;">📊 Master Excel Workbook (.xlsx)</b>
@@ -187,7 +200,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 xl_bytes = _get_cached_master_excel(engine, pid=portfolio_id)
                 st.download_button(
@@ -197,13 +212,14 @@ def render_wealth_reporting_and_exports_hub(
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
                     type="primary",
-                    key="dl_xl_hub"
+                    key="dl_xl_hub",
                 )
             except Exception as e:
                 st.error(f"Errore Excel: {e}")
 
         with c_dat2:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #6366f1; font-size: 13.5px;">💾 Parquet Analytical Database (.parquet)</b>
@@ -212,7 +228,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 df_tx = get_cashflow_records(engine, portfolio_id=portfolio_id)
                 if df_tx is None or df_tx.empty:
@@ -225,7 +243,7 @@ def render_wealth_reporting_and_exports_hub(
                     file_name=f"argus_wealth_cashflow_{prof_slug}_{date_slug}.parquet",
                     mime="application/octet-stream",
                     use_container_width=True,
-                    key="dl_pq_hub"
+                    key="dl_pq_hub",
                 )
             except Exception as e:
                 st.error(f"Errore Parquet: {e}")
@@ -233,12 +251,15 @@ def render_wealth_reporting_and_exports_hub(
     # ── TAB 3: FISCO & LIBRO MASTRO ─────────────────────────────
     with tab_fisc:
         st.markdown("##### ⚖️ Fiscalità, Libro Mastro & Monitoraggio Estero")
-        st.caption("Prospetti conformi alla normativa tributaria italiana (TUIR Quadro RW / RT) e registro dei movimenti bancari.")
+        st.caption(
+            "Prospetti conformi alla normativa tributaria italiana (TUIR Quadro RW / RT) e registro dei movimenti bancari."
+        )
 
         c_fisc1, c_fisc2 = st.columns(2)
 
         with c_fisc1:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #f59e0b; font-size: 13.5px;">📑 Prospetto Quadro RW / RT (.xlsx / .csv)</b>
@@ -247,7 +268,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 fisc = compute_fiscal_analytics(engine, portfolio_id=portfolio_id)
                 df_rw = pd.DataFrame(fisc.get("quadro_rw_rows", []))
@@ -255,13 +278,14 @@ def render_wealth_reporting_and_exports_hub(
                     df_rw,
                     file_prefix=f"argus_quadro_rw_{prof_slug}",
                     key_suffix="hub_quadro_rw",
-                    table_title="Prospetto Quadro RW / RT"
+                    table_title="Prospetto Quadro RW / RT",
                 )
             except Exception as e:
                 st.error(f"Errore Quadro RW: {e}")
 
         with c_fisc2:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #38bdf8; font-size: 13.5px;">📜 Registro Integrale Cash Flow (.xlsx / .csv)</b>
@@ -270,14 +294,16 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
                 render_export_toolbar(
                     df_cf,
                     file_prefix=f"argus_cashflow_ledger_{prof_slug}",
                     key_suffix="hub_cashflow_ledger",
-                    table_title="Registro Integrale Cash Flow"
+                    table_title="Registro Integrale Cash Flow",
                 )
             except Exception as e:
                 st.error(f"Errore Cash Flow CSV: {e}")
@@ -290,7 +316,8 @@ def render_wealth_reporting_and_exports_hub(
         c_med1, c_med2 = st.columns(2)
 
         with c_med1:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #ec4899; font-size: 13.5px;">🎙️ Copione Audio Briefing (.txt)</b>
@@ -299,7 +326,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 vb = generate_ai_voice_executive_briefing(engine, portfolio_id=portfolio_id, client_name=prof_name)
                 st.download_button(
@@ -308,13 +337,14 @@ def render_wealth_reporting_and_exports_hub(
                     file_name=f"argus_voice_script_{prof_slug}_{date_slug}.txt",
                     mime="text/plain",
                     use_container_width=True,
-                    key="dl_txt_audio_hub"
+                    key="dl_txt_audio_hub",
                 )
             except Exception as e:
                 st.error(f"Errore Audio Script: {e}")
 
         with c_med2:
-            st.markdown("""
+            st.markdown(
+                """
             <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #a855f7; font-size: 13.5px;">🏛️ Snapshot Patrimoniale JSON (.json)</b>
@@ -323,7 +353,9 @@ def render_wealth_reporting_and_exports_hub(
                     </p>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """,
+                unsafe_allow_html=True,
+            )
             try:
                 nw = compute_consolidated_net_worth(engine, portfolio_id=portfolio_id)
                 snap_dict = {
@@ -335,7 +367,7 @@ def render_wealth_reporting_and_exports_hub(
                     "investments_eur": nw.financial_investments,
                     "real_estate_eur": nw.real_estate_total,
                     "liabilities_eur": nw.total_liabilities,
-                    "health_score": nw.wealth_health_score
+                    "health_score": nw.wealth_health_score,
                 }
                 json_str = json.dumps(snap_dict, indent=2)
                 st.download_button(
@@ -344,7 +376,7 @@ def render_wealth_reporting_and_exports_hub(
                     file_name=f"argus_wealth_snapshot_{prof_slug}_{date_slug}.json",
                     mime="application/json",
                     use_container_width=True,
-                    key="dl_json_snap_hub"
+                    key="dl_json_snap_hub",
                 )
             except Exception as e:
                 st.error(f"Errore JSON Snapshot: {e}")

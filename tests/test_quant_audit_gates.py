@@ -2,17 +2,17 @@
 # tests/test_quant_audit_gates.py
 # Quality Gate: Benchmark Numerici e Forme Chiuse (Audit Quantitativo)
 # ==============================================================================
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 
-from core.risk_engine import _calc_return_metrics, _calc_market_risk, compute_black_litterman_optimization
-from core.wealth.wealth_models import AccountType
+from core.risk_engine import _calc_market_risk, _calc_return_metrics, compute_black_litterman_optimization
+from core.terminal_engine import get_fx_rate_to_eur
 from core.wealth.wealth_db import init_wealth_db, save_wealth_account
 from core.wealth.wealth_engine import compute_consolidated_net_worth
-from core.terminal_engine import get_fx_rate_to_eur
+from core.wealth.wealth_models import AccountType
 
 
 def test_calmar_ratio_sign_preservation():

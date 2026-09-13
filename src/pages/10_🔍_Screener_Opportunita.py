@@ -13,40 +13,39 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 import io
 
-import core.ui_utils as ui_utils
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+
 import core.risk_engine as risk_engine
 import core.screener_engine as screener_engine
-
-from core.sidebar import render_sidebar
-from core.ui_utils import (
-    inject_custom_css,
-    metric_card,
-    glossary_modal,
-    apply_plotly_theme,
-    render_segmented_tabs,
-    render_command_bar,
-    ensure_risk_bundle_loaded,
-    render_sandbox_banner,
-    render_export_toolbar
-)
+import core.ui_utils as ui_utils
 from core.pdf_generator import generate_asset_factsheet_pdf
-
 from core.screener_engine import (
     MARKET_UNIVERSES,
-    fetch_screener_universe_data,
-    apply_strategy_preset,
-    evaluate_custom_screener_query,
-    SCREENER_FORMULA_PRESETS,
     SCREENER_FIELD_ALIASES,
-    simulate_pre_trade_impact,
+    SCREENER_FORMULA_PRESETS,
+    apply_strategy_preset,
+    compute_market_and_watchlist_alerts,
     compute_optimal_candidate_weight,
-    compute_market_and_watchlist_alerts
+    evaluate_custom_screener_query,
+    fetch_screener_universe_data,
+    simulate_pre_trade_impact,
+)
+from core.sidebar import render_sidebar
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_risk_bundle_loaded,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_export_toolbar,
+    render_sandbox_banner,
+    render_segmented_tabs,
 )
 
 inject_custom_css()
@@ -1010,12 +1009,12 @@ elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":
                 st.button("✅ Trasmesso a Pag. 3", disabled=True, use_container_width=True)
 
         with act_col2:
-            if st.button(f"📈 Analisi Tecnica", use_container_width=True, help=f"Apri il Cockpit Tecnico su {cand_ticker}"):
+            if st.button("📈 Analisi Tecnica", use_container_width=True, help=f"Apri il Cockpit Tecnico su {cand_ticker}"):
                 st.session_state["ta_target_ticker"] = cand_ticker
                 st.switch_page("pages/9_📈_Analisi_Tecnica.py")
 
         with act_col3:
-            if st.button(f"🏛️ Bilanci 10-K", use_container_width=True, help=f"Apri la Valutazione Fondamentale su {cand_ticker}"):
+            if st.button("🏛️ Bilanci 10-K", use_container_width=True, help=f"Apri la Valutazione Fondamentale su {cand_ticker}"):
                 st.session_state["fund_target_ticker"] = cand_ticker
                 st.switch_page("pages/6_🏛️_Valutazione_Aziendale.py")
 

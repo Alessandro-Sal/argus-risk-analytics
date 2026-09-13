@@ -3,44 +3,46 @@
 # ARGUS Wealth Management — Luxury Watches, Real Estate & Collectibles
 # ============================================================
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.express as px
-from datetime import datetime, date
 import importlib
+from datetime import date, datetime
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import streamlit as st
+
 import core.ui_utils
+
 importlib.reload(core.ui_utils)
 
 from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    render_kpi_card,
-    fmt_eur,
-    fmt_pct,
-    render_omni_command_bar,
-    render_wealth_command_bar,
-    render_wealth_executive_badges,
-    render_standard_hero,
-    apply_plotly_theme,
     apply_chart_theme,
+    apply_plotly_theme,
     ensure_portal_context,
     ensure_portfolio_loaded,
+    fmt_eur,
+    fmt_pct,
+    inject_custom_css,
+    metric_card,
     render_data_table,
+    render_kpi_card,
+    render_omni_command_bar,
+    render_standard_hero,
     render_table_with_export,
+    render_wealth_command_bar,
+    render_wealth_executive_badges,
+    section,
 )
-from core.sidebar import render_sidebar
 from core.wealth import (
-    get_physical_assets,
-    save_physical_asset,
-    get_wealth_portfolios,
     compute_consolidated_net_worth,
-    compute_private_equity_deal_metrics
+    compute_private_equity_deal_metrics,
+    get_physical_assets,
+    get_wealth_portfolios,
+    save_physical_asset,
 )
 from core.wealth.wealth_modals import render_illiquids_methodology_modal
-
 
 st.set_page_config(page_title="Asset Illiquidi & Orologi | ARGUS Wealth", page_icon="⌚", layout="wide")
 

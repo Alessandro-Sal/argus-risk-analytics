@@ -3,14 +3,16 @@ ARGUS — Risk Analytics Platform
 PyTest Suite: Financial Statement Analysis & Corporate Solvency Engine
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from core.financial_analysis import (
     compute_altman_z_score,
     compute_dupont_analysis,
     compute_financial_ratios,
-    generate_company_financial_statement_analysis
+    generate_company_financial_statement_analysis,
 )
+
 
 def test_altman_z_score_safe_zone():
     res = compute_altman_z_score(
@@ -80,7 +82,7 @@ def test_financial_ratios_math():
     assert ratios["profitability"]["roe_pct"] == 13.33
 
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 def test_generate_company_financial_statement_analysis():
@@ -137,7 +139,11 @@ def test_compute_dcf_monte_carlo_valuation():
 
 
 def test_piotroski_wacc_multiples():
-    from core.financial_analysis import compute_piotroski_f_score, compute_wacc_estimation, compute_valuation_multiples_matrix
+    from core.financial_analysis import (
+        compute_piotroski_f_score,
+        compute_valuation_multiples_matrix,
+        compute_wacc_estimation,
+    )
     
     with patch("yfinance.Ticker") as mock_ticker:
         mock_instance = MagicMock()

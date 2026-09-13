@@ -1,8 +1,11 @@
-import pytest
-import re
 import glob
 import os
-from core.ui_utils import resolve_metric_knowledge, KNOWN_METRICS_KNOWLEDGE_BASE, metric_card
+import re
+
+import pytest
+
+from core.ui_utils import KNOWN_METRICS_KNOWLEDGE_BASE, metric_card, resolve_metric_knowledge
+
 
 def test_critical_metrics_no_false_positive_collisions():
     """Verifica che parole simili non collidano con metriche non correlate per via di sottostringhe."""

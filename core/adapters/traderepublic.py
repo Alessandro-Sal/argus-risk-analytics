@@ -23,7 +23,20 @@ def _classify_tr_tx_type(type_and_name: str) -> Optional[str]:
     tn = type_and_name.lower()
     if any(k in tn for k in ["dividend", "dividende", "dividendo", "ausschüttung", "cedola", "distribution"]):
         return "dividend"
-    if any(k in tn for k in ["split", "frazionamento", "aktienteilung", "raggruppamento", "reverse split", "fusione", "merger", "spinoff", "scissione"]):
+    if any(
+        k in tn
+        for k in [
+            "split",
+            "frazionamento",
+            "aktienteilung",
+            "raggruppamento",
+            "reverse split",
+            "fusione",
+            "merger",
+            "spinoff",
+            "scissione",
+        ]
+    ):
         return "split"
     if any(k in tn for k in ["sell", "verkauf", "vendita"]):
         return "sell"
@@ -68,10 +81,16 @@ def _parse_tr_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optional[Di
     if qty == 0.0 and tx_type != "dividend":
         return None
 
-    fees = abs(clean_numeric_value(row.get(cols["fee"]), default=1.0 if tx_type in ["buy", "sell"] else 0.0)) if cols["fee"] else 0.0
+    fees = (
+        abs(clean_numeric_value(row.get(cols["fee"]), default=1.0 if tx_type in ["buy", "sell"] else 0.0))
+        if cols["fee"]
+        else 0.0
+    )
     curr = "EUR"
-    asset_class = "crypto" if "crypto" in type_and_name or "bitcoin" in type_and_name or "ethereum" in type_and_name else (
-        "etf" if any(k in raw_name.lower() for k in ["etf", "ucits", "ishares", "vanguard", "core"]) else "stock"
+    asset_class = (
+        "crypto"
+        if "crypto" in type_and_name or "bitcoin" in type_and_name or "ethereum" in type_and_name
+        else ("etf" if any(k in raw_name.lower() for k in ["etf", "ucits", "ishares", "vanguard", "core"]) else "stock")
     )
 
     return {
@@ -83,7 +102,7 @@ def _parse_tr_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optional[Di
         "currency": curr,
         "fees": fees,
         "asset_class": asset_class,
-        "notes": f"Trade Republic: {raw_name or ticker}"
+        "notes": f"Trade Republic: {raw_name or ticker}",
     }
 
 
@@ -98,18 +117,33 @@ def parse_traderepublic_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
     date_col = next((c for c in df.columns if any(k in c for k in ["timestamp", "date", "datum", "data"])), None)
     type_col = next((c for c in df.columns if any(k in c for k in ["type", "typ", "tipo", "action", "activity"])), None)
     isin_col = next((c for c in df.columns if any(k in c for k in ["isin", "wkn", "identifier", "ticker"])), None)
-    name_col = next((c for c in df.columns if any(k in c for k in ["name", "wertpapier", "titolo", "title", "description"])), None)
-    shares_col = next((c for c in df.columns if any(k in c for k in ["shares", "stueck", "stück", "quantit", "quantity", "anzahl"])), None)
+    name_col = next(
+        (c for c in df.columns if any(k in c for k in ["name", "wertpapier", "titolo", "title", "description"])), None
+    )
+    shares_col = next(
+        (c for c in df.columns if any(k in c for k in ["shares", "stueck", "stück", "quantit", "quantity", "anzahl"])),
+        None,
+    )
     price_col = next((c for c in df.columns if any(k in c for k in ["price", "kurs", "prezzo", "share_price"])), None)
-    amount_col = next((c for c in df.columns if any(k in c for k in ["amount", "betrag", "importo", "total", "controvalore"])), None)
-    fee_col = next((c for c in df.columns if any(k in c for k in ["fee", "gebuehr", "gebühr", "spese", "commission"])), None)
+    amount_col = next(
+        (c for c in df.columns if any(k in c for k in ["amount", "betrag", "importo", "total", "controvalore"])), None
+    )
+    fee_col = next(
+        (c for c in df.columns if any(k in c for k in ["fee", "gebuehr", "gebühr", "spese", "commission"])), None
+    )
 
     if not date_col or (not isin_col and not name_col):
         raise ValueError("Il file non sembra un export valido di Trade Republic (colonne Data o ISIN/Nome mancanti).")
 
     cols = {
-        "date": date_col, "type": type_col, "isin": isin_col, "name": name_col,
-        "shares": shares_col, "price": price_col, "amount": amount_col, "fee": fee_col
+        "date": date_col,
+        "type": type_col,
+        "isin": isin_col,
+        "name": name_col,
+        "shares": shares_col,
+        "price": price_col,
+        "amount": amount_col,
+        "fee": fee_col,
     }
 
     records = []

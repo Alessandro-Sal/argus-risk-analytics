@@ -2,12 +2,13 @@ import streamlit as st
 
 st.set_page_config(page_title="Modelli Quantitativi | ARGUS", page_icon="🔬", layout="wide")
 
-import pandas as pd
-import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
 import uuid
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 
 import core.ui_utils
 
@@ -27,38 +28,61 @@ except ImportError:
         int_p, dec_p = formatted.split(".")
         return f"€ {int_p.replace(',', '.')},{dec_p}"
 
-from core.ui_utils import inject_custom_css, metric_card, fmt_eur, fmt_pct, glossary_modal, section, apply_plotly_theme, render_command_bar, render_segmented_tabs, render_info_modal, render_volatility_smile_modal, render_fama_french_modal, render_export_toolbar
-from core.hrp_optimizer import compute_hrp_portfolio
-from core.options_hedging import black_scholes_pricing, compute_portfolio_delta_hedge, compute_covered_call_yield_enhancement
-from core.volatility_surface import build_volatility_surface, fit_volatility_smile
-from core.advanced_quant import compute_tail_copula_matrix, compute_kelly_criterion_sizing, compute_equal_risk_contribution_portfolio
+from core.advanced_quant import (
+    compute_equal_risk_contribution_portfolio,
+    compute_kelly_criterion_sizing,
+    compute_tail_copula_matrix,
+)
 from core.fixed_income import (
+    INSTITUTIONAL_BOND_PRESETS,
+    compute_bond_analytics,
     compute_bond_cash_flows,
     compute_bond_price_from_ytm,
     compute_bond_ytm,
-    compute_bond_analytics,
-    compute_z_spread,
     compute_cds_implied_default_probability,
-    INSTITUTIONAL_BOND_PRESETS
+    compute_z_spread,
 )
+from core.hrp_optimizer import compute_hrp_portfolio
+from core.options_hedging import (
+    black_scholes_pricing,
+    compute_covered_call_yield_enhancement,
+    compute_portfolio_delta_hedge,
+)
+from core.ui_utils import (
+    apply_plotly_theme,
+    fmt_eur,
+    fmt_pct,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_export_toolbar,
+    render_fama_french_modal,
+    render_info_modal,
+    render_segmented_tabs,
+    render_volatility_smile_modal,
+    section,
+)
+from core.volatility_surface import build_volatility_surface, fit_volatility_smile
 from core.yield_curve import (
-    evaluate_nelson_siegel_svensson_curve,
     compute_key_rate_durations,
-    get_institutional_yield_curve
+    evaluate_nelson_siegel_svensson_curve,
+    get_institutional_yield_curve,
 )
 
 inject_custom_css()
 
 # Sidebar
 from core.sidebar import render_sidebar
+
 render_sidebar()
-import core.risk_engine
-import core.options_hedging
-import core.volatility_surface
 import core.factor_library
+import core.options_hedging
 import core.reinforcement_learning
-from core.ui_utils import ensure_portfolio_loaded, render_sandbox_banner
+import core.risk_engine
+import core.volatility_surface
 from core.reinforcement_learning import train_and_evaluate_rl_portfolio
+from core.ui_utils import ensure_portfolio_loaded, render_sandbox_banner
 
 results, has_real = ensure_portfolio_loaded(module_type="risk")
 has_portfolio = results is not None and isinstance(results, dict) and bool(results.get("positions") is not None and not results.get("positions").empty)
@@ -69,7 +93,7 @@ if isinstance(pos, pd.DataFrame) and not pos.empty and "ticker" in pos.columns:
     mask_open = (pos["qty_net"] > 1e-6) if "qty_net" in pos.columns else pd.Series(True, index=pos.index)
     if "current_value" in pos.columns:
         mask_open = mask_open & (pos["current_value"] > 0)
-    active_tickers_set = set([t for t in pos[mask_open]["ticker"].dropna().unique() if not str(t).endswith("=X")])
+    active_tickers_set = {t for t in pos[mask_open]["ticker"].dropna().unique() if not str(t).endswith("=X")}
 else:
     active_tickers_set = set()
 
@@ -557,7 +581,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 all_vols = [frontier["vol_pct"].min(), frontier["vol_pct"].max(), cur_v, ms_v, mv_v]
                 all_rets = [frontier["ret_pct"].min(), frontier["ret_pct"].max(), cur_r, ms_r, mv_r]
                 all_vols = [v for v in all_vols if v > 0]
-                all_rets = [r for r in all_rets]
+                all_rets = list(all_rets)
 
                 min_x = max(0, min(all_vols) - 2.0) if all_vols else 0
                 max_x = max(all_vols) + 3.0 if all_vols else 30
@@ -792,7 +816,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     apply_target_strategy_weights({t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt})
             with col_p7:
                 if st.button("🧹 Azzera (0)", key="btn_pre_zero", use_container_width=True, help="Azzera tutto"):
-                    apply_target_strategy_weights({t: 0.0 for t in tickers_in_opt})
+                    apply_target_strategy_weights(dict.fromkeys(tickers_in_opt, 0.0))
 
             st.divider()
 
@@ -2160,6 +2184,7 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
         from core.risk_engine import run_advanced_monte_carlo_simulation
     except ImportError:
         import importlib
+
         import core.risk_engine
         importlib.reload(core.risk_engine)
         from core.risk_engine import run_advanced_monte_carlo_simulation
@@ -2780,7 +2805,7 @@ elif active_quant_tab == "🛡️ Hedging & Opzioni":
     if not has_portfolio or results is None:
         st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare le coperture di Hedging Tattico.")
     else:
-        from core.hedging import compute_beta_neutral_hedge, HEDGE_INSTRUMENTS
+        from core.hedging import HEDGE_INSTRUMENTS, compute_beta_neutral_hedge
 
         col_hd1, col_hd2 = st.columns(2)
         with col_hd1:
@@ -3953,7 +3978,7 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
 </div>
 """, button_label="💡 Come funziona il Backtest a Quintili")
 
-        from core.factor_library import run_factor_quintile_backtest, FACTOR_PRESET_DEFINITIONS
+        from core.factor_library import FACTOR_PRESET_DEFINITIONS, run_factor_quintile_backtest
         
         col_fq_c1, col_fq_c2, col_fq_c3 = st.columns([2.0, 1.2, 1.2])
         with col_fq_c1:
@@ -4116,10 +4141,10 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
         st.caption("Standard Tier-1 (BlackRock Aladdin / MSCI Barra): scomposizione analitica della matrice di covarianza &Sigma; = X F X<sup>T</sup> + &Delta; tra Rischio Sistemico Fattoriale e Rischio Idiosincratico Residuo, con Marginal Risk Contribution (MCTR) e Percent Risk Contribution (PCTR) conformi al Teorema di Eulero.")
 
         from core.msci_barra_risk_engine import (
-            BarraMultiAssetRiskEngine,
-            AssetFactorProfile,
+            GICS_SECTORS,
             STYLE_FACTORS,
-            GICS_SECTORS
+            AssetFactorProfile,
+            BarraMultiAssetRiskEngine,
         )
 
         barra_eng = BarraMultiAssetRiskEngine()
@@ -4573,7 +4598,7 @@ elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
     section("⚖️ Ribilanciatore Tax-Aware, Matrice di Attrito & Zero-Tax PAC")
     st.caption("Ottimizzazione dell'esecuzione degli ordini con frizioni reali (commissioni broker, bid-ask spread, imposte capital gain 26%/12.5% e compensazione minusvalenze) oppure ribilanciamento asintotico a zero imposte tramite nuovi versamenti.")
 
-    from core.tax_aware_rebalancer import TaxAwarePortfolioRebalancer, FrictionConfig
+    from core.tax_aware_rebalancer import FrictionConfig, TaxAwarePortfolioRebalancer
 
     # Recupera posizioni attuali
     if has_portfolio and opt and opt.get("tickers"):
@@ -4613,7 +4638,7 @@ elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
         target_w_map = {"SWDA.MI": 0.30, "EIMI.MI": 0.00, "XEON.DE": 0.15, "BTP-10Y": 0.40, "GLD": 0.15}
     elif target_preset == "Equal Weight 1/N":
         n_t = len(df_cur_pos["ticker"].tolist())
-        target_w_map = {t: 1.0 / n_t for t in df_cur_pos["ticker"].tolist()}
+        target_w_map = dict.fromkeys(df_cur_pos["ticker"].tolist(), 1.0 / n_t)
     else:  # Bilanciato 60/40
         target_w_map = {"SWDA.MI": 0.50, "EIMI.MI": 0.10, "XEON.DE": 0.10, "BTP-10Y": 0.25, "GLD": 0.05}
 
