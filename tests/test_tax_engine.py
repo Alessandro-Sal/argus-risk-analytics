@@ -3,9 +3,11 @@ ARGUS — Risk Analytics Platform
 Unit Tests for Tax Optimization & Tax-Loss Harvesting Engine
 """
 
-import pytest
 import pandas as pd
+import pytest
+
 from core.tax_engine import compute_tax_and_harvesting, get_asset_tax_rate
+
 
 def test_get_asset_tax_rate():
     assert get_asset_tax_rate("Equity", "GOOGL") == 0.26

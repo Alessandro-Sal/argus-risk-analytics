@@ -9,6 +9,7 @@
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
 import requests
@@ -108,7 +109,9 @@ def _coingecko_throttle():
         _LAST_COINGECKO_TIME = time.time()
 
 
-def fetch_binance_ohlcv(base: str, quote: str = "EUR", limit: int = 1000, timeout: float = 5.0) -> Optional[pd.DataFrame]:
+def fetch_binance_ohlcv(
+    base: str, quote: str = "EUR", limit: int = 1000, timeout: float = 5.0
+) -> Optional[pd.DataFrame]:
     """
     Scarica le candele giornaliere da Binance Public Market Data API.
     Se la coppia diretta in EUR non esiste, tenta la coppia in USDT e converte.
@@ -170,14 +173,16 @@ def _parse_binance_klines(klines: List[List[Any]]) -> Optional[pd.DataFrame]:
         for k in klines:
             # k[0] = open_time (ms), k[1]=open, k[2]=high, k[3]=low, k[4]=close, k[5]=volume
             dt = pd.to_datetime(k[0], unit="ms").floor("D")
-            records.append({
-                "date": dt,
-                "open": float(k[1]),
-                "high": float(k[2]),
-                "low": float(k[3]),
-                "close": float(k[4]),
-                "volume": float(k[5]),
-            })
+            records.append(
+                {
+                    "date": dt,
+                    "open": float(k[1]),
+                    "high": float(k[2]),
+                    "low": float(k[3]),
+                    "close": float(k[4]),
+                    "volume": float(k[5]),
+                }
+            )
         if records:
             df = pd.DataFrame(records).drop_duplicates(subset=["date"]).set_index("date").sort_index()
             return df
@@ -211,14 +216,16 @@ def fetch_kraken_ohlcv(base: str, quote: str = "EUR", timeout: float = 5.0) -> O
                     records = []
                     for row in val:
                         dt = pd.to_datetime(row[0], unit="s").floor("D")
-                        records.append({
-                            "date": dt,
-                            "open": float(row[1]),
-                            "high": float(row[2]),
-                            "low": float(row[3]),
-                            "close": float(row[4]),
-                            "volume": float(row[6]),
-                        })
+                        records.append(
+                            {
+                                "date": dt,
+                                "open": float(row[1]),
+                                "high": float(row[2]),
+                                "low": float(row[3]),
+                                "close": float(row[4]),
+                                "volume": float(row[6]),
+                            }
+                        )
                     if records:
                         if crypto_circuit_breaker:
                             crypto_circuit_breaker.record_success()
@@ -228,7 +235,9 @@ def fetch_kraken_ohlcv(base: str, quote: str = "EUR", timeout: float = 5.0) -> O
     return None
 
 
-def fetch_coingecko_ohlcv(base: str, quote: str = "eur", days: int = 730, timeout: float = 6.0) -> Optional[pd.DataFrame]:
+def fetch_coingecko_ohlcv(
+    base: str, quote: str = "eur", days: int = 730, timeout: float = 6.0
+) -> Optional[pd.DataFrame]:
     """Scarica i prezzi storici da CoinGecko con Token Bucket Throttle (2.0s) anti-429."""
     if crypto_circuit_breaker and not crypto_circuit_breaker.allow_request():
         return None
@@ -275,9 +284,7 @@ def fetch_coingecko_ohlcv(base: str, quote: str = "eur", days: int = 730, timeou
 
 
 def fetch_crypto_history_unified(
-    ticker: str,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None
+    ticker: str, start_date: Optional[str] = None, end_date: Optional[str] = None
 ) -> Optional[pd.DataFrame]:
     """
     Pipeline multi-exchange per dati storici crypto con architettura a cascata:

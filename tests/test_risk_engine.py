@@ -1,6 +1,6 @@
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
 # Nota: per testare in modo completo risk_engine.py sarebbe necessario 
 # fare mocking del database (SQLAlchemy) e dei DataFrame storici.
@@ -13,6 +13,7 @@ def test_dummy_math():
     assert len(returns) == 4
 
 from core.risk_engine import _fifo_engine
+
 
 def test_fifo_engine_basic_buy():
     # Arrange
@@ -100,8 +101,8 @@ def test_fifo_engine_with_dividends():
     assert res["dividends_total"] == 25.0
 
 
-from core.risk_engine import _calc_return_metrics
 from core.db_exporter import _safe_float
+from core.risk_engine import _calc_return_metrics
 
 
 def test_zero_volatility_sharpe_safe():

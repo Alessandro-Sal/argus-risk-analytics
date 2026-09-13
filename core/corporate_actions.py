@@ -77,7 +77,7 @@ KNOWN_HISTORICAL_SPLITS: Dict[str, List[Dict[str, Any]]] = {
     ],
     "ISP.MI": [
         {"date": "2018-06-18", "ratio": 1.0, "desc": "Conversione Azioni Risparmio / Fusione Categorie"},
-    ]
+    ],
 }
 
 # Cache in memoria per evitare chiamate ripetute a Yahoo Finance (TTL 24h)
@@ -86,6 +86,7 @@ _SPLIT_CACHE_TTL_SECONDS = 86400  # 24 ore
 
 
 # ── 2. DOWNLOAD & FETCHING DEGLI SPLIT AZIONARI ──────────────────────────────
+
 
 def fetch_stock_splits(ticker: str, start_date: Optional[str] = None) -> pd.Series:
     """
@@ -115,6 +116,7 @@ def fetch_stock_splits(ticker: str, start_date: Optional[str] = None) -> pd.Seri
     # 2. Query live a Yahoo Finance via yfinance
     try:
         import yfinance as yf
+
         t_obj = yf.Ticker(clean_tk)
         splits_raw = t_obj.splits
         if splits_raw is not None and not splits_raw.empty:
@@ -147,11 +149,9 @@ def fetch_stock_splits(ticker: str, start_date: Optional[str] = None) -> pd.Seri
 
 # ── 3. RETTIFICA TRANSAZIONI PER CORPORATE ACTIONS ───────────────────────────
 
+
 def _resolve_splits_for_ticker(
-    ticker: str,
-    grp: pd.DataFrame,
-    auto_fetch: bool,
-    custom_splits: Optional[Dict[str, List[Dict[str, Any]]]]
+    ticker: str, grp: pd.DataFrame, auto_fetch: bool, custom_splits: Optional[Dict[str, List[Dict[str, Any]]]]
 ) -> List[Dict[str, Any]]:
     """Recupera ed unifica tutti gli split applicabili per un ticker (custom, live o espliciti)."""
     splits_to_apply = []
@@ -159,54 +159,71 @@ def _resolve_splits_for_ticker(
 
     if custom_splits and ticker in custom_splits:
         for sp in custom_splits[ticker]:
-            splits_to_apply.append({
-                "date": pd.to_datetime(sp["date"]).normalize(),
-                "ratio": float(sp["ratio"]),
-                "desc": sp.get("desc", f"{sp['ratio']}:1 Split")
-            })
+            splits_to_apply.append(
+                {
+                    "date": pd.to_datetime(sp["date"]).normalize(),
+                    "ratio": float(sp["ratio"]),
+                    "desc": sp.get("desc", f"{sp['ratio']}:1 Split"),
+                }
+            )
     elif auto_fetch:
         sp_series = fetch_stock_splits(ticker, start_date=str(min_date.date()))
         for sp_date, ratio in sp_series.items():
             if ratio > 0.0 and ratio != 1.0:
-                splits_to_apply.append({
-                    "date": pd.to_datetime(sp_date).normalize(),
-                    "ratio": float(ratio),
-                    "desc": f"{ratio:.4g}:1 Split" if ratio > 1.0 else f"1:{1.0/ratio:.4g} Reverse Split"
-                })
+                splits_to_apply.append(
+                    {
+                        "date": pd.to_datetime(sp_date).normalize(),
+                        "ratio": float(ratio),
+                        "desc": f"{ratio:.4g}:1 Split" if ratio > 1.0 else f"1:{1.0 / ratio:.4g} Reverse Split",
+                    }
+                )
 
-    explicit_splits = grp[grp["tx_type"].astype(str).str.lower().str.strip().isin([
-        "split", "frazionamento", "raggruppamento", "reverse_split", "reverse split",
-        "stock_split", "stock split", "stock_dividend", "fusione", "merger",
-        "scambio", "scambio_azioni", "spinoff", "scissione"
-    ])]
+    explicit_splits = grp[
+        grp["tx_type"]
+        .astype(str)
+        .str.lower()
+        .str.strip()
+        .isin(
+            [
+                "split",
+                "frazionamento",
+                "raggruppamento",
+                "reverse_split",
+                "reverse split",
+                "stock_split",
+                "stock split",
+                "stock_dividend",
+                "fusione",
+                "merger",
+                "scambio",
+                "scambio_azioni",
+                "spinoff",
+                "scissione",
+            ]
+        )
+    ]
     for _, sp_row in explicit_splits.iterrows():
         sp_ratio = float(sp_row.get("quantity") or sp_row.get("price") or 1.0)
         if sp_ratio > 0.0 and sp_ratio != 1.0:
             sp_date = pd.to_datetime(sp_row["tx_date"]).normalize()
             if not any(abs((s["date"] - sp_date).days) <= 1 for s in splits_to_apply):
-                splits_to_apply.append({
-                    "date": sp_date,
-                    "ratio": sp_ratio,
-                    "desc": f"Transazione Corporate Action ({sp_ratio:.4g}:1)"
-                })
+                splits_to_apply.append(
+                    {"date": sp_date, "ratio": sp_ratio, "desc": f"Transazione Corporate Action ({sp_ratio:.4g}:1)"}
+                )
 
     return sorted(splits_to_apply, key=lambda x: x["date"])
 
 
-def _apply_split_to_dataframe(
-    df: pd.DataFrame,
-    ticker: str,
-    sp: Dict[str, Any]
-) -> Optional[Dict[str, Any]]:
+def _apply_split_to_dataframe(df: pd.DataFrame, ticker: str, sp: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Applica un singolo split su tutte le transazioni ante-split del ticker specificato."""
     sp_date = sp["date"]
     sp_ratio = sp["ratio"]
     valid_tx = ["buy", "sell", "dividend", "acquisto", "vendita", "b", "s", "cedola", "div"]
 
     mask = (
-        (df["ticker"] == ticker) &
-        (df["tx_date"] < sp_date) &
-        (df["tx_type"].astype(str).str.lower().str.strip().isin(valid_tx))
+        (df["ticker"] == ticker)
+        & (df["tx_date"] < sp_date)
+        & (df["tx_type"].astype(str).str.lower().str.strip().isin(valid_tx))
     )
     affected_rows = df[mask]
     if affected_rows.empty:
@@ -225,19 +242,19 @@ def _apply_split_to_dataframe(
         "ticker": ticker,
         "split_date": sp_date.strftime("%Y-%m-%d"),
         "split_ratio": sp_ratio,
-        "split_type": "Forward Split" if sp_ratio > 1.0 else ("Reverse Split / Raggruppamento" if sp_ratio < 1.0 else "Fusione / Conversione"),
+        "split_type": "Forward Split"
+        if sp_ratio > 1.0
+        else ("Reverse Split / Raggruppamento" if sp_ratio < 1.0 else "Fusione / Conversione"),
         "description": sp["desc"],
         "affected_lots_count": len(affected_rows),
         "shares_before": round(total_qty_before, 4),
         "shares_after": round(total_qty_after, 4),
-        "cost_basis_invariant": True
+        "cost_basis_invariant": True,
     }
 
 
 def adjust_transactions_for_splits(
-    df_tx: pd.DataFrame,
-    auto_fetch: bool = True,
-    custom_splits: Optional[Dict[str, List[Dict[str, Any]]]] = None
+    df_tx: pd.DataFrame, auto_fetch: bool = True, custom_splits: Optional[Dict[str, List[Dict[str, Any]]]] = None
 ) -> Tuple[pd.DataFrame, List[Dict[str, Any]]]:
     """
     Rettifica l'intero registro delle transazioni (df_tx) applicando i coefficienti di split.
@@ -290,9 +307,20 @@ def adjust_transactions_for_splits(
 
     # Rimuovi righe di corporate actions esplicite dal dataset di esecuzione FIFO per evitare duplicazioni
     corp_act_types = [
-        "split", "frazionamento", "raggruppamento", "reverse_split", "reverse split",
-        "stock_split", "stock split", "stock_dividend", "fusione", "merger",
-        "scambio", "scambio_azioni", "spinoff", "scissione"
+        "split",
+        "frazionamento",
+        "raggruppamento",
+        "reverse_split",
+        "reverse split",
+        "stock_split",
+        "stock split",
+        "stock_dividend",
+        "fusione",
+        "merger",
+        "scambio",
+        "scambio_azioni",
+        "spinoff",
+        "scissione",
     ]
     df_clean_fifo = df[~df["tx_type"].astype(str).str.lower().str.strip().isin(corp_act_types)].copy()
 
@@ -301,11 +329,8 @@ def adjust_transactions_for_splits(
 
 # ── 4. HELPER PER IL CONTROLLO DI CONSISTENZA DEL WACP ────────────────────────
 
-def verify_split_accounting_invariance(
-    qty_before: float,
-    price_before: float,
-    split_ratio: float
-) -> Dict[str, Any]:
+
+def verify_split_accounting_invariance(qty_before: float, price_before: float, split_ratio: float) -> Dict[str, Any]:
     """
     Verifica e certifica l'invarianza del Cost Basis secondo la formula:
     Cost_Basis = Q_orig * P_orig = Q_adj * P_adj
@@ -324,5 +349,5 @@ def verify_split_accounting_invariance(
         "price_after": price_after,
         "cost_after": cost_after,
         "diff_cost": abs(cost_before - cost_after),
-        "is_invariant": abs(cost_before - cost_after) < 1e-6
+        "is_invariant": abs(cost_before - cost_after) < 1e-6,
     }

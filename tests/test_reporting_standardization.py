@@ -3,22 +3,23 @@ Unit tests for ARGUS Financial Reporting Standardization, Design System, Interac
 """
 
 import io
-import pytest
+
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 
-from core.reporting_design_system import (
-    InstitutionalPalette,
-    InstitutionalNumberedCanvas,
-    get_institutional_reportlab_styles,
-    create_vector_donut_chart,
-    HAS_REPORTLAB
-)
-from core.pdf_generator import generate_executive_pdf_report, _generate_legacy_pure_pdf
 from core.excel_generator import generate_excel_in_memory
-from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
-from core.wealth.wealth_db import init_wealth_db, create_wealth_portfolio
 from core.modular_factsheet_builder import FactsheetExportConfig, ModularFactsheetBuilder
+from core.pdf_generator import _generate_legacy_pure_pdf, generate_executive_pdf_report
+from core.reporting_design_system import (
+    HAS_REPORTLAB,
+    InstitutionalNumberedCanvas,
+    InstitutionalPalette,
+    create_vector_donut_chart,
+    get_institutional_reportlab_styles,
+)
+from core.wealth.wealth_db import create_wealth_portfolio, init_wealth_db
+from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
 
 
 def test_reporting_design_system_tokens_and_canvas():

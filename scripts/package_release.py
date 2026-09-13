@@ -5,10 +5,11 @@ Esegue un'ispezione preventiva di sicurezza per garantire che NESSUN file sensib
 """
 
 import os
-import sys
-import zipfile
 import re
 import shutil
+import sys
+import zipfile
+
 
 def create_secure_release_zip(version: str = ""):
     project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

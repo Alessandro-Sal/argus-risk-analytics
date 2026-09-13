@@ -6,36 +6,36 @@
 
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class AccountType(str, Enum):
-    CHECKING = "checking"              # Conto corrente
-    SAVINGS = "savings"                # Conto deposito / risparmio
+    CHECKING = "checking"  # Conto corrente
+    SAVINGS = "savings"  # Conto deposito / risparmio
     EMERGENCY_FUND = "emergency_fund"  # Fondo emergenza
     BROKERAGE_CASH = "brokerage_cash"  # Liquidità su broker / exchange
-    CREDIT_CARD = "credit_card"        # Carta di credito (passività a breve)
-    LOAN = "loan"                      # Prestito / finanziamento
-    MORTGAGE = "mortgage"              # Mutuo
+    CREDIT_CARD = "credit_card"  # Carta di credito (passività a breve)
+    LOAN = "loan"  # Prestito / finanziamento
+    MORTGAGE = "mortgage"  # Mutuo
 
 
 class CategoryNature(str, Enum):
-    ESSENTIAL_NEED = "essential_need"      # 50% Needs (Casa, bollette, spesa)
-    DISCRETIONARY_WANT = "discretionary_want" # 30% Wants (Ristoranti, viaggi, shopping)
-    SAVING_INVESTMENT = "saving_investment"   # 20% Savings (PAC, pensione, risparmio)
-    DEBT_SERVICE = "debt_service"          # Rata mutuo/prestito
-    TAX = "tax"                            # Tasse e imposte
-    INFLOW_ACTIVE = "inflow_active"        # Stipendio, fatturato, bonus
-    INFLOW_PASSIVE = "inflow_passive"      # Dividendi, affitti, cedole
+    ESSENTIAL_NEED = "essential_need"  # 50% Needs (Casa, bollette, spesa)
+    DISCRETIONARY_WANT = "discretionary_want"  # 30% Wants (Ristoranti, viaggi, shopping)
+    SAVING_INVESTMENT = "saving_investment"  # 20% Savings (PAC, pensione, risparmio)
+    DEBT_SERVICE = "debt_service"  # Rata mutuo/prestito
+    TAX = "tax"  # Tasse e imposte
+    INFLOW_ACTIVE = "inflow_active"  # Stipendio, fatturato, bonus
+    INFLOW_PASSIVE = "inflow_passive"  # Dividendi, affitti, cedole
 
 
 class PhysicalAssetCategory(str, Enum):
-    LUXURY_WATCHES = "luxury_watches"      # Orologi di lusso (Rolex, Patek, Omega...)
-    REAL_ESTATE = "real_estate"            # Immobili, terreni
-    PRECIOUS_METALS = "precious_metals"    # Oro, argento, lingotti
-    COLLECTIBLES = "collectibles_art"      # Arte, auto d'epoca, collezioni
-    VEHICLES = "vehicles"                  # Auto, moto
+    LUXURY_WATCHES = "luxury_watches"  # Orologi di lusso (Rolex, Patek, Omega...)
+    REAL_ESTATE = "real_estate"  # Immobili, terreni
+    PRECIOUS_METALS = "precious_metals"  # Oro, argento, lingotti
+    COLLECTIBLES = "collectibles_art"  # Arte, auto d'epoca, collezioni
+    VEHICLES = "vehicles"  # Auto, moto
     OTHER = "other"
 
 
@@ -138,7 +138,6 @@ class NetWorthSummary:
         return max(0.0, self.real_estate_total - self.total_liabilities)
 
 
-
 class GoalCategory(str, Enum):
     FIRE = "fire"
     REAL_ESTATE = "real_estate"
@@ -167,13 +166,13 @@ class WealthGoalItem:
 
 
 class HeirRelationship(str, Enum):
-    SPOUSE = "spouse"                    # Coniuge (Franchigia 1.000.000€, aliquota 4%)
-    CHILD = "child"                      # Figlio / Discendente in linea retta (Franchigia 1.000.000€, aliquota 4%)
-    PARENT = "parent"                    # Genitore / Ascendente in linea retta (Franchigia 1.000.000€, aliquota 4%)
-    SIBLING = "sibling"                  # Fratello / Sorella (Franchigia 100.000€, aliquota 6%)
-    RELATIVE_4TH = "relative_4th"        # Altri parenti fino al 4° grado / affini (Nessuna franchigia, aliquota 6%)
-    OTHER = "other"                      # Altri soggetti / estranei (Nessuna franchigia, aliquota 8%)
-    DISABLED = "disabled"                # Portatore di handicap grave L. 104 (Franchigia 1.500.000€)
+    SPOUSE = "spouse"  # Coniuge (Franchigia 1.000.000€, aliquota 4%)
+    CHILD = "child"  # Figlio / Discendente in linea retta (Franchigia 1.000.000€, aliquota 4%)
+    PARENT = "parent"  # Genitore / Ascendente in linea retta (Franchigia 1.000.000€, aliquota 4%)
+    SIBLING = "sibling"  # Fratello / Sorella (Franchigia 100.000€, aliquota 6%)
+    RELATIVE_4TH = "relative_4th"  # Altri parenti fino al 4° grado / affini (Nessuna franchigia, aliquota 6%)
+    OTHER = "other"  # Altri soggetti / estranei (Nessuna franchigia, aliquota 8%)
+    DISABLED = "disabled"  # Portatore di handicap grave L. 104 (Franchigia 1.500.000€)
 
 
 @dataclass
@@ -215,7 +214,7 @@ class RebalanceDriftItem:
     target_weight_pct: float
     drift_pct: float
     drift_status: str  # "CRITICAL", "MODERATE", "IN_LINE"
-    action_type: str   # "BUY", "SELL", "HOLD"
+    action_type: str  # "BUY", "SELL", "HOLD"
     target_delta_eur: float
     is_tax_advantaged: bool = False
     notes: Optional[str] = None
@@ -234,11 +233,11 @@ class RealEstateEquitySummary:
 
 
 class LegalEntityType(str, Enum):
-    PERSONA_FISICA = "persona_fisica"             # Persona fisica residente (IRPEF / 26%)
-    HOLDING_SRL = "holding_srl"                   # Holding di partecipazioni SRL / SpA (IRES 24%, PEX 1.2%)
-    SOCIETA_SEMPLICE = "societa_semplice"         # Società Semplice / Cassaforte Familiare (trasparenza)
-    TRUST_FAMILIARE = "trust_familiare"           # Trust di protezione patrimoniale e successoria
-    POLIZZA_ISTITUZIONALE = "polizza_dedicata"     # Polizza vita Ramo I/III Private Insurance
+    PERSONA_FISICA = "persona_fisica"  # Persona fisica residente (IRPEF / 26%)
+    HOLDING_SRL = "holding_srl"  # Holding di partecipazioni SRL / SpA (IRES 24%, PEX 1.2%)
+    SOCIETA_SEMPLICE = "societa_semplice"  # Società Semplice / Cassaforte Familiare (trasparenza)
+    TRUST_FAMILIARE = "trust_familiare"  # Trust di protezione patrimoniale e successoria
+    POLIZZA_ISTITUZIONALE = "polizza_dedicata"  # Polizza vita Ramo I/III Private Insurance
 
 
 @dataclass
@@ -250,8 +249,8 @@ class FamilyOfficeEntityItem:
     third_party_liabilities_eur: float = 0.0
     intercompany_receivables_eur: float = 0.0  # Crediti verso altre entità del gruppo
     intercompany_liabilities_eur: float = 0.0  # Debiti verso soci / altre entità del gruppo
-    ownership_share_pct: float = 100.0         # Quota di possesso del nucleo familiare
-    effective_tax_rate_est: float = 26.0       # Aliquota media stimata su redditi di capitale
+    ownership_share_pct: float = 100.0  # Quota di possesso del nucleo familiare
+    effective_tax_rate_est: float = 26.0  # Aliquota media stimata su redditi di capitale
     jurisdiction: str = "Italia"
     notes: Optional[str] = None
 
@@ -280,6 +279,7 @@ class QuarterlyReviewResult:
 
 
 # ── PRIVATE EQUITY & REAL ASSETS MODELS ──────────────────────
+
 
 @dataclass
 class PECashflowItem:
@@ -322,6 +322,7 @@ class PEDealMetrics:
 
 # ── MULTI-CURRENCY FX HEDGING MODELS ─────────────────────────
 
+
 @dataclass
 class FXExposureItem:
     currency: str
@@ -346,6 +347,7 @@ class FXHedgingResult:
 
 # ── FAMILY GOVERNANCE & PATTO DI FAMIGLIA MODELS ─────────────
 
+
 @dataclass
 class PattoFamigliaResult:
     business_value_eur: float
@@ -367,6 +369,7 @@ class FamilyGovernancePlan:
 
 
 # ── MULTI-ASSET TOTAL WEALTH BRINSON ATTRIBUTION ─────────────
+
 
 @dataclass
 class BrinsonWealthBucketItem:
@@ -394,6 +397,7 @@ class BrinsonWealthResult:
 
 # ── SMART CASHFLOW RECONCILIATION MODELS ─────────────────────
 
+
 @dataclass
 class ReconciliationMatchItem:
     tx_date: str
@@ -413,4 +417,3 @@ class ReconciliationResult:
     duplicates_flagged_count: int
     reconciliation_rate_pct: float
     matches: List[ReconciliationMatchItem]
-

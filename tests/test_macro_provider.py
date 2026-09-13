@@ -5,20 +5,21 @@
 # ============================================================
 
 import io
-from unittest.mock import patch, MagicMock
-import pytest
-import pandas as pd
+from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pandas as pd
+import pytest
 
 from core.macro_provider import (
+    ECB_YIELD_TENORS,
+    FRED_TREASURY_SERIES,
+    fetch_ecb_yield_curve,
     fetch_fred_series,
     fetch_us_treasury_term_structure,
-    fetch_ecb_yield_curve,
     get_live_central_bank_rates,
-    FRED_TREASURY_SERIES,
-    ECB_YIELD_TENORS
 )
-from core.yield_curve import get_institutional_yield_curve, get_active_risk_free_rate
+from core.yield_curve import get_active_risk_free_rate, get_institutional_yield_curve
 
 
 @pytest.fixture(autouse=True)

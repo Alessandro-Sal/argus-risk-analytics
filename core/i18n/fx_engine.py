@@ -20,8 +20,8 @@ import pandas as pd
 SUPPORTED_CURRENCIES = ["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK"]
 
 TARGET2_HOLIDAYS_MD = [
-    (1, 1),    # Capodanno
-    (5, 1),    # Festa del Lavoro
+    (1, 1),  # Capodanno
+    (5, 1),  # Festa del Lavoro
     (12, 25),  # Natale
     (12, 26),  # Santo Stefano
 ]
@@ -30,6 +30,7 @@ TARGET2_HOLIDAYS_MD = [
 @dataclass
 class FXDecompositionResult:
     """Risultato analitico della scomposizione del rendimento e del rischio FX."""
+
     asset_ticker: str
     local_currency: str
     base_currency: str
@@ -65,10 +66,7 @@ class ECBRateProvider:
         self.cache_file = os.path.join(self.cache_dir, "ecb_fx_historical.parquet")
 
     def fetch_historical_rates(
-        self,
-        currencies: Optional[List[str]] = None,
-        days_back: int = 1825,
-        force_refresh: bool = False
+        self, currencies: Optional[List[str]] = None, days_back: int = 1825, force_refresh: bool = False
     ) -> pd.DataFrame:
         """
         Recupera i tassi di cambio giornalieri BCE (EUR per valuta estera).
@@ -105,6 +103,7 @@ class ECBRateProvider:
     def _download_from_ecb(self) -> Optional[pd.DataFrame]:
         """Tenta il download dal feed pubblico XML della BCE (ultimi 90 giorni)."""
         import urllib.request
+
         url = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "ARGUS/9.0.0 Financial Analytics"})
@@ -114,7 +113,7 @@ class ECBRateProvider:
             root = ET.fromstring(content)
             namespaces = {
                 "gesmes": "http://www.gesmes.org/xml/2002-08-01",
-                "ecb": "http://www.ecb.int/vocabulary/2002-08-01/eurofxref"
+                "ecb": "http://www.ecb.int/vocabulary/2002-08-01/eurofxref",
             }
             records = []
             for cube_time in root.findall(".//ecb:Cube[@time]", namespaces):
@@ -143,11 +142,11 @@ class ECBRateProvider:
 
         # Parametri tipici EUR: (Base rate per 1 FX unit in EUR, Vol annua, Drift annuo)
         params = {
-            "USD": (0.92, 0.075, 0.005),   # 1 USD ≈ 0.92 EUR (EUR/USD ≈ 1.08)
+            "USD": (0.92, 0.075, 0.005),  # 1 USD ≈ 0.92 EUR (EUR/USD ≈ 1.08)
             "GBP": (1.18, 0.065, -0.002),  # 1 GBP ≈ 1.18 EUR (EUR/GBP ≈ 0.85)
-            "CHF": (1.04, 0.055, 0.015),   # 1 CHF ≈ 1.04 EUR (EUR/CHF ≈ 0.96)
-            "JPY": (0.0062, 0.095, -0.02), # 1 JPY ≈ 0.0062 EUR (EUR/JPY ≈ 161)
-            "CAD": (0.68, 0.070, 0.002),   # 1 CAD ≈ 0.68 EUR
+            "CHF": (1.04, 0.055, 0.015),  # 1 CHF ≈ 1.04 EUR (EUR/CHF ≈ 0.96)
+            "JPY": (0.0062, 0.095, -0.02),  # 1 JPY ≈ 0.0062 EUR (EUR/JPY ≈ 161)
+            "CAD": (0.68, 0.070, 0.002),  # 1 CAD ≈ 0.68 EUR
             "AUD": (0.60, 0.080, -0.005),  # 1 AUD ≈ 0.60 EUR
         }
 
@@ -197,10 +196,7 @@ class FXConversionEngine:
             self.df_rates = fx_rates_df
 
     def get_rate(
-        self,
-        from_currency: str,
-        to_currency: str,
-        as_of_date: Optional[Union[datetime, date, str]] = None
+        self, from_currency: str, to_currency: str, as_of_date: Optional[Union[datetime, date, str]] = None
     ) -> float:
         """
         Calcola il tasso di cambio spot da from_currency a to_currency alla data specificata.
@@ -262,7 +258,7 @@ class FXConversionEngine:
         amount: float,
         from_currency: str,
         to_currency: str,
-        as_of_date: Optional[Union[datetime, date, str]] = None
+        as_of_date: Optional[Union[datetime, date, str]] = None,
     ) -> float:
         """Converte un importo monetario tra due valute alla data specificata."""
         rate = self.get_rate(from_currency, to_currency, as_of_date)
@@ -273,7 +269,7 @@ class FXConversionEngine:
         from_currency: str,
         to_currency: str,
         start_date: Optional[Union[datetime, date, str]] = None,
-        end_date: Optional[Union[datetime, date, str]] = None
+        end_date: Optional[Union[datetime, date, str]] = None,
     ) -> pd.Series:
         """Restituisce la serie storica giornaliera del tasso di cambio tra due valute."""
         c_from = from_currency.upper().strip()
@@ -299,7 +295,7 @@ class FXConversionEngine:
         asset_currency: str,
         base_currency: str = "EUR",
         ticker: str = "ASSET",
-        holding_quantity: float = 1.0
+        holding_quantity: float = 1.0,
     ) -> FXDecompositionResult:
         """
         Esegue la scomposizione analitica formale del rendimento e del rischio FX:
@@ -377,12 +373,15 @@ class FXConversionEngine:
         holding_cross_pnl = holding_quantity * (pT_local - p0_local) * (sT_fx - s0_fx)
         holding_pnl_base = holding_quantity * (pT_local * sT_fx - p0_local * s0_fx)
 
-        df_rets = pd.DataFrame({
-            "return_local": r_local,
-            "return_fx": r_fx,
-            "return_cross": r_cross,
-            "return_base": r_base,
-        }, index=common_rets_idx)
+        df_rets = pd.DataFrame(
+            {
+                "return_local": r_local,
+                "return_fx": r_fx,
+                "return_cross": r_cross,
+                "return_base": r_base,
+            },
+            index=common_rets_idx,
+        )
 
         return FXDecompositionResult(
             asset_ticker=ticker,
@@ -426,5 +425,5 @@ class FXConversionEngine:
             holding_asset_pnl=0.0,
             holding_fx_pnl=0.0,
             holding_cross_pnl=0.0,
-            daily_returns_df=pd.DataFrame()
+            daily_returns_df=pd.DataFrame(),
         )

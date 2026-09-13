@@ -12,6 +12,7 @@ Pilastro di trasformazione Next-Level:
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -20,6 +21,7 @@ from scipy import stats
 @dataclass(frozen=True)
 class LaborIncomeProfile:
     """Profilo lavorativo e redditizio dell'investitore."""
+
     current_annual_net_income: float
     years_to_retirement: int
     income_growth_rate: float
@@ -31,6 +33,7 @@ class LaborIncomeProfile:
 @dataclass(frozen=True)
 class TotalBalanceSheetState:
     """Stato patrimoniale completo comprensivo di asset liquidi, illiquidi e debito."""
+
     liquid_portfolio_value: float
     liquid_portfolio_weights: np.ndarray
     liquid_covariance_matrix: np.ndarray
@@ -65,7 +68,7 @@ class HumanCapitalEngine:
                 "quasi_bond_weight": 1.0,
                 "quasi_equity_amount": 0.0,
                 "quasi_bond_amount": 0.0,
-                "annual_cashflows_projection": []
+                "annual_cashflows_projection": [],
             }
 
         # Tasso di attualizzazione: rf + beta * ERP + premio specifico
@@ -87,7 +90,7 @@ class HumanCapitalEngine:
             "quasi_bond_weight": quasi_bond_w,
             "quasi_equity_amount": hc_pv * quasi_equity_w,
             "quasi_bond_amount": hc_pv * quasi_bond_w,
-            "annual_cashflows_projection": expected_cashflows.tolist()
+            "annual_cashflows_projection": expected_cashflows.tolist(),
         }
 
 
@@ -101,10 +104,7 @@ class HolisticBalanceSheetEngine:
         self.hc_engine = HumanCapitalEngine(base_risk_free_rate=risk_free_rate, equity_risk_premium=equity_risk_premium)
 
     def compute_total_balance_sheet_var(
-        self,
-        state: TotalBalanceSheetState,
-        confidence: float = 0.95,
-        horizon_years: float = 1.0
+        self, state: TotalBalanceSheetState, confidence: float = 0.95, horizon_years: float = 1.0
     ) -> Dict[str, Any]:
         """
         Calcola il Total Balance Sheet VaR (TBS-VaR) e CVaR (TBS-CVaR) integrando:
@@ -129,7 +129,9 @@ class HolisticBalanceSheetEngine:
 
         # Volatilità del portafoglio liquido
         if state.liquid_portfolio_weights.ndim == 1 and state.liquid_covariance_matrix.ndim == 2:
-            liq_var = float(state.liquid_portfolio_weights.T @ state.liquid_covariance_matrix @ state.liquid_portfolio_weights)
+            liq_var = float(
+                state.liquid_portfolio_weights.T @ state.liquid_covariance_matrix @ state.liquid_portfolio_weights
+            )
             sigma_liquid = np.sqrt(max(liq_var, 1e-8)) * np.sqrt(252)
         else:
             sigma_liquid = 0.15
@@ -138,17 +140,19 @@ class HolisticBalanceSheetEngine:
         market_vol = 0.16
         bond_vol = 0.04
         sigma_hc = np.sqrt(
-            (hc_metrics["quasi_equity_weight"] ** 2) * (market_vol ** 2) +
-            (hc_metrics["quasi_bond_weight"] ** 2) * (bond_vol ** 2)
+            (hc_metrics["quasi_equity_weight"] ** 2) * (market_vol**2)
+            + (hc_metrics["quasi_bond_weight"] ** 2) * (bond_vol**2)
         )
 
         # Matrice di correlazione macro dei 3 pilastri
         # [0: Liquid, 1: Real Estate, 2: Human Capital]
-        corr_matrix = np.array([
-            [1.00, 0.25, float(np.clip(state.labor_profile.sector_beta * 0.45, -0.2, 0.85))],
-            [0.25, 1.00, 0.15],
-            [float(np.clip(state.labor_profile.sector_beta * 0.45, -0.2, 0.85)), 0.15, 1.00]
-        ])
+        corr_matrix = np.array(
+            [
+                [1.00, 0.25, float(np.clip(state.labor_profile.sector_beta * 0.45, -0.2, 0.85))],
+                [0.25, 1.00, 0.15],
+                [float(np.clip(state.labor_profile.sector_beta * 0.45, -0.2, 0.85)), 0.15, 1.00],
+            ]
+        )
 
         vol_vector = np.array([sigma_liquid, state.real_estate_volatility, sigma_hc])
         cov_matrix = np.outer(vol_vector, vol_vector) * corr_matrix
@@ -201,6 +205,6 @@ class HolisticBalanceSheetEngine:
             "weights_breakdown": {
                 "liquid_portfolio_pct": w_liquid * 100.0,
                 "real_estate_pct": w_re * 100.0,
-                "human_capital_pct": w_hc * 100.0
-            }
+                "human_capital_pct": w_hc * 100.0,
+            },
         }

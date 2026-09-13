@@ -3,14 +3,11 @@ ARGUS — Risk Analytics Platform
 Unit Tests for Reinforcement Learning Dynamic Portfolio Optimization
 """
 
-import pytest
-import pandas as pd
 import numpy as np
-from core.reinforcement_learning import (
-    PortfolioEnv,
-    RLPolicyAgent,
-    train_and_evaluate_rl_portfolio
-)
+import pandas as pd
+import pytest
+
+from core.reinforcement_learning import PortfolioEnv, RLPolicyAgent, train_and_evaluate_rl_portfolio
 
 
 def test_rl_environment_step_and_reward():

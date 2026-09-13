@@ -3,17 +3,19 @@
 # ARGUS Wealth Management — Financial Independence, FIRE & Stress Testing
 # ============================================================
 
-import streamlit as st
-import pandas as pd
+import importlib
+from datetime import datetime
+
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
-import importlib
+import streamlit as st
+
 import core.ui_utils
+import core.wealth
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
-import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
@@ -21,45 +23,44 @@ importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
 from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    render_kpi_card,
-    fmt_eur,
-    fmt_pct,
-    render_omni_command_bar,
-    render_wealth_command_bar,
-    render_wealth_executive_badges,
-    render_standard_hero,
-    render_page_header,
-    apply_plotly_theme,
     apply_chart_theme,
+    apply_plotly_theme,
     ensure_portal_context,
     ensure_portfolio_loaded,
+    fmt_eur,
+    fmt_pct,
+    inject_custom_css,
+    metric_card,
     render_data_table,
+    render_kpi_card,
+    render_omni_command_bar,
+    render_page_header,
+    render_standard_hero,
     render_table_with_export,
+    render_wealth_command_bar,
+    render_wealth_executive_badges,
+    section,
 )
-from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
+    delete_wealth_goal,
     get_cashflow_records,
-    get_wealth_portfolios,
     get_wealth_goals,
+    get_wealth_portfolios,
     save_wealth_goal,
-    delete_wealth_goal
 )
 from core.wealth.wealth_engine import (
-    compute_consolidated_net_worth,
     compute_cashflow_analytics,
-    compute_fire_analytics,
-    compute_wealth_stress_test,
-    compute_wealth_risk_integrated_analytics,
-    compute_goal_based_monte_carlo,
+    compute_consolidated_net_worth,
     compute_dynamic_glide_path,
+    compute_fire_analytics,
+    compute_goal_based_monte_carlo,
     compute_portfolio_tco_and_fee_drag,
-    compute_sequence_of_returns_risk_engine
+    compute_sequence_of_returns_risk_engine,
+    compute_wealth_risk_integrated_analytics,
+    compute_wealth_stress_test,
 )
-
 
 st.set_page_config(page_title="Indipendenza & FIRE | ARGUS Wealth", page_icon="🔥", layout="wide")
 

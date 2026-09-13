@@ -15,34 +15,34 @@ Validates:
 """
 
 import time
-import pytest
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
+import pytest
 
 from core.chart_framework import (
-    ARGUS_COLORS,
-    ARGUS_FINANCIAL_PALETTE,
     ARGUS_ASSET_CLASS_COLORS,
+    ARGUS_COLORS,
     ARGUS_DIVERGING_SCALE,
-    FINVIZ_PNL_SCALE,
+    ARGUS_FINANCIAL_PALETTE,
     ARGUS_GLOW_CONES,
-    get_asset_color,
-    optimize_plotly_figure_memory,
-    register_argus_plotly_templates,
-    get_argus_plotly_config,
+    FINVIZ_PNL_SCALE,
     apply_argus_theme,
-    lttb_downsample,
     auto_webgl_trace,
     convert_figure_to_webgl,
-    create_timeseries_chart,
-    create_montecarlo_fan_chart,
     create_asset_allocation_treemap,
-    create_waterfall_cashflow,
     create_correlation_heatmap,
+    create_montecarlo_fan_chart,
+    create_timeseries_chart,
+    create_waterfall_cashflow,
+    get_argus_plotly_config,
+    get_asset_color,
+    lttb_downsample,
+    optimize_plotly_figure_memory,
+    register_argus_plotly_templates,
 )
-
 
 # ==============================================================================
 # 1. TEST LTTB DOWNSAMPLING ALGORITHM

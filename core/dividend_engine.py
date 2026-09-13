@@ -1,27 +1,38 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+
 
 def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
     """
     Calcola la proiezione dettagliata dei flussi di cassa da dividendi per il portafoglio.
     Supporta sia i dividendi storici incassati sia i dividendi stimati a 12 mesi,
     con dettaglio puntuale di chi paga, quando e quanto per ogni singolo mese.
-    
+
     Parameters
     ----------
     positions : pd.DataFrame
         DataFrame delle posizioni correnti da compute_risk()
-        
+
     Returns
     -------
     dict con totali, medie, calendario mensile, breakdown per società e matrice annuale.
     """
-    empty_breakdown = pd.DataFrame(columns=[
-        "ticker", "asset_class", "qty_net", "current_value_eur", 
-        "dividend_yield_pct", "yield_on_cost_pct", "frequency", 
-        "payout_months_str", "installment_payout_eur", "annual_payout_eur", 
-        "historical_payout_eur", "weight_pct"
-    ])
+    empty_breakdown = pd.DataFrame(
+        columns=[
+            "ticker",
+            "asset_class",
+            "qty_net",
+            "current_value_eur",
+            "dividend_yield_pct",
+            "yield_on_cost_pct",
+            "frequency",
+            "payout_months_str",
+            "installment_payout_eur",
+            "annual_payout_eur",
+            "historical_payout_eur",
+            "weight_pct",
+        ]
+    )
 
     if positions.empty:
         return {
@@ -32,7 +43,7 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
             "monthly_forecast": pd.DataFrame(),
             "dividend_breakdown": empty_breakdown,
             "calendar_events": pd.DataFrame(),
-            "monthly_matrix": pd.DataFrame()
+            "monthly_matrix": pd.DataFrame(),
         }
 
     pos = positions[positions["qty_net"] > 0].copy() if "qty_net" in positions.columns else positions.copy()
@@ -48,12 +59,38 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
             "monthly_forecast": pd.DataFrame(),
             "dividend_breakdown": empty_breakdown,
             "calendar_events": pd.DataFrame(),
-            "monthly_matrix": pd.DataFrame()
+            "monthly_matrix": pd.DataFrame(),
         }
 
-    MONTH_LABELS = {1: "Gen", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mag", 6: "Giu", 7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"}
-    MONTH_FULL_NAMES = {1: "Gennaio", 2: "Febbraio", 3: "Marzo", 4: "Aprile", 5: "Maggio", 6: "Giugno", 7: "Luglio", 8: "Agosto", 9: "Settembre", 10: "Ottobre", 11: "Novembre", 12: "Dicembre"}
-    
+    MONTH_LABELS = {
+        1: "Gen",
+        2: "Feb",
+        3: "Mar",
+        4: "Apr",
+        5: "Mag",
+        6: "Giu",
+        7: "Lug",
+        8: "Ago",
+        9: "Set",
+        10: "Ott",
+        11: "Nov",
+        12: "Dic",
+    }
+    MONTH_FULL_NAMES = {
+        1: "Gennaio",
+        2: "Febbraio",
+        3: "Marzo",
+        4: "Aprile",
+        5: "Maggio",
+        6: "Giugno",
+        7: "Luglio",
+        8: "Agosto",
+        9: "Settembre",
+        10: "Ottobre",
+        11: "Novembre",
+        12: "Dicembre",
+    }
+
     # Stagionalità tipica dei dividendi per i principali asset
     TICKER_PAYOUT_MONTHS = {
         "ISP.MI": [5, 11],
@@ -122,12 +159,16 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
         t = str(row.get("ticker", "")).strip().upper()
         cval = float(row.get("current_value", row.get("market_value", 0.0)))
         qty = float(row.get("qty_net", row.get("shares", row.get("quantity", 0.0))))
-        hist_div = float(row.get("dividends_total", 0.0)) if "dividends_total" in row and not pd.isna(row.get("dividends_total")) else 0.0
-        
+        hist_div = (
+            float(row.get("dividends_total", 0.0))
+            if "dividends_total" in row and not pd.isna(row.get("dividends_total"))
+            else 0.0
+        )
+
         # Calcolo Invested Capital per Yield on Cost
         avg_price = float(row.get("avg_cost", row.get("avg_price", 0.0)))
         invested_cap = (qty * avg_price) if (qty > 0 and avg_price > 0) else cval
-        
+
         dy_raw = row.get("dividend_yield")
         if (dy_raw is None or pd.isna(dy_raw) or float(dy_raw) <= 0) and t in KNOWN_DIVIDEND_YIELDS:
             dy_raw = KNOWN_DIVIDEND_YIELDS[t]
@@ -169,39 +210,52 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
         months_str = ", ".join([MONTH_LABELS[m] for m in months]) if months else "Nessuno stacco previsto"
         installment_eur = (annual_div_eur / len(months)) if months else 0.0
 
-        breakdown_list.append({
-            "ticker": t,
-            "asset_class": row.get("asset_class", "Stock"),
-            "qty_net": qty,
-            "current_value_eur": cval,
-            "dividend_yield_pct": round(dy_display, 2),
-            "yield_on_cost_pct": round(yoc_pct, 2),
-            "frequency": freq_label,
-            "payout_months_str": months_str,
-            "installment_payout_eur": round(installment_eur, 2),
-            "annual_payout_eur": round(annual_div_eur, 2),
-            "historical_payout_eur": round(hist_div, 2),
-            "weight_pct": float(row.get("weight_pct", 0))
-        })
+        breakdown_list.append(
+            {
+                "ticker": t,
+                "asset_class": row.get("asset_class", "Stock"),
+                "qty_net": qty,
+                "current_value_eur": cval,
+                "dividend_yield_pct": round(dy_display, 2),
+                "yield_on_cost_pct": round(yoc_pct, 2),
+                "frequency": freq_label,
+                "payout_months_str": months_str,
+                "installment_payout_eur": round(installment_eur, 2),
+                "annual_payout_eur": round(annual_div_eur, 2),
+                "historical_payout_eur": round(hist_div, 2),
+                "weight_pct": float(row.get("weight_pct", 0)),
+            }
+        )
 
         if annual_div_eur > 0:
             for m in months:
-                calendar_events_list.append({
-                    "month_num": m,
-                    "month_name": MONTH_LABELS[m],
-                    "month_full": MONTH_FULL_NAMES[m],
-                    "ticker": t,
-                    "qty_net": qty,
-                    "dividend_yield_pct": round(dy_display, 2),
-                    "installment_payout_eur": round(installment_eur, 2),
-                    "annual_payout_eur": round(annual_div_eur, 2)
-                })
+                calendar_events_list.append(
+                    {
+                        "month_num": m,
+                        "month_name": MONTH_LABELS[m],
+                        "month_full": MONTH_FULL_NAMES[m],
+                        "ticker": t,
+                        "qty_net": qty,
+                        "dividend_yield_pct": round(dy_display, 2),
+                        "installment_payout_eur": round(installment_eur, 2),
+                        "annual_payout_eur": round(annual_div_eur, 2),
+                    }
+                )
 
     df_breakdown = pd.DataFrame(breakdown_list)
-    df_events = pd.DataFrame(calendar_events_list, columns=[
-        "month_num", "month_name", "month_full", "ticker", "qty_net", 
-        "dividend_yield_pct", "installment_payout_eur", "annual_payout_eur"
-    ])
+    df_events = pd.DataFrame(
+        calendar_events_list,
+        columns=[
+            "month_num",
+            "month_name",
+            "month_full",
+            "ticker",
+            "qty_net",
+            "dividend_yield_pct",
+            "installment_payout_eur",
+            "annual_payout_eur",
+        ],
+    )
     portfolio_yield_pct = (total_annual_div / total_port_val * 100.0) if total_port_val > 0 else 0.0
     monthly_avg_eur = total_annual_div / 12.0
 
@@ -214,7 +268,11 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
         if not df_events.empty:
             m_events = df_events[df_events["month_num"] == m]
             tot = float(m_events["installment_payout_eur"].sum()) if not m_events.empty else 0.0
-            comps = ", ".join([f"{r['ticker']} (€ {r['installment_payout_eur']:.2f})" for _, r in m_events.iterrows()]) if not m_events.empty else "-"
+            comps = (
+                ", ".join([f"{r['ticker']} (€ {r['installment_payout_eur']:.2f})" for _, r in m_events.iterrows()])
+                if not m_events.empty
+                else "-"
+            )
             n_paying = len(m_events)
         else:
             tot = 0.0
@@ -222,14 +280,16 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
             n_paying = 0
 
         w_ratio = (tot / total_annual_div) if total_annual_div > 0 else 0.0
-        monthly_rows.append({
-            "month_num": m,
-            "month_name": m_name,
-            "projected_payout_eur": round(tot, 2),
-            "pct_of_annual": round(w_ratio * 100, 1),
-            "num_paying_companies": n_paying,
-            "paying_companies": comps
-        })
+        monthly_rows.append(
+            {
+                "month_num": m,
+                "month_name": m_name,
+                "projected_payout_eur": round(tot, 2),
+                "pct_of_annual": round(w_ratio * 100, 1),
+                "num_paying_companies": n_paying,
+                "paying_companies": comps,
+            }
+        )
 
     df_monthly = pd.DataFrame(monthly_rows)
 
@@ -247,7 +307,7 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
                 row_dict[m_label] = float(m_ev["installment_payout_eur"].sum()) if not m_ev.empty else 0.0
             row_dict["Totale Annuo (€)"] = b["annual_payout_eur"]
             matrix_rows.append(row_dict)
-    
+
     df_matrix = pd.DataFrame(matrix_rows)
     if not df_matrix.empty:
         df_matrix = df_matrix.sort_values(by="Totale Annuo (€)", ascending=False)
@@ -260,5 +320,5 @@ def compute_dividend_forecast(positions: pd.DataFrame) -> dict:
         "monthly_forecast": df_monthly,
         "dividend_breakdown": df_breakdown.sort_values(by="annual_payout_eur", ascending=False),
         "calendar_events": df_events,
-        "monthly_matrix": df_matrix
+        "monthly_matrix": df_matrix,
     }

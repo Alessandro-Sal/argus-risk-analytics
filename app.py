@@ -1,7 +1,7 @@
 import os
 import runpy
-import sys
 import subprocess
+import sys
 
 
 def run_ui():

@@ -3,20 +3,22 @@ ARGUS Verification & Precision Audit Script
 Senior Functional Analyst & QA Calculations Specialist
 """
 
-import sys
 import os
-import pandas as pd
-import numpy as np
+import sys
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
 
 # Add root to sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from core.validator import validate_csv
+from core.corporate_actions import adjust_transactions_for_splits
 from core.fetcher import fetch_and_store
 from core.risk_engine import compute_risk
 from core.tax_engine import compute_tax_and_harvesting
-from core.corporate_actions import adjust_transactions_for_splits
+from core.validator import validate_csv
+
 
 def run_verification():
     csv_path = "data/test_portfolio.csv"

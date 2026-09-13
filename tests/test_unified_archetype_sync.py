@@ -1,11 +1,14 @@
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-import pandas as pd
 from unittest.mock import MagicMock
+
+import pandas as pd
 
 # Mock streamlit session_state
 import streamlit as st
+
 if not hasattr(st, "session_state") or not isinstance(st.session_state, dict):
     class SessionState(dict):
         def __getattr__(self, item):
@@ -22,9 +25,10 @@ st.rerun = MagicMock()
 st.cache_data = MagicMock()
 st.cache_data.clear = MagicMock()
 
-from core.archetype_manager import execute_unified_archetype_load, clear_unified_archetype
+from core.archetype_manager import clear_unified_archetype, execute_unified_archetype_load
 from core.fetcher import get_engine
 from core.wealth.wealth_db import get_wealth_portfolios
+
 
 def test_unified_loading():
     print("--- 1. Testing execute_unified_archetype_load ---")

@@ -2,30 +2,39 @@ import streamlit as st
 
 st.set_page_config(page_title="Valutazione Aziendale | ARGUS", page_icon="🏛️", layout="wide")
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-import core.ui_utils as ui_utils
+import core.financial_analysis as financial_analysis
+import core.metadata_resolver as metadata_resolver
 import core.risk_engine as risk_engine
 import core.sec_rag_engine as sec_rag_engine
-import core.metadata_resolver as metadata_resolver
-import core.financial_analysis as financial_analysis
-
-from core.ui_utils import (
-    inject_custom_css, metric_card, glossary_modal, fmt_pct,
-    render_altman_zscore_modal, apply_plotly_theme, render_command_bar, render_segmented_tabs,
-    ensure_risk_bundle_loaded, render_sandbox_banner, render_sec_rag_modal, render_export_toolbar
-)
-from core.workspace_manager import get_url_param, set_url_params, register_workspace_tab
+import core.ui_utils as ui_utils
+from core.financial_analysis import resolve_company_name
 from core.forensic_accounting import compute_beneish_m_score, compute_sloan_accrual_ratio
 from core.metadata_resolver import resolve_asset_metadata, resolve_asset_valuation_metrics
-from core.financial_analysis import resolve_company_name
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_risk_bundle_loaded,
+    fmt_pct,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_altman_zscore_modal,
+    render_command_bar,
+    render_export_toolbar,
+    render_sandbox_banner,
+    render_sec_rag_modal,
+    render_segmented_tabs,
+)
+from core.workspace_manager import get_url_param, register_workspace_tab, set_url_params
 
 inject_custom_css()
 
 from core.sidebar import render_sidebar
+
 render_sidebar()
 render_command_bar()
 
@@ -52,6 +61,7 @@ else:
     port_metrics = results.get("metrics", {})
 
 from core.financial_analysis import resolve_company_name
+
 equity_pos = active_pos[active_pos["asset_class"].str.lower().isin(["equity", "azione", "stock", "azioni"])].copy() if "asset_class" in active_pos.columns else active_pos
 if equity_pos.empty:
     equity_pos = active_pos
@@ -631,12 +641,29 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
     active_bilanci_subtab = render_segmented_tabs(subtab_options, key="bilanci_subtab_nav")
 
     try:
-        from core.financial_analysis import resolve_company_name, generate_company_financial_statement_analysis, fetch_detailed_financial_statements, compare_multiple_companies, compute_piotroski_f_score, compute_wacc_estimation, compute_valuation_multiples_matrix
+        from core.financial_analysis import (
+            compare_multiple_companies,
+            compute_piotroski_f_score,
+            compute_valuation_multiples_matrix,
+            compute_wacc_estimation,
+            fetch_detailed_financial_statements,
+            generate_company_financial_statement_analysis,
+            resolve_company_name,
+        )
     except ImportError:
         import importlib
+
         import core.financial_analysis
         importlib.reload(core.financial_analysis)
-        from core.financial_analysis import resolve_company_name, generate_company_financial_statement_analysis, fetch_detailed_financial_statements, compare_multiple_companies, compute_piotroski_f_score, compute_wacc_estimation, compute_valuation_multiples_matrix
+        from core.financial_analysis import (
+            compare_multiple_companies,
+            compute_piotroski_f_score,
+            compute_valuation_multiples_matrix,
+            compute_wacc_estimation,
+            fetch_detailed_financial_statements,
+            generate_company_financial_statement_analysis,
+            resolve_company_name,
+        )
 
     equity_pos = active_pos[active_pos["asset_class"].str.lower().isin(["equity", "azione", "stock", "azioni"])].copy() if "asset_class" in active_pos.columns else active_pos
     if equity_pos.empty:
@@ -831,7 +858,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
         st.markdown("#### 🤖 Diagnostica Predittiva Machine Learning (Random Forest Classifier)")
         st.caption("Classificazione del rischio di distress finanziario e della solvibilità aziendale tramite modelli di Machine Learning con spiegabilità delle feature (Explainable AI).")
 
-        from core.financial_analysis import predict_ml_distress_and_volatility, compute_piotroski_f_score
+        from core.financial_analysis import compute_piotroski_f_score, predict_ml_distress_and_volatility
         try:
             p_res = compute_piotroski_f_score(selected_ticker)
             p_score_val = float(p_res.get("score", 7.0))
@@ -990,6 +1017,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             if btn_load_statements:
                 with st.spinner(f"📥 Download in corso dei bilanci ufficiali per {selected_ticker} ({yr_label})..."):
                     import importlib
+
                     import core.financial_analysis
                     importlib.reload(core.financial_analysis)
                     from core.financial_analysis import fetch_detailed_financial_statements as fetch_stm
@@ -1045,7 +1073,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
             render_sec_rag_modal(button_label="ℹ️ Guida al Motore SEC RAG & Form 10-K", use_popover=False)
 
-        from core.sec_rag_engine import query_sec_filings_rag, index_ticker_sec_filings
+        from core.sec_rag_engine import index_ticker_sec_filings, query_sec_filings_rag
 
         indexed_chunks_cnt = index_ticker_sec_filings(selected_ticker)
         st.caption(f"📚 *Vector Store Indicizzato: **{indexed_chunks_cnt} chunk semantici** attivi per {selected_ticker} (Form 10-K / 10-Q).*")
@@ -1144,6 +1172,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             st.warning("⚠️ Seleziona almeno **2 aziende** per attivare l'analisi comparativa affiancata.")
         else:
             import importlib
+
             import core.financial_analysis
             importlib.reload(core.financial_analysis)
             from core.financial_analysis import compare_multiple_companies as compare_fn
@@ -1366,6 +1395,7 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         from core.financial_analysis import compute_dcf_monte_carlo_valuation, fetch_dcf_initial_inputs
     except ImportError:
         import importlib
+
         import core.financial_analysis
         importlib.reload(core.financial_analysis)
         from core.financial_analysis import compute_dcf_monte_carlo_valuation, fetch_dcf_initial_inputs

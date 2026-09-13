@@ -3,17 +3,18 @@
 # Unit tests for Wealth CSV validation & standardization
 # ============================================================
 
-import os
 import io
-import pytest
-import pandas as pd
-from core.wealth.wealth_validator import (
-    validate_cashflow_df,
-    validate_physical_assets_df,
-    validate_accounts_df,
-    validate_pension_df
-)
+import os
 
+import pandas as pd
+import pytest
+
+from core.wealth.wealth_validator import (
+    validate_accounts_df,
+    validate_cashflow_df,
+    validate_pension_df,
+    validate_physical_assets_df,
+)
 
 SAMPLE_CASHFLOW_CSV = """Data,Importo,Descrizione,Direzione,Categoria,Conto,Metodo_Pagamento,Note
 2026-08-01,2800.00,Stipendio e Compensi Mese,inflow,Stipendio / Compensi,Fineco Conto Principale,Bonifico,Accredito stipendio mensile

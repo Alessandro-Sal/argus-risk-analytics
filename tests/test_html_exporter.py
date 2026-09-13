@@ -1,6 +1,8 @@
-import pytest
 import pandas as pd
+import pytest
+
 from core.html_exporter import generate_interactive_html_report
+
 
 def test_generate_interactive_html_report():
     sample_results = {

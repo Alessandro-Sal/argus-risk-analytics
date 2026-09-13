@@ -1,31 +1,102 @@
-﻿# ============================================================
+# ============================================================
 # core/esg_engine.py
 # ARGUS — ESG & SFDR Sustainability Desk
 # European SFDR (Art. 6 / 8 / 9), Carbon Intensity & Tri-Pillar Score
 # ============================================================
 
-from typing import Dict, Any, List, Optional
-import pandas as pd
-import numpy as np
+from typing import Any, Dict, List, Optional
 
+import numpy as np
+import pandas as pd
 
 # Knowledge base euristica di scoring ESG per ticker comuni / asset class
 KNOWN_ESG_METRICS = {
-    "SWDA.MI": {"esg_score": 78.5, "e_score": 76.0, "s_score": 79.0, "g_score": 82.0, "sfdr_art": 8, "carbon_intensity": 98.0, "controversies": "None"},
-    "EIMI.MI": {"esg_score": 68.0, "e_score": 64.0, "s_score": 69.0, "g_score": 72.0, "sfdr_art": 8, "carbon_intensity": 185.0, "controversies": "Low"},
-    "XG7S.MI": {"esg_score": 84.0, "e_score": 88.0, "s_score": 82.0, "g_score": 83.0, "sfdr_art": 8, "carbon_intensity": 45.0, "controversies": "None"},
-    "XEON.MI": {"esg_score": 75.0, "e_score": 70.0, "s_score": 75.0, "g_score": 80.0, "sfdr_art": 6, "carbon_intensity": 10.0, "controversies": "None"},
-    "SGLD.MI": {"esg_score": 55.0, "e_score": 45.0, "s_score": 60.0, "g_score": 65.0, "sfdr_art": 6, "carbon_intensity": 320.0, "controversies": "Moderate"},
-    "AAPL": {"esg_score": 82.0, "e_score": 85.0, "s_score": 78.0, "g_score": 84.0, "sfdr_art": 8, "carbon_intensity": 65.0, "controversies": "None"},
-    "MSFT": {"esg_score": 89.0, "e_score": 92.0, "s_score": 86.0, "g_score": 90.0, "sfdr_art": 9, "carbon_intensity": 35.0, "controversies": "None"},
-    "NVDA": {"esg_score": 79.0, "e_score": 74.0, "s_score": 81.0, "g_score": 83.0, "sfdr_art": 8, "carbon_intensity": 50.0, "controversies": "None"},
-    "BTP": {"esg_score": 72.0, "e_score": 70.0, "s_score": 73.0, "g_score": 74.0, "sfdr_art": 6, "carbon_intensity": 110.0, "controversies": "None"}
+    "SWDA.MI": {
+        "esg_score": 78.5,
+        "e_score": 76.0,
+        "s_score": 79.0,
+        "g_score": 82.0,
+        "sfdr_art": 8,
+        "carbon_intensity": 98.0,
+        "controversies": "None",
+    },
+    "EIMI.MI": {
+        "esg_score": 68.0,
+        "e_score": 64.0,
+        "s_score": 69.0,
+        "g_score": 72.0,
+        "sfdr_art": 8,
+        "carbon_intensity": 185.0,
+        "controversies": "Low",
+    },
+    "XG7S.MI": {
+        "esg_score": 84.0,
+        "e_score": 88.0,
+        "s_score": 82.0,
+        "g_score": 83.0,
+        "sfdr_art": 8,
+        "carbon_intensity": 45.0,
+        "controversies": "None",
+    },
+    "XEON.MI": {
+        "esg_score": 75.0,
+        "e_score": 70.0,
+        "s_score": 75.0,
+        "g_score": 80.0,
+        "sfdr_art": 6,
+        "carbon_intensity": 10.0,
+        "controversies": "None",
+    },
+    "SGLD.MI": {
+        "esg_score": 55.0,
+        "e_score": 45.0,
+        "s_score": 60.0,
+        "g_score": 65.0,
+        "sfdr_art": 6,
+        "carbon_intensity": 320.0,
+        "controversies": "Moderate",
+    },
+    "AAPL": {
+        "esg_score": 82.0,
+        "e_score": 85.0,
+        "s_score": 78.0,
+        "g_score": 84.0,
+        "sfdr_art": 8,
+        "carbon_intensity": 65.0,
+        "controversies": "None",
+    },
+    "MSFT": {
+        "esg_score": 89.0,
+        "e_score": 92.0,
+        "s_score": 86.0,
+        "g_score": 90.0,
+        "sfdr_art": 9,
+        "carbon_intensity": 35.0,
+        "controversies": "None",
+    },
+    "NVDA": {
+        "esg_score": 79.0,
+        "e_score": 74.0,
+        "s_score": 81.0,
+        "g_score": 83.0,
+        "sfdr_art": 8,
+        "carbon_intensity": 50.0,
+        "controversies": "None",
+    },
+    "BTP": {
+        "esg_score": 72.0,
+        "e_score": 70.0,
+        "s_score": 73.0,
+        "g_score": 74.0,
+        "sfdr_art": 6,
+        "carbon_intensity": 110.0,
+        "controversies": "None",
+    },
 }
 
 
 def compute_portfolio_esg_and_sfdr_metrics(
-    df_positions: Optional[pd.DataFrame] = None,
-    results: Optional[Dict[str, Any]] = None
+    df_positions: Optional[pd.DataFrame] = None, results: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
     Calcola l'allineamento ESG del portafoglio, la ripartizione SFDR (Art. 6/8/9) e l'intensità carbonica ponderata.
@@ -54,15 +125,18 @@ def compute_portfolio_esg_and_sfdr_metrics(
             w = (val / total_val) if total_val > 0 else 0.0
 
             # Lookup metrics
-            metrics = KNOWN_ESG_METRICS.get(ticker, {
-                "esg_score": 72.0,
-                "e_score": 70.0,
-                "s_score": 72.0,
-                "g_score": 75.0,
-                "sfdr_art": 8 if "ESG" in name.upper() or "CLEAN" in name.upper() else 6,
-                "carbon_intensity": 110.0,
-                "controversies": "None"
-            })
+            metrics = KNOWN_ESG_METRICS.get(
+                ticker,
+                {
+                    "esg_score": 72.0,
+                    "e_score": 70.0,
+                    "s_score": 72.0,
+                    "g_score": 75.0,
+                    "sfdr_art": 8 if "ESG" in name.upper() or "CLEAN" in name.upper() else 6,
+                    "carbon_intensity": 110.0,
+                    "controversies": "None",
+                },
+            )
 
             w_esg += w * metrics["esg_score"]
             w_e += w * metrics["e_score"]
@@ -72,18 +146,20 @@ def compute_portfolio_esg_and_sfdr_metrics(
             art = metrics["sfdr_art"]
             sfdr_weights[art] = sfdr_weights.get(art, 0.0) + w
 
-            holdings_esg.append({
-                "ticker": ticker,
-                "name": name,
-                "weight_pct": round(w * 100.0, 1),
-                "esg_score": metrics["esg_score"],
-                "e_pillar": metrics["e_score"],
-                "s_pillar": metrics["s_score"],
-                "g_pillar": metrics["g_score"],
-                "sfdr_classification": f"Art. {metrics['sfdr_art']}",
-                "carbon_intensity_tco2e": metrics["carbon_intensity"],
-                "controversy_level": metrics["controversies"]
-            })
+            holdings_esg.append(
+                {
+                    "ticker": ticker,
+                    "name": name,
+                    "weight_pct": round(w * 100.0, 1),
+                    "esg_score": metrics["esg_score"],
+                    "e_pillar": metrics["e_score"],
+                    "s_pillar": metrics["s_score"],
+                    "g_pillar": metrics["g_score"],
+                    "sfdr_classification": f"Art. {metrics['sfdr_art']}",
+                    "carbon_intensity_tco2e": metrics["carbon_intensity"],
+                    "controversy_level": metrics["controversies"],
+                }
+            )
     else:
         # Fallback sintetico
         w_esg = 77.8
@@ -93,13 +169,48 @@ def compute_portfolio_esg_and_sfdr_metrics(
         w_carbon = 88.5
         sfdr_weights = {6: 0.25, 8: 0.65, 9: 0.10}
         holdings_esg = [
-            {"ticker": "SWDA.MI", "name": "iShares Core MSCI World", "weight_pct": 50.0, "esg_score": 78.5, "e_pillar": 76.0, "s_pillar": 79.0, "g_pillar": 82.0, "sfdr_classification": "Art. 8", "carbon_intensity_tco2e": 98.0, "controversy_level": "None"},
-            {"ticker": "XG7S.MI", "name": "Xtrackers Global Govt Bond", "weight_pct": 30.0, "esg_score": 84.0, "e_pillar": 88.0, "s_pillar": 82.0, "g_pillar": 83.0, "sfdr_classification": "Art. 8", "carbon_intensity_tco2e": 45.0, "controversy_level": "None"},
-            {"ticker": "MSFT", "name": "Microsoft Corp", "weight_pct": 20.0, "esg_score": 89.0, "e_pillar": 92.0, "s_pillar": 86.0, "g_pillar": 90.0, "sfdr_classification": "Art. 9", "carbon_intensity_tco2e": 35.0, "controversy_level": "None"}
+            {
+                "ticker": "SWDA.MI",
+                "name": "iShares Core MSCI World",
+                "weight_pct": 50.0,
+                "esg_score": 78.5,
+                "e_pillar": 76.0,
+                "s_pillar": 79.0,
+                "g_pillar": 82.0,
+                "sfdr_classification": "Art. 8",
+                "carbon_intensity_tco2e": 98.0,
+                "controversy_level": "None",
+            },
+            {
+                "ticker": "XG7S.MI",
+                "name": "Xtrackers Global Govt Bond",
+                "weight_pct": 30.0,
+                "esg_score": 84.0,
+                "e_pillar": 88.0,
+                "s_pillar": 82.0,
+                "g_pillar": 83.0,
+                "sfdr_classification": "Art. 8",
+                "carbon_intensity_tco2e": 45.0,
+                "controversy_level": "None",
+            },
+            {
+                "ticker": "MSFT",
+                "name": "Microsoft Corp",
+                "weight_pct": 20.0,
+                "esg_score": 89.0,
+                "e_pillar": 92.0,
+                "s_pillar": 86.0,
+                "g_pillar": 90.0,
+                "sfdr_classification": "Art. 9",
+                "carbon_intensity_tco2e": 35.0,
+                "controversy_level": "None",
+            },
         ]
 
     # ESG Rating Band
-    rating_band = "AAA" if w_esg >= 85 else ("AA" if w_esg >= 75 else ("A" if w_esg >= 65 else ("BBB" if w_esg >= 55 else "BB")))
+    rating_band = (
+        "AAA" if w_esg >= 85 else ("AA" if w_esg >= 75 else ("A" if w_esg >= 65 else ("BBB" if w_esg >= 55 else "BB")))
+    )
 
     # SFDR Summary
     sfdr_summary = {
@@ -120,5 +231,5 @@ def compute_portfolio_esg_and_sfdr_metrics(
         "sfdr_breakdown": sfdr_summary,
         "holdings_esg_list": holdings_esg,
         "holdings_esg_df": df_holdings,
-        "is_esg_leader": w_esg >= 75.0
+        "is_esg_leader": w_esg >= 75.0,
     }

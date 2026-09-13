@@ -1,20 +1,12 @@
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
-from core.wealth.unified_stress_bridge import (
-    MacroFactorShock,
-    UnifiedCrossAssetStressEngine
-)
 from core.advanced_quant import compute_liquidity_adjusted_var
-from core.fixed_income import (
-    price_bond_cashflows_nelson_siegel,
-    compute_key_rate_durations,
-    compute_bond_cash_flows
-)
-from core.wealth.tax_aware_location import TaxAwareAssetLocator
 from core.autonomous_rebalancer import generate_autonomous_rebalancing_proposal
-
+from core.fixed_income import compute_bond_cash_flows, compute_key_rate_durations, price_bond_cashflows_nelson_siegel
+from core.wealth.tax_aware_location import TaxAwareAssetLocator
+from core.wealth.unified_stress_bridge import MacroFactorShock, UnifiedCrossAssetStressEngine
 
 # ==============================================================================
 # 1. TEST UNIFIED CROSS-ASSET STRESS ENGINE (RISK ↔ WEALTH CONVERGENCE)

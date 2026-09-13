@@ -1,16 +1,18 @@
 import io
-import pytest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import pytest
 from sqlalchemy import create_engine
+
 from core.ingestion_utils import read_tabular_stream
 from core.wealth.universal_bank_parser import reconcile_internal_transfers
 from core.wealth.wealth_db import (
+    bulk_insert_cashflow_tx,
+    get_cashflow_records,
+    get_wealth_accounts,
     init_wealth_db,
     save_wealth_account,
-    get_wealth_accounts,
-    bulk_insert_cashflow_tx,
-    get_cashflow_records
 )
 
 

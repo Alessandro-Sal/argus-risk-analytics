@@ -7,20 +7,17 @@ Provides multi-account wealth management:
 3. Virtual consolidation into a Master Total Wealth portfolio with full risk metrics & returns series
 """
 
-import os
 import json
+import os
 import pickle
-import pandas as pd
-import numpy as np
-from scipy import stats
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+import numpy as np
+import pandas as pd
+from scipy import stats
 
-PORTFOLIOS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "data", "multi_portfolios"
-)
+PORTFOLIOS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "multi_portfolios")
 
 
 def _ensure_dir():
@@ -34,11 +31,11 @@ def _extract_metrics_safe(data: dict) -> dict:
     mk = data.get("metrics", {})
     if not isinstance(mk, dict):
         mk = {}
-        
+
     ret = mk.get("returns", {}) if isinstance(mk.get("returns"), dict) else {}
     mr = mk.get("market_risk", {}) if isinstance(mk.get("market_risk"), dict) else {}
     conc = mk.get("concentration", {}) if isinstance(mk.get("concentration"), dict) else {}
-    
+
     # Portfolio Value
     val = data.get("portfolio_value")
     if val is None or val == 0.0:
@@ -49,43 +46,43 @@ def _extract_metrics_safe(data: dict) -> dict:
             val = float(pos_raw.get("current_value", pos_raw.get("market_value", pd.Series([0.0]))).sum())
         elif isinstance(pos_raw, list):
             val = float(sum(p.get("current_value", p.get("market_value", 0.0)) for p in pos_raw if isinstance(p, dict)))
-        
+
     # CAGR %
     cagr_pct = ret.get("cagr_pct")
     if cagr_pct is None:
         cagr_val = mk.get("cagr_pct", mk.get("cagr", 0.0))
         cagr_pct = cagr_val * 100.0 if abs(cagr_val) < 2.0 and cagr_val != 0.0 else cagr_val
-        
+
     # Volatility %
     vol_pct = mr.get("volatility_annual_pct")
     if vol_pct is None:
         vol_val = mk.get("volatility_annual_pct", mk.get("volatility", 0.0))
         vol_pct = vol_val * 100.0 if abs(vol_val) < 2.0 and vol_val != 0.0 else vol_val
-        
+
     # Sharpe Ratio
     sharpe = ret.get("sharpe_ratio", mr.get("sharpe_ratio", mk.get("sharpe_ratio", 0.0)))
-    
+
     # Sortino Ratio
     sortino = ret.get("sortino_ratio", mr.get("sortino_ratio", mk.get("sortino_ratio", 0.0)))
-    
+
     # VaR 95 %
     var_95_pct = mr.get("var_cf_95")
     if var_95_pct is None:
         var_95_pct = mr.get("var_95", mk.get("var_cf_95", mk.get("var_95", 0.0)))
     if abs(var_95_pct) < 1.0 and var_95_pct != 0.0:
         var_95_pct = var_95_pct * 100.0
-        
+
     # Max Drawdown %
     max_dd_pct = mr.get("max_drawdown_pct")
     if max_dd_pct is None:
         max_dd_pct = mk.get("max_drawdown_pct", mk.get("max_drawdown", 0.0))
     if abs(max_dd_pct) < 1.0 and max_dd_pct != 0.0:
         max_dd_pct = max_dd_pct * 100.0
-        
+
     # HHI & Diversification
     hhi = conc.get("hhi", mk.get("hhi", 0.0))
     div_ratio = conc.get("diversification_ratio", mk.get("diversification_ratio", 1.0))
-    
+
     return {
         "portfolio_value": float(val),
         "cagr_pct": float(cagr_pct),
@@ -95,7 +92,7 @@ def _extract_metrics_safe(data: dict) -> dict:
         "var_95_pct": float(var_95_pct),
         "max_dd_pct": float(max_dd_pct),
         "hhi": float(hhi),
-        "diversification_ratio": float(div_ratio)
+        "diversification_ratio": float(div_ratio),
     }
 
 
@@ -107,7 +104,7 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
     if positions_raw is None:
         return []
     records = []
-    
+
     if isinstance(positions_raw, pd.DataFrame):
         if positions_raw.empty:
             return []
@@ -115,9 +112,9 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
             t = str(row.get("ticker", "")).strip()
             if not t or t.lower() in ("nan", "none", "null"):
                 continue
-            
+
             mv = float(row.get("current_value", row.get("market_value", 0.0)))
-            
+
             # Rilevamento quantità rigoroso
             has_qty = False
             qty_val = 0.0
@@ -129,7 +126,7 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                         break
                     except Exception:
                         pass
-            
+
             if has_qty:
                 if qty_val <= 1e-6:
                     continue
@@ -143,100 +140,23 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
             if cost == 0.0 and shares > 0:
                 cost = float(row.get("avg_cost", 0.0)) * shares
             unrealized = float(row.get("unrealized_pnl", mv - cost))
-            
+
             w_raw = row.get("weight_pct", row.get("weight", 0.0))
             w_val = float(w_raw) if pd.notna(w_raw) else 0.0
             w_dec = (w_val / 100.0) if w_val > 1.0 else w_val
             w_pct = w_val if w_val > 1.0 else (w_val * 100.0)
-            
+
             wacp = float(row.get("avg_cost", (cost / shares) if shares > 0 else 0.0))
             ac = str(row.get("asset_class", "Equity"))
             curr = str(row.get("currency", "EUR"))
             tot_ret = float(row.get("total_return", ((unrealized / cost * 100.0) if cost > 0 else 0.0)))
-            
+
             c_raw = row.get("country", row.get("Country", ""))
             s_raw = row.get("gics_sector", row.get("sector", ""))
             c_clean, s_clean = resolve_asset_metadata(t, ac, c_raw, s_raw)
-            
-            records.append({
-                "ticker": t,
-                "shares": shares,
-                "quantity": shares,
-                "qty_net": shares,
-                "market_value": mv,
-                "current_value": mv,
-                "total_cost": cost,
-                "cost_basis": cost,
-                "unrealized_pnl": unrealized,
-                "weight": w_dec,
-                "weight_pct": w_pct,
-                "wacp": wacp,
-                "avg_cost": wacp,
-                "sector": s_clean,
-                "gics_sector": s_clean,
-                "country": c_clean,
-                "asset_class": ac,
-                "currency": curr,
-                "total_return": tot_ret,
-                "realized_pnl": float(row.get("realized_pnl", 0.0)),
-                "dividends_total": float(row.get("dividends_total", 0.0)),
-                "dividend_yield": float(row.get("dividend_yield")) if pd.notna(row.get("dividend_yield")) else None,
-                "trailing_pe": float(row.get("trailing_pe")) if pd.notna(row.get("trailing_pe")) else None,
-                "forward_pe": float(row.get("forward_pe")) if pd.notna(row.get("forward_pe")) else None,
-                "price_to_book": float(row.get("price_to_book")) if pd.notna(row.get("price_to_book")) else None,
-                "roe": float(row.get("roe")) if pd.notna(row.get("roe")) else None,
-                "beta_5y": float(row.get("beta_5y")) if pd.notna(row.get("beta_5y")) else None,
-                "market_cap": float(row.get("market_cap")) if pd.notna(row.get("market_cap")) else None,
-            })
-    elif isinstance(positions_raw, list):
-        for p in positions_raw:
-            if isinstance(p, dict):
-                t = str(p.get("ticker", "")).strip()
-                if not t or t.lower() in ("nan", "none", "null"):
-                    continue
-                
-                mv = float(p.get("current_value", p.get("market_value", 0.0)))
-                
-                has_qty = False
-                qty_val = 0.0
-                for qk in ["qty_net", "shares", "quantity", "qty", "units"]:
-                    if qk in p and p[qk] is not None:
-                        try:
-                            qty_val = float(p[qk])
-                            has_qty = True
-                            break
-                        except Exception:
-                            pass
-                
-                if has_qty:
-                    if qty_val <= 1e-6:
-                        continue
-                    shares = qty_val
-                else:
-                    if mv <= 1e-6:
-                        continue
-                    shares = 0.0
-                    
-                cost = float(p.get("cost_basis", p.get("total_cost", 0.0)))
-                if cost == 0.0 and shares > 0:
-                    cost = float(p.get("avg_cost", 0.0)) * shares
-                unrealized = float(p.get("unrealized_pnl", mv - cost))
-                
-                w_raw = p.get("weight_pct", p.get("weight", 0.0))
-                w_val = float(w_raw) if w_raw is not None else 0.0
-                w_dec = (w_val / 100.0) if w_val > 1.0 else w_val
-                w_pct = w_val if w_val > 1.0 else (w_val * 100.0)
-                
-                wacp = float(p.get("avg_cost", p.get("wacp", (cost / shares) if shares > 0 else 0.0)))
-                ac = str(p.get("asset_class", "Equity"))
-                curr = str(p.get("currency", "EUR"))
-                tot_ret = float(p.get("total_return", ((unrealized / cost * 100.0) if cost > 0 else 0.0)))
-                
-                c_raw = p.get("country", p.get("Country", ""))
-                s_raw = p.get("gics_sector", p.get("sector", ""))
-                c_clean, s_clean = resolve_asset_metadata(t, ac, c_raw, s_raw)
-                
-                records.append({
+
+            records.append(
+                {
                     "ticker": t,
                     "shares": shares,
                     "quantity": shares,
@@ -256,18 +176,101 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                     "asset_class": ac,
                     "currency": curr,
                     "total_return": tot_ret,
-                    "realized_pnl": float(p.get("realized_pnl", 0.0)),
-                    "dividends_total": float(p.get("dividends_total", 0.0)),
-                    "dividend_yield": float(p.get("dividend_yield")) if pd.notna(p.get("dividend_yield")) else None,
-                    "trailing_pe": float(p.get("trailing_pe")) if pd.notna(p.get("trailing_pe")) else None,
-                    "forward_pe": float(p.get("forward_pe")) if pd.notna(p.get("forward_pe")) else None,
-                    "price_to_book": float(p.get("price_to_book")) if pd.notna(p.get("price_to_book")) else None,
-                    "roe": float(p.get("roe")) if pd.notna(p.get("roe")) else None,
-                    "target_mean_price": float(p.get("target_mean_price")) if pd.notna(p.get("target_mean_price")) else None,
-                    "peg_ratio": float(p.get("peg_ratio")) if pd.notna(p.get("peg_ratio")) else None,
-                    "beta_5y": float(p.get("beta_5y")) if pd.notna(p.get("beta_5y")) else None,
-                    "market_cap": float(p.get("market_cap")) if pd.notna(p.get("market_cap")) else None,
-                })
+                    "realized_pnl": float(row.get("realized_pnl", 0.0)),
+                    "dividends_total": float(row.get("dividends_total", 0.0)),
+                    "dividend_yield": float(row.get("dividend_yield")) if pd.notna(row.get("dividend_yield")) else None,
+                    "trailing_pe": float(row.get("trailing_pe")) if pd.notna(row.get("trailing_pe")) else None,
+                    "forward_pe": float(row.get("forward_pe")) if pd.notna(row.get("forward_pe")) else None,
+                    "price_to_book": float(row.get("price_to_book")) if pd.notna(row.get("price_to_book")) else None,
+                    "roe": float(row.get("roe")) if pd.notna(row.get("roe")) else None,
+                    "beta_5y": float(row.get("beta_5y")) if pd.notna(row.get("beta_5y")) else None,
+                    "market_cap": float(row.get("market_cap")) if pd.notna(row.get("market_cap")) else None,
+                }
+            )
+    elif isinstance(positions_raw, list):
+        for p in positions_raw:
+            if isinstance(p, dict):
+                t = str(p.get("ticker", "")).strip()
+                if not t or t.lower() in ("nan", "none", "null"):
+                    continue
+
+                mv = float(p.get("current_value", p.get("market_value", 0.0)))
+
+                has_qty = False
+                qty_val = 0.0
+                for qk in ["qty_net", "shares", "quantity", "qty", "units"]:
+                    if qk in p and p[qk] is not None:
+                        try:
+                            qty_val = float(p[qk])
+                            has_qty = True
+                            break
+                        except Exception:
+                            pass
+
+                if has_qty:
+                    if qty_val <= 1e-6:
+                        continue
+                    shares = qty_val
+                else:
+                    if mv <= 1e-6:
+                        continue
+                    shares = 0.0
+
+                cost = float(p.get("cost_basis", p.get("total_cost", 0.0)))
+                if cost == 0.0 and shares > 0:
+                    cost = float(p.get("avg_cost", 0.0)) * shares
+                unrealized = float(p.get("unrealized_pnl", mv - cost))
+
+                w_raw = p.get("weight_pct", p.get("weight", 0.0))
+                w_val = float(w_raw) if w_raw is not None else 0.0
+                w_dec = (w_val / 100.0) if w_val > 1.0 else w_val
+                w_pct = w_val if w_val > 1.0 else (w_val * 100.0)
+
+                wacp = float(p.get("avg_cost", p.get("wacp", (cost / shares) if shares > 0 else 0.0)))
+                ac = str(p.get("asset_class", "Equity"))
+                curr = str(p.get("currency", "EUR"))
+                tot_ret = float(p.get("total_return", ((unrealized / cost * 100.0) if cost > 0 else 0.0)))
+
+                c_raw = p.get("country", p.get("Country", ""))
+                s_raw = p.get("gics_sector", p.get("sector", ""))
+                c_clean, s_clean = resolve_asset_metadata(t, ac, c_raw, s_raw)
+
+                records.append(
+                    {
+                        "ticker": t,
+                        "shares": shares,
+                        "quantity": shares,
+                        "qty_net": shares,
+                        "market_value": mv,
+                        "current_value": mv,
+                        "total_cost": cost,
+                        "cost_basis": cost,
+                        "unrealized_pnl": unrealized,
+                        "weight": w_dec,
+                        "weight_pct": w_pct,
+                        "wacp": wacp,
+                        "avg_cost": wacp,
+                        "sector": s_clean,
+                        "gics_sector": s_clean,
+                        "country": c_clean,
+                        "asset_class": ac,
+                        "currency": curr,
+                        "total_return": tot_ret,
+                        "realized_pnl": float(p.get("realized_pnl", 0.0)),
+                        "dividends_total": float(p.get("dividends_total", 0.0)),
+                        "dividend_yield": float(p.get("dividend_yield")) if pd.notna(p.get("dividend_yield")) else None,
+                        "trailing_pe": float(p.get("trailing_pe")) if pd.notna(p.get("trailing_pe")) else None,
+                        "forward_pe": float(p.get("forward_pe")) if pd.notna(p.get("forward_pe")) else None,
+                        "price_to_book": float(p.get("price_to_book")) if pd.notna(p.get("price_to_book")) else None,
+                        "roe": float(p.get("roe")) if pd.notna(p.get("roe")) else None,
+                        "target_mean_price": float(p.get("target_mean_price"))
+                        if pd.notna(p.get("target_mean_price"))
+                        else None,
+                        "peg_ratio": float(p.get("peg_ratio")) if pd.notna(p.get("peg_ratio")) else None,
+                        "beta_5y": float(p.get("beta_5y")) if pd.notna(p.get("beta_5y")) else None,
+                        "market_cap": float(p.get("market_cap")) if pd.notna(p.get("market_cap")) else None,
+                    }
+                )
     return records
 
 
@@ -276,7 +279,12 @@ def _get_portfolio_return_series(p: dict) -> Optional[pd.Series]:
     if "portfolio_return" in p and isinstance(p["portfolio_return"], pd.Series) and not p["portfolio_return"].empty:
         return p["portfolio_return"]
     rf = p.get("results_full")
-    if isinstance(rf, dict) and "portfolio_return" in rf and isinstance(rf["portfolio_return"], pd.Series) and not rf["portfolio_return"].empty:
+    if (
+        isinstance(rf, dict)
+        and "portfolio_return" in rf
+        and isinstance(rf["portfolio_return"], pd.Series)
+        and not rf["portfolio_return"].empty
+    ):
         return rf["portfolio_return"]
     r = p.get("returns")
     if isinstance(r, pd.Series) and not r.empty:
@@ -289,17 +297,17 @@ def _get_benchmark_return_series(p: dict) -> Optional[pd.Series]:
     if "benchmark_return" in p and isinstance(p["benchmark_return"], pd.Series) and not p["benchmark_return"].empty:
         return p["benchmark_return"]
     rf = p.get("results_full")
-    if isinstance(rf, dict) and "benchmark_return" in rf and isinstance(rf["benchmark_return"], pd.Series) and not rf["benchmark_return"].empty:
+    if (
+        isinstance(rf, dict)
+        and "benchmark_return" in rf
+        and isinstance(rf["benchmark_return"], pd.Series)
+        and not rf["benchmark_return"].empty
+    ):
         return rf["benchmark_return"]
     return None
 
 
-def save_portfolio_profile(
-    name: str,
-    results: dict,
-    tag: str = "Generale",
-    description: str = ""
-) -> bool:
+def save_portfolio_profile(name: str, results: dict, tag: str = "Generale", description: str = "") -> bool:
     """Salva uno snapshot di portafoglio completo nel registro multi-account."""
     if not name or not results or not isinstance(results, dict):
         return False
@@ -328,7 +336,7 @@ def save_portfolio_profile(
         "benchmark_return": results.get("benchmark_return"),
         "returns": results.get("returns"),
         "df_prices": results.get("df_prices"),
-        "results_full": results
+        "results_full": results,
     }
 
     try:
@@ -343,7 +351,7 @@ def list_saved_portfolio_profiles() -> List[dict]:
     """Restituisce l'elenco dei profili di portafoglio salvati con metadati sintetici corretti."""
     _ensure_dir()
     profiles = []
-    
+
     if not os.path.exists(PORTFOLIOS_DIR):
         return profiles
 
@@ -355,21 +363,23 @@ def list_saved_portfolio_profiles() -> List[dict]:
                     data = pickle.load(f)
                 mk = _extract_metrics_safe(data)
                 positions = _normalize_positions_list(data.get("positions"))
-                
-                profiles.append({
-                    "name": data.get("name", fname.replace(".pkl", "")),
-                    "tag": data.get("tag", "Generale"),
-                    "description": data.get("description", ""),
-                    "saved_at": data.get("saved_at", "N/A"),
-                    "portfolio_value": mk["portfolio_value"],
-                    "asset_count": len(positions),
-                    "cagr_pct": mk["cagr_pct"],
-                    "volatility_pct": mk["volatility_pct"],
-                    "sharpe_ratio": mk["sharpe_ratio"],
-                    "sortino_ratio": mk["sortino_ratio"],
-                    "var_95_pct": mk["var_95_pct"],
-                    "max_dd_pct": mk["max_dd_pct"]
-                })
+
+                profiles.append(
+                    {
+                        "name": data.get("name", fname.replace(".pkl", "")),
+                        "tag": data.get("tag", "Generale"),
+                        "description": data.get("description", ""),
+                        "saved_at": data.get("saved_at", "N/A"),
+                        "portfolio_value": mk["portfolio_value"],
+                        "asset_count": len(positions),
+                        "cagr_pct": mk["cagr_pct"],
+                        "volatility_pct": mk["volatility_pct"],
+                        "sharpe_ratio": mk["sharpe_ratio"],
+                        "sortino_ratio": mk["sortino_ratio"],
+                        "var_95_pct": mk["var_95_pct"],
+                        "max_dd_pct": mk["max_dd_pct"],
+                    }
+                )
             except Exception:
                 continue
 
@@ -425,34 +435,34 @@ def compute_multi_portfolio_comparison(selected_names: List[str]) -> pd.DataFram
         pos = _normalize_positions_list(prof.get("positions"))
         val = mk["portfolio_value"]
         share = (val / total_wealth * 100.0) if total_wealth > 0 else 0.0
-        
+
         # Top holding
         top_h = "N/A"
         if pos:
             sorted_p = sorted(pos, key=lambda x: x.get("market_value", 0.0), reverse=True)
             top_h = f"{sorted_p[0].get('ticker', '')} ({sorted_p[0].get('weight_pct', 0.0):.1f}%)"
 
-        rows.append({
-            "Portafoglio": name,
-            "Strategia / Tag": tag,
-            "Controvalore (€)": f"€ {val:,.2f}",
-            "Quota Wealth (%)": f"{share:.1f}%",
-            "CAGR (%)": f"{mk['cagr_pct']:+.2f}%",
-            "Volatilità (%)": f"{mk['volatility_pct']:.2f}%",
-            "Sharpe Ratio": f"{mk['sharpe_ratio']:.2f}",
-            "VaR 95% (1g)": f"{mk['var_95_pct']:.2f}%",
-                    "Max Drawdown": f"{mk['max_dd_pct']:.2f}%",
-                    "N° Posizioni": len(pos),
-                    "Top Holding": top_h
-                })
+        rows.append(
+            {
+                "Portafoglio": name,
+                "Strategia / Tag": tag,
+                "Controvalore (€)": f"€ {val:,.2f}",
+                "Quota Wealth (%)": f"{share:.1f}%",
+                "CAGR (%)": f"{mk['cagr_pct']:+.2f}%",
+                "Volatilità (%)": f"{mk['volatility_pct']:.2f}%",
+                "Sharpe Ratio": f"{mk['sharpe_ratio']:.2f}",
+                "VaR 95% (1g)": f"{mk['var_95_pct']:.2f}%",
+                "Max Drawdown": f"{mk['max_dd_pct']:.2f}%",
+                "N° Posizioni": len(pos),
+                "Top Holding": top_h,
+            }
+        )
 
     return pd.DataFrame(rows)
 
 
 def consolidate_multi_portfolios(
-    selected_names: List[str],
-    risk_free_rate: float = None,
-    base_currency: str = "EUR"
+    selected_names: List[str], risk_free_rate: float = None, base_currency: str = "EUR"
 ) -> Optional[dict]:
     """
     Fonde e consolida più portafogli in un unico Master Portfolio (Total Wealth).
@@ -460,6 +470,7 @@ def consolidate_multi_portfolios(
     e genera metriche di rischio e tabelle completamente conformi a tutta la piattaforma ARGUS.
     """
     from core.yield_curve import get_active_risk_free_rate
+
     rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
     active_rf_rate = rf_info["rate"]
 
@@ -483,7 +494,8 @@ def consolidate_multi_portfolios(
     merged_positions: Dict[str, dict] = {}
     for prof in profiles:
         pos_list = _normalize_positions_list(
-            prof.get("positions") or (prof.get("results_full", {}).get("positions") if isinstance(prof.get("results_full"), dict) else None)
+            prof.get("positions")
+            or (prof.get("results_full", {}).get("positions") if isinstance(prof.get("results_full"), dict) else None)
         )
         for pos in pos_list:
             t = pos.get("ticker", "").strip().upper()
@@ -492,7 +504,9 @@ def consolidate_multi_portfolios(
 
             shares = float(pos.get("qty_net") or pos.get("shares") or 0.0)
             cost = float(pos.get("cost_basis") or (pos.get("avg_cost", 0.0) * shares) or 0.0)
-            mv = float(pos.get("current_value") or pos.get("market_value") or (pos.get("last_price", 0.0) * shares) or 0.0)
+            mv = float(
+                pos.get("current_value") or pos.get("market_value") or (pos.get("last_price", 0.0) * shares) or 0.0
+            )
             realized = float(pos.get("realized_pnl") or 0.0)
             divs = float(pos.get("dividends_total") or 0.0)
             curr = pos.get("currency", "EUR")
@@ -537,9 +551,19 @@ def consolidate_multi_portfolios(
                 merged_positions[t]["cost_basis"] += cost
                 merged_positions[t]["realized_pnl"] += realized
                 merged_positions[t]["dividends_total"] += divs
-                merged_positions[t]["unrealized_pnl"] = merged_positions[t]["current_value"] - merged_positions[t]["cost_basis"]
-                merged_positions[t]["unrealized_pnl_pct"] = (merged_positions[t]["unrealized_pnl"] / merged_positions[t]["cost_basis"] * 100.0) if merged_positions[t]["cost_basis"] > 0 else 0.0
-                merged_positions[t]["total_return"] = merged_positions[t]["unrealized_pnl"] + merged_positions[t]["realized_pnl"] + merged_positions[t]["dividends_total"]
+                merged_positions[t]["unrealized_pnl"] = (
+                    merged_positions[t]["current_value"] - merged_positions[t]["cost_basis"]
+                )
+                merged_positions[t]["unrealized_pnl_pct"] = (
+                    (merged_positions[t]["unrealized_pnl"] / merged_positions[t]["cost_basis"] * 100.0)
+                    if merged_positions[t]["cost_basis"] > 0
+                    else 0.0
+                )
+                merged_positions[t]["total_return"] = (
+                    merged_positions[t]["unrealized_pnl"]
+                    + merged_positions[t]["realized_pnl"]
+                    + merged_positions[t]["dividends_total"]
+                )
                 if pos.get("dividend_yield") is not None and pd.notna(pos.get("dividend_yield")):
                     merged_positions[t]["dividend_yield"] = pos.get("dividend_yield")
                 if pos.get("target_mean_price") is not None and pd.notna(pos.get("target_mean_price")):
@@ -556,7 +580,9 @@ def consolidate_multi_portfolios(
                     merged_positions[t]["roe"] = pos.get("roe")
                 if merged_positions[t]["qty_net"] > 0:
                     merged_positions[t]["avg_cost"] = merged_positions[t]["cost_basis"] / merged_positions[t]["qty_net"]
-                    merged_positions[t]["last_price"] = merged_positions[t]["current_value"] / merged_positions[t]["qty_net"]
+                    merged_positions[t]["last_price"] = (
+                        merged_positions[t]["current_value"] / merged_positions[t]["qty_net"]
+                    )
 
     # Calcolo pesi percentuali e HHI
     df_positions = pd.DataFrame(list(merged_positions.values()))
@@ -588,7 +614,7 @@ def consolidate_multi_portfolios(
         if r_ser is not None and not r_ser.empty and p_val > 0:
             all_returns_series.append(r_ser)
             weights_list.append(p_val)
-            
+
         if bm_ser is not None and not bm_ser.empty:
             all_bm_series.append(bm_ser)
 
@@ -598,7 +624,11 @@ def consolidate_multi_portfolios(
                 all_price_dfs.append(rf["df_prices"])
             if "returns" in rf and isinstance(rf["returns"], pd.DataFrame):
                 all_asset_returns.append(rf["returns"])
-            tx_cand = rf.get("df_tx") if isinstance(rf.get("df_tx"), pd.DataFrame) else (rf.get("df_tx_raw") if isinstance(rf.get("df_tx_raw"), pd.DataFrame) else None)
+            tx_cand = (
+                rf.get("df_tx")
+                if isinstance(rf.get("df_tx"), pd.DataFrame)
+                else (rf.get("df_tx_raw") if isinstance(rf.get("df_tx_raw"), pd.DataFrame) else None)
+            )
             if tx_cand is not None and not tx_cand.empty:
                 all_tx_dfs.append(tx_cand)
         elif "df_tx" in prof and isinstance(prof["df_tx"], pd.DataFrame) and not prof["df_tx"].empty:
@@ -608,7 +638,9 @@ def consolidate_multi_portfolios(
         master_df_tx = pd.concat(all_tx_dfs, ignore_index=True)
         if "tx_date" in master_df_tx.columns:
             master_df_tx["tx_date"] = pd.to_datetime(master_df_tx["tx_date"])
-            master_df_tx = master_df_tx.sort_values(["tx_date", "tx_id"] if "tx_id" in master_df_tx.columns else ["tx_date"]).reset_index(drop=True)
+            master_df_tx = master_df_tx.sort_values(
+                ["tx_date", "tx_id"] if "tx_id" in master_df_tx.columns else ["tx_date"]
+            ).reset_index(drop=True)
     else:
         master_df_tx = pd.DataFrame()
 
@@ -616,7 +648,7 @@ def consolidate_multi_portfolios(
         cleaned_returns = []
         for s in all_returns_series:
             s_c = s.copy()
-            if getattr(s_c.index, 'tz', None) is not None:
+            if getattr(s_c.index, "tz", None) is not None:
                 s_c.index = s_c.index.tz_localize(None)
             cleaned_returns.append(s_c)
         comb_df = pd.concat(cleaned_returns, axis=1).fillna(0.0)
@@ -627,26 +659,29 @@ def consolidate_multi_portfolios(
     else:
         master_returns = pd.Series(dtype=float)
 
-    if getattr(master_returns.index, 'tz', None) is not None:
+    if getattr(master_returns.index, "tz", None) is not None:
         master_returns.index = master_returns.index.tz_localize(None)
 
     if all_price_dfs:
-        combined_prices = pd.concat(all_price_dfs, ignore_index=True).drop_duplicates(["ticker", "price_date"]).reset_index(drop=True)
+        combined_prices = (
+            pd.concat(all_price_dfs, ignore_index=True).drop_duplicates(["ticker", "price_date"]).reset_index(drop=True)
+        )
     else:
         combined_prices = pd.DataFrame()
 
     if all_asset_returns:
         combined_asset_returns = pd.concat(all_asset_returns, axis=1)
         combined_asset_returns = combined_asset_returns.loc[:, ~combined_asset_returns.columns.duplicated()].fillna(0.0)
-        if getattr(combined_asset_returns.index, 'tz', None) is not None:
+        if getattr(combined_asset_returns.index, "tz", None) is not None:
             combined_asset_returns.index = combined_asset_returns.index.tz_localize(None)
     else:
         combined_asset_returns = pd.DataFrame()
 
-    from core.risk_engine import _load_benchmark, _calc_market_risk, _calc_return_metrics, _calc_concentration
+    from core.risk_engine import _calc_concentration, _calc_market_risk, _calc_return_metrics, _load_benchmark
+
     if all_bm_series:
         longest_bm = max(all_bm_series, key=lambda x: len(x)).copy()
-        if getattr(longest_bm.index, 'tz', None) is not None:
+        if getattr(longest_bm.index, "tz", None) is not None:
             longest_bm.index = longest_bm.index.tz_localize(None)
         master_bm_returns = longest_bm.reindex(master_returns.index).fillna(0.0)
     else:
@@ -656,7 +691,12 @@ def consolidate_multi_portfolios(
         master_bm_returns = _load_benchmark("SPY", combined_prices, master_returns.index)
 
     # Calcolo Beta empirico per ciascun asset vs Benchmark
-    if combined_asset_returns is not None and not combined_asset_returns.empty and master_bm_returns is not None and not master_bm_returns.empty:
+    if (
+        combined_asset_returns is not None
+        and not combined_asset_returns.empty
+        and master_bm_returns is not None
+        and not master_bm_returns.empty
+    ):
         try:
             asset_betas = {}
             for col in combined_asset_returns.columns:
@@ -675,8 +715,16 @@ def consolidate_multi_portfolios(
             pass
 
     # 3. Calcolo Completo Metriche Quantitative Standard ARGUS
-    market_risk_res = _calc_market_risk(master_returns, master_bm_returns, benchmark_ticker="SPY", risk_free_rate=active_rf_rate, df_positions=df_positions)
-    return_metrics_res = _calc_return_metrics(master_returns, master_bm_returns, master_df_tx, df_positions, risk_free_rate=active_rf_rate)
+    market_risk_res = _calc_market_risk(
+        master_returns,
+        master_bm_returns,
+        benchmark_ticker="SPY",
+        risk_free_rate=active_rf_rate,
+        df_positions=df_positions,
+    )
+    return_metrics_res = _calc_return_metrics(
+        master_returns, master_bm_returns, master_df_tx, df_positions, risk_free_rate=active_rf_rate
+    )
     concentration_res = _calc_concentration(df_positions)
 
     cum_ret = float(return_metrics_res.get("total_return_pct", 0.0) or 0.0) / 100.0
@@ -712,23 +760,22 @@ def consolidate_multi_portfolios(
         "returns": return_metrics_res,
         "market_risk": market_risk_res,
         "concentration": concentration_res,
-        "risk_free": rf_info
+        "risk_free": rf_info,
     }
 
     names_str = " + ".join(selected_names)
-    
+
     # Calcolo Scomposizione Rischio Master, Stress Testing & Ottimizzazione Markowitz
     from core.risk_engine import _calc_risk_contribution, _calc_stress_tests, _compute_efficient_frontier
+
     rc_master = _calc_risk_contribution(combined_asset_returns, df_positions)
     stress_master = _calc_stress_tests(combined_asset_returns, df_positions, master_bm_returns)
     opt_master = _compute_efficient_frontier(combined_asset_returns, df_positions, risk_free_rate=active_rf_rate)
 
     from core.closed_trades import compute_closed_trades_journal
+
     closed_trades_master = compute_closed_trades_journal(
-        df_tx=master_df_tx,
-        df_prices=combined_prices,
-        df_positions=df_positions,
-        is_sandbox=False
+        df_tx=master_df_tx, df_prices=combined_prices, df_positions=df_positions, is_sandbox=False
     )
 
     return {
@@ -753,7 +800,5 @@ def consolidate_multi_portfolios(
         "warnings": [],
         "base_currency": "EUR",
         "run_id": f"MASTER-{datetime.now().strftime('%Y%m%d_%H%M%S')}",
-        "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-
-

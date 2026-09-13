@@ -3,20 +3,14 @@
 # Unit tests for Wealth Google Sheets synchronization & parsing
 # ============================================================
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 from sqlalchemy import create_engine
+
 import gsheets_sync_subproject.sync_google_sheets
-from core.wealth.wealth_sync import (
-    sync_expenses_tracker_2026_from_gsheets,
-    GSHEET_CATEGORY_MAPPING
-)
-from core.wealth.wealth_db import (
-    init_wealth_db,
-    get_wealth_accounts,
-    get_cashflow_records,
-    get_wealth_categories
-)
+from core.wealth.wealth_db import get_cashflow_records, get_wealth_accounts, get_wealth_categories, init_wealth_db
+from core.wealth.wealth_sync import GSHEET_CATEGORY_MAPPING, sync_expenses_tracker_2026_from_gsheets
 
 
 def test_wealth_gsheet_category_mapping_completeness():
@@ -99,9 +93,10 @@ def test_classify_category_semantic():
 def test_sync_config_fixed_expenses_and_integration():
     """Verifica il parsing e il salvataggio delle spese fisse da Config_FixedExpenses."""
     from sqlalchemy import create_engine
-    from core.wealth.wealth_sync import _sync_config_fixed_expenses_sheet
+
     from core.wealth.wealth_db import get_wealth_fixed_expenses, save_wealth_fixed_expense
     from core.wealth.wealth_engine import compute_recurring_subscriptions_analytics
+    from core.wealth.wealth_sync import _sync_config_fixed_expenses_sheet
 
     engine = create_engine("sqlite:///:memory:")
 

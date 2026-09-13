@@ -9,32 +9,32 @@ schema compliance across all user archetypes.
 """
 
 import os
+import sqlite3
 import sys
 import tempfile
-import sqlite3
 from datetime import datetime
 from pathlib import Path
-import pytest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+import pytest
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
+from core.wealth.wealth_db import init_wealth_db
 from scripts.generate_realistic_portfolio import (
     ARCHETYPES,
-    MarketCalendarHelper,
-    FrenchMortgageEngine,
     CashLedger,
-    PriceAndDividendEngine,
+    FrenchMortgageEngine,
+    MarketCalendarHelper,
     PortfolioSimulationEngine,
-    verify_simulation_invariants,
+    PriceAndDividendEngine,
+    export_simulation_to_files,
     populate_argus_database,
-    export_simulation_to_files
+    verify_simulation_invariants,
 )
-from core.wealth.wealth_db import init_wealth_db
-
 
 # ─────────────────────────────────────────────────────────────
 # 1. Test del Calendario di Negoziazione

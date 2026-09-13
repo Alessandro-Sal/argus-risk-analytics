@@ -15,9 +15,9 @@
 
 ---
 
-## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.4.0)
+## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.5.0)
 
-ARGUS v9.4.0 introduce il **disaccoppiamento completo del motore quantitativo dal front-end Streamlit**, trasformando ARGUS in un **Headless Analytical Package** installabile e integrabile in pipeline di produzione, notebook Jupyter e architetture a microservizi:
+ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo headless**, introducendo uno **Unified Stochastic Kernel** con Cholesky PSD robusto, vettorizzazione BLAS/SIMD delle metriche di rischio e completa conformità CI/CD e linter:
 
 * **📦 Python Package Headless & CLI Console Scripts (`argus-risk`)**:
   ```bash

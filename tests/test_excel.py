@@ -1,6 +1,9 @@
 import io
+
 import pandas as pd
+
 from core.excel_generator import generate_excel_in_memory
+
 
 def test_generate_excel_in_memory():
     # Mock active positions DataFrame

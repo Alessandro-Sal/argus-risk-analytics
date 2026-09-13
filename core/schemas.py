@@ -3,12 +3,12 @@
 # Investment Risk BI Platform
 # ============================================================
 
-from datetime import date
-from typing import Optional, List
 from dataclasses import dataclass, field
+from datetime import date
+from typing import List, Optional
 
 try:
-    from pydantic import BaseModel, Field, field_validator, ConfigDict
+    from pydantic import BaseModel, ConfigDict, Field, field_validator
 
     class TransactionContract(BaseModel):
         model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -91,7 +91,7 @@ def validate_transaction_records(records: list) -> tuple[list, list]:
                 price=float(rec.get("price", 0)),
                 currency=str(rec.get("currency", "EUR")),
                 fees=float(rec.get("fees", 0.0)),
-                notes=rec.get("notes")
+                notes=rec.get("notes"),
             )
             valid_contracts.append(contract)
         except Exception as e:

@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import duckdb
+
     HAS_DUCKDB = True
 except ImportError:
     duckdb = None
@@ -29,6 +30,7 @@ except ImportError:
 
 try:
     import pyarrow as pa
+
     HAS_PYARROW = True
 except ImportError:
     pa = None
@@ -132,16 +134,15 @@ class UniversalLedgerEngine:
         """)
 
     @staticmethod
-    def generate_entry_id(entity_id: str, booking_date: str, asset_id: str, op_type: str, qty: float, price: float) -> str:
+    def generate_entry_id(
+        entity_id: str, booking_date: str, asset_id: str, op_type: str, qty: float, price: float
+    ) -> str:
         """Genera un hash deterministico SHA-256 idempotente per la riga contabile."""
         raw = f"{entity_id}_{booking_date}_{asset_id}_{op_type}_{qty:.6f}_{price:.6f}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
     def ingest_trading_transactions(
-        self, 
-        df_transactions: pd.DataFrame, 
-        entity_id: str = "DEFAULT_ENTITY",
-        base_currency: str = "EUR"
+        self, df_transactions: pd.DataFrame, entity_id: str = "DEFAULT_ENTITY", base_currency: str = "EUR"
     ) -> int:
         """
         Ingerisce le transazioni azionarie, ETF, obbligazionarie e crypto nel One-Ledger.
@@ -151,12 +152,16 @@ class UniversalLedgerEngine:
             return 0
 
         df = df_transactions.copy()
-        
+
         # Mappatura colonne standard
         date_col = "Date" if "Date" in df.columns else ("date" if "date" in df.columns else None)
         ticker_col = "Ticker" if "Ticker" in df.columns else ("ticker" if "ticker" in df.columns else None)
         type_col = "Type" if "Type" in df.columns else ("type" if "type" in df.columns else None)
-        shares_col = "Shares" if "Shares" in df.columns else ("shares" if "shares" in df.columns else ("Quantity" if "Quantity" in df.columns else "quantity"))
+        shares_col = (
+            "Shares"
+            if "Shares" in df.columns
+            else ("shares" if "shares" in df.columns else ("Quantity" if "Quantity" in df.columns else "quantity"))
+        )
         price_col = "Price" if "Price" in df.columns else ("price" if "price" in df.columns else None)
         fees_col = "Commission" if "Commission" in df.columns else ("fees" if "fees" in df.columns else None)
         curr_col = "Currency" if "Currency" in df.columns else ("currency" if "currency" in df.columns else None)
@@ -199,7 +204,7 @@ class UniversalLedgerEngine:
                     "STANDARD",
                     curr,
                     True,
-                    "REDDITI_DIVERSI" if not is_crypto else "REDDITI_DIVERSI_CRYPTO"
+                    "REDDITI_DIVERSI" if not is_crypto else "REDDITI_DIVERSI_CRYPTO",
                 )
 
             # Calcolo importi
@@ -211,18 +216,47 @@ class UniversalLedgerEngine:
             account_credit = f"ACT_CASH_{curr}" if op in ["BUY", "DEPOSIT"] else f"ACT_PORTFOLIO_{asset_class}"
 
             entry_id = self.generate_entry_id(entity_id, d_val, ticker, op, qty, price)
-            records.append((
-                entry_id, entity_id, d_val, d_val, account_debit, account_credit,
-                ticker, op, qty, price, gross, fees, 0.0, net, curr, fx, net_base,
-                None, f"Automated Ingestion from {op}", None
-            ))
+            records.append(
+                (
+                    entry_id,
+                    entity_id,
+                    d_val,
+                    d_val,
+                    account_debit,
+                    account_credit,
+                    ticker,
+                    op,
+                    qty,
+                    price,
+                    gross,
+                    fees,
+                    0.0,
+                    net,
+                    curr,
+                    fx,
+                    net_base,
+                    None,
+                    f"Automated Ingestion from {op}",
+                    None,
+                )
+            )
 
         # Inserimento anagrafiche asset
         if asset_records:
-            asset_df = pd.DataFrame(list(asset_records.values()), columns=[
-                "asset_id", "isin", "ticker", "name", "asset_class", "sub_asset_class", 
-                "quote_currency", "is_liquid", "tax_category"
-            ])
+            asset_df = pd.DataFrame(
+                list(asset_records.values()),
+                columns=[
+                    "asset_id",
+                    "isin",
+                    "ticker",
+                    "name",
+                    "asset_class",
+                    "sub_asset_class",
+                    "quote_currency",
+                    "is_liquid",
+                    "tax_category",
+                ],
+            )
             self.con.register("temp_assets", asset_df)
             self.con.execute("""
                 INSERT INTO dim_asset_master (asset_id, isin, ticker, name, asset_class, sub_asset_class, quote_currency, is_liquid, tax_category)
@@ -234,12 +268,31 @@ class UniversalLedgerEngine:
 
         # Inserimento transazioni nel ledger
         if records:
-            ledger_df = pd.DataFrame(records, columns=[
-                "entry_id", "entity_id", "booking_date", "value_date", "account_debit", "account_credit",
-                "asset_id", "operation_type", "quantity", "unit_price", "gross_amount", "transaction_fees",
-                "withholding_tax", "net_amount", "currency", "fx_rate_to_base", "net_amount_base_eur",
-                "tax_lot_id", "notes", "metadata_json"
-            ])
+            ledger_df = pd.DataFrame(
+                records,
+                columns=[
+                    "entry_id",
+                    "entity_id",
+                    "booking_date",
+                    "value_date",
+                    "account_debit",
+                    "account_credit",
+                    "asset_id",
+                    "operation_type",
+                    "quantity",
+                    "unit_price",
+                    "gross_amount",
+                    "transaction_fees",
+                    "withholding_tax",
+                    "net_amount",
+                    "currency",
+                    "fx_rate_to_base",
+                    "net_amount_base_eur",
+                    "tax_lot_id",
+                    "notes",
+                    "metadata_json",
+                ],
+            )
             self.con.register("temp_ledger", ledger_df)
             self.con.execute("""
                 INSERT INTO fact_ledger_entry 
@@ -259,7 +312,7 @@ class UniversalLedgerEngine:
         accounts_df: Optional[pd.DataFrame] = None,
         mortgages_df: Optional[pd.DataFrame] = None,
         real_estate_df: Optional[pd.DataFrame] = None,
-        entity_id: str = "DEFAULT_ENTITY"
+        entity_id: str = "DEFAULT_ENTITY",
     ) -> Dict[str, int]:
         """
         Ingerisce posizioni patrimoniali illiquide, liquidità e mutui nello schema universale.
@@ -280,28 +333,71 @@ class UniversalLedgerEngine:
                 asset_id = f"CASH_{acc_name.upper().replace(' ', '_')}"
 
                 # Inserisci anagrafica asset
-                self.con.execute("""
+                self.con.execute(
+                    """
                     INSERT INTO dim_asset_master (asset_id, name, asset_class, is_liquid, tax_category, quote_currency)
                     VALUES ($1, $2, 'CASH', TRUE, 'REDDITI_CAPITALE', $3)
                     ON CONFLICT (asset_id) DO NOTHING;
-                """, [asset_id, acc_name, curr])
+                """,
+                    [asset_id, acc_name, curr],
+                )
 
                 entry_id = f"SNAP_ACC_{asset_id}_{today_str}"
-                acc_records.append((
-                    entry_id, entity_id, today_str, today_str, f"ACT_CASH_{curr}", "ACT_EQUITY_NET_WORTH",
-                    asset_id, "SNAPSHOT_BALANCE", 1.0, balance, balance, 0.0, 0.0, balance, curr, 1.0, balance,
-                    None, "Account Cash Balance Snapshot", None
-                ))
+                acc_records.append(
+                    (
+                        entry_id,
+                        entity_id,
+                        today_str,
+                        today_str,
+                        f"ACT_CASH_{curr}",
+                        "ACT_EQUITY_NET_WORTH",
+                        asset_id,
+                        "SNAPSHOT_BALANCE",
+                        1.0,
+                        balance,
+                        balance,
+                        0.0,
+                        0.0,
+                        balance,
+                        curr,
+                        1.0,
+                        balance,
+                        None,
+                        "Account Cash Balance Snapshot",
+                        None,
+                    )
+                )
 
             if acc_records:
-                temp_acc = pd.DataFrame(acc_records, columns=[
-                    "entry_id", "entity_id", "booking_date", "value_date", "account_debit", "account_credit",
-                    "asset_id", "operation_type", "quantity", "unit_price", "gross_amount", "transaction_fees",
-                    "withholding_tax", "net_amount", "currency", "fx_rate_to_base", "net_amount_base_eur",
-                    "tax_lot_id", "notes", "metadata_json"
-                ])
+                temp_acc = pd.DataFrame(
+                    acc_records,
+                    columns=[
+                        "entry_id",
+                        "entity_id",
+                        "booking_date",
+                        "value_date",
+                        "account_debit",
+                        "account_credit",
+                        "asset_id",
+                        "operation_type",
+                        "quantity",
+                        "unit_price",
+                        "gross_amount",
+                        "transaction_fees",
+                        "withholding_tax",
+                        "net_amount",
+                        "currency",
+                        "fx_rate_to_base",
+                        "net_amount_base_eur",
+                        "tax_lot_id",
+                        "notes",
+                        "metadata_json",
+                    ],
+                )
                 self.con.register("temp_acc", temp_acc)
-                self.con.execute("INSERT INTO fact_ledger_entry SELECT * FROM temp_acc ON CONFLICT (entry_id) DO NOTHING;")
+                self.con.execute(
+                    "INSERT INTO fact_ledger_entry SELECT * FROM temp_acc ON CONFLICT (entry_id) DO NOTHING;"
+                )
                 self.con.unregister("temp_acc")
                 counts["accounts"] = len(acc_records)
 
@@ -313,28 +409,71 @@ class UniversalLedgerEngine:
                 est_val = float(r.get("estimated_value", r.get("value", 0.0)))
                 asset_id = f"RE_{prop_name.upper().replace(' ', '_')}"
 
-                self.con.execute("""
+                self.con.execute(
+                    """
                     INSERT INTO dim_asset_master (asset_id, name, asset_class, is_liquid, tax_category, quote_currency)
                     VALUES ($1, $2, 'REAL_ESTATE', FALSE, 'PATRIMONIALE_ESENTE', 'EUR')
                     ON CONFLICT (asset_id) DO NOTHING;
-                """, [asset_id, prop_name])
+                """,
+                    [asset_id, prop_name],
+                )
 
                 entry_id = f"SNAP_RE_{asset_id}_{today_str}"
-                re_records.append((
-                    entry_id, entity_id, today_str, today_str, "ACT_REAL_ESTATE", "ACT_EQUITY_NET_WORTH",
-                    asset_id, "SNAPSHOT_BALANCE", 1.0, est_val, est_val, 0.0, 0.0, est_val, "EUR", 1.0, est_val,
-                    None, "Real Estate Valuation Snapshot", None
-                ))
+                re_records.append(
+                    (
+                        entry_id,
+                        entity_id,
+                        today_str,
+                        today_str,
+                        "ACT_REAL_ESTATE",
+                        "ACT_EQUITY_NET_WORTH",
+                        asset_id,
+                        "SNAPSHOT_BALANCE",
+                        1.0,
+                        est_val,
+                        est_val,
+                        0.0,
+                        0.0,
+                        est_val,
+                        "EUR",
+                        1.0,
+                        est_val,
+                        None,
+                        "Real Estate Valuation Snapshot",
+                        None,
+                    )
+                )
 
             if re_records:
-                temp_re = pd.DataFrame(re_records, columns=[
-                    "entry_id", "entity_id", "booking_date", "value_date", "account_debit", "account_credit",
-                    "asset_id", "operation_type", "quantity", "unit_price", "gross_amount", "transaction_fees",
-                    "withholding_tax", "net_amount", "currency", "fx_rate_to_base", "net_amount_base_eur",
-                    "tax_lot_id", "notes", "metadata_json"
-                ])
+                temp_re = pd.DataFrame(
+                    re_records,
+                    columns=[
+                        "entry_id",
+                        "entity_id",
+                        "booking_date",
+                        "value_date",
+                        "account_debit",
+                        "account_credit",
+                        "asset_id",
+                        "operation_type",
+                        "quantity",
+                        "unit_price",
+                        "gross_amount",
+                        "transaction_fees",
+                        "withholding_tax",
+                        "net_amount",
+                        "currency",
+                        "fx_rate_to_base",
+                        "net_amount_base_eur",
+                        "tax_lot_id",
+                        "notes",
+                        "metadata_json",
+                    ],
+                )
                 self.con.register("temp_re", temp_re)
-                self.con.execute("INSERT INTO fact_ledger_entry SELECT * FROM temp_re ON CONFLICT (entry_id) DO NOTHING;")
+                self.con.execute(
+                    "INSERT INTO fact_ledger_entry SELECT * FROM temp_re ON CONFLICT (entry_id) DO NOTHING;"
+                )
                 self.con.unregister("temp_re")
                 counts["real_estate"] = len(re_records)
 
@@ -346,28 +485,71 @@ class UniversalLedgerEngine:
                 outstanding = float(r.get("outstanding_debt", r.get("remaining_debt", 0.0)))
                 asset_id = f"MORTGAGE_{m_name.upper().replace(' ', '_')}"
 
-                self.con.execute("""
+                self.con.execute(
+                    """
                     INSERT INTO dim_asset_master (asset_id, name, asset_class, is_liquid, tax_category, quote_currency)
                     VALUES ($1, $2, 'MORTGAGE', FALSE, 'LIABILITY', 'EUR')
                     ON CONFLICT (asset_id) DO NOTHING;
-                """, [asset_id, m_name])
+                """,
+                    [asset_id, m_name],
+                )
 
                 entry_id = f"SNAP_MORTGAGE_{asset_id}_{today_str}"
-                m_records.append((
-                    entry_id, entity_id, today_str, today_str, "ACT_EQUITY_NET_WORTH", "ACT_LIABILITY_MORTGAGE",
-                    asset_id, "SNAPSHOT_BALANCE", 1.0, outstanding, outstanding, 0.0, 0.0, outstanding, "EUR", 1.0, outstanding,
-                    None, "Mortgage Liability Snapshot", None
-                ))
+                m_records.append(
+                    (
+                        entry_id,
+                        entity_id,
+                        today_str,
+                        today_str,
+                        "ACT_EQUITY_NET_WORTH",
+                        "ACT_LIABILITY_MORTGAGE",
+                        asset_id,
+                        "SNAPSHOT_BALANCE",
+                        1.0,
+                        outstanding,
+                        outstanding,
+                        0.0,
+                        0.0,
+                        outstanding,
+                        "EUR",
+                        1.0,
+                        outstanding,
+                        None,
+                        "Mortgage Liability Snapshot",
+                        None,
+                    )
+                )
 
             if m_records:
-                temp_m = pd.DataFrame(m_records, columns=[
-                    "entry_id", "entity_id", "booking_date", "value_date", "account_debit", "account_credit",
-                    "asset_id", "operation_type", "quantity", "unit_price", "gross_amount", "transaction_fees",
-                    "withholding_tax", "net_amount", "currency", "fx_rate_to_base", "net_amount_base_eur",
-                    "tax_lot_id", "notes", "metadata_json"
-                ])
+                temp_m = pd.DataFrame(
+                    m_records,
+                    columns=[
+                        "entry_id",
+                        "entity_id",
+                        "booking_date",
+                        "value_date",
+                        "account_debit",
+                        "account_credit",
+                        "asset_id",
+                        "operation_type",
+                        "quantity",
+                        "unit_price",
+                        "gross_amount",
+                        "transaction_fees",
+                        "withholding_tax",
+                        "net_amount",
+                        "currency",
+                        "fx_rate_to_base",
+                        "net_amount_base_eur",
+                        "tax_lot_id",
+                        "notes",
+                        "metadata_json",
+                    ],
+                )
                 self.con.register("temp_m", temp_m)
-                self.con.execute("INSERT INTO fact_ledger_entry SELECT * FROM temp_m ON CONFLICT (entry_id) DO NOTHING;")
+                self.con.execute(
+                    "INSERT INTO fact_ledger_entry SELECT * FROM temp_m ON CONFLICT (entry_id) DO NOTHING;"
+                )
                 self.con.unregister("temp_m")
                 counts["mortgages"] = len(m_records)
 
@@ -465,7 +647,7 @@ class UniversalLedgerEngine:
             "real_estate_assets_eur": re_val,
             "total_assets_eur": total_assets,
             "mortgage_liabilities_eur": mort_val,
-            "consolidated_net_worth_eur": net_worth
+            "consolidated_net_worth_eur": net_worth,
         }
 
     def get_arrow_table(self, table_name: str = "fact_ledger_entry") -> Optional[Any]:
@@ -502,7 +684,8 @@ class UniversalLedgerEngine:
         if self.con is None or bitemporal_engine is None:
             return 0
 
-        df = self.con.execute("""
+        df = self.con.execute(
+            """
             SELECT entry_id, entity_id, booking_date, value_date, asset_id,
                    operation_type, quantity, unit_price, gross_amount,
                    transaction_fees, withholding_tax, net_amount, currency,
@@ -510,14 +693,16 @@ class UniversalLedgerEngine:
             FROM fact_ledger_entry
             WHERE entity_id = $1
             ORDER BY booking_date ASC
-        """, [entity_id]).fetchdf()
+        """,
+            [entity_id],
+        ).fetchdf()
 
         if df.empty:
             return 0
 
         synced = 0
         for _, row in df.iterrows():
-            v_date_str = pd.to_datetime(row['value_date']).strftime("%Y-%m-%d %H:%M:%S")
+            v_date_str = pd.to_datetime(row["value_date"]).strftime("%Y-%m-%d %H:%M:%S")
             bitemporal_engine.record_transaction(
                 tx_business_id=str(row["entry_id"]),
                 portfolio_id=str(row["entity_id"]),
@@ -531,7 +716,7 @@ class UniversalLedgerEngine:
                 taxes=float(row.get("withholding_tax", 0.0) or 0.0),
                 currency=str(row.get("currency", "EUR")),
                 fx_rate_to_base=float(row.get("fx_rate_to_base", 1.0) or 1.0),
-                source_doc_ref=f"LEDGER_ENTRY_{str(row['entry_id'])[:8]}"
+                source_doc_ref=f"LEDGER_ENTRY_{str(row['entry_id'])[:8]}",
             )
             synced += 1
 
@@ -540,6 +725,6 @@ class UniversalLedgerEngine:
             entity_id=entity_id,
             actor_id="SYSTEM:UniversalLedgerEngine",
             rationale=f"Sincronizzazione contabile batch di {synced} transazioni dal One-Ledger",
-            payload={"entity_id": entity_id, "records_synced": synced}
+            payload={"entity_id": entity_id, "records_synced": synced},
         )
         return synced

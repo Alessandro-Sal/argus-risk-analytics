@@ -13,7 +13,6 @@ if _root_dir not in sys.path:
 
 import streamlit as st
 
-
 # Gestione parametri URL e calcolo stato sidebar (collassata all'avvio su splash, aperta nei moduli)
 _qp = getattr(st, "query_params", None)
 _is_splash = not st.session_state.get("_app_initialized", False) and not st.session_state.get("splash_dismissed", False)
@@ -51,7 +50,9 @@ if _qp is not None:
             pass
 
 # ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
-from components.splash import render_splash_screen as render_argus_splash, auto_expand_sidebar
+from components.splash import auto_expand_sidebar
+from components.splash import render_splash_screen as render_argus_splash
+
 if render_argus_splash(app_version="9.0.0"):
     st.stop()
 
@@ -59,15 +60,16 @@ if render_argus_splash(app_version="9.0.0"):
 auto_expand_sidebar()
 
 
-import pandas as pd
-import numpy as np
 import datetime
+import html
 import json
+import logging
 import os
 import re
-import html
+
+import numpy as np
+import pandas as pd
 import requests
-import logging
 
 logger = logging.getLogger("argus.control_room")
 
@@ -77,52 +79,52 @@ try:
 except ImportError:
     pass
 
-from core.validator import validate_csv
-from core.fetcher import fetch_and_store, get_engine
-from core.risk_engine import compute_risk
-from core.db_exporter import save_snapshot_to_db
-import core.ui_utils
-import core.duckdb_engine as duckdb_engine
 import core.adapters.broker_hub as broker_hub
-from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    fmt_eur,
-    fmt_pct,
-    render_workflow_stepper,
-    render_command_bar,
-    render_validation_report,
-    glossary_modal,
-    render_info_modal,
-    render_control_room_hero,
-    get_display_portfolio_name,
-    render_broker_hub_modal,
-    render_duckdb_modal,
-    render_export_toolbar,
-    render_table_with_export,
-)
-from components.splash import render_splash_screen as render_argus_splash
+import core.duckdb_engine as duckdb_engine
 import core.multi_portfolio
-from core.multi_portfolio import (
-    save_portfolio_profile,
-    list_saved_portfolio_profiles,
-    load_portfolio_profile,
-    delete_saved_portfolio_profile,
-    compute_multi_portfolio_comparison,
-    consolidate_multi_portfolios,
-)
+import core.ui_utils
+from components.splash import render_splash_screen as render_argus_splash
+from core.cache_shield import clear_cache
+from core.db_exporter import save_snapshot_to_db
 from core.diagnostics import (
-    run_system_health_check,
-    optimize_database_storage,
     clean_expired_cache_records,
-    reindex_databases,
-    setup_logging,
-    get_recent_logs,
     generate_support_bundle,
     get_hardware_and_environment_specs,
+    get_recent_logs,
+    optimize_database_storage,
+    reindex_databases,
+    run_system_health_check,
+    setup_logging,
 )
-from core.cache_shield import clear_cache
+from core.fetcher import fetch_and_store, get_engine
+from core.multi_portfolio import (
+    compute_multi_portfolio_comparison,
+    consolidate_multi_portfolios,
+    delete_saved_portfolio_profile,
+    list_saved_portfolio_profiles,
+    load_portfolio_profile,
+    save_portfolio_profile,
+)
+from core.risk_engine import compute_risk
+from core.ui_utils import (
+    fmt_eur,
+    fmt_pct,
+    get_display_portfolio_name,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_broker_hub_modal,
+    render_command_bar,
+    render_control_room_hero,
+    render_duckdb_modal,
+    render_export_toolbar,
+    render_info_modal,
+    render_table_with_export,
+    render_validation_report,
+    render_workflow_stepper,
+    section,
+)
+from core.validator import validate_csv
 
 # Inizializzazione Centralizzata Logging SRE & Sanitizzazione PII
 setup_logging()
@@ -141,6 +143,7 @@ inject_custom_css()
 
 # ── Sidebar (Caricata solo dopo l'accesso al terminale) ───────
 from core.sidebar import render_sidebar
+
 render_sidebar()
 
 # Fetch parameters safely from session_state
@@ -451,8 +454,8 @@ if st.session_state.get("pipeline_done"):
         """, unsafe_allow_html=True)
     with col_act2:
         if st.button("🔄 Reset / Nuova Analisi", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
-            from core.workspace_manager import clear_session_cache
             from core.workspace_context import WorkspaceContext
+            from core.workspace_manager import clear_session_cache
             for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested", "df_clean", "selected_bitemp_port"]:
                 st.session_state.pop(k, None)
             clear_session_cache()
@@ -508,8 +511,8 @@ with tab_ingest:
 
     # ── Helper Iniezione Archetipo Unificato ─────────────────────
     from core.archetype_manager import (
-        execute_unified_archetype_load,
         clear_unified_archetype,
+        execute_unified_archetype_load,
         render_unified_archetype_hud,
     )
 
@@ -669,6 +672,7 @@ with tab_ingest:
             with st.spinner("⏳ Connessione a Google Sheets ed esecuzione ETL in corso..."):
                 try:
                     import importlib
+
                     import core.db_exporter
                     importlib.reload(core.db_exporter)
                     import core.risk_engine
@@ -980,6 +984,7 @@ with tab_ingest:
                     
                     if not offline_mode:
                         from sqlalchemy import text as sqlt
+
                         from core.db_exporter import get_or_create_portfolio_id
                         with engine.begin() as conn:
                             portfolio_id = get_or_create_portfolio_id(
@@ -2046,6 +2051,7 @@ with tab_bitemporal:
     st.caption("Standard ISO/IEC 9075:2011 SQL Temporal, MiFID II / AIFMD Compliance & Certificazione Merkle Tree per Family Office e SGR.")
 
     import importlib
+
     import core.bitemporal_engine
     importlib.reload(core.bitemporal_engine)
     from core.bitemporal_engine import BitemporalLedgerEngine
@@ -2112,7 +2118,9 @@ with tab_bitemporal:
 
         # 5. Profili persistiti in data/multi_portfolios/*.pkl (inclusi tutti i sync GSheets eseguiti)
         try:
-            import os, pickle
+            import os
+            import pickle
+
             from core.multi_portfolio import PORTFOLIOS_DIR
             if os.path.exists(PORTFOLIOS_DIR):
                 for fn in sorted(os.listdir(PORTFOLIOS_DIR)):

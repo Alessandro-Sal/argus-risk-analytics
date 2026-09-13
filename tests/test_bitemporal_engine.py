@@ -4,11 +4,12 @@ Test suite per il modulo Bitemporal Persistence Engine, Audit Trail Crittografic
 """
 
 from datetime import datetime
-import pytest
-import pandas as pd
-import numpy as np
 
-from core.bitemporal_engine import BitemporalLedgerEngine, HAS_DUCKDB
+import numpy as np
+import pandas as pd
+import pytest
+
+from core.bitemporal_engine import HAS_DUCKDB, BitemporalLedgerEngine
 from core.universal_ledger import UniversalLedgerEngine
 
 

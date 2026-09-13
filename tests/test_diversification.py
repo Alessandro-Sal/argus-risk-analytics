@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def calculate_diversification_ratio(weights, individual_vols, portfolio_vol):
     weighted_vol = np.sum(weights * individual_vols)
     return (weighted_vol / portfolio_vol) if portfolio_vol > 0 else 1.0

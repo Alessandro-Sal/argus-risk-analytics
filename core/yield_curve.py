@@ -21,25 +21,25 @@ INSTITUTIONAL_BENCHMARK_RATES: Dict[str, Dict[str, Any]] = {
         "default_rate": 0.0275,  # 2.75% BCE Deposit Facility / €STR
         "ticker_proxy": "XEON.DE",
         "benchmark_name": "BCE €STR / Euro Short-Term Rate",
-        "description": "Tasso overnight privo di rischio dell'Area Euro (€STR / BCE Deposit Rate)."
+        "description": "Tasso overnight privo di rischio dell'Area Euro (€STR / BCE Deposit Rate).",
     },
     "USD": {
         "default_rate": 0.0435,  # 4.35% US 3-Month Treasury Bill / SOFR
         "ticker_proxy": "^IRX",
         "benchmark_name": "US 3-Month Treasury Bill (^IRX)",
-        "description": "Rendimento annualizzato dei Buoni del Tesoro USA a 13 settimane (3M T-Bill)."
+        "description": "Rendimento annualizzato dei Buoni del Tesoro USA a 13 settimane (3M T-Bill).",
     },
     "GBP": {
         "default_rate": 0.0475,  # 4.75% BoE SONIA / UK 3M Gilt
         "ticker_proxy": "CSH2.L",
         "benchmark_name": "Bank of England SONIA Benchmark",
-        "description": "Sterling Overnight Index Average (SONIA) del Regno Unito."
+        "description": "Sterling Overnight Index Average (SONIA) del Regno Unito.",
     },
     "CHF": {
         "default_rate": 0.0100,  # 1.00% SNB SARON
         "ticker_proxy": None,
         "benchmark_name": "Swiss National Bank SARON",
-        "description": "Swiss Average Rate Overnight (SARON) della Banca Nazionale Svizzera."
+        "description": "Swiss Average Rate Overnight (SARON) della Banca Nazionale Svizzera.",
     },
 }
 
@@ -53,7 +53,9 @@ def get_default_risk_free_rate(currency: str = "EUR") -> float:
     return float(info["default_rate"])
 
 
-def _extract_rate_from_proxy_history(ticker: str, benchmark_name: str, force_refresh: bool) -> tuple[Optional[float], Optional[str]]:
+def _extract_rate_from_proxy_history(
+    ticker: str, benchmark_name: str, force_refresh: bool
+) -> tuple[Optional[float], Optional[str]]:
     """Estrae la stima del tasso live dal proxy di mercato (ticker Yahoo Finance)."""
     try:
         df = get_cached_ticker_history(ticker, ttl_seconds=43200, force_refresh=force_refresh)
@@ -81,10 +83,7 @@ def _extract_rate_from_proxy_history(ticker: str, benchmark_name: str, force_ref
     return None, None
 
 
-def fetch_live_risk_free_rate(
-    currency: str = "EUR",
-    force_refresh: bool = False
-) -> Dict[str, Any]:
+def fetch_live_risk_free_rate(currency: str = "EUR", force_refresh: bool = False) -> Dict[str, Any]:
     """
     Recupera il tasso d'interesse privo di rischio (Risk-Free Rate) aggiornato per la valuta base.
     Utilizza lo scudo di caching a 2 livelli e ripiega in modo trasparente sui tassi ufficiali
@@ -136,21 +135,15 @@ def fetch_live_risk_free_rate(
         "description": meta["description"],
         "is_live": is_live,
         "as_of_date": today_str,
-        "default_rate_pct": round(default_rate * 100.0, 2)
+        "default_rate_pct": round(default_rate * 100.0, 2),
     }
 
-    _YIELD_CACHE[cache_key] = {
-        "_cached_at": now,
-        "data": result
-    }
+    _YIELD_CACHE[cache_key] = {"_cached_at": now, "data": result}
 
     return result
 
 
-def get_active_risk_free_rate(
-    currency: str = "EUR",
-    custom_override: Optional[float] = None
-) -> Dict[str, Any]:
+def get_active_risk_free_rate(currency: str = "EUR", custom_override: Optional[float] = None) -> Dict[str, Any]:
     """
     Restituisce la configurazione attiva del tasso risk-free, applicando l'eventuale override manuale.
     """
@@ -166,7 +159,7 @@ def get_active_risk_free_rate(
             "is_live": False,
             "is_manual_override": True,
             "as_of_date": datetime.now().strftime("%Y-%m-%d"),
-            "default_rate_pct": round(get_default_risk_free_rate(c_upper) * 100.0, 2)
+            "default_rate_pct": round(get_default_risk_free_rate(c_upper) * 100.0, 2),
         }
 
     live_info = fetch_live_risk_free_rate(currency)
@@ -174,10 +167,7 @@ def get_active_risk_free_rate(
     return live_info
 
 
-def get_daily_risk_free_rate(
-    annual_rate: float,
-    trading_days: int = 252
-) -> float:
+def get_daily_risk_free_rate(annual_rate: float, trading_days: int = 252) -> float:
     """Converte un tasso risk-free annuo nel corrispondente tasso giornaliero."""
     if annual_rate <= 0:
         return 0.0
@@ -185,6 +175,7 @@ def get_daily_risk_free_rate(
 
 
 # ── Modello Parametrico Nelson-Siegel per Yield Curve ────────
+
 
 def _nelson_siegel_basis(t: np.ndarray, tau: float) -> tuple[np.ndarray, np.ndarray]:
     """Calcola le funzioni di base (slope e curvature) di Nelson-Siegel condizionate a tau."""
@@ -196,10 +187,7 @@ def _nelson_siegel_basis(t: np.ndarray, tau: float) -> tuple[np.ndarray, np.ndar
     return factor1, factor2
 
 
-def evaluate_yield_term_structure(
-    maturities_years: Any,
-    params: Dict[str, float]
-) -> np.ndarray:
+def evaluate_yield_term_structure(maturities_years: Any, params: Dict[str, float]) -> np.ndarray:
     """
     Valuta il rendimento zero-coupon y(t) secondo il modello parametrico di Nelson-Siegel:
     y(t) = beta0 + beta1 * ((1 - exp(-t/tau)) / (t/tau)) + beta2 * (((1 - exp(-t/tau)) / (t/tau)) - exp(-t/tau))
@@ -219,9 +207,7 @@ evaluate_nelson_siegel_curve = evaluate_yield_term_structure
 
 
 def fit_nelson_siegel_curve(
-    maturities_years: Any,
-    yields: Any,
-    tau_grid: Optional[np.ndarray] = None
+    maturities_years: Any, yields: Any, tau_grid: Optional[np.ndarray] = None
 ) -> Dict[str, Any]:
     """
     Calibra la curva dei rendimenti Nelson-Siegel tramite ottimizzazione OLS condizionata.
@@ -244,7 +230,7 @@ def fit_nelson_siegel_curve(
             "tau": 1.5,
             "r_squared": 1.0,
             "rmse": 0.0,
-            "fitted_yields": y_clean.tolist() if len(y_clean) > 0 else []
+            "fitted_yields": y_clean.tolist() if len(y_clean) > 0 else [],
         }
 
     if tau_grid is None:
@@ -263,8 +249,8 @@ def fit_nelson_siegel_curve(
             coeffs, _, _, _ = np.linalg.lstsq(X, y_clean, rcond=None)
             y_pred = X @ coeffs
             res = y_clean - y_pred
-            ss_res = np.sum(res ** 2)
-            rmse = np.sqrt(np.mean(res ** 2))
+            ss_res = np.sum(res**2)
+            rmse = np.sqrt(np.mean(res**2))
             r2 = 1.0 - (ss_res / (ss_tot + 1e-12)) if ss_tot > 0 else 0.99
 
             if r2 > best_r2:
@@ -276,7 +262,7 @@ def fit_nelson_siegel_curve(
                     "beta2": float(coeffs[2]),
                     "tau": float(tau_cand),
                     "r_squared": float(max(0.0, min(1.0, r2))),
-                    "rmse": float(rmse)
+                    "rmse": float(rmse),
                 }
         except Exception:
             continue
@@ -288,7 +274,7 @@ def fit_nelson_siegel_curve(
             "beta2": 0.0,
             "tau": 1.5,
             "r_squared": 0.95,
-            "rmse": 0.001
+            "rmse": 0.001,
         }
 
     fitted_curve = evaluate_yield_term_structure(t_clean, best_params)
@@ -298,9 +284,8 @@ def fit_nelson_siegel_curve(
 
 # ── Modello Parametrico Nelson-Siegel-Svensson (NSS 6 Parametri) ──
 
-def _nelson_siegel_svensson_basis(
-    t: np.ndarray, tau1: float, tau2: float
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+
+def _nelson_siegel_svensson_basis(t: np.ndarray, tau1: float, tau2: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Calcola le tre funzioni di base di Nelson-Siegel-Svensson condizionate a tau1 e tau2."""
     t_safe = np.maximum(t, 1e-6)
     tau1_safe = max(tau1, 1e-4)
@@ -317,10 +302,7 @@ def _nelson_siegel_svensson_basis(
     return f1, f2, f3
 
 
-def evaluate_nelson_siegel_svensson_curve(
-    maturities_years: Any,
-    params: Dict[str, float]
-) -> np.ndarray:
+def evaluate_nelson_siegel_svensson_curve(maturities_years: Any, params: Dict[str, float]) -> np.ndarray:
     """
     Valuta la struttura a termine NSS a 6 parametri (Svensson 1994):
     y(t) = beta0 + beta1 * f1(t, tau1) + beta2 * f2(t, tau1) + beta3 * f3(t, tau2)
@@ -339,10 +321,7 @@ def evaluate_nelson_siegel_svensson_curve(
 
 
 def fit_nelson_siegel_svensson_curve(
-    maturities_years: Any,
-    yields: Any,
-    tau1_grid: Optional[np.ndarray] = None,
-    tau2_grid: Optional[np.ndarray] = None
+    maturities_years: Any, yields: Any, tau1_grid: Optional[np.ndarray] = None, tau2_grid: Optional[np.ndarray] = None
 ) -> Dict[str, Any]:
     """
     Calibra la curva Svensson a 6 parametri con 2D grid-search OLS condizionato.
@@ -381,8 +360,8 @@ def fit_nelson_siegel_svensson_curve(
                 coeffs, _, _, _ = np.linalg.lstsq(X, y_clean, rcond=None)
                 y_pred = X @ coeffs
                 res = y_clean - y_pred
-                ss_res = np.sum(res ** 2)
-                rmse = np.sqrt(np.mean(res ** 2))
+                ss_res = np.sum(res**2)
+                rmse = np.sqrt(np.mean(res**2))
                 r2 = 1.0 - (ss_res / (ss_tot + 1e-12)) if ss_tot > 0 else 0.99
 
                 if r2 > best_r2:
@@ -396,7 +375,7 @@ def fit_nelson_siegel_svensson_curve(
                         "tau1": float(t1),
                         "tau2": float(t2),
                         "r_squared": float(max(0.0, min(1.0, r2))),
-                        "rmse": float(rmse)
+                        "rmse": float(rmse),
                     }
             except Exception:
                 continue
@@ -410,7 +389,7 @@ def fit_nelson_siegel_svensson_curve(
             "tau1": 1.5,
             "tau2": 5.0,
             "r_squared": 0.95,
-            "rmse": 0.001
+            "rmse": 0.001,
         }
 
     fitted_curve = evaluate_nelson_siegel_svensson_curve(t_clean, best_params)
@@ -423,7 +402,7 @@ def compute_key_rate_durations(
     coupon_or_cash_flows: Any,
     yield_curve_params: Dict[str, float],
     key_tenors: Optional[list] = None,
-    shift_bps: float = 1.0
+    shift_bps: float = 1.0,
 ) -> Dict[str, Any]:
     """
     Calcola le Key Rate Durations (KRD) su scadenze benchmark (es. 0.5Y, 1Y, 2Y, 5Y, 10Y, 30Y)
@@ -476,17 +455,10 @@ def compute_key_rate_durations(
         krd_dict[f"{kt}Y"] = round(float(krd), 4)
         total_krd += float(krd)
 
-    return {
-        "key_rate_durations": krd_dict,
-        "effective_duration": round(total_krd, 4),
-        "base_pv": round(base_pv, 4)
-    }
+    return {"key_rate_durations": krd_dict, "effective_duration": round(total_krd, 4), "base_pv": round(base_pv, 4)}
 
 
-def compute_discount_factors(
-    maturities_years: Any,
-    params: Dict[str, float]
-) -> np.ndarray:
+def compute_discount_factors(maturities_years: Any, params: Dict[str, float]) -> np.ndarray:
     """Calcola i fattori di sconto continui DF(t) = exp(-y(t) * t)."""
     t_arr = np.asarray(maturities_years, dtype=float)
     y_arr = evaluate_yield_term_structure(t_arr, params)
@@ -504,7 +476,7 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
     short_rate = active_rf["rate"]
 
     # Scadenze standard di mercato (in anni)
-    maturities = np.array([1/12, 3/12, 6/12, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0])
+    maturities = np.array([1 / 12, 3 / 12, 6 / 12, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 20.0, 30.0])
     maturity_labels = ["1M", "3M", "6M", "1Y", "2Y", "3Y", "5Y", "7Y", "10Y", "20Y", "30Y"]
 
     sample_yields = None
@@ -514,6 +486,7 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
     try:
         if c_upper == "USD":
             from core.macro_provider import fetch_us_treasury_term_structure
+
             us_live = fetch_us_treasury_term_structure()
             if us_live and len(us_live) >= 5:
                 y_list = []
@@ -526,6 +499,7 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
                 curve_source = "Live FRED (Federal Reserve Bank of St. Louis Treasury Curve)"
         elif c_upper == "EUR":
             from core.macro_provider import fetch_ecb_yield_curve
+
             ecb_live = fetch_ecb_yield_curve()
             if ecb_live and len(ecb_live) >= 5:
                 y_list = []
@@ -554,7 +528,11 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
             long_rate = max(0.008, short_rate + 0.006)
             mid_bump = 0.001
 
-        sample_yields = short_rate + (long_rate - short_rate) * (1.0 - np.exp(-maturities / 4.0)) + mid_bump * (maturities / 5.0) * np.exp(-maturities / 5.0)
+        sample_yields = (
+            short_rate
+            + (long_rate - short_rate) * (1.0 - np.exp(-maturities / 4.0))
+            + mid_bump * (maturities / 5.0) * np.exp(-maturities / 5.0)
+        )
     else:
         long_rate = float(sample_yields[-1])
 
@@ -564,13 +542,15 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
     fitted_nss_yields = evaluate_nelson_siegel_svensson_curve(maturities, nss_params)
     dfs = compute_discount_factors(maturities, ns_params)
 
-    df_curve = pd.DataFrame({
-        "tenor": maturity_labels,
-        "maturity_years": maturities,
-        "zero_rate_pct": np.round(fitted_yields * 100.0, 3),
-        "svensson_rate_pct": np.round(fitted_nss_yields * 100.0, 3),
-        "discount_factor": np.round(dfs, 5)
-    })
+    df_curve = pd.DataFrame(
+        {
+            "tenor": maturity_labels,
+            "maturity_years": maturities,
+            "zero_rate_pct": np.round(fitted_yields * 100.0, 3),
+            "svensson_rate_pct": np.round(fitted_nss_yields * 100.0, 3),
+            "discount_factor": np.round(dfs, 5),
+        }
+    )
 
     return {
         "currency": c_upper,
@@ -580,6 +560,5 @@ def get_institutional_yield_curve(currency: str = "EUR") -> Dict[str, Any]:
         "long_term_rate_pct": round(long_rate * 100.0, 2),
         "nelson_siegel_params": ns_params,
         "svensson_params": nss_params,
-        "df_curve": df_curve
+        "df_curve": df_curve,
     }
-

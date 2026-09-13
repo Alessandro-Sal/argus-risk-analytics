@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+
 def compute_backtest_metrics(ret_series, risk_free_rate=0.035):
     # Cumulative return
     cum_ret = (1 + ret_series).prod() - 1

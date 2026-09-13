@@ -3,18 +3,19 @@
 # ARGUS — Unit tests for Resilient Multi-Exchange Crypto Provider
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
+from core.cache_shield import get_cached_ticker_history
 from core.crypto_provider import (
+    fetch_binance_ohlcv,
+    fetch_coingecko_ohlcv,
+    fetch_crypto_history_unified,
+    fetch_kraken_ohlcv,
     is_crypto_symbol,
     normalize_crypto_pair,
-    fetch_binance_ohlcv,
-    fetch_kraken_ohlcv,
-    fetch_coingecko_ohlcv,
-    fetch_crypto_history_unified
 )
-from core.cache_shield import get_cached_ticker_history
 
 
 def test_is_crypto_symbol_detection():

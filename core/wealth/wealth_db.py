@@ -7,74 +7,200 @@
 import json
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 import pandas as pd
-from sqlalchemy import text as sqlt, Engine, Connection
+from sqlalchemy import Connection, Engine
+from sqlalchemy import text as sqlt
 
 from core.fetcher import get_engine
 from core.wealth.wealth_models import (
-    WealthAccount,
-    WealthCategory,
-    WealthCashflowItem,
-    PhysicalAssetItem,
-    PensionPlanItem,
     AccountType,
     CategoryNature,
-    PhysicalAssetCategory
+    PensionPlanItem,
+    PhysicalAssetCategory,
+    PhysicalAssetItem,
+    WealthAccount,
+    WealthCashflowItem,
+    WealthCategory,
 )
 
 # Categorie predefinite di sistema con icone e classificazione per natura
 DEFAULT_SYSTEM_CATEGORIES = [
     # Entrate
-    {"name": "Stipendio / Compensi", "flow_type": "income", "nature": "inflow_active", "icon": "💼", "color": "#10b981"},
-    {"name": "Bonus / Straordinari", "flow_type": "income", "nature": "inflow_active", "icon": "🎁", "color": "#34d399"},
+    {
+        "name": "Stipendio / Compensi",
+        "flow_type": "income",
+        "nature": "inflow_active",
+        "icon": "💼",
+        "color": "#10b981",
+    },
+    {
+        "name": "Bonus / Straordinari",
+        "flow_type": "income",
+        "nature": "inflow_active",
+        "icon": "🎁",
+        "color": "#34d399",
+    },
     {"name": "Dividendi & Cedole", "flow_type": "income", "nature": "inflow_passive", "icon": "📈", "color": "#059669"},
-    {"name": "Affitti & Rendite Immobiliari", "flow_type": "income", "nature": "inflow_passive", "icon": "🏠", "color": "#047857"},
-    {"name": "Rimborsi & Altre Entrate", "flow_type": "income", "nature": "inflow_active", "icon": "💵", "color": "#6ee7b7"},
-
+    {
+        "name": "Affitti & Rendite Immobiliari",
+        "flow_type": "income",
+        "nature": "inflow_passive",
+        "icon": "🏠",
+        "color": "#047857",
+    },
+    {
+        "name": "Rimborsi & Altre Entrate",
+        "flow_type": "income",
+        "nature": "inflow_active",
+        "icon": "💵",
+        "color": "#6ee7b7",
+    },
     # Spese Primarie (50% Needs)
-    {"name": "Casa & Mutuo / Affitto", "flow_type": "expense", "nature": "essential_need", "icon": "🏠", "color": "#ef4444"},
-    {"name": "Bollette & Utenze (Luce/Gas/Internet)", "flow_type": "expense", "nature": "essential_need", "icon": "⚡", "color": "#f87171"},
-    {"name": "Spesa Alimentare & Supermercato", "flow_type": "expense", "nature": "essential_need", "icon": "🛒", "color": "#dc2626"},
-    {"name": "Trasporti, Carburante & Mezzi", "flow_type": "expense", "nature": "essential_need", "icon": "🚗", "color": "#b91c1c"},
-    {"name": "Salute, Farmaci & Visite", "flow_type": "expense", "nature": "essential_need", "icon": "🏥", "color": "#991b1b"},
-    {"name": "Assicurazioni & Bolli", "flow_type": "expense", "nature": "essential_need", "icon": "🛡️", "color": "#7f1d1d"},
-
+    {
+        "name": "Casa & Mutuo / Affitto",
+        "flow_type": "expense",
+        "nature": "essential_need",
+        "icon": "🏠",
+        "color": "#ef4444",
+    },
+    {
+        "name": "Bollette & Utenze (Luce/Gas/Internet)",
+        "flow_type": "expense",
+        "nature": "essential_need",
+        "icon": "⚡",
+        "color": "#f87171",
+    },
+    {
+        "name": "Spesa Alimentare & Supermercato",
+        "flow_type": "expense",
+        "nature": "essential_need",
+        "icon": "🛒",
+        "color": "#dc2626",
+    },
+    {
+        "name": "Trasporti, Carburante & Mezzi",
+        "flow_type": "expense",
+        "nature": "essential_need",
+        "icon": "🚗",
+        "color": "#b91c1c",
+    },
+    {
+        "name": "Salute, Farmaci & Visite",
+        "flow_type": "expense",
+        "nature": "essential_need",
+        "icon": "🏥",
+        "color": "#991b1b",
+    },
+    {
+        "name": "Assicurazioni & Bolli",
+        "flow_type": "expense",
+        "nature": "essential_need",
+        "icon": "🛡️",
+        "color": "#7f1d1d",
+    },
     # Spese Discrezionali (30% Wants)
-    {"name": "Ristoranti, Bar & Delivery", "flow_type": "expense", "nature": "discretionary_want", "icon": "🍽️", "color": "#f59e0b"},
-    {"name": "Viaggi, Vacanze & Weekend", "flow_type": "expense", "nature": "discretionary_want", "icon": "✈️", "color": "#fbbf24"},
-    {"name": "Shopping & Abbigliamento", "flow_type": "expense", "nature": "discretionary_want", "icon": "🛍️", "color": "#d97706"},
-    {"name": "Svago, Cinema & Eventi", "flow_type": "expense", "nature": "discretionary_want", "icon": "🎟️", "color": "#b45309"},
-    {"name": "Abbonamenti, Tech & Streaming", "flow_type": "expense", "nature": "discretionary_want", "icon": "📱", "color": "#92400e"},
-    {"name": "Sport, Palestra & Hobby", "flow_type": "expense", "nature": "discretionary_want", "icon": "🎾", "color": "#78350f"},
-    {"name": "Lusso & Orologi (Spesa / Manutenzione)", "flow_type": "expense", "nature": "discretionary_want", "icon": "⌚", "color": "#eab308"},
-
+    {
+        "name": "Ristoranti, Bar & Delivery",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "🍽️",
+        "color": "#f59e0b",
+    },
+    {
+        "name": "Viaggi, Vacanze & Weekend",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "✈️",
+        "color": "#fbbf24",
+    },
+    {
+        "name": "Shopping & Abbigliamento",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "🛍️",
+        "color": "#d97706",
+    },
+    {
+        "name": "Svago, Cinema & Eventi",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "🎟️",
+        "color": "#b45309",
+    },
+    {
+        "name": "Abbonamenti, Tech & Streaming",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "📱",
+        "color": "#92400e",
+    },
+    {
+        "name": "Sport, Palestra & Hobby",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "🎾",
+        "color": "#78350f",
+    },
+    {
+        "name": "Lusso & Orologi (Spesa / Manutenzione)",
+        "flow_type": "expense",
+        "nature": "discretionary_want",
+        "icon": "⌚",
+        "color": "#eab308",
+    },
     # Risparmio & Investimenti (20% Savings)
-    {"name": "PAC / Investimenti Titoli", "flow_type": "expense", "nature": "saving_investment", "icon": "📊", "color": "#6366f1"},
-    {"name": "Versamento Fondo Pensione", "flow_type": "expense", "nature": "saving_investment", "icon": "🛡️", "color": "#818cf8"},
-    {"name": "Risparmio Fondo Emergenza", "flow_type": "expense", "nature": "saving_investment", "icon": "💰", "color": "#4f46e5"},
-
+    {
+        "name": "PAC / Investimenti Titoli",
+        "flow_type": "expense",
+        "nature": "saving_investment",
+        "icon": "📊",
+        "color": "#6366f1",
+    },
+    {
+        "name": "Versamento Fondo Pensione",
+        "flow_type": "expense",
+        "nature": "saving_investment",
+        "icon": "🛡️",
+        "color": "#818cf8",
+    },
+    {
+        "name": "Risparmio Fondo Emergenza",
+        "flow_type": "expense",
+        "nature": "saving_investment",
+        "icon": "💰",
+        "color": "#4f46e5",
+    },
     # Fisco & Oneri Finanziari
     {"name": "Tasse, Imposte & F24", "flow_type": "expense", "nature": "tax", "icon": "🏛️", "color": "#64748b"},
-    {"name": "Commissioni Bancarie & Interessi", "flow_type": "expense", "nature": "debt_service", "icon": "🏦", "color": "#475569"},
+    {
+        "name": "Commissioni Bancarie & Interessi",
+        "flow_type": "expense",
+        "nature": "debt_service",
+        "icon": "🏦",
+        "color": "#475569",
+    },
 ]
 
 
 def init_wealth_db(engine: Engine) -> None:
     """Inizializza automaticamente le tabelle del Wealth Management se non presenti."""
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
 
     if is_sqlite:
         try:
             db_file = getattr(getattr(engine, "url", None), "database", None)
             if db_file and db_file != ":memory:":
                 from core.database_migration_manager import bootstrap_and_migrate_db
+
                 bootstrap_and_migrate_db(db_file)
         except Exception:
             pass
 
     with engine.begin() as conn:
         if is_sqlite:
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_profiles (
                     profile_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -83,8 +209,10 @@ def init_wealth_db(engine: Engine) -> None:
                     base_currency TEXT NOT NULL DEFAULT 'EUR',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_accounts (
 
                     account_id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,8 +226,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_categories (
                     category_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -111,8 +241,10 @@ def init_wealth_db(engine: Engine) -> None:
                     is_system INTEGER NOT NULL DEFAULT 0,
                     FOREIGN KEY (parent_id) REFERENCES wealth_categories(category_id)
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_cashflow (
                     tx_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     account_id INTEGER NOT NULL,
@@ -131,8 +263,10 @@ def init_wealth_db(engine: Engine) -> None:
                     FOREIGN KEY (account_id) REFERENCES wealth_accounts(account_id),
                     FOREIGN KEY (category_id) REFERENCES wealth_categories(category_id)
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_physical_assets (
                     asset_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
@@ -150,8 +284,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_pension_plans (
                     plan_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     plan_name TEXT NOT NULL,
@@ -167,8 +303,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_networth_snapshots (
                     snapshot_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -192,8 +330,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_fixed_expenses (
                     fixed_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -209,8 +349,10 @@ def init_wealth_db(engine: Engine) -> None:
                     is_active INTEGER DEFAULT 1,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_goals (
                     goal_id INTEGER PRIMARY KEY AUTOINCREMENT,
                     portfolio_id INTEGER NOT NULL DEFAULT 1,
@@ -226,11 +368,13 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
-            """))
+            """)
+            )
 
         else:
             # MySQL DDL
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_profiles (
                     profile_id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(150) NOT NULL,
@@ -239,8 +383,10 @@ def init_wealth_db(engine: Engine) -> None:
                     base_currency VARCHAR(10) NOT NULL DEFAULT 'EUR',
                     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_accounts (
 
                     account_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -254,8 +400,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes VARCHAR(255) NULL,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_categories (
                     category_id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(100) NOT NULL,
@@ -268,8 +416,10 @@ def init_wealth_db(engine: Engine) -> None:
                     CONSTRAINT fk_cat_parent FOREIGN KEY (parent_id)
                         REFERENCES wealth_categories (category_id) ON DELETE SET NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_cashflow (
                     tx_id INT AUTO_INCREMENT PRIMARY KEY,
                     account_id INT NOT NULL,
@@ -294,8 +444,10 @@ def init_wealth_db(engine: Engine) -> None:
                     INDEX idx_cashflow_cat_date (category_id, tx_date DESC),
                     INDEX idx_cashflow_tx_hash (account_id, tx_hash)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_physical_assets (
                     asset_id INT AUTO_INCREMENT PRIMARY KEY,
                     name VARCHAR(150) NOT NULL,
@@ -313,8 +465,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT NULL,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_pension_plans (
                     plan_id INT AUTO_INCREMENT PRIMARY KEY,
                     plan_name VARCHAR(150) NOT NULL,
@@ -330,8 +484,10 @@ def init_wealth_db(engine: Engine) -> None:
                     notes TEXT NULL,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_networth_snapshots (
                     snapshot_id INT AUTO_INCREMENT PRIMARY KEY,
                     portfolio_id INT NOT NULL DEFAULT 1,
@@ -358,8 +514,10 @@ def init_wealth_db(engine: Engine) -> None:
                     INDEX idx_wealth_snap_run (run_id),
                     INDEX idx_snap_port_date (portfolio_id, snapshot_date DESC)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_fixed_expenses (
                     fixed_id INT AUTO_INCREMENT PRIMARY KEY,
                     portfolio_id INT NOT NULL DEFAULT 1,
@@ -376,8 +534,10 @@ def init_wealth_db(engine: Engine) -> None:
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                     INDEX idx_fixed_port (portfolio_id, is_active)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-            conn.execute(sqlt("""
+            """)
+            )
+            conn.execute(
+                sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_goals (
                     goal_id INT AUTO_INCREMENT PRIMARY KEY,
                     portfolio_id INT NOT NULL DEFAULT 1,
@@ -394,41 +554,61 @@ def init_wealth_db(engine: Engine) -> None:
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_goals_port (portfolio_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-            """))
-
+            """)
+            )
 
         # Migrazione colonne snapshot_name, details_json, run_id e portfolio_id se mancanti
         try:
             if is_sqlite:
                 cols = [r[1] for r in conn.execute(sqlt("PRAGMA table_info(wealth_networth_snapshots)")).fetchall()]
                 if "snapshot_name" not in cols:
-                    conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN snapshot_name TEXT DEFAULT 'Snapshot Patrimoniale'"))
+                    conn.execute(
+                        sqlt(
+                            "ALTER TABLE wealth_networth_snapshots ADD COLUMN snapshot_name TEXT DEFAULT 'Snapshot Patrimoniale'"
+                        )
+                    )
                 if "details_json" not in cols:
                     conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN details_json TEXT"))
                 if "run_id" not in cols:
                     conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN run_id TEXT"))
-                
+
                 # Migrazione portfolio_id su tutte le tabelle wealth
-                for t in ["wealth_accounts", "wealth_cashflow", "wealth_physical_assets", "wealth_pension_plans", "wealth_networth_snapshots"]:
+                for t in [
+                    "wealth_accounts",
+                    "wealth_cashflow",
+                    "wealth_physical_assets",
+                    "wealth_pension_plans",
+                    "wealth_networth_snapshots",
+                ]:
                     t_cols = [r[1] for r in conn.execute(sqlt(f"PRAGMA table_info({t})")).fetchall()]
                     if "portfolio_id" not in t_cols:
                         conn.execute(sqlt(f"ALTER TABLE {t} ADD COLUMN portfolio_id INTEGER DEFAULT 1"))
             else:
                 cols = [r[0] for r in conn.execute(sqlt("SHOW COLUMNS FROM wealth_networth_snapshots")).fetchall()]
                 if "snapshot_name" not in cols:
-                    conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN snapshot_name VARCHAR(150) NULL DEFAULT 'Snapshot Patrimoniale'"))
+                    conn.execute(
+                        sqlt(
+                            "ALTER TABLE wealth_networth_snapshots ADD COLUMN snapshot_name VARCHAR(150) NULL DEFAULT 'Snapshot Patrimoniale'"
+                        )
+                    )
                 if "details_json" not in cols:
                     conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN details_json LONGTEXT NULL"))
                 if "run_id" not in cols:
                     conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots ADD COLUMN run_id VARCHAR(64) NULL"))
-                
+
                 try:
                     conn.execute(sqlt("ALTER TABLE wealth_networth_snapshots DROP INDEX uq_wealth_snap_date"))
                 except Exception:
                     pass
 
                 # Migrazione portfolio_id su tutte le tabelle wealth
-                for t in ["wealth_accounts", "wealth_cashflow", "wealth_physical_assets", "wealth_pension_plans", "wealth_networth_snapshots"]:
+                for t in [
+                    "wealth_accounts",
+                    "wealth_cashflow",
+                    "wealth_physical_assets",
+                    "wealth_pension_plans",
+                    "wealth_networth_snapshots",
+                ]:
                     t_cols = [r[0] for r in conn.execute(sqlt(f"SHOW COLUMNS FROM {t}")).fetchall()]
                     if "portfolio_id" not in t_cols:
                         conn.execute(sqlt(f"ALTER TABLE {t} ADD COLUMN portfolio_id INT NOT NULL DEFAULT 1"))
@@ -438,7 +618,8 @@ def init_wealth_db(engine: Engine) -> None:
         # Assicura la presenza della tabella portfolios e di almeno un portafoglio di default
         try:
             if is_sqlite:
-                conn.execute(sqlt("""
+                conn.execute(
+                    sqlt("""
                     CREATE TABLE IF NOT EXISTS portfolios (
                         portfolio_id INTEGER PRIMARY KEY AUTOINCREMENT,
                         name TEXT NOT NULL,
@@ -447,9 +628,11 @@ def init_wealth_db(engine: Engine) -> None:
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         description TEXT
                     )
-                """))
+                """)
+                )
             else:
-                conn.execute(sqlt("""
+                conn.execute(
+                    sqlt("""
                     CREATE TABLE IF NOT EXISTS portfolios (
                         portfolio_id INT AUTO_INCREMENT PRIMARY KEY,
                         name VARCHAR(100) NOT NULL,
@@ -458,34 +641,44 @@ def init_wealth_db(engine: Engine) -> None:
                         created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                         description TEXT NULL
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-                """))
+                """)
+                )
                 try:
-                    conn.execute(sqlt("ALTER TABLE portfolios MODIFY COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"))
+                    conn.execute(
+                        sqlt(
+                            "ALTER TABLE portfolios MODIFY COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+                        )
+                    )
                 except Exception:
                     pass
-            
+
             p_cnt = conn.execute(sqlt("SELECT COUNT(*) FROM portfolios")).scalar()
             if p_cnt == 0:
-                conn.execute(sqlt("""
+                conn.execute(
+                    sqlt("""
                     INSERT INTO portfolios (name, owner, base_currency, description, created_at)
                     VALUES ('Patrimonio Personale', 'user', 'EUR', 'Portafoglio e Profilo Patrimoniale Principale', CURRENT_TIMESTAMP)
-                """))
+                """)
+                )
         except Exception:
             pass
 
         # Tabella di collegamento tra Profili Wealth e Portafogli Risk
         try:
             if is_sqlite:
-                conn.execute(sqlt("""
+                conn.execute(
+                    sqlt("""
                     CREATE TABLE IF NOT EXISTS wealth_portfolio_risk_links (
                         wealth_portfolio_id INTEGER NOT NULL,
                         risk_portfolio_id INTEGER NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         PRIMARY KEY (wealth_portfolio_id, risk_portfolio_id)
                     );
-                """))
+                """)
+                )
             else:
-                conn.execute(sqlt("""
+                conn.execute(
+                    sqlt("""
                     CREATE TABLE IF NOT EXISTS wealth_portfolio_risk_links (
                         wealth_portfolio_id INT NOT NULL,
                         risk_portfolio_id INT NOT NULL,
@@ -494,15 +687,24 @@ def init_wealth_db(engine: Engine) -> None:
                         INDEX idx_wprl_w (wealth_portfolio_id),
                         INDEX idx_wprl_r (risk_portfolio_id)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-                """))
+                """)
+                )
         except Exception:
             pass
 
         # ── OTTIMIZZAZIONI DI INDICIZZAZIONE TIME-SERIES (SQLite & MySQL) ──
         try:
-            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_cf_acct_date ON wealth_cashflow(account_id, tx_date DESC);"))
-            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_cf_cat_date ON wealth_cashflow(category_id, tx_date DESC);"))
-            conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_snap_port_date ON wealth_networth_snapshots(portfolio_id, snapshot_date DESC);"))
+            conn.execute(
+                sqlt("CREATE INDEX IF NOT EXISTS idx_cf_acct_date ON wealth_cashflow(account_id, tx_date DESC);")
+            )
+            conn.execute(
+                sqlt("CREATE INDEX IF NOT EXISTS idx_cf_cat_date ON wealth_cashflow(category_id, tx_date DESC);")
+            )
+            conn.execute(
+                sqlt(
+                    "CREATE INDEX IF NOT EXISTS idx_snap_port_date ON wealth_networth_snapshots(portfolio_id, snapshot_date DESC);"
+                )
+            )
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_phys_port ON wealth_physical_assets(portfolio_id);"))
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_pens_port ON wealth_pension_plans(portfolio_id);"))
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_acct_port ON wealth_accounts(portfolio_id);"))
@@ -522,23 +724,24 @@ def init_wealth_db(engine: Engine) -> None:
     seed_default_categories(engine)
 
 
-
-
 def seed_default_categories(engine: Engine) -> None:
     """Popola le categorie di default se la tabella è vuota."""
     with engine.begin() as conn:
         cnt = conn.execute(sqlt("SELECT COUNT(*) FROM wealth_categories")).scalar()
         if cnt == 0:
             for cat in DEFAULT_SYSTEM_CATEGORIES:
-                conn.execute(sqlt("""
+                conn.execute(
+                    sqlt("""
                     INSERT INTO wealth_categories (name, flow_type, nature, icon, color, is_system)
                     VALUES (:name, :flow_type, :nature, :icon, :color, 1)
-                """), cat)
+                """),
+                    cat,
+                )
 
 
 def _get_last_insert_id(conn: Connection, engine: Engine) -> int:
     """Ritorna l'ultimo ID inserito in modo compatibile sia con SQLite che con MySQL."""
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
     sql = "SELECT last_insert_rowid()" if is_sqlite else "SELECT LAST_INSERT_ID()"
     val = conn.execute(sqlt(sql)).scalar()
     return int(val) if val else 1
@@ -569,18 +772,24 @@ def save_wealth_category(engine: Engine, category: Dict[str, Any]) -> int:
     with engine.begin() as conn:
         if cat_id:
             params["cid"] = cat_id
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 UPDATE wealth_categories
                 SET name=:name, flow_type=:flow_type, nature=:nature,
                     parent_id=:parent_id, icon=:icon, color=:color
                 WHERE category_id = :cid
-            """), params)
+            """),
+                params,
+            )
             return cat_id
         else:
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 INSERT INTO wealth_categories (name, flow_type, nature, parent_id, icon, color, is_system)
                 VALUES (:name, :flow_type, :nature, :parent_id, :icon, :color, 0)
-            """), params)
+            """),
+                params,
+            )
             return _get_last_insert_id(conn, engine)
 
 
@@ -591,44 +800,49 @@ def get_wealth_portfolios(engine: Engine) -> pd.DataFrame:
     """Recupera l'elenco dei profili patrimoniali dalla tabella dedicata wealth_profiles."""
     init_wealth_db(engine)
     with engine.connect() as conn:
-        df = pd.read_sql("""
+        df = pd.read_sql(
+            """
             SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
             FROM wealth_profiles 
             WHERE name IS NOT NULL AND TRIM(name) != ''
             ORDER BY profile_id ASC
-        """, conn)
-    
+        """,
+            conn,
+        )
+
     if df.empty:
         with engine.begin() as wconn:
-            wconn.execute(sqlt("""
+            wconn.execute(
+                sqlt("""
                 INSERT INTO wealth_profiles (name, owner, base_currency, description, created_at)
                 VALUES ('Personale', 'user', 'EUR', 'Profilo Patrimoniale Principale', CURRENT_TIMESTAMP)
-            """))
+            """)
+            )
         with engine.connect() as conn2:
-            df = pd.read_sql("""
+            df = pd.read_sql(
+                """
                 SELECT profile_id AS portfolio_id, name, owner, base_currency, created_at, description 
                 FROM wealth_profiles 
                 WHERE name IS NOT NULL AND TRIM(name) != ''
                 ORDER BY profile_id ASC
-            """, conn2)
+            """,
+                conn2,
+            )
     return df
-
 
 
 def cleanup_empty_wealth_portfolios(engine: Engine) -> int:
     """Elimina i profili con nome vuoto o non valido dalla tabella wealth_profiles."""
     init_wealth_db(engine)
     with engine.begin() as conn:
-        res = conn.execute(sqlt("DELETE FROM wealth_profiles WHERE (name IS NULL OR TRIM(name) = '') AND profile_id != 1"))
+        res = conn.execute(
+            sqlt("DELETE FROM wealth_profiles WHERE (name IS NULL OR TRIM(name) = '') AND profile_id != 1")
+        )
         return res.rowcount if hasattr(res, "rowcount") else 0
 
 
 def create_wealth_portfolio(
-    engine: Engine,
-    name: str,
-    description: Optional[str] = None,
-    owner: str = "user",
-    base_currency: str = "EUR"
+    engine: Engine, name: str, description: Optional[str] = None, owner: str = "user", base_currency: str = "EUR"
 ) -> int:
     """Crea un nuovo profilo patrimoniale dedicato nella tabella wealth_profiles."""
     init_wealth_db(engine)
@@ -637,16 +851,21 @@ def create_wealth_portfolio(
         clean_name = "Nuovo Profilo"
     with engine.begin() as conn:
         existing_id = conn.execute(
-            sqlt("SELECT profile_id FROM wealth_profiles WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) ORDER BY profile_id ASC LIMIT 1"),
-            {"name": clean_name}
+            sqlt(
+                "SELECT profile_id FROM wealth_profiles WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name)) ORDER BY profile_id ASC LIMIT 1"
+            ),
+            {"name": clean_name},
         ).scalar()
         if existing_id:
             return int(existing_id)
 
-        conn.execute(sqlt("""
+        conn.execute(
+            sqlt("""
             INSERT INTO wealth_profiles (name, owner, base_currency, description, created_at)
             VALUES (:name, :owner, :bcurr, :desc, CURRENT_TIMESTAMP)
-        """), {"name": clean_name, "owner": owner, "bcurr": base_currency or "EUR", "desc": description or ""})
+        """),
+            {"name": clean_name, "owner": owner, "bcurr": base_currency or "EUR", "desc": description or ""},
+        )
         return _get_last_insert_id(conn, engine)
 
 
@@ -656,14 +875,21 @@ def delete_wealth_portfolio(engine: Engine, portfolio_id: int) -> bool:
     init_wealth_db(engine)
     with engine.begin() as conn:
         for tbl in [
-            "wealth_cashflow", "wealth_accounts", "wealth_physical_assets",
-            "wealth_pension_plans", "wealth_networth_snapshots",
-            "wealth_portfolio_risk_links"
+            "wealth_cashflow",
+            "wealth_accounts",
+            "wealth_physical_assets",
+            "wealth_pension_plans",
+            "wealth_networth_snapshots",
+            "wealth_portfolio_risk_links",
         ]:
             try:
                 conn.execute(
-                    sqlt(f"DELETE FROM {tbl} WHERE wealth_portfolio_id = :pid" if tbl == "wealth_portfolio_risk_links" else f"DELETE FROM {tbl} WHERE portfolio_id = :pid"),
-                    {"pid": portfolio_id}
+                    sqlt(
+                        f"DELETE FROM {tbl} WHERE wealth_portfolio_id = :pid"
+                        if tbl == "wealth_portfolio_risk_links"
+                        else f"DELETE FROM {tbl} WHERE portfolio_id = :pid"
+                    ),
+                    {"pid": portfolio_id},
                 )
             except Exception:
                 pass
@@ -674,15 +900,16 @@ def delete_wealth_portfolio(engine: Engine, portfolio_id: int) -> bool:
     return True
 
 
-
 # ── RISK PORTFOLIOS DYNAMIC LINKAGE ─────────────────────────
+
 
 def get_available_risk_portfolios(engine: Engine, exclude_wealth_portfolio_id: Optional[int] = None) -> pd.DataFrame:
     """Recupera tutti i portafogli di investimento censiti nel modulo Risk Analytics dal database attivo."""
     init_wealth_db(engine)
     exclude_clause = f"AND p.portfolio_id != {int(exclude_wealth_portfolio_id)}" if exclude_wealth_portfolio_id else ""
     with engine.connect() as conn:
-        df = pd.read_sql(f"""
+        df = pd.read_sql(
+            f"""
             SELECT 
                 p.portfolio_id,
                 p.name,
@@ -704,7 +931,9 @@ def get_available_risk_portfolios(engine: Engine, exclude_wealth_portfolio_id: O
             GROUP BY p.portfolio_id, p.name, p.owner, p.base_currency, p.created_at
             HAVING COUNT(s.snapshot_id) > 0
             ORDER BY latest_value DESC, p.portfolio_id ASC
-        """, conn)
+        """,
+            conn,
+        )
         return df
 
 
@@ -719,7 +948,7 @@ def get_linked_risk_portfolios(engine: Engine, wealth_portfolio_id: int = 1) -> 
                 WHERE wealth_portfolio_id = :wpid AND risk_portfolio_id != :wpid 
                 ORDER BY risk_portfolio_id ASC
             """),
-            {"wpid": wealth_portfolio_id}
+            {"wpid": wealth_portfolio_id},
         ).fetchall()
         return [int(r[0]) for r in rows]
 
@@ -731,7 +960,7 @@ def set_linked_risk_portfolios(engine: Engine, wealth_portfolio_id: int, risk_po
     with engine.begin() as conn:
         conn.execute(
             sqlt("DELETE FROM wealth_portfolio_risk_links WHERE wealth_portfolio_id = :wpid"),
-            {"wpid": wealth_portfolio_id}
+            {"wpid": wealth_portfolio_id},
         )
         for rpid in clean_rpids:
             try:
@@ -740,12 +969,11 @@ def set_linked_risk_portfolios(engine: Engine, wealth_portfolio_id: int, risk_po
                         INSERT INTO wealth_portfolio_risk_links (wealth_portfolio_id, risk_portfolio_id, created_at)
                         VALUES (:wpid, :rpid, CURRENT_TIMESTAMP)
                     """),
-                    {"wpid": wealth_portfolio_id, "rpid": rpid}
+                    {"wpid": wealth_portfolio_id, "rpid": rpid},
                 )
             except Exception:
                 pass
     return True
-
 
 
 def get_linked_risk_portfolios_summary(engine: Engine, wealth_portfolio_id: int = 1) -> Tuple[float, pd.DataFrame]:
@@ -754,22 +982,18 @@ def get_linked_risk_portfolios_summary(engine: Engine, wealth_portfolio_id: int 
     linked_ids = get_linked_risk_portfolios(engine, wealth_portfolio_id)
     if not linked_ids:
         return 0.0, pd.DataFrame()
-    
+
     df_all = get_available_risk_portfolios(engine)
     df_linked = df_all[df_all["portfolio_id"].isin(linked_ids)].copy()
     tot_val = float(df_linked["latest_value"].sum()) if not df_linked.empty else 0.0
     return tot_val, df_linked
 
 
-
-
 # ── DATA LIFECYCLE & RESET UTILITIES ────────────────────────
 
+
 def clear_wealth_cashflow(
-    engine: Engine,
-    portfolio_id: Optional[int] = None,
-    account_id: Optional[int] = None,
-    year: Optional[int] = None
+    engine: Engine, portfolio_id: Optional[int] = None, account_id: Optional[int] = None, year: Optional[int] = None
 ) -> int:
     """Svuota le transazioni del libro mastro cassa secondo i filtri specificati."""
     init_wealth_db(engine)
@@ -823,9 +1047,7 @@ def clear_wealth_accounts(engine: Engine, portfolio_id: Optional[int] = None) ->
 
 
 def reset_wealth_portfolio_data(
-    engine: Engine,
-    portfolio_id: Optional[int] = None,
-    keep_accounts: bool = False
+    engine: Engine, portfolio_id: Optional[int] = None, keep_accounts: bool = False
 ) -> Dict[str, int]:
     """
     Esegue il reset totale o parziale dei dati patrimoniali per il profilo selezionato (o globale se portfolio_id è None).
@@ -882,7 +1104,13 @@ def reset_all_wealth_database(engine: Engine) -> Dict[str, int]:
     init_wealth_db(engine)
     results = {}
     with engine.begin() as conn:
-        for tbl in ["wealth_cashflow", "wealth_networth_snapshots", "wealth_physical_assets", "wealth_pension_plans", "wealth_accounts"]:
+        for tbl in [
+            "wealth_cashflow",
+            "wealth_networth_snapshots",
+            "wealth_physical_assets",
+            "wealth_pension_plans",
+            "wealth_accounts",
+        ]:
             try:
                 res = conn.execute(sqlt(f"DELETE FROM {tbl}"))
                 results[tbl] = res.rowcount if hasattr(res, "rowcount") else 0
@@ -894,11 +1122,8 @@ def reset_all_wealth_database(engine: Engine) -> Dict[str, int]:
 # ── ACCOUNTS CRUD ───────────────────────────────────────────
 
 
-
 def get_wealth_accounts(
-    engine: Engine,
-    portfolio_id: Optional[int] = None,
-    is_active_only: bool = False
+    engine: Engine, portfolio_id: Optional[int] = None, is_active_only: bool = False
 ) -> pd.DataFrame:
     """Recupera tutti i conti censiti per il portafoglio/profilo specificato."""
     init_wealth_db(engine)
@@ -935,26 +1160,32 @@ def save_wealth_account(engine: Engine, account: Dict[str, Any]) -> int:
         if not acc_id:
             existing_id = conn.execute(
                 sqlt("SELECT account_id FROM wealth_accounts WHERE LOWER(TRIM(name)) = LOWER(TRIM(:name))"),
-                {"name": account["name"]}
+                {"name": account["name"]},
             ).scalar()
             if existing_id:
                 acc_id = existing_id
 
         if acc_id:
             params["aid"] = acc_id
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 UPDATE wealth_accounts 
                 SET portfolio_id=:portfolio_id, name=:name, account_type=:account_type, institution=:institution,
                     currency=:currency, balance=:balance, is_active=:is_active,
                     iban=:iban, notes=:notes
                 WHERE account_id = :aid
-            """), params)
+            """),
+                params,
+            )
             return acc_id
         else:
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 INSERT INTO wealth_accounts (portfolio_id, name, account_type, institution, currency, balance, is_active, iban, notes)
                 VALUES (:portfolio_id, :name, :account_type, :institution, :currency, :balance, :is_active, :iban, :notes)
-            """), params)
+            """),
+                params,
+            )
             return _get_last_insert_id(conn, engine)
 
 
@@ -962,17 +1193,23 @@ def delete_wealth_account(engine: Engine, account_id: int) -> bool:
     """Elimina un conto dall'anagrafica e riassegna eventuali movimenti al primo conto disponibile."""
     init_wealth_db(engine)
     with engine.begin() as conn:
-        fallback_id = conn.execute(sqlt("""
+        fallback_id = conn.execute(
+            sqlt("""
             SELECT account_id FROM wealth_accounts 
             WHERE account_id != :aid 
             ORDER BY account_id ASC LIMIT 1
-        """), {"aid": account_id}).scalar()
-        
+        """),
+            {"aid": account_id},
+        ).scalar()
+
         if fallback_id:
-            conn.execute(sqlt("UPDATE wealth_cashflow SET account_id = :fid WHERE account_id = :aid"), {"fid": fallback_id, "aid": account_id})
+            conn.execute(
+                sqlt("UPDATE wealth_cashflow SET account_id = :fid WHERE account_id = :aid"),
+                {"fid": fallback_id, "aid": account_id},
+            )
         else:
             conn.execute(sqlt("DELETE FROM wealth_cashflow WHERE account_id = :aid"), {"aid": account_id})
-            
+
         conn.execute(sqlt("DELETE FROM wealth_accounts WHERE account_id = :aid"), {"aid": account_id})
     return True
 
@@ -1004,7 +1241,10 @@ def deduplicate_wealth_accounts(engine: Engine, portfolio_id: Optional[int] = No
 
         for old_id, can_id in id_to_canonical.items():
             if old_id != can_id:
-                conn.execute(sqlt("UPDATE wealth_cashflow SET account_id = :can WHERE account_id = :old"), {"can": can_id, "old": old_id})
+                conn.execute(
+                    sqlt("UPDATE wealth_cashflow SET account_id = :can WHERE account_id = :old"),
+                    {"can": can_id, "old": old_id},
+                )
                 conn.execute(sqlt("DELETE FROM wealth_accounts WHERE account_id = :old"), {"old": old_id})
 
     return removed_count
@@ -1012,12 +1252,13 @@ def deduplicate_wealth_accounts(engine: Engine, portfolio_id: Optional[int] = No
 
 # ── CASH FLOW CRUD ──────────────────────────────────────────
 
+
 def get_cashflow_records(
     engine: Engine,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     portfolio_id: Optional[int] = None,
-    account_id: Optional[int] = None
+    account_id: Optional[int] = None,
 ) -> pd.DataFrame:
     """Recupera le transazioni di cassa unite alle categorie e ai conti."""
     init_wealth_db(engine)
@@ -1077,27 +1318,31 @@ def insert_cashflow_tx(engine: Engine, tx_data: Dict[str, Any], deduplicate: boo
         if deduplicate and tx_hash:
             existing = conn.execute(
                 sqlt("SELECT tx_id FROM wealth_cashflow WHERE account_id = :aid AND tx_hash = :thash LIMIT 1"),
-                {"aid": params["account_id"], "thash": tx_hash}
+                {"aid": params["account_id"], "thash": tx_hash},
             ).fetchone()
             if existing:
                 return None
 
-        conn.execute(sqlt("""
+        conn.execute(
+            sqlt("""
             INSERT INTO wealth_cashflow (portfolio_id, account_id, category_id, tx_date, amount, currency, direction, merchant, notes, is_recurring, payment_method, tags, tx_hash)
             VALUES (:portfolio_id, :account_id, :category_id, :tx_date, :amount, :currency, :direction, :merchant, :notes, :is_recurring, :payment_method, :tags, :tx_hash)
-        """), params)
+        """),
+            params,
+        )
         tx_id = _get_last_insert_id(conn, engine)
 
         # Aggiorna il saldo del conto
         delta = params["amount"] if params["direction"] == "inflow" else -params["amount"]
-        conn.execute(sqlt("UPDATE wealth_accounts SET balance = balance + :delta WHERE account_id = :aid"), {"delta": delta, "aid": params["account_id"]})
+        conn.execute(
+            sqlt("UPDATE wealth_accounts SET balance = balance + :delta WHERE account_id = :aid"),
+            {"delta": delta, "aid": params["account_id"]},
+        )
         return tx_id
 
 
 def bulk_insert_cashflow_tx(
-    engine: Engine,
-    tx_records: List[Dict[str, Any]],
-    deduplicate: bool = True
+    engine: Engine, tx_records: List[Dict[str, Any]], deduplicate: bool = True
 ) -> Tuple[int, int]:
     """
     Inserimento ATOMICO a batch (Unit of Work) di una lista di transazioni nel libro mastro.
@@ -1114,14 +1359,16 @@ def bulk_insert_cashflow_tx(
     init_wealth_db(engine)
 
     with engine.begin() as conn:
-        account_ids = list({int(r["account_id"]) for r in tx_records if "account_id" in r and r["account_id"] is not None})
+        account_ids = list(
+            {int(r["account_id"]) for r in tx_records if "account_id" in r and r["account_id"] is not None}
+        )
         existing_hashes = set()
 
         if deduplicate and account_ids:
             for aid in account_ids:
                 rows = conn.execute(
                     sqlt("SELECT tx_hash FROM wealth_cashflow WHERE account_id = :aid AND tx_hash IS NOT NULL"),
-                    {"aid": aid}
+                    {"aid": aid},
                 ).fetchall()
                 for r in rows:
                     if r[0]:
@@ -1169,17 +1416,20 @@ def bulk_insert_cashflow_tx(
         if not valid_params:
             return 0, duplicates_count
 
-        conn.execute(sqlt("""
+        conn.execute(
+            sqlt("""
             INSERT INTO wealth_cashflow 
             (portfolio_id, account_id, category_id, tx_date, amount, currency, direction, merchant, notes, is_recurring, payment_method, tags, tx_hash)
             VALUES (:portfolio_id, :account_id, :category_id, :tx_date, :amount, :currency, :direction, :merchant, :notes, :is_recurring, :payment_method, :tags, :tx_hash)
-        """), valid_params)
+        """),
+            valid_params,
+        )
 
         for aid, delta in balance_deltas_per_account.items():
             if abs(delta) > 1e-6:
                 conn.execute(
                     sqlt("UPDATE wealth_accounts SET balance = balance + :delta WHERE account_id = :aid"),
-                    {"delta": delta, "aid": aid}
+                    {"delta": delta, "aid": aid},
                 )
 
         return len(valid_params), duplicates_count
@@ -1187,10 +1437,9 @@ def bulk_insert_cashflow_tx(
 
 # ── PHYSICAL ASSETS & WATCHES CRUD ─────────────────────────
 
+
 def get_physical_assets(
-    engine: Engine,
-    category: Optional[str] = None,
-    portfolio_id: Optional[int] = None
+    engine: Engine, category: Optional[str] = None, portfolio_id: Optional[int] = None
 ) -> pd.DataFrame:
     """Recupera tutti gli asset fisici (orologi, immobili, metalli, collezioni)."""
     init_wealth_db(engine)
@@ -1235,7 +1484,8 @@ def save_physical_asset(engine: Engine, asset: Dict[str, Any]) -> int:
     with engine.begin() as conn:
         if aid:
             params["aid"] = aid
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 UPDATE wealth_physical_assets
                 SET portfolio_id=:portfolio_id, name=:name, asset_category=:asset_category, brand_or_location=:brand_or_location,
                     model_or_specs=:model_or_specs, reference_number=:reference_number,
@@ -1244,17 +1494,23 @@ def save_physical_asset(engine: Engine, asset: Dict[str, Any]) -> int:
                     valuation_source=:valuation_source, condition_grade=:condition_grade,
                     currency=:currency, notes=:notes
                 WHERE asset_id = :aid
-            """), params)
+            """),
+                params,
+            )
             return aid
         else:
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 INSERT INTO wealth_physical_assets (portfolio_id, name, asset_category, brand_or_location, model_or_specs, reference_number, acquisition_date, purchase_price, current_market_value, valuation_date, valuation_source, condition_grade, currency, notes)
                 VALUES (:portfolio_id, :name, :asset_category, :brand_or_location, :model_or_specs, :reference_number, :acquisition_date, :purchase_price, :current_market_value, :valuation_date, :valuation_source, :condition_grade, :currency, :notes)
-            """), params)
+            """),
+                params,
+            )
             return _get_last_insert_id(conn, engine)
 
 
 # ── PENSION PLANS CRUD ─────────────────────────────────────
+
 
 def get_pension_plans(engine: Engine, portfolio_id: Optional[int] = None) -> pd.DataFrame:
     """Recupera tutti i fondi pensione e piani di previdenza complementare."""
@@ -1291,7 +1547,8 @@ def save_pension_plan(engine: Engine, plan: Dict[str, Any]) -> int:
     with engine.begin() as conn:
         if pid:
             params["pid"] = pid
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 UPDATE wealth_pension_plans
                 SET portfolio_id=:portfolio_id, plan_name=:plan_name, provider=:provider, plan_type=:plan_type,
                     accumulated_value=:accumulated_value, monthly_employee_contrib=:monthly_employee_contrib,
@@ -1299,17 +1556,23 @@ def save_pension_plan(engine: Engine, plan: Dict[str, Any]) -> int:
                     expected_retirement_age=:expected_retirement_age, currency=:currency,
                     investment_line=:investment_line, notes=:notes
                 WHERE plan_id = :pid
-            """), params)
+            """),
+                params,
+            )
             return pid
         else:
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 INSERT INTO wealth_pension_plans (portfolio_id, plan_name, provider, plan_type, accumulated_value, monthly_employee_contrib, monthly_employer_contrib, tax_deductible_annual, expected_retirement_age, currency, investment_line, notes)
                 VALUES (:portfolio_id, :plan_name, :provider, :plan_type, :accumulated_value, :monthly_employee_contrib, :monthly_employer_contrib, :tax_deductible_annual, :expected_retirement_age, :currency, :investment_line, :notes)
-            """), params)
+            """),
+                params,
+            )
             return _get_last_insert_id(conn, engine)
 
 
 # ── NET WORTH SNAPSHOTS CRUD & RECALL ──────────────────────
+
 
 def save_wealth_snapshot_to_db(
     engine: Engine,
@@ -1319,13 +1582,13 @@ def save_wealth_snapshot_to_db(
     portfolio_id: Optional[int] = None,
     risk_portfolio_ids: Optional[List[int]] = None,
     run_id: Optional[str] = None,
-    run_name: Optional[str] = None
+    run_name: Optional[str] = None,
 ) -> int:
     """
     Calcola e salva una fotografia completa (snapshot) del patrimonio netto consolidato nel database.
     Ogni esecuzione o ingestione crea un nuovo snapshot storico indicizzato con run_id.
     """
-    from core.wealth.wealth_engine import compute_consolidated_net_worth, compute_cashflow_analytics
+    from core.wealth.wealth_engine import compute_cashflow_analytics, compute_consolidated_net_worth
 
     init_wealth_db(engine)
     p_id = portfolio_id or 1
@@ -1341,7 +1604,6 @@ def save_wealth_snapshot_to_db(
     s_date = snapshot_date_val or date.today()
     s_name = run_name or snapshot_name or f"Snapshot Patrimoniale {s_date.strftime('%d/%m/%Y %H:%M')}"
     s_run_id = run_id or f"RUN-WLT-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-
 
     details_payload = {
         "snapshot_date": str(s_date),
@@ -1360,13 +1622,13 @@ def save_wealth_snapshot_to_db(
             "total_liabilities": nw.total_liabilities,
             "savings_rate_pct": nw.savings_rate_pct,
             "runway_months": nw.runway_months,
-            "wealth_health_score": nw.wealth_health_score
+            "wealth_health_score": nw.wealth_health_score,
         },
         "linked_risk_portfolios": df_linked_risk.to_dict(orient="records") if not df_linked_risk.empty else [],
         "cashflow_analytics": cf_metrics,
         "accounts": df_accs.to_dict(orient="records") if not df_accs.empty else [],
         "physical_assets": df_phys.to_dict(orient="records") if not df_phys.empty else [],
-        "pension_plans": df_pens.to_dict(orient="records") if not df_pens.empty else []
+        "pension_plans": df_pens.to_dict(orient="records") if not df_pens.empty else [],
     }
 
     details_str = json.dumps(details_payload, default=str)
@@ -1390,11 +1652,12 @@ def save_wealth_snapshot_to_db(
         "runway": float(nw.runway_months),
         "score": float(nw.wealth_health_score),
         "details": details_str,
-        "notes": notes
+        "notes": notes,
     }
 
     with engine.begin() as conn:
-        conn.execute(sqlt("""
+        conn.execute(
+            sqlt("""
             INSERT INTO wealth_networth_snapshots (
                 portfolio_id, run_id, snapshot_date, snapshot_name, total_net_worth, liquid_assets,
                 financial_investments, physical_assets_total, watches_total,
@@ -1408,7 +1671,9 @@ def save_wealth_snapshot_to_db(
                 :inc_avg, :exp_avg, :sav_rate,
                 :runway, :score, :details, :notes
             )
-        """), params)
+        """),
+            params,
+        )
         return _get_last_insert_id(conn, engine)
 
 
@@ -1431,26 +1696,23 @@ def get_wealth_snapshots_history(engine: Engine, portfolio_id: Optional[int] = N
         return pd.read_sql(sqlt(query), conn, params=params)
 
 
-
 def delete_wealth_snapshot(engine: Engine, snapshot_id: int) -> bool:
     """Elimina uno snapshot patrimoniale dal database."""
     init_wealth_db(engine)
     with engine.begin() as conn:
-        res = conn.execute(
-            sqlt("DELETE FROM wealth_networth_snapshots WHERE snapshot_id = :sid"),
-            {"sid": snapshot_id}
-        )
-        return (res.rowcount > 0)
+        res = conn.execute(sqlt("DELETE FROM wealth_networth_snapshots WHERE snapshot_id = :sid"), {"sid": snapshot_id})
+        return res.rowcount > 0
 
 
 def load_wealth_snapshot_details(engine: Engine, snapshot_id: int) -> Optional[Dict[str, Any]]:
     """Carica il payload completo di dettagli di uno snapshot patrimoniale salvato."""
     init_wealth_db(engine)
     with engine.connect() as conn:
-        row = conn.execute(
-            sqlt("SELECT * FROM wealth_networth_snapshots WHERE snapshot_id = :sid"),
-            {"sid": snapshot_id}
-        ).mappings().fetchone()
+        row = (
+            conn.execute(sqlt("SELECT * FROM wealth_networth_snapshots WHERE snapshot_id = :sid"), {"sid": snapshot_id})
+            .mappings()
+            .fetchone()
+        )
         if not row:
             return None
         res_dict = dict(row)
@@ -1468,11 +1730,12 @@ def load_wealth_snapshot_details(engine: Engine, snapshot_id: int) -> Optional[D
 # ── GESTIONE SPESE FISSE & SUBSCRIPTIONS DA CONFIG_FIXEDEXPENSES
 # ============================================================
 
+
 def save_wealth_fixed_expense(engine: Engine, data: Dict[str, Any]) -> int:
     """Salva o aggiorna una spesa fissa/abbonamento nel database."""
     init_wealth_db(engine)
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
-    
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
+
     with engine.begin() as conn:
         fixed_id = data.get("fixed_id")
         params = {
@@ -1480,24 +1743,29 @@ def save_wealth_fixed_expense(engine: Engine, data: Dict[str, Any]) -> int:
             "cat": str(data.get("category", "Subscriptions")).strip(),
             "note": str(data.get("note", "")).strip(),
             "amt": float(data.get("amount", 0.0)),
-            "p_day": int(data["payment_day"]) if data.get("payment_day") is not None and str(data["payment_day"]).isdigit() else None,
+            "p_day": int(data["payment_day"])
+            if data.get("payment_day") is not None and str(data["payment_day"]).isdigit()
+            else None,
             "s_date": str(data["start_date"])[:10] if data.get("start_date") else None,
             "e_date": str(data["end_date"])[:10] if data.get("end_date") else None,
             "is_split": 1 if data.get("is_split") else 0,
             "s_det": str(data.get("split_details", "")) if data.get("split_details") else None,
             "cadence": str(data.get("cadence", "Mensile")),
-            "active": 1 if data.get("is_active", True) else 0
+            "active": 1 if data.get("is_active", True) else 0,
         }
 
         if fixed_id:
             params["fid"] = int(fixed_id)
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 UPDATE wealth_fixed_expenses
                 SET portfolio_id = :pid, category = :cat, note = :note, amount = :amt,
                     payment_day = :p_day, start_date = :s_date, end_date = :e_date,
                     is_split = :is_split, split_details = :s_det, cadence = :cadence, is_active = :active
                 WHERE fixed_id = :fid
-            """), params)
+            """),
+                params,
+            )
             return fixed_id
         else:
             q_ins = """
@@ -1542,12 +1810,13 @@ def clear_wealth_fixed_expenses(engine: Engine, portfolio_id: Optional[int] = No
 
 # ── GOAL-BASED WEALTH PLANNING CRUD ────────────────────────
 
+
 def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
     """Crea o aggiorna un traguardo/obiettivo patrimoniale (Goal-Based Planning)."""
     init_wealth_db(engine)
-    is_sqlite = (getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite")
+    is_sqlite = getattr(engine, "dialect", None) is not None and engine.dialect.name == "sqlite"
     gid = goal_data.get("goal_id")
-    
+
     t_date = goal_data.get("target_date")
     if isinstance(t_date, str):
         try:
@@ -1566,13 +1835,14 @@ def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
         "priority": str(goal_data.get("priority", "medium")),
         "risk_tolerance": str(goal_data.get("risk_tolerance", "moderate")),
         "inflation_rate": float(goal_data.get("inflation_rate", 0.02)),
-        "notes": goal_data.get("notes")
+        "notes": goal_data.get("notes"),
     }
 
     with engine.begin() as conn:
         if gid:
             params["gid"] = int(gid)
-            conn.execute(sqlt("""
+            conn.execute(
+                sqlt("""
                 UPDATE wealth_goals
                 SET portfolio_id = :pid, name = :name, category = :category,
                     target_amount = :target_amount, target_date = :target_date,
@@ -1580,7 +1850,9 @@ def save_wealth_goal(engine: Engine, goal_data: Dict[str, Any]) -> int:
                     priority = :priority, risk_tolerance = :risk_tolerance,
                     inflation_rate = :inflation_rate, notes = :notes
                 WHERE goal_id = :gid
-            """), params)
+            """),
+                params,
+            )
             return int(gid)
         else:
             q_ins = """
@@ -1622,6 +1894,7 @@ def delete_wealth_goal(engine: Engine, goal_id: int) -> bool:
 
 # ── SINCRONIZZAZIONE DIRETTA MYSQL ⇄ SQLITE LOCALE ─────────────
 
+
 def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Engine) -> dict:
     """
     Sincronizza in modo sicuro ed efficiente le tabelle del modulo Wealth da un engine a un altro
@@ -1629,16 +1902,18 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
     Tollera differenze di colonne tra dialetti inserendo solo le colonne condivise
     e normalizza i formati data per la compatibilità con i driver SQLite e MySQL.
     """
-    from sqlalchemy import inspect as sqla_inspect, text as sqlt
     import pandas as pd
-    
+    from sqlalchemy import inspect as sqla_inspect
+    from sqlalchemy import text as sqlt
+
     from core.models import Base
+
     try:
         Base.metadata.create_all(target_engine)
     except Exception:
         pass
     init_wealth_db(target_engine)
-    
+
     tables_to_sync = [
         "wealth_profiles",
         "wealth_accounts",
@@ -1656,14 +1931,14 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
         "portfolio_snapshots",
         "snapshot_positions",
     ]
-    
+
     results = {}
     src_insp = sqla_inspect(source_engine)
     tgt_insp = sqla_inspect(target_engine)
     src_tables = set(src_insp.get_table_names())
     tgt_tables = set(tgt_insp.get_table_names())
-    is_tgt_sqlite = (getattr(target_engine, "dialect", None) is not None and target_engine.dialect.name == "sqlite")
-    
+    is_tgt_sqlite = getattr(target_engine, "dialect", None) is not None and target_engine.dialect.name == "sqlite"
+
     for tbl in tables_to_sync:
         if tbl not in src_tables or tbl not in tgt_tables:
             continue
@@ -1671,23 +1946,25 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
             df = pd.read_sql_table(tbl, source_engine)
             if df is None:
                 continue
-            
+
             tgt_cols = {col["name"] for col in tgt_insp.get_columns(tbl)}
             common_cols = [c for c in df.columns if c in tgt_cols]
-            
+
             if not common_cols:
                 continue
-                
+
             df_to_insert = df[common_cols].copy()
-            
+
             if is_tgt_sqlite:
                 for col in df_to_insert.columns:
                     col_l = col.lower()
                     if "date" in col_l and not ("created_at" in col_l or "updated_at" in col_l or "calc_date" in col_l):
                         df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime("%Y-%m-%d")
                     elif "created_at" in col_l or "updated_at" in col_l or "calc_date" in col_l:
-                        df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
-            
+                        df_to_insert[col] = pd.to_datetime(df_to_insert[col], errors="coerce").dt.strftime(
+                            "%Y-%m-%d %H:%M:%S"
+                        )
+
             with target_engine.begin() as conn:
                 conn.execute(sqlt(f"DELETE FROM {tbl}"))
                 if not df_to_insert.empty:
@@ -1695,22 +1972,22 @@ def sync_wealth_tables_between_engines(source_engine: Engine, target_engine: Eng
             results[tbl] = len(df_to_insert)
         except Exception as ex:
             results[tbl] = f"Error: {ex}"
-            
+
     return results
 
 
-def sync_mysql_to_sqlite(db_user: str = "root", db_pass: str = "root", db_host: str = "localhost",
-                         db_port: int = 3306, db_name: str = "wealth", sqlite_path: str = "data/argus_local.db") -> dict:
+def sync_mysql_to_sqlite(
+    db_user: str = "root",
+    db_pass: str = "root",
+    db_host: str = "localhost",
+    db_port: int = 3306,
+    db_name: str = "wealth",
+    sqlite_path: str = "data/argus_local.db",
+) -> dict:
     """
     Utility per travasare con 1-click tutti i dati Wealth da MySQL al database locale SQLite.
     Permette l'operatività completa offline con gli stessi identici saldi e movimenti.
     """
-    from core.fetcher import get_engine
     eng_mysql = get_engine(user=db_user, password=db_pass, host=db_host, port=db_port, db=db_name, database=db_name)
     eng_sqlite = get_engine(offline=True, sqlite_path=sqlite_path)
     return sync_wealth_tables_between_engines(eng_mysql, eng_sqlite)
-
-
-
-
-

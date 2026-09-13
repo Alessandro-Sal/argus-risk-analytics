@@ -23,7 +23,21 @@ def _classify_fineco_tx_type(type_and_desc: str) -> Optional[str]:
     td = type_and_desc.lower()
     if any(k in td for k in ["dividendo", "cedola", "dividend", "accredito dividendo", "accredito cedola"]):
         return "dividend"
-    if any(k in td for k in ["split", "frazionamento", "raggruppamento", "reverse split", "fusione", "incorporazione", "scambio", "merger", "scissione", "spinoff"]):
+    if any(
+        k in td
+        for k in [
+            "split",
+            "frazionamento",
+            "raggruppamento",
+            "reverse split",
+            "fusione",
+            "incorporazione",
+            "scambio",
+            "merger",
+            "scissione",
+            "spinoff",
+        ]
+    ):
         return "split"
     if any(k in td for k in ["vendi", "vendita", "ven", "sell"]):
         return "sell"
@@ -73,7 +87,9 @@ def _parse_fineco_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optiona
     if not curr or curr in ["NAN", "NONE", ""]:
         curr = "EUR"
 
-    asset_class = "etf" if any(k in raw_desc.lower() for k in ["etf", "ucits", "ishares", "vanguard", "lyxor"]) else "stock"
+    asset_class = (
+        "etf" if any(k in raw_desc.lower() for k in ["etf", "ucits", "ishares", "vanguard", "lyxor"]) else "stock"
+    )
 
     return {
         "tx_date": tx_date,
@@ -84,7 +100,7 @@ def _parse_fineco_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optiona
         "currency": curr,
         "fees": fees,
         "asset_class": asset_class,
-        "notes": f"Fineco: {raw_desc or ticker}"
+        "notes": f"Fineco: {raw_desc or ticker}",
     }
 
 
@@ -99,7 +115,7 @@ def parse_fineco_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
             row_str = " ".join([str(v).lower() for v in row.values if pd.notna(v)])
             if any(k in row_str for k in ["data operazione", "data valuta", "isin", "titolo", "descrizione"]):
                 df.columns = [str(v).strip().lower() for v in row.values]
-                df = df.iloc[idx + 1:].reset_index(drop=True)
+                df = df.iloc[idx + 1 :].reset_index(drop=True)
                 break
 
     df.columns = df.columns.astype(str).str.strip().str.lower()
@@ -108,11 +124,26 @@ def parse_fineco_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
     if not date_col:
         date_col = next((c for c in df.columns if "data" in c or "date" in c), None)
 
-    type_col = next((c for c in df.columns if c != date_col and any(k in c for k in ["tipo operazione", "operazione", "tipo", "descrizione operazione"])), None)
-    isin_col = next((c for c in df.columns if any(k in c for k in ["isin", "codice titolo", "codice isin", "simbolo", "ticker"])), None)
+    type_col = next(
+        (
+            c
+            for c in df.columns
+            if c != date_col
+            and any(k in c for k in ["tipo operazione", "operazione", "tipo", "descrizione operazione"])
+        ),
+        None,
+    )
+    isin_col = next(
+        (c for c in df.columns if any(k in c for k in ["isin", "codice titolo", "codice isin", "simbolo", "ticker"])),
+        None,
+    )
     desc_col = next((c for c in df.columns if any(k in c for k in ["titolo", "descrizione", "name", "prodotto"])), None)
-    qty_col = next((c for c in df.columns if any(k in c for k in ["quantit", "quantita", "q.ta", "volume", "shares"])), None)
-    price_col = next((c for c in df.columns if any(k in c for k in ["prezzo", "price", "quotazione", "prezzo medio"])), None)
+    qty_col = next(
+        (c for c in df.columns if any(k in c for k in ["quantit", "quantita", "q.ta", "volume", "shares"])), None
+    )
+    price_col = next(
+        (c for c in df.columns if any(k in c for k in ["prezzo", "price", "quotazione", "prezzo medio"])), None
+    )
     amount_col = next((c for c in df.columns if any(k in c for k in ["importo", "controvalore", "totale"])), None)
     fee_col = next((c for c in df.columns if any(k in c for k in ["commission", "spese", "fee", "costi"])), None)
     curr_col = next((c for c in df.columns if any(k in c for k in ["divisa", "valuta", "currency"])), None)
@@ -121,9 +152,15 @@ def parse_fineco_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
         raise ValueError("Il file non sembra un export valido di Fineco Bank (colonne Data o ISIN/Titolo non trovate).")
 
     cols = {
-        "date": date_col, "type": type_col, "isin": isin_col,
-        "desc": desc_col, "qty": qty_col, "price": price_col,
-        "amount": amount_col, "fee": fee_col, "curr": curr_col
+        "date": date_col,
+        "type": type_col,
+        "isin": isin_col,
+        "desc": desc_col,
+        "qty": qty_col,
+        "price": price_col,
+        "amount": amount_col,
+        "fee": fee_col,
+        "curr": curr_col,
     }
 
     records = []

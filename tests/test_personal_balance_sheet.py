@@ -3,19 +3,20 @@
 # ARGUS — Tests for Personal Balance Sheet & Financial Statements
 # ============================================================
 
-import pytest
 import sqlite3
+
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine
 
-from core.wealth.personal_balance_sheet import compute_personal_balance_sheet
 from core.fetcher import get_engine
+from core.wealth.personal_balance_sheet import compute_personal_balance_sheet
 from core.wealth.wealth_db import (
-    init_wealth_db,
-    get_wealth_accounts,
-    save_wealth_account,
     get_cashflow_records,
+    get_wealth_accounts,
+    init_wealth_db,
     insert_cashflow_tx,
+    save_wealth_account,
 )
 
 

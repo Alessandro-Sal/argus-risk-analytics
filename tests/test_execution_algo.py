@@ -3,14 +3,15 @@ ARGUS — Risk Analytics Platform
 Unit Tests for TWAP & VWAP Algorithmic Execution Smart Router
 """
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.execution_algo import (
-    generate_intraday_volume_profile,
+    compare_execution_strategies,
     compute_twap_schedule,
     compute_vwap_schedule,
-    compare_execution_strategies
+    generate_intraday_volume_profile,
 )
 
 

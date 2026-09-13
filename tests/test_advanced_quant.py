@@ -2,13 +2,14 @@
 Unit & Integration Tests for core/advanced_quant.py
 """
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.advanced_quant import (
-    compute_tail_copula_matrix,
+    compute_equal_risk_contribution_portfolio,
     compute_kelly_criterion_sizing,
-    compute_equal_risk_contribution_portfolio
+    compute_tail_copula_matrix,
 )
 
 

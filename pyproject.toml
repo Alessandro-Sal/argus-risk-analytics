@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "argus-risk"
-version = "9.4.0"
+version = "9.5.0"
 description = "ARGUS — Headless Quantitative Risk Engine, Portfolio Optimization & Bitemporal Analytics"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -35,6 +35,8 @@ dependencies = [
     "cryptography>=42.0.0",
     "python-dotenv>=1.0.1",
     "SQLAlchemy>=2.0.25",
+    "yfinance>=0.2.36",
+    "PyMySQL[rsa]>=1.1.0",
 ]
 
 [project.optional-dependencies]
@@ -49,13 +51,15 @@ ui = [
     "openpyxl>=3.1.2",
     "xlsxwriter>=3.2.0",
     "reportlab>=4.1.0",
-    "yfinance>=0.2.36",
-    "PyMySQL[rsa]>=1.1.0",
-    "gspread>=5.12.0",
-    "google-auth>=2.20.0",
     "psutil>=5.9.0",
+]
+desktop = [
     "pywebview>=4.4.0",
     "pyinstaller>=6.3.0",
+]
+sync = [
+    "gspread>=5.12.0",
+    "google-auth>=2.20.0",
 ]
 dev = [
     "pytest>=7.4.0",
@@ -68,7 +72,7 @@ dev = [
     "pymdown-extensions>=10.7",
 ]
 all = [
-    "argus-risk[api,ui,dev]",
+    "argus-risk[api,ui,desktop,sync,dev]",
 ]
 
 [project.scripts]
@@ -99,8 +103,22 @@ select = [
     "B",  # flake8-bugbear
 ]
 ignore = [
-    "E501", # line too long, handled by black if used
-    "F401", # imported but unused (useful to ignore during rapid dev)
+    "E501", # line too long, handled by formatter
+    "F401", # imported but unused
+    "C901", # cyclomatic complexity threshold (quant engines have complex branches)
+    "W291", # trailing whitespace
+    "W293", # blank line with whitespace
+    "B905", # zip without explicit strict
+    "E741", # ambiguous variable name (common in financial formulas like l, I)
+    "F841", # unused variables
+    "B007", # unused loop control variable
+    "E402", # module level import not at top of file (used for lazy/conditional imports)
+    "C414", # unnecessary double cast or process
+    "B904", # raise without from inside except
+    "E731", # lambda assignment
+    "F811", # redefined while unused
+    "C408", # unnecessary collection call (dict() used pervasively in Plotly graph_objects)
+    "E701", # multiple statements on one line (colon)
 ]
 
 [tool.pytest.ini_options]

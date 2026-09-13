@@ -4,19 +4,21 @@
 # Formal Syntactic/Semantic Schema, Z-Score Validation & Canonical Deduplication
 # ==============================================================================
 
-import re
 import hashlib
 import logging
+import re
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple, Set, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
+
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 logger = logging.getLogger("argus.data_quality")
 
 # ── ENUMERATIVI STANDARD FINANZIARI ──────────────────────────────────────────
+
 
 class TransactionType(str, Enum):
     BUY = "buy"
@@ -37,9 +39,31 @@ class AssetClass(str, Enum):
 
 # Valute ISO 4217 standard e crypto supportate
 MAJOR_CURRENCIES: Set[str] = {
-    "EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD", "SEK", "NOK", "DKK",
-    "HKD", "SGD", "NZD", "MXN", "BRL", "INR", "CNY", "ZAR",
-    "BTC", "ETH", "USDT", "USDC", "BNB", "XRP", "SOL"
+    "EUR",
+    "USD",
+    "GBP",
+    "CHF",
+    "JPY",
+    "CAD",
+    "AUD",
+    "SEK",
+    "NOK",
+    "DKK",
+    "HKD",
+    "SGD",
+    "NZD",
+    "MXN",
+    "BRL",
+    "INR",
+    "CNY",
+    "ZAR",
+    "BTC",
+    "ETH",
+    "USDT",
+    "USDC",
+    "BNB",
+    "XRP",
+    "SOL",
 }
 
 ISIN_REGEX = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
@@ -47,11 +71,13 @@ ISIN_REGEX = re.compile(r"^[A-Z]{2}[A-Z0-9]{9}[0-9]$")
 
 # ── PYDANTIC RECORD SCHEMA ───────────────────────────────────────────────────
 
+
 class CanonicalTradeRecord(BaseModel):
     """
     Schema formale e fortemente tipizzato per singola transazione finanziaria.
     Applica validazioni sintattiche, normalizzazione delle valute e hash univoco.
     """
+
     model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
 
     broker: str = Field(..., description="Nome univoco del broker o adapter")
@@ -167,6 +193,7 @@ class CanonicalTradeRecord(BaseModel):
 
 # ── REPORT STRUTTURATO DI VALIDAZIONE ────────────────────────────────────────
 
+
 class QualityGateReport(BaseModel):
     is_valid: bool = True
     total_raw_rows: int = 0
@@ -182,6 +209,7 @@ class QualityGateReport(BaseModel):
 
 
 # ── DATA QUALITY GATE MIDDLEWARE ─────────────────────────────────────────────
+
 
 class DataQualityGate:
     """
@@ -199,7 +227,7 @@ class DataQualityGate:
         df_adapter: pd.DataFrame,
         broker_name: str = "generic",
         portfolio_id: int = 1,
-        existing_hashes: Optional[Set[str]] = None
+        existing_hashes: Optional[Set[str]] = None,
     ) -> Tuple[pd.DataFrame, QualityGateReport]:
         """
         Esegue la pipeline di controllo end-to-end:
@@ -252,7 +280,7 @@ class DataQualityGate:
                     "fees": rec.fees,
                     "asset_class": rec.asset_class,
                     "notes": rec.notes,
-                    "tx_hash": tx_hash
+                    "tx_hash": tx_hash,
                 }
                 clean_records.append(clean_dict)
 
@@ -306,7 +334,9 @@ class DataQualityGate:
 
         logger.info(
             "QualityGate completato: %d righe valide, %d duplicate scartate, %d errori bloccanti",
-            report.valid_rows_count, report.duplicates_suppressed, len(report.critical_errors)
+            report.valid_rows_count,
+            report.duplicates_suppressed,
+            len(report.critical_errors),
         )
 
         return df_validated, report
@@ -314,8 +344,10 @@ class DataQualityGate:
 
 # ── MARKET DATA QUALITY GATE (PRICE SERIES INTEGRITY) ─────────────────────────
 
+
 class MarketDataQualityReport(BaseModel):
     """Report diagnostico e quantitativo sull'integrità delle serie storiche dei prezzi."""
+
     is_valid: bool = True
     active_tickers: List[str] = Field(default_factory=list)
     missing_tickers: List[str] = Field(default_factory=list)
@@ -338,7 +370,7 @@ class MarketDataQualityGate:
         min_history_days: int = 30,
         max_ffill_days: int = 5,
         max_stale_streak: int = 10,
-        z_score_jump_threshold: float = 6.0
+        z_score_jump_threshold: float = 6.0,
     ):
         self.min_history_days = min_history_days
         self.max_ffill_days = max_ffill_days
@@ -346,10 +378,7 @@ class MarketDataQualityGate:
         self.z_score_jump_threshold = z_score_jump_threshold
 
     def validate_and_align_prices(
-        self,
-        df_prices: pd.DataFrame,
-        required_tickers: Set[str],
-        reference_index: Optional[pd.DatetimeIndex] = None
+        self, df_prices: pd.DataFrame, required_tickers: Set[str], reference_index: Optional[pd.DatetimeIndex] = None
     ) -> Tuple[pd.DataFrame, MarketDataQualityReport]:
         """
         Allinea la matrice dei prezzi su un asse feriale continuativo e calcola la diagnostica.
@@ -438,18 +467,19 @@ class MarketDataQualityGate:
                     z_scores = (rets - rets.mean()) / std_ret
                     extreme_jumps = z_scores[z_scores.abs() > self.z_score_jump_threshold]
                     for dt, val in extreme_jumps.items():
-                        report.abnormal_returns.append({
-                            "ticker": tk,
-                            "date": dt.strftime("%Y-%m-%d"),
-                            "z_score": round(float(val), 2),
-                            "daily_return_pct": round(float(rets[dt]) * 100, 2)
-                        })
+                        report.abnormal_returns.append(
+                            {
+                                "ticker": tk,
+                                "date": dt.strftime("%Y-%m-%d"),
+                                "z_score": round(float(val), 2),
+                                "daily_return_pct": round(float(rets[dt]) * 100, 2),
+                            }
+                        )
                         report.warnings.append(
                             f"Salto anomalo di prezzo su '{tk}' in data {dt.strftime('%Y-%m-%d')}: "
-                            f"variazione {rets[dt]*100:.2f}% (Z-Score: {val:.1f})."
+                            f"variazione {rets[dt] * 100:.2f}% (Z-Score: {val:.1f})."
                         )
 
         report.active_tickers = sorted(list(available_tickers))
         report.is_valid = len(report.active_tickers) > 0
         return pivot, report
-

@@ -3,89 +3,77 @@
 # ARGUS Wealth Management — Dedicated Control Room & Ingestion Hub
 # ============================================================
 
-import os
 import json
-import streamlit as st
+import os
+from datetime import date, datetime
+
 import pandas as pd
-from datetime import datetime, date
+import streamlit as st
 
 import core.ui_utils
 import core.wealth.wealth_db
-import core.wealth.wealth_sync
 import core.wealth.wealth_engine
-
-from core.fetcher import get_engine
-from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    render_kpi_card,
-    fmt_eur,
-    fmt_pct,
-    render_omni_command_bar,
-    render_wealth_command_bar,
-    render_wealth_executive_badges,
-    render_wealth_control_room_hero,
-    ensure_portal_context,
-    render_segmented_tabs,
-    render_data_table
-)
-from core.wealth.wealth_engine import compute_consolidated_net_worth
-from core.sidebar import render_sidebar
-
-from core.wealth.wealth_db import (
-    init_wealth_db,
-    get_wealth_accounts,
-    save_wealth_account,
-    delete_wealth_account,
-    deduplicate_wealth_accounts,
-    get_wealth_categories,
-    save_wealth_category,
-    get_cashflow_records,
-    save_physical_asset,
-    save_pension_plan,
-    get_wealth_portfolios,
-    create_wealth_portfolio,
-    delete_wealth_portfolio,
-    cleanup_empty_wealth_portfolios,
-    clear_wealth_cashflow,
-    clear_wealth_snapshots,
-    clear_wealth_accounts,
-    reset_wealth_portfolio_data,
-    reset_all_wealth_database,
-    save_wealth_snapshot_to_db,
-    get_wealth_snapshots_history,
-    delete_wealth_snapshot,
-    load_wealth_snapshot_details,
-    get_available_risk_portfolios,
-    get_linked_risk_portfolios,
-    set_linked_risk_portfolios,
-    get_linked_risk_portfolios_summary
-)
-
-
-from core.wealth.wealth_importer import (
-    parse_universal_statement,
-    auto_categorize_transactions,
-    bulk_import_statement
-)
-from core.wealth.wealth_validator import (
-    validate_cashflow_df,
-    validate_physical_assets_df,
-    validate_accounts_df,
-    validate_pension_df
-)
-from core.wealth.wealth_sync import (
-    sync_expenses_tracker_2026_from_gsheets,
-    sync_all_historical_expenses_from_gsheets
-)
+import core.wealth.wealth_sync
 from core.archetype_manager import (
-    execute_unified_archetype_load,
     clear_unified_archetype,
+    execute_unified_archetype_load,
     render_unified_archetype_hud,
 )
-
-
+from core.fetcher import get_engine
+from core.sidebar import render_sidebar
+from core.ui_utils import (
+    ensure_portal_context,
+    fmt_eur,
+    fmt_pct,
+    inject_custom_css,
+    metric_card,
+    render_data_table,
+    render_kpi_card,
+    render_omni_command_bar,
+    render_segmented_tabs,
+    render_wealth_command_bar,
+    render_wealth_control_room_hero,
+    render_wealth_executive_badges,
+    section,
+)
+from core.wealth.wealth_db import (
+    cleanup_empty_wealth_portfolios,
+    clear_wealth_accounts,
+    clear_wealth_cashflow,
+    clear_wealth_snapshots,
+    create_wealth_portfolio,
+    deduplicate_wealth_accounts,
+    delete_wealth_account,
+    delete_wealth_portfolio,
+    delete_wealth_snapshot,
+    get_available_risk_portfolios,
+    get_cashflow_records,
+    get_linked_risk_portfolios,
+    get_linked_risk_portfolios_summary,
+    get_wealth_accounts,
+    get_wealth_categories,
+    get_wealth_portfolios,
+    get_wealth_snapshots_history,
+    init_wealth_db,
+    load_wealth_snapshot_details,
+    reset_all_wealth_database,
+    reset_wealth_portfolio_data,
+    save_pension_plan,
+    save_physical_asset,
+    save_wealth_account,
+    save_wealth_category,
+    save_wealth_snapshot_to_db,
+    set_linked_risk_portfolios,
+)
+from core.wealth.wealth_engine import compute_consolidated_net_worth
+from core.wealth.wealth_importer import auto_categorize_transactions, bulk_import_statement, parse_universal_statement
+from core.wealth.wealth_sync import sync_all_historical_expenses_from_gsheets, sync_expenses_tracker_2026_from_gsheets
+from core.wealth.wealth_validator import (
+    validate_accounts_df,
+    validate_cashflow_df,
+    validate_pension_df,
+    validate_physical_assets_df,
+)
 
 # ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────
 st.set_page_config(

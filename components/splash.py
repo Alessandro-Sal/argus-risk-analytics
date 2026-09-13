@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import html
 from typing import Callable, List, Optional, Tuple
+
 import streamlit as st
 
 

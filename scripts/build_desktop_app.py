@@ -4,9 +4,10 @@ tramite PyInstaller per ARGUS Risk Analytics Platform.
 """
 
 import os
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
+
 
 def build():
     project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

@@ -1,9 +1,11 @@
-import pytest
 import pandas as pd
-from core.report_exporter import generate_pdf_factsheet, generate_excel_report, generate_institutional_audit_dossier
-from core.rebalancer import compute_rebalancing_orders
+import pytest
+
 from core.advisor import generate_quant_advisory_report
 from core.dividend_engine import compute_dividend_forecast
+from core.rebalancer import compute_rebalancing_orders
+from core.report_exporter import generate_excel_report, generate_institutional_audit_dossier, generate_pdf_factsheet
+
 
 @pytest.fixture
 def mock_risk_results():
@@ -90,6 +92,7 @@ def test_advisor_with_none_values():
 def test_advisor_page_targets_exist_on_disk():
     """Verifica che tutti i page_target generati dall'advisor esistano fisicamente in src/."""
     import os
+
     from core.workspace_manager import resolve_page_path
 
     src_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")

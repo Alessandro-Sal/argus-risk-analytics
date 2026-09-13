@@ -1,21 +1,22 @@
-import pytest
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
+import pytest
 
 from core.ui_utils import (
-    register_argus_plotly_templates,
-    get_plotly_config,
+    ARGUS_COLORS,
+    ARGUS_FINANCIAL_PALETTE,
     apply_custom_chart_layout,
-    create_monte_carlo_fan_chart,
-    create_correlation_heatmap,
     create_cashflow_waterfall_chart,
+    create_correlation_heatmap,
     create_equity_drawdown_chart,
     create_hierarchical_allocation_chart,
-    ARGUS_COLORS,
-    ARGUS_FINANCIAL_PALETTE
+    create_monte_carlo_fan_chart,
+    get_plotly_config,
+    register_argus_plotly_templates,
 )
+
 
 def test_templates_registered():
     register_argus_plotly_templates()

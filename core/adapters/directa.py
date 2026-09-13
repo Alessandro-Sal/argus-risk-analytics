@@ -23,7 +23,21 @@ def _classify_directa_tx_type(raw_type: str) -> Optional[str]:
     rt = str(raw_type).strip().lower()
     if any(k in rt for k in ["dividendo", "cedola", "dividend", "accredito div"]) or rt == "div":
         return "dividend"
-    if any(k in rt for k in ["split", "frazionamento", "raggruppamento", "reverse split", "fusione", "incorporazione", "scambio", "merger", "scissione", "spinoff"]):
+    if any(
+        k in rt
+        for k in [
+            "split",
+            "frazionamento",
+            "raggruppamento",
+            "reverse split",
+            "fusione",
+            "incorporazione",
+            "scambio",
+            "merger",
+            "scissione",
+            "spinoff",
+        ]
+    ):
         return "split"
     if any(k in rt for k in ["vende", "vendita", "sell", "ven"]) or rt == "v":
         return "sell"
@@ -79,7 +93,7 @@ def _parse_directa_row(row: pd.Series, cols: Dict[str, Optional[str]], df: pd.Da
         "currency": curr,
         "fees": fees,
         "asset_class": asset_class,
-        "notes": f"Directa: {raw_desc or ticker}"
+        "notes": f"Directa: {raw_desc or ticker}",
     }
 
 
@@ -95,21 +109,39 @@ def parse_directa_transactions(df_raw: pd.DataFrame) -> pd.DataFrame:
     if not date_col:
         date_col = next((c for c in df.columns if "data" in c or "date" in c), None)
 
-    type_col = next((c for c in df.columns if c != date_col and any(k in c for k in ["operazione", "tipo operazione", "tipo", "type", "segno"])), None)
+    type_col = next(
+        (
+            c
+            for c in df.columns
+            if c != date_col and any(k in c for k in ["operazione", "tipo operazione", "tipo", "type", "segno"])
+        ),
+        None,
+    )
     ticker_col = next((c for c in df.columns if any(k in c for k in ["simbolo", "ticker", "codice", "isin"])), None)
     desc_col = next((c for c in df.columns if any(k in c for k in ["titolo", "descrizione", "name", "prodotto"])), None)
-    qty_col = next((c for c in df.columns if any(k in c for k in ["quantit", "quantita", "q.ta", "qty", "volume"])), None)
-    price_col = next((c for c in df.columns if any(k in c for k in ["prezzo", "price", "quotazione", "prezzo medio"])), None)
+    qty_col = next(
+        (c for c in df.columns if any(k in c for k in ["quantit", "quantita", "q.ta", "qty", "volume"])), None
+    )
+    price_col = next(
+        (c for c in df.columns if any(k in c for k in ["prezzo", "price", "quotazione", "prezzo medio"])), None
+    )
     fee_col = next((c for c in df.columns if any(k in c for k in ["commission", "spese", "fee", "costi"])), None)
     curr_col = next((c for c in df.columns if any(k in c for k in ["divisa", "valuta", "currency"])), None)
 
     if not date_col or (not ticker_col and not desc_col):
-        raise ValueError("Il file non sembra un export valido di Directa SIM (colonne Data o Simbolo/Titolo non trovate).")
+        raise ValueError(
+            "Il file non sembra un export valido di Directa SIM (colonne Data o Simbolo/Titolo non trovate)."
+        )
 
     cols = {
-        "date": date_col, "type": type_col, "ticker": ticker_col,
-        "desc": desc_col, "qty": qty_col, "price": price_col,
-        "fee": fee_col, "curr": curr_col
+        "date": date_col,
+        "type": type_col,
+        "ticker": ticker_col,
+        "desc": desc_col,
+        "qty": qty_col,
+        "price": price_col,
+        "fee": fee_col,
+        "curr": curr_col,
     }
 
     records = []

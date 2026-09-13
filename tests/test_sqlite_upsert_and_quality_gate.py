@@ -1,9 +1,11 @@
-import pytest
 import pandas as pd
+import pytest
 from sqlalchemy import create_engine, text
-from core.fetcher import _upsert_asset, _store_prices, _store_isin_price
-from core.risk_engine import _compute_returns
+
+from core.fetcher import _store_isin_price, _store_prices, _upsert_asset
 from core.models import Base
+from core.risk_engine import _compute_returns
+
 
 def test_sqlite_upsert_and_store_prices():
     # Arrange: SQLite in-memory database

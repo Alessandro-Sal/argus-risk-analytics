@@ -3,15 +3,16 @@
 # ARGUS — Unit Tests for Live Terminal Engine & Interactive CLI Desk
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.terminal_engine import (
     ArgusTerminalEngine,
-    TerminalCommandResult,
     OMSOrder,
+    TerminalCommandResult,
+    get_active_positions,
     get_terminal_engine,
-    get_active_positions
 )
 
 
@@ -265,7 +266,7 @@ def test_terminal_engine_live_quote_and_watchlist(mock_session_context):
     assert "AAPL" in res_port.output_text
 
     # Batch parallel quote fetching
-    from core.terminal_engine import fetch_multiple_live_quotes, convert_to_eur, detect_currency, get_fx_rate_to_eur
+    from core.terminal_engine import convert_to_eur, detect_currency, fetch_multiple_live_quotes, get_fx_rate_to_eur
     batch_res = fetch_multiple_live_quotes(["AAPL", "MSFT", "NVDA"], max_workers=3)
     assert len(batch_res) == 3
     assert "AAPL" in batch_res and batch_res["AAPL"]["last_price"] > 0
@@ -345,7 +346,7 @@ def test_terminal_engine_advanced_features(mock_session_context):
 
 
 def test_pre_trade_risk_evaluation():
-    from core.terminal_engine import evaluate_pre_trade_risk, DeskRiskLimits
+    from core.terminal_engine import DeskRiskLimits, evaluate_pre_trade_risk
 
     limits = DeskRiskLimits(
         max_daily_loss_eur=5000.0,

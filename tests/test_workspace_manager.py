@@ -4,23 +4,24 @@ Tests URL Query Parameter state synchronization, session snapshot caching/restor
 and in-app workspace tab management.
 """
 
-import os
 import json
+import os
+
 import pandas as pd
 import pytest
 import streamlit as st
 
 from core.workspace_manager import (
+    WORKSPACE_CACHE_PKL,
+    close_workspace_tab,
     get_url_param,
-    set_url_params,
-    save_session_snapshot_to_cache,
-    try_restore_session_from_cache,
-    sync_url_state,
     get_workspace_tabs,
     register_workspace_tab,
-    close_workspace_tab,
+    save_session_snapshot_to_cache,
     set_active_workspace,
-    WORKSPACE_CACHE_PKL
+    set_url_params,
+    sync_url_state,
+    try_restore_session_from_cache,
 )
 
 

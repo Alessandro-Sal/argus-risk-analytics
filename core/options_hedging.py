@@ -9,16 +9,12 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-from core.yield_curve import get_default_risk_free_rate, get_active_risk_free_rate
+
+from core.yield_curve import get_active_risk_free_rate, get_default_risk_free_rate
 
 
 def black_scholes_pricing(
-    S: float,
-    K: float,
-    T: float,
-    r: float = None,
-    sigma: float = 0.20,
-    option_type: str = "put"
+    S: float, K: float, T: float, r: float = None, sigma: float = 0.20, option_type: str = "put"
 ) -> Dict[str, Any]:
     """
     Calcola il prezzo analitico e i 5 Greci di un'opzione Europea secondo il modello di Black-Scholes-Merton (1973).
@@ -35,16 +31,9 @@ def black_scholes_pricing(
         r = get_default_risk_free_rate("USD")
 
     if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
-        return {
-            "price": 0.0,
-            "delta": 0.0,
-            "gamma": 0.0,
-            "theta": 0.0,
-            "vega": 0.0,
-            "rho": 0.0
-        }
+        return {"price": 0.0, "delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
 
-    d1 = (np.log(S / K) + (r + 0.5 * sigma ** 2) * T) / (sigma * np.sqrt(T))
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)
 
     pdf_d1 = stats.norm.pdf(d1)
@@ -59,12 +48,12 @@ def black_scholes_pricing(
         price = float(S * cdf_d1 - K * np.exp(-r * T) * cdf_d2)
         delta = float(cdf_d1)
         rho = float(K * T * np.exp(-r * T) * cdf_d2 / 100.0)
-        theta = float((- (S * pdf_d1 * sigma) / (2 * np.sqrt(T)) - r * K * np.exp(-r * T) * cdf_d2) / 365.0)
+        theta = float((-(S * pdf_d1 * sigma) / (2 * np.sqrt(T)) - r * K * np.exp(-r * T) * cdf_d2) / 365.0)
     else:  # Put
         price = float(K * np.exp(-r * T) * cdf_minus_d2 - S * cdf_minus_d1)
         delta = float(cdf_d1 - 1.0)
-        rho = float(- K * T * np.exp(-r * T) * cdf_minus_d2 / 100.0)
-        theta = float((- (S * pdf_d1 * sigma) / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * cdf_minus_d2) / 365.0)
+        rho = float(-K * T * np.exp(-r * T) * cdf_minus_d2 / 100.0)
+        theta = float((-(S * pdf_d1 * sigma) / (2 * np.sqrt(T)) + r * K * np.exp(-r * T) * cdf_minus_d2) / 365.0)
 
     # Gamma e Vega sono identici per Call e Put
     gamma = float(pdf_d1 / (S * sigma * np.sqrt(T)))
@@ -78,7 +67,7 @@ def black_scholes_pricing(
         "vega": vega,
         "rho": rho,
         "d1": float(d1),
-        "d2": float(d2)
+        "d2": float(d2),
     }
 
 
@@ -92,7 +81,7 @@ def compute_portfolio_delta_hedge(
     expiry_months: float = 3.0,
     implied_vol: float = 0.18,
     risk_free_rate: float = None,
-    use_skew_calibration: bool = True
+    use_skew_calibration: bool = True,
 ) -> Dict[str, Any]:
     """
     Calcola la strategia ottimale di Delta-Hedging con opzioni Put sul benchmark (es. SPY / SPX)
@@ -107,6 +96,7 @@ def compute_portfolio_delta_hedge(
     # Calcolo IV con o senza Volatility Skew
     if use_skew_calibration:
         from core.volatility_surface import build_volatility_surface
+
         surface = build_volatility_surface(spot=benchmark_spot, r=risk_free_rate, base_atm_iv=implied_vol)
         m_key = f"{int(round(expiry_months))}M" if f"{int(round(expiry_months))}M" in surface["smile_models"] else "3M"
         smile_model = surface["smile_models"].get(m_key, list(surface["smile_models"].values())[0])
@@ -116,22 +106,12 @@ def compute_portfolio_delta_hedge(
 
     # Prezzatura Put con IV effettiva
     put_metrics = black_scholes_pricing(
-        S=benchmark_spot,
-        K=K,
-        T=T,
-        r=risk_free_rate,
-        sigma=effective_iv,
-        option_type="put"
+        S=benchmark_spot, K=K, T=T, r=risk_free_rate, sigma=effective_iv, option_type="put"
     )
 
     # Prezzatura Put piatta per confronto
     flat_put_metrics = black_scholes_pricing(
-        S=benchmark_spot,
-        K=K,
-        T=T,
-        r=risk_free_rate,
-        sigma=implied_vol,
-        option_type="put"
+        S=benchmark_spot, K=K, T=T, r=risk_free_rate, sigma=implied_vol, option_type="put"
     )
 
     put_price = put_metrics["price"]
@@ -141,12 +121,22 @@ def compute_portfolio_delta_hedge(
     portfolio_delta_euros = portfolio_value * portfolio_beta * (target_hedge_pct / 100.0)
     contract_notional_delta = benchmark_spot * contract_multiplier * put_delta
 
-    contracts_needed = int(np.ceil(portfolio_delta_euros / max(1.0, contract_notional_delta))) if contract_notional_delta > 0 else 0
+    contracts_needed = (
+        int(np.ceil(portfolio_delta_euros / max(1.0, contract_notional_delta))) if contract_notional_delta > 0 else 0
+    )
     total_hedge_cost = contracts_needed * put_price * contract_multiplier
     cost_pct_of_portfolio = (total_hedge_cost / max(1.0, portfolio_value)) * 100.0
 
     # Calcolo costo piatto teorico per confronto
-    flat_contracts = int(np.ceil(portfolio_delta_euros / max(1.0, benchmark_spot * contract_multiplier * abs(flat_put_metrics["delta"])))) if abs(flat_put_metrics["delta"]) > 0 else 0
+    flat_contracts = (
+        int(
+            np.ceil(
+                portfolio_delta_euros / max(1.0, benchmark_spot * contract_multiplier * abs(flat_put_metrics["delta"]))
+            )
+        )
+        if abs(flat_put_metrics["delta"]) > 0
+        else 0
+    )
     flat_total_cost = flat_contracts * flat_put_metrics["price"] * contract_multiplier
     skew_cost_premium_eur = total_hedge_cost - flat_total_cost
 
@@ -169,7 +159,7 @@ def compute_portfolio_delta_hedge(
         "flat_put_price": float(flat_put_metrics["price"]),
         "flat_total_cost": float(flat_total_cost),
         "skew_cost_premium_eur": float(skew_cost_premium_eur),
-        "use_skew_calibration": use_skew_calibration
+        "use_skew_calibration": use_skew_calibration,
     }
 
 
@@ -181,7 +171,7 @@ def compute_covered_call_yield_enhancement(
     risk_free_rate: float = None,
     use_skew_calibration: bool = True,
     contract_multiplier: int = 100,
-    vol_map: Optional[dict] = None
+    vol_map: Optional[dict] = None,
 ) -> pd.DataFrame:
     """
     Calcola la strategia di Covered Call Writing (vendita di Call Out-of-The-Money) per generare
@@ -214,13 +204,16 @@ def compute_covered_call_yield_enhancement(
 
         if use_skew_calibration:
             from core.volatility_surface import build_volatility_surface
+
             surf_asset = build_volatility_surface(spot=price, r=risk_free_rate, base_atm_iv=asset_base_iv)
             smile_model = surf_asset["smile_models"].get("1M", list(surf_asset["smile_models"].values())[0])
             effective_call_iv = smile_model["eval_func"](K)
         else:
             effective_call_iv = asset_base_iv
 
-        call_res = black_scholes_pricing(S=price, K=K, T=T, r=risk_free_rate, sigma=effective_call_iv, option_type="call")
+        call_res = black_scholes_pricing(
+            S=price, K=K, T=T, r=risk_free_rate, sigma=effective_call_iv, option_type="call"
+        )
 
         call_premium_per_share = call_res["price"]
         total_premium_income = call_premium_per_share * qty
@@ -233,21 +226,23 @@ def compute_covered_call_yield_enhancement(
         uncovered_shares = max(0.0, qty - covered_shares)
         executable_premium_income = contracts_tradable * call_premium_per_share * contract_multiplier
 
-        results.append({
-            "ticker": ticker,
-            "quantita_totale": qty,
-            "prezzo_spot": price,
-            "strike_call_otm": K,
-            "iv_effettiva_pct": effective_call_iv * 100.0,
-            "premio_per_azione": call_premium_per_share,
-            "incasso_premio_totale": total_premium_income,
-            "contratti_eseguibili": contracts_tradable,
-            "quote_coperte": covered_shares,
-            "quote_scoperte": uncovered_shares,
-            "incasso_eseguibile_eur": executable_premium_income,
-            "extra_rendimento_mensile_pct": monthly_yield_pct,
-            "extra_rendimento_annuo_pct": annualized_yield_pct,
-            "delta_call": call_res["delta"]
-        })
+        results.append(
+            {
+                "ticker": ticker,
+                "quantita_totale": qty,
+                "prezzo_spot": price,
+                "strike_call_otm": K,
+                "iv_effettiva_pct": effective_call_iv * 100.0,
+                "premio_per_azione": call_premium_per_share,
+                "incasso_premio_totale": total_premium_income,
+                "contratti_eseguibili": contracts_tradable,
+                "quote_coperte": covered_shares,
+                "quote_scoperte": uncovered_shares,
+                "incasso_eseguibile_eur": executable_premium_income,
+                "extra_rendimento_mensile_pct": monthly_yield_pct,
+                "extra_rendimento_annuo_pct": annualized_yield_pct,
+                "delta_call": call_res["delta"],
+            }
+        )
 
     return pd.DataFrame(results)

@@ -4,23 +4,13 @@
 # Verifies Italian Fiscal Framework Compliance (TUIR Artt. 44, 67, 68, L. 197/2022, L. 213/2023)
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 
-from core.tax_engine import (
-    compute_modello_redditi_pf,
-    compute_withholding_tax_analysis,
-    is_etf,
-    get_asset_tax_rate
-)
-from core.tax_aware_rebalancer import TaxAwarePortfolioRebalancer, FrictionConfig
-from core.prescriptive_rebalancer import (
-    PrescriptiveConicRebalancer,
-    PositionLot,
-    TaxWalletState
-)
-
+from core.prescriptive_rebalancer import PositionLot, PrescriptiveConicRebalancer, TaxWalletState
+from core.tax_aware_rebalancer import FrictionConfig, TaxAwarePortfolioRebalancer
+from core.tax_engine import compute_modello_redditi_pf, compute_withholding_tax_analysis, get_asset_tax_rate, is_etf
 
 # ── 1. TEST ASIMMETRIA ETF NEI REBALANCER (TUIR Art. 44 vs 67) ──
 
@@ -182,8 +172,9 @@ def test_wealth_engine_giacenza_media_and_monitoring_thresholds():
     - Giacenza media <= 5.000€ ma Picco > 15.000€ -> IVAFE 0€, monitoraggio_solo = 'Sì (Picco > 15k)'
     - Giacenza media <= 5.000€ e Picco <= 15.000€ -> IVAFE 0€, monitoraggio_solo = 'Esonerato (Sotto soglie)'
     """
-    from core.wealth.wealth_engine import compute_fiscal_analytics
     from unittest.mock import MagicMock, patch
+
+    from core.wealth.wealth_engine import compute_fiscal_analytics
 
     mock_accounts = pd.DataFrame([
         {

@@ -5,26 +5,21 @@
 # ============================================================
 
 from datetime import datetime, timezone
+
 import numpy as np
 import pandas as pd
 import pytest
 
 from core.fixed_income import (
+    INSTITUTIONAL_BOND_PRESETS,
+    compute_bond_analytics,
     compute_bond_cash_flows,
     compute_bond_price_from_ytm,
     compute_bond_ytm,
-    compute_bond_analytics,
-    compute_z_spread,
     compute_cds_implied_default_probability,
-    INSTITUTIONAL_BOND_PRESETS
+    compute_z_spread,
 )
-from core.streaming_engine import (
-    MarketTick,
-    TickRingBuffer,
-    OrderBookLevel,
-    OrderBookL2,
-    generate_mock_streaming_ticks
-)
+from core.streaming_engine import MarketTick, OrderBookL2, OrderBookLevel, TickRingBuffer, generate_mock_streaming_ticks
 from core.ui_utils import parse_terminal_command
 
 

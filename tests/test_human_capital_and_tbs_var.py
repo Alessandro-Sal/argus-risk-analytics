@@ -3,13 +3,14 @@ tests/test_human_capital_and_tbs_var.py
 Unit tests for HumanCapitalEngine and HolisticBalanceSheetEngine (TBS-VaR).
 """
 
-import pytest
 import numpy as np
+import pytest
+
 from core.wealth.human_capital_engine import (
+    HolisticBalanceSheetEngine,
+    HumanCapitalEngine,
     LaborIncomeProfile,
     TotalBalanceSheetState,
-    HumanCapitalEngine,
-    HolisticBalanceSheetEngine,
 )
 
 

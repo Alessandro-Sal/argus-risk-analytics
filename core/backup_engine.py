@@ -4,11 +4,11 @@
 # Zero-Downtime Hot Backup (SQLite Online Backup API), Integrity Check & Point-In-Time Rollback
 # ============================================================
 
-import os
 import gzip
+import logging
+import os
 import shutil
 import sqlite3
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -45,9 +45,7 @@ def verify_db_integrity(db_path: Path) -> bool:
 
 
 def perform_hot_backup(
-    db_path: Optional[Path] = None,
-    backup_dir: Optional[Path] = None,
-    max_retention_days: int = 30
+    db_path: Optional[Path] = None, backup_dir: Optional[Path] = None, max_retention_days: int = 30
 ) -> Path:
     """
     Esegue un backup online atomico e consistente di SQLite senza bloccare letture/scritture.
@@ -109,10 +107,7 @@ def perform_hot_backup(
     return compressed_file
 
 
-def restore_snapshot(
-    backup_archive_path: Path,
-    target_db_path: Optional[Path] = None
-) -> bool:
+def restore_snapshot(backup_archive_path: Path, target_db_path: Optional[Path] = None) -> bool:
     """
     Ripristina il database a partire da un archivio compresso .db.gz.
     Crea preliminarmente una copia di emergenza (.emergency_pre_restore) e valida
@@ -175,13 +170,15 @@ def list_available_backups(backup_dir: Optional[Path] = None) -> List[Dict[str, 
     for f in sorted(target_dir.glob("argus_backup_*.db.gz"), reverse=True):
         try:
             stat = f.stat()
-            backups.append({
-                "path": str(f.resolve()),
-                "filename": f.name,
-                "created_at": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                "size_kb": round(stat.st_size / 1024.0, 2),
-                "timestamp_slug": f.name.replace("argus_backup_", "").replace(".db.gz", "")
-            })
+            backups.append(
+                {
+                    "path": str(f.resolve()),
+                    "filename": f.name,
+                    "created_at": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+                    "size_kb": round(stat.st_size / 1024.0, 2),
+                    "timestamp_slug": f.name.replace("argus_backup_", "").replace(".db.gz", ""),
+                }
+            )
         except Exception:
             pass
     return backups

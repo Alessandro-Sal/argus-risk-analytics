@@ -69,26 +69,45 @@ def _parse_ibkr_row(row: pd.Series, cols: Dict[str, Optional[str]]) -> Optional[
         "currency": curr,
         "fees": fees,
         "asset_class": asset_class,
-        "notes": f"IBKR: {ticker}"
+        "notes": f"IBKR: {ticker}",
     }
 
 
 def _extract_records_from_ibkr_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """Estrae e mappa le colonne IBKR nei campi standard ARGUS."""
     date_col = next((c for c in df.columns if any(k in c for k in ["date/time", "date", "trade date", "data"])), None)
-    symbol_col = next((c for c in df.columns if any(k in c for k in ["symbol", "ticker", "financial instrument", "isin"])), None)
+    symbol_col = next(
+        (c for c in df.columns if any(k in c for k in ["symbol", "ticker", "financial instrument", "isin"])), None
+    )
     qty_col = next((c for c in df.columns if any(k in c for k in ["quantity", "shares", "qty", "volume"])), None)
-    price_col = next((c for c in df.columns if any(k in c for k in ["t. price", "trade price", "tradeprice", "price", "prezzo"])), None)
-    fee_col = next((c for c in df.columns if any(k in c for k in ["comm/fee", "commission", "ibcommission", "fee", "spese"])), None)
-    curr_col = next((c for c in df.columns if any(k in c for k in ["currencyprimary", "currency", "currency (base)", "valuta"])), None)
-    cat_col = next((c for c in df.columns if any(k in c for k in ["asset category", "assetclass", "security type"])), None)
+    price_col = next(
+        (c for c in df.columns if any(k in c for k in ["t. price", "trade price", "tradeprice", "price", "prezzo"])),
+        None,
+    )
+    fee_col = next(
+        (c for c in df.columns if any(k in c for k in ["comm/fee", "commission", "ibcommission", "fee", "spese"])), None
+    )
+    curr_col = next(
+        (c for c in df.columns if any(k in c for k in ["currencyprimary", "currency", "currency (base)", "valuta"])),
+        None,
+    )
+    cat_col = next(
+        (c for c in df.columns if any(k in c for k in ["asset category", "assetclass", "security type"])), None
+    )
 
     if not date_col or not symbol_col or not qty_col:
-        raise ValueError("Il file non sembra un export valido di Interactive Brokers (colonne Date, Symbol o Quantity mancanti).")
+        raise ValueError(
+            "Il file non sembra un export valido di Interactive Brokers (colonne Date, Symbol o Quantity mancanti)."
+        )
 
     cols = {
-        "date": date_col, "symbol": symbol_col, "qty": qty_col,
-        "price": price_col, "fee": fee_col, "curr": curr_col, "cat": cat_col
+        "date": date_col,
+        "symbol": symbol_col,
+        "qty": qty_col,
+        "price": price_col,
+        "fee": fee_col,
+        "curr": curr_col,
+        "cat": cat_col,
     }
 
     records = []
@@ -117,7 +136,7 @@ def _parse_ibkr_activity_statement(df: pd.DataFrame) -> pd.DataFrame:
         headers = [str(v).strip().lower() for v in header_row.iloc[0].values]
         data_df = trades_df[trades_df.iloc[:, 1].astype(str).str.strip().isin(["Data", "Order"])].copy()
 
-    data_df.columns = headers[:len(data_df.columns)]
+    data_df.columns = headers[: len(data_df.columns)]
     return _extract_records_from_ibkr_dataframe(data_df)
 
 

@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def test_monte_carlo_var_bounds():
     # Simulated final portfolio values (10000 paths)
     np.random.seed(42)
@@ -22,6 +23,7 @@ def test_monte_carlo_var_bounds():
 
 def test_run_advanced_monte_carlo_simulation():
     import pandas as pd
+
     from core.risk_engine import run_advanced_monte_carlo_simulation
     
     dates = pd.date_range("2023-01-01", periods=100, freq="B")

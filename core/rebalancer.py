@@ -1,5 +1,5 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 def _safe_series_get(row, keys, default=0.0):
@@ -30,7 +30,7 @@ def compute_rebalancing_orders(
     target_weights_dict: dict = None,
     new_cash_eur: float = 0.0,
     target_total_value: float = None,
-    integer_shares: bool = True
+    integer_shares: bool = True,
 ) -> dict:
     """
     Calcola gli ordini puntuali di acquisto / vendita (Rebalancing Plan)
@@ -125,28 +125,30 @@ def compute_rebalancing_orders(
         else:
             action = "HOLD ⚪"
 
-        orders_list.append({
-            "ticker": t,
-            "action": action,
-            "current_qty": round(curr_qty, 2) if not integer_shares else int(round(curr_qty)),
-            "target_qty": round(tgt_qty, 2) if not integer_shares else int(tgt_qty),
-            "qty_delta": round(qty_delta, 2) if not integer_shares else int(round(qty_delta)),
-            "last_price": round(price, 2),
-            "order_value_eur": round(abs(order_val), 2),
-            "current_weight_pct": round(curr_w, 2),
-            "target_weight_pct": round(tgt_w, 2),
-            "weight_delta_pct": round(tgt_w - curr_w, 2),
-            "Ticker": t,
-            "Azione": action,
-            "Quote Attuali": round(curr_qty, 2) if not integer_shares else int(round(curr_qty)),
-            "Quote Target": round(tgt_qty, 2) if not integer_shares else int(tgt_qty),
-            "Delta Quote": round(qty_delta, 2) if not integer_shares else int(round(qty_delta)),
-            "Prezzo (€/$)": round(price, 2),
-            "Valore Ordine (€/$)": round(abs(order_val), 2),
-            "Peso Attuale %": round(curr_w, 2),
-            "Peso Target %": round(tgt_w, 2),
-            "Delta Peso %": round(tgt_w - curr_w, 2)
-        })
+        orders_list.append(
+            {
+                "ticker": t,
+                "action": action,
+                "current_qty": round(curr_qty, 2) if not integer_shares else int(round(curr_qty)),
+                "target_qty": round(tgt_qty, 2) if not integer_shares else int(tgt_qty),
+                "qty_delta": round(qty_delta, 2) if not integer_shares else int(round(qty_delta)),
+                "last_price": round(price, 2),
+                "order_value_eur": round(abs(order_val), 2),
+                "current_weight_pct": round(curr_w, 2),
+                "target_weight_pct": round(tgt_w, 2),
+                "weight_delta_pct": round(tgt_w - curr_w, 2),
+                "Ticker": t,
+                "Azione": action,
+                "Quote Attuali": round(curr_qty, 2) if not integer_shares else int(round(curr_qty)),
+                "Quote Target": round(tgt_qty, 2) if not integer_shares else int(tgt_qty),
+                "Delta Quote": round(qty_delta, 2) if not integer_shares else int(round(qty_delta)),
+                "Prezzo (€/$)": round(price, 2),
+                "Valore Ordine (€/$)": round(abs(order_val), 2),
+                "Peso Attuale %": round(curr_w, 2),
+                "Peso Target %": round(tgt_w, 2),
+                "Delta Peso %": round(tgt_w - curr_w, 2),
+            }
+        )
 
     df_orders = pd.DataFrame(orders_list)
     net_flow = total_raised - total_spent
@@ -163,7 +165,7 @@ def compute_rebalancing_orders(
         "total_sell_value": total_raised,
         "net_cash_flow": net_flow,
         "net_cash_delta": net_flow,
-        "num_orders": len([o for o in orders_list if "HOLD" not in o["action"]])
+        "num_orders": len([o for o in orders_list if "HOLD" not in o["action"]]),
     }
 
     return {"orders": df_orders, "summary": summary}

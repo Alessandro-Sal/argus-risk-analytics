@@ -6,21 +6,22 @@ Tests robustness across standalone and portfolio-dependent modules under zero-da
 
 from datetime import date, datetime
 from unittest.mock import patch
+
 import numpy as np
 import pandas as pd
 import pytest
 import streamlit as st
 
 from core.fetcher import get_engine
-from core.onboarding_guard import ensure_portfolio_loaded, render_empty_state_screen, empty_state_guard
+from core.onboarding_guard import empty_state_guard, ensure_portfolio_loaded, render_empty_state_screen
 from core.unified_demo_seeder import seed_unified_demo_scenario
 from core.wealth.wealth_db import (
-    init_wealth_db,
-    get_wealth_portfolios,
-    get_wealth_accounts,
-    get_physical_assets,
+    get_cashflow_records,
     get_pension_plans,
-    get_cashflow_records
+    get_physical_assets,
+    get_wealth_accounts,
+    get_wealth_portfolios,
+    init_wealth_db,
 )
 from core.wealth.wealth_engine import compute_consolidated_net_worth
 
@@ -301,9 +302,9 @@ def test_session_reset_then_risk_then_wealth_selection_flow():
     2. Naviga nel modulo Risk senza caricare alcun portafoglio
     3. Entra nel modulo Wealth: verifica che nessun profilo (ID #1 o altro) venga selezionato automaticamente.
     """
+    from core.onboarding_guard import ensure_portfolio_loaded
     from core.sidebar import _execute_full_session_reset, render_sidebar
     from core.ui_utils import ensure_portal_context
-    from core.onboarding_guard import ensure_portfolio_loaded
     from core.workspace_context import WorkspaceContext
 
     # 1. Reset di sessione completo
@@ -336,6 +337,7 @@ def test_session_reset_then_risk_then_wealth_selection_flow():
 def test_splash_screen_not_active_on_cold_start_or_risk_launch():
     """Verifica che al primo avvio del modulo Risk lo splash screen non si attivi automaticamente provocando sfarfallii."""
     from unittest.mock import MagicMock
+
     from core.ui_utils import render_splash_screen
 
     # 1. Cold start: session_state vuoto senza 'splash_dismissed'
@@ -362,6 +364,7 @@ def test_splash_screen_not_active_on_cold_start_or_risk_launch():
 def test_render_wealth_profile_picker_click_does_not_modify_instantiated_widget_key():
     """Verifica che render_wealth_profile_picker non tenti di modificare wealth_profile_selector_widget dopo l'istanziazione del widget."""
     from unittest.mock import MagicMock, patch
+
     from core.ui_utils import render_wealth_profile_picker
 
     st.session_state.clear()

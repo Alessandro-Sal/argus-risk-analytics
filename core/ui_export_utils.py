@@ -18,25 +18,28 @@ Caratteristiche:
 ==============================================================================
 """
 
+import datetime
 import io
 import re
-import datetime
-from typing import Optional, Dict, Tuple, Any, List, Union
-import streamlit as st
-import pandas as pd
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import numpy as np
+import pandas as pd
+import streamlit as st
 
 # Verifica disponibilità motori Excel
 try:
     import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
+
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
 
 try:
     import xlsxwriter
+
     HAS_XLSXWRITER = True
 except ImportError:
     HAS_XLSXWRITER = False
@@ -45,6 +48,7 @@ except ImportError:
 # ==============================================================================
 # 1. SANITIZZAZIONE E PREPARAZIONE DATAFRAME
 # ==============================================================================
+
 
 def prepare_dataframe_for_export(df: Optional[pd.DataFrame]) -> pd.DataFrame:
     """
@@ -95,16 +99,14 @@ def prepare_dataframe_for_export(df: Optional[pd.DataFrame]) -> pd.DataFrame:
 
 
 def generate_export_filename(
-    prefix: str = "argus_export",
-    portfolio_name: Optional[str] = None,
-    extension: str = "csv"
+    prefix: str = "argus_export", portfolio_name: Optional[str] = None, extension: str = "csv"
 ) -> str:
     """
     Genera un nome file dinamico contestuale conforme allo standard ARGUS:
     {prefisso}_{nome_portafoglio}_{YYYYMMDD_HHMMSS}.{ext}
     """
-    clean_prefix = re.sub(r'[^\w\-]', '_', str(prefix or 'argus_export').strip()).strip('_')
-    
+    clean_prefix = re.sub(r"[^\w\-]", "_", str(prefix or "argus_export").strip()).strip("_")
+
     if not portfolio_name:
         portfolio_name = (
             st.session_state.get("portfolio_name")
@@ -112,8 +114,8 @@ def generate_export_filename(
             or st.session_state.get("selected_portfolio")
             or ""
         )
-    
-    clean_port = re.sub(r'[^\w\-]', '_', str(portfolio_name).strip()).strip('_')
+
+    clean_port = re.sub(r"[^\w\-]", "_", str(portfolio_name).strip()).strip("_")
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
     parts = [clean_prefix]
@@ -122,7 +124,7 @@ def generate_export_filename(
     parts.append(ts)
 
     base = "_".join(parts)
-    ext = extension.lstrip('.')
+    ext = extension.lstrip(".")
     return f"{base}.{ext}"
 
 
@@ -130,12 +132,8 @@ def generate_export_filename(
 # 2. SERIALIZZATORI IN-MEMORY (CSV & EXCEL)
 # ==============================================================================
 
-def to_csv_bytes(
-    df: pd.DataFrame,
-    sep: str = ",",
-    decimal: str = ".",
-    encoding: str = "utf-8-sig"
-) -> bytes:
+
+def to_csv_bytes(df: pd.DataFrame, sep: str = ",", decimal: str = ".", encoding: str = "utf-8-sig") -> bytes:
     """
     Esporta un DataFrame in formato CSV in-memory.
     Utilizza di default codifica UTF-8 con BOM (utf-8-sig) per garantire che
@@ -152,10 +150,7 @@ def to_csv_bytes(
 
 
 def to_excel_bytes(
-    df: pd.DataFrame,
-    sheet_name: str = "Dati",
-    table_title: Optional[str] = None,
-    base_currency: str = "EUR"
+    df: pd.DataFrame, sheet_name: str = "Dati", table_title: Optional[str] = None, base_currency: str = "EUR"
 ) -> bytes:
     """
     Esporta un DataFrame in un file Microsoft Excel (.xlsx) professionale:
@@ -170,7 +165,9 @@ def to_excel_bytes(
     if clean_df.empty:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl" if HAS_OPENPYXL else "xlsxwriter") as writer:
-            pd.DataFrame({"Messaggio": ["Nessun dato disponibile"]}).to_excel(writer, index=False, sheet_name=sheet_name[:31])
+            pd.DataFrame({"Messaggio": ["Nessun dato disponibile"]}).to_excel(
+                writer, index=False, sheet_name=sheet_name[:31]
+            )
         return output.getvalue()
 
     output = io.BytesIO()
@@ -189,18 +186,18 @@ def to_excel_bytes(
         header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
         header_align = Alignment(horizontal="center", vertical="center", wrap_text=False)
         header_border = Border(
-            bottom=Side(style='medium', color="FF9900"),
-            left=Side(style='thin', color="30363D"),
-            right=Side(style='thin', color="30363D"),
-            top=Side(style='thin', color="30363D")
+            bottom=Side(style="medium", color="FF9900"),
+            left=Side(style="thin", color="30363D"),
+            right=Side(style="thin", color="30363D"),
+            top=Side(style="thin", color="30363D"),
         )
 
         data_font = Font(name="Calibri", size=10, color="1F2328")
         data_border = Border(
-            left=Side(style='thin', color="E1E4E8"),
-            right=Side(style='thin', color="E1E4E8"),
-            top=Side(style='thin', color="E1E4E8"),
-            bottom=Side(style='thin', color="E1E4E8")
+            left=Side(style="thin", color="E1E4E8"),
+            right=Side(style="thin", color="E1E4E8"),
+            top=Side(style="thin", color="E1E4E8"),
+            bottom=Side(style="thin", color="E1E4E8"),
         )
         zebra_fill = PatternFill(start_color="F6F8FA", end_color="F6F8FA", fill_type="solid")
 
@@ -224,28 +221,65 @@ def to_excel_bytes(
             col_series = clean_df[col_name].dropna()
 
             # 1. Valuta
-            if any(k in name_lower for k in ("€", "$", "£", "valore", "prezzo", "controvalore", "costo", "pnl", "nav", "cash", "patrimonio", "spesa", "ricavo", "amount", "capital", "wacp")):
+            if any(
+                k in name_lower
+                for k in (
+                    "€",
+                    "$",
+                    "£",
+                    "valore",
+                    "prezzo",
+                    "controvalore",
+                    "costo",
+                    "pnl",
+                    "nav",
+                    "cash",
+                    "patrimonio",
+                    "spesa",
+                    "ricavo",
+                    "amount",
+                    "capital",
+                    "wacp",
+                )
+            ):
                 col_formats[col_idx] = f'#,##0.00 "{curr_symbol}"'
             # 2. Percentuale
-            elif any(k in name_lower for k in ("%", "pct", "peso", "weight", "rendimento", "yield", "rate", "drawdown", "volatilit", "var", "cvar")):
+            elif any(
+                k in name_lower
+                for k in (
+                    "%",
+                    "pct",
+                    "peso",
+                    "weight",
+                    "rendimento",
+                    "yield",
+                    "rate",
+                    "drawdown",
+                    "volatilit",
+                    "var",
+                    "cvar",
+                )
+            ):
                 if not col_series.empty and pd.api.types.is_numeric_dtype(col_series):
                     max_abs = col_series.abs().max()
-                    col_formats[col_idx] = '0.00"%"' if max_abs > 1.5 else '0.00%'
+                    col_formats[col_idx] = '0.00"%"' if max_abs > 1.5 else "0.00%"
                 else:
                     col_formats[col_idx] = '0.00"%"'
             # 3. Date / Datetime
-            elif pd.api.types.is_datetime64_any_dtype(clean_df[col_name]) or any(k in name_lower for k in ("data", "date", "timestamp")):
-                col_formats[col_idx] = 'yyyy-mm-dd'
+            elif pd.api.types.is_datetime64_any_dtype(clean_df[col_name]) or any(
+                k in name_lower for k in ("data", "date", "timestamp")
+            ):
+                col_formats[col_idx] = "yyyy-mm-dd"
             # 4. Numeri interi generici
             elif pd.api.types.is_integer_dtype(clean_df[col_name]):
-                col_formats[col_idx] = '#,##0'
+                col_formats[col_idx] = "#,##0"
             # 5. Numeri decimali generici
             elif pd.api.types.is_float_dtype(clean_df[col_name]):
-                col_formats[col_idx] = '#,##0.00'
+                col_formats[col_idx] = "#,##0.00"
 
         # Scrittura righe dati
         for row_idx, row_data in enumerate(clean_df.itertuples(index=False), 2):
-            is_even = (row_idx % 2 == 0)
+            is_even = row_idx % 2 == 0
             for col_idx, val in enumerate(row_data, 1):
                 cell = ws.cell(row=row_idx, column=col_idx)
 
@@ -293,14 +327,16 @@ def to_excel_bytes(
             workbook = writer.book
             worksheet = writer.sheets[sheet_name[:31]]
 
-            header_format = workbook.add_format({
-                'bold': True,
-                'font_color': '#FFFFFF',
-                'bg_color': '#161B22',
-                'border': 1,
-                'border_color': '#30363D',
-                'align': 'center'
-            })
+            header_format = workbook.add_format(
+                {
+                    "bold": True,
+                    "font_color": "#FFFFFF",
+                    "bg_color": "#161B22",
+                    "border": 1,
+                    "border_color": "#30363D",
+                    "align": "center",
+                }
+            )
             for col_num, value in enumerate(clean_df.columns.values):
                 worksheet.write(0, col_num, str(value), header_format)
                 col_len = max(len(str(value)), clean_df[value].astype(str).map(len).max() if not clean_df.empty else 0)
@@ -318,6 +354,7 @@ def to_excel_bytes(
 # 3. PERFORMANCE & STREAMLIT DATA CACHING
 # ==============================================================================
 
+
 @st.cache_data(show_spinner=False)
 def get_cached_csv_bytes(df: pd.DataFrame, sep: str = ",") -> bytes:
     """Funzione con cache per serializzazione CSV ultra-rapida."""
@@ -325,11 +362,7 @@ def get_cached_csv_bytes(df: pd.DataFrame, sep: str = ",") -> bytes:
 
 
 @st.cache_data(show_spinner=False)
-def get_cached_excel_bytes(
-    df: pd.DataFrame,
-    sheet_name: str = "Dati",
-    base_currency: str = "EUR"
-) -> bytes:
+def get_cached_excel_bytes(df: pd.DataFrame, sheet_name: str = "Dati", base_currency: str = "EUR") -> bytes:
     """Funzione con cache per serializzazione Excel professionale."""
     return to_excel_bytes(df, sheet_name=sheet_name, base_currency=base_currency)
 
@@ -338,18 +371,19 @@ def get_cached_excel_bytes(
 # 4. COMPONENTI UI STREAMLIT (TOOLBAR & TABLE WRAPPER)
 # ==============================================================================
 
+
 def render_export_toolbar(
     df: pd.DataFrame,
     file_prefix: str = "export",
     key_suffix: str = "main",
     table_title: Optional[str] = None,
     sheet_name: str = "Dati",
-    show_row_count: bool = True
+    show_row_count: bool = True,
 ) -> None:
     """
     Renderizza un micro-popover compatto '📥 Esporta Dati' progettato per
     integrarsi perfettamente nelle toolbar delle card senza ingombro verticale.
-    
+
     Contiene:
     - Badge con il conteggio di righe e colonne.
     - Download button per Excel (.xlsx) professionale formattato.
@@ -371,12 +405,12 @@ def render_export_toolbar(
 
     with st.popover(popover_label, help=popover_help, use_container_width=False):
         st.markdown(
-            f"""
+            """
             <div style="font-size: 0.82rem; font-weight: 600; color: #8b949e; margin-bottom: 8px;">
                 OPZIONI DI ESPORTAZIONE DATI
             </div>
             """,
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
 
         if show_row_count:
@@ -387,7 +421,7 @@ def render_export_toolbar(
                     <span><b>{n_rows:,}</b> righe • <b>{n_cols}</b> colonne</span>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
         # Generazione binarie lazy/cached
@@ -402,7 +436,7 @@ def render_export_toolbar(
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True,
             key=f"dl_xlsx_{file_prefix}_{key_suffix}",
-            help="File Microsoft Excel formattato con colori istituzionali, griglia contabile e formati numerici automatici."
+            help="File Microsoft Excel formattato con colori istituzionali, griglia contabile e formati numerici automatici.",
         )
 
         # 2. Download CSV (UTF-8 con BOM)
@@ -413,7 +447,7 @@ def render_export_toolbar(
             mime="text/csv",
             use_container_width=True,
             key=f"dl_csv_{file_prefix}_{key_suffix}",
-            help="File CSV con codifica UTF-8 BOM per apertura immediata senza anomalie di caratteri speciali in Excel europeo."
+            help="File CSV con codifica UTF-8 BOM per apertura immediata senza anomalie di caratteri speciali in Excel europeo.",
         )
 
 
@@ -428,12 +462,12 @@ def render_table_with_export(
     progress_cols: Optional[Dict[str, Tuple[float, float]]] = None,
     hide_index: bool = True,
     height: Optional[int] = 380,
-    sheet_name: str = "Dati"
+    sheet_name: str = "Dati",
 ) -> None:
     """
     Wrapper universale All-in-One per visualizzare un DataFrame con design
     istituzionale ARGUS e toolbar di esportazione integrata.
-    
+
     Layout:
     ┌───────────────────────────────────────────────────────────┐
     │ 📋 Titolo Tabella   [ 42 righe • 8 col ]      [📥 Esporta]│
@@ -449,7 +483,7 @@ def render_table_with_export(
 
     # Header Bar con Titolo a sinistra e Toolbar Export a destra
     col_title, col_export = st.columns([0.82, 0.18], gap="small")
-    
+
     with col_title:
         if table_title:
             st.markdown(
@@ -463,7 +497,7 @@ def render_table_with_export(
                     </span>
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
         else:
             st.markdown(
@@ -472,7 +506,7 @@ def render_table_with_export(
                     {len(df):,} record disponibili
                 </div>
                 """,
-                unsafe_allow_html=True
+                unsafe_allow_html=True,
             )
 
     with col_export:
@@ -482,7 +516,7 @@ def render_table_with_export(
             key_suffix=key_suffix,
             table_title=table_title,
             sheet_name=sheet_name,
-            show_row_count=False  # Già visibile nel titolo
+            show_row_count=False,  # Già visibile nel titolo
         )
 
     # Configurazione automatica colonne se passati elenchi semplificati
@@ -494,19 +528,13 @@ def render_table_with_export(
         for c in currency_cols:
             if c in df.columns and c not in cfg:
                 cfg[c] = st.column_config.NumberColumn(
-                    c,
-                    format=f"{curr_symbol} %.2f",
-                    help=f"Importo espresso in {base_curr}"
+                    c, format=f"{curr_symbol} %.2f", help=f"Importo espresso in {base_curr}"
                 )
 
     if pct_cols:
         for c in pct_cols:
             if c in df.columns and c not in cfg:
-                cfg[c] = st.column_config.NumberColumn(
-                    c,
-                    format="%.2f%%",
-                    help="Valore percentuale"
-                )
+                cfg[c] = st.column_config.NumberColumn(c, format="%.2f%%", help="Valore percentuale")
 
     if progress_cols:
         for c, (min_v, max_v) in progress_cols.items():
@@ -516,14 +544,8 @@ def render_table_with_export(
                     min_value=min_v,
                     max_value=max_v,
                     format="%.1f%%" if max_v <= 100 and min_v >= 0 else "%.2f",
-                    help=f"Allocazione / Intensità per {c}"
+                    help=f"Allocazione / Intensità per {c}",
                 )
 
     # Render data grid
-    st.dataframe(
-        df,
-        column_config=cfg if cfg else None,
-        hide_index=hide_index,
-        height=height,
-        use_container_width=True
-    )
+    st.dataframe(df, column_config=cfg if cfg else None, hide_index=hide_index, height=height, use_container_width=True)

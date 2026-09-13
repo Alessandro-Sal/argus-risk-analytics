@@ -3,45 +3,46 @@
 # ARGUS Wealth — Fiscalità, Minusvalenze & Monitoraggio Quadro RW / RT
 # ============================================================
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime
 import importlib
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
 import core.ui_utils
+import core.wealth
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
-import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
+from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    fmt_eur,
-    fmt_pct,
-    render_wealth_command_bar,
-    render_wealth_executive_badges,
-    render_page_header,
     apply_plotly_theme,
     ensure_portfolio_loaded,
-    render_export_toolbar
+    fmt_eur,
+    fmt_pct,
+    inject_custom_css,
+    metric_card,
+    render_export_toolbar,
+    render_page_header,
+    render_wealth_command_bar,
+    render_wealth_executive_badges,
+    section,
 )
-from core.sidebar import render_sidebar
-from core.fetcher import get_engine
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
 from core.wealth.wealth_engine import (
-    compute_fiscal_analytics,
     compute_consolidated_net_worth,
-    compute_tax_loss_harvesting_and_latent_taxes
+    compute_fiscal_analytics,
+    compute_tax_loss_harvesting_and_latent_taxes,
 )
-
 
 st.set_page_config(page_title="Fiscalità & Quadro RW | ARGUS Wealth", page_icon="📑", layout="wide")
 inject_custom_css()

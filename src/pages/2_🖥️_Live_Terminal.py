@@ -4,10 +4,11 @@
 # Real-Time Streaming Tape • L2 Depth Book • Portfolio & Watchlist Live Monitor • Bloomberg CLI Console • OMS Blotter
 # ==============================================================================
 
-import io
-import time
 import datetime
 import html
+import io
+import time
+
 import streamlit as st
 
 st.set_page_config(
@@ -17,47 +18,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+import datetime
 import io
 import time
-import datetime
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-import core.ui_utils as ui_utils
 import core.streaming_engine as streaming_engine
 import core.terminal_engine as terminal_engine
-
+import core.ui_utils as ui_utils
 from core.sidebar import render_sidebar
-from core.ui_utils import (
-    inject_custom_css,
-    render_command_bar,
-    render_omni_command_bar,
-    metric_card,
-    render_kpi_card,
-    glossary_modal,
-    ensure_risk_bundle_loaded,
-    render_page_header,
-    render_standard_hero,
-    apply_plotly_theme,
-    apply_chart_theme
-)
 from core.terminal_engine import (
-    get_terminal_engine,
-    get_active_positions,
-    TerminalCommandResult,
-    OMSOrder,
     DeskRiskLimits,
+    OMSOrder,
     PreTradeRiskResult,
-    evaluate_pre_trade_risk,
+    TerminalCommandResult,
     compute_pnl_attribution,
-    fetch_market_catalysts,
     convert_to_eur,
     detect_currency,
-    get_fx_rate_to_eur,
+    evaluate_pre_trade_risk,
     fetch_live_ticker_quote,
-    fetch_multiple_live_quotes
+    fetch_market_catalysts,
+    fetch_multiple_live_quotes,
+    get_active_positions,
+    get_fx_rate_to_eur,
+    get_terminal_engine,
+)
+from core.ui_utils import (
+    apply_chart_theme,
+    apply_plotly_theme,
+    ensure_risk_bundle_loaded,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_command_bar,
+    render_kpi_card,
+    render_omni_command_bar,
+    render_page_header,
+    render_standard_hero,
 )
 
 inject_custom_css()
@@ -282,7 +283,7 @@ with col_tape_ctrl:
         
         btn_b1, btn_b2, btn_b3 = st.columns(3)
         with btn_b1:
-            if st.button(f"🟢 BUY", key=f"btn_qt_buy_{active_tape_ticker}", use_container_width=True):
+            if st.button("🟢 BUY", key=f"btn_qt_buy_{active_tape_ticker}", use_container_width=True):
                 otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
                 ok, msg, _ = term_eng.place_order(active_tape_ticker, "BUY", qt_qty, otype, context=session_context)
                 if ok:
@@ -291,7 +292,7 @@ with col_tape_ctrl:
                     st.error(msg)
                 st.rerun()
         with btn_b2:
-            if st.button(f"🔴 SELL", key=f"btn_qt_sell_{active_tape_ticker}", use_container_width=True):
+            if st.button("🔴 SELL", key=f"btn_qt_sell_{active_tape_ticker}", use_container_width=True):
                 otype = "TWAP" if "TWAP" in qt_algo else ("VWAP" if "VWAP" in qt_algo else "MKT")
                 ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", qt_qty, otype, context=session_context)
                 if ok:
@@ -302,7 +303,7 @@ with col_tape_ctrl:
         with btn_b3:
             pos_match = pos[pos["ticker"].astype(str).str.upper() == active_tape_ticker] if (not pos.empty and "ticker" in pos.columns) else pd.DataFrame()
             curr_q = float(pos_match.iloc[0].get("qty_net", pos_match.iloc[0].get("quantity", 0.0))) if not pos_match.empty else 0.0
-            if st.button(f"🛑 Chiudi", key=f"btn_qt_close_{active_tape_ticker}", use_container_width=True, disabled=(curr_q <= 0), help=f"Posizione aperta: {curr_q:,.0f} quote"):
+            if st.button("🛑 Chiudi", key=f"btn_qt_close_{active_tape_ticker}", use_container_width=True, disabled=(curr_q <= 0), help=f"Posizione aperta: {curr_q:,.0f} quote"):
                 if curr_q > 0:
                     ok, msg, _ = term_eng.place_order(active_tape_ticker, "SELL", curr_q, "MKT", context=session_context)
                     if ok:

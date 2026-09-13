@@ -3,50 +3,47 @@
 # ARGUS Wealth — AI Wealth Copilot, Diagnostica Intelligente & Ribilanciamento
 # ============================================================
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
-from datetime import datetime
 import importlib
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
+
 import core.ui_utils
+import core.wealth
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
-import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
 importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
+from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
+    apply_plotly_theme,
     fmt_eur,
     fmt_pct,
+    inject_custom_css,
+    metric_card,
+    render_page_header,
+    render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
-    render_page_header,
-    apply_plotly_theme,
-    render_table_with_export,
+    section,
 )
-from core.sidebar import render_sidebar
-from core.fetcher import get_engine
+from core.wealth.wealth_db import get_cashflow_records, get_wealth_portfolios, init_wealth_db
 from core.wealth.wealth_engine import (
-    compute_consolidated_net_worth,
+    compute_ai_quarterly_wealth_review,
     compute_ai_wealth_diagnostics,
     compute_cashflow_analytics,
+    compute_consolidated_net_worth,
     compute_tax_smart_rebalancing_watchdog,
-    compute_ai_quarterly_wealth_review
 )
-from core.wealth.wealth_db import (
-    get_wealth_portfolios,
-    get_cashflow_records,
-    init_wealth_db
-)
-
 
 st.set_page_config(page_title="AI Copilot & Advisor | ARGUS Wealth", page_icon="🤖", layout="wide")
 inject_custom_css()
@@ -195,7 +192,7 @@ with tab_diag:
         st.success("🎉 **Nessun collo di bottiglia critico rilevato!** Il tuo profilo patrimoniale rispetta pienamente tutti i parametri di liquidità, risparmio 50/30/20 e diversificazione.")
 
 with tab_rebal:
-    st.markdown(f"### ⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor")
+    st.markdown("### ⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor")
     st.caption("Monitoraggio in tempo reale dello scostamento (drift) dall'Asset Allocation Target con ottimizzazione fiscale vincolante (TUIR Art. 67).")
 
     watchdog_res = compute_tax_smart_rebalancing_watchdog(engine, portfolio_id=current_pid)
@@ -276,13 +273,13 @@ with tab_council:
     st.markdown("### 🏛️ Tri-Agent Quantitative Governance Council & Prescriptive Conic Rebalancer")
     st.caption("Comitato di investimento multi-agente autonomo (Tier-1 Institutional standard: BlackRock Aladdin & Bloomberg AIM). Ottimizzazione convessa vincolata su Tracking Error, Minusvalenze e Slippage Almgren-Chriss.")
 
+    from core.ai_analyst import TriAgentQuantitativeGovernance
     from core.prescriptive_rebalancer import (
         PositionLot,
-        TaxWalletState,
+        PrescriptiveConicRebalancer,
         RebalanceConstraints,
-        PrescriptiveConicRebalancer
+        TaxWalletState,
     )
-    from core.ai_analyst import TriAgentQuantitativeGovernance
 
     col_cfg1, col_cfg2, col_cfg3 = st.columns([1.2, 1.2, 1.2])
     with col_cfg1:

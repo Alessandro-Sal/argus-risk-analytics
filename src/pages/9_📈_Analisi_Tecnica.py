@@ -6,35 +6,34 @@ st.set_page_config(
     layout="wide"
 )
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import core.ui_utils as ui_utils
 import core.risk_engine as risk_engine
-
+import core.ui_utils as ui_utils
 from core.sidebar import render_sidebar
-from core.ui_utils import (
-    inject_custom_css, render_header, render_segmented_tabs, metric_card,
-    apply_plotly_theme, glossary_modal, ensure_risk_bundle_loaded, render_sandbox_banner,
-    render_export_toolbar
-)
-from core.workspace_manager import get_url_param, set_url_params, register_workspace_tab
+from core.streaming_engine import MarketTick, OrderBookL2, OrderBookLevel, TickRingBuffer, generate_mock_streaming_ticks
 from core.technical_analysis import (
+    compute_multi_timeframe_analysis,
+    compute_technical_confluence_score,
     compute_technical_indicators,
     compute_volume_profile,
     detect_candlestick_patterns,
-    compute_technical_confluence_score,
-    compute_multi_timeframe_analysis
 )
-from core.streaming_engine import (
-    MarketTick,
-    TickRingBuffer,
-    OrderBookLevel,
-    OrderBookL2,
-    generate_mock_streaming_ticks
+from core.ui_utils import (
+    apply_plotly_theme,
+    ensure_risk_bundle_loaded,
+    glossary_modal,
+    inject_custom_css,
+    metric_card,
+    render_export_toolbar,
+    render_header,
+    render_sandbox_banner,
+    render_segmented_tabs,
 )
+from core.workspace_manager import get_url_param, register_workspace_tab, set_url_params
 
 inject_custom_css()
 render_sidebar()
@@ -308,9 +307,13 @@ if split_view_active:
         if dual_mode_choice == "🏛️ Valutazione Fondamentale":
             st.markdown(f"#### 🏛️ Due Diligence Fondamentale: `{target_ticker}`")
             try:
-                from core.financial_analysis import compute_altman_z_score, compute_piotroski_f_score, compute_valuation_multiples_matrix
-                from core.forensic_accounting import compute_beneish_m_score
                 from core.cache_shield import get_cached_ticker_info
+                from core.financial_analysis import (
+                    compute_altman_z_score,
+                    compute_piotroski_f_score,
+                    compute_valuation_multiples_matrix,
+                )
+                from core.forensic_accounting import compute_beneish_m_score
 
                 info = get_cached_ticker_info(target_ticker) or {}
                 target_price = info.get("targetMeanPrice") or info.get("targetMedianPrice")

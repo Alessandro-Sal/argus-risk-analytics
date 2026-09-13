@@ -4,29 +4,30 @@
 # Unit Tests for Structured Logging, PII Sanitization, Channels & Support Bundle
 # ==========================================================
 
-import os
-import sys
 import io
 import json
 import logging
+import os
+import sys
 import zipfile
-import pytest
 from pathlib import Path
 
+import pytest
+
 from core.diagnostics import (
-    sanitize_text,
-    sanitize_dict,
     FinancialAndPIISanitizingFilter,
     StructuredJsonFormatter,
-    setup_logging,
-    get_system_logger,
+    generate_support_bundle,
     get_audit_logger,
+    get_database_integrity_details,
+    get_hardware_and_environment_specs,
+    get_recent_logs,
+    get_system_logger,
     log_audit_event,
     measure_latency,
-    get_hardware_and_environment_specs,
-    get_database_integrity_details,
-    get_recent_logs,
-    generate_support_bundle,
+    sanitize_dict,
+    sanitize_text,
+    setup_logging,
 )
 
 
@@ -182,7 +183,7 @@ def test_setup_logging_and_channel_separation():
         status="SUCCESS"
     )
 
-    from core.diagnostics import SYSTEM_LOG_PATH, AUDIT_LOG_PATH
+    from core.diagnostics import AUDIT_LOG_PATH, SYSTEM_LOG_PATH
     assert SYSTEM_LOG_PATH.exists()
     assert AUDIT_LOG_PATH.exists()
 

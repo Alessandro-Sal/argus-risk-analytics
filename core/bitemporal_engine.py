@@ -12,13 +12,13 @@ MiFID II, AIFMD e GIPS per Family Office, SGR e Wealth Management:
 4. Motore di query storiche Point-in-Time bidimensionali ("Time-Travel Machine") e rilevamento drift retroattivi.
 """
 
-from collections import deque
-from datetime import datetime, timezone
 import hashlib
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
 import uuid
+from collections import deque
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 try:
     import duckdb
+
     HAS_DUCKDB = True
 except ImportError:
     duckdb = None
@@ -206,16 +207,28 @@ class BitemporalLedgerEngine:
         raw_to_hash = f"{prev_hash}|{entry_uuid}|{sys_ts}|{canonical_payload}"
         entry_hash = self.compute_sha256(raw_to_hash)
 
-        self.con.execute("""
+        self.con.execute(
+            """
             INSERT INTO audit_decision_log (
                 entry_uuid, sequence_id, decision_type, entity_id, actor_id,
                 rationale, prompt_hash, model_version, canonical_payload_json,
                 sys_timestamp, prev_record_hash, entry_hash
             ) VALUES (?, nextval('seq_audit_decision'), ?, ?, ?, ?, ?, ?, ?, ?::TIMESTAMP, ?, ?)
-        """, [
-            entry_uuid, decision_type, entity_id, actor_id, rationale,
-            prompt_hash, model_version, canonical_payload, sys_ts, prev_hash, entry_hash
-        ])
+        """,
+            [
+                entry_uuid,
+                decision_type,
+                entity_id,
+                actor_id,
+                rationale,
+                prompt_hash,
+                model_version,
+                canonical_payload,
+                sys_ts,
+                prev_hash,
+                entry_hash,
+            ],
+        )
 
         return entry_hash
 
@@ -244,7 +257,7 @@ class BitemporalLedgerEngine:
                     False,
                     f"Violazione della catena di continuità alla sequenza #{seq}. "
                     f"Atteso prev: {expected_prev_hash[:12]}..., Trovato: {row['prev_record_hash'][:12]}...",
-                    seq
+                    seq,
                 )
 
             # Normalizza timestamp string
@@ -257,7 +270,7 @@ class BitemporalLedgerEngine:
                     False,
                     f"Manomissione rilevata al record sequence #{seq}! "
                     f"L'hash memorizzato non corrisponde al payload crittografico.",
-                    seq
+                    seq,
                 )
 
             expected_prev_hash = row["entry_hash"]
@@ -322,16 +335,23 @@ class BitemporalLedgerEngine:
         row_uuid = str(uuid.uuid4())
         sys_now = custom_sys_from or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
         valid_from_norm = pd.to_datetime(valid_from).strftime("%Y-%m-%d %H:%M:%S")
-        valid_to_norm = self.INFINITY_TIMESTAMP if valid_to == self.INFINITY_TIMESTAMP else pd.to_datetime(valid_to).strftime("%Y-%m-%d %H:%M:%S")
+        valid_to_norm = (
+            self.INFINITY_TIMESTAMP
+            if valid_to == self.INFINITY_TIMESTAMP
+            else pd.to_datetime(valid_to).strftime("%Y-%m-%d %H:%M:%S")
+        )
         gross = round(quantity * unit_price, 2)
-        net_local = round(gross - fees - taxes, 2) if operation_type.upper() == "SELL" else round(gross + fees + taxes, 2)
+        net_local = (
+            round(gross - fees - taxes, 2) if operation_type.upper() == "SELL" else round(gross + fees + taxes, 2)
+        )
         net_base = round(net_local * fx_rate_to_base, 2)
 
         # Hash di integrita di riga
         row_raw = f"{tx_business_id}|{portfolio_id}|{asset_id}|{operation_type}|{quantity}|{unit_price}|{valid_from_norm}|{sys_now}"
         integrity_hash = self.compute_sha256(row_raw)
 
-        self.con.execute("""
+        self.con.execute(
+            """
             INSERT INTO bitemporal_transactions (
                 row_uuid, tx_business_id, portfolio_id, asset_id, operation_type,
                 quantity, unit_price, gross_amount, fee_amount, tax_amount, net_amount,
@@ -342,13 +362,31 @@ class BitemporalLedgerEngine:
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?::TIMESTAMP, ?::TIMESTAMP, ?::TIMESTAMP, ?::TIMESTAMP, 'INSERT', ?, ?, ?
             )
-        """, [
-            row_uuid, tx_business_id, portfolio_id, asset_id, operation_type.upper(),
-            quantity, unit_price, gross, fees, taxes, net_local,
-            currency.upper(), fx_rate_to_base, net_base,
-            valid_from_norm, valid_to_norm, sys_now, self.INFINITY_TIMESTAMP,
-            recorded_by, source_doc_ref, integrity_hash
-        ])
+        """,
+            [
+                row_uuid,
+                tx_business_id,
+                portfolio_id,
+                asset_id,
+                operation_type.upper(),
+                quantity,
+                unit_price,
+                gross,
+                fees,
+                taxes,
+                net_local,
+                currency.upper(),
+                fx_rate_to_base,
+                net_base,
+                valid_from_norm,
+                valid_to_norm,
+                sys_now,
+                self.INFINITY_TIMESTAMP,
+                recorded_by,
+                source_doc_ref,
+                integrity_hash,
+            ],
+        )
 
         return row_uuid
 
@@ -378,7 +416,8 @@ class BitemporalLedgerEngine:
         row_raw = f"{asset_business_id}|{gross_market_value}|{valid_from}|{sys_now}"
         integrity_hash = self.compute_sha256(row_raw)
 
-        self.con.execute("""
+        self.con.execute(
+            """
             INSERT INTO bitemporal_asset_appraisals (
                 appraisal_uuid, asset_business_id, portfolio_id, appraisal_type,
                 appraiser_name, gross_market_value, liquidity_haircut_pct,
@@ -390,13 +429,26 @@ class BitemporalLedgerEngine:
                 ?::TIMESTAMP, ?::TIMESTAMP, ?::TIMESTAMP, ?::TIMESTAMP,
                 'INSERT', ?, ?, ?
             )
-        """, [
-            appraisal_uuid, asset_business_id, portfolio_id, appraisal_type,
-            appraiser_name, gross_market_value, liquidity_haircut_pct,
-            net_liq, currency.upper(), valid_from, valid_to,
-            sys_now, self.INFINITY_TIMESTAMP, recorded_by, certification_doc_hash,
-            integrity_hash
-        ])
+        """,
+            [
+                appraisal_uuid,
+                asset_business_id,
+                portfolio_id,
+                appraisal_type,
+                appraiser_name,
+                gross_market_value,
+                liquidity_haircut_pct,
+                net_liq,
+                currency.upper(),
+                valid_from,
+                valid_to,
+                sys_now,
+                self.INFINITY_TIMESTAMP,
+                recorded_by,
+                certification_doc_hash,
+                integrity_hash,
+            ],
+        )
 
         return appraisal_uuid
 
@@ -421,27 +473,30 @@ class BitemporalLedgerEngine:
 
         sys_now = custom_sys_from or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
 
-        prev = self.con.execute("""
+        prev = self.con.execute(
+            """
             SELECT row_uuid, portfolio_id, asset_id, operation_type, fee_amount, tax_amount,
                    currency, fx_rate_to_base, valid_from, valid_to
             FROM bitemporal_transactions
             WHERE tx_business_id = ? AND sys_to = ?::TIMESTAMP
-        """, [tx_business_id, self.INFINITY_TIMESTAMP]).fetchone()
+        """,
+            [tx_business_id, self.INFINITY_TIMESTAMP],
+        ).fetchone()
 
         if not prev:
             raise ValueError(f"Nessuna versione attiva trovata per transazione business ID: {tx_business_id}")
 
-        (
-            old_row_uuid, portfolio_id, asset_id, op_type, fees, taxes,
-            curr, fx_rate, valid_from_dt, valid_to_dt
-        ) = prev
+        (old_row_uuid, portfolio_id, asset_id, op_type, fees, taxes, curr, fx_rate, valid_from_dt, valid_to_dt) = prev
 
         # 1. Chiusura logica della riga precedente nel System Time
-        self.con.execute("""
+        self.con.execute(
+            """
             UPDATE bitemporal_transactions
             SET sys_to = ?::TIMESTAMP
             WHERE row_uuid = ?
-        """, [sys_now, old_row_uuid])
+        """,
+            [sys_now, old_row_uuid],
+        )
 
         # 2. Inserimento nuova versione
         new_row_uuid = str(uuid.uuid4())
@@ -455,7 +510,8 @@ class BitemporalLedgerEngine:
         raw_to_hash = f"{tx_business_id}|{new_quantity}|{new_unit_price}|{valid_from_str}|{sys_now}"
         integrity_hash = self.compute_sha256(raw_to_hash)
 
-        self.con.execute("""
+        self.con.execute(
+            """
             INSERT INTO bitemporal_transactions (
                 row_uuid, tx_business_id, portfolio_id, asset_id, operation_type,
                 quantity, unit_price, gross_amount, fee_amount, tax_amount, net_amount,
@@ -466,13 +522,31 @@ class BitemporalLedgerEngine:
                 ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
                 ?::TIMESTAMP, ?::TIMESTAMP, ?::TIMESTAMP, ?::TIMESTAMP, 'CORRECTION', ?, ?, ?
             )
-        """, [
-            new_row_uuid, tx_business_id, portfolio_id, asset_id, op_type,
-            new_quantity, new_unit_price, gross, fees, taxes, net_local,
-            curr, fx_rate, net_base,
-            valid_from_str, valid_to_str, sys_now, self.INFINITY_TIMESTAMP,
-            actor_id, f"CORRECTION_OF_{old_row_uuid[:8]}", integrity_hash
-        ])
+        """,
+            [
+                new_row_uuid,
+                tx_business_id,
+                portfolio_id,
+                asset_id,
+                op_type,
+                new_quantity,
+                new_unit_price,
+                gross,
+                fees,
+                taxes,
+                net_local,
+                curr,
+                fx_rate,
+                net_base,
+                valid_from_str,
+                valid_to_str,
+                sys_now,
+                self.INFINITY_TIMESTAMP,
+                actor_id,
+                f"CORRECTION_OF_{old_row_uuid[:8]}",
+                integrity_hash,
+            ],
+        )
 
         # 3. Log immutabile della decisione
         self.log_decision(
@@ -485,9 +559,9 @@ class BitemporalLedgerEngine:
                 "old_row_uuid": old_row_uuid,
                 "new_row_uuid": new_row_uuid,
                 "new_quantity": new_quantity,
-                "new_unit_price": new_unit_price
+                "new_unit_price": new_unit_price,
             },
-            custom_sys_timestamp=sys_now
+            custom_sys_timestamp=sys_now,
         )
 
         return new_row_uuid
@@ -534,9 +608,7 @@ class BitemporalLedgerEngine:
               AND sys_to     >  ?::TIMESTAMP
             ORDER BY valid_from ASC, tx_business_id ASC
         """
-        return self.con.execute(query, [
-            portfolio_id, as_at_valid_time, as_at_valid_time, sys_target, sys_target
-        ]).df()
+        return self.con.execute(query, [portfolio_id, as_at_valid_time, as_at_valid_time, sys_target, sys_target]).df()
 
     def time_travel_appraisals(
         self,
@@ -563,9 +635,7 @@ class BitemporalLedgerEngine:
               AND sys_to     >  ?::TIMESTAMP
             ORDER BY valid_from DESC
         """
-        return self.con.execute(query, [
-            portfolio_id, as_at_valid_time, as_at_valid_time, sys_target, sys_target
-        ]).df()
+        return self.con.execute(query, [portfolio_id, as_at_valid_time, as_at_valid_time, sys_target, sys_target]).df()
 
     def reconstruct_portfolio_at_times(
         self,
@@ -621,12 +691,14 @@ class BitemporalLedgerEngine:
             if tot_shares > 1e-6:
                 tot_cost = sum(lot[0] * lot[1] for lot in lots)
                 pmc = (tot_cost / tot_shares) if tot_shares > 0 else 0.0
-                positions_summary.append({
-                    "asset_id": asset,
-                    "shares": round(tot_shares, 4),
-                    "wacp_eur": round(pmc, 2),
-                    "cost_value_eur": round(tot_cost, 2)
-                })
+                positions_summary.append(
+                    {
+                        "asset_id": asset,
+                        "shares": round(tot_shares, 4),
+                        "wacp_eur": round(pmc, 2),
+                        "cost_value_eur": round(tot_cost, 2),
+                    }
+                )
 
         illiquid_total = float(df_app["net_liquidation_value"].sum()) if not df_app.empty else 0.0
         tot_positions_cost = sum(p["cost_value_eur"] for p in positions_summary)
@@ -642,7 +714,7 @@ class BitemporalLedgerEngine:
             "illiquid_appraisals_eur": round(illiquid_total, 2),
             "total_book_value_eur": round(cash_balance_eur + tot_positions_cost + illiquid_total, 2),
             "tx_count": len(df_tx),
-            "appraisals_count": len(df_app)
+            "appraisals_count": len(df_app),
         }
 
     def detect_retroactive_drifts(
@@ -667,22 +739,38 @@ class BitemporalLedgerEngine:
         deleted_tx_ids = before_ids - after_ids
         common_tx_ids = before_ids.intersection(after_ids)
 
-        new_records = df_after[df_after["tx_business_id"].isin(new_tx_ids)].to_dict(orient="records") if not df_after.empty else []
+        new_records = (
+            df_after[df_after["tx_business_id"].isin(new_tx_ids)].to_dict(orient="records")
+            if not df_after.empty
+            else []
+        )
         modified_records = []
 
         for tid in common_tx_ids:
             row_b = df_before[df_before["tx_business_id"] == tid].iloc[0]
             row_a = df_after[df_after["tx_business_id"] == tid].iloc[0]
-            if (row_b["quantity"] != row_a["quantity"] or 
-                row_b["unit_price"] != row_a["unit_price"] or 
-                row_b["net_amount_base_eur"] != row_a["net_amount_base_eur"]):
-                modified_records.append({
-                    "tx_business_id": tid,
-                    "asset_id": row_a["asset_id"],
-                    "before": {"qty": row_b["quantity"], "price": row_b["unit_price"], "net": row_b["net_amount_base_eur"]},
-                    "after": {"qty": row_a["quantity"], "price": row_a["unit_price"], "net": row_a["net_amount_base_eur"]},
-                    "delta_eur": round(row_a["net_amount_base_eur"] - row_b["net_amount_base_eur"], 2)
-                })
+            if (
+                row_b["quantity"] != row_a["quantity"]
+                or row_b["unit_price"] != row_a["unit_price"]
+                or row_b["net_amount_base_eur"] != row_a["net_amount_base_eur"]
+            ):
+                modified_records.append(
+                    {
+                        "tx_business_id": tid,
+                        "asset_id": row_a["asset_id"],
+                        "before": {
+                            "qty": row_b["quantity"],
+                            "price": row_b["unit_price"],
+                            "net": row_b["net_amount_base_eur"],
+                        },
+                        "after": {
+                            "qty": row_a["quantity"],
+                            "price": row_a["unit_price"],
+                            "net": row_a["net_amount_base_eur"],
+                        },
+                        "delta_eur": round(row_a["net_amount_base_eur"] - row_b["net_amount_base_eur"], 2),
+                    }
+                )
 
         val_before = float(df_before["net_amount_base_eur"].sum()) if not df_before.empty else 0.0
         val_after = float(df_after["net_amount_base_eur"].sum()) if not df_after.empty else 0.0
@@ -698,7 +786,7 @@ class BitemporalLedgerEngine:
             "modified_transactions_count": len(modified_records),
             "modified_transactions": modified_records,
             "deleted_transactions_count": len(deleted_tx_ids),
-            "delta_total_volume_eur": round(val_after - val_before, 2)
+            "delta_total_volume_eur": round(val_after - val_before, 2),
         }
 
     # =========================================================================
@@ -734,13 +822,13 @@ class BitemporalLedgerEngine:
     ) -> int:
         """
         Ingerisce un DataFrame di transazioni utente nel ledger bitemporale immutabile.
-        
+
         Parametri:
             df_tx: DataFrame con transazioni (supporta formati ARGUS standard o multi-broker).
             portfolio_id: Identificatore univoco del portafoglio nel ledger.
             recorded_by: Etichetta dell'attore/sorgente di acquisizione.
             starting_cash: Importo liquidità iniziale opzionale (se None, calcola un buffer congruo).
-            
+
         Ritorna:
             Numero di transazioni contabili registrate e sigillate con hash SHA-256.
         """
@@ -794,7 +882,9 @@ class BitemporalLedgerEngine:
         # Verifica presenza movimenti di cassa espliciti
         has_cash_in = False
         if "tx_type" in df.columns:
-            has_cash_in = df["tx_type"].astype(str).str.upper().str.contains("CASH_IN|DEPOSIT|VERSAMENTO|CONFERIMENTO").any()
+            has_cash_in = (
+                df["tx_type"].astype(str).str.upper().str.contains("CASH_IN|DEPOSIT|VERSAMENTO|CONFERIMENTO").any()
+            )
 
         # Calcolo liquidità iniziale
         starting_cash_injected = 0.0
@@ -815,9 +905,9 @@ class BitemporalLedgerEngine:
                 t = float(r.get("taxes", 0.0) or 0.0) if pd.notna(r.get("taxes")) else 0.0
 
                 if "BUY" in raw_op or "ACQUISTO" in raw_op:
-                    cum_cash -= ((q * p) + f + t)
+                    cum_cash -= (q * p) + f + t
                 elif "SELL" in raw_op or "VENDITA" in raw_op:
-                    cum_cash += ((q * p) - f - t)
+                    cum_cash += (q * p) - f - t
                 elif "DIVIDEND" in raw_op or "DIV" in raw_op:
                     cum_cash += (p - f - t) if p > 0 else 0.0
                 elif "CASH_IN" in raw_op or "DEPOSIT" in raw_op:
@@ -863,7 +953,7 @@ class BitemporalLedgerEngine:
             else:
                 op_type = "BUY"
 
-            asset_id = str(row.get("ticker", f"ASSET_{idx+1}")).strip().upper()
+            asset_id = str(row.get("ticker", f"ASSET_{idx + 1}")).strip().upper()
             qty = abs(float(row.get("quantity", 0.0) or 0.0))
             price = float(row.get("price", 0.0) or 0.0)
             fees = float(row.get("fees", 0.0) or 0.0) if pd.notna(row.get("fees")) else 0.0
@@ -874,7 +964,7 @@ class BitemporalLedgerEngine:
             if pd.isna(raw_date):
                 raw_date = earliest_dt
             vt_str = pd.to_datetime(raw_date).strftime("%Y-%m-%d %H:%M:%S")
-            tx_id = f"TX_{portfolio_id}_{idx+1:04d}"
+            tx_id = f"TX_{portfolio_id}_{idx + 1:04d}"
 
             self.record_transaction(
                 tx_business_id=tx_id,
@@ -889,7 +979,7 @@ class BitemporalLedgerEngine:
                 taxes=taxes,
                 currency=curr,
                 custom_sys_from=sys_now,
-                source_doc_ref=str(row.get("notes", "")) if pd.notna(row.get("notes")) else None
+                source_doc_ref=str(row.get("notes", "")) if pd.notna(row.get("notes")) else None,
             )
             row_count += 1
 
@@ -940,7 +1030,7 @@ class BitemporalLedgerEngine:
             unit_price=500_000.0,
             valid_from="2026-03-01 09:00:00",
             recorded_by="DEPOSIT_RECEIPT",
-            custom_sys_from="2026-03-01 09:05:00"
+            custom_sys_from="2026-03-01 09:05:00",
         )
         self.log_decision(
             decision_type="CAPITAL_INJECTION",
@@ -948,7 +1038,7 @@ class BitemporalLedgerEngine:
             actor_id="USER:Founder",
             rationale="Conferimento iniziale liquidità Family Office",
             payload={"amount_eur": 500_000.0},
-            custom_sys_timestamp="2026-03-01 09:05:00"
+            custom_sys_timestamp="2026-03-01 09:05:00",
         )
 
         # 2. Acquisto BTP_10Y
@@ -962,7 +1052,7 @@ class BitemporalLedgerEngine:
             valid_from="2026-03-05 10:00:00",
             recorded_by="BROKER_DIRECTA",
             fees=18.0,
-            custom_sys_from="2026-03-05 10:05:00"
+            custom_sys_from="2026-03-05 10:05:00",
         )
         self.log_decision(
             decision_type="ASSET_ALLOCATION",
@@ -970,7 +1060,7 @@ class BitemporalLedgerEngine:
             actor_id="AGENT:Tactical_Rebalancer",
             rationale="Acquisto BTP per immunizzazione tasso fisso",
             payload={"asset": "BTP_10Y", "shares": 1000, "price": 100.0},
-            custom_sys_timestamp="2026-03-05 10:05:00"
+            custom_sys_timestamp="2026-03-05 10:05:00",
         )
 
         # 3. Acquisto VWCE
@@ -984,7 +1074,7 @@ class BitemporalLedgerEngine:
             valid_from="2026-03-10 11:30:00",
             recorded_by="BROKER_IBKR",
             fees=5.0,
-            custom_sys_from="2026-03-10 11:35:00"
+            custom_sys_from="2026-03-10 11:35:00",
         )
 
         # 4. Perizia Immobile
@@ -997,7 +1087,7 @@ class BitemporalLedgerEngine:
             valid_from="2026-03-16 14:00:00",
             recorded_by="FAMILY_OFFICE_LEGAL",
             liquidity_haircut_pct=0.15,
-            custom_sys_from="2026-03-16 14:15:00"
+            custom_sys_from="2026-03-16 14:15:00",
         )
 
         # 5. Dividendo retroattivo VWCE staccato il 15 Marzo ma arrivato il 20 Marzo alle 18:30
@@ -1012,7 +1102,7 @@ class BitemporalLedgerEngine:
             recorded_by="BROKER_IBKR_STATEMENT",
             taxes=325.0,
             custom_sys_from="2026-03-20 18:30:00",
-            source_doc_ref="IBKR_MARCH_2026_DIVIDEND_ADVICE.pdf"
+            source_doc_ref="IBKR_MARCH_2026_DIVIDEND_ADVICE.pdf",
         )
         self.log_decision(
             decision_type="RETROACTIVE_DIVIDEND_RECORDING",
@@ -1020,7 +1110,7 @@ class BitemporalLedgerEngine:
             actor_id="SYSTEM:Broker_Statement_Parser",
             rationale="Registrazione tardiva dividendo da estratto conto pervenuto il 20 Marzo",
             payload={"asset": "VWCE.DE", "gross": 1250.0, "taxes": 325.0, "net": 925.0},
-            custom_sys_timestamp="2026-03-20 18:30:00"
+            custom_sys_timestamp="2026-03-20 18:30:00",
         )
 
         # 6. Correzione retroattiva BTP eseguita il 22 Marzo
@@ -1030,7 +1120,7 @@ class BitemporalLedgerEngine:
             new_unit_price=99.50,
             reason="Rettifica prezzo di carico per sconto intermediario istituzionale",
             actor_id="USER:Audit_Officer",
-            custom_sys_from="2026-03-22 16:00:00"
+            custom_sys_from="2026-03-22 16:00:00",
         )
 
         return {
@@ -1041,6 +1131,6 @@ class BitemporalLedgerEngine:
                 "meeting_date_audit": "2026-03-18 10:00:00",
                 "dividend_event_date": "2026-03-15 00:00:00",
                 "dividend_knowledge_date": "2026-03-20 18:30:00",
-                "correction_knowledge_date": "2026-03-22 16:00:00"
-            }
+                "correction_knowledge_date": "2026-03-22 16:00:00",
+            },
         }

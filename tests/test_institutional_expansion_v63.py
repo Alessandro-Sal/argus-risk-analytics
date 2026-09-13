@@ -3,28 +3,17 @@
 # Unit tests for ARGUS v6.3.0 Expansion
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
-from core.private_debt_engine import (
-    get_standard_private_debt_deals,
-    compute_private_debt_waterfall_and_covenants
-)
-from core.execution_algo_engine import (
-    compute_implementation_shortfall_and_execution_benchmarks
-)
-from core.cross_border_tax_engine import (
-    get_international_tax_jurisdictions,
-    compute_cross_border_wealth_tax_comparison
-)
-from core.hmm_regime_engine import (
-    compute_hmm_market_regime_detection
-)
-from core.voice_advisor_engine import (
-    generate_ai_voice_executive_briefing
-)
-from core.terminal_engine import get_terminal_engine
+import pandas as pd
+import pytest
+
+from core.cross_border_tax_engine import compute_cross_border_wealth_tax_comparison, get_international_tax_jurisdictions
+from core.execution_algo_engine import compute_implementation_shortfall_and_execution_benchmarks
 from core.fetcher import get_engine
+from core.hmm_regime_engine import compute_hmm_market_regime_detection
+from core.private_debt_engine import compute_private_debt_waterfall_and_covenants, get_standard_private_debt_deals
+from core.terminal_engine import get_terminal_engine
+from core.voice_advisor_engine import generate_ai_voice_executive_briefing
 
 
 def test_private_debt_waterfall_and_covenants():

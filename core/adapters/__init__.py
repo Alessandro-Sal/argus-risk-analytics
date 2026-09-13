@@ -22,11 +22,11 @@ from core.adapters.traderepublic import parse_traderepublic_transactions
 
 try:
     from core.data_quality_gate import (
-        DataQualityGate,
+        AssetClass,
         CanonicalTradeRecord,
+        DataQualityGate,
         QualityGateReport,
         TransactionType,
-        AssetClass,
     )
 except ImportError:
     DataQualityGate = None  # type: ignore

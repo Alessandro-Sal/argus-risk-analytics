@@ -48,6 +48,7 @@ def _get_crypto_transactions(results: Dict[str, Any], db_engine=None) -> pd.Data
     if (df_tx is None or df_tx.empty) and db_engine is not None and portfolio_id is not None:
         try:
             from sqlalchemy import text
+
             query = text("""
                 SELECT t.tx_id, t.tx_date, t.tx_type, t.quantity, t.price, t.currency, a.ticker, a.asset_class
                 FROM transactions t
@@ -78,8 +79,7 @@ def _get_crypto_transactions(results: Dict[str, Any], db_engine=None) -> pd.Data
 
 
 def _calc_yearly_crypto_stats(
-    df_crypto_tx: pd.DataFrame,
-    df_prices: Optional[pd.DataFrame] = None
+    df_crypto_tx: pd.DataFrame, df_prices: Optional[pd.DataFrame] = None
 ) -> Dict[int, Dict[str, float]]:
     """Elabora code FIFO per determinare plusvalenze e minusvalenze realizzate anno per anno con conversione FX storica."""
     yearly_crypto_stats: Dict[int, Dict[str, float]] = {}
@@ -117,7 +117,7 @@ def _calc_yearly_crypto_stats(
                 if curr in fx_series_map and not fx_series_map[curr].empty:
                     s_fx = fx_series_map[curr]
                     try:
-                        idx = s_fx.index.get_indexer([tx_dt], method='ffill')[0]
+                        idx = s_fx.index.get_indexer([tx_dt], method="ffill")[0]
                         fx = float(s_fx.iloc[idx]) if idx >= 0 else float(s_fx.iloc[0])
                     except Exception:
                         fx = float(s_fx.iloc[-1])
@@ -157,8 +157,7 @@ def _calc_yearly_crypto_stats(
 
 
 def _build_crypto_rt_dataframe(
-    yearly_crypto_stats: Dict[int, Dict[str, float]],
-    tax_year: Optional[int]
+    yearly_crypto_stats: Dict[int, Dict[str, float]], tax_year: Optional[int]
 ) -> tuple[pd.DataFrame, List[Dict[str, Any]]]:
     """Genera la tabella Quadro RT con deduzione minusvalenze pregresse e franchigia 2.000€."""
     rt_rows = []
@@ -195,28 +194,32 @@ def _build_crypto_rt_dataframe(
         else:
             net_loss = abs(net_raw)
             if net_loss > 1e-2:
-                crypto_buckets.append({
-                    "origin_year": yr,
-                    "expiry_year": yr + 4,
-                    "initial": round(net_loss, 2),
-                    "compensated": 0.0,
-                    "residual": round(net_loss, 2)
-                })
+                crypto_buckets.append(
+                    {
+                        "origin_year": yr,
+                        "expiry_year": yr + 4,
+                        "initial": round(net_loss, 2),
+                        "compensated": 0.0,
+                        "residual": round(net_loss, 2),
+                    }
+                )
 
         tax_due = taxable_base * CRYPTO_TAX_RATE
         active_zainetto = sum(b["residual"] for b in crypto_buckets if yr <= b["expiry_year"])
 
-        rt_rows.append({
-            "year": yr,
-            "realized_gains_eur": round(gains, 2),
-            "realized_losses_eur": round(losses, 2),
-            "net_pnl_eur": round(net_raw, 2),
-            "prior_crypto_minus_deducted_eur": round(prior_deducted, 2),
-            "taxable_base_rt_eur": round(taxable_base, 2),
-            "tax_due_rt_eur": round(tax_due, 2),
-            "threshold_exempt": bool(threshold_applied),
-            "crypto_zainetto_residual_eur": round(active_zainetto, 2)
-        })
+        rt_rows.append(
+            {
+                "year": yr,
+                "realized_gains_eur": round(gains, 2),
+                "realized_losses_eur": round(losses, 2),
+                "net_pnl_eur": round(net_raw, 2),
+                "prior_crypto_minus_deducted_eur": round(prior_deducted, 2),
+                "taxable_base_rt_eur": round(taxable_base, 2),
+                "tax_due_rt_eur": round(tax_due, 2),
+                "threshold_exempt": bool(threshold_applied),
+                "crypto_zainetto_residual_eur": round(active_zainetto, 2),
+            }
+        )
 
     df_rt = pd.DataFrame(rt_rows)
     if tax_year is not None and not df_rt.empty:
@@ -255,24 +258,26 @@ def _build_crypto_rw_dataframe(df_crypto_pos: pd.DataFrame) -> tuple[pd.DataFram
             tot_val_final += val_final
             tot_ivafe += ivafe_item
 
-            rw_rows.append({
-                "quadro": "RW",
-                "codice_investimento": CRYPTO_RW_CODE,
-                "descrizione_bene": f"Cripto-attività ({ticker})",
-                "ticker": ticker,
-                "quantita_detenuta": qty,
-                "valore_iniziale_eur": round(val_initial, 2),
-                "valore_finale_eur": round(val_final, 2),
-                "valore_massimo_eur": round(val_max, 2),
-                "giorni_detenzione": days_held,
-                "quota_possesso_pct": 100.0,
-                "imposta_valore_ivafe_eur": round(ivafe_item, 2)
-            })
+            rw_rows.append(
+                {
+                    "quadro": "RW",
+                    "codice_investimento": CRYPTO_RW_CODE,
+                    "descrizione_bene": f"Cripto-attività ({ticker})",
+                    "ticker": ticker,
+                    "quantita_detenuta": qty,
+                    "valore_iniziale_eur": round(val_initial, 2),
+                    "valore_finale_eur": round(val_final, 2),
+                    "valore_massimo_eur": round(val_max, 2),
+                    "giorni_detenzione": days_held,
+                    "quota_possesso_pct": 100.0,
+                    "imposta_valore_ivafe_eur": round(ivafe_item, 2),
+                }
+            )
 
     return pd.DataFrame(rw_rows), {
         "tot_val_initial": tot_val_initial,
         "tot_val_final": tot_val_final,
-        "tot_ivafe": tot_ivafe
+        "tot_ivafe": tot_ivafe,
     }
 
 
@@ -281,25 +286,27 @@ def _build_crypto_zainetto_dataframe(crypto_buckets: List[Dict[str, Any]], cur_y
     zainetto_crypto_rows = []
     for b in crypto_buckets:
         years_left = max(0, b["expiry_year"] - cur_year)
-        status = "✅ Totalmente Compensato" if b["residual"] < 1e-4 else (
-            "❌ Prescritto / Scaduto" if cur_year > b["expiry_year"] else f"⏳ Attivo ({years_left}a rimanenti)"
+        status = (
+            "✅ Totalmente Compensato"
+            if b["residual"] < 1e-4
+            else ("❌ Prescritto / Scaduto" if cur_year > b["expiry_year"] else f"⏳ Attivo ({years_left}a rimanenti)")
         )
-        zainetto_crypto_rows.append({
-            "origin_year": b["origin_year"],
-            "expiry_year": b["expiry_year"],
-            "initial_minus_eur": b["initial"],
-            "compensated_eur": round(b["compensated"], 2),
-            "residual_active_eur": round(b["residual"], 2),
-            "years_to_expiry": years_left,
-            "status": status
-        })
+        zainetto_crypto_rows.append(
+            {
+                "origin_year": b["origin_year"],
+                "expiry_year": b["expiry_year"],
+                "initial_minus_eur": b["initial"],
+                "compensated_eur": round(b["compensated"], 2),
+                "residual_active_eur": round(b["residual"], 2),
+                "years_to_expiry": years_left,
+                "status": status,
+            }
+        )
     return pd.DataFrame(zainetto_crypto_rows)
 
 
 def compute_crypto_tax_report(
-    results: Dict[str, Any],
-    db_engine=None,
-    tax_year: Optional[int] = None
+    results: Dict[str, Any], db_engine=None, tax_year: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Genera il prospetto fiscale integrato per Cripto-Attività conforme alla L. 197/2022:
@@ -334,7 +341,7 @@ def compute_crypto_tax_report(
         "total_ivafe_rw_eur": round(rw_totals["tot_ivafe"], 2),
         "total_crypto_tax_burden_eur": round(tot_tax_rt + rw_totals["tot_ivafe"], 2),
         "active_crypto_zainetto_eur": round(tot_crypto_credit, 2),
-        "has_crypto_positions": not df_crypto_pos.empty or not df_crypto_tx.empty
+        "has_crypto_positions": not df_crypto_pos.empty or not df_crypto_tx.empty,
     }
 
     return {
@@ -342,5 +349,5 @@ def compute_crypto_tax_report(
         "df_rt": df_rt,
         "df_rw": df_rw,
         "df_crypto_zainetto": df_crypto_zainetto,
-        "df_crypto_positions": df_crypto_pos
+        "df_crypto_positions": df_crypto_pos,
     }

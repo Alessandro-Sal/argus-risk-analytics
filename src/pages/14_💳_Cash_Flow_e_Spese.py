@@ -3,17 +3,19 @@
 # ARGUS Wealth Management — Cash Flow Intelligence & Budgeting
 # ============================================================
 
-import streamlit as st
-import pandas as pd
+import importlib
+from datetime import date, datetime
+
 import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, date
-import importlib
+import streamlit as st
+
 import core.ui_utils
+import core.wealth
 import core.wealth.wealth_db
 import core.wealth.wealth_engine
-import core.wealth
 
 importlib.reload(core.ui_utils)
 importlib.reload(core.wealth.wealth_db)
@@ -21,43 +23,43 @@ importlib.reload(core.wealth.wealth_engine)
 importlib.reload(core.wealth)
 
 from core.fetcher import get_engine
+from core.sidebar import render_sidebar
 from core.ui_utils import (
-    inject_custom_css,
-    section,
-    metric_card,
-    render_kpi_card,
-    fmt_eur,
-    fmt_pct,
-    render_omni_command_bar,
-    render_wealth_command_bar,
-    render_wealth_executive_badges,
-    render_page_header,
-    apply_plotly_theme,
     apply_chart_theme,
+    apply_plotly_theme,
     ensure_portal_context,
     ensure_portfolio_loaded,
+    fmt_eur,
+    fmt_pct,
+    inject_custom_css,
+    metric_card,
     render_data_table,
-    render_export_toolbar
+    render_export_toolbar,
+    render_kpi_card,
+    render_omni_command_bar,
+    render_page_header,
+    render_wealth_command_bar,
+    render_wealth_executive_badges,
+    section,
 )
-from core.sidebar import render_sidebar
 from core.wealth.wealth_db import (
-    get_cashflow_records,
-    insert_cashflow_tx,
     bulk_insert_cashflow_tx,
+    get_cashflow_records,
     get_wealth_accounts,
     get_wealth_categories,
-    get_wealth_portfolios
+    get_wealth_portfolios,
+    insert_cashflow_tx,
 )
 from core.wealth.wealth_engine import (
     compute_cashflow_analytics,
-    compute_consolidated_net_worth,
-    compute_recurring_subscriptions_analytics,
     compute_cashflow_forecast_and_anomalies,
-    compute_merchant_pareto_analytics,
-    compute_seasonality_matrix,
-    compute_envelope_budget_analytics,
     compute_cashflow_whatif_reinvestment,
-    compute_smart_cashflow_reconciliation
+    compute_consolidated_net_worth,
+    compute_envelope_budget_analytics,
+    compute_merchant_pareto_analytics,
+    compute_recurring_subscriptions_analytics,
+    compute_seasonality_matrix,
+    compute_smart_cashflow_reconciliation,
 )
 
 # ── CONFIGURAZIONE PAGINA & SIDEBAR ─────────────────────────

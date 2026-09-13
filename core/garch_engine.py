@@ -16,22 +16,39 @@ logger = logging.getLogger(__name__)
 TRADING_DAYS_YEAR = 252
 
 
+try:
+    from numba import njit
+    HAS_NUMBA = True
+except ImportError:
+    HAS_NUMBA = False
+
+    def njit(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
+
+
+@njit(fastmath=True)
+def _garch11_variance_loop(omega: float, alpha: float, beta: float, eps2: np.ndarray, initial_var: float) -> np.ndarray:
+    t_len = eps2.shape[0]
+    sigma2 = np.empty(t_len, dtype=np.float64)
+    sigma2[0] = initial_var
+    for t in range(1, t_len):
+        v = omega + alpha * eps2[t - 1] + beta * sigma2[t - 1]
+        sigma2[t] = v if v > 1e-12 else 1e-12
+    return sigma2
+
+
 def _garch11_log_likelihood(params: np.ndarray, eps: np.ndarray, initial_var: float) -> float:
     """
     Calcola la Negative Log-Likelihood gaussiana per il modello GARCH(1,1).
     params: [omega, alpha, beta]
     """
     omega, alpha, beta = params
-    t_len = len(eps)
-    sigma2 = np.empty(t_len)
-    sigma2[0] = initial_var
+    eps2 = eps * eps
+    sigma2 = _garch11_variance_loop(float(omega), float(alpha), float(beta), eps2, float(initial_var))
 
-    for t in range(1, t_len):
-        sigma2[t] = omega + alpha * (eps[t - 1] ** 2) + beta * sigma2[t - 1]
-        if sigma2[t] <= 1e-12:
-            sigma2[t] = 1e-12
-
-    ll = -0.5 * np.sum(np.log(2.0 * np.pi) + np.log(sigma2) + (eps ** 2) / sigma2)
+    ll = -0.5 * np.sum(np.log(2.0 * np.pi) + np.log(sigma2) + eps2 / sigma2)
     return -float(ll) if np.isfinite(ll) else 1e10
 
 
@@ -80,7 +97,7 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
             "standardized_residuals": std_resids,
             "log_likelihood": 0.0,
             "aic": 0.0,
-            "bic": 0.0
+            "bic": 0.0,
         }
 
     r_vals = np.asarray(s_ret.values, dtype=float).ravel()
@@ -98,8 +115,8 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
 
     bounds = [
         (1e-9, sample_var * 2.0),  # omega
-        (1e-4, 0.40),              # alpha (shock ARCH)
-        (0.40, 0.98)               # beta (persistenza GARCH)
+        (1e-4, 0.40),  # alpha (shock ARCH)
+        (0.40, 0.98),  # beta (persistenza GARCH)
     ]
     constraints = [
         {"type": "ineq", "fun": lambda p: 0.9999 - (p[1] + p[2])}  # alpha + beta < 1
@@ -112,7 +129,7 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
         method="SLSQP",
         bounds=bounds,
         constraints=constraints,
-        options={"maxiter": 200, "ftol": 1e-7}
+        options={"maxiter": 200, "ftol": 1e-7},
     )
 
     if opt_res.success and np.isfinite(opt_res.fun):
@@ -172,7 +189,7 @@ def fit_garch11(returns: pd.Series) -> Dict[str, Any]:
         "standardized_residuals": std_residuals,
         "log_likelihood": -nll,
         "aic": aic,
-        "bic": bic
+        "bic": bic,
     }
 
 
@@ -196,18 +213,14 @@ def forecast_garch_volatility(fit_res: Dict[str, Any], horizon: int = 30) -> pd.
         var_forecasts.append(var_k)
         ann_vols.append(vol_k_ann)
 
-    return pd.DataFrame({
-        "horizon_days": days,
-        "forecast_variance": var_forecasts,
-        "forecast_annual_vol_pct": ann_vols
-    })
+    return pd.DataFrame({"horizon_days": days, "forecast_variance": var_forecasts, "forecast_annual_vol_pct": ann_vols})
 
 
 def compute_filtered_historical_simulation(
     returns: pd.Series,
     fit_res: Optional[Dict[str, Any]] = None,
     alpha_levels: Optional[List[float]] = None,
-    horizon: int = 1
+    horizon: int = 1,
 ) -> Dict[str, Any]:
     """
     Esegue la Filtered Historical Simulation (FHS) scalando i residui empirici standardizzati
@@ -250,15 +263,11 @@ def compute_filtered_historical_simulation(
         "var_fhs": var_results,
         "cvar_fhs": cvar_results,
         "horizon": horizon,
-        "sample_size": len(simulated_returns)
+        "sample_size": len(simulated_returns),
     }
 
 
-def compute_garch_fhs_bundle(
-    returns: pd.Series,
-    total_value: float = 100000.0,
-    horizon: int = 1
-) -> Dict[str, Any]:
+def compute_garch_fhs_bundle(returns: pd.Series, total_value: float = 100000.0, horizon: int = 1) -> Dict[str, Any]:
     """
     Costruisce il bundle diagnostico completo GARCH(1,1) e FHS integrato per la UI di ARGUS.
     """
@@ -275,13 +284,16 @@ def compute_garch_fhs_bundle(
     var95_dynamic = -(mu - 1.644853 * sigmas)
     var99_dynamic = -(mu - 2.326348 * sigmas)
 
-    df_dynamic_var = pd.DataFrame({
-        "return": s_ret,
-        "sigma_daily": sigmas,
-        "sigma_annual_pct": sigmas * np.sqrt(TRADING_DAYS_YEAR) * 100.0,
-        "var95_dynamic_pct": var95_dynamic * 100.0,
-        "var99_dynamic_pct": var99_dynamic * 100.0
-    }, index=s_ret.index)
+    df_dynamic_var = pd.DataFrame(
+        {
+            "return": s_ret,
+            "sigma_daily": sigmas,
+            "sigma_annual_pct": sigmas * np.sqrt(TRADING_DAYS_YEAR) * 100.0,
+            "var95_dynamic_pct": var95_dynamic * 100.0,
+            "var99_dynamic_pct": var99_dynamic * 100.0,
+        },
+        index=s_ret.index,
+    )
 
     # Confronto monetario VaR FHS vs Storico Classico
     var95_pct = fhs_res["var_fhs"].get("var_fhs_95", 0.0)
@@ -311,5 +323,5 @@ def compute_garch_fhs_bundle(
             "cvar_fhs_95_eur": cvar95_pct * total_value,
             "cvar_fhs_99_pct": cvar99_pct * 100.0,
             "cvar_fhs_99_eur": cvar99_pct * total_value,
-        }
+        },
     }

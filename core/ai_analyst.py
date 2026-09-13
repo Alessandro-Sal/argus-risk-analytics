@@ -7,12 +7,12 @@ portfolio copilot with dual-engine architecture:
 2. Offline Deterministic Quantitative NLG Engine (Zero-dependency fallback)
 """
 
-import os
 import json
-import urllib.request
+import os
 import urllib.error
-from typing import Dict, Any, Optional, List
+import urllib.request
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 # ==============================================================================
 # GUARDRAILS DI COMPLIANCE & DISCLAIMER NORMATIVO (MiFID II / CONSOB)
@@ -45,8 +45,8 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     if not results or not isinstance(results, dict):
         return {}
 
-    import pandas as pd
     import numpy as np
+    import pandas as pd
 
     m = results.get("metrics", {})
     ret_m = m.get("returns", {}) if isinstance(m, dict) else {}
@@ -67,13 +67,22 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     if abs(cagr) < 1.0 and cagr != 0.0:
         cagr = cagr * 100.0
 
-    tot_ret_raw = ret_m.get("total_return_pct") if "total_return_pct" in ret_m else m.get("total_return_pct", m.get("total_return", 0.0))
+    tot_ret_raw = (
+        ret_m.get("total_return_pct")
+        if "total_return_pct" in ret_m
+        else m.get("total_return_pct", m.get("total_return", 0.0))
+    )
     tot_ret = float(tot_ret_raw or 0.0)
     if abs(tot_ret) < 1.0 and tot_ret != 0.0 and abs(tot_ret) > 0.0001:
         tot_ret = tot_ret * 100.0
 
     # 3. Volatilità
-    vol_raw = mr_m.get("volatility_annual_pct") or mr_m.get("volatility_annual") or m.get("volatility_annual_pct") or m.get("volatility", 0.0)
+    vol_raw = (
+        mr_m.get("volatility_annual_pct")
+        or mr_m.get("volatility_annual")
+        or m.get("volatility_annual_pct")
+        or m.get("volatility", 0.0)
+    )
     vol = float(vol_raw or 0.0)
     if vol < 1.0 and vol > 0.0:
         vol = vol * 100.0
@@ -107,7 +116,11 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     beta = float(beta_raw if beta_raw is not None else 1.0)
 
     # 8. Diversification & HHI
-    div_ratio_raw = conc_m.get("diversification_ratio") or results.get("risk_contribution", {}).get("diversification_ratio") or m.get("diversification_ratio", 1.0)
+    div_ratio_raw = (
+        conc_m.get("diversification_ratio")
+        or results.get("risk_contribution", {}).get("diversification_ratio")
+        or m.get("diversification_ratio", 1.0)
+    )
     div_ratio = float(div_ratio_raw if div_ratio_raw is not None else 1.0)
 
     hhi_raw = conc_m.get("herfindahl_index") or conc_m.get("hhi") or m.get("hhi", 0.0)
@@ -136,12 +149,14 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
                 cost_b = float(row.get("cost_basis", 0.0) or 0.0)
                 pnl_val = float(row.get("unrealized_pnl", row.get("total_return", 0.0)) or 0.0)
                 pnl_pct = (pnl_val / cost_b * 100.0) if cost_b > 0 else 0.0
-                top_holdings.append({
-                    "ticker": str(row.get("ticker", "")),
-                    "weight_pct": round(t_w, 2),
-                    "value_eur": round(t_val, 2),
-                    "pnl_pct": round(pnl_pct, 2)
-                })
+                top_holdings.append(
+                    {
+                        "ticker": str(row.get("ticker", "")),
+                        "weight_pct": round(t_w, 2),
+                        "value_eur": round(t_val, 2),
+                        "pnl_pct": round(pnl_pct, 2),
+                    }
+                )
     elif isinstance(positions, list) and positions:
         sorted_pos = sorted(positions, key=lambda x: x.get("market_value", x.get("current_value", 0.0)), reverse=True)
         for p in sorted_pos[:5]:
@@ -152,12 +167,14 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
             pnl = float(p.get("pnl_pct", 0.0) or 0.0)
             if abs(pnl) < 1.0 and pnl != 0.0:
                 pnl = pnl * 100.0
-            top_holdings.append({
-                "ticker": str(p.get("ticker", "")),
-                "weight_pct": round(w, 2),
-                "value_eur": round(p_val, 2),
-                "pnl_pct": round(pnl, 2)
-            })
+            top_holdings.append(
+                {
+                    "ticker": str(p.get("ticker", "")),
+                    "weight_pct": round(w, 2),
+                    "value_eur": round(p_val, 2),
+                    "pnl_pct": round(pnl, 2),
+                }
+            )
 
     # 10. Regime & ML
     regime = "Bull Low-Vol"
@@ -166,6 +183,7 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     else:
         try:
             from core.regime_switching import compute_market_regime_states
+
             sr_ret = results.get("portfolio_return")
             if sr_ret is not None and len(sr_ret) > 10:
                 reg_out = compute_market_regime_states(sr_ret)
@@ -180,6 +198,7 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     if advisor_score is None:
         try:
             from core.advisor import generate_quant_advisory_report
+
             adv_rep = generate_quant_advisory_report(results)
             advisor_score = adv_rep.get("health_score", 80)
         except Exception:
@@ -191,8 +210,14 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
     smb_val = float(mr_m.get("smb_tilt", mr_m.get("size_smb", m.get("smb_tilt", 0.0))) or 0.0)
     hml_val = float(mr_m.get("hml_tilt", mr_m.get("value_hml", m.get("hml_tilt", 0.0))) or 0.0)
 
-    rf_rate = float(results.get("risk_free", {}).get("rate_pct", 2.75) if isinstance(results.get("risk_free"), dict) else 2.75)
-    opt_inc = float(results.get("options_hedging", {}).get("covered_call", {}).get("incasso_eseguibile_eur", 0.0) if isinstance(results.get("options_hedging"), dict) else 0.0)
+    rf_rate = float(
+        results.get("risk_free", {}).get("rate_pct", 2.75) if isinstance(results.get("risk_free"), dict) else 2.75
+    )
+    opt_inc = float(
+        results.get("options_hedging", {}).get("covered_call", {}).get("incasso_eseguibile_eur", 0.0)
+        if isinstance(results.get("options_hedging"), dict)
+        else 0.0
+    )
 
     # Parametri patrimoniali (Wealth) opzionali se presenti nel contesto
     w_ctx = results.get("wealth_context", {}) if isinstance(results.get("wealth_context"), dict) else {}
@@ -227,7 +252,7 @@ def _extract_portfolio_summary_context(results: dict) -> dict:
         "covered_call_income_eur": round(opt_inc, 2),
         "top_holdings": top_holdings,
         "benchmark": results.get("benchmark", "SPY"),
-        "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M")
+        "analysis_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
     }
 
     if net_worth_eur > 0:
@@ -320,15 +345,25 @@ def _generate_deterministic_memorandum(ctx: dict) -> dict:
     # Sezione 4: Raccomandazioni Tattiche
     recs = []
     if sharpe < 1.2:
-        recs.append("Valutare il ribilanciamento verso pesi di Max Sharpe o Equal Risk Contribution per comprimere la varianza specifica.")
+        recs.append(
+            "Valutare il ribilanciamento verso pesi di Max Sharpe o Equal Risk Contribution per comprimere la varianza specifica."
+        )
     if beta > 1.15:
-        recs.append(f"Considerare una strategia di Delta-Hedging con opzioni Put su {bm} per immunizzare l'extra-beta nei periodi di alta volatilità.")
+        recs.append(
+            f"Considerare una strategia di Delta-Hedging con opzioni Put su {bm} per immunizzare l'extra-beta nei periodi di alta volatilità."
+        )
     if cc_inc > 0.0:
-        recs.append(f"Valutare un overlay di Covered Call sui lotti azionari da 100 quote per generare fino a € {cc_inc:,.2f} di rendimento addizionale.")
+        recs.append(
+            f"Valutare un overlay di Covered Call sui lotti azionari da 100 quote per generare fino a € {cc_inc:,.2f} di rendimento addizionale."
+        )
     if hhi > 0.20:
-        recs.append("Riallocare parzialmente le posizioni sovrappesate verso settori decorrelati per incrementare il Diversification Ratio.")
+        recs.append(
+            "Riallocare parzialmente le posizioni sovrappesate verso settori decorrelati per incrementare il Diversification Ratio."
+        )
     if not recs:
-        recs.append("Mantenere l'asset allocation corrente, monitorando i livelli di stop-loss ATR Chandelier sulle posizioni a maggior momentum.")
+        recs.append(
+            "Mantenere l'asset allocation corrente, monitorando i livelli di stop-loss ATR Chandelier sulle posizioni a maggior momentum."
+        )
 
     sec4 = " ".join([f"• **{r}**" for r in recs])
 
@@ -362,7 +397,7 @@ def _generate_deterministic_memorandum(ctx: dict) -> dict:
         "risk_summary": sec2,
         "regime_summary": sec3,
         "recommendations": sec4,
-        "context": ctx
+        "context": ctx,
     }
 
 
@@ -386,9 +421,16 @@ def _parse_http_error(e: urllib.error.HTTPError) -> str:
 def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash") -> Optional[str]:
     """Invia il prompt all'API REST ufficiale di Google Gemini con guardrail MiFID II e fallback automatico sui modelli."""
     cleaned_key = api_key.strip()
-    
+
     # Modelli supportati in ordine di efficienza e velocità
-    models_to_try = [model, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-flash-latest", "gemini-1.5-pro", "gemini-pro"]
+    models_to_try = [
+        model,
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro",
+        "gemini-pro",
+    ]
     seen = set()
     models_to_try = [m for m in models_to_try if not (m in seen or seen.add(m))]
 
@@ -396,14 +438,10 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
     last_err_msg = None
 
     payload = {
-        "contents": [{
-            "role": "user",
-            "parts": [{"text": f"{UNIFIED_MIFID_SYSTEM_PROMPT}\n\n[RICHIESTA OPERATIVA]\n{prompt}"}]
-        }],
-        "generationConfig": {
-            "temperature": 0.1,
-            "maxOutputTokens": 2000
-        }
+        "contents": [
+            {"role": "user", "parts": [{"text": f"{UNIFIED_MIFID_SYSTEM_PROMPT}\n\n[RICHIESTA OPERATIVA]\n{prompt}"}]}
+        ],
+        "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2000},
     }
     data_bytes = json.dumps(payload).encode("utf-8")
 
@@ -413,11 +451,8 @@ def _call_gemini_api(prompt: str, api_key: str, model: str = "gemini-1.5-flash")
             req = urllib.request.Request(
                 url,
                 data=data_bytes,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-goog-api-key": cleaned_key
-                },
-                method="POST"
+                headers={"Content-Type": "application/json", "x-goog-api-key": cleaned_key},
+                method="POST",
             )
             try:
                 with urllib.request.urlopen(req, timeout=15) as resp:
@@ -447,25 +482,16 @@ def _call_openai_api(prompt: str, api_key: str, model: str = "gpt-4o-mini") -> O
     url = "https://api.openai.com/v1/chat/completions"
     payload = {
         "model": model,
-        "messages": [
-            {
-                "role": "system",
-                "content": UNIFIED_MIFID_SYSTEM_PROMPT
-            },
-            {"role": "user", "content": prompt}
-        ],
+        "messages": [{"role": "system", "content": UNIFIED_MIFID_SYSTEM_PROMPT}, {"role": "user", "content": prompt}],
         "temperature": 0.1,
-        "max_tokens": 2000
+        "max_tokens": 2000,
     }
     data_bytes = json.dumps(payload).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=data_bytes,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {api_key.strip()}"
-        },
-        method="POST"
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key.strip()}"},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
@@ -480,10 +506,7 @@ def _call_openai_api(prompt: str, api_key: str, model: str = "gpt-4o-mini") -> O
 
 
 def generate_portfolio_narrative_memorandum(
-    results: dict,
-    api_key: Optional[str] = None,
-    provider: str = "auto",
-    model_name: Optional[str] = None
+    results: dict, api_key: Optional[str] = None, provider: str = "auto", model_name: Optional[str] = None
 ) -> dict:
     """
     Genera il memorandum istituzionale discorsivo sul portafoglio.
@@ -499,7 +522,7 @@ def generate_portfolio_narrative_memorandum(
             "engine": "Error",
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "full_text": "⚠️ Nessun dato di portafoglio disponibile per la generazione del memorandum.",
-            "context": {}
+            "context": {},
         }
 
     key_clean = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY") or "").strip()
@@ -525,20 +548,20 @@ def generate_portfolio_narrative_memorandum(
     prompt = f"""Esegui una diagnosi quantitativa e redigi un Executive Memorandum formattato in Markdown per il seguente portafoglio:
 
 Dati Quantitativi di Portafoglio:
-- Controvalore Totale: € {ctx.get('portfolio_value_eur', 0):,.2f}
-- Rendimento Annuo Composto (CAGR): {ctx.get('cagr_pct', 0):+.2f}%
-- Rendimento Totale Storico: {ctx.get('total_return_pct', 0):+.2f}%
-- Volatilità Annualizzata: {ctx.get('volatility_pct', 0):.2f}%
-- Sharpe Ratio: {ctx.get('sharpe_ratio', 0):.2f} (Sortino: {ctx.get('sortino_ratio', 0):.2f})
-- Max Drawdown Storico: {ctx.get('max_drawdown_pct', 0):.2f}%
-- Value at Risk Giornaliero 95% (VaR 95): {ctx.get('var_95_pct', 0):.2f}%
-- Conditional VaR 95% (CVaR 95): {ctx.get('cvar_95_pct', 0):.2f}%
-- Beta verso Benchmark ({ctx.get('benchmark', 'SPY')}): {ctx.get('beta', 1.0):.2f}
-- Diversification Ratio: {ctx.get('diversification_ratio', 1.0):.2f}
-- Indice di Concentrazione HHI: {ctx.get('hhi', 0):.4f}
-- ARGUS Health Score: {ctx.get('health_score', 75)}/100
-- Regime Macroeconomico Attuale: {ctx.get('market_regime', 'N/A')}
-- Prime 5 Posizioni per Peso: {json.dumps(ctx.get('top_holdings', []))}
+- Controvalore Totale: € {ctx.get("portfolio_value_eur", 0):,.2f}
+- Rendimento Annuo Composto (CAGR): {ctx.get("cagr_pct", 0):+.2f}%
+- Rendimento Totale Storico: {ctx.get("total_return_pct", 0):+.2f}%
+- Volatilità Annualizzata: {ctx.get("volatility_pct", 0):.2f}%
+- Sharpe Ratio: {ctx.get("sharpe_ratio", 0):.2f} (Sortino: {ctx.get("sortino_ratio", 0):.2f})
+- Max Drawdown Storico: {ctx.get("max_drawdown_pct", 0):.2f}%
+- Value at Risk Giornaliero 95% (VaR 95): {ctx.get("var_95_pct", 0):.2f}%
+- Conditional VaR 95% (CVaR 95): {ctx.get("cvar_95_pct", 0):.2f}%
+- Beta verso Benchmark ({ctx.get("benchmark", "SPY")}): {ctx.get("beta", 1.0):.2f}
+- Diversification Ratio: {ctx.get("diversification_ratio", 1.0):.2f}
+- Indice di Concentrazione HHI: {ctx.get("hhi", 0):.4f}
+- ARGUS Health Score: {ctx.get("health_score", 75)}/100
+- Regime Macroeconomico Attuale: {ctx.get("market_regime", "N/A")}
+- Prime 5 Posizioni per Peso: {json.dumps(ctx.get("top_holdings", []))}
 
 Struttura richiesta del Memorandum:
 1. Sintesi Esecutiva & Giudizio di Performance
@@ -565,7 +588,10 @@ Struttura richiesta del Memorandum:
         hint = ""
         if "404" in err_msg or "400" in err_msg:
             hint = " (Verifica che la chiave corrisponda al provider selezionato: le chiavi Gemini iniziano con 'AIza...', quelle OpenAI con 'sk-')."
-        det_memo["full_text"] = f"> ⚠️ *Nota: Chiamata API fallita ({err_msg}){hint}. Visualizzazione generata dal motore quantitativo deterministico offline.*\n\n" + det_memo["full_text"]
+        det_memo["full_text"] = (
+            f"> ⚠️ *Nota: Chiamata API fallita ({err_msg}){hint}. Visualizzazione generata dal motore quantitativo deterministico offline.*\n\n"
+            + det_memo["full_text"]
+        )
         return det_memo
 
     if llm_output and len(llm_output.strip()) > 50:
@@ -576,19 +602,14 @@ Struttura richiesta del Memorandum:
             "engine": engine_name,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "full_text": clean_text,
-            "context": ctx
+            "context": ctx,
         }
 
     # Fallback finale
     return _generate_deterministic_memorandum(ctx)
 
 
-def query_argus_assistant(
-    question: str,
-    results: dict,
-    api_key: Optional[str] = None,
-    provider: str = "auto"
-) -> str:
+def query_argus_assistant(question: str, results: dict, api_key: Optional[str] = None, provider: str = "auto") -> str:
     """Risponde a una domanda specifica dell'utente sul portafoglio in analisi con guardrails MiFID II."""
     if not question or not question.strip():
         return "Inserisci una domanda specifica sul portafoglio."
@@ -656,10 +677,19 @@ Domanda Utente: "{question}"
         raw_ans = (
             f"📈 **Performance Risk-Adjusted**: Il portafoglio genera un CAGR annuo del **{cagr:+.2f}%** con volatilità del **{vol:.2f}%**, "
             f"producendo uno Sharpe Ratio di **{sharpe:.2f}**. "
-            + ("Uno Sharpe superiore a 1.0 indica un'ottima efficienza dell'allocazione." if sharpe >= 1.0 else "Lo Sharpe evidenzia margini di ottimizzazione tramite Markowitz o Equal Risk Contribution.")
+            + (
+                "Uno Sharpe superiore a 1.0 indica un'ottima efficienza dell'allocazione."
+                if sharpe >= 1.0
+                else "Lo Sharpe evidenzia margini di ottimizzazione tramite Markowitz o Equal Risk Contribution."
+            )
         )
     elif any(w in q_lower for w in ["titoli", "posizioni", "peso", "concentrazione", "top"]):
-        pos_list = "\n".join([f"- **{h['ticker']}**: {h['weight_pct']}% (€ {h['value_eur']:,.2f}, PnL: {h['pnl_pct']:+.2f}%)" for h in top_h])
+        pos_list = "\n".join(
+            [
+                f"- **{h['ticker']}**: {h['weight_pct']}% (€ {h['value_eur']:,.2f}, PnL: {h['pnl_pct']:+.2f}%)"
+                for h in top_h
+            ]
+        )
         raw_ans = f"🏆 **Principali Posizioni in Portafoglio**:\n{pos_list}\n\nIndice di concentrazione HHI: **{ctx.get('hhi', 0):.4f}**."
     elif any(w in q_lower for w in ["consigli", "ribilanciare", "operazioni", "cosa fare"]):
         raw_ans = (
@@ -688,7 +718,7 @@ def verify_metric_grounding(text: str, context: dict) -> Dict[str, Any]:
         "context_portfolio_value": context.get("portfolio_value_eur"),
         "context_var_95": context.get("var_95_pct"),
         "context_sharpe": context.get("sharpe_ratio"),
-        "grounding_passed": True
+        "grounding_passed": True,
     }
 
 
@@ -696,7 +726,7 @@ class TriAgentQuantitativeGovernance:
     """
     Sistema di Governance AI Multi-Agente Istituzionale per la convalida dei ribilanciamenti
     e delle decisioni di asset allocation.
-    
+
     Composto da 3 agenti con mandati specialistici ortogonali:
     1. QuantRiskAuditor: Controllo rischio, tracking error, turnover, concentrazione e code.
     2. TaxEfficiencySpecialist: Efficienza fiscale, assorbimento minusvalenze e tax-loss harvesting.
@@ -708,9 +738,7 @@ class TriAgentQuantitativeGovernance:
         self.provider = provider
 
     def audit_rebalance_plan(
-        self,
-        portfolio_context: Dict[str, Any],
-        rebalance_results: Dict[str, Any]
+        self, portfolio_context: Dict[str, Any], rebalance_results: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         Esegue la deliberazione collegiale del comitato investimenti a 3 agenti.
@@ -729,19 +757,25 @@ class TriAgentQuantitativeGovernance:
         risk_findings = []
         if turnover_pct > 50.0:
             risk_score -= 30.0
-            risk_findings.append(f"Turnover eccessivo ({turnover_pct:.1f}%): rischio di destabilizzazione dell'esposizione.")
+            risk_findings.append(
+                f"Turnover eccessivo ({turnover_pct:.1f}%): rischio di destabilizzazione dell'esposizione."
+            )
         elif turnover_pct > 25.0:
             risk_score -= 10.0
             risk_findings.append(f"Turnover moderato ({turnover_pct:.1f}%): monitorare i costi di ribilanciamento.")
         else:
-            risk_findings.append(f"Turnover controllato ({turnover_pct:.1f}%): preservazione ottimale dell'inerzia di portafoglio.")
+            risk_findings.append(
+                f"Turnover controllato ({turnover_pct:.1f}%): preservazione ottimale dell'inerzia di portafoglio."
+            )
 
         if trades_count == 0:
             risk_findings.append("Nessuna transazione richiesta: portafoglio perfettamente allineato ai target.")
         else:
             risk_findings.append(f"{trades_count} esecuzioni programmate per allineamento delle ponderazioni ottimali.")
 
-        risk_verdict = "APPROVED" if risk_score >= 80.0 else ("CONDITIONAL_APPROVAL" if risk_score >= 50.0 else "REJECTED")
+        risk_verdict = (
+            "APPROVED" if risk_score >= 80.0 else ("CONDITIONAL_APPROVAL" if risk_score >= 50.0 else "REJECTED")
+        )
 
         # --- 2. TAX EFFICIENCY SPECIALIST ---
         tax_score = 100.0
@@ -749,20 +783,30 @@ class TriAgentQuantitativeGovernance:
         tax_drag_bps = (total_tax_due / total_wealth) * 10000.0 if total_wealth > 0 else 0.0
 
         if minus_absorbed > 0:
-            tax_findings.append(f"Ottimizzazione fiscale virtuosa: assorbiti € {minus_absorbed:,.2f} di minusvalenze pregresse.")
+            tax_findings.append(
+                f"Ottimizzazione fiscale virtuosa: assorbiti € {minus_absorbed:,.2f} di minusvalenze pregresse."
+            )
             tax_score = min(100.0, tax_score + 5.0)
 
         if total_tax_due > 0:
             if remaining_minus > 0:
                 tax_score -= 15.0
-                tax_findings.append(f"Imposta generata (€ {total_tax_due:,.2f}) nonostante minusvalenze residue (€ {remaining_minus:,.2f}) a causa di asimmetrie fiscali su bond o ETF.")
+                tax_findings.append(
+                    f"Imposta generata (€ {total_tax_due:,.2f}) nonostante minusvalenze residue (€ {remaining_minus:,.2f}) a causa di asimmetrie fiscali su bond o ETF."
+                )
             else:
-                tax_findings.append(f"Tax drag calcolato di {tax_drag_bps:.1f} bps (€ {total_tax_due:,.2f} di imposte sui capital gain).")
+                tax_findings.append(
+                    f"Tax drag calcolato di {tax_drag_bps:.1f} bps (€ {total_tax_due:,.2f} di imposte sui capital gain)."
+                )
         else:
-            tax_findings.append("Zero imposte generate: ribilanciamento fiscalmente neutro o incentrato su riallocazione senza plusvalenze.")
+            tax_findings.append(
+                "Zero imposte generate: ribilanciamento fiscalmente neutro o incentrato su riallocazione senza plusvalenze."
+            )
 
         if remaining_minus > 5000.0:
-            tax_findings.append(f"Opportunità: presenti ancora € {remaining_minus:,.2f} di minusvalenze da compensare prima della scadenza.")
+            tax_findings.append(
+                f"Opportunità: presenti ancora € {remaining_minus:,.2f} di minusvalenze da compensare prima della scadenza."
+            )
 
         tax_verdict = "APPROVED" if tax_score >= 80.0 else ("CONDITIONAL_APPROVAL" if tax_score >= 55.0 else "REJECTED")
 
@@ -773,19 +817,27 @@ class TriAgentQuantitativeGovernance:
 
         if slippage_bps > 15.0:
             exec_score -= 30.0
-            exec_findings.append(f"Slippage e Market Impact elevati ({slippage_bps:.1f} bps / € {slippage_cost:,.2f}): raccomandato spezzettamento in iceberg orders.")
+            exec_findings.append(
+                f"Slippage e Market Impact elevati ({slippage_bps:.1f} bps / € {slippage_cost:,.2f}): raccomandato spezzettamento in iceberg orders."
+            )
         elif slippage_bps > 5.0:
             exec_score -= 10.0
-            exec_findings.append(f"Slippage contenuto ({slippage_bps:.1f} bps): esecuzione idonea con ordini Limit Protocol FIX 4.4.")
+            exec_findings.append(
+                f"Slippage contenuto ({slippage_bps:.1f} bps): esecuzione idonea con ordini Limit Protocol FIX 4.4."
+            )
         else:
             exec_findings.append(f"Liquidità ottimale: slippage trascurabile ({slippage_bps:.2f} bps).")
 
-        exec_findings.append("Flusso ordini serializzato conforme FIX 4.4 (Tag 35=D, Tag 54, Tag 38, Tag 44) pronto per routing OMS/EMS.")
-        exec_verdict = "APPROVED" if exec_score >= 80.0 else ("CONDITIONAL_APPROVAL" if exec_score >= 50.0 else "REJECTED")
+        exec_findings.append(
+            "Flusso ordini serializzato conforme FIX 4.4 (Tag 35=D, Tag 54, Tag 38, Tag 44) pronto per routing OMS/EMS."
+        )
+        exec_verdict = (
+            "APPROVED" if exec_score >= 80.0 else ("CONDITIONAL_APPROVAL" if exec_score >= 50.0 else "REJECTED")
+        )
 
         # --- PROTOCOLLO DI CONSENSO COLLEGIALE ---
         consensus_score = float(0.35 * risk_score + 0.35 * tax_score + 0.30 * exec_score)
-        
+
         if "REJECTED" in [risk_verdict, tax_verdict, exec_verdict] or consensus_score < 60.0:
             consensus_verdict = "REJECTED"
             verdict_badge = "❌ NON APPROVATO"
@@ -800,13 +852,16 @@ class TriAgentQuantitativeGovernance:
             f"### 🏛️ Verbale del Comitato Quantitativo di Governance (Tri-Agent Sign-off)\n\n"
             f"**Esito della Deliberazione:** {verdict_badge} (Punteggio di Governance: **{consensus_score:.1f}/100**)\n\n"
             f"#### 1. Quantitative Risk & Factor Auditor (`{risk_verdict}` - Score {risk_score:.0f}/100)\n"
-            + "\n".join([f"- {f}" for f in risk_findings]) + "\n\n"
+            + "\n".join([f"- {f}" for f in risk_findings])
+            + "\n\n"
             f"#### 2. Tax Efficiency Specialist (`{tax_verdict}` - Score {tax_score:.0f}/100)\n"
-            + "\n".join([f"- {f}" for f in tax_findings]) + "\n\n"
+            + "\n".join([f"- {f}" for f in tax_findings])
+            + "\n\n"
             f"#### 3. Macro Liquidity & Execution Strategist (`{exec_verdict}` - Score {exec_score:.0f}/100)\n"
-            + "\n".join([f"- {f}" for f in exec_findings]) + "\n\n"
-            f"**Prescrizione Finale OMS/EMS:** Procedere all'invio del blotter ordini previa validazione delle disponibilità liquide minime.\n\n"
-            f"> ⚖️ *MiFID II Compliance Note: Valutazione generata da algoritmi quantitativi di secondo livello a supporto decisionale dell'intermediario abilitato.*"
+            + "\n".join([f"- {f}" for f in exec_findings])
+            + "\n\n"
+            "**Prescrizione Finale OMS/EMS:** Procedere all'invio del blotter ordini previa validazione delle disponibilità liquide minime.\n\n"
+            "> ⚖️ *MiFID II Compliance Note: Valutazione generata da algoritmi quantitativi di secondo livello a supporto decisionale dell'intermediario abilitato.*"
         )
 
         return {
@@ -818,22 +873,21 @@ class TriAgentQuantitativeGovernance:
                     "name": "Quantitative Risk & Factor Auditor",
                     "verdict": risk_verdict,
                     "score": risk_score,
-                    "findings": risk_findings
+                    "findings": risk_findings,
                 },
                 "tax_specialist": {
                     "name": "Tax Efficiency Specialist",
                     "verdict": tax_verdict,
                     "score": tax_score,
-                    "findings": tax_findings
+                    "findings": tax_findings,
                 },
                 "macro_execution": {
                     "name": "Macro Liquidity & Execution Strategist",
                     "verdict": exec_verdict,
                     "score": exec_score,
-                    "findings": exec_findings
-                }
+                    "findings": exec_findings,
+                },
             },
             "signoff_memo": signoff_memo,
-            "mifid_compliant": True
+            "mifid_compliant": True,
         }
-

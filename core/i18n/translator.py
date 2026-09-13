@@ -71,6 +71,7 @@ class I18nEngine:
         # Sincronizza con Streamlit se disponibile
         try:
             import streamlit as st
+
             if hasattr(st, "session_state"):
                 st.session_state["locale"] = self._active_locale
         except Exception:
@@ -80,6 +81,7 @@ class I18nEngine:
         """Recupera la lingua attiva tenendo conto dello stato di sessione Streamlit."""
         try:
             import streamlit as st
+
             if hasattr(st, "session_state") and "locale" in st.session_state:
                 loc = str(st.session_state["locale"]).strip().lower()
                 if loc in self._dictionaries:
@@ -128,6 +130,7 @@ class I18nEngine:
 
 
 # ── Global Facade Functions ──────────────────────────────────────────
+
 
 def get_i18n() -> I18nEngine:
     """Restituisce l'istanza singleton del motore I18n."""

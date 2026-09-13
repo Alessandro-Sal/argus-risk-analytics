@@ -16,37 +16,37 @@ from plotly.subplots import make_subplots
 from core.fetcher import get_engine
 from core.sidebar import render_sidebar
 from core.ui_utils import (
-    apply_plotly_theme,
     apply_chart_theme,
+    apply_plotly_theme,
+    ensure_portal_context,
+    ensure_portfolio_loaded,
     fmt_eur,
     fmt_pct,
     inject_custom_css,
     metric_card,
+    render_data_table,
+    render_export_toolbar,
     render_kpi_card,
     render_omni_command_bar,
+    render_segmented_tabs,
     render_wealth_command_bar,
     render_wealth_executive_badges,
-    ensure_portal_context,
-    ensure_portfolio_loaded,
-    render_data_table,
-    render_segmented_tabs,
     section,
-    render_export_toolbar
 )
 from core.wealth.wealth_db import (
-    init_wealth_db,
     get_linked_risk_portfolios_summary,
     get_pension_plans,
     get_physical_assets,
     get_wealth_accounts,
     get_wealth_portfolios,
+    init_wealth_db,
     save_wealth_account,
 )
 from core.wealth.wealth_engine import (
-    compute_personal_balance_sheet,
     compute_consolidated_net_worth,
     compute_family_office_multi_entity_consolidation,
     compute_multi_currency_fx_hedging_engine,
+    compute_personal_balance_sheet,
     compute_total_wealth_brinson_attribution,
     generate_advisory_pitchbook_html,
     generate_advisory_pitchbook_pdf,
@@ -217,6 +217,7 @@ render_wealth_executive_badges(nw)
 
 # ── SMART FINANCIAL WATCHDOG SENTINEL ────────────────────────
 from core.wealth.wealth_watchdog import WealthWatchdog, render_wealth_watchdog_banner
+
 summary_watchdog_dict = {
     "total_net_worth": tot_nw,
     "liquid_cash": liq_cash,
@@ -305,7 +306,7 @@ if st.session_state.get("wealth_boardroom_mode", False):
     with bc5:
         metric_card("🛡️ Previdenza Complementare", fmt_eur(pens_val), delta="Fondi Pensione & PIP", delta_color="normal")
     with bc6:
-        metric_card("📉 Passività & Mutui Residui", fmt_eur(liab_val), delta=f"DSTI Sostenibile", delta_color="inverse" if liab_val > 0 else "normal")
+        metric_card("📉 Passività & Mutui Residui", fmt_eur(liab_val), delta="DSTI Sostenibile", delta_color="inverse" if liab_val > 0 else "normal")
 
     st.write("")
     # Grafici Istituzionali Boardroom
@@ -1356,7 +1357,7 @@ with main_tab_sheet:
         with cek2:
             metric_card(f"Costi di Gestione {sel_ce_year}", fmt_eur(ce_outflow), delta="Spese di vita (Consumi)", delta_color="inverse")
         with cek3:
-            metric_card("Risparmio Netto Annuo", fmt_eur(ce_savings), delta=f"Surplus d'esercizio", delta_color="normal" if ce_savings >= 0 else "inverse")
+            metric_card("Risparmio Netto Annuo", fmt_eur(ce_savings), delta="Surplus d'esercizio", delta_color="normal" if ce_savings >= 0 else "inverse")
         with cek4:
             metric_card("Personal Savings Rate", f"{ce_sr:.1f}%", delta="Target ≥ 20%", delta_color="normal" if ce_sr >= 20 else "off")
 
@@ -2206,10 +2207,10 @@ with main_tab_fx:
 with main_tab_stress:
     from core.wealth.wealth_stress_engine import (
         PRESET_STRESS_SCENARIOS,
-        run_wealth_stress_test,
-        create_wealth_waterfall_chart,
         create_liquidity_squeeze_timeline_chart,
-        simulate_wealth_recovery_trajectories
+        create_wealth_waterfall_chart,
+        run_wealth_stress_test,
+        simulate_wealth_recovery_trajectories,
     )
 
     st.markdown("""

@@ -25,8 +25,7 @@ COMMON_DELIMITERS: List[str] = [";", ",", "\t", "|"]
 
 
 def read_tabular_stream(
-    file_bytes_or_buffer: Union[bytes, io.BytesIO, io.StringIO, str, Any],
-    filename: str = ""
+    file_bytes_or_buffer: Union[bytes, io.BytesIO, io.StringIO, str, Any], filename: str = ""
 ) -> pd.DataFrame:
     """
     Legge resilientemente flussi tabulari (CSV, TSV, XLSX, XLS) da memoria o disco.
@@ -108,9 +107,24 @@ def read_tabular_stream(
     # 3. Individuazione riga di header e sniffer del delimitatore
     header_idx = 0
     candidate_keywords = [
-        "data", "date", "ticker", "simbolo", "isin", "operazione",
-        "importo", "amount", "quantità", "quantity", "shares", "prezzo", "price",
-        "descrizione", "description", "causale", "saldo", "balance"
+        "data",
+        "date",
+        "ticker",
+        "simbolo",
+        "isin",
+        "operazione",
+        "importo",
+        "amount",
+        "quantità",
+        "quantity",
+        "shares",
+        "prezzo",
+        "price",
+        "descrizione",
+        "description",
+        "causale",
+        "saldo",
+        "balance",
     ]
     for i, line in enumerate(lines[:20]):
         line_low = line.lower()
@@ -119,7 +133,7 @@ def read_tabular_stream(
             break
 
     sub_text = "\n".join(lines[header_idx:])
-    sample_lines = lines[header_idx: min(header_idx + 15, len(lines))]
+    sample_lines = lines[header_idx : min(header_idx + 15, len(lines))]
     sample_joined = "\n".join(sample_lines)
 
     delim_counts = {sep: sample_joined.count(sep) for sep in COMMON_DELIMITERS}

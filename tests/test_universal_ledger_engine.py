@@ -4,11 +4,12 @@ Test suite per il modulo Universal One-Ledger Engine (DuckDB & PyArrow).
 """
 
 import os
-import pytest
-import pandas as pd
-import numpy as np
 
-from core.universal_ledger import UniversalLedgerEngine, HAS_DUCKDB, HAS_PYARROW
+import numpy as np
+import pandas as pd
+import pytest
+
+from core.universal_ledger import HAS_DUCKDB, HAS_PYARROW, UniversalLedgerEngine
 
 
 @pytest.mark.skipif(not HAS_DUCKDB, reason="DuckDB non installato nell'ambiente")

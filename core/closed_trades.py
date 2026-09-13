@@ -1,7 +1,9 @@
-import pandas as pd
-import numpy as np
-from datetime import datetime
 from collections import deque
+from datetime import datetime
+
+import numpy as np
+import pandas as pd
+
 
 def _normalize_asset_class(ac_raw: str, ticker: str = "") -> str:
     """Normalizza la classe di attivo in etichette istituzionali standard in italiano."""
@@ -9,7 +11,7 @@ def _normalize_asset_class(ac_raw: str, ticker: str = "") -> str:
         ac_raw = ""
     s = str(ac_raw).lower().strip()
     t = str(ticker).upper().strip()
-    
+
     if "etf" in s or "etf" in t or t in ["CSPX", "VWCE", "IEMG", "AGGH", "EIMI", "MEUD", "XEON", "NDIA.L"]:
         return "ETF & Fondi"
     elif "crypto" in s or "btc" in t or "eth" in t or "crypto" in t:
@@ -30,14 +32,21 @@ def _normalize_sector(sec_raw: str, ticker: str = "", ac_normalized: str = "Azio
         sec_raw = ""
     s = str(sec_raw).lower().strip()
     t = str(ticker).upper().strip()
-    
+
     if "tech" in s or "inform" in s or "semiconductor" in s or "software" in s:
         return "Tecnologia"
     elif "finan" in s or "bank" in s or "banc" in s or "assicur" in s or "insurance" in s:
         return "Servizi Finanziari"
     elif "health" in s or "pharma" in s or "salute" in s or "biotech" in s or "medical" in s:
         return "Salute & Pharma"
-    elif "cyclical" in s or "discretionary" in s or "voluttuari" in s or "automotive" in s or "auto" in s or "beni di consumo" in s:
+    elif (
+        "cyclical" in s
+        or "discretionary" in s
+        or "voluttuari" in s
+        or "automotive" in s
+        or "auto" in s
+        or "beni di consumo" in s
+    ):
         return "Beni di Consumo"
     elif "staples" in s or "defensive" in s or "necessit" in s or "food" in s or "beverage" in s:
         return "Beni di Prima Necessità"
@@ -65,7 +74,7 @@ def compute_closed_trades_journal(
     df_tx: pd.DataFrame = None,
     df_prices: pd.DataFrame = None,
     df_positions: pd.DataFrame = None,
-    is_sandbox: bool = False
+    is_sandbox: bool = False,
 ) -> dict:
     """
     Analizza lo storico delle transazioni (df_tx) ed estrae con precisione contabile FIFO:
@@ -118,7 +127,7 @@ def compute_closed_trades_journal(
             "asset_class": norm_ac,
             "sector": norm_sec,
             "country": first_row.get("country", "Global"),
-            "currency": str(first_row.get("currency", first_row.get("asset_currency", "EUR"))).upper()
+            "currency": str(first_row.get("currency", first_row.get("asset_currency", "EUR"))).upper(),
         }
 
     # ── 2. MOTORE FIFO PER OGNI TICKER ───────────────────────────────────────
@@ -141,17 +150,17 @@ def compute_closed_trades_journal(
         last_sell_date = None
 
         for row in grp.itertuples(index=False):
-            tx_t = getattr(row, "tx_type_clean")
-            qty = float(getattr(row, "quantity"))
-            tx_d = getattr(row, "tx_date")
+            tx_t = row.tx_type_clean
+            qty = float(row.quantity)
+            tx_d = row.tx_date
             tx_id = getattr(row, "tx_id", None)
-            orig_price = float(getattr(row, "price"))
+            orig_price = float(row.price)
 
             # Calcolo tasso di cambio EUR
             fx_rate = 1.0
             if cur not in ["EUR", "", "NAN", "NONE"] and fx_series is not None and not fx_series.empty:
                 try:
-                    idx = fx_series.index.get_indexer([tx_d], method='ffill')[0]
+                    idx = fx_series.index.get_indexer([tx_d], method="ffill")[0]
                     fx_rate = float(fx_series.iloc[idx]) if idx >= 0 else float(fx_series.iloc[0])
                 except Exception:
                     pass
@@ -161,13 +170,9 @@ def compute_closed_trades_journal(
             if tx_t in ["buy", "acquisto", "b"]:
                 if first_buy_date is None:
                     first_buy_date = tx_d
-                queue.append({
-                    "date": tx_d,
-                    "qty": qty,
-                    "price_eur": price_eur,
-                    "price_orig": orig_price,
-                    "tx_id": tx_id
-                })
+                queue.append(
+                    {"date": tx_d, "qty": qty, "price_eur": price_eur, "price_orig": orig_price, "tx_id": tx_id}
+                )
 
             elif tx_t in ["sell", "vendita", "s"]:
                 last_sell_date = tx_d
@@ -219,7 +224,21 @@ def compute_closed_trades_journal(
                         lot["qty"] -= qty_to_sell
                         qty_to_sell = 0.0
 
-            elif tx_t in ["split", "frazionamento", "raggruppamento", "reverse_split", "reverse split", "stock_split", "stock split", "stock_dividend", "fusione", "merger", "scambio", "spinoff", "scissione"]:
+            elif tx_t in [
+                "split",
+                "frazionamento",
+                "raggruppamento",
+                "reverse_split",
+                "reverse split",
+                "stock_split",
+                "stock split",
+                "stock_dividend",
+                "fusione",
+                "merger",
+                "scambio",
+                "spinoff",
+                "scissione",
+            ]:
                 sp_ratio = float(getattr(row, "quantity", 1.0) or getattr(row, "price", 1.0) or 1.0)
                 if sp_ratio > 0.0 and sp_ratio != 1.0:
                     for lot in queue:
@@ -258,7 +277,7 @@ def compute_closed_trades_journal(
                 "first_buy_date": first_buy_date.strftime("%Y-%m-%d") if first_buy_date else "N/A",
                 "last_sell_date": last_sell_date.strftime("%Y-%m-%d") if last_sell_date else "N/A",
                 "avg_holding_days": int(round(avg_holding)),
-                "outcome": "🟢 WIN" if tot_pnl_eur > 0.01 else ("🔴 LOSS" if tot_pnl_eur < -0.01 else "🟡 BREAKEVEN")
+                "outcome": "🟢 WIN" if tot_pnl_eur > 0.01 else ("🔴 LOSS" if tot_pnl_eur < -0.01 else "🟡 BREAKEVEN"),
             }
 
     df_lots = pd.DataFrame(closed_lots)
@@ -307,7 +326,9 @@ def _build_metrics_from_dataframes(df_lots: pd.DataFrame, df_assets: pd.DataFram
     worst_trade = df_lots.loc[worst_idx].to_dict() if worst_idx is not None else {}
 
     # Dividendi totali incassati su posizioni chiuse
-    total_divs = float(df_assets["dividends_eur"].sum()) if not df_assets.empty and "dividends_eur" in df_assets.columns else 0.0
+    total_divs = (
+        float(df_assets["dividends_eur"].sum()) if not df_assets.empty and "dividends_eur" in df_assets.columns else 0.0
+    )
 
     # ── 1. Curva Cumulativa di PnL Realizzato
     df_cum_curve = compute_cumulative_realized_curve(df_lots)
@@ -344,7 +365,7 @@ def _build_metrics_from_dataframes(df_lots: pd.DataFrame, df_assets: pd.DataFram
         "df_closed_assets": df_assets.sort_values("realized_pnl_eur", ascending=False),
         "df_cumulative_curve": df_cum_curve,
         "calendar_data": calendar_data,
-        "breakdown_data": breakdown_data
+        "breakdown_data": breakdown_data,
     }
 
 
@@ -352,22 +373,23 @@ def compute_cumulative_realized_curve(df_lots: pd.DataFrame) -> pd.DataFrame:
     """Genera la serie storica cumulativa del PnL realizzato nel tempo con High-Water Mark."""
     if df_lots is None or df_lots.empty:
         return pd.DataFrame()
-    
+
     df_sorted = df_lots.sort_values("sell_date", ascending=True).copy()
     df_sorted["sell_date"] = pd.to_datetime(df_sorted["sell_date"])
-    
+
     # Aggrega per data per avere un punto temporale univoco
-    daily_pnl = df_sorted.groupby("sell_date").agg({
-        "realized_pnl_eur": "sum",
-        "ticker": lambda x: ", ".join(x.unique()[:3])
-    }).reset_index()
-    
+    daily_pnl = (
+        df_sorted.groupby("sell_date")
+        .agg({"realized_pnl_eur": "sum", "ticker": lambda x: ", ".join(x.unique()[:3])})
+        .reset_index()
+    )
+
     daily_pnl["realized_pnl_eur"] = daily_pnl["realized_pnl_eur"].round(2)
     daily_pnl["cum_realized_pnl_eur"] = daily_pnl["realized_pnl_eur"].cumsum().round(2)
     daily_pnl["high_water_mark_eur"] = daily_pnl["cum_realized_pnl_eur"].cummax().round(2)
     daily_pnl["drawdown_eur"] = (daily_pnl["cum_realized_pnl_eur"] - daily_pnl["high_water_mark_eur"]).round(2)
     daily_pnl["sell_date_str"] = daily_pnl["sell_date"].dt.strftime("%Y-%m-%d")
-    
+
     return daily_pnl
 
 
@@ -375,77 +397,97 @@ def compute_monthly_trading_calendar(df_lots: pd.DataFrame) -> dict:
     """Calcola la matrice di performance mese x anno per le posizioni chiuse."""
     if df_lots is None or df_lots.empty:
         return {"df_pivot": pd.DataFrame(), "monthly_records": []}
-    
+
     df = df_lots.copy()
     df["sell_date_dt"] = pd.to_datetime(df["sell_date"])
     df["year"] = df["sell_date_dt"].dt.year
     df["month"] = df["sell_date_dt"].dt.month
-    
+
     month_names = {
-        1: "Gen", 2: "Feb", 3: "Mar", 4: "Apr", 5: "Mag", 6: "Giu",
-        7: "Lug", 8: "Ago", 9: "Set", 10: "Ott", 11: "Nov", 12: "Dic"
+        1: "Gen",
+        2: "Feb",
+        3: "Mar",
+        4: "Apr",
+        5: "Mag",
+        6: "Giu",
+        7: "Lug",
+        8: "Ago",
+        9: "Set",
+        10: "Ott",
+        11: "Nov",
+        12: "Dic",
     }
     df["month_name"] = df["month"].map(month_names)
-    
+
     # Raggruppamento per Anno e Mese
-    grp = df.groupby(["year", "month", "month_name"]).agg(
-        pnl_eur=("realized_pnl_eur", "sum"),
-        trades_count=("ticker", "count"),
-        win_count=("realized_pnl_eur", lambda x: (x > 0.01).sum())
-    ).reset_index()
-    
+    grp = (
+        df.groupby(["year", "month", "month_name"])
+        .agg(
+            pnl_eur=("realized_pnl_eur", "sum"),
+            trades_count=("ticker", "count"),
+            win_count=("realized_pnl_eur", lambda x: (x > 0.01).sum()),
+        )
+        .reset_index()
+    )
+
     grp["win_rate"] = (grp["win_count"] / grp["trades_count"] * 100.0).round(1)
-    
+
     # Pivot table Anno x Mese
     pivot = grp.pivot(index="year", columns="month_name", values="pnl_eur").fillna(0.0)
-    
+
     # Ordina colonne mesi
     ordered_cols = [month_names[m] for m in range(1, 13) if month_names[m] in pivot.columns]
     pivot = pivot[ordered_cols]
     pivot["Totale Anno (€)"] = pivot.sum(axis=1)
-    
-    return {
-        "df_pivot": pivot.sort_index(ascending=False),
-        "monthly_records": grp.to_dict(orient="records")
-    }
+
+    return {"df_pivot": pivot.sort_index(ascending=False), "monthly_records": grp.to_dict(orient="records")}
 
 
 def compute_sector_asset_class_breakdown(df_lots: pd.DataFrame) -> dict:
     """Scompone il PnL realizzato per settore economico e asset class."""
     if df_lots is None or df_lots.empty:
         return {"df_by_sector": pd.DataFrame(), "df_by_asset_class": pd.DataFrame()}
-    
+
     df = df_lots.copy()
     if "sector" not in df.columns:
         df["sector"] = "Azionario Diversificato"
     if "asset_class" not in df.columns:
         df["asset_class"] = "Azioni (Equity)"
-        
-    df["asset_class"] = df.apply(lambda r: _normalize_asset_class(r.get("asset_class", ""), r.get("ticker", "")), axis=1)
-    df["sector"] = df.apply(lambda r: _normalize_sector(r.get("sector", ""), r.get("ticker", ""), r.get("asset_class", "")), axis=1)
-    
-    by_sector = df.groupby("sector").agg(
-        pnl_eur=("realized_pnl_eur", "sum"),
-        proceeds_eur=("proceeds_eur", "sum"),
-        trades_count=("ticker", "count"),
-        win_trades=("realized_pnl_eur", lambda x: (x > 0.01).sum())
-    ).reset_index()
+
+    df["asset_class"] = df.apply(
+        lambda r: _normalize_asset_class(r.get("asset_class", ""), r.get("ticker", "")), axis=1
+    )
+    df["sector"] = df.apply(
+        lambda r: _normalize_sector(r.get("sector", ""), r.get("ticker", ""), r.get("asset_class", "")), axis=1
+    )
+
+    by_sector = (
+        df.groupby("sector")
+        .agg(
+            pnl_eur=("realized_pnl_eur", "sum"),
+            proceeds_eur=("proceeds_eur", "sum"),
+            trades_count=("ticker", "count"),
+            win_trades=("realized_pnl_eur", lambda x: (x > 0.01).sum()),
+        )
+        .reset_index()
+    )
     by_sector["win_rate_pct"] = (by_sector["win_trades"] / by_sector["trades_count"] * 100.0).round(1)
     by_sector = by_sector.sort_values("pnl_eur", ascending=False)
-    
-    by_asset_class = df.groupby("asset_class").agg(
-        pnl_eur=("realized_pnl_eur", "sum"),
-        proceeds_eur=("proceeds_eur", "sum"),
-        trades_count=("ticker", "count"),
-        win_trades=("realized_pnl_eur", lambda x: (x > 0.01).sum())
-    ).reset_index()
+
+    by_asset_class = (
+        df.groupby("asset_class")
+        .agg(
+            pnl_eur=("realized_pnl_eur", "sum"),
+            proceeds_eur=("proceeds_eur", "sum"),
+            trades_count=("ticker", "count"),
+            win_trades=("realized_pnl_eur", lambda x: (x > 0.01).sum()),
+        )
+        .reset_index()
+    )
     by_asset_class["win_rate_pct"] = (by_asset_class["win_trades"] / by_asset_class["trades_count"] * 100.0).round(1)
     by_asset_class = by_asset_class.sort_values("pnl_eur", ascending=False)
-    
-    return {
-        "df_by_sector": by_sector,
-        "df_by_asset_class": by_asset_class
-    }
+
+    return {"df_by_sector": by_sector, "df_by_asset_class": by_asset_class}
 
 
 def _empty_closed_trades_result() -> dict:
@@ -476,7 +518,7 @@ def _empty_closed_trades_result() -> dict:
         "df_closed_assets": pd.DataFrame(),
         "df_cumulative_curve": pd.DataFrame(),
         "calendar_data": {"df_pivot": pd.DataFrame(), "monthly_records": []},
-        "breakdown_data": {"df_by_sector": pd.DataFrame(), "df_by_asset_class": pd.DataFrame()}
+        "breakdown_data": {"df_by_sector": pd.DataFrame(), "df_by_asset_class": pd.DataFrame()},
     }
 
 
@@ -484,73 +526,198 @@ def _generate_sandbox_closed_trades() -> dict:
     """Genera uno storico realistico di trade chiusi per la modalità Sandbox/Demo."""
     lots = [
         {
-            "ticker": "TSLA", "asset_class": "Equity", "sector": "Consumer Cyclical", "country": "USA",
-            "buy_date": "2024-02-15", "sell_date": "2024-08-20", "qty": 45.0,
-            "buy_price_eur": 182.40, "sell_price_eur": 235.80, "cost_basis_eur": 8208.0, "proceeds_eur": 10611.0,
-            "realized_pnl_eur": 2403.0, "realized_pnl_pct": 29.28, "holding_days": 187, "outcome": "🟢 WIN"
+            "ticker": "TSLA",
+            "asset_class": "Equity",
+            "sector": "Consumer Cyclical",
+            "country": "USA",
+            "buy_date": "2024-02-15",
+            "sell_date": "2024-08-20",
+            "qty": 45.0,
+            "buy_price_eur": 182.40,
+            "sell_price_eur": 235.80,
+            "cost_basis_eur": 8208.0,
+            "proceeds_eur": 10611.0,
+            "realized_pnl_eur": 2403.0,
+            "realized_pnl_pct": 29.28,
+            "holding_days": 187,
+            "outcome": "🟢 WIN",
         },
         {
-            "ticker": "NVDA", "asset_class": "Equity", "sector": "Technology", "country": "USA",
-            "buy_date": "2024-01-10", "sell_date": "2024-06-18", "qty": 30.0,
-            "buy_price_eur": 54.20, "sell_price_eur": 118.50, "cost_basis_eur": 1626.0, "proceeds_eur": 3555.0,
-            "realized_pnl_eur": 1929.0, "realized_pnl_pct": 118.63, "holding_days": 160, "outcome": "🟢 WIN"
+            "ticker": "NVDA",
+            "asset_class": "Equity",
+            "sector": "Technology",
+            "country": "USA",
+            "buy_date": "2024-01-10",
+            "sell_date": "2024-06-18",
+            "qty": 30.0,
+            "buy_price_eur": 54.20,
+            "sell_price_eur": 118.50,
+            "cost_basis_eur": 1626.0,
+            "proceeds_eur": 3555.0,
+            "realized_pnl_eur": 1929.0,
+            "realized_pnl_pct": 118.63,
+            "holding_days": 160,
+            "outcome": "🟢 WIN",
         },
         {
-            "ticker": "BND", "asset_class": "Fixed Income", "sector": "Bonds & Treasuries", "country": "USA",
-            "buy_date": "2023-11-05", "sell_date": "2024-04-12", "qty": 110.0,
-            "buy_price_eur": 76.50, "sell_price_eur": 72.80, "cost_basis_eur": 8415.0, "proceeds_eur": 8008.0,
-            "realized_pnl_eur": -407.0, "realized_pnl_pct": -4.84, "holding_days": 159, "outcome": "🔴 LOSS"
+            "ticker": "BND",
+            "asset_class": "Fixed Income",
+            "sector": "Bonds & Treasuries",
+            "country": "USA",
+            "buy_date": "2023-11-05",
+            "sell_date": "2024-04-12",
+            "qty": 110.0,
+            "buy_price_eur": 76.50,
+            "sell_price_eur": 72.80,
+            "cost_basis_eur": 8415.0,
+            "proceeds_eur": 8008.0,
+            "realized_pnl_eur": -407.0,
+            "realized_pnl_pct": -4.84,
+            "holding_days": 159,
+            "outcome": "🔴 LOSS",
         },
         {
-            "ticker": "ENEL.MI", "asset_class": "Equity", "sector": "Utilities", "country": "Italy",
-            "buy_date": "2023-09-20", "sell_date": "2024-05-30", "qty": 800.0,
-            "buy_price_eur": 5.90, "sell_price_eur": 6.75, "cost_basis_eur": 4720.0, "proceeds_eur": 5400.0,
-            "realized_pnl_eur": 680.0, "realized_pnl_pct": 14.41, "holding_days": 253, "outcome": "🟢 WIN"
+            "ticker": "ENEL.MI",
+            "asset_class": "Equity",
+            "sector": "Utilities",
+            "country": "Italy",
+            "buy_date": "2023-09-20",
+            "sell_date": "2024-05-30",
+            "qty": 800.0,
+            "buy_price_eur": 5.90,
+            "sell_price_eur": 6.75,
+            "cost_basis_eur": 4720.0,
+            "proceeds_eur": 5400.0,
+            "realized_pnl_eur": 680.0,
+            "realized_pnl_pct": 14.41,
+            "holding_days": 253,
+            "outcome": "🟢 WIN",
         },
         {
-            "ticker": "PYPL", "asset_class": "Equity", "sector": "Financial Services", "country": "USA",
-            "buy_date": "2024-03-01", "sell_date": "2024-07-15", "qty": 60.0,
-            "buy_price_eur": 63.40, "sell_price_eur": 58.10, "cost_basis_eur": 3804.0, "proceeds_eur": 3486.0,
-            "realized_pnl_eur": -318.0, "realized_pnl_pct": -8.36, "holding_days": 136, "outcome": "🔴 LOSS"
-        }
+            "ticker": "PYPL",
+            "asset_class": "Equity",
+            "sector": "Financial Services",
+            "country": "USA",
+            "buy_date": "2024-03-01",
+            "sell_date": "2024-07-15",
+            "qty": 60.0,
+            "buy_price_eur": 63.40,
+            "sell_price_eur": 58.10,
+            "cost_basis_eur": 3804.0,
+            "proceeds_eur": 3486.0,
+            "realized_pnl_eur": -318.0,
+            "realized_pnl_pct": -8.36,
+            "holding_days": 136,
+            "outcome": "🔴 LOSS",
+        },
     ]
 
     assets = [
         {
-            "ticker": "TSLA", "asset_class": "Equity", "sector": "Consumer Cyclical", "country": "USA",
-            "status": "🪦 Chiusa al 100%", "qty_sold": 45.0, "qty_remaining": 0.0,
-            "avg_buy_price_eur": 182.40, "avg_sell_price_eur": 235.80, "cost_basis_eur": 8208.0, "proceeds_eur": 10611.0,
-            "realized_pnl_eur": 2403.0, "realized_pnl_pct": 29.28, "dividends_eur": 0.0, "total_profit_eur": 2403.0,
-            "first_buy_date": "2024-02-15", "last_sell_date": "2024-08-20", "avg_holding_days": 187, "outcome": "🟢 WIN"
+            "ticker": "TSLA",
+            "asset_class": "Equity",
+            "sector": "Consumer Cyclical",
+            "country": "USA",
+            "status": "🪦 Chiusa al 100%",
+            "qty_sold": 45.0,
+            "qty_remaining": 0.0,
+            "avg_buy_price_eur": 182.40,
+            "avg_sell_price_eur": 235.80,
+            "cost_basis_eur": 8208.0,
+            "proceeds_eur": 10611.0,
+            "realized_pnl_eur": 2403.0,
+            "realized_pnl_pct": 29.28,
+            "dividends_eur": 0.0,
+            "total_profit_eur": 2403.0,
+            "first_buy_date": "2024-02-15",
+            "last_sell_date": "2024-08-20",
+            "avg_holding_days": 187,
+            "outcome": "🟢 WIN",
         },
         {
-            "ticker": "NVDA", "asset_class": "Equity", "sector": "Technology", "country": "USA",
-            "status": "⚡ Smobilizzo Parziale", "qty_sold": 30.0, "qty_remaining": 20.0,
-            "avg_buy_price_eur": 54.20, "avg_sell_price_eur": 118.50, "cost_basis_eur": 1626.0, "proceeds_eur": 3555.0,
-            "realized_pnl_eur": 1929.0, "realized_pnl_pct": 118.63, "dividends_eur": 12.50, "total_profit_eur": 1941.50,
-            "first_buy_date": "2024-01-10", "last_sell_date": "2024-06-18", "avg_holding_days": 160, "outcome": "🟢 WIN"
+            "ticker": "NVDA",
+            "asset_class": "Equity",
+            "sector": "Technology",
+            "country": "USA",
+            "status": "⚡ Smobilizzo Parziale",
+            "qty_sold": 30.0,
+            "qty_remaining": 20.0,
+            "avg_buy_price_eur": 54.20,
+            "avg_sell_price_eur": 118.50,
+            "cost_basis_eur": 1626.0,
+            "proceeds_eur": 3555.0,
+            "realized_pnl_eur": 1929.0,
+            "realized_pnl_pct": 118.63,
+            "dividends_eur": 12.50,
+            "total_profit_eur": 1941.50,
+            "first_buy_date": "2024-01-10",
+            "last_sell_date": "2024-06-18",
+            "avg_holding_days": 160,
+            "outcome": "🟢 WIN",
         },
         {
-            "ticker": "ENEL.MI", "asset_class": "Equity", "sector": "Utilities", "country": "Italy",
-            "status": "🪦 Chiusa al 100%", "qty_sold": 800.0, "qty_remaining": 0.0,
-            "avg_buy_price_eur": 5.90, "avg_sell_price_eur": 6.75, "cost_basis_eur": 4720.0, "proceeds_eur": 5400.0,
-            "realized_pnl_eur": 680.0, "realized_pnl_pct": 14.41, "dividends_eur": 180.0, "total_profit_eur": 860.0,
-            "first_buy_date": "2023-09-20", "last_sell_date": "2024-05-30", "avg_holding_days": 253, "outcome": "🟢 WIN"
+            "ticker": "ENEL.MI",
+            "asset_class": "Equity",
+            "sector": "Utilities",
+            "country": "Italy",
+            "status": "🪦 Chiusa al 100%",
+            "qty_sold": 800.0,
+            "qty_remaining": 0.0,
+            "avg_buy_price_eur": 5.90,
+            "avg_sell_price_eur": 6.75,
+            "cost_basis_eur": 4720.0,
+            "proceeds_eur": 5400.0,
+            "realized_pnl_eur": 680.0,
+            "realized_pnl_pct": 14.41,
+            "dividends_eur": 180.0,
+            "total_profit_eur": 860.0,
+            "first_buy_date": "2023-09-20",
+            "last_sell_date": "2024-05-30",
+            "avg_holding_days": 253,
+            "outcome": "🟢 WIN",
         },
         {
-            "ticker": "PYPL", "asset_class": "Equity", "sector": "Financial Services", "country": "USA",
-            "status": "🪦 Chiusa al 100%", "qty_sold": 60.0, "qty_remaining": 0.0,
-            "avg_buy_price_eur": 63.40, "avg_sell_price_eur": 58.10, "cost_basis_eur": 3804.0, "proceeds_eur": 3486.0,
-            "realized_pnl_eur": -318.0, "realized_pnl_pct": -8.36, "dividends_eur": 0.0, "total_profit_eur": -318.0,
-            "first_buy_date": "2024-03-01", "last_sell_date": "2024-07-15", "avg_holding_days": 136, "outcome": "🔴 LOSS"
+            "ticker": "PYPL",
+            "asset_class": "Equity",
+            "sector": "Financial Services",
+            "country": "USA",
+            "status": "🪦 Chiusa al 100%",
+            "qty_sold": 60.0,
+            "qty_remaining": 0.0,
+            "avg_buy_price_eur": 63.40,
+            "avg_sell_price_eur": 58.10,
+            "cost_basis_eur": 3804.0,
+            "proceeds_eur": 3486.0,
+            "realized_pnl_eur": -318.0,
+            "realized_pnl_pct": -8.36,
+            "dividends_eur": 0.0,
+            "total_profit_eur": -318.0,
+            "first_buy_date": "2024-03-01",
+            "last_sell_date": "2024-07-15",
+            "avg_holding_days": 136,
+            "outcome": "🔴 LOSS",
         },
         {
-            "ticker": "BND", "asset_class": "Fixed Income", "sector": "Bonds & Treasuries", "country": "USA",
-            "status": "⚡ Smobilizzo Parziale", "qty_sold": 110.0, "qty_remaining": 50.0,
-            "avg_buy_price_eur": 76.50, "avg_sell_price_eur": 72.80, "cost_basis_eur": 8415.0, "proceeds_eur": 8008.0,
-            "realized_pnl_eur": -407.0, "realized_pnl_pct": -4.84, "dividends_eur": 65.0, "total_profit_eur": -342.0,
-            "first_buy_date": "2023-11-05", "last_sell_date": "2024-04-12", "avg_holding_days": 159, "outcome": "🔴 LOSS"
-        }
+            "ticker": "BND",
+            "asset_class": "Fixed Income",
+            "sector": "Bonds & Treasuries",
+            "country": "USA",
+            "status": "⚡ Smobilizzo Parziale",
+            "qty_sold": 110.0,
+            "qty_remaining": 50.0,
+            "avg_buy_price_eur": 76.50,
+            "avg_sell_price_eur": 72.80,
+            "cost_basis_eur": 8415.0,
+            "proceeds_eur": 8008.0,
+            "realized_pnl_eur": -407.0,
+            "realized_pnl_pct": -4.84,
+            "dividends_eur": 65.0,
+            "total_profit_eur": -342.0,
+            "first_buy_date": "2023-11-05",
+            "last_sell_date": "2024-04-12",
+            "avg_holding_days": 159,
+            "outcome": "🔴 LOSS",
+        },
     ]
 
     return _build_metrics_from_dataframes(pd.DataFrame(lots), pd.DataFrame(assets))

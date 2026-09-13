@@ -3,25 +3,26 @@
 # ARGUS — Unit Tests for Enterprise SRE Market Data Resilience Engine
 # ============================================================
 
-import time
 import io
+import time
 import unittest
 from datetime import date, datetime, timedelta
 from unittest.mock import MagicMock, patch
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import requests
 
 from core.resilient_market_engine import (
     CircuitBreaker,
     CircuitBreakerConfig,
     CircuitState,
-    RetryPolicy,
     FreshnessLevel,
-    MarketFreshnessEvaluator,
     MarketDataEnvelope,
-    StooqDataProvider,
+    MarketFreshnessEvaluator,
     ResilientMarketDataFetcher,
+    RetryPolicy,
+    StooqDataProvider,
     with_circuit_breaker,
 )
 

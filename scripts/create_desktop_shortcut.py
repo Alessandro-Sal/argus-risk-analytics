@@ -4,8 +4,9 @@ con l'icona applicativa personalizzata 'Occhio di Argus' e refresh cache icone.
 """
 
 import os
-import sys
 import subprocess
+import sys
+
 
 def create_shortcut():
     project_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))

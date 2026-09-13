@@ -2,14 +2,15 @@
 Unit & Integration Tests for core/ai_analyst.py
 """
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
+
 from core.ai_analyst import (
     _extract_portfolio_summary_context,
     _generate_deterministic_memorandum,
     generate_portfolio_narrative_memorandum,
-    query_argus_assistant
+    query_argus_assistant,
 )
 
 

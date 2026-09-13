@@ -3,12 +3,12 @@ ARGUS — Risk Analytics Platform
 Unit Tests for 3D Surface Stress Testing, MSCI Barra Multi-Factor Model, and ML Volatility/Distress Classifier
 """
 
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
-from core.risk_engine import compute_3d_stress_surface, compute_msci_barra_multifactor_model
 from core.financial_analysis import predict_ml_distress_and_volatility
+from core.risk_engine import compute_3d_stress_surface, compute_msci_barra_multifactor_model
 
 
 def test_compute_3d_stress_surface():

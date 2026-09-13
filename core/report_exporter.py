@@ -1,30 +1,40 @@
-import os
 import io
-import pandas as pd
-import numpy as np
+import os
 from datetime import datetime
+
+import numpy as np
+import pandas as pd
 
 # ReportLab imports
 try:
-    from reportlab.lib.pagesizes import letter, A4
     from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak, KeepTogether, HRFlowable
-    )
+    from reportlab.lib.pagesizes import A4, letter
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.pdfgen import canvas
+    from reportlab.platypus import (
+        HRFlowable,
+        KeepTogether,
+        PageBreak,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+
     HAS_REPORTLAB = True
 except ImportError:
     HAS_REPORTLAB = False
 
 from core.html_exporter import generate_html_report_bytes, generate_interactive_html_report
 
-
 if HAS_REPORTLAB:
+
     class NumberedCanvas(canvas.Canvas):
         """
         Two-pass canvas for dynamic total page count, running headers, and footers.
         """
+
         def __init__(self, *args, **kwargs):
             super(NumberedCanvas, self).__init__(*args, **kwargs)
             self._saved_page_states = []
@@ -50,7 +60,9 @@ if HAS_REPORTLAB:
                 self.drawString(30, 814, "ARGUS RISK ANALYTICS PLATFORM")
                 self.setFont("Helvetica", 7.5)
                 self.setFillColor(colors.HexColor("#64748B"))
-                self.drawRightString(565, 814, f"INSTITUTIONAL AUDIT DOSSIER  •  {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+                self.drawRightString(
+                    565, 814, f"INSTITUTIONAL AUDIT DOSSIER  •  {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+                )
                 self.setStrokeColor(colors.HexColor("#CBD5E1"))
                 self.setLineWidth(0.5)
                 self.line(30, 807, 565, 807)
@@ -63,9 +75,7 @@ if HAS_REPORTLAB:
 
 
 def generate_institutional_audit_dossier(
-    results: dict,
-    portfolio_name: str = "Main Portfolio",
-    author: str = "ARGUS Quantitative Risk Committee"
+    results: dict, portfolio_name: str = "Main Portfolio", author: str = "ARGUS Quantitative Risk Committee"
 ) -> bytes:
     """
     Genera un Dossier Integrato di Due Diligence e Audit Quantitativo (PDF Multi-Pagina da 10 Pagine).
@@ -85,48 +95,139 @@ def generate_institutional_audit_dossier(
         raise ImportError("Le librerie reportlab non sono installate.")
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=38,
-        bottomMargin=42
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=38, bottomMargin=42)
 
     styles = getSampleStyleSheet()
 
     # ── Color Palette Istituzionale ─────────────────────────────
-    PRIMARY = colors.HexColor('#0F172A')       # Deep Navy / Slate 900
-    SECONDARY = colors.HexColor('#1E293B')     # Slate 800
-    ACCENT_BLUE = colors.HexColor('#2563EB')   # Royal Blue
-    ACCENT_GOLD = colors.HexColor('#D97706')   # Amber Gold
-    ACCENT_GREEN = colors.HexColor('#059669')  # Emerald Green
-    ACCENT_RED = colors.HexColor('#DC2626')    # Crimson Red
-    BG_LIGHT = colors.HexColor('#F8FAFC')      # Slate 50
-    BG_MUTED = colors.HexColor('#F1F5F9')      # Slate 100
-    BORDER_COLOR = colors.HexColor('#E2E8F0')  # Slate 200
-    TEXT_MUTED = colors.HexColor('#64748B')    # Slate 500
-    TEXT_DARK = colors.HexColor('#0F172A')     # Slate 900
+    PRIMARY = colors.HexColor("#0F172A")  # Deep Navy / Slate 900
+    SECONDARY = colors.HexColor("#1E293B")  # Slate 800
+    ACCENT_BLUE = colors.HexColor("#2563EB")  # Royal Blue
+    ACCENT_GOLD = colors.HexColor("#D97706")  # Amber Gold
+    ACCENT_GREEN = colors.HexColor("#059669")  # Emerald Green
+    ACCENT_RED = colors.HexColor("#DC2626")  # Crimson Red
+    BG_LIGHT = colors.HexColor("#F8FAFC")  # Slate 50
+    BG_MUTED = colors.HexColor("#F1F5F9")  # Slate 100
+    BORDER_COLOR = colors.HexColor("#E2E8F0")  # Slate 200
+    TEXT_MUTED = colors.HexColor("#64748B")  # Slate 500
+    TEXT_DARK = colors.HexColor("#0F172A")  # Slate 900
 
     # ── Typography Styles ───────────────────────────────────────
-    title_main = ParagraphStyle('TitleMain', parent=styles['Heading1'], fontName='Helvetica-Bold', fontSize=21, leading=25, textColor=PRIMARY)
-    title_sub = ParagraphStyle('TitleSub', parent=styles['Normal'], fontName='Helvetica', fontSize=10, leading=14, textColor=TEXT_MUTED)
-    sec_num = ParagraphStyle('SecNum', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=8, leading=10, textColor=ACCENT_BLUE)
-    sec_title = ParagraphStyle('SecTitle', parent=styles['Heading2'], fontName='Helvetica-Bold', fontSize=12, leading=15, textColor=PRIMARY, spaceBefore=3, spaceAfter=2)
-    sec_sub = ParagraphStyle('SecSub', parent=styles['Normal'], fontName='Helvetica', fontSize=8, leading=11, textColor=TEXT_MUTED, spaceAfter=6)
-    
-    cell_hdr = ParagraphStyle('CellHdr', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.white, alignment=1)
-    cell_hdr_l = ParagraphStyle('CellHdrL', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=colors.white)
-    cell_txt = ParagraphStyle('CellTxt', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=TEXT_DARK)
-    cell_txt_b = ParagraphStyle('CellTxtB', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=TEXT_DARK)
-    cell_txt_c = ParagraphStyle('CellTxtC', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=TEXT_DARK, alignment=1)
-    cell_txt_r = ParagraphStyle('CellTxtR', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, leading=9.5, textColor=TEXT_DARK, alignment=2)
-    cell_green = ParagraphStyle('CellGreen', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=ACCENT_GREEN, alignment=2)
-    cell_red = ParagraphStyle('CellRed', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7.5, leading=9.5, textColor=ACCENT_RED, alignment=2)
-    cell_badge_green = ParagraphStyle('BadgeGreen', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=ACCENT_GREEN, alignment=1)
-    cell_badge_yellow = ParagraphStyle('BadgeYellow', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=ACCENT_GOLD, alignment=1)
-    cell_badge_red = ParagraphStyle('BadgeRed', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=7, leading=9, textColor=ACCENT_RED, alignment=1)
+    title_main = ParagraphStyle(
+        "TitleMain", parent=styles["Heading1"], fontName="Helvetica-Bold", fontSize=21, leading=25, textColor=PRIMARY
+    )
+    title_sub = ParagraphStyle(
+        "TitleSub", parent=styles["Normal"], fontName="Helvetica", fontSize=10, leading=14, textColor=TEXT_MUTED
+    )
+    sec_num = ParagraphStyle(
+        "SecNum", parent=styles["Heading2"], fontName="Helvetica-Bold", fontSize=8, leading=10, textColor=ACCENT_BLUE
+    )
+    sec_title = ParagraphStyle(
+        "SecTitle",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=15,
+        textColor=PRIMARY,
+        spaceBefore=3,
+        spaceAfter=2,
+    )
+    sec_sub = ParagraphStyle(
+        "SecSub",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        textColor=TEXT_MUTED,
+        spaceAfter=6,
+    )
+
+    cell_hdr = ParagraphStyle(
+        "CellHdr",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.white,
+        alignment=1,
+    )
+    cell_hdr_l = ParagraphStyle(
+        "CellHdrL",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7.5,
+        leading=9.5,
+        textColor=colors.white,
+    )
+    cell_txt = ParagraphStyle(
+        "CellTxt", parent=styles["Normal"], fontName="Helvetica", fontSize=7.5, leading=9.5, textColor=TEXT_DARK
+    )
+    cell_txt_b = ParagraphStyle(
+        "CellTxtB", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=7.5, leading=9.5, textColor=TEXT_DARK
+    )
+    cell_txt_c = ParagraphStyle(
+        "CellTxtC",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7.5,
+        leading=9.5,
+        textColor=TEXT_DARK,
+        alignment=1,
+    )
+    cell_txt_r = ParagraphStyle(
+        "CellTxtR",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7.5,
+        leading=9.5,
+        textColor=TEXT_DARK,
+        alignment=2,
+    )
+    cell_green = ParagraphStyle(
+        "CellGreen",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7.5,
+        leading=9.5,
+        textColor=ACCENT_GREEN,
+        alignment=2,
+    )
+    cell_red = ParagraphStyle(
+        "CellRed",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7.5,
+        leading=9.5,
+        textColor=ACCENT_RED,
+        alignment=2,
+    )
+    cell_badge_green = ParagraphStyle(
+        "BadgeGreen",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=9,
+        textColor=ACCENT_GREEN,
+        alignment=1,
+    )
+    cell_badge_yellow = ParagraphStyle(
+        "BadgeYellow",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=9,
+        textColor=ACCENT_GOLD,
+        alignment=1,
+    )
+    cell_badge_red = ParagraphStyle(
+        "BadgeRed",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=7,
+        leading=9,
+        textColor=ACCENT_RED,
+        alignment=1,
+    )
 
     story = []
 
@@ -138,7 +239,9 @@ def generate_institutional_audit_dossier(
         story.append(HRFlowable(width="100%", thickness=0.8, color=BORDER_COLOR, spaceAfter=6))
 
     # Helper KPI Card Table
-    def make_kpi_table(items, col_widths=[130, 137, 130, 138]):
+    def make_kpi_table(items, col_widths=None):
+        if col_widths is None:
+            col_widths = [130, 137, 130, 138]
         formatted = []
         for row in items:
             formatted_row = []
@@ -155,14 +258,18 @@ def generate_institutional_audit_dossier(
                     val_p = Paragraph(str(val), cell_txt)
                 formatted_row.extend([lbl_p, val_p])
             formatted.append(formatted_row)
-        
+
         t = Table(formatted, colWidths=col_widths)
-        t.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
-            ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-            ('PADDING', (0,0), (-1,-1), 4),
-            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-        ]))
+        t.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), BG_LIGHT),
+                    ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                    ("PADDING", (0, 0), (-1, -1), 4),
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ]
+            )
+        )
         return t
 
     # Estrazione Dati di Sintesi
@@ -210,108 +317,208 @@ def generate_institutional_audit_dossier(
     # PAGINA 1: COPERTINA ISTITUZIONALE & INDICE AUDIT
     # ═════════════════════════════════════════════════════════════
     story.append(Spacer(1, 8))
-    cover_hdr_data = [[
-        Paragraph("<b>ARGUS RISK ANALYTICS PLATFORM</b>", ParagraphStyle('CoverHdrL', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, textColor=colors.white)),
-        Paragraph("INSTITUTIONAL TIER 1 • FIDUCIARY AUDIT", ParagraphStyle('CoverHdrR', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, textColor=ACCENT_GOLD, alignment=2))
-    ]]
+    cover_hdr_data = [
+        [
+            Paragraph(
+                "<b>ARGUS RISK ANALYTICS PLATFORM</b>",
+                ParagraphStyle(
+                    "CoverHdrL", parent=styles["Normal"], fontName="Helvetica-Bold", fontSize=10, textColor=colors.white
+                ),
+            ),
+            Paragraph(
+                "INSTITUTIONAL TIER 1 • FIDUCIARY AUDIT",
+                ParagraphStyle(
+                    "CoverHdrR",
+                    parent=styles["Normal"],
+                    fontName="Helvetica-Bold",
+                    fontSize=8.5,
+                    textColor=ACCENT_GOLD,
+                    alignment=2,
+                ),
+            ),
+        ]
+    ]
     t_cov_hdr = Table(cover_hdr_data, colWidths=[267, 268])
-    t_cov_hdr.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), PRIMARY),
-        ('PADDING', (0,0), (-1,-1), 7),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_cov_hdr.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), PRIMARY),
+                ("PADDING", (0, 0), (-1, -1), 7),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_cov_hdr)
     story.append(Spacer(1, 24))
 
     story.append(Paragraph("<b>PORTFOLIO DUE DILIGENCE &amp;<br/>QUANTITATIVE RISK AUDIT DOSSIER</b>", title_main))
     story.append(Spacer(1, 6))
-    story.append(Paragraph(f"Comprehensive Multi-Dimensional Risk Assessment, Factor Attribution, Stress Testing &amp; Tax Optimization for <b>{portfolio_name.upper()}</b>", title_sub))
+    story.append(
+        Paragraph(
+            f"Comprehensive Multi-Dimensional Risk Assessment, Factor Attribution, Stress Testing &amp; Tax Optimization for <b>{portfolio_name.upper()}</b>",
+            title_sub,
+        )
+    )
     story.append(Spacer(1, 16))
 
     # Box Metadati Portafoglio
     cov_meta_data = [
         [
-            Paragraph("Nome Mandato / Portafoglio", cell_txt_b), Paragraph(f"<b>{portfolio_name}</b>", cell_txt),
-            Paragraph("Data &amp; Ora di Audit", cell_txt_b), Paragraph(datetime.now().strftime('%d/%m/%Y — %H:%M:%S UTC+2'), cell_txt)
+            Paragraph("Nome Mandato / Portafoglio", cell_txt_b),
+            Paragraph(f"<b>{portfolio_name}</b>", cell_txt),
+            Paragraph("Data &amp; Ora di Audit", cell_txt_b),
+            Paragraph(datetime.now().strftime("%d/%m/%Y — %H:%M:%S UTC+2"), cell_txt),
         ],
         [
-            Paragraph("Valutazione NAV Totale", cell_txt_b), Paragraph(f"<b>€ {port_val:,.2f}</b>", cell_green if tot_pnl >= 0 else cell_red),
-            Paragraph("Benchmark di Riferimento", cell_txt_b), Paragraph(f"<b>{bm_ticker} (Total Return)</b>", cell_txt)
+            Paragraph("Valutazione NAV Totale", cell_txt_b),
+            Paragraph(f"<b>€ {port_val:,.2f}</b>", cell_green if tot_pnl >= 0 else cell_red),
+            Paragraph("Benchmark di Riferimento", cell_txt_b),
+            Paragraph(f"<b>{bm_ticker} (Total Return)</b>", cell_txt),
         ],
         [
-            Paragraph("Tasso Risk-Free (Rf)", cell_txt_b), Paragraph("3.00% p.a. (ECB / Fed Blend)", cell_txt),
-            Paragraph("Numero Posizioni Attive", cell_txt_b), Paragraph(f"<b>{len(active_pos)} Asset Aperti</b> ({len(pos)} a registro)", cell_txt)
+            Paragraph("Tasso Risk-Free (Rf)", cell_txt_b),
+            Paragraph("3.00% p.a. (ECB / Fed Blend)", cell_txt),
+            Paragraph("Numero Posizioni Attive", cell_txt_b),
+            Paragraph(f"<b>{len(active_pos)} Asset Aperti</b> ({len(pos)} a registro)", cell_txt),
         ],
         [
-            Paragraph("Regime Fiscale Applicato", cell_txt_b), Paragraph("TUIR Art. 67 (Italia 26%)", cell_txt),
-            Paragraph("Comitato di Valutazione", cell_txt_b), Paragraph(str(author), cell_txt)
+            Paragraph("Regime Fiscale Applicato", cell_txt_b),
+            Paragraph("TUIR Art. 67 (Italia 26%)", cell_txt),
+            Paragraph("Comitato di Valutazione", cell_txt_b),
+            Paragraph(str(author), cell_txt),
         ],
     ]
     t_cov_meta = Table(cov_meta_data, colWidths=[130, 137, 130, 138])
-    t_cov_meta.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 5),
-    ]))
+    t_cov_meta.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), BG_LIGHT),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(t_cov_meta)
     story.append(Spacer(1, 14))
 
     # Certificazioni Istituzionali Badge
     cert_data = [
         [
-            Paragraph("<b>VALIDAZIONE MODELLI</b><br/><font color='#059669'>[PASSED] No Singularities</font>", cell_txt_c),
+            Paragraph(
+                "<b>VALIDAZIONE MODELLI</b><br/><font color='#059669'>[PASSED] No Singularities</font>", cell_txt_c
+            ),
             Paragraph("<b>SEMAFORO DI BASELEA</b><br/><font color='#059669'>[GREEN ZONE] Kupiec LR</font>", cell_txt_c),
             Paragraph("<b>COMPLIANCE IPS</b><br/><font color='#059669'>[100% IN-BOUNDS] Mandate</font>", cell_txt_c),
             Paragraph("<b>FIDUCIARY SCORE</b><br/><font color='#2563EB'><b>94 / 100 (Tier 1)</b></font>", cell_txt_c),
         ]
     ]
     t_cert = Table(cert_data, colWidths=[133, 134, 134, 134])
-    t_cert.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), BG_MUTED),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 5.5),
-    ]))
+    t_cert.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), BG_MUTED),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 5.5),
+            ]
+        )
+    )
     story.append(t_cert)
     story.append(Spacer(1, 18))
 
     # Sommario Indice dei Capitoli
     story.append(Paragraph("<b>INDICE GENERALE DEL DOSSIER DI AUDIT</b>", sec_title))
     story.append(HRFlowable(width="100%", thickness=0.8, color=BORDER_COLOR, spaceAfter=6))
-    
+
     toc_data = [
-        [Paragraph("<b>Capitolo 1</b> — Executive Summary &amp; Matrice KPI di Performance e Rischio", cell_txt), Paragraph("Pagina 2", cell_txt_r)],
-        [Paragraph("<b>Capitolo 2</b> — Diagnostica Avanzata del Rischio, Matrice VaR &amp; Stress Testing Macro", cell_txt), Paragraph("Pagina 3", cell_txt_r)],
-        [Paragraph("<b>Capitolo 3</b> — Decomposizione Fattoriale Fama-French 5F &amp; Brinson Attribution", cell_txt), Paragraph("Pagina 4", cell_txt_r)],
-        [Paragraph("<b>Capitolo 4</b> — Asset Allocation, Esposizione Geografica &amp; Concentrazione HHI", cell_txt), Paragraph("Pagina 5", cell_txt_r)],
-        [Paragraph("<b>Capitolo 5</b> — Registro Analitico Completo delle Posizioni &amp; Lotti FIFO", cell_txt), Paragraph("Pagina 6", cell_txt_r)],
-        [Paragraph("<b>Capitolo 6</b> — Proiezione Flussi di Cassa, Cedole &amp; Dividendi a 12 Mesi", cell_txt), Paragraph("Pagina 7", cell_txt_r)],
-        [Paragraph("<b>Capitolo 7</b> — Audit Fiscale, Zainetto Minusvalenze &amp; Simulazione Riforma 2026", cell_txt), Paragraph("Pagina 8", cell_txt_r)],
-        [Paragraph("<b>Capitolo 8</b> — Derivati, Superficie di Volatilità SABR &amp; Strategie di Hedging", cell_txt), Paragraph("Pagina 9", cell_txt_r)],
-        [Paragraph("<b>Capitolo 9</b> — Conclusioni del Risk Committee, IPS Compliance &amp; Distinta Ordini", cell_txt), Paragraph("Pagina 10", cell_txt_r)],
+        [
+            Paragraph("<b>Capitolo 1</b> — Executive Summary &amp; Matrice KPI di Performance e Rischio", cell_txt),
+            Paragraph("Pagina 2", cell_txt_r),
+        ],
+        [
+            Paragraph(
+                "<b>Capitolo 2</b> — Diagnostica Avanzata del Rischio, Matrice VaR &amp; Stress Testing Macro", cell_txt
+            ),
+            Paragraph("Pagina 3", cell_txt_r),
+        ],
+        [
+            Paragraph(
+                "<b>Capitolo 3</b> — Decomposizione Fattoriale Fama-French 5F &amp; Brinson Attribution", cell_txt
+            ),
+            Paragraph("Pagina 4", cell_txt_r),
+        ],
+        [
+            Paragraph(
+                "<b>Capitolo 4</b> — Asset Allocation, Esposizione Geografica &amp; Concentrazione HHI", cell_txt
+            ),
+            Paragraph("Pagina 5", cell_txt_r),
+        ],
+        [
+            Paragraph("<b>Capitolo 5</b> — Registro Analitico Completo delle Posizioni &amp; Lotti FIFO", cell_txt),
+            Paragraph("Pagina 6", cell_txt_r),
+        ],
+        [
+            Paragraph("<b>Capitolo 6</b> — Proiezione Flussi di Cassa, Cedole &amp; Dividendi a 12 Mesi", cell_txt),
+            Paragraph("Pagina 7", cell_txt_r),
+        ],
+        [
+            Paragraph(
+                "<b>Capitolo 7</b> — Audit Fiscale, Zainetto Minusvalenze &amp; Simulazione Riforma 2026", cell_txt
+            ),
+            Paragraph("Pagina 8", cell_txt_r),
+        ],
+        [
+            Paragraph(
+                "<b>Capitolo 8</b> — Derivati, Superficie di Volatilità SABR &amp; Strategie di Hedging", cell_txt
+            ),
+            Paragraph("Pagina 9", cell_txt_r),
+        ],
+        [
+            Paragraph(
+                "<b>Capitolo 9</b> — Conclusioni del Risk Committee, IPS Compliance &amp; Distinta Ordini", cell_txt
+            ),
+            Paragraph("Pagina 10", cell_txt_r),
+        ],
     ]
     t_toc = Table(toc_data, colWidths=[445, 90])
-    t_toc.setStyle(TableStyle([
-        ('GRID', (0,0), (-1,-1), 0.3, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('BACKGROUND', (0,0), (-1,-1), colors.white),
-    ]))
+    t_toc.setStyle(
+        TableStyle(
+            [
+                ("GRID", (0, 0), (-1, -1), 0.3, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ]
+        )
+    )
     story.append(t_toc)
     story.append(Spacer(1, 18))
 
     # Box Firme Fiduciarie
     sign_data = [
         [
-            Paragraph("<b>Lead Quantitative Strategist</b><br/><br/>_______________________________<br/>ARGUS Analytics Engine", cell_txt_c),
-            Paragraph("<b>Chief Risk Officer (CRO)</b><br/><br/>_______________________________<br/>Institutional Risk Committee", cell_txt_c),
-            Paragraph("<b>Head of Compliance &amp; Tax</b><br/><br/>_______________________________<br/>Fiduciary Oversight Division", cell_txt_c),
+            Paragraph(
+                "<b>Lead Quantitative Strategist</b><br/><br/>_______________________________<br/>ARGUS Analytics Engine",
+                cell_txt_c,
+            ),
+            Paragraph(
+                "<b>Chief Risk Officer (CRO)</b><br/><br/>_______________________________<br/>Institutional Risk Committee",
+                cell_txt_c,
+            ),
+            Paragraph(
+                "<b>Head of Compliance &amp; Tax</b><br/><br/>_______________________________<br/>Fiduciary Oversight Division",
+                cell_txt_c,
+            ),
         ]
     ]
     t_sign = Table(sign_data, colWidths=[178, 179, 178])
-    t_sign.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
-        ('BOX', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 7),
-    ]))
+    t_sign.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), BG_LIGHT),
+                ("BOX", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
     story.append(t_sign)
 
     story.append(PageBreak())
@@ -322,23 +529,55 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 01",
         "Executive Summary &amp; Matrice di Performance e Rischio",
-        "Sintesi esecutiva delle metriche di rendimento composto, profilo di volatilità, efficienza risk-adjusted e spread attivo vs Benchmark."
+        "Sintesi esecutiva delle metriche di rendimento composto, profilo di volatilità, efficienza risk-adjusted e spread attivo vs Benchmark.",
     )
 
-    alpha_ann = float(mk.get('alpha_annual_pct', 0.0))
-    omega_val = float(ret.get('omega_ratio', 1.45))
+    alpha_ann = float(mk.get("alpha_annual_pct", 0.0))
+    omega_val = float(ret.get("omega_ratio", 1.45))
     if omega_val <= 0:
         omega_val = 1.45
 
     kpi_rows_p2 = [
-        [("Valore NAV Totale", f"€ {port_val:,.2f}", "bold"), ("Capitale Netto Investito", f"€ {cost_basis:,.2f}", "normal")],
-        [("PnL Totale Non Realizzato", f"€ {tot_pnl:,.2f} ({(tot_pnl/cost_basis*100) if cost_basis > 0 else 0:+.2f}%)", "green" if tot_pnl >= 0 else "red"), ("CAGR Annuo Composto", f"{cagr:+.2f}%", "bold")],
-        [("Volatilità Annualizzata", f"{vol_ann:.2f}%", "normal"), ("Indice di Sharpe (Rf=3%)", f"{sharpe:.2f}", "bold")],
-        [("Indice di Sortino (Downside)", f"{sortino:.2f}", "bold"), ("Calmar Ratio (CAGR/MaxDD)", f"{ret.get('calmar_ratio', 0.85):.2f}", "normal")],
-        [("Omega Ratio (Th=0%)", f"{omega_val:.2f}", "normal"), ("Max Drawdown Storico", f"{max_dd:.2f}% (€ {mk.get('max_drawdown_eur', port_val * abs(max_dd)/100.0):,.2f})", "red")],
-        [("Beta di Mercato", f"{beta:.2f}", "normal"), ("Tracking Error Annualizzato", f"{mk.get('tracking_error_pct', 12.87):.2f}%", "normal")],
-        [("Alpha di Jensen Annuo", f"{alpha_ann:+.2f}%", "green" if alpha_ann >= 0 else "red"), ("Information Ratio", f"{mk.get('information_ratio', 0.65):.2f}", "normal")],
-        [("Indice Concentrazione HHI", f"{hhi:.4f}", "normal"), ("Numero Effettivo di Scommesse (N_eff)", f"{n_eff:.1f} Asset", "bold")],
+        [
+            ("Valore NAV Totale", f"€ {port_val:,.2f}", "bold"),
+            ("Capitale Netto Investito", f"€ {cost_basis:,.2f}", "normal"),
+        ],
+        [
+            (
+                "PnL Totale Non Realizzato",
+                f"€ {tot_pnl:,.2f} ({(tot_pnl / cost_basis * 100) if cost_basis > 0 else 0:+.2f}%)",
+                "green" if tot_pnl >= 0 else "red",
+            ),
+            ("CAGR Annuo Composto", f"{cagr:+.2f}%", "bold"),
+        ],
+        [
+            ("Volatilità Annualizzata", f"{vol_ann:.2f}%", "normal"),
+            ("Indice di Sharpe (Rf=3%)", f"{sharpe:.2f}", "bold"),
+        ],
+        [
+            ("Indice di Sortino (Downside)", f"{sortino:.2f}", "bold"),
+            ("Calmar Ratio (CAGR/MaxDD)", f"{ret.get('calmar_ratio', 0.85):.2f}", "normal"),
+        ],
+        [
+            ("Omega Ratio (Th=0%)", f"{omega_val:.2f}", "normal"),
+            (
+                "Max Drawdown Storico",
+                f"{max_dd:.2f}% (€ {mk.get('max_drawdown_eur', port_val * abs(max_dd) / 100.0):,.2f})",
+                "red",
+            ),
+        ],
+        [
+            ("Beta di Mercato", f"{beta:.2f}", "normal"),
+            ("Tracking Error Annualizzato", f"{mk.get('tracking_error_pct', 12.87):.2f}%", "normal"),
+        ],
+        [
+            ("Alpha di Jensen Annuo", f"{alpha_ann:+.2f}%", "green" if alpha_ann >= 0 else "red"),
+            ("Information Ratio", f"{mk.get('information_ratio', 0.65):.2f}", "normal"),
+        ],
+        [
+            ("Indice Concentrazione HHI", f"{hhi:.4f}", "normal"),
+            ("Numero Effettivo di Scommesse (N_eff)", f"{n_eff:.1f} Asset", "bold"),
+        ],
     ]
     story.append(make_kpi_table(kpi_rows_p2))
     story.append(Spacer(1, 12))
@@ -346,25 +585,71 @@ def generate_institutional_audit_dossier(
     # Rendimenti Multi-Periodo
     story.append(Paragraph("<b>Rendimenti Cumulati &amp; Annualizzati per Orizzonte Temporale</b>", sec_title))
     story.append(Spacer(1, 3))
-    
+
     tot_ret_pct = (tot_pnl / cost_basis * 100) if cost_basis > 0 else cagr
     periods_data = [
-        [Paragraph("Orizzonte", cell_hdr_l), Paragraph("Portafoglio (%)", cell_hdr), Paragraph(f"Benchmark {bm_ticker} (%)", cell_hdr), Paragraph("Alpha Attivo (%)", cell_hdr), Paragraph("Stato", cell_hdr)],
-        [Paragraph("1 Mese (1M)", cell_txt_b), Paragraph("+2.15%", cell_txt_r), Paragraph("+1.40%", cell_txt_r), Paragraph("+0.75%", cell_green), Paragraph("[+] Outperform", cell_badge_green)],
-        [Paragraph("3 Mesi (3M)", cell_txt_b), Paragraph("+5.80%", cell_txt_r), Paragraph("+4.20%", cell_txt_r), Paragraph("+1.60%", cell_green), Paragraph("[+] Outperform", cell_badge_green)],
-        [Paragraph("6 Mesi (6M)", cell_txt_b), Paragraph("+9.40%", cell_txt_r), Paragraph("+8.10%", cell_txt_r), Paragraph("+1.30%", cell_green), Paragraph("[+] Outperform", cell_badge_green)],
-        [Paragraph("Year-to-Date (YTD)", cell_txt_b), Paragraph(f"{ret.get('ytd_return_pct', cagr*0.7):+.2f}%", cell_txt_r), Paragraph(f"{cagr*0.6:+.2f}%", cell_txt_r), Paragraph(f"{cagr*0.1:+.2f}%", cell_green), Paragraph("[+] Outperform", cell_badge_green)],
-        [Paragraph("1 Anno (1Y)", cell_txt_b), Paragraph(f"{cagr:+.2f}%", cell_txt_r), Paragraph(f"{cagr - 2.5:+.2f}%", cell_txt_r), Paragraph("+2.50%", cell_green), Paragraph("[+] Outperform", cell_badge_green)],
-        [Paragraph("Dall'Inception", cell_txt_b), Paragraph(f"{tot_ret_pct:+.2f}%", cell_txt_r), Paragraph(f"{tot_ret_pct*0.85:+.2f}%", cell_txt_r), Paragraph(f"{tot_ret_pct*0.15:+.2f}%", cell_green), Paragraph("[+] Outperform", cell_badge_green)],
+        [
+            Paragraph("Orizzonte", cell_hdr_l),
+            Paragraph("Portafoglio (%)", cell_hdr),
+            Paragraph(f"Benchmark {bm_ticker} (%)", cell_hdr),
+            Paragraph("Alpha Attivo (%)", cell_hdr),
+            Paragraph("Stato", cell_hdr),
+        ],
+        [
+            Paragraph("1 Mese (1M)", cell_txt_b),
+            Paragraph("+2.15%", cell_txt_r),
+            Paragraph("+1.40%", cell_txt_r),
+            Paragraph("+0.75%", cell_green),
+            Paragraph("[+] Outperform", cell_badge_green),
+        ],
+        [
+            Paragraph("3 Mesi (3M)", cell_txt_b),
+            Paragraph("+5.80%", cell_txt_r),
+            Paragraph("+4.20%", cell_txt_r),
+            Paragraph("+1.60%", cell_green),
+            Paragraph("[+] Outperform", cell_badge_green),
+        ],
+        [
+            Paragraph("6 Mesi (6M)", cell_txt_b),
+            Paragraph("+9.40%", cell_txt_r),
+            Paragraph("+8.10%", cell_txt_r),
+            Paragraph("+1.30%", cell_green),
+            Paragraph("[+] Outperform", cell_badge_green),
+        ],
+        [
+            Paragraph("Year-to-Date (YTD)", cell_txt_b),
+            Paragraph(f"{ret.get('ytd_return_pct', cagr * 0.7):+.2f}%", cell_txt_r),
+            Paragraph(f"{cagr * 0.6:+.2f}%", cell_txt_r),
+            Paragraph(f"{cagr * 0.1:+.2f}%", cell_green),
+            Paragraph("[+] Outperform", cell_badge_green),
+        ],
+        [
+            Paragraph("1 Anno (1Y)", cell_txt_b),
+            Paragraph(f"{cagr:+.2f}%", cell_txt_r),
+            Paragraph(f"{cagr - 2.5:+.2f}%", cell_txt_r),
+            Paragraph("+2.50%", cell_green),
+            Paragraph("[+] Outperform", cell_badge_green),
+        ],
+        [
+            Paragraph("Dall'Inception", cell_txt_b),
+            Paragraph(f"{tot_ret_pct:+.2f}%", cell_txt_r),
+            Paragraph(f"{tot_ret_pct * 0.85:+.2f}%", cell_txt_r),
+            Paragraph(f"{tot_ret_pct * 0.15:+.2f}%", cell_green),
+            Paragraph("[+] Outperform", cell_badge_green),
+        ],
     ]
     t_per = Table(periods_data, colWidths=[115, 105, 105, 105, 105])
-    t_per.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_per.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_per)
     story.append(Spacer(1, 12))
 
@@ -377,11 +662,15 @@ def generate_institutional_audit_dossier(
     Il Beta verso il benchmark di riferimento ({bm_ticker}) si attesta a <b>{beta:.2f}</b>, denotando un'esposizione bilanciata da una solida diversificazione interna (HHI: {hhi:.4f}, {n_eff:.1f} scommesse effettive).
     """
     t_com = Table([[Paragraph(com_text.strip(), cell_txt)]], colWidths=[535])
-    t_com.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), BG_MUTED),
-        ('BOX', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 7),
-    ]))
+    t_com.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), BG_MUTED),
+                ("BOX", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
     story.append(t_com)
 
     story.append(PageBreak())
@@ -392,63 +681,153 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 02",
         "Diagnostica del Rischio, Matrice VaR &amp; Stress Testing Macro",
-        "Modellazione quantitativa delle perdite estreme di coda (VaR / CVaR a 95% e 99%), backtesting di Basilea e simulazione di shock storici MSCI Barra."
+        "Modellazione quantitativa delle perdite estreme di coda (VaR / CVaR a 95% e 99%), backtesting di Basilea e simulazione di shock storici MSCI Barra.",
     )
 
-    story.append(Paragraph("<b>Matrice Comparativa Modelli Value at Risk (VaR) &amp; Expected Shortfall (CVaR)</b>", sec_title))
+    story.append(
+        Paragraph("<b>Matrice Comparativa Modelli Value at Risk (VaR) &amp; Expected Shortfall (CVaR)</b>", sec_title)
+    )
     story.append(Spacer(1, 3))
 
-    var95_p = mk.get('var_95_pct', (var95_eur / port_val * 100) if port_val > 0 else 1.65)
-    var99_p = mk.get('var_99_pct', (var99_eur / port_val * 100) if port_val > 0 else 2.45)
+    var95_p = mk.get("var_95_pct", (var95_eur / port_val * 100) if port_val > 0 else 1.65)
+    var99_p = mk.get("var_99_pct", (var99_eur / port_val * 100) if port_val > 0 else 2.45)
 
     var_matrix_data = [
-        [Paragraph("Modello Quantitativo", cell_hdr_l), Paragraph("Orizzonte", cell_hdr), Paragraph("VaR 95% (€)", cell_hdr), Paragraph("VaR 95% (%)", cell_hdr), Paragraph("VaR 99% (€)", cell_hdr), Paragraph("CVaR 95% (€)", cell_hdr)],
-        [Paragraph("1. VaR Parametrico Normale (Gaussian)", cell_txt_b), Paragraph("1 Giorno", cell_txt_c), Paragraph(f"€ {var95_eur:,.2f}", cell_txt_r), Paragraph(f"{var95_p:.2f}%", cell_txt_r), Paragraph(f"€ {var99_eur:,.2f}", cell_txt_r), Paragraph(f"€ {cvar95_eur:,.2f}", cell_txt_r)],
-        [Paragraph("2. VaR Storico Non-Parametrico (Empirical)", cell_txt_b), Paragraph("1 Giorno", cell_txt_c), Paragraph(f"€ {var95_eur*1.04:,.2f}", cell_txt_r), Paragraph(f"{var95_p*1.04:.2f}%", cell_txt_r), Paragraph(f"€ {var99_eur*1.08:,.2f}", cell_txt_r), Paragraph(f"€ {cvar95_eur*1.06:,.2f}", cell_txt_r)],
-        [Paragraph("3. Cornish-Fisher (Skewness &amp; Kurtosis)", cell_txt_b), Paragraph("1 Giorno", cell_txt_c), Paragraph(f"€ {var95_eur*1.08:,.2f}", cell_txt_r), Paragraph(f"{var95_p*1.08:.2f}%", cell_txt_r), Paragraph(f"€ {var99_eur*1.15:,.2f}", cell_txt_r), Paragraph(f"€ {cvar95_eur*1.12:,.2f}", cell_txt_r)],
-        [Paragraph("4. GARCH(1,1) Filtered Hist. Sim. (FHS)", cell_txt_b), Paragraph("1 Giorno", cell_txt_c), Paragraph(f"€ {var95_eur*1.06:,.2f}", cell_txt_r), Paragraph(f"{var95_p*1.06:.2f}%", cell_txt_r), Paragraph(f"€ {var99_eur*1.12:,.2f}", cell_txt_r), Paragraph(f"€ {cvar95_eur*1.09:,.2f}", cell_txt_r)],
-        [Paragraph("5. Extreme Value Theory (EVT / GPD)", cell_txt_b), Paragraph("1 Giorno", cell_txt_c), Paragraph(f"€ {var95_eur*1.12:,.2f}", cell_txt_r), Paragraph(f"{var95_p*1.12:.2f}%", cell_txt_r), Paragraph(f"€ {var99_eur*1.22:,.2f}", cell_txt_r), Paragraph(f"€ {cvar95_eur*1.18:,.2f}", cell_txt_r)],
-        [Paragraph("6. VaR Parametrico Multi-Day (Basel III)", cell_txt_b), Paragraph("10 Giorni", cell_txt_c), Paragraph(f"€ {var95_eur*np.sqrt(10):,.2f}", cell_txt_r), Paragraph(f"{var95_p*np.sqrt(10):.2f}%", cell_txt_r), Paragraph(f"€ {var99_eur*np.sqrt(10):,.2f}", cell_txt_r), Paragraph(f"€ {cvar95_eur*np.sqrt(10):,.2f}", cell_txt_r)],
+        [
+            Paragraph("Modello Quantitativo", cell_hdr_l),
+            Paragraph("Orizzonte", cell_hdr),
+            Paragraph("VaR 95% (€)", cell_hdr),
+            Paragraph("VaR 95% (%)", cell_hdr),
+            Paragraph("VaR 99% (€)", cell_hdr),
+            Paragraph("CVaR 95% (€)", cell_hdr),
+        ],
+        [
+            Paragraph("1. VaR Parametrico Normale (Gaussian)", cell_txt_b),
+            Paragraph("1 Giorno", cell_txt_c),
+            Paragraph(f"€ {var95_eur:,.2f}", cell_txt_r),
+            Paragraph(f"{var95_p:.2f}%", cell_txt_r),
+            Paragraph(f"€ {var99_eur:,.2f}", cell_txt_r),
+            Paragraph(f"€ {cvar95_eur:,.2f}", cell_txt_r),
+        ],
+        [
+            Paragraph("2. VaR Storico Non-Parametrico (Empirical)", cell_txt_b),
+            Paragraph("1 Giorno", cell_txt_c),
+            Paragraph(f"€ {var95_eur * 1.04:,.2f}", cell_txt_r),
+            Paragraph(f"{var95_p * 1.04:.2f}%", cell_txt_r),
+            Paragraph(f"€ {var99_eur * 1.08:,.2f}", cell_txt_r),
+            Paragraph(f"€ {cvar95_eur * 1.06:,.2f}", cell_txt_r),
+        ],
+        [
+            Paragraph("3. Cornish-Fisher (Skewness &amp; Kurtosis)", cell_txt_b),
+            Paragraph("1 Giorno", cell_txt_c),
+            Paragraph(f"€ {var95_eur * 1.08:,.2f}", cell_txt_r),
+            Paragraph(f"{var95_p * 1.08:.2f}%", cell_txt_r),
+            Paragraph(f"€ {var99_eur * 1.15:,.2f}", cell_txt_r),
+            Paragraph(f"€ {cvar95_eur * 1.12:,.2f}", cell_txt_r),
+        ],
+        [
+            Paragraph("4. GARCH(1,1) Filtered Hist. Sim. (FHS)", cell_txt_b),
+            Paragraph("1 Giorno", cell_txt_c),
+            Paragraph(f"€ {var95_eur * 1.06:,.2f}", cell_txt_r),
+            Paragraph(f"{var95_p * 1.06:.2f}%", cell_txt_r),
+            Paragraph(f"€ {var99_eur * 1.12:,.2f}", cell_txt_r),
+            Paragraph(f"€ {cvar95_eur * 1.09:,.2f}", cell_txt_r),
+        ],
+        [
+            Paragraph("5. Extreme Value Theory (EVT / GPD)", cell_txt_b),
+            Paragraph("1 Giorno", cell_txt_c),
+            Paragraph(f"€ {var95_eur * 1.12:,.2f}", cell_txt_r),
+            Paragraph(f"{var95_p * 1.12:.2f}%", cell_txt_r),
+            Paragraph(f"€ {var99_eur * 1.22:,.2f}", cell_txt_r),
+            Paragraph(f"€ {cvar95_eur * 1.18:,.2f}", cell_txt_r),
+        ],
+        [
+            Paragraph("6. VaR Parametrico Multi-Day (Basel III)", cell_txt_b),
+            Paragraph("10 Giorni", cell_txt_c),
+            Paragraph(f"€ {var95_eur * np.sqrt(10):,.2f}", cell_txt_r),
+            Paragraph(f"{var95_p * np.sqrt(10):.2f}%", cell_txt_r),
+            Paragraph(f"€ {var99_eur * np.sqrt(10):,.2f}", cell_txt_r),
+            Paragraph(f"€ {cvar95_eur * np.sqrt(10):,.2f}", cell_txt_r),
+        ],
     ]
     t_var = Table(var_matrix_data, colWidths=[165, 60, 75, 75, 80, 80])
-    t_var.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_var.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_var)
     story.append(Spacer(1, 10))
 
     # Backtesting Semaforo di Basilea
-    story.append(Paragraph("<b>Backtesting di Copertura VaR &amp; Test di Basilea (Kupiec &amp; Christoffersen)</b>", sec_title))
+    story.append(
+        Paragraph("<b>Backtesting di Copertura VaR &amp; Test di Basilea (Kupiec &amp; Christoffersen)</b>", sec_title)
+    )
     story.append(Spacer(1, 3))
-    
+
     basel_data = [
-        [Paragraph("Test Statistico", cell_hdr_l), Paragraph("Eccezioni / Breaches", cell_hdr), Paragraph("Attese Teoriche", cell_hdr), Paragraph("Likelihood Ratio (LR)", cell_hdr), Paragraph("p-Value", cell_hdr), Paragraph("Esito Basilea", cell_hdr)],
-        [Paragraph("Kupiec Proportion of Failures (POF)", cell_txt_b), Paragraph("4 giorni", cell_txt_c), Paragraph("5.0 giorni (1%)", cell_txt_c), Paragraph("0.245", cell_txt_c), Paragraph("0.621 (Accetta H0)", cell_green), Paragraph("[GREEN ZONE]", cell_badge_green)],
-        [Paragraph("Christoffersen Independence Test", cell_txt_b), Paragraph("0 cluster", cell_txt_c), Paragraph("Indipendenti", cell_txt_c), Paragraph("0.082", cell_txt_c), Paragraph("0.774 (No Cluster)", cell_green), Paragraph("[GREEN ZONE]", cell_badge_green)],
+        [
+            Paragraph("Test Statistico", cell_hdr_l),
+            Paragraph("Eccezioni / Breaches", cell_hdr),
+            Paragraph("Attese Teoriche", cell_hdr),
+            Paragraph("Likelihood Ratio (LR)", cell_hdr),
+            Paragraph("p-Value", cell_hdr),
+            Paragraph("Esito Basilea", cell_hdr),
+        ],
+        [
+            Paragraph("Kupiec Proportion of Failures (POF)", cell_txt_b),
+            Paragraph("4 giorni", cell_txt_c),
+            Paragraph("5.0 giorni (1%)", cell_txt_c),
+            Paragraph("0.245", cell_txt_c),
+            Paragraph("0.621 (Accetta H0)", cell_green),
+            Paragraph("[GREEN ZONE]", cell_badge_green),
+        ],
+        [
+            Paragraph("Christoffersen Independence Test", cell_txt_b),
+            Paragraph("0 cluster", cell_txt_c),
+            Paragraph("Indipendenti", cell_txt_c),
+            Paragraph("0.082", cell_txt_c),
+            Paragraph("0.774 (No Cluster)", cell_green),
+            Paragraph("[GREEN ZONE]", cell_badge_green),
+        ],
     ]
     t_basel = Table(basel_data, colWidths=[155, 75, 75, 75, 80, 75])
-    t_basel.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), SECONDARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_basel.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), SECONDARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_basel)
     story.append(Spacer(1, 10))
 
     # Stress Testing Matrice Scenari Storici
-    story.append(Paragraph("<b>Stress Testing: Resilienza a Scenari Macro Storici (MSCI Barra Multi-Factor)</b>", sec_title))
+    story.append(
+        Paragraph("<b>Stress Testing: Resilienza a Scenari Macro Storici (MSCI Barra Multi-Factor)</b>", sec_title)
+    )
     story.append(Spacer(1, 3))
 
     stress_table_data = [
-        [Paragraph("Scenario Storico di Crisi", cell_hdr_l), Paragraph("Shock Benchmark (%)", cell_hdr), Paragraph("Perdita Stimata (€)", cell_hdr), Paragraph("Perdita Stimata (%)", cell_hdr), Paragraph("Severità Rischio", cell_hdr)]
+        [
+            Paragraph("Scenario Storico di Crisi", cell_hdr_l),
+            Paragraph("Shock Benchmark (%)", cell_hdr),
+            Paragraph("Perdita Stimata (€)", cell_hdr),
+            Paragraph("Perdita Stimata (%)", cell_hdr),
+            Paragraph("Severità Rischio", cell_hdr),
+        ]
     ]
-    
+
     macro_defaults = {
         "Dot-Com Crash (Mar 2000 - Ott 2002)": -49.0,
         "Lehman Brothers (Sep-Nov 2008)": -48.0,
@@ -469,31 +848,47 @@ def generate_institutional_audit_dossier(
                 bm_shk = macro_defaults.get(s_name, -25.0)
 
             sev = "[CRITICA]" if abs(loss_pct) > 30 else ("[MODERATA]" if abs(loss_pct) > 15 else "[CONTENUTA]")
-            sev_badge = cell_badge_red if abs(loss_pct) > 30 else (cell_badge_yellow if abs(loss_pct) > 15 else cell_badge_green)
-            
-            stress_table_data.append([
-                Paragraph(str(s_name), cell_txt_b),
-                Paragraph(f"{bm_shk:+.1f}%", cell_txt_r),
-                Paragraph(f"€ {loss_eur:,.2f}", cell_red if loss_eur < 0 else cell_txt_r),
-                Paragraph(f"{loss_pct:+.2f}%", cell_red if loss_pct < 0 else cell_txt_r),
-                Paragraph(sev, sev_badge)
-            ])
+            sev_badge = (
+                cell_badge_red
+                if abs(loss_pct) > 30
+                else (cell_badge_yellow if abs(loss_pct) > 15 else cell_badge_green)
+            )
+
+            stress_table_data.append(
+                [
+                    Paragraph(str(s_name), cell_txt_b),
+                    Paragraph(f"{bm_shk:+.1f}%", cell_txt_r),
+                    Paragraph(f"€ {loss_eur:,.2f}", cell_red if loss_eur < 0 else cell_txt_r),
+                    Paragraph(f"{loss_pct:+.2f}%", cell_red if loss_pct < 0 else cell_txt_r),
+                    Paragraph(sev, sev_badge),
+                ]
+            )
     else:
         for sc_name, sc_shk in macro_defaults.items():
             l_eur = -port_val * abs(sc_shk) / 100.0 * beta
             l_pct = sc_shk * beta
-            stress_table_data.append([
-                Paragraph(sc_name, cell_txt_b), Paragraph(f"{sc_shk:+.1f}%", cell_txt_r), Paragraph(f"€ {l_eur:,.2f}", cell_red), Paragraph(f"{l_pct:+.2f}%", cell_red), Paragraph("[MODERATA]", cell_badge_yellow)
-            ])
+            stress_table_data.append(
+                [
+                    Paragraph(sc_name, cell_txt_b),
+                    Paragraph(f"{sc_shk:+.1f}%", cell_txt_r),
+                    Paragraph(f"€ {l_eur:,.2f}", cell_red),
+                    Paragraph(f"{l_pct:+.2f}%", cell_red),
+                    Paragraph("[MODERATA]", cell_badge_yellow),
+                ]
+            )
 
     t_str = Table(stress_table_data, colWidths=[185, 85, 95, 85, 85])
-    t_str.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_str.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_str)
 
     story.append(PageBreak())
@@ -504,30 +899,82 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 03",
         "Decomposizione Fattoriale Fama-French 5F &amp; Brinson Attribution",
-        "Isolamento dei driver sistematici di rendimento: premi al rischio fattoriali (Size, Value, Profitability, Investment, Momentum) e scomposizione settoriale Brinson-Fachler."
+        "Isolamento dei driver sistematici di rendimento: premi al rischio fattoriali (Size, Value, Profitability, Investment, Momentum) e scomposizione settoriale Brinson-Fachler.",
     )
 
     story.append(Paragraph("<b>Modello Multifattoriale Fama-French 5 Fattori + Carhart Momentum</b>", sec_title))
     story.append(Spacer(1, 3))
 
     ff_data = [
-        [Paragraph("Fattore di Rischio Sistematico", cell_hdr_l), Paragraph("Sensibilità (Beta)", cell_hdr), Paragraph("t-Statistic", cell_hdr), Paragraph("p-Value", cell_hdr), Paragraph("Interpretazione Fattoriale", cell_hdr_l)],
-        [Paragraph("Market Risk Premium (Mkt - Rf)", cell_txt_b), Paragraph(f"{beta:.2f}", cell_txt_c), Paragraph("14.82", cell_txt_c), Paragraph("< 0.001 ***", cell_green), Paragraph("Esposizione direzionale al mercato azionario globale", cell_txt)],
-        [Paragraph("Size Factor (SMB - Small Minus Big)", cell_txt_b), Paragraph("+0.14", cell_txt_c), Paragraph("2.15", cell_txt_c), Paragraph("0.032 **", cell_green), Paragraph("Tilt moderato verso titoli a media-grande capitalizzazione", cell_txt)],
-        [Paragraph("Value Factor (HML - High Minus Low B/M)", cell_txt_b), Paragraph("-0.22", cell_txt_c), Paragraph("-3.40", cell_txt_c), Paragraph("0.001 ***", cell_green), Paragraph("Esposizione a titoli Growth/Quality (B/M ratio contenuto)", cell_txt)],
-        [Paragraph("Profitability (RMW - Robust Minus Weak)", cell_txt_b), Paragraph("+0.28", cell_txt_c), Paragraph("4.12", cell_txt_c), Paragraph("< 0.001 ***", cell_green), Paragraph("Forte predilezione per società ad elevata redditività operativa", cell_txt)],
-        [Paragraph("Investment (CMA - Conservative Minus Aggressive)", cell_txt_b), Paragraph("+0.09", cell_txt_c), Paragraph("1.45", cell_txt_c), Paragraph("0.148 (n.s.)", cell_txt_c), Paragraph("Allocazione bilanciata tra investimenti espansivi e conservativi", cell_txt)],
-        [Paragraph("Momentum (WML - Winners Minus Losers)", cell_txt_b), Paragraph("+0.18", cell_txt_c), Paragraph("2.88", cell_txt_c), Paragraph("0.004 **", cell_green), Paragraph("Driver positivo dai titoli in trend relativo rialzista a 12M", cell_txt)],
-        [Paragraph("Alpha Puro Non Spiegato (Jensen's Alpha)", cell_txt_b), Paragraph(f"{alpha_ann:+.2f}% p.a.", cell_green), Paragraph("2.64", cell_txt_c), Paragraph("0.009 **", cell_green), Paragraph("Generazione di extra-rendimento attivo indipendente dai fattori", cell_txt)],
+        [
+            Paragraph("Fattore di Rischio Sistematico", cell_hdr_l),
+            Paragraph("Sensibilità (Beta)", cell_hdr),
+            Paragraph("t-Statistic", cell_hdr),
+            Paragraph("p-Value", cell_hdr),
+            Paragraph("Interpretazione Fattoriale", cell_hdr_l),
+        ],
+        [
+            Paragraph("Market Risk Premium (Mkt - Rf)", cell_txt_b),
+            Paragraph(f"{beta:.2f}", cell_txt_c),
+            Paragraph("14.82", cell_txt_c),
+            Paragraph("< 0.001 ***", cell_green),
+            Paragraph("Esposizione direzionale al mercato azionario globale", cell_txt),
+        ],
+        [
+            Paragraph("Size Factor (SMB - Small Minus Big)", cell_txt_b),
+            Paragraph("+0.14", cell_txt_c),
+            Paragraph("2.15", cell_txt_c),
+            Paragraph("0.032 **", cell_green),
+            Paragraph("Tilt moderato verso titoli a media-grande capitalizzazione", cell_txt),
+        ],
+        [
+            Paragraph("Value Factor (HML - High Minus Low B/M)", cell_txt_b),
+            Paragraph("-0.22", cell_txt_c),
+            Paragraph("-3.40", cell_txt_c),
+            Paragraph("0.001 ***", cell_green),
+            Paragraph("Esposizione a titoli Growth/Quality (B/M ratio contenuto)", cell_txt),
+        ],
+        [
+            Paragraph("Profitability (RMW - Robust Minus Weak)", cell_txt_b),
+            Paragraph("+0.28", cell_txt_c),
+            Paragraph("4.12", cell_txt_c),
+            Paragraph("< 0.001 ***", cell_green),
+            Paragraph("Forte predilezione per società ad elevata redditività operativa", cell_txt),
+        ],
+        [
+            Paragraph("Investment (CMA - Conservative Minus Aggressive)", cell_txt_b),
+            Paragraph("+0.09", cell_txt_c),
+            Paragraph("1.45", cell_txt_c),
+            Paragraph("0.148 (n.s.)", cell_txt_c),
+            Paragraph("Allocazione bilanciata tra investimenti espansivi e conservativi", cell_txt),
+        ],
+        [
+            Paragraph("Momentum (WML - Winners Minus Losers)", cell_txt_b),
+            Paragraph("+0.18", cell_txt_c),
+            Paragraph("2.88", cell_txt_c),
+            Paragraph("0.004 **", cell_green),
+            Paragraph("Driver positivo dai titoli in trend relativo rialzista a 12M", cell_txt),
+        ],
+        [
+            Paragraph("Alpha Puro Non Spiegato (Jensen's Alpha)", cell_txt_b),
+            Paragraph(f"{alpha_ann:+.2f}% p.a.", cell_green),
+            Paragraph("2.64", cell_txt_c),
+            Paragraph("0.009 **", cell_green),
+            Paragraph("Generazione di extra-rendimento attivo indipendente dai fattori", cell_txt),
+        ],
     ]
     t_ff = Table(ff_data, colWidths=[150, 70, 55, 65, 195])
-    t_ff.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_ff.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_ff)
     story.append(Spacer(1, 12))
 
@@ -536,24 +983,92 @@ def generate_institutional_audit_dossier(
     story.append(Spacer(1, 3))
 
     brinson_data = [
-        [Paragraph("Settore GICS", cell_hdr_l), Paragraph("Peso Port. (%)", cell_hdr), Paragraph("Peso BM (%)", cell_hdr), Paragraph("Allocazione (%)", cell_hdr), Paragraph("Selezione (%)", cell_hdr), Paragraph("Interazione (%)", cell_hdr), Paragraph("Contributo Tot. (%)", cell_hdr)],
-        [Paragraph("Information Technology", cell_txt_b), Paragraph("32.5%", cell_txt_r), Paragraph("28.0%", cell_txt_r), Paragraph("+0.42%", cell_green), Paragraph("+0.85%", cell_green), Paragraph("+0.06%", cell_green), Paragraph("+1.33%", cell_green)],
-        [Paragraph("Financials", cell_txt_b), Paragraph("14.8%", cell_txt_r), Paragraph("13.2%", cell_txt_r), Paragraph("+0.12%", cell_green), Paragraph("+0.34%", cell_green), Paragraph("+0.02%", cell_green), Paragraph("+0.48%", cell_green)],
-        [Paragraph("Healthcare", cell_txt_b), Paragraph("12.0%", cell_txt_r), Paragraph("12.5%", cell_txt_r), Paragraph("-0.04%", cell_red), Paragraph("+0.18%", cell_green), Paragraph("-0.01%", cell_red), Paragraph("+0.13%", cell_green)],
-        [Paragraph("Consumer Discretionary", cell_txt_b), Paragraph("11.5%", cell_txt_r), Paragraph("10.8%", cell_txt_r), Paragraph("+0.05%", cell_green), Paragraph("+0.22%", cell_green), Paragraph("+0.01%", cell_green), Paragraph("+0.28%", cell_green)],
-        [Paragraph("Industrials &amp; Utilities", cell_txt_b), Paragraph("15.2%", cell_txt_r), Paragraph("14.5%", cell_txt_r), Paragraph("+0.08%", cell_green), Paragraph("+0.15%", cell_green), Paragraph("+0.01%", cell_green), Paragraph("+0.24%", cell_green)],
-        [Paragraph("Liquidità / Altro", cell_txt_b), Paragraph("14.0%", cell_txt_r), Paragraph("21.0%", cell_txt_r), Paragraph("-0.15%", cell_red), Paragraph("0.00%", cell_txt_r), Paragraph("0.00%", cell_txt_r), Paragraph("-0.15%", cell_red)],
-        [Paragraph("<b>TOTALE ATTRIBUTION</b>", cell_txt_b), Paragraph("<b>100.0%</b>", cell_txt_r), Paragraph("<b>100.0%</b>", cell_txt_r), Paragraph("<b>+0.48%</b>", cell_green), Paragraph("<b>+1.74%</b>", cell_green), Paragraph("<b>+0.09%</b>", cell_green), Paragraph("<b>+2.31%</b>", cell_green)],
+        [
+            Paragraph("Settore GICS", cell_hdr_l),
+            Paragraph("Peso Port. (%)", cell_hdr),
+            Paragraph("Peso BM (%)", cell_hdr),
+            Paragraph("Allocazione (%)", cell_hdr),
+            Paragraph("Selezione (%)", cell_hdr),
+            Paragraph("Interazione (%)", cell_hdr),
+            Paragraph("Contributo Tot. (%)", cell_hdr),
+        ],
+        [
+            Paragraph("Information Technology", cell_txt_b),
+            Paragraph("32.5%", cell_txt_r),
+            Paragraph("28.0%", cell_txt_r),
+            Paragraph("+0.42%", cell_green),
+            Paragraph("+0.85%", cell_green),
+            Paragraph("+0.06%", cell_green),
+            Paragraph("+1.33%", cell_green),
+        ],
+        [
+            Paragraph("Financials", cell_txt_b),
+            Paragraph("14.8%", cell_txt_r),
+            Paragraph("13.2%", cell_txt_r),
+            Paragraph("+0.12%", cell_green),
+            Paragraph("+0.34%", cell_green),
+            Paragraph("+0.02%", cell_green),
+            Paragraph("+0.48%", cell_green),
+        ],
+        [
+            Paragraph("Healthcare", cell_txt_b),
+            Paragraph("12.0%", cell_txt_r),
+            Paragraph("12.5%", cell_txt_r),
+            Paragraph("-0.04%", cell_red),
+            Paragraph("+0.18%", cell_green),
+            Paragraph("-0.01%", cell_red),
+            Paragraph("+0.13%", cell_green),
+        ],
+        [
+            Paragraph("Consumer Discretionary", cell_txt_b),
+            Paragraph("11.5%", cell_txt_r),
+            Paragraph("10.8%", cell_txt_r),
+            Paragraph("+0.05%", cell_green),
+            Paragraph("+0.22%", cell_green),
+            Paragraph("+0.01%", cell_green),
+            Paragraph("+0.28%", cell_green),
+        ],
+        [
+            Paragraph("Industrials &amp; Utilities", cell_txt_b),
+            Paragraph("15.2%", cell_txt_r),
+            Paragraph("14.5%", cell_txt_r),
+            Paragraph("+0.08%", cell_green),
+            Paragraph("+0.15%", cell_green),
+            Paragraph("+0.01%", cell_green),
+            Paragraph("+0.24%", cell_green),
+        ],
+        [
+            Paragraph("Liquidità / Altro", cell_txt_b),
+            Paragraph("14.0%", cell_txt_r),
+            Paragraph("21.0%", cell_txt_r),
+            Paragraph("-0.15%", cell_red),
+            Paragraph("0.00%", cell_txt_r),
+            Paragraph("0.00%", cell_txt_r),
+            Paragraph("-0.15%", cell_red),
+        ],
+        [
+            Paragraph("<b>TOTALE ATTRIBUTION</b>", cell_txt_b),
+            Paragraph("<b>100.0%</b>", cell_txt_r),
+            Paragraph("<b>100.0%</b>", cell_txt_r),
+            Paragraph("<b>+0.48%</b>", cell_green),
+            Paragraph("<b>+1.74%</b>", cell_green),
+            Paragraph("<b>+0.09%</b>", cell_green),
+            Paragraph("<b>+2.31%</b>", cell_green),
+        ],
     ]
     t_brin = Table(brinson_data, colWidths=[125, 65, 65, 70, 70, 70, 70])
-    t_brin.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), SECONDARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-2), [colors.white, BG_LIGHT]),
-        ('BACKGROUND', (0,-1), (-1,-1), BG_MUTED),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_brin.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), SECONDARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, BG_LIGHT]),
+                ("BACKGROUND", (0, -1), (-1, -1), BG_MUTED),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_brin)
 
     story.append(PageBreak())
@@ -564,47 +1079,81 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 04",
         "Asset Allocation, Esposizione Geografica &amp; Concentrazione HHI",
-        "Ripartizione dinamica per asset class, tassonomia geografica/valutaria e diagnostica di concentrazione di portafoglio."
+        "Ripartizione dinamica per asset class, tassonomia geografica/valutaria e diagnostica di concentrazione di portafoglio.",
     )
 
     story.append(Paragraph("<b>Ripartizione Dinamica per Asset Class &amp; Target di Ribilanciamento</b>", sec_title))
     story.append(Spacer(1, 3))
 
     alloc_data = [
-        [Paragraph("Asset Class", cell_hdr_l), Paragraph("Controvalore (€)", cell_hdr), Paragraph("Peso Attuale (%)", cell_hdr), Paragraph("Peso Target IPS (%)", cell_hdr), Paragraph("Delta Ribilanciamento", cell_hdr), Paragraph("Status", cell_hdr)]
+        [
+            Paragraph("Asset Class", cell_hdr_l),
+            Paragraph("Controvalore (€)", cell_hdr),
+            Paragraph("Peso Attuale (%)", cell_hdr),
+            Paragraph("Peso Target IPS (%)", cell_hdr),
+            Paragraph("Delta Ribilanciamento", cell_hdr),
+            Paragraph("Status", cell_hdr),
+        ]
     ]
 
     if not active_pos.empty and "asset_class" in active_pos.columns:
         ac_grp = active_pos.groupby("asset_class")["current_value"].sum().sort_values(ascending=False)
         for ac_name, ac_val in ac_grp.items():
             ac_pct = (ac_val / port_val * 100.0) if port_val > 0 else 0.0
-            alloc_data.append([
-                Paragraph(str(ac_name).capitalize(), cell_txt_b),
-                Paragraph(f"€ {ac_val:,.2f}", cell_txt_r),
-                Paragraph(f"{ac_pct:.1f}%", cell_txt_r),
-                Paragraph(f"{max(5.0, round(ac_pct/5.0)*5.0):.1f}%", cell_txt_r),
-                Paragraph(f"{ac_pct - max(5.0, round(ac_pct/5.0)*5.0):+.1f}%", cell_txt_r),
-                Paragraph("[+] Conforme", cell_badge_green)
-            ])
+            alloc_data.append(
+                [
+                    Paragraph(str(ac_name).capitalize(), cell_txt_b),
+                    Paragraph(f"€ {ac_val:,.2f}", cell_txt_r),
+                    Paragraph(f"{ac_pct:.1f}%", cell_txt_r),
+                    Paragraph(f"{max(5.0, round(ac_pct / 5.0) * 5.0):.1f}%", cell_txt_r),
+                    Paragraph(f"{ac_pct - max(5.0, round(ac_pct / 5.0) * 5.0):+.1f}%", cell_txt_r),
+                    Paragraph("[+] Conforme", cell_badge_green),
+                ]
+            )
     else:
-        alloc_data.append([
-            Paragraph("Azionario Globale (Equities)", cell_txt_b), Paragraph(f"€ {port_val*0.65:,.2f}", cell_txt_r), Paragraph("65.0%", cell_txt_r), Paragraph("60.0%", cell_txt_r), Paragraph("+5.0%", cell_txt_r), Paragraph("[+] Conforme", cell_badge_green)
-        ])
-        alloc_data.append([
-            Paragraph("Obbligazionario (Fixed Income)", cell_txt_b), Paragraph(f"€ {port_val*0.20:,.2f}", cell_txt_r), Paragraph("20.0%", cell_txt_r), Paragraph("25.0%", cell_txt_r), Paragraph("-5.0%", cell_txt_r), Paragraph("[+] Conforme", cell_badge_green)
-        ])
-        alloc_data.append([
-            Paragraph("ETF &amp; Fondi", cell_txt_b), Paragraph(f"€ {port_val*0.15:,.2f}", cell_txt_r), Paragraph("15.0%", cell_txt_r), Paragraph("15.0%", cell_txt_r), Paragraph("0.0%", cell_txt_r), Paragraph("[+] Conforme", cell_badge_green)
-        ])
+        alloc_data.append(
+            [
+                Paragraph("Azionario Globale (Equities)", cell_txt_b),
+                Paragraph(f"€ {port_val * 0.65:,.2f}", cell_txt_r),
+                Paragraph("65.0%", cell_txt_r),
+                Paragraph("60.0%", cell_txt_r),
+                Paragraph("+5.0%", cell_txt_r),
+                Paragraph("[+] Conforme", cell_badge_green),
+            ]
+        )
+        alloc_data.append(
+            [
+                Paragraph("Obbligazionario (Fixed Income)", cell_txt_b),
+                Paragraph(f"€ {port_val * 0.20:,.2f}", cell_txt_r),
+                Paragraph("20.0%", cell_txt_r),
+                Paragraph("25.0%", cell_txt_r),
+                Paragraph("-5.0%", cell_txt_r),
+                Paragraph("[+] Conforme", cell_badge_green),
+            ]
+        )
+        alloc_data.append(
+            [
+                Paragraph("ETF &amp; Fondi", cell_txt_b),
+                Paragraph(f"€ {port_val * 0.15:,.2f}", cell_txt_r),
+                Paragraph("15.0%", cell_txt_r),
+                Paragraph("15.0%", cell_txt_r),
+                Paragraph("0.0%", cell_txt_r),
+                Paragraph("[+] Conforme", cell_badge_green),
+            ]
+        )
 
     t_alloc = Table(alloc_data, colWidths=[150, 85, 75, 75, 85, 65])
-    t_alloc.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_alloc.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_alloc)
     story.append(Spacer(1, 12))
 
@@ -613,49 +1162,104 @@ def generate_institutional_audit_dossier(
     story.append(Spacer(1, 3))
 
     geo_data = [
-        [Paragraph("Area Geografica / Paese", cell_hdr_l), Paragraph("Valuta Base", cell_hdr), Paragraph("Controvalore (€)", cell_hdr), Paragraph("Peso %", cell_hdr), Paragraph("Rischio Cambio FX", cell_hdr_l)]
+        [
+            Paragraph("Area Geografica / Paese", cell_hdr_l),
+            Paragraph("Valuta Base", cell_hdr),
+            Paragraph("Controvalore (€)", cell_hdr),
+            Paragraph("Peso %", cell_hdr),
+            Paragraph("Rischio Cambio FX", cell_hdr_l),
+        ]
     ]
 
     if not active_pos.empty and "country" in active_pos.columns:
         geo_grp = active_pos.groupby("country")["current_value"].sum().sort_values(ascending=False).head(5)
         for g_name, g_val in geo_grp.items():
             g_pct = (g_val / port_val * 100.0) if port_val > 0 else 0.0
-            fx_curr = "USD ($)" if str(g_name).upper() in ["USA", "US"] else ("EUR (€)" if str(g_name).upper() in ["ITALY", "GERMANY", "FRANCE", "EUROPE"] else "Global FX")
-            fx_desc = "Zero rischio cambio (Valuta domestica)" if fx_curr == "EUR (€)" else "Esposizione aperta / Hedging opzionale"
-            geo_data.append([
-                Paragraph(str(g_name), cell_txt_b),
-                Paragraph(fx_curr, cell_txt_c),
-                Paragraph(f"€ {g_val:,.2f}", cell_txt_r),
-                Paragraph(f"{g_pct:.1f}%", cell_txt_r),
-                Paragraph(fx_desc, cell_txt)
-            ])
+            fx_curr = (
+                "USD ($)"
+                if str(g_name).upper() in ["USA", "US"]
+                else ("EUR (€)" if str(g_name).upper() in ["ITALY", "GERMANY", "FRANCE", "EUROPE"] else "Global FX")
+            )
+            fx_desc = (
+                "Zero rischio cambio (Valuta domestica)"
+                if fx_curr == "EUR (€)"
+                else "Esposizione aperta / Hedging opzionale"
+            )
+            geo_data.append(
+                [
+                    Paragraph(str(g_name), cell_txt_b),
+                    Paragraph(fx_curr, cell_txt_c),
+                    Paragraph(f"€ {g_val:,.2f}", cell_txt_r),
+                    Paragraph(f"{g_pct:.1f}%", cell_txt_r),
+                    Paragraph(fx_desc, cell_txt),
+                ]
+            )
     else:
-        geo_data.append([Paragraph("Nord America (Stati Uniti)", cell_txt_b), Paragraph("USD ($)", cell_txt_c), Paragraph(f"€ {port_val*0.58:,.2f}", cell_txt_r), Paragraph("58.0%", cell_txt_r), Paragraph("Esposizione USD aperta", cell_txt)])
-        geo_data.append([Paragraph("Eurozona (Italia, Europa)", cell_txt_b), Paragraph("EUR (€)", cell_txt_c), Paragraph(f"€ {port_val*0.42:,.2f}", cell_txt_r), Paragraph("42.0%", cell_txt_r), Paragraph("Zero rischio cambio", cell_txt)])
+        geo_data.append(
+            [
+                Paragraph("Nord America (Stati Uniti)", cell_txt_b),
+                Paragraph("USD ($)", cell_txt_c),
+                Paragraph(f"€ {port_val * 0.58:,.2f}", cell_txt_r),
+                Paragraph("58.0%", cell_txt_r),
+                Paragraph("Esposizione USD aperta", cell_txt),
+            ]
+        )
+        geo_data.append(
+            [
+                Paragraph("Eurozona (Italia, Europa)", cell_txt_b),
+                Paragraph("EUR (€)", cell_txt_c),
+                Paragraph(f"€ {port_val * 0.42:,.2f}", cell_txt_r),
+                Paragraph("42.0%", cell_txt_r),
+                Paragraph("Zero rischio cambio", cell_txt),
+            ]
+        )
 
     t_geo = Table(geo_data, colWidths=[150, 65, 85, 55, 180])
-    t_geo.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), SECONDARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_geo.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), SECONDARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_geo)
     story.append(Spacer(1, 12))
 
     # Concentrazione HHI Box
     story.append(Paragraph("<b>Diagnostica di Concentrazione &amp; Diversificazione di Portafoglio</b>", sec_title))
     story.append(Spacer(1, 3))
-    
-    top1_w = float(active_pos["weight_pct"].max()) if not active_pos.empty and "weight_pct" in active_pos.columns else 15.0
-    top3_w = float(active_pos["weight_pct"].nlargest(3).sum()) if not active_pos.empty and "weight_pct" in active_pos.columns else 35.0
-    top5_w = float(active_pos["weight_pct"].nlargest(5).sum()) if not active_pos.empty and "weight_pct" in active_pos.columns else 55.0
+
+    top1_w = (
+        float(active_pos["weight_pct"].max()) if not active_pos.empty and "weight_pct" in active_pos.columns else 15.0
+    )
+    top3_w = (
+        float(active_pos["weight_pct"].nlargest(3).sum())
+        if not active_pos.empty and "weight_pct" in active_pos.columns
+        else 35.0
+    )
+    top5_w = (
+        float(active_pos["weight_pct"].nlargest(5).sum())
+        if not active_pos.empty and "weight_pct" in active_pos.columns
+        else 55.0
+    )
 
     conc_items = [
-        [("Indice Herfindahl-Hirschman (HHI)", f"{hhi:.4f} (Ben Diversificato)", "bold"), ("Numero Effettivo di Titoli (N_eff)", f"{n_eff:.1f} Asset Aperti", "normal")],
-        [("Peso Top 1 Holding", f"{top1_w:.2f}%", "normal"), ("Peso Cumulato Top 3 Holdings", f"{top3_w:.2f}%", "bold")],
-        [("Peso Cumulato Top 5 Holdings", f"{top5_w:.2f}%", "bold"), ("Diversification Ratio (Choueifaty)", "1.48 (Rischio Ridotto del 32%)", "green")],
+        [
+            ("Indice Herfindahl-Hirschman (HHI)", f"{hhi:.4f} (Ben Diversificato)", "bold"),
+            ("Numero Effettivo di Titoli (N_eff)", f"{n_eff:.1f} Asset Aperti", "normal"),
+        ],
+        [
+            ("Peso Top 1 Holding", f"{top1_w:.2f}%", "normal"),
+            ("Peso Cumulato Top 3 Holdings", f"{top3_w:.2f}%", "bold"),
+        ],
+        [
+            ("Peso Cumulato Top 5 Holdings", f"{top5_w:.2f}%", "bold"),
+            ("Diversification Ratio (Choueifaty)", "1.48 (Rischio Ridotto del 32%)", "green"),
+        ],
     ]
     story.append(make_kpi_table(conc_items))
 
@@ -667,16 +1271,32 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 05",
         "Registro Analitico Completo delle Posizioni &amp; Lotti FIFO",
-        "Inventario esaustivo degli strumenti attivi a mercato, prezzi di carico fiscale FIFO, plus/minusvalenze latenti e parametri di rischio individuale."
+        "Inventario esaustivo degli strumenti attivi a mercato, prezzi di carico fiscale FIFO, plus/minusvalenze latenti e parametri di rischio individuale.",
     )
 
     pos_table_rows = [
-        [Paragraph("Ticker", cell_hdr_l), Paragraph("Classe", cell_hdr), Paragraph("Quantità", cell_hdr), Paragraph("PMC FIFO (€)", cell_hdr), Paragraph("Prezzo (€)", cell_hdr), Paragraph("Controvalore (€)", cell_hdr), Paragraph("Peso %", cell_hdr), Paragraph("PnL Latente (€)", cell_hdr), Paragraph("Beta", cell_hdr)]
+        [
+            Paragraph("Ticker", cell_hdr_l),
+            Paragraph("Classe", cell_hdr),
+            Paragraph("Quantità", cell_hdr),
+            Paragraph("PMC FIFO (€)", cell_hdr),
+            Paragraph("Prezzo (€)", cell_hdr),
+            Paragraph("Controvalore (€)", cell_hdr),
+            Paragraph("Peso %", cell_hdr),
+            Paragraph("PnL Latente (€)", cell_hdr),
+            Paragraph("Beta", cell_hdr),
+        ]
     ]
 
     # Helper per Risoluzione Beta Empirico / Strutturale di Ciascun Asset
-    df_ret_matrix = results.get("returns") if isinstance(results.get("returns"), pd.DataFrame) else results.get("df_returns")
-    bm_ret_series = results.get("benchmark_return") if isinstance(results.get("benchmark_return"), pd.Series) else results.get("sr_benchmark")
+    df_ret_matrix = (
+        results.get("returns") if isinstance(results.get("returns"), pd.DataFrame) else results.get("df_returns")
+    )
+    bm_ret_series = (
+        results.get("benchmark_return")
+        if isinstance(results.get("benchmark_return"), pd.Series)
+        else results.get("sr_benchmark")
+    )
 
     def _resolve_ticker_beta(tk: str, r_dict: dict) -> float:
         # 1. Beta empirico già presente e diverso dal default 1.0 (tranne se ticker è SPY)
@@ -690,7 +1310,12 @@ def generate_institutional_audit_dossier(
                 pass
 
         # 2. Calcolo Covarianza empirica dinamica vs Benchmark
-        if df_ret_matrix is not None and tk in df_ret_matrix.columns and bm_ret_series is not None and not bm_ret_series.empty:
+        if (
+            df_ret_matrix is not None
+            and tk in df_ret_matrix.columns
+            and bm_ret_series is not None
+            and not bm_ret_series.empty
+        ):
             try:
                 s_asset = df_ret_matrix[tk].dropna()
                 s_bm = bm_ret_series.reindex(s_asset.index).dropna()
@@ -726,24 +1351,37 @@ def generate_institutional_audit_dossier(
         # 5. Baseline euristica accurata per classe di attivo e settore
         ac = str(r_dict.get("asset_class", "")).lower()
         tk_u = str(tk).upper()
-        if "crypto" in ac or any(c in tk.lower() for c in ["btc", "eth", "sol", "xrp", "ada", "fdusd", "sei", "bnb", "usdt"]):
-            if "btc" in tk.lower(): return 1.85
-            if "eth" in tk.lower(): return 1.95
-            if "sol" in tk.lower(): return 2.20
-            if "xrp" in tk.lower(): return 1.90
-            if "ada" in tk.lower(): return 2.15
+        if "crypto" in ac or any(
+            c in tk.lower() for c in ["btc", "eth", "sol", "xrp", "ada", "fdusd", "sei", "bnb", "usdt"]
+        ):
+            if "btc" in tk.lower():
+                return 1.85
+            if "eth" in tk.lower():
+                return 1.95
+            if "sol" in tk.lower():
+                return 2.20
+            if "xrp" in tk.lower():
+                return 1.90
+            if "ada" in tk.lower():
+                return 2.15
             return 0.00 if any(s in tk.lower() for s in ["fdusd", "usdt", "usdc"]) else 1.80
 
         if "etf" in ac:
-            if "dfns" in tk.lower() or "dfnd" in tk.lower(): return 0.85
-            if "ndia" in tk.lower(): return 0.88
-            if "imea" in tk.lower(): return 0.92
+            if "dfns" in tk.lower() or "dfnd" in tk.lower():
+                return 0.85
+            if "ndia" in tk.lower():
+                return 0.88
+            if "imea" in tk.lower():
+                return 0.92
             return 0.90
 
         if tk_u in ["GOOGL", "AMZN", "META", "MSFT", "PYPL", "CRSR", "ENPH", "TDOC", "BABA", "AAPL", "TSLA", "NVDA"]:
-            if tk_u in ["ENPH", "TDOC", "TSLA", "NVDA"]: return 1.65
-            if tk_u in ["AMZN", "META", "PYPL", "CRSR"]: return 1.25
-            if tk_u in ["BABA"]: return 1.05
+            if tk_u in ["ENPH", "TDOC", "TSLA", "NVDA"]:
+                return 1.65
+            if tk_u in ["AMZN", "META", "PYPL", "CRSR"]:
+                return 1.25
+            if tk_u in ["BABA"]:
+                return 1.05
             return 1.15
         if tk_u in ["NOVO-B.CO", "BIIB", "PRX.AS", "PFE"]:
             return 0.75 if "NOVO" in tk_u else 0.80
@@ -768,33 +1406,63 @@ def generate_institutional_audit_dossier(
             tk = str(r.get("ticker"))
             b_val = _resolve_ticker_beta(tk, r.to_dict())
 
-            pos_table_rows.append([
-                Paragraph(f"<b>{tk}</b>", cell_txt),
-                Paragraph(str(r.get("asset_class", "Stock")).capitalize(), cell_txt),
-                Paragraph(f"{r.get('qty_net', 0):,.1f}", cell_txt_r),
-                Paragraph(f"€ {r.get('avg_cost', r.get('cost_basis_unit', r.get('last_price', 0))):,.2f}", cell_txt_r),
-                Paragraph(f"€ {r.get('last_price', 0):,.2f}", cell_txt_r),
-                Paragraph(f"€ {cv:,.2f}", cell_txt_r),
-                Paragraph(f"{r.get('weight_pct', 0):.1f}%", cell_txt_r),
-                Paragraph(f"{pnl_val:+,.2f}", cell_green if pnl_val >= 0 else cell_red),
-                Paragraph(f"{b_val:.2f}", cell_txt_c),
-            ])
+            pos_table_rows.append(
+                [
+                    Paragraph(f"<b>{tk}</b>", cell_txt),
+                    Paragraph(str(r.get("asset_class", "Stock")).capitalize(), cell_txt),
+                    Paragraph(f"{r.get('qty_net', 0):,.1f}", cell_txt_r),
+                    Paragraph(
+                        f"€ {r.get('avg_cost', r.get('cost_basis_unit', r.get('last_price', 0))):,.2f}", cell_txt_r
+                    ),
+                    Paragraph(f"€ {r.get('last_price', 0):,.2f}", cell_txt_r),
+                    Paragraph(f"€ {cv:,.2f}", cell_txt_r),
+                    Paragraph(f"{r.get('weight_pct', 0):.1f}%", cell_txt_r),
+                    Paragraph(f"{pnl_val:+,.2f}", cell_green if pnl_val >= 0 else cell_red),
+                    Paragraph(f"{b_val:.2f}", cell_txt_c),
+                ]
+            )
     else:
-        pos_table_rows.append([
-            Paragraph("Nessuna posizione attiva", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt), Paragraph("-", cell_txt)
-        ])
+        pos_table_rows.append(
+            [
+                Paragraph("Nessuna posizione attiva", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+                Paragraph("-", cell_txt),
+            ]
+        )
 
     t_all_pos = Table(pos_table_rows, colWidths=[65, 50, 48, 65, 58, 75, 45, 74, 55])
-    t_all_pos.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.0),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_all_pos.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.0),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_all_pos)
     story.append(Spacer(1, 6))
-    story.append(Paragraph(f"<i>* Visualizzate le Top {len(sorted_pos) if 'sorted_pos' in locals() else 0} posizioni attive su {len(active_pos)} strumenti aperti a mercato. Il registro integrale di tutte le transazioni storiche è consultabile nel modulo Posizioni ed esportabile in Excel / CSV.</i>", ParagraphStyle('Footnote', parent=styles['Normal'], fontName='Helvetica-Oblique', fontSize=7, leading=9, textColor=TEXT_MUTED)))
+    story.append(
+        Paragraph(
+            f"<i>* Visualizzate le Top {len(sorted_pos) if 'sorted_pos' in locals() else 0} posizioni attive su {len(active_pos)} strumenti aperti a mercato. Il registro integrale di tutte le transazioni storiche è consultabile nel modulo Posizioni ed esportabile in Excel / CSV.</i>",
+            ParagraphStyle(
+                "Footnote",
+                parent=styles["Normal"],
+                fontName="Helvetica-Oblique",
+                fontSize=7,
+                leading=9,
+                textColor=TEXT_MUTED,
+            ),
+        )
+    )
 
     story.append(PageBreak())
 
@@ -804,16 +1472,25 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 06",
         "Proiezione Flussi di Cassa, Cedole &amp; Dividendi a 12 Mesi",
-        "Analisi predittiva della generazione di reddito periodico, Dividend Yield di portafoglio, Yield on Cost (YoC) storico e calendario flussi cedolari attesi."
+        "Analisi predittiva della generazione di reddito periodico, Dividend Yield di portafoglio, Yield on Cost (YoC) storico e calendario flussi cedolari attesi.",
     )
 
     div_gross_est = port_val * 0.0245
     div_net_est = div_gross_est * 0.74
 
     div_kpis = [
-        [("Dividend Yield Medio Ponderato", "2.45% p.a.", "bold"), ("Yield on Cost Storico (YoC)", "2.95% p.a.", "green")],
-        [("Monte Dividendi Lordo Annuo Stimato", f"€ {div_gross_est:,.2f}", "bold"), ("Flusso Netto Post-Ritenuta (26%)", f"€ {div_net_est:,.2f}", "normal")],
-        [("Frequenza Media di Distribuzione", "Trimestrale (Q1-Q4)", "normal"), ("Copertura FCF / Payout Sostenibile", "1.85x (Grado di Sicurezza Elevato)", "green")],
+        [
+            ("Dividend Yield Medio Ponderato", "2.45% p.a.", "bold"),
+            ("Yield on Cost Storico (YoC)", "2.95% p.a.", "green"),
+        ],
+        [
+            ("Monte Dividendi Lordo Annuo Stimato", f"€ {div_gross_est:,.2f}", "bold"),
+            ("Flusso Netto Post-Ritenuta (26%)", f"€ {div_net_est:,.2f}", "normal"),
+        ],
+        [
+            ("Frequenza Media di Distribuzione", "Trimestrale (Q1-Q4)", "normal"),
+            ("Copertura FCF / Payout Sostenibile", "1.85x (Grado di Sicurezza Elevato)", "green"),
+        ],
     ]
     story.append(make_kpi_table(div_kpis))
     story.append(Spacer(1, 12))
@@ -822,7 +1499,15 @@ def generate_institutional_audit_dossier(
     story.append(Spacer(1, 3))
 
     div_table_data = [
-        [Paragraph("Ticker", cell_hdr_l), Paragraph("Frequenza", cell_hdr), Paragraph("Ultimo Dividendo", cell_hdr), Paragraph("Dividendo Annuo (€)", cell_hdr), Paragraph("Flusso Lordo (€)", cell_hdr), Paragraph("YoC (%)", cell_hdr), Paragraph("Sostenibilità", cell_hdr)]
+        [
+            Paragraph("Ticker", cell_hdr_l),
+            Paragraph("Frequenza", cell_hdr),
+            Paragraph("Ultimo Dividendo", cell_hdr),
+            Paragraph("Dividendo Annuo (€)", cell_hdr),
+            Paragraph("Flusso Lordo (€)", cell_hdr),
+            Paragraph("YoC (%)", cell_hdr),
+            Paragraph("Sostenibilità", cell_hdr),
+        ]
     ]
 
     # Dinamicamente dai titoli attivi
@@ -836,27 +1521,56 @@ def generate_institutional_audit_dossier(
                 dy = 1.8
             ann_cash = cv * (dy / 100.0)
             yoc_val = dy * 1.15
-            div_table_data.append([
-                Paragraph(f"<b>{tk}</b>", cell_txt),
-                Paragraph("Trimestrale" if "crypto" not in str(r.get("asset_class")).lower() else "Staking/N/A", cell_txt_c),
-                Paragraph(f"€ {r.get('last_price', 10.0)*0.006:,.2f}", cell_txt_r),
-                Paragraph(f"€ {r.get('last_price', 10.0)*(dy/100.0):,.2f}", cell_txt_r),
-                Paragraph(f"€ {ann_cash:,.2f}", cell_txt_r),
-                Paragraph(f"{yoc_val:.2f}%", cell_green),
-                Paragraph("[+] Sostenibile", cell_badge_green)
-            ])
+            div_table_data.append(
+                [
+                    Paragraph(f"<b>{tk}</b>", cell_txt),
+                    Paragraph(
+                        "Trimestrale" if "crypto" not in str(r.get("asset_class")).lower() else "Staking/N/A",
+                        cell_txt_c,
+                    ),
+                    Paragraph(f"€ {r.get('last_price', 10.0) * 0.006:,.2f}", cell_txt_r),
+                    Paragraph(f"€ {r.get('last_price', 10.0) * (dy / 100.0):,.2f}", cell_txt_r),
+                    Paragraph(f"€ {ann_cash:,.2f}", cell_txt_r),
+                    Paragraph(f"{yoc_val:.2f}%", cell_green),
+                    Paragraph("[+] Sostenibile", cell_badge_green),
+                ]
+            )
     else:
-        div_table_data.append([Paragraph("ENEL.MI", cell_txt_b), Paragraph("Semestrale", cell_txt_c), Paragraph("€ 0.215", cell_txt_r), Paragraph("€ 0.43", cell_txt_r), Paragraph("€ 645.00", cell_txt_r), Paragraph("6.94%", cell_green), Paragraph("[+] Stabile (Utilities)", cell_badge_green)])
-        div_table_data.append([Paragraph("ISP.MI", cell_txt_b), Paragraph("Semestrale", cell_txt_c), Paragraph("€ 0.152", cell_txt_r), Paragraph("€ 0.30", cell_txt_r), Paragraph("€ 750.00", cell_txt_r), Paragraph("9.68%", cell_green), Paragraph("[+] Moderata (Bancario)", cell_badge_yellow)])
+        div_table_data.append(
+            [
+                Paragraph("ENEL.MI", cell_txt_b),
+                Paragraph("Semestrale", cell_txt_c),
+                Paragraph("€ 0.215", cell_txt_r),
+                Paragraph("€ 0.43", cell_txt_r),
+                Paragraph("€ 645.00", cell_txt_r),
+                Paragraph("6.94%", cell_green),
+                Paragraph("[+] Stabile (Utilities)", cell_badge_green),
+            ]
+        )
+        div_table_data.append(
+            [
+                Paragraph("ISP.MI", cell_txt_b),
+                Paragraph("Semestrale", cell_txt_c),
+                Paragraph("€ 0.152", cell_txt_r),
+                Paragraph("€ 0.30", cell_txt_r),
+                Paragraph("€ 750.00", cell_txt_r),
+                Paragraph("9.68%", cell_green),
+                Paragraph("[+] Moderata (Bancario)", cell_badge_yellow),
+            ]
+        )
 
     t_div = Table(div_table_data, colWidths=[80, 75, 75, 75, 75, 60, 95])
-    t_div.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_div.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_div)
 
     story.append(PageBreak())
@@ -867,13 +1581,22 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 07",
         "Audit Fiscale, Zainetto Minusvalenze &amp; Riforma Fiscale 2026",
-        "Quadro normativo TUIR Art. 67, monitoraggio dello zainetto fiscale delle minusvalenze, strategie di Tax-Loss Harvesting e simulazione impatto Riforma 2026."
+        "Quadro normativo TUIR Art. 67, monitoraggio dello zainetto fiscale delle minusvalenze, strategie di Tax-Loss Harvesting e simulazione impatto Riforma 2026.",
     )
 
     tax_kpis = [
-        [("Plusvalenze Latenti Potenziali", f"€ {max(0, tot_pnl):,.2f}", "green"), ("Imposta Sostitutiva Latente (26%)", f"€ {max(0, tot_pnl)*0.26:,.2f}", "red")],
-        [("Minusvalenze Pregresse in Zainetto", "€ 3,450.00", "normal"), ("Scadenza Prossima Tranche (Anno T+1)", "€ 1,200.00 (Entro 31/12/2026)", "bold")],
-        [("Risparmio da Tax-Loss Harvesting", "€ 897.00 (Recupero Fiscale)", "green"), ("Efficienza Fiscale Complessiva", "92.5% (Ottimizzato)", "bold")],
+        [
+            ("Plusvalenze Latenti Potenziali", f"€ {max(0, tot_pnl):,.2f}", "green"),
+            ("Imposta Sostitutiva Latente (26%)", f"€ {max(0, tot_pnl) * 0.26:,.2f}", "red"),
+        ],
+        [
+            ("Minusvalenze Pregresse in Zainetto", "€ 3,450.00", "normal"),
+            ("Scadenza Prossima Tranche (Anno T+1)", "€ 1,200.00 (Entro 31/12/2026)", "bold"),
+        ],
+        [
+            ("Risparmio da Tax-Loss Harvesting", "€ 897.00 (Recupero Fiscale)", "green"),
+            ("Efficienza Fiscale Complessiva", "92.5% (Ottimizzato)", "bold"),
+        ],
     ]
     story.append(make_kpi_table(tax_kpis))
     story.append(Spacer(1, 12))
@@ -882,20 +1605,49 @@ def generate_institutional_audit_dossier(
     story.append(Spacer(1, 3))
 
     tax_comp_data = [
-        [Paragraph("Parametro / Categoria Fiscale", cell_hdr_l), Paragraph("Regime Attuale (TUIR 2024)", cell_hdr), Paragraph("Regime Riformato 2026", cell_hdr), Paragraph("Vantaggio / Delta Fiduciario", cell_hdr_l)],
-        [Paragraph("Trattamento Fiscale ETF e Fondi", cell_txt_b), Paragraph("Redditi di Capitale (No Compensazione)", cell_txt_c), Paragraph("Categoria Unica 'Redditi Finanziari'", cell_txt_c), Paragraph("[+] Compensazione integrale minusvalenze con ETF", cell_txt)],
-        [Paragraph("Aliquota Fiscale Standard", cell_txt_b), Paragraph("26.00% (12.5% Titoli di Stato)", cell_txt_c), Paragraph("26.00% (Armonizzata)", cell_txt_c), Paragraph("Invariata per azionario privato", cell_txt)],
-        [Paragraph("Zainetto Fiscale Pregresso", cell_txt_b), Paragraph("Scadenza a 4 anni + anno realizzo", cell_txt_c), Paragraph("Proroga / Affrancamento agevolato", cell_txt_c), Paragraph("[+] Recupero crediti fiscali a rischio decadenza", cell_txt)],
-        [Paragraph("Efficienza Fiscale su Rib. Tattico", cell_txt_b), Paragraph("Drag Fiscale ~0.45% annuo", cell_txt_c), Paragraph("Drag Fiscale ridotto a ~0.15%", cell_txt_c), Paragraph("[+] Guadagno netto stimato +€ 350/anno per 100k", cell_green)],
+        [
+            Paragraph("Parametro / Categoria Fiscale", cell_hdr_l),
+            Paragraph("Regime Attuale (TUIR 2024)", cell_hdr),
+            Paragraph("Regime Riformato 2026", cell_hdr),
+            Paragraph("Vantaggio / Delta Fiduciario", cell_hdr_l),
+        ],
+        [
+            Paragraph("Trattamento Fiscale ETF e Fondi", cell_txt_b),
+            Paragraph("Redditi di Capitale (No Compensazione)", cell_txt_c),
+            Paragraph("Categoria Unica 'Redditi Finanziari'", cell_txt_c),
+            Paragraph("[+] Compensazione integrale minusvalenze con ETF", cell_txt),
+        ],
+        [
+            Paragraph("Aliquota Fiscale Standard", cell_txt_b),
+            Paragraph("26.00% (12.5% Titoli di Stato)", cell_txt_c),
+            Paragraph("26.00% (Armonizzata)", cell_txt_c),
+            Paragraph("Invariata per azionario privato", cell_txt),
+        ],
+        [
+            Paragraph("Zainetto Fiscale Pregresso", cell_txt_b),
+            Paragraph("Scadenza a 4 anni + anno realizzo", cell_txt_c),
+            Paragraph("Proroga / Affrancamento agevolato", cell_txt_c),
+            Paragraph("[+] Recupero crediti fiscali a rischio decadenza", cell_txt),
+        ],
+        [
+            Paragraph("Efficienza Fiscale su Rib. Tattico", cell_txt_b),
+            Paragraph("Drag Fiscale ~0.45% annuo", cell_txt_c),
+            Paragraph("Drag Fiscale ridotto a ~0.15%", cell_txt_c),
+            Paragraph("[+] Guadagno netto stimato +€ 350/anno per 100k", cell_green),
+        ],
     ]
     t_tax_comp = Table(tax_comp_data, colWidths=[140, 110, 110, 175])
-    t_tax_comp.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_tax_comp.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_tax_comp)
 
     story.append(PageBreak())
@@ -906,13 +1658,22 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 08",
         "Derivati, Superficie di Volatilità SABR &amp; Strategie di Hedging",
-        "Sensibilità di primo e secondo ordine (Greche di portafoglio), calibrazione del Volatility Smile con modello SABR e sizing di overlay protettivi."
+        "Sensibilità di primo e secondo ordine (Greche di portafoglio), calibrazione del Volatility Smile con modello SABR e sizing di overlay protettivi.",
     )
 
     greeks_kpis = [
-        [("Delta Netto di Portafoglio (Δ)", f"€ {port_val*beta:,.2f} ({beta:.2f}x Beta)", "bold"), ("Gamma di Secondo Ordine (Γ)", "+0.0012 (Concavità Stabile)", "normal")],
-        [("Vega di Volatilità (V in €/1% IV)", f"€ {-port_val*0.0028:,.2f} (Sensibilità IV)", "bold"), ("Theta Time Decay (Θ in €/Giorno)", f"€ {-port_val*0.00015:,.2f} / giorno", "normal")],
-        [("Parametri Calibrazione SABR", "Alpha=0.22, Beta=0.70, Rho=-0.35, Nu=0.45", "normal"), ("Costo Protezione Tail Risk 95%", "1.20% annuo del NAV", "green")],
+        [
+            ("Delta Netto di Portafoglio (Δ)", f"€ {port_val * beta:,.2f} ({beta:.2f}x Beta)", "bold"),
+            ("Gamma di Secondo Ordine (Γ)", "+0.0012 (Concavità Stabile)", "normal"),
+        ],
+        [
+            ("Vega di Volatilità (V in €/1% IV)", f"€ {-port_val * 0.0028:,.2f} (Sensibilità IV)", "bold"),
+            ("Theta Time Decay (Θ in €/Giorno)", f"€ {-port_val * 0.00015:,.2f} / giorno", "normal"),
+        ],
+        [
+            ("Parametri Calibrazione SABR", "Alpha=0.22, Beta=0.70, Rho=-0.35, Nu=0.45", "normal"),
+            ("Costo Protezione Tail Risk 95%", "1.20% annuo del NAV", "green"),
+        ],
     ]
     story.append(make_kpi_table(greeks_kpis))
     story.append(Spacer(1, 12))
@@ -921,19 +1682,47 @@ def generate_institutional_audit_dossier(
     story.append(Spacer(1, 3))
 
     hedge_data = [
-        [Paragraph("Strategia di Hedging", cell_hdr_l), Paragraph("Struttura Strumenti", cell_hdr_l), Paragraph("Costo Annuo Stimato", cell_hdr), Paragraph("Protezione Massima", cell_hdr), Paragraph("Raccomandazione", cell_hdr)],
-        [Paragraph("1. Protective Put (Tail Risk)", cell_txt_b), Paragraph("Long Put OTM 95% su SPY / EuroStoxx 50", cell_txt), Paragraph("1.20% NAV", cell_txt_r), Paragraph("Cap alle perdite a -5.0%", cell_green), Paragraph("Consigliata pre-macro eventi", cell_badge_green)],
-        [Paragraph("2. Zero-Cost Collar", cell_txt_b), Paragraph("Long Put 95% + Short Call 105% (Autofinanziato)", cell_txt), Paragraph("0.00% (Zero Cost)", cell_green), Paragraph("Corridoio [-5%, +5%]", cell_txt_c), Paragraph("Ideale in fasi laterali/bear", cell_badge_green)],
-        [Paragraph("3. Beta-Neutral Index Short", cell_txt_b), Paragraph("Short Micro-E-mini S&amp;P Futures / Inverse ETF", cell_txt), Paragraph("Costo di carry / Funding", cell_txt_r), Paragraph("Neutralizzazione Delta 100%", cell_green), Paragraph("Solo per hedging tattico breve", cell_badge_yellow)],
+        [
+            Paragraph("Strategia di Hedging", cell_hdr_l),
+            Paragraph("Struttura Strumenti", cell_hdr_l),
+            Paragraph("Costo Annuo Stimato", cell_hdr),
+            Paragraph("Protezione Massima", cell_hdr),
+            Paragraph("Raccomandazione", cell_hdr),
+        ],
+        [
+            Paragraph("1. Protective Put (Tail Risk)", cell_txt_b),
+            Paragraph("Long Put OTM 95% su SPY / EuroStoxx 50", cell_txt),
+            Paragraph("1.20% NAV", cell_txt_r),
+            Paragraph("Cap alle perdite a -5.0%", cell_green),
+            Paragraph("Consigliata pre-macro eventi", cell_badge_green),
+        ],
+        [
+            Paragraph("2. Zero-Cost Collar", cell_txt_b),
+            Paragraph("Long Put 95% + Short Call 105% (Autofinanziato)", cell_txt),
+            Paragraph("0.00% (Zero Cost)", cell_green),
+            Paragraph("Corridoio [-5%, +5%]", cell_txt_c),
+            Paragraph("Ideale in fasi laterali/bear", cell_badge_green),
+        ],
+        [
+            Paragraph("3. Beta-Neutral Index Short", cell_txt_b),
+            Paragraph("Short Micro-E-mini S&amp;P Futures / Inverse ETF", cell_txt),
+            Paragraph("Costo di carry / Funding", cell_txt_r),
+            Paragraph("Neutralizzazione Delta 100%", cell_green),
+            Paragraph("Solo per hedging tattico breve", cell_badge_yellow),
+        ],
     ]
     t_hdg = Table(hedge_data, colWidths=[125, 140, 75, 95, 100])
-    t_hdg.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), SECONDARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_hdg.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), SECONDARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_hdg)
 
     story.append(PageBreak())
@@ -944,28 +1733,70 @@ def generate_institutional_audit_dossier(
     add_section_header(
         "SEZIONE 09",
         "Conclusioni del Risk Committee, IPS Compliance &amp; Distinta Ordini",
-        "Verifica fiduciaria dei vincoli del mandato di gestione (Investment Policy Statement), raccomandazioni tattiche del comitato ed esecuzione ribilanciamento."
+        "Verifica fiduciaria dei vincoli del mandato di gestione (Investment Policy Statement), raccomandazioni tattiche del comitato ed esecuzione ribilanciamento.",
     )
 
-    story.append(Paragraph("<b>Verifica di Conformità al Mandato di Gestione (IPS Compliance Traffic Light)</b>", sec_title))
+    story.append(
+        Paragraph("<b>Verifica di Conformità al Mandato di Gestione (IPS Compliance Traffic Light)</b>", sec_title)
+    )
     story.append(Spacer(1, 3))
 
     ips_data = [
-        [Paragraph("Regola di Mandato IPS", cell_hdr_l), Paragraph("Limite Contrattuale", cell_hdr), Paragraph("Valore Attuale", cell_hdr), Paragraph("Margine di Sicurezza", cell_hdr), Paragraph("Esito Compliance", cell_hdr)],
-        [Paragraph("1. Esposizione Azionaria Massima", cell_txt_b), Paragraph("Max 70.0%", cell_txt_c), Paragraph("65.0%", cell_txt_c), Paragraph("+5.0% di margine", cell_green), Paragraph("[+] CONFORME", cell_badge_green)],
-        [Paragraph("2. Concentrazione Singolo Titolo", cell_txt_b), Paragraph("Max 20.0%", cell_txt_c), Paragraph(f"{top1_w:.1f}%", cell_txt_c), Paragraph(f"+{20.0 - top1_w:.1f}% di margine", cell_green), Paragraph("[+] CONFORME", cell_badge_green)],
-        [Paragraph("3. Value at Risk Giornaliero 95%", cell_txt_b), Paragraph("Max 2.50%", cell_txt_c), Paragraph(f"{var95_p:.2f}%", cell_txt_c), Paragraph(f"+{2.50 - var95_p:.2f}% di margine", cell_green), Paragraph("[+] CONFORME", cell_badge_green)],
-        [Paragraph("4. Riserva Minima di Liquidità", cell_txt_b), Paragraph("Min 3.0%", cell_txt_c), Paragraph("5.0%", cell_txt_c), Paragraph("+2.0% eccedenza", cell_green), Paragraph("[+] CONFORME", cell_badge_green)],
-        [Paragraph("5. Indice di Concentrazione HHI", cell_txt_b), Paragraph("Max 0.2000", cell_txt_c), Paragraph(f"{hhi:.4f}", cell_txt_c), Paragraph("Elevata diversificazione", cell_green), Paragraph("[+] CONFORME", cell_badge_green)],
+        [
+            Paragraph("Regola di Mandato IPS", cell_hdr_l),
+            Paragraph("Limite Contrattuale", cell_hdr),
+            Paragraph("Valore Attuale", cell_hdr),
+            Paragraph("Margine di Sicurezza", cell_hdr),
+            Paragraph("Esito Compliance", cell_hdr),
+        ],
+        [
+            Paragraph("1. Esposizione Azionaria Massima", cell_txt_b),
+            Paragraph("Max 70.0%", cell_txt_c),
+            Paragraph("65.0%", cell_txt_c),
+            Paragraph("+5.0% di margine", cell_green),
+            Paragraph("[+] CONFORME", cell_badge_green),
+        ],
+        [
+            Paragraph("2. Concentrazione Singolo Titolo", cell_txt_b),
+            Paragraph("Max 20.0%", cell_txt_c),
+            Paragraph(f"{top1_w:.1f}%", cell_txt_c),
+            Paragraph(f"+{20.0 - top1_w:.1f}% di margine", cell_green),
+            Paragraph("[+] CONFORME", cell_badge_green),
+        ],
+        [
+            Paragraph("3. Value at Risk Giornaliero 95%", cell_txt_b),
+            Paragraph("Max 2.50%", cell_txt_c),
+            Paragraph(f"{var95_p:.2f}%", cell_txt_c),
+            Paragraph(f"+{2.50 - var95_p:.2f}% di margine", cell_green),
+            Paragraph("[+] CONFORME", cell_badge_green),
+        ],
+        [
+            Paragraph("4. Riserva Minima di Liquidità", cell_txt_b),
+            Paragraph("Min 3.0%", cell_txt_c),
+            Paragraph("5.0%", cell_txt_c),
+            Paragraph("+2.0% eccedenza", cell_green),
+            Paragraph("[+] CONFORME", cell_badge_green),
+        ],
+        [
+            Paragraph("5. Indice di Concentrazione HHI", cell_txt_b),
+            Paragraph("Max 0.2000", cell_txt_c),
+            Paragraph(f"{hhi:.4f}", cell_txt_c),
+            Paragraph("Elevata diversificazione", cell_green),
+            Paragraph("[+] CONFORME", cell_badge_green),
+        ],
     ]
     t_ips = Table(ips_data, colWidths=[155, 85, 80, 115, 100])
-    t_ips.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), PRIMARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_ips.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), PRIMARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_ips)
     story.append(Spacer(1, 10))
 
@@ -974,18 +1805,43 @@ def generate_institutional_audit_dossier(
     story.append(Spacer(1, 3))
 
     orders_data = [
-        [Paragraph("Azione", cell_hdr), Paragraph("Ticker", cell_hdr_l), Paragraph("Peso Attuale", cell_hdr), Paragraph("Peso Target", cell_hdr), Paragraph("Delta Capitale (€)", cell_hdr), Paragraph("Tipo Ordine", cell_hdr)],
-        [Paragraph("SELL", cell_badge_yellow), Paragraph("NVDA", cell_txt_b), Paragraph("15.0%", cell_txt_r), Paragraph("12.0%", cell_txt_r), Paragraph(f"€ {-port_val*0.03:,.2f}", cell_red), Paragraph("Limit Order", cell_txt_c)],
-        [Paragraph("BUY", cell_badge_green), Paragraph("VWCE.DE", cell_txt_b), Paragraph("7.0%", cell_txt_r), Paragraph("10.0%", cell_txt_r), Paragraph(f"€ {port_val*0.03:,.2f}", cell_green), Paragraph("Market on Close", cell_txt_c)],
+        [
+            Paragraph("Azione", cell_hdr),
+            Paragraph("Ticker", cell_hdr_l),
+            Paragraph("Peso Attuale", cell_hdr),
+            Paragraph("Peso Target", cell_hdr),
+            Paragraph("Delta Capitale (€)", cell_hdr),
+            Paragraph("Tipo Ordine", cell_hdr),
+        ],
+        [
+            Paragraph("SELL", cell_badge_yellow),
+            Paragraph("NVDA", cell_txt_b),
+            Paragraph("15.0%", cell_txt_r),
+            Paragraph("12.0%", cell_txt_r),
+            Paragraph(f"€ {-port_val * 0.03:,.2f}", cell_red),
+            Paragraph("Limit Order", cell_txt_c),
+        ],
+        [
+            Paragraph("BUY", cell_badge_green),
+            Paragraph("VWCE.DE", cell_txt_b),
+            Paragraph("7.0%", cell_txt_r),
+            Paragraph("10.0%", cell_txt_r),
+            Paragraph(f"€ {port_val * 0.03:,.2f}", cell_green),
+            Paragraph("Market on Close", cell_txt_c),
+        ],
     ]
     t_ord = Table(orders_data, colWidths=[65, 95, 75, 75, 115, 110])
-    t_ord.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), SECONDARY),
-        ('GRID', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 3.5),
-        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, BG_LIGHT]),
-        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-    ]))
+    t_ord.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), SECONDARY),
+                ("GRID", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 3.5),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, BG_LIGHT]),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+        )
+    )
     story.append(t_ord)
     story.append(Spacer(1, 12))
 
@@ -994,12 +1850,33 @@ def generate_institutional_audit_dossier(
     <b>DISCLAIMER DI AUDIT ISTITUZIONALE &amp; RESPONSABILITÀ FIDUCIARIA:</b><br/>
     Il presente dossier è stato redatto da ARGUS Risk Analytics Platform a scopi analitici e di supporto decisionale professionale. Le simulazioni statistiche, i modelli di Value at Risk (VaR), le stime di rendimento e le attribuzioni fattoriali si basano su metodologie quantitative avanzate (Ledoit-Wolf, Fama-French, GARCH, EVT) ma non costituiscono garanzia di performance future. Tutti i dati sono trattati nel rispetto dei requisiti di confidenzialità e conformità normativa Mifid II / Fiduciary Duty.
     """
-    t_disc = Table([[Paragraph(disclaimer_text.strip(), ParagraphStyle('Disc', parent=styles['Normal'], fontName='Helvetica', fontSize=6.5, leading=8.5, textColor=TEXT_MUTED))]], colWidths=[535])
-    t_disc.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), BG_MUTED),
-        ('BOX', (0,0), (-1,-1), 0.5, BORDER_COLOR),
-        ('PADDING', (0,0), (-1,-1), 5),
-    ]))
+    t_disc = Table(
+        [
+            [
+                Paragraph(
+                    disclaimer_text.strip(),
+                    ParagraphStyle(
+                        "Disc",
+                        parent=styles["Normal"],
+                        fontName="Helvetica",
+                        fontSize=6.5,
+                        leading=8.5,
+                        textColor=TEXT_MUTED,
+                    ),
+                )
+            ]
+        ],
+        colWidths=[535],
+    )
+    t_disc.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), BG_MUTED),
+                ("BOX", (0, 0), (-1, -1), 0.5, BORDER_COLOR),
+                ("PADDING", (0, 0), (-1, -1), 5),
+            ]
+        )
+    )
     story.append(t_disc)
 
     # Costruzione del PDF a 10 pagine con NumberedCanvas
@@ -1017,65 +1894,63 @@ def generate_pdf_factsheet(results: dict, portfolio_name: str = "My Portfolio") 
         raise ImportError("Le librerie reportlab non sono installate.")
 
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=30,
-        leftMargin=30,
-        topMargin=30,
-        bottomMargin=30
-    )
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
 
     styles = getSampleStyleSheet()
-    
+
     title_style = ParagraphStyle(
-        'DocTitle',
-        parent=styles['Heading1'],
-        fontName='Helvetica-Bold',
+        "DocTitle",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
         fontSize=20,
         leading=24,
-        textColor=colors.HexColor('#0F172A')
+        textColor=colors.HexColor("#0F172A"),
     )
     subtitle_style = ParagraphStyle(
-        'DocSubTitle',
-        parent=styles['Normal'],
-        fontName='Helvetica',
+        "DocSubTitle",
+        parent=styles["Normal"],
+        fontName="Helvetica",
         fontSize=10,
         leading=14,
-        textColor=colors.HexColor('#64748B')
+        textColor=colors.HexColor("#64748B"),
     )
     h2_style = ParagraphStyle(
-        'SectionH2',
-        parent=styles['Heading2'],
-        fontName='Helvetica-Bold',
+        "SectionH2",
+        parent=styles["Heading2"],
+        fontName="Helvetica-Bold",
         fontSize=13,
         leading=16,
-        textColor=colors.HexColor('#1E293B'),
+        textColor=colors.HexColor("#1E293B"),
         spaceBefore=10,
-        spaceAfter=6
+        spaceAfter=6,
     )
     cell_style = ParagraphStyle(
-        'TableCell',
-        parent=styles['Normal'],
-        fontName='Helvetica',
+        "TableCell",
+        parent=styles["Normal"],
+        fontName="Helvetica",
         fontSize=9,
         leading=11,
-        textColor=colors.HexColor('#334155')
+        textColor=colors.HexColor("#334155"),
     )
     cell_bold = ParagraphStyle(
-        'TableCellBold',
-        parent=styles['Normal'],
-        fontName='Helvetica-Bold',
+        "TableCellBold",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
         fontSize=9,
         leading=11,
-        textColor=colors.HexColor('#0F172A')
+        textColor=colors.HexColor("#0F172A"),
     )
 
     story = []
 
     # ── Header Banner ───────────────────────────────────────
     story.append(Paragraph(f"<b>ARGUS QUANTITATIVE FACTSHEET</b> — {portfolio_name.upper()}", title_style))
-    story.append(Paragraph(f"Data Report: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Benchmark: {results.get('metrics', {}).get('market_risk', {}).get('benchmark_ticker', 'SPY')}", subtitle_style))
+    story.append(
+        Paragraph(
+            f"Data Report: {datetime.now().strftime('%d/%m/%Y %H:%M')} | Benchmark: {results.get('metrics', {}).get('market_risk', {}).get('benchmark_ticker', 'SPY')}",
+            subtitle_style,
+        )
+    )
     story.append(Spacer(1, 12))
 
     # ── Key Metrics Summary Table ────────────────────────────
@@ -1086,61 +1961,84 @@ def generate_pdf_factsheet(results: dict, portfolio_name: str = "My Portfolio") 
 
     kpi_data = [
         [
-            Paragraph("Valore Portafoglio", cell_bold), Paragraph(f"€ {ret.get('portfolio_value', 0):,.2f}", cell_style),
-            Paragraph("CAGR Annuo", cell_bold), Paragraph(f"{ret.get('cagr_pct', 0):+.2f}%", cell_style)
+            Paragraph("Valore Portafoglio", cell_bold),
+            Paragraph(f"€ {ret.get('portfolio_value', 0):,.2f}", cell_style),
+            Paragraph("CAGR Annuo", cell_bold),
+            Paragraph(f"{ret.get('cagr_pct', 0):+.2f}%", cell_style),
         ],
         [
-            Paragraph("PnL Cumulato", cell_bold), Paragraph(f"€ {ret.get('total_pnl', 0):,.2f}", cell_style),
-            Paragraph("Sharpe Ratio", cell_bold), Paragraph(f"{ret.get('sharpe_ratio', 0):.2f}", cell_style)
+            Paragraph("PnL Cumulato", cell_bold),
+            Paragraph(f"€ {ret.get('total_pnl', 0):,.2f}", cell_style),
+            Paragraph("Sharpe Ratio", cell_bold),
+            Paragraph(f"{ret.get('sharpe_ratio', 0):.2f}", cell_style),
         ],
         [
-            Paragraph("Value at Risk (VaR 95%)", cell_bold), Paragraph(f"€ {mk.get('var_95', 0):,.2f}", cell_style),
-            Paragraph("Max Drawdown", cell_bold), Paragraph(f"{mk.get('max_drawdown_pct', 0):.2f}%", cell_style)
+            Paragraph("Value at Risk (VaR 95%)", cell_bold),
+            Paragraph(f"€ {mk.get('var_95', 0):,.2f}", cell_style),
+            Paragraph("Max Drawdown", cell_bold),
+            Paragraph(f"{mk.get('max_drawdown_pct', 0):.2f}%", cell_style),
         ],
         [
-            Paragraph("Beta vs Benchmark", cell_bold), Paragraph(f"{mk.get('beta', 1.0):.2f}", cell_style),
-            Paragraph("HHI Concentrazione", cell_bold), Paragraph(f"{con.get('hhi', 0):.4f}", cell_style)
-        ]
+            Paragraph("Beta vs Benchmark", cell_bold),
+            Paragraph(f"{mk.get('beta', 1.0):.2f}", cell_style),
+            Paragraph("HHI Concentrazione", cell_bold),
+            Paragraph(f"{con.get('hhi', 0):.4f}", cell_style),
+        ],
     ]
 
     t_kpi = Table(kpi_data, colWidths=[130, 135, 130, 135])
-    t_kpi.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#F8FAFC')),
-        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#E2E8F0')),
-        ('PADDING', (0,0), (-1,-1), 6),
-    ]))
+    t_kpi.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("PADDING", (0, 0), (-1, -1), 6),
+            ]
+        )
+    )
     story.append(t_kpi)
     story.append(Spacer(1, 15))
 
     # ── Asset Allocation & Top Holdings ───────────────────────
     story.append(Paragraph("Dettaglio Top Posizioni in Portafoglio", h2_style))
-    
+
     pos = results.get("positions", pd.DataFrame())
     if not pos.empty:
         top_pos = pos.sort_values(by="current_value", ascending=False).head(10)
-        pos_table_data = [[
-            Paragraph("Ticker", cell_bold), Paragraph("Classe", cell_bold), 
-            Paragraph("Quantità", cell_bold), Paragraph("Prezzo", cell_bold), 
-            Paragraph("Valore (€)", cell_bold), Paragraph("Peso %", cell_bold)
-        ]]
-        
+        pos_table_data = [
+            [
+                Paragraph("Ticker", cell_bold),
+                Paragraph("Classe", cell_bold),
+                Paragraph("Quantità", cell_bold),
+                Paragraph("Prezzo", cell_bold),
+                Paragraph("Valore (€)", cell_bold),
+                Paragraph("Peso %", cell_bold),
+            ]
+        ]
+
         for _, r in top_pos.iterrows():
-            pos_table_data.append([
-                Paragraph(str(r.get("ticker")), cell_style),
-                Paragraph(str(r.get("asset_class", "Stock")), cell_style),
-                Paragraph(f"{r.get('qty_net', 0):,.2f}", cell_style),
-                Paragraph(f"€ {r.get('last_price', 0):,.2f}", cell_style),
-                Paragraph(f"€ {r.get('current_value', 0):,.2f}", cell_style),
-                Paragraph(f"{r.get('weight_pct', 0):.2f}%", cell_style),
-            ])
+            pos_table_data.append(
+                [
+                    Paragraph(str(r.get("ticker")), cell_style),
+                    Paragraph(str(r.get("asset_class", "Stock")), cell_style),
+                    Paragraph(f"{r.get('qty_net', 0):,.2f}", cell_style),
+                    Paragraph(f"€ {r.get('last_price', 0):,.2f}", cell_style),
+                    Paragraph(f"€ {r.get('current_value', 0):,.2f}", cell_style),
+                    Paragraph(f"{r.get('weight_pct', 0):.2f}%", cell_style),
+                ]
+            )
 
         t_pos = Table(pos_table_data, colWidths=[75, 85, 80, 95, 105, 90])
-        t_pos.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#0F172A')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-            ('PADDING', (0,0), (-1,-1), 5),
-        ]))
+        t_pos.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0F172A")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(t_pos)
 
     story.append(Spacer(1, 15))
@@ -1148,29 +2046,37 @@ def generate_pdf_factsheet(results: dict, portfolio_name: str = "My Portfolio") 
     # ── Stress Testing Summary ───────────────────────────────
     story.append(Paragraph("Valutazione degli Scenario Stress Test", h2_style))
     stress_tests = results.get("stress_tests", {})
-    
+
     if stress_tests:
-        stress_data = [[
-            Paragraph("Scenario Storico", cell_bold), 
-            Paragraph("Shock Mkt", cell_bold), 
-            Paragraph("Perdita Stimata (€)", cell_bold), 
-            Paragraph("Perdita Stimata (%)", cell_bold)
-        ]]
+        stress_data = [
+            [
+                Paragraph("Scenario Storico", cell_bold),
+                Paragraph("Shock Mkt", cell_bold),
+                Paragraph("Perdita Stimata (€)", cell_bold),
+                Paragraph("Perdita Stimata (%)", cell_bold),
+            ]
+        ]
         for name, st_info in stress_tests.items():
-            stress_data.append([
-                Paragraph(name, cell_style),
-                Paragraph(f"{st_info.get('benchmark_shock_pct', 0):+.1f}%", cell_style),
-                Paragraph(f"€ {st_info.get('portfolio_loss_eur', 0):,.2f}", cell_style),
-                Paragraph(f"{st_info.get('portfolio_loss_pct', 0):+.2f}%", cell_style),
-            ])
-            
+            stress_data.append(
+                [
+                    Paragraph(name, cell_style),
+                    Paragraph(f"{st_info.get('benchmark_shock_pct', 0):+.1f}%", cell_style),
+                    Paragraph(f"€ {st_info.get('portfolio_loss_eur', 0):,.2f}", cell_style),
+                    Paragraph(f"{st_info.get('portfolio_loss_pct', 0):+.2f}%", cell_style),
+                ]
+            )
+
         t_stress = Table(stress_data, colWidths=[180, 90, 130, 130])
-        t_stress.setStyle(TableStyle([
-            ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1E293B')),
-            ('TEXTCOLOR', (0,0), (-1,0), colors.white),
-            ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-            ('PADDING', (0,0), (-1,-1), 5),
-        ]))
+        t_stress.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E293B")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                    ("PADDING", (0, 0), (-1, -1), 5),
+                ]
+            )
+        )
         story.append(t_stress)
 
     doc.build(story)
@@ -1184,8 +2090,8 @@ def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -
     Ritorna i byte pronti per il download in Streamlit.
     """
     output = io.BytesIO()
-    
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         # Tab 1: Executive Summary
         m = results.get("metrics", {})
         ret = m.get("returns", {})
@@ -1220,12 +2126,16 @@ def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -
         sr_port = results.get("portfolio_return", pd.Series())
         sr_bm = results.get("benchmark_return", pd.Series())
         if not sr_port.empty:
-            sr_bm_aligned = sr_bm.reindex(sr_port.index).fillna(0.0) if not sr_bm.empty else pd.Series(0.0, index=sr_port.index)
-            df_ret = pd.DataFrame({
-                "Data": sr_port.index.strftime("%Y-%m-%d"),
-                "Rendimento Portafoglio (%)": (sr_port.values * 100).round(4),
-                "Rendimento Benchmark (%)": (sr_bm_aligned.values * 100).round(4),
-            })
+            sr_bm_aligned = (
+                sr_bm.reindex(sr_port.index).fillna(0.0) if not sr_bm.empty else pd.Series(0.0, index=sr_port.index)
+            )
+            df_ret = pd.DataFrame(
+                {
+                    "Data": sr_port.index.strftime("%Y-%m-%d"),
+                    "Rendimento Portafoglio (%)": (sr_port.values * 100).round(4),
+                    "Rendimento Benchmark (%)": (sr_bm_aligned.values * 100).round(4),
+                }
+            )
             df_ret.to_excel(writer, sheet_name="Rendimenti Storici", index=False)
 
         # Tab 4: Stress Tests
@@ -1233,16 +2143,19 @@ def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -
         if stress:
             stress_rows = []
             for s_name, s_val in stress.items():
-                stress_rows.append({
-                    "Scenario": s_name,
-                    "Shock Benchmark (%)": s_val.get("benchmark_shock_pct"),
-                    "Perdita Stimata (€)": s_val.get("portfolio_loss_eur"),
-                    "Perdita Stimata (%)": s_val.get("portfolio_loss_pct")
-                })
+                stress_rows.append(
+                    {
+                        "Scenario": s_name,
+                        "Shock Benchmark (%)": s_val.get("benchmark_shock_pct"),
+                        "Perdita Stimata (€)": s_val.get("portfolio_loss_eur"),
+                        "Perdita Stimata (%)": s_val.get("portfolio_loss_pct"),
+                    }
+                )
             pd.DataFrame(stress_rows).to_excel(writer, sheet_name="Stress Testing", index=False)
 
     output.seek(0)
     return output.getvalue()
+
 
 # Alias for backwards compatibility
 generate_pdf_report = generate_pdf_factsheet

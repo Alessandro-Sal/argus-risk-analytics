@@ -1,10 +1,11 @@
-﻿# ============================================================
+# ============================================================
 # core/options_workbench.py
 # ARGUS — Multi-Leg Options Strategy Workbench & Payoff Engine
 # Iron Condor, Collar, Spreads, Straddle & 2D/3D Greeks Decay
 # ============================================================
 
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 from scipy.stats import norm
@@ -23,7 +24,7 @@ def _bs_price_and_greeks(
             delta = -1.0 if spot < strike else 0.0
         return {"price": val, "delta": delta, "gamma": 0.0, "theta": 0.0, "vega": 0.0}
 
-    d1 = (np.log(spot / strike) + (r + 0.5 * sigma ** 2) * t) / (sigma * np.sqrt(t))
+    d1 = (np.log(spot / strike) + (r + 0.5 * sigma**2) * t) / (sigma * np.sqrt(t))
     d2 = d1 - sigma * np.sqrt(t)
 
     pdf_d1 = norm.pdf(d1)
@@ -33,13 +34,13 @@ def _bs_price_and_greeks(
     if option_type == "call":
         price = spot * cdf_d1 - strike * np.exp(-r * t) * cdf_d2
         delta = cdf_d1
-        theta = (- (spot * pdf_d1 * sigma) / (2 * np.sqrt(t)) - r * strike * np.exp(-r * t) * cdf_d2) / 365.0
+        theta = (-(spot * pdf_d1 * sigma) / (2 * np.sqrt(t)) - r * strike * np.exp(-r * t) * cdf_d2) / 365.0
     else:
         cdf_minus_d1 = norm.cdf(-d1)
         cdf_minus_d2 = norm.cdf(-d2)
         price = strike * np.exp(-r * t) * cdf_minus_d2 - spot * cdf_minus_d1
         delta = cdf_d1 - 1.0
-        theta = (- (spot * pdf_d1 * sigma) / (2 * np.sqrt(t)) + r * strike * np.exp(-r * t) * cdf_minus_d2) / 365.0
+        theta = (-(spot * pdf_d1 * sigma) / (2 * np.sqrt(t)) + r * strike * np.exp(-r * t) * cdf_minus_d2) / 365.0
 
     gamma = pdf_d1 / (spot * sigma * np.sqrt(t))
     vega = (spot * np.sqrt(t) * pdf_d1) / 100.0
@@ -49,20 +50,13 @@ def _bs_price_and_greeks(
         "delta": float(delta),
         "gamma": float(gamma),
         "theta": float(theta),
-        "vega": float(vega)
+        "vega": float(vega),
     }
 
 
 def get_options_strategy_presets() -> List[str]:
     """Elenco dei preset di strategie in opzioni supportate."""
-    return [
-        "Protective Collar",
-        "Iron Condor",
-        "Bull Call Spread",
-        "Bear Put Spread",
-        "Long Straddle",
-        "Covered Call"
-    ]
+    return ["Protective Collar", "Iron Condor", "Bull Call Spread", "Bear Put Spread", "Long Straddle", "Covered Call"]
 
 
 def build_options_strategy_payoff(
@@ -72,7 +66,7 @@ def build_options_strategy_payoff(
     iv: float = 0.20,
     days_to_exp: int = 45,
     contracts: int = 1,
-    risk_free_rate: float = 0.035
+    risk_free_rate: float = 0.035,
 ) -> Dict[str, Any]:
     """
     Costruisce la struttura multi-gamba, calcola greche e profili di payoff a scadenza e anticipati.
@@ -94,7 +88,7 @@ def build_options_strategy_payoff(
             {"type": "put", "action": "BUY", "strike": k_put_long, "qty": contracts},
             {"type": "put", "action": "SELL", "strike": k_put_short, "qty": contracts},
             {"type": "call", "action": "SELL", "strike": k_call_short, "qty": contracts},
-            {"type": "call", "action": "BUY", "strike": k_call_long, "qty": contracts}
+            {"type": "call", "action": "BUY", "strike": k_call_long, "qty": contracts},
         ]
     elif strategy_name == "Protective Collar":
         # Long Stock + Long Put OTM + Short Call OTM
@@ -103,32 +97,32 @@ def build_options_strategy_payoff(
         legs = [
             {"type": "stock", "action": "BUY", "strike": s0, "qty": contracts},
             {"type": "put", "action": "BUY", "strike": k_put, "qty": contracts},
-            {"type": "call", "action": "SELL", "strike": k_call, "qty": contracts}
+            {"type": "call", "action": "SELL", "strike": k_call, "qty": contracts},
         ]
     elif strategy_name == "Bull Call Spread":
         k1 = s0 * (1 - strike_offset_pct / 200.0)
         k2 = s0 * (1 + strike_offset_pct / 100.0)
         legs = [
             {"type": "call", "action": "BUY", "strike": k1, "qty": contracts},
-            {"type": "call", "action": "SELL", "strike": k2, "qty": contracts}
+            {"type": "call", "action": "SELL", "strike": k2, "qty": contracts},
         ]
     elif strategy_name == "Bear Put Spread":
         k1 = s0 * (1 + strike_offset_pct / 200.0)
         k2 = s0 * (1 - strike_offset_pct / 100.0)
         legs = [
             {"type": "put", "action": "BUY", "strike": k1, "qty": contracts},
-            {"type": "put", "action": "SELL", "strike": k2, "qty": contracts}
+            {"type": "put", "action": "SELL", "strike": k2, "qty": contracts},
         ]
     elif strategy_name == "Long Straddle":
         legs = [
             {"type": "call", "action": "BUY", "strike": s0, "qty": contracts},
-            {"type": "put", "action": "BUY", "strike": s0, "qty": contracts}
+            {"type": "put", "action": "BUY", "strike": s0, "qty": contracts},
         ]
     else:  # Covered Call
         k_call = s0 * (1 + strike_offset_pct / 100.0)
         legs = [
             {"type": "stock", "action": "BUY", "strike": s0, "qty": contracts},
-            {"type": "call", "action": "SELL", "strike": k_call, "qty": contracts}
+            {"type": "call", "action": "SELL", "strike": k_call, "qty": contracts},
         ]
 
     # Prezzatura delle gambe e aggregazione greche
@@ -161,16 +155,18 @@ def build_options_strategy_payoff(
         agg_theta += sign * th * multiplier
         agg_vega += sign * v * multiplier
 
-        legs_enriched.append({
-            "leg_type": l_type.upper(),
-            "action": l_act,
-            "strike_eur": round(k, 2),
-            "premium_unit_eur": round(px, 2),
-            "delta": round(d * sign, 3),
-            "gamma": round(g * sign, 4),
-            "theta": round(th * sign, 2),
-            "vega": round(v * sign, 2)
-        })
+        legs_enriched.append(
+            {
+                "leg_type": l_type.upper(),
+                "action": l_act,
+                "strike_eur": round(k, 2),
+                "premium_unit_eur": round(px, 2),
+                "delta": round(d * sign, 3),
+                "gamma": round(g * sign, 4),
+                "theta": round(th * sign, 2),
+                "vega": round(v * sign, 2),
+            }
+        )
 
     # Range prezzi spot per il payoff (da -30% a +30%)
     spots = np.linspace(s0 * 0.70, s0 * 1.30, 80)
@@ -193,10 +189,16 @@ def build_options_strategy_payoff(
                 val_mid = s - s0
             elif l_type == "call":
                 val_exp = max(0.0, s - k) - (_bs_price_and_greeks(s0, k, t_years, risk_free_rate, iv, "call")["price"])
-                val_mid = (_bs_price_and_greeks(s, k, t_mid, risk_free_rate, iv, "call")["price"]) - (_bs_price_and_greeks(s0, k, t_years, risk_free_rate, iv, "call")["price"])
+                val_mid = (
+                    (_bs_price_and_greeks(s, k, t_mid, risk_free_rate, iv, "call")["price"])
+                    - (_bs_price_and_greeks(s0, k, t_years, risk_free_rate, iv, "call")["price"])
+                )
             else:
                 val_exp = max(0.0, k - s) - (_bs_price_and_greeks(s0, k, t_years, risk_free_rate, iv, "put")["price"])
-                val_mid = (_bs_price_and_greeks(s, k, t_mid, risk_free_rate, iv, "put")["price"]) - (_bs_price_and_greeks(s0, k, t_years, risk_free_rate, iv, "put")["price"])
+                val_mid = (
+                    (_bs_price_and_greeks(s, k, t_mid, risk_free_rate, iv, "put")["price"])
+                    - (_bs_price_and_greeks(s0, k, t_years, risk_free_rate, iv, "put")["price"])
+                )
 
             pnl_exp += sign * val_exp * multiplier
             pnl_mid += sign * val_mid * multiplier
@@ -204,11 +206,7 @@ def build_options_strategy_payoff(
         payoffs_expiry.append(pnl_exp)
         payoffs_mid.append(pnl_mid)
 
-    df_payoff = pd.DataFrame({
-        "spot_price": spots,
-        "pnl_expiry_eur": payoffs_expiry,
-        "pnl_mid_term_eur": payoffs_mid
-    })
+    df_payoff = pd.DataFrame({"spot_price": spots, "pnl_expiry_eur": payoffs_expiry, "pnl_mid_term_eur": payoffs_mid})
 
     max_profit = float(np.max(payoffs_expiry))
     max_loss = float(np.min(payoffs_expiry))
@@ -216,7 +214,9 @@ def build_options_strategy_payoff(
     # Individuazione Breakevens
     zero_crossings = []
     for i in range(len(payoffs_expiry) - 1):
-        if (payoffs_expiry[i] <= 0 and payoffs_expiry[i+1] > 0) or (payoffs_expiry[i] >= 0 and payoffs_expiry[i+1] < 0):
+        if (payoffs_expiry[i] <= 0 and payoffs_expiry[i + 1] > 0) or (
+            payoffs_expiry[i] >= 0 and payoffs_expiry[i + 1] < 0
+        ):
             zero_crossings.append(round(spots[i], 2))
 
     return {
@@ -232,8 +232,8 @@ def build_options_strategy_payoff(
             "net_delta": round(agg_delta, 2),
             "net_gamma": round(agg_gamma, 4),
             "net_theta_per_day": round(agg_theta, 2),
-            "net_vega_per_pct": round(agg_vega, 2)
+            "net_vega_per_pct": round(agg_vega, 2),
         },
         "legs": legs_enriched,
-        "payoff_df": df_payoff
+        "payoff_df": df_payoff,
     }

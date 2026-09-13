@@ -3,13 +3,15 @@
 # Investment Risk BI Platform
 # ============================================================
 
-import pytest
-import pandas as pd
-import numpy as np
 from datetime import date
-from core.schemas import validate_transaction_records, TransactionContract
-from core.risk_engine import _compute_efficient_frontier
+
+import numpy as np
+import pandas as pd
+import pytest
+
 from core.pdf_generator import generate_executive_pdf_report
+from core.risk_engine import _compute_efficient_frontier
+from core.schemas import TransactionContract, validate_transaction_records
 
 
 def test_schema_validation():
@@ -120,10 +122,10 @@ def test_fama_french_and_ulcer_index():
 
 def test_institutional_and_pe_engines():
     from core.risk_engine import (
+        compute_almgren_chriss_market_impact,
         compute_brinson_attribution,
         compute_hierarchical_risk_parity,
-        compute_almgren_chriss_market_impact,
-        compute_private_equity_waterfall
+        compute_private_equity_waterfall,
     )
     
     # 1. HRP Test
@@ -163,7 +165,8 @@ def test_institutional_and_pe_engines():
 def test_optimize_plotly_figure_memory():
     """Verifica che optimize_plotly_figure_memory arrotondi i dati float e riduca il payload."""
     import plotly.graph_objects as go
-    from core.ui_utils import optimize_plotly_figure_memory, apply_plotly_theme
+
+    from core.ui_utils import apply_plotly_theme, optimize_plotly_figure_memory
 
     fig = go.Figure(data=[
         go.Scatter(

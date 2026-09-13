@@ -4,19 +4,20 @@
 # Compliance: GDPR Art. 32 (Security of Processing), OWASP Top 10, CWE-1236 (Formula Injection)
 # ============================================================
 
-import os
-import re
-import html
 import base64
 import hashlib
 import hmac
+import html
 import logging
+import os
+import re
 from typing import Any, Dict, List, Optional, Union
+
 import pandas as pd
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 logger = logging.getLogger("argus.security")
 
@@ -29,6 +30,7 @@ CIPHER_PREFIX = "argus_enc::"
 
 
 # ── 1. FORMULA INJECTION & EXPORT SANITIZATION (CWE-1236) ──────
+
 
 def sanitize_for_export(val: Any) -> Any:
     """
@@ -51,10 +53,7 @@ def sanitize_for_export(val: Any) -> Any:
     return val
 
 
-def sanitize_dataframe_for_export(
-    df: pd.DataFrame,
-    columns: Optional[List[str]] = None
-) -> pd.DataFrame:
+def sanitize_dataframe_for_export(df: pd.DataFrame, columns: Optional[List[str]] = None) -> pd.DataFrame:
     """
     Restituisce una copia profonda del DataFrame con tutte le colonne testuali
     sanitizzate contro Formula Injection e caratteri di controllo malevoli.
@@ -73,6 +72,7 @@ def sanitize_dataframe_for_export(
 
 
 # ── 2. DATA MASKING & ANONIMIZZAZIONE PII (GDPR Art. 32) ───────
+
 
 def mask_iban(iban: Optional[str], visible_start: int = 4, visible_end: int = 4) -> str:
     """
@@ -129,6 +129,7 @@ def pseudonymize_identifier(val: str, salt: Optional[str] = None) -> str:
 
 # ── 3. HTML & XSS SANITIZATION PER STREAMLIT ───────────────────
 
+
 def escape_html_content(text: Any) -> str:
     """
     Esegue l'escape sicuro di codice HTML/JS per stringhe dinamiche (LLM response,
@@ -140,6 +141,7 @@ def escape_html_content(text: Any) -> str:
 
 
 # ── 4. FIELD-LEVEL ENCRYPTION AT REST (AES-256 / FERNET) ───────
+
 
 class ArgusDataVault:
     """
@@ -156,11 +158,7 @@ class ArgusDataVault:
         salt_bytes = salt or (os.getenv("ARGUS_VAULT_SALT") or "ARGUS_SECURE_SALT_99").encode("utf-8")
 
         kdf = PBKDF2HMAC(
-            algorithm=hashes.SHA256(),
-            length=32,
-            salt=salt_bytes,
-            iterations=600_000,
-            backend=default_backend()
+            algorithm=hashes.SHA256(), length=32, salt=salt_bytes, iterations=600_000, backend=default_backend()
         )
         derived_key = base64.urlsafe_b64encode(kdf.derive(key_material))
         self._fernet = Fernet(derived_key)
@@ -190,7 +188,7 @@ class ArgusDataVault:
         if not ciphertext.startswith(CIPHER_PREFIX):
             return ciphertext
 
-        raw_token = ciphertext[len(CIPHER_PREFIX):].encode("utf-8")
+        raw_token = ciphertext[len(CIPHER_PREFIX) :].encode("utf-8")
         try:
             decrypted_bytes = self._fernet.decrypt(raw_token)
             return decrypted_bytes.decode("utf-8")

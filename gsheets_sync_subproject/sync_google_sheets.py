@@ -7,12 +7,14 @@ foglio criptovalute ('History B/S Crypto'), separando i due portafogli a livello
 Data Warehouse (MySQL/SQLite) e registrandoli nei profili del Total Wealth Hub.
 """
 
-import os
-import sys
+import datetime
 import json
 import logging
-import datetime
+import os
+import sys
+
 import pandas as pd
+
 try:
     import gspread
     from google.oauth2.service_account import Credentials
@@ -27,11 +29,11 @@ PROJECT_ROOT = os.path.dirname(SUBPROJECT_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from core.validator import validate_csv
+from core.db_exporter import ensure_snapshot_tables, save_snapshot_to_db
 from core.fetcher import fetch_and_store, get_engine
+from core.multi_portfolio import consolidate_multi_portfolios, save_portfolio_profile
 from core.risk_engine import compute_risk
-from core.db_exporter import save_snapshot_to_db, ensure_snapshot_tables
-from core.multi_portfolio import save_portfolio_profile, consolidate_multi_portfolios
+from core.validator import validate_csv
 
 # Setup logging
 os.makedirs(os.path.join(SUBPROJECT_DIR, "logs"), exist_ok=True)
@@ -243,7 +245,7 @@ def normalize_gsheet_columns(df_raw: pd.DataFrame, is_crypto: bool = False, defa
         if row_is_crypto:
             asset_class = "crypto"
             # Format crypto ticker with currency pair (e.g. BTC -> BTC-EUR or BTC-USD)
-            if not "-" in security:
+            if "-" not in security:
                 pair_curr = currency if currency in ["EUR", "USD"] else "EUR"
                 security = f"{security}-{pair_curr}"
         else:
@@ -340,6 +342,7 @@ def sync_single_tab(
     portfolio_id = 1
     if not offline_mode and db_engine:
         from sqlalchemy import text as sqlt
+
         from core.db_exporter import get_or_create_portfolio_id
         with db_engine.begin() as conn:
             portfolio_id = get_or_create_portfolio_id(conn, name=portfolio_name, owner="gsheets_cron", base_currency="EUR")
@@ -472,7 +475,8 @@ def run_daily_pipeline(
     db_name = os.environ.get("DB_NAME", "wealth")
 
     try:
-        from sqlalchemy import create_engine, text as sqlt
+        from sqlalchemy import create_engine
+        from sqlalchemy import text as sqlt
         temp_engine = create_engine(f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/", echo=False)
         with temp_engine.begin() as conn:
             conn.execute(sqlt(f"CREATE DATABASE IF NOT EXISTS `{db_name}`"))

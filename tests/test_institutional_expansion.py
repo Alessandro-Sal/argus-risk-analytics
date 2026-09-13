@@ -3,30 +3,21 @@
 # Unit tests for ARGUS v6.2.0 Institutional Quant & Wealth Expansion
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
-from core.macro_stress_engine import (
-    get_standard_macro_scenarios,
-    compute_macro_scenario_stress_test,
-    compute_reverse_stress_test
-)
-from core.autonomous_rebalancer import (
-    generate_autonomous_rebalancing_proposal,
-    check_mifid_suitability_and_limits
-)
-from core.esg_engine import (
-    compute_portfolio_esg_and_sfdr_metrics
-)
-from core.options_workbench import (
-    get_options_strategy_presets,
-    build_options_strategy_payoff
-)
-from core.quarterly_report_generator import (
-    generate_white_label_quarterly_pdf_report
-)
-from core.terminal_engine import get_terminal_engine
+import pandas as pd
+import pytest
+
+from core.autonomous_rebalancer import check_mifid_suitability_and_limits, generate_autonomous_rebalancing_proposal
+from core.esg_engine import compute_portfolio_esg_and_sfdr_metrics
 from core.fetcher import get_engine
+from core.macro_stress_engine import (
+    compute_macro_scenario_stress_test,
+    compute_reverse_stress_test,
+    get_standard_macro_scenarios,
+)
+from core.options_workbench import build_options_strategy_payoff, get_options_strategy_presets
+from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
+from core.terminal_engine import get_terminal_engine
 
 
 @pytest.fixture

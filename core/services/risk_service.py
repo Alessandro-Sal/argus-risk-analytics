@@ -5,14 +5,37 @@ and Hierarchical Risk Parity (HRP) portfolio optimization.
 """
 
 from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
+
 from core.hrp_optimizer import compute_hrp_portfolio
-from core.risk_engine import _calc_market_risk, _calc_return_metrics
+from core.risk_engine import calc_market_risk, calc_return_metrics, compute_risk
 
 
 class RiskService:
     """Headless application service for risk calculations and portfolio optimization."""
+
+    @staticmethod
+    def compute_full_portfolio_risk(
+        portfolio_id: int,
+        engine: Any,
+        benchmark_ticker: str = "SPY",
+        df_tx: Optional[pd.DataFrame] = None,
+        df_prices: Optional[pd.DataFrame] = None,
+        risk_free_rate: Optional[float] = None,
+        base_currency: str = "EUR",
+    ) -> Dict[str, Any]:
+        """Esegue l'analisi completa del rischio di portafoglio orchestrando i motori di calcolo."""
+        return compute_risk(
+            portfolio_id=portfolio_id,
+            engine=engine,
+            benchmark_ticker=benchmark_ticker,
+            df_tx=df_tx,
+            df_prices=df_prices,
+            risk_free_rate=risk_free_rate,
+            base_currency=base_currency,
+        )
 
     @staticmethod
     def compute_risk_metrics(
@@ -34,27 +57,30 @@ class RiskService:
         else:
             sr_bm = pd.Series(0.0, index=sr_portfolio.index)
 
-        mkt_risk = _calc_market_risk(
-            sr_portfolio=sr_portfolio,
-            sr_benchmark=sr_bm,
-            benchmark_ticker="BENCHMARK",
-            risk_free_rate=risk_free_rate
+        mkt_risk = calc_market_risk(
+            sr_portfolio=sr_portfolio, sr_benchmark=sr_bm, benchmark_ticker="BENCHMARK", risk_free_rate=risk_free_rate
         )
 
-        ret_metrics = _calc_return_metrics(
-            sr_portfolio=sr_portfolio,
-            sr_benchmark=sr_bm,
-            risk_free_rate=risk_free_rate
-        )
+        ret_metrics = calc_return_metrics(sr_portfolio=sr_portfolio, sr_benchmark=sr_bm, risk_free_rate=risk_free_rate)
 
         var_raw = mkt_risk.get("var", {})
         cvar_raw = mkt_risk.get("cvar", {})
 
-        var_hist = {f"{k}%": v for k, v in var_raw.items() if not k.startswith("var_parametric") and not k.startswith("var_cf")}
-        cvar_hist = {f"{k}%": v for k, v in cvar_raw.items() if not k.startswith("cvar_parametric") and not k.startswith("cvar_cf")}
+        var_hist = {
+            f"{k}%": v for k, v in var_raw.items() if not k.startswith("var_parametric") and not k.startswith("var_cf")
+        }
+        cvar_hist = {
+            f"{k}%": v
+            for k, v in cvar_raw.items()
+            if not k.startswith("cvar_parametric") and not k.startswith("cvar_cf")
+        }
 
-        var_param = {k.replace("var_parametric_", "") + "%": v for k, v in var_raw.items() if k.startswith("var_parametric_")}
-        cvar_param = {k.replace("cvar_parametric_", "") + "%": v for k, v in cvar_raw.items() if k.startswith("cvar_parametric_")}
+        var_param = {
+            k.replace("var_parametric_", "") + "%": v for k, v in var_raw.items() if k.startswith("var_parametric_")
+        }
+        cvar_param = {
+            k.replace("cvar_parametric_", "") + "%": v for k, v in cvar_raw.items() if k.startswith("cvar_parametric_")
+        }
 
         var_cf = {k.replace("var_cf_", "") + "%": v for k, v in var_raw.items() if k.startswith("var_cf_")}
         cvar_cf = {k.replace("cvar_cf_", "") + "%": v for k, v in cvar_raw.items() if k.startswith("cvar_cf_")}
@@ -79,10 +105,7 @@ class RiskService:
         }
 
     @staticmethod
-    def optimize_hrp(
-        asset_returns: Dict[str, List[float]],
-        linkage_method: str = "single"
-    ) -> Dict[str, Any]:
+    def optimize_hrp(asset_returns: Dict[str, List[float]], linkage_method: str = "single") -> Dict[str, Any]:
         """Esegue l'ottimizzazione di portafoglio Hierarchical Risk Parity (López de Prado)."""
         if not asset_returns or len(asset_returns) < 2:
             raise ValueError("At least two asset return series are required for portfolio optimization.")
@@ -111,10 +134,11 @@ class RiskService:
         drift_shift_pct: float = 0.0,
         distribution_type: str = "gaussian",
         n_simulations: int = 3000,
-        seed: int = 42
+        seed: int = 42,
     ) -> Dict[str, Any]:
         """Esegue la simulazione stocastica Monte Carlo multivariata del portafoglio."""
         from core.risk_engine import run_advanced_monte_carlo_simulation
+
         return run_advanced_monte_carlo_simulation(
             results_dict=results_dict,
             horizon_days=horizon_days,
@@ -122,6 +146,5 @@ class RiskService:
             drift_shift_pct=drift_shift_pct,
             distribution_type=distribution_type,
             n_simulations=n_simulations,
-            seed=seed
+            seed=seed,
         )
-

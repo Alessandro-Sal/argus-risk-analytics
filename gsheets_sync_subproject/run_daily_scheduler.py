@@ -5,23 +5,18 @@ Esegue la sincronizzazione automatica ogni giorno ad un orario prestabilito (es.
 estraendo sia Stocks sia Crypto e separandoli nel Data Warehouse DB.
 """
 
+import argparse
+import datetime
 import os
 import sys
 import time
-import datetime
-import argparse
 
 SUBPROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(SUBPROJECT_DIR)
 sys.path.append(PROJECT_ROOT)
 sys.path.append(SUBPROJECT_DIR)
 
-from sync_google_sheets import (
-    run_daily_pipeline,
-    DEFAULT_SPREADSHEET,
-    DEFAULT_STOCKS_TAB,
-    DEFAULT_CRYPTO_TAB
-)
+from sync_google_sheets import DEFAULT_CRYPTO_TAB, DEFAULT_SPREADSHEET, DEFAULT_STOCKS_TAB, run_daily_pipeline
 
 
 def run_scheduler(

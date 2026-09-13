@@ -44,12 +44,9 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
     # BTP 10Y (Gov Bond): Beta ~ 0.10 vs equity, vol=7.5%
     ret_btp = 0.10 * ret_bm + np.random.normal(0.038 / 252.0, 0.075 / np.sqrt(252.0), 252)
 
-    df_returns = pd.DataFrame({
-        "VWCE.DE": ret_vwce,
-        "AAPL": ret_aapl,
-        "ASML.AS": ret_asml,
-        "BTP_10Y": ret_btp
-    }, index=dates)
+    df_returns = pd.DataFrame(
+        {"VWCE.DE": ret_vwce, "AAPL": ret_aapl, "ASML.AS": ret_asml, "BTP_10Y": ret_btp}, index=dates
+    )
 
     sr_bm = pd.Series(ret_bm, index=dates, name="SPY")
 
@@ -68,36 +65,86 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
     risk_metrics["market_risk"]["tracking_error_pct"] = float((port_ret - sr_bm).std() * np.sqrt(252.0) * 100.0)
 
     # ── 3. POSIZIONI MOBILIARI DETTAGLIATE ───────────────────────
-    positions_df = pd.DataFrame([
-        {
-            "ticker": "VWCE.DE", "asset_class": "ETF", "gics_sector": "Global Equity",
-            "country": "DE", "currency": "EUR", "qty_net": 500.0, "avg_cost": 105.0,
-            "last_price": 112.50, "current_value": 56250.0, "cost_basis": 52500.0,
-            "unrealized_pnl": 3750.0, "unrealized_pnl_pct": 7.14, "realized_pnl": 0.0,
-            "dividends_total": 0.0, "weight_pct": 26.17, "beta": 0.98, "days_to_liquidate": 0.2
-        },
-        {
-            "ticker": "AAPL", "asset_class": "Equity", "gics_sector": "Information Technology",
-            "country": "US", "currency": "USD", "qty_net": 150.0, "avg_cost": 160.0,
-            "last_price": 170.0, "current_value": 25500.0, "cost_basis": 24000.0,
-            "unrealized_pnl": 1500.0, "unrealized_pnl_pct": 6.25, "realized_pnl": 450.0,
-            "dividends_total": 180.0, "weight_pct": 11.86, "beta": 1.15, "days_to_liquidate": 0.1
-        },
-        {
-            "ticker": "ASML.AS", "asset_class": "Equity", "gics_sector": "Information Technology",
-            "country": "NL", "currency": "EUR", "qty_net": 40.0, "avg_cost": 750.0,
-            "last_price": 850.0, "current_value": 34000.0, "cost_basis": 30000.0,
-            "unrealized_pnl": 4000.0, "unrealized_pnl_pct": 13.33, "realized_pnl": 0.0,
-            "dividends_total": 240.0, "weight_pct": 15.82, "beta": 1.25, "days_to_liquidate": 0.3
-        },
-        {
-            "ticker": "BTP_10Y", "asset_class": "Fixed Income", "gics_sector": "Sovereign Debt",
-            "country": "IT", "currency": "EUR", "qty_net": 1000.0, "avg_cost": 100.0,
-            "last_price": 99.20, "current_value": 99200.0, "cost_basis": 100000.0,
-            "unrealized_pnl": -800.0, "unrealized_pnl_pct": -0.80, "realized_pnl": 0.0,
-            "dividends_total": 3850.0, "weight_pct": 46.15, "beta": 0.10, "days_to_liquidate": 0.5
-        }
-    ])
+    positions_df = pd.DataFrame(
+        [
+            {
+                "ticker": "VWCE.DE",
+                "asset_class": "ETF",
+                "gics_sector": "Global Equity",
+                "country": "DE",
+                "currency": "EUR",
+                "qty_net": 500.0,
+                "avg_cost": 105.0,
+                "last_price": 112.50,
+                "current_value": 56250.0,
+                "cost_basis": 52500.0,
+                "unrealized_pnl": 3750.0,
+                "unrealized_pnl_pct": 7.14,
+                "realized_pnl": 0.0,
+                "dividends_total": 0.0,
+                "weight_pct": 26.17,
+                "beta": 0.98,
+                "days_to_liquidate": 0.2,
+            },
+            {
+                "ticker": "AAPL",
+                "asset_class": "Equity",
+                "gics_sector": "Information Technology",
+                "country": "US",
+                "currency": "USD",
+                "qty_net": 150.0,
+                "avg_cost": 160.0,
+                "last_price": 170.0,
+                "current_value": 25500.0,
+                "cost_basis": 24000.0,
+                "unrealized_pnl": 1500.0,
+                "unrealized_pnl_pct": 6.25,
+                "realized_pnl": 450.0,
+                "dividends_total": 180.0,
+                "weight_pct": 11.86,
+                "beta": 1.15,
+                "days_to_liquidate": 0.1,
+            },
+            {
+                "ticker": "ASML.AS",
+                "asset_class": "Equity",
+                "gics_sector": "Information Technology",
+                "country": "NL",
+                "currency": "EUR",
+                "qty_net": 40.0,
+                "avg_cost": 750.0,
+                "last_price": 850.0,
+                "current_value": 34000.0,
+                "cost_basis": 30000.0,
+                "unrealized_pnl": 4000.0,
+                "unrealized_pnl_pct": 13.33,
+                "realized_pnl": 0.0,
+                "dividends_total": 240.0,
+                "weight_pct": 15.82,
+                "beta": 1.25,
+                "days_to_liquidate": 0.3,
+            },
+            {
+                "ticker": "BTP_10Y",
+                "asset_class": "Fixed Income",
+                "gics_sector": "Sovereign Debt",
+                "country": "IT",
+                "currency": "EUR",
+                "qty_net": 1000.0,
+                "avg_cost": 100.0,
+                "last_price": 99.20,
+                "current_value": 99200.0,
+                "cost_basis": 100000.0,
+                "unrealized_pnl": -800.0,
+                "unrealized_pnl_pct": -0.80,
+                "realized_pnl": 0.0,
+                "dividends_total": 3850.0,
+                "weight_pct": 46.15,
+                "beta": 0.10,
+                "days_to_liquidate": 0.5,
+            },
+        ]
+    )
 
     # ── 4. STRESS TESTS SU CRISI STORICHE ───────────────────────
     stress_tests = {
@@ -105,21 +152,21 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
         "Lehman Brothers (2008)": {"portfolio_loss_pct": -28.2, "portfolio_loss_eur": -60615.0},
         "US Downgrade (2011)": {"portfolio_loss_pct": -11.4, "portfolio_loss_eur": -24504.0},
         "COVID-19 Crash (2020)": {"portfolio_loss_pct": -21.6, "portfolio_loss_eur": -46429.0},
-        "Tech & Rate Shock (2022)": {"portfolio_loss_pct": -16.8, "portfolio_loss_eur": -36111.0}
+        "Tech & Rate Shock (2022)": {"portfolio_loss_pct": -16.8, "portfolio_loss_eur": -36111.0},
     }
 
     # ── 5. TOTAL WEALTH SNAPSHOT (5 PILASTRI) ────────────────────
     wealth_snapshot = {
-        "liquid_cash": 95000.0,               # Cassa €45k + Deposito €50k
-        "financial_investments": 214950.0,    # Valore titoli
-        "physical_assets": 674500.0,          # Immobile €650k + Rolex €24.5k
-        "pension_total": 38000.0,             # Fondo pensione
-        "liabilities_total": 220000.0,        # Mutuo residuo
+        "liquid_cash": 95000.0,  # Cassa €45k + Deposito €50k
+        "financial_investments": 214950.0,  # Valore titoli
+        "physical_assets": 674500.0,  # Immobile €650k + Rolex €24.5k
+        "pension_total": 38000.0,  # Fondo pensione
+        "liabilities_total": 220000.0,  # Mutuo residuo
         "total_assets": 1022450.0,
         "total_net_worth": 802450.0,
         "wealth_health_score": 91.0,
         "debt_to_asset_pct": 21.52,
-        "emergency_fund_months": 18.5
+        "emergency_fund_months": 18.5,
     }
 
     # ── 6. ASSEMBLAGGIO BUNDLE RISCHIO COMPLETO ─────────────────
@@ -136,7 +183,7 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
         "metrics": risk_metrics,
         "stress_tests": stress_tests,
         "wealth_snapshot": wealth_snapshot,
-        "base_currency": "EUR"
+        "base_currency": "EUR",
     }
 
     # ── 7. SINCRONIZZAZIONE STATO SESSIONE & WORKSPACE CONTEXT ──
@@ -154,6 +201,7 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
 
     try:
         import streamlit as st
+
         if hasattr(st, "session_state"):
             st.session_state["results"] = results_bundle
             st.session_state["pipeline_done"] = True
@@ -168,6 +216,7 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
     # ── 8. SEED OPZIONALE BITEMPORAL & WEALTH DB ─────────────────
     try:
         from core.bitemporal_engine import BitemporalLedgerEngine
+
         b_engine = BitemporalLedgerEngine()
         b_engine.seed_demonstration_scenario(portfolio_id=target_portfolio_name)
     except Exception:
@@ -176,14 +225,15 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
     try:
         from core.fetcher import get_engine
         from core.wealth.wealth_db import (
-            init_wealth_db,
             create_wealth_portfolio,
-            save_wealth_account,
-            save_physical_asset,
-            save_pension_plan,
+            get_wealth_categories,
+            init_wealth_db,
             insert_cashflow_tx,
-            get_wealth_categories
+            save_pension_plan,
+            save_physical_asset,
+            save_wealth_account,
         )
+
         engine = get_engine(database="wealth", offline=True)
         init_wealth_db(engine)
 
@@ -192,10 +242,11 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
             name=target_portfolio_name,
             description="Demo Family Office Multi-Asset (5 Pilastri)",
             owner="Demo User",
-            base_currency="EUR"
+            base_currency="EUR",
         )
         try:
             import streamlit as st
+
             if hasattr(st, "session_state"):
                 st.session_state["wealth_active_portfolio_id"] = pid
                 st.session_state["session_cleared"] = False
@@ -205,75 +256,93 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
         # Check existing accounts for this profile to prevent duplication
         with engine.connect() as conn:
             from sqlalchemy import text as sqlt
+
             res_cnt = conn.execute(
-                sqlt("SELECT COUNT(*) FROM wealth_accounts WHERE portfolio_id = :pid"),
-                {"pid": pid}
+                sqlt("SELECT COUNT(*) FROM wealth_accounts WHERE portfolio_id = :pid"), {"pid": pid}
             ).scalar()
 
         if not res_cnt:
-            acc_chk_id = save_wealth_account(engine, {
-                "name": "Conto Corrente Principale",
-                "institution": "Intesa Sanpaolo",
-                "account_type": "checking",
-                "currency": "EUR",
-                "balance": 45000.0,
-                "portfolio_id": pid,
-                "notes": "Liquidità operativa di cassa"
-            })
-            save_wealth_account(engine, {
-                "name": "Conto Deposito Rendimento",
-                "institution": "Illimity Bank",
-                "account_type": "savings",
-                "currency": "EUR",
-                "balance": 50000.0,
-                "portfolio_id": pid,
-                "notes": "Fondo emergenza e remunerazione liquidità"
-            })
-            save_wealth_account(engine, {
-                "name": "Mutuo Ipotecario Casa Milano",
-                "institution": "Banco BPM",
-                "account_type": "loan",
-                "currency": "EUR",
-                "balance": -220000.0,
-                "portfolio_id": pid,
-                "notes": "Debito ipotecario residuo prima casa"
-            })
+            acc_chk_id = save_wealth_account(
+                engine,
+                {
+                    "name": "Conto Corrente Principale",
+                    "institution": "Intesa Sanpaolo",
+                    "account_type": "checking",
+                    "currency": "EUR",
+                    "balance": 45000.0,
+                    "portfolio_id": pid,
+                    "notes": "Liquidità operativa di cassa",
+                },
+            )
+            save_wealth_account(
+                engine,
+                {
+                    "name": "Conto Deposito Rendimento",
+                    "institution": "Illimity Bank",
+                    "account_type": "savings",
+                    "currency": "EUR",
+                    "balance": 50000.0,
+                    "portfolio_id": pid,
+                    "notes": "Fondo emergenza e remunerazione liquidità",
+                },
+            )
+            save_wealth_account(
+                engine,
+                {
+                    "name": "Mutuo Ipotecario Casa Milano",
+                    "institution": "Banco BPM",
+                    "account_type": "loan",
+                    "currency": "EUR",
+                    "balance": -220000.0,
+                    "portfolio_id": pid,
+                    "notes": "Debito ipotecario residuo prima casa",
+                },
+            )
 
             # Physical Assets (Immobile Milano €650k, Rolex Daytona €24.5k)
-            save_physical_asset(engine, {
-                "name": "Immobile Residenziale Milano Centro",
-                "asset_category": "real_estate",
-                "brand_or_location": "Milano, Porta Nuova",
-                "model_or_specs": "Quadrilocale 140 mq con box",
-                "purchase_price": 580000.0,
-                "current_market_value": 650000.0,
-                "portfolio_id": pid,
-                "notes": "Abitazione principale"
-            })
-            save_physical_asset(engine, {
-                "name": "Rolex Daytona Cosmograph 116500LN",
-                "asset_category": "luxury_watches",
-                "brand_or_location": "Rolex",
-                "model_or_specs": "Acciaio Oyster, Quadrante Bianco, Ghiera Cerachrom",
-                "reference_number": "116500LN",
-                "purchase_price": 18500.0,
-                "current_market_value": 24500.0,
-                "portfolio_id": pid,
-                "notes": "Collezione personale con garanzia e scatola originale"
-            })
+            save_physical_asset(
+                engine,
+                {
+                    "name": "Immobile Residenziale Milano Centro",
+                    "asset_category": "real_estate",
+                    "brand_or_location": "Milano, Porta Nuova",
+                    "model_or_specs": "Quadrilocale 140 mq con box",
+                    "purchase_price": 580000.0,
+                    "current_market_value": 650000.0,
+                    "portfolio_id": pid,
+                    "notes": "Abitazione principale",
+                },
+            )
+            save_physical_asset(
+                engine,
+                {
+                    "name": "Rolex Daytona Cosmograph 116500LN",
+                    "asset_category": "luxury_watches",
+                    "brand_or_location": "Rolex",
+                    "model_or_specs": "Acciaio Oyster, Quadrante Bianco, Ghiera Cerachrom",
+                    "reference_number": "116500LN",
+                    "purchase_price": 18500.0,
+                    "current_market_value": 24500.0,
+                    "portfolio_id": pid,
+                    "notes": "Collezione personale con garanzia e scatola originale",
+                },
+            )
 
             # Pension Plan (Fondo Cometa €38k)
-            save_pension_plan(engine, {
-                "plan_name": "Fondo Pensione Cometa / Fonchim",
-                "provider": "Fondo Pensione Negoziale",
-                "plan_type": "fondo_pensione_aperto",
-                "accumulated_value": 38000.0,
-                "monthly_employee_contrib": 250.0,
-                "monthly_employer_contrib": 250.0,
-                "tax_deductible_annual": 5164.57,
-                "portfolio_id": pid,
-                "notes": "Comparto Crescita / Azionario Bilanciato"
-            })
+            save_pension_plan(
+                engine,
+                {
+                    "plan_name": "Fondo Pensione Cometa / Fonchim",
+                    "provider": "Fondo Pensione Negoziale",
+                    "plan_type": "fondo_pensione_aperto",
+                    "accumulated_value": 38000.0,
+                    "monthly_employee_contrib": 250.0,
+                    "monthly_employer_contrib": 250.0,
+                    "tax_deductible_annual": 5164.57,
+                    "portfolio_id": pid,
+                    "notes": "Comparto Crescita / Azionario Bilanciato",
+                },
+            )
 
             # Sample cash flows
             today_d = datetime.now().date()
@@ -290,30 +359,36 @@ def seed_unified_demo_scenario(target_portfolio_name: str = "DEMO_FAMILY_OFFICE"
 
             if acc_chk_id:
                 try:
-                    insert_cashflow_tx(engine, {
-                        "account_id": acc_chk_id,
-                        "category_id": inc_cat,
-                        "tx_date": today_d.strftime("%Y-%m-%d"),
-                        "amount": 6500.0,
-                        "direction": "inflow",
-                        "merchant": "Datore di Lavoro SpA",
-                        "notes": "Stipendio Mensile Dirigente",
-                        "portfolio_id": pid
-                    })
-                    insert_cashflow_tx(engine, {
-                        "account_id": acc_chk_id,
-                        "category_id": exp_cat,
-                        "tx_date": today_d.strftime("%Y-%m-%d"),
-                        "amount": 1450.0,
-                        "direction": "outflow",
-                        "merchant": "Banco BPM",
-                        "notes": "Rata Mensile Mutuo",
-                        "portfolio_id": pid
-                    })
+                    insert_cashflow_tx(
+                        engine,
+                        {
+                            "account_id": acc_chk_id,
+                            "category_id": inc_cat,
+                            "tx_date": today_d.strftime("%Y-%m-%d"),
+                            "amount": 6500.0,
+                            "direction": "inflow",
+                            "merchant": "Datore di Lavoro SpA",
+                            "notes": "Stipendio Mensile Dirigente",
+                            "portfolio_id": pid,
+                        },
+                    )
+                    insert_cashflow_tx(
+                        engine,
+                        {
+                            "account_id": acc_chk_id,
+                            "category_id": exp_cat,
+                            "tx_date": today_d.strftime("%Y-%m-%d"),
+                            "amount": 1450.0,
+                            "direction": "outflow",
+                            "merchant": "Banco BPM",
+                            "notes": "Rata Mensile Mutuo",
+                            "portfolio_id": pid,
+                        },
+                    )
                     with engine.begin() as wconn:
                         wconn.execute(
                             sqlt("UPDATE wealth_accounts SET balance = 45000.0 WHERE account_id = :aid"),
-                            {"aid": acc_chk_id}
+                            {"aid": acc_chk_id},
                         )
                 except Exception:
                     pass

@@ -4,23 +4,13 @@
 # Unit Tests for Fase 3: EQS Formula Engine, Almgren-Chriss Impact & Factor Quintiles
 # ============================================================
 
-import pytest
 import numpy as np
 import pandas as pd
+import pytest
 
-from core.screener_engine import (
-    evaluate_custom_screener_query,
-    SCREENER_FIELD_ALIASES,
-    SCREENER_FORMULA_PRESETS
-)
-from core.risk_engine import (
-    compute_almgren_chriss_optimal_execution,
-    compute_almgren_chriss_market_impact
-)
-from core.factor_library import (
-    run_factor_quintile_backtest,
-    FACTOR_PRESET_DEFINITIONS
-)
+from core.factor_library import FACTOR_PRESET_DEFINITIONS, run_factor_quintile_backtest
+from core.risk_engine import compute_almgren_chriss_market_impact, compute_almgren_chriss_optimal_execution
+from core.screener_engine import SCREENER_FIELD_ALIASES, SCREENER_FORMULA_PRESETS, evaluate_custom_screener_query
 
 
 # ── TEST 1: EQS FORMULA SCREENER ENGINE ───────────────────────

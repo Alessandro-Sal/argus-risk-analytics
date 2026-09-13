@@ -2,19 +2,21 @@
 Unit & Integration Tests for core/multi_portfolio.py
 """
 
-import pytest
-import pandas as pd
-import numpy as np
 import os
 import shutil
+
+import numpy as np
+import pandas as pd
+import pytest
+
 from core.multi_portfolio import (
-    save_portfolio_profile,
-    list_saved_portfolio_profiles,
-    load_portfolio_profile,
-    delete_saved_portfolio_profile,
+    PORTFOLIOS_DIR,
     compute_multi_portfolio_comparison,
     consolidate_multi_portfolios,
-    PORTFOLIOS_DIR
+    delete_saved_portfolio_profile,
+    list_saved_portfolio_profiles,
+    load_portfolio_profile,
+    save_portfolio_profile,
 )
 
 

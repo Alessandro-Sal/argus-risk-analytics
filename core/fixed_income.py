@@ -12,56 +12,51 @@
 # ============================================================
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import brentq, newton
 
 # ── 1. MODELLO CASH FLOW OBBLIGAZIONARI ─────────────────────────────
 
+
 def compute_bond_cash_flows(
-    face_value: float = 100.0,
-    coupon_rate: float = 0.04,
-    maturity_years: float = 10.0,
-    coupon_frequency: int = 2
+    face_value: float = 100.0, coupon_rate: float = 0.04, maturity_years: float = 10.0, coupon_frequency: int = 2
 ) -> List[Tuple[float, float]]:
     """
     Genera il piano di flussi di cassa (cedole + rimborso capitale a scadenza).
-    
+
     Args:
         face_value: Valore nominale (default 100.0)
         coupon_rate: Tasso cedolare annuo decimale (es. 0.04 per 4.0%)
         maturity_years: Durata residua in anni (es. 10.0)
         coupon_frequency: Frequenza annuale stacco cedola (1=annuale, 2=semestrale, 4=trimestrale)
-        
+
     Returns:
         Lista di tuple (tempo_anni_t, cash_flow_t)
     """
     if maturity_years <= 0:
         return [(0.0, face_value)]
-    
+
     freq = max(1, int(coupon_frequency))
     total_periods = int(round(maturity_years * freq))
     if total_periods == 0:
         total_periods = 1
-        
+
     coupon_payment = (coupon_rate * face_value) / freq
     cash_flows = []
-    
+
     for i in range(1, total_periods + 1):
         t = i / freq
         # All'ultimo periodo si aggiunge il rimborso del valore nominale
         amount = coupon_payment + (face_value if i == total_periods else 0.0)
         cash_flows.append((t, amount))
-        
+
     return cash_flows
 
 
 def compute_bond_price_from_ytm(
-    face_value: float,
-    coupon_rate: float,
-    maturity_years: float,
-    ytm: float,
-    coupon_frequency: int = 2
+    face_value: float, coupon_rate: float, maturity_years: float, ytm: float, coupon_frequency: int = 2
 ) -> float:
     """
     Calcola il prezzo teorico del bond dato uno Yield to Maturity (YTM).
@@ -69,26 +64,23 @@ def compute_bond_price_from_ytm(
     """
     if maturity_years <= 0:
         return float(face_value)
-        
+
     freq = max(1, int(coupon_frequency))
     cfs = compute_bond_cash_flows(face_value, coupon_rate, maturity_years, freq)
-    
+
     price = 0.0
     for t, cf in cfs:
         discount_factor = (1.0 + ytm / freq) ** (freq * t)
         price += cf / discount_factor
-        
+
     return float(price)
 
 
 # ── 2. RISOLUTORE NUMERICO YTM (YIELD TO MATURITY) ─────────────────
 
+
 def compute_bond_ytm(
-    face_value: float,
-    coupon_rate: float,
-    maturity_years: float,
-    market_price: float,
-    coupon_frequency: int = 2
+    face_value: float, coupon_rate: float, maturity_years: float, market_price: float, coupon_frequency: int = 2
 ) -> float:
     """
     Risolve numericamente lo Yield to Maturity (YTM) di un bond dato il suo prezzo di mercato.
@@ -115,7 +107,9 @@ def compute_bond_ytm(
     # Stima iniziale prudenziale (formula approssimata di YTM)
     # y0 ~ (C + (F - P)/n) / ((F + P)/2)
     annual_coupon = coupon_rate * face_value
-    approx_y = (annual_coupon + (face_value - market_price) / max(0.1, maturity_years)) / ((face_value + market_price) / 2.0)
+    approx_y = (annual_coupon + (face_value - market_price) / max(0.1, maturity_years)) / (
+        (face_value + market_price) / 2.0
+    )
     approx_y = max(-0.10, min(0.50, approx_y))
 
     try:
@@ -135,13 +129,14 @@ def compute_bond_ytm(
 
 # ── 3. ANALISI ISTITUZIONALE: DURATION, CONVEXITY, DV01 ─────────────
 
+
 def compute_bond_analytics(
     face_value: float = 100.0,
     coupon_rate: float = 0.04,
     maturity_years: float = 10.0,
     market_price: float = 100.0,
     coupon_frequency: int = 2,
-    yield_shift_bps: float = 10.0
+    yield_shift_bps: float = 10.0,
 ) -> Dict[str, Any]:
     """
     Calcola l'insieme completo delle metriche di sensibilità istituzionale (Bloomberg YAS Style):
@@ -157,12 +152,12 @@ def compute_bond_analytics(
     current_yield = (coupon_rate * face_value) / market_price if market_price > 0 else 0.0
 
     cfs = compute_bond_cash_flows(face_value, coupon_rate, maturity_years, freq)
-    
+
     # Calcolo Macaulay Duration & Convexity esatta
     weighted_time_sum = 0.0
     convexity_sum = 0.0
     actual_price = 0.0
-    
+
     for t, cf in cfs:
         df = (1.0 + ytm / freq) ** (freq * t)
         pv_cf = cf / df
@@ -175,10 +170,10 @@ def compute_bond_analytics(
     ref_price = max(0.01, actual_price if actual_price > 0 else market_price)
     macaulay_duration = weighted_time_sum / ref_price
     modified_duration = macaulay_duration / (1.0 + ytm / freq)
-    
+
     # Convexity: 1 / (P * (1 + y/m)^2) * sum(...)
     convexity = convexity_sum / (ref_price * ((1.0 + ytm / freq) ** 2))
-    
+
     # DV01 (Dollar Value of a 01 / Price Value of a Basis Point)
     # DV01 = Modified Duration * P * 0.0001
     dv01 = modified_duration * market_price * 0.0001
@@ -187,27 +182,29 @@ def compute_bond_analytics(
     # Generazione tabella di sensibilità a shock di rendimento (-200bps .. +200bps)
     shifts_bps = [-200, -100, -50, -25, 25, 50, 100, 200]
     sensitivity_rows = []
-    
+
     for s_bps in shifts_bps:
         dy = s_bps / 10000.0
         # Prezzo esatto ricalcolato
         exact_p = compute_bond_price_from_ytm(face_value, coupon_rate, maturity_years, ytm + dy, freq)
         pct_exact = ((exact_p - market_price) / market_price) * 100.0
-        
+
         # Taylor 1° ordine (Solo Duration)
         pct_taylor_1 = (-modified_duration * dy) * 100.0
         # Taylor 2° ordine (Duration + Convexity)
-        pct_taylor_2 = (-modified_duration * dy + 0.5 * convexity * (dy ** 2)) * 100.0
-        
-        sensitivity_rows.append({
-            "shift_bps": s_bps,
-            "new_ytm_pct": (ytm + dy) * 100.0,
-            "exact_price": round(exact_p, 4),
-            "pct_change_exact": round(pct_exact, 3),
-            "pct_change_duration_only": round(pct_taylor_1, 3),
-            "pct_change_duration_plus_convexity": round(pct_taylor_2, 3),
-            "convexity_gain_pct": round(pct_taylor_2 - pct_taylor_1, 3)
-        })
+        pct_taylor_2 = (-modified_duration * dy + 0.5 * convexity * (dy**2)) * 100.0
+
+        sensitivity_rows.append(
+            {
+                "shift_bps": s_bps,
+                "new_ytm_pct": (ytm + dy) * 100.0,
+                "exact_price": round(exact_p, 4),
+                "pct_change_exact": round(pct_exact, 3),
+                "pct_change_duration_only": round(pct_taylor_1, 3),
+                "pct_change_duration_plus_convexity": round(pct_taylor_2, 3),
+                "convexity_gain_pct": round(pct_taylor_2 - pct_taylor_1, 3),
+            }
+        )
 
     return {
         "face_value": face_value,
@@ -221,11 +218,12 @@ def compute_bond_analytics(
         "convexity": round(convexity, 4),
         "dv01": round(dv01, 5),
         "pvbp": round(pvbp, 5),
-        "sensitivity_table": pd.DataFrame(sensitivity_rows)
+        "sensitivity_table": pd.DataFrame(sensitivity_rows),
     }
 
 
 # ── 4. Z-SPREAD (ZERO-VOLATILITY SPREAD) SU CURVA NSS ──────────────
+
 
 def compute_z_spread(
     face_value: float,
@@ -233,7 +231,7 @@ def compute_z_spread(
     maturity_years: float,
     market_price: float,
     spot_curve_fn_or_params: Union[Callable[[float], float], Dict[str, float], None] = None,
-    coupon_frequency: int = 2
+    coupon_frequency: int = 2,
 ) -> float:
     """
     Calcola lo Z-Spread (in Basis Points) rispetto a una curva spot risk-free o Nelson-Siegel-Svensson.
@@ -251,6 +249,7 @@ def compute_z_spread(
         r_spot = spot_curve_fn_or_params
     elif isinstance(spot_curve_fn_or_params, dict) and "beta0" in spot_curve_fn_or_params:
         from core.yield_curve import evaluate_nelson_siegel_svensson_curve
+
         params = spot_curve_fn_or_params
         r_spot = lambda t: evaluate_nelson_siegel_svensson_curve(np.array([t]), params)[0] / 100.0
     else:
@@ -281,37 +280,36 @@ def compute_z_spread(
 
 # ── 5. CREDIT DEFAULT SWAP (CDS) & IMPLIED DEFAULT PROBABILITY ─────
 
+
 def compute_cds_implied_default_probability(
-    cds_spread_bps: float,
-    recovery_rate: float = 0.40,
-    tenors_years: Optional[List[float]] = None
+    cds_spread_bps: float, recovery_rate: float = 0.40, tenors_years: Optional[List[float]] = None
 ) -> Dict[str, Any]:
     """
     Stima la probabilità cumulativa di default e l'Hazard Rate (intensità di default)
     a partire dallo spread di mercato di un Credit Default Swap (CDS).
-    
+
     Formula standard di mercato:
       Hazard Rate (lambda) ~ S_CDS / (1 - Recovery Rate)
       Sopravvivenza S(t) = exp(-lambda * t)
       Probabilità Cumulativa di Default PD(t) = 1 - exp(-lambda * t)
-      
+
     Args:
         cds_spread_bps: Spread CDS a 5 anni in punti base (es. 120 bps = 1.20%)
         recovery_rate: Tasso di recupero atteso (default standard ISDA 40% = 0.40)
         tenors_years: Lista di orizzonti temporali (es. [1, 2, 3, 5, 7, 10])
-        
+
     Returns:
         Dizionario con Hazard Rate, tabella term structure di default e probabilità marginali.
     """
     if tenors_years is None:
         tenors_years = [0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 30.0]
-        
+
     spread_dec = max(0.0, cds_spread_bps / 10000.0)
     loss_given_default = max(0.01, 1.0 - recovery_rate)
-    
+
     # Stima dell'Hazard Rate (lambda costante o approssimato)
     hazard_rate = spread_dec / loss_given_default
-    
+
     rows = []
     prev_pd = 0.0
     for t in tenors_years:
@@ -319,25 +317,27 @@ def compute_cds_implied_default_probability(
         cum_pd = 1.0 - surv_prob
         marginal_pd = cum_pd - prev_pd
         annualized_pd = 1.0 - (surv_prob ** (1.0 / t)) if t > 0 else 0.0
-        
-        rows.append({
-            "tenor_years": t,
-            "tenor_label": f"{int(t)}Y" if t == int(t) else f"{t}Y",
-            "survival_probability_pct": round(float(surv_prob * 100.0), 3),
-            "cumulative_default_prob_pct": round(float(cum_pd * 100.0), 3),
-            "marginal_default_prob_pct": round(float(marginal_pd * 100.0), 3),
-            "annualized_default_rate_pct": round(float(annualized_pd * 100.0), 3)
-        })
+
+        rows.append(
+            {
+                "tenor_years": t,
+                "tenor_label": f"{int(t)}Y" if t == int(t) else f"{t}Y",
+                "survival_probability_pct": round(float(surv_prob * 100.0), 3),
+                "cumulative_default_prob_pct": round(float(cum_pd * 100.0), 3),
+                "marginal_default_prob_pct": round(float(marginal_pd * 100.0), 3),
+                "annualized_default_rate_pct": round(float(annualized_pd * 100.0), 3),
+            }
+        )
         prev_pd = cum_pd
-        
+
     df_pd = pd.DataFrame(rows)
-    
+
     return {
         "cds_spread_bps": cds_spread_bps,
         "recovery_rate_pct": recovery_rate * 100.0,
         "loss_given_default_pct": loss_given_default * 100.0,
         "implied_hazard_rate_pct": round(float(hazard_rate * 100.0), 4),
-        "default_probability_curve": df_pd
+        "default_probability_curve": df_pd,
     }
 
 
@@ -352,7 +352,7 @@ INSTITUTIONAL_BOND_PRESETS: Dict[str, Dict[str, Any]] = {
         "market_price": 101.50,
         "currency": "EUR",
         "coupon_freq": 2,
-        "cds_5y_bps": 88.0
+        "cds_5y_bps": 88.0,
     },
     "DE10Y": {
         "name": "Bund Decennale Repubblica Federale Tedesca 2.50%",
@@ -362,7 +362,7 @@ INSTITUTIONAL_BOND_PRESETS: Dict[str, Dict[str, Any]] = {
         "market_price": 99.80,
         "currency": "EUR",
         "coupon_freq": 1,
-        "cds_5y_bps": 12.0
+        "cds_5y_bps": 12.0,
     },
     "US10Y": {
         "name": "US 10-Year Treasury Note 4.25%",
@@ -372,7 +372,7 @@ INSTITUTIONAL_BOND_PRESETS: Dict[str, Dict[str, Any]] = {
         "market_price": 98.90,
         "currency": "USD",
         "coupon_freq": 2,
-        "cds_5y_bps": 34.0
+        "cds_5y_bps": 34.0,
     },
     "CORP_ENI": {
         "name": "ENI SpA Sustainability-Linked Bond 3.875%",
@@ -382,17 +382,16 @@ INSTITUTIONAL_BOND_PRESETS: Dict[str, Dict[str, Any]] = {
         "market_price": 99.20,
         "currency": "EUR",
         "coupon_freq": 1,
-        "cds_5y_bps": 65.0
-    }
+        "cds_5y_bps": 65.0,
+    },
 }
 
 
 # ── 6. NELSON-SIEGEL CASHFLOW PRICING & KEY RATE DURATION ─────────
 
+
 def price_bond_cashflows_nelson_siegel(
-    cashflows: List[Tuple[float, float]],
-    ns_params: Dict[str, float],
-    compounding_freq: int = 2
+    cashflows: List[Tuple[float, float]], ns_params: Dict[str, float], compounding_freq: int = 2
 ) -> Dict[str, Any]:
     """
     Calcola il prezzo teorico analitico, la Duration di Macaulay e la Convessità
@@ -429,14 +428,16 @@ def price_bond_cashflows_nelson_siegel(
     mod_duration = mac_duration / (1.0 + avg_yield / freq)
 
     # Convessità discreta
-    convexity = float(np.sum(maturities * (maturities + 1.0 / freq) * pv_cashflows) / (fair_price * (1.0 + avg_yield / freq) ** 2))
+    convexity = float(
+        np.sum(maturities * (maturities + 1.0 / freq) * pv_cashflows) / (fair_price * (1.0 + avg_yield / freq) ** 2)
+    )
 
     return {
         "fair_price": round(fair_price, 4),
         "macaulay_duration": round(mac_duration, 3),
         "modified_duration": round(mod_duration, 3),
         "convexity": round(convexity, 3),
-        "weighted_spot_yield_pct": round(avg_yield * 100.0, 3)
+        "weighted_spot_yield_pct": round(avg_yield * 100.0, 3),
     }
 
 
@@ -447,7 +448,7 @@ def compute_key_rate_durations(
     ns_params: Dict[str, float],
     key_rates: Optional[List[float]] = None,
     coupon_freq: int = 2,
-    shift_bps: float = 10.0
+    shift_bps: float = 10.0,
 ) -> Dict[str, float]:
     """
     Calcola le Key Rate Durations (KRD) sui nodi della curva specificati (default: 2Y, 5Y, 10Y, 30Y).
@@ -465,6 +466,7 @@ def compute_key_rate_durations(
     krd_results = {}
 
     from core.yield_curve import evaluate_nelson_siegel_curve, evaluate_nelson_siegel_svensson_curve
+
     is_svensson = "beta3" in ns_params or "tau2" in ns_params
     eval_fn = evaluate_nelson_siegel_svensson_curve if is_svensson else evaluate_nelson_siegel_curve
 
@@ -506,4 +508,3 @@ def compute_key_rate_durations(
         krd_results[label] = round(float(krd), 3)
 
     return krd_results
-

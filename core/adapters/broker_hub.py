@@ -25,56 +25,56 @@ SUPPORTED_BROKERS: Dict[str, Dict[str, Any]] = {
         "name": "CSV Standard ARGUS",
         "icon": "📄",
         "desc": "Template nativo a 9 colonne (tx_date, ticker, tx_type, quantity, price, currency, fees, asset_class, notes).",
-        "sample_columns": ["tx_date", "ticker", "tx_type", "quantity", "price", "currency"]
+        "sample_columns": ["tx_date", "ticker", "tx_type", "quantity", "price", "currency"],
     },
     "degiro": {
         "name": "DeGiro",
         "icon": "🟡",
         "desc": "Export Transazioni da Attività > Transazioni (IT/EN/NL). Riconosce ISIN e calcola il cambio valuta.",
-        "sample_columns": ["data", "ora", "prodotto", "isin", "quantità", "prezzo", "valuta"]
+        "sample_columns": ["data", "ora", "prodotto", "isin", "quantità", "prezzo", "valuta"],
     },
     "directa": {
         "name": "Directa SIM",
         "icon": "🔵",
         "desc": "Export Ordini Eseguiti o Estratto Conto Titoli dalle piattaforme dLite o Classic.",
-        "sample_columns": ["data", "ora", "operazione", "titolo", "simbolo", "quantità", "prezzo", "commissioni"]
+        "sample_columns": ["data", "ora", "operazione", "titolo", "simbolo", "quantità", "prezzo", "commissioni"],
     },
     "fineco": {
         "name": "Fineco Bank",
         "icon": "🔴",
         "desc": "Report Movimenti Conto Trading, Ordini Eseguiti e Rendiconto Fiscale.",
-        "sample_columns": ["data operazione", "tipo operazione", "descrizione", "codice isin", "quantità", "prezzo"]
+        "sample_columns": ["data operazione", "tipo operazione", "descrizione", "codice isin", "quantità", "prezzo"],
     },
     "ibkr": {
         "name": "Interactive Brokers (IBKR)",
         "icon": "🟠",
         "desc": "Activity Statement CSV (sezione Trades) o Trades Report esportato da Client Portal / TWS.",
-        "sample_columns": ["trades", "date/time", "symbol", "quantity", "t. price", "comm/fee"]
+        "sample_columns": ["trades", "date/time", "symbol", "quantity", "t. price", "comm/fee"],
     },
     "traderepublic": {
         "name": "Trade Republic",
         "icon": "🟢",
         "desc": "Export estratto conto, transazioni e ordini PAC (Savings Plan) in formato CSV.",
-        "sample_columns": ["timestamp", "type", "isin", "name", "shares", "price", "fee"]
+        "sample_columns": ["timestamp", "type", "isin", "name", "shares", "price", "fee"],
     },
     "scalable": {
         "name": "Scalable Capital",
         "icon": "🔷",
         "desc": "Export transazioni Baader Bank / Scalable Broker per compravendite, dividendi e PAC ETF.",
-        "sample_columns": ["date", "type", "security", "isin", "shares", "price", "amount"]
+        "sample_columns": ["date", "type", "security", "isin", "shares", "price", "amount"],
     },
     "etoro": {
         "name": "eToro",
         "icon": "🟩",
         "desc": "Estratto Conto / Account Statement e Closed Positions esportati da eToro.",
-        "sample_columns": ["position id", "action", "details", "units", "open rate", "close rate", "amount"]
+        "sample_columns": ["position id", "action", "details", "units", "open rate", "close rate", "amount"],
     },
     "revolut": {
         "name": "Revolut Trading",
         "icon": "🟣",
         "desc": "Export transazioni e ordini della sezione Trading / Investimenti di Revolut.",
-        "sample_columns": ["date", "ticker", "type", "quantity", "price per share", "total amount", "currency"]
-    }
+        "sample_columns": ["date", "ticker", "type", "quantity", "price per share", "total amount", "currency"],
+    },
 }
 
 
@@ -84,28 +84,55 @@ def _match_broker_signatures(cols_lower: list, cols_joined: str, first_col_value
     if std_required.issubset(set(cols_lower)):
         return "standard"
 
-    if any("trades" in v for v in first_col_values) or any(k in cols_joined for k in ["t. price", "tradeprice", "comm/fee", "currencyprimary"]):
+    if any("trades" in v for v in first_col_values) or any(
+        k in cols_joined for k in ["t. price", "tradeprice", "comm/fee", "currencyprimary"]
+    ):
         return "ibkr"
 
-    if any("isin" in c for c in cols_lower) and any(k in cols_joined for k in ["prodotto", "product", "costi di transazione", "transaction costs", "valuta autoconversione"]):
+    if any("isin" in c for c in cols_lower) and any(
+        k in cols_joined
+        for k in ["prodotto", "product", "costi di transazione", "transaction costs", "valuta autoconversione"]
+    ):
         return "degiro"
 
-    if any(k in cols_joined for k in ["operazione", "tipo operazione"]) and any(k in cols_joined for k in ["simbolo", "controvalore", "prezzo eseguito", "mercato", "divisa"]):
+    if any(k in cols_joined for k in ["operazione", "tipo operazione"]) and any(
+        k in cols_joined for k in ["simbolo", "controvalore", "prezzo eseguito", "mercato", "divisa"]
+    ):
         return "directa"
 
-    if any(k in cols_joined for k in ["data operazione", "data valuta"]) and any(k in cols_joined for k in ["codice isin", "codice titolo", "importo in euro", "tipo operazione"]):
+    if any(k in cols_joined for k in ["data operazione", "data valuta"]) and any(
+        k in cols_joined for k in ["codice isin", "codice titolo", "importo in euro", "tipo operazione"]
+    ):
         return "fineco"
 
-    if any(k in cols_joined for k in ["security", "bezeichnung", "kurswert", "ausführungskurs", "transaktionsart", "scalable"]):
+    if any(
+        k in cols_joined
+        for k in ["security", "bezeichnung", "kurswert", "ausführungskurs", "transaktionsart", "scalable"]
+    ):
         return "scalable"
 
-    if any(k in cols_joined for k in ["timestamp", "wertpapier", "gebuehr", "gebühr", "traderepublic", "trade republic"]):
+    if any(
+        k in cols_joined for k in ["timestamp", "wertpapier", "gebuehr", "gebühr", "traderepublic", "trade republic"]
+    ):
         return "traderepublic"
 
-    if any(k in cols_joined for k in ["position id", "open rate", "close rate", "take profit", "stop loss rate", "realized equity change", "etoro"]):
+    if any(
+        k in cols_joined
+        for k in [
+            "position id",
+            "open rate",
+            "close rate",
+            "take profit",
+            "stop loss rate",
+            "realized equity change",
+            "etoro",
+        ]
+    ):
         return "etoro"
 
-    if any(k in cols_joined for k in ["price per share", "total amount", "revolut"]) or ("ticker" in cols_joined and "price" in cols_joined and ("fx rate" in cols_joined or "amount" in cols_joined)):
+    if any(k in cols_joined for k in ["price per share", "total amount", "revolut"]) or (
+        "ticker" in cols_joined and "price" in cols_joined and ("fx rate" in cols_joined or "amount" in cols_joined)
+    ):
         return "revolut"
 
     if "isin" in cols_joined and any(k in cols_joined for k in ["name", "shares", "stueck", "stück"]):
@@ -127,7 +154,9 @@ def detect_broker_format(df_raw: pd.DataFrame) -> str:
 
     cols_lower = [str(c).strip().lower() for c in df_raw.columns]
     cols_joined = " ".join(cols_lower)
-    first_col_values = [str(v).strip().lower() for v in df_raw.iloc[:15, 0].values if pd.notna(v)] if not df_raw.empty else []
+    first_col_values = (
+        [str(v).strip().lower() for v in df_raw.iloc[:15, 0].values if pd.notna(v)] if not df_raw.empty else []
+    )
 
     detected = _match_broker_signatures(cols_lower, cols_joined, first_col_values)
     return detected if detected else "standard"
@@ -159,7 +188,7 @@ def parse_broker_csv(
     broker_key: str = "auto",
     apply_quality_gate: bool = False,
     portfolio_id: int = 1,
-    existing_hashes: Optional[Any] = None
+    existing_hashes: Optional[Any] = None,
 ) -> Tuple[pd.DataFrame, str, Dict[str, Any]]:
     """
     Esegue il parsing e la normalizzazione del DataFrame grezzo utilizzando il parser appropriato.
@@ -168,7 +197,9 @@ def parse_broker_csv(
     if df_raw is None or df_raw.empty:
         return pd.DataFrame(), "standard", {"status": "empty", "rows_parsed": 0}
 
-    detected_key = detect_broker_format(df_raw) if (broker_key == "auto" or not broker_key) else broker_key.lower().strip()
+    detected_key = (
+        detect_broker_format(df_raw) if (broker_key == "auto" or not broker_key) else broker_key.lower().strip()
+    )
     logger.info(f"Avvio parsing con adapter broker: {detected_key}")
 
     try:
@@ -180,17 +211,15 @@ def parse_broker_csv(
             "broker_icon": SUPPORTED_BROKERS.get(detected_key, {}).get("icon", "📄"),
             "rows_raw": len(df_raw),
             "rows_parsed": len(df_parsed),
-            "is_auto_detected": (broker_key == "auto")
+            "is_auto_detected": (broker_key == "auto"),
         }
 
         if apply_quality_gate and not df_parsed.empty:
             from core.data_quality_gate import DataQualityGate
+
             gate = DataQualityGate()
             df_gated, q_report = gate.process(
-                df_parsed,
-                broker_name=detected_key,
-                portfolio_id=portfolio_id,
-                existing_hashes=existing_hashes
+                df_parsed, broker_name=detected_key, portfolio_id=portfolio_id, existing_hashes=existing_hashes
             )
             report["quality_gate"] = q_report.model_dump()
             report["rows_parsed"] = len(df_gated)
@@ -201,4 +230,3 @@ def parse_broker_csv(
         logger.error(f"Errore durante il parsing del broker {detected_key}: {e}", exc_info=True)
         b_name = SUPPORTED_BROKERS.get(detected_key, {}).get("name", detected_key)
         raise ValueError(f"Errore durante l'elaborazione del file con il parser {b_name}: {e}") from e
-

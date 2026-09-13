@@ -1,18 +1,16 @@
-﻿# ============================================================
+# ============================================================
 # core/hmm_regime_engine.py
 # ARGUS — Machine Learning Hidden Markov Models (HMM) Regime Engine
 # Classificazione non supervisionata a 3 stati latenti & Transition Matrix
 # ============================================================
 
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 import pandas as pd
 
 
-def compute_hmm_market_regime_detection(
-    sr_returns: Optional[pd.Series] = None,
-    n_states: int = 3
-) -> Dict[str, Any]:
+def compute_hmm_market_regime_detection(sr_returns: Optional[pd.Series] = None, n_states: int = 3) -> Dict[str, Any]:
     """
     Identifica i regimi di mercato latenti tramite modello Markoviano a 3 stati
     (Low-Vol Bull, Range-Bound Drift, High-Vol Crisis) e calcola la matrice di transizione.
@@ -50,7 +48,7 @@ def compute_hmm_market_regime_detection(
 
     # Calcolo Matrice di Transizione empirica (3x3)
     trans_matrix = np.zeros((3, 3))
-    for (i, j) in zip(regimes[:-1], regimes[1:]):
+    for i, j in zip(regimes[:-1], regimes[1:]):
         trans_matrix[i, j] += 1
 
     # Normalizzazione per riga
@@ -63,7 +61,7 @@ def compute_hmm_market_regime_detection(
     state_profiles = []
 
     for s in range(3):
-        mask = (regimes == s)
+        mask = regimes == s
         s_rets = vals[mask] if np.sum(mask) > 0 else vals
         s_vol = float(np.std(s_rets) * np.sqrt(252.0) * 100.0)
         s_cagr = float(np.mean(s_rets) * 252.0 * 100.0)
@@ -71,32 +69,43 @@ def compute_hmm_market_regime_detection(
         p_stay = float(trans_matrix_prob[s, s])
         expected_duration_days = int(1.0 / max(0.01, 1.0 - p_stay))
 
-        state_profiles.append({
-            "state_id": s,
-            "state_name": state_names[s],
-            "observations_count": int(np.sum(mask)),
-            "frequency_pct": round(float(np.sum(mask) / len(regimes) * 100.0), 1),
-            "annualized_return_pct": round(s_cagr, 2),
-            "annualized_volatility_pct": round(s_vol, 2),
-            "sharpe_ratio": round(s_sharpe, 2),
-            "persistence_prob_pct": round(p_stay * 100.0, 1),
-            "expected_duration_days": expected_duration_days
-        })
+        state_profiles.append(
+            {
+                "state_id": s,
+                "state_name": state_names[s],
+                "observations_count": int(np.sum(mask)),
+                "frequency_pct": round(float(np.sum(mask) / len(regimes) * 100.0), 1),
+                "annualized_return_pct": round(s_cagr, 2),
+                "annualized_volatility_pct": round(s_vol, 2),
+                "sharpe_ratio": round(s_sharpe, 2),
+                "persistence_prob_pct": round(p_stay * 100.0, 1),
+                "expected_duration_days": expected_duration_days,
+            }
+        )
 
     cur_state = int(regimes[-1])
     cur_profile = state_profiles[cur_state]
 
     # Raccomandazione di asset allocation tattica
     recommendations = {
-        0: {"allocation": "100% Risk-On (Equity Overweight & Growth)", "action": "Mantenere piena esposizione azionaria, momentum e carry trade."},
-        1: {"allocation": "70% Core Multi-Asset / 30% Quality Fixed Income", "action": "Ribilanciamento equilibrato, focus su dividendi e quality factor."},
-        2: {"allocation": "De-Risking / Cash Buffer & Tail Hedging", "action": "Copertura asimmetrica con Put OTM, incremento liquidità e oro rifugio."}
+        0: {
+            "allocation": "100% Risk-On (Equity Overweight & Growth)",
+            "action": "Mantenere piena esposizione azionaria, momentum e carry trade.",
+        },
+        1: {
+            "allocation": "70% Core Multi-Asset / 30% Quality Fixed Income",
+            "action": "Ribilanciamento equilibrato, focus su dividendi e quality factor.",
+        },
+        2: {
+            "allocation": "De-Risking / Cash Buffer & Tail Hedging",
+            "action": "Copertura asimmetrica con Put OTM, incremento liquidità e oro rifugio.",
+        },
     }
 
     df_trans = pd.DataFrame(
         np.round(trans_matrix_prob * 100.0, 1),
         index=["Da Bull", "Da Neutral", "Da Crisis"],
-        columns=["Verso Bull %", "Verso Neutral %", "Verso Crisis %"]
+        columns=["Verso Bull %", "Verso Neutral %", "Verso Crisis %"],
     )
 
     return {
@@ -107,5 +116,5 @@ def compute_hmm_market_regime_detection(
         "tactical_recommendation": recommendations[cur_state],
         "state_profiles": state_profiles,
         "state_profiles_df": pd.DataFrame(state_profiles),
-        "transition_matrix_pct_df": df_trans
+        "transition_matrix_pct_df": df_trans,
     }

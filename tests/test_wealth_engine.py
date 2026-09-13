@@ -3,78 +3,73 @@
 # Unit tests for ARGUS Wealth Management & Personal Finance
 # ============================================================
 
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
+import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 
-from core.wealth.wealth_models import (
-    WealthAccount,
-    PhysicalAssetItem,
-    PensionPlanItem,
-    CategoryNature,
-    GoalCategory,
-    WealthGoalItem,
-    HeirRelationship,
-    EstateHeirItem,
-    EstatePlanResult,
-    NetWorthSummary,
-    AccountType,
-    PhysicalAssetCategory
-)
 from core.wealth.wealth_db import (
-    init_wealth_db,
-    save_wealth_account,
-    get_wealth_accounts,
-    insert_cashflow_tx,
-    get_cashflow_records,
-    save_physical_asset,
-    get_physical_assets,
-    save_pension_plan,
-    get_pension_plans,
-    get_wealth_categories,
-    get_wealth_portfolios,
-    create_wealth_portfolio,
-    delete_wealth_portfolio,
+    cleanup_empty_wealth_portfolios,
+    clear_wealth_accounts,
     clear_wealth_cashflow,
     clear_wealth_snapshots,
-    clear_wealth_accounts,
-    reset_wealth_portfolio_data,
-    reset_all_wealth_database,
-    cleanup_empty_wealth_portfolios,
-    save_wealth_goal,
+    create_wealth_portfolio,
+    delete_wealth_goal,
+    delete_wealth_portfolio,
+    get_cashflow_records,
+    get_pension_plans,
+    get_physical_assets,
+    get_wealth_accounts,
+    get_wealth_categories,
     get_wealth_goals,
-    delete_wealth_goal
+    get_wealth_portfolios,
+    init_wealth_db,
+    insert_cashflow_tx,
+    reset_all_wealth_database,
+    reset_wealth_portfolio_data,
+    save_pension_plan,
+    save_physical_asset,
+    save_wealth_account,
+    save_wealth_goal,
 )
 from core.wealth.wealth_engine import (
-    compute_consolidated_net_worth,
-    compute_cashflow_analytics,
-    compute_wealth_health_score,
-    simulate_pension_projection,
-    compute_goal_based_monte_carlo,
-    compute_dynamic_glide_path,
-    compute_portfolio_tco_and_fee_drag,
     compute_advanced_estate_planning,
-    compute_tax_smart_rebalancing_watchdog,
+    compute_ai_quarterly_wealth_review,
+    compute_cashflow_analytics,
+    compute_consolidated_net_worth,
+    compute_dynamic_glide_path,
+    compute_family_governance_and_patti_di_famiglia,
+    compute_family_office_multi_entity_consolidation,
+    compute_goal_based_monte_carlo,
+    compute_multi_currency_fx_hedging_engine,
+    compute_portfolio_tco_and_fee_drag,
+    compute_private_equity_deal_metrics,
     compute_real_estate_net_equity_and_ltv,
+    compute_sequence_of_returns_risk_engine,
+    compute_smart_cashflow_reconciliation,
+    compute_tax_smart_rebalancing_watchdog,
+    compute_total_wealth_brinson_attribution,
+    compute_wealth_health_score,
     generate_advisory_pitchbook_html,
     generate_advisory_pitchbook_pdf,
-    compute_ai_quarterly_wealth_review,
-    compute_family_office_multi_entity_consolidation,
-    compute_sequence_of_returns_risk_engine,
-    compute_private_equity_deal_metrics,
-    compute_multi_currency_fx_hedging_engine,
-    compute_family_governance_and_patti_di_famiglia,
-    compute_total_wealth_brinson_attribution,
-    compute_smart_cashflow_reconciliation
+    simulate_pension_projection,
 )
-from core.wealth.wealth_importer import (
-    parse_universal_statement,
-    auto_categorize_transactions
+from core.wealth.wealth_importer import auto_categorize_transactions, parse_universal_statement
+from core.wealth.wealth_models import (
+    AccountType,
+    CategoryNature,
+    EstateHeirItem,
+    EstatePlanResult,
+    GoalCategory,
+    HeirRelationship,
+    NetWorthSummary,
+    PensionPlanItem,
+    PhysicalAssetCategory,
+    PhysicalAssetItem,
+    WealthAccount,
+    WealthGoalItem,
 )
-
-
-from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture
@@ -221,11 +216,12 @@ def test_universal_statement_parser():
 def test_wealth_snapshot_save_and_recall(sqlite_engine):
     """Verifica il salvataggio su DB e il richiamo dello snapshot patrimoniale."""
     from datetime import date
+
     from core.wealth.wealth_snapshot import (
-        save_wealth_snapshot_to_db,
+        delete_wealth_snapshot,
         get_wealth_snapshots_history,
         load_wealth_snapshot_details,
-        delete_wealth_snapshot
+        save_wealth_snapshot_to_db,
     )
 
     save_wealth_account(sqlite_engine, {
@@ -406,13 +402,14 @@ def test_reset_all_wealth_database_and_cleanup(sqlite_engine):
 def test_dynamic_risk_portfolio_linkage(sqlite_engine):
     """Verifica il collegamento dinamico dei portafogli dal modulo Risk al modulo Wealth."""
     from sqlalchemy import text as sqlt
+
     from core.wealth.wealth_db import (
         get_available_risk_portfolios,
-        set_linked_risk_portfolios,
         get_linked_risk_portfolios,
         get_linked_risk_portfolios_summary,
+        load_wealth_snapshot_details,
         save_wealth_snapshot_to_db,
-        load_wealth_snapshot_details
+        set_linked_risk_portfolios,
     )
 
     # Crea tabelle portfolios e portfolio_snapshots se non esistono nel mock SQLite
@@ -485,8 +482,8 @@ def test_dynamic_risk_portfolio_linkage(sqlite_engine):
 
 def test_fire_analytics_and_wealth_stress_testing(sqlite_engine):
     """Verifica il calcolo analitico del FIRE e dello stress testing patrimoniale."""
-    from core.wealth.wealth_models import NetWorthSummary
     from core.wealth.wealth_engine import compute_fire_analytics, compute_wealth_stress_test
+    from core.wealth.wealth_models import NetWorthSummary
 
     mock_summary = NetWorthSummary(
         total_net_worth=100000.0,
@@ -625,8 +622,8 @@ def test_compute_buy_vs_rent_comparison():
 
 def test_compute_estate_planning_analytics():
     """Verifica le quote di legittima del Codice Civile e il calcolo franchigie successorie."""
-    from core.wealth.wealth_models import NetWorthSummary
     from core.wealth.wealth_engine import compute_estate_planning_analytics
+    from core.wealth.wealth_models import NetWorthSummary
 
     mock_nw = NetWorthSummary(
         total_net_worth=1500000.0,
@@ -832,10 +829,10 @@ def test_compute_cashflow_analytics_strict_transfers_exclusion():
     """Verifica che i giroconti e trasferimenti interni NON siano conteggiati come entrate né uscite."""
     from core.wealth.wealth_engine import (
         compute_cashflow_analytics,
+        compute_cashflow_whatif_reinvestment,
+        compute_envelope_budget_analytics,
         compute_merchant_pareto_analytics,
         compute_seasonality_matrix,
-        compute_envelope_budget_analytics,
-        compute_cashflow_whatif_reinvestment
     )
 
     df_test = pd.DataFrame([

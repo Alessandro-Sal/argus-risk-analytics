@@ -4,31 +4,28 @@
 # ==============================================================================
 
 import os
-import pytest
-import pandas as pd
-import numpy as np
 
-from core.bquant_engine import (
-    execute_bquant_script,
-    BQUANT_SNIPPETS
+import numpy as np
+import pandas as pd
+import pytest
+
+from core.bquant_engine import BQUANT_SNIPPETS, execute_bquant_script
+from core.excel_connector import (
+    EXCEL_PORTFOLIO_RISK_FIELDS,
+    EXCEL_SUPPORTED_FIELDS,
+    build_bloomberg_formula,
+    export_institutional_multisheet_excel,
+    generate_office_script_code,
+    generate_vba_macro_code,
 )
+from core.ui_utils import parse_terminal_command
 from core.workspace_engine import (
     ROLE_PRESET_PROFILES,
     get_available_roles,
     get_role_profile,
+    load_custom_workspace_layout,
     save_custom_workspace_layout,
-    load_custom_workspace_layout
 )
-from core.excel_connector import (
-    EXCEL_SUPPORTED_FIELDS,
-    EXCEL_PORTFOLIO_RISK_FIELDS,
-    build_bloomberg_formula,
-    generate_vba_macro_code,
-    generate_office_script_code,
-    export_institutional_multisheet_excel
-)
-from core.ui_utils import parse_terminal_command
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 1. BQuant Python Sandbox Engine Tests

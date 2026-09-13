@@ -1,15 +1,17 @@
-﻿import pytest
+﻿import numpy as np
 import pandas as pd
-import numpy as np
+import pytest
+
 from core.ui_utils import (
     generate_svg_sparkline,
-    render_status_badge,
-    render_kpi_metric,
-    render_kpi_card,
+    render_data_table,
     render_glassmorphic_card,
+    render_kpi_card,
+    render_kpi_metric,
     render_page_header,
-    render_data_table
+    render_status_badge,
 )
+
 
 def test_generate_svg_sparkline_valid():
     data = [10.0, 12.5, 11.0, 14.2, 13.8, 16.0]

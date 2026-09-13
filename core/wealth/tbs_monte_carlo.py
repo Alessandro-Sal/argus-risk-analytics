@@ -17,6 +17,7 @@ Features:
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
+
 import numpy as np
 import pandas as pd
 
@@ -24,6 +25,7 @@ import pandas as pd
 @dataclass
 class TBSLifecycleConfig:
     """Configurazione dei parametri per la simulazione Monte Carlo a ciclo di vita."""
+
     current_age: int = 35
     retirement_age: int = 67
     terminal_age: int = 90
@@ -75,16 +77,9 @@ class TBSMonteCarloEngine:
         rng = np.random.default_rng(cfg.random_seed)
 
         # Correlazione tra rendimento azionario e immobiliare (~0.25)
-        corr_matrix = np.array([
-            [1.00, 0.25],
-            [0.25, 1.00]
-        ])
-        try:
-            chol = np.linalg.cholesky(corr_matrix)
-        except np.linalg.LinAlgError:
-            eigvals, eigvecs = np.linalg.eigh(corr_matrix)
-            eigvals = np.maximum(eigvals, 1e-6)
-            chol = eigvecs @ np.diag(np.sqrt(eigvals))
+        corr_matrix = np.array([[1.00, 0.25], [0.25, 1.00]])
+        from core.stochastic_kernel import robust_cholesky
+        chol = robust_cholesky(corr_matrix, min_eigval=1e-6)
 
         # Matrici per gli stati patrimoniali: [Simulazioni x Anni]
         # Anno 0 è lo stato iniziale
@@ -102,9 +97,7 @@ class TBSMonteCarloEngine:
         net_worth_paths[:, 0] = cfg.initial_liquid_wealth + cfg.initial_real_estate_value - cfg.initial_mortgage_debt
 
         mortgage_annual_pmt = self._calc_annual_mortgage_payment(
-            cfg.initial_mortgage_debt,
-            cfg.mortgage_annual_interest_rate,
-            cfg.mortgage_years_remaining
+            cfg.initial_mortgage_debt, cfg.mortgage_annual_interest_rate, cfg.mortgage_years_remaining
         )
 
         curr_debt = cfg.initial_mortgage_debt
@@ -123,16 +116,22 @@ class TBSMonteCarloEngine:
 
             # Rendimenti log-normali
             # Portfolio: media liquid_wealth_real_return_mean, vol liquid_wealth_volatility
-            r_liq = np.exp(
-                (cfg.liquid_wealth_real_return_mean - 0.5 * (cfg.liquid_wealth_volatility ** 2)) +
-                cfg.liquid_wealth_volatility * z_corr[:, 0]
-            ) - 1.0
+            r_liq = (
+                np.exp(
+                    (cfg.liquid_wealth_real_return_mean - 0.5 * (cfg.liquid_wealth_volatility**2))
+                    + cfg.liquid_wealth_volatility * z_corr[:, 0]
+                )
+                - 1.0
+            )
 
             # Real estate: media real_estate_real_appreciation, vol real_estate_volatility
-            r_re = np.exp(
-                (cfg.real_estate_real_appreciation - 0.5 * (cfg.real_estate_volatility ** 2)) +
-                cfg.real_estate_volatility * z_corr[:, 1]
-            ) - 1.0
+            r_re = (
+                np.exp(
+                    (cfg.real_estate_real_appreciation - 0.5 * (cfg.real_estate_volatility**2))
+                    + cfg.real_estate_volatility * z_corr[:, 1]
+                )
+                - 1.0
+            )
 
             # 2. Capitale Umano & Reddito da Lavoro / Pensione
             if age < cfg.retirement_age:
@@ -210,7 +209,7 @@ class TBSMonteCarloEngine:
             fragile_t = int(np.argmax(ruin_increments)) + 1
         else:
             # Se nessuna rovina, identifica l'anno con la mediana di liquidità più bassa nei primi 20 anni
-            fragile_t = int(np.argmin(liq_p50[:min(25, len(liq_p50))]))
+            fragile_t = int(np.argmin(liq_p50[: min(25, len(liq_p50))]))
 
         fragile_age = int(cfg.current_age + fragile_t)
 
@@ -220,18 +219,20 @@ class TBSMonteCarloEngine:
         spending_haircut = (excess_ruin / 100.0) * cfg.annual_living_expenses * 0.50
         recommended_spending = max(12000.0, cfg.annual_living_expenses - spending_haircut)
 
-        timeline_df = pd.DataFrame({
-            "age": ages,
-            "year": years_arr,
-            "net_worth_p10": nw_p10,
-            "net_worth_p25": nw_p25,
-            "net_worth_p50": nw_p50,
-            "net_worth_p75": nw_p75,
-            "net_worth_p90": nw_p90,
-            "liquid_wealth_median": liq_p50,
-            "real_estate_median": re_p50,
-            "cumulative_ruin_pct": cumulative_ruin_pct
-        })
+        timeline_df = pd.DataFrame(
+            {
+                "age": ages,
+                "year": years_arr,
+                "net_worth_p10": nw_p10,
+                "net_worth_p25": nw_p25,
+                "net_worth_p50": nw_p50,
+                "net_worth_p75": nw_p75,
+                "net_worth_p90": nw_p90,
+                "liquid_wealth_median": liq_p50,
+                "real_estate_median": re_p50,
+                "cumulative_ruin_pct": cumulative_ruin_pct,
+            }
+        )
 
         return {
             "total_ruin_probability_pct": total_ruin_prob_pct,
@@ -245,5 +246,5 @@ class TBSMonteCarloEngine:
             "recommended_spending_cut_eur": spending_haircut,
             "timeline_df": timeline_df,
             "simulation_runs": num_sims,
-            "total_horizon_years": total_years
+            "total_horizon_years": total_years,
         }

@@ -5,16 +5,17 @@
 
 import pandas as pd
 import pytest
+
 from core.security_engine import (
-    sanitize_for_export,
-    sanitize_dataframe_for_export,
-    mask_iban,
+    CIPHER_PREFIX,
+    ArgusDataVault,
+    escape_html_content,
     mask_account_number,
+    mask_iban,
     mask_tax_id,
     pseudonymize_identifier,
-    escape_html_content,
-    ArgusDataVault,
-    CIPHER_PREFIX
+    sanitize_dataframe_for_export,
+    sanitize_for_export,
 )
 
 
