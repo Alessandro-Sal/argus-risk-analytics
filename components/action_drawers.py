@@ -10,10 +10,11 @@ Reusable modal action drawers built on @st.dialog for institutional workflow con
 """
 
 from typing import Any, Dict, List, Optional
-import streamlit as st
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 
 from core.chart_framework import ObsidianTheme, apply_argus_theme
 

@@ -2,18 +2,18 @@
 # tests/test_ui_ux_overhaul.py
 # ARGUS Risk Analytics — UI/UX & Terminal Ergonomics Suite Tests
 # ==============================================================================
-import pytest
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
+import pytest
 
-from components.command_palette import CATALOG_PAGES, CATALOG_SCENARIOS, HOTKEY_JS_SNIPPET
 from components.action_drawers import (
-    render_order_blotter_dialog,
     render_lot_inspector_dialog,
+    render_order_blotter_dialog,
     render_risk_decomposition_dialog,
 )
-from core.chart_framework import apply_argus_theme, lttb_downsample, ObsidianTheme
+from components.command_palette import CATALOG_PAGES, CATALOG_SCENARIOS, HOTKEY_JS_SNIPPET
+from core.chart_framework import ObsidianTheme, apply_argus_theme, lttb_downsample
 
 
 def test_command_palette_catalog_completeness():

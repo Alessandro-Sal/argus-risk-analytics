@@ -234,6 +234,19 @@ def main():
             except Exception:
                 pass
 
+        def on_closed():
+            print("[ARGUS Desktop] Chiusura finestra nativa. Arresto server in corso...")
+            try:
+                process.terminate()
+                process.wait(timeout=3)
+            except Exception:
+                process.kill()
+            try:
+                shutil.rmtree(udf_dir, ignore_errors=True)
+            except Exception:
+                pass
+            print("[ARGUS Desktop] Shutdown completato pulitamente.")
+
         window.events.loaded += on_loaded
         window.events.closed += on_closed
         webview.start(private_mode=False, storage_path=udf_dir)
