@@ -2747,48 +2747,143 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
 
 # ── TAB 5: RIBILANCIAMENTO AUTONOMO & MIFID II ───────────────
 elif active_pos_tab == "⚖️ Ribilanciamento Autonomo & MiFID II":
-    st.markdown("### ⚖️ Autonomous AI Rebalancing & MiFID II Suitability Gate")
-    st.caption("Generazione automatica di proposte d'ordine per riallineare i pesi agli obiettivi strategici, verifica del turnover, stima delle plusvalenze/minusvalenze fiscali e controllo di adeguatezza MiFID II.")
+    st.markdown("### ⚖️ Multi-Strategy Institutional Rebalancing & MiFID II Gate")
+    st.caption("Motore unificato di ribilanciamento multi-strategia: verifica del turnover, conformità fiscale TUIR Art. 44 vs 67, matrice di attrito e gate di adeguatezza MiFID II.")
 
-    from core.autonomous_rebalancer import check_mifid_suitability_and_limits, generate_autonomous_rebalancing_proposal
+    from core.services.rebalancing_service import RebalancingService
+    from core.session_manager import ArgusSessionManager
 
-    col_reb_opt1, col_reb_opt2 = st.columns([2, 1])
+    # Strategie disponibili dal RebalancingEngine
+    strat_options = {
+        "🤖 Autonomous AI Rebalancer (MiFID II + TUIR)": "autonomous",
+        "⚖️ Tax-Aware Friction Matrix & Cashflow": "tax_aware",
+        "🎯 Prescriptive Conic (SLSQP & FIX Blotter)": "prescriptive",
+        "📐 Heuristic Target Allocation": "heuristic",
+    }
+
+    col_reb_opt1, col_reb_opt2, col_reb_opt3 = st.columns([1.5, 1, 1])
     with col_reb_opt1:
-        prof_sel = st.selectbox("Profilo di Rischio Cliente (MiFID II):", ["Conservative", "Moderate", "Aggressive"], index=1)
+        strat_label = st.selectbox("Strategia di Ribilanciamento:", list(strat_options.keys()), index=0)
+        chosen_strat = strat_options[strat_label]
     with col_reb_opt2:
+        curr_prof = ArgusSessionManager.get_risk_profile()
+        prof_options = ["Conservative", "Moderate", "Aggressive"]
+        prof_idx = prof_options.index(curr_prof) if curr_prof in prof_options else 1
+        prof_sel = st.selectbox(
+            "Profilo di Rischio Cliente (MiFID II):",
+            prof_options,
+            index=prof_idx,
+        )
+        if prof_sel != curr_prof:
+            ArgusSessionManager.set_risk_profile(prof_sel)
+    with col_reb_opt3:
         max_turn = st.slider("Massimo Turnover Ammesso (%):", 5.0, 50.0, 25.0, 5.0)
 
-    mifid_res = check_mifid_suitability_and_limits(df_positions=pos, results=results, risk_profile=prof_sel)
-    rebal_res = generate_autonomous_rebalancing_proposal(df_positions=pos, results=results, max_turnover_pct=max_turn)
+    # Zainetto fiscale e soglia minima
+    col_reb_sub1, col_reb_sub2 = st.columns(2)
+    with col_reb_sub1:
+        current_minus = ArgusSessionManager.get_minusvalenze_available()
+        minus_input = st.number_input("Minusvalenze Pregresse Compensabili (€, Art. 67 TUIR):", min_value=0.0, value=float(current_minus), step=100.0)
+        if minus_input != current_minus:
+            ArgusSessionManager.set_minusvalenze_available(minus_input)
+    with col_reb_sub2:
+        min_trade = st.number_input("Taglia Minima Ordine (€):", min_value=10.0, max_value=5000.0, value=100.0, step=50.0)
+
+    # Calcolo target weights da optimization o default bilanciato
+    opt = results.get("optimization", {})
+    target_weights = {}
+    if opt and "tickers" in opt and opt.get("tickers"):
+        opt_tickers = opt["tickers"]
+        opt_w = opt.get("max_sharpe", {}).get("weights", [])
+        if len(opt_w) == len(opt_tickers):
+            target_weights = {t: float(w) for t, w in zip(opt_tickers, opt_w)}
+
+    rebal_res = RebalancingService.execute_rebalance(
+        positions=pos,
+        target_weights=target_weights,
+        strategy=chosen_strat,
+        total_portfolio_value=float(pos["current_value"].sum()) if not pos.empty and "current_value" in pos.columns else None,
+        minusvalenze_available=minus_input,
+        max_turnover_pct=max_turn,
+        min_trade_eur=min_trade,
+        metadata={"risk_profile": prof_sel},
+    )
+
+    # Memorizza esito in ArgusSessionManager
+    ArgusSessionManager.save_rebalance_result(rebal_res)
+
+    compliance = rebal_res.get("compliance", {})
+    mifid_status = compliance.get("status", "APPROVED 🟢")
+    mifid_violations = compliance.get("violations_count", 0)
+    is_mifid_ok = compliance.get("is_mifid_compliant", True)
+
+    summary = rebal_res.get("summary", {})
+    turnover_val = summary.get("turnover_pct", 0.0)
+    is_turnover_ok = summary.get("is_turnover_compliant", True)
+    buy_vol = summary.get("total_buy_volume_eur", 0.0)
+    sell_vol = summary.get("total_sell_volume_eur", 0.0)
+
+    tax_rep = rebal_res.get("tax_report", {})
+    tax_liability = tax_rep.get("estimated_tax_liability_eur", 0.0)
 
     rc1, rc2, rc3, rc4 = st.columns(4)
     with rc1:
-        metric_card("Stato Gate MiFID II", mifid_res["status"], delta=f"{mifid_res['violations_count']} Violazioni", delta_color="normal" if mifid_res["is_mifid_compliant"] else "inverse")
+        metric_card(
+            "Stato Gate MiFID II",
+            mifid_status,
+            delta=f"{mifid_violations} Violazioni" if mifid_violations > 0 else "Conforme",
+            delta_color="normal" if is_mifid_ok else "inverse",
+        )
     with rc2:
-        metric_card("Turnover Proposto", f"{rebal_res['turnover_pct']:.1f}%", delta=f"Max Consentito: {max_turn:.0f}%", delta_color="normal" if rebal_res["is_turnover_compliant"] else "inverse")
+        metric_card(
+            "Turnover Proposto",
+            f"{turnover_val:.1f}%",
+            delta=f"Max Consentito: {max_turn:.0f}%",
+            delta_color="normal" if is_turnover_ok else "inverse",
+        )
     with rc3:
-        metric_card("Volume Acquisti / Vendite", f"€ {rebal_res['total_buy_volume_eur']:,.0f}", delta=f"Vendite: € {rebal_res['total_sell_volume_eur']:,.0f}", delta_color="normal")
+        metric_card(
+            "Volume Acquisti / Vendite",
+            f"€ {buy_vol:,.0f}",
+            delta=f"Vendite: € {sell_vol:,.0f}",
+            delta_color="normal",
+        )
     with rc4:
-        metric_card("Imposta CGT Stimata", fmt_eur(rebal_res["estimated_tax_liability_eur"]), delta="Capital Gain Tax", delta_color="inverse" if rebal_res["estimated_tax_liability_eur"] > 0 else "normal")
+        metric_card(
+            "Imposta CGT Stimata",
+            fmt_eur(tax_liability),
+            delta="Capital Gain Tax",
+            delta_color="inverse" if tax_liability > 0 else "normal",
+        )
 
     st.write("")
 
-    if not rebal_res["trades_df"].empty:
-        st.markdown("##### 📝 Distinta Ordini di Ribilanciamento (Trade Blotter)")
-        st.dataframe(
-            rebal_res["trades_df"][["ticker", "action", "current_weight_pct", "target_weight_pct", "suggested_shares", "estimated_price", "trade_notional_eur", "estimated_tax_impact_eur", "status"]].rename(columns={
-                "ticker": "Strumento",
-                "action": "Azione",
-                "current_weight_pct": "Peso Attuale (%)",
-                "target_weight_pct": "Peso Target (%)",
-                "suggested_shares": "Quote Consigliate",
-                "estimated_price": "Prezzo Stimato (€)",
-                "trade_notional_eur": "Controvalore Ordine (€)",
-                "estimated_tax_impact_eur": "Imposta Stimata (€)",
-                "status": "Stato Ordine"
-            }),
-            use_container_width=True,
-            hide_index=True
+    orders = rebal_res.get("orders", [])
+    if orders:
+        df_display_orders = pd.DataFrame(orders)
+        # Rinomina per visualizzazione istituzionale
+        cols_map = {
+            "ticker": "Strumento",
+            "action": "Azione",
+            "current_weight_pct": "Peso Attuale (%)",
+            "target_weight_pct": "Peso Target (%)",
+            "shares": "Quote Consigliate",
+            "price": "Prezzo Stimato (€)",
+            "order_value": "Controvalore Ordine (€)",
+            "tax_category": "Regime Fiscale (TUIR)",
+            "estimated_tax": "Imposta Stimata (€)",
+        }
+        avail_cols = [c for c in cols_map.keys() if c in df_display_orders.columns]
+        df_show = df_display_orders[avail_cols].rename(columns=cols_map)
+
+        render_table_with_export(
+            df=df_show,
+            table_title="📝 Distinta Ordini di Ribilanciamento Istituzionale (Trade Blotter)",
+            file_prefix=f"rebalance_{chosen_strat}",
+            key_suffix="rebal_tab5",
+            currency_cols=["Prezzo Stimato (€)", "Controvalore Ordine (€)", "Imposta Stimata (€)"],
+            pct_cols=["Peso Attuale (%)", "Peso Target (%)"],
+            hide_index=True,
         )
     else:
         st.success("🟢 **Portafoglio Perfettamente Allineato**: Nessun ordine di riallineamento necessario rispetto ai pesi target impostati.")

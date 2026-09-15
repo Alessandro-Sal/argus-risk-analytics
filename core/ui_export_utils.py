@@ -371,7 +371,11 @@ def get_cached_excel_bytes(df: pd.DataFrame, sheet_name: str = "Dati", base_curr
 # 4. COMPONENTI UI STREAMLIT (TOOLBAR & TABLE WRAPPER)
 # ==============================================================================
 
+# Isolamento Streamlit Fragment: evita il full-page rerun al download/apertura del popover
+_export_fragment = st.fragment if hasattr(st, "fragment") else lambda f: f
 
+
+@_export_fragment
 def render_export_toolbar(
     df: pd.DataFrame,
     file_prefix: str = "export",

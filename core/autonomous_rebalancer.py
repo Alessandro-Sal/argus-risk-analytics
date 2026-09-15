@@ -129,19 +129,28 @@ def generate_autonomous_rebalancing_proposal(
     if sum_t > 0:
         targets = {k: v / sum_t for k, v in targets.items()}
 
+    if (df_positions is None or df_positions.empty) and results and "positions" in results:
+        res_pos = results["positions"]
+        if isinstance(res_pos, pd.DataFrame) and not res_pos.empty:
+            df_positions = res_pos
+
     current_positions = {}
     prices = {}
     pmcs = {}
+    asset_classes = {}
     if df_positions is not None and not df_positions.empty:
         for _, r in df_positions.iterrows():
             t = str(r.get("ticker", "")).strip()
-            val = float(r.get("controvalore", 0.0))
-            p = float(r.get("prezzo_corrente", r.get("prezzo_medio_carico", 100.0)))
-            pmc_val = float(r.get("prezzo_medio_carico", r.get("pmc_fiscale", 0.0)))
+            val = float(r.get("controvalore", r.get("current_value", r.get("market_value", 0.0))))
+            p = float(r.get("prezzo_corrente", r.get("last_price", r.get("prezzo_medio_carico", 100.0))))
+            pmc_val = float(r.get("prezzo_medio_carico", r.get("pmc_fiscale", r.get("avg_cost", 0.0))))
+            ac_val = str(r.get("asset_class", r.get("categoria", "")))
             current_positions[t] = val
             prices[t] = max(0.01, p)
             if pmc_val > 0:
                 pmcs[t] = pmc_val
+            if ac_val:
+                asset_classes[t] = ac_val
 
     # Elenco unificato di ticker
     all_tickers = sorted(list(set(list(targets.keys()) + list(current_positions.keys()))))
@@ -152,6 +161,10 @@ def generate_autonomous_rebalancing_proposal(
     estimated_tax_impact_eur = 0.0
     remaining_minus_eur = float(max(0.0, available_minusvalenze_eur))
     total_tax_saved_eur = 0.0
+    total_etf_gains_eur = 0.0
+    total_diversi_gains_eur = 0.0
+
+    from core.tax_engine import get_asset_tax_rate, is_etf
 
     for t in all_tickers:
         cur_val = current_positions.get(t, 0.0)
@@ -171,9 +184,15 @@ def generate_autonomous_rebalancing_proposal(
                 gross_gain = 0.0
                 offset_used = 0.0
                 tax_saved = 0.0
+                tax_cat = "N/A"
             else:
                 action = "SELL"
                 total_sell_eur += notional
+
+                # Determinazione classificazione fiscale dello strumento (TUIR Art. 44 vs 67)
+                ac_str = asset_classes.get(t, "")
+                is_etf_asset = is_etf(ac_str, t)
+                applicable_tax_rate = get_asset_tax_rate(ac_str, t)
 
                 # Calcolo fiscale analitico su PMC se disponibile
                 pmc = pmcs.get(t, 0.0)
@@ -184,20 +203,31 @@ def generate_autonomous_rebalancing_proposal(
                     gross_gain = float(notional * 0.15)
 
                 if gross_gain > 0:
-                    # Plusvalenza: verifica compensabilità con minusvalenze capienti
-                    if remaining_minus_eur > 0:
-                        offset_used = min(remaining_minus_eur, gross_gain)
-                        taxable_gain = gross_gain - offset_used
-                        remaining_minus_eur -= offset_used
-                        tax_impact = taxable_gain * 0.26
-                        tax_saved = offset_used * 0.26
-                        total_tax_saved_eur += tax_saved
-                    else:
+                    if is_etf_asset:
+                        # TUIR Art. 44: Proventi da ETF = Redditi di Capitale (NON compensabili con minusvalenze pregresse)
+                        tax_cat = "REDDITI_CAPITALE (ETF - No Offset)"
                         offset_used = 0.0
                         tax_saved = 0.0
-                        tax_impact = gross_gain * 0.26
+                        tax_impact = gross_gain * applicable_tax_rate
+                        total_etf_gains_eur += gross_gain
+                    else:
+                        # TUIR Art. 67: Azioni / Bond / ETC = Redditi Diversi (Compensabili con minusvalenze pregresse)
+                        tax_cat = "REDDITI_DIVERSI (Compensabile)"
+                        total_diversi_gains_eur += gross_gain
+                        if remaining_minus_eur > 0:
+                            offset_used = min(remaining_minus_eur, gross_gain)
+                            taxable_gain = gross_gain - offset_used
+                            remaining_minus_eur -= offset_used
+                            tax_impact = taxable_gain * applicable_tax_rate
+                            tax_saved = offset_used * applicable_tax_rate
+                            total_tax_saved_eur += tax_saved
+                        else:
+                            offset_used = 0.0
+                            tax_saved = 0.0
+                            tax_impact = gross_gain * applicable_tax_rate
                 else:
-                    # Minusvalenza generata dalla vendita: alimenta lo zainetto
+                    # Minusvalenza generata dalla vendita: alimenta lo zainetto fiscale (TUIR Art. 68 c. 5)
+                    tax_cat = "MINUSVALENZA_GENERATA"
                     new_minus = abs(gross_gain)
                     remaining_minus_eur += new_minus
                     tax_impact = 0.0
@@ -220,6 +250,7 @@ def generate_autonomous_rebalancing_proposal(
                     "minus_offset_used_eur": round(offset_used, 2),
                     "estimated_tax_impact_eur": round(tax_impact, 2),
                     "tax_saved_eur": round(tax_saved, 2),
+                    "tax_category": tax_cat,
                     "status": "READY_TO_EXECUTE",
                 }
             )
@@ -242,6 +273,8 @@ def generate_autonomous_rebalancing_proposal(
         "remaining_minusvalenze_eur": round(remaining_minus_eur, 2),
         "total_tax_saved_by_harvesting_eur": round(total_tax_saved_eur, 2),
         "estimated_tax_liability_eur": round(estimated_tax_impact_eur, 2),
+        "total_etf_gains_eur": round(total_etf_gains_eur, 2),
+        "total_diversi_gains_eur": round(total_diversi_gains_eur, 2),
         "trades_list": trades,
         "trades_df": df_trades,
     }
