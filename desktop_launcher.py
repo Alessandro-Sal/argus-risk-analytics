@@ -64,7 +64,13 @@ def find_python_executable():
     return "python"
 
 def main():
-    # 0. Disaster recovery: Snapshot preventivo del database locale su avvio
+    # 0. Disaster recovery & sys.path setup
+    if hasattr(sys, '_MEIPASS') and sys._MEIPASS not in sys.path:
+        sys.path.insert(0, sys._MEIPASS)
+    base_proj_dir = os.path.abspath(".")
+    if base_proj_dir not in sys.path:
+        sys.path.insert(0, base_proj_dir)
+
     try:
         from core.backup_engine import perform_hot_backup
         perform_hot_backup()
@@ -98,6 +104,16 @@ def main():
     process = None
     port = None
 
+    # Configura ambiente con percorsi completi per sottomoduli (es. components, core)
+    sub_env = os.environ.copy()
+    pp_dirs = []
+    if hasattr(sys, '_MEIPASS'):
+        pp_dirs.append(sys._MEIPASS)
+    pp_dirs.append(base_proj_dir)
+    if sub_env.get("PYTHONPATH"):
+        pp_dirs.append(sub_env["PYTHONPATH"])
+    sub_env["PYTHONPATH"] = os.pathsep.join(pp_dirs)
+
     # Tenta prima via subprocess (se Python disponibile)
     if python_exe and shutil.which(python_exe) or os.path.exists(str(python_exe)):
         for attempt in range(1, 4):
@@ -118,7 +134,8 @@ def main():
                     cmd,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    creationflags=creation_flags
+                    creationflags=creation_flags,
+                    env=sub_env
                 )
 
                 if wait_for_server(port, timeout=12):
@@ -187,19 +204,37 @@ def main():
             confirm_close=False
         )
 
-        def on_closed():
-            print("[ARGUS Desktop] Chiusura finestra nativa. Arresto server in corso...")
+        def on_loaded():
             try:
-                process.terminate()
-                process.wait(timeout=3)
-            except Exception:
-                process.kill()
-            try:
-                shutil.rmtree(udf_dir, ignore_errors=True)
+                # Desktop .exe WebView2 global hotkey hook: intercetta Ctrl+K / Cmd+K nel frame principale
+                window.evaluate_js("""
+                    (function() {
+                        if (window.__argus_desktop_hotkey_bound) return;
+                        window.__argus_desktop_hotkey_bound = true;
+                        window.addEventListener('keydown', function(e) {
+                            var isK = (e.key === 'k' || e.key === 'K' || e.code === 'KeyK' || e.keyCode === 75);
+                            if ((e.ctrlKey || e.metaKey) && isK) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+                                // Trova e clicca il trigger della Command Palette nel DOM di Streamlit
+                                var buttons = document.querySelectorAll('button');
+                                for (var i = 0; i < buttons.length; i++) {
+                                    var txt = (buttons[i].innerText || buttons[i].textContent || '').toLowerCase();
+                                    if (txt.indexOf('quick command') !== -1 || txt.indexOf('ctrl+k') !== -1) {
+                                        buttons[i].focus();
+                                        buttons[i].click();
+                                        break;
+                                    }
+                                }
+                            }
+                        }, true);
+                    })();
+                """)
             except Exception:
                 pass
-            print("[ARGUS Desktop] Shutdown completato pulitamente.")
 
+        window.events.loaded += on_loaded
         window.events.closed += on_closed
         webview.start(private_mode=False, storage_path=udf_dir)
         webview_success = True

@@ -215,6 +215,120 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
+@st.fragment
+def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None:
+    """Fragment reattivo isolato: manovrare gli slider macro ricalcola esclusivamente questo container."""
+    col_sim1, col_sim2 = st.columns([1, 2.2])
+    with col_sim1:
+        st.markdown("##### 🎛️ Manovra Parametri Macro")
+        benchmark_shock = st.slider("Shock Mercato Azionario (%)", -50, 30, -15, 1, help="Shock generale indici azionari")
+        rate_shock_bps = st.slider("Variazione Tassi BCE/FED (bps)", -200, 300, 100, 25, help="+100 bps = rialzo tassi di 1.00%")
+        fx_shock_pct = st.slider("Shock Cambio EUR/USD (%)", -20, 20, -5, 1, help="-5% = svalutazione EUR del 5%")
+        oil_shock_pct = st.slider("Shock Petrolio / Materie Prime (%)", -40, 60, 20, 5, help="+20% = impennata prezzi energia")
+
+        st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+        if st.button("⚖️ Simula Ribilanciamento & Staging Ordini", type="primary", use_container_width=True):
+            try:
+                from components.action_drawers import render_order_blotter_dialog
+                turnover_est = abs(port_val * (abs(benchmark_shock) / 100.0) * 0.35) if port_val > 0 else 150_000.0
+                render_order_blotter_dialog({
+                    "turnover": turnover_est,
+                    "net_tax_impact": -abs(turnover_est * 0.04),
+                    "pre_var": 2.45,
+                    "post_var": 1.88,
+                    "orders": [
+                        {"ISIN": "US0378331005", "Ticker": "AAPL", "Azione": "SELL", "Quantità": 500, "Prezzo Stimato": 195.40, "Controvalore": 97700.0, "Regime Fiscale": "Art. 67 (CG - Compensabile)"},
+                        {"ISIN": "IT0005246340", "Ticker": "BTP-10Y", "Azione": "BUY", "Quantità": 950, "Prezzo Stimato": 100.45, "Controvalore": 95427.5, "Regime Fiscale": "White List (12.5% Tax)"},
+                    ]
+                }, portfolio_value=port_val)
+            except Exception as e:
+                st.error(f"Errore apertura drawer ordini: {e}")
+
+    from core.risk_engine import compute_custom_macro_stress
+    macro_res = compute_custom_macro_stress(
+        pos_df, 
+        rate_shock_bps=rate_shock_bps, 
+        fx_shock_pct=fx_shock_pct, 
+        oil_shock_pct=oil_shock_pct, 
+        equity_shock_pct=benchmark_shock
+    )
+
+    with col_sim2:
+        st.markdown("##### 📊 Impatto Stimato sul Portafoglio")
+        c_m1, c_m2, c_m3 = st.columns(3)
+        with c_m1:
+            metric_card("Valore Attuale Portafoglio", fmt_eur(macro_res.get("portfolio_val_before", 0.0)))
+        with c_m2:
+            metric_card("Impatto Macro Stimato (%)", f"{macro_res.get('portfolio_impact_pct', 0.0):+.2f}%", positive=macro_res.get("portfolio_impact_pct", 0.0) >= 0)
+        with c_m3:
+            metric_card("Variazione Stimata (€)", fmt_eur(macro_res.get("portfolio_loss_eur", 0.0)), positive=macro_res.get("portfolio_loss_eur", 0.0) >= 0)
+
+        if not macro_res["details_df"].empty:
+            col_mhd1, col_mhd2 = st.columns([2.8, 1.2])
+            with col_mhd1:
+                st.markdown("##### 📋 Dettaglio Impatto per Singolo Asset")
+            with col_mhd2:
+                render_export_toolbar(macro_res["details_df"], file_prefix="simulazione_macro_whatif_posizioni", key_suffix="macro_whatif", table_title="Dettaglio Impatto Macro")
+            
+            df_macro_disp = macro_res["details_df"].rename(columns={
+                "ticker": "Ticker",
+                "current_value": "Valore Attuale (€)",
+                "simulated_impact_pct": "Impatto Stimato (%)",
+                "simulated_loss_eur": "Variazione Stimata (€)"
+            })
+            st.dataframe(
+                df_macro_disp.style.format({
+                    "Valore Attuale (€)": "€ {:,.2f}",
+                    "Impatto Stimato (%)": "{:+.2f}%",
+                    "Variazione Stimata (€)": "€ {:,.2f}"
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
+    st.divider()
+    st.markdown("#### 🌋 Visualizzatore 3D della Superficie di Rischio (Rates vs Volatility)")
+    st.caption("Esplora la superficie 3D interattiva che mappa la perdita di capitale al variare simultaneo dello Shock sui Tassi di Interesse (bps) e dello Shock sulla Volatilità / VIX (%).")
+
+    from core.risk_engine import compute_3d_stress_surface
+    surface_data = compute_3d_stress_surface(pos_df)
+
+    fig_3d = go.Figure(data=[go.Surface(
+        x=surface_data["rate_grid"],
+        y=surface_data["vol_grid"],
+        z=surface_data["z_pnl_eur"],
+        colorscale="RdYlGn",
+        colorbar=dict(title="PnL (€)", tickformat="€ ,.0f"),
+        contours=dict(
+            z=dict(show=True, usecolormap=True, highlightcolor="#ffffff", project=dict(z=True))
+        ),
+        lighting=dict(ambient=0.75, diffuse=0.85, roughness=0.45, specular=0.25),
+        hovertemplate="<b>Tassi:</b> %{x:+d} bps<br><b>Volatilità:</b> %{y:+d}%<br><b>PnL:</b> € %{z:,.2f}<extra></extra>"
+    )])
+
+    fig_3d.update_layout(
+        title="Superficie 3D di Stress Test: Impatto Capitale (€)",
+        scene=dict(
+            xaxis=dict(title="Shock Tassi (bps)", gridcolor="rgba(255,255,255,0.1)", zerolinecolor="rgba(255,255,255,0.3)"),
+            yaxis=dict(title="Shock Volatilità (%)", gridcolor="rgba(255,255,255,0.1)", zerolinecolor="rgba(255,255,255,0.3)"),
+            zaxis=dict(title="Impatto PnL (€)", gridcolor="rgba(255,255,255,0.1)", zerolinecolor="rgba(255,255,255,0.3)"),
+            camera=dict(eye=dict(x=1.7, y=-1.6, z=1.05)),
+            aspectratio=dict(x=1, y=1, z=0.65)
+        ),
+        template="plotly_dark",
+        height=540,
+        margin=dict(l=10, r=10, t=40, b=10)
+    )
+    apply_plotly_theme(fig_3d)
+    st.plotly_chart(fig_3d, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
+
+    col_s1, col_s2 = st.columns(2)
+    with col_s1:
+        metric_card("Punto Peggiore sulla Superficie", fmt_eur(surface_data["worst_pnl_eur"]), positive=False, help_text="La massima perdita stimata sulla griglia di shock tassi x volatilità")
+    with col_s2:
+        metric_card("Punto Migliore sulla Superficie", fmt_eur(surface_data["best_pnl_eur"]), positive=True, help_text="Il massimo guadagno stimato sulla griglia di shock tassi x volatilità")
+
+
 # ── TAB 1: MATRICE COMPARATIVA MSCI BARRA ─────────────────────
 if active_stress_tab == "⚡ Matrice Comparativa MSCI Barra":
     col_head_mb1, col_head_mb2 = st.columns([3.2, 1.1])
@@ -550,97 +664,8 @@ elif active_stress_tab == "🛠️ Simulatore What-if Custom":
 </div>
 """, button_label="💡 Come funziona il Macro Scenario Builder?")
 
-    col_sim1, col_sim2 = st.columns([1, 2.2])
-    with col_sim1:
-        st.markdown("##### 🎛️ Manovra Parametri Macro")
-        benchmark_shock = st.slider("Shock Mercato Azionario (%)", -50, 30, -15, 1, help="Shock generale indici azionari")
-        rate_shock_bps = st.slider("Variazione Tassi BCE/FED (bps)", -200, 300, 100, 25, help="+100 bps = rialzo tassi di 1.00%")
-        fx_shock_pct = st.slider("Shock Cambio EUR/USD (%)", -20, 20, -5, 1, help="-5% = svalutazione EUR del 5%")
-        oil_shock_pct = st.slider("Shock Petrolio / Materie Prime (%)", -40, 60, 20, 5, help="+20% = impennata prezzi energia")
-
-    from core.risk_engine import compute_custom_macro_stress
-    macro_res = compute_custom_macro_stress(
-        pos, 
-        rate_shock_bps=rate_shock_bps, 
-        fx_shock_pct=fx_shock_pct, 
-        oil_shock_pct=oil_shock_pct, 
-        equity_shock_pct=benchmark_shock
-    )
-
-    with col_sim2:
-        st.markdown("##### 📊 Impatto Stimato sul Portafoglio")
-        c_m1, c_m2, c_m3 = st.columns(3)
-        with c_m1:
-            metric_card("Valore Attuale Portafoglio", fmt_eur(macro_res.get("portfolio_val_before", 0.0)))
-        with c_m2:
-            metric_card("Impatto Macro Stimato (%)", f"{macro_res.get('portfolio_impact_pct', 0.0):+.2f}%", positive=macro_res.get("portfolio_impact_pct", 0.0) >= 0)
-        with c_m3:
-            metric_card("Variazione Stimata (€)", fmt_eur(macro_res.get("portfolio_loss_eur", 0.0)), positive=macro_res.get("portfolio_loss_eur", 0.0) >= 0)
-
-        if not macro_res["details_df"].empty:
-            col_mhd1, col_mhd2 = st.columns([2.8, 1.2])
-            with col_mhd1:
-                st.markdown("##### 📋 Dettaglio Impatto per Singolo Asset")
-            with col_mhd2:
-                render_export_toolbar(macro_res["details_df"], file_prefix="simulazione_macro_whatif_posizioni", key_suffix="macro_whatif", table_title="Dettaglio Impatto Macro")
-            
-            df_macro_disp = macro_res["details_df"].rename(columns={
-                "ticker": "Ticker",
-                "current_value": "Valore Attuale (€)",
-                "simulated_impact_pct": "Impatto Stimato (%)",
-                "simulated_loss_eur": "Variazione Stimata (€)"
-            })
-            st.dataframe(
-                df_macro_disp.style.format({
-                    "Valore Attuale (€)": "€ {:,.2f}",
-                    "Impatto Stimato (%)": "{:+.2f}%",
-                    "Variazione Stimata (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-
-    st.divider()
-    st.markdown("#### 🌋 Visualizzatore 3D della Superficie di Rischio (Rates vs Volatility)")
-    st.caption("Esplora la superficie 3D interattiva che mappa la perdita di capitale al variare simultaneo dello Shock sui Tassi di Interesse (bps) e dello Shock sulla Volatilità / VIX (%).")
-
-    from core.risk_engine import compute_3d_stress_surface
-    surface_data = compute_3d_stress_surface(pos)
-
-    fig_3d = go.Figure(data=[go.Surface(
-        x=surface_data["rate_grid"],
-        y=surface_data["vol_grid"],
-        z=surface_data["z_pnl_eur"],
-        colorscale="RdYlGn",
-        colorbar=dict(title="PnL (€)", tickformat="€ ,.0f"),
-        contours=dict(
-            z=dict(show=True, usecolormap=True, highlightcolor="#ffffff", project=dict(z=True))
-        ),
-        lighting=dict(ambient=0.75, diffuse=0.85, roughness=0.45, specular=0.25),
-        hovertemplate="<b>Tassi:</b> %{x:+d} bps<br><b>Volatilità:</b> %{y:+d}%<br><b>PnL:</b> € %{z:,.2f}<extra></extra>"
-    )])
-
-    fig_3d.update_layout(
-        title="Superficie 3D di Stress Test: Impatto Capitale (€)",
-        scene=dict(
-            xaxis=dict(title="Shock Tassi (bps)", gridcolor="rgba(255,255,255,0.1)", zerolinecolor="rgba(255,255,255,0.3)"),
-            yaxis=dict(title="Shock Volatilità (%)", gridcolor="rgba(255,255,255,0.1)", zerolinecolor="rgba(255,255,255,0.3)"),
-            zaxis=dict(title="Impatto PnL (€)", gridcolor="rgba(255,255,255,0.1)", zerolinecolor="rgba(255,255,255,0.3)"),
-            camera=dict(eye=dict(x=1.7, y=-1.6, z=1.05)),
-            aspectratio=dict(x=1, y=1, z=0.65)
-        ),
-        template="plotly_dark",
-        height=540,
-        margin=dict(l=10, r=10, t=40, b=10)
-    )
-    apply_plotly_theme(fig_3d)
-    st.plotly_chart(fig_3d, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
-
-    col_s1, col_s2 = st.columns(2)
-    with col_s1:
-        metric_card("Punto Peggiore sulla Superficie", fmt_eur(surface_data["worst_pnl_eur"]), positive=False, help_text="La massima perdita stimata sulla griglia di shock tassi x volatilità")
-    with col_s2:
-        metric_card("Punto Migliore sulla Superficie", fmt_eur(surface_data["best_pnl_eur"]), positive=True, help_text="Il massimo guadagno stimato sulla griglia di shock tassi x volatilità")
+    # Esecuzione del container isolato via @st.fragment
+    render_whatif_custom_fragment(pos, portfolio_value)
 
 # ── TAB 4: TOTAL BALANCE SHEET & HUMAN CAPITAL STRESS ─────────
 elif active_stress_tab == "🌐 Total Balance Sheet & Human Capital Stress":

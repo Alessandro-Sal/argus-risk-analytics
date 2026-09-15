@@ -33,6 +33,7 @@ block_cipher = None
 datas = [
     ('src', 'src'),
     ('core', 'core'),
+    ('components', 'components'),
     ('docs', 'docs'),
     ('app.py', '.'),
 ]
@@ -48,6 +49,7 @@ hiddenimports = [
 ]
 hiddenimports += collect_submodules('streamlit')
 hiddenimports += collect_submodules('core')
+hiddenimports += collect_submodules('components')
 
 a = Analysis(
     ['desktop_launcher.py'],

@@ -67,7 +67,11 @@ ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo he
 
 **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è una piattaforma integrata di **Business Intelligence, Financial Valuation, Forensic Accounting, AI Narrative Intelligence, Data Engineering e Quantitative Risk Management** potenziata con standard **Bloomberg Terminal Parity**. Progettata con un'interfaccia ad alta densità informativa di livello istituzionale, la soluzione offre un ecosistema avanzato per la diagnosi contabile, la profilazione del rischio e la protezione strategica di portafogli d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto e Cash*).
 
-Sviluppata come soluzione di punta per l'analisi di Finanza Quantitativa, **ARGUS** converte registri di negoziazione eterogenei (file CSV generici, esportazioni native da broker quali **DeGiro**, **Directa SIM**, **Fineco Bank**, **Interactive Brokers / IBKR**, **Trade Republic**, **Scalable Capital**, **eToro**, **Revolut Trading** e sincronizzazioni live da **Google Sheets** con estrazione duale separata di *Stocks & Crypto*) in un framework analitico strutturato. La piattaforma integra:
+* **⚡ Institutional UI/UX Ergonomics, Command Palette (Ctrl+K), Action Drawers & @st.fragment Reactivity v9.7 (`components/command_palette.py`, `components/action_drawers.py`, `core/chart_framework.py`, `core/ui_utils.py`, `desktop_launcher.py`)**:
+  1. *Universal Bloomberg-Style Command Palette (`Ctrl+K` / `Cmd+K`)*: Switcher ad altissima velocità accessibile globalmente da tutte le 22 pagine della piattaforma. Permette la ricerca fuzzy istantanea tra moduli analitici, asset/ISIN del portafoglio attivo e macro-scenari di stress (Lehman 2008, COVID-19, Rates Shock 2022, Spread BTP 2011, Dot-Com). Architettura a tripla intercettazione DOM con supporto completo sia per browser web moderni che per l'applicazione desktop nativa Windows standalone (`.exe` via PyInstaller e Microsoft Edge WebView2).
+  2. *Ultra-Reactive UI with `@st.fragment`*: Eliminazione dei re-render globali e dei flash di caricamento. Isolamento computazionale granulare per il simulatore interattivo di shock multi-asset (`src/pages/7_🌪️_Stress_Testing.py`) e per il motore parametrico Cornish-Fisher / decomposizione del rischio di Eulero (`src/pages/3_🔴_Analisi_Rischio.py`), con feedback istantaneo in millisecondi su variazioni di slider e confidenza.
+  3. *Institutional Modal Action Drawers (`@st.dialog`)*: Esperienza utente fluida senza perdita di contesto o navigazione forzata. Include il *Pre-Trade Order Blotter* (pre-flight check conformi a MiFID II e staging ordini FIX), il *TUIR Tax Lot Inspector* (audit analitico lotto per lotto conforme al TUIR Art. 44 Redditi di Capitale vs Art. 67 Redditi Diversi e PMC fiscale) e la *Decomposizione Rischio Euler* (analisi granulare di Marginal VaR e contributo percentuale al rischio di portafoglio).
+  4. *Obsidian Dark Institutional Theme & Monospace Tabular Ergonomics*: Palette a contrasto elevato per terminali finanziari (`ObsidianTheme`), tabelle monospaziate contabili ad alta densità (`argus-dense-table`) e integrazione di `st.data_editor` con badge cromatici di conformità fiscale in `src/pages/5_📋_Posizioni_e_Dettagli.py`.
 * **🏛️ Enterprise Quant Hardening, Arrow Binary Engine & Unified Rebalancing Architecture v9.6 (`core/rebalancing/`, `core/services/rebalancing_service.py`, `core/session_manager.py`, `api/main.py`, `core/cache_shield.py`, `core/risk_engine.py`)**:
   1. *Unified Multi-Strategy Rebalancing Layer & Strategy Protocols*: Architettura polimorfica a contratti unificati (`protocol.py`, `engine.py`) che orchestra le 4 strategie di ribilanciamento (*Autonomous AI*, *Tax-Aware Friction Matrix*, *Prescriptive Conic SLSQP*, *Heuristic Target Allocation*) con piena conformità TUIR Art. 44 (asimmetria ETF/OICR Redditi di Capitale) vs Art. 67 (azioni/ETC Redditi Diversi capienti nello zainetto fiscale).
   2. *Application Services Facade & Headless REST API (`POST /api/v1/rebalance`)*: Facciata di servizio applicativo `RebalancingService` e router FastAPI ad alte prestazioni conforme a schemi Pydantic v2 per l'esecuzione headless da terminali quantitativi, automazioni esterne e sistemi OMS/EMS.
@@ -520,6 +524,10 @@ argus-risk-analytics/
 │   │   ├── ci.yml
 │   │   ├── deploy-pages.yml
 │   │   └── release.yml
+├── components/                  # Modali Istituzionali @st.dialog, Command Palette (Ctrl+K) & Splash
+│   ├── action_drawers.py        # Institutional Drawers (Pre-Trade Blotter, TUIR Lot Inspector, Euler Risk)
+│   ├── command_palette.py       # Bloomberg-Style Command Palette (Ctrl+K) & Switcher Multi-Modulo
+│   └── splash.py                # Bootloader Splash Screen, Animated Vector Logo & Diagnostics
 ├── config/                      # Configurazione e mapping ISIN-Ticker
 │   └── config.json
 ├── core/                        # Engine quantitativo, calcoli di rischio e moduli istituzionali
@@ -602,7 +610,7 @@ argus-risk-analytics/
 │   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
 │   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
 │   ├── security_engine.py       # CWE-1236 Anti-Formula Injection, PII Masking & ArgusDataVault AES
-│   ├── sidebar.py               # Navigation Rail v9.0.0, Execution Mode & Spotlight Search
+│   ├── sidebar.py               # Navigation Rail v9.7.0, Command Palette (Ctrl+K) & Spotlight Search
 │   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
 │   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
 │   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
@@ -820,4 +828,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v9.0.0 Institutional Enterprise Release.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v9.7.0 Institutional Enterprise Release.*

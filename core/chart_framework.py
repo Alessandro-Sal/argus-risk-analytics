@@ -42,6 +42,21 @@ ARGUS_COLORS: Dict[str, str] = {
     "grid_light": "rgba(0, 0, 0, 0.06)",
 }
 
+
+class ObsidianTheme:
+    """Design System Semantic Constants per Obsidian Dark Theme."""
+    ELECTRIC_BLUE: str = "#38bdf8"
+    EMERALD: str = "#10b981"
+    AMBER: str = "#f59e0b"
+    PURPLE: str = "#8b5cf6"
+    CRIMSON: str = "#ef4444"
+    SLATE: str = "#64748b"
+    MUTED_BLUE: str = "#3b82f6"
+    GOLD: str = "#f59e0b"
+    DARK_SURFACE: str = "#111827"
+    DARK_BG: str = "#0b0f19"
+
+
 ARGUS_FINANCIAL_PALETTE: List[str] = [
     "#38bdf8",  # Cyan / Equity
     "#10b981",  # Emerald / Fixed Income

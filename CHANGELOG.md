@@ -7,6 +7,37 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.7.0] - 2026-09-15
+
+### ⚡ Institutional UI/UX Ergonomics, @st.fragment Reactivity, @st.dialog Action Drawers & Desktop Command Palette (Ctrl+K)
+
+Questa release rivoluziona l'esperienza utente, l'ergonomia visiva e la reattività operativa della piattaforma ARGUS, portando l'usabilità ai livelli di un terminale istituzionale (Bloomberg / FactSet):
+
+- **Universal Command Palette (`Ctrl+K` / `Cmd+K`) (`components/command_palette.py`)**:
+  - Switcher rapido e universale accessibile globalmente da qualsiasi modulo della suite.
+  - Indicizzazione e navigazione istantanea tra tutte le 22 pagine di ARGUS, gli asset/ISIN del portafoglio attivo e gli scenari di stress macro (Lehman 2008, COVID-19, Rates Shock 2022, Spread BTP 2011, Dot-Com 2000).
+  - Architettura di intercettazione hotkey multi-contesto con tripla strategia di geolocalizzazione DOM (ancora HTML dedicata, ricerca per contenuto testuale ed elementi `stBaseButton`).
+  - **Full Desktop Native Standalone (`.exe`) Compatibility**:
+    - Risolto il supporto `Ctrl+K` nell'eseguibile Windows nativo WebView2 (`dist/ARGUS_Desktop/ARGUS.exe`): incluso il pacchetto `components` nel bundle PyInstaller (`argus_desktop.spec`, `scripts/build_desktop_app.py`) e implementato l'hook di cattura tastiera `window.events.loaded` nel container WebView2 (`desktop_launcher.py`).
+    - Eliminato il rischio di throttling Chromium dell'iframe dei componenti tramite altezza attiva e layout non-bloccante.
+- **Reattività Ultra-Fluida con `@st.fragment`**:
+  - **Stress Testing Interattivo (`src/pages/7_🌪️_Stress_Testing.py`)**: Isolamento del simulatore di shock multi-asset in frammento computazionale autonomo. Lo slider dei parametri e l'applicazione degli scenari storici ricalcolano esclusivamente il Delta P&L e le metriche di stress senza causare il re-render globale della pagina.
+  - **Simulatore Parametrico VaR/CVaR (`src/pages/3_🔴_Analisi_Rischio.py`)**: Isolamento del calcolo Cornish-Fisher e decomposizione Euler VaR in `@st.fragment`, garantendo feedback interattivo in millisecondi durante la variazione del livello di confidenza e dell'orizzonte temporale.
+- **Institutional Action Drawers con `@st.dialog` (`components/action_drawers.py`)**:
+  - **Pre-Trade Order Blotter (`render_order_blotter_dialog`)**: Finestra modale non bloccante per la simulazione e validazione pre-flight degli ordini FIX/blotter generati dal motore di ribilanciamento con controllo conformità MiFID II.
+  - **TUIR Tax Lot Inspector (`render_lot_inspector_dialog`)**: Ispezione approfondita lotto per lotto conforme al TUIR Art. 44 vs 67, con calcolo analitico di PMC fiscale, plusvalenze/minusvalenze latenti e classificazione Redditi di Capitale vs Redditi Diversi.
+  - **Decomposizione Rischio Euler (`render_risk_decomposition_dialog`)**: Modale interattiva per l'analisi del rischio marginale e della percentuale di contributo al VaR di portafoglio a livello di singolo asset.
+- **Tabular Ergonomics & High-Density Design System (`core/ui_utils.py`, `core/chart_framework.py`)**:
+  - **Obsidian Dark Theme**: Palette colore istituzionale ad alto contrasto per terminali finanziari (`ObsidianTheme.BG_DEEP`, `ACCENT_CYAN`, `ACCENT_AMBER`, `BORDER`).
+  - **Tabella Monospazio ad Alta Densità (`argus-dense-table`)**: Regole CSS ad alta densità informativa per report tabellari privi di sprechi di spazio verticale.
+  - **Badge Fiscale TUIR**: Indicatori visivi cromatici per `Redditi di Capitale (Art. 44)` e `Redditi Diversi (Art. 67)`.
+  - **Grid Interattiva Posizioni (`src/pages/5_📋_Posizioni_e_Dettagli.py`)**: Integrazione avanzata con `st.data_editor` e pulsanti one-click per l'apertura immediata dei drawer fiscali e degli ordini.
+- **Allineamento Versioni & Testing**:
+  - Allineate tutte le componenti alla release **v9.7.0** (`pyproject.toml`, `src/0_Control_Room.py`, `core/sidebar.py`, `components/splash.py`, `components/command_palette.py`, `components/action_drawers.py`).
+  - Test suite `tests/test_ui_ux_overhaul.py` (5/5) e test smoke di compilazione su tutte le 24 pagine superati al 100%.
+
+---
+
 ## [9.6.0] - 2026-09-15
 
 ### 🏛️ Unified Rebalancing Layer, Headless REST API, Arrow Binary Caching & Quant Hardening
