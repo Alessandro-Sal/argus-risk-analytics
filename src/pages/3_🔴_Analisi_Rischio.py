@@ -927,6 +927,33 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 </div>
 """, button_label="💡 Guida VaR & Kupiec")
 
+    # ── METRICHE DI RISCHIO BASELINE (AMBITO PAGINA) ────────────────────────
+    r = sr_port.dropna()
+    total_value = float(pos["current_value"].sum()) if not pos.empty and "current_value" in pos.columns else 0.0
+    conf_level = float(st.session_state.get("confidence_level", 0.95))
+    holding_period = 1
+    alpha = 1.0 - conf_level
+    z = float(stats.norm.ppf(alpha))
+
+    # 1. VaR Storico (1g)
+    threshold_hist_1d = float(r.quantile(alpha)) if not r.empty else 0.0
+    var_hist_1d = abs(threshold_hist_1d)
+
+    # 2. VaR Parametrico (1g)
+    mean_daily = float(r.mean()) if not r.empty else 0.0
+    std_daily = float(r.std()) if not r.empty else 0.0
+    var_param_1d = abs(mean_daily + z * std_daily)
+
+    # 3. VaR Cornish-Fisher (1g)
+    skewness_base = float(stats.skew(r)) if len(r) > 2 else 0.0
+    kurtosis_base = float(stats.kurtosis(r)) if len(r) > 2 else 0.0
+    z_cf_base = z + (1/6)*(z**2 - 1)*skewness_base + (1/24)*(z**3 - 3*z)*kurtosis_base - (1/36)*(2*z**3 - 5*z)*(skewness_base**2)
+    var_cf_1d = abs(mean_daily + z_cf_base * std_daily)
+
+    # 4. Expected Shortfall / CVaR Storico (1g)
+    tail_returns_base = r[r <= threshold_hist_1d]
+    cvar_hist_1d = abs(float(tail_returns_base.mean())) if not tail_returns_base.empty else var_hist_1d
+
     @st.fragment
     def render_dynamic_var_kpi_fragment(sr_returns: pd.Series, df_pos: pd.DataFrame) -> None:
         """Fragment isolato per la simulazione del VaR e CVaR multi-orizzonte."""

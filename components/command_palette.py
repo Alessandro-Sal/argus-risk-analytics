@@ -11,13 +11,13 @@ Universal Command Palette & Fast Asset/Workspace Switcher:
 - Direct non-blocking navigation and session state propagation.
 """
 
-from typing import Any, Dict, List, Optional
 import os
+from typing import Any, Dict, List, Optional
+
 import streamlit as st
 import streamlit.components.v1 as components
 
 from core.sidebar import switch_to_page
-
 
 HOTKEY_JS_SNIPPET = """
 <div id="argus-cmd-palette-listener-stub" style="display:none; width:0; height:0;"></div>
