@@ -363,6 +363,20 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         ]
         valid_cols = [c for c in display_cols if c in df_l.columns]
         df_disp = df_l[valid_cols].copy()
+
+        # Inquadramento tributario TUIR automatico (Art. 44 OICR vs Art. 67 Plus/Minus vs White List)
+        def _classify_tax_regime(row):
+            ac = str(row.get("asset_class", "")).lower()
+            sym = str(row.get("ticker", "")).lower()
+            if any(k in ac for k in ["etf", "fondo", "oicr", "mutual"]) or any(k in sym for k in ["etf", "iwda", "swda", "cssx"]):
+                return "Art. 44 (OICR)"
+            elif any(k in ac for k in ["bond", "obbligaz", "gov", "btp", "bund", "treasury"]):
+                return "White List (12.5%)"
+            else:
+                return "Art. 67 (CG)"
+
+        if "asset_class" in df_l.columns:
+            df_disp["Regime TUIR"] = df_l.apply(_classify_tax_regime, axis=1)
         
         col_renames = {
             "ticker": "Ticker", "asset_class": "Asset Class", "sector": "Settore",
@@ -395,6 +409,7 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             df_disp_filt = df_disp_filt[df_disp_filt["Asset Class"] == filter_ac]
 
         column_config = {
+            "Regime TUIR": st.column_config.TextColumn("Regime TUIR", width="small", help="Classificazione fiscale TUIR: Art. 44 (OICR) / Art. 67 (Capital Gain) / White List"),
             "Prezzo Carico (€)": st.column_config.NumberColumn("Prezzo Carico (€)", format="€ %.2f"),
             "Prezzo Mkt (€)": st.column_config.NumberColumn("Prezzo Mkt (€)", format="€ %.2f"),
             "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %.2f"),
@@ -414,6 +429,28 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             column_config=column_config,
             height=420
         )
+
+        # ── QUICK ACTION DRAWER TRIGGERS: LOT INSPECTOR & PRE-TRADE BLOTTER ──
+        col_act1, col_act2, col_act3 = st.columns([1.5, 1.2, 1.3])
+        with col_act1:
+            tickers_list = df_disp["Ticker"].tolist() if "Ticker" in df_disp.columns else []
+            sel_insp_asset = st.selectbox("🔬 Seleziona Strumento da Ispezionare:", tickers_list, key="sel_insp_asset_p5")
+        with col_act2:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            if st.button("📑 Ispeziona Lotti Fiscali (TUIR)", key="btn_open_lot_inspector_p5", use_container_width=True):
+                try:
+                    from components.action_drawers import render_lot_inspector_dialog
+                    render_lot_inspector_dialog(sel_insp_asset)
+                except Exception as e:
+                    st.error(f"Errore apertura ispettore lotti: {e}")
+        with col_act3:
+            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
+            if st.button("🚀 Apri Order Blotter Pre-Trade", key="btn_open_blotter_p5", use_container_width=True, type="primary"):
+                try:
+                    from components.action_drawers import render_order_blotter_dialog
+                    render_order_blotter_dialog()
+                except Exception as e:
+                    st.error(f"Errore apertura blotter ordini: {e}")
 
         st.markdown("#### Ripartizione Liquidità del Portafoglio (ADV Days)")
         t1 = df_l[df_l["days_to_liquidate"] <= 1.0]["current_value"].sum()

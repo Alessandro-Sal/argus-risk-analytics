@@ -927,132 +927,139 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
 </div>
 """, button_label="💡 Guida VaR & Kupiec")
 
-    col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
-    with col_ctrl1:
-        conf_opts = [0.90, 0.95, 0.99]
-        curr_conf = float(st.session_state.get("confidence_level", 0.95))
-        c_idx = conf_opts.index(curr_conf) if curr_conf in conf_opts else 1
-        conf_level = st.selectbox(
-            "Livello di Confidenza (c = 1 - α)",
-            options=conf_opts,
-            index=c_idx,
-            format_func=lambda x: f"{int(x*100)}%",
-            key="inpage_conf_level_p3"
-        )
-        st.session_state.confidence_level = conf_level
-    with col_ctrl2:
-        holding_period = st.slider(
-            "Orizzonte Temporale (Giorni lavorativi - T)",
-            min_value=1,
-            max_value=20,
-            value=1,
-            step=1
-        )
-    with col_ctrl3:
-        lookback_sel = st.selectbox(
-            "Finestra Storica di Analisi",
-            options=["Storico Completo", "Ultimo Anno (252g)", "Ultimi 3 Anni", "Ultimi 5 Anni"],
-            index=0
-        )
+    @st.fragment
+    def render_dynamic_var_kpi_fragment(sr_returns: pd.Series, df_pos: pd.DataFrame) -> None:
+        """Fragment isolato per la simulazione del VaR e CVaR multi-orizzonte."""
+        col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
+        with col_ctrl1:
+            conf_opts = [0.90, 0.95, 0.99]
+            curr_conf = float(st.session_state.get("confidence_level", 0.95))
+            c_idx = conf_opts.index(curr_conf) if curr_conf in conf_opts else 1
+            conf_level = st.selectbox(
+                "Livello di Confidenza (c = 1 - α)",
+                options=conf_opts,
+                index=c_idx,
+                format_func=lambda x: f"{int(x*100)}%",
+                key="inpage_conf_level_p3_frag"
+            )
+            st.session_state.confidence_level = conf_level
+        with col_ctrl2:
+            holding_period = st.slider(
+                "Orizzonte Temporale (Giorni lavorativi - T)",
+                min_value=1,
+                max_value=20,
+                value=1,
+                step=1,
+                key="inpage_hp_p3_frag"
+            )
+        with col_ctrl3:
+            lookback_sel = st.selectbox(
+                "Finestra Storica di Analisi",
+                options=["Storico Completo", "Ultimo Anno (252g)", "Ultimi 3 Anni", "Ultimi 5 Anni"],
+                index=0,
+                key="inpage_lookback_p3_frag"
+            )
 
-    r = sr_port.dropna()
-    if lookback_sel == "Ultimo Anno (252g)":
-        r = r.tail(252)
-    elif lookback_sel == "Ultimi 3 Anni":
-        r = r.tail(252 * 3)
-    elif lookback_sel == "Ultimi 5 Anni":
-        r = r.tail(252 * 5)
-    total_value = pos["current_value"].sum()
+        r = sr_returns.dropna()
+        if lookback_sel == "Ultimo Anno (252g)":
+            r = r.tail(252)
+        elif lookback_sel == "Ultimi 3 Anni":
+            r = r.tail(252 * 3)
+        elif lookback_sel == "Ultimi 5 Anni":
+            r = r.tail(252 * 5)
+        total_value = df_pos["current_value"].sum() if not df_pos.empty and "current_value" in df_pos.columns else 0.0
 
-    alpha = 1 - conf_level
-    z = stats.norm.ppf(alpha)
+        alpha = 1 - conf_level
+        z = stats.norm.ppf(alpha)
 
-    # 1. VaR Storico (1g)
-    threshold_hist_1d = r.quantile(alpha)
-    var_hist_1d = abs(threshold_hist_1d)
+        # 1. VaR Storico (1g)
+        threshold_hist_1d = r.quantile(alpha) if not r.empty else 0.0
+        var_hist_1d = abs(threshold_hist_1d)
 
-    # 2. VaR Parametrico (1g)
-    mean_daily = r.mean()
-    std_daily = r.std()
-    var_param_1d = abs(mean_daily + z * std_daily)
+        # 2. VaR Parametrico (1g)
+        mean_daily = r.mean() if not r.empty else 0.0
+        std_daily = r.std() if not r.empty else 0.0
+        var_param_1d = abs(mean_daily + z * std_daily)
 
-    # 3. VaR Cornish-Fisher (1g)
-    skewness = stats.skew(r) if len(r) > 2 else 0.0
-    kurtosis = stats.kurtosis(r) if len(r) > 2 else 0.0
-    z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
-    var_cf_1d = abs(mean_daily + z_cf * std_daily)
+        # 3. VaR Cornish-Fisher (1g)
+        skewness = stats.skew(r) if len(r) > 2 else 0.0
+        kurtosis = stats.kurtosis(r) if len(r) > 2 else 0.0
+        z_cf = z + (1/6)*(z**2 - 1)*skewness + (1/24)*(z**3 - 3*z)*kurtosis - (1/36)*(2*z**3 - 5*z)*(skewness**2)
+        var_cf_1d = abs(mean_daily + z_cf * std_daily)
 
-    # 4. Expected Shortfall / CVaR Storico (1g)
-    tail_returns = r[r <= threshold_hist_1d]
-    cvar_hist_1d = abs(tail_returns.mean()) if not tail_returns.empty else var_hist_1d
+        # 4. Expected Shortfall / CVaR Storico (1g)
+        tail_returns = r[r <= threshold_hist_1d]
+        cvar_hist_1d = abs(tail_returns.mean()) if not tail_returns.empty else var_hist_1d
 
-    # Scaling con radice del tempo
-    sqrt_t = np.sqrt(holding_period)
-    var_hist_t = var_hist_1d * sqrt_t
-    var_param_t = var_param_1d * sqrt_t
-    var_cf_t = var_cf_1d * sqrt_t
-    cvar_hist_t = cvar_hist_1d * sqrt_t
+        # Scaling con radice del tempo
+        sqrt_t = np.sqrt(holding_period)
+        var_hist_t = var_hist_1d * sqrt_t
+        var_param_t = var_param_1d * sqrt_t
+        var_cf_t = var_cf_1d * sqrt_t
+        cvar_hist_t = cvar_hist_1d * sqrt_t
 
-    # Valori monetari
-    var_hist_eur = var_hist_t * total_value
-    var_param_eur = var_param_t * total_value
-    var_cf_eur = var_cf_t * total_value
-    cvar_hist_eur = cvar_hist_t * total_value
+        # Valori monetari
+        var_hist_eur = var_hist_t * total_value
+        var_param_eur = var_param_t * total_value
+        var_cf_eur = var_cf_t * total_value
+        cvar_hist_eur = cvar_hist_t * total_value
 
-    # 4 KPI Cards ad Alta Risoluzione (Nessun Troncamento)
-    col_m1, col_m2, col_m3, col_m4 = st.columns(4)
-    with col_m1:
-        metric_card(
-            f"VaR Storico ({holding_period}G)",
-            f"{var_hist_t*100:.2f}%",
-            delta=f"-€ {var_hist_eur:,.2f}",
-            positive=False,
-            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+        # 4 KPI Cards ad Alta Risoluzione (Nessun Troncamento)
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        with col_m1:
+            metric_card(
+                f"VaR Storico ({holding_period}G)",
+                f"{var_hist_t*100:.2f}%",
+                delta=f"-€ {var_hist_eur:,.2f}",
+                positive=False,
+                help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
 <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Value at Risk non-parametrico calcolato sul quantile empirico reale ({int(conf_level*100)}%) dei rendimenti storici.</div>
 <div style="margin-bottom: 6px;"><b>📐 Formula:</b> VaR<sub>storico</sub> = &minus;Q(R<sub>p</sub>, &alpha;) &times; &radic;{holding_period}</div>
 <div style="margin-bottom: 6px;"><b>🎯 Significato:</b> Perdita massima attesa a {int(conf_level*100)}% su {holding_period} giorni basata sulla storia effettiva del portafoglio.</div>
 <div><b>💶 Impatto Capitale:</b> Perdita stimata pari a -€ {var_hist_eur:,.2f}.</div>
 </div>"""
-        )
-    with col_m2:
-        metric_card(
-            f"VaR Parametrico ({holding_period}G)",
-            f"{var_param_t*100:.2f}%",
-            delta=f"-€ {var_param_eur:,.2f}",
-            positive=False,
-            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+            )
+        with col_m2:
+            metric_card(
+                f"VaR Parametrico ({holding_period}G)",
+                f"{var_param_t*100:.2f}%",
+                delta=f"-€ {var_param_eur:,.2f}",
+                positive=False,
+                help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
 <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Value at Risk gaussiano basato sull'ipotesi di distribuzione normale dei rendimenti.</div>
 <div style="margin-bottom: 6px;"><b>📐 Formula:</b> VaR<sub>param</sub> = &minus;(&mu;<sub>p</sub> + z<sub>&alpha;</sub> &times; &sigma;<sub>p</sub>) &times; &radic;{holding_period}</div>
 <div style="margin-bottom: 6px;"><b>🎯 Significato:</b> Stima teorica della massima perdita attesa con quantile normale z = {z:.2f}.</div>
 <div><b>💶 Impatto Capitale:</b> Perdita stimata pari a -€ {var_param_eur:,.2f}.</div>
 </div>"""
-        )
-    with col_m3:
-        metric_card(
-            f"VaR Cornish-Fisher ({holding_period}G)",
-            f"{var_cf_t*100:.2f}%",
-            delta=f"-€ {var_cf_eur:,.2f}",
-            positive=False,
-            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+            )
+        with col_m3:
+            metric_card(
+                f"VaR Cornish-Fisher ({holding_period}G)",
+                f"{var_cf_t*100:.2f}%",
+                delta=f"-€ {var_cf_eur:,.2f}",
+                positive=False,
+                help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
 <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Value at Risk modificato per catturare le code grasse (Fat Tails) e l'asimmetria reale del portafoglio.</div>
 <div style="margin-bottom: 6px;"><b>📐 Parametri:</b> Skewness = {skewness:+.2f} | Kurtosis = {kurtosis:+.2f} | z<sub>CF</sub> = {z_cf:.2f}</div>
 <div style="margin-bottom: 6px;"><b>🎯 Significato:</b> Evita la sottostima dei crolli improvvisi tipica del VaR gaussiano.</div>
 <div><b>💶 Impatto Capitale:</b> Perdita stimata pari a -€ {var_cf_eur:,.2f}.</div>
 </div>"""
-        )
-    with col_m4:
-        metric_card(
-            f"Expected Shortfall (CVaR - {holding_period}G)",
-            f"{cvar_hist_t*100:.2f}%",
-            delta=f"-€ {cvar_hist_eur:,.2f}",
-            positive=False,
-            help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
+            )
+        with col_m4:
+            metric_card(
+                f"Expected Shortfall (CVaR - {holding_period}G)",
+                f"{cvar_hist_t*100:.2f}%",
+                delta=f"-€ {cvar_hist_eur:,.2f}",
+                positive=False,
+                help_text=f"""<div style="font-size: 13px; line-height: 1.45;">
 <div style="margin-bottom: 6px;"><b>📌 Cos'è:</b> Misura di rischio coerente (Artzner) che calcola la perdita media negli scenari peggiori oltre la soglia del VaR.</div>
 <div style="margin-bottom: 6px;"><b>📐 Formula:</b> CVaR<sub>&alpha;</sub> = &minus;E[R<sub>p</sub> | R<sub>p</sub> &le; &minus;VaR<sub>&alpha;</sub>] &times; &radic;{holding_period}</div>
 <div style="margin-bottom: 6px;"><b>🎯 Requisito:</b> Metrica primaria adottata da Basilea III (FRTB) per il monitoraggio del rischio di coda estremo.</div>
 <div><b>💶 Impatto Capitale:</b> Perdita media nello scenario di superamento pari a -€ {cvar_hist_eur:,.2f}.</div>
 </div>"""
-        )
+            )
+
+    render_dynamic_var_kpi_fragment(sr_port, pos)
 
     st.divider()
 

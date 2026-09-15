@@ -55,6 +55,55 @@ def inject_custom_css():
             font-feature-settings: "tnum" 1, "zero" 1 !important;
         }}
 
+        /* High-Density Institutional Data Grids */
+        [data-testid="stDataFrame"], [data-testid="stDataEditor"] {{
+            border-radius: 8px !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            background: rgba(13, 17, 23, 0.6) !important;
+        }}
+        [data-testid="stDataFrame"] td, [data-testid="stDataEditor"] td {{
+            font-family: 'JetBrains Mono', monospace !important;
+            font-size: 12px !important;
+            font-feature-settings: "tnum" 1, "zero" 1 !important;
+            padding: 4px 8px !important;
+        }}
+        [data-testid="stDataFrame"] th, [data-testid="stDataEditor"] th {{
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            color: #8b949e !important;
+            background: rgba(22, 27, 34, 0.8) !important;
+        }}
+
+        /* Institutional Tax & Risk Badges */
+        .argus-badge {{
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 12px;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }}
+        .argus-badge-tax-oicr {{
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }}
+        .argus-badge-tax-cg {{
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }}
+        .argus-badge-risk-alert {{
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }}
+
 
         /* Institutional Typography Hierarchy */
         h1, [data-testid="stHeading"] h1, [data-testid="stHeader"] h1 {{

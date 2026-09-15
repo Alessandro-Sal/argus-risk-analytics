@@ -24,6 +24,7 @@ icon_path = next((p for p in icon_candidates if os.path.exists(p)), None)
 datas = [
     (os.path.join(spec_dir, "src"), "src"),
     (os.path.join(spec_dir, "core"), "core"),
+    (os.path.join(spec_dir, "components"), "components"),
     (os.path.join(spec_dir, "docs"), "docs"),
     (os.path.join(spec_dir, "app.py"), "."),
 ]
@@ -56,6 +57,7 @@ hiddenimports = [
 ]
 hiddenimports += collect_submodules("streamlit")
 hiddenimports += collect_submodules("core")
+hiddenimports += collect_submodules("components")
 
 # 4. Esclusioni Selettive per Ridurre il Bundle Size (Risparmio > 800 MB)
 excludes = [

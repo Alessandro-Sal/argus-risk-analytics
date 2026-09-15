@@ -813,7 +813,7 @@ def get_argus_vector_logo_svg(size: int = 138, accent_color: str = "#f59e0b") ->
 def render_splash_html(
     app_title: str = "A R G U S",
     subtitle: str = "QUANTITATIVE RISK ANALYTICS & WEALTH INTELLIGENCE ECOSYSTEM",
-    version_tag: str = "v9.0.0 Institutional",
+    version_tag: str = "v9.7.0 Institutional",
     current_status: str = "Kernel operativo. Seleziona l'Ambiente di Lavoro sottostante:",
     progress_pct: int = 100,
     accent_color: str = "#f59e0b",
@@ -888,7 +888,7 @@ def render_splash_html(
 
 # ── CONTROLLO CICLO DI VITA & RENDERING PRINCIPALE ─────────────────
 def render_splash_screen(
-    app_version: str = "9.0.0",
+    app_version: str = "9.7.0",
     force_show: bool = False,
     boot_tasks: Optional[List[Tuple[str, Optional[Callable[[], None]]]]] = None,
     min_step_duration: float = 0.32,

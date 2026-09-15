@@ -1,6 +1,6 @@
 # ============================================================
 # 0_Control_Room.py (Main Entry Point)
-# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v9.0.0
+# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v9.7.0
 # ============================================================
 
 import sys
@@ -53,7 +53,7 @@ if _qp is not None:
 from components.splash import auto_expand_sidebar
 from components.splash import render_splash_screen as render_argus_splash
 
-if render_argus_splash(app_version="9.0.0"):
+if render_argus_splash(app_version="9.7.0"):
     st.stop()
 
 # Apertura automatica della sidebar una volta entrati nella Control Room
