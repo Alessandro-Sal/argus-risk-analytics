@@ -2540,7 +2540,8 @@ def compute_black_litterman_optimization(
                 Q[idx] = val
 
         omega = np.diag(np.diag(tau * (P @ sigma @ P.T)))
-        if np.linalg.det(omega) == 0:
+        omega_diag = np.diag(omega)
+        if np.any(omega_diag <= 1e-12) or np.linalg.cond(omega) > 1e12:
             omega += np.eye(k) * 1e-6
 
         # Formulazione duale He & Litterman / Woodbury (inverte solo la matrice K x K delle viste):
@@ -2563,15 +2564,40 @@ def compute_black_litterman_optimization(
         M_cov = tau * sigma - tau_sigma_Pt @ inv_kernel @ tau_sigma_Pt.T
         bl_cov = sigma + M_cov
 
-    # Optimal Black-Litterman Weights con fallback a pseudo-inversa
+    # Pesi ottimali Black-Litterman tramite Quadratic Programming vincolato Long-Only (w >= 0, sum(w) = 1)
+    n_assets = len(assets)
+    def bl_objective(weights_vec: np.ndarray) -> float:
+        return 0.5 * float(weights_vec @ bl_cov @ weights_vec) - (1.0 / max(1e-4, risk_aversion)) * float(np.dot(weights_vec, bl_returns))
+
+    w0 = np.ones(n_assets) / float(n_assets)
+    bnds = tuple((0.0, 1.0) for _ in range(n_assets))
+    cons = {"type": "eq", "fun": lambda w: np.sum(w) - 1.0}
+
     try:
-        inv_cov = np.linalg.inv(bl_cov)
-    except np.linalg.LinAlgError:
-        inv_cov = np.linalg.pinv(bl_cov)
-    w_bl = inv_cov @ bl_returns / risk_aversion
-    w_bl = np.maximum(w_bl, 0.0)
-    if np.sum(w_bl) > 0:
-        w_bl /= np.sum(w_bl)
+        opt_res = sco.minimize(
+            bl_objective,
+            w0,
+            method="SLSQP",
+            bounds=bnds,
+            constraints=cons,
+            options={"maxiter": 250, "ftol": 1e-9},
+        )
+        if opt_res.success and np.all(np.isfinite(opt_res.x)):
+            w_bl = np.clip(opt_res.x, 0.0, 1.0)
+            s = np.sum(w_bl)
+            w_bl = w_bl / s if s > 0 else w0
+        else:
+            raise RuntimeError("SLSQP convergence failure")
+    except Exception:
+        # Fallback a soluzione analitica non vincolata con clipping
+        try:
+            inv_cov = np.linalg.inv(bl_cov)
+        except np.linalg.LinAlgError:
+            inv_cov = np.linalg.pinv(bl_cov)
+        w_raw = inv_cov @ bl_returns / max(1e-4, risk_aversion)
+        w_bl = np.maximum(w_raw, 0.0)
+        s = np.sum(w_bl)
+        w_bl = w_bl / s if s > 0 else w0
 
     return {
         "implied_equilibrium_returns": pd.Series(pi, index=assets),
@@ -3020,26 +3046,29 @@ def compute_merton_jump_diffusion_simulation(
 
     np.random.seed(42)
 
-    paths = np.zeros((n_sims, time_horizon_days + 1))
+    # 1. Diffusione geometrica browniana vettorizzata (n_sims, time_horizon_days)
+    dW = np.random.normal(0.0, np.sqrt(dt), size=(n_sims, time_horizon_days))
+
+    # 2. Salti composti di Poisson vettorizzati
+    poisson_jumps = np.random.poisson(lambda_j * dt, size=(n_sims, time_horizon_days))
+    jump_counts_per_sim = np.sum(poisson_jumps, axis=1)
+
+    jump_shocks = np.zeros((n_sims, time_horizon_days), dtype=np.float64)
+    has_jumps = poisson_jumps > 0
+    if np.any(has_jumps):
+        n_j = poisson_jumps[has_jumps]
+        jump_shocks[has_jumps] = np.random.normal(
+            loc=n_j * mu_j,
+            scale=np.sqrt(n_j) * sigma_j
+        )
+
+    # 3. Log-rendimenti totali e traiettorie cumulate vettorizzate
+    log_returns = (drift * dt) + (sigma * dW) + jump_shocks
+    cum_log_returns = np.cumsum(log_returns, axis=1)
+
+    paths = np.empty((n_sims, time_horizon_days + 1), dtype=np.float64)
     paths[:, 0] = initial_value
-    jump_counts_per_sim = np.zeros(n_sims)
-
-    for i in range(n_sims):
-        price = initial_value
-        total_jumps = 0
-        for t in range(1, time_horizon_days + 1):
-            dW = np.random.normal(0.0, np.sqrt(dt))
-            n_jumps = np.random.poisson(lambda_j * dt)
-            total_jumps += n_jumps
-            if n_jumps > 0:
-                jump_factor = np.sum(np.random.normal(mu_j, sigma_j, n_jumps))
-            else:
-                jump_factor = 0.0
-
-            log_return = drift * dt + sigma * dW + jump_factor
-            price *= np.exp(log_return)
-            paths[i, t] = price
-        jump_counts_per_sim[i] = total_jumps
+    paths[:, 1:] = initial_value * np.exp(cum_log_returns)
 
     final_prices = paths[:, -1]
     pct_returns = (final_prices - initial_value) / initial_value
@@ -3340,7 +3369,21 @@ def compute_marginal_and_component_var(
     w = w / w_sum
 
     ret_sub = df_returns[active_tickers].fillna(0.0)
-    cov_matrix = ret_sub.cov().values
+    if len(active_tickers) > 1 and len(ret_sub) >= 5:
+        try:
+            cov_matrix = LedoitWolf().fit(ret_sub).covariance_
+        except Exception:
+            cov_matrix = ret_sub.cov().values
+    else:
+        cov_matrix = ret_sub.cov().values
+
+    # Garanzia simmetria e matrice semi-definita positiva (PSD)
+    if cov_matrix.ndim == 2 and cov_matrix.shape[0] == cov_matrix.shape[1]:
+        cov_matrix = (cov_matrix + cov_matrix.T) / 2.0
+        eigvals, eigvecs = np.linalg.eigh(cov_matrix)
+        eigvals_clipped = np.clip(eigvals, 1e-8, None)
+        cov_matrix = eigvecs @ np.diag(eigvals_clipped) @ eigvecs.T
+
     w_arr = w.values
 
     port_var = float(w_arr.T @ cov_matrix @ w_arr)
@@ -3355,11 +3398,13 @@ def compute_marginal_and_component_var(
 
     # Marginal VaR: (Cov @ w) / sigma_p * z_alpha * sqrt(T)
     cov_w = cov_matrix @ w_arr
-    marginal_var_pct = (z_alpha / port_sigma) * cov_w * scale_factor
+    safe_sigma = max(1e-8, port_sigma)
+    marginal_var_pct = (z_alpha / safe_sigma) * cov_w * scale_factor
     component_var_pct = w_arr * marginal_var_pct
     component_var_amount = component_var_pct * tot_val
 
-    pct_contribution = (component_var_pct / max(1e-12, port_var_pct)) * 100.0
+    safe_port_var = max(1e-8, port_var_pct)
+    pct_contribution = (component_var_pct / safe_port_var) * 100.0
 
     rows = []
     for idx, tk in enumerate(active_tickers):
@@ -3395,6 +3440,10 @@ def compute_marginal_and_component_var(
         "euler_check_passed": euler_check_passed,
         "euler_residual": round(float(euler_diff), 6),
     }
+
+
+# Alias istituzionale per la decomposizione di Eulero del VaR
+calc_euler_var_decomposition = compute_marginal_and_component_var
 
 
 # ── Liquidity-Adjusted Value at Risk (LVaR) ──────────────────────

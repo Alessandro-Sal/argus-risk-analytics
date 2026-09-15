@@ -5,22 +5,90 @@
 # (Tier 1: Fast RAM LRU Cache | Tier 2: Persistent SQLite 24h TTL)
 # ============================================================
 
+import io
 import json
 import os
 import random
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+
+try:
+    import pyarrow as pa
+    import pyarrow.feather as feather
+    HAS_PYARROW = True
+except ImportError:
+    pa = None
+    feather = None
+    HAS_PYARROW = False
 
 CACHE_DB_PATH = Path("data") / "yfinance_cache.db"
 DEFAULT_TTL_SECONDS = 86400  # 24 Ore di validità
 
 # In-memory L1 cache dictionary
 _L1_CACHE: Dict[str, Tuple[float, Any]] = {}
+
+
+def _df_to_binary_payload(df: pd.DataFrame) -> bytes:
+    """Serializza un DataFrame in formato binario compatto Apache Arrow Feather ad alte prestazioni."""
+    if not HAS_PYARROW:
+        return df.to_json(date_format="iso").encode("utf-8")
+
+    buf = io.BytesIO()
+    df_to_write = df.copy()
+    if isinstance(df_to_write.index, pd.DatetimeIndex):
+        df_to_write = df_to_write.reset_index()
+    feather.write_feather(df_to_write, buf, compression="zstd")
+    return buf.getvalue()
+
+
+def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
+    """Deserializza automaticamente sia buffer binari Arrow Feather che stringhe legacy JSON."""
+    if payload is None:
+        return pd.DataFrame()
+
+    if isinstance(payload, str):
+        try:
+            df = pd.read_json(io.StringIO(payload))
+            if not df.empty:
+                for c in ["date", "Date", "price_date"]:
+                    if c in df.columns:
+                        df[c] = pd.to_datetime(df[c])
+                        df = df.set_index(c)
+                        break
+            return df
+        except Exception:
+            return pd.DataFrame()
+
+    if isinstance(payload, bytes):
+        if payload.strip().startswith((b"{", b"[")):
+            try:
+                text_payload = payload.decode("utf-8", errors="ignore")
+                return pd.read_json(io.StringIO(text_payload))
+            except Exception:
+                pass
+
+        if HAS_PYARROW:
+            try:
+                buf = io.BytesIO(payload)
+                df = feather.read_feather(buf)
+                for c in ["date", "Date", "price_date", "index"]:
+                    if c in df.columns:
+                        try:
+                            df[c] = pd.to_datetime(df[c])
+                            df = df.set_index(c)
+                            break
+                        except Exception:
+                            pass
+                return df
+            except Exception:
+                pass
+
+    return pd.DataFrame()
 
 
 def _get_cache_connection() -> sqlite3.Connection:
@@ -38,7 +106,7 @@ def _get_cache_connection() -> sqlite3.Connection:
             cache_key TEXT PRIMARY KEY,
             ticker TEXT,
             data_type TEXT,
-            payload TEXT,
+            payload BLOB,
             cached_at REAL,
             ttl_seconds REAL
         )
@@ -57,7 +125,7 @@ def get_cached_ticker_history(
     """
     Recupera i dati storici dei prezzi con scudo multi-livello anti-429 Rate Limiting:
     1. Controllo L1 RAM Cache (istantaneo < 1ms)
-    2. Controllo L2 SQLite Cache con TTL 24h
+    2. Controllo L2 SQLite Cache con Arrow Feather binario e TTL 24h
     3. Chiamata protetta a yfinance con exponential backoff in caso di rate limit
     4. Fallback offline seamless in caso di mancata connessione.
     """
@@ -78,9 +146,9 @@ def get_cached_ticker_history(
         cur.execute("SELECT payload, cached_at, ttl_seconds FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
         row = cur.fetchone()
         if row and not force_refresh:
-            payload_json, cached_at, row_ttl = row
+            payload_data, cached_at, row_ttl = row
             if (now - cached_at) < row_ttl:
-                df_disk = pd.read_json(payload_json)
+                df_disk = _binary_payload_to_df(payload_data)
                 if not df_disk.empty:
                     _L1_CACHE[cache_key] = (cached_at, df_disk)
                     return df_disk.copy()
@@ -94,14 +162,14 @@ def get_cached_ticker_history(
         # Salva in L1 e L2
         _L1_CACHE[cache_key] = (now, df_downloaded)
         try:
-            payload_str = df_downloaded.to_json(date_format="iso")
+            payload_bin = _df_to_binary_payload(df_downloaded)
             cur = conn.cursor()
             cur.execute(
                 """
                 INSERT OR REPLACE INTO yfinance_cache (cache_key, ticker, data_type, payload, cached_at, ttl_seconds)
                 VALUES (?, ?, 'history', ?, ?, ?)
             """,
-                (cache_key, clean_ticker, payload_str, now, ttl_seconds),
+                (cache_key, clean_ticker, sqlite3.Binary(payload_bin) if isinstance(payload_bin, bytes) else payload_bin, now, ttl_seconds),
             )
             conn.commit()
         except Exception:
@@ -114,7 +182,7 @@ def get_cached_ticker_history(
         cur.execute("SELECT payload FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
         row = cur.fetchone()
         if row:
-            df_fallback = pd.read_json(row[0])
+            df_fallback = _binary_payload_to_df(row[0])
             if not df_fallback.empty:
                 return df_fallback.copy()
     except Exception:

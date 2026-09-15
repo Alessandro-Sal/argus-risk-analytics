@@ -23,6 +23,7 @@ except ImportError:
     FastAPI = object  # Fallback for type hinting
 
 from core.bitemporal_engine import BitemporalLedgerEngine
+from core.services.rebalancing_service import RebalancingService
 from core.services.risk_service import RiskService
 from core.services.tax_service import TaxService
 from core.services.wealth_service import WealthService
@@ -176,6 +177,72 @@ class HealthResponse(BaseModel):
     timestamp: str
 
 
+class RebalanceHoldingItem(BaseModel):
+    """Individual holding item for portfolio rebalancing."""
+    ticker: str = Field(..., description="Asset ticker symbol, e.g. SWDA.MI or AAPL")
+    shares: float = Field(..., description="Current quantity of shares/units held", ge=0.0)
+    current_price: float = Field(..., description="Current market price per share", gt=0.0)
+    pmc: float = Field(default=0.0, description="Prezzo Medio di Carico (tax acquisition cost)", ge=0.0)
+    asset_class: str = Field(default="Equity", description="Asset class: Equity, ETF, Bond_Gov, Bond_Corp, Crypto, etc.")
+
+
+class RebalanceRequest(BaseModel):
+    """Payload for institutional multi-strategy portfolio rebalancing."""
+    holdings: List[RebalanceHoldingItem] = Field(..., min_length=1, description="List of current portfolio holdings")
+    target_weights: Dict[str, float] = Field(..., description="Target allocation weights (e.g. {'SWDA.MI': 0.6, 'XEON.MI': 0.4})")
+    strategy: str = Field(default="autonomous", description="Rebalancing strategy: 'autonomous', 'tax_aware', 'prescriptive', 'heuristic'")
+    total_portfolio_value: Optional[float] = Field(default=None, description="Optional target total portfolio value in EUR")
+    minusvalenze_available: float = Field(default=0.0, description="Available past capital losses in tax wallet (TUIR Art. 67)", ge=0.0)
+    max_turnover_pct: float = Field(default=50.0, description="Maximum permissible turnover percentage", ge=0.0, le=100.0)
+    min_trade_eur: float = Field(default=50.0, description="Minimum order size threshold in EUR", ge=0.0)
+    cash_injection: float = 0.0
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "holdings": [
+                    {"ticker": "SWDA.MI", "shares": 100, "current_price": 100.0, "pmc": 80.0, "asset_class": "ETF"},
+                    {"ticker": "ISP.MI", "shares": 1000, "current_price": 4.0, "pmc": 3.0, "asset_class": "Equity"}
+                ],
+                "target_weights": {"SWDA.MI": 0.50, "ISP.MI": 0.50},
+                "strategy": "autonomous",
+                "minusvalenze_available": 500.0,
+                "max_turnover_pct": 30.0,
+                "min_trade_eur": 100.0,
+                "cash_injection": 0.0
+            }
+        }
+    }
+
+
+class PlannedOrderItem(BaseModel):
+    """Calculated execution order item."""
+    ticker: str
+    action: str
+    shares: float
+    price: float
+    order_value: float
+    tax_category: str
+    realized_gain: float
+    estimated_tax: float
+    estimated_fees: float
+    current_weight_pct: float
+    target_weight_pct: float
+    delta_weight_pct: float
+    fix_message: Optional[str] = None
+    notes: str = ""
+
+
+class RebalanceResponse(BaseModel):
+    """Institutional rebalancing response with orders, metrics, and compliance audit."""
+    strategy: str
+    orders: List[PlannedOrderItem]
+    summary: Dict[str, Any]
+    tax_report: Dict[str, Any]
+    compliance: Dict[str, Any]
+    status: str
+
+
 # ============================================================
 # FastAPI Application Factory
 # ============================================================
@@ -310,6 +377,69 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Wealth net worth error: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=f"Wealth calculation failure: {str(exc)}")
+
+    # ── Portfolio Rebalancing Endpoint ───────────────────────────
+
+    @app.post(
+        "/api/v1/rebalance",
+        response_model=RebalanceResponse,
+        tags=["Rebalancing & Execution"],
+        summary="Compute Institutional Portfolio Rebalancing Plan"
+    )
+    def compute_rebalancing_plan(req: RebalanceRequest) -> RebalanceResponse:
+        """
+        Calcola gli ordini di ribilanciamento istituzionale, impatto fiscale TUIR Art. 44 vs 67,
+        matrice di attrito e gate MiFID II su strategie polimorfiche.
+        """
+        try:
+            holdings_dicts = [h.model_dump() for h in req.holdings]
+            res = RebalancingService.execute_rebalance(
+                positions=holdings_dicts,
+                target_weights=req.target_weights,
+                strategy=req.strategy,
+                total_portfolio_value=req.total_portfolio_value,
+                minusvalenze_available=req.minusvalenze_available,
+                max_turnover_pct=req.max_turnover_pct,
+                min_trade_eur=req.min_trade_eur,
+                cash_injection=req.cash_injection,
+            )
+
+            formatted_orders = [
+                PlannedOrderItem(
+                    ticker=o["ticker"],
+                    action=o["action"],
+                    shares=float(o["shares"]),
+                    price=float(o["price"]),
+                    order_value=float(o["order_value"]),
+                    tax_category=str(o["tax_category"]),
+                    realized_gain=float(o["realized_gain"]),
+                    estimated_tax=float(o["estimated_tax"]),
+                    estimated_fees=float(o.get("estimated_fees", 0.0)),
+                    current_weight_pct=float(o["current_weight_pct"]),
+                    target_weight_pct=float(o["target_weight_pct"]),
+                    delta_weight_pct=float(o["delta_weight_pct"]),
+                    fix_message=o.get("fix_message"),
+                    notes=o.get("notes", ""),
+                )
+                for o in res.get("orders", [])
+            ]
+
+            return RebalanceResponse(
+                strategy=res["strategy"],
+                orders=formatted_orders,
+                summary=res["summary"],
+                tax_report=res["tax_report"],
+                compliance=res["compliance"],
+                status=res["status"],
+            )
+        except ValueError as v_err:
+            raise HTTPException(status_code=422, detail=str(v_err))
+        except Exception as exc:
+            logger.error("Rebalancing execution failed: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=500,
+                detail=f"Rebalancing calculation failure: {str(exc)}"
+            )
 
     # ── Bitemporal Time-Travel Endpoint ──────────────────────────
 

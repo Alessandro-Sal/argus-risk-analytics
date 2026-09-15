@@ -147,5 +147,35 @@ def create_secure_release_zip(version: str = ""):
     print(f"      File inclusi: {len(files_to_zip)}")
     print("=" * 70)
 
+    # -------------------------------------------------------------
+    # Compilazione Eseguibile Desktop Standalone (se richiesta con --build-exe)
+    # -------------------------------------------------------------
+    build_exe_requested = "--build-exe" in sys.argv or os.environ.get("ARGUS_BUILD_EXE", "").lower() in ("1", "true")
+    if build_exe_requested:
+        print("\n" + "=" * 70)
+        print(" [DESKTOP BUILD] Avvio compilazione PyInstaller standalone (argus_desktop.spec)...")
+        print("=" * 70)
+        import subprocess
+        spec_file = os.path.join(project_dir, "argus_desktop.spec")
+        if os.path.exists(spec_file):
+            cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", spec_file]
+            print(f"[CMD] {' '.join(cmd)}")
+            res = subprocess.run(cmd, cwd=project_dir)
+            if res.returncode == 0:
+                desktop_dist_dir = os.path.join(dist_dir, "ARGUS_Desktop")
+                if os.path.exists(desktop_dist_dir):
+                    desktop_zip_filename = f"ARGUS_{version}_Windows_Desktop_Standalone.zip"
+                    desktop_zip_path = os.path.join(dist_dir, desktop_zip_filename)
+                    if os.path.exists(desktop_zip_path):
+                        os.remove(desktop_zip_path)
+                    print(f"[INFO] Creazione archivio standalone: {desktop_zip_filename}...")
+                    shutil.make_archive(os.path.splitext(desktop_zip_path)[0], "zip", dist_dir, "ARGUS_Desktop")
+                    desktop_size_mb = os.path.getsize(desktop_zip_path) / (1024 * 1024)
+                    print(f" [OK] Pacchetto desktop standalone creato: {desktop_zip_path} ({desktop_size_mb:.2f} MB)")
+            else:
+                print(f"[WARN] Compilazione PyInstaller terminata con errore (codice {res.returncode}).")
+        else:
+            print(f"[WARN] File spec non trovato: {spec_file}")
+
 if __name__ == "__main__":
     create_secure_release_zip()
