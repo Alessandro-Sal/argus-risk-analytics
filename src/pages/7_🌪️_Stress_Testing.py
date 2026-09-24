@@ -143,6 +143,13 @@ STRESS_MODELS_CATALOG = {
         "badge_color": "#06b6d4",
         "category": "Liquidity & Execution Risk",
         "desc": "Audit dei volumi medi scambiati (ADV), giorni necessari alla liquidazione (DTL al 10% e 20% ADV), indice di illiquidità di Amihud, ripartizione in 4 Tier di liquidità e calcolo del Liquidity-Adjusted VaR (L-VaR) endogeno."
+    },
+    "⚡ Reverse Stress Testing (EBA / BCE)": {
+        "title": "Reverse Stress Testing Istituzionale (Linee Guida EBA & BCE Supervisory Framework)",
+        "badge": "Min-Mahalanobis • Soglie di Rottura",
+        "badge_color": "#ec4899",
+        "category": "Regulatory Supervisory Analytics",
+        "desc": "Calcolo inverso del vettore macroeconomico più probabile (minima distanza di Mahalanobis) che genera il superamento di una soglia critica di perdita del portafoglio."
     }
 }
 
@@ -1187,6 +1194,92 @@ elif active_stress_tab == "💧 Rischio Liquidità & Orizzonte DTL (Basel III / 
             },
             hide_index=True
         )
+
+# ── TAB 7: REVERSE STRESS TESTING (EBA / BCE) ──────────────────
+elif active_stress_tab == "⚡ Reverse Stress Testing (EBA / BCE)":
+    st.markdown("#### ⚡ Reverse Stress Testing Istituzionale (Linee Guida EBA & BCE)")
+    st.caption("Calcolo del vettore macroeconomico più plausibile (minima distanza di Mahalanobis) che causa il superamento della soglia di perdita critica indicata.")
+
+    from core.macro_stress_engine import compute_reverse_stress_test
+
+    col_rev_c1, col_rev_c2 = st.columns([2.5, 1.5])
+    with col_rev_c1:
+        target_loss_sel = st.slider(
+            "Seleziona Soglia di Perdita Critica (%):",
+            min_value=-60.0,
+            max_value=-10.0,
+            value=-25.0,
+            step=2.5,
+            format="%.1f%%",
+            help="Definisce il livello di drawdown o perdita patrimoniale da investigare a ritroso."
+        )
+    with col_rev_c2:
+        st.markdown("""
+        <div style="background: rgba(236, 72, 153, 0.1); border-left: 3px solid #ec4899; padding: 10px 14px; border-radius: 6px; font-size: 12.5px; color: #cbd5e1;">
+            <b>Obiettivo EBA / BCE:</b> Identificare i punti ciechi di correlazione e i canali di trasmissione sistemica prima che si verifichino.
+        </div>
+        """, unsafe_allow_html=True)
+
+    rev_res = compute_reverse_stress_test(
+        positions_df=pos,
+        portfolio_value=float(portfolio_value or 100000.0),
+        target_loss_pct=target_loss_sel,
+    )
+
+    r_c1, r_c2, r_c3, r_c4 = st.columns(4)
+    with r_c1:
+        metric_card("Perdita Target", fmt_eur(rev_res["target_loss_eur"]), delta=f"{rev_res['target_loss_pct']:.1f}%", delta_color="inverse")
+    with r_c2:
+        metric_card("Distanza di Mahalanobis", f"{rev_res['mahalanobis_distance']:.2f} σ", delta="Min-Distance Solver", delta_color="normal")
+    with r_c3:
+        metric_card("Valutazione Plausibilità", rev_res["severity_badge"], delta=rev_res["implied_frequency_estimate"], delta_color="normal")
+    with r_c4:
+        metric_card("Valore Post-Shock", fmt_eur(rev_res["post_shock_portfolio_value_eur"]), delta="Capitale Residuo", delta_color="normal")
+
+    st.write("")
+    col_chart_rev1, col_chart_rev2 = st.columns([1.6, 1.2])
+
+    with col_chart_rev1:
+        st.markdown("##### 🌪️ Shock Ottimali Richiesti per Macro-Fattore")
+        df_sh = rev_res["factors_df"].copy()
+        fig_sh = px.bar(
+            df_sh,
+            x="Fattore Macro",
+            y="Valore Grezzo",
+            color="Impatto su Portafoglio",
+            color_continuous_scale="RdBu_r",
+            title="Vettore di Shock Macro Più Plausibile (Distanza Minima)",
+            template="plotly_dark",
+            height=320,
+        )
+        fig_sh.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=30, b=10))
+        apply_plotly_theme(fig_sh)
+        st.plotly_chart(fig_sh, use_container_width=True, config={"displayModeBar": False})
+
+    with col_chart_rev2:
+        st.markdown("##### 🍰 Quota di Contribuzione alla Perdita Totale")
+        df_sh_pie = df_sh[df_sh["Valore Grezzo"] != 0].copy()
+        fig_pie = px.pie(
+            df_sh_pie,
+            names="Fattore Macro",
+            values=df_sh_pie["Quota Perdita (%)"].str.rstrip("%").astype(float).abs(),
+            title="Scomposizione Causale della Rottura",
+            hole=0.45,
+            template="plotly_dark",
+            height=320,
+        )
+        fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=30, b=10))
+        apply_plotly_theme(fig_pie)
+        st.plotly_chart(fig_pie, use_container_width=True, config={"displayModeBar": False})
+
+    st.markdown("##### 📋 Dettaglio Parametrico & Sensibilità ai Fattori Macro")
+    render_table_with_export(
+        df=rev_res["factors_df"][["Fattore Macro", "Sensibilità (β)", "Shock Ottimale Richiesto", "Impatto su Portafoglio", "Quota Perdita (%)"]],
+        table_title="Matrice Reverse Stress Test EBA",
+        file_prefix="reverse_stress_test_factors",
+        key_suffix="p7_rev_stress_breakdown",
+        hide_index=True,
+    )
 
 st.divider()
 

@@ -67,6 +67,11 @@ Multi-factor risk attribution powered by empirical factor time-series directly s
 ### 9. Portfolio Fixed Income ALM & Endogenous Liquidity Risk
 Dynamic bond and bond-ETF aggregation computing Macaulay and Effective Modified Duration, Portfolio Convexity, DV01 (€/bps), Key Rate Durations (2Y, 5Y, 10Y, 30Y), non-parallel curve twist scenarios (Bull/Bear Steepeners & Flatteners), Average Daily Volume (ADV 30d/90d), Days to Liquidate (DTL 10% & 20%), Amihud illiquidity ratio, and Endogenous L-VaR.
 
+### 10. Spinu (2013) Convex Risk Budgeting & Pure Risk Parity (ERC)
+Florian Spinu's strictly convex potential formulation $\min_{x > 0} \frac{1}{2} x^T \Sigma x - \sum b_i \ln(x_i)$ with exact analytical gradient, guaranteed global convergence via L-BFGS-B / SLSQP, supporting arbitrary risk budget vectors $b_i$ or uniform Equal Risk Contribution (1/N).
+
+### 11. Regulatory Reverse Stress Testing (EBA/BCE) & Gatheral SVI
+Inverse stress testing identifying the minimum Mahalanobis distance macroeconomic shock causing a predetermined loss threshold $\mathcal{L}^*$, complete with Chi-squared plausibility p-values and causal factor attribution; paired with Jim Gatheral's (2004) Raw SVI Arbitrage-Free Volatility Surface with Roger Lee moment bounds and Durrleman risk-neutral density non-negativity checks.
 
 ---
 

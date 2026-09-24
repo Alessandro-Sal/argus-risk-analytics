@@ -7,6 +7,49 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.10.0] - 2026-09-24
+
+### 💎 Spinu Convex Risk Budgeting, Regulatory Reverse Stress Testing, Gatheral SVI & Institutional Factsheet PDF
+
+Questa release istituzionale eleva le capacità analitiche e l'interoperabilità di ARGUS agli standard qualitativi di un desk tier-1 di Quantitative Risk Management & Portfolio Construction:
+
+- **Ottimizzazione Risk Parity & Budgeting Convesso di Florian Spinu (2013) (`core/advanced_quant.py`)**:
+  - Implementata la formulazione del potenziale strettamente convesso:
+    $$\min_{x > 0} \frac{1}{2} x^T \Sigma x - \sum_{i=1}^N b_i \ln(x_i)$$
+  - Gradiente analitico esatto $\nabla f(x) = \Sigma x - \frac{b}{x}$ e convergenza globale garantita tramite algoritmo quasi-Newton L-BFGS-B con vincoli di positività stretta $x_i > 0$ e fallback SLSQP.
+  - Supporto nativo per **Arbitrary Risk Budgeting** (budget di rischio frazionari arbitrari $b_i$, con $\sum b_i = 1$) ed **Equal Risk Contribution (ERC / Pure Risk Parity)** con $b_i = 1/N$.
+  - Decomposizione esatta del rischio marginale (MRC) e del contributo percentuale di rischio (PRC).
+- **Motore di Regulatory Reverse Stress Testing (Linee Guida EBA & BCE) (`core/macro_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Risoluzione dell'inverso dello stress test sotto vincolo di perdita target prefissata $\mathcal{L}^*$ (es. $-15\%$ o $-20\%$):
+    $$\min_{\mathbf{f}} \frac{1}{2} \mathbf{f}^T \Sigma_f^{-1} \mathbf{f} \quad \text{s.t.} \quad \boldsymbol{\beta}^T \mathbf{f} \le \frac{\mathcal{L}^*}{100}$$
+  - Calcolo della **distanza statistica di Mahalanobis** $d_M = \sqrt{\mathbf{f}^{*T} \Sigma_f^{-1} \mathbf{f}^*}$ e del relativo $p$-value di plausibilità sotto distribuzione $\chi^2$ a 6 gradi di libertà.
+  - Rating qualitativo di plausibilità dello scenario con badge di severità (Plausibile, Severo, Molto Severo, Cigno Nero) e stima della frequenza empirica implicita.
+  - Scomposizione della perdita tra 6 macro-fattori regolamentari: Azionario Globale, Tasso Sovrano 10Y, Spread Corporate IG, Spread Corporate HY, FX EUR/USD, Materie Prime/Energia.
+  - Nuova tab interattiva dedicata in UI con slider soglia $\mathcal{L}^*$, grafici Plotly e matrici di shock.
+- **Superficie di Volatilità 3D No-Arbitrage SVI di Jim Gatheral (2004) (`core/volatility_surface.py`)**:
+  - Implementazione della parametrizzazione Raw SVI per la varianza totale implicita:
+    $$w(k) = a + b \left[ \rho (k - m) + \sqrt{(k - m)^2 + \sigma^2} \right]$$
+  - Verifica rigorosa delle condizioni no-arbitrage: vincoli asintotici sui momenti di Roger Lee ($b(1 + |\rho|) \le 4/T$) e non-negatività della densità neutrale al rischio di Durrleman ($g(k) \ge 0$).
+  - Calibrazione numerica del sorriso tramite SLSQP con fitting simultaneo cross-maturity (1M, 3M, 6M, 12M).
+- **Generatore di Institutional Portfolio Factsheet PDF a 2 Pagine (`core/pdf_generator.py`, `src/pages/1_📈_Dashboard_Generale.py`)**:
+  - Sviluppato motore Platypus su standard Morningstar / BlackRock con canvas numerato `Page X of Y` e palette istituzionale:
+    - **Pagina 1 (Executive Tear Sheet)**: Header, 4 KPI cards, donut vettoriale di allocazione, matrice di rischio Cornish-Fisher/Basilea IV e Top 7 posizioni con DTL.
+    - **Pagina 2 (Attribution & Stress Profile)**: Tabella di regressione ed esposizione Fama-French a 5 fattori + Carhart con $t$-stat, matrice scenari regolamentari EBA/CCAR, profilo ALM Fixed Income & liquidità ADV, Executive AI Commentary e disclaimer legale MiFID II.
+  - Integrato pulsante di download immediato "📄 Scarica Factsheet Istituzionale (2 Pagine PDF)" nella Dashboard Generale.
+- **Espansione Headless REST API Microservice (`api/main.py`)**:
+  - Rilasciati 7 nuovi endpoint REST ad alte prestazioni:
+    - `POST /api/v1/optimize/erc`: Spinu convex risk budgeting ed Equal Risk Contribution.
+    - `POST /api/v1/risk/reverse-stress`: EBA/BCE minimum Mahalanobis reverse stress testing.
+    - `POST /api/v1/risk/fama-french`: OLS multivariate factor attribution & regression.
+    - `POST /api/v1/fixed-income/analytics`: Bloomberg YAS duration, convexity, DV01 e stress matrix.
+    - `POST /api/v1/risk/liquidity`: Basel III DTL, Amihud illiquidity e tier breakdown.
+    - `POST /api/v1/tax/harvesting`: Italian TUIR tax-loss harvesting & potential savings.
+    - `GET /api/v1/reports/factsheet`: Streaming del PDF Factsheet istituzionale a 2 pagine.
+- **Suite di Test Unitari Istituzionale (`tests/test_institutional_v910.py`)**:
+  - 9 test automatizzati coprenti convergenza del solutore convesso, arbitraggio SVI Durrleman, reverse stress testing, validazione binaria del PDF e suite REST TestClient (100% pass rate).
+
+---
+
 ## [9.9.0] - 2026-09-24
 
 ### 🚀 Real Multifactor Econometrics, Portfolio Fixed Income ALM, Liquidity Risk & Tax Harvesting
