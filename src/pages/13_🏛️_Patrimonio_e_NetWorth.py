@@ -25,15 +25,16 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_data_table,
-    render_export_toolbar,
     render_kpi_card,
     render_omni_command_bar,
     render_segmented_tabs,
+    render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
     section,
 )
 from core.wealth.wealth_db import (
+    get_cashflow_records,
     get_linked_risk_portfolios_summary,
     get_pension_plans,
     get_physical_assets,
@@ -46,13 +47,20 @@ from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
     compute_family_office_multi_entity_consolidation,
     compute_multi_currency_fx_hedging_engine,
+    compute_multi_year_balance_comparison,
     compute_personal_balance_sheet,
     compute_total_wealth_brinson_attribution,
     generate_advisory_pitchbook_html,
     generate_advisory_pitchbook_pdf,
     generate_executive_tear_sheet_html,
     generate_executive_tear_sheet_pdf,
+    generate_personal_balance_sheet_html,
+    generate_personal_balance_sheet_pdf,
+    generate_personal_balance_sheet_tearsheet_html,
+    generate_personal_balance_sheet_tearsheet_pdf,
 )
+
+from core.wealth.wealth_modals import render_balance_sheet_methodology_modal
 from core.wealth.wealth_snapshot import get_wealth_snapshots_history
 from core.wealth.wealth_temporal_engine import (
     compute_wealth_benchmark_comparison,
@@ -120,6 +128,28 @@ def _get_cached_pitchbook_html(_engine, pid: int) -> str:
 @st.cache_data(ttl=60, show_spinner=False)
 def _load_cached_personal_balance_sheet(_engine, pid: int = 1, yr: Optional[int] = None) -> Dict[str, Any]:
     return compute_personal_balance_sheet(_engine, portfolio_id=pid, year=yr)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _load_cached_multi_year_balance_comparison(_engine, pid: int = 1) -> Dict[str, Any]:
+    return compute_multi_year_balance_comparison(_engine, portfolio_id=pid)
+
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_balance_sheet_pdf(_engine, pid: int, yr: Optional[int] = None) -> bytes:
+    return generate_personal_balance_sheet_pdf(_engine, portfolio_id=pid, year=yr)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_balance_sheet_tearsheet_pdf(_engine, pid: int, yr: Optional[int] = None) -> bytes:
+    return generate_personal_balance_sheet_tearsheet_pdf(_engine, portfolio_id=pid, year=yr)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_balance_sheet_html(_engine, pid: int, yr: Optional[int] = None) -> str:
+    return generate_personal_balance_sheet_html(_engine, portfolio_id=pid, year=yr)
+
 
 st.set_page_config(page_title="Patrimonio & Net Worth | ARGUS Wealth", page_icon="🏛️", layout="wide")
 inject_custom_css()
@@ -1021,19 +1051,22 @@ with main_tab_alloc:
                 }
                 for it in sorted(breakdown_items, key=lambda x: x["val"], reverse=True)
             ])
-            c_al_t, c_al_exp = st.columns([3.5, 1.2])
-            with c_al_exp:
-                render_export_toolbar(
-                    df_alloc_table,
-                    file_prefix="asset_allocation_net_worth",
-                    key_suffix="nw_alloc_table",
-                    table_title="Asset Allocation Net Worth"
-                )
-            styler_alloc = df_alloc_table.style.format({
-                "Controvalore (€)": "€ {:,.2f}",
-                "Peso sul Net Worth (%)": "{:.1f}%"
-            })
-            st.dataframe(styler_alloc, use_container_width=True, hide_index=True)
+            alloc_cfg = {
+                "Macro Asset Class": st.column_config.TextColumn("Macro Asset Class", width="medium"),
+                "Profilo Liquidità (IFRS 13)": st.column_config.TextColumn("Profilo Liquidità", width="medium"),
+                "Destinazione Strategica": st.column_config.TextColumn("Destinazione Strategica", width="medium"),
+                "Livello Rischio": st.column_config.TextColumn("Livello Rischio", width="small"),
+                "Controvalore (€)": st.column_config.NumberColumn("Controvalore (€)", format="€ %,.2f"),
+                "Peso sul Net Worth (%)": st.column_config.ProgressColumn("Peso sul Net Worth (%)", format="%.1f%%", min_value=0.0, max_value=100.0)
+            }
+            render_table_with_export(
+                df=df_alloc_table,
+                table_title="Composizione Patrimonio Complessivo",
+                file_prefix="asset_allocation_net_worth",
+                key_suffix="nw_alloc_table",
+                column_config=alloc_cfg,
+                hide_index=True
+            )
     else:
         st.info("Nessun dato di allocazione disponibile. Aggiungi conti o asset fisici.")
 
@@ -1113,13 +1146,61 @@ with main_tab_alloc:
 # TAB 2: BILANCIO PERSONALE & STATO PATRIMONIALE ISTITUZIONALE
 # ══════════════════════════════════════════════════════════════
 with main_tab_sheet:
-    # ── CARICAMENTO DATI BILANCIO PERSONALE ─────────────────────
-    pbs_data = _load_cached_personal_balance_sheet(engine, pid=current_pid)
+    # ── SONDAGGIO ESERCIZI FISCALI DISPONIBILI ────────────────
+    df_cf_probe = get_cashflow_records(engine, portfolio_id=current_pid)
+    curr_yr = datetime.now().year
+    if not df_cf_probe.empty:
+        df_cf_probe["tx_date"] = pd.to_datetime(df_cf_probe["tx_date"], errors="coerce")
+        avail_years = sorted([int(y) for y in df_cf_probe["tx_date"].dt.year.dropna().unique()], reverse=True)
+    else:
+        avail_years = [curr_yr]
+    if curr_yr not in avail_years:
+        avail_years = sorted(list(set(avail_years + [curr_yr])), reverse=True)
+
+    # ── BARRA DI CONTROLLO ESERCIZIO MASTER ────────────────────
+    col_yr1, col_yr2, col_yr3 = st.columns([1.6, 2.2, 1.2])
+    with col_yr1:
+        selected_pbs_year = st.selectbox(
+            "📅 Esercizio Fiscale / Anno di Bilancio:",
+            options=avail_years,
+            index=0,
+            key="master_pbs_year_selector"
+        )
+    with col_yr2:
+        is_past = selected_pbs_year < curr_yr
+        badge_status = (
+            f"🔒 Esercizio Chiuso al 31/12/{selected_pbs_year}"
+            if is_past
+            else f"🟢 Esercizio in Corso (Aggiornato al {datetime.now().strftime('%d/%m/%Y')})"
+        )
+        st.markdown(f"""
+        <div style="padding-top:28px;">
+            <span style="background:{'rgba(59,130,246,0.15)' if is_past else 'rgba(16,185,129,0.15)'}; border:1px solid {'rgba(59,130,246,0.4)' if is_past else 'rgba(16,185,129,0.4)'}; padding:6px 14px; border-radius:18px; font-size:12px; font-weight:700; color:{'#60a5fa' if is_past else '#34d399'};">
+                {badge_status}
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+    with col_yr3:
+        if is_past:
+            st.markdown("<div style='padding-top:24px;'></div>", unsafe_allow_html=True)
+            if st.button("📸 Salva Chiusura", key="btn_save_year_close_snap", use_container_width=True, help=f"Salva e congela formalmente lo snapshot di bilancio al 31/12/{selected_pbs_year} nel database"):
+                from core.wealth.wealth_snapshot import save_wealth_snapshot_to_db
+                from datetime import date as d_date
+                snap_id = save_wealth_snapshot_to_db(
+                    engine=engine,
+                    portfolio_id=current_pid,
+                    snapshot_name=f"Chiusura Esercizio {selected_pbs_year}",
+                    snapshot_date_val=d_date(selected_pbs_year, 12, 31),
+                    notes=f"Snapshot ufficiale di chiusura bilancio personale esercizio {selected_pbs_year}"
+                )
+                st.toast(f"✅ Snapshot di chiusura {selected_pbs_year} archiviato con successo!", icon="🏛️")
+                st.cache_data.clear()
+                st.rerun()
+
+    # ── CARICAMENTO DATI BILANCIO PERSONALE PER L'ANNO SELEZIONATO ──
+    pbs_data = _load_cached_personal_balance_sheet(engine, pid=current_pid, yr=selected_pbs_year)
     sp_data = pbs_data["stato_patrimoniale"]
     ind_data = pbs_data["indici_bilancio"]
-    avail_years = pbs_data.get("available_years", [datetime.now().year])
-    if not avail_years:
-        avail_years = [datetime.now().year]
 
     tot_att = sp_data["attivo"]["totale_attivo"]
     tot_pas = sp_data["passivo"]["totale_passivo"]
@@ -1136,7 +1217,7 @@ with main_tab_sheet:
                     📋
                 </div>
                 <div>
-                    <div style="font-size:17px; font-weight:800; color:#f8fafc; letter-spacing:0.3px;">Bilancio Personale Istituzionale (Personal Financial Statements)</div>
+                    <div style="font-size:17px; font-weight:800; color:#f8fafc; letter-spacing:0.3px;">Bilancio Personale Istituzionale &bull; {pbs_data.get('period_title', 'Esercizio ' + str(selected_pbs_year))}</div>
                     <div style="font-size:12px; color:#94a3b8; margin-top:2px;">Prospetto contabile a sezioni contrapposte, Conto Economico di gestione e indici di solidità conforme agli standard CFP Board &amp; Private Banking</div>
                 </div>
             </div>
@@ -1152,13 +1233,77 @@ with main_tab_sheet:
     </div>
     """, unsafe_allow_html=True)
 
+    # ── EXECUTIVE PERSONAL BALANCE SHEET TOOLBAR ──────────────────
+    pbs_pdf = _get_cached_balance_sheet_pdf(engine, current_pid, selected_pbs_year)
+    pbs_tearsheet_pdf = _get_cached_balance_sheet_tearsheet_pdf(engine, current_pid, selected_pbs_year)
+    pbs_html = _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year)
+    pbs_date_slug = f"{selected_pbs_year}" if is_past else datetime.now().strftime('%Y%m%d')
+    pbs_prof_slug = str(prof_map.get(current_pid, 'portfolio')).lower().replace(' ', '_')
+
+    st.markdown(f"""
+    <div style="background:rgba(22,27,34,0.75); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #10b981; border-radius:10px; padding:12px 16px; margin-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:34px; height:34px; border-radius:8px; background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0;">
+                📋
+            </div>
+            <div>
+                <div style="font-size:13.5px; font-weight:750; color:#ffffff; letter-spacing:0.3px;">Executive Balance Sheet Dossier &amp; Financial Statements ({selected_pbs_year})</div>
+                <div style="font-size:11px; color:#94a3b8; margin-top:1px;">Prospetto contabile certificato a sezioni contrapposte, Conto Economico di gestione, pareggio di bilancio e indici di solidità patrimoniale per l'anno {selected_pbs_year}.</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    pb_c1, pb_c2, pb_c3, pb_c4, pb_c5 = st.columns([1.3, 1.1, 0.8, 0.8, 1.1])
+    with pb_c1:
+        st.download_button(
+            label=f"📥 Scarica Bilancio PDF ({selected_pbs_year})",
+            data=pbs_pdf,
+            file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            type="primary",
+            key="dl_pbs_pdf_btn"
+        )
+    with pb_c2:
+        st.download_button(
+            label=f"📑 Tear-Sheet Contabile ({selected_pbs_year})",
+            data=pbs_tearsheet_pdf,
+            file_name=f"argus_tearsheet_contabile_{pbs_prof_slug}_{selected_pbs_year}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            key="dl_pbs_ts_pdf_btn"
+        )
+    with pb_c3:
+        st.download_button(
+            label="🌐 HTML",
+            data=pbs_html.encode("utf-8"),
+            file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.html",
+            mime="text/html",
+            use_container_width=True,
+            key="dl_pbs_html_btn"
+        )
+    with pb_c4:
+        show_pbs_preview = st.toggle("📑 Anteprima", value=False, key="toggle_pbs_preview_p13")
+    with pb_c5:
+        if st.button("ℹ️ Guida IFRS/CFP", key="btn_modal_pbs_methodology_p13", use_container_width=True):
+            render_balance_sheet_methodology_modal()
+
+    if show_pbs_preview:
+        st.components.v1.html(pbs_html, height=620, scrolling=True)
+
+    st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
+
     # ── SUB-TABS DEL BILANCIO PERSONALE ────────────────────────
-    sub_sp, sub_ce, sub_ind, sub_conti = st.tabs([
+    sub_sp, sub_ce, sub_ind, sub_conti, sub_multi, sub_stress = st.tabs([
         "🏛️ Stato Patrimoniale a Sezioni Contrapposte",
         "📈 Conto Economico di Gestione",
         "🎯 Indici di Bilancio & Benchmark",
-        "🏦 Dettaglio Conti & Portafogli Risk"
+        "🏦 Dettaglio Conti & Portafogli Risk",
+        "📊 Bilancio Comparativo Pluriennale",
+        "🌪️ Stress Test sul Patrimonio Netto"
     ])
+
 
     # ──────────────────────────────────────────────────────────
     # SUB-TAB 1: STATO PATRIMONIALE A SEZIONI CONTRAPPOSTE
@@ -1333,15 +1478,16 @@ with main_tab_sheet:
             st.markdown("##### 📈 Conto Economico Personale (Rendiconto di Gestione)")
             st.caption("Prospetto economico di entrate correnti vs costi di vita, surplus di risparmio e destinazione agli investimenti.")
         with c_ce_head2:
-            sel_ce_year = st.selectbox(
-                "Anno di Esercizio:",
-                options=avail_years,
-                index=0,
-                key="pbs_ce_year_select"
-            )
+            st.markdown(f"""
+            <div style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:8px; padding:8px 14px; text-align:right; margin-top:4px;">
+                <span style="font-size:11px; color:#94a3b8;">Esercizio Attivo:</span>
+                <span style="font-weight:800; color:#34d399; font-size:13.5px; margin-left:6px;">{selected_pbs_year}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
-        # Ricarica CE per l'anno selezionato
-        ce_year_data = _load_cached_personal_balance_sheet(engine, pid=current_pid, yr=sel_ce_year)["conto_economico"]
+        # Conto Economico per l'anno selezionato a monte
+        ce_year_data = pbs_data["conto_economico"]
+
 
         ce_inflow = ce_year_data["totale_entrate"]
         ce_outflow = ce_year_data["totale_uscite"]
@@ -1353,9 +1499,9 @@ with main_tab_sheet:
         # KPI Cards Conto Economico
         cek1, cek2, cek3, cek4 = st.columns(4)
         with cek1:
-            metric_card(f"Totale Entrate {sel_ce_year}", fmt_eur(ce_inflow), delta="Inflows ordinari & attivi", delta_color="normal")
+            metric_card(f"Totale Entrate {selected_pbs_year}", fmt_eur(ce_inflow), delta="Inflows ordinari & attivi", delta_color="normal")
         with cek2:
-            metric_card(f"Costi di Gestione {sel_ce_year}", fmt_eur(ce_outflow), delta="Spese di vita (Consumi)", delta_color="inverse")
+            metric_card(f"Costi di Gestione {selected_pbs_year}", fmt_eur(ce_outflow), delta="Spese di vita (Consumi)", delta_color="inverse")
         with cek3:
             metric_card("Risparmio Netto Annuo", fmt_eur(ce_savings), delta="Surplus d'esercizio", delta_color="normal" if ce_savings >= 0 else "inverse")
         with cek4:
@@ -1383,7 +1529,7 @@ with main_tab_sheet:
                     })
                 st.dataframe(pd.DataFrame(in_rows), use_container_width=True, hide_index=True)
             else:
-                st.info(f"Nessuna entrata registrata per l'anno {sel_ce_year}.")
+                st.info(f"Nessuna entrata registrata per l'anno {selected_pbs_year}.")
 
             st.markdown(f"""
             <div style="background:rgba(22,27,34,0.7); border:1px solid rgba(16,185,129,0.4); border-radius:8px; padding:12px 16px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -1410,7 +1556,7 @@ with main_tab_sheet:
                     })
                 st.dataframe(pd.DataFrame(out_rows), use_container_width=True, hide_index=True)
             else:
-                st.info(f"Nessuna uscita registrata per l'anno {sel_ce_year}.")
+                st.info(f"Nessuna uscita registrata per l'anno {selected_pbs_year}.")
 
             st.markdown(f"""
             <div style="background:rgba(22,27,34,0.7); border:1px solid rgba(239,68,68,0.4); border-radius:8px; padding:12px 16px; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
@@ -1422,7 +1568,7 @@ with main_tab_sheet:
         st.divider()
 
         # Waterfall Chart: Flusso Economico e Allocazione del Capitale
-        st.markdown(f"##### 🌊 Waterfall di Gestione Economica & Allocazione del Capitale ({sel_ce_year})")
+        st.markdown(f"##### 🌊 Waterfall di Gestione Economica & Allocazione del Capitale ({selected_pbs_year})")
         st.caption("Dalle entrate lorde ai consumi, fino alla quota convertita in investimenti patrimoniali o riserva liquida.")
 
         wf_measures = ["relative", "relative", "total", "relative", "total"]
@@ -1623,10 +1769,243 @@ with main_tab_sheet:
                 if st.button("🎛️ Gestisci Portafogli in Control Room →", type="secondary", use_container_width=True, key="btn_goto_wcr_risk_link_p13"):
                     st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
 
+    # ──────────────────────────────────────────────────────────
+    # SUB-TAB 5: BILANCIO COMPARATIVO PLURIENNALE
+    # ──────────────────────────────────────────────────────────
+    with sub_multi:
+        section("📊 Bilancio Comparativo Pluriennale (Trend Storico degli Esercizi)")
+        st.caption("Prospetto comparativo di Stato Patrimoniale, Conto Economico e indici di solidità anno su anno, con evidenza dei delta di ricchezza netta.")
+
+        comp_res = _load_cached_multi_year_balance_comparison(engine, pid=current_pid)
+        df_comp = comp_res.get("comparison_df", pd.DataFrame())
+
+        if not df_comp.empty:
+            # KPI Pluriennali di Sintesi
+            kpi_m1, kpi_m2, kpi_m3, kpi_m4 = st.columns(4)
+            latest_row = df_comp.iloc[0]
+            oldest_row = df_comp.iloc[-1]
+            cum_delta_pn = float(latest_row["patrimonio_netto"] - oldest_row["patrimonio_netto"])
+            cum_delta_pct = (cum_delta_pn / oldest_row["patrimonio_netto"] * 100.0) if oldest_row["patrimonio_netto"] > 0 else 0.0
+
+            with kpi_m1:
+                metric_card("Esercizi Esaminati", f"{len(df_comp)} Anni", delta=f"{oldest_row['anno']} - {latest_row['anno']}", delta_color="normal")
+            with kpi_m2:
+                metric_card("Patrimonio Netto Attuale", fmt_eur(latest_row["patrimonio_netto"]), delta=f"Esercizio {latest_row['anno']}", delta_color="normal")
+            with kpi_m3:
+                metric_card("Crescita Netta Cumulata", fmt_eur(cum_delta_pn), delta=f"{cum_delta_pct:+.1f}% nel periodo", delta_color="normal" if cum_delta_pn >= 0 else "inverse")
+            with kpi_m4:
+                avg_sr = df_comp["savings_rate_pct"].mean()
+                metric_card("Savings Rate Medio", f"{avg_sr:.1f}%", delta="Media Pluriennale", delta_color="normal" if avg_sr >= 20 else "off")
+
+            st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+
+            # Tabella di Sintesi Comparativa
+            show_cols = [
+                "anno", "totale_attivo", "tot_liquidita", "tot_investimenti", "tot_previdenza",
+                "totale_passivo", "patrimonio_netto", "delta_pn_eur", "delta_pn_pct",
+                "totale_entrate", "totale_uscite", "risparmio_netto", "savings_rate_pct"
+            ]
+            valid_cols = [c for c in show_cols if c in df_comp.columns]
+            df_disp = df_comp[valid_cols].copy()
+            df_disp["anno"] = df_disp["anno"].astype(str)
+
+            st.dataframe(
+                df_disp.rename(columns={
+                    "anno": "Esercizio",
+                    "totale_attivo": "Attivo Totale (€)",
+                    "tot_liquidita": "Liquidità (€)",
+                    "tot_investimenti": "Investimenti (€)",
+                    "tot_previdenza": "Previdenza (€)",
+                    "totale_passivo": "Passivo Totale (€)",
+                    "patrimonio_netto": "Patrimonio Netto (€)",
+                    "delta_pn_eur": "Δ PN Annuo (€)",
+                    "delta_pn_pct": "Δ PN Annuo (%)",
+                    "totale_entrate": "Entrate (€)",
+                    "totale_uscite": "Costi di Vita (€)",
+                    "risparmio_netto": "Risparmio Netto (€)",
+                    "savings_rate_pct": "Savings Rate (%)"
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                label="📥 Esporta Bilancio Comparativo (CSV)",
+                data=df_disp.to_csv(index=False).encode("utf-8"),
+                file_name=f"argus_bilancio_comparativo_pluriennale_{current_pid}.csv",
+                mime="text/csv",
+                key="dl_multi_year_csv"
+            )
+
+            st.markdown("<div style='margin-bottom: 14px;'></div>", unsafe_allow_html=True)
+
+            # Grafico Comparativo Evolutivo
+            df_chart = df_comp.sort_values("anno", ascending=True).copy()
+            fig_multi = go.Figure()
+            fig_multi.add_trace(go.Bar(
+                name="Attivo Totale",
+                x=df_chart["anno"].astype(str),
+                y=df_chart["totale_attivo"],
+                marker_color="#10b981",
+                text=[fmt_eur(v) for v in df_chart["totale_attivo"]],
+                textposition="auto"
+            ))
+            fig_multi.add_trace(go.Bar(
+                name="Passivo Totale",
+                x=df_chart["anno"].astype(str),
+                y=df_chart["totale_passivo"],
+                marker_color="#ef4444",
+                text=[fmt_eur(v) for v in df_chart["totale_passivo"]],
+                textposition="auto"
+            ))
+            fig_multi.add_trace(go.Scatter(
+                name="Patrimonio Netto",
+                x=df_chart["anno"].astype(str),
+                y=df_chart["patrimonio_netto"],
+                mode="lines+markers+text",
+                line=dict(color="#f59e0b", width=3),
+                marker=dict(size=8, color="#f59e0b"),
+                text=[fmt_eur(v) for v in df_chart["patrimonio_netto"]],
+                textposition="top center"
+            ))
+            fig_multi.update_layout(
+                title="Evoluzione Pluriennale: Attivo, Passivo e Patrimonio Netto",
+                barmode="group",
+                height=380,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            apply_chart_theme(fig_multi, portal_mode="wealth")
+            st.plotly_chart(fig_multi, use_container_width=True)
+        else:
+            st.info("Dati insufficienti per costruire il bilancio comparativo pluriennale.")
+
+    # ──────────────────────────────────────────────────────────
+    # SUB-TAB 6: STRESS TEST CONSOLIDATO SUL PATRIMONIO NETTO
+    # ──────────────────────────────────────────────────────────
+    with sub_stress:
+        from core.macro_stress_engine import compute_consolidated_wealth_stress_test
+
+        section("🌪️ Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (Total Wealth)")
+        st.caption(
+            "Simulazione regolamentare (EBA Regulatory Adverse 2026, Fed CCAR Severe, Stagflazione e Risk-Off Geopolitico) "
+            "applicata simultaneamente a tutte le macro-classi dell'Attivo (Liquidità, Investimenti, Immobili, Previdenza, Beni di Lusso) "
+            "per quantificare la perdita di capitale netto e l'amplificazione della leva finanziaria (Debt-to-Assets)."
+        )
+
+        wealth_stress_res = compute_consolidated_wealth_stress_test(pbs_data)
+
+        # Top KPI Cards
+        stk1, stk2, stk3, stk4 = st.columns(4)
+        with stk1:
+            metric_card(
+                "Patrimonio Netto Base",
+                fmt_eur(wealth_stress_res["initial_net_worth_eur"]),
+                delta=f"Attivo: {fmt_eur(wealth_stress_res['initial_total_assets_eur'])}",
+                delta_color="normal",
+            )
+        with stk2:
+            worst_dd = wealth_stress_res["worst_net_worth_drawdown_pct"]
+            metric_card(
+                "Peggior Scenario Stress",
+                wealth_stress_res["worst_scenario_name"],
+                delta=f"Drawdown: {worst_dd:+.1f}%",
+                delta_color="inverse",
+            )
+        with stk3:
+            worst_loss = wealth_stress_res["worst_net_worth_loss_eur"]
+            metric_card(
+                "Massima Perdita di Ricchezza",
+                fmt_eur(worst_loss),
+                delta="Perdita di Capitale Netto",
+                delta_color="inverse",
+            )
+        with stk4:
+            post_dta = wealth_stress_res["worst_post_debt_to_assets_pct"]
+            init_dta = wealth_stress_res["initial_debt_to_assets_pct"]
+            delta_dta = post_dta - init_dta
+            metric_card(
+                "Debt-to-Assets Post-Stress",
+                f"{post_dta:.1f}%",
+                delta=f"+{delta_dta:.1f}% (Base: {init_dta:.1f}%)",
+                delta_color="inverse" if post_dta > 30 else "normal",
+            )
+
+        st.markdown("<div style='margin-bottom: 16px;'></div>", unsafe_allow_html=True)
+
+        scen_df = wealth_stress_res.get("scenarios_df", pd.DataFrame())
+        if not scen_df.empty:
+            base_nw = wealth_stress_res["initial_net_worth_eur"]
+
+            # Grafico a Barre Orizzontale dei 4 Scenari di Stress
+            fig_wstress = go.Figure()
+            fig_wstress.add_trace(go.Bar(
+                name="Patrimonio Netto Post-Stress",
+                y=scen_df["scenario_name"],
+                x=scen_df["post_shock_net_worth_eur"],
+                orientation="h",
+                marker_color="#ef4444",
+                text=[f"{fmt_eur(v)} ({dd:+.1f}%)" for v, dd in zip(scen_df["post_shock_net_worth_eur"], scen_df["net_worth_drawdown_pct"])],
+                textposition="auto",
+            ))
+
+            fig_wstress.add_vline(
+                x=base_nw,
+                line_width=2,
+                line_dash="dash",
+                line_color="#10b981",
+                annotation_text=f"Base: {fmt_eur(base_nw)}",
+                annotation_position="top right"
+            )
+
+            fig_wstress.update_layout(
+                title="Resilienza del Patrimonio Netto per Scenario Macroeconomico Istituzionale",
+                xaxis_title="Patrimonio Netto (€)",
+                yaxis_title="",
+                height=340,
+                margin=dict(l=10, r=10, t=40, b=20),
+            )
+            apply_chart_theme(fig_wstress, portal_mode="wealth")
+            st.plotly_chart(fig_wstress, use_container_width=True)
+
+            # Tabella Dettagliata per Scenario
+            st.markdown("##### 📋 Prospetto Analitico di Impatto Patrimoniale")
+            show_cols = [
+                "scenario_name", "description", "post_shock_assets_eur",
+                "post_shock_net_worth_eur", "net_worth_delta_eur",
+                "net_worth_drawdown_pct", "post_shock_debt_to_assets_pct"
+            ]
+            valid_cols = [c for c in show_cols if c in scen_df.columns]
+            disp_scen = scen_df[valid_cols].copy()
+
+            st.dataframe(
+                disp_scen.rename(columns={
+                    "scenario_name": "Scenario Macro",
+                    "description": "Descrizione",
+                    "post_shock_assets_eur": "Attivo Post-Stress (€)",
+                    "post_shock_net_worth_eur": "Patrimonio Netto (€)",
+                    "net_worth_delta_eur": "Δ Ricchezza (€)",
+                    "net_worth_drawdown_pct": "Drawdown (%)",
+                    "post_shock_debt_to_assets_pct": "Debt-to-Assets (%)",
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+
+            st.download_button(
+                label="📥 Esporta Stress Test Consolidato (CSV)",
+                data=disp_scen.to_csv(index=False).encode("utf-8"),
+                file_name=f"argus_consolidated_wealth_stress_{selected_pbs_year}.csv",
+                mime="text/csv",
+                key="dl_consolidated_wealth_stress_csv"
+            )
+        else:
+            st.info("Nessun dato disponibile per il calcolo dello stress test patrimoniale.")
+
 
 # ══════════════════════════════════════════════════════════════
 # TAB 3: WEALTH TEMPORAL DESK (DINAMICHE TEMPORALI)
 # ══════════════════════════════════════════════════════════════
+
 with main_tab_temporal:
     # ── SEZIONE: ANALISI TEMPORALE & DINAMICA STORICA DEL PATRIMONIO ────
     section("📊 Analisi Temporale & Dinamica Storica del Patrimonio (Wealth Temporal Desk)")

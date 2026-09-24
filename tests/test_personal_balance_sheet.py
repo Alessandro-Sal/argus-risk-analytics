@@ -155,3 +155,118 @@ def test_personal_balance_sheet_empty_mock_db():
     assert res["conto_economico"]["totale_uscite"] == 0.0
     assert res["indici_bilancio"]["solvency_ratio"]["valore"] == 100.0
 
+
+def test_compute_multi_year_balance_comparison():
+    """Verifica il calcolo della comparazione pluriennale di stato patrimoniale e conto economico."""
+    from core.wealth.personal_balance_sheet import compute_multi_year_balance_comparison
+    engine = get_engine()
+    _ensure_test_data(engine, portfolio_id=1)
+    res = compute_multi_year_balance_comparison(engine, portfolio_id=1, years=[2024, 2025, 2026])
+
+    assert isinstance(res, dict)
+    assert "comparison_df" in res
+    assert "records" in res
+    df_comp = res["comparison_df"]
+    assert isinstance(df_comp, pd.DataFrame)
+    assert not df_comp.empty
+    assert "anno" in df_comp.columns
+    assert "totale_attivo" in df_comp.columns
+    assert "patrimonio_netto" in df_comp.columns
+    assert "delta_pn_eur" in df_comp.columns
+    assert "delta_pn_pct" in df_comp.columns
+    assert "tot_previdenza" in df_comp.columns
+
+
+def test_pension_plan_point_in_time_dynamic():
+    """Verifica che la previdenza sia dinamica e point-in-time per ciascun esercizio."""
+    import json
+    from core.wealth.wealth_db import init_wealth_db, save_pension_plan, save_wealth_account
+
+    mock_engine = create_engine("sqlite:///:memory:")
+    init_wealth_db(mock_engine)
+
+    save_wealth_account(mock_engine, {
+        "portfolio_id": 1,
+        "name": "Conto Deposito",
+        "account_type": "savings",
+        "balance": 10000.0,
+        "currency": "EUR"
+    })
+
+    # Piano con yearly_data_json strutturato
+    save_pension_plan(mock_engine, {
+        "portfolio_id": 1,
+        "plan_name": "Fondo Pensione Alpha",
+        "provider": "Gestore Previdenziale",
+        "accumulated_value": 2500.0,
+        "monthly_employee_contrib": 150.0,
+        "currency": "EUR",
+        "yearly_data_json": json.dumps({
+            "2023": {"tot_year": 200.0, "tot_cumulato": 200.0, "months": {"nov": 100.0, "dic": 100.0}},
+            "2024": {"tot_year": 1000.0, "tot_cumulato": 1200.0},
+            "2025": {"tot_year": 800.0, "tot_cumulato": 2000.0},
+            "2026": {"tot_year": 500.0, "tot_cumulato": 2500.0},
+        })
+    })
+
+    bs_2022 = compute_personal_balance_sheet(mock_engine, portfolio_id=1, year=2022)
+    bs_2023 = compute_personal_balance_sheet(mock_engine, portfolio_id=1, year=2023)
+    bs_2024 = compute_personal_balance_sheet(mock_engine, portfolio_id=1, year=2024)
+    bs_2025 = compute_personal_balance_sheet(mock_engine, portfolio_id=1, year=2025)
+    bs_2026 = compute_personal_balance_sheet(mock_engine, portfolio_id=1, year=2026)
+
+    # 1. Valutazioni puntuali attese
+    assert bs_2022["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 0.0
+    assert bs_2023["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 200.0
+    assert bs_2024["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 1200.0
+    assert bs_2025["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 2000.0
+    assert bs_2026["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 2500.0
+
+    # 2. Quadratura contabile per tutti gli esercizi
+    for bs in [bs_2022, bs_2023, bs_2024, bs_2025, bs_2026]:
+        sp = bs["stato_patrimoniale"]
+        assert sp["pareggio"]["is_quadrato"] is True
+        assert abs(sp["attivo"]["totale_attivo"] - (sp["passivo"]["totale_passivo"] + sp["patrimonio_netto"]["totale_patrimonio_netto"])) < 0.01
+
+    # 3. Test fallback con parsing da campo notes
+    mock_engine2 = create_engine("sqlite:///:memory:")
+    init_wealth_db(mock_engine2)
+    save_wealth_account(mock_engine2, {
+        "portfolio_id": 1,
+        "name": "Conto Primario",
+        "account_type": "checking",
+        "balance": 5000.0,
+        "currency": "EUR"
+    })
+    save_pension_plan(mock_engine2, {
+        "portfolio_id": 1,
+        "plan_name": "Fondo Beta Fallback Notes",
+        "provider": "PIP Assicurativo",
+        "accumulated_value": 600.0,
+        "notes": "Sincronizzato da foglio Pension (Anni: 2023: €100.00 | 2024: €500.00)",
+        "currency": "EUR"
+    })
+
+    bs_fb_2022 = compute_personal_balance_sheet(mock_engine2, portfolio_id=1, year=2022)
+    bs_fb_2023 = compute_personal_balance_sheet(mock_engine2, portfolio_id=1, year=2023)
+    bs_fb_2024 = compute_personal_balance_sheet(mock_engine2, portfolio_id=1, year=2024)
+
+    assert bs_fb_2022["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 0.0
+    assert bs_fb_2023["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 100.0
+    assert bs_fb_2024["stato_patrimoniale"]["attivo"]["tot_previdenza"] == 600.0
+
+
+def test_risk_engine_as_of_date():
+    """Verifica che il motore di rischio supporti point-in-time filtering con as_of_date."""
+    from core.risk_engine import compute_risk
+    engine = get_engine()
+    try:
+        res_hist = compute_risk(portfolio_id=1, engine=engine, as_of_date="2024-12-31")
+        assert "as_of_date" in res_hist
+        assert res_hist["as_of_date"] == "2024-12-31"
+        assert "total_value" in res_hist
+    except ValueError as e:
+        # Se non ci sono transazioni prima del 2024 per il portfolio 1, la verifica fallisce gracefully
+        assert "Nessun dato" in str(e) or "transazione" in str(e).lower()
+
+

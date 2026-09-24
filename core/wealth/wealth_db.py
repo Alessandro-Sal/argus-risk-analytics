@@ -301,6 +301,7 @@ def init_wealth_db(engine: Engine) -> None:
                     currency TEXT NOT NULL DEFAULT 'EUR',
                     investment_line TEXT DEFAULT 'Azionario / Crescita',
                     notes TEXT,
+                    yearly_data_json TEXT,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
             """)
@@ -482,6 +483,7 @@ def init_wealth_db(engine: Engine) -> None:
                     currency CHAR(3) NOT NULL DEFAULT 'EUR',
                     investment_line VARCHAR(100) NULL DEFAULT 'Azionario / Crescita',
                     notes TEXT NULL,
+                    yearly_data_json LONGTEXT NULL,
                     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """)
@@ -583,6 +585,11 @@ def init_wealth_db(engine: Engine) -> None:
                     t_cols = [r[1] for r in conn.execute(sqlt(f"PRAGMA table_info({t})")).fetchall()]
                     if "portfolio_id" not in t_cols:
                         conn.execute(sqlt(f"ALTER TABLE {t} ADD COLUMN portfolio_id INTEGER DEFAULT 1"))
+
+                # Migrazione yearly_data_json su wealth_pension_plans (SQLite)
+                p_cols = [r[1] for r in conn.execute(sqlt("PRAGMA table_info(wealth_pension_plans)")).fetchall()]
+                if "yearly_data_json" not in p_cols:
+                    conn.execute(sqlt("ALTER TABLE wealth_pension_plans ADD COLUMN yearly_data_json TEXT"))
             else:
                 cols = [r[0] for r in conn.execute(sqlt("SHOW COLUMNS FROM wealth_networth_snapshots")).fetchall()]
                 if "snapshot_name" not in cols:
@@ -612,6 +619,11 @@ def init_wealth_db(engine: Engine) -> None:
                     t_cols = [r[0] for r in conn.execute(sqlt(f"SHOW COLUMNS FROM {t}")).fetchall()]
                     if "portfolio_id" not in t_cols:
                         conn.execute(sqlt(f"ALTER TABLE {t} ADD COLUMN portfolio_id INT NOT NULL DEFAULT 1"))
+
+                # Migrazione yearly_data_json su wealth_pension_plans (MySQL)
+                p_cols = [r[0] for r in conn.execute(sqlt("SHOW COLUMNS FROM wealth_pension_plans")).fetchall()]
+                if "yearly_data_json" not in p_cols:
+                    conn.execute(sqlt("ALTER TABLE wealth_pension_plans ADD COLUMN yearly_data_json LONGTEXT NULL"))
         except Exception:
             pass
 
@@ -1528,8 +1540,14 @@ def get_pension_plans(engine: Engine, portfolio_id: Optional[int] = None) -> pd.
 
 def save_pension_plan(engine: Engine, plan: Dict[str, Any]) -> int:
     """Crea o aggiorna un fondo pensione."""
+    import json
+
     init_wealth_db(engine)
     pid = plan.get("plan_id")
+    yearly_data_json = plan.get("yearly_data_json")
+    if isinstance(yearly_data_json, (dict, list)):
+        yearly_data_json = json.dumps(yearly_data_json)
+
     params = {
         "portfolio_id": int(plan.get("portfolio_id", 1) or 1),
         "plan_name": plan["plan_name"],
@@ -1547,24 +1565,40 @@ def save_pension_plan(engine: Engine, plan: Dict[str, Any]) -> int:
     with engine.begin() as conn:
         if pid:
             params["pid"] = pid
-            conn.execute(
-                sqlt("""
-                UPDATE wealth_pension_plans
-                SET portfolio_id=:portfolio_id, plan_name=:plan_name, provider=:provider, plan_type=:plan_type,
-                    accumulated_value=:accumulated_value, monthly_employee_contrib=:monthly_employee_contrib,
-                    monthly_employer_contrib=:monthly_employer_contrib, tax_deductible_annual=:tax_deductible_annual,
-                    expected_retirement_age=:expected_retirement_age, currency=:currency,
-                    investment_line=:investment_line, notes=:notes
-                WHERE plan_id = :pid
-            """),
-                params,
-            )
+            if yearly_data_json is not None:
+                params["yearly_data_json"] = yearly_data_json
+                conn.execute(
+                    sqlt("""
+                    UPDATE wealth_pension_plans
+                    SET portfolio_id=:portfolio_id, plan_name=:plan_name, provider=:provider, plan_type=:plan_type,
+                        accumulated_value=:accumulated_value, monthly_employee_contrib=:monthly_employee_contrib,
+                        monthly_employer_contrib=:monthly_employer_contrib, tax_deductible_annual=:tax_deductible_annual,
+                        expected_retirement_age=:expected_retirement_age, currency=:currency,
+                        investment_line=:investment_line, notes=:notes, yearly_data_json=:yearly_data_json
+                    WHERE plan_id = :pid
+                """),
+                    params,
+                )
+            else:
+                conn.execute(
+                    sqlt("""
+                    UPDATE wealth_pension_plans
+                    SET portfolio_id=:portfolio_id, plan_name=:plan_name, provider=:provider, plan_type=:plan_type,
+                        accumulated_value=:accumulated_value, monthly_employee_contrib=:monthly_employee_contrib,
+                        monthly_employer_contrib=:monthly_employer_contrib, tax_deductible_annual=:tax_deductible_annual,
+                        expected_retirement_age=:expected_retirement_age, currency=:currency,
+                        investment_line=:investment_line, notes=:notes
+                    WHERE plan_id = :pid
+                """),
+                    params,
+                )
             return pid
         else:
+            params["yearly_data_json"] = yearly_data_json
             conn.execute(
                 sqlt("""
-                INSERT INTO wealth_pension_plans (portfolio_id, plan_name, provider, plan_type, accumulated_value, monthly_employee_contrib, monthly_employer_contrib, tax_deductible_annual, expected_retirement_age, currency, investment_line, notes)
-                VALUES (:portfolio_id, :plan_name, :provider, :plan_type, :accumulated_value, :monthly_employee_contrib, :monthly_employer_contrib, :tax_deductible_annual, :expected_retirement_age, :currency, :investment_line, :notes)
+                INSERT INTO wealth_pension_plans (portfolio_id, plan_name, provider, plan_type, accumulated_value, monthly_employee_contrib, monthly_employer_contrib, tax_deductible_annual, expected_retirement_age, currency, investment_line, notes, yearly_data_json)
+                VALUES (:portfolio_id, :plan_name, :provider, :plan_type, :accumulated_value, :monthly_employee_contrib, :monthly_employer_contrib, :tax_deductible_annual, :expected_retirement_age, :currency, :investment_line, :notes, :yearly_data_json)
             """),
                 params,
             )
@@ -1588,48 +1622,112 @@ def save_wealth_snapshot_to_db(
     Calcola e salva una fotografia completa (snapshot) del patrimonio netto consolidato nel database.
     Ogni esecuzione o ingestione crea un nuovo snapshot storico indicizzato con run_id.
     """
-    from core.wealth.wealth_engine import compute_cashflow_analytics, compute_consolidated_net_worth
-
     init_wealth_db(engine)
     p_id = portfolio_id or 1
-    nw = compute_consolidated_net_worth(engine, portfolio_id=p_id, risk_portfolio_ids=risk_portfolio_ids)
-    df_cf = get_cashflow_records(engine, portfolio_id=p_id)
-    cf_metrics = compute_cashflow_analytics(df_cf)
-
-    df_accs = get_wealth_accounts(engine, portfolio_id=p_id)
-    df_phys = get_physical_assets(engine, portfolio_id=p_id)
-    df_pens = get_pension_plans(engine, portfolio_id=p_id)
-    _, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=p_id)
-
     s_date = snapshot_date_val or date.today()
     s_name = run_name or snapshot_name or f"Snapshot Patrimoniale {s_date.strftime('%d/%m/%Y %H:%M')}"
     s_run_id = run_id or f"RUN-WLT-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
 
-    details_payload = {
-        "snapshot_date": str(s_date),
-        "snapshot_name": s_name,
-        "run_id": s_run_id,
-        "portfolio_id": p_id,
-        "summary": {
-            "total_net_worth": nw.total_net_worth,
-            "liquid_cash": nw.liquid_cash,
-            "financial_investments": nw.financial_investments,
-            "physical_assets": nw.physical_assets,
-            "luxury_watches_total": nw.luxury_watches_total,
-            "real_estate_total": nw.real_estate_total,
-            "precious_metals_total": nw.precious_metals_total,
-            "pension_total": nw.pension_total,
-            "total_liabilities": nw.total_liabilities,
-            "savings_rate_pct": nw.savings_rate_pct,
-            "runway_months": nw.runway_months,
-            "wealth_health_score": nw.wealth_health_score,
-        },
-        "linked_risk_portfolios": df_linked_risk.to_dict(orient="records") if not df_linked_risk.empty else [],
-        "cashflow_analytics": cf_metrics,
-        "accounts": df_accs.to_dict(orient="records") if not df_accs.empty else [],
-        "physical_assets": df_phys.to_dict(orient="records") if not df_phys.empty else [],
-        "pension_plans": df_pens.to_dict(orient="records") if not df_pens.empty else [],
-    }
+    is_past_year = s_date.year < datetime.now().year
+    if is_past_year:
+        from core.wealth.personal_balance_sheet import compute_personal_balance_sheet
+        pbs = compute_personal_balance_sheet(engine, portfolio_id=p_id, year=s_date.year)
+        sp_att = pbs["stato_patrimoniale"]["attivo"]
+        sp_pas = pbs["stato_patrimoniale"]["passivo"]
+        sp_pn = pbs["stato_patrimoniale"]["patrimonio_netto"]
+        ind = pbs["indici_bilancio"]
+        ce = pbs["conto_economico"]
+
+        tot_nw = float(sp_pn["totale_patrimonio_netto"])
+        liq = float(sp_att.get("tot_liquidita", 0.0))
+        fin = float(sp_att.get("tot_investimenti", 0.0))
+        phys = float(sp_att.get("tot_attivita_reali", 0.0))
+        watches = phys
+        re_val = 0.0
+        pens = float(sp_att.get("tot_previdenza", 0.0))
+        liab = float(sp_pas.get("totale_passivo", 0.0))
+        inc_avg = float(ce.get("totale_entrate", 0.0)) / 12.0
+        exp_avg = float(ce.get("totale_uscite", 0.0)) / 12.0
+        sav_rate = float(ind["savings_rate"]["valore"])
+        runway = float(ind["emergency_runway"]["valore"])
+        score = 100.0
+
+        details_payload = {
+            "snapshot_date": str(s_date),
+            "snapshot_name": s_name,
+            "run_id": s_run_id,
+            "portfolio_id": p_id,
+            "summary": {
+                "total_net_worth": tot_nw,
+                "liquid_cash": liq,
+                "financial_investments": fin,
+                "physical_assets": phys,
+                "luxury_watches_total": watches,
+                "real_estate_total": re_val,
+                "precious_metals_total": 0.0,
+                "pension_total": pens,
+                "total_liabilities": liab,
+                "savings_rate_pct": sav_rate,
+                "runway_months": runway,
+                "wealth_health_score": score,
+            },
+            "linked_risk_portfolios": [],
+            "cashflow_analytics": {"avg_monthly_income": inc_avg, "avg_monthly_expense": exp_avg},
+            "accounts": [],
+            "physical_assets": [],
+            "pension_plans": [],
+            "balance_sheet": pbs,
+        }
+    else:
+        from core.wealth.wealth_engine import compute_cashflow_analytics, compute_consolidated_net_worth
+        nw = compute_consolidated_net_worth(engine, portfolio_id=p_id, risk_portfolio_ids=risk_portfolio_ids)
+        df_cf = get_cashflow_records(engine, portfolio_id=p_id)
+        cf_metrics = compute_cashflow_analytics(df_cf)
+
+        df_accs = get_wealth_accounts(engine, portfolio_id=p_id)
+        df_phys = get_physical_assets(engine, portfolio_id=p_id)
+        df_pens = get_pension_plans(engine, portfolio_id=p_id)
+        _, df_linked_risk = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=p_id)
+
+        tot_nw = float(nw.total_net_worth)
+        liq = float(nw.liquid_cash)
+        fin = float(nw.financial_investments)
+        phys = float(nw.physical_assets)
+        watches = float(nw.luxury_watches_total)
+        re_val = float(nw.real_estate_total)
+        pens = float(nw.pension_total)
+        liab = float(nw.total_liabilities)
+        inc_avg = float(cf_metrics.get("avg_monthly_income", 0.0))
+        exp_avg = float(cf_metrics.get("avg_monthly_expense", 0.0))
+        sav_rate = float(nw.savings_rate_pct)
+        runway = float(nw.runway_months)
+        score = float(nw.wealth_health_score)
+
+        details_payload = {
+            "snapshot_date": str(s_date),
+            "snapshot_name": s_name,
+            "run_id": s_run_id,
+            "portfolio_id": p_id,
+            "summary": {
+                "total_net_worth": tot_nw,
+                "liquid_cash": liq,
+                "financial_investments": fin,
+                "physical_assets": phys,
+                "luxury_watches_total": watches,
+                "real_estate_total": re_val,
+                "precious_metals_total": nw.precious_metals_total,
+                "pension_total": pens,
+                "total_liabilities": liab,
+                "savings_rate_pct": sav_rate,
+                "runway_months": runway,
+                "wealth_health_score": score,
+            },
+            "linked_risk_portfolios": df_linked_risk.to_dict(orient="records") if not df_linked_risk.empty else [],
+            "cashflow_analytics": cf_metrics,
+            "accounts": df_accs.to_dict(orient="records") if not df_accs.empty else [],
+            "physical_assets": df_phys.to_dict(orient="records") if not df_phys.empty else [],
+            "pension_plans": df_pens.to_dict(orient="records") if not df_pens.empty else [],
+        }
 
     details_str = json.dumps(details_payload, default=str)
 
@@ -1638,19 +1736,19 @@ def save_wealth_snapshot_to_db(
         "run_id": s_run_id,
         "s_date": str(s_date),
         "s_name": s_name,
-        "tot_nw": float(nw.total_net_worth),
-        "liq": float(nw.liquid_cash),
-        "fin": float(nw.financial_investments),
-        "phys": float(nw.physical_assets),
-        "watches": float(nw.luxury_watches_total),
-        "re": float(nw.real_estate_total),
-        "pens": float(nw.pension_total),
-        "liab": float(nw.total_liabilities),
-        "inc_avg": float(cf_metrics.get("avg_monthly_income", 0.0)),
-        "exp_avg": float(cf_metrics.get("avg_monthly_expense", 0.0)),
-        "sav_rate": float(nw.savings_rate_pct),
-        "runway": float(nw.runway_months),
-        "score": float(nw.wealth_health_score),
+        "tot_nw": tot_nw,
+        "liq": liq,
+        "fin": fin,
+        "phys": phys,
+        "watches": watches,
+        "re": re_val,
+        "pens": pens,
+        "liab": liab,
+        "inc_avg": inc_avg,
+        "exp_avg": exp_avg,
+        "sav_rate": sav_rate,
+        "runway": runway,
+        "score": score,
         "details": details_str,
         "notes": notes,
     }

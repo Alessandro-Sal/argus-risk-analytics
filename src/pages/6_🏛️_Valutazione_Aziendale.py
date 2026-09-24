@@ -15,6 +15,7 @@ import core.ui_utils as ui_utils
 from core.financial_analysis import resolve_company_name
 from core.forensic_accounting import compute_beneish_m_score, compute_sloan_accrual_ratio
 from core.metadata_resolver import resolve_asset_metadata, resolve_asset_valuation_metrics
+from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
     apply_plotly_theme,
     ensure_risk_bundle_loaded,
@@ -24,7 +25,6 @@ from core.ui_utils import (
     metric_card,
     render_altman_zscore_modal,
     render_command_bar,
-    render_export_toolbar,
     render_sandbox_banner,
     render_sec_rag_modal,
     render_segmented_tabs,
@@ -72,14 +72,13 @@ for _, r in equity_pos.iterrows():
     raw_name = r.get("name", r.get("asset_name", tk))
     company_options[tk] = resolve_company_name(tk, raw_name)
 
-col_head1, col_head2 = st.columns([3.4, 1.2])
+col_head1, col_head2 = st.columns([3.4, 1.2], vertical_alignment="center")
 with col_head1:
     st.title("🏛️ Valutazione Intrinseca & Fair Value")
     if "run_id" in st.session_state:
         st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Analisi dei fondamentali societari, target price dei mercati (Consensus) e simulazioni di private equity (IRR & TVPI).")
 
 with col_head2:
-    st.markdown('<div style="display: flex; justify-content: flex-end; margin-top: 24px;">', unsafe_allow_html=True)
     glossary_modal("Cos'è la Valutazione Aziendale & Fair Value", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -143,38 +142,102 @@ for col in ["last_price", "target_mean_price", "peg_ratio", "trailing_pe", "forw
     else:
         df_fund[col] = np.nan
 
+@st.cache_data(ttl=86400, show_spinner=False)
+def get_live_asset_valuation(tk_str: str) -> dict:
+    try:
+        import yfinance as yf
+        t = yf.Ticker(tk_str)
+        info = t.info
+        if not info:
+            return {}
+        return {
+            "target_mean_price": info.get("targetMeanPrice"),
+            "trailing_pe": info.get("trailingPE"),
+            "forward_pe": info.get("forwardPE"),
+            "peg_ratio": info.get("pegRatio"),
+            "price_to_book": info.get("priceToBook"),
+            "dividend_yield": info.get("dividendYield"),
+            "roe": info.get("returnOnEquity"),
+            "currency": info.get("currency"),
+        }
+    except Exception:
+        return {}
+
+# Mappatura tassi di cambio (base EUR) dinamica da df_prices con fallback di mercato
+fx_rates_map = {
+    "EUR": 1.0,
+    "USD": 0.8667,
+    "DKK": 0.1338,
+    "GBP": 1.1676,
+    "GBp": 0.011676,
+    "SEK": 0.088,
+    "NOK": 0.086,
+    "CHF": 1.06,
+    "JPY": 0.0062,
+    "CAD": 0.68,
+}
+if isinstance(results, dict) and "df_prices" in results:
+    df_pr_fx = results["df_prices"]
+    if isinstance(df_pr_fx, pd.DataFrame) and not df_pr_fx.empty and "ticker" in df_pr_fx.columns:
+        for cur, pair in [("USD", "USDEUR=X"), ("DKK", "DKKEUR=X"), ("GBP", "GBPEUR=X"), ("CHF", "CHFEUR=X"), ("JPY", "JPYEUR=X"), ("SEK", "SEKEUR=X"), ("CAD", "CADEUR=X")]:
+            sub_fx = df_pr_fx[df_pr_fx["ticker"] == pair]
+            if not sub_fx.empty:
+                try:
+                    fx_rates_map[cur] = float(sub_fx.iloc[-1]["close"])
+                except Exception:
+                    pass
+
 # Arricchimento automatico per asset noti privi di Target Price o multipli
 for idx, row in df_fund.iterrows():
     tk = str(row.get("ticker", "")).strip().upper()
     known_val = resolve_asset_valuation_metrics(tk)
+    if not known_val or "target_mean_price" not in known_val:
+        live_val = get_live_asset_valuation(tk)
+        if live_val:
+            known_val = {**live_val, **(known_val or {})}
+
     if known_val:
         for metric_k, metric_v in known_val.items():
-            if metric_k in df_fund.columns and (pd.isna(df_fund.at[idx, metric_k]) or df_fund.at[idx, metric_k] is None):
+            if metric_k == "currency":
+                df_fund.at[idx, "native_currency"] = metric_v
+            elif metric_k in df_fund.columns and (pd.isna(df_fund.at[idx, metric_k]) or df_fund.at[idx, metric_k] is None):
                 df_fund.at[idx, metric_k] = metric_v
 
-# Normalizzazione automatica valuta per Target Price (es. DKK, SEK, JPY, GBp)
+# Normalizzazione automatica valuta per Target Price (conversione coerente in EUR)
 def normalize_target_price(row):
     last = row.get("last_price")
     target = row.get("target_mean_price")
-    ticker = str(row.get("ticker", "")).upper()
+    ticker = str(row.get("ticker", "")).strip().upper()
     
     if pd.isna(last) or pd.isna(target) or last <= 0:
         return target
         
-    ratio = target / last
-    if ratio > 3.0 or ratio < 0.2:
-        if ticker.endswith(".CO") or (ratio >= 6.5 and ratio <= 8.5):
-            return target / 7.46  # DKK -> EUR (es. Novo Nordisk NOVO-B.CO)
-        elif ticker.endswith(".ST") or (ratio >= 10.0 and ratio <= 13.0):
-            return target / 11.40 # SEK -> EUR
+    curr = str(row.get("native_currency", "")).strip().upper()
+    if not curr or curr in ["NAN", "NONE"]:
+        if ticker.endswith((".MI", ".PA", ".AS", ".DE", ".MC")):
+            curr = "EUR"
+        elif ticker.endswith(".CO"):
+            curr = "DKK"
+        elif ticker.endswith(".ST"):
+            curr = "SEK"
         elif ticker.endswith(".OL"):
-            return target / 11.50 # NOK -> EUR
-        elif ticker.endswith(".T") or ratio > 100:
-            return target / 162.0 # JPY -> EUR
-        elif ticker.endswith(".L") and ratio > 50:
-            return (target / 100.0) * 1.17 # GBp (pence) -> GBP -> EUR
-
-    return target
+            curr = "NOK"
+        elif ticker.endswith(".SW"):
+            curr = "CHF"
+        elif ticker.endswith(".T"):
+            curr = "JPY"
+        elif ticker.endswith(".L"):
+            curr = "GBP"
+        else:
+            curr = "USD"
+            
+    # Gestione pence britannici (GBp -> GBP)
+    if ticker.endswith(".L") and target > 100:
+        target = target / 100.0
+        curr = "GBP"
+        
+    fx = fx_rates_map.get(curr, 1.0)
+    return target * fx
 
 df_fund["target_mean_price"] = df_fund.apply(normalize_target_price, axis=1)
 
@@ -379,13 +442,13 @@ if active_val_tab == "🏛️ Fair Value & Consensus Analisti":
             df_display["PEG Ratio"] = df_display["PEG Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
             df_display["P/E Ratio"] = df_display["P/E Ratio"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "N/A")
 
-            col_fv_h1, col_fv_h2 = st.columns([3.2, 1.1])
-            with col_fv_h1:
-                st.markdown("#### Tabella Fair Value & Target Price")
-            with col_fv_h2:
-                render_export_toolbar(df_display, file_prefix="fair_value_target_price", key_suffix="fv_tp", table_title="Fair Value e Target Price")
-            
-            st.dataframe(df_display, use_container_width=True, hide_index=True, height=400)
+            render_table_with_export(
+                df_display,
+                table_title="📋 Tabella Fair Value & Target Price",
+                file_prefix="fair_value_target_price",
+                key_suffix="fv_tp",
+                height=400,
+            )
 
         with col_b:
             glossary_modal("📚 Glossario Metriche di Valutazione", """
@@ -802,20 +865,18 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             st.plotly_chart(fig_z, use_container_width=True, key="val_altman_z_gauge", config={"displayModeBar": "hover", "displaylogo": False})
 
         with col_z2:
-            col_dp_h1, col_dp_h2 = st.columns([3.0, 1.2])
-            with col_dp_h1:
-                st.markdown("#### 🔍 Driver del ROE (DuPont 3-Fattori)")
-            
             df_dp = pd.DataFrame([
                 {"Fattore": "Profit Margin (Utile/Sales)", "Valore": f"{dp_data['profit_margin_pct']:.2f}%"},
                 {"Fattore": "Asset Turnover (Sales/Assets)", "Valore": f"{dp_data['asset_turnover']:.2f}x"},
                 {"Fattore": "Equity Multiplier (Assets/Equity)", "Valore": f"{dp_data['equity_multiplier']:.2f}x"},
                 {"Fattore": "ROE Risultante", "Valore": f"{dp_data['roe_pct']:.2f}%"}
             ])
-            with col_dp_h2:
-                render_export_toolbar(df_dp, file_prefix="dupont_analysis_roe", key_suffix="dupont", table_title="DuPont Analysis")
-
-            st.dataframe(df_dp, use_container_width=True, hide_index=True)
+            render_table_with_export(
+                df_dp,
+                table_title="🔍 Driver del ROE (DuPont 3-Fattori)",
+                file_prefix="dupont_analysis_roe",
+                key_suffix="dupont",
+            )
 
         st.divider()
 
@@ -1028,6 +1089,28 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
             bal_df = raw_stm.get("balance_sheet", pd.DataFrame())
             cf_df  = raw_stm.get("cash_flow", pd.DataFrame())
 
+            from core.financial_analysis import translate_statement_item
+
+            def ensure_item_column(df: pd.DataFrame) -> pd.DataFrame:
+                if df is None or df.empty:
+                    return pd.DataFrame()
+                df_out = df.copy()
+                if "Voce di Bilancio" not in df_out.columns:
+                    df_out.insert(0, "Voce di Bilancio", [translate_statement_item(str(idx)) for idx in df_out.index])
+                return df_out
+
+            inc_df = ensure_item_column(inc_df)
+            bal_df = ensure_item_column(bal_df)
+            cf_df  = ensure_item_column(cf_df)
+
+            cfg_stm = {
+                "Voce di Bilancio": st.column_config.TextColumn(
+                    "Voce di Bilancio (10-K)",
+                    width="large",
+                    help="Voce contabile ufficiale desunta dal Form 10-K depositato presso la SEC"
+                )
+            }
+
             st.caption("💡 *Tutti i valori dei bilanci ufficiali sono formattati in Milioni (**M €**) con separatori delle migliaia e gestione delle voci non disponibili (N/A).*")
 
             st_tab1, st_tab2, st_tab3 = st.tabs([
@@ -1038,28 +1121,40 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
 
             with st_tab1:
                 if not inc_df.empty:
-                    col_inc_h1, col_inc_h2 = st.columns([3.5, 0.9])
-                    with col_inc_h2:
-                        render_export_toolbar(inc_df, file_prefix=f"{selected_ticker}_conto_economico", key_suffix="inc_stmt", table_title=f"Conto Economico {selected_ticker}")
-                    st.dataframe(inc_df, use_container_width=True, height=450)
+                    render_table_with_export(
+                        inc_df,
+                        table_title=f"📋 Conto Economico — {selected_ticker}",
+                        file_prefix=f"{selected_ticker}_conto_economico",
+                        key_suffix="inc_stmt",
+                        column_config=cfg_stm,
+                        height=450,
+                    )
                 else:
                     st.info(f"Conto Economico di esercizio non disponibile offline per {selected_ticker}.")
 
             with st_tab2:
                 if not bal_df.empty:
-                    col_bal_h1, col_bal_h2 = st.columns([3.5, 0.9])
-                    with col_bal_h2:
-                        render_export_toolbar(bal_df, file_prefix=f"{selected_ticker}_stato_patrimoniale", key_suffix="bal_stmt", table_title=f"Stato Patrimoniale {selected_ticker}")
-                    st.dataframe(bal_df, use_container_width=True, height=450)
+                    render_table_with_export(
+                        bal_df,
+                        table_title=f"📋 Stato Patrimoniale — {selected_ticker}",
+                        file_prefix=f"{selected_ticker}_stato_patrimoniale",
+                        key_suffix="bal_stmt",
+                        column_config=cfg_stm,
+                        height=450,
+                    )
                 else:
                     st.info(f"Stato Patrimoniale di esercizio non disponibile offline per {selected_ticker}.")
 
             with st_tab3:
                 if not cf_df.empty:
-                    col_cf_h1, col_cf_h2 = st.columns([3.5, 0.9])
-                    with col_cf_h2:
-                        render_export_toolbar(cf_df, file_prefix=f"{selected_ticker}_rendiconto_finanziario", key_suffix="cf_stmt", table_title=f"Rendiconto Finanziario {selected_ticker}")
-                    st.dataframe(cf_df, use_container_width=True, height=450)
+                    render_table_with_export(
+                        cf_df,
+                        table_title=f"📋 Rendiconto Finanziario — {selected_ticker}",
+                        file_prefix=f"{selected_ticker}_rendiconto_finanziario",
+                        key_suffix="cf_stmt",
+                        column_config=cfg_stm,
+                        height=450,
+                    )
                 else:
                     st.info(f"Rendiconto Finanziario di esercizio non disponibile offline per {selected_ticker}.")
 
@@ -1078,7 +1173,7 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
         indexed_chunks_cnt = index_ticker_sec_filings(selected_ticker)
         st.caption(f"📚 *Vector Store Indicizzato: **{indexed_chunks_cnt} chunk semantici** attivi per {selected_ticker} (Form 10-K / 10-Q).*")
 
-        col_rag_opt1, col_rag_opt2 = st.columns([2.5, 1.5])
+        col_rag_opt1, col_rag_opt2 = st.columns([2.5, 1.5], vertical_alignment="bottom")
         with col_rag_opt1:
             sec_filter_choice = st.selectbox(
                 "Filtra per Sezione Normativa SEC:",
@@ -1092,7 +1187,6 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
                 index=0
             )
         with col_rag_opt2:
-            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
             rag_top_k = st.slider("Numero di Chunk da Recuperare (Top-K):", min_value=1, max_value=6, value=3)
 
         st.markdown("##### 💡 Domande Frequenti di Due Diligence (1-Click Prompt):")
@@ -1433,12 +1527,28 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
     p_price_fallback = float(match_pos.iloc[0]["last_price"]) if not match_pos.empty and pd.notna(match_pos.iloc[0].get("last_price")) else 150.0
 
     dcf_defaults = fetch_dcf_initial_inputs(dcf_tk, fallback_price=p_price_fallback)
+    dcf_currency = str(dcf_defaults.get("currency") or "USD").upper()
+    CURR_SYMS = {
+        "EUR": "€",
+        "USD": "$",
+        "GBP": "£",
+        "GBp": "p",
+        "CHF": "CHF",
+        "JPY": "¥",
+        "CAD": "C$",
+        "AUD": "A$",
+        "DKK": "kr",
+        "SEK": "kr",
+        "NOK": "kr",
+        "HKD": "HK$",
+    }
+    dcf_curr_sym = CURR_SYMS.get(dcf_currency, dcf_currency)
 
     col_inp1, col_inp2, col_inp3 = st.columns(3)
     with col_inp1:
-        input_price = st.number_input("Prezzo Spot Attuale (€ / $):", value=float(dcf_defaults["price"]), min_value=0.1, step=1.0)
+        input_price = st.number_input(f"Prezzo Spot Attuale ({dcf_curr_sym}):", value=float(dcf_defaults["price"]), min_value=0.1, step=1.0)
     with col_inp2:
-        input_fcf = st.number_input("FCF Base Iniziale (M €/$):", value=float(dcf_defaults["fcf_m"]), min_value=1.0, step=500.0) * 1e6
+        input_fcf = st.number_input(f"FCF Base Iniziale (M {dcf_curr_sym}):", value=float(dcf_defaults["fcf_m"]), min_value=1.0, step=500.0) * 1e6
     with col_inp3:
         input_shares = st.number_input("Azioni Diluite (Milioni):", value=float(dcf_defaults["shares_m"]), min_value=1.0, step=100.0) * 1e6
 
@@ -1446,10 +1556,10 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         c_adv1, c_adv2, c_adv3 = st.columns(3)
         with c_adv1:
             wacc_val = st.slider("WACC Medio (%):", 4.0, 16.0, 8.5, 0.25) / 100.0
-            cash_val = st.number_input("Cassa Netta & Equivalenti (M €/$):", value=float(dcf_defaults["cash_m"])) * 1e6
+            cash_val = st.number_input(f"Cassa Netta & Equivalenti (M {dcf_curr_sym}):", value=float(dcf_defaults["cash_m"])) * 1e6
         with c_adv2:
             growth_val = st.slider("Crescita FCF Anni 1-5 (%):", -5.0, 30.0, 8.5, 0.5) / 100.0
-            debt_val = st.number_input("Debito Totale (M €/$):", value=float(dcf_defaults["debt_m"])) * 1e6
+            debt_val = st.number_input(f"Debito Totale (M {dcf_curr_sym}):", value=float(dcf_defaults["debt_m"])) * 1e6
         with c_adv3:
             term_g_val = st.slider("Crescita Perpetua Terminale (%):", 0.5, 4.5, 2.5, 0.1) / 100.0
             n_sims = st.select_slider("Numero Iterazioni Monte Carlo:", options=[250, 500, 1000, 2000], value=1000)
@@ -1474,9 +1584,9 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 
     dk1, dk2, dk3, dk4 = st.columns(4)
     with dk1:
-        metric_card("Fair Value Intrinseco", f"€ {dcf_res['fair_value_median']:.2f}", f"Base Case: € {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
+        metric_card("Fair Value Intrinseco", f"{dcf_curr_sym} {dcf_res['fair_value_median']:.2f}", f"Base Case: {dcf_curr_sym} {dcf_res['fair_value_base']:.2f}", True if dcf_res['upside_downside_pct'] > 0 else False)
     with dk2:
-        metric_card("Prezzo Attuale di Mercato", f"€ {dcf_res['current_price']:.2f}", "Quotazione Spot", True)
+        metric_card("Prezzo Attuale di Mercato", f"{dcf_curr_sym} {dcf_res['current_price']:.2f}", f"Quotazione Spot ({dcf_currency})", True)
     with dk3:
         metric_card("Upside / Downside", f"{dcf_res['upside_downside_pct']:+.1f}%", "Margine di Sicurezza", True if dcf_res['upside_downside_pct'] > 0 else False)
     with dk4:
@@ -1505,13 +1615,13 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
                 color="rgba(0, 230, 118, 0.55)",
                 line=dict(color="#00e676", width=1)
             ),
-            hovertemplate="Intervallo Fair Value: <b>€ %{x:,.2f}</b><br>Conteggio Simulazioni: <b>%{y}</b><extra></extra>"
+            hovertemplate=f"Intervallo Fair Value: <b>{dcf_curr_sym} %{{x:,.2f}}</b><br>Conteggio Simulazioni: <b>%{{y}}</b><extra></extra>"
         ))
         
-        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Mediana (€ {fv_med:.2f})", line=dict(color="#00e676", width=2.5, dash="solid")))
-        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Prezzo (€ {cur_p:.2f})", line=dict(color="#f85149", width=2, dash="dash")))
-        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Bear 10% (€ {p10:.2f})", line=dict(color="#d29922", width=1.5, dash="dot")))
-        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Bull 90% (€ {p90:.2f})", line=dict(color="#58a6ff", width=1.5, dash="dot")))
+        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Mediana ({dcf_curr_sym} {fv_med:.2f})", line=dict(color="#00e676", width=2.5, dash="solid")))
+        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Prezzo ({dcf_curr_sym} {cur_p:.2f})", line=dict(color="#f85149", width=2, dash="dash")))
+        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Bear 10% ({dcf_curr_sym} {p10:.2f})", line=dict(color="#d29922", width=1.5, dash="dot")))
+        fig_dcf_hist.add_trace(go.Scatter(x=[None], y=[None], mode="lines", name=f"Bull 90% ({dcf_curr_sym} {p90:.2f})", line=dict(color="#58a6ff", width=1.5, dash="dot")))
         
         fig_dcf_hist.add_vline(x=fv_med, line_dash="solid", line_color="#00e676", line_width=2.5)
         fig_dcf_hist.add_vline(x=cur_p, line_dash="dash", line_color="#f85149", line_width=2)
@@ -1519,7 +1629,7 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         fig_dcf_hist.add_vline(x=p90, line_dash="dot", line_color="#58a6ff", line_width=1.5)
         
         fig_dcf_hist.update_layout(
-            xaxis=dict(title="Fair Value Stimato (€ / $)", gridcolor="rgba(255,255,255,0.06)"),
+            xaxis=dict(title=f"Fair Value Stimato ({dcf_curr_sym})", gridcolor="rgba(255,255,255,0.06)"),
             yaxis=dict(title="Frequenza Simulazioni", gridcolor="rgba(255,255,255,0.06)"),
             legend=dict(
                 orientation="h",
@@ -1544,9 +1654,9 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
     with col_scen:
         st.markdown("##### 📋 Matrice di Sensibilità & Scenari")
         df_dcf_scenarios = pd.DataFrame([
-            {"Scenario": "🐻 Bear Case (10° Percentile)", "Fair Value": f"€ {dcf_res['p10_bear_case']:.2f}", "Upside/Downside": f"{((dcf_res['p10_bear_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"},
-            {"Scenario": "⚖️ Base Case (Mediana DCF)", "Fair Value": f"€ {dcf_res['fair_value_median']:.2f}", "Upside/Downside": f"{dcf_res['upside_downside_pct']:+.1f}%"},
-            {"Scenario": "🐂 Bull Case (90° Percentile)", "Fair Value": f"€ {dcf_res['p90_bull_case']:.2f}", "Upside/Downside": f"{((dcf_res['p90_bull_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"}
+            {"Scenario": "🐻 Bear Case (10° Percentile)", "Fair Value": f"{dcf_curr_sym} {dcf_res['p10_bear_case']:.2f}", "Upside/Downside": f"{((dcf_res['p10_bear_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"},
+            {"Scenario": "⚖️ Base Case (Mediana DCF)", "Fair Value": f"{dcf_curr_sym} {dcf_res['fair_value_median']:.2f}", "Upside/Downside": f"{dcf_res['upside_downside_pct']:+.1f}%"},
+            {"Scenario": "🐂 Bull Case (90° Percentile)", "Fair Value": f"{dcf_curr_sym} {dcf_res['p90_bull_case']:.2f}", "Upside/Downside": f"{((dcf_res['p90_bull_case']-dcf_res['current_price'])/dcf_res['current_price'])*100:+.1f}%"}
         ])
         st.dataframe(df_dcf_scenarios, use_container_width=True, hide_index=True, height=210)
         

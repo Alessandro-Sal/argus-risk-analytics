@@ -657,6 +657,7 @@ class V004_WealthEcosystemAudit(BaseMigration):
                 currency TEXT NOT NULL DEFAULT 'EUR',
                 investment_line TEXT DEFAULT 'Azionario / Crescita',
                 notes TEXT,
+                yearly_data_json TEXT,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)

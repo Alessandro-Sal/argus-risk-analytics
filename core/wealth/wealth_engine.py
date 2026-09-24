@@ -5400,4 +5400,13 @@ def compute_smart_cashflow_reconciliation(
 # ============================================================
 # BILANCIO PERSONALE ISTITUZIONALE (PERSONAL FINANCIAL STATEMENTS)
 # ============================================================
-from core.wealth.personal_balance_sheet import compute_personal_balance_sheet
+from core.wealth.personal_balance_sheet import (
+    compute_multi_year_balance_comparison,
+    compute_personal_balance_sheet,
+    generate_personal_balance_sheet_html,
+    generate_personal_balance_sheet_pdf,
+    generate_personal_balance_sheet_tearsheet_html,
+    generate_personal_balance_sheet_tearsheet_pdf,
+)
+
+

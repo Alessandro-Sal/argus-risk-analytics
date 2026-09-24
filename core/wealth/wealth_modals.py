@@ -27,6 +27,59 @@ def render_wealth_methodology_modal():
     st.caption("Standard di calcolo: ARGUS Family Office Engine • Certificazione IFRS/GIPS.")
 
 
+@st.dialog("ℹ️ Standard Contabili & Metodologia Bilancio Personale (CFP / IFRS)", width="large")
+def render_balance_sheet_methodology_modal():
+    """Modale informativo sulla metodologia del Bilancio Personale e Stato Patrimoniale Istituzionale."""
+    st.markdown(r"""
+    ### 📋 Principi Contabili del Bilancio Personale Istituzionale
+    
+    Il modulo **Bilancio Personale & Stato Patrimoniale** di ARGUS applica gli standard di contabilità patrimoniale personale definiti dal **CFP Board (Certified Financial Planner Board of Standards)** e le linee guida **IFRS per Family Office e Persone Fisiche**.
+
+    ---
+
+    #### 🏛️ 1. L'Equazione Contabile Fondamentale
+    Nello Stato Patrimoniale a sezioni contrapposte, il principio di bilanciamento matematico è rigorosamente garantito:
+    
+    $$\text{Attivo Totale (Assets)} = \text{Passività Totali (Liabilities)} + \text{Patrimonio Netto (Net Worth / Equity)}$$
+
+    - **Attivo (Impieghi di Ricchezza)**: Comprende 5 macro-classi contabili:
+      1. *Sezione I: Attività Liquide & Equivalenti* (Conti correnti, conti deposito, fondo emergenza, liquidità broker non investita).
+      2. *Sezione II: Investimenti Finanziari & Capitale Produttivo* (Azioni, ETF, Obbligazioni, Cripto-attività, Portafogli Risk Engine collegati).
+      3. *Sezione III: Previdenza Integrativa* (Fondi pensione negoziali, fondi aperti, PIP accantonati al valore di riscatto).
+      4. *Sezione IV: Attività Reali & Beni Personali* (Immobili di proprietà a valore peritale/mercato, orologi di lusso, metalli preziosi, collezionabili).
+      5. *Sezione V: Crediti Personali & Ratei Attivi* (Crediti d'imposta personali, caparre e cauzioni esigibili).
+    - **Passivo (Fonti Esterne / Debiti)**:
+      1. *Passività Correnti a Breve Termine (< 12 mesi)*: Saldi carte di credito a saldo, scoperti di c/c.
+      2. *Passività Consolidate a Medio/Lungo Termine (> 12 mesi)*: Mutui ipotecari residui (quota capitale), finanziamenti personali, prestiti auto.
+    - **Patrimonio Netto (Fonti Proprie / Capitale Netto)**:
+      - *Capitale Pregresso Consolidato*: Ricchezza netta accumulata negli anni precedenti.
+      - *Risultato Economico d'Esercizio*: Surplus/risparmio netto generato dalla gestione economica dell'anno solare in corso.
+
+    ---
+
+    #### 📈 2. Conto Economico di Gestione (Income Statement)
+    Classifica con precisione chirurgica le transazioni dell'anno solare separando nettamente i **Costi di Vita (Consumi a perdere)** dai **Trasferimenti Patrimoniali (Investimenti & Risparmio)**:
+    
+    $$\text{Risparmio Netto (Surplus)} = \text{Entrate Ordinarie Totali} - \text{Spese di Vita (Consumi)}$$
+    $$\text{Personal Savings Rate (\%)} = \frac{\text{Risparmio Netto}}{\text{Entrate Ordinarie Totali}} \times 100$$
+
+    - **Allocazione del Capitale (Waterfall)**:
+      $$\text{Risparmio Netto} = \text{Flussi Investiti (PAC / Titoli)} + \text{Variazione Riserve Liquide}$$
+
+    ---
+
+    #### 🎯 3. I 6 Indici Fondamentali di Solidità Finanziaria
+    1. **Indice di Solvibilità Patrimoniale**: $\frac{\text{Patrimonio Netto}}{\text{Attivo Totale}}$ (Benchmark: $\ge 70\%$ Solido, $\ge 50\%$ Adeguato).
+    2. **Debt-to-Assets (Grado di Leva)**: $\frac{\text{Passività Totali}}{\text{Attivo Totale}}$ (Benchmark: $\le 20\%$ Ottimale, $\le 40\%$ Monitorabile).
+    3. **Runway Fondo Emergenza**: $\frac{\text{Liquidità Immediata}}{\text{Spese Mensili Medie}}$ (Benchmark: $\ge 6$ mesi Ottimale, $\ge 3$ mesi Minimo di Sicurezza).
+    4. **Personal Savings Rate**: $\frac{\text{Risparmio Netto}}{\text{Entrate Totali}}$ (Benchmark: $\ge 25\%$ Top-Tier, $\ge 15\%$ Sano).
+    5. **Debt Service-to-Income (DSTI)**: $\frac{\text{Servizio Debito Annuo (Rate)}}{\text{Entrate Totali}}$ (Benchmark: $\le 15\%$ Basso Rischio, $\le 33\%$ Limite di Sostenibilità).
+    6. **Invested Assets Ratio**: $\frac{\text{Investimenti} + \text{Previdenza}}{\text{Patrimonio Netto}}$ (Benchmark: $\ge 50\%$ Capitale che lavora attivamente).
+    """)
+    st.caption("Standard di riferimento: CFP Board Financial Planning Practice Standards • IFRS Practice Statement Management Commentary.")
+
+
+
 @st.dialog("💸 Guida Metodologica: Cash Flow, 50/30/20 & Envelope Budgeting", width="large")
 def render_budget_rule_methodology_modal():
     """Modale informativo sulla regola 50/30/20 e l'Envelope Budgeting."""

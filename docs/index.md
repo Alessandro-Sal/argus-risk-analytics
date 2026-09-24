@@ -52,6 +52,15 @@ Compliant with **ISO/IEC 9075:2011**, **MiFID II**, and **GIPS**, ARGUS tracks t
 - **Transaction Time ($TT$)**: When our system recorded or modified the record.
 Every decision, override, and allocation shift is immutably signed using SHA-256 hash chaining and sealed via a Merkle Tree.
 
+### 5. Extreme Value Theory (EVT) & Basel IV Backtesting
+Peaks-Over-Threshold (POT) modeling with Generalized Pareto Distribution (GPD) for extreme tail quantiles (99.0% and 99.9% VaR/CVaR), coupled with the Basel IV Regulatory Traffic Light backtesting suite (Kupiec POF test, Christoffersen independence clustering test, conditional coverage test, and regulatory capital multipliers 3.00x–4.00x).
+
+### 6. Advanced Optimizers: MDP & Min-CVaR Linear Programming
+Maximum Diversification Portfolio (Choueifaty Diversification Ratio maximization via SLSQP) and exact Mean-CVaR portfolio optimization formulated as a linear program (Rockafellar & Uryasev 2000) solved via HiGHS in sub-5ms.
+
+### 7. Consolidated Total Wealth Stress Testing (EBA & CCAR)
+Holistic balance-sheet stress engine transmitting joint macroeconomic shocks (EBA Adverse 2026, Fed CCAR Severe, Stagflation, Geopolitical Risk-Off) across liquid assets, real estate, pension funds, luxury caveau, and fixed liabilities with Debt-to-Assets leverage effect modeling.
+
 ---
 
 ## Quick Navigation

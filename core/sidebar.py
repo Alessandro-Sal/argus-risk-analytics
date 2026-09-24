@@ -1527,6 +1527,23 @@ def render_sidebar():
                 padding-top: 0px !important;
                 margin-top: 0px !important;
             }
+
+            /* Institutional Sidebar Selectbox Layout & Comfort */
+            section[data-testid="stSidebar"] div[data-baseweb="select"] {
+                border-radius: 8px !important;
+                min-height: 38px !important;
+                background: rgba(22, 27, 34, 0.85) !important;
+                border: 1px solid rgba(255, 255, 255, 0.12) !important;
+                transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+            }
+            section[data-testid="stSidebar"] div[data-baseweb="select"]:hover {
+                border-color: rgba(16, 185, 129, 0.45) !important;
+            }
+            section[data-testid="stSidebar"] div[data-baseweb="select"] > div {
+                min-height: 38px !important;
+                align-items: center !important;
+                border-radius: 8px !important;
+            }
         </style>
         """,
             unsafe_allow_html=True,
@@ -1750,7 +1767,7 @@ def render_sidebar():
 
             st.markdown(
                 f"""
-            <div style="background:rgba(16, 185, 129, 0.10); border:1px solid rgba(16, 185, 129, 0.35); border-radius:10px; padding: 10px 12px; margin-bottom: 8px; backdrop-filter: blur(10px);">
+            <div style="background:rgba(16, 185, 129, 0.10); border:1px solid rgba(16, 185, 129, 0.35); border-radius:10px; padding: 10px 12px; backdrop-filter: blur(10px);">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 4px;">
                     <span style="font-size:10px; font-weight:700; color:#8b949e; letter-spacing:0.6px; text-transform:uppercase;">Portale Attivo</span>
                     {w_status_badge}
@@ -1767,6 +1784,7 @@ def render_sidebar():
                     <span style="color:#8b949e; font-size:9.5px;">🎯 Pensione: <b style="color:#38bdf8;">{st.session_state.get("wealth_target_retirement_age", 67)}a</b></span>
                 </div>
             </div>
+            <div style="height: 10px;"></div>
             """,
                 unsafe_allow_html=True,
             )
@@ -1776,8 +1794,15 @@ def render_sidebar():
                 from core.fetcher import get_engine
                 from core.wealth.wealth_db import get_wealth_portfolios
 
+                db_user = st.session_state.get("db_user", "root")
+                db_pass = st.session_state.get("db_pass", "root")
+                db_host = st.session_state.get("db_host", "localhost")
+                try:
+                    db_port = int(st.session_state.get("db_port", 3306))
+                except Exception:
+                    db_port = 3306
                 raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
-                w_eng = get_engine(database=raw_db, offline=is_offline)
+                w_eng = get_engine(db_user, db_pass, db_host, db_port, raw_db, database=raw_db, offline=is_offline)
                 df_wports = get_wealth_portfolios(w_eng)
                 if not df_wports.empty and len(df_wports) >= 1:
                     col_id = (
@@ -1788,16 +1813,66 @@ def render_sidebar():
                     pids = df_wports[col_id].tolist()
                     w_opts = [None] + pids
                     w_names = dict(zip(df_wports[col_id], df_wports["name"]))
-                    active_w_pid = st.session_state.get("wealth_active_portfolio_id")
-                    if active_w_pid not in pids:
-                        active_w_pid = None
 
-                    w_idx = w_opts.index(active_w_pid)
+                    active_w_pid = st.session_state.get("wealth_active_portfolio_id")
+                    if active_w_pid is None:
+                        try:
+                            from core.workspace_context import WorkspaceContext
+
+                            ws_ctx = WorkspaceContext.get_current()
+                            if ws_ctx and ws_ctx.wealth and ws_ctx.wealth.profile_id is not None:
+                                active_w_pid = ws_ctx.wealth.profile_id
+                        except Exception:
+                            pass
+
+                    # Normalizzazione tipizzata per garantire corrispondenza (int, str, numpy.int64)
+                    matched_pid = None
+                    if active_w_pid is not None:
+                        for p in pids:
+                            if p == active_w_pid:
+                                matched_pid = p
+                                break
+                            try:
+                                if int(p) == int(active_w_pid):
+                                    matched_pid = p
+                                    break
+                            except (ValueError, TypeError):
+                                pass
+                            if str(p) == str(active_w_pid):
+                                matched_pid = p
+                                break
+
+                    active_w_pid = matched_pid
+                    if active_w_pid is not None:
+                        st.session_state["wealth_active_portfolio_id"] = active_w_pid
+
+                    # Sincronizzazione bi-direzionale garantita con la chiave Streamlit
+                    if active_w_pid in w_opts:
+                        w_idx = w_opts.index(active_w_pid)
+                        if st.session_state.get("sb_wealth_profile_selector") != active_w_pid:
+                            st.session_state["sb_wealth_profile_selector"] = active_w_pid
+                    else:
+                        w_idx = 0
+                        if st.session_state.get("sb_wealth_profile_selector") not in w_opts:
+                            st.session_state["sb_wealth_profile_selector"] = None
 
                     def _on_sb_wealth_prof_change():
                         sel = st.session_state.get("sb_wealth_profile_selector")
                         st.session_state["wealth_active_portfolio_id"] = sel
                         st.session_state["wealth_profile_selector_widget"] = sel
+                        st.session_state["nw_profile_selector_widget"] = sel
+                        st.session_state["cf_profile_selector_widget"] = sel
+                        try:
+                            from core.workspace_context import WorkspaceContext
+
+                            WorkspaceContext.get_current().wealth.profile_id = sel
+                        except Exception:
+                            pass
+
+                    st.markdown(
+                        '<div class="sidebar-section-header" style="margin-top: 4px; margin-bottom: 5px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap;">👤 PROFILO PATRIMONIALE</div>',
+                        unsafe_allow_html=True,
+                    )
 
                     st.selectbox(
                         "👤 Profilo Patrimoniale",
@@ -1808,8 +1883,10 @@ def render_sidebar():
                         index=w_idx,
                         key="sb_wealth_profile_selector",
                         on_change=_on_sb_wealth_prof_change,
+                        label_visibility="collapsed",
                         help="Seleziona il profilo patrimoniale attivo per tutte le analisi del modulo Wealth.",
                     )
+                    st.markdown('<div style="height: 6px;"></div>', unsafe_allow_html=True)
             except Exception:
                 pass
         else:

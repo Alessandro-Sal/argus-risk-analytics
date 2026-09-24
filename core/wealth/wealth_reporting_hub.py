@@ -26,6 +26,10 @@ from core.wealth.wealth_engine import (
     generate_advisory_pitchbook_pdf,
     generate_executive_tear_sheet_pdf,
 )
+from core.wealth.personal_balance_sheet import (
+    generate_personal_balance_sheet_pdf,
+    generate_personal_balance_sheet_tearsheet_pdf,
+)
 from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
 
 
@@ -42,6 +46,11 @@ def _get_cached_pitchbook_pdf(_engine, pid: int) -> bytes:
 
 
 @st.cache_data(ttl=300, show_spinner=False)
+def _get_cached_balance_sheet_pdf(_engine, pid: int) -> bytes:
+    return generate_personal_balance_sheet_pdf(_engine, portfolio_id=pid)
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def _get_cached_tear_sheet_pdf(_engine, pid: int) -> bytes:
     return generate_executive_tear_sheet_pdf(_engine, portfolio_id=pid)
 
@@ -49,6 +58,7 @@ def _get_cached_tear_sheet_pdf(_engine, pid: int) -> bytes:
 @st.cache_data(ttl=300, show_spinner=False)
 def _get_cached_master_excel(_engine, pid: int) -> bytes:
     return export_wealth_master_excel_workbook(_engine, portfolio_id=pid).getvalue()
+
 
 
 def render_wealth_reporting_and_exports_hub(
@@ -98,12 +108,12 @@ def render_wealth_reporting_and_exports_hub(
             "Documenti ad alta risoluzione pronti per la stampa, comitati consultivi e clienti di private banking."
         )
 
-        c_pdf1, c_pdf2, c_pdf3 = st.columns(3)
+        c_pdf1, c_pdf2 = st.columns(2)
 
         with c_pdf1:
             st.markdown(
                 """
-            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #38bdf8; font-size: 13.5px;">📄 Quarterly Client Report (PDF)</b>
                     <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
@@ -131,7 +141,7 @@ def render_wealth_reporting_and_exports_hub(
         with c_pdf2:
             st.markdown(
                 """
-            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
                     <b style="color: #34d399; font-size: 13.5px;">🏢 Advisory Pitchbook (PDF 6 Pag.)</b>
                     <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
@@ -155,12 +165,43 @@ def render_wealth_reporting_and_exports_hub(
             except Exception as e:
                 st.error(f"Errore Pitchbook: {e}")
 
+        st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+
+        c_pdf3, c_pdf4 = st.columns(2)
+
         with c_pdf3:
             st.markdown(
                 """
-            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 180px; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-left: 3px solid #10b981; border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <b style="color: #fbbf24; font-size: 13.5px;">📑 Tear-Sheet Sintetica (PDF/HTML)</b>
+                    <b style="color: #10b981; font-size: 13.5px;">📋 Bilancio Personale &amp; Stato Patrimoniale (PDF 3 Pag.)</b>
+                    <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
+                        Prospetto contabile certificato CFP Board / IFRS: sezioni contrapposte, Conto Economico di gestione, pareggio e indici di solidità.
+                    </p>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+            try:
+                pdf_pbs = _get_cached_balance_sheet_pdf(engine, pid=portfolio_id)
+                st.download_button(
+                    label="📥 Scarica Bilancio Personale PDF",
+                    data=pdf_pbs,
+                    file_name=f"argus_bilancio_personale_{prof_slug}_{date_slug}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key="dl_pbs_pdf_hub",
+                )
+            except Exception as e:
+                st.error(f"Errore Bilancio Personale PDF: {e}")
+
+        with c_pdf4:
+            st.markdown(
+                """
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <b style="color: #fbbf24; font-size: 13.5px;">📑 Tear-Sheet Sintetica &amp; Contabile (PDF/HTML)</b>
                     <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
                         Scheda riassuntiva one-page a colpo d'occhio con Net Worth, indicatori di solvibilità e sintesi grafica degli attivi.
                     </p>

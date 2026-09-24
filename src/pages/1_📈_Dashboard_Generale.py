@@ -10,8 +10,8 @@ import core.duckdb_engine
 import core.risk_engine
 import core.ui_utils
 from core.excel_generator import generate_excel_in_memory
+from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
-    apply_chart_theme,
     apply_plotly_theme,
     ensure_portfolio_loaded,
     fmt_eur,
@@ -732,7 +732,7 @@ with st.expander("💡 Guida Rapida: Perché il Max Drawdown non coincide con la
 
 # ── SCORECARD COMPARATIVA MULTI-BENCHMARK (COMPLETAMENTE AUTONOMA & FILTRABILE) ──
 st.markdown('<div style="margin-top: 20px;"></div>', unsafe_allow_html=True)
-col_sc_title, col_sc_dl = st.columns([3.8, 1.0])
+col_sc_title, col_sc_dl = st.columns([3.8, 1.0], vertical_alignment="center")
 with col_sc_title:
     st.markdown("#### 🏆 Scorecard Comparativa Multi-Benchmark Globale")
     st.caption("Valutazione comparativa esaustiva e indipendente tra il Portafoglio ARGUS e l'intero panorama dei benchmark azionari (USA, Europa, Asia, Emergenti), obbligazionari e alternativi.")
@@ -1479,15 +1479,6 @@ with col_rl1:
     """, unsafe_allow_html=True)
 
 with col_rl2:
-    col_rl_h1, col_rl_h2 = st.columns([3.5, 1.2])
-    with col_rl_h2:
-        render_export_toolbar(
-            df_eval,
-            file_prefix="risk_compliance_limits",
-            key_suffix="dash_compliance",
-            table_title="Limiti di Rischio e Conformità"
-        )
-
     df_eval_show = df_eval[["status_icon", "rule_name", "current_value", "limit_threshold", "unit"]].rename(columns={
         "status_icon": "Stato",
         "rule_name": "Regola di Rischio",
@@ -1502,11 +1493,12 @@ with col_rl2:
         "Soglia Limite": st.column_config.TextColumn("Soglia Limite", width="small"),
         "Unità": st.column_config.TextColumn("Unità", width="small")
     }
-    st.dataframe(
+    render_table_with_export(
         df_eval_show,
+        table_title="📋 Limiti di Rischio e Conformità",
+        file_prefix="risk_compliance_limits",
+        key_suffix="dash_compliance",
         column_config=eval_cfg,
-        use_container_width=True,
-        hide_index=True
     )
 
 st.divider()
@@ -1907,7 +1899,7 @@ col_csv1, col_csv2 = st.columns(2)
 
 with col_csv1:
     if not pos.empty:
-        c_p_t, c_p_e = st.columns([2, 1.2])
+        c_p_t, c_p_e = st.columns([2, 1.2], vertical_alignment="center")
         with c_p_t:
             st.markdown("##### 📋 Dettaglio Posizioni")
         with c_p_e:
@@ -1920,7 +1912,7 @@ with col_csv1:
 
 with col_csv2:
     if not sr_port.empty:
-        c_r_t, c_r_e = st.columns([2, 1.2])
+        c_r_t, c_r_e = st.columns([2, 1.2], vertical_alignment="center")
         with c_r_t:
             st.markdown("##### 📈 Rendimenti Storici")
         with c_r_e:

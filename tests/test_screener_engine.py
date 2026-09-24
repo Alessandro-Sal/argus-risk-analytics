@@ -200,6 +200,40 @@ def test_compute_optimal_candidate_weight():
         assert not res["curve_df"].empty
 
 
+def test_mixed_timezone_pre_trade_and_optimal_weight():
+    from core.screener_engine import compute_optimal_candidate_weight, simulate_pre_trade_impact
+    
+    df_pos = pd.DataFrame({
+        "ticker": ["AAPL", "ENEL.MI"],
+        "current_value": [6000.0, 4000.0]
+    })
+
+    # AAPL with America/New_York tz
+    dates_us = pd.date_range("2024-01-01", periods=100, freq="B", tz="America/New_York")
+    # ENEL with tz-naive
+    dates_eu = pd.date_range("2024-01-01", periods=100, freq="B")
+    # Candidate with UTC
+    dates_utc = pd.date_range("2024-01-01", periods=100, freq="B", tz="UTC")
+
+    p = 100 * np.exp(np.cumsum(np.full(100, 0.001)))
+
+    def mock_hist(ticker, **kwargs):
+        tk = str(ticker).upper()
+        if tk == "AAPL": return pd.DataFrame({"close": p}, index=dates_us)
+        elif tk == "ENEL.MI": return pd.DataFrame({"close": p}, index=dates_eu)
+        elif tk == "CAND": return pd.DataFrame({"close": p}, index=dates_utc)
+        return pd.DataFrame({"close": p}, index=dates_us)
+
+    with patch("core.screener_engine.get_cached_ticker_history", side_effect=mock_hist):
+        opt = compute_optimal_candidate_weight(df_pos, "CAND", benchmark_ticker="SPY")
+        assert opt["valid"] is True
+        assert opt["candidate_ticker"] == "CAND"
+
+        sim = simulate_pre_trade_impact(df_pos, "CAND", 5.0, benchmark_ticker="SPY")
+        assert sim["valid"] is True
+        assert "metrics_comparison" in sim
+
+
 def test_evaluate_custom_screener_query():
     from core.screener_engine import evaluate_custom_screener_query
     

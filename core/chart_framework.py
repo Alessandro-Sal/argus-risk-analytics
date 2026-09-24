@@ -363,6 +363,7 @@ def apply_argus_theme(
     show_spikes: bool = True,
     optimize_memory: bool = True,
     precision: int = 4,
+    uirevision: Optional[Any] = "argus_global_viewport",
 ) -> go.Figure:
     """
     Applica il Design System istituzionale ARGUS a una figura Plotly:
@@ -371,6 +372,8 @@ def apply_argus_theme(
     - Legenda orizzontale posizionata in basso (o in alto) con zero interferenza
     - Formattazione automatica degli assi (valuta/percentuale)
     - Compressione della memoria RAM tramite arrotondamento float
+    - Sincronizzazione cross-chart del cursore temporale (spikemode="across+toaxis")
+    - Persistenza dello zoom / viewport dell'utente (uirevision)
     """
     if fig is None:
         return fig
@@ -391,6 +394,9 @@ def apply_argus_theme(
         "plot_bgcolor": "rgba(0,0,0,0)",
         "margin": {"l": 40, "r": 20, "t": top_margin, "b": bottom_margin},
     }
+
+    if uirevision is not None:
+        layout_updates["uirevision"] = uirevision
 
     if height is not None:
         layout_updates["height"] = height
@@ -451,9 +457,10 @@ def apply_argus_theme(
             {
                 "showspikes": True,
                 "spikethickness": 1,
-                "spikedash": "dot",
-                "spikemode": "across",
-                "spikecolor": "rgba(255, 255, 255, 0.25)" if dark_mode else "rgba(0, 0, 0, 0.25)",
+                "spikedash": "solid",
+                "spikesnap": "cursor",
+                "spikemode": "across+toaxis",
+                "spikecolor": "rgba(56, 189, 248, 0.45)" if dark_mode else "rgba(37, 99, 235, 0.45)",
             }
         )
     if x_kwargs:

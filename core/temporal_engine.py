@@ -434,6 +434,26 @@ def reconstruct_point_in_time_portfolio(
 
     # 1. Calcolo prezzi storici di riferimento alla data target
     hist_prices = {}
+    if (
+        df_prices is not None
+        and not df_prices.empty
+        and "ticker" in df_prices.columns
+        and "close" in df_prices.columns
+    ):
+        try:
+            df_p = df_prices.copy()
+            df_p["price_date"] = pd.to_datetime(df_p["price_date"])
+            if getattr(df_p["price_date"].dt, "tz", None) is not None:
+                df_p["price_date"] = df_p["price_date"].dt.tz_localize(None)
+            df_p_target = df_p[df_p["price_date"] <= target_dt]
+            if not df_p_target.empty:
+                last_px_map = df_p_target.sort_values("price_date").groupby("ticker")["close"].last().to_dict()
+                for tk, px_val in last_px_map.items():
+                    if px_val is not None and not np.isnan(px_val) and float(px_val) > 0:
+                        hist_prices[tk] = float(px_val)
+        except Exception:
+            pass
+
     if returns_df is not None and not returns_df.empty:
         r_df = returns_df.copy().dropna(how="all")
         if getattr(r_df.index, "tz", None) is not None:
@@ -444,9 +464,10 @@ def reconstruct_point_in_time_portfolio(
 
         for _, row in pos_today.iterrows():
             tk = row.get("ticker")
-            p_now = float(row.get("last_price", 1.0))
-            f = float(cum_factors[tk]) if (tk in cum_factors.index and float(cum_factors[tk]) > 0.0001) else 1.0
-            hist_prices[tk] = p_now / f
+            if tk not in hist_prices:
+                p_now = float(row.get("last_price", 1.0))
+                f = float(cum_factors[tk]) if (tk in cum_factors.index and float(cum_factors[tk]) > 0.0001) else 1.0
+                hist_prices[tk] = p_now / f
 
     # 2. Se abbiamo df_tx, ricostruisci la quantità esatta posseduta alla data target
     if df_tx is not None and not df_tx.empty and "tx_date" in df_tx.columns:

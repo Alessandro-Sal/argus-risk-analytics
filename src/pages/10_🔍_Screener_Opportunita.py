@@ -36,6 +36,7 @@ from core.screener_engine import (
     simulate_pre_trade_impact,
 )
 from core.sidebar import render_sidebar
+from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
     apply_plotly_theme,
     ensure_risk_bundle_loaded,
@@ -43,7 +44,6 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
-    render_export_toolbar,
     render_sandbox_banner,
     render_segmented_tabs,
 )
@@ -146,7 +146,7 @@ if portfolio_tickers:
 univ_options.extend(list(MARKET_UNIVERSES.keys()))
 univ_options.append("✍️ Lista Personalizzata (Custom Tickers)...")
 
-col_u1, col_u2, col_u3, col_u4 = st.columns([2.0, 1.8, 1.0, 1.0])
+col_u1, col_u2, col_u3, col_u4 = st.columns([2.0, 1.8, 1.0, 1.0], vertical_alignment="bottom")
 
 with col_u1:
     univ_choice = st.selectbox(
@@ -177,11 +177,9 @@ else:
         st.caption(f"ℹ️ **{univ_choice}**: {MARKET_UNIVERSES[univ_choice]['description']}")
 
 with col_u3:
-    st.markdown('<div style="margin-top: 24px;"></div>', unsafe_allow_html=True)
     refresh_btn = st.button("🚀 Esegui Screening", type="primary", use_container_width=True)
 
 with col_u4:
-    st.markdown('<div style="margin-top: 24px;"></div>', unsafe_allow_html=True)
     force_refresh_btn = st.button("🔄 Forza Live", help="Bypassa la cache locale e scarica i dati più recenti in tempo reale da Yahoo Finance", use_container_width=True)
 
 # Esecuzione / Caricamento dati
@@ -468,7 +466,7 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
 
     else:
         # Archetipi Istituzionali
-        preset_col, reset_col = st.columns([4, 1])
+        preset_col, reset_col = st.columns([4, 1], vertical_alignment="bottom")
         with preset_col:
             preset_choice = st.radio(
                 "⚡ Preset Strategico Istituzionale (One-Click Archetype):",
@@ -483,7 +481,6 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
                 horizontal=True
             )
         with reset_col:
-            st.markdown('<div style="margin-top: 26px;"></div>', unsafe_allow_html=True)
             show_all = st.button("🔄 Reset Filtri", use_container_width=True)
 
         # Mappatura preset
@@ -569,12 +566,6 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         "argus_score": "ARGUS Score"
     }, inplace=True)
 
-    col_sc_h1, col_sc_h2 = st.columns([3.2, 1.0])
-    with col_sc_h1:
-        st.markdown(f"<div style='margin-top: 6px; font-size: 15px; color: #e6edf3;'><b>Risultati dello Screening:</b> Trovate <b>{len(df_filtered)}</b> opportunità su {len(df_raw)} titoli esaminati.</div>", unsafe_allow_html=True)
-    with col_sc_h2:
-        render_export_toolbar(df_table, file_prefix="screener_opportunita", key_suffix="scr_main", table_title="Screener Opportunità")
-
     scr_cfg = {
         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
         "Azienda": st.column_config.TextColumn("Azienda", width="medium"),
@@ -595,16 +586,17 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
         "ARGUS Score": st.column_config.ProgressColumn("ARGUS Score", format="%.1f / 100", min_value=0.0, max_value=100.0)
     }
 
-    st.dataframe(
+    render_table_with_export(
         df_table,
+        table_title=f"Risultati dello Screening ({len(df_filtered)}/{len(df_raw)} titoli)",
+        file_prefix="screener_opportunita",
+        key_suffix="scr_main",
         column_config=scr_cfg,
-        use_container_width=True,
-        hide_index=True,
-        height=380
+        height=380,
     )
 
     # Azione rapida: Aggiunta a Watchlist
-    col_w_add1, col_w_add2 = st.columns([3, 1])
+    col_w_add1, col_w_add2 = st.columns([3, 1], vertical_alignment="bottom")
     with col_w_add1:
         selected_to_watch = st.multiselect(
             "➕ Seleziona titoli da salvare nella Watchlist di sessione:",
@@ -612,7 +604,6 @@ if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":
             default=[]
         )
     with col_w_add2:
-        st.markdown('<div style="margin-top: 26px;"></div>', unsafe_allow_html=True)
         if st.button("💾 Salva in Watchlist", use_container_width=True):
             for t in selected_to_watch:
                 if t not in st.session_state.screener_watchlist:
@@ -752,7 +743,7 @@ elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":
     if "pre_trade_cand_weight" not in st.session_state:
         st.session_state["pre_trade_cand_weight"] = 5.0
 
-    col_sim1, col_sim2, col_sim3 = st.columns([2, 2, 1.2])
+    col_sim1, col_sim2, col_sim3 = st.columns([2, 2, 1.2], vertical_alignment="bottom")
     with col_sim1:
         cand_options = df_raw["ticker"].tolist()
         cand_ticker = st.selectbox("Seleziona Titolo Candidato dall'Universo:", cand_options, index=0)
@@ -766,7 +757,6 @@ elif active_screener_tab == "🧪 Pre-Trade Portfolio Impact Simulator":
             key="pre_trade_slider"
         )
     with col_sim3:
-        st.markdown('<div style="margin-top: 24px;"></div>', unsafe_allow_html=True)
         run_sim = st.button("⚡ Calcola Impatto", type="primary", use_container_width=True)
 
     # ── Smart Sizing & Sharpe Frontier Optimizer ───────────────────
@@ -1147,35 +1137,27 @@ elif active_screener_tab == "💾 Watchlist & Segnali Operativi":
     if watchlist_tickers:
         df_wl = df_raw[df_raw["ticker"].isin(watchlist_tickers)].copy()
         
-        col_w_head1, col_w_head2 = st.columns([3, 1])
-        with col_w_head1:
-            st.markdown(f"**Titoli in Watchlist:** {len(df_wl)} asset salvati.")
+        col_w_head1, col_w_head2 = st.columns([4, 1], vertical_alignment="center")
         with col_w_head2:
             if st.button("🗑️ Svuota Watchlist", use_container_width=True):
                 st.session_state.screener_watchlist = []
                 st.rerun()
 
-        st.dataframe(
-            df_wl[[
-                "ticker", "name", "sector", "last_price", "upside_pct", "trailing_pe", "peg_ratio",
-                "dividend_yield_pct", "roe_pct", "altman_z_score", "volatility_ann_pct", "beta", "argus_score"
-            ]].rename(columns={
-                "ticker": "Ticker", "name": "Nome", "sector": "Settore", "last_price": "Prezzo",
-                "upside_pct": "Upside %", "trailing_pe": "P/E", "peg_ratio": "PEG", "dividend_yield_pct": "Div. Yield %",
-                "roe_pct": "ROE %", "altman_z_score": "Altman Z", "volatility_ann_pct": "Vol %", "beta": "Beta", "argus_score": "Score"
-            }),
-            use_container_width=True,
-            hide_index=True
+        df_wl_show = df_wl[[
+            "ticker", "name", "sector", "last_price", "upside_pct", "trailing_pe", "peg_ratio",
+            "dividend_yield_pct", "roe_pct", "altman_z_score", "volatility_ann_pct", "beta", "argus_score"
+        ]].rename(columns={
+            "ticker": "Ticker", "name": "Nome", "sector": "Settore", "last_price": "Prezzo",
+            "upside_pct": "Upside %", "trailing_pe": "P/E", "peg_ratio": "PEG", "dividend_yield_pct": "Div. Yield %",
+            "roe_pct": "ROE %", "altman_z_score": "Altman Z", "volatility_ann_pct": "Vol %", "beta": "Beta", "argus_score": "Score"
+        })
+
+        render_table_with_export(
+            df_wl_show,
+            table_title=f"📋 Watchlist Titoli Monitorati ({len(df_wl)} asset)",
+            file_prefix="ARGUS_Watchlist_Screener",
+            key_suffix="scr_wl",
         )
-
-        st.divider()
-
-        # Esportazione universale Watchlist
-        col_exp_w1, col_exp_w2 = st.columns([3.2, 1.0])
-        with col_exp_w1:
-            st.markdown(f"<div style='font-size: 14px; color: #8b949e;'><b>Esporta Watchlist:</b> {len(df_wl)} titoli monitorati attivamente.</div>", unsafe_allow_html=True)
-        with col_exp_w2:
-            render_export_toolbar(df_wl, file_prefix="ARGUS_Watchlist_Screener", key_suffix="scr_wl", table_title="Watchlist Screener")
 
     else:
         st.info("Nessun titolo attualmente salvato nella Watchlist. Vai al Tab 1 (Screener) e seleziona i titoli preferiti per aggiungerli qui.")

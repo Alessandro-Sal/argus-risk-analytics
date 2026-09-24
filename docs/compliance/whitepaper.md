@@ -101,6 +101,8 @@ This provides institutional stakeholders (auditors, risk committees, custodians)
 
 ## 6. Governance & Regulatory Compliance Mapping
 
+- **Basel IV / FRTB (Fundamental Review of the Trading Book)**: Standardized 250-day backtesting with Kupiec POF, Christoffersen independence, and conditional coverage tests; dynamic regulatory capital multipliers (3.00x–4.00x) and Peaks-Over-Threshold Extreme Value Theory (EVT POT-GPD) for 99.0% and 99.9% tail risk.
+- **EBA Adverse 2026 & Fed CCAR**: Full balance sheet macroeconomic stress testing connecting liquid financial assets, real estate, pension capital, and illiquid wealth with fixed liabilities.
 - **MiFID II (RTS 28 / Best Execution)**: Comprehensive tracking of slippage and execution performance vs benchmark (TWAP/VWAP).
 - **AIFMD / UCITS**: Formal multi-factor stress testing (MSCI Barra, custom macro shocks) and liquidity-adjusted VaR (L-VaR).
-- **GIPS (Global Investment Performance Standards)**: Exact point-in-time portfolio reconstruction without look-ahead bias or survivorship distortion.
+- **GIPS (Global Investment Performance Standards)**: Exact point-in-time portfolio reconstruction without look-ahead bias, true daily Time-Weighted Return (TWR Modified Dietz) and Money-Weighted Return (MWR / IRR).

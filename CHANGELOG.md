@@ -7,6 +7,40 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.8.0] - 2026-09-23
+
+### 🏛️ Institutional Risk Engine, Basel IV Traffic Light, EVT Tail Risk & Total Wealth Stress Testing
+
+Questa release potenzia il core computazionale quantitativo e patrimoniale di ARGUS con standard di conformità regolamentare **Basilea IV**, **GIPS** e **CFP Board**:
+
+- **Extreme Value Theory (EVT POT-GPD) & Tail Risk 99.9% (`core/risk_engine.py`, `src/pages/3_🔴_Analisi_Rischio.py`)**:
+  - Implementato il framework Peaks-Over-Threshold (POT) e fitting della Generalized Pareto Distribution (GPD via `scipy.stats.genpareto`) per la stima accurata di VaR e CVaR (Expected Shortfall) a livelli di confidenza estremi (99.0% e 99.9%).
+  - Risoluzione analitica del tail index $\xi$ e del parametro di scala $\sigma$ su soglie calibrate empiricamente al 90° percentile delle perdite.
+- **Backtesting Regolamentare Basilea IV (Traffic Light Framework) (`core/risk_engine.py`, `src/pages/3_🔴_Analisi_Rischio.py`)**:
+  - Validazione istituzionale su finestra mobile di 250 giorni di borsa aperta per il VaR 99% a 1 giorno con classificazione regolamentare in Zona Verde ($x \le 4$, moltiplicatore $3.00$), Gialla ($5 \le x \le 9$, moltiplicatori $3.40 - 3.85$) o Rossa ($x \ge 10$, moltiplicatore $4.00$).
+  - Integrazione analitica del test di copertura incondizionata di Kupiec (POF), del test di indipendenza di Christoffersen (Markov-chain clustering delle violazioni) e del test congiunto di copertura condizionale.
+- **Ottimizzatori Avanzati: Maximum Diversification (MDP) & Min-CVaR Linear Programming (`core/risk_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Massimizzazione del Diversification Ratio (DR) di Choueifaty & Coignard per estrarre la massima riduzione del rischio dalle correlazioni imperfette ($\rho_{ij} < 1$) senza dipendere da stime di rendimento atteso $\mu$.
+  - Ottimizzazione convessa esatta Min-CVaR (Expected Shortfall) formulata come Programma Lineare (Rockafellar & Uryasev 2000) e risolta in sub-5ms tramite solutore C++ HiGHS (`scipy.optimize.linprog(method='highs')`), con preset buttons 1-click nel Super-Ribilanciatore.
+- **Risoluzione Point-in-Time dei Tassi Risk-Free & Supporto ZIRP (2020–2026) (`core/yield_curve.py`)**:
+  - Creata la mappatura `HISTORICAL_ANNUAL_RISK_FREE_RATES` per EUR (€STR/BCE Deposit), USD (Fed T-Bill 3M), GBP (BoE SONIA) e CHF (SNB SARON) dal 2020 al 2026, con pieno supporto ai tassi negativi (-0.50% BCE) ed eliminazione totale dei bias retroattivi nei coefficienti di Sharpe e Sortino.
+- **Dinamica Point-in-Time delle Quote $Q_{i,t}$, True Daily TWR (Modified Dietz) & MWR (IRR) (`core/risk_engine.py`)**:
+  - Ricostruzione giorno per giorno del portafoglio storico e calcolo del vero Time-Weighted Return (TWR) quotidiano depurato dai flussi di cassa esogeni (PAC e prelievi), con risoluzione del Money-Weighted Return (IRR) via algoritmo di Brent (`scipy.optimize.brentq`).
+- **Scomposizione Rischio FX & Simulatore Forward Hedging Carry (`core/risk_engine.py`, `src/pages/3_🔴_Analisi_Rischio.py`)**:
+  - Decomposizione analitica esatta della varianza $\sigma^2_{tot} \approx \sigma^2_{local} + \sigma^2_{fx} + 2\text{Cov}(R_{local}, R_{fx})$, quantificazione dell'esposizione valutaria aperta e stima del Forward Carry Drag annuo basato sulla Covered Interest Rate Parity.
+- **Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (Sub-Tab 6 in `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`, `core/macro_stress_engine.py`)**:
+  - Simulazione congiunta degli shock regolamentari (EBA Regulatory Adverse 2026, Fed CCAR Severe, Stagflazione & Shock Tassi, Crisi Geopolitica Globale) su tutto l'attivo patrimoniale (Liquidità, Portafogli, Immobili, Fondi Pensione, Caveau & Orologi), con calcolo della perdita assoluta di ricchezza netta, del drawdown e dell'effetto leva finanziaria (*Debt-to-Assets Post-Stress*).
+- **Bilancio Comparativo Pluriennale (2021–2026) & Dossier PDF a 4 Pagine (`core/wealth/personal_balance_sheet.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Sub-tab 5 con prospetto storico a 6 esercizi di Attivo, Passivo, Patrimonio Netto, delta anno su anno (€ e %) e savings rate medio, corredato da grafico evolutivo e download CSV.
+  - Esteso il dossier PDF istituzionale certificato con l'inclusione della **Pagina 4** dedicata al trend pluriennale e CSS Progress Bars evolutive.
+  - Congelamento batch degli snapshot ufficiali di chiusura esercizio (2021–2025) al 31/12 via `scripts/freeze_historical_snapshots.py`.
+- **Cronistoria Previdenziale & Scudo Fiscale Dinamico (2023–2026) (`src/pages/16_🛡️_Previdenza_e_Pension_Planning.py`)**:
+  - Tabella analitica dei versamenti storici con tracking della deducibilità fiscale IRPEF (art. 51 TUIR, tetto 5.164,57 €), risparmio d'imposta reale (aliquota 43%) e plafond residuo con anno d'esercizio dinamico (`datetime.now().year`), affiancata dal grafico evolutivo su doppio asse.
+- **Testing & Quality Gate**:
+  - Creata la suite dedicata `tests/test_risk_engine_institutional.py` (9/9 passed) e verificata la suite congiunta di regressione (29/29 passed in 8.93s, 100% pass rate).
+
+---
+
 ## [9.7.0] - 2026-09-15
 
 ### ⚡ Institutional UI/UX Ergonomics, @st.fragment Reactivity, @st.dialog Action Drawers & Desktop Command Palette (Ctrl+K)

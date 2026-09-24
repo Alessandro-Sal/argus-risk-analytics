@@ -115,6 +115,27 @@ def _get_cache_connection() -> sqlite3.Connection:
     return conn
 
 
+def _normalize_history_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Garantisce che il DataFrame storico abbia indice DatetimeIndex tz-naive e normalizzato a livello giornaliero."""
+    if df is None or df.empty:
+        return df
+    if hasattr(df.index, "tz") and df.index.tz is not None:
+        try:
+            df.index = df.index.tz_localize(None)
+        except Exception:
+            try:
+                df.index = df.index.tz_convert(None)
+            except Exception:
+                pass
+    try:
+        df.index = df.index.normalize()
+    except Exception:
+        pass
+    if getattr(df.index, "has_duplicates", False):
+        df = df[~df.index.duplicated(keep="last")]
+    return df
+
+
 def get_cached_ticker_history(
     ticker: str,
     start_date: Optional[str] = None,
@@ -137,7 +158,7 @@ def get_cached_ticker_history(
     if not force_refresh and cache_key in _L1_CACHE:
         timestamp, df_cached = _L1_CACHE[cache_key]
         if (now - timestamp) < ttl_seconds and isinstance(df_cached, pd.DataFrame) and not df_cached.empty:
-            return df_cached.copy()
+            return _normalize_history_df(df_cached.copy())
 
     # 2. Tier 2: L2 SQLite Cache su Disco
     conn = _get_cache_connection()
@@ -150,6 +171,7 @@ def get_cached_ticker_history(
             if (now - cached_at) < row_ttl:
                 df_disk = _binary_payload_to_df(payload_data)
                 if not df_disk.empty:
+                    df_disk = _normalize_history_df(df_disk)
                     _L1_CACHE[cache_key] = (cached_at, df_disk)
                     return df_disk.copy()
     except Exception:
@@ -159,6 +181,7 @@ def get_cached_ticker_history(
     df_downloaded = _fetch_yfinance_history_safe(clean_ticker, start_date, end_date)
 
     if df_downloaded is not None and not df_downloaded.empty:
+        df_downloaded = _normalize_history_df(df_downloaded)
         # Salva in L1 e L2
         _L1_CACHE[cache_key] = (now, df_downloaded)
         try:
@@ -184,7 +207,7 @@ def get_cached_ticker_history(
         if row:
             df_fallback = _binary_payload_to_df(row[0])
             if not df_fallback.empty:
-                return df_fallback.copy()
+                return _normalize_history_df(df_fallback.copy())
     except Exception:
         pass
 

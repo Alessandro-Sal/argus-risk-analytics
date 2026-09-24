@@ -582,18 +582,18 @@ if active_time_tab == "📈 Curva Cumulata & Drawdown Underwater":
 elif active_time_tab == "🗓️ Matrice Rendimenti Mensili & Annuali":
     matrix_instrument_options = ["🏛️ Portafoglio Completo", "🎯 Benchmark (SPY)"] + [f"🔹 {t}" for t in active_tickers]
     
-    col_hm1, col_hm2 = st.columns([2.5, 2.5])
+    col_hm1, col_hm2 = st.columns([1.6, 2.4])
     with col_hm1:
         selected_matrix_inst = st.selectbox(
-            "🔍 Scegli quale strumento analizzare nella Matrice Mensile:",
+            "🔍 Strumento da analizzare:",
             options=matrix_instrument_options,
             index=0,
             help="Puoi visualizzare la tavola periodica dei rendimenti dell'intero portafoglio oppure di qualsiasi singolo titolo azionario o crypto."
         )
     with col_hm2:
-        st.markdown(r"""
-        <div style="padding-top: 25px; font-size: 12.5px; color: #8b949e;">
-            💡 <i>I rendimenti mensili sono calcolati con capitalizzazione geometrica continua \(\prod (1 + r_t) - 1\).</i>
+        st.markdown("""
+        <div style="padding-top: 28px; font-size: 12.5px; color: #8b949e; white-space: nowrap;">
+            💡 <i>Rendimenti a capitalizzazione geometrica: <b style="color: #c9d1d9;">&prod;(1 + r<sub>t</sub>) &minus; 1</b>.</i>
         </div>
         """, unsafe_allow_html=True)
 

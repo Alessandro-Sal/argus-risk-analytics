@@ -183,7 +183,7 @@ if not df_plans.empty:
             </div>
             <div style="background:rgba(0,0,0,0.25); border-radius:8px; padding:12px 16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                    <span style="font-size:12px; color:#c9d1d9; font-weight:600;">Deducibilità IRPEF Utilizzata nel 2026: <b style="color:#ffffff;">{fmt_eur(annual_ded)} / {fmt_eur(MAX_TAX_DEDUCTION)}</b> ({tax_shield_used_pct:.1f}%)</span>
+                    <span style="font-size:12px; color:#c9d1d9; font-weight:600;">Deducibilità IRPEF Utilizzata (Esercizio {datetime.now().year}): <b style="color:#ffffff;">{fmt_eur(annual_ded)} / {fmt_eur(MAX_TAX_DEDUCTION)}</b> ({tax_shield_used_pct:.1f}%)</span>
                     <span style="font-size:11.5px; color:#34d399;">Risparmio Fiscale Immediato: <b>{fmt_eur(annual_ded * 0.43)}</b></span>
                 </div>
                 <div style="background:rgba(255,255,255,0.08); border-radius:4px; height:8px; overflow:hidden; margin-bottom:8px;">
@@ -195,6 +195,72 @@ if not df_plans.empty:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+        yearly_json = p.get("yearly_data_json")
+        if yearly_json:
+            import json
+            try:
+                yd = json.loads(yearly_json) if isinstance(yearly_json, str) else yearly_json
+                hist_rows = []
+                for yr_k, yr_info in sorted(yd.items()):
+                    tot_y = yr_info.get("tot_year", 0.0) or 0.0
+                    if tot_y > 0 or yr_k in ["2023", "2024", "2025", "2026"]:
+                        tot_cum = yr_info.get("tot_cumulato", 0.0) or 0.0
+                        tax_ded = min(tot_y, MAX_TAX_DEDUCTION)
+                        tax_sav = tax_ded * 0.43
+                        plaf_res = max(0.0, MAX_TAX_DEDUCTION - tax_ded)
+                        hist_rows.append({
+                            "Esercizio": yr_k,
+                            "Versamenti Annui (€)": fmt_eur(tot_y),
+                            "Cumulato Versato (€)": fmt_eur(tot_cum),
+                            "Deducibilità Fiscale (€)": fmt_eur(tax_ded),
+                            "Risparmio IRPEF 43% (€)": fmt_eur(tax_sav),
+                            "Plafond Residuo (€)": fmt_eur(plaf_res),
+                            "_raw_y": tot_y,
+                            "_raw_cum": tot_cum,
+                            "_year": yr_k
+                        })
+
+                if hist_rows:
+                    st.markdown(f"###### 📊 Cronistoria Versamenti & Ottimizzazione Fiscale ({hist_rows[0]['_year']} - {hist_rows[-1]['_year']})")
+                    df_h = pd.DataFrame(hist_rows)
+                    st.dataframe(
+                        df_h[["Esercizio", "Versamenti Annui (€)", "Cumulato Versato (€)", "Deducibilità Fiscale (€)", "Risparmio IRPEF 43% (€)", "Plafond Residuo (€)"]],
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+                    fig_prev = go.Figure()
+                    fig_prev.add_trace(go.Bar(
+                        x=[r["_year"] for r in hist_rows],
+                        y=[r["_raw_y"] for r in hist_rows],
+                        name="Versamento Annuo",
+                        marker_color="#3b82f6",
+                        text=[fmt_eur(r["_raw_y"]) for r in hist_rows],
+                        textposition="auto"
+                    ))
+                    fig_prev.add_trace(go.Scatter(
+                        x=[r["_year"] for r in hist_rows],
+                        y=[r["_raw_cum"] for r in hist_rows],
+                        name="Montante Cumulato",
+                        mode="lines+markers+text",
+                        line=dict(color="#10b981", width=3),
+                        marker=dict(size=8, color="#10b981"),
+                        text=[fmt_eur(r["_raw_cum"]) for r in hist_rows],
+                        textposition="top center",
+                        yaxis="y2"
+                    ))
+                    fig_prev.update_layout(
+                        height=280,
+                        margin=dict(l=30, r=30, t=30, b=20),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        yaxis=dict(title="Versamento Annuo (€)"),
+                        yaxis2=dict(title="Cumulato (€)", overlaying="y", side="right")
+                    )
+                    apply_plotly_theme(fig_prev)
+                    st.plotly_chart(fig_prev, use_container_width=True)
+            except Exception:
+                pass
 else:
     st.info("Nessun fondo pensione registrato. Registra il tuo fondo dal modulo sottostante.")
 

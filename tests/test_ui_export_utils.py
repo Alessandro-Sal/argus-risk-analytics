@@ -71,6 +71,19 @@ def test_prepare_dataframe_complex_nested_types():
     assert "mainnet" in clean["Metadata"].iloc[0]
 
 
+def test_prepare_dataframe_duplicated_columns():
+    # DataFrame con colonne duplicate (es. 'Valore', 'Valore')
+    df = pd.DataFrame([[100.0, "Tech", 120.0]], columns=["Valore", "Settore", "Valore"])
+    clean = prepare_dataframe_for_export(df)
+    assert clean.columns.tolist() == ["Valore", "Settore", "Valore_1"]
+    
+    # Verifica che to_excel_bytes e to_csv_bytes non sollevino AttributeError
+    xl = to_excel_bytes(df, sheet_name="Dati")
+    assert len(xl) > 0
+    csv = to_csv_bytes(df)
+    assert len(csv) > 0
+
+
 # ==============================================================================
 # 2. TEST GENERATORE NOMI FILE DINAMICO
 # ==============================================================================

@@ -138,6 +138,38 @@ def test_compute_dcf_monte_carlo_valuation():
     assert 0 <= res["prob_undervalued_pct"] <= 100
 
 
+def test_fetch_dcf_initial_inputs():
+    from core.financial_analysis import fetch_dcf_initial_inputs
+
+    # Case 1: Mocked yfinance returns currency
+    with patch("yfinance.Ticker") as mock_ticker:
+        mock_instance = MagicMock()
+        mock_instance.info = {
+            "currentPrice": 342.87,
+            "freeCashflow": 73266000000.0,
+            "impliedSharesOutstanding": 12229930000.0,
+            "totalCash": 242474000000.0,
+            "totalDebt": 120791000000.0,
+            "currency": "USD",
+        }
+        mock_instance.fast_info = None
+        mock_instance.cashflow = None
+        mock_ticker.return_value = mock_instance
+
+        inputs = fetch_dcf_initial_inputs("GOOGL")
+        assert inputs["price"] == 342.87
+        assert inputs["currency"] == "USD"
+        assert inputs["fcf_m"] == 73266.0
+        assert inputs["shares_m"] == 12229.93
+
+    # Case 2: Suffix-based fallback currency (e.g. .MI -> EUR)
+    with patch("yfinance.Ticker") as mock_ticker:
+        mock_ticker.side_effect = Exception("Network error")
+        eur_inputs = fetch_dcf_initial_inputs("ENEL.MI", fallback_price=6.50)
+        assert eur_inputs["currency"] == "EUR"
+        assert eur_inputs["price"] == 6.50
+
+
 def test_piotroski_wacc_multiples():
     from core.financial_analysis import (
         compute_piotroski_f_score,

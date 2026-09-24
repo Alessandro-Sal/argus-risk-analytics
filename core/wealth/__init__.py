@@ -63,7 +63,9 @@ from core.wealth.wealth_engine import (
     compute_fiscal_analytics,
     compute_mortgage_amortization,
     compute_multi_currency_fx_hedging_engine,
+    compute_multi_year_balance_comparison,
     compute_personal_balance_sheet,
+
     compute_private_equity_deal_metrics,
     compute_real_estate_net_equity_and_ltv,
     compute_real_estate_roi,

@@ -5,6 +5,7 @@ Implements Policy Gradient / Deep Q-inspired continuous-action policy optimizati
 trained to maximize Sortino / Sharpe utility with adaptive regime switching and transaction penalty.
 """
 
+from collections import deque
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -17,6 +18,7 @@ class PortfolioEnv:
     Observation State: [Asset Sharpe, Momentum, Downside Volatility] per asset.
     Action: Simplex portfolio weight allocation w in Delta^{N-1}
     Reward: Risk-adjusted Sortino/Sharpe utility minus turnover friction with diversification incentive.
+    Supports periodic rebalancing with asset price drift between rebalance dates.
     """
 
     def __init__(
@@ -25,6 +27,7 @@ class PortfolioEnv:
         window_size: int = 25,
         reward_type: str = "sortino",
         turnover_penalty: float = 0.0003,
+        rebalance_days: int = 21,
     ):
         self.df_returns = df_returns.dropna().copy()
         self.tickers = self.df_returns.columns.tolist()
@@ -32,75 +35,123 @@ class PortfolioEnv:
         self.window_size = max(10, window_size)
         self.reward_type = reward_type.lower()
         self.turnover_penalty = turnover_penalty
+        self.rebalance_days = max(1, int(rebalance_days))
+        self.rets_arr = self.df_returns.values
+        self.T, self.N = self.rets_arr.shape
+        self.max_steps = self.T - 1
         self.current_step = 0
-        self.max_steps = len(self.df_returns) - 1
-        self.prev_weights = np.ones(self.n_assets) / self.n_assets
+        self.current_weights = np.ones(self.n_assets) / self.n_assets
+        self.recent_returns: deque = deque(maxlen=self.window_size)
+
+        # Vectorized precomputation of rolling features across all time steps
+        df = pd.DataFrame(self.rets_arr)
+        means = df.rolling(self.window_size).mean().values * 100.0
+        vols = df.rolling(self.window_size).std().values * 100.0 + 1e-4
+        sharpes = means / vols
+        ema_fast = df.rolling(5).mean().values * 100.0
+        mom = (ema_fast - means) / (vols + 1e-4)
+
+        def zscore_ax1(mat: np.ndarray) -> np.ndarray:
+            m = np.mean(mat, axis=1, keepdims=True)
+            s = np.std(mat, axis=1, keepdims=True)
+            return np.where(s > 1e-6, (mat - m) / (s + 1e-6), 0.0)
+
+        f_sh = zscore_ax1(sharpes)
+        f_mo = zscore_ax1(mom)
+        f_vo = zscore_ax1(vols)
+        self.all_states = np.clip(
+            np.stack([f_sh, f_mo, f_vo], axis=2).reshape(self.T, self.N * 3),
+            -3.0,
+            3.0,
+        )
+
+    @property
+    def prev_weights(self) -> np.ndarray:
+        return self.current_weights
+
+    @prev_weights.setter
+    def prev_weights(self, w: np.ndarray):
+        self.current_weights = w
 
     def reset(self) -> np.ndarray:
         self.current_step = self.window_size
-        self.prev_weights = np.ones(self.n_assets) / self.n_assets
-        return self._get_state()
+        self.current_weights = np.ones(self.n_assets) / self.n_assets
+        self.recent_returns.clear()
+        for idx in range(self.window_size):
+            r_seed = float(np.dot(self.current_weights, self.rets_arr[idx]))
+            self.recent_returns.append(r_seed)
+        return self.all_states[self.current_step]
 
     def _get_state(self) -> np.ndarray:
-        window_data = self.df_returns.iloc[self.current_step - self.window_size : self.current_step].values
-        means = np.mean(window_data, axis=0) * 100.0
-        vols = np.std(window_data, axis=0) * 100.0 + 1e-4
-        sharpes = means / vols
-
-        # Multi-timeframe momentum
-        ema_fast = np.mean(window_data[-5:], axis=0) * 100.0
-        ema_slow = np.mean(window_data, axis=0) * 100.0
-        mom = (ema_fast - ema_slow) / (vols + 1e-4)
-
-        # Cross-sectional z-score standardization across universe
-        def _zscore(v: np.ndarray) -> np.ndarray:
-            s = np.std(v)
-            return (v - np.mean(v)) / (s + 1e-6) if s > 1e-6 else np.zeros_like(v)
-
-        f_sharpe = _zscore(sharpes)
-        f_mom = _zscore(mom)
-        f_vol = _zscore(vols)
-
-        # Matrix of features per asset (N, 3) flattened to (N * 3,)
-        feat_matrix = np.column_stack([f_sharpe, f_mom, f_vol])
-        return np.clip(feat_matrix.flatten(), -3.0, 3.0)
+        if self.current_step < self.max_steps:
+            return self.all_states[self.current_step]
+        return np.zeros(self.n_assets * 3)
 
     def step(self, action_weights: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
-        # Ensure weights are valid simplex on Delta^{N-1}
-        w = np.maximum(0.001, action_weights)
-        if np.sum(w) > 0:
-            w = w / np.sum(w)
+        w_target = np.maximum(0.001, action_weights)
+        s = np.sum(w_target)
+        if s > 0:
+            w_target = w_target / s
         else:
-            w = np.ones(self.n_assets) / self.n_assets
+            w_target = np.ones(self.n_assets) / self.n_assets
 
-        step_returns = self.df_returns.iloc[self.current_step].values
-        portfolio_ret = float(np.dot(w, step_returns))
+        # Check if today is a scheduled rebalance day
+        is_rebal_day = ((self.current_step - self.window_size) % self.rebalance_days == 0)
 
-        # Turnover friction
-        turnover = float(np.sum(np.abs(w - self.prev_weights)))
-        cost = turnover * self.turnover_penalty
+        if is_rebal_day:
+            turnover = float(np.sum(np.abs(w_target - self.current_weights)))
+            cost = turnover * self.turnover_penalty
+            active_w = w_target
+        else:
+            turnover = 0.0
+            cost = 0.0
+            active_w = self.current_weights
+
+        step_returns = self.rets_arr[self.current_step]
+        portfolio_ret = float(np.dot(active_w, step_returns))
         net_ret = portfolio_ret - cost
 
-        # Diversification incentive (1 - HHI is maximized when balanced)
-        div_bonus = 1.0 - float(np.sum(w**2))
-
-        # Risk-adjusted reward calculation
-        if self.reward_type == "sortino":
-            downside = max(0.0, -net_ret)
-            reward = net_ret * 100.0 - 2.0 * (downside * 100.0) - cost * 30.0 + 0.15 * div_bonus
-        elif self.reward_type == "sharpe":
-            vol_est = float(np.std(step_returns)) + 1e-4
-            reward = (net_ret / vol_est) * 5.0 - cost * 30.0 + 0.10 * div_bonus
+        # Drift portfolio weights according to asset returns until the next rebalance
+        denom = 1.0 + portfolio_ret
+        if denom > 1e-6:
+            self.current_weights = (active_w * (1.0 + step_returns)) / denom
+            self.current_weights = np.maximum(0.001, self.current_weights)
+            self.current_weights /= np.sum(self.current_weights)
         else:
-            # Min volatility
-            reward = net_ret * 50.0 - 2.0 * (portfolio_ret**2) * 100.0 - cost * 30.0 + 0.20 * div_bonus
+            self.current_weights = np.ones(self.n_assets) / self.n_assets
 
-        self.prev_weights = w.copy()
+        self.recent_returns.append(net_ret)
+
+        # Rolling risk metrics over recent history (temporal volatility, downside deviation)
+        window_rets = list(self.recent_returns)
+        roll_vol = float(np.std(window_rets)) * np.sqrt(252.0) + 1e-4
+        downside_arr = [min(0.0, r) for r in window_rets]
+        downside_dev = float(np.std(downside_arr)) * np.sqrt(252.0) + 1e-4
+        div_bonus = 1.0 - float(np.sum(active_w ** 2))
+
+        # Annualized excess return over risk-free rate (assume ~2.75%)
+        ann_excess = net_ret * 252.0 - 0.0275
+
+        if self.reward_type == "sortino":
+            reward = (ann_excess / downside_dev) * 0.05 - (cost * 252.0) * 0.5 + 0.02 * div_bonus
+        elif self.reward_type == "sharpe":
+            reward = (ann_excess / roll_vol) * 0.05 - (cost * 252.0) * 0.5 + 0.02 * div_bonus
+        else:
+            reward = (ann_excess * 0.05) - (roll_vol ** 2) * 0.2 - (cost * 252.0) * 0.5 + 0.02 * div_bonus
+
+        reward = float(np.clip(reward, -3.0, 3.0))
+
         self.current_step += 1
         done = self.current_step >= self.max_steps
-        next_state = self._get_state() if not done else np.zeros(self.n_assets * 3)
+        next_state = self.all_states[self.current_step] if not done else np.zeros(self.n_assets * 3)
 
-        info = {"net_return": net_ret, "raw_return": portfolio_ret, "turnover": turnover, "weights": w.copy()}
+        info = {
+            "net_return": net_ret,
+            "raw_return": portfolio_ret,
+            "turnover": turnover,
+            "weights": active_w.copy(),
+            "is_rebalance": is_rebal_day,
+        }
         return next_state, reward, done, info
 
 
@@ -226,12 +277,13 @@ def train_and_evaluate_rl_portfolio(
     window_size: int = 25,
     reward_type: str = "sortino",
     turnover_penalty: float = 0.0003,
+    rebalance_days: int = 21,
     random_seed: int = 42,
 ) -> Dict[str, Any]:
     """
     Trains the Reinforcement Learning agent across historical episodes,
     evaluates out-of-sample portfolio trajectories, and compares performance against
-    Equal-Weight (1/N) and Benchmark strategies.
+    Equal-Weight (1/N) and Benchmark strategies under identical rebalancing frequency.
     """
     if df_returns.empty or len(df_returns) < 60:
         return {
@@ -248,22 +300,30 @@ def train_and_evaluate_rl_portfolio(
     state_dim = n_assets * 3
     action_dim = n_assets
 
-    env = PortfolioEnv(rets, window_size=window_size, reward_type=reward_type, turnover_penalty=turnover_penalty)
+    env = PortfolioEnv(
+        rets,
+        window_size=window_size,
+        reward_type=reward_type,
+        turnover_penalty=turnover_penalty,
+        rebalance_days=rebalance_days,
+    )
     agent = RLPolicyAgent(
         state_dim=state_dim, action_dim=action_dim, lr=0.025, entropy_coeff=0.02, random_seed=random_seed
     )
 
     learning_curve_data = []
+    batch_size = max(63, min(252, env.max_steps // 15))
 
     # ── TRAINING LOOP ──
     for ep in range(1, episodes + 1):
         state = env.reset()
         states_history, actions_history, rewards_history = [], [], []
         total_ep_reward = 0.0
+        n_steps_ep = 0
 
         while True:
             # Forward pass + exploration noise smoothly decaying with training progress
-            noise_scale = max(0.01, 0.08 * (1.0 - (ep / episodes)))
+            noise_scale = max(0.01, 0.06 * (1.0 - (ep / episodes)))
             raw_w = agent.forward(state)
             noisy_w = np.maximum(0.001, raw_w + np.random.normal(0, noise_scale, action_dim))
             action_w = noisy_w / np.sum(noisy_w)
@@ -274,18 +334,22 @@ def train_and_evaluate_rl_portfolio(
             actions_history.append(action_w)
             rewards_history.append(reward)
             total_ep_reward += reward
+            n_steps_ep += 1
+
+            # Incremental mini-batch policy gradient update to prevent gradient dilution on multi-decade series
+            if len(rewards_history) >= batch_size or done:
+                agent.update(states_history, actions_history, rewards_history)
+                states_history, actions_history, rewards_history = [], [], []
 
             state = next_state
             if done:
                 break
 
-        # Batch policy gradient update
-        agent.update(states_history, actions_history, rewards_history)
         learning_curve_data.append(
             {
                 "episode": ep,
                 "cumulative_reward": round(total_ep_reward, 2),
-                "avg_reward_per_step": round(total_ep_reward / max(1, len(rewards_history)), 4),
+                "avg_reward_per_step": round(total_ep_reward / max(1, n_steps_ep), 4),
             }
         )
 
@@ -297,7 +361,8 @@ def train_and_evaluate_rl_portfolio(
     ew_returns = []
     weights_records = []
 
-    ew_weight = np.ones(n_assets) / n_assets
+    ew_target = np.ones(n_assets) / n_assets
+    ew_active = ew_target.copy()
 
     step_idx = 0
     while True:
@@ -306,9 +371,25 @@ def train_and_evaluate_rl_portfolio(
 
         rl_returns.append(info["net_return"])
 
-        # Benchmark 1/N
+        # Benchmark 1/N with identical periodic rebalance and drift
         step_rets = env.df_returns.iloc[env.current_step - 1].values
-        ew_returns.append(float(np.dot(ew_weight, step_rets)))
+        if info["is_rebalance"]:
+            ew_turnover = float(np.sum(np.abs(ew_target - ew_active)))
+            ew_cost = ew_turnover * turnover_penalty
+            ew_active = ew_target.copy()
+        else:
+            ew_cost = 0.0
+        ew_net = float(np.dot(ew_active, step_rets)) - ew_cost
+        ew_returns.append(ew_net)
+
+        # Drift EW weights
+        ew_denom = 1.0 + float(np.dot(ew_active, step_rets))
+        if ew_denom > 1e-6:
+            ew_active = (ew_active * (1.0 + step_rets)) / ew_denom
+            ew_active = np.maximum(0.001, ew_active)
+            ew_active /= np.sum(ew_active)
+        else:
+            ew_active = ew_target.copy()
 
         # Record weights
         w_dict = {tickers[i]: round(float(action_w[i]), 4) for i in range(n_assets)}
@@ -330,18 +411,27 @@ def train_and_evaluate_rl_portfolio(
 
     # Calculate Summary Performance Metrics
     def calc_stats(ret_series: np.ndarray) -> Dict[str, float]:
-        r_mean = float(np.mean(ret_series)) * 252.0 * 100.0
+        n_steps = len(ret_series)
+        cum_mult = float(np.prod(1.0 + ret_series))
+        cum_ret = (cum_mult - 1.0) * 100.0
+
+        # Geometric CAGR
+        if cum_mult > 0 and n_steps > 0:
+            cagr = float((cum_mult ** (252.0 / n_steps) - 1.0) * 100.0)
+        else:
+            cagr = -100.0
+
         r_vol = float(np.std(ret_series)) * np.sqrt(252.0) * 100.0
-        sharpe = (r_mean - 2.75) / max(0.01, r_vol)
+        sharpe = (cagr - 2.75) / max(0.01, r_vol)
         downside = float(np.std(np.minimum(0, ret_series))) * np.sqrt(252.0) * 100.0
-        sortino = (r_mean - 2.75) / max(0.01, downside)
-        cum_ret = float((np.prod(1.0 + ret_series) - 1.0) * 100.0)
+        sortino = (cagr - 2.75) / max(0.01, downside)
+
         # Max Drawdown
         peaks = np.maximum.accumulate(np.cumprod(1.0 + ret_series))
         dd = (np.cumprod(1.0 + ret_series) - peaks) / peaks
         max_dd = float(np.min(dd) * 100.0)
         return {
-            "cagr_pct": round(r_mean, 2),
+            "cagr_pct": round(cagr, 2),
             "volatility_pct": round(r_vol, 2),
             "sharpe_ratio": round(sharpe, 2),
             "sortino_ratio": round(sortino, 2),
@@ -357,6 +447,7 @@ def train_and_evaluate_rl_portfolio(
         "tickers": tickers,
         "n_assets": n_assets,
         "episodes_trained": episodes,
+        "rebalance_days": rebalance_days,
         "learning_curve": pd.DataFrame(learning_curve_data),
         "backtest_df": df_backtest,
         "weights_history": pd.DataFrame(weights_records),
@@ -364,4 +455,5 @@ def train_and_evaluate_rl_portfolio(
         "ew_stats": ew_stats,
         "final_weights": {tickers[i]: round(float(agent.forward(state)[i]), 4) for i in range(n_assets)},
         "alpha_over_ew_pct": round(rl_stats["total_return_pct"] - ew_stats["total_return_pct"], 2),
+        "alpha_cagr_pct": round(rl_stats["cagr_pct"] - ew_stats["cagr_pct"], 2),
     }

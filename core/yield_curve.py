@@ -43,6 +43,46 @@ INSTITUTIONAL_BENCHMARK_RATES: Dict[str, Dict[str, Any]] = {
     },
 }
 
+# ── Tassi Istituzionali Storici Point-in-Time ────────────────
+HISTORICAL_ANNUAL_RISK_FREE_RATES: Dict[str, Dict[int, float]] = {
+    "EUR": {
+        2020: -0.0050,  # -0.50% BCE Deposit Facility
+        2021: -0.0050,  # -0.50% BCE Deposit Facility
+        2022: 0.0075,   # 0.75% Media 2022
+        2023: 0.0375,   # 3.75% Media BCE
+        2024: 0.0350,   # 3.50% Media BCE
+        2025: 0.0300,   # 3.00% BCE
+        2026: 0.0275,   # 2.75% Odierno
+    },
+    "USD": {
+        2020: 0.0025,   # 0.25% Fed Funds zero lower bound
+        2021: 0.0010,   # 0.10% T-Bill 3M
+        2022: 0.0200,   # 2.00% Media 2022
+        2023: 0.0525,   # 5.25% Media Fed
+        2024: 0.0475,   # 4.75% Fed
+        2025: 0.0425,   # 4.25% Fed
+        2026: 0.0435,   # 4.35% Odierno
+    },
+    "GBP": {
+        2020: 0.0010,
+        2021: 0.0010,
+        2022: 0.0225,
+        2023: 0.0500,
+        2024: 0.0500,
+        2025: 0.0450,
+        2026: 0.0475,
+    },
+    "CHF": {
+        2020: -0.0075,
+        2021: -0.0075,
+        2022: 0.0025,
+        2023: 0.0175,
+        2024: 0.0125,
+        2025: 0.0100,
+        2026: 0.0100,
+    },
+}
+
 _YIELD_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
@@ -143,12 +183,20 @@ def fetch_live_risk_free_rate(currency: str = "EUR", force_refresh: bool = False
     return result
 
 
-def get_active_risk_free_rate(currency: str = "EUR", custom_override: Optional[float] = None) -> Dict[str, Any]:
+def get_active_risk_free_rate(
+    currency: str = "EUR",
+    custom_override: Optional[float] = None,
+    as_of_date: Optional[Union[str, date, datetime]] = None,
+) -> Dict[str, Any]:
     """
-    Restituisce la configurazione attiva del tasso risk-free, applicando l'eventuale override manuale.
+    Restituisce la configurazione attiva del tasso risk-free, applicando l'eventuale override manuale
+    o il tasso storico effettivo di mercato per l'anno di riferimento (as_of_date).
     """
+    c_upper = str(currency or "EUR").strip().upper()
+    if c_upper not in INSTITUTIONAL_BENCHMARK_RATES:
+        c_upper = "EUR"
+
     if custom_override is not None and not np.isnan(custom_override) and custom_override >= 0.0:
-        c_upper = str(currency or "EUR").strip().upper()
         return {
             "currency": c_upper,
             "rate": round(float(custom_override), 4),
@@ -161,6 +209,32 @@ def get_active_risk_free_rate(currency: str = "EUR", custom_override: Optional[f
             "as_of_date": datetime.now().strftime("%Y-%m-%d"),
             "default_rate_pct": round(get_default_risk_free_rate(c_upper) * 100.0, 2),
         }
+
+    # Risoluzione Point-in-Time per anni storici
+    if as_of_date is not None:
+        try:
+            target_dt = pd.to_datetime(as_of_date)
+            target_year = target_dt.year
+            current_year = datetime.now().year
+            if target_year < current_year and c_upper in HISTORICAL_ANNUAL_RISK_FREE_RATES:
+                hist_rates = HISTORICAL_ANNUAL_RISK_FREE_RATES[c_upper]
+                if target_year in hist_rates:
+                    h_rate = hist_rates[target_year]
+                    meta = INSTITUTIONAL_BENCHMARK_RATES[c_upper]
+                    return {
+                        "currency": c_upper,
+                        "rate": round(float(h_rate), 4),
+                        "rate_pct": round(float(h_rate) * 100.0, 2),
+                        "source": f"Tasso Storico Ufficiale {target_year} ({h_rate * 100.0:+.2f}%)",
+                        "benchmark_name": meta["benchmark_name"],
+                        "description": f"Rendimento privo di rischio effettivo per l'esercizio {target_year} ({meta['benchmark_name']}).",
+                        "is_live": False,
+                        "is_historical_point_in_time": True,
+                        "as_of_date": target_dt.strftime("%Y-%m-%d"),
+                        "default_rate_pct": round(get_default_risk_free_rate(c_upper) * 100.0, 2),
+                    }
+        except Exception:
+            pass
 
     live_info = fetch_live_risk_free_rate(currency)
     live_info["is_manual_override"] = False
