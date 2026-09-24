@@ -2787,74 +2787,142 @@ def compute_black_litterman_optimization(
 
 def compute_fama_french_exposures(sr_portfolio: pd.Series) -> dict:
     """
-    Stima le esposizioni ai 3 fattori Fama-French (Market, Size SMB, Value HML)
-    tramite regressione dei rendimenti.
+    Stima le esposizioni ai 3 fattori Fama-French (Market Mkt-RF, Size SMB, Value HML)
+    tramite regressione multivariata OLS su serie Kenneth French o benchmark calibrati.
     """
-    if sr_portfolio.empty or len(sr_portfolio) < 10:
-        return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "r_squared": 0.0}
+    if sr_portfolio.empty or len(sr_portfolio.dropna()) < 10:
+        return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "r_squared": 0.0, "adj_r_squared": 0.0}
 
-    n = len(sr_portfolio)
-    np.random.seed(42)
-    mkt_rf = np.random.normal(0.0004, 0.01, n)
-    smb = np.random.normal(0.0001, 0.005, n)
-    hml = np.random.normal(0.0001, 0.005, n)
+    from core.factor_library import compute_fama_french_factor_model
 
-    X = np.column_stack([np.ones(n), mkt_rf, smb, hml])
-    y = sr_portfolio.fillna(0.0).values
+    res = compute_fama_french_factor_model(sr_portfolio, model_type="3_factor")
+    df_f = res.get("df_factors")
 
-    try:
-        beta, residuals, rank, s = np.linalg.lstsq(X, y, rcond=None)
-        y_pred = X @ beta
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
-        ss_res = np.sum((y - y_pred) ** 2)
-        r2 = max(0.0, 1.0 - (ss_res / (ss_tot + 1e-9)))
+    beta_mkt, beta_smb, beta_hml = 1.0, 0.0, 0.0
+    if df_f is not None and not df_f.empty and "factor" in df_f.columns:
+        mkt_row = df_f[df_f["factor"] == "Mkt-RF"]
+        if not mkt_row.empty:
+            beta_mkt = float(mkt_row["beta"].values[0])
+        smb_row = df_f[df_f["factor"] == "SMB"]
+        if not smb_row.empty:
+            beta_smb = float(smb_row["beta"].values[0])
+        hml_row = df_f[df_f["factor"] == "HML"]
+        if not hml_row.empty:
+            beta_hml = float(hml_row["beta"].values[0])
 
-        return {
-            "alpha": float(beta[0] * 252),
-            "beta_mkt": float(beta[1]),
-            "beta_smb": float(beta[2]),
-            "beta_hml": float(beta[3]),
-            "r_squared": float(r2),
-        }
-    except Exception:
-        return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "r_squared": 0.0}
+    return {
+        "alpha": float(res.get("alpha_annualized", 0.0)),
+        "beta_mkt": float(beta_mkt),
+        "beta_smb": float(beta_smb),
+        "beta_hml": float(beta_hml),
+        "r_squared": float(res.get("r_squared", 0.0)),
+        "adj_r_squared": float(res.get("adj_r_squared", 0.0)),
+        "alpha_t_stat": float(res.get("alpha_t_stat", 0.0)),
+        "alpha_p_value": float(res.get("alpha_p_value", 1.0)),
+        "alpha_is_significant": bool(res.get("alpha_is_significant", False)),
+        "systematic_risk_pct": float(res.get("systematic_risk_pct", 0.0)),
+        "specific_risk_pct": float(res.get("specific_risk_pct", 100.0)),
+        "df_factors": df_f,
+        "factor_attribution": res.get("factor_attribution", {}),
+        "rolling_betas": res.get("rolling_betas"),
+    }
 
 
 def compute_carhart_4factor_exposures(sr_portfolio: pd.Series) -> dict:
     """
-    Stima le esposizioni ai 4 fattori di Carhart (Market, Size SMB, Value HML, Momentum WML)
-    tramite regressione multivariata OLS.
+    Stima le esposizioni ai 4 fattori di Carhart (Market Mkt-RF, Size SMB, Value HML, Momentum MOM)
+    tramite regressione multivariata OLS su serie Kenneth French o benchmark calibrati.
     """
-    if sr_portfolio.empty or len(sr_portfolio) < 10:
+    if sr_portfolio.empty or len(sr_portfolio.dropna()) < 10:
         return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "beta_wml": 0.0, "r_squared": 0.0}
 
-    n = len(sr_portfolio)
-    np.random.seed(42)
-    mkt_rf = np.random.normal(0.0004, 0.01, n)
-    smb = np.random.normal(0.0001, 0.005, n)
-    hml = np.random.normal(0.0001, 0.005, n)
-    wml = np.random.normal(0.0002, 0.006, n)  # Momentum factor (Winners Minus Losers)
+    from core.factor_library import compute_fama_french_factor_model
 
-    X = np.column_stack([np.ones(n), mkt_rf, smb, hml, wml])
-    y = sr_portfolio.fillna(0.0).values
+    res = compute_fama_french_factor_model(sr_portfolio, model_type="4_factor")
+    df_f = res.get("df_factors")
 
-    try:
-        beta, residuals, rank, s = np.linalg.lstsq(X, y, rcond=None)
-        y_pred = X @ beta
-        ss_tot = np.sum((y - np.mean(y)) ** 2)
-        ss_res = np.sum((y - y_pred) ** 2)
-        r2 = max(0.0, 1.0 - (ss_res / (ss_tot + 1e-9)))
+    beta_mkt, beta_smb, beta_hml, beta_wml = 1.0, 0.0, 0.0, 0.0
+    if df_f is not None and not df_f.empty and "factor" in df_f.columns:
+        mkt_row = df_f[df_f["factor"] == "Mkt-RF"]
+        if not mkt_row.empty:
+            beta_mkt = float(mkt_row["beta"].values[0])
+        smb_row = df_f[df_f["factor"] == "SMB"]
+        if not smb_row.empty:
+            beta_smb = float(smb_row["beta"].values[0])
+        hml_row = df_f[df_f["factor"] == "HML"]
+        if not hml_row.empty:
+            beta_hml = float(hml_row["beta"].values[0])
+        mom_row = df_f[df_f["factor"] == "MOM"]
+        if not mom_row.empty:
+            beta_wml = float(mom_row["beta"].values[0])
 
+    return {
+        "alpha": float(res.get("alpha_annualized", 0.0)),
+        "beta_mkt": float(beta_mkt),
+        "beta_smb": float(beta_smb),
+        "beta_hml": float(beta_hml),
+        "beta_wml": float(beta_wml),
+        "r_squared": float(res.get("r_squared", 0.0)),
+        "adj_r_squared": float(res.get("adj_r_squared", 0.0)),
+        "alpha_t_stat": float(res.get("alpha_t_stat", 0.0)),
+        "alpha_p_value": float(res.get("alpha_p_value", 1.0)),
+        "alpha_is_significant": bool(res.get("alpha_is_significant", False)),
+        "systematic_risk_pct": float(res.get("systematic_risk_pct", 0.0)),
+        "specific_risk_pct": float(res.get("specific_risk_pct", 100.0)),
+        "df_factors": df_f,
+        "factor_attribution": res.get("factor_attribution", {}),
+        "rolling_betas": res.get("rolling_betas"),
+    }
+
+
+def compute_fama_french_5factor_exposures(sr_portfolio: pd.Series) -> dict:
+    """
+    Stima le esposizioni al modello completo Fama-French a 5 fattori + Momentum (2015):
+    Market (Mkt-RF), Size (SMB), Value (HML), Profitability (RMW), Investment (CMA), Momentum (MOM).
+    """
+    if sr_portfolio.empty or len(sr_portfolio.dropna()) < 10:
         return {
-            "alpha": float(beta[0] * 252),
-            "beta_mkt": float(beta[1]),
-            "beta_smb": float(beta[2]),
-            "beta_hml": float(beta[3]),
-            "beta_wml": float(beta[4]),
-            "r_squared": float(r2),
+            "alpha": 0.0,
+            "beta_mkt": 1.0,
+            "beta_smb": 0.0,
+            "beta_hml": 0.0,
+            "beta_rmw": 0.0,
+            "beta_cma": 0.0,
+            "beta_mom": 0.0,
+            "r_squared": 0.0,
         }
-    except Exception:
-        return {"alpha": 0.0, "beta_mkt": 1.0, "beta_smb": 0.0, "beta_hml": 0.0, "beta_wml": 0.0, "r_squared": 0.0}
+
+    from core.factor_library import compute_fama_french_factor_model
+
+    res = compute_fama_french_factor_model(sr_portfolio, model_type="5_factor_mom")
+    df_f = res.get("df_factors")
+
+    betas_map = {"Mkt-RF": 1.0, "SMB": 0.0, "HML": 0.0, "RMW": 0.0, "CMA": 0.0, "MOM": 0.0}
+    if df_f is not None and not df_f.empty and "factor" in df_f.columns:
+        for f in betas_map.keys():
+            row = df_f[df_f["factor"] == f]
+            if not row.empty:
+                betas_map[f] = float(row["beta"].values[0])
+
+    return {
+        "alpha": float(res.get("alpha_annualized", 0.0)),
+        "beta_mkt": float(betas_map["Mkt-RF"]),
+        "beta_smb": float(betas_map["SMB"]),
+        "beta_hml": float(betas_map["HML"]),
+        "beta_rmw": float(betas_map["RMW"]),
+        "beta_cma": float(betas_map["CMA"]),
+        "beta_mom": float(betas_map["MOM"]),
+        "r_squared": float(res.get("r_squared", 0.0)),
+        "adj_r_squared": float(res.get("adj_r_squared", 0.0)),
+        "alpha_t_stat": float(res.get("alpha_t_stat", 0.0)),
+        "alpha_p_value": float(res.get("alpha_p_value", 1.0)),
+        "alpha_is_significant": bool(res.get("alpha_is_significant", False)),
+        "systematic_risk_pct": float(res.get("systematic_risk_pct", 0.0)),
+        "specific_risk_pct": float(res.get("specific_risk_pct", 100.0)),
+        "df_factors": df_f,
+        "factor_attribution": res.get("factor_attribution", {}),
+        "rolling_betas": res.get("rolling_betas"),
+    }
 
 
 def compute_atr_chandelier_exits(
@@ -3686,6 +3754,191 @@ def compute_liquidity_adjusted_var(
         "liquidity_cost_amount": round(liquidity_cost, 2),
         "lvar_amount": round(lvar_amount, 2),
         "lvar_premium_pct": round(lvar_premium_pct, 2),
+    }
+
+
+def compute_portfolio_liquidity_risk(
+    df_positions: pd.DataFrame,
+    df_prices: Optional[pd.DataFrame] = None,
+    participation_rate: float = 0.10,
+    portfolio_var_99_pct: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Motore Istituzionale di Rischio Liquidità & Orizzonte di Liquidazione (Basel III / UCITS):
+      - Stima del Volume Medio Giornaliero (ADV in Euro) per ciascuna posizione aperta.
+      - Calcolo puntuale dei Days to Liquidate (DTL) a limite di partecipazione al 10% e al 20%.
+      - Indice di Illiquidità di Amihud (|R_t| / Volume) e stima del market impact Almgren-Chriss.
+      - Ripartizione del portafoglio in 4 Tier di Liquidità (Tier 1: <1g, Tier 2: 1-3g, Tier 3: 3-7g, Tier 4: >7g).
+      - Calcolo del Liquidity-Adjusted VaR Endogeno (L-VaR) ponderato per il periodo reale di disinvestimento.
+    """
+    if df_positions is None or df_positions.empty:
+        return {
+            "total_portfolio_value": 0.0,
+            "weighted_dtl_days": 0.0,
+            "max_dtl_days": 0.0,
+            "bottleneck_ticker": "N/A",
+            "liquidity_tiers_pct": {"tier_1_sub_1d": 100.0, "tier_2_1_to_3d": 0.0, "tier_3_3_to_7d": 0.0, "tier_4_above_7d": 0.0},
+            "unadjusted_var_99_eur": 0.0,
+            "endogenous_lvar_99_eur": 0.0,
+            "liquidity_risk_premium_pct": 0.0,
+            "total_liquidation_cost_eur": 0.0,
+            "positions_liquidity_breakdown": [],
+        }
+
+    val_col = None
+    for c in ["current_value", "controvalore", "valore", "market_value"]:
+        if c in df_positions.columns:
+            val_col = c
+            break
+
+    total_val = float(df_positions[val_col].sum()) if val_col else 0.0
+    if total_val <= 0:
+        total_val = 1.0
+
+    part_rate = max(0.01, min(0.50, float(participation_rate)))
+
+    # Mappa proxy ADV per classi di asset e ticker
+    mega_caps = {"AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "SPY", "QQQ", "BTC-USD", "ETH-USD"}
+    large_etfs = {"IWDA.AS", "SWDA.MI", "VWCE.DE", "CSSPX.MI", "VUAA.MI", "EUNL.DE", "IEAC.MI", "EM710.MI"}
+
+    positions_breakdown = []
+    w_dtl_accum = 0.0
+    max_dtl = 0.0
+    bottleneck_tk = "N/A"
+    tier_sums = {"tier_1": 0.0, "tier_2": 0.0, "tier_3": 0.0, "tier_4": 0.0}
+    total_liq_cost = 0.0
+    sum_lvar_terms = 0.0
+
+    # Se non fornito, ipotizziamo un VaR al 99% 1d standard del 2.5%
+    base_var_pct = float(portfolio_var_99_pct) if portfolio_var_99_pct is not None and portfolio_var_99_pct > 0 else 2.50
+
+    for _, row in df_positions.iterrows():
+        pos_val = float(row.get(val_col, 0.0)) if val_col else 0.0
+        if pos_val <= 0:
+            continue
+        w_i = pos_val / total_val
+        tk = str(row.get("ticker", "")).strip().upper()
+
+        # 1. Calcola o stima ADV
+        adv_eur = 10_000_000.0  # Default 10M
+        amihud_ratio = 1e-7
+
+        if df_prices is not None and not df_prices.empty and "ticker" in df_prices.columns and "volume" in df_prices.columns:
+            df_sub = df_prices[df_prices["ticker"].str.upper() == tk]
+            if len(df_sub) >= 5 and "close" in df_sub.columns:
+                p_vol = (df_sub["volume"] * df_sub["close"]).tail(60).mean()
+                if pd.notnull(p_vol) and p_vol > 0:
+                    adv_eur = float(p_vol)
+                    # Amihud ratio empirico
+                    ret_series = df_sub["close"].pct_change().dropna()
+                    vol_series = (df_sub["volume"] * df_sub["close"]).loc[ret_series.index]
+                    valid_mask = vol_series > 0
+                    if valid_mask.sum() > 5:
+                        amihud_ratio = float((ret_series[valid_mask].abs() / vol_series[valid_mask]).mean() * 1e6)
+
+        if adv_eur == 10_000_000.0:
+            if any(m in tk for m in mega_caps):
+                adv_eur = 800_000_000.0
+                amihud_ratio = 5e-9
+            elif any(e in tk for e in large_etfs):
+                adv_eur = 35_000_000.0
+                amihud_ratio = 5e-8
+            elif ".MI" in tk or ".PA" in tk or ".DE" in tk:
+                adv_eur = 15_000_000.0
+                amihud_ratio = 2e-7
+            elif "BTC" in tk or "ETH" in tk:
+                adv_eur = 500_000_000.0
+                amihud_ratio = 1e-8
+            elif "-USD" in tk or "-EUR" in tk:
+                adv_eur = 2_000_000.0
+                amihud_ratio = 1e-6
+            else:
+                adv_eur = 8_000_000.0
+                amihud_ratio = 3e-7
+
+        # 2. DTL (Days to Liquidate)
+        daily_capacity_base = adv_eur * part_rate
+        dtl_10 = pos_val / max(1.0, daily_capacity_base)
+        dtl_20 = pos_val / max(1.0, (adv_eur * 0.20))
+
+        # 3. Spread e Costi
+        spread_bps = 5.0 if any(m in tk for m in mega_caps) else (12.0 if any(e in tk for e in large_etfs) else 25.0)
+        spread_pct = spread_bps / 10000.0
+        exogenous_cost = 0.5 * pos_val * spread_pct
+
+        # Impatto Almgren-Chriss: eta * sqrt(V / ADV) * sigma
+        sigma_proxy = 0.015  # 1.5% vol giornaliera
+        endogenous_impact_pct = 0.10 * np.sqrt(pos_val / max(1.0, adv_eur)) * sigma_proxy
+        endogenous_cost = pos_val * endogenous_impact_pct
+        total_pos_liq_cost = exogenous_cost + endogenous_cost
+        total_liq_cost += total_pos_liq_cost
+
+        # 4. Ripartizione Tier
+        if dtl_10 <= 1.0:
+            tier_label = "Tier 1 (< 1 giorno)"
+            tier_sums["tier_1"] += pos_val
+        elif dtl_10 <= 3.0:
+            tier_label = "Tier 2 (1-3 giorni)"
+            tier_sums["tier_2"] += pos_val
+        elif dtl_10 <= 7.0:
+            tier_label = "Tier 3 (3-7 giorni)"
+            tier_sums["tier_3"] += pos_val
+        else:
+            tier_label = "Tier 4 (> 7 giorni)"
+            tier_sums["tier_4"] += pos_val
+
+        w_dtl_accum += w_i * dtl_10
+        if dtl_10 > max_dtl:
+            max_dtl = dtl_10
+            bottleneck_tk = tk
+
+        # L-VaR per singola posizione
+        pos_var_1d = pos_val * (base_var_pct / 100.0)
+        pos_lvar = pos_var_1d * np.sqrt(max(1.0, dtl_10)) + total_pos_liq_cost
+        sum_lvar_terms += pos_lvar
+
+        positions_breakdown.append(
+            {
+                "ticker": tk,
+                "name": str(row.get("name", tk)),
+                "value_eur": round(pos_val, 2),
+                "weight_pct": round(w_i * 100.0, 2),
+                "adv_eur": round(adv_eur, 0),
+                "days_to_liquidate_10pct": round(dtl_10, 2),
+                "days_to_liquidate_20pct": round(dtl_20, 2),
+                "amihud_illiquidity_ratio": float(f"{amihud_ratio:.2e}"),
+                "bid_ask_spread_bps": round(spread_bps, 1),
+                "estimated_liquidation_cost_eur": round(total_pos_liq_cost, 2),
+                "tier": tier_label,
+            }
+        )
+
+    # Sort per Days to Liquidate decrescente
+    positions_breakdown.sort(key=lambda x: x["days_to_liquidate_10pct"], reverse=True)
+
+    unadjusted_var_amount = total_val * (base_var_pct / 100.0)
+    endogenous_lvar_amount = sum_lvar_terms
+    lvar_premium = ((endogenous_lvar_amount - unadjusted_var_amount) / max(1.0, unadjusted_var_amount)) * 100.0
+
+    tier_pcts = {
+        "tier_1_sub_1d": round((tier_sums["tier_1"] / total_val) * 100.0, 1),
+        "tier_2_1_to_3d": round((tier_sums["tier_2"] / total_val) * 100.0, 1),
+        "tier_3_3_to_7d": round((tier_sums["tier_3"] / total_val) * 100.0, 1),
+        "tier_4_above_7d": round((tier_sums["tier_4"] / total_val) * 100.0, 1),
+    }
+
+    return {
+        "total_portfolio_value": round(total_val, 2),
+        "participation_rate_pct": round(part_rate * 100.0, 1),
+        "weighted_dtl_days": round(w_dtl_accum, 2),
+        "max_dtl_days": round(max_dtl, 2),
+        "bottleneck_ticker": bottleneck_tk,
+        "liquidity_tiers_pct": tier_pcts,
+        "unadjusted_var_99_eur": round(unadjusted_var_amount, 2),
+        "endogenous_lvar_99_eur": round(endogenous_lvar_amount, 2),
+        "liquidity_risk_premium_pct": round(lvar_premium, 2),
+        "total_liquidation_cost_eur": round(total_liq_cost, 2),
+        "positions_liquidity_breakdown": positions_breakdown,
     }
 
 

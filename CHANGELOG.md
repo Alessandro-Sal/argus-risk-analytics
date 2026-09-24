@@ -7,6 +7,45 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.9.0] - 2026-09-24
+
+### 🚀 Real Multifactor Econometrics, Portfolio Fixed Income ALM, Liquidity Risk & Tax Harvesting
+
+Questa release estende l'infrastruttura quantitativa e di wealth intelligence di ARGUS introducendo motori di livello tier-1 per asset-liability management, liquidità endogena ed efficienza fiscale proattiva:
+
+- **Modello Econometrico Fama-French & Carhart Reale (`core/risk_engine.py`)**:
+  - Eliminata ogni simulazione sintetica da `compute_fama_french_exposures` e `compute_carhart_4factor_exposures`, collegandole direttamente alla libreria ufficiale Kenneth French dal Dartmouth College (`core/factor_library.py`).
+  - Introdotta la funzione `compute_fama_french_5factor_exposures` a 5 fattori + Momentum (Mkt-RF, SMB, HML, RMW, CMA, MOM).
+  - Restituzione completa di $t$-statistiche, $p$-values, $R^2$ aggiustato, confidenza al 95%, scomposizione del rischio sistematico vs specifico e rolling betas a 60 giorni.
+- **Aggregatore di Rischio Reddito Fisso & ALM di Portafoglio (`core/fixed_income.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Implementata la funzione `compute_portfolio_fixed_income_analytics`:
+    - Filtraggio automatico e classificazione di bond diretti (governativi/corporate) ed ETF obbligazionari.
+    - Calcolo di Macaulay Duration, Modified Duration ponderata e Convessità effettiva di portafoglio.
+    - Calcolo del **Portfolio DV01 (PVBP)** in unità monetarie (perdita in € per ogni +1 basis point di rialzo tassi).
+    - Decomposizione delle Key Rate Durations (2Y, 5Y, 10Y, 30Y) per segmenti di curva.
+    - Scenari di stress non-paralleli della curva dei tassi: Bull Steepener, Bear Steepener, Bull Flattener, Bear Flattener e parallel shifts ($\pm 50, \pm 100, \pm 200$ bps).
+    - Nuova sub-tab dedicata nella pagina di Stress Testing.
+- **Motore di Rischio Liquidità Endogena & Orizzonte DTL (`core/risk_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Implementata la funzione `compute_portfolio_liquidity_risk`:
+    - Stima del Volume Medio Giornaliero (ADV) e turnover ponderato in Euro/USD per ciascun asset.
+    - Calcolo puntuale dei **Days to Liquidate (DTL)** a vincolo prudenziale di partecipazione (10% e 20% di ADV).
+    - Indice di Illiquidità di Amihud ($|R_t| / \text{Volume}_t$) e impatto di mercato permanente Almgren-Chriss.
+    - Ripartizione del portafoglio nei 4 Tier di Liquidità istituzionali (Tier 1: <1g, Tier 2: 1-3g, Tier 3: 3-7g, Tier 4: >7g).
+    - Calcolo del **Liquidity-Adjusted VaR (L-VaR)** endogeno e del Liquidity Risk Premium percentuale.
+- **Screener & Ottimizzatore di Tax-Loss Harvesting (`core/tax_engine.py`, `src/pages/18_📑_Fiscalita_e_Quadro_RW.py`)**:
+  - Implementata la funzione `compute_tax_loss_harvesting_opportunities`:
+    - Scansione delle perdite non realizzate e calcolo del Tax Alpha (credito d'imposta recuperabile al 26% o 12.5%).
+    - Mappatura intelligente di strumenti sostitutivi compliant ad elevata correlazione ($\rho \ge 0.98$) per evitare la perdita di beta di mercato (es. SWDA $\leftrightarrow$ LCWD, VWCE $\leftrightarrow$ FWRA, CSSPX $\leftrightarrow$ VUAA).
+    - Monitoraggio delle minusvalenze in scadenza quadriennale (art. 68 TUIR) con livello di urgenza.
+- **Simulatore Stocastico di Cash Flow e Decumulazione a Ciclo di Vita (`core/wealth/tbs_monte_carlo.py`, `core/wealth/__init__.py`)**:
+  - Implementata la funzione `compute_stochastic_cash_flow_decumulation`:
+    - Simulazione Monte Carlo su N cammini correlando rendimenti di mercato, inflazione, progressione salariale e mutui.
+    - Calcolo della probabilità di rovina di cassa a ciclo di vita, età di massima fragilità finanziaria e raccomandazione sul corridoio di spesa sostenibile (Safe Spending Corridor).
+- **Nuova Suite di Test Automatizzati**:
+  - Aggiunto `tests/test_institutional_enhancements.py` con 7 test di validazione integrata (100% pass rate).
+
+---
+
 ## [9.8.0] - 2026-09-23
 
 ### 🏛️ Institutional Risk Engine, Basel IV Traffic Light, EVT Tail Risk & Total Wealth Stress Testing

@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-655%2F655%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-711%2F711%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -15,9 +15,9 @@
 
 ---
 
-## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.8.0)
+## 🚀 ARGUS Headless Core, Kenneth French Econometrics & ALM Treasury Engine (v9.9.0)
 
-ARGUS v9.8.0 consolida l'architettura quantitativa istituzionale (**Tier-1 Risk & Wealth Intelligence**), introducendo il motore di calcolo del rischio conforme a **Basilea IV**, l'**Extreme Value Theory (EVT POT-GPD)** per code estreme, l'ottimizzazione **Min-CVaR lineare esatta** e **Maximum Diversification (MDP)**, la scomposizione del **rischio FX** e lo **Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (EBA & Fed CCAR)**:
+ARGUS v9.9.0 introduce il modulo econometrico empirico sui fattori reali di Kenneth French (Dartmouth College) Fama-French 3/4/5 factor, il motore istituzionale di Portfolio Fixed Income & ALM Treasury (DV01, Key-Rate Durations 2Y/5Y/10Y/30Y, Bull/Bear Steepener & Flattener), l'Endogenous Liquidity Risk & Days to Liquidate (DTL, Amihud, L-VaR), l'ottimizzatore proattivo di Tax-Loss Harvesting con proxy compliant a correlazione $\ge 0.98$, e la simulazione stocastica del corridoio di decumulo patrimoniale (TBS-MC):
 
 * **📦 Python Package Headless & CLI Console Scripts (`argus-risk`)**:
   ```bash
@@ -67,6 +67,13 @@ ARGUS v9.8.0 consolida l'architettura quantitativa istituzionale (**Tier-1 Risk 
 
 **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è una piattaforma integrata di **Business Intelligence, Financial Valuation, Forensic Accounting, AI Narrative Intelligence, Data Engineering e Quantitative Risk Management** potenziata con standard **Bloomberg Terminal Parity**. Progettata con un'interfaccia ad alta densità informativa di livello istituzionale, la soluzione offre un ecosistema avanzato per la diagnosi contabile, la profilazione del rischio e la protezione strategica di portafogli d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto e Cash*).
 
+* **🏛️ Real Fama-French Econometrics, Portfolio Fixed Income ALM, Liquidity Risk & Tax Harvesting v9.9 (`core/risk_engine.py`, `core/fixed_income.py`, `core/tax_engine.py`, `core/wealth/tbs_monte_carlo.py`, `src/pages/7_🌪️_Stress_Testing.py`, `src/pages/18_📑_Fiscalita_e_Quadro_RW.py`)**:
+  1. *Fattori Reali Kenneth French Fama-French 3/4/5 & Carhart Econometrics*: Sostituzione delle approssimazioni gaussiane con le serie storiche ufficiali del Dartmouth College Data Library (Mkt-RF, SMB, HML, RMW, CMA, WML). Regressione OLS multivariata con calcolo di t-stat, p-value, $R^2$ aggiustato, quota di rischio sistemico vs idiosincratico e significatività di Alpha di Jensen.
+  2. *Portfolio Fixed Income & ALM Treasury Analytics (DV01 & KRD)*: Aggregazione dinamica di obbligazioni individuali ed ETF obbligazionari (SHY, IEI, IEF, TLT, AGG, BND, BTP, HYG). Calcolo di Macaulay Duration, Modified Duration effettiva, Convessità ponderata, Dollar Duration / DV01 (€/bps) e Key Rate Durations a 4 nodi critici (2Y, 5Y, 10Y, 30Y).
+  3. *Scenari di Curva Non Paralleli (Curve Twist & Steepening/Flattening)*: Simulazione istantanea di shock sulla struttura a termine con scenari Bear Steepener (+100 bps lungo, +25 bps breve), Bull Steepener (-25 bps lungo, -100 bps breve), Bear Flattener (+100 bps breve, +25 bps lungo) e Bull Flattener (-25 bps breve, -100 bps lungo).
+  4. *Endogenous Liquidity Risk & Orizzonte Days to Liquidate (DTL)*: Calcolo dell'Average Daily Volume (ADV 30d/90d), orizzonte Days to Liquidate con cap di partecipazione al 10% e 20%, Amihud Illiquidity Ratio, classificazione in 4 Tier di liquidità (<1d, 1-3d, 3-7d, >7d) e stima del Liquidity-Adjusted VaR (L-VaR endogeno).
+  5. *Proactive Tax-Loss Harvesting & Minusvalenze Proxy Switches*: Monitoraggio real-time delle perdite latenti con stima del Tax Alpha generabile (26% azioni/ETF, 12.5% titoli di stato), raccomandazione automatica di ETF proxy correlati ($\rho \ge 0.98$, es. SWDA $\leftrightarrow$ LCWD, VWCE $\leftrightarrow$ FWRA, CSSPX $\leftrightarrow$ VUAA) e alert di urgenza per minusvalenze in scadenza nel quarto anno solare.
+  6. *Decumulo Patrimoniale Stocastico a Ciclo di Vita (TBS-MC Decumulation)*: Simulazione Monte Carlo a 5.000 cammini con flussi di cassa reali attesi, calcolo della Probabilità di Rovina, Età di Massima Fragilità patrimoniale e corridoio di spesa annua sostenibile al 95% di confidenza.
 * **🏛️ Institutional Risk Engine, Basel IV Traffic Light, EVT Tail Risk & Total Wealth Stress Testing v9.8 (`core/risk_engine.py`, `core/yield_curve.py`, `core/macro_stress_engine.py`, `core/wealth/personal_balance_sheet.py`, `src/pages/3_🔴_Analisi_Rischio.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`, `src/pages/16_🛡️_Previdenza_e_Pension_Planning.py`)**:
   1. *Extreme Value Theory (EVT POT-GPD) & Tail Risk 99.9%*: Modellazione avanzata delle perdite estreme e dei cigni neri tramite approccio Peaks-Over-Threshold (POT) e distribuzione di Pareto Generalizzata (GPD) conforme ai requisiti di Basilea IV per la stima accurata di VaR e CVaR (Expected Shortfall) al 99.0% e 99.9%.
   2. *Backtesting Regolamentare Basilea IV (Traffic Light Framework)*: Backtest su finestra mobile standard di 250 giorni di negoziazione con classificazione automatica in Zona Verde ($x \le 4$, moltiplicatore $3.00$), Gialla ($5 \le x \le 9$, moltiplicatori $3.40 - 3.85$) o Rossa ($x \ge 10$, moltiplicatore $4.00$), corredato dal test di copertura incondizionata di Kupiec (POF), dal test di indipendenza di Christoffersen (clustering delle violazioni) e dal test di copertura condizionale congiunto.

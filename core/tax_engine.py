@@ -1250,3 +1250,166 @@ def simulate_fifo_lot_sale(
         "residual_value_eur": round(residual_val, 2),
         "df_affected_lots": df_affected,
     }
+
+
+# ── 12. PROACTIVE TAX-LOSS HARVESTING & MINUSVALENZE OPTIMIZER ────────
+
+TAX_LOSS_HARVEST_SUBSTITUTES: Dict[str, Dict[str, Any]] = {
+    # Azionario Globale
+    "SWDA.MI": {"substitute": "LCWD.MI", "name": "Lyxor Core MSCI World", "correlation": 0.99, "category": "MSCI World"},
+    "LCWD.MI": {"substitute": "SWDA.MI", "name": "iShares Core MSCI World", "correlation": 0.99, "category": "MSCI World"},
+    "VWCE.DE": {"substitute": "FWRA.MI", "name": "Invesco FTSE All-World", "correlation": 0.99, "category": "All-World"},
+    "IWDA.AS": {"substitute": "SWDA.MI", "name": "iShares Core MSCI World", "correlation": 1.00, "category": "MSCI World"},
+    # S&P 500 & US
+    "CSSPX.MI": {"substitute": "VUAA.MI", "name": "Vanguard S&P 500", "correlation": 1.00, "category": "S&P 500"},
+    "VUAA.MI": {"substitute": "SP500.MI", "name": "Invesco S&P 500", "correlation": 1.00, "category": "S&P 500"},
+    "SPY": {"substitute": "IVV", "name": "iShares Core S&P 500", "correlation": 1.00, "category": "S&P 500"},
+    "QQQ": {"substitute": "EQAC.MI", "name": "Invesco EQQQ Nasdaq-100", "correlation": 0.99, "category": "Nasdaq 100"},
+    # Europe
+    "EXSA.DE": {"substitute": "MEUD.PA", "name": "Lyxor Core STOXX Europe 600", "correlation": 0.99, "category": "Europe 600"},
+    # Obbligazionario
+    "AGGH.MI": {"substitute": "VAGF.MI", "name": "Vanguard Global Aggregate Bond", "correlation": 0.98, "category": "Global Agg"},
+    "CSB.MI": {"substitute": "IBCI.MI", "name": "iShares Euro Gov Inflation Linked", "correlation": 0.97, "category": "Euro Gov"},
+    "EM710.MI": {"substitute": "VGEA.MI", "name": "Vanguard EUR Eurozone Gov Bond", "correlation": 0.99, "category": "Eurozone Gov"},
+}
+
+
+def compute_tax_loss_harvesting_opportunities(
+    df_positions: pd.DataFrame,
+    tax_ledger: Optional[Dict[str, Any]] = None,
+    current_year: int = 2026,
+    min_loss_threshold_eur: float = 100.0,
+) -> Dict[str, Any]:
+    """
+    Screener & Ottimizzatore di Tax-Loss Harvesting (Recupero Minusvalenze & Efficienza Fiscale):
+      - Scansiona tutte le posizioni aperte in portafoglio con perdite non realizzate (Unrealized Capital Losses).
+      - Calcola il potenziale credito fiscale generabile (Tax Alpha al 26% o 12.5% per Titoli di Stato).
+      - Confronta con il 'zainetto fiscale' attuale e stima la priorità di realizzo rispetto a minusvalenze storiche in scadenza.
+      - Suggerisce strumenti sostitutivi compliant ad elevata correlazione (rho >= 0.98) per mantenere intatta l'asset allocation.
+    """
+    if df_positions is None or df_positions.empty:
+        return {
+            "has_harvesting_opportunities": False,
+            "total_harvestable_losses_eur": 0.0,
+            "total_potential_tax_savings_eur": 0.0,
+            "count_loss_positions": 0,
+            "expiring_minusvalenze_current_year_eur": 0.0,
+            "urgency_level": "Bassa",
+            "opportunities": [],
+        }
+
+    pos = df_positions.copy()
+
+    # Identifica colonne valore e pnl
+    val_col = None
+    for c in ["current_value", "controvalore", "valore", "market_value"]:
+        if c in pos.columns:
+            val_col = c
+            break
+
+    pnl_col = None
+    for c in ["unrealized_pnl", "pnl_non_realizzato", "pnl_eur", "gain_loss"]:
+        if c in pos.columns:
+            pnl_col = c
+            break
+
+    # Se non c'è pnl_col esplicita, calcolalo da prezzo e costo medio
+    if not pnl_col and val_col and "avg_cost" in pos.columns and "quantity" in pos.columns:
+        pos["calc_pnl"] = (pos["current_price"] - pos["avg_cost"]) * pos["quantity"]
+        pnl_col = "calc_pnl"
+
+    if not pnl_col:
+        return {
+            "has_harvesting_opportunities": False,
+            "total_harvestable_losses_eur": 0.0,
+            "total_potential_tax_savings_eur": 0.0,
+            "count_loss_positions": 0,
+            "expiring_minusvalenze_current_year_eur": 0.0,
+            "urgency_level": "Bassa",
+            "opportunities": [],
+            "message": "Dati P&L insufficienti per individuare opportunità di harvesting.",
+        }
+
+    opps = []
+    tot_losses = 0.0
+    tot_tax_savings = 0.0
+
+    for _, row in pos.iterrows():
+        pnl = float(row.get(pnl_col, 0.0))
+        if pnl >= -abs(min_loss_threshold_eur):
+            continue  # Salta posizioni in utile o con perdite trascurabili
+
+        tk = str(row.get("ticker", "")).strip().upper()
+        name = str(row.get("name", tk))
+        val = float(row.get(val_col, 0.0)) if val_col else abs(pnl) * 2.0
+        loss_abs = abs(pnl)
+
+        # Aliquota fiscale applicabile (12.5% per BTP/Gov, 26% altrimenti)
+        ac = str(row.get("asset_class", "")).upper()
+        mac = str(row.get("macro_asset_class", "")).upper()
+        is_gov = any(k in tk or k in ac or k in mac for k in ["BTP", "BOT", "BUND", "GOV", "TREASURY", "CCT"])
+        tax_rate = 0.125 if is_gov else 0.26
+
+        tax_saving = loss_abs * tax_rate
+        tot_losses += loss_abs
+        tot_tax_savings += tax_saving
+
+        # Ricerca sostituto compliant
+        sub_info = TAX_LOSS_HARVEST_SUBSTITUTES.get(tk)
+        if not sub_info:
+            for k_sub, v_sub in TAX_LOSS_HARVEST_SUBSTITUTES.items():
+                if k_sub.split(".")[0] in tk:
+                    sub_info = v_sub
+                    break
+
+        if sub_info:
+            sub_tk = sub_info["substitute"]
+            sub_name = sub_info["name"]
+            corr = sub_info["correlation"]
+            cat = sub_info["category"]
+        else:
+            sub_tk = "ETF / Certificato Equivalente"
+            sub_name = f"Benchmark Equivalente per {tk}"
+            corr = 0.95
+            cat = "Generico"
+
+        opps.append(
+            {
+                "ticker": tk,
+                "name": name,
+                "current_value_eur": round(val, 2),
+                "unrealized_loss_eur": round(pnl, 2),
+                "unrealized_loss_pct": round((pnl / max(1.0, val - pnl)) * 100.0, 2),
+                "applicable_tax_rate_pct": round(tax_rate * 100.0, 1),
+                "potential_tax_alpha_eur": round(tax_saving, 2),
+                "suggested_substitute_ticker": sub_tk,
+                "suggested_substitute_name": sub_name,
+                "substitute_correlation": corr,
+                "asset_category": cat,
+                "recommended_action": f"Vendi {tk} per cristallizzare €{loss_abs:,.2f} di minusvalenza e acquista contestualmente {sub_tk} per mantenere l'esposizione.",
+            }
+        )
+
+    opps.sort(key=lambda x: abs(x["unrealized_loss_eur"]), reverse=True)
+
+    # Verifica zainetto fiscale
+    expiring_this_year = 0.0
+    if tax_ledger and "minusvalenze_per_anno" in tax_ledger:
+        exp_year = current_year - 4
+        expiring_this_year = float(tax_ledger["minusvalenze_per_anno"].get(exp_year, 0.0))
+
+    urgency = "Bassa"
+    if expiring_this_year > 500.0:
+        urgency = "🔴 Alta (Minusvalenze in scadenza entro l'anno)"
+    elif tot_tax_savings > 1000.0:
+        urgency = "🟡 Media (Consistente credito fiscale recuperabile)"
+
+    return {
+        "has_harvesting_opportunities": len(opps) > 0,
+        "total_harvestable_losses_eur": round(tot_losses, 2),
+        "total_potential_tax_savings_eur": round(tot_tax_savings, 2),
+        "count_loss_positions": len(opps),
+        "expiring_minusvalenze_current_year_eur": round(expiring_this_year, 2),
+        "urgency_level": urgency,
+        "opportunities": opps,
+    }

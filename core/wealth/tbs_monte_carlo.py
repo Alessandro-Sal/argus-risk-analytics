@@ -248,3 +248,47 @@ class TBSMonteCarloEngine:
             "simulation_runs": num_sims,
             "total_horizon_years": total_years,
         }
+
+
+def compute_stochastic_cash_flow_decumulation(
+    initial_liquid_wealth: float = 100000.0,
+    annual_income: float = 50000.0,
+    annual_expenses: float = 30000.0,
+    current_age: int = 35,
+    retirement_age: int = 67,
+    terminal_age: int = 90,
+    initial_real_estate_value: float = 0.0,
+    mortgage_debt: float = 0.0,
+    mortgage_rate: float = 0.035,
+    mortgage_years: int = 0,
+    expected_real_return: float = 0.045,
+    return_volatility: float = 0.15,
+    inflation_rate: float = 0.025,
+    num_simulations: int = 2000,
+    random_seed: int = 42,
+) -> Dict[str, Any]:
+    """
+    Simulatore Stocastico di Cash Flow e Decumulazione Patrimoniale Monte Carlo:
+      - Modella l'evoluzione patrimoniale su N cammini stocastici correlati.
+      - Calcola la probabilità di rovina di cassa e l'età di massima fragilità finanziaria.
+      - Restituisce la traiettoria mediana e il corridoio di spesa sostenibile (P10-P90).
+    """
+    cfg = TBSLifecycleConfig(
+        current_age=int(current_age),
+        retirement_age=int(retirement_age),
+        terminal_age=int(terminal_age),
+        current_annual_net_income=float(annual_income),
+        annual_living_expenses=float(annual_expenses),
+        initial_liquid_wealth=float(initial_liquid_wealth),
+        liquid_wealth_real_return_mean=float(expected_real_return),
+        liquid_wealth_volatility=float(return_volatility),
+        initial_real_estate_value=float(initial_real_estate_value),
+        initial_mortgage_debt=float(mortgage_debt),
+        mortgage_annual_interest_rate=float(mortgage_rate),
+        mortgage_years_remaining=int(mortgage_years),
+        num_simulations=int(num_simulations),
+        random_seed=int(random_seed),
+    )
+    engine = TBSMonteCarloEngine(cfg)
+    return engine.simulate_lifetime_solvency()
+
