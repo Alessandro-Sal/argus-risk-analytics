@@ -248,6 +248,36 @@ with tab_harvest:
         st.info("Nessuna minusvalenza latente rilevata nel portafoglio.")
 
     st.write("")
+
+    from core.tax_engine import compute_tax_loss_harvesting_opportunities
+    pos_df = st.session_state.get("portfolio_positions", pd.DataFrame())
+    if pos_df.empty and "positions" in st.session_state:
+        pos_df = st.session_state["positions"]
+
+    tlh_opps = compute_tax_loss_harvesting_opportunities(pos_df)
+    if tlh_opps["has_harvesting_opportunities"]:
+        st.markdown("##### 🔄 Switch di Tax-Loss Harvesting & Proxy Compliant")
+        st.caption("Strumenti sostitutivi ad elevata correlazione (ρ ≥ 0.97) consigliati per monetizzare la perdita fiscale mantenendo intatta l'asset allocation.")
+        df_switches = pd.DataFrame(tlh_opps["opportunities"])
+        render_table_with_export(
+            df=df_switches[["ticker", "name", "unrealized_loss_eur", "potential_tax_alpha_eur", "suggested_substitute_ticker", "suggested_substitute_name", "substitute_correlation", "recommended_action"]],
+            table_title="Strategie di Switch e Proxy per Recupero Minusvalenze",
+            file_prefix=f"tax_loss_switches_{current_pid}",
+            key_suffix=f"p18_switches_{current_pid}",
+            column_config={
+                "ticker": st.column_config.TextColumn("Ticker Attuale", width="small"),
+                "name": st.column_config.TextColumn("Nome Asset", width="medium"),
+                "unrealized_loss_eur": st.column_config.NumberColumn("Perdita Non Realizzata", format="€ %,.2f"),
+                "potential_tax_alpha_eur": st.column_config.NumberColumn("Tax Alpha (Credito 26%)", format="€ %,.2f"),
+                "suggested_substitute_ticker": st.column_config.TextColumn("Proxy Sostitutivo", width="small"),
+                "suggested_substitute_name": st.column_config.TextColumn("Nome Benchmark Proxy", width="medium"),
+                "substitute_correlation": st.column_config.NumberColumn("Correlazione ρ", format="%.2f"),
+                "recommended_action": st.column_config.TextColumn("Azione Consigliata", width="large"),
+            },
+            hide_index=True
+        )
+        st.write("")
+
     # RIGA 2: Simulatore Deduzione IRPEF Fondo Pensione (Full Width)
     st.markdown("##### 🛡️ Simulatore Deduzione IRPEF Fondo Pensione (Art. 51 TUIR)")
     irp = tlh["irpef_pension_optimization"]

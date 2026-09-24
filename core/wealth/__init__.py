@@ -14,6 +14,11 @@ from core.wealth.asset_protection_engine import (
     StatutoryShareItem,
     SuccessionSharesResult,
 )
+from core.wealth.tbs_monte_carlo import (
+    TBSLifecycleConfig,
+    TBSMonteCarloEngine,
+    compute_stochastic_cash_flow_decumulation,
+)
 from core.wealth.wealth_db import (
     cleanup_empty_wealth_portfolios,
     clear_wealth_accounts,

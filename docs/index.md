@@ -61,6 +61,13 @@ Maximum Diversification Portfolio (Choueifaty Diversification Ratio maximization
 ### 7. Consolidated Total Wealth Stress Testing (EBA & CCAR)
 Holistic balance-sheet stress engine transmitting joint macroeconomic shocks (EBA Adverse 2026, Fed CCAR Severe, Stagflation, Geopolitical Risk-Off) across liquid assets, real estate, pension funds, luxury caveau, and fixed liabilities with Debt-to-Assets leverage effect modeling.
 
+### 8. Real Kenneth French (Dartmouth College) Factor Econometrics
+Multi-factor risk attribution powered by empirical factor time-series directly sourced from Kenneth French's Dartmouth Data Library (Mkt-RF, SMB, HML, RMW, CMA, MOM) with multivariate OLS regression, t-statistics, p-values, adjusted $R^2$, and systematic vs. idiosyncratic variance decomposition.
+
+### 9. Portfolio Fixed Income ALM & Endogenous Liquidity Risk
+Dynamic bond and bond-ETF aggregation computing Macaulay and Effective Modified Duration, Portfolio Convexity, DV01 (€/bps), Key Rate Durations (2Y, 5Y, 10Y, 30Y), non-parallel curve twist scenarios (Bull/Bear Steepeners & Flatteners), Average Daily Volume (ADV 30d/90d), Days to Liquidate (DTL 10% & 20%), Amihud illiquidity ratio, and Endogenous L-VaR.
+
+
 ---
 
 ## Quick Navigation

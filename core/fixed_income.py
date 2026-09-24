@@ -508,3 +508,247 @@ def compute_key_rate_durations(
         krd_results[label] = round(float(krd), 3)
 
     return krd_results
+
+
+# ── 7. PORTFOLIO FIXED INCOME & ALM ANALYTICS ENGINE ───────────────────
+
+KNOWN_BOND_ETF_METRICS: Dict[str, Dict[str, float]] = {
+    "SHY": {"duration": 1.9, "convexity": 0.05, "avg_ytm": 0.042},
+    "IEI": {"duration": 4.5, "convexity": 0.25, "avg_ytm": 0.041},
+    "IEF": {"duration": 7.4, "convexity": 0.65, "avg_ytm": 0.043},
+    "TLT": {"duration": 16.8, "convexity": 3.70, "avg_ytm": 0.046},
+    "AGG": {"duration": 6.1, "convexity": 0.45, "avg_ytm": 0.044},
+    "BND": {"duration": 6.2, "convexity": 0.48, "avg_ytm": 0.044},
+    "HYG": {"duration": 3.6, "convexity": 0.18, "avg_ytm": 0.068},
+    "JNK": {"duration": 3.4, "convexity": 0.16, "avg_ytm": 0.070},
+    "LQD": {"duration": 8.1, "convexity": 0.85, "avg_ytm": 0.052},
+    "EMB": {"duration": 6.9, "convexity": 0.75, "avg_ytm": 0.062},
+    "BTP": {"duration": 6.5, "convexity": 0.55, "avg_ytm": 0.036},
+    "BUND": {"duration": 7.2, "convexity": 0.60, "avg_ytm": 0.024},
+    "CSB.MI": {"duration": 4.8, "convexity": 0.30, "avg_ytm": 0.035},
+    "EM710.MI": {"duration": 7.1, "convexity": 0.62, "avg_ytm": 0.033},
+    "IEAC.MI": {"duration": 4.7, "convexity": 0.32, "avg_ytm": 0.038},
+    "VGEA.MI": {"duration": 7.3, "convexity": 0.65, "avg_ytm": 0.028},
+}
+
+
+def _is_fixed_income_asset(row: pd.Series) -> bool:
+    """Riconosce se una riga di posizioni appartiene alla classe obbligazionaria."""
+    ac = str(row.get("asset_class", "")).strip().upper()
+    mac = str(row.get("macro_asset_class", "")).strip().upper()
+    tipo = str(row.get("tipo", "")).strip().upper()
+
+    # Esclusione esplicita di azioni e crypto a meno che non ci siano parametri obbligazionari espliciti
+    if any(eq in ac or eq in mac or eq in tipo for eq in ["EQUITY", "AZION", "STOCK", "CRYPTO", "COMMODIT"]):
+        if not ("coupon_rate" in row and "maturity_years" in row and pd.notnull(row["maturity_years"]) and float(row.get("maturity_years", 0)) > 0):
+            return False
+
+    tk = str(row.get("ticker", "")).strip().upper()
+    name = str(row.get("name", "")).strip().upper()
+    isin = str(row.get("isin", "")).strip().upper()
+
+    # Controllo esatto o prefisso su ticker di ETF/Bond noti
+    for k in KNOWN_BOND_ETF_METRICS.keys():
+        if tk == k or tk.startswith(k + ".") or tk == k + "-USD" or tk == k + "-EUR":
+            return True
+
+    fi_keywords = ["BOND", "OBBLIGAZ", "FIXED INCOME", "TREASURY", "GOV BOND", "CORP BOND", "BTP", "BOT", "CCT", "CTZ", "BUND", "GILT"]
+    search_text = f"{tk} {ac} {mac} {tipo} {name} {isin}"
+    return any(kw in search_text for kw in fi_keywords)
+
+
+
+def compute_portfolio_fixed_income_analytics(
+    df_positions: pd.DataFrame,
+    df_prices: Optional[pd.DataFrame] = None,
+    ns_params: Optional[Dict[str, float]] = None,
+) -> Dict[str, Any]:
+    """
+    Calcola l'analisi aggregata del rischio tasso e reddito fisso di portafoglio (ALM / Treasury):
+      - Identificazione e filtraggio automatico delle posizioni a reddito fisso (Bond diretti, ETF obbligazionari).
+      - Macaulay Duration, Modified Duration e Convessità ponderata per controvalore.
+      - DV01 / PVBP Totale di Portafoglio (perdita monetaria per ogni +1 bps di rialzo tassi).
+      - Key Rate Durations aggregate (2Y, 5Y, 10Y, 30Y).
+      - Matrice di Stress Scenari Curva Tassi:
+          * Parallel Shifts (+50, -50, +100, +200 bps)
+          * Bull Steepener (2Y -100bps, 10Y -25bps)
+          * Bear Steepener (2Y +25bps, 10Y +100bps)
+          * Bull Flattener (2Y -25bps, 10Y -100bps)
+          * Bear Flattener (2Y +100bps, 10Y +25bps)
+      - Tabella dettagliata per singola posizione obbligazionaria.
+    """
+    if df_positions is None or df_positions.empty:
+        return {
+            "has_fixed_income": False,
+            "total_portfolio_value": 0.0,
+            "fixed_income_value": 0.0,
+            "fixed_income_weight_pct": 0.0,
+            "weighted_mac_duration": 0.0,
+            "weighted_mod_duration": 0.0,
+            "weighted_convexity": 0.0,
+            "portfolio_dv01": 0.0,
+            "key_rate_durations": {"2Y": 0.0, "5Y": 0.0, "10Y": 0.0, "30Y": 0.0},
+            "curve_stress_scenarios": {},
+            "fi_positions_breakdown": [],
+        }
+
+    val_col = None
+    for c in ["current_value", "controvalore", "valore", "market_value"]:
+        if c in df_positions.columns:
+            val_col = c
+            break
+
+    total_port_val = float(df_positions[val_col].sum()) if val_col else 0.0
+
+    fi_rows = []
+    for _, row in df_positions.iterrows():
+        if _is_fixed_income_asset(row):
+            fi_rows.append(row)
+
+    if not fi_rows:
+        return {
+            "has_fixed_income": False,
+            "total_portfolio_value": round(total_port_val, 2),
+            "fixed_income_value": 0.0,
+            "fixed_income_weight_pct": 0.0,
+            "weighted_mac_duration": 0.0,
+            "weighted_mod_duration": 0.0,
+            "weighted_convexity": 0.0,
+            "portfolio_dv01": 0.0,
+            "key_rate_durations": {"2Y": 0.0, "5Y": 0.0, "10Y": 0.0, "30Y": 0.0},
+            "curve_stress_scenarios": {},
+            "fi_positions_breakdown": [],
+            "message": "Nessuna posizione obbligazionaria o ETF a reddito fisso individuata nel portafoglio.",
+        }
+
+    df_fi = pd.DataFrame(fi_rows)
+    total_fi_val = float(df_fi[val_col].sum()) if val_col else 1.0
+    if total_fi_val <= 0:
+        total_fi_val = 1.0
+
+    detailed_positions = []
+    w_mac_dur = 0.0
+    w_mod_dur = 0.0
+    w_convexity = 0.0
+    total_dv01 = 0.0
+    krd_accum = {"2Y": 0.0, "5Y": 0.0, "10Y": 0.0, "30Y": 0.0}
+
+    for _, row in df_fi.iterrows():
+        val = float(row.get(val_col, 0.0)) if val_col else 0.0
+        weight_fi = val / total_fi_val if total_fi_val > 0 else 0.0
+        tk = str(row.get("ticker", "")).strip().upper()
+
+        # Determina metriche del singolo strumento
+        d_mac, d_mod, conv, ytm = 5.0, 4.6, 0.35, 0.035
+        matched_proxy = None
+        for k_proxy, metrics in KNOWN_BOND_ETF_METRICS.items():
+            if k_proxy in tk:
+                d_mod = metrics["duration"]
+                d_mac = d_mod * 1.04
+                conv = metrics["convexity"]
+                ytm = metrics["avg_ytm"]
+                matched_proxy = k_proxy
+                break
+
+        # Se sono presenti parametri espliciti del bond
+        if "coupon_rate" in row and "maturity_years" in row and pd.notnull(row["maturity_years"]):
+            try:
+                b_res = compute_bond_analytics(
+                    face_value=float(row.get("face_value", 100.0)),
+                    coupon_rate=float(row.get("coupon_rate", 0.03)),
+                    maturity_years=float(row.get("maturity_years", 5.0)),
+                    market_price=float(row.get("market_price", 100.0)),
+                )
+                d_mac = b_res["macaulay_duration"]
+                d_mod = b_res["modified_duration"]
+                conv = b_res["convexity"]
+                ytm = b_res["ytm_pct"] / 100.0
+            except Exception:
+                pass
+
+        dv01_pos = val * d_mod * 0.0001
+        impact_plus_100bps = -d_mod * 0.01 + 0.5 * conv * (0.01**2)
+        euro_impact_100bps = val * impact_plus_100bps
+
+        w_mac_dur += weight_fi * d_mac
+        w_mod_dur += weight_fi * d_mod
+        w_convexity += weight_fi * conv
+        total_dv01 += dv01_pos
+
+        # Key rate allocation stocastica basata su duration
+        if d_mod <= 3.0:
+            krd_accum["2Y"] += weight_fi * d_mod
+        elif d_mod <= 7.0:
+            krd_accum["2Y"] += weight_fi * (d_mod * 0.3)
+            krd_accum["5Y"] += weight_fi * (d_mod * 0.7)
+        elif d_mod <= 12.0:
+            krd_accum["5Y"] += weight_fi * (d_mod * 0.3)
+            krd_accum["10Y"] += weight_fi * (d_mod * 0.7)
+        else:
+            krd_accum["10Y"] += weight_fi * (d_mod * 0.4)
+            krd_accum["30Y"] += weight_fi * (d_mod * 0.6)
+
+        detailed_positions.append(
+            {
+                "ticker": tk,
+                "name": str(row.get("name", tk)),
+                "value_eur": round(val, 2),
+                "weight_fi_pct": round(weight_fi * 100.0, 2),
+                "weight_portfolio_pct": round((val / total_port_val * 100.0) if total_port_val > 0 else 0.0, 2),
+                "macaulay_duration": round(d_mac, 2),
+                "modified_duration": round(d_mod, 2),
+                "convexity": round(conv, 3),
+                "ytm_pct": round(ytm * 100.0, 2),
+                "dv01_eur": round(dv01_pos, 2),
+                "loss_plus_100bps_eur": round(euro_impact_100bps, 2),
+                "proxy": matched_proxy or "Model Inferred",
+            }
+        )
+
+    # Scenari di stress curva
+    scenarios = {}
+    parallel_shifts = [-100.0, -50.0, 25.0, 50.0, 100.0, 200.0]
+    for bps in parallel_shifts:
+        dy = bps / 10000.0
+        pct_chg = -w_mod_dur * dy + 0.5 * w_convexity * (dy**2)
+        scenarios[f"Parallel_{int(bps):+d}bps"] = {
+            "name": f"Shift Parallelo {int(bps):+d} bps",
+            "rate_change_bps": bps,
+            "fi_return_pct": round(pct_chg * 100.0, 2),
+            "fi_pnl_eur": round(total_fi_val * pct_chg, 2),
+            "portfolio_pnl_eur": round(total_fi_val * pct_chg, 2),
+            "portfolio_impact_pct": round((total_fi_val * pct_chg / total_port_val * 100.0) if total_port_val > 0 else 0.0, 2),
+        }
+
+    # Twist Scenarios (Steepener / Flattener)
+    twist_definitions = {
+        "Bull_Steepener": {"name": "Bull Steepener (Tagli aggressivi a breve)", "dy_2y": -0.0100, "dy_10y": -0.0025},
+        "Bear_Steepener": {"name": "Bear Steepener (Pressioni inflative a lungo)", "dy_2y": 0.0025, "dy_10y": 0.0100},
+        "Bull_Flattener": {"name": "Bull Flattener (Rally su scadenze lunghe)", "dy_2y": -0.0025, "dy_10y": -0.0100},
+        "Bear_Flattener": {"name": "Bear Flattener (Stretta tassi a breve termine)", "dy_2y": 0.0100, "dy_10y": 0.0025},
+    }
+    for code, tw in twist_definitions.items():
+        dy2, dy10 = tw["dy_2y"], tw["dy_10y"]
+        # Impatto stimato con Key Rate Durations
+        pct_chg = -(krd_accum["2Y"] * dy2 + krd_accum["5Y"] * ((dy2 + dy10) / 2.0) + krd_accum["10Y"] * dy10 + krd_accum["30Y"] * dy10)
+        scenarios[code] = {
+            "name": tw["name"],
+            "fi_return_pct": round(pct_chg * 100.0, 2),
+            "fi_pnl_eur": round(total_fi_val * pct_chg, 2),
+            "portfolio_pnl_eur": round(total_fi_val * pct_chg, 2),
+            "portfolio_impact_pct": round((total_fi_val * pct_chg / total_port_val * 100.0) if total_port_val > 0 else 0.0, 2),
+        }
+
+    return {
+        "has_fixed_income": True,
+        "total_portfolio_value": round(total_port_val, 2),
+        "fixed_income_value": round(total_fi_val, 2),
+        "fixed_income_weight_pct": round((total_fi_val / total_port_val * 100.0) if total_port_val > 0 else 0.0, 2),
+        "weighted_mac_duration": round(w_mac_dur, 2),
+        "weighted_mod_duration": round(w_mod_dur, 2),
+        "weighted_convexity": round(w_convexity, 3),
+        "portfolio_dv01": round(total_dv01, 2),
+        "key_rate_durations": {k: round(v, 2) for k, v in krd_accum.items()},
+        "curve_stress_scenarios": scenarios,
+        "fi_positions_breakdown": detailed_positions,
+    }

@@ -129,6 +129,20 @@ STRESS_MODELS_CATALOG = {
         "badge_color": "#a855f7",
         "category": "Integrazione Olistica Wealth-Risk",
         "desc": "Integrazione attuariale del Capitale Umano (quasi-equity/quasi-bond) con gli asset liquidi e illiquidi (Real Estate, Mutui a tasso variabile). Calcolo del Total Balance Sheet VaR (TBS-VaR 95%), Emergency Runway e sovraesposizione settoriale."
+    },
+    "📈 Portfolio Fixed Income & ALM Treasury": {
+        "title": "Analisi Rischio Tassi & ALM Portfolio Aggregator (Duration, DV01 & Curve Twist)",
+        "badge": "Duration • DV01 • Key Rates",
+        "badge_color": "#10b981",
+        "category": "Asset-Liability Management",
+        "desc": "Aggregazione istituzionale del comparto obbligazionario ed ETF a reddito fisso: Macaulay/Modified Duration ponderata, sensibilità monetaria DV01 per basis point, Key Rate Durations (2Y, 5Y, 10Y, 30Y) e rotazione della curva (Bull/Bear Steepener e Flattener)."
+    },
+    "💧 Rischio Liquidità & Orizzonte DTL (Basel III / UCITS)": {
+        "title": "Motore Istituzionale di Liquidità & Orizzonte di Smobilizzo (Days to Liquidate & Amihud)",
+        "badge": "DTL • Amihud • Endogenous L-VaR",
+        "badge_color": "#06b6d4",
+        "category": "Liquidity & Execution Risk",
+        "desc": "Audit dei volumi medi scambiati (ADV), giorni necessari alla liquidazione (DTL al 10% e 20% ADV), indice di illiquidità di Amihud, ripartizione in 4 Tier di liquidità e calcolo del Liquidity-Adjusted VaR (L-VaR) endogeno."
     }
 }
 
@@ -994,6 +1008,185 @@ elif active_stress_tab == "🌐 Total Balance Sheet & Human Capital Stress":
                     </span>
                 </div>
                 """, unsafe_allow_html=True)
+
+# ── TAB 5: PORTFOLIO FIXED INCOME & ALM TREASURY ENGINE ───────
+elif active_stress_tab == "📈 Portfolio Fixed Income & ALM Treasury":
+    st.markdown("#### 📈 Portfolio Fixed Income & ALM Treasury Engine")
+    st.caption("Aggregazione del comparto a reddito fisso: Macaulay/Modified Duration ponderata, DV01/PVBP, Key Rate Durations e scenari di rotazione curva.")
+
+    from core.fixed_income import compute_portfolio_fixed_income_analytics
+    fi_res = compute_portfolio_fixed_income_analytics(df_positions=pos, df_prices=results.get("prices"))
+
+    if not fi_res["has_fixed_income"]:
+        st.info("ℹ️ " + fi_res.get("message", "Nessuna posizione a reddito fisso individuata."))
+    else:
+        k_fi1, k_fi2, k_fi3, k_fi4 = st.columns(4)
+        with k_fi1:
+            metric_card("Controvalore Obbligazionario", fmt_eur(fi_res["fixed_income_value"]), delta=f"{fi_res['fixed_income_weight_pct']:.1f}% del Portafoglio", delta_color="normal")
+        with k_fi2:
+            metric_card("Modified Duration Ponderata", f"{fi_res['weighted_mod_duration']:.2f} anni", delta=f"Mac: {fi_res['weighted_mac_duration']:.2f}y", delta_color="normal")
+        with k_fi3:
+            metric_card("Portfolio DV01 (PVBP)", fmt_eur(fi_res["portfolio_dv01"]), delta="€ per +1 bps", delta_color="inverse")
+        with k_fi4:
+            metric_card("Convessità Effettiva", f"{fi_res['weighted_convexity']:.3f}", delta="2° Ordine Taylor", delta_color="normal")
+
+        st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+        col_krd, col_scen = st.columns([1.2, 1.8])
+
+        with col_krd:
+            st.markdown("##### 📐 Key Rate Durations (2Y, 5Y, 10Y, 30Y)")
+            krd_df = pd.DataFrame(list(fi_res["key_rate_durations"].items()), columns=["Nodo Curva", "Key Rate Duration (Anni)"])
+            fig_krd = go.Figure(go.Bar(
+                x=krd_df["Nodo Curva"],
+                y=krd_df["Key Rate Duration (Anni)"],
+                marker_color="#10b981",
+                text=[f"{v:.2f}y" for v in krd_df["Key Rate Duration (Anni)"]],
+                textposition="auto"
+            ))
+            fig_krd.update_layout(
+                template="plotly_dark", height=280,
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                yaxis=dict(title="Duration (Anni)", gridcolor="rgba(255,255,255,0.06)"),
+                margin=dict(l=10, r=10, t=20, b=10)
+            )
+            apply_plotly_theme(fig_krd)
+            st.plotly_chart(fig_krd, use_container_width=True, config={"displayModeBar": False})
+
+        with col_scen:
+            st.markdown("##### 🌪️ Scenari di Shift & Rotazione Curva (Steepener / Flattener)")
+            scen_rows = []
+            for sc_k, sc_v in fi_res["curve_stress_scenarios"].items():
+                scen_rows.append({
+                    "Scenario": sc_v["name"],
+                    "Rendimento Comparto (%)": sc_v["fi_return_pct"],
+                    "Impatto Monetario (€)": sc_v["fi_pnl_eur"],
+                    "Impatto Portafoglio Totale (%)": sc_v["portfolio_impact_pct"],
+                })
+            df_scen = pd.DataFrame(scen_rows)
+            st.dataframe(
+                df_scen,
+                column_config={
+                    "Scenario": st.column_config.TextColumn("Scenario Curva Tassi", width="large"),
+                    "Rendimento Comparto (%)": st.column_config.NumberColumn("Impatto Comparto", format="%+.2f%%"),
+                    "Impatto Monetario (€)": st.column_config.NumberColumn("PnL Stimato", format="€ %,.2f"),
+                    "Impatto Portafoglio Totale (%)": st.column_config.NumberColumn("Incidenza Totale", format="%+.2f%%"),
+                },
+                use_container_width=True,
+                hide_index=True
+            )
+
+        if fi_res["fi_positions_breakdown"]:
+            st.markdown("##### 📋 Dettaglio Titoli & ETF Obbligazionari")
+            df_det_fi = pd.DataFrame(fi_res["fi_positions_breakdown"])
+            render_table_with_export(
+                df=df_det_fi,
+                table_title="Composizione Comparto Reddito Fisso",
+                file_prefix="portfolio_fixed_income_breakdown",
+                key_suffix="p7_fi_breakdown",
+                column_config={
+                    "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "name": st.column_config.TextColumn("Nome Strumento", width="medium"),
+                    "value_eur": st.column_config.NumberColumn("Valore (€)", format="€ %,.2f"),
+                    "weight_fi_pct": st.column_config.NumberColumn("Peso FI (%)", format="%.2f%%"),
+                    "modified_duration": st.column_config.NumberColumn("Mod Duration", format="%.2f"),
+                    "convexity": st.column_config.NumberColumn("Convessità", format="%.3f"),
+                    "ytm_pct": st.column_config.NumberColumn("YTM Stimato", format="%.2f%%"),
+                    "dv01_eur": st.column_config.NumberColumn("DV01 (€/bps)", format="€ %,.2f"),
+                    "loss_plus_100bps_eur": st.column_config.NumberColumn("Perdita +100bps (€)", format="€ %,.2f"),
+                },
+                hide_index=True
+            )
+
+# ── TAB 6: RISCHIO LIQUIDITA & ORIZZONTE DTL ──────────────────
+elif active_stress_tab == "💧 Rischio Liquidità & Orizzonte DTL (Basel III / UCITS)":
+    st.markdown("#### 💧 Motore Istituzionale di Liquidità & Orizzonte di Smobilizzo")
+    st.caption("Valutazione dei giorni necessari alla liquidazione (DTL), impatto di mercato Almgren-Chriss, indice di Amihud e Liquidity-Adjusted VaR (L-VaR).")
+
+    from core.risk_engine import compute_portfolio_liquidity_risk
+    liq_res = compute_portfolio_liquidity_risk(
+        df_positions=pos,
+        df_prices=results.get("prices"),
+        participation_rate=0.10,
+        portfolio_var_99_pct=results.get("var_99")
+    )
+
+    l_c1, l_c2, l_c3, l_c4 = st.columns(4)
+    with l_c1:
+        metric_card("Days to Liquidate (Medio)", f"{liq_res['weighted_dtl_days']:.2f} giorni", delta="Limite 10% ADV", delta_color="normal")
+    with l_c2:
+        metric_card("Bottleneck di Smobilizzo", f"{liq_res['max_dtl_days']:.1f} giorni", delta=f"Asset: {liq_res['bottleneck_ticker']}", delta_color="inverse")
+    with l_c3:
+        metric_card("L-VaR 99% Endogeno", fmt_eur(liq_res["endogenous_lvar_99_eur"]), delta=f"+{liq_res['liquidity_risk_premium_pct']:.1f}% vs VaR Standard", delta_color="inverse")
+    with l_c4:
+        metric_card("Costo Totale Smobilizzo", fmt_eur(liq_res["total_liquidation_cost_eur"]), delta="Spread + Market Impact", delta_color="inverse")
+
+    st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+    c_t_chart, c_t_info = st.columns([1.3, 1.7])
+
+    with c_t_chart:
+        st.markdown("##### 📊 Ripartizione nei 4 Tier di Liquidità")
+        tiers = liq_res["liquidity_tiers_pct"]
+        fig_tiers = go.Figure(go.Pie(
+            labels=["Tier 1 (< 1 giorno)", "Tier 2 (1-3 giorni)", "Tier 3 (3-7 giorni)", "Tier 4 (> 7 giorni)"],
+            values=[tiers["tier_1_sub_1d"], tiers["tier_2_1_to_3d"], tiers["tier_3_3_to_7d"], tiers["tier_4_above_7d"]],
+            hole=0.45,
+            marker_colors=["#10b981", "#38bdf8", "#f59e0b", "#ef4444"]
+        ))
+        fig_tiers.update_layout(
+            template="plotly_dark", height=280,
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            margin=dict(l=10, r=10, t=10, b=10),
+            legend=dict(orientation="h", yanchor="top", y=-0.1)
+        )
+        apply_plotly_theme(fig_tiers)
+        st.plotly_chart(fig_tiers, use_container_width=True, config={"displayModeBar": False})
+
+    with c_t_info:
+        st.markdown("##### ℹ️ Prescrizioni di Rischio Liquidità (Basel III Standard)")
+        t4_pct = tiers["tier_4_above_7d"]
+        if t4_pct > 15.0:
+            st.markdown(f"""
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #ef4444; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px;">
+                <b style="color: #f87171; font-size: 13.5px;">⚠️ Concentrazione Eccessiva in Asset Illiquidi ({t4_pct:.1f}%)</b><br>
+                <span style="font-size: 12px; color: #cbd5e1; line-height: 1.5;">
+                Oltre il 15% del portafoglio richiede più di 7 giorni di borsa aperta per essere liquidato senza eccedere il 10% del volume medio giornaliero.<br>
+                <b>Collo di bottiglia:</b> <code>{liq_res['bottleneck_ticker']}</code> ({liq_res['max_dtl_days']:.1f} giorni). In caso di margin call o shock sistemico, i costi di disinvestimento forzato aumenteranno sensibilmente la perdita effettiva.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.35); border-left: 4px solid #10b981; border-radius: 8px; padding: 12px 16px; margin-bottom: 10px;">
+                <b style="color: #34d399; font-size: 13.5px;">✅ Profilo di Liquidità Istituzionale Eccellente</b><br>
+                <span style="font-size: 12px; color: #cbd5e1; line-height: 1.5;">
+                Il <b>{tiers['tier_1_sub_1d']:.1f}%</b> del portafoglio può essere smobilizzato entro 24 ore a un tasso di partecipazione prudenziale del 10% di ADV.<br>
+                Il Liquidity-Adjusted VaR (L-VaR) aggiunge un premio di rischio modesto pari a solo il <b>+{liq_res['liquidity_risk_premium_pct']:.1f}%</b> rispetto al VaR non rettificato.
+                </span>
+            </div>
+            """, unsafe_allow_html=True)
+
+    if liq_res["positions_liquidity_breakdown"]:
+        st.markdown("##### 📋 Dettaglio Liquidità & Market Impact per Singola Posizione")
+        df_liq_pos = pd.DataFrame(liq_res["positions_liquidity_breakdown"])
+        render_table_with_export(
+            df=df_liq_pos,
+            table_title="Analisi Orizzonte di Liquidazione per Asset",
+            file_prefix="portfolio_liquidity_risk_breakdown",
+            key_suffix="p7_liq_breakdown",
+            column_config={
+                "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "name": st.column_config.TextColumn("Nome Asset", width="medium"),
+                "value_eur": st.column_config.NumberColumn("Valore (€)", format="€ %,.2f"),
+                "adv_eur": st.column_config.NumberColumn("ADV Stimato (€)", format="€ %,.0f"),
+                "days_to_liquidate_10pct": st.column_config.NumberColumn("DTL (10% ADV)", format="%.2f g"),
+                "days_to_liquidate_20pct": st.column_config.NumberColumn("DTL (20% ADV)", format="%.2f g"),
+                "amihud_illiquidity_ratio": st.column_config.NumberColumn("Amihud Ratio", format="%.2e"),
+                "bid_ask_spread_bps": st.column_config.NumberColumn("Spread (bps)", format="%.1f"),
+                "estimated_liquidation_cost_eur": st.column_config.NumberColumn("Costo Smobilizzo (€)", format="€ %,.2f"),
+                "tier": st.column_config.TextColumn("Tier di Liquidità", width="medium"),
+            },
+            hide_index=True
+        )
 
 st.divider()
 
