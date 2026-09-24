@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-720%2F720%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-726%2F726%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -15,9 +15,9 @@
 
 ---
 
-## 🚀 Spinu Convex Risk Budgeting, EBA Reverse Stress, Gatheral SVI & Factsheet Engine (v9.10.0)
+## 🚀 Walk-Forward Rolling OOS Engine, HMM Adaptive Allocation, Total Wealth Reverse Stress & MIP Rebalancing (v9.11.0)
 
-ARGUS v9.10.0 introduce il solutore convesso di Florian Spinu (2013) per Risk Budgeting & Equal Risk Contribution (ERC), il motore di Regulatory Reverse Stress Testing (EBA / BCE Guidelines con distanza di Mahalanobis), la superficie di volatilità 3D No-Arbitrage SVI di Jim Gatheral (2004), il generatore di Institutional Factsheet PDF a 2 pagine conforme Morningstar/BlackRock, e l'espansione del microservizio REST API con 7 nuovi endpoint:
+ARGUS v9.11.0 introduce il simulatore Walk-Forward multi-strategia Out-of-Sample con attrito reale, l'overlay tattico adattivo con Hidden Markov Models (HMM), il Reverse Stress Testing sul patrimonio consolidato (Solvency II), il ribilanciatore discreto a numeri interi con programmazione lineare mista (SciPy HiGHS MILP), la coda asincrona di job con WebSocket gateway e il Dossier Regolamentare PDF a 4 pagine:
 
 * **📦 Python Package Headless & CLI Console Scripts (`argus-risk`)**:
   ```bash
@@ -36,20 +36,29 @@ ARGUS v9.10.0 introduce il solutore convesso di Florian Spinu (2013) per Risk Bu
   ```
 
 * **⚡ Microservizio REST API ad Alte Prestazioni (`api/main.py`)**:
-  Server asincrono ASGI (`uvicorn api.main:app --port 8000`) alimentato dal disaccoppiato **Application Service Layer** (`core/services/`), con contratti dichiarativi Pydantic v2 e documentazione OpenAPI Swagger interattiva (`/docs`, `/redoc`):
-  - `GET /health`: Health-check dedicato, diagnostica del motore v9.10.0 e disponibilità DuckDB C++.
-  - `POST /api/v1/risk/metrics`: Calcolo istantaneo di VaR/CVaR Cornish-Fisher, Sharpe, Sortino, Drawdown e momenti superiori.
-  - `POST /api/v1/optimize/hrp`: Ottimizzazione di portafoglio con algoritmo Hierarchical Risk Parity (López de Prado 2016).
+  Server asincrono ASGI (`uvicorn api.main:app --port 8000`) con coda asincrona `BackgroundTasks`, WebSocket streaming (`/api/v1/stream/ticks`) e contratti Pydantic v2:
+  - `GET /health`: Health-check dedicato, diagnostica del motore v9.11.0 e disponibilità DuckDB C++.
+  - `POST /api/v1/jobs/submit`: Accodamento asincrono non bloccante di task quantitativi pesanti (Walk-Forward, MIP, Stress).
+  - `GET /api/v1/jobs/{job_id}`: Polling di stato e recupero dei risultati elaborati dal background worker.
+  - `GET /api/v1/jobs`: Registro storico e diagnostico dei task in esecuzione/completati.
+  - `WS /api/v1/stream/ticks`: Streaming WebSocket di tick di mercato ad alta frequenza con bid/ask spread.
+  - `POST /api/v1/backtest/walk-forward`: Simulazione rolling out-of-sample (Equal Weight, HRP, ERC, Max Sharpe).
+  - `POST /api/v1/optimize/regime-adaptive`: Allocazione condizionata a regimi HMM con haircut asimmetrici.
+  - `POST /api/v1/risk/total-wealth-reverse-stress`: Reverse stress testing su 5 macro-fattori patrimoniali.
+  - `POST /api/v1/rebalance/mip`: Ottimizzazione discreta a quote intere con limite di cardinalità e CGT budget.
+  - `GET /api/v1/reports/stress-dossier`: Download del Dossier Regolamentare PDF a 4 pagine (EBA / Solvency II).
+  - `POST /api/v1/risk/metrics`: Calcolo istantaneo di VaR/CVaR Cornish-Fisher, Sharpe, Sortino e drawdown.
+  - `POST /api/v1/optimize/hrp`: Ottimizzazione di portafoglio con algoritmo Hierarchical Risk Parity.
   - `POST /api/v1/optimize/erc`: Spinu (2013) Strictly Convex Potential Risk Budgeting & Equal Risk Contribution.
   - `POST /api/v1/risk/reverse-stress`: Regulatory Reverse Stress Testing (EBA / BCE minimum Mahalanobis distance).
-  - `POST /api/v1/risk/fama-french`: Regressione multivariata e attribuzione a 3/4/5 fattori + Momentum (Kenneth French).
-  - `POST /api/v1/fixed-income/analytics`: Metriche Bloomberg YAS (YTM, Macaulay/Modified Duration, Convexity, DV01/PVBP).
+  - `POST /api/v1/risk/fama-french`: Regressione multivariata e attribuzione a 3/4/5 fattori + Momentum.
+  - `POST /api/v1/fixed-income/analytics`: Metriche Bloomberg YAS (YTM, Duration, Convexity, DV01/PVBP).
   - `POST /api/v1/risk/liquidity`: Basel III Days-to-Liquidate (DTL), Amihud illiquidity ratio e L-VaR.
-  - `POST /api/v1/tax/harvesting`: Italian TUIR tax-loss harvesting screening e calcolo potenziale risparmio d'imposta.
+  - `POST /api/v1/tax/harvesting`: Italian TUIR tax-loss harvesting screening e calcolo potenziale risparmio.
   - `GET /api/v1/reports/factsheet`: Streaming del PDF Factsheet istituzionale a 2 pagine certificato.
   - `GET /api/v1/wealth/networth`: Consolidamento istantaneo Net Worth, liquidità, solvency ratio e health score.
-  - `POST /api/v1/rebalance`: Pianificazione del ribilanciamento multi-asset con impatto fiscale TUIR e gate MiFID II.
-  - `POST /api/v1/ledger/timetravel`: Ricostruzione contabile bitemporale Point-in-Time con sigillo crittografico Merkle Tree.
+  - `POST /api/v1/rebalance`: Ribilanciamento con supporto strategie `autonomous`, `tax_aware` e `mip_cardinality`.
+  - `POST /api/v1/ledger/timetravel`: Ricostruzione contabile bitemporale Point-in-Time con sigillo Merkle Tree.
 
 * **🏛️ Application Service Layer Headless (`core/services/`)**:
   Architettura a servizi applicativi agnostici dall'interfaccia utente: `RiskService` (VaR, CVaR, HRP, Monte Carlo stocastico), `TaxService` (TUIR Art. 67, Crypto, Cross-Border) e `WealthService` (Net Worth, Solvency, Stress Testing, Glide Path), condivisi identicamente da FastAPI e da tutte le 21 viste Streamlit.

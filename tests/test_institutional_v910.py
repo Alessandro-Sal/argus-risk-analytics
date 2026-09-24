@@ -229,7 +229,7 @@ def test_api_endpoints_via_testclient():
     assert health_resp.status_code == 200
     data = health_resp.json()
     assert data["status"] == "healthy"
-    assert data["version"] == "9.10.0"
+    assert data["version"] == "9.11.0"
 
     # 2. Risk Parity / ERC endpoint
     erc_payload = {

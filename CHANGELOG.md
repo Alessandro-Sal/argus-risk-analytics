@@ -7,6 +7,44 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.11.0] - 2026-09-25
+
+### 🌐 Walk-Forward Rolling OOS Engine, HMM Adaptive Allocation, Total Wealth Reverse Stress, SciPy HiGHS MIP Rebalancer, Async Job Queue & Regulatory Stress Dossier PDF
+
+Questa major release istituzionale completa l'infrastruttura quantitativa e headless di ARGUS, introducendo 6 pilastri avanzati per la gestione del rischio, l'ottimizzazione discreta e la scalabilità microservizi:
+
+- **Walk-Forward Multi-Strategy Rolling Out-of-Sample Engine (`core/walk_forward_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Simulazione rolling out-of-sample realistica per strategie quantitative (Equal Weight, HRP, Spinu ERC, Max Sharpe Ledoit-Wolf).
+  - Finestre di training in-sample configurabili e finestre out-of-sample rolling con frizioni di mercato (commissioni di ribilanciamento bps, slippage ed execution spread).
+  - Serie cumulate out-of-sample, drawdown profile e statistiche complete (CAGR, Volatilità, Sharpe Ratio, Calmar Ratio, Max Drawdown, Annual Turnover).
+- **Regime-Conditional Adaptive Allocation & HMM Overlay (`core/regime_allocation.py`)**:
+  - Classificazione probabilistica dello stato di mercato (Bull, Neutral, Crisis) con Hidden Markov Model (HMM) e Gaussian Mixture.
+  - Modulazione dinamica dei budget di rischio $b_i$: haircut prudenziale sugli asset risk-on in caso di shock/crisi e sovrappeso asimmetrico su safe-haven e cash proxy.
+  - Risoluzione dell'allocazione ottima tramite Spinu Convex Risk Budgeting (`solve_spinu_risk_budgeting`).
+- **Total Wealth Reverse Stress Testing (Solvency & Ruin Multi-Asset) (`core/wealth/total_wealth_reverse_stress.py`, `core/macro_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Formulazione di Reverse Stress Testing su 5 fattori di ricchezza familiare/HNWI (Liquid Markets, Real Estate, Corporate Equity / PMI, Debito/Mutui Euribor, Illiquid / Luxury).
+  - Ottimizzazione vincolata a minima distanza di Mahalanobis $D_M$ sotto matrice di covarianza macroeconomica congiunta per barriere di solvibilità (Debt-to-Assets $\ge 60\%$) e rovina patrimoniale (Net Worth loss).
+  - Identificazione analitica del fattore più vulnerabile, stima del periodo di ritorno probabilistico (distribuzione $\chi^2$) e raccomandazioni di salvaguardia patrimoniale.
+- **Mixed-Integer Programming (MIP) Cardinality & Lot-Sizing Rebalancer (`core/mip_rebalancer.py`, `core/services/rebalancing_service.py`)**:
+  - Solutore MILP basato su SciPy HiGHS (`scipy.optimize.milp`) per l'allocazione con quote intere e vincoli discreti reali.
+  - Vincolo di cardinalità massima $\sum z_i \le K$ per portafogli compatti a basso turnover.
+  - Vincolo di lotto minimo negoziabile ($L_i \in \mathbb{Z}^+$), soglia minima di trade in EUR e budget fiscale sulle plusvalenze realizzate (CGT budget).
+  - Integrazione nativa in `RebalancingService.execute_rebalance` sotto strategia `"mip_cardinality"`.
+- **Asynchronous Job Queue & WebSocket Gateway per la REST API Headless (`api/main.py`)**:
+  - Motore di job non bloccante con `BackgroundTasks` di FastAPI:
+    - `POST /api/v1/jobs/submit`: Accodamento asincrono di task ad alta intensità computazionale.
+    - `GET /api/v1/jobs/{job_id}`: Polling di stato e recupero dei risultati.
+    - `GET /api/v1/jobs`: Registro storico dei job eseguiti.
+  - Streaming in tempo reale tramite WebSocket su `/api/v1/stream/ticks`.
+  - Nuovi endpoint REST sincroni: `/api/v1/backtest/walk-forward`, `/api/v1/optimize/regime-adaptive`, `/api/v1/risk/total-wealth-reverse-stress`, `/api/v1/rebalance/mip`, `/api/v1/reports/stress-dossier`.
+- **Regulatory Stress Testing Dossier PDF a 4 Pagine (`core/pdf_generator.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Generatore vettoriale di documentazione fiduciaria A4 conforme a EBA Guidelines on Stress Testing / Basel III / Solvency II.
+  - 4 pagine strutturate: Executive Macro Summary & Scenari EBA/CCAR (Pag. 1), Decomposizione Fattori & Attribuzione Perdite (Pag. 2), Reverse Stress Testing & Rovina Patrimoniale (Pag. 3), Piano di Mitigazione Capitale & Tracciabilità di Audit con firme CRO/Compliance (Pag. 4).
+- **Suite di Test Unitari & Integrazione v9.11.0 (`tests/test_v911_institutional_suite.py`)**:
+  - Suite dedicata con 6 test esaustivi coprenti tutti i pilastri (100% pass rate).
+
+---
+
 ## [9.10.0] - 2026-09-24
 
 ### 💎 Spinu Convex Risk Budgeting, Regulatory Reverse Stress Testing, Gatheral SVI & Institutional Factsheet PDF

@@ -664,3 +664,8 @@ def compute_reverse_stress_test(
     }
 
 
+# Re-export Total Wealth Reverse Stress Engine (v9.11.0)
+from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
+
+
+

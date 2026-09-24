@@ -30,7 +30,7 @@ def test_health_endpoint(client):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["version"] == "9.10.0"
+    assert data["version"] == "9.11.0"
     assert "engine" in data
     assert isinstance(data["duckdb_available"], bool)
     assert "timestamp" in data
