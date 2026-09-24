@@ -1427,3 +1427,48 @@ df_tw_shocks = pd.DataFrame([
     {"Fattore di Rischio Patrimoniale": "Beni di Lusso / Illiquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['illiquid_luxury_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['illiquid_luxury_loss_eur'])},
 ])
 st.table(df_tw_shocks)
+
+
+# ── V9.12.0: SOLVENCY II STANDARD FORMULA & SCR ENGINE ─────────────
+st.markdown("---")
+st.markdown("#### 🛡️ Solvency II Standard Formula & SCR Capital Engine (EIOPA QRT S.25.01 / S.26.01)")
+st.caption("Calcolo del Requisito Patrimoniale di Solvibilita (SCR) conforme al Regolamento Delegato (UE) 2015/35.")
+
+from core.solvency2_engine import compute_solvency2_standard_formula
+
+with st.expander("⚙️ Parametri Solvency II & Fondi Propri Ammissibili", expanded=False):
+    s2_c1, s2_c2 = st.columns(2)
+    with s2_c1:
+        s2_eof = st.number_input("Eligible Own Funds (Tier 1 + Tier 2) (€):", min_value=100000.0, value=2500000.0, step=100000.0)
+        s2_tp = st.number_input("Riserve Tecniche Lorde (€):", min_value=0.0, value=1500000.0, step=100000.0)
+    with s2_c2:
+        s2_symm = st.slider("Aggiustamento Simmetrico Azionario (%):", min_value=-10.0, max_value=10.0, value=0.0, step=1.0) / 100.0
+
+sample_s2_assets = [
+    {"name": "Azioni Core Europa", "asset_type": "equity_type1", "value": 800000.0, "duration": 0.0, "cqs_rating": 2, "currency": "EUR"},
+    {"name": "Emerging Markets Equity", "asset_type": "equity_type2", "value": 300000.0, "duration": 0.0, "cqs_rating": 3, "currency": "USD"},
+    {"name": "BTP Governativi 10Y", "asset_type": "bond", "value": 900000.0, "duration": 7.5, "cqs_rating": 3, "currency": "EUR"},
+    {"name": "Corporate Bond Investment Grade", "asset_type": "bond", "value": 500000.0, "duration": 4.2, "cqs_rating": 2, "currency": "EUR"},
+    {"name": "Immobili a Reddito", "asset_type": "property", "value": 400000.0, "duration": 0.0, "cqs_rating": 2, "currency": "EUR"},
+    {"name": "Liquidita & Depositi Bancari", "asset_type": "cash", "value": 200000.0, "duration": 0.25, "cqs_rating": 2, "currency": "EUR"},
+]
+
+s2_report = compute_solvency2_standard_formula(
+    portfolio_assets=sample_s2_assets,
+    eligible_own_funds=s2_eof,
+    technical_provisions=s2_tp,
+    symmetric_equity_adjustment=s2_symm,
+)
+
+s2k1, s2k2, s2k3, s2k4 = st.columns(4)
+with s2k1:
+    metric_card("Eligible Own Funds", fmt_eur(s2_report["eligible_own_funds"]), delta="Tier 1 + Tier 2", delta_color="normal")
+with s2k2:
+    metric_card("Requisito SCR Totale", fmt_eur(s2_report["scr_total"]), delta=f"BSCR: {fmt_eur(s2_report['bscr'])}", delta_color="inverse")
+with s2k3:
+    metric_card("Beneficio Diversificazione", fmt_eur(s2_report["market_diversification_benefit"]), delta="Aggregazione EIOPA", delta_color="normal")
+with s2k4:
+    metric_card("Solvency Ratio", f"{s2_report['solvency_ratio_pct']:.1f}%", delta=s2_report["solvency_health"], delta_color="normal" if s2_report["solvency_ratio_pct"] >= 160 else "inverse")
+
+st.markdown("##### 📋 Prospetto Regolamentare QRT S.25.01.21 (SCR Standard Formula)")
+st.dataframe(pd.DataFrame(list(s2_report["qrt_s25_01"].items()), columns=["Voce Regolamentare", "Valore"]), use_container_width=True, hide_index=True)

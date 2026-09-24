@@ -2763,3 +2763,39 @@ with main_tab_stress:
         st.plotly_chart(simulate_wealth_recovery_trajectories(stress_out["post_shock"]["net_worth"]), use_container_width=True)
 
 
+
+
+# ── V9.12.0: FAMILY OFFICE GENERATIONAL SUCCESSION OPTIMIZER ────────
+st.markdown("---")
+st.markdown("#### 🌳 Ottimizzatore Successorio Generazionale Multi-Veicolo (Patto di Famiglia vs Trust vs Polizze)")
+st.caption("Confronto probabilistico a 30 anni tra Regime Ordinario, Holding Familiare (PEX 95% Art. 87 TUIR / Patto ex Art. 768-bis c.c.), Trust Fiduciario (AdE 34/E/2022) e Polizze Vita PPLI (Art. 12 TUS).")
+
+from core.wealth.succession_optimizer import compute_family_succession_optimization
+
+with st.expander("⚙️ Configura Asse Ereditario & Profilo Familiare", expanded=False):
+    f_c1, f_c2 = st.columns(2)
+    with f_c1:
+        succ_liq = st.number_input("Liquidita & Titoli Finanziari (€):", min_value=0.0, value=5000000.0, step=500000.0)
+        succ_biz = st.number_input("Partecipazione Azienda / Holding (€):", min_value=0.0, value=10000000.0, step=1000000.0)
+    with f_c2:
+        succ_re = st.number_input("Patrimonio Immobiliare Privato (€):", min_value=0.0, value=4000000.0, step=500000.0)
+        succ_heirs = st.number_input("Numero di Eredi / Figli:", min_value=1, max_value=6, value=2, step=1)
+
+succ_res = compute_family_succession_optimization(
+    liquid_investments_eur=succ_liq,
+    operating_business_equity_eur=succ_biz,
+    real_estate_properties_eur=succ_re,
+    num_children=succ_heirs,
+)
+
+succ_k1, succ_k2, succ_k3 = st.columns(3)
+with succ_k1:
+    metric_card("Patrimonio Iniziale", fmt_eur(succ_res["initial_estate_total_eur"]), delta="G1 Fondatore", delta_color="normal")
+with succ_k2:
+    metric_card("Architettura Raccomandata", succ_res["recommended_strategy"], delta="Ottimizzazione Fiscale", delta_color="normal")
+with succ_k3:
+    best_tax_alpha = succ_res["strategies"][succ_res["recommended_strategy"]]["tax_alpha_eur"]
+    metric_card("Tax Alpha Generazionale", fmt_eur(best_tax_alpha), delta="Risparmio Fiscale 30Y", delta_color="normal")
+
+st.markdown("##### 📊 Confronto Architetture di Protezione & Successione")
+st.dataframe(pd.DataFrame(succ_res["summary_table"]), use_container_width=True, hide_index=True)

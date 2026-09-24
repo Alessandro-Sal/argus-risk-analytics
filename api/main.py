@@ -23,8 +23,11 @@ except ImportError:
     FastAPI = object  # Fallback for type hinting
 
 from core.advanced_quant import compute_risk_budgeting_portfolio
+from core.barra_risk_model import compute_barra_structural_risk
 from core.bitemporal_engine import BitemporalLedgerEngine
+from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
 from core.factor_library import compute_fama_french_factor_model
+from core.fix_engine import execute_mock_fix_order
 from core.fixed_income import compute_bond_analytics
 from core.macro_stress_engine import compute_reverse_stress_test
 from core.mip_rebalancer import solve_mip_rebalance
@@ -38,8 +41,11 @@ from core.services.rebalancing_service import RebalancingService
 from core.services.risk_service import RiskService
 from core.services.tax_service import TaxService
 from core.services.wealth_service import WealthService
+from core.solvency2_engine import compute_solvency2_standard_formula
 from core.tax_engine import compute_tax_and_harvesting
 from core.walk_forward_engine import run_walk_forward_backtest
+from core.watchdog.risk_watchdog import RiskWatchdogService, evaluate_risk_appetite_framework
+from core.wealth.succession_optimizer import compute_family_succession_optimization
 from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
 
 logger = logging.getLogger("argus.api")
@@ -80,6 +86,58 @@ class TotalWealthReverseStressRequest(BaseModel):
     balance_sheet: Dict[str, float] = Field(..., description="Balance sheet: liquid_assets, real_estate, corporate_equity, illiquid_assets, total_liabilities")
     target_type: str = Field(default="solvency", description="'solvency' or 'ruin'")
     target_threshold: float = Field(default=0.60, description="Critical threshold (e.g. 0.60 for D/A ratio or 0.50 for ruin)")
+
+
+class BarraRiskRequest(BaseModel):
+    """Payload for Barra Structural Multi-Asset Risk Model."""
+    returns: Dict[str, List[float]] = Field(..., description="Historical returns dictionary {ticker: [ret1, ret2, ...]}")
+    weights: Optional[Dict[str, float]] = None
+    factor_returns: Optional[Dict[str, List[float]]] = None
+    benchmark_weights: Optional[Dict[str, float]] = None
+
+
+class Solvency2ScrRequest(BaseModel):
+    """Payload for Solvency II Standard Formula SCR calculation."""
+    positions: List[Dict[str, Any]] = Field(..., description="Portfolio assets list with value, duration, CQS, asset_type")
+    eligible_own_funds: float = Field(..., description="Eligible Own Funds (Tier 1 + Tier 2 capital) in EUR")
+    technical_provisions: float = Field(default=0.0, description="Gross technical provisions in EUR")
+    symmetric_equity_adjustment: float = Field(default=0.0, ge=-0.10, le=0.10)
+
+
+class DccGarchRequest(BaseModel):
+    """Payload for DCC-GARCH and Vine Copula Tail Risk Engine."""
+    returns: Dict[str, List[float]] = Field(..., description="Historical returns dictionary {ticker: [ret1, ret2, ...]}")
+    weights: Optional[Dict[str, float]] = None
+    n_mc_sims: int = Field(default=2000, ge=100)
+
+
+class FixOrderRequest(BaseModel):
+    """Payload for Mock FIX 4.4 Order Execution & L2 DOM Simulator."""
+    symbol: str = Field(default="SWDA.MI")
+    side: str = Field(default="BUY")
+    qty: int = Field(default=1000, gt=0)
+    order_type: str = Field(default="MARKET")
+    limit_price: Optional[float] = None
+    mid_price: float = Field(default=100.0, gt=0.0)
+
+
+class SuccessionOptimizationRequest(BaseModel):
+    """Payload for Generational Wealth Succession Optimizer."""
+    liquid_investments_eur: float = Field(default=5_000_000.0)
+    operating_business_equity_eur: float = Field(default=10_000_000.0)
+    real_estate_properties_eur: float = Field(default=4_000_000.0)
+    alternative_investments_eur: float = Field(default=1_000_000.0)
+    num_children: int = Field(default=2, ge=1)
+    has_spouse: bool = Field(default=True)
+    annual_consumption_eur: float = Field(default=120_000.0)
+
+
+class WatchdogCheckRequest(BaseModel):
+    """Payload for Event-Driven Risk Watchdog limit evaluation."""
+    metrics: Dict[str, Any] = Field(..., description="Active portfolio metrics dictionary")
+    custom_limits: Optional[Dict[str, float]] = None
+    channels: Optional[List[str]] = Field(default=["telegram", "discord", "slack"])
+    mock_dispatch: bool = Field(default=True)
 
 
 class MipRebalanceRequest(BaseModel):
@@ -579,7 +637,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.11.0",
+        version="9.12.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -592,8 +650,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # In-memory bitemporal ledger instance for demonstration and stateless caching
+    # In-memory bitemporal ledger instance and watchdog service
     ledger_instance = BitemporalLedgerEngine(db_path=":memory:")
+    watchdog_instance = RiskWatchdogService(mock_dispatch=True)
 
     # ── Health Endpoint ──────────────────────────────────────────
 
@@ -603,7 +662,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.11.0",
+            version="9.12.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1288,6 +1347,103 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Stress dossier PDF failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── V9.12.0 Institutional Endpoints ─────────────────────────
+
+    @app.post("/api/v1/risk/barra", tags=["Quantitative Risk Engine"])
+    def run_barra_structural_risk(req: BarraRiskRequest) -> Dict[str, Any]:
+        """Barra-style structural multi-asset factor risk decomposition."""
+        try:
+            df_returns = pd.DataFrame(req.returns)
+            df_factors = pd.DataFrame(req.factor_returns) if req.factor_returns else None
+            return compute_barra_structural_risk(
+                asset_returns=df_returns,
+                weights=req.weights,
+                factor_returns=df_factors,
+                benchmark_weights=req.benchmark_weights,
+            )
+        except Exception as exc:
+            logger.error("Barra risk model failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/risk/solvency2-scr", tags=["Risk Analytics"])
+    def run_solvency2_scr(req: Solvency2ScrRequest) -> Dict[str, Any]:
+        """EIOPA Solvency II Standard Formula Solvency Capital Requirement (SCR)."""
+        try:
+            return compute_solvency2_standard_formula(
+                portfolio_assets=req.positions,
+                eligible_own_funds=req.eligible_own_funds,
+                technical_provisions=req.technical_provisions,
+                symmetric_equity_adjustment=req.symmetric_equity_adjustment,
+            )
+        except Exception as exc:
+            logger.error("Solvency II SCR failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/risk/dcc-garch", tags=["Quantitative Risk Engine"])
+    def run_dcc_garch_tail_risk(req: DccGarchRequest) -> Dict[str, Any]:
+        """DCC-GARCH Dynamic Conditional Correlation and Vine Copula Tail Risk."""
+        try:
+            df_returns = pd.DataFrame(req.returns)
+            return compute_dcc_garch_extreme_risk(
+                returns_df=df_returns,
+                weights=req.weights,
+                n_mc_sims=req.n_mc_sims,
+            )
+        except Exception as exc:
+            logger.error("DCC-GARCH tail risk failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/execution/fix/order", tags=["Execution & Algos"])
+    def run_fix_order_execution(req: FixOrderRequest) -> Dict[str, Any]:
+        """Mock FIX 4.4 simulated order execution against 10-level DOM and TCA."""
+        try:
+            return execute_mock_fix_order(
+                symbol=req.symbol,
+                side=req.side,
+                qty=req.qty,
+                order_type=req.order_type,
+                limit_price=req.limit_price,
+                mid_price=req.mid_price,
+            )
+        except Exception as exc:
+            logger.error("FIX execution failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/wealth/succession-optimization", tags=["Wealth Management"])
+    def run_succession_optimization(req: SuccessionOptimizationRequest) -> Dict[str, Any]:
+        """Family Office 30-year multi-generational succession Monte Carlo optimizer."""
+        try:
+            return compute_family_succession_optimization(
+                liquid_investments_eur=req.liquid_investments_eur,
+                operating_business_equity_eur=req.operating_business_equity_eur,
+                real_estate_properties_eur=req.real_estate_properties_eur,
+                alternative_investments_eur=req.alternative_investments_eur,
+                num_children=req.num_children,
+                has_spouse=req.has_spouse,
+                annual_consumption_eur=req.annual_consumption_eur,
+            )
+        except Exception as exc:
+            logger.error("Succession optimization failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/watchdog/check", tags=["System"])
+    def run_watchdog_check(req: WatchdogCheckRequest) -> Dict[str, Any]:
+        """Evaluates active risk limits against RAF thresholds and dispatches alerts."""
+        try:
+            return watchdog_instance.evaluate_and_notify(
+                metrics=req.metrics,
+                channels=req.channels,
+                custom_limits=req.custom_limits,
+            )
+        except Exception as exc:
+            logger.error("Watchdog evaluation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/api/v1/watchdog/alerts", tags=["System"])
+    def get_watchdog_alerts(limit: int = 50) -> List[Dict[str, Any]]:
+        """Returns recent watchdog alert events."""
+        return watchdog_instance.get_recent_alerts(limit=limit)
 
     return app
 

@@ -14,6 +14,10 @@ from core.wealth.asset_protection_engine import (
     StatutoryShareItem,
     SuccessionSharesResult,
 )
+from core.wealth.succession_optimizer import (
+    FamilyOfficeSuccessionOptimizer,
+    compute_family_succession_optimization,
+)
 from core.wealth.tbs_monte_carlo import (
     TBSLifecycleConfig,
     TBSMonteCarloEngine,

@@ -82,6 +82,24 @@ Unsupervised Hidden Markov Model (HMM) and Gaussian Mixture classification of la
 ### 14. Mixed-Integer Programming (MIP) Rebalancer & Async REST Queue
 SciPy HiGHS Mixed-Integer Linear Programming (MILP) solving discrete share rebalancing subject to maximum cardinality constraints ($\sum z_i \le K$), minimum lot sizes ($L_i$), and capital gains tax budgets; complemented by an asynchronous job queue (`BackgroundTasks`) and WebSocket tick streaming gateway for enterprise scale.
 
+### 15. Barra-Style Structural Multi-Asset Risk Model
+Structural multi-factor covariance decomposition $\boldsymbol{\Sigma} = \mathbf{X}\boldsymbol{\Sigma}_F\mathbf{X}^T + \boldsymbol{\Delta}_\epsilon$ across 6 style factors (Size, Value, Momentum, Quality, Low Volatility, Liquidity), 11 GICS sectors, and macro factors (Term, Credit, Breakeven Inflation, FX USD) with Euler Marginal/Percent Contribution to Total Risk (MCTR/PCTR) and Active Tracking Error.
+
+### 16. Solvency II Standard Formula & SCR Engine
+EIOPA Delegated Regulation (EU) 2015/35 Solvency Capital Requirement engine: Market risk sub-modules (Interest Rate up/down, Equity Type 1/2, Property 25%, Spread CQS 0-6, Concentration, Currency), correlation aggregation $\boldsymbol{\Omega}_{\text{mkt}}$, Basic SCR (BSCR), Operational Risk, Loss-Absorbing Capacity, Solvency Ratio, and QRT S.25.01 / S.26.01 reporting.
+
+### 17. DCC-GARCH & Regular Vine Copula Dynamic Tail Risk
+Two-stage econometric modeling: univariate GARCH(1,1) volatility filtering, Engle (2002) time-varying Dynamic Conditional Correlation $R_t$, and Regular Vine Copula pair decomposition (Clayton, Gumbel, Student-t) capturing non-linear tail dependence and forecasting dynamic 1-day/5-day VaR/CVaR.
+
+### 18. Mock FIX 4.4 Engine & L2 Depth-of-Market (DOM) Simulator
+Tag-value FIX 4.4 parser/serializer with 3-digit modulo-256 CheckSum verification, 10-level synthetic order book matching engine with liquidity depletion and queue fill modeling, and post-trade Transaction Cost Analysis (Arrival Price, Execution VWAP, Implementation Shortfall in EUR and bps).
+
+### 19. Family Office Generational Succession Optimizer
+30-year multi-generational stochastic Monte Carlo engine comparing 5 succession architectures under Italian/EU law: Holding Familiare (PEX 95% Art. 87 TUIR / Patto di Famiglia Art. 768-bis c.c. & Art. 3 c. 4-ter D.Lgs. 346/1990) vs. Trust Fiduciario (AdE 34/E/2022) vs. Polizze Vita PPLI (Art. 12 D.Lgs. 346/1990) vs. Regime Ordinario, calculating Generational Tax Alpha (€ and %) and capital preservation probabilities.
+
+### 20. Event-Driven Risk Watchdog & Multi-Channel Notification Hub
+Autonomous real-time monitor against institutional Risk Appetite Framework (RAF) thresholds (VaR 99%, Solvency Ratio, Max Drawdown, concentration limits) with multi-channel webhook dispatching to Telegram, Discord, Slack, and SMTP Email with testing mock mode and in-memory event audit log.
+
 ---
 
 ## Quick Navigation
