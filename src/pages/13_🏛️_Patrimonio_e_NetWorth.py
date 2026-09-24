@@ -421,13 +421,14 @@ with r2_c3:
 st.divider()
 
 # ── MACRO-TAB DEL PATRIMONIO PER MASSIMA EFFICIENZA & CHIAREZZA ───
-main_tab_alloc, main_tab_sheet, main_tab_temporal, main_tab_fo, main_tab_fx, main_tab_stress = st.tabs([
-    "🏛️ Bilancio & Allocazione",
-    "📋 Bilancio Personale & Stato Patrimoniale",
-    "📊 Wealth Temporal Desk",
-    "🏢 Family Office & Holding",
+main_tab_alloc, main_tab_sheet, main_tab_temporal, main_tab_fo, main_tab_fx, main_tab_stress, main_tab_struct = st.tabs([
+    "📊 Bilancio & Allocazione",
+    "📑 Bilancio Personale & Stato Patrimoniale",
+    "⏳ Wealth Temporal Desk",
+    "🏛️ Family Office & Holding",
     "💱 Rischio FX & Attribuzione Brinson",
-    "🌪️ Global Wealth Stress-Testing"
+    "🌪️ Global Wealth Stress-Testing",
+    "💎 Prodotti Strutturati & PRIIPs/SFDR"
 ])
 
 # ══════════════════════════════════════════════════════════════
@@ -2864,3 +2865,130 @@ if ds_info:
 
 st.markdown("##### 📋 Piano Annuale Dettagliato dei Flussi di Cassa del Fondo")
 st.dataframe(sched_df, use_container_width=True, hide_index=True)
+
+
+# ══════════════════════════════════════════════════════════════
+# TAB 7: PRODOTTI STRUTTURATI & REPORTING REGOLAMENTARE PRIIPs / SFDR
+# ══════════════════════════════════════════════════════════════
+with main_tab_struct:
+    st.markdown("### 💎 Ingegneria Finanziaria: Certificati Strutturati & Reporting PRIIPs/SFDR")
+    st.caption("Pricing Monte Carlo multi-asset Worst-Of (Phoenix & Reverse Convertible) e compliance disclosure regolamentare (PRIIPs RTS & SFDR RTS).")
+
+    sub_struct_prod, sub_reg_rep = st.tabs([
+        "💎 Prezzatore Prodotti Strutturati & Greche",
+        "📋 Reporting PRIIPs KID (SRI) & SFDR ESG (Annex I)"
+    ])
+
+    with sub_struct_prod:
+        from core.structured_products_engine import compute_structured_product_pricing
+
+        st.markdown("#### 💎 Valutazione Worst-Of Phoenix Autocallable & Reverse Convertible")
+        sp_c1, sp_c2, sp_c3 = st.columns(3)
+        with sp_c1:
+            prod_choice = st.selectbox("Tipologia Certificato:", ["phoenix_autocallable", "reverse_convertible"], format_func=lambda x: "Phoenix Autocallable (Memory Coupon)" if x == "phoenix_autocallable" else "Reverse Convertible (Cedola Fissa)", key="sp_type_sel")
+            sp_nominal = st.number_input("Valore Nominale per Titolo (€):", min_value=100.0, value=1000.0, step=100.0, key="sp_nom_in")
+            sp_mat_yrs = st.slider("Scadenza Totale (Anni):", min_value=0.5, max_value=5.0, value=2.0, step=0.5, key="sp_mat_slider")
+        with sp_c2:
+            sp_coupon_pa = st.number_input("Cedola Annua (%):", min_value=1.0, max_value=25.0, value=8.5, step=0.5, key="sp_coup_in") / 100.0
+            sp_obs_freq = st.selectbox("Frequenza Rilevazione Cedola/Autocall:", [3, 6, 12], format_func=lambda x: f"Ogni {x} Mesi", index=1, key="sp_freq_sel")
+            sp_mem_toggle = st.checkbox("Effetto Memoria Cedole", value=True, key="sp_mem_check")
+        with sp_c3:
+            sp_bar_autocall = st.slider("Barriera Autocall (% Spot Iniziale):", min_value=80, max_value=120, value=100, step=5, key="sp_bar_auto") / 100.0
+            sp_bar_coupon = st.slider("Barriera Cedola (% Spot Iniziale):", min_value=50, max_value=90, value=70, step=5, key="sp_bar_coup") / 100.0
+            sp_bar_prot = st.slider("Barriera Protezione a Scadenza (%):", min_value=40, max_value=80, value=60, step=5, key="sp_bar_prot") / 100.0
+
+        if st.button("🚀 Valuta Certificato & Calcola Greche", key="btn_run_struct", type="primary", use_container_width=True):
+            with st.spinner("Simulazione Monte Carlo correlata su paniere Worst-Of (SX5E, SPX, NKY)..."):
+                sp_res = compute_structured_product_pricing(
+                    product_type=prod_choice,
+                    nominal=sp_nominal,
+                    maturity_years=sp_mat_yrs,
+                    observation_frequency_months=sp_obs_freq,
+                    coupon_rate_p_a=sp_coupon_pa,
+                    has_memory_coupon=sp_mem_toggle,
+                    coupon_barrier_pct=sp_bar_coupon,
+                    autocall_barrier_pct=sp_bar_autocall,
+                    protection_barrier_pct=sp_bar_prot,
+                    n_simulations=10000,
+                )
+                st.session_state["struct_prod_last"] = sp_res
+
+        if "struct_prod_last" in st.session_state:
+            s_res = st.session_state["struct_prod_last"]
+            grk = s_res["greeks"]
+
+            spk1, spk2, spk3, spk4 = st.columns(4)
+            with spk1:
+                metric_card("Fair Value / Prezzo", fmt_eur(s_res["present_value"]), delta=f"{s_res['price_pct_nominal']:.2f}% del Nominale", delta_color="normal")
+            with spk2:
+                metric_card("Vita Media Attesa", f"{s_res['expected_duration_years']:.2f} Anni", delta=f"Autocall Prob: {s_res['autocall_probability_total']*100:.1f}%", delta_color="normal")
+            with spk3:
+                metric_card("Rendimento Cedolare Atteso", f"{s_res['expected_coupon_yield_p_a']*100:.2f}% p.a.", delta=f"Nominale: {sp_coupon_pa*100:.1f}%", delta_color="normal")
+            with spk4:
+                metric_card("Rischio Perdita Capitale", f"{s_res['knock_in_loss_probability']*100:.2f}%", delta="Prob. Knock-In", delta_color="inverse")
+
+            st.markdown("##### 📐 Greche di Primo e Secondo Ordine & Sensibilità Barriera")
+            g_col1, g_col2, g_col3, g_col4, g_col5 = st.columns(5)
+            with g_col1:
+                st.metric("Delta (Δ)", f"{grk['delta']:.4f}")
+            with g_col2:
+                st.metric("Gamma (Γ)", f"{grk['gamma']:.6f}")
+            with g_col3:
+                st.metric("Vega (ν)", f"{grk['vega']:.4f} €/%")
+            with g_col4:
+                st.metric("Theta (θ)", f"{grk['theta']:.4f} €/m")
+            with g_col5:
+                st.metric("Sens. Barriera", f"{grk['barrier_sensitivity']:.4f} €/+1%")
+
+            st.markdown("##### 📅 Programma Cedole & Probabilità di Rimborso Anticipato per Data di Rilevazione")
+            st.dataframe(pd.DataFrame(s_res["observation_schedule"]), use_container_width=True, hide_index=True)
+
+    with sub_reg_rep:
+        from core.regulatory_reporting_engine import compute_regulatory_dossier
+
+        st.markdown("#### 📋 Prospetto Regolamentare PRIIPs KID & SFDR ESG (Annex I)")
+        r_c1, r_c2, r_c3 = st.columns(3)
+        with r_c1:
+            kid_rating = st.selectbox("Rating Creditizio Emittente (CRM):", ["AAA", "AA", "A", "BBB", "BB", "B", "CCC"], index=2, key="kid_rat_sel")
+            kid_rhp = st.number_input("Periodo di Detenzione Raccomandato (RHP Anni):", min_value=1.0, max_value=10.0, value=5.0, step=1.0, key="kid_rhp_in")
+        with r_c2:
+            kid_inv_eur = st.number_input("Investimento di Riferimento (€):", min_value=1000.0, value=10000.0, step=1000.0, key="kid_inv_in")
+            sfdr_art_sel = st.selectbox("Classificazione SFDR:", ["Article 6", "Article 8", "Article 9"], index=1, key="sfdr_art_sel")
+        with r_c3:
+            taxo_align = st.slider("Allineamento Tassonomia UE (%):", min_value=0.0, max_value=100.0, value=25.0, step=5.0, key="taxo_align_in")
+            sust_inv_pct = st.slider("Quota Investimenti Sostenibili SFDR (%):", min_value=0.0, max_value=100.0, value=35.0, step=5.0, key="sust_inv_in")
+
+        reg_res = compute_regulatory_dossier(
+            issuer_credit_rating=kid_rating,
+            rhp_years=kid_rhp,
+            investment_amount_eur=kid_inv_eur,
+            sfdr_article=sfdr_art_sel,
+            taxonomy_alignment_pct=taxo_align,
+            sustainable_investment_pct=sust_inv_pct,
+        )
+
+        kid_info = reg_res["priips_kid"]
+        sfdr_info = reg_res["sfdr_disclosures"]
+
+        rk1, rk2, rk3, rk4 = st.columns(4)
+        with rk1:
+            metric_card("Summary Risk Indicator (SRI)", f"Livello {kid_info['sri_score']} / 7", delta=f"MRM {kid_info['mrm_score']} | CRM {kid_info['crm_score']}", delta_color="normal")
+        with rk2:
+            metric_card("PRIIPs VEV (Volatilità)", f"{kid_info['vev_percent']:.2f}%", delta="Cornish-Fisher VEV", delta_color="normal")
+        with rk3:
+            metric_card("Classificazione SFDR", sfdr_info["sfdr_classification"], delta="Light Green" if sfdr_info["sfdr_classification"] == "Article 8" else ("Dark Green" if sfdr_info["sfdr_classification"] == "Article 9" else "Standard"), delta_color="normal")
+        with rk4:
+            metric_card("Allineamento Tassonomia UE", f"{sfdr_info['taxonomy_alignment_pct']:.1f}%", delta=f"Sostenibile: {sfdr_info['sustainable_investment_pct']:.1f}%", delta_color="normal")
+
+        st.markdown("##### 🎯 Scenari di Performance PRIIPs RTS (1 Anno, Metà RHP, Scadenza RHP)")
+        perf_data = []
+        for scen_name, horizons_dict in kid_info["performance_scenarios"].items():
+            row = {"Scenario": scen_name.capitalize()}
+            for h_label, h_val in horizons_dict.items():
+                row[f"{h_label} (€)"] = fmt_eur(h_val["terminal_value_eur"])
+                row[f"{h_label} (%)"] = f"{h_val['annualized_return_pct']:+.2f}%"
+            perf_data.append(row)
+        st.dataframe(pd.DataFrame(perf_data), use_container_width=True, hide_index=True)
+
+        st.markdown("##### 🌍 Tabella SFDR Annex I: 14 Indicatori Principali degli Effetti Negativi (PAI)")
+        st.dataframe(pd.DataFrame(sfdr_info["pai_indicators"]), use_container_width=True, hide_index=True)

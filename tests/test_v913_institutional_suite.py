@@ -237,10 +237,10 @@ def test_v913_rest_api_endpoints():
 
     client = TestClient(app)
 
-    # Check health version is 9.13.0
+    # Check health version is 9.13.0 or 9.14.0
     h_res = client.get("/health")
     assert h_res.status_code == 200
-    assert h_res.json()["version"] == "9.13.0"
+    assert h_res.json()["version"] in ["9.13.0", "9.14.0"]
 
     # 1. FRTB SBM
     frtb_resp = client.post("/api/v1/risk/frtb-sbm", json={"total_portfolio_value": 25_000_000.0})

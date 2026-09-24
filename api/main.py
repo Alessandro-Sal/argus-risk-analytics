@@ -24,13 +24,16 @@ except ImportError:
 
 from core.advanced_quant import compute_risk_budgeting_portfolio
 from core.barra_risk_model import compute_barra_structural_risk
+from core.basel_liquidity_engine import compute_basel_liquidity_ratios
 from core.bitemporal_engine import BitemporalLedgerEngine
+from core.black_litterman_engine import compute_black_litterman_allocation
 from core.climate_stress_engine import compute_ngfs_climate_stress
 from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
 from core.factor_library import compute_fama_french_factor_model
 from core.fix_engine import execute_mock_fix_order
 from core.fixed_income import compute_bond_analytics
 from core.frtb_engine import compute_frtb_capital_charges
+from core.heston_fft_engine import compute_heston_surface_and_calibration
 from core.macro_stress_engine import compute_reverse_stress_test
 from core.macro_war_room import compute_macro_war_room_stress
 from core.mip_rebalancer import solve_mip_rebalance
@@ -39,6 +42,7 @@ from core.pdf_generator import (
     generate_regulatory_stress_testing_dossier_pdf,
 )
 from core.regime_allocation import compute_regime_conditional_allocation
+from core.regulatory_reporting_engine import compute_regulatory_dossier
 from core.risk_engine import compute_portfolio_liquidity_risk
 from core.sabr_local_vol_engine import compute_sabr_and_local_vol_surface
 from core.services.rebalancing_service import RebalancingService
@@ -47,12 +51,14 @@ from core.services.tax_service import TaxService
 from core.services.wealth_service import WealthService
 from core.smart_order_router import compute_smart_order_routing
 from core.solvency2_engine import compute_solvency2_standard_formula
+from core.structured_products_engine import compute_structured_product_pricing
 from core.tax_engine import compute_tax_and_harvesting
 from core.walk_forward_engine import run_walk_forward_backtest
 from core.watchdog.risk_watchdog import RiskWatchdogService, evaluate_risk_appetite_framework
 from core.wealth.private_markets_engine import compute_private_markets_analytics
 from core.wealth.succession_optimizer import compute_family_succession_optimization
 from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
+from core.xva_engine import compute_xva_metrics
 
 logger = logging.getLogger("argus.api")
 
@@ -206,6 +212,75 @@ class MacroWarRoomRequest(BaseModel):
     """Payload for Interactive Macro War Room & Correlation Breakdown."""
     assets: Optional[List[Dict[str, Any]]] = None
     scenario_params: Optional[Dict[str, Any]] = None
+
+
+
+class XvaRequest(BaseModel):
+    """Payload for Bilateral XVA & Exposure Profile simulation."""
+    trades: Optional[List[Dict[str, Any]]] = None
+    csa_params: Optional[Dict[str, Any]] = None
+    market_params: Optional[Dict[str, Any]] = None
+
+
+class HestonPricingRequest(BaseModel):
+    """Payload for Heston FFT calibration and volatility surface."""
+    s0: float = Field(default=100.0, gt=0.0)
+    r: float = Field(default=0.03)
+    q: float = Field(default=0.0)
+    market_quotes: Optional[List[Dict[str, Any]]] = None
+    custom_params: Optional[Dict[str, float]] = None
+
+
+class BlackLittermanRequest(BaseModel):
+    """Payload for Bayesian Black-Litterman Portfolio Optimization."""
+    assets: Optional[List[str]] = None
+    cov_matrix: Optional[List[List[float]]] = None
+    market_weights: Optional[Dict[str, float]] = None
+    views: Optional[List[Dict[str, Any]]] = None
+    risk_aversion: float = Field(default=3.0, gt=0.0)
+    tau: float = Field(default=0.05, gt=0.0)
+    risk_free_rate: float = Field(default=0.02)
+    long_only: bool = Field(default=True)
+    max_weight: float = Field(default=0.40, gt=0.0, le=1.0)
+
+
+class BaselLiquidityRequest(BaseModel):
+    """Payload for Basel III LCR and NSFR Liquidity Ratios."""
+    hqla: Optional[List[Dict[str, Any]]] = None
+    outflows: Optional[List[Dict[str, Any]]] = None
+    inflows: Optional[List[Dict[str, Any]]] = None
+    asf: Optional[List[Dict[str, Any]]] = None
+    rsf: Optional[List[Dict[str, Any]]] = None
+
+
+class StructuredProductRequest(BaseModel):
+    """Payload for Exotic Derivatives & Structured Products Valuation."""
+    product_type: str = Field(default="phoenix_autocallable")
+    nominal: float = Field(default=1000.0, gt=0.0)
+    maturity_years: float = Field(default=2.0, gt=0.0)
+    observation_frequency_months: int = Field(default=6, ge=1, le=12)
+    coupon_rate_p_a: float = Field(default=0.08)
+    has_memory_coupon: bool = Field(default=True)
+    coupon_barrier_pct: float = Field(default=0.70, gt=0.0, le=1.0)
+    autocall_barrier_pct: float = Field(default=1.00, gt=0.0)
+    protection_barrier_pct: float = Field(default=0.60, gt=0.0, le=1.0)
+    underlyings: Optional[List[str]] = None
+    spots: Optional[List[float]] = None
+    volatilities: Optional[List[float]] = None
+    risk_free_rate: float = Field(default=0.03)
+    n_simulations: int = Field(default=10000, ge=1000, le=100000)
+
+
+class RegulatoryReportingRequest(BaseModel):
+    """Payload for PRIIPs KID Summary Risk Indicator & SFDR Annex I disclosures."""
+    historical_returns: Optional[List[float]] = None
+    issuer_credit_rating: str = Field(default="A")
+    rhp_years: float = Field(default=5.0, gt=0.0)
+    investment_amount_eur: float = Field(default=10000.0, gt=0.0)
+    sfdr_article: str = Field(default="Article 8")
+    taxonomy_alignment_pct: float = Field(default=24.5, ge=0.0, le=100.0)
+    sustainable_investment_pct: float = Field(default=35.0, ge=0.0, le=100.0)
+    custom_pai: Optional[Dict[str, float]] = None
 
 
 # In-memory background jobs registry
@@ -690,7 +765,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.13.0",
+        version="9.14.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -715,7 +790,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.13.0",
+            version="9.14.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1581,6 +1656,113 @@ def create_app() -> FastAPI:
             )
         except Exception as exc:
             logger.error("Macro war room stress failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+
+    # ── V9.14.0 Institutional Tier-1 Endpoints ─────────────────────────
+
+    @app.post("/api/v1/risk/xva", tags=["Risk Analytics"])
+    def run_xva_metrics(req: XvaRequest) -> Dict[str, Any]:
+        """Bilateral CVA, DVA, FVA, MVA, KVA and exposure profile under CSA netting sets."""
+        try:
+            return compute_xva_metrics(
+                trades_data=req.trades,
+                csa_params=req.csa_params,
+                market_params=req.market_params,
+            )
+        except Exception as exc:
+            logger.error("XVA metrics calculation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/pricing/heston", tags=["Derivatives & Volatility"])
+    def run_heston_pricing(req: HestonPricingRequest) -> Dict[str, Any]:
+        """Heston (1993) Carr-Madan FFT option pricing, Feller check, and surface calibration."""
+        try:
+            return compute_heston_surface_and_calibration(
+                s0=req.s0,
+                r=req.r,
+                q=req.q,
+                market_quotes=req.market_quotes,
+                custom_params=req.custom_params,
+            )
+        except Exception as exc:
+            logger.error("Heston pricing failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/optimize/black-litterman", tags=["Portfolio Optimization"])
+    def run_black_litterman_optimization(req: BlackLittermanRequest) -> Dict[str, Any]:
+        """Bayesian Black-Litterman optimization with Idzorek confidence weighting."""
+        try:
+            return compute_black_litterman_allocation(
+                assets=req.assets,
+                cov_matrix=req.cov_matrix,
+                market_weights=req.market_weights,
+                views_data=req.views,
+                risk_aversion=req.risk_aversion,
+                tau=req.tau,
+                risk_free_rate=req.risk_free_rate,
+                long_only=req.long_only,
+                max_weight=req.max_weight,
+            )
+        except Exception as exc:
+            logger.error("Black-Litterman optimization failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/risk/basel-liquidity", tags=["Stress Testing & Regulatory"])
+    def run_basel_liquidity_ratios(req: BaselLiquidityRequest) -> Dict[str, Any]:
+        """Basel III Liquidity Coverage Ratio (LCR), Net Stable Funding Ratio (NSFR), and cash ladder."""
+        try:
+            return compute_basel_liquidity_ratios(
+                hqla_data=req.hqla,
+                outflows_data=req.outflows,
+                inflows_data=req.inflows,
+                asf_data=req.asf,
+                rsf_data=req.rsf,
+            )
+        except Exception as exc:
+            logger.error("Basel liquidity ratios failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/pricing/structured-products", tags=["Derivatives & Volatility"])
+    def run_structured_products_pricing(req: StructuredProductRequest) -> Dict[str, Any]:
+        """Worst-Of Phoenix Autocallables with memory coupons & Reverse Convertibles pricer with Greeks."""
+        try:
+            return compute_structured_product_pricing(
+                product_type=req.product_type,
+                nominal=req.nominal,
+                maturity_years=req.maturity_years,
+                observation_frequency_months=req.observation_frequency_months,
+                coupon_rate_p_a=req.coupon_rate_p_a,
+                has_memory_coupon=req.has_memory_coupon,
+                coupon_barrier_pct=req.coupon_barrier_pct,
+                autocall_barrier_pct=req.autocall_barrier_pct,
+                protection_barrier_pct=req.protection_barrier_pct,
+                underlyings=req.underlyings,
+                spots=req.spots,
+                volatilities=req.volatilities,
+                risk_free_rate=req.risk_free_rate,
+                n_simulations=req.n_simulations,
+            )
+        except Exception as exc:
+            logger.error("Structured products pricing failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/regulatory/priips-sfdr", tags=["Stress Testing & Regulatory"])
+    def run_regulatory_dossier(req: RegulatoryReportingRequest) -> Dict[str, Any]:
+        """PRIIPs RTS Summary Risk Indicator (SRI 1-7), 4 Performance Scenarios, and SFDR Annex I 14 PAI table."""
+        try:
+            return compute_regulatory_dossier(
+                historical_returns=req.historical_returns,
+                issuer_credit_rating=req.issuer_credit_rating,
+                rhp_years=req.rhp_years,
+                investment_amount_eur=req.investment_amount_eur,
+                sfdr_article=req.sfdr_article,
+                taxonomy_alignment_pct=req.taxonomy_alignment_pct,
+                sustainable_investment_pct=req.sustainable_investment_pct,
+                custom_pai=req.custom_pai,
+            )
+        except Exception as exc:
+            logger.error("Regulatory dossier generation failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
     return app

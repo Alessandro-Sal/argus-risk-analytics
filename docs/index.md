@@ -118,6 +118,24 @@ Takahashi-Alexander (2001) 10-year cash flow pacing model simulating Capital Cal
 ### 26. Interactive Macro War Room & Correlation Breakdown Stress Engine
 Multi-lever systemic macro scenario constructor (parallel yield shift, yield curve slope twist, inflation CPI surge, oil/energy spike, FX USD move, equity crash, and credit spread widening) combined with a systemic Correlation Breakdown Engine modeling the contagion collapse toward equicorrelation ($\mathbf{R}_{\text{panic}} \to 0.85$), volatility surges, diversification loss quantification, and variation margin liquidity drain projection.
 
+### 27. Bilateral XVA & Counterparty Credit Risk Engine (CVA, DVA, FVA, MVA, KVA)
+Comprehensive bilateral valuation adjustments stack for OTC derivatives portfolios under Credit Support Annex (CSA) netting agreements: Credit Valuation Adjustment (CVA), Debit Valuation Adjustment (DVA), Funding Valuation Adjustment (FVA), Margin Valuation Adjustment (MVA for ISDA SIMM initial margin), and Capital Valuation Adjustment (KVA for regulatory capital costs). Features Monte Carlo exposure profile simulation ($EE$, $PFE_{95\%}$, $PFE_{99\%}$, $ENE$, $EEPE$) and collateral dynamics (Threshold, MTA, MPOR).
+
+### 28. Heston Stochastic Volatility FFT Calibration Engine (Carr-Madan 1999)
+Analytical characteristic function formulation stabilized according to Lord-Kahl / Albrecher without branch cuts, Carr-Madan (1999) Fast Fourier Transform (FFT) option pricer for rapid multi-strike valuation, analytical Feller condition verification ($2\kappa\theta > \sigma_v^2$), and robust L-BFGS-B/SLSQP calibration against market implied volatilities.
+
+### 29. Bayesian Black-Litterman Portfolio Optimization (Idzorek 2005)
+Reverse optimization extracting market implied equilibrium expected returns $\boldsymbol{\Pi} = \lambda \boldsymbol{\Sigma}\mathbf{w}_{\text{mkt}}$, combined with subjective absolute and relative investor views weighted by Idzorek's (2005) percentage confidence mapping to the view uncertainty matrix $\boldsymbol{\Omega}$. Computes posterior expected returns $\mathbf{E}[R]$, posterior covariance $\mathbf{M}$, and optimal constrained SLSQP weights with active tilt analytics.
+
+### 30. Basel III Liquidity Standards (LCR, NSFR & Dynamic Cash Flow Stress Ladder)
+Full implementation of Basel Committee on Banking Supervision (BCBS 238) liquidity rules: 30-day Liquidity Coverage Ratio (LCR $\ge 100\%$) with Level 1, 2A, 2B HQLA classification, regulatory haircuts (0%, 15%, 50%), 40%/15% asset caps, and 75% inflow cap; Net Stable Funding Ratio (NSFR $\ge 100\%$); and dynamic multi-horizon cash flow stress ladder (1d to 360d) with survival horizon estimation.
+
+### 31. Exotic Derivatives & Worst-Of Structured Products Engine (Phoenix Autocallables)
+Correlated multi-asset Monte Carlo valuation engine for Worst-Of structured notes: Phoenix Autocallables (memory coupons, autocall early redemption barriers, European knock-in protection barriers at maturity) and Reverse Convertibles. Computes analytical/numerical Greeks ($\Delta$, $\Gamma$, $\nu$, $\theta$, $\rho$, barrier sensitivity), early redemption probabilities, and expected duration.
+
+### 32. Regulatory PRIIPs KID (SRI 1-7) & SFDR ESG Reporting Engine (Annex I 14 PAI)
+Regulatory disclosure and compliance automation: Packaged Retail and Insurance-based Investment Products (PRIIPs RTS) Summary Risk Indicator (SRI 1 to 7) combining Market Risk Measure (MRM from Cornish-Fisher VEV) and Credit Risk Measure (CRM from issuer rating), 4 regulatory performance scenarios (Favourable, Moderate, Unfavourable, Stress) at 1Y, Half-RHP, and RHP; alongside Sustainable Finance Disclosure Regulation (SFDR) Article 6/8/9 classification and the complete Annex I 14 mandatory Principal Adverse Impacts (PAI) table.
+
 ---
 
 ## Quick Navigation
