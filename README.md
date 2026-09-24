@@ -7,11 +7,24 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-726%2F726%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-740%2F740%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Docker Ready](https://img.shields.io/badge/docker-ready-blue.svg)](docker-compose.yml)
+
+---
+
+## 🚀 FRTB Basel IV, SABR Vol Surface (3D), NGFS Climate Stress, Multi-Venue SOR & Private Markets (v9.13.0)
+
+ARGUS v9.13.0 espande la piattaforma con 6 motori quantitativi di livello Tier-1 per banche d'investimento, desk derivati, banche centrali, broker MiFID II e family office:
+- **FRTB Basel IV Standardized Approach (`core/frtb_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Implementazione BCBS 365 con Sensitivities-Based Method (SBM) Delta, Vega e Curvature su GIRR, CSR, Equity, FX e Commodity, aggregazione multi-scenario (Medium, High, Low), Default Risk Charge (DRC) Jump-to-Default e Residual Risk Add-on (RRAO).
+- **SABR Stochastic Volatility & Dupire Local Volatility Surface 3D (`core/sabr_local_vol_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Calibrazione analitica Hagan et al. (2002) $(\alpha, \rho, \nu)$, inversione PDE di Dupire (1994) $\sigma_{\text{loc}}(K, T)$ e Volatility Cube 3D con visualizzazione Mesh interattiva in Plotly WebGL.
+- **NGFS Phase IV Climate Transition & Physical Risk Stress Engine (`core/climate_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Stress test climatico su scenari NGFS (Orderly Net Zero 2050, Disorderly Delayed Transition, Hot House World), contabilità Scope 1-2-3, intensità WACI ($tCO_2e/M€$), impatto carbon tax su EBITDA/spread e danni fisici su immobili con Climate VaR aggregato.
+- **Multi-Venue Smart Order Router & MiFID II RTS 28 Best Execution (`core/smart_order_router.py`)**: Algoritmo SOR su 5 liquidity pools (Primary Lit, Alt MTF, Systematic Internalizer, Dark Pool, Crossing Network), scoring multi-criterio concorrente e report annuale di disclosure conforme a MiFID II RTS 28 (top 5 venue, ordini passivi/aggressivi, price improvement).
+- **Private Markets & Illiquid Asset Valuation Engine (`core/wealth/private_markets_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**: Pacing dei flussi di cassa a 10 anni secondo Takahashi-Alexander (2001) per Private Equity e VC (Capital Calls, Distribuzioni, NAV, J-Curve, Net IRR, TVPI/DPI/RVPI), Kaplan-Schoar PME, Direct Alpha e de-smoothing econometrico di Geltner-Fisher (1991/1994).
+- **Interactive Macro War Room & Correlation Breakdown Stress Engine (`core/macro_war_room.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Simulatore macro a leve multiple (Tassi, Slope Twist, Inflazione, Petrolio, FX USD, Azionario, Spread OAS) con crollo sistemico delle correlazioni verso equicorrelazione di panico $\mathbf{R}_{\text{panic}} \to 0.85$, aumento di volatilità, perdita di diversificazione e proiezione drenaggio liquidità / margin call.
+- **Nuovi Endpoint REST Headless v9.13.0 (`api/main.py`)**: `/api/v1/risk/frtb-sbm`, `/api/v1/pricing/sabr-vol`, `/api/v1/stress/climate-ngfs`, `/api/v1/execution/smart-route`, `/api/v1/wealth/private-markets`, `/api/v1/stress/macro-war-room`.
 
 ---
 

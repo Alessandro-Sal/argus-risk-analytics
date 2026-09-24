@@ -25,11 +25,14 @@ except ImportError:
 from core.advanced_quant import compute_risk_budgeting_portfolio
 from core.barra_risk_model import compute_barra_structural_risk
 from core.bitemporal_engine import BitemporalLedgerEngine
+from core.climate_stress_engine import compute_ngfs_climate_stress
 from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
 from core.factor_library import compute_fama_french_factor_model
 from core.fix_engine import execute_mock_fix_order
 from core.fixed_income import compute_bond_analytics
+from core.frtb_engine import compute_frtb_capital_charges
 from core.macro_stress_engine import compute_reverse_stress_test
+from core.macro_war_room import compute_macro_war_room_stress
 from core.mip_rebalancer import solve_mip_rebalance
 from core.pdf_generator import (
     generate_institutional_portfolio_factsheet_pdf,
@@ -37,14 +40,17 @@ from core.pdf_generator import (
 )
 from core.regime_allocation import compute_regime_conditional_allocation
 from core.risk_engine import compute_portfolio_liquidity_risk
+from core.sabr_local_vol_engine import compute_sabr_and_local_vol_surface
 from core.services.rebalancing_service import RebalancingService
 from core.services.risk_service import RiskService
 from core.services.tax_service import TaxService
 from core.services.wealth_service import WealthService
+from core.smart_order_router import compute_smart_order_routing
 from core.solvency2_engine import compute_solvency2_standard_formula
 from core.tax_engine import compute_tax_and_harvesting
 from core.walk_forward_engine import run_walk_forward_backtest
 from core.watchdog.risk_watchdog import RiskWatchdogService, evaluate_risk_appetite_framework
+from core.wealth.private_markets_engine import compute_private_markets_analytics
 from core.wealth.succession_optimizer import compute_family_succession_optimization
 from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
 
@@ -153,6 +159,53 @@ class MipRebalanceRequest(BaseModel):
     capital_gains_tax_budget_eur: Optional[float] = None
     pmc_dict: Optional[Dict[str, float]] = None
     tax_rate: float = Field(default=0.26)
+
+
+class FrtbSbmRequest(BaseModel):
+    """Payload for BCBS 365 / FRTB Standardized Approach Capital Charges."""
+    sensitivities: Optional[List[Dict[str, Any]]] = None
+    default_positions: Optional[List[Dict[str, Any]]] = None
+    exotic_notionals: Optional[Dict[str, float]] = None
+    total_portfolio_value: float = Field(default=100_000_000.0, gt=0.0)
+
+
+class SabrVolRequest(BaseModel):
+    """Payload for Hagan SABR Calibration and Dupire Local Vol Surface Inversion."""
+    f0: float = Field(default=100.0, gt=0.0)
+    strikes: Optional[List[float]] = None
+    maturities: Optional[List[float]] = None
+    market_vols: Optional[List[List[float]]] = None
+    beta: float = Field(default=0.70, ge=0.0, le=1.0)
+
+
+class ClimateNgfsRequest(BaseModel):
+    """Payload for NGFS Phase IV Climate Transition & Physical Stress."""
+    portfolio_holdings: Optional[List[Dict[str, Any]]] = None
+    scenario_name: str = Field(default="Net Zero 2050 (Orderly)")
+    target_year: int = Field(default=2030, ge=2024, le=2050)
+
+
+class SmartRouteRequest(BaseModel):
+    """Payload for Multi-Venue Smart Order Router & MiFID II Best Execution."""
+    symbol: str = Field(default="ASML.AS")
+    side: str = Field(default="BUY")
+    quantity: int = Field(default=5000, gt=0)
+    limit_price: Optional[float] = None
+    urgency: str = Field(default="MEDIUM")
+
+
+class PrivateMarketsRequest(BaseModel):
+    """Payload for Private Markets 10-Yr Cash Flow Pacing & De-smoothing."""
+    commitment_eur: float = Field(default=5_000_000.0, gt=0.0)
+    fund_life_years: int = Field(default=10, ge=5, le=20)
+    growth_rate: float = Field(default=0.10)
+    observed_returns: Optional[List[float]] = None
+
+
+class MacroWarRoomRequest(BaseModel):
+    """Payload for Interactive Macro War Room & Correlation Breakdown."""
+    assets: Optional[List[Dict[str, Any]]] = None
+    scenario_params: Optional[Dict[str, Any]] = None
 
 
 # In-memory background jobs registry
@@ -637,7 +690,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.12.0",
+        version="9.13.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -662,7 +715,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.12.0",
+            version="9.13.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1444,6 +1497,91 @@ def create_app() -> FastAPI:
     def get_watchdog_alerts(limit: int = 50) -> List[Dict[str, Any]]:
         """Returns recent watchdog alert events."""
         return watchdog_instance.get_recent_alerts(limit=limit)
+
+    # ── V9.13.0 Institutional Endpoints ─────────────────────────
+
+    @app.post("/api/v1/risk/frtb-sbm", tags=["Risk Analytics"])
+    def run_frtb_capital_charges(req: FrtbSbmRequest) -> Dict[str, Any]:
+        """BCBS 365 / FRTB Standardized Approach SBM, DRC, and RRAO capital requirements."""
+        try:
+            return compute_frtb_capital_charges(
+                sensitivities_data=req.sensitivities,
+                default_positions_data=req.default_positions,
+                exotic_notionals=req.exotic_notionals,
+                total_portfolio_value=req.total_portfolio_value,
+            )
+        except Exception as exc:
+            logger.error("FRTB capital charges failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/pricing/sabr-vol", tags=["Quantitative Risk Engine"])
+    def run_sabr_local_vol(req: SabrVolRequest) -> Dict[str, Any]:
+        """Hagan SABR calibration and Dupire local volatility PDE surface inversion."""
+        try:
+            return compute_sabr_and_local_vol_surface(
+                f0=req.f0,
+                strikes=req.strikes,
+                maturities=req.maturities,
+                market_vols=req.market_vols,
+                beta=req.beta,
+            )
+        except Exception as exc:
+            logger.error("SABR/Local vol calculation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/stress/climate-ngfs", tags=["Stress Testing & Regulatory"])
+    def run_climate_ngfs_stress(req: ClimateNgfsRequest) -> Dict[str, Any]:
+        """NGFS Phase IV transition & physical climate risk stress testing."""
+        try:
+            return compute_ngfs_climate_stress(
+                portfolio_holdings=req.portfolio_holdings,
+                scenario_name=req.scenario_name,
+                target_year=req.target_year,
+            )
+        except Exception as exc:
+            logger.error("NGFS climate stress failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/execution/smart-route", tags=["Execution & Algos"])
+    def run_smart_order_routing(req: SmartRouteRequest) -> Dict[str, Any]:
+        """Multi-venue SOR, liquidity slicing and MiFID II RTS 28 Best Execution."""
+        try:
+            return compute_smart_order_routing(
+                symbol=req.symbol,
+                side=req.side,
+                quantity=req.quantity,
+                limit_price=req.limit_price,
+                urgency=req.urgency,
+            )
+        except Exception as exc:
+            logger.error("Smart order routing failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/wealth/private-markets", tags=["Wealth Management"])
+    def run_private_markets_pacing(req: PrivateMarketsRequest) -> Dict[str, Any]:
+        """Takahashi-Alexander 10-yr cash flow pacing and Geltner de-smoothing."""
+        try:
+            return compute_private_markets_analytics(
+                commitment_eur=req.commitment_eur,
+                fund_life_years=req.fund_life_years,
+                growth_rate=req.growth_rate,
+                observed_returns=req.observed_returns,
+            )
+        except Exception as exc:
+            logger.error("Private markets analytics failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/stress/macro-war-room", tags=["Stress Testing & Regulatory"])
+    def run_macro_war_room_stress(req: MacroWarRoomRequest) -> Dict[str, Any]:
+        """Interactive Macro War Room multi-lever shock and systemic correlation breakdown."""
+        try:
+            return compute_macro_war_room_stress(
+                assets_data=req.assets,
+                scenario_params=req.scenario_params,
+            )
+        except Exception as exc:
+            logger.error("Macro war room stress failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
 
     return app
 
