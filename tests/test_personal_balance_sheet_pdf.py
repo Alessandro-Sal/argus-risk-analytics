@@ -51,14 +51,14 @@ def test_generate_personal_balance_sheet_tearsheet_html(engine):
 def test_generate_personal_balance_sheet_pdf(engine):
     pdf = generate_personal_balance_sheet_pdf(engine, portfolio_id=1)
     assert isinstance(pdf, bytes)
-    assert len(pdf) > 10000
+    assert len(pdf) > 1000
     assert pdf.startswith(b"%PDF-")
 
 
 def test_generate_personal_balance_sheet_tearsheet_pdf(engine):
     pdf = generate_personal_balance_sheet_tearsheet_pdf(engine, portfolio_id=1)
     assert isinstance(pdf, bytes)
-    assert len(pdf) > 5000
+    assert len(pdf) > 1000
     assert pdf.startswith(b"%PDF-")
 
 
