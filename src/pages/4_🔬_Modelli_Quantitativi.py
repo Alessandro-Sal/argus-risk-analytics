@@ -226,6 +226,20 @@ QUANT_MODELS_CATALOG = {
         "category": "Esecuzione & Fiscale",
         "desc": "Calcolo della Trade Execution List esatta con frizione reale (commissioni fisse/percentuali, bid-ask spread, imposte capital gain 26%/12.5% e compensazione minusvalenze) oppure ribilanciamento a impatto fiscale zero tramite flussi di cassa/PAC."
     },
+    "🏛️ Barra Structural Multi-Factor Risk": {
+        "title": "Barra-Style Structural Multi-Asset Risk Model (MSCI GEM3/USE4)",
+        "badge": "Structural Covariance • Style & Macro Tilts • MCTR",
+        "badge_color": "#8b5cf6",
+        "category": "Attribuzione del Rischio",
+        "desc": "Decomposizione formale Sigma = X @ Sigma_F @ X.T + Delta_epsilon, stima dei factor loadings (Size, Value, Momentum, Quality, Low Vol, Macro), Euler MCTR/PCTR e Tracking Error attivo."
+    },
+    "🌊 DCC-GARCH & Vine Copula": {
+        "title": "DCC-GARCH Dynamic Conditional Correlation & Vine Copula Tail Risk",
+        "badge": "Engle DCC • Time-Varying Cov • Clayton/Gumbel Vine",
+        "badge_color": "#0ea5e9",
+        "category": "Rischio Dinamico & Coda",
+        "desc": "Modellazione econometrica a due stadi: volatilita condizionale GARCH(1,1), correlazione dinamica tempo-variante R_t (Engle 2002) e copule a vite per la dipendenza asimmetrica nei crash congiunti."
+    },
     "🔄 Walk-Forward Backtesting (WFO)": {
         "title": "Walk-Forward Multi-Strategy Rolling Out-of-Sample Backtesting",
         "badge": "WFO • Rolling OOS • Real Friction",
@@ -4834,3 +4848,79 @@ elif active_quant_tab == "🔄 Walk-Forward Backtesting (WFO)":
                 fig_dd = px.area(dd_df * 100.0, title="Profilo di Drawdown OOS (%)")
                 fig_dd = apply_plotly_theme(fig_dd)
                 st.plotly_chart(fig_dd, use_container_width=True)
+
+# ── TAB: BARRA STRUCTURAL MULTI-FACTOR RISK MODEL ───────────────────
+elif active_quant_tab == "🏛️ Barra Structural Multi-Factor Risk":
+    st.markdown("#### 🏛️ Barra-Style Structural Multi-Asset Risk Model (MSCI GEM3/USE4)")
+    st.caption("Decomposizione formale: $\\boldsymbol{\\Sigma} = \\mathbf{X}\\boldsymbol{\\Sigma}_F\\mathbf{X}^T + \\boldsymbol{\\Delta}_\\epsilon$ con attribuzione Euleriana MCTR/PCTR.")
+
+    from core.barra_risk_model import compute_barra_structural_risk
+
+    b_ret_df = results.get("returns_df") if isinstance(results, dict) else None
+    if b_ret_df is None or (isinstance(b_ret_df, pd.DataFrame) and b_ret_df.empty):
+        tickers = ["AAPL", "MSFT", "BTP-10Y", "XOM", "JNJ"]
+        np.random.seed(42)
+        dates = pd.date_range(end=datetime.now(), periods=500, freq="B")
+        b_ret_df = pd.DataFrame({t: np.random.normal(0.0004, 0.012, len(dates)) for t in tickers}, index=dates)
+
+    if st.button("🚀 Esegui Decomposizione Fattoriale Barra", key="btn_run_barra", type="primary", use_container_width=True):
+        with st.spinner("Calibrazione factor loadings e covarianza strutturale..."):
+            try:
+                b_res = compute_barra_structural_risk(asset_returns=b_ret_df)
+                st.session_state["barra_last_result"] = b_res
+            except Exception as e:
+                st.error(f"Errore durante l'esecuzione del modello Barra: {e}")
+
+    if "barra_last_result" in st.session_state:
+        res_b = st.session_state["barra_last_result"]
+        bk1, bk2, bk3, bk4 = st.columns(4)
+        with bk1:
+            metric_card("Volatilita Totale", f"{res_b['volatility_total_annual']*100:.2f}%", delta="Annualizzata 252d", delta_color="normal")
+        with bk2:
+            metric_card("Rischio Sistemico (Fattoriale)", f"{res_b['factor_risk_contribution_pct']:.1f}%", delta=f"Vol: {res_b['volatility_factor_annual']*100:.2f}%", delta_color="normal")
+        with bk3:
+            metric_card("Rischio Idiosincratico", f"{res_b['specific_risk_contribution_pct']:.1f}%", delta=f"Vol: {res_b['volatility_specific_annual']*100:.2f}%", delta_color="normal")
+        with bk4:
+            metric_card("Euler Sum PCTR", f"{res_b['euler_sum_pctr']:.2f}%", delta="Verifica Eulero (100%)", delta_color="normal")
+
+        st.markdown("##### 🧩 Decomposizione del Rischio per Fattore di Stile & Macro")
+        fact_df = pd.DataFrame(res_b["factor_attribution"]).T.reset_index().rename(columns={"index": "Fattore"})
+        st.dataframe(fact_df, use_container_width=True, hide_index=True)
+
+
+# ── TAB: DCC-GARCH & VINE COPULA DYNAMIC TAIL RISK ──────────────────
+elif active_quant_tab == "🌊 DCC-GARCH & Vine Copula":
+    st.markdown("#### 🌊 DCC-GARCH Dynamic Correlation & Vine Copula Tail Risk")
+    st.caption("Modellazione tempo-variante $R_t$ (Engle 2002) e dipendenza asimmetrica di coda tramite Regular Vine Copula.")
+
+    from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
+
+    d_ret_df = results.get("returns_df") if isinstance(results, dict) else None
+    if d_ret_df is None or (isinstance(d_ret_df, pd.DataFrame) and d_ret_df.empty):
+        tickers = ["SPY", "QQQ", "TLT", "GLD"]
+        np.random.seed(42)
+        dates = pd.date_range(end=datetime.now(), periods=500, freq="B")
+        d_ret_df = pd.DataFrame({t: np.random.normal(0.0004, 0.012, len(dates)) for t in tickers}, index=dates)
+
+    if st.button("🚀 Calibra DCC-GARCH & Simula Vine Copula", key="btn_run_dcc", type="primary", use_container_width=True):
+        with st.spinner("Calibrazione GARCH(1,1) multivariata e ottimizzazione DCC..."):
+            try:
+                d_res = compute_dcc_garch_extreme_risk(returns_df=d_ret_df, n_mc_sims=3000)
+                st.session_state["dcc_last_result"] = d_res
+            except Exception as e:
+                st.error(f"Errore durante l'esecuzione DCC-GARCH: {e}")
+
+    if "dcc_last_result" in st.session_state:
+        res_d = st.session_state["dcc_last_result"]
+        dk1, dk2, dk3, dk4 = st.columns(4)
+        with dk1:
+            metric_card("DCC Alpha (Shock)", f"{res_d['dcc_alpha']:.4f}", delta=f"Beta: {res_d['dcc_beta']:.4f}", delta_color="normal")
+        with dk2:
+            metric_card("Persistenza Dinamica", f"{res_d['persistence']:.4f}", delta="< 1.0 Stazionario", delta_color="normal")
+        with dk3:
+            metric_card("Dynamic VaR 99% (T+1)", f"{res_d['dynamic_var_99_t1']*100:.2f}%", delta=f"Static Normal: {res_d['static_normal_var_99']*100:.2f}%", delta_color="inverse")
+        with dk4:
+            metric_card("Dynamic CVaR 99% (T+1)", f"{res_d['dynamic_cvar_99_t1']*100:.2f}%", delta=f"Lower Tail Dep: {res_d['tail_dependence_lower']:.2f}", delta_color="inverse")
+
+        st.markdown("##### 🌐 Matrice di Correlazione Prevista (T+1)")
+        st.dataframe(pd.DataFrame(res_d["forecast_correlation_t1"]), use_container_width=True)

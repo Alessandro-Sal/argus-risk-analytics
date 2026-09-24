@@ -15,6 +15,19 @@
 
 ---
 
+## 🚀 Barra Risk Model, Solvency II SCR, DCC-GARCH & Vine Copula, Mock FIX 4.4 Engine & Family Office Succession (v9.12.0)
+
+ARGUS v9.12.0 introduce 6 moduli istituzionali tier-1 per l'investment management, le assicurazioni, il trading algoritmico e il family office:
+- **Barra Structural Multi-Asset Risk Model (`core/barra_risk_model.py`)**: Decomposizione della covarianza strutturale $\boldsymbol{\Sigma} = \mathbf{X}\boldsymbol{\Sigma}_F\mathbf{X}^T + \boldsymbol{\Delta}_\epsilon$, stima factor loadings per 6 fattori di stile (Size, Value, Momentum, Quality, Low Volatility, Liquidity), 11 settori GICS e macro fattori, calcolo Euler MCTR/PCTR e Tracking Error attivo.
+- **Solvency II Standard Formula & SCR Engine (`core/solvency2_engine.py`)**: Calcolo del Requisito Patrimoniale di Solvibilità (SCR) conforme al Regolamento Delegato (UE) 2015/35 EIOPA: sub-moduli Market Risk (Interest Rate up/down, Equity Type 1/2, Property 25%, Spread CQS 0-6, Concentration, Currency), aggregazione con matrice $\boldsymbol{\Omega}_{\text{mkt}}$, Basic SCR (BSCR), Rischio Operativo $\text{SCR}_{\text{op}}$, Loss-Absorbing Capacity (LAC), Solvency Ratio ed export QRT S.25.01 / S.26.01.
+- **DCC-GARCH Dynamic Correlation & Vine Copula Tail Risk (`core/dcc_garch_engine.py`)**: Filtraggio GARCH(1,1) univariate, correlazione dinamica tempo-variante $R_t$ (Engle 2002), copule a vite (Clayton per crash contagion, Gumbel per rally, Student-t) e previsione dinamica VaR / CVaR a $T+1$ e $T+5$.
+- **Mock FIX 4.4 Protocol Engine & L2 DOM Simulator (`core/fix_engine.py`)**: Parser/serializer tag-value FIX 4.4 standard con validazione CheckSum a 3 cifre, book Depth-of-Market a 10 livelli, matching engine con book walking e Post-Trade Transaction Cost Analysis (TCA) completa (Arrival Price, Execution VWAP, Implementation Shortfall in EUR e bps).
+- **Family Office Generational Succession Optimizer (`core/wealth/succession_optimizer.py`)**: Confronto stocastico a 30 anni su 5 veicoli: Holding Familiare (PEX 95% Art. 87 TUIR, Patto di Famiglia Art. 768-bis c.c. ed esenzione Art. 3 c. 4-ter D.Lgs. 346/1990) vs Trust Fiduciario (AdE Circolare 34/E/2022) vs Polizze Vita Ramo I/III (Art. 12 D.Lgs. 346/1990) vs Regime Ordinario, con calcolo del Tax Alpha generazionale (€ e %).
+- **Event-Driven Risk Watchdog & Notification Hub (`core/watchdog/risk_watchdog.py`)**: Monitoraggio dei limiti RAF (VaR 99%, Solvency Ratio, Max Drawdown, concentrazione) e webhook dispatcher verso Telegram, Discord, Slack e SMTP Email con modalità mock e audit trail.
+- **Nuovi Endpoint REST Headless v9.12.0 (`api/main.py`)**: `/api/v1/risk/barra`, `/api/v1/risk/solvency2-scr`, `/api/v1/risk/dcc-garch`, `/api/v1/execution/fix/order`, `/api/v1/wealth/succession-optimization`, `/api/v1/watchdog/check`, `/api/v1/watchdog/alerts`.
+
+---
+
 ## 🚀 Walk-Forward Rolling OOS Engine, HMM Adaptive Allocation, Total Wealth Reverse Stress & MIP Rebalancing (v9.11.0)
 
 ARGUS v9.11.0 introduce il simulatore Walk-Forward multi-strategia Out-of-Sample con attrito reale, l'overlay tattico adattivo con Hidden Markov Models (HMM), il Reverse Stress Testing sul patrimonio consolidato (Solvency II), il ribilanciatore discreto a numeri interi con programmazione lineare mista (SciPy HiGHS MILP), la coda asincrona di job con WebSocket gateway e il Dossier Regolamentare PDF a 4 pagine:

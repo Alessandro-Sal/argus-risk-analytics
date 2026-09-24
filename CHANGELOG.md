@@ -7,6 +7,57 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.12.0] - 2026-09-25
+
+### 🏛️ Barra Structural Multi-Asset Risk Model, Solvency II SCR Standard Formula, DCC-GARCH & Vine Copula, Mock FIX 4.4 Engine & L2 DOM, Generational Succession Optimizer, Risk Watchdog & Notification Hub
+
+Questa major release istituzionale espande ulteriormente la suite di ingegneria finanziaria e conformita regolamentare di ARGUS con 6 moduli di livello tier-1 per l'investment management, le assicurazioni, l'esecuzione algoritmica e il family office:
+
+- **Barra-Style Structural Multi-Asset Risk Model (`core/barra_risk_model.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Decomposizione formale della covarianza strutturale $\\boldsymbol{\\Sigma} = \\mathbf{X}\\boldsymbol{\\Sigma}_F\\mathbf{X}^T + \\boldsymbol{\\Delta}_\\epsilon$.
+  - Stima cross-section e time-series dei factor loadings per 6 fattori di stile (Size, Value, Momentum, Quality, Low Volatility, Liquidity), 11 settori GICS e macro fattori (Term/Rates, Credit Spread, Breakeven Inflation, FX USD).
+  - Decomposizione Euleriana di varianza (Systematic vs Specific) e calcolo Marginal/Percent Contribution to Total Risk (MCTR / PCTR) sia a livello di singolo asset che per fattore.
+  - Analisi del rischio attivo: Active Risk (Tracking Error) e Factor Tilts rispetto al benchmark.
+- **Solvency II Standard Formula & SCR Engine (`core/solvency2_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Calcolo del Requisito Patrimoniale di Solvibilita (SCR) conforme al Regolamento Delegato (UE) 2015/35 EIOPA e Direttiva 2009/138/CE.
+  - Sub-moduli Market Risk completi: Interest Rate (shock up/down con duration ladder), Equity (Type 1 a 39%, Type 2 a 49%, strategic equity a 22%, symmetric adjustment +-10%), Property (25%), Spread risk per Credit Quality Step (CQS 0-6), Concentration risk per emittente e Currency (+-25% vs EUR).
+  - Matrice di correlazione aggregata EIOPA $\\boldsymbol{\\Omega}_{\\text{mkt}}$, Basic SCR (BSCR), Rischio Operativo $\\text{SCR}_{\\text{op}}$, Loss-Absorbing Capacity (LAC) e Solvency Ratio (EOF / SCR %).
+  - Export dati conforme ai Quantitative Reporting Templates (QRT) S.25.01.21 e S.26.01.01.
+- **DCC-GARCH Dynamic Conditional Correlation & Vine Copula Tail Risk (`core/dcc_garch_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Modellazione econometrica a due stadi: filtraggio univariate GARCH(1,1) per volatilita condizionale e stima della correlazione dinamica tempo-variante $R_t$ (Engle 2002).
+  - Modellazione della dipendenza di coda estrema asimmetrica tramite Regular Vine Copula (Clayton per crash contagion congiunti, Gumbel per rally, Student-t e Gaussian).
+  - Previsione $T+1$ e $T+5$ di covarianza condizionale $H_t$ e simulazione Monte Carlo su copula a code spesse per Dynamic VaR / CVaR al 95%, 99% e 99.5%.
+- **Mock FIX 4.4 Engine & L2 Depth-of-Market (DOM) Simulator (`core/fix_engine.py`)**:
+  - Parser, Lexer e Serializer per protocollo tag-value FIX 4.4 standard con validazione CheckSum a 3 cifre modulo 256.
+  - Session state machine per Logon (`35=A`), Heartbeat (`35=0`), NewOrderSingle (`35=D`), ExecutionReport (`35=8`), OrderCancel (`35=F`).
+  - Simulatore di Order Book L2 Depth-of-Market a 10 livelli di bid e ask attorno al mid price.
+  - Matching engine con book walking per ordini Market e accodamento con probabilita di fill per ordini Limit.
+  - Post-Trade Transaction Cost Analysis (TCA) completa: Arrival Price vs Execution VWAP vs Terminal Price, Implementation Shortfall in EUR e bps, scomposizione Slippage, Price Impact e Delay.
+- **Family Office Generational Wealth Succession Optimizer (`core/wealth/succession_optimizer.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Confronto stocastico a 30 anni su 5 architetture successorie:
+    1. Regime Ordinario (successione diretta, franchigie €1M/€100k, imposte 4%/6%/8%, ipo-catastali 3%, CGT 26%).
+    2. Holding Familiare (PEX 95% Art. 87 TUIR, Patto di Famiglia Art. 768-bis c.c. con esenzione totale Art. 3 c. 4-ter D.Lgs. 346/1990).
+    3. Trust Fiduciario (segregazione patrimoniale, differimento tassazione all'uscita ex AdE Circolare 34/E/2022).
+    4. Polizze Vita Ramo I/III PPLI (esenzione successoria Art. 12 D.Lgs. 346/1990, impignorabilita Art. 1923 c.c.).
+    5. Ottimizzazione Ibrida (Patto + PPLI + Trust).
+  - Simulazione Monte Carlo 30Y con decumulazione fondatore (G1), primo passaggio (G1 -> G2) e secondo passaggio (G2 -> G3).
+  - Calcolo del Tax Alpha generazionale (€ e %), probabilità di conservazione del capitale e punteggio di asset protection.
+- **Event-Driven Risk Watchdog & Multi-Channel Notification Hub (`core/watchdog/risk_watchdog.py`)**:
+  - Monitoraggio proattivo dei limiti del Risk Appetite Framework (RAF): VaR 99%, Solvency Ratio, Max Drawdown, concentrazione singola/settore e runway liquidita.
+  - Webhook dispatcher con payload formattati per Telegram Bot API, Discord Webhook (rich embeds), Slack Incoming Webhooks (Block Kit) e SMTP Email, con modalita mock per testing e audit trail in-memory.
+- **Nuovi Endpoint REST Headless v9.12.0 (`api/main.py`)**:
+  - `POST /api/v1/risk/barra`: Decomposizione fattoriale strutturale Barra.
+  - `POST /api/v1/risk/solvency2-scr`: Requisito patrimoniale Solvency II SCR.
+  - `POST /api/v1/risk/dcc-garch`: Correlazione dinamica DCC-GARCH e rischio di coda.
+  - `POST /api/v1/execution/fix/order`: Esecuzione simulata FIX 4.4 su DOM L2 e TCA.
+  - `POST /api/v1/wealth/succession-optimization`: Ottimizzazione successoria 30Y Monte Carlo.
+  - `POST /api/v1/watchdog/check`: Valutazione limiti RAF e invio alert.
+  - `GET /api/v1/watchdog/alerts`: Registro storico degli alert generati.
+- **Suite di Test Unitari & Integrazione v9.12.0 (`tests/test_v912_institutional_suite.py`)**:
+  - Suite dedicata con 7 test esaustivi coprenti tutti i pilastri (100% pass rate).
+
+---
+
 ## [9.11.0] - 2026-09-25
 
 ### 🌐 Walk-Forward Rolling OOS Engine, HMM Adaptive Allocation, Total Wealth Reverse Stress, SciPy HiGHS MIP Rebalancer, Async Job Queue & Regulatory Stress Dossier PDF
