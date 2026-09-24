@@ -52,7 +52,7 @@ def test_desktop_packaging_includes_components():
 
     with open("pyproject.toml", "r", encoding="utf-8") as f:
         toml_text = f.read()
-    assert 'version = "9.9.0"' in toml_text
+    assert 'version = "9.10.0"' in toml_text
 
 
 def test_action_drawers_callables():

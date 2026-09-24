@@ -477,7 +477,9 @@ def compute_reverse_stress_test(
     if target_drawdown_pct is not None:
         target_loss_pct = target_drawdown_pct
     if results is not None:
-        if "portfolio_value" in results and float(results["portfolio_value"] or 0) > 0:
+        if "valore_totale" in results and float(results["valore_totale"] or 0) > 0:
+            portfolio_value = float(results["valore_totale"])
+        elif "portfolio_value" in results and float(results["portfolio_value"] or 0) > 0:
             portfolio_value = float(results["portfolio_value"])
         elif "metrics" in results and "portfolio_value" in results["metrics"]:
             portfolio_value = float(results["metrics"]["portfolio_value"] or portfolio_value)
@@ -639,9 +641,12 @@ def compute_reverse_stress_test(
     implied_years = max(2, int(1.0 / max(p_value, 1e-4)))
     freq_est = f"1 su {implied_years} anni"
 
+    target_dd = float(target_drawdown_pct) if target_drawdown_pct is not None else -abs(float(round(target_loss_pct, 2)))
+
     return {
         "target_loss_pct": round(target_loss_pct, 2),
-        "target_loss_eur": round(portfolio_value * (target_loss_pct / 100.0), 2),
+        "target_drawdown_pct": target_dd,
+        "target_loss_eur": round(portfolio_value * (abs(target_loss_pct) / 100.0), 2),
         "simulated_loss_pct": round(simulated_loss_pct, 2),
         "simulated_loss_eur": round(simulated_loss_eur, 2),
         "portfolio_initial_value_eur": round(portfolio_value, 2),
