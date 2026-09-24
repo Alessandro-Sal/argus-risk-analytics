@@ -59,7 +59,6 @@ from core.wealth.wealth_engine import (
     generate_personal_balance_sheet_tearsheet_html,
     generate_personal_balance_sheet_tearsheet_pdf,
 )
-
 from core.wealth.wealth_modals import render_balance_sheet_methodology_modal
 from core.wealth.wealth_snapshot import get_wealth_snapshots_history
 from core.wealth.wealth_temporal_engine import (
@@ -1184,8 +1183,9 @@ with main_tab_sheet:
         if is_past:
             st.markdown("<div style='padding-top:24px;'></div>", unsafe_allow_html=True)
             if st.button("📸 Salva Chiusura", key="btn_save_year_close_snap", use_container_width=True, help=f"Salva e congela formalmente lo snapshot di bilancio al 31/12/{selected_pbs_year} nel database"):
-                from core.wealth.wealth_snapshot import save_wealth_snapshot_to_db
                 from datetime import date as d_date
+
+                from core.wealth.wealth_snapshot import save_wealth_snapshot_to_db
                 snap_id = save_wealth_snapshot_to_db(
                     engine=engine,
                     portfolio_id=current_pid,

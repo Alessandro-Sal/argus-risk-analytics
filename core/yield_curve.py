@@ -7,7 +7,7 @@
 
 import os
 import time
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
