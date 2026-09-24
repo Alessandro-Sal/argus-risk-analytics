@@ -19,6 +19,7 @@ from core.wealth.tbs_monte_carlo import (
     TBSMonteCarloEngine,
     compute_stochastic_cash_flow_decumulation,
 )
+from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
 from core.wealth.wealth_db import (
     cleanup_empty_wealth_portfolios,
     clear_wealth_accounts,
@@ -137,3 +138,4 @@ from core.wealth.wealth_validator import (
     validate_pension_df,
     validate_physical_assets_df,
 )
+

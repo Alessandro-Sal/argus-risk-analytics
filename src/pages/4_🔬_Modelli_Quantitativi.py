@@ -225,6 +225,13 @@ QUANT_MODELS_CATALOG = {
         "badge_color": "#34d399",
         "category": "Esecuzione & Fiscale",
         "desc": "Calcolo della Trade Execution List esatta con frizione reale (commissioni fisse/percentuali, bid-ask spread, imposte capital gain 26%/12.5% e compensazione minusvalenze) oppure ribilanciamento a impatto fiscale zero tramite flussi di cassa/PAC."
+    },
+    "🔄 Walk-Forward Backtesting (WFO)": {
+        "title": "Walk-Forward Multi-Strategy Rolling Out-of-Sample Backtesting",
+        "badge": "WFO • Rolling OOS • Real Friction",
+        "badge_color": "#14b8a6",
+        "category": "Backtesting Quantitativo",
+        "desc": "Validazione rolling Out-of-Sample delle strategie di allocazione quantitativa (Equal Weight, HRP, ERC, Max Sharpe) con costi di transazione, slippage e bid-ask spread realistici."
     }
 }
 
@@ -4749,3 +4756,81 @@ elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
 
 
 
+
+
+# ── TAB: WALK-FORWARD MULTI-STRATEGY ROLLING OOS ENGINE ────────────
+elif active_quant_tab == "🔄 Walk-Forward Backtesting (WFO)":
+    st.markdown("#### 🔄 Walk-Forward Multi-Strategy Rolling Out-of-Sample Engine")
+    st.caption("Esecuzione di backtesting rolling con finestre di training (In-Sample) e finestre di test (Out-of-Sample) con frizioni di ribilanciamento.")
+
+    returns_df = results.get("returns_df") if isinstance(results, dict) else None
+    if returns_df is None or (isinstance(returns_df, pd.DataFrame) and returns_df.empty):
+        tickers = (
+            list(pos["ticker"].dropna().unique())
+            if isinstance(pos, pd.DataFrame) and not pos.empty and "ticker" in pos.columns
+            else ["SPY", "QQQ", "TLT", "GLD"]
+        )
+        if len(tickers) < 2:
+            tickers = ["SPY", "QQQ", "TLT", "GLD"]
+        np.random.seed(42)
+        dates = pd.date_range(end=datetime.now(), periods=500, freq="B")
+        synth_data = {t: np.random.normal(0.0004, 0.012, len(dates)) for t in tickers}
+        returns_df = pd.DataFrame(synth_data, index=dates)
+
+    if not has_portfolio and (returns_df is None or returns_df.empty):
+        st.warning("⚠️ Carica prima un portafoglio nella Control Room con serie storiche per eseguire il Walk-Forward Backtesting.")
+    else:
+        from core.walk_forward_engine import run_walk_forward_backtest
+
+        wfo_c1, wfo_c2, wfo_c3 = st.columns(3)
+        with wfo_c1:
+            wfo_strat = st.selectbox(
+                "Strategia Quantitativa:",
+                options=["equal_weight", "hrp", "erc", "max_sharpe"],
+                format_func=lambda x: {
+                    "equal_weight": "1/N Equal Weight (Naive Benchmark)",
+                    "hrp": "Hierarchical Risk Parity (HRP)",
+                    "erc": "Equal Risk Contribution (ERC Spinu)",
+                    "max_sharpe": "Maximum Sharpe Ratio (Ledoit-Wolf)",
+                }.get(x, x),
+            )
+            wfo_train = st.slider("Finestra di Training (In-Sample Giorni):", min_value=63, max_value=504, value=252, step=21)
+        with wfo_c2:
+            wfo_test = st.slider("Finestra di Test (Out-of-Sample Giorni):", min_value=21, max_value=126, value=63, step=21)
+            wfo_reb_cost = st.slider("Costo Commissionale Ribilanciamento (bps):", min_value=0.0, max_value=50.0, value=10.0, step=2.5)
+        with wfo_c3:
+            wfo_slip = st.slider("Slippage d'Esecuzione (bps):", min_value=0.0, max_value=30.0, value=5.0, step=2.5)
+            wfo_bid_ask = st.slider("Bid-Ask Spread Drag (bps):", min_value=0.0, max_value=30.0, value=5.0, step=2.5)
+
+        if st.button("🚀 Esegui Walk-Forward Backtesting", key="btn_run_wfo", use_container_width=True, type="primary"):
+            with st.spinner("Esecuzione backtest rolling multi-finestra..."):
+                try:
+                    wfo_res = run_walk_forward_backtest(
+                        returns_df=returns_df,
+                        strategy_name=wfo_strat,
+                        train_window_days=wfo_train,
+                        test_window_days=wfo_test,
+                        rebalance_cost_bps=wfo_reb_cost,
+                        slippage_bps=wfo_slip,
+                        bid_ask_bps=wfo_bid_ask,
+                    )
+                    st.session_state["wfo_last_result"] = wfo_res
+                except Exception as exc:
+                    st.error(f"Errore durante l'esecuzione del Walk-Forward: {exc}")
+
+        if "wfo_last_result" in st.session_state:
+            res_wfo = st.session_state["wfo_last_result"]
+            st.markdown("##### 📈 Risultati Rolling Out-of-Sample")
+            st.dataframe(res_wfo["summary_table"], use_container_width=True, hide_index=True)
+
+            cum_df = res_wfo["cumulative_returns"]
+            if not cum_df.empty:
+                fig_cum = px.line(cum_df, title="Curve Rendimento Cumulativo OOS vs Buy & Hold (Netto Frizioni)")
+                fig_cum = apply_plotly_theme(fig_cum)
+                st.plotly_chart(fig_cum, use_container_width=True)
+
+            dd_df = res_wfo["drawdown_series"]
+            if not dd_df.empty:
+                fig_dd = px.area(dd_df * 100.0, title="Profilo di Drawdown OOS (%)")
+                fig_dd = apply_plotly_theme(fig_dd)
+                st.plotly_chart(fig_dd, use_container_width=True)

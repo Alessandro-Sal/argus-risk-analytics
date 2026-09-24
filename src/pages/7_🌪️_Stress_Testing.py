@@ -2,6 +2,8 @@ import streamlit as st
 
 st.set_page_config(page_title="Stress Testing | ARGUS", page_icon="🌪️", layout="wide")
 
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -1337,3 +1339,91 @@ with c_m_r:
         </span>
     </div>
     """, unsafe_allow_html=True)
+
+
+# ── V9.11.0: REGULATORY STRESS TESTING DOSSIER (4-PAGE PDF) & TOTAL WEALTH REVERSE STRESS ──
+st.markdown("---")
+st.markdown("#### 🏛️ Regulatory Stress Testing Dossier & Total Wealth Ruin Barrier (EBA / Solvency II)")
+st.caption("Generazione documentale ufficiale conforme agli standard European Banking Authority (EBA) e stress inverso multi-asset del bilancio patrimoniale consolidato.")
+
+col_dossier1, col_dossier2 = st.columns([3, 1], vertical_alignment="center")
+with col_dossier1:
+    st.markdown("""
+    Il **Regulatory Stress Testing Dossier** è un report esecutivo ad alta risoluzione (4 Pagine A4) per Comitati Rischi,
+    Private Banking e Audit Interno. Include l'impatto degli scenari EBA 2026/Fed CCAR, decomposizione marginale del rischio,
+    reverse stress con distanza di Mahalanobis e piano di mitigazione patrimoniale.
+    """)
+with col_dossier2:
+    from core.pdf_generator import generate_regulatory_stress_testing_dossier_pdf
+    pdf_stress_data = {
+        "portfolio_nav": float(macro_res.get("initial_portfolio_value_eur", 1_000_000.0)),
+        "worst_loss_pct": float(macro_res.get("worst_case_drawdown_pct", -28.45)),
+        "worst_loss_eur": float(macro_res.get("worst_case_loss_eur", 284500.0)),
+        "scenarios": macro_res.get("scenarios_df"),
+        "reverse_stress": rev_res,
+    }
+    dossier_pdf = generate_regulatory_stress_testing_dossier_pdf(
+        portfolio_name=st.session_state.get("portfolio_name", "Portafoglio Istituzionale"),
+        stress_data=pdf_stress_data,
+        base_currency="EUR",
+    )
+    st.download_button(
+        label="📑 Scarica Dossier Regolamentare (4 Pagine PDF)",
+        data=dossier_pdf,
+        file_name=f"ARGUS_Regulatory_Stress_Dossier_{datetime.now().strftime('%Y%m%d')}.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
+
+st.markdown("##### 🏦 Total Wealth Reverse Stress Testing (Solvency & Ruin Multi-Asset)")
+st.caption("Identificazione della combinazione di shock minimi più verosimile (Mahalanobis Distance) sul patrimonio familiare/HNWI.")
+
+with st.expander("🔬 Configura Bilancio Patrimoniale & Vincoli di Solvibilità", expanded=False):
+    tw_c1, tw_c2, tw_c3 = st.columns(3)
+    with tw_c1:
+        tw_liquid = st.number_input("Attivi Finanziari Liquidi (€):", min_value=0.0, value=float(macro_res.get("initial_portfolio_value_eur", 500000.0)), step=50000.0)
+        tw_re = st.number_input("Patrimonio Immobiliare (€):", min_value=0.0, value=800000.0, step=50000.0)
+    with tw_c2:
+        tw_corp = st.number_input("Partecipazioni Aziendali / PMI (€):", min_value=0.0, value=400000.0, step=50000.0)
+        tw_illiq = st.number_input("Beni da Collezione & Illiquidi (€):", min_value=0.0, value=100000.0, step=20000.0)
+    with tw_c3:
+        tw_debt = st.number_input("Debito & Mutui Passivi (€):", min_value=0.0, value=600000.0, step=50000.0)
+        tw_target_type = st.selectbox("Modalità di Stress Inverso:", options=["solvency", "ruin"], format_func=lambda x: "Solvency Ruin (Debt-to-Assets)" if x == "solvency" else "Net Worth Ruin (Perdita PN)")
+        if tw_target_type == "solvency":
+            tw_threshold = st.slider("Soglia Critica Debt-to-Assets (%):", min_value=40.0, max_value=90.0, value=65.0, step=5.0) / 100.0
+        else:
+            tw_threshold = st.slider("Perdita Minima Net Worth (%):", min_value=20.0, max_value=80.0, value=50.0, step=5.0) / 100.0
+
+from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
+
+tw_balance = {
+    "liquid_assets": tw_liquid,
+    "real_estate": tw_re,
+    "corporate_equity": tw_corp,
+    "illiquid_assets": tw_illiq,
+    "total_liabilities": tw_debt,
+}
+tw_res = compute_total_wealth_reverse_stress(
+    balance_sheet=tw_balance,
+    target_type=tw_target_type,
+    target_threshold=tw_threshold,
+)
+
+tw_k1, tw_k2, tw_k3, tw_k4 = st.columns(4)
+with tw_k1:
+    metric_card("Mahalanobis Distance", f"{tw_res['mahalanobis_distance']:.2f}σ", delta="Vulnerabilità Strutturale", delta_color="normal")
+with tw_k2:
+    metric_card("Probabilità Implicita", f"{tw_res['implied_probability_pct']:.3f}%", delta=f"Ritorno: 1/{tw_res['return_period_years']} anni", delta_color="normal")
+with tw_k3:
+    metric_card("Fattore Più Vulnerabile", tw_res["most_vulnerable_factor"], delta="Massima Perdita EUR", delta_color="inverse")
+with tw_k4:
+    metric_card("Perdita Net Worth Stimata", fmt_eur(tw_res["breakdown_loss"]["total_net_worth_loss_eur"]), delta=f"Pre: {fmt_eur(tw_res['pre_stress_balance_sheet']['net_worth_eur'])}", delta_color="inverse")
+
+df_tw_shocks = pd.DataFrame([
+    {"Fattore di Rischio Patrimoniale": "Mercati Finanziari Liquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['liquid_markets_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['liquid_markets_loss_eur'])},
+    {"Fattore di Rischio Patrimoniale": "Settore Immobiliare", "Shock % Richiesto": f"{tw_res['factor_shocks']['real_estate_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['real_estate_loss_eur'])},
+    {"Fattore di Rischio Patrimoniale": "Partecipazioni / Corporate PMI", "Shock % Richiesto": f"{tw_res['factor_shocks']['corporate_equity_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['corporate_equity_loss_eur'])},
+    {"Fattore di Rischio Patrimoniale": "Passività / Mutui (Euribor Spread)", "Shock % Richiesto": f"{tw_res['factor_shocks']['debt_liabilities_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['debt_increase_eur'])},
+    {"Fattore di Rischio Patrimoniale": "Beni di Lusso / Illiquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['illiquid_luxury_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['illiquid_luxury_loss_eur'])},
+])
+st.table(df_tw_shocks)

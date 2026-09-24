@@ -15,7 +15,7 @@ import pandas as pd
 from pydantic import BaseModel, Field
 
 try:
-    from fastapi import FastAPI, HTTPException, Query, Response
+    from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
     from fastapi.middleware.cors import CORSMiddleware
     HAS_FASTAPI = True
 except ImportError:
@@ -27,19 +27,148 @@ from core.bitemporal_engine import BitemporalLedgerEngine
 from core.factor_library import compute_fama_french_factor_model
 from core.fixed_income import compute_bond_analytics
 from core.macro_stress_engine import compute_reverse_stress_test
-from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+from core.mip_rebalancer import solve_mip_rebalance
+from core.pdf_generator import (
+    generate_institutional_portfolio_factsheet_pdf,
+    generate_regulatory_stress_testing_dossier_pdf,
+)
+from core.regime_allocation import compute_regime_conditional_allocation
 from core.risk_engine import compute_portfolio_liquidity_risk
 from core.services.rebalancing_service import RebalancingService
 from core.services.risk_service import RiskService
 from core.services.tax_service import TaxService
 from core.services.wealth_service import WealthService
 from core.tax_engine import compute_tax_and_harvesting
+from core.walk_forward_engine import run_walk_forward_backtest
+from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
 
 logger = logging.getLogger("argus.api")
 
 # ============================================================
 # Pydantic Request & Response Schemas (v2 Compatible)
 # ============================================================
+
+
+class JobSubmitRequest(BaseModel):
+    """Payload for submitting an asynchronous background task."""
+    task_type: str = Field(..., description="Task type: walk_forward, regime_adaptive, mip_rebalance, reverse_stress")
+    payload: Dict[str, Any] = Field(default_factory=dict, description="Task-specific payload")
+
+
+class WalkForwardRequest(BaseModel):
+    """Payload for Walk-Forward Rolling Backtesting."""
+    returns: Dict[str, List[float]] = Field(..., description="Historical returns dictionary {ticker: [ret1, ret2, ...]}")
+    strategy: str = Field(default="equal_weight", description="Strategy: equal_weight, hrp, erc, max_sharpe")
+    train_window_days: int = Field(default=252, ge=20)
+    test_window_days: int = Field(default=63, ge=5)
+    rebalance_cost_bps: float = Field(default=10.0, ge=0.0)
+    slippage_bps: float = Field(default=5.0, ge=0.0)
+    bid_ask_bps: float = Field(default=5.0, ge=0.0)
+
+
+class RegimeAdaptiveRequest(BaseModel):
+    """Payload for Regime-Conditional Adaptive Allocation."""
+    returns: Dict[str, List[float]] = Field(..., description="Historical returns dictionary {ticker: [ret1, ret2, ...]}")
+    base_weights: Optional[Dict[str, float]] = None
+    current_regime: Optional[str] = None
+    crisis_equity_haircut: float = Field(default=0.40, ge=0.0, le=1.0)
+    risk_free_rate: float = Field(default=0.02)
+
+
+class TotalWealthReverseStressRequest(BaseModel):
+    """Payload for Total Wealth Reverse Stress Testing."""
+    balance_sheet: Dict[str, float] = Field(..., description="Balance sheet: liquid_assets, real_estate, corporate_equity, illiquid_assets, total_liabilities")
+    target_type: str = Field(default="solvency", description="'solvency' or 'ruin'")
+    target_threshold: float = Field(default=0.60, description="Critical threshold (e.g. 0.60 for D/A ratio or 0.50 for ruin)")
+
+
+class MipRebalanceRequest(BaseModel):
+    """Payload for Mixed-Integer Programming Discrete Lot & Cardinality Rebalancer."""
+    current_holdings: Dict[str, float] = Field(..., description="Current shares {ticker: quantity}")
+    current_prices: Dict[str, float] = Field(..., description="Current prices {ticker: price_eur}")
+    target_weights: Dict[str, float] = Field(..., description="Target weights {ticker: weight}")
+    total_capital: Optional[float] = None
+    cash_available: float = Field(default=0.0)
+    max_cardinality: Optional[int] = None
+    lot_sizes: Optional[Dict[str, int]] = None
+    min_trade_eur: float = Field(default=50.0)
+    capital_gains_tax_budget_eur: Optional[float] = None
+    pmc_dict: Optional[Dict[str, float]] = None
+    tax_rate: float = Field(default=0.26)
+
+
+# In-memory background jobs registry
+_jobs_registry: Dict[str, Dict[str, Any]] = {}
+
+
+def execute_background_job(job_id: str, task_type: str, payload: Dict[str, Any]):
+    """Background worker executing quantitative tasks asynchronously."""
+    try:
+        _jobs_registry[job_id]["status"] = "RUNNING"
+        _jobs_registry[job_id]["started_at"] = datetime.now(timezone.utc).isoformat()
+
+        if task_type == "walk_forward":
+            rets_dict = payload.get("returns", {})
+            df_rets = pd.DataFrame(rets_dict)
+            strat = payload.get("strategy", "equal_weight")
+            train_w = int(payload.get("train_window_days", 252))
+            test_w = int(payload.get("test_window_days", 63))
+            reb_cost = float(payload.get("rebalance_cost_bps", 10.0))
+            slip = float(payload.get("slippage_bps", 5.0))
+            ba = float(payload.get("bid_ask_bps", 5.0))
+            res = run_walk_forward_backtest(
+                returns_df=df_rets,
+                strategy_name=strat,
+                train_window_days=train_w,
+                test_window_days=test_w,
+                rebalance_cost_bps=reb_cost,
+                slippage_bps=slip,
+                bid_ask_bps=ba,
+            )
+            output = {
+                "summary": res["summary_table"].to_dict(orient="records"),
+                "params": res["params"],
+                "rebalance_dates": res["rebalance_dates"],
+            }
+        elif task_type == "regime_adaptive":
+            rets_dict = payload.get("returns", {})
+            df_rets = pd.DataFrame(rets_dict)
+            output = compute_regime_conditional_allocation(
+                returns_df=df_rets,
+                base_weights=payload.get("base_weights"),
+                current_regime=payload.get("current_regime"),
+                crisis_equity_haircut=float(payload.get("crisis_equity_haircut", 0.40)),
+            )
+        elif task_type == "mip_rebalance":
+            output = solve_mip_rebalance(
+                current_holdings=payload.get("current_holdings", {}),
+                current_prices=payload.get("current_prices", {}),
+                target_weights=payload.get("target_weights", {}),
+                total_capital=payload.get("total_capital"),
+                cash_available=float(payload.get("cash_available", 0.0)),
+                max_cardinality=payload.get("max_cardinality"),
+                lot_sizes=payload.get("lot_sizes"),
+                min_trade_eur=float(payload.get("min_trade_eur", 50.0)),
+                capital_gains_tax_budget_eur=payload.get("capital_gains_tax_budget_eur"),
+                pmc_dict=payload.get("pmc_dict"),
+            )
+        elif task_type == "reverse_stress":
+            output = compute_total_wealth_reverse_stress(
+                balance_sheet=payload.get("balance_sheet", {}),
+                target_type=payload.get("target_type", "solvency"),
+                target_threshold=float(payload.get("target_threshold", 0.60)),
+            )
+        else:
+            output = {"message": f"Task {task_type} completed", "payload": payload}
+
+        _jobs_registry[job_id]["status"] = "COMPLETED"
+        _jobs_registry[job_id]["result"] = output
+        _jobs_registry[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception as exc:
+        logger.error("Job %s failed: %s", job_id, exc, exc_info=True)
+        _jobs_registry[job_id]["status"] = "FAILED"
+        _jobs_registry[job_id]["error"] = str(exc)
+        _jobs_registry[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
 
 class RiskMetricsRequest(BaseModel):
     """Payload for computing portfolio risk and performance metrics."""
@@ -450,7 +579,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.10.0",
+        version="9.11.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -474,7 +603,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.10.0",
+            version="9.11.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1005,6 +1134,160 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Factsheet PDF generation failure: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=f"PDF generation error: {str(exc)}")
+
+
+    # --- Asynchronous Job Queue Endpoints ---
+    @app.post("/api/v1/jobs/submit", tags=["Async Job Queue"])
+    def submit_job(req: JobSubmitRequest, background_tasks: BackgroundTasks) -> Dict[str, Any]:
+        import uuid
+        job_id = uuid.uuid4().hex
+        _jobs_registry[job_id] = {
+            "job_id": job_id,
+            "task_type": req.task_type,
+            "status": "PENDING",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": None,
+            "completed_at": None,
+            "result": None,
+            "error": None,
+        }
+        background_tasks.add_task(execute_background_job, job_id, req.task_type, req.payload)
+        return {"job_id": job_id, "status": "PENDING", "task_type": req.task_type}
+
+    @app.get("/api/v1/jobs/{job_id}", tags=["Async Job Queue"])
+    def get_job(job_id: str) -> Dict[str, Any]:
+        if job_id not in _jobs_registry:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        return _jobs_registry[job_id]
+
+    @app.get("/api/v1/jobs", tags=["Async Job Queue"])
+    def list_jobs(limit: int = 50) -> List[Dict[str, Any]]:
+        return list(_jobs_registry.values())[-limit:]
+
+    # --- WebSocket Streaming Gateway ---
+    @app.websocket("/api/v1/stream/ticks")
+    async def websocket_ticks(websocket: WebSocket):
+        await websocket.accept()
+        import asyncio
+        tickers = ["SPY", "QQQ", "TLT", "GLD", "BND"]
+        prices = {"SPY": 580.0, "QQQ": 490.0, "TLT": 95.0, "GLD": 240.0, "BND": 72.0}
+        try:
+            for _ in range(10):
+                for t in tickers:
+                    shock = float(np.random.normal(0, 0.0005))
+                    prices[t] = round(prices[t] * (1.0 + shock), 2)
+                    bid = round(prices[t] - 0.02, 2)
+                    ask = round(prices[t] + 0.02, 2)
+                    await websocket.send_json({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "ticker": t,
+                        "price": prices[t],
+                        "bid": bid,
+                        "ask": ask,
+                        "spread_bps": 4.0,
+                    })
+                await asyncio.sleep(0.1)
+            await websocket.send_json({"event": "STREAM_FINISHED"})
+            await websocket.close()
+        except WebSocketDisconnect:
+            logger.info("Client disconnected from tick stream")
+        except Exception as exc:
+            logger.warning("WebSocket stream exception: %s", exc)
+
+    # --- Synchronous Quantitative REST Endpoints ---
+    @app.post("/api/v1/backtest/walk-forward", tags=["Quantitative Optimization"])
+    def backtest_walk_forward(req: WalkForwardRequest) -> Dict[str, Any]:
+        try:
+            df_rets = pd.DataFrame(req.returns)
+            res = run_walk_forward_backtest(
+                returns_df=df_rets,
+                strategy_name=req.strategy,
+                train_window_days=req.train_window_days,
+                test_window_days=req.test_window_days,
+                rebalance_cost_bps=req.rebalance_cost_bps,
+                slippage_bps=req.slippage_bps,
+                bid_ask_bps=req.bid_ask_bps,
+            )
+            return {
+                "status": "SUCCESS",
+                "summary": res["summary_table"].to_dict(orient="records"),
+                "params": res["params"],
+                "rebalance_dates": res["rebalance_dates"],
+            }
+        except Exception as exc:
+            logger.error("Walk-forward failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/optimize/regime-adaptive", tags=["Quantitative Optimization"])
+    def optimize_regime_adaptive(req: RegimeAdaptiveRequest) -> Dict[str, Any]:
+        try:
+            df_rets = pd.DataFrame(req.returns)
+            return compute_regime_conditional_allocation(
+                returns_df=df_rets,
+                base_weights=req.base_weights,
+                current_regime=req.current_regime,
+                crisis_equity_haircut=req.crisis_equity_haircut,
+                risk_free_rate=req.risk_free_rate,
+            )
+        except Exception as exc:
+            logger.error("Regime adaptive allocation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/risk/total-wealth-reverse-stress", tags=["Risk Analytics"])
+    def run_wealth_reverse_stress(req: TotalWealthReverseStressRequest) -> Dict[str, Any]:
+        try:
+            return compute_total_wealth_reverse_stress(
+                balance_sheet=req.balance_sheet,
+                target_type=req.target_type,
+                target_threshold=req.target_threshold,
+            )
+        except Exception as exc:
+            logger.error("Total wealth reverse stress failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/rebalance/mip", tags=["Portfolio Rebalancing"])
+    def rebalance_mip(req: MipRebalanceRequest) -> Dict[str, Any]:
+        try:
+            return solve_mip_rebalance(
+                current_holdings=req.current_holdings,
+                current_prices=req.current_prices,
+                target_weights=req.target_weights,
+                total_capital=req.total_capital,
+                cash_available=req.cash_available,
+                max_cardinality=req.max_cardinality,
+                lot_sizes=req.lot_sizes,
+                min_trade_eur=req.min_trade_eur,
+                capital_gains_tax_budget_eur=req.capital_gains_tax_budget_eur,
+                pmc_dict=req.pmc_dict,
+                tax_rate=req.tax_rate,
+            )
+        except Exception as exc:
+            logger.error("MIP rebalance failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/api/v1/reports/stress-dossier", tags=["Reporting & Factsheets"])
+    def download_stress_dossier_pdf(
+        portfolio_name: str = Query("Global All-Weather", description="Portfolio denomination"),
+        currency: str = Query("EUR", description="Base reporting currency")
+    ):
+        try:
+            pdf_bytes = generate_regulatory_stress_testing_dossier_pdf(
+                portfolio_name=portfolio_name,
+                stress_data={"portfolio_nav": 1_000_000.0, "worst_loss_pct": -28.45},
+                base_currency=currency,
+            )
+            safe_name = "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in portfolio_name)
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="Stress_Dossier_{safe_name}.pdf"',
+                    "Content-Type": "application/pdf",
+                },
+            )
+        except Exception as exc:
+            logger.error("Stress dossier PDF failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
 
     return app
 

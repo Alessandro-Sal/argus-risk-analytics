@@ -73,6 +73,15 @@ Florian Spinu's strictly convex potential formulation $\min_{x > 0} \frac{1}{2} 
 ### 11. Regulatory Reverse Stress Testing (EBA/BCE) & Gatheral SVI
 Inverse stress testing identifying the minimum Mahalanobis distance macroeconomic shock causing a predetermined loss threshold $\mathcal{L}^*$, complete with Chi-squared plausibility p-values and causal factor attribution; paired with Jim Gatheral's (2004) Raw SVI Arbitrage-Free Volatility Surface with Roger Lee moment bounds and Durrleman risk-neutral density non-negativity checks.
 
+### 12. Walk-Forward Multi-Strategy Rolling Out-of-Sample Engine (WFO)
+Realistic rolling Out-of-Sample backtesting across quantitative allocation strategies (Equal Weight, HRP, Spinu ERC, Max Sharpe) with user-configurable In-Sample training windows and Out-of-Sample test windows, incorporating real transaction costs, execution slippage, and bid-ask spread drag.
+
+### 13. Regime-Conditional Adaptive Allocation & HMM Overlay
+Unsupervised Hidden Markov Model (HMM) and Gaussian Mixture classification of latent market regimes (Bull, Neutral, Crisis) with dynamic risk budget modulation: asymmetrical risk-on haircuts during systemic crises and reallocation to defensive safe-haven anchors.
+
+### 14. Mixed-Integer Programming (MIP) Rebalancer & Async REST Queue
+SciPy HiGHS Mixed-Integer Linear Programming (MILP) solving discrete share rebalancing subject to maximum cardinality constraints ($\sum z_i \le K$), minimum lot sizes ($L_i$), and capital gains tax budgets; complemented by an asynchronous job queue (`BackgroundTasks`) and WebSocket tick streaming gateway for enterprise scale.
+
 ---
 
 ## Quick Navigation
