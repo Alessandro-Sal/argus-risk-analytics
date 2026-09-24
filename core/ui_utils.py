@@ -1451,7 +1451,7 @@ def render_skeleton_table(n_rows: int = 5, n_cols: int = 4, height: int = 240) -
     rows_html = "".join(
         f"""
         <div style="display:flex; gap:12px; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04);">
-            {''.join(f'<div class="argus-skeleton" style="flex:1; height:15px;"></div>' for _ in range(n_cols))}
+            {''.join('<div class="argus-skeleton" style="flex:1; height:15px;"></div>' for _ in range(n_cols))}
         </div>
         """
         for _ in range(n_rows)
@@ -1460,7 +1460,7 @@ def render_skeleton_table(n_rows: int = 5, n_cols: int = 4, height: int = 240) -
         f"""
         <div style="background:rgba(13,17,23,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:8px; height:{height}px; overflow:hidden;">
             <div style="display:flex; gap:12px; padding:10px 12px; background:rgba(22,27,34,0.8); border-bottom:1px solid rgba(255,255,255,0.08);">
-                {''.join(f'<div class="argus-skeleton" style="flex:1; height:12px; opacity:0.6;"></div>' for _ in range(n_cols))}
+                {''.join('<div class="argus-skeleton" style="flex:1; height:12px; opacity:0.6;"></div>' for _ in range(n_cols))}
             </div>
             {rows_html}
         </div>

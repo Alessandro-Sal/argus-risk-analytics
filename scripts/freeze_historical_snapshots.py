@@ -3,16 +3,17 @@
 # ARGUS — Batch Freezing of Year-End Wealth Snapshots (2021-2025)
 # ============================================================
 
-import sys
 import os
+import sys
 from datetime import date
+
 import pandas as pd
 from sqlalchemy import text
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.fetcher import get_engine
-from core.wealth.wealth_snapshot import save_wealth_snapshot_to_db, get_wealth_snapshots_history
+from core.wealth.wealth_snapshot import get_wealth_snapshots_history, save_wealth_snapshot_to_db
 
 
 def freeze_snapshots(portfolio_id: int = 1):

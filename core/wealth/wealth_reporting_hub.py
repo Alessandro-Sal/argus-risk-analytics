@@ -17,6 +17,10 @@ from core.fetcher import get_engine
 from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
 from core.ui_export_utils import render_export_toolbar
 from core.voice_advisor_engine import generate_ai_voice_executive_briefing
+from core.wealth.personal_balance_sheet import (
+    generate_personal_balance_sheet_pdf,
+    generate_personal_balance_sheet_tearsheet_pdf,
+)
 from core.wealth.wealth_db import get_cashflow_records, get_pension_plans, get_physical_assets, get_wealth_accounts
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
@@ -25,10 +29,6 @@ from core.wealth.wealth_engine import (
     generate_advisory_pitchbook_html,
     generate_advisory_pitchbook_pdf,
     generate_executive_tear_sheet_pdf,
-)
-from core.wealth.personal_balance_sheet import (
-    generate_personal_balance_sheet_pdf,
-    generate_personal_balance_sheet_tearsheet_pdf,
 )
 from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
 

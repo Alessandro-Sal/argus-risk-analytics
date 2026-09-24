@@ -180,6 +180,7 @@ def test_compute_multi_year_balance_comparison():
 def test_pension_plan_point_in_time_dynamic():
     """Verifica che la previdenza sia dinamica e point-in-time per ciascun esercizio."""
     import json
+
     from core.wealth.wealth_db import init_wealth_db, save_pension_plan, save_wealth_account
 
     mock_engine = create_engine("sqlite:///:memory:")

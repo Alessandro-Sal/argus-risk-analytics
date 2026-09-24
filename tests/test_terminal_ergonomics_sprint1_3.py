@@ -4,17 +4,17 @@ Verifica della persistenza uirevision, cross-chart cursor spikes, skeleton loade
 e dell'inferenza automatica in render_institutional_datagrid.
 """
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import pytest
 
 from core.chart_framework import apply_argus_theme
 from core.ui_utils import (
-    render_skeleton_cards,
-    render_skeleton_table,
-    render_skeleton_chart,
     render_institutional_datagrid,
+    render_skeleton_cards,
+    render_skeleton_chart,
+    render_skeleton_table,
 )
 
 

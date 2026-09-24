@@ -4,7 +4,7 @@
 # Aligned with EBA Adverse, Fed CCAR & Regulatory Multi-Factor Shocks
 # ============================================================
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd

@@ -114,6 +114,7 @@ def test_action_drawers_dynamic_portfolio_binding():
 def test_order_blotter_crypto_and_no_shorting():
     """Verifica che il blotter ordini gestisca le crypto in modo frazionato e non generi vendite superiori alle quote possedute."""
     from unittest.mock import MagicMock, patch
+
     from components.action_drawers import render_order_blotter_dialog
 
     pos = pd.DataFrame([

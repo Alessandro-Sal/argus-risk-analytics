@@ -4,7 +4,9 @@
 # ============================================================
 
 from unittest.mock import patch
+
 import pytest
+
 from core.fetcher import get_engine
 from core.wealth.personal_balance_sheet import (
     compute_personal_balance_sheet,

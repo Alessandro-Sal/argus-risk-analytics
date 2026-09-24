@@ -4,20 +4,20 @@
 # ============================================================
 
 from datetime import datetime
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from core.yield_curve import get_active_risk_free_rate, HISTORICAL_ANNUAL_RISK_FREE_RATES
-from core.risk_engine import (
-    compute_evt_pot_var_cvar,
-    compute_basel_traffic_light_backtest,
-    compute_maximum_diversification_portfolio,
-    compute_cvar_portfolio_optimization,
-    compute_fx_risk_decomposition,
-)
 from core.macro_stress_engine import compute_consolidated_wealth_stress_test
-
+from core.risk_engine import (
+    compute_basel_traffic_light_backtest,
+    compute_cvar_portfolio_optimization,
+    compute_evt_pot_var_cvar,
+    compute_fx_risk_decomposition,
+    compute_maximum_diversification_portfolio,
+)
+from core.yield_curve import HISTORICAL_ANNUAL_RISK_FREE_RATES, get_active_risk_free_rate
 
 # ──────────────────────────────────────────────────────────
 # 1. POINT-IN-TIME HISTORICAL RISK-FREE RATES
