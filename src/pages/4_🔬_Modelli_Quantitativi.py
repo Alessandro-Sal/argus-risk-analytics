@@ -246,6 +246,13 @@ QUANT_MODELS_CATALOG = {
         "badge_color": "#14b8a6",
         "category": "Backtesting Quantitativo",
         "desc": "Validazione rolling Out-of-Sample delle strategie di allocazione quantitativa (Equal Weight, HRP, ERC, Max Sharpe) con costi di transazione, slippage e bid-ask spread realistici."
+    },
+    "🔮 SABR & Local Volatility Surface 3D": {
+        "title": "SABR Model Calibration & Dupire Local Volatility PDE Surface (3D)",
+        "badge": "Hagan SABR • Dupire PDE • 3D Vol Cube",
+        "badge_color": "#ec4899",
+        "category": "Derivati & Volatilità",
+        "desc": "Calibrazione analitica SABR (Hagan et al. 2002) per smile/skew e inversione PDE di Dupire (1994) per la superficie di volatilità locale sigma_loc(K,T) con visualizzazione 3D Mesh."
     }
 }
 
@@ -4924,3 +4931,97 @@ elif active_quant_tab == "🌊 DCC-GARCH & Vine Copula":
 
         st.markdown("##### 🌐 Matrice di Correlazione Prevista (T+1)")
         st.dataframe(pd.DataFrame(res_d["forecast_correlation_t1"]), use_container_width=True)
+
+
+# ── TAB: SABR & LOCAL VOLATILITY SURFACE 3D ─────────────────────────
+elif active_quant_tab == "🔮 SABR & Local Volatility Surface 3D":
+    st.markdown("#### 🔮 SABR Volatility Smile Calibration & Dupire Local Volatility Surface (3D)")
+    st.caption("Modellazione stocastica della volatilità secondo Hagan et al. (2002) e inversione PDE di Dupire (1994) $\\sigma_{\\text{loc}}(K, T)$.")
+
+    from core.sabr_local_vol_engine import compute_sabr_and_local_vol_surface
+
+    c_sb1, c_sb2, c_sb3 = st.columns(3)
+    with c_sb1:
+        f0_in = st.number_input("Prezzo Forward / Spot ($F_0$):", min_value=1.0, value=100.0, step=5.0, key="sabr_f0_in")
+        asset_type = st.selectbox("Asset Class Underlying:", ["Equity / Index (Beta = 0.70)", "Fixed Income / Rates (Beta = 0.50)", "FX / Normal (Beta = 1.00)"], key="sabr_asset_sel")
+        beta_val = 0.70 if "Equity" in asset_type else (0.50 if "Rates" in asset_type else 1.00)
+    with c_sb2:
+        atm_vol_pct = st.slider("Volatilità ATM Iniziale (%):", min_value=5.0, max_value=80.0, value=20.0, step=1.0, key="sabr_atm_vol_in")
+        skew_preset = st.select_slider("Skew / Asimmetria di Coda (Correlation $\\rho$):", options=[-0.75, -0.50, -0.25, 0.0, 0.25, 0.50], value=-0.25, key="sabr_rho_slider")
+    with c_sb3:
+        vol_of_vol = st.slider("Volatilità della Volatilità ($\\nu$):", min_value=0.10, max_value=1.50, value=0.45, step=0.05, key="sabr_nu_slider")
+        maturities_preset = st.multiselect("Scadenze Opzioni (Anni):", [0.25, 0.50, 1.00, 2.00, 3.00, 5.00], default=[0.25, 0.50, 1.00, 2.00], key="sabr_mat_multi")
+
+    if not maturities_preset:
+        maturities_preset = [0.25, 0.50, 1.00, 2.00]
+
+    if st.button("🚀 Calibra SABR & Calcola Superficie Dupire 3D", key="btn_run_sabr", type="primary", use_container_width=True):
+        with st.spinner("Calibrazione parametri SABR ed inversione PDE Dupire..."):
+            try:
+                strikes_arr = [round(f0_in * mult, 2) for mult in [0.70, 0.80, 0.90, 0.95, 1.0, 1.05, 1.10, 1.20, 1.30]]
+                market_vols_matrix = []
+                for T in maturities_preset:
+                    row = []
+                    for K in strikes_arr:
+                        log_m = np.log(K / f0_in)
+                        vol_k = (atm_vol_pct / 100.0) + skew_preset * 0.15 * log_m + vol_of_vol * 0.10 * (log_m ** 2) / np.sqrt(T)
+                        row.append(max(0.04, vol_k))
+                    market_vols_matrix.append(row)
+
+                sabr_res = compute_sabr_and_local_vol_surface(
+                    f0=f0_in,
+                    strikes=strikes_arr,
+                    maturities=maturities_preset,
+                    market_vols=market_vols_matrix,
+                    beta=beta_val,
+                )
+                st.session_state["sabr_last_result"] = sabr_res
+            except Exception as e:
+                st.error(f"Errore durante il calcolo SABR/Dupire: {e}")
+
+    if "sabr_last_result" in st.session_state:
+        s_res = st.session_state["sabr_last_result"]
+        calib = s_res["calibrated_sabr_parameters"]
+        sk1, sk2, sk3, sk4 = st.columns(4)
+        with sk1:
+            metric_card("SABR Alpha (Vol Iniziale)", f"{calib['alpha']:.4f}", delta="Livello ATM", delta_color="normal")
+        with sk2:
+            metric_card("SABR Rho (Correlazione Skew)", f"{calib['rho']:.4f}", delta="Inclinazione Smile", delta_color="normal")
+        with sk3:
+            metric_card("SABR Nu (Vol of Vol)", f"{calib['nu']:.4f}", delta="Curvatura Convexity", delta_color="normal")
+        with sk4:
+            metric_card("SABR Beta (Elasticità)", f"{calib['beta']:.2f}", delta=asset_type.split()[0], delta_color="normal")
+
+        st.markdown("##### 🌐 Superficie di Volatilità Locale di Dupire $\\sigma_{\\text{loc}}(K, T)$ [3D Mesh]")
+        loc_df = pd.DataFrame(s_res["local_vol_surface_pct"])
+
+        z_data = loc_df.values
+        x_strikes = [float(c.replace("K_", "")) for c in loc_df.columns]
+        y_maturities = [float(idx.replace("T_", "").replace("y", "")) for idx in loc_df.index]
+
+        fig_3d = go.Figure(data=[go.Surface(
+            z=z_data,
+            x=x_strikes,
+            y=y_maturities,
+            colorscale="Viridis",
+            colorbar=dict(title="Local Vol (%)")
+        )])
+        fig_3d.update_layout(
+            title="Superficie 3D Dupire Local Volatility σ_loc(K, T)",
+            scene=dict(
+                xaxis_title="Strike (K)",
+                yaxis_title="Maturity (Anni T)",
+                zaxis_title="Local Vol (%)"
+            ),
+            margin=dict(l=10, r=10, b=10, t=40),
+            height=550,
+        )
+        st.plotly_chart(fig_3d, use_container_width=True)
+
+        st.markdown("##### 📊 Griglia Tabellare: Volatilità Implicita SABR vs Volatilità Locale")
+        tab_v_sabr, tab_v_loc = st.tabs(["🔮 Implied Vol SABR (%)", "🌊 Local Vol Dupire (%)"])
+        with tab_v_sabr:
+            st.dataframe(pd.DataFrame(s_res["implied_vol_surface_pct"]), use_container_width=True)
+        with tab_v_loc:
+            st.dataframe(loc_df, use_container_width=True)
+

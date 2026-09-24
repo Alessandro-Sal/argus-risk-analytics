@@ -2799,3 +2799,68 @@ with succ_k3:
 
 st.markdown("##### 📊 Confronto Architetture di Protezione & Successione")
 st.dataframe(pd.DataFrame(succ_res["summary_table"]), use_container_width=True, hide_index=True)
+
+# ── V9.13.0: PRIVATE MARKETS PACING & DE-SMOOTHING (YALE ENDOWMENT) ──
+st.markdown("---")
+st.markdown("#### 🏛️ Private Markets Cash Flow Pacing (Takahashi-Alexander) & De-smoothing Econometrico")
+st.caption("Modellazione J-Curve a 10 anni (Chiamate, Distribuzioni, NAV) secondo Takahashi-Alexander (2001) e correzione econometrica di Geltner-Fisher per la reale volatilita non quotata.")
+
+from core.wealth.private_markets_engine import compute_private_markets_analytics
+
+with st.expander("⚙️ Parametri Impegno Fondo Private Equity / Venture Capital", expanded=True):
+    pe_c1, pe_c2, pe_c3 = st.columns(3)
+    with pe_c1:
+        pe_commit = st.number_input("Impegno Totale di Capitale (Commitment €):", min_value=100_000.0, value=5_000_000.0, step=500_000.0, key="pe_comm_in")
+    with pe_c2:
+        pe_life = st.slider("Durata Vita del Fondo (Anni):", min_value=5, max_value=15, value=10, step=1, key="pe_life_in")
+    with pe_c3:
+        pe_growth = st.slider("Tasso di Crescita Atteso Asset (% annuo):", min_value=2.0, max_value=25.0, value=10.0, step=0.5, key="pe_g_in") / 100.0
+
+# Esecuzione simulazione pacing
+pe_res = compute_private_markets_analytics(
+    commitment_eur=pe_commit,
+    fund_life_years=pe_life,
+    growth_rate=pe_growth,
+    observed_returns=[0.02, 0.025, 0.018, 0.022, 0.031, 0.015, 0.028, 0.019],
+)
+
+pek1, pek2, pek3, pek4 = st.columns(4)
+with pek1:
+    metric_card("Net IRR Atteso", f"{pe_res['net_irr_pct']:.2f}%", delta="Rendimento Annuo Interno", delta_color="normal")
+with pek2:
+    metric_card("Multiplo TVPI", f"{pe_res['tvpi']:.2f}x", delta=f"DPI: {pe_res['dpi']:.2f}x", delta_color="normal")
+with pek3:
+    metric_card("Picco Fabbisogno Capitale", fmt_eur(pe_res["peak_capital_deficit_eur"]), delta=f"Trough Anno {pe_res['j_curve_trough_year']}", delta_color="inverse")
+with pek4:
+    metric_card("PME Kaplan-Schoar", f"{pe_res['pme_kaplan_schoar']:.2f}x", delta=f"Direct Alpha: {pe_res['direct_alpha_pct']:+.2f}%", delta_color="normal")
+
+st.markdown("##### 📈 Profilo Temporale J-Curve: Flussi di Cassa & Valutazione NAV (€)")
+sched_df = pd.DataFrame(pe_res["schedule"])
+
+fig_pe = go.Figure()
+fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df["Capital Call (€)"], name="Capital Calls (Versamenti)", marker_color="#f87171"))
+fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df["Distribuzioni (€)"], name="Distribuzioni (Rimborsi)", marker_color="#34d399"))
+fig_pe.add_trace(go.Scatter(x=sched_df["Anno"], y=sched_df["NAV (€)"], name="NAV Fondo (Valore Residuo)", mode="lines+markers", line=dict(color="#38bdf8", width=3)))
+fig_pe.update_layout(
+    title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV",
+    xaxis_title="Anno di Vita del Fondo",
+    yaxis_title="Euro (€)",
+    barmode="group",
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    height=400,
+)
+st.plotly_chart(apply_plotly_theme(fig_pe), use_container_width=True)
+
+st.markdown("##### 📉 Correzione Econometrica di De-smoothing (Geltner-Fisher)")
+ds_info = pe_res["desmoothing"]
+if ds_info:
+    dsk1, dsk2, dsk3 = st.columns(3)
+    with dsk1:
+        metric_card("Volatilità Osservata (Appraisal)", f"{ds_info['observed_vol_pct']:.2f}%", delta="Artificialmente Bassa", delta_color="normal")
+    with dsk2:
+        metric_card("Volatilità De-smoothed Reale", f"{ds_info['desmoothed_vol_pct']:.2f}%", delta=f"Sottostima: {ds_info['understatement_ratio']:.2f}x", delta_color="inverse")
+    with dsk3:
+        metric_card("Autocorrelazione Lag-1 (ρ)", f"{ds_info['autocorrelation_rho']:.3f}", delta="Inerzia delle Perizie", delta_color="normal")
+
+st.markdown("##### 📋 Piano Annuale Dettagliato dei Flussi di Cassa del Fondo")
+st.dataframe(sched_df, use_container_width=True, hide_index=True)

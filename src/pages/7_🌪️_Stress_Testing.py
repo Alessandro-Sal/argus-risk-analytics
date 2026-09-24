@@ -1472,3 +1472,117 @@ with s2k4:
 
 st.markdown("##### 📋 Prospetto Regolamentare QRT S.25.01.21 (SCR Standard Formula)")
 st.dataframe(pd.DataFrame(list(s2_report["qrt_s25_01"].items()), columns=["Voce Regolamentare", "Valore"]), use_container_width=True, hide_index=True)
+
+# ── V9.13.0: FRTB (BASEL IV / BCBS 365) STANDARDIZED APPROACH ──────
+st.markdown("---")
+st.markdown("#### 🏛️ FRTB Standardized Approach Capital Engine (BCBS 365 / Basel IV)")
+st.caption("Sensitivities-Based Method (SBM) Delta/Vega/Curvature, Default Risk Charge (DRC) e Residual Risk Add-on (RRAO).")
+
+from core.frtb_engine import compute_frtb_capital_charges
+
+with st.expander("⚙️ Parametri Portafoglio di Trading & Sensibilità FRTB", expanded=False):
+    frtb_c1, frtb_c2 = st.columns(2)
+    with frtb_c1:
+        frtb_port_val = st.number_input("Valore Totale Portafoglio di Trading (€):", min_value=1_000_000.0, value=50_000_000.0, step=5_000_000.0, key="frtb_port_val_in")
+    with frtb_c2:
+        frtb_corr_scenario = st.selectbox("Scenario di Correlazione BCBS:", ["MEDIUM", "HIGH", "LOW"], index=0, key="frtb_scen_sel")
+
+frtb_res = compute_frtb_capital_charges(
+    correlation_scenario=frtb_corr_scenario,
+    total_portfolio_value=frtb_port_val,
+)
+
+fk1, fk2, fk3, fk4 = st.columns(4)
+with fk1:
+    metric_card("Requisito FRTB Totale", fmt_eur(frtb_res["total_frtb_capital_charge_eur"]), delta=f"{frtb_res['capital_ratio_pct']:.2f}% Portafoglio", delta_color="inverse")
+with fk2:
+    metric_card("SBM Total Charge", fmt_eur(frtb_res["sbm_total_charge_eur"]), delta=f"Delta: {fmt_eur(frtb_res['sbm_delta_charge_eur'])}", delta_color="normal")
+with fk3:
+    metric_card("Default Risk Charge (DRC)", fmt_eur(frtb_res["drc_total_charge_eur"]), delta="JTD & Rating Weights", delta_color="normal")
+with fk4:
+    metric_card("Residual Risk (RRAO)", fmt_eur(frtb_res["rrao_total_charge_eur"]), delta="Prodotti Esotici", delta_color="normal")
+
+st.markdown("##### 📊 Decomposizione SBM per Classe di Rischio e Sensibilità")
+st.dataframe(pd.DataFrame(frtb_res["sbm_breakdown_by_risk_class"]), use_container_width=True, hide_index=True)
+
+
+# ── V9.13.0: NGFS CLIMATE TRANSITION & PHYSICAL STRESS ENGINE ───────
+st.markdown("---")
+st.markdown("#### 🌱 NGFS Phase IV Climate Transition & Physical Risk Stress Engine")
+st.caption("Stress test climatico su scenari NGFS (Orderly Net Zero 2050, Disorderly Delayed Transition, Hot House World) con WACI Scope 1-2-3.")
+
+from core.climate_stress_engine import compute_ngfs_climate_stress
+
+cl_c1, cl_c2 = st.columns(2)
+with cl_c1:
+    ngfs_scenario_sel = st.selectbox("Scenario NGFS Phase IV:", ["Net Zero 2050 (Orderly)", "Delayed Transition (Disorderly)", "Current Policies (Hot House World)"], key="ngfs_scen_sel")
+with cl_c2:
+    ngfs_target_yr = st.select_slider("Orizzonte Temporale di Stress:", options=[2030, 2035, 2040, 2050], value=2030, key="ngfs_yr_sel")
+
+cl_res = compute_ngfs_climate_stress(scenario_name=ngfs_scenario_sel, target_year=ngfs_target_yr)
+
+ck1, ck2, ck3, ck4 = st.columns(4)
+with ck1:
+    metric_card("Perdita Climatica Totale", f"{cl_res['portfolio_loss_pct']:.2f}%", delta=fmt_eur(cl_res["portfolio_loss_eur"]), delta_color="inverse")
+with ck2:
+    metric_card("Rischio di Transizione", fmt_eur(cl_res["transition_risk_loss_eur"]), delta=f"Prezzo CO₂: ${cl_res['carbon_price_usd_ton']}/t", delta_color="inverse")
+with ck3:
+    metric_card("Rischio Fisico (Danni)", fmt_eur(cl_res["physical_risk_loss_eur"]), delta=f"Riscaldamento: +{cl_res['temperature_anomaly_celsius']}°C", delta_color="inverse")
+with ck4:
+    metric_card("Intensità WACI Portafoglio", f"{cl_res['portfolio_waci_tco2e_per_meur']:.1f}", delta="tCO₂e / M€ Ricavi", delta_color="normal")
+
+st.markdown("##### 🏢 Impatto Climatico Dettagliato per Società & Asset")
+st.dataframe(pd.DataFrame(cl_res["holdings_breakdown"]), use_container_width=True, hide_index=True)
+
+
+# ── V9.13.0: INTERACTIVE MACRO WAR ROOM & CORRELATION BREAKDOWN ───
+st.markdown("---")
+st.markdown("#### 🎯 Interactive Macro War Room & Correlation Breakdown Stress Engine")
+st.caption("Simulatore macro a leve multiple (Tassi, Twist, Inflazione, Petrolio, Spread) con crollo sistemico delle correlazioni verso equicorrelazione.")
+
+from core.macro_war_room import compute_macro_war_room_stress
+
+with st.expander("🎛️ Pannello di Controllo Macro Shock & Leva di Correlazione", expanded=True):
+    mw1, mw2, mw3, mw4 = st.columns(4)
+    with mw1:
+        rates_bps = st.slider("Parallel Rates Shock (bps):", min_value=-300, max_value=400, value=150, step=25, key="mw_rates_bps")
+        twist_bps = st.slider("Curve Twist Inversion (bps):", min_value=-150, max_value=150, value=-50, step=10, key="mw_twist_bps")
+    with mw2:
+        cpi_shock = st.slider("Inflation / CPI Surge (%):", min_value=-2.0, max_value=10.0, value=3.5, step=0.5, key="mw_cpi_shock")
+        oil_shock = st.slider("Oil / Energy Spike (%):", min_value=-50, max_value=100, value=40, step=5, key="mw_oil_shock")
+    with mw3:
+        eq_crash = st.slider("Equity Drawdown (%):", min_value=-60, max_value=20, value=-20, step=5, key="mw_eq_crash")
+        cs_spread = st.slider("Credit Spread OAS Widening (bps):", min_value=-50, max_value=600, value=250, step=25, key="mw_cs_spread")
+    with mw4:
+        lam_corr = st.slider("Correlation Breakdown (λ):", min_value=0.0, max_value=1.0, value=0.60, step=0.05, key="mw_lam_corr", help="0 = correlazione storica, 1 = panic equicorrelation matrix (0.85)")
+        vol_surge = st.slider("Vol Surge Multiplier:", min_value=1.0, max_value=3.0, value=1.50, step=0.1, key="mw_vol_surge")
+
+mw_params = {
+    "scenario_name": "Stagflationary Energy Shock & Yield Surge",
+    "parallel_rates_bps": rates_bps,
+    "slope_twist_bps": twist_bps,
+    "inflation_shock_pct": cpi_shock,
+    "oil_shock_pct": oil_shock,
+    "equity_shock_pct": eq_crash,
+    "credit_spread_widening_bps": cs_spread,
+    "correlation_breakdown_lambda": lam_corr,
+    "vol_surge_factor": vol_surge,
+}
+
+mw_res = compute_macro_war_room_stress(scenario_params=mw_params)
+
+mk1, mk2, mk3, mk4 = st.columns(4)
+with mk1:
+    metric_card("PnL Portafoglio Macro", fmt_eur(mw_res["total_pnl_eur"]), delta=f"{mw_res['total_pnl_pct']:.2f}%", delta_color="inverse" if mw_res["total_pnl_eur"] < 0 else "normal")
+with mk2:
+    metric_card("Volatilità Stressata", f"{mw_res['stressed_vol_pct']:.2f}%", delta=f"Base: {mw_res['base_vol_pct']:.2f}%", delta_color="inverse")
+with mk3:
+    metric_card("Perdita di Diversificazione", f"+{mw_res['diversification_loss_pct']:.2f}%", delta="Impatto Correlazione λ", delta_color="inverse")
+with mk4:
+    metric_card("Drenaggio Liquidità / Margin Call", fmt_eur(mw_res["liquidity_margin_drain_eur"]), delta="Cuscino di Garanzia", delta_color="inverse")
+
+st.markdown("##### 📋 Decomposizione PnL per Asset e Fattore Macro")
+st.dataframe(pd.DataFrame(mw_res["assets_breakdown"]), use_container_width=True, hide_index=True)
+
+st.markdown("##### 🌐 Matrice di Correlazione Sotto Stress Sistemico ($R_{\text{stressed}}$)")
+st.dataframe(pd.DataFrame(mw_res["stressed_correlation_matrix"]), use_container_width=True)

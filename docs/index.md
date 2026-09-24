@@ -100,6 +100,24 @@ Tag-value FIX 4.4 parser/serializer with 3-digit modulo-256 CheckSum verificatio
 ### 20. Event-Driven Risk Watchdog & Multi-Channel Notification Hub
 Autonomous real-time monitor against institutional Risk Appetite Framework (RAF) thresholds (VaR 99%, Solvency Ratio, Max Drawdown, concentration limits) with multi-channel webhook dispatching to Telegram, Discord, Slack, and SMTP Email with testing mock mode and in-memory event audit log.
 
+### 21. FRTB Standardized Approach Engine (BCBS 365 / Basel IV)
+Full implementation of the Basel Committee on Banking Supervision (BCBS 365) Standardized Approach for market risk: Sensitivities-Based Method (SBM) Delta, Vega, and Curvature across GIRR, CSR non-securitisation, Equity, FX, and Commodity; multi-scenario correlation aggregation (Medium, High, Low); Default Risk Charge (DRC) Jump-to-Default; and Residual Risk Add-on (RRAO).
+
+### 22. SABR Stochastic Volatility & Dupire Local Volatility Surface (3D)
+Analytical calibration of Hagan et al. (2002) SABR model $(\alpha, \rho, \nu)$ for fixed beta (0.50 rates, 0.70 equity, 1.0 FX), finite-difference inversion of Dupire's (1994) PDE for the continuous local volatility surface $\sigma_{\text{loc}}(K, T)$, and dense 3D Volatility Cube generation with interactive WebGL rendering.
+
+### 23. NGFS Phase IV Climate Transition & Physical Risk Stress Engine
+Central bank climate stress testing aligned with Network for Greening the Financial System (NGFS Phase IV) scenarios (Orderly Net Zero 2050, Disorderly Delayed Transition, Current Policies / Hot House World), corporate Scope 1-2-3 emissions accounting, Weighted Average Carbon Intensity (WACI in $tCO_2e/M€$), carbon price margin transmission, physical flood/wildfire damage modeling, and aggregate Climate VaR.
+
+### 24. Multi-Venue Smart Order Router & MiFID II RTS 28 Best Execution
+Algorithmic SOR optimizing order execution across 5 fragmented liquidity pools (Primary Lit, Alt MTF, Systematic Internalizer, Dark Pool, Crossing Network) with real-time multi-criteria scoring (fees, latency, historical fill rate, spread) and mandatory MiFID II RTS 28 top 5 venue disclosure reporting.
+
+### 25. Private Markets & Illiquid Asset Valuation Engine (Yale Endowment Model)
+Takahashi-Alexander (2001) 10-year cash flow pacing model simulating Capital Calls, Distributions, NAV progression, J-Curve dynamics, Net IRR, and TVPI/DPI/RVPI multiples; Kaplan-Schoar Public Market Equivalent (PME) and Direct Alpha; coupled with Geltner-Fisher (1991/1994) econometric de-smoothing restoring true underlying volatility and cross-asset correlations.
+
+### 26. Interactive Macro War Room & Correlation Breakdown Stress Engine
+Multi-lever systemic macro scenario constructor (parallel yield shift, yield curve slope twist, inflation CPI surge, oil/energy spike, FX USD move, equity crash, and credit spread widening) combined with a systemic Correlation Breakdown Engine modeling the contagion collapse toward equicorrelation ($\mathbf{R}_{\text{panic}} \to 0.85$), volatility surges, diversification loss quantification, and variation margin liquidity drain projection.
+
 ---
 
 ## Quick Navigation

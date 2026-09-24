@@ -14,6 +14,14 @@ from core.wealth.asset_protection_engine import (
     StatutoryShareItem,
     SuccessionSharesResult,
 )
+from core.wealth.private_markets_engine import (
+    DesmoothingResult,
+    EconometricDesmoother,
+    PacingYearRecord,
+    PrivateEquityFundReport,
+    TakahashiAlexanderPacingModel,
+    compute_private_markets_analytics,
+)
 from core.wealth.succession_optimizer import (
     FamilyOfficeSuccessionOptimizer,
     compute_family_succession_optimization,

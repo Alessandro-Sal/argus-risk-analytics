@@ -7,6 +7,57 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.13.0] - 2026-09-25
+
+### 🏛️ FRTB Standardized Approach (BCBS 365 / Basel IV), SABR Calibration & Dupire Local Volatility Surface (3D), NGFS Climate Stress Engine, Multi-Venue Smart Order Router (MiFID II RTS 28), Private Markets Pacing (Yale Model), Interactive Macro War Room & Correlation Breakdown
+
+Questa major release istituzionale arricchisce la piattaforma ARGUS con 6 motori quantitativi di livello Tier-1 per banche d'investimento, desk derivati, banche centrali, broker MiFID II e family office:
+
+- **FRTB Standardized Approach Engine (`core/frtb_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Implementazione completa dei requisiti patrimoniali Basel IV / BCBS 365:
+    * Sensitivities-Based Method (SBM): Delta, Vega e Curvature charges sulle 5 classi di rischio regolamentari (GIRR, CSR non-securitisation, Equity, FX, Commodity).
+    * Aggregazione multi-scenario di correlazione: Medium, High (+25%) e Low (-25%).
+    * Default Risk Charge (DRC): Jump-to-Default (JTD) su debito ed equity con ponderazioni creditizie e LGD.
+    * Residual Risk Add-on (RRAO): add-on per pay-off esotici e rischio di correlazione (0.1% / 1.0%).
+    * Basel IV Capital Adequacy Ratio e compliance reporting.
+- **SABR Stochastic Volatility & Dupire Local Volatility PDE Engine (`core/sabr_local_vol_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Calibrazione analitica del modello SABR (Hagan et al. 2002) $(\alpha, \rho, \nu)$ con formula asintotica esatta ATM e non-ATM per fixed beta (0.50 tassi, 0.70 equity, 1.0 FX).
+  - Inversione PDE di Dupire (1994) alle differenze finite per la superficie di volatilità locale $\sigma_{\text{loc}}(K, T)$ a partire dalle opzioni Black-Scholes.
+  - Generazione del Volatility Cube 3D denso e visualizzazione interattiva 3D Mesh in Plotly WebGL.
+- **NGFS Phase IV Climate Transition & Physical Risk Stress Engine (`core/climate_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Modellazione dei 3 scenari standard del Network for Greening the Financial System (NGFS Phase IV): Orderly Net Zero 2050, Disorderly Delayed Transition, Current Policies / Hot House World.
+  - Contabilità delle emissioni societarie Scope 1, 2, 3 e Weighted Average Carbon Intensity (WACI in $tCO_2e / M€$).
+  - Meccanismo di trasmissione del carbon price su margini EBITDA, equity re-rating e allargamento credit spread.
+  - Quantificazione del rischio fisico (alluvioni, incendi, stress termico) su immobili e asset reali, con calcolo del Climate VaR aggregato.
+- **Multi-Venue Smart Order Router & MiFID II RTS 28 Best Execution (`core/smart_order_router.py`)**:
+  - Routing algoritmico intelligente su 5 liquidity pools frammentate (Primary Lit Euronext/MTA, Alt MTF Cboe/Turquoise, Systematic Internalizer Citadel, Dark Pool Liquidnet, Crossing Network).
+  - Scoring in tempo reale dei venue basato su fee, latenza, fill rate storico e spread.
+  - Slicing e routing concorrente degli ordini child (fill passivi vs aggressivi).
+  - Report annuale di disclosure Best Execution conforme a MiFID II RTS 28 (top 5 venue per volume, ordini passivi/aggressivi, price improvement in bps ed EUR).
+- **Private Markets & Illiquid Asset Valuation Engine (`core/wealth/private_markets_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Simulazione del ciclo decennale di cassa secondo il modello di Takahashi & Alexander (2001) per fondi Private Equity e Venture Capital: Chiamate di capitale, Distribuzioni, evoluzione NAV e curva a J.
+  - Metriche di performance private equity: Net IRR, multipli TVPI, DPI, RVPI e peak capital deficit.
+  - Public Market Equivalent (PME) di Kaplan-Schoar e Direct Alpha rispetto ai benchmark quotati (S&P 500 / MSCI World).
+  - Correzione econometrica di de-smoothing di Geltner (1991) e Fisher (1994) per neutralizzare l'inerzia artificiale delle perizie periodiche e ripristinare la vera volatilità e correlazione.
+- **Interactive Macro War Room & Correlation Breakdown Stress Engine (`core/macro_war_room.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Costruttore di shock macro a leve multiple: shift parallelo della curva dei tassi, twist pendenza (2Y-10Y flattening/steepening), inflazione CPI, impennata del petrolio/energia, oscillazione FX USD, crollo equity e allargamento spread creditizi OAS.
+  - Correlation Breakdown Engine: modellazione del crollo sistemico delle correlazioni verso equicorrelazione di panico $\mathbf{R}_{\text{panic}} \to 0.85$, aumento della volatilità e quantificazione della perdita di diversificazione.
+  - Calcolo del fabbisogno di cuscino di liquidità e margin call per variazione nei derivati.
+- **Headless REST API v9.13.0 (`api/main.py`)**:
+  - 6 nuovi endpoint REST JSON documentati con OpenAPI/Swagger:
+    * `POST /api/v1/risk/frtb-sbm`: Calcolo requisiti patrimoniali FRTB.
+    * `POST /api/v1/pricing/sabr-vol`: Calibrazione SABR e superficie locale Dupire.
+    * `POST /api/v1/stress/climate-ngfs`: Stress test climatico NGFS.
+    * `POST /api/v1/execution/smart-route`: Routing SOR e report RTS 28.
+    * `POST /api/v1/wealth/private-markets`: Pacing a 10 anni PE e de-smoothing.
+    * `POST /api/v1/stress/macro-war-room`: Simulazione Macro War Room e rottura correlazioni.
+  - Bump versione API a `9.13.0`.
+- **Suite di Test Unitari & Integrazione v9.13.0 (`tests/test_v913_institutional_suite.py`)**:
+  - 7 test istituzionali dedicati (100% pass rate).
+  - Test suite globale del progetto portata a **740 test passati al 100%** (0 errori, 0 warnings bloccanti, 0 linting issues).
+
+---
+
 ## [9.12.0] - 2026-09-25
 
 ### 🏛️ Barra Structural Multi-Asset Risk Model, Solvency II SCR Standard Formula, DCC-GARCH & Vine Copula, Mock FIX 4.4 Engine & L2 DOM, Generational Succession Optimizer, Risk Watchdog & Notification Hub
