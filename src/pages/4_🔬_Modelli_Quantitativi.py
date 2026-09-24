@@ -247,6 +247,20 @@ QUANT_MODELS_CATALOG = {
         "category": "Backtesting Quantitativo",
         "desc": "Validazione rolling Out-of-Sample delle strategie di allocazione quantitativa (Equal Weight, HRP, ERC, Max Sharpe) con costi di transazione, slippage e bid-ask spread realistici."
     },
+    "⚡ Heston FFT Stochastic Volatility": {
+        "title": "Heston (1993) Stochastic Volatility & Carr-Madan (1999) FFT Calibration",
+        "badge": "Carr-Madan FFT · Feller Condition · Vol Surface",
+        "badge_color": "#f59e0b",
+        "category": "Derivati & Volatilità",
+        "desc": "Prezzatura ultra-rapida di opzioni europee su griglie di strike multiple tramite trasformata veloce di Fourier (FFT), verifica della condizione di Feller 2κθ > σ_v^2 e calibrazione L-BFGS-B/SLSQP contro le quote di mercato."
+    },
+    "⚖️ Bayesian Black-Litterman Optimization": {
+        "title": "Bayesian Black-Litterman Model with Idzorek Confidence Weighting",
+        "badge": "Equilibrium Priors · Views Uncertainty · Idzorek",
+        "badge_color": "#6366f1",
+        "category": "Allocazione & Portafoglio",
+        "desc": "Fusione bayesiana tra rendimenti impliciti di equilibrio di mercato (reverse optimization) e view soggettive dell'investitore (assolute o relative) ponderate per livello di confidenza empirico (Idzorek 2005)."
+    },
     "🔮 SABR & Local Volatility Surface 3D": {
         "title": "SABR Model Calibration & Dupire Local Volatility PDE Surface (3D)",
         "badge": "Hagan SABR • Dupire PDE • 3D Vol Cube",
@@ -5025,3 +5039,162 @@ elif active_quant_tab == "🔮 SABR & Local Volatility Surface 3D":
         with tab_v_loc:
             st.dataframe(loc_df, use_container_width=True)
 
+
+
+# ── TAB: HESTON FFT STOCHASTIC VOLATILITY ─────────────────────────────
+elif active_quant_tab == "⚡ Heston FFT Stochastic Volatility":
+    st.markdown("#### ⚡ Heston (1993) Stochastic Volatility & Carr-Madan (1999) FFT Calibration")
+    st.caption("Prezzatura Fourier ad alte prestazioni per opzioni europee, test di positività varianza di Feller e calibrazione L-BFGS-B.")
+
+    from core.heston_fft_engine import compute_heston_surface_and_calibration
+
+    h_col1, h_col2, h_col3 = st.columns(3)
+    with h_col1:
+        h_s0 = st.number_input("Prezzo Spot S0:", min_value=1.0, value=100.0, step=5.0, key="heston_s0")
+        h_r = st.number_input("Tasso Risk-Free (r):", min_value=0.0, max_value=0.20, value=0.03, step=0.005, key="heston_r")
+        h_q = st.number_input("Dividend Yield (q):", min_value=0.0, max_value=0.15, value=0.015, step=0.005, key="heston_q")
+    with h_col2:
+        h_v0 = st.slider("Varianza Iniziale v0 (vol ~20%):", min_value=0.01, max_value=0.25, value=0.04, step=0.01, key="heston_v0")
+        h_kappa = st.slider("Velocità Mean Reversion (κ):", min_value=0.2, max_value=8.0, value=2.0, step=0.2, key="heston_kappa")
+        h_theta = st.slider("Varianza a Lungo Termine (θ):", min_value=0.01, max_value=0.25, value=0.04, step=0.01, key="heston_theta")
+    with h_col3:
+        h_sigma_v = st.slider("Volatilità della Varianza (σ_v):", min_value=0.05, max_value=1.0, value=0.30, step=0.05, key="heston_sigmav")
+        h_rho = st.slider("Correlazione Prezzo-Varianza (ρ):", min_value=-0.95, max_value=0.0, value=-0.65, step=0.05, key="heston_rho")
+
+    # Live Feller Check metric
+    feller_denom = 2.0 * h_kappa * h_theta
+    feller_stat = (h_sigma_v ** 2) / feller_denom if feller_denom > 0 else 999.0
+    feller_pass = h_sigma_v ** 2 < feller_denom
+
+    f_col1, f_col2, f_col3 = st.columns(3)
+    with f_col1:
+        st.metric("Condizione di Feller (2κθ > σ_v²)", "Soddisfatta ✅" if feller_pass else "Violata ⚠️", delta=f"Ratio: {feller_stat:.3f}")
+    with f_col2:
+        st.metric("2κθ (Drift Variational)", f"{feller_denom:.4f}")
+    with f_col3:
+        st.metric("σ_v² (Diffusion Variance)", f"{(h_sigma_v**2):.4f}")
+
+    if st.button("🚀 Calcola Superficie Carr-Madan FFT & Calibra", key="btn_run_heston", type="primary", use_container_width=True):
+        with st.spinner("Esecuzione trasformata veloce di Fourier (Carr-Madan 1999)..."):
+            custom_p = {"v0": h_v0, "kappa": h_kappa, "theta": h_theta, "sigma_v": h_sigma_v, "rho": h_rho}
+            heston_res = compute_heston_surface_and_calibration(
+                s0=h_s0, r=h_r, q=h_q, custom_params=custom_p
+            )
+            st.session_state["heston_last_result"] = heston_res
+
+    if "heston_last_result" in st.session_state:
+        h_data = st.session_state["heston_last_result"]
+        surf = h_data["volatility_surface"]
+
+        st.markdown("##### 📈 Superficie di Volatilità Implicita Heston 3D Mesh")
+        mat_arr = surf["maturities"]
+        k_arr = surf["strikes"]
+        iv_matrix = np.array(surf["iv_matrix"]) * 100.0
+
+        fig_h3d = go.Figure(data=[go.Surface(
+            z=iv_matrix,
+            x=k_arr,
+            y=mat_arr,
+            colorscale="Plasma",
+            colorbar=dict(title="Implied Vol (%)")
+        )])
+        fig_h3d.update_layout(
+            title="Heston Analytical Implied Volatility Surface σ_imp(K, T)",
+            scene=dict(
+                xaxis_title="Strike (K)",
+                yaxis_title="Scadenza T (Anni)",
+                zaxis_title="Implied Vol (%)"
+            ),
+            margin=dict(l=10, r=10, b=10, t=40),
+            height=500,
+        )
+        st.plotly_chart(fig_h3d, use_container_width=True)
+
+        st.markdown("##### 📋 Tabella Quotazioni Prezzi & Volatilità Implicita")
+        pts_df = pd.DataFrame(surf["surface_points"])
+        pts_df["implied_vol_pct"] = (pts_df["implied_vol"] * 100.0).round(2)
+        st.dataframe(pts_df[["maturity_years", "strike", "moneyness", "call_price", "implied_vol_pct"]], use_container_width=True)
+
+
+# ── TAB: BAYESIAN BLACK-LITTERMAN OPTIMIZATION ───────────────────────
+elif active_quant_tab == "⚖️ Bayesian Black-Litterman Optimization":
+    st.markdown("#### ⚖️ Bayesian Black-Litterman Model with Idzorek Confidence Weighting")
+    st.caption("Pesi di equilibrio di mercato (reverse optimization), integrazione di view soggettive e matrice Omega calibrata empiricamente.")
+
+    from core.black_litterman_engine import compute_black_litterman_allocation
+
+    bl_c1, bl_c2, bl_c3 = st.columns(3)
+    with bl_c1:
+        bl_aversion = st.slider("Avversione al Rischio (λ):", min_value=1.0, max_value=8.0, value=3.0, step=0.5, key="bl_lambda")
+    with bl_c2:
+        bl_tau = st.slider("Incertezza del Prior (τ):", min_value=0.01, max_value=0.20, value=0.05, step=0.01, key="bl_tau")
+    with bl_c3:
+        bl_max_w = st.slider("Peso Massimo per Asset (%):", min_value=20, max_value=60, value=40, step=5, key="bl_maxw") / 100.0
+
+    st.markdown("##### 👁️ Configurazione View Soggettive dell'Investitore")
+    v_col1, v_col2 = st.columns(2)
+    with v_col1:
+        st.info("📌 **View 1 (Assoluta)**: US Equities sovraperformerà con rendimento annuo target:")
+        v1_ret = st.number_input("Rendimento Atteso US Equities (%):", min_value=1.0, max_value=25.0, value=9.5, step=0.5, key="v1_ret") / 100.0
+        v1_conf = st.slider("Livello di Confidenza View 1 (Idzorek %):", min_value=10, max_value=95, value=70, step=5, key="v1_conf") / 100.0
+    with v_col2:
+        st.info("📌 **View 2 (Relativa)**: EM Equities sovraperformerà EU Equities con spread annuo di:")
+        v2_ret = st.number_input("Spread EM vs EU (%):", min_value=0.5, max_value=10.0, value=3.0, step=0.5, key="v2_ret") / 100.0
+        v2_conf = st.slider("Livello di Confidenza View 2 (Idzorek %):", min_value=10, max_value=95, value=65, step=5, key="v2_conf") / 100.0
+
+    if st.button("🚀 Esegui Ottimizzazione Black-Litterman", key="btn_run_bl", type="primary", use_container_width=True):
+        with st.spinner("Calcolo rendimenti di equilibrio, aggiornamento Bayesiano e SLSQP..."):
+            custom_views = [
+                {"view_type": "absolute", "assets": ["US_Equities"], "weights": [1.0], "expected_return": v1_ret, "confidence": v1_conf},
+                {"view_type": "relative", "assets": ["EM_Equities", "EU_Equities"], "weights": [1.0, -1.0], "expected_return": v2_ret, "confidence": v2_conf}
+            ]
+            bl_res = compute_black_litterman_allocation(
+                risk_aversion=bl_aversion,
+                tau=bl_tau,
+                max_weight=bl_max_w,
+                views_data=custom_views,
+            )
+            st.session_state["bl_last_result"] = bl_res
+
+    if "bl_last_result" in st.session_state:
+        b_res = st.session_state["bl_last_result"]
+        metrics = b_res["portfolio_metrics"]
+
+        bm1, bm2, bm3, bm4 = st.columns(4)
+        with bm1:
+            st.metric("Rendimento Atteso Ptf", f"{metrics['portfolio_expected_return']*100:.2f}%", delta=f"Benchmark: {metrics['benchmark_expected_return']*100:.2f}%")
+        with bm2:
+            st.metric("Volatilità Posterior", f"{metrics['portfolio_volatility']*100:.2f}%", delta=f"Benchmark: {metrics['benchmark_volatility']*100:.2f}%")
+        with bm3:
+            st.metric("Sharpe Ratio Ptf", f"{metrics['portfolio_sharpe']:.2f}", delta=f"BM: {metrics['benchmark_sharpe']:.2f}")
+        with bm4:
+            st.metric("Information Ratio", f"{metrics['information_ratio']:.2f}", delta=f"Tracking Error: {metrics['tracking_error']*100:.2f}%")
+
+        st.markdown("##### ⚖️ Confronto Allocazioni: Portafoglio Ottimo vs Benchmark di Mercato")
+        sum_df = pd.DataFrame(b_res["summary_table"])
+
+        fig_bl = go.Figure()
+        fig_bl.add_trace(go.Bar(
+            name="Market Benchmark (%)",
+            x=sum_df["asset"],
+            y=sum_df["market_weight_pct"],
+            marker_color="#94a3b8"
+        ))
+        fig_bl.add_trace(go.Bar(
+            name="Black-Litterman Optimal (%)",
+            x=sum_df["asset"],
+            y=sum_df["optimal_weight_pct"],
+            marker_color="#6366f1"
+        ))
+        fig_bl.update_layout(
+            barmode="group",
+            title="Allocazione di Portafoglio Black-Litterman con Tilt Attivi",
+            xaxis_title="Classe di Attivo",
+            yaxis_title="Peso (%)",
+            height=400,
+            margin=dict(l=10, r=10, b=10, t=40)
+        )
+        st.plotly_chart(fig_bl, use_container_width=True)
+
+        st.markdown("##### 📋 Tabella Dettagliata Rendimenti & Tilt Attivi")
+        st.dataframe(sum_df, use_container_width=True)

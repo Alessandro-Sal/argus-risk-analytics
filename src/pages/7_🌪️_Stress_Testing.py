@@ -1586,3 +1586,117 @@ st.dataframe(pd.DataFrame(mw_res["assets_breakdown"]), use_container_width=True,
 
 st.markdown("##### 🌐 Matrice di Correlazione Sotto Stress Sistemico ($R_{\text{stressed}}$)")
 st.dataframe(pd.DataFrame(mw_res["stressed_correlation_matrix"]), use_container_width=True)
+
+
+# ── V9.14.0: BILATERAL XVA & COUNTERPARTY RISK ENGINE ─────────────────
+st.markdown("---")
+st.markdown("#### 🛡️ Bilateral XVA & Counterparty Credit Risk Engine (BCBS / ISDA SIMM)")
+st.caption("Valutazione CVA, DVA, FVA, MVA, KVA con accordi di compensazione CSA e simulazione profili di esposizione (EE, PFE 95%/99%, ENE).")
+
+from core.xva_engine import compute_xva_metrics
+
+with st.expander("⚙️ Parametri Contratto CSA Netting Set & Portafoglio Derivati", expanded=False):
+    xva_c1, xva_c2, xva_c3 = st.columns(3)
+    with xva_c1:
+        xva_port_mtm = st.number_input("MTM Lordo Portafoglio Derivati (€):", min_value=100_000.0, value=2_500_000.0, step=250_000.0, key="xva_mtm_in")
+        xva_thresh = st.number_input("Soglia CSA Bilaterale (€):", min_value=0.0, value=250_000.0, step=50_000.0, key="xva_thresh_in")
+    with xva_c2:
+        xva_cpty_spread = st.number_input("Credit Spread Controparte (bps):", min_value=10.0, max_value=1000.0, value=120.0, step=10.0, key="xva_cpty_sp")
+        xva_own_spread = st.number_input("Credit Spread Proprio (DVA bps):", min_value=10.0, max_value=500.0, value=65.0, step=5.0, key="xva_own_sp")
+    with xva_c3:
+        xva_mpor = st.slider("Margin Period of Risk (MPOR Giorni):", min_value=5, max_value=30, value=10, step=1, key="xva_mpor_in")
+        xva_mta = st.number_input("Minimum Transfer Amount (€):", min_value=0.0, value=50_000.0, step=10_000.0, key="xva_mta_in")
+
+custom_csa = {
+    "threshold": xva_thresh,
+    "mta": xva_mta,
+    "mpor_days": xva_mpor,
+}
+custom_mkt = {
+    "counterparty_cds_spread_bps": xva_cpty_spread,
+    "own_cds_spread_bps": xva_own_spread,
+}
+
+xva_res = compute_xva_metrics(csa_params=custom_csa, market_params=custom_mkt)
+
+xk1, xk2, xk3, xk4 = st.columns(4)
+with xk1:
+    metric_card("Credit Valuation Adj (CVA)", fmt_eur(xva_res["cva_eur"]), delta="Rischio Controparte", delta_color="inverse")
+with xk2:
+    metric_card("Debit Valuation Adj (DVA)", fmt_eur(xva_res["dva_eur"]), delta="Rischio Proprio (+)", delta_color="normal")
+with xk3:
+    metric_card("Funding Valuation Adj (FVA)", fmt_eur(xva_res["fva_eur"]), delta=f"MVA: {fmt_eur(xva_res['mva_eur'])}", delta_color="inverse")
+with xk4:
+    metric_card("Total Net XVA", fmt_eur(xva_res["total_xva_eur"]), delta=f"Peak PFE 99%: {fmt_eur(xva_res['peak_pfe_99_eur'])}", delta_color="inverse" if xva_res["total_xva_eur"] < 0 else "normal")
+
+st.markdown("##### 📈 Profilo di Esposizione Creditizia Futura (EE, PFE 95%, PFE 99%, ENE)")
+exp_df = pd.DataFrame(xva_res["exposure_profile"])
+
+fig_xva = go.Figure()
+fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["pfe_99_eur"], name="PFE 99% (Worst-Case)", line=dict(color="#f43f5e", width=2.5)))
+fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["pfe_95_eur"], name="PFE 95%", line=dict(color="#fb923c", width=2)))
+fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["expected_exposure_eur"], name="Expected Exposure (EE)", line=dict(color="#38bdf8", width=2.5)))
+fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["expected_negative_exposure_eur"], name="Expected Neg. Exposure (ENE)", line=dict(color="#a855f7", dash="dot")))
+
+fig_xva.update_layout(
+    title="Simulazione Monte Carlo dei Profili di Esposizione con Collaterale CSA",
+    xaxis_title="Orizzonte Temporale (Anni)",
+    yaxis_title="Esposizione Potenziale (€)",
+    height=420,
+    margin=dict(l=10, r=10, b=10, t=40),
+)
+st.plotly_chart(fig_xva, use_container_width=True)
+
+
+# ── V9.14.0: BASEL III LIQUIDITY STANDARDS (LCR & NSFR) ───────────────
+st.markdown("---")
+st.markdown("#### 💧 Basel III Liquidity Standards & Dynamic Cash Ladder (BCBS 238)")
+st.caption("Requisito di copertura della liquidità a 30 giorni (LCR ≥ 100%), Net Stable Funding Ratio (NSFR ≥ 100%) e proiezioni di sopravvivenza.")
+
+from core.basel_liquidity_engine import compute_basel_liquidity_ratios
+
+with st.expander("⚙️ Parametri Attivi Liquidi HQLA & Run-off di Cassa", expanded=False):
+    b_c1, b_c2 = st.columns(2)
+    with b_c1:
+        hqla_l1_val = st.number_input("HQLA Livello 1 - Riserve & Titoli Sovrani 0% RW (€):", min_value=5_000_000.0, value=70_000_000.0, step=5_000_000.0, key="hqla_l1_in")
+        hqla_l2a_val = st.number_input("HQLA Livello 2A - Corp Bonds AAA/AA (€):", min_value=0.0, value=30_000_000.0, step=2_000_000.0, key="hqla_l2a_in")
+    with b_c2:
+        hqla_l2b_val = st.number_input("HQLA Livello 2B - Azioni & Titoli BBB (€):", min_value=0.0, value=15_000_000.0, step=1_000_000.0, key="hqla_l2b_in")
+        outflow_stress_mult = st.slider("Stress Multiplier sui Deflussi a 30gg:", min_value=1.0, max_value=2.0, value=1.25, step=0.05, key="liq_mult_in")
+
+custom_hqla = [
+    {"asset_id": "L1_SOV", "asset_type": "sovereign_l1", "level": "1", "market_value": hqla_l1_val, "haircut": 0.0},
+    {"asset_id": "L2A_CORP", "asset_type": "corp_bond_l2a", "level": "2A", "market_value": hqla_l2a_val, "haircut": 0.15},
+    {"asset_id": "L2B_EQ", "asset_type": "qualifying_equities", "level": "2B", "market_value": hqla_l2b_val, "haircut": 0.50},
+]
+
+basel_res = compute_basel_liquidity_ratios(hqla_data=custom_hqla)
+
+bk1, bk2, bk3, bk4 = st.columns(4)
+with bk1:
+    lcr_stat = "CONFORME ✅" if basel_res["lcr_compliant"] else "DEFICIT ⚠️"
+    metric_card("Liquidity Coverage Ratio (LCR)", f"{basel_res['lcr_ratio_pct']:.1f}%", delta=f"{lcr_stat} (Min 100%)", delta_color="normal" if basel_res["lcr_compliant"] else "inverse")
+with bk2:
+    metric_card("HQLA Totale Idoneo", fmt_eur(basel_res["total_hqla_eligible"]), delta=f"Cap Deduc: {fmt_eur(basel_res['cap_deduction'])}", delta_color="normal")
+with bk3:
+    nsfr_stat = "CONFORME ✅" if basel_res["nsfr_compliant"] else "DEFICIT ⚠️"
+    metric_card("Net Stable Funding Ratio (NSFR)", f"{basel_res['nsfr_ratio_pct']:.1f}%", delta=f"{nsfr_stat} (Min 100%)", delta_color="normal" if basel_res["nsfr_compliant"] else "inverse")
+with bk4:
+    metric_card("Orizzonte di Sopravvivenza", f"{basel_res['survival_horizon_days']} Giorni", delta="Stress Sistemico", delta_color="normal" if basel_res["survival_horizon_days"] > 30 else "inverse")
+
+st.markdown("##### 🪜 Dynamic Cash Flow Stress Ladder & Buffer di Liquidità")
+ladder_df = pd.DataFrame(basel_res["stress_ladder"])
+
+fig_ladder = go.Figure()
+fig_ladder.add_trace(go.Bar(x=ladder_df["horizon_days"].astype(str) + "d", y=ladder_df["projected_liquidity_buffer"], name="Buffer Netto Residuo (€)", marker_color="#0ea5e9"))
+fig_ladder.update_layout(
+    title="Evoluzione del Cuscinetto di Liquidità Proiettato per Orizzonte Temporale",
+    xaxis_title="Orizzonte di Stress (Giorni)",
+    yaxis_title="Buffer Disponibile (€)",
+    height=380,
+    margin=dict(l=10, r=10, b=10, t=40),
+)
+st.plotly_chart(fig_ladder, use_container_width=True)
+
+st.markdown("##### 📋 Dettaglio HQLA per Livello e Haircut Regolamentare")
+st.dataframe(pd.DataFrame(basel_res["hqla_breakdown"]), use_container_width=True, hide_index=True)

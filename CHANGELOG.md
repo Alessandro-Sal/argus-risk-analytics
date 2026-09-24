@@ -7,6 +7,68 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.14.0] - 2026-09-25
+
+### 🏛️ XVA & Counterparty Credit Risk (CVA/DVA/FVA/MVA/KVA), Heston Stochastic Volatility FFT Calibration (Carr-Madan 1999), Bayesian Black-Litterman Portfolio Optimization (Idzorek 2005), Basel III Liquidity Standards (LCR & NSFR), Exotic Derivatives & Worst-Of Structured Products (Phoenix Autocallable), Regulatory PRIIPs KID (SRI 1-7) & SFDR ESG (Annex I PAI Table)
+
+Questa major release istituzionale completa l'infrastruttura di risk analytics e asset allocation di ARGUS con 6 motori quantitativi di livello Tier-1:
+
+- **Bilateral XVA & Counterparty Credit Risk Engine (`core/xva_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Calcolo completo dello stack di aggiustamenti di valore bilaterali per derivati over-the-counter (OTC):
+    * CVA (Credit Valuation Adjustment) per il rischio di default della controparte con credit spread e LGD.
+    * DVA (Debit Valuation Adjustment) per il beneficio di default proprio (DVA bilaterale).
+    * FVA (Funding Valuation Adjustment, FCA/FBA) per i costi asimmetrici di funding del collaterale non segregato.
+    * MVA (Margin Valuation Adjustment) per il costo del capitale vincolato nei margini iniziali segregati ISDA SIMM.
+    * KVA (Capital Valuation Adjustment) per il costo opportunità del capitale regolamentare (cost of capital hurdle rate).
+  - Simulazione Monte Carlo dei profili di esposizione creditizia nel tempo: Expected Exposure ($EE$), Potential Future Exposure ($PFE_{95\%}, PFE_{99\%}$), Expected Negative Exposure ($ENE$) ed Effective Expected Positive Exposure ($EEPE$).
+  - Modellazione realistica dei contratti Credit Support Annex (CSA): Netting Set, Soglia di non-collateralizzazione (Threshold), Minimum Transfer Amount (MTA), Independent Amount (IA) e Margin Period of Risk (MPOR a 10 giorni).
+- **Heston Stochastic Volatility FFT Option Pricing & Surface Calibration Engine (`core/heston_fft_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Implementazione analitica della funzione caratteristica di Heston (1993) stabilizzata secondo Lord-Kahl / Albrecher per eliminare discontinuità di branch-cut.
+  - Prezzatura ultra-rapida di opzioni europee (Call e Put via put-call parity) su griglie arbitrarie di strike tramite la trasformata veloce di Fourier (FFT) di Carr & Madan (1999) con damping factor $\alpha=1.5$ e pesi di Simpson.
+  - Verifica analitica della condizione di Feller ($2\kappa\theta > \sigma_v^2$) per la garanzia di non-annullamento del processo di varianza e calcolo del Feller ratio.
+  - Calibrazione numerica ad alte prestazioni dei parametri $(v_0, \kappa, \theta, \sigma_v, \rho)$ tramite algoritmi L-BFGS-B e SLSQP contro le quote o volatilità implicite di mercato con vincolo di penalità soft.
+  - Ricostruzione della superficie 3D di volatilità implicita $\sigma_{\text{imp}}(K, T)$ tramite inversione numerica robusta di Black-Scholes (Brent).
+- **Bayesian Black-Litterman Portfolio Optimization Engine (`core/black_litterman_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Formula maestra di Black-Litterman (1992) con reverse optimization per la stima dei rendimenti impliciti di equilibrio di mercato $\boldsymbol{\Pi} = \lambda \boldsymbol{\Sigma} \mathbf{w}_{\text{mkt}}$.
+  - Matrice di picking $\mathbf{P}$ e vettore $\mathbf{q}$ per la formulazione flessibile di view assolute (es. "US Equities renderà il 9.5%") e relative (es. "EM Equities sovraperformerà EU Equities del 3.0%").
+  - Modellazione della matrice di covarianza dell'incertezza $\boldsymbol{\Omega}$ secondo il metodo di Idzorek (2005), mappando la confidenza soggettiva espressa in percentuale ($0-100\%$) direttamente nella dispersione della view.
+  - Calcolo del vettore bayesiano dei rendimenti attesi a posteriori $\mathbf{E}[R]$ e della matrice di covarianza posteriore $\mathbf{M}$.
+  - Risoluzione dei pesi ottimi di portafoglio $\mathbf{w}^*$ con vincoli long-only e concentrazione massima tramite programmazione quadratica / SLSQP, tracking error ed information ratio atteso.
+- **Basel III Liquidity Risk Engine (`core/basel_liquidity_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Liquidity Coverage Ratio (LCR $\ge 100\%$): classificazione degli attivi liquidi di alta qualità (HQLA) in Livello 1 (haircut 0%), Livello 2A (haircut 15%), Livello 2B (haircut 50%).
+  - Applicazione analitica dei tetti massimi regolamentari (Cap del 40% su Livello 2 e Cap del 15% su Livello 2B) con formula di deduzione dell'eccesso.
+  - Calcolo dei deflussi stressati a 30 giorni (retail stable 5%, less stable 10%, wholesale non-operational 100%, committed facilities 20%) e cap del 75% sui flussi in entrata ammissibili.
+  - Net Stable Funding Ratio (NSFR = Total ASF / Total RSF $\ge 100\%$) con fattori di ponderazione regolamentari per capitale, depositi stabili, mutui e crediti corporate.
+  - Dynamic Cash Flow Stress Ladder multi-orizzonte (1d, 7d, 14d, 30d, 60d, 90d, 180d, 360d) con quantificazione dei deflussi cumulati e calcolo dell'orizzonte di sopravvivenza in giorni.
+- **Exotic Derivatives & Worst-Of Structured Products Engine (`core/structured_products_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Motore di valutazione Monte Carlo correlato per certificati su panieri Worst-Of:
+    * Phoenix Autocallables con barriera autocall per rimborso anticipato al 100% del nominale, barriera cedola con effetto memoria (recupero cedole non pagate) e barriera di protezione del capitale a scadenza di tipo europeo.
+    * Reverse Convertibles con cedole periodiche garantite fisse e downside short put strike con rimborso cash/physical condizionato.
+  - Calcolo delle greche analitico/numerico alle differenze finite: Delta ($\Delta$), Gamma ($\Gamma$), Vega ($\nu$), Theta ($\theta$), Rho ($\rho$) e Sensibilità alla Barriera di Protezione.
+  - Probabilità di estinzione anticipata (autocall probability per ogni finestra di osservazione), probabilità di perdita del capitale a scadenza (knock-in hit probability) e vita media attesa / duration del certificato.
+- **Regulatory PRIIPs KID & SFDR ESG Reporting Engine (`core/regulatory_reporting_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - PRIIPs RTS (Regolamento Delegato UE 2017/653):
+    * Summary Risk Indicator (SRI da 1 a 7) combinando la Market Risk Measure (MRM da 1 a 7, derivata dalla Value-at-Risk Equivalent Volatility - VEV calcolata tramite espansione di Cornish-Fisher con skewness e kurtosis) e la Credit Risk Measure (CRM da 1 a 6 derivata dal rating creditizio dell'emittente).
+    * Generazione dei 4 scenari regolamentari di performance (Favorevole 90° percentile, Moderato mediana, Sfavorevole 10° percentile, Stress 99° percentile con volatilità accresciuta) calcolati a 1 Anno, Metà RHP e Scadenza RHP in valore terminale monetario ed annualizzato.
+  - SFDR (Regolamento UE 2019/2088 & Reg. Delegato 2022/1288):
+    * Classificazione del fondo/mandato in Articolo 6, Articolo 8 ("Light Green") o Articolo 9 ("Dark Green").
+    * Prospetto completo dei 14 indicatori obbligatori di impatto negativo sulla sostenibilità (Principal Adverse Impacts - PAI, Allegato I): emissioni GHG Scope 1-2-3, carbon footprint, intensità energetica, biodiversità, emissioni nell'acqua, rifiuti pericolosi, violazioni UNGC/OECD, gender pay gap, diversità nel CdA ed esclusione armi controverse.
+    * Percentuale di allineamento alla Tassonomia UE e investimenti sostenibili.
+- **Headless REST API v9.14.0 (`api/main.py`)**:
+  - 6 nuovi endpoint REST JSON ad alte prestazioni documentati con OpenAPI/Swagger:
+    * `POST /api/v1/risk/xva`: Metriche bilaterali CVA, DVA, FVA, MVA, KVA e profili di esposizione CSA.
+    * `POST /api/v1/pricing/heston`: Prezzatura opzioni FFT Carr-Madan, verifica Feller e calibrazione L-BFGS-B.
+    * `POST /api/v1/optimize/black-litterman`: Ottimizzazione bayesiana Black-Litterman con confidenza Idzorek.
+    * `POST /api/v1/risk/basel-liquidity`: Ratios regolamentari Basel III LCR e NSFR con stress ladder.
+    * `POST /api/v1/pricing/structured-products`: Valutazione certificati Phoenix/Reverse Convertible e greche.
+    * `POST /api/v1/regulatory/priips-sfdr`: Dossier regolamentare PRIIPs KID (SRI) e SFDR (14 PAI).
+  - Version bump dell'API e dell'endpoint `/health` a `9.14.0`.
+- **Suite di Test Unitari & Integrazione v9.14.0 (`tests/test_v914_institutional_suite.py`)**:
+  - 7 test istituzionali dedicati (100% pass rate).
+  - Test suite globale portata a **747 test passati al 100%** (0 errori, 0 warnings bloccanti, 0 linting issues).
+
+---
+
 ## [9.13.0] - 2026-09-25
 
 ### 🏛️ FRTB Standardized Approach (BCBS 365 / Basel IV), SABR Calibration & Dupire Local Volatility Surface (3D), NGFS Climate Stress Engine, Multi-Venue Smart Order Router (MiFID II RTS 28), Private Markets Pacing (Yale Model), Interactive Macro War Room & Correlation Breakdown
