@@ -7,7 +7,7 @@ Includes:
 3. Equal Risk Contribution (ERC / Risk Parity Portfolio Optimizer)
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -312,17 +312,101 @@ def compute_interactive_trade_kelly(
 
 
 # ==============================================================================
-# 3. EQUAL RISK CONTRIBUTION (ERC / RISK PARITY)
+# ==============================================================================
+# 3. EQUAL RISK CONTRIBUTION (ERC) & SPINO CONVEX RISK BUDGETING
 # ==============================================================================
 
 
-def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame, risk_free_rate: float = None) -> dict:
+def solve_spinu_risk_budgeting(
+    cov_matrix: np.ndarray,
+    risk_budgets: Optional[np.ndarray] = None,
+    max_iter: int = 100,
+    tol: float = 1e-8,
+) -> Tuple[np.ndarray, bool]:
     """
-    Risolve il problema di ottimizzazione Equal Risk Contribution (ERC / Risk Parity).
+    Risolve il problema di Risk Budgeting tramite la formulazione convessa di Spinu (2013):
+        min_{x > 0} f(x) = 0.5 * x^T * Σ * x - sum(b_i * ln(x_i))
 
-    Ciascun asset contribuisce esattamente per la stessa frazione (1/N) alla volatilità
-    totale di portafoglio:
-    RC_i = w_i * (Σ w)_i / σ_p = σ_p / N  per ogni i.
+    All'ottimo, i pesi normalizzati w = x / sum(x) soddisfano esattamente:
+        RC_i / σ_p = b_i  per ogni asset i.
+    """
+    n = cov_matrix.shape[0]
+    if risk_budgets is None:
+        b = np.ones(n) / n
+    else:
+        b = np.array(risk_budgets, dtype=float)
+        b = np.maximum(b, 1e-6)
+        b = b / np.sum(b)
+
+    # Stima punto iniziale: x_0 proporzionale a 1 / sqrt(diag(Sigma))
+    vols = np.sqrt(np.maximum(np.diag(cov_matrix), 1e-8))
+    inv_vols = 1.0 / vols
+    scale = np.sqrt(float(inv_vols.T @ cov_matrix @ inv_vols))
+    x0 = inv_vols / max(scale, 1e-6)
+
+    def _obj_and_grad(x: np.ndarray) -> Tuple[float, np.ndarray]:
+        x_safe = np.maximum(x, 1e-12)
+        sig_x = cov_matrix @ x_safe
+        val = 0.5 * float(x_safe.T @ sig_x) - float(np.sum(b * np.log(x_safe)))
+        grad = sig_x - (b / x_safe)
+        return val, grad
+
+    # Minimizzazione convessa unconstrained su x > 0 con L-BFGS-B
+    bounds = tuple((1e-8, None) for _ in range(n))
+    res = minimize(
+        fun=lambda x: _obj_and_grad(x)[0],
+        x0=x0,
+        jac=lambda x: _obj_and_grad(x)[1],
+        method="L-BFGS-B",
+        bounds=bounds,
+        options={"maxiter": max_iter, "ftol": tol, "gtol": tol},
+    )
+
+    if res.success and np.all(res.x > 0):
+        w = res.x / np.sum(res.x)
+        return w, True
+
+    # Fallback con Sequential Least Squares (SLSQP)
+    res_slsqp = minimize(
+        fun=lambda x: _obj_and_grad(x)[0],
+        x0=x0,
+        jac=lambda x: _obj_and_grad(x)[1],
+        method="SLSQP",
+        bounds=bounds,
+        options={"maxiter": max_iter * 2, "ftol": tol},
+    )
+    if res_slsqp.success and np.all(res_slsqp.x > 0):
+        w = res_slsqp.x / np.sum(res_slsqp.x)
+        return w, True
+
+    # Fallback euristico Inverse Volatility
+    w_fallback = inv_vols / np.sum(inv_vols)
+    return w_fallback, False
+
+
+def compute_risk_budgeting_portfolio(
+    returns_df: pd.DataFrame,
+    risk_budgets: Optional[Dict[str, float]] = None,
+    risk_free_rate: Optional[float] = None,
+) -> dict:
+    """
+    Calcola l'allocazione ottimale di portafoglio secondo il modello di Risk Budgeting (Roncalli 2013 / Spinu 2013).
+    Se risk_budgets non è specificato, calcola l'Equal Risk Contribution (ERC / Pure Risk Parity) dove b_i = 1/N.
+
+    Parametri:
+    - returns_df: DataFrame dei rendimenti storici giornalieri degli asset
+    - risk_budgets: Dizionario opzionale {ticker: budget_frazione} (es. {'SPY': 0.6, 'TLT': 0.4})
+    - risk_free_rate: Tasso annuo risk-free (€STR/Fed) per Sharpe ratio
+
+    Ritorna:
+    - weights: Pesi ottimali di portafoglio (somma = 1.0)
+    - risk_contributions_pct: Contributo percentuale effettivo di ciascun asset al rischio totale
+    - risk_budgets_pct: Budget di rischio obiettivo in percentuale
+    - expected_return: Rendimento annuo atteso
+    - volatility: Volatilità annua del portafoglio
+    - sharpe_ratio: Sharpe ratio annualizzato
+    - diversification_ratio: Diversification Ratio di Choueifaty
+    - success: Convergenza globale verificata
     """
     from core.yield_curve import get_default_risk_free_rate
 
@@ -332,16 +416,16 @@ def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame, risk_fre
     if returns_df is None or returns_df.empty or returns_df.shape[1] < 2:
         return {
             "weights": {},
+            "risk_contributions_pct": {},
+            "risk_budgets_pct": {},
             "expected_return": 0.0,
             "volatility": 0.0,
             "sharpe_ratio": 0.0,
-            "risk_contributions_pct": {},
+            "diversification_ratio": 1.0,
             "success": False,
         }
 
-    # Sostituzione inf e clipping per evitare che anomalie o split sporchino i rendimenti
     clean_df = returns_df.replace([np.inf, -np.inf], np.nan).clip(lower=-0.95, upper=3.0)
-    # Bonifica NaN multi-mercato per evitare che dropna() elimini troppi giorni di borsa
     clean_df_no_nan = clean_df.dropna(axis=0, how="any")
     if clean_df_no_nan.shape[0] >= 15:
         clean_df = clean_df_no_nan
@@ -353,21 +437,22 @@ def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame, risk_fre
     if n < 2 or clean_df.empty:
         return {
             "weights": dict.fromkeys(tickers, 1.0 / n),
+            "risk_contributions_pct": dict.fromkeys(tickers, 100.0 / n),
+            "risk_budgets_pct": dict.fromkeys(tickers, 100.0 / n),
             "expected_return": 0.0,
             "volatility": 0.0,
             "sharpe_ratio": 0.0,
-            "risk_contributions_pct": dict.fromkeys(tickers, 100.0 / n),
+            "diversification_ratio": 1.0,
             "success": False,
         }
 
-    # Covarianza Ledoit-Wolf per evitare singolarità e sovrastima del rumore
+    # Covarianza Ledoit-Wolf
     try:
         lw = LedoitWolf().fit(clean_df)
         cov_matrix = lw.covariance_ * 252.0
     except Exception:
         cov_matrix = clean_df.cov().fillna(0.0).values * 252.0
 
-    # Garanzia simmetria e semi-definitezza positiva
     cov_matrix = (cov_matrix + cov_matrix.T) / 2.0
     try:
         min_eig = np.min(np.real(np.linalg.eigvals(cov_matrix)))
@@ -378,70 +463,58 @@ def compute_equal_risk_contribution_portfolio(returns_df: pd.DataFrame, risk_fre
 
     mean_returns = clean_df.mean().values * 252.0
 
-    # Funzione Obiettivo ERC: minimizzare la dispersione dei contributi percentuali al rischio rispetto a 1/N
-    def _erc_objective(w):
-        w = np.array(w)
-        port_var = float(w.T @ cov_matrix @ w)
-        if port_var <= 0:
-            return 1e6
-        # RC_pct_i = w_i * (Σ w)_i / σ_p^2
-        risk_contributions_pct = (w * (cov_matrix @ w)) / port_var
-        target_rc = 1.0 / n
-        return np.sum((risk_contributions_pct - target_rc) ** 2)
-
-    # Vincoli e Limiti: pesi positivi e somma a 1
-    init_weights = np.ones(n) / n
-    bounds = tuple((0.001, 0.99) for _ in range(n))
-    constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1.0}
-
-    opt_res = minimize(
-        _erc_objective,
-        init_weights,
-        method="SLSQP",
-        bounds=bounds,
-        constraints=constraints,
-        options={"maxiter": 600, "ftol": 1e-9},
-    )
-
-    if opt_res.success:
-        opt_w = opt_res.x
+    # Vettore dei budget di rischio b
+    if risk_budgets is not None and isinstance(risk_budgets, dict):
+        b_vec = np.array([float(risk_budgets.get(t, 1.0 / n)) for t in tickers], dtype=float)
+        b_vec = np.maximum(b_vec, 1e-6)
+        b_vec = b_vec / np.sum(b_vec)
     else:
-        # Fallback rapido con ottimizzazione L-BFGS-B o inverse volatility
-        try:
-            vols = np.sqrt(np.diag(cov_matrix))
-            inv_vols = 1.0 / np.where(vols > 0, vols, 1.0)
-            opt_w = inv_vols / np.sum(inv_vols)
-        except Exception:
-            opt_w = init_weights
+        b_vec = np.ones(n) / n
 
-    # Normalizzazione finale
-    opt_w = np.clip(opt_w, 0.0, 1.0)
-    if np.sum(opt_w) > 0:
-        opt_w = opt_w / np.sum(opt_w)
-    else:
-        opt_w = init_weights
+    # Risoluzione Spinu 2013
+    opt_w, success = solve_spinu_risk_budgeting(cov_matrix, b_vec)
 
+    # Metriche di portafoglio
     port_ret = float(np.clip(opt_w @ mean_returns, -2.0, 5.0))
     port_var = float(opt_w.T @ cov_matrix @ opt_w)
     port_vol = float(np.clip(np.sqrt(max(1e-6, port_var)), 0.001, 3.0))
     sharpe = float((port_ret - risk_free_rate) / port_vol) if port_vol > 0 else 0.0
 
-    # Calcolo esatto dei Risk Contributions
+    # Decomposizione esatta del rischio (Euler)
     marginal_risk = (cov_matrix @ opt_w) / port_vol
     rc_absolute = opt_w * marginal_risk
     rc_pct = (rc_absolute / port_vol) * 100.0
 
+    # Diversification Ratio (Choueifaty)
+    individual_vols = np.sqrt(np.maximum(np.diag(cov_matrix), 1e-8))
+    weighted_vol = float(np.sum(opt_w * individual_vols))
+    div_ratio = float(weighted_vol / port_vol) if port_vol > 0 else 1.0
+
     weights_dict = {t: float(round(opt_w[i], 4)) for i, t in enumerate(tickers)}
     rc_pct_dict = {t: float(round(rc_pct[i], 2)) for i, t in enumerate(tickers)}
+    b_pct_dict = {t: float(round(b_vec[i] * 100.0, 2)) for i, t in enumerate(tickers)}
 
     return {
         "weights": weights_dict,
+        "risk_contributions_pct": rc_pct_dict,
+        "risk_budgets_pct": b_pct_dict,
         "expected_return": round(port_ret, 4),
         "volatility": round(port_vol, 4),
         "sharpe_ratio": round(sharpe, 2),
-        "risk_contributions_pct": rc_pct_dict,
-        "success": bool(opt_res.success),
+        "diversification_ratio": round(div_ratio, 2),
+        "success": bool(success),
     }
+
+
+def compute_equal_risk_contribution_portfolio(
+    returns_df: pd.DataFrame, risk_free_rate: Optional[float] = None
+) -> dict:
+    """
+    Risolve il problema di ottimizzazione Equal Risk Contribution (ERC / Pure Risk Parity).
+    Wrapper retrocompatibile basato sull'algoritmo convesso di Spinu (2013).
+    """
+    return compute_risk_budgeting_portfolio(returns_df, risk_budgets=None, risk_free_rate=risk_free_rate)
+
 
 
 # ==============================================================================

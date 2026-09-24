@@ -63,6 +63,30 @@ render_standard_hero(
 
 render_executive_badges(m)
 
+# 📄 Factsheet Istituzionale A4 a Due Pagine (Private Banking / Morningstar Standard)
+col_pdf_left, col_pdf_right = st.columns([3, 1])
+with col_pdf_right:
+    try:
+        from datetime import datetime
+
+        from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+
+        pdf_factsheet_bytes = generate_institutional_portfolio_factsheet_pdf(
+            portfolio_name=str(st.session_state.get("portfolio_name", "Portfolio Master")),
+            risk_data=results,
+            base_currency=str(st.session_state.get("base_currency", "EUR")),
+        )
+        st.download_button(
+            label="📄 Factsheet PDF (2 Pagine)",
+            data=pdf_factsheet_bytes,
+            file_name=f"ARGUS_Factsheet_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            help="Genera ed esporta il Factsheet istituzionale A4 a 2 pagine conforme agli standard Private Banking / Morningstar",
+        )
+    except Exception:
+        pass
+
 # Warning Popover if any ingestion warnings exist
 has_warnings = bool(results.get("warnings"))
 warn_list = results.get("warnings", [])

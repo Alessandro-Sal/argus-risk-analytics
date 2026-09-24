@@ -8,6 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy import stats
+from scipy.optimize import minimize
 
 
 def get_standard_macro_scenarios() -> Dict[str, Dict[str, Any]]:
@@ -415,4 +417,245 @@ def compute_consolidated_wealth_stress_test(
         "worst_net_worth_drawdown_pct": worst.get("net_worth_drawdown_pct", 0.0),
         "worst_post_debt_to_assets_pct": worst.get("post_shock_debt_to_assets_pct", init_dta),
     }
+
+
+# ============================================================
+# 3. REVERSE STRESS TESTING ENGINE (EBA & BCE SUPERVISORY GUIDELINES)
+# ============================================================
+
+DEFAULT_REVERSE_STRESS_FACTORS = [
+    {"key": "equity_mkt", "name": "Azionario Globale (MSCI World)", "unit": "%", "vol": 0.18, "typical_min": -0.60, "typical_max": 0.20},
+    {"key": "yield_10y", "name": "Tasso Bund / T-Note 10Y", "unit": "bps", "vol": 0.80, "typical_min": -2.00, "typical_max": 3.50},  # 1 unit = 100 bps
+    {"key": "credit_ig", "name": "Spread Corporate Investment Grade", "unit": "bps", "vol": 0.60, "typical_min": -0.50, "typical_max": 2.50},
+    {"key": "credit_hy", "name": "Spread High Yield", "unit": "bps", "vol": 1.50, "typical_min": -1.00, "typical_max": 6.00},
+    {"key": "fx_usd", "name": "Apprezzamento EUR/USD", "unit": "%", "vol": 0.09, "typical_min": -0.25, "typical_max": 0.25},
+    {"key": "commodities", "name": "Materie Prime & Energia", "unit": "%", "vol": 0.25, "typical_min": -0.50, "typical_max": 0.60},
+]
+
+DEFAULT_REVERSE_CORR = np.array([
+    # Eq,   Yld,   IG,    HY,    FX,    Comm
+    [ 1.00, -0.15, -0.60, -0.75, -0.20,  0.35],
+    [-0.15,  1.00,  0.25,  0.15,  0.30,  0.40],
+    [-0.60,  0.25,  1.00,  0.85,  0.15, -0.20],
+    [-0.75,  0.15,  0.85,  1.00,  0.10, -0.25],
+    [-0.20,  0.30,  0.15,  0.10,  1.00,  0.20],
+    [ 0.35,  0.40, -0.20, -0.25,  0.20,  1.00],
+])
+
+
+def compute_reverse_stress_test(
+    positions_df: Optional[pd.DataFrame] = None,
+    portfolio_value: float = 100000.0,
+    target_loss_pct: float = -25.0,
+    factor_betas: Optional[Dict[str, float]] = None,
+    custom_cov_matrix: Optional[np.ndarray] = None,
+    # Compatibility aliases for legacy calls
+    df_positions: Optional[pd.DataFrame] = None,
+    target_drawdown_pct: Optional[float] = None,
+    results: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    """
+    Esegue il Reverse Stress Testing conforme alle linee guida di vigilanza EBA & BCE.
+
+    Invece di simulare uno shock ipotetico, calcola il vettore di shock macroeconomico
+    più probabile / plausibile (minima distanza di Mahalanobis) che causa esattamente
+    o supera la soglia critica di perdita di portafoglio indicata (target_loss_pct):
+
+        min_f  0.5 * f^T * Σ_f^{-1} * f
+        s.t.   β^T * f <= target_loss_pct / 100
+
+    Parametri:
+    - positions_df / df_positions: DataFrame con le posizioni attuali di portafoglio
+    - portfolio_value: Controvalore totale in EUR
+    - target_loss_pct / target_drawdown_pct: Soglia di perdita critica percentuale (es. -25.0 per -25%)
+    - factor_betas: Sensibilità opzionali del portafoglio ai 6 macro-fattori
+    - custom_cov_matrix: Matrice di covarianza personalizzata tra i fattori
+    """
+    if df_positions is not None and positions_df is None:
+        positions_df = df_positions
+    if target_drawdown_pct is not None:
+        target_loss_pct = target_drawdown_pct
+    if results is not None:
+        if "portfolio_value" in results and float(results["portfolio_value"] or 0) > 0:
+            portfolio_value = float(results["portfolio_value"])
+        elif "metrics" in results and "portfolio_value" in results["metrics"]:
+            portfolio_value = float(results["metrics"]["portfolio_value"] or portfolio_value)
+    k_factors = len(DEFAULT_REVERSE_STRESS_FACTORS)
+    factor_keys = [f["key"] for f in DEFAULT_REVERSE_STRESS_FACTORS]
+    factor_vols = np.array([f["vol"] for f in DEFAULT_REVERSE_STRESS_FACTORS])
+
+    # 1. Costruzione Matrice di Covarianza Σ_f
+    if custom_cov_matrix is not None and custom_cov_matrix.shape == (k_factors, k_factors):
+        sigma_f = custom_cov_matrix
+    else:
+        d_mat = np.diag(factor_vols)
+        sigma_f = d_mat @ DEFAULT_REVERSE_CORR @ d_mat
+
+    # Regolarizzazione PSD
+    sigma_f = (sigma_f + sigma_f.T) / 2.0
+    min_eig = np.min(np.real(np.linalg.eigvals(sigma_f)))
+    if min_eig < 1e-6:
+        sigma_f += (1e-6 - min_eig) * np.eye(k_factors)
+
+    sigma_f_inv = np.linalg.pinv(sigma_f)
+
+    # 2. Stima delle sensibilità β
+    if factor_betas is not None and isinstance(factor_betas, dict):
+        beta_vec = np.array([float(factor_betas.get(k, 0.0)) for k in factor_keys], dtype=float)
+    else:
+        # Calcolo da positions_df se disponibile
+        tot_val, cat_weights = _extract_portfolio_values_and_weights(positions_df)
+        if tot_val > 0:
+            portfolio_value = tot_val
+
+        w_eq = cat_weights.get("equity", 0.60)
+        w_bond = cat_weights.get("bonds", 0.30)
+        w_comm = cat_weights.get("commodities", 0.05)
+        w_crypto = cat_weights.get("crypto", 0.05)
+
+        # Stime di sensibilità standard
+        beta_eq = w_eq * 1.05 + w_crypto * 2.2  # Alta sensibilità azionaria e crypto
+        beta_yld = -(w_bond * 0.055)            # Duration effettiva media 5.5 anni per 100 bps
+        beta_ig = -(w_bond * 0.045 * 0.7)       # 70% del bond in IG
+        beta_hy = -(w_bond * 0.035 * 0.3)       # 30% del bond in HY
+        beta_fx = 0.35 * w_eq                   # Quota stimata esposta a USD
+        beta_comm = w_comm * 1.0
+
+        beta_vec = np.array([beta_eq, beta_yld, beta_ig, beta_hy, beta_fx, beta_comm], dtype=float)
+
+    # Assicura che esista almeno una sensibilità non nulla
+    if np.all(np.abs(beta_vec) < 1e-4):
+        beta_vec[0] = 1.0  # Default equity market exposure
+
+    loss_target_dec = abs(target_loss_pct) / 100.0  # e.g. 0.25
+
+    # 3. Soluzione Esatta Analitica di Lagrange (Unconstrained)
+    #    f^* = - loss_target_dec * (Σ_f * β) / (β^T * Σ_f * β)
+    denom = float(beta_vec.T @ sigma_f @ beta_vec)
+    if denom <= 1e-8:
+        denom = 1e-8
+    f_unconstrained = -loss_target_dec * (sigma_f @ beta_vec) / denom
+
+    # 4. Soluzione con Vincoli Realistici (Box Bounds) via SLSQP
+    bounds = [
+        (f["typical_min"], f["typical_max"])
+        for f in DEFAULT_REVERSE_STRESS_FACTORS
+    ]
+
+    def _mahalanobis_obj(f: np.ndarray) -> float:
+        return 0.5 * float(f.T @ sigma_f_inv @ f)
+
+    def _loss_constraint(f: np.ndarray) -> float:
+        # Portafoglio deve perdere almeno target_loss_pct: beta^T * f <= -loss_target_dec
+        # In Scipy: fun >= 0 => -loss_target_dec - beta^T * f >= 0
+        return -loss_target_dec - float(beta_vec.T @ f)
+
+    opt_res = minimize(
+        _mahalanobis_obj,
+        x0=f_unconstrained,
+        method="SLSQP",
+        bounds=bounds,
+        constraints={"type": "ineq", "fun": _loss_constraint},
+        options={"maxiter": 300, "ftol": 1e-7},
+    )
+
+    if opt_res.success:
+        optimal_f = opt_res.x
+    else:
+        # Fallback clippato alla soluzione analitica
+        optimal_f = np.clip(
+            f_unconstrained,
+            [b[0] for b in bounds],
+            [b[1] for b in bounds],
+        )
+
+    # 5. Metriche di Rischio e Plausibilità
+    maha_dist = float(np.sqrt(max(0.0, optimal_f.T @ sigma_f_inv @ optimal_f)))
+    # Gradi di libertà = numero di fattori
+    chi2_val = maha_dist ** 2
+    p_value = float(1.0 - stats.chi2.cdf(chi2_val, df=k_factors))
+
+    if maha_dist < 2.0:
+        plausibility = "Plausibile (Frequenza decennale, shock gestibile)"
+        severity_badge = "🟡 Moderato"
+    elif maha_dist < 3.5:
+        plausibility = "Severo (Frequenza 25-50 anni, crisi sistemica stile 2008)"
+        severity_badge = "🟠 Severo"
+    elif maha_dist < 5.0:
+        plausibility = "Molto Severo (Frequenza 100 anni, shock esogeno globale)"
+        severity_badge = "🔴 Molto Severo"
+    else:
+        plausibility = "Estremo (Cigno Nero oltre 200 anni, rottura di mercato)"
+        severity_badge = "🟣 Cigno Nero"
+
+    simulated_loss_pct = float(beta_vec.T @ optimal_f * 100.0)
+    simulated_loss_eur = float(portfolio_value * (simulated_loss_pct / 100.0))
+    post_shock_value = float(portfolio_value + simulated_loss_eur)
+
+    # 6. Scomposizione della Perdita tra i Macro-Fattori
+    factor_impacts_pct = beta_vec * optimal_f * 100.0
+    tot_impact = np.sum(factor_impacts_pct)
+    if abs(tot_impact) > 1e-4:
+        contrib_pct = (factor_impacts_pct / tot_impact) * 100.0
+    else:
+        contrib_pct = np.zeros(k_factors)
+
+    # Preparazione DataFrame di output
+    rows = []
+    shocks_dict = {}
+    for i, meta in enumerate(DEFAULT_REVERSE_STRESS_FACTORS):
+        val = optimal_f[i]
+        # Se l'unità è bps, moltiplica per 100 (dato che 1 unità = 100 bps)
+        display_val = val * 100.0 if meta["unit"] == "%" else val * 100.0
+        shocks_dict[meta["key"]] = round(display_val, 2)
+        rows.append({
+            "Fattore Macro": meta["name"],
+            "Sensibilità (β)": round(beta_vec[i], 3),
+            "Shock Ottimale Richiesto": f"{display_val:+.2f} {meta['unit']}",
+            "Impatto su Portafoglio": f"{factor_impacts_pct[i]:+.2f}%",
+            "Quota Perdita (%)": f"{contrib_pct[i]:.1f}%",
+            "Valore Grezzo": val,
+        })
+
+    df_shocks = pd.DataFrame(rows)
+
+    # Calcolo soluzioni analitiche mono-fattoriale e congiunta per retrocompatibilità
+    pure_eq = -(loss_target_dec / max(abs(beta_vec[0]), 0.01)) * 100.0
+    pure_rate = (loss_target_dec / max(abs(beta_vec[1]), 0.001)) * 100.0  # in bps
+    comb_eq = pure_eq * 0.5
+    comb_rate = pure_rate * 0.5
+
+    break_even_solutions = {
+        "pure_equity_crash_pct": round(pure_eq, 1),
+        "pure_rate_shock_bps": round(pure_rate, 0),
+        "combined_scenario": {
+            "equity_crash_pct": round(comb_eq, 1),
+            "rate_shock_bps": round(comb_rate, 0),
+        },
+    }
+
+    z_score = round(float(maha_dist), 2)
+    implied_years = max(2, int(1.0 / max(p_value, 1e-4)))
+    freq_est = f"1 su {implied_years} anni"
+
+    return {
+        "target_loss_pct": round(target_loss_pct, 2),
+        "target_loss_eur": round(portfolio_value * (target_loss_pct / 100.0), 2),
+        "simulated_loss_pct": round(simulated_loss_pct, 2),
+        "simulated_loss_eur": round(simulated_loss_eur, 2),
+        "portfolio_initial_value_eur": round(portfolio_value, 2),
+        "post_shock_portfolio_value_eur": round(post_shock_value, 2),
+        "mahalanobis_distance": round(maha_dist, 3),
+        "p_value_chi2": round(p_value, 6),
+        "plausibility_rating": plausibility,
+        "severity_badge": severity_badge,
+        "implied_frequency_estimate": freq_est,
+        "implied_z_score": f"{z_score:.2f}σ",
+        "break_even_solutions": break_even_solutions,
+        "shocks_by_factor": shocks_dict,
+        "factor_betas": {meta["key"]: round(beta_vec[i], 3) for i, meta in enumerate(DEFAULT_REVERSE_STRESS_FACTORS)},
+        "factors_df": df_shocks,
+    }
+
 
