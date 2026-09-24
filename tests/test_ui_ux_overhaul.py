@@ -52,7 +52,7 @@ def test_desktop_packaging_includes_components():
 
     with open("pyproject.toml", "r", encoding="utf-8") as f:
         toml_text = f.read()
-    assert 'version = "9.7.0"' in toml_text
+    assert 'version = "9.8.0"' in toml_text
 
 
 def test_action_drawers_callables():
@@ -78,7 +78,7 @@ def test_chart_framework_unified_hover_and_spikes():
     
     assert styled_fig.layout.hovermode == "x unified"
     assert styled_fig.layout.xaxis.showspikes is True
-    assert styled_fig.layout.xaxis.spikemode == "across"
+    assert styled_fig.layout.xaxis.spikemode == "across+toaxis"
 
 
 def test_lttb_downsampling_performance_and_integrity():
@@ -93,3 +93,51 @@ def test_lttb_downsampling_performance_and_integrity():
     # Verifica preservazione estremi
     assert x_sampled[0] == x[0]
     assert x_sampled[-1] == x[-1]
+
+
+def test_action_drawers_dynamic_portfolio_binding():
+    """Verifica che i drawer modali si leghino dinamicamente alle posizioni effettive del portafoglio."""
+    from components.action_drawers import _get_active_portfolio_context
+
+    custom_pos = pd.DataFrame([
+        {"ticker": "ENEL.MI", "qty_net": 100, "last_price": 6.80, "current_value": 680.0, "asset_class": "Equity"},
+        {"ticker": "ISP.MI", "qty_net": 200, "last_price": 3.40, "current_value": 680.0, "asset_class": "Equity"},
+        {"ticker": "BTP-10Y", "qty_net": 10, "last_price": 100.50, "current_value": 1005.0, "asset_class": "Fixed Income / Bond"},
+    ])
+
+    df_pos, res, tot_val, port_name = _get_active_portfolio_context(positions=custom_pos)
+    assert len(df_pos) == 3
+    assert set(df_pos["ticker"].tolist()) == {"ENEL.MI", "ISP.MI", "BTP-10Y"}
+    assert tot_val == 2365.0
+
+
+def test_order_blotter_crypto_and_no_shorting():
+    """Verifica che il blotter ordini gestisca le crypto in modo frazionato e non generi vendite superiori alle quote possedute."""
+    from unittest.mock import MagicMock, patch
+    from components.action_drawers import render_order_blotter_dialog
+
+    pos = pd.DataFrame([
+        {"ticker": "BTC-EUR", "qty_net": 0.0848, "last_price": 65530.66, "current_value": 5557.0, "asset_class": "Crypto", "wacp": 75000.0},
+        {"ticker": "GOOGL", "qty_net": 10.0, "last_price": 158.55, "current_value": 1585.5, "asset_class": "Equity", "wacp": 140.0},
+    ])
+
+    fn = getattr(render_order_blotter_dialog, "__wrapped__", render_order_blotter_dialog)
+    with patch("streamlit.dataframe") as mock_df, \
+         patch("streamlit.columns", side_effect=lambda x: [MagicMock()] * (len(x) if isinstance(x, list) else x)), \
+         patch("streamlit.caption"), patch("streamlit.markdown"), patch("streamlit.info"), \
+         patch("streamlit.divider"), patch("streamlit.radio"), patch("streamlit.button"), \
+         patch("streamlit.metric"):
+        fn(portfolio_value=7142.5, positions=pos)
+        assert mock_df.called
+        df_result = mock_df.call_args[0][0]
+
+        btc_row = df_result[df_result["Ticker"] == "BTC-EUR"]
+        assert not btc_row.empty
+        btc_order = btc_row.iloc[0]
+        assert btc_order["Azione"] == "SELL"
+        # La quantità venduta deve essere frazionata e rigorosamente <= a quanto posseduto (0.0848)
+        qty_sold = float(btc_order["Quantità"])
+        assert 0.0 < qty_sold <= 0.0848
+        assert btc_order["Controvalore"] < 5557.0
+        assert "IT_BTC-EUR_01" not in btc_order["ISIN"]
+

@@ -104,6 +104,28 @@ def inject_custom_css():
             border: 1px solid rgba(239, 68, 68, 0.3);
         }}
 
+        /* Institutional Skeleton Shimmer Loaders (Anti-CLS Layout Stability) */
+        @keyframes argus-shimmer {{
+            0% {{ background-position: -200% 0; }}
+            100% {{ background-position: 200% 0; }}
+        }}
+        .argus-skeleton {{
+            background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+            background-size: 200% 100%;
+            animation: argus-shimmer 1.8s infinite ease-in-out;
+            border-radius: 6px;
+        }}
+        .argus-skeleton-card {{
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: rgba(17, 24, 39, 0.5);
+            border-radius: 10px;
+            padding: 16px;
+            height: 105px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }}
+
 
         /* Institutional Typography Hierarchy */
         h1, [data-testid="stHeading"] h1, [data-testid="stHeader"] h1 {{
@@ -1077,7 +1099,8 @@ def inject_custom_css():
             color: #8b949e !important;
             text-transform: uppercase !important;
             letter-spacing: 0.4px !important;
-            margin-bottom: 2px !important;
+            margin-bottom: 4px !important;
+            margin-top: 2px !important;
             white-space: nowrap !important;
         }}
         section[data-testid="stSidebar"] [data-testid="stCheckbox"] label p,
@@ -1103,10 +1126,15 @@ def inject_custom_css():
         }}
         section[data-testid="stSidebar"] div[data-baseweb="select"] {{
             font-size: 12px !important;
-            border-radius: 6px !important;
+            border-radius: 8px !important;
             background: rgba(22, 27, 34, 0.8) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            min-height: 32px !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            min-height: 38px !important;
+        }}
+        section[data-testid="stSidebar"] div[data-baseweb="select"] > div {{
+            min-height: 38px !important;
+            align-items: center !important;
+            border-radius: 8px !important;
         }}
         section[data-testid="stSidebar"] div[data-baseweb="select"] * {{
             font-size: 12px !important;
@@ -1401,12 +1429,165 @@ def get_display_portfolio_name():
     return name, True
 
 
+def render_skeleton_cards(n_cards: int = 4) -> None:
+    """Renderizza indicatori KPI scheletro animati per evitare Cumulative Layout Shift durante il calcolo."""
+    cols = st.columns(n_cards)
+    for col in cols:
+        with col:
+            st.markdown(
+                """
+                <div class="argus-skeleton-card">
+                    <div class="argus-skeleton" style="width: 45%; height: 12px; margin-bottom: 8px;"></div>
+                    <div class="argus-skeleton" style="width: 75%; height: 26px; margin-bottom: 6px;"></div>
+                    <div class="argus-skeleton" style="width: 35%; height: 10px;"></div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+
+def render_skeleton_table(n_rows: int = 5, n_cols: int = 4, height: int = 240) -> None:
+    """Renderizza una griglia scheletro animata a dimensione fissa durante il fetch/processing dei dati."""
+    rows_html = "".join(
+        f"""
+        <div style="display:flex; gap:12px; padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.04);">
+            {''.join(f'<div class="argus-skeleton" style="flex:1; height:15px;"></div>' for _ in range(n_cols))}
+        </div>
+        """
+        for _ in range(n_rows)
+    )
+    st.markdown(
+        f"""
+        <div style="background:rgba(13,17,23,0.6); border:1px solid rgba(255,255,255,0.08); border-radius:8px; height:{height}px; overflow:hidden;">
+            <div style="display:flex; gap:12px; padding:10px 12px; background:rgba(22,27,34,0.8); border-bottom:1px solid rgba(255,255,255,0.08);">
+                {''.join(f'<div class="argus-skeleton" style="flex:1; height:12px; opacity:0.6;"></div>' for _ in range(n_cols))}
+            </div>
+            {rows_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_skeleton_chart(height: int = 280) -> None:
+    """Renderizza un placeholder grafico animato a dimensione fissa."""
+    st.markdown(
+        f"""
+        <div class="argus-skeleton" style="height:{height}px; width:100%; border-radius:8px; border:1px solid rgba(255,255,255,0.06); display:flex; align-items:center; justify-content:center;">
+            <span style="color:rgba(255,255,255,0.25); font-size:11px; font-weight:700; font-family:'Outfit',sans-serif; letter-spacing:0.5px;">CARICAMENTO GRAFICO ISTITUZIONALE...</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_institutional_datagrid(
+    df: pd.DataFrame,
+    title: Optional[str] = None,
+    height: int = 380,
+    currency_cols: Optional[List[str]] = None,
+    pct_cols: Optional[List[str]] = None,
+    weight_cols: Optional[List[str]] = None,
+    sparkline_cols: Optional[List[str]] = None,
+    key_suffix: str = "inst_grid",
+) -> None:
+    """
+    Data Grid istituzionale ad alta densità informativa con inferenza automatica delle colonne:
+    - Numeri contabili allineati con monospace tabular (JetBrains Mono)
+    - Progress bars per allocazione e pesi percentuali
+    - Line chart inline per sparklines storiche
+    - Badge di status e integrazione con toolbar di esportazione universale
+    """
+    if df is None or df.empty:
+        if title:
+            st.markdown(f"##### {title}")
+        st.info("Nessun record disponibile per la visualizzazione.")
+        return
+
+    from core.ui_export_utils import render_table_with_export
+
+    col_cfg: Dict[str, Any] = {}
+    base_curr = st.session_state.get("base_currency", "EUR")
+    curr_sym = "€" if base_curr == "EUR" else ("$" if base_curr == "USD" else base_curr)
+
+    # Inferenza automatica delle colonne
+    infer_curr = currency_cols is None
+    infer_pct = pct_cols is None
+    infer_weights = weight_cols is None
+
+    auto_curr = list(currency_cols or [])
+    auto_pct = list(pct_cols or [])
+    auto_weights = list(weight_cols or [])
+    progress_dict: Dict[str, Tuple[float, float]] = {}
+
+    for c in df.columns:
+        col_lower = str(c).lower()
+        if infer_curr and any(k in col_lower for k in ["controvalore", "prezzo", "valore", "pmc", "nav", "costo", "pnl", "gain", "loss"]):
+            if "%" not in col_lower and "pct" not in col_lower and "yield" not in col_lower:
+                if c not in auto_curr:
+                    auto_curr.append(c)
+        elif infer_pct and any(k in col_lower for k in ["pct", "rendimento", "var", "cvar", "volatilit", "drawdown", "tasso"]):
+            if c not in auto_pct:
+                auto_pct.append(c)
+        elif infer_weights and any(k in col_lower for k in ["peso", "weight", "allocazione", "quota"]):
+            if c not in auto_weights:
+                auto_weights.append(c)
+
+    for w_col in auto_weights:
+        if w_col in df.columns:
+            # Determinazione scala (0-1 oppure 0-100)
+            max_val = float(df[w_col].dropna().max()) if not df[w_col].dropna().empty else 1.0
+            if max_val <= 1.05:
+                progress_dict[w_col] = (0.0, 1.0)
+            else:
+                progress_dict[w_col] = (0.0, 100.0)
+
+    if sparkline_cols:
+        for sc in sparkline_cols:
+            if sc in df.columns:
+                col_cfg[sc] = st.column_config.LineChartColumn(
+                    sc,
+                    help="Trend temporale inline",
+                    width="small",
+                )
+
+    render_table_with_export(
+        df=df,
+        table_title=title,
+        file_prefix="argus_datagrid",
+        key_suffix=key_suffix,
+        column_config=col_cfg if col_cfg else None,
+        currency_cols=auto_curr if auto_curr else None,
+        pct_cols=auto_pct if auto_pct else None,
+        progress_cols=progress_dict if progress_dict else None,
+        hide_index=True,
+        height=height,
+    )
+
+
+
 def render_command_bar():
-    """Renderizza la barra di stato e comando ARGUS v9.0.0 in cima alla pagina con telemetria, spotlight e popout 2° monitor."""
+    """Renderizza la barra di stato e comando ARGUS v10.0 in cima alla pagina con telemetria, progressive disclosure e Spotlight Ctrl+K."""
     try:
         from core.workspace_manager import sync_url_state
 
         sync_url_state()
+    except Exception:
+        pass
+
+    # Sincronizzazione Progressive Disclosure Density (Default L3: Quant / Audit - Vedo Tutto)
+    density = st.session_state.get("ui_density_level", "L3")
+    if hasattr(st, "query_params") and "density" in st.query_params:
+        p_dens = st.query_params.get("density")
+        if p_dens in ["L1", "L2", "L3"]:
+            density = p_dens
+            st.session_state["ui_density_level"] = density
+
+    # Iniezione del listener globale per scorciatoia tastiera Ctrl+K / Cmd+K
+    try:
+        from components.command_palette import inject_command_palette_support
+
+        inject_command_palette_support(render_button=False)
     except Exception:
         pass
 
@@ -1421,7 +1602,7 @@ def render_command_bar():
     mode_bg = "rgba(227, 179, 65, 0.10)" if offline else "rgba(63, 185, 80, 0.10)"
     mode_border = "rgba(227, 179, 65, 0.28)" if offline else "rgba(63, 185, 80, 0.28)"
 
-    col_bar1, col_bar2 = st.columns([1.3, 1.1])
+    col_bar1, col_bar2 = st.columns([1.1, 1.3])
     with col_bar1:
         st.markdown(
             f"""
@@ -1440,7 +1621,7 @@ def render_command_bar():
         )
 
     with col_bar2:
-        c_pills, c_btn = st.columns([1.7, 1.0])
+        c_pills, c_dens, c_btn = st.columns([1.3, 0.9, 0.9])
         with c_pills:
             st.markdown(
                 f"""
@@ -1454,12 +1635,36 @@ def render_command_bar():
             """,
                 unsafe_allow_html=True,
             )
+        with c_dens:
+            dens_labels = {"L1": "👤 L1 Client", "L2": "📊 L2 Desk", "L3": "🔬 L3 Quant"}
+            cur_label = dens_labels.get(density, "🔬 L3 Quant")
+            with st.popover(cur_label, use_container_width=True):
+                st.markdown(
+                    "<div style='font-size:11px; font-weight:700; color:#8b949e; margin-bottom:6px;'>SELETTORE DENSITÀ VISIVA</div>",
+                    unsafe_allow_html=True,
+                )
+                dens_opts = ["L1: Client / Executive", "L2: Desk / PM", "L3: Quant / Audit"]
+                d_idx = 0 if density == "L1" else (2 if density == "L3" else 1)
+                selected_d = st.radio(
+                    "Livello Ergonomico",
+                    dens_opts,
+                    index=d_idx,
+                    label_visibility="collapsed",
+                    key="cmd_density_radio",
+                )
+                code_sel = selected_d.split(":")[0].strip()
+                if code_sel != density:
+                    st.session_state["ui_density_level"] = code_sel
+                    if hasattr(st, "query_params"):
+                        st.query_params["density"] = code_sel
+                    st.rerun()
+
         with c_btn:
             if st.button(
-                "🔍 Spotlight",
+                "⚡ Ctrl+K",
                 key="btn_open_spotlight",
                 use_container_width=True,
-                help="Cerca pagine, schede, ticker o lancia comandi rapidi (Ctrl+K)",
+                help="Bloomberg-style Omni-Command Gateway (Ctrl+K)",
             ):
                 render_spotlight_palette()
 
@@ -7500,9 +7705,38 @@ def ensure_portal_context(module: str = "risk") -> dict:
 
         prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
         pid = st.session_state.get("wealth_active_portfolio_id")
-        if pid is not None and pid in prof_map:
+        if pid is None:
+            try:
+                ws_ctx_check = WorkspaceContext.get_current()
+                if ws_ctx_check and ws_ctx_check.wealth and ws_ctx_check.wealth.profile_id is not None:
+                    pid = ws_ctx_check.wealth.profile_id
+            except Exception:
+                pass
+
+        matched_pid = None
+        if pid is not None:
+            for p in prof_map.keys():
+                if p == pid:
+                    matched_pid = p
+                    break
+                try:
+                    if int(p) == int(pid):
+                        matched_pid = p
+                        break
+                except (ValueError, TypeError):
+                    pass
+                if str(p) == str(pid):
+                    matched_pid = p
+                    break
+
+        if matched_pid is not None:
+            pid = matched_pid
             prof_name = prof_map[pid]
+            st.session_state["wealth_active_portfolio_id"] = pid
             st.session_state["wealth_active_profile_name"] = prof_name
+            # Sincronizza anche la chiave del selettore in sidebar se necessario
+            if st.session_state.get("sb_wealth_profile_selector") != pid:
+                st.session_state["sb_wealth_profile_selector"] = pid
             nw = compute_consolidated_net_worth(engine, portfolio_id=pid)
         else:
             pid = None

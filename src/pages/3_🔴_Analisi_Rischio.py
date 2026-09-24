@@ -11,6 +11,7 @@ import scipy.stats as stats
 import core.risk_engine
 import core.ui_utils
 from core.regime_switching import compute_market_regime_states
+from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
     apply_plotly_theme,
     ensure_portfolio_loaded,
@@ -541,12 +542,7 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
 
         col_rc1, col_rc2 = st.columns([1.4, 1.1])
         with col_rc1:
-            col_rc_h1, col_rc_h2 = st.columns([2.5, 1.0])
-            with col_rc_h1:
-                search_rc = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_contrib")
-            with col_rc_h2:
-                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                render_export_toolbar(df_display, file_prefix="scomposizione_rischio", key_suffix="rc_main", table_title="Scomposizione Rischio")
+            search_rc = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_contrib")
 
             df_rc_filt = df_display.copy()
             if search_rc:
@@ -559,12 +555,13 @@ dove <i>w<sub>i</sub></i> è il peso percentuale del singolo asset (scala 0 – 
                 "risk_contrib_pct": st.column_config.ProgressColumn("Contributo Rischio (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
                 "risk_vs_weight": st.column_config.NumberColumn("Sbilancio", format="%+.2f%%"),
             }
-            st.dataframe(
+            render_table_with_export(
                 df_rc_filt,
+                table_title="Scomposizione Rischio",
+                file_prefix="scomposizione_rischio",
+                key_suffix="rc_main",
                 column_config=cfg,
-                use_container_width=True,
-                hide_index=True,
-                height=380
+                height=380,
             )
 
         with col_rc2:
@@ -1580,6 +1577,122 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
     )
     st.plotly_chart(fig_kup, use_container_width=True)
 
+    # ── BASEL COMMITTEE IV TRAFFIC LIGHT & EVT POT-GPD TAIL RISK ───
+    st.markdown('<div style="margin-top: 18px;"></div>', unsafe_allow_html=True)
+    col_evt_h1, col_evt_h2 = st.columns([3.5, 1.2])
+    with col_evt_h1:
+        st.markdown("#### 🏛️ Semaforo Regolamentare di Basilea IV & Extreme Value Theory (EVT POT-GPD)")
+        st.caption("Validazione formale 99% VaR su 250 giorni (Semaforo di Basilea, Moltiplicatore di Capitale, Indipendenza di Christoffersen) e stima delle perdite ultra-estreme al 99.9% con Generalized Pareto Distribution.")
+    with col_evt_h2:
+        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+        glossary_modal("🏛️ Guida Basilea IV & EVT GPD", """
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(16,185,129,0.25); border-radius: 10px; padding: 14px; margin-bottom: 8px;">
+  <div style="color: #34d399; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🚦 Quadro Regolamentare di Basilea IV</div>
+  <div>Per il VaR al 99% a 1 giorno (250 giorni di osservazione):<br>
+  • <b>Zona Verde (0-4 violazioni):</b> Modello accettato. Moltiplicatore di capitale minimo k = 3.00.<br>
+  • <b>Zona Gialla (5-9 violazioni):</b> Richiesta di add-on di capitale (k da 3.40 a 3.85).<br>
+  • <b>Zona Rossa (&ge;10 violazioni):</b> Modello rigettato (k = 4.00), obbligo di revisione dell'engine.
+  </div>
+</div>
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(56,189,248,0.25); border-radius: 10px; padding: 14px;">
+  <div style="color: #38bdf8; font-size: 15px; font-weight: 700; margin-bottom: 6px;">🌪️ Extreme Value Theory (POT-GPD)</div>
+  <div>Modella analiticamente gli eccessi rispetto a una soglia u mediante Generalized Pareto:<br>
+  • <b>Parametro di Forma &xi; (Tail Index):</b> Se &xi; &gt; 0 la coda è iperbolica/grassa (Fréchet).<br>
+  • <b>VaR/CVaR 99.9%:</b> Cattura l'evento estremo 1 su 1.000 giorni (crisi sistemica decennale).
+  </div>
+</div>
+</div>
+""", button_label="💡 Basilea & EVT")
+
+    from core.risk_engine import compute_basel_traffic_light_backtest, compute_evt_pot_var_cvar
+    basel_info = mk.get("basel_backtest") or compute_basel_traffic_light_backtest(r, var_99=mk.get("var_cf_99", mk.get("var_99")))
+    evt_info = mk.get("evt_tail_risk") or compute_evt_pot_var_cvar(r)
+    fx_info = results.get("fx_risk") or {}
+
+    c_b1, c_b2, c_b3, c_b4 = st.columns(4)
+    with c_b1:
+        z_col = basel_info.get("zone_color", "#22c55e")
+        z_txt = basel_info.get("zone", "Verde")
+        exc_cnt = basel_info.get("exceptions_count", 0)
+        mult_val = basel_info.get("basel_multiplier", 3.00)
+        metric_card(
+            "Semaforo Basilea IV (99%)",
+            f"Zona {z_txt}",
+            delta=f"{exc_cnt} violazioni su 250 gg (k = {mult_val:.2f})",
+            positive=(z_txt == "Verde"),
+            help_text="Zona regolamentare di Basilea per il VaR 99% a 1 giorno."
+        )
+    with c_b2:
+        k_pval = basel_info.get("kupiec_p_value", 1.0)
+        c_pval = basel_info.get("christoffersen_p_value", 1.0)
+        metric_card(
+            "Test Kupiec & Christoffersen",
+            f"p-val {k_pval:.3f}",
+            delta=f"Indipendenza: p-val {c_pval:.3f}",
+            positive=(k_pval >= 0.05 and c_pval >= 0.05),
+            help_text="Kupiec valuta la frequenza delle eccezioni; Christoffersen verifica l'assenza di clustering o dipendenza seriale."
+        )
+    with c_b3:
+        evt_v99 = evt_info.get("evt_var_99_pct", 0.0)
+        evt_cv99 = evt_info.get("evt_cvar_99_pct", 0.0)
+        metric_card(
+            "EVT POT 99.0% VaR / CVaR",
+            f"{evt_v99:.2f}%",
+            delta=f"CVaR (Shortfall): {evt_cv99:.2f}%",
+            positive=False,
+            help_text="Extreme Value Theory (POT-GPD): VaR e Expected Shortfall stimati adattando una distribuzione Generalized Pareto agli eccessi di perdita."
+        )
+    with c_b4:
+        evt_v999 = evt_info.get("evt_var_999_pct", 0.0)
+        evt_cv999 = evt_info.get("evt_cvar_999_pct", 0.0)
+        xi_val = evt_info.get("tail_index_xi", 0.0)
+        metric_card(
+            "EVT POT 99.9% Ultra-Tail",
+            f"{evt_v999:.2f}%",
+            delta=f"CVaR: {evt_cv999:.2f}% (Tail Index ξ: {xi_val:+.3f})",
+            positive=False,
+            help_text="Stima della perdita estrema 1 su 1.000 giorni (decennale) con indice di coda ξ."
+        )
+
+    if fx_info and fx_info.get("foreign_currency_share_pct", 0.0) > 0.0:
+        with st.expander(f"💱 Scomposizione Rischio di Cambio & Simulatore Copertura Forward (Esposizione: {fx_info.get('foreign_currency_share_pct', 0.0):.1f}% del portafoglio)", expanded=False):
+            c_fx1, c_fx2 = st.columns([1.8, 2.2])
+            with c_fx1:
+                st.markdown(f"""
+                <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 14px;">
+                    <div style="font-weight: 700; color: #f8fafc; font-size: 13.5px; margin-bottom: 8px;">📊 Esposizione Valutaria Aggregata</div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #94a3b8; margin-bottom: 4px;">
+                        <span>Controvalore in Valuta Estera:</span>
+                        <b style="color: #ffffff;">€ {fx_info.get('foreign_currency_exposure_eur', 0.0):,.2f}</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #94a3b8; margin-bottom: 4px;">
+                        <span>Quota sul Portafoglio Totale:</span>
+                        <b style="color: #38bdf8;">{fx_info.get('foreign_currency_share_pct', 0.0):.2f}%</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #94a3b8; margin-bottom: 4px;">
+                        <span>Costo Carry Stimato Copertura 100% FX:</span>
+                        <b style="color: #facc15;">{fx_info.get('hedging_simulation', {}).get('est_forward_carry_cost_bps', 0.0):+.1f} bps/anno</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12.5px; color: #94a3b8;">
+                        <span>Drag Finanziario Annuo Copertura:</span>
+                        <b style="color: #f87171;">-€ {fx_info.get('hedging_simulation', {}).get('est_annual_carry_drag_eur', 0.0):,.2f}</b>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+            with c_fx2:
+                df_fx_b = pd.DataFrame(fx_info.get("assets_breakdown", []))
+                if not df_fx_b.empty:
+                    df_fx_disp = df_fx_b[["ticker", "currency", "total_volatility_ann_pct", "local_asset_vol_pct", "fx_volatility_pct", "variance_share_fx_pct"]].rename(columns={
+                        "ticker": "Ticker",
+                        "currency": "Divisa",
+                        "total_volatility_ann_pct": "Vol Totale (%)",
+                        "local_asset_vol_pct": "Vol Asset (%)",
+                        "fx_volatility_pct": "Vol FX (%)",
+                        "variance_share_fx_pct": "Quota Rischio FX (%)"
+                    })
+                    st.dataframe(df_fx_disp, use_container_width=True, hide_index=True)
+
     # ── SEZIONE GARCH(1,1) & FILTERED HISTORICAL SIMULATION (FHS) ────────
     st.divider()
     col_garch_head1, col_garch_head2 = st.columns([3.2, 1.2])
@@ -1976,13 +2089,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
             </div>
             """, unsafe_allow_html=True)
 
-        # Tabella Dettagliata Decomposizione con Pulsante Download CSV
-        col_dec_h1, col_dec_h2 = st.columns([3.0, 1.0])
-        with col_dec_h1:
-            st.markdown("##### 📋 Dettaglio Decomposizione di Eulero per Asset")
-        with col_dec_h2:
-            render_export_toolbar(df_decomp, file_prefix="euler_risk_decomposition", key_suffix="euler_decomp", table_title="Decomposizione di Eulero")
-
+        # Tabella Dettagliata Decomposizione con Pulsante Download CSV/Excel
         decomp_cfg = {
             "ticker": st.column_config.TextColumn("Ticker", width="small"),
             "weight_pct": st.column_config.NumberColumn("Peso (%)", format="%.2f%%"),
@@ -1992,21 +2099,21 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
             "component_var_amount": st.column_config.NumberColumn("Component VaR (€)", format="€ %,.2f"),
             "risk_contribution_pct": st.column_config.NumberColumn("% Rischio Totale", format="%.2f%%")
         }
-        st.dataframe(
+        render_table_with_export(
             df_decomp,
+            table_title="📋 Dettaglio Decomposizione di Eulero per Asset",
+            file_prefix="euler_risk_decomposition",
+            key_suffix="euler_decomp",
             column_config=decomp_cfg,
-            use_container_width=True,
-            hide_index=True
         )
 
     # ── LIQUIDITY-ADJUSTED VAR (LVAR) INTERATTIVO ──────────────────────
     st.markdown("---")
-    col_lvar_h1, col_lvar_h2 = st.columns([3.2, 1.3])
+    col_lvar_h1, col_lvar_h2 = st.columns([3.2, 1.3], vertical_alignment="center")
     with col_lvar_h1:
         st.markdown("#### 💧 Liquidity-Adjusted VaR (LVaR) — Modello di Bangia")
         st.caption("Stima del rischio totale di mercato combinato al costo di attrito ed esogeno di liquidazione delle posizioni in base al bid-ask spread e all'orizzonte di smobilizzo.")
     with col_lvar_h2:
-        st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
         glossary_modal("💡 Come funziona il Liquidity-Adjusted VaR (LVaR)", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -2063,7 +2170,7 @@ elif active_risk_tab == "📉 VaR, CVaR & Backtesting Kupiec":
         {"Metrica LVaR": "LVaR Totale", "Valore (€)": lvar_calc['lvar_amount'], "Note": f"Premio Liquidità: +{lvar_calc['lvar_premium_pct']:.2f}%"}
     ])
 
-    col_lvar_h1, col_lvar_h2 = st.columns([3.0, 1.0])
+    col_lvar_h1, col_lvar_h2 = st.columns([3.0, 1.0], vertical_alignment="center")
     with col_lvar_h1:
         st.markdown("##### 💧 Liquidity-Adjusted Value at Risk (LVaR - Bangia / Basel III)")
     with col_lvar_h2:
@@ -2397,13 +2504,7 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
             )
         })
 
-        col_tb_h1, col_tb_h2, col_tb_h3 = st.columns([2.4, 1.2, 0.9])
-        with col_tb_h1:
-            st.markdown("##### 📋 Dettaglio Smobilizzo & Liquidità per Posizione")
-        with col_tb_h2:
-            search_liq = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_liq", label_visibility="collapsed")
-        with col_tb_h3:
-            render_export_toolbar(df_liq_display, file_prefix="liquidita_smobilizzo_portafoglio", key_suffix="risk_liq", table_title="Smobilizzo e Liquidità")
+        search_liq = st.text_input("🔍 Cerca Asset:", placeholder="Filtra per Ticker...", key="search_risk_liq")
 
         df_liq_filt = df_liq_display.copy()
         if search_liq:
@@ -2417,23 +2518,23 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
             "Profilo Smobilizzo": st.column_config.TextColumn("Profilo Smobilizzo", width="medium")
         }
 
-        st.dataframe(
+        render_table_with_export(
             df_liq_filt,
+            table_title="📋 Dettaglio Smobilizzo & Liquidità per Posizione",
+            file_prefix="liquidita_smobilizzo_portafoglio",
+            key_suffix="risk_liq",
             column_config=liq_col_config,
-            use_container_width=True,
-            hide_index=True
         )
     else:
         st.info("Dati sui volumi non sufficienti per calcolare i Days-to-Liquidate.")
 
     st.divider()
 
-    col_atr_h1, col_atr_h2 = st.columns([3.5, 1.2])
+    col_atr_h1, col_atr_h2 = st.columns([3.5, 1.2], vertical_alignment="center")
     with col_atr_h1:
         st.markdown("### 🛡️ ATR Trailing Stop-Loss & Chandelier Exit Manager")
         st.caption("Livelli quantitativi di stop-loss dinamici ancorati alla volatilità effettiva ($ATR_{14}$) e ai massimi a 22 giorni per ciascun asset.")
     with col_atr_h2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
         glossary_modal(
             "🛡️ Guida all'ATR Trailing Stop-Loss & Chandelier Exit",
             """
@@ -2524,14 +2625,7 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
                 "Stato Alert": df_atr_disp.apply(_resolve_atr_status, axis=1)
             })
 
-            col_atr_tb1, col_atr_tb2, col_atr_tb3 = st.columns([2.4, 1.2, 0.9])
-            with col_atr_tb1:
-                st.markdown("##### 📋 Dettaglio Livelli Chandelier Stop per Posizione")
-            with col_atr_tb2:
-                search_atr = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_risk_atr", label_visibility="collapsed")
-            with col_atr_tb3:
-                render_export_toolbar(df_atr_table, file_prefix="atr_chandelier_stops", key_suffix="risk_atr", table_title="Chandelier Stops")
-
+            search_atr = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_risk_atr")
             df_atr_filt = df_atr_table.copy()
             if search_atr:
                 df_atr_filt = df_atr_filt[df_atr_filt["Ticker"].str.contains(search_atr.strip(), case=False, na=False)]
@@ -2545,12 +2639,12 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
                 "Distanza dallo Stop %": st.column_config.NumberColumn("Distanza dallo Stop %", format="%+.2f%%"),
                 "Stato Alert": st.column_config.TextColumn("Stato Alert", width="medium")
             }
-
-            st.dataframe(
+            render_table_with_export(
                 df_atr_filt,
+                table_title="📋 Dettaglio Livelli Chandelier Stop per Posizione",
+                file_prefix="atr_chandelier_stops",
+                key_suffix="risk_atr",
                 column_config=atr_col_config,
-                use_container_width=True,
-                hide_index=True
             )
         else:
             st.info("Dati storici sui prezzi insufficienti per il calcolo dell'ATR.")
@@ -2560,12 +2654,11 @@ elif active_risk_tab == "🔗 Correlazioni, Liquidità & ATR Chandelier":
 # TAB 4: RILEVATORE ANOMALIE ML (ISOLATION FOREST)
 # ==============================================================================
 elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)":
-    col_head_iso1, col_head_iso2 = st.columns([3.2, 1.1])
+    col_head_iso1, col_head_iso2 = st.columns([3.2, 1.1], vertical_alignment="center")
     with col_head_iso1:
         st.markdown("### 🕵️‍♂️ Machine Learning Anomaly Detector (Isolation Forest & Correlation Drift)")
         st.caption("Algoritmo di Machine Learning non supervisionato (Isolation Forest) per l'identificazione automatica di anomalie di rendimento, rotture di correlazione e giornate di stress di mercato.")
     with col_head_iso2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
         glossary_modal("🕵️‍♂️ Guida al Rilevatore di Anomalie ML (Isolation Forest)", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -2660,13 +2753,7 @@ elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Fore
         if not iso_res["anomaly_df"].empty:
             df_ano = iso_res["anomaly_df"].copy()
             
-            col_ano_h1, col_ano_h2, col_ano_h3 = st.columns([2.4, 1.2, 0.9])
-            with col_ano_h1:
-                st.markdown("##### 📋 Tabella delle Giornate Anomale Rilevate dal Modello ML")
-            with col_ano_h2:
-                search_ano = st.text_input("🔍 Cerca Data:", placeholder="Filtra data (YYYY-MM-DD)...", key="search_risk_anomaly", label_visibility="collapsed")
-            with col_ano_h3:
-                render_export_toolbar(df_ano, file_prefix="giornate_anomale_ml", key_suffix="risk_ano", table_title="Giornate Anomale ML")
+            search_ano = st.text_input("🔍 Cerca Data:", placeholder="Filtra data (YYYY-MM-DD)...", key="search_risk_anomaly")
 
             df_ano_filt = df_ano.copy()
             if search_ano:
@@ -2682,9 +2769,10 @@ elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Fore
                 "Score Anomalia": st.column_config.NumberColumn("Score Anomalia", format="%.3f")
             }
 
-            st.dataframe(
+            render_table_with_export(
                 df_ano_filt,
+                table_title="📋 Tabella delle Giornate Anomale Rilevate dal Modello ML",
+                file_prefix="giornate_anomale_ml",
+                key_suffix="risk_ano",
                 column_config=ano_col_config,
-                use_container_width=True,
-                hide_index=True
             )

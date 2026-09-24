@@ -48,8 +48,8 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
-    render_export_toolbar,
     render_page_header,
+    render_table_with_export,
 )
 from core.workspace_engine import (
     ROLE_PRESET_PROFILES,
@@ -273,7 +273,7 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
     if "bquant_code_text_area" not in st.session_state:
         st.session_state["bquant_code_text_area"] = BQUANT_SNIPPETS["rolling_correlation"]["code"]
 
-    col_snip1, col_snip2 = st.columns([3.8, 1.2])
+    col_snip1, col_snip2 = st.columns([3.8, 1.2], vertical_alignment="bottom")
     with col_snip1:
         sel_snippet_key = st.selectbox(
             "Carica Snippet Quantitativo Istituzionale:",
@@ -285,7 +285,6 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
         )
         
     with col_snip2:
-        st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
         if st.button("🔄 Reset Template", key="btn_load_snippet", use_container_width=True, help="Ripristina il template originale selezionato eliminando le modifiche manuali."):
             _sync_bquant_snippet_selection()
             st.rerun()
@@ -383,17 +382,13 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
         if res_exec.get("output_df") is not None and isinstance(res_exec["output_df"], pd.DataFrame):
             df_res = res_exec["output_df"]
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-            col_df_h1, col_df_h2 = st.columns([3.5, 1.2])
-            with col_df_h1:
-                st.markdown(f"##### 📊 Risultato Tabellare (`df_out` • {len(df_res)} righe)")
-            with col_df_h2:
-                render_export_toolbar(
-                    df_res,
-                    file_prefix="bquant_result",
-                    key_suffix="bquant_res",
-                    table_title="Risultato BQuant"
-                )
-            st.dataframe(df_res, use_container_width=True)
+            render_table_with_export(
+                df=df_res,
+                table_title="Risultato Tabellare (df_out)",
+                file_prefix="bquant_result",
+                key_suffix="bquant_res",
+                hide_index=False
+            )
 
         # ── Visualizzazione Grafico Plotly risultante ──
         if res_exec.get("output_fig") is not None:

@@ -22,6 +22,7 @@ from core.technical_analysis import (
     compute_volume_profile,
     detect_candlestick_patterns,
 )
+from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
     apply_plotly_theme,
     ensure_risk_bundle_loaded,
@@ -38,12 +39,11 @@ from core.workspace_manager import get_url_param, register_workspace_tab, set_ur
 inject_custom_css()
 render_sidebar()
 
-col_head1, col_head2 = st.columns([3.2, 1.2])
+col_head1, col_head2 = st.columns([3.2, 1.2], vertical_alignment="center")
 with col_head1:
     st.title("📈 Cockpit di Analisi Tecnica & Quantitative Charting")
     st.caption("Indicatori Algoritmici, Volume Profile (POC/VAH/VAL), Pattern Recognition e Confluence Score per supportare decisioni di trading e ribilanciamento.")
 with col_head2:
-    st.markdown('<div style="margin-top: 14px;"></div>', unsafe_allow_html=True)
     glossary_modal("Cos'è il Cockpit di Analisi Tecnica & Quantitative Charting?", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -713,13 +713,7 @@ else:
 
         with col_v2:
             if not df_prof.empty:
-                col_vh1, col_vh2 = st.columns([1.8, 1.2])
-                with col_vh1:
-                    st.markdown("##### 📊 Nodi di Prezzo & Fasce Volumetriche")
-                with col_vh2:
-                    tk_slug = target_ticker.lower().replace(" ", "_").replace(":", "_").replace("/", "_")
-                    render_export_toolbar(df_prof, file_prefix=f"volume_profile_{tk_slug}", key_suffix="vp_prof", table_title="Volume Profile")
-
+                tk_slug = target_ticker.lower().replace(" ", "_").replace(":", "_").replace("/", "_")
                 df_table = pd.DataFrame({
                     "Livello Prezzo": df_prof["price_bin_mid"].map(lambda v: f"€ {v:.2f}"),
                     "Fascia Minima": df_prof["price_bin_min"].map(lambda v: f"€ {v:.2f}"),
@@ -730,11 +724,12 @@ else:
                     "Canale Value Area": df_prof["in_value_area"].map({True: "🟢 Value Area (70%)", False: "⚪ Fuori Canale"})
                 })
 
-                st.dataframe(
+                render_table_with_export(
                     df_table,
-                    use_container_width=True,
-                    hide_index=True,
-                    height=350
+                    table_title="📊 Nodi di Prezzo & Fasce Volumetriche",
+                    file_prefix=f"volume_profile_{tk_slug}",
+                    key_suffix="vp_prof",
+                    height=350,
                 )
             else:
                 st.info("Nessun dato di volume profile disponibile.")
@@ -1058,7 +1053,7 @@ else:
         col_l2_left, col_l2_right = st.columns([1.2, 1.8])
         
         with col_l2_left:
-            col_l2_h1, col_l2_h2 = st.columns([1.6, 1.4])
+            col_l2_h1, col_l2_h2 = st.columns([1.6, 1.4], vertical_alignment="center")
             with col_l2_h1:
                 st.markdown("##### 🧱 Level-2 Book")
             with col_l2_h2:
@@ -1102,25 +1097,21 @@ else:
                 st.dataframe(df_asks, hide_index=True, use_container_width=True)
 
         with col_l2_right:
-            col_reg_h1, col_reg_h2 = st.columns([2.0, 1.2])
-            with col_reg_h1:
-                st.markdown("##### 📋 Registro Tick (Ring Buffer FIFO)")
-            with col_reg_h2:
-                render_export_toolbar(df_stream, file_prefix=f"ticks_{target_ticker.lower()}", key_suffix="stream_ticks", table_title="Registro Tick")
-
             df_display = df_stream[["ticker", "price", "size", "bid", "ask", "spread", "mid_price"]].tail(15).iloc[::-1]
-            st.dataframe(
+            reg_cfg = {
+                "ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "price": st.column_config.NumberColumn("Prezzo Tick", format="$ %.4f"),
+                "size": st.column_config.NumberColumn("Volume", format="%,.0f"),
+                "bid": st.column_config.NumberColumn("Bid", format="$ %.4f"),
+                "ask": st.column_config.NumberColumn("Ask", format="$ %.4f"),
+                "spread": st.column_config.NumberColumn("Spread", format="$ %.4f"),
+                "mid_price": st.column_config.NumberColumn("Mid Price", format="$ %.4f")
+            }
+            render_table_with_export(
                 df_display,
-                column_config={
-                    "ticker": st.column_config.TextColumn("Ticker", width="small"),
-                    "price": st.column_config.NumberColumn("Prezzo Tick", format="$ %.4f"),
-                    "size": st.column_config.NumberColumn("Volume", format="%,.0f"),
-                    "bid": st.column_config.NumberColumn("Bid", format="$ %.4f"),
-                    "ask": st.column_config.NumberColumn("Ask", format="$ %.4f"),
-                    "spread": st.column_config.NumberColumn("Spread", format="$ %.4f"),
-                    "mid_price": st.column_config.NumberColumn("Mid Price", format="$ %.4f")
-                },
-                hide_index=True,
-                use_container_width=True
+                table_title="📋 Registro Tick (Ring Buffer FIFO)",
+                file_prefix=f"ticks_{target_ticker.lower()}",
+                key_suffix="stream_ticks",
+                column_config=reg_cfg,
             )
 

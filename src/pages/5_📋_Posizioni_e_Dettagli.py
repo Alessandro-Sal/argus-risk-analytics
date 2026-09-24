@@ -389,15 +389,12 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
         }
         df_disp.rename(columns=col_renames, inplace=True)
 
-        col_pos_f1, col_pos_f2, col_pos_f3 = st.columns([2.0, 1.3, 0.9])
+        col_pos_f1, col_pos_f2 = st.columns([1.8, 1.2])
         with col_pos_f1:
             search_pos = st.text_input("🔍 Cerca Posizione:", placeholder="Filtra per Ticker o Settore...", key="search_main_pos")
         with col_pos_f2:
             classes_available = ["Tutte le Classi"] + sorted(list(df_disp["Asset Class"].dropna().unique())) if "Asset Class" in df_disp.columns else ["Tutte"]
             filter_ac = st.selectbox("🏷️ Asset Class:", classes_available, key="filter_main_pos_ac")
-        with col_pos_f3:
-            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-            render_export_toolbar(df_disp, file_prefix="posizioni_complete", key_suffix="filter_bar", table_title="Dataset Completo")
 
         df_disp_filt = df_disp.copy()
         if search_pos:
@@ -430,25 +427,31 @@ if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
             height=420
         )
 
-        # ── QUICK ACTION DRAWER TRIGGERS: LOT INSPECTOR & PRE-TRADE BLOTTER ──
-        col_act1, col_act2, col_act3 = st.columns([1.5, 1.2, 1.3])
+        # ── QUICK ACTION DRAWER TRIGGERS: LOT INSPECTOR, RISK DECOMPOSITION & BLOTTER ──
+        col_act1, col_act2, col_act3, col_act4 = st.columns([1.3, 1.1, 1.2, 1.2], vertical_alignment="bottom")
         with col_act1:
             tickers_list = df_disp["Ticker"].tolist() if "Ticker" in df_disp.columns else []
             sel_insp_asset = st.selectbox("🔬 Seleziona Strumento da Ispezionare:", tickers_list, key="sel_insp_asset_p5")
         with col_act2:
-            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("📑 Ispeziona Lotti Fiscali (TUIR)", key="btn_open_lot_inspector_p5", use_container_width=True):
+            if st.button("📑 Lotti Fiscali", key="btn_open_lot_inspector_p5", use_container_width=True, help="Ispezione lotti FIFO/LIFO e TUIR Art. 44 vs 67"):
                 try:
                     from components.action_drawers import render_lot_inspector_dialog
-                    render_lot_inspector_dialog(sel_insp_asset)
+                    render_lot_inspector_dialog(sel_insp_asset, positions=df_disp)
                 except Exception as e:
                     st.error(f"Errore apertura ispettore lotti: {e}")
         with col_act3:
-            st.markdown("<div style='margin-top: 28px;'></div>", unsafe_allow_html=True)
-            if st.button("🚀 Apri Order Blotter Pre-Trade", key="btn_open_blotter_p5", use_container_width=True, type="primary"):
+            if st.button("🔬 Decomposizione", key="btn_open_risk_decomp_p5", use_container_width=True, help="Decomposizione marginale VaR ed Eulero"):
+                try:
+                    from components.action_drawers import render_risk_decomposition_dialog
+                    render_risk_decomposition_dialog(sel_insp_asset, results=results, positions=df_disp)
+                except Exception as e:
+                    st.error(f"Errore apertura decomposizione rischio: {e}")
+        with col_act4:
+            if st.button("🚀 Order Blotter", key="btn_open_blotter_p5", use_container_width=True, type="primary", help="Pre-flight staging e generazione ordini"):
                 try:
                     from components.action_drawers import render_order_blotter_dialog
-                    render_order_blotter_dialog()
+                    total_val_p5 = float(df_disp["Controvalore (€)"].sum()) if "Controvalore (€)" in df_disp.columns else 0.0
+                    render_order_blotter_dialog(portfolio_value=total_val_p5, positions=df_disp)
                 except Exception as e:
                     st.error(f"Errore apertura blotter ordini: {e}")
 
@@ -1007,8 +1010,8 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     "outcome": "Esito"
                 })
 
-                # Toolbar: Ricerca, Filtri e Download CSV
-                col_f1, col_f2, col_f3, col_f4 = st.columns([2.0, 1.2, 1.2, 1.1])
+                # Toolbar: Ricerca e Filtri
+                col_f1, col_f2, col_f3 = st.columns([2.0, 1.2, 1.2])
                 with col_f1:
                     search_gy_a = st.text_input("🔍 Cerca Ticker / Settore:", key="search_gy_assets", placeholder="Es. META, AAPL, Tecnologia...")
                 with col_f2:
@@ -1017,14 +1020,6 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                 with col_f3:
                     outcomes = ["Tutti gli Esiti"] + sorted(list(df_a_show["Esito"].dropna().unique())) if "Esito" in df_a_show.columns else ["Tutti"]
                     filter_outcome = st.selectbox("🎯 Esito:", outcomes, key="filter_gy_outcome")
-                with col_f4:
-                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    render_export_toolbar(
-                        df_a_show,
-                        file_prefix="graveyard_sintesi_asset",
-                        key_suffix="gy_assets",
-                        table_title="Graveyard Sintesi Asset"
-                    )
 
                 df_a_filt = df_a_show.copy()
                 if search_gy_a:
@@ -1050,7 +1045,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     "Profitto Netto (€)": st.column_config.NumberColumn("Profitto Netto (€)", format="€ %.2f"),
                     "Holding Medio (gg)": st.column_config.NumberColumn("Holding Medio (gg)", format="%d gg")
                 }
-                st.dataframe(df_a_filt, use_container_width=True, hide_index=True, column_config=cfg_a)
+                render_table_with_export(
+                    df_a_filt,
+                    table_title="Sintesi Posizioni Chiuse per Asset",
+                    file_prefix="graveyard_sintesi_asset",
+                    key_suffix="gy_assets",
+                    column_config=cfg_a
+                )
             else:
                 st.info("Nessuna sintesi per asset disponibile.")
 
@@ -1072,21 +1073,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     "realized_pnl_pct": "Rendimento (%)", "holding_days": "Holding (gg)", "outcome": "Esito"
                 })
 
-                # Toolbar: Ricerca, Filtri e Download CSV per Registro Lotti
-                col_lf1, col_lf2, col_lf3 = st.columns([2.0, 1.2, 1.1])
+                # Toolbar: Ricerca e Filtri per Registro Lotti
+                col_lf1, col_lf2 = st.columns([2.0, 1.2])
                 with col_lf1:
                     search_gy_l = st.text_input("🔍 Cerca Ticker / Data / Settore:", key="search_gy_lots", placeholder="Es. BTC, 2024, META, Tecnologia...")
                 with col_lf2:
                     outcomes_l = ["Tutti gli Esiti"] + sorted(list(df_l_show["Esito"].dropna().unique())) if "Esito" in df_l_show.columns else ["Tutti"]
                     filter_outcome_l = st.selectbox("🎯 Esito:", outcomes_l, key="filter_gy_outcome_lots")
-                with col_lf3:
-                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    render_export_toolbar(
-                        df_l_show,
-                        file_prefix="registro_analitico_lotti_chiusi",
-                        key_suffix="gy_lots",
-                        table_title="Registro Lotti Chiusi"
-                    )
 
                 df_l_filt = df_l_show.copy()
                 if search_gy_l:
@@ -1110,7 +1103,13 @@ elif active_pos_tab == "🪦 Posizioni Chiuse & Graveyard":
                     "Rendimento (%)": st.column_config.NumberColumn("Rendimento (%)", format="%.2f%%"),
                     "Holding (gg)": st.column_config.NumberColumn("Holding (gg)", format="%d gg")
                 }
-                st.dataframe(df_l_filt, use_container_width=True, hide_index=True, column_config=cfg_l)
+                render_table_with_export(
+                    df_l_filt,
+                    table_title="Registro Analitico Lotti Chiusi",
+                    file_prefix="registro_analitico_lotti_chiusi",
+                    key_suffix="gy_lots",
+                    column_config=cfg_l
+                )
             else:
                 st.info("Nessun lotto chiuso disponibile.")
 
@@ -1135,6 +1134,23 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
     df_div_b = div_data.get("dividend_breakdown", pd.DataFrame())
     df_events = div_data.get("calendar_events", pd.DataFrame())
     df_matrix = div_data.get("monthly_matrix", pd.DataFrame())
+
+    df_forecast = df_div_b.copy() if isinstance(df_div_b, pd.DataFrame) else pd.DataFrame()
+    if not df_forecast.empty:
+        if "distribution_frequency" not in df_forecast.columns and "frequency" in df_forecast.columns:
+            df_forecast["distribution_frequency"] = df_forecast["frequency"]
+        if "months_payout_str" not in df_forecast.columns and "payout_months_str" in df_forecast.columns:
+            df_forecast["months_payout_str"] = df_forecast["payout_months_str"]
+        if "company_name" not in df_forecast.columns:
+            if isinstance(pos, pd.DataFrame) and "ticker" in pos.columns:
+                name_col = "company_name" if "company_name" in pos.columns else ("name" if "name" in pos.columns else None)
+                if name_col:
+                    name_map = pos.drop_duplicates(subset=["ticker"]).set_index("ticker")[name_col].to_dict()
+                    df_forecast["company_name"] = df_forecast["ticker"].map(name_map).fillna(df_forecast["ticker"])
+                else:
+                    df_forecast["company_name"] = df_forecast["ticker"]
+            else:
+                df_forecast["company_name"] = df_forecast["ticker"]
 
     col_d1, col_d2, col_d3, col_d4 = st.columns(4)
     with col_d1:
@@ -1194,9 +1210,7 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
             st.markdown("##### 🔍 Chi Paga per Singolo Mese")
             
             month_options = ["Tutti i Mesi con Incassi", "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"]
-            col_m_sel, col_m_btn = st.columns([2.0, 1.1])
-            with col_m_sel:
-                selected_m = st.selectbox("Seleziona Mese da Ispezionare:", options=month_options, index=0, key="select_div_month_focus")
+            selected_m = st.selectbox("Seleziona Mese da Ispezionare:", options=month_options, index=0, key="select_div_month_focus")
             
             if selected_m == "Tutti i Mesi con Incassi":
                 if not df_events.empty and "month_num" in df_events.columns and "installment_payout_eur" in df_events.columns:
@@ -1204,25 +1218,18 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                     df_disp_ev = active_events[["month_name", "ticker", "installment_payout_eur", "annual_payout_eur"]].rename(columns={
                         "month_name": "Mese", "ticker": "Asset", "installment_payout_eur": "Stacco", "annual_payout_eur": "Tot. Annuo"
                     })
-                    with col_m_btn:
-                        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                        render_export_toolbar(
-                            df_disp_ev,
-                            file_prefix="dividendi_per_mese",
-                            key_suffix="div_m_all",
-                            table_title="Dividendi per Mese"
-                        )
-
                     ev_cfg = {
                         "Mese": st.column_config.TextColumn("Mese", width="small"),
                         "Asset": st.column_config.TextColumn("Asset", width="small"),
                         "Stacco": st.column_config.NumberColumn("Stacco Singolo", format="€ %.2f"),
                         "Tot. Annuo": st.column_config.NumberColumn("Tot. Annuo", format="€ %.2f")
                     }
-                    st.dataframe(
-                        df_disp_ev,
+                    render_table_with_export(
+                        df=df_disp_ev,
+                        table_title="Dividendi per Mese",
+                        file_prefix="dividendi_per_mese",
+                        key_suffix="div_m_all",
                         column_config=ev_cfg,
-                        use_container_width=True,
                         hide_index=True,
                         height=280
                     )
@@ -1240,15 +1247,6 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                     df_disp_ev = m_events[["ticker", "dividend_yield_pct", "installment_payout_eur", "annual_payout_eur"]].rename(columns={
                         "ticker": "Asset", "dividend_yield_pct": "Yield %", "installment_payout_eur": "Stacco", "annual_payout_eur": "Tot. Annuo"
                     })
-                    with col_m_btn:
-                        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                        render_export_toolbar(
-                            df_disp_ev,
-                            file_prefix=f"dividendi_{selected_m.lower()}",
-                            key_suffix=f"div_m_{m_num}",
-                            table_title=f"Dividendi {selected_m}"
-                        )
-
                     st.success(f"🗓️ **{selected_m}**: Incasso Totale Stimato di **€ {tot_m:,.2f}**")
                     ev_cfg = {
                         "Asset": st.column_config.TextColumn("Asset", width="small"),
@@ -1256,10 +1254,12 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                         "Stacco": st.column_config.NumberColumn("Stacco Singolo", format="€ %.2f"),
                         "Tot. Annuo": st.column_config.NumberColumn("Tot. Annuo", format="€ %.2f")
                     }
-                    st.dataframe(
-                        df_disp_ev,
+                    render_table_with_export(
+                        df=df_disp_ev,
+                        table_title=f"Dividendi Stimati ({selected_m})",
+                        file_prefix=f"dividendi_{selected_m.lower()}",
+                        key_suffix=f"div_m_{m_num}",
                         column_config=ev_cfg,
-                        use_container_width=True,
                         hide_index=True,
                         height=240
                     )
@@ -1271,90 +1271,65 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
     st.markdown("#### 📋 Calendario Completo Dividendi: Chi Paga, Quando e Quanto")
     st.caption("Riepilogo analitico per ciascun asset in portafoglio: frequenza di distribuzione, mesi previsti di accredito e stima dell'importo per singolo stacco.")
 
-    if not df_div_b.empty:
-        paying_assets = df_div_b[df_div_b["annual_payout_eur"] > 0].copy()
-        if not paying_assets.empty:
-            # Fallback sicuro per colonne
-            default_cols = {
-                "dividend_yield_pct": 0.0,
-                "yield_on_cost_pct": 0.0,
-                "frequency": "Trimestrale (4x)",
-                "payout_months_str": "Mar, Giu, Set, Dic",
-                "installment_payout_eur": 0.0,
-                "annual_payout_eur": 0.0,
-                "historical_payout_eur": 0.0
-            }
-            for col_name, def_val in default_cols.items():
-                if col_name not in paying_assets.columns:
-                    paying_assets[col_name] = def_val
+    if not df_forecast.empty:
+        df_table = df_forecast.copy()
+        show_cols = [
+            "ticker", "company_name", "dividend_yield_pct", "yield_on_cost_pct",
+            "distribution_frequency", "months_payout_str",
+            "installment_payout_eur", "annual_payout_eur", "historical_payout_eur"
+        ]
+        df_table_show = df_table[[c for c in show_cols if c in df_table.columns]].rename(columns={
+            "ticker": "Asset / Ticker",
+            "company_name": "Società / Titolo",
+            "dividend_yield_pct": "Dividend Yield",
+            "yield_on_cost_pct": "Yield on Cost (YOC)",
+            "distribution_frequency": "Frequenza",
+            "months_payout_str": "Mesi di Stacco Stimati",
+            "installment_payout_eur": "Incasso per Singolo Stacco",
+            "annual_payout_eur": "Stima Totale Annua",
+            "historical_payout_eur": "Storico Incassato Reale"
+        })
 
-            df_table_show = paying_assets[[
-                "ticker", "dividend_yield_pct", "yield_on_cost_pct", "frequency", 
-                "payout_months_str", "installment_payout_eur", "annual_payout_eur", "historical_payout_eur"
-            ]].rename(columns={
-                "ticker": "Asset / Ticker",
-                "dividend_yield_pct": "Dividend Yield",
-                "yield_on_cost_pct": "Yield on Cost (YOC)",
-                "frequency": "Frequenza",
-                "payout_months_str": "Mesi di Stacco Stimati",
-                "installment_payout_eur": "Incasso per Singolo Stacco",
-                "annual_payout_eur": "Stima Totale Annua",
-                "historical_payout_eur": "Storico Incassato Reale"
-            })
+        # Toolbar: Ricerca e Filtro Frequenza
+        col_df1, col_df2 = st.columns([2.0, 1.2])
+        with col_df1:
+            search_div = st.text_input("🔍 Cerca Asset / Mesi:", key="search_div_table", placeholder="Es. ISP.MI, NOVO, Maggio, Trimestrale...")
+        with col_df2:
+            freqs = ["Tutte le Frequenze"] + sorted(list(df_table_show["Frequenza"].dropna().unique())) if "Frequenza" in df_table_show.columns else ["Tutte"]
+            filter_freq = st.selectbox("⏳ Frequenza:", freqs, key="filter_div_freq")
 
-            # Toolbar: Ricerca, Filtro Frequenza e Download CSV
-            col_df1, col_df2, col_df3 = st.columns([2.0, 1.2, 1.1])
-            with col_df1:
-                search_div = st.text_input("🔍 Cerca Asset / Mesi:", key="search_div_table", placeholder="Es. ISP.MI, NOVO, Maggio, Trimestrale...")
-            with col_df2:
-                freqs = ["Tutte le Frequenze"] + sorted(list(df_table_show["Frequenza"].dropna().unique())) if "Frequenza" in df_table_show.columns else ["Tutte"]
-                filter_freq = st.selectbox("⏳ Frequenza:", freqs, key="filter_div_freq")
-            with col_df3:
-                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                render_export_toolbar(
-                    df_table_show,
-                    file_prefix="calendario_dividendi_stimati",
-                    key_suffix="div_calendar",
-                    table_title="Calendario Dividendi Stimati"
-                )
+        df_table_filt = df_table_show.copy()
+        if search_div:
+            mask = df_table_filt["Asset / Ticker"].astype(str).str.contains(search_div.strip(), case=False, na=False)
+            if "Mesi di Stacco Stimati" in df_table_filt.columns:
+                mask |= df_table_filt["Mesi di Stacco Stimati"].astype(str).str.contains(search_div.strip(), case=False, na=False)
+            if "Frequenza" in df_table_filt.columns:
+                mask |= df_table_filt["Frequenza"].astype(str).str.contains(search_div.strip(), case=False, na=False)
+            df_table_filt = df_table_filt[mask]
+        if filter_freq != "Tutte le Frequenze" and "Frequenza" in df_table_filt.columns:
+            df_table_filt = df_table_filt[df_table_filt["Frequenza"] == filter_freq]
 
-            df_table_filt = df_table_show.copy()
-            if search_div:
-                mask = df_table_filt["Asset / Ticker"].astype(str).str.contains(search_div.strip(), case=False, na=False)
-                if "Mesi di Stacco Stimati" in df_table_filt.columns:
-                    mask |= df_table_filt["Mesi di Stacco Stimati"].astype(str).str.contains(search_div.strip(), case=False, na=False)
-                if "Frequenza" in df_table_filt.columns:
-                    mask |= df_table_filt["Frequenza"].astype(str).str.contains(search_div.strip(), case=False, na=False)
-                df_table_filt = df_table_filt[mask]
-            if filter_freq != "Tutte le Frequenze" and "Frequenza" in df_table_filt.columns:
-                df_table_filt = df_table_filt[df_table_filt["Frequenza"] == filter_freq]
+        div_table_config = {
+            "Dividend Yield": st.column_config.NumberColumn("Dividend Yield", format="%.2f%%"),
+            "Yield on Cost (YOC)": st.column_config.NumberColumn("Yield on Cost (YOC)", format="%.2f%%"),
+            "Incasso per Singolo Stacco": st.column_config.NumberColumn("Incasso per Singolo Stacco", format="€ %.2f"),
+            "Stima Totale Annua": st.column_config.NumberColumn("Stima Totale Annua", format="€ %.2f"),
+            "Storico Incassato Reale": st.column_config.NumberColumn("Storico Incassato Reale", format="€ %.2f")
+        }
 
-            div_table_config = {
-                "Dividend Yield": st.column_config.NumberColumn("Dividend Yield", format="%.2f%%"),
-                "Yield on Cost (YOC)": st.column_config.NumberColumn("Yield on Cost (YOC)", format="%.2f%%"),
-                "Incasso per Singolo Stacco": st.column_config.NumberColumn("Incasso per Singolo Stacco", format="€ %.2f"),
-                "Stima Totale Annua": st.column_config.NumberColumn("Stima Totale Annua", format="€ %.2f"),
-                "Storico Incassato Reale": st.column_config.NumberColumn("Storico Incassato Reale", format="€ %.2f")
-            }
-
-            st.dataframe(df_table_filt, use_container_width=True, hide_index=True, column_config=div_table_config)
-        else:
-            st.info("Nessuna posizione in portafoglio genera dividendi o cedole attive.")
+        render_table_with_export(
+            df_table_filt,
+            table_title="Calendario Dividendi Stimati",
+            file_prefix="calendario_dividendi_stimati",
+            key_suffix="div_calendar",
+            column_config=div_table_config
+        )
+    else:
+        st.info("Nessuna posizione in portafoglio genera dividendi o cedole attive.")
 
     # ── MATRICE MENSILE DISTRIBUZIONE DIVIDENDI ──────────────────────
     if not df_matrix.empty:
         with st.expander("🗓️ Visualizza la Matrice Annuale Completa (Incassi Titolo per Mese)", expanded=False):
-            col_m1, col_m2 = st.columns([3.4, 1.1])
-            with col_m1:
-                st.markdown('<div style="padding-top: 6px; font-size: 13.5px; color: #8b949e;">Importo monetario stimato (€) per ciascun mese dell\'anno solare:</div>', unsafe_allow_html=True)
-            with col_m2:
-                render_export_toolbar(
-                    df_matrix,
-                    file_prefix="matrice_annuale_dividendi",
-                    key_suffix="div_matrix",
-                    table_title="Matrice Annuale Dividendi"
-                )
-
             matrix_config = {
                 "Ticker": st.column_config.TextColumn("Ticker", width="small"),
                 "Yield %": st.column_config.NumberColumn("Yield %", format="%.2f%%"),
@@ -1365,10 +1340,11 @@ elif active_pos_tab == "📅 Proiezione Dividendi":
                 matrix_config[m_l] = st.column_config.NumberColumn(m_l, format="€ %.2f")
 
             mat_height = min(480, max(220, 42 + len(df_matrix) * 38))
-            st.dataframe(
+            render_table_with_export(
                 df_matrix,
-                use_container_width=True,
-                hide_index=True,
+                table_title="Matrice Annuale Dividendi (€ per mese)",
+                file_prefix="matrice_annuale_dividendi",
+                key_suffix="div_matrix",
                 column_config=matrix_config,
                 height=mat_height
             )
@@ -1566,17 +1542,7 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                         "replacement_proxy": "Re-Entry Proxy Correlato", "rationale": "Logica Operativa"
                     })
 
-                    col_hl1, col_hl2 = st.columns([3.5, 1.2])
-                    with col_hl1:
-                        st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
-                    with col_hl2:
-                        render_export_toolbar(
-                            df_hl_disp,
-                            file_prefix="ordini_tax_loss_harvesting",
-                            key_suffix="tax_harvest_orders",
-                            table_title="Ordini Tax-Loss Harvesting"
-                        )
-
+                    st.caption("Esegui gli ordini di vendita per registrare le minusvalenze e reinvesti contestualmente nel proxy consigliato per mantenere l'esposizione al trend.")
                     cfg_hl = {
                         "Ticker": st.column_config.TextColumn("Ticker", width="small"),
                         "Classe Asset": st.column_config.TextColumn("Classe", width="small"),
@@ -1589,9 +1555,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                         "Re-Entry Proxy Correlato": st.column_config.TextColumn("Proxy Re-Entry", width="medium"),
                     }
 
-                    st.dataframe(
+                    render_table_with_export(
                         df_hl_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Controvalore (€)", "Minus Realizzabile (€)", "Risparmio Fiscale (€)", "Azione Consigliata", "Re-Entry Proxy Correlato"]],
-                        column_config=cfg_hl, use_container_width=True, hide_index=True
+                        table_title="Ordini Suggeriti Tax-Loss Harvesting",
+                        file_prefix="ordini_tax_loss_harvesting",
+                        key_suffix="tax_harvest_orders",
+                        column_config=cfg_hl
                     )
                 else:
                     st.info("Nessuna posizione in perdita latente da raccogliere.")
@@ -1618,9 +1587,12 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                         "Azione Consigliata": st.column_config.TextColumn("Azione", width="medium"),
                     }
 
-                    st.dataframe(
+                    render_table_with_export(
                         df_su_disp[["Ticker", "Classe Asset", "Quote Detenute", "Prezzo (€)", "Plusvalenza Latente (€)", "Minus Compensabile (€)", "Tasse Azzerate (€)", "Azione Consigliata"]],
-                        column_config=cfg_su, use_container_width=True, hide_index=True
+                        table_title="Opportunità Step-Up Fiscale a 0€ Imposte",
+                        file_prefix="step_up_fiscale",
+                        key_suffix="step_up_orders",
+                        column_config=cfg_su
                     )
                 else:
                     st.info("Nessun candidato per Step-Up a 0€ imposte (richiede posizioni in utile su Redditi Diversi e saldo zainetto attivo).")
@@ -1643,87 +1615,53 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 )
                 legend_names = {"residual_active_eur": "Residuo Attivo", "compensated_eur": "Compensato", "expired_eur": "Scaduto"}
                 fig_z_timeline.for_each_trace(lambda t: t.update(name=legend_names.get(t.name, t.name), hovertemplate="<b>%{x}</b><br>" + legend_names.get(t.name, t.name) + ": <b>€ %{y:,.2f}</b><extra></extra>"))
-                fig_z_timeline.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=20, r=20, t=35, b=20), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5, font=dict(size=11, color="#ffffff")))
+                fig_z_timeline.update_layout(
+                    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                    margin=dict(l=10, r=10, t=30, b=10),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="center", x=0.5)
+                )
                 apply_plotly_theme(fig_z_timeline)
                 st.plotly_chart(fig_z_timeline, use_container_width=True, config={"displayModeBar": False})
 
         # ══════════════════════════════════════════════════════════════════════
-        # SUB-TAB 2: PROSPETTO PRECOMPILATO MODELLO REDDITI PF (QUADRO RT & RW)
+        # SUB-TAB 2: REPORT PRECOMPILATO UNICO (QUADRI RT & RW)
         # ══════════════════════════════════════════════════════════════════════
         with tab_tax_c2:
-            col_rt_h1, col_rt_h2 = st.columns([3.2, 1.2])
-            with col_rt_h1:
-                st.markdown("#### 📑 Prospetto Precompilato Modello Redditi Persone Fisiche")
-                st.caption("Prospetto conforme per chi opera in **Regime Dichiarativo** (es. Interactive Brokers, Degiro, Scalable Capital, Revolut o Wallet Privati).")
-            with col_rt_h2:
-                st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-                glossary_modal(
-                    "ℹ️ Istruzioni Modello Redditi PF",
-                    """
-<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
-<div style="background: rgba(255, 153, 0, 0.08); border-left: 3px solid #ff9900; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
-  <b style="color: #ff9900;">🏛️ Come utilizzare questi prospetti</b><br>
-  I dati calcolati riportano esattamente i codici rigo ministeriali per la compilazione della dichiarazione annuale dei redditi da parte del Commercialista o CAF.
-</div>
-<div><b>Quadro RT (Sez. II):</b> Plusvalenze su partecipazioni non qualificate assoggettate ad imposta sostitutiva del 26% (Codice tributo F24: <b>1100</b>).<br>
-<b>Quadro RW:</b> Monitoraggio fiscale delle attività finanziarie detenute all'estero e liquidazione IVAFE (0,20%).</div>
-</div>
-"""
-                )
+            st.markdown("#### 📑 Report Fiscale Precompilato Modello Redditi PF")
+            st.caption("Quadro sintetico per la dichiarazione dei redditi (Regime Dichiarativo). Genera i dati conformi ai modelli ministeriali dell'Agenzia delle Entrate.")
 
-            col_rt_in1, col_rt_in2 = st.columns([2.0, 2.0])
-            with col_rt_in1:
-                prior_minus_in = st.number_input(
-                    "Minusvalenze Pregresse da Quadro RT Anno Precedente (€):",
-                    value=float(tax_credit_val),
-                    step=250.0, format="%.2f",
-                    key="input_prior_minus_rt"
-                )
+            pf_data = compute_modello_redditi_pf(results)
+            pf_sum = pf_data.get("summary", {})
+            df_rt_table = pf_data.get("df_quadro_rt", pd.DataFrame())
+            df_rw_table = pf_data.get("df_quadro_rw", pd.DataFrame())
 
-            pf_res = compute_modello_redditi_pf(results, tax_year=tax_year_param, db_engine=engine, prior_minus_custom_eur=prior_minus_in)
-            pf_sum = pf_res["summary"]
-            df_rt_table = pf_res["df_quadro_rt"]
-            df_rw_table = pf_res["df_quadro_rw"]
+            rt_tax = float(pf_sum.get("imposta_sostitutiva_rt26_eur", pf_sum.get("imposta_sostitutiva_rt_eur", 0.0)))
+            ivafe_tax = float(pf_sum.get("totale_ivafe_rw_eur", 0.0))
+            is_esente = bool(pf_sum.get("esenzione_ivafe_applicata", False))
+            tot_f24 = float(pf_sum.get("totale_debito_dichiarativo_eur", rt_tax + ivafe_tax))
+            minus_rip = float(pf_sum.get("minusvalenze_riportabili_eur", 0.0))
 
             col_pf1, col_pf2, col_pf3, col_pf4 = st.columns(4)
             with col_pf1:
-                metric_card("Imposta Sostitutiva (RT)", f"€ {pf_sum['imposta_sostitutiva_rt_eur']:,.2f}", "Aliquota 26% F24 (Cod. 1100)", False)
+                metric_card("Imposta Sostitutiva RT", f"€ {rt_tax:,.2f}", "26% su Plusvalenze Nette", False)
             with col_pf2:
-                metric_card("IVAFE Dovuta (RW)", f"€ {pf_sum['totale_ivafe_rw_eur']:,.2f}", "Esente se < 12€" if pf_sum["esenzione_ivafe_applicata"] else "0.20% su giacenza estera", False)
+                metric_card("IVAFE Dovuta (RW)", f"€ {ivafe_tax:,.2f}", "Esente se < 12€" if is_esente else "0.20% su giacenza estera", False)
             with col_pf3:
-                metric_card("Totale Debito F24", f"€ {pf_sum['totale_debito_dichiarativo_eur']:,.2f}", "RT26 + RW IVAFE", False)
+                metric_card("Totale Debito F24", f"€ {tot_f24:,.2f}", "RT26 + RW IVAFE", False)
             with col_pf4:
-                metric_card("Minus Riportabili (RT25)", f"€ {pf_sum['minusvalenze_riportabili_eur']:,.2f}", "Valide per i prossimi 4 anni", True)
+                metric_card("Minus Riportabili (RT25)", f"€ {minus_rip:,.2f}", "Valide per i prossimi 4 anni", True)
 
-            st.markdown("##### 📋 Quadro RT — Sezione II (Plusvalenze & Minusvalenze Finanziarie)")
-            col_rt_d1, col_rt_d2 = st.columns([3.5, 1.2])
-            with col_rt_d2:
-                render_export_toolbar(
-                    df_rt_table,
-                    file_prefix="quadro_rt_precompilato",
-                    key_suffix="rt_precomp",
-                    table_title="Quadro RT Precompilato"
-                )
-
-            st.dataframe(
+            render_table_with_export(
                 df_rt_table.rename(columns={"rigo": "Rigo", "descrizione": "Descrizione Ministeriale", "valore_eur": "Importo (€)"}),
-                column_config={"Importo (€)": st.column_config.NumberColumn("Importo (€)", format="€ %.2f")},
-                use_container_width=True, hide_index=True
+                table_title="Quadro RT — Sezione II (Plusvalenze & Minusvalenze Finanziarie)",
+                file_prefix="quadro_rt_precompilato",
+                key_suffix="rt_precomp",
+                column_config={"Importo (€)": st.column_config.NumberColumn("Importo (€)", format="€ %.2f")}
             )
 
             st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
-            st.markdown("##### 🌍 Quadro RW — Monitoraggio Fiscale Attività Estere & Calcolo IVAFE")
             if not df_rw_table.empty:
-                col_rw_d1, col_rw_d2 = st.columns([3.5, 1.2])
-                with col_rw_d2:
-                    render_export_toolbar(
-                        df_rw_table,
-                        file_prefix="quadro_rw_precompilato",
-                        key_suffix="rw_precomp",
-                        table_title="Quadro RW Precompilato"
-                    )
-
-                st.dataframe(
+                render_table_with_export(
                     df_rw_table.rename(columns={
                         "rigo": "Rigo", "ticker": "Asset / Ticker", "asset_class": "Classe",
                         "codice_investimento": "Cod. Investimento", "codice_paese": "Cod. Paese",
@@ -1731,13 +1669,15 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                         "valore_iniziale_eur": "Valore Iniziale (€)", "valore_finale_eur": "Valore Finale (€)",
                         "ivafe_calcolata_eur": "IVAFE (€)"
                     }),
+                    table_title="Quadro RW — Monitoraggio Fiscale Attività Estere & Calcolo IVAFE",
+                    file_prefix="quadro_rw_precompilato",
+                    key_suffix="rw_precomp",
                     column_config={
                         "Valore Iniziale (€)": st.column_config.NumberColumn("Valore Iniziale", format="€ %.2f"),
                         "Valore Finale (€)": st.column_config.NumberColumn("Valore Finale", format="€ %.2f"),
                         "IVAFE (€)": st.column_config.NumberColumn("IVAFE (0.2%)", format="€ %.2f"),
                         "Possesso %": st.column_config.NumberColumn("Possesso", format="%.0f%%")
-                    },
-                    use_container_width=True, hide_index=True
+                    }
                 )
             else:
                 st.info("Nessun asset estero rilevante ai fini del monitoraggio Quadro RW.")
@@ -1780,18 +1720,7 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 metric_card("Aliquota Effettiva Media", f"{wht_sum['weighted_effective_tax_pct']:.2f}%", f"Tax Drag vs ETF: € {wht_sum['total_tax_drag_vs_accumulating_eur']:,.2f}", False)
 
             if not df_wht.empty:
-                col_wd1, col_wd2 = st.columns([3.5, 1.2])
-                with col_wd1:
-                    st.markdown("##### 🔍 Breakdown Fiscale per Singolo Asset a Distribuzione")
-                with col_wd2:
-                    render_export_toolbar(
-                        df_wht,
-                        file_prefix="withholding_tax_report",
-                        key_suffix="wht_report",
-                        table_title="Withholding Tax Report"
-                    )
-
-                st.dataframe(
+                render_table_with_export(
                     df_wht.rename(columns={
                         "ticker": "Ticker", "asset_class": "Classe", "paese_regime": "Paese / Regime Fiscale",
                         "dividendo_lordo_eur": "Dividendo Lordo (€)", "ritenuta_estera_wht_eur": "WHT Estera (€)",
@@ -1800,6 +1729,9 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                         "dividendo_netto_incassato_eur": "Netto Incassato (€)", "aliquota_effettiva_combinata_pct": "Aliquota Effettiva %",
                         "tax_drag_vs_accumulo_eur": "Tax Drag vs Accumulo (€)"
                     }),
+                    table_title="Breakdown Fiscale per Singolo Asset a Distribuzione",
+                    file_prefix="withholding_tax_report",
+                    key_suffix="wht_report",
                     column_config={
                         "Dividendo Lordo (€)": st.column_config.NumberColumn("Lordo (€)", format="€ %.2f"),
                         "WHT Estera (€)": st.column_config.NumberColumn("WHT Estera", format="€ %.2f"),
@@ -1808,8 +1740,7 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                         "Netto Incassato (€)": st.column_config.NumberColumn("Netto Reale", format="€ %.2f"),
                         "Aliquota Effettiva %": st.column_config.NumberColumn("Aliquota Effettiva", format="%.2f%%"),
                         "Tax Drag vs Accumulo (€)": st.column_config.NumberColumn("Tax Drag vs Acc.", format="€ %.2f"),
-                    },
-                    use_container_width=True, hide_index=True
+                    }
                 )
             else:
                 st.info("Nessuna posizione azionaria estera a dividendo presente in portafoglio.")
@@ -1846,13 +1777,20 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 
                 cur_lot_pos = pos_df[pos_df["ticker"] == sel_lot_ticker].iloc[0]
                 cur_qty = float(cur_lot_pos.get("qty_net", 1.0))
-                cur_price = float(cur_lot_pos.get("current_price", 100.0))
+                cur_price = float(
+                    cur_lot_pos.get("last_price")
+                    or cur_lot_pos.get("current_price")
+                    or (cur_lot_pos.get("current_value", 0.0) / max(0.0001, cur_qty) if cur_qty > 0 else 100.0)
+                    or 100.0
+                )
 
                 with col_ls_in2:
+                    min_q = 0.0001 if cur_qty < 1.0 else 0.01
+                    def_q = float(min(cur_qty, max(min_q, round(cur_qty * 0.5, 4 if cur_qty < 1.0 else 2))))
                     qty_to_sell_input = st.number_input(
-                        f"Quote da Vendere (Max: {cur_qty:,.2f}):",
-                        min_value=0.01, max_value=float(cur_qty), value=float(min(cur_qty, max(1.0, round(cur_qty * 0.5, 2)))),
-                        step=1.0 if cur_qty >= 10 else 0.1, key="input_qty_to_sell_sim"
+                        f"Quote da Vendere (Max: {cur_qty:,.4f}):" if cur_qty < 1.0 else f"Quote da Vendere (Max: {cur_qty:,.2f}):",
+                        min_value=min_q, max_value=float(cur_qty), value=def_q,
+                        step=0.0001 if cur_qty < 1.0 else (1.0 if cur_qty >= 10 else 0.1), key="input_qty_to_sell_sim"
                     )
                 with col_ls_in3:
                     price_sell_input = st.number_input(
@@ -1935,18 +1873,6 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
 
         # 1. Prospetto Quadro RT
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        col_rt_h1, col_rt_h2 = st.columns([3.5, 0.9])
-        with col_rt_h1:
-            st.markdown("##### 📈 Quadro RT (Sezione II-B) — Plusvalenze su Cripto-Attività (Art. 67 c. 1 lett. c-sexies TUIR)")
-        with col_rt_h2:
-            if not df_c_rt.empty:
-                render_export_toolbar(
-                    df_c_rt,
-                    file_prefix="quadro_rt_cripto",
-                    key_suffix="crypto_rt",
-                    table_title="Quadro RT Cripto"
-                )
-
         if not df_c_rt.empty:
             df_rt_show = df_c_rt.rename(columns={
                 "year": "Anno Fiscale",
@@ -1960,35 +1886,27 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "crypto_zainetto_residual_eur": "Zainetto Cripto Residuo (€)"
             })
             df_rt_show["Franchigia 2.000€ Applicata"] = df_rt_show["Franchigia 2.000€ Applicata"].apply(lambda x: "✅ Sì (Esente)" if x else "❌ No (Oltre Soglia)")
-            st.dataframe(
-                df_rt_show.style.format({
-                    "Plusvalenze Realizzate (€)": "€ {:,.2f}",
-                    "Minusvalenze Realizzate (€)": "€ {:,.2f}",
-                    "Saldo Netto (€)": "€ {:,.2f}",
-                    "Minusv. Cripto Dedotte (€)": "€ {:,.2f}",
-                    "Base Imponibile (€)": "€ {:,.2f}",
-                    "Imposta Dovuta 26% (€)": "€ {:,.2f}",
-                    "Zainetto Cripto Residuo (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True, hide_index=True
+            cfg_c_rt = {
+                "Plusvalenze Realizzate (€)": st.column_config.NumberColumn("Plusvalenze Realizzate (€)", format="€ %.2f"),
+                "Minusvalenze Realizzate (€)": st.column_config.NumberColumn("Minusvalenze Realizzate (€)", format="€ %.2f"),
+                "Saldo Netto (€)": st.column_config.NumberColumn("Saldo Netto (€)", format="€ %.2f"),
+                "Minusv. Cripto Dedotte (€)": st.column_config.NumberColumn("Minusv. Cripto Dedotte (€)", format="€ %.2f"),
+                "Base Imponibile (€)": st.column_config.NumberColumn("Base Imponibile (€)", format="€ %.2f"),
+                "Imposta Dovuta 26% (€)": st.column_config.NumberColumn("Imposta Dovuta 26% (€)", format="€ %.2f"),
+                "Zainetto Cripto Residuo (€)": st.column_config.NumberColumn("Zainetto Cripto Residuo (€)", format="€ %.2f"),
+            }
+            render_table_with_export(
+                df_rt_show,
+                table_title="Quadro RT (Sezione II-B) — Plusvalenze su Cripto-Attività",
+                file_prefix="quadro_rt_cripto",
+                key_suffix="crypto_rt",
+                column_config=cfg_c_rt
             )
         else:
             st.info("Nessuna transazione di vendita o realizzo cripto registrata per il periodo selezionato.")
 
         # 2. Prospetto Quadro RW
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        col_rw_h1, col_rw_h2 = st.columns([3.5, 0.9])
-        with col_rw_h1:
-            st.markdown("##### 🌐 Quadro RW — Prospetto Monitoraggio Fiscale Attività Estere & Self-Custody (Codice 21)")
-        with col_rw_h2:
-            if not df_c_rw.empty:
-                render_export_toolbar(
-                    df_c_rw,
-                    file_prefix="quadro_rw_cripto",
-                    key_suffix="crypto_rw",
-                    table_title="Quadro RW Cripto"
-                )
-
         if not df_c_rw.empty:
             df_rw_show = df_c_rw.rename(columns={
                 "quadro": "Quadro",
@@ -2001,15 +1919,19 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "quota_possesso_pct": "Quota Possesso %",
                 "imposta_valore_ivafe_eur": "Imposta Valore / IVAFE 0,20% (€)"
             })
-            st.dataframe(
-                df_rw_show.style.format({
-                    "Valore Iniziale 01/01 (€)": "€ {:,.2f}",
-                    "Valore Finale 31/12 (€)": "€ {:,.2f}",
-                    "Valore Massimo (€)": "€ {:,.2f}",
-                    "Quota Possesso %": "{:.0f}%",
-                    "Imposta Valore / IVAFE 0,20% (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True, hide_index=True
+            cfg_c_rw = {
+                "Valore Iniziale 01/01 (€)": st.column_config.NumberColumn("Valore Iniziale 01/01 (€)", format="€ %.2f"),
+                "Valore Finale 31/12 (€)": st.column_config.NumberColumn("Valore Finale 31/12 (€)", format="€ %.2f"),
+                "Valore Massimo (€)": st.column_config.NumberColumn("Valore Massimo (€)", format="€ %.2f"),
+                "Quota Possesso %": st.column_config.NumberColumn("Quota Possesso %", format="%.0f%%"),
+                "Imposta Valore / IVAFE 0,20% (€)": st.column_config.NumberColumn("Imposta Valore / IVAFE 0,20% (€)", format="€ %.2f")
+            }
+            render_table_with_export(
+                df_rw_show,
+                table_title="Quadro RW — Prospetto Monitoraggio Fiscale Attività Estere & Self-Custody",
+                file_prefix="quadro_rw_cripto",
+                key_suffix="crypto_rw",
+                column_config=cfg_c_rw
             )
         else:
             st.info("Nessuna posizione cripto aperta attualmente in portafoglio da monitorare nel Quadro RW.")
@@ -2017,17 +1939,6 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
         # 3. Zainetto Fiscale Cripto Separato
         if not df_c_zainetto.empty:
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-            col_cz_h1, col_cz_h2 = st.columns([3.5, 0.9])
-            with col_cz_h1:
-                st.markdown("##### 📦 Zainetto Fiscale Cripto Separato (Minusvalenze Riportabili in 4 Anni)")
-            with col_cz_h2:
-                render_export_toolbar(
-                    df_c_zainetto,
-                    file_prefix="zainetto_fiscale_cripto",
-                    key_suffix="crypto_zainetto",
-                    table_title="Zainetto Fiscale Cripto"
-                )
-
             df_cz_show = df_c_zainetto.rename(columns={
                 "origin_year": "Anno Origine",
                 "expiry_year": "Anno Scadenza",
@@ -2036,13 +1947,17 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
                 "residual_active_eur": "Credito Cripto Residuo (€)",
                 "status": "Stato Fiscale"
             })
-            st.dataframe(
-                df_cz_show.style.format({
-                    "Minusvalenza Iniziale (€)": "€ {:,.2f}",
-                    "Compensato (€)": "€ {:,.2f}",
-                    "Credito Cripto Residuo (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True, hide_index=True
+            cfg_cz = {
+                "Minusvalenza Iniziale (€)": st.column_config.NumberColumn("Minusvalenza Iniziale (€)", format="€ %.2f"),
+                "Compensato (€)": st.column_config.NumberColumn("Compensato (€)", format="€ %.2f"),
+                "Credito Cripto Residuo (€)": st.column_config.NumberColumn("Credito Cripto Residuo (€)", format="€ %.2f")
+            }
+            render_table_with_export(
+                df_cz_show,
+                table_title="Zainetto Fiscale Cripto Separato (Minusvalenze Riportabili in 4 Anni)",
+                file_prefix="zainetto_fiscale_cripto",
+                key_suffix="crypto_zainetto",
+                column_config=cfg_cz
             )
 
 # ── TAB 5: RISCHIO LIQUIDITÀ & SMART ORDER ROUTER ─────────────
@@ -2086,19 +2001,11 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
     
     if not df_ac.empty:
         # Sezione 1: Overview Tabellare
-        col_t1, col_t2 = st.columns([3.0, 1.0])
-        with col_t1:
-            st.markdown("##### 📊 Profilo di Rischio Liquidità per Asset")
-        with col_t2:
-            render_export_toolbar(
-                df_ac,
-                file_prefix="liquidita_almgren_chriss",
-                key_suffix="ac_liquidity",
-                table_title="Liquidità Almgren-Chriss"
-            )
-
-        st.dataframe(
+        render_table_with_export(
             df_ac,
+            table_title="Profilo di Rischio Liquidità per Asset",
+            file_prefix="liquidita_almgren_chriss",
+            key_suffix="ac_liquidity",
             column_config={
                 "Ticker": st.column_config.TextColumn("Ticker"),
                 "Valore (€)": st.column_config.NumberColumn("Valore", format="€ %,.2f"),
@@ -2110,9 +2017,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 "Costo Totale (€)": st.column_config.NumberColumn("Costo Stimato", format="€ %,.2f"),
                 "Costo (bps)": st.column_config.NumberColumn("Slippage", format="%.1f bps"),
                 "Rischio Liquidità": st.column_config.TextColumn("Livello Rischio")
-            },
-            hide_index=True,
-            use_container_width=True
+            }
         )
 
         st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 24px 0;'>", unsafe_allow_html=True)
@@ -2252,19 +2157,11 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             st.plotly_chart(fig_bd, use_container_width=True, config={"displayModeBar": False})
 
         # Tabella Schedule di Trading
-        col_sch_h1, col_sch_h2 = st.columns([3.0, 1.0])
-        with col_sch_h1:
-            st.markdown("##### 📋 Tabella di Esecuzione a Scaglioni (Order Slicing Schedule)")
-        with col_sch_h2:
-            render_export_toolbar(
-                df_sched,
-                file_prefix=f"execution_schedule_{exec_horizon}d",
-                key_suffix="ac_schedule",
-                table_title=f"Execution Schedule ({exec_horizon}d)"
-            )
-
-        st.dataframe(
+        render_table_with_export(
             df_sched,
+            table_title=f"Tabella di Esecuzione a Scaglioni ({exec_horizon}d)",
+            file_prefix=f"execution_schedule_{exec_horizon}d",
+            key_suffix="ac_schedule",
             column_config={
                 "Intervallo": st.column_config.TextColumn("Fetta"),
                 "Giorno": st.column_config.NumberColumn("Giorno", format="%.2f"),
@@ -2274,9 +2171,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                 "Costo Step (€)": st.column_config.NumberColumn("Costo Fetta", format="€ %,.2f"),
                 "Costo Cumulato (€)": st.column_config.NumberColumn("Costo Cumulato", format="€ %,.2f"),
                 "% Liquidata": st.column_config.NumberColumn("% Eseguita", format="%.1f%%")
-            },
-            hide_index=True,
-            use_container_width=True
+            }
         )
 
         st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
@@ -2652,22 +2547,14 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     apply_plotly_theme(fig_cum)
                     st.plotly_chart(fig_cum, use_container_width=True)
 
-                col_vwap_h1, col_vwap_h2 = st.columns([3.0, 1.0])
-                with col_vwap_h1:
-                    st.markdown("##### 📋 Tabella Dettagliata Tranche VWAP")
-                with col_vwap_h2:
-                    render_export_toolbar(
-                        df_vwap_sched,
-                        file_prefix="vwap_orders_schedule",
-                        key_suffix="vwap_sched",
-                        table_title="Tranche VWAP"
-                    )
-
-                st.dataframe(
+                render_table_with_export(
                     df_vwap_sched[[
                         "tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_progress_pct",
                         "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "pov_rate_pct"
                     ]],
+                    table_title="Tabella Dettagliata Tranche VWAP",
+                    file_prefix="vwap_orders_schedule",
+                    key_suffix="vwap_sched",
                     column_config={
                         "tranche_idx": st.column_config.NumberColumn("#", format="%d", width="small"),
                         "timestamp": st.column_config.TextColumn("Orario", width="small"),
@@ -2680,9 +2567,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                         "est_exec_price_eur": st.column_config.NumberColumn("Prezzo Esecuzione Stimato (€)", format="€ %,.2f"),
                         "est_slippage_bps": st.column_config.NumberColumn("Slippage (bps)", format="%.1f bps"),
                         "pov_rate_pct": st.column_config.NumberColumn("POV Rate", format="%.2f%%")
-                    },
-                    hide_index=True,
-                    use_container_width=True
+                    }
                 )
 
         with col_algo_tab2:
@@ -2746,22 +2631,14 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                     apply_plotly_theme(fig_cum_tw)
                     st.plotly_chart(fig_cum_tw, use_container_width=True)
 
-                col_twap_h1, col_twap_h2 = st.columns([3.0, 1.0])
-                with col_twap_h1:
-                    st.markdown("##### 📋 Tabella Dettagliata Tranche TWAP (Uniform Time Jitter)")
-                with col_twap_h2:
-                    render_export_toolbar(
-                        df_twap_sched,
-                        file_prefix="twap_orders_schedule",
-                        key_suffix="twap_sched",
-                        table_title="Tranche TWAP"
-                    )
-
-                st.dataframe(
+                render_table_with_export(
                     df_twap_sched[[
                         "tranche_idx", "timestamp", "ticker", "action", "slice_qty", "cum_progress_pct",
                         "order_notional_eur", "benchmark_price_eur", "est_exec_price_eur", "est_slippage_bps", "pov_rate_pct"
                     ]],
+                    table_title="Tabella Dettagliata Tranche TWAP (Uniform Time Jitter)",
+                    file_prefix="twap_orders_schedule",
+                    key_suffix="twap_sched",
                     column_config={
                         "tranche_idx": st.column_config.NumberColumn("#", format="%d", width="small"),
                         "timestamp": st.column_config.TextColumn("Orario", width="small"),
@@ -2774,9 +2651,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
                         "est_exec_price_eur": st.column_config.NumberColumn("Prezzo Esecuzione Stimato (€)", format="€ %,.2f"),
                         "est_slippage_bps": st.column_config.NumberColumn("Slippage (bps)", format="%.1f bps"),
                         "pov_rate_pct": st.column_config.NumberColumn("POV Rate", format="%.2f%%")
-                    },
-                    hide_index=True,
-                    use_container_width=True
+                    }
                 )
 
     else:
@@ -2963,19 +2838,21 @@ elif active_pos_tab == "🌿 Sostenibilità ESG & SFDR Desk":
         """, unsafe_allow_html=True)
 
     with col_sfdr_r:
-        st.markdown("##### 📊 Dettaglio ESG per Singolo Titolo")
-        st.dataframe(
-            esg_res["holdings_esg_df"][["ticker", "name", "weight_pct", "esg_score", "sfdr_classification", "carbon_intensity_tco2e", "controversy_level"]].rename(columns={
-                "ticker": "Ticker",
-                "name": "Denominazione",
-                "weight_pct": "Peso (%)",
-                "esg_score": "Score ESG",
-                "sfdr_classification": "SFDR",
-                "carbon_intensity_tco2e": "Carbon (tCO2e)",
-                "controversy_level": "Controversie"
-            }),
-            use_container_width=True,
-            hide_index=True
+        df_esg_show = esg_res["holdings_esg_df"][["ticker", "name", "weight_pct", "esg_score", "sfdr_classification", "carbon_intensity_tco2e", "controversy_level"]].rename(columns={
+            "ticker": "Ticker",
+            "name": "Denominazione",
+            "weight_pct": "Peso (%)",
+            "esg_score": "Score ESG",
+            "sfdr_classification": "SFDR",
+            "carbon_intensity_tco2e": "Carbon (tCO2e)",
+            "controversy_level": "Controversie"
+        })
+        render_table_with_export(
+            df_esg_show,
+            table_title="Dettaglio ESG per Singolo Titolo",
+            file_prefix="esg_holdings_detail",
+            key_suffix="esg_holdings",
+            pct_cols=["Peso (%)"]
         )
 
 # ── TAB 7: IMPLEMENTATION SHORTFALL & EXECUTION ─────────────

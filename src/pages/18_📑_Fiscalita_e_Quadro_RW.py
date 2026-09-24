@@ -31,8 +31,8 @@ from core.ui_utils import (
     fmt_pct,
     inject_custom_css,
     metric_card,
-    render_export_toolbar,
     render_page_header,
+    render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
     section,
@@ -143,35 +143,26 @@ with tab_rw:
     
     if fiscal["quadro_rw_rows"]:
         df_rw = pd.DataFrame(fiscal["quadro_rw_rows"])
-        
-        st.dataframe(
-            df_rw,
-            column_config={
-                "rigo": st.column_config.TextColumn("Rigo RW", width="small"),
-                "descrizione": st.column_config.TextColumn("Descrizione / Intermediario", width="large"),
-                "codice_investimento": st.column_config.NumberColumn("Cod. Investimento", width="small"),
-                "codice_stato_estero": st.column_config.TextColumn("Paese Estero", width="medium"),
-                "giacenza_media": st.column_config.NumberColumn("Giacenza Media (€)", format="€ %,.2f", width="medium"),
-                "valore_massimo": st.column_config.NumberColumn("Picco Max (€)", format="€ %,.2f", width="medium"),
-                "valore_finale": st.column_config.NumberColumn("Valore al 31/12 (€)", format="€ %,.2f", width="medium"),
-                "ivafe_dovuta": st.column_config.NumberColumn("IVAFE Dovuta (€)", format="€ %,.2f", width="medium"),
-                "monitoraggio_solo": st.column_config.TextColumn("Monitoraggio", width="medium")
-            },
-            hide_index=True,
-            use_container_width=True
+        rw_cfg = {
+            "rigo": st.column_config.TextColumn("Rigo RW", width="small"),
+            "descrizione": st.column_config.TextColumn("Descrizione / Intermediario", width="large"),
+            "codice_investimento": st.column_config.NumberColumn("Cod. Investimento", width="small"),
+            "codice_stato_estero": st.column_config.TextColumn("Paese Estero", width="medium"),
+            "giacenza_media": st.column_config.NumberColumn("Giacenza Media (€)", format="€ %,.2f", width="medium"),
+            "valore_massimo": st.column_config.NumberColumn("Picco Max (€)", format="€ %,.2f", width="medium"),
+            "valore_finale": st.column_config.NumberColumn("Valore al 31/12 (€)", format="€ %,.2f", width="medium"),
+            "ivafe_dovuta": st.column_config.NumberColumn("IVAFE Dovuta (€)", format="€ %,.2f", width="medium"),
+            "monitoraggio_solo": st.column_config.TextColumn("Monitoraggio", width="medium")
+        }
+        render_table_with_export(
+            df=df_rw,
+            table_title="Quadro RW (Monitoraggio Attività Estere)",
+            file_prefix=f"argus_quadro_rw_portfolio_{current_pid}",
+            key_suffix=f"p18_rw_{current_pid}",
+            column_config=rw_cfg,
+            hide_index=True
         )
-
-        st.write("")
-        c_export, c_note = st.columns([1.2, 2.8])
-        with c_export:
-            render_export_toolbar(
-                df_rw,
-                file_prefix=f"argus_quadro_rw_portfolio_{current_pid}",
-                key_suffix=f"p18_rw_{current_pid}",
-                table_title="Quadro RW"
-            )
-        with c_note:
-            st.info("💡 **Nota Normativa**: I conti correnti esteri con giacenza media annua inferiore a € 5.000 e picco massimo non superiore a € 15.000 non richiedono versamento IVAFE.")
+        st.info("💡 **Nota Normativa**: I conti correnti esteri con giacenza media annua inferiore a € 5.000 e picco massimo non superiore a € 15.000 non richiedono versamento IVAFE.")
     else:
         st.info("Nessuna attività finanziaria estera o crypto identificata per questo profilo patrimoniale.")
 
@@ -235,30 +226,23 @@ with tab_harvest:
 
     st.write("")
     st.write("")
-    c_th_title, c_th_exp = st.columns([4, 1.2])
-    with c_th_title:
-        st.markdown("##### 🎯 Opportunità di Tax-Loss Harvesting Rilevate")
     if tlh["harvesting_opportunities"]:
         df_th = pd.DataFrame(tlh["harvesting_opportunities"])
-        with c_th_exp:
-            render_export_toolbar(
-                df_th,
-                file_prefix=f"tax_loss_harvesting_{current_pid}",
-                key_suffix=f"p18_tlh_{current_pid}",
-                table_title="Tax-Loss Harvesting"
-            )
-        st.dataframe(
-            df_th[["asset", "tipo", "minus_latente", "risparmio_fiscale_26", "azione_consigliata", "priorita"]],
-            column_config={
-                "asset": st.column_config.TextColumn("Asset / Posizione", width="medium"),
-                "tipo": st.column_config.TextColumn("Classe", width="small"),
-                "minus_latente": st.column_config.NumberColumn("Minus Latente (€)", format="€ %,.2f", width="small"),
-                "risparmio_fiscale_26": st.column_config.NumberColumn("Risparmio 26% (€)", format="€ %,.2f", width="small"),
-                "azione_consigliata": st.column_config.TextColumn("Azione Consigliata", width="large"),
-                "priorita": st.column_config.TextColumn("Priorità", width="medium")
-            },
-            hide_index=True,
-            use_container_width=True
+        th_cfg = {
+            "asset": st.column_config.TextColumn("Asset / Posizione", width="medium"),
+            "tipo": st.column_config.TextColumn("Classe", width="small"),
+            "minus_latente": st.column_config.NumberColumn("Minus Latente (€)", format="€ %,.2f", width="small"),
+            "risparmio_fiscale_26": st.column_config.NumberColumn("Risparmio 26% (€)", format="€ %,.2f", width="small"),
+            "azione_consigliata": st.column_config.TextColumn("Azione Consigliata", width="large"),
+            "priorita": st.column_config.TextColumn("Priorità", width="medium")
+        }
+        render_table_with_export(
+            df=df_th[["asset", "tipo", "minus_latente", "risparmio_fiscale_26", "azione_consigliata", "priorita"]],
+            table_title="Opportunità di Tax-Loss Harvesting Rilevate",
+            file_prefix=f"tax_loss_harvesting_{current_pid}",
+            key_suffix=f"p18_tlh_{current_pid}",
+            column_config=th_cfg,
+            hide_index=True
         )
     else:
         st.info("Nessuna minusvalenza latente rilevata nel portafoglio.")

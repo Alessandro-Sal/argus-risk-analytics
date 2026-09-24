@@ -60,6 +60,7 @@ from core.ui_utils import (
     render_fama_french_modal,
     render_info_modal,
     render_segmented_tabs,
+    render_table_with_export,
     render_volatility_smile_modal,
     section,
 )
@@ -112,7 +113,7 @@ opt = results.get("optimization", {})
 
 render_sandbox_banner(page_key="p3")
 
-col_head1, col_head2 = st.columns([3.0, 1.3])
+col_head1, col_head2 = st.columns([3.0, 1.3], vertical_alignment="center")
 with col_head1:
     st.title("🔬 Modelli Quantitativi & Frontiera di Portafoglio")
     if "run_id" in st.session_state:
@@ -121,7 +122,6 @@ with col_head1:
         st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 
 with col_head2:
-    st.markdown('<div style="display: flex; justify-content: flex-end; margin-top: 24px;">', unsafe_allow_html=True)
     glossary_modal("📚 Glossario Istituzionale dei Modelli Quantitativi", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -687,6 +687,55 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 </div>
                 """, unsafe_allow_html=True)
 
+            mdp_info = opt.get("mdp", {})
+            mcvar_info = opt.get("min_cvar", {})
+            if mdp_info or mcvar_info:
+                mdp_dr = float(mdp_info.get("diversification_ratio", 1.0))
+                mdp_v = float(mdp_info.get("portfolio_volatility_pct", 0.0))
+                mcvar_ann = float(mcvar_info.get("cvar_annual_pct", 0.0))
+                mcvar_d = float(mcvar_info.get("cvar_daily_pct", 0.0))
+
+                st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
+                col_c4, col_c5 = st.columns(2)
+                with col_c4:
+                    st.markdown(f"""
+                    <div style="background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(168, 85, 247, 0.35); border-left: 4px solid #a855f7; border-radius: 12px; padding: 16px 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); height: 100%;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <div style="font-weight: 700; font-size: 15px; color: #ffffff;">💎 Massima Diversificazione (MDP)</div>
+                            <span class="argus-command-pill" style="border-color: rgba(168, 85, 247, 0.5); color: #a855f7; font-size: 10.5px; font-weight: 700;">CHOUEIFATY</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; text-align: center;">
+                            <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                                <div style="font-size: 10px; color: #8b949e; font-weight: 600;">DIVERSIFICATION RATIO</div>
+                                <div style="font-size: 16px; font-weight: 800; color: #a855f7;">{mdp_dr:.3f}</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                                <div style="font-size: 10px; color: #8b949e; font-weight: 600;">VOLATILITÀ STIMATA</div>
+                                <div style="font-size: 16px; font-weight: 800; color: #58a6ff;">{mdp_v:.2f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                with col_c5:
+                    st.markdown(f"""
+                    <div style="background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(14px); border: 1px solid rgba(239, 68, 68, 0.35); border-left: 4px solid #ef4444; border-radius: 12px; padding: 16px 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); height: 100%;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                            <div style="font-weight: 700; font-size: 15px; color: #ffffff;">🛡️ Minimo CVaR (Expected Shortfall)</div>
+                            <span class="argus-command-pill" style="border-color: rgba(239, 68, 68, 0.5); color: #ef4444; font-size: 10.5px; font-weight: 700;">ROCKAFELLAR LP</span>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; text-align: center;">
+                            <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                                <div style="font-size: 10px; color: #8b949e; font-weight: 600;">CVaR 95% ANNUO</div>
+                                <div style="font-size: 16px; font-weight: 800; color: #ef4444;">{mcvar_ann:.2f}%</div>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.03); padding: 8px 4px; border-radius: 8px;">
+                                <div style="font-size: 10px; color: #8b949e; font-weight: 600;">CVaR GIORNALIERO</div>
+                                <div style="font-size: 16px; font-weight: 800; color: #f97316;">{mcvar_d:.2f}%</div>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
         # ── SUPER-RIBILANCIATORE & SIMULATORE TATTICO UNIFICATO ───────────────────────
         st.divider()
         col_sb_h1, col_sb_h2 = st.columns([3.5, 1.2])
@@ -724,6 +773,8 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
             cur_w_map = _to_weight_map(opt.get("current", {}).get("weights"), tickers_in_opt)
             ms_w_map = _to_weight_map(opt.get("max_sharpe", {}).get("weights"), tickers_in_opt)
             mv_w_map = _to_weight_map(opt.get("min_vol", {}).get("weights"), tickers_in_opt)
+            mdp_w_map = _to_weight_map(opt.get("mdp", {}).get("weights"), tickers_in_opt)
+            mcvar_w_map = _to_weight_map(opt.get("min_cvar", {}).get("weights"), tickers_in_opt)
 
             # Mappa prezzi e quote attuali
             price_map = {}
@@ -790,7 +841,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                 st.rerun()
 
             st.markdown('<div style="font-size:12px; font-weight:700; color:#8b949e; margin: 8px 0 4px 0;">🎯 PRESET STRATEGICI & AZIONI RAPIDE:</div>', unsafe_allow_html=True)
-            col_p1, col_p2, col_p3, col_p4, col_p5, col_p6, col_p7 = st.columns(7)
+            col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns(5)
             with col_p1:
                 if st.button("⭐ Attuale", key="btn_pre_cur", use_container_width=True, help="Ripristina posizioni attuali"):
                     apply_target_strategy_weights(cur_w_map)
@@ -811,10 +862,18 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     hrp_res_t = compute_hrp_portfolio(df_ret_temp[tickers_in_opt] if not df_ret_temp.empty and all(t in df_ret_temp.columns for t in tickers_in_opt) else None)
                     hrp_w_dict = hrp_res_t.get("weights", {t: 1.0/len(tickers_in_opt) for t in tickers_in_opt}) if hrp_res_t else {t: 1.0/len(tickers_in_opt) for t in tickers_in_opt}
                     apply_target_strategy_weights(hrp_w_dict)
+
+            col_p6, col_p7, col_p8, col_p9 = st.columns(4)
             with col_p6:
+                if st.button("💎 Max Div (MDP)", key="btn_pre_mdp", use_container_width=True, help="Massima diversificazione Choueifaty"):
+                    apply_target_strategy_weights(mdp_w_map)
+            with col_p7:
+                if st.button("🛡️ Min-CVaR (LP)", key="btn_pre_mcvar", use_container_width=True, help="Minimizzazione Expected Shortfall"):
+                    apply_target_strategy_weights(mcvar_w_map)
+            with col_p8:
                 if st.button("⚖️ Equi-peso", key="btn_pre_eq", use_container_width=True, help="1/N capitale"):
                     apply_target_strategy_weights({t: 1.0 / len(tickers_in_opt) for t in tickers_in_opt})
-            with col_p7:
+            with col_p9:
                 if st.button("🧹 Azzera (0)", key="btn_pre_zero", use_container_width=True, help="Azzera tutto"):
                     apply_target_strategy_weights(dict.fromkeys(tickers_in_opt, 0.0))
 
@@ -1185,7 +1244,7 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
 
                 df_orders_exec = pd.DataFrame(table_rows)
 
-                col_ord_f1, col_ord_f2, col_ord_f3 = st.columns([2.0, 1.3, 0.9])
+                col_ord_f1, col_ord_f2, col_ord_f3 = st.columns([2.0, 1.3, 0.9], vertical_alignment="bottom")
                 with col_ord_f1:
                     search_ord = st.text_input("🔍 Cerca Titolo:", placeholder="Filtra per Ticker (es. GOOGL, BABA, MSFT)...", key="search_unified_rebal")
                 with col_ord_f2:
@@ -1202,7 +1261,6 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     df_orders_disp = df_orders_disp[df_orders_disp["Azione Tattica"].astype(str).str.contains("HOLD|MANTIENI", case=False, na=False)]
 
                 with col_ord_f3:
-                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                     render_export_toolbar(
                         df_orders_disp,
                         file_prefix="distinta_ordini_ribilanciamento",
@@ -1341,18 +1399,17 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                         "hrp_weight": "Peso Frazionario",
                         "hrp_weight_pct": "Allocazione Ottima HRP %"
                     })
-                    render_export_toolbar(
-                        df_hrp_display,
+                    hrp_cfg = {
+                        "Asset / Titolo": st.column_config.TextColumn("Asset / Titolo", width="medium"),
+                        "Allocazione Ottima HRP %": st.column_config.ProgressColumn("Allocazione Ottima HRP %", format="%.2f%%", min_value=0.0, max_value=100.0),
+                        "Peso Frazionario": st.column_config.NumberColumn("Peso Frazionario", format="%.4f")
+                    }
+                    render_table_with_export(
+                        df=df_hrp_display,
+                        table_title="Pesi Ottimali HRP",
                         file_prefix="pesi_ottimali_hrp",
                         key_suffix="mq_hrp",
-                        table_title="Pesi Ottimali HRP"
-                    )
-                    st.dataframe(
-                        df_hrp_display.style.format({
-                            "Allocazione Ottima HRP %": "{:.2f}%",
-                            "Peso Frazionario": "{:.4f}"
-                        }),
-                        use_container_width=True,
+                        column_config=hrp_cfg,
                         hide_index=True,
                         height=240
                     )
@@ -1425,18 +1482,17 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     "erc_weight_pct": "Peso ERC (%)",
                     "risk_contrib_pct": "Contributo al Rischio (%)"
                 })
-                render_export_toolbar(
-                    df_erc_disp,
+                erc_cfg = {
+                    "Asset": st.column_config.TextColumn("Asset", width="medium"),
+                    "Peso ERC (%)": st.column_config.ProgressColumn("Peso ERC (%)", format="%.2f%%", min_value=0.0, max_value=100.0),
+                    "Contributo al Rischio (%)": st.column_config.ProgressColumn("Contributo al Rischio (%)", format="%.2f%%", min_value=0.0, max_value=100.0)
+                }
+                render_table_with_export(
+                    df=df_erc_disp,
+                    table_title="Pesi Ottimali ERC",
                     file_prefix="pesi_ottimali_erc",
                     key_suffix="mq_erc",
-                    table_title="Pesi Ottimali ERC"
-                )
-                st.dataframe(
-                    df_erc_disp.style.format({
-                        "Peso ERC (%)": "{:.2f}%",
-                        "Contributo al Rischio (%)": "{:.2f}%"
-                    }),
-                    use_container_width=True,
+                    column_config=erc_cfg,
                     hide_index=True,
                     height=230
                 )
@@ -1508,9 +1564,9 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Spazio degli Stati, Azioni e Funzione di Ricompensa</div>
   <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Stato ($S_t \in \mathbb{R}^{3N}$):</b> Feature sub-vettoriali per asset (Sharpe Rolling 20g, Momentum Multi-Timeframe e Downside Volatility standardizzati via z-score cross-sectional).<br>
+    • <b>Stato ($S_t \in \mathbb{R}^{3N}$):</b> Feature sub-vettoriali per asset (Sharpe Rolling, Momentum Multi-Timeframe e Downside Volatility standardizzati via z-score cross-sectional).<br>
     • <b>Azione ($A_t \in \Delta^{N-1}$):</b> Vettore pesi sul simplesso ($\sum w_i = 1, w_i \ge 0$) generato tramite rete neurale a scoring condiviso (Permutation-Equivariant) e attivazione Softmax.<br>
-    • <b>Ricompensa ($R_t$):</b> $R_t = r_{p,t} - 2.0 \cdot \max(0, -r_{p,t}) - \text{Costi Turnover} + \beta_{\text{div}} \cdot (1 - \text{HHI}_t)$ (Sortino Reward con incentivo alla diversificazione).
+    • <b>Ricompensa ($R_t$):</b> Sortino/Sharpe normalizzato calcolato su volatilità rolling temporale con penalità per i costi di transazione e bonus di diversificazione ($1 - \text{HHI}_t$). Ribilanciamento periodico con deriva naturale dei prezzi per evitare l'overtrading.
   </div>
 </div>
 
@@ -1534,12 +1590,12 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
             st.info("Dati di serie storiche insufficienti per l'addestramento del modello di Reinforcement Learning.")
         else:
             # Control Bar di Configurazione dell'Agente
-            col_cfg1, col_cfg2, col_cfg3, col_cfg4 = st.columns([1.2, 1.6, 1.2, 1.2])
+            col_cfg1, col_cfg2, col_cfg3, col_cfg4, col_cfg5 = st.columns([1.1, 1.4, 1.1, 1.1, 1.1])
             with col_cfg1:
-                episodes_in = st.slider("Episodi di Addestramento", min_value=10, max_value=60, value=30, step=5, key="rl_episodes_slider")
+                episodes_in = st.slider("Episodi Addestramento", min_value=10, max_value=60, value=30, step=5, key="rl_episodes_slider")
             with col_cfg2:
                 reward_choice = st.selectbox(
-                    "Obiettivo di Ricompensa (Reward Function)",
+                    "Obiettivo Reward",
                     options=[
                         "Massimizzazione Sortino (Penalità Downside)",
                         "Massimizzazione Sharpe Ratio",
@@ -1549,29 +1605,58 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                 )
                 reward_key = "sortino" if "Sortino" in reward_choice else ("sharpe" if "Sharpe" in reward_choice else "min_vol")
             with col_cfg3:
-                lookback_w = st.slider("Finestra Lookback (Giorni)", min_value=15, max_value=50, value=25, step=5, key="rl_window_slider")
+                rebal_choice = st.selectbox(
+                    "Ribilanciamento",
+                    options=[
+                        "Mensile (~21 gg)",
+                        "Bi-settimanale (~10 gg)",
+                        "Settimanale (~5 gg)",
+                        "Trimestrale (~63 gg)",
+                        "Giornaliero (Alta Freq.)",
+                    ],
+                    index=0,
+                    key="rl_rebal_select"
+                )
+                rebal_map = {
+                    "Mensile (~21 gg)": 21,
+                    "Bi-settimanale (~10 gg)": 10,
+                    "Settimanale (~5 gg)": 5,
+                    "Trimestrale (~63 gg)": 63,
+                    "Giornaliero (Alta Freq.)": 1,
+                }
+                rebal_days = rebal_map[rebal_choice]
             with col_cfg4:
-                turnover_pen = st.slider("Penalità Turnover (%)", min_value=0.0, max_value=0.5, value=0.1, step=0.05, format="%.2f%%", key="rl_turnover_slider") / 100.0
+                lookback_w = st.slider("Lookback (gg)", min_value=15, max_value=50, value=25, step=5, key="rl_window_slider")
+            with col_cfg5:
+                turnover_pen = st.slider("Costo Turnover (%)", min_value=0.0, max_value=0.5, value=0.10, step=0.05, format="%.2f%%", key="rl_turnover_slider") / 100.0
 
             col_btn1, col_btn2 = st.columns([1.5, 3.5])
             with col_btn1:
                 run_rl_btn = st.button("⚡ Avvia Addestramento Agente RL", type="primary", use_container_width=True, key="btn_train_rl")
 
-            # Training Execution / Session State Cache
-            if run_rl_btn or "rl_portfolio_results" not in st.session_state:
+            # Training Execution / Session State Cache (Attivazione su richiesta tramite pulsante)
+            if run_rl_btn:
                 with st.spinner("🤖 Addestramento della Policy Neurale in corso con simulazione ad episodi..."):
                     rl_res = train_and_evaluate_rl_portfolio(
                         df_returns=df_returns_rl,
                         episodes=episodes_in,
                         window_size=lookback_w,
                         reward_type=reward_key,
-                        turnover_penalty=turnover_pen
+                        turnover_penalty=turnover_pen,
+                        rebalance_days=rebal_days,
                     )
                     st.session_state["rl_portfolio_results"] = rl_res
+                    if rl_res and rl_res.get("has_data"):
+                        st.toast("✅ Addestramento agente RL completato!", icon="🤖")
 
             rl_res = st.session_state.get("rl_portfolio_results")
 
-            if rl_res and rl_res.get("has_data"):
+            if rl_res is None:
+                st.markdown("<div style='height: 8px;'></div>", unsafe_allow_html=True)
+                st.info("💡 Configura i parametri sopra e clicca su **⚡ Avvia Addestramento Agente RL** per avviare la simulazione e confrontare l'agente con la strategia equiponderata (1/N).")
+            elif rl_res and not rl_res.get("has_data"):
+                st.warning("⚠️ Dati storici insufficienti o non validi per addestrare l'agente neurale.")
+            elif rl_res and rl_res.get("has_data"):
                 rl_stats = rl_res["rl_stats"]
                 ew_stats = rl_res["ew_stats"]
 
@@ -1580,19 +1665,55 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                 # ── KPI SCORECARD ROW ──
                 col_k1, col_k2, col_k3, col_k4, col_k5, col_k6 = st.columns(6)
                 with col_k1:
-                    metric_card("Rendimento Totale RL", f"{rl_stats['total_return_pct']:.2f}%", f"{rl_res['alpha_over_ew_pct']:+.2f}% vs 1/N", positive=(rl_res['alpha_over_ew_pct'] >= 0))
+                    diff_ret = rl_stats['total_return_pct'] - ew_stats['total_return_pct']
+                    metric_card(
+                        "Rendimento Totale RL",
+                        f"{rl_stats['total_return_pct']:.2f}%",
+                        f"{diff_ret:+.2f}% vs 1/N ({ew_stats['total_return_pct']:.1f}%)",
+                        is_positive=(diff_ret >= 0),
+                    )
                 with col_k2:
-                    metric_card("CAGR Annualizzato", f"{rl_stats['cagr_pct']:.2f}%", f"1/N: {ew_stats['cagr_pct']:.2f}%")
+                    diff_cagr = rl_stats['cagr_pct'] - ew_stats['cagr_pct']
+                    metric_card(
+                        "CAGR Annualizzato",
+                        f"{rl_stats['cagr_pct']:.2f}%",
+                        f"{diff_cagr:+.2f}% vs 1/N ({ew_stats['cagr_pct']:.2f}%)",
+                        is_positive=(diff_cagr >= 0),
+                    )
                 with col_k3:
-                    metric_card("Volatilità Ann.", f"{rl_stats['volatility_pct']:.2f}%", f"1/N: {ew_stats['volatility_pct']:.2f}%")
+                    diff_vol = rl_stats['volatility_pct'] - ew_stats['volatility_pct']
+                    # Volatilità più bassa è preferibile (differenziale negativo è positivo)
+                    metric_card(
+                        "Volatilità Ann.",
+                        f"{rl_stats['volatility_pct']:.2f}%",
+                        f"{diff_vol:+.2f}% vs 1/N ({ew_stats['volatility_pct']:.2f}%)",
+                        is_positive=(diff_vol <= 0),
+                    )
                 with col_k4:
                     diff_sh = rl_stats['sharpe_ratio'] - ew_stats['sharpe_ratio']
-                    metric_card("Sharpe Ratio", f"{rl_stats['sharpe_ratio']:.2f}", f"{diff_sh:+.2f} vs 1/N", positive=(diff_sh >= 0))
+                    metric_card(
+                        "Sharpe Ratio",
+                        f"{rl_stats['sharpe_ratio']:.2f}",
+                        f"{diff_sh:+.2f} vs 1/N ({ew_stats['sharpe_ratio']:.2f})",
+                        is_positive=(diff_sh >= 0),
+                    )
                 with col_k5:
                     diff_so = rl_stats['sortino_ratio'] - ew_stats['sortino_ratio']
-                    metric_card("Sortino Ratio", f"{rl_stats['sortino_ratio']:.2f}", f"{diff_so:+.2f} vs 1/N", positive=(diff_so >= 0))
+                    metric_card(
+                        "Sortino Ratio",
+                        f"{rl_stats['sortino_ratio']:.2f}",
+                        f"{diff_so:+.2f} vs 1/N ({ew_stats['sortino_ratio']:.2f})",
+                        is_positive=(diff_so >= 0),
+                    )
                 with col_k6:
-                    metric_card("Max Drawdown", f"{rl_stats['max_drawdown_pct']:.2f}%", f"1/N: {ew_stats['max_drawdown_pct']:.2f}%")
+                    diff_dd = rl_stats['max_drawdown_pct'] - ew_stats['max_drawdown_pct']
+                    # Max DD meno profondo (es. -40% > -50% => diff > 0) è preferibile
+                    metric_card(
+                        "Max Drawdown",
+                        f"{rl_stats['max_drawdown_pct']:.2f}%",
+                        f"{diff_dd:+.2f}% vs 1/N ({ew_stats['max_drawdown_pct']:.2f}%)",
+                        is_positive=(diff_dd >= 0),
+                    )
 
                 st.markdown("<div style='height: 14px;'></div>", unsafe_allow_html=True)
 
@@ -1686,22 +1807,6 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                     apply_plotly_theme(fig_area)
                     st.plotly_chart(fig_area, use_container_width=True)
 
-                # ── ALLOCATION SUMMARY TABLE & EXPORT ──
-                col_tbl1, col_tbl2 = st.columns([3.0, 1.2])
-                with col_tbl1:
-                    st.markdown("##### 📋 Pesi Target Raccomandati dall'Agente RL")
-                with col_tbl2:
-                    df_target_w = pd.DataFrame([
-                        {"Ticker": tk, "Peso RL Target (%)": round(rl_res["final_weights"].get(tk, 0.0) * 100.0, 2)}
-                        for tk in rl_res["tickers"]
-                    ])
-                    render_export_toolbar(
-                        df_target_w,
-                        file_prefix="pesi_target_rl_agent",
-                        key_suffix="mq_rl_weights",
-                        table_title="Pesi Target RL Agent"
-                    )
-
                 # Costruisci confronto con pesi attuali con rilevamento ticker robusto
                 target_rows = []
                 tot_val = float(pos["current_value"].sum()) if ("current_value" in pos.columns and pos["current_value"].sum() > 0) else 100_000.0
@@ -1721,17 +1826,21 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
                         "Azione Suggerita": "🟢 Incrementa" if delta_w > 1.0 else ("🔴 Riduci" if delta_w < -1.0 else "⚪ Mantieni")
                     })
 
-                st.dataframe(
-                    pd.DataFrame(target_rows),
-                    column_config={
-                        "Ticker": st.column_config.TextColumn("Ticker"),
-                        "Peso Attuale (%)": st.column_config.NumberColumn("Peso Attuale", format="%.2f%%"),
-                        "Peso RL Target (%)": st.column_config.NumberColumn("Peso Target RL", format="%.2f%%"),
-                        "Variazione Tattica (Δ)": st.column_config.NumberColumn("Variazione (Δ)", format="%+.2f%%"),
-                        "Azione Suggerita": st.column_config.TextColumn("Raccomandazione AI")
-                    },
-                    hide_index=True,
-                    use_container_width=True
+                df_target_comp = pd.DataFrame(target_rows)
+                rl_cfg = {
+                    "Ticker": st.column_config.TextColumn("Ticker"),
+                    "Peso Attuale (%)": st.column_config.NumberColumn("Peso Attuale", format="%.2f%%"),
+                    "Peso RL Target (%)": st.column_config.NumberColumn("Peso Target RL", format="%.2f%%"),
+                    "Variazione Tattica (Δ)": st.column_config.NumberColumn("Variazione (Δ)", format="%+.2f%%"),
+                    "Azione Suggerita": st.column_config.TextColumn("Raccomandazione AI")
+                }
+                render_table_with_export(
+                    df=df_target_comp,
+                    table_title="Pesi Target Raccomandati dall'Agente RL",
+                    file_prefix="pesi_target_rl_agent",
+                    key_suffix="mq_rl_weights",
+                    column_config=rl_cfg,
+                    hide_index=True
                 )
 
 # ── TAB 3: TAIL COPULA & KELLY SIZING ────────────────────────────
@@ -1942,24 +2051,12 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
         # Tabella Coppie a Rischio Contagio & Indice di Rottura della Diversificazione
         contagion = copula_res.get("contagion_pairs", [])
         if contagion:
-            col_cont_h1, col_cont_h2 = st.columns([3.5, 0.9])
-            with col_cont_h1:
-                st.markdown(r"##### ⚠️ Alert Coppie ad Alto Contagio di Coda ($\lambda_L \ge 0.30$)")
-                st.caption("Queste coppie mostrano un picco di correlazione durante i crolli di mercato (*'In a crisis, all correlations go to 1'*), azzerando l'effetto protettivo della diversificazione.")
+            st.caption("Queste coppie mostrano un picco di correlazione durante i crolli di mercato (*'In a crisis, all correlations go to 1'*), azzerando l'effetto protettivo della diversificazione.")
             
             df_cont = pd.DataFrame(contagion).rename(columns={
                 "pair": "Coppia Asset", "lambda_lower": "Lower Tail (λ_L)",
                 "lambda_upper": "Upper Tail (λ_U)", "asymmetry": "Asimmetria di Coda", "risk_level": "Livello Rischio"
             })
-
-            with col_cont_h2:
-                st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-                render_export_toolbar(
-                    df_cont,
-                    file_prefix="coppie_contagio_tail_risk",
-                    key_suffix="mq_contagion",
-                    table_title="Coppie Contagio Tail Risk"
-                )
 
             cont_cfg = {
                 "Coppia Asset": st.column_config.TextColumn("Coppia Asset", width="medium"),
@@ -1968,7 +2065,14 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
                 "Asimmetria di Coda": st.column_config.NumberColumn("Asimmetria (λ_L - λ_U)", format="%+.3f"),
                 "Livello Rischio": st.column_config.TextColumn("Livello Rischio", width="small")
             }
-            st.dataframe(df_cont, column_config=cont_cfg, use_container_width=True, hide_index=True)
+            render_table_with_export(
+                df=df_cont,
+                table_title="Alert Coppie ad Alto Contagio di Coda (λ_L ≥ 0.30)",
+                file_prefix="coppie_contagio_tail_risk",
+                key_suffix="mq_contagion",
+                column_config=cont_cfg,
+                hide_index=True
+            )
 
         st.divider()
 
@@ -1993,7 +2097,7 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
         df_kelly = compute_kelly_criterion_sizing(df_returns_all, current_weights=cur_w_k, risk_free_rate=rf_rate)
         
         if not df_kelly.empty:
-            col_k_f1, col_k_f2, col_k_f3 = st.columns([2.0, 1.3, 0.9])
+            col_k_f1, col_k_f2, col_k_f3 = st.columns([2.0, 1.3, 0.9], vertical_alignment="bottom")
             with col_k_f1:
                 search_k = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker (es. AAPL, BTC, ETH, GOOGL)...", key="search_kelly_ticker")
             with col_k_f2:
@@ -2012,7 +2116,6 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
                 df_k_filt = df_k_filt[df_k_filt["Stato Allocazione"].astype(str).str.contains("Nessun|Zero", case=False, na=False)]
 
             with col_k_f3:
-                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                 render_export_toolbar(
                     df_k_filt,
                     file_prefix="kelly_criterion_sizing",
@@ -2402,10 +2505,7 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
             st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
             # ── RIGA 2: MATRICE DELLE PROBABILITÀ & RISK PROFILE ───────────
-            col_mo_h1, col_mo_h2 = st.columns([3.5, 0.9])
-            with col_mo_h1:
-                st.markdown("#### 🎯 Matrice delle Probabilità & Risk Profile")
-                st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
+            st.caption("Valutazione quantitativa delle probabilità di successo e degli scenari di stress drawdown su 3.000 path simulati.")
             
             df_odds = pd.DataFrame([
                 {"Scenario Stocastico": "🟢 Probabilità di Profitto", "Probabilità / Valore": f"{mc_adv['prob_profit_pct']:.1f}%", "Condizione": "Rendimento Finale > 0%"},
@@ -2417,21 +2517,19 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
                 {"Scenario Stocastico": "💥 Max Drawdown Simulato Worst 1%", "Probabilità / Valore": f"{mc_adv['p99_max_drawdown_pct']:.2f}%", "Condizione": "Peggior drawdown nell'1% dei percorsi estremi"}
             ])
 
-            with col_mo_h2:
-                st.markdown('<div style="margin-top: 10px;"></div>', unsafe_allow_html=True)
-                render_export_toolbar(
-                    df_odds,
-                    file_prefix="monte_carlo_odds_matrix",
-                    key_suffix="mq_mc_odds",
-                    table_title="Matrice Odds Monte Carlo"
-                )
-
             odds_cfg = {
                 "Scenario Stocastico": st.column_config.TextColumn("Scenario Stocastico", width="medium"),
                 "Probabilità / Valore": st.column_config.TextColumn("Probabilità / Valore", width="small"),
                 "Condizione": st.column_config.TextColumn("Condizione di Verifica", width="large")
             }
-            st.dataframe(df_odds, column_config=odds_cfg, use_container_width=True, hide_index=True)
+            render_table_with_export(
+                df=df_odds,
+                table_title="Matrice delle Probabilità & Risk Profile",
+                file_prefix="monte_carlo_odds_matrix",
+                key_suffix="mq_mc_odds",
+                column_config=odds_cfg,
+                hide_index=True
+            )
 
         else:
             st.info("Simulazione Monte Carlo non disponibile per gli asset selezionati.")
@@ -2632,19 +2730,7 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
                 "Sharpe Implicito": ((df_cl["cagr"] - 2.75) / df_cl["volatility"].replace(0, np.nan)).fillna(0.0).round(2)
             })
 
-            col_cl_t1, col_cl_t2, col_cl_t3 = st.columns([2.4, 1.2, 0.9])
-            with col_cl_t1:
-                st.markdown("##### 📋 Dettaglio Asset per Cluster di Rischio")
-            with col_cl_t2:
-                search_cl = st.text_input("🔍 Cerca Ticker:", placeholder="Filtra per Ticker...", key="search_km_cluster", label_visibility="collapsed")
-            with col_cl_t3:
-                render_export_toolbar(
-                    df_cl_table,
-                    file_prefix="asset_clusters_kmeans",
-                    key_suffix="mq_kmeans",
-                    table_title="Cluster Asset K-Means"
-                )
-
+            search_cl = st.text_input("🔍 Cerca Ticker nei Cluster:", placeholder="Filtra per Ticker...", key="search_km_cluster")
             df_cl_filt = df_cl_table.copy()
             if search_cl:
                 df_cl_filt = df_cl_filt[df_cl_filt["Ticker"].str.contains(search_cl.strip(), case=False, na=False)]
@@ -2656,11 +2742,12 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
                 "CAGR %": st.column_config.NumberColumn("CAGR %", format="%+.2f%%"),
                 "Sharpe Implicito": st.column_config.NumberColumn("Sharpe Implicito", format="%.2f")
             }
-
-            st.dataframe(
-                df_cl_filt,
+            render_table_with_export(
+                df=df_cl_filt,
+                table_title="Dettaglio Asset per Cluster di Rischio",
+                file_prefix="asset_clusters_kmeans",
+                key_suffix="mq_kmeans",
                 column_config=cl_col_config,
-                use_container_width=True,
                 hide_index=True
             )
         else:
@@ -3083,7 +3170,7 @@ elif active_quant_tab == "🛡️ Hedging & Opzioni":
         ) if isinstance(pos_active_cc, pd.DataFrame) and not pos_active_cc.empty else pd.DataFrame()
 
         if not df_cov_call.empty:
-            col_cc_f1, col_cc_f2, col_cc_f3 = st.columns([2.0, 1.3, 0.9])
+            col_cc_f1, col_cc_f2, col_cc_f3 = st.columns([2.0, 1.3, 0.9], vertical_alignment="bottom")
             with col_cc_f1:
                 search_cc = st.text_input("🔍 Cerca Ticker:", placeholder="Digita ticker per filtrare (es. BTC, GOOGL, AMZN)...", key="search_cov_call")
             with col_cc_f2:
@@ -3118,7 +3205,6 @@ elif active_quant_tab == "🛡️ Hedging & Opzioni":
                 })
 
                 with col_cc_f3:
-                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                     render_export_toolbar(
                         df_cov_show,
                         file_prefix="strategia_covered_call",
@@ -3355,13 +3441,14 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                         path=[px.Constant("Allocazione Black-Litterman"), "Ticker"],
                         values="BL Weight %",
                         color="BL Return %",
+                        custom_data=["BL Return %"],
                         color_continuous_scale=[[0.0, "#0f172a"], [0.5, "#1e3a8a"], [1.0, "#38bdf8"]],
                         labels={"BL Weight %": "Peso Target %", "BL Return %": "Rendimento BL %"}
                     )
                     fig_bl_tm.update_traces(
                         textinfo="label+value",
-                        texttemplate="<b>%{label}</b><br>%{value:.2f}%<br><span style='font-size:10.5px;'>Ret: %{color:.2f}%</span>",
-                        hovertemplate="<b>Asset: %{label}</b><br>🎯 Peso Target BL: <b>%{value:.2f}%</b><br>📈 Rendimento Atteso: <b>%{color:.2f}%</b><extra></extra>"
+                        texttemplate="<b>%{label}</b><br>%{value:.2f}%<br><span style='font-size:10.5px;'>Ret: %{customdata[0]:.2f}%</span>",
+                        hovertemplate="<b>Asset: %{label}</b><br>🎯 Peso Target BL: <b>%{value:.2f}%</b><br>📈 Rendimento Atteso: <b>%{customdata[0]:.2f}%</b><extra></extra>"
                     )
                     fig_bl_tm.update_layout(
                         height=310,
@@ -3406,18 +3493,7 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                     st.plotly_chart(fig_bl_bar, use_container_width=True)
 
                 # ── RIGA 2: TABELLA INTERATTIVA AD ALTEZZA COMPATTA CON FILTRI ───────
-                col_bl_f1, col_bl_f2 = st.columns([3.2, 0.9])
-                with col_bl_f1:
-                    search_bl = st.text_input("🔍 Cerca Ticker nella Tabella Black-Litterman:", placeholder="Filtra per Ticker (es. GOOGL, BTC, ETH)...", key="search_bl_ticker")
-                with col_bl_f2:
-                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                    render_export_toolbar(
-                        df_bl,
-                        file_prefix="black_litterman_weights",
-                        key_suffix="mq_bl_weights",
-                        table_title="Pesi Black-Litterman"
-                    )
-
+                search_bl = st.text_input("🔍 Cerca Ticker nella Tabella Black-Litterman:", placeholder="Filtra per Ticker (es. GOOGL, BTC, ETH)...", key="search_bl_ticker")
                 df_bl_filt = df_bl.copy()
                 if search_bl:
                     df_bl_filt = df_bl_filt[df_bl_filt["Ticker"].astype(str).str.contains(search_bl.strip(), case=False, na=False)]
@@ -3428,10 +3504,12 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                     "BL Return %": st.column_config.NumberColumn("BL Return", format="%.2f%%"),
                     "BL Weight %": st.column_config.ProgressColumn("BL Target Weight", format="%.2f%%", min_value=0.0, max_value=100.0)
                 }
-                st.dataframe(
-                    df_bl_filt,
+                render_table_with_export(
+                    df=df_bl_filt,
+                    table_title="Pesi Black-Litterman",
+                    file_prefix="black_litterman_weights",
+                    key_suffix="mq_bl_weights",
                     column_config=bl_cfg,
-                    use_container_width=True,
                     hide_index=True,
                     height=280
                 )
@@ -3640,19 +3718,7 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             st.caption(f"Bontà di Adattamento OLS: **R² = {r2_val*100:.1f}%** | **Adj R² = {ff_res.get('adj_r_squared', 0.0)*100:.1f}%**")
 
         # Tabella Econometrica dei Parametri
-        # Tabella Econometrica dei Parametri
         if not df_ff_factors.empty:
-            col_ff_h1, col_ff_h2 = st.columns([3.5, 0.9])
-            with col_ff_h1:
-                st.markdown("##### 📋 Tabella Econometrica di Regressione OLS & Test di Ipotesi")
-            with col_ff_h2:
-                render_export_toolbar(
-                    df_ff_factors,
-                    file_prefix="fama_french_factor_regression",
-                    key_suffix="mq_fama_french",
-                    table_title="Fama-French Factor Regression"
-                )
-
             df_ff_show = df_ff_factors.rename(columns={
                 "factor": "Fattore di Rischio",
                 "beta": "Coefficiente Beta (β)",
@@ -3676,10 +3742,12 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                 "Significatività (95%)": st.column_config.TextColumn("Significatività (95%)", width="medium"),
                 "Contributo Rendimento Annuo (%)": st.column_config.NumberColumn("Contributo Rend. Annuo", format="%+.2f%%")
             }
-            st.dataframe(
-                df_ff_show,
+            render_table_with_export(
+                df=df_ff_show,
+                table_title="Tabella Econometrica di Regressione OLS & Test di Ipotesi",
+                file_prefix="fama_french_factor_regression",
+                key_suffix="mq_fama_french",
                 column_config=ff_cfg,
-                use_container_width=True,
                 hide_index=True
             )
 
@@ -3690,7 +3758,7 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             st.caption("Traccia nel tempo come cambiano i Beta di rischio sistemico e di stile del portafoglio (evidenziando cambi di regime o drift stilistici).")
             
             all_factors = [c for c in df_roll_b.columns if c != "Alpha (Ann)"]
-            col_rf1, col_rf2 = st.columns([3.2, 1.0])
+            col_rf1, col_rf2 = st.columns([3.2, 1.0], vertical_alignment="bottom")
             with col_rf1:
                 selected_factors = st.multiselect(
                     "🔍 Filtra Fattori da visualizzare nel Grafico:",
@@ -3699,7 +3767,6 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                     key="rolling_factors_filter"
                 )
             with col_rf2:
-                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                 render_export_toolbar(
                     df_roll_b.reset_index() if isinstance(df_roll_b.index, pd.DatetimeIndex) else df_roll_b,
                     file_prefix="rolling_factor_betas_60d",
@@ -3903,27 +3970,18 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
             metric_card("Alpha Multi-Fattoriale (α)", f"{barra_res.get('alpha_annualized', 0.0)*100:+.2f}%", "MSCI Barra 5-Factor", True)
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
-        col_bar_h1, col_bar_h2 = st.columns([3.5, 1.2])
-        with col_bar_h1:
-            st.markdown("##### 📋 Tabella di Dettaglio dei Fattori MSCI Barra")
-        with col_bar_h2:
-            render_export_toolbar(
-                df_barra,
-                file_prefix="msci_barra_factors",
-                key_suffix="mq_msci_barra",
-                table_title="Fattori MSCI Barra"
-            )
-
         barra_cfg = {
             "Fattore Barra": st.column_config.TextColumn("Fattore Barra", width="medium"),
             "Beta Fattoriale": st.column_config.NumberColumn("Beta Fattoriale", format="%+.3f"),
             "Statistica t": st.column_config.NumberColumn("Statistica t", format="%+.2f"),
             "Significatività (95%)": st.column_config.TextColumn("Significatività (95%)", width="medium")
         }
-        st.dataframe(
-            df_barra,
+        render_table_with_export(
+            df=df_barra,
+            table_title="Tabella di Dettaglio dei Fattori MSCI Barra",
+            file_prefix="msci_barra_factors",
+            key_suffix="mq_msci_barra",
             column_config=barra_cfg,
-            use_container_width=True,
             hide_index=True
         )
 
@@ -4106,30 +4164,22 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
                 st.plotly_chart(fig_bar_q, use_container_width=True, config={"displayModeBar": False})
 
             # Tabella Dettagliata Analytics per Quintile
-            col_t_h1, col_t_h2 = st.columns([3.2, 1.0])
-            with col_t_h1:
-                st.markdown("##### 📋 Tabella Comparativa di Performance e Rischio per Quintile")
-            with col_t_h2:
-                render_export_toolbar(
-                    fq_res["metrics_df"],
-                    file_prefix=f"factor_quintile_{fact_choice.lower()}",
-                    key_suffix="mq_factor_quintiles",
-                    table_title=f"Factor Quintile ({fact_choice})"
-                )
-
-            st.dataframe(
-                fq_res["metrics_df"],
-                column_config={
-                    "Quintile": st.column_config.TextColumn("Paniere Quintile", width="medium"),
-                    "Rendimento Annuo CAGR %": st.column_config.NumberColumn("CAGR Ann %", format="%+.2f%%"),
-                    "Volatilità Annua %": st.column_config.NumberColumn("Volatilità %", format="%.2f%%"),
-                    "Sharpe Ratio": st.column_config.NumberColumn("Sharpe Ratio", format="%.2f"),
-                    "Max Drawdown %": st.column_config.NumberColumn("Max Drawdown", format="%.2f%%"),
-                    "Win Rate Mensile %": st.column_config.NumberColumn("Win Rate Mensile", format="%.1f%%"),
-                    "Information Ratio vs Univ": st.column_config.NumberColumn("Information Ratio", format="%.2f")
-                },
-                hide_index=True,
-                use_container_width=True
+            fq_cfg = {
+                "Quintile": st.column_config.TextColumn("Paniere Quintile", width="medium"),
+                "Rendimento Annuo CAGR %": st.column_config.NumberColumn("CAGR Ann %", format="%+.2f%%"),
+                "Volatilità Annua %": st.column_config.NumberColumn("Volatilità %", format="%.2f%%"),
+                "Sharpe Ratio": st.column_config.NumberColumn("Sharpe Ratio", format="%.2f"),
+                "Max Drawdown %": st.column_config.NumberColumn("Max Drawdown", format="%.2f%%"),
+                "Win Rate Mensile %": st.column_config.NumberColumn("Win Rate Mensile", format="%.1f%%"),
+                "Information Ratio vs Univ": st.column_config.NumberColumn("Information Ratio", format="%.2f")
+            }
+            render_table_with_export(
+                df=fq_res["metrics_df"],
+                table_title="Tabella Comparativa di Performance e Rischio per Quintile",
+                file_prefix=f"factor_quintile_{fact_choice.lower()}",
+                key_suffix="mq_factor_quintiles",
+                column_config=fq_cfg,
+                hide_index=True
             )
         else:
             st.info(fq_res.get("message", "Dati non sufficienti per calcolare il backtest a quintili."))
@@ -4483,7 +4533,7 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
 
     with col_plot2:
         df_cds = cds_res["default_probability_curve"]
-        col_cds_h1, col_cds_h2 = st.columns([2.0, 1.2])
+        col_cds_h1, col_cds_h2 = st.columns([2.0, 1.2], vertical_alignment="center")
         with col_cds_h1:
             st.markdown("##### 🛡️ Curva Default Implicita (CDS)")
         with col_cds_h2:
@@ -4518,17 +4568,6 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
     # Tabella di Sensibilità a Shock di Rendimento
     st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
     df_sens = bond_res["sensitivity_table"].copy()
-    col_sens_h1, col_sens_h2 = st.columns([3.0, 1.0])
-    with col_sens_h1:
-        st.markdown("##### 📋 Matrice di Sensibilità Istituzionale a Shock di Tasso (Basis Points Shock)")
-    with col_sens_h2:
-        render_export_toolbar(
-            df_sens,
-            file_prefix=f"bond_sensitivity_{preset_choice.lower()}",
-            key_suffix="mq_bond_sens",
-            table_title="Matrice Sensibilità Shock Tasso"
-        )
-    
     sens_cfg = {
         "shift_bps": st.column_config.NumberColumn("Shock Tasso", format="%+d bps"),
         "new_ytm_pct": st.column_config.NumberColumn("Nuovo YTM", format="%.3f%%"),
@@ -4538,10 +4577,12 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
         "pct_change_duration_plus_convexity": st.column_config.NumberColumn("Stima Duration + Convexity", format="%+.2f%%"),
         "convexity_gain_pct": st.column_config.NumberColumn("Vantaggio Convessità", format="%+.2f%%")
     }
-    st.dataframe(
-        df_sens,
+    render_table_with_export(
+        df=df_sens,
+        table_title="Matrice di Sensibilità Istituzionale a Shock di Tasso",
+        file_prefix=f"bond_sensitivity_{preset_choice.lower()}",
+        key_suffix="mq_bond_sens",
         column_config=sens_cfg,
-        use_container_width=True,
         hide_index=True
     )
 
@@ -4675,22 +4716,15 @@ elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
             metric_card("Costo Frizione Totale", fmt_eur(full_reb["total_friction_drag_eur"]), delta="Impatto su Performance", delta_color="inverse")
 
         st.write("")
-        st.markdown("##### 📋 Trade Execution List (Distinta Ordini Pronta per il Broker)")
         df_exec = full_reb["trade_execution_list_df"]
         if not df_exec.empty:
-            st.dataframe(
-                df_exec,
-                use_container_width=True,
+            render_table_with_export(
+                df=df_exec,
+                table_title="Trade Execution List (Distinta Ordini Pronta per il Broker)",
+                file_prefix="trade_execution_list",
+                key_suffix="mq_trade_exec",
                 hide_index=True
             )
-            col_d_csv, _ = st.columns([1.5, 3.5])
-            with col_d_csv:
-                render_export_toolbar(
-                    df_exec,
-                    file_prefix="trade_execution_list",
-                    key_suffix="mq_trade_exec",
-                    table_title="Distinta Ordini Esecutivi"
-                )
         else:
             st.success("✅ Portafoglio già perfettamente allineato ai pesi target!")
 

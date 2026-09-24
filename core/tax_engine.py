@@ -370,7 +370,10 @@ def compute_zainetto_timeline(df_yearly: pd.DataFrame, current_year: int = None)
     Le minusvalenze generate nell'anno T sono compensabili con plusvalenze da redditi diversi
     fino al 31 dicembre dell'anno T+4.
     """
-    if df_yearly is None or df_yearly.empty:
+    if isinstance(df_yearly, dict):
+        df_yearly = df_yearly.get("yearly_breakdown", df_yearly.get("tax_by_year", pd.DataFrame()))
+
+    if df_yearly is None or not isinstance(df_yearly, pd.DataFrame) or df_yearly.empty:
         return pd.DataFrame(
             columns=[
                 "origin_year",
@@ -721,6 +724,18 @@ def compute_modello_redditi_pf(
     - Quadro RT (Sezione II - Plusvalenze su partecipazioni non qualificate / titoli esteri / crypto)
     - Quadro RW (Monitoraggio fiscale attività patrimoniali e finanziarie estere & IVAFE)
     """
+    # Support both compute_modello_redditi_pf(results) and compute_modello_redditi_pf(pos, results)
+    if isinstance(results, pd.DataFrame):
+        if isinstance(tax_year, dict):
+            actual_results = tax_year.copy()
+            actual_results["positions"] = results
+            results = actual_results
+            tax_year = None
+        else:
+            results = {"positions": results}
+    elif not isinstance(results, dict):
+        results = {}
+
     pos = results.get("positions", pd.DataFrame())
     df_tx = results.get("df_tx", pd.DataFrame())
 
@@ -940,6 +955,7 @@ def compute_modello_redditi_pf(
         "df_quadro_rm": df_rm,
         "summary": {
             "imposta_sostitutiva_rt_eur": round(imposta_sostitutiva, 2),
+            "imposta_sostitutiva_rt26_eur": round(imposta_sostitutiva, 2),
             "totale_ivafe_rw_eur": round(tot_ivafe_due, 2),
             "imposta_sostitutiva_rm_eur": round(tot_tax_rm, 2),
             "totale_debito_dichiarativo_eur": round(totale_debito_dichiarativo, 2),
@@ -1102,11 +1118,6 @@ def simulate_fifo_lot_sale(
     df_tx = results.get("df_tx", pd.DataFrame())
 
     ticker_pos = pos[pos["ticker"] == ticker] if not pos.empty and "ticker" in pos.columns else pd.DataFrame()
-    curr_mkt_price = (
-        float(ticker_pos["current_price"].values[0])
-        if not ticker_pos.empty and "current_price" in ticker_pos.columns
-        else 100.0
-    )
     total_qty_held = (
         float(ticker_pos["qty_net"].values[0]) if not ticker_pos.empty and "qty_net" in ticker_pos.columns else 0.0
     )
@@ -1115,6 +1126,16 @@ def simulate_fifo_lot_sale(
         if not ticker_pos.empty and "asset_class" in ticker_pos.columns
         else "Equity"
     )
+
+    curr_mkt_price = 100.0
+    if not ticker_pos.empty:
+        for c in ["last_price", "current_price", "price", "Prezzo Mkt (€)"]:
+            if c in ticker_pos.columns and pd.notna(ticker_pos[c].values[0]) and float(ticker_pos[c].values[0]) > 0:
+                curr_mkt_price = float(ticker_pos[c].values[0])
+                break
+        else:
+            if "current_value" in ticker_pos.columns and total_qty_held > 0:
+                curr_mkt_price = float(ticker_pos["current_value"].values[0]) / total_qty_held
 
     exec_price = float(sale_price) if (sale_price is not None and sale_price > 0) else curr_mkt_price
     tax_rate = get_asset_tax_rate(ac, ticker)
@@ -1146,12 +1167,17 @@ def simulate_fifo_lot_sale(
 
     # Fallback sintetico se non ci sono transazioni storiche nel database
     if not open_lots and total_qty_held > 0:
-        cost_basis = (
-            float(ticker_pos["cost_basis_eur"].values[0])
-            if "cost_basis_eur" in ticker_pos.columns
-            else exec_price * 0.90
-        )
-        open_lots.append({"date": "Lotto Aperto (Storico)", "qty": total_qty_held, "price": cost_basis})
+        unit_cost = exec_price * 0.90
+        for c in ["avg_cost", "wacp", "cost_basis_eur", "cost_basis"]:
+            if c in ticker_pos.columns and pd.notna(ticker_pos[c].values[0]):
+                v = float(ticker_pos[c].values[0])
+                if c in ["avg_cost", "wacp"]:
+                    unit_cost = v
+                    break
+                elif total_qty_held > 0:
+                    unit_cost = v / total_qty_held
+                    break
+        open_lots.append({"date": "Lotto Aperto (Storico)", "qty": total_qty_held, "price": unit_cost})
 
     # Simulazione scarico FIFO
     target_sell = min(float(qty_to_sell), total_qty_held) if total_qty_held > 0 else float(qty_to_sell)

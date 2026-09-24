@@ -501,6 +501,11 @@ with tab_ingest:
         current_wf_step = 3
 
     section("① Carica la Sorgente Dati (Multi-Broker Ingestion Hub, CSV Standard o Google Sheets)")
+    col_sec1_h1, col_sec1_h2 = st.columns([3.2, 1.1])
+    with col_sec1_h1:
+        st.caption("Importa e consolida transazioni da oltre 10 broker internazionali, sincronizza da Google Sheets o scarica il template CSV standard ARGUS.")
+    with col_sec1_h2:
+        render_broker_hub_modal(use_popover=False)
 
     template_csv = """tx_date,ticker,tx_type,quantity,price,currency,fees,asset_class,notes
 2021-03-15,AAPL,buy,10,121.03,USD,1.50,stock,Esempio acquisto
@@ -590,7 +595,7 @@ with tab_ingest:
                     if st.button(lbl_h, key="btn_load_arch_hnwi", type="secondary", use_container_width=True, help="Carica i dati su DB e sessione senza avviare subito il calcolo."):
                         _execute_archetype_load("hnwi_family", auto_run=False)
 
-    col_ds_sel, col_ds_modal, col_ds_tpl = st.columns([2.6, 1.0, 1.0])
+    col_ds_sel, col_ds_tpl = st.columns([3.2, 1.2], vertical_alignment="bottom")
     with col_ds_sel:
         data_source = st.selectbox(
             "Sorgente Dati / Piattaforma Broker",
@@ -609,11 +614,7 @@ with tab_ingest:
             ],
             help="Seleziona il broker da cui proviene il file CSV oppure usa 'Auto-Detect' per il riconoscimento automatico intelligente."
         )
-    with col_ds_modal:
-        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-        render_broker_hub_modal(use_popover=False)
     with col_ds_tpl:
-        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
         st.download_button(
             "⬇️ Template CSV",
             data=template_csv,
@@ -1822,7 +1823,7 @@ with tab_diagnostics:
 
     with tab_diag_logs:
         st.markdown("##### 📜 Registro Eventi Strutturato & Audit Trail Contabile")
-        col_l_chan, col_l_level, col_l_limit, col_l_ref = st.columns([1.5, 1.2, 1.0, 0.8])
+        col_l_chan, col_l_level, col_l_limit, col_l_ref = st.columns([1.5, 1.2, 1.0, 0.8], vertical_alignment="bottom")
         with col_l_chan:
             sel_channel = st.selectbox(
                 "Canale Registro",
@@ -1845,7 +1846,6 @@ with tab_diagnostics:
                 key="diag_sel_limit"
             )
         with col_l_ref:
-            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
             if st.button("🔄 Ricarica", key="diag_btn_reload_logs", use_container_width=True):
                 st.rerun()
 

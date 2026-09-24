@@ -34,10 +34,10 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_data_table,
-    render_export_toolbar,
     render_kpi_card,
     render_omni_command_bar,
     render_page_header,
+    render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
     section,
@@ -341,17 +341,22 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
         "notes": "Note"
     }
     df_disp = df_disp.rename(columns=col_names)
-
-    st.dataframe(df_disp, use_container_width=True, hide_index=True)
-
-    c_m_sp, c_m_exp = st.columns([3.5, 1.5])
-    with c_m_exp:
-        render_export_toolbar(
-            df_disp,
-            file_prefix=f"argus_flusso_{node_name.replace(' ', '_').lower()}",
-            key_suffix=f"cf_modal_{node_name.replace(' ', '_')}",
-            table_title=f"Transazioni {node_name}"
-        )
+    cf_modal_cfg = {
+        "Data": st.column_config.DateColumn("Data", format="YYYY-MM-DD"),
+        "Descrizione / Esercente": st.column_config.TextColumn("Descrizione / Esercente", width="medium"),
+        "Conto / Carta": st.column_config.TextColumn("Conto / Carta", width="small"),
+        "Importo": st.column_config.NumberColumn("Importo (€)", format="€ %,.2f"),
+        "Categoria": st.column_config.TextColumn("Categoria", width="small"),
+        "Note": st.column_config.TextColumn("Note", width="medium")
+    }
+    render_table_with_export(
+        df=df_disp,
+        table_title=f"Transazioni {node_name}",
+        file_prefix=f"argus_flusso_{node_name.replace(' ', '_').lower()}",
+        key_suffix=f"cf_modal_{node_name.replace(' ', '_')}",
+        column_config=cf_modal_cfg,
+        hide_index=True
+    )
 
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
@@ -1410,17 +1415,7 @@ with tab_ledger:
                     st.success("Transazione registrata con successo!")
                     st.rerun()
 
-    st.markdown("##### 📜 Libro Mastro Movimenti Completo")
     if not df_cf_filtered.empty:
-        col_dl_l, col_dl_r = st.columns([3.5, 1.5])
-        with col_dl_r:
-            render_export_toolbar(
-                df_cf_filtered,
-                file_prefix=f"argus_cashflow_{sel_year_str}_{sel_month_num}",
-                key_suffix="cf_ledger",
-                table_title="Libro Mastro Movimenti"
-            )
-
         df_disp_ledger = df_cf_filtered.copy()
         
         def format_dir_badge(row):
@@ -1436,17 +1431,30 @@ with tab_ledger:
             return d.upper()
 
         df_disp_ledger["Tipo"] = df_disp_ledger.apply(format_dir_badge, axis=1)
+        df_table_show = df_disp_ledger[["tx_date", "Tipo", "amount", "category_name", "merchant", "account_name", "notes"]].rename(columns={
+            "tx_date": "Data",
+            "amount": "Importo (€)",
+            "category_name": "Categoria",
+            "merchant": "Beneficiario / Merchant",
+            "account_name": "Conto",
+            "notes": "Note"
+        })
 
-        st.dataframe(
-            df_disp_ledger[["tx_date", "Tipo", "amount", "category_name", "merchant", "account_name", "notes"]].rename(columns={
-                "tx_date": "Data",
-                "amount": "Importo (€)",
-                "category_name": "Categoria",
-                "merchant": "Beneficiario / Merchant",
-                "account_name": "Conto",
-                "notes": "Note"
-            }),
-            use_container_width=True,
+        ledger_cfg = {
+            "Data": st.column_config.DateColumn("Data", format="YYYY-MM-DD"),
+            "Tipo": st.column_config.TextColumn("Tipo", width="small"),
+            "Importo (€)": st.column_config.NumberColumn("Importo (€)", format="€ %,.2f"),
+            "Categoria": st.column_config.TextColumn("Categoria", width="small"),
+            "Beneficiario / Merchant": st.column_config.TextColumn("Beneficiario / Merchant", width="medium"),
+            "Conto": st.column_config.TextColumn("Conto", width="small"),
+            "Note": st.column_config.TextColumn("Note", width="medium")
+        }
+        render_table_with_export(
+            df=df_table_show,
+            table_title="Libro Mastro Movimenti Completo",
+            file_prefix=f"argus_cashflow_{sel_year_str}_{sel_month_num}",
+            key_suffix="cf_ledger",
+            column_config=ledger_cfg,
             hide_index=True
         )
     else:

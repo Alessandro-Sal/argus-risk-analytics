@@ -82,18 +82,43 @@ def prepare_dataframe_for_export(df: Optional[pd.DataFrame]) -> pd.DataFrame:
 
     # Appiattimento indice se rilevante (es. serie temporali o MultiIndex)
     if isinstance(df_clean.index, pd.MultiIndex):
-        df_clean = df_clean.reset_index()
-    elif df_clean.index.name is not None:
-        # Se l'indice ha un nome (es. 'Date', 'Ticker'), trasformalo in colonna esportabile
-        df_clean = df_clean.reset_index()
+        try:
+            df_clean = df_clean.reset_index()
+        except Exception:
+            pass
+    elif df_clean.index.name is not None and str(df_clean.index.name).strip():
+        # Se l'indice ha un nome (es. 'Date', 'Ticker') che non è già tra le colonne
+        idx_name = str(df_clean.index.name)
+        if idx_name not in df_clean.columns:
+            try:
+                df_clean = df_clean.reset_index()
+            except Exception:
+                pass
+
+    # De-duplicazione nomi colonne se presenti duplicati
+    if getattr(df_clean.columns, "duplicated", None) is not None and df_clean.columns.duplicated().any():
+        new_cols = []
+        counts = {}
+        for c in df_clean.columns:
+            c_str = str(c)
+            if c_str in counts:
+                counts[c_str] += 1
+                new_cols.append(f"{c_str}_{counts[c_str]}")
+            else:
+                counts[c_str] = 0
+                new_cols.append(c_str)
+        df_clean.columns = new_cols
 
     # Normalizzazione tipi complessi per evitare crash di serializzazione Excel/CSV
     for col in df_clean.columns:
-        if df_clean[col].dtype == object:
+        col_series = df_clean[col]
+        if isinstance(col_series, pd.DataFrame):
+            col_series = col_series.iloc[:, 0]
+        if hasattr(col_series, "dtype") and col_series.dtype == object:
             # Se contiene dict o list, serializza a stringa
-            sample_val = df_clean[col].dropna().iloc[0] if not df_clean[col].dropna().empty else None
+            sample_val = col_series.dropna().iloc[0] if not col_series.dropna().empty else None
             if isinstance(sample_val, (dict, list, set, tuple)):
-                df_clean[col] = df_clean[col].apply(lambda x: str(x) if x is not None else "")
+                df_clean[col] = col_series.apply(lambda x: str(x) if x is not None else "")
 
     return df_clean
 
@@ -218,7 +243,10 @@ def to_excel_bytes(
 
         for col_idx, col_name in enumerate(clean_df.columns, 1):
             name_lower = str(col_name).lower()
-            col_series = clean_df[col_name].dropna()
+            raw_series = clean_df[col_name]
+            if isinstance(raw_series, pd.DataFrame):
+                raw_series = raw_series.iloc[:, 0]
+            col_series = raw_series.dropna()
 
             # 1. Valuta
             if any(
@@ -260,21 +288,21 @@ def to_excel_bytes(
                     "cvar",
                 )
             ):
-                if not col_series.empty and pd.api.types.is_numeric_dtype(col_series):
+                if not col_series.empty and pd.api.types.is_numeric_dtype(raw_series):
                     max_abs = col_series.abs().max()
                     col_formats[col_idx] = '0.00"%"' if max_abs > 1.5 else "0.00%"
                 else:
                     col_formats[col_idx] = '0.00"%"'
             # 3. Date / Datetime
-            elif pd.api.types.is_datetime64_any_dtype(clean_df[col_name]) or any(
+            elif pd.api.types.is_datetime64_any_dtype(raw_series) or any(
                 k in name_lower for k in ("data", "date", "timestamp")
             ):
                 col_formats[col_idx] = "yyyy-mm-dd"
             # 4. Numeri interi generici
-            elif pd.api.types.is_integer_dtype(clean_df[col_name]):
+            elif pd.api.types.is_integer_dtype(raw_series):
                 col_formats[col_idx] = "#,##0"
             # 5. Numeri decimali generici
-            elif pd.api.types.is_float_dtype(clean_df[col_name]):
+            elif pd.api.types.is_float_dtype(raw_series):
                 col_formats[col_idx] = "#,##0.00"
 
         # Scrittura righe dati
@@ -383,6 +411,7 @@ def render_export_toolbar(
     table_title: Optional[str] = None,
     sheet_name: str = "Dati",
     show_row_count: bool = True,
+    use_container_width: bool = True,
 ) -> None:
     """
     Renderizza un micro-popover compatto '📥 Esporta Dati' progettato per
@@ -407,7 +436,7 @@ def render_export_toolbar(
     popover_label = "📥 Esporta"
     popover_help = f"Esporta {n_rows:,} record in formato Excel professionale (.xlsx) o CSV"
 
-    with st.popover(popover_label, help=popover_help, use_container_width=False):
+    with st.popover(popover_label, help=popover_help, use_container_width=use_container_width):
         st.markdown(
             """
             <div style="font-size: 0.82rem; font-weight: 600; color: #8b949e; margin-bottom: 8px;">
@@ -485,18 +514,18 @@ def render_table_with_export(
         st.info("Nessun record disponibile nella tabella.")
         return
 
-    # Header Bar con Titolo a sinistra e Toolbar Export a destra
-    col_title, col_export = st.columns([0.82, 0.18], gap="small")
+    # Header Bar con Titolo a sinistra e Toolbar Export a destra perfettamente allineati
+    col_title, col_export = st.columns([0.80, 0.20], gap="small", vertical_alignment="center")
 
     with col_title:
         if table_title:
             st.markdown(
                 f"""
-                <div style="display: flex; align-items: baseline; gap: 10px; margin-top: 2px;">
-                    <span style="font-size: 1.05rem; font-weight: 700; color: #ffffff; letter-spacing: -0.2px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 1.02rem; font-weight: 700; color: #ffffff; letter-spacing: -0.2px;">
                         {table_title}
                     </span>
-                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.76rem; color: #8b949e; background: rgba(255,255,255,0.06); padding: 1px 7px; border-radius: 4px;">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; color: #8b949e; background: rgba(255,255,255,0.06); padding: 1px 7px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);">
                         {len(df):,} righe
                     </span>
                 </div>
@@ -506,7 +535,7 @@ def render_table_with_export(
         else:
             st.markdown(
                 f"""
-                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #8b949e; margin-top: 4px;">
+                <div style="font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; color: #8b949e;">
                     {len(df):,} record disponibili
                 </div>
                 """,
@@ -521,6 +550,7 @@ def render_table_with_export(
             table_title=table_title,
             sheet_name=sheet_name,
             show_row_count=False,  # Già visibile nel titolo
+            use_container_width=True,
         )
 
     # Configurazione automatica colonne se passati elenchi semplificati
@@ -553,3 +583,47 @@ def render_table_with_export(
 
     # Render data grid
     st.dataframe(df, column_config=cfg if cfg else None, hide_index=hide_index, height=height, use_container_width=True)
+
+
+def render_institutional_datagrid(
+    df: pd.DataFrame,
+    table_title: Optional[str] = None,
+    file_prefix: str = "argus_datagrid",
+    key_suffix: str = "inst_tbl",
+    column_config: Optional[Dict[str, Any]] = None,
+    currency_cols: Optional[List[str]] = None,
+    pct_cols: Optional[List[str]] = None,
+    weight_cols: Optional[List[str]] = None,
+    sparkline_cols: Optional[List[str]] = None,
+    hide_index: bool = True,
+    height: Optional[int] = 380,
+    sheet_name: str = "Dati",
+) -> None:
+    """Funzione di alto livello per data grid istituzionali con layout compatto e formattazione semantica automatica."""
+    auto_progress = {}
+    if weight_cols:
+        for wc in weight_cols:
+            if wc in df.columns:
+                max_v = float(df[wc].dropna().max()) if not df[wc].dropna().empty else 1.0
+                auto_progress[wc] = (0.0, 1.0) if max_v <= 1.05 else (0.0, 100.0)
+
+    cfg = column_config.copy() if column_config else {}
+    if sparkline_cols:
+        for sc in sparkline_cols:
+            if sc in df.columns and sc not in cfg:
+                cfg[sc] = st.column_config.LineChartColumn(sc, width="small", help="Trend storico inline")
+
+    render_table_with_export(
+        df=df,
+        table_title=table_title,
+        file_prefix=file_prefix,
+        key_suffix=key_suffix,
+        column_config=cfg if cfg else None,
+        currency_cols=currency_cols,
+        pct_cols=pct_cols,
+        progress_cols=auto_progress if auto_progress else None,
+        hide_index=hide_index,
+        height=height,
+        sheet_name=sheet_name,
+    )
+

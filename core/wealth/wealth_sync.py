@@ -4,6 +4,7 @@
 # Multi-Year Sync Engine (2021 - 2026) for Personal Finance
 # ============================================================
 
+import json
 import logging
 import os
 import re
@@ -782,6 +783,7 @@ def _sync_pension_sheet(engine: Engine, spreadsheet: Any, portfolio_id: int = 1)
             "currency": "EUR",
             "investment_line": "Azionario / Crescita",
             "notes": f"Sincronizzato da foglio Pension (Anni: {history_str})",
+            "yearly_data_json": json.dumps(yearly_data),
         },
     )
 

@@ -436,6 +436,160 @@ def resolve_company_name(ticker: str, pos_name: Any = None) -> str:
     return ticker
 
 
+FINANCIAL_STATEMENT_TRANSLATIONS = {
+    # Income Statement
+    "Total Revenue": "Ricavi Totali (Total Revenue)",
+    "Operating Revenue": "Ricavi Operativi (Operating Revenue)",
+    "Cost Of Revenue": "Costo del Venduto (Cost of Revenue)",
+    "Gross Profit": "Margine Lordo Industriale (Gross Profit)",
+    "Operating Expense": "Spese Operative Totali (Operating Expense)",
+    "Operating Income": "Reddito Operativo / EBIT (Operating Income)",
+    "EBITDA": "EBITDA (Margine Operativo Lordo)",
+    "EBIT": "EBIT (Reddito Operativo)",
+    "Normalized EBITDA": "EBITDA Normalizzato (Normalized EBITDA)",
+    "Research And Development": "Ricerca & Sviluppo (R&D)",
+    "Selling General And Administration": "Spese Commerciali, Generali e Amm. (SG&A)",
+    "Selling And Marketing Expense": "Spese Commerciali e Marketing",
+    "General And Administrative Expense": "Spese Generali e Amministrative (G&A)",
+    "Other Gand A": "Altre Spese Generali e Amm.",
+    "Net Income": "Utile Netto di Esercizio (Net Income)",
+    "Pretax Income": "Utile Ante Imposte / EBT (Pretax Income)",
+    "Tax Provision": "Imposte sul Reddito (Tax Provision)",
+    "Tax Rate For Calcs": "Aliquota Fiscale Effettiva (Tax Rate)",
+    "Tax Effect Of Unusual Items": "Effetto Fiscale Voci Straordinarie",
+    "Total Unusual Items": "Totale Voci Straordinarie",
+    "Total Unusual Items Excluding Goodwill": "Voci Straordinarie escl. Avviamento",
+    "Net Income Common Stockholders": "Utile per Azionisti Ordinari",
+    "Diluted NI Availto Com Stockholders": "Utile per Azionisti Ordinari (Diluito)",
+    "Basic EPS": "Utile per Azione Base (Basic EPS)",
+    "Diluted EPS": "Utile per Azione Diluito (Diluted EPS)",
+    "Basic Average Shares": "Numero Azioni Medie Base",
+    "Diluted Average Shares": "Numero Azioni Medie Diluite",
+    "Total Expenses": "Costi Totali (Total Expenses)",
+    "Net Interest Income": "Interessi Netti (Net Interest Income)",
+    "Interest Expense": "Interessi Passivi (Interest Expense)",
+    "Interest Income": "Interessi Attivi (Interest Income)",
+    "Normalized Income": "Utile Netto Normalizzato (Normalized Income)",
+    "Net Income Continuous Operations": "Utile da Operazioni Continue",
+    "Net Income Including Noncontrolling Interests": "Utile Netto Totale (incl. Terzi)",
+    "Reconciled Depreciation": "Ammortamenti Riconciliati",
+    "Reconciled Cost Of Revenue": "Costo del Venduto Riconciliato",
+    "Other Income Expense": "Altri Proventi / Oneri Netti",
+    "Other Non Operating Income Expenses": "Proventi / Oneri Non Operativi",
+    "Special Income Charges": "Oneri Straordinari Speciali",
+    "Write Off": "Svalutazioni e Rettifiche (Write-offs)",
+    "Earnings From Equity Interest": "Proventi da Partecipazioni",
+    "Gain On Sale Of Security": "Plusvalenze da Vendita Titoli",
+    "Net Non Operating Interest Income Expense": "Interessi Netti Non Operativi",
+    "Interest Expense Non Operating": "Interessi Passivi Non Operativi",
+
+    # Balance Sheet
+    "Total Assets": "Totale Attivo (Total Assets)",
+    "Total Non Current Assets": "Totale Attivo Non Circolante (Immobilizzazioni)",
+    "Net PPE": "Immobilizzazioni Materiali Nette (Net PPE)",
+    "Gross PPE": "Immobilizzazioni Materiali Lorde (Gross PPE)",
+    "Accumulated Depreciation": "Fondo Ammortamento Cumulato",
+    "Goodwill": "Avviamento (Goodwill)",
+    "Goodwill And Other Intangible Assets": "Avviamento e Altre Attività Immateriali",
+    "Other Intangible Assets": "Altre Immobilizzazioni Immateriali",
+    "Investments And Advances": "Partecipazioni e Anticipi",
+    "Investmentin Financial Assets": "Investimenti in Attività Finanziarie",
+    "Available For Sale Securities": "Attività Finanziarie Disponibili per la Vendita",
+    "Current Assets": "Totale Attivo Circolante (Current Assets)",
+    "Cash And Cash Equivalents": "Cassa e Disponibilità Liquide (Cash & Equivalents)",
+    "Cash Cash Equivalents And Short Term Investments": "Liquidità e Investimenti a Breve",
+    "Other Short Term Investments": "Altri Investimenti a Breve Termine",
+    "Accounts Receivable": "Crediti vs Clienti (Accounts Receivable)",
+    "Gross Accounts Receivable": "Crediti vs Clienti Lordi",
+    "Allowance For Doubtful Accounts Receivable": "Fondo Svalutazione Crediti",
+    "Receivables": "Crediti Totali (Receivables)",
+    "Taxes Receivable": "Crediti Tributari",
+    "Inventory": "Rimanenze di Magazzino (Inventory)",
+    "Other Current Assets": "Altre Attività Correnti",
+    "Other Non Current Assets": "Altre Attività Non Correnti",
+    "Non Current Deferred Assets": "Attività Differite a Lungo Termine",
+    "Non Current Deferred Taxes Assets": "Imposte Anticipate a Lungo Termine",
+    "Total Liabilities Net Minority Interest": "Totale Passività (escl. Terzi)",
+    "Total Liabilities": "Totale Passività (Total Liabilities)",
+    "Current Liabilities": "Totale Passività Correnti / a Breve",
+    "Accounts Payable": "Debiti vs Fornitori (Accounts Payable)",
+    "Payables": "Debiti Commerciali Complessivi",
+    "Payables And Accrued Expenses": "Debiti e Ratei/Risconti Passivi",
+    "Current Accrued Expenses": "Ratei Passivi Correnti",
+    "Other Current Liabilities": "Altre Passività Correnti",
+    "Current Debt And Capital Lease Obligation": "Debiti Finanziari a Breve e Leasing",
+    "Current Debt": "Debiti Finanziari a Breve Termine",
+    "Current Capital Lease Obligation": "Quota Corrente Debiti per Leasing",
+    "Total Non Current Liabilities Net Minority Interest": "Passività Non Correnti / a Medio-Lungo",
+    "Long Term Debt": "Debiti Finanziari a Lungo Termine (Long Term Debt)",
+    "Long Term Debt And Capital Lease Obligation": "Debiti a Lungo Termine e Leasing",
+    "Long Term Capital Lease Obligation": "Debiti per Leasing a Lungo Termine",
+    "Non Current Deferred Liabilities": "Passività Differite a Lungo Termine",
+    "Non Current Deferred Revenue": "Risconti Passivi a Lungo Termine",
+    "Non Current Deferred Taxes Liabilities": "Fondo Imposte Differite a Lungo Termine",
+    "Stockholders Equity": "Patrimonio Netto degli Azionisti (Equity)",
+    "Common Stock Equity": "Capitale Azionario Ordinario",
+    "Capital Stock": "Capitale Sociale Emesso",
+    "Common Stock": "Azioni Ordinarie",
+    "Preferred Stock": "Azioni Privilegiate",
+    "Retained Earnings": "Utili a Nuovo / Riserve di Utili (Retained Earnings)",
+    "Total Equity Gross Minority Interest": "Patrimonio Netto Totale (incl. Terzi)",
+    "Total Capitalization": "Capitale Totale Investito",
+    "Working Capital": "Capitale Circolante Netto (Working Capital / CCN)",
+    "Net Tangible Assets": "Attività Nette Tangibili (Net Tangible Assets)",
+    "Tangible Book Value": "Patrimonio Netto Tangibile (Tangible Book Value)",
+    "Total Debt": "Debito Finanziario Totale (Total Debt)",
+    "Net Debt": "Indebitamento Finanziario Netto (Net Debt)",
+    "Invested Capital": "Capitale Investito Netto (Invested Capital)",
+    "Ordinary Shares Number": "Numero Azioni Ordinarie",
+    "Treasury Shares Number": "Numero Azioni Proprie",
+    "Share Issued": "Numero Azioni Emesse",
+
+    # Cash Flow
+    "Operating Cash Flow": "Flusso di Cassa da Attività Operativa (OCF)",
+    "Cash Flow From Continuing Operating Activities": "Flusso Operativo da Attività Continue",
+    "Net Income From Continuing Operations": "Utile Netto da Operazioni Continue",
+    "Depreciation And Amortization": "Ammortamenti e Svalutazioni (D&A)",
+    "Depreciation Amortization Depletion": "Ammortamenti Totali e Svalutazioni",
+    "Stock Based Compensation": "Compensazione in Azioni (SBC)",
+    "Deferred Tax": "Effetto Imposte Differite",
+    "Change In Working Capital": "Variazione del Capitale Circolante Netto (CCN)",
+    "Change In Receivables": "Variazione Crediti vs Clienti",
+    "Change In Inventory": "Variazione Rimanenze di Magazzino",
+    "Change In Account Payable": "Variazione Debiti vs Fornitori",
+    "Investing Cash Flow": "Flusso di Cassa da Investimenti (ICF)",
+    "Cash Flow From Continuing Investing Activities": "Flussi da Attività di Investimento",
+    "Capital Expenditure": "Investimenti in Capitale Fisso / CapEx",
+    "Purchase Of PPE": "Acquisto Fabbricati, Impianti e Macchinari (CapEx)",
+    "Net PPE Purchase And Sale": "Investimenti Netti in Beni Materiali",
+    "Purchase Of Business": "Esborsi per Acquisizioni Aziendali (M&A)",
+    "Purchase Of Investment": "Acquisti di Titoli e Investimenti Finanziari",
+    "Sale Of Investment": "Incassi da Vendita Titoli Finanziari",
+    "Financing Cash Flow": "Flusso di Cassa da Attività Finanziaria (FCF)",
+    "Cash Flow From Continuing Financing Activities": "Flussi da Attività di Finanziamento",
+    "Repayment Of Debt": "Rimborso Finanziamenti e Debiti",
+    "Issuance Of Debt": "Emissione Nuovi Prestiti / Obbligazioni",
+    "Long Term Debt Payments": "Rimborsi Debiti a Lungo Termine",
+    "Long Term Debt Issuance": "Nuove Emissioni Debito a Lungo Termine",
+    "Repurchase Of Capital Stock": "Buyback / Riacquisto Azioni Proprie",
+    "Cash Dividends Paid": "Dividendi Distribuiti agli Azionisti",
+    "Free Cash Flow": "Flusso di Cassa Libero (Free Cash Flow)",
+    "Changes In Cash": "Variazione Netta delle Disponibilità Liquide",
+    "Beginning Cash Position": "Liquidità a Inizio Esercizio",
+    "End Cash Position": "Liquidità a Fine Esercizio",
+    "Effect Of Exchange Rate Changes": "Effetto dei Tassi di Cambio sulla Liquidità",
+}
+
+
+def translate_statement_item(item: str) -> str:
+    """Restituisce la descrizione estesa italiana per una voce di bilancio 10-K."""
+    item_clean = str(item).strip()
+    if item_clean in FINANCIAL_STATEMENT_TRANSLATIONS:
+        return FINANCIAL_STATEMENT_TRANSLATIONS[item_clean]
+    import re
+    return re.sub(r"([a-z])([A-Z])", r"\1 \2", item_clean).strip()
+
+
 def fetch_detailed_financial_statements(ticker: str, years: Optional[int] = 5) -> Dict[str, pd.DataFrame]:
     """
     Fetches real annual 10-K financial statements (Income Statement, Balance Sheet, Cash Flow)
@@ -482,7 +636,10 @@ def fetch_detailed_financial_statements(ticker: str, years: Optional[int] = 5) -
                             formatted_col.append(str(val))
                 formatted_dict[col] = formatted_col
 
-            return pd.DataFrame(formatted_dict, index=df_c.index)
+            res_df = pd.DataFrame(formatted_dict, index=df_c.index)
+            # Inserimento esplicito della prima colonna contenente le voci di bilancio
+            res_df.insert(0, "Voce di Bilancio", [translate_statement_item(str(idx)) for idx in df_c.index])
+            return res_df
 
         def _raw_df(df):
             if df is None or df.empty:
@@ -702,11 +859,33 @@ def compute_dcf_monte_carlo_valuation(
     }
 
 
-def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict[str, float]:
+def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict[str, Any]:
     """
-    Fetches real-world financial parameters (FCF, Total Diluted Shares, Cash, Debt, Current Price)
+    Fetches real-world financial parameters (FCF, Total Diluted Shares, Cash, Debt, Current Price, Currency)
     from Yahoo Finance to pre-fill the DCF Monte Carlo model.
     """
+    u_tk = str(ticker).upper().strip() if ticker else ""
+    if any(u_tk.endswith(sfx) for sfx in [".MI", ".PA", ".AS", ".BR", ".MC", ".DE", ".F", ".VI"]):
+        curr_fallback = "EUR"
+    elif u_tk.endswith(".L"):
+        curr_fallback = "GBP"
+    elif u_tk.endswith(".CO"):
+        curr_fallback = "DKK"
+    elif u_tk.endswith(".ST"):
+        curr_fallback = "SEK"
+    elif u_tk.endswith(".SW"):
+        curr_fallback = "CHF"
+    elif u_tk.endswith(".TO"):
+        curr_fallback = "CAD"
+    elif u_tk.endswith(".AX"):
+        curr_fallback = "AUD"
+    elif u_tk.endswith(".T") or u_tk.endswith(".TYO"):
+        curr_fallback = "JPY"
+    elif u_tk.endswith(".HK"):
+        curr_fallback = "HKD"
+    else:
+        curr_fallback = "USD"
+
     try:
         import yfinance as yf
 
@@ -749,6 +928,7 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
 
         cash = float(inf.get("totalCash") or (mkt_cap * 0.08))
         debt = float(inf.get("totalDebt") or (mkt_cap * 0.06))
+        currency = inf.get("currency") or curr_fallback
 
         return {
             "price": round(price, 2),
@@ -756,6 +936,7 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
             "shares_m": max(10.0, round(shares / 1e6, 2)),
             "cash_m": max(0.0, round(cash / 1e6, 2)),
             "debt_m": max(0.0, round(debt / 1e6, 2)),
+            "currency": currency.upper() if isinstance(currency, str) else curr_fallback,
         }
     except Exception:
         return {
@@ -764,6 +945,7 @@ def fetch_dcf_initial_inputs(ticker: str, fallback_price: float = 150.0) -> Dict
             "shares_m": 12230.0,
             "cash_m": 242474.0,
             "debt_m": 120791.0,
+            "currency": curr_fallback,
         }
 
 

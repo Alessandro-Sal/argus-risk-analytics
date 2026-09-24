@@ -53,8 +53,8 @@ def test_train_and_evaluate_rl_portfolio():
         "TLT": np.random.normal(-0.0001, 0.006, 120),
     }
     df_rets = pd.DataFrame(data, index=dates)
-    
-    rl_res = train_and_evaluate_rl_portfolio(df_rets, episodes=10, window_size=20)
+
+    rl_res = train_and_evaluate_rl_portfolio(df_rets, episodes=10, window_size=20, rebalance_days=21)
     assert rl_res["has_data"] is True
     assert not rl_res["learning_curve"].empty
     assert not rl_res["backtest_df"].empty
@@ -63,3 +63,33 @@ def test_train_and_evaluate_rl_portfolio():
     assert "rl_stats" in rl_res
     assert "ew_stats" in rl_res
     assert "final_weights" in rl_res
+    assert rl_res["rebalance_days"] == 21
+
+    # Rewards should be reasonable and bounded, not -1500 or -5000
+    cum_rewards = rl_res["learning_curve"]["cumulative_reward"]
+    assert cum_rewards.min() > -500.0
+
+
+def test_portfolio_env_periodic_rebalancing_and_drift():
+    np.random.seed(42)
+    dates = pd.date_range("2023-01-01", periods=50, freq="B")
+    data = {
+        "A": [0.05] * 50,  # Asset A consistently gains 5%
+        "B": [-0.02] * 50, # Asset B loses 2%
+    }
+    df_rets = pd.DataFrame(data, index=dates)
+
+    env = PortfolioEnv(df_rets, window_size=10, rebalance_days=5, turnover_penalty=0.001)
+    env.reset()
+
+    # Step 0: rebalance day ((0) % 5 == 0)
+    _, _, _, info0 = env.step(np.array([0.5, 0.5]))
+    assert info0["is_rebalance"] is True
+
+    # Step 1: non-rebalance day ((1) % 5 != 0) -> weights drift, turnover=0
+    _, _, _, info1 = env.step(np.array([0.8, 0.2]))  # target ignored on non-rebalance day
+    assert info1["is_rebalance"] is False
+    assert info1["turnover"] == 0.0
+    # Because A gained 5% and B lost 2%, active weight of A should have drifted higher than 0.50
+    assert info1["weights"][0] > 0.50
+

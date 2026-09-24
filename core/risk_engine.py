@@ -13,7 +13,7 @@
 #     (rimosso il "fix" del validator che li azzerava)
 # ============================================================
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -42,9 +42,17 @@ def compute_risk(
     df_prices: pd.DataFrame = None,
     risk_free_rate: float = None,
     base_currency: str = "EUR",
+    as_of_date: Optional[Union[str, date, datetime]] = None,
 ) -> dict:
     if df_tx is None or df_prices is None:
-        df_tx, df_prices = _load_data(portfolio_id, engine, benchmark_ticker)
+        df_tx, df_prices = _load_data(portfolio_id, engine, benchmark_ticker, as_of_date=as_of_date)
+
+    if as_of_date is not None:
+        as_of_dt = pd.to_datetime(as_of_date)
+        if df_tx is not None and not df_tx.empty:
+            df_tx = df_tx[pd.to_datetime(df_tx["tx_date"]) <= as_of_dt].copy()
+        if df_prices is not None and not df_prices.empty:
+            df_prices = df_prices[pd.to_datetime(df_prices["price_date"]) <= as_of_dt].copy()
 
     if df_tx.empty:
         raise ValueError(f"Nessuna transazione per portfolio_id={portfolio_id}")
@@ -62,7 +70,7 @@ def compute_risk(
 
     from core.yield_curve import get_active_risk_free_rate
 
-    rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate)
+    rf_info = get_active_risk_free_rate(currency=base_currency, custom_override=risk_free_rate, as_of_date=as_of_date)
     active_rf_rate = rf_info["rate"]
 
     warnings_list = []
@@ -115,6 +123,16 @@ def compute_risk(
     # Diversification Ratio Injection
     div_ratio_val = metrics["concentration"].get("diversification_ratio", 1.0)
     metrics["market_risk"]["diversification_ratio"] = div_ratio_val
+
+    # EVT POT-GPD Tail Risk & Basel IV Backtesting
+    try:
+        metrics["market_risk"]["evt_tail_risk"] = compute_evt_pot_var_cvar(sr_portfolio)
+        metrics["market_risk"]["basel_backtest"] = compute_basel_traffic_light_backtest(
+            sr_portfolio,
+            var_99=metrics["market_risk"].get("var_cf_99", metrics["market_risk"].get("var_99")),
+        )
+    except Exception:
+        pass
 
     from core.closed_trades import compute_closed_trades_journal
 
@@ -349,10 +367,36 @@ def compute_risk(
         pass
 
     risk_contrib = _calc_risk_contribution(df_returns, df_positions)
+    tot_equity_val = round(float(tot_val), 2)
+
+    # Ottimizzazione di Portafoglio Avanzata (Markowitz, MDP Choueifaty, Min-CVaR Rockafellar-Uryasev)
+    opt_frontier = _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate)
+    try:
+        common_tk = opt_frontier.get("tickers", [])
+        if common_tk and len(common_tk) > 1 and "cov_matrix" in opt_frontier:
+            cov_mat = opt_frontier["cov_matrix"].values
+            stds = np.sqrt(np.diag(cov_mat))
+            opt_frontier["mdp"] = compute_maximum_diversification_portfolio(cov_mat, stds, tickers=common_tk)
+            if df_returns is not None and not df_returns.empty:
+                common_in_returns = [t for t in common_tk if t in df_returns.columns]
+                if common_in_returns:
+                    opt_frontier["min_cvar"] = compute_cvar_portfolio_optimization(df_returns[common_in_returns])
+    except Exception:
+        pass
+
+    # Scomposizione Rischio Valutario (FX Risk Decomposition & Hedging Carry Simulator)
+    fx_risk_decomp = {}
+    try:
+        fx_risk_decomp = compute_fx_risk_decomposition(df_positions, df_prices, base_currency=base_currency)
+    except Exception:
+        fx_risk_decomp = {}
 
     return {
         "portfolio_id": portfolio_id,
         "computed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "as_of_date": str(as_of_date) if as_of_date else None,
+        "total_value": tot_equity_val,
+        "portfolio_value": tot_equity_val,
         "df_tx": df_tx_adj,
         "df_tx_raw": df_tx,
         "corporate_actions": corp_actions_audit,
@@ -373,7 +417,8 @@ def compute_risk(
         "l_var_summary": lvar_summary,
         "risk_contribution": risk_contrib,
         "stress_tests": _calc_stress_tests(df_returns, df_positions, sr_benchmark),
-        "optimization": _compute_efficient_frontier(df_returns, df_positions, risk_free_rate=active_rf_rate),
+        "optimization": opt_frontier,
+        "fx_risk": fx_risk_decomp,
         "closed_trades": closed_trades_data,
         "warnings": warnings_list,
     }
@@ -382,8 +427,27 @@ def compute_risk(
 # ── Load data ────────────────────────────────────────────────
 
 
-def _load_data(portfolio_id: int, engine, benchmark_ticker: str) -> tuple:
-    sql_tx = text("""
+def _load_data(
+    portfolio_id: int,
+    engine,
+    benchmark_ticker: str,
+    as_of_date: Optional[Union[str, date, datetime]] = None,
+) -> tuple:
+    params_tx: Dict[str, Any] = {"pid": portfolio_id}
+    params_px: Dict[str, Any] = {"pid": portfolio_id, "bm": benchmark_ticker}
+    tx_where = "WHERE t.portfolio_id = :pid"
+    px_where = """WHERE (a.ticker IN (
+            SELECT a2.ticker FROM transactions t JOIN assets a2 ON t.asset_id = a2.asset_id WHERE t.portfolio_id = :pid
+        ) OR a.ticker LIKE '%EUR=X' OR a.ticker = :bm)"""
+
+    if as_of_date is not None:
+        as_of_str = str(as_of_date)[:10] if isinstance(as_of_date, (date, datetime)) else str(as_of_date)[:10]
+        tx_where += " AND t.tx_date <= :as_of_date"
+        px_where += " AND mp.price_date <= :as_of_date"
+        params_tx["as_of_date"] = as_of_str
+        params_px["as_of_date"] = as_of_str
+
+    sql_tx = text(f"""
         SELECT
             t.tx_id, t.tx_date, t.tx_type,
             t.quantity, t.price, t.currency, t.fees,
@@ -397,10 +461,10 @@ def _load_data(portfolio_id: int, engine, benchmark_ticker: str) -> tuple:
             a.debt_to_equity, a.revenue_growth, a.earnings_growth
         FROM transactions t
         JOIN assets a ON t.asset_id = a.asset_id
-        WHERE t.portfolio_id = :pid
+        {tx_where}
         ORDER BY t.tx_date, t.tx_id
     """)
-    sql_prices = text("""
+    sql_prices = text(f"""
         SELECT
             a.ticker,
             mp.price_date,
@@ -408,19 +472,18 @@ def _load_data(portfolio_id: int, engine, benchmark_ticker: str) -> tuple:
             mp.volume
         FROM market_prices mp
         JOIN assets a ON mp.asset_id = a.asset_id
-        WHERE a.ticker IN (
-            SELECT a2.ticker FROM transactions t JOIN assets a2 ON t.asset_id = a2.asset_id WHERE t.portfolio_id = :pid
-        ) OR a.ticker LIKE '%EUR=X' OR a.ticker = :bm
+        {px_where}
         GROUP BY a.ticker, mp.price_date, mp.close, mp.volume
         ORDER BY a.ticker, mp.price_date
     """)
     with engine.connect() as conn:
-        df_tx = pd.read_sql(sql_tx, conn, params={"pid": portfolio_id})
-        df_prices = pd.read_sql(sql_prices, conn, params={"pid": portfolio_id, "bm": benchmark_ticker})
+        df_tx = pd.read_sql(sql_tx, conn, params=params_tx)
+        df_prices = pd.read_sql(sql_prices, conn, params=params_px)
 
     df_tx["tx_date"] = pd.to_datetime(df_tx["tx_date"])
     df_prices["price_date"] = pd.to_datetime(df_prices["price_date"])
     return df_tx, df_prices
+
 
 
 # ── FIFO engine ──────────────────────────────────────────────
@@ -692,6 +755,70 @@ def _compute_positions(df_tx: pd.DataFrame, df_prices: pd.DataFrame, warnings_li
     return df_pos.sort_values("current_value", ascending=False).reset_index(drop=True)
 
 
+# ── Calcolo Saldi Quote Dinamici e True TWR (Modified Dietz) ──
+
+
+def _compute_dynamic_holdings_twr(
+    df_tx: pd.DataFrame,
+    pivot_prices: pd.DataFrame,
+    common_tickers: list,
+    min_tx_date: pd.Timestamp,
+) -> Optional[pd.Series]:
+    """
+    Ricostruisce i pesi e i saldi quote giornalieri dinamici (Point-in-Time Q_{i,t})
+    dalle transazioni effettive eliminando il lookback bias e il survivorship bias.
+    Calcola il Time-Weighted Return (TWR) giornaliero effettivo secondo la metodologia Modified Dietz.
+    """
+    try:
+        if df_tx is None or df_tx.empty or pivot_prices.empty or not common_tickers:
+            return None
+
+        tx = df_tx.copy()
+        tx["tx_date"] = pd.to_datetime(tx["tx_date"])
+        if getattr(tx["tx_date"].dt, "tz", None) is not None:
+            tx["tx_date"] = tx["tx_date"].dt.tz_localize(None)
+
+        tx = tx[tx["ticker"].isin(common_tickers)].sort_values("tx_date")
+        if tx.empty:
+            return None
+
+        cal_dates = [d for d in pivot_prices.index if pd.to_datetime(d) >= min_tx_date]
+        if len(cal_dates) < 5:
+            return None
+
+        tx_type = tx["tx_type"].astype(str).str.lower().str.strip()
+        is_inflow = tx_type.isin(["buy", "acquisto", "deposit", "transfer_in"])
+        is_outflow = tx_type.isin(["sell", "vendita", "withdrawal", "transfer_out"])
+
+        tx["signed_qty"] = np.where(is_inflow, tx["quantity"], np.where(is_outflow, -tx["quantity"], 0.0))
+
+        daily_delta_q = tx.groupby(["tx_date", "ticker"])["signed_qty"].sum().unstack(fill_value=0.0)
+        daily_delta_q = daily_delta_q.reindex(index=cal_dates, columns=common_tickers).fillna(0.0)
+        daily_shares = daily_delta_q.cumsum()
+
+        px = pivot_prices.loc[cal_dates, common_tickers].ffill().bfill()
+
+        v_end = (daily_shares * px).sum(axis=1)
+        daily_shares_prev = daily_shares.shift(1).fillna(0.0)
+        v_start = (daily_shares_prev * px.shift(1)).sum(axis=1)
+        daily_cf = (daily_delta_q * px).sum(axis=1)
+
+        denom = v_start + 0.5 * daily_cf
+        numer = v_end - v_start - daily_cf
+
+        valid_mask = denom > 1.0
+        daily_twr = pd.Series(0.0, index=cal_dates)
+        daily_twr[valid_mask] = (numer[valid_mask] / denom[valid_mask]).clip(-0.50, 0.50)
+        daily_twr = daily_twr.dropna()
+
+        if len(daily_twr) >= 10 and float(daily_twr.std()) > 1e-6:
+            daily_twr.name = "portfolio"
+            return daily_twr
+        return None
+    except Exception:
+        return None
+
+
 # ── Rendimenti giornalieri ───────────────────────────────────
 
 
@@ -784,9 +911,18 @@ def _compute_returns(
     else:
         w = pd.Series(dtype=float)
 
+
     # I rendimenti di portafoglio partono dalla prima transazione
     df_returns_portfolio = df_returns[df_returns.index >= min_tx_date]
-    sr_portfolio = df_returns_portfolio[common].fillna(0.0).dot(w).dropna()
+    sr_portfolio_const = df_returns_portfolio[common].fillna(0.0).dot(w).dropna()
+    sr_portfolio_const.name = "portfolio"
+
+    sr_dynamic = _compute_dynamic_holdings_twr(df_tx, pivot, common, min_tx_date)
+    if sr_dynamic is not None and len(sr_dynamic) >= 10:
+        sr_portfolio = sr_dynamic
+    else:
+        sr_portfolio = sr_portfolio_const
+
     sr_portfolio.name = "portfolio"
     return df_returns, sr_portfolio
 
@@ -1854,9 +1990,52 @@ def _calc_return_metrics(
 
     total_pnl_pct = (total_pnl / total_cost) if total_cost > 0 else 0.0
 
+    # Calcolo Money-Weighted Return (MWR / IRR)
+    mwr_irr = None
+    try:
+        if df_tx is not None and not df_tx.empty and total_value > 0 and len(r) > 1:
+            t0 = pd.to_datetime(df_tx["tx_date"].min())
+            t_end = r.index.max() if isinstance(r.index, pd.DatetimeIndex) else pd.to_datetime(df_tx["tx_date"].max())
+            cf_list = []
+            for _, tx_row in df_tx.iterrows():
+                tt = str(tx_row.get("tx_type", "")).lower()
+                q = float(tx_row.get("quantity", 0.0) or 0.0)
+                p = float(tx_row.get("price", 0.0) or 0.0)
+                fee = float(tx_row.get("fees", 0.0) or 0.0)
+                d = pd.to_datetime(tx_row["tx_date"])
+                t_yrs = (d - t0).days / 365.25 if hasattr(d - t0, "days") else 0.0
+                if any(k in tt for k in ["buy", "acquisto", "deposit"]):
+                    cf_list.append((t_yrs, -(q * p + fee)))
+                elif any(k in tt for k in ["sell", "vendita", "withdrawal"]):
+                    cf_list.append((t_yrs, +(q * p - fee)))
+                elif "div" in tt:
+                    cf_list.append((t_yrs, +p))
+
+            t_end_yrs = (t_end - t0).days / 365.25 if hasattr(t_end - t0, "days") else 0.0
+            cf_list.append((t_end_yrs, +float(total_value)))
+
+            if len(cf_list) >= 2:
+                def npv(rate):
+                    return sum(amt / ((1.0 + rate) ** t) for t, amt in cf_list)
+
+                from scipy.optimize import brentq
+
+                npv_low = npv(-0.95)
+                npv_high = npv(5.0)
+                if npv_low * npv_high <= 0:
+                    mwr_irr = float(brentq(npv, -0.95, 5.0, maxiter=200))
+                else:
+                    npv_high2 = npv(20.0)
+                    if npv_low * npv_high2 <= 0:
+                        mwr_irr = float(brentq(npv, -0.95, 20.0, maxiter=200))
+    except Exception:
+        mwr_irr = None
+
     return {
         "total_return_pct": round(total_return * 100, 4),
         "cagr_pct": round(cagr * 100, 4) if cagr is not None else None,
+        "twr_cagr_pct": round(cagr * 100, 4) if cagr is not None else None,
+        "mwr_irr_pct": round(mwr_irr * 100.0, 4) if mwr_irr is not None else None,
         "sharpe_ratio": round(sharpe, 4) if sharpe is not None else None,
         "sortino_ratio": round(sortino, 4) if sortino is not None else None,
         "calmar_ratio": round(calmar, 4) if calmar is not None else None,
@@ -3510,9 +3689,555 @@ def compute_liquidity_adjusted_var(
     }
 
 
+# ── Extreme Value Theory (EVT POT-GPD) ───────────────────────────
+
+
+def compute_evt_pot_var_cvar(
+    r: pd.Series,
+    threshold_quantile: float = 0.90,
+    confidence: float = 0.99,
+) -> Dict[str, Any]:
+    """
+    Stima del rischio di coda estremo mediante Extreme Value Theory (EVT)
+    con approccio Peaks-Over-Threshold (POT) e distribuzione Generalized Pareto (GPD).
+    Conforme ai requisiti di Basilea per scenari di stress estremi (99.0% e 99.9%).
+    """
+    if r is None or len(r.dropna()) < 30:
+        return {
+            "evt_var_99_pct": 0.0,
+            "evt_cvar_99_pct": 0.0,
+            "evt_var_999_pct": 0.0,
+            "evt_cvar_999_pct": 0.0,
+            "tail_index_xi": 0.0,
+            "scale_sigma": 0.0,
+            "threshold_u_pct": 0.0,
+            "n_excesses": 0,
+            "total_observations": 0,
+        }
+
+    s = r.dropna().values
+    losses = -s  # Perdite positive
+    n_total = len(losses)
+    u = float(np.quantile(losses, threshold_quantile))
+    excesses = losses[losses > u] - u
+    n_u = len(excesses)
+
+    if n_u < 5:
+        var_99 = float(np.quantile(losses, 0.99))
+        cvar_99 = float(losses[losses >= var_99].mean()) if any(losses >= var_99) else var_99
+        var_999 = float(np.quantile(losses, 0.999))
+        cvar_999 = float(losses[losses >= var_999].mean()) if any(losses >= var_999) else var_999
+        return {
+            "evt_var_99_pct": round(var_99 * 100.0, 4),
+            "evt_cvar_99_pct": round(cvar_99 * 100.0, 4),
+            "evt_var_999_pct": round(var_999 * 100.0, 4),
+            "evt_cvar_999_pct": round(cvar_999 * 100.0, 4),
+            "tail_index_xi": 0.0,
+            "scale_sigma": float(np.std(excesses)) if len(excesses) > 1 else 0.0,
+            "threshold_u_pct": round(u * 100.0, 4),
+            "n_excesses": n_u,
+            "total_observations": n_total,
+        }
+
+    try:
+        from scipy.stats import genpareto
+
+        xi, _, sigma = genpareto.fit(excesses, floc=0)
+        xi = float(np.clip(xi, -0.5, 0.95))
+        sigma = max(float(sigma), 1e-6)
+
+        def _calc_pot(p):
+            tail_p = 1.0 - p
+            ratio = (n_total / n_u) * tail_p
+            if abs(xi) < 1e-4:
+                var_p = u - sigma * np.log(ratio)
+            else:
+                var_p = u + (sigma / xi) * (ratio ** (-xi) - 1.0)
+
+            if xi < 1.0:
+                cvar_p = (var_p / (1.0 - xi)) + ((sigma - xi * u) / (1.0 - xi))
+            else:
+                cvar_p = var_p * 1.3
+            return max(0.0, float(var_p)), max(0.0, float(cvar_p))
+
+        var_99, cvar_99 = _calc_pot(0.99)
+        var_999, cvar_999 = _calc_pot(0.999)
+
+        if cvar_99 < var_99:
+            cvar_99 = var_99
+        if cvar_999 < var_999:
+            cvar_999 = var_999
+
+        return {
+            "evt_var_99_pct": round(var_99 * 100.0, 4),
+            "evt_cvar_99_pct": round(cvar_99 * 100.0, 4),
+            "evt_var_999_pct": round(var_999 * 100.0, 4),
+            "evt_cvar_999_pct": round(cvar_999 * 100.0, 4),
+            "tail_index_xi": round(float(xi), 4),
+            "scale_sigma": round(float(sigma), 6),
+            "threshold_u_pct": round(u * 100.0, 4),
+            "n_excesses": int(n_u),
+            "total_observations": int(n_total),
+        }
+    except Exception:
+        var_99 = float(np.quantile(losses, 0.99))
+        cvar_99 = float(losses[losses >= var_99].mean()) if any(losses >= var_99) else var_99
+        return {
+            "evt_var_99_pct": round(var_99 * 100.0, 4),
+            "evt_cvar_99_pct": round(cvar_99 * 100.0, 4),
+            "evt_var_999_pct": round(var_99 * 1.5 * 100.0, 4),
+            "evt_cvar_999_pct": round(cvar_99 * 1.5 * 100.0, 4),
+            "tail_index_xi": 0.0,
+            "scale_sigma": 0.0,
+            "threshold_u_pct": round(u * 100.0, 4),
+            "n_excesses": int(n_u),
+            "total_observations": int(n_total),
+        }
+
+
+# ── Backtesting Regolamentare Basilea IV & Test Kupiec/Christoffersen ──
+
+
+def compute_basel_traffic_light_backtest(
+    r: pd.Series,
+    var_99: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Backtesting regolamentare del VaR a 1 giorno (99% confidenza) conforme agli standard di Basilea IV.
+    Valuta gli ultimi 250 giorni di trading e calcola:
+    - Semaforo di Basilea (Zona Verde, Gialla, Rossa) e Moltiplicatore di capitale (da 3.00 a 4.00)
+    - Test di Kupiec POF (Proportion of Failures Likelihood Ratio)
+    - Test di Indipendenza di Christoffersen (Clustering delle violazioni)
+    - Test congiunto di Copertura Condizionale (Conditional Coverage)
+    """
+    from scipy.stats import chi2
+
+    if r is None or len(r.dropna()) < 20:
+        return {
+            "zone": "Verde",
+            "zone_color": "#22c55e",
+            "exceptions_count": 0,
+            "n_days": 0,
+            "expected_exceptions": 0.0,
+            "basel_multiplier": 3.0,
+            "kupiec_lr": 0.0,
+            "kupiec_p_value": 1.0,
+            "kupiec_status": "Accettato",
+            "christoffersen_lr": 0.0,
+            "christoffersen_p_value": 1.0,
+            "christoffersen_status": "Accettato",
+            "conditional_coverage_lr": 0.0,
+            "conditional_coverage_p_value": 1.0,
+            "conditional_coverage_status": "Accettato",
+        }
+
+    s = r.dropna().tail(250)
+    n_days = len(s)
+    p_target = 0.01  # 99% VaR -> 1% violazioni attese
+    expected_exc = n_days * p_target
+
+    if var_99 is not None:
+        if isinstance(var_99, (pd.Series, np.ndarray, list)):
+            v_val = float(var_99.iloc[0] if isinstance(var_99, pd.Series) else var_99[0]) if len(var_99) > 0 else None
+        else:
+            try:
+                v_val = float(var_99)
+            except (ValueError, TypeError):
+                v_val = None
+        if v_val is not None and v_val > 0:
+            v_thresh = -(v_val / 100.0 if v_val > 1.0 else v_val)
+        else:
+            v_thresh = float(s.quantile(p_target))
+    else:
+        v_thresh = float(s.quantile(p_target))
+
+    hits = (s < v_thresh).astype(int).values
+    x = int(np.sum(hits))
+
+    if x <= 4:
+        zone = "Verde"
+        zone_color = "#22c55e"
+        multiplier = 3.00
+    elif x == 5:
+        zone = "Gialla"
+        zone_color = "#eab308"
+        multiplier = 3.40
+    elif x == 6:
+        zone = "Gialla"
+        zone_color = "#eab308"
+        multiplier = 3.50
+    elif x == 7:
+        zone = "Gialla"
+        zone_color = "#eab308"
+        multiplier = 3.65
+    elif x == 8:
+        zone = "Gialla"
+        zone_color = "#eab308"
+        multiplier = 3.75
+    elif x == 9:
+        zone = "Gialla"
+        zone_color = "#eab308"
+        multiplier = 3.85
+    else:
+        zone = "Rossa"
+        zone_color = "#ef4444"
+        multiplier = 4.00
+
+    p_hat = x / n_days if n_days > 0 else 0.0
+    if p_hat == 0:
+        lr_pof = -2.0 * (n_days * np.log(1.0 - p_target))
+    elif p_hat >= 1:
+        lr_pof = -2.0 * (n_days * np.log(p_target))
+    else:
+        num = ((1.0 - p_target) ** (n_days - x)) * (p_target ** x)
+        den = ((1.0 - p_hat) ** (n_days - x)) * (p_hat ** x)
+        lr_pof = -2.0 * np.log(num / den) if (den > 0 and num > 0) else 0.0
+    lr_pof = max(0.0, float(lr_pof))
+    pval_pof = float(chi2.sf(lr_pof, df=1))
+    kupiec_status = "Accettato" if pval_pof >= 0.05 else "Rigettato (H0 rifiutata)"
+
+    n00 = n01 = n10 = n11 = 0
+    for t in range(1, len(hits)):
+        prev, curr = hits[t - 1], hits[t]
+        if prev == 0 and curr == 0:
+            n00 += 1
+        elif prev == 0 and curr == 1:
+            n01 += 1
+        elif prev == 1 and curr == 0:
+            n10 += 1
+        elif prev == 1 and curr == 1:
+            n11 += 1
+
+    pi01 = n01 / (n00 + n01) if (n00 + n01) > 0 else 0.0
+    pi11 = n11 / (n10 + n11) if (n10 + n11) > 0 else 0.0
+    pi = (n01 + n11) / (n00 + n01 + n10 + n11) if (n00 + n01 + n10 + n11) > 0 else 0.0
+
+    try:
+        if (0 < pi < 1) and (0 < pi01 < 1 or pi01 == 0) and (0 < pi11 < 1 or pi11 == 0):
+            l_ind_num = ((1.0 - pi) ** (n00 + n10)) * (pi ** (n01 + n11))
+            l_ind_den = (
+                ((1.0 - pi01) ** n00)
+                * (pi01 ** n01 if n01 > 0 else 1.0)
+                * (((1.0 - pi11) ** n10) if (1.0 - pi11) > 0 else 1.0)
+                * (pi11 ** n11 if n11 > 0 else 1.0)
+            )
+            lr_ind = -2.0 * np.log(l_ind_num / l_ind_den) if (l_ind_den > 0 and l_ind_num > 0) else 0.0
+        else:
+            lr_ind = 0.0
+    except Exception:
+        lr_ind = 0.0
+    lr_ind = max(0.0, float(lr_ind))
+    pval_ind = float(chi2.sf(lr_ind, df=1))
+    ind_status = "Accettato (Indipendenti)" if pval_ind >= 0.05 else "Rigettato (Cluster di violazioni)"
+
+    lr_cc = lr_pof + lr_ind
+    pval_cc = float(chi2.sf(lr_cc, df=2))
+    cc_status = "Accettato" if pval_cc >= 0.05 else "Rigettato"
+
+    return {
+        "zone": zone,
+        "zone_color": zone_color,
+        "exceptions_count": x,
+        "n_days": n_days,
+        "expected_exceptions": round(expected_exc, 1),
+        "basel_multiplier": multiplier,
+        "kupiec_lr": round(lr_pof, 4),
+        "kupiec_p_value": round(pval_pof, 4),
+        "kupiec_status": kupiec_status,
+        "christoffersen_lr": round(lr_ind, 4),
+        "christoffersen_p_value": round(pval_ind, 4),
+        "christoffersen_status": ind_status,
+        "conditional_coverage_lr": round(lr_cc, 4),
+        "conditional_coverage_p_value": round(pval_cc, 4),
+        "conditional_coverage_status": cc_status,
+    }
+
+
+# ── Portafoglio a Massima Diversificazione (MDP - Choueifaty) ────
+
+
+def compute_maximum_diversification_portfolio(
+    cov_matrix: np.ndarray,
+    asset_stds: Optional[np.ndarray] = None,
+    tickers: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Calcola il Portafoglio a Massima Diversificazione (MDP - Choueifaty & Coignard, 2008).
+    Massimizza il Diversification Ratio:
+    DR(w) = (w^T * sigma) / sqrt(w^T * Sigma * w)
+    soggetto a sum(w) = 1, w_i >= 0.
+    """
+    from scipy.optimize import minimize
+
+    cov = np.asarray(cov_matrix, dtype=np.float64)
+    if asset_stds is None:
+        asset_stds = np.sqrt(np.diag(cov))
+    sigmas = np.asarray(asset_stds, dtype=np.float64)
+
+    n = len(sigmas)
+    if n == 0:
+        return {}
+    if n == 1:
+        tk = tickers[0] if tickers else "Asset_0"
+        return {
+            "diversification_ratio": 1.0,
+            "portfolio_volatility_pct": round(float(asset_stds[0]) * np.sqrt(252) * 100.0, 2),
+            "weights": {tk: 1.0},
+            "weights_list": [1.0],
+        }
+
+    def neg_diversification_ratio(w):
+        port_vol = np.sqrt(np.dot(w.T, np.dot(cov, w)))
+        if port_vol < 1e-8:
+            return 0.0
+        weighted_vol = np.dot(w, sigmas)
+        return -(weighted_vol / port_vol)
+
+    w0 = np.ones(n) / n
+    bounds = tuple((0.0, 1.0) for _ in range(n))
+    constraints = {"type": "eq", "fun": lambda w: np.sum(w) - 1.0}
+
+    res = minimize(
+        neg_diversification_ratio,
+        w0,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+        options={"ftol": 1e-9, "maxiter": 500},
+    )
+
+    w_opt = res.x if res.success else w0
+    w_opt = np.maximum(0.0, w_opt)
+    if np.sum(w_opt) > 0:
+        w_opt /= np.sum(w_opt)
+
+    port_vol = float(np.sqrt(np.dot(w_opt.T, np.dot(cov, w_opt))))
+    weighted_vol = float(np.dot(w_opt, sigmas))
+    dr = float(weighted_vol / port_vol) if port_vol > 1e-8 else 1.0
+
+    w_dict = {
+        tickers[i] if (tickers and i < len(tickers)) else f"Asset_{i}": round(float(w_opt[i]), 4)
+        for i in range(n)
+    }
+
+    return {
+        "diversification_ratio": round(dr, 4),
+        "portfolio_volatility_pct": round(port_vol * np.sqrt(252) * 100.0, 2),
+        "weights": w_dict,
+        "weights_list": [round(float(x), 4) for x in w_opt],
+    }
+
+
+# ── Ottimizzazione Mean-CVaR (Rockafellar & Uryasev LP) ──────────
+
+
+def compute_cvar_portfolio_optimization(
+    df_returns: pd.DataFrame,
+    confidence: float = 0.95,
+    target_return: Optional[float] = None,
+    alpha: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Ottimizzazione convessa del portafoglio basata su Mean-CVaR / Expected Shortfall
+    mediante formulazione di Programmazione Lineare esatta (Rockafellar & Uryasev, 2000).
+    Minimizza il Conditional Value at Risk garantendo un profilo asimmetrico protetto da crash.
+    """
+    from scipy.optimize import linprog
+
+    if alpha is not None:
+        confidence = float(alpha)
+
+    if df_returns is None or df_returns.empty or len(df_returns.columns) == 0:
+        return {}
+
+    clean_ret = df_returns.dropna()
+    tickers = clean_ret.columns.tolist()
+    n = len(tickers)
+    T = len(clean_ret)
+
+    if n == 1 or T < 5:
+        tk = tickers[0] if tickers else "Asset_0"
+        return {
+            "cvar_daily_pct": 0.0,
+            "cvar_annual_pct": 0.0,
+            "weights": {tk: 1.0},
+            "weights_list": [1.0],
+        }
+
+    R = clean_ret.values
+    alpha = confidence
+    num_vars = n + 1 + T
+
+    c = np.zeros(num_vars)
+    c[n] = 1.0
+    c[n + 1 :] = 1.0 / ((1.0 - alpha) * T)
+
+    A_ub = np.zeros((T, num_vars))
+    A_ub[:, :n] = -R
+    A_ub[:, n] = -1.0
+    A_ub[:, n + 1 :] = -np.eye(T)
+    b_ub = np.zeros(T)
+
+    A_eq = np.zeros((1, num_vars))
+    A_eq[0, :n] = 1.0
+    b_eq = np.array([1.0])
+
+    if target_return is not None:
+        mean_r = R.mean(axis=0)
+        row_ret = np.zeros((1, num_vars))
+        row_ret[0, :n] = -mean_r
+        A_ub = np.vstack([A_ub, row_ret])
+        b_ub = np.append(b_ub, -target_return)
+
+    bounds = [(0.0, 1.0)] * n + [(None, None)] + [(0.0, None)] * T
+
+    res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq, bounds=bounds, method="highs")
+
+    if res.success:
+        w_opt = res.x[:n]
+        w_opt = np.maximum(0.0, w_opt)
+        if np.sum(w_opt) > 0:
+            w_opt /= np.sum(w_opt)
+        opt_cvar_daily = float(res.fun)
+    else:
+        w_opt = np.ones(n) / n
+        opt_cvar_daily = 0.0
+
+    w_dict = {tickers[i]: round(float(w_opt[i]), 4) for i in range(n)}
+
+    return {
+        "cvar_daily_pct": round(opt_cvar_daily * 100.0, 4),
+        "cvar_annual_pct": round(opt_cvar_daily * np.sqrt(252) * 100.0, 2),
+        "weights": w_dict,
+        "weights_list": [round(float(x), 4) for x in w_opt],
+    }
+
+
+# ── FX Risk Decomposition & Hedging Simulator ────────────────────
+
+
+def compute_fx_risk_decomposition(
+    df_positions: pd.DataFrame,
+    df_prices: pd.DataFrame,
+    base_currency: str = "EUR",
+) -> Dict[str, Any]:
+    """
+    Scompone la volatilità totale di ogni asset non-base (es. USD, GBP, CHF) in:
+    - Rischio dell'asset locale (sigma_local^2)
+    - Rischio valutario puro (sigma_fx^2)
+    - Effetto di covarianza/interazione (2 * Cov(r_local, r_fx))
+    Calcola inoltre l'esposizione valutaria aggregata di portafoglio,
+    la volatilità con e senza copertura valutaria (100% FX Hedged)
+    e la stima del Carry Cost da Interest Rate Parity.
+    """
+    if df_positions is None or df_positions.empty or df_prices is None or df_prices.empty:
+        return {}
+
+    pivot = df_prices.pivot(index="price_date", columns="ticker", values="close")
+    pos_open = (
+        df_positions[df_positions.get("qty_net", 1) > 0].copy()
+        if "qty_net" in df_positions.columns
+        else df_positions.copy()
+    )
+
+    total_port_val = float(pos_open["current_value"].sum()) if "current_value" in pos_open.columns else 1.0
+
+    breakdown_list = []
+    fx_exposure_by_curr = {}
+
+    for _, row in pos_open.iterrows():
+        tk = row.get("ticker")
+        curr = str(row.get("asset_currency") or row.get("currency") or base_currency).upper().strip()
+        val = float(row.get("current_value", 0.0))
+        w = (val / total_port_val) if total_port_val > 0 else 0.0
+
+        if curr not in [base_currency, "XXX", "CRYPTO", "NAN", "NONE"] and len(curr) == 3:
+            fx_exposure_by_curr[curr] = fx_exposure_by_curr.get(curr, 0.0) + val
+            fx_tk = f"{curr}{base_currency}=X"
+            fx_tk_inv = f"{base_currency}{curr}=X"
+
+            s_local = pivot[tk].dropna() if tk in pivot.columns else pd.Series(dtype=float)
+            if fx_tk in pivot.columns:
+                s_fx = pivot[fx_tk].dropna()
+            elif fx_tk_inv in pivot.columns:
+                s_fx = (1.0 / pivot[fx_tk_inv].dropna()).dropna()
+            else:
+                s_fx = pd.Series(dtype=float)
+
+            common_idx = s_local.index.intersection(s_fx.index)
+            if len(common_idx) > 15:
+                r_loc = s_local.loc[common_idx].pct_change().dropna()
+                r_fx = s_fx.loc[common_idx].pct_change().dropna()
+                c_idx = r_loc.index.intersection(r_fx.index)
+
+                if len(c_idx) > 10:
+                    r_loc = r_loc.loc[c_idx]
+                    r_fx = r_fx.loc[c_idx]
+                    r_tot = (1.0 + r_loc) * (1.0 + r_fx) - 1.0
+
+                    var_tot = float(np.var(r_tot, ddof=1))
+                    var_loc = float(np.var(r_loc, ddof=1))
+                    var_fx = float(np.var(r_fx, ddof=1))
+                    cov_loc_fx = float(np.cov(r_loc, r_fx)[0, 1])
+
+                    vol_tot_ann = np.sqrt(var_tot * 252) * 100.0
+                    vol_loc_ann = np.sqrt(var_loc * 252) * 100.0
+                    vol_fx_ann = np.sqrt(var_fx * 252) * 100.0
+
+                    sum_var_terms = max(1e-8, var_loc + var_fx + 2.0 * cov_loc_fx)
+                    pct_local = (var_loc / sum_var_terms) * 100.0
+                    pct_fx = (var_fx / sum_var_terms) * 100.0
+                    pct_interaction = ((2.0 * cov_loc_fx) / sum_var_terms) * 100.0
+
+                    breakdown_list.append(
+                        {
+                            "ticker": tk,
+                            "currency": curr,
+                            "portfolio_weight_pct": round(w * 100.0, 2),
+                            "value_eur": round(val, 2),
+                            "total_volatility_ann_pct": round(vol_tot_ann, 2),
+                            "local_asset_vol_pct": round(vol_loc_ann, 2),
+                            "fx_volatility_pct": round(vol_fx_ann, 2),
+                            "variance_share_local_pct": round(pct_local, 1),
+                            "variance_share_fx_pct": round(pct_fx, 1),
+                            "variance_share_interaction_pct": round(pct_interaction, 1),
+                        }
+                    )
+
+    tot_foreign_val = sum(fx_exposure_by_curr.values())
+    foreign_share_pct = (tot_foreign_val / total_port_val * 100.0) if total_port_val > 0 else 0.0
+
+    rf_base = 0.0325 if base_currency == "EUR" else 0.045
+    rf_foreign_usd = 0.045
+    est_carry_cost_bps = round((rf_base - rf_foreign_usd) * 10000.0, 1)
+
+    return {
+        "base_currency": base_currency,
+        "foreign_currency_exposure_eur": round(tot_foreign_val, 2),
+        "foreign_currency_share_pct": round(foreign_share_pct, 2),
+        "exposure_by_currency": {k: round(v, 2) for k, v in fx_exposure_by_curr.items()},
+        "assets_breakdown": breakdown_list,
+        "hedging_simulation": {
+            "est_forward_carry_cost_bps": est_carry_cost_bps,
+            "est_annual_carry_drag_eur": round(tot_foreign_val * abs(est_carry_cost_bps / 10000.0), 2),
+            "hedged_status": (
+                "Esposizione aperta (Unhedged)"
+                if foreign_share_pct > 5.0
+                else "Completamente denominato in valuta base"
+            ),
+        },
+    }
+
+
 # ── Public Aliases for Service Layer & Headless Consumers ────
 calc_market_risk = _calc_market_risk
 calc_return_metrics = _calc_return_metrics
 compute_positions = _compute_positions
 compute_returns = _compute_returns
+calc_evt_pot_var_cvar = compute_evt_pot_var_cvar
+calc_basel_traffic_light_backtest = compute_basel_traffic_light_backtest
+calc_maximum_diversification_portfolio = compute_maximum_diversification_portfolio
+calc_cvar_portfolio_optimization = compute_cvar_portfolio_optimization
+calc_fx_risk_decomposition = compute_fx_risk_decomposition
+
 

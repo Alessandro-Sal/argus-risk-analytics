@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 
 import core.risk_engine
 import core.ui_utils
+from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
     apply_plotly_theme,
     ensure_portfolio_loaded,
@@ -18,7 +19,6 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
-    render_export_toolbar,
     render_sandbox_banner,
     render_segmented_tabs,
 )
@@ -45,9 +45,9 @@ if not stress and not pos.empty:
     if stress:
         results["stress_tests"] = stress
 
-render_sandbox_banner(page_key="p6")
+render_sandbox_banner(page_key="p7")
 
-col_head1, col_head2 = st.columns([3.4, 1.2])
+col_head1, col_head2 = st.columns([3.4, 1.2], vertical_alignment="center")
 with col_head1:
     st.title("🌪️ Stress Testing & Resilience Analysis")
     if "run_id" in st.session_state:
@@ -56,7 +56,6 @@ with col_head1:
         st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 
 with col_head2:
-    st.markdown('<div style="display: flex; justify-content: flex-end; margin-top: 24px;">', unsafe_allow_html=True)
     glossary_modal("Cos'è lo Stress Testing Istituzionale?", """
 <div style="font-size: 13.5px; line-height: 1.45;">
 
@@ -230,17 +229,103 @@ def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None
         if st.button("⚖️ Simula Ribilanciamento & Staging Ordini", type="primary", use_container_width=True):
             try:
                 from components.action_drawers import render_order_blotter_dialog
-                turnover_est = abs(port_val * (abs(benchmark_shock) / 100.0) * 0.35) if port_val > 0 else 150_000.0
+
+                # Generazione ordini di de-risking dinamici sulle posizioni effettive
+                orders_sim = []
+                turnover_sim = 0.0
+                tax_sim = 0.0
+                de_risk_factor = min(0.35, max(0.10, abs(benchmark_shock) / 100.0 * 0.7))
+
+                if isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+                    col_t = "ticker" if "ticker" in pos_df.columns else ("Ticker" if "Ticker" in pos_df.columns else None)
+                    col_q = "qty_net" if "qty_net" in pos_df.columns else ("shares" if "shares" in pos_df.columns else ("Quantità" if "Quantità" in pos_df.columns else None))
+                    col_p = "last_price" if "last_price" in pos_df.columns else ("current_price" if "current_price" in pos_df.columns else ("Prezzo Mkt (€)" if "Prezzo Mkt (€)" in pos_df.columns else None))
+                    col_pmc = "wacp" if "wacp" in pos_df.columns else ("pmc" if "pmc" in pos_df.columns else ("Prezzo Carico (€)" if "Prezzo Carico (€)" in pos_df.columns else None))
+                    col_ac = "asset_class" if "asset_class" in pos_df.columns else ("Asset Class" if "Asset Class" in pos_df.columns else None)
+
+                    for _, r in pos_df.iterrows():
+                        tk = str(r.get(col_t, "ASSET")).strip()
+                        sh = float(r.get(col_q, 1.0))
+                        px = float(r.get(col_p, 100.0))
+                        pmc = float(r.get(col_pmc, px))
+                        ac = str(r.get(col_ac, "Equity")).lower()
+
+                        if sh <= 0 or px <= 0:
+                            continue
+
+                        t_upper = tk.upper()
+                        is_crypto = (
+                            ("crypto" in ac)
+                            or any(t_upper.endswith(s) for s in ["-EUR", "-USD", "-USDT", "-BTC"])
+                            or (t_upper in ["BTC", "ETH", "SOL", "ADA", "XRP", "BNB", "USDT", "DOGE", "AVAX", "DOT", "LINK"])
+                        )
+                        is_etf = any(k in ac for k in ["etf", "fondo", "oicr"]) or any(k in tk.lower() for k in ["etf", "iwda", "swda"])
+                        is_gov = any(k in ac for k in ["bond", "obbligaz", "gov"]) or any(k in t_upper for k in ["BTP", "BOT", "BUND", "TREASURY"])
+
+                        isin_raw = str(r.get("isin", r.get("ISIN", ""))).strip()
+                        isin_str = isin_raw if (isin_raw and isin_raw != "None" and len(isin_raw) >= 9) else ("— (Crypto)" if is_crypto else "—")
+
+                        if is_gov:
+                            # Titoli governativi/obbligazionari: flight-to-quality
+                            raw_buy = round(sh * de_risk_factor)
+                            sh_buy = max(1.0, float(raw_buy)) if raw_buy >= 1 else 1.0
+                            val_buy = round(sh_buy * px, 2)
+                            turnover_sim += val_buy
+                            orders_sim.append({
+                                "ISIN": isin_str,
+                                "Ticker": tk,
+                                "Azione": "BUY",
+                                "Quantità": str(int(sh_buy)),
+                                "Prezzo Stimato": px,
+                                "Controvalore": val_buy,
+                                "Regime Fiscale": "White List (12.5% Tax)",
+                                "Plus/Minus Stima": "N/D (Acquisto)",
+                            })
+                        else:
+                            # Asset equity/crypto/rischiosi: de-risking prudenziale
+                            if is_crypto:
+                                sh_trim = min(sh, round(sh * de_risk_factor, 4))
+                                qty_disp = f"{sh_trim:.4f}".rstrip("0").rstrip(".")
+                            else:
+                                raw_trim = round(sh * de_risk_factor)
+                                sh_trim = min(sh, max(1.0, float(raw_trim)) if raw_trim >= 1 else 0.0)
+                                qty_disp = str(int(sh_trim))
+
+                            if sh_trim <= 0:
+                                continue
+
+                            val_trim = round(sh_trim * px, 2)
+                            gain = (px - pmc) * sh_trim
+                            tax_rate = 0.26
+                            tax_cost = gain * tax_rate if gain > 0 else gain * 0.26
+                            tax_sim += tax_cost
+                            turnover_sim += val_trim
+
+                            if is_crypto:
+                                tax_regime = "Art. 67 (Plusvalenze Cripto)"
+                            elif is_etf:
+                                tax_regime = "Art. 44 (OICR - Reddito Cap.)"
+                            else:
+                                tax_regime = "Art. 67 (CG - Compensabile)"
+
+                            orders_sim.append({
+                                "ISIN": isin_str,
+                                "Ticker": tk,
+                                "Azione": "SELL",
+                                "Quantità": qty_disp,
+                                "Prezzo Stimato": px,
+                                "Controvalore": val_trim,
+                                "Regime Fiscale": tax_regime,
+                                "Plus/Minus Stima": f"{gain:+.2f} €",
+                            })
+
                 render_order_blotter_dialog({
-                    "turnover": turnover_est,
-                    "net_tax_impact": -abs(turnover_est * 0.04),
+                    "turnover": round(turnover_sim, 2),
+                    "net_tax_impact": round(tax_sim, 2),
                     "pre_var": 2.45,
                     "post_var": 1.88,
-                    "orders": [
-                        {"ISIN": "US0378331005", "Ticker": "AAPL", "Azione": "SELL", "Quantità": 500, "Prezzo Stimato": 195.40, "Controvalore": 97700.0, "Regime Fiscale": "Art. 67 (CG - Compensabile)"},
-                        {"ISIN": "IT0005246340", "Ticker": "BTP-10Y", "Azione": "BUY", "Quantità": 950, "Prezzo Stimato": 100.45, "Controvalore": 95427.5, "Regime Fiscale": "White List (12.5% Tax)"},
-                    ]
-                }, portfolio_value=port_val)
+                    "orders": orders_sim,
+                }, portfolio_value=port_val, positions=pos_df)
             except Exception as e:
                 st.error(f"Errore apertura drawer ordini: {e}")
 
@@ -264,26 +349,24 @@ def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None
             metric_card("Variazione Stimata (€)", fmt_eur(macro_res.get("portfolio_loss_eur", 0.0)), positive=macro_res.get("portfolio_loss_eur", 0.0) >= 0)
 
         if not macro_res["details_df"].empty:
-            col_mhd1, col_mhd2 = st.columns([2.8, 1.2])
-            with col_mhd1:
-                st.markdown("##### 📋 Dettaglio Impatto per Singolo Asset")
-            with col_mhd2:
-                render_export_toolbar(macro_res["details_df"], file_prefix="simulazione_macro_whatif_posizioni", key_suffix="macro_whatif", table_title="Dettaglio Impatto Macro")
-            
             df_macro_disp = macro_res["details_df"].rename(columns={
                 "ticker": "Ticker",
                 "current_value": "Valore Attuale (€)",
                 "simulated_impact_pct": "Impatto Stimato (%)",
                 "simulated_loss_eur": "Variazione Stimata (€)"
             })
-            st.dataframe(
-                df_macro_disp.style.format({
-                    "Valore Attuale (€)": "€ {:,.2f}",
-                    "Impatto Stimato (%)": "{:+.2f}%",
-                    "Variazione Stimata (€)": "€ {:,.2f}"
-                }),
-                use_container_width=True,
-                hide_index=True
+            macro_cfg = {
+                "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                "Valore Attuale (€)": st.column_config.NumberColumn("Valore Attuale", format="€ %,.2f"),
+                "Impatto Stimato (%)": st.column_config.NumberColumn("Impatto Stimato", format="%+.2f%%"),
+                "Variazione Stimata (€)": st.column_config.NumberColumn("Variazione Stimata", format="€ %,.2f"),
+            }
+            render_table_with_export(
+                df_macro_disp,
+                table_title="📋 Dettaglio Impatto per Singolo Asset",
+                file_prefix="simulazione_macro_whatif_posizioni",
+                key_suffix="macro_whatif",
+                column_config=macro_cfg,
             )
 
     st.divider()
@@ -483,22 +566,20 @@ if active_stress_tab == "⚡ Matrice Comparativa MSCI Barra":
     apply_plotly_theme(fig_mat)
     st.plotly_chart(fig_mat, use_container_width=True, config={"displayModeBar": "hover", "displaylogo": False})
 
-    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
-    col_syn1, col_syn2 = st.columns([3.2, 1.0])
-    with col_syn1:
-        st.markdown("##### 📋 Matrice Sinottica Dettagliata degli Scenari")
-    with col_syn2:
-        render_export_toolbar(df_matrix, file_prefix="matrice_scenari_stress_test", key_suffix="stress_mat", table_title="Matrice Scenari")
-
-    st.dataframe(
-        df_matrix[["Scenario", "Shock Mercato %", "Impatto Portafoglio %", "Differenziale (Alpha) %", "Perdita Stimata (€)"]].style.format({
-            "Shock Mercato %": "{:+.2f}%",
-            "Impatto Portafoglio %": "{:+.2f}%",
-            "Differenziale (Alpha) %": "{:+.2f}%",
-            "Perdita Stimata (€)": "€ {:,.2f}"
-        }),
-        use_container_width=True,
-        hide_index=True
+    df_matrix_disp = df_matrix[["Scenario", "Shock Mercato %", "Impatto Portafoglio %", "Differenziale (Alpha) %", "Perdita Stimata (€)"]].copy()
+    matrix_cfg = {
+        "Scenario": st.column_config.TextColumn("Scenario", width="medium"),
+        "Shock Mercato %": st.column_config.NumberColumn("Shock Mercato", format="%+.2f%%"),
+        "Impatto Portafoglio %": st.column_config.NumberColumn("Impatto Portafoglio", format="%+.2f%%"),
+        "Differenziale (Alpha) %": st.column_config.NumberColumn("Differenziale (Alpha)", format="%+.2f%%"),
+        "Perdita Stimata (€)": st.column_config.NumberColumn("Perdita Stimata", format="€ %,.2f"),
+    }
+    render_table_with_export(
+        df_matrix_disp,
+        table_title="📋 Matrice Sinottica Dettagliata degli Scenari",
+        file_prefix="matrice_scenari_stress_test",
+        key_suffix="stress_mat",
+        column_config=matrix_cfg,
     )
 
 # ── TAB 2: ANALISI SCENARI STORICI DETTAGLIATA ────────────────
@@ -566,23 +647,26 @@ elif active_stress_tab == "🏛️ Analisi Scenari Storici Dettagliata":
             
             col_t, col_c = st.columns([1.15, 1.15])
             with col_t:
-                col_hd1, col_hd2 = st.columns([2.0, 1.1])
-                with col_hd1:
-                    st.markdown("##### 📋 Dettaglio per Singola Posizione")
-                with col_hd2:
-                    sc_slug = active_scenario.lower().replace(" ", "_").replace(":", "").replace("/", "_")
-                    render_export_toolbar(df_det, file_prefix=f"stress_test_posizioni_{sc_slug}", key_suffix=f"stress_det_{sc_slug}", table_title="Dettaglio Posizioni Stress")
-                
+                sc_slug = active_scenario.lower().replace(" ", "_").replace(":", "").replace("/", "_")
                 df_disp = df_det.copy()
-                df_disp["Shock %"] = df_disp["Shock %"].apply(lambda x: f"{x:.2f}%")
-                df_disp["Perdita Stimata (€)"] = df_disp["Perdita Stimata (€)"].apply(lambda x: f"€ {x:,.2f}")
-                if "Beta" in df_disp.columns:
-                    df_disp["Beta"] = df_disp["Beta"].apply(lambda x: f"{x:.2f}" if pd.notna(x) else "1.00")
+                tbl_h = max(360, min(560, len(df_disp) * 35 + 38))
+                det_cfg = {
+                    "Ticker": st.column_config.TextColumn("Ticker", width="small"),
+                    "Beta": st.column_config.NumberColumn("Beta", format="%.2f"),
+                    "Shock %": st.column_config.NumberColumn("Shock %", format="%+.2f%%"),
+                    "Perdita Stimata (€)": st.column_config.NumberColumn("Perdita Stimata (€)", format="€ %,.2f"),
+                }
                 if "Dato Storico Reale" in df_disp.columns:
                     df_disp["Dato Storico Reale"] = df_disp["Dato Storico Reale"].apply(lambda x: "✅ Reale" if x else "⚡ Beta")
-                
-                tbl_h = max(360, min(560, len(df_disp) * 35 + 38))
-                st.dataframe(df_disp, use_container_width=True, hide_index=True, height=tbl_h)
+                    det_cfg["Dato Storico Reale"] = st.column_config.TextColumn("Dato Storico Reale", width="small")
+                render_table_with_export(
+                    df_disp,
+                    table_title="📋 Dettaglio per Singola Posizione",
+                    file_prefix=f"stress_test_posizioni_{sc_slug}",
+                    key_suffix=f"stress_det_{sc_slug}",
+                    column_config=det_cfg,
+                    height=tbl_h,
+                )
                 
             with col_c:
                 st.markdown("##### 🔻 Distribuzione della Perdita per Singolo Asset")

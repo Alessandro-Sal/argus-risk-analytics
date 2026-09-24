@@ -15,9 +15,9 @@
 
 ---
 
-## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.5.0)
+## 🚀 ARGUS Headless Core, REST API & Developer Ecosystem (v9.8.0)
 
-ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo headless**, introducendo uno **Unified Stochastic Kernel** con Cholesky PSD robusto, vettorizzazione BLAS/SIMD delle metriche di rischio e completa conformità CI/CD e linter:
+ARGUS v9.8.0 consolida l'architettura quantitativa istituzionale (**Tier-1 Risk & Wealth Intelligence**), introducendo il motore di calcolo del rischio conforme a **Basilea IV**, l'**Extreme Value Theory (EVT POT-GPD)** per code estreme, l'ottimizzazione **Min-CVaR lineare esatta** e **Maximum Diversification (MDP)**, la scomposizione del **rischio FX** e lo **Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (EBA & Fed CCAR)**:
 
 * **📦 Python Package Headless & CLI Console Scripts (`argus-risk`)**:
   ```bash
@@ -67,6 +67,15 @@ ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo he
 
 **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è una piattaforma integrata di **Business Intelligence, Financial Valuation, Forensic Accounting, AI Narrative Intelligence, Data Engineering e Quantitative Risk Management** potenziata con standard **Bloomberg Terminal Parity**. Progettata con un'interfaccia ad alta densità informativa di livello istituzionale, la soluzione offre un ecosistema avanzato per la diagnosi contabile, la profilazione del rischio e la protezione strategica di portafogli d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto e Cash*).
 
+* **🏛️ Institutional Risk Engine, Basel IV Traffic Light, EVT Tail Risk & Total Wealth Stress Testing v9.8 (`core/risk_engine.py`, `core/yield_curve.py`, `core/macro_stress_engine.py`, `core/wealth/personal_balance_sheet.py`, `src/pages/3_🔴_Analisi_Rischio.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`, `src/pages/16_🛡️_Previdenza_e_Pension_Planning.py`)**:
+  1. *Extreme Value Theory (EVT POT-GPD) & Tail Risk 99.9%*: Modellazione avanzata delle perdite estreme e dei cigni neri tramite approccio Peaks-Over-Threshold (POT) e distribuzione di Pareto Generalizzata (GPD) conforme ai requisiti di Basilea IV per la stima accurata di VaR e CVaR (Expected Shortfall) al 99.0% e 99.9%.
+  2. *Backtesting Regolamentare Basilea IV (Traffic Light Framework)*: Backtest su finestra mobile standard di 250 giorni di negoziazione con classificazione automatica in Zona Verde ($x \le 4$, moltiplicatore $3.00$), Gialla ($5 \le x \le 9$, moltiplicatori $3.40 - 3.85$) o Rossa ($x \ge 10$, moltiplicatore $4.00$), corredato dal test di copertura incondizionata di Kupiec (POF), dal test di indipendenza di Christoffersen (clustering delle violazioni) e dal test di copertura condizionale congiunto.
+  3. *Ottimizzatori Avanzati: Maximum Diversification (MDP) & Min-CVaR (Rockafellar-Uryasev LP)*: Ottimizzazione del Diversification Ratio (DR) di Choueifaty & Coignard per estrarre la massima riduzione della volatilità senza stime di rendimento atteso, unita all'ottimizzazione convessa esatta Min-CVaR (Rockafellar & Uryasev 2000) formulata come Programma Lineare e risolta in sub-5ms tramite solutore C++ HiGHS.
+  4. *Risoluzione Point-in-Time dei Tassi Risk-Free & Regime ZIRP (2020–2026)*: Term structure storica dei tassi privi di rischio (€STR/BCE Deposit per EUR, T-Bill 3M per USD, SONIA per GBP, SARON per CHF) con supporto fedele ai tassi negativi (-0.50% BCE) ed eliminazione totale dei bias retroattivi di Sharpe e Sortino.
+  5. *Dinamica Point-in-Time delle Quote $Q_{i,t}$, True TWR (Modified Dietz) & MWR (IRR)*: Ricostruzione giornaliera delle quote possedute, calcolo del Time-Weighted Return quotidiano depurato dai flussi di cassa esogeni (PAC e prelievi) e risoluzione esatta del Money-Weighted Return (IRR) via algoritmo di Brent (`scipy.optimize.brentq`).
+  6. *Scomposizione del Rischio di Cambio (FX Risk) & Forward Hedging Carry Simulator*: Decomposizione esatta della varianza $\sigma^2_{tot} \approx \sigma^2_{local} + \sigma^2_{fx} + 2\text{Cov}$, quantificazione dell'esposizione valutaria aperta e stima del Carry Drag annuo da Covered Interest Rate Parity.
+  7. *Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (Total Wealth)*: Simulazione congiunta degli shock regolamentari (EBA Regulatory Adverse 2026, Fed CCAR Severe, Stagflazione & Shock Tassi, Crisi Geopolitica Globale) su tutte le macro-classi dell'attivo (Liquidità, Portafogli, Immobili, Fondi Pensione, Caveau & Orologi) con quantificazione del drawdown patrimoniale e dell'amplificazione dell'indebitamento (Debt-to-Assets).
+  8. *Bilancio Comparativo Pluriennale (2021–2026) & Dossier PDF a 4 Pagine*: Sub-tab 5 e 6 in Pagina 13, esportazione CSV della serie storica completa, Dossier PDF a 4 pagine certificato con Pagina 4 dedicata al trend pluriennale e CSS Progress Bars evolutive, e cronistoria previdenziale (2023–2026) con scudo fiscale art. 51 TUIR dinamico in Pagina 16.
 * **⚡ Institutional UI/UX Ergonomics, Command Palette (Ctrl+K), Action Drawers & @st.fragment Reactivity v9.7 (`components/command_palette.py`, `components/action_drawers.py`, `core/chart_framework.py`, `core/ui_utils.py`, `desktop_launcher.py`)**:
   1. *Universal Bloomberg-Style Command Palette (`Ctrl+K` / `Cmd+K`)*: Switcher ad altissima velocità accessibile globalmente da tutte le 22 pagine della piattaforma. Permette la ricerca fuzzy istantanea tra moduli analitici, asset/ISIN del portafoglio attivo e macro-scenari di stress (Lehman 2008, COVID-19, Rates Shock 2022, Spread BTP 2011, Dot-Com). Architettura a tripla intercettazione DOM con supporto completo sia per browser web moderni che per l'applicazione desktop nativa Windows standalone (`.exe` via PyInstaller e Microsoft Edge WebView2).
   2. *Ultra-Reactive UI with `@st.fragment`*: Eliminazione dei re-render globali e dei flash di caricamento. Isolamento computazionale granulare per il simulatore interattivo di shock multi-asset (`src/pages/7_🌪️_Stress_Testing.py`) e per il motore parametrico Cornish-Fisher / decomposizione del rischio di Eulero (`src/pages/3_🔴_Analisi_Rischio.py`), con feedback istantaneo in millisecondi su variazioni di slider e confidenza.
@@ -202,12 +211,17 @@ ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo he
 
 ### 3. 🔴 Analisi del Rischio & Rilevamento Anomalie (`src/pages/3_🔴_Analisi_Rischio.py`)
 * **📊 Profilo del Rischio & Fama-French**: Rischio sistematico Beta, Tracking Error, Information Ratio, asimmetria (Skewness), curtosi (Kurtosis/Fat Tails) e regressione OLS multivariata sui 3 fattori accademici Kenneth French.
-* **📉 VaR, CVaR & Backtesting Kupiec**: Decomposizione di Eulero VaR/CVaR $(\sum \text{CVaR}_i = \text{VaR}_p)$, Marginal VaR $(\partial \text{VaR}/\partial w_i)$, Liquidity-Adjusted VaR (LVaR Bangia 1999), 4 modelli di VaR (Storico, Parametrico Gaussiano, Cornish-Fisher asimmetrico e Filtered Historical Simulation FHS) e validazione regolamentare su 252 giorni con test Kupiec POF conforme ai semafori di Basilea.
+* **🚦 Backtesting Regolamentare Basilea IV (Traffic Light Framework)**: Validazione istituzionale su finestra a 250 giorni per il VaR 99% a 1 giorno con classificazione in Zona Verde ($x \le 4$, moltiplicatore $3.00$), Gialla ($5 \le x \le 9$) o Rossa ($x \ge 10$, moltiplicatore $4.00$), test di Kupiec (POF), test di indipendenza di Christoffersen (clustering delle eccezioni) e test di copertura condizionale congiunto.
+* **⚡ Extreme Value Theory (EVT POT-GPD a 99.0% e 99.9%)**: Stima del rischio di coda asimmetrico e dei cigni neri tramite approccio Peaks-Over-Threshold (POT) e distribuzione di Pareto Generalizzata (GPD) conforme ai requisiti di Basilea IV per scenari di stress estremi.
+* **💱 Decomposizione del Rischio di Cambio (FX Risk) & Forward Hedging**: Scomposizione analitica della varianza $(\sigma^2_{tot} \approx \sigma^2_{local} + \sigma^2_{fx} + 2\text{Cov})$, quantificazione dell'esposizione valutaria aperta in Euro e simulazione del Forward Carry Drag annuo basato sulla Covered Interest Rate Parity.
+* **📉 VaR, CVaR & Decomposizione di Eulero**: Decomposizione di Eulero VaR/CVaR $(\sum \text{CVaR}_i = \text{VaR}_p)$, Marginal VaR $(\partial \text{VaR}/\partial w_i)$, Liquidity-Adjusted VaR (LVaR Bangia 1999) e 4 modelli di VaR (Storico, Parametrico Gaussiano, Cornish-Fisher asimmetrico e Filtered Historical Simulation FHS).
 * **🔗 Correlazioni, Liquidità & ATR Chandelier**: Matrice di correlazione interattiva Pearson/Spearman, monitoraggio volumi medi giornalieri (Average Daily Volume ADV) e calcolo dinamico degli Stop-Loss Chandelier ($3 \times ATR_{14}$).
 * **🕵️‍♂️ Rilevatore Anomalie ML (Isolation Forest)**: Algoritmo non supervisionato di Machine Learning per l'identificazione precoce di panic selling, rotture improvvise delle correlazioni storiche (*Correlation Breakdown*) e code di rischio non lineari.
 
 ### 4. 🔬 Modelli Quantitativi di Frontiera & Live Sandbox (`src/pages/4_🔬_Modelli_Quantitativi.py`)
 * **📊 Markowitz & Rebalancing**: Frontiera Efficiente risolta via SciPy SLSQP vincolato con stimatori di covarianza *Ledoit-Wolf Shrinkage*, Parità di Rischio Pura (Equal Risk Contribution ERC), Frontiera 3D ad alta densità con campionamento Multi-Alpha Dirichlet e generatore di ribilanciamento interattivo.
+* **💎 Portafoglio a Massima Diversificazione (MDP - Choueifaty & Coignard)**: Ottimizzazione del Diversification Ratio (DR) per massimizzare la diversificazione effettiva estraendo il massimo beneficio dalle correlazioni imperfette senza dipendere da stime di rendimento atteso.
+* **🛡️ Min-CVaR Exact Linear Programming (Rockafellar & Uryasev 2000)**: Ottimizzazione convessa del Conditional Value at Risk formulata come Programma Lineare esatto e risolta in sub-5ms tramite solutore C++ HiGHS, con pulsanti di allocazione rapida one-click nel Super-Ribilanciatore.
 * **🤖 AI Reinforcement Learning Policy Sandbox**: Ottimizzazione dinamica dei pesi di portafoglio basata su Policy Gradient REINFORCE e MDP continuo nello spazio degli stati $\mathbb{R}^{3N}$, addestrata ad adattarsi ai cambi di regime di mercato massimizzando il Sortino Ratio con controllo del turnover.
 * **🧬 Tail Copula & Kelly**: Mappatura della dipendenza di coda asimmetrica inferiore ($\lambda_L$) e superiore ($\lambda_U$) con copule di Clayton e Gumbel per il rischio di crash sistemico, affiancata dal simulatore continuo/discreto Kelly Criterion & Half-Kelly Position Sizing.
 * **🎲 Monte Carlo & Merton**: Simulazioni stocastiche previsionali a 10.000 cammini con Decomposizione di Cholesky e distribuzioni Student-t a code grasse, combinate con il modello Merton Jump-Diffusion a shock di salto Poissoniani.
@@ -278,14 +292,16 @@ ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo he
   * **Conto Economico di Gestione (Income Statement)**: Rendiconto economico per anno solare con distinzione rigorosa tra Redditi Personali (Lavoro, Capitale, Supporto familiare, Rimborsi) e Costi di Gestione/Consumi di vita (Abitazione, Alimentari, Ristorazione, Mobilità, Formazione, Salute, Svago).
   * **Waterfall Chart & Allocazione del Capitale**: Rappresentazione grafica Plotly a cascata dai flussi lordi al Risparmio Netto d'Esercizio, con rendiconto della destinazione del surplus tra investimenti in asset produttivi (PAC Titoli/ETF, Cripto-attività, Fondi Pensione) e accantonamento di cassa liquida.
   * **6 Indici di Bilancio & Radar di Solidità**: Suite di KPI patrimoniali con benchmark istituzionali e semafori di sicurezza: *Indice di Solvibilità* ($\ge 70\%$), *Debt-to-Assets* ($\le 30\%$), *Runway Fondo di Emergenza* ($\ge 6\text{ mesi}$), *Personal Savings Rate* ($\ge 20\%$), *Debt Service-to-Income DSTI* ($\le 33\%$), *Invested Assets Ratio* ($\ge 50\%$) affiancati da Radar Chart e rating sintetico (AAA / AA / A).
+  * **Bilancio Comparativo Pluriennale (2021–2026)**: Prospetto comparativo storico con serie a 6 esercizi di Attivo, Passivo, Patrimonio Netto, delta anno su anno (€ e %) e savings rate medio, corredato da grafico evolutivo e pulsante di esportazione CSV immediata.
+  * **🌪️ Stress Testing Macroeconomico Consolidato sul Patrimonio Netto (Sub-Tab 6)**: Simulazione congiunta degli shock regolamentari EBA Adverse 2026, Fed CCAR Severe, Stagflazione e Geopolitico su tutto l'attivo consolidato, con stima della perdita di capitale netto, del drawdown e dell'effetto leva finanziaria (*Debt-to-Assets Post-Stress*).
 * **🏛️ Consolidamento a 5 Livelli**: Aggregazione in tempo reale di Liquidità, Investimenti Finanziari (collegamento dinamico a portafogli Risk), Asset Fisici/Caveau, Previdenza Integrativa e Passività.
 * **🏆 Wealth Health Score (0-100)**: Punteggio sintetico di salute patrimoniale calcolato su 5 pilastri: Riserva di Liquidità, Tasso di Risparmio, Diversificazione, Copertura Previdenziale e Grado di Indebitamento (DTI).
 * **🌪️ Global Wealth Stress-Testing 3D, Waterfall & Liquidity Squeeze Timeline**: Simulazione interattiva di shock macro congiunti (Stagflazione 2022, Cigno Nero, Crisi Immobiliare, GFC 2008 Deflattivo, COVID 2020) con scomposizione Plotly Waterfall, stima del *Point of Forced Liquidation ($t^*$)*, calcolo della variazione rata mutuo alla francese, Dynamic FIRE SWR (Guyton-Klinger) e proiezione Monte Carlo della ripresa del Net Worth a 10 anni.
 * **🏢 Family Office Multi-Entity & Holding Consolidator**: Consolidamento patrimoniale e societario tra diverse entità giuridiche del nucleo familiare (*Persona Fisica, Holding SRL, Società Semplice, Trust Familiare, Polizze Dedicate*) con elisione automatica delle partite infragruppo (finanziamenti soci ed equity intercompany) e analisi di convenienza fiscale **PEX (Participation Exemption Art. 87 TUIR: 1,2% effettivo vs 26% IRPEF)**.
 * **💱 Multi-Currency FX Exposure & Forward Hedging Overlay**: Mappatura dell'esposizione a valute estere (USD, GBP, CHF, JPY), calcolo dei Forward Points e costo annuo di copertura secondo la Covered Interest Parity (CIP) e simulazione di scenari di shock valutario (-15%) a confronto tra strategie Unhedged, 50% e 100% Hedged.
 * **🎯 Total Wealth Brinson-Fachler Multi-Asset Attribution**: Scomposizione del rendimento attivo patrimoniale (Alpha) rispetto a un benchmark strategico composito in Effetto Allocazione, Effetto Selezione ed Effetto Interazione su tutto il patrimonio consolidato.
-* **📊 Trend Storico & Snapshot Temporali**: Storicizzazione dei bilanci patrimoniali e monitoraggio della crescita del capitale nel tempo.
-* **📑 Client-Ready Advisory Pitchbook**: Generazione ed esportazione di dossier multipagina esecutivi in formato PDF e HTML per clientela Private Banking e Family Office.
+* **📊 Trend Storico & Snapshot Temporali al 31/12**: Storicizzazione dei bilanci patrimoniali e congelamento batch degli snapshot ufficiali di chiusura esercizio (2021–2025).
+* **📑 Dossier PDF Istituzionale a 4 Pagine & Client-Ready Advisory Pitchbook**: Generazione esecutiva in formato PDF certificato a 4 pagine (Stato Patrimoniale, Conto Economico, Indici di Solidità e Bilancio Comparativo Pluriennale con CSS Progress Bars) e HTML interattivo per clientela Private Banking e Family Office.
 
 ### 14. 💳 Cash Flow, Budgeting 50/30/20 & Spese (`src/pages/14_💳_Cash_Flow_e_Spese.py`)
 * **📊 Libro Mastro Entrate & Uscite**: Analisi granulare dei flussi di cassa, scomposizione per categorie di spesa e monitoraggio del tasso di risparmio mensile.
@@ -301,6 +317,7 @@ ARGUS v9.5.0 consolida il **disaccoppiamento completo del motore quantitativo he
 * **💧 Matrice di Liquidabilità**: Mappatura del tempo medio di smobilizzo (Days-to-Cash) e haircut prudenziale in caso di liquidazione rapida.
 
 ### 16. 🛡️ Previdenza & Pension Planning (`src/pages/16_🛡️_Previdenza_e_Pension_Planning.py`)
+* **📜 Cronistoria Previdenziale & Scudo Fiscale Dinamico (2023–2026)**: Tabella analitica dei versamenti storici con tracking della deducibilità fiscale IRPEF (art. 51 TUIR, tetto 5.164,57 €), risparmio d'imposta reale (aliquota 43%) e plafond residuo con anno d'esercizio dinamico (`datetime.now().year`), affiancata dal grafico evolutivo su doppio asse (versamenti annui vs montante accumulato).
 * **🎲 Simulazione Monte Carlo Fondo Pensione**: Proiezione stocastica del montante pensionistico a 10.000 scenari con calcolo rendita mensile attesa post-tassazione agevolata (15% $\rightarrow$ 9%).
 * **💼 Rivalutazione TFR (Trattamento di Fine Rapporto)**: Calcolo contabile della rivalutazione annuale di legge ($1.5\% + 75\% \text{ FOI}$) e confronto rendimento TFR in azienda vs Fondo Pensione negoziale/aperto.
 * **🏛️ Gap Previdenziale & Tasso di Sostituzione**: Stima della pensione pubblica INPS attesa e quantificazione del gap reddituale rispetto all'ultimo stipendio.
@@ -809,7 +826,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **550 test automatizzati PyTest** distribuiti su 93 file di test (inclusi test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
+Il progetto include **660+ test automatizzati PyTest** distribuiti su 95 file di test (inclusi i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -817,7 +834,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 550 passed in ~88.00s (100%) =======================
+======================= 660+ passed in ~90.00s (100%) =======================
 ```
 
 ---
@@ -828,4 +845,4 @@ Questo progetto è distribuito sotto licenza open-source **MIT License**. Consul
 
 ---
 
-*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v9.7.0 Institutional Enterprise Release.*
+*ARGUS — Institutional Risk & Wealth Intelligence Ecosystem v9.8.0 Institutional Enterprise Release.*

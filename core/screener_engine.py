@@ -323,6 +323,40 @@ def _compute_rsi(series: pd.Series, period: int = 14) -> float:
     return float(100.0 - (100.0 / (1.0 + rs)))
 
 
+def _extract_clean_close_series(df_h: Optional[pd.DataFrame]) -> Optional[pd.Series]:
+    """
+    Estrae e sanitizza la serie storica dei prezzi di chiusura:
+    - Rimuove timezone (tz-naive) per evitare conflitti di join tra mercati diversi (USA/UE/Crypto).
+    - Normalizza a livello giornaliero (ore 00:00:00) per garantire un perfetto allineamento sui giorni di borsa.
+    - Rimuove eventuali duplicati di indice.
+    """
+    if df_h is None or df_h.empty or "close" not in df_h.columns:
+        return None
+    s = df_h["close"].dropna().copy()
+    if s.empty:
+        return None
+    if not isinstance(s.index, pd.DatetimeIndex):
+        try:
+            s.index = pd.to_datetime(s.index)
+        except Exception:
+            pass
+    if getattr(s.index, "tz", None) is not None:
+        try:
+            s.index = s.index.tz_localize(None)
+        except Exception:
+            try:
+                s.index = s.index.tz_convert(None)
+            except Exception:
+                pass
+    try:
+        s.index = s.index.normalize()
+    except Exception:
+        pass
+    if getattr(s.index, "has_duplicates", False):
+        s = s[~s.index.duplicated(keep="last")]
+    return s
+
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
@@ -449,8 +483,9 @@ def _process_single_screener_ticker(tk: str, sr_bm_ret: pd.Series, force_refresh
         perf_1y_pct = np.nan
 
         if df_hist is not None and not df_hist.empty and len(df_hist) > 20:
-            closes = df_hist["close"].dropna()
-            rets = closes.pct_change().dropna()
+            closes = _extract_clean_close_series(df_hist)
+            if closes is not None and len(closes) > 20:
+                rets = closes.pct_change().dropna()
 
             if not rets.empty:
                 vol_ann_pct = float(rets.std() * np.sqrt(252) * 100.0)
@@ -628,8 +663,9 @@ def fetch_screener_universe_data(
     # Pre-caricamento storico del benchmark per calcolo Beta
     df_bm = get_cached_ticker_history(benchmark_ticker, force_refresh=force_refresh)
     sr_bm_ret = pd.Series(dtype=float)
-    if df_bm is not None and not df_bm.empty and "close" in df_bm.columns:
-        sr_bm_ret = df_bm["close"].pct_change().dropna()
+    s_bm_close = _extract_clean_close_series(df_bm)
+    if s_bm_close is not None and not s_bm_close.empty:
+        sr_bm_ret = s_bm_close.pct_change().dropna()
 
     total = len(clean_tickers)
     rows = []
@@ -942,8 +978,9 @@ def simulate_pre_trade_impact(
     price_dict = {}
     for tk in all_tickers:
         df_h = get_cached_ticker_history(tk)
-        if df_h is not None and not df_h.empty and "close" in df_h.columns:
-            price_dict[tk] = df_h["close"]
+        s_close = _extract_clean_close_series(df_h)
+        if s_close is not None and not s_close.empty:
+            price_dict[tk] = s_close
 
     df_prices = pd.DataFrame(price_dict).dropna(how="all").ffill().dropna()
     if df_prices.empty or df_prices.shape[1] < 1 or clean_cand not in df_prices.columns:
@@ -956,8 +993,9 @@ def simulate_pre_trade_impact(
     # Benchmark returns
     df_bm = get_cached_ticker_history(benchmark_ticker)
     sr_bm = pd.Series(dtype=float)
-    if df_bm is not None and not df_bm.empty and "close" in df_bm.columns:
-        sr_bm = df_bm["close"].pct_change().dropna()
+    s_bm_close = _extract_clean_close_series(df_bm)
+    if s_bm_close is not None and not s_bm_close.empty:
+        sr_bm = s_bm_close.pct_change().dropna()
 
     # Vettore pesi PRIMA (Old)
     w_old_map = {r["ticker"]: r["weight"] for _, r in df_pos.iterrows()}
@@ -1169,8 +1207,9 @@ def compute_optimal_candidate_weight(
     price_dict = {}
     for tk in all_tickers:
         df_h = get_cached_ticker_history(tk)
-        if df_h is not None and not df_h.empty and "close" in df_h.columns:
-            price_dict[tk] = df_h["close"]
+        s_close = _extract_clean_close_series(df_h)
+        if s_close is not None and not s_close.empty:
+            price_dict[tk] = s_close
 
     df_prices = pd.DataFrame(price_dict).dropna(how="all").ffill().dropna()
     if df_prices.empty or df_prices.shape[1] < 1 or clean_cand not in df_prices.columns:
