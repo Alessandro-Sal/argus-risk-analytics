@@ -1828,3 +1828,33 @@ render_scenario_delta_comparator(
     },
 )
 st.dataframe(df_sev, use_container_width=True, hide_index=True)
+
+
+# ============================================================================
+# v9.17.0: ISDA SIMM v2.6 INITIAL MARGIN & UNCLEARED MARGIN RULES (UMR)
+# ============================================================================
+st.divider()
+st.markdown("#### 🛡️ ISDA SIMM™ v2.6 (Standard Initial Margin Model) & BCBS-IOSCO UMR Compliance")
+st.caption("Calcolo regolamentare del Margine Iniziale (DeltaMargin, VegaMargin, CurvatureMargin) sulle 6 classi di rischio ISDA, matrice di correlazione cross-asset ψ_{r,s}, verifica della soglia UMR di €50 Milioni e risparmio MVA tramite Central Clearing (CCP LCH/Eurex).")
+
+from core.isda_simm_engine import compute_isda_simm_margin
+
+sm_c1, sm_c2 = st.columns(2)
+with sm_c1:
+    sm_fspread = st.slider("Spread di Funding Collaterale (bps):", min_value=30.0, max_value=350.0, value=145.0, step=5.0, key="sm_fspread_in")
+with sm_c2:
+    sm_mpor = st.slider("Margin Period of Risk Bilaterale (MPOR Giorni):", min_value=5, max_value=20, value=10, step=1, key="sm_mpor_in")
+
+simm_res = compute_isda_simm_margin(funding_spread_bps=sm_fspread, mpor_days=int(sm_mpor))
+
+smk1, smk2, smk3, smk4 = st.columns(4)
+with smk1:
+    metric_card("ISDA SIMM Initial Margin", fmt_eur(simm_res["total_simm_initial_margin_eur"]), delta=f"Beneficio Diversif.: -{simm_res['cross_class_diversification_benefit_pct']:.1f}%", delta_color="normal")
+with smk2:
+    metric_card("Utilizzo Soglia UMR (€50M)", f"{simm_res['umr_utilization_pct']:.1f}%", delta=simm_res["recommended_clearing_route"].split(" (")[0], delta_color="normal" if not simm_res["umr_threshold_breached"] else "inverse")
+with smk3:
+    metric_card("IM Equivalente CCP (LCH/Eurex)", fmt_eur(simm_res["ccp_cleared_equivalent_im_eur"]), delta="MPOR 5gg Clearing", delta_color="normal")
+with smk4:
+    metric_card("Risparmio Annuo MVA (CCP vs CSA)", fmt_eur(simm_res["annual_ccp_mva_savings_eur"]), delta=f"MVA Bilat: {fmt_eur(simm_res['annual_mva_bilateral_eur'])}", delta_color="normal")
+
+st.dataframe(pd.DataFrame(simm_res["risk_class_breakdown"]), use_container_width=True, hide_index=True)

@@ -285,6 +285,20 @@ QUANT_MODELS_CATALOG = {
         "category": "Fixed Income & Rates",
         "desc": "Modello di tasso a breve gaussiano a 1 fattore dr_t = [θ(t) - a r_t]dt + σ dW_t calibrato sulla curva zero-coupon, con induzione a ritroso Least-Squares Monte Carlo (Longstaff-Schwartz) per Swaption Bermudiane e Callable Bonds."
     },
+    "🌊 Rough Volatility (rBergomi) & SVI Surface": {
+        "title": "Rough Volatility (rBergomi Hurst H ~ 0.10) & Gatheral SVI Arbitrage-Free Surface",
+        "badge": "Rough Bergomi · Gatheral SVI · Durrleman g(k) >= 0",
+        "badge_color": "#06b6d4",
+        "category": "Derivati & Volatilità",
+        "desc": "Parametrizzazione SVI/SSVI di Gatheral con verifica analitica di assenza di arbitraggio Butterfly (Durrleman g(k) >= 0) e Calendar Spread, combinata con il modello frazionario Rough Bergomi (Bayer-Friz-Gatheral 2016) per l'esplosione dello skew ATM a breve termine."
+    },
+    "💳 Single-Name CDS & iTraxx/CDX CDO Tranches": {
+        "title": "ISDA Single-Name CDS Bootstrapping & 1-Factor Gaussian Copula CDO Tranches",
+        "badge": "Hazard Rate λ(t) · ISDA Upfront · iTraxx / CDX Tranches",
+        "badge_color": "#f43f5e",
+        "category": "Credit & Structured Finance",
+        "desc": "Bootstrapping delle probabilità di sopravvivenza Q(0,t) e intensità di default λ(t), ISDA Standard Model Upfront, CS01, Jump-to-Default e prezzatura 1-Factor Gaussian Copula / Base Correlation delle tranche sintetiche (Equity 0-3%, Mezzanine 3-6%, Senior 6-9%, Super-Senior)."
+    },
     "🔮 SABR & Local Volatility Surface 3D": {
         "title": "SABR Model Calibration & Dupire Local Volatility PDE Surface (3D)",
         "badge": "Hagan SABR • Dupire PDE • 3D Vol Cube",
@@ -5351,3 +5365,83 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
     )
     ex_df = pd.DataFrame(hw_res["exercise_schedule"])
     st.dataframe(ex_df, use_container_width=True, hide_index=True)
+
+
+# ── TAB: ROUGH VOLATILITY (rBERGOMI) & SVI ARBITRAGE-FREE SURFACE ──────────
+elif active_quant_tab == "🌊 Rough Volatility (rBergomi) & SVI Surface":
+    st.markdown("#### 🌊 Rough Volatility (Rough Bergomi $H \approx 0.10$) & Gatheral SVI Arbitrage-Free Surface")
+    st.caption(r"Parametrizzazione SVI di Gatheral con test di non-arbitraggio Butterfly di Durrleman $g(k) \ge 0$ e legge di potenza dello skew ATM a breve termine $\mathcal{O}(T^{H - 1/2})$.")
+
+    from core.rough_vol_svi_engine import compute_rough_vol_svi_surface
+
+    rv_c1, rv_c2, rv_c3 = st.columns(3)
+    with rv_c1:
+        rv_h = st.slider("Esponente di Hurst Rough Bergomi (H):", min_value=0.04, max_value=0.35, value=0.10, step=0.01, key="rv_h_in")
+        rv_rho = st.slider("Correlazione Spot-Vol SVI (ρ):", min_value=-0.95, max_value=0.20, value=-0.62, step=0.02, key="rv_rho_in")
+    with rv_c2:
+        rv_b = st.slider("Pendenza Ali SVI (b):", min_value=0.05, max_value=0.40, value=0.185, step=0.01, key="rv_b_in")
+        rv_sig = st.slider("Curvatura ATM SVI (σ):", min_value=0.05, max_value=0.40, value=0.14, step=0.01, key="rv_sig_in")
+    with rv_c3:
+        rv_eta = st.slider("Vol-of-Vol Rough Bergomi (η):", min_value=0.50, max_value=3.50, value=1.85, step=0.05, key="rv_eta_in")
+
+    rv_res = compute_rough_vol_svi_surface(hurst_h=rv_h, svi_b=rv_b, svi_rho=rv_rho, svi_sigma=rv_sig, eta_vol_of_vol=rv_eta)
+
+    rk1, rk2, rk3, rk4 = st.columns(4)
+    with rk1:
+        st.metric("Hurst Exponent H & Dim. Frattale", f"H = {rv_res['hurst_exponent_h']:.2f}", delta=f"Fractal D = {rv_res['fractal_dimension_d']:.2f}")
+    with rk2:
+        st.metric("Durrleman Butterfly Min g(k)", f"{rv_res['min_durrleman_density_g']:.4f}", delta="Arbitrage-Free ✅" if rv_res["butterfly_arbitrage_free"] else "Arbitrage ⚠️")
+    with rk3:
+        st.metric("ATM Skew 1M (Rough Bergomi)", f"{rv_res['short_end_skew_1m']:.3f}", delta=f"Esponente: T^({rv_res['skew_power_law_exponent']:+.2f})")
+    with rk4:
+        st.metric("ATM Skew 12M (1 Anno)", f"{rv_res['one_year_skew_12m']:.3f}", delta="Calendar Free ✅" if rv_res["calendar_spread_arbitrage_free"] else "Warning")
+
+    svi_df = pd.DataFrame(rv_res["surface_term_structure"])
+    fig_rv = go.Figure()
+    fig_rv.add_trace(go.Scatter(x=svi_df["tenor_label"], y=svi_df["rough_bergomi_atm_skew"].abs(), mode="lines+markers", name="|ATM Skew| Rough Bergomi (Power-Law)", line=dict(color="#06b6d4", width=3)))
+    fig_rv.add_trace(go.Scatter(x=svi_df["tenor_label"], y=svi_df["classical_markov_skew"].abs(), mode="lines+markers", name="|ATM Skew| Heston Classico", line=dict(color="#94a3b8", width=2, dash="dash")))
+    style_institutional_chart(fig_rv, title="Confronto Term Structure ATM Volatility Skew: Rough Bergomi vs Modello Markoviano Classico", height=380)
+    st.plotly_chart(fig_rv, use_container_width=True)
+    st.dataframe(svi_df, use_container_width=True, hide_index=True)
+
+
+# ── TAB: SINGLE-NAME CDS & SYNTHETIC CREDIT INDEX TRANCHES (iTRAXX/CDX) ────
+elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
+    st.markdown("#### 💳 ISDA Single-Name CDS Bootstrapping & Synthetic CDO Tranches (iTraxx / CDX 1F Gaussian Copula)")
+    st.caption(r"Bootstrapping delle intensità di default $\lambda(t)$ e probabilità di sopravvivenza $Q(0, t)$, ISDA Upfront, CS01 e prezzatura 1-Factor Gaussian Copula / Base Correlation delle tranche sintetiche.")
+
+    from core.cds_tranche_engine import compute_cds_and_tranche_pricing
+
+    cd_c1, cd_c2, cd_c3 = st.columns(3)
+    with cd_c1:
+        cd_ent = st.text_input("Reference Entity / Indice:", value="Intesa Sanpaolo S.p.A. (Senior)", key="cd_ent_in")
+        cd_not = st.number_input("Nozionale CDS / Tranche (€):", min_value=100_000.0, value=10_000_000.0, step=1_000_000.0, key="cd_not_in")
+    with cd_c2:
+        cd_spr = st.slider("Par Spread CDS 5 Anni (bps):", min_value=15.0, max_value=550.0, value=96.0, step=5.0, key="cd_spr_in")
+        cd_rec = st.slider("Recovery Rate Atteso R (%):", min_value=10.0, max_value=70.0, value=40.0, step=5.0, key="cd_rec_in") / 100.0
+    with cd_c3:
+        cd_rho = st.slider("Correlazione Sistemica Gaussian Copula (ρ):", min_value=0.10, max_value=0.75, value=0.32, step=0.02, key="cd_rho_in")
+
+    cd_res = compute_cds_and_tranche_pricing(
+        reference_entity=cd_ent,
+        notional_eur=cd_not,
+        recovery_rate=cd_rec,
+        five_year_spread_bps=cd_spr,
+        copula_correlation_rho=cd_rho,
+    )
+
+    ck1, ck2, ck3, ck4 = st.columns(4)
+    with ck1:
+        st.metric("ISDA Upfront (vs 100 bps Running)", fmt_eur(cd_res["isda_upfront_eur"]), delta=f"{cd_res['isda_upfront_pct']:+.2f}% del nozionale")
+    with ck2:
+        st.metric("CS01 (Credit Spread 01)", fmt_eur(cd_res["cs01_eur_per_bp"]), delta=f"Risky PV01: {cd_res['risky_pv01_5y']:.3f}")
+    with ck3:
+        st.metric("Jump-to-Default (JTD Net)", fmt_eur(cd_res["jump_to_default_jtd_eur"]), delta=f"Recovery: {cd_res['recovery_rate_pct']:.0f}%")
+    with ck4:
+        eq_tr = cd_res["synthetic_cdo_tranches"][0]
+        st.metric("Equity Tranche [0-3%] Spread", f"{eq_tr['fair_running_spread_bps']:,.0f} bps", delta=f"Upfront: {eq_tr['upfront_vs_std_coupon_pct']:+.1f}% (vs 500 bps)")
+
+    st.markdown("##### 📊 Prezzatura Tranche Sintetiche iTraxx / CDX (1-Factor Gaussian Copula & Base Correlation)")
+    st.dataframe(pd.DataFrame(cd_res["synthetic_cdo_tranches"]), use_container_width=True, hide_index=True)
+    st.markdown(r"##### 📈 Curva delle Probabilità di Sopravvivenza $Q(0, t)$ & Hazard Rates $\lambda(t)$")
+    st.dataframe(pd.DataFrame(cd_res["survival_curve_nodes"]), use_container_width=True, hide_index=True)
