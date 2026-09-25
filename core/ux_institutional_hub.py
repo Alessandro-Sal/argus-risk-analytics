@@ -973,7 +973,7 @@ def render_executive_traffic_light_radar(
                 nav_eur=float(radar.get("nav_eur", 125_000_000.0)),
                 risk_data=risk_data,
             )
-            bp_c1, bp_c2 = st.columns([2.95, 1.25], vertical_alignment="stretch")
+            bp_c1, bp_c2 = st.columns([2.95, 1.25], vertical_alignment="top")
             with bp_c1:
                 rx_cards_html = ""
                 for rx in bp_res["cro_prescriptions"]:
