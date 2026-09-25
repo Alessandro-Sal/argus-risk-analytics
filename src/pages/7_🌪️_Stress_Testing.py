@@ -1595,29 +1595,39 @@ st.caption("Valutazione CVA, DVA, FVA, MVA, KVA con accordi di compensazione CSA
 
 from core.xva_engine import compute_xva_metrics
 
+_default_xva_mtm = max(1_000.0, round(float(portfolio_value), 2)) if portfolio_value > 0 else 2_500_000.0
+_default_xva_thr = max(500.0, round(_default_xva_mtm * 0.15, -2))
+_default_xva_mta = max(100.0, round(_default_xva_mtm * 0.05, -2))
+
 with st.expander("⚙️ Parametri Contratto CSA Netting Set & Portafoglio Derivati", expanded=False):
     xva_c1, xva_c2, xva_c3 = st.columns(3)
     with xva_c1:
-        xva_port_mtm = st.number_input("MTM Lordo Portafoglio Derivati (€):", min_value=100_000.0, value=2_500_000.0, step=250_000.0, key="xva_mtm_in")
-        xva_thresh = st.number_input("Soglia CSA Bilaterale (€):", min_value=0.0, value=250_000.0, step=50_000.0, key="xva_thresh_in")
+        xva_port_mtm = st.number_input("MTM Lordo / Nozionale Portafoglio (€):", min_value=1_000.0, value=float(_default_xva_mtm), step=10_000.0, key="xva_mtm_in")
+        xva_thresh = st.number_input("Soglia CSA Bilaterale (€):", min_value=0.0, value=float(_default_xva_thr), step=5_000.0, key="xva_thresh_in")
     with xva_c2:
         xva_cpty_spread = st.number_input("Credit Spread Controparte (bps):", min_value=10.0, max_value=1000.0, value=120.0, step=10.0, key="xva_cpty_sp")
         xva_own_spread = st.number_input("Credit Spread Proprio (DVA bps):", min_value=10.0, max_value=500.0, value=65.0, step=5.0, key="xva_own_sp")
     with xva_c3:
         xva_mpor = st.slider("Margin Period of Risk (MPOR Giorni):", min_value=5, max_value=30, value=10, step=1, key="xva_mpor_in")
-        xva_mta = st.number_input("Minimum Transfer Amount (€):", min_value=0.0, value=50_000.0, step=10_000.0, key="xva_mta_in")
+        xva_mta = st.number_input("Minimum Transfer Amount (€):", min_value=0.0, value=float(_default_xva_mta), step=1_000.0, key="xva_mta_in")
 
 custom_csa = {
-    "threshold": xva_thresh,
-    "mta": xva_mta,
+    "threshold_eur": xva_thresh,
+    "mta_eur": xva_mta,
     "mpor_days": xva_mpor,
 }
 custom_mkt = {
     "counterparty_cds_spread_bps": xva_cpty_spread,
     "own_cds_spread_bps": xva_own_spread,
 }
+_xva_trades = [
+    {"trade_id": "IRS_EUR_5Y", "symbol": "EUR_SWAP_5Y", "asset_class": "IR_SWAP", "notional_eur": xva_port_mtm * 0.45, "maturity_years": 5.0, "mtm_eur": xva_port_mtm * 0.14, "volatility_annual": 0.18},
+    {"trade_id": "IRS_EUR_10Y", "symbol": "EUR_SWAP_10Y", "asset_class": "IR_SWAP", "notional_eur": xva_port_mtm * 0.27, "maturity_years": 10.0, "mtm_eur": -xva_port_mtm * 0.05, "volatility_annual": 0.15},
+    {"trade_id": "FX_FWD_USD", "symbol": "EUR_USD_2Y", "asset_class": "FX_FORWARD", "notional_eur": xva_port_mtm * 0.18, "maturity_years": 2.0, "mtm_eur": xva_port_mtm * 0.07, "volatility_annual": 0.12},
+    {"trade_id": "EQ_OPT_PORT", "symbol": "PORT_HEDGE_1Y", "asset_class": "EQUITY_OPTION", "notional_eur": xva_port_mtm * 0.10, "maturity_years": 1.0, "mtm_eur": xva_port_mtm * 0.04, "volatility_annual": 0.24},
+]
 
-xva_res = compute_xva_metrics(csa_params=custom_csa, market_params=custom_mkt)
+xva_res = compute_xva_metrics(trades_data=_xva_trades, csa_params=custom_csa, market_params=custom_mkt)
 
 xk1, xk2, xk3, xk4 = st.columns(4)
 with xk1:
@@ -1631,12 +1641,13 @@ with xk4:
 
 st.markdown("##### 📈 Profilo di Esposizione Creditizia Futura (EE, PFE 95%, PFE 99%, ENE)")
 exp_df = pd.DataFrame(xva_res["exposure_profile"])
+_x_col = "tenor_years" if "tenor_years" in exp_df.columns else "time_years"
 
 fig_xva = go.Figure()
-fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["pfe_99_eur"], name="PFE 99% (Worst-Case)", line=dict(color="#f43f5e", width=2.5)))
-fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["pfe_95_eur"], name="PFE 95%", line=dict(color="#fb923c", width=2)))
-fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["expected_exposure_eur"], name="Expected Exposure (EE)", line=dict(color="#38bdf8", width=2.5)))
-fig_xva.add_trace(go.Scatter(x=exp_df["tenor_years"], y=exp_df["expected_negative_exposure_eur"], name="Expected Neg. Exposure (ENE)", line=dict(color="#a855f7", dash="dot")))
+fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["pfe_99_eur"], name="PFE 99% (Worst-Case)", line=dict(color="#f43f5e", width=2.5)))
+fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["pfe_95_eur"], name="PFE 95%", line=dict(color="#fb923c", width=2)))
+fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["expected_exposure_eur"], name="Expected Exposure (EE)", line=dict(color="#38bdf8", width=2.5)))
+fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["expected_negative_exposure_eur"], name="Expected Neg. Exposure (ENE)", line=dict(color="#a855f7", dash="dot")))
 
 fig_xva.update_layout(
     title="Simulazione Monte Carlo dei Profili di Esposizione con Collaterale CSA",
