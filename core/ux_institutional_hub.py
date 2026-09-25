@@ -659,6 +659,17 @@ def compute_executive_traffic_light_radar(
     }
 
 
+def _safe_page_link(page_path: str, label: str) -> None:
+    """Safely render st.page_link using path relative to the src/ entrypoint directory."""
+    if st is None or not hasattr(st, "page_link") or not page_path:
+        return
+    rel_path = page_path[4:] if page_path.startswith("src/") else page_path
+    try:
+        st.page_link(rel_path, label=label, use_container_width=True)
+    except Exception:
+        pass
+
+
 def render_executive_traffic_light_radar(
     key_prefix: str = "cro_radar",
     metrics_override: dict[str, float] | None = None,
@@ -717,8 +728,8 @@ def render_executive_traffic_light_radar(
                 if res.get("macro_shock"):
                     st.session_state["global_macro_shock"] = res["macro_shock"]
                 st.info(f"**{res['command']}** → {res['description']}")
-                if res.get("target_page") and hasattr(st, "page_link"):
-                    st.page_link(res["target_page"], label=f"🚀 Apri {res['command']} ({res['workspace']})")
+                if res.get("target_page"):
+                    _safe_page_link(res["target_page"], f"🚀 Apri {res['command']} ({res['workspace']})")
         with c_shk:
             preset_keys = list(MACRO_SHOCK_PRESETS.keys())
             idx = preset_keys.index(cur_shock) if cur_shock in preset_keys else 0
@@ -747,17 +758,17 @@ def render_executive_traffic_light_radar(
         if hasattr(st, "page_link"):
             qj1, qj2, qj3, qj4, qj5, qj6 = st.columns(6)
             with qj1:
-                st.page_link("src/pages/7_🌪️_Stress_Testing.py", label="🛡️ ISDA SIMM v2.6", use_container_width=True)
+                _safe_page_link("pages/7_🌪️_Stress_Testing.py", "🛡️ ISDA SIMM v2.6")
             with qj2:
-                st.page_link("src/pages/4_🔬_Modelli_Quantitativi.py", label="🌊 Rough Vol & SVI", use_container_width=True)
+                _safe_page_link("pages/4_🔬_Modelli_Quantitativi.py", "🌊 Rough Vol & SVI")
             with qj3:
-                st.page_link("src/pages/13_🏛️_Patrimonio_e_NetWorth.py", label="🏛️ ALM / LDI LP", use_container_width=True)
+                _safe_page_link("pages/13_🏛️_Patrimonio_e_NetWorth.py", "🏛️ ALM / LDI LP")
             with qj4:
-                st.page_link("src/pages/4_🔬_Modelli_Quantitativi.py", label="💳 CDS & Tranches", use_container_width=True)
+                _safe_page_link("pages/4_🔬_Modelli_Quantitativi.py", "💳 CDS & Tranches")
             with qj5:
-                st.page_link("src/pages/13_🏛️_Patrimonio_e_NetWorth.py", label="⚡ Market-Making VPIN", use_container_width=True)
+                _safe_page_link("pages/13_🏛️_Patrimonio_e_NetWorth.py", "⚡ Market-Making VPIN")
             with qj6:
-                st.page_link("src/pages/7_🌪️_Stress_Testing.py", label="🌪️ Fed CCAR 9Q", use_container_width=True)
+                _safe_page_link("pages/7_🌪️_Stress_Testing.py", "🌪️ Fed CCAR 9Q")
 
         # Row 3: 6 Rich Bento CRO Pillar Cards with Inline SVG Sparklines & Limit Utilization Bars
         cols = st.columns(3)
@@ -1308,8 +1319,8 @@ def render_command_bar_and_shock_ribbon(key_prefix: str = "global_cmd") -> dict[
                 if res.get("macro_shock"):
                     st.session_state["global_macro_shock"] = res["macro_shock"]
                 st.info(f"**{res['command']}** → {res['description']}")
-                if res.get("target_page") and hasattr(st, "page_link"):
-                    st.page_link(res["target_page"], label=f"🚀 Open {res['command']} ({res['workspace']})")
+                if res.get("target_page"):
+                    _safe_page_link(res["target_page"], f"🚀 Open {res['command']} ({res['workspace']})")
         with c2:
             preset_keys = list(MACRO_SHOCK_PRESETS.keys())
             cur_shock = str(st.session_state.get("global_macro_shock", "NONE"))
