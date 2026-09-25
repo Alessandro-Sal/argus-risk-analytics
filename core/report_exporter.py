@@ -2067,9 +2067,21 @@ def generate_institutional_audit_dossier(
 
 def generate_pdf_factsheet(results: dict, portfolio_name: str = "My Portfolio") -> bytes:
     """
-    Genera un Report PDF Executive Factsheet compatto a 2 pagine in-memory.
-    Ritorna il buffer di byte PDF pronti per il download Streamlit.
+    Genera il Report PDF Executive Factsheet Istituzionale a 2 pagine (Morningstar / Private Banking Standard).
+    Delega a generate_institutional_portfolio_factsheet_pdf per garantire grafici vettoriali,
+    NumberedCanvas con header/footer regolamentari MiFID II, scomposizione Fama-French e ALM.
     """
+    try:
+        from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+
+        return generate_institutional_portfolio_factsheet_pdf(
+            portfolio_name=portfolio_name,
+            risk_data=results,
+            base_currency="EUR",
+        )
+    except Exception:
+        pass
+
     if not HAS_REPORTLAB:
         raise ImportError("Le librerie reportlab non sono installate.")
 
