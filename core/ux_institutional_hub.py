@@ -94,6 +94,76 @@ def build_telemetry_ribbon_state(
     }
 
 
+def _compact_html(raw: str) -> str:
+    """Collapse multi-line HTML into a single line to prevent CommonMark 4-space code block parsing."""
+    return " ".join(line.strip() for line in raw.splitlines() if line.strip())
+
+
+def build_telemetry_ribbon_html(
+    telemetry: dict[str, Any],
+    shock_info: dict[str, Any] | None = None,
+) -> str:
+    """Build single-line, zero-indent HTML for the sticky institutional telemetry ribbon."""
+    s_info = shock_info if shock_info is not None else get_active_macro_shock()
+    nav_str = f"€ {telemetry['nav_eur']:,.0f}".replace(",", ".")
+    var_str = f"€ {telemetry['var_99_eur']:,.0f}".replace(",", ".")
+    shock_pill_html = ""
+    if s_info.get("is_active"):
+        shock_pill_html = (
+            f'<span style="background: rgba(168, 85, 247, 0.22); border: 1px solid #a855f7; '
+            f'color: #e9d5ff; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 12px;">'
+            f'⚡ SHOCK: {s_info["label"]}</span>'
+        )
+
+    raw_html = f"""
+    <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
+                border: 1px solid rgba(99, 102, 241, 0.32);
+                border-left: 4px solid #6366f1;
+                border-radius: 10px;
+                padding: 8px 14px;
+                margin-bottom: 8px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.35);">
+        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <span style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.45);
+                         color: #818cf8; font-size: 10.5px; font-weight: 800; padding: 2px 8px;
+                         border-radius: 6px; font-family: 'JetBrains Mono', monospace;">
+                ARGUS v{telemetry['app_version']}
+            </span>
+            <span style="color: #e2e8f0; font-size: 12px; font-weight: 700;">
+                🏛️ {telemetry['profile_name']}
+            </span>
+            <span style="color: #64748b; font-size: 11px;">|</span>
+            <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
+                {telemetry['page_badge']}
+            </span>
+            {shock_pill_html}
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                NAV: <b style="color: #10b981;">{nav_str}</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                VaR 99%: <b style="color: #f59e0b;">{var_str} ({telemetry['var_99_pct']:.2f}%)</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Sharpe: <b style="color: #38bdf8;">{telemetry['sharpe_ratio']:.2f}</b>
+            </span>
+            <span style="background: rgba(255,255,255,0.04); border: 1px solid {telemetry['regime_color']};
+                         color: {telemetry['regime_color']}; font-size: 10.5px; font-weight: 800;
+                         padding: 2px 8px; border-radius: 12px;">
+                {telemetry['regime_label']}
+            </span>
+        </div>
+    </div>
+    """
+    return _compact_html(raw_html)
+
+
 def render_institutional_telemetry_ribbon(
     page_badge: str = "INSTITUTIONAL TERMINAL",
 ) -> dict[str, Any]:
@@ -107,65 +177,7 @@ def render_institutional_telemetry_ribbon(
     density_mode = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
     inject_density_mode_css(density_mode)
 
-    nav_str = f"€ {telemetry['nav_eur']:,.0f}".replace(",", ".")
-    var_str = f"€ {telemetry['var_99_eur']:,.0f}".replace(",", ".")
-    shock_pill_html = ""
-    if shock_info["is_active"]:
-        shock_pill_html = (
-            f'<span style="background: rgba(168, 85, 247, 0.22); border: 1px solid #a855f7; '
-            f'color: #e9d5ff; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 12px;">'
-            f'⚡ SHOCK: {shock_info["label"]}</span>'
-        )
-
-    st.markdown(
-        f"""
-        <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
-                    border: 1px solid rgba(99, 102, 241, 0.32);
-                    border-left: 4px solid #6366f1;
-                    border-radius: 10px;
-                    padding: 8px 14px;
-                    margin-bottom: 8px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    flex-wrap: wrap;
-                    gap: 10px;
-                    box-shadow: 0 4px 16px rgba(0,0,0,0.35);">
-            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                <span style="background: rgba(99, 102, 241, 0.18); border: 1px solid rgba(99, 102, 241, 0.45);
-                             color: #818cf8; font-size: 10.5px; font-weight: 800; padding: 2px 8px;
-                             border-radius: 6px; font-family: 'JetBrains Mono', monospace;">
-                    ARGUS v{telemetry['app_version']}
-                </span>
-                <span style="color: #e2e8f0; font-size: 12px; font-weight: 700;">
-                    🏛️ {telemetry['profile_name']}
-                </span>
-                <span style="color: #64748b; font-size: 11px;">|</span>
-                <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
-                    {telemetry['page_badge']}
-                </span>
-                {shock_pill_html}
-            </div>
-            <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
-                <span style="font-size: 11.5px; color: #cbd5e1;">
-                    NAV: <b style="color: #10b981;">{nav_str}</b>
-                </span>
-                <span style="font-size: 11.5px; color: #cbd5e1;">
-                    VaR 99%: <b style="color: #f59e0b;">{var_str} ({telemetry['var_99_pct']:.2f}%)</b>
-                </span>
-                <span style="font-size: 11.5px; color: #cbd5e1;">
-                    Sharpe: <b style="color: #38bdf8;">{telemetry['sharpe_ratio']:.2f}</b>
-                </span>
-                <span style="background: rgba(255,255,255,0.04); border: 1px solid {telemetry['regime_color']};
-                             color: {telemetry['regime_color']}; font-size: 10.5px; font-weight: 800;
-                             padding: 2px 8px; border-radius: 12px;">
-                    {telemetry['regime_label']}
-                </span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(build_telemetry_ribbon_html(telemetry, shock_info), unsafe_allow_html=True)
     render_command_bar_and_shock_ribbon(key_prefix=f"cmd_{page_badge[:10].lower().replace(' ', '_')}")
     return telemetry
 
@@ -569,7 +581,7 @@ def render_executive_traffic_light_radar(
         for idx, p in enumerate(radar["pillars"]):
             icon = "🟢" if p["status"] == "PASS" else ("🟡" if p["status"] == "WARNING" else "🔴")
             with cols[idx % 3]:
-                st.markdown(
+                card_html = _compact_html(
                     f"""
                     <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08);
                                 border-left: 4px solid {p['badge_color']}; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px;">
@@ -581,9 +593,9 @@ def render_executive_traffic_light_radar(
                             {p['value_label']}
                         </div>
                     </div>
-                    """,
-                    unsafe_allow_html=True,
+                    """
                 )
+                st.markdown(card_html, unsafe_allow_html=True)
     return radar
 
 
@@ -1007,18 +1019,22 @@ def get_density_mode_css(mode: str = "COMPACT_DESK") -> str:
     """Return CSS rules for Compact Quant Desk vs Boardroom Presentation mode."""
     mode_norm = str(mode or "COMPACT_DESK").upper()
     if mode_norm == "BOARDROOM":
-        return """
+        return _compact_html(
+            """
+            <style>
+            .argus-bento-card { padding: 18px 22px !important; }
+            div[data-testid="stMetricValue"] { font-size: 1.85rem !important; }
+            </style>
+            """
+        )
+    return _compact_html(
+        """
         <style>
-        .argus-bento-card { padding: 18px 22px !important; }
-        div[data-testid="stMetricValue"] { font-size: 1.85rem !important; }
+        .argus-bento-card { padding: 10px 12px !important; }
+        div[data-testid="stMetricValue"] { font-size: 1.35rem !important; font-family: 'JetBrains Mono', monospace !important; }
         </style>
         """
-    return """
-    <style>
-    .argus-bento-card { padding: 10px 12px !important; }
-    div[data-testid="stMetricValue"] { font-size: 1.35rem !important; font-family: 'JetBrains Mono', monospace !important; }
-    </style>
-    """
+    )
 
 
 def inject_density_mode_css(mode: str = "COMPACT_DESK") -> str:

@@ -153,3 +153,18 @@ def test_v918_api_command_dispatch_endpoint() -> None:
     assert data["command_resolution"]["command_key"] == "SHOCK 2008"
     assert data["shocked_inputs"]["macro_shock_active"] is True
     assert data["shocked_inputs"]["index_spread_bps"] == 450.0
+
+
+def test_v918_telemetry_ribbon_html_no_codeblock_indentation() -> None:
+    """Ensure build_telemetry_ribbon_html never contains blank lines or 4-space CommonMark code blocks."""
+    from core.ux_institutional_hub import build_telemetry_ribbon_html, build_telemetry_ribbon_state
+
+    tel = build_telemetry_ribbon_state(page_badge="CONTROL ROOM & EXECUTIVE LAUNCHPAD")
+    html_no_shock = build_telemetry_ribbon_html(tel, {"is_active": False, "label": "NONE"})
+    assert "\n" not in html_no_shock
+    assert "NAV:" in html_no_shock and "BULL / NORMAL" in html_no_shock
+
+    html_shock = build_telemetry_ribbon_html(tel, {"is_active": True, "label": "GFC 2008"})
+    assert "\n" not in html_shock
+    assert "⚡ SHOCK: GFC 2008" in html_shock
+
