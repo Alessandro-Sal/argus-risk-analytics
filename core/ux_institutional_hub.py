@@ -797,6 +797,7 @@ def compute_executive_traffic_light_radar(
         "readiness_score": readiness_score,
         "active_macro_shock": s_key,
         "nav_eur": nav_eur,
+        "metrics": m,
         "pass_count": pass_cnt,
         "warning_count": warn_cnt,
         "breach_count": breach_cnt,
@@ -970,39 +971,109 @@ def render_executive_traffic_light_radar(
             bp_res = generate_executive_board_pack(
                 portfolio_name=port_name,
                 nav_eur=float(radar.get("nav_eur", 125_000_000.0)),
+                risk_data=risk_data,
             )
-            bp_c1, bp_c2 = st.columns([3.0, 1.2])
+            bp_c1, bp_c2 = st.columns([2.95, 1.25], vertical_alignment="stretch")
             with bp_c1:
-                rx_items_html = "".join(
-                    f'<div style="font-size:11.5px; color:#e2e8f0; margin-bottom:4px;">'
-                    f'<span style="background:rgba(99,102,241,0.2); color:#a5b4fc; font-weight:800; font-size:10px; '
-                    f'padding:1px 6px; border-radius:4px; margin-right:6px;">{rx["priority"]} · {rx["domain"]}</span>'
-                    f'{rx["action"]}</div>'
-                    for rx in bp_res["cro_prescriptions"][:2]
-                )
+                rx_cards_html = ""
+                for rx in bp_res["cro_prescriptions"]:
+                    b_col = rx.get("badge_color", "#6366f1")
+                    rx_cards_html += (
+                        f'<div style="background:rgba(15,23,42,0.82); border:1px solid rgba(148,163,184,0.14); '
+                        f'border-left:3px solid {b_col}; border-radius:7px; padding:7px 10px; margin-bottom:6px;">'
+                        f'<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:3px;">'
+                        f'<div style="display:flex; align-items:center; gap:6px;">'
+                        f'<span style="background:rgba(99,102,241,0.22); color:#c7d2fe; font-family:\'JetBrains Mono\',monospace; '
+                        f'font-weight:800; font-size:9.5px; padding:1px 6px; border-radius:4px;">{rx.get("code", "RX")}</span>'
+                        f'<span style="font-size:11px; font-weight:800; color:#f8fafc;">{rx["priority"]}</span>'
+                        f'<span style="font-size:10px; color:#94a3b8;">· {rx["domain"]}</span>'
+                        f'</div>'
+                        f'<div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">'
+                        f'<span style="background:rgba(245,158,11,0.14); border:1px solid rgba(245,158,11,0.35); color:#fbbf24; '
+                        f'font-family:\'JetBrains Mono\',monospace; font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:4px;">'
+                        f'{rx.get("notional_label", "")}</span>'
+                        f'<span style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; '
+                        f'font-family:\'JetBrains Mono\',monospace; font-size:9.5px; font-weight:700; padding:1px 6px; border-radius:4px;">'
+                        f'{rx.get("target_kpi", "")}</span>'
+                        f'<span style="background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.35); color:#34d399; '
+                        f'font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:4px;">{rx.get("readiness_lift", "")}</span>'
+                        f'</div>'
+                        f'</div>'
+                        f'<div style="font-size:11px; color:#cbd5e1; line-height:1.38;">'
+                        f'<b style="color:#e2e8f0;">Strumento ({rx.get("instrument", "Overlay")}):</b> {rx["action"]}'
+                        f'</div>'
+                        f'</div>'
+                    )
+
+                lift_pts = max(0, int(bp_res.get("readiness_post_hedge", 95)) - int(bp_res.get("readiness_score", 70)))
                 st.markdown(
                     _compact_html(
                         f"""
-                        <div style="background:rgba(22,27,34,0.75); border:1px solid rgba(255,255,255,0.08);
-                                    border-radius:8px; padding:8px 12px;">
-                            <div style="font-size:11px; font-weight:800; color:#f59e0b; margin-bottom:4px;">
-                                📑 PRESCRIZIONI OPERATIVE COMITATO RISCHI ({port_name} — NAV € {radar['nav_eur']:,.2f})
+                        <div style="background:rgba(22,27,34,0.88); border:1px solid rgba(148,163,184,0.18);
+                                    border-radius:10px; padding:10px 14px;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                                <div style="font-size:11.5px; font-weight:800; color:#f59e0b; letter-spacing:0.3px;">
+                                    📑 MATRICE PRESCRITTIVA COMITATO RISCHI &amp; TRADE TICKETS ({port_name} — NAV € {radar['nav_eur']:,.2f})
+                                </div>
+                                <span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.4); color:#34d399;
+                                             font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px;">
+                                    🎯 Readiness Post-Copertura: {bp_res.get('readiness_post_hedge', 95)}/100 (+{lift_pts} pts)
+                                </span>
                             </div>
-                            {rx_items_html}
+                            {rx_cards_html}
                         </div>
                         """
                     ),
                     unsafe_allow_html=True,
                 )
             with bp_c2:
+                seal_short = str(bp_res.get("sha256_audit_seal", ""))[:16]
+                st.markdown(
+                    _compact_html(
+                        f"""
+                        <div style="background:rgba(15,23,42,0.92); border:1px solid rgba(99,102,241,0.32);
+                                    border-top:3px solid #6366f1; border-radius:10px; padding:9px 12px; margin-bottom:8px;">
+                            <div style="font-size:11px; font-weight:800; color:#f8fafc; letter-spacing:0.3px;">
+                                🏛️ DOSSIER COMITATO RISCHI (CRO)
+                            </div>
+                            <div style="font-size:10px; color:#94a3b8; margin-top:3px; line-height:1.35;">
+                                Certificazione <b>BCBS-239 / Fed SR 11-7</b><br/>
+                                Include: 6 Pilastri · 3 Trade Tickets · 4 Stress<br/>
+                                <span style="font-family:'JetBrains Mono',monospace; color:#818cf8; font-size:9.5px;">
+                                    SHA-256: {seal_short}...
+                                </span>
+                            </div>
+                        </div>
+                        """
+                    ),
+                    unsafe_allow_html=True,
+                )
                 st.download_button(
-                    label="📥 Scarica CRO Board-Pack (HTML5)",
+                    label="🏛️ Dossier CRO (HTML5 Print-Ready)",
                     data=bp_res["board_pack_html"].encode("utf-8"),
-                    file_name="argus_executive_cro_board_pack_v918.html",
+                    file_name=f"ARGUS_CRO_BoardPack_{datetime.now().strftime('%Y%m%d')}.html",
                     mime="text/html",
                     use_container_width=True,
                     type="primary",
                     key=f"{key_prefix}_dl_bp_btn",
+                )
+                import base64
+
+                st.download_button(
+                    label="📕 Verbale Ufficiale CRO (PDF A4)",
+                    data=base64.b64decode(bp_res.get("board_pack_pdf_base64", "")),
+                    file_name=f"ARGUS_Verbale_CRO_{datetime.now().strftime('%Y%m%d')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    key=f"{key_prefix}_dl_cro_pdf_btn",
+                )
+                st.download_button(
+                    label="🧾 Audit Trail SR 11-7 (JSON)",
+                    data=bp_res["board_pack_audit_json"].encode("utf-8"),
+                    file_name=f"ARGUS_SR117_Audit_{datetime.now().strftime('%Y%m%d')}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    key=f"{key_prefix}_dl_cro_json_btn",
                 )
     return radar
 

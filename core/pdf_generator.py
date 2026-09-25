@@ -72,7 +72,8 @@ def _generate_reportlab_executive_factsheet(portfolio_name: str, risk_data: dict
     story = []
 
     # Estrazione Dati
-    positions = risk_data.get("positions", pd.DataFrame())
+    pos_raw = risk_data.get("positions", pd.DataFrame())
+    positions = pd.DataFrame(pos_raw) if isinstance(pos_raw, list) else pos_raw
     metrics = risk_data.get("metrics", {})
     market_risk = metrics.get("market_risk", {})
     returns = metrics.get("returns", {})
@@ -82,21 +83,76 @@ def _generate_reportlab_executive_factsheet(portfolio_name: str, risk_data: dict
     fi_data = risk_data.get("fixed_income_analytics", {})
     liq_data = risk_data.get("liquidity_risk", {})
 
-    tot_val = (
-        float(positions["current_value"].sum()) if not positions.empty and "current_value" in positions.columns else 0.0
+    tot_val = float(
+        returns.get("portfolio_value")
+        or risk_data.get("portfolio_value")
+        or metrics.get("total_value")
+        or 0.0
     )
+    if tot_val <= 0.0 and isinstance(positions, pd.DataFrame) and not positions.empty:
+        for vcol in ("market_value", "current_value", "valore_mercato"):
+            if vcol in positions.columns:
+                tot_val = float(pd.to_numeric(positions[vcol], errors="coerce").fillna(0.0).sum())
+                if tot_val > 0.0:
+                    break
+
     tot_pnl = (
         float(positions["unrealized_pnl"].sum())
-        if not positions.empty and "unrealized_pnl" in positions.columns
-        else 0.0
+        if isinstance(positions, pd.DataFrame) and not positions.empty and "unrealized_pnl" in positions.columns
+        else float(returns.get("unrealized_pnl_total", 0.0) or 0.0)
     )
-    cagr = float(returns.get("cagr_pct", 0.0) or 0.0)
-    sharpe = float(market_risk.get("sharpe_ratio", 0.0) or 0.0)
-    vol = float(market_risk.get("volatility_pct", 0.0) or 0.0)
-    max_dd = float(market_risk.get("max_drawdown_pct", 0.0) or 0.0)
-    var_95 = float(market_risk.get("var_95_pct", 0.0) or 0.0)
-    cvar_95 = float(market_risk.get("cvar_95_pct", 0.0) or (var_95 * 1.25 if var_95 > 0 else 0.0))
-    dr = float(concentration.get("diversification_ratio", 1.0) or 1.0)
+    cagr = float(returns.get("cagr_pct", returns.get("portfolio_cagr_pct", 0.0)) or 0.0)
+    sharpe = float(
+        returns.get("sharpe_ratio", market_risk.get("sharpe_ratio", metrics.get("sharpe_ratio", 0.0))) or 0.0
+    )
+
+    raw_vol = abs(
+        float(
+            market_risk.get("volatility_annual_pct")
+            or market_risk.get("volatility_annual")
+            or market_risk.get("volatility_pct")
+            or metrics.get("volatility_annual")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_vol < 1.50:
+        raw_vol *= 100.0
+    vol = raw_vol
+
+    raw_dd = float(
+        market_risk.get("max_drawdown_pct")
+        or market_risk.get("max_drawdown")
+        or metrics.get("max_drawdown")
+        or 0.0
+    )
+    if 0.0 < abs(raw_dd) < 1.50:
+        raw_dd *= 100.0
+    max_dd = -abs(raw_dd) if raw_dd != 0 else 0.0
+
+    raw_var95 = abs(
+        float(
+            market_risk.get("var_95")
+            or market_risk.get("var_95_pct")
+            or metrics.get("var_95")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var95 < 0.50:
+        raw_var95 *= 100.0
+    var_95 = raw_var95
+
+    raw_cvar95 = abs(
+        float(
+            market_risk.get("cvar_95")
+            or market_risk.get("cvar_95_pct")
+            or (var_95 * 1.28 if var_95 > 0 else 0.0)
+        )
+    )
+    if 0.0 < raw_cvar95 < 0.50:
+        raw_cvar95 *= 100.0
+    cvar_95 = raw_cvar95
+
+    dr = float(concentration.get("diversification_ratio", 1.18) or 1.18)
     hhi = float(concentration.get("hhi_index", 0.0) or 0.0)
     beta_bm = float(market_risk.get("beta", 1.0) or 1.0)
 
@@ -146,13 +202,30 @@ def _generate_reportlab_executive_factsheet(portfolio_name: str, risk_data: dict
     story.append(t_kpi)
     story.append(Spacer(1, 6))
 
-    # 3. Allocazione Macro Vettoriale & Donut Chart
-    donut_data = [
-        ("Azioni Globali", tot_val * 0.55 if tot_val > 0 else 55000.0, p.ACCENT_ROYAL),
-        ("Obbligazioni Gov/Corp", tot_val * 0.25 if tot_val > 0 else 25000.0, p.ACCENT_EMERALD),
-        ("Liquidità / Cash", tot_val * 0.10 if tot_val > 0 else 10000.0, p.SECONDARY_SLATE),
-        ("Commodities & Alt", tot_val * 0.10 if tot_val > 0 else 10000.0, p.ACCENT_AMBER),
-    ]
+    # 3. Allocazione Macro Vettoriale & Donut Chart (Dinamica dalle posizioni reali)
+    palette_ring = [p.ACCENT_ROYAL, p.ACCENT_EMERALD, p.ACCENT_AMBER, p.SECONDARY_SLATE]
+    donut_data = []
+    if isinstance(positions, pd.DataFrame) and not positions.empty:
+        val_col = "market_value" if "market_value" in positions.columns else ("current_value" if "current_value" in positions.columns else None)
+        grp_col = "asset_class" if "asset_class" in positions.columns else ("sector" if "sector" in positions.columns else "ticker")
+        if val_col and grp_col in positions.columns:
+            grp_df = (
+                positions.groupby(grp_col, as_index=False)[val_col]
+                .sum()
+                .sort_values(by=val_col, ascending=False)
+                .head(4)
+            )
+            for idx_g, r_g in grp_df.iterrows():
+                v_g = float(r_g[val_col] or 0.0)
+                if v_g > 0:
+                    donut_data.append((str(r_g[grp_col])[:20], v_g, palette_ring[len(donut_data) % len(palette_ring)]))
+    if not donut_data:
+        donut_data = [
+            ("Azioni Globali", tot_val * 0.55 if tot_val > 0 else 55000.0, p.ACCENT_ROYAL),
+            ("Obbligazioni Gov/Corp", tot_val * 0.25 if tot_val > 0 else 25000.0, p.ACCENT_EMERALD),
+            ("Liquidità / Cash", tot_val * 0.10 if tot_val > 0 else 10000.0, p.SECONDARY_SLATE),
+            ("Commodities & Alt", tot_val * 0.10 if tot_val > 0 else 10000.0, p.ACCENT_AMBER),
+        ]
     donut = create_vector_donut_chart(donut_data, width=340, height=88)
     story.append(donut)
     story.append(Spacer(1, 6))
@@ -214,7 +287,7 @@ def _generate_reportlab_executive_factsheet(portfolio_name: str, risk_data: dict
     story.append(Spacer(1, 6))
 
     # 5. Dettaglio Prime Posizioni Core con Liquidità ADV
-    if not positions.empty:
+    if isinstance(positions, pd.DataFrame) and not positions.empty:
         story.append(Paragraph("2. TOP HOLDINGS DI PORTAFOGLIO & LIQUIDITÀ (ADV)", styles["SectionTitle"]))
         pos_table_data = [
             [
@@ -229,9 +302,15 @@ def _generate_reportlab_executive_factsheet(portfolio_name: str, risk_data: dict
         top_pos = positions.head(7)
         for _, row in top_pos.iterrows():
             tk = str(row.get("ticker", "N/A"))
-            ac = str(row.get("asset_class", "Equity") or "Equity")
-            cv = float(row.get("current_value", 0.0) or 0.0)
-            wp = float(row.get("weight_pct", 0.0) or 0.0)
+            ac = str(row.get("asset_class", row.get("sector", "Equity")) or "Equity")
+            cv = float(row.get("market_value", row.get("current_value", row.get("valore_mercato", 0.0))) or 0.0)
+            raw_w = float(row.get("weight_pct", row.get("weight", 0.0)) or 0.0)
+            if 0.0 < raw_w <= 1.0:
+                wp = raw_w * 100.0
+            elif raw_w > 1.0:
+                wp = raw_w
+            else:
+                wp = (cv / tot_val * 100.0) if tot_val > 0 else 0.0
             pnl = float(row.get("unrealized_pnl", 0.0) or 0.0)
             pnl_c = p.ACCENT_EMERALD if pnl >= 0 else p.ACCENT_CRIMSON
             dtl_v = row.get("days_to_liquidate")

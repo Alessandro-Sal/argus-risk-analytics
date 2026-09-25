@@ -213,12 +213,31 @@ def test_v918_master_wealth_portfolio_synchronization_and_board_pack_scaling() -
     assert mw_radar["warning_count"] >= 2
     assert mw_radar["readiness_score"] < 75
 
-    engine = ExecutiveBoardPackEngine(portfolio_name="Master Wealth (Stocks + Crypto)", nav_eur=mw_radar["nav_eur"])
+    engine = ExecutiveBoardPackEngine(
+        portfolio_name="Master Wealth (Stocks + Crypto)",
+        nav_eur=mw_radar["nav_eur"],
+        risk_data=master_wealth_results,
+        session_state_dict={"global_macro_shock": "NONE"},
+    )
     bp = engine.generate_board_pack()
     # Verify Board-Pack euro prescriptions scale proportionally to € 64,233.31 (neither € 95M nor € 151M)
     assert any("14,131" in str(p.get("action", "")) for p in bp["cro_prescriptions"])
     assert any("49,092" in str(p.get("action", "")) for p in bp["cro_prescriptions"])
     assert "95,536,044" not in bp["board_pack_html"]
     assert "151,428,360" not in bp["board_pack_html"]
+    import base64
+
+    assert "RX-CRO-01" in bp["board_pack_html"]
+    assert base64.b64decode(bp["board_pack_pdf_base64"]).startswith(b"%PDF")
+    assert "RX-CRO-01" in bp["board_pack_audit_json"]
+
+    from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+
+    factsheet_pdf = generate_institutional_portfolio_factsheet_pdf(
+        portfolio_name="Master Wealth (Stocks + Crypto)",
+        risk_data=master_wealth_results,
+        base_currency="EUR",
+    )
+    assert factsheet_pdf.startswith(b"%PDF")
 
 
