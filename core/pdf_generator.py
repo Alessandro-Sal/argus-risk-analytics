@@ -74,10 +74,10 @@ def _generate_reportlab_executive_factsheet(portfolio_name: str, risk_data: dict
     # Estrazione Dati
     pos_raw = risk_data.get("positions", pd.DataFrame())
     positions = pd.DataFrame(pos_raw) if isinstance(pos_raw, list) else pos_raw
-    metrics = risk_data.get("metrics", {})
-    market_risk = metrics.get("market_risk", {})
-    returns = metrics.get("returns", {})
-    concentration = metrics.get("concentration", {})
+    metrics = risk_data.get("metrics", {}) if isinstance(risk_data.get("metrics"), dict) else {}
+    market_risk = metrics.get("market_risk") if isinstance(metrics.get("market_risk"), dict) else (risk_data.get("market_risk") if isinstance(risk_data.get("market_risk"), dict) else {})
+    returns = metrics.get("returns") if isinstance(metrics.get("returns"), dict) else (risk_data.get("returns") if isinstance(risk_data.get("returns"), dict) else {})
+    concentration = metrics.get("concentration") if isinstance(metrics.get("concentration"), dict) else (risk_data.get("concentration") if isinstance(risk_data.get("concentration"), dict) else {})
     stress = risk_data.get("stress_tests", {})
     ff_data = risk_data.get("fama_french", {})
     fi_data = risk_data.get("fixed_income_analytics", {})

@@ -2290,9 +2290,12 @@ def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -
 
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         m = results.get("metrics", {}) if isinstance(results.get("metrics"), dict) else {}
-        ret = results.get("returns", m.get("returns", {})) or {}
-        mk = results.get("market_risk", m.get("market_risk", {})) or {}
-        con = results.get("concentration", m.get("concentration", {})) or {}
+        raw_ret = results.get("returns")
+        ret = raw_ret if isinstance(raw_ret, dict) else (m.get("returns") if isinstance(m.get("returns"), dict) else {})
+        raw_mk = results.get("market_risk")
+        mk = raw_mk if isinstance(raw_mk, dict) else (m.get("market_risk") if isinstance(m.get("market_risk"), dict) else {})
+        raw_con = results.get("concentration")
+        con = raw_con if isinstance(raw_con, dict) else (m.get("concentration") if isinstance(m.get("concentration"), dict) else {})
         pos = results.get("positions", pd.DataFrame())
 
         val_tot = float(ret.get("portfolio_value", 0.0) or 0.0)
