@@ -38,38 +38,157 @@ INSTITUTIONAL_PALETTE: list[str] = [
 ]
 
 
-def build_telemetry_ribbon_state(
+def _resolve_active_portfolio_bundle(
     session_state_dict: dict[str, Any] | None = None,
-    page_badge: str = "INSTITUTIONAL TERMINAL",
-) -> dict[str, Any]:
-    """Extract live portfolio telemetry from session state with institutional fallbacks."""
+    risk_data: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], str]:
+    """Resolve the active portfolio risk bundle and portfolio name from session_state or explicit risk_data."""
     state = session_state_dict if session_state_dict is not None else (
         dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
     )
-    last_res = state.get("last_results") or {}
+    res: dict[str, Any] = {}
+    if isinstance(risk_data, dict) and risk_data:
+        res = risk_data
+    elif isinstance(state.get("results"), dict) and state.get("results"):
+        res = state["results"]
+    elif isinstance(state.get("last_results"), dict) and state.get("last_results"):
+        res = state["last_results"]
+    elif st is not None and session_state_dict is None:
+        try:
+            from core.ui_utils import ensure_portfolio_loaded
+
+            loaded_res, _ = ensure_portfolio_loaded(module_type="risk")
+            if isinstance(loaded_res, dict):
+                res = loaded_res
+        except Exception:
+            pass
+
     profile_name = str(
-        state.get("active_portfolio_name")
+        state.get("portfolio_name")
+        or state.get("wealth_active_profile_name")
+        or state.get("active_portfolio_name")
         or state.get("selected_portfolio_name")
+        or res.get("portfolio_name")
+        or res.get("sandbox_name")
         or "Portafoglio Principale (Institutional)"
     )
+    return res, profile_name
 
-    nav_eur = 0.0
+
+def build_telemetry_ribbon_state(
+    session_state_dict: dict[str, Any] | None = None,
+    page_badge: str = "INSTITUTIONAL TERMINAL",
+    risk_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Extract live portfolio telemetry from session state with institutional fallbacks."""
+    last_res, profile_name = _resolve_active_portfolio_bundle(
+        risk_data=risk_data,
+        session_state_dict=session_state_dict,
+    )
+    metrics_block = last_res.get("metrics") if isinstance(last_res.get("metrics"), dict) else {}
+    ret_block = (
+        metrics_block.get("returns")
+        if isinstance(metrics_block.get("returns"), dict)
+        else (last_res.get("returns") if isinstance(last_res.get("returns"), dict) else {})
+    )
+    mk_block = (
+        metrics_block.get("market_risk")
+        if isinstance(metrics_block.get("market_risk"), dict)
+        else (last_res.get("market_risk") if isinstance(last_res.get("market_risk"), dict) else {})
+    )
+
+    nav_eur = float(
+        ret_block.get("portfolio_value")
+        or metrics_block.get("total_market_value")
+        or metrics_block.get("total_value")
+        or metrics_block.get("portfolio_value")
+        or last_res.get("portfolio_value")
+        or last_res.get("total_value")
+        or 0.0
+    )
     pos_df = last_res.get("positions")
-    if isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
-        if "current_value" in pos_df.columns:
-            nav_eur = float(pos_df["current_value"].fillna(0.0).sum())
-        elif "qty_net" in pos_df.columns and "last_price" in pos_df.columns:
+    if isinstance(pos_df, list):
+        pos_df = pd.DataFrame(pos_df)
+    if nav_eur <= 0.0 and isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+        for vcol in ("current_value", "market_value", "valore_mercato"):
+            if vcol in pos_df.columns:
+                nav_eur = float(pd.to_numeric(pos_df[vcol], errors="coerce").fillna(0.0).sum())
+                if nav_eur > 0.0:
+                    break
+        if nav_eur <= 0.0 and "qty_net" in pos_df.columns and "last_price" in pos_df.columns:
             nav_eur = float((pos_df["qty_net"].fillna(0.0) * pos_df["last_price"].fillna(0.0)).sum())
 
     if nav_eur <= 0.0:
-        nav_eur = float(last_res.get("total_value", 1_250_000.0) or 1_250_000.0)
+        nav_eur = 1_250_000.0
 
-    var_99_pct = float(last_res.get("var_99_pct", last_res.get("var_95_pct", 1.84)) or 1.84)
+    raw_var95 = abs(
+        float(
+            mk_block.get("var_95")
+            or mk_block.get("var_95_pct")
+            or metrics_block.get("var_95_pct")
+            or metrics_block.get("var_95")
+            or last_res.get("var_95_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var95 < 0.50:
+        raw_var95 *= 100.0
+
+    raw_var99 = abs(
+        float(
+            mk_block.get("var_99")
+            or mk_block.get("var_99_pct")
+            or metrics_block.get("var_99_pct")
+            or metrics_block.get("var_99")
+            or last_res.get("var_99_pct")
+            or (raw_var95 * 1.38 if raw_var95 > 0.0 else 1.84)
+        )
+    )
+    if 0.0 < raw_var99 < 0.50:
+        raw_var99 *= 100.0
+
+    var_95_pct = raw_var95 if raw_var95 > 0.0 else round(raw_var99 / 1.38, 2)
+    var_95_eur = nav_eur * (abs(var_95_pct) / 100.0)
+    var_99_pct = raw_var99
     var_99_eur = nav_eur * (abs(var_99_pct) / 100.0)
-    sharpe = float(last_res.get("sharpe_ratio", 1.42) or 1.42)
-    ann_vol_pct = float(last_res.get("annual_volatility_pct", 12.6) or 12.6)
 
-    if ann_vol_pct >= 22.0 or abs(var_99_pct) >= 3.0:
+    has_live = bool(ret_block or mk_block or metrics_block or (isinstance(pos_df, pd.DataFrame) and not pos_df.empty))
+    if has_live and (
+        "sharpe_ratio" in ret_block
+        or "sharpe_ratio" in mk_block
+        or "sharpe_ratio" in metrics_block
+        or "sharpe_ratio" in last_res
+    ):
+        sharpe = float(
+            ret_block.get(
+                "sharpe_ratio",
+                mk_block.get(
+                    "sharpe_ratio",
+                    metrics_block.get("sharpe_ratio", last_res.get("sharpe_ratio", 0.0)),
+                ),
+            )
+            or 0.0
+        )
+    else:
+        sharpe = float(last_res.get("sharpe_ratio", 1.42) or 1.42)
+
+    raw_vol = abs(
+        float(
+            mk_block.get("volatility_pct")
+            or mk_block.get("volatility_annual_pct")
+            or mk_block.get("volatility_annual")
+            or metrics_block.get("volatility_pct")
+            or metrics_block.get("volatility_annual_pct")
+            or ret_block.get("volatility_pct")
+            or last_res.get("annual_volatility_pct")
+            or 12.6
+        )
+    )
+    if 0.0 < raw_vol < 1.50:
+        raw_vol *= 100.0
+    ann_vol_pct = raw_vol
+
+    if ann_vol_pct >= 22.0 or abs(var_95_pct) >= 2.20 or abs(var_99_pct) >= 3.0:
         regime_label = "🔴 STRESS / HIGH VOL"
         regime_color = "#ef4444"
     elif ann_vol_pct >= 15.5:
@@ -83,7 +202,10 @@ def build_telemetry_ribbon_state(
         "app_version": APP_VERSION,
         "page_badge": page_badge,
         "profile_name": profile_name,
+        "portfolio_name": profile_name,
         "nav_eur": round(nav_eur, 2),
+        "var_95_pct": round(abs(var_95_pct), 2),
+        "var_95_eur": round(var_95_eur, 2),
         "var_99_pct": round(abs(var_99_pct), 2),
         "var_99_eur": round(var_99_eur, 2),
         "sharpe_ratio": round(sharpe, 2),
@@ -105,8 +227,18 @@ def build_telemetry_ribbon_html(
 ) -> str:
     """Build single-line, zero-indent HTML for the sticky institutional telemetry ribbon."""
     s_info = shock_info if shock_info is not None else get_active_macro_shock()
-    nav_str = f"€ {telemetry['nav_eur']:,.0f}".replace(",", ".")
-    var_str = f"€ {telemetry['var_99_eur']:,.0f}".replace(",", ".")
+    nav_val = float(telemetry.get("nav_eur", 0.0))
+    if nav_val < 1_000_000.0:
+        int_p, dec_p = f"{nav_val:,.2f}".split(".")
+        nav_str = f"€ {int_p.replace(',', '.')},{dec_p}"
+    else:
+        nav_str = f"€ {nav_val:,.0f}".replace(",", ".")
+
+    var95_pct = float(telemetry.get("var_95_pct", telemetry.get("var_99_pct", 2.50) / 1.38))
+    var95_eur = float(telemetry.get("var_95_eur", nav_val * var95_pct / 100.0))
+    var_str = f"€ {var95_eur:,.0f}".replace(",", ".")
+    vol_pct = float(telemetry.get("annual_volatility_pct", 12.6))
+
     shock_pill_html = ""
     if s_info.get("is_active"):
         shock_pill_html = (
@@ -148,7 +280,10 @@ def build_telemetry_ribbon_html(
                 NAV: <b style="color: #10b981;">{nav_str}</b>
             </span>
             <span style="font-size: 11.5px; color: #cbd5e1;">
-                VaR 99%: <b style="color: #f59e0b;">{var_str} ({telemetry['var_99_pct']:.2f}%)</b>
+                VaR 95%: <b style="color: #f59e0b;">{var_str} ({var95_pct:.2f}%)</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Vol: <b style="color: #e2e8f0;">{vol_pct:.2f}%</b>
             </span>
             <span style="font-size: 11.5px; color: #cbd5e1;">
                 Sharpe: <b style="color: #38bdf8;">{telemetry['sharpe_ratio']:.2f}</b>
@@ -166,9 +301,10 @@ def build_telemetry_ribbon_html(
 
 def render_institutional_telemetry_ribbon(
     page_badge: str = "INSTITUTIONAL TERMINAL",
+    risk_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Render sticky Bloomberg Launchpad-style top telemetry ribbon in Streamlit."""
-    telemetry = build_telemetry_ribbon_state(page_badge=page_badge)
+    telemetry = build_telemetry_ribbon_state(page_badge=page_badge, risk_data=risk_data)
     shock_info = get_active_macro_shock()
     telemetry["active_macro_shock"] = shock_info["preset_key"]
     if st is None:
@@ -185,34 +321,63 @@ def render_institutional_telemetry_ribbon(
 
 def extract_live_portfolio_binding(
     session_state_dict: dict[str, Any] | None = None,
+    risk_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Extract live portfolio ticker, spot price, quantity, volatility, and NAV for 1-click auto-binding."""
-    state = session_state_dict if session_state_dict is not None else (
-        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    last_res, profile_name = _resolve_active_portfolio_bundle(
+        risk_data=risk_data,
+        session_state_dict=session_state_dict,
     )
-    last_res = state.get("last_results") or {}
     pos_df = last_res.get("positions")
+    if isinstance(pos_df, list):
+        pos_df = pd.DataFrame(pos_df)
+
+    metrics_block = last_res.get("metrics") if isinstance(last_res.get("metrics"), dict) else {}
+    mk_block = (
+        metrics_block.get("market_risk")
+        if isinstance(metrics_block.get("market_risk"), dict)
+        else (last_res.get("market_risk") if isinstance(last_res.get("market_risk"), dict) else {})
+    )
 
     has_live = False
-    top_ticker = "ENI.MI"
-    top_spot = 14.80
-    top_shares = 250_000.0
-    total_nav = 1_250_000.0
-    daily_vol = 0.018
-    annual_vol = 0.28
+    top_ticker = "SOL-USD"
+    top_spot = 74.16
+    top_shares = 250.0
+    total_nav = float(
+        metrics_block.get("total_market_value")
+        or metrics_block.get("portfolio_value")
+        or metrics_block.get("total_value")
+        or 64_233.31
+    )
+    ann_vol_pct = float(
+        mk_block.get("volatility_pct")
+        or mk_block.get("volatility_annual_pct")
+        or metrics_block.get("volatility_pct")
+        or metrics_block.get("volatility_annual_pct")
+        or 26.25
+    )
+    if 0.0 < ann_vol_pct < 1.50:
+        ann_vol_pct *= 100.0
+    annual_vol = float(np.clip(ann_vol_pct / 100.0, 0.05, 1.20))
+    daily_vol = float(np.clip(annual_vol / np.sqrt(252.0), 0.004, 0.08))
+    positions_count = 0
 
     if isinstance(pos_df, pd.DataFrame) and not pos_df.empty and "ticker" in pos_df.columns:
         has_live = True
         df_sorted = pos_df.copy()
+        if "qty_net" in df_sorted.columns:
+            df_sorted = df_sorted[df_sorted["qty_net"] > 1e-6]
+        positions_count = len(df_sorted)
         if "current_value" not in df_sorted.columns and "qty_net" in df_sorted.columns and "last_price" in df_sorted.columns:
             df_sorted["current_value"] = df_sorted["qty_net"].fillna(0.0) * df_sorted["last_price"].fillna(0.0)
-        if "current_value" in df_sorted.columns:
+        if "current_value" in df_sorted.columns and not df_sorted.empty:
             df_sorted = df_sorted.sort_values("current_value", ascending=False)
-            total_nav = max(float(df_sorted["current_value"].fillna(0.0).sum()), 10_000.0)
-        row0 = df_sorted.iloc[0]
-        top_ticker = str(row0.get("ticker", "ENI.MI") or "ENI.MI")
-        top_spot = max(float(row0.get("last_price", 14.80) or 14.80), 0.5)
-        top_shares = max(float(row0.get("qty_net", 1000.0) or 1000.0), 100.0)
+            total_nav = max(float(df_sorted["current_value"].fillna(0.0).sum()), 100.0)
+        if not df_sorted.empty:
+            row0 = df_sorted.iloc[0]
+            top_ticker = str(row0.get("ticker", "SOL-USD") or "SOL-USD")
+            top_spot = max(float(row0.get("last_price", 74.16) or 74.16), 0.01)
+            top_shares = max(float(row0.get("qty_net", 250.0) or 250.0), 0.0001)
 
     rets_df = last_res.get("returns")
     if isinstance(rets_df, pd.DataFrame) and not rets_df.empty:
@@ -221,41 +386,47 @@ def extract_live_portfolio_binding(
             s_std = float(rets_df[top_ticker].dropna().std())
             if s_std > 1e-5:
                 daily_vol = float(np.clip(s_std, 0.005, 0.06))
-                annual_vol = float(np.clip(s_std * np.sqrt(252.0), 0.08, 0.80))
+                annual_vol = float(np.clip(s_std * np.sqrt(252.0), 0.08, 0.85))
 
     return {
         "has_live_portfolio": has_live,
+        "portfolio_name": profile_name,
+        "positions_count": positions_count,
+        "asset_count": positions_count,
         "top_ticker": top_ticker,
         "top_spot_price": round(top_spot, 4),
-        "top_shares": round(top_shares, 1),
+        "top_shares": round(top_shares, 4),
         "total_nav_eur": round(total_nav, 2),
         "daily_volatility": round(daily_vol, 4),
         "annual_volatility": round(annual_vol, 4),
-        "adv_shares_estimate": round(max(top_shares * 20.0, 500_000.0), 0),
+        "adv_shares": round(max(top_shares * 25.0, 50_000.0), 0),
+        "adv_shares_estimate": round(max(top_shares * 25.0, 50_000.0), 0),
     }
 
 
 def render_live_portfolio_autobind_banner(
     key_prefix: str,
     model_label: str = "Motore Quantitativo",
+    risk_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Render 1-Click Live Portfolio Auto-Bind control and return bound parameters."""
-    binding = extract_live_portfolio_binding()
+    binding = extract_live_portfolio_binding(risk_data=risk_data)
     if st is None:
         return binding
 
-    c1, c2 = st.columns([1.5, 2.5])
+    c1, c2 = st.columns([1.6, 2.4])
     with c1:
         use_live = st.toggle(
-            f"🔗 Sincronizza dal Portafoglio Attivo ({binding['top_ticker']})",
+            f"🔗 Sincronizza da {binding['portfolio_name']} ({binding['top_ticker']})",
             value=binding["has_live_portfolio"],
             key=f"autobind_toggle_{key_prefix}",
-            help=f"Popola automaticamente {model_label} con i dati reali del portafoglio attivo.",
+            help=f"Popola automaticamente {model_label} con i dati reali del portafoglio attivo ({binding['portfolio_name']}).",
         )
     with c2:
         mode_txt = (
-            f"🟢 <b>Auto-Binding Attivo</b>: Ticker Primario <code>{binding['top_ticker']}</code> "
-            f"(Spot € {binding['top_spot_price']:.2f} | Vol Giornaliera {binding['daily_volatility']*100:.2f}% | NAV € {binding['total_nav_eur']:,.0f})"
+            f"🟢 <b>Auto-Binding Attivo ({binding['portfolio_name']} · {binding['positions_count']} asset)</b>: "
+            f"Top Holding <code>{binding['top_ticker']}</code> "
+            f"(Spot € {binding['top_spot_price']:,.2f} | Q.tà {binding['top_shares']:g} | Vol Annua {binding['annual_volatility']*100:.2f}% | NAV € {binding['total_nav_eur']:,.2f})"
             if use_live
             else "⚪ <b>Modalità Sandbox Istituzionale</b>: Parametri manuali personalizzabili indipendenti dal portafoglio."
         )
@@ -448,13 +619,18 @@ def compute_executive_traffic_light_radar(
     risk_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compute 6-Pillar Executive CRO Traffic-Light Radar reactive to Live Portfolio & Global Macro Shocks."""
-    state = session_state_dict if session_state_dict is not None else (
-        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    last_res, _ = _resolve_active_portfolio_bundle(session_state_dict=session_state_dict, risk_data=risk_data)
+    metrics_block = last_res.get("metrics") if isinstance(last_res.get("metrics"), dict) else {}
+    ret_block = (
+        metrics_block.get("returns")
+        if isinstance(metrics_block.get("returns"), dict)
+        else (last_res.get("returns") if isinstance(last_res.get("returns"), dict) else {})
     )
-    last_res = risk_data if isinstance(risk_data, dict) and risk_data else (state.get("last_results") or {})
-    metrics_block = last_res.get("metrics") or {}
-    ret_block = metrics_block.get("returns") or {}
-    mk = metrics_block.get("market_risk") or {}
+    mk = (
+        metrics_block.get("market_risk")
+        if isinstance(metrics_block.get("market_risk"), dict)
+        else (last_res.get("market_risk") if isinstance(last_res.get("market_risk"), dict) else {})
+    )
     pos_raw = last_res.get("positions")
     pos_df = pd.DataFrame(pos_raw) if isinstance(pos_raw, list) else pos_raw
     has_live_portfolio = bool(
@@ -510,7 +686,8 @@ def compute_executive_traffic_light_radar(
     # 3. Extract Real Annualized Volatility %, Max Drawdown %, and Sharpe Ratio
     raw_vol = abs(
         float(
-            mk.get("volatility_annual_pct")
+            mk.get("volatility_pct")
+            or mk.get("volatility_annual_pct")
             or mk.get("volatility_annual")
             or mk.get("annual_volatility")
             or ret_block.get("volatility_pct")
@@ -598,7 +775,7 @@ def compute_executive_traffic_light_radar(
 
     base_cva = round(14.2 + max(0.0, (live_vol - 14.0) * 0.65), 1)
 
-    shock = get_active_macro_shock(session_state_dict=state)
+    shock = get_active_macro_shock(session_state_dict=session_state_dict)
     s_key = str(shock.get("preset_key", "NONE"))
 
     var_shock_add = 0.0
@@ -825,9 +1002,10 @@ def render_executive_traffic_light_radar(
     factsheet_pdf_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """Render upgraded CRO Traffic-Light Radar, Global Macro Shock Console & 1-Click Board-Pack."""
+    eff_risk_data, resolved_port_name = _resolve_active_portfolio_bundle(risk_data=risk_data)
     radar = compute_executive_traffic_light_radar(
         metrics_override=metrics_override,
-        risk_data=risk_data,
+        risk_data=eff_risk_data,
     )
     if st is None:
         return radar
@@ -967,11 +1145,11 @@ def render_executive_traffic_light_radar(
         if include_board_pack:
             from core.executive_board_pack_engine import generate_executive_board_pack
 
-            port_name = str(st.session_state.get("portfolio_name") or "Portafoglio Attivo")
+            port_name = str(resolved_port_name or st.session_state.get("portfolio_name") or "Portafoglio Attivo")
             bp_res = generate_executive_board_pack(
                 portfolio_name=port_name,
                 nav_eur=float(radar.get("nav_eur", 125_000_000.0)),
-                risk_data=risk_data,
+                risk_data=eff_risk_data,
             )
             bp_c1, bp_c2 = st.columns([2.95, 1.25], vertical_alignment="top")
             with bp_c1:
