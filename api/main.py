@@ -59,6 +59,10 @@ from core.smart_order_router import compute_smart_order_routing
 from core.solvency2_engine import compute_solvency2_standard_formula
 from core.structured_products_engine import compute_structured_product_pricing
 from core.tax_engine import compute_tax_and_harvesting
+from core.ux_institutional_hub import (
+    compute_executive_traffic_light_radar,
+    compute_scenario_delta_comparison,
+)
 from core.walk_forward_engine import run_walk_forward_backtest
 from core.watchdog.risk_watchdog import RiskWatchdogService, evaluate_risk_appetite_framework
 from core.wealth.private_markets_engine import compute_private_markets_analytics
@@ -359,6 +363,18 @@ class CcarStressRequest(BaseModel):
     trading_book_notional_eur_m: float = Field(default=28_000.0, ge=0.0)
     pillar2_requirement_pct: float = Field(default=1.5, ge=0.0)
     gsii_osii_buffer_pct: float = Field(default=1.0, ge=0.0)
+
+
+class ExecutiveRadarRequest(BaseModel):
+    """Payload for 6-Pillar CRO Executive Traffic-Light Radar."""
+    metrics_override: Optional[Dict[str, float]] = None
+
+
+class ScenarioDeltaRequest(BaseModel):
+    """Payload for Side-by-Side Scenario Pin & Delta Comparator."""
+    baseline_metrics: Dict[str, float]
+    current_metrics: Dict[str, float]
+    higher_is_better_map: Optional[Dict[str, bool]] = None
 
 
 # In-memory background jobs registry
@@ -843,7 +859,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.15.0",
+        version="9.16.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -868,7 +884,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.15.0",
+            version="9.16.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1843,7 +1859,7 @@ def create_app() -> FastAPI:
             logger.error("Regulatory dossier generation failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
-    # ── v9.15.0 Institutional Endpoints ──────────────────────────
+    # ── v9.16.0 Institutional Endpoints ──────────────────────────
 
     @app.post("/api/v1/pricing/multicurve", tags=["Fixed Income & Rates"])
     def run_multicurve_bootstrapping(req: MultiCurveRequest) -> Dict[str, Any]:
@@ -1951,6 +1967,30 @@ def create_app() -> FastAPI:
             )
         except Exception as exc:
             logger.error("CCAR capital stress failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── v9.16.0 Institutional Terminal UX/UI Endpoints ────────────
+
+    @app.post("/api/v1/ux/executive-radar", tags=["Institutional UX & Telemetry"])
+    def run_executive_traffic_light_radar(req: ExecutiveRadarRequest) -> Dict[str, Any]:
+        """6-Pillar Executive CRO Traffic-Light Radar (VaR, LCR/NSFR, CCAR CET1, PRIIPs SRI, HHI, XVA)."""
+        try:
+            return compute_executive_traffic_light_radar(metrics_override=req.metrics_override)
+        except Exception as exc:
+            logger.error("Executive traffic-light radar failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/ux/scenario-delta", tags=["Institutional UX & Telemetry"])
+    def run_scenario_delta_comparator(req: ScenarioDeltaRequest) -> Dict[str, Any]:
+        """Side-by-Side Scenario Baseline vs Current Simulation Delta Comparator."""
+        try:
+            return compute_scenario_delta_comparison(
+                baseline_metrics=req.baseline_metrics,
+                current_metrics=req.current_metrics,
+                higher_is_better_map=req.higher_is_better_map,
+            )
+        except Exception as exc:
+            logger.error("Scenario delta comparator failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
     return app

@@ -161,6 +161,16 @@ with col_head2:
 
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
+# ── v9.16.0 GLOBAL TELEMETRY RIBBON & LIVE PORTFOLIO AUTO-BINDING ────
+from core.ux_institutional_hub import (
+    render_institutional_telemetry_ribbon,
+    render_live_portfolio_autobind_banner,
+    render_scenario_delta_comparator,
+    style_institutional_chart,
+)
+
+render_institutional_telemetry_ribbon(page_badge="QUANTITATIVE MODELS & PRICING LAB")
+
 # ── SELETTORE MODELLI QUANTITATIVI STILE BLOOMBERG TERMINAL ─────────
 QUANT_MODELS_CATALOG = {
     "📊 Markowitz & Rebalancing": {
@@ -5262,7 +5272,19 @@ elif active_quant_tab == "📈 Multi-Curve OIS & Dual-Curve IRS":
         height=400,
         margin=dict(l=10, r=10, b=10, t=40),
     )
+    style_institutional_chart(fig_mc, title="Struttura per Scadenza Multi-Curve: OIS Discount vs Forward Projection 6M", height=400)
     st.plotly_chart(fig_mc, use_container_width=True)
+    render_scenario_delta_comparator(
+        scenario_key="multicurve_irs",
+        scenario_title="Multi-Curve OIS & Dual-Curve IRS",
+        current_metrics={
+            "Par Swap Rate (%)": float(irs_info["par_swap_rate_pct"]),
+            "NPV Multi-Curve (€)": float(irs_info["multicurve_npv_eur"]),
+            "DV01 (€/bp)": float(irs_info["dv01_eur"]),
+            "Tenor Basis 6M/3M (bps)": float(tbs_info["fair_basis_spread_3m_vs_6m_bps"]),
+        },
+        higher_is_better_map={"Par Swap Rate (%)": True, "NPV Multi-Curve (€)": True, "DV01 (€/bp)": False, "Tenor Basis 6M/3M (bps)": False},
+    )
     st.dataframe(ois_df, use_container_width=True, hide_index=True)
 
 
@@ -5307,5 +5329,25 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
     with hk4:
         st.metric("Prezzo Callable Bond", fmt_eur(float(hw_res["callable_bond_pv_eur"])), delta=f"Option: -{fmt_eur(float(hw_res['embedded_call_option_eur']))}")
 
+    render_scenario_delta_comparator(
+        scenario_key="hull_white_bermudan",
+        scenario_title="Hull-White 1F Bermudan Swaption",
+        current_metrics={
+            "Bermudan Swaption PV (€)": float(hw_res["bermudan_swaption_pv_eur"]),
+            "European Swaption PV (€)": float(hw_res["european_swaption_pv_eur"]),
+            "Early Exercise Premium (€)": float(hw_res["early_exercise_premium_eur"]),
+            "Callable Bond PV (€)": float(hw_res["callable_bond_pv_eur"]),
+        },
+    )
+    render_scenario_delta_comparator(
+        scenario_key="hull_white_bermudan",
+        scenario_title="Hull-White 1F Bermudan Swaption",
+        current_metrics={
+            "Bermudan Swaption PV (€)": float(hw_res["bermudan_swaption_pv_eur"]),
+            "European Swaption PV (€)": float(hw_res["european_swaption_pv_eur"]),
+            "Early Exercise Premium (€)": float(hw_res["early_exercise_premium_eur"]),
+            "Callable Bond PV (€)": float(hw_res["callable_bond_pv_eur"]),
+        },
+    )
     ex_df = pd.DataFrame(hw_res["exercise_schedule"])
     st.dataframe(ex_df, use_container_width=True, hide_index=True)

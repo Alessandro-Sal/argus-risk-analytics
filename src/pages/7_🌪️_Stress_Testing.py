@@ -1703,6 +1703,30 @@ st.dataframe(pd.DataFrame(basel_res["hqla_breakdown"]), use_container_width=True
 
 
 # ============================================================================
+# v9.16.0: TELEMETRY RIBBON, WORKSPACE SWITCHER & SCENARIO DELTA COMPARATOR
+# ============================================================================
+from core.ux_institutional_hub import (
+    render_executive_traffic_light_radar,
+    render_institutional_telemetry_ribbon,
+    render_scenario_delta_comparator,
+    render_segmented_workspace_switcher,
+    style_institutional_chart,
+)
+
+render_institutional_telemetry_ribbon(page_badge="REGULATORY STRESS TESTING & CAPITAL LAB")
+render_executive_traffic_light_radar(key_prefix="stress_page_cro_radar")
+
+active_stress_ws = render_segmented_workspace_switcher(
+    workspace_key="stress_v916_domain",
+    label="🧭 Filtra Workspace Regolamentare (Eliminazione Scroll Verticale):",
+    options=[
+        "🌐 Tutti i Laboratori Regolamentari",
+        "🤝 Credito & Controparte (CreditMetrics & Vasicek IRB)",
+        "🏛️ Capitale Prudenziale 9Q (Fed CCAR / EBA CET1 Trajectory)",
+    ],
+)
+
+# ============================================================================
 # v9.15.0: CREDITMETRICS PORTFOLIO CREDIT RISK & FED CCAR / EBA STRESS ENGINE
 # ============================================================================
 st.divider()
@@ -1785,5 +1809,22 @@ fig_ccar.update_layout(
     height=420,
     margin=dict(l=10, r=10, b=10, t=40),
 )
+style_institutional_chart(fig_ccar, title="Traiettoria Regolamentare 9-Trimestri del CET1 Ratio (%) sotto Stress EBA / Fed CCAR", height=420)
 st.plotly_chart(fig_ccar, use_container_width=True)
+render_scenario_delta_comparator(
+    scenario_key="ccar_capital_stress",
+    scenario_title="Fed CCAR / EBA 9Q Capital Stress",
+    current_metrics={
+        "CET1 Iniziale (%)": float(ccar_res["initial_cet1_ratio_pct"]),
+        "Min CET1 Severely Adverse (%)": float(sev_scen["minimum_stressed_cet1_ratio_pct"]),
+        "Perdite Credito 9Q (€M)": float(sev_scen["cumulative_9q_credit_losses_eur_m"]),
+        "Stress Capital Buffer SCB (%)": float(ccar_res["required_stress_capital_buffer_scb_pct"]),
+    },
+    higher_is_better_map={
+        "CET1 Iniziale (%)": True,
+        "Min CET1 Severely Adverse (%)": True,
+        "Perdite Credito 9Q (€M)": False,
+        "Stress Capital Buffer SCB (%)": False,
+    },
+)
 st.dataframe(df_sev, use_container_width=True, hide_index=True)

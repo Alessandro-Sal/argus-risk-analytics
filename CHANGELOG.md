@@ -7,6 +7,30 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.16.0] - 2026-09-25
+
+### 🖥️ Institutional Terminal UX/UI Overhaul: Global Telemetry Top-Ribbon, 1-Click Live Portfolio Auto-Binding, Segmented Domain Workspaces, Scenario Pin & Delta Comparator, Unified Plotly Crosshair Styling & Executive CRO Traffic-Light Radar
+
+Questa major release trasforma l'ergonomia e la User Experience di ARGUS in un terminale istituzionale di livello Bloomberg Launchpad / BlackRock Aladdin attraverso **6 pilastri UX/UI**:
+
+- **Pillar 1 — Segmented Domain Workspace Switcher (`core/ux_institutional_hub.py`, `src/pages/7_🌪️_Stress_Testing.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Selettori orizzontali di dominio che eliminano lo scroll infinito verticale raggruppando i laboratori per area operativa (*Capitale Regolamentare 9Q*, *Credito & Controparte*, *Commodity & Optimal Liquidation*).
+- **Pillar 2 — Global Telemetry Top-Ribbon (`render_institutional_telemetry_ribbon`, `src/0_Control_Room.py`, Pages 4, 7, 13)**:
+  - Barra superiore sticky glassmorphic con visualizzazione in tempo reale di: Portafoglio Attivo, NAV Consolidato (€), VaR 99% (1d in € e %), Sharpe Ratio, Regime di Mercato (`🟢 BULL / NORMAL` vs `🔴 STRESS / HIGH VOL`) e versione dinamica `v9.16.0` sincronizzata anche con lo splash screen della Control Room.
+- **Pillar 3 — 1-Click Live Portfolio Auto-Binding (`extract_live_portfolio_binding`, `render_live_portfolio_autobind_banner`)**:
+  - Estrazione automatica dal portafoglio reale (`st.session_state["last_results"]`) del titolo primario per peso, prezzo spot reale, quantità detenuta, volatilità storica giornaliera/annua e ADV stimato, con toggle 1-click per collegare i modelli quantitativi (*Optimal Liquidation*, *Commodity*, *Derivatives*) al portafoglio attivo.
+- **Pillar 4 — Unified Institutional Plotly Styling & Crosshair Sync (`style_institutional_chart`)**:
+  - Standardizzazione estetica dei grafici Plotly con sfondo trasparente glassmorphic (`rgba(0,0,0,0)`), crosshair magnetico sincronizzato (`hovermode="x unified"`, `spikemode="across"`), tipografia `Outfit` / `JetBrains Mono` e palette cromatica istituzionale.
+- **Pillar 5 — Scenario Pin & Delta Comparator (`compute_scenario_delta_comparison`, `render_scenario_delta_comparator`)**:
+  - Funzionalità *"📌 Fissa come Baseline"* in tutti i laboratori avanzati per congelare i risultati di una simulazione e visualizzare fianco a fianco i differenziali assoluti ($\Delta$) e percentuali ($\Delta\%$) quando si modificano i parametri.
+- **Pillar 6 — Executive CRO Traffic-Light Radar (`compute_executive_traffic_light_radar`, `render_executive_traffic_light_radar`)**:
+  - Semaforo esecutivo a 6 pilastri regolamentari (`Market Risk VaR 99%`, `Basel III LCR & NSFR`, `Fed CCAR / EBA Stressed CET1`, `PRIIPs KID SRI`, `Concentrazione HHI & UCITS`, `Counterparty XVA & Credit IRB`) con classificazione automatica `PASS (🟢)` / `WARNING (🟡)` / `BREACH (🔴)`.
+- **Headless REST API v9.16.0 (`api/main.py`) & Test Suite (`tests/test_v916_ux_ui_overhaul.py`)**:
+  - Nuovi endpoint REST JSON `/api/v1/ux/executive-radar` e `/api/v1/ux/scenario-delta`.
+  - 761/761 unit e integration test superati al 100% con 0 errori Ruff (`ruff check .`).
+
+---
+
 ## [9.15.0] - 2026-09-25
 
 ### 🏛️ Multi-Curve OIS Discounting (€STR/SOFR & Dual-Curve Bootstrapping), Hull-White 1F Short Rate & LSMC Bermudan Swaptions, CreditMetrics Rating Migration & Basel IRB Vasicek Credit Portfolio Risk, Schwartz 2-Factor Commodity Convenience Yield Curve, Intraday Optimal Liquidation (Square-Root Impact & POV-Capped VWAP), Supervisory Fed CCAR / EBA 9-Quarter Capital Stress

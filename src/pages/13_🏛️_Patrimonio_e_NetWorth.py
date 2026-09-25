@@ -2994,6 +2994,30 @@ with main_tab_struct:
         st.dataframe(pd.DataFrame(sfdr_info["pai_indicators"]), use_container_width=True, hide_index=True)
 
 
+        # ── v9.16.0: TELEMETRY RIBBON, LIVE PORTFOLIO AUTO-BINDING & DELTA COMPARATOR ──
+        from core.ux_institutional_hub import (
+            render_institutional_telemetry_ribbon,
+            render_live_portfolio_autobind_banner,
+            render_scenario_delta_comparator,
+            render_segmented_workspace_switcher,
+            style_institutional_chart,
+        )
+
+        render_institutional_telemetry_ribbon(page_badge="WEALTH MANAGEMENT, COMMODITIES & EXECUTION DESK")
+        live_bind = render_live_portfolio_autobind_banner(
+            key_prefix="p13_wealth_exec",
+            model_label="Optimal Liquidation & Commodity Desk",
+        )
+        _ = render_segmented_workspace_switcher(
+            workspace_key="p13_v916_domain",
+            label="🧭 Selettore Rapido Desk Istituzionale:",
+            options=[
+                "🌐 Vista Integrata (Commodity + Optimal Liquidation)",
+                "🛢️ Schwartz 2-Factor Commodity Futures & Spread Options",
+                "⚡ Intraday Optimal Liquidation (Almgren-Chriss vs VWAP/TWAP)",
+            ],
+        )
+
         # ── v9.15.0: SCHWARTZ 2-FACTOR COMMODITY FUTURES & OPTIMAL LIQUIDATION ──
         st.divider()
         section("🛢️ Schwartz (1997) 2-Factor Commodity Futures & Convenience Yield Term Structure")
@@ -3050,6 +3074,7 @@ with main_tab_struct:
             height=380,
             margin=dict(l=10, r=10, b=10, t=40),
         )
+        style_institutional_chart(fig_cm, title=f"Curva Futures a Termine {cm_name}: Modello a 2 Fattori di Schwartz vs Cost-of-Carry", height=380)
         st.plotly_chart(fig_cm, use_container_width=True)
         st.dataframe(cm_df, use_container_width=True, hide_index=True)
 
@@ -3059,10 +3084,10 @@ with main_tab_struct:
 
         ol_c1, ol_c2, ol_c3, ol_c4 = st.columns(4)
         with ol_c1:
-            ol_ticker = st.text_input("Ticker Ordine Istituzionale:", value="ENI.MI", key="ol_tk_in")
+            ol_ticker = st.text_input("Ticker Ordine Istituzionale:", value=live_bind["top_ticker"] if live_bind.get("autobind_enabled") else "ENI.MI", key="ol_tk_in")
             ol_shares = st.number_input("Quantità Azioni da Liquidare:", min_value=1_000.0, value=250_000.0, step=25_000.0, key="ol_sh_in")
         with ol_c2:
-            ol_px = st.number_input("Prezzo Spot Mid (€):", min_value=0.5, value=14.80, step=0.5, key="ol_px_in")
+            ol_px = st.number_input("Prezzo Spot Mid (€):", min_value=0.5, value=float(live_bind["top_spot_price"]) if live_bind.get("autobind_enabled") else 14.80, step=0.5, key="ol_px_in")
             ol_adv = st.number_input("Volume Medio Giornaliero (ADV Azioni):", min_value=50_000.0, value=5_000_000.0, step=250_000.0, key="ol_adv_in")
         with ol_c3:
             ol_vol = st.slider("Volatilità Giornaliera (%):", min_value=0.5, max_value=6.0, value=1.8, step=0.1, key="ol_vol_in") / 100.0
@@ -3107,5 +3132,22 @@ with main_tab_struct:
             height=380,
             margin=dict(l=10, r=10, b=10, t=40),
         )
+        style_institutional_chart(fig_ol, title="Curva di Decadimento dell'Inventario Intraday (Almgren-Chriss vs Dynamic VWAP vs TWAP)", height=380)
         st.plotly_chart(fig_ol, use_container_width=True)
+        render_scenario_delta_comparator(
+            scenario_key="optimal_liquidation_p13",
+            scenario_title="Intraday Optimal Liquidation",
+            current_metrics={
+                "AC Optimal Cost (bps)": float(s_opt["expected_cost_bps"]),
+                "Dynamic VWAP Cost (bps)": float(s_vwap["expected_cost_bps"]),
+                "TWAP Benchmark Cost (bps)": float(s_twap["expected_cost_bps"]),
+                "Timing Risk Std (bps)": float(s_opt["timing_risk_std_bps"]),
+            },
+            higher_is_better_map={
+                "AC Optimal Cost (bps)": False,
+                "Dynamic VWAP Cost (bps)": False,
+                "TWAP Benchmark Cost (bps)": False,
+                "Timing Risk Std (bps)": False,
+            },
+        )
         st.dataframe(sched_df, use_container_width=True, hide_index=True)
