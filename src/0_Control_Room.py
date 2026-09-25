@@ -52,10 +52,7 @@ if _qp is not None:
 # ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
 from components.splash import auto_expand_sidebar
 from components.splash import render_splash_screen as render_argus_splash
-from core.ux_institutional_hub import (
-    APP_VERSION,
-    render_executive_traffic_light_radar,
-)
+from core.ux_institutional_hub import APP_VERSION
 
 if render_argus_splash(app_version=APP_VERSION):
     st.stop()
@@ -205,7 +202,6 @@ def get_analysis_history(engine):
 
 render_command_bar()
 render_control_room_hero()
-render_executive_traffic_light_radar(key_prefix="ctrl_room_cro_radar", include_board_pack=True)
 
 engine_sidebar = None
 db_error = None

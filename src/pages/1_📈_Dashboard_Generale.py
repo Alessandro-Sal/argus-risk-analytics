@@ -63,6 +63,14 @@ render_standard_hero(
 
 render_executive_badges(m)
 
+from core.ux_institutional_hub import render_executive_traffic_light_radar
+
+render_executive_traffic_light_radar(
+    key_prefix="dash_gen_cro_radar",
+    include_board_pack=True,
+    default_expanded=True,
+)
+
 # 📄 Factsheet Istituzionale A4 a Due Pagine (Private Banking / Morningstar Standard)
 col_pdf_left, col_pdf_right = st.columns([3, 1])
 with col_pdf_right:
