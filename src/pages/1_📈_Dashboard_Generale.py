@@ -1850,17 +1850,17 @@ with col_exp_pdf:
 
 st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
 
-# ── RIGA 2: EXCEL, HTML5 INTERATTIVO & POWER BI ──
-col_exp_excel, col_exp_html, col_exp_bi = st.columns(3, vertical_alignment="top")
+# ── RIGA 2: EXCEL, HTML5 INTERATTIVO, POWER BI & DATASET CSV (4 CARD UNIFORMI) ──
+col_exp_excel, col_exp_html, col_exp_bi, col_exp_csv = st.columns(4, vertical_alignment="top")
 
 with col_exp_excel:
     st.markdown(
         """<div style="background: rgba(15,23,42,0.75); border: 1px solid rgba(16,185,129,0.28); border-left: 3px solid #10b981; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
-<span style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">📊 Workbook Excel</span>
+<span style="font-size: 13px; font-weight: 700; color: #f8fafc;">📊 Workbook Excel</span>
 <span style="color: #34d399; font-size: 10px; font-weight: 700; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">.XLSX · 6 TAB</span>
 </div>
-<div style="font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Summary, Posizioni, Rendimenti, Stress, Fama-French, FIFO.</div>
+<div style="font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Summary, Posizioni, Stress, FIFO.</div>
 </div>""",
         unsafe_allow_html=True,
     )
@@ -1889,10 +1889,10 @@ with col_exp_html:
     st.markdown(
         """<div style="background: rgba(15,23,42,0.75); border: 1px solid rgba(56,189,248,0.28); border-left: 3px solid #38bdf8; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
-<span style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">🌐 Dashboard Web</span>
+<span style="font-size: 13px; font-weight: 700; color: #f8fafc;">🌐 Dashboard Web</span>
 <span style="color: #38bdf8; font-size: 10px; font-weight: 700; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">.HTML · PLOTLY</span>
 </div>
-<div style="font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Report interattivo autonomo con grafici zoomabili.</div>
+<div style="font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Report interattivo per browser.</div>
 </div>""",
         unsafe_allow_html=True,
     )
@@ -1907,10 +1907,10 @@ with col_exp_html:
         port_filename = f"ARGUS_Factsheet_{_exp_port_name.replace(' ', '_')}.html"
         html_bytes_ready = generate_html_report_bytes(results)
 
-        h_c1, h_c2 = st.columns([1.4, 1.0], vertical_alignment="center")
+        h_c1, h_c2 = st.columns(2, vertical_alignment="center")
         with h_c1:
             st.download_button(
-                label="💾 Scarica (.html)",
+                label="💾 Scarica",
                 data=html_bytes_ready,
                 file_name=port_filename,
                 mime="text/html",
@@ -1932,10 +1932,10 @@ with col_exp_bi:
     st.markdown(
         """<div style="background: rgba(15,23,42,0.75); border: 1px solid rgba(168,85,247,0.28); border-left: 3px solid #a855f7; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
 <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
-<span style="font-size: 13.5px; font-weight: 700; color: #f8fafc;">🗂️ Data Model BI</span>
-<span style="color: #c084fc; font-size: 10px; font-weight: 700; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">.ZIP · STAR SCHEMA</span>
+<span style="font-size: 13px; font-weight: 700; color: #f8fafc;">🗂️ Data Model BI</span>
+<span style="color: #c084fc; font-size: 10px; font-weight: 700; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">.ZIP · BI</span>
 </div>
-<div style="font-size: 11.5px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tabelle relazionali Fact &amp; Dim per Power BI / Tableau.</div>
+<div style="font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Star Schema Power BI / Tableau.</div>
 </div>""",
         unsafe_allow_html=True,
     )
@@ -1948,7 +1948,7 @@ with col_exp_bi:
 
         zip_bytes = generate_star_schema_zip(results)
         st.download_button(
-            label="🗂️ Scarica Star Schema (.zip)",
+            label="🗂️ Star Schema (.zip)",
             data=zip_bytes,
             file_name=f"ARGUS_PowerBI_StarSchema_{_exp_port_name.replace(' ', '_')}.zip",
             mime="application/zip",
@@ -1957,49 +1957,48 @@ with col_exp_bi:
     except Exception as e:
         st.error(f"Errore Power BI: {e}")
 
-st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
-
-# ── RIGA 3: ESPORTAZIONE RAPIDA TABELLE (CSV / XLSX / JSON) ──
-col_csv1, col_csv2 = st.columns(2, vertical_alignment="center")
-
-with col_csv1:
-    if not pos.empty:
-        with st.container(border=True):
-            c_p_t, c_p_e = st.columns([2.2, 1.0], vertical_alignment="center")
-            with c_p_t:
-                st.markdown(
-                    f"<div style='font-size:13px; font-weight:700; color:#f8fafc;'>📋 Dettaglio Posizioni <span style='color:#64748b; font-weight:500; font-size:11.5px;'>({_exp_n_pos} asset)</span></div>",
-                    unsafe_allow_html=True,
-                )
-            with c_p_e:
-                render_export_toolbar(
-                    pos,
-                    file_prefix=f"posizioni_{_exp_port_name.lower().replace(' ', '_')}",
-                    key_suffix="dash_pos_export",
-                    table_title="Dettaglio Posizioni",
-                )
-
-with col_csv2:
-    if not sr_port.empty:
-        with st.container(border=True):
-            c_r_t, c_r_e = st.columns([2.2, 1.0], vertical_alignment="center")
-            with c_r_t:
-                st.markdown(
-                    f"<div style='font-size:13px; font-weight:700; color:#f8fafc;'>📈 Rendimenti Storici <span style='color:#64748b; font-weight:500; font-size:11.5px;'>({len(sr_port)} giorni)</span></div>",
-                    unsafe_allow_html=True,
-                )
-            with c_r_e:
-                sr_bm_sliced = sr_bm.reindex(sr_port.index).fillna(0.0)
-                df_ret_exp = pd.DataFrame(
-                    {
-                        "date": sr_port.index.strftime("%Y-%m-%d"),
-                        "portfolio_return_pct": (sr_port.values * 100).round(4),
-                        "benchmark_return_pct": (sr_bm_sliced.values * 100).round(4),
-                    }
-                )
-                render_export_toolbar(
-                    df_ret_exp,
-                    file_prefix=f"rendimenti_{_exp_port_name.lower().replace(' ', '_')}",
-                    key_suffix="dash_ret_export",
-                    table_title="Rendimenti Storici",
-                )
+with col_exp_csv:
+    st.markdown(
+        f"""<div style="background: rgba(15,23,42,0.75); border: 1px solid rgba(148,163,184,0.28); border-left: 3px solid #94a3b8; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
+<span style="font-size: 13px; font-weight: 700; color: #f8fafc;">📋 Dataset Grezzi</span>
+<span style="color: #cbd5e1; font-size: 10px; font-weight: 700; white-space: nowrap; font-family: 'JetBrains Mono', monospace;">.CSV · {_exp_n_pos} ASSET</span>
+</div>
+<div style="font-size: 11px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Posizioni attive e serie storica.</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
+    csv_c1, csv_c2 = st.columns(2, vertical_alignment="center")
+    with csv_c1:
+        pos_csv_bytes = pos.to_csv(index=False).encode("utf-8") if not pos.empty else b""
+        st.download_button(
+            label="📋 Posizioni",
+            data=pos_csv_bytes,
+            file_name=f"ARGUS_Posizioni_{_exp_port_name.replace(' ', '_')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            disabled=pos.empty,
+            key="btn_dl_pos_csv_direct",
+        )
+    with csv_c2:
+        if not sr_port.empty:
+            sr_bm_sliced = sr_bm.reindex(sr_port.index).fillna(0.0)
+            df_ret_exp = pd.DataFrame(
+                {
+                    "date": sr_port.index.strftime("%Y-%m-%d"),
+                    "portfolio_return_pct": (sr_port.values * 100).round(4),
+                    "benchmark_return_pct": (sr_bm_sliced.values * 100).round(4),
+                }
+            )
+            ret_csv_bytes = df_ret_exp.to_csv(index=False).encode("utf-8")
+        else:
+            ret_csv_bytes = b""
+        st.download_button(
+            label="📈 Rendimenti",
+            data=ret_csv_bytes,
+            file_name=f"ARGUS_Rendimenti_{_exp_port_name.replace(' ', '_')}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            disabled=sr_port.empty,
+            key="btn_dl_ret_csv_direct",
+        )
