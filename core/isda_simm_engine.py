@@ -166,6 +166,7 @@ class IsdaSimmEngine:
                 "vega_margin_eur": rc_margins[rc]["vega_margin"],
                 "curvature_margin_eur": rc_margins[rc]["curvature_margin"],
                 "total_class_simm_eur": rc_margins[rc]["total_rc_simm"],
+                "total_class_im_eur": rc_margins[rc]["total_rc_simm"],
                 "share_of_gross_pct": round(
                     (rc_margins[rc]["total_rc_simm"] / max(gross_sum_simm, 1.0)) * 100.0, 2
                 ),
@@ -177,6 +178,7 @@ class IsdaSimmEngine:
             "model_version": "ISDA SIMM v2.6",
             "total_simm_initial_margin_eur": round(total_simm_eur, 2),
             "gross_undiversified_simm_eur": round(gross_sum_simm, 2),
+            "undiversified_sum_im_eur": round(gross_sum_simm, 2),
             "cross_class_diversification_benefit_eur": round(diversification_benefit_eur, 2),
             "cross_class_diversification_benefit_pct": round(diversification_benefit_pct, 2),
             "umr_threshold_eur": self.UMR_THRESHOLD_EUR,
