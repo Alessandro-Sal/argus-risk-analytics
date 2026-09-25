@@ -19,8 +19,10 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     interactive Plotly charts, metric cards, and positions table.
     """
     metrics = results.get("metrics", {}) if isinstance(results, dict) and isinstance(results.get("metrics"), dict) else {}
-    m_risk = (results.get("market_risk") or metrics.get("market_risk") or {}) if isinstance(results, dict) else {}
-    returns = (results.get("returns") or metrics.get("returns") or {}) if isinstance(results, dict) else {}
+    raw_mk = results.get("market_risk") if isinstance(results, dict) else None
+    m_risk = raw_mk if isinstance(raw_mk, dict) else (metrics.get("market_risk") if isinstance(metrics.get("market_risk"), dict) else {})
+    raw_ret = results.get("returns") if isinstance(results, dict) else None
+    returns = raw_ret if isinstance(raw_ret, dict) else (metrics.get("returns") if isinstance(metrics.get("returns"), dict) else {})
     pos = results.get("positions", pd.DataFrame()) if isinstance(results, dict) else pd.DataFrame()
 
     calc_date = (
