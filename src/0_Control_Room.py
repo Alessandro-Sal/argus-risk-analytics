@@ -55,7 +55,6 @@ from components.splash import render_splash_screen as render_argus_splash
 from core.ux_institutional_hub import (
     APP_VERSION,
     render_executive_traffic_light_radar,
-    render_institutional_telemetry_ribbon,
 )
 
 if render_argus_splash(app_version=APP_VERSION):
@@ -63,26 +62,6 @@ if render_argus_splash(app_version=APP_VERSION):
 
 # Apertura automatica della sidebar una volta entrati nella Control Room
 auto_expand_sidebar()
-render_institutional_telemetry_ribbon(page_badge="CONTROL ROOM & EXECUTIVE LAUNCHPAD")
-render_executive_traffic_light_radar(key_prefix="ctrl_room_cro_radar")
-
-with st.expander("📑 1-Click Executive CRO & Investment Committee Board-Pack Dossier (v9.17.0)", expanded=False):
-    from core.executive_board_pack_engine import generate_executive_board_pack
-    bp_res = generate_executive_board_pack()
-    bp_c1, bp_c2 = st.columns([2.8, 1.2])
-    with bp_c1:
-        for rx in bp_res["cro_prescriptions"]:
-            st.markdown(f"**{rx['priority']} [{rx['domain']}]** — {rx['action']}")
-    with bp_c2:
-        st.download_button(
-            label="📥 Scarica CRO Board-Pack (HTML5)",
-            data=bp_res["board_pack_html"].encode("utf-8"),
-            file_name="argus_executive_cro_board_pack_v917.html",
-            mime="text/html",
-            use_container_width=True,
-            type="primary",
-            key="dl_cro_bp_html_btn",
-        )
 
 
 import datetime
@@ -226,6 +205,7 @@ def get_analysis_history(engine):
 
 render_command_bar()
 render_control_room_hero()
+render_executive_traffic_light_radar(key_prefix="ctrl_room_cro_radar", include_board_pack=True)
 
 engine_sidebar = None
 db_error = None
