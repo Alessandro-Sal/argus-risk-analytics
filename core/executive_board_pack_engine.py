@@ -32,37 +32,42 @@ class ExecutiveBoardPackEngine:
     def generate_board_pack(self) -> dict[str, Any]:
         """Synthesize multi-engine telemetry, CRO prescriptions, and HTML5 Board Pack."""
         radar = compute_executive_traffic_light_radar()
+        scale_factor = max(float(self.nav_eur), 1_000.0) / 125_000_000.0
         simm = compute_isda_simm_margin()
-        alm = compute_alm_ldi_immunization(asset_portfolio_eur=self.nav_eur)
+        alm = compute_alm_ldi_immunization(asset_portfolio_eur=max(float(self.nav_eur), 10_000.0))
         ccar = compute_ccar_capital_stress()
 
         sev_cet1 = float(ccar["severely_adverse_min_cet1_pct"])
         funding_ratio = float(alm["funding_ratio_pct"])
-        simm_im = float(simm["total_simm_initial_margin_eur"])
+        simm_im = float(simm["total_simm_initial_margin_eur"]) * scale_factor
+        mva_sav = float(simm["annual_ccp_mva_savings_eur"]) * scale_factor
+        irs_hedge_eur = float(alm["required_20y_receiver_swap_notional_eur"])
+        de_risk_eur = float(self.nav_eur) * 0.22
 
         prescriptions: list[dict[str, str]] = [
             {
-                "priority": "PRIORITY 1 - LDI & DURATION HEDGE",
+                "priority": "PRIORITY 1 - RISK & VOLATILITY BUDGET",
+                "domain": "Market Risk & Tail Hedging",
+                "action": (
+                    f"Per il portafoglio '{self.portfolio_name}' (NAV € {self.nav_eur:,.2f}), "
+                    f"proteggere € {de_risk_eur:,.2f} (22% del NAV) tramite collar/overlay difensivo o riduzione beta "
+                    f"per ricondurre VaR 99% e Max Drawdown entro le soglie regolamentari."
+                ),
+            },
+            {
+                "priority": "PRIORITY 2 - LDI & DURATION HEDGE",
                 "domain": "Asset-Liability Management (ALM)",
                 "action": (
-                    f"Eseguire Receiver IRS 20Y per € {alm['required_20y_receiver_swap_notional_eur']:,.0f} "
-                    f"per chiudere il Duration Gap ({alm['duration_gap_years']:+.2f} anni) e portare il Liability Hedge Ratio al 100%."
+                    f"Copertura Duration / Tasso per € {irs_hedge_eur:,.2f} "
+                    f"per chiudere il Duration Gap ({alm['duration_gap_years']:+.2f} anni) e stabilizzare il rendimento sopra l'hurdle rate Risk-Free."
                 ),
             },
             {
-                "priority": "PRIORITY 2 - OTC MARGIN & CENTRAL CLEARING",
+                "priority": "PRIORITY 3 - OTC MARGIN & CENTRAL CLEARING",
                 "domain": "ISDA SIMM v2.6 & UMR",
                 "action": (
-                    f"Margine Iniziale ISDA SIMM pari a € {simm_im:,.0f} ({simm['umr_utilization_pct']:.1f}% della soglia UMR €50M). "
-                    f"Il clearing su CCP LCH/Eurex riduce l'MVA annuo di € {simm['annual_ccp_mva_savings_eur']:,.0f}."
-                ),
-            },
-            {
-                "priority": "PRIORITY 3 - SUPERVISORY CAPITAL BUFFER",
-                "domain": "Fed CCAR / EBA 9Q Stress",
-                "action": (
-                    f"Minimo CET1 nello scenario Severely Adverse pari a {sev_cet1:.2f}% (Trough in {ccar['severely_adverse_trough_quarter']}). "
-                    f"Mantenere uno Stress Capital Buffer (SCB) prudenziale di almeno {ccar['required_stress_capital_buffer_scb_pct']:.2f}%."
+                    f"Margine Iniziale proporzionale pari a € {simm_im:,.2f}. "
+                    f"L'ottimizzazione del collaterale riduce il costo di funding annuo (MVA) di € {mva_sav:,.2f}."
                 ),
             },
         ]

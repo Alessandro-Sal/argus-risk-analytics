@@ -445,32 +445,162 @@ def render_scenario_delta_comparator(
 def compute_executive_traffic_light_radar(
     metrics_override: dict[str, float] | None = None,
     session_state_dict: dict[str, Any] | None = None,
+    risk_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compute 6-Pillar Executive CRO Traffic-Light Radar reactive to Live Portfolio & Global Macro Shocks."""
     state = session_state_dict if session_state_dict is not None else (
         dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
     )
-    last_res = state.get("last_results") or {}
-    mk = (last_res.get("metrics") or {}).get("market_risk") or {}
-    pos_df = last_res.get("positions")
+    last_res = risk_data if isinstance(risk_data, dict) and risk_data else (state.get("last_results") or {})
+    metrics_block = last_res.get("metrics") or {}
+    ret_block = metrics_block.get("returns") or {}
+    mk = metrics_block.get("market_risk") or {}
+    pos_raw = last_res.get("positions")
+    pos_df = pd.DataFrame(pos_raw) if isinstance(pos_raw, list) else pos_raw
+    has_live_portfolio = bool(
+        last_res and (mk or ret_block or metrics_block or (isinstance(pos_df, pd.DataFrame) and not pos_df.empty))
+    )
 
-    live_var = float(last_res.get("var_99_pct") or mk.get("var_99") or mk.get("var_95") or 1.84)
-    if 0.0 < live_var < 0.25:
-        live_var *= 100.0
+    # 1. Extract NAV (€)
+    nav_eur = float(
+        ret_block.get("portfolio_value")
+        or metrics_block.get("total_value")
+        or metrics_block.get("portfolio_value")
+        or last_res.get("portfolio_value")
+        or last_res.get("total_value")
+        or 0.0
+    )
+    if nav_eur <= 0.0 and isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+        for vcol in ("market_value", "current_value", "valore_mercato"):
+            if vcol in pos_df.columns:
+                nav_eur = float(pd.to_numeric(pos_df[vcol], errors="coerce").fillna(0.0).sum())
+                if nav_eur > 0.0:
+                    break
+    if nav_eur <= 0.0:
+        nav_eur = 125_000_000.0
 
+    # 2. Extract Real Daily VaR 95% & VaR 99% (handling negative decimals like -0.0250 or pct like 2.50)
+    raw_var95 = abs(
+        float(
+            mk.get("var_95")
+            or mk.get("var_95_pct")
+            or metrics_block.get("var_95")
+            or last_res.get("var_95_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var95 < 0.50:
+        raw_var95 *= 100.0
+    raw_var99 = abs(
+        float(
+            mk.get("var_99")
+            or mk.get("var_99_pct")
+            or metrics_block.get("var_99")
+            or last_res.get("var_99_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_var99 < 0.50:
+        raw_var99 *= 100.0
+    if raw_var99 <= 0.0:
+        live_var = round(raw_var95 * 1.38, 2) if raw_var95 > 0.0 else 1.84
+    else:
+        live_var = round(raw_var99, 2)
+
+    # 3. Extract Real Annualized Volatility %, Max Drawdown %, and Sharpe Ratio
+    raw_vol = abs(
+        float(
+            mk.get("volatility_annual_pct")
+            or mk.get("volatility_annual")
+            or mk.get("annual_volatility")
+            or ret_block.get("volatility_pct")
+            or metrics_block.get("volatility_annual_pct")
+            or metrics_block.get("volatility_annual")
+            or last_res.get("annual_volatility_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_vol < 1.50:
+        raw_vol *= 100.0
+    live_vol = round(raw_vol, 2) if raw_vol > 0.0 else 12.6
+
+    raw_mdd = abs(
+        float(
+            mk.get("max_drawdown_pct")
+            or mk.get("max_drawdown")
+            or ret_block.get("max_drawdown_pct")
+            or metrics_block.get("max_drawdown_pct")
+            or metrics_block.get("max_drawdown")
+            or last_res.get("max_drawdown_pct")
+            or 0.0
+        )
+    )
+    if 0.0 < raw_mdd < 1.50:
+        raw_mdd *= 100.0
+    live_mdd = round(raw_mdd, 2) if raw_mdd > 0.0 else 9.8
+
+    if has_live_portfolio and (
+        "sharpe_ratio" in ret_block
+        or "sharpe_ratio" in mk
+        or "sharpe_ratio" in metrics_block
+        or "sharpe_ratio" in last_res
+    ):
+        live_sharpe = round(
+            float(
+                ret_block.get(
+                    "sharpe_ratio",
+                    mk.get(
+                        "sharpe_ratio",
+                        metrics_block.get("sharpe_ratio", last_res.get("sharpe_ratio", 1.42)),
+                    ),
+                )
+            ),
+            2,
+        )
+    else:
+        live_sharpe = 1.42
+
+    # 4. Extract Real HHI Concentration % from positions
     live_hhi = 16.5
-    if isinstance(pos_df, pd.DataFrame) and not pos_df.empty and "weight" in pos_df.columns:
-        w = pd.to_numeric(pos_df["weight"], errors="coerce").fillna(0.0)
-        if w.sum() > 1.5:
-            w = w / 100.0
-        hhi_calc = float((w**2).sum() * 100.0)
-        if hhi_calc > 0.5:
-            live_hhi = round(hhi_calc, 1)
+    if isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+        w_series = None
+        for wcol in ("weight", "weight_pct", "peso_pct"):
+            if wcol in pos_df.columns:
+                w_series = pd.to_numeric(pos_df[wcol], errors="coerce").fillna(0.0)
+                break
+        if w_series is None:
+            for vcol in ("market_value", "current_value", "valore_mercato"):
+                if vcol in pos_df.columns:
+                    vals = pd.to_numeric(pos_df[vcol], errors="coerce").fillna(0.0).abs()
+                    if vals.sum() > 0:
+                        w_series = vals / vals.sum()
+                        break
+        if w_series is not None and w_series.sum() > 0:
+            w_norm = w_series / w_series.sum()
+            hhi_calc = float((w_norm**2).sum() * 100.0)
+            if hhi_calc > 0.5:
+                live_hhi = round(hhi_calc, 1)
+
+    # 5. Compute Real PRIIPs SRI (1-7) & CET1 / Liquidity adjustments from portfolio risk
+    base_sri = 3.0
+    if live_vol >= 40.0 or live_mdd >= 32.0:
+        base_sri = 6.0
+    elif live_vol >= 25.0 or live_mdd >= 22.0:
+        base_sri = 5.0
+    elif live_vol >= 15.0 or live_mdd >= 14.0:
+        base_sri = 4.0
+
+    base_cet1 = 10.25
+    if live_sharpe < 0.35 or live_mdd >= 25.0:
+        base_cet1 = 8.85
+    elif live_sharpe < 0.70 or live_mdd >= 18.0:
+        base_cet1 = 9.35
+
+    base_cva = round(14.2 + max(0.0, (live_vol - 14.0) * 0.65), 1)
 
     shock = get_active_macro_shock(session_state_dict=state)
     s_key = str(shock.get("preset_key", "NONE"))
 
-    # Shock multipliers / deltas
     var_shock_add = 0.0
     lcr_shock_add = 0.0
     nsfr_shock_add = 0.0
@@ -509,11 +639,11 @@ def compute_executive_traffic_light_radar(
         "var_limit_pct": 2.50,
         "basel_lcr_pct": round(142.5 + lcr_shock_add, 1),
         "basel_nsfr_pct": round(118.4 + nsfr_shock_add, 1),
-        "ccar_stressed_cet1_pct": round(10.25 + cet1_shock_add, 2),
+        "ccar_stressed_cet1_pct": round(base_cet1 + cet1_shock_add, 2),
         "ccar_mda_hurdle_pct": 9.50,
-        "priips_sri_score": min(7.0, max(1.0, 3.0 + sri_shock_add)),
+        "priips_sri_score": min(7.0, max(1.0, base_sri + sri_shock_add)),
         "hhi_concentration_pct": round(live_hhi + hhi_shock_add, 1),
-        "counterparty_cva_bps": round(14.2 + cva_shock_add, 1),
+        "counterparty_cva_bps": round(base_cva + cva_shock_add, 1),
     }
     if metrics_override:
         m.update(metrics_override)
@@ -530,12 +660,16 @@ def compute_executive_traffic_light_radar(
             "pillar_id": "market_var",
             "title": "Market Risk VaR 99% (1d)",
             "reg_framework": "BCBS-352 / FRTB",
-            "value_label": f"{var_val:.2f}% (Limit {var_lim:.2f}%)",
-            "delta_label": f"Δ +{var_shock_add:.2f}% Shock" if var_shock_add > 0 else "Baseline Compliant",
+            "value_label": f"VaR {var_val:.2f}% / Lim {var_lim:.2f}%",
+            "delta_label": (
+                f"Δ +{var_shock_add:.2f}% Shock"
+                if var_shock_add > 0
+                else (f"VaR 95%: {raw_var95:.2f}%" if raw_var95 > 0 else "Baseline Compliant")
+            ),
             "utilization_pct": round(var_util, 1),
-            "sparkline": [1.45, 1.62, 1.75, 1.84, var_val],
+            "sparkline": [1.45, 1.62, 1.84, max(1.84, live_var * 0.9), var_val],
             "status": var_status,
-            "target_page": "src/pages/2_🔴_Analisi_Rischio.py",
+            "target_page": "pages/2_🔴_Analisi_Rischio.py",
             "badge_color": "#10b981" if var_status == "PASS" else ("#f59e0b" if var_status == "WARNING" else "#ef4444"),
         }
     )
@@ -543,58 +677,68 @@ def compute_executive_traffic_light_radar(
     # 2. Basel III Liquidity LCR & NSFR
     lcr = float(m["basel_lcr_pct"])
     nsfr = float(m["basel_nsfr_pct"])
-    liq_util = min(100.0, max(10.0, (150.0 - lcr) / 50.0 * 100.0))
+    liq_util = min(100.0, max(12.0, (150.0 - lcr) / 50.0 * 100.0))
     liq_status = "PASS" if (lcr >= 110.0 and nsfr >= 105.0) else ("WARNING" if (lcr >= 100.0 and nsfr >= 100.0) else "BREACH")
     pillars.append(
         {
             "pillar_id": "basel_liquidity",
             "title": "Basel III LCR & NSFR",
             "reg_framework": "CRR II / Basel III",
-            "value_label": f"LCR {lcr:.1f}% | NSFR {nsfr:.1f}%",
+            "value_label": f"LCR {lcr:.1f}% · NSFR {nsfr:.0f}%",
             "delta_label": f"Δ {lcr_shock_add:+.1f}% LCR" if lcr_shock_add != 0 else "Min 100% Buffer OK",
             "utilization_pct": round(liq_util, 1),
             "sparkline": [148.0, 145.0, 143.5, 142.5, lcr],
             "status": liq_status,
-            "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+            "target_page": "pages/7_🌪️_Stress_Testing.py",
             "badge_color": "#10b981" if liq_status == "PASS" else ("#f59e0b" if liq_status == "WARNING" else "#ef4444"),
         }
     )
 
-    # 3. Fed CCAR / EBA Stressed CET1
+    # 3. Fed CCAR / EBA Stressed CET1 & Sharpe Efficiency
     cet1 = float(m["ccar_stressed_cet1_pct"])
     mda = float(m["ccar_mda_hurdle_pct"])
-    ccar_util = min(100.0, max(12.0, (mda / max(cet1, 1.0)) * 82.0))
-    ccar_status = "PASS" if cet1 >= mda + 0.5 else ("WARNING" if cet1 >= mda - 0.5 else "BREACH")
+    ccar_util = min(100.0, max(15.0, (mda / max(cet1, 1.0)) * 84.0))
+    ccar_status = "PASS" if (cet1 >= mda + 0.5 and live_sharpe >= 0.70) else ("WARNING" if (cet1 >= 8.5 and live_sharpe >= 0.15) else "BREACH")
+    if metrics_override and "ccar_stressed_cet1_pct" in metrics_override:
+        ccar_status = "PASS" if cet1 >= mda + 0.5 else ("WARNING" if cet1 >= 6.0 else "BREACH")
     pillars.append(
         {
             "pillar_id": "ccar_capital",
-            "title": "Fed CCAR / EBA Stressed CET1",
-            "reg_framework": "EBA / Fed CCAR 9Q",
-            "value_label": f"Min CET1 {cet1:.2f}% (MDA {mda:.1f}%)",
-            "delta_label": f"Δ {cet1_shock_add:+.2f}% CET1" if cet1_shock_add != 0 else f"+{cet1 - mda:.2f}% vs MDA",
+            "title": "Stressed CET1 & Sharpe",
+            "reg_framework": "EBA / Hurdle Rf",
+            "value_label": f"CET1 {cet1:.2f}% · SR {live_sharpe:.2f}",
+            "delta_label": (
+                f"Sharpe {live_sharpe:.2f} < 0.70 Hurdle"
+                if live_sharpe < 0.70
+                else (f"Δ {cet1_shock_add:+.2f}% CET1" if cet1_shock_add != 0 else f"+{cet1 - mda:.2f}% vs MDA")
+            ),
             "utilization_pct": round(ccar_util, 1),
             "sparkline": [12.4, 11.8, 11.1, 10.25, cet1],
             "status": ccar_status,
-            "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+            "target_page": "pages/7_🌪️_Stress_Testing.py",
             "badge_color": "#10b981" if ccar_status == "PASS" else ("#f59e0b" if ccar_status == "WARNING" else "#ef4444"),
         }
     )
 
-    # 4. PRIIPs KID SRI & SFDR Compliance
+    # 4. PRIIPs KID SRI & Max Drawdown Gate
     sri = int(round(float(m["priips_sri_score"])))
     sri_util = round((sri / 7.0) * 100.0, 1)
-    sri_status = "PASS" if sri <= 4 else ("WARNING" if sri == 5 else "BREACH")
+    sri_status = "PASS" if (sri <= 4 and live_mdd <= 22.0) else ("WARNING" if (sri == 5 and live_mdd <= 28.0) else "BREACH")
     pillars.append(
         {
             "pillar_id": "priips_sri",
-            "title": "PRIIPs KID Risk Indicator",
-            "reg_framework": "EU PRIIPs / SFDR",
-            "value_label": f"SRI {sri}/7 (Art. 8/9 ESG)",
-            "delta_label": f"Δ +{int(sri_shock_add)} Notch" if sri_shock_add > 0 else "Target SRI ≤ 4/7",
+            "title": "PRIIPs SRI & Drawdown",
+            "reg_framework": "EU PRIIPs / MDD",
+            "value_label": f"SRI {sri}/7 · MDD {live_mdd:.1f}%",
+            "delta_label": (
+                f"Vol {live_vol:.1f}% (>25%) · MDD {live_mdd:.1f}%"
+                if (live_vol > 25.0 or live_mdd > 22.0)
+                else "Target SRI ≤ 4/7"
+            ),
             "utilization_pct": sri_util,
-            "sparkline": [3.0, 3.0, 3.0, 3.0, float(sri)],
+            "sparkline": [3.0, 3.0, 4.0, base_sri, float(sri)],
             "status": sri_status,
-            "target_page": "src/pages/13_🏛️_Patrimonio_e_NetWorth.py",
+            "target_page": "pages/13_🏛️_Patrimonio_e_NetWorth.py",
             "badge_color": "#10b981" if sri_status == "PASS" else ("#f59e0b" if sri_status == "WARNING" else "#ef4444"),
         }
     )
@@ -608,12 +752,12 @@ def compute_executive_traffic_light_radar(
             "pillar_id": "hhi_concentration",
             "title": "Concentrazione HHI & UCITS",
             "reg_framework": "UCITS V 5/10/40",
-            "value_label": f"HHI {hhi:.1f}% (Soglia 25%)",
+            "value_label": f"HHI {hhi:.1f}% / Max 25%",
             "delta_label": f"Δ +{hhi_shock_add:.1f}% Corr." if hhi_shock_add > 0 else "Diversificato",
             "utilization_pct": round(hhi_util, 1),
-            "sparkline": [14.0, 15.2, 16.0, 16.5, hhi],
+            "sparkline": [14.0, 15.2, 16.0, live_hhi, hhi],
             "status": hhi_status,
-            "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+            "target_page": "pages/4_🔬_Modelli_Quantitativi.py",
             "badge_color": "#10b981" if hhi_status == "PASS" else ("#f59e0b" if hhi_status == "WARNING" else "#ef4444"),
         }
     )
@@ -626,13 +770,13 @@ def compute_executive_traffic_light_radar(
         {
             "pillar_id": "xva_credit",
             "title": "Counterparty XVA & Credit IRB",
-            "reg_framework": "ISDA SIMM v2.6 / SA-CCR",
-            "value_label": f"CVA/FVA {cva_bps:.1f} bps",
+            "reg_framework": "ISDA SIMM v2.6",
+            "value_label": f"CVA {cva_bps:.1f} bps / Lim 50",
             "delta_label": f"Δ +{cva_shock_add:.1f} bps" if cva_shock_add > 0 else "Soglia 50 bps",
             "utilization_pct": round(xva_util, 1),
-            "sparkline": [11.5, 12.4, 13.5, 14.2, cva_bps],
+            "sparkline": [11.5, 12.4, 13.5, base_cva, cva_bps],
             "status": xva_status,
-            "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+            "target_page": "pages/7_🌪️_Stress_Testing.py",
             "badge_color": "#10b981" if xva_status == "PASS" else ("#f59e0b" if xva_status == "WARNING" else "#ef4444"),
         }
     )
@@ -640,11 +784,11 @@ def compute_executive_traffic_light_radar(
     pass_cnt = sum(1 for p in pillars if p["status"] == "PASS")
     warn_cnt = sum(1 for p in pillars if p["status"] == "WARNING")
     breach_cnt = sum(1 for p in pillars if p["status"] == "BREACH")
-    readiness_score = max(15, int(round(100 - warn_cnt * 12 - breach_cnt * 24)))
+    readiness_score = max(15, int(round(100 - warn_cnt * 12 - breach_cnt * 22)))
 
     overall = "GREEN - ALL REGULATORY GATES COMPLIANT"
     if breach_cnt > 0:
-        overall = f"RED - {breach_cnt} REGULATORY BREACH(ES) DETECTED"
+        overall = f"RED - {breach_cnt} REGULATORY BREACH(ES) & {warn_cnt} WATCH ITEM(S)"
     elif warn_cnt > 0:
         overall = f"AMBER - {warn_cnt} SUPERVISORY WATCH ITEM(S)"
 
@@ -652,6 +796,7 @@ def compute_executive_traffic_light_radar(
         "overall_status": overall,
         "readiness_score": readiness_score,
         "active_macro_shock": s_key,
+        "nav_eur": nav_eur,
         "pass_count": pass_cnt,
         "warning_count": warn_cnt,
         "breach_count": breach_cnt,
@@ -675,9 +820,14 @@ def render_executive_traffic_light_radar(
     metrics_override: dict[str, float] | None = None,
     include_board_pack: bool = False,
     default_expanded: bool = False,
+    risk_data: dict[str, Any] | None = None,
+    factsheet_pdf_bytes: bytes | None = None,
 ) -> dict[str, Any]:
     """Render upgraded CRO Traffic-Light Radar, Global Macro Shock Console & 1-Click Board-Pack."""
-    radar = compute_executive_traffic_light_radar(metrics_override=metrics_override)
+    radar = compute_executive_traffic_light_radar(
+        metrics_override=metrics_override,
+        risk_data=risk_data,
+    )
     if st is None:
         return radar
 
@@ -690,7 +840,6 @@ def render_executive_traffic_light_radar(
     )
 
     with st.expander(expander_title, expanded=default_expanded):
-        # Top Executive Summary Strip inside the Console
         score_col = "#10b981" if score >= 85 else ("#f59e0b" if score >= 60 else "#ef4444")
         shock_lbl = MACRO_SHOCK_PRESETS.get(cur_shock, MACRO_SHOCK_PRESETS["NONE"])["label"]
         top_strip_html = _compact_html(
@@ -707,14 +856,14 @@ def render_executive_traffic_light_radar(
                     <span style="font-size:12px; font-weight:700; color:#f8fafc;">{radar['overall_status']}</span>
                 </div>
                 <div style="font-size:11.5px; color:#cbd5e1; font-family:'JetBrains Mono',monospace;">
-                    Scenario Attivo: <b style="color:#a855f7;">{shock_lbl}</b>
+                    NAV: <b style="color:#10b981;">€ {radar['nav_eur']:,.2f}</b> &bull; Scenario: <b style="color:#a855f7;">{shock_lbl}</b>
                 </div>
             </div>
             """
         )
         st.markdown(top_strip_html, unsafe_allow_html=True)
 
-        # Row 1: Perfectly Aligned 3-Column Controls (all 38px single-line label widgets)
+        # Row 1: Perfectly Aligned 3-Column Controls
         c_cmd, c_shk, c_den = st.columns([2.1, 2.2, 1.2])
         with c_cmd:
             cmd_input = st.text_input(
@@ -770,37 +919,37 @@ def render_executive_traffic_light_radar(
             with qj6:
                 _safe_page_link("pages/7_🌪️_Stress_Testing.py", "🌪️ Fed CCAR 9Q")
 
-        # Row 3: 6 Rich Bento CRO Pillar Cards with Inline SVG Sparklines & Limit Utilization Bars
+        # Row 3: 6 Rich Bento CRO Pillar Cards (Single-Line Value Label, SVG Sparkline & Limit Bar)
         cols = st.columns(3)
         for idx_p, p in enumerate(radar["pillars"]):
             icon = "🟢" if p["status"] == "PASS" else ("🟡" if p["status"] == "WARNING" else "🔴")
-            spark_svg = build_svg_sparkline(p.get("sparkline", [1.0, 1.1, 1.05]), color=p["badge_color"], width=90, height=24)
+            spark_svg = build_svg_sparkline(p.get("sparkline", [1.0, 1.1, 1.05]), color=p["badge_color"], width=86, height=22)
             util_pct = float(p.get("utilization_pct", 50.0))
             with cols[idx_p % 3]:
                 card_html = _compact_html(
                     f"""
                     <div class="argus-bento-card" style="background: rgba(15, 23, 42, 0.90); border: 1px solid rgba(148,163,184,0.16);
-                                border-left: 4px solid {p['badge_color']}; border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+                                border-left: 4px solid {p['badge_color']}; border-radius: 10px; padding: 11px 14px; margin-bottom: 10px;
                                 box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                            <span style="font-size: 12px; font-weight: 700; color: #f8fafc;">{p['title']}</span>
+                            <span style="font-size: 11.5px; font-weight: 700; color: #f8fafc; white-space:nowrap;">{p['title']}</span>
                             <span style="background:rgba(255,255,255,0.05); border:1px solid {p['badge_color']};
-                                         font-size: 10px; font-weight: 800; color: {p['badge_color']}; padding:1px 7px; border-radius:10px;">
+                                         font-size: 9.5px; font-weight: 800; color: {p['badge_color']}; padding:1px 7px; border-radius:10px; white-space:nowrap;">
                                 {icon} {p['status']}
                             </span>
                         </div>
-                        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:8px;">
-                            <div>
-                                <div style="font-size: 14.5px; font-weight: 800; color: #f1f5f9; font-family: 'JetBrains Mono', monospace;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:7px; gap:8px;">
+                            <div style="min-width:0;">
+                                <div style="font-size: 13.5px; font-weight: 800; color: #f1f5f9; font-family: 'JetBrains Mono', monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     {p['value_label']}
                                 </div>
-                                <div style="font-size: 10.5px; color: #94a3b8; margin-top:2px;">
+                                <div style="font-size: 10px; color: #94a3b8; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     <span style="color:#818cf8; font-weight:700;">[{p.get('reg_framework', 'BCBS')}]</span> · {p.get('delta_label', '')}
                                 </div>
                             </div>
-                            <div>{spark_svg}</div>
+                            <div style="flex-shrink:0;">{spark_svg}</div>
                         </div>
-                        <div style="margin-top:8px;">
+                        <div style="margin-top:7px;">
                             <div style="display:flex; justify-content:space-between; font-size:9.5px; color:#94a3b8; margin-bottom:2px;">
                                 <span>Saturazione Limite Regolamentare</span>
                                 <span style="color:{p['badge_color']}; font-weight:700;">{util_pct:.1f}%</span>
@@ -817,7 +966,11 @@ def render_executive_traffic_light_radar(
         if include_board_pack:
             from core.executive_board_pack_engine import generate_executive_board_pack
 
-            bp_res = generate_executive_board_pack()
+            port_name = str(st.session_state.get("portfolio_name") or "Portafoglio Attivo")
+            bp_res = generate_executive_board_pack(
+                portfolio_name=port_name,
+                nav_eur=float(radar.get("nav_eur", 125_000_000.0)),
+            )
             bp_c1, bp_c2 = st.columns([3.0, 1.2])
             with bp_c1:
                 rx_items_html = "".join(
@@ -833,7 +986,7 @@ def render_executive_traffic_light_radar(
                         <div style="background:rgba(22,27,34,0.75); border:1px solid rgba(255,255,255,0.08);
                                     border-radius:8px; padding:8px 12px;">
                             <div style="font-size:11px; font-weight:800; color:#f59e0b; margin-bottom:4px;">
-                                📑 PRESCRIZIONI OPERATIVE COMITATO RISCHI (BOARD-PACK v{APP_VERSION})
+                                📑 PRESCRIZIONI OPERATIVE COMITATO RISCHI ({port_name} — NAV € {radar['nav_eur']:,.2f})
                             </div>
                             {rx_items_html}
                         </div>
@@ -851,6 +1004,15 @@ def render_executive_traffic_light_radar(
                     type="primary",
                     key=f"{key_prefix}_dl_bp_btn",
                 )
+                if factsheet_pdf_bytes:
+                    st.download_button(
+                        label="📄 Factsheet PDF (2 Pagine)",
+                        data=factsheet_pdf_bytes,
+                        file_name=f"ARGUS_Factsheet_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key=f"{key_prefix}_dl_pdf_btn",
+                    )
     return radar
 
 
