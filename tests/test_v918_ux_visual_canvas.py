@@ -168,3 +168,18 @@ def test_v918_telemetry_ribbon_html_no_codeblock_indentation() -> None:
     assert "\n" not in html_shock
     assert "⚡ SHOCK: GFC 2008" in html_shock
 
+
+def test_v918_cro_radar_shock_reactivity_and_readiness_score() -> None:
+    """Verify compute_executive_traffic_light_radar reacts to Global Macro Shock presets."""
+    from core.ux_institutional_hub import compute_executive_traffic_light_radar
+
+    base_radar = compute_executive_traffic_light_radar(session_state_dict={"global_macro_shock": "NONE"})
+    assert base_radar["readiness_score"] >= 90
+    assert base_radar["breach_count"] == 0
+    assert all("utilization_pct" in p and "sparkline" in p and "reg_framework" in p for p in base_radar["pillars"])
+
+    gfc_radar = compute_executive_traffic_light_radar(session_state_dict={"global_macro_shock": "GFC_2008"})
+    assert gfc_radar["readiness_score"] < base_radar["readiness_score"]
+    assert gfc_radar["breach_count"] >= 2
+
+
