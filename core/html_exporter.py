@@ -18,9 +18,9 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     Generates a high-tech standalone HTML executive factsheet with embedded
     interactive Plotly charts, metric cards, and positions table.
     """
-    metrics = results.get("metrics", {}) if isinstance(results, dict) else {}
-    m_risk = metrics.get("market_risk", {}) if isinstance(metrics, dict) else {}
-    returns = metrics.get("returns", {}) if isinstance(metrics, dict) else {}
+    metrics = results.get("metrics", {}) if isinstance(results, dict) and isinstance(results.get("metrics"), dict) else {}
+    m_risk = (results.get("market_risk") or metrics.get("market_risk") or {}) if isinstance(results, dict) else {}
+    returns = (results.get("returns") or metrics.get("returns") or {}) if isinstance(results, dict) else {}
     pos = results.get("positions", pd.DataFrame()) if isinstance(results, dict) else pd.DataFrame()
 
     calc_date = (
@@ -161,15 +161,16 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     sharpe_raw = returns.get("sharpe_ratio", returns.get("sharpe", 0.0))
     sharpe = float(sharpe_raw) if sharpe_raw is not None and not pd.isna(sharpe_raw) else 0.0
 
-    var95_raw = m_risk.get("var_95_param", m_risk.get("var_95_hist", 0.0))
-    var95 = float(var95_raw) if var95_raw is not None and not pd.isna(var95_raw) else 0.0
-    if abs(var95) > 5.0:
-        var95 = var95 / 100.0
+    var95_raw = m_risk.get("var_95", m_risk.get("var_95_param", m_risk.get("var_95_hist", 0.0)))
+    var95 = abs(float(var95_raw)) if var95_raw is not None and not pd.isna(var95_raw) else 0.0
+    if 0.0 < var95 < 0.50:
+        var95 *= 100.0
+    var95_eur = tot_val * (var95 / 100.0)
 
-    cagr_raw = returns.get("cagr", returns.get("cagr_pct", returns.get("portfolio_cagr_pct", 0.0)))
+    cagr_raw = returns.get("cagr_pct", returns.get("cagr", returns.get("portfolio_cagr_pct", 0.0)))
     cagr = float(cagr_raw) if cagr_raw is not None and not pd.isna(cagr_raw) else 0.0
-    if abs(cagr) > 5.0:
-        cagr = cagr / 100.0
+    if 0.0 < abs(cagr) < 0.50:
+        cagr *= 100.0
 
     html_content = f"""<!DOCTYPE html>
 <html lang="it">
@@ -268,20 +269,20 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
 
     <div class="kpi-grid">
         <div class="kpi-card">
-            <div class="kpi-title">Valore di Portafoglio</div>
+            <div class="kpi-title">Valore di Portafoglio (NAV)</div>
             <div class="kpi-value">€ {tot_val:,.2f}</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-title">CAGR (Rendimento Annuo)</div>
-            <div class="kpi-value" style="color: {"#00e676" if cagr >= 0 else "#ff5252"};">{cagr * 100:+.2f}%</div>
+            <div class="kpi-value" style="color: {"#00e676" if cagr >= 0 else "#ff5252"};">{cagr:+.2f}%</div>
         </div>
         <div class="kpi-card">
             <div class="kpi-title">Sharpe Ratio</div>
             <div class="kpi-value" style="color: #00f3ff;">{sharpe:.2f}</div>
         </div>
         <div class="kpi-card">
-            <div class="kpi-title">Value at Risk (VaR 95%)</div>
-            <div class="kpi-value" style="color: #ffab40;">{var95 * 100:.2f}%</div>
+            <div class="kpi-title">Value at Risk (VaR 95% 1g)</div>
+            <div class="kpi-value" style="color: #ffab40;">{var95:.2f}% <span style="font-size: 14px; color: #94a3b8;">(€ {var95_eur:,.0f})</span></div>
         </div>
     </div>
 

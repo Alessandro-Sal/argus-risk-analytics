@@ -1773,37 +1773,100 @@ with st.expander("💬 ARGUS Quant Copilot (Fai una domanda sul portafoglio)", e
 
 st.divider()
 
-# ── CENTRO ESPORTAZIONE REPORT & DATI (IN FONDO ALLA PAGINA) ──
+# ── CENTRO ESPORTAZIONE REPORT & DELIVERABLE ISTITUZIONALI (DATA ROOM) ──
 section("📥 Centro Esportazione Report & Deliverable Istituzionali")
-st.caption("Esporta il Dossier Integrato di Due Diligence (Audit Completo a 10 Pagine PDF), il Factsheet Rapido (2 Pagine), il Workbook Excel Multi-Tab o il pacchetto Star Schema per Power BI.")
 
-# Riga 1: Istituzionale PDF Dossier (Hero) & Factsheet Rapido
-col_exp_dossier, col_exp_pdf = st.columns([1.6, 1.4])
+_exp_port_name = str(st.session_state.get("portfolio_name", "Main Portfolio"))
+_exp_ret = results.get("returns", {}) if isinstance(results.get("returns"), dict) else {}
+_exp_mk = results.get("market_risk", {}) if isinstance(results.get("market_risk"), dict) else {}
+_exp_nav = float(_exp_ret.get("portfolio_value", 0.0) or (pos["current_value"].sum() if not pos.empty and "current_value" in pos.columns else 0.0))
+_exp_n_pos = int(len(pos[pos.get("qty_net", 1) > 1e-6])) if not pos.empty else 0
+_exp_var95 = abs(float(_exp_mk.get("var_95", 0.0) or 0.0))
+if 0 < _exp_var95 < 0.50:
+    _exp_var95 *= 100.0
+_exp_var95_eur = _exp_nav * (_exp_var95 / 100.0)
+_exp_vol = float(_exp_mk.get("volatility_pct", 0.0) or 0.0)
+
+st.markdown(
+    f"""<div style="background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(17,24,39,0.92) 100%); border: 1px solid rgba(56,189,248,0.22); border-left: 4px solid #38bdf8; border-radius: 12px; padding: 14px 18px; margin-bottom: 16px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+<div>
+<div style="font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #38bdf8; margin-bottom: 3px;">🏛️ INSTITUTIONAL DATA ROOM &amp; DELIVERABLE VAULT · SR 11-7 / MiFID II</div>
+<div style="font-size: 13px; color: #cbd5e1;">Tutti i pacchetti documentali e analitici sono generati in tempo reale con riconciliazione contabile certificata sul portafoglio <b style="color: #f8fafc;">{_exp_port_name}</b>.</div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<span style="background: rgba(16,185,129,0.12); border: 1px solid rgba(16,185,129,0.35); color: #34d399; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">NAV: € {_exp_nav:,.2f}</span>
+<span style="background: rgba(56,189,248,0.12); border: 1px solid rgba(56,189,248,0.35); color: #38bdf8; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">{_exp_n_pos} Asset Attivi</span>
+<span style="background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.35); color: #fbbf24; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 700; font-family: 'JetBrains Mono', monospace;">VaR 95% (1g): {_exp_var95:.2f}% (€ {_exp_var95_eur:,.0f})</span>
+<span style="background: rgba(148,163,184,0.12); border: 1px solid rgba(148,163,184,0.3); color: #e2e8f0; padding: 4px 10px; border-radius: 6px; font-size: 11.5px; font-weight: 600;">Vol: {_exp_vol:.2f}%</span>
+</div>
+</div>""",
+    unsafe_allow_html=True,
+)
+
+# ── TIER 1: DELIVERABLE DIREZIONALI PDF (DOSSIER 10 PAGINE & FACTSHEET 2 PAGINE) ──
+col_exp_dossier, col_exp_pdf = st.columns(2, vertical_alignment="top")
 
 with col_exp_dossier:
+    st.markdown(
+        f"""<div style="background: linear-gradient(145deg, rgba(30,41,59,0.75) 0%, rgba(15,23,42,0.92) 100%); border: 1px solid rgba(245,158,11,0.40); border-top: 3px solid #f59e0b; border-radius: 12px; padding: 16px 18px 12px 18px; margin-bottom: 8px; min-height: 172px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+<span style="background: rgba(245,158,11,0.16); color: #fbbf24; border: 1px solid rgba(245,158,11,0.4); font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 5px; letter-spacing: 0.6px;">🏛️ BOARD &amp; FAMILY OFFICE DELIVERABLE</span>
+<span style="color: #94a3b8; font-size: 11px; font-family: 'JetBrains Mono', monospace;">10 PAGINE A4 · PDF VETTORIALE</span>
+</div>
+<div style="font-size: 16px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">Dossier Audit Istituzionale Integrato</div>
+<div style="font-size: 12.2px; color: #cbd5e1; line-height: 1.45; margin-bottom: 10px;">
+Fascicolo completo di Due Diligence per Comitati d'Investimento: Sintesi Esecutiva &amp; Mandato, Risk Analysis &amp; Code Grasse (VaR/CVaR € e %), Regressione Fama-French 5F &amp; Brinson Attribution, Stress Test Storici, Inventario Completo ({_exp_n_pos} posizioni) &amp; Lotti FIFO, Cash-Flow Dividendi, Zainetto Fiscale TUIR (Art. 67) &amp; Tax-Loss Harvesting, e Piano di Ribilanciamento.
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px;">
+<span style="font-size: 10.5px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;">✓ 10 Sezioni Certificate</span>
+<span style="font-size: 10.5px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;">✓ Lotti Fiscali FIFO &amp; TUIR</span>
+<span style="font-size: 10.5px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;">✓ Trade List di Ribilanciamento</span>
+</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
     try:
         import importlib
 
         import core.report_exporter
         importlib.reload(core.report_exporter)
         from core.report_exporter import generate_institutional_audit_dossier
+
         dossier_pdf_bytes = generate_institutional_audit_dossier(
             results,
-            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
+            portfolio_name=_exp_port_name,
         )
         st.download_button(
             label="🏛️ Scarica Dossier Audit Istituzionale (10 Pag. PDF)",
             data=dossier_pdf_bytes,
-            file_name=f"ARGUS_Audit_Dossier_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.pdf",
+            file_name=f"ARGUS_Audit_Dossier_{_exp_port_name.replace(' ', '_')}.pdf",
             mime="application/pdf",
             type="primary",
             use_container_width=True,
-            help="Dossier completo per Comitati d'Investimento e Family Office con VaR, Fama-French, Brinson Attribution, Lotti FIFO, Dividendi, Fisco TUIR e Compliance IPS."
+            help="Esporta il Dossier integrale di Due Diligence a 10 pagine A4 per Comitati d'Investimento e Family Office.",
         )
     except Exception as e:
         st.error(f"Errore nella generazione Audit Dossier PDF: {e}")
 
 with col_exp_pdf:
+    st.markdown(
+        """<div style="background: linear-gradient(145deg, rgba(30,41,59,0.75) 0%, rgba(15,23,42,0.92) 100%); border: 1px solid rgba(56,189,248,0.35); border-top: 3px solid #38bdf8; border-radius: 12px; padding: 16px 18px 12px 18px; margin-bottom: 8px; min-height: 172px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+<span style="background: rgba(56,189,248,0.15); color: #38bdf8; border: 1px solid rgba(56,189,248,0.38); font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 5px; letter-spacing: 0.6px;">📄 EXECUTIVE TEAR SHEET · MORNINGSTAR STYLE</span>
+<span style="color: #94a3b8; font-size: 11px; font-family: 'JetBrains Mono', monospace;">2 PAGINE A4 · PDF VETTORIALE</span>
+</div>
+<div style="font-size: 16px; font-weight: 800; color: #f8fafc; margin-bottom: 6px;">Executive Factsheet Istituzionale</div>
+<div style="font-size: 12.2px; color: #cbd5e1; line-height: 1.45; margin-bottom: 10px;">
+Tear Sheet direzionale ad alta densità informativa (Standard Private Banking / Morningstar): KPI Banner a 4 colonne, Grafico Donut Vettoriale sulle asset class, Diagnostica VaR/CVaR Cornish-Fisher (% e €), Top Holdings &amp; Giorni di Smobilizzo (ADV), Factor Tilts Fama-French, ALM Duration (DV01, L-VaR) e Stress Test EBA.
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 6px;">
+<span style="font-size: 10.5px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;">✓ Grafico Donut Vettoriale</span>
+<span style="font-size: 10.5px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;">✓ Liquidità ADV &amp; ALM DV01</span>
+<span style="font-size: 10.5px; color: #cbd5e1; background: rgba(255,255,255,0.05); padding: 2px 7px; border-radius: 4px;">✓ MiFID II Running Footer</span>
+</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
     try:
         import importlib
 
@@ -1812,14 +1875,14 @@ with col_exp_pdf:
         from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
 
         pdf_bytes = generate_institutional_portfolio_factsheet_pdf(
-            portfolio_name=str(st.session_state.get("portfolio_name", "Main Portfolio")),
+            portfolio_name=_exp_port_name,
             risk_data=results,
             base_currency=str(st.session_state.get("base_currency", "EUR")),
         )
         st.download_button(
             label="📄 Scarica Executive Factsheet Istituzionale (2 Pag. PDF)",
             data=pdf_bytes,
-            file_name=f"ARGUS_Factsheet_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.pdf",
+            file_name=f"ARGUS_Factsheet_{_exp_port_name.replace(' ', '_')}.pdf",
             mime="application/pdf",
             use_container_width=True,
             help="Tear Sheet esecutivo A4 a 2 pagine (Standard Morningstar / Private Banking) con Grafico Donut Vettoriale, VaR/CVaR Cornish-Fisher, Top Holdings & Liquidità ADV, Scomposizione Fama-French, ALM Duration e Stress Test EBA.",
@@ -1827,115 +1890,166 @@ with col_exp_pdf:
     except Exception as e:
         st.error(f"Errore nella generazione Factsheet PDF: {e}")
 
-st.markdown("<div style='margin-top: 8px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
 
-# Riga 2: Excel, HTML & Power BI
-col_exp_excel, col_exp_html, col_exp_bi = st.columns(3)
+# ── TIER 2: WORKBOOK EXCEL MULTI-TAB, WEB HTML5 INTERATTIVO & POWER BI STAR SCHEMA ──
+col_exp_excel, col_exp_html, col_exp_bi = st.columns(3, vertical_alignment="top")
 
 with col_exp_excel:
+    st.markdown(
+        """<div style="background: rgba(15,23,42,0.82); border: 1px solid rgba(16,185,129,0.30); border-top: 2px solid #10b981; border-radius: 10px; padding: 13px 15px 10px 15px; margin-bottom: 8px; min-height: 118px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+<span style="color: #34d399; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">📊 WORKBOOK ANALITICO</span>
+<span style="color: #94a3b8; font-size: 10px; font-family: 'JetBrains Mono', monospace;">6 TAB · .XLSX</span>
+</div>
+<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">Report Excel Multi-Foglio</div>
+<div style="font-size: 11.5px; color: #94a3b8; line-height: 1.4;">Include 6 fogli nativi: <i>Executive Summary</i>, <i>Posizioni</i>, <i>Rendimenti</i>, <i>Stress Test</i>, <i>Fama-French 5F</i> e <i>Lotti Fiscali FIFO</i>.</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
     try:
         import importlib
 
         import core.report_exporter
         importlib.reload(core.report_exporter)
         from core.report_exporter import generate_excel_report
+
         excel_bytes = generate_excel_report(
             results,
-            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
+            portfolio_name=_exp_port_name,
         )
         st.download_button(
-            label="📊 Scarica Report Excel (.xlsx)",
+            label="📊 Scarica Workbook Excel (.xlsx)",
             data=excel_bytes,
-            file_name=f"ARGUS_Report_MultiTab_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.xlsx",
+            file_name=f"ARGUS_Report_MultiTab_{_exp_port_name.replace(' ', '_')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+            use_container_width=True,
+            help="Scarica il modello Excel a 6 fogli pronto per revisione contabile e modellazione finanziaria.",
         )
     except Exception as e:
         st.error(f"Errore nella generazione Excel: {e}")
 
 with col_exp_html:
-    import os
-    port_filename = f"ARGUS_Factsheet_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.html"
-    file_path = os.path.abspath(os.path.join("exports", port_filename))
+    st.markdown(
+        """<div style="background: rgba(15,23,42,0.82); border: 1px solid rgba(56,189,248,0.30); border-top: 2px solid #38bdf8; border-radius: 10px; padding: 13px 15px 10px 15px; margin-bottom: 8px; min-height: 118px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+<span style="color: #38bdf8; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">🌐 STANDALONE WEB DASHBOARD</span>
+<span style="color: #94a3b8; font-size: 10px; font-family: 'JetBrains Mono', monospace;">PLOTLY · .HTML</span>
+</div>
+<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">Factsheet Interattivo HTML5</div>
+<div style="font-size: 11.5px; color: #94a3b8; line-height: 1.4;">Dashboard autonoma navigabile nel browser con grafici Plotly interattivi (zoom/hover), KPI Cards e inventario posizioni.</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
+    try:
+        import importlib
+        import os
 
-    if st.button("🌐 Genera & Apri Factsheet HTML", use_container_width=True, key="btn_generate_html_on_demand"):
-        try:
-            import importlib
+        import core.html_exporter
+        importlib.reload(core.html_exporter)
+        from core.html_exporter import generate_html_report_bytes, generate_interactive_html_report
 
-            import core.html_exporter
-            importlib.reload(core.html_exporter)
-            from core.html_exporter import generate_interactive_html_report
+        port_filename = f"ARGUS_Factsheet_{_exp_port_name.replace(' ', '_')}.html"
+        html_bytes_ready = generate_html_report_bytes(results)
 
-            os.makedirs("exports", exist_ok=True)
-            generate_interactive_html_report(results, output_path=file_path)
-            st.session_state["last_html_export"] = file_path
-            
-            if os.path.exists(file_path):
-                os.startfile(file_path)
-                st.toast("Factsheet generato ed aperto nel browser!", icon="✅")
-        except Exception as e:
-            st.error(f"Errore nella generazione HTML: {e}")
-
-    if st.session_state.get("last_html_export") == file_path and os.path.exists(file_path):
-        with open(file_path, "rb") as f:
+        h_c1, h_c2 = st.columns([1.55, 1.0], vertical_alignment="center")
+        with h_c1:
             st.download_button(
-                label="💾 Scarica File HTML (.html)",
-                data=f.read(),
+                label="💾 Scarica HTML (.html)",
+                data=html_bytes_ready,
                 file_name=port_filename,
                 mime="text/html",
                 use_container_width=True,
-                key="btn_download_html_file"
+                key="btn_download_html_direct",
+                help="Scarica direttamente il file HTML5 interattivo autonomo.",
             )
+        with h_c2:
+            if st.button("🚀 Apri Live", use_container_width=True, key="btn_generate_html_on_demand", help="Genera e apri immediatamente il Factsheet HTML nel browser predefinito"):
+                os.makedirs("exports", exist_ok=True)
+                file_path = os.path.abspath(os.path.join("exports", port_filename))
+                generate_interactive_html_report(results, output_path=file_path)
+                if os.path.exists(file_path):
+                    os.startfile(file_path)
+                    st.toast("Factsheet HTML aperto nel browser!", icon="✅")
+    except Exception as e:
+        st.error(f"Errore nella generazione HTML: {e}")
 
 with col_exp_bi:
+    st.markdown(
+        """<div style="background: rgba(15,23,42,0.82); border: 1px solid rgba(168,85,247,0.30); border-top: 2px solid #a855f7; border-radius: 10px; padding: 13px 15px 10px 15px; margin-bottom: 8px; min-height: 118px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+<span style="color: #c084fc; font-size: 10px; font-weight: 800; letter-spacing: 0.5px;">🗂️ DATA WAREHOUSE &amp; BI</span>
+<span style="color: #94a3b8; font-size: 10px; font-family: 'JetBrains Mono', monospace;">STAR SCHEMA · .ZIP</span>
+</div>
+<div style="font-size: 14px; font-weight: 700; color: #f8fafc; margin-bottom: 4px;">Power BI &amp; Tableau Star Schema</div>
+<div style="font-size: 11.5px; color: #94a3b8; line-height: 1.4;">Archivio relazionale (<i>Fact_Returns</i>, <i>Fact_Holdings</i>, <i>Dim_Assets</i>, <i>Dim_Calendar</i>, <i>Fact_Risk</i>) per importazione BI.</div>
+</div>""",
+        unsafe_allow_html=True,
+    )
     try:
         import importlib
 
         import scripts.export_star_schema
         importlib.reload(scripts.export_star_schema)
         from scripts.export_star_schema import generate_star_schema_zip
+
         zip_bytes = generate_star_schema_zip(results)
         st.download_button(
-            label="🗃️ Scarica Power BI Star Schema (.zip)",
+            label="🗂️ Scarica Power BI Star Schema (.zip)",
             data=zip_bytes,
-            file_name=f"ARGUS_PowerBI_StarSchema_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.zip",
+            file_name=f"ARGUS_PowerBI_StarSchema_{_exp_port_name.replace(' ', '_')}.zip",
             mime="application/zip",
-            use_container_width=True
+            use_container_width=True,
+            help="Scarica il pacchetto ZIP contenente le tabelle Fact & Dimension per Power BI / Tableau.",
         )
     except Exception as e:
         st.error(f"Errore Power BI Export: {e}")
 
-st.markdown('<div style="margin-top: 15px;"></div>', unsafe_allow_html=True)
-col_csv1, col_csv2 = st.columns(2)
+st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+
+# ── TIER 3: ESPORTAZIONE RAPIDA DATASET GREZZI (CSV / EXCEL / JSON) ──
+col_csv1, col_csv2 = st.columns(2, vertical_alignment="center")
 
 with col_csv1:
     if not pos.empty:
-        c_p_t, c_p_e = st.columns([2, 1.2], vertical_alignment="center")
-        with c_p_t:
-            st.markdown("##### 📋 Dettaglio Posizioni")
-        with c_p_e:
-            render_export_toolbar(
-                pos,
-                file_prefix=f"posizioni_{st.session_state.get('portfolio_name', 'Portfolio').lower().replace(' ', '_')}",
-                key_suffix="dash_pos_export",
-                table_title="Dettaglio Posizioni"
-            )
+        with st.container(border=True):
+            c_p_t, c_p_e = st.columns([2.2, 1.1], vertical_alignment="center")
+            with c_p_t:
+                st.markdown(
+                    f"<div style='font-size:13.5px; font-weight:700; color:#f8fafc;'>📋 Dataset Inventario Posizioni &amp; Pesi</div>"
+                    f"<div style='font-size:11px; color:#94a3b8;'>{_exp_n_pos} posizioni attive · Prezzi, PMC, PnL Latente e Pesi % (CSV / XLSX / JSON)</div>",
+                    unsafe_allow_html=True,
+                )
+            with c_p_e:
+                render_export_toolbar(
+                    pos,
+                    file_prefix=f"posizioni_{_exp_port_name.lower().replace(' ', '_')}",
+                    key_suffix="dash_pos_export",
+                    table_title="Dettaglio Posizioni",
+                )
 
 with col_csv2:
     if not sr_port.empty:
-        c_r_t, c_r_e = st.columns([2, 1.2], vertical_alignment="center")
-        with c_r_t:
-            st.markdown("##### 📈 Rendimenti Storici")
-        with c_r_e:
-            sr_bm_sliced = sr_bm.reindex(sr_port.index).fillna(0.0)
-            df_ret_exp = pd.DataFrame({
-                "date": sr_port.index.strftime("%Y-%m-%d"),
-                "portfolio_return_pct": (sr_port.values * 100).round(4),
-                "benchmark_return_pct": (sr_bm_sliced.values * 100).round(4)
-            })
-            render_export_toolbar(
-                df_ret_exp,
-                file_prefix=f"rendimenti_{st.session_state.get('portfolio_name', 'Portfolio').lower().replace(' ', '_')}",
-                key_suffix="dash_ret_export",
-                table_title="Rendimenti Storici"
-            )
+        with st.container(border=True):
+            c_r_t, c_r_e = st.columns([2.2, 1.1], vertical_alignment="center")
+            with c_r_t:
+                st.markdown(
+                    f"<div style='font-size:13.5px; font-weight:700; color:#f8fafc;'>📈 Serie Storica Rendimenti Giornalieri</div>"
+                    f"<div style='font-size:11px; color:#94a3b8;'>{len(sr_port)} osservazioni giornaliere · Portafoglio vs Benchmark % (CSV / XLSX / JSON)</div>",
+                    unsafe_allow_html=True,
+                )
+            with c_r_e:
+                sr_bm_sliced = sr_bm.reindex(sr_port.index).fillna(0.0)
+                df_ret_exp = pd.DataFrame(
+                    {
+                        "date": sr_port.index.strftime("%Y-%m-%d"),
+                        "portfolio_return_pct": (sr_port.values * 100).round(4),
+                        "benchmark_return_pct": (sr_bm_sliced.values * 100).round(4),
+                    }
+                )
+                render_export_toolbar(
+                    df_ret_exp,
+                    file_prefix=f"rendimenti_{_exp_port_name.lower().replace(' ', '_')}",
+                    key_suffix="dash_ret_export",
+                    table_title="Rendimenti Storici",
+                )

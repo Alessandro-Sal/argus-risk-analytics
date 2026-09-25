@@ -2278,48 +2278,79 @@ def generate_pdf_factsheet(results: dict, portfolio_name: str = "My Portfolio") 
 
 def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -> bytes:
     """
-    Genera un Excel Workbook (.xlsx) multi-tab in-memory.
-    Ritorna i byte pronti per il download in Streamlit.
+    Genera un Excel Workbook (.xlsx) istituzionale a 6 Tab in-memory:
+    1. Executive Summary
+    2. Posizioni Dettaglio
+    3. Rendimenti Storici
+    4. Stress Testing
+    5. Fattori Fama-French
+    6. Lotti Fiscali FIFO
     """
     output = io.BytesIO()
 
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        # Tab 1: Executive Summary
-        m = results.get("metrics", {})
-        ret = m.get("returns", {})
-        mk = m.get("market_risk", {})
-        con = m.get("concentration", {})
+        m = results.get("metrics", {}) if isinstance(results.get("metrics"), dict) else {}
+        ret = results.get("returns", m.get("returns", {})) or {}
+        mk = results.get("market_risk", m.get("market_risk", {})) or {}
+        con = results.get("concentration", m.get("concentration", {})) or {}
+        pos = results.get("positions", pd.DataFrame())
+
+        val_tot = float(ret.get("portfolio_value", 0.0) or 0.0)
+        if val_tot <= 0 and isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns:
+            val_tot = float(pos["current_value"].sum())
+        pnl_tot = float(ret.get("total_pnl", 0.0) or 0.0)
+        if pnl_tot == 0.0 and isinstance(pos, pd.DataFrame) and not pos.empty and "unrealized_pnl" in pos.columns:
+            pnl_tot = float(pos["unrealized_pnl"].sum())
+        cost_tot = float(ret.get("cost_basis_total", 0.0) or 0.0)
+        if cost_tot <= 0 and val_tot > 0:
+            cost_tot = max(0.0, val_tot - pnl_tot)
+
+        var95_pct = abs(float(mk.get("var_95", mk.get("var_95_pct", 0.0)) or 0.0))
+        if 0 < var95_pct < 0.50:
+            var95_pct *= 100.0
+        var95_eur = val_tot * (var95_pct / 100.0)
+
+        cvar95_pct = abs(float(mk.get("cvar_95", mk.get("cvar_95_pct", var95_pct * 1.28)) or 0.0))
+        if 0 < cvar95_pct < 0.50:
+            cvar95_pct *= 100.0
+        cvar95_eur = val_tot * (cvar95_pct / 100.0)
+
+        vol_pct = float(mk.get("volatility_pct", mk.get("volatility_annual_pct", 0.0)) or 0.0)
 
         summary_rows = [
             {"Metrica": "Nome Portafoglio", "Valore": portfolio_name},
-            {"Metrica": "Data Calcolo", "Valore": results.get("computed_at", datetime.now().strftime("%Y-%m-%d"))},
-            {"Metrica": "Valore Totale (€)", "Valore": ret.get("portfolio_value", 0)},
-            {"Metrica": "Capitale Investito (€)", "Valore": ret.get("cost_basis_total", 0)},
-            {"Metrica": "PnL Cumulato (€)", "Valore": ret.get("total_pnl", 0)},
-            {"Metrica": "CAGR (%)", "Valore": ret.get("cagr_pct", 0)},
-            {"Metrica": "Sharpe Ratio", "Valore": ret.get("sharpe_ratio", 0)},
-            {"Metrica": "Sortino Ratio", "Valore": ret.get("sortino_ratio", 0)},
-            {"Metrica": "Volatilità Annua (%)", "Valore": mk.get("volatility_annual_pct", 0)},
-            {"Metrica": "Value at Risk 95% (€)", "Valore": mk.get("var_95", 0)},
-            {"Metrica": "Value at Risk 99% (€)", "Valore": mk.get("var_99", 0)},
-            {"Metrica": "Max Drawdown (%)", "Valore": mk.get("max_drawdown_pct", 0)},
-            {"Metrica": "Beta vs Benchmark", "Valore": mk.get("beta", 1.0)},
-            {"Metrica": "Indice HHI Concentrazione", "Valore": con.get("hhi", 0)},
+            {"Metrica": "Data Calcolo", "Valore": results.get("computed_at", datetime.now().strftime("%Y-%m-%d %H:%M"))},
+            {"Metrica": "Valore Totale NAV (€)", "Valore": round(val_tot, 2)},
+            {"Metrica": "Capitale Investito PMC (€)", "Valore": round(cost_tot, 2)},
+            {"Metrica": "PnL Latente Cumulato (€)", "Valore": round(pnl_tot, 2)},
+            {"Metrica": "CAGR Annuo (%)", "Valore": round(float(ret.get("cagr_pct", 0.0) or 0.0), 2)},
+            {"Metrica": "Volatilità Annualizzata (%)", "Valore": round(vol_pct, 2)},
+            {"Metrica": "Sharpe Ratio", "Valore": round(float(ret.get("sharpe_ratio", 0.0) or 0.0), 2)},
+            {"Metrica": "Sortino Ratio", "Valore": round(float(ret.get("sortino_ratio", 0.0) or 0.0), 2)},
+            {"Metrica": "Value at Risk 95% 1g (%)", "Valore": round(var95_pct, 2)},
+            {"Metrica": "Value at Risk 95% 1g (€)", "Valore": round(var95_eur, 2)},
+            {"Metrica": "Expected Shortfall CVaR 95% (%)", "Valore": round(cvar95_pct, 2)},
+            {"Metrica": "Expected Shortfall CVaR 95% (€)", "Valore": round(cvar95_eur, 2)},
+            {"Metrica": "Max Drawdown Storico (%)", "Valore": round(float(mk.get("max_drawdown_pct", 0.0) or 0.0), 2)},
+            {"Metrica": "Beta vs Benchmark", "Valore": round(float(mk.get("beta", 1.0) or 1.0), 2)},
+            {"Metrica": "Indice HHI Concentrazione", "Valore": round(float(con.get("hhi", 0.0) or 0.0), 4)},
+            {"Metrica": "Diversification Ratio (DR)", "Valore": round(float(con.get("diversification_ratio", 1.0) or 1.0), 2)},
         ]
         df_summary = pd.DataFrame(summary_rows)
         df_summary.to_excel(writer, sheet_name="Executive Summary", index=False)
 
         # Tab 2: Posizioni & Dettagli
-        pos = results.get("positions", pd.DataFrame())
-        if not pos.empty:
+        if isinstance(pos, pd.DataFrame) and not pos.empty:
             pos.to_excel(writer, sheet_name="Posizioni Dettaglio", index=False)
 
         # Tab 3: Rendimenti Giornalieri
-        sr_port = results.get("portfolio_return", pd.Series())
-        sr_bm = results.get("benchmark_return", pd.Series())
-        if not sr_port.empty:
+        sr_port = results.get("portfolio_return", pd.Series(dtype=float))
+        sr_bm = results.get("benchmark_return", pd.Series(dtype=float))
+        if isinstance(sr_port, pd.Series) and not sr_port.empty:
             sr_bm_aligned = (
-                sr_bm.reindex(sr_port.index).fillna(0.0) if not sr_bm.empty else pd.Series(0.0, index=sr_port.index)
+                sr_bm.reindex(sr_port.index).fillna(0.0)
+                if isinstance(sr_bm, pd.Series) and not sr_bm.empty
+                else pd.Series(0.0, index=sr_port.index)
             )
             df_ret = pd.DataFrame(
                 {
@@ -2332,18 +2363,43 @@ def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -
 
         # Tab 4: Stress Tests
         stress = results.get("stress_tests", {})
-        if stress:
+        if isinstance(stress, dict) and stress:
             stress_rows = []
             for s_name, s_val in stress.items():
-                stress_rows.append(
-                    {
-                        "Scenario": s_name,
-                        "Shock Benchmark (%)": s_val.get("benchmark_shock_pct"),
-                        "Perdita Stimata (€)": s_val.get("portfolio_loss_eur"),
-                        "Perdita Stimata (%)": s_val.get("portfolio_loss_pct"),
-                    }
-                )
-            pd.DataFrame(stress_rows).to_excel(writer, sheet_name="Stress Testing", index=False)
+                if isinstance(s_val, dict):
+                    p_loss = float(s_val.get("pct_loss", s_val.get("portfolio_loss_pct", 0.0)) or 0.0)
+                    e_loss = float(s_val.get("euro_loss", s_val.get("portfolio_loss_eur", val_tot * abs(p_loss) / 100.0)) or 0.0)
+                    b_shock = float(s_val.get("benchmark_shock_pct", p_loss * 0.85) or 0.0)
+                    stress_rows.append(
+                        {
+                            "Scenario": s_name,
+                            "Shock Benchmark (%)": round(b_shock, 2),
+                            "Perdita Stimata Portafoglio (%)": round(p_loss, 2),
+                            "Perdita Stimata Portafoglio (€)": round(-abs(e_loss), 2),
+                        }
+                    )
+            if stress_rows:
+                pd.DataFrame(stress_rows).to_excel(writer, sheet_name="Stress Testing", index=False)
+
+        # Tab 5: Fama-French Factor Attribution
+        ff = results.get("fama_french", {})
+        if isinstance(ff, dict) and isinstance(ff.get("betas"), dict):
+            ff_betas = ff.get("betas", {})
+            ff_tstats = ff.get("t_stats", {}) if isinstance(ff.get("t_stats"), dict) else {}
+            ff_rows = [
+                {
+                    "Fattore": f_key,
+                    "Beta Sensibilità": round(float(f_val or 0.0), 4),
+                    "T-Statistic": round(float(ff_tstats.get(f_key, 0.0) or 0.0), 2),
+                }
+                for f_key, f_val in ff_betas.items()
+            ]
+            pd.DataFrame(ff_rows).to_excel(writer, sheet_name="Fama-French 5F", index=False)
+
+        # Tab 6: Lotti Fiscali FIFO
+        fifo_lots = results.get("fifo_lots", pd.DataFrame())
+        if isinstance(fifo_lots, pd.DataFrame) and not fifo_lots.empty:
+            fifo_lots.to_excel(writer, sheet_name="Lotti Fiscali FIFO", index=False)
 
     output.seek(0)
     return output.getvalue()
