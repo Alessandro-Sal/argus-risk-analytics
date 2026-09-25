@@ -34,14 +34,15 @@ class ExecutiveBoardPackEngine:
         radar = compute_executive_traffic_light_radar()
         scale_factor = max(float(self.nav_eur), 1_000.0) / 125_000_000.0
         simm = compute_isda_simm_margin()
-        alm = compute_alm_ldi_immunization(asset_portfolio_eur=max(float(self.nav_eur), 10_000.0))
+        alm = compute_alm_ldi_immunization()
         ccar = compute_ccar_capital_stress()
 
         sev_cet1 = float(ccar["severely_adverse_min_cet1_pct"])
         funding_ratio = float(alm["funding_ratio_pct"])
         simm_im = float(simm["total_simm_initial_margin_eur"]) * scale_factor
         mva_sav = float(simm["annual_ccp_mva_savings_eur"]) * scale_factor
-        irs_hedge_eur = float(alm["required_20y_receiver_swap_notional_eur"])
+        irs_hedge_eur = float(alm["required_20y_receiver_swap_notional_eur"]) * scale_factor
+        alm_surplus_scaled = float(alm["accounting_surplus_eur"]) * scale_factor
         de_risk_eur = float(self.nav_eur) * 0.22
 
         prescriptions: list[dict[str, str]] = [
@@ -112,9 +113,9 @@ class ExecutiveBoardPackEngine:
             "overall_regulatory_status": radar["overall_status"],
             "executive_kpis": {
                 "alm_funding_ratio_pct": funding_ratio,
-                "alm_surplus_eur": alm["accounting_surplus_eur"],
+                "alm_surplus_eur": alm_surplus_scaled,
                 "isda_simm_im_eur": simm_im,
-                "ccp_mva_savings_eur": simm["annual_ccp_mva_savings_eur"],
+                "ccp_mva_savings_eur": mva_sav,
                 "ccar_severely_adverse_min_cet1_pct": sev_cet1,
                 "ccar_required_scb_pct": ccar["required_stress_capital_buffer_scb_pct"],
             },

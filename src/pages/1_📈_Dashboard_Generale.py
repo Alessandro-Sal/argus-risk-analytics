@@ -61,29 +61,38 @@ render_standard_hero(
     icon="📈"
 )
 
-render_executive_badges(m)
+col_badges, col_factsheet = st.columns([3.8, 1.2], vertical_alignment="center")
+with col_badges:
+    render_executive_badges(m)
+with col_factsheet:
+    try:
+        from datetime import datetime
+
+        from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+
+        pdf_factsheet_bytes = generate_institutional_portfolio_factsheet_pdf(
+            portfolio_name=str(st.session_state.get("portfolio_name", "Portfolio Master")),
+            risk_data=results,
+            base_currency=str(st.session_state.get("base_currency", "EUR")),
+        )
+        st.download_button(
+            label="📄 Factsheet PDF (2 Pagine)",
+            data=pdf_factsheet_bytes,
+            file_name=f"ARGUS_Factsheet_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+            help="Esporta il Factsheet istituzionale A4 a 2 pagine del portafoglio (Standard Private Banking / Morningstar)",
+        )
+    except Exception:
+        pass
 
 from core.ux_institutional_hub import render_executive_traffic_light_radar
-
-# Pre-calcolo Factsheet Istituzionale A4 a Due Pagine (Private Banking / Morningstar Standard)
-pdf_factsheet_bytes = None
-try:
-    from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
-
-    pdf_factsheet_bytes = generate_institutional_portfolio_factsheet_pdf(
-        portfolio_name=str(st.session_state.get("portfolio_name", "Portfolio Master")),
-        risk_data=results,
-        base_currency=str(st.session_state.get("base_currency", "EUR")),
-    )
-except Exception:
-    pdf_factsheet_bytes = None
 
 render_executive_traffic_light_radar(
     key_prefix="dash_gen_cro_radar",
     include_board_pack=True,
     default_expanded=True,
     risk_data=results,
-    factsheet_pdf_bytes=pdf_factsheet_bytes,
 )
 
 # Warning Popover if any ingestion warnings exist

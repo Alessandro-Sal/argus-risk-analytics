@@ -1004,15 +1004,6 @@ def render_executive_traffic_light_radar(
                     type="primary",
                     key=f"{key_prefix}_dl_bp_btn",
                 )
-                if factsheet_pdf_bytes:
-                    st.download_button(
-                        label="📄 Factsheet PDF (2 Pagine)",
-                        data=factsheet_pdf_bytes,
-                        file_name=f"ARGUS_Factsheet_{datetime.now().strftime('%Y%m%d')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key=f"{key_prefix}_dl_pdf_btn",
-                    )
     return radar
 
 
