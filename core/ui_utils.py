@@ -8288,3 +8288,18 @@ from core.chart_framework import (
     optimize_plotly_figure_memory,
     register_argus_plotly_templates,
 )
+
+# ── v9.16.0 Institutional UX/UI Hub Exports ──────────────────────────
+from core.ux_institutional_hub import (  # noqa: E402, F401
+    APP_VERSION,
+    build_telemetry_ribbon_state,
+    compute_executive_traffic_light_radar,
+    compute_scenario_delta_comparison,
+    extract_live_portfolio_binding,
+    render_executive_traffic_light_radar,
+    render_institutional_telemetry_ribbon,
+    render_live_portfolio_autobind_banner,
+    render_scenario_delta_comparator,
+    render_segmented_workspace_switcher,
+    style_institutional_chart,
+)

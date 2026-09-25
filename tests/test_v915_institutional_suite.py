@@ -133,7 +133,7 @@ def test_v915_api_endpoints_integration() -> None:
 
     health = client.get("/health")
     assert health.status_code == 200
-    assert health.json()["version"] == "9.15.0"
+    assert health.json()["version"] == "9.16.0"
 
     r1 = client.post("/api/v1/pricing/multicurve", json={"currency": "EUR", "notional": 5_000_000.0})
     assert r1.status_code == 200
