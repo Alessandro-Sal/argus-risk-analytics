@@ -61,30 +61,7 @@ render_standard_hero(
     icon="📈"
 )
 
-col_badges, col_factsheet = st.columns([3.8, 1.2], vertical_alignment="center")
-with col_badges:
-    render_executive_badges(m)
-with col_factsheet:
-    try:
-        from datetime import datetime
-
-        from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
-
-        pdf_factsheet_bytes = generate_institutional_portfolio_factsheet_pdf(
-            portfolio_name=str(st.session_state.get("portfolio_name", "Portfolio Master")),
-            risk_data=results,
-            base_currency=str(st.session_state.get("base_currency", "EUR")),
-        )
-        st.download_button(
-            label="📄 Factsheet PDF (2 Pagine)",
-            data=pdf_factsheet_bytes,
-            file_name=f"ARGUS_Factsheet_{datetime.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf",
-            use_container_width=True,
-            help="Esporta il Factsheet istituzionale A4 a 2 pagine del portafoglio (Standard Private Banking / Morningstar)",
-        )
-    except Exception:
-        pass
+render_executive_badges(m)
 
 from core.ux_institutional_hub import render_executive_traffic_light_radar
 
@@ -1830,20 +1807,22 @@ with col_exp_pdf:
     try:
         import importlib
 
-        import core.report_exporter
-        importlib.reload(core.report_exporter)
-        from core.report_exporter import generate_pdf_factsheet
-        pdf_bytes = generate_pdf_factsheet(
-            results,
-            portfolio_name=st.session_state.get("portfolio_name", "Main Portfolio")
+        import core.pdf_generator
+        importlib.reload(core.pdf_generator)
+        from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+
+        pdf_bytes = generate_institutional_portfolio_factsheet_pdf(
+            portfolio_name=str(st.session_state.get("portfolio_name", "Main Portfolio")),
+            risk_data=results,
+            base_currency=str(st.session_state.get("base_currency", "EUR")),
         )
         st.download_button(
-            label="📄 Scarica Executive Factsheet (2 Pag. PDF)",
+            label="📄 Scarica Executive Factsheet Istituzionale (2 Pag. PDF)",
             data=pdf_bytes,
             file_name=f"ARGUS_Factsheet_{st.session_state.get('portfolio_name', 'Portfolio').replace(' ', '_')}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            help="Sintesi esecutiva a 2 pagine con KPI, Top Holdings e Stress Test."
+            help="Tear Sheet esecutivo A4 a 2 pagine (Standard Morningstar / Private Banking) con Grafico Donut Vettoriale, VaR/CVaR Cornish-Fisher, Top Holdings & Liquidità ADV, Scomposizione Fama-French, ALM Duration e Stress Test EBA.",
         )
     except Exception as e:
         st.error(f"Errore nella generazione Factsheet PDF: {e}")
