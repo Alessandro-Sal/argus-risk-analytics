@@ -15,16 +15,16 @@
 
 ---
 
-## 🚀 XVA Counterparty Risk, Heston FFT Volatility, Black-Litterman, Basel III Liquidity, Structured Products & PRIIPs/SFDR (v9.14.0)
+## 🚀 XVA Counterparty Risk, Heston FFT Volatility, Black-Litterman, Basel III Liquidity, Structured Products & PRIIPs/SFDR (v9.15.0)
 
-ARGUS v9.14.0 completa la suite istituzionale con 6 motori quantitativi di livello Tier-1 per banche d'investimento, desk derivati, tesorerie e gestori patrimoniali:
+ARGUS v9.15.0 completa la suite istituzionale con 6 motori quantitativi di livello Tier-1 per banche d'investimento, desk derivati, tesorerie e gestori patrimoniali:
 - **Bilateral XVA & Counterparty Credit Risk Engine (`core/xva_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Calcolo CVA, DVA, FVA, MVA (ISDA SIMM) e KVA (costo del capitale), simulazione Monte Carlo profili di esposizione creditizia ($EE$, $PFE_{95\%}$, $PFE_{99\%}$, $ENE$, $EEPE$) e accordi di compensazione CSA bilaterali (Threshold, MTA, MPOR).
 - **Heston Stochastic Volatility FFT Calibration Engine (`core/heston_fft_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Funzione caratteristica stazionaria senza branch-cuts (Lord-Kahl / Albrecher), prezzatura opzioni europee ultra-veloce via Carr-Madan (1999) Fast Fourier Transform (FFT), test analitico condizione di Feller ($2\kappa\theta > \sigma_v^2$) e calibrazione surface L-BFGS-B/SLSQP.
 - **Bayesian Black-Litterman Portfolio Optimization (`core/black_litterman_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Prior da rendimenti impliciti di equilibrio di mercato ($\boldsymbol{\Pi} = \lambda \boldsymbol{\Sigma}\mathbf{w}_{\text{mkt}}$), integrazione bayesiana di view soggettive assolute e relative con mappatura di confidenza Idzorek (2005) sulla covarianza d'incertezza $\boldsymbol{\Omega}$, stima posterior $\mathbf{E}[R]$ e pesi ottimi constrained SLSQP.
 - **Basel III Liquidity Risk Engine (`core/basel_liquidity_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Monitoraggio prudenziale Liquidity Coverage Ratio (LCR $\ge 100\%$, classificazione HQLA Livello 1, 2A, 2B, haircut 0%/15%/50%, caps 40%/15% e cap inflows 75%), Net Stable Funding Ratio (NSFR $\ge 100\%$) e dynamic cash flow stress ladder multi-orizzonte con stima della survival horizon.
 - **Exotic Derivatives & Structured Products Engine (`core/structured_products_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**: Prezzatore Monte Carlo correlato su panieri Worst-Of per Phoenix Autocallables (memory coupons, barriera autocall, barriera knock-in europea a scadenza) e Reverse Convertibles, calcolo greche analitiche/numeriche ($\Delta, \Gamma, \nu, \theta, \rho$ e barrier sensitivity), probabilità di rimborso anticipato e duration attesa.
 - **Regulatory PRIIPs KID & SFDR ESG Reporting Engine (`core/regulatory_reporting_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**: Calcolo Summary Risk Indicator (SRI 1-7) combinando Market Risk Measure (MRM da Cornish-Fisher VEV) e Credit Risk Measure (CRM da rating emittente), 4 scenari regolamentari di performance (Favorevole, Moderato, Sfavorevole, Stress) e prospetto SFDR RTS Allegato I con tabella completa dei 14 indicatori PAI obbligatori.
-- **Nuovi Endpoint REST Headless v9.14.0 (`api/main.py`)**: `/api/v1/risk/xva`, `/api/v1/pricing/heston`, `/api/v1/optimize/black-litterman`, `/api/v1/risk/basel-liquidity`, `/api/v1/pricing/structured-products`, `/api/v1/regulatory/priips-sfdr`.
+- **Nuovi Endpoint REST Headless v9.15.0 (`api/main.py`)**: `/api/v1/risk/xva`, `/api/v1/pricing/heston`, `/api/v1/optimize/black-litterman`, `/api/v1/risk/basel-liquidity`, `/api/v1/pricing/structured-products`, `/api/v1/regulatory/priips-sfdr`.
 
 ---
 

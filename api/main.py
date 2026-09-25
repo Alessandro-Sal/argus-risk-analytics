@@ -27,16 +27,22 @@ from core.barra_risk_model import compute_barra_structural_risk
 from core.basel_liquidity_engine import compute_basel_liquidity_ratios
 from core.bitemporal_engine import BitemporalLedgerEngine
 from core.black_litterman_engine import compute_black_litterman_allocation
+from core.ccar_stress_engine import compute_ccar_capital_stress
 from core.climate_stress_engine import compute_ngfs_climate_stress
+from core.commodity_engine import compute_commodity_term_structure
+from core.credit_portfolio_engine import compute_credit_portfolio_risk
 from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
 from core.factor_library import compute_fama_french_factor_model
 from core.fix_engine import execute_mock_fix_order
 from core.fixed_income import compute_bond_analytics
 from core.frtb_engine import compute_frtb_capital_charges
 from core.heston_fft_engine import compute_heston_surface_and_calibration
+from core.hull_white_engine import compute_hull_white_swaptions
 from core.macro_stress_engine import compute_reverse_stress_test
 from core.macro_war_room import compute_macro_war_room_stress
 from core.mip_rebalancer import solve_mip_rebalance
+from core.multicurve_engine import compute_multicurve_bootstrapping
+from core.optimal_liquidation_engine import compute_optimal_execution_schedule
 from core.pdf_generator import (
     generate_institutional_portfolio_factsheet_pdf,
     generate_regulatory_stress_testing_dossier_pdf,
@@ -281,6 +287,78 @@ class RegulatoryReportingRequest(BaseModel):
     taxonomy_alignment_pct: float = Field(default=24.5, ge=0.0, le=100.0)
     sustainable_investment_pct: float = Field(default=35.0, ge=0.0, le=100.0)
     custom_pai: Optional[Dict[str, float]] = None
+
+
+class MultiCurveRequest(BaseModel):
+    """Payload for Multi-Curve OIS Discounting & Dual-Curve Bootstrapping."""
+    currency: str = Field(default="EUR")
+    notional: float = Field(default=10_000_000.0, gt=0.0)
+    irs_fixed_rate: float = Field(default=0.031)
+    irs_maturity_years: float = Field(default=5.0, gt=0.0)
+    ois_quotes_data: Optional[List[Dict[str, Any]]] = None
+    fwd_quotes_data: Optional[List[Dict[str, Any]]] = None
+
+
+class HullWhiteRequest(BaseModel):
+    """Payload for 1-Factor Hull-White Short Rate & LSMC Bermudan Swaptions."""
+    notional: float = Field(default=10_000_000.0, gt=0.0)
+    strike_rate: float = Field(default=0.03)
+    swap_maturity_years: float = Field(default=5.0, gt=0.0)
+    bermudan_exercise_years: Optional[List[float]] = None
+    is_payer: bool = Field(default=True)
+    mean_reversion_a: float = Field(default=0.05, gt=0.0)
+    short_rate_vol_sigma: float = Field(default=0.01, gt=0.0)
+    initial_short_rate: float = Field(default=0.03)
+    n_paths: int = Field(default=3000, ge=500, le=50000)
+
+
+class CreditPortfolioRequest(BaseModel):
+    """Payload for CreditMetrics Migration & Vasicek IRB Portfolio Credit Risk."""
+    obligors_data: Optional[List[Dict[str, Any]]] = None
+    n_simulations: int = Field(default=8000, ge=1000, le=50000)
+
+
+class CommodityPricingRequest(BaseModel):
+    """Payload for Schwartz 2-Factor Commodity Futures & Convenience Yield Term Structure."""
+    commodity_name: str = Field(default="Brent Crude Oil (ICE)")
+    spot_price: float = Field(default=82.50, gt=0.0)
+    initial_convenience_yield: float = Field(default=0.085)
+    long_run_convenience_yield: float = Field(default=0.045)
+    mean_reversion_speed: float = Field(default=1.45, gt=0.0)
+    spot_volatility: float = Field(default=0.32, gt=0.0)
+    convenience_yield_volatility: float = Field(default=0.24, gt=0.0)
+    correlation: float = Field(default=0.65, ge=-0.999, le=0.999)
+    risk_free_rate: float = Field(default=0.035)
+    storage_cost_rate: float = Field(default=0.025)
+    seasonality_amplitude: float = Field(default=0.018)
+
+
+class OptimalLiquidationRequest(BaseModel):
+    """Payload for Intraday Optimal Liquidation & VWAP/TWAP Slicing with Nonlinear Impact."""
+    ticker: str = Field(default="ENI.MI")
+    order_shares: float = Field(default=250_000.0, gt=0.0)
+    spot_price: float = Field(default=14.80, gt=0.0)
+    adv_shares: float = Field(default=5_000_000.0, gt=0.0)
+    daily_volatility: float = Field(default=0.018, gt=0.0)
+    bid_ask_spread_bps: float = Field(default=4.0, ge=0.0)
+    temp_impact_eta: float = Field(default=0.14, gt=0.0)
+    perm_impact_gamma: float = Field(default=0.08, ge=0.0)
+    risk_aversion_lambda: float = Field(default=2.5e-6, ge=0.0)
+    horizon_hours: float = Field(default=6.5, gt=0.0, le=24.0)
+    n_slices: int = Field(default=13, ge=2, le=100)
+    max_pov_cap: float = Field(default=0.15, gt=0.0, le=1.0)
+
+
+class CcarStressRequest(BaseModel):
+    """Payload for Fed CCAR / EBA 9-Quarter Supervisory Capital Stress & CET1 Trajectory."""
+    institution_name: str = Field(default="Argus European Systemic Bank S.p.A.")
+    initial_cet1_capital_eur_m: float = Field(default=14_200.0, gt=0.0)
+    initial_rwa_eur_m: float = Field(default=100_000.0, gt=0.0)
+    total_loan_book_eur_m: float = Field(default=145_000.0, gt=0.0)
+    quarterly_ppnr_baseline_eur_m: float = Field(default=920.0, gt=0.0)
+    trading_book_notional_eur_m: float = Field(default=28_000.0, ge=0.0)
+    pillar2_requirement_pct: float = Field(default=1.5, ge=0.0)
+    gsii_osii_buffer_pct: float = Field(default=1.0, ge=0.0)
 
 
 # In-memory background jobs registry
@@ -765,7 +843,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.14.0",
+        version="9.15.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -790,7 +868,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.14.0",
+            version="9.15.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1763,6 +1841,116 @@ def create_app() -> FastAPI:
             )
         except Exception as exc:
             logger.error("Regulatory dossier generation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── v9.15.0 Institutional Endpoints ──────────────────────────
+
+    @app.post("/api/v1/pricing/multicurve", tags=["Fixed Income & Rates"])
+    def run_multicurve_bootstrapping(req: MultiCurveRequest) -> Dict[str, Any]:
+        """Post-LIBOR Dual-Curve OIS Discounting (€STR/SOFR) & Euribor Forward Projection Bootstrapping."""
+        try:
+            return compute_multicurve_bootstrapping(
+                currency=req.currency,
+                notional=req.notional,
+                irs_fixed_rate=req.irs_fixed_rate,
+                irs_maturity_years=req.irs_maturity_years,
+                ois_quotes_data=req.ois_quotes_data,
+                fwd_quotes_data=req.fwd_quotes_data,
+            )
+        except Exception as exc:
+            logger.error("Multi-curve bootstrapping failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/pricing/hull-white", tags=["Fixed Income & Rates"])
+    def run_hull_white_swaptions(req: HullWhiteRequest) -> Dict[str, Any]:
+        """1-Factor Gaussian Hull-White Short Rate & LSMC Bermudan Swaption / Callable Bond Pricer."""
+        try:
+            return compute_hull_white_swaptions(
+                notional=req.notional,
+                strike_rate=req.strike_rate,
+                swap_maturity_years=req.swap_maturity_years,
+                bermudan_exercise_years=req.bermudan_exercise_years,
+                is_payer=req.is_payer,
+                mean_reversion_a=req.mean_reversion_a,
+                short_rate_vol_sigma=req.short_rate_vol_sigma,
+                initial_short_rate=req.initial_short_rate,
+                n_paths=req.n_paths,
+            )
+        except Exception as exc:
+            logger.error("Hull-White Bermudan swaption pricing failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/risk/credit-portfolio", tags=["Credit & Counterparty Risk"])
+    def run_credit_portfolio_risk(req: CreditPortfolioRequest) -> Dict[str, Any]:
+        """CreditMetrics 8x8 S&P Rating Migration & Basel IRB Vasicek Multi-Obligor Credit Portfolio Risk."""
+        try:
+            return compute_credit_portfolio_risk(
+                obligors_data=req.obligors_data,
+                n_simulations=req.n_simulations,
+            )
+        except Exception as exc:
+            logger.error("Credit portfolio risk failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/pricing/commodity", tags=["Derivatives & Volatility"])
+    def run_commodity_term_structure(req: CommodityPricingRequest) -> Dict[str, Any]:
+        """Schwartz (1997) 2-Factor Commodity Futures, Convenience Yield Curve & Calendar Spread Options."""
+        try:
+            return compute_commodity_term_structure(
+                commodity_name=req.commodity_name,
+                spot_price=req.spot_price,
+                initial_convenience_yield=req.initial_convenience_yield,
+                long_run_convenience_yield=req.long_run_convenience_yield,
+                mean_reversion_speed=req.mean_reversion_speed,
+                spot_volatility=req.spot_volatility,
+                convenience_yield_volatility=req.convenience_yield_volatility,
+                correlation=req.correlation,
+                risk_free_rate=req.risk_free_rate,
+                storage_cost_rate=req.storage_cost_rate,
+                seasonality_amplitude=req.seasonality_amplitude,
+            )
+        except Exception as exc:
+            logger.error("Commodity term structure failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/execution/optimal-liquidation", tags=["Rebalancing & Execution"])
+    def run_optimal_liquidation(req: OptimalLiquidationRequest) -> Dict[str, Any]:
+        """Intraday Optimal Liquidation (Almgren-Chriss Square-Root Impact vs Dynamic VWAP vs TWAP)."""
+        try:
+            return compute_optimal_execution_schedule(
+                ticker=req.ticker,
+                order_shares=req.order_shares,
+                spot_price=req.spot_price,
+                adv_shares=req.adv_shares,
+                daily_volatility=req.daily_volatility,
+                bid_ask_spread_bps=req.bid_ask_spread_bps,
+                temp_impact_eta=req.temp_impact_eta,
+                perm_impact_gamma=req.perm_impact_gamma,
+                risk_aversion_lambda=req.risk_aversion_lambda,
+                horizon_hours=req.horizon_hours,
+                n_slices=req.n_slices,
+                max_pov_cap=req.max_pov_cap,
+            )
+        except Exception as exc:
+            logger.error("Optimal liquidation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/stress/ccar-capital", tags=["Stress Testing & Regulatory"])
+    def run_ccar_capital_stress(req: CcarStressRequest) -> Dict[str, Any]:
+        """Fed CCAR / EBA 9-Quarter Supervisory Capital Stress & CET1 Trajectory (Baseline, Adverse, Severely Adverse)."""
+        try:
+            return compute_ccar_capital_stress(
+                institution_name=req.institution_name,
+                initial_cet1_capital_eur_m=req.initial_cet1_capital_eur_m,
+                initial_rwa_eur_m=req.initial_rwa_eur_m,
+                total_loan_book_eur_m=req.total_loan_book_eur_m,
+                quarterly_ppnr_baseline_eur_m=req.quarterly_ppnr_baseline_eur_m,
+                trading_book_notional_eur_m=req.trading_book_notional_eur_m,
+                pillar2_requirement_pct=req.pillar2_requirement_pct,
+                gsii_osii_buffer_pct=req.gsii_osii_buffer_pct,
+            )
+        except Exception as exc:
+            logger.error("CCAR capital stress failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
     return app

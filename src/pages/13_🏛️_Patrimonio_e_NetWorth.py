@@ -2992,3 +2992,120 @@ with main_tab_struct:
 
         st.markdown("##### 🌍 Tabella SFDR Annex I: 14 Indicatori Principali degli Effetti Negativi (PAI)")
         st.dataframe(pd.DataFrame(sfdr_info["pai_indicators"]), use_container_width=True, hide_index=True)
+
+
+        # ── v9.15.0: SCHWARTZ 2-FACTOR COMMODITY FUTURES & OPTIMAL LIQUIDATION ──
+        st.divider()
+        section("🛢️ Schwartz (1997) 2-Factor Commodity Futures & Convenience Yield Term Structure")
+        st.caption("Modellazione stocastica a 2 fattori di Gibson-Schwartz per materie prime: prezzo spot S_t e convenience yield mean-reverting δ_t, classificazione Contango/Backwardation, Roll Yield implicito e opzioni Calendar/Storage Spread (Kirk 1995).")
+
+        from core.commodity_engine import compute_commodity_term_structure
+        from core.optimal_liquidation_engine import compute_optimal_execution_schedule
+
+        cm_c1, cm_c2, cm_c3, cm_c4 = st.columns(4)
+        with cm_c1:
+            cm_name = st.selectbox("Materia Prima:", ["Brent Crude Oil (ICE)", "TTF Natural Gas", "Gold Bullion (LBMA)", "Copper LME Grade A"], index=0, key="cm_name_sel")
+            cm_spot = st.number_input("Prezzo Spot S0 ($/€):", min_value=1.0, value=82.50, step=2.5, key="cm_spot_in")
+        with cm_c2:
+            cm_cy0 = st.slider("Convenience Yield Iniziale δ0 (%):", min_value=-10.0, max_value=25.0, value=8.5, step=0.5, key="cm_cy0_in") / 100.0
+            cm_cylr = st.slider("Convenience Yield Long-Run α (%):", min_value=-5.0, max_value=15.0, value=4.5, step=0.5, key="cm_cylr_in") / 100.0
+        with cm_c3:
+            cm_kappa = st.slider("Velocità Mean-Reversion κ:", min_value=0.20, max_value=4.0, value=1.45, step=0.10, key="cm_kappa_in")
+            cm_vol1 = st.slider("Volatilità Spot σ1 (%):", min_value=5.0, max_value=80.0, value=32.0, step=1.0, key="cm_vol1_in") / 100.0
+        with cm_c4:
+            cm_vol2 = st.slider("Volatilità Convenience Yield σ2 (%):", min_value=5.0, max_value=80.0, value=24.0, step=1.0, key="cm_vol2_in") / 100.0
+            cm_seas = st.slider("Ampiezza Stagionalità (%):", min_value=0.0, max_value=8.0, value=1.8, step=0.2, key="cm_seas_in") / 100.0
+
+        cm_res = compute_commodity_term_structure(
+            commodity_name=cm_name,
+            spot_price=cm_spot,
+            initial_convenience_yield=cm_cy0,
+            long_run_convenience_yield=cm_cylr,
+            mean_reversion_speed=cm_kappa,
+            spot_volatility=cm_vol1,
+            convenience_yield_volatility=cm_vol2,
+            seasonality_amplitude=cm_seas,
+        )
+
+        cmk1, cmk2, cmk3, cmk4 = st.columns(4)
+        with cmk1:
+            metric_card("Regime Struttura a Termine", cm_res["market_regime"], delta=f"Half-Life: {cm_res['half_life_months']:.1f} mesi", delta_color="normal")
+        with cmk2:
+            metric_card("Futures 1 Anno F(0, 1Y)", f"$ {cm_res['one_year_futures_price']:.2f}", delta=f"Spot: $ {cm_res['spot_price']:.2f}", delta_color="normal")
+        with cmk3:
+            metric_card("Roll Yield Implicito (1Y)", f"{cm_res['one_year_roll_yield_pct']:+.2f}%", delta="Rendimento da Rullaggio", delta_color="normal" if cm_res["one_year_roll_yield_pct"] >= 0 else "inverse")
+        with cmk4:
+            sp_opt = cm_res["calendar_spread_option_3m_12m"]
+            metric_card("Opzione Calendar Spread (3M-12M)", f"$ {sp_opt['option_price']:.2f}", delta=f"Kirk Vol: {sp_opt['kirk_composite_vol_pct']:.1f}%", delta_color="normal")
+
+        cm_df = pd.DataFrame(cm_res["term_structure"])
+        fig_cm = go.Figure()
+        fig_cm.add_trace(go.Scatter(x=cm_df["tenor_label"], y=cm_df["futures_price_seasonal"], mode="lines+markers", name="Curva Futures 2-Fattori (Stagionale)", line=dict(color="#f59e0b", width=3)))
+        fig_cm.add_trace(go.Scatter(x=cm_df["tenor_label"], y=cm_df["futures_price_structural"], mode="lines", name="Curva Strutturale Schwartz", line=dict(color="#38bdf8", width=2, dash="dash")))
+        fig_cm.add_trace(go.Scatter(x=cm_df["tenor_label"], y=cm_df["cost_of_carry_benchmark"], mode="lines", name="Cost-of-Carry Classico", line=dict(color="#94a3b8", width=1.8, dash="dot")))
+        fig_cm.update_layout(
+            title=f"Curva Futures a Termine {cm_name}: Modello a 2 Fattori di Schwartz vs Cost-of-Carry",
+            xaxis_title="Scadenza Contratto",
+            yaxis_title="Prezzo Futures ($/€)",
+            height=380,
+            margin=dict(l=10, r=10, b=10, t=40),
+        )
+        st.plotly_chart(fig_cm, use_container_width=True)
+        st.dataframe(cm_df, use_container_width=True, hide_index=True)
+
+        st.divider()
+        section("⚡ Intraday Optimal Liquidation & Algorithmic Slicing (Almgren-Chriss vs VWAP/TWAP)")
+        st.caption("Ottimizzazione dell'esecuzione intraday con legge dell'impatto temporaneo a radice quadrata h(v) = η·σ·(v/V)^0.5, profilo volumetrico a U e confronto tra traiettoria risk-averse Almgren-Chriss, Dynamic VWAP (POV-Capped) e TWAP.")
+
+        ol_c1, ol_c2, ol_c3, ol_c4 = st.columns(4)
+        with ol_c1:
+            ol_ticker = st.text_input("Ticker Ordine Istituzionale:", value="ENI.MI", key="ol_tk_in")
+            ol_shares = st.number_input("Quantità Azioni da Liquidare:", min_value=1_000.0, value=250_000.0, step=25_000.0, key="ol_sh_in")
+        with ol_c2:
+            ol_px = st.number_input("Prezzo Spot Mid (€):", min_value=0.5, value=14.80, step=0.5, key="ol_px_in")
+            ol_adv = st.number_input("Volume Medio Giornaliero (ADV Azioni):", min_value=50_000.0, value=5_000_000.0, step=250_000.0, key="ol_adv_in")
+        with ol_c3:
+            ol_vol = st.slider("Volatilità Giornaliera (%):", min_value=0.5, max_value=6.0, value=1.8, step=0.1, key="ol_vol_in") / 100.0
+            ol_pov = st.slider("Limite Max Participation Rate (POV %):", min_value=5, max_value=35, value=15, step=1, key="ol_pov_in") / 100.0
+        with ol_c4:
+            ol_eta = st.slider("Coefficiente Impatto Temporaneo (η):", min_value=0.05, max_value=0.40, value=0.14, step=0.01, key="ol_eta_in")
+            ol_lambda = st.select_slider("Avversione al Rischio di Mercato (λ):", options=[1e-7, 1e-6, 2.5e-6, 5e-6, 1e-5], value=2.5e-6, key="ol_lam_in")
+
+        ol_res = compute_optimal_execution_schedule(
+            ticker=ol_ticker,
+            order_shares=ol_shares,
+            spot_price=ol_px,
+            adv_shares=ol_adv,
+            daily_volatility=ol_vol,
+            temp_impact_eta=ol_eta,
+            risk_aversion_lambda=float(ol_lambda),
+            max_pov_cap=ol_pov,
+        )
+        s_opt = ol_res["strategies"]["almgren_chriss_optimal"]
+        s_vwap = ol_res["strategies"]["dynamic_vwap"]
+        s_twap = ol_res["strategies"]["uniform_twap"]
+
+        ok1, ok2, ok3, ok4 = st.columns(4)
+        with ok1:
+            metric_card("Controvalore Ordine & % ADV", fmt_eur(ol_res["order_notional_eur"]), delta=f"{ol_res['order_pct_of_adv']:.2f}% dell'ADV giornaliero", delta_color="normal")
+        with ok2:
+            metric_card("Implementation Shortfall (AC Optimal)", f"{s_opt['expected_cost_bps']:.2f} bps", delta=f"{fmt_eur(s_opt['expected_cost_eur'])} | Urgency κ={ol_res['urgency_parameter_kappa']:.2f}", delta_color="normal")
+        with ok3:
+            metric_card("Dynamic VWAP (POV-Capped)", f"{s_vwap['expected_cost_bps']:.2f} bps", delta=f"Max POV: {s_vwap['max_pov_rate_pct']:.1f}%", delta_color="normal")
+        with ok4:
+            metric_card("Algoritmo Raccomandato", ol_res["recommended_algorithm"].split(" (")[0], delta=f"Timing Risk: ±{s_opt['timing_risk_std_bps']:.1f} bps", delta_color="normal")
+
+        sched_df = pd.DataFrame(ol_res["intraday_schedule"])
+        fig_ol = go.Figure()
+        fig_ol.add_trace(go.Scatter(x=sched_df["time_bucket"], y=sched_df["inventory_optimal"], mode="lines+markers", name="Inventario Almgren-Chriss (IS)", line=dict(color="#10b981", width=3)))
+        fig_ol.add_trace(go.Scatter(x=sched_df["time_bucket"], y=sched_df["inventory_vwap"], mode="lines+markers", name="Inventario Dynamic VWAP", line=dict(color="#6366f1", width=2.5)))
+        fig_ol.add_trace(go.Scatter(x=sched_df["time_bucket"], y=sched_df["inventory_twap"], mode="lines", name="Inventario Uniform TWAP", line=dict(color="#94a3b8", width=2, dash="dash")))
+        fig_ol.update_layout(
+            title="Curva di Decadimento dell'Inventario Intraday (Almgren-Chriss vs Dynamic VWAP vs TWAP)",
+            xaxis_title="Fascia Oraria Intraday",
+            yaxis_title="Azioni Residue in Portafoglio",
+            height=380,
+            margin=dict(l=10, r=10, b=10, t=40),
+        )
+        st.plotly_chart(fig_ol, use_container_width=True)
+        st.dataframe(sched_df, use_container_width=True, hide_index=True)
