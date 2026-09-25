@@ -339,7 +339,7 @@ def test_v912_rest_api_endpoints():
     # Health check version
     h = client.get("/health")
     assert h.status_code == 200
-    assert h.json()["version"] in ["9.12.0", "9.13.0", "9.14.0"]
+    assert h.json()["version"] in ["9.12.0", "9.13.0", "9.15.0"]
 
     # Barra Risk endpoint
     r_barra = client.post(

@@ -261,6 +261,20 @@ QUANT_MODELS_CATALOG = {
         "category": "Allocazione & Portafoglio",
         "desc": "Fusione bayesiana tra rendimenti impliciti di equilibrio di mercato (reverse optimization) e view soggettive dell'investitore (assolute o relative) ponderate per livello di confidenza empirico (Idzorek 2005)."
     },
+    "📈 Multi-Curve OIS & Dual-Curve IRS": {
+        "title": "Post-LIBOR Multi-Curve OIS Discounting (€STR/SOFR) & Dual-Curve Bootstrapping",
+        "badge": "€STR / SOFR OIS · Euribor 3M/6M · Tenor Basis",
+        "badge_color": "#10b981",
+        "category": "Fixed Income & Rates",
+        "desc": "Separazione post-LIBOR tra curva di sconto risk-free OIS (€STR / SOFR) e curve di proiezione forward (Euribor 3M/6M), interpolazione Monotone Convex/Pchip, pricing IRS dual-curve, FRA e Tenor Basis Swaps."
+    },
+    "🔔 Hull-White Bermudan Swaptions": {
+        "title": "1-Factor Gaussian Hull-White Short Rate & Longstaff-Schwartz Bermudan Swaptions",
+        "badge": "Hull-White 1F · LSMC · Early Exercise Premium",
+        "badge_color": "#ec4899",
+        "category": "Fixed Income & Rates",
+        "desc": "Modello di tasso a breve gaussiano a 1 fattore dr_t = [θ(t) - a r_t]dt + σ dW_t calibrato sulla curva zero-coupon, con induzione a ritroso Least-Squares Monte Carlo (Longstaff-Schwartz) per Swaption Bermudiane e Callable Bonds."
+    },
     "🔮 SABR & Local Volatility Surface 3D": {
         "title": "SABR Model Calibration & Dupire Local Volatility PDE Surface (3D)",
         "badge": "Hagan SABR • Dupire PDE • 3D Vol Cube",
@@ -5198,3 +5212,100 @@ elif active_quant_tab == "⚖️ Bayesian Black-Litterman Optimization":
 
         st.markdown("##### 📋 Tabella Dettagliata Rendimenti & Tilt Attivi")
         st.dataframe(sum_df, use_container_width=True)
+
+
+# ── TAB: MULTI-CURVE OIS DISCOUNTING & DUAL-CURVE IRS ───────────────────────
+elif active_quant_tab == "📈 Multi-Curve OIS & Dual-Curve IRS":
+    st.markdown("#### 📈 Post-LIBOR Multi-Curve OIS Discounting (€STR / SOFR) & Dual-Curve Bootstrapping")
+    st.caption("Bootstrapping disaccoppiato della curva di sconto OIS risk-free (€STR / SOFR) e della curva forward Ibor (Euribor 6M / Term SOFR), interpolazione Pchip sui log-discount factors, pricing IRS dual-curve e Tenor Basis Swap.")
+
+    from core.multicurve_engine import compute_multicurve_bootstrapping
+
+    mc_c1, mc_c2, mc_c3, mc_c4 = st.columns(4)
+    with mc_c1:
+        mc_ccy = st.selectbox("Valuta di Riferimento:", ["EUR", "USD"], index=0, key="mc_ccy_sel")
+    with mc_c2:
+        mc_notional = st.number_input("Nozionale IRS (€/$):", min_value=100_000.0, value=10_000_000.0, step=1_000_000.0, key="mc_notional_in")
+    with mc_c3:
+        mc_fixed = st.slider("Tasso Fisso IRS (%):", min_value=0.50, max_value=6.50, value=3.10, step=0.05, key="mc_fixed_in") / 100.0
+    with mc_c4:
+        mc_mat = st.slider("Scadenza IRS (Anni):", min_value=1.0, max_value=30.0, value=5.0, step=1.0, key="mc_mat_in")
+
+    mc_res = compute_multicurve_bootstrapping(
+        currency=mc_ccy,
+        notional=mc_notional,
+        irs_fixed_rate=mc_fixed,
+        irs_maturity_years=mc_mat,
+    )
+    irs_info = mc_res["irs_valuation"]
+    tbs_info = mc_res["basis_swap_valuation"]
+
+    m_k1, m_k2, m_k3, m_k4 = st.columns(4)
+    with m_k1:
+        st.metric("Par Swap Rate (Dual-Curve)", f"{float(irs_info['par_swap_rate_pct']):.3f}%", delta=f"Adj Multi-Curve: {fmt_eur(float(irs_info['multicurve_valuation_adjustment_eur']))}")
+    with m_k2:
+        st.metric("NPV Swap (Multi-Curve)", fmt_eur(float(irs_info["multicurve_npv_eur"])), delta=f"DV01: {fmt_eur(float(irs_info['dv01_eur']))}")
+    with m_k3:
+        st.metric("PV Gamba Variabile vs Fissa", fmt_eur(float(irs_info["pv_floating_leg_eur"])), delta=f"Fixed PV: {fmt_eur(float(irs_info['pv_fixed_leg_eur']))}")
+    with m_k4:
+        st.metric("Fair Tenor Basis (6M vs 3M)", f"{float(tbs_info['fair_basis_spread_3m_vs_6m_bps']):.2f} bps", delta=f"NPV Basis: {fmt_eur(float(tbs_info['basis_swap_npv_eur']))}")
+
+    ois_df = pd.DataFrame(mc_res["ois_curve_nodes"])
+    f6_df = pd.DataFrame(mc_res["forward_6m_nodes"])
+    fig_mc = go.Figure()
+    fig_mc.add_trace(go.Scatter(x=ois_df["tenor_years"], y=ois_df["zero_rate_pct"], mode="lines+markers", name="OIS Zero Rate (€STR/SOFR %)", line=dict(color="#10b981", width=2.5)))
+    fig_mc.add_trace(go.Scatter(x=f6_df["tenor_years"], y=f6_df["zero_rate_pct"], mode="lines+markers", name="Forward 6M Zero Rate (%)", line=dict(color="#3b82f6", width=2.5)))
+    fig_mc.update_layout(
+        title="Struttura per Scadenza Multi-Curve: OIS Discount vs Forward Projection 6M",
+        xaxis_title="Scadenza (Anni)",
+        yaxis=dict(title="Tasso Zero-Coupon (%)"),
+        height=400,
+        margin=dict(l=10, r=10, b=10, t=40),
+    )
+    st.plotly_chart(fig_mc, use_container_width=True)
+    st.dataframe(ois_df, use_container_width=True, hide_index=True)
+
+
+# ── TAB: HULL-WHITE SHORT RATE & BERMUDAN SWAPTIONS ─────────────────────────
+elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
+    st.markdown("#### 🔔 1-Factor Gaussian Hull-White Short Rate & Longstaff-Schwartz Bermudan Swaptions")
+    st.caption("Simulazione esatta del tasso breve dr_t = [θ(t) - a r_t]dt + σ dW_t e induzione all'indietro LSMC per la valutazione dell'Early Exercise Premium su Swaption Bermudiane e Callable Bonds.")
+
+    from core.hull_white_engine import compute_hull_white_swaptions
+
+    hw_c1, hw_c2, hw_c3, hw_c4 = st.columns(4)
+    with hw_c1:
+        hw_strike = st.slider("Strike Rate Swaption (%):", min_value=0.5, max_value=6.0, value=3.0, step=0.1, key="hw_strike_in") / 100.0
+        hw_r0 = st.slider("Short Rate Iniziale r0 (%):", min_value=0.5, max_value=6.0, value=3.0, step=0.1, key="hw_r0_in") / 100.0
+    with hw_c2:
+        hw_a = st.slider("Mean Reversion Speed (a):", min_value=0.01, max_value=0.30, value=0.05, step=0.01, key="hw_a_in")
+        hw_sigma = st.slider("Volatilità Short Rate σ (bps):", min_value=20, max_value=250, value=100, step=10, key="hw_sigma_in") / 10000.0
+    with hw_c3:
+        hw_mat = st.selectbox("Maturity Sottostante (Anni):", [3.0, 5.0, 7.0, 10.0], index=1, key="hw_mat_sel")
+        hw_payer = st.selectbox("Tipo Swaption:", ["Payer (diritto a pagare fisso)", "Receiver (diritto a ricevere fisso)"], index=0, key="hw_type_sel")
+    with hw_c4:
+        hw_paths = st.select_slider("Percorsi LSMC Monte Carlo:", options=[1000, 2000, 3000, 5000], value=2000, key="hw_paths_sel")
+
+    hw_res = compute_hull_white_swaptions(
+        notional=10_000_000.0,
+        strike_rate=hw_strike,
+        swap_maturity_years=float(hw_mat),
+        is_payer=hw_payer.startswith("Payer"),
+        mean_reversion_a=hw_a,
+        short_rate_vol_sigma=hw_sigma,
+        initial_short_rate=hw_r0,
+        n_paths=int(hw_paths),
+    )
+
+    hk1, hk2, hk3, hk4 = st.columns(4)
+    with hk1:
+        st.metric("Prezzo Bermudan Swaption (LSMC)", fmt_eur(float(hw_res["bermudan_swaption_pv_eur"])), delta=f"{float(hw_res['bermudan_price_bps']):.1f} bps del nozionale")
+    with hk2:
+        st.metric("Benchmark Europea Co-Terminale", fmt_eur(float(hw_res["european_swaption_pv_eur"])), delta="Jamshidian / Analytical")
+    with hk3:
+        st.metric("Early Exercise Premium (EEP)", fmt_eur(float(hw_res["early_exercise_premium_eur"])), delta="Valore Flessibilità Bermudiana")
+    with hk4:
+        st.metric("Prezzo Callable Bond", fmt_eur(float(hw_res["callable_bond_pv_eur"])), delta=f"Option: -{fmt_eur(float(hw_res['embedded_call_option_eur']))}")
+
+    ex_df = pd.DataFrame(hw_res["exercise_schedule"])
+    st.dataframe(ex_df, use_container_width=True, hide_index=True)

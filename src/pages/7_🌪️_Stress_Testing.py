@@ -1700,3 +1700,90 @@ st.plotly_chart(fig_ladder, use_container_width=True)
 
 st.markdown("##### 📋 Dettaglio HQLA per Livello e Haircut Regolamentare")
 st.dataframe(pd.DataFrame(basel_res["hqla_breakdown"]), use_container_width=True, hide_index=True)
+
+
+# ============================================================================
+# v9.15.0: CREDITMETRICS PORTFOLIO CREDIT RISK & FED CCAR / EBA STRESS ENGINE
+# ============================================================================
+st.divider()
+st.markdown("#### 🏦 CreditMetrics Rating Migration & Basel III IRB Vasicek Portfolio Credit Risk")
+st.caption("Modello multi-debitore con matrice di transizione S&P a 8 stati (AAA..D), correlazione latente degli asset di Vasicek (2002), capitale regolamentare IRB (K_IRB e RWA), Credit VaR 99.9% e Incremental Risk Charge (IRC).")
+
+from core.ccar_stress_engine import compute_ccar_capital_stress
+from core.credit_portfolio_engine import compute_credit_portfolio_risk
+
+cp_c1, cp_c2 = st.columns([1, 3])
+with cp_c1:
+    cp_sims = st.select_slider("Simulazioni Monte Carlo CreditMetrics:", options=[2000, 5000, 8000, 12000], value=5000, key="cp_sims_slider")
+with cp_c2:
+    st.info("📌 Il portafoglio istituzionale predefinito include esposizioni Corporate e Sovrane distribuite sui rating S&P da AAA a B, rivalutate mark-to-market sugli spread creditizi ad 1 anno.")
+
+cp_res = compute_credit_portfolio_risk(n_simulations=int(cp_sims))
+ck1, ck2, ck3, ck4 = st.columns(4)
+with ck1:
+    metric_card("Expected Loss (EL Basilea IRB)", fmt_eur(float(cp_res["expected_loss_eur"])), delta=f"EAD: {fmt_eur(float(cp_res['total_ead_eur']))}", delta_color="inverse")
+with ck2:
+    metric_card("Capitale Regolamentare K_IRB", fmt_eur(float(cp_res["vasicek_irb_capital_999_eur"])), delta=f"RWA: {fmt_eur(float(cp_res['vasicek_rwa_eur']))}", delta_color="normal")
+with ck3:
+    metric_card("Credit VaR 99.9% (1Y Migration)", fmt_eur(float(cp_res["creditmetrics_var_999_eur"])), delta=f"VaR 99%: {fmt_eur(float(cp_res['creditmetrics_var_99_eur']))}", delta_color="inverse")
+with ck4:
+    metric_card("Incremental Risk Charge (IRC)", fmt_eur(float(cp_res["incremental_risk_charge_eur"])), delta=f"ES 99.9%: {fmt_eur(float(cp_res['creditmetrics_es_999_eur']))}", delta_color="inverse")
+
+st.markdown("##### 📋 Decomposizione per Controparte: PD, Correlazione Vasicek ρ, RWA e Contributo Euler al Rischio")
+st.dataframe(pd.DataFrame(cp_res["obligor_contributions"]), use_container_width=True, hide_index=True)
+
+st.divider()
+st.markdown("#### 🏛️ Fed CCAR / EBA 9-Quarter Supervisory Capital Stress & Traiettoria CET1")
+st.caption("Proiezione prudenziale su 9 trimestri (Q1..Q9) negli scenari Supervisory Baseline, Adverse e Severely Adverse: Pre-Provision Net Revenue (PPNR), transizione crediti deteriorati IFRS 9 / CECL (Stage 1/2/3), inflazione RWA e Stress Capital Buffer (SCB).")
+
+cc_c1, cc_c2, cc_c3, cc_c4 = st.columns(4)
+with cc_c1:
+    cc_cet1 = st.number_input("Capitale CET1 Iniziale (€ Milioni):", min_value=1_000.0, value=14_200.0, step=500.0, key="cc_cet1_in")
+with cc_c2:
+    cc_rwa = st.number_input("RWA Iniziali (€ Milioni):", min_value=10_000.0, value=100_000.0, step=5_000.0, key="cc_rwa_in")
+with cc_c3:
+    cc_loans = st.number_input("Portafoglio Crediti Totale (€ Milioni):", min_value=10_000.0, value=145_000.0, step=5_000.0, key="cc_loans_in")
+with cc_c4:
+    cc_ppnr = st.number_input("PPNR Trimestrale Base (€ Milioni):", min_value=100.0, value=920.0, step=50.0, key="cc_ppnr_in")
+
+ccar_res = compute_ccar_capital_stress(
+    initial_cet1_capital_eur_m=cc_cet1,
+    initial_rwa_eur_m=cc_rwa,
+    total_loan_book_eur_m=cc_loans,
+    quarterly_ppnr_baseline_eur_m=cc_ppnr,
+)
+
+sev_scen = ccar_res["scenarios"]["severely_adverse"]
+adv_scen = ccar_res["scenarios"]["adverse"]
+base_scen = ccar_res["scenarios"]["baseline"]
+mda_hurdle = ccar_res["regulatory_hurdles"]["overall_capital_requirement_mda_pct"]
+
+cck1, cck2, cck3, cck4 = st.columns(4)
+with cck1:
+    metric_card("CET1 Ratio Iniziale", f"{ccar_res['initial_cet1_ratio_pct']:.2f}%", delta=f"Soglia OCR/MDA: {mda_hurdle:.2f}%", delta_color="normal")
+with cck2:
+    metric_card("Min CET1 (Severely Adverse)", f"{sev_scen['minimum_stressed_cet1_ratio_pct']:.2f}%", delta=f"Trough in {sev_scen['trough_quarter']} (-{sev_scen['max_cet1_drawdown_bps']:.0f} bps)", delta_color="normal" if not sev_scen["mda_restriction_triggered"] else "inverse")
+with cck3:
+    metric_card("Perdite Credito Cumulate 9Q", f"€ {sev_scen['cumulative_9q_credit_losses_eur_m']:,.0f} M", delta=f"Loss Rate: {sev_scen['cumulative_9q_loss_rate_pct']:.2f}%", delta_color="inverse")
+with cck4:
+    metric_card("Stress Capital Buffer (SCB)", f"{ccar_res['required_stress_capital_buffer_scb_pct']:.2f}%", delta=ccar_res["supervisory_assessment_status"].split(" - ")[0], delta_color="normal" if "PASS" in ccar_res["supervisory_assessment_status"] else "inverse")
+
+df_base = pd.DataFrame(base_scen["trajectory"])
+df_adv = pd.DataFrame(adv_scen["trajectory"])
+df_sev = pd.DataFrame(sev_scen["trajectory"])
+
+fig_ccar = go.Figure()
+fig_ccar.add_trace(go.Scatter(x=df_base["quarter"], y=df_base["cet1_ratio_pct"], mode="lines+markers", name="Supervisory Baseline (%)", line=dict(color="#10b981", width=3)))
+fig_ccar.add_trace(go.Scatter(x=df_adv["quarter"], y=df_adv["cet1_ratio_pct"], mode="lines+markers", name="Supervisory Adverse (%)", line=dict(color="#f59e0b", width=3)))
+fig_ccar.add_trace(go.Scatter(x=df_sev["quarter"], y=df_sev["cet1_ratio_pct"], mode="lines+markers", name="Fed CCAR / EBA Severely Adverse (%)", line=dict(color="#ef4444", width=3.5)))
+fig_ccar.add_hline(y=mda_hurdle, line_dash="dash", line_color="#fbbf24", annotation_text=f"OCR / MDA Trigger ({mda_hurdle:.1f}%)")
+fig_ccar.add_hline(y=6.0, line_dash="dot", line_color="#dc2626", annotation_text="Pillar 1 + P2R Min (6.0%)")
+fig_ccar.update_layout(
+    title="Traiettoria Regolamentare 9-Trimestri del CET1 Ratio (%) sotto Stress EBA / Fed CCAR",
+    xaxis_title="Orizzonte Trimestrale di Proiezione",
+    yaxis_title="CET1 Ratio (%)",
+    height=420,
+    margin=dict(l=10, r=10, b=10, t=40),
+)
+st.plotly_chart(fig_ccar, use_container_width=True)
+st.dataframe(df_sev, use_container_width=True, hide_index=True)

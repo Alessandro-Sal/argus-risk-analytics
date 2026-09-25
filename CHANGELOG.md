@@ -7,6 +7,37 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.15.0] - 2026-09-25
+
+### 🏛️ Multi-Curve OIS Discounting (€STR/SOFR & Dual-Curve Bootstrapping), Hull-White 1F Short Rate & LSMC Bermudan Swaptions, CreditMetrics Rating Migration & Basel IRB Vasicek Credit Portfolio Risk, Schwartz 2-Factor Commodity Convenience Yield Curve, Intraday Optimal Liquidation (Square-Root Impact & POV-Capped VWAP), Supervisory Fed CCAR / EBA 9-Quarter Capital Stress
+
+Questa major release espande l'architettura istituzionale di ARGUS con 6 nuovi motori quantitativi di livello Tier-1 per il trading desk di tassi d'interesse, credito multi-debitore, materie prime, esecuzione algoritmica intraday e stress test di capitale regolamentare:
+
+- **Post-LIBOR Multi-Curve OIS Discounting & Dual-Curve Bootstrapping Engine (`core/multicurve_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  -Separazione formale post-LIBOR tra curva di sconto risk-free OIS (€STR / SOFR) e curve di proiezione dei tassi forward (Euribor 3M / 6M, Term SOFR).
+  - Bootstrapping esatto e interpolazione cubica monotona Hermite (Pchip / Hagan-West Monotone Convex) sui log-discount factors per prevenire oscillazioni spurie nei tassi forward istantanei.
+  - Prezzatura dual-curve di Interest Rate Swaps (IRS), Forward Rate Agreements (FRA) e Tenor Basis Swaps (3M vs 6M) con quantificazione del Multi-Curve Valuation Adjustment e DV01.
+- **1-Factor Gaussian Hull-White Short Rate & Longstaff-Schwartz Bermudan Swaptions Engine (`core/hull_white_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Modello di tasso a breve a 1 fattore $dr_t = [\theta(t) - a r_t] dt + \sigma dW_t$ calibrato analiticamente sulla struttura per scadenza dei bond zero-coupon $P(0, T)$ tramite decomposizione affine $P(t, T) = A(t, T) e^{-B(t, T) r_t}$.
+  - Induzione all'indietro Least-Squares Monte Carlo (Longstaff & Schwartz 2001) con polinomi di Laguerre/potenza per la valutazione di Bermudan Swaptions (Payer/Receiver) e Callable Bonds, isolando l'Early Exercise Premium (EEP) rispetto al portafoglio di Swaption Europee co-terminali.
+- **CreditMetrics Rating Migration & Vasicek IRB Credit Portfolio Risk Engine (`core/credit_portfolio_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Formula regolamentare Basilea II/III Internal Ratings-Based (IRB) di Vasicek (2002) Asymptotic Single Risk Factor (ASRF): correlazione degli asset $\rho(PD)$, aggiustamento di scadenza $b(PD)$, Expected Loss ($EL$), capitale regolamentare $K_{\text{IRB}}$ e Risk-Weighted Assets (RWA).
+  - Simulazione Monte Carlo multi-debitore J.P. Morgan CreditMetrics basata sulla matrice di transizione S&P a 8 stati (`AAA`, `AA`, `A`, `BBB`, `BB`, `B`, `CCC`, `D`), rivalutazione mark-to-market sugli spread creditizi, Credit VaR (99.0% e 99.9%), Expected Shortfall ($ES_{99.9\%}$), Incremental Risk Charge (IRC) e decomposizione di Eulero per controparte.
+- **Schwartz (1997) 2-Factor Commodity Futures & Convenience Yield Engine (`core/commodity_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Modello stocastico a due fattori di Gibson-Schwartz (1990) / Schwartz (1997) per prezzo spot $S_t$ e convenience yield netto istantaneo mean-reverting $\delta_t$.
+  - Soluzione analitica chiusa per la curva futures $F(S_0, \delta_0, T) = S_0 \exp(A(T) - B(T)\delta_0)$ con fattore stagionale sinusoidale, classificazione automatica del regime (`BACKWARDATION`, `CONTANGO`, `HUMPED`), Roll Yield annualizzato e prezzatura di opzioni Calendar / Storage Spread tramite approssimazione di Kirk (1995).
+- **Intraday Optimal Liquidation & VWAP/TWAP Slicing Engine with Square-Root Impact (`core/optimal_liquidation_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Estensione del modello di esecuzione ottima di Almgren & Chriss (2001) con legge dell'impatto temporaneo a radice quadrata $h(v_k) = \eta \cdot \sigma_{\text{daily}} S_0 (|v_k| / V_k)^{0.5}$, impatto permanente lineare e profilo volumetrico di mercato intraday a U (aste di apertura/chiusura).
+  - Confronto completo tra traiettoria ottima avversa al rischio ($\sinh$), Dynamic Intraday VWAP con vincolo di partecipazione massima (POV cap 5%-35%) e benchmark TWAP uniforme, con Implementation Shortfall in EUR e bps.
+- **Supervisory Fed CCAR / EBA 9-Quarter Capital Stress & CET1 Trajectory Engine (`core/ccar_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Proiezione prudenziale su 9 trimestri ($Q_1 \dots Q_9$) attraverso i 3 scenari macroeconomici regolamentari (`Supervisory Baseline`, `Supervisory Adverse`, `Fed CCAR / EBA Severely Adverse`).
+  - Dinamica trimestrale di Pre-Provision Net Revenue (PPNR), migrazione del portafoglio crediti a 3 stadi IFRS 9 / CECL (`Stage 1` $\to$ `Stage 2 SICR` $\to$ `Stage 3 Default`), Global Market Shock (GMS), inflazione dei RWA, traiettoria del CET1 Ratio rispetto alla soglia MDA/OCR e calcolo dello Stress Capital Buffer (SCB).
+- **Headless REST API v9.15.0 (`api/main.py`) & Test Suite (`tests/test_v915_institutional_suite.py`)**:
+  - 6 nuovi endpoint REST JSON documentati con OpenAPI (`/api/v1/pricing/multicurve`, `/api/v1/pricing/hull-white`, `/api/v1/risk/credit-portfolio`, `/api/v1/pricing/commodity`, `/api/v1/execution/optimal-liquidation`, `/api/v1/stress/ccar-capital`).
+  - 754/754 unit e integration test superati al 100% con 0 errori Ruff (`ruff check .`).
+
+---
+
 ## [9.14.0] - 2026-09-25
 
 ### 🏛️ XVA & Counterparty Credit Risk (CVA/DVA/FVA/MVA/KVA), Heston Stochastic Volatility FFT Calibration (Carr-Madan 1999), Bayesian Black-Litterman Portfolio Optimization (Idzorek 2005), Basel III Liquidity Standards (LCR & NSFR), Exotic Derivatives & Worst-Of Structured Products (Phoenix Autocallable), Regulatory PRIIPs KID (SRI 1-7) & SFDR ESG (Annex I PAI Table)
