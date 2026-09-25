@@ -232,6 +232,7 @@ def test_v918_master_wealth_portfolio_synchronization_and_board_pack_scaling() -
     assert "RX-CRO-01" in bp["board_pack_audit_json"]
 
     from core.pdf_generator import generate_institutional_portfolio_factsheet_pdf
+    from core.report_exporter import generate_institutional_audit_dossier
 
     factsheet_pdf = generate_institutional_portfolio_factsheet_pdf(
         portfolio_name="Master Wealth (Stocks + Crypto)",
@@ -239,5 +240,12 @@ def test_v918_master_wealth_portfolio_synchronization_and_board_pack_scaling() -
         base_currency="EUR",
     )
     assert factsheet_pdf.startswith(b"%PDF")
+
+    audit_dossier_pdf = generate_institutional_audit_dossier(
+        results=master_wealth_results,
+        portfolio_name="Master Wealth (Stocks + Crypto)",
+    )
+    assert audit_dossier_pdf.startswith(b"%PDF")
+
 
 
