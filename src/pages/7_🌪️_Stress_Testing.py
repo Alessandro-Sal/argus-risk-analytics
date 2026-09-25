@@ -1713,8 +1713,8 @@ from core.ux_institutional_hub import (
     style_institutional_chart,
 )
 
-render_institutional_telemetry_ribbon(page_badge="REGULATORY STRESS TESTING & CAPITAL LAB")
-render_executive_traffic_light_radar(key_prefix="stress_page_cro_radar")
+render_institutional_telemetry_ribbon(page_badge="REGULATORY STRESS TESTING & CAPITAL LAB", risk_data=results)
+render_executive_traffic_light_radar(key_prefix="stress_page_cro_radar", risk_data=results, include_board_pack=True)
 
 active_stress_ws = render_segmented_workspace_switcher(
     workspace_key="stress_v916_domain",
@@ -1736,13 +1736,40 @@ st.caption("Modello multi-debitore con matrice di transizione S&P a 8 stati (AAA
 from core.ccar_stress_engine import compute_ccar_capital_stress
 from core.credit_portfolio_engine import compute_credit_portfolio_risk
 
+_live_obligors = None
+if isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns:
+    _pos_valid = pos[pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0].copy()
+    if not _pos_valid.empty:
+        _pos_valid["val_num"] = pd.to_numeric(_pos_valid["current_value"], errors="coerce").fillna(0.0)
+        _pos_top = _pos_valid.sort_values("val_num", ascending=False).head(8)
+        _rating_cycle = ["AA", "A", "A", "BBB", "BBB", "BB", "BB", "B"]
+        _live_obligors = []
+        for idx_ob, (_, r_ob) in enumerate(_pos_top.iterrows()):
+            _tk_ob = str(r_ob.get("ticker", f"OB_{idx_ob+1}"))
+            _nm_ob = str(r_ob.get("name") or _tk_ob)
+            _sec_ob = str(r_ob.get("sector") or r_ob.get("asset_class") or "Multi-Asset")
+            _is_cry = "-USD" in _tk_ob or "CRYPTO" in _sec_ob.upper()
+            _rat_ob = "B" if _is_cry else _rating_cycle[idx_ob % len(_rating_cycle)]
+            _live_obligors.append(
+                {
+                    "obligor_id": _tk_ob,
+                    "name": f"{_nm_ob} ({_tk_ob})" if _tk_ob not in _nm_ob else _nm_ob,
+                    "sector": _sec_ob,
+                    "rating": _rat_ob,
+                    "ead_eur": float(r_ob["val_num"]),
+                    "lgd": 0.55 if _is_cry else 0.42,
+                    "maturity_years": 3.0,
+                }
+            )
+
 cp_c1, cp_c2 = st.columns([1, 3])
 with cp_c1:
     cp_sims = st.select_slider("Simulazioni Monte Carlo CreditMetrics:", options=[2000, 5000, 8000, 12000], value=5000, key="cp_sims_slider")
 with cp_c2:
-    st.info("📌 Il portafoglio istituzionale predefinito include esposizioni Corporate e Sovrane distribuite sui rating S&P da AAA a B, rivalutate mark-to-market sugli spread creditizi ad 1 anno.")
+    _port_lbl_st = str(st.session_state.get("portfolio_name") or "Portafoglio Attivo")
+    st.info(f"📌 Esposizioni auto-collegate al portafoglio attivo **{_port_lbl_st}** ({len(_live_obligors) if _live_obligors else 6} posizioni principali) rivalutate mark-to-market sugli spread creditizi S&P ad 1 anno.")
 
-cp_res = compute_credit_portfolio_risk(n_simulations=int(cp_sims))
+cp_res = compute_credit_portfolio_risk(obligors_data=_live_obligors, n_simulations=int(cp_sims))
 ck1, ck2, ck3, ck4 = st.columns(4)
 with ck1:
     metric_card("Expected Loss (EL Basilea IRB)", fmt_eur(float(cp_res["expected_loss_eur"])), delta=f"EAD: {fmt_eur(float(cp_res['total_ead_eur']))}", delta_color="inverse")

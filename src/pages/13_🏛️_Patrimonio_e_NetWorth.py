@@ -3085,12 +3085,13 @@ with main_tab_struct:
         ol_c1, ol_c2, ol_c3, ol_c4 = st.columns(4)
         with ol_c1:
             ol_ticker = st.text_input("Ticker Ordine Istituzionale:", value=live_bind["top_ticker"] if live_bind.get("autobind_enabled") else "ENI.MI", key="ol_tk_in")
-            ol_shares = st.number_input("Quantità Azioni da Liquidare:", min_value=1_000.0, value=250_000.0, step=25_000.0, key="ol_sh_in")
+            ol_shares = st.number_input("Quantità Azioni da Liquidare:", min_value=0.01, value=max(0.01, float(live_bind.get("top_shares", 250_000.0))) if live_bind.get("autobind_enabled") else 250_000.0, step=10.0, key="ol_sh_in")
         with ol_c2:
-            ol_px = st.number_input("Prezzo Spot Mid (€):", min_value=0.5, value=float(live_bind["top_spot_price"]) if live_bind.get("autobind_enabled") else 14.80, step=0.5, key="ol_px_in")
-            ol_adv = st.number_input("Volume Medio Giornaliero (ADV Azioni):", min_value=50_000.0, value=5_000_000.0, step=250_000.0, key="ol_adv_in")
+            ol_px = st.number_input("Prezzo Spot Mid (€):", min_value=0.01, value=max(0.01, float(live_bind["top_spot_price"])) if live_bind.get("autobind_enabled") else 14.80, step=0.5, key="ol_px_in")
+            ol_adv = st.number_input("Volume Medio Giornaliero (ADV Azioni):", min_value=1_000.0, value=float(live_bind.get("adv_shares", 5_000_000.0)) if live_bind.get("autobind_enabled") else 5_000_000.0, step=50_000.0, key="ol_adv_in")
         with ol_c3:
-            ol_vol = st.slider("Volatilità Giornaliera (%):", min_value=0.5, max_value=6.0, value=1.8, step=0.1, key="ol_vol_in") / 100.0
+            _def_ol_vol = round(float(np.clip(float(live_bind.get("daily_volatility", 0.018)) * 100.0, 0.5, 6.0)), 1) if live_bind.get("autobind_enabled") else 1.8
+            ol_vol = st.slider("Volatilità Giornaliera (%):", min_value=0.5, max_value=6.0, value=_def_ol_vol, step=0.1, key="ol_vol_in") / 100.0
             ol_pov = st.slider("Limite Max Participation Rate (POV %):", min_value=5, max_value=35, value=15, step=1, key="ol_pov_in") / 100.0
         with ol_c4:
             ol_eta = st.slider("Coefficiente Impatto Temporaneo (η):", min_value=0.05, max_value=0.40, value=0.14, step=0.01, key="ol_eta_in")
@@ -3172,7 +3173,8 @@ with main_tab_struct:
 
         al_c1, al_c2, al_c3 = st.columns(3)
         with al_c1:
-            al_assets = st.number_input("Valore Attuale Attivi ALM (€):", min_value=1_000_000.0, value=125_000_000.0, step=5_000_000.0, key="al_assets_in")
+            _def_al_assets = max(1_000.0, round(float(live_bind.get("total_nav_eur", 64_233.0)), 2)) if live_bind.get("autobind_enabled") else 125_000_000.0
+            al_assets = st.number_input("Valore Attuale Attivi ALM (€):", min_value=1_000.0, value=float(_def_al_assets), step=10_000.0, key="al_assets_in")
         with al_c2:
             al_dur = st.slider("Modified Duration Attivi (Anni):", min_value=1.0, max_value=22.0, value=6.8, step=0.2, key="al_dur_in")
         with al_c3:

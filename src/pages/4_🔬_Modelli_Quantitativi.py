@@ -169,7 +169,12 @@ from core.ux_institutional_hub import (
     style_institutional_chart,
 )
 
-render_institutional_telemetry_ribbon(page_badge="QUANTITATIVE MODELS & PRICING LAB")
+render_institutional_telemetry_ribbon(page_badge="QUANTITATIVE MODELS & PRICING LAB", risk_data=results)
+live_bind = render_live_portfolio_autobind_banner(
+    key_prefix="p4_quant_lab",
+    model_label="Quantitative Models & Pricing Lab",
+    risk_data=results,
+)
 
 # ── SELETTORE MODELLI QUANTITATIVI STILE BLOOMBERG TERMINAL ─────────
 QUANT_MODELS_CATALOG = {
@@ -5245,11 +5250,12 @@ elif active_quant_tab == "📈 Multi-Curve OIS & Dual-Curve IRS":
 
     from core.multicurve_engine import compute_multicurve_bootstrapping
 
+    _live_nav_q = max(1_000.0, round(float(live_bind.get("total_nav_eur", 64_233.0)), 2)) if live_bind.get("autobind_enabled") else 10_000_000.0
     mc_c1, mc_c2, mc_c3, mc_c4 = st.columns(4)
     with mc_c1:
         mc_ccy = st.selectbox("Valuta di Riferimento:", ["EUR", "USD"], index=0, key="mc_ccy_sel")
     with mc_c2:
-        mc_notional = st.number_input("Nozionale IRS (€/$):", min_value=100_000.0, value=10_000_000.0, step=1_000_000.0, key="mc_notional_in")
+        mc_notional = st.number_input("Nozionale IRS (€/$):", min_value=1_000.0, value=float(_live_nav_q), step=10_000.0, key="mc_notional_in")
     with mc_c3:
         mc_fixed = st.slider("Tasso Fisso IRS (%):", min_value=0.50, max_value=6.50, value=3.10, step=0.05, key="mc_fixed_in") / 100.0
     with mc_c4:
@@ -5309,6 +5315,7 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
 
     from core.hull_white_engine import compute_hull_white_swaptions
 
+    _live_nav_hw = max(1_000.0, round(float(live_bind.get("total_nav_eur", 64_233.0)), 2)) if live_bind.get("autobind_enabled") else 10_000_000.0
     hw_c1, hw_c2, hw_c3, hw_c4 = st.columns(4)
     with hw_c1:
         hw_strike = st.slider("Strike Rate Swaption (%):", min_value=0.5, max_value=6.0, value=3.0, step=0.1, key="hw_strike_in") / 100.0
@@ -5320,10 +5327,11 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
         hw_mat = st.selectbox("Maturity Sottostante (Anni):", [3.0, 5.0, 7.0, 10.0], index=1, key="hw_mat_sel")
         hw_payer = st.selectbox("Tipo Swaption:", ["Payer (diritto a pagare fisso)", "Receiver (diritto a ricevere fisso)"], index=0, key="hw_type_sel")
     with hw_c4:
+        hw_notional = st.number_input("Nozionale Swaption (€):", min_value=1_000.0, value=float(_live_nav_hw), step=10_000.0, key="hw_notional_in")
         hw_paths = st.select_slider("Percorsi LSMC Monte Carlo:", options=[1000, 2000, 3000, 5000], value=2000, key="hw_paths_sel")
 
     hw_res = compute_hull_white_swaptions(
-        notional=10_000_000.0,
+        notional=float(hw_notional),
         strike_rate=hw_strike,
         swap_maturity_years=float(hw_mat),
         is_payer=hw_payer.startswith("Payer"),
@@ -5353,16 +5361,6 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
             "Callable Bond PV (€)": float(hw_res["callable_bond_pv_eur"]),
         },
     )
-    render_scenario_delta_comparator(
-        scenario_key="hull_white_bermudan",
-        scenario_title="Hull-White 1F Bermudan Swaption",
-        current_metrics={
-            "Bermudan Swaption PV (€)": float(hw_res["bermudan_swaption_pv_eur"]),
-            "European Swaption PV (€)": float(hw_res["european_swaption_pv_eur"]),
-            "Early Exercise Premium (€)": float(hw_res["early_exercise_premium_eur"]),
-            "Callable Bond PV (€)": float(hw_res["callable_bond_pv_eur"]),
-        },
-    )
     ex_df = pd.DataFrame(hw_res["exercise_schedule"])
     st.dataframe(ex_df, use_container_width=True, hide_index=True)
 
@@ -5376,19 +5374,20 @@ elif active_quant_tab == "🌊 Rough Volatility (rBergomi) & SVI Surface":
     from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
     from core.ux_quant_canvas import build_svi_3d_surface_and_density_chart
 
+    _default_svi_sig = round(float(np.clip(float(live_bind.get("annual_volatility", 0.2625)), 0.05, 0.40)), 2) if live_bind.get("autobind_enabled") else 0.14
     rv_c1, rv_c2, rv_c3 = st.columns(3)
     with rv_c1:
         rv_h = st.slider("Esponente di Hurst Rough Bergomi (H):", min_value=0.04, max_value=0.35, value=0.10, step=0.01, key="rv_h_in")
         rv_rho = st.slider("Correlazione Spot-Vol SVI (ρ):", min_value=-0.95, max_value=0.20, value=-0.62, step=0.02, key="rv_rho_in")
     with rv_c2:
         rv_b = st.slider("Pendenza Ali SVI (b):", min_value=0.05, max_value=0.40, value=0.185, step=0.01, key="rv_b_in")
-        rv_sig = st.slider("Curvatura ATM SVI (σ):", min_value=0.05, max_value=0.40, value=0.14, step=0.01, key="rv_sig_in")
+        rv_sig = st.slider("Curvatura ATM SVI (σ):", min_value=0.05, max_value=0.40, value=float(_default_svi_sig), step=0.01, key="rv_sig_in")
     with rv_c3:
         rv_eta = st.slider("Vol-of-Vol Rough Bergomi (η):", min_value=0.50, max_value=3.50, value=1.85, step=0.05, key="rv_eta_in")
 
     shocked_rv = apply_macro_shock_to_inputs({"annual_vol": rv_sig})
     eff_sig = float(shocked_rv["annual_vol"])
-    prov_tag = "GLOBAL SHOCK OVERRIDE" if shocked_rv.get("macro_shock_active") else "CALIBRATED SVI"
+    prov_tag = "GLOBAL SHOCK OVERRIDE" if shocked_rv.get("macro_shock_active") else "LIVE PORTFOLIO BOUND"
 
     rv_res = compute_rough_vol_svi_surface(hurst_h=rv_h, svi_b=rv_b, svi_rho=rv_rho, svi_sigma=eff_sig, eta_vol_of_vol=rv_eta)
 
@@ -5468,10 +5467,12 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
     from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
     from core.ux_quant_canvas import build_cds_bootstrap_and_tranche_chart
 
+    _default_cds_ent = f"{live_bind.get('top_ticker', 'ENI.MI')} ({live_bind.get('portfolio_name', 'Portafoglio Attivo')})" if live_bind.get("autobind_enabled") else "Intesa Sanpaolo S.p.A. (Senior)"
+    _default_cds_not = max(1_000.0, round(float(live_bind.get("total_nav_eur", 64_233.0)), 2)) if live_bind.get("autobind_enabled") else 10_000_000.0
     cd_c1, cd_c2, cd_c3 = st.columns(3)
     with cd_c1:
-        cd_ent = st.text_input("Reference Entity / Indice:", value="Intesa Sanpaolo S.p.A. (Senior)", key="cd_ent_in")
-        cd_not = st.number_input("Nozionale CDS / Tranche (€):", min_value=100_000.0, value=10_000_000.0, step=1_000_000.0, key="cd_not_in")
+        cd_ent = st.text_input("Reference Entity / Indice:", value=_default_cds_ent, key="cd_ent_in")
+        cd_not = st.number_input("Nozionale CDS / Tranche (€):", min_value=1_000.0, value=float(_default_cds_not), step=10_000.0, key="cd_not_in")
     with cd_c2:
         cd_spr = st.slider("Par Spread CDS 5 Anni (bps):", min_value=15.0, max_value=550.0, value=96.0, step=5.0, key="cd_spr_in")
         cd_rec = st.slider("Recovery Rate Atteso R (%):", min_value=10.0, max_value=70.0, value=40.0, step=5.0, key="cd_rec_in") / 100.0
