@@ -177,8 +177,9 @@ def render_institutional_telemetry_ribbon(
     density_mode = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
     inject_density_mode_css(density_mode)
 
-    st.markdown(build_telemetry_ribbon_html(telemetry, shock_info), unsafe_allow_html=True)
-    render_command_bar_and_shock_ribbon(key_prefix=f"cmd_{page_badge[:10].lower().replace(' ', '_')}")
+    # Avoid rendering a duplicate top bar on the Control Room (which already renders render_command_bar + render_control_room_hero)
+    if "CONTROL ROOM" not in page_badge.upper():
+        st.markdown(build_telemetry_ribbon_html(telemetry, shock_info), unsafe_allow_html=True)
     return telemetry
 
 
@@ -570,17 +571,62 @@ def compute_executive_traffic_light_radar(
 def render_executive_traffic_light_radar(
     key_prefix: str = "cro_radar",
     metrics_override: dict[str, float] | None = None,
+    include_board_pack: bool = False,
 ) -> dict[str, Any]:
-    """Render compact 6-Pillar CRO Traffic-Light Radar with 1-click page navigation."""
+    """Render unified CRO Traffic-Light Radar, Global Macro Shock Console & 1-Click Board-Pack in a single expander."""
     radar = compute_executive_traffic_light_radar(metrics_override=metrics_override)
     if st is None:
         return radar
 
-    with st.expander("🚦 Executive CRO Traffic-Light Radar (Semaforo Regolamentare & Risk Appetite — 6 Pilastri)", expanded=False):
+    cur_shock = str(st.session_state.get("global_macro_shock", "NONE"))
+    shock_badge = f" · ⚡ SHOCK ATTIVO: {cur_shock}" if cur_shock != "NONE" else ""
+    expander_title = (
+        f"🏛️ Console Istituzionale CRO: Semaforo Regolamentare (6 Pilastri), Global Macro Shock & Dossier Comitato{shock_badge}"
+    )
+
+    with st.expander(expander_title, expanded=False):
+        c_cmd, c_shk, c_den = st.columns([2.2, 2.0, 1.2])
+        with c_cmd:
+            cmd_input = st.text_input(
+                "⌨️ Comando Rapido (`SIMM <GO>`, `SVI <GO>`, `ALM <GO>`, `CDS <GO>`, `VPIN <GO>`, `SHOCK 2008`)",
+                value="",
+                placeholder="Digita es. SIMM <GO> o SHOCK STAGFLATION...",
+                key=f"{key_prefix}_go_in",
+            )
+            if cmd_input.strip():
+                res = resolve_terminal_command(cmd_input)
+                if res.get("macro_shock"):
+                    st.session_state["global_macro_shock"] = res["macro_shock"]
+                st.info(f"**{res['command']}** → {res['description']}")
+                if res.get("target_page") and hasattr(st, "page_link"):
+                    st.page_link(res["target_page"], label=f"🚀 Apri {res['command']} ({res['workspace']})")
+        with c_shk:
+            preset_keys = list(MACRO_SHOCK_PRESETS.keys())
+            idx = preset_keys.index(cur_shock) if cur_shock in preset_keys else 0
+            chosen_shock = st.selectbox(
+                "⚡ Global Macro Shock Broadcast (Cross-Page)",
+                options=preset_keys,
+                format_func=lambda k: MACRO_SHOCK_PRESETS[k]["label"],
+                index=idx,
+                key=f"{key_prefix}_shock_sel",
+            )
+            st.session_state["global_macro_shock"] = chosen_shock
+        with c_den:
+            cur_density = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+            chosen_density = st.radio(
+                "🖥️ Densità UI",
+                options=["COMPACT_DESK", "BOARDROOM"],
+                format_func=lambda m: "Desk" if m == "COMPACT_DESK" else "Board HD",
+                index=0 if cur_density == "COMPACT_DESK" else 1,
+                horizontal=True,
+                key=f"{key_prefix}_density_sel",
+            )
+            st.session_state["ux_density_mode"] = chosen_density
+
         cols = st.columns(3)
-        for idx, p in enumerate(radar["pillars"]):
+        for idx_p, p in enumerate(radar["pillars"]):
             icon = "🟢" if p["status"] == "PASS" else ("🟡" if p["status"] == "WARNING" else "🔴")
-            with cols[idx % 3]:
+            with cols[idx_p % 3]:
                 card_html = _compact_html(
                     f"""
                     <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255,255,255,0.08);
@@ -596,6 +642,27 @@ def render_executive_traffic_light_radar(
                     """
                 )
                 st.markdown(card_html, unsafe_allow_html=True)
+
+        if include_board_pack:
+            from core.executive_board_pack_engine import generate_executive_board_pack
+
+            bp_res = generate_executive_board_pack()
+            bp_c1, bp_c2 = st.columns([2.8, 1.2])
+            with bp_c1:
+                st.caption(
+                    "📑 **Prescrizioni Comitato Rischi (Board-Pack v9.18.0)**: "
+                    + " · ".join(f"[{rx['domain']}] {rx['action']}" for rx in bp_res["cro_prescriptions"][:2])
+                )
+            with bp_c2:
+                st.download_button(
+                    label="📥 Scarica CRO Board-Pack (HTML5)",
+                    data=bp_res["board_pack_html"].encode("utf-8"),
+                    file_name="argus_executive_cro_board_pack_v918.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    type="primary",
+                    key=f"{key_prefix}_dl_bp_btn",
+                )
     return radar
 
 
