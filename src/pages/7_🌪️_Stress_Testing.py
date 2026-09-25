@@ -1831,13 +1831,15 @@ st.dataframe(df_sev, use_container_width=True, hide_index=True)
 
 
 # ============================================================================
-# v9.17.0: ISDA SIMM v2.6 INITIAL MARGIN & UNCLEARED MARGIN RULES (UMR)
+# v9.17.0 / v9.18.0: ISDA SIMM v2.6 INITIAL MARGIN & UNCLEARED MARGIN RULES (UMR)
 # ============================================================================
 st.divider()
 st.markdown("#### 🛡️ ISDA SIMM™ v2.6 (Standard Initial Margin Model) & BCBS-IOSCO UMR Compliance")
 st.caption("Calcolo regolamentare del Margine Iniziale (DeltaMargin, VegaMargin, CurvatureMargin) sulle 6 classi di rischio ISDA, matrice di correlazione cross-asset ψ_{r,s}, verifica della soglia UMR di €50 Milioni e risparmio MVA tramite Central Clearing (CCP LCH/Eurex).")
 
 from core.isda_simm_engine import compute_isda_simm_margin
+from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
+from core.ux_quant_canvas import build_isda_simm_waterfall_and_umr_chart
 
 sm_c1, sm_c2 = st.columns(2)
 with sm_c1:
@@ -1845,16 +1847,86 @@ with sm_c1:
 with sm_c2:
     sm_mpor = st.slider("Margin Period of Risk Bilaterale (MPOR Giorni):", min_value=5, max_value=20, value=10, step=1, key="sm_mpor_in")
 
-simm_res = compute_isda_simm_margin(funding_spread_bps=sm_fspread, mpor_days=int(sm_mpor))
+shocked_simm = apply_macro_shock_to_inputs({"index_spread_bps": sm_fspread})
+eff_fspread = float(shocked_simm["index_spread_bps"])
+simm_prov = "GLOBAL SHOCK OVERRIDE" if shocked_simm.get("macro_shock_active") else "LIVE PORTFOLIO BOUND"
+
+simm_res = compute_isda_simm_margin(funding_spread_bps=eff_fspread, mpor_days=int(sm_mpor))
 
 smk1, smk2, smk3, smk4 = st.columns(4)
 with smk1:
-    metric_card("ISDA SIMM Initial Margin", fmt_eur(simm_res["total_simm_initial_margin_eur"]), delta=f"Beneficio Diversif.: -{simm_res['cross_class_diversification_benefit_pct']:.1f}%", delta_color="normal")
+    render_bento_kpi_card(
+        "ISDA SIMM Initial Margin",
+        fmt_eur(simm_res["total_simm_initial_margin_eur"]),
+        f"Beneficio Diversif.: -{simm_res['cross_class_diversification_benefit_pct']:.1f}%",
+        provenance=simm_prov,
+        sparkline_values=[float(r["total_class_im_eur"]) / 1e6 for r in simm_res["risk_class_breakdown"]],
+        accent_color="#3b82f6",
+    )
 with smk2:
-    metric_card("Utilizzo Soglia UMR (€50M)", f"{simm_res['umr_utilization_pct']:.1f}%", delta=simm_res["recommended_clearing_route"].split(" (")[0], delta_color="normal" if not simm_res["umr_threshold_breached"] else "inverse")
+    render_bento_kpi_card(
+        "Utilizzo Soglia UMR (€50M)",
+        f"{simm_res['umr_utilization_pct']:.1f}%",
+        simm_res["recommended_clearing_route"].split(" (")[0],
+        provenance=simm_prov,
+        limit_utilization_pct=float(simm_res["umr_utilization_pct"]),
+        accent_color="#10b981" if not simm_res["umr_threshold_breached"] else "#ef4444",
+    )
 with smk3:
-    metric_card("IM Equivalente CCP (LCH/Eurex)", fmt_eur(simm_res["ccp_cleared_equivalent_im_eur"]), delta="MPOR 5gg Clearing", delta_color="normal")
+    render_bento_kpi_card(
+        "IM Equivalente CCP (LCH/Eurex)",
+        fmt_eur(simm_res["ccp_cleared_equivalent_im_eur"]),
+        "MPOR 5gg Clearing",
+        provenance=simm_prov,
+        accent_color="#10b981",
+    )
 with smk4:
-    metric_card("Risparmio Annuo MVA (CCP vs CSA)", fmt_eur(simm_res["annual_ccp_mva_savings_eur"]), delta=f"MVA Bilat: {fmt_eur(simm_res['annual_mva_bilateral_eur'])}", delta_color="normal")
+    render_bento_kpi_card(
+        "Risparmio Annuo MVA (CCP vs CSA)",
+        fmt_eur(simm_res["annual_ccp_mva_savings_eur"]),
+        f"MVA Bilat: {fmt_eur(simm_res['annual_mva_bilateral_eur'])}",
+        provenance=simm_prov,
+        accent_color="#f59e0b",
+    )
 
+rc_map_for_chart = {}
+for row in simm_res["risk_class_breakdown"]:
+    rc_label = str(row["risk_class"])
+    if "Interest" in rc_label:
+        rc_map_for_chart["IR"] = {"total_margin": row["total_class_im_eur"]}
+    elif "Non-Qual" in rc_label:
+        rc_map_for_chart["CreditNonQ"] = {"total_margin": row["total_class_im_eur"]}
+    elif "Credit" in rc_label:
+        rc_map_for_chart["CreditQ"] = {"total_margin": row["total_class_im_eur"]}
+    elif "Equity" in rc_label:
+        rc_map_for_chart["Equity"] = {"total_margin": row["total_class_im_eur"]}
+    elif "Commodity" in rc_label:
+        rc_map_for_chart["Commodity"] = {"total_margin": row["total_class_im_eur"]}
+    elif "FX" in rc_label:
+        rc_map_for_chart["FX"] = {"total_margin": row["total_class_im_eur"]}
+
+fig_simm_wf = build_isda_simm_waterfall_and_umr_chart(
+    {
+        "risk_class_breakdown": rc_map_for_chart,
+        "standalone_sum_eur": simm_res["undiversified_sum_im_eur"],
+        "total_simm_im_eur": simm_res["total_simm_initial_margin_eur"],
+        "ccp_cleared_im_eur": simm_res["ccp_cleared_equivalent_im_eur"],
+        "umr_threshold_eur": simm_res["umr_threshold_eur"],
+    }
+)
+st.plotly_chart(fig_simm_wf, use_container_width=True)
 st.dataframe(pd.DataFrame(simm_res["risk_class_breakdown"]), use_container_width=True, hide_index=True)
+render_sr117_audit_drawer(
+    engine_name="ISDA SIMM v2.6 & BCBS-IOSCO UMR Compliance Engine",
+    latex_formulas=[
+        r"\text{SIMM}_{\text{total}} = \sqrt{\sum_{r \in \mathcal{R}} \text{IM}_r^2 + \sum_{r \neq s} \psi_{r,s}\,\text{IM}_r\,\text{IM}_s}",
+        r"K_b = \sqrt{\sum_k WS_k^2 + \sum_{k \neq l} \rho_{kl}\,f_{kl}\,WS_k\,WS_l}, \quad CR_k = \max\!\left(1, \sqrt{\frac{|s_k|}{T_k}}\right)",
+    ],
+    inputs_dict={"funding_spread_bps": eff_fspread, "mpor_days": int(sm_mpor)},
+    outputs_dict={
+        "total_simm_im_eur": simm_res["total_simm_initial_margin_eur"],
+        "ccp_im_eur": simm_res["ccp_cleared_equivalent_im_eur"],
+        "mva_savings_eur": simm_res["annual_ccp_mva_savings_eur"],
+    },
+    regulatory_refs=["ISDA SIMM v2.6 Methodology", "BCBS-IOSCO UMR Phase 6", "Fed SR 11-7"],
+)

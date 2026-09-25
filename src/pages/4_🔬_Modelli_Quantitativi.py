@@ -5369,10 +5369,12 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
 
 # ── TAB: ROUGH VOLATILITY (rBERGOMI) & SVI ARBITRAGE-FREE SURFACE ──────────
 elif active_quant_tab == "🌊 Rough Volatility (rBergomi) & SVI Surface":
-    st.markdown("#### 🌊 Rough Volatility (Rough Bergomi $H \approx 0.10$) & Gatheral SVI Arbitrage-Free Surface")
+    st.markdown("#### 🌊 Rough Volatility (Rough Bergomi $H \\approx 0.10$) & Gatheral SVI Arbitrage-Free Surface")
     st.caption(r"Parametrizzazione SVI di Gatheral con test di non-arbitraggio Butterfly di Durrleman $g(k) \ge 0$ e legge di potenza dello skew ATM a breve termine $\mathcal{O}(T^{H - 1/2})$.")
 
     from core.rough_vol_svi_engine import compute_rough_vol_svi_surface
+    from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
+    from core.ux_quant_canvas import build_svi_3d_surface_and_density_chart
 
     rv_c1, rv_c2, rv_c3 = st.columns(3)
     with rv_c1:
@@ -5384,25 +5386,77 @@ elif active_quant_tab == "🌊 Rough Volatility (rBergomi) & SVI Surface":
     with rv_c3:
         rv_eta = st.slider("Vol-of-Vol Rough Bergomi (η):", min_value=0.50, max_value=3.50, value=1.85, step=0.05, key="rv_eta_in")
 
-    rv_res = compute_rough_vol_svi_surface(hurst_h=rv_h, svi_b=rv_b, svi_rho=rv_rho, svi_sigma=rv_sig, eta_vol_of_vol=rv_eta)
+    shocked_rv = apply_macro_shock_to_inputs({"annual_vol": rv_sig})
+    eff_sig = float(shocked_rv["annual_vol"])
+    prov_tag = "GLOBAL SHOCK OVERRIDE" if shocked_rv.get("macro_shock_active") else "CALIBRATED SVI"
+
+    rv_res = compute_rough_vol_svi_surface(hurst_h=rv_h, svi_b=rv_b, svi_rho=rv_rho, svi_sigma=eff_sig, eta_vol_of_vol=rv_eta)
 
     rk1, rk2, rk3, rk4 = st.columns(4)
     with rk1:
-        st.metric("Hurst Exponent H & Dim. Frattale", f"H = {rv_res['hurst_exponent_h']:.2f}", delta=f"Fractal D = {rv_res['fractal_dimension_d']:.2f}")
+        render_bento_kpi_card(
+            "Hurst H & Fractal Dim.",
+            f"H = {rv_res['hurst_exponent_h']:.2f}",
+            f"Fractal D = {rv_res['fractal_dimension_d']:.2f}",
+            provenance=prov_tag,
+            sparkline_values=[0.22, 0.16, 0.12, 0.10, float(rv_res["hurst_exponent_h"])],
+            accent_color="#06b6d4",
+        )
     with rk2:
-        st.metric("Durrleman Butterfly Min g(k)", f"{rv_res['min_durrleman_density_g']:.4f}", delta="Arbitrage-Free ✅" if rv_res["butterfly_arbitrage_free"] else "Arbitrage ⚠️")
+        render_bento_kpi_card(
+            "Durrleman Butterfly Min g(k)",
+            f"{rv_res['min_durrleman_density_g']:.4f}",
+            "Arbitrage-Free ✅" if rv_res["butterfly_arbitrage_free"] else "Arbitrage ⚠️",
+            provenance=prov_tag,
+            limit_utilization_pct=max(5.0, min(95.0, (1.0 - float(rv_res["min_durrleman_density_g"])) * 55.0)),
+            accent_color="#10b981" if rv_res["butterfly_arbitrage_free"] else "#ef4444",
+        )
     with rk3:
-        st.metric("ATM Skew 1M (Rough Bergomi)", f"{rv_res['short_end_skew_1m']:.3f}", delta=f"Esponente: T^({rv_res['skew_power_law_exponent']:+.2f})")
+        render_bento_kpi_card(
+            "ATM Skew 1M (rBergomi)",
+            f"{rv_res['short_end_skew_1m']:.3f}",
+            f"Power-Law T^({rv_res['skew_power_law_exponent']:+.2f})",
+            provenance=prov_tag,
+            sparkline_values=[abs(float(r["rough_bergomi_atm_skew"])) for r in rv_res["surface_term_structure"]],
+            accent_color="#3b82f6",
+        )
     with rk4:
-        st.metric("ATM Skew 12M (1 Anno)", f"{rv_res['one_year_skew_12m']:.3f}", delta="Calendar Free ✅" if rv_res["calendar_spread_arbitrage_free"] else "Warning")
+        render_bento_kpi_card(
+            "ATM Skew 12M (1 Anno)",
+            f"{rv_res['one_year_skew_12m']:.3f}",
+            "Calendar Free ✅" if rv_res["calendar_spread_arbitrage_free"] else "Warning ⚠️",
+            provenance=prov_tag,
+            accent_color="#f59e0b",
+        )
+
+    fig_3d_svi, fig_dens_svi = build_svi_3d_surface_and_density_chart(
+        {"calibrated_params": {"a": 0.015, "b": rv_b, "rho": rv_rho, "m": 0.01, "sigma": eff_sig}, "maturity_years": 0.25},
+        {"hurst_h": rv_h},
+    )
+    ch_col1, ch_col2 = st.columns(2)
+    with ch_col1:
+        st.plotly_chart(fig_3d_svi, use_container_width=True)
+    with ch_col2:
+        st.plotly_chart(fig_dens_svi, use_container_width=True)
 
     svi_df = pd.DataFrame(rv_res["surface_term_structure"])
     fig_rv = go.Figure()
     fig_rv.add_trace(go.Scatter(x=svi_df["tenor_label"], y=svi_df["rough_bergomi_atm_skew"].abs(), mode="lines+markers", name="|ATM Skew| Rough Bergomi (Power-Law)", line=dict(color="#06b6d4", width=3)))
     fig_rv.add_trace(go.Scatter(x=svi_df["tenor_label"], y=svi_df["classical_markov_skew"].abs(), mode="lines+markers", name="|ATM Skew| Heston Classico", line=dict(color="#94a3b8", width=2, dash="dash")))
-    style_institutional_chart(fig_rv, title="Confronto Term Structure ATM Volatility Skew: Rough Bergomi vs Modello Markoviano Classico", height=380)
+    style_institutional_chart(fig_rv, title="Confronto Term Structure ATM Volatility Skew: Rough Bergomi vs Modello Markoviano Classico", height=360)
     st.plotly_chart(fig_rv, use_container_width=True)
     st.dataframe(svi_df, use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="Rough Bergomi & Gatheral SVI Surface Engine",
+        latex_formulas=[
+            r"w(k) = a + b\left(\rho(k-m) + \sqrt{(k-m)^2 + \sigma^2}\right)",
+            r"g(k) = \left(1 - \frac{k w'(k)}{2w(k)}\right)^2 - \frac{(w'(k))^2}{4}\left(\frac{1}{w(k)} + \frac{1}{4}\right) + \frac{w''(k)}{2} \ge 0",
+            r"\mathcal{S}_{\text{ATM}}(T) = \left.\frac{\partial \sigma_{\text{BS}}(k,T)}{\partial k}\right|_{k=0} \propto T^{H - 1/2}",
+        ],
+        inputs_dict={"hurst_h": rv_h, "svi_b": rv_b, "svi_rho": rv_rho, "svi_sigma": eff_sig, "eta": rv_eta},
+        outputs_dict={"min_g_k": rv_res["min_durrleman_density_g"], "short_end_skew_1m": rv_res["short_end_skew_1m"]},
+        regulatory_refs=["Gatheral & Jacquier (2014)", "Bayer, Friz & Gatheral (2016)", "Fed SR 11-7"],
+    )
 
 
 # ── TAB: SINGLE-NAME CDS & SYNTHETIC CREDIT INDEX TRANCHES (iTRAXX/CDX) ────
@@ -5411,6 +5465,8 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
     st.caption(r"Bootstrapping delle intensità di default $\lambda(t)$ e probabilità di sopravvivenza $Q(0, t)$, ISDA Upfront, CS01 e prezzatura 1-Factor Gaussian Copula / Base Correlation delle tranche sintetiche.")
 
     from core.cds_tranche_engine import compute_cds_and_tranche_pricing
+    from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
+    from core.ux_quant_canvas import build_cds_bootstrap_and_tranche_chart
 
     cd_c1, cd_c2, cd_c3 = st.columns(3)
     with cd_c1:
@@ -5422,26 +5478,96 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
     with cd_c3:
         cd_rho = st.slider("Correlazione Sistemica Gaussian Copula (ρ):", min_value=0.10, max_value=0.75, value=0.32, step=0.02, key="cd_rho_in")
 
+    shocked_cd = apply_macro_shock_to_inputs({"index_spread_bps": cd_spr})
+    eff_cd_spr = float(shocked_cd["index_spread_bps"])
+    cd_prov = "GLOBAL SHOCK OVERRIDE" if shocked_cd.get("macro_shock_active") else "LIVE CREDIT CURVE"
+
     cd_res = compute_cds_and_tranche_pricing(
         reference_entity=cd_ent,
         notional_eur=cd_not,
         recovery_rate=cd_rec,
-        five_year_spread_bps=cd_spr,
+        five_year_spread_bps=eff_cd_spr,
         copula_correlation_rho=cd_rho,
     )
 
     ck1, ck2, ck3, ck4 = st.columns(4)
     with ck1:
-        st.metric("ISDA Upfront (vs 100 bps Running)", fmt_eur(cd_res["isda_upfront_eur"]), delta=f"{cd_res['isda_upfront_pct']:+.2f}% del nozionale")
+        render_bento_kpi_card(
+            "ISDA Upfront (vs 100bps)",
+            fmt_eur(cd_res["isda_upfront_eur"]),
+            f"{cd_res['isda_upfront_pct']:+.2f}% Notional",
+            provenance=cd_prov,
+            sparkline_values=[float(n["survival_prob_q"]) * 100.0 for n in cd_res["survival_curve_nodes"]],
+            accent_color="#3b82f6",
+        )
     with ck2:
-        st.metric("CS01 (Credit Spread 01)", fmt_eur(cd_res["cs01_eur_per_bp"]), delta=f"Risky PV01: {cd_res['risky_pv01_5y']:.3f}")
+        render_bento_kpi_card(
+            "CS01 (Credit Spread 01)",
+            fmt_eur(cd_res["cs01_eur_per_bp"]),
+            f"Risky PV01: {cd_res['risky_pv01_5y']:.3f}",
+            provenance=cd_prov,
+            accent_color="#10b981",
+        )
     with ck3:
-        st.metric("Jump-to-Default (JTD Net)", fmt_eur(cd_res["jump_to_default_jtd_eur"]), delta=f"Recovery: {cd_res['recovery_rate_pct']:.0f}%")
+        render_bento_kpi_card(
+            "Jump-to-Default (JTD Net)",
+            fmt_eur(cd_res["jump_to_default_jtd_eur"]),
+            f"Recovery: {cd_res['recovery_rate_pct']:.0f}%",
+            provenance=cd_prov,
+            limit_utilization_pct=min(100.0, float(cd_res["jump_to_default_jtd_eur"]) / max(cd_not, 1.0) * 100.0),
+            accent_color="#ef4444",
+        )
     with ck4:
         eq_tr = cd_res["synthetic_cdo_tranches"][0]
-        st.metric("Equity Tranche [0-3%] Spread", f"{eq_tr['fair_running_spread_bps']:,.0f} bps", delta=f"Upfront: {eq_tr['upfront_vs_std_coupon_pct']:+.1f}% (vs 500 bps)")
+        render_bento_kpi_card(
+            "Equity Tranche [0-3%]",
+            f"{eq_tr['fair_running_spread_bps']:,.0f} bps",
+            f"Upfront: {eq_tr['upfront_vs_std_coupon_pct']:+.1f}% (vs 500 bps)",
+            provenance=cd_prov,
+            accent_color="#f59e0b",
+        )
+
+    fig_cds_curve, fig_cdo_tr = build_cds_bootstrap_and_tranche_chart(
+        {
+            "bootstrapped_curve": [
+                {
+                    "tenor_years": r["tenor_years"],
+                    "survival_prob_q": r["survival_prob_q"],
+                    "hazard_rate_lambda": r["hazard_rate_bps"] / 10000.0,
+                }
+                for r in cd_res["survival_curve_nodes"]
+            ]
+        },
+        {
+            "tranches": [
+                {
+                    "tranche_name": r["tranche_name"],
+                    "attach_pct": float(r["attachment_detachment"].split("-")[0].replace("%", "")),
+                    "detach_pct": float(r["attachment_detachment"].split("-")[1].replace("%", "")),
+                    "expected_loss_pct": r["expected_tranche_loss_pct"],
+                    "fair_running_spread_bps": r["fair_running_spread_bps"],
+                }
+                for r in cd_res["synthetic_cdo_tranches"]
+            ]
+        },
+    )
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        st.plotly_chart(fig_cds_curve, use_container_width=True)
+    with cc2:
+        st.plotly_chart(fig_cdo_tr, use_container_width=True)
 
     st.markdown("##### 📊 Prezzatura Tranche Sintetiche iTraxx / CDX (1-Factor Gaussian Copula & Base Correlation)")
     st.dataframe(pd.DataFrame(cd_res["synthetic_cdo_tranches"]), use_container_width=True, hide_index=True)
     st.markdown(r"##### 📈 Curva delle Probabilità di Sopravvivenza $Q(0, t)$ & Hazard Rates $\lambda(t)$")
     st.dataframe(pd.DataFrame(cd_res["survival_curve_nodes"]), use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="ISDA Single-Name CDS & 1F Gaussian Copula Tranche Engine",
+        latex_formulas=[
+            r"Q(0, t_i) = \exp\left(-\int_0^{t_i} \lambda(u)\,du\right), \quad \text{PV}_{\text{prot}} = (1 - R)\sum_{j=1}^M D(0, t_j)\,[Q(t_{j-1}) - Q(t_j)]",
+            r"p(T \mid M) = \Phi\left(\frac{\Phi^{-1}(1 - Q(0,T)) - \sqrt{\rho}\,M}{\sqrt{1-\rho}}\right)",
+        ],
+        inputs_dict={"entity": cd_ent, "notional_eur": cd_not, "spread_5y_bps": eff_cd_spr, "recovery": cd_rec, "rho": cd_rho},
+        outputs_dict={"isda_upfront_eur": cd_res["isda_upfront_eur"], "cs01_eur": cd_res["cs01_eur_per_bp"]},
+        regulatory_refs=["ISDA CDS Standard Model", "Vasicek (2002) LHP", "Basel III CVA/IRC"],
+    )

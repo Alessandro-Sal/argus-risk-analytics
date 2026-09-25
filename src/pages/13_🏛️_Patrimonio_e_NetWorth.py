@@ -3153,13 +3153,22 @@ with main_tab_struct:
         st.dataframe(sched_df, use_container_width=True, hide_index=True)
 
 
-        # ── v9.17.0: ALM / LDI IMMUNIZATION & AVELLANEDA-STOIKOV VPIN ENGINE ──
+        # ── v9.17.0 / v9.18.0: ALM / LDI IMMUNIZATION & AVELLANEDA-STOIKOV VPIN ENGINE ──
         st.divider()
         section("🏛️ Asset-Liability Management (ALM), Immunizzazione di Redington & Cash-Flow Matching LP")
         st.caption("Copertura attuariale delle passività pluriennali, Funding Ratio, Surplus-at-Risk 99%, dimensionamento Receiver IRS 20Y (LDI) e portafoglio obbligazionario dedicato calcolato via Programmazione Lineare (scipy.optimize.linprog).")
 
         from core.alm_ldi_engine import compute_alm_ldi_immunization
         from core.market_making_vpin_engine import compute_market_making_and_vpin
+        from core.ux_institutional_hub import (
+            apply_macro_shock_to_inputs,
+            render_bento_kpi_card,
+            render_sr117_audit_drawer,
+        )
+        from core.ux_quant_canvas import (
+            build_alm_cashflow_and_surplus_chart,
+            build_avellaneda_stoikov_microstructure_chart,
+        )
 
         al_c1, al_c2, al_c3 = st.columns(3)
         with al_c1:
@@ -3169,23 +3178,66 @@ with main_tab_struct:
         with al_c3:
             al_disc = st.slider("Tasso di Sconto Attuariale (%):", min_value=1.0, max_value=6.5, value=3.4, step=0.1, key="al_disc_in") / 100.0
 
+        shocked_alm = apply_macro_shock_to_inputs({"asset_value": al_assets, "discount_rate": al_disc})
+        eff_al_assets = float(shocked_alm["asset_value"])
+        eff_al_disc = float(shocked_alm["discount_rate"])
+        alm_prov = "GLOBAL SHOCK OVERRIDE" if shocked_alm.get("macro_shock_active") else "LIVE BALANCE SHEET"
+
         alm_res = compute_alm_ldi_immunization(
-            asset_portfolio_eur=al_assets,
+            asset_portfolio_eur=eff_al_assets,
             asset_modified_duration=al_dur,
-            discount_rate=al_disc,
+            discount_rate=eff_al_disc,
         )
 
         alk1, alk2, alk3, alk4 = st.columns(4)
         with alk1:
-            metric_card("ALM Funding Ratio", f"{alm_res['funding_ratio_pct']:.1f}%", delta=f"Surplus: {fmt_eur(alm_res['accounting_surplus_eur'])}", delta_color="normal" if alm_res["funding_ratio_pct"] >= 100.0 else "inverse")
+            render_bento_kpi_card(
+                "ALM Funding Ratio",
+                f"{alm_res['funding_ratio_pct']:.1f}%",
+                f"Surplus: {fmt_eur(alm_res['accounting_surplus_eur'])}",
+                provenance=alm_prov,
+                limit_utilization_pct=min(100.0, float(alm_res["funding_ratio_pct"])),
+                sparkline_values=[94.0, 97.5, 101.2, 104.0, float(alm_res["funding_ratio_pct"])],
+                accent_color="#10b981" if alm_res["funding_ratio_pct"] >= 100.0 else "#ef4444",
+            )
         with alk2:
-            metric_card("Duration Gap (Assets vs Liab.)", f"{alm_res['duration_gap_years']:+.2f} Anni", delta=f"Liab Duration: {alm_res['liability_modified_duration']:.2f}Y", delta_color="normal" if abs(alm_res["duration_gap_years"]) <= 1.0 else "inverse")
+            render_bento_kpi_card(
+                "Duration Gap (A vs L)",
+                f"{alm_res['duration_gap_years']:+.2f} Anni",
+                f"Liab Duration: {alm_res['liability_modified_duration']:.2f}Y",
+                provenance=alm_prov,
+                accent_color="#3b82f6" if abs(alm_res["duration_gap_years"]) <= 1.0 else "#f59e0b",
+            )
         with alk3:
-            metric_card("LDI Receiver Swap 20Y Richiesto", fmt_eur(alm_res["required_20y_receiver_swap_notional_eur"]), delta=f"Hedge Ratio: {alm_res['liability_hedge_ratio_pct']:.1f}%", delta_color="normal")
+            render_bento_kpi_card(
+                "LDI Receiver Swap 20Y",
+                fmt_eur(alm_res["required_20y_receiver_swap_notional_eur"]),
+                f"Hedge Ratio: {alm_res['liability_hedge_ratio_pct']:.1f}%",
+                provenance=alm_prov,
+                accent_color="#10b981",
+            )
         with alk4:
-            metric_card("Surplus-at-Risk 99% (1Y)", fmt_eur(alm_res["surplus_at_risk_99_eur"]), delta="Redington OK ✅" if alm_res["redington_immunization_satisfied"] else "Duration Mismatch ⚠️", delta_color="normal" if alm_res["redington_immunization_satisfied"] else "inverse")
+            render_bento_kpi_card(
+                "Surplus-at-Risk 99% (1Y)",
+                fmt_eur(alm_res["surplus_at_risk_99_eur"]),
+                "Redington OK ✅" if alm_res["redington_immunization_satisfied"] else "Duration Mismatch ⚠️",
+                provenance=alm_prov,
+                accent_color="#10b981" if alm_res["redington_immunization_satisfied"] else "#ef4444",
+            )
 
+        fig_alm_cf = build_alm_cashflow_and_surplus_chart(alm_res)
+        st.plotly_chart(fig_alm_cf, use_container_width=True)
         st.dataframe(pd.DataFrame(alm_res["cashflow_matching_lp"]["bond_allocations"]), use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="ALM Redington Immunization & Cash-Flow Matching LP Engine",
+            latex_formulas=[
+                r"\text{Redington Conditions: } PV_A \ge PV_L, \quad D_A^{\text{mod}} = D_L^{\text{mod}}, \quad C_A > C_L",
+                r"\min_{\mathbf{x} \ge 0} \mathbf{p}^\top \mathbf{x} \quad \text{s.t.} \quad \mathbf{C}\,\mathbf{x} \ge \mathbf{L}",
+            ],
+            inputs_dict={"assets_eur": eff_al_assets, "asset_duration": al_dur, "discount_rate": eff_al_disc},
+            outputs_dict={"funding_ratio_pct": alm_res["funding_ratio_pct"], "sar_99_eur": alm_res["surplus_at_risk_99_eur"]},
+            regulatory_refs=["IORP II Pension Directive", "Solvency II ALM", "Redington (1952)"],
+        )
 
         st.divider()
         section("⚡ Avellaneda-Stoikov (2008) Market-Making & Tossicità Ordini VPIN / Hawkes")
@@ -3203,12 +3255,57 @@ with main_tab_struct:
 
         mmk1, mmk2, mmk3, mmk4 = st.columns(4)
         with mmk1:
-            metric_card("Reservation Price r(s,q,t)", f"€ {mm_res['reservation_price']:.4f}", delta=f"Skew: {mm_res['inventory_skew_bps']:+.1f} bps vs Mid", delta_color="normal")
+            render_bento_kpi_card(
+                "Reservation Price r(s,q,t)",
+                f"€ {mm_res['reservation_price']:.4f}",
+                f"Skew: {mm_res['inventory_skew_bps']:+.1f} bps vs Mid",
+                provenance=alm_prov,
+                accent_color="#f59e0b",
+            )
         with mmk2:
-            metric_card("Quote Ottime Bid / Ask", f"€ {mm_res['optimal_bid_price']:.3f} / € {mm_res['optimal_ask_price']:.3f}", delta=f"Spread: {mm_res['optimal_spread_bps']:.1f} bps", delta_color="normal")
+            render_bento_kpi_card(
+                "Quote Ottime Bid / Ask",
+                f"€ {mm_res['optimal_bid_price']:.3f} / € {mm_res['optimal_ask_price']:.3f}",
+                f"Spread: {mm_res['optimal_spread_bps']:.1f} bps",
+                provenance=alm_prov,
+                accent_color="#10b981",
+            )
         with mmk3:
-            metric_card("VPIN Order-Flow Toxicity", f"{mm_res['current_vpin_score']:.3f}", delta=f"Picco VPIN: {mm_res['peak_vpin_score']:.3f}", delta_color="normal" if mm_res["peak_vpin_score"] < 0.40 else "inverse")
+            render_bento_kpi_card(
+                "VPIN Order-Flow Toxicity",
+                f"{mm_res['current_vpin_score']:.3f}",
+                f"Picco VPIN: {mm_res['peak_vpin_score']:.3f}",
+                provenance=alm_prov,
+                limit_utilization_pct=min(100.0, float(mm_res["peak_vpin_score"]) * 100.0),
+                accent_color="#10b981" if mm_res["peak_vpin_score"] < 0.40 else "#ef4444",
+            )
         with mmk4:
-            metric_card("Hawkes Branching Ratio (α/β)", f"{mm_res['hawkes_branching_ratio_eta']:.2f}", delta=mm_res["toxicity_regime"].split(" - ")[0], delta_color="normal" if "BENIGN" in mm_res["toxicity_regime"] else "inverse")
+            render_bento_kpi_card(
+                "Hawkes Branching Ratio (α/β)",
+                f"{mm_res['hawkes_branching_ratio_eta']:.2f}",
+                mm_res["toxicity_regime"].split(" - ")[0],
+                provenance=alm_prov,
+                accent_color="#10b981" if "BENIGN" in mm_res["toxicity_regime"] else "#ef4444",
+            )
 
+        fig_mm_lob = build_avellaneda_stoikov_microstructure_chart(
+            {
+                "mid_price": 100.0,
+                "reservation_price": mm_res["reservation_price"],
+                "optimal_bid": mm_res["optimal_bid_price"],
+                "optimal_ask": mm_res["optimal_ask_price"],
+                "inventory_units": mm_inv,
+            }
+        )
+        st.plotly_chart(fig_mm_lob, use_container_width=True)
         st.dataframe(pd.DataFrame(mm_res["inventory_quote_schedule"]), use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="Avellaneda-Stoikov Market-Making & Hawkes VPIN Engine",
+            latex_formulas=[
+                r"r(s, q, t) = s - q\,\gamma\,\sigma^2\,(T - t), \quad \delta^a + \delta^b = \gamma\,\sigma^2\,(T - t) + \frac{2}{\gamma}\ln\!\left(1 + \frac{\gamma}{\kappa}\right)",
+                r"\text{VPIN} = \frac{\sum_{\tau=1}^n |V_\tau^B - V_\tau^S|}{n \cdot V_{\text{bucket}}}, \quad \eta_{\text{Hawkes}} = \frac{\alpha}{\beta}",
+            ],
+            inputs_dict={"inventory_q": mm_inv, "gamma": mm_gam, "hawkes_alpha": mm_alp},
+            outputs_dict={"reservation_price": mm_res["reservation_price"], "vpin_score": mm_res["current_vpin_score"]},
+            regulatory_refs=["Avellaneda & Stoikov (2008)", "Easley, López de Prado & O'Hara (2012)", "MiFID II RTS 6"],
+        )

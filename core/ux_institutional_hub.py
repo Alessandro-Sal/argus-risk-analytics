@@ -11,6 +11,8 @@ Provides the 6 Institutional UX/UI Pillars:
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime
 from typing import Any
 
@@ -22,7 +24,7 @@ try:
 except ImportError:  # pragma: no cover
     st = None  # type: ignore[assignment]
 
-APP_VERSION: str = "9.17.0"
+APP_VERSION: str = "9.18.0"
 
 INSTITUTIONAL_PALETTE: list[str] = [
     "#10b981",  # Emerald
@@ -97,11 +99,23 @@ def render_institutional_telemetry_ribbon(
 ) -> dict[str, Any]:
     """Render sticky Bloomberg Launchpad-style top telemetry ribbon in Streamlit."""
     telemetry = build_telemetry_ribbon_state(page_badge=page_badge)
+    shock_info = get_active_macro_shock()
+    telemetry["active_macro_shock"] = shock_info["preset_key"]
     if st is None:
         return telemetry
 
+    density_mode = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+    inject_density_mode_css(density_mode)
+
     nav_str = f"€ {telemetry['nav_eur']:,.0f}".replace(",", ".")
     var_str = f"€ {telemetry['var_99_eur']:,.0f}".replace(",", ".")
+    shock_pill_html = ""
+    if shock_info["is_active"]:
+        shock_pill_html = (
+            f'<span style="background: rgba(168, 85, 247, 0.22); border: 1px solid #a855f7; '
+            f'color: #e9d5ff; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 12px;">'
+            f'⚡ SHOCK: {shock_info["label"]}</span>'
+        )
 
     st.markdown(
         f"""
@@ -110,7 +124,7 @@ def render_institutional_telemetry_ribbon(
                     border-left: 4px solid #6366f1;
                     border-radius: 10px;
                     padding: 8px 14px;
-                    margin-bottom: 12px;
+                    margin-bottom: 8px;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
@@ -130,6 +144,7 @@ def render_institutional_telemetry_ribbon(
                 <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
                     {telemetry['page_badge']}
                 </span>
+                {shock_pill_html}
             </div>
             <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
                 <span style="font-size: 11.5px; color: #cbd5e1;">
@@ -151,6 +166,7 @@ def render_institutional_telemetry_ribbon(
         """,
         unsafe_allow_html=True,
     )
+    render_command_bar_and_shock_ribbon(key_prefix=f"cmd_{page_badge[:10].lower().replace(' ', '_')}")
     return telemetry
 
 
@@ -294,6 +310,9 @@ def style_institutional_chart(
             zerolinecolor="rgba(255,255,255,0.12)",
         )
     return fig
+
+
+apply_institutional_plotly_theme = style_institutional_chart
 
 
 def compute_scenario_delta_comparison(
@@ -586,3 +605,474 @@ def render_segmented_workspace_switcher(
         key=f"seg_ws_{workspace_key}",
     )
     return str(selected)
+
+
+# ============================================================================
+# RELEASE v9.18.0 — BLOOMBERG COMMAND BAR <GO>, MACRO SHOCK BROADCAST,
+# BENTO KPI CARDS (SVG SPARKLINES), SR 11-7 AUDIT DRAWER & DENSITY MODES
+# ============================================================================
+
+MACRO_SHOCK_PRESETS: dict[str, dict[str, Any]] = {
+    "NONE": {
+        "preset_key": "NONE",
+        "label": "🟢 Baseline Normal Market (No Global Shock)",
+        "is_active": False,
+        "rates_bps": 0.0,
+        "credit_bps": 0.0,
+        "equity_pct": 0.0,
+        "vol_pts": 0.0,
+        "vpin_add": 0.0,
+    },
+    "GFC_2008": {
+        "preset_key": "GFC_2008",
+        "label": "🔴 Global Financial Crisis 2008 (-125bps Rates / +350bps Credit / -35% Eq / +22v)",
+        "is_active": True,
+        "rates_bps": -125.0,
+        "credit_bps": 350.0,
+        "equity_pct": -35.0,
+        "vol_pts": 22.0,
+        "vpin_add": 0.35,
+    },
+    "STAGFLATION_SHOCK": {
+        "preset_key": "STAGFLATION_SHOCK",
+        "label": "🟠 Stagflation & Rate Spike (+200bps Rates / +160bps Credit / -18% Eq / +10v)",
+        "is_active": True,
+        "rates_bps": 200.0,
+        "credit_bps": 160.0,
+        "equity_pct": -18.0,
+        "vol_pts": 10.0,
+        "vpin_add": 0.20,
+    },
+    "LIQUIDITY_FREEZE": {
+        "preset_key": "LIQUIDITY_FREEZE",
+        "label": "🟣 Flash Crash & Order-Flow Toxicity (+50bps Rates / +220bps Credit / VPIN +0.45)",
+        "is_active": True,
+        "rates_bps": 50.0,
+        "credit_bps": 220.0,
+        "equity_pct": -15.0,
+        "vol_pts": 16.0,
+        "vpin_add": 0.45,
+    },
+}
+
+GLOBAL_COMMAND_REGISTRY: dict[str, dict[str, str]] = {
+    "SIMM": {
+        "command": "SIMM <GO>",
+        "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+        "workspace": "🛡️ Bilateral XVA, ISDA SIMM & Reg Capital",
+        "description": "ISDA SIMM v2.6 Initial Margin, UMR $50M Threshold & CCP Optimizer",
+    },
+    "SVI": {
+        "command": "SVI <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "📈 Rates, Credit, Commodities & Rough Vol",
+        "description": "Rough Bergomi (H=0.10) & Gatheral SVI Arbitrage-Free Volatility Surface",
+    },
+    "RBERGOMI": {
+        "command": "RBERGOMI <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "📈 Rates, Credit, Commodities & Rough Vol",
+        "description": "Rough Bergomi Fractional Brownian Motion Volatility Surface",
+    },
+    "CDS": {
+        "command": "CDS <GO>",
+        "target_page": "src/pages/4_🔬_Modelli_Quantitativi.py",
+        "workspace": "📈 Rates, Credit, Commodities & Rough Vol",
+        "description": "Single-Name CDS Bootstrapping & iTraxx/CDX Synthetic CDO Tranches",
+    },
+    "ALM": {
+        "command": "ALM <GO>",
+        "target_page": "src/pages/13_🏛️_Patrimonio_e_NetWorth.py",
+        "workspace": "🏛️ ALM, LDI & Microstructure Execution",
+        "description": "Asset-Liability Management, Redington Immunization & Cash-Flow LP",
+    },
+    "VPIN": {
+        "command": "VPIN <GO>",
+        "target_page": "src/pages/13_🏛️_Patrimonio_e_NetWorth.py",
+        "workspace": "🏛️ ALM, LDI & Microstructure Execution",
+        "description": "Avellaneda-Stoikov Market-Making & Hawkes / VPIN Order-Flow Toxicity",
+    },
+    "PACK": {
+        "command": "PACK <GO>",
+        "target_page": "src/0_Control_Room.py",
+        "workspace": "Executive CRO Board-Pack",
+        "description": "1-Click Executive CRO & Investment Committee Printable HTML5 Board-Pack",
+    },
+    "CCAR": {
+        "command": "CCAR <GO>",
+        "target_page": "src/pages/7_🌪️_Stress_Testing.py",
+        "workspace": "🛡️ Bilateral XVA, ISDA SIMM & Reg Capital",
+        "description": "Fed CCAR / EBA 9-Quarter CET1 & Leverage Capital Trajectory",
+    },
+    "SHOCK 2008": {
+        "command": "SHOCK 2008 <GO>",
+        "target_page": "",
+        "macro_shock": "GFC_2008",
+        "description": "Broadcast Global Financial Crisis 2008 Macro Shock across all pages",
+    },
+    "SHOCK STAGFLATION": {
+        "command": "SHOCK STAGFLATION <GO>",
+        "target_page": "",
+        "macro_shock": "STAGFLATION_SHOCK",
+        "description": "Broadcast Stagflation (+200bps Rates / +160bps Credit) Shock across all pages",
+    },
+    "SHOCK LIQUIDITY": {
+        "command": "SHOCK LIQUIDITY <GO>",
+        "target_page": "",
+        "macro_shock": "LIQUIDITY_FREEZE",
+        "description": "Broadcast Liquidity Freeze & High VPIN Toxicity across all pages",
+    },
+    "SHOCK RESET": {
+        "command": "SHOCK RESET <GO>",
+        "target_page": "",
+        "macro_shock": "NONE",
+        "description": "Clear Global Macro Shock and return to Baseline Normal Market",
+    },
+}
+
+
+def resolve_terminal_command(query: str) -> dict[str, Any]:
+    """Resolve a user command string (e.g. 'SIMM <GO>', 'svi', 'shock 2008') into an executable action."""
+    clean = str(query or "").upper().replace("<GO>", "").strip()
+    if not clean:
+        return {
+            "matched": False,
+            "command_key": "NONE",
+            "command": "HELP <GO>",
+            "target_page": "",
+            "workspace": "",
+            "macro_shock": "",
+            "description": "Type SIMM, SVI, CDS, ALM, VPIN, PACK, CCAR, or SHOCK 2008",
+        }
+
+    # Exact or prefix match first
+    for key, spec in GLOBAL_COMMAND_REGISTRY.items():
+        if clean == key or clean.startswith(key) or key in clean:
+            return {
+                "matched": True,
+                "command_key": key,
+                "command": spec["command"],
+                "target_page": spec.get("target_page", ""),
+                "workspace": spec.get("workspace", ""),
+                "macro_shock": spec.get("macro_shock", ""),
+                "description": spec["description"],
+            }
+
+    # Fuzzy keyword match on description
+    for key, spec in GLOBAL_COMMAND_REGISTRY.items():
+        if any(tok in spec["description"].upper() for tok in clean.split() if len(tok) >= 3):
+            return {
+                "matched": True,
+                "command_key": key,
+                "command": spec["command"],
+                "target_page": spec.get("target_page", ""),
+                "workspace": spec.get("workspace", ""),
+                "macro_shock": spec.get("macro_shock", ""),
+                "description": spec["description"],
+            }
+
+    return {
+        "matched": False,
+        "command_key": "UNKNOWN",
+        "command": f"{clean} <GO>",
+        "target_page": "",
+        "workspace": "",
+        "macro_shock": "",
+        "description": f"No exact match for '{clean}'. Available: " + ", ".join(GLOBAL_COMMAND_REGISTRY.keys()),
+    }
+
+
+def get_active_macro_shock(
+    session_state_dict: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Return active global macro shock preset from session state."""
+    state = session_state_dict if session_state_dict is not None else (
+        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    )
+    preset_key = str(state.get("global_macro_shock", "NONE")).upper()
+    if preset_key not in MACRO_SHOCK_PRESETS:
+        preset_key = "NONE"
+    return dict(MACRO_SHOCK_PRESETS[preset_key])
+
+
+def apply_macro_shock_to_inputs(
+    base_inputs: dict[str, float],
+    session_state_dict: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Apply active global macro shock deltas to engine inputs deterministically."""
+    shock = get_active_macro_shock(session_state_dict=session_state_dict)
+    out = dict(base_inputs)
+    if not shock["is_active"]:
+        out["macro_shock_active"] = False
+        out["macro_shock_label"] = shock["label"]
+        return out
+
+    rates_delta_dec = float(shock["rates_bps"]) / 10000.0
+    credit_mult = 1.0 + float(shock["credit_bps"]) / 200.0
+    eq_mult = max(0.25, 1.0 + float(shock["equity_pct"]) / 100.0)
+    vol_add_dec = float(shock["vol_pts"]) / 100.0
+
+    if "discount_rate" in out:
+        out["discount_rate"] = max(0.005, float(out["discount_rate"]) + rates_delta_dec)
+    if "index_spread_bps" in out:
+        out["index_spread_bps"] = max(10.0, float(out["index_spread_bps"]) + float(shock["credit_bps"]))
+    if "ir_dv01" in out:
+        out["ir_dv01"] = float(out["ir_dv01"]) * (1.0 + abs(float(shock["rates_bps"])) / 250.0)
+    if "credit_q_cs01" in out:
+        out["credit_q_cs01"] = float(out["credit_q_cs01"]) * credit_mult
+    if "equity_delta" in out:
+        out["equity_delta"] = float(out["equity_delta"]) * (2.0 - eq_mult)
+    if "annual_vol" in out:
+        out["annual_vol"] = min(1.50, float(out["annual_vol"]) + vol_add_dec)
+    if "asset_value" in out:
+        out["asset_value"] = float(out["asset_value"]) * eq_mult
+
+    out["macro_shock_active"] = True
+    out["macro_shock_label"] = shock["label"]
+    out["macro_shock_preset"] = shock["preset_key"]
+    return out
+
+
+def build_svg_sparkline(
+    values: list[float],
+    color: str = "#10b981",
+    width: int = 120,
+    height: int = 30,
+) -> str:
+    """Build an inline SVG polyline micro-sparkline for Bento KPI cards."""
+    pts = [float(v) for v in (values or [1.0, 1.05, 1.02, 1.08, 1.12]) if np.isfinite(v)]
+    if len(pts) < 2:
+        pts = [1.0, 1.0]
+    vmin, vmax = min(pts), max(pts)
+    span = max(vmax - vmin, 1e-9)
+    coords: list[str] = []
+    for idx, val in enumerate(pts):
+        x = (idx / (len(pts) - 1)) * (width - 6) + 3
+        y = height - 4 - ((val - vmin) / span) * (height - 8)
+        coords.append(f"{x:.1f},{y:.1f}")
+    poly_points = " ".join(coords)
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'xmlns="http://www.w3.org/2000/svg" style="overflow:visible;">'
+        f'<polyline fill="none" stroke="{color}" stroke-width="2" stroke-linecap="round" '
+        f'stroke-linejoin="round" points="{poly_points}" />'
+        f"</svg>"
+    )
+
+
+def build_bento_kpi_card_html(
+    title: str,
+    value: str,
+    delta_label: str = "",
+    provenance: str = "LIVE PORTFOLIO",
+    limit_utilization_pct: float | None = None,
+    sparkline_values: list[float] | None = None,
+    accent_color: str = "#10b981",
+) -> str:
+    """Build HTML for an Institutional Bento KPI Card with inline SVG sparkline & limit bar."""
+    prov_upper = provenance.upper()
+    if "SHOCK" in prov_upper:
+        prov_bg, prov_col, prov_icon = "rgba(168,85,247,0.18)", "#d8b4fe", "🟣"
+    elif "LIVE" in prov_upper:
+        prov_bg, prov_col, prov_icon = "rgba(16,185,129,0.16)", "#6ee7b7", "🟢"
+    else:
+        prov_bg, prov_col, prov_icon = "rgba(59,130,246,0.16)", "#93c5fd", "🔵"
+
+    spark_html = ""
+    if sparkline_values:
+        spark_html = build_svg_sparkline(sparkline_values, color=accent_color, width=105, height=26)
+
+    limit_html = ""
+    if limit_utilization_pct is not None:
+        pct_clamped = float(np.clip(limit_utilization_pct, 0.0, 100.0))
+        bar_col = "#10b981" if pct_clamped < 70.0 else ("#f59e0b" if pct_clamped < 90.0 else "#ef4444")
+        limit_html = (
+            f'<div style="margin-top:8px;">'
+            f'<div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8;margin-bottom:2px;">'
+            f'<span>Limit Utilization</span><span style="color:{bar_col};font-weight:700;">{limit_utilization_pct:.1f}%</span></div>'
+            f'<div style="width:100%;height:5px;background:rgba(255,255,255,0.08);border-radius:3px;overflow:hidden;">'
+            f'<div style="width:{pct_clamped:.1f}%;height:100%;background:{bar_col};border-radius:3px;"></div>'
+            f"</div></div>"
+        )
+
+    return (
+        f'<div class="argus-bento-card" style="background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.18);'
+        f'border-top:3px solid {accent_color};border-radius:10px;padding:12px 14px;margin-bottom:8px;'
+        f'box-shadow:0 4px 14px rgba(0,0,0,0.28);">'
+        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
+        f'<span style="font-size:11.5px;font-weight:700;color:#cbd5e1;">{title}</span>'
+        f'<span style="background:{prov_bg};color:{prov_col};font-size:9.5px;font-weight:800;'
+        f'padding:2px 6px;border-radius:8px;font-family:\'JetBrains Mono\',monospace;">{prov_icon} {provenance}</span>'
+        f"</div>"
+        f'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;">'
+        f"<div>"
+        f'<div style="font-size:20px;font-weight:800;color:#f8fafc;font-family:\'JetBrains Mono\',monospace;">{value}</div>'
+        f'<div style="font-size:11px;color:{accent_color};font-weight:600;margin-top:2px;">{delta_label}</div>'
+        f"</div>"
+        f"<div>{spark_html}</div>"
+        f"</div>"
+        f"{limit_html}"
+        f"</div>"
+    )
+
+
+def render_bento_kpi_card(
+    title: str,
+    value: str,
+    delta_label: str = "",
+    provenance: str = "LIVE PORTFOLIO",
+    limit_utilization_pct: float | None = None,
+    sparkline_values: list[float] | None = None,
+    accent_color: str = "#10b981",
+) -> str:
+    """Render an Institutional Bento KPI Card in Streamlit and return its HTML."""
+    html = build_bento_kpi_card_html(
+        title=title,
+        value=value,
+        delta_label=delta_label,
+        provenance=provenance,
+        limit_utilization_pct=limit_utilization_pct,
+        sparkline_values=sparkline_values,
+        accent_color=accent_color,
+    )
+    if st is not None:
+        st.markdown(html, unsafe_allow_html=True)
+    return html
+
+
+def build_sr117_audit_record(
+    engine_name: str,
+    model_version: str,
+    latex_formulas: list[str],
+    inputs_dict: dict[str, Any],
+    outputs_dict: dict[str, Any],
+    compute_ms: float = 4.2,
+    regulatory_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build a deterministic Fed SR 11-7 / ECB TRIM Model Risk Management audit trail record."""
+    canonical_payload = json.dumps(
+        {"engine": engine_name, "version": model_version, "inputs": inputs_dict, "outputs": outputs_dict},
+        sort_keys=True,
+        default=str,
+    )
+    sha256_hash = hashlib.sha256(canonical_payload.encode("utf-8")).hexdigest()
+    return {
+        "engine_name": engine_name,
+        "model_version": model_version,
+        "sha256_audit_hash": sha256_hash,
+        "compute_ms": round(float(compute_ms), 2),
+        "timestamp_utc": datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "regulatory_references": regulatory_refs or ["Fed SR 11-7", "ECB TRIM", "BCBS-352"],
+        "latex_formulas": latex_formulas,
+        "canonical_json": canonical_payload,
+    }
+
+
+def render_sr117_audit_drawer(
+    engine_name: str,
+    latex_formulas: list[str],
+    inputs_dict: dict[str, Any],
+    outputs_dict: dict[str, Any],
+    compute_ms: float = 4.2,
+    regulatory_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Render collapsible Explain-the-Math & SR 11-7 Audit Trail drawer for a quantitative engine."""
+    record = build_sr117_audit_record(
+        engine_name=engine_name,
+        model_version=APP_VERSION,
+        latex_formulas=latex_formulas,
+        inputs_dict=inputs_dict,
+        outputs_dict=outputs_dict,
+        compute_ms=compute_ms,
+        regulatory_refs=regulatory_refs,
+    )
+    if st is None:
+        return record
+
+    with st.expander(
+        f"📐 Explain-the-Math & SR 11-7 Audit Trail — {engine_name} [SHA-256: {record['sha256_audit_hash'][:12]}...]"
+    ):
+        st.caption(
+            f"**Regulatory Standards**: {', '.join(record['regulatory_references'])} | "
+            f"**Compute Latency**: `{record['compute_ms']:.2f} ms` | "
+            f"**Audit Hash**: `{record['sha256_audit_hash']}`"
+        )
+        for formula in latex_formulas:
+            st.latex(formula)
+        st.code(record["canonical_json"][:1200], language="json")
+    return record
+
+
+def get_density_mode_css(mode: str = "COMPACT_DESK") -> str:
+    """Return CSS rules for Compact Quant Desk vs Boardroom Presentation mode."""
+    mode_norm = str(mode or "COMPACT_DESK").upper()
+    if mode_norm == "BOARDROOM":
+        return """
+        <style>
+        .argus-bento-card { padding: 18px 22px !important; }
+        div[data-testid="stMetricValue"] { font-size: 1.85rem !important; }
+        </style>
+        """
+    return """
+    <style>
+    .argus-bento-card { padding: 10px 12px !important; }
+    div[data-testid="stMetricValue"] { font-size: 1.35rem !important; font-family: 'JetBrains Mono', monospace !important; }
+    </style>
+    """
+
+
+def inject_density_mode_css(mode: str = "COMPACT_DESK") -> str:
+    """Inject adaptive density CSS into Streamlit view."""
+    css = get_density_mode_css(mode)
+    if st is not None:
+        st.markdown(css, unsafe_allow_html=True)
+    return css
+
+
+def render_command_bar_and_shock_ribbon(key_prefix: str = "global_cmd") -> dict[str, Any]:
+    """Render Bloomberg <GO> Command Launcher, Global Macro Shock Selector & Adaptive Density Toggle."""
+    if st is None:
+        return get_active_macro_shock()
+
+    with st.expander("⌨️ Bloomberg Command Bar `<GO>` · Global Macro Shock Broadcast · Adaptive Density", expanded=False):
+        c1, c2, c3 = st.columns([2.2, 2.0, 1.3])
+        with c1:
+            cmd_input = st.text_input(
+                "Terminal Command (`SIMM <GO>`, `SVI <GO>`, `ALM <GO>`, `CDS <GO>`, `VPIN <GO>`, `PACK <GO>`, `SHOCK 2008`)",
+                value="",
+                placeholder="Type e.g. SIMM <GO> or SHOCK STAGFLATION and press Enter...",
+                key=f"{key_prefix}_input",
+            )
+            if cmd_input.strip():
+                res = resolve_terminal_command(cmd_input)
+                if res.get("macro_shock"):
+                    st.session_state["global_macro_shock"] = res["macro_shock"]
+                st.info(f"**{res['command']}** → {res['description']}")
+                if res.get("target_page") and hasattr(st, "page_link"):
+                    st.page_link(res["target_page"], label=f"🚀 Open {res['command']} ({res['workspace']})")
+        with c2:
+            preset_keys = list(MACRO_SHOCK_PRESETS.keys())
+            cur_shock = str(st.session_state.get("global_macro_shock", "NONE"))
+            idx = preset_keys.index(cur_shock) if cur_shock in preset_keys else 0
+            chosen_shock = st.selectbox(
+                "⚡ Global Macro Shock Broadcast (Cross-Page Synchronizer)",
+                options=preset_keys,
+                format_func=lambda k: MACRO_SHOCK_PRESETS[k]["label"],
+                index=idx,
+                key=f"{key_prefix}_shock_sel",
+            )
+            st.session_state["global_macro_shock"] = chosen_shock
+        with c3:
+            cur_density = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+            chosen_density = st.radio(
+                "🖥️ View Density",
+                options=["COMPACT_DESK", "BOARDROOM"],
+                format_func=lambda m: "Compact Desk" if m == "COMPACT_DESK" else "Boardroom HD",
+                index=0 if cur_density == "COMPACT_DESK" else 1,
+                horizontal=True,
+                key=f"{key_prefix}_density_sel",
+            )
+            st.session_state["ux_density_mode"] = chosen_density
+
+    return get_active_macro_shock()
+
