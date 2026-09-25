@@ -185,6 +185,7 @@ class XVAEngine:
 
             records.append({
                 "time_years": round(t_val, 3),
+                "tenor_years": round(t_val, 3),
                 "expected_exposure_eur": round(ee, 2),
                 "expected_negative_exposure_eur": round(ene, 2),
                 "pfe_95_eur": round(pfe_95, 2),
@@ -318,18 +319,36 @@ def compute_xva_metrics(
     csa_dict = csa_params or {}
     csa = CSAAgreement(
         has_csa=bool(csa_dict.get("has_csa", True)),
-        threshold_eur=float(csa_dict.get("threshold_eur", 500_000.0)),
-        mta_eur=float(csa_dict.get("mta_eur", 100_000.0)),
+        threshold_eur=float(csa_dict.get("threshold_eur", csa_dict.get("threshold", 500_000.0))),
+        mta_eur=float(csa_dict.get("mta_eur", csa_dict.get("mta", 100_000.0))),
         independent_amount_eur=float(csa_dict.get("independent_amount_eur", 0.0)),
         mpor_days=int(csa_dict.get("mpor_days", 10)),
     )
 
     mkt_dict = market_params or {}
+    cpty_lgd = float(mkt_dict.get("counterparty_lgd", 0.60))
+    own_lgd = float(mkt_dict.get("own_lgd", 0.60))
+    cpty_hz = float(
+        mkt_dict.get(
+            "counterparty_hazard_rate",
+            (float(mkt_dict["counterparty_cds_spread_bps"]) / 10000.0) / max(cpty_lgd, 0.1)
+            if "counterparty_cds_spread_bps" in mkt_dict
+            else 0.015,
+        )
+    )
+    own_hz = float(
+        mkt_dict.get(
+            "own_hazard_rate",
+            (float(mkt_dict["own_cds_spread_bps"]) / 10000.0) / max(own_lgd, 0.1)
+            if "own_cds_spread_bps" in mkt_dict
+            else 0.008,
+        )
+    )
     engine = XVAEngine(
         risk_free_rate=float(mkt_dict.get("risk_free_rate", 0.025)),
-        counterparty_hazard_rate=float(mkt_dict.get("counterparty_hazard_rate", 0.015)),
-        counterparty_lgd=float(mkt_dict.get("counterparty_lgd", 0.60)),
-        own_hazard_rate=float(mkt_dict.get("own_hazard_rate", 0.008)),
+        counterparty_hazard_rate=cpty_hz,
+        counterparty_lgd=cpty_lgd,
+        own_hazard_rate=own_hz,
         funding_spread_bps=float(mkt_dict.get("funding_spread_bps", 100.0)),
         margin_funding_spread_bps=float(mkt_dict.get("margin_funding_spread_bps", 75.0)),
         cost_of_capital_pct=float(mkt_dict.get("cost_of_capital_pct", 10.0)),
