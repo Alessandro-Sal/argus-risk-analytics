@@ -133,26 +133,21 @@ with col_head2:
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Modelli Quantitativi di Frontiera</div>
   <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Markowitz & Ledoit-Wolf:</b> Frontiera efficiente con covarianza a shrinkage antirumore.<br>
-    • <b>Reinforcement Learning:</b> Policy Gradient REINFORCE per asset allocation dinamica su regimi di volatilità.<br>
-    • <b>Equal Risk Contribution (ERC):</b> Parità pura di rischio dove ogni asset contribuisce 1/N alla volatilità.<br>
-    • <b>Hierarchical Risk Parity (HRP):</b> Clustering ad albero (López de Prado) senza matrice inversa.<br>
-    • <b>Tail Copula Asimmetriche:</b> Dipendenza di coda (Clayton/Gumbel) per quantificare il rischio di crash congiunto.<br>
-    • <b>Kelly Criterion Sizing:</b> Dimensionamento matematico per la massima crescita del capitale.<br>
-    • <b>Monte Carlo Multivariato:</b> Decomposizione Cholesky & code Student-t su 3.000 percorsi.<br>
-    • <b>Merton Jump-Diffusion:</b> Processo a salti Poissoniani per shock estremi di mercato.<br>
-    • <b>Black-Scholes Delta-Hedging:</b> Neutralizzazione del Beta con opzioni Put e Covered Call.
+    • <b>Allocazione & Ottimizzazione:</b> Markowitz/Ledoit-Wolf, HRP, ERC, Bayesian Black-Litterman (Idzorek), AI Deep RL e Barra Factor Model.<br>
+    • <b>Rischio di Coda & Correlazione Dinamica:</b> Tail Copula Asimmetriche (Clayton/Gumbel), DCC-GARCH(1,1) di Engle, Kelly Criterion e Monte Carlo Student-t.<br>
+    • <b>Superfici di Volatilità & Derivati Azionari:</b> Black-Scholes Delta-Hedging, SABR & Dupire Local Vol 3D, Heston FFT (Carr-Madan) e Rough Bergomi (H ≈ 0.10) con superficie SVI di Gatheral.<br>
+    • <b>Tassi d'Interesse & Credito Strutturato:</b> Curva Nelson-Siegel-Svensson, Multi-Curve OIS Discounting (€STR/SOFR) & IRS Dual-Curve, Hull-White 1F Bermudan Swaptions (LSMC) e Single-Name CDS / CDO Tranches iTraxx-CDX.
   </div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>I moduli <code>core/risk_engine.py</code>, <code>core/reinforcement_learning.py</code> e <code>core/financial_analysis.py</code> eseguono simulazioni stocastiche vettorializzate ad alte prestazioni.</div>
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Auto-Binding sul Portafoglio Attivo (v9.18.0)</div>
+  <div>Tutti i modelli sono sincronizzati in tempo reale con il portafoglio attivo (NAV, Volatilità Annua, Top Holding e serie storica dei rendimenti) e dispongono di <b>Riquadri Informativi Metodologici</b> e cassetti di validazione <b>Fed SR 11-7 / BCE TRIM</b>.</div>
 </div>
 
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come navigare la sezione</div>
-  <div>Utilizza le schede superiori per passare dall'ottimizzazione Markowitz (Tab 1), all'Asset Allocation AI RL (Tab 2), alle Copule/Kelly (Tab 3), al Monte Carlo (Tab 4), alla Copertura (Tab 5), all'Attribuzione (Tab 6) e al Fixed Income (Tab 7).</div>
+  <div>Seleziona il modello dal menu a tendina in stile Bloomberg Terminal (oppure usa i pulsanti <code>◀ Prec.</code> / <code>Succ. ▶</code>) per accedere alla scheda dedicata con parametri interattivi e guida all'interpretazione.</div>
 </div>
 
 </div>
@@ -161,11 +156,13 @@ with col_head2:
 
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
-# ── v9.16.0 GLOBAL TELEMETRY RIBBON & LIVE PORTFOLIO AUTO-BINDING ────
+# ── v9.18.0 GLOBAL TELEMETRY RIBBON & LIVE PORTFOLIO AUTO-BINDING ────
 from core.ux_institutional_hub import (
+    render_institutional_info_box,
     render_institutional_telemetry_ribbon,
     render_live_portfolio_autobind_banner,
     render_scenario_delta_comparator,
+    render_sr117_audit_drawer,
     style_institutional_chart,
 )
 
@@ -4996,6 +4993,31 @@ elif active_quant_tab == "🔮 SABR & Local Volatility Surface 3D":
     st.caption("Modellazione stocastica della volatilità secondo Hagan et al. (2002) e inversione PDE di Dupire (1994) $\\sigma_{\\text{loc}}(K, T)$.")
 
     from core.sabr_local_vol_engine import compute_sabr_and_local_vol_surface
+    from core.ux_institutional_hub import render_institutional_info_box
+
+    render_institutional_info_box(
+        title="SABR Volatility Smile (Hagan 2002) & Dupire Local Volatility PDE (1994)",
+        badge="VOLATILITY DESK • SABR / DUPIRE",
+        summary_html=(
+            "Il modello <b>SABR (Stochastic Alpha Beta Rho)</b> modella congiuntamente la dinamica del prezzo forward $dF_t = \\alpha_t F_t^\\beta dW_1$ "
+            "e della volatilità stocastica $d\\alpha_t = \\nu \\alpha_t dW_2$, mentre l'inversione PDE di <b>Dupire (1994)</b> ricava l'unica funzione deterministica "
+            "$\\sigma_{\\text{loc}}(K, T)$ coerente con tutti i prezzi delle opzioni europee quotate."
+        ),
+        math_html=(
+            "Espansione asintotica di Hagan et al. (2002) e formula di Dupire:<br>"
+            "<code>σ_loc²(K, T) = [ ∂C/∂T + (r - q) K ∂C/∂K + q C ] / [ ½ K² ∂²C/∂K² ]</code><br>"
+            "I 4 parametri $(\\alpha, \\beta, \\rho, \\nu)$ controllano rispettivamente il livello ATM, il backbone di elasticità CEV, "
+            "lo skew direzionale (correlazione spot-vol) e la curvatura delle ali (vol-of-vol)."
+        ),
+        chart_guide_html=(
+            "• <b>Superficie 3D Dupire Local Vol</b>: mostra la volatilità istantanea locale $\\sigma_{\\text{loc}}(K, T)$ utilizzabile nei pricing engine Monte Carlo per opzioni esotiche path-dependent.<br>"
+            "• <b>Griglia Tabellare SABR vs Dupire</b>: confronta la volatilità implicita Black-Scholes (media integrata lungo il percorso) con la volatilità locale puntuale."
+        ),
+        regulatory_html=(
+            "• <b>Exotic Desk & Barrier Options</b>: la volatilità locale di Dupire è lo standard di mercato per il pricing coerente di Barrier Options, Autocallable e Cliquet.<br>"
+            "• <b>IPV & Prudent Valuation (EBA RTS)</b>: calibrazione inter-strike priva di arbitraggio statico per la verifica indipendente dei prezzi (Independent Price Verification)."
+        ),
+    )
 
     c_sb1, c_sb2, c_sb3 = st.columns(3)
     with c_sb1:
@@ -5090,6 +5112,31 @@ elif active_quant_tab == "⚡ Heston FFT Stochastic Volatility":
     st.caption("Prezzatura Fourier ad alte prestazioni per opzioni europee, test di positività varianza di Feller e calibrazione L-BFGS-B.")
 
     from core.heston_fft_engine import compute_heston_surface_and_calibration
+    from core.ux_institutional_hub import render_institutional_info_box
+
+    render_institutional_info_box(
+        title="Heston (1993) Stochastic Volatility & Carr-Madan (1999) Fast Fourier Transform",
+        badge="FOURIER PRICING • HESTON FFT",
+        summary_html=(
+            "Il modello di <b>Heston (1993)</b> descrive la varianza istantanea $v_t$ tramite un processo CIR mean-reverting "
+            "$dv_t = \\kappa(\\theta - v_t)dt + \\sigma_v \\sqrt{v_t}dW_2$, prezzando intere catene di opzioni in millisecondi tramite "
+            "l'inversione <b>Fast Fourier Transform (Carr-Madan 1999)</b> della funzione caratteristica chiusa."
+        ),
+        math_html=(
+            "Condizione di stretta positività di Feller e formula di Carr-Madan:<br>"
+            "<code>2 κ θ &gt; σ_v²  (Condizione di Feller: v_t &gt; 0 q.c.)</code><br>"
+            "<code>C(k) = (e^(-α k) / π) ∫_0^∞ Re[ e^(-i u k) ψ_T(u) ] du</code><br>"
+            "dove $\\psi_T(u)$ è la trasformata di Fourier smorzata espressa tramite la funzione caratteristica analitica di Heston."
+        ),
+        chart_guide_html=(
+            "• <b>Condizione di Feller</b>: se soddisfatta ($2\\kappa\\theta > \\sigma_v^2$), il processo di varianza non tocca mai lo zero.<br>"
+            "• <b>Superficie 3D Heston IV</b>: mostra come $\\rho < 0$ generi lo skew negativo equity e $\\sigma_v$ controlli la convessità (kurtosi) a breve e medio termine."
+        ),
+        regulatory_html=(
+            "• <b>Forward-Starting & Cliquet Options</b>: contrariamente a Dupire Local Vol, Heston preserva la dinamica stocastica dello smile forward.<br>"
+            "• <b>Model Risk Audit</b>: calibrazione L-BFGS-B regolarizzata per evitare l'instabilità numerica del ramo complesso del logaritmo (Albrecher et al. 2007)."
+        ),
+    )
 
     h_col1, h_col2, h_col3 = st.columns(3)
     with h_col1:
@@ -5165,6 +5212,30 @@ elif active_quant_tab == "⚖️ Bayesian Black-Litterman Optimization":
     st.caption("Pesi di equilibrio di mercato (reverse optimization), integrazione di view soggettive e matrice Omega calibrata empiricamente.")
 
     from core.black_litterman_engine import compute_black_litterman_allocation
+    from core.ux_institutional_hub import render_institutional_info_box
+
+    render_institutional_info_box(
+        title="Bayesian Black-Litterman Allocation & Idzorek (2005) Confidence Calibration",
+        badge="ASSET ALLOCATION • BLACK-LITTERMAN",
+        summary_html=(
+            "Il modello <b>Black-Litterman (1992)</b> supera l'instabilità estrema dell'ottimizzazione media-varianza classica di Markowitz "
+            "combinando tramite aggiornamento Bayesiano i <b>rendimenti impliciti di equilibrio CAPM ($\\Pi = \\lambda \\Sigma w_{\\text{mkt}}$)</b> "
+            "con le view soggettive (assolute o relative) del Comitato Investimenti calibrate secondo <b>Idzorek (2005)</b>."
+        ),
+        math_html=(
+            "Vettore dei rendimenti attesi a posteriori $\\mu_{\\text{BL}}$ e covarianza posterior $\\Sigma_{\\text{BL}}$:<br>"
+            "<code>Π = λ Σ w_mkt  |  μ_BL = [ (τΣ)^(-1) + P^T Ω^(-1) P ]^(-1) [ (τΣ)^(-1) Π + P^T Ω^(-1) Q ]</code><br>"
+            "La matrice diagonale d'incertezza delle view $\\Omega$ viene calibrata direttamente dal livello percentuale di confidenza $c_k \\in (0, 1)$ espresso dal gestore."
+        ),
+        chart_guide_html=(
+            "• <b>Confronto Allocazioni</b>: evidenzia gli scostamenti attivi (Active Tilt) del portafoglio ottimo rispetto ai pesi di capitalizzazione del benchmark.<br>"
+            "• <b>Information Ratio & Tracking Error</b>: misura l'efficienza dell'extrarendimento generato dalle view attive per unità di rischio relativo assunto."
+        ),
+        regulatory_html=(
+            "• <b>Strategic & Tactical Asset Allocation (SAA / TAA)</b>: evita portafogli concentrati o corner solutions non investibili.<br>"
+            "• <b>Investment Committee Governance</b>: separa in modo trasparente e verificabile il consenso neutrale di mercato dalle scommesse attive del gestore."
+        ),
+    )
 
     bl_c1, bl_c2, bl_c3 = st.columns(3)
     with bl_c1:
@@ -5247,6 +5318,15 @@ elif active_quant_tab == "⚖️ Bayesian Black-Litterman Optimization":
 elif active_quant_tab == "📈 Multi-Curve OIS & Dual-Curve IRS":
     st.markdown("#### 📈 Post-LIBOR Multi-Curve OIS Discounting (€STR / SOFR) & Dual-Curve Bootstrapping")
     st.caption("Bootstrapping disaccoppiato della curva di sconto OIS risk-free (€STR / SOFR) e della curva forward Ibor (Euribor 6M / Term SOFR), interpolazione Pchip sui log-discount factors, pricing IRS dual-curve e Tenor Basis Swap.")
+    render_institutional_info_box(
+        title="Architettura Multi-Curve Post-LIBOR: OIS Discounting (€STR / SOFR) & Dual-Curve IRS",
+        badge="OIS DISCOUNTING • DUAL-CURVE • TENOR BASIS",
+        summary="Separazione rigorosa tra la curva di attualizzazione collateralizzata OIS (€STR/SOFR) e la curva di proiezione dei flussi variabili (Euribor 6M / Term SOFR).",
+        math_foundation="Dalla crisi del 2008 e dalla riforma dei benchmark IBOR, il valore attuale di un Interest Rate Swap collateralizzato CSA si calcola scontando con fattori $D_{\\text{OIS}}(0, T_i)$ estratti da €STR/SOFR e proiettando i tassi forward $F_{6M}(T_{i-1}, T_i)$ su una curva separata tramite interpolazione monotona Pchip sui log-discount factors.",
+        kpi_guide="• <b>Par Swap Rate Dual-Curve</b>: tasso fisso che azzera l'NPV multi-curva.<br>• <b>DV01 (€/bp)</b>: variazione di valore per +1 bp parallelo.<br>• <b>Fair Tenor Basis (6M vs 3M)</b>: premio di liquidità e credito interbancario tra scadenze 6M e 3M.",
+        operational_impact="Standard obbligatorio per le banche soggette a vigilanza BCE/Fed, clearing house (LCH SwapClear, Eurex Clearing) e valutazione mark-to-market IFRS 13 dei derivati su tassi.",
+        accent_color="#10b981",
+    )
 
     from core.multicurve_engine import compute_multicurve_bootstrapping
 
@@ -5306,12 +5386,31 @@ elif active_quant_tab == "📈 Multi-Curve OIS & Dual-Curve IRS":
         higher_is_better_map={"Par Swap Rate (%)": True, "NPV Multi-Curve (€)": True, "DV01 (€/bp)": False, "Tenor Basis 6M/3M (bps)": False},
     )
     st.dataframe(ois_df, use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="Multi-Curve OIS Discounting & Dual-Curve IRS Engine",
+        latex_formulas=[
+            r"\text{NPV}_{\text{IRS}} = N \sum_{i=1}^M \tau_i F_{6M}(T_{i-1}, T_i) D_{\text{OIS}}(0, T_i) - N K \sum_{j=1}^N \alpha_j D_{\text{OIS}}(0, T_j)",
+            r"S_{\text{par}} = \frac{\sum_{i=1}^M \tau_i F_{6M}(T_{i-1}, T_i) D_{\text{OIS}}(0, T_i)}{\sum_{j=1}^N \alpha_j D_{\text{OIS}}(0, T_j)}",
+        ],
+        inputs_dict={"currency": mc_ccy, "notional": mc_notional, "fixed_rate": mc_fixed, "maturity_years": mc_mat},
+        outputs_dict={"par_swap_rate_pct": irs_info["par_swap_rate_pct"], "multicurve_npv_eur": irs_info["multicurve_npv_eur"], "dv01_eur": irs_info["dv01_eur"]},
+        regulatory_refs=["Ametrano & Bianchetti (2013)", "ISDA IBOR Fallbacks Protocol", "ECB €STR / Fed SOFR Standards"],
+    )
 
 
 # ── TAB: HULL-WHITE SHORT RATE & BERMUDAN SWAPTIONS ─────────────────────────
 elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
     st.markdown("#### 🔔 1-Factor Gaussian Hull-White Short Rate & Longstaff-Schwartz Bermudan Swaptions")
     st.caption("Simulazione esatta del tasso breve dr_t = [θ(t) - a r_t]dt + σ dW_t e induzione all'indietro LSMC per la valutazione dell'Early Exercise Premium su Swaption Bermudiane e Callable Bonds.")
+    render_institutional_info_box(
+        title="Modello 1-Fattore di Hull-White (1990) & Bermudan Swaptions via Longstaff-Schwartz (LSMC)",
+        badge="HULL-WHITE 1F • LSMC BACKWARD INDUCTION • CALLABLE BONDS",
+        summary="Calibrazione esatta alla struttura a termine iniziale dei tassi e valutazione dell'opzionalità di esercizio anticipato su date discrete (Bermudan).",
+        math_foundation="Il tasso breve $dr_t = [\\theta(t) - a r_t]dt + \\sigma dW_t$ ammette prezzi obbligazionari zero-coupon analitici affini $P(t,T) = A(t,T)e^{-B(t,T)r_t}$. L'algoritmo di Longstaff-Schwartz stima il valore di continuazione tramite regressione polinomiale trasversale ad ogni data di esercizio $T_m$, determinando la frontiera ottima di esercizio.",
+        kpi_guide="• <b>Bermudan Swaption PV</b>: valore totale dell'opzione con facoltà di esercizio multi-data.<br>• <b>Early Exercise Premium (EEP)</b>: extravalore rispetto alla swaption europea co-terminale.<br>• <b>Callable Bond PV</b>: prezzo dell'obbligazione al netto dell'opzione di rimborso anticipato dell'emittente.",
+        operational_impact="Utilizzato dalle tesorerie bancarie e dai desk ALM per prezzare e coprire mutui rinegoziabili, emissioni obbligazionarie Callable/Puttable e portafogli di swaption esotiche.",
+        accent_color="#3b82f6",
+    )
 
     from core.hull_white_engine import compute_hull_white_swaptions
 
@@ -5363,12 +5462,31 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
     )
     ex_df = pd.DataFrame(hw_res["exercise_schedule"])
     st.dataframe(ex_df, use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="Hull-White 1F Short Rate & LSMC Bermudan Swaption Engine",
+        latex_formulas=[
+            r"dr_t = [\theta(t) - a\,r_t]\,dt + \sigma\,dW_t, \quad B(t,T) = \frac{1 - e^{-a(T-t)}}{a}",
+            r"V_m(r_{T_m}) = \max\!\left(\text{Payoff}_m(r_{T_m}),\; \mathbb{E}\!\left[e^{-\int_{T_m}^{T_{m+1}} r_s ds} V_{m+1} \mid r_{T_m}\right]\right)",
+        ],
+        inputs_dict={"notional": hw_notional, "strike": hw_strike, "a": hw_a, "sigma": hw_sigma, "paths": hw_paths},
+        outputs_dict={"bermudan_pv_eur": hw_res["bermudan_swaption_pv_eur"], "eep_eur": hw_res["early_exercise_premium_eur"]},
+        regulatory_refs=["Hull & White (1990)", "Longstaff & Schwartz (2001)", "Fed SR 11-7 Model Validation"],
+    )
 
 
 # ── TAB: ROUGH VOLATILITY (rBERGOMI) & SVI ARBITRAGE-FREE SURFACE ──────────
 elif active_quant_tab == "🌊 Rough Volatility (rBergomi) & SVI Surface":
     st.markdown("#### 🌊 Rough Volatility (Rough Bergomi $H \\approx 0.10$) & Gatheral SVI Arbitrage-Free Surface")
     st.caption(r"Parametrizzazione SVI di Gatheral con test di non-arbitraggio Butterfly di Durrleman $g(k) \ge 0$ e legge di potenza dello skew ATM a breve termine $\mathcal{O}(T^{H - 1/2})$.")
+    render_institutional_info_box(
+        title="Rough Volatility (rBergomi H ≈ 0.10) & Superficie SVI Arbitrage-Free di Gatheral",
+        badge="ROUGH BERGOMI • GATHERAL SVI • DURRLEMAN g(k) ≥ 0",
+        summary="Modellazione frazionaria della volatilità con memoria corta (Hurst H ≈ 0.10) e verifica rigorosa di assenza di arbitraggio Butterfly e Calendar.",
+        math_foundation="I dati empirici ad alta frequenza mostrano che la log-volatilità segue un Moto Browniano Frazionario con $H \\approx 0.10$, generando uno skew ATM esplosivo per scadenze brevi $\\mathcal{S}(T) \\propto T^{H-1/2}$. La parametrizzazione SVI $w(k) = a + b(\\rho(k-m) + \\sqrt{(k-m)^2 + \\sigma^2})$ è priva di arbitraggio statico se la densità di Durrleman $g(k) \\ge 0$ per ogni log-moneyness $k$.",
+        kpi_guide="• <b>Hurst H & Fractal Dim D = 2 - H</b>: rugosità della traiettoria di volatilità.<br>• <b>Durrleman Min g(k) ≥ 0</b>: certifica che la densità neutrale al rischio $p(K)$ è strettamente positiva.<br>• <b>ATM Skew 1M vs 12M</b>: legge di potenza dello skew sulle scadenze corte.",
+        operational_impact="Evita il mispricing sistematico delle opzioni settimanali/mensili (0DTE / 1M) tipico dei modelli di volatilità stocastica markoviani classici (Heston/SABR).",
+        accent_color="#06b6d4",
+    )
 
     from core.rough_vol_svi_engine import compute_rough_vol_svi_surface
     from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
@@ -5464,8 +5582,36 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
     st.caption(r"Bootstrapping delle intensità di default $\lambda(t)$ e probabilità di sopravvivenza $Q(0, t)$, ISDA Upfront, CS01 e prezzatura 1-Factor Gaussian Copula / Base Correlation delle tranche sintetiche.")
 
     from core.cds_tranche_engine import compute_cds_and_tranche_pricing
-    from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
+    from core.ux_institutional_hub import (
+        apply_macro_shock_to_inputs,
+        render_bento_kpi_card,
+        render_institutional_info_box,
+        render_sr117_audit_drawer,
+    )
     from core.ux_quant_canvas import build_cds_bootstrap_and_tranche_chart
+
+    render_institutional_info_box(
+        title="ISDA Standard CDS Hazard-Rate Bootstrapping & 1-Factor Gaussian Copula CDO Tranches",
+        badge="CREDIT DERIVATIVES • ISDA / COPULA",
+        summary_html=(
+            "Il motore effettua lo stripping esatto della curva delle probabilità di sopravvivenza $Q(0, t) = \\exp(-\\int_0^t \\lambda(u)du)$ "
+            "dai par spread di mercato (convenzione <b>ISDA Big Bang / Standard Model</b> con cedola fissa 100/500 bps) e prezza le tranche sintetiche "
+            "<b>iTraxx Europe / CDX IG</b> tramite il modello <b>Large Homogeneous Portfolio (LHP) 1-Factor Gaussian Copula (Li 2000 / Vasicek)</b>."
+        ),
+        math_html=(
+            "Uguaglianza tra Premium Leg e Protection Leg ed Expected Tranche Loss $[K_1, K_2]$:<br>"
+            "<code>Upfront = (S_par - C_std) · RPV01(0, T)  |  Q(0, t_k) = exp(- Σ_j λ_j Δt_j)</code><br>"
+            "<code>p(M) = Φ( (Φ⁻¹(PD) - √ρ M) / √(1 - ρ) )  ⇒  EL_[K1,K2] = E_M[ min(max(L(M)-K1, 0), K2-K1) ] / (K2 - K1)</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Pannello Sinistro (Curva Survival $Q(0,t)$ & Hazard Rate $\\lambda_t$)</b>: mostra la probabilità cumulativa di sopravvivenza e l'intensità marginale di default.<br>"
+            "• <b>Pannello Destro (Tranche Loss & Spread per Attachment Point)</b>: illustra come la tranche Equity $[0\\%-3\\%]$ assorba le prime perdite idiosincratiche mentre la Senior $[12\\%-22\\%]$ sia esposta alla correlazione sistemica $\\rho$."
+        ),
+        regulatory_html=(
+            "• <b>FRTB CSR (Credit Spread Risk) & DRC (Default Risk Charge)</b>: CS01 e Jump-to-Default (JTD) alimentano i requisiti patrimoniali Basilea IV per il Trading Book.<br>"
+            "• <b>CVA Hedging Desk</b>: i CDS Single-Name e gli indici iTraxx sono gli strumenti primari per la copertura dinamica del Credit Valuation Adjustment."
+        ),
+    )
 
     _default_cds_ent = f"{live_bind.get('top_ticker', 'ENI.MI')} ({live_bind.get('portfolio_name', 'Portafoglio Attivo')})" if live_bind.get("autobind_enabled") else "Intesa Sanpaolo S.p.A. (Senior)"
     _default_cds_not = max(1_000.0, round(float(live_bind.get("total_nav_eur", 64_233.0)), 2)) if live_bind.get("autobind_enabled") else 10_000_000.0

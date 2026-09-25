@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/universal_ledger.py`, `core/wealth/human_capital_engine.py`, `core/prescriptive_rebalancer.py`, `core/msci_barra_risk_engine.py`, `core/wealth/tbs_monte_carlo.py`, `core/risk_engine.py`, `core/wealth/unified_stress_bridge.py`, `core/wealth/tax_aware_location.py`, `core/autonomous_rebalancer.py`, `core/wealth/wealth_engine.py`, `core/wealth/wealth_stress_engine.py`, `core/workspace_context.py`, `core/reporting_design_system.py`, `core/terminal_engine.py`, `core/financial_analysis.py`, `core/tax_engine.py`, `core/attribution.py`, `core/risk_limits.py`, `core/garch_fhs_engine.py`, `core/volatility_surface.py`, `core/crypto_tax_engine.py`, `core/factor_library.py`, `core/sec_rag_engine.py`, `core/duckdb_engine.py`, `core/yield_curve.py`, `core/streaming_engine.py`, `core/screener_engine.py`, `core/bquant_engine.py`, `core/workspace_engine.py`, `core/excel_connector.py`, `core/backup_engine.py`, `core/security_engine.py`, `core/data_quality_gate.py`) di **ARGUS Risk & Wealth Analytics Platform v9.0.0 Enterprise Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/universal_ledger.py`, `core/risk_engine.py`, `core/multicurve_ois_irs_engine.py`, `core/hull_white_bermudan_engine.py`, `core/rough_vol_svi_engine.py`, `core/cds_tranche_engine.py`, `core/sabr_local_vol_engine.py`, `core/heston_fft_engine.py`, `core/black_litterman_engine.py`, `core/solvency2_engine.py`, `core/frtb_engine.py`, `core/climate_stress_engine.py`, `core/macro_war_room.py`, `core/xva_engine.py`, `core/isda_simm_engine.py`, `core/basel_liquidity_engine.py`, `core/credit_portfolio_engine.py`, `core/ccar_stress_engine.py`, `core/commodity_engine.py`, `core/optimal_liquidation_engine.py`, `core/market_making_vpin_engine.py`, `core/alm_ldi_engine.py`, `core/ux_institutional_hub.py`) di **ARGUS Risk & Wealth Analytics Platform v9.18.0 Institutional Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -3187,3 +3187,107 @@ Estende lo standard CFP Board / IFRS per la rendicontazione contabile del patrim
    - Pagina 3: Indici di Solidità Patrimoniale, Rating AAA e Benchmark CFP.
    - Pagina 4: Bilancio Comparativo Pluriennale & Trend Storico con Progress Bar CSS evolutive.
 3. **Cronistoria Previdenziale**: Tracciamento dei versamenti storici (2023–2026), scudo fiscale art. 51 TUIR dinamico (`datetime.now().year`) e risparmio IRPEF.
+
+---
+
+## 89. Multi-Curve OIS Discounting (€STR / SOFR) & Dual-Curve IRS Valuation (`core/multicurve_ois_irs_engine.py`)
+
+Dalla crisi interbancaria del 2008, la valutazione istituzionale dei derivati sui tassi separa la **curva di sconto risk-free OIS ($P_{\text{OIS}}(0, T)$)** dalla **curva di proiezione dei tassi forward IBOR ($F_{6M}(0; T_{i-1}, T_i)$)**:
+
+$$P_{\text{OIS}}(0, T_k) = \frac{1 - R_k^{\text{OIS}} \sum_{j=1}^{k-1} \tau_j P_{\text{OIS}}(0, T_j)}{1 + \tau_k R_k^{\text{OIS}}}$$
+
+$$S_{\text{par}}(T_N) = \frac{\sum_{i=1}^{2N} \tau_i F_{6M}(0; T_{i-1}, T_i) P_{\text{OIS}}(0, T_i)}{\sum_{j=1}^{N} \Delta_j P_{\text{OIS}}(0, T_j)}$$
+
+Il motore calcola inoltre la scaletta di rischio tasso **Key-Rate DV01** per nodo di scadenza e la **Convexity ($\Gamma$)** in $\text{EUR}/\text{bp}^2$.
+
+---
+
+## 90. Hull-White 1-Factor Short-Rate Trinomial Tree & Bermudan Swaptions (`core/hull_white_bermudan_engine.py`)
+
+Modella il tasso istantaneo $r_t$ tramite il processo Gaussiano mean-reverting calibrato esattamente alla struttura per scadenza iniziale $f^M(0, t)$:
+
+$$dr_t = (\theta(t) - a r_t)\,dt + \sigma_{\text{HW}}\,dW_t, \quad \theta(t) = \frac{\partial f^M(0, t)}{\partial t} + a f^M(0, t) + \frac{\sigma_{\text{HW}}^2}{2a}(1 - e^{-2at})$$
+
+Sull'albero trinomiale ricombinante di Hull-White (1994), il premio di esercizio anticipato Bermudiano (*Switch Option Value*) e l'**Option-Adjusted Spread (OAS)** sono determinati per induzione retrograda di Bellman:
+
+$$V_i(j) = \max\left(\text{Payoff}_{\text{intr}}(t_i, r_{i,j}), \; e^{-r_{i,j}\Delta t}\sum_{k \in \{u,m,d\}} p_k V_{i+1}(j+k)\right)$$
+
+---
+
+## 91. Rough Volatility (rBergomi $H \approx 0.10$) & Gatheral SVI Butterfly Check (`core/rough_vol_svi_engine.py`)
+
+Sostituisce il moto Browniano standard della varianza con un **moto Browniano frazionario di Hurst $H \in (0.05, 0.20)$**, riproducendo la legge di potenza empirica dello skew ATM a breve scadenza:
+
+$$\mathcal{S}_{\text{ATM}}(T) = \left.\frac{\partial \sigma_{\text{BS}}(k, T)}{\partial k}\right|_{k=0} \propto T^{H - 1/2}$$
+
+L'assenza di arbitraggio statico Butterfly sulla superficie **Raw SVI** $w(k) = a + b(\rho(k-m) + \sqrt{(k-m)^2 + \sigma^2})$ è certificata tramite la condizione di positività della funzione di densità di **Durrleman (2014)**:
+
+$$g(k) = \left(1 - \frac{k w'(k)}{2w(k)}\right)^2 - \frac{(w'(k))^2}{4}\left(\frac{1}{w(k)} + \frac{1}{4}\right) + \frac{w''(k)}{2} \ge 0 \quad \forall k \in \mathbb{R}$$
+
+---
+
+## 92. ISDA Single-Name CDS Bootstrapping & 1-Factor Gaussian Copula CDO Tranches (`core/cds_tranche_engine.py`)
+
+Estrae la curva delle intensità di default a tratti $\lambda_k$ e le probabilità di sopravvivenza $Q(0, t_k) = \exp(-\sum_j \lambda_j \Delta t_j)$ dai par spread CDS di mercato (convenzione ISDA Upfront rispetto a cedola standard $C_{\text{std}} \in \{100, 500\}\text{ bps}$):
+
+$$\text{Upfront} = (S_{\text{par}} - C_{\text{std}}) \cdot \text{RPV01}(0, T)$$
+
+Per le tranche sintetiche **iTraxx Europe / CDX IG** ($[0\text{-}3\%], [3\text{-}6\%], [6\text{-}9\%], [9\text{-}12\%], [12\text{-}22\%]$), la perdita attesa condizionata al fattore macro comune $M \sim \mathcal{N}(0, 1)$ è integrata via quadratura di Gauss-Hermite:
+
+$$p(M) = \Phi\!\left(\frac{\Phi^{-1}(\text{PD}) - \sqrt{\rho}\,M}{\sqrt{1 - \rho}}\right), \quad \text{EL}_{[K_1, K_2]} = \mathbb{E}_M\!\left[\frac{\min(\max((1-R)\,p(M) - K_1, 0), K_2 - K_1)}{K_2 - K_1}\right]$$
+
+---
+
+## 93. CreditMetrics™ S&P 8-State Migration & Basel III Vasicek IRB (`core/credit_portfolio_engine.py`)
+
+Combina la matrice di transizione annuale S&P a 8 stati ($\text{AAA}, \text{AA}, \text{A}, \text{BBB}, \text{BB}, \text{B}, \text{CCC}, \text{D}$) con la formula regolamentare **Asymptotic Single Risk Factor (ASRF / Vasicek 2002)** dell'Art. 153 CRR:
+
+$$\rho(\text{PD}) = 0.12 \cdot \frac{1 - e^{-50\,\text{PD}}}{1 - e^{-50}} + 0.24 \cdot \left(1 - \frac{1 - e^{-50\,\text{PD}}}{1 - e^{-50}}\right)$$
+
+$$K_{\text{IRB}} = \left[ \text{LGD} \cdot \Phi\!\left(\frac{\Phi^{-1}(\text{PD}) + \sqrt{\rho}\,\Phi^{-1}(0.999)}{\sqrt{1 - \rho}}\right) - \text{PD} \cdot \text{LGD} \right] \cdot \frac{1 + (M - 2.5)\,b(\text{PD})}{1 - 1.5\,b(\text{PD})}, \quad \text{RWA} = 12.5 \times K_{\text{IRB}} \times \text{EAD}$$
+
+---
+
+## 94. Fed CCAR / EBA 9-Quarter Supervisory CET1 Capital Stress (`core/ccar_stress_engine.py`)
+
+Proietta per 9 trimestri ($Q_1 \dots Q_9$) l'evoluzione del coefficiente patrimoniale **CET1 Ratio** negli scenari *Baseline*, *Adverse* e *Severely Adverse*, integrando Pre-Provision Net Revenue ($\text{PPNR}_t$), accantonamenti su crediti deteriorati **IFRS 9 / CECL (Stage 1/2/3)** e inflazione degli RWA:
+
+$$\text{CET1}_{t+1} = \text{CET1}_t + \text{PPNR}_t - \text{CreditProvisions}_{t}^{\text{IFRS9}} - \text{TradingLosses}_t - \text{Taxes}_t - \text{Dividends}_t$$
+
+$$\text{Stress Capital Buffer (SCB)} = \max\!\left(2.5\%, \; \text{CET1}_0 - \min_{t \in \{1..9\}} \text{CET1\_Ratio}_{\text{SevAdv}}(t)\right)$$
+
+---
+
+## 95. Bilateral XVA Desk & ISDA SIMM™ v2.6 Initial Margin (`core/xva_engine.py`, `core/isda_simm_engine.py`)
+
+1. **Bilateral XVA (CVA, DVA, FVA, MVA, KVA)**: Simula i profili di esposizione collateralizzati CSA ($EE(t)$, $PFE_{95\%}(t)$, $PFE_{99\%}(t)$, $ENE(t)$) con soglia $H$, Minimum Transfer Amount $MTA$ e Margin Period of Risk $MPOR = 10\text{gg}$.
+2. **ISDA SIMM™ v2.6 & UMR (€50M Phase 6 Threshold)**: Aggrega i margini Delta, Vega e Curvature sulle 6 classi di rischio ($\text{IR}, \text{CreditQ}, \text{CreditNonQ}, \text{Equity}, \text{Commodity}, \text{FX}$) tramite la matrice di correlazione regolamentare $\psi_{r,s}$:
+
+$$\text{SIMM}_{\text{total}} = \sqrt{\sum_{r \in \mathcal{R}} \text{IM}_r^2 + \sum_{r \neq s} \psi_{r,s}\,\text{IM}_r\,\text{IM}_s}, \quad \text{IM}_r = \text{DeltaMargin}_r + \text{VegaMargin}_r + \text{CurvatureMargin}_r$$
+
+---
+
+## 96. Gibson-Schwartz (1997) 2-Factor Commodity Futures & Kirk (1995) Spread Options (`core/commodity_engine.py`)
+
+Modella il prezzo spot $S_t$ e il convenience yield stocastico $\delta_t$ delle materie prime energetiche e metalli:
+
+$$dS_t = (r - \delta_t)\,S_t\,dt + \sigma_1\,S_t\,dW_1, \quad d\delta_t = \kappa(\alpha - \delta_t)\,dt + \sigma_2\,dW_2, \quad dW_1 dW_2 = \rho\,dt$$
+
+Il valore delle opzioni **Calendar / Storage Spread** tra due scadenze $F_1, F_2$ è calcolato tramite la volatilità composita di **Kirk (1995)**.
+
+---
+
+## 97. Almgren-Chriss (2001) Optimal Liquidation & Avellaneda-Stoikov (2008) / VPIN (`core/optimal_liquidation_engine.py`, `core/market_making_vpin_engine.py`)
+
+1. **Traiettoria d'Esecuzione Ottima di Almgren-Chriss**: Minimizza $E[\text{Cost}] + \lambda \operatorname{Var}[\text{Cost}]$, generando il decadimento iperbolico dell'inventario:
+   $$x(t_j) = X_0 \frac{\sinh(\kappa(T - t_j))}{\sinh(\kappa T)}, \quad \kappa = \sqrt{\frac{\lambda \sigma^2}{\eta}}$$
+2. **Market-Making di Avellaneda-Stoikov & Tossicità VPIN / Hawkes**: Calcola il Reservation Price $r(s, q, t) = s - q \gamma \sigma^2 (T - t)$, lo spread ottimo Bid/Ask, l'indice **VPIN** di selezione avversa e il **Branching Ratio di Hawkes** $\eta = \alpha / \beta$.
+
+---
+
+## 98. Redington (1952) ALM Immunization & Cash-Flow Matching LP (`core/alm_ldi_engine.py`)
+
+Verifica le tre condizioni attuariali di immunizzazione di **Redington** ($PV_A \ge PV_L$, $D_A^{\text{mod}} = D_L^{\text{mod}}$, $C_A > C_L$), dimensiona l'overlay **Receiver IRS 20Y (LDI)** per chiudere il Duration Gap e risolve il problema di **Programmazione Lineare (`scipy.optimize.linprog`)** per costruire il portafoglio obbligazionario dedicato di costo minimo che copre esattamente i flussi passivi $L_t$:
+
+$$\min_{\mathbf{x} \ge 0} \mathbf{p}^\top \mathbf{x} \quad \text{s.t.} \quad \mathbf{C}\,\mathbf{x} \ge \mathbf{L}$$
+

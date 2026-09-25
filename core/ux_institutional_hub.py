@@ -1749,3 +1749,99 @@ def render_command_bar_and_shock_ribbon(key_prefix: str = "global_cmd") -> dict[
 
     return get_active_macro_shock()
 
+
+def render_institutional_info_box(
+    title: str,
+    badge: str,
+    summary: str,
+    math_foundation: str,
+    kpi_guide: str,
+    operational_impact: str,
+    accent_color: str = "#6366f1",
+    default_expanded: bool = False,
+) -> None:
+    """Render an institutional methodology & interpretation info box with compact banner and expandable 3-column guide."""
+    if st is None:
+        return
+
+    banner_html = _compact_html(
+        f"""
+        <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.85) 100%);
+                    border: 1px solid rgba(148, 163, 184, 0.18); border-left: 4px solid {accent_color};
+                    border-radius: 9px; padding: 9px 14px; margin-bottom: 10px;
+                    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
+                <span style="background: {accent_color}24; color: #e2e8f0; border: 1px solid {accent_color}66;
+                             font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 800;
+                             padding: 2px 8px; border-radius: 5px;">
+                    {badge}
+                </span>
+                <span style="font-size: 12.5px; font-weight: 800; color: #f8fafc;">{title}</span>
+            </div>
+            <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.4;">
+                {summary}
+            </div>
+        </div>
+        """
+    )
+    st.markdown(banner_html, unsafe_allow_html=True)
+
+    with st.expander(f"📘 Guida Metodologica & Interpretazione Istituzionale — {title}", expanded=default_expanded):
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            st.markdown(
+                _compact_html(
+                    f"""
+                    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
+                                border-top: 3px solid {accent_color}; border-radius: 8px; padding: 10px 12px; height: 100%;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #93c5fd; margin-bottom: 5px;">
+                            🔬 1. Fondamento Matematico & Modello
+                        </div>
+                        <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
+                            {math_foundation}
+                        </div>
+                    </div>
+                    """
+                ),
+                unsafe_allow_html=True,
+            )
+        with c2:
+            st.markdown(
+                _compact_html(
+                    """
+                    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
+                                border-top: 3px solid #10b981; border-radius: 8px; padding: 10px 12px; height: 100%;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #6ee7b7; margin-bottom: 5px;">
+                            📊 2. Come Leggere i KPI & i Grafici
+                        </div>
+                        <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
+                    """
+                    + kpi_guide
+                    + """
+                        </div>
+                    </div>
+                    """
+                ),
+                unsafe_allow_html=True,
+            )
+        with c3:
+            st.markdown(
+                _compact_html(
+                    """
+                    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.16);
+                                border-top: 3px solid #f59e0b; border-radius: 8px; padding: 10px 12px; height: 100%;">
+                        <div style="font-size: 11.5px; font-weight: 800; color: #fcd34d; margin-bottom: 5px;">
+                            🛡️ 3. Implicazioni Regolamentari & Operative
+                        </div>
+                        <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
+                    """
+                    + operational_impact
+                    + """
+                        </div>
+                    </div>
+                    """
+                ),
+                unsafe_allow_html=True,
+            )
+
+

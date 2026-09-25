@@ -2871,18 +2871,62 @@ st.dataframe(sched_df, use_container_width=True, hide_index=True)
 # TAB 7: PRODOTTI STRUTTURATI & REPORTING REGOLAMENTARE PRIIPs / SFDR
 # ══════════════════════════════════════════════════════════════
 with main_tab_struct:
-    st.markdown("### 💎 Ingegneria Finanziaria: Certificati Strutturati & Reporting PRIIPs/SFDR")
-    st.caption("Pricing Monte Carlo multi-asset Worst-Of (Phoenix & Reverse Convertible) e compliance disclosure regolamentare (PRIIPs RTS & SFDR RTS).")
+    st.markdown("### 💎 Ingegneria Finanziaria, Prodotti Strutturati, Commodities, Execution & ALM/LDI")
+    st.caption("Pricing Monte Carlo multi-asset Worst-Of, compliance PRIIPs/SFDR, curva Futures Materie Prime (Schwartz 2F), Optimal Execution (Almgren-Chriss & VPIN) e Immunizzazione Attuariale ALM/LDI.")
 
-    sub_struct_prod, sub_reg_rep = st.tabs([
-        "💎 Prezzatore Prodotti Strutturati & Greche",
-        "📋 Reporting PRIIPs KID (SRI) & SFDR ESG (Annex I)"
+    from core.ux_institutional_hub import (
+        apply_macro_shock_to_inputs,
+        render_bento_kpi_card,
+        render_institutional_info_box,
+        render_institutional_telemetry_ribbon,
+        render_live_portfolio_autobind_banner,
+        render_scenario_delta_comparator,
+        render_segmented_workspace_switcher,
+        render_sr117_audit_drawer,
+        style_institutional_chart,
+    )
+
+    render_institutional_telemetry_ribbon(page_badge="WEALTH MANAGEMENT, COMMODITIES & EXECUTION DESK")
+    live_bind = render_live_portfolio_autobind_banner(
+        key_prefix="p13_wealth_exec",
+        model_label="Optimal Liquidation, ALM/LDI & Structured Desk",
+    )
+
+    sub_struct_prod, sub_reg_rep, sub_comm_desk, sub_opt_liq, sub_alm_ldi = st.tabs([
+        "💎 Certificati Strutturati & Greche",
+        "📋 PRIIPs KID (SRI) & SFDR ESG",
+        "🛢️ Commodity Futures (Schwartz 2F)",
+        "⚡ Optimal Liquidation & VPIN (Almgren-Chriss)",
+        "🏛️ ALM / LDI Immunization & Cash-Flow LP",
     ])
 
     with sub_struct_prod:
         from core.structured_products_engine import compute_structured_product_pricing
 
         st.markdown("#### 💎 Valutazione Worst-Of Phoenix Autocallable & Reverse Convertible")
+        render_institutional_info_box(
+            title="Worst-Of Phoenix Autocallable & Reverse Convertible Monte Carlo Pricing",
+            badge="STRUCTURED PRODUCTS • WORST-OF BASKET",
+            summary_html=(
+                "Prezza certificati d'investimento <b>Phoenix Autocallable con Effetto Memoria</b> e <b>Reverse Convertible</b> legati a un paniere "
+                "<i>Worst-Of</i> di indici o azioni tramite simulazione Monte Carlo multi-asset correlata (decomposizione di Cholesky), "
+                "calcolando la probabilità di rimborso anticipato per finestra e le Greche numeriche di primo e secondo ordine."
+            ),
+            math_html=(
+                "Performance del sottostante peggiore (Worst-Of) alle date di osservazione $t_m$:<br>"
+                "<code>W(t_m) = min_{i ∈ {1..d}} [ S_i(t_m) / S_i(0) ]</code><br>"
+                "<code>Se W(t_m) ≥ B_autocall ⇒ Rimborso 100% + Cedole + Memoria;  a scadenza T se W(T) &lt; B_knock_in ⇒ Payoff = Nominal · W(T)</code>"
+            ),
+            chart_guide_html=(
+                "• <b>Fair Value & Vita Media Attesa</b>: indica il valore equo scorporando i costi impliciti di strutturazione e la durata attesa ponderata per le probabilità di Autocall.<br>"
+                r"• <b>Sensibilità Barriera & Greche ($\Delta, \Gamma, \mathcal{V}, \Theta$)</b>: misura l'esposizione alla volatilità implicita (corta Vega vicino alla barriera di Knock-In)."
+            ),
+            regulatory_html=(
+                "• <b>MiFID II Product Governance & Target Market</b>: quantificazione oggettiva della probabilità di perdita in conto capitale a scadenza.<br>"
+                "• <b>Unbundling Commissionale</b>: confronto immediato tra prezzo d'emissione (100%) e Fair Value teorico risk-neutral."
+            ),
+        )
+
         sp_c1, sp_c2, sp_c3 = st.columns(3)
         with sp_c1:
             prod_choice = st.selectbox("Tipologia Certificato:", ["phoenix_autocallable", "reverse_convertible"], format_func=lambda x: "Phoenix Autocallable (Memory Coupon)" if x == "phoenix_autocallable" else "Reverse Convertible (Cedola Fissa)", key="sp_type_sel")
@@ -2947,6 +2991,29 @@ with main_tab_struct:
         from core.regulatory_reporting_engine import compute_regulatory_dossier
 
         st.markdown("#### 📋 Prospetto Regolamentare PRIIPs KID & SFDR ESG (Annex I)")
+        render_institutional_info_box(
+            title="PRIIPs KID (Reg. UE 1286/2014) Summary Risk Indicator & SFDR ESG Annex I (Reg. UE 2019/2088)",
+            badge="REGULATORY DISCLOSURE • PRIIPs & SFDR",
+            summary_html=(
+                "Genera il prospetto normativo europeo <b>PRIIPs Key Information Document (KID)</b> combinando la classe di rischio di mercato "
+                "<b>MRM (1–7 tramite VaR-Equivalent Volatility di Cornish-Fisher)</b> con il rischio di credito dell'emittente <b>CRM (1–6)</b> "
+                "per ottenere il <b>Summary Risk Indicator (SRI 1–7)</b>, oltre ai 14 indicatori obbligatori <b>Principal Adverse Impacts (PAI) SFDR</b>."
+            ),
+            math_html=(
+                "Calcolo della VaR-Equivalent Volatility (VEV) PRIIPs RTS Allegato II:<br>"
+                "<code>VEV = [ √(3.842 - 2 · VaR_97.5%(CF)) - 1.96 ] / √T_RHP</code><br>"
+                "dove $\\text{VaR}_{97.5\\%}(\\text{CF})$ incorpora i momenti empirici fino al quarto ordine (media, varianza, asimmetria $S$ ed eccesso di curtosi $K$)."
+            ),
+            chart_guide_html=(
+                "• <b>Scenari di Performance PRIIPs RTS</b>: mostra il capitale finale e il rendimento annuo atteso nei 4 regimi (Stress, Sfavorevole, Moderato, Favorevole) a 1 anno, metà RHP e scadenza RHP.<br>"
+                "• <b>Tabella 14 PAI SFDR</b>: rendiconta emissioni GHG Scope 1-2-3, impronta carbonica, WACI, biodiversità e gender pay gap."
+            ),
+            regulatory_html=(
+                "• <b>Regolamento Delegato (UE) 2017/653 & (UE) 2022/1288 (SFDR RTS)</b>: conformità informativa pre-contrattuale per clientela Retail e Private.<br>"
+                "• <b>Tassonomia UE (Reg. UE 2020/852)</b>: verifica della quota di investimenti eco-sostenibili ed effettivamente allineati."
+            ),
+        )
+
         r_c1, r_c2, r_c3 = st.columns(3)
         with r_c1:
             kid_rating = st.selectbox("Rating Creditizio Emittente (CRM):", ["AAA", "AA", "A", "BBB", "BB", "B", "CCC"], index=2, key="kid_rat_sel")
@@ -2993,38 +3060,34 @@ with main_tab_struct:
         st.markdown("##### 🌍 Tabella SFDR Annex I: 14 Indicatori Principali degli Effetti Negativi (PAI)")
         st.dataframe(pd.DataFrame(sfdr_info["pai_indicators"]), use_container_width=True, hide_index=True)
 
+    with sub_comm_desk:
+        from core.commodity_engine import compute_commodity_term_structure
 
-        # ── v9.16.0: TELEMETRY RIBBON, LIVE PORTFOLIO AUTO-BINDING & DELTA COMPARATOR ──
-        from core.ux_institutional_hub import (
-            render_institutional_telemetry_ribbon,
-            render_live_portfolio_autobind_banner,
-            render_scenario_delta_comparator,
-            render_segmented_workspace_switcher,
-            style_institutional_chart,
-        )
-
-        render_institutional_telemetry_ribbon(page_badge="WEALTH MANAGEMENT, COMMODITIES & EXECUTION DESK")
-        live_bind = render_live_portfolio_autobind_banner(
-            key_prefix="p13_wealth_exec",
-            model_label="Optimal Liquidation & Commodity Desk",
-        )
-        _ = render_segmented_workspace_switcher(
-            workspace_key="p13_v916_domain",
-            label="🧭 Selettore Rapido Desk Istituzionale:",
-            options=[
-                "🌐 Vista Integrata (Commodity + Optimal Liquidation)",
-                "🛢️ Schwartz 2-Factor Commodity Futures & Spread Options",
-                "⚡ Intraday Optimal Liquidation (Almgren-Chriss vs VWAP/TWAP)",
-            ],
-        )
-
-        # ── v9.15.0: SCHWARTZ 2-FACTOR COMMODITY FUTURES & OPTIMAL LIQUIDATION ──
-        st.divider()
         section("🛢️ Schwartz (1997) 2-Factor Commodity Futures & Convenience Yield Term Structure")
         st.caption("Modellazione stocastica a 2 fattori di Gibson-Schwartz per materie prime: prezzo spot S_t e convenience yield mean-reverting δ_t, classificazione Contango/Backwardation, Roll Yield implicito e opzioni Calendar/Storage Spread (Kirk 1995).")
 
-        from core.commodity_engine import compute_commodity_term_structure
-        from core.optimal_liquidation_engine import compute_optimal_execution_schedule
+        render_institutional_info_box(
+            title="Gibson-Schwartz (1990/1997) 2-Factor Commodity Futures & Kirk (1995) Spread Options",
+            badge="COMMODITIES DESK • SCHWARTZ 2F",
+            summary_html=(
+                "Modella la struttura a termine dei Futures sulle materie prime (Brent, TTF Gas, Gold, Copper) tramite la dinamica congiunta del "
+                "<b>prezzo spot $S_t$</b> e del <b>Convenience Yield stocastico mean-reverting $\\delta_t$</b> (beneficio marginale di detenzione delle scorte fisiche), "
+                "prezzando le opzioni di stoccaggio <b>Calendar Spread</b> con l'approssimazione analitica di <b>Kirk (1995)</b>."
+            ),
+            math_html=(
+                "Sistema SDE a 2 fattori di Gibson-Schwartz e formula affine chiusa del prezzo Futures $F(S, \\delta, \\tau)$:<br>"
+                "<code>dS_t = (r - δ_t) S_t dt + σ_1 S_t dW_1  |  dδ_t = κ(α - δ_t)dt + σ_2 dW_2</code><br>"
+                "<code>ln F(S, δ, τ) = ln S - δ · (1 - e^(-κτ))/κ + (r - α + ½ Var_term) τ + Seasonality(τ)</code>"
+            ),
+            chart_guide_html=(
+                "• <b>Regime Backwardation vs Contango</b>: se $\\delta_0 > r + c$ (scarsità di scorte), la curva è in <i>Backwardation</i> e genera un <b>Roll Yield positivo</b> per l'investitore long.<br>"
+                "• <b>Curva Stagionale vs Strutturale</b>: separa la componente ciclica invernale/estiva dal trend di equilibrio $\\alpha$."
+            ),
+            regulatory_html=(
+                "• <b>FRTB Commodity Risk & Real Assets Hedging</b>: gestione del rischio di base (Basis Risk) tra contratti front-month e scadenze lunghe.<br>"
+                "• <b>Physical Storage Valuation</b>: le opzioni Calendar Spread (3M vs 12M) misurano il valore intrinseco ed estrinseco degli impianti di stoccaggio energetico."
+            ),
+        )
 
         cm_c1, cm_c2, cm_c3, cm_c4 = st.columns(4)
         with cm_c1:
@@ -3078,9 +3141,46 @@ with main_tab_struct:
         st.plotly_chart(fig_cm, use_container_width=True)
         st.dataframe(cm_df, use_container_width=True, hide_index=True)
 
-        st.divider()
+    with sub_opt_liq:
+        from core.market_making_vpin_engine import compute_market_making_and_vpin
+        from core.optimal_liquidation_engine import compute_optimal_execution_schedule
+        from core.ux_quant_canvas import build_avellaneda_stoikov_microstructure_chart
+
+        _ = render_segmented_workspace_switcher(
+            workspace_key="p13_v916_domain",
+            label="🧭 Selettore Rapido Microstruttura & Esecuzione:",
+            options=[
+                "🌐 Vista Integrata (Almgren-Chriss + Avellaneda-Stoikov / VPIN)",
+                "⚡ Intraday Optimal Liquidation (Almgren-Chriss vs VWAP/TWAP)",
+                "📊 Avellaneda-Stoikov Market-Making & Tossicità VPIN / Hawkes",
+            ],
+        )
+
         section("⚡ Intraday Optimal Liquidation & Algorithmic Slicing (Almgren-Chriss vs VWAP/TWAP)")
         st.caption("Ottimizzazione dell'esecuzione intraday con legge dell'impatto temporaneo a radice quadrata h(v) = η·σ·(v/V)^0.5, profilo volumetrico a U e confronto tra traiettoria risk-averse Almgren-Chriss, Dynamic VWAP (POV-Capped) e TWAP.")
+
+        render_institutional_info_box(
+            title="Almgren-Chriss (2001) Optimal Execution & Avellaneda-Stoikov (2008) / VPIN Microstructure",
+            badge="EXECUTION & MICROSTRUCTURE • AC / VPIN",
+            summary_html=(
+                "Risoluzione del trade-off fondamentale di <b>Almgren-Chriss (2001)</b> tra <b>Market Impact Cost</b> (liquidare troppo in fretta) "
+                "e <b>Timing Risk</b> (liquidare troppo lentamente esponendosi alla volatilità $\\sigma$), affiancata dal modello di Market-Making "
+                "<b>Avellaneda-Stoikov (2008)</b> e dalla metrica di tossicità del flusso ordini <b>VPIN (Volume-Synchronized Probability of Informed Trading)</b>."
+            ),
+            math_html=(
+                "Traiettoria iperbolica d'inventario Almgren-Chriss e Reservation Price di Avellaneda-Stoikov:<br>"
+                "<code>x(t_j) = X_0 · sinh(κ (T - t_j)) / sinh(κ T),   con κ = √(λ σ² / η)</code><br>"
+                "<code>r(s, q, t) = s - q γ σ² (T - t)  |  VPIN = (1 / n V_bucket) Σ_τ |V_τ^Buy - V_τ^Sell|</code>"
+            ),
+            chart_guide_html=(
+                "• <b>Curva di Decadimento Inventario Intraday</b>: mostra come Almgren-Chriss anticipi le vendite (front-loading) al crescere dell'avversione al rischio $\\lambda$ rispetto a VWAP e TWAP.<br>"
+                "• <b>Grafico Microstruttura Bid/Ask & VPIN</b>: visualizza lo skew delle quote rispetto al Mid-Price per smaltire l'inventario $q$ e l'allerta Flash-Crash del rapporto di diramazione di Hawkes $\\alpha/\\beta$."
+            ),
+            regulatory_html=(
+                "• <b>MiFID II Art. 27 (Best Execution & Transaction Cost Analysis - TCA)</b>: documentazione quantitativa della minimizzazione dell'Implementation Shortfall.<br>"
+                "• <b>MiFID II RTS 6 (Algorithmic Trading Controls)</b>: monitoraggio in tempo reale della tossicità VPIN per sospendere il quoting in regimi di selezione avversa."
+            ),
+        )
 
         ol_c1, ol_c2, ol_c3, ol_c4 = st.columns(4)
         with ol_c1:
@@ -3153,22 +3253,105 @@ with main_tab_struct:
         )
         st.dataframe(sched_df, use_container_width=True, hide_index=True)
 
-
-        # ── v9.17.0 / v9.18.0: ALM / LDI IMMUNIZATION & AVELLANEDA-STOIKOV VPIN ENGINE ──
         st.divider()
+        section("⚡ Avellaneda-Stoikov (2008) Market-Making & Tossicità Ordini VPIN / Hawkes")
+        st.caption("Calcolo del Reservation Price r(s,q,t) e dello spread Bid/Ask ottimo asimmetrico in funzione dell'inventario q, combinato con la metrica di selezione avversa VPIN e il processo auto-eccitante di Hawkes per l'allerta precoce di Flash-Crash.")
+
+        mm_c1, mm_c2, mm_c3 = st.columns(3)
+        with mm_c1:
+            mm_inv = st.slider("Inventario Attuale Market-Maker q (Azioni):", min_value=-5000.0, max_value=5000.0, value=1500.0, step=250.0, key="mm_inv_in")
+        with mm_c2:
+            mm_gam = st.slider("Avversione al Rischio Inventario (γ):", min_value=0.01, max_value=0.30, value=0.08, step=0.01, key="mm_gam_in")
+        with mm_c3:
+            mm_alp = st.slider("Eccitazione Processo di Hawkes (α):", min_value=0.20, max_value=1.30, value=0.85, step=0.05, key="mm_alp_in")
+
+        mm_res = compute_market_making_and_vpin(inventory_q=mm_inv, risk_aversion_gamma=mm_gam, hawkes_alpha=mm_alp)
+
+        mmk1, mmk2, mmk3, mmk4 = st.columns(4)
+        with mmk1:
+            render_bento_kpi_card(
+                "Reservation Price r(s,q,t)",
+                f"€ {mm_res['reservation_price']:.4f}",
+                f"Skew: {mm_res['inventory_skew_bps']:+.1f} bps vs Mid",
+                provenance="MICROSTRUCTURE LIVE",
+                accent_color="#f59e0b",
+            )
+        with mmk2:
+            render_bento_kpi_card(
+                "Quote Ottime Bid / Ask",
+                f"€ {mm_res['optimal_bid_price']:.3f} / € {mm_res['optimal_ask_price']:.3f}",
+                f"Spread: {mm_res['optimal_spread_bps']:.1f} bps",
+                provenance="MICROSTRUCTURE LIVE",
+                accent_color="#10b981",
+            )
+        with mmk3:
+            render_bento_kpi_card(
+                "VPIN Order-Flow Toxicity",
+                f"{mm_res['current_vpin_score']:.3f}",
+                f"Picco VPIN: {mm_res['peak_vpin_score']:.3f}",
+                provenance="MICROSTRUCTURE LIVE",
+                limit_utilization_pct=min(100.0, float(mm_res["peak_vpin_score"]) * 100.0),
+                accent_color="#10b981" if mm_res["peak_vpin_score"] < 0.40 else "#ef4444",
+            )
+        with mmk4:
+            render_bento_kpi_card(
+                "Hawkes Branching Ratio (α/β)",
+                f"{mm_res['hawkes_branching_ratio_eta']:.2f}",
+                mm_res["toxicity_regime"].split(" - ")[0],
+                provenance="MICROSTRUCTURE LIVE",
+                accent_color="#10b981" if "BENIGN" in mm_res["toxicity_regime"] else "#ef4444",
+            )
+
+        fig_mm_lob = build_avellaneda_stoikov_microstructure_chart(
+            {
+                "mid_price": 100.0,
+                "reservation_price": mm_res["reservation_price"],
+                "optimal_bid": mm_res["optimal_bid_price"],
+                "optimal_ask": mm_res["optimal_ask_price"],
+                "inventory_units": mm_inv,
+            }
+        )
+        st.plotly_chart(fig_mm_lob, use_container_width=True)
+        st.dataframe(pd.DataFrame(mm_res["inventory_quote_schedule"]), use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="Avellaneda-Stoikov Market-Making & Hawkes VPIN Engine",
+            latex_formulas=[
+                r"r(s, q, t) = s - q\,\gamma\,\sigma^2\,(T - t), \quad \delta^a + \delta^b = \gamma\,\sigma^2\,(T - t) + \frac{2}{\gamma}\ln\!\left(1 + \frac{\gamma}{\kappa}\right)",
+                r"\text{VPIN} = \frac{\sum_{\tau=1}^n |V_\tau^B - V_\tau^S|}{n \cdot V_{\text{bucket}}}, \quad \eta_{\text{Hawkes}} = \frac{\alpha}{\beta}",
+            ],
+            inputs_dict={"inventory_q": mm_inv, "gamma": mm_gam, "hawkes_alpha": mm_alp},
+            outputs_dict={"reservation_price": mm_res["reservation_price"], "vpin_score": mm_res["current_vpin_score"]},
+            regulatory_refs=["Avellaneda & Stoikov (2008)", "Easley, López de Prado & O'Hara (2012)", "MiFID II RTS 6"],
+        )
+
+    with sub_alm_ldi:
+        from core.alm_ldi_engine import compute_alm_ldi_immunization
+        from core.ux_quant_canvas import build_alm_cashflow_and_surplus_chart
+
         section("🏛️ Asset-Liability Management (ALM), Immunizzazione di Redington & Cash-Flow Matching LP")
         st.caption("Copertura attuariale delle passività pluriennali, Funding Ratio, Surplus-at-Risk 99%, dimensionamento Receiver IRS 20Y (LDI) e portafoglio obbligazionario dedicato calcolato via Programmazione Lineare (scipy.optimize.linprog).")
 
-        from core.alm_ldi_engine import compute_alm_ldi_immunization
-        from core.market_making_vpin_engine import compute_market_making_and_vpin
-        from core.ux_institutional_hub import (
-            apply_macro_shock_to_inputs,
-            render_bento_kpi_card,
-            render_sr117_audit_drawer,
-        )
-        from core.ux_quant_canvas import (
-            build_alm_cashflow_and_surplus_chart,
-            build_avellaneda_stoikov_microstructure_chart,
+        render_institutional_info_box(
+            title="Redington (1952) ALM Immunization, LDI Receiver Swap Overlay & Cash-Flow Matching LP",
+            badge="ALM & PENSION LDI • REDINGTON / LP",
+            summary_html=(
+                "Governa l'equilibrio attuariale tra il portafoglio di attivi e il profilo di uscite future (passività previdenziali, fondazioni o obiettivi familiari multi-decennali), "
+                "verificando le <b>3 condizioni di immunizzazione di Redington (1952)</b>, il <b>Surplus-at-Risk al 99%</b>, il nozionale ottimo di copertura "
+                "<b>Receiver Interest Rate Swap 20Y (LDI)</b> e il portafoglio obbligazionario dedicato di costo minimo via <b>Programmazione Lineare (`scipy.optimize.linprog`)</b>."
+            ),
+            math_html=(
+                "Condizioni classiche di Redington e problema duale di Cash-Flow Matching LP:<br>"
+                "<code>1) PV_Assets ≥ PV_Liabilities   2) DollarDuration_A = DollarDuration_L   3) Convexity_A &gt; Convexity_L</code><br>"
+                "<code>min_{x ≥ 0}  p^T x    s.t.    C_matrix · x ≥ L_schedule</code>"
+            ),
+            chart_guide_html=(
+                "• <b>ALM Cash-Flow Matching Ladder</b>: confronta anno per anno le passività attese con i flussi cedolari/rimborsi generati dal portafoglio obbligazionario ottimo.<br>"
+                "• <b>Curva del Surplus Attuariale</b>: mostra come l'overlay LDI Receiver Swap immunizzi il Funding Ratio contro ribassi paralleli dei tassi di sconto."
+            ),
+            regulatory_html=(
+                "• <b>Direttiva IORP II (UE 2016/2341) & Solvency II ALM</b>: gestione del rischio di tasso d'interesse sul passivo e verifica della solvibilità prospettica.<br>"
+                "• <b>Dedicated Bond Portfolio Optimization</b>: elimina il rischio di reinvestimento sulle scadenze a breve-medio termine."
+            ),
         )
 
         al_c1, al_c2, al_c3 = st.columns(3)
@@ -3239,75 +3422,4 @@ with main_tab_struct:
             inputs_dict={"assets_eur": eff_al_assets, "asset_duration": al_dur, "discount_rate": eff_al_disc},
             outputs_dict={"funding_ratio_pct": alm_res["funding_ratio_pct"], "sar_99_eur": alm_res["surplus_at_risk_99_eur"]},
             regulatory_refs=["IORP II Pension Directive", "Solvency II ALM", "Redington (1952)"],
-        )
-
-        st.divider()
-        section("⚡ Avellaneda-Stoikov (2008) Market-Making & Tossicità Ordini VPIN / Hawkes")
-        st.caption("Calcolo del Reservation Price r(s,q,t) e dello spread Bid/Ask ottimo asimmetrico in funzione dell'inventario q, combinato con la metrica di selezione avversa VPIN e il processo auto-eccitante di Hawkes per l'allerta precoce di Flash-Crash.")
-
-        mm_c1, mm_c2, mm_c3 = st.columns(3)
-        with mm_c1:
-            mm_inv = st.slider("Inventario Attuale Market-Maker q (Azioni):", min_value=-5000.0, max_value=5000.0, value=1500.0, step=250.0, key="mm_inv_in")
-        with mm_c2:
-            mm_gam = st.slider("Avversione al Rischio Inventario (γ):", min_value=0.01, max_value=0.30, value=0.08, step=0.01, key="mm_gam_in")
-        with mm_c3:
-            mm_alp = st.slider("Eccitazione Processo di Hawkes (α):", min_value=0.20, max_value=1.30, value=0.85, step=0.05, key="mm_alp_in")
-
-        mm_res = compute_market_making_and_vpin(inventory_q=mm_inv, risk_aversion_gamma=mm_gam, hawkes_alpha=mm_alp)
-
-        mmk1, mmk2, mmk3, mmk4 = st.columns(4)
-        with mmk1:
-            render_bento_kpi_card(
-                "Reservation Price r(s,q,t)",
-                f"€ {mm_res['reservation_price']:.4f}",
-                f"Skew: {mm_res['inventory_skew_bps']:+.1f} bps vs Mid",
-                provenance=alm_prov,
-                accent_color="#f59e0b",
-            )
-        with mmk2:
-            render_bento_kpi_card(
-                "Quote Ottime Bid / Ask",
-                f"€ {mm_res['optimal_bid_price']:.3f} / € {mm_res['optimal_ask_price']:.3f}",
-                f"Spread: {mm_res['optimal_spread_bps']:.1f} bps",
-                provenance=alm_prov,
-                accent_color="#10b981",
-            )
-        with mmk3:
-            render_bento_kpi_card(
-                "VPIN Order-Flow Toxicity",
-                f"{mm_res['current_vpin_score']:.3f}",
-                f"Picco VPIN: {mm_res['peak_vpin_score']:.3f}",
-                provenance=alm_prov,
-                limit_utilization_pct=min(100.0, float(mm_res["peak_vpin_score"]) * 100.0),
-                accent_color="#10b981" if mm_res["peak_vpin_score"] < 0.40 else "#ef4444",
-            )
-        with mmk4:
-            render_bento_kpi_card(
-                "Hawkes Branching Ratio (α/β)",
-                f"{mm_res['hawkes_branching_ratio_eta']:.2f}",
-                mm_res["toxicity_regime"].split(" - ")[0],
-                provenance=alm_prov,
-                accent_color="#10b981" if "BENIGN" in mm_res["toxicity_regime"] else "#ef4444",
-            )
-
-        fig_mm_lob = build_avellaneda_stoikov_microstructure_chart(
-            {
-                "mid_price": 100.0,
-                "reservation_price": mm_res["reservation_price"],
-                "optimal_bid": mm_res["optimal_bid_price"],
-                "optimal_ask": mm_res["optimal_ask_price"],
-                "inventory_units": mm_inv,
-            }
-        )
-        st.plotly_chart(fig_mm_lob, use_container_width=True)
-        st.dataframe(pd.DataFrame(mm_res["inventory_quote_schedule"]), use_container_width=True, hide_index=True)
-        render_sr117_audit_drawer(
-            engine_name="Avellaneda-Stoikov Market-Making & Hawkes VPIN Engine",
-            latex_formulas=[
-                r"r(s, q, t) = s - q\,\gamma\,\sigma^2\,(T - t), \quad \delta^a + \delta^b = \gamma\,\sigma^2\,(T - t) + \frac{2}{\gamma}\ln\!\left(1 + \frac{\gamma}{\kappa}\right)",
-                r"\text{VPIN} = \frac{\sum_{\tau=1}^n |V_\tau^B - V_\tau^S|}{n \cdot V_{\text{bucket}}}, \quad \eta_{\text{Hawkes}} = \frac{\alpha}{\beta}",
-            ],
-            inputs_dict={"inventory_q": mm_inv, "gamma": mm_gam, "hawkes_alpha": mm_alp},
-            outputs_dict={"reservation_price": mm_res["reservation_price"], "vpin_score": mm_res["current_vpin_score"]},
-            regulatory_refs=["Avellaneda & Stoikov (2008)", "Easley, López de Prado & O'Hara (2012)", "MiFID II RTS 6"],
         )
