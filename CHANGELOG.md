@@ -30,9 +30,13 @@ Questa major release introduce 6 motori quantitativi e di reporting esecutivo di
   - Calcolo della metrica di selezione avversa **VPIN** (Easley-López de Prado-O'Hara 2012) e dell'intensità auto-eccitante di **Hawkes** ($\lambda_t$) con branching ratio $\alpha/\beta$ per l'allerta precoce di Flash-Crash.
 - **1-Click Executive CRO & Investment Committee Board-Pack Generator (`core/executive_board_pack_engine.py`, `src/0_Control_Room.py`)**:
   - Sintesi multi-motore con generazione istantanea del **Dossier del Comitato Rischi & Investimenti (HTML5 / JSON)** e **CRO Prescriptive Action Checklist** automatica.
-- **Headless REST API v9.18.0 (`api/main.py`) & Test Suite (`tests/test_v917_institutional_suite.py`)**:
+- **Headless REST API v9.18.0 (`api/main.py`) & Test Suite (`tests/test_v917_institutional_suite.py`, `tests/test_v918_ux_visual_canvas.py`)**:
   - 6 nuovi endpoint REST JSON (`/api/v1/margin/isda-simm`, `/api/v1/wealth/alm-ldi`, `/api/v1/pricing/rough-vol-svi`, `/api/v1/credit/cds-tranches`, `/api/v1/execution/market-making-vpin`, `/api/v1/reporting/executive-board-pack`).
-  - 768/768 unit e integration test superati al 100% con 0 errori Ruff (`ruff check .`).
+- **Riquadri Informativi Metodologici (`render_institutional_info_box`) & Architettura a Tab Separati (Pages 4, 7, 13)**:
+  - Implementato in `core/ux_institutional_hub.py` il componente `render_institutional_info_box(...)` con banner istituzionale + guida espandibile a 3 colonne (*1. Fondamento Matematico & Modello*, *2. Come Leggere i KPI & i Grafici*, *3. Implicazioni Regolamentari & Operative*) presente su tutti i 22 motori quantitativi e regolamentari di `src/pages/4_🔬_Modelli_Quantitativi.py` (15 modelli), `src/pages/7_🌪️_Stress_Testing.py` (10 tab in `STRESS_MODELS_CATALOG`) e `src/pages/13_🏛️_Patrimonio_e_NetWorth.py` (5 sotto-tab dedicati in `main_tab_struct`).
+  - Risolto lo stacking verticale in `src/pages/7_🌪️_Stress_Testing.py` e `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`, garantendo che ogni laboratorio sia isolato nel proprio tab e che la barra telemetrica globale e il semaforo CRO siano sempre in cima alla pagina.
+  - Ripristinato il collegamento dinamico del portafoglio attivo (*Master Wealth*) dal file reale `data/portfolios/Master_Wealth.json` in `extract_live_portfolio_binding` e consolidato il centro di esportazione in un unico popover `📤 Export Center` nella top-bar di `src/0_Control_Room.py`.
+  - Sincronizzata la versione **`v9.18.0`** su tutti i moduli (`pyproject.toml`, `api/main.py`, `core/ux_institutional_hub.py`, `core/sidebar.py`, `src/0_Control_Room.py`, `src/pages/2_🖥️_Live_Terminal.py`, `docs/metriche_rischio.md`, `docs/index.md`, `README.md`).
 
 ---
 

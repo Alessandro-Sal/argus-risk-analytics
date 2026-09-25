@@ -87,9 +87,17 @@ with col_head2:
   <div>ARGUS applica la serie storica reale per i titoli con track record durante le crisi ed esegue stime parametriche basate su Beta e Duration per gli asset più recenti.</div>
 </div>
 
+<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
+  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🏛️ 10 Moduli di Stress Testing & Capitale Regolamentare (v9.18.0)</div>
+  <div>• <b>Stress Storici, What-If, TBS-VaR, ALM, Liquidità DTL & Reverse Stress</b><br>
+  • <b>FRTB Basel IV (BCBS 365), Solvency II SCR (EIOPA) & NGFS Phase IV Climate / Macro War Room</b><br>
+  • <b>Bilateral XVA (CVA/DVA/FVA/MVA/KVA), ISDA SIMM™ v2.6 (UMR €50M) & Basel III LCR/NSFR</b><br>
+  • <b>CreditMetrics™ S&P 8-State Vasicek IRB & Fed CCAR / EBA 9Q CET1 Capital Stress</b></div>
+</div>
+
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>Se l'impatto stimato in uno scenario supera il 35%, il portafoglio presenta un'elevata convessità negativa e vulnerabilità a quel fattore di rischio.</div>
+  <div>Se l'impatto stimato in uno scenario supera il 35%, il portafoglio presenta un'elevata convessità negativa e vulnerabilità a quel fattore di rischio. Ogni tab integra un <b>Riquadro Informativo Metodologico</b> con formule, guida ai grafici e riferimenti normativi.</div>
 </div>
 
 </div>
@@ -101,6 +109,19 @@ st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 if not stress:
     st.info("Risultati dello stress test non disponibili (dati insufficienti).")
     st.stop()
+
+# ── TELEMETRY RIBBON & EXECUTIVE CRO TRAFFIC-LIGHT RADAR (TOP OF PAGE) ──
+from core.ux_institutional_hub import (
+    render_executive_traffic_light_radar,
+    render_institutional_info_box,
+    render_institutional_telemetry_ribbon,
+    render_scenario_delta_comparator,
+    render_segmented_workspace_switcher,
+    style_institutional_chart,
+)
+
+render_institutional_telemetry_ribbon(page_badge="REGULATORY STRESS TESTING & CAPITAL LAB", risk_data=results)
+render_executive_traffic_light_radar(key_prefix="stress_page_cro_radar", risk_data=results, include_board_pack=True)
 
 # ── SELETTORE MODULI DI STRESS TESTING STILE BLOOMBERG TERMINAL ─────────
 STRESS_MODELS_CATALOG = {
@@ -152,7 +173,28 @@ STRESS_MODELS_CATALOG = {
         "badge_color": "#ec4899",
         "category": "Regulatory Supervisory Analytics",
         "desc": "Calcolo inverso del vettore macroeconomico più probabile (minima distanza di Mahalanobis) che genera il superamento di una soglia critica di perdita del portafoglio."
-    }
+    },
+    "🏛️ FRTB Basel IV, Solvency II & NGFS Climate": {
+        "title": "Requisiti Patrimoniali FRTB (BCBS 365), Solvency II SCR (EIOPA) & NGFS Phase IV Climate / Macro War Room",
+        "badge": "FRTB • Solvency II • NGFS Climate",
+        "badge_color": "#3b82f6",
+        "category": "Regulatory Market & Climate Capital",
+        "desc": "Calcolo integrato del capitale regolamentare Solvency II Standard Formula (QRT S.25.01), FRTB Sensitivities-Based Method (Delta/Vega/Curvature + DRC + RRAO), stress test climatico NGFS Phase IV (Scope 1-2-3 WACI) e Interactive Macro War Room con rottura delle correlazioni."
+    },
+    "🛡️ Bilateral XVA, ISDA SIMM™ v2.6 & Basel III Liquidity": {
+        "title": "Bilateral XVA (CVA/DVA/FVA/MVA/KVA), ISDA SIMM™ v2.6 (UMR €50M) & Basel III Liquidity (LCR / NSFR)",
+        "badge": "XVA • ISDA SIMM v2.6 • LCR/NSFR",
+        "badge_color": "#14b8a6",
+        "category": "Counterparty, Margin & Liquidity",
+        "desc": "Simulazione Monte Carlo dei profili di esposizione creditizia (EE, PFE 95%/99%, ENE) con accordi CSA, calcolo del Margine Iniziale ISDA SIMM™ v2.6 con verifica soglia UMR €50M vs CCP Clearing, e ratio di liquidità Basilea III (LCR 30gg e NSFR)."
+    },
+    "🏦 CreditMetrics™ Vasicek IRB & Fed CCAR / EBA 9Q Capital": {
+        "title": "CreditMetrics™ S&P 8-State Migration, Basel III IRB Vasicek & Fed CCAR / EBA 9-Quarter CET1 Stress",
+        "badge": "CreditMetrics • K_IRB • CCAR 9Q",
+        "badge_color": "#f59e0b",
+        "category": "Credit Portfolio & Supervisory Capital",
+        "desc": "Rischio di migrazione e default multi-debitore (S&P 8-State Matrix + Copula di Vasicek IRB, RWA e IRC) auto-collegato al portafoglio attivo e proiezione prudenziale su 9 trimestri del CET1 Ratio (Baseline, Adverse, Severely Adverse) con soglie OCR/MDA e Stress Capital Buffer (SCB)."
+    },
 }
 
 # Risoluzione dello stato attivo con priorità alla sidebar o global jump
@@ -1283,688 +1325,899 @@ elif active_stress_tab == "⚡ Reverse Stress Testing (EBA / BCE)":
         hide_index=True,
     )
 
-st.divider()
+    st.divider()
 
-# ── SEZIONE STRESS TEST MACRO NORMATIVO (EBA / FED CCAR) & REVERSE STRESS ──
-st.markdown("### 🏛️ Macro Factor Stress Testing Normativo (EBA / Fed CCAR) & Reverse Stress")
-st.caption("Valutazione del portafoglio sotto scenari macroeconomici istituzionali congiunti (European Banking Authority, Federal Reserve) e calcolo delle soglie di rottura tramite Reverse Stress Testing.")
-
-from core.macro_stress_engine import compute_macro_scenario_stress_test, compute_reverse_stress_test
-
-macro_res = compute_macro_scenario_stress_test(df_positions=pos, results=results)
-
-m_c1, m_c2, m_c3, m_c4 = st.columns(4)
-with m_c1:
-    metric_card("Capitale Sottoposto a Test", fmt_eur(macro_res["initial_portfolio_value_eur"]), delta="Valutazione Base", delta_color="normal")
-with m_c2:
-    metric_card("Scenario Più Severo", macro_res["worst_case_scenario"][:24], delta="EBA / Fed Stress", delta_color="normal")
-with m_c3:
-    metric_card("Drawdown Max Normativo", f"{macro_res['worst_case_drawdown_pct']:+.2f}%", delta="Shock Combinato Macro", delta_color="inverse")
-with m_c4:
-    metric_card("Perdita Stimata Max", fmt_eur(macro_res["worst_case_loss_eur"]), delta="Worst Case Loss", delta_color="inverse")
-
-st.write("")
-
-c_m_l, c_m_r = st.columns([3, 2])
-with c_m_l:
-    st.markdown("##### 📋 Risultati Scenari Macroeconomici Istituzionali")
-    st.dataframe(
-        macro_res["scenarios_df"][["scenario_name", "equity_shock_pct", "rate_shock_bps", "credit_spread_bps", "commodities_shock_pct", "portfolio_return_pct", "pnl_impact_eur"]].rename(columns={
-            "scenario_name": "Scenario Istituzionale",
-            "equity_shock_pct": "Equity Shock (%)",
-            "rate_shock_bps": "Tassi (bps)",
-            "credit_spread_bps": "Spread (bps)",
-            "commodities_shock_pct": "Materie Prime (%)",
-            "portfolio_return_pct": "Impatto Portafoglio (%)",
-            "pnl_impact_eur": "PnL (€)"
-        }),
-        use_container_width=True,
-        hide_index=True
+    render_institutional_info_box(
+        title="Reverse Stress Testing (EBA GL/2018/04) & Min-Mahalanobis Ruin Solver",
+        badge="SUPERVISORY REVERSE STRESS • EBA / BCE",
+        summary_html=(
+            "A differenza dello stress test diretto (che fissa uno scenario e calcola la perdita), il <b>Reverse Stress Testing</b> fissa una "
+            "<b>soglia critica di rottura o insolvenza patrimoniale ($L_{\\text{target}}$)</b> e risolve il problema d'ottimizzazione inversa per individuare "
+            "la combinazione di shock macroeconomici <b>più verosimile (minima distanza di Mahalanobis)</b> capace di generare tale perdita."
+        ),
+        math_html=(
+            "Formulazione Lagrangiana di minima distanza ellissoidale sulla matrice di covarianza dei fattori $\\Sigma_f$:<br>"
+            "<code>min_{Δf}  D_M(Δf) = √( Δf^T Σ_f⁻¹ Δf )   s.t.   β_p^T Δf = -L_target</code><br>"
+            "Soluzione analitica chiusa: <code>Δf* = - L_target · (Σ_f β_p) / (β_p^T Σ_f β_p)</code>."
+        ),
+        chart_guide_html=(
+            "• <b>Tabella Scenari & Break-Even Solver</b>: confronta gli shock singoli (puro crollo azionario o puro rialzo tassi) con lo scenario congiunto più probabile.<br>"
+            "• <b>Total Wealth Ruin Barrier</b>: estende l'analisi al bilancio familiare/HNWI complessivo (asset liquidi, immobili, azienda, mutui)."
+        ),
+        regulatory_html=(
+            "• <b>EBA Guidelines on Institutions' Stress Testing (EBA/GL/2018/04)</b>: obbligatorio nell'ambito ICAAP per identificare vulnerabilità nascoste e punti di non ritorno.<br>"
+            "• <b>Recovery Plan Trigger</b>: definisce le soglie quantitative di attivazione delle misure di salvataggio patrimoniale."
+        ),
     )
 
-with c_m_r:
-    st.markdown("##### 🎯 Reverse Stress Testing (Break-Even Solver)")
-    target_dd_input = st.slider("Seleziona Drawdown Target di Rottura (%):", min_value=-50.0, max_value=-5.0, value=-20.0, step=5.0)
-    rev_res = compute_reverse_stress_test(df_positions=pos, results=results, target_drawdown_pct=target_dd_input)
-    sol = rev_res["break_even_solutions"]
+    # ── SEZIONE STRESS TEST MACRO NORMATIVO (EBA / FED CCAR) & REVERSE STRESS ──
+    st.markdown("### 🏛️ Macro Factor Stress Testing Normativo (EBA / Fed CCAR) & Reverse Stress")
+    st.caption("Valutazione del portafoglio sotto scenari macroeconomici istituzionali congiunti (European Banking Authority, Federal Reserve) e calcolo delle soglie di rottura tramite Reverse Stress Testing.")
 
-    st.markdown(f"""
-    <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(239, 68, 68, 0.3); border-left: 4px solid #ef4444; border-radius: 10px; padding: 14px 18px;">
-        <b style="color: #f87171; font-size: 14px;">Soglie Minime per Causare {target_dd_input:.0f}% di Perdita ({fmt_eur(rev_res['target_loss_eur'])}):</b><br>
-        <span style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
-        • <b>Solo Azionario:</b> Crollo del <b>{sol['pure_equity_crash_pct']:.1f}%</b> (a tassi invariati)<br>
-        • <b>Solo Tassi d'Interesse:</b> Impennata di <b>+{sol['pure_rate_shock_bps']:.0f} bps</b> (a equity stabile)<br>
-        • <b>Scenario Congiunto (50/50):</b> Crollo Azionario <b>{sol['combined_scenario']['equity_crash_pct']:.1f}%</b> CON Tassi <b>+{sol['combined_scenario']['rate_shock_bps']:.0f} bps</b><br>
-        <b style="color: #38bdf8;">Rarità Statistica Stimata: {rev_res['implied_frequency_estimate']} (Z-Score: {rev_res['implied_z_score']})</b>
-        </span>
-    </div>
-    """, unsafe_allow_html=True)
+    from core.macro_stress_engine import compute_macro_scenario_stress_test, compute_reverse_stress_test
 
+    macro_res = compute_macro_scenario_stress_test(df_positions=pos, results=results)
 
-# ── V9.11.0: REGULATORY STRESS TESTING DOSSIER (4-PAGE PDF) & TOTAL WEALTH REVERSE STRESS ──
-st.markdown("---")
-st.markdown("#### 🏛️ Regulatory Stress Testing Dossier & Total Wealth Ruin Barrier (EBA / Solvency II)")
-st.caption("Generazione documentale ufficiale conforme agli standard European Banking Authority (EBA) e stress inverso multi-asset del bilancio patrimoniale consolidato.")
+    m_c1, m_c2, m_c3, m_c4 = st.columns(4)
+    with m_c1:
+        metric_card("Capitale Sottoposto a Test", fmt_eur(macro_res["initial_portfolio_value_eur"]), delta="Valutazione Base", delta_color="normal")
+    with m_c2:
+        metric_card("Scenario Più Severo", macro_res["worst_case_scenario"][:24], delta="EBA / Fed Stress", delta_color="normal")
+    with m_c3:
+        metric_card("Drawdown Max Normativo", f"{macro_res['worst_case_drawdown_pct']:+.2f}%", delta="Shock Combinato Macro", delta_color="inverse")
+    with m_c4:
+        metric_card("Perdita Stimata Max", fmt_eur(macro_res["worst_case_loss_eur"]), delta="Worst Case Loss", delta_color="inverse")
 
-col_dossier1, col_dossier2 = st.columns([3, 1], vertical_alignment="center")
-with col_dossier1:
-    st.markdown("""
-    Il **Regulatory Stress Testing Dossier** è un report esecutivo ad alta risoluzione (4 Pagine A4) per Comitati Rischi,
-    Private Banking e Audit Interno. Include l'impatto degli scenari EBA 2026/Fed CCAR, decomposizione marginale del rischio,
-    reverse stress con distanza di Mahalanobis e piano di mitigazione patrimoniale.
-    """)
-with col_dossier2:
-    from core.pdf_generator import generate_regulatory_stress_testing_dossier_pdf
-    pdf_stress_data = {
-        "portfolio_nav": float(macro_res.get("initial_portfolio_value_eur", 1_000_000.0)),
-        "worst_loss_pct": float(macro_res.get("worst_case_drawdown_pct", -28.45)),
-        "worst_loss_eur": float(macro_res.get("worst_case_loss_eur", 284500.0)),
-        "scenarios": macro_res.get("scenarios_df"),
-        "reverse_stress": rev_res,
+    st.write("")
+
+    c_m_l, c_m_r = st.columns([3, 2])
+    with c_m_l:
+        st.markdown("##### 📋 Risultati Scenari Macroeconomici Istituzionali")
+        st.dataframe(
+            macro_res["scenarios_df"][["scenario_name", "equity_shock_pct", "rate_shock_bps", "credit_spread_bps", "commodities_shock_pct", "portfolio_return_pct", "pnl_impact_eur"]].rename(columns={
+                "scenario_name": "Scenario Istituzionale",
+                "equity_shock_pct": "Equity Shock (%)",
+                "rate_shock_bps": "Tassi (bps)",
+                "credit_spread_bps": "Spread (bps)",
+                "commodities_shock_pct": "Materie Prime (%)",
+                "portfolio_return_pct": "Impatto Portafoglio (%)",
+                "pnl_impact_eur": "PnL (€)"
+            }),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    with c_m_r:
+        st.markdown("##### 🎯 Reverse Stress Testing (Break-Even Solver)")
+        target_dd_input = st.slider("Seleziona Drawdown Target di Rottura (%):", min_value=-50.0, max_value=-5.0, value=-20.0, step=5.0)
+        rev_res = compute_reverse_stress_test(df_positions=pos, results=results, target_drawdown_pct=target_dd_input)
+        sol = rev_res["break_even_solutions"]
+
+        st.markdown(f"""
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(239, 68, 68, 0.3); border-left: 4px solid #ef4444; border-radius: 10px; padding: 14px 18px;">
+            <b style="color: #f87171; font-size: 14px;">Soglie Minime per Causare {target_dd_input:.0f}% di Perdita ({fmt_eur(rev_res['target_loss_eur'])}):</b><br>
+            <span style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
+            • <b>Solo Azionario:</b> Crollo del <b>{sol['pure_equity_crash_pct']:.1f}%</b> (a tassi invariati)<br>
+            • <b>Solo Tassi d'Interesse:</b> Impennata di <b>+{sol['pure_rate_shock_bps']:.0f} bps</b> (a equity stabile)<br>
+            • <b>Scenario Congiunto (50/50):</b> Crollo Azionario <b>{sol['combined_scenario']['equity_crash_pct']:.1f}%</b> CON Tassi <b>+{sol['combined_scenario']['rate_shock_bps']:.0f} bps</b><br>
+            <b style="color: #38bdf8;">Rarità Statistica Stimata: {rev_res['implied_frequency_estimate']} (Z-Score: {rev_res['implied_z_score']})</b>
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # ── V9.11.0: REGULATORY STRESS TESTING DOSSIER (4-PAGE PDF) & TOTAL WEALTH REVERSE STRESS ──
+    st.markdown("---")
+    st.markdown("#### 🏛️ Regulatory Stress Testing Dossier & Total Wealth Ruin Barrier (EBA / Solvency II)")
+    st.caption("Generazione documentale ufficiale conforme agli standard European Banking Authority (EBA) e stress inverso multi-asset del bilancio patrimoniale consolidato.")
+
+    col_dossier1, col_dossier2 = st.columns([3, 1], vertical_alignment="center")
+    with col_dossier1:
+        st.markdown("""
+        Il **Regulatory Stress Testing Dossier** è un report esecutivo ad alta risoluzione (4 Pagine A4) per Comitati Rischi,
+        Private Banking e Audit Interno. Include l'impatto degli scenari EBA 2026/Fed CCAR, decomposizione marginale del rischio,
+        reverse stress con distanza di Mahalanobis e piano di mitigazione patrimoniale.
+        """)
+    with col_dossier2:
+        from core.pdf_generator import generate_regulatory_stress_testing_dossier_pdf
+        pdf_stress_data = {
+            "portfolio_nav": float(macro_res.get("initial_portfolio_value_eur", 1_000_000.0)),
+            "worst_loss_pct": float(macro_res.get("worst_case_drawdown_pct", -28.45)),
+            "worst_loss_eur": float(macro_res.get("worst_case_loss_eur", 284500.0)),
+            "scenarios": macro_res.get("scenarios_df"),
+            "reverse_stress": rev_res,
+        }
+        dossier_pdf = generate_regulatory_stress_testing_dossier_pdf(
+            portfolio_name=st.session_state.get("portfolio_name", "Portafoglio Istituzionale"),
+            stress_data=pdf_stress_data,
+            base_currency="EUR",
+        )
+        st.download_button(
+            label="📑 Scarica Dossier Regolamentare (4 Pagine PDF)",
+            data=dossier_pdf,
+            file_name=f"ARGUS_Regulatory_Stress_Dossier_{datetime.now().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+    st.markdown("##### 🏦 Total Wealth Reverse Stress Testing (Solvency & Ruin Multi-Asset)")
+    st.caption("Identificazione della combinazione di shock minimi più verosimile (Mahalanobis Distance) sul patrimonio familiare/HNWI.")
+
+    with st.expander("🔬 Configura Bilancio Patrimoniale & Vincoli di Solvibilità", expanded=False):
+        tw_c1, tw_c2, tw_c3 = st.columns(3)
+        with tw_c1:
+            tw_liquid = st.number_input("Attivi Finanziari Liquidi (€):", min_value=0.0, value=float(macro_res.get("initial_portfolio_value_eur", 500000.0)), step=50000.0)
+            tw_re = st.number_input("Patrimonio Immobiliare (€):", min_value=0.0, value=800000.0, step=50000.0)
+        with tw_c2:
+            tw_corp = st.number_input("Partecipazioni Aziendali / PMI (€):", min_value=0.0, value=400000.0, step=50000.0)
+            tw_illiq = st.number_input("Beni da Collezione & Illiquidi (€):", min_value=0.0, value=100000.0, step=20000.0)
+        with tw_c3:
+            tw_debt = st.number_input("Debito & Mutui Passivi (€):", min_value=0.0, value=600000.0, step=50000.0)
+            tw_target_type = st.selectbox("Modalità di Stress Inverso:", options=["solvency", "ruin"], format_func=lambda x: "Solvency Ruin (Debt-to-Assets)" if x == "solvency" else "Net Worth Ruin (Perdita PN)")
+            if tw_target_type == "solvency":
+                tw_threshold = st.slider("Soglia Critica Debt-to-Assets (%):", min_value=40.0, max_value=90.0, value=65.0, step=5.0) / 100.0
+            else:
+                tw_threshold = st.slider("Perdita Minima Net Worth (%):", min_value=20.0, max_value=80.0, value=50.0, step=5.0) / 100.0
+
+    from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
+
+    tw_balance = {
+        "liquid_assets": tw_liquid,
+        "real_estate": tw_re,
+        "corporate_equity": tw_corp,
+        "illiquid_assets": tw_illiq,
+        "total_liabilities": tw_debt,
     }
-    dossier_pdf = generate_regulatory_stress_testing_dossier_pdf(
-        portfolio_name=st.session_state.get("portfolio_name", "Portafoglio Istituzionale"),
-        stress_data=pdf_stress_data,
-        base_currency="EUR",
-    )
-    st.download_button(
-        label="📑 Scarica Dossier Regolamentare (4 Pagine PDF)",
-        data=dossier_pdf,
-        file_name=f"ARGUS_Regulatory_Stress_Dossier_{datetime.now().strftime('%Y%m%d')}.pdf",
-        mime="application/pdf",
-        use_container_width=True,
+    tw_res = compute_total_wealth_reverse_stress(
+        balance_sheet=tw_balance,
+        target_type=tw_target_type,
+        target_threshold=tw_threshold,
     )
 
-st.markdown("##### 🏦 Total Wealth Reverse Stress Testing (Solvency & Ruin Multi-Asset)")
-st.caption("Identificazione della combinazione di shock minimi più verosimile (Mahalanobis Distance) sul patrimonio familiare/HNWI.")
-
-with st.expander("🔬 Configura Bilancio Patrimoniale & Vincoli di Solvibilità", expanded=False):
-    tw_c1, tw_c2, tw_c3 = st.columns(3)
-    with tw_c1:
-        tw_liquid = st.number_input("Attivi Finanziari Liquidi (€):", min_value=0.0, value=float(macro_res.get("initial_portfolio_value_eur", 500000.0)), step=50000.0)
-        tw_re = st.number_input("Patrimonio Immobiliare (€):", min_value=0.0, value=800000.0, step=50000.0)
-    with tw_c2:
-        tw_corp = st.number_input("Partecipazioni Aziendali / PMI (€):", min_value=0.0, value=400000.0, step=50000.0)
-        tw_illiq = st.number_input("Beni da Collezione & Illiquidi (€):", min_value=0.0, value=100000.0, step=20000.0)
-    with tw_c3:
-        tw_debt = st.number_input("Debito & Mutui Passivi (€):", min_value=0.0, value=600000.0, step=50000.0)
-        tw_target_type = st.selectbox("Modalità di Stress Inverso:", options=["solvency", "ruin"], format_func=lambda x: "Solvency Ruin (Debt-to-Assets)" if x == "solvency" else "Net Worth Ruin (Perdita PN)")
-        if tw_target_type == "solvency":
-            tw_threshold = st.slider("Soglia Critica Debt-to-Assets (%):", min_value=40.0, max_value=90.0, value=65.0, step=5.0) / 100.0
-        else:
-            tw_threshold = st.slider("Perdita Minima Net Worth (%):", min_value=20.0, max_value=80.0, value=50.0, step=5.0) / 100.0
-
-from core.wealth.total_wealth_reverse_stress import compute_total_wealth_reverse_stress
-
-tw_balance = {
-    "liquid_assets": tw_liquid,
-    "real_estate": tw_re,
-    "corporate_equity": tw_corp,
-    "illiquid_assets": tw_illiq,
-    "total_liabilities": tw_debt,
-}
-tw_res = compute_total_wealth_reverse_stress(
-    balance_sheet=tw_balance,
-    target_type=tw_target_type,
-    target_threshold=tw_threshold,
-)
-
-tw_k1, tw_k2, tw_k3, tw_k4 = st.columns(4)
-with tw_k1:
-    metric_card("Mahalanobis Distance", f"{tw_res['mahalanobis_distance']:.2f}σ", delta="Vulnerabilità Strutturale", delta_color="normal")
-with tw_k2:
-    metric_card("Probabilità Implicita", f"{tw_res['implied_probability_pct']:.3f}%", delta=f"Ritorno: 1/{tw_res['return_period_years']} anni", delta_color="normal")
-with tw_k3:
-    metric_card("Fattore Più Vulnerabile", tw_res["most_vulnerable_factor"], delta="Massima Perdita EUR", delta_color="inverse")
-with tw_k4:
-    metric_card("Perdita Net Worth Stimata", fmt_eur(tw_res["breakdown_loss"]["total_net_worth_loss_eur"]), delta=f"Pre: {fmt_eur(tw_res['pre_stress_balance_sheet']['net_worth_eur'])}", delta_color="inverse")
-
-df_tw_shocks = pd.DataFrame([
-    {"Fattore di Rischio Patrimoniale": "Mercati Finanziari Liquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['liquid_markets_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['liquid_markets_loss_eur'])},
-    {"Fattore di Rischio Patrimoniale": "Settore Immobiliare", "Shock % Richiesto": f"{tw_res['factor_shocks']['real_estate_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['real_estate_loss_eur'])},
-    {"Fattore di Rischio Patrimoniale": "Partecipazioni / Corporate PMI", "Shock % Richiesto": f"{tw_res['factor_shocks']['corporate_equity_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['corporate_equity_loss_eur'])},
-    {"Fattore di Rischio Patrimoniale": "Passività / Mutui (Euribor Spread)", "Shock % Richiesto": f"{tw_res['factor_shocks']['debt_liabilities_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['debt_increase_eur'])},
-    {"Fattore di Rischio Patrimoniale": "Beni di Lusso / Illiquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['illiquid_luxury_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['illiquid_luxury_loss_eur'])},
-])
-st.table(df_tw_shocks)
-
-
-# ── V9.12.0: SOLVENCY II STANDARD FORMULA & SCR ENGINE ─────────────
-st.markdown("---")
-st.markdown("#### 🛡️ Solvency II Standard Formula & SCR Capital Engine (EIOPA QRT S.25.01 / S.26.01)")
-st.caption("Calcolo del Requisito Patrimoniale di Solvibilita (SCR) conforme al Regolamento Delegato (UE) 2015/35.")
-
-from core.solvency2_engine import compute_solvency2_standard_formula
-
-with st.expander("⚙️ Parametri Solvency II & Fondi Propri Ammissibili", expanded=False):
-    s2_c1, s2_c2 = st.columns(2)
-    with s2_c1:
-        s2_eof = st.number_input("Eligible Own Funds (Tier 1 + Tier 2) (€):", min_value=100000.0, value=2500000.0, step=100000.0)
-        s2_tp = st.number_input("Riserve Tecniche Lorde (€):", min_value=0.0, value=1500000.0, step=100000.0)
-    with s2_c2:
-        s2_symm = st.slider("Aggiustamento Simmetrico Azionario (%):", min_value=-10.0, max_value=10.0, value=0.0, step=1.0) / 100.0
-
-sample_s2_assets = [
-    {"name": "Azioni Core Europa", "asset_type": "equity_type1", "value": 800000.0, "duration": 0.0, "cqs_rating": 2, "currency": "EUR"},
-    {"name": "Emerging Markets Equity", "asset_type": "equity_type2", "value": 300000.0, "duration": 0.0, "cqs_rating": 3, "currency": "USD"},
-    {"name": "BTP Governativi 10Y", "asset_type": "bond", "value": 900000.0, "duration": 7.5, "cqs_rating": 3, "currency": "EUR"},
-    {"name": "Corporate Bond Investment Grade", "asset_type": "bond", "value": 500000.0, "duration": 4.2, "cqs_rating": 2, "currency": "EUR"},
-    {"name": "Immobili a Reddito", "asset_type": "property", "value": 400000.0, "duration": 0.0, "cqs_rating": 2, "currency": "EUR"},
-    {"name": "Liquidita & Depositi Bancari", "asset_type": "cash", "value": 200000.0, "duration": 0.25, "cqs_rating": 2, "currency": "EUR"},
-]
-
-s2_report = compute_solvency2_standard_formula(
-    portfolio_assets=sample_s2_assets,
-    eligible_own_funds=s2_eof,
-    technical_provisions=s2_tp,
-    symmetric_equity_adjustment=s2_symm,
-)
-
-s2k1, s2k2, s2k3, s2k4 = st.columns(4)
-with s2k1:
-    metric_card("Eligible Own Funds", fmt_eur(s2_report["eligible_own_funds"]), delta="Tier 1 + Tier 2", delta_color="normal")
-with s2k2:
-    metric_card("Requisito SCR Totale", fmt_eur(s2_report["scr_total"]), delta=f"BSCR: {fmt_eur(s2_report['bscr'])}", delta_color="inverse")
-with s2k3:
-    metric_card("Beneficio Diversificazione", fmt_eur(s2_report["market_diversification_benefit"]), delta="Aggregazione EIOPA", delta_color="normal")
-with s2k4:
-    metric_card("Solvency Ratio", f"{s2_report['solvency_ratio_pct']:.1f}%", delta=s2_report["solvency_health"], delta_color="normal" if s2_report["solvency_ratio_pct"] >= 160 else "inverse")
-
-st.markdown("##### 📋 Prospetto Regolamentare QRT S.25.01.21 (SCR Standard Formula)")
-st.dataframe(pd.DataFrame(list(s2_report["qrt_s25_01"].items()), columns=["Voce Regolamentare", "Valore"]), use_container_width=True, hide_index=True)
-
-# ── V9.13.0: FRTB (BASEL IV / BCBS 365) STANDARDIZED APPROACH ──────
-st.markdown("---")
-st.markdown("#### 🏛️ FRTB Standardized Approach Capital Engine (BCBS 365 / Basel IV)")
-st.caption("Sensitivities-Based Method (SBM) Delta/Vega/Curvature, Default Risk Charge (DRC) e Residual Risk Add-on (RRAO).")
-
-from core.frtb_engine import compute_frtb_capital_charges
-
-with st.expander("⚙️ Parametri Portafoglio di Trading & Sensibilità FRTB", expanded=False):
-    frtb_c1, frtb_c2 = st.columns(2)
-    with frtb_c1:
-        frtb_port_val = st.number_input("Valore Totale Portafoglio di Trading (€):", min_value=1_000_000.0, value=50_000_000.0, step=5_000_000.0, key="frtb_port_val_in")
-    with frtb_c2:
-        frtb_corr_scenario = st.selectbox("Scenario di Correlazione BCBS:", ["MEDIUM", "HIGH", "LOW"], index=0, key="frtb_scen_sel")
-
-frtb_res = compute_frtb_capital_charges(
-    correlation_scenario=frtb_corr_scenario,
-    total_portfolio_value=frtb_port_val,
-)
-
-fk1, fk2, fk3, fk4 = st.columns(4)
-with fk1:
-    metric_card("Requisito FRTB Totale", fmt_eur(frtb_res["total_frtb_capital_charge_eur"]), delta=f"{frtb_res['capital_ratio_pct']:.2f}% Portafoglio", delta_color="inverse")
-with fk2:
-    metric_card("SBM Total Charge", fmt_eur(frtb_res["sbm_total_charge_eur"]), delta=f"Delta: {fmt_eur(frtb_res['sbm_delta_charge_eur'])}", delta_color="normal")
-with fk3:
-    metric_card("Default Risk Charge (DRC)", fmt_eur(frtb_res["drc_total_charge_eur"]), delta="JTD & Rating Weights", delta_color="normal")
-with fk4:
-    metric_card("Residual Risk (RRAO)", fmt_eur(frtb_res["rrao_total_charge_eur"]), delta="Prodotti Esotici", delta_color="normal")
-
-st.markdown("##### 📊 Decomposizione SBM per Classe di Rischio e Sensibilità")
-st.dataframe(pd.DataFrame(frtb_res["sbm_breakdown_by_risk_class"]), use_container_width=True, hide_index=True)
-
-
-# ── V9.13.0: NGFS CLIMATE TRANSITION & PHYSICAL STRESS ENGINE ───────
-st.markdown("---")
-st.markdown("#### 🌱 NGFS Phase IV Climate Transition & Physical Risk Stress Engine")
-st.caption("Stress test climatico su scenari NGFS (Orderly Net Zero 2050, Disorderly Delayed Transition, Hot House World) con WACI Scope 1-2-3.")
-
-from core.climate_stress_engine import compute_ngfs_climate_stress
-
-cl_c1, cl_c2 = st.columns(2)
-with cl_c1:
-    ngfs_scenario_sel = st.selectbox("Scenario NGFS Phase IV:", ["Net Zero 2050 (Orderly)", "Delayed Transition (Disorderly)", "Current Policies (Hot House World)"], key="ngfs_scen_sel")
-with cl_c2:
-    ngfs_target_yr = st.select_slider("Orizzonte Temporale di Stress:", options=[2030, 2035, 2040, 2050], value=2030, key="ngfs_yr_sel")
-
-cl_res = compute_ngfs_climate_stress(scenario_name=ngfs_scenario_sel, target_year=ngfs_target_yr)
-
-ck1, ck2, ck3, ck4 = st.columns(4)
-with ck1:
-    metric_card("Perdita Climatica Totale", f"{cl_res['portfolio_loss_pct']:.2f}%", delta=fmt_eur(cl_res["portfolio_loss_eur"]), delta_color="inverse")
-with ck2:
-    metric_card("Rischio di Transizione", fmt_eur(cl_res["transition_risk_loss_eur"]), delta=f"Prezzo CO₂: ${cl_res['carbon_price_usd_ton']}/t", delta_color="inverse")
-with ck3:
-    metric_card("Rischio Fisico (Danni)", fmt_eur(cl_res["physical_risk_loss_eur"]), delta=f"Riscaldamento: +{cl_res['temperature_anomaly_celsius']}°C", delta_color="inverse")
-with ck4:
-    metric_card("Intensità WACI Portafoglio", f"{cl_res['portfolio_waci_tco2e_per_meur']:.1f}", delta="tCO₂e / M€ Ricavi", delta_color="normal")
-
-st.markdown("##### 🏢 Impatto Climatico Dettagliato per Società & Asset")
-st.dataframe(pd.DataFrame(cl_res["holdings_breakdown"]), use_container_width=True, hide_index=True)
-
-
-# ── V9.13.0: INTERACTIVE MACRO WAR ROOM & CORRELATION BREAKDOWN ───
-st.markdown("---")
-st.markdown("#### 🎯 Interactive Macro War Room & Correlation Breakdown Stress Engine")
-st.caption("Simulatore macro a leve multiple (Tassi, Twist, Inflazione, Petrolio, Spread) con crollo sistemico delle correlazioni verso equicorrelazione.")
-
-from core.macro_war_room import compute_macro_war_room_stress
-
-with st.expander("🎛️ Pannello di Controllo Macro Shock & Leva di Correlazione", expanded=True):
-    mw1, mw2, mw3, mw4 = st.columns(4)
-    with mw1:
-        rates_bps = st.slider("Parallel Rates Shock (bps):", min_value=-300, max_value=400, value=150, step=25, key="mw_rates_bps")
-        twist_bps = st.slider("Curve Twist Inversion (bps):", min_value=-150, max_value=150, value=-50, step=10, key="mw_twist_bps")
-    with mw2:
-        cpi_shock = st.slider("Inflation / CPI Surge (%):", min_value=-2.0, max_value=10.0, value=3.5, step=0.5, key="mw_cpi_shock")
-        oil_shock = st.slider("Oil / Energy Spike (%):", min_value=-50, max_value=100, value=40, step=5, key="mw_oil_shock")
-    with mw3:
-        eq_crash = st.slider("Equity Drawdown (%):", min_value=-60, max_value=20, value=-20, step=5, key="mw_eq_crash")
-        cs_spread = st.slider("Credit Spread OAS Widening (bps):", min_value=-50, max_value=600, value=250, step=25, key="mw_cs_spread")
-    with mw4:
-        lam_corr = st.slider("Correlation Breakdown (λ):", min_value=0.0, max_value=1.0, value=0.60, step=0.05, key="mw_lam_corr", help="0 = correlazione storica, 1 = panic equicorrelation matrix (0.85)")
-        vol_surge = st.slider("Vol Surge Multiplier:", min_value=1.0, max_value=3.0, value=1.50, step=0.1, key="mw_vol_surge")
-
-mw_params = {
-    "scenario_name": "Stagflationary Energy Shock & Yield Surge",
-    "parallel_rates_bps": rates_bps,
-    "slope_twist_bps": twist_bps,
-    "inflation_shock_pct": cpi_shock,
-    "oil_shock_pct": oil_shock,
-    "equity_shock_pct": eq_crash,
-    "credit_spread_widening_bps": cs_spread,
-    "correlation_breakdown_lambda": lam_corr,
-    "vol_surge_factor": vol_surge,
-}
-
-mw_res = compute_macro_war_room_stress(scenario_params=mw_params)
-
-mk1, mk2, mk3, mk4 = st.columns(4)
-with mk1:
-    metric_card("PnL Portafoglio Macro", fmt_eur(mw_res["total_pnl_eur"]), delta=f"{mw_res['total_pnl_pct']:.2f}%", delta_color="inverse" if mw_res["total_pnl_eur"] < 0 else "normal")
-with mk2:
-    metric_card("Volatilità Stressata", f"{mw_res['stressed_vol_pct']:.2f}%", delta=f"Base: {mw_res['base_vol_pct']:.2f}%", delta_color="inverse")
-with mk3:
-    metric_card("Perdita di Diversificazione", f"+{mw_res['diversification_loss_pct']:.2f}%", delta="Impatto Correlazione λ", delta_color="inverse")
-with mk4:
-    metric_card("Drenaggio Liquidità / Margin Call", fmt_eur(mw_res["liquidity_margin_drain_eur"]), delta="Cuscino di Garanzia", delta_color="inverse")
-
-st.markdown("##### 📋 Decomposizione PnL per Asset e Fattore Macro")
-st.dataframe(pd.DataFrame(mw_res["assets_breakdown"]), use_container_width=True, hide_index=True)
-
-st.markdown("##### 🌐 Matrice di Correlazione Sotto Stress Sistemico ($R_{\text{stressed}}$)")
-st.dataframe(pd.DataFrame(mw_res["stressed_correlation_matrix"]), use_container_width=True)
-
-
-# ── V9.14.0: BILATERAL XVA & COUNTERPARTY RISK ENGINE ─────────────────
-st.markdown("---")
-st.markdown("#### 🛡️ Bilateral XVA & Counterparty Credit Risk Engine (BCBS / ISDA SIMM)")
-st.caption("Valutazione CVA, DVA, FVA, MVA, KVA con accordi di compensazione CSA e simulazione profili di esposizione (EE, PFE 95%/99%, ENE).")
-
-from core.xva_engine import compute_xva_metrics
-
-_default_xva_mtm = max(1_000.0, round(float(portfolio_value), 2)) if portfolio_value > 0 else 2_500_000.0
-_default_xva_thr = max(500.0, round(_default_xva_mtm * 0.15, -2))
-_default_xva_mta = max(100.0, round(_default_xva_mtm * 0.05, -2))
-
-with st.expander("⚙️ Parametri Contratto CSA Netting Set & Portafoglio Derivati", expanded=False):
-    xva_c1, xva_c2, xva_c3 = st.columns(3)
-    with xva_c1:
-        xva_port_mtm = st.number_input("MTM Lordo / Nozionale Portafoglio (€):", min_value=1_000.0, value=float(_default_xva_mtm), step=10_000.0, key="xva_mtm_in")
-        xva_thresh = st.number_input("Soglia CSA Bilaterale (€):", min_value=0.0, value=float(_default_xva_thr), step=5_000.0, key="xva_thresh_in")
-    with xva_c2:
-        xva_cpty_spread = st.number_input("Credit Spread Controparte (bps):", min_value=10.0, max_value=1000.0, value=120.0, step=10.0, key="xva_cpty_sp")
-        xva_own_spread = st.number_input("Credit Spread Proprio (DVA bps):", min_value=10.0, max_value=500.0, value=65.0, step=5.0, key="xva_own_sp")
-    with xva_c3:
-        xva_mpor = st.slider("Margin Period of Risk (MPOR Giorni):", min_value=5, max_value=30, value=10, step=1, key="xva_mpor_in")
-        xva_mta = st.number_input("Minimum Transfer Amount (€):", min_value=0.0, value=float(_default_xva_mta), step=1_000.0, key="xva_mta_in")
-
-custom_csa = {
-    "threshold_eur": xva_thresh,
-    "mta_eur": xva_mta,
-    "mpor_days": xva_mpor,
-}
-custom_mkt = {
-    "counterparty_cds_spread_bps": xva_cpty_spread,
-    "own_cds_spread_bps": xva_own_spread,
-}
-_xva_trades = [
-    {"trade_id": "IRS_EUR_5Y", "symbol": "EUR_SWAP_5Y", "asset_class": "IR_SWAP", "notional_eur": xva_port_mtm * 0.45, "maturity_years": 5.0, "mtm_eur": xva_port_mtm * 0.14, "volatility_annual": 0.18},
-    {"trade_id": "IRS_EUR_10Y", "symbol": "EUR_SWAP_10Y", "asset_class": "IR_SWAP", "notional_eur": xva_port_mtm * 0.27, "maturity_years": 10.0, "mtm_eur": -xva_port_mtm * 0.05, "volatility_annual": 0.15},
-    {"trade_id": "FX_FWD_USD", "symbol": "EUR_USD_2Y", "asset_class": "FX_FORWARD", "notional_eur": xva_port_mtm * 0.18, "maturity_years": 2.0, "mtm_eur": xva_port_mtm * 0.07, "volatility_annual": 0.12},
-    {"trade_id": "EQ_OPT_PORT", "symbol": "PORT_HEDGE_1Y", "asset_class": "EQUITY_OPTION", "notional_eur": xva_port_mtm * 0.10, "maturity_years": 1.0, "mtm_eur": xva_port_mtm * 0.04, "volatility_annual": 0.24},
-]
-
-xva_res = compute_xva_metrics(trades_data=_xva_trades, csa_params=custom_csa, market_params=custom_mkt)
-
-xk1, xk2, xk3, xk4 = st.columns(4)
-with xk1:
-    metric_card("Credit Valuation Adj (CVA)", fmt_eur(xva_res["cva_eur"]), delta="Rischio Controparte", delta_color="inverse")
-with xk2:
-    metric_card("Debit Valuation Adj (DVA)", fmt_eur(xva_res["dva_eur"]), delta="Rischio Proprio (+)", delta_color="normal")
-with xk3:
-    metric_card("Funding Valuation Adj (FVA)", fmt_eur(xva_res["fva_eur"]), delta=f"MVA: {fmt_eur(xva_res['mva_eur'])}", delta_color="inverse")
-with xk4:
-    metric_card("Total Net XVA", fmt_eur(xva_res["total_xva_eur"]), delta=f"Peak PFE 99%: {fmt_eur(xva_res['peak_pfe_99_eur'])}", delta_color="inverse" if xva_res["total_xva_eur"] < 0 else "normal")
-
-st.markdown("##### 📈 Profilo di Esposizione Creditizia Futura (EE, PFE 95%, PFE 99%, ENE)")
-exp_df = pd.DataFrame(xva_res["exposure_profile"])
-_x_col = "tenor_years" if "tenor_years" in exp_df.columns else "time_years"
-
-fig_xva = go.Figure()
-fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["pfe_99_eur"], name="PFE 99% (Worst-Case)", line=dict(color="#f43f5e", width=2.5)))
-fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["pfe_95_eur"], name="PFE 95%", line=dict(color="#fb923c", width=2)))
-fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["expected_exposure_eur"], name="Expected Exposure (EE)", line=dict(color="#38bdf8", width=2.5)))
-fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["expected_negative_exposure_eur"], name="Expected Neg. Exposure (ENE)", line=dict(color="#a855f7", dash="dot")))
-
-fig_xva.update_layout(
-    title="Simulazione Monte Carlo dei Profili di Esposizione con Collaterale CSA",
-    xaxis_title="Orizzonte Temporale (Anni)",
-    yaxis_title="Esposizione Potenziale (€)",
-    height=420,
-    margin=dict(l=10, r=10, b=10, t=40),
-)
-st.plotly_chart(fig_xva, use_container_width=True)
-
-
-# ── V9.14.0: BASEL III LIQUIDITY STANDARDS (LCR & NSFR) ───────────────
-st.markdown("---")
-st.markdown("#### 💧 Basel III Liquidity Standards & Dynamic Cash Ladder (BCBS 238)")
-st.caption("Requisito di copertura della liquidità a 30 giorni (LCR ≥ 100%), Net Stable Funding Ratio (NSFR ≥ 100%) e proiezioni di sopravvivenza.")
-
-from core.basel_liquidity_engine import compute_basel_liquidity_ratios
-
-with st.expander("⚙️ Parametri Attivi Liquidi HQLA & Run-off di Cassa", expanded=False):
-    b_c1, b_c2 = st.columns(2)
-    with b_c1:
-        hqla_l1_val = st.number_input("HQLA Livello 1 - Riserve & Titoli Sovrani 0% RW (€):", min_value=5_000_000.0, value=70_000_000.0, step=5_000_000.0, key="hqla_l1_in")
-        hqla_l2a_val = st.number_input("HQLA Livello 2A - Corp Bonds AAA/AA (€):", min_value=0.0, value=30_000_000.0, step=2_000_000.0, key="hqla_l2a_in")
-    with b_c2:
-        hqla_l2b_val = st.number_input("HQLA Livello 2B - Azioni & Titoli BBB (€):", min_value=0.0, value=15_000_000.0, step=1_000_000.0, key="hqla_l2b_in")
-        outflow_stress_mult = st.slider("Stress Multiplier sui Deflussi a 30gg:", min_value=1.0, max_value=2.0, value=1.25, step=0.05, key="liq_mult_in")
-
-custom_hqla = [
-    {"asset_id": "L1_SOV", "asset_type": "sovereign_l1", "level": "1", "market_value": hqla_l1_val, "haircut": 0.0},
-    {"asset_id": "L2A_CORP", "asset_type": "corp_bond_l2a", "level": "2A", "market_value": hqla_l2a_val, "haircut": 0.15},
-    {"asset_id": "L2B_EQ", "asset_type": "qualifying_equities", "level": "2B", "market_value": hqla_l2b_val, "haircut": 0.50},
-]
-
-basel_res = compute_basel_liquidity_ratios(hqla_data=custom_hqla)
-
-bk1, bk2, bk3, bk4 = st.columns(4)
-with bk1:
-    lcr_stat = "CONFORME ✅" if basel_res["lcr_compliant"] else "DEFICIT ⚠️"
-    metric_card("Liquidity Coverage Ratio (LCR)", f"{basel_res['lcr_ratio_pct']:.1f}%", delta=f"{lcr_stat} (Min 100%)", delta_color="normal" if basel_res["lcr_compliant"] else "inverse")
-with bk2:
-    metric_card("HQLA Totale Idoneo", fmt_eur(basel_res["total_hqla_eligible"]), delta=f"Cap Deduc: {fmt_eur(basel_res['cap_deduction'])}", delta_color="normal")
-with bk3:
-    nsfr_stat = "CONFORME ✅" if basel_res["nsfr_compliant"] else "DEFICIT ⚠️"
-    metric_card("Net Stable Funding Ratio (NSFR)", f"{basel_res['nsfr_ratio_pct']:.1f}%", delta=f"{nsfr_stat} (Min 100%)", delta_color="normal" if basel_res["nsfr_compliant"] else "inverse")
-with bk4:
-    metric_card("Orizzonte di Sopravvivenza", f"{basel_res['survival_horizon_days']} Giorni", delta="Stress Sistemico", delta_color="normal" if basel_res["survival_horizon_days"] > 30 else "inverse")
-
-st.markdown("##### 🪜 Dynamic Cash Flow Stress Ladder & Buffer di Liquidità")
-ladder_df = pd.DataFrame(basel_res["stress_ladder"])
-
-fig_ladder = go.Figure()
-fig_ladder.add_trace(go.Bar(x=ladder_df["horizon_days"].astype(str) + "d", y=ladder_df["projected_liquidity_buffer"], name="Buffer Netto Residuo (€)", marker_color="#0ea5e9"))
-fig_ladder.update_layout(
-    title="Evoluzione del Cuscinetto di Liquidità Proiettato per Orizzonte Temporale",
-    xaxis_title="Orizzonte di Stress (Giorni)",
-    yaxis_title="Buffer Disponibile (€)",
-    height=380,
-    margin=dict(l=10, r=10, b=10, t=40),
-)
-st.plotly_chart(fig_ladder, use_container_width=True)
-
-st.markdown("##### 📋 Dettaglio HQLA per Livello e Haircut Regolamentare")
-st.dataframe(pd.DataFrame(basel_res["hqla_breakdown"]), use_container_width=True, hide_index=True)
-
-
-# ============================================================================
-# v9.16.0: TELEMETRY RIBBON, WORKSPACE SWITCHER & SCENARIO DELTA COMPARATOR
-# ============================================================================
-from core.ux_institutional_hub import (
-    render_executive_traffic_light_radar,
-    render_institutional_telemetry_ribbon,
-    render_scenario_delta_comparator,
-    render_segmented_workspace_switcher,
-    style_institutional_chart,
-)
-
-render_institutional_telemetry_ribbon(page_badge="REGULATORY STRESS TESTING & CAPITAL LAB", risk_data=results)
-render_executive_traffic_light_radar(key_prefix="stress_page_cro_radar", risk_data=results, include_board_pack=True)
-
-active_stress_ws = render_segmented_workspace_switcher(
-    workspace_key="stress_v916_domain",
-    label="🧭 Filtra Workspace Regolamentare (Eliminazione Scroll Verticale):",
-    options=[
-        "🌐 Tutti i Laboratori Regolamentari",
-        "🤝 Credito & Controparte (CreditMetrics & Vasicek IRB)",
-        "🏛️ Capitale Prudenziale 9Q (Fed CCAR / EBA CET1 Trajectory)",
-    ],
-)
-
-# ============================================================================
-# v9.15.0: CREDITMETRICS PORTFOLIO CREDIT RISK & FED CCAR / EBA STRESS ENGINE
-# ============================================================================
-st.divider()
-st.markdown("#### 🏦 CreditMetrics Rating Migration & Basel III IRB Vasicek Portfolio Credit Risk")
-st.caption("Modello multi-debitore con matrice di transizione S&P a 8 stati (AAA..D), correlazione latente degli asset di Vasicek (2002), capitale regolamentare IRB (K_IRB e RWA), Credit VaR 99.9% e Incremental Risk Charge (IRC).")
-
-from core.ccar_stress_engine import compute_ccar_capital_stress
-from core.credit_portfolio_engine import compute_credit_portfolio_risk
-
-_live_obligors = None
-if isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns:
-    _pos_valid = pos[pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0].copy()
-    if not _pos_valid.empty:
-        _pos_valid["val_num"] = pd.to_numeric(_pos_valid["current_value"], errors="coerce").fillna(0.0)
-        _pos_top = _pos_valid.sort_values("val_num", ascending=False).head(8)
-        _rating_cycle = ["AA", "A", "A", "BBB", "BBB", "BB", "BB", "B"]
-        _live_obligors = []
-        for idx_ob, (_, r_ob) in enumerate(_pos_top.iterrows()):
-            _tk_ob = str(r_ob.get("ticker", f"OB_{idx_ob+1}"))
-            _nm_ob = str(r_ob.get("name") or _tk_ob)
-            _sec_ob = str(r_ob.get("sector") or r_ob.get("asset_class") or "Multi-Asset")
-            _is_cry = "-USD" in _tk_ob or "CRYPTO" in _sec_ob.upper()
-            _rat_ob = "B" if _is_cry else _rating_cycle[idx_ob % len(_rating_cycle)]
-            _live_obligors.append(
-                {
-                    "obligor_id": _tk_ob,
-                    "name": f"{_nm_ob} ({_tk_ob})" if _tk_ob not in _nm_ob else _nm_ob,
-                    "sector": _sec_ob,
-                    "rating": _rat_ob,
-                    "ead_eur": float(r_ob["val_num"]),
-                    "lgd": 0.55 if _is_cry else 0.42,
-                    "maturity_years": 3.0,
-                }
-            )
-
-cp_c1, cp_c2 = st.columns([1, 3])
-with cp_c1:
-    cp_sims = st.select_slider("Simulazioni Monte Carlo CreditMetrics:", options=[2000, 5000, 8000, 12000], value=5000, key="cp_sims_slider")
-with cp_c2:
-    _port_lbl_st = str(st.session_state.get("portfolio_name") or "Portafoglio Attivo")
-    st.info(f"📌 Esposizioni auto-collegate al portafoglio attivo **{_port_lbl_st}** ({len(_live_obligors) if _live_obligors else 6} posizioni principali) rivalutate mark-to-market sugli spread creditizi S&P ad 1 anno.")
-
-cp_res = compute_credit_portfolio_risk(obligors_data=_live_obligors, n_simulations=int(cp_sims))
-ck1, ck2, ck3, ck4 = st.columns(4)
-with ck1:
-    metric_card("Expected Loss (EL Basilea IRB)", fmt_eur(float(cp_res["expected_loss_eur"])), delta=f"EAD: {fmt_eur(float(cp_res['total_ead_eur']))}", delta_color="inverse")
-with ck2:
-    metric_card("Capitale Regolamentare K_IRB", fmt_eur(float(cp_res["vasicek_irb_capital_999_eur"])), delta=f"RWA: {fmt_eur(float(cp_res['vasicek_rwa_eur']))}", delta_color="normal")
-with ck3:
-    metric_card("Credit VaR 99.9% (1Y Migration)", fmt_eur(float(cp_res["creditmetrics_var_999_eur"])), delta=f"VaR 99%: {fmt_eur(float(cp_res['creditmetrics_var_99_eur']))}", delta_color="inverse")
-with ck4:
-    metric_card("Incremental Risk Charge (IRC)", fmt_eur(float(cp_res["incremental_risk_charge_eur"])), delta=f"ES 99.9%: {fmt_eur(float(cp_res['creditmetrics_es_999_eur']))}", delta_color="inverse")
-
-st.markdown("##### 📋 Decomposizione per Controparte: PD, Correlazione Vasicek ρ, RWA e Contributo Euler al Rischio")
-st.dataframe(pd.DataFrame(cp_res["obligor_contributions"]), use_container_width=True, hide_index=True)
-
-st.divider()
-st.markdown("#### 🏛️ Fed CCAR / EBA 9-Quarter Supervisory Capital Stress & Traiettoria CET1")
-st.caption("Proiezione prudenziale su 9 trimestri (Q1..Q9) negli scenari Supervisory Baseline, Adverse e Severely Adverse: Pre-Provision Net Revenue (PPNR), transizione crediti deteriorati IFRS 9 / CECL (Stage 1/2/3), inflazione RWA e Stress Capital Buffer (SCB).")
-
-cc_c1, cc_c2, cc_c3, cc_c4 = st.columns(4)
-with cc_c1:
-    cc_cet1 = st.number_input("Capitale CET1 Iniziale (€ Milioni):", min_value=1_000.0, value=14_200.0, step=500.0, key="cc_cet1_in")
-with cc_c2:
-    cc_rwa = st.number_input("RWA Iniziali (€ Milioni):", min_value=10_000.0, value=100_000.0, step=5_000.0, key="cc_rwa_in")
-with cc_c3:
-    cc_loans = st.number_input("Portafoglio Crediti Totale (€ Milioni):", min_value=10_000.0, value=145_000.0, step=5_000.0, key="cc_loans_in")
-with cc_c4:
-    cc_ppnr = st.number_input("PPNR Trimestrale Base (€ Milioni):", min_value=100.0, value=920.0, step=50.0, key="cc_ppnr_in")
-
-ccar_res = compute_ccar_capital_stress(
-    initial_cet1_capital_eur_m=cc_cet1,
-    initial_rwa_eur_m=cc_rwa,
-    total_loan_book_eur_m=cc_loans,
-    quarterly_ppnr_baseline_eur_m=cc_ppnr,
-)
-
-sev_scen = ccar_res["scenarios"]["severely_adverse"]
-adv_scen = ccar_res["scenarios"]["adverse"]
-base_scen = ccar_res["scenarios"]["baseline"]
-mda_hurdle = ccar_res["regulatory_hurdles"]["overall_capital_requirement_mda_pct"]
-
-cck1, cck2, cck3, cck4 = st.columns(4)
-with cck1:
-    metric_card("CET1 Ratio Iniziale", f"{ccar_res['initial_cet1_ratio_pct']:.2f}%", delta=f"Soglia OCR/MDA: {mda_hurdle:.2f}%", delta_color="normal")
-with cck2:
-    metric_card("Min CET1 (Severely Adverse)", f"{sev_scen['minimum_stressed_cet1_ratio_pct']:.2f}%", delta=f"Trough in {sev_scen['trough_quarter']} (-{sev_scen['max_cet1_drawdown_bps']:.0f} bps)", delta_color="normal" if not sev_scen["mda_restriction_triggered"] else "inverse")
-with cck3:
-    metric_card("Perdite Credito Cumulate 9Q", f"€ {sev_scen['cumulative_9q_credit_losses_eur_m']:,.0f} M", delta=f"Loss Rate: {sev_scen['cumulative_9q_loss_rate_pct']:.2f}%", delta_color="inverse")
-with cck4:
-    metric_card("Stress Capital Buffer (SCB)", f"{ccar_res['required_stress_capital_buffer_scb_pct']:.2f}%", delta=ccar_res["supervisory_assessment_status"].split(" - ")[0], delta_color="normal" if "PASS" in ccar_res["supervisory_assessment_status"] else "inverse")
-
-df_base = pd.DataFrame(base_scen["trajectory"])
-df_adv = pd.DataFrame(adv_scen["trajectory"])
-df_sev = pd.DataFrame(sev_scen["trajectory"])
-
-fig_ccar = go.Figure()
-fig_ccar.add_trace(go.Scatter(x=df_base["quarter"], y=df_base["cet1_ratio_pct"], mode="lines+markers", name="Supervisory Baseline (%)", line=dict(color="#10b981", width=3)))
-fig_ccar.add_trace(go.Scatter(x=df_adv["quarter"], y=df_adv["cet1_ratio_pct"], mode="lines+markers", name="Supervisory Adverse (%)", line=dict(color="#f59e0b", width=3)))
-fig_ccar.add_trace(go.Scatter(x=df_sev["quarter"], y=df_sev["cet1_ratio_pct"], mode="lines+markers", name="Fed CCAR / EBA Severely Adverse (%)", line=dict(color="#ef4444", width=3.5)))
-fig_ccar.add_hline(y=mda_hurdle, line_dash="dash", line_color="#fbbf24", annotation_text=f"OCR / MDA Trigger ({mda_hurdle:.1f}%)")
-fig_ccar.add_hline(y=6.0, line_dash="dot", line_color="#dc2626", annotation_text="Pillar 1 + P2R Min (6.0%)")
-fig_ccar.update_layout(
-    title="Traiettoria Regolamentare 9-Trimestri del CET1 Ratio (%) sotto Stress EBA / Fed CCAR",
-    xaxis_title="Orizzonte Trimestrale di Proiezione",
-    yaxis_title="CET1 Ratio (%)",
-    height=420,
-    margin=dict(l=10, r=10, b=10, t=40),
-)
-style_institutional_chart(fig_ccar, title="Traiettoria Regolamentare 9-Trimestri del CET1 Ratio (%) sotto Stress EBA / Fed CCAR", height=420)
-st.plotly_chart(fig_ccar, use_container_width=True)
-render_scenario_delta_comparator(
-    scenario_key="ccar_capital_stress",
-    scenario_title="Fed CCAR / EBA 9Q Capital Stress",
-    current_metrics={
-        "CET1 Iniziale (%)": float(ccar_res["initial_cet1_ratio_pct"]),
-        "Min CET1 Severely Adverse (%)": float(sev_scen["minimum_stressed_cet1_ratio_pct"]),
-        "Perdite Credito 9Q (€M)": float(sev_scen["cumulative_9q_credit_losses_eur_m"]),
-        "Stress Capital Buffer SCB (%)": float(ccar_res["required_stress_capital_buffer_scb_pct"]),
-    },
-    higher_is_better_map={
-        "CET1 Iniziale (%)": True,
-        "Min CET1 Severely Adverse (%)": True,
-        "Perdite Credito 9Q (€M)": False,
-        "Stress Capital Buffer SCB (%)": False,
-    },
-)
-st.dataframe(df_sev, use_container_width=True, hide_index=True)
-
-
-# ============================================================================
-# v9.17.0 / v9.18.0: ISDA SIMM v2.6 INITIAL MARGIN & UNCLEARED MARGIN RULES (UMR)
-# ============================================================================
-st.divider()
-st.markdown("#### 🛡️ ISDA SIMM™ v2.6 (Standard Initial Margin Model) & BCBS-IOSCO UMR Compliance")
-st.caption("Calcolo regolamentare del Margine Iniziale (DeltaMargin, VegaMargin, CurvatureMargin) sulle 6 classi di rischio ISDA, matrice di correlazione cross-asset ψ_{r,s}, verifica della soglia UMR di €50 Milioni e risparmio MVA tramite Central Clearing (CCP LCH/Eurex).")
-
-from core.isda_simm_engine import compute_isda_simm_margin
-from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
-from core.ux_quant_canvas import build_isda_simm_waterfall_and_umr_chart
-
-sm_c1, sm_c2 = st.columns(2)
-with sm_c1:
-    sm_fspread = st.slider("Spread di Funding Collaterale (bps):", min_value=30.0, max_value=350.0, value=145.0, step=5.0, key="sm_fspread_in")
-with sm_c2:
-    sm_mpor = st.slider("Margin Period of Risk Bilaterale (MPOR Giorni):", min_value=5, max_value=20, value=10, step=1, key="sm_mpor_in")
-
-shocked_simm = apply_macro_shock_to_inputs({"index_spread_bps": sm_fspread})
-eff_fspread = float(shocked_simm["index_spread_bps"])
-simm_prov = "GLOBAL SHOCK OVERRIDE" if shocked_simm.get("macro_shock_active") else "LIVE PORTFOLIO BOUND"
-
-simm_res = compute_isda_simm_margin(funding_spread_bps=eff_fspread, mpor_days=int(sm_mpor))
-
-smk1, smk2, smk3, smk4 = st.columns(4)
-with smk1:
-    render_bento_kpi_card(
-        "ISDA SIMM Initial Margin",
-        fmt_eur(simm_res["total_simm_initial_margin_eur"]),
-        f"Beneficio Diversif.: -{simm_res['cross_class_diversification_benefit_pct']:.1f}%",
-        provenance=simm_prov,
-        sparkline_values=[float(r["total_class_im_eur"]) / 1e6 for r in simm_res["risk_class_breakdown"]],
-        accent_color="#3b82f6",
-    )
-with smk2:
-    render_bento_kpi_card(
-        "Utilizzo Soglia UMR (€50M)",
-        f"{simm_res['umr_utilization_pct']:.1f}%",
-        simm_res["recommended_clearing_route"].split(" (")[0],
-        provenance=simm_prov,
-        limit_utilization_pct=float(simm_res["umr_utilization_pct"]),
-        accent_color="#10b981" if not simm_res["umr_threshold_breached"] else "#ef4444",
-    )
-with smk3:
-    render_bento_kpi_card(
-        "IM Equivalente CCP (LCH/Eurex)",
-        fmt_eur(simm_res["ccp_cleared_equivalent_im_eur"]),
-        "MPOR 5gg Clearing",
-        provenance=simm_prov,
-        accent_color="#10b981",
-    )
-with smk4:
-    render_bento_kpi_card(
-        "Risparmio Annuo MVA (CCP vs CSA)",
-        fmt_eur(simm_res["annual_ccp_mva_savings_eur"]),
-        f"MVA Bilat: {fmt_eur(simm_res['annual_mva_bilateral_eur'])}",
-        provenance=simm_prov,
-        accent_color="#f59e0b",
+    tw_k1, tw_k2, tw_k3, tw_k4 = st.columns(4)
+    with tw_k1:
+        metric_card("Mahalanobis Distance", f"{tw_res['mahalanobis_distance']:.2f}σ", delta="Vulnerabilità Strutturale", delta_color="normal")
+    with tw_k2:
+        metric_card("Probabilità Implicita", f"{tw_res['implied_probability_pct']:.3f}%", delta=f"Ritorno: 1/{tw_res['return_period_years']} anni", delta_color="normal")
+    with tw_k3:
+        metric_card("Fattore Più Vulnerabile", tw_res["most_vulnerable_factor"], delta="Massima Perdita EUR", delta_color="inverse")
+    with tw_k4:
+        metric_card("Perdita Net Worth Stimata", fmt_eur(tw_res["breakdown_loss"]["total_net_worth_loss_eur"]), delta=f"Pre: {fmt_eur(tw_res['pre_stress_balance_sheet']['net_worth_eur'])}", delta_color="inverse")
+
+    df_tw_shocks = pd.DataFrame([
+        {"Fattore di Rischio Patrimoniale": "Mercati Finanziari Liquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['liquid_markets_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['liquid_markets_loss_eur'])},
+        {"Fattore di Rischio Patrimoniale": "Settore Immobiliare", "Shock % Richiesto": f"{tw_res['factor_shocks']['real_estate_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['real_estate_loss_eur'])},
+        {"Fattore di Rischio Patrimoniale": "Partecipazioni / Corporate PMI", "Shock % Richiesto": f"{tw_res['factor_shocks']['corporate_equity_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['corporate_equity_loss_eur'])},
+        {"Fattore di Rischio Patrimoniale": "Passività / Mutui (Euribor Spread)", "Shock % Richiesto": f"{tw_res['factor_shocks']['debt_liabilities_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['debt_increase_eur'])},
+        {"Fattore di Rischio Patrimoniale": "Beni di Lusso / Illiquidi", "Shock % Richiesto": f"{tw_res['factor_shocks']['illiquid_luxury_pct']:+.1f}%", "Perdita (€)": fmt_eur(tw_res['breakdown_loss']['illiquid_luxury_loss_eur'])},
+    ])
+    st.table(df_tw_shocks)
+
+
+elif active_stress_tab == "🏛️ FRTB Basel IV, Solvency II & NGFS Climate":
+    # ── V9.12.0: SOLVENCY II STANDARD FORMULA & SCR ENGINE ─────────────
+    st.markdown("#### 🛡️ Solvency II Standard Formula & SCR Capital Engine (EIOPA QRT S.25.01 / S.26.01)")
+    st.caption("Calcolo del Requisito Patrimoniale di Solvibilità (SCR) conforme al Regolamento Delegato (UE) 2015/35.")
+
+    from core.solvency2_engine import compute_solvency2_standard_formula
+
+    render_institutional_info_box(
+        title="Solvency II Standard Formula SCR (EIOPA Delegated Regulation EU 2015/35)",
+        badge="INSURANCE CAPITAL • SOLVENCY II SCR",
+        summary_html=(
+            "La <b>Standard Formula Solvency II</b> calcola il <b>Solvency Capital Requirement (SCR)</b> calibrato sul Value-at-Risk a 1 anno "
+            "al <b>99.5% di confidenza</b>, aggregando i sottomoduli di Rischio Mercato (Equity Type 1/2 con Symmetric Adjustment, Interest Rate, Spread, Property, Currency) "
+            "tramite la matrice di correlazione EIOPA."
+        ),
+        math_html=(
+            "Aggregazione quadratica EIOPA del modulo Market Risk ($\text{SCR}_{\\text{mkt}}$) e Solvency Ratio:<br>"
+            "<code>SCR_mkt = √( Σ_{i,j} CorrMkt_{i,j} · SCR_i · SCR_j )  |  Solvency Ratio = Eligible Own Funds / SCR_total</code><br>"
+            "Gli shock azionari base sono del 39% (Type 1 OCSE) e 49% (Type 2 Emergenti/Alt) più il <i>dampener</i> anticiclico $\\pm 10\\%$."
+        ),
+        chart_guide_html=(
+            "• <b>KPI Solvency Ratio</b>: un indice $\\ge 100\\%$ rappresenta il minimo regolamentare (MCR/SCR); le compagnie targettizzano una zona verde $\\ge 160\\%$.<br>"
+            "• <b>Prospetto QRT S.25.01.21</b>: replica il Quantitative Reporting Template ufficiale inviato alle autorità di vigilanza (IVASS / EIOPA)."
+        ),
+        regulatory_html=(
+            "• <b>Direttiva 2009/138/CE & Reg. (UE) 2015/35</b>: standard per compagnie assicurative, casse previdenziali e mandati istituzionali.<br>"
+            "• <b>Beneficio di Diversificazione</b>: quantifica il risparmio di capitale generato dalla decorrelazione imperfetta tra azionario, tassi e immobiliare."
+        ),
     )
 
-rc_map_for_chart = {}
-for row in simm_res["risk_class_breakdown"]:
-    rc_label = str(row["risk_class"])
-    if "Interest" in rc_label:
-        rc_map_for_chart["IR"] = {"total_margin": row["total_class_im_eur"]}
-    elif "Non-Qual" in rc_label:
-        rc_map_for_chart["CreditNonQ"] = {"total_margin": row["total_class_im_eur"]}
-    elif "Credit" in rc_label:
-        rc_map_for_chart["CreditQ"] = {"total_margin": row["total_class_im_eur"]}
-    elif "Equity" in rc_label:
-        rc_map_for_chart["Equity"] = {"total_margin": row["total_class_im_eur"]}
-    elif "Commodity" in rc_label:
-        rc_map_for_chart["Commodity"] = {"total_margin": row["total_class_im_eur"]}
-    elif "FX" in rc_label:
-        rc_map_for_chart["FX"] = {"total_margin": row["total_class_im_eur"]}
+    with st.expander("⚙️ Parametri Solvency II & Fondi Propri Ammissibili", expanded=False):
+        s2_c1, s2_c2 = st.columns(2)
+        with s2_c1:
+            s2_eof = st.number_input("Eligible Own Funds (Tier 1 + Tier 2) (€):", min_value=100000.0, value=2500000.0, step=100000.0)
+            s2_tp = st.number_input("Riserve Tecniche Lorde (€):", min_value=0.0, value=1500000.0, step=100000.0)
+        with s2_c2:
+            s2_symm = st.slider("Aggiustamento Simmetrico Azionario (%):", min_value=-10.0, max_value=10.0, value=0.0, step=1.0) / 100.0
 
-fig_simm_wf = build_isda_simm_waterfall_and_umr_chart(
-    {
-        "risk_class_breakdown": rc_map_for_chart,
-        "standalone_sum_eur": simm_res["undiversified_sum_im_eur"],
-        "total_simm_im_eur": simm_res["total_simm_initial_margin_eur"],
-        "ccp_cleared_im_eur": simm_res["ccp_cleared_equivalent_im_eur"],
-        "umr_threshold_eur": simm_res["umr_threshold_eur"],
+    sample_s2_assets = [
+        {"name": "Azioni Core Europa", "asset_type": "equity_type1", "value": 800000.0, "duration": 0.0, "cqs_rating": 2, "currency": "EUR"},
+        {"name": "Emerging Markets Equity", "asset_type": "equity_type2", "value": 300000.0, "duration": 0.0, "cqs_rating": 3, "currency": "USD"},
+        {"name": "BTP Governativi 10Y", "asset_type": "bond", "value": 900000.0, "duration": 7.5, "cqs_rating": 3, "currency": "EUR"},
+        {"name": "Corporate Bond Investment Grade", "asset_type": "bond", "value": 500000.0, "duration": 4.2, "cqs_rating": 2, "currency": "EUR"},
+        {"name": "Immobili a Reddito", "asset_type": "property", "value": 400000.0, "duration": 0.0, "cqs_rating": 2, "currency": "EUR"},
+        {"name": "Liquidita & Depositi Bancari", "asset_type": "cash", "value": 200000.0, "duration": 0.25, "cqs_rating": 2, "currency": "EUR"},
+    ]
+
+    s2_report = compute_solvency2_standard_formula(
+        portfolio_assets=sample_s2_assets,
+        eligible_own_funds=s2_eof,
+        technical_provisions=s2_tp,
+        symmetric_equity_adjustment=s2_symm,
+    )
+
+    s2k1, s2k2, s2k3, s2k4 = st.columns(4)
+    with s2k1:
+        metric_card("Eligible Own Funds", fmt_eur(s2_report["eligible_own_funds"]), delta="Tier 1 + Tier 2", delta_color="normal")
+    with s2k2:
+        metric_card("Requisito SCR Totale", fmt_eur(s2_report["scr_total"]), delta=f"BSCR: {fmt_eur(s2_report['bscr'])}", delta_color="inverse")
+    with s2k3:
+        metric_card("Beneficio Diversificazione", fmt_eur(s2_report["market_diversification_benefit"]), delta="Aggregazione EIOPA", delta_color="normal")
+    with s2k4:
+        metric_card("Solvency Ratio", f"{s2_report['solvency_ratio_pct']:.1f}%", delta=s2_report["solvency_health"], delta_color="normal" if s2_report["solvency_ratio_pct"] >= 160 else "inverse")
+
+    st.markdown("##### 📋 Prospetto Regolamentare QRT S.25.01.21 (SCR Standard Formula)")
+    st.dataframe(pd.DataFrame(list(s2_report["qrt_s25_01"].items()), columns=["Voce Regolamentare", "Valore"]), use_container_width=True, hide_index=True)
+
+    # ── V9.13.0: FRTB (BASEL IV / BCBS 365) STANDARDIZED APPROACH ──────
+    st.markdown("---")
+    st.markdown("#### 🏛️ FRTB Standardized Approach Capital Engine (BCBS 365 / Basel IV)")
+    st.caption("Sensitivities-Based Method (SBM) Delta/Vega/Curvature, Default Risk Charge (DRC) e Residual Risk Add-on (RRAO).")
+
+    from core.frtb_engine import compute_frtb_capital_charges
+
+    render_institutional_info_box(
+        title="FRTB Standardized Approach (BCBS 365 / CRR III Trading Book Capital)",
+        badge="BASEL IV TRADING BOOK • FRTB-SA",
+        summary_html=(
+            "Il framework <b>Fundamental Review of the Trading Book (FRTB - BCBS 365)</b> sostituisce il VaR tradizionale del portafoglio di negoziazione "
+            "con la somma di tre pilastri: <b>Sensitivities-Based Method (SBM: Delta, Vega, Curvature)</b>, <b>Default Risk Charge (DRC)</b> "
+            "e <b>Residual Risk Add-On (RRAO)</b> testati su 3 scenari di correlazione (Low, Medium, High)."
+        ),
+        math_html=(
+            "Capitale totale FRTB-SA e aggregazione intra/inter-bucket:<br>"
+            "<code>K_FRTB = max_{c ∈ {Low, Med, High}} [ K_SBM(c) ] + K_DRC + K_RRAO</code><br>"
+            "<code>K_b = √( max(0, Σ_k WS_k² + Σ_{k≠l} ρ_{kl} WS_k WS_l) )</code> dove $WS_k = RW_k \\cdot s_k$ sono le sensibilità ponderate."
+        ),
+        chart_guide_html=(
+            "• <b>KPI Requisito FRTB Totale</b>: mostra l'assorbimento patrimoniale complessivo e la ripartizione tra SBM, DRC e RRAO.<br>"
+            "• <b>Tabella SBM per Classe di Rischio</b>: dettaglia il contributo di GIRR, CSR, Equity, Commodity e FX."
+        ),
+        regulatory_html=(
+            "• <b>Regolamento (UE) 2024/1623 (CRR III / Basilea IV)</b>: standard vincolante per il calcolo dei requisiti patrimoniali di mercato.<br>"
+            "• <b>Stress di Correlazione BCBS</b>: le correlazioni $\\rho_{kl}$ e $\\gamma_{bc}$ sono scalate del $\\times 1.25$ (High) e $\\times 0.75$ (Low) per catturare il correlation breakdown."
+        ),
+    )
+
+    with st.expander("⚙️ Parametri Portafoglio di Trading & Sensibilità FRTB", expanded=False):
+        frtb_c1, frtb_c2 = st.columns(2)
+        with frtb_c1:
+            frtb_port_val = st.number_input("Valore Totale Portafoglio di Trading (€):", min_value=1_000_000.0, value=50_000_000.0, step=5_000_000.0, key="frtb_port_val_in")
+        with frtb_c2:
+            frtb_corr_scenario = st.selectbox("Scenario di Correlazione BCBS:", ["MEDIUM", "HIGH", "LOW"], index=0, key="frtb_scen_sel")
+
+    frtb_res = compute_frtb_capital_charges(
+        correlation_scenario=frtb_corr_scenario,
+        total_portfolio_value=frtb_port_val,
+    )
+
+    fk1, fk2, fk3, fk4 = st.columns(4)
+    with fk1:
+        metric_card("Requisito FRTB Totale", fmt_eur(frtb_res["total_frtb_capital_charge_eur"]), delta=f"{frtb_res['capital_ratio_pct']:.2f}% Portafoglio", delta_color="inverse")
+    with fk2:
+        metric_card("SBM Total Charge", fmt_eur(frtb_res["sbm_total_charge_eur"]), delta=f"Delta: {fmt_eur(frtb_res['sbm_delta_charge_eur'])}", delta_color="normal")
+    with fk3:
+        metric_card("Default Risk Charge (DRC)", fmt_eur(frtb_res["drc_total_charge_eur"]), delta="JTD & Rating Weights", delta_color="normal")
+    with fk4:
+        metric_card("Residual Risk (RRAO)", fmt_eur(frtb_res["rrao_total_charge_eur"]), delta="Prodotti Esotici", delta_color="normal")
+
+    st.markdown("##### 📊 Decomposizione SBM per Classe di Rischio e Sensibilità")
+    st.dataframe(pd.DataFrame(frtb_res["sbm_breakdown_by_risk_class"]), use_container_width=True, hide_index=True)
+
+    # ── V9.13.0: NGFS CLIMATE TRANSITION & PHYSICAL STRESS ENGINE ───────
+    st.markdown("---")
+    st.markdown("#### 🌱 NGFS Phase IV Climate Transition & Physical Risk Stress Engine")
+    st.caption("Stress test climatico su scenari NGFS (Orderly Net Zero 2050, Disorderly Delayed Transition, Hot House World) con WACI Scope 1-2-3.")
+
+    from core.climate_stress_engine import compute_ngfs_climate_stress
+
+    render_institutional_info_box(
+        title="NGFS Phase IV Climate Stress Test (Transition Carbon Tax & Physical Damage)",
+        badge="CLIMATE STRESS • NGFS / ECB",
+        summary_html=(
+            "Simula l'impatto patrimoniale dei tre archetipi climatici del <b>Network for Greening the Financial System (NGFS Phase IV)</b>: "
+            "<i>Orderly Net Zero 2050</i>, <i>Disorderly Delayed Transition</i> e <i>Hot House World</i>, scomponendo la perdita tra "
+            "<b>Rischio di Transizione (Carbon Price su Scope 1-2-3)</b> e <b>Rischio Fisico Cronico/Acuto</b>."
+        ),
+        math_html=(
+            "Weighted Average Carbon Intensity (WACI) e shock di valutazione per emittente $i$:<br>"
+            "<code>WACI = Σ_i w_i · [ Emissioni_Scope123_i / Ricavi_MEUR_i ]</code><br>"
+            "<code>ΔV_i = - τ_CO2(t) · E_i · (1 - PassThrough_i) · Multiplier_EBITDA - Damage_Physical(ΔT_°C)</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Perdita Transizione vs Rischio Fisico</b>: Net Zero 2050 anticipa il costo della Carbon Tax ma minimizza il danno fisico; Hot House World azzera la transizione ma massimizza i danni climatici.<br>"
+            "• <b>Tabella Holdings</b>: identifica i titoli 'Stranded Asset' ad alta intensità carbonica."
+        ),
+        regulatory_html=(
+            "• <b>BCE Climate Stress Test & CSRD / SFDR PAI</b>: allineato alle metriche obbligatorie di rendicontazione dell'impronta carbonica di portafoglio.<br>"
+            "• <b>EBA Pillar 3 ESG Disclosures (ITS)</b>: quantificazione dell'esposizione verso settori ad alto impatto climatico (NACE)."
+        ),
+    )
+
+    cl_c1, cl_c2 = st.columns(2)
+    with cl_c1:
+        ngfs_scenario_sel = st.selectbox("Scenario NGFS Phase IV:", ["Net Zero 2050 (Orderly)", "Delayed Transition (Disorderly)", "Current Policies (Hot House World)"], key="ngfs_scen_sel")
+    with cl_c2:
+        ngfs_target_yr = st.select_slider("Orizzonte Temporale di Stress:", options=[2030, 2035, 2040, 2050], value=2030, key="ngfs_yr_sel")
+
+    cl_res = compute_ngfs_climate_stress(scenario_name=ngfs_scenario_sel, target_year=ngfs_target_yr)
+
+    ck1, ck2, ck3, ck4 = st.columns(4)
+    with ck1:
+        metric_card("Perdita Climatica Totale", f"{cl_res['portfolio_loss_pct']:.2f}%", delta=fmt_eur(cl_res["portfolio_loss_eur"]), delta_color="inverse")
+    with ck2:
+        metric_card("Rischio di Transizione", fmt_eur(cl_res["transition_risk_loss_eur"]), delta=f"Prezzo CO₂: ${cl_res['carbon_price_usd_ton']}/t", delta_color="inverse")
+    with ck3:
+        metric_card("Rischio Fisico (Danni)", fmt_eur(cl_res["physical_risk_loss_eur"]), delta=f"Riscaldamento: +{cl_res['temperature_anomaly_celsius']}°C", delta_color="inverse")
+    with ck4:
+        metric_card("Intensità WACI Portafoglio", f"{cl_res['portfolio_waci_tco2e_per_meur']:.1f}", delta="tCO₂e / M€ Ricavi", delta_color="normal")
+
+    st.markdown("##### 🏢 Impatto Climatico Dettagliato per Società & Asset")
+    st.dataframe(pd.DataFrame(cl_res["holdings_breakdown"]), use_container_width=True, hide_index=True)
+
+    # ── V9.13.0: INTERACTIVE MACRO WAR ROOM & CORRELATION BREAKDOWN ───
+    st.markdown("---")
+    st.markdown("#### 🎯 Interactive Macro War Room & Correlation Breakdown Stress Engine")
+    st.caption("Simulatore macro a leve multiple (Tassi, Twist, Inflazione, Petrolio, Spread) con crollo sistemico delle correlazioni verso equicorrelazione.")
+
+    from core.macro_war_room import compute_macro_war_room_stress
+
+    render_institutional_info_box(
+        title="Interactive Macro War Room & Correlation Breakdown (Panic Equicorrelation)",
+        badge="MACRO WAR ROOM • CORRELATION BREAKDOWN",
+        summary_html=(
+            "Durante i crash di liquidità sistemici, le correlazioni storiche tra classi di attivo convergono verso $1$ "
+            "(<b>Correlation Breakdown</b>), annullando i benefici di diversificazione. Questo laboratorio combina 6 shock macroeconomici simultanei "
+            "con una miscela convessa $\\lambda \\in [0, 1]$ tra la matrice di correlazione empirica $R_{\\text{hist}}$ e la matrice di panico $R_{\\text{panic}}$."
+        ),
+        math_html=(
+            "Matrice di correlazione stressata e volatilità di portafoglio sotto contagio:<br>"
+            "<code>R_stressed(λ) = (1 - λ) R_hist + λ R_panic(ρ_eq = 0.85)</code><br>"
+            "<code>σ_stressed = Multi_vol · √( w^T D_σ R_stressed(λ) D_σ w )</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Perdita di Diversificazione</b>: misura in punti percentuali l'incremento di volatilità causato esclusivamente dalla rottura delle correlazioni ($\\lambda > 0$).<br>"
+            "• <b>Drenaggio Liquidità / Margin Call</b>: stima il fabbisogno immediato di cassa per far fronte alle richieste di margine di variazione e iniziale."
+        ),
+        regulatory_html=(
+            "• <b>BCBS Stress Testing Principles</b>: modellazione esplicita della non-linearità e dell'endogenità delle correlazioni in condizioni di mercato avverse.<br>"
+            "• <b>Contingency Funding Plan (CFP)</b>: dimensionamento del buffer di liquidità contro chiamate di margine simultanee."
+        ),
+    )
+
+    with st.expander("🎛️ Pannello di Controllo Macro Shock & Leva di Correlazione", expanded=True):
+        mw1, mw2, mw3, mw4 = st.columns(4)
+        with mw1:
+            rates_bps = st.slider("Parallel Rates Shock (bps):", min_value=-300, max_value=400, value=150, step=25, key="mw_rates_bps")
+            twist_bps = st.slider("Curve Twist Inversion (bps):", min_value=-150, max_value=150, value=-50, step=10, key="mw_twist_bps")
+        with mw2:
+            cpi_shock = st.slider("Inflation / CPI Surge (%):", min_value=-2.0, max_value=10.0, value=3.5, step=0.5, key="mw_cpi_shock")
+            oil_shock = st.slider("Oil / Energy Spike (%):", min_value=-50, max_value=100, value=40, step=5, key="mw_oil_shock")
+        with mw3:
+            eq_crash = st.slider("Equity Drawdown (%):", min_value=-60, max_value=20, value=-20, step=5, key="mw_eq_crash")
+            cs_spread = st.slider("Credit Spread OAS Widening (bps):", min_value=-50, max_value=600, value=250, step=25, key="mw_cs_spread")
+        with mw4:
+            lam_corr = st.slider("Correlation Breakdown (λ):", min_value=0.0, max_value=1.0, value=0.60, step=0.05, key="mw_lam_corr", help="0 = correlazione storica, 1 = panic equicorrelation matrix (0.85)")
+            vol_surge = st.slider("Vol Surge Multiplier:", min_value=1.0, max_value=3.0, value=1.50, step=0.1, key="mw_vol_surge")
+
+    mw_params = {
+        "scenario_name": "Stagflationary Energy Shock & Yield Surge",
+        "parallel_rates_bps": rates_bps,
+        "slope_twist_bps": twist_bps,
+        "inflation_shock_pct": cpi_shock,
+        "oil_shock_pct": oil_shock,
+        "equity_shock_pct": eq_crash,
+        "credit_spread_widening_bps": cs_spread,
+        "correlation_breakdown_lambda": lam_corr,
+        "vol_surge_factor": vol_surge,
     }
-)
-st.plotly_chart(fig_simm_wf, use_container_width=True)
-st.dataframe(pd.DataFrame(simm_res["risk_class_breakdown"]), use_container_width=True, hide_index=True)
-render_sr117_audit_drawer(
-    engine_name="ISDA SIMM v2.6 & BCBS-IOSCO UMR Compliance Engine",
-    latex_formulas=[
-        r"\text{SIMM}_{\text{total}} = \sqrt{\sum_{r \in \mathcal{R}} \text{IM}_r^2 + \sum_{r \neq s} \psi_{r,s}\,\text{IM}_r\,\text{IM}_s}",
-        r"K_b = \sqrt{\sum_k WS_k^2 + \sum_{k \neq l} \rho_{kl}\,f_{kl}\,WS_k\,WS_l}, \quad CR_k = \max\!\left(1, \sqrt{\frac{|s_k|}{T_k}}\right)",
-    ],
-    inputs_dict={"funding_spread_bps": eff_fspread, "mpor_days": int(sm_mpor)},
-    outputs_dict={
-        "total_simm_im_eur": simm_res["total_simm_initial_margin_eur"],
-        "ccp_im_eur": simm_res["ccp_cleared_equivalent_im_eur"],
-        "mva_savings_eur": simm_res["annual_ccp_mva_savings_eur"],
-    },
-    regulatory_refs=["ISDA SIMM v2.6 Methodology", "BCBS-IOSCO UMR Phase 6", "Fed SR 11-7"],
-)
+
+    mw_res = compute_macro_war_room_stress(scenario_params=mw_params)
+
+    mk1, mk2, mk3, mk4 = st.columns(4)
+    with mk1:
+        metric_card("PnL Portafoglio Macro", fmt_eur(mw_res["total_pnl_eur"]), delta=f"{mw_res['total_pnl_pct']:.2f}%", delta_color="inverse" if mw_res["total_pnl_eur"] < 0 else "normal")
+    with mk2:
+        metric_card("Volatilità Stressata", f"{mw_res['stressed_vol_pct']:.2f}%", delta=f"Base: {mw_res['base_vol_pct']:.2f}%", delta_color="inverse")
+    with mk3:
+        metric_card("Perdita di Diversificazione", f"+{mw_res['diversification_loss_pct']:.2f}%", delta="Impatto Correlazione λ", delta_color="inverse")
+    with mk4:
+        metric_card("Drenaggio Liquidità / Margin Call", fmt_eur(mw_res["liquidity_margin_drain_eur"]), delta="Cuscino di Garanzia", delta_color="inverse")
+
+    st.markdown("##### 📋 Decomposizione PnL per Asset e Fattore Macro")
+    st.dataframe(pd.DataFrame(mw_res["assets_breakdown"]), use_container_width=True, hide_index=True)
+
+    st.markdown("##### 🌐 Matrice di Correlazione Sotto Stress Sistemico ($R_{\\text{stressed}}$)")
+    st.dataframe(pd.DataFrame(mw_res["stressed_correlation_matrix"]), use_container_width=True)
+
+
+elif active_stress_tab == "🛡️ Bilateral XVA, ISDA SIMM™ v2.6 & Basel III Liquidity":
+    # ── V9.14.0: BILATERAL XVA & COUNTERPARTY RISK ENGINE ─────────────────
+    st.markdown("#### 🛡️ Bilateral XVA & Counterparty Credit Risk Engine (BCBS / ISDA SIMM)")
+    st.caption("Valutazione CVA, DVA, FVA, MVA, KVA con accordi di compensazione CSA e simulazione profili di esposizione (EE, PFE 95%/99%, ENE).")
+
+    from core.xva_engine import compute_xva_metrics
+
+    render_institutional_info_box(
+        title="Bilateral XVA Desk (CVA, DVA, FVA, MVA, KVA) & CSA Collateralized Exposure",
+        badge="XVA DESK • COUNTERPARTY RISK",
+        summary_html=(
+            "Il motore <b>Bilateral XVA</b> simula tramite Monte Carlo l'evoluzione del Mark-to-Market del netting set di derivati "
+            "in presenza di un contratto <b>ISDA Credit Support Annex (CSA)</b> (con soglia $H$, Minimum Transfer Amount $MTA$ e Margin Period of Risk $MPOR$), "
+            "calcolando gli aggiustamenti di valutazione creditizi, di funding, di margine iniziale e di capitale regolamentare."
+        ),
+        math_html=(
+            "Integrali discreti lungo la griglia temporale $t_k$ per CVA, DVA, FVA, MVA e KVA:<br>"
+            "<code>CVA = - LGD_C Σ_k EE_CSA(t_k) · P(0, t_k) · ΔPD_C(t_{k-1}, t_k)</code><br>"
+            "<code>DVA = + LGD_B Σ_k ENE_CSA(t_k) · P(0, t_k) · ΔPD_B(t_{k-1}, t_k)  |  MVA = - Σ_k IM(t_k) · s_funding · Δt_k</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Profilo EE vs PFE 95%/99%</b>: l'Expected Exposure (EE) guida il pricing CVA/FVA, mentre la Potential Future Exposure al 99% (PFE 99%) misura il consumo delle linee di fido creditizio.<br>"
+            "• <b>Expected Negative Exposure (ENE)</b>: rappresenta l'esposizione dal punto di vista della controparte e determina il beneficio DVA e Funding Benefit (FBA)."
+        ),
+        regulatory_html=(
+            "• <b>IFRS 13 Fair Value Measurement & Basilea III/IV SA-CVA (BCBS 325)</b>: obbligo contabile e prudenziale di valorizzazione del rischio di controparte.<br>"
+            "• <b>MPOR Risk</b>: cattura il salto di esposizione residua nei 10 giorni lavorativi necessari a chiudere e rimpiazzare il portafoglio di una controparte in default."
+        ),
+    )
+
+    _default_xva_mtm = max(1_000.0, round(float(portfolio_value), 2)) if portfolio_value > 0 else 2_500_000.0
+    _default_xva_thr = max(500.0, round(_default_xva_mtm * 0.15, -2))
+    _default_xva_mta = max(100.0, round(_default_xva_mtm * 0.05, -2))
+
+    with st.expander("⚙️ Parametri Contratto CSA Netting Set & Portafoglio Derivati", expanded=False):
+        xva_c1, xva_c2, xva_c3 = st.columns(3)
+        with xva_c1:
+            xva_port_mtm = st.number_input("MTM Lordo / Nozionale Portafoglio (€):", min_value=1_000.0, value=float(_default_xva_mtm), step=10_000.0, key="xva_mtm_in")
+            xva_thresh = st.number_input("Soglia CSA Bilaterale (€):", min_value=0.0, value=float(_default_xva_thr), step=5_000.0, key="xva_thresh_in")
+        with xva_c2:
+            xva_cpty_spread = st.number_input("Credit Spread Controparte (bps):", min_value=10.0, max_value=1000.0, value=120.0, step=10.0, key="xva_cpty_sp")
+            xva_own_spread = st.number_input("Credit Spread Proprio (DVA bps):", min_value=10.0, max_value=500.0, value=65.0, step=5.0, key="xva_own_sp")
+        with xva_c3:
+            xva_mpor = st.slider("Margin Period of Risk (MPOR Giorni):", min_value=5, max_value=30, value=10, step=1, key="xva_mpor_in")
+            xva_mta = st.number_input("Minimum Transfer Amount (€):", min_value=0.0, value=float(_default_xva_mta), step=1_000.0, key="xva_mta_in")
+
+    custom_csa = {
+        "threshold_eur": xva_thresh,
+        "mta_eur": xva_mta,
+        "mpor_days": xva_mpor,
+    }
+    custom_mkt = {
+        "counterparty_cds_spread_bps": xva_cpty_spread,
+        "own_cds_spread_bps": xva_own_spread,
+    }
+    _xva_trades = [
+        {"trade_id": "IRS_EUR_5Y", "symbol": "EUR_SWAP_5Y", "asset_class": "IR_SWAP", "notional_eur": xva_port_mtm * 0.45, "maturity_years": 5.0, "mtm_eur": xva_port_mtm * 0.14, "volatility_annual": 0.18},
+        {"trade_id": "IRS_EUR_10Y", "symbol": "EUR_SWAP_10Y", "asset_class": "IR_SWAP", "notional_eur": xva_port_mtm * 0.27, "maturity_years": 10.0, "mtm_eur": -xva_port_mtm * 0.05, "volatility_annual": 0.15},
+        {"trade_id": "FX_FWD_USD", "symbol": "EUR_USD_2Y", "asset_class": "FX_FORWARD", "notional_eur": xva_port_mtm * 0.18, "maturity_years": 2.0, "mtm_eur": xva_port_mtm * 0.07, "volatility_annual": 0.12},
+        {"trade_id": "EQ_OPT_PORT", "symbol": "PORT_HEDGE_1Y", "asset_class": "EQUITY_OPTION", "notional_eur": xva_port_mtm * 0.10, "maturity_years": 1.0, "mtm_eur": xva_port_mtm * 0.04, "volatility_annual": 0.24},
+    ]
+
+    xva_res = compute_xva_metrics(trades_data=_xva_trades, csa_params=custom_csa, market_params=custom_mkt)
+
+    xk1, xk2, xk3, xk4 = st.columns(4)
+    with xk1:
+        metric_card("Credit Valuation Adj (CVA)", fmt_eur(xva_res["cva_eur"]), delta="Rischio Controparte", delta_color="inverse")
+    with xk2:
+        metric_card("Debit Valuation Adj (DVA)", fmt_eur(xva_res["dva_eur"]), delta="Rischio Proprio (+)", delta_color="normal")
+    with xk3:
+        metric_card("Funding Valuation Adj (FVA)", fmt_eur(xva_res["fva_eur"]), delta=f"MVA: {fmt_eur(xva_res['mva_eur'])}", delta_color="inverse")
+    with xk4:
+        metric_card("Total Net XVA", fmt_eur(xva_res["total_xva_eur"]), delta=f"Peak PFE 99%: {fmt_eur(xva_res['peak_pfe_99_eur'])}", delta_color="inverse" if xva_res["total_xva_eur"] < 0 else "normal")
+
+    st.markdown("##### 📈 Profilo di Esposizione Creditizia Futura (EE, PFE 95%, PFE 99%, ENE)")
+    exp_df = pd.DataFrame(xva_res["exposure_profile"])
+    _x_col = "tenor_years" if "tenor_years" in exp_df.columns else "time_years"
+
+    fig_xva = go.Figure()
+    fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["pfe_99_eur"], name="PFE 99% (Worst-Case)", line=dict(color="#f43f5e", width=2.5)))
+    fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["pfe_95_eur"], name="PFE 95%", line=dict(color="#fb923c", width=2)))
+    fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["expected_exposure_eur"], name="Expected Exposure (EE)", line=dict(color="#38bdf8", width=2.5)))
+    fig_xva.add_trace(go.Scatter(x=exp_df[_x_col], y=exp_df["expected_negative_exposure_eur"], name="Expected Neg. Exposure (ENE)", line=dict(color="#a855f7", dash="dot")))
+
+    fig_xva.update_layout(
+        title="Simulazione Monte Carlo dei Profili di Esposizione con Collaterale CSA",
+        xaxis_title="Orizzonte Temporale (Anni)",
+        yaxis_title="Esposizione Potenziale (€)",
+        height=420,
+        margin=dict(l=10, r=10, b=10, t=40),
+    )
+    st.plotly_chart(fig_xva, use_container_width=True)
+
+    # ── V9.14.0: BASEL III LIQUIDITY STANDARDS (LCR & NSFR) ───────────────
+    st.markdown("---")
+    st.markdown("#### 💧 Basel III Liquidity Standards & Dynamic Cash Ladder (BCBS 238)")
+    st.caption("Requisito di copertura della liquidità a 30 giorni (LCR ≥ 100%), Net Stable Funding Ratio (NSFR ≥ 100%) e proiezioni di sopravvivenza.")
+
+    from core.basel_liquidity_engine import compute_basel_liquidity_ratios
+
+    render_institutional_info_box(
+        title="Basel III Liquidity Coverage Ratio (LCR, BCBS 238) & Net Stable Funding Ratio (NSFR, BCBS 295)",
+        badge="BASEL III LIQUIDITY • LCR & NSFR",
+        summary_html=(
+            "Verifica la resilienza di liquidità a breve termine (<b>LCR a 30 giorni</b> tramite lo stock di <i>High-Quality Liquid Assets</i> "
+            "Livello 1, 2A e 2B con cap regolamentari del 40%/15%) e l'equilibrio strutturale delle fonti di provvista stabile a 1 anno (<b>NSFR</b>)."
+        ),
+        math_html=(
+            "Ratio regolamentari di liquidità Basilea III / CRR II:<br>"
+            "<code>LCR = Stock HQLA_net / max( Outflows_30d - min(Inflows_30d, 0.75 · Outflows_30d), 1 ) ≥ 100%</code><br>"
+            "<code>NSFR = Available Stable Funding (ASF) / Required Stable Funding (RSF) ≥ 100%</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Dynamic Cash Flow Stress Ladder</b>: proietta il buffer di liquidità netto disponibile a 1, 7, 30, 60 e 90 giorni sotto stress combinato.<br>"
+            "• <b>Tabella HQLA Breakdown</b>: mostra l'applicazione degli haircut obbligatori (0% su L1 Sovrani, 15% su L2A Corporate AA, 50% su L2B Equity)."
+        ),
+        regulatory_html=(
+            "• <b>BCBS 238 & 295 / Regolamento (UE) 2015/61 (LCR Delegated Act)</b>: pilastro della vigilanza ILAAP (Internal Liquidity Adequacy Assessment Process).<br>"
+            "• <b>Survival Horizon</b>: numero di giorni in cui l'istituzione rimane solvibile senza accesso al mercato interbancario unsecured."
+        ),
+    )
+
+    with st.expander("⚙️ Parametri Attivi Liquidi HQLA & Run-off di Cassa", expanded=False):
+        b_c1, b_c2 = st.columns(2)
+        with b_c1:
+            hqla_l1_val = st.number_input("HQLA Livello 1 - Riserve & Titoli Sovrani 0% RW (€):", min_value=5_000_000.0, value=70_000_000.0, step=5_000_000.0, key="hqla_l1_in")
+            hqla_l2a_val = st.number_input("HQLA Livello 2A - Corp Bonds AAA/AA (€):", min_value=0.0, value=30_000_000.0, step=2_000_000.0, key="hqla_l2a_in")
+        with b_c2:
+            hqla_l2b_val = st.number_input("HQLA Livello 2B - Azioni & Titoli BBB (€):", min_value=0.0, value=15_000_000.0, step=1_000_000.0, key="hqla_l2b_in")
+            outflow_stress_mult = st.slider("Stress Multiplier sui Deflussi a 30gg:", min_value=1.0, max_value=2.0, value=1.25, step=0.05, key="liq_mult_in")
+
+    custom_hqla = [
+        {"asset_id": "L1_SOV", "asset_type": "sovereign_l1", "level": "1", "market_value": hqla_l1_val, "haircut": 0.0},
+        {"asset_id": "L2A_CORP", "asset_type": "corp_bond_l2a", "level": "2A", "market_value": hqla_l2a_val, "haircut": 0.15},
+        {"asset_id": "L2B_EQ", "asset_type": "qualifying_equities", "level": "2B", "market_value": hqla_l2b_val, "haircut": 0.50},
+    ]
+
+    basel_res = compute_basel_liquidity_ratios(hqla_data=custom_hqla)
+
+    bk1, bk2, bk3, bk4 = st.columns(4)
+    with bk1:
+        lcr_stat = "CONFORME ✅" if basel_res["lcr_compliant"] else "DEFICIT ⚠️"
+        metric_card("Liquidity Coverage Ratio (LCR)", f"{basel_res['lcr_ratio_pct']:.1f}%", delta=f"{lcr_stat} (Min 100%)", delta_color="normal" if basel_res["lcr_compliant"] else "inverse")
+    with bk2:
+        metric_card("HQLA Totale Idoneo", fmt_eur(basel_res["total_hqla_eligible"]), delta=f"Cap Deduc: {fmt_eur(basel_res['cap_deduction'])}", delta_color="normal")
+    with bk3:
+        nsfr_stat = "CONFORME ✅" if basel_res["nsfr_compliant"] else "DEFICIT ⚠️"
+        metric_card("Net Stable Funding Ratio (NSFR)", f"{basel_res['nsfr_ratio_pct']:.1f}%", delta=f"{nsfr_stat} (Min 100%)", delta_color="normal" if basel_res["nsfr_compliant"] else "inverse")
+    with bk4:
+        metric_card("Orizzonte di Sopravvivenza", f"{basel_res['survival_horizon_days']} Giorni", delta="Stress Sistemico", delta_color="normal" if basel_res["survival_horizon_days"] > 30 else "inverse")
+
+    st.markdown("##### 🪜 Dynamic Cash Flow Stress Ladder & Buffer di Liquidità")
+    ladder_df = pd.DataFrame(basel_res["stress_ladder"])
+
+    fig_ladder = go.Figure()
+    fig_ladder.add_trace(go.Bar(x=ladder_df["horizon_days"].astype(str) + "d", y=ladder_df["projected_liquidity_buffer"], name="Buffer Netto Residuo (€)", marker_color="#0ea5e9"))
+    fig_ladder.update_layout(
+        title="Evoluzione del Cuscinetto di Liquidità Proiettato per Orizzonte Temporale",
+        xaxis_title="Orizzonte di Stress (Giorni)",
+        yaxis_title="Buffer Disponibile (€)",
+        height=380,
+        margin=dict(l=10, r=10, b=10, t=40),
+    )
+    st.plotly_chart(fig_ladder, use_container_width=True)
+
+    st.markdown("##### 📋 Dettaglio HQLA per Livello e Haircut Regolamentare")
+    st.dataframe(pd.DataFrame(basel_res["hqla_breakdown"]), use_container_width=True, hide_index=True)
+
+
+    # ── v9.17.0 / v9.18.0: ISDA SIMM v2.6 INITIAL MARGIN & UNCLEARED MARGIN RULES (UMR) ──
+    st.divider()
+    st.markdown("#### 🛡️ ISDA SIMM™ v2.6 (Standard Initial Margin Model) & BCBS-IOSCO UMR Compliance")
+    st.caption("Calcolo regolamentare del Margine Iniziale (DeltaMargin, VegaMargin, CurvatureMargin) sulle 6 classi di rischio ISDA, matrice di correlazione cross-asset ψ_{r,s}, verifica della soglia UMR di €50 Milioni e risparmio MVA tramite Central Clearing (CCP LCH/Eurex).")
+
+    from core.isda_simm_engine import compute_isda_simm_margin
+    from core.ux_institutional_hub import apply_macro_shock_to_inputs, render_bento_kpi_card, render_sr117_audit_drawer
+    from core.ux_quant_canvas import build_isda_simm_waterfall_and_umr_chart
+
+    render_institutional_info_box(
+        title="ISDA SIMM™ v2.6 Initial Margin Model & BCBS-IOSCO UMR (€50M Phase 6 Threshold)",
+        badge="UNCLEARED MARGIN • ISDA SIMM v2.6",
+        summary_html=(
+            "Il modello standardizzato <b>ISDA SIMM™ v2.6</b> calcola il Margine Iniziale bilaterale non-compensato aggregando "
+            "DeltaMargin, VegaMargin e CurvatureMargin sulle 6 classi di rischio (Interest Rate, Credit Qualifying, Credit Non-Qualifying, Equity, Commodity, FX) "
+            "tramite la matrice di correlazione cross-asset $\\psi_{r,s}$ e confronta il costo di funding <b>MVA (Margin Valuation Adjustment)</b> con il clearing centrale (CCP LCH/Eurex)."
+        ),
+        math_html=(
+            "Formula di aggregazione gerarchica ISDA SIMM v2.6 e fattore di concentrazione $CR_k$:<br>"
+            "<code>SIMM_total = √( Σ_r IM_r² + Σ_{r≠s} ψ_{r,s} IM_r IM_s )  |  IM_r = DeltaMargin_r + VegaMargin_r + CurvatureMargin_r</code><br>"
+            "<code>CR_k = max(1, √(|s_k| / T_k))  |  K_b = √( Σ_k WS_k² + Σ_{k≠l} ρ_{kl} f_{kl} WS_k WS_l )</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Waterfall ISDA SIMM & UMR €50M Gauge</b>: mostra come la somma non diversificata delle 6 classi scenda grazie alla correlazione $\\psi_{r,s}$ e se il portafoglio supera la soglia normativa UMR di €50 Milioni.<br>"
+            "• <b>Confronto CCP vs Bilaterale CSA</b>: evidenzia la riduzione del Margine Iniziale (MPOR 5gg vs 10gg) e il risparmio annuo di MVA."
+        ),
+        regulatory_html=(
+            "• <b>BCBS-IOSCO Uncleared Margin Rules (UMR Phase 6 / EMIR Refit)</b>: obbligo di segregazione bilaterale dell'Initial Margin presso custodian terzo sopra €50M di AANA/IM.<br>"
+            "• <b>SIMM Backtesting & Governance SR 11-7</b>: calibrazione basata sul quantile al 99% a 10 giorni (MPOR) su periodo di stress."
+        ),
+    )
+
+    sm_c1, sm_c2 = st.columns(2)
+    with sm_c1:
+        sm_fspread = st.slider("Spread di Funding Collaterale (bps):", min_value=30.0, max_value=350.0, value=145.0, step=5.0, key="sm_fspread_in")
+    with sm_c2:
+        sm_mpor = st.slider("Margin Period of Risk Bilaterale (MPOR Giorni):", min_value=5, max_value=20, value=10, step=1, key="sm_mpor_in")
+
+    shocked_simm = apply_macro_shock_to_inputs({"index_spread_bps": sm_fspread})
+    eff_fspread = float(shocked_simm["index_spread_bps"])
+    simm_prov = "GLOBAL SHOCK OVERRIDE" if shocked_simm.get("macro_shock_active") else "LIVE PORTFOLIO BOUND"
+
+    simm_res = compute_isda_simm_margin(funding_spread_bps=eff_fspread, mpor_days=int(sm_mpor))
+
+    smk1, smk2, smk3, smk4 = st.columns(4)
+    with smk1:
+        render_bento_kpi_card(
+            "ISDA SIMM Initial Margin",
+            fmt_eur(simm_res["total_simm_initial_margin_eur"]),
+            f"Beneficio Diversif.: -{simm_res['cross_class_diversification_benefit_pct']:.1f}%",
+            provenance=simm_prov,
+            sparkline_values=[float(r["total_class_im_eur"]) / 1e6 for r in simm_res["risk_class_breakdown"]],
+            accent_color="#3b82f6",
+        )
+    with smk2:
+        render_bento_kpi_card(
+            "Utilizzo Soglia UMR (€50M)",
+            f"{simm_res['umr_utilization_pct']:.1f}%",
+            simm_res["recommended_clearing_route"].split(" (")[0],
+            provenance=simm_prov,
+            limit_utilization_pct=float(simm_res["umr_utilization_pct"]),
+            accent_color="#10b981" if not simm_res["umr_threshold_breached"] else "#ef4444",
+        )
+    with smk3:
+        render_bento_kpi_card(
+            "IM Equivalente CCP (LCH/Eurex)",
+            fmt_eur(simm_res["ccp_cleared_equivalent_im_eur"]),
+            "MPOR 5gg Clearing",
+            provenance=simm_prov,
+            accent_color="#10b981",
+        )
+    with smk4:
+        render_bento_kpi_card(
+            "Risparmio Annuo MVA (CCP vs CSA)",
+            fmt_eur(simm_res["annual_ccp_mva_savings_eur"]),
+            f"MVA Bilat: {fmt_eur(simm_res['annual_mva_bilateral_eur'])}",
+            provenance=simm_prov,
+            accent_color="#f59e0b",
+        )
+
+    rc_map_for_chart = {}
+    for row in simm_res["risk_class_breakdown"]:
+        rc_label = str(row["risk_class"])
+        if "Interest" in rc_label:
+            rc_map_for_chart["IR"] = {"total_margin": row["total_class_im_eur"]}
+        elif "Non-Qual" in rc_label:
+            rc_map_for_chart["CreditNonQ"] = {"total_margin": row["total_class_im_eur"]}
+        elif "Credit" in rc_label:
+            rc_map_for_chart["CreditQ"] = {"total_margin": row["total_class_im_eur"]}
+        elif "Equity" in rc_label:
+            rc_map_for_chart["Equity"] = {"total_margin": row["total_class_im_eur"]}
+        elif "Commodity" in rc_label:
+            rc_map_for_chart["Commodity"] = {"total_margin": row["total_class_im_eur"]}
+        elif "FX" in rc_label:
+            rc_map_for_chart["FX"] = {"total_margin": row["total_class_im_eur"]}
+
+    fig_simm_wf = build_isda_simm_waterfall_and_umr_chart(
+        {
+            "risk_class_breakdown": rc_map_for_chart,
+            "standalone_sum_eur": simm_res["undiversified_sum_im_eur"],
+            "total_simm_im_eur": simm_res["total_simm_initial_margin_eur"],
+            "ccp_cleared_im_eur": simm_res["ccp_cleared_equivalent_im_eur"],
+            "umr_threshold_eur": simm_res["umr_threshold_eur"],
+        }
+    )
+    st.plotly_chart(fig_simm_wf, use_container_width=True)
+    st.dataframe(pd.DataFrame(simm_res["risk_class_breakdown"]), use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="ISDA SIMM v2.6 & BCBS-IOSCO UMR Compliance Engine",
+        latex_formulas=[
+            r"\text{SIMM}_{\text{total}} = \sqrt{\sum_{r \in \mathcal{R}} \text{IM}_r^2 + \sum_{r \neq s} \psi_{r,s}\,\text{IM}_r\,\text{IM}_s}",
+            r"K_b = \sqrt{\sum_k WS_k^2 + \sum_{k \neq l} \rho_{kl}\,f_{kl}\,WS_k\,WS_l}, \quad CR_k = \max\!\left(1, \sqrt{\frac{|s_k|}{T_k}}\right)",
+        ],
+        inputs_dict={"funding_spread_bps": eff_fspread, "mpor_days": int(sm_mpor)},
+        outputs_dict={
+            "total_simm_im_eur": simm_res["total_simm_initial_margin_eur"],
+            "ccp_im_eur": simm_res["ccp_cleared_equivalent_im_eur"],
+            "mva_savings_eur": simm_res["annual_ccp_mva_savings_eur"],
+        },
+        regulatory_refs=["ISDA SIMM v2.6 Methodology", "BCBS-IOSCO UMR Phase 6", "Fed SR 11-7"],
+    )
+
+
+elif active_stress_tab == "🏦 CreditMetrics™ Vasicek IRB & Fed CCAR / EBA 9Q Capital":
+    # ============================================================================
+    # v9.15.0 / v9.18.0: CREDITMETRICS PORTFOLIO CREDIT RISK & FED CCAR / EBA STRESS ENGINE
+    # ============================================================================
+    active_stress_ws = render_segmented_workspace_switcher(
+        workspace_key="stress_v916_domain",
+        label="🧭 Filtra Sezione (CreditMetrics IRB vs Fed CCAR / EBA 9Q):",
+        options=[
+            "🌐 Tutti i Laboratori Regolamentari",
+            "🤝 Credito & Controparte (CreditMetrics & Vasicek IRB)",
+            "🏛️ Capitale Prudenziale 9Q (Fed CCAR / EBA CET1 Trajectory)",
+        ],
+    )
+
+    from core.ccar_stress_engine import compute_ccar_capital_stress
+    from core.credit_portfolio_engine import compute_credit_portfolio_risk
+
+    if active_stress_ws in ("🌐 Tutti i Laboratori Regolamentari", "🤝 Credito & Controparte (CreditMetrics & Vasicek IRB)"):
+        st.markdown("#### 🏦 CreditMetrics Rating Migration & Basel III IRB Vasicek Portfolio Credit Risk")
+        st.caption("Modello multi-debitore con matrice di transizione S&P a 8 stati (AAA..D), correlazione latente degli asset di Vasicek (2002), capitale regolamentare IRB (K_IRB e RWA), Credit VaR 99.9% e Incremental Risk Charge (IRC).")
+
+        render_institutional_info_box(
+            title="CreditMetrics™ S&P 8-State Migration & Basel III ASRF Vasicek (2002) IRB Formula",
+            badge="CREDIT PORTFOLIO • VASICEK IRB",
+            summary_html=(
+                "Modella congiuntamente il rischio di <b>migrazione del merito creditizio (upgrade/downgrade su matrice S&P a 8 stati AAA..D)</b> "
+                "e il default tramite copula Gaussiana ad 1 fattore latente $Z_i = \\sqrt{\\rho_i} M + \\sqrt{1 - \\rho_i} \\varepsilon_i$, "
+                "affiancando il requisito analitico <b>Basel III Asymptotic Single Risk Factor (ASRF / Vasicek $K_{\\text{IRB}}$)</b>."
+            ),
+            math_html=(
+                "Formula regolamentare Basilea III IRB (Art. 153 CRR) e correlazione decrescente con la PD:<br>"
+                "<code>ρ(PD) = 0.12 · (1 - e^(-50 PD))/(1 - e^(-50)) + 0.24 · [1 - (1 - e^(-50 PD))/(1 - e^(-50))]</code><br>"
+                "<code>K_IRB = [ LGD · Φ( (Φ⁻¹(PD) + √ρ Φ⁻¹(0.999)) / √(1 - ρ) ) - PD · LGD ] · M_adj</code>"
+            ),
+            chart_guide_html=(
+                "• <b>Expected Loss (EL) vs Capitale $K_{\\text{IRB}}$ (UL)</b>: la perdita attesa (EL) è coperta dagli accantonamenti IFRS 9; la perdita inattesa al 99.9% ($K_{\\text{IRB}}$) è coperta dal patrimonio CET1.<br>"
+                "• <b>Tabella Controparti</b>: scompone PD, correlazione $\\rho_i$, RWA ed Euler Marginal Credit VaR per ciascuna posizione del portafoglio attivo."
+            ),
+            regulatory_html=(
+                "• <b>CRR Art. 153-154 & BCBS IRB Framework</b>: calcolo ufficiale dei Risk-Weighted Assets ($\\text{RWA} = 12.5 \\times K_{\\text{IRB}} \\times \\text{EAD}$).<br>"
+                "• <b>Incremental Risk Charge (IRC)</b>: misura ad orizzonte 1 anno al 99.9% il rischio di migrazione e default sugli strumenti creditizi."
+            ),
+        )
+
+        _live_obligors = None
+        if isinstance(pos, pd.DataFrame) and not pos.empty and "current_value" in pos.columns:
+            _pos_valid = pos[pd.to_numeric(pos["current_value"], errors="coerce").fillna(0.0) > 0].copy()
+            if not _pos_valid.empty:
+                _pos_valid["val_num"] = pd.to_numeric(_pos_valid["current_value"], errors="coerce").fillna(0.0)
+                _pos_top = _pos_valid.sort_values("val_num", ascending=False).head(8)
+                _rating_cycle = ["AA", "A", "A", "BBB", "BBB", "BB", "BB", "B"]
+                _live_obligors = []
+                for idx_ob, (_, r_ob) in enumerate(_pos_top.iterrows()):
+                    _tk_ob = str(r_ob.get("ticker", f"OB_{idx_ob+1}"))
+                    _nm_ob = str(r_ob.get("name") or _tk_ob)
+                    _sec_ob = str(r_ob.get("sector") or r_ob.get("asset_class") or "Multi-Asset")
+                    _is_cry = "-USD" in _tk_ob or "CRYPTO" in _sec_ob.upper()
+                    _rat_ob = "B" if _is_cry else _rating_cycle[idx_ob % len(_rating_cycle)]
+                    _live_obligors.append(
+                        {
+                            "obligor_id": _tk_ob,
+                            "name": f"{_nm_ob} ({_tk_ob})" if _tk_ob not in _nm_ob else _nm_ob,
+                            "sector": _sec_ob,
+                            "rating": _rat_ob,
+                            "ead_eur": float(r_ob["val_num"]),
+                            "lgd": 0.55 if _is_cry else 0.42,
+                            "maturity_years": 3.0,
+                        }
+                    )
+
+        cp_c1, cp_c2 = st.columns([1, 3])
+        with cp_c1:
+            cp_sims = st.select_slider("Simulazioni Monte Carlo CreditMetrics:", options=[2000, 5000, 8000, 12000], value=5000, key="cp_sims_slider")
+        with cp_c2:
+            _port_lbl_st = str(st.session_state.get("portfolio_name") or "Portafoglio Attivo")
+            st.info(f"📌 Esposizioni auto-collegate al portafoglio attivo **{_port_lbl_st}** ({len(_live_obligors) if _live_obligors else 6} posizioni principali) rivalutate mark-to-market sugli spread creditizi S&P ad 1 anno.")
+
+        cp_res = compute_credit_portfolio_risk(obligors_data=_live_obligors, n_simulations=int(cp_sims))
+        ck1, ck2, ck3, ck4 = st.columns(4)
+        with ck1:
+            metric_card("Expected Loss (EL Basilea IRB)", fmt_eur(float(cp_res["expected_loss_eur"])), delta=f"EAD: {fmt_eur(float(cp_res['total_ead_eur']))}", delta_color="inverse")
+        with ck2:
+            metric_card("Capitale Regolamentare K_IRB", fmt_eur(float(cp_res["vasicek_irb_capital_999_eur"])), delta=f"RWA: {fmt_eur(float(cp_res['vasicek_rwa_eur']))}", delta_color="normal")
+        with ck3:
+            metric_card("Credit VaR 99.9% (1Y Migration)", fmt_eur(float(cp_res["creditmetrics_var_999_eur"])), delta=f"VaR 99%: {fmt_eur(float(cp_res['creditmetrics_var_99_eur']))}", delta_color="inverse")
+        with ck4:
+            metric_card("Incremental Risk Charge (IRC)", fmt_eur(float(cp_res["incremental_risk_charge_eur"])), delta=f"ES 99.9%: {fmt_eur(float(cp_res['creditmetrics_es_999_eur']))}", delta_color="inverse")
+
+        st.markdown("##### 📋 Decomposizione per Controparte: PD, Correlazione Vasicek ρ, RWA e Contributo Euler al Rischio")
+        st.dataframe(pd.DataFrame(cp_res["obligor_contributions"]), use_container_width=True, hide_index=True)
+
+    if active_stress_ws in ("🌐 Tutti i Laboratori Regolamentari", "🏛️ Capitale Prudenziale 9Q (Fed CCAR / EBA CET1 Trajectory)"):
+        st.divider()
+        st.markdown("#### 🏛️ Fed CCAR / EBA 9-Quarter Supervisory Capital Stress & Traiettoria CET1")
+        st.caption("Proiezione prudenziale su 9 trimestri (Q1..Q9) negli scenari Supervisory Baseline, Adverse e Severely Adverse: Pre-Provision Net Revenue (PPNR), transizione crediti deteriorati IFRS 9 / CECL (Stage 1/2/3), inflazione RWA e Stress Capital Buffer (SCB).")
+
+        render_institutional_info_box(
+            title="Fed CCAR / EBA EU-Wide 9-Quarter CET1 Capital Stress & Stress Capital Buffer (SCB)",
+            badge="SUPERVISORY CAPITAL • CCAR / EBA 9Q",
+            summary_html=(
+                "Simula l'evoluzione trimestrale per 9 trimestri ($Q_1 \\dots Q_9$) del <b>Common Equity Tier 1 (CET1) Ratio</b> sotto gli scenari "
+                "regolamentari <i>Baseline</i>, <i>Adverse</i> e <i>Severely Adverse</i>, integrando la generazione organica di capitale (PPNR), "
+                "gli accantonamenti su crediti deteriorati <b>IFRS 9 / CECL (Stage 1 $\\to$ Stage 2 $\\to$ Stage 3)</b>, le perdite di trading e l'inflazione degli RWA."
+            ),
+            math_html=(
+                "Dinamica ricorsiva del capitale CET1 e calcolo dello Stress Capital Buffer (SCB):<br>"
+                "<code>CET1_{t+1} = CET1_t + PPNR_t - Provision_IFRS9_t - TradingLoss_t - Tax_t - Div_t</code><br>"
+                "<code>CET1_Ratio(t) = CET1_t / RWA_stressed(t)  |  SCB = max( 2.5%,  CET1_0 - min_{t ∈ 1..9} CET1_Ratio_SevAdv(t) )</code>"
+            ),
+            chart_guide_html=(
+                "• <b>Traiettoria 9-Trimestri CET1 (%)</b>: confronta i 3 scenari con la linea gialla tratteggiata <b>OCR / MDA Trigger</b> (sotto la quale scattano i blocchi di distribuzione dividendi/bonus e cedole AT1).<br>"
+                "• <b>Scenario Delta Comparator</b>: permette di salvare uno snapshot Baseline e confrontare i delta in tempo reale."
+            ),
+            regulatory_html=(
+                "• <b>Federal Reserve CCAR / Dodd-Frank Act Stress Test (DFAST) & EBA EU-Wide Stress Test</b>: metodologia standard per il dimensionamento del Pillar 2 Guidance (P2G) e dello Stress Capital Buffer.<br>"
+                "• <b>CRD V Art. 141 (Maximum Distributable Amount - MDA)</b>: presidio automatico contro l'erosione del Combined Buffer Requirement."
+            ),
+        )
+
+        cc_c1, cc_c2, cc_c3, cc_c4 = st.columns(4)
+        with cc_c1:
+            cc_cet1 = st.number_input("Capitale CET1 Iniziale (€ Milioni):", min_value=1_000.0, value=14_200.0, step=500.0, key="cc_cet1_in")
+        with cc_c2:
+            cc_rwa = st.number_input("RWA Iniziali (€ Milioni):", min_value=10_000.0, value=100_000.0, step=5_000.0, key="cc_rwa_in")
+        with cc_c3:
+            cc_loans = st.number_input("Portafoglio Crediti Totale (€ Milioni):", min_value=10_000.0, value=145_000.0, step=5_000.0, key="cc_loans_in")
+        with cc_c4:
+            cc_ppnr = st.number_input("PPNR Trimestrale Base (€ Milioni):", min_value=100.0, value=920.0, step=50.0, key="cc_ppnr_in")
+
+        ccar_res = compute_ccar_capital_stress(
+            initial_cet1_capital_eur_m=cc_cet1,
+            initial_rwa_eur_m=cc_rwa,
+            total_loan_book_eur_m=cc_loans,
+            quarterly_ppnr_baseline_eur_m=cc_ppnr,
+        )
+
+        sev_scen = ccar_res["scenarios"]["severely_adverse"]
+        adv_scen = ccar_res["scenarios"]["adverse"]
+        base_scen = ccar_res["scenarios"]["baseline"]
+        mda_hurdle = ccar_res["regulatory_hurdles"]["overall_capital_requirement_mda_pct"]
+
+        cck1, cck2, cck3, cck4 = st.columns(4)
+        with cck1:
+            metric_card("CET1 Ratio Iniziale", f"{ccar_res['initial_cet1_ratio_pct']:.2f}%", delta=f"Soglia OCR/MDA: {mda_hurdle:.2f}%", delta_color="normal")
+        with cck2:
+            metric_card("Min CET1 (Severely Adverse)", f"{sev_scen['minimum_stressed_cet1_ratio_pct']:.2f}%", delta=f"Trough in {sev_scen['trough_quarter']} (-{sev_scen['max_cet1_drawdown_bps']:.0f} bps)", delta_color="normal" if not sev_scen["mda_restriction_triggered"] else "inverse")
+        with cck3:
+            metric_card("Perdite Credito Cumulate 9Q", f"€ {sev_scen['cumulative_9q_credit_losses_eur_m']:,.0f} M", delta=f"Loss Rate: {sev_scen['cumulative_9q_loss_rate_pct']:.2f}%", delta_color="inverse")
+        with cck4:
+            metric_card("Stress Capital Buffer (SCB)", f"{ccar_res['required_stress_capital_buffer_scb_pct']:.2f}%", delta=ccar_res["supervisory_assessment_status"].split(" - ")[0], delta_color="normal" if "PASS" in ccar_res["supervisory_assessment_status"] else "inverse")
+
+        df_base = pd.DataFrame(base_scen["trajectory"])
+        df_adv = pd.DataFrame(adv_scen["trajectory"])
+        df_sev = pd.DataFrame(sev_scen["trajectory"])
+
+        fig_ccar = go.Figure()
+        fig_ccar.add_trace(go.Scatter(x=df_base["quarter"], y=df_base["cet1_ratio_pct"], mode="lines+markers", name="Supervisory Baseline (%)", line=dict(color="#10b981", width=3)))
+        fig_ccar.add_trace(go.Scatter(x=df_adv["quarter"], y=df_adv["cet1_ratio_pct"], mode="lines+markers", name="Supervisory Adverse (%)", line=dict(color="#f59e0b", width=3)))
+        fig_ccar.add_trace(go.Scatter(x=df_sev["quarter"], y=df_sev["cet1_ratio_pct"], mode="lines+markers", name="Fed CCAR / EBA Severely Adverse (%)", line=dict(color="#ef4444", width=3.5)))
+        fig_ccar.add_hline(y=mda_hurdle, line_dash="dash", line_color="#fbbf24", annotation_text=f"OCR / MDA Trigger ({mda_hurdle:.1f}%)")
+        fig_ccar.add_hline(y=6.0, line_dash="dot", line_color="#dc2626", annotation_text="Pillar 1 + P2R Min (6.0%)")
+        fig_ccar.update_layout(
+            title="Traiettoria Regolamentare 9-Trimestri del CET1 Ratio (%) sotto Stress EBA / Fed CCAR",
+            xaxis_title="Orizzonte Trimestrale di Proiezione",
+            yaxis_title="CET1 Ratio (%)",
+            height=420,
+            margin=dict(l=10, r=10, b=10, t=40),
+        )
+        style_institutional_chart(fig_ccar, title="Traiettoria Regolamentare 9-Trimestri del CET1 Ratio (%) sotto Stress EBA / Fed CCAR", height=420)
+        st.plotly_chart(fig_ccar, use_container_width=True)
+        render_scenario_delta_comparator(
+            scenario_key="ccar_capital_stress",
+            scenario_title="Fed CCAR / EBA 9Q Capital Stress",
+            current_metrics={
+                "CET1 Iniziale (%)": float(ccar_res["initial_cet1_ratio_pct"]),
+                "Min CET1 Severely Adverse (%)": float(sev_scen["minimum_stressed_cet1_ratio_pct"]),
+                "Perdite Credito 9Q (€M)": float(sev_scen["cumulative_9q_credit_losses_eur_m"]),
+                "Stress Capital Buffer SCB (%)": float(ccar_res["required_stress_capital_buffer_scb_pct"]),
+            },
+            higher_is_better_map={
+                "CET1 Iniziale (%)": True,
+                "Min CET1 Severely Adverse (%)": True,
+                "Perdite Credito 9Q (€M)": False,
+                "Stress Capital Buffer SCB (%)": False,
+            },
+        )
+        st.dataframe(df_sev, use_container_width=True, hide_index=True)

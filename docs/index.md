@@ -136,6 +136,36 @@ Correlated multi-asset Monte Carlo valuation engine for Worst-Of structured note
 ### 32. Regulatory PRIIPs KID (SRI 1-7) & SFDR ESG Reporting Engine (Annex I 14 PAI)
 Regulatory disclosure and compliance automation: Packaged Retail and Insurance-based Investment Products (PRIIPs RTS) Summary Risk Indicator (SRI 1 to 7) combining Market Risk Measure (MRM from Cornish-Fisher VEV) and Credit Risk Measure (CRM from issuer rating), 4 regulatory performance scenarios (Favourable, Moderate, Unfavourable, Stress) at 1Y, Half-RHP, and RHP; alongside Sustainable Finance Disclosure Regulation (SFDR) Article 6/8/9 classification and the complete Annex I 14 mandatory Principal Adverse Impacts (PAI) table.
 
+### 33. Multi-Curve OIS Discounting (€STR / SOFR) & Dual-Curve EURIBOR 6M IRS Pricing
+Post-2008 dual-curve bootstrapping separating risk-free OIS discounting $P_{\text{OIS}}(0, T)$ from 6M IBOR forward rate projection $F_{6M}(0; T_{i-1}, T_i)$, Par Swap Rate stripping, Key-Rate DV01 bucketed sensitivity ladder, and analytical Gamma convexity.
+
+### 34. Hull-White 1-Factor Short-Rate Trinomial Lattice & Bermudan Swaption OAS
+Exact initial term-structure calibration $\theta(t)$ on a recombining trinomial lattice for Bermudan Swaptions and Callable Bonds, decomposing total valuation into European Co-Terminal value (Jamshidian 1989) and the Bellman Early-Exercise Switch Premium with implied Option-Adjusted Spread (OAS).
+
+### 35. Rough Volatility (rBergomi $H \approx 0.10$) & Gatheral SVI Arbitrage-Free Surface
+Fractional Brownian motion volatility modeling with Hurst exponent $H \approx 0.10$ capturing the power-law explosion of short-dated ATM skew $\mathcal{S}(T) \propto T^{H - 1/2}$, paired with Durrleman's (2014) butterfly arbitrage density verification $g(k) \ge 0$.
+
+### 36. ISDA Single-Name CDS Bootstrapping & Synthetic CDO Tranches (iTraxx / CDX)
+Piecewise-constant hazard-rate $\lambda(t)$ and survival probability $Q(0, t)$ bootstrapping under ISDA Big Bang standard coupons (100/500 bps), Upfront valuation, CS01, Jump-to-Default (JTD), and Large Homogeneous Portfolio (LHP) 1-Factor Gaussian Copula pricing across $[0\text{-}3\%]$ to $[12\text{-}22\%]$ tranches.
+
+### 37. CreditMetrics™ S&P 8-State Migration & Basel III IRB Vasicek Portfolio Credit Risk
+Multi-obligor credit migration and default engine using S&P 8-state transition matrices, latent Gaussian factor correlation, Basel III ASRF Vasicek (2002) regulatory capital $K_{\text{IRB}}$, Risk-Weighted Assets (RWA), Credit VaR 99.9%, and Incremental Risk Charge (IRC).
+
+### 38. Fed CCAR / EBA 9-Quarter Supervisory CET1 Capital Stress Engine
+9-quarter forward projection ($Q_1 \dots Q_9$) across Baseline, Adverse, and Severely Adverse supervisory scenarios modeling Pre-Provision Net Revenue (PPNR), IFRS 9 / CECL Stage 1/2/3 credit provisions, RWA inflation, OCR/MDA dividend restriction triggers, and Stress Capital Buffer (SCB).
+
+### 39. ISDA SIMM™ v2.6 Initial Margin & BCBS-IOSCO UMR Compliance
+Standard Initial Margin Model v2.6 across all 6 ISDA risk classes (IR, Credit Qualifying, Credit Non-Qualifying, Equity, Commodity, FX) with concentration thresholds $CR_k$, cross-class correlation aggregation $\psi_{r,s}$, €50M UMR Phase 6 threshold utilization, and bilateral CSA vs. CCP (LCH/Eurex) MVA savings.
+
+### 40. Gibson-Schwartz (1997) 2-Factor Commodity Futures & Kirk (1995) Spread Options
+Joint stochastic modeling of spot price $S_t$ and mean-reverting convenience yield $\delta_t$ for energy and metals futures curves, Contango/Backwardation regime detection, Roll Yield analytics, and Kirk's (1995) Calendar/Storage Spread Option pricing.
+
+### 41. Almgren-Chriss Intraday Optimal Liquidation & Avellaneda-Stoikov / VPIN Microstructure
+Intraday execution optimizer balancing Square-Root temporary market impact against timing risk across Almgren-Chriss, Dynamic POV-Capped VWAP, and TWAP; integrated with Avellaneda-Stoikov (2008) inventory-skewed market-making quotes, VPIN order-flow toxicity, and Hawkes self-exciting branching ratios.
+
+### 42. Redington ALM / LDI Immunization & Cash-Flow Matching Linear Programming
+Pension and Total Wealth Asset-Liability Management verifying Redington's (1952) three immunization conditions, Surplus-at-Risk 99%, 20Y Receiver IRS LDI overlay sizing, and exact minimum-cost dedicated bond portfolio construction via Linear Programming (`scipy.optimize.linprog`).
+
 ---
 
 ## Quick Navigation
