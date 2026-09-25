@@ -215,8 +215,10 @@ def test_v918_master_wealth_portfolio_synchronization_and_board_pack_scaling() -
 
     engine = ExecutiveBoardPackEngine(portfolio_name="Master Wealth (Stocks + Crypto)", nav_eur=mw_radar["nav_eur"])
     bp = engine.generate_board_pack()
-    # Verify Board-Pack euro prescriptions scale proportionally to € 64,233.31 (not € 95M)
+    # Verify Board-Pack euro prescriptions scale proportionally to € 64,233.31 (neither € 95M nor € 151M)
     assert any("14,131" in str(p.get("action", "")) for p in bp["cro_prescriptions"])
+    assert any("49,092" in str(p.get("action", "")) for p in bp["cro_prescriptions"])
     assert "95,536,044" not in bp["board_pack_html"]
+    assert "151,428,360" not in bp["board_pack_html"]
 
 
