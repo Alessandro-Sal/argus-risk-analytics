@@ -22,7 +22,7 @@ try:
 except ImportError:  # pragma: no cover
     st = None  # type: ignore[assignment]
 
-APP_VERSION: str = "9.16.0"
+APP_VERSION: str = "9.17.0"
 
 INSTITUTIONAL_PALETTE: list[str] = [
     "#10b981",  # Emerald

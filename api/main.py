@@ -23,23 +23,28 @@ except ImportError:
     FastAPI = object  # Fallback for type hinting
 
 from core.advanced_quant import compute_risk_budgeting_portfolio
+from core.alm_ldi_engine import compute_alm_ldi_immunization
 from core.barra_risk_model import compute_barra_structural_risk
 from core.basel_liquidity_engine import compute_basel_liquidity_ratios
 from core.bitemporal_engine import BitemporalLedgerEngine
 from core.black_litterman_engine import compute_black_litterman_allocation
 from core.ccar_stress_engine import compute_ccar_capital_stress
+from core.cds_tranche_engine import compute_cds_and_tranche_pricing
 from core.climate_stress_engine import compute_ngfs_climate_stress
 from core.commodity_engine import compute_commodity_term_structure
 from core.credit_portfolio_engine import compute_credit_portfolio_risk
 from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
+from core.executive_board_pack_engine import generate_executive_board_pack
 from core.factor_library import compute_fama_french_factor_model
 from core.fix_engine import execute_mock_fix_order
 from core.fixed_income import compute_bond_analytics
 from core.frtb_engine import compute_frtb_capital_charges
 from core.heston_fft_engine import compute_heston_surface_and_calibration
 from core.hull_white_engine import compute_hull_white_swaptions
+from core.isda_simm_engine import compute_isda_simm_margin
 from core.macro_stress_engine import compute_reverse_stress_test
 from core.macro_war_room import compute_macro_war_room_stress
+from core.market_making_vpin_engine import compute_market_making_and_vpin
 from core.mip_rebalancer import solve_mip_rebalance
 from core.multicurve_engine import compute_multicurve_bootstrapping
 from core.optimal_liquidation_engine import compute_optimal_execution_schedule
@@ -50,6 +55,7 @@ from core.pdf_generator import (
 from core.regime_allocation import compute_regime_conditional_allocation
 from core.regulatory_reporting_engine import compute_regulatory_dossier
 from core.risk_engine import compute_portfolio_liquidity_risk
+from core.rough_vol_svi_engine import compute_rough_vol_svi_surface
 from core.sabr_local_vol_engine import compute_sabr_and_local_vol_surface
 from core.services.rebalancing_service import RebalancingService
 from core.services.risk_service import RiskService
@@ -375,6 +381,60 @@ class ScenarioDeltaRequest(BaseModel):
     baseline_metrics: Dict[str, float]
     current_metrics: Dict[str, float]
     higher_is_better_map: Optional[Dict[str, bool]] = None
+
+
+class IsdaSimmRequest(BaseModel):
+    """Payload for ISDA SIMM v2.6 Initial Margin & UMR Compliance."""
+    sensitivities: Optional[List[Dict[str, Any]]] = None
+    funding_spread_bps: float = Field(default=145.0, ge=0.0)
+    mpor_days: int = Field(default=10, ge=1, le=30)
+
+
+class AlmLdiRequest(BaseModel):
+    """Payload for Asset-Liability Management (ALM), LDI & Cash-Flow Matching LP."""
+    asset_portfolio_eur: float = Field(default=125_000_000.0, gt=0.0)
+    asset_modified_duration: float = Field(default=6.8, ge=0.0)
+    asset_convexity: float = Field(default=62.0, ge=0.0)
+    asset_annual_vol: float = Field(default=0.095, gt=0.0)
+    discount_rate: float = Field(default=0.034)
+    inflation_rate: float = Field(default=0.021)
+
+
+class RoughVolSviRequest(BaseModel):
+    """Payload for Rough Volatility (rBergomi) & Gatheral SVI Arbitrage-Free Surface."""
+    hurst_h: float = Field(default=0.10, ge=0.02, le=0.49)
+    svi_a: float = Field(default=0.012, gt=0.0)
+    svi_b: float = Field(default=0.185, gt=0.0)
+    svi_rho: float = Field(default=-0.62, ge=-0.999, le=0.999)
+    svi_sigma: float = Field(default=0.14, gt=0.0)
+    eta_vol_of_vol: float = Field(default=1.85, gt=0.0)
+
+
+class CdsTrancheRequest(BaseModel):
+    """Payload for Single-Name CDS Bootstrapping & iTraxx/CDX Synthetic CDO Tranches."""
+    reference_entity: str = Field(default="Intesa Sanpaolo S.p.A. (Senior)")
+    notional_eur: float = Field(default=10_000_000.0, gt=0.0)
+    recovery_rate: float = Field(default=0.40, ge=0.0, le=0.95)
+    five_year_spread_bps: float = Field(default=96.0, gt=0.0)
+    copula_correlation_rho: float = Field(default=0.32, ge=0.05, le=0.90)
+
+
+class MarketMakingVpinRequest(BaseModel):
+    """Payload for Avellaneda-Stoikov Market-Making & Hawkes/VPIN Order-Flow Toxicity."""
+    symbol: str = Field(default="STM.MI")
+    mid_price: float = Field(default=38.50, gt=0.0)
+    inventory_q: float = Field(default=1_500.0)
+    risk_aversion_gamma: float = Field(default=0.08, gt=0.0)
+    volatility_sigma: float = Field(default=0.022, gt=0.0)
+    order_book_density_kappa: float = Field(default=1.65, gt=0.0)
+    hawkes_alpha: float = Field(default=0.85, gt=0.0)
+    hawkes_beta: float = Field(default=1.40, gt=0.0)
+
+
+class ExecutiveBoardPackRequest(BaseModel):
+    """Payload for 1-Click CRO & Investment Committee Board-Pack Generator."""
+    portfolio_name: str = Field(default="Argus Institutional Master Mandate")
+    nav_eur: float = Field(default=125_000_000.0, gt=0.0)
 
 
 # In-memory background jobs registry
@@ -859,7 +919,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.16.0",
+        version="9.17.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -884,7 +944,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.16.0",
+            version="9.17.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -1859,7 +1919,7 @@ def create_app() -> FastAPI:
             logger.error("Regulatory dossier generation failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
-    # ── v9.16.0 Institutional Endpoints ──────────────────────────
+    # ── v9.17.0 Institutional Endpoints ──────────────────────────
 
     @app.post("/api/v1/pricing/multicurve", tags=["Fixed Income & Rates"])
     def run_multicurve_bootstrapping(req: MultiCurveRequest) -> Dict[str, Any]:
@@ -1969,7 +2029,7 @@ def create_app() -> FastAPI:
             logger.error("CCAR capital stress failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
-    # ── v9.16.0 Institutional Terminal UX/UI Endpoints ────────────
+    # ── v9.17.0 Institutional Terminal UX/UI Endpoints ────────────
 
     @app.post("/api/v1/ux/executive-radar", tags=["Institutional UX & Telemetry"])
     def run_executive_traffic_light_radar(req: ExecutiveRadarRequest) -> Dict[str, Any]:
@@ -1991,6 +2051,98 @@ def create_app() -> FastAPI:
             )
         except Exception as exc:
             logger.error("Scenario delta comparator failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    # ── v9.17.0 Institutional Endpoints ──────────────────────────
+
+    @app.post("/api/v1/margin/isda-simm", tags=["Credit & Counterparty Risk"])
+    def run_isda_simm_margin(req: IsdaSimmRequest) -> Dict[str, Any]:
+        """ISDA SIMM v2.6 Initial Margin (Delta, Vega, Curvature across 6 risk classes) & UMR €50M Check."""
+        try:
+            return compute_isda_simm_margin(
+                sensitivities=req.sensitivities,
+                funding_spread_bps=req.funding_spread_bps,
+                mpor_days=req.mpor_days,
+            )
+        except Exception as exc:
+            logger.error("ISDA SIMM margin failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/wealth/alm-ldi", tags=["Wealth Intelligence"])
+    def run_alm_ldi_immunization(req: AlmLdiRequest) -> Dict[str, Any]:
+        """Asset-Liability Management (ALM), Redington Immunization, LDI Receiver Swap & Cash-Flow Matching LP."""
+        try:
+            return compute_alm_ldi_immunization(
+                asset_portfolio_eur=req.asset_portfolio_eur,
+                asset_modified_duration=req.asset_modified_duration,
+                asset_convexity=req.asset_convexity,
+                asset_annual_vol=req.asset_annual_vol,
+                discount_rate=req.discount_rate,
+                inflation_rate=req.inflation_rate,
+            )
+        except Exception as exc:
+            logger.error("ALM LDI immunization failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/pricing/rough-vol-svi", tags=["Derivatives & Volatility"])
+    def run_rough_vol_svi(req: RoughVolSviRequest) -> Dict[str, Any]:
+        """Rough Bergomi (Hurst H) & Gatheral SVI Arbitrage-Free Surface (Durrleman Butterfly Condition)."""
+        try:
+            return compute_rough_vol_svi_surface(
+                hurst_h=req.hurst_h,
+                svi_a=req.svi_a,
+                svi_b=req.svi_b,
+                svi_rho=req.svi_rho,
+                svi_sigma=req.svi_sigma,
+                eta_vol_of_vol=req.eta_vol_of_vol,
+            )
+        except Exception as exc:
+            logger.error("Rough vol SVI surface failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/credit/cds-tranches", tags=["Credit & Counterparty Risk"])
+    def run_cds_and_tranche_pricing(req: CdsTrancheRequest) -> Dict[str, Any]:
+        """Single-Name CDS Hazard Rate Bootstrapping & iTraxx/CDX Synthetic CDO Tranches (1F Gaussian Copula)."""
+        try:
+            return compute_cds_and_tranche_pricing(
+                reference_entity=req.reference_entity,
+                notional_eur=req.notional_eur,
+                recovery_rate=req.recovery_rate,
+                five_year_spread_bps=req.five_year_spread_bps,
+                copula_correlation_rho=req.copula_correlation_rho,
+            )
+        except Exception as exc:
+            logger.error("CDS and tranche pricing failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/execution/market-making-vpin", tags=["Rebalancing & Execution"])
+    def run_market_making_and_vpin(req: MarketMakingVpinRequest) -> Dict[str, Any]:
+        """Avellaneda-Stoikov (2008) Market-Making Reservation Price & Hawkes/VPIN Order-Flow Toxicity."""
+        try:
+            return compute_market_making_and_vpin(
+                symbol=req.symbol,
+                mid_price=req.mid_price,
+                inventory_q=req.inventory_q,
+                risk_aversion_gamma=req.risk_aversion_gamma,
+                volatility_sigma=req.volatility_sigma,
+                order_book_density_kappa=req.order_book_density_kappa,
+                hawkes_alpha=req.hawkes_alpha,
+                hawkes_beta=req.hawkes_beta,
+            )
+        except Exception as exc:
+            logger.error("Market making VPIN failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/reporting/executive-board-pack", tags=["Institutional UX & Telemetry"])
+    def run_executive_board_pack(req: ExecutiveBoardPackRequest) -> Dict[str, Any]:
+        """1-Click Executive CRO & Investment Committee Board-Pack Dossier (JSON + HTML5)."""
+        try:
+            return generate_executive_board_pack(
+                portfolio_name=req.portfolio_name,
+                nav_eur=req.nav_eur,
+            )
+        except Exception as exc:
+            logger.error("Executive board pack failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
 
     return app

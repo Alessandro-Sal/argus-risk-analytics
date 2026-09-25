@@ -3151,3 +3151,64 @@ with main_tab_struct:
             },
         )
         st.dataframe(sched_df, use_container_width=True, hide_index=True)
+
+
+        # ── v9.17.0: ALM / LDI IMMUNIZATION & AVELLANEDA-STOIKOV VPIN ENGINE ──
+        st.divider()
+        section("🏛️ Asset-Liability Management (ALM), Immunizzazione di Redington & Cash-Flow Matching LP")
+        st.caption("Copertura attuariale delle passività pluriennali, Funding Ratio, Surplus-at-Risk 99%, dimensionamento Receiver IRS 20Y (LDI) e portafoglio obbligazionario dedicato calcolato via Programmazione Lineare (scipy.optimize.linprog).")
+
+        from core.alm_ldi_engine import compute_alm_ldi_immunization
+        from core.market_making_vpin_engine import compute_market_making_and_vpin
+
+        al_c1, al_c2, al_c3 = st.columns(3)
+        with al_c1:
+            al_assets = st.number_input("Valore Attuale Attivi ALM (€):", min_value=1_000_000.0, value=125_000_000.0, step=5_000_000.0, key="al_assets_in")
+        with al_c2:
+            al_dur = st.slider("Modified Duration Attivi (Anni):", min_value=1.0, max_value=22.0, value=6.8, step=0.2, key="al_dur_in")
+        with al_c3:
+            al_disc = st.slider("Tasso di Sconto Attuariale (%):", min_value=1.0, max_value=6.5, value=3.4, step=0.1, key="al_disc_in") / 100.0
+
+        alm_res = compute_alm_ldi_immunization(
+            asset_portfolio_eur=al_assets,
+            asset_modified_duration=al_dur,
+            discount_rate=al_disc,
+        )
+
+        alk1, alk2, alk3, alk4 = st.columns(4)
+        with alk1:
+            metric_card("ALM Funding Ratio", f"{alm_res['funding_ratio_pct']:.1f}%", delta=f"Surplus: {fmt_eur(alm_res['accounting_surplus_eur'])}", delta_color="normal" if alm_res["funding_ratio_pct"] >= 100.0 else "inverse")
+        with alk2:
+            metric_card("Duration Gap (Assets vs Liab.)", f"{alm_res['duration_gap_years']:+.2f} Anni", delta=f"Liab Duration: {alm_res['liability_modified_duration']:.2f}Y", delta_color="normal" if abs(alm_res["duration_gap_years"]) <= 1.0 else "inverse")
+        with alk3:
+            metric_card("LDI Receiver Swap 20Y Richiesto", fmt_eur(alm_res["required_20y_receiver_swap_notional_eur"]), delta=f"Hedge Ratio: {alm_res['liability_hedge_ratio_pct']:.1f}%", delta_color="normal")
+        with alk4:
+            metric_card("Surplus-at-Risk 99% (1Y)", fmt_eur(alm_res["surplus_at_risk_99_eur"]), delta="Redington OK ✅" if alm_res["redington_immunization_satisfied"] else "Duration Mismatch ⚠️", delta_color="normal" if alm_res["redington_immunization_satisfied"] else "inverse")
+
+        st.dataframe(pd.DataFrame(alm_res["cashflow_matching_lp"]["bond_allocations"]), use_container_width=True, hide_index=True)
+
+        st.divider()
+        section("⚡ Avellaneda-Stoikov (2008) Market-Making & Tossicità Ordini VPIN / Hawkes")
+        st.caption("Calcolo del Reservation Price r(s,q,t) e dello spread Bid/Ask ottimo asimmetrico in funzione dell'inventario q, combinato con la metrica di selezione avversa VPIN e il processo auto-eccitante di Hawkes per l'allerta precoce di Flash-Crash.")
+
+        mm_c1, mm_c2, mm_c3 = st.columns(3)
+        with mm_c1:
+            mm_inv = st.slider("Inventario Attuale Market-Maker q (Azioni):", min_value=-5000.0, max_value=5000.0, value=1500.0, step=250.0, key="mm_inv_in")
+        with mm_c2:
+            mm_gam = st.slider("Avversione al Rischio Inventario (γ):", min_value=0.01, max_value=0.30, value=0.08, step=0.01, key="mm_gam_in")
+        with mm_c3:
+            mm_alp = st.slider("Eccitazione Processo di Hawkes (α):", min_value=0.20, max_value=1.30, value=0.85, step=0.05, key="mm_alp_in")
+
+        mm_res = compute_market_making_and_vpin(inventory_q=mm_inv, risk_aversion_gamma=mm_gam, hawkes_alpha=mm_alp)
+
+        mmk1, mmk2, mmk3, mmk4 = st.columns(4)
+        with mmk1:
+            metric_card("Reservation Price r(s,q,t)", f"€ {mm_res['reservation_price']:.4f}", delta=f"Skew: {mm_res['inventory_skew_bps']:+.1f} bps vs Mid", delta_color="normal")
+        with mmk2:
+            metric_card("Quote Ottime Bid / Ask", f"€ {mm_res['optimal_bid_price']:.3f} / € {mm_res['optimal_ask_price']:.3f}", delta=f"Spread: {mm_res['optimal_spread_bps']:.1f} bps", delta_color="normal")
+        with mmk3:
+            metric_card("VPIN Order-Flow Toxicity", f"{mm_res['current_vpin_score']:.3f}", delta=f"Picco VPIN: {mm_res['peak_vpin_score']:.3f}", delta_color="normal" if mm_res["peak_vpin_score"] < 0.40 else "inverse")
+        with mmk4:
+            metric_card("Hawkes Branching Ratio (α/β)", f"{mm_res['hawkes_branching_ratio_eta']:.2f}", delta=mm_res["toxicity_regime"].split(" - ")[0], delta_color="normal" if "BENIGN" in mm_res["toxicity_regime"] else "inverse")
+
+        st.dataframe(pd.DataFrame(mm_res["inventory_quote_schedule"]), use_container_width=True, hide_index=True)

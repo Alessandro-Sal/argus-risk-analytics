@@ -337,7 +337,7 @@ def test_v914_rest_api_endpoints():
     # Health check
     h = client.get("/health")
     assert h.status_code == 200
-    assert h.json()["version"] == "9.16.0"
+    assert h.json()["version"] == "9.17.0"
 
     # 1. XVA
     r_xva = client.post("/api/v1/risk/xva", json={})

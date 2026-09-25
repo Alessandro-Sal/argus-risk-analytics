@@ -7,6 +7,35 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.17.0] - 2026-09-25
+
+### 🛡️ ISDA SIMM™ v2.6 & Uncleared Margin Rules (UMR), Asset-Liability Management (ALM / LDI & Cash-Flow Matching LP), Rough Volatility (Rough Bergomi) & SVI Arbitrage-Free Surface, Single-Name CDS & iTraxx/CDX Synthetic CDO Tranches, Avellaneda-Stoikov Market-Making & Hawkes VPIN Toxicity, 1-Click CRO & Investment Committee Board-Pack Generator
+
+Questa major release introduce 6 motori quantitativi e di reporting esecutivo di livello Tier-1:
+
+- **ISDA SIMM™ v2.6 & BCBS-IOSCO Uncleared Margin Rules (UMR) Engine (`core/isda_simm_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Calcolo di *DeltaMargin*, *VegaMargin* e *CurvatureMargin* sulle 6 classi di rischio ISDA (*Interest Rate, Credit Qualifying, Credit Non-Qualifying, Equity, Commodity, FX*) con fattori di concentrazione $CR_k$, correlazioni intra/inter-bucket e matrice cross-risk-class $\psi_{r,s}$.
+  - Verifica della soglia regolamentare UMR di €50 Milioni e quantificazione del risparmio MVA tramite Central Clearing (CCP LCH / Eurex con MPOR a 5 giorni vs CSA bilaterale a 10 giorni).
+- **Asset-Liability Management (ALM), Redington Immunization & Cash-Flow Matching LP Engine (`core/alm_ldi_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Valutazione attuariale di passività pluriennali nominali e indicizzate all'inflazione, Funding Ratio ($PV_A / PV_L$), Surplus contabile e **1-Year 99% Surplus-at-Risk ($SaR_{99\%}$)**.
+  - Verifica delle condizioni di immunizzazione di Redington ($D_A = D_L$, $\text{Convexity}_A > \text{Convexity}_L$), dimensionamento dell'overlay LDI con Receiver IRS 20Y e risoluzione del **Dedicated Bond Cash-Flow Matching LP (`scipy.optimize.linprog` HiGHS)**.
+- **Rough Volatility (Rough Bergomi $H \approx 0.10$) & Gatheral SVI Arbitrage-Free Surface Engine (`core/rough_vol_svi_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Parametrizzazione SVI di Gatheral $w(k) = a + b(\rho(k-m) + \sqrt{(k-m)^2 + \sigma^2})$ con verifica esplicita della condizione di assenza di arbitraggio Butterfly di Durrleman ($g(k) \ge 0$) e Calendar Spread ($\partial_T w \ge 0$).
+  - Modello frazionario Rough Bergomi (Bayer-Friz-Gatheral 2016) con esponente di Hurst $H \in (0.05, 0.25)$ per lo scaling a legge di potenza dello skew ATM a breve termine $\mathcal{O}(T^{H - 1/2})$.
+- **Single-Name CDS Bootstrapping & Synthetic Credit Index Tranches (`core/cds_tranche_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Bootstrapping delle probabilità di sopravvivenza $Q(0, t)$ e intensità di default $\lambda(t)$ da par spread CDS (`1Y..10Y`), ISDA Standard Model Upfront, Risky PV01, CS01 e Jump-to-Default (JTD).
+  - Prezzatura 1-Factor Gaussian Copula (Li 2000 / Laurent-Gregory) & Base Correlation delle tranche sintetiche iTraxx Europe / CDX IG (`Equity 0-3%`, `Junior Mezzanine 3-6%`, `Senior Mezzanine 6-9%`, `Senior 9-12%`, `Super-Senior 12-22%`).
+- **Avellaneda-Stoikov (2008) Market-Making & Hawkes / VPIN Order-Flow Toxicity Engine (`core/market_making_vpin_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
+  - Calcolo del *Reservation Price* $r(s, q, t) = s - q \gamma \sigma^2 (T - t)$ e delle quote ottime asimmetriche Bid/Ask in funzione dell'inventario $q$.
+  - Calcolo della metrica di selezione avversa **VPIN** (Easley-López de Prado-O'Hara 2012) e dell'intensità auto-eccitante di **Hawkes** ($\lambda_t$) con branching ratio $\alpha/\beta$ per l'allerta precoce di Flash-Crash.
+- **1-Click Executive CRO & Investment Committee Board-Pack Generator (`core/executive_board_pack_engine.py`, `src/0_Control_Room.py`)**:
+  - Sintesi multi-motore con generazione istantanea del **Dossier del Comitato Rischi & Investimenti (HTML5 / JSON)** e **CRO Prescriptive Action Checklist** automatica.
+- **Headless REST API v9.17.0 (`api/main.py`) & Test Suite (`tests/test_v917_institutional_suite.py`)**:
+  - 6 nuovi endpoint REST JSON (`/api/v1/margin/isda-simm`, `/api/v1/wealth/alm-ldi`, `/api/v1/pricing/rough-vol-svi`, `/api/v1/credit/cds-tranches`, `/api/v1/execution/market-making-vpin`, `/api/v1/reporting/executive-board-pack`).
+  - 768/768 unit e integration test superati al 100% con 0 errori Ruff (`ruff check .`).
+
+---
+
 ## [9.16.0] - 2026-09-25
 
 ### 🖥️ Institutional Terminal UX/UI Overhaul: Global Telemetry Top-Ribbon, 1-Click Live Portfolio Auto-Binding, Segmented Domain Workspaces, Scenario Pin & Delta Comparator, Unified Plotly Crosshair Styling & Executive CRO Traffic-Light Radar
