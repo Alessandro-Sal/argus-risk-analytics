@@ -183,3 +183,40 @@ def test_v918_cro_radar_shock_reactivity_and_readiness_score() -> None:
     assert gfc_radar["breach_count"] >= 2
 
 
+def test_v918_master_wealth_portfolio_synchronization_and_board_pack_scaling() -> None:
+    """Verify Master Wealth (Stocks + Crypto, € 64,233.31) synchronizes top badges, CRO Radar, and Board-Pack euro prescriptions."""
+    from core.executive_board_pack_engine import ExecutiveBoardPackEngine
+    from core.ux_institutional_hub import compute_executive_traffic_light_radar
+
+    master_wealth_results = {
+        "portfolio_value": 64233.31,
+        "metrics": {
+            "var_95": -0.025,            # 2.50% daily VaR 95% -> 3.45% VaR 99% (BREACH vs 2.50% limit)
+            "volatility_annual": 0.285,  # > 25% Vol (Profilo Aggressivo -> SRI 5/7 WARNING)
+            "max_drawdown": -0.242,      # > 22% Drawdown
+            "sharpe_ratio": 0.17,        # < 0.70 Sharpe Contenuto (WARNING)
+            "total_value": 64233.31,
+        },
+        "positions": [
+            {"ticker": "BTC-USD", "market_value": 25000.0},
+            {"ticker": "NVDA", "market_value": 20000.0},
+            {"ticker": "SPY", "market_value": 19233.31},
+        ],
+    }
+
+    mw_radar = compute_executive_traffic_light_radar(
+        session_state_dict={"global_macro_shock": "NONE"},
+        risk_data=master_wealth_results,
+    )
+    assert abs(mw_radar["nav_eur"] - 64233.31) < 0.01
+    assert mw_radar["breach_count"] >= 1
+    assert mw_radar["warning_count"] >= 2
+    assert mw_radar["readiness_score"] < 75
+
+    engine = ExecutiveBoardPackEngine(portfolio_name="Master Wealth (Stocks + Crypto)", nav_eur=mw_radar["nav_eur"])
+    bp = engine.generate_board_pack()
+    # Verify Board-Pack euro prescriptions scale proportionally to € 64,233.31 (not € 95M)
+    assert any("14,131" in str(p.get("action", "")) for p in bp["cro_prescriptions"])
+    assert "95,536,044" not in bp["board_pack_html"]
+
+
