@@ -66,8 +66,10 @@ from core.solvency2_engine import compute_solvency2_standard_formula
 from core.structured_products_engine import compute_structured_product_pricing
 from core.tax_engine import compute_tax_and_harvesting
 from core.ux_institutional_hub import (
+    apply_macro_shock_to_inputs,
     compute_executive_traffic_light_radar,
     compute_scenario_delta_comparison,
+    resolve_terminal_command,
 )
 from core.walk_forward_engine import run_walk_forward_backtest
 from core.watchdog.risk_watchdog import RiskWatchdogService, evaluate_risk_appetite_framework
@@ -919,7 +921,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.17.0",
+        version="9.18.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -944,7 +946,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.17.0",
+            version="9.18.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -2144,6 +2146,29 @@ def create_app() -> FastAPI:
         except Exception as exc:
             logger.error("Executive board pack failed: %s", exc, exc_info=True)
             raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/ux/command-dispatch", tags=["Institutional UX & Telemetry"])
+    def dispatch_terminal_command(payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Resolve Bloomberg <GO> Command Bar query and apply optional Global Macro Shock broadcast."""
+        query = str(payload.get("command", "SIMM <GO>"))
+        macro_shock = str(payload.get("global_macro_shock", "NONE"))
+        base_inputs = payload.get("base_inputs") or {
+            "discount_rate": 0.034,
+            "index_spread_bps": 96.0,
+            "annual_vol": 0.16,
+            "asset_value": 125_000_000.0,
+        }
+        cmd_res = resolve_terminal_command(query)
+        eff_shock = cmd_res.get("macro_shock") or macro_shock
+        shocked_inputs = apply_macro_shock_to_inputs(
+            base_inputs=base_inputs,
+            session_state_dict={"global_macro_shock": eff_shock},
+        )
+        return {
+            "version": "9.18.0",
+            "command_resolution": cmd_res,
+            "shocked_inputs": shocked_inputs,
+        }
 
     return app
 

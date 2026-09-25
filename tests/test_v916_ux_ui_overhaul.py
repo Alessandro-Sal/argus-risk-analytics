@@ -21,7 +21,7 @@ from core.ux_institutional_hub import (
 
 def test_app_version_sync_and_control_room_splash() -> None:
     """Verify APP_VERSION is 9.16.0 and Control Room no longer hardcodes 9.7.0."""
-    assert APP_VERSION == "9.17.0"
+    assert APP_VERSION == "9.18.0"
     ctrl_room_text = Path("src/0_Control_Room.py").read_text(encoding="utf-8")
     assert "render_argus_splash(app_version=APP_VERSION)" in ctrl_room_text
     assert 'render_argus_splash(app_version="9.7.0")' not in ctrl_room_text
@@ -47,7 +47,7 @@ def test_telemetry_ribbon_state_extraction_and_regimes() -> None:
         },
     }
     tel = build_telemetry_ribbon_state(session_state_dict=session_normal, page_badge="QUANT LAB")
-    assert tel["app_version"] == "9.17.0"
+    assert tel["app_version"] == "9.18.0"
     assert tel["nav_eur"] == 160_000.0
     assert tel["var_99_eur"] == round(160_000.0 * 0.0165, 2)
     assert "BULL / NORMAL" in tel["regime_label"]
@@ -136,7 +136,7 @@ def test_v916_api_endpoints_and_version() -> None:
 
     h = client.get("/health")
     assert h.status_code == 200
-    assert h.json()["version"] == "9.17.0"
+    assert h.json()["version"] == "9.18.0"
 
     r_radar = client.post("/api/v1/ux/executive-radar", json={"metrics_override": {"basel_lcr_pct": 135.0}})
     assert r_radar.status_code == 200

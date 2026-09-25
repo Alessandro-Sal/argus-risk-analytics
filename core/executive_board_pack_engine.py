@@ -1,7 +1,7 @@
 """1-Click Executive CRO & Investment Committee Board-Pack Generator Engine.
 
 Synthesizes live risk, capital, liquidity, derivatives, ALM, and wealth telemetry across
-the entire ARGUS v9.17.0 platform into:
+the entire ARGUS v9.18.0 platform into:
 1. Structured Committee Dossier JSON
 2. Automated Chief Risk Officer (CRO) Prescriptive Action Checklist (Priority 1/2/3)
 3. Self-contained, printable Executive HTML5 Committee Board-Pack Dossier

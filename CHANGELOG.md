@@ -7,7 +7,7 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
-## [9.17.0] - 2026-09-25
+## [9.18.0] - 2026-09-25
 
 ### 🛡️ ISDA SIMM™ v2.6 & Uncleared Margin Rules (UMR), Asset-Liability Management (ALM / LDI & Cash-Flow Matching LP), Rough Volatility (Rough Bergomi) & SVI Arbitrage-Free Surface, Single-Name CDS & iTraxx/CDX Synthetic CDO Tranches, Avellaneda-Stoikov Market-Making & Hawkes VPIN Toxicity, 1-Click CRO & Investment Committee Board-Pack Generator
 
@@ -30,7 +30,7 @@ Questa major release introduce 6 motori quantitativi e di reporting esecutivo di
   - Calcolo della metrica di selezione avversa **VPIN** (Easley-López de Prado-O'Hara 2012) e dell'intensità auto-eccitante di **Hawkes** ($\lambda_t$) con branching ratio $\alpha/\beta$ per l'allerta precoce di Flash-Crash.
 - **1-Click Executive CRO & Investment Committee Board-Pack Generator (`core/executive_board_pack_engine.py`, `src/0_Control_Room.py`)**:
   - Sintesi multi-motore con generazione istantanea del **Dossier del Comitato Rischi & Investimenti (HTML5 / JSON)** e **CRO Prescriptive Action Checklist** automatica.
-- **Headless REST API v9.17.0 (`api/main.py`) & Test Suite (`tests/test_v917_institutional_suite.py`)**:
+- **Headless REST API v9.18.0 (`api/main.py`) & Test Suite (`tests/test_v917_institutional_suite.py`)**:
   - 6 nuovi endpoint REST JSON (`/api/v1/margin/isda-simm`, `/api/v1/wealth/alm-ldi`, `/api/v1/pricing/rough-vol-svi`, `/api/v1/credit/cds-tranches`, `/api/v1/execution/market-making-vpin`, `/api/v1/reporting/executive-board-pack`).
   - 768/768 unit e integration test superati al 100% con 0 errori Ruff (`ruff check .`).
 
