@@ -1919,19 +1919,29 @@ with tab_diagnostics:
 
         include_logs_opt = st.checkbox("Includi gli ultimi 500 eventi di log sanificati (Sistema & Audit)", value=True, key="chk_include_logs_bundle")
         
-        bundle_bytes = generate_support_bundle(include_logs=include_logs_opt, max_log_lines=500)
-        now_bundle_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        bundle_name = f"argus_support_bundle_{now_bundle_str}.zip"
+        c_gen_b, c_dl_b = st.columns([1.5, 2.0])
+        with c_gen_b:
+            if st.button("⚡ Genera Support Bundle ZIP", type="primary", use_container_width=True, key="btn_gen_bundle_trigger"):
+                with st.spinner("Creazione archivio diagnostico in corso..."):
+                    st.session_state["_cached_support_bundle"] = generate_support_bundle(include_logs=include_logs_opt, max_log_lines=500)
+                st.success("Support Bundle generato con successo!")
 
-        st.download_button(
-            label=f"📥 Scarica Support Bundle ({len(bundle_bytes) / 1024.0:.1f} KB)",
-            data=bundle_bytes,
-            file_name=bundle_name,
-            mime="application/zip",
-            use_container_width=True,
-            type="primary",
-            key="btn_download_support_bundle"
-        )
+        with c_dl_b:
+            bundle_bytes = st.session_state.get("_cached_support_bundle")
+            if bundle_bytes:
+                now_bundle_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                bundle_name = f"argus_support_bundle_{now_bundle_str}.zip"
+                st.download_button(
+                    label=f"📥 Scarica Support Bundle ({len(bundle_bytes) / 1024.0:.1f} KB)",
+                    data=bundle_bytes,
+                    file_name=bundle_name,
+                    mime="application/zip",
+                    use_container_width=True,
+                    type="primary",
+                    key="btn_download_support_bundle"
+                )
+            else:
+                st.caption("ℹ️ Clicca su **⚡ Genera Support Bundle ZIP** per compilare il pacchetto diagnostico.")
 
 # =============================================================
 # TAB 5: MOTORE ANALITICO EMBEDDED DUCKDB (OLAP & SQL SANDBOX)

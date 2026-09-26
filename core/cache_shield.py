@@ -34,16 +34,21 @@ _L1_CACHE: Dict[str, Tuple[float, Any]] = {}
 
 
 def _df_to_binary_payload(df: pd.DataFrame) -> bytes:
-    """Serializza un DataFrame in formato binario compatto Apache Arrow Feather ad alte prestazioni."""
-    if not HAS_PYARROW:
+    """Serializza un DataFrame in formato binario compatto Arrow o fallback JSON resiliente."""
+    if HAS_PYARROW and feather is not None:
+        try:
+            buf = io.BytesIO()
+            df_to_write = df.copy()
+            if isinstance(df_to_write.index, pd.DatetimeIndex):
+                df_to_write = df_to_write.reset_index()
+            feather.write_feather(df_to_write, buf, compression="zstd")
+            return buf.getvalue()
+        except Exception:
+            pass
+    try:
         return df.to_json(date_format="iso").encode("utf-8")
-
-    buf = io.BytesIO()
-    df_to_write = df.copy()
-    if isinstance(df_to_write.index, pd.DatetimeIndex):
-        df_to_write = df_to_write.reset_index()
-    feather.write_feather(df_to_write, buf, compression="zstd")
-    return buf.getvalue()
+    except Exception:
+        return b"{}"
 
 
 def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
@@ -72,7 +77,7 @@ def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
             except Exception:
                 pass
 
-        if HAS_PYARROW:
+        if HAS_PYARROW and feather is not None:
             try:
                 buf = io.BytesIO(payload)
                 df = feather.read_feather(buf)
@@ -87,6 +92,13 @@ def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
                 return df
             except Exception:
                 pass
+
+        # Tentativo fallback decodifica JSON se payload bytes non è feather valido
+        try:
+            text_payload = payload.decode("utf-8", errors="ignore")
+            return pd.read_json(io.StringIO(text_payload))
+        except Exception:
+            pass
 
     return pd.DataFrame()
 
