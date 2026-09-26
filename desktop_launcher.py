@@ -44,15 +44,21 @@ def wait_for_server(port, timeout=15):
     return False
 
 def find_python_executable():
-    """Trova un interprete Python valido sul sistema."""
+    """Trova un interprete Python valido sul sistema (preferendo python.exe per garantire stream stdio validi al server)."""
     if not getattr(sys, 'frozen', False):
-        return sys.executable
+        exe = sys.executable
+        if exe and exe.lower().endswith("pythonw.exe"):
+            py_exe = exe[:-5] + ".exe"
+            if os.path.exists(py_exe):
+                return py_exe
+        return exe
     
     candidates = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Python\bin\python.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Python\pythoncore-3.14-64\python.exe"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Python\Python314\python.exe"),
         shutil.which("python"),
         shutil.which("py"),
-        os.path.expandvars(r"%LOCALAPPDATA%\Python\bin\python.exe"),
-        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Python\Python314\python.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\Python\Python313\python.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\Python\Python312\python.exe"),
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\Python\Python311\python.exe"),
@@ -114,8 +120,13 @@ def main():
         pp_dirs.append(sub_env["PYTHONPATH"])
     sub_env["PYTHONPATH"] = os.pathsep.join(pp_dirs)
 
+    # Assicura cartella di log per il server
+    log_dir = os.path.join(base_proj_dir, "logs")
+    os.makedirs(log_dir, exist_ok=True)
+    srv_log_path = os.path.join(log_dir, "streamlit_server.log")
+
     # Tenta prima via subprocess (se Python disponibile)
-    if python_exe and shutil.which(python_exe) or os.path.exists(str(python_exe)):
+    if python_exe and (shutil.which(python_exe) or os.path.exists(str(python_exe))):
         for attempt in range(1, 4):
             port = find_free_port()
             print(f"[ARGUS Desktop] Tentativo {attempt}/3: Avvio server su http://127.0.0.1:{port}...")
@@ -125,24 +136,33 @@ def main():
                 f"--server.port={port}",
                 "--server.headless=true",
                 "--server.address=127.0.0.1",
+                "--server.enableCORS=false",
+                "--server.enableXsrfProtection=false",
+                "--server.maxMessageSize=500",
+                "--server.fileWatcherType=none",
                 "--global.developmentMode=false",
                 "--browser.gatherUsageStats=false"
             ]
 
             try:
+                srv_log_file = open(srv_log_path, "a", encoding="utf-8")
                 process = subprocess.Popen(
                     cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    stdout=srv_log_file,
+                    stderr=srv_log_file,
                     creationflags=creation_flags,
                     env=sub_env
                 )
 
-                if wait_for_server(port, timeout=12):
+                if wait_for_server(port, timeout=14):
                     server_ready = True
                     break
                 else:
                     print(f"[ARGUS Desktop] Tentativo {attempt} fallito. Chiusura processo e retry...")
+                    try:
+                        process.terminate()
+                    except Exception:
+                        pass
                     try:
                         process.terminate()
                     except Exception:

@@ -1,9 +1,16 @@
 [client]
-showDeployButton = false
 toolbarMode = "minimal"
 
 [browser]
 gatherUsageStats = false
+
+[server]
+headless = true
+enableCORS = false
+enableXsrfProtection = false
+maxMessageSize = 500
+fileWatcherType = "none"
+folderWatchBlacklist = ["data", "logs", "exports", "cache"]
 
 [theme]
 base = "dark"

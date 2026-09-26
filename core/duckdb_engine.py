@@ -70,18 +70,21 @@ def get_shared_duckdb_connection():
 
 
 def _register_dfs_optimized(con, context_dfs: Optional[Dict[str, pd.DataFrame]] = None) -> None:
-    """Registra i DataFrame nel catalogo DuckDB sfruttando PyArrow Zero-Copy se disponibile."""
+    """Registra i DataFrame nel catalogo DuckDB in modo sicuro ed efficiente."""
     if not con or not context_dfs:
         return
     for name, df in context_dfs.items():
         if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
             try:
-                import pyarrow as pa
-
-                arrow_table = pa.Table.from_pandas(df)
-                con.register(name, arrow_table)
-            except Exception:
                 con.register(name, df)
+            except Exception:
+                try:
+                    import pyarrow as pa
+
+                    arrow_table = pa.Table.from_pandas(df)
+                    con.register(name, arrow_table)
+                except Exception:
+                    pass
 
 
 def get_in_memory_duckdb_connection(context_dfs: Optional[Dict[str, pd.DataFrame]] = None):
