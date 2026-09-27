@@ -63,7 +63,12 @@ render_standard_hero(
 
 render_executive_badges(m)
 
-from core.ux_institutional_hub import render_executive_traffic_light_radar
+from core.ux_institutional_hub import (
+    render_executive_traffic_light_radar,
+    render_institutional_telemetry_ribbon,
+)
+
+render_institutional_telemetry_ribbon(page_badge="EXECUTIVE OVERVIEW & CONTROL DASHBOARD", risk_data=results)
 
 render_executive_traffic_light_radar(
     key_prefix="dash_gen_cro_radar",

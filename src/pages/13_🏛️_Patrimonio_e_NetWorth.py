@@ -2984,8 +2984,31 @@ with main_tab_struct:
             with g_col5:
                 st.metric("Sens. Barriera", f"{grk['barrier_sensitivity']:.4f} €/+1%")
 
-            st.markdown("##### 📅 Programma Cedole & Probabilità di Rimborso Anticipato per Data di Rilevazione")
             st.dataframe(pd.DataFrame(s_res["observation_schedule"]), use_container_width=True, hide_index=True)
+            render_sr117_audit_drawer(
+                engine_name="Phoenix Autocallable Snowball Monte Carlo Engine",
+                latex_formulas=[
+                    r"V_0 = \mathbb{E}^{\mathbb{Q}}\left[ \sum_{m=1}^M D(0, t_m)\,C_m\,\mathbb{I}_{\{\tau \ge t_m\}} + D(0, \tau)\,R_\tau \right]",
+                    r"C_m = \left(m \cdot c - \sum_{j < m} C_j\right)\mathbb{I}_{\{S_{t_m} \ge B_c\}}, \quad \Delta = \frac{\partial V_0}{\partial S}, \quad \Gamma = \frac{\partial^2 V_0}{\partial S^2}",
+                ],
+                inputs_dict={
+                    "spot_price": float(s_res["spot_price"]),
+                    "strike_price": float(s_res["strike_price"]),
+                    "autocall_barrier_pct": float(s_res["autocall_barrier_pct"]),
+                    "protection_barrier_pct": float(s_res["protection_barrier_pct"]),
+                },
+                outputs_dict={
+                    "present_value_eur": float(s_res["present_value"]),
+                    "expected_duration_years": float(s_res["expected_duration_years"]),
+                    "knock_in_prob_pct": float(s_res["knock_in_loss_probability"]) * 100.0,
+                    "delta": float(grk["delta"]),
+                },
+                regulatory_refs=[
+                    "PRIIPs RTS Category 3 Structured Products Valuation",
+                    "Fed SR 11-7 Model Risk Management Guidance",
+                    "Glasserman (2003) Monte Carlo Methods in Financial Engineering",
+                ],
+            )
 
     with sub_reg_rep:
         from core.regulatory_reporting_engine import compute_regulatory_dossier
@@ -3057,8 +3080,31 @@ with main_tab_struct:
             perf_data.append(row)
         st.dataframe(pd.DataFrame(perf_data), use_container_width=True, hide_index=True)
 
-        st.markdown("##### 🌍 Tabella SFDR Annex I: 14 Indicatori Principali degli Effetti Negativi (PAI)")
         st.dataframe(pd.DataFrame(sfdr_info["pai_indicators"]), use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="EU PRIIPs KID RTS & SFDR ESG Annex I Regulatory Engine",
+            latex_formulas=[
+                r"\text{VEV} = \frac{\sqrt{3.842 - 2\,\text{VaR}_{97.5\%}(\text{CF})} - 1.96}{\sqrt{T_{\text{RHP}}}}, \quad \text{SRI} = \max(\text{MRM}, \text{CRM})",
+                r"\text{WACI} = \sum_{i=1}^n w_i \times \frac{\text{Scope 1} + \text{Scope 2 CO}_2\text{e}_i}{\text{Ricavi}_i \text{ (M€)}}, \quad \text{Taxonomy Alignment} = \sum_{i=1}^n w_i \times \text{AlignedRev}_i",
+            ],
+            inputs_dict={
+                "portfolio_value_eur": float(kid_info["portfolio_value_eur"]),
+                "mrm_score": int(kid_info["mrm_score"]),
+                "crm_score": int(kid_info["crm_score"]),
+                "rhp_years": 5.0,
+            },
+            outputs_dict={
+                "sri_score": int(kid_info["sri_score"]),
+                "vev_percent": float(kid_info["vev_percent"]),
+                "sfdr_classification": str(sfdr_info["sfdr_classification"]),
+                "taxonomy_alignment_pct": float(sfdr_info["taxonomy_alignment_pct"]),
+            },
+            regulatory_refs=[
+                "Commission Delegated Regulation (EU) 2017/653 (PRIIPs RTS)",
+                "Regulation (EU) 2019/2088 (SFDR Directive)",
+                "Regulation (EU) 2020/852 (EU Taxonomy Directive)",
+            ],
+        )
 
     with sub_comm_desk:
         from core.commodity_engine import compute_commodity_term_structure
@@ -3140,6 +3186,30 @@ with main_tab_struct:
         style_institutional_chart(fig_cm, title=f"Curva Futures a Termine {cm_name}: Modello a 2 Fattori di Schwartz vs Cost-of-Carry", height=380)
         st.plotly_chart(fig_cm, use_container_width=True)
         st.dataframe(cm_df, use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="Gibson-Schwartz (1990/1997) 2-Factor Commodity Futures & Kirk Options Engine",
+            latex_formulas=[
+                r"\ln(S_t) = \chi_t + \xi_t, \quad d\chi_t = -\kappa\,\chi_t\,dt + \sigma_\chi\,dW_\chi, \quad d\xi_t = \mu_\xi\,dt + \sigma_\xi\,dW_\xi",
+                r"\ln F(0, T) = e^{-\kappa T}\,\chi_0 + \xi_0 + A(T), \quad \text{Roll Yield} = \frac{F(0, T_1) - F(0, T_2)}{F(0, T_1)}",
+            ],
+            inputs_dict={
+                "commodity": cm_name,
+                "spot_price_usd": float(cm_res["spot_price"]),
+                "convenience_yield_initial": float(cm_res["convenience_yield_initial"]),
+                "mean_reversion_kappa": float(cm_kappa),
+            },
+            outputs_dict={
+                "market_regime": str(cm_res["market_regime"]),
+                "one_year_futures_usd": float(cm_res["one_year_futures_price"]),
+                "one_year_roll_yield_pct": float(cm_res["one_year_roll_yield_pct"]),
+                "calendar_spread_option_usd": float(cm_res["calendar_spread_option_3m_12m"]["option_price"]),
+            },
+            regulatory_refs=[
+                "Schwartz (1997) The Stochastic Behavior of Commodity Prices",
+                "Kirk (1995) Correlation in the Energy Markets",
+                "Fed SR 11-7 Model Risk Management Guidance",
+            ],
+        )
 
     with sub_opt_liq:
         from core.market_making_vpin_engine import compute_market_making_and_vpin
@@ -3252,6 +3322,29 @@ with main_tab_struct:
             },
         )
         st.dataframe(sched_df, use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="Almgren-Chriss (2000) Optimal Execution & Intraday Liquidation Engine",
+            latex_formulas=[
+                r"x_j = \frac{\sinh(\kappa(T - t_j))}{\sinh(\kappa T)}\,X, \quad \kappa \approx \sqrt{\frac{\lambda\,\sigma^2}{\eta}}",
+                r"\min_{n_j} \left( \mathbb{E}[x] + \lambda\,V[x] \right), \quad \mathbb{E}[x] = \frac{1}{2}\gamma X^2 + \epsilon X + \tilde{\eta} \sum_{j=1}^N \frac{\tau_j}{\tau} n_j^2",
+            ],
+            inputs_dict={
+                "order_notional_eur": float(ol_res["order_notional_eur"]),
+                "order_pct_of_adv": float(ol_res["order_pct_of_adv"]),
+                "urgency_parameter_kappa": float(ol_res["urgency_parameter_kappa"]),
+            },
+            outputs_dict={
+                "ac_optimal_cost_bps": float(s_opt["expected_cost_bps"]),
+                "vwap_cost_bps": float(s_vwap["expected_cost_bps"]),
+                "twap_cost_bps": float(s_twap["expected_cost_bps"]),
+                "timing_risk_bps": float(s_opt["timing_risk_std_bps"]),
+            },
+            regulatory_refs=[
+                "Almgren & Chriss (2000) Optimal Execution of Portfolio Transactions",
+                "SEC Rule 606 & MiFID II RTS 27/28 Best Execution Standards",
+                "Fed SR 11-7 Model Risk Management Guidance",
+            ],
+        )
 
         st.divider()
         section("⚡ Avellaneda-Stoikov (2008) Market-Making & Tossicità Ordini VPIN / Hawkes")
