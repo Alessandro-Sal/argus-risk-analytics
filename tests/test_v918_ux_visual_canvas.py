@@ -390,7 +390,7 @@ def test_v918_zero_legacy_st_metric_and_global_page_alignment():
 
     assert not violations, "Legacy st.metric calls found:\n" + "\n".join(violations)
 
-    # 2. Telemetry Ribbon coverage across Tier-1 and Desk pages
+    # 2. Telemetry Ribbon coverage across 100% of the 21 active modules in src/pages
     expected_ribbon_pages = [
         "1_*Dashboard*.py",
         "2_*Live*.py",
@@ -399,9 +399,20 @@ def test_v918_zero_legacy_st_metric_and_global_page_alignment():
         "5_*Posizioni*.py",
         "6_*Valutazione*.py",
         "7_*Stress*.py",
+        "8_*Temporale*.py",
+        "9_*Tecnica*.py",
+        "10_*Screener*.py",
         "11_*BQuant*.py",
         "12_*Wealth*.py",
         "13_*Patrimonio*.py",
+        "14_*Cash*.py",
+        "15_*Illiquidi*.py",
+        "16_*Previdenza*.py",
+        "17_*FIRE*.py",
+        "18_*Fiscalita*.py",
+        "19_*Immobili*.py",
+        "20_*Successoria*.py",
+        "21_*Copilot*.py",
     ]
 
     for pat in expected_ribbon_pages:
@@ -413,13 +424,23 @@ def test_v918_zero_legacy_st_metric_and_global_page_alignment():
                 f"Page {matches[0]} missing render_institutional_telemetry_ribbon!"
             )
 
-    # 3. SR 11-7 Drawer coverage across Quantitative and Algorithmic pages
+    # 3. SR 11-7 Drawer coverage across all Quantitative, Statistical & Actuarial pages
     expected_sr117_pages = [
         "4_*Modelli*.py",
         "5_*Posizioni*.py",
         "6_*Valutazione*.py",
         "7_*Stress*.py",
+        "8_*Temporale*.py",
+        "9_*Tecnica*.py",
+        "10_*Screener*.py",
         "13_*Patrimonio*.py",
+        "15_*Illiquidi*.py",
+        "16_*Previdenza*.py",
+        "17_*FIRE*.py",
+        "18_*Fiscalita*.py",
+        "19_*Immobili*.py",
+        "20_*Successoria*.py",
+        "21_*Copilot*.py",
     ]
 
     for pat in expected_sr117_pages:
@@ -453,4 +474,42 @@ def test_v918_zero_legacy_st_metric_and_global_page_alignment():
     )
     assert len(rec_ac["sha256_audit_hash"]) == 64
     assert "MiFID II RTS 28" in rec_ac["regulatory_references"]
+
+def test_v918_global_command_registry_full_coverage():
+    """Verify Bloomberg command registry coverage (> 35 commands) across all application pages."""
+    from core.ux_institutional_hub import GLOBAL_COMMAND_REGISTRY, resolve_terminal_command
+
+    assert len(GLOBAL_COMMAND_REGISTRY) >= 35, f"Expected >= 35 commands, found {len(GLOBAL_COMMAND_REGISTRY)}"
+
+    # Test key navigation shortcuts
+    sample_queries = [
+        ("PORT <GO>", "1_📈_Dashboard_Generale.py"),
+        ("TERM <GO>", "2_🖥️_Live_Terminal.py"),
+        ("VAR <GO>", "3_🔴_Analisi_Rischio.py"),
+        ("QUANT <GO>", "4_🔬_Modelli_Quantitativi.py"),
+        ("POS <GO>", "5_📋_Posizioni_e_Dettagli.py"),
+        ("VAL <GO>", "6_🏛️_Valutazione_Aziendale.py"),
+        ("STRESS <GO>", "7_🌪️_Stress_Testing.py"),
+        ("TIME <GO>", "8_📊_Analisi_Temporale.py"),
+        ("TECH <GO>", "9_📈_Analisi_Tecnica.py"),
+        ("SCREEN <GO>", "10_🎯_Screener_Opportunita.py"),
+        ("BQ <GO>", "11_💻_BQuant_e_Launchpad.py"),
+        ("WEALTH <GO>", "12_🎛️_Wealth_Control_Room.py"),
+        ("NET <GO>", "13_🏛️_Patrimonio_e_NetWorth.py"),
+        ("CASH <GO>", "14_💳_Cash_Flow_e_Spese.py"),
+        ("ILLIQ <GO>", "15_📦_Asset_Illiquidi_e_Orologi.py"),
+        ("PENS <GO>", "16_👵_Previdenza_e_Pension_Planning.py"),
+        ("FIRE <GO>", "17_🏖️_Indipendenza_Finanziaria_e_FIRE.py"),
+        ("TAX <GO>", "18_⚖️_Fiscalita_e_Quadro_RW.py"),
+        ("RE <GO>", "19_🏠_Immobili_e_Mutui.py"),
+        ("ESTATE <GO>", "20_📜_Pianificazione_Successoria.py"),
+        ("AI <GO>", "21_🤖_AI_Copilot_e_Advisor.py"),
+    ]
+
+    for cmd, expected_page in sample_queries:
+        res = resolve_terminal_command(cmd)
+        assert res["matched"] is True, f"Command '{cmd}' failed to match!"
+        assert expected_page in res["target_page"], (
+            f"Command '{cmd}' routed to '{res.get('target_page')}', expected containing '{expected_page}'"
+        )
 

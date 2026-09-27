@@ -39,7 +39,9 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
+    render_institutional_telemetry_ribbon,
     render_sandbox_banner,
+    render_sr117_audit_drawer,
     render_table_with_export,
 )
 
@@ -49,6 +51,10 @@ render_command_bar()
 
 # ── Load In-Memory Portfolio Bundle ───────────────────────────
 results, has_real = ensure_portfolio_loaded(module_type="risk")
+render_institutional_telemetry_ribbon(
+    page_badge="TIME SERIES & STOCHASTIC REGIMES",
+    risk_data=results if has_real else None,
+)
 
 raw_sr_port = results.get("portfolio_return", pd.Series(dtype=float))
 raw_sr_bm = results.get("benchmark_return", pd.Series(dtype=float))

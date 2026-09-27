@@ -34,6 +34,7 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_data_table,
+    render_institutional_telemetry_ribbon,
     render_kpi_card,
     render_omni_command_bar,
     render_page_header,

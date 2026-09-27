@@ -44,8 +44,10 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
+    render_institutional_telemetry_ribbon,
     render_sandbox_banner,
     render_segmented_tabs,
+    render_sr117_audit_drawer,
 )
 
 inject_custom_css()
@@ -62,6 +64,10 @@ if "last_screened_universe" not in st.session_state:
 
 # Recupero posizioni e benchmark di portafoglio da session_state o Sandbox
 results, has_real_portfolio = ensure_risk_bundle_loaded()
+render_institutional_telemetry_ribbon(
+    page_badge="FACTOR SCREENER & OPPORTUNITY SCANNER",
+    risk_data=results if has_real_portfolio else None,
+)
 pos = results.get("positions", pd.DataFrame()) if isinstance(results, dict) else pd.DataFrame()
 
 if not has_real_portfolio:

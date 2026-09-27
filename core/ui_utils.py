@@ -104,6 +104,27 @@ def inject_custom_css():
             border: 1px solid rgba(239, 68, 68, 0.3);
         }}
 
+        /* Responsive Ergonomics for Glassmorphic Modals, Ribbons & Small Screens */
+        @media (max-width: 768px) {{
+            [class*="modal-content-"], [class*="bento-modal-content-"] {{
+                width: 95vw !important;
+                max-width: 95vw !important;
+                max-height: 85vh !important;
+                padding: 16px 18px !important;
+                overflow-y: auto !important;
+            }}
+            .institutional-telemetry-ribbon {{
+                padding: 8px 12px !important;
+            }}
+            .institutional-telemetry-ribbon > div {{
+                flex-wrap: wrap !important;
+                gap: 6px !important;
+            }}
+            .bento-kpi-card {{
+                padding: 12px 14px !important;
+            }}
+        }}
+
         /* Institutional Skeleton Shimmer Loaders (Anti-CLS Layout Stability) */
         @keyframes argus-shimmer {{
             0% {{ background-position: -200% 0; }}

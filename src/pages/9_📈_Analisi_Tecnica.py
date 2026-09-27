@@ -31,8 +31,10 @@ from core.ui_utils import (
     metric_card,
     render_export_toolbar,
     render_header,
+    render_institutional_telemetry_ribbon,
     render_sandbox_banner,
     render_segmented_tabs,
+    render_sr117_audit_drawer,
 )
 from core.workspace_manager import get_url_param, register_workspace_tab, set_url_params
 
@@ -77,6 +79,10 @@ with col_head2:
 
 # Verifichiamo la presenza dei dati di sessione o Sandbox
 results, has_real_portfolio = ensure_risk_bundle_loaded()
+render_institutional_telemetry_ribbon(
+    page_badge="TECHNICAL SIGNALS & VOLATILITY BANDS",
+    risk_data=results if has_real_portfolio else None,
+)
 pos_df = results.get("positions", pd.DataFrame()) if isinstance(results, dict) else pd.DataFrame()
 
 if not has_real_portfolio:
