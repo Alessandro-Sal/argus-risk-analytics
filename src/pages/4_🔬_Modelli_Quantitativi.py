@@ -5644,7 +5644,10 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
             fmt_eur(cd_res["isda_upfront_eur"]),
             f"{cd_res['isda_upfront_pct']:+.2f}% Notional",
             provenance=cd_prov,
-            sparkline_values=[float(n["survival_prob_q"]) * 100.0 for n in cd_res["survival_curve_nodes"]],
+            sparkline_values=[
+                float(n.get("survival_probability_pct", float(n.get("survival_prob_q", 1.0)) * 100.0))
+                for n in cd_res.get("survival_curve_nodes", [])
+            ],
             accent_color="#3b82f6",
         )
     with ck2:
@@ -5678,23 +5681,23 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
         {
             "bootstrapped_curve": [
                 {
-                    "tenor_years": r["tenor_years"],
-                    "survival_prob_q": r["survival_prob_q"],
-                    "hazard_rate_lambda": r["hazard_rate_bps"] / 10000.0,
+                    "tenor_years": float(r.get("tenor_years", 1.0)),
+                    "survival_prob_q": float(r.get("survival_prob_q", float(r.get("survival_probability_pct", 100.0)) / 100.0)),
+                    "hazard_rate_lambda": float(r.get("hazard_rate_lambda", float(r.get("hazard_rate_bps", float(r.get("hazard_rate_pct", 1.0)) * 100.0)) / 10000.0)),
                 }
-                for r in cd_res["survival_curve_nodes"]
+                for r in cd_res.get("survival_curve_nodes", [])
             ]
         },
         {
             "tranches": [
                 {
-                    "tranche_name": r["tranche_name"],
-                    "attach_pct": float(r["attachment_detachment"].split("-")[0].replace("%", "")),
-                    "detach_pct": float(r["attachment_detachment"].split("-")[1].replace("%", "")),
-                    "expected_loss_pct": r["expected_tranche_loss_pct"],
-                    "fair_running_spread_bps": r["fair_running_spread_bps"],
+                    "tranche_name": str(r.get("tranche_name", "Tranche")),
+                    "attach_pct": float(r.get("attachment_pct", r.get("attach_pct", float(str(r.get("attachment_detachment", "0-3")).split("-")[0].replace("%", ""))))),
+                    "detach_pct": float(r.get("detachment_pct", r.get("detach_pct", float(str(r.get("attachment_detachment", "0-3")).split("-")[1].replace("%", ""))))),
+                    "expected_loss_pct": float(r.get("expected_loss_pct", r.get("expected_tranche_loss_pct", 0.0))),
+                    "fair_running_spread_bps": float(r.get("fair_running_spread_bps", 0.0)),
                 }
-                for r in cd_res["synthetic_cdo_tranches"]
+                for r in cd_res.get("synthetic_cdo_tranches", [])
             ]
         },
     )

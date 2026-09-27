@@ -259,11 +259,25 @@ def build_cds_bootstrap_and_tranche_chart(
     tranche_result: dict[str, Any],
 ) -> tuple[go.Figure, go.Figure]:
     """Build Bootstrapped CDS Survival/Hazard curve and Synthetic CDO Tranche Loss/Spread chart."""
-    curve = cds_result.get("bootstrapped_curve", [])
+    curve = cds_result.get("bootstrapped_curve", cds_result.get("survival_curve_nodes", []))
     if curve:
-        tenors = [float(r["tenor_years"]) for r in curve]
-        surv_pct = [float(r["survival_prob_q"]) * 100.0 for r in curve]
-        haz_bps = [float(r["hazard_rate_lambda"]) * 10000.0 for r in curve]
+        tenors = [float(r.get("tenor_years", 0.0)) for r in curve]
+        surv_pct = [
+            float(r["survival_probability_pct"])
+            if "survival_probability_pct" in r
+            else float(r.get("survival_prob_q", 1.0)) * 100.0
+            for r in curve
+        ]
+        haz_bps = [
+            float(r["hazard_rate_bps"])
+            if "hazard_rate_bps" in r
+            else (
+                float(r["hazard_rate_pct"]) * 100.0
+                if "hazard_rate_pct" in r
+                else float(r.get("hazard_rate_lambda", 0.0)) * 10000.0
+            )
+            for r in curve
+        ]
     else:
         tenors = [1.0, 3.0, 5.0, 7.0, 10.0]
         surv_pct = [99.0, 96.5, 93.2, 89.5, 84.0]
@@ -299,11 +313,14 @@ def build_cds_bootstrap_and_tranche_chart(
         height=380,
     )
 
-    tranches = tranche_result.get("tranches", [])
+    tranches = tranche_result.get("tranches", tranche_result.get("synthetic_cdo_tranches", []))
     if tranches:
-        t_names = [f"{r['tranche_name']} [{r['attach_pct']:.0f}-{r['detach_pct']:.0f}%]" for r in tranches]
-        el_pcts = [float(r["expected_loss_pct"]) for r in tranches]
-        spreads_bps = [float(r["fair_running_spread_bps"]) for r in tranches]
+        t_names = [
+            f"{r.get('tranche_name', 'Tranche')} [{float(r.get('attach_pct', r.get('attachment_pct', 0.0))):.0f}-{float(r.get('detach_pct', r.get('detachment_pct', 0.0))):.0f}%]"
+            for r in tranches
+        ]
+        el_pcts = [float(r.get("expected_loss_pct", r.get("expected_tranche_loss_pct", 0.0))) for r in tranches]
+        spreads_bps = [float(r.get("fair_running_spread_bps", 0.0)) for r in tranches]
     else:
         t_names = ["Equity [0-3%]", "Mezzanine [3-7%]", "Senior [7-15%]", "Super-Senior [15-100%]"]
         el_pcts = [42.5, 11.2, 2.8, 0.15]
