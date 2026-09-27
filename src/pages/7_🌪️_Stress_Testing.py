@@ -479,46 +479,16 @@ def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None
 
 # ── TAB 1: MATRICE COMPARATIVA MSCI BARRA ─────────────────────
 if active_stress_tab == "⚡ Matrice Comparativa MSCI Barra":
-    col_head_mb1, col_head_mb2 = st.columns([3.2, 1.1])
-    with col_head_mb1:
-        st.markdown("#### ⚡ Matrice Comparativa di Stress Test Simultanea (MSCI Barra Style)")
-        st.caption("Confronta l'impatto stimato in € e % del tuo portafoglio in tutti gli scenari di crisi contemporaneamente")
-    with col_head_mb2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("ℹ️ Guida alla Matrice di Stress Test (MSCI Barra Style)", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è la Matrice Comparativa MSCI Barra</div>
-  <div>Una visione sinottica orizzontale che affianca simultaneamente i 5 grandi eventi di crisi dei mercati finanziari moderni, permettendo di valutare a colpo d'occhio la resilienza comparata del portafoglio.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Metodologia di Calcolo</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Drawdown Benchmark:</b> Shock percentuale registrato dall'indice S&P 500 / MSCI World<br>
-    • <b>Drawdown Portafoglio:</b> &sum; (w<sub>i</sub> &times; Rendimento Storico<sub>i, crisi</sub>)<br>
-    • <b>Perdita Monetaria:</b> Controvalore Attuale &times; Impatto Portafoglio %
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Identificare quale tipologia di shock macro (crollo tecnologico, crisi bancaria/creditizia, shock tassi o pandemia) infligge il danno maggiore al portafoglio.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>Il motore carica i rendimenti storici effettivi dal database e genera la matrice comparativa con gradiente cromatico ad alto contrasto.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>Una perdita di portafoglio inferiore allo shock di mercato indica una solida componente difensiva o di decorrelazione efficace.</div>
-</div>
-
-</div>
-""", button_label="💡 Come funziona la Matrice MSCI Barra?")
+    st.markdown("#### ⚡ Matrice Comparativa di Stress Test Simultanea (MSCI Barra Multi-Asset)")
+    render_institutional_info_box(
+        title="Matrice Comparativa di Stress Test Simultanea (MSCI Barra Style)",
+        badge="MSCI BARRA • MULTI-CRISIS MATRIX",
+        summary_html="Visione sinottica orizzontale che affianca simultaneamente i 5 grandi crash sistemici moderni (COVID 2020, Subprime 2008, Dot-Com 2000, Taper Tantrum 2013, Inflazione 2022) per valutare istantaneamente la resilienza comparata del portafoglio.",
+        math_html="Rendimento del portafoglio sotto scenario storico: <code>R_{p,k} = Σ_i w_i · R_{i,k}</code><br>Perdita monetaria stimata: <code>L_k = V_p · R_{p,k}</code> con $w_i$ pesi effettivi e $R_{i,k}$ shock storico realizzato sulla finestra temporale dell'evento.",
+        chart_guide_html="• <b>Benchmark vs Portafoglio:</b> confronta la perdita dell'indice S&P500/MSCI World con la reazione del portafoglio attivo.<br>• <b>Differenziale (Alpha) %:</b> identifica se la diversificazione ha generato extra-protezione relativa o sovra-vulnerabilità rispetto al mercato.",
+        regulatory_html="• <b>Linee Guida EBA/GL/2018/04:</b> obbligo di stress testing retrospettivo su scenari severi ma plausibili per la validazione ICAAP.<br>• <b>Governance del Rischio:</b> dimensionamento delle riserve di liquidità commisurato al Maximum Historical Drawdown stimato.",
+        accent_color="#ff9900",
+    )
 
     df_matrix_rows = []
     for sc_name, sc_data in stress.items():
@@ -649,7 +619,16 @@ if active_stress_tab == "⚡ Matrice Comparativa MSCI Barra":
 
 # ── TAB 2: ANALISI SCENARI STORICI DETTAGLIATA ────────────────
 elif active_stress_tab == "🏛️ Analisi Scenari Storici Dettagliata":
-    st.markdown("#### Analisi dei Singoli Scenari Storici di Crisi")
+    st.markdown("#### 🏛️ Analisi Dettagliata per Singolo Scenario di Crisi Storica")
+    render_institutional_info_box(
+        title="Audit di Profondità per Singolo Scenario Storico & Waterfall P&L",
+        badge="HISTORICAL DECOMPOSITION • WATERFALL P&L",
+        summary_html="Scomposizione analitica per singola posizione della perdita attesa in uno scenario selezionato, con diagramma Waterfall dell'impatto sul capitale e dissezione dei driver di drawdown.",
+        math_html="Decomposizione per singolo asset $i$: <code>ΔV_i = V_p · w_i · r_{i,crisi}</code><br>Contributo percentuale alla perdita totale: <code>Contrib_i (%) = ΔV_i / Σ_j ΔV_j</code>.",
+        chart_guide_html="• <b>Grafico Waterfall:</b> visualizza il ponte contabile dal capitale iniziale pre-crisi al capitale finale residuo.<br>• <b>Bar Chart per Asset:</b> evidenzia quali titoli assorbono la quota maggiore delle perdite (top detractor) e quali offrono decorrelazione.",
+        regulatory_html="• <b>BCBS 239:</b> capacità di aggregazione tempestiva e granulare delle esposizioni di rischio sotto scenari di crisi.<br>• <b>Risk Appetite Framework (RAF):</b> verifica del rispetto dei limiti massimi di perdita ammissibile per singolo comparto.",
+        accent_color="#f85149",
+    )
     scenario_names = list(stress.keys())
     active_scenario = render_segmented_tabs(scenario_names, key="stress_scenario_subtab")
 
@@ -771,75 +750,32 @@ elif active_stress_tab == "🏛️ Analisi Scenari Storici Dettagliata":
 
 # ── TAB 3: SIMULATORE WHAT-IF & MACRO SCENARIO BUILDER ─────────
 elif active_stress_tab == "🛠️ Simulatore What-if Custom":
-    col_head_sb1, col_head_sb2 = st.columns([3.2, 1.1])
-    with col_head_sb1:
-        st.markdown("#### 🛠️ Macro Scenario Builder Multi-Fattoriale & Simulatore What-If")
-        st.caption("Manovra i parametri macroeconomici (Tassi d'interesse, Tasso EUR/USD, Prezzo Petrolio, Shock Azionario) per simulare scenari complessi di mercato sul tuo portafoglio.")
-    with col_head_sb2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("⚡ Guida al Macro Scenario Builder Multi-Fattoriale", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Macro Scenario Builder Multi-Fattoriale</div>
-  <div>Un potente motore di stress testing causale che permette di costruire scenari macroeconomici combinati su misura, stimando l'impatto contemporaneo di shock azionari, monetari, valutari ed energetici.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 I 4 Canali di Trasmissione Macroeconomica</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Shock Tassi (&Delta;r):</b> &minus;Duration &times; &Delta;r sui bond e compressione dei multipli P/E azionari<br>
-    • <b>Shock Valutario (&Delta;FX EUR/USD):</b> Rivalutazione/svalutazione delle posizioni denominate in dollari<br>
-    • <b>Shock Materie Prime (&Delta;Commodity):</b> Impatto inflattivo e pressione sui margini aziendali<br>
-    • <b>Shock Azionario (&Delta;Equity):</b> &beta; &times; Shock Mercato per ciascun titolo azionario
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Testare scenari di "Stagflazione", "Taglio Tassi & Boom Tech" o "Crisi Geopolitica Petrolifera" calibrando liberamente l'intensità di ogni singola variabile macroeconomica.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>La funzione <code>compute_custom_macro_stress</code> aggrega i flussi di sensitività titolo per titolo producendo il conto economico simulato del portafoglio.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>Usa i 4 slider interattivi a sinistra: i KPI a destra e la tabella dettagliata per asset si aggiornano istantaneamente mostrando la scomposizione della perdita/guadagno.</div>
-</div>
-
-</div>
-""", button_label="💡 Come funziona il Macro Scenario Builder?")
+    st.markdown("#### 🛠️ Macro Scenario Builder Multi-Fattoriale & Simulatore What-If")
+    render_institutional_info_box(
+        title="Simulatore di Shock Macro Personalizzato & Trasmissione Multi-Fattoriale",
+        badge="WHAT-IF SIMULATION • MACRO CHANNELS",
+        summary_html="Motore di stress testing causale per costruire scenari macro combinati su misura, stimando l'impatto contemporaneo di variazioni arbitrarie su azionario, tassi d'interesse, tassi di cambio EUR/USD e materie prime/energia.",
+        math_html="Impatto multi-fattoriale lineare combinato:<br><code>ΔP_i / P_i = β_i · ΔS_mkt - D_mod,i · Δr + β_fx,i · ΔFX + β_comm,i · ΔCommodity</code><br>dove $D_{mod}$ è la modified duration e $\\beta$ le sensibilità fattoriali empiriche stimate sui prezzi.",
+        chart_guide_html="• <b>Manovra Slider:</b> variazione istantanea dei parametri macro con ricalcolo isolato ad alte prestazioni tramite Streamlit Fragment.<br>• <b>Staging Ordini:</b> possibilità di generare ordini di ribilanciamento automatici per mitigare lo shock impostato.",
+        regulatory_html="• <b>EBA Stress Test & BCE SREP:</b> simulazione bottom-up di scenari ipotetici non lineari per la quantificazione di Pillar 2 Guidance (P2G).<br>• <b>Pianificazione Strategica:</b> stress testing prospettico anticipatore di pivot di politica monetaria o shock geopolitici.",
+        accent_color="#38bdf8",
+    )
 
     # Esecuzione del container isolato via @st.fragment
     render_whatif_custom_fragment(pos, portfolio_value)
 
 # ── TAB 4: TOTAL BALANCE SHEET & HUMAN CAPITAL STRESS ─────────
 elif active_stress_tab == "🌐 Total Balance Sheet & Human Capital Stress":
-    col_tb1, col_tb2 = st.columns([3.2, 1.1])
-    with col_tb1:
-        st.markdown("#### 🌐 Total Balance Sheet & Human Capital Stress Testing")
-        st.caption("Modello olistico di classe BlackRock Aladdin: integra Capitale Umano (quasi-equity/quasi-bond), Real Estate e debito ipotecario con il portafoglio titoli.")
-    with col_tb2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("ℹ️ Guida al Total Balance Sheet VaR (TBS-VaR)", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #a855f7; margin-bottom: 3px;">📌 Cos'è il Total Balance Sheet VaR</div>
-  <div>Supera l'approccio miope del solo portafoglio finanziario. L'investitore reale possiede Capitale Umano (stipendi futuri scontati), immobili e mutui. Il TBS-VaR calcola la perdita potenziale aggregata considerando le correlazioni incrociate tra mercato azionario, settore professionale e mercato immobiliare.</div>
-</div>
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #a855f7; margin-bottom: 3px;">💼 Capitale Umano come Quasi-Equity vs Quasi-Bond</div>
-  <div>Se lavori nel settore Tech o Finanza, il tuo stipendio e i tuoi bonus sono correlati all'andamento del mercato azionario (alto Beta: Quasi-Equity). Se lavori nel settore pubblico o nella sanità, il tuo reddito è assimilabile a un BTP o Treasury indicizzato (Quasi-Bond).</div>
-</div>
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #a855f7; margin-bottom: 3px;">⚠️ Correlazione Catastrofica (Income-Portfolio Shock)</div>
-  <div>Avere il 70% del portafoglio in titoli tecnologici lavorando in una Big Tech crea un rischio sistemico: un crollo settoriale mette a repentaglio contemporaneamente il capitale investito e la sicurezza del posto di lavoro.</div>
-</div>
-</div>
-""", button_label="💡 Come funziona il TBS-VaR?")
+    st.markdown("#### 🌐 Total Balance Sheet & Human Capital Stress Testing")
+    render_institutional_info_box(
+        title="Holistic Total Balance Sheet VaR & Stress Test Capitale Umano (BlackRock Aladdin Style)",
+        badge="TBS-VaR • HUMAN CAPITAL • REAL ESTATE",
+        summary_html="Integrazione olistica del Capitale Umano (stipendi futuri attualizzati trattati come quasi-equity o quasi-bond), immobili reali e mutui a tasso fisso/variabile con il portafoglio titoli liquido per calcolare il Total Balance Sheet VaR.",
+        math_html="Valore Attuale Capitale Umano: <code>HC_0 = Σ_{t=1}^T S_t / (1 + r + π_w)^t</code><br>Matrice di covarianza olistica: <code>Σ_{TBS} = [Σ_{port}, Cov(P,HC), Cov(P,RE); Cov(HC,P), σ_{HC}², Cov(HC,RE); Cov(RE,P), Cov(RE,HC), σ_{RE}²]</code><br><code>TBS-VaR_{95%} = z_{0.95} · √( w_{TBS}^T Σ_{TBS} w_{TBS} )</code>.",
+        chart_guide_html="• <b>Quasi-Equity vs Quasi-Bond:</b> settori ciclici (Tech, Finanza) presentano alta covarianza azionaria; settori pubblici/sanità agiscono come bond.<br>• <b>Emergency Runway:</b> mesi di copertura delle spese vive familiari garantiti dalla liquidità disponibile sotto stress.",
+        regulatory_html="• <b>Wealth Planning HNWI & Family Office:</b> standard di consulenza avanzata MiFID II per clienti Private ed Imprenditori con forte concentrazione professionale.<br>• <b>Asset-Liability Matching Personale:</b> immunizzazione del debito ipotecario con attivi finanziari a tasso variabile/indicizzati.",
+        accent_color="#a855f7",
+    )
 
     from core.wealth.human_capital_engine import HolisticBalanceSheetEngine, LaborIncomeProfile, TotalBalanceSheetState
 
@@ -1063,7 +999,15 @@ elif active_stress_tab == "🌐 Total Balance Sheet & Human Capital Stress":
 # ── TAB 5: PORTFOLIO FIXED INCOME & ALM TREASURY ENGINE ───────
 elif active_stress_tab == "📈 Portfolio Fixed Income & ALM Treasury":
     st.markdown("#### 📈 Portfolio Fixed Income & ALM Treasury Engine")
-    st.caption("Aggregazione del comparto a reddito fisso: Macaulay/Modified Duration ponderata, DV01/PVBP, Key Rate Durations e scenari di rotazione curva.")
+    render_institutional_info_box(
+        title="Portfolio Fixed Income Analytics, Key Rate Durations & Scenari di Curva",
+        badge="FIXED INCOME • DURATION • DV01 • TWIST",
+        summary_html="Aggregazione istituzionale del comparto obbligazionario ed ETF a reddito fisso: calcolo di Macaulay/Modified Duration ponderata, sensibilità monetaria DV01 per basis point, Key Rate Durations (2Y, 5Y, 10Y, 30Y) e stress scenari di rotazione della curva.",
+        math_html="Modified Duration aggregata: <code>D_{mod,p} = Σ_i w_i · D_{mod,i}</code> | <code>DV01_p = V_p · D_{mod,p} · 0.0001</code><br>Approssimazione di Taylor 2° ordine: <code>ΔP/P ≈ - D_{mod} · Δy + 0.5 · Convexity · (Δy)²</code>.<br>Key Rate Durations: sensibilità vettoriale a shift localizzati nei nodi 2Y, 5Y, 10Y, 30Y.",
+        chart_guide_html="• <b>Barre KRD:</b> identificano a quali tenori della curva dei rendimenti il portafoglio è maggiormente esposto.<br>• <b>Scenari Steepener/Flattener:</b> quantificano il P&L in caso di irripidimento (bull/bear steepening) o appiattimento (flattening) dei tassi.",
+        regulatory_html="• <b>BCBS Standards on IRRBB (Interest Rate Risk in the Banking Book):</b> calcolo obbligatorio della variazione di Economic Value of Equity (ΔEVE) e Net Interest Income (ΔNII) sotto 6 scenari di shock regolamentari standardizzati.<br>• <b>ALM Treasury Governance:</b> definizione dei limiti operativi di DV01 e strategie di macro-hedging con Interest Rate Swaps.",
+        accent_color="#10b981",
+    )
 
     from core.fixed_income import compute_portfolio_fixed_income_analytics
     fi_res = compute_portfolio_fixed_income_analytics(df_positions=pos, df_prices=results.get("prices"))
@@ -1151,7 +1095,15 @@ elif active_stress_tab == "📈 Portfolio Fixed Income & ALM Treasury":
 # ── TAB 6: RISCHIO LIQUIDITA & ORIZZONTE DTL ──────────────────
 elif active_stress_tab == "💧 Rischio Liquidità & Orizzonte DTL (Basel III / UCITS)":
     st.markdown("#### 💧 Motore Istituzionale di Liquidità & Orizzonte di Smobilizzo")
-    st.caption("Valutazione dei giorni necessari alla liquidazione (DTL), impatto di mercato Almgren-Chriss, indice di Amihud e Liquidity-Adjusted VaR (L-VaR).")
+    render_institutional_info_box(
+        title="Audit di Liquidità, Days to Liquidate (DTL), Indice di Amihud & L-VaR Endogeno",
+        badge="LIQUIDITY RISK • DTL • AMIHUD • L-VaR",
+        summary_html="Audit dettagliato dei volumi medi scambiati (ADV), giorni necessari alla liquidazione ordinata (DTL al 10% e 20% di partecipazione al volume), indice di illiquidità di Amihud, classificazione in 4 Tier UCITS/Basel e quantificazione del Liquidity-Adjusted VaR (L-VaR) endogeno.",
+        math_html="Days to Liquidate al participation rate $\\alpha$: <code>DTL_i = Qty_i / (α · ADV_i)</code><br>Indice di Amihud: <code>ILLIQ_i = (1/T) Σ_t |r_{i,t}| / Volume_{i,t}</code><br>Endogenous L-VaR (Bangia et al.): <code>L-VaR_α = VaR_α + 0.5 · V_p · (Spread_{medio} + z_α · σ_{spread}) + Costo_{Impatto}</code>.",
+        chart_guide_html="• <b>Days to Liquidate:</b> se DTL > 5 giorni, lo smobilizzo richiederà giorni di esecuzione sul mercato o comporterà forte slippage di prezzo.<br>• <b>Premio per Rischio Liquidità:</b> delta percentuale di perdita aggiuntiva rispetto al VaR puramente di mercato.",
+        regulatory_html="• <b>ESMA Guidelines on Liquidity Stress Testing (UCITS & AIFMD):</b> monitoraggio del profilo di liquidità degli attivi rispetto al profilo di rimborso dei passivi.<br>• <b>Basilea III / FRTB:</b> identificazione dei Non-Modellable Risk Factors (NMRF) dovuti a scarsa liquidità e applicazione del liquidity horizon floor.",
+        accent_color="#06b6d4",
+    )
 
     from core.risk_engine import compute_portfolio_liquidity_risk
     liq_res = compute_portfolio_liquidity_risk(

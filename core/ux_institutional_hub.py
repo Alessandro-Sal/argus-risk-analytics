@@ -1774,22 +1774,166 @@ def render_institutional_info_box(
     eff_kpi = chart_guide_html if chart_guide_html is not None else kpi_guide
     eff_reg = regulatory_html if regulatory_html is not None else operational_impact
 
+    unique_id = hashlib.md5(f"{title}_{badge}".encode("utf-8")).hexdigest()[:8]
+
     banner_html = _compact_html(
         f"""
-        <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.92) 0%, rgba(30, 41, 59, 0.85) 100%);
-                    border: 1px solid rgba(148, 163, 184, 0.18); border-left: 4px solid {accent_color};
-                    border-radius: 9px; padding: 9px 14px; margin-bottom: 10px;
-                    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+        <style>
+        #inst-modal-{unique_id} {{ display: none; }}
+        .inst-modal-overlay-{unique_id} {{
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 999999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }}
+        #inst-modal-{unique_id}:checked ~ .inst-modal-overlay-{unique_id} {{
+            display: flex;
+        }}
+        .inst-modal-backdrop-{unique_id} {{
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(10, 14, 20, 0.88);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            cursor: pointer;
+            z-index: 1;
+        }}
+        .inst-modal-content-{unique_id} {{
+            background: #0f172a;
+            border: 1px solid rgba(148, 163, 184, 0.28);
+            border-top: 4px solid {accent_color};
+            padding: 26px 30px;
+            border-radius: 16px;
+            width: 94%;
+            max-width: 900px;
+            max-height: 88vh;
+            overflow-y: auto;
+            color: #f1f5f9;
+            position: relative;
+            z-index: 2;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.92), 0 0 35px {accent_color}33;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            text-align: left;
+            box-sizing: border-box;
+            animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }}
+        @keyframes modalPopIn {{
+            from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+            to {{ opacity: 1; transform: scale(1) translateY(0); }}
+        }}
+        .inst-modal-close-{unique_id} {{
+            position: absolute;
+            top: 16px; right: 20px;
+            cursor: pointer;
+            font-size: 26px;
+            color: #94a3b8;
+            line-height: 1;
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        }}
+        .inst-modal-close-{unique_id}:hover {{
+            color: #f8fafc;
+            background: rgba(255, 255, 255, 0.1);
+        }}
+        .btn-inst-modal-{unique_id} {{
+            cursor: pointer;
+            background: {accent_color}22;
+            color: #f8fafc;
+            border: 1px solid {accent_color}77;
+            padding: 5px 12px;
+            border-radius: 7px;
+            font-size: 11.5px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            user-select: none;
+        }}
+        .btn-inst-modal-{unique_id}:hover {{
+            background: {accent_color}44;
+            border-color: {accent_color};
+            box-shadow: 0 0 12px {accent_color}55;
+            transform: translateY(-1px);
+        }}
+        </style>
+
+        <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.94) 0%, rgba(30, 41, 59, 0.88) 100%);
+                    border: 1px solid rgba(148, 163, 184, 0.22); border-left: 4px solid {accent_color};
+                    border-radius: 9px; padding: 10px 14px; margin-bottom: 10px;
+                    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
             <div style="display: flex; align-items: center; gap: 9px; flex-wrap: wrap;">
                 <span style="background: {accent_color}24; color: #e2e8f0; border: 1px solid {accent_color}66;
                              font-family: 'JetBrains Mono', monospace; font-size: 10.5px; font-weight: 800;
                              padding: 2px 8px; border-radius: 5px;">
                     {badge}
                 </span>
-                <span style="font-size: 12.5px; font-weight: 800; color: #f8fafc;">{title}</span>
+                <span style="font-size: 13px; font-weight: 800; color: #f8fafc;">{title}</span>
             </div>
-            <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.4;">
-                {eff_summary}
+            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.4; max-width: 600px;">
+                    {eff_summary}
+                </div>
+                <label for="inst-modal-{unique_id}" class="btn-inst-modal-{unique_id}" title="Apri scheda metodologica e interpretazione in modale a schermo intero">
+                    🔍 Modale Informativo
+                </label>
+            </div>
+        </div>
+
+        <input type="checkbox" id="inst-modal-{unique_id}">
+        <div class="inst-modal-overlay-{unique_id}">
+            <label for="inst-modal-{unique_id}" class="inst-modal-backdrop-{unique_id}"></label>
+            <div class="inst-modal-content-{unique_id}">
+                <label for="inst-modal-{unique_id}" class="inst-modal-close-{unique_id}">×</label>
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;">
+                    <span style="background: {accent_color}25; color: #e2e8f0; border: 1px solid {accent_color}66;
+                                 font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 800;
+                                 padding: 3px 9px; border-radius: 6px;">
+                        {badge}
+                    </span>
+                    <h3 style="margin:0; font-size:18px; font-weight:800; color:#f8fafc;">{title}</h3>
+                </div>
+                <div style="background:rgba(30,41,59,0.7); border-left:3px solid {accent_color}; border-radius:8px; padding:12px 16px; margin-bottom:18px; font-size:13px; color:#cbd5e1; line-height:1.55;">
+                    {eff_summary}
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr; gap:14px;">
+                    <div style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.18); border-top:3px solid {accent_color}; border-radius:8px; padding:14px 16px;">
+                        <div style="font-size:13px; font-weight:800; color:#93c5fd; margin-bottom:8px;">
+                            🔬 1. Fondamento Matematico & Modello
+                        </div>
+                        <div style="font-size:12.5px; color:#cbd5e1; line-height:1.55;">
+                            {eff_math}
+                        </div>
+                    </div>
+                    <div style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.18); border-top:3px solid #10b981; border-radius:8px; padding:14px 16px;">
+                        <div style="font-size:13px; font-weight:800; color:#6ee7b7; margin-bottom:8px;">
+                            📊 2. Come Leggere i KPI & i Grafici
+                        </div>
+                        <div style="font-size:12.5px; color:#cbd5e1; line-height:1.55;">
+                            {eff_kpi}
+                        </div>
+                    </div>
+                    <div style="background:rgba(15,23,42,0.9); border:1px solid rgba(148,163,184,0.18); border-top:3px solid #f59e0b; border-radius:8px; padding:14px 16px;">
+                        <div style="font-size:13px; font-weight:800; color:#fcd34d; margin-bottom:8px;">
+                            🛡️ 3. Implicazioni Regolamentari & Operative
+                        </div>
+                        <div style="font-size:12.5px; color:#cbd5e1; line-height:1.55;">
+                            {eff_reg}
+                        </div>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                    <label for="inst-modal-{unique_id}" style="cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1; padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600;">
+                        Chiudi Scheda
+                    </label>
+                </div>
             </div>
         </div>
         """
