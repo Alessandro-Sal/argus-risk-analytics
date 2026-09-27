@@ -180,3 +180,62 @@ def test_render_institutional_info_box_signatures() -> None:
         default_expanded=True,
     )
 
+
+def test_render_institutional_info_box_modal_generation() -> None:
+    """Verify render_institutional_info_box produces modal overlay, close button, and trigger button."""
+    from unittest.mock import MagicMock
+
+    import core.ux_institutional_hub as uxh
+
+    mock_st = MagicMock()
+    mock_st.columns.return_value = (MagicMock(), MagicMock(), MagicMock())
+    orig_st = uxh.st
+    try:
+        uxh.st = mock_st
+        uxh.render_institutional_info_box(
+            title="Rough Volatility & SVI Surface",
+            badge="ROUGH-SVI",
+            summary_html="<b>Test Summary</b>",
+            math_html="<code>Test Math Formula</code>",
+            chart_guide_html="Test Guide",
+            regulatory_html="Test Reg",
+            accent_color="#ec4899",
+        )
+        assert mock_st.markdown.called
+        # Check that banner HTML includes modal button and overlay elements
+        html_calls = [call[0][0] for call in mock_st.markdown.call_args_list if isinstance(call[0][0], str)]
+        full_html = "".join(html_calls)
+        assert "btn-inst-modal-" in full_html
+        assert "Modale Informativo" in full_html
+        assert "inst-modal-overlay-" in full_html
+        assert "inst-modal-content-" in full_html
+        assert "Chiudi Scheda" in full_html
+        assert "Fondamento Matematico & Modello" in full_html
+    finally:
+        uxh.st = orig_st
+
+
+def test_known_metrics_knowledge_base_entries() -> None:
+    """Verify new institutional metrics are present with all 6 descriptive fields."""
+    from core.ui_utils import KNOWN_METRICS_KNOWLEDGE_BASE
+
+    expected_keys = [
+        "ois_discounting",
+        "hull_white_1f",
+        "rough_volatility",
+        "isda_cds_tranche",
+        "solvency2_scr",
+        "bilateral_xva",
+        "isda_simm_im",
+        "ccar_cet1_stress",
+        "almgren_chriss_exec",
+        "redington_alm_ldi",
+    ]
+    for k in expected_keys:
+        assert k in KNOWN_METRICS_KNOWLEDGE_BASE, f"Missing metric {k}"
+        entry = KNOWN_METRICS_KNOWLEDGE_BASE[k]
+        for field in ("title", "what_is", "how_calc", "why_useful", "how_to_read", "limitations"):
+            assert field in entry, f"Missing field {field} in {k}"
+            assert len(entry[field]) > 10, f"Field {field} too short in {k}"
+
+

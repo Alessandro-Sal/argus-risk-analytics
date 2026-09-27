@@ -397,47 +397,16 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
     if not has_portfolio:
         st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare la Frontiera Efficiente di Markowitz.")
     elif opt and opt.get("tickers"):
-        col_head_opt1, col_head_opt2 = st.columns([3.0, 1.3])
-        with col_head_opt1:
-            st.markdown("#### Ottimizzazione di Portafoglio (Markowitz Efficient Frontier)")
-            st.caption(f"Confronta il tuo portafoglio attuale con le allocazioni ottimali (Stima Covarianza: **{opt.get('cov_type', 'Ledoit-Wolf Shrinkage')}**)")
-        with col_head_opt2:
-            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            glossary_modal("ℹ️ Guida all'Ottimizzazione Ledoit-Wolf & Ribilanciamento", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è la Frontiera Efficiente di Markowitz</div>
-  <div>Il luogo geometrico dei portafogli ottimali che massimizzano il rendimento atteso per ogni livello di volatilità (o minimizzano il rischio per un dato rendimento target).</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Matrice di Covarianza Ledoit-Wolf Shrinkage</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12.5px; text-align: center;">
-    <b>&Sigma;<sub>LW</sub></b> = &delta; &middot; <b>F</b> + (1 &minus; &delta;) &middot; <b>S</b>
-  </div>
-  <div>dove <i>S</i> è la covarianza campionaria, <i>F</i> è la matrice target strutturata a singolo fattore e <i>&delta;</i> è il parametro ottimale di contrazione (shrinkage) che minimizza l'errore quadratico medio.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Risolve l'instabilità dell'ottimizzazione classica (l'effetto "error-maximizer"), producendo pesi di ribilanciamento concreti ed eseguibili senza pesi estremi.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>ARGUS risolve l'ottimizzazione quadratica vincolata (Long-Only, sum(w)=1) calcolando i due portafogli cardine: <b>Max Sharpe Ratio</b> e <b>Minima Varianza</b>.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>
-    • 🟢 <b>Stella Verde:</b> Il tuo portafoglio attuale.<br>
-    • 🟠 <b>Stella Arancione:</b> Portafoglio a Massimo Sharpe Ratio (massima efficienza rendimento/rischio).<br>
-    • 🔵 <b>Stella Azzurra:</b> Portafoglio a Minima Volatilità (massima stabilità del capitale).
-  </div>
-</div>
-""", button_label="💡 Guida Markowitz")
+        st.markdown("#### 📊 Ottimizzazione di Portafoglio (Markowitz Efficient Frontier)")
+        render_institutional_info_box(
+            title="Frontiera Efficiente di Markowitz & Covarianza Ledoit-Wolf Shrinkage",
+            badge="PORTFOLIO OPTIMIZATION • LEDOIT-WOLF • MPT",
+            summary_html="Ottimizzazione convessa vincolata (Long-Only, sum(w)=1) con regolarizzazione della matrice di covarianza campionaria tramite Ledoit-Wolf Shrinkage verso un target a singolo fattore, individuando i portafogli a Massimo Sharpe Ratio e Minima Varianza.",
+            math_html="Formulazione di contrazione: <code>Σ_{LW} = δ · F + (1 - δ) · S</code> con $S$ covarianza campionaria, $F$ matrice strutturata e $\\delta^* \\in [0, 1]$ intensità ottimale analitica.<br>Ottimizzazione Max Sharpe: <code>max_w (w^T μ - r_f) / √(w^T Σ_{LW} w)   s.t.  Σ w_i = 1, w_i ≥ 0</code>.",
+            chart_guide_html="• <b>Frontiera e Stelle:</b> 🟢 Portafoglio Attuale | 🟠 Max Sharpe Ratio | 🔵 Minima Varianza Globale.<br>• <b>Allocazione Ribilanciata:</b> tabella delle variazioni percentuali $\\Delta w$ e ordini broker generati.",
+            regulatory_html="• <b>MiFID II Suitability & Best Execution:</b> documentazione trasparente del razionale matematico di allocazione e ribilanciamento periodico.<br>• <b>Contenimento del Turnover:</b> la shrinkage Ledoit-Wolf elimina i pesi estremi ed irrealistici generati dall'instabilità della covarianza campionaria.",
+            accent_color="#ff9900",
+        )
         
         cand_handoff = st.session_state.get("screener_candidate_to_optimize")
         if cand_handoff:
@@ -1627,40 +1596,16 @@ elif active_quant_tab == "🤖 AI Reinforcement Learning":
     if not has_portfolio:
         st.warning("⚠️ Carica prima un portafoglio per addestrare l'Agente AI di Reinforcement Learning.")
     else:
-        col_rl_h1, col_rl_h2 = st.columns([3.0, 1.3])
-        with col_rl_h1:
-            st.markdown("### 🤖 Asset Allocation con Reinforcement Learning (RL Policy Sandbox)")
-            st.caption("Addestramento di agenti neurali continui (Permutation-Equivariant Policy Gradient) per l'adattamento dinamico dei pesi su regimi macro e minimizzazione del Downside Risk.")
-        with col_rl_h2:
-            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            glossary_modal(
-                "ℹ️ Guida Metodologica: Reinforcement Learning in Portfolio Management",
-                r"""
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Portfolio Management via RL</div>
-  <div>A differenza dei modelli statici di Markowitz (che assumono parametri di covarianza costanti nel tempo), un agente di <b>Reinforcement Learning (RL)</b> apprende una <i>policy</i> decisionale dinamica $\pi_\theta(a|s)$ formulata come Processo Decisionale di Markov (MDP).</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Spazio degli Stati, Azioni e Funzione di Ricompensa</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Stato ($S_t \in \mathbb{R}^{3N}$):</b> Feature sub-vettoriali per asset (Sharpe Rolling, Momentum Multi-Timeframe e Downside Volatility standardizzati via z-score cross-sectional).<br>
-    • <b>Azione ($A_t \in \Delta^{N-1}$):</b> Vettore pesi sul simplesso ($\sum w_i = 1, w_i \ge 0$) generato tramite rete neurale a scoring condiviso (Permutation-Equivariant) e attivazione Softmax.<br>
-    • <b>Ricompensa ($R_t$):</b> Sortino/Sharpe normalizzato calcolato su volatilità rolling temporale con penalità per i costi di transazione e bonus di diversificazione ($1 - \text{HHI}_t$). Ribilanciamento periodico con deriva naturale dei prezzi per evitare l'overtrading.
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Algoritmo di Ottimizzazione Batch Adam</div>
-  <div>La rete neurale a scoring condiviso viene addestrata mediante <b>Batch Policy Gradient REINFORCE</b> con regolarizzazione dell'entropia ($\mathcal{H}(\pi)$) e ottimizzatore <b>Adam</b> con gradient clipping, garantendo convergenza progressiva e onde di allocazione fluide.</div>
-</div>
-
-</div>
-""",
-                button_label="💡 Guida RL Agent"
-            )
+        st.markdown("### 🤖 Asset Allocation con Reinforcement Learning (RL Policy Sandbox)")
+        render_institutional_info_box(
+            title="AI Deep Reinforcement Learning & Permutation-Equivariant Policy Gradient",
+            badge="ARTIFICIAL INTELLIGENCE • DEEP RL • POLICY GRADIENT",
+            summary_html="Addestramento di agenti neurali continui (Permutation-Equivariant Policy Gradient) formulati come Processo Decisionale di Markov (MDP) per l'adattamento dinamico dei pesi sui regimi macro e la massimizzazione del reward risk-adjusted.",
+            math_html="Ottimizzazione policy: <code>∇_θ J(θ) = E_{τ ~ π_θ} [ Σ_t ∇_θ log π_θ(a_t | s_t) · R_t ] + λ_H ∇_θ H(π_θ)</code><br>Stato $s_t \\in \\mathbb{R}^{3N}$ (Sharpe rolling, momentum e downside volatility), Azione $a_t \\in \\Delta^{N-1}$ via Softmax equivariante e ottimizzatore <b>Adam</b> con gradient clipping.",
+            chart_guide_html="• <b>Reward Curve:</b> traccia la convergenza della funzione obiettivo (Sharpe, Sortino o Min-Vol) attraverso gli episodi di addestramento.<br>• <b>Allocazione Dinamica:</b> visualizza le transizioni temporali dei pesi in risposta alle variazioni di volatilità e trend.",
+            regulatory_html="• <b>AI Act (Regolamento UE 2024/1689):</b> tracciabilità e spiegabilità degli algoritmi decisionali autonomi per investimenti ad alto impatto.<br>• <b>Model Risk Governance (SR 11-7):</b> validazione empirica out-of-sample per prevenire l'overfitting su serie storiche rumorose.",
+            accent_color="#a855f7",
+        )
 
         df_returns_rl = results.get("returns", pd.DataFrame())
         if active_tickers_set:
@@ -1930,63 +1875,16 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
     if not has_portfolio:
         st.warning("⚠️ Carica prima un portafoglio per calcolare le Copule di Coda e il dimensionamento di Kelly.")
     else:
-        col_cop_h1, col_cop_h2 = st.columns([3.0, 1.3])
-        with col_cop_h1:
-            st.markdown("### 🧬 Modelli di Dipendenza di Coda (Tail Copula) & Kelly Criterion")
-            st.caption("Quantifica il rischio di crash congiunto asimmetrico (Clayton/Gumbel Copulas) e calcola il dimensionamento matematico ottimale delle posizioni (Half-Kelly).")
-        with col_cop_h2:
-            st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-            glossary_modal(
-                "ℹ️ Guida Metodologica: Tail Copula & Criterio di Kelly",
-                """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 1. COS'È</div>
-  <div>
-    • <b>Dipendenza di Coda (Tail Copulas):</b> Misura quantitativa non lineare della tendenza di due asset a crollare contemporaneamente durante shock sistemici di mercato, superando i limiti della classica correlazione lineare di Pearson.<br>
-    • <b>Criterio di Kelly (Trade Sizing):</b> Algoritmo di teoria dell'informazione che determina la percentuale ottimale di capitale da rischiare su ciascuna operazione per massimizzare la crescita geometrica di lungo termine.
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 2. COME SI CALCOLA</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px;">
-    <b>Lower Tail Dependence:</b> &lambda;<sub>L</sub> = lim<sub>q&rarr;0<sup>+</sup></sub> P(U<sub>j</sub> &le; q | U<sub>i</sub> &le; q) = 2<sup>&minus;1/&theta;</sup> (Clayton)<br>
-    <b>Kelly Formula (Discreta):</b> f<sup>*</sup> = [p &middot; (b + 1) &minus; 1] / b &nbsp;&nbsp;|&nbsp;&nbsp; <b>Half-Kelly:</b> f<sup>*</sup><sub>half</sub> = f<sup>*</sup> / 2
-  </div>
-  <div>dove <i>p</i> è il Win Rate (%), <i>b</i> è il Payoff Ratio (Avg Win / Avg Loss) e <i>f<sup>*</sup></i> è la frazione di capitale ottimale.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 3. A COSA SERVE</div>
-  <div>
-    • <b>Prevenzione del Crash Contagion:</b> Rileva le coppie di asset che sembrano decorrelate in tempi normali ma perdono completamente la diversificazione durante i crash.<br>
-    • <b>Dimensionamento Scientifico:</b> Elimina il sovradimensionamento (overbetting) e azzera il rischio matematico di rovina (Gambler's Ruin).
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ 4. COME VIENE CALCOLATO DA ARGUS</div>
-  <div>
-    • <b>Copule:</b> ARGUS trasforma i rendimenti storici in ranghi uniformi empirici (CDF) e stima il parametro di copula archimedea &theta; e &lambda;<sub>L</sub> sulla soglia di percentile estremo <i>q</i>.<br>
-    • <b>Kelly Simulator:</b> ARGUS estrae in tempo reale dal motore <b>FIFO del Graveyard</b> il Win Rate reale e il Payoff Ratio storico, calcolando il dimensionamento monetario (€) esatto in base allo Stop-Loss inserito.
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 5. COME LEGGERLO</div>
-  <div>
-    • 🚨 <b>&lambda;<sub>L</sub> &ge; 0.30:</b> Allerta Diversification Breakdown (in crollo la correlazione sale verso 1).<br>
-    • 🟢 <b>Half-Kelly (Raccomandato):</b> Ottiene il 75% del rendimento geometrico massimo riducendo la volatilità del 50% e proteggendo dai drawdown estremi.<br>
-    • ⚠️ <b>Edge &le; 0%:</b> Se l'edge statistico è negativo, il Kelly formula consiglia zero esposizione (non operare).
-  </div>
-</div>
-
-</div>
-""",
-                button_label="💡 Guida Copula & Kelly"
-            )
+        st.markdown("### 🧬 Modelli di Dipendenza di Coda (Tail Copula) & Kelly Criterion")
+        render_institutional_info_box(
+            title="Dipendenza di Coda Asimmetrica (Tail Copulas) & Optimal Kelly Sizing",
+            badge="EXTREME RISK • CLAYTON/GUMBEL • HALF-KELLY",
+            summary_html="Quantificazione non lineare del rischio di crash congiunto asimmetrico tramite copule archimedee (Clayton e Gumbel) per rilevare il contagio sistemico, combinata con il dimensionamento matematico di capitale frazionario (Half-Kelly).",
+            math_html="Lower Tail Dependence (Clayton): <code>λ_L = lim_{q→0^+} P(U_j ≤ q | U_i ≤ q) = 2^{-1/θ}</code><br>Kelly Criterion continuo: <code>f^* = (μ - r_f) / σ²</code> | Half-Kelly discreto: <code>f^*_{half} = 0.5 · [p(b + 1) - 1] / b</code> con win-rate $p$ e payoff ratio $b$.",
+            chart_guide_html="• <b>Heatmap Dipendenza di Coda:</b> celle con $\\lambda_L \\ge 0.30$ segnalano breakdown della diversificazione in caso di crolli.<br>• <b>Half-Kelly Sizing:</b> garantisce il 75% del tasso di crescita geometrico asintotico riducendo la volatilità e il rischio di rovina del 50%.",
+            regulatory_html="• <b>Basilea III / FRTB Expected Shortfall:</b> cattura il rischio di code pesanti non gaussiane e crolli simultanei non riflessi dalla covarianza lineare.<br>• <b>Money Management Istituzionale:</b> imposizione di capping stringenti per evitare sovradimensionamento e drawdown irreversibili.",
+            accent_color="#ec4899",
+        )
 
         df_returns_all = results.get("returns", pd.DataFrame())
         if df_returns_all.empty or not isinstance(df_returns_all, pd.DataFrame) or df_returns_all.shape[1] < 2:
@@ -2321,49 +2219,16 @@ elif active_quant_tab == "🧬 Tail Copula & Kelly":
 
 # ── TAB 3: SIMULAZIONI STOCASTICHE ────────────────────────────
 elif active_quant_tab == "🎲 Monte Carlo & Merton":
-    col_head_mc1, col_head_mc2 = st.columns([3.0, 1.3])
-    with col_head_mc1:
-        st.markdown("### 🎲 Simulatore Stocastico Monte Carlo Multivariato & Clustering")
-        st.caption("Proietta 3.000 traiettorie causali del portafoglio nel tempo tramite Decomposizione di Cholesky, con supporto per regimi di stress, distribuzioni a code grasse (Student-t) e metriche di Tail Risk (VaR & CVaR).")
-    with col_head_mc2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("📚 Guida alla Simulazione Monte Carlo Multivariata", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Cos'è il Simulatore Monte Carlo Multivariato</div>
-  <div>Un generatore di percorsi stocastici casuali che simula migliaia di possibili evoluzioni future del valore di portafoglio, preservando la reale matrice di covarianza storica tra tutti i titoli componenti.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Decomposizione di Cholesky & Code Grasse (Student-t)</div>
-  <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 5px 0; color: #ffb74d; font-size: 12px; line-height: 1.45;">
-    • <b>Fattorizzazione di Cholesky:</b> &Sigma; = <b>L &middot; L<sup>T</sup></b> per generare shock correlati <b>&epsilon;<sub>corr</sub> = L &middot; z</b><br>
-    • <b>Distribuzione Student-t (&nu; = 5):</b> Introduce code pesanti per simulare cigni neri e shock estremi
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🎯 A cosa serve</div>
-  <div>Stimare la probabilità di perdita del capitale a 1, 2 o 3 anni, calcolare il VaR/CVaR terminale e valutare la resilienza del portafoglio sotto stress di volatilità o calo del drift.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">⚙️ Calcolo in ARGUS</div>
-  <div>ARGUS esegue 3.000 iterazioni stocastiche vettorializzate con NumPy, proiettando percentili 5°, 25°, 50° (mediana), 75° e 95° e aggregando i cluster K-Means degli asset.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🔍 Come leggerlo</div>
-  <div>
-    • <b>Linea Blu Centrale:</b> Traiettoria mediana attesa (scenario base).<br>
-    • <b>Banda Ombreggiata (5° - 95° percentile):</b> Intervallo di confidenza al 90% del controvalore finale.<br>
-    • <b>Probabilità di Perdita (%):</b> Quota di simulazioni che chiudono sotto il capitale iniziale.
-  </div>
-</div>
-
-</div>
-""", button_label="💡 Guida Monte Carlo")
+    st.markdown("### 🎲 Simulatore Stocastico Monte Carlo Multivariato & Salti di Merton")
+    render_institutional_info_box(
+        title="Simulatore Stocastico Monte Carlo Multivariato & Jump-Diffusion di Merton",
+        badge="STOCHASTIC SIMULATION • 10K SCENARIOS • MERTON JUMP",
+        summary_html="Generatore vettoriale ad alte prestazioni (10.000 iterazioni) per proiettare l'evoluzione congiunta del portafoglio tramite Decomposizione di Cholesky, code pesanti (Student-t) e componente a salti discreti di Poisson (Merton 1976).",
+        math_html="Dinamica Jump-Diffusion di Merton: <code>dS_t / S_t = (μ - λ k) dt + σ dW_t + (J - 1) dq_t</code><br>con $W_t$ Browniano correlato via Cholesky $\\Sigma = L L^T$, $q_t$ processo di Poisson con intensità di salto $\\lambda$, e $\\ln(J) \\sim \\mathcal{N}(\\mu_J, \\sigma_J^2)$.",
+        chart_guide_html="• <b>Fascio Traiettorie & Mediana:</b> visualizza il cono di confidenza (5°, 25°, 50°, 75°, 95° percentile) del controvalore atteso.<br>• <b>Probabilità di Perdita (%):</b> quota di scenari che si attestano al di sotto del capitale iniziale investito.",
+        regulatory_html="• <b>Basilea III Stressed VaR / Expected Shortfall:</b> proiezione di scenari congiunti estremi per verificare la tenuta dei requisiti di capitale di vigilanza.<br>• <b>PRIIPs Methodology:</b> simulazione di scenari Favorevole, Moderato, Sfavorevole e di Stress conforme agli standard tecnici RTS UE.",
+        accent_color="#3b82f6",
+    )
 
     try:
         from core.risk_engine import run_advanced_monte_carlo_simulation
@@ -2968,8 +2833,16 @@ elif active_quant_tab == "🎲 Monte Carlo & Merton":
 
 # ── TAB 4: HEDGING TATTICO & TAIL RISK ────────────────────────
 elif active_quant_tab == "🛡️ Hedging & Opzioni":
-    section("🛡️ Simulatore di Copertura & Hedging Tattico (Beta-Neutral & Tail Protection)")
-    st.caption("Calcola le coperture esatte con ETF inversi o micro-futures per azzerare o ridurre la sensibilità al rischio sistemico senza vendere gli asset.")
+    st.markdown("#### 🛡️ Simulatore di Copertura & Hedging Tattico (Beta-Neutral & Black-Scholes Options)")
+    render_institutional_info_box(
+        title="Tactical Beta-Neutral Hedging, Black-Scholes (1973) Greeks & Volatility Skew",
+        badge="TACTICAL HEDGING • GREEKS • VOLATILITY SKEW",
+        summary_html="Dimensionamento esatto delle coperture di portafoglio: calcolo delle quote per ETF inversi e micro-futures per immunizzare il Beta di mercato, pricing analitico di opzioni europee (Black-Scholes-Merton), decomposizione dei 5 Greci (Δ, Γ, Θ, Vega, ρ) e calibrazione dello Skew di volatilità reale.",
+        math_html="Numero contratti/quote di copertura: <code>N_{hedge} = - (β_{target} - β_p) · V_p / (β_{inst} · P_{inst})</code><br>Pricing Black-Scholes: <code>C = S e^{-q T} N(d_1) - K e^{-r T} N(d_2)</code> | <code>P = K e^{-r T} N(-d_2) - S e^{-q T} N(-d_1)</code><br>con $d_1 = [\\ln(S/K) + (r - q + 0.5 σ²)T] / (σ \\sqrt{T})$ e $d_2 = d_1 - σ \\sqrt{T}$.",
+        chart_guide_html="• <b>Beta Attuale vs Target:</b> calcola l'investimento monetario protettivo per azzerare la reattività sistemica (Beta-Neutral).<br>• <b>Profilo Payoff & Vol Skew:</b> evidenzia l'effetto asimmetrico OTM Put/Call e il costo del decadimento temporale (Theta bleed).",
+        regulatory_html="• <b>IFRS 9 Hedge Accounting:</b> documentazione formale dell'efficacia prospettica e retrospettiva della copertura (intervallo 80-125%).<br>• <b>EMIR & Clearing Mandates:</b> gestione del rischio di base (basis risk) tra lo strumento derivato quotato o ETF inverso e il paniere di portafoglio sottostante.",
+        accent_color="#06b6d4",
+    )
 
     if not has_portfolio or results is None:
         st.warning("⚠️ Carica prima un portafoglio nella Control Room per calcolare le coperture di Hedging Tattico.")
@@ -3402,8 +3275,16 @@ elif active_quant_tab == "🛡️ Hedging & Opzioni":
 
 # ── TAB 5: ATTRIBUZIONE BRINSON & FATTORI MULTI-FATTORIALI ────────
 elif active_quant_tab == "🎯 Attribuzione & Fattori":
-    section("🎯 Attribuzione della Performance & Modelli Multi-Fattoriali (Brinson, Barra & ML)")
-    st.caption("Scompone l'extra-rendimento di portafoglio rispetto al Benchmark ed analizza l'esposizione ai fattori di rischio Barra/Carhart, Black-Litterman e Volatilità ML.")
+    st.markdown("#### 🎯 Attribuzione della Performance & Modelli Multi-Fattoriali (Brinson-Fachler)")
+    render_institutional_info_box(
+        title="Performance Attribution Brinson-Fachler & Regressione Multi-Fattoriale",
+        badge="ALPHA ATTRIBUTION • BRINSON-FACHLER • MULTI-FACTOR",
+        summary_html="Decomposizione formale dell'extra-rendimento di portafoglio rispetto al benchmark nei tre pilastri canonici di Brinson-Fachler: Allocation Effect (scelta settoriale), Selection Effect (scelta titoli) e Interaction Effect, integrata con modelli fattoriali empirici.",
+        math_html="Modello di Brinson-Fachler:<br><code>Allocation = Σ_i (w_i^p - w_i^b) · (R_i^b - R_tot^b)</code><br><code>Selection = Σ_i w_i^b · (R_i^p - R_i^b)</code> | <code>Interaction = Σ_i (w_i^p - w_i^b) · (R_i^p - R_i^b)</code><br>Extra-rendimento totale: <code>R_p - R_b = Allocation + Selection + Interaction</code>.",
+        chart_guide_html="• <b>Barre di Attribuzione per Settore:</b> identifica se l'Alpha deriva dall'overweight/underweight di specifici settori o dalla bravura nel selezionare i singoli titoli.<br>• <b>Tabelle di Dettaglio:</b> quantificano in punti base i contributi marginali di ogni singola posizione.",
+        regulatory_html="• <b>GIPS (Global Investment Performance Standards):</b> conformità ai requisiti CFA Institute per il reporting oggettivo delle performance e la spiegazione delle fonti di valore aggiunto.<br>• <b>Governance del Fondo:</b> verifica dell'aderenza del gestore al mandato d'investimento e al benchmark dichiarato.",
+        accent_color="#10b981",
+    )
 
     if not has_portfolio or results is None:
         st.warning("⚠️ Carica prima un portafoglio nella Control Room per visualizzare l'attribuzione di performance e i fattori Barra.")
@@ -4413,38 +4294,16 @@ elif active_quant_tab == "🎯 Attribuzione & Fattori":
 
 # ── TAB 6: FIXED INCOME, YTM & Z-SPREAD (YAS) ──────────────────────
 elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
-    col_fi_h1, col_fi_h2 = st.columns([3.0, 1.3])
-    with col_fi_h1:
-        st.markdown("#### 🏛️ Fixed Income Istituzionale & Z-Spread Cockpit (Bloomberg YAS Style)")
-        st.caption("Analisi quantitativa per Titoli di Stato ed Obbligazioni Corporate • Yield to Maturity (YTM), Duration, Convessità, DV01, Z-Spread e Probabilità di Default CDS.")
-    with col_fi_h2:
-        st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
-        glossary_modal("ℹ️ Guida a Fixed Income, Duration & Z-Spread", """
-<div style="font-size: 13.5px; line-height: 1.45;">
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📌 Metriche di Sensibilità Obbligazionaria</div>
-  <div>
-    • <b>Yield to Maturity (YTM):</b> Tasso interno di rendimento (TIR) che eguaglia il valore attuale dei flussi al prezzo di mercato.<br>
-    • <b>Macaulay Duration:</b> Scadenza media ponderata per il valore attuale dei flussi di cassa.<br>
-    • <b>Modified Duration:</b> Sensibilità percentuale del prezzo per una variazione dell'1% (100 bps) nei tassi di interesse.<br>
-    • <b>Convexity:</b> Curvatura di 2° ordine che quantifica il vantaggio per cui i bond guadagnano di più quando i tassi scendono e perdono di meno quando i tassi salgono.<br>
-    • <b>DV01 / PVBP:</b> Variazione del valore monetario del titolo per ogni movimento di 1 punto base (0.01%) di rendimento.
-  </div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 Z-Spread (Zero-Volatility Spread)</div>
-  <div>Lo spread costante in punti base (bps) da aggiungere a ciascun nodo della curva spot sovrana per riprodurre esattamente il prezzo di mercato del bond.</div>
-</div>
-
-<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px;">
-  <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">🛡️ Probabilità di Default Implicita (CDS)</div>
-  <div>Stima dell'intensità di default (Hazard Rate &lambda; = Spread / (1 - Recovery Rate)) e probabilità cumulativa di insolvenza su orizzonti da 1 a 30 anni.</div>
-</div>
-
-</div>
-""", button_label="💡 Guida Fixed Income")
+    st.markdown("#### 🏛️ Fixed Income Istituzionale & Z-Spread Cockpit (Bloomberg YAS Style)")
+    render_institutional_info_box(
+        title="Fixed Income Pricing, Curva Zero-Coupon, Z-Spread & Default Implicito",
+        badge="FIXED INCOME • YAS • Z-SPREAD • CDS HAZARD",
+        summary_html="Valutazione obbligazionaria di classe Bloomberg YAS: Yield to Maturity (YTM), Duration Modificata, Convessità, DV01/PVBP, bootstrapping della curva zero-coupon sovrana, calcolo dello Z-Spread e stima dell'intensità di default (Hazard Rate).",
+        math_html="Pricing Z-Spread su curva spot $z(t_i)$: <code>P = Σ_{i=1}^n C_i / [1 + z(t_i) + Z]^{t_i} + M / [1 + z(t_n) + Z]^{t_n}</code><br>Sensibilità di prezzo: <code>ΔP/P ≈ - D_{mod} · Δy + 0.5 · C · (Δy)²</code> | <code>DV01 = P · D_{mod} · 0.0001</code>.<br>Hazard Rate implicita: <code>λ ≈ S_{CDS} / (1 - R)</code> con Recovery Rate $R$.",
+        chart_guide_html="• <b>Z-Spread vs Benchmark:</b> misura il puro premio al rischio creditizio e di liquidità scorporato dalla forma della curva dei tassi.<br>• <b>Probabilità di Default Cumulata:</b> proietta la curva $Q(0, t) = 1 - e^{-λ t}$ a 1Y, 5Y, 10Y, 30Y.",
+        regulatory_html="• <b>Basilea III Requisiti di Capitale per Rischio Tassi nel Banking Book (IRRBB):</b> monitoraggio delle sensibilità DV01 ed effetto convessità su grandi movimenti di curva.<br>• <b>Valutazione Fair Value IFRS 13 / Mark-to-Model:</b> calibrazione oggettiva dei flussi di cassa scontati su tassi zero-coupon privi di rischio.",
+        accent_color="#eab308",
+    )
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
@@ -4670,8 +4529,32 @@ elif active_quant_tab == "🏛️ Fixed Income & Z-Spread":
 
 # ── TAB 8: MACHINE LEARNING HMM REGIMES ──────────────────────
 elif active_quant_tab == "⚡ Machine Learning HMM Regimes":
-    section("⚡ Machine Learning Hidden Markov Models (HMM) & Regime Detection")
+    st.markdown("#### ⚡ Machine Learning Hidden Markov Models (HMM) & Regime Detection")
     st.caption("Classificazione probabilistica non supervisionata della serie dei rendimenti in 3 stati latenti (Low-Vol Bull, Range-Bound Drift, High-Vol Crisis) e calcolo della matrice di transizione.")
+
+    render_institutional_info_box(
+        title="Hidden Markov Models (HMM) & Regime Detection Non-Supervisionato (Hamilton 1989)",
+        badge="MACHINE LEARNING • MARKOV SWITCHING",
+        summary_html=(
+            "Classificazione probabilistica non supervisionata della serie storica dei rendimenti in 3 stati latenti "
+            "<b>(Low-Vol Bull, Range-Bound Drift, High-Vol Crisis)</b> con stima della matrice di transizione Markoviana "
+            "e calcolo analitico della durata attesa di permanenza nel regime."
+        ),
+        math_html=(
+            "Probabilità di transizione $p_{ij} = P(S_t = j \\mid S_{t-1} = i)$ stimate via algoritmo di <b>Baum-Welch (EM)</b>:<br>"
+            "<code>L(θ) = Σ_S P(Y, S | θ)  |  Durata media attesa E[D_i] = 1 / (1 - p_ii)</code><br>"
+            "Rendimento e varianza condizionati: <code>Y_t | (S_t = k) ~ N(μ_k, σ²_k)</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Profilo Statistico dei Regimi</b>: indica rendimento annuo, volatilità e Sharpe ratio associati a ciascuno stato latente.<br>"
+            "• <b>Matrice di Transizione (%)</b>: la diagonale principale $(p_{ii})$ quantifica la persistenza e stabilità del regime."
+        ),
+        regulatory_html=(
+            "• <b>Pillar 2 Supervisory Stress Testing</b>: identificazione tempestiva delle transizioni verso regimi di crisi ad alta volatilità.<br>"
+            "• <b>Tactical Asset Allocation</b>: adeguamento dinamico dei pesi di portafoglio in funzione della probabilità di transizione a $T+1$."
+        ),
+        accent_color="#8b5cf6",
+    )
 
     from core.hmm_regime_engine import compute_hmm_market_regime_detection
 
@@ -4718,8 +4601,32 @@ elif active_quant_tab == "⚡ Machine Learning HMM Regimes":
 
 # ── TAB 9: TAX-AWARE REBALANCER & EXECUTION ──────────────────
 elif active_quant_tab == "⚖️ Tax-Aware Rebalancer & Execution":
-    section("⚖️ Ribilanciatore Tax-Aware, Matrice di Attrito & Zero-Tax PAC")
+    st.markdown("#### ⚖️ Ribilanciatore Tax-Aware, Matrice di Attrito & Zero-Tax PAC")
     st.caption("Ottimizzazione dell'esecuzione degli ordini con frizioni reali (commissioni broker, bid-ask spread, imposte capital gain 26%/12.5% e compensazione minusvalenze) oppure ribilanciamento asintotico a zero imposte tramite nuovi versamenti.")
+
+    render_institutional_info_box(
+        title="Ribilanciatore Tax-Aware, Matrice d'Attrito & Zero-Tax PAC Asintotico",
+        badge="TAX & EXECUTION • FRICTION MATRIX",
+        summary_html=(
+            "Ottimizzazione convessa dell'esecuzione con frizioni reali: commissioni fisse e variabili broker, "
+            "bid-ask spread di mercato, imposte sul capital gain (aliquote 26% e 12.5% per titoli di Stato white-list) "
+            "e compensazione FIFO delle minusvalenze pregresse nello zainetto fiscale quadriennale."
+        ),
+        math_html=(
+            "Funzione obiettivo quadratica con penalizzazione d'attrito e imposte:<br>"
+            "<code>min_w  (w - w_target)' Σ (w - w_target) + λ_tax · TaxDue(w, w_0) + λ_cost · FrictionCost(w - w_0)</code><br>"
+            "Zero-Tax PAC Flow: <code>ΔC_i = max(0, w_target,i · (V_0 + C_new) - V_0,i)</code> [solo acquisti, zero plusvalenze realizzate]"
+        ),
+        chart_guide_html=(
+            "• <b>Confronto Ribilanciamento Standard vs Tax-Aware</b>: evidenzia il risparmio fiscale netto e il turnover ottimizzato.<br>"
+            "• <b>Zainetto Fiscale & Minusvalenze</b>: monitora il credito d'imposta utilizzabile e la scadenza quadriennale."
+        ),
+        regulatory_html=(
+            "• <b>TUIR Art. 67-68 (Regime Fiscale Italiano)</b>: compensazione minusvalenze con plusvalenze di natura diversa.<br>"
+            "• <b>MIFID II Best Execution</b>: minimizzazione dei costi totali di transazione e dell'impatto sul NAV del cliente."
+        ),
+        accent_color="#10b981",
+    )
 
     from core.tax_aware_rebalancer import FrictionConfig, TaxAwarePortfolioRebalancer
 
@@ -4838,6 +4745,30 @@ elif active_quant_tab == "🔄 Walk-Forward Backtesting (WFO)":
     st.markdown("#### 🔄 Walk-Forward Multi-Strategy Rolling Out-of-Sample Engine")
     st.caption("Esecuzione di backtesting rolling con finestre di training (In-Sample) e finestre di test (Out-of-Sample) con frizioni di ribilanciamento.")
 
+    render_institutional_info_box(
+        title="Walk-Forward Optimization (WFO), Out-of-Sample Efficiency & PBO",
+        badge="MODEL VALIDATION • PURGED WALK-FORWARD",
+        summary_html=(
+            "Validazione quantitativa non retrospettiva con finestre rolling Out-of-Sample per prevenire l'overfitting. "
+            "Calcolo della <b>Walk-Forward Efficiency (WFE) di Pardo (2008)</b> e della <b>Probability of Backtest Overfitting (PBO)</b> "
+            "di Bailey & López de Prado (2014)."
+        ),
+        math_html=(
+            "Efficienza Out-of-Sample e Combinatorially Symmetric CV (CSCV):<br>"
+            "<code>WFE = Sharpe_OOS / Sharpe_IS ≥ 65%  |  PBO = P(Sharpe_OOS ≤ Median(Sharpe_IS))</code><br>"
+            "Purged & Embargoed folds per eliminare il look-ahead bias e la correlazione seriale dei residui."
+        ),
+        chart_guide_html=(
+            "• <b>Equity Line In-Sample vs Out-of-Sample</b>: verifica che le performance non degradino bruscamente fuori campione.<br>"
+            "• <b>Distribuzione Overfitting PBO</b>: valori superiori al 30% segnalano data-mining bias e instabilità parametrica."
+        ),
+        regulatory_html=(
+            "• <b>Fed SR 11-7 / OCC 2011-12</b>: requisiti stringenti di validazione indipendente dei modelli e test fuori campione.<br>"
+            "• <b>EBA Guidelines on Internal Models</b>: backtesting continuo e monitoraggio del decadimento prestazionale."
+        ),
+        accent_color="#06b6d4",
+    )
+
     returns_df = results.get("returns_df") if isinstance(results, dict) else None
     if returns_df is None or (isinstance(returns_df, pd.DataFrame) and returns_df.empty):
         tickers = (
@@ -4915,6 +4846,31 @@ elif active_quant_tab == "🏛️ Barra Structural Multi-Factor Risk":
     st.markdown("#### 🏛️ Barra-Style Structural Multi-Asset Risk Model (MSCI GEM3/USE4)")
     st.caption("Decomposizione formale: $\\boldsymbol{\\Sigma} = \\mathbf{X}\\boldsymbol{\\Sigma}_F\\mathbf{X}^T + \\boldsymbol{\\Delta}_\\epsilon$ con attribuzione Euleriana MCTR/PCTR.")
 
+    render_institutional_info_box(
+        title="Barra-Style Structural Multi-Asset Risk Model (MSCI GEM3/USE4) & Euler PCTR",
+        badge="FACTOR RISK • BARRA STRUCTURAL",
+        summary_html=(
+            "Decomposizione formale della covarianza di portafoglio "
+            "$\\boldsymbol{\\Sigma} = \\mathbf{X}\\boldsymbol{\\Sigma}_F\\mathbf{X}^T + \\boldsymbol{\\Delta}_\\epsilon$ "
+            "in fattori sistemici di Stile (Value, Momentum, Quality, Low Vol, Size) e Macro "
+            "con attribuzione Euleriana esatta al 100% (Marginal & Percentage Contribution to Risk)."
+        ),
+        math_html=(
+            "Attribuzione Euleriana del Rischio (Teorema di Eulero per funzioni omogenee di grado 1):<br>"
+            "<code>σ_p = w' Σ w / σ_p = Σ_i w_i · MCTR_i  |  PCTR_i = (w_i · MCTR_i) / σ_p  ⇒  Σ_i PCTR_i = 100%</code><br>"
+            "Fattoriale: <code>FactorRisk = w' X Σ_F X' w  |  SpecificRisk = w' Δ_ε w</code>"
+        ),
+        chart_guide_html=(
+            "• <b>Ripartizione Rischio Sistemico vs Idiosincratico</b>: identifica quanta varianza è spiegata dai fattori di mercato e quanto dal rischio specifico.<br>"
+            "• <b>Factor Loadings & Attribuzione</b>: mostra quali fattori guidano la volatilità del portafoglio."
+        ),
+        regulatory_html=(
+            "• <b>BCBS 365 (FRTB-SBA)</b>: decomposizione dei fattori di rischio per la sensibilità Delta, Vega e Curvature.<br>"
+            "• <b>Active Risk Budgeting</b>: allocazione del tracking error e monitoraggio dei limiti di esposizione fattoriale."
+        ),
+        accent_color="#3b82f6",
+    )
+
     from core.barra_risk_model import compute_barra_structural_risk
 
     b_ret_df = results.get("returns_df") if isinstance(results, dict) else None
@@ -4953,6 +4909,30 @@ elif active_quant_tab == "🏛️ Barra Structural Multi-Factor Risk":
 elif active_quant_tab == "🌊 DCC-GARCH & Vine Copula":
     st.markdown("#### 🌊 DCC-GARCH Dynamic Correlation & Vine Copula Tail Risk")
     st.caption("Modellazione tempo-variante $R_t$ (Engle 2002) e dipendenza asimmetrica di coda tramite Regular Vine Copula.")
+
+    render_institutional_info_box(
+        title="DCC-GARCH Dynamic Conditional Correlation (Engle 2002) & Vine Copula Extreme Risk",
+        badge="DYNAMIC VOLATILITY • ASYMMETRIC COPULA",
+        summary_html=(
+            "Modellazione tempo-variante della matrice di correlazione condizionata $R_t$ secondo la metodologia "
+            "di Robert Engle (premio Nobel 2003) combinata con Regular Vine Copula per catturare la dipendenza asimmetrica "
+            "di coda estrema (Crash Dependence)."
+        ),
+        math_html=(
+            "Dinamica della quasi-correlazione $Q_t$ e standardizzazione $R_t$:<br>"
+            "<code>Q_t = (1 - α - β) Q_bar + α (ε_{t-1} ε'_{t-1}) + β Q_{t-1}  |  R_t = diag(Q_t)^{-1/2} Q_t diag(Q_t)^{-1/2}</code><br>"
+            "Copula C-Vine / D-Vine: decomposizione della densità congiunta in alberi di copule bivariate condizionate $c_{ij|D}$."
+        ),
+        chart_guide_html=(
+            "• <b>DCC Alpha & Beta</b>: $\\alpha$ misura la sensibilità agli shock improvvisi, $\\beta$ la persistenza della correlazione ($\alpha + \beta < 1$).<br>"
+            "• <b>Dynamic VaR/CVaR T+1</b>: incorpora il clustering della volatilità rispetto alle metriche statiche."
+        ),
+        regulatory_html=(
+            "• <b>Basilea IV Stressed Expected Shortfall</b>: cattura l'incremento di correlazione sistemica durante le fasi di stress estremo.<br>"
+            "• <b>Tail Risk Hedging</b>: dimensionamento delle coperture asimmetriche su opzioni e swap."
+        ),
+        accent_color="#ec4899",
+    )
 
     from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
 
