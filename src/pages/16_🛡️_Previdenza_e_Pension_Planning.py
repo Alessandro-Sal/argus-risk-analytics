@@ -24,6 +24,8 @@ from core.ui_utils import (
     fmt_pct,
     inject_custom_css,
     metric_card,
+    render_institutional_telemetry_ribbon,
+    render_sr117_audit_drawer,
     render_wealth_command_bar,
     render_wealth_executive_badges,
     section,

@@ -27,8 +27,10 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_data_table,
+    render_institutional_telemetry_ribbon,
     render_kpi_card,
     render_omni_command_bar,
+    render_sr117_audit_drawer,
     render_standard_hero,
     render_table_with_export,
     render_wealth_command_bar,
@@ -61,6 +63,7 @@ if current_pid is None:
     st.stop()
 
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p15")
+render_institutional_telemetry_ribbon(page_badge="ILLIQUID ASSETS & LUXURY VALUATION")
 render_wealth_executive_badges(nw_curr)
 
 render_standard_hero(
