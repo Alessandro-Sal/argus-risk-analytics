@@ -5138,11 +5138,11 @@ elif active_quant_tab == "⚡ Heston FFT Stochastic Volatility":
 
     f_col1, f_col2, f_col3 = st.columns(3)
     with f_col1:
-        st.metric("Condizione di Feller (2κθ > σ_v²)", "Soddisfatta ✅" if feller_pass else "Violata ⚠️", delta=f"Ratio: {feller_stat:.3f}")
+        metric_card("Condizione di Feller (2κθ > σ_v²)", "Soddisfatta ✅" if feller_pass else "Violata ❌", delta=f"Ratio: {feller_stat:.3f}", positive=feller_pass)
     with f_col2:
-        st.metric("2κθ (Drift Variational)", f"{feller_denom:.4f}")
+        metric_card("2κθ (Drift Variational)", f"{feller_denom:.4f}", delta="Mean Reversion Barrier", positive=True)
     with f_col3:
-        st.metric("σ_v² (Diffusion Variance)", f"{(h_sigma_v**2):.4f}")
+        metric_card("σ_v² (Diffusion Variance)", f"{(h_sigma_v**2):.4f}", delta="Vol-of-Vol Dispersion", positive=True)
 
     if st.button("🚀 Calcola Superficie Carr-Madan FFT & Calibra", key="btn_run_heston", type="primary", use_container_width=True):
         with st.spinner("Esecuzione trasformata veloce di Fourier (Carr-Madan 1999)..."):
@@ -5256,13 +5256,13 @@ elif active_quant_tab == "⚖️ Bayesian Black-Litterman Optimization":
 
         bm1, bm2, bm3, bm4 = st.columns(4)
         with bm1:
-            st.metric("Rendimento Atteso Ptf", f"{metrics['portfolio_expected_return']*100:.2f}%", delta=f"Benchmark: {metrics['benchmark_expected_return']*100:.2f}%")
+            metric_card("Rendimento Atteso Ptf", f"{metrics['portfolio_expected_return']*100:.2f}%", delta=f"Benchmark: {metrics['benchmark_expected_return']*100:.2f}%", positive=metrics['portfolio_expected_return'] >= metrics['benchmark_expected_return'])
         with bm2:
-            st.metric("Volatilità Posterior", f"{metrics['portfolio_volatility']*100:.2f}%", delta=f"Benchmark: {metrics['benchmark_volatility']*100:.2f}%")
+            metric_card("Volatilità Posterior", f"{metrics['portfolio_volatility']*100:.2f}%", delta=f"Benchmark: {metrics['benchmark_volatility']*100:.2f}%", positive=metrics['portfolio_volatility'] <= metrics['benchmark_volatility'])
         with bm3:
-            st.metric("Sharpe Ratio Ptf", f"{metrics['portfolio_sharpe']:.2f}", delta=f"BM: {metrics['benchmark_sharpe']:.2f}")
+            metric_card("Sharpe Ratio Ptf", f"{metrics['portfolio_sharpe']:.2f}", delta=f"BM: {metrics['benchmark_sharpe']:.2f}", positive=metrics['portfolio_sharpe'] >= metrics['benchmark_sharpe'])
         with bm4:
-            st.metric("Information Ratio", f"{metrics['information_ratio']:.2f}", delta=f"Tracking Error: {metrics['tracking_error']*100:.2f}%")
+            metric_card("Information Ratio", f"{metrics['information_ratio']:.2f}", delta=f"Tracking Error: {metrics['tracking_error']*100:.2f}%", positive=metrics['information_ratio'] > 0)
 
         st.markdown("##### ⚖️ Confronto Allocazioni: Portafoglio Ottimo vs Benchmark di Mercato")
         sum_df = pd.DataFrame(b_res["summary_table"])
@@ -5332,13 +5332,13 @@ elif active_quant_tab == "📈 Multi-Curve OIS & Dual-Curve IRS":
 
     m_k1, m_k2, m_k3, m_k4 = st.columns(4)
     with m_k1:
-        st.metric("Par Swap Rate (Dual-Curve)", f"{float(irs_info['par_swap_rate_pct']):.3f}%", delta=f"Adj Multi-Curve: {fmt_eur(float(irs_info['multicurve_valuation_adjustment_eur']))}")
+        metric_card("Par Swap Rate (Dual-Curve)", f"{float(irs_info['par_swap_rate_pct']):.3f}%", delta=f"Adj Multi-Curve: {fmt_eur(float(irs_info['multicurve_valuation_adjustment_eur']))}", positive=True)
     with m_k2:
-        st.metric("NPV Swap (Multi-Curve)", fmt_eur(float(irs_info["multicurve_npv_eur"])), delta=f"DV01: {fmt_eur(float(irs_info['dv01_eur']))}")
+        metric_card("NPV Swap (Multi-Curve)", fmt_eur(float(irs_info["multicurve_npv_eur"])), delta=f"DV01: {fmt_eur(float(irs_info['dv01_eur']))}", positive=float(irs_info["multicurve_npv_eur"]) >= 0)
     with m_k3:
-        st.metric("PV Gamba Variabile vs Fissa", fmt_eur(float(irs_info["pv_floating_leg_eur"])), delta=f"Fixed PV: {fmt_eur(float(irs_info['pv_fixed_leg_eur']))}")
+        metric_card("PV Gamba Variabile vs Fissa", fmt_eur(float(irs_info["pv_floating_leg_eur"])), delta=f"Fixed PV: {fmt_eur(float(irs_info['pv_fixed_leg_eur']))}", positive=True)
     with m_k4:
-        st.metric("Fair Tenor Basis (6M vs 3M)", f"{float(tbs_info['fair_basis_spread_3m_vs_6m_bps']):.2f} bps", delta=f"NPV Basis: {fmt_eur(float(tbs_info['basis_swap_npv_eur']))}")
+        metric_card("Fair Tenor Basis (6M vs 3M)", f"{float(tbs_info['fair_basis_spread_3m_vs_6m_bps']):.2f} bps", delta=f"NPV Basis: {fmt_eur(float(tbs_info['basis_swap_npv_eur']))}", positive=True)
 
     ois_df = pd.DataFrame(mc_res["ois_curve_nodes"])
     f6_df = pd.DataFrame(mc_res["forward_6m_nodes"])
@@ -5422,13 +5422,13 @@ elif active_quant_tab == "🔔 Hull-White Bermudan Swaptions":
 
     hk1, hk2, hk3, hk4 = st.columns(4)
     with hk1:
-        st.metric("Prezzo Bermudan Swaption (LSMC)", fmt_eur(float(hw_res["bermudan_swaption_pv_eur"])), delta=f"{float(hw_res['bermudan_price_bps']):.1f} bps del nozionale")
+        metric_card("Prezzo Bermudan Swaption (LSMC)", fmt_eur(float(hw_res["bermudan_swaption_pv_eur"])), delta=f"{float(hw_res['bermudan_price_bps']):.1f} bps del nozionale", positive=True)
     with hk2:
-        st.metric("Benchmark Europea Co-Terminale", fmt_eur(float(hw_res["european_swaption_pv_eur"])), delta="Jamshidian / Analytical")
+        metric_card("Benchmark Europea Co-Terminale", fmt_eur(float(hw_res["european_swaption_pv_eur"])), delta="Jamshidian / Analytical", positive=True)
     with hk3:
-        st.metric("Early Exercise Premium (EEP)", fmt_eur(float(hw_res["early_exercise_premium_eur"])), delta="Valore Flessibilità Bermudiana")
+        metric_card("Early Exercise Premium (EEP)", fmt_eur(float(hw_res["early_exercise_premium_eur"])), delta="Valore Flessibilità Bermudiana", positive=True)
     with hk4:
-        st.metric("Prezzo Callable Bond", fmt_eur(float(hw_res["callable_bond_pv_eur"])), delta=f"Option: -{fmt_eur(float(hw_res['embedded_call_option_eur']))}")
+        metric_card("Prezzo Callable Bond", fmt_eur(float(hw_res["callable_bond_pv_eur"])), delta=f"Option: -{fmt_eur(float(hw_res['embedded_call_option_eur']))}", positive=True)
 
     render_scenario_delta_comparator(
         scenario_key="hull_white_bermudan",

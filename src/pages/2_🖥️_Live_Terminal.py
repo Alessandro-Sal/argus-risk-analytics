@@ -55,6 +55,7 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
+    render_institutional_telemetry_ribbon,
     render_kpi_card,
     render_omni_command_bar,
     render_page_header,
@@ -68,6 +69,10 @@ render_sidebar()
 render_omni_command_bar(portal="risk")
 
 results, has_real_portfolio = ensure_risk_bundle_loaded()
+render_institutional_telemetry_ribbon(
+    page_badge="LIVE TERMINAL & MARKET DESK",
+    risk_data=results if has_real_portfolio else None,
+)
 pos = results.get("positions", pd.DataFrame()) if results else pd.DataFrame()
 active_pos = get_active_positions(pos)
 df_rets = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()

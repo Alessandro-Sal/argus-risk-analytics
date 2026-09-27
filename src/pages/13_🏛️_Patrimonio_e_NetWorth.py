@@ -2974,15 +2974,15 @@ with main_tab_struct:
             st.markdown("##### 📐 Greche di Primo e Secondo Ordine & Sensibilità Barriera")
             g_col1, g_col2, g_col3, g_col4, g_col5 = st.columns(5)
             with g_col1:
-                st.metric("Delta (Δ)", f"{grk['delta']:.4f}")
+                metric_card("Delta (Δ)", f"{grk['delta']:.4f}", delta="Sensibilità Prezzo Sottostante", positive=True)
             with g_col2:
-                st.metric("Gamma (Γ)", f"{grk['gamma']:.6f}")
+                metric_card("Gamma (Γ)", f"{grk['gamma']:.6f}", delta="Curvatura di Secondo Ordine", positive=True)
             with g_col3:
-                st.metric("Vega (ν)", f"{grk['vega']:.4f} €/%")
+                metric_card("Vega (ν)", f"{grk['vega']:.4f} €/%", delta="Sensibilità Volatilità +1%", positive=True)
             with g_col4:
-                st.metric("Theta (θ)", f"{grk['theta']:.4f} €/m")
+                metric_card("Theta (θ)", f"{grk['theta']:.4f} €/m", delta="Decadimento Temporale Mensile", positive=True)
             with g_col5:
-                st.metric("Sens. Barriera", f"{grk['barrier_sensitivity']:.4f} €/+1%")
+                metric_card("Sens. Barriera", f"{grk['barrier_sensitivity']:.4f} €/+1%", delta="Rischio Salto Knock-In", positive=True)
 
             st.dataframe(pd.DataFrame(s_res["observation_schedule"]), use_container_width=True, hide_index=True)
             render_sr117_audit_drawer(

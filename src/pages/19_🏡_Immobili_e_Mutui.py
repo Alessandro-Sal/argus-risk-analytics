@@ -159,7 +159,7 @@ with tab_equity:
                 st.warning(f"**LTV al {ltv_val:.1f}% — Elevato Indebitamento:** Si consiglia di valutare estinzioni anticipate parziali o accantonamenti di liquidità.")
             
             if re_ltv_summary["estimated_monthly_mortgage_payment"] > 0:
-                st.metric("Rata Mensile Stimata Mutuo", fmt_eur(re_ltv_summary["estimated_monthly_mortgage_payment"]))
+                metric_card("Rata Mensile Stimata Mutuo", fmt_eur(re_ltv_summary["estimated_monthly_mortgage_payment"]), delta="Ammortamento Francese", delta_color="normal")
     else:
         st.info("Nessun immobile censito in questo profilo patrimoniale. Puoi registrarne uno nella pagina **15. Asset Illiquidi & Caveau**.")
 
