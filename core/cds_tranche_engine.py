@@ -63,6 +63,9 @@ class CdsTrancheEngine:
                     "tenor_years": round(tenor, 2),
                     "par_spread_bps": round(float(self.cds_curve_bps[tenor]), 2),
                     "hazard_rate_pct": round(hazard_rate * 100.0, 3),
+                    "hazard_rate_bps": round(hazard_rate * 10000.0, 2),
+                    "hazard_rate_lambda": round(hazard_rate, 6),
+                    "survival_prob_q": round(surv_prob, 4),
                     "survival_probability_pct": round(surv_prob * 100.0, 2),
                     "cumulative_pd_pct": round(cum_pd * 100.0, 2),
                     "risky_pv01": round(rpv01, 4),
@@ -128,10 +131,14 @@ class CdsTrancheEngine:
             tranches_table.append(
                 {
                     "tranche_name": label,
+                    "attachment_detachment": f"{int(round(k1*100))}%-{int(round(k2*100))}%",
                     "attachment_pct": round(k1 * 100.0, 1),
                     "detachment_pct": round(k2 * 100.0, 1),
+                    "attach_pct": round(k1 * 100.0, 1),
+                    "detach_pct": round(k2 * 100.0, 1),
                     "base_correlation_rho": round(base_rho, 3),
                     "expected_loss_pct": round(el_frac * 100.0, 2),
+                    "expected_tranche_loss_pct": round(el_frac * 100.0, 2),
                     "fair_running_spread_bps": round(fair_spread_bps, 1),
                     "upfront_vs_std_coupon_pct": round(tranche_upfront_pct, 2),
                     "tranche_delta_leverage": tranche_delta,
@@ -150,7 +157,9 @@ class CdsTrancheEngine:
             "cs01_eur_per_bp": round(cs01_eur, 2),
             "jump_to_default_jtd_eur": round(jtd_exposure_eur, 2),
             "survival_curve_nodes": nodes,
+            "bootstrapped_curve": nodes,
             "synthetic_cdo_tranches": tranches_table,
+            "tranches": tranches_table,
         }
 
 
