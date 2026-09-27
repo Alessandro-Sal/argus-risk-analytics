@@ -28,6 +28,7 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_data_table,
+    render_institutional_telemetry_ribbon,
     render_kpi_card,
     render_omni_command_bar,
     render_segmented_tabs,
@@ -92,6 +93,7 @@ profile_map = ctx["profile_map"]
 nw_curr = ctx["net_worth"]
 
 render_omni_command_bar(portal="wealth", context_name=active_p_name, key_suffix="p12")
+render_institutional_telemetry_ribbon(page_badge="WEALTH DESK & INGESTION")
 render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid)
 
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
@@ -206,52 +208,13 @@ k1, k2, k3, k4 = st.columns(4)
 
 
 with k1:
-    st.markdown(f"""
-    <div class="wealth-kpi-card">
-        <div class="wealth-kpi-header">
-            <span class="wealth-kpi-title">Liquidità Consolidata</span>
-            <span>💧</span>
-        </div>
-        <div class="wealth-kpi-val">{fmt_eur(tot_cash)}</div>
-        <div class="wealth-kpi-pill">🏦 {tot_acc_count} Conti Attivi</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    metric_card("Liquidità Consolidata", fmt_eur(tot_cash), delta=f"{tot_acc_count} Conti Attivi", delta_color="normal")
 with k2:
-    st.markdown(f"""
-    <div class="wealth-kpi-card">
-        <div class="wealth-kpi-header">
-            <span class="wealth-kpi-title">Libro Mastro Cassa</span>
-            <span>📜</span>
-        </div>
-        <div class="wealth-kpi-val">{tot_tx_count:,}</div>
-        <div class="wealth-kpi-pill">💳 Movimenti Registrati</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    metric_card("Libro Mastro Cassa", f"{tot_tx_count:,}", delta="Movimenti Registrati", delta_color="normal")
 with k3:
-    st.markdown(f"""
-    <div class="wealth-kpi-card">
-        <div class="wealth-kpi-header">
-            <span class="wealth-kpi-title">Ultima Registrazione</span>
-            <span>📅</span>
-        </div>
-        <div class="wealth-kpi-val">{last_tx_date}</div>
-        <div class="wealth-kpi-pill">⚡ Data Valuta</div>
-    </div>
-    """, unsafe_allow_html=True)
-
+    metric_card("Ultima Registrazione", str(last_tx_date), delta="Data Valuta", delta_color="normal")
 with k4:
-    st.markdown(f"""
-    <div class="wealth-kpi-card">
-        <div class="wealth-kpi-header">
-            <span class="wealth-kpi-title">Snapshot Storici</span>
-            <span>📸</span>
-        </div>
-        <div class="wealth-kpi-val">{tot_snaps_count} Snapshot</div>
-        <div class="wealth-kpi-pill">📁 Profilo #{current_pid}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    metric_card("Snapshot Storici", f"{tot_snaps_count} Snapshot", delta=f"Profilo #{current_pid}", delta_color="normal")
 
 st.markdown("</div>", unsafe_allow_html=True)
 

@@ -48,6 +48,7 @@ from core.ui_utils import (
     inject_custom_css,
     metric_card,
     render_command_bar,
+    render_institutional_telemetry_ribbon,
     render_page_header,
     render_table_with_export,
 )
@@ -66,6 +67,10 @@ render_sidebar()
 render_command_bar()
 
 results, has_real_portfolio = ensure_risk_bundle_loaded()
+render_institutional_telemetry_ribbon(
+    page_badge="BQUANT & LAUNCHPAD DESK",
+    risk_data=results if has_real_portfolio else None,
+)
 pos = results.get("positions", pd.DataFrame()) if results else pd.DataFrame()
 df_rets = results.get("returns", pd.DataFrame()) if results else pd.DataFrame()
 df_prices = results.get("df_prices", pd.DataFrame()) if results else pd.DataFrame()

@@ -9103,6 +9103,7 @@ from core.chart_framework import (
 # ── v9.16.0 Institutional UX/UI Hub Exports ──────────────────────────
 from core.ux_institutional_hub import (  # noqa: E402, F401
     APP_VERSION,
+    build_sr117_audit_record,
     build_telemetry_ribbon_state,
     compute_executive_traffic_light_radar,
     compute_scenario_delta_comparison,
@@ -9112,5 +9113,6 @@ from core.ux_institutional_hub import (  # noqa: E402, F401
     render_live_portfolio_autobind_banner,
     render_scenario_delta_comparator,
     render_segmented_workspace_switcher,
+    render_sr117_audit_drawer,
     style_institutional_chart,
 )

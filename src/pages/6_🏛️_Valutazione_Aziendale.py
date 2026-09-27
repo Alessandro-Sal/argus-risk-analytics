@@ -25,9 +25,11 @@ from core.ui_utils import (
     metric_card,
     render_altman_zscore_modal,
     render_command_bar,
+    render_institutional_telemetry_ribbon,
     render_sandbox_banner,
     render_sec_rag_modal,
     render_segmented_tabs,
+    render_sr117_audit_drawer,
 )
 from core.workspace_manager import get_url_param, register_workspace_tab, set_url_params
 
@@ -59,6 +61,11 @@ else:
     pos = results.get("positions", pd.DataFrame())
     active_pos = pos[pos["qty_net"] > 0].copy() if not pos.empty and "qty_net" in pos.columns else (pos[pos["weight_pct"] > 0].copy() if not pos.empty and "weight_pct" in pos.columns else pos.copy())
     port_metrics = results.get("metrics", {})
+
+render_institutional_telemetry_ribbon(
+    page_badge="CORPORATE VALUATION & CREDIT",
+    risk_data={"metrics": port_metrics, "positions": active_pos} if has_real_portfolio else None,
+)
 
 from core.financial_analysis import resolve_company_name
 
@@ -557,6 +564,26 @@ Rapporto tra multiplo P/E e tasso di crescita atteso degli utili (EPS Growth). V
         else:
             st.info("Dati di Upside non disponibili per gli asset attuali.")
 
+        render_sr117_audit_drawer(
+            engine_name="Consensus Valuation & Analyst Target Price Model",
+            latex_formulas=[
+                r"\text{Consensus Target Price} = \text{Median}(TP_1, TP_2, \dots, TP_K)",
+                r"\text{Margin of Safety} = \frac{\text{Consensus Target Price} - P_{\text{spot}}}{P_{\text{spot}}} \times 100",
+                r"\text{Fair PEG Ratio} = \frac{\text{P/E}}{\text{EPS Growth Rate}} \quad (\text{Benchmark: } \le 1.5\text{x})"
+            ],
+            assumptions=[
+                "Consensus istituzionale derivato dalla mediana dei report degli analisti sell-side (Wall Street & Borsa Italiana).",
+                "Target price normalizzati in valuta di portafoglio (EUR) con i tassi di cambio spot della BCE.",
+                "Margine di sicurezza minimo fissato al +10% per confermare la raccomandazione di sottovalutazione ('Buy').",
+            ],
+            risk_limits=[
+                "Titoli con PEG > 2.5x classificati 'Sopravvalutati (PEG Alto)' anche in presenza di upside nominale favorevole.",
+                "Dispersione elevata delle stime sell-side (> 40% dev.std) attiva flag di incertezza previsionale elevata.",
+                "Mancanza di copertura analisti (< 3 broker) attiva regime di non classificabilità prudenziale.",
+            ],
+            benchmark_supervisory="Graham & Dodd Security Analysis, CFA Institute Research Objectivity Standards & FINRA Rule 2241."
+        )
+
 # ── TAB 2: PRIVATE EQUITY SIMULATOR ───────────────────────────
 elif active_val_tab == "💼 Private Equity & Waterfall":
     col_head_pe1, col_head_pe2 = st.columns([3.5, 1.0])
@@ -649,6 +676,26 @@ elif active_val_tab == "💼 Private Equity & Waterfall":
         )
         apply_plotly_theme(fig_wf)
         st.plotly_chart(fig_wf, use_container_width=True, key="val_pe_waterfall_chart", config={"displayModeBar": "hover", "displaylogo": False})
+
+    render_sr117_audit_drawer(
+        engine_name="Private Equity Cash Flow Waterfall & Carried Interest Model",
+        latex_formulas=[
+            r"\text{TVPI} = \frac{\sum \text{Distributions} + \text{Residual NAV}}{\text{Paid-In Capital}} = \text{DPI} + \text{RVPI}",
+            r"\text{Hurdle Amount} = \text{Invested Capital} \times (1 + r_{\text{pref}})^t",
+            r"\text{Carried Interest}_{\text{GP}} = \min\Big(\text{Distributions} - \text{Hurdle}, \frac{\alpha}{1 - \alpha}\Big)",
+        ],
+        assumptions=[
+            "Hurdle Rate convenzionale 8.0% annuo capitalizzato annualmente prima del catch-up GP.",
+            "Catch-up clause piena GP (100%) fino a raggiungere il 20% del profitto totale prima della ripartizione 80/20 pari passu.",
+            "NAV residuo (RVPI) basato su fair value IFRS 13 / US GAAP Topic 820 a fine periodo.",
+        ],
+        risk_limits=[
+            "TVPI / MOIC < 1.0x segnala distruzione di valore sul capitale complessivo investito.",
+            "DPI < 0.5x in fondi oltre il 6° anno indica elevato rischio di illiquidità e ritardi negli exit.",
+            "Clawback liability: monitoraggio continuo delle distribuzioni anticipate soggette a clawback in caso di perdite future.",
+        ],
+        benchmark_supervisory="ILPA Reporting Best Practices, Invest Europe Guidelines & SEC Private Fund Adviser Rules."
+    )
 
 # ── TAB 4: ANALISI DEI BILANCI & SOLVIBILITÀ ──────────────────
 elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
@@ -1438,6 +1485,26 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
         m_data = compute_valuation_multiples_matrix(p_tk)
         st.dataframe(m_data["multiples_table"], use_container_width=True, hide_index=True)
 
+        render_sr117_audit_drawer(
+            engine_name="Altman Z-Score Solvency & DuPont Decomposed ROE Engine",
+            latex_formulas=[
+                r"Z = 1.2 X_1 + 1.4 X_2 + 3.3 X_3 + 0.6 X_4 + 0.999 X_5 \quad (X_1=\frac{WC}{TA}, X_2=\frac{RE}{TA}, X_3=\frac{EBIT}{TA}, X_4=\frac{MCap}{TL}, X_5=\frac{S}{TA})",
+                r"\text{ROE} = \frac{\text{Net Income}}{\text{Sales}} \times \frac{\text{Sales}}{\text{Assets}} \times \frac{\text{Assets}}{\text{Equity}} \quad (\text{DuPont 3-Way})",
+                r"M = -4.84 + 0.920 \cdot \text{DSRI} + 0.528 \cdot \text{GMI} + 0.404 \cdot \text{AQI} + 0.892 \cdot \text{SGI} + 0.115 \cdot \text{DEPI} - 0.172 \cdot \text{SGAI} + 4.037 \cdot \text{TATA} + 0.0327 \cdot \text{LVGI}",
+            ],
+            assumptions=[
+                "Modello Altman Z-Score originale calibrato per società quotate (Zone: Z < 1.81 Distress, 1.81-2.99 Grey, Z > 2.99 Safe).",
+                "Scomposizione DuPont basata su bilanci consolidati normalizzati da partite straordinarie a norma IAS/IFRS.",
+                "Beneish M-Score parametrizzato per individuazione manipolazioni contabili (M > -1.78 indica probabile manipolatore).",
+            ],
+            risk_limits=[
+                "Z-Score < 1.81 attiva classificazione automatica 'Distress Watchlist' con stop agli acquisti.",
+                "Beneish M-Score > -1.78 e Sloan Accruals > 5% attivano forensic audit alert per bassa qualità degli utili.",
+                "Equity Multiplier (DuPont) > 5.0x segnala leva finanziaria speculativa su bilanci non finanziari.",
+            ],
+            benchmark_supervisory="Edward Altman (1968), Messod Beneish (1999), Richard Sloan (1996) Accounting Review & Basel III Corporate IRB Default Models."
+        )
+
 
 # ── TAB 5: VALUTAZIONE INTRINSECA DCF MONTE CARLO ─────────────────────
 elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
@@ -1661,6 +1728,26 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         st.dataframe(df_dcf_scenarios, use_container_width=True, hide_index=True, height=210)
         
         st.info(f"💡 **Sintesi Strategica**: Con una probabilità di sottovalutazione del **{dcf_res['prob_undervalued_pct']:.1f}%**, il titolo quota a **{abs(dcf_res['upside_downside_pct']):.1f}%** {'a premio' if dcf_res['upside_downside_pct'] < 0 else 'a sconto'} rispetto al Fair Value intrinseco mediano.")
+
+        render_sr117_audit_drawer(
+            engine_name="Stochastic Monte Carlo DCF & WACC Intrinsic Valuation Engine",
+            latex_formulas=[
+                r"\text{Enterprise Value} = \sum_{t=1}^T \frac{\text{FCFF}_t}{(1 + \text{WACC})^t} + \frac{\text{FCFF}_T (1 + g)}{(\text{WACC} - g)(1 + \text{WACC})^T}",
+                r"\text{WACC} = \frac{E}{E+D} K_e + \frac{D}{E+D} K_d (1 - \tau_c) \quad \text{con } K_e = R_f + \beta (R_m - R_f)",
+                r"\text{Equity Value} = \text{Enterprise Value} + \text{Cash} - \text{Total Debt} - \text{Minorities}",
+            ],
+            assumptions=[
+                "Crescita terminale g compresa tra 1.5% e 2.5% per rispettare la convergenza di lungo termine al PIL globale nominale.",
+                "Costo del capitale proprio Ke determinato tramite CAPM con beta rettificato (Vasicek/Blume) e Equity Risk Premium di mercato.",
+                "1.000 iterazioni stocastiche Monte Carlo con distribuzioni normali troncate su tassi di crescita, WACC e margini EBITDA.",
+            ],
+            risk_limits=[
+                "WACC deve essere strettamente maggiore di g (WACC - g > 0.5%) per evitare divergenze asintotiche nella formula di Gordon.",
+                "Probabilità di sottovalutazione < 30% attiva warning di sopravvalutazione speculativa.",
+                "Margine di sicurezza minimo richiesto: +20% per raccomandazione 'Strong Buy' istituzionale.",
+            ],
+            benchmark_supervisory="Aswath Damodaran Valuation Standards, CFA Institute GIPS & Federal Reserve SR 11-7 Model Risk Management."
+        )
 
 
 

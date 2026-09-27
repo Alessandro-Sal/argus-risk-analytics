@@ -367,6 +367,90 @@ def test_v918_kb_resolution_and_sr117_drawers_alignment():
     assert rec_ccar["engine_name"] == "Fed CCAR & EBA 9-Quarter Supervisory CET1 Stress Engine"
     assert len(rec_ccar["sha256_audit_hash"]) == 64
 
+def test_v918_zero_legacy_st_metric_and_global_page_alignment():
+    """Verify 100% elimination of st.metric and institutional ribbon / SR 11-7 drawer coverage across pages."""
+    import glob
+    import re
 
+    from core.ui_utils import build_sr117_audit_record
 
+    # 1. Zero st.metric verification
+    py_files = glob.glob("src/**/*.py", recursive=True)
+    st_metric_pattern = re.compile(r"\bst\.metric\(")
+
+    violations = []
+    for f_path in py_files:
+        with open(f_path, "r", encoding="utf-8") as pf:
+            for idx, line in enumerate(pf, start=1):
+                # Ignore comments
+                if line.strip().startswith("#"):
+                    continue
+                if st_metric_pattern.search(line):
+                    violations.append(f"{f_path}:{idx}: {line.strip()}")
+
+    assert not violations, "Legacy st.metric calls found:\n" + "\n".join(violations)
+
+    # 2. Telemetry Ribbon coverage across Tier-1 and Desk pages
+    expected_ribbon_pages = [
+        "1_*Dashboard*.py",
+        "2_*Live*.py",
+        "3_*Analisi_Rischio*.py",
+        "4_*Modelli*.py",
+        "5_*Posizioni*.py",
+        "6_*Valutazione*.py",
+        "7_*Stress*.py",
+        "11_*BQuant*.py",
+        "12_*Wealth*.py",
+        "13_*Patrimonio*.py",
+    ]
+
+    for pat in expected_ribbon_pages:
+        matches = glob.glob(f"src/pages/{pat}")
+        assert len(matches) == 1, f"Expected exactly 1 match for pattern {pat}"
+        with open(matches[0], "r", encoding="utf-8") as pf:
+            page_content = pf.read()
+            assert "render_institutional_telemetry_ribbon" in page_content, (
+                f"Page {matches[0]} missing render_institutional_telemetry_ribbon!"
+            )
+
+    # 3. SR 11-7 Drawer coverage across Quantitative and Algorithmic pages
+    expected_sr117_pages = [
+        "4_*Modelli*.py",
+        "5_*Posizioni*.py",
+        "6_*Valutazione*.py",
+        "7_*Stress*.py",
+        "13_*Patrimonio*.py",
+    ]
+
+    for pat in expected_sr117_pages:
+        matches = glob.glob(f"src/pages/{pat}")
+        assert len(matches) == 1, f"Expected exactly 1 match for pattern {pat}"
+        with open(matches[0], "r", encoding="utf-8") as pf:
+            page_content = pf.read()
+            assert "render_sr117_audit_drawer" in page_content, (
+                f"Page {matches[0]} missing render_sr117_audit_drawer!"
+            )
+
+    # 4. Verify Corporate & Execution SR 11-7 Audit Records integrity
+    rec_dcf = build_sr117_audit_record(
+        engine_name="Stochastic Monte Carlo DCF & WACC Intrinsic Valuation Engine",
+        model_version="v9.18.0",
+        latex_formulas=[r"\text{Enterprise Value} = \sum \frac{\text{FCFF}_t}{(1 + \text{WACC})^t}"],
+        inputs_dict={"wacc_mean": 0.085, "g_terminal": 0.02, "simulations": 1000},
+        outputs_dict={"fair_value_median": 142.50, "prob_undervalued_pct": 74.2},
+        regulatory_refs=["Damodaran Standards", "CFA Institute", "SR 11-7"],
+    )
+    assert len(rec_dcf["sha256_audit_hash"]) == 64
+    assert rec_dcf["engine_name"] == "Stochastic Monte Carlo DCF & WACC Intrinsic Valuation Engine"
+
+    rec_ac = build_sr117_audit_record(
+        engine_name="Almgren-Chriss Optimal Liquidation & Market Impact Model",
+        model_version="v9.18.0",
+        latex_formulas=[r"\min E[x] + \lambda V[x]"],
+        inputs_dict={"initial_shares": 50000, "horizon_days": 10, "risk_aversion": 1e-5},
+        outputs_dict={"expected_slippage_bps": 12.8, "var_95_eur": 4500.0},
+        regulatory_refs=["Almgren-Chriss (2000)", "MiFID II RTS 28", "SEC Rule 606"],
+    )
+    assert len(rec_ac["sha256_audit_hash"]) == 64
+    assert "MiFID II RTS 28" in rec_ac["regulatory_references"]
 

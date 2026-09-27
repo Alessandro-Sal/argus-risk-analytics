@@ -39,8 +39,10 @@ from core.ui_utils import (
     render_corporate_actions_modal,
     render_crypto_tax_modal,
     render_export_toolbar,
+    render_institutional_telemetry_ribbon,
     render_sandbox_banner,
     render_segmented_tabs,
+    render_sr117_audit_drawer,
     render_table_with_export,
     section,
 )
@@ -50,6 +52,10 @@ render_sidebar()
 render_command_bar()
 
 results, has_real = ensure_portfolio_loaded(module_type="risk")
+render_institutional_telemetry_ribbon(
+    page_badge="EXECUTION & TCA DESK",
+    risk_data=results if has_real else None,
+)
 pos = results.get("positions", pd.DataFrame())
 con = results.get("metrics", {}).get("concentration", {})
 portfolio_name = st.session_state.get("portfolio_name", results.get("sandbox_name", "Portfolio"))
@@ -2174,6 +2180,26 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             }
         )
 
+        render_sr117_audit_drawer(
+            engine_name="Almgren-Chriss Optimal Liquidation & Market Impact Model",
+            latex_formulas=[
+                r"\min_{x_k} E[x] + \lambda V[x] = \sum_{k=1}^N \Big( \tau \eta \Big(\frac{n_k}{\tau}\Big)^2 + \frac{1}{2}\gamma n_k^2 \Big) + \lambda \sum_{k=1}^N \tau \sigma^2 x_k^2",
+                r"x_j = \frac{\sinh(\kappa (T - t_j))}{\sinh(\kappa T)} X_0, \quad \kappa \approx \sqrt{\frac{\lambda \sigma^2}{\eta}}",
+                r"\text{Slippage (bps)} = \frac{1}{2}\text{Spread} + \gamma \Big(\frac{\text{Order Size}}{\text{ADV}}\Big)^{\alpha} \sigma",
+            ],
+            assumptions=[
+                "Impatto di mercato temporaneo quadratico (η) e impatto permanente lineare (γ, Kyle 1985).",
+                "Aversione al rischio del trader parametrizzata con λ bilanciando costo atteso e varianza di mercato.",
+                "Volume intraday e volatilità stimati su lookback rolling a 30 giorni dai dati d'asta e continuo.",
+            ],
+            risk_limits=[
+                "Participation rate massimo (POV) limitato al 15% del Volume Medio Giornaliero (ADV) per prevenire order toxicity.",
+                "Half-life dell'impatto permanente monitorata per evitare distorsioni di prezzo su più giorni consecutivi.",
+                "Execution VaR 95% calcolato sull'orizzonte di liquidazione residuo per limitare il downside risk.",
+            ],
+            benchmark_supervisory="Almgren & Chriss (2000) Journal of Risk, MiFID II RTS 28 Best Execution & SEC Rule 606 Disclosure."
+        )
+
         st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
 
         # ── SEZIONE 3: SMART ORDER ROUTER INTRADAY (TWAP & VWAP) ────────────
@@ -3020,3 +3046,23 @@ elif active_pos_tab == "🤖 Implementation Shortfall & Execution":
             metric_card("Slippage vs Market VWAP", f"{sb['vs_market_vwap']['slippage_bps']:.1f} bps", delta="Outperformed VWAP 🟢" if vwap_beat else "Underperformed VWAP 🔴", delta_color="normal" if vwap_beat else "inverse")
         with pk4:
             metric_card("Alpha Preservation", f"{psum['alpha_preservation_pct']:.2f}%", delta=f"Shortfall {fmt_eur(ppb['total_implementation_shortfall_eur'])}", delta_color="normal")
+
+    render_sr117_audit_drawer(
+        engine_name="Transaction Cost Analysis (TCA) & Implementation Shortfall Engine",
+        latex_formulas=[
+            r"\text{Implementation Shortfall} = \text{Paper Return} - \text{Actual Return} = \sum p_j q_j - P_{\text{decision}} \sum q_j + \text{Fees}",
+            r"\text{IS Scomposition} = \text{Delay Cost} + \text{Realized Spread} + \text{Market Impact} + \text{Commissions} + \text{Opportunity Cost}",
+            r"\text{Arrival Slippage (bps)} = \frac{P_{\text{exec}} - P_{\text{arrival}}}{P_{\text{arrival}}} \times 10{,}000",
+        ],
+        assumptions=[
+            "Prezzo di decisione P_decision registrato al timestamp del segnale quantitativo del modello.",
+            "Prezzo di arrivo P_arrival registrato all'istante di ricezione dell'ordine nel FIX Blotter del broker.",
+            "Benchmark Slippage misurato congiuntamente contro Arrival Price, Interval VWAP e Market Close (MOC).",
+        ],
+        risk_limits=[
+            "Slippage vs Arrival Price superiore a 25 bps attiva audit automatico di latenza o adverse selection.",
+            "Alpha Preservation < 70% indica eccessivo drag di esecuzione che distrugge il segnale alfa sistematico.",
+            "Execution Quality Score (0-100) inferiore a 60 attiva riclassificazione del broker o cambio di algoritmo.",
+        ],
+        benchmark_supervisory="Andre Perold (1988) Implementation Shortfall, CFA Institute Trade Management Guidelines & FINRA Rule 5310."
+    )
