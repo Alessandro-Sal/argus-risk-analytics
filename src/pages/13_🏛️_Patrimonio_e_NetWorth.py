@@ -3257,6 +3257,32 @@ with main_tab_struct:
         section("⚡ Avellaneda-Stoikov (2008) Market-Making & Tossicità Ordini VPIN / Hawkes")
         st.caption("Calcolo del Reservation Price r(s,q,t) e dello spread Bid/Ask ottimo asimmetrico in funzione dell'inventario q, combinato con la metrica di selezione avversa VPIN e il processo auto-eccitante di Hawkes per l'allerta precoce di Flash-Crash.")
 
+        render_institutional_info_box(
+            title="Avellaneda-Stoikov (2008) Market-Making, VPIN Order-Flow Toxicity & Hawkes Point Processes",
+            badge="MARKET MAKING • INVENTORY SKEW • VPIN • HAWKES",
+            summary_html=(
+                "Modellazione microstrutturale ad alta frequenza per il quoting asimmetrico: determinazione del <b>Reservation Price r(s,q,t)</b> "
+                "in presenza di rischio d'inventario $q$, quotazioni ottime Bid/Ask per indurre flussi compensativi, quantificazione della probabilità "
+                "di trading informato <b>VPIN</b> e allerta precoce di cascate di liquidità tramite processi auto-eccitanti di <b>Hawkes</b>."
+            ),
+            math_html=(
+                "Reservation Price & Spread Ottimo (Avellaneda-Stoikov):<br>"
+                "<code>r(s, q, t) = s - q γ σ² (T - t)</code><br>"
+                "<code>δ^a(q) + δ^b(q) = γ σ² (T - t) + (2/γ) ln(1 + γ/κ)</code><br>"
+                "Tossicità del Flusso VPIN (Easley et al.): <code>VPIN = (1 / (N · V)) Σ_τ |V_τ^Buy - V_τ^Sell|</code><br>"
+                "Intensità Hawkes: <code>λ(t) = μ + Σ_{t_i < t} α · e^{-β (t - t_i)},   Branching Ratio η = α / β</code>"
+            ),
+            chart_guide_html=(
+                "• <b>Grafico Microstruttura LOB:</b> osserva lo spostamento asimmetrico delle quote Bid ed Ask rispetto al Mid-Price per incentivare l'esecuzione sul lato che riduce l'esposizione d'inventario $q$.<br>"
+                "• <b>Indicatore VPIN & Regime di Tossicità:</b> valori VPIN > 0.40 o $\\alpha/\\beta > 0.80$ indicano accumulo tossico di ordini informati (pre-crash)."
+            ),
+            regulatory_html=(
+                "• <b>MiFID II RTS 8 (Market Making Agreements):</b> parametri contrattuali di presenza continuativa sul book, spread massimo vincolante e volume minimo quotato.<br>"
+                "• <b>Regolamento MAR (Market Abuse Regulation):</b> monitoraggio delle asimmetrie anomale nei volumi buy/sell per prevenire spoofing, layering e manipolazioni del book."
+            ),
+            accent_color="#f59e0b",
+        )
+
         mm_c1, mm_c2, mm_c3 = st.columns(3)
         with mm_c1:
             mm_inv = st.slider("Inventario Attuale Market-Maker q (Azioni):", min_value=-5000.0, max_value=5000.0, value=1500.0, step=250.0, key="mm_inv_in")

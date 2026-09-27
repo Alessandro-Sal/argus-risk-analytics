@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from datetime import datetime
 from typing import Any
 
@@ -1104,14 +1105,155 @@ def render_executive_traffic_light_radar(
             icon = "🟢" if p["status"] == "PASS" else ("🟡" if p["status"] == "WARNING" else "🔴")
             spark_svg = build_svg_sparkline(p.get("sparkline", [1.0, 1.1, 1.05]), color=p["badge_color"], width=86, height=22)
             util_pct = float(p.get("utilization_pct", 50.0))
+            pillar_id = p.get("pillar_id", f"p_{idx_p}")
+            unique_p_id = hashlib.md5(f"cro_pillar_{pillar_id}_{p['title']}".encode("utf-8")).hexdigest()[:8]
+            try:
+                from core.ui_utils import resolve_metric_knowledge
+
+                raw_p_content = resolve_metric_knowledge(p["title"])
+            except Exception:
+                raw_p_content = f"<p><b>{p['title']}</b>: Pilastro di adeguatezza patrimoniale e tolleranza al rischio (Risk Appetite Framework).</p>"
+            cleaned_p = re.sub(r"<!--.*?-->", "", raw_p_content, flags=re.DOTALL)
+            safe_p_content = _compact_html(cleaned_p)
+            p_info_svg = (
+                '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+                'stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">'
+                '<circle cx="12" cy="12" r="10"></circle>'
+                '<line x1="12" y1="16" x2="12" y2="12"></line>'
+                '<line x1="12" y1="8" x2="12.01" y2="8"></line>'
+                '</svg>'
+            )
+
             with cols[idx_p % 3]:
                 card_html = _compact_html(
                     f"""
+                    <style>
+                    #cro-modal-toggle-{unique_p_id} {{ display: none; }}
+                    .cro-modal-overlay-{unique_p_id} {{
+                        display: none;
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        z-index: 999999;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 20px;
+                        box-sizing: border-box;
+                    }}
+                    #cro-modal-toggle-{unique_p_id}:checked ~ .cro-modal-overlay-{unique_p_id} {{
+                        display: flex;
+                    }}
+                    .cro-modal-backdrop-{unique_p_id} {{
+                        position: fixed;
+                        top: 0; left: 0; right: 0; bottom: 0;
+                        background: rgba(10, 14, 20, 0.88);
+                        backdrop-filter: blur(12px);
+                        -webkit-backdrop-filter: blur(12px);
+                        cursor: pointer;
+                        z-index: 1;
+                    }}
+                    .cro-modal-content-{unique_p_id} {{
+                        background: #0f172a;
+                        border: 1px solid rgba(148, 163, 184, 0.28);
+                        border-top: 4px solid {p['badge_color']};
+                        padding: 24px 28px;
+                        border-radius: 16px;
+                        width: 92%;
+                        max-width: 760px;
+                        max-height: 86vh;
+                        overflow-y: auto;
+                        color: #f1f5f9;
+                        position: relative;
+                        z-index: 2;
+                        box-shadow: 0 24px 60px rgba(0,0,0,0.92), 0 0 30px {p['badge_color']}33;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        text-align: left;
+                        box-sizing: border-box;
+                        animation: croPopIn_{unique_p_id} 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+                    }}
+                    @keyframes croPopIn_{unique_p_id} {{
+                        from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+                        to {{ opacity: 1; transform: scale(1) translateY(0); }}
+                    }}
+                    .cro-modal-close-{unique_p_id} {{
+                        position: absolute;
+                        top: 14px; right: 18px;
+                        cursor: pointer;
+                        font-size: 26px;
+                        color: #94a3b8;
+                        line-height: 1;
+                        width: 30px; height: 30px;
+                        display: flex; align-items: center; justify-content: center;
+                        border-radius: 6px;
+                        transition: all 0.2s ease;
+                    }}
+                    .cro-modal-close-{unique_p_id}:hover {{
+                        color: #f8fafc;
+                        background: rgba(255, 255, 255, 0.1);
+                    }}
+                    .cro-info-icon-{unique_p_id} {{
+                        cursor: pointer;
+                        color: {p['badge_color']};
+                        opacity: 0.85;
+                        background: {p['badge_color']}18;
+                        border: 1px solid {p['badge_color']}44;
+                        border-radius: 50%;
+                        width: 16px;
+                        height: 16px;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        flex-shrink: 0 !important;
+                        transition: all 0.2s ease;
+                        box-sizing: border-box !important;
+                        padding: 0;
+                    }}
+                    .cro-info-icon-{unique_p_id}:hover {{
+                        opacity: 1;
+                        background: {p['badge_color']}33;
+                        border-color: {p['badge_color']};
+                        box-shadow: 0 0 8px {p['badge_color']}66;
+                        transform: scale(1.15);
+                    }}
+                    </style>
+
+                    <input type="checkbox" id="cro-modal-toggle-{unique_p_id}">
+                    <div class="cro-modal-overlay-{unique_p_id}">
+                        <label for="cro-modal-toggle-{unique_p_id}" class="cro-modal-backdrop-{unique_p_id}"></label>
+                        <div class="cro-modal-content-{unique_p_id}">
+                            <label for="cro-modal-toggle-{unique_p_id}" class="cro-modal-close-{unique_p_id}">×</label>
+                            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; border-bottom:1px solid rgba(148,163,184,0.2); padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+                                <div>
+                                    <span style="font-size:10.5px; font-weight:800; color:{p['badge_color']}; text-transform:uppercase; letter-spacing:0.5px; font-family:'JetBrains Mono',monospace;">
+                                        🏛️ PILASTRO CRO [{p.get('reg_framework', 'BCBS')}] &bull; SCHEDA METODOLOGICA
+                                    </span>
+                                    <h3 style="margin:2px 0 0 0; font-size:18px; font-weight:800; color:#f8fafc;">{p['title']}</h3>
+                                </div>
+                                <div style="text-align:right;">
+                                    <div style="font-size:15px; font-weight:800; color:#f8fafc; font-family:'JetBrains Mono',monospace;">{p['value_label']}</div>
+                                    <div style="font-size:10.5px; color:{p['badge_color']}; font-weight:700;">{icon} {p['status']} ({p.get('delta_label', '')})</div>
+                                </div>
+                            </div>
+                            <div style="font-size:13px; line-height:1.55; color:#cbd5e1;">
+                                {safe_p_content}
+                            </div>
+                            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                                <label for="cro-modal-toggle-{unique_p_id}" style="cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1; padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600;">
+                                    Chiudi Scheda
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="argus-bento-card" style="background: rgba(15, 23, 42, 0.90); border: 1px solid rgba(148,163,184,0.16);
                                 border-left: 4px solid {p['badge_color']}; border-radius: 10px; padding: 11px 14px; margin-bottom: 10px;
                                 box-shadow: 0 4px 12px rgba(0,0,0,0.25);">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
-                            <span style="font-size: 11.5px; font-weight: 700; color: #f8fafc; white-space:nowrap;">{p['title']}</span>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span style="font-size: 11.5px; font-weight: 700; color: #f8fafc; white-space:nowrap;">{p['title']}</span>
+                                <label for="cro-modal-toggle-{unique_p_id}" class="cro-info-icon-{unique_p_id}" title="Clicca per approfondire la metodologia di {p['title']}">
+                                    {p_info_svg}
+                                </label>
+                            </div>
                             <span style="background:rgba(255,255,255,0.05); border:1px solid {p['badge_color']};
                                          font-size: 9.5px; font-weight: 800; color: {p['badge_color']}; padding:1px 7px; border-radius:10px; white-space:nowrap;">
                                 {icon} {p['status']}
@@ -1537,8 +1679,10 @@ def build_bento_kpi_card_html(
     limit_utilization_pct: float | None = None,
     sparkline_values: list[float] | None = None,
     accent_color: str = "#10b981",
+    help_text: str | None = None,
+    modal_content: str | None = None,
 ) -> str:
-    """Build HTML for an Institutional Bento KPI Card with inline SVG sparkline & limit bar."""
+    """Build HTML for an Institutional Bento KPI Card with inline SVG sparkline, limit bar & interactive methodology modal."""
     prov_upper = provenance.upper()
     if "SHOCK" in prov_upper:
         prov_bg, prov_col, prov_icon = "rgba(168,85,247,0.18)", "#d8b4fe", "🟣"
@@ -1564,25 +1708,172 @@ def build_bento_kpi_card_html(
             f"</div></div>"
         )
 
-    return (
-        f'<div class="argus-bento-card" style="background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.18);'
-        f'border-top:3px solid {accent_color};border-radius:10px;padding:12px 14px;margin-bottom:8px;'
-        f'box-shadow:0 4px 14px rgba(0,0,0,0.28);">'
-        f'<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">'
-        f'<span style="font-size:11.5px;font-weight:700;color:#cbd5e1;">{title}</span>'
-        f'<span style="background:{prov_bg};color:{prov_col};font-size:9.5px;font-weight:800;'
-        f'padding:2px 6px;border-radius:8px;font-family:\'JetBrains Mono\',monospace;">{prov_icon} {provenance}</span>'
-        f"</div>"
-        f'<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;">'
-        f"<div>"
-        f'<div style="font-size:20px;font-weight:800;color:#f8fafc;font-family:\'JetBrains Mono\',monospace;">{value}</div>'
-        f'<div style="font-size:11px;color:{accent_color};font-weight:600;margin-top:2px;">{delta_label}</div>'
-        f"</div>"
-        f"<div>{spark_html}</div>"
-        f"</div>"
-        f"{limit_html}"
-        f"</div>"
+    unique_id = hashlib.md5(f"bento_{title}_{provenance}_{value}_{delta_label}".encode("utf-8")).hexdigest()[:8]
+
+    if modal_content:
+        raw_modal_content = modal_content
+    else:
+        try:
+            from core.ui_utils import resolve_metric_knowledge
+
+            raw_modal_content = resolve_metric_knowledge(title, help_text)
+        except Exception:
+            raw_modal_content = f"<p><b>{title}</b>: Metrica di controllo quantitativo e prudenziale del portafoglio.</p>"
+
+    cleaned = re.sub(r"<!--.*?-->", "", raw_modal_content, flags=re.DOTALL)
+    safe_modal_content = _compact_html(cleaned)
+
+    info_svg = (
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="display:block;">'
+        '<circle cx="12" cy="12" r="10"></circle>'
+        '<line x1="12" y1="16" x2="12" y2="12"></line>'
+        '<line x1="12" y1="8" x2="12.01" y2="8"></line>'
+        '</svg>'
     )
+
+    card_markup = f"""
+    <style>
+    #bento-modal-toggle-{unique_id} {{ display: none; }}
+    .bento-modal-overlay-{unique_id} {{
+        display: none;
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        z-index: 999999;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+    }}
+    #bento-modal-toggle-{unique_id}:checked ~ .bento-modal-overlay-{unique_id} {{
+        display: flex;
+    }}
+    .bento-modal-backdrop-{unique_id} {{
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(10, 14, 20, 0.88);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        cursor: pointer;
+        z-index: 1;
+    }}
+    .bento-modal-content-{unique_id} {{
+        background: #0f172a;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-top: 4px solid {accent_color};
+        padding: 24px 28px;
+        border-radius: 16px;
+        width: 92%;
+        max-width: 760px;
+        max-height: 86vh;
+        overflow-y: auto;
+        color: #f1f5f9;
+        position: relative;
+        z-index: 2;
+        box-shadow: 0 24px 60px rgba(0,0,0,0.92), 0 0 30px {accent_color}33;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        text-align: left;
+        box-sizing: border-box;
+        animation: bentoPopIn_{unique_id} 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }}
+    @keyframes bentoPopIn_{unique_id} {{
+        from {{ opacity: 0; transform: scale(0.95) translateY(10px); }}
+        to {{ opacity: 1; transform: scale(1) translateY(0); }}
+    }}
+    .bento-modal-close-{unique_id} {{
+        position: absolute;
+        top: 14px; right: 18px;
+        cursor: pointer;
+        font-size: 26px;
+        color: #94a3b8;
+        line-height: 1;
+        width: 30px; height: 30px;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 6px;
+        transition: all 0.2s ease;
+    }}
+    .bento-modal-close-{unique_id}:hover {{
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.1);
+    }}
+    .bento-info-icon-{unique_id} {{
+        cursor: pointer;
+        color: {accent_color};
+        opacity: 0.85;
+        background: {accent_color}18;
+        border: 1px solid {accent_color}44;
+        border-radius: 50%;
+        width: 17px;
+        height: 17px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0 !important;
+        transition: all 0.2s ease;
+        box-sizing: border-box !important;
+        padding: 0;
+    }}
+    .bento-info-icon-{unique_id}:hover {{
+        opacity: 1;
+        background: {accent_color}33;
+        border-color: {accent_color};
+        box-shadow: 0 0 8px {accent_color}66;
+        transform: scale(1.15);
+    }}
+    </style>
+
+    <input type="checkbox" id="bento-modal-toggle-{unique_id}">
+    <div class="bento-modal-overlay-{unique_id}">
+        <label for="bento-modal-toggle-{unique_id}" class="bento-modal-backdrop-{unique_id}"></label>
+        <div class="bento-modal-content-{unique_id}">
+            <label for="bento-modal-toggle-{unique_id}" class="bento-modal-close-{unique_id}">×</label>
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; border-bottom:1px solid rgba(148,163,184,0.2); padding-bottom:10px; flex-wrap:wrap; gap:8px;">
+                <div>
+                    <span style="font-size:10.5px; font-weight:800; color:{accent_color}; text-transform:uppercase; letter-spacing:0.5px; font-family:'JetBrains Mono',monospace;">
+                        {prov_icon} {provenance} &bull; SCHEDA METODOLOGICA ISTITUZIONALE
+                    </span>
+                    <h3 style="margin:2px 0 0 0; font-size:18px; font-weight:800; color:#f8fafc;">{title}</h3>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:17px; font-weight:800; color:#f8fafc; font-family:'JetBrains Mono',monospace;">{value}</div>
+                    <div style="font-size:10.5px; color:{accent_color}; font-weight:700;">{delta_label}</div>
+                </div>
+            </div>
+            <div style="font-size:13px; line-height:1.55; color:#cbd5e1;">
+                {safe_modal_content}
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-top:16px;">
+                <label for="bento-modal-toggle-{unique_id}" style="cursor:pointer; background:rgba(255,255,255,0.06); border:1px solid rgba(148,163,184,0.25); color:#cbd5e1; padding:6px 16px; border-radius:8px; font-size:12px; font-weight:600;">
+                    Chiudi Scheda
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="argus-bento-card" style="background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.18);
+                border-top:3px solid {accent_color};border-radius:10px;padding:12px 14px;margin-bottom:8px;
+                box-shadow:0 4px 14px rgba(0,0,0,0.28);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+                <span style="font-size:11.5px;font-weight:700;color:#cbd5e1;">{title}</span>
+                <label for="bento-modal-toggle-{unique_id}" class="bento-info-icon-{unique_id}" title="Clicca per approfondire la metodologia di {title}">
+                    {info_svg}
+                </label>
+            </div>
+            <span style="background:{prov_bg};color:{prov_col};font-size:9.5px;font-weight:800;
+                         padding:2px 6px;border-radius:8px;font-family:'JetBrains Mono',monospace;">{prov_icon} {provenance}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:6px;">
+            <div>
+                <div style="font-size:20px;font-weight:800;color:#f8fafc;font-family:'JetBrains Mono',monospace;">{value}</div>
+                <div style="font-size:11px;color:{accent_color};font-weight:600;margin-top:2px;">{delta_label}</div>
+            </div>
+            <div>{spark_html}</div>
+        </div>
+        {limit_html}
+    </div>
+    """
+    return _compact_html(card_markup)
 
 
 def render_bento_kpi_card(
@@ -1593,6 +1884,8 @@ def render_bento_kpi_card(
     limit_utilization_pct: float | None = None,
     sparkline_values: list[float] | None = None,
     accent_color: str = "#10b981",
+    help_text: str | None = None,
+    modal_content: str | None = None,
 ) -> str:
     """Render an Institutional Bento KPI Card in Streamlit and return its HTML."""
     html = build_bento_kpi_card_html(
@@ -1603,6 +1896,8 @@ def render_bento_kpi_card(
         limit_utilization_pct=limit_utilization_pct,
         sparkline_values=sparkline_values,
         accent_color=accent_color,
+        help_text=help_text,
+        modal_content=modal_content,
     )
     if st is not None:
         st.markdown(html, unsafe_allow_html=True)

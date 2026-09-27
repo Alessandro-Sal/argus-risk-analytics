@@ -80,6 +80,41 @@ def test_v918_bento_kpi_cards_and_svg_sparklines() -> None:
     assert "GLOBAL SHOCK OVERRIDE" in html
     assert "76.8%" in html
     assert "<svg" in html
+    assert "bento-modal-overlay" in html
+    assert "bento-modal-toggle" in html
+    assert "bento-info-icon" in html
+    assert "bento-modal-content" in html
+
+    from core.ui_utils import resolve_metric_knowledge
+
+    bento_titles = [
+        "Hurst H & Fractal Dim.",
+        "Durrleman Butterfly Min g(k)",
+        "ATM Skew 1M (rBergomi)",
+        "ATM Skew 12M (1 Anno)",
+        "ISDA Upfront (vs 100bps)",
+        "CS01 (Credit Spread 01)",
+        "Jump-to-Default (JTD Net)",
+        "Equity Tranche [0-3%]",
+        "ISDA SIMM Initial Margin",
+        "Utilizzo Soglia UMR (€50M)",
+        "IM Equivalente CCP (LCH/Eurex)",
+        "Risparmio Annuo MVA (CCP vs CSA)",
+        "Reservation Price r(s,q,t)",
+        "Quote Ottime Bid / Ask",
+        "VPIN Order-Flow Toxicity",
+        "Hawkes Branching Ratio (α/β)",
+        "ALM Funding Ratio",
+        "Duration Gap (A vs L)",
+        "LDI Receiver Swap 20Y",
+        "Surplus-at-Risk 99% (1Y)",
+    ]
+    for bt in bento_titles:
+        resolved = resolve_metric_knowledge(bt)
+        assert len(resolved) > 2000, f"Card '{bt}' resolved text too short: {len(resolved)}"
+        assert "Cos'è" in resolved or "Cosa" in resolved, f"Missing section 1 in '{bt}'"
+        assert "Calcolo" in resolved or "calcolat" in resolved, f"Missing section 2 in '{bt}'"
+        assert "Come si legge" in resolved or "Valori Guida" in resolved, f"Missing section 4 in '{bt}'"
 
 
 def test_v918_sr117_audit_record_and_adaptive_density_css() -> None:
