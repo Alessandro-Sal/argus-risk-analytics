@@ -152,3 +152,31 @@ def test_v916_api_endpoints_and_version() -> None:
     )
     assert r_delta.status_code == 200
     assert r_delta.json()["improved_count"] == 1
+
+
+def test_render_institutional_info_box_signatures() -> None:
+    """Verify render_institutional_info_box supports both legacy and html-suffixed keyword arguments."""
+    from core.ux_institutional_hub import render_institutional_info_box
+
+    # Should not raise TypeError with html-suffixed kwargs
+    render_institutional_info_box(
+        title="Test Solvency II",
+        badge="SOLVENCY-II",
+        summary_html="<b>Summary HTML</b>",
+        math_html="<b>Math HTML</b>",
+        chart_guide_html="<b>Guide HTML</b>",
+        regulatory_html="<b>Reg HTML</b>",
+    )
+
+    # Should not raise TypeError with standard kwargs
+    render_institutional_info_box(
+        title="Test Standard",
+        badge="RISK-STD",
+        summary="Standard Summary",
+        math_foundation="Formula text",
+        kpi_guide="KPI details",
+        operational_impact="Regulatory notes",
+        accent_color="#10b981",
+        default_expanded=True,
+    )
+

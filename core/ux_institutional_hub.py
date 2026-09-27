@@ -1751,18 +1751,28 @@ def render_command_bar_and_shock_ribbon(key_prefix: str = "global_cmd") -> dict[
 
 
 def render_institutional_info_box(
-    title: str,
-    badge: str,
-    summary: str,
-    math_foundation: str,
-    kpi_guide: str,
-    operational_impact: str,
+    title: str = "",
+    badge: str = "",
+    summary: str = "",
+    math_foundation: str = "",
+    kpi_guide: str = "",
+    operational_impact: str = "",
     accent_color: str = "#6366f1",
     default_expanded: bool = False,
+    summary_html: str | None = None,
+    math_html: str | None = None,
+    chart_guide_html: str | None = None,
+    regulatory_html: str | None = None,
+    **kwargs: Any,
 ) -> None:
     """Render an institutional methodology & interpretation info box with compact banner and expandable 3-column guide."""
     if st is None:
         return
+
+    eff_summary = summary_html if summary_html is not None else summary
+    eff_math = math_html if math_html is not None else math_foundation
+    eff_kpi = chart_guide_html if chart_guide_html is not None else kpi_guide
+    eff_reg = regulatory_html if regulatory_html is not None else operational_impact
 
     banner_html = _compact_html(
         f"""
@@ -1779,7 +1789,7 @@ def render_institutional_info_box(
                 <span style="font-size: 12.5px; font-weight: 800; color: #f8fafc;">{title}</span>
             </div>
             <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.4;">
-                {summary}
+                {eff_summary}
             </div>
         </div>
         """
@@ -1798,7 +1808,7 @@ def render_institutional_info_box(
                             🔬 1. Fondamento Matematico & Modello
                         </div>
                         <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
-                            {math_foundation}
+                            {eff_math}
                         </div>
                     </div>
                     """
@@ -1816,7 +1826,7 @@ def render_institutional_info_box(
                         </div>
                         <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
                     """
-                    + kpi_guide
+                    + eff_kpi
                     + """
                         </div>
                     </div>
@@ -1835,7 +1845,7 @@ def render_institutional_info_box(
                         </div>
                         <div style="font-size: 11.5px; color: #cbd5e1; line-height: 1.48;">
                     """
-                    + operational_impact
+                    + eff_reg
                     + """
                         </div>
                     </div>
