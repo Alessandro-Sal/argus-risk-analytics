@@ -283,4 +283,90 @@ def test_v918_master_wealth_portfolio_synchronization_and_board_pack_scaling() -
     assert audit_dossier_pdf.startswith(b"%PDF")
 
 
+def test_v918_kb_resolution_and_sr117_drawers_alignment():
+    """Verify that all regulatory stress testing, capital, ESG, and execution metrics resolve to exact KB entries."""
+    from core.ui_utils import KNOWN_METRICS_KNOWLEDGE_BASE, resolve_metric_knowledge
+    from core.ux_institutional_hub import build_sr117_audit_record
+
+    audit_labels = [
+        "Capitale Regolamentare K_IRB",
+        "Expected Loss (EL Basilea IRB)",
+        "Credit VaR 99.9% (1Y Migration)",
+        "Incremental Risk Charge (IRC)",
+        "Stress Capital Buffer (SCB)",
+        "CET1 Ratio Iniziale",
+        "Min CET1 (Severely Adverse)",
+        "Perdite Credito Cumulate 9Q",
+        "Requisito FRTB Totale",
+        "SBM Total Charge",
+        "Default Risk Charge (DRC)",
+        "Residual Risk (RRAO)",
+        "Solvency Ratio",
+        "Solvency II SCR Ratio",
+        "Requisito SCR Totale",
+        "Eligible Own Funds",
+        "Intensità WACI Portafoglio",
+        "Rischio di Transizione",
+        "Rischio Fisico (Danni)",
+        "Perdita Climatica Totale",
+        "Total Net XVA",
+        "Credit Valuation Adj (CVA)",
+        "Debit Valuation Adj (DVA)",
+        "Funding Valuation Adj (FVA)",
+        "PnL Portafoglio Macro",
+        "Volatilità Stressata",
+        "Perdita di Diversificazione",
+        "Drenaggio Liquidità / Margin Call",
+        "Summary Risk Indicator (SRI)",
+        "PRIIPs VEV (Volatilità)",
+        "Classificazione SFDR",
+        "Allineamento Tassonomia UE",
+        "Regime Struttura a Termine",
+        "Futures 1 Anno F(0, 1Y)",
+        "Roll Yield Implicito (1Y)",
+        "Implementation Shortfall (AC Optimal)",
+        "Dynamic VWAP (POV-Capped)",
+        "Controvalore Ordine & % ADV",
+        "Distanza di Mahalanobis",
+        "Days to Liquidate (Medio)",
+    ]
+
+    for lbl in audit_labels:
+        html_out = resolve_metric_knowledge(lbl)
+        # Must contain standard institutional 5-section headers
+        assert "📌 Cos'è" in html_out
+        assert "⚙️ Come viene calcolat" in html_out or "⚙️ Formula" in html_out
+        assert "🎯 A cosa serve" in html_out
+        assert "📊 Come si legge" in html_out
+        assert "⚠️ Limitazioni" in html_out
+        # Must match an exact knowledge base entry title, not the generic dynamic fallback
+        matched_title = any(v.get("title", "") in html_out for v in KNOWN_METRICS_KNOWLEDGE_BASE.values())
+        assert matched_title, f"Label '{lbl}' failed to match an exact KB entry!"
+
+    # Test SR 11-7 Drawers generation
+    rec_frtb = build_sr117_audit_record(
+        engine_name="FRTB Basel IV Standardized Approach (BCBS 365 / CRR III) Engine",
+        model_version="v9.18.0",
+        latex_formulas=[r"K_{\text{FRTB}} = \max [ K_{\text{SBM}} ] + K_{\text{DRC}}"],
+        inputs_dict={"trading_val_eur": 50_000_000.0},
+        outputs_dict={"total_frtb_charge_eur": 1_250_000.0},
+        regulatory_refs=["BCBS 365", "CRR III"],
+    )
+    assert rec_frtb["engine_name"] == "FRTB Basel IV Standardized Approach (BCBS 365 / CRR III) Engine"
+    assert len(rec_frtb["sha256_audit_hash"]) == 64
+    assert "BCBS 365" in rec_frtb["regulatory_references"]
+
+    rec_ccar = build_sr117_audit_record(
+        engine_name="Fed CCAR & EBA 9-Quarter Supervisory CET1 Stress Engine",
+        model_version="v9.18.0",
+        latex_formulas=[r"\text{CET1}_{t+1} = \frac{\text{CET1}_t + \text{PPNR}_t - \text{Losses}_t}{\text{RWA}_t}"],
+        inputs_dict={"initial_cet1_pct": 14.5},
+        outputs_dict={"scb_pct": 2.50},
+        regulatory_refs=["Fed CCAR", "EBA Methodology"],
+    )
+    assert rec_ccar["engine_name"] == "Fed CCAR & EBA 9-Quarter Supervisory CET1 Stress Engine"
+    assert len(rec_ccar["sha256_audit_hash"]) == 64
+
+
+
 

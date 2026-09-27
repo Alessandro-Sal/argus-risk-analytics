@@ -50,6 +50,10 @@ elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
 
+from core.ux_institutional_hub import render_institutional_telemetry_ribbon
+
+render_institutional_telemetry_ribbon(page_badge="PORTFOLIO MARKET RISK & VAR ENGINE", risk_data=results)
+
 # ── SELETTORE MODULI DI RISCHIO STILE BLOOMBERG TERMINAL ─────────
 RISK_MODELS_CATALOG = {
     "📊 Profilo del Rischio & Fama-French": {

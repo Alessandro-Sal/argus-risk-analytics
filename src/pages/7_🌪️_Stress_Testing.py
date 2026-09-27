@@ -115,12 +115,19 @@ from core.ux_institutional_hub import (
     render_executive_traffic_light_radar,
     render_institutional_info_box,
     render_institutional_telemetry_ribbon,
+    render_live_portfolio_autobind_banner,
     render_scenario_delta_comparator,
     render_segmented_workspace_switcher,
+    render_sr117_audit_drawer,
     style_institutional_chart,
 )
 
 render_institutional_telemetry_ribbon(page_badge="REGULATORY STRESS TESTING & CAPITAL LAB", risk_data=results)
+live_bind = render_live_portfolio_autobind_banner(
+    key_prefix="p7_stress_lab",
+    model_label="Regulatory Stress Testing & Capital Lab",
+    risk_data=results,
+)
 render_executive_traffic_light_radar(key_prefix="stress_page_cro_radar", risk_data=results, include_board_pack=True)
 
 # ── SELETTORE MODULI DI STRESS TESTING STILE BLOOMBERG TERMINAL ─────────
@@ -1509,8 +1516,32 @@ elif active_stress_tab == "🏛️ FRTB Basel IV, Solvency II & NGFS Climate":
     with s2k4:
         metric_card("Solvency Ratio", f"{s2_report['solvency_ratio_pct']:.1f}%", delta=s2_report["solvency_health"], delta_color="normal" if s2_report["solvency_ratio_pct"] >= 160 else "inverse")
 
-    st.markdown("##### 📋 Prospetto Regolamentare QRT S.25.01.21 (SCR Standard Formula)")
     st.dataframe(pd.DataFrame(list(s2_report["qrt_s25_01"].items()), columns=["Voce Regolamentare", "Valore"]), use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="EIOPA Solvency II Standard Formula SCR Capital Engine",
+        latex_formulas=[
+            r"\text{SCR}_{\text{mkt}} = \sqrt{\sum_{i,j} \text{Corr}_{i,j}\,\text{SCR}_i\,\text{SCR}_j}",
+            r"\text{BSCR} = \sqrt{\sum_{r,s} \text{Corr}_{r,s}\,\text{SCR}_r\,\text{SCR}_s} + \text{SCR}_{\text{op}}",
+            r"\text{Solvency Ratio} = \frac{\text{Eligible Own Funds}}{\text{SCR}_{\text{total}}} \times 100\%",
+        ],
+        inputs_dict={
+            "eligible_own_funds_eur": s2_eof,
+            "technical_provisions_eur": s2_tp,
+            "symmetric_equity_adjustment_pct": s2_symm * 100.0,
+            "portfolio_assets_count": len(sample_s2_assets),
+        },
+        outputs_dict={
+            "scr_total_eur": s2_report["scr_total"],
+            "bscr_eur": s2_report["bscr"],
+            "solvency_ratio_pct": s2_report["solvency_ratio_pct"],
+            "diversification_benefit_eur": s2_report["market_diversification_benefit"],
+        },
+        regulatory_refs=[
+            "EIOPA Delegated Regulation (EU) 2015/35 (Solvency II RTS)",
+            "Directive 2009/138/EC (Solvency II Framework)",
+            "EIOPA QRT S.25.01 / S.26.01 Reporting Guidelines",
+        ],
+    )
 
     # ── V9.13.0: FRTB (BASEL IV / BCBS 365) STANDARDIZED APPROACH ──────
     st.markdown("---")
@@ -1564,8 +1595,29 @@ elif active_stress_tab == "🏛️ FRTB Basel IV, Solvency II & NGFS Climate":
     with fk4:
         metric_card("Residual Risk (RRAO)", fmt_eur(frtb_res["rrao_total_charge_eur"]), delta="Prodotti Esotici", delta_color="normal")
 
-    st.markdown("##### 📊 Decomposizione SBM per Classe di Rischio e Sensibilità")
     st.dataframe(pd.DataFrame(frtb_res["sbm_breakdown_by_risk_class"]), use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="FRTB Basel IV Standardized Approach (BCBS 365 / CRR III) Engine",
+        latex_formulas=[
+            r"K_{\text{FRTB}} = \max_{c \in \{\text{Low, Med, High}\}} \left[ K_{\text{SBM}}(c) \right] + K_{\text{DRC}} + K_{\text{RRAO}}",
+            r"K_b = \sqrt{\sum_k WS_k^2 + \sum_{k \neq l} \rho_{kl}\,WS_k\,WS_l}, \quad K_{\text{SBM}} = \sum_b K_b + \sum_{b \neq c} \gamma_{bc}\,S_b\,S_c",
+        ],
+        inputs_dict={
+            "trading_portfolio_value_eur": frtb_port_val,
+            "correlation_scenario": frtb_corr_scenario,
+        },
+        outputs_dict={
+            "total_frtb_charge_eur": frtb_res["total_frtb_capital_charge_eur"],
+            "sbm_charge_eur": frtb_res["sbm_total_charge_eur"],
+            "drc_charge_eur": frtb_res["drc_total_charge_eur"],
+            "rrao_charge_eur": frtb_res["rrao_total_charge_eur"],
+        },
+        regulatory_refs=[
+            "BCBS 365 Standards (Fundamental Review of the Trading Book)",
+            "Regulation (EU) 2024/1623 (CRR III / Basel IV Implementation)",
+            "Fed SR 11-7 Model Risk Management Guidance",
+        ],
+    )
 
     # ── V9.13.0: NGFS CLIMATE TRANSITION & PHYSICAL STRESS ENGINE ───────
     st.markdown("---")
@@ -2074,8 +2126,30 @@ elif active_stress_tab == "🏦 CreditMetrics™ Vasicek IRB & Fed CCAR / EBA 9Q
         with ck4:
             metric_card("Incremental Risk Charge (IRC)", fmt_eur(float(cp_res["incremental_risk_charge_eur"])), delta=f"ES 99.9%: {fmt_eur(float(cp_res['creditmetrics_es_999_eur']))}", delta_color="inverse")
 
-        st.markdown("##### 📋 Decomposizione per Controparte: PD, Correlazione Vasicek ρ, RWA e Contributo Euler al Rischio")
-        st.dataframe(pd.DataFrame(cp_res["obligor_contributions"]), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(cp_res["obligor_contributions"]), use_container_width=True, hide_index=True)
+    render_sr117_audit_drawer(
+        engine_name="CreditMetrics™ S&P 8-State & Basel III ASRF Vasicek IRB Engine",
+        latex_formulas=[
+            r"K_{\text{IRB}} = \left[ \text{LGD} \cdot \Phi\left( \frac{\Phi^{-1}(\text{PD}) + \sqrt{\rho}\,\Phi^{-1}(0.999)}{\sqrt{1-\rho}} \right) - \text{PD}\cdot\text{LGD} \right] \cdot \frac{1 + (M - 2.5)b(\text{PD})}{1 - 1.5b(\text{PD})}",
+            r"\text{RWA} = K_{\text{IRB}} \times 12.5 \times \text{EAD}, \quad \text{IRC}_{99.9\%} = \text{CreditVaR}_{99.9\%} - \text{EL}",
+        ],
+        inputs_dict={
+            "n_obligors": len(_live_obligors) if _live_obligors else 6,
+            "n_simulations": int(cp_sims),
+            "total_ead_eur": float(cp_res["total_ead_eur"]),
+        },
+        outputs_dict={
+            "expected_loss_eur": float(cp_res["expected_loss_eur"]),
+            "k_irb_capital_eur": float(cp_res["vasicek_irb_capital_999_eur"]),
+            "rwa_eur": float(cp_res["vasicek_rwa_eur"]),
+            "credit_var_999_eur": float(cp_res["creditmetrics_var_999_eur"]),
+        },
+        regulatory_refs=[
+            "Basel III IRB Framework (CRR Articles 153-154)",
+            "Vasicek (2002) Asymptotic Single Risk Factor (ASRF)",
+            "Gupton, Finger & Bhatia (1997) CreditMetrics™ Technical Document",
+        ],
+    )
 
     if active_stress_ws in ("🌐 Tutti i Laboratori Regolamentari", "🏛️ Capitale Prudenziale 9Q (Fed CCAR / EBA CET1 Trajectory)"):
         st.divider()
@@ -2173,3 +2247,26 @@ elif active_stress_tab == "🏦 CreditMetrics™ Vasicek IRB & Fed CCAR / EBA 9Q
             },
         )
         st.dataframe(df_sev, use_container_width=True, hide_index=True)
+        render_sr117_audit_drawer(
+            engine_name="Fed CCAR & EBA 9-Quarter Supervisory CET1 Stress Engine",
+            latex_formulas=[
+                r"\text{CET1}_{t+1} = \frac{\text{CET1}_t + \text{PPNR}_t - \text{Losses}_{\text{credit}, t} - \text{Losses}_{\text{mkt}, t} - \text{Tax}_t - \text{Div}_t}{\text{RWA}_t}",
+                r"\text{SCB} = \max\left(2.50\%,\; \max_{t \in [1,9]} (\text{CET1}_0 - \text{CET1}_t) + \frac{4 \times \text{PlannedDiv}}{\text{RWA}_0}\right)",
+            ],
+            inputs_dict={
+                "initial_cet1_ratio_pct": float(ccar_res["initial_cet1_ratio_pct"]),
+                "mda_hurdle_pct": float(mda_hurdle),
+                "projection_quarters": 9,
+            },
+            outputs_dict={
+                "scb_required_pct": float(ccar_res["required_stress_capital_buffer_scb_pct"]),
+                "min_severely_adverse_cet1_pct": float(sev_scen["minimum_stressed_cet1_ratio_pct"]),
+                "max_drawdown_bps": float(sev_scen["max_cet1_drawdown_bps"]),
+                "trough_quarter": str(sev_scen["trough_quarter"]),
+            },
+            regulatory_refs=[
+                "Federal Reserve Comprehensive Capital Analysis and Review (CCAR)",
+                "EBA EU-Wide Stress Test Methodology (EBA/GL/2023/04)",
+                "Fed SR 15-18 Capital Planning and Internal Controls",
+            ],
+        )
