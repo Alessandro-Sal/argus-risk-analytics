@@ -2806,6 +2806,7 @@ st.markdown("---")
 st.markdown("#### 🏛️ Private Markets Cash Flow Pacing (Takahashi-Alexander) & De-smoothing Econometrico")
 st.caption("Modellazione J-Curve a 10 anni (Chiamate, Distribuzioni, NAV) secondo Takahashi-Alexander (2001) e correzione econometrica di Geltner-Fisher per la reale volatilita non quotata.")
 
+from core.ux_institutional_hub import render_sr117_audit_drawer, style_institutional_chart
 from core.wealth.private_markets_engine import compute_private_markets_analytics
 
 with st.expander("⚙️ Parametri Impegno Fondo Private Equity / Venture Capital", expanded=True):
@@ -2836,24 +2837,48 @@ with pek4:
     metric_card("PME Kaplan-Schoar", f"{pe_res['pme_kaplan_schoar']:.2f}x", delta=f"Direct Alpha: {pe_res['direct_alpha_pct']:+.2f}%", delta_color="normal")
 
 st.markdown("##### 📈 Profilo Temporale J-Curve: Flussi di Cassa & Valutazione NAV (€)")
-sched_df = pd.DataFrame(pe_res["schedule"])
+sched_df = pd.DataFrame(pe_res.get("schedule", []))
+if not sched_df.empty:
+    if "year" in sched_df.columns and "Anno" not in sched_df.columns:
+        sched_df["Anno"] = sched_df["year"]
+    if "capital_call_eur" in sched_df.columns and "Capital Call (€)" not in sched_df.columns:
+        sched_df["Capital Call (€)"] = sched_df["capital_call_eur"]
+    if "distribution_eur" in sched_df.columns and "Distribuzioni (€)" not in sched_df.columns:
+        sched_df["Distribuzioni (€)"] = sched_df["distribution_eur"]
+    if "nav_ending_eur" in sched_df.columns and "NAV (€)" not in sched_df.columns:
+        sched_df["NAV (€)"] = sched_df["nav_ending_eur"]
+    if "net_cash_flow_eur" in sched_df.columns and "Flusso Netto (€)" not in sched_df.columns:
+        sched_df["Flusso Netto (€)"] = sched_df["net_cash_flow_eur"]
+    if "cumulative_paid_in_eur" in sched_df.columns and "Capitale Richiamato (€)" not in sched_df.columns:
+        sched_df["Capitale Richiamato (€)"] = sched_df["cumulative_paid_in_eur"]
+    if "cumulative_distributed_eur" in sched_df.columns and "Distribuzioni Cumulate (€)" not in sched_df.columns:
+        sched_df["Distribuzioni Cumulate (€)"] = sched_df["cumulative_distributed_eur"]
+    if "dpi" in sched_df.columns and "DPI" not in sched_df.columns:
+        sched_df["DPI"] = sched_df["dpi"]
+    if "rvpi" in sched_df.columns and "RVPI" not in sched_df.columns:
+        sched_df["RVPI"] = sched_df["rvpi"]
+    if "tvpi" in sched_df.columns and "TVPI" not in sched_df.columns:
+        sched_df["TVPI"] = sched_df["tvpi"]
 
 fig_pe = go.Figure()
-fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df["Capital Call (€)"], name="Capital Calls (Versamenti)", marker_color="#f87171"))
-fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df["Distribuzioni (€)"], name="Distribuzioni (Rimborsi)", marker_color="#34d399"))
-fig_pe.add_trace(go.Scatter(x=sched_df["Anno"], y=sched_df["NAV (€)"], name="NAV Fondo (Valore Residuo)", mode="lines+markers", line=dict(color="#38bdf8", width=3)))
+if not sched_df.empty and "Anno" in sched_df.columns:
+    fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df.get("Capital Call (€)", sched_df.get("capital_call_eur", 0)), name="Capital Calls (Versamenti)", marker_color="#f87171"))
+    fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df.get("Distribuzioni (€)", sched_df.get("distribution_eur", 0)), name="Distribuzioni (Rimborsi)", marker_color="#34d399"))
+    fig_pe.add_trace(go.Scatter(x=sched_df["Anno"], y=sched_df.get("NAV (€)", sched_df.get("nav_ending_eur", 0)), name="NAV Fondo (Valore Residuo)", mode="lines+markers", line=dict(color="#38bdf8", width=3)))
+
 fig_pe.update_layout(
-    title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV",
+    title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV (J-Curve)",
     xaxis_title="Anno di Vita del Fondo",
     yaxis_title="Euro (€)",
     barmode="group",
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     height=400,
 )
-st.plotly_chart(apply_plotly_theme(fig_pe), use_container_width=True)
+style_institutional_chart(fig_pe, title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV (J-Curve)", height=400)
+st.plotly_chart(fig_pe, use_container_width=True)
 
 st.markdown("##### 📉 Correzione Econometrica di De-smoothing (Geltner-Fisher)")
-ds_info = pe_res["desmoothing"]
+ds_info = pe_res.get("desmoothing", {})
 if ds_info:
     dsk1, dsk2, dsk3 = st.columns(3)
     with dsk1:
@@ -2864,7 +2889,39 @@ if ds_info:
         metric_card("Autocorrelazione Lag-1 (ρ)", f"{ds_info['autocorrelation_rho']:.3f}", delta="Inerzia delle Perizie", delta_color="normal")
 
 st.markdown("##### 📋 Piano Annuale Dettagliato dei Flussi di Cassa del Fondo")
-st.dataframe(sched_df, use_container_width=True, hide_index=True)
+display_cols = [
+    c for c in [
+        "Anno", "Capital Call (€)", "Distribuzioni (€)", "Flusso Netto (€)",
+        "NAV (€)", "Capitale Richiamato (€)", "Distribuzioni Cumulate (€)",
+        "DPI", "RVPI", "TVPI"
+    ] if c in sched_df.columns
+]
+st.dataframe(sched_df[display_cols] if display_cols else sched_df, use_container_width=True, hide_index=True)
+
+render_sr117_audit_drawer(
+    engine_name="Takahashi-Alexander (2001) Private Equity Pacing & Geltner-Fisher De-smoothing Engine",
+    latex_formulas=[
+        r"RD(t) = \max\!\left(0, \frac{t}{L}\right)^B, \quad C(t) = \max(0, C - \text{PIC}_t) \cdot RC(t)",
+        r"\text{NAV}_t = \text{NAV}_{t-1}(1 + g) + C(t) - D(t), \quad r_t^{\text{true}} = \frac{r_t^{\text{obs}} - \rho\,r_{t-1}^{\text{obs}}}{1 - \rho}",
+    ],
+    inputs_dict={
+        "commitment_eur": float(pe_commit),
+        "fund_life_years": int(pe_life),
+        "growth_rate_pct": float(pe_growth * 100.0),
+    },
+    outputs_dict={
+        "net_irr_pct": float(pe_res["net_irr_pct"]),
+        "tvpi": float(pe_res["tvpi"]),
+        "dpi": float(pe_res["dpi"]),
+        "peak_capital_deficit_eur": float(pe_res["peak_capital_deficit_eur"]),
+        "pme_kaplan_schoar": float(pe_res["pme_kaplan_schoar"]),
+    },
+    regulatory_refs=[
+        "Takahashi & Alexander (2001) When the J-Curve Flattens",
+        "Geltner (1991) / Fisher (1994) Appraisal Volatility De-smoothing",
+        "ILPA Standards & Fed SR 11-7 Model Risk Management",
+    ],
+)
 
 
 # ══════════════════════════════════════════════════════════════

@@ -144,6 +144,17 @@ class TakahashiAlexanderPacingModel:
             )
 
         df = pd.DataFrame([r.__dict__ for r in records])
+        # Localized Italian column aliases for UI consistency
+        df["Anno"] = df["year"]
+        df["Capital Call (€)"] = df["capital_call_eur"]
+        df["Distribuzioni (€)"] = df["distribution_eur"]
+        df["Flusso Netto (€)"] = df["net_cash_flow_eur"]
+        df["NAV (€)"] = df["nav_ending_eur"]
+        df["Capitale Richiamato (€)"] = df["cumulative_paid_in_eur"]
+        df["Distribuzioni Cumulate (€)"] = df["cumulative_distributed_eur"]
+        df["DPI"] = df["dpi"]
+        df["RVPI"] = df["rvpi"]
+        df["TVPI"] = df["tvpi"]
 
         # Net IRR calculation
         cf_irr = [float(-records[0].capital_call_eur)]
