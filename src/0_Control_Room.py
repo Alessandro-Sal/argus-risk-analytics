@@ -57,6 +57,12 @@ from core.ux_institutional_hub import APP_VERSION
 if render_argus_splash(app_version=APP_VERSION):
     st.stop()
 
+# Reindirizzamento garantito al desk Wealth se selezionato (dallo splash o da switch rapido)
+if st.session_state.get("argus_portal_mode") == "🏛️ Wealth Management":
+    from core.sidebar import switch_to_page
+    switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+    st.stop()
+
 # Apertura automatica della sidebar una volta entrati nella Control Room
 auto_expand_sidebar()
 
