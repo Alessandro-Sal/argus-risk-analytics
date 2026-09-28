@@ -29,6 +29,14 @@ def test_wealth_temporal_progression():
     assert res24_real["is_inflation_adjusted"] is True
     assert res24_real["months_count"] == 25
 
+    # 5-year trajectory test: verify 2022 values are realistic (~16k - 21k) and not synthetic ~50k
+    res60 = compute_wealth_temporal_progression(engine, portfolio_id=1, timeframe_months=60)
+    assert res60["months_count"] == 61
+    df_2022 = res60["history_df"].loc["2022-01-01":"2022-12-31"]
+    if not df_2022.empty:
+        assert df_2022["total_net_worth"].max() < 25000.0
+        assert df_2022["total_net_worth"].min() > 14000.0
+
 
 def test_wealth_growth_attribution():
     engine = get_engine()

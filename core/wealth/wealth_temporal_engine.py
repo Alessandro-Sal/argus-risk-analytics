@@ -83,6 +83,10 @@ def compute_wealth_temporal_progression(
     cur_liab = float(nw_curr.total_liabilities)
 
     df_snaps = get_wealth_snapshots_history(engine, portfolio_id=portfolio_id)
+    if portfolio_id is not None and df_snaps is not None and not df_snaps.empty and "portfolio_id" in df_snaps.columns:
+        df_pid_snaps = df_snaps[df_snaps["portfolio_id"] == portfolio_id]
+        if not df_pid_snaps.empty:
+            df_snaps = df_pid_snaps
 
     dates = []
     nw_vals = []
@@ -110,7 +114,7 @@ def compute_wealth_temporal_progression(
 
     if has_long_term_snapshots and df_snaps_sliced is not None:
         for _, r in df_snaps_sliced.iterrows():
-            d_val = pd.to_datetime(r["snapshot_date"]).date()
+            d_val = pd.to_datetime(r["snapshot_date"])
             dates.append(d_val)
 
             nw_raw = (
@@ -167,35 +171,215 @@ def compute_wealth_temporal_progression(
             liab_val = float(liab_raw) if liab_raw is not None and pd.notna(liab_raw) else cur_liab
             liab_vals.append(liab_val)
     else:
+        # Verifica disponibilità di dati storici autentici (snapshot annuali/periodici o transazioni cassa)
+        df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
+        has_real_history = (
+            (df_snaps is not None and not df_snaps.empty)
+            or (df_cf is not None and not df_cf.empty and len(df_cf) >= 5)
+        )
+
         today = date.today()
-        multipliers = _generate_synthetic_multipliers(timeframe_months)
-        n_points = len(multipliers)
+        target_dates = [
+            (today.replace(day=1) - pd.DateOffset(months=timeframe_months - i)).date()
+            for i in range(timeframe_months)
+        ] + [today]
 
-        for i, mult in enumerate(multipliers[:-1]):
-            m_offset = (n_points - 1) - i
-            m_date = (today.replace(day=1) - pd.DateOffset(months=m_offset)).date()
-            dates.append(m_date)
-            nw_vals.append(round(cur_nw * mult, 2))
-            liquid_vals.append(round(cur_liquid * max(0.4, 0.85 + (mult * 0.15) + (np.sin(i * 0.8) * 0.02)), 2))
-            invest_vals.append(round(cur_invest * max(0.4, mult * 1.02), 2))
+        if has_real_history:
+            # 1. Costruzione punti ancora certificati da snapshot storici e punto live odierno
+            anchors = []
+            if df_snaps is not None and not df_snaps.empty:
+                for _, r in df_snaps.iterrows():
+                    d_val = pd.to_datetime(r["snapshot_date"]).date()
+                    anchors.append(
+                        {
+                            "date": d_val,
+                            "liquid_cash": float(
+                                r.get("liquid_assets")
+                                if pd.notna(r.get("liquid_assets"))
+                                else r.get("liquid_cash") or 0.0
+                            ),
+                            "financial_investments": float(
+                                r.get("financial_investments")
+                                if pd.notna(r.get("financial_investments"))
+                                else 0.0
+                            ),
+                            "real_estate": float(
+                                r.get("real_estate_total")
+                                if pd.notna(r.get("real_estate_total"))
+                                else r.get("real_estate") or 0.0
+                            ),
+                            "physical_assets": float(
+                                r.get("physical_assets_total")
+                                if pd.notna(r.get("physical_assets_total"))
+                                else r.get("physical_assets") or 0.0
+                            ),
+                            "pension_plans": float(
+                                r.get("pension_total")
+                                if pd.notna(r.get("pension_total"))
+                                else r.get("pension_plans") or 0.0
+                            ),
+                            "liabilities": float(
+                                r.get("total_liabilities")
+                                if pd.notna(r.get("total_liabilities"))
+                                else r.get("liabilities") or 0.0
+                            ),
+                        }
+                    )
+
+            anchors.append(
+                {
+                    "date": today,
+                    "liquid_cash": cur_liquid,
+                    "financial_investments": cur_invest,
+                    "real_estate": cur_re,
+                    "physical_assets": cur_physical,
+                    "pension_plans": cur_pension,
+                    "liabilities": cur_liab,
+                }
+            )
+            df_anchors = (
+                pd.DataFrame(anchors).drop_duplicates(subset=["date"]).sort_values("date").reset_index(drop=True)
+            )
+
+            # 2. Aggregazione flussi di risparmio mensili netti dai movimenti effettivi di conto
+            monthly_savings = pd.Series(dtype=float)
+            if df_cf is not None and not df_cf.empty:
+                df_cf_copy = df_cf.copy()
+                df_cf_copy["tx_date"] = pd.to_datetime(df_cf_copy["tx_date"], errors="coerce")
+                df_cf_clean = (
+                    df_cf_copy[df_cf_copy["direction"].isin(["inflow", "outflow"])]
+                    .dropna(subset=["tx_date"])
+                    .copy()
+                )
+                if "category" in df_cf_clean.columns:
+                    df_cf_clean = df_cf_clean[
+                        ~df_cf_clean["category"]
+                        .astype(str)
+                        .str.lower()
+                        .str.contains("giroconto|trasferimento|transfer", na=False)
+                    ]
+                if not df_cf_clean.empty:
+                    m_net = (
+                        df_cf_clean.groupby([df_cf_clean["tx_date"].dt.to_period("M"), "direction"])["amount"]
+                        .sum()
+                        .unstack(fill_value=0.0)
+                    )
+                    monthly_savings = m_net.get("inflow", 0.0) - m_net.get("outflow", 0.0)
+
+            # 3. Ricostruzione mensile point-in-time per ciascuna data della griglia
+            for d in target_dates:
+                past_anchors = df_anchors[df_anchors["date"] <= d]
+                future_anchors = df_anchors[df_anchors["date"] >= d]
+
+                if past_anchors.empty:
+                    a1 = future_anchors.iloc[0]
+                    p_start = pd.Period(d, freq="M")
+                    p_end = pd.Period(a1["date"], freq="M")
+                    cum_cf = 0.0
+                    if not monthly_savings.empty:
+                        try:
+                            if p_start < p_end:
+                                cum_cf = float(monthly_savings.loc[p_start:p_end].iloc[:-1].sum())
+                        except Exception:
+                            pass
+                    liq = max(0.0, a1["liquid_cash"] - cum_cf)
+                    fin = a1["financial_investments"]
+                    re = a1["real_estate"]
+                    phys = a1["physical_assets"]
+                    pens = a1["pension_plans"]
+                    liab = a1["liabilities"]
+                elif future_anchors.empty:
+                    a0 = past_anchors.iloc[-1]
+                    liq = a0["liquid_cash"]
+                    fin = a0["financial_investments"]
+                    re = a0["real_estate"]
+                    phys = a0["physical_assets"]
+                    pens = a0["pension_plans"]
+                    liab = a0["liabilities"]
+                else:
+                    a0 = past_anchors.iloc[-1]
+                    a1 = future_anchors.iloc[0]
+                    if a0["date"] == a1["date"]:
+                        liq = a0["liquid_cash"]
+                        fin = a0["financial_investments"]
+                        re = a0["real_estate"]
+                        phys = a0["physical_assets"]
+                        pens = a0["pension_plans"]
+                        liab = a0["liabilities"]
+                    else:
+                        total_days = max(1, (a1["date"] - a0["date"]).days)
+                        elapsed_days = (d - a0["date"]).days
+                        alpha = min(1.0, max(0.0, elapsed_days / total_days))
+
+                        # Liquidità guidata dai flussi effettivi di cassa
+                        p_a0 = pd.Period(a0["date"], freq="M")
+                        p_d = pd.Period(d, freq="M")
+                        p_a1 = pd.Period(a1["date"], freq="M")
+
+                        liq = None
+                        if not monthly_savings.empty:
+                            try:
+                                cf_interval = monthly_savings.loc[p_a0:p_a1]
+                                if len(cf_interval) > 1:
+                                    cf_to_d = (
+                                        float(monthly_savings.loc[p_a0:p_d].iloc[1:].sum())
+                                        if p_d > p_a0
+                                        else 0.0
+                                    )
+                                    tot_cf_span = float(monthly_savings.loc[p_a0:p_a1].iloc[1:].sum())
+                                    diff = (a1["liquid_cash"] - a0["liquid_cash"]) - tot_cf_span
+                                    liq = max(0.0, a0["liquid_cash"] + cf_to_d + (alpha * diff))
+                            except Exception:
+                                liq = None
+
+                        if liq is None:
+                            liq = max(0.0, (1.0 - alpha) * a0["liquid_cash"] + alpha * a1["liquid_cash"])
+
+                        fin = max(0.0, (1.0 - alpha) * a0["financial_investments"] + alpha * a1["financial_investments"])
+                        re = max(0.0, (1.0 - alpha) * a0["real_estate"] + alpha * a1["real_estate"])
+                        phys = max(0.0, (1.0 - alpha) * a0["physical_assets"] + alpha * a1["physical_assets"])
+                        pens = max(0.0, (1.0 - alpha) * a0["pension_plans"] + alpha * a1["pension_plans"])
+                        liab = max(0.0, (1.0 - alpha) * a0["liabilities"] + alpha * a1["liabilities"])
+
+                nw = max(0.0, liq + fin + re + phys + pens - liab)
+                dates.append(pd.to_datetime(d))
+                nw_vals.append(round(nw, 2))
+                liquid_vals.append(round(liq, 2))
+                invest_vals.append(round(fin, 2))
+                re_vals.append(round(re, 2))
+                physical_vals.append(round(phys, 2))
+                pension_vals.append(round(pens, 2))
+                illiquid_vals.append(round(phys + pens, 2))
+                liab_vals.append(round(liab, 2))
+        else:
+            multipliers = _generate_synthetic_multipliers(timeframe_months)
+            n_points = len(multipliers)
+
+            for i, mult in enumerate(multipliers[:-1]):
+                m_offset = (n_points - 1) - i
+                m_date = (today.replace(day=1) - pd.DateOffset(months=m_offset)).date()
+                dates.append(pd.to_datetime(m_date))
+                nw_vals.append(round(cur_nw * mult, 2))
+                liquid_vals.append(round(cur_liquid * max(0.4, 0.85 + (mult * 0.15) + (np.sin(i * 0.8) * 0.02)), 2))
+                invest_vals.append(round(cur_invest * max(0.4, mult * 1.02), 2))
+                re_vals.append(round(cur_re, 2))
+                p_val = round(cur_physical * max(0.5, 0.90 + (mult * 0.10)), 2)
+                pe_val = round(cur_pension * max(0.4, 0.88 + (mult * 0.12)), 2)
+                physical_vals.append(p_val)
+                pension_vals.append(pe_val)
+                illiquid_vals.append(round(p_val + pe_val, 2))
+                liab_vals.append(round(cur_liab * max(0.4, 1.0 + (m_offset * 0.004)), 2))
+
+            # Punto odierno live consolidato
+            dates.append(pd.to_datetime(today))
+            nw_vals.append(round(cur_nw, 2))
+            liquid_vals.append(round(cur_liquid, 2))
+            invest_vals.append(round(cur_invest, 2))
             re_vals.append(round(cur_re, 2))
-            p_val = round(cur_physical * max(0.5, 0.90 + (mult * 0.10)), 2)
-            pe_val = round(cur_pension * max(0.4, 0.88 + (mult * 0.12)), 2)
-            physical_vals.append(p_val)
-            pension_vals.append(pe_val)
-            illiquid_vals.append(round(p_val + pe_val, 2))
-            liab_vals.append(round(cur_liab * max(0.4, 1.0 + (m_offset * 0.004)), 2))
-
-        # Punto odierno live consolidato
-        dates.append(today)
-        nw_vals.append(round(cur_nw, 2))
-        liquid_vals.append(round(cur_liquid, 2))
-        invest_vals.append(round(cur_invest, 2))
-        re_vals.append(round(cur_re, 2))
-        physical_vals.append(round(cur_physical, 2))
-        pension_vals.append(round(cur_pension, 2))
-        illiquid_vals.append(round(cur_physical + cur_pension, 2))
-        liab_vals.append(round(cur_liab, 2))
+            physical_vals.append(round(cur_physical, 2))
+            pension_vals.append(round(cur_pension, 2))
+            illiquid_vals.append(round(cur_physical + cur_pension, 2))
+            liab_vals.append(round(cur_liab, 2))
 
     df_hist = (
         pd.DataFrame(
@@ -262,6 +446,29 @@ def compute_wealth_growth_attribution(
     n_pts = len(df_hist)
     d_tot_avg = max(50.0, total_growth / max(1, n_pts - 1)) if total_growth > 0 else 500.0
 
+    df_cf = get_cashflow_records(engine, portfolio_id=portfolio_id)
+    monthly_cf_savings = pd.Series(dtype=float)
+    if df_cf is not None and not df_cf.empty:
+        df_cf_copy = df_cf.copy()
+        df_cf_copy["tx_date"] = pd.to_datetime(df_cf_copy["tx_date"], errors="coerce")
+        df_cf_clean = (
+            df_cf_copy[df_cf_copy["direction"].isin(["inflow", "outflow"])].dropna(subset=["tx_date"]).copy()
+        )
+        if "category" in df_cf_clean.columns:
+            df_cf_clean = df_cf_clean[
+                ~df_cf_clean["category"]
+                .astype(str)
+                .str.lower()
+                .str.contains("giroconto|trasferimento|transfer", na=False)
+            ]
+        if not df_cf_clean.empty:
+            m_net = (
+                df_cf_clean.groupby([df_cf_clean["tx_date"].dt.to_period("M"), "direction"])["amount"]
+                .sum()
+                .unstack(fill_value=0.0)
+            )
+            monthly_cf_savings = m_net.get("inflow", 0.0) - m_net.get("outflow", 0.0)
+
     monthly_savings = []
     monthly_market_pnl = []
     monthly_other_delta = []
@@ -273,9 +480,14 @@ def compute_wealth_growth_attribution(
             monthly_other_delta.append(0.0)
         else:
             d_tot = float(delta_nw.iloc[i])
-            sav_factor = 0.62 + (np.sin(i * 0.75) * 0.15)
-            sav = round(max(0.0, d_tot_avg * sav_factor), 2)
             other = round(float(delta_re.iloc[i] + delta_illiquid.iloc[i] - delta_liab.iloc[i]), 2)
+            cur_dt = df_hist.index[i]
+            cur_period = pd.Period(cur_dt, freq="M")
+            if not monthly_cf_savings.empty and cur_period in monthly_cf_savings.index:
+                sav = round(float(monthly_cf_savings.loc[cur_period]), 2)
+            else:
+                sav_factor = 0.62 + (np.sin(i * 0.75) * 0.15)
+                sav = round(max(0.0, d_tot_avg * sav_factor), 2)
             mkt_pnl = round(d_tot - sav - other, 2)
 
             monthly_savings.append(sav)
