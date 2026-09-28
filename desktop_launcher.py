@@ -131,6 +131,7 @@ def main():
             port = find_free_port()
             print(f"[ARGUS Desktop] Tentativo {attempt}/3: Avvio server su http://127.0.0.1:{port}...")
             
+            watcher_type = "none" if getattr(sys, 'frozen', False) else "auto"
             cmd = [
                 python_exe, "-m", "streamlit", "run", entry_point,
                 f"--server.port={port}",
@@ -139,7 +140,7 @@ def main():
                 "--server.enableCORS=false",
                 "--server.enableXsrfProtection=false",
                 "--server.maxMessageSize=500",
-                "--server.fileWatcherType=none",
+                f"--server.fileWatcherType={watcher_type}",
                 "--global.developmentMode=false",
                 "--browser.gatherUsageStats=false"
             ]
