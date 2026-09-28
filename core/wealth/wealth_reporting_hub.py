@@ -125,10 +125,9 @@ def render_wealth_reporting_and_exports_hub(
                 unsafe_allow_html=True,
             )
             try:
-                pdf_qtr = _get_cached_quarterly_pdf(engine, pid=portfolio_id, client_name=prof_name, quarter="Q1 2026")
                 st.download_button(
                     label="📥 Scarica Quarterly Report PDF",
-                    data=pdf_qtr,
+                    data=lambda: _get_cached_quarterly_pdf(engine, pid=portfolio_id, client_name=prof_name, quarter="Q1 2026"),
                     file_name=f"argus_quarterly_dossier_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -153,10 +152,9 @@ def render_wealth_reporting_and_exports_hub(
                 unsafe_allow_html=True,
             )
             try:
-                pdf_pitch = _get_cached_pitchbook_pdf(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Pitchbook PDF",
-                    data=pdf_pitch,
+                    data=lambda: _get_cached_pitchbook_pdf(engine, pid=portfolio_id),
                     file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -184,10 +182,9 @@ def render_wealth_reporting_and_exports_hub(
                 unsafe_allow_html=True,
             )
             try:
-                pdf_pbs = _get_cached_balance_sheet_pdf(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Bilancio Personale PDF",
-                    data=pdf_pbs,
+                    data=lambda: _get_cached_balance_sheet_pdf(engine, pid=portfolio_id),
                     file_name=f"argus_bilancio_personale_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -211,10 +208,9 @@ def render_wealth_reporting_and_exports_hub(
                 unsafe_allow_html=True,
             )
             try:
-                pdf_ts = _get_cached_tear_sheet_pdf(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Tear-Sheet PDF",
-                    data=pdf_ts,
+                    data=lambda: _get_cached_tear_sheet_pdf(engine, pid=portfolio_id),
                     file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -245,10 +241,9 @@ def render_wealth_reporting_and_exports_hub(
                 unsafe_allow_html=True,
             )
             try:
-                xl_bytes = _get_cached_master_excel(engine, pid=portfolio_id)
                 st.download_button(
                     label="📥 Scarica Master Excel (.xlsx)",
-                    data=xl_bytes,
+                    data=lambda: _get_cached_master_excel(engine, pid=portfolio_id),
                     file_name=f"argus_wealth_master_{prof_slug}_{date_slug}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,
@@ -371,10 +366,9 @@ def render_wealth_reporting_and_exports_hub(
                 unsafe_allow_html=True,
             )
             try:
-                vb = generate_ai_voice_executive_briefing(engine, portfolio_id=portfolio_id, client_name=prof_name)
                 st.download_button(
                     label="📥 Scarica Script Audio (.txt)",
-                    data=vb["full_text_transcript"],
+                    data=lambda: generate_ai_voice_executive_briefing(engine, portfolio_id=portfolio_id, client_name=prof_name)["full_text_transcript"],
                     file_name=f"argus_voice_script_{prof_slug}_{date_slug}.txt",
                     mime="text/plain",
                     use_container_width=True,
