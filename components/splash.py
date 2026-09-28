@@ -955,6 +955,11 @@ def render_splash_screen(
                 del st.query_params["splash"]
         except Exception:
             pass
+        try:
+            from core.sidebar import switch_to_page
+            switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+        except Exception:
+            pass
 
     # Schede Bento Grid e Pulsanti di Accesso Istituzionale Fusi Insieme
     col_risk, col_wealth = st.columns(2)
@@ -1006,7 +1011,8 @@ def render_splash_screen(
         st.markdown(wealth_card_html, unsafe_allow_html=True)
         if st.button("💎 ENTRA NELLA SUITE WEALTH ADVISORY →", key="btn_splash_wealth", use_container_width=True, on_click=_on_click_enter_wealth):
             _on_click_enter_wealth()
-            st.switch_page("pages/12_🎛️_Wealth_Control_Room.py")
+            from core.sidebar import switch_to_page
+            switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
 
     return True
 
