@@ -218,12 +218,13 @@ NAV_MODULES_WEALTH = [
         "has_subtabs": True,
         "tab_key": "wealth_nw_active_tab",
         "subtabs": [
-            {"label": "🌐 Bilancio & Allocazione", "target": "🏛️ Bilancio & Allocazione"},
-            {"label": "📜 Stato Patrimoniale", "target": "📋 Stato Patrimoniale & Conti"},
-            {"label": "⏳ Wealth Temporal", "target": "📊 Wealth Temporal Desk"},
-            {"label": "🏛️ Family Office", "target": "🏢 Family Office & Holding"},
+            {"label": "📊 Bilancio & Allocazione", "target": "📊 Bilancio & Allocazione"},
+            {"label": "📑 Bilancio Personale", "target": "📑 Bilancio Personale & Stato Patrimoniale"},
+            {"label": "⏳ Wealth Temporal", "target": "⏳ Wealth Temporal Desk"},
+            {"label": "🏛️ Family Office", "target": "🏛️ Family Office & Holding"},
             {"label": "💱 Rischio FX & Brinson", "target": "💱 Rischio FX & Attribuzione Brinson"},
             {"label": "🌪️ Stress Testing", "target": "🌪️ Global Wealth Stress-Testing"},
+            {"label": "💎 Prodotti Strutturati", "target": "💎 Prodotti Strutturati & PRIIPs/SFDR"},
         ],
     },
     {

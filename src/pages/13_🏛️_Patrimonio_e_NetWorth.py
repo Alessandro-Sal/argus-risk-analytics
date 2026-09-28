@@ -373,24 +373,24 @@ if st.session_state.get("wealth_boardroom_mode", False):
     st.divider()
     col_b_act1, col_b_act2, col_b_act3 = st.columns([1.5, 1.5, 1.0])
     with col_b_act1:
-        pitchbook_pdf = _get_cached_pitchbook_pdf(engine, current_pid)
         date_slug = datetime.now().strftime('%Y%m%d')
         st.download_button(
             label="📥 Scarica Advisory Pitchbook PDF (300 DPI)",
-            data=pitchbook_pdf,
+            data=lambda: _get_cached_pitchbook_pdf(engine, current_pid),
             file_name=f"argus_boardroom_dossier_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            type="primary"
+            type="primary",
+            key="dl_pitchbook_pdf_btn_boardroom",
         )
     with col_b_act2:
-        tear_sheet_pdf = _get_cached_tear_sheet_pdf(engine, current_pid)
         st.download_button(
             label="📑 Scarica Executive Tear Sheet (PDF)",
-            data=tear_sheet_pdf,
+            data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid),
             file_name=f"argus_tear_sheet_{date_slug}.pdf",
             mime="application/pdf",
-            use_container_width=True
+            use_container_width=True,
+            key="dl_tearsheet_pdf_btn_boardroom",
         )
     with col_b_act3:
         if st.button("❌ Esci da Boardroom Mode", use_container_width=True):
@@ -421,24 +421,21 @@ with r2_c3:
 st.divider()
 
 # ── MACRO-TAB DEL PATRIMONIO PER MASSIMA EFFICIENZA & CHIAREZZA ───
-main_tab_alloc, main_tab_sheet, main_tab_temporal, main_tab_fo, main_tab_fx, main_tab_stress, main_tab_struct = st.tabs([
+active_nw_tab = render_segmented_tabs([
     "📊 Bilancio & Allocazione",
     "📑 Bilancio Personale & Stato Patrimoniale",
     "⏳ Wealth Temporal Desk",
     "🏛️ Family Office & Holding",
     "💱 Rischio FX & Attribuzione Brinson",
     "🌪️ Global Wealth Stress-Testing",
-    "💎 Prodotti Strutturati & PRIIPs/SFDR"
-])
+    "💎 Prodotti Strutturati & PRIIPs/SFDR",
+], key="wealth_nw_active_tab")
 
 # ══════════════════════════════════════════════════════════════
 # TAB 1: BILANCIO, ALLOCAZIONE & HEALTH SCORE
 # ══════════════════════════════════════════════════════════════
-with main_tab_alloc:
+if active_nw_tab == "📊 Bilancio & Allocazione":
     # ── EXECUTIVE TEAR SHEET & ADVISORY PITCHBOOK TOOLBAR ──────────
-    pitchbook_pdf = _get_cached_pitchbook_pdf(engine, current_pid)
-    tear_sheet_pdf = _get_cached_tear_sheet_pdf(engine, current_pid)
-    tear_sheet_html = _get_cached_pitchbook_html(engine, current_pid)
     date_slug = datetime.now().strftime('%Y%m%d')
     prof_slug = str(prof_map.get(current_pid, 'portfolio')).lower().replace(' ', '_')
 
@@ -462,27 +459,30 @@ with main_tab_alloc:
     with ts_c1:
         st.download_button(
             label="📥 Scarica Pitchbook PDF",
-            data=pitchbook_pdf,
+            data=lambda: _get_cached_pitchbook_pdf(engine, current_pid),
             file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            type="primary"
+            type="primary",
+            key="dl_pitchbook_pdf_btn_tab1",
         )
     with ts_c2:
         st.download_button(
             label="📑 Tear-Sheet Sintetica",
-            data=tear_sheet_pdf,
+            data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid),
             file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
             mime="application/pdf",
-            use_container_width=True
+            use_container_width=True,
+            key="dl_tearsheet_pdf_btn_tab1",
         )
     with ts_c3:
         st.download_button(
             label="🌐 HTML",
-            data=tear_sheet_html.encode("utf-8"),
+            data=lambda: _get_cached_pitchbook_html(engine, current_pid).encode("utf-8"),
             file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.html",
             mime="text/html",
-            use_container_width=True
+            use_container_width=True,
+            key="dl_pitchbook_html_btn_tab1",
         )
     with ts_c4:
         show_ts_preview = st.toggle("📑 Anteprima", value=False, key="toggle_ts_preview_p13")
@@ -491,6 +491,7 @@ with main_tab_alloc:
             render_wealth_methodology_modal()
 
     if show_ts_preview:
+        tear_sheet_html = _get_cached_pitchbook_html(engine, current_pid)
         st.components.v1.html(tear_sheet_html, height=600, scrolling=True)
 
     from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
@@ -1145,7 +1146,7 @@ with main_tab_alloc:
 # ══════════════════════════════════════════════════════════════
 # TAB 2: BILANCIO PERSONALE & STATO PATRIMONIALE ISTITUZIONALE
 # ══════════════════════════════════════════════════════════════
-with main_tab_sheet:
+elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ── SONDAGGIO ESERCIZI FISCALI DISPONIBILI ────────────────
     df_cf_probe = get_cashflow_records(engine, portfolio_id=current_pid)
     curr_yr = datetime.now().year
@@ -1235,9 +1236,6 @@ with main_tab_sheet:
     """, unsafe_allow_html=True)
 
     # ── EXECUTIVE PERSONAL BALANCE SHEET TOOLBAR ──────────────────
-    pbs_pdf = _get_cached_balance_sheet_pdf(engine, current_pid, selected_pbs_year)
-    pbs_tearsheet_pdf = _get_cached_balance_sheet_tearsheet_pdf(engine, current_pid, selected_pbs_year)
-    pbs_html = _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year)
     pbs_date_slug = f"{selected_pbs_year}" if is_past else datetime.now().strftime('%Y%m%d')
     pbs_prof_slug = str(prof_map.get(current_pid, 'portfolio')).lower().replace(' ', '_')
 
@@ -1259,7 +1257,7 @@ with main_tab_sheet:
     with pb_c1:
         st.download_button(
             label=f"📥 Scarica Bilancio PDF ({selected_pbs_year})",
-            data=pbs_pdf,
+            data=lambda: _get_cached_balance_sheet_pdf(engine, current_pid, selected_pbs_year),
             file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -1269,7 +1267,7 @@ with main_tab_sheet:
     with pb_c2:
         st.download_button(
             label=f"📑 Tear-Sheet Contabile ({selected_pbs_year})",
-            data=pbs_tearsheet_pdf,
+            data=lambda: _get_cached_balance_sheet_tearsheet_pdf(engine, current_pid, selected_pbs_year),
             file_name=f"argus_tearsheet_contabile_{pbs_prof_slug}_{selected_pbs_year}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -1278,7 +1276,7 @@ with main_tab_sheet:
     with pb_c3:
         st.download_button(
             label="🌐 HTML",
-            data=pbs_html.encode("utf-8"),
+            data=lambda: _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year).encode("utf-8"),
             file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.html",
             mime="text/html",
             use_container_width=True,
@@ -1291,6 +1289,7 @@ with main_tab_sheet:
             render_balance_sheet_methodology_modal()
 
     if show_pbs_preview:
+        pbs_html = _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year)
         st.components.v1.html(pbs_html, height=620, scrolling=True)
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
@@ -2007,7 +2006,7 @@ with main_tab_sheet:
 # TAB 3: WEALTH TEMPORAL DESK (DINAMICHE TEMPORALI)
 # ══════════════════════════════════════════════════════════════
 
-with main_tab_temporal:
+elif active_nw_tab == "⏳ Wealth Temporal Desk":
     # ── SEZIONE: ANALISI TEMPORALE & DINAMICA STORICA DEL PATRIMONIO ────
     section("📊 Analisi Temporale & Dinamica Storica del Patrimonio (Wealth Temporal Desk)")
     st.caption("Evoluzione di lungo termine del Net Worth, scomposizione della crescita (Risparmio vs Mercato), benchmark 60/40, matrici mensili e drawdown.")
@@ -2453,9 +2452,7 @@ with main_tab_temporal:
 # ══════════════════════════════════════════════════════════════
 # TAB 4: FAMILY OFFICE & STRUTTURE GIURIDICHE
 # ══════════════════════════════════════════════════════════════
-# TAB 4: FAMILY OFFICE & STRUTTURE GIURIDICHE
-# ══════════════════════════════════════════════════════════════
-with main_tab_fo:
+elif active_nw_tab == "🏛️ Family Office & Holding":
     # ── FAMILY OFFICE MULTI-ENTITY & HOLDING CONSOLIDATOR ───────
     section("🏢 Family Office Multi-Entity & Holding Consolidator")
     st.caption("Consolidamento patrimoniale tra diverse entità giuridiche del nucleo familiare (Persona Fisica, Holding SRL, Società Semplice, Trust) con elisione automatica delle partite infragruppo (finanziamenti soci) e analisi convenienza fiscale PEX (1.2% vs 26%).")
@@ -2511,7 +2508,7 @@ with main_tab_fo:
 # ══════════════════════════════════════════════════════════════
 # TAB 5: RISCHIO FX & ATTRIBUZIONE BRINSON MULTI-ASSET
 # ══════════════════════════════════════════════════════════════
-with main_tab_fx:
+elif active_nw_tab == "💱 Rischio FX & Attribuzione Brinson":
     # ── RISCHIO DI CAMBIO & FX FORWARD HEDGING OVERLAY ───────────
     section("💱 Rischio di Cambio & FX Forward Hedging Overlay")
     st.caption("Mappatura dell'esposizione valutaria estera (USD, GBP, CHF, JPY), stima del costo dei Forward Points (Covered Interest Parity) e simulazione di strategie di copertura a confronto.")
@@ -2584,7 +2581,7 @@ with main_tab_fx:
 # ══════════════════════════════════════════════════════════════
 # TAB 6: GLOBAL WEALTH STRESS-TESTING & RESILIENZA
 # ══════════════════════════════════════════════════════════════
-with main_tab_stress:
+elif active_nw_tab == "🌪️ Global Wealth Stress-Testing":
     from core.wealth.wealth_stress_engine import (
         PRESET_STRESS_SCENARIOS,
         create_liquidity_squeeze_timeline_chart,
@@ -2766,168 +2763,168 @@ with main_tab_stress:
 
 
 
-# ── V9.12.0: FAMILY OFFICE GENERATIONAL SUCCESSION OPTIMIZER ────────
-st.markdown("---")
-st.markdown("#### 🌳 Ottimizzatore Successorio Generazionale Multi-Veicolo (Patto di Famiglia vs Trust vs Polizze)")
-st.caption("Confronto probabilistico a 30 anni tra Regime Ordinario, Holding Familiare (PEX 95% Art. 87 TUIR / Patto ex Art. 768-bis c.c.), Trust Fiduciario (AdE 34/E/2022) e Polizze Vita PPLI (Art. 12 TUS).")
+    # ── V9.12.0: FAMILY OFFICE GENERATIONAL SUCCESSION OPTIMIZER ────────
+    st.markdown("---")
+    st.markdown("#### 🌳 Ottimizzatore Successorio Generazionale Multi-Veicolo (Patto di Famiglia vs Trust vs Polizze)")
+    st.caption("Confronto probabilistico a 30 anni tra Regime Ordinario, Holding Familiare (PEX 95% Art. 87 TUIR / Patto ex Art. 768-bis c.c.), Trust Fiduciario (AdE 34/E/2022) e Polizze Vita PPLI (Art. 12 TUS).")
 
-from core.wealth.succession_optimizer import compute_family_succession_optimization
+    from core.wealth.succession_optimizer import compute_family_succession_optimization
 
-with st.expander("⚙️ Configura Asse Ereditario & Profilo Familiare", expanded=False):
-    f_c1, f_c2 = st.columns(2)
-    with f_c1:
-        succ_liq = st.number_input("Liquidita & Titoli Finanziari (€):", min_value=0.0, value=5000000.0, step=500000.0)
-        succ_biz = st.number_input("Partecipazione Azienda / Holding (€):", min_value=0.0, value=10000000.0, step=1000000.0)
-    with f_c2:
-        succ_re = st.number_input("Patrimonio Immobiliare Privato (€):", min_value=0.0, value=4000000.0, step=500000.0)
-        succ_heirs = st.number_input("Numero di Eredi / Figli:", min_value=1, max_value=6, value=2, step=1)
+    with st.expander("⚙️ Configura Asse Ereditario & Profilo Familiare", expanded=False):
+        f_c1, f_c2 = st.columns(2)
+        with f_c1:
+            succ_liq = st.number_input("Liquidita & Titoli Finanziari (€):", min_value=0.0, value=5000000.0, step=500000.0)
+            succ_biz = st.number_input("Partecipazione Azienda / Holding (€):", min_value=0.0, value=10000000.0, step=1000000.0)
+        with f_c2:
+            succ_re = st.number_input("Patrimonio Immobiliare Privato (€):", min_value=0.0, value=4000000.0, step=500000.0)
+            succ_heirs = st.number_input("Numero di Eredi / Figli:", min_value=1, max_value=6, value=2, step=1)
 
-succ_res = compute_family_succession_optimization(
-    liquid_investments_eur=succ_liq,
-    operating_business_equity_eur=succ_biz,
-    real_estate_properties_eur=succ_re,
-    num_children=succ_heirs,
-)
+    succ_res = compute_family_succession_optimization(
+        liquid_investments_eur=succ_liq,
+        operating_business_equity_eur=succ_biz,
+        real_estate_properties_eur=succ_re,
+        num_children=succ_heirs,
+    )
 
-succ_k1, succ_k2, succ_k3 = st.columns(3)
-with succ_k1:
-    metric_card("Patrimonio Iniziale", fmt_eur(succ_res["initial_estate_total_eur"]), delta="G1 Fondatore", delta_color="normal")
-with succ_k2:
-    metric_card("Architettura Raccomandata", succ_res["recommended_strategy"], delta="Ottimizzazione Fiscale", delta_color="normal")
-with succ_k3:
-    best_tax_alpha = succ_res["strategies"][succ_res["recommended_strategy"]]["tax_alpha_eur"]
-    metric_card("Tax Alpha Generazionale", fmt_eur(best_tax_alpha), delta="Risparmio Fiscale 30Y", delta_color="normal")
+    succ_k1, succ_k2, succ_k3 = st.columns(3)
+    with succ_k1:
+        metric_card("Patrimonio Iniziale", fmt_eur(succ_res["initial_estate_total_eur"]), delta="G1 Fondatore", delta_color="normal")
+    with succ_k2:
+        metric_card("Architettura Raccomandata", succ_res["recommended_strategy"], delta="Ottimizzazione Fiscale", delta_color="normal")
+    with succ_k3:
+        best_tax_alpha = succ_res["strategies"][succ_res["recommended_strategy"]]["tax_alpha_eur"]
+        metric_card("Tax Alpha Generazionale", fmt_eur(best_tax_alpha), delta="Risparmio Fiscale 30Y", delta_color="normal")
 
-st.markdown("##### 📊 Confronto Architetture di Protezione & Successione")
-st.dataframe(pd.DataFrame(succ_res["summary_table"]), use_container_width=True, hide_index=True)
+    st.markdown("##### 📊 Confronto Architetture di Protezione & Successione")
+    st.dataframe(pd.DataFrame(succ_res["summary_table"]), use_container_width=True, hide_index=True)
 
-# ── V9.13.0: PRIVATE MARKETS PACING & DE-SMOOTHING (YALE ENDOWMENT) ──
-st.markdown("---")
-st.markdown("#### 🏛️ Private Markets Cash Flow Pacing (Takahashi-Alexander) & De-smoothing Econometrico")
-st.caption("Modellazione J-Curve a 10 anni (Chiamate, Distribuzioni, NAV) secondo Takahashi-Alexander (2001) e correzione econometrica di Geltner-Fisher per la reale volatilita non quotata.")
+    # ── V9.13.0: PRIVATE MARKETS PACING & DE-SMOOTHING (YALE ENDOWMENT) ──
+    st.markdown("---")
+    st.markdown("#### 🏛️ Private Markets Cash Flow Pacing (Takahashi-Alexander) & De-smoothing Econometrico")
+    st.caption("Modellazione J-Curve a 10 anni (Chiamate, Distribuzioni, NAV) secondo Takahashi-Alexander (2001) e correzione econometrica di Geltner-Fisher per la reale volatilita non quotata.")
 
-from core.ux_institutional_hub import render_sr117_audit_drawer, style_institutional_chart
-from core.wealth.private_markets_engine import compute_private_markets_analytics
+    from core.ux_institutional_hub import render_sr117_audit_drawer, style_institutional_chart
+    from core.wealth.private_markets_engine import compute_private_markets_analytics
 
-with st.expander("⚙️ Parametri Impegno Fondo Private Equity / Venture Capital", expanded=True):
-    pe_c1, pe_c2, pe_c3 = st.columns(3)
-    with pe_c1:
-        pe_commit = st.number_input("Impegno Totale di Capitale (Commitment €):", min_value=100_000.0, value=5_000_000.0, step=500_000.0, key="pe_comm_in")
-    with pe_c2:
-        pe_life = st.slider("Durata Vita del Fondo (Anni):", min_value=5, max_value=15, value=10, step=1, key="pe_life_in")
-    with pe_c3:
-        pe_growth = st.slider("Tasso di Crescita Atteso Asset (% annuo):", min_value=2.0, max_value=25.0, value=10.0, step=0.5, key="pe_g_in") / 100.0
+    with st.expander("⚙️ Parametri Impegno Fondo Private Equity / Venture Capital", expanded=True):
+        pe_c1, pe_c2, pe_c3 = st.columns(3)
+        with pe_c1:
+            pe_commit = st.number_input("Impegno Totale di Capitale (Commitment €):", min_value=100_000.0, value=5_000_000.0, step=500_000.0, key="pe_comm_in")
+        with pe_c2:
+            pe_life = st.slider("Durata Vita del Fondo (Anni):", min_value=5, max_value=15, value=10, step=1, key="pe_life_in")
+        with pe_c3:
+            pe_growth = st.slider("Tasso di Crescita Atteso Asset (% annuo):", min_value=2.0, max_value=25.0, value=10.0, step=0.5, key="pe_g_in") / 100.0
 
-# Esecuzione simulazione pacing
-pe_res = compute_private_markets_analytics(
-    commitment_eur=pe_commit,
-    fund_life_years=pe_life,
-    growth_rate=pe_growth,
-    observed_returns=[0.02, 0.025, 0.018, 0.022, 0.031, 0.015, 0.028, 0.019],
-)
+    # Esecuzione simulazione pacing
+    pe_res = compute_private_markets_analytics(
+        commitment_eur=pe_commit,
+        fund_life_years=pe_life,
+        growth_rate=pe_growth,
+        observed_returns=[0.02, 0.025, 0.018, 0.022, 0.031, 0.015, 0.028, 0.019],
+    )
 
-pek1, pek2, pek3, pek4 = st.columns(4)
-with pek1:
-    metric_card("Net IRR Atteso", f"{pe_res['net_irr_pct']:.2f}%", delta="Rendimento Annuo Interno", delta_color="normal")
-with pek2:
-    metric_card("Multiplo TVPI", f"{pe_res['tvpi']:.2f}x", delta=f"DPI: {pe_res['dpi']:.2f}x", delta_color="normal")
-with pek3:
-    metric_card("Picco Fabbisogno Capitale", fmt_eur(pe_res["peak_capital_deficit_eur"]), delta=f"Trough Anno {pe_res['j_curve_trough_year']}", delta_color="inverse")
-with pek4:
-    metric_card("PME Kaplan-Schoar", f"{pe_res['pme_kaplan_schoar']:.2f}x", delta=f"Direct Alpha: {pe_res['direct_alpha_pct']:+.2f}%", delta_color="normal")
+    pek1, pek2, pek3, pek4 = st.columns(4)
+    with pek1:
+        metric_card("Net IRR Atteso", f"{pe_res['net_irr_pct']:.2f}%", delta="Rendimento Annuo Interno", delta_color="normal")
+    with pek2:
+        metric_card("Multiplo TVPI", f"{pe_res['tvpi']:.2f}x", delta=f"DPI: {pe_res['dpi']:.2f}x", delta_color="normal")
+    with pek3:
+        metric_card("Picco Fabbisogno Capitale", fmt_eur(pe_res["peak_capital_deficit_eur"]), delta=f"Trough Anno {pe_res['j_curve_trough_year']}", delta_color="inverse")
+    with pek4:
+        metric_card("PME Kaplan-Schoar", f"{pe_res['pme_kaplan_schoar']:.2f}x", delta=f"Direct Alpha: {pe_res['direct_alpha_pct']:+.2f}%", delta_color="normal")
 
-st.markdown("##### 📈 Profilo Temporale J-Curve: Flussi di Cassa & Valutazione NAV (€)")
-sched_df = pd.DataFrame(pe_res.get("schedule", []))
-if not sched_df.empty:
-    if "year" in sched_df.columns and "Anno" not in sched_df.columns:
-        sched_df["Anno"] = sched_df["year"]
-    if "capital_call_eur" in sched_df.columns and "Capital Call (€)" not in sched_df.columns:
-        sched_df["Capital Call (€)"] = sched_df["capital_call_eur"]
-    if "distribution_eur" in sched_df.columns and "Distribuzioni (€)" not in sched_df.columns:
-        sched_df["Distribuzioni (€)"] = sched_df["distribution_eur"]
-    if "nav_ending_eur" in sched_df.columns and "NAV (€)" not in sched_df.columns:
-        sched_df["NAV (€)"] = sched_df["nav_ending_eur"]
-    if "net_cash_flow_eur" in sched_df.columns and "Flusso Netto (€)" not in sched_df.columns:
-        sched_df["Flusso Netto (€)"] = sched_df["net_cash_flow_eur"]
-    if "cumulative_paid_in_eur" in sched_df.columns and "Capitale Richiamato (€)" not in sched_df.columns:
-        sched_df["Capitale Richiamato (€)"] = sched_df["cumulative_paid_in_eur"]
-    if "cumulative_distributed_eur" in sched_df.columns and "Distribuzioni Cumulate (€)" not in sched_df.columns:
-        sched_df["Distribuzioni Cumulate (€)"] = sched_df["cumulative_distributed_eur"]
-    if "dpi" in sched_df.columns and "DPI" not in sched_df.columns:
-        sched_df["DPI"] = sched_df["dpi"]
-    if "rvpi" in sched_df.columns and "RVPI" not in sched_df.columns:
-        sched_df["RVPI"] = sched_df["rvpi"]
-    if "tvpi" in sched_df.columns and "TVPI" not in sched_df.columns:
-        sched_df["TVPI"] = sched_df["tvpi"]
+    st.markdown("##### 📈 Profilo Temporale J-Curve: Flussi di Cassa & Valutazione NAV (€)")
+    sched_df = pd.DataFrame(pe_res.get("schedule", []))
+    if not sched_df.empty:
+        if "year" in sched_df.columns and "Anno" not in sched_df.columns:
+            sched_df["Anno"] = sched_df["year"]
+        if "capital_call_eur" in sched_df.columns and "Capital Call (€)" not in sched_df.columns:
+            sched_df["Capital Call (€)"] = sched_df["capital_call_eur"]
+        if "distribution_eur" in sched_df.columns and "Distribuzioni (€)" not in sched_df.columns:
+            sched_df["Distribuzioni (€)"] = sched_df["distribution_eur"]
+        if "nav_ending_eur" in sched_df.columns and "NAV (€)" not in sched_df.columns:
+            sched_df["NAV (€)"] = sched_df["nav_ending_eur"]
+        if "net_cash_flow_eur" in sched_df.columns and "Flusso Netto (€)" not in sched_df.columns:
+            sched_df["Flusso Netto (€)"] = sched_df["net_cash_flow_eur"]
+        if "cumulative_paid_in_eur" in sched_df.columns and "Capitale Richiamato (€)" not in sched_df.columns:
+            sched_df["Capitale Richiamato (€)"] = sched_df["cumulative_paid_in_eur"]
+        if "cumulative_distributed_eur" in sched_df.columns and "Distribuzioni Cumulate (€)" not in sched_df.columns:
+            sched_df["Distribuzioni Cumulate (€)"] = sched_df["cumulative_distributed_eur"]
+        if "dpi" in sched_df.columns and "DPI" not in sched_df.columns:
+            sched_df["DPI"] = sched_df["dpi"]
+        if "rvpi" in sched_df.columns and "RVPI" not in sched_df.columns:
+            sched_df["RVPI"] = sched_df["rvpi"]
+        if "tvpi" in sched_df.columns and "TVPI" not in sched_df.columns:
+            sched_df["TVPI"] = sched_df["tvpi"]
 
-fig_pe = go.Figure()
-if not sched_df.empty and "Anno" in sched_df.columns:
-    fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df.get("Capital Call (€)", sched_df.get("capital_call_eur", 0)), name="Capital Calls (Versamenti)", marker_color="#f87171"))
-    fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df.get("Distribuzioni (€)", sched_df.get("distribution_eur", 0)), name="Distribuzioni (Rimborsi)", marker_color="#34d399"))
-    fig_pe.add_trace(go.Scatter(x=sched_df["Anno"], y=sched_df.get("NAV (€)", sched_df.get("nav_ending_eur", 0)), name="NAV Fondo (Valore Residuo)", mode="lines+markers", line=dict(color="#38bdf8", width=3)))
+    fig_pe = go.Figure()
+    if not sched_df.empty and "Anno" in sched_df.columns:
+        fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df.get("Capital Call (€)", sched_df.get("capital_call_eur", 0)), name="Capital Calls (Versamenti)", marker_color="#f87171"))
+        fig_pe.add_trace(go.Bar(x=sched_df["Anno"], y=sched_df.get("Distribuzioni (€)", sched_df.get("distribution_eur", 0)), name="Distribuzioni (Rimborsi)", marker_color="#34d399"))
+        fig_pe.add_trace(go.Scatter(x=sched_df["Anno"], y=sched_df.get("NAV (€)", sched_df.get("nav_ending_eur", 0)), name="NAV Fondo (Valore Residuo)", mode="lines+markers", line=dict(color="#38bdf8", width=3)))
 
-fig_pe.update_layout(
-    title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV (J-Curve)",
-    xaxis_title="Anno di Vita del Fondo",
-    yaxis_title="Euro (€)",
-    barmode="group",
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    height=400,
-)
-style_institutional_chart(fig_pe, title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV (J-Curve)", height=400)
-st.plotly_chart(fig_pe, use_container_width=True)
+    fig_pe.update_layout(
+        title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV (J-Curve)",
+        xaxis_title="Anno di Vita del Fondo",
+        yaxis_title="Euro (€)",
+        barmode="group",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=400,
+    )
+    style_institutional_chart(fig_pe, title="Dinamica dei Flussi di Cassa Annuali e Crescita NAV (J-Curve)", height=400)
+    st.plotly_chart(fig_pe, use_container_width=True)
 
-st.markdown("##### 📉 Correzione Econometrica di De-smoothing (Geltner-Fisher)")
-ds_info = pe_res.get("desmoothing", {})
-if ds_info:
-    dsk1, dsk2, dsk3 = st.columns(3)
-    with dsk1:
-        metric_card("Volatilità Osservata (Appraisal)", f"{ds_info['observed_vol_pct']:.2f}%", delta="Artificialmente Bassa", delta_color="normal")
-    with dsk2:
-        metric_card("Volatilità De-smoothed Reale", f"{ds_info['desmoothed_vol_pct']:.2f}%", delta=f"Sottostima: {ds_info['understatement_ratio']:.2f}x", delta_color="inverse")
-    with dsk3:
-        metric_card("Autocorrelazione Lag-1 (ρ)", f"{ds_info['autocorrelation_rho']:.3f}", delta="Inerzia delle Perizie", delta_color="normal")
+    st.markdown("##### 📉 Correzione Econometrica di De-smoothing (Geltner-Fisher)")
+    ds_info = pe_res.get("desmoothing", {})
+    if ds_info:
+        dsk1, dsk2, dsk3 = st.columns(3)
+        with dsk1:
+            metric_card("Volatilità Osservata (Appraisal)", f"{ds_info['observed_vol_pct']:.2f}%", delta="Artificialmente Bassa", delta_color="normal")
+        with dsk2:
+            metric_card("Volatilità De-smoothed Reale", f"{ds_info['desmoothed_vol_pct']:.2f}%", delta=f"Sottostima: {ds_info['understatement_ratio']:.2f}x", delta_color="inverse")
+        with dsk3:
+            metric_card("Autocorrelazione Lag-1 (ρ)", f"{ds_info['autocorrelation_rho']:.3f}", delta="Inerzia delle Perizie", delta_color="normal")
 
-st.markdown("##### 📋 Piano Annuale Dettagliato dei Flussi di Cassa del Fondo")
-display_cols = [
-    c for c in [
-        "Anno", "Capital Call (€)", "Distribuzioni (€)", "Flusso Netto (€)",
-        "NAV (€)", "Capitale Richiamato (€)", "Distribuzioni Cumulate (€)",
-        "DPI", "RVPI", "TVPI"
-    ] if c in sched_df.columns
-]
-st.dataframe(sched_df[display_cols] if display_cols else sched_df, use_container_width=True, hide_index=True)
+    st.markdown("##### 📋 Piano Annuale Dettagliato dei Flussi di Cassa del Fondo")
+    display_cols = [
+        c for c in [
+            "Anno", "Capital Call (€)", "Distribuzioni (€)", "Flusso Netto (€)",
+            "NAV (€)", "Capitale Richiamato (€)", "Distribuzioni Cumulate (€)",
+            "DPI", "RVPI", "TVPI"
+        ] if c in sched_df.columns
+    ]
+    st.dataframe(sched_df[display_cols] if display_cols else sched_df, use_container_width=True, hide_index=True)
 
-render_sr117_audit_drawer(
-    engine_name="Takahashi-Alexander (2001) Private Equity Pacing & Geltner-Fisher De-smoothing Engine",
-    latex_formulas=[
-        r"RD(t) = \max\!\left(0, \frac{t}{L}\right)^B, \quad C(t) = \max(0, C - \text{PIC}_t) \cdot RC(t)",
-        r"\text{NAV}_t = \text{NAV}_{t-1}(1 + g) + C(t) - D(t), \quad r_t^{\text{true}} = \frac{r_t^{\text{obs}} - \rho\,r_{t-1}^{\text{obs}}}{1 - \rho}",
-    ],
-    inputs_dict={
-        "commitment_eur": float(pe_commit),
-        "fund_life_years": int(pe_life),
-        "growth_rate_pct": float(pe_growth * 100.0),
-    },
-    outputs_dict={
-        "net_irr_pct": float(pe_res["net_irr_pct"]),
-        "tvpi": float(pe_res["tvpi"]),
-        "dpi": float(pe_res["dpi"]),
-        "peak_capital_deficit_eur": float(pe_res["peak_capital_deficit_eur"]),
-        "pme_kaplan_schoar": float(pe_res["pme_kaplan_schoar"]),
-    },
-    regulatory_refs=[
-        "Takahashi & Alexander (2001) When the J-Curve Flattens",
-        "Geltner (1991) / Fisher (1994) Appraisal Volatility De-smoothing",
-        "ILPA Standards & Fed SR 11-7 Model Risk Management",
-    ],
-)
+    render_sr117_audit_drawer(
+        engine_name="Takahashi-Alexander (2001) Private Equity Pacing & Geltner-Fisher De-smoothing Engine",
+        latex_formulas=[
+            r"RD(t) = \max\!\left(0, \frac{t}{L}\right)^B, \quad C(t) = \max(0, C - \text{PIC}_t) \cdot RC(t)",
+            r"\text{NAV}_t = \text{NAV}_{t-1}(1 + g) + C(t) - D(t), \quad r_t^{\text{true}} = \frac{r_t^{\text{obs}} - \rho\,r_{t-1}^{\text{obs}}}{1 - \rho}",
+        ],
+        inputs_dict={
+            "commitment_eur": float(pe_commit),
+            "fund_life_years": int(pe_life),
+            "growth_rate_pct": float(pe_growth * 100.0),
+        },
+        outputs_dict={
+            "net_irr_pct": float(pe_res["net_irr_pct"]),
+            "tvpi": float(pe_res["tvpi"]),
+            "dpi": float(pe_res["dpi"]),
+            "peak_capital_deficit_eur": float(pe_res["peak_capital_deficit_eur"]),
+            "pme_kaplan_schoar": float(pe_res["pme_kaplan_schoar"]),
+        },
+        regulatory_refs=[
+            "Takahashi & Alexander (2001) When the J-Curve Flattens",
+            "Geltner (1991) / Fisher (1994) Appraisal Volatility De-smoothing",
+            "ILPA Standards & Fed SR 11-7 Model Risk Management",
+        ],
+    )
 
 
 # ══════════════════════════════════════════════════════════════
 # TAB 7: PRODOTTI STRUTTURATI & REPORTING REGOLAMENTARE PRIIPs / SFDR
 # ══════════════════════════════════════════════════════════════
-with main_tab_struct:
+elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
     st.markdown("### 💎 Ingegneria Finanziaria, Prodotti Strutturati, Commodities, Execution & ALM/LDI")
     st.caption("Pricing Monte Carlo multi-asset Worst-Of, compliance PRIIPs/SFDR, curva Futures Materie Prime (Schwartz 2F), Optimal Execution (Almgren-Chriss & VPIN) e Immunizzazione Attuariale ALM/LDI.")
 
