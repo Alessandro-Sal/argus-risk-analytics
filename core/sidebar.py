@@ -1978,13 +1978,29 @@ def render_sidebar():
                 tk = mod_item["tab_key"]
                 sb_k = f"{tk}_selectbox"
                 tgt_k = f"target_subtab_{tk}"
+                sync_k = f"_synced_tab_val_{tk}"
+                prev_val = st.session_state.get(sync_k)
+
                 if tgt_k in st.session_state and st.session_state[tgt_k]:
-                    st.session_state[tk] = st.session_state[tgt_k]
-                    st.session_state[sb_k] = st.session_state[tgt_k]
-                elif sb_k in st.session_state and st.session_state[sb_k]:
-                    st.session_state[tk] = st.session_state[sb_k]
-                elif tk in st.session_state and st.session_state[tk]:
-                    st.session_state[sb_k] = st.session_state[tk]
+                    val = st.session_state[tgt_k]
+                    st.session_state[tk] = val
+                    st.session_state[sb_k] = val
+                    st.session_state[sync_k] = val
+                else:
+                    curr_tk = st.session_state.get(tk)
+                    curr_sb = st.session_state.get(sb_k)
+                    if curr_tk != prev_val and curr_tk is not None:
+                        st.session_state[sb_k] = curr_tk
+                        st.session_state[sync_k] = curr_tk
+                    elif curr_sb != prev_val and curr_sb is not None:
+                        st.session_state[tk] = curr_sb
+                        st.session_state[sync_k] = curr_sb
+                    elif curr_tk is not None:
+                        st.session_state[sb_k] = curr_tk
+                        st.session_state[sync_k] = curr_tk
+                    elif curr_sb is not None:
+                        st.session_state[tk] = curr_sb
+                        st.session_state[sync_k] = curr_sb
 
         # ── 2. RENDERING MODULI NAVIGAZIONE ─────────────────────────────
         for mod in active_nav_modules:
@@ -2021,6 +2037,7 @@ def render_sidebar():
                                 st.session_state[mod["tab_key"]] = sub["target"]
                                 st.session_state[f"target_subtab_{mod['tab_key']}"] = sub["target"]
                                 st.session_state[f"{mod['tab_key']}_selectbox"] = sub["target"]
+                                st.session_state[f"_synced_tab_val_{mod['tab_key']}"] = sub["target"]
                                 st.session_state["global_target_subtab"] = sub["target"]
                             switch_to_page(mod["page_file"])
 
