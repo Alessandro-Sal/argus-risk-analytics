@@ -465,6 +465,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
             use_container_width=True,
             type="primary",
             key="dl_pitchbook_pdf_btn_tab1",
+            on_click="ignore",
         )
     with ts_c2:
         st.download_button(
@@ -474,6 +475,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
             mime="application/pdf",
             use_container_width=True,
             key="dl_tearsheet_pdf_btn_tab1",
+            on_click="ignore",
         )
     with ts_c3:
         st.download_button(
@@ -483,6 +485,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
             mime="text/html",
             use_container_width=True,
             key="dl_pitchbook_html_btn_tab1",
+            on_click="ignore",
         )
     with ts_c4:
         show_ts_preview = st.toggle("📑 Anteprima", value=False, key="toggle_ts_preview_p13")
@@ -1262,7 +1265,8 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
             mime="application/pdf",
             use_container_width=True,
             type="primary",
-            key="dl_pbs_pdf_btn"
+            key="dl_pbs_pdf_btn",
+            on_click="ignore",
         )
     with pb_c2:
         st.download_button(
@@ -1271,7 +1275,8 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
             file_name=f"argus_tearsheet_contabile_{pbs_prof_slug}_{selected_pbs_year}.pdf",
             mime="application/pdf",
             use_container_width=True,
-            key="dl_pbs_ts_pdf_btn"
+            key="dl_pbs_ts_pdf_btn",
+            on_click="ignore",
         )
     with pb_c3:
         st.download_button(
@@ -1280,7 +1285,8 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
             file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.html",
             mime="text/html",
             use_container_width=True,
-            key="dl_pbs_html_btn"
+            key="dl_pbs_html_btn",
+            on_click="ignore",
         )
     with pb_c4:
         show_pbs_preview = st.toggle("📑 Anteprima", value=False, key="toggle_pbs_preview_p13")

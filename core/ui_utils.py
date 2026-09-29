@@ -6674,13 +6674,19 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
 
     if target and target in options:
         st.session_state[key] = target
+        st.session_state[f"{key}_selectbox"] = target
+        st.session_state[f"_synced_tab_val_{key}"] = target
     elif key not in st.session_state:
         st.session_state[key] = default if (default and default in options) else options[0]
+        st.session_state[f"{key}_selectbox"] = st.session_state[key]
+        st.session_state[f"_synced_tab_val_{key}"] = st.session_state[key]
 
     current = st.session_state.get(key, options[0])
     if current not in options:
         current = options[0]
         st.session_state[key] = current
+        st.session_state[f"{key}_selectbox"] = current
+        st.session_state[f"_synced_tab_val_{key}"] = current
 
     # 2. Rendering del Deck a Schede Istituzionale & Gestione Scroll to Top
     prev_tab_session_key = f"_prev_rendered_tab_{key}"
@@ -6699,6 +6705,9 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
             if st.button(opt, key=btn_key, type=btn_type, use_container_width=True):
                 if st.session_state.get(key) != opt:
                     st.session_state[key] = opt
+                    st.session_state[f"{key}_selectbox"] = opt
+                    st.session_state[f"target_subtab_{key}"] = opt
+                    st.session_state[f"_synced_tab_val_{key}"] = opt
                     st.session_state[prev_tab_session_key] = opt
                     changed = True
     st.markdown("</div>", unsafe_allow_html=True)
