@@ -3,9 +3,8 @@
 # Test suite for bidirectional subtab and segmented tabs synchronization
 # ============================================================
 
-from unittest.mock import MagicMock
-import streamlit as st
 import pytest
+import streamlit as st
 
 
 def test_render_segmented_tabs_state_sync(monkeypatch):
