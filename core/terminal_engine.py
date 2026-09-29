@@ -3410,9 +3410,10 @@ ESITO SCENARI DI STRESS A 30 ANNI:
             )
 
             engine = (ctx or {}).get("engine") or get_engine()
-            prog = compute_wealth_temporal_progression(engine, portfolio_id=1)
-            under = compute_wealth_underwater_drawdowns(engine, portfolio_id=1)
-            seas = compute_wealth_seasonality_patterns(engine, portfolio_id=1)
+            portfolio_id = (ctx or {}).get("wealth_portfolio_id") or (ctx or {}).get("portfolio_id") or 1
+            prog = compute_wealth_temporal_progression(engine, portfolio_id=portfolio_id)
+            under = compute_wealth_underwater_drawdowns(engine, portfolio_id=portfolio_id)
+            seas = compute_wealth_seasonality_patterns(engine, portfolio_id=portfolio_id)
 
             lines = [
                 "[WEALTH TEMPORAL ANALYTICS & NET WORTH DYNAMICS]",
