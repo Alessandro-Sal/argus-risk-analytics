@@ -8,11 +8,13 @@
 import io
 import json
 import os
+import pickle
 import random
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Generator, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -34,17 +36,11 @@ _L1_CACHE: Dict[str, Tuple[float, Any]] = {}
 
 
 def _df_to_binary_payload(df: pd.DataFrame) -> bytes:
-    """Serializza un DataFrame in formato binario compatto Arrow o fallback JSON resiliente."""
-    if HAS_PYARROW and feather is not None:
-        try:
-            buf = io.BytesIO()
-            df_to_write = df.copy()
-            if isinstance(df_to_write.index, pd.DatetimeIndex):
-                df_to_write = df_to_write.reset_index()
-            feather.write_feather(df_to_write, buf, compression="zstd")
-            return buf.getvalue()
-        except Exception:
-            pass
+    """Serializza un DataFrame in formato binario ad alte prestazioni (pickle protocol 5 o fallback JSON resiliente)."""
+    try:
+        return pickle.dumps(df, protocol=pickle.HIGHEST_PROTOCOL)
+    except Exception:
+        pass
     try:
         return df.to_json(date_format="iso").encode("utf-8")
     except Exception:
@@ -52,7 +48,7 @@ def _df_to_binary_payload(df: pd.DataFrame) -> bytes:
 
 
 def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
-    """Deserializza automaticamente sia buffer binari Arrow Feather che stringhe legacy JSON."""
+    """Deserializza automaticamente buffer binari (pickle / legacy Feather) o stringhe JSON."""
     if payload is None:
         return pd.DataFrame()
 
@@ -69,17 +65,32 @@ def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
         except Exception:
             return pd.DataFrame()
 
-    if isinstance(payload, bytes):
-        if payload.strip().startswith((b"{", b"[")):
+    if isinstance(payload, (bytes, bytearray, memoryview)):
+        payload_bytes = bytes(payload)
+        if not payload_bytes:
+            return pd.DataFrame()
+
+        # 1. Tentativo decodifica Pickle nativo (protocol >= 2 inizia con b'\x80')
+        if payload_bytes.startswith(b"\x80"):
             try:
-                text_payload = payload.decode("utf-8", errors="ignore")
+                obj = pickle.loads(payload_bytes)
+                if isinstance(obj, pd.DataFrame):
+                    return obj
+            except Exception:
+                pass
+
+        # 2. Tentativo JSON veloce
+        if payload_bytes.strip().startswith((b"{", b"[")):
+            try:
+                text_payload = payload_bytes.decode("utf-8", errors="ignore")
                 return pd.read_json(io.StringIO(text_payload))
             except Exception:
                 pass
 
+        # 3. Legacy Feather fallback (se presente e valido)
         if HAS_PYARROW and feather is not None:
             try:
-                buf = io.BytesIO(payload)
+                buf = io.BytesIO(payload_bytes)
                 df = feather.read_feather(buf)
                 for c in ["date", "Date", "price_date", "index"]:
                     if c in df.columns:
@@ -93,9 +104,9 @@ def _binary_payload_to_df(payload: Union[bytes, str]) -> pd.DataFrame:
             except Exception:
                 pass
 
-        # Tentativo fallback decodifica JSON se payload bytes non è feather valido
+        # 4. Fallback finale JSON
         try:
-            text_payload = payload.decode("utf-8", errors="ignore")
+            text_payload = payload_bytes.decode("utf-8", errors="ignore")
             return pd.read_json(io.StringIO(text_payload))
         except Exception:
             pass
@@ -125,6 +136,16 @@ def _get_cache_connection() -> sqlite3.Connection:
     """)
     conn.commit()
     return conn
+
+
+@contextmanager
+def get_cache_db() -> Generator[sqlite3.Connection, None, None]:
+    """Context manager thread-safe per gestire in sicurezza connessioni SQLite alla cache."""
+    conn = _get_cache_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 
 def _normalize_history_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -188,6 +209,8 @@ def get_cached_ticker_history(
                     return df_disk.copy()
     except Exception:
         pass
+    finally:
+        conn.close()
 
     # 3. Tier 3: Fetch con Rate-Limit Shield & Exponential Backoff
     df_downloaded = _fetch_yfinance_history_safe(clean_ticker, start_date, end_date)
@@ -196,6 +219,7 @@ def get_cached_ticker_history(
         df_downloaded = _normalize_history_df(df_downloaded)
         # Salva in L1 e L2
         _L1_CACHE[cache_key] = (now, df_downloaded)
+        conn = _get_cache_connection()
         try:
             payload_bin = _df_to_binary_payload(df_downloaded)
             cur = conn.cursor()
@@ -209,9 +233,12 @@ def get_cached_ticker_history(
             conn.commit()
         except Exception:
             pass
+        finally:
+            conn.close()
         return df_downloaded.copy()
 
     # 4. Fallback: Se la rete fallisce o restituisce 429, usa il dato in cache anche se scaduto
+    conn = _get_cache_connection()
     try:
         cur = conn.cursor()
         cur.execute("SELECT payload FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
@@ -222,6 +249,8 @@ def get_cached_ticker_history(
                 return _normalize_history_df(df_fallback.copy())
     except Exception:
         pass
+    finally:
+        conn.close()
 
     return pd.DataFrame()
 
@@ -336,6 +365,8 @@ def get_cached_ticker_info(
                 return info_disk
     except Exception:
         pass
+    finally:
+        conn.close()
 
     # Fetch yfinance info
     import yfinance as yf
@@ -367,6 +398,7 @@ def get_cached_ticker_info(
 
             if info_data:
                 _L1_CACHE[cache_key] = (now, info_data)
+                conn = _get_cache_connection()
                 try:
                     cur = conn.cursor()
                     cur.execute(
@@ -379,6 +411,8 @@ def get_cached_ticker_info(
                     conn.commit()
                 except Exception:
                     pass
+                finally:
+                    conn.close()
                 return info_data
         except Exception as e:
             err_msg = str(e).lower()
@@ -388,6 +422,7 @@ def get_cached_ticker_info(
                 break
 
     # Fallback to existing disk info
+    conn = _get_cache_connection()
     try:
         cur = conn.cursor()
         cur.execute("SELECT payload FROM yfinance_cache WHERE cache_key = ?", (cache_key,))
@@ -396,6 +431,8 @@ def get_cached_ticker_info(
             return json.loads(row[0])
     except Exception:
         pass
+    finally:
+        conn.close()
 
     return {}
 
@@ -403,12 +440,15 @@ def get_cached_ticker_info(
 def get_cache_stats() -> Dict[str, Any]:
     """Restituisce statistiche operative e metriche di salute della cache di sistema."""
     conn = _get_cache_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT COUNT(*), COUNT(DISTINCT ticker) FROM yfinance_cache")
-    total_entries, distinct_tickers = cur.fetchone()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(*), COUNT(DISTINCT ticker) FROM yfinance_cache")
+        total_entries, distinct_tickers = cur.fetchone()
 
-    cur.execute("SELECT SUM(LENGTH(payload)) FROM yfinance_cache")
-    size_bytes = cur.fetchone()[0] or 0
+        cur.execute("SELECT SUM(LENGTH(payload)) FROM yfinance_cache")
+        size_bytes = cur.fetchone()[0] or 0
+    finally:
+        conn.close()
 
     db_size_kb = 0.0
     if CACHE_DB_PATH.exists():
@@ -431,11 +471,14 @@ def clear_cache(data_type: Optional[str] = None) -> int:
     _L1_CACHE.clear()
 
     conn = _get_cache_connection()
-    cur = conn.cursor()
-    if data_type:
-        cur.execute("DELETE FROM yfinance_cache WHERE data_type = ?", (data_type,))
-    else:
-        cur.execute("DELETE FROM yfinance_cache")
-    deleted = cur.rowcount
-    conn.commit()
-    return deleted
+    try:
+        cur = conn.cursor()
+        if data_type:
+            cur.execute("DELETE FROM yfinance_cache WHERE data_type = ?", (data_type,))
+        else:
+            cur.execute("DELETE FROM yfinance_cache")
+        deleted = cur.rowcount
+        conn.commit()
+        return deleted
+    finally:
+        conn.close()
