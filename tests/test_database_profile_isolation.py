@@ -28,6 +28,7 @@ import streamlit as st
 
 # Setup Streamlit session_state proxy for headless pytest execution
 if not hasattr(st, "session_state") or not isinstance(st.session_state, dict):
+
     class SessionState(dict):
         def __getattr__(self, item):
             return self.get(item)
@@ -54,7 +55,6 @@ from core.wealth.wealth_db import (
 from core.wealth.wealth_engine import compute_consolidated_net_worth
 from core.wealth.wealth_reporting_hub import _get_engine_db_key
 from core.workspace_context import WorkspaceContext
-
 
 # ── FIXTURES ─────────────────────────────────────────────────────────
 
@@ -383,7 +383,9 @@ class TestDatabaseProfileIsolation:
             WorkspaceContext.execute_database_switch(new_db="database_b")
             assert spy_clear.call_count >= 1
 
-    def test_cache_poisoning_prevention_intra_database_profile_switch(self, isolated_session_state, dual_db_environments):
+    def test_cache_poisoning_prevention_intra_database_profile_switch(
+        self, isolated_session_state, dual_db_environments
+    ):
         """
         3B. CACHE POISONING: Switch di Profilo all'interno dello stesso Database.
         Verifica che lo switch tra Profili azzeri lo snapshot storico in sessione (wealth_active_snapshot),
@@ -479,6 +481,7 @@ class TestDatabaseProfileIsolation:
             fallback_triggered = False
             try:
                 from core.fetcher import get_engine
+
                 new_eng = get_engine(host="192.168.1.99", db="non_existent")
             except OperationalError:
                 # Safe recovery: rollback su SQLite locale offline
