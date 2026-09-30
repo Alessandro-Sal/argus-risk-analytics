@@ -37,6 +37,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    resolve_active_subtab,
     section,
 )
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
@@ -129,14 +130,18 @@ with k5:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_rw, tab_minus, tab_harvest, tab_split, tab_strat, tab_cross = st.tabs([
+tax_tab_options = [
     "📑 Prospetto Quadro RW / RT",
     "📉 Zainetto Fiscale & Scadenze",
     "🌾 Tax-Loss Harvesting & Plusvalenze",
     "⚖️ Ripartizione Italia vs Estero",
     "💡 Strategie di Efficienza Fiscale",
-    "🌍 Fiscalità Internazionale & Cross-Border"
-])
+    "🌍 Fiscalità Internazionale & Cross-Border",
+]
+resolve_active_subtab(tax_tab_options, key="wealth_tax_active_tab")
+tab_rw, tab_minus, tab_harvest, tab_split, tab_strat, tab_cross = st.tabs(
+    tax_tab_options, key="wealth_tax_active_tab", on_change="rerun"
+)
 
 
 with tab_rw:

@@ -43,6 +43,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    resolve_active_subtab,
     section,
 )
 from core.wealth.wealth_db import (
@@ -117,13 +118,17 @@ with c4:
 st.divider()
 
 # ── NAVIGAZIONE A TAB ───────────────────────────────────────
-tab_fire, tab_stress, tab_goals, tab_srr, tab_tco = st.tabs([
+fire_tab_options = [
     "🔥 Simulatore FIRE & Traiettorie",
     "🌪️ Wealth Macro Stress Testing",
     "🎯 Goal-Based Multi-Traguardo & SPI %",
     "🔮 Sequence of Returns Risk (SRR)",
-    "💸 Costi Nascosti & TER Drag"
-])
+    "💸 Costi Nascosti & TER Drag",
+]
+resolve_active_subtab(fire_tab_options, key="wealth_fire_active_tab")
+tab_fire, tab_stress, tab_goals, tab_srr, tab_tco = st.tabs(
+    fire_tab_options, key="wealth_fire_active_tab", on_change="rerun"
+)
 
 # ============================================================
 # TAB 1: SIMULATORE FIRE & TRAIETTORIE

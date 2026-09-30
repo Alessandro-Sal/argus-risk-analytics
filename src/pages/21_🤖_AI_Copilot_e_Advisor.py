@@ -36,6 +36,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    resolve_active_subtab,
     section,
 )
 from core.wealth.wealth_db import get_cashflow_records, get_wealth_portfolios, init_wealth_db
@@ -148,15 +149,19 @@ with k4:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_diag, tab_rebal, tab_council, tab_life, tab_review, tab_chat, tab_voice = st.tabs([
+copilot_tab_options = [
     "🔍 Diagnostica & Colli di Bottiglia",
     "⚖️ Motore di Ribilanciamento Target",
     "🏛️ Tri-Agent Governance & Conic Rebalancer",
     "🔮 Life Event & Decision Simulator",
     "📑 Executive Quarterly Review (NLG)",
     "💬 Assistente Finanziario Diretto",
-    "🎙️ AI Voice Briefing & Audio Podcast"
-])
+    "🎙️ AI Voice Briefing & Audio Podcast",
+]
+resolve_active_subtab(copilot_tab_options, key="wealth_copilot_active_tab")
+tab_diag, tab_rebal, tab_council, tab_life, tab_review, tab_chat, tab_voice = st.tabs(
+    copilot_tab_options, key="wealth_copilot_active_tab", on_change="rerun"
+)
 
 with tab_diag:
     st.markdown("### 🔍 Report Diagnostico Autonomo ARGUS")
