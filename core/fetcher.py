@@ -17,6 +17,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -79,6 +80,18 @@ LOOKBACK_EXTRA_DAYS = 365
 # ── Connessione MySQL ────────────────────────────────────────
 
 
+def dispose_engine(engine: Any) -> None:
+    """
+    Dispone in modo sicuro un engine SQLAlchemy rilasciando connessioni aperte,
+    socket di rete e file locks sul database.
+    """
+    if engine is not None:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+
+
 def get_engine(
     user: str = "root",
     password: str = "root",
@@ -110,15 +123,22 @@ def get_engine(
         except Exception:
             pass
     else:
-        # Priorità a variabili d'ambiente rispetto ai default (supporta sia MYSQL_ che STREAMLIT_DB_)
-        user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user
-        password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password or "root"
-        host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host
-        port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
-        port = int(port_env) if port_env else port
+        # Corretta gerarchia di precedenza: se il parametro fornito è personalizzato, ha precedenza
+        # rispetto a variabili d'ambiente (altrimenti usa env var o fallback default).
+        if not user or user == "root":
+            user = os.getenv("MYSQL_USER") or os.getenv("STREAMLIT_DB_USER") or user or "root"
+        if not password or password == "root":
+            password = os.getenv("MYSQL_PASSWORD") or os.getenv("STREAMLIT_DB_PASS") or password or "root"
+        if not host or host == "localhost":
+            host = os.getenv("MYSQL_HOST") or os.getenv("STREAMLIT_DB_HOST") or host or "localhost"
+        if not port or port == 3306:
+            port_env = os.getenv("MYSQL_PORT") or os.getenv("STREAMLIT_DB_PORT")
+            port = int(port_env) if port_env else 3306
         if database is not None:
             db = database
-        elif db == "investment_risk_bi":
+        elif db and db != "investment_risk_bi":
+            db = db
+        else:
             db = os.getenv("MYSQL_DATABASE") or os.getenv("STREAMLIT_DB_NAME") or db
 
         try:
@@ -126,10 +146,16 @@ def get_engine(
 
             sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
             sys_engine = create_engine(sys_url, connect_args={"connect_timeout": 3})
-            with sys_engine.begin() as conn:
-                conn.execute(
-                    text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
-                )
+            try:
+                with sys_engine.begin() as conn:
+                    conn.execute(
+                        text(f"CREATE DATABASE IF NOT EXISTS {db} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+                    )
+            finally:
+                try:
+                    sys_engine.dispose()
+                except Exception:
+                    pass
 
             url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
             engine = create_engine(url, echo=False)

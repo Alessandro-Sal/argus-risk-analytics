@@ -33,30 +33,41 @@ from core.wealth.wealth_engine import (
 from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
 
 
+def _get_engine_db_key(eng) -> str:
+    """Restituisce un identificatore deterministico del DB attivo per isolamento dell'hash di cache."""
+    if eng is None:
+        return "none"
+    try:
+        url = eng.url
+        return f"{url.drivername}://{url.username}@{url.host}:{url.port}/{url.database}"
+    except Exception:
+        return str(getattr(eng, "url", "unknown"))
+
+
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_quarterly_pdf(_engine, pid: int, client_name: str, quarter: str) -> bytes:
+def _get_cached_quarterly_pdf(_engine, pid: int, client_name: str, quarter: str, db_key: str = "") -> bytes:
     return generate_white_label_quarterly_pdf_report(
         _engine, portfolio_id=pid, client_name=client_name, quarter=quarter
     )
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_pitchbook_pdf(_engine, pid: int) -> bytes:
+def _get_cached_pitchbook_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_advisory_pitchbook_pdf(_engine, portfolio_id=pid)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_balance_sheet_pdf(_engine, pid: int) -> bytes:
+def _get_cached_balance_sheet_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_personal_balance_sheet_pdf(_engine, portfolio_id=pid)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_tear_sheet_pdf(_engine, pid: int) -> bytes:
+def _get_cached_tear_sheet_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_executive_tear_sheet_pdf(_engine, portfolio_id=pid)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_master_excel(_engine, pid: int) -> bytes:
+def _get_cached_master_excel(_engine, pid: int, db_key: str = "") -> bytes:
     return export_wealth_master_excel_workbook(_engine, portfolio_id=pid).getvalue()
 
 
@@ -68,6 +79,7 @@ def render_wealth_reporting_and_exports_hub(
     Renderizza il Centro Istituzionale di Reportistica ed Esportazioni Multi-Formato per ARGUS Wealth.
     Include 9 tipologie di esportazione: PDF, XLSX, Parquet, CSV, JSON e Audio TTS.
     """
+    db_key = _get_engine_db_key(engine)
     date_slug = datetime.now().strftime("%Y%m%d")
     prof_slug = prof_name.lower().replace(" ", "_")
 
@@ -127,7 +139,7 @@ def render_wealth_reporting_and_exports_hub(
             try:
                 st.download_button(
                     label="📥 Scarica Quarterly Report PDF",
-                    data=lambda: _get_cached_quarterly_pdf(engine, pid=portfolio_id, client_name=prof_name, quarter="Q1 2026"),
+                    data=lambda: _get_cached_quarterly_pdf(engine, pid=portfolio_id, client_name=prof_name, quarter="Q1 2026", db_key=db_key),
                     file_name=f"argus_quarterly_dossier_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -154,7 +166,7 @@ def render_wealth_reporting_and_exports_hub(
             try:
                 st.download_button(
                     label="📥 Scarica Pitchbook PDF",
-                    data=lambda: _get_cached_pitchbook_pdf(engine, pid=portfolio_id),
+                    data=lambda: _get_cached_pitchbook_pdf(engine, pid=portfolio_id, db_key=db_key),
                     file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -184,7 +196,7 @@ def render_wealth_reporting_and_exports_hub(
             try:
                 st.download_button(
                     label="📥 Scarica Bilancio Personale PDF",
-                    data=lambda: _get_cached_balance_sheet_pdf(engine, pid=portfolio_id),
+                    data=lambda: _get_cached_balance_sheet_pdf(engine, pid=portfolio_id, db_key=db_key),
                     file_name=f"argus_bilancio_personale_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -210,7 +222,7 @@ def render_wealth_reporting_and_exports_hub(
             try:
                 st.download_button(
                     label="📥 Scarica Tear-Sheet PDF",
-                    data=lambda: _get_cached_tear_sheet_pdf(engine, pid=portfolio_id),
+                    data=lambda: _get_cached_tear_sheet_pdf(engine, pid=portfolio_id, db_key=db_key),
                     file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
                     mime="application/pdf",
                     use_container_width=True,
@@ -243,7 +255,7 @@ def render_wealth_reporting_and_exports_hub(
             try:
                 st.download_button(
                     label="📥 Scarica Master Excel (.xlsx)",
-                    data=lambda: _get_cached_master_excel(engine, pid=portfolio_id),
+                    data=lambda: _get_cached_master_excel(engine, pid=portfolio_id, db_key=db_key),
                     file_name=f"argus_wealth_master_{prof_slug}_{date_slug}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     use_container_width=True,

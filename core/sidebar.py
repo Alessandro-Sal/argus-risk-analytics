@@ -25,11 +25,17 @@ def _get_available_mysql_dbs(host: str, port: int, user: str, password: str) -> 
 
         sys_url = f"mysql+pymysql://{user}:{password}@{host}:{port}/"
         eng = create_engine(sys_url, connect_args={"connect_timeout": 2})
-        with eng.connect() as conn:
-            res = conn.execute(text("SHOW DATABASES;"))
-            ignored = {"information_schema", "mysql", "performance_schema", "sys"}
-            dbs = [row[0] for row in res if row[0] not in ignored]
-            return dbs
+        try:
+            with eng.connect() as conn:
+                res = conn.execute(text("SHOW DATABASES;"))
+                ignored = {"information_schema", "mysql", "performance_schema", "sys"}
+                dbs = [row[0] for row in res if row[0] not in ignored]
+                return dbs
+        finally:
+            try:
+                eng.dispose()
+            except Exception:
+                pass
     except Exception:
         return []
 
@@ -1027,10 +1033,18 @@ def render_settings_dialog(current_module: str = "risk") -> None:
             if is_wealth
             else "Simulazione in memoria RAM con dataset sintetici senza dipendenze esterne."
         )
+        prev_off = bool(st.session_state.get("offline_mode", False))
         sel_off = st.toggle(
-            off_lbl, value=bool(st.session_state.get("offline_mode", False)), key="sb_offline_toggle", help=off_hlp
+            off_lbl, value=prev_off, key="sb_offline_toggle", help=off_hlp
         )
-        st.session_state.offline_mode = sel_off
+        if sel_off != prev_off:
+            from core.workspace_context import WorkspaceContext
+
+            WorkspaceContext.execute_database_switch(
+                st.session_state.get("db_name", "wealth"), offline_mode=sel_off
+            )
+        else:
+            st.session_state.offline_mode = sel_off
 
         # Gestione Connessione MySQL (se non in modalità offline)
         if not st.session_state.offline_mode:
@@ -1076,6 +1090,7 @@ def render_settings_dialog(current_module: str = "risk") -> None:
 
                 db_idx = db_options.index(active_db) if active_db in db_options else (len(db_options) - 1)
                 sel_db = st.selectbox("Database Schema", db_options, index=db_idx, key="sb_db_select")
+                target_db = active_db
                 if sel_db == "Custom...":
                     custom_db = st.text_input(
                         "Nome DB Custom",
@@ -1084,13 +1099,18 @@ def render_settings_dialog(current_module: str = "risk") -> None:
                         placeholder="es. family_office_db",
                     ).strip()
                     if custom_db:
-                        st.session_state.db_name = custom_db
-                        st.session_state.wealth_db_name = custom_db
-                        st.session_state.risk_db_name = custom_db
+                        target_db = custom_db
                 else:
-                    st.session_state.db_name = sel_db
-                    st.session_state.wealth_db_name = sel_db
-                    st.session_state.risk_db_name = sel_db
+                    target_db = sel_db
+
+                if target_db and target_db != active_db:
+                    from core.workspace_context import WorkspaceContext
+
+                    WorkspaceContext.execute_database_switch(target_db)
+                else:
+                    st.session_state.db_name = target_db
+                    st.session_state.wealth_db_name = target_db
+                    st.session_state.risk_db_name = target_db
 
                 if is_wealth:
                     if st.button(
@@ -1149,6 +1169,17 @@ def _execute_full_session_reset(is_wealth_mode: bool = False) -> None:
         clear_disk_cache()
     except Exception:
         pass
+
+    try:
+        from core.fetcher import dispose_engine
+
+        old_engine = st.session_state.get("engine") or st.session_state.get("db_engine")
+        if old_engine is not None:
+            dispose_engine(old_engine)
+    except Exception:
+        pass
+    st.session_state["engine"] = None
+    st.session_state["db_engine"] = None
 
     # 2. Reset dominio e archetipi
     try:
@@ -1862,16 +1893,14 @@ def render_sidebar():
 
                     def _on_sb_wealth_prof_change():
                         sel = st.session_state.get("sb_wealth_profile_selector")
-                        st.session_state["wealth_active_portfolio_id"] = sel
-                        st.session_state["wealth_profile_selector_widget"] = sel
-                        st.session_state["nw_profile_selector_widget"] = sel
-                        st.session_state["cf_profile_selector_widget"] = sel
+                        prof_nm = w_names.get(sel) if sel is not None else None
                         try:
                             from core.workspace_context import WorkspaceContext
 
-                            WorkspaceContext.get_current().wealth.profile_id = sel
+                            WorkspaceContext.switch_wealth_profile(sel, profile_name=prof_nm)
                         except Exception:
-                            pass
+                            st.session_state["wealth_active_portfolio_id"] = sel
+                            st.session_state.pop("wealth_active_snapshot", None)
 
                     st.markdown(
                         '<div class="sidebar-section-header" style="margin-top: 4px; margin-bottom: 5px; font-size: 10px; font-weight: 800; color: #8b949e; text-transform: uppercase; letter-spacing: 0.8px; white-space: nowrap;">👤 PROFILO PATRIMONIALE</div>',
