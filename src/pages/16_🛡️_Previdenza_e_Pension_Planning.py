@@ -91,7 +91,9 @@ if len(prof_map) > 1:
             key="pension_profile_selector_widget"
         )
         if sel_pid != current_pid:
-            st.session_state["wealth_active_portfolio_id"] = sel_pid
+            from core.workspace_context import WorkspaceContext
+
+            WorkspaceContext.switch_wealth_profile(sel_pid, profile_name=prof_map.get(sel_pid))
             st.rerun()
     with head_c3:
         st.write("")

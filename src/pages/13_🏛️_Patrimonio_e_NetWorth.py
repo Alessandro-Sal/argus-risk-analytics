@@ -73,23 +73,34 @@ from core.wealth.wealth_temporal_engine import (
 
 
 # ── HIGH-PERFORMANCE STREAMLIT CACHING LAYER ─────────────────
+def _get_engine_db_key(eng) -> str:
+    """Restituisce un identificatore deterministico del DB attivo per isolamento dell'hash di cache."""
+    if eng is None:
+        return "none"
+    try:
+        url = eng.url
+        return f"{url.drivername}://{url.username}@{url.host}:{url.port}/{url.database}"
+    except Exception:
+        return str(getattr(eng, "url", "unknown"))
+
+
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_wealth_portfolios(_engine):
+def _load_cached_wealth_portfolios(_engine, db_key: str = ""):
     return get_wealth_portfolios(_engine)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_consolidated_net_worth(_engine, portfolio_id: int):
+def _load_cached_consolidated_net_worth(_engine, portfolio_id: int, db_key: str = ""):
     return compute_consolidated_net_worth(_engine, portfolio_id=portfolio_id)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_wealth_accounts(_engine, portfolio_id: int):
+def _load_cached_wealth_accounts(_engine, portfolio_id: int, db_key: str = ""):
     return get_wealth_accounts(_engine, portfolio_id=portfolio_id)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_family_office_suite(_engine, portfolio_id: int):
+def _load_cached_family_office_suite(_engine, portfolio_id: int, db_key: str = ""):
     fo = compute_family_office_multi_entity_consolidation(_engine, portfolio_id=portfolio_id)
     fx = compute_multi_currency_fx_hedging_engine(_engine, portfolio_id=portfolio_id)
     br = compute_total_wealth_brinson_attribution(_engine, portfolio_id=portfolio_id)
@@ -97,7 +108,7 @@ def _load_cached_family_office_suite(_engine, portfolio_id: int):
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: int, adjust_inflation: bool, cache_bust: str = "v3_exact_split_phys_pens"):
+def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: int, adjust_inflation: bool, cache_bust: str = "v3_exact_split_phys_pens", db_key: str = ""):
     prog = compute_wealth_temporal_progression(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months, adjust_inflation=adjust_inflation)
     attr = compute_wealth_growth_attribution(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months, adjust_inflation=adjust_inflation)
     bench = compute_wealth_benchmark_comparison(_engine, portfolio_id=portfolio_id, timeframe_months=timeframe_months)
@@ -109,44 +120,44 @@ def _load_cached_temporal_suite(_engine, portfolio_id: int, timeframe_months: in
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_pitchbook_pdf(_engine, pid: int) -> bytes:
+def _get_cached_pitchbook_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_advisory_pitchbook_pdf(_engine, portfolio_id=pid)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_tear_sheet_pdf(_engine, pid: int) -> bytes:
+def _get_cached_tear_sheet_pdf(_engine, pid: int, db_key: str = "") -> bytes:
     return generate_executive_tear_sheet_pdf(_engine, portfolio_id=pid)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_pitchbook_html(_engine, pid: int) -> str:
+def _get_cached_pitchbook_html(_engine, pid: int, db_key: str = "") -> str:
     return generate_advisory_pitchbook_html(_engine, portfolio_id=pid)
 
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_personal_balance_sheet(_engine, pid: int = 1, yr: Optional[int] = None) -> Dict[str, Any]:
+def _load_cached_personal_balance_sheet(_engine, pid: int = 1, yr: Optional[int] = None, db_key: str = "") -> Dict[str, Any]:
     return compute_personal_balance_sheet(_engine, portfolio_id=pid, year=yr)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_multi_year_balance_comparison(_engine, pid: int = 1) -> Dict[str, Any]:
+def _load_cached_multi_year_balance_comparison(_engine, pid: int = 1, db_key: str = "") -> Dict[str, Any]:
     return compute_multi_year_balance_comparison(_engine, portfolio_id=pid)
 
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_balance_sheet_pdf(_engine, pid: int, yr: Optional[int] = None) -> bytes:
+def _get_cached_balance_sheet_pdf(_engine, pid: int, yr: Optional[int] = None, db_key: str = "") -> bytes:
     return generate_personal_balance_sheet_pdf(_engine, portfolio_id=pid, year=yr)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_balance_sheet_tearsheet_pdf(_engine, pid: int, yr: Optional[int] = None) -> bytes:
+def _get_cached_balance_sheet_tearsheet_pdf(_engine, pid: int, yr: Optional[int] = None, db_key: str = "") -> bytes:
     return generate_personal_balance_sheet_tearsheet_pdf(_engine, portfolio_id=pid, year=yr)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
-def _get_cached_balance_sheet_html(_engine, pid: int, yr: Optional[int] = None) -> str:
+def _get_cached_balance_sheet_html(_engine, pid: int, yr: Optional[int] = None, db_key: str = "") -> str:
     return generate_personal_balance_sheet_html(_engine, portfolio_id=pid, year=yr)
 
 
@@ -165,9 +176,11 @@ db_port = int(st.session_state.get("db_port", 3306))
 raw_db = st.session_state.get("wealth_db_name") or st.session_state.get("db_name") or "wealth"
 db_name = raw_db if raw_db else "wealth"
 st.session_state.wealth_db_name = db_name
-st.session_state.db_name = db_name
 engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
+st.session_state["engine"] = engine
+st.session_state["db_engine"] = engine
 init_wealth_db(engine)
+db_key = _get_engine_db_key(engine)
 
 ensure_portfolio_loaded(module_type="wealth")
 
@@ -210,7 +223,7 @@ if is_snapshot_mode:
     df_accounts = pd.DataFrame(details.get("accounts", []))
 else:
     # Modalità Live ad alte prestazioni con Caching
-    df_prof = _load_cached_wealth_portfolios(engine)
+    df_prof = _load_cached_wealth_portfolios(engine, db_key=db_key)
     prof_map = {row["portfolio_id"]: row["name"] for _, row in df_prof.iterrows()}
     current_pid = st.session_state.get("wealth_active_portfolio_id")
 
@@ -224,7 +237,7 @@ else:
         render_wealth_profile_picker(engine, prof_map, key_prefix="p13_picker")
         st.stop()
 
-    nw = _load_cached_consolidated_net_worth(engine, portfolio_id=current_pid)
+    nw = _load_cached_consolidated_net_worth(engine, portfolio_id=current_pid, db_key=db_key)
     tot_nw = nw.total_net_worth
     liq_cash = nw.liquid_cash
     fin_inv = nw.financial_investments
@@ -238,7 +251,7 @@ else:
     runway_m = nw.runway_months
     sav_rate = nw.savings_rate_pct
 
-    df_accounts = _load_cached_wealth_accounts(engine, portfolio_id=current_pid)
+    df_accounts = _load_cached_wealth_accounts(engine, portfolio_id=current_pid, db_key=db_key)
 
 prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p13")
@@ -278,7 +291,9 @@ if not is_snapshot_mode and len(prof_map) > 1:
             key="nw_profile_selector_widget"
         )
         if sel_pid != current_pid:
-            st.session_state["wealth_active_portfolio_id"] = sel_pid
+            from core.workspace_context import WorkspaceContext
+
+            WorkspaceContext.switch_wealth_profile(sel_pid, profile_name=prof_map.get(sel_pid))
             st.rerun()
     with head_c3:
         st.write("")
@@ -376,7 +391,7 @@ if st.session_state.get("wealth_boardroom_mode", False):
         date_slug = datetime.now().strftime('%Y%m%d')
         st.download_button(
             label="📥 Scarica Advisory Pitchbook PDF (300 DPI)",
-            data=lambda: _get_cached_pitchbook_pdf(engine, current_pid),
+            data=lambda: _get_cached_pitchbook_pdf(engine, current_pid, db_key=db_key),
             file_name=f"argus_boardroom_dossier_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -386,7 +401,7 @@ if st.session_state.get("wealth_boardroom_mode", False):
     with col_b_act2:
         st.download_button(
             label="📑 Scarica Executive Tear Sheet (PDF)",
-            data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid),
+            data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid, db_key=db_key),
             file_name=f"argus_tear_sheet_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -459,7 +474,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
     with ts_c1:
         st.download_button(
             label="📥 Scarica Pitchbook PDF",
-            data=lambda: _get_cached_pitchbook_pdf(engine, current_pid),
+            data=lambda: _get_cached_pitchbook_pdf(engine, current_pid, db_key=db_key),
             file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -470,7 +485,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
     with ts_c2:
         st.download_button(
             label="📑 Tear-Sheet Sintetica",
-            data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid),
+            data=lambda: _get_cached_tear_sheet_pdf(engine, current_pid, db_key=db_key),
             file_name=f"argus_tear_sheet_{prof_slug}_{date_slug}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -480,7 +495,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
     with ts_c3:
         st.download_button(
             label="🌐 HTML",
-            data=lambda: _get_cached_pitchbook_html(engine, current_pid).encode("utf-8"),
+            data=lambda: _get_cached_pitchbook_html(engine, current_pid, db_key=db_key).encode("utf-8"),
             file_name=f"argus_advisory_pitchbook_{prof_slug}_{date_slug}.html",
             mime="text/html",
             use_container_width=True,
@@ -494,7 +509,7 @@ if active_nw_tab == "📊 Bilancio & Allocazione":
             render_wealth_methodology_modal()
 
     if show_ts_preview:
-        tear_sheet_html = _get_cached_pitchbook_html(engine, current_pid)
+        tear_sheet_html = _get_cached_pitchbook_html(engine, current_pid, db_key=db_key)
         st.components.v1.html(tear_sheet_html, height=600, scrolling=True)
 
     from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
@@ -1203,7 +1218,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
                 st.rerun()
 
     # ── CARICAMENTO DATI BILANCIO PERSONALE PER L'ANNO SELEZIONATO ──
-    pbs_data = _load_cached_personal_balance_sheet(engine, pid=current_pid, yr=selected_pbs_year)
+    pbs_data = _load_cached_personal_balance_sheet(engine, pid=current_pid, yr=selected_pbs_year, db_key=db_key)
     sp_data = pbs_data["stato_patrimoniale"]
     ind_data = pbs_data["indici_bilancio"]
 
@@ -1260,7 +1275,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     with pb_c1:
         st.download_button(
             label=f"📥 Scarica Bilancio PDF ({selected_pbs_year})",
-            data=lambda: _get_cached_balance_sheet_pdf(engine, current_pid, selected_pbs_year),
+            data=lambda: _get_cached_balance_sheet_pdf(engine, current_pid, selected_pbs_year, db_key=db_key),
             file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -1271,7 +1286,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     with pb_c2:
         st.download_button(
             label=f"📑 Tear-Sheet Contabile ({selected_pbs_year})",
-            data=lambda: _get_cached_balance_sheet_tearsheet_pdf(engine, current_pid, selected_pbs_year),
+            data=lambda: _get_cached_balance_sheet_tearsheet_pdf(engine, current_pid, selected_pbs_year, db_key=db_key),
             file_name=f"argus_tearsheet_contabile_{pbs_prof_slug}_{selected_pbs_year}.pdf",
             mime="application/pdf",
             use_container_width=True,
@@ -1281,7 +1296,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     with pb_c3:
         st.download_button(
             label="🌐 HTML",
-            data=lambda: _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year).encode("utf-8"),
+            data=lambda: _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year, db_key=db_key).encode("utf-8"),
             file_name=f"argus_bilancio_personale_{pbs_prof_slug}_{selected_pbs_year}.html",
             mime="text/html",
             use_container_width=True,
@@ -1295,7 +1310,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
             render_balance_sheet_methodology_modal()
 
     if show_pbs_preview:
-        pbs_html = _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year)
+        pbs_html = _get_cached_balance_sheet_html(engine, current_pid, selected_pbs_year, db_key=db_key)
         st.components.v1.html(pbs_html, height=620, scrolling=True)
 
     st.markdown("<div style='margin-bottom: 12px;'></div>", unsafe_allow_html=True)
@@ -1782,7 +1797,7 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
         section("📊 Bilancio Comparativo Pluriennale (Trend Storico degli Esercizi)")
         st.caption("Prospetto comparativo di Stato Patrimoniale, Conto Economico e indici di solidità anno su anno, con evidenza dei delta di ricchezza netta.")
 
-        comp_res = _load_cached_multi_year_balance_comparison(engine, pid=current_pid)
+        comp_res = _load_cached_multi_year_balance_comparison(engine, pid=current_pid, db_key=db_key)
         df_comp = comp_res.get("comparison_df", pd.DataFrame())
 
         if not df_comp.empty:
@@ -2047,7 +2062,7 @@ elif active_nw_tab == "⏳ Wealth Temporal Desk":
     is_real_inflation = ("Reale" in sel_val_mode)
 
     prog_res, attr_res, bench_res, roll_df, under_res, seas_res, matrix_df = _load_cached_temporal_suite(
-        engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation
+        engine, portfolio_id=current_pid, timeframe_months=active_tf_months, adjust_inflation=is_real_inflation, db_key=db_key
     )
 
     # Top KPI temporali
@@ -2463,7 +2478,7 @@ elif active_nw_tab == "🏛️ Family Office & Holding":
     section("🏢 Family Office Multi-Entity & Holding Consolidator")
     st.caption("Consolidamento patrimoniale tra diverse entità giuridiche del nucleo familiare (Persona Fisica, Holding SRL, Società Semplice, Trust) con elisione automatica delle partite infragruppo (finanziamenti soci) e analisi convenienza fiscale PEX (1.2% vs 26%).")
 
-    fo_data, _, _ = _load_cached_family_office_suite(engine, portfolio_id=current_pid)
+    fo_data, _, _ = _load_cached_family_office_suite(engine, portfolio_id=current_pid, db_key=db_key)
 
     fo_k1, fo_k2, fo_k3, fo_k4 = st.columns(4)
     with fo_k1:
@@ -2519,7 +2534,7 @@ elif active_nw_tab == "💱 Rischio FX & Attribuzione Brinson":
     section("💱 Rischio di Cambio & FX Forward Hedging Overlay")
     st.caption("Mappatura dell'esposizione valutaria estera (USD, GBP, CHF, JPY), stima del costo dei Forward Points (Covered Interest Parity) e simulazione di strategie di copertura a confronto.")
 
-    _, fx_res, br_res = _load_cached_family_office_suite(engine, portfolio_id=current_pid)
+    _, fx_res, br_res = _load_cached_family_office_suite(engine, portfolio_id=current_pid, db_key=db_key)
 
     fx_k1, fx_k2, fx_k3, fx_k4 = st.columns(4)
     with fx_k1:

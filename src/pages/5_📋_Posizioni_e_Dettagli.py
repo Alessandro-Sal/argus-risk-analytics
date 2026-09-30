@@ -1376,12 +1376,20 @@ elif active_pos_tab == "💰 Ottimizzazione Fiscale (TUIR Art. 67)":
         simulate_fifo_lot_sale,
     )
 
-    engine = st.session_state.get("db_engine", None)
+    engine = st.session_state.get("engine") or st.session_state.get("db_engine", None)
     if engine is None:
         try:
             from core.fetcher import get_engine
-            db_nm = st.session_state.get("wealth_db_name", "wealth")
-            engine = get_engine("root", "root", "localhost", 3306, db_nm, database=db_nm)
+
+            db_nm = st.session_state.get("wealth_db_name") or st.session_state.get("db_name", "wealth")
+            u = st.session_state.get("db_user", "root")
+            p = st.session_state.get("db_pass", "root")
+            h = st.session_state.get("db_host", "localhost")
+            port = int(st.session_state.get("db_port", 3306))
+            off = bool(st.session_state.get("offline_mode", False))
+            engine = get_engine(u, p, h, port, db_nm, database=db_nm, offline=off)
+            st.session_state["engine"] = engine
+            st.session_state["db_engine"] = engine
         except Exception:
             engine = None
 

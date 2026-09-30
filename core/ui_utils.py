@@ -7653,8 +7653,9 @@ def render_wealth_profile_picker(engine, profile_map: dict, key_prefix: str = "w
                 unsafe_allow_html=True,
             )
             if st.button(f"▶ Apri '{pname}'", key=f"{key_prefix}_open_{pid}", type="primary", use_container_width=True):
-                st.session_state["wealth_active_portfolio_id"] = pid
-                st.session_state["wealth_active_profile_name"] = pname
+                from core.workspace_context import WorkspaceContext
+
+                WorkspaceContext.switch_wealth_profile(pid, profile_name=pname)
                 st.rerun()
 
     new_col = cols[len(profile_map) % col_count]
@@ -8531,6 +8532,8 @@ def ensure_portal_context(module: str = "risk") -> dict:
     st.session_state.risk_db_name = db_name
 
     engine = get_engine(db_user, db_pass, db_host, db_port, db_name, database=db_name, offline=offline_mode)
+    st.session_state["engine"] = engine
+    st.session_state["db_engine"] = engine
 
     if is_wealth:
         from core.wealth.wealth_db import create_wealth_portfolio, get_wealth_portfolios, init_wealth_db

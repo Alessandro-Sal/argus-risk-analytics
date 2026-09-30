@@ -106,10 +106,14 @@ with p_bar_c1:
 
     def _on_wealth_profile_change():
         new_val = st.session_state.get("wealth_profile_selector_widget")
-        if new_val is not None and new_val in profile_map:
+        prof_nm = profile_map.get(new_val) if new_val is not None else None
+        try:
+            from core.workspace_context import WorkspaceContext
+
+            WorkspaceContext.switch_wealth_profile(new_val, profile_name=prof_nm)
+        except Exception:
             st.session_state["wealth_active_portfolio_id"] = new_val
-        elif new_val is None:
-            st.session_state["wealth_active_portfolio_id"] = None
+            st.session_state.pop("wealth_active_snapshot", None)
 
     selected_pid = st.selectbox(
         "💼 Profilo Patrimoniale Attivo:",

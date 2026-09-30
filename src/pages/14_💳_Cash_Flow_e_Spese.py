@@ -112,7 +112,9 @@ with col_f1:
             key="cf_profile_selector_widget"
         )
         if sel_pid != current_pid:
-            st.session_state["wealth_active_portfolio_id"] = sel_pid
+            from core.workspace_context import WorkspaceContext
+
+            WorkspaceContext.switch_wealth_profile(sel_pid, profile_name=prof_map.get(sel_pid))
             st.rerun()
     else:
         st.selectbox("Profilo Patrimoniale:", [f"📁 {prof_title}"], disabled=True, key="cf_profile_single")

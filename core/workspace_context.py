@@ -337,6 +337,136 @@ class WorkspaceContext:
             self.version += 1
             self.is_dirty = True
 
+    @classmethod
+    def switch_wealth_profile(cls, new_pid: Optional[int], profile_name: Optional[str] = None) -> None:
+        """
+        Commuta in sicurezza il profilo patrimoniale attivo, sincronizzando tutti i widget
+        di selezione e resettando lo snapshot storico per evitare data leakage tra profili.
+        """
+        try:
+            import streamlit as st
+        except ImportError:
+            return
+
+        st_state = getattr(st, "session_state", None)
+        if st_state is None:
+            return
+
+        # Sincronizzazione atomica di tutti i selettori di pagina e sidebar
+        st_state["wealth_active_portfolio_id"] = new_pid
+        st_state["sb_wealth_profile_selector"] = new_pid
+        st_state["wealth_profile_selector_widget"] = new_pid
+        st_state["nw_profile_selector_widget"] = new_pid
+        st_state["cf_profile_selector_widget"] = new_pid
+        st_state["pension_profile_selector_widget"] = new_pid
+        st_state["fiscal_profile_selector_widget"] = new_pid
+        st_state["estate_profile_selector_widget"] = new_pid
+        st_state["ai_profile_selector_widget"] = new_pid
+
+        # Reset dello snapshot storico per impedire bleed di snapshot tra profili
+        st_state.pop("wealth_active_snapshot", None)
+
+        if profile_name:
+            st_state["wealth_active_profile_name"] = profile_name
+        elif new_pid is None:
+            st_state.pop("wealth_active_profile_name", None)
+
+        try:
+            ws = cls.get_current()
+            ws.wealth.profile_id = new_pid
+            if profile_name:
+                ws.wealth.profile_name = profile_name
+            ws.wealth.net_worth_cached = None
+            ws.version += 1
+        except Exception:
+            pass
+
+    @classmethod
+    def execute_database_switch(cls, new_db: str, offline_mode: Optional[bool] = None) -> None:
+        """
+        Esegue il teardown atomico dello stato applicativo, della cache e dei connection pool
+        quando l'utente seleziona un nuovo schema database o commuta la modalità offline/online.
+        """
+        try:
+            import streamlit as st
+        except ImportError:
+            return
+
+        st_state = getattr(st, "session_state", None)
+        if st_state is None:
+            return
+
+        # 1. Dispose del Connection Pool attivo per rilasciare socket MySQL e lock SQLite
+        try:
+            from core.fetcher import dispose_engine
+
+            old_engine = st_state.get("engine") or st_state.get("db_engine")
+            if old_engine is not None:
+                dispose_engine(old_engine)
+        except Exception:
+            pass
+        st_state["engine"] = None
+        st_state["db_engine"] = None
+
+        # 2. Svuotamento completo delle cache Streamlit (process-level)
+        try:
+            st.cache_data.clear()
+            st.cache_resource.clear()
+        except Exception:
+            pass
+
+        # 3. Svuotamento della cache su disco
+        try:
+            from core.cache_shield import clear_cache as clear_disk_cache
+
+            clear_disk_cache()
+        except Exception:
+            pass
+
+        # 4. Flush dei domini in WorkspaceContext
+        try:
+            ws = cls.get_current()
+            ws.flush_wealth_domain()
+            ws.flush_risk_domain()
+        except Exception:
+            pass
+
+        # 5. Bonifica deterministica delle chiavi di sessione
+        keys_to_purge = [
+            "wealth_active_portfolio_id",
+            "wealth_active_profile_name",
+            "wealth_active_snapshot",
+            "portfolio_id",
+            "portfolio_name",
+            "results",
+            "pipeline_done",
+            "last_pipeline_hash",
+            "fetch_report",
+            "sandbox_preset_name",
+            "sb_wealth_profile_selector",
+            "wealth_profile_selector_widget",
+            "nw_profile_selector_widget",
+            "cf_profile_selector_widget",
+            "pension_profile_selector_widget",
+            "fiscal_profile_selector_widget",
+            "estate_profile_selector_widget",
+            "ai_profile_selector_widget",
+        ]
+        for k in keys_to_purge:
+            st_state.pop(k, None)
+
+        st_state["wealth_active_portfolio_id"] = None
+        st_state["wealth_active_profile_name"] = None
+
+        # 6. Assegnazione atomica dei nuovi puntatori
+        if new_db:
+            st_state["db_name"] = new_db
+            st_state["wealth_db_name"] = new_db
+            st_state["risk_db_name"] = new_db
+
+        if offline_mode is not None:
+            st_state["offline_mode"] = bool(offline_mode)
+
     # ── REACTIVE TOTAL WEALTH CONSOLIDATION BRIDGE ─────────────
 
     def get_consolidated_equity_for_wealth(self, engine, linked_risk_ids: Optional[List[int]] = None) -> float:

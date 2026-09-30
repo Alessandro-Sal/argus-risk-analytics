@@ -2088,4 +2088,14 @@ def sync_mysql_to_sqlite(
     """
     eng_mysql = get_engine(user=db_user, password=db_pass, host=db_host, port=db_port, db=db_name, database=db_name)
     eng_sqlite = get_engine(offline=True, sqlite_path=sqlite_path)
-    return sync_wealth_tables_between_engines(eng_mysql, eng_sqlite)
+    try:
+        return sync_wealth_tables_between_engines(eng_mysql, eng_sqlite)
+    finally:
+        try:
+            eng_mysql.dispose()
+        except Exception:
+            pass
+        try:
+            eng_sqlite.dispose()
+        except Exception:
+            pass
