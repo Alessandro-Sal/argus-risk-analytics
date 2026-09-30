@@ -445,29 +445,32 @@ class ResilientMarketDataFetcher:
 
         # Ultimo tentativo: prova a leggere qualunque dato scaduto dalla cache SQLite
         try:
-            from core.cache_shield import _get_cache_connection
+            from core.cache_shield import _binary_payload_to_df, _get_cache_connection
 
             conn = _get_cache_connection()
-            cur = conn.cursor()
-            cur.execute(
-                "SELECT payload FROM yfinance_cache WHERE ticker = ? AND data_type = 'history' ORDER BY cached_at DESC LIMIT 1",
-                (clean_ticker,),
-            )
-            row = cur.fetchone()
-            if row:
-                df_stale = pd.read_json(row[0])
-                if not df_stale.empty:
-                    freshness, as_of = MarketFreshnessEvaluator.evaluate(df_stale, clean_ticker, is_crypto)
-                    return MarketDataEnvelope(
-                        ticker=clean_ticker,
-                        data=df_stale,
-                        source="SQLite Expired Cache (Emergency)",
-                        freshness=FreshnessLevel.OFFLINE_EMERGENCY,
-                        as_of_date=as_of,
-                        latency_ms=round((time.time() - t0) * 1000, 2),
-                        is_fallback=True,
-                        warning_msg=f"⚠️ Prezzi di emergenza estratti dalla cache locale (datazione: {as_of}).",
-                    )
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    "SELECT payload FROM yfinance_cache WHERE ticker = ? AND data_type = 'history' ORDER BY cached_at DESC LIMIT 1",
+                    (clean_ticker,),
+                )
+                row = cur.fetchone()
+                if row:
+                    df_stale = _binary_payload_to_df(row[0])
+                    if not df_stale.empty:
+                        freshness, as_of = MarketFreshnessEvaluator.evaluate(df_stale, clean_ticker, is_crypto)
+                        return MarketDataEnvelope(
+                            ticker=clean_ticker,
+                            data=df_stale,
+                            source="SQLite Expired Cache (Emergency)",
+                            freshness=FreshnessLevel.OFFLINE_EMERGENCY,
+                            as_of_date=as_of,
+                            latency_ms=round((time.time() - t0) * 1000, 2),
+                            is_fallback=True,
+                            warning_msg=f"⚠️ Prezzi di emergenza estratti dalla cache locale (datazione: {as_of}).",
+                        )
+            finally:
+                conn.close()
         except Exception:
             pass
 
