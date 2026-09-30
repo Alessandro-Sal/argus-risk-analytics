@@ -41,6 +41,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    resolve_active_subtab,
     section,
 )
 from core.wealth.wealth_db import (
@@ -363,7 +364,7 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_sankey, tab_trend, tab_merchants, tab_envelope, tab_subs, tab_whatif, tab_fc, tab_recon, tab_ledger = st.tabs([
+cf_tab_options = [
     "🌊 Sankey & Flussi",
     "📊 Trend & Stagionalità MoM",
     "🏷️ Top Merchant & Pareto (80/20)",
@@ -372,8 +373,12 @@ tab_sankey, tab_trend, tab_merchants, tab_envelope, tab_subs, tab_whatif, tab_fc
     "🔄 Ottimizzazione PAC & What-If",
     "🔮 Previsione Cassa & Anomalie",
     "🔍 Smart Reconciliation & Matching",
-    "📜 Libro Mastro & Inserimento"
-])
+    "📜 Libro Mastro & Inserimento",
+]
+resolve_active_subtab(cf_tab_options, key="wealth_cf_active_tab")
+tab_sankey, tab_trend, tab_merchants, tab_envelope, tab_subs, tab_whatif, tab_fc, tab_recon, tab_ledger = st.tabs(
+    cf_tab_options, key="wealth_cf_active_tab", on_change="rerun"
+)
 
 # ── 1. SANKEY & FLUSSI ──────────────────────────────────────
 with tab_sankey:

@@ -36,6 +36,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    resolve_active_subtab,
     section,
 )
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
@@ -97,12 +98,16 @@ with col_re_h2:
 
 re_ltv_summary = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=current_pid)
 
-tab_equity, tab_mortgage, tab_roi, tab_bvr = st.tabs([
+re_tab_options = [
     "🏡 Home Equity & LTV Reale",
     "🏦 Simulatore Mutuo & Ammortamento",
     "📈 Redditività Immobiliare (Cap Rate & Cash Flow)",
-    "⚖️ Buy vs Rent (Affitto vs Acquisto)"
-])
+    "⚖️ Buy vs Rent (Affitto vs Acquisto)",
+]
+resolve_active_subtab(re_tab_options, key="wealth_re_active_tab")
+tab_equity, tab_mortgage, tab_roi, tab_bvr = st.tabs(
+    re_tab_options, key="wealth_re_active_tab", on_change="rerun"
+)
 
 # ── TAB 1: HOME EQUITY & DYNAMIC LTV ───────────────────────
 with tab_equity:

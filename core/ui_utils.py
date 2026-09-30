@@ -6657,10 +6657,11 @@ def load_benchmark_returns(ticker: str, df_prices, portfolio_index) -> pd.Series
     return sr_synth
 
 
-def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
+def resolve_active_subtab(options: list, default: str = None, key: str = "active_tab") -> str:
     """
-    Renderizza una barra di navigazione a schede istituzionale in stile Bloomberg Terminal / Linear.
-    Zero cerchietti radio, pulsanti tattili a tutta larghezza con indicatore oro, feedback immediato e piena sincronizzazione con la sidebar.
+    Risolve ed allinea lo stato attivo della sottoscheda (subtab) con priorità ai comandi
+    della sidebar (target_subtab_{key} o global_target_subtab) e sincronizza tutte le
+    chiavi di stato collegate.
     """
     if not options:
         return ""
@@ -6687,6 +6688,19 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
         st.session_state[key] = current
         st.session_state[f"{key}_selectbox"] = current
         st.session_state[f"_synced_tab_val_{key}"] = current
+
+    return current
+
+
+def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
+    """
+    Renderizza una barra di navigazione a schede istituzionale in stile Bloomberg Terminal / Linear.
+    Zero cerchietti radio, pulsanti tattili a tutta larghezza con indicatore oro, feedback immediato e piena sincronizzazione con la sidebar.
+    """
+    if not options:
+        return ""
+
+    current = resolve_active_subtab(options=options, default=default, key=key)
 
     # 2. Rendering del Deck a Schede Istituzionale & Gestione Scroll to Top
     prev_tab_session_key = f"_prev_rendered_tab_{key}"
@@ -6717,6 +6731,7 @@ def render_segmented_tabs(options: list, default: str = None, key: str = "active
         st.rerun()
 
     return st.session_state.get(key, options[0])
+
 
 
 def render_info_modal(title: str, content: str, button_label: str = "ℹ️ Metodologia & Guida", use_popover: bool = False):

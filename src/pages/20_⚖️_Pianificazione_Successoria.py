@@ -37,6 +37,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    resolve_active_subtab,
     section,
 )
 from core.wealth import (
@@ -220,13 +221,17 @@ with ek5:
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── TABS ────────────────────────────────────────────────────
-tab_shares, tab_taxes, tab_optimizer, tab_shield, tab_patto = st.tabs([
+estate_tab_options = [
     "🍰 Ripartizione Quote di Legittima",
     "🧾 Calcolo Imposta & Franchigie",
     "🚀 Generational Transfer Optimizer (Ante vs Post)",
     "🛡️ Strumenti di Protezione Patrimoniale",
-    "🏛️ Family Governance & Patti di Famiglia"
-])
+    "🏛️ Family Governance & Patti di Famiglia",
+]
+resolve_active_subtab(estate_tab_options, key="wealth_estate_active_tab")
+tab_shares, tab_taxes, tab_optimizer, tab_shield, tab_patto = st.tabs(
+    estate_tab_options, key="wealth_estate_active_tab", on_change="rerun"
+)
 
 with tab_shares:
     st.markdown("### 🍰 Ripartizione Quote di Legittima (Codice Civile Artt. 536-544)")

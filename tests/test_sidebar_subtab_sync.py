@@ -3,15 +3,50 @@
 # Test suite for bidirectional subtab and segmented tabs synchronization
 # ============================================================
 
-import pytest
+import os
+from pathlib import Path
+
 import streamlit as st
+
+from core.sidebar import NAV_MODULES_RISK, NAV_MODULES_WEALTH
+from core.ui_utils import render_segmented_tabs, resolve_active_subtab
+
+
+def test_resolve_active_subtab():
+    """Verifica che resolve_active_subtab risolva correttamente stato iniziale, target sidebar e fallback."""
+    key = "test_resolve_key"
+    keys_to_clean = [
+        key,
+        f"{key}_selectbox",
+        f"target_subtab_{key}",
+        f"_synced_tab_val_{key}",
+        "global_target_subtab",
+    ]
+    for k in keys_to_clean:
+        st.session_state.pop(k, None)
+
+    options = ["Tab Alpha", "Tab Beta", "Tab Gamma"]
+
+    # 1. Default fallback to first option
+    res = resolve_active_subtab(options, key=key)
+    assert res == "Tab Alpha"
+    assert st.session_state[key] == "Tab Alpha"
+
+    # 2. Sidebar target priority
+    st.session_state[f"target_subtab_{key}"] = "Tab Gamma"
+    res = resolve_active_subtab(options, key=key)
+    assert res == "Tab Gamma"
+    assert st.session_state[key] == "Tab Gamma"
+    assert f"target_subtab_{key}" not in st.session_state
+
+    # 3. Invalid target fallback
+    st.session_state[f"target_subtab_{key}"] = "NonExistentTab"
+    res = resolve_active_subtab(options, key=key)
+    assert res == "Tab Gamma"  # keeps current if target invalid
 
 
 def test_render_segmented_tabs_state_sync(monkeypatch):
     """Verifica che render_segmented_tabs mantenga sincronizzati tutti i puntatori di stato."""
-    from core.ui_utils import render_segmented_tabs
-
-    # Pulisci session state per il test
     keys_to_clean = [
         "test_tab_key",
         "test_tab_key_selectbox",
@@ -21,13 +56,10 @@ def test_render_segmented_tabs_state_sync(monkeypatch):
         "global_target_subtab",
     ]
     for k in keys_to_clean:
-        if k in st.session_state:
-            del st.session_state[k]
+        st.session_state.pop(k, None)
 
     options = ["Tab A", "Tab B", "Tab C"]
 
-    # Simula render iniziale
-    # Monkeypatch st.button per non cliccare nulla
     monkeypatch.setattr(st, "button", lambda *args, **kwargs: False)
     monkeypatch.setattr(st, "rerun", lambda: None)
 
@@ -45,7 +77,7 @@ def test_render_segmented_tabs_state_sync(monkeypatch):
     rerun_called = []
     monkeypatch.setattr(st, "rerun", lambda: rerun_called.append(True))
 
-    active_after_click = render_segmented_tabs(options, key="test_tab_key")
+    render_segmented_tabs(options, key="test_tab_key")
     assert st.session_state["test_tab_key"] == "Tab B"
     assert st.session_state["test_tab_key_selectbox"] == "Tab B"
     assert st.session_state["target_subtab_test_tab_key"] == "Tab B"
@@ -55,13 +87,6 @@ def test_render_segmented_tabs_state_sync(monkeypatch):
 
 def test_sidebar_subtab_bidirectional_sync_logic():
     """Verifica la logica di sincronizzazione della sidebar senza sovrascritture stantie."""
-    active_nav_modules = [
-        {
-            "has_subtabs": True,
-            "tab_key": "sync_test_mod",
-        }
-    ]
-
     tk = "sync_test_mod"
     sb_k = f"{tk}_selectbox"
     tgt_k = f"target_subtab_{tk}"
@@ -113,3 +138,35 @@ def test_sidebar_subtab_bidirectional_sync_logic():
     assert st.session_state[tk] == "Tab 3"
     assert st.session_state[sb_k] == "Tab 3"
     assert st.session_state[sync_k] == "Tab 3"
+
+
+def test_all_sidebar_subtabs_exist_in_page_files():
+    """
+    Test di regressione: verifica che TUTTE le subtabs configurate in NAV_MODULES_RISK
+    e NAV_MODULES_WEALTH abbiano un target testuale che compare nel codice sorgente della relativa pagina.
+    """
+    all_modules = NAV_MODULES_RISK + NAV_MODULES_WEALTH
+    project_root = Path(__file__).parent.parent
+
+    for mod in all_modules:
+        if not mod.get("has_subtabs"):
+            continue
+
+        raw_page_file = mod["page_file"]
+        # In this project, pages are stored in src/pages
+        page_rel = raw_page_file.replace("pages/", "src/pages/")
+        page_path = project_root / page_rel
+
+        assert page_path.exists(), f"Page file does not exist: {page_path}"
+
+        with open(page_path, encoding="utf-8") as f:
+            content = f.read()
+
+        subtabs = mod.get("subtabs", [])
+        assert len(subtabs) > 0, f"Module {mod['title']} has has_subtabs=True but subtabs is empty"
+
+        for sub in subtabs:
+            target = sub["target"]
+            assert target in content, (
+                f"Mismatch in module '{mod['title']}': target '{target}' not found in {page_path.name}"
+            )
