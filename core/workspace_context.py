@@ -624,6 +624,12 @@ class WorkspaceContext:
 
             # 1. Sanitizzazione atomica dei filtri e selezioni orfane del profilo precedente
             cls.sanitize_wealth_profile_state(preserve_routing_keys=True)
+            try:
+                from core.ui_lifecycle import teardown_view_state
+
+                teardown_view_state(reason="wealth_profile_switch")
+            except Exception:
+                pass
 
             # 2. Sincronizzazione atomica dello stato attivo primario (single source of truth)
             st_state["wealth_active_portfolio_id"] = new_pid
@@ -752,6 +758,12 @@ class WorkspaceContext:
             # 4. Sanitizzazione profonda di tutti i domini
             cls.sanitize_risk_portfolio_state(preserve_db_creds=True)
             cls.sanitize_wealth_profile_state(preserve_routing_keys=False)
+            try:
+                from core.ui_lifecycle import teardown_view_state
+
+                teardown_view_state(force=True, reason="database_switch")
+            except Exception:
+                pass
 
             # 5. Flush dei domini in WorkspaceContext
             try:
@@ -1175,3 +1187,16 @@ def prune_stale_session_caches(max_age_hours: int = 24):
                 os.remove(p)
         except Exception:
             pass
+
+
+# ── EXPORTS DI STATE MANAGEMENT & UI LIFECYCLE ───────────────────────
+try:
+    from core.ui_lifecycle import (  # noqa: F401
+        get_active_context_salt,
+        get_ui_lifecycle_telemetry,
+        get_widget_key,
+        teardown_view_state,
+    )
+except Exception:
+    pass
+
