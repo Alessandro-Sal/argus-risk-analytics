@@ -549,7 +549,9 @@ class WorkspaceContext:
             self.is_dirty = True
 
     @classmethod
-    def switch_wealth_profile(cls, new_pid: Optional[int], profile_name: Optional[str] = None) -> None:
+    def switch_wealth_profile(
+        cls, new_pid: Optional[int], profile_name: Optional[str] = None, force: bool = False
+    ) -> None:
         """
         Commuta in sicurezza il profilo patrimoniale attivo, sincronizzando tutti i widget
         di selezione e resettando lo snapshot storico per evitare data leakage tra profili.
@@ -564,6 +566,12 @@ class WorkspaceContext:
             return
 
         with cls._LOCK:
+            curr_pid = st_state.get("wealth_active_portfolio_id")
+            if not force and curr_pid == new_pid and new_pid is not None:
+                if profile_name and st_state.get("wealth_active_profile_name") != profile_name:
+                    st_state["wealth_active_profile_name"] = profile_name
+                return
+
             # 1. Sanitizzazione atomica dei filtri e selezioni orfane del profilo precedente
             cls.sanitize_wealth_profile_state(preserve_routing_keys=True)
 
@@ -628,9 +636,12 @@ class WorkspaceContext:
             try:
                 from core.fetcher import dispose_engine
 
-                old_engine = st_state.get("engine") or st_state.get("db_engine")
-                if old_engine is not None:
-                    dispose_engine(old_engine)
+                eng1 = st_state.get("engine")
+                eng2 = st_state.get("db_engine")
+                if eng1 is not None:
+                    dispose_engine(eng1)
+                if eng2 is not None and eng2 is not eng1:
+                    dispose_engine(eng2)
             except Exception:
                 pass
             st_state["engine"] = None
