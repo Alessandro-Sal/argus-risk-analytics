@@ -6688,21 +6688,30 @@ def resolve_active_subtab(options: list, default: str = None, key: str = "active
     if not options:
         return ""
 
-    # 1. Risoluzione dello stato attivo con priorità alla sidebar
+    # 1. Risoluzione dello stato attivo con priorità alla sidebar o global jump
     target = None
     if key and f"target_subtab_{key}" in st.session_state:
         target = st.session_state.pop(f"target_subtab_{key}")
     elif "global_target_subtab" in st.session_state:
         target = st.session_state.pop("global_target_subtab")
+    elif key and f"target_{key}" in st.session_state:
+        target = st.session_state.pop(f"target_{key}")
 
     if target and target in options:
         st.session_state[key] = target
         st.session_state[f"{key}_selectbox"] = target
         st.session_state[f"_synced_tab_val_{key}"] = target
-    elif key not in st.session_state:
-        st.session_state[key] = default if (default and default in options) else options[0]
+    elif f"{key}_selectbox" in st.session_state and st.session_state[f"{key}_selectbox"] in options:
+        st.session_state[key] = st.session_state[f"{key}_selectbox"]
+        st.session_state[f"_synced_tab_val_{key}"] = st.session_state[f"{key}_selectbox"]
+    elif key in st.session_state and st.session_state[key] in options:
         st.session_state[f"{key}_selectbox"] = st.session_state[key]
         st.session_state[f"_synced_tab_val_{key}"] = st.session_state[key]
+    else:
+        init_val = default if (default and default in options) else options[0]
+        st.session_state[key] = init_val
+        st.session_state[f"{key}_selectbox"] = init_val
+        st.session_state[f"_synced_tab_val_{key}"] = init_val
 
     current = st.session_state.get(key, options[0])
     if current not in options:
@@ -6714,45 +6723,145 @@ def resolve_active_subtab(options: list, default: str = None, key: str = "active
     return current
 
 
-def render_segmented_tabs(options: list, default: str = None, key: str = "active_tab") -> str:
+def render_segmented_tabs(
+    options: list | dict,
+    default: str = None,
+    key: str = "active_tab",
+    catalog: dict = None,
+    show_banner: bool = True,
+    label_visibility: str = "collapsed",
+    select_label: str = "Seleziona Modulo:",
+) -> str:
     """
-    Renderizza una barra di navigazione a schede istituzionale in stile Bloomberg Terminal / Linear.
-    Zero cerchietti radio, pulsanti tattili a tutta larghezza con indicatore oro, feedback immediato e piena sincronizzazione con la sidebar.
+    Renderizza una barra di navigazione a schede istituzionale in stile Bloomberg Terminal (Risk Engine standard).
+    Combina:
+      1. Barra compatta con Selectbox a ricerca rapida ed etichette informative [Categoria • Badge]
+      2. Pulsanti chevron di navigazione rapida sequenziale (◀ Prec. / Succ. ▶)
+      3. Banner istituzionale Bloomberg con indicatore di accento colorato e sintesi del modulo
+      4. Piena sincronizzazione bidirezionale con sidebar, query params e session_state
     """
     if not options:
         return ""
 
-    current = resolve_active_subtab(options=options, default=default, key=key)
+    if isinstance(options, dict):
+        if catalog is None:
+            catalog = options
+        option_keys = list(options.keys())
+    else:
+        option_keys = list(options)
 
-    # 2. Rendering del Deck a Schede Istituzionale & Gestione Scroll to Top
+    # 1. Risoluzione dello stato attivo con priorità alla sidebar o global jump
+    current = resolve_active_subtab(options=option_keys, default=default, key=key)
+    curr_idx = option_keys.index(current) if current in option_keys else 0
+
+    # 2. Gestione Scroll to Top al cambio tab
     prev_tab_session_key = f"_prev_rendered_tab_{key}"
     if st.session_state.get(prev_tab_session_key) != current:
         st.session_state[prev_tab_session_key] = current
         scroll_to_top()
 
-    st.markdown('<div class="argus-tab-deck-container">', unsafe_allow_html=True)
-    cols = st.columns(len(options))
-    changed = False
-    for i, opt in enumerate(options):
-        is_selected = opt == current
-        with cols[i]:
-            btn_key = f"tab_deck_{key}_{i}"
-            btn_type = "primary" if is_selected else "secondary"
-            if st.button(opt, key=btn_key, type=btn_type, use_container_width=True):
-                if st.session_state.get(key) != opt:
-                    st.session_state[key] = opt
-                    st.session_state[f"{key}_selectbox"] = opt
-                    st.session_state[f"target_subtab_{key}"] = opt
-                    st.session_state[f"_synced_tab_val_{key}"] = opt
-                    st.session_state[prev_tab_session_key] = opt
-                    changed = True
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Spaziatura e Respiro Layout
+    st.markdown("<div style='margin-top: 10px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
 
-    if changed:
-        scroll_to_top()
-        st.rerun()
+    # Barra Selettore Compatta Bloomberg Style
+    c_sel, c_prev, c_next = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
 
-    return st.session_state.get(key, options[0])
+    with c_prev:
+        if st.button("◀ Prec.", key=f"btn_{key}_prev", use_container_width=True, help="Modulo precedente"):
+            new_i = (curr_idx - 1) % len(option_keys)
+            new_val = option_keys[new_i]
+            st.session_state[key] = new_val
+            st.session_state[f"{key}_selectbox"] = new_val
+            st.session_state[f"target_subtab_{key}"] = new_val
+            st.session_state[f"_synced_tab_val_{key}"] = new_val
+            st.session_state[prev_tab_session_key] = new_val
+            scroll_to_top()
+            st.rerun()
+
+    with c_next:
+        if st.button("Succ. ▶", key=f"btn_{key}_next", use_container_width=True, help="Modulo successivo"):
+            new_i = (curr_idx + 1) % len(option_keys)
+            new_val = option_keys[new_i]
+            st.session_state[key] = new_val
+            st.session_state[f"{key}_selectbox"] = new_val
+            st.session_state[f"target_subtab_{key}"] = new_val
+            st.session_state[f"_synced_tab_val_{key}"] = new_val
+            st.session_state[prev_tab_session_key] = new_val
+            scroll_to_top()
+            st.rerun()
+
+    with c_sel:
+        def _fmt(k):
+            if catalog and k in catalog:
+                cat = catalog[k].get("category")
+                badge = catalog[k].get("badge")
+                if cat and badge:
+                    return f"{k}  —  {cat} [{badge}]"
+                elif cat:
+                    return f"{k}  —  {cat}"
+            return str(k)
+
+        selected = st.selectbox(
+            select_label,
+            options=option_keys,
+            index=curr_idx,
+            format_func=_fmt if catalog else str,
+            key=f"{key}_selectbox",
+            label_visibility=label_visibility,
+        )
+        if selected != current:
+            st.session_state[key] = selected
+            st.session_state[f"target_subtab_{key}"] = selected
+            st.session_state[f"_synced_tab_val_{key}"] = selected
+            st.session_state[prev_tab_session_key] = selected
+            current = selected
+            scroll_to_top()
+            st.rerun()
+
+    # 3. Bloomberg Terminal Header Banner per il Modulo Attivo
+    if show_banner and catalog and current in catalog:
+        active_info = catalog[current]
+        title = active_info.get("title", current)
+        badge = active_info.get("badge", "")
+        badge_color = active_info.get("badge_color", "#ff9900")
+        category = active_info.get("category", "")
+        desc = active_info.get("desc", "")
+
+        cat_html = (
+            f'<span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">{category}</span>'
+            if category
+            else ""
+        )
+        badge_html = (
+            f'<span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {badge_color}22; color: {badge_color}; border: 1px solid {badge_color}55;">{badge}</span>'
+            if badge
+            else ""
+        )
+        desc_html = (
+            f'<div style="font-size: 13px; color: #8b949e; line-height: 1.45;">{desc}</div>'
+            if desc
+            else ""
+        )
+
+        st.markdown(
+            f"""
+<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {badge_color}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
+    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+      {title}
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      {cat_html}
+      {badge_html}
+    </div>
+  </div>
+  {desc_html}
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
+    return current
 
 
 

@@ -406,12 +406,36 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
 
 from core.wealth.wealth_reporting_hub import render_wealth_reporting_and_exports_hub
 
-# ── STRUTTURA A TAB ORGANIZZATA & PULITA ────────────────────
-active_cr_tab = render_segmented_tabs([
-    "📥 Data Pipeline & Ingestion",
-    "⚙️ Gestione Conti & Categorie",
-    "📑 Hub Reportistica & Esportazioni"
-], key="wealth_cr_active_tab")
+# ── SELETTORE MODULI CONTROL ROOM STILE BLOOMBERG TERMINAL ───────
+WEALTH_CR_MODELS_CATALOG = {
+    "📥 Data Pipeline & Ingestion": {
+        "title": "Pipeline di Ingestione Dati, Connettori Bancari & Calcolo Patrimoniale",
+        "badge": "ETL Ingestion • Parsing CSV • Sync",
+        "badge_color": "#10b981",
+        "category": "Ingestione & Data Pipeline",
+        "desc": "Processo guidato a step per importare estratti conto bancari, sincronizzare fogli Google Sheets, caricare posizioni finanziarie e consolidare automaticamente il Net Worth.",
+    },
+    "⚙️ Gestione Conti & Categorie": {
+        "title": "Anagrafica Conti, Categorie di Spesa & Perimetri Patrimoniali",
+        "badge": "Conti Bancari • Categorie • Wallet",
+        "badge_color": "#38bdf8",
+        "category": "Configurazione & Anagrafica",
+        "desc": "Configurazione e censimento dei rapporti di conto corrente, depositi titoli, wallet crypto, carte di credito e definizione dell'albero delle categorie di spesa/entrata.",
+    },
+    "📑 Hub Reportistica & Esportazioni": {
+        "title": "Hub Reportistica Istituzionale, Esportazioni Dati & Audit Log",
+        "badge": "PDF Dossier • Excel • CSV Audit",
+        "badge_color": "#a855f7",
+        "category": "Reporting & Compliance",
+        "desc": "Generazione e download dei report patrimoniali consolidati: Dossier PDF per Private Banking, prospetti contabili in Excel (XLSX) e dump certificati in formato CSV.",
+    },
+}
+
+active_cr_tab = render_segmented_tabs(
+    WEALTH_CR_MODELS_CATALOG,
+    key="wealth_cr_active_tab",
+    select_label="Seleziona Modulo Control Room:",
+)
 
 # =============================================================
 # TAB 1: PIPELINE GUIDATA A STEP

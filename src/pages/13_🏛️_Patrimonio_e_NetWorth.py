@@ -437,16 +437,64 @@ with r2_c3:
 
 st.divider()
 
-# ── MACRO-TAB DEL PATRIMONIO PER MASSIMA EFFICIENZA & CHIAREZZA ───
-active_nw_tab = render_segmented_tabs([
-    "📊 Bilancio & Allocazione",
-    "📑 Bilancio Personale & Stato Patrimoniale",
-    "⏳ Wealth Temporal Desk",
-    "🏛️ Family Office & Holding",
-    "💱 Rischio FX & Attribuzione Brinson",
-    "🌪️ Global Wealth Stress-Testing",
-    "💎 Prodotti Strutturati & PRIIPs/SFDR",
-], key="wealth_nw_active_tab")
+# ── SELETTORE MODULI PATRIMONIO STILE BLOOMBERG TERMINAL ─────────
+WEALTH_NW_MODELS_CATALOG = {
+    "📊 Bilancio & Allocazione": {
+        "title": "Bilancio Consolidato Globale, Allocazione Asset & Wealth Health Score",
+        "badge": "Allocazione • Health Score • Tear Sheet",
+        "badge_color": "#10b981",
+        "category": "Bilancio & Allocazione",
+        "desc": "Quadro patrimoniale consolidato: scomposizione per macro-asset class, indicatori di solidità finanziaria (Wealth Health Score), runway di liquidità ed Executive Advisory Dossier.",
+    },
+    "📑 Bilancio Personale & Stato Patrimoniale": {
+        "title": "Stato Patrimoniale Istituzionale & Conto Economico Personale (CE/SP)",
+        "badge": "Stato Patrimoniale • Conto Economico • Multi-Year",
+        "badge_color": "#38bdf8",
+        "category": "Rendicontazione Istituzionale",
+        "desc": "Riclassificazione contabile patrimoniale: Attivo Circolante/Immobilizzato vs Passivo a Breve/Lungo Termine, Conto Economico dei flussi e analisi comparata multi-esercizio.",
+    },
+    "⏳ Wealth Temporal Desk": {
+        "title": "Wealth Temporal Desk: Dinamica Storica, Scomposizione Risparmio & Benchmark",
+        "badge": "Traiettoria • Risparmio vs Mercato • Drawdown",
+        "badge_color": "#a855f7",
+        "category": "Dinamica Temporale",
+        "desc": "Evoluzione storica del Net Worth, scomposizione della crescita del capitale (apporto risparmio vs rendimento di mercato), matrici mensili, analisi drawdown e confronto con benchmark 60/40.",
+    },
+    "🏛️ Family Office & Holding": {
+        "title": "Family Office, Governance Multi-Intestatario & Società Holding",
+        "badge": "Holding • Governance • Multi-Intestatario",
+        "badge_color": "#eab308",
+        "category": "Corporate & Governance",
+        "desc": "Mappatura e aggregazione per entità patrimoniali: conti personali, fiduciarie, holding di famiglia e quote di partecipazione con monitoraggio dei flussi inter-company.",
+    },
+    "💱 Rischio FX & Attribuzione Brinson": {
+        "title": "Esposizione Valutaria FX & Attribuzione della Performance Brinson-Fachler",
+        "badge": "Rischio FX • Brinson-Fachler • Currency Overlay",
+        "badge_color": "#ec4899",
+        "category": "Rischio Valutario & Attribuzione",
+        "desc": "Scomposizione del rischio di cambio per divisa (EUR, USD, CHF, GBP), stima dell'impatto svalutazione/rivalutazione e scomposizione Brinson (Allocation vs Selection vs Interaction).",
+    },
+    "🌪️ Global Wealth Stress-Testing": {
+        "title": "Global Wealth Stress-Testing, Simulazione Shock & Resilienza Patrimoniale",
+        "badge": "Macro Shock • Stagflazione • Resilienza",
+        "badge_color": "#f85149",
+        "category": "Stress Testing & Rischio Estremo",
+        "desc": "Stress test integrato su tutto il patrimonio netto: impatto congiunto di crisi inflazionistiche, crolli azionari, rialzi tassi sui mutui e svalutazione immobiliare con matrici di sopravvivenza.",
+    },
+    "💎 Prodotti Strutturati & PRIIPs/SFDR": {
+        "title": "Prodotti Strutturati, Certificati, Monitoraggio Barriere & PRIIPs/SFDR",
+        "badge": "Certificati • Barriere • PRIIPs KID",
+        "badge_color": "#6366f1",
+        "category": "Derivati & Strutturati",
+        "desc": "Censimento e monitoraggio di certificati di investimento e note strutturate: distanza da barriera capitale/cedola, scenari di rimborso a scadenza, KID PRIIPs e classificazione ESG SFDR.",
+    },
+}
+
+active_nw_tab = render_segmented_tabs(
+    WEALTH_NW_MODELS_CATALOG,
+    key="wealth_nw_active_tab",
+    select_label="Seleziona Modulo Patrimonio & Net Worth:",
+)
 
 # ══════════════════════════════════════════════════════════════
 # TAB 1: BILANCIO, ALLOCAZIONE & HEALTH SCORE
