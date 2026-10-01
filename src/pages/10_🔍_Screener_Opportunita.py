@@ -39,9 +39,12 @@ from core.sidebar import render_sidebar
 from core.ui_export_utils import render_table_with_export
 from core.ui_utils import (
     apply_plotly_theme,
+    computation_barrier,
+    debounce_trigger,
     ensure_risk_bundle_loaded,
     glossary_modal,
     inject_custom_css,
+    is_computing,
     metric_card,
     render_command_bar,
     render_institutional_telemetry_ribbon,
@@ -183,10 +186,24 @@ else:
         st.caption(f"ℹ️ **{univ_choice}**: {MARKET_UNIVERSES[univ_choice]['description']}")
 
 with col_u3:
-    refresh_btn = st.button("🚀 Esegui Screening", type="primary", use_container_width=True)
+    refresh_btn = st.button(
+        "🚀 Esegui Screening",
+        type="primary",
+        use_container_width=True,
+        disabled=is_computing("screener_fetch"),
+    )
+    if refresh_btn and not debounce_trigger("screener_btn", cooldown_seconds=1.2):
+        refresh_btn = False
 
 with col_u4:
-    force_refresh_btn = st.button("🔄 Forza Live", help="Bypassa la cache locale e scarica i dati più recenti in tempo reale da Yahoo Finance", use_container_width=True)
+    force_refresh_btn = st.button(
+        "🔄 Forza Live",
+        help="Bypassa la cache locale e scarica i dati più recenti in tempo reale da Yahoo Finance",
+        use_container_width=True,
+        disabled=is_computing("screener_fetch"),
+    )
+    if force_refresh_btn and not debounce_trigger("screener_force_btn", cooldown_seconds=1.2):
+        force_refresh_btn = False
 
 # Esecuzione / Caricamento dati
 need_fetch = (
@@ -197,11 +214,15 @@ need_fetch = (
 )
 
 if need_fetch and tickers_to_screen:
-    with st.spinner("Estrazione e calcolo metriche multi-fattoriali in corso (Multi-Thread Cache Shield)..."):
+    with computation_barrier(
+        key="screener_fetch",
+        label="Estrazione e calcolo metriche multi-fattoriali in corso (Multi-Thread Cache Shield)...",
+        skeleton_type="dashboard",
+    ):
         df_screened = fetch_screener_universe_data(
             tickers=tickers_to_screen,
             benchmark_ticker=benchmark_ticker,
-            force_refresh=force_refresh_btn
+            force_refresh=force_refresh_btn,
         )
         st.session_state.cached_screener_df = df_screened
         st.session_state.last_screened_universe_key = univ_key
