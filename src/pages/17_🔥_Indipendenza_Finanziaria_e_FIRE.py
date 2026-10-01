@@ -27,6 +27,7 @@ from core.sidebar import render_sidebar
 from core.ui_utils import (
     apply_chart_theme,
     apply_plotly_theme,
+    atomic_computation,
     ensure_portal_context,
     ensure_portfolio_loaded,
     fmt_eur,
@@ -38,6 +39,7 @@ from core.ui_utils import (
     render_kpi_card,
     render_omni_command_bar,
     render_page_header,
+    render_segmented_tabs,
     render_sr117_audit_drawer,
     render_standard_hero,
     render_table_with_export,
@@ -117,23 +119,55 @@ with c4:
 
 st.divider()
 
-# ── NAVIGAZIONE A TAB ───────────────────────────────────────
-fire_tab_options = [
-    "🔥 Simulatore FIRE & Traiettorie",
-    "🌪️ Wealth Macro Stress Testing",
-    "🎯 Goal-Based Multi-Traguardo & SPI %",
-    "🔮 Sequence of Returns Risk (SRR)",
-    "💸 Costi Nascosti & TER Drag",
-]
-resolve_active_subtab(fire_tab_options, key="wealth_fire_active_tab")
-tab_fire, tab_stress, tab_goals, tab_srr, tab_tco = st.tabs(
-    fire_tab_options, key="wealth_fire_active_tab", on_change="rerun"
+# ── SELETTORE MODULI FIRE STILE BLOOMBERG TERMINAL ─────────────
+WEALTH_FIRE_MODELS_CATALOG = {
+    "🔥 Simulatore FIRE & Traiettorie": {
+        "title": "Simulatore Indipendenza Finanziaria (FIRE) & 4 Archetipi",
+        "badge": "Lean • Standard • Fat • Coast FIRE",
+        "badge_color": "#f97316",
+        "category": "Indipendenza Finanziaria",
+        "desc": "Calcolo del numero FIRE, Safe Withdrawal Rate (SWR), traiettorie di accumulo/decumulo e monitoraggio dei 4 archetipi di indipendenza.",
+    },
+    "🌪️ Wealth Macro Stress Testing": {
+        "title": "Macro Stress Testing Patrimoniale & Resilienza Globale",
+        "badge": "Stagflazione • Tassi • Shock Mercati",
+        "badge_color": "#f85149",
+        "category": "Stress Testing",
+        "desc": "Simulazione congiunta di shock macroeconomici estremi (inflazione persistente, rialzi tassi, crollo azionario) sulla sostenibilità del patrimonio.",
+    },
+    "🎯 Goal-Based Multi-Traguardo & SPI %": {
+        "title": "Pianificazione Finanziaria per Obiettivi (Goal-Based) & SPI %",
+        "badge": "Goal-Based • Monte Carlo • Glide Path",
+        "badge_color": "#10b981",
+        "category": "Pianificazione Obiettivi",
+        "desc": "Gestione traguardi di vita (acquisto prima casa, istruzione figli, eredità) con calcolo Monte Carlo della probabilità di successo e allocazione dinamica.",
+    },
+    "🔮 Sequence of Returns Risk (SRR)": {
+        "title": "Sequence of Returns Risk (SRR) & Analisi di Sopravvivenza",
+        "badge": "SRR • Decumulo • Failure Rate",
+        "badge_color": "#a855f7",
+        "category": "Rischio di Decumulo",
+        "desc": "Analisi dell'impatto critico dell'ordine dei rendimenti nei primi anni di pensionamento, calcolo della probabilità di esaurimento capitale e strategie tampone.",
+    },
+    "💸 Costi Nascosti & TER Drag": {
+        "title": "Analisi Costi Nascosti, Total Expense Ratio (TER Drag) & TCO",
+        "badge": "TER Drag • Fee Impact • Compound Cost",
+        "badge_color": "#eab308",
+        "category": "Efficienza Commissionale",
+        "desc": "Quantificazione del costo totale di possesso (TCO) dei fondi/ETF e stima del capitale eroso dall'effetto cumulato delle commissioni su 30 anni.",
+    },
+}
+
+active_fire_tab = render_segmented_tabs(
+    WEALTH_FIRE_MODELS_CATALOG,
+    key="wealth_fire_active_tab",
+    select_label="Seleziona Modulo FIRE & Obiettivi:",
 )
 
 # ============================================================
 # TAB 1: SIMULATORE FIRE & TRAIETTORIE
 # ============================================================
-with tab_fire:
+if active_fire_tab == "🔥 Simulatore FIRE & Traiettorie":
     fc1, fc2, fc3, fc4 = st.columns(4)
     with fc1:
         age_in = st.slider("Età Attuale", min_value=18, max_value=60, value=28)
@@ -253,7 +287,7 @@ with tab_fire:
 # ============================================================
 # TAB 2: WEALTH MACRO STRESS TESTING & RISK ENGINE BRIDGE
 # ============================================================
-with tab_stress:
+elif active_fire_tab == "🌪️ Wealth Macro Stress Testing":
     st.markdown("### 🌪️ Ponte Wealth ⇄ Risk: Liquidity-at-Risk & Net Worth Stress Testing")
     st.caption("Integrazione quantitativa diretta con i modelli di rischio: calibrazione del fondo di emergenza su CVaR 95% (Anti-Forced Selling) e stress test macroeconomici consolidati.")
 
@@ -394,7 +428,7 @@ with tab_stress:
 # ============================================================
 # TAB 3: GOAL-BASED MULTI-TRAGUARDO & STOCHASTIC MONTE CARLO (SPI %)
 # ============================================================
-with tab_goals:
+elif active_fire_tab == "🎯 Goal-Based Multi-Traguardo & SPI %":
     st.markdown("### 🎯 Goal-Based Investing & Struttura a 3 Bucket Temporali")
     st.caption("Pianificazione stocastica per traguardi di vita (Merton Jump-Diffusion), calcolo dell'indice di successo SPI % e Glide Path.")
     st.write("")
@@ -548,22 +582,23 @@ with tab_goals:
         sim_infl_val = st.slider("Inflazione Annua (%)", min_value=0.0, max_value=8.0, value=2.0, step=0.5, key="sim_infl_in")
         sim_risk_profile = st.selectbox("Profilo Glide Path", ["conservative", "moderate", "aggressive"], index=1, key="sim_risk_prof_in")
 
-    # Esecuzione simulazione Monte Carlo con caching di sessione
+    # Esecuzione simulazione Monte Carlo con caching di sessione ed atomic loading
     mc_fire_key = f"mc_fire_{sim_curr_val}_{sim_pac_val}_{sim_target_val}_{sim_years_val}_{sim_ret_val}_{sim_vol_val}_{sim_infl_val}"
     if mc_fire_key in st.session_state:
         mc_goal_res = st.session_state[mc_fire_key]
     else:
-        mc_goal_res = compute_goal_based_monte_carlo(
-            current_amount=sim_curr_val,
-            monthly_contribution=sim_pac_val,
-            target_amount=sim_target_val,
-            years=sim_years_val,
-            mean_annual_return=sim_ret_val / 100.0,
-            annual_volatility=sim_vol_val / 100.0,
-            inflation_rate=sim_infl_val / 100.0,
-            n_simulations=5000
-        )
-        st.session_state[mc_fire_key] = mc_goal_res
+        with atomic_computation("Simulazione Stocastica Merton Jump-Diffusion (5.000 iterazioni) in corso...", view_slot_key="fire_mc_comp"):
+            mc_goal_res = compute_goal_based_monte_carlo(
+                current_amount=sim_curr_val,
+                monthly_contribution=sim_pac_val,
+                target_amount=sim_target_val,
+                years=sim_years_val,
+                mean_annual_return=sim_ret_val / 100.0,
+                annual_volatility=sim_vol_val / 100.0,
+                inflation_rate=sim_infl_val / 100.0,
+                n_simulations=5000
+            )
+            st.session_state[mc_fire_key] = mc_goal_res
 
     # Indicatori di sintesi
     spi = mc_goal_res["spi_pct"]
@@ -674,7 +709,7 @@ with tab_goals:
 # ============================================================
 # TAB 4: SEQUENCE OF RETURNS RISK (SRR) & DECUMULATION CRASH TEST
 # ============================================================
-with tab_srr:
+elif active_fire_tab == "🔮 Sequence of Returns Risk (SRR)":
     st.markdown("### 🔮 Sequence of Returns Risk (SRR) & Stress Test di Decumulo")
     st.caption("Simulazione avanzata dell'impatto di un Bear Market concentrato nei primi 3 anni di pensionamento/FIRE vs rendimenti stabili, e dimensionamento del Glide Cash Buffer per prevenire liquidazioni forzate.")
     st.write("")
@@ -760,7 +795,7 @@ with tab_srr:
 # ============================================================
 # TAB 5: COSTI NASCOSTI, TER LOOKTHROUGH & FEE DRAG (TCO)
 # ============================================================
-with tab_tco:
+elif active_fire_tab == "💸 Costi Nascosti & TER Drag":
     st.markdown("### 💸 Total Cost of Ownership (TCO) & Analisi del Fee Drag")
     st.caption("Misurazione dell'impatto cumulativo dei costi di gestione degli strumenti (TER fondi/ETF) e quantificazione dell'erosione da commissioni su orizzonti decennali.")
     st.write("")

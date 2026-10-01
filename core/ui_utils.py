@@ -9285,6 +9285,8 @@ from core.ux_institutional_hub import (  # noqa: E402, F401
     APP_VERSION,
     build_sr117_audit_record,
     build_telemetry_ribbon_state,
+    build_wealth_telemetry_ribbon_html,
+    build_wealth_telemetry_ribbon_state,
     compute_executive_traffic_light_radar,
     compute_scenario_delta_comparison,
     extract_live_portfolio_binding,
@@ -9294,5 +9296,6 @@ from core.ux_institutional_hub import (  # noqa: E402, F401
     render_scenario_delta_comparator,
     render_segmented_workspace_switcher,
     render_sr117_audit_drawer,
+    render_wealth_telemetry_ribbon,
     style_institutional_chart,
 )

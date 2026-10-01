@@ -308,12 +308,25 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **Ottimizzazione Tattica di Ribilanciamento**: Generazione autonoma di ordini vincolati a turnover e tolleranza sul tracking error rispetto all'allocazione strategica.
 - **Integrazione Fiscale TUIR & Zainetto Fiscale**: Calcolo esatto del capital gain realizzato tramite il Prezzo Medio di Carico (WACP / PMC) reale estratto dalla contabilità FIFO e compensazione preventiva con le minusvalenze pregresse disponibili per minimizzare il carico d'imposta netto generato.
 
-### `core/ui_utils.py` — ✅ Obsidian Sovereign Design System, 5-Block Modals & Vector SVG Icons
+### `core/ui_utils.py` & `core/ux_institutional_hub.py` — ✅ UI Lifecycle, Atomic Loading & Bloomberg Terminal Navigation
+- **Hard Reset / State Teardown & Lifecycle Sanitation (`teardown_view_state()`)**:
+  - Eliminazione sistematica di strascichi visivi, frame intermedi e dati fantasma (*ghost state*) durante la navigazione tra pagine, il cambio di profilo patrimoniale o lo switch di database.
+  - Reset chirurgico di variabili volatili preservando le sole chiavi strutturali d'infrastruttura (autenticazione, tema grafico, workspace attivi).
+  - Iniezione deterministica di `key_suffix` e salt dinamici legati al `portfolio_id` e al DB attivo per forzare Streamlit al rimontaggio atomico (*clean remount*) dei componenti.
+- **Flusso Atomico di Caricamento & Loading States (`atomic_computation`, `atomic_view_slot`)**:
+  - Separazione formale del lifecycle: *Fase 1: Svuotamento / Skeleton* $\rightarrow$ *Fase 2: Calcolo Bloccante / Background* $\rightarrow$ *Fase 3: Render Atomico*.
+  - Skeleton loader professionali (`render_skeleton_kpi_row`, `render_skeleton_table`) e context manager protetti che bloccano l'interazione ed evitano doppie esecuzioni (Debouncing / Concurrency Lock).
+- **Bloomberg Terminal Segmented Subtab Navigation & Bidirectional Sync**:
+  - Estensione universale a tutti i 22 moduli Risk & Wealth (Control Room, Patrimonio, Cash Flow, FIRE, Fiscalità, Immobili, Successione, AI Copilot) tramite `render_segmented_tabs()` e cataloghi di metadati strutturati (`title`, `badge`, `category`, `desc`).
+  - Pulsantiera di scorrimento sequenziale con chevron `◀ Prec.` / `Succ. ▶` e banner descrittivo istituzionale con badge categorici colorati.
+  - Sincronizzazione bidirezionale totale a 5 vie (`target_subtab_{key}`, `global_target_subtab`, `target_{key}`, `{key}_selectbox`, `st.session_state[key]`), consentendo all'albero della sidebar di selezionare e visualizzare all'istante qualsiasi sotto-modulo senza ricaricamenti anomali o perdita di stato.
+- **Institutional Wealth Telemetry Ribbon (`render_wealth_telemetry_ribbon`)**:
+  - Top-ribbon sticky glassmorphic con visualizzazione in tempo reale di *Net Worth Consolidato*, *Liquidità & Runway di Sicurezza*, *Investimenti Finanziari* e *Solvency Health Status*.
 - **Standardizzazione Istituzionale Modali Informativi**: Revisione e allineamento di tutte le schede informative sulle metriche di rischio e patrimonio allo schema rigoroso a 5 blocchi: 📌 *Cos'è*, 📐 *Formula Matematica*, 🎯 *Come interpretarlo & Benchmark*, ⚙️ *Implementazione nel Codice*, ⚠️ *Limiti & Falsi Segnali*.
 - **Icona Vettoriale SVG Pure-Code**: Risoluzione definitiva delle anomalie di rendering dei caratteri Unicode grazie all'icona SVG vettoriale inline `<circle> + <line>` integrata in `metric_card` e `render_kpi_card`.
 
 ### `core/wealth/` & `core/wealth/personal_balance_sheet.py` — ✅ Wealth Ecosystem & Personal Financial Statements
-- **`wealth_db.py`**: Star Schema relazionale per conti correnti, cash flow, asset fisici, immobili e snapshot temporali con indici compositi B-Tree ottimizzati per query time-series.
+- **`wealth_db.py`**: Star Schema relazionale per conti correnti, cash flow, asset fisici, immobili e snapshot temporali con indici compositi B-Tree ottimizzati per query time-series (`idx_cf_port_date` su `(portfolio_id, tx_date DESC)` e `idx_cf_port_cat` su `(portfolio_id, category_id)` per query OLAP istantanee multi-profilo).
 - **`personal_balance_sheet.py`**: Motore contabile per il Bilancio Personale Istituzionale (Personal Financial Statements):
   - *Stato Patrimoniale a Sezioni Contrapposte*: Attivo (Liquidità, Investimenti, Previdenza, Asset Reali, Crediti) vs Passivo (Breve e Medio/Lungo termine) vs Patrimonio Netto con quadratura a pareggio matematico esatto ($\text{Attivo} = \text{Passivo} + \text{Patrimonio Netto}$).
   - *Conto Economico di Gestione*: Rendiconto annuale delle Entrate (Lavoro, Capitale, Donazioni, Rimborsi) e Costi di Vita/Consumi con margine di Risparmio Netto e Savings Rate %.
@@ -400,7 +413,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti i **550 test automatizzati passano con successo (100%)** distribuiti su 93 file di test (inclusi i test di resilienza SRE Circuit Breaker/Jitter, il modulo `tests/test_estate_planning_optimizer.py`, la suite DBRE `tests/test_migration_manager.py`, il modulo `tests/test_structured_logging_and_support_bundle.py`, la suite di simulazione quantitativa `tests/test_realistic_portfolio_generator.py`, la suite di internazionalizzazione e cambi `tests/test_i18n_and_fx_engine.py`, la suite di esecuzione algoritmica e TCA `tests/test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `tests/test_bitemporal_engine.py`):
+Tutti gli **817 test automatizzati passano con successo (100%)** distribuiti su 100+ file di test (inclusi i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
 
 ```bash
 py -m pytest
@@ -408,7 +421,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 597 passed in ~79.00s (100%) =======================
+======================= 817 passed in ~125.00s (100%) =======================
 ```
 
 ---

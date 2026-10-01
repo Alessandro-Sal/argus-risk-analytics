@@ -33,6 +33,7 @@ from core.ui_utils import (
     metric_card,
     render_institutional_telemetry_ribbon,
     render_page_header,
+    render_segmented_tabs,
     render_sr117_audit_drawer,
     render_table_with_export,
     render_wealth_command_bar,
@@ -224,20 +225,52 @@ with ek5:
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-# ── TABS ────────────────────────────────────────────────────
-estate_tab_options = [
-    "🍰 Ripartizione Quote di Legittima",
-    "🧾 Calcolo Imposta & Franchigie",
-    "🚀 Generational Transfer Optimizer (Ante vs Post)",
-    "🛡️ Strumenti di Protezione Patrimoniale",
-    "🏛️ Family Governance & Patti di Famiglia",
-]
-resolve_active_subtab(estate_tab_options, key="wealth_estate_active_tab")
-tab_shares, tab_taxes, tab_optimizer, tab_shield, tab_patto = st.tabs(
-    estate_tab_options, key="wealth_estate_active_tab", on_change="rerun"
+# ── SELETTORE MODULI SUCCESSORI STILE BLOOMBERG TERMINAL ───────
+WEALTH_ESTATE_MODELS_CATALOG = {
+    "🍰 Ripartizione Quote di Legittima": {
+        "title": "Mappatura dell'Asse Ereditario & Quote di Riserva dei Legittimari (Codice Civile)",
+        "badge": "Legittima • Disponibile • Riunione Fittizia",
+        "badge_color": "#10b981",
+        "category": "Asse Ereditario",
+        "desc": "Calcolo delle quote di riserva ex artt. 536-564 c.c. su Relictum e Donatum (Riunione Fittizia art. 556 c.c.) e determinazione della quota disponibile.",
+    },
+    "🧾 Calcolo Imposta & Franchigie": {
+        "title": "Simulazione Imposte di Successione, Franchigie di Legge & Imposte Ipo-Catastali",
+        "badge": "TUS D.Lgs. 346/90 • Franchigie 1M/1.5M • IpoCat",
+        "badge_color": "#f85149",
+        "category": "Fiscalità Successoria",
+        "desc": "Calcolo puntuale delle imposte di successione per ciascun erede, applicazione delle franchigie di legge e imposte ipotecarie/catastali sugli immobili.",
+    },
+    "🚀 Generational Transfer Optimizer (Ante vs Post)": {
+        "title": "Generational Transfer Optimizer (Confronto Attuariale Ante vs Post Pianificazione)",
+        "badge": "Optimizer • Polizze Vita • Nuda Proprietà • Holding",
+        "badge_color": "#38bdf8",
+        "category": "Ottimizzazione Patrimoniale",
+        "desc": "Simulatore di efficienza del passaggio generazionale tramite polizze vita esenti art. 12 TUS, donazione di nuda proprietà e holding familiare.",
+    },
+    "🛡️ Strumenti di Protezione Patrimoniale": {
+        "title": "Asset Protection Matrix (Fondo Patrimoniale, Società Semplice, Trust)",
+        "badge": "Asset Protection • Trust • Società Semplice • Revocatoria",
+        "badge_color": "#fbbf24",
+        "category": "Protezione & Segregazione",
+        "desc": "Valutazione comparativa dei veicoli di segregazione patrimoniale, livello di tutela contro creditori, costi di gestione e termini di azione revocatoria.",
+    },
+    "🏛️ Family Governance & Patti di Famiglia": {
+        "title": "Family Governance & Patti di Famiglia (Art. 768-bis c.c.)",
+        "badge": "Patto di Famiglia • Continuità Aziendale • Immunità Riduzione",
+        "badge_color": "#a855f7",
+        "category": "Governance Familiare",
+        "desc": "Pianificazione del passaggio del controllo aziendale, calcolo della liquidazione dei legittimari non assegnatari e scudo definitivo contro collazione e riduzione.",
+    },
+}
+
+active_estate_tab = render_segmented_tabs(
+    WEALTH_ESTATE_MODELS_CATALOG,
+    key="wealth_estate_active_tab",
+    select_label="Seleziona Modulo Successorio:",
 )
 
-with tab_shares:
+if active_estate_tab == "🍰 Ripartizione Quote di Legittima":
     st.markdown("### 🍰 Ripartizione Quote di Legittima (Codice Civile Artt. 536-544)")
     st.caption(f"Norma applicata: **{estate['quota_desc']}**")
 
@@ -342,7 +375,7 @@ with tab_shares:
         </div>
         """, unsafe_allow_html=True)
 
-with tab_taxes:
+elif active_estate_tab == "🧾 Calcolo Imposta & Franchigie":
     st.markdown("### 🧾 Simulazione Imposte di Successione & Ipotecarie/Catastali")
     st.caption("Normativa applicata: **D.Lgs. 346/1990 (TUS)** e **D.Lgs. 347/1990**. Franchigia di € 1.000.000 (elevata a € 1.500.000 per handicap grave L. 104) con aliquota al 4% oltre soglia per coniuge e parenti in linea retta.")
 
@@ -376,7 +409,7 @@ with tab_taxes:
 
 
 # ── TAB 3: GENERATIONAL TRANSFER OPTIMIZER ──────────────────
-with tab_optimizer:
+elif active_estate_tab == "🚀 Generational Transfer Optimizer (Ante vs Post)":
     st.markdown("### 🚀 Generational Transfer Optimizer (Ante vs. Post Pianificazione HNWI)")
     st.caption("Simulatore quantitativo per la riduzione del carico fiscale successorio, la creazione di liquidità immediata per gli eredi (svincolata dai blocchi bancari) e la blindatura da azioni di riduzione.")
 
@@ -585,7 +618,7 @@ with tab_optimizer:
         )
 
 
-with tab_shield:
+elif active_estate_tab == "🛡️ Strumenti di Protezione Patrimoniale":
     st.markdown("### 🛡️ Asset Protection, Trust & Holding Familiare Simulator")
     st.caption("Analisi quantitativa e giuridica per la segregazione dei rischi patrimoniali, la protezione dai creditori e la pianificazione tramite Trust o Società Semplice (S.s.).")
 
@@ -671,7 +704,7 @@ with tab_shield:
         </div>
         """, unsafe_allow_html=True)
 
-with tab_patto:
+elif active_estate_tab == "🏛️ Family Governance & Patti di Famiglia":
     st.markdown("### 🏛️ Family Governance & Patti di Famiglia (Art. 768-bis c.c.)")
     st.caption("Pianificazione del passaggio del controllo aziendale e societario, calcolo della compensazione liquidatoria per i legittimari non assegnatari e scudo contro future azioni di riduzione.")
 

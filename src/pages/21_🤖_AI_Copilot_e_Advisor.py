@@ -26,12 +26,14 @@ from core.fetcher import get_engine
 from core.sidebar import render_sidebar
 from core.ui_utils import (
     apply_plotly_theme,
+    atomic_computation,
     fmt_eur,
     fmt_pct,
     inject_custom_css,
     metric_card,
     render_institutional_telemetry_ribbon,
     render_page_header,
+    render_segmented_tabs,
     render_sr117_audit_drawer,
     render_table_with_export,
     render_wealth_command_bar,
@@ -152,22 +154,66 @@ with k4:
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-# ── TABS ────────────────────────────────────────────────────
-copilot_tab_options = [
-    "🔍 Diagnostica & Colli di Bottiglia",
-    "⚖️ Motore di Ribilanciamento Target",
-    "🏛️ Tri-Agent Governance & Conic Rebalancer",
-    "🔮 Life Event & Decision Simulator",
-    "📑 Executive Quarterly Review (NLG)",
-    "💬 Assistente Finanziario Diretto",
-    "🎙️ AI Voice Briefing & Audio Podcast",
-]
-resolve_active_subtab(copilot_tab_options, key="wealth_copilot_active_tab")
-tab_diag, tab_rebal, tab_council, tab_life, tab_review, tab_chat, tab_voice = st.tabs(
-    copilot_tab_options, key="wealth_copilot_active_tab", on_change="rerun"
+# ── SELETTORE MODULI AI COPILOT STILE BLOOMBERG TERMINAL ───────
+WEALTH_COPILOT_MODELS_CATALOG = {
+    "🔍 Diagnostica & Colli di Bottiglia": {
+        "title": "Diagnostica Olistica di Bilancio & Algoritmi Rilevamento Colli di Bottiglia",
+        "badge": "Health Score • Colli Bottiglia • Emergency Runway",
+        "badge_color": "#10b981",
+        "category": "Audit & Diagnostica",
+        "desc": "Scansione autonoma di liquidità, risparmio 50/30/20, concentrazione e debito residuo con rating globale di salute patrimoniale.",
+    },
+    "⚖️ Motore di Ribilanciamento Target": {
+        "title": "Tax-Smart Rebalancing Watchdog & Drift Monitor (Asset Allocation Target)",
+        "badge": "Drift Watchdog • Cash Drag • Ordini Fiscale",
+        "badge_color": "#38bdf8",
+        "category": "Ribilanciamento Intelligente",
+        "desc": "Monitoraggio dello scostamento rispetto all'allocazione obiettivo, calcolo del costo opportunità da cash drag e generazione ordini con ottimizzazione fiscale.",
+    },
+    "🏛️ Tri-Agent Governance & Conic Rebalancer": {
+        "title": "Tri-Agent Quantitative Governance Council & Prescriptive Conic Rebalancer",
+        "badge": "Tri-Agent • Conic SOCP • Almgren-Chriss • Zainetto",
+        "badge_color": "#a855f7",
+        "category": "Institutional Council",
+        "desc": "Comitato quantitativo a tre agenti (Macro, Rischio, Compliance MiFID II) e ottimizzatore convesso vincolato su tracking error, turnover e zainetto fiscale.",
+    },
+    "🔮 Life Event & Decision Simulator": {
+        "title": "Life Event Simulator & Total Balance Sheet Lifetime Solvency (TBS-MC)",
+        "badge": "What-If • Simulatore Monte Carlo • Rovina a Vita",
+        "badge_color": "#fbbf24",
+        "category": "Simulazione Olistica",
+        "desc": "Simulazione d'impatto di spese straordinarie e modello Monte Carlo a ciclo di vita (fino a 90 anni) per la stima della probabilità di rovina patrimoniale.",
+    },
+    "📑 Executive Quarterly Review (NLG)": {
+        "title": "AI Executive Quarterly Review (Commentary NLG & Dossier PDF)",
+        "badge": "Natural Language • Report PDF • Family Office",
+        "badge_color": "#06b6d4",
+        "category": "Reportistica Esecutiva",
+        "desc": "Generazione automatica di commentari narrativi istituzionali e dossier trimestrale white-label stampabile in formato PDF ad alta definizione.",
+    },
+    "💬 Assistente Finanziario Diretto": {
+        "title": "Neural Wealth Advisor & Conversational Action Memo Generator",
+        "badge": "Neural Advisor • What-If Instant • Action Memo",
+        "badge_color": "#34d399",
+        "category": "Advisor Neurale",
+        "desc": "Interfaccia di dialogo e decision-making strategico connessa ai dati patrimoniali con generazione esportabile di Action Memo esecutivi.",
+    },
+    "🎙️ AI Voice Briefing & Audio Podcast": {
+        "title": "AI Voice Executive Briefing & Wealth Audio Podcast (CIO vs CRO)",
+        "badge": "Audio Podcast • Dialogue Script • Due Voci",
+        "badge_color": "#ec4899",
+        "category": "Audio Intelligence",
+        "desc": "Sintesi esecutiva in formato podcast a due voci contrapposte (Chief Investment Officer vs Chief Risk Officer) per briefing vocali istituzionali.",
+    },
+}
+
+active_copilot_tab = render_segmented_tabs(
+    WEALTH_COPILOT_MODELS_CATALOG,
+    key="wealth_copilot_active_tab",
+    select_label="Seleziona Modulo Copilot & Advisor:",
 )
 
-with tab_diag:
+if active_copilot_tab == "🔍 Diagnostica & Colli di Bottiglia":
     st.markdown("### 🔍 Report Diagnostico Autonomo ARGUS")
     st.caption("Il motore AI analizza liquidità, flussi di cassa, scudo fiscale e concentrazione degli asset per identificare inefficienze.")
 
@@ -202,7 +248,7 @@ with tab_diag:
     else:
         st.success("🎉 **Nessun collo di bottiglia critico rilevato!** Il tuo profilo patrimoniale rispetta pienamente tutti i parametri di liquidità, risparmio 50/30/20 e diversificazione.")
 
-with tab_rebal:
+elif active_copilot_tab == "⚖️ Motore di Ribilanciamento Target":
     st.markdown("### ⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor")
     st.caption("Monitoraggio in tempo reale dello scostamento (drift) dall'Asset Allocation Target con ottimizzazione fiscale vincolante (TUIR Art. 67).")
 
@@ -280,7 +326,7 @@ with tab_rebal:
         if all(d["action_type"] == "HOLD" for d in watchdog_res.get("drift_table", [])):
             st.success("✅ Portafoglio perfettamente allineato! Nessun ordine di ribilanciamento richiesto.")
 
-with tab_council:
+elif active_copilot_tab == "🏛️ Tri-Agent Governance & Conic Rebalancer":
     st.markdown("### 🏛️ Tri-Agent Quantitative Governance Council & Prescriptive Conic Rebalancer")
     st.caption("Comitato di investimento multi-agente autonomo (Tier-1 Institutional standard: BlackRock Aladdin & Bloomberg AIM). Ottimizzazione convessa vincolata su Tracking Error, Minusvalenze e Slippage Almgren-Chriss.")
 
@@ -549,7 +595,7 @@ with tab_council:
                 use_container_width=True
             )
 
-with tab_life:
+elif active_copilot_tab == "🔮 Life Event & Decision Simulator":
     st.markdown("### 🔮 Life Event & Decision Simulator")
     st.caption("Simula l'impatto di eventi di vita straordinari o decisioni di acquisto sul tuo Patrimonio Netto e sulla sicurezza del Fondo di Emergenza.")
 
@@ -649,8 +695,9 @@ with tab_life:
         num_simulations=1500
     )
 
-    tbs_mc_eng = TBSMonteCarloEngine(mc_cfg)
-    mc_res = tbs_mc_eng.simulate_lifetime_solvency()
+    with atomic_computation("Simulazione TBS-MC a Ciclo di Vita (1.500 percorsi stocastici) in corso...", view_slot_key="tbs_mc_sim"):
+        tbs_mc_eng = TBSMonteCarloEngine(mc_cfg)
+        mc_res = tbs_mc_eng.simulate_lifetime_solvency()
 
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
 
@@ -747,7 +794,7 @@ with tab_life:
     apply_plotly_theme(fig_fan)
     st.plotly_chart(fig_fan, use_container_width=True)
 
-with tab_review:
+elif active_copilot_tab == "📑 Executive Quarterly Review (NLG)":
     st.markdown("### 📑 AI Executive Quarterly Review (NLG & Client Commentary)")
     st.caption("Genera una relazione esecutiva trimestrale istituzionale in linguaggio naturale, pronta per la consultazione del Family Office o per presentazioni a clienti.")
 
@@ -784,7 +831,7 @@ with tab_review:
         )
 
 
-with tab_chat:
+elif active_copilot_tab == "💬 Assistente Finanziario Diretto":
     st.markdown("### 🧠 Neural Wealth Advisor & Conversational Action Memo")
     st.caption("Consulente patrimoniale neurale connesso in tempo reale ai tuoi dati di bilancio. Esegue simulazioni 'What-If' istantanee e redige Action Memo esecutivi.")
 
@@ -885,7 +932,7 @@ with tab_chat:
             type="primary"
         )
 
-with tab_voice:
+elif active_copilot_tab == "🎙️ AI Voice Briefing & Audio Podcast":
     st.markdown("### 🎙️ AI Voice Executive Briefing & Wealth Audio Podcast")
     st.caption("Genera un briefing audio e un copione esecutivo a due voci (Chief Investment Officer & Chief Risk Officer) sincronizzato sui dati reali del patrimonio.")
 

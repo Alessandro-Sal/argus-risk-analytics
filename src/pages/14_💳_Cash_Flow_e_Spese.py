@@ -38,6 +38,7 @@ from core.ui_utils import (
     render_kpi_card,
     render_omni_command_bar,
     render_page_header,
+    render_segmented_tabs,
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
@@ -376,25 +377,81 @@ def render_flow_detail_modal(node_name: str, df_source: pd.DataFrame):
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-# ── TABS ────────────────────────────────────────────────────
-cf_tab_options = [
-    "🌊 Sankey & Flussi",
-    "📊 Trend & Stagionalità MoM",
-    "🏷️ Top Merchant & Pareto (80/20)",
-    "🎯 Budget vs Consuntivo (Envelope)",
-    "🔁 Abbonamenti & Costi Fissi",
-    "🔄 Ottimizzazione PAC & What-If",
-    "🔮 Previsione Cassa & Anomalie",
-    "🔍 Smart Reconciliation & Matching",
-    "📜 Libro Mastro & Inserimento",
-]
-resolve_active_subtab(cf_tab_options, key="wealth_cf_active_tab")
-tab_sankey, tab_trend, tab_merchants, tab_envelope, tab_subs, tab_whatif, tab_fc, tab_recon, tab_ledger = st.tabs(
-    cf_tab_options, key="wealth_cf_active_tab", on_change="rerun"
+# ── SELETTORE MODULI CASH FLOW STILE BLOOMBERG TERMINAL ─────────
+WEALTH_CF_MODELS_CATALOG = {
+    "🌊 Sankey & Flussi": {
+        "title": "Diagramma di Flusso Sankey & Ripartizione della Cassa",
+        "badge": "Sankey • Entrate vs Uscite • Nodi",
+        "badge_color": "#10b981",
+        "category": "Flussi Finanziari",
+        "desc": "Mappatura dinamica delle entrate e uscite di cassa, scomposizione per macro-categorie e destinazione del risparmio mensile.",
+    },
+    "📊 Trend & Stagionalità MoM": {
+        "title": "Analisi Trend Temporali, Stagionalità & Spese MoM",
+        "badge": "MoM • Stagionalità • Rolling Avg",
+        "badge_color": "#38bdf8",
+        "category": "Trend Storici",
+        "desc": "Monitoraggio dell'evoluzione storica del tasso di risparmio, stagionalità delle spese ricorrenti e confronto mensile/annuale.",
+    },
+    "🏷️ Top Merchant & Pareto (80/20)": {
+        "title": "Analisi di Pareto (80/20) & Top Esercenti (Merchant)",
+        "badge": "Pareto 80/20 • Top Merchant • Leakage",
+        "badge_color": "#fbbf24",
+        "category": "Analisi Fornitori",
+        "desc": "Individuazione dei principali esercenti e identificazione delle micro-spese o dispersioni di liquidità (Cash Leakage).",
+    },
+    "🎯 Budget vs Consuntivo (Envelope)": {
+        "title": "Sistema di Budget a Buste (Envelope Budgeting) & Scostamenti",
+        "badge": "Envelope • Budget vs Consuntivo • Alert",
+        "badge_color": "#ec4899",
+        "category": "Controllo di Gestione",
+        "desc": "Pianificazione preventiva dei limiti di spesa per categoria (Buste) e monitoraggio in tempo reale degli scostamenti rispetto al budget.",
+    },
+    "🔁 Abbonamenti & Costi Fissi": {
+        "title": "Gestione Abbonamenti Ricorrenti, Servizi & Costi Fissi",
+        "badge": "Recurring • Costi Fissi • Subscriptions",
+        "badge_color": "#a855f7",
+        "category": "Costi Ricorrenti",
+        "desc": "Censimento automatico delle utenze, canoni di abbonamento periodici e stima dell'impatto cumulato annuale sul cash flow.",
+    },
+    "🔄 Ottimizzazione PAC & What-If": {
+        "title": "Simulatore Piano di Accumulo (PAC) & Ottimizzazione What-If",
+        "badge": "PAC Sizing • DCA • What-If",
+        "badge_color": "#34d399",
+        "category": "Pianificazione Investimenti",
+        "desc": "Calibrazione della quota mensile di accumulo (DCA), analisi di sostenibilità del cash buffer e simulazione di scenari what-if sul risparmio.",
+    },
+    "🔮 Previsione Cassa & Anomalie": {
+        "title": "Previsione di Cassa a 12 Mesi & Rilevamento Anomalie",
+        "badge": "Forecast • Outlier Detection • Cassa Minima",
+        "badge_color": "#f97316",
+        "category": "Previsioni & Rischio",
+        "desc": "Proiezione statistica dei flussi futuri di cassa, stima del saldo minimo di conto e alert automatici su addebiti anomali o duplicati.",
+    },
+    "🔍 Smart Reconciliation & Matching": {
+        "title": "Riconciliazione Intelligente & Matching Movimenti Bancari",
+        "badge": "Reconciliation • Auto-Match • Giroconti",
+        "badge_color": "#06b6d4",
+        "category": "Integrità Contabile",
+        "desc": "Algoritmo euristico per l'eliminazione dei doppioni, individuazione dei giroconti tra propri conti ed elisione dei trasferimenti interni.",
+    },
+    "📜 Libro Mastro & Inserimento": {
+        "title": "Libro Mastro Movimenti, Inserimento Manuale & Modifica",
+        "badge": "Libro Mastro • Quick Entry • Audit Log",
+        "badge_color": "#8b949e",
+        "category": "Registro Contabile",
+        "desc": "Registro dettagliato e filtrabile di tutti i movimenti registrati, con interfaccia rapida per inserimento manuale o bonifica record.",
+    },
+}
+
+active_cf_tab = render_segmented_tabs(
+    WEALTH_CF_MODELS_CATALOG,
+    key="wealth_cf_active_tab",
+    select_label="Seleziona Modulo Cash Flow:",
 )
 
 # ── 1. SANKEY & FLUSSI ──────────────────────────────────────
-with tab_sankey:
+if active_cf_tab == "🌊 Sankey & Flussi":
     section("🌊 Diagramma Sankey dei Flussi Finanziari")
     sankey = cf_analytics.get("sankey_data", {})
     if sankey and sankey.get("nodes") and sankey.get("links"):
@@ -516,7 +573,7 @@ with tab_sankey:
 
 
 # ── 2. TREND MENSILE & STAGIONALITÀ MoM ─────────────────────
-with tab_trend:
+elif active_cf_tab == "📊 Trend & Stagionalità MoM":
     st.markdown("### 📊 Evoluzione Finanziaria & Statistiche Temporali")
     st.caption("Confronto dinamico delle entrate operative, spese di consumo, investimenti patrimoniali e tasso di risparmio.")
     
@@ -727,7 +784,7 @@ with tab_trend:
 
 
 # ── 3. TOP MERCHANT & PARETO (80/20) ────────────────────────
-with tab_merchants:
+elif active_cf_tab == "🏷️ Top Merchant & Pareto (80/20)":
     st.markdown("### 🏷️ Top Merchant, Esercenti & Analisi di Pareto (80/20)")
     st.caption("Individuazione analitica dei fornitori e beneficiari in cui si concentra la maggior parte delle uscite.")
     
@@ -830,7 +887,7 @@ with tab_merchants:
 
 
 # ── 4. BUDGET PREVENTIVO VS CONSUNTIVO (ENVELOPE) ────────────
-with tab_envelope:
+elif active_cf_tab == "🎯 Budget vs Consuntivo (Envelope)":
     st.markdown("### 🎯 Budget Preventivo vs Consuntivo (Envelope / Plafond)")
     st.caption("Controllo in tempo reale dei limiti di spesa allocati per ciascuna categoria e monitoraggio degli sforamenti.")
     
@@ -1009,7 +1066,7 @@ with tab_envelope:
 
 
 # ── 5. ABBONAMENTI & COSTI FISSI ────────────────────────────
-with tab_subs:
+elif active_cf_tab == "🔁 Abbonamenti & Costi Fissi":
     st.markdown("### 🔁 Subscription Sentinel & Costo Opportunità a Lungo Termine")
     st.caption("Rilevamento autonomo dei costi fissi e degli abbonamenti ricorrenti con calcolo del capitale perso se investito al 7% annuo.")
     
@@ -1091,7 +1148,7 @@ with tab_subs:
 
 
 # ── 6. OTTIMIZZAZIONE PAC & WHAT-IF ─────────────────────────
-with tab_whatif:
+elif active_cf_tab == "🔄 Ottimizzazione PAC & What-If":
     st.markdown("### 🔄 Simulatore di Conversione: Spese Superflue ➔ PAC Azionario")
     st.caption("Simulatore 'What-If': Calcola la crescita esponenziale del patrimonio se tagli una quota di desideri/lifestyle e la investi a lungo termine.")
     
@@ -1165,7 +1222,7 @@ with tab_whatif:
 
 
 # ── 7. PREVISIONE CASSA & ANOMALIE ──────────────────────────
-with tab_fc:
+elif active_cf_tab == "🔮 Previsione Cassa & Anomalie":
     st.markdown("### 🔮 Previsione Cassa Rolling & Rilevamento Anomalie Z-Score")
     st.caption("Proiezione probabilistica della liquidità a 3 e 6 mesi e identificazione automatica di spike o uscite straordinarie.")
     
@@ -1248,7 +1305,7 @@ with tab_fc:
 
 
 # ── 8. SMART CASHFLOW RECONCILIATION & AUTO-MATCHING ───────────
-with tab_recon:
+elif active_cf_tab == "🔍 Smart Reconciliation & Matching":
     section("🔍 Smart Cashflow Reconciliation & Auto-Matching")
     st.caption("Riconciliazione automatica con intelligenza semantica tra estratti conto bancari e impegni ricorrenti (stipendi, rate mutuo, abbonamenti), con individuazione immediata di transazioni duplicate o non abbinate.")
 
@@ -1283,7 +1340,7 @@ with tab_recon:
 
 
 # ── 9. LIBRO MASTRO & INSERIMENTO ───────────────────────────
-with tab_ledger:
+elif active_cf_tab == "📜 Libro Mastro & Inserimento":
     df_accs = get_wealth_accounts(engine)
     df_cats = get_wealth_categories(engine)
 
