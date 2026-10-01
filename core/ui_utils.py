@@ -7688,8 +7688,9 @@ def render_wealth_profile_picker(engine, profile_map: dict, key_prefix: str = "w
                             owner=np_owner.strip() if np_owner else "Principal",
                             base_currency="EUR",
                         )
-                        st.session_state["wealth_active_portfolio_id"] = n_pid
-                        st.session_state["wealth_active_profile_name"] = np_name.strip()
+                        from core.workspace_context import WorkspaceContext
+
+                        WorkspaceContext.switch_wealth_profile(n_pid, profile_name=np_name.strip())
                         st.success(f"Profilo '{np_name.strip()}' creato e selezionato!")
                         st.rerun()
                     except Exception as ex:
