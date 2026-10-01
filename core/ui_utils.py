@@ -211,6 +211,13 @@ def inject_custom_css():
             background: transparent !important;
             background-color: transparent !important;
             color: #ffffff !important;
+            height: 0px !important;
+            min-height: 0px !important;
+            max-height: 0px !important;
+            padding: 0px !important;
+            margin: 0px !important;
+            border: none !important;
+            pointer-events: none !important;
             z-index: 99 !important;
         }}
 
@@ -237,6 +244,8 @@ def inject_custom_css():
             background: transparent !important;
             background-color: transparent !important;
             border: none !important;
+            height: 0px !important;
+            min-height: 0px !important;
         }}
 
         /* Mantieni il controllo di apertura sidebar (Panel Dock Expand) sempre visibile a sidebar chiusa */
@@ -392,12 +401,14 @@ def inject_custom_css():
             text-overflow: ellipsis !important;
         }}
 
-        /* Main Block Container - Generous Bottom Padding for Safe Scrolling */
+        /* Main Block Container - Generous Bottom Padding & Zero Top Dead Space */
         .block-container,
         [data-testid="block-container"],
         [data-testid="stMainBlockContainer"],
-        .stMainBlockContainer {{
-            padding-top: 1.5rem !important;
+        .stMainBlockContainer,
+        div[data-testid="stAppViewBlockContainer"],
+        section.main > div {{
+            padding-top: 0.35rem !important;
             padding-bottom: 6.5rem !important;
             padding-left: 1.75rem !important;
             padding-right: 1.75rem !important;
@@ -778,38 +789,119 @@ def inject_custom_css():
             animation: pulse-green 2s infinite;
         }}
 
-        /* ARGUS Glassmorphic Top Command Bar */
+        /* ARGUS Glassmorphic Top Command Bar & Alignment */
         .argus-command-bar {{
             background: rgba(22, 27, 34, 0.6);
             backdrop-filter: blur(12px);
             -webkit-backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 12px;
-            padding: 10px 18px;
-            margin-bottom: 24px;
+            padding: 8px 16px;
+            margin-bottom: 8px;
             display: flex;
             align-items: center;
             justify-content: space-between;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }}
+
+        /* Top Command Bar Containers - Zero Gap & Pixel-Perfect Vertical Centering */
+        div[class*="st-key-argus_top_command_bar_container"],
+        div[class*="st-key-argus_wealth_command_bar_container"],
+        div[class*="st-key-argus_omni_command_bar_container"] {{
+            margin-top: 0px !important;
+            margin-bottom: 4px !important;
+            padding: 0px !important;
+        }}
+
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stHorizontalBlock"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stHorizontalBlock"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stHorizontalBlock"] {{
+            align-items: center !important;
+            gap: 10px !important;
+        }}
+
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stColumn"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stColumn"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stColumn"] {{
+            display: flex !important;
+            align-items: center !important;
+            min-height: 34px !important;
+        }}
+
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stElementContainer"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stElementContainer"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stElementContainer"],
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stMarkdownContainer"],
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stMarkdownContainer"],
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stMarkdownContainer"] {{
+            margin: 0px !important;
+            padding: 0px !important;
+            display: flex !important;
+            align-items: center !important;
+            width: 100% !important;
+        }}
+
+        /* Command Bar Buttons & Popovers Matching Pill Density & Height */
+        div[class*="st-key-argus_top_command_bar_container"] button,
+        div[class*="st-key-argus_wealth_command_bar_container"] button,
+        div[class*="st-key-argus_omni_command_bar_container"] button,
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stPopover"] button,
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stPopover"] button,
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stPopover"] button {{
+            height: 32px !important;
+            min-height: 32px !important;
+            max-height: 32px !important;
+            padding: 0px 10px !important;
+            font-size: 11.5px !important;
+            font-weight: 600 !important;
+            border-radius: 6px !important;
+            line-height: 30px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: 0px !important;
+            white-space: nowrap !important;
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            color: #c9d1d9 !important;
+            transition: all 0.18s ease !important;
+        }}
+
+        div[class*="st-key-argus_top_command_bar_container"] button:hover,
+        div[class*="st-key-argus_wealth_command_bar_container"] button:hover,
+        div[class*="st-key-argus_omni_command_bar_container"] button:hover,
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stPopover"] button:hover,
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stPopover"] button:hover,
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stPopover"] button:hover {{
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 153, 0, 0.45) !important;
+            color: #ffffff !important;
+            transform: translateY(-1px) !important;
+        }}
+
         .argus-command-pill {{
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 11.5px;
-            font-weight: 500;
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #c9d1d9;
-            white-space: nowrap;
-            letter-spacing: 0.2px;
-            transition: all 0.18s ease;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            height: 32px !important;
+            min-height: 32px !important;
+            padding: 0px 10px !important;
+            border-radius: 6px !important;
+            font-size: 11.5px !important;
+            font-weight: 500 !important;
+            background: rgba(255, 255, 255, 0.04) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: #c9d1d9 !important;
+            white-space: nowrap !important;
+            letter-spacing: 0.2px !important;
+            line-height: 30px !important;
+            box-sizing: border-box !important;
+            transition: all 0.18s ease !important;
         }}
         .argus-command-pill:hover {{
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 153, 0, 0.4);
-            color: #ffffff;
+            background: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 153, 0, 0.4) !important;
+            color: #ffffff !important;
         }}
 
         /* Streamlit Tabs Customization - Glassmorphism Dock */
@@ -1645,30 +1737,32 @@ def render_command_bar():
     mode_bg = "rgba(227, 179, 65, 0.10)" if offline else "rgba(63, 185, 80, 0.10)"
     mode_border = "rgba(227, 179, 65, 0.28)" if offline else "rgba(63, 185, 80, 0.28)"
 
-    col_bar1, col_bar2 = st.columns([1.1, 1.3])
-    with col_bar1:
-        st.markdown(
-            f"""
-        <div style="display:flex; align-items:center; gap: 8px; padding: 2px 0; height: 38px;">
-            <span class="status-dot-pulse" style="margin-right: 2px;"></span>
-            <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
-                ARGUS ENGINE
-            </span>
-            <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
-            <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                <span>{port_icon}</span> {port_label}
-            </span>
-        </div>
-        """,
-            unsafe_allow_html=True,
+    with st.container(key="argus_top_command_bar_container"):
+        col_title, col_pills, col_dens, col_btn = st.columns(
+            [4.0, 2.9, 1.4, 1.1],
+            vertical_alignment="center",
         )
-
-    with col_bar2:
-        c_pills, c_dens, c_btn = st.columns([1.3, 0.9, 0.9])
-        with c_pills:
+        with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 38px;">
+            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap;">
+                <span class="status-dot-pulse" style="margin-right: 2px;"></span>
+                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+                    ARGUS ENGINE
+                </span>
+                <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
+                <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <span>{port_icon}</span> {port_label}
+                </span>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        with col_pills:
+            st.markdown(
+                f"""
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 32px; line-height: 1; white-space:nowrap;">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 <div class="argus-command-pill">📊 <b>{bench}</b></div>
                 <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
@@ -1678,7 +1772,7 @@ def render_command_bar():
             """,
                 unsafe_allow_html=True,
             )
-        with c_dens:
+        with col_dens:
             dens_labels = {"L1": "👤 L1 Client", "L2": "📊 L2 Desk", "L3": "🔬 L3 Quant"}
             cur_label = dens_labels.get(density, "🔬 L3 Quant")
             with st.popover(cur_label, use_container_width=True):
@@ -1702,7 +1796,7 @@ def render_command_bar():
                         st.query_params["density"] = code_sel
                     st.rerun()
 
-        with c_btn:
+        with col_btn:
             if st.button(
                 "⚡ Ctrl+K",
                 key="btn_open_spotlight",
@@ -8537,28 +8631,30 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
     else:
         prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic;">⏳ Nessun Profilo (In attesa)</span>'
 
-    col_bar1, col_bar2 = st.columns([1.3, 1.1])
-    with col_bar1:
-        st.markdown(
-            f"""
-        <div style="display:flex; align-items:center; gap: 8px; padding: 2px 0; height: 38px;">
-            <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981;"></span>
-            <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
-                ARGUS WEALTH
-            </span>
-            <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
-            {prof_html}
-        </div>
-        """,
-            unsafe_allow_html=True,
+    with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
+        col_title, col_pills, col_btn = st.columns(
+            [4.6, 4.0, 1.2],
+            vertical_alignment="center",
         )
-
-    with col_bar2:
-        c_pills, c_btn = st.columns([1.7, 1.0])
-        with c_pills:
+        with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 38px;">
+            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap;">
+                <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981;"></span>
+                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+                    ARGUS WEALTH
+                </span>
+                <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
+                {prof_html}
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+
+        with col_pills:
+            st.markdown(
+                f"""
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 32px; line-height: 1; white-space:nowrap;">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 <div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">
                     🏷️ <b>{rule_label}</b>
@@ -8570,7 +8666,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
             """,
                 unsafe_allow_html=True,
             )
-        with c_btn:
+        with col_btn:
             if st.button(
                 "🔍 Spotlight",
                 key=f"btn_open_spotlight_{key_suffix}",
@@ -8818,27 +8914,29 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
         "rgba(227, 179, 65, 0.28)" if offline else f"rgba({('16, 185, 129' if is_wealth else '255, 153, 0')}, 0.3)"
     )
 
-    col_bar1, col_bar2 = st.columns([1.3, 1.1])
-    with col_bar1:
-        st.markdown(
-            f"""
-        <div style="display:flex; align-items:center; gap: 8px; padding: 2px 0; height: 38px;">
-            <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px;"></span>
-            <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
-                {portal_label}
-            </span>
-            <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
-            <span style="color:{accent_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                <span>{icon}</span> {context_name}
-            </span>
-        </div>
-        """,
-            unsafe_allow_html=True,
+    with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
+        col_title, col_pills, col_btn = st.columns(
+            [4.6, 4.0, 1.2],
+            vertical_alignment="center",
         )
+        with col_title:
+            st.markdown(
+                f"""
+            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap;">
+                <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px;"></span>
+                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+                    {portal_label}
+                </span>
+                <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
+                <span style="color:{accent_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                    <span>{icon}</span> {context_name}
+                </span>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
 
-    with col_bar2:
-        c_pills, c_btn = st.columns([1.7, 1.0])
-        with c_pills:
+        with col_pills:
             extra_pill = ""
             if is_wealth:
                 w_needs = int(st.session_state.get("wealth_budget_needs_pct", 50.0))
@@ -8851,7 +8949,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 38px;">
+            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 32px; line-height: 1; white-space:nowrap;">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 {extra_pill}
                 <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
@@ -8861,7 +8959,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
             """,
                 unsafe_allow_html=True,
             )
-        with c_btn:
+        with col_btn:
             if st.button(
                 "🔍 Spotlight",
                 key=f"omni_btn_spotlight_{key_suffix}",
