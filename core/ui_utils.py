@@ -828,6 +828,14 @@ def inject_custom_css():
             min-height: 34px !important;
         }}
 
+        div[class*="st-key-argus_top_command_bar_container"] [data-testid="stColumn"] > div,
+        div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stColumn"] > div,
+        div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stColumn"] > div {{
+            width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+        }}
+
         div[class*="st-key-argus_top_command_bar_container"] [data-testid="stElementContainer"],
         div[class*="st-key-argus_wealth_command_bar_container"] [data-testid="stElementContainer"],
         div[class*="st-key-argus_omni_command_bar_container"] [data-testid="stElementContainer"],
@@ -838,6 +846,17 @@ def inject_custom_css():
             padding: 0px !important;
             display: flex !important;
             align-items: center !important;
+            width: 100% !important;
+        }}
+
+        .argus-command-pills-cluster {{
+            display: flex !important;
+            align-items: center !important;
+            justify-content: flex-end !important;
+            gap: 6px !important;
+            height: 32px !important;
+            line-height: 1 !important;
+            white-space: nowrap !important;
             width: 100% !important;
         }}
 
@@ -1738,8 +1757,8 @@ def render_command_bar():
     mode_border = "rgba(227, 179, 65, 0.28)" if offline else "rgba(63, 185, 80, 0.28)"
 
     with st.container(key="argus_top_command_bar_container"):
-        col_title, col_pills, col_dens, col_btn = st.columns(
-            [4.0, 2.9, 1.4, 1.1],
+        col_title, col_space, col_pills, col_dens, col_btn = st.columns(
+            [3.2, 2.6, 2.4, 1.1, 0.8],
             vertical_alignment="center",
         )
         with col_title:
@@ -1759,10 +1778,13 @@ def render_command_bar():
                 unsafe_allow_html=True,
             )
 
+        with col_space:
+            st.empty()
+
         with col_pills:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 32px; line-height: 1; white-space:nowrap;">
+            <div class="argus-command-pills-cluster">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 <div class="argus-command-pill">📊 <b>{bench}</b></div>
                 <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
@@ -8632,8 +8654,8 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
         prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic;">⏳ Nessun Profilo (In attesa)</span>'
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
-        col_title, col_pills, col_btn = st.columns(
-            [4.6, 4.0, 1.2],
+        col_title, col_space, col_pills, col_btn = st.columns(
+            [3.5, 3.2, 2.4, 1.0],
             vertical_alignment="center",
         )
         with col_title:
@@ -8651,10 +8673,13 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
                 unsafe_allow_html=True,
             )
 
+        with col_space:
+            st.empty()
+
         with col_pills:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 32px; line-height: 1; white-space:nowrap;">
+            <div class="argus-command-pills-cluster">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 <div class="argus-command-pill" style="background:rgba(16, 185, 129, 0.12); border-color:rgba(16, 185, 129, 0.3); color:#34d399;">
                     🏷️ <b>{rule_label}</b>
@@ -8915,8 +8940,8 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
     )
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
-        col_title, col_pills, col_btn = st.columns(
-            [4.6, 4.0, 1.2],
+        col_title, col_space, col_pills, col_btn = st.columns(
+            [3.5, 3.2, 2.4, 1.0],
             vertical_alignment="center",
         )
         with col_title:
@@ -8936,6 +8961,9 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                 unsafe_allow_html=True,
             )
 
+        with col_space:
+            st.empty()
+
         with col_pills:
             extra_pill = ""
             if is_wealth:
@@ -8949,7 +8977,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; justify-content:flex-end; gap: 6px; height: 32px; line-height: 1; white-space:nowrap;">
+            <div class="argus-command-pills-cluster">
                 <div class="argus-command-pill">💱 <b>{base_curr}</b></div>
                 {extra_pill}
                 <div class="argus-command-pill" style="background:{mode_bg}; border-color:{mode_border}; color:{mode_color};">
