@@ -19,11 +19,12 @@ if not hasattr(st, "session_state") or not isinstance(st.session_state, dict):
             self.pop(item, None)
     st.session_state = SessionState()
 
-# Mock st.spinner, st.rerun, st.cache_data
+# Mock st.spinner, st.rerun
 st.spinner = MagicMock()
 st.rerun = MagicMock()
-st.cache_data = MagicMock()
-st.cache_data.clear = MagicMock()
+if not hasattr(st, "cache_data") or not callable(st.cache_data):
+    st.cache_data = MagicMock()
+    st.cache_data.clear = MagicMock()
 
 from core.archetype_manager import clear_unified_archetype, execute_unified_archetype_load
 from core.fetcher import get_engine
