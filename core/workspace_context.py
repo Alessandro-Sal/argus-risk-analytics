@@ -6,6 +6,7 @@ Thread-safe, multi-tenant ready, with deterministic lifecycle and zero cross-con
 
 import glob
 import json
+import logging
 import os
 import pickle
 import threading
@@ -16,6 +17,32 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
+
+logger = logging.getLogger("argus.workspace")
+
+
+def _safe_log_audit(
+    action: str,
+    entity_type: str,
+    entity_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    status: str = "SUCCESS",
+) -> None:
+    """Helper difensivo per registrare audit log senza fallire in ambienti di test headless."""
+    try:
+        from core.diagnostics import log_audit_event
+
+        log_audit_event(
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            details=details,
+            status=status,
+            user_id="workspace_engine",
+        )
+    except Exception as ex:
+        logger.debug("Silenced audit log error: %s", ex)
+
 
 # ── STORAGE PATHS & CONSTANTS ────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -494,6 +521,12 @@ class WorkspaceContext:
                 except Exception:
                     st_state.pop(key, None)
 
+            logger.debug(
+                "Sanitized wealth profile state (purged %d orphan keys, preserve_routing=%s)",
+                len(keys_to_purge),
+                preserve_routing_keys,
+            )
+
             # Invalida cache dati di processo
             try:
                 st.cache_data.clear()
@@ -527,6 +560,12 @@ class WorkspaceContext:
                     del st_state[key]
                 except Exception:
                     st_state.pop(key, None)
+
+            logger.debug(
+                "Sanitized risk portfolio state (purged %d orphan keys, preserve_db_creds=%s)",
+                len(keys_to_purge),
+                preserve_db_creds,
+            )
 
             try:
                 ws = cls.get_current()
@@ -567,10 +606,21 @@ class WorkspaceContext:
 
         with cls._LOCK:
             curr_pid = st_state.get("wealth_active_portfolio_id")
+            old_name = st_state.get("wealth_active_profile_name")
             if not force and curr_pid == new_pid and new_pid is not None:
                 if profile_name and st_state.get("wealth_active_profile_name") != profile_name:
                     st_state["wealth_active_profile_name"] = profile_name
+                logger.debug("Idempotent profile switch skipped for PID %s", new_pid)
                 return
+
+            logger.info(
+                "Initiating Wealth profile switch: PID %s ('%s') -> PID %s ('%s') [force=%s]",
+                curr_pid,
+                old_name,
+                new_pid,
+                profile_name or "N/A",
+                force,
+            )
 
             # 1. Sanitizzazione atomica dei filtri e selezioni orfane del profilo precedente
             cls.sanitize_wealth_profile_state(preserve_routing_keys=True)
@@ -616,6 +666,24 @@ class WorkspaceContext:
             except Exception:
                 pass
 
+            logger.info(
+                "Wealth profile switch completed: active PID is now %s ('%s')",
+                new_pid,
+                profile_name or "N/A",
+            )
+            _safe_log_audit(
+                action="PROFILE_SWITCH",
+                entity_type="wealth_profile",
+                entity_id=str(new_pid) if new_pid is not None else "NONE",
+                details={
+                    "old_profile_id": curr_pid,
+                    "old_profile_name": old_name,
+                    "new_profile_id": new_pid,
+                    "new_profile_name": profile_name,
+                    "force": force,
+                },
+            )
+
     @classmethod
     def execute_database_switch(cls, new_db: str, offline_mode: Optional[bool] = None) -> None:
         """
@@ -632,15 +700,34 @@ class WorkspaceContext:
             return
 
         with cls._LOCK:
+            old_db = st_state.get("db_name")
+            old_offline = st_state.get("offline_mode")
+            logger.info(
+                "Initiating Database switch: '%s' (offline=%s) -> '%s' (offline=%s)",
+                old_db,
+                old_offline,
+                new_db,
+                offline_mode,
+            )
+
             # 1. Dispose del Connection Pool attivo per rilasciare socket MySQL e lock SQLite
+            disposed_fps: List[str] = []
             try:
                 from core.fetcher import dispose_engine
 
                 eng1 = st_state.get("engine")
                 eng2 = st_state.get("db_engine")
                 if eng1 is not None:
+                    try:
+                        disposed_fps.append(get_canonical_db_fingerprint(eng1))
+                    except Exception:
+                        pass
                     dispose_engine(eng1)
                 if eng2 is not None and eng2 is not eng1:
+                    try:
+                        disposed_fps.append(get_canonical_db_fingerprint(eng2))
+                    except Exception:
+                        pass
                     dispose_engine(eng2)
             except Exception:
                 pass
@@ -701,6 +788,25 @@ class WorkspaceContext:
 
             if offline_mode is not None:
                 st_state["offline_mode"] = bool(offline_mode)
+
+            logger.info(
+                "Database switch completed successfully: active DB is now '%s' (offline=%s, pools_disposed=%d)",
+                new_db,
+                st_state.get("offline_mode"),
+                len(disposed_fps),
+            )
+            _safe_log_audit(
+                action="DATABASE_SWITCH",
+                entity_type="database",
+                entity_id=new_db,
+                details={
+                    "old_db": old_db,
+                    "new_db": new_db,
+                    "old_offline": old_offline,
+                    "new_offline": st_state.get("offline_mode"),
+                    "disposed_pools": disposed_fps,
+                },
+            )
 
     # ── REACTIVE TOTAL WEALTH CONSOLIDATION BRIDGE ─────────────
 

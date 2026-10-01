@@ -86,10 +86,20 @@ def dispose_engine(engine: Any) -> None:
     socket di rete e file locks sul database.
     """
     if engine is not None:
+        fp = "unknown"
         try:
-            engine.dispose()
+            from core.workspace_context import get_canonical_db_fingerprint
+
+            fp = get_canonical_db_fingerprint(engine)
         except Exception:
-            pass
+            fp = str(getattr(engine, "url", "unbound"))
+
+        try:
+            if hasattr(engine, "dispose"):
+                engine.dispose()
+            logger.info("Disposed connection pool and released handles for engine: %s", fp)
+        except Exception as ex:
+            logger.warning("Error during dispose of engine (%s): %s", fp, ex)
 
 
 def get_engine(

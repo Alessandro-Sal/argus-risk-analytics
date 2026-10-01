@@ -835,4 +835,47 @@ class TestDatabaseProfileIsolation:
         assert st.session_state.get("wealth_active_portfolio_id") == 20
         assert st.session_state.get("wealth_active_profile_name") == "Holding Beta"
 
+    def test_audit_logging_and_observability_on_switch(self, isolated_session_state):
+        """
+        13. COMPLIANCE & OBSERVABILITY AUDIT TRAIL:
+        Verifica che ogni evento di switch di database e di profilo emetta un record
+        nell'audit trail formale (log_audit_event) con azione, entity_id, timestamp e dettagli.
+        """
+        with patch("core.diagnostics.log_audit_event") as mock_audit:
+            # Test audit su profile switch
+            st.session_state["wealth_active_portfolio_id"] = 1
+            st.session_state["wealth_active_profile_name"] = "Profilo Alfa"
+
+            WorkspaceContext.switch_wealth_profile(new_pid=2, profile_name="Profilo Beta")
+
+            assert mock_audit.called
+            profile_call = [
+                call for call in mock_audit.call_args_list if call.kwargs.get("action") == "PROFILE_SWITCH"
+            ]
+            assert len(profile_call) == 1
+            kwargs = profile_call[0].kwargs
+            assert kwargs["entity_type"] == "wealth_profile"
+            assert kwargs["entity_id"] == "2"
+            assert kwargs["details"]["old_profile_id"] == 1
+            assert kwargs["details"]["new_profile_id"] == 2
+
+            # Test audit su database switch
+            st.session_state["db_name"] = "db_alpha"
+            mock_audit.reset_mock()
+
+            WorkspaceContext.execute_database_switch(new_db="db_beta", offline_mode=True)
+
+            assert mock_audit.called
+            db_call = [
+                call for call in mock_audit.call_args_list if call.kwargs.get("action") == "DATABASE_SWITCH"
+            ]
+            assert len(db_call) == 1
+            db_kwargs = db_call[0].kwargs
+            assert db_kwargs["entity_type"] == "database"
+            assert db_kwargs["entity_id"] == "db_beta"
+            assert db_kwargs["details"]["old_db"] == "db_alpha"
+            assert db_kwargs["details"]["new_db"] == "db_beta"
+            assert db_kwargs["details"]["new_offline"] is True
+
+
 
