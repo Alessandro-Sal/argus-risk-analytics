@@ -9,6 +9,7 @@ from datetime import date, datetime
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 import core.ui_utils
@@ -17,6 +18,7 @@ importlib.reload(core.ui_utils)
 
 from core.fetcher import get_engine
 from core.sidebar import render_sidebar
+from core.ui_lifecycle import teardown_view_state
 from core.ui_utils import (
     apply_chart_theme,
     apply_plotly_theme,
@@ -30,11 +32,13 @@ from core.ui_utils import (
     render_institutional_telemetry_ribbon,
     render_kpi_card,
     render_omni_command_bar,
+    render_segmented_tabs,
     render_sr117_audit_drawer,
     render_standard_hero,
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_wealth_telemetry_ribbon,
     section,
 )
 from core.wealth import (
@@ -62,23 +66,24 @@ if current_pid is None:
     render_wealth_profile_picker(engine, prof_map, key_prefix="p15_picker")
     st.stop()
 
+# ── ATOMIC STATE TEARDOWN ───────────────────────────────────
+teardown_view_state(current_pid, active_page="15_Asset_Illiquidi_e_Orologi")
+
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p15")
-render_institutional_telemetry_ribbon(page_badge="ILLIQUID ASSETS & LUXURY VALUATION")
+render_wealth_telemetry_ribbon(nw_summary=nw_curr, page_badge="ASSET ILLIQUIDI & OROLOGI", profile_name=prof_title)
 render_wealth_executive_badges(nw_curr)
 
 render_standard_hero(
     title="Caveau & Asset Fisici",
-    subtitle="Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili e Metalli Preziosi.",
+    subtitle="Tracciamento, valutazione e rivalutazione di Orologi di Lusso, Immobili, Metalli Preziosi e Private Markets.",
     icon="⌚",
     profile_map=prof_map,
     current_pid=current_pid,
     dialog_callback=render_illiquids_methodology_modal,
-    dialog_btn_label="ℹ️ Metodologia Perizie"
+    dialog_btn_label="ℹ️ Metodologia Perizie",
 )
 
 df_assets = get_physical_assets(engine, portfolio_id=current_pid)
-
-
 
 # Calcolo metriche aggregate
 total_market_val = float(df_assets["current_market_value"].sum()) if not df_assets.empty else 0.0
@@ -101,152 +106,192 @@ with c4:
 
 st.divider()
 
-# ── SEZIONE OROLOGI DA COLLEZIONE ────────────────────────────
-section("👑 Collezione Orologi di Lusso")
+# ── SELETTORE MODULI ASSET ILLIQUIDI STILE BLOOMBERG TERMINAL ───
+WEALTH_ILLIQUIDS_MODELS_CATALOG = {
+    "👑 Collezione Orologi & Caveau": {
+        "title": "Collezione Orologi di Lusso, Caveau & Metalli Preziosi",
+        "badge": "Horology • Perizie • Haute Horlogerie",
+        "badge_color": "#6366f1",
+        "category": "Caveau & Collezionismo",
+        "desc": "Tracciamento pezzi da collezione, maison di prestigio, referenze, stato di conservazione e plusvalenze latenti da perizia periodica.",
+    },
+    "🏠 Immobili & Altri Asset Fisici": {
+        "title": "Registro Immobili, Veicoli, Opere d'Arte & Nuovi Asset",
+        "badge": "Real Estate • Tangibili • Inserimento",
+        "badge_color": "#10b981",
+        "category": "Asset Tangibili",
+        "desc": "Censimento asset fisici, terreni, metalli preziosi, veicoli e collezionismo con modulo di perizia e registrazione diretta nel Caveau.",
+    },
+    "💼 Private Equity, VC & J-Curve": {
+        "title": "Private Equity, Venture Capital & J-Curve Waterfall",
+        "badge": "Illiquid Equity • J-Curve • MOIC/TVPI",
+        "badge_color": "#f59e0b",
+        "category": "Private Markets",
+        "desc": "Monitoraggio partecipazioni non quotate, chiamate di capitale (capital calls), distribuzioni (DPI), TVPI/MOIC e XIRR di portafoglio.",
+    },
+    "🏛️ Private Debt & Direct Lending": {
+        "title": "Private Debt, Direct Lending & Credit Waterfall Desk",
+        "badge": "Direct Lending • Covenants • ICR/DSCR",
+        "badge_color": "#38bdf8",
+        "category": "Credito Privato",
+        "desc": "Analisi cascata di pagamenti multi-tranche, monitoraggio covenants contrattuali (Net Debt/EBITDA, ICR, DSCR) e stress test EBITDA.",
+    },
+}
 
-df_watches = df_assets[df_assets["asset_category"] == "luxury_watches"] if not df_assets.empty else pd.DataFrame()
-if not df_watches.empty:
-    for _, w in df_watches.iterrows():
-        brand = str(w.get("brand_or_location") or "Maison").strip()
-        model = str(w.get("model_or_specs") or "").strip()
-        ref = str(w.get("reference_number") or "").strip()
-        cond = str(w.get("condition_grade") or "Ottimo / Custodito").strip()
-        acq_date = str(w.get("acquisition_date") or "").strip()
-        if acq_date in ["None", "NaT", "nan"]: acq_date = ""
+active_illiquid_tab = render_segmented_tabs(
+    WEALTH_ILLIQUIDS_MODELS_CATALOG,
+    key="wealth_illiquids_active_tab",
+    select_label="Seleziona Modulo Asset Illiquidi:",
+)
 
-        p_cost = float(w.get("purchase_price", 0.0) or 0.0)
-        p_val = float(w.get("current_market_value", 0.0) or 0.0)
-        pnl = p_val - p_cost
-        pnl_pct = (pnl / p_cost * 100.0) if p_cost > 0 else 0.0
+# ── 1. COLLEZIONE OROLOGI & CAVEAU ─────────────────────────
+if active_illiquid_tab == "👑 Collezione Orologi & Caveau":
+    section("👑 Collezione Orologi di Lusso")
 
-        pnl_color = "#10b981" if pnl >= 0 else "#f85149"
-        pnl_sign = "+" if pnl >= 0 else ""
+    df_watches = df_assets[df_assets["asset_category"] == "luxury_watches"] if not df_assets.empty else pd.DataFrame()
+    if not df_watches.empty:
+        for _, w in df_watches.iterrows():
+            brand = str(w.get("brand_or_location") or "Maison").strip()
+            model = str(w.get("model_or_specs") or "").strip()
+            ref = str(w.get("reference_number") or "").strip()
+            cond = str(w.get("condition_grade") or "Ottimo / Custodito").strip()
+            acq_date = str(w.get("acquisition_date") or "").strip()
+            if acq_date in ["None", "NaT", "nan"]:
+                acq_date = ""
 
-        badges_html = f'<span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:3px 8px; border-radius:4px; font-size:11px; color:#c9d1d9; margin-right:6px;">🏷️ {brand}</span>'
-        if model and model.lower() != brand.lower():
-            badges_html += f'<span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:3px 8px; border-radius:4px; font-size:11px; color:#c9d1d9; margin-right:6px;">⚙️ {model}</span>'
-        if ref and ref.lower() not in ["none", "n/d", "nan", ""]:
-            badges_html += f'<span style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#818cf8; margin-right:6px;">🔖 Ref: {ref}</span>'
-        badges_html += f'<span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#34d399; margin-right:6px;">🟢 {cond}</span>'
-        if acq_date:
-            badges_html += f'<span style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:3px 8px; border-radius:4px; font-size:11px; color:#8b949e;">📅 {acq_date}</span>'
+            p_cost = float(w.get("purchase_price", 0.0) or 0.0)
+            p_val = float(w.get("current_market_value", 0.0) or 0.0)
+            pnl = p_val - p_cost
+            pnl_pct = (pnl / p_cost * 100.0) if p_cost > 0 else 0.0
 
-        st.markdown(f"""
-        <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #6366f1; border-radius:10px; padding:16px 20px; margin-bottom:14px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-                <div>
-                    <div style="font-size:17px; font-weight:700; color:#ffffff; margin-bottom:6px;">⌚ {w['name']}</div>
-                    <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">{badges_html}</div>
-                </div>
-                <div style="display:flex; gap:24px; align-items:center;">
-                    <div style="text-align:right;">
-                        <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Valore Attuale Stimato</div>
-                        <div style="font-size:19px; font-weight:700; color:#ffffff;">{fmt_eur(p_val)}</div>
-                        <div style="font-size:11px; color:#8b949e;">Acquisto: <span style="color:#c9d1d9;">{fmt_eur(p_cost)}</span></div>
+            pnl_color = "#10b981" if pnl >= 0 else "#f85149"
+            pnl_sign = "+" if pnl >= 0 else ""
+
+            badges_html = f'<span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:3px 8px; border-radius:4px; font-size:11px; color:#c9d1d9; margin-right:6px;">🏷️ {brand}</span>'
+            if model and model.lower() != brand.lower():
+                badges_html += f'<span style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); padding:3px 8px; border-radius:4px; font-size:11px; color:#c9d1d9; margin-right:6px;">⚙️ {model}</span>'
+            if ref and ref.lower() not in ["none", "n/d", "nan", ""]:
+                badges_html += f'<span style="background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#818cf8; margin-right:6px;">🔖 Ref: {ref}</span>'
+            badges_html += f'<span style="background:rgba(16,185,129,0.15); border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:4px; font-size:11px; color:#34d399; margin-right:6px;">🟢 {cond}</span>'
+            if acq_date:
+                badges_html += f'<span style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); padding:3px 8px; border-radius:4px; font-size:11px; color:#8b949e;">📅 {acq_date}</span>'
+
+            st.markdown(
+                f"""
+            <div style="background:rgba(22,27,34,0.85); border:1px solid rgba(255,255,255,0.08); border-left:4px solid #6366f1; border-radius:10px; padding:16px 20px; margin-bottom:14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+                    <div>
+                        <div style="font-size:17px; font-weight:700; color:#ffffff; margin-bottom:6px;">⌚ {w['name']}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; align-items:center;">{badges_html}</div>
                     </div>
-                    <div style="text-align:right; min-width:110px;">
-                        <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Plusvalenza Latente</div>
-                        <div style="font-size:19px; font-weight:700; color:{pnl_color};">{pnl_sign}{fmt_eur(pnl)}</div>
-                        <div style="font-size:11px; font-weight:600; color:{pnl_color};">{pnl_sign}{pnl_pct:.1f}%</div>
+                    <div style="display:flex; gap:24px; align-items:center;">
+                        <div style="text-align:right;">
+                            <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Valore Attuale Stimato</div>
+                            <div style="font-size:19px; font-weight:700; color:#ffffff;">{fmt_eur(p_val)}</div>
+                            <div style="font-size:11px; color:#8b949e;">Acquisto: <span style="color:#c9d1d9;">{fmt_eur(p_cost)}</span></div>
+                        </div>
+                        <div style="text-align:right; min-width:110px;">
+                            <div style="font-size:11px; font-weight:600; color:#8b949e; text-transform:uppercase; letter-spacing:0.5px;">Plusvalenza Latente</div>
+                            <div style="font-size:19px; font-weight:700; color:{pnl_color};">{pnl_sign}{fmt_eur(pnl)}</div>
+                            <div style="font-size:11px; font-weight:600; color:{pnl_color};">{pnl_sign}{pnl_pct:.1f}%</div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
-else:
-    st.info("Nessun orologio registrato. Aggiungi il tuo primo segnatempo dal modulo sottostante.")
+            """,
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("Nessun orologio registrato. Aggiungi il tuo primo segnatempo dal modulo nella sezione 'Immobili & Altri Asset Fisici'.")
 
-# ── SEZIONE ALTRI ASSET (IMMOBILI, METALLI) ──────────────────
-section("🏠 Immobili, Metalli Preziosi & Altro")
-df_other = df_assets[df_assets["asset_category"] != "luxury_watches"] if not df_assets.empty else pd.DataFrame()
-if not df_other.empty:
-    cat_map = {
-        "precious_metals": "🥇 Metalli Preziosi (Oro/Argento)",
-        "real_estate": "🏠 Immobili / Terreni",
-        "collectibles_art": "🎨 Collezionismo & Arte",
-        "vehicles": "🚗 Veicoli & Auto",
-        "other": "📦 Altro Caveau"
-    }
-    
-    df_other_disp = df_other.copy()
-    df_other_disp["Categoria"] = df_other_disp["asset_category"].map(lambda c: cat_map.get(c, c.replace("_", " ").title()))
-    df_other_disp["Prezzo Acquisto"] = df_other_disp["purchase_price"].apply(lambda v: fmt_eur(v) if float(v or 0.0) > 0 else "€ 0,00 (Donazione / Oro)")
-    df_other_disp["Valore Attuale"] = df_other_disp["current_market_value"].apply(lambda v: fmt_eur(v))
-    df_other_disp["Plusvalenza"] = df_other_disp["unrealized_pnl"].apply(lambda v: f"{'+' if v >= 0 else ''}{fmt_eur(v)}")
-    df_other_disp["Rivalutazione"] = df_other_disp.apply(
-        lambda r: "+100.0% (Oro / Donazione)" if float(r.get("purchase_price", 0.0) or 0.0) == 0.0 and float(r.get("current_market_value", 0.0) or 0.0) > 0
-        else (f"{'+' if r['unrealized_pnl_pct'] >= 0 else ''}{r['unrealized_pnl_pct']:.1f}%" if pd.notna(r.get("unrealized_pnl_pct")) else "N/D"),
-        axis=1
-    )
-    
-    render_table_with_export(
-        df_other_disp[["name", "Categoria", "brand_or_location", "model_or_specs", "Prezzo Acquisto", "Valore Attuale", "Plusvalenza", "Rivalutazione"]].rename(columns={
-            "name": "Nome Asset",
-            "brand_or_location": "Materiale / Maison",
-            "model_or_specs": "Dettagli / Specifiche"
-        }),
-        table_title="Asset Fisici, Orologi & Metalli Preziosi",
-        file_prefix="asset_fisici_caveau",
-        key_suffix="p15_physical_assets"
-    )
-else:
-    st.caption("Nessun immobile o metallo prezioso registrato.")
+# ── 2. IMMOBILI & ALTRI ASSET FISICI ───────────────────────
+elif active_illiquid_tab == "🏠 Immobili & Altri Asset Fisici":
+    section("🏠 Immobili, Metalli Preziosi & Altro")
+    df_other = df_assets[df_assets["asset_category"] != "luxury_watches"] if not df_assets.empty else pd.DataFrame()
+    if not df_other.empty:
+        cat_map = {
+            "precious_metals": "🥇 Metalli Preziosi (Oro/Argento)",
+            "real_estate": "🏠 Immobili / Terreni",
+            "collectibles_art": "🎨 Collezionismo & Arte",
+            "vehicles": "🚗 Veicoli & Auto",
+            "other": "📦 Altro Caveau",
+        }
 
+        df_other_disp = df_other.copy()
+        df_other_disp["Categoria"] = df_other_disp["asset_category"].map(lambda c: cat_map.get(c, c.replace("_", " ").title()))
+        df_other_disp["Prezzo Acquisto"] = df_other_disp["purchase_price"].apply(lambda v: fmt_eur(v) if float(v or 0.0) > 0 else "€ 0,00 (Donazione / Oro)")
+        df_other_disp["Valore Attuale"] = df_other_disp["current_market_value"].apply(lambda v: fmt_eur(v))
+        df_other_disp["Plusvalenza"] = df_other_disp["unrealized_pnl"].apply(lambda v: f"{'+' if v >= 0 else ''}{fmt_eur(v)}")
+        df_other_disp["Rivalutazione"] = df_other_disp.apply(
+            lambda r: "+100.0% (Oro / Donazione)"
+            if float(r.get("purchase_price", 0.0) or 0.0) == 0.0 and float(r.get("current_market_value", 0.0) or 0.0) > 0
+            else (f"{'+' if r['unrealized_pnl_pct'] >= 0 else ''}{r['unrealized_pnl_pct']:.1f}%" if pd.notna(r.get("unrealized_pnl_pct")) else "N/D"),
+            axis=1,
+        )
 
-# ── FORM AGGIUNGI / MODIFICA ASSET FISICO ────────────────────
-with st.expander("➕ Aggiungi Nuovo Orologio, Immobile o Asset Fisico"):
-    with st.form("form_add_physical_asset"):
-        pa1, pa2, pa3 = st.columns(3)
-        with pa1:
-            pa_name = st.text_input("Nome Identificativo *", placeholder="es. Rolex GMT-Master II Batman")
-            pa_cat = st.selectbox("Categoria Asset *", [
-                ("luxury_watches", "Orologio di Lusso"),
-                ("real_estate", "Immobile / Terreno"),
-                ("precious_metals", "Metalli Preziosi (Oro/Argento)"),
-                ("collectibles_art", "Collezionismo / Arte / Auto"),
-                ("vehicles", "Veicoli (Auto/Moto)"),
-                ("other", "Altro")
-            ], format_func=lambda x: x[1])
-            pa_brand = st.text_input("Maison / Brand o Città", placeholder="es. Rolex, Patek, Milano...")
-        with pa2:
-            pa_model = st.text_input("Modello / Specifiche", placeholder="es. GMT-Master II Jubilee")
-            pa_ref = st.text_input("Numero Referenza / Catasto", placeholder="es. 126710BLNR")
-            pa_cond = st.text_input("Condizione & Set", placeholder="es. Mai indossato / Full Set 2024")
-        with pa3:
-            pa_cost = st.number_input("Prezzo d'Acquisto (€) *", min_value=0.0, value=10000.0, step=500.0)
-            pa_val = st.number_input("Valore di Mercato Attuale (€) *", min_value=0.0, value=15000.0, step=500.0)
-            pa_date = st.date_input("Data di Acquisto", value=date.today())
-            pa_notes = st.text_input("Note", placeholder="Garanzia, revisione, provenienza...")
+        render_table_with_export(
+            df_other_disp[["name", "Categoria", "brand_or_location", "model_or_specs", "Prezzo Acquisto", "Valore Attuale", "Plusvalenza", "Rivalutazione"]].rename(columns={
+                "name": "Nome Asset",
+                "brand_or_location": "Materiale / Maison",
+                "model_or_specs": "Dettagli / Specifiche",
+            }),
+            table_title="Asset Fisici, Orologi & Metalli Preziosi",
+            file_prefix="asset_fisici_caveau",
+            key_suffix="p15_physical_assets",
+        )
+    else:
+        st.caption("Nessun immobile o metallo prezioso registrato.")
 
-        btn_save_pa = st.form_submit_button("💾 Salva nel Caveau", use_container_width=True)
-        if btn_save_pa:
-            if pa_name:
-                save_physical_asset(engine, {
-                    "portfolio_id": current_pid,
-                    "name": pa_name,
-                    "asset_category": pa_cat[0],
-                    "brand_or_location": pa_brand,
-                    "model_or_specs": pa_model,
-                    "reference_number": pa_ref,
-                    "condition_grade": pa_cond,
-                    "purchase_price": pa_cost,
-                    "current_market_value": pa_val,
-                    "acquisition_date": pa_date,
-                    "notes": pa_notes
-                })
+    st.write("")
+    # ── FORM AGGIUNGI / MODIFICA ASSET FISICO ────────────────────
+    with st.expander("➕ Aggiungi Nuovo Orologio, Immobile o Asset Fisico al Caveau", expanded=df_other.empty):
+        with st.form("form_add_physical_asset"):
+            pa1, pa2, pa3 = st.columns(3)
+            with pa1:
+                pa_name = st.text_input("Nome Identificativo *", placeholder="es. Rolex GMT-Master II Batman")
+                pa_cat = st.selectbox("Categoria Asset *", [
+                    ("luxury_watches", "Orologio di Lusso"),
+                    ("real_estate", "Immobile / Terreno"),
+                    ("precious_metals", "Metalli Preziosi (Oro/Argento)"),
+                    ("collectibles_art", "Collezionismo / Arte / Auto"),
+                    ("vehicles", "Veicoli (Auto/Moto)"),
+                    ("other", "Altro"),
+                ], format_func=lambda x: x[1])
+                pa_brand = st.text_input("Maison / Brand o Città", placeholder="es. Rolex, Patek, Milano...")
+            with pa2:
+                pa_model = st.text_input("Modello / Specifiche", placeholder="es. GMT-Master II Jubilee")
+                pa_ref = st.text_input("Numero Referenza / Catasto", placeholder="es. 126710BLNR")
+                pa_cond = st.text_input("Condizione & Set", placeholder="es. Mai indossato / Full Set 2024")
+            with pa3:
+                pa_cost = st.number_input("Prezzo d'Acquisto (€) *", min_value=0.0, value=10000.0, step=500.0)
+                pa_val = st.number_input("Valore di Mercato Attuale (€) *", min_value=0.0, value=15000.0, step=500.0)
+                pa_date = st.date_input("Data di Acquisto", value=date.today())
+                pa_notes = st.text_input("Note", placeholder="Garanzia, revisione, provenienza...")
 
-                st.success(f"Asset '{pa_name}' salvato con successo!")
-                st.rerun()
-            else:
-                st.error("Inserisci il Nome Identificativo dell'asset.")
+            btn_save_pa = st.form_submit_button("💾 Salva nel Caveau", use_container_width=True)
+            if btn_save_pa:
+                if pa_name:
+                    save_physical_asset(engine, {
+                        "portfolio_id": current_pid,
+                        "name": pa_name,
+                        "asset_category": pa_cat[0],
+                        "brand_or_location": pa_brand,
+                        "model_or_specs": pa_model,
+                        "reference_number": pa_ref,
+                        "condition_grade": pa_cond,
+                        "purchase_price": pa_cost,
+                        "current_market_value": pa_val,
+                        "acquisition_date": pa_date,
+                        "notes": pa_notes,
+                    })
 
-st.divider()
+                    st.success(f"Asset '{pa_name}' salvato con successo!")
+                    st.rerun()
+                else:
+                    st.error("Inserisci il Nome Identificativo dell'asset.")
 
-# ── DESK SIMULATORE: PRIVATE EQUITY, VENTURE CAPITAL & PRIVATE DEBT ────
-with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Capital & Private Debt (J-Curve & Covenants)", expanded=False):
-    st.info("💡 **Desk di Modellazione & Previsione Deal:** Nel tuo profilo non risultano attualmente partecipazioni societarie illiquide o quote di credito privato. Questo desk consente di simulare chiamate di capitale (Capital Calls), distribuzioni (DPI), curva J-Curve (XIRR/MOIC) e stress test dei covenants creditizi prima di sottoscrivere un nuovo fondo o club deal.")
-
-    # ── SEZIONE PRIVATE EQUITY, VENTURE CAPITAL & J-CURVE ────────
+# ── 3. PRIVATE EQUITY, VC & J-CURVE ────────────────────────
+elif active_illiquid_tab == "💼 Private Equity, VC & J-Curve":
     section("💼 Private Equity, Venture Capital & J-Curve Waterfall (Simulazione)")
     st.caption("Monitoraggio delle partecipazioni societarie illiquide, chiamate di capitale (Capital Calls), distribuzioni (DPI) e modellazione stocastica della J-Curve di rendimento atteso.")
 
@@ -276,16 +321,15 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
                 "current_nav_estimated_eur": "NAV Stimato (€)",
                 "moic_multiple": "MOIC (x)",
                 "irr_net_pct": "XIRR (%)",
-                "status": "Stato"
+                "status": "Stato",
             }),
             table_title="Registro Partecipazioni & Club Deal",
             file_prefix="pe_club_deals",
-            key_suffix="p15_pe_deals"
+            key_suffix="p15_pe_deals",
         )
 
     with c_pe_right:
         st.markdown("##### 📈 Modellazione J-Curve di Portafoglio")
-        import plotly.graph_objects as go
         df_j = pe_res["j_curve_df"]
         fig_j = go.Figure()
         fig_j.add_trace(go.Scatter(
@@ -293,29 +337,28 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
             y=df_j["Valore Netto Portafoglio PE (€)"],
             mode="lines+markers",
             name="Valore Netto (J-Curve)",
-            line=dict(color="#6366f1", width=3)
+            line=dict(color="#6366f1", width=3),
         ))
         fig_j.add_trace(go.Scatter(
             x=df_j["Anno di Vita Deal"],
             y=df_j["Capitale Versato Cumulativo (€)"],
             mode="lines",
             name="Capitale Versato Base",
-            line=dict(color="#94a3b8", width=1.5, dash="dash")
+            line=dict(color="#94a3b8", width=1.5, dash="dash"),
         ))
         fig_j.update_layout(
             xaxis_title="Anno di Vita del Deal",
             yaxis_title="Valore (€)",
             height=280,
             margin=dict(t=15, l=10, r=10, b=10),
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
         )
         apply_chart_theme(fig_j, portal_mode="wealth")
-        st.plotly_chart(fig_j, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig_j, use_container_width=True, config={"displayModeBar": False})
 
-    st.divider()
-
-    # ── PRIVATE DEBT & DIRECT LENDING WATERFALL DESK ────────────
-    st.markdown("### 🏛️ Private Debt, Direct Lending & Credit Waterfall Desk")
+# ── 4. PRIVATE DEBT & DIRECT LENDING ───────────────────────
+elif active_illiquid_tab == "🏛️ Private Debt & Direct Lending":
+    section("🏛️ Private Debt, Direct Lending & Credit Waterfall Desk")
     st.caption("Analisi della cascata di pagamenti multi-tranche per investimenti in credito privato, monitoraggio contrattuale dei covenants (Leva Net Debt/EBITDA, ICR, DSCR) e capitalizzazione interessi PIK.")
 
     from core.private_debt_engine import compute_private_debt_waterfall_and_covenants, get_standard_private_debt_deals
@@ -341,7 +384,7 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
     with pdk3:
         metric_card("Rendimento All-In Medio", f"{pd_analysis['weighted_all_in_yield_pct']:.2f}%", delta="Cash + PIK", delta_color="normal")
     with pdk4:
-        metric_card("Copertura Interessi (ICR)", f"{cr_m['interest_coverage_ratio_icr']:.2f}x", delta=f"Min Richiesto: {cr_m['min_icr_allowed']:.2f}x", delta_color="normal" if not cr_m['icr_breached'] else "inverse")
+        metric_card("Copertura Interessi (ICR)", f"{cr_m['interest_coverage_ratio_icr']:.2f}x", delta=f"Min Richiesto: {cr_m['min_icr_allowed']:.2f}x", delta_color="normal" if not cr_m["icr_breached"] else "inverse")
 
     st.write("")
 
@@ -356,16 +399,17 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
                 "pik_coupon_pct": "Cedola PIK (%)",
                 "all_in_yield_pct": "Rendimento Totale (%)",
                 "attachment_leverage": "Attach Leverage",
-                "detachment_leverage": "Detach Leverage"
+                "detachment_leverage": "Detach Leverage",
             }),
             table_title="Scomposizione Tranche & Struttura del Capitale",
             file_prefix="private_debt_tranches",
-            key_suffix="p15_pd_tranches"
+            key_suffix="p15_pd_tranches",
         )
 
     with col_pd_r:
         st.markdown("##### 🛡️ Monitoraggio Covenants & DSCR")
-        st.markdown(f"""
+        st.markdown(
+            f"""
         <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(99, 102, 241, 0.25); border-left: 4px solid #6366f1; border-radius: 10px; padding: 14px 18px;">
             <b style="color: #6366f1; font-size: 14px;">Quadro di Solidità Creditizia:</b><br>
             <span style="font-size: 13px; color: #cbd5e1; line-height: 1.6;">
@@ -376,4 +420,6 @@ with st.expander("💼 Desk Simulatore & Stress Test: Private Equity, Venture Ca
             <b style="color: {'#10b981' if pd_analysis['is_covenant_compliant'] else '#ef4444'};">Esito Monitoraggio: {pd_analysis['covenant_status']}</b>
             </span>
         </div>
-        """, unsafe_allow_html=True)
+        """,
+            unsafe_allow_html=True,
+        )

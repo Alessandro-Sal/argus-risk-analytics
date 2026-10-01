@@ -344,6 +344,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 - **`wealth_stress_engine.py`**: Motore congiunto di macro stress testing che modella la trasmissione dello shock tassi sull'ammortamento non-lineare dei mutui alla francese ($\Delta PMT$), identifica il *Point of Forced Liquidation* ($t^*$) sul fondo di emergenza, stima la perdita irreversibile da liquidazione forzata di asset depressi e ricalcola il Safe Withdrawal Rate dinamico con regole di Guyton-Klinger.
 - **`wealth_importer.py` & `wealth_validator.py`**: Parser universale con tolleranza a format drift e riconciliazione automatica con `DataQualityGate`.
 - **`wealth_exporter.py`**: Generazione del Master Workbook Excel (.xlsx multi-tab) sanitizzato con bilancio consolidato e tabelle `ListObject` con formule live.
+- **`wealth_olap.py`**: Motore OLAP vettorizzato in-process basato su DuckDB C++ SIMD (con fallback trasparente su Pandas) per il calcolo sub-millisecondo di cubi multidimensionali sui movimenti di cassa (`compute_wealth_cashflow_olap_cube`), scomposizione Pareto 80/20 di categorie e merchant, e analisi di traiettoria temporale del Net Worth (`compute_wealth_snapshot_trajectory_olap` con HWM, Max Drawdown e CAGR).
 
 ### `scripts/generate_realistic_portfolio.py` — ✅ Quantitative Simulation Engine & Synthetic Archetypes Generator
 - **Motore di Simulazione Vettorizzato**: Generazione end-to-end di serie storiche pluriennali realistiche di transazioni mobiliari e flussi di cassa patrimoniali con coerenza macroeconomica, stagionalità e microstruttura.
@@ -401,19 +402,19 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 13. **`12_🎛️_Wealth_Control_Room.py`**: Control Room del patrimonio complessivo, sincronizzazione estratti conto bancari, Universal Bank Ingestion Hub (Layout Sniffer), switch profili patrimoniali e **🎲 Archetipi Patrimoniali Didattici 1-Click** per l'iniezione atomica dell'ecosistema completo (conti, cash flow, mutui francesi, asset illiquidi con perizie, fondi pensione e snapshot) nel database SQLite locale.
 14. **`13_🏛️_Patrimonio_e_NetWorth.py`**: **Bilancio Personale Istituzionale (Stato Patrimoniale a sezioni contrapposte con quadratura a pareggio, Conto Economico di gestione per anno solare, Waterfall Flussi di Risparmio, 6 Indici di Solidità con Radar e Rating AAA)**, Bilancio patrimoniale consolidato a 5 livelli (Liquidità, Investimenti, Previdenza, Asset Fisici, Passività), **Unified Macro Stress Engine (Shock Tassi, Ammortamento Mutui $\Delta PMT$, Liquidity Squeeze $t^*$ & Guyton-Klinger SWR)**, Family Office Holding Consolidator (PEX 1,2% vs 26%), Currency Overlay ed Advisory Pitchbook PDF a 6 pagine.
 15. **`14_💳_Cash_Flow_e_Spese.py`**: Budgeting con regola 50/30/20, diagramma di flusso Sankey interattivo, tracciamento entrate/uscite e diagnosi dei costi fissi.
-16. **`15_⌚_Asset_Illiquidi_e_Orologi.py`**: Gestione asset fisici e collezionabili (orologi di lusso, metalli preziosi, opere d'arte) con storico rivalutazioni, perizie e liquidity haircut.
-17. **`16_🛡️_Previdenza_e_Pension_Planning.py`**: Simulazione pensione pubblica (INPS) e integrativa, stima del tasso di sostituzione, gap pensionistico e deducibilità fiscale contributi (€5.164,57 annui).
+16. **`15_⌚_Asset_Illiquidi_e_Orologi.py`**: **Bloomberg Terminal Segmented Navigation (4 Subtab: `👑 Collezione Orologi & Caveau`, `🏠 Immobili & Altri Asset Fisici`, `💼 Private Equity, VC & J-Curve`, `🏛️ Private Debt & Direct Lending Waterfall`)**, gestione collezionabili, perizie storiche, liquidity haircut prudenziale, chiamate di capitale e monitoraggio covenants creditizi.
+17. **`16_🛡️_Previdenza_e_Pension_Planning.py`**: **Bloomberg Terminal Segmented Navigation (3 Subtab: `📋 Piani Attivi & Scudo Fiscale`, `🎲 Simulatore Monte Carlo & Cono Evolutivo`, `➕ Censimento & Gestione Fondi`)**, monitoraggio versamenti, ottimizzazione deducibilità art. 51 TUIR (€ 5.164,57 annui) e cono stocastico a percentili (P10, P50, P90).
 18. **`17_🔥_Indipendenza_Finanziaria_e_FIRE.py`**: Analizzatore di indipendenza finanziaria (FatFIRE, LeanFIRE, CoastFIRE), simulazione stocastica Merton Jump-Diffusion SPI %, Safe Withdrawal Rate (SWR 3%-4%) e target age.
 19. **`18_📑_Fiscalita_e_Quadro_RW.py`**: Compilazione pre-dichiarativa per monitoraggio fiscale estero (Quadro RW con giacenza media e picco max, Quadro RT, Quadro RM per dividendi esteri a tassazione sostitutiva, tributo 1100, IVAFE ordinaria 0,20% e Black List 0,40%) e ottimizzazione minusvalenze/step-up fiscale.
 20. **`19_🏡_Immobili_e_Mutui.py`**: Registro patrimonio immobiliare, simulazione piani di ammortamento a rate costanti (francese), calcolo LTV dinamico e Net Home Equity.
 21. **`20_⚖️_Pianificazione_Successoria.py`**: Simulazione asse ereditario con Riunione Fittizia ex art. 556 c.c., quote di legittima e disponibile secondo il Codice Civile (artt. 536-544 c.c.), diagnosi azione di riduzione (artt. 553-564 c.c.), calcolo imposte di successione (D.Lgs. 346/1990) con franchigie ordinarie e maggiorata L. 104 ad € 1.500.000, imposte ipo-catastali e **Generational Transfer Optimizer (Ante vs. Post)** con 4 leve di ottimizzazione (Polizze Vita esenti art. 12 TUS / art. 1923 c.c., Patto di Famiglia art. 768-bis c.c. con esenzione totale art. 3 c. 4-ter TUS, Donazione Nuda Proprietà con tabella usufrutto per età D.P.R. 131/1986, Cointestazione 50% art. 1298 c.c.) e Memorandum Markdown Family Office.
-22. **`21_🤖_AI_Copilot_e_Advisor.py`**: Assistente patrimoniale conversazionale con accesso contestuale ai dati di bilancio consolidato, validazione di aderenza numerica, guardrails MiFID II / Art. 21 TUF ed Executive Voice Briefing a due voci (CIO & CRO).
+22. **`21_🤖_AI_Copilot_e_Advisor.py`**: Assistente patrimoniale conversazionale con accesso contestuale ai dati di bilancio consolidato, **Protocollo Advisory 360° & Check-Up Istituzionale Family Office (Action Memo esecutivo su Solvibilità, Previdenza, Immobili e Ribilanciamento)**, validazione di aderenza numerica, guardrails MiFID II / Art. 21 TUF ed Executive Voice Briefing a due voci (CIO & CRO).
 
 ---
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti gli **817 test automatizzati passano con successo (100%)** distribuiti su 100+ file di test (inclusi i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
+Tutti gli **821 test automatizzati passano con successo (100%)** distribuiti su 100+ file di test (inclusi i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite del motore DuckDB OLAP `tests/test_wealth_olap.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
 
 ```bash
 py -m pytest
@@ -421,7 +422,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 817 passed in ~125.00s (100%) =======================
+======================= 821 passed in ~205.00s (100%) =======================
 ```
 
 ---

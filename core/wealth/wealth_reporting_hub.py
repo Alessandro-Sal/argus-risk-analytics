@@ -16,6 +16,7 @@ from sqlalchemy import Engine
 from core.fetcher import get_engine
 from core.quarterly_report_generator import generate_white_label_quarterly_pdf_report
 from core.ui_export_utils import render_export_toolbar
+from core.ui_utils import render_segmented_tabs
 from core.voice_advisor_engine import generate_ai_voice_executive_briefing
 from core.wealth.personal_balance_sheet import (
     generate_personal_balance_sheet_pdf,
@@ -100,17 +101,45 @@ def render_wealth_reporting_and_exports_hub(
         unsafe_allow_html=True,
     )
 
-    tab_pdf, tab_data, tab_fisc, tab_media = st.tabs(
-        [
-            "📑 Dossier PDF & Client Reports",
-            "📊 Master Excel & Database Parquet",
-            "⚖️ Fisco, Libro Mastro & Quadro RW",
-            "🎙️ Executive Audio & Backup JSON",
-        ]
+    REPORTING_HUB_CATALOG = {
+        "📑 Dossier PDF & Client Reports": {
+            "title": "Dossier PDF, Pitchbook Istituzionali & Client Reports",
+            "badge": "PDF • ReportLab • Pitchbook",
+            "badge_color": "#38bdf8",
+            "category": "Documenti Clienti",
+            "desc": "Dossier trimestrali, advisory pitchbook a 6 pagine, bilancio personale certificato e tear-sheet sintetica.",
+        },
+        "📊 Master Excel & Database Parquet": {
+            "title": "Master Excel (.xlsx) & Database Analitico Parquet",
+            "badge": "Excel • OpenPyXL • Parquet",
+            "badge_color": "#10b981",
+            "category": "Fogli di Calcolo & OLAP",
+            "desc": "Workbook multi-foglio con formule live e tabelle ListObject, oltre al database colonnare Parquet per Power BI.",
+        },
+        "⚖️ Fisco, Libro Mastro & Quadro RW": {
+            "title": "Monitoraggio Fiscale, Libro Mastro & Quadro RW",
+            "badge": "Quadro RW • Fisco • CSV",
+            "badge_color": "#f59e0b",
+            "category": "Fisco & Contabilità",
+            "desc": "Prospetti per la dichiarazione dei redditi (Quadro RW, RT, RM) e libro mastro transazioni in formato CSV/JSON.",
+        },
+        "🎙️ Executive Audio & Backup JSON": {
+            "title": "Executive Voice Briefing & Backup Crittografato",
+            "badge": "TTS • Audio Briefing • JSON Vault",
+            "badge_color": "#a855f7",
+            "category": "Multimedia & Backup",
+            "desc": "Briefing vocale sintetico per il CIO/Family Officer e snapshot crittografato di backup per disaster recovery.",
+        },
+    }
+
+    active_rep_tab = render_segmented_tabs(
+        REPORTING_HUB_CATALOG,
+        key=f"wealth_reporting_hub_active_tab_{portfolio_id}",
+        select_label="Seleziona Formato / Canale di Esportazione:",
     )
 
     # ── TAB 1: PDF & CLIENT DOSSIERS ────────────────────────────
-    with tab_pdf:
+    if active_rep_tab == "📑 Dossier PDF & Client Reports":
         st.markdown("##### 📄 Dossier Multipagina & Pitchbook Istituzionali")
         st.caption(
             "Documenti ad alta risoluzione pronti per la stampa, comitati consultivi e clienti di private banking."
@@ -228,7 +257,7 @@ def render_wealth_reporting_and_exports_hub(
                 st.error(f"Errore Tear-Sheet: {e}")
 
     # ── TAB 2: MASTER EXCEL & PARQUET ───────────────────────────
-    with tab_data:
+    elif active_rep_tab == "📊 Master Excel & Database Parquet":
         st.markdown("##### 📊 Database & Fogli di Calcolo Strutturati")
         st.caption("Modelli tabellari per audit analitico, elaborazioni in Python/R o integrazione in database OLAP.")
 
@@ -293,7 +322,7 @@ def render_wealth_reporting_and_exports_hub(
                 st.error(f"Errore Parquet: {e}")
 
     # ── TAB 3: FISCO & LIBRO MASTRO ─────────────────────────────
-    with tab_fisc:
+    elif active_rep_tab == "⚖️ Fisco, Libro Mastro & Quadro RW":
         st.markdown("##### ⚖️ Fiscalità, Libro Mastro & Monitoraggio Estero")
         st.caption(
             "Prospetti conformi alla normativa tributaria italiana (TUIR Quadro RW / RT) e registro dei movimenti bancari."
@@ -353,7 +382,7 @@ def render_wealth_reporting_and_exports_hub(
                 st.error(f"Errore Cash Flow CSV: {e}")
 
     # ── TAB 4: AUDIO & BACKUP JSON ──────────────────────────────
-    with tab_media:
+    elif active_rep_tab == "🎙️ Executive Audio & Backup JSON":
         st.markdown("##### 🎙️ Audio Executive Briefing & Backup Crittografico JSON")
         st.caption("Sintesi vocale per podcast esecutivo e snapshot JSON atomico per backup e migrazione dati.")
 

@@ -42,6 +42,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_wealth_telemetry_ribbon,
     resolve_active_subtab,
     section,
 )
@@ -91,6 +92,7 @@ else:
     available_years = [2026]
 
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p14")
+render_wealth_telemetry_ribbon(nw_summary=nw_curr, page_badge="CASH FLOW & SPESE", profile_name=prof_title)
 render_wealth_executive_badges(nw_curr)
 
 # Header
