@@ -1433,9 +1433,13 @@ elif active_val_tab == "📊 Bilanci & Solvibilità (Altman & DuPont)":
                 key="radio_p_search"
             )
             if search_mode_p == "Azienda dal Portafoglio":
+                opts_p = list(company_options.keys())
+                curr_p = st.session_state.get("selectbox_p_portfolio")
+                if curr_p is not None and curr_p not in opts_p and opts_p:
+                    st.session_state["selectbox_p_portfolio"] = opts_p[0]
                 p_tk = st.selectbox(
                     "Seleziona Azienda dal Portafoglio:",
-                    list(company_options.keys()),
+                    opts_p,
                     format_func=lambda x: f"{x} - {company_options[x]}" if company_options[x] != x else f"{x}",
                     key="selectbox_p_portfolio"
                 )
@@ -1574,9 +1578,13 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
         )
     with col_sel2:
         if search_mode_dcf == "Portafoglio":
+            opts_dcf = list(company_options.keys())
+            curr_dcf = st.session_state.get("selectbox_dcf_portfolio")
+            if curr_dcf is not None and curr_dcf not in opts_dcf and opts_dcf:
+                st.session_state["selectbox_dcf_portfolio"] = opts_dcf[0]
             dcf_tk = st.selectbox(
                 "Seleziona Azienda dal Portafoglio:",
-                list(company_options.keys()),
+                opts_dcf,
                 format_func=lambda x: f"{x} - {company_options[x]}" if company_options[x] != x else f"{x}",
                 key="selectbox_dcf_portfolio"
             )

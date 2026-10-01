@@ -23,8 +23,9 @@ SESSIONS_CACHE_DIR = os.path.join(BASE_DIR, "data", "cache", "sessions")
 LEGACY_CACHE_PKL = os.path.join(BASE_DIR, "data", "cache", "active_session_full.pkl")
 LEGACY_CACHE_JSON = os.path.join(BASE_DIR, "data", "cache", "last_session_snapshot.json")
 
-# Prefissi o chiavi di widget di pagina da bonificare al cambio portafoglio/analisi
-ANALYTICAL_ORPHAN_PREFIXES = (
+# Prefissi o chiavi di widget di pagina da bonificare al cambio portafoglio/analisi Risk
+RISK_ORPHAN_PREFIXES = (
+    "ta_",
     "ta_target_",
     "tech_",
     "time_",
@@ -37,9 +38,30 @@ ANALYTICAL_ORPHAN_PREFIXES = (
     "opt_weights_",
     "subtab_",
     "target_subtab_",
+    "mc_adv_",
+    "rl_",
+    "wfo_",
+    "barra_",
+    "dcc_",
+    "sabr_",
+    "heston_",
+    "bl_",
+    "cached_screener_",
+    "triagent_",
+    "filter_gy_",
+    "filter_div_",
+    "filter_scorecard_",
+    "sel_lot_",
+    "selectbox_dcf_",
+    "selectbox_p_",
+    "search_bl_",
+    "search_kelly_",
+    "filter_cov_",
+    "fi_preset_",
+    "ff_model_",
 )
 
-ANALYTICAL_EXACT_KEYS = {
+RISK_ORPHAN_EXACT_KEYS = {
     "ta_target_ticker",
     "tech_active_subtab",
     "tech_active_subtab_selectbox",
@@ -54,7 +76,128 @@ ANALYTICAL_EXACT_KEYS = {
     "custom_stress_multiplier",
     "bquant_active_cell",
     "sandbox_preset_name",
+    "triagent_last_results",
+    "cached_screener_df",
+    "last_screened_universe_key",
+    "last_screened_universe",
+    "last_bquant_result",
+    "screener_candidate_to_optimize",
+    "rl_portfolio_results",
+    "wfo_last_result",
+    "barra_last_result",
+    "dcc_last_result",
+    "sabr_last_result",
+    "heston_last_result",
+    "bl_last_result",
+    "sel_tape_ticker_page2",
+    "inp_port_table_search",
+    "filter_main_pos_ac",
+    "search_div_table",
+    "radio_dcf_search",
+    "radio_p_search",
+    "select_history_run",
+    "hist_port_filter",
+    "bl_view_asset",
+    "sel_lot_sizing_ticker",
+    "selectbox_dcf_portfolio",
+    "selectbox_p_portfolio",
 }
+
+# Alias retrocompatibili
+ANALYTICAL_ORPHAN_PREFIXES = RISK_ORPHAN_PREFIXES
+ANALYTICAL_EXACT_KEYS = RISK_ORPHAN_EXACT_KEYS
+
+# Prefissi e chiavi di widget/filtri del modulo Wealth da bonificare al cambio profilo
+WEALTH_ORPHAN_PREFIXES = (
+    "cf_",
+    "master_pbs_",
+    "pension_",
+    "fiscal_",
+    "estate_",
+    "fire_",
+    "wealth_nw_",
+    "wealth_cf_",
+    "wealth_tax_",
+    "wealth_estate_",
+    "wealth_copilot_",
+    "wealth_fire_",
+    "wealth_re_",
+    "alloc_",
+    "pipe_csv_cf_",
+    "pipe_up_accs",
+    "pipe_gsheet_",
+    "sel_mod_acc_",
+)
+
+WEALTH_ORPHAN_EXACT_KEYS = {
+    "wealth_active_snapshot",
+    "triagent_last_results",
+    "cf_account_selector_widget",
+    "cf_year_selector_widget",
+    "cf_month_selector_widget",
+    "cf_upload_target_acc",
+    "master_pbs_year_selector",
+    "sankey_flow_dropdown_picker",
+    "env_status_filter_select",
+    "alloc_dim_selector_seg",
+    "alloc_chart_view_mode_seg",
+    "toggle_pbs_preview_p13",
+    "toggle_ts_preview_p13",
+    "wealth_temporal_view_style",
+    "wealth_select_snapshot_recall",
+    "wealth_hist_port_filter",
+    "nw_stress_scen_picker",
+    "sp_mat_slider",
+}
+
+WEALTH_ROUTING_KEYS = {
+    "wealth_active_portfolio_id",
+    "wealth_active_profile_name",
+    "sb_wealth_profile_selector",
+    "wealth_profile_selector_widget",
+    "nw_profile_selector_widget",
+    "cf_profile_selector_widget",
+    "pension_profile_selector_widget",
+    "fiscal_profile_selector_widget",
+    "estate_profile_selector_widget",
+    "ai_profile_selector_widget",
+}
+
+
+def get_canonical_db_fingerprint(engine: Any) -> str:
+    """
+    Genera un fingerprint deterministico e canonico per l'engine database attivo.
+    Risolve path assoluti canonici per SQLite, connection URI univoci per MySQL/PostgreSQL,
+    e gestisce mock/test engines senza collisioni di cache.
+    """
+    if engine is None:
+        return "none:unbound"
+    try:
+        url = getattr(engine, "url", None)
+        if url is None:
+            return f"mock:{id(engine)}"
+
+        driver = getattr(url, "drivername", "unknown") or "unknown"
+
+        # Gestione SQLite (Normalizzazione path canonico per evitare discrepanze relative/assolute)
+        if "sqlite" in driver:
+            db_path = getattr(url, "database", None)
+            if not db_path or db_path == ":memory:":
+                return f"sqlite:memory:{id(engine)}"
+            try:
+                norm_path = os.path.realpath(os.path.abspath(db_path)).replace("\\", "/")
+            except Exception:
+                norm_path = str(db_path).replace("\\", "/")
+            return f"sqlite://{norm_path}"
+
+        # Gestione MySQL / PostgreSQL / RDBMS di rete
+        user = getattr(url, "username", "anon") or "anon"
+        host = getattr(url, "host", "localhost") or "localhost"
+        port = getattr(url, "port", 3306) or 3306
+        dbname = getattr(url, "database", "default") or "default"
+        return f"{driver}://{user}@{host}:{port}/{dbname}"
+    except Exception:
+        return f"fallback:{id(engine)}"
 
 
 # ── DOMAIN SUB-CONTEXT DATACLASSES ────────────────────────────
@@ -317,21 +460,89 @@ class WorkspaceContext:
             self.is_dirty = True
             self.clear_persisted_cache()
 
+    @classmethod
+    def sanitize_wealth_profile_state(cls, preserve_routing_keys: bool = True) -> None:
+        """
+        Esegue la bonifica mirata di filtri, conti, anni fiscali e selezioni orfane al cambio profilo Wealth.
+        Scongiura la permanenza di ID conto, anni o selezioni del profilo precedente.
+        """
+        try:
+            import streamlit as st
+        except ImportError:
+            return
+        st_state = getattr(st, "session_state", None)
+        if st_state is None:
+            return
+
+        with cls._LOCK:
+            keys_to_purge: Set[str] = set()
+            for key in list(st_state.keys()):
+                if preserve_routing_keys and key in WEALTH_ROUTING_KEYS:
+                    continue
+                if not preserve_routing_keys and key in WEALTH_ROUTING_KEYS:
+                    keys_to_purge.add(key)
+                elif key in WEALTH_ORPHAN_EXACT_KEYS:
+                    keys_to_purge.add(key)
+                elif any(key.startswith(pfx) for pfx in WEALTH_ORPHAN_PREFIXES):
+                    if preserve_routing_keys and key.endswith("_profile_selector_widget"):
+                        continue
+                    keys_to_purge.add(key)
+
+            for key in keys_to_purge:
+                try:
+                    del st_state[key]
+                except Exception:
+                    st_state.pop(key, None)
+
+            # Invalida cache dati di processo
+            try:
+                st.cache_data.clear()
+            except Exception:
+                pass
+
+    @classmethod
+    def sanitize_risk_portfolio_state(cls, preserve_db_creds: bool = True) -> None:
+        """
+        Esegue la bonifica completa di modelli quantitativi, ticker, array di pesi e widget analitici orfani
+        prima di ricalcolare o ricaricare un'analisi di portafoglio Risk.
+        """
+        try:
+            import streamlit as st
+        except ImportError:
+            return
+        st_state = getattr(st, "session_state", None)
+        if st_state is None:
+            return
+
+        with cls._LOCK:
+            keys_to_purge: Set[str] = set()
+            for key in list(st_state.keys()):
+                if key in RISK_ORPHAN_EXACT_KEYS:
+                    keys_to_purge.add(key)
+                elif any(key.startswith(pfx) for pfx in RISK_ORPHAN_PREFIXES):
+                    keys_to_purge.add(key)
+
+            for key in keys_to_purge:
+                try:
+                    del st_state[key]
+                except Exception:
+                    st_state.pop(key, None)
+
+            try:
+                ws = cls.get_current()
+                ws.flush_risk_domain(preserve_db_creds=preserve_db_creds)
+            except Exception:
+                pass
+
     def flush_wealth_domain(self):
-        """Azzera deterministicamente lo stato del modulo Wealth."""
+        """Azzera deterministicamente lo stato del modulo Wealth e tutti i relativi widget."""
         with self._LOCK:
             self.wealth = WealthSubContext()
+            self.sanitize_wealth_profile_state(preserve_routing_keys=False)
             st_state = self._get_st_session_state()
             if st_state is not None:
-                for key in [
-                    "wealth_profile_selector_widget",
-                    "wealth_active_profile_name",
-                    "wealth_active_portfolio_id",
-                    "sb_wealth_profile_selector",
-                    "wealth_active_snapshot",
-                ]:
-                    if key in st_state:
-                        del st_state[key]
+                for key in WEALTH_ROUTING_KEYS:
+                    st_state.pop(key, None)
                 st_state["wealth_active_portfolio_id"] = None
                 st_state["wealth_active_profile_name"] = None
             self.version += 1
@@ -352,47 +563,50 @@ class WorkspaceContext:
         if st_state is None:
             return
 
-        # 1. Sincronizzazione atomica dello stato attivo primario (single source of truth)
-        st_state["wealth_active_portfolio_id"] = new_pid
+        with cls._LOCK:
+            # 1. Sanitizzazione atomica dei filtri e selezioni orfane del profilo precedente
+            cls.sanitize_wealth_profile_state(preserve_routing_keys=True)
 
-        # 2. Sincronizzazione difensiva di tutti i selettori di pagina e sidebar:
-        # Se un widget è già stato istanziato nel run corrente (es. la sidebar viene sempre renderizzata
-        # prima del corpo pagina o dei modal/picker), Streamlit vieta l'assegnazione diretta
-        # sollevando StreamlitAPIException. Il valore viene comunque recepito al successivo ciclo
-        # di esecuzione (st.rerun()) tramite wealth_active_portfolio_id.
-        widget_keys = [
-            "sb_wealth_profile_selector",
-            "wealth_profile_selector_widget",
-            "nw_profile_selector_widget",
-            "cf_profile_selector_widget",
-            "pension_profile_selector_widget",
-            "fiscal_profile_selector_widget",
-            "estate_profile_selector_widget",
-            "ai_profile_selector_widget",
-        ]
-        for wk in widget_keys:
+            # 2. Sincronizzazione atomica dello stato attivo primario (single source of truth)
+            st_state["wealth_active_portfolio_id"] = new_pid
+
+            # 3. Sincronizzazione difensiva di tutti i selettori di pagina e sidebar:
+            # Se un widget è già stato istanziato nel run corrente (es. la sidebar viene sempre renderizzata
+            # prima del corpo pagina o dei modal/picker), Streamlit vieta l'assegnazione diretta
+            # sollevando StreamlitAPIException. Il valore viene comunque recepito al successivo ciclo
+            # di esecuzione (st.rerun()) tramite wealth_active_portfolio_id.
+            for wk in WEALTH_ROUTING_KEYS:
+                if wk in ("wealth_active_portfolio_id", "wealth_active_profile_name"):
+                    continue
+                try:
+                    st_state[wk] = new_pid
+                except Exception:
+                    pass
+
+            # 4. Reset dello snapshot storico e dell'advisor copilot per impedire bleed tra profili
+            st_state.pop("wealth_active_snapshot", None)
+            st_state.pop("triagent_last_results", None)
+
+            # 5. Invalidazione atomica della cache di processo Streamlit per prevenire calcoli e PDF stantii cross-profilo
             try:
-                st_state[wk] = new_pid
+                st.cache_data.clear()
             except Exception:
                 pass
 
-        # 3. Reset dello snapshot storico per impedire bleed di snapshot tra profili
-        st_state.pop("wealth_active_snapshot", None)
-
-        if profile_name:
-            st_state["wealth_active_profile_name"] = profile_name
-        elif new_pid is None:
-            st_state.pop("wealth_active_profile_name", None)
-
-        try:
-            ws = cls.get_current()
-            ws.wealth.profile_id = new_pid
             if profile_name:
-                ws.wealth.profile_name = profile_name
-            ws.wealth.net_worth_cached = None
-            ws.version += 1
-        except Exception:
-            pass
+                st_state["wealth_active_profile_name"] = profile_name
+            elif new_pid is None:
+                st_state.pop("wealth_active_profile_name", None)
+
+            try:
+                ws = cls.get_current()
+                ws.wealth.profile_id = new_pid
+                if profile_name:
+                    ws.wealth.profile_name = profile_name
+                ws.wealth.net_worth_cached = None
+                ws.version += 1
+            except Exception:
+                pass
 
     @classmethod
     def execute_database_switch(cls, new_db: str, offline_mode: Optional[bool] = None) -> None:
@@ -409,76 +623,73 @@ class WorkspaceContext:
         if st_state is None:
             return
 
-        # 1. Dispose del Connection Pool attivo per rilasciare socket MySQL e lock SQLite
-        try:
-            from core.fetcher import dispose_engine
+        with cls._LOCK:
+            # 1. Dispose del Connection Pool attivo per rilasciare socket MySQL e lock SQLite
+            try:
+                from core.fetcher import dispose_engine
 
-            old_engine = st_state.get("engine") or st_state.get("db_engine")
-            if old_engine is not None:
-                dispose_engine(old_engine)
-        except Exception:
-            pass
-        st_state["engine"] = None
-        st_state["db_engine"] = None
+                old_engine = st_state.get("engine") or st_state.get("db_engine")
+                if old_engine is not None:
+                    dispose_engine(old_engine)
+            except Exception:
+                pass
+            st_state["engine"] = None
+            st_state["db_engine"] = None
 
-        # 2. Svuotamento completo delle cache Streamlit (process-level)
-        try:
-            st.cache_data.clear()
-            st.cache_resource.clear()
-        except Exception:
-            pass
+            # 2. Svuotamento completo delle cache Streamlit (process-level)
+            try:
+                st.cache_data.clear()
+                st.cache_resource.clear()
+            except Exception:
+                pass
 
-        # 3. Svuotamento della cache su disco
-        try:
-            from core.cache_shield import clear_cache as clear_disk_cache
+            # 3. Svuotamento della cache su disco
+            try:
+                from core.cache_shield import clear_cache as clear_disk_cache
 
-            clear_disk_cache()
-        except Exception:
-            pass
+                clear_disk_cache()
+            except Exception:
+                pass
 
-        # 4. Flush dei domini in WorkspaceContext
-        try:
-            ws = cls.get_current()
-            ws.flush_wealth_domain()
-            ws.flush_risk_domain()
-        except Exception:
-            pass
+            # 4. Sanitizzazione profonda di tutti i domini
+            cls.sanitize_risk_portfolio_state(preserve_db_creds=True)
+            cls.sanitize_wealth_profile_state(preserve_routing_keys=False)
 
-        # 5. Bonifica deterministica delle chiavi di sessione
-        keys_to_purge = [
-            "wealth_active_portfolio_id",
-            "wealth_active_profile_name",
-            "wealth_active_snapshot",
-            "portfolio_id",
-            "portfolio_name",
-            "results",
-            "pipeline_done",
-            "last_pipeline_hash",
-            "fetch_report",
-            "sandbox_preset_name",
-            "sb_wealth_profile_selector",
-            "wealth_profile_selector_widget",
-            "nw_profile_selector_widget",
-            "cf_profile_selector_widget",
-            "pension_profile_selector_widget",
-            "fiscal_profile_selector_widget",
-            "estate_profile_selector_widget",
-            "ai_profile_selector_widget",
-        ]
-        for k in keys_to_purge:
-            st_state.pop(k, None)
+            # 5. Flush dei domini in WorkspaceContext
+            try:
+                ws = cls.get_current()
+                ws.flush_wealth_domain()
+                ws.flush_risk_domain()
+            except Exception:
+                pass
 
-        st_state["wealth_active_portfolio_id"] = None
-        st_state["wealth_active_profile_name"] = None
+            # 6. Bonifica deterministica delle chiavi di sessione
+            keys_to_purge = [
+                "wealth_active_portfolio_id",
+                "wealth_active_profile_name",
+                "wealth_active_snapshot",
+                "portfolio_id",
+                "portfolio_name",
+                "results",
+                "pipeline_done",
+                "last_pipeline_hash",
+                "fetch_report",
+                "sandbox_preset_name",
+            ] + list(WEALTH_ROUTING_KEYS)
+            for k in keys_to_purge:
+                st_state.pop(k, None)
 
-        # 6. Assegnazione atomica dei nuovi puntatori
-        if new_db:
-            st_state["db_name"] = new_db
-            st_state["wealth_db_name"] = new_db
-            st_state["risk_db_name"] = new_db
+            st_state["wealth_active_portfolio_id"] = None
+            st_state["wealth_active_profile_name"] = None
 
-        if offline_mode is not None:
-            st_state["offline_mode"] = bool(offline_mode)
+            # 7. Assegnazione atomica dei nuovi puntatori
+            if new_db:
+                st_state["db_name"] = new_db
+                st_state["wealth_db_name"] = new_db
+                st_state["risk_db_name"] = new_db
+
+            if offline_mode is not None:
+                st_state["offline_mode"] = bool(offline_mode)
 
     # ── REACTIVE TOTAL WEALTH CONSOLIDATION BRIDGE ─────────────
 
@@ -540,10 +751,27 @@ class WorkspaceContext:
             if not self.risk.results or not isinstance(self.risk.results, dict):
                 return False
 
+            st_state = self._get_st_session_state()
+            current_db_name = None
+            current_engine = None
+            if st_state is not None:
+                current_db_name = (
+                    st_state.get("db_name")
+                    or st_state.get("wealth_db_name")
+                    or st_state.get("risk_db_name")
+                )
+                current_engine = st_state.get("engine") or st_state.get("db_engine")
+
+            db_meta = {
+                "db_name": current_db_name,
+                "db_fingerprint": get_canonical_db_fingerprint(current_engine),
+            }
+
             bundle = {
                 "session_id": self.session_id,
                 "version": self.version,
                 "saved_at": datetime.now().isoformat(),
+                "database": db_meta,
                 "risk": {
                     "results": self.risk.results,
                     "portfolio_id": self.risk.portfolio_id,
@@ -581,6 +809,7 @@ class WorkspaceContext:
                     "base_currency": self.risk.base_currency,
                     "benchmark": self.risk.benchmark,
                     "saved_at": datetime.now().isoformat(),
+                    "database": db_meta,
                 }
                 with open(LEGACY_CACHE_PKL, "wb") as lf:
                     pickle.dump(legacy_bundle, lf, protocol=pickle.HIGHEST_PROTOCOL)
@@ -594,6 +823,7 @@ class WorkspaceContext:
                         "saved_at": datetime.now().isoformat(),
                         "run_id": self.risk.run_id,
                         "portfolio_name": self.risk.portfolio_name,
+                        "database": db_meta,
                         "metrics": self.risk.results.get("metrics", {}),
                         "positions": pos_rec,
                     }
@@ -615,6 +845,14 @@ class WorkspaceContext:
             if st_state is not None and st_state.get("session_cleared", False) and not force:
                 return False
 
+            current_db_name = None
+            if st_state is not None:
+                current_db_name = (
+                    st_state.get("db_name")
+                    or st_state.get("wealth_db_name")
+                    or st_state.get("risk_db_name")
+                )
+
             # 1. Tenta prima dal file specifico della sessione
             session_path = self.get_session_cache_path()
             if os.path.exists(session_path):
@@ -622,6 +860,15 @@ class WorkspaceContext:
                     with open(session_path, "rb") as f:
                         bundle = pickle.load(f)
                     if bundle and isinstance(bundle, dict):
+                        saved_db = (
+                            bundle.get("database", {}).get("db_name")
+                            if isinstance(bundle.get("database"), dict)
+                            else None
+                        )
+                        if not force and saved_db and current_db_name and saved_db != current_db_name:
+                            # Protezione anti-contaminazione: rifiuta caricamento cross-database
+                            return False
+
                         r_data = bundle.get("risk", {})
                         if r_data.get("results"):
                             self.risk.results = r_data.get("results")
@@ -657,6 +904,14 @@ class WorkspaceContext:
                     with open(LEGACY_CACHE_PKL, "rb") as lf:
                         legacy_bundle = pickle.load(lf)
                     if legacy_bundle and isinstance(legacy_bundle, dict) and "results" in legacy_bundle:
+                        saved_db = (
+                            legacy_bundle.get("database", {}).get("db_name")
+                            if isinstance(legacy_bundle.get("database"), dict)
+                            else None
+                        )
+                        if not force and saved_db and current_db_name and saved_db != current_db_name:
+                            return False
+
                         self.risk.results = legacy_bundle.get("results")
                         self.risk.portfolio_name = legacy_bundle.get("portfolio_name", "Portfolio")
                         self.risk.run_id = legacy_bundle.get("run_id", "RESTORED")

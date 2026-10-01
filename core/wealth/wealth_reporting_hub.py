@@ -35,13 +35,9 @@ from core.wealth.wealth_exporter import export_wealth_master_excel_workbook
 
 def _get_engine_db_key(eng) -> str:
     """Restituisce un identificatore deterministico del DB attivo per isolamento dell'hash di cache."""
-    if eng is None:
-        return "none"
-    try:
-        url = eng.url
-        return f"{url.drivername}://{url.username}@{url.host}:{url.port}/{url.database}"
-    except Exception:
-        return str(getattr(eng, "url", "unknown"))
+    from core.workspace_context import get_canonical_db_fingerprint
+
+    return get_canonical_db_fingerprint(eng)
 
 
 @st.cache_data(ttl=300, show_spinner=False)

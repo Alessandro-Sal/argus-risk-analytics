@@ -62,7 +62,7 @@ from core.wealth.wealth_db import (
 )
 from core.wealth.wealth_engine import compute_consolidated_net_worth
 from core.wealth.wealth_reporting_hub import _get_engine_db_key
-from core.workspace_context import WorkspaceContext
+from core.workspace_context import WorkspaceContext, get_canonical_db_fingerprint
 
 # ── FIXTURES ─────────────────────────────────────────────────────────
 
@@ -556,3 +556,238 @@ class TestDatabaseProfileIsolation:
         assert ws is not None
         assert isinstance(ws.version, int)
         assert ws.version > 1
+
+    def test_canonical_db_fingerprint_isolation(self, dual_db_environments):
+        """
+        5. CANONICAL DB FINGERPRINT:
+        Verifica che get_canonical_db_fingerprint generi stringhe deterministiche
+        e non collidenti per percorsi SQLite, istanze in memoria, MySQL e mock engines.
+        """
+        engine_a = dual_db_environments["engine_a"]
+        engine_b = dual_db_environments["engine_b"]
+
+        fp_a = get_canonical_db_fingerprint(engine_a)
+        fp_b = get_canonical_db_fingerprint(engine_b)
+
+        assert fp_a != fp_b
+        assert "sqlite://" in fp_a
+        assert "sqlite://" in fp_b
+        assert "argus_database_a.db" in fp_a
+        assert "argus_database_b.db" in fp_b
+
+        # Test memoria isolata
+        mem_engine_1 = create_engine("sqlite:///:memory:")
+        mem_engine_2 = create_engine("sqlite:///:memory:")
+        fp_mem1 = get_canonical_db_fingerprint(mem_engine_1)
+        fp_mem2 = get_canonical_db_fingerprint(mem_engine_2)
+        assert fp_mem1 != fp_mem2
+        assert "sqlite:memory:" in fp_mem1
+        dispose_engine(mem_engine_1)
+        dispose_engine(mem_engine_2)
+
+        # Test mock engine e None
+        mock_eng = MagicMock()
+        mock_eng.url = None
+        fp_mock = get_canonical_db_fingerprint(mock_eng)
+        assert "mock:" in fp_mock
+
+        fp_none = get_canonical_db_fingerprint(None)
+        assert fp_none == "none:unbound"
+
+    def test_ghost_state_and_analytical_orphan_purging(self, isolated_session_state):
+        """
+        6. GHOST STATE PURGING:
+        Verifica che lo switch di profilo patrimoniale elimini lo stato dell'AI Copilot (triagent_last_results)
+        e che il flush del dominio Risk / switch DB epuri modelli quantitativi orfani
+        (mc_adv_*, rl_portfolio_results, wfo_last_result, cached_screener_df).
+        """
+        st.session_state["triagent_last_results"] = {
+            "reb_res": {"rebalanced": True},
+            "gov_audit": {"consensus_score": 95.0},
+        }
+        st.session_state["rl_portfolio_results"] = {"sharpe": 1.8}
+        st.session_state["wfo_last_result"] = {"equity_curve": [100, 105]}
+        st.session_state["mc_adv_126_1.0_0.0_gaussian_RUN1"] = {"simulations": 3000}
+        st.session_state["cached_screener_df"] = pd.DataFrame([{"ticker": "AAPL"}])
+
+        ws = WorkspaceContext.get_current(session_id="test_orphan_purge_session")
+
+        # Step 1: Switch di profilo Wealth deve epurare triagent_last_results
+        WorkspaceContext.switch_wealth_profile(new_pid=99, profile_name="Client Test")
+        assert "triagent_last_results" not in st.session_state
+        # I modelli di risk non devono essere intaccati da un semplice switch wealth
+        assert "rl_portfolio_results" in st.session_state
+
+        # Step 2: Flush del dominio Risk deve bonificare tutti i modelli quantitativi orfani
+        ws.flush_risk_domain()
+        assert "rl_portfolio_results" not in st.session_state
+        assert "wfo_last_result" not in st.session_state
+        assert "mc_adv_126_1.0_0.0_gaussian_RUN1" not in st.session_state
+        assert "cached_screener_df" not in st.session_state
+
+    def test_session_cache_cross_database_protection(self, isolated_session_state, dual_db_environments):
+        """
+        7. SESSION CACHE DB ISOLATION:
+        Verifica che una sessione persistita su DB_A rifiuti il ripristino su DB_B
+        per scongiurare cross-database data bleed tra tenant/clienti diversi.
+        """
+        engine_a = dual_db_environments["engine_a"]
+        ctx = WorkspaceContext(session_id="tenant_isolation_session")
+
+        st.session_state["db_name"] = "database_alpha"
+        st.session_state["engine"] = engine_a
+        ctx.risk.results = {"positions": pd.DataFrame([{"ticker": "ENEL.MI", "current_value": 5000.0}])}
+        ctx.risk.portfolio_name = "Alpha Portfolio"
+
+        # Salvataggio su database_alpha
+        assert ctx.save_session_cache() is True
+
+        # Cambio database attivo a database_beta
+        st.session_state["db_name"] = "database_beta"
+
+        # Tentativo di restore in nuovo contesto: DEVE ESSERE RIFIUTATO
+        fresh_ctx = WorkspaceContext(session_id="tenant_isolation_session")
+        restored = fresh_ctx.restore_session_cache(force=False)
+        assert restored is False
+        assert fresh_ctx.risk.portfolio_name != "Alpha Portfolio"
+
+        # Con ripristino forzato esplicito (force=True), il restore è autorizzato
+        forced_restore = fresh_ctx.restore_session_cache(force=True)
+        assert forced_restore is True
+        assert fresh_ctx.risk.portfolio_name == "Alpha Portfolio"
+
+        ctx.clear_persisted_cache()
+
+    def test_full_atomic_state_sanitization_on_wealth_switch(self, isolated_session_state):
+        """
+        8. ATOMIC WEALTH SANITIZATION:
+        Verifica che WorkspaceContext.sanitize_wealth_profile_state() elimini tutti i filtri,
+        widget, snapshot e cache del profilo patrimoniale uscente, preservando se richiesto
+        le sole routing keys essenziali per la navigazione.
+        """
+        # Popolamento stato Wealth specifico
+        st.session_state["wealth_active_portfolio_id"] = 42
+        st.session_state["wealth_active_profile_name"] = "Profilo Alfa"
+        st.session_state["sb_wealth_profile_selector"] = 42
+        st.session_state["wealth_active_snapshot"] = {"total_net_worth": 1000000.0}
+        st.session_state["triagent_last_results"] = {"audit": "passed"}
+        st.session_state["cf_year_selector_widget"] = "2023"
+        st.session_state["cf_month_selector_widget"] = 5
+        st.session_state["cf_account_selector_widget"] = "Conto Private"
+        st.session_state["master_pbs_year_selector"] = 2023
+        st.session_state["pension_expected_return"] = 0.05
+        st.session_state["fiscal_tax_year_selector"] = 2023
+        st.session_state["estate_active_heirs_table"] = pd.DataFrame([{"heir": "Marco"}])
+
+        # Test modalità con routing keys preservate
+        WorkspaceContext.sanitize_wealth_profile_state(preserve_routing_keys=True)
+
+        assert "wealth_active_snapshot" not in st.session_state
+        assert "triagent_last_results" not in st.session_state
+        assert "cf_year_selector_widget" not in st.session_state
+        assert "cf_month_selector_widget" not in st.session_state
+        assert "cf_account_selector_widget" not in st.session_state
+        assert "master_pbs_year_selector" not in st.session_state
+        assert "pension_expected_return" not in st.session_state
+        assert "fiscal_tax_year_selector" not in st.session_state
+        assert "estate_active_heirs_table" not in st.session_state
+
+        # Le routing keys devono essere state preservate
+        assert st.session_state.get("wealth_active_portfolio_id") == 42
+        assert st.session_state.get("wealth_active_profile_name") == "Profilo Alfa"
+        assert st.session_state.get("sb_wealth_profile_selector") == 42
+
+        # Test modalità senza routing keys (hard reset su cambio DB)
+        WorkspaceContext.sanitize_wealth_profile_state(preserve_routing_keys=False)
+        assert st.session_state.get("wealth_active_portfolio_id") is None
+        assert st.session_state.get("wealth_active_profile_name") is None
+        assert "sb_wealth_profile_selector" not in st.session_state
+
+    def test_full_atomic_state_sanitization_on_risk_switch(self, isolated_session_state, dual_db_environments):
+        """
+        9. ATOMIC RISK SANITIZATION:
+        Verifica che WorkspaceContext.sanitize_risk_portfolio_state() elimini tutti i modelli quantitativi,
+        vettori di peso (active_opt_weights), selezioni ticker/widget e risultati del portafoglio uscente,
+        preservando i puntatori DB e le credenziali.
+        """
+        engine_a = dual_db_environments["engine_a"]
+
+        # Popolamento stato Risk specifico
+        st.session_state["engine"] = engine_a
+        st.session_state["db_engine"] = engine_a
+        st.session_state["db_name"] = "database_a"
+        st.session_state["db_user"] = "root"
+
+        st.session_state["portfolio_id"] = 101
+        st.session_state["portfolio_name"] = "Aggressive Growth"
+        st.session_state["pipeline_done"] = True
+        st.session_state["results"] = {"metrics": {"sharpe": 1.45}}
+        st.session_state["active_opt_weights"] = [0.25, 0.25, 0.50]
+        st.session_state["ta_target_ticker"] = "MSFT"
+        st.session_state["bl_view_asset"] = "AAPL"
+        st.session_state["selectbox_dcf_portfolio"] = "NVDA"
+        st.session_state["selectbox_p_portfolio"] = "NVDA"
+        st.session_state["rl_model_checkpoint"] = "agent_v3.zip"
+        st.session_state["mc_adv_sim_results"] = [1.2, 1.4, 1.1]
+        st.session_state["barra_factor_exposure"] = pd.DataFrame([{"factor": "Momentum", "exp": 0.8}])
+        st.session_state["dcc_garch_fitted_model"] = {"h_t": [0.01, 0.02]}
+
+        # Esecuzione sanitizzazione
+        WorkspaceContext.sanitize_risk_portfolio_state(preserve_db_creds=True)
+
+        # Modelli quantitativi, ticker e vettori di pesi devono essere stati bonificati
+        assert "results" not in st.session_state
+        assert "pipeline_done" not in st.session_state
+        assert "portfolio_id" not in st.session_state
+        assert "portfolio_name" not in st.session_state
+        assert "active_opt_weights" not in st.session_state
+        assert "ta_target_ticker" not in st.session_state
+        assert "bl_view_asset" not in st.session_state
+        assert "selectbox_dcf_portfolio" not in st.session_state
+        assert "selectbox_p_portfolio" not in st.session_state
+        assert "rl_model_checkpoint" not in st.session_state
+        assert "mc_adv_sim_results" not in st.session_state
+        assert "barra_factor_exposure" not in st.session_state
+        assert "dcc_garch_fitted_model" not in st.session_state
+
+        # Credenziali DB e handle engine devono essere preservati
+        assert st.session_state.get("engine") == engine_a
+        assert st.session_state.get("db_engine") == engine_a
+        assert st.session_state.get("db_name") == "database_a"
+        assert st.session_state.get("db_user") == "root"
+
+    def test_pre_widget_option_clamping_defense(self, isolated_session_state):
+        """
+        10. DEFENSIVE OPTION CLAMPING:
+        Verifica che il pattern di clamping difensivo prevenga StreamlitAPIException o stati disallineati
+        quando session_state contiene una chiave con un valore orfano non appartenente alle opzioni correnti.
+        """
+        # Simulazione: il vecchio profilo aveva un conto bancario orfano "Banca Privata Alfa"
+        st.session_state["cf_account_selector_widget"] = "Banca Privata Alfa"
+        available_accs = ["🌐 Tutti i Conti", "Conto Standard Beta"]
+
+        # Clamping logic
+        curr_acc = st.session_state.get("cf_account_selector_widget")
+        if curr_acc is not None and curr_acc not in available_accs:
+            st.session_state["cf_account_selector_widget"] = available_accs[0]
+
+        assert st.session_state["cf_account_selector_widget"] == "🌐 Tutti i Conti"
+
+        # Simulazione: vecchio anno "2021" non presente tra gli anni disponibili del nuovo profilo
+        st.session_state["master_pbs_year_selector"] = 2021
+        avail_years = [2026, 2025, 2024]
+        curr_pbs_yr = st.session_state.get("master_pbs_year_selector")
+        if curr_pbs_yr is not None and curr_pbs_yr not in avail_years and avail_years:
+            st.session_state["master_pbs_year_selector"] = avail_years[0]
+
+        assert st.session_state["master_pbs_year_selector"] == 2026
+
+        # Simulazione: vecchio ticker "TSLA" non presente nelle partecipazioni azionarie del nuovo portafoglio
+        st.session_state["selectbox_dcf_portfolio"] = "TSLA"
+        company_options = ["AAPL", "GOOGL"]
+        curr_dcf = st.session_state.get("selectbox_dcf_portfolio")
+        if curr_dcf is not None and curr_dcf not in company_options and company_options:
+            st.session_state["selectbox_dcf_portfolio"] = company_options[0]
+
+        assert st.session_state["selectbox_dcf_portfolio"] == "AAPL"
+

@@ -391,6 +391,8 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                 
                 if btn_load:
                     with st.spinner(f"Ricalcolo rapido dell'analisi {sel_row.run_id}..."):
+                        from core.workspace_context import WorkspaceContext
+                        WorkspaceContext.sanitize_risk_portfolio_state(preserve_db_creds=True)
                         rf_val = st.session_state.get("active_rf_rate")
                         base_curr = st.session_state.get("base_currency", "EUR")
                         from sqlalchemy import text as sqlt
@@ -466,7 +468,7 @@ if st.session_state.get("pipeline_done"):
             for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested", "df_clean", "selected_bitemp_port"]:
                 st.session_state.pop(k, None)
             clear_session_cache()
-            WorkspaceContext.get_current().flush_risk_domain()
+            WorkspaceContext.sanitize_risk_portfolio_state(preserve_db_creds=True)
             st.rerun()
 else:
     col_onb1, col_onb2 = st.columns([3.2, 1.2])
@@ -1065,6 +1067,8 @@ with tab_ingest:
                                     "notes":    None if pd.isna(row.get("notes")) else row.get("notes"),
                                 })
 
+                    from core.workspace_context import WorkspaceContext
+                    WorkspaceContext.sanitize_risk_portfolio_state(preserve_db_creds=True)
                     rf_val = st.session_state.get("active_rf_rate")
                     base_curr = st.session_state.get("base_currency", "EUR")
 

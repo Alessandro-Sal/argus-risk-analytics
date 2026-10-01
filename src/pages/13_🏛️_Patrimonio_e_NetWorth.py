@@ -75,13 +75,9 @@ from core.wealth.wealth_temporal_engine import (
 # ── HIGH-PERFORMANCE STREAMLIT CACHING LAYER ─────────────────
 def _get_engine_db_key(eng) -> str:
     """Restituisce un identificatore deterministico del DB attivo per isolamento dell'hash di cache."""
-    if eng is None:
-        return "none"
-    try:
-        url = eng.url
-        return f"{url.drivername}://{url.username}@{url.host}:{url.port}/{url.database}"
-    except Exception:
-        return str(getattr(eng, "url", "unknown"))
+    from core.workspace_context import get_canonical_db_fingerprint
+
+    return get_canonical_db_fingerprint(eng)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
@@ -136,12 +132,16 @@ def _get_cached_pitchbook_html(_engine, pid: int, db_key: str = "") -> str:
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_personal_balance_sheet(_engine, pid: int = 1, yr: Optional[int] = None, db_key: str = "") -> Dict[str, Any]:
+def _load_cached_personal_balance_sheet(_engine, pid: Optional[int] = None, yr: Optional[int] = None, db_key: str = "") -> Dict[str, Any]:
+    if pid is None:
+        return {}
     return compute_personal_balance_sheet(_engine, portfolio_id=pid, year=yr)
 
 
 @st.cache_data(ttl=60, show_spinner=False)
-def _load_cached_multi_year_balance_comparison(_engine, pid: int = 1, db_key: str = "") -> Dict[str, Any]:
+def _load_cached_multi_year_balance_comparison(_engine, pid: Optional[int] = None, db_key: str = "") -> Dict[str, Any]:
+    if pid is None:
+        return {}
     return compute_multi_year_balance_comparison(_engine, portfolio_id=pid)
 
 
@@ -1181,6 +1181,9 @@ elif active_nw_tab == "📑 Bilancio Personale & Stato Patrimoniale":
     # ── BARRA DI CONTROLLO ESERCIZIO MASTER ────────────────────
     col_yr1, col_yr2, col_yr3 = st.columns([1.6, 2.2, 1.2])
     with col_yr1:
+        curr_pbs_yr = st.session_state.get("master_pbs_year_selector")
+        if curr_pbs_yr is not None and curr_pbs_yr not in avail_years and avail_years:
+            st.session_state["master_pbs_year_selector"] = avail_years[0]
         selected_pbs_year = st.selectbox(
             "📅 Esercizio Fiscale / Anno di Bilancio:",
             options=avail_years,
