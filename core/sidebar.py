@@ -1405,6 +1405,7 @@ def render_sidebar():
                 padding: 0px !important;
                 margin: 0px !important;
                 border: none !important;
+                overflow: hidden !important;
                 pointer-events: none !important;
                 z-index: 99 !important;
             }
@@ -1449,6 +1450,9 @@ def render_sidebar():
                 opacity: 1 !important;
                 cursor: pointer !important;
                 pointer-events: auto !important;
+                position: fixed !important;
+                top: 6px !important;
+                left: 8px !important;
                 z-index: 999999 !important;
             }
             [data-testid="collapsedControl"] button,
