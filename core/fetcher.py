@@ -117,7 +117,7 @@ def get_engine(
     if offline:
         os.makedirs(os.path.dirname(sqlite_path) or ".", exist_ok=True)
         sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
-        engine = create_engine(sqlite_url, echo=False)
+        engine = create_engine(sqlite_url, echo=False, connect_args={"timeout": 15})
         try:
             event.listen(engine, "connect", _set_sqlite_pragmas)
         except Exception:
@@ -158,11 +158,18 @@ def get_engine(
                     pass
 
             url = f"mysql+pymysql://{user}:{password}@{host}:{port}/{db}"
-            engine = create_engine(url, echo=False)
+            engine = create_engine(
+                url,
+                echo=False,
+                pool_pre_ping=True,
+                pool_recycle=3600,
+                pool_timeout=15,
+                connect_args={"connect_timeout": 5},
+            )
         except Exception:
             os.makedirs("data", exist_ok=True)
             sqlite_url = f"sqlite:///{sqlite_path.replace(chr(92), '/')}"
-            engine = create_engine(sqlite_url, echo=False)
+            engine = create_engine(sqlite_url, echo=False, connect_args={"timeout": 15})
             try:
                 event.listen(engine, "connect", _set_sqlite_pragmas)
             except Exception:

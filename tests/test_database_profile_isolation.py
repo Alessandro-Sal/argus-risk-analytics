@@ -791,3 +791,48 @@ class TestDatabaseProfileIsolation:
 
         assert st.session_state["selectbox_dcf_portfolio"] == "AAPL"
 
+    def test_dual_engine_disposal_prevention_of_orphaned_pools(self, isolated_session_state):
+        """
+        11. DBRE DUAL-ENGINE DISPOSAL:
+        Verifica che execute_database_switch effettui il dispose sia di 'engine' che di 'db_engine'
+        anche qualora puntino a due istanze SQLAlchemy distinte, azzerando i leak di connessioni zombie.
+        """
+        mock_eng1 = MagicMock()
+        mock_eng2 = MagicMock()
+
+        st.session_state["engine"] = mock_eng1
+        st.session_state["db_engine"] = mock_eng2
+
+        WorkspaceContext.execute_database_switch(new_db="db_new")
+
+        assert mock_eng1.dispose.call_count == 1
+        assert mock_eng2.dispose.call_count == 1
+        assert st.session_state.get("engine") is None
+        assert st.session_state.get("db_engine") is None
+
+    def test_switch_wealth_profile_idempotency_and_force(self, isolated_session_state):
+        """
+        12. DBRE SWITCH IDEMPOTENCY:
+        Verifica che clic ripetuti sullo stesso profilo non distruggano inutilmente filtri e cache utente,
+        ma che un cambio di PID o un flag force=True attivino la completa sanificazione atomica.
+        """
+        st.session_state["wealth_active_portfolio_id"] = 10
+        st.session_state["wealth_active_profile_name"] = "Holding Alfa"
+        st.session_state["cf_account_selector_widget"] = "Conto Intesa"
+
+        # Clic sullo stesso profilo già attivo -> IDEMPOTENTE, preserva i filtri
+        WorkspaceContext.switch_wealth_profile(new_pid=10, profile_name="Holding Alfa")
+        assert st.session_state.get("cf_account_selector_widget") == "Conto Intesa"
+
+        # Clic forzato sullo stesso profilo -> SANIFICAZIONE ATOMICA
+        WorkspaceContext.switch_wealth_profile(new_pid=10, profile_name="Holding Alfa", force=True)
+        assert "cf_account_selector_widget" not in st.session_state
+
+        # Ripristino e switch su profilo diverso -> SANIFICAZIONE ATOMICA
+        st.session_state["cf_account_selector_widget"] = "Conto Intesa"
+        WorkspaceContext.switch_wealth_profile(new_pid=20, profile_name="Holding Beta")
+        assert "cf_account_selector_widget" not in st.session_state
+        assert st.session_state.get("wealth_active_portfolio_id") == 20
+        assert st.session_state.get("wealth_active_profile_name") == "Holding Beta"
+
+

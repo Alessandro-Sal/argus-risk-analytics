@@ -199,6 +199,10 @@ def init_wealth_db(engine: Engine) -> None:
 
     with engine.begin() as conn:
         if is_sqlite:
+            try:
+                conn.execute(sqlt("PRAGMA busy_timeout = 10000;"))
+            except Exception:
+                pass
             conn.execute(
                 sqlt("""
                 CREATE TABLE IF NOT EXISTS wealth_profiles (
