@@ -10,6 +10,21 @@ import plotly.io as pio
 import plotly.subplots as sp
 import streamlit as st
 
+from core.loading_states import (  # noqa: F401
+    AtomicViewSlot,
+    atomic_computation,
+    computation_barrier,
+    debounce_trigger,
+    inject_loading_css,
+    is_computing,
+    render_chart_skeleton,
+    render_dashboard_skeleton,
+    render_kpi_skeleton,
+    render_table_skeleton,
+    render_transition_overlay,
+    set_computing_state,
+    switch_to_page_with_transition,
+)
 from core.ui_export_utils import (
     generate_export_filename,
     prepare_dataframe_for_export,
@@ -21,6 +36,13 @@ from core.ui_export_utils import (
 
 
 def inject_custom_css():
+    try:
+        from core.loading_states import inject_loading_css
+
+        inject_loading_css()
+    except Exception:
+        pass
+
     theme = st.session_state.get("ui_theme", "Midnight Obsidian")
 
     if theme == "Cyberpunk Neon":
