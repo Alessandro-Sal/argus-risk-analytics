@@ -339,6 +339,27 @@ def build_wealth_telemetry_ribbon_state(
     real_est = float(getattr(nw_summary, "real_estate_total", 0.0) if nw_summary is not None else state.get("wealth_real_estate_total", 480_000.0))
     liab = float(getattr(nw_summary, "total_liabilities", 0.0) if nw_summary is not None else state.get("wealth_total_liabilities", 110_000.0))
 
+    macro_key = str(state.get("global_macro_shock", "NONE")).upper().strip()
+    shock_res: dict[str, Any] = {}
+    if macro_key and macro_key != "NONE":
+        try:
+            from core.wealth.unified_stress_bridge import evaluate_active_wealth_macro_shock
+
+            snapshot = {
+                "total_net_worth": tot_nw,
+                "liquid_cash": liq_cash,
+                "financial_investments": fin_inv,
+                "real_estate_total": real_est,
+                "total_liabilities": liab,
+                "runway_months": runway_m,
+                "fixed_mortgages_balance": float(getattr(nw_summary, "fixed_mortgages_balance", liab * 0.7)),
+                "variable_mortgages_balance": float(getattr(nw_summary, "variable_mortgages_balance", liab * 0.3)),
+            }
+            pos_df = state.get("last_portfolio_result", {}).get("positions") if isinstance(state.get("last_portfolio_result"), dict) else None
+            shock_res = evaluate_active_wealth_macro_shock(snapshot, session_state_dict=state, portfolio_positions=pos_df)
+        except Exception:
+            shock_res = {}
+
     if runway_m >= 12.0:
         solvency_label = "🟢 EXCELLENT RUNWAY"
         solvency_color = "#10b981"
@@ -361,6 +382,14 @@ def build_wealth_telemetry_ribbon_state(
         "total_liabilities": round(liab, 2),
         "solvency_label": solvency_label,
         "solvency_color": solvency_color,
+        "macro_shock_active": bool(shock_res.get("is_shock_active", False)),
+        "macro_shock_key": macro_key,
+        "macro_shock_name": shock_res.get("scenario_name", ""),
+        "stressed_net_worth": shock_res.get("post_stress_net_worth", tot_nw),
+        "macro_shock_pnl_pct": shock_res.get("total_net_worth_pnl_pct", 0.0),
+        "macro_shock_pnl_eur": shock_res.get("total_wealth_pnl_eur", 0.0),
+        "stressed_runway_months": shock_res.get("stressed_runway_months", runway_m),
+        "solvency_warning": shock_res.get("solvency_warning", False),
         "timestamp_utc": datetime.now().strftime("%H:%M:%S"),
     }
 
@@ -376,6 +405,18 @@ def build_wealth_telemetry_ribbon_html(
     fin_val = float(telemetry.get("financial_investments", 0.0))
     fin_str = f"€ {fin_val:,.0f}".replace(",", ".")
     runway_m = float(telemetry.get("runway_months", 12.0))
+
+    shock_pill_html = ""
+    if telemetry.get("macro_shock_active"):
+        s_nw = float(telemetry.get("stressed_net_worth", 0.0))
+        s_nw_str = f"€ {s_nw:,.0f}".replace(",", ".")
+        pnl_pct = float(telemetry.get("macro_shock_pnl_pct", 0.0))
+        s_color = "#ef4444" if pnl_pct < -10 else "#f59e0b"
+        shock_pill_html = (
+            f'<span style="background: rgba(239, 68, 68, 0.22); border: 1px solid {s_color}; '
+            f'color: #fca5a5; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 12px;">'
+            f'⚡ STRESSED NW: {s_nw_str} ({pnl_pct:+.1f}%)</span>'
+        )
 
     raw_html = f"""
     <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
@@ -398,6 +439,7 @@ def build_wealth_telemetry_ribbon_html(
             <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
                 {telemetry['page_badge']}
             </span>
+            {shock_pill_html}
         </div>
         <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
             <span style="font-size: 11.5px; color: #cbd5e1;">
@@ -561,6 +603,29 @@ def render_live_portfolio_autobind_banner(
     return binding
 
 
+def ensure_webgl_scatter(fig: Any, threshold: int = 2000) -> Any:
+    """Converte automaticamente i trace Scatter ad alta densità (>= threshold punti) in Scattergl per accelerazione WebGL."""
+    if fig is None or not hasattr(fig, "to_dict"):
+        return fig
+    try:
+        fig_dict = fig.to_dict()
+        has_dense = False
+        for tr in fig_dict.get("data", []):
+            if tr.get("type") == "scatter":
+                x_len = len(tr.get("x") or [])
+                y_len = len(tr.get("y") or [])
+                if max(x_len, y_len) >= threshold:
+                    tr["type"] = "scattergl"
+                    has_dense = True
+        if has_dense:
+            import plotly.graph_objects as go
+
+            return go.Figure(fig_dict)
+    except Exception:
+        pass
+    return fig
+
+
 def style_institutional_chart(
     fig: Any,
     title: str | None = None,
@@ -616,6 +681,7 @@ def style_institutional_chart(
             gridcolor="rgba(255,255,255,0.06)",
             zerolinecolor="rgba(255,255,255,0.12)",
         )
+    fig = ensure_webgl_scatter(fig)
     return fig
 
 

@@ -97,7 +97,7 @@ render_institutional_telemetry_ribbon(page_badge="WEALTH CONTROL ROOM & INGESTIO
 render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid)
 
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
-p_bar_c1, p_bar_c2, p_bar_c3, p_bar_c4 = st.columns([3.2, 1.1, 1.1, 1.4])
+p_bar_c1, p_bar_c2, p_bar_c3, p_bar_c4, p_bar_c5 = st.columns([2.7, 0.9, 0.9, 1.3, 1.3])
 with p_bar_c1:
     opts = [None] + list(profile_map.keys())
     curr_idx = opts.index(current_pid) if current_pid in opts else 0
@@ -157,6 +157,38 @@ with p_bar_c3:
 with p_bar_c4:
     st.write("")
     if current_pid is not None:
+        with st.popover("📑 Master Pack", use_container_width=True):
+            st.markdown("##### 📑 Executive Master Board Pack")
+            st.caption("Dossier istituzionale unificato Risk & Wealth.")
+            prof_nm = profile_map.get(current_pid, "Family Office Master")
+            try:
+                from core.wealth.wealth_reporting_hub import (
+                    _get_cached_master_board_pack_html,
+                    _get_cached_master_board_pack_pdf,
+                )
+                st.download_button(
+                    "📥 Scarica PDF Master",
+                    data=lambda: _get_cached_master_board_pack_pdf(engine, pid=current_pid, prof_name=prof_nm),
+                    file_name=f"argus_master_board_pack_{prof_nm.lower().replace(' ', '_')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary",
+                    key="dl_mb_pdf_w_ctrl",
+                )
+                st.download_button(
+                    "🌐 Scarica HTML Master",
+                    data=lambda: _get_cached_master_board_pack_html(engine, pid=current_pid, prof_name=prof_nm),
+                    file_name=f"argus_master_board_pack_{prof_nm.lower().replace(' ', '_')}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    key="dl_mb_html_w_ctrl",
+                )
+            except Exception as ex:
+                st.error(f"Errore generazione Master Board Pack: {ex}")
+
+with p_bar_c5:
+    st.write("")
+    if current_pid is not None:
         if st.button("🏛️ Vai al Net Worth →", type="secondary", use_container_width=True, key="btn_goto_nw_top"):
             st.switch_page("pages/13_🏛️_Patrimonio_e_NetWorth.py")
 
@@ -206,6 +238,23 @@ tot_snaps_count = len(df_snaps) if not df_snaps.empty else 0
 
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
 render_wealth_executive_badges(nw_curr)
+
+from core.wealth.unified_stress_bridge import render_cross_portal_stress_bridge_banner
+
+render_cross_portal_stress_bridge_banner(
+    wealth_snapshot={
+        "total_net_worth": nw_curr.total_net_worth,
+        "liquid_cash": nw_curr.liquid_cash,
+        "financial_investments": nw_curr.financial_investments,
+        "real_estate_total": nw_curr.real_estate_total,
+        "total_liabilities": nw_curr.total_liabilities,
+        "runway_months": nw_curr.runway_months,
+        "fixed_mortgages_balance": getattr(nw_curr, "fixed_mortgages_balance", nw_curr.total_liabilities * 0.7),
+        "variable_mortgages_balance": getattr(nw_curr, "variable_mortgages_balance", nw_curr.total_liabilities * 0.3),
+    },
+    portfolio_id=current_pid,
+    key_suffix="p12_main",
+)
 
 st.markdown("<div style='margin-top: 10px; margin-bottom: 18px;'>", unsafe_allow_html=True)
 k1, k2, k3, k4 = st.columns(4)

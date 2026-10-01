@@ -86,87 +86,17 @@ RISK_MODELS_CATALOG = {
     }
 }
 
-# Risoluzione dello stato attivo con priorità alla sidebar o global jump
-target_tab = None
-if "target_subtab_risk_active_tab" in st.session_state:
-    target_tab = st.session_state.pop("target_subtab_risk_active_tab")
+if "target_risk_module" in st.session_state:
+    st.session_state["target_subtab_risk_active_tab"] = st.session_state.pop("target_risk_module")
 elif "global_target_subtab" in st.session_state:
-    target_tab = st.session_state.pop("global_target_subtab")
-elif "target_risk_module" in st.session_state:
-    target_tab = st.session_state.pop("target_risk_module")
+    st.session_state["target_subtab_risk_active_tab"] = st.session_state.pop("global_target_subtab")
 
-risk_keys = list(RISK_MODELS_CATALOG.keys())
+active_risk_tab = render_segmented_tabs(
+    RISK_MODELS_CATALOG,
+    key="risk_active_tab",
+    select_label="Seleziona Modulo di Analisi Rischio:",
+)
 
-if target_tab and target_tab in risk_keys:
-    st.session_state["risk_active_tab"] = target_tab
-    st.session_state["risk_active_tab_selectbox"] = target_tab
-elif "risk_active_tab_selectbox" in st.session_state and st.session_state["risk_active_tab_selectbox"] in risk_keys:
-    st.session_state["risk_active_tab"] = st.session_state["risk_active_tab_selectbox"]
-elif "risk_active_tab" in st.session_state and st.session_state["risk_active_tab"] in risk_keys:
-    st.session_state["risk_active_tab_selectbox"] = st.session_state["risk_active_tab"]
-else:
-    st.session_state["risk_active_tab"] = risk_keys[0]
-    st.session_state["risk_active_tab_selectbox"] = risk_keys[0]
-
-curr_idx = risk_keys.index(st.session_state["risk_active_tab"])
-
-# Spaziatura e Respiro Layout
-st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
-
-# Barra Selettore Compatta Bloomberg Style
-c_sel_r, c_prev_r, c_next_r = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
-
-with c_prev_r:
-    if st.button("◀ Prec.", key="btn_risk_prev", use_container_width=True, help="Modulo precedente"):
-        new_i = (curr_idx - 1) % len(risk_keys)
-        st.session_state["target_subtab_risk_active_tab"] = risk_keys[new_i]
-        st.session_state["risk_active_tab"] = risk_keys[new_i]
-        st.session_state["risk_active_tab_selectbox"] = risk_keys[new_i]
-        st.rerun()
-
-with c_next_r:
-    if st.button("Succ. ▶", key="btn_risk_next", use_container_width=True, help="Modulo successivo"):
-        new_i = (curr_idx + 1) % len(risk_keys)
-        st.session_state["target_subtab_risk_active_tab"] = risk_keys[new_i]
-        st.session_state["risk_active_tab"] = risk_keys[new_i]
-        st.session_state["risk_active_tab_selectbox"] = risk_keys[new_i]
-        st.rerun()
-
-with c_sel_r:
-    selected_risk_key = st.selectbox(
-        "Seleziona Modulo di Analisi Rischio:",
-        options=risk_keys,
-        index=curr_idx,
-        format_func=lambda k: f"{k}  —  {RISK_MODELS_CATALOG[k]['category']} [{RISK_MODELS_CATALOG[k]['badge']}]",
-        key="risk_active_tab_selectbox",
-        label_visibility="collapsed"
-    )
-    st.session_state["risk_active_tab"] = selected_risk_key
-
-active_risk_tab = st.session_state["risk_active_tab"]
-active_risk_info = RISK_MODELS_CATALOG[active_risk_tab]
-
-# Bloomberg Terminal Header Banner per il Modulo Attivo
-st.markdown(f"""
-<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_risk_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
-    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
-      {active_risk_info['title']}
-    </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
-      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
-        {active_risk_info['category']}
-      </span>
-      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_risk_info['badge_color']}22; color: {active_risk_info['badge_color']}; border: 1px solid {active_risk_info['badge_color']}55;">
-        {active_risk_info['badge']}
-      </span>
-    </div>
-  </div>
-  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
-    {active_risk_info['desc']}
-  </div>
-</div>
-""", unsafe_allow_html=True)
 
 # Risoluzione robusta del Beta aggregato a livello di pagina
 b_val_display = mk.get('beta')

@@ -190,3 +190,77 @@ def test_unified_macro_stress_engine_with_risk_positions():
     assert "AAPL" in tickers and "NVDA" in tickers
     assert res["deltas"]["financial_investments"] == pytest.approx(-62500.0, 1.0)
 
+
+def test_cross_portal_macro_stress_bridge():
+    """Verifica il calcolo dello shock macro cross-portal e l'haircut patrimoniale."""
+    from core.wealth.unified_stress_bridge import (
+        evaluate_active_wealth_macro_shock,
+        map_global_macro_preset_to_factor_shock,
+    )
+
+    shocks = map_global_macro_preset_to_factor_shock("GFC_2008")
+    assert shocks.equity_mkt_pct == -0.35
+    assert shocks.yield_curve_shift_bps == -125.0
+    assert shocks.inflation_rate_pct >= 0
+
+    wealth_snapshot = {
+        "liquid_investments": 400_000.0,
+        "cash_reserves": 100_000.0,
+        "real_estate_gross": 500_000.0,
+        "total_liabilities": 200_000.0,
+        "variable_debt_principal": 150_000.0,
+        "mortgage_interest_rate": 0.025,
+        "mortgage_months_remaining": 180,
+    }
+    result = evaluate_active_wealth_macro_shock(
+        wealth_snapshot, session_state_dict={"global_macro_shock": "GFC_2008"}
+    )
+    assert result["is_shock_active"] is True
+    assert result["global_preset_key"] == "GFC_2008"
+    assert result["post_stress_net_worth"] < result["pre_stress_net_worth"]
+    assert result["total_net_worth_pnl_pct"] < 0
+
+
+def test_webgl_acceleration():
+    """Verifica la conversione automatica di Scatter in Scattergl oltre 2000 punti."""
+    import plotly.graph_objects as go
+
+    from core.ux_institutional_hub import ensure_webgl_scatter, style_institutional_chart
+
+    # Scatter piccolo (< 2000 punti) deve rimanere scatter
+    fig_small = go.Figure(data=go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))
+    fig_small_opt = ensure_webgl_scatter(fig_small, threshold=2000)
+    assert fig_small_opt.data[0].type == "scatter"
+
+    # Scatter denso (>= 2000 punti) deve convertirsi in scattergl
+    large_x = list(range(2500))
+    large_y = [x * 0.5 for x in large_x]
+    fig_large = go.Figure(data=go.Scatter(x=large_x, y=large_y))
+    fig_large_opt = ensure_webgl_scatter(fig_large, threshold=2000)
+    assert fig_large_opt.data[0].type == "scattergl"
+
+    # style_institutional_chart converte automaticamente
+    fig_styled = style_institutional_chart(fig_large)
+    assert fig_styled.data[0].type == "scattergl"
+
+
+def test_master_board_pack_generation():
+    """Verifica la generazione dell'Executive Master Board Pack HTML e struttura."""
+    from sqlalchemy import create_engine
+
+    from core.wealth.wealth_db import init_wealth_db
+    from core.wealth.wealth_reporting_hub import generate_master_board_pack_html
+
+    engine = create_engine("sqlite:///:memory:")
+    init_wealth_db(engine)
+
+    html = generate_master_board_pack_html(
+        engine,
+        portfolio_id=1,
+        prof_name="Family Office Test",
+    )
+    assert "<!DOCTYPE html>" in html
+    assert "Master Board Pack" in html
+    assert "Family Office Test" in html
+
+

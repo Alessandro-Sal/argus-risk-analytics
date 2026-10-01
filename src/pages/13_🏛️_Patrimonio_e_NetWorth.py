@@ -278,6 +278,23 @@ summary_watchdog_dict = {
 watchdog_alerts = WealthWatchdog.evaluate_all_alerts(summary_watchdog_dict)
 render_wealth_watchdog_banner(watchdog_alerts)
 
+from core.wealth.unified_stress_bridge import render_cross_portal_stress_bridge_banner
+
+render_cross_portal_stress_bridge_banner(
+    wealth_snapshot={
+        "total_net_worth": tot_nw,
+        "liquid_cash": liq_cash,
+        "financial_investments": fin_inv,
+        "real_estate_total": re_val,
+        "total_liabilities": liab_val,
+        "runway_months": runway_m,
+        "fixed_mortgages_balance": liab_val * 0.7,
+        "variable_mortgages_balance": liab_val * 0.3,
+    },
+    portfolio_id=current_pid,
+    key_suffix="p13_top",
+)
+
 if not is_snapshot_mode and len(prof_map) > 1:
     head_c1, head_c2, head_c3 = st.columns([3.2, 1.0, 1.0])
     with head_c1:
@@ -2672,6 +2689,25 @@ elif active_nw_tab == "🌪️ Global Wealth Stress-Testing":
         <div style="font-size: 12px; color: #94a3b8; margin-top: 2px;">Simula l'impatto di shock macroeconomici estremi e congiunti (crisi immobiliare, stagflazione, cigno nero, shock reddituale) su tutte le componenti del patrimonio.</div>
     </div>
     """, unsafe_allow_html=True)
+
+    active_macro = str(st.session_state.get("global_macro_shock", "NONE")).upper().strip()
+    if active_macro != "NONE":
+        macro_sync_map = {
+            "GFC_2008": "SUBPRIME_CRASH_2008",
+            "STAGFLATION_SHOCK": "STAGFLATION_CRUNCH",
+            "LIQUIDITY_FREEZE": "BLACK_SWAN_PANDEMIC",
+        }
+        target_preset = macro_sync_map.get(active_macro)
+        st.markdown(
+            f"""
+            <div style="background: rgba(239, 68, 68, 0.1); border: 1px dashed #ef4444; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; color: #fca5a5;">
+                    ⚡ <b>Macro Shock Attivo nel Terminale Rischio:</b> <code>{active_macro}</code> (Cross-Portal Bridge Collegato)
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     scen_keys = list(PRESET_STRESS_SCENARIOS.keys()) + ["CUSTOM"]
     scen_labels = {k: PRESET_STRESS_SCENARIOS[k]["name"] for k in PRESET_STRESS_SCENARIOS}
