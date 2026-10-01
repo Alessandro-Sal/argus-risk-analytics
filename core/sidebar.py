@@ -1164,6 +1164,13 @@ def _execute_full_session_reset(is_wealth_mode: bool = False) -> None:
     st.cache_data.clear()
     st.cache_resource.clear()
     try:
+        from core.ui_lifecycle import teardown_view_state
+
+        teardown_view_state(force=True, reason="manual_full_reset")
+    except Exception:
+        pass
+
+    try:
         from core.cache_shield import clear_cache as clear_disk_cache
 
         clear_disk_cache()
@@ -1354,6 +1361,12 @@ def render_sidebar():
         pass
 
     current_page = get_current_page_name()
+    try:
+        from core.ui_lifecycle import teardown_view_state
+
+        teardown_view_state(target_page=current_page)
+    except Exception:
+        pass
 
     with st.sidebar:
         # Zero Dead-Space Top Padding Override with Preserved Toggle Buttons
