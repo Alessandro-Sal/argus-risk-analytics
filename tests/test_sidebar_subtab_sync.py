@@ -69,9 +69,9 @@ def test_render_segmented_tabs_state_sync(monkeypatch):
     assert st.session_state["test_tab_key_selectbox"] == "Tab A"
     assert st.session_state["_synced_tab_val_test_tab_key"] == "Tab A"
 
-    # Simula click su Tab B
+    # Simula click su Succ. ▶ (stile Bloomberg Risk Engine)
     def mock_button(label, *args, **kwargs):
-        return label == "Tab B"
+        return label == "Succ. ▶"
 
     monkeypatch.setattr(st, "button", mock_button)
     rerun_called = []
@@ -83,6 +83,38 @@ def test_render_segmented_tabs_state_sync(monkeypatch):
     assert st.session_state["target_subtab_test_tab_key"] == "Tab B"
     assert st.session_state["_synced_tab_val_test_tab_key"] == "Tab B"
     assert len(rerun_called) == 1
+
+
+def test_render_segmented_tabs_with_catalog(monkeypatch):
+    """Verifica che render_segmented_tabs supporti cataloghi dizionario e formatti il banner."""
+    catalog = {
+        "Mod Alpha": {
+            "title": "Modulo Alpha Istituzionale",
+            "badge": "ALPHA • 95%",
+            "badge_color": "#10b981",
+            "category": "Quant",
+            "desc": "Descrizione modulo alpha.",
+        },
+        "Mod Beta": {
+            "title": "Modulo Beta Istituzionale",
+            "badge": "BETA • 99%",
+            "badge_color": "#f85149",
+            "category": "Risk",
+            "desc": "Descrizione modulo beta.",
+        },
+    }
+    for k in ["cat_key", "cat_key_selectbox", "target_subtab_cat_key", "_synced_tab_val_cat_key", "_prev_rendered_tab_cat_key"]:
+        st.session_state.pop(k, None)
+
+    monkeypatch.setattr(st, "button", lambda *args, **kwargs: False)
+    markdown_rendered = []
+    monkeypatch.setattr(st, "markdown", lambda body, *args, **kwargs: markdown_rendered.append(body))
+
+    active = render_segmented_tabs(catalog, key="cat_key")
+    assert active == "Mod Alpha"
+    assert st.session_state["cat_key"] == "Mod Alpha"
+    assert any("Modulo Alpha Istituzionale" in str(m) for m in markdown_rendered)
+    assert any("#10b981" in str(m) for m in markdown_rendered)
 
 
 def test_sidebar_subtab_bidirectional_sync_logic():
