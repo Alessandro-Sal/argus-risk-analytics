@@ -124,6 +124,9 @@ with col_f1:
 with col_f2:
     year_opts = ["🌐 Tutto lo Storico"] + [str(y) for y in available_years]
     def_idx = year_opts.index("2026") if "2026" in year_opts else 0
+    curr_yr = st.session_state.get("cf_year_selector_widget")
+    if curr_yr is not None and curr_yr not in year_opts:
+        st.session_state["cf_year_selector_widget"] = year_opts[def_idx]
     sel_year_str = st.selectbox("Anno di Analisi:", year_opts, index=def_idx, key="cf_year_selector_widget")
 
 with col_f3:
@@ -143,6 +146,9 @@ with col_f3:
         12: "12 - Dicembre"
     }
     month_opts = list(month_names_map.keys())
+    curr_m = st.session_state.get("cf_month_selector_widget")
+    if curr_m is not None and curr_m not in month_opts:
+        st.session_state["cf_month_selector_widget"] = month_opts[0]
     sel_month_num = st.selectbox(
         "Mese di Analisi:",
         options=month_opts,
@@ -156,6 +162,9 @@ with col_f4:
     if not df_cf.empty and "account_name" in df_cf.columns:
         acc_list = sorted([str(a) for a in df_cf["account_name"].dropna().unique()])
         available_accs.extend(acc_list)
+    curr_acc = st.session_state.get("cf_account_selector_widget")
+    if curr_acc is not None and curr_acc not in available_accs:
+        st.session_state["cf_account_selector_widget"] = available_accs[0]
     sel_acc = st.selectbox("Conto / Carta:", available_accs, index=0, key="cf_account_selector_widget")
 
 with col_f5:
