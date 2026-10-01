@@ -320,6 +320,128 @@ def render_institutional_telemetry_ribbon(
     return telemetry
 
 
+def build_wealth_telemetry_ribbon_state(
+    nw_summary: Any = None,
+    session_state_dict: dict[str, Any] | None = None,
+    page_badge: str = "WEALTH DESK",
+    profile_name: str | None = None,
+) -> dict[str, Any]:
+    """Extract wealth telemetry metrics (Net Worth, Liquid Cash, Runway, Financials, Real Estate, Debt)."""
+    state = session_state_dict if session_state_dict is not None else (
+        dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
+    )
+    p_name = profile_name or state.get("wealth_active_profile_name") or state.get("active_portfolio_name") or "Family Office Portfolio"
+
+    tot_nw = float(getattr(nw_summary, "total_net_worth", 0.0) if nw_summary is not None else state.get("wealth_total_net_worth", 1_250_000.0))
+    liq_cash = float(getattr(nw_summary, "liquid_cash", 0.0) if nw_summary is not None else state.get("wealth_liquid_cash", 120_000.0))
+    runway_m = float(getattr(nw_summary, "runway_months", 0.0) if nw_summary is not None else state.get("wealth_runway_months", 14.5))
+    fin_inv = float(getattr(nw_summary, "financial_investments", 0.0) if nw_summary is not None else state.get("wealth_financial_investments", 650_000.0))
+    real_est = float(getattr(nw_summary, "real_estate_total", 0.0) if nw_summary is not None else state.get("wealth_real_estate_total", 480_000.0))
+    liab = float(getattr(nw_summary, "total_liabilities", 0.0) if nw_summary is not None else state.get("wealth_total_liabilities", 110_000.0))
+
+    if runway_m >= 12.0:
+        solvency_label = "🟢 EXCELLENT RUNWAY"
+        solvency_color = "#10b981"
+    elif runway_m >= 6.0:
+        solvency_label = "🟡 ADEQUATE RUNWAY"
+        solvency_color = "#f59e0b"
+    else:
+        solvency_label = "🔴 VULNERABLE RUNWAY"
+        solvency_color = "#ef4444"
+
+    return {
+        "app_version": APP_VERSION,
+        "page_badge": page_badge,
+        "profile_name": p_name,
+        "total_net_worth": round(tot_nw, 2),
+        "liquid_cash": round(liq_cash, 2),
+        "runway_months": round(runway_m, 1),
+        "financial_investments": round(fin_inv, 2),
+        "real_estate_total": round(real_est, 2),
+        "total_liabilities": round(liab, 2),
+        "solvency_label": solvency_label,
+        "solvency_color": solvency_color,
+        "timestamp_utc": datetime.now().strftime("%H:%M:%S"),
+    }
+
+
+def build_wealth_telemetry_ribbon_html(
+    telemetry: dict[str, Any],
+) -> str:
+    """Build single-line, zero-indent HTML for the wealth institutional telemetry ribbon."""
+    nw_val = float(telemetry.get("total_net_worth", 0.0))
+    nw_str = f"€ {nw_val:,.0f}".replace(",", ".")
+    liq_val = float(telemetry.get("liquid_cash", 0.0))
+    liq_str = f"€ {liq_val:,.0f}".replace(",", ".")
+    fin_val = float(telemetry.get("financial_investments", 0.0))
+    fin_str = f"€ {fin_val:,.0f}".replace(",", ".")
+    runway_m = float(telemetry.get("runway_months", 12.0))
+
+    raw_html = f"""
+    <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
+                border: 1px solid rgba(16, 185, 129, 0.32);
+                border-left: 4px solid #10b981;
+                border-radius: 10px;
+                padding: 8px 14px;
+                margin-bottom: 8px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.35);">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <span style="background: #10b981; color: #022c22; font-size: 10.5px; font-weight: 800;
+                         padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px;">ARGUS WEALTH</span>
+            <span style="color: #e2e8f0; font-size: 12px; font-weight: 700;">
+                🏛️ {telemetry['profile_name']}
+            </span>
+            <span style="color: #64748b; font-size: 11px;">|</span>
+            <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
+                {telemetry['page_badge']}
+            </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Net Worth: <b style="color: #10b981;">{nw_str}</b>
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Liquidità: <b style="color: #38bdf8;">{liq_str}</b> ({runway_m:.1f}m)
+            </span>
+            <span style="font-size: 11.5px; color: #cbd5e1;">
+                Finanziari: <b style="color: #f59e0b;">{fin_str}</b>
+            </span>
+            <span style="background: rgba(255,255,255,0.04); border: 1px solid {telemetry['solvency_color']};
+                         color: {telemetry['solvency_color']}; font-size: 10.5px; font-weight: 800;
+                         padding: 2px 8px; border-radius: 12px;">
+                {telemetry['solvency_label']}
+            </span>
+        </div>
+    </div>
+    """
+    return _compact_html(raw_html)
+
+
+def render_wealth_telemetry_ribbon(
+    nw_summary: Any = None,
+    page_badge: str = "WEALTH MANAGEMENT",
+    profile_name: str | None = None,
+) -> dict[str, Any]:
+    """Render sticky wealth management telemetry ribbon in Streamlit."""
+    telemetry = build_wealth_telemetry_ribbon_state(
+        nw_summary=nw_summary,
+        page_badge=page_badge,
+        profile_name=profile_name,
+    )
+    if st is None:
+        return telemetry
+
+    density_mode = str(st.session_state.get("ux_density_mode", "COMPACT_DESK"))
+    inject_density_mode_css(density_mode)
+
+    if "CONTROL ROOM" not in page_badge.upper():
+        st.markdown(build_wealth_telemetry_ribbon_html(telemetry), unsafe_allow_html=True)
+    return telemetry
+
+
 def extract_live_portfolio_binding(
     session_state_dict: dict[str, Any] | None = None,
     risk_data: dict[str, Any] | None = None,

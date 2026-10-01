@@ -32,6 +32,7 @@ from core.ui_utils import (
     metric_card,
     render_institutional_telemetry_ribbon,
     render_page_header,
+    render_segmented_tabs,
     render_sr117_audit_drawer,
     render_table_with_export,
     render_wealth_command_bar,
@@ -98,19 +99,45 @@ with col_re_h2:
 
 re_ltv_summary = compute_real_estate_net_equity_and_ltv(engine, portfolio_id=current_pid)
 
-re_tab_options = [
-    "🏡 Home Equity & LTV Reale",
-    "🏦 Simulatore Mutuo & Ammortamento",
-    "📈 Redditività Immobiliare (Cap Rate & Cash Flow)",
-    "⚖️ Buy vs Rent (Affitto vs Acquisto)",
-]
-resolve_active_subtab(re_tab_options, key="wealth_re_active_tab")
-tab_equity, tab_mortgage, tab_roi, tab_bvr = st.tabs(
-    re_tab_options, key="wealth_re_active_tab", on_change="rerun"
+WEALTH_RE_MODELS_CATALOG = {
+    "🏡 Home Equity & LTV Reale": {
+        "title": "Home Equity Netto & Posizione Finanziaria Immobiliare (LTV Dinamico)",
+        "badge": "LTV • Equity Reale • Asset Illiquidi",
+        "badge_color": "#10b981",
+        "category": "Patrimonio Immobiliare",
+        "desc": "Integrazione in tempo reale tra valore di mercato degli immobili registrati, ammortamento del debito residuo e LTV complessivo.",
+    },
+    "🏦 Simulatore Mutuo & Ammortamento": {
+        "title": "Piano di Ammortamento alla Francese, Tasso Fisso/Variabile & Estinzione Anticipata",
+        "badge": "Ammortamento • Francese • Extra-Rimborso",
+        "badge_color": "#38bdf8",
+        "category": "Finanziamenti & Mutui",
+        "desc": "Simulazione dettagliata piano di rimborso, estinzione anticipata straordinaria, risparmio interessi e shock test Euribor su mutui a tasso variabile.",
+    },
+    "📈 Redditività Immobiliare (Cap Rate & Cash Flow)": {
+        "title": "Valutazione Redditività da Locazione (Buy-to-Let) & Cash-on-Cash Return",
+        "badge": "Cap Rate • NOI • Cash Flow • Cedolare",
+        "badge_color": "#fbbf24",
+        "category": "Rendimento da Locazione",
+        "desc": "Calcolo di Cap Rate lordo/netto, Net Operating Income (NOI), cash flow mensile post-rata e rendimento del capitale proprio investito.",
+    },
+    "⚖️ Buy vs Rent (Affitto vs Acquisto)": {
+        "title": "Modello Matematico di Costo Opportunità Affitto vs Acquisto Prima Casa",
+        "badge": "Buy vs Rent • Costo Opportunità • Equity Accumulation",
+        "badge_color": "#a855f7",
+        "category": "Decision Engine",
+        "desc": "Confronto attuariale tra acquisto con mutuo e locazione con reinvestimento dell'anticipo e del delta-rata in un portafoglio diversificato.",
+    },
+}
+
+active_re_tab = render_segmented_tabs(
+    WEALTH_RE_MODELS_CATALOG,
+    key="wealth_re_active_tab",
+    select_label="Seleziona Modulo Immobiliare:",
 )
 
 # ── TAB 1: HOME EQUITY & DYNAMIC LTV ───────────────────────
-with tab_equity:
+if active_re_tab == "🏡 Home Equity & LTV Reale":
     st.markdown("### 🏡 Net Home Equity & Posizione Finanziaria Immobiliare")
     st.caption("Integrazione in tempo reale tra il valore di mercato degli immobili registrati nel Caveau/Fisici e il debito residuo dei mutui.")
 
@@ -189,7 +216,7 @@ with tab_equity:
         )
 
 # ── TAB 2: AMMORTAMENTO MUTUO ───────────────────────────────
-with tab_mortgage:
+elif active_re_tab == "🏦 Simulatore Mutuo & Ammortamento":
     st.markdown("### 🏦 Piano di Ammortamento alla Francese & Estinzione Anticipata")
     
     col_in1, col_in2, col_in3, col_in4 = st.columns(4)
@@ -300,7 +327,7 @@ with tab_mortgage:
 
 
 # ── TAB 2: REDDITIVITÀ IMMOBILIARE (BUY-TO-LET) ─────────────
-with tab_roi:
+elif active_re_tab == "📈 Redditività Immobiliare (Cap Rate & Cash Flow)":
     st.markdown("### 📈 Valutazione Redditività da Locazione (Buy-to-Let)")
     st.caption("Calcolo del Cap Rate, Rendimento Lordo, Net Operating Income (NOI) e Cash-on-Cash Return al netto di IMU, spese e cedolare secca.")
 
@@ -346,7 +373,7 @@ with tab_roi:
         metric_card("Cash-on-Cash", f"{roi['cash_on_cash_pct']:.2f}%", delta="Ritorno Capitale", help_text="Rendimento sul solo capitale effettivamente versato (Anticipo + Spese notarili).")
 
 # ── TAB 3: BUY VS RENT ──────────────────────────────────────
-with tab_bvr:
+elif active_re_tab == "⚖️ Buy vs Rent (Affitto vs Acquisto)":
     st.markdown("### ⚖️ Buy vs Rent — Modello Matematico sul Costo Opportunità")
     st.caption("Confronta la crescita del patrimonio netto tra l'acquisto della prima casa e l'affitto con investimento del capitale iniziale in un portafoglio azionario globale diversificato.")
 

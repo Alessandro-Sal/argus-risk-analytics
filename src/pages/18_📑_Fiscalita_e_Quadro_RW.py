@@ -33,6 +33,7 @@ from core.ui_utils import (
     metric_card,
     render_institutional_telemetry_ribbon,
     render_page_header,
+    render_segmented_tabs,
     render_sr117_audit_drawer,
     render_table_with_export,
     render_wealth_command_bar,
@@ -133,22 +134,59 @@ with k5:
 
 st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
-# ── TABS ────────────────────────────────────────────────────
-tax_tab_options = [
-    "📑 Prospetto Quadro RW / RT",
-    "📉 Zainetto Fiscale & Scadenze",
-    "🌾 Tax-Loss Harvesting & Plusvalenze",
-    "⚖️ Ripartizione Italia vs Estero",
-    "💡 Strategie di Efficienza Fiscale",
-    "🌍 Fiscalità Internazionale & Cross-Border",
-]
-resolve_active_subtab(tax_tab_options, key="wealth_tax_active_tab")
-tab_rw, tab_minus, tab_harvest, tab_split, tab_strat, tab_cross = st.tabs(
-    tax_tab_options, key="wealth_tax_active_tab", on_change="rerun"
+# ── SELETTORE MODULI FISCALITÀ STILE BLOOMBERG TERMINAL ─────────
+WEALTH_TAX_MODELS_CATALOG = {
+    "📑 Prospetto Quadro RW / RT": {
+        "title": "Prospetto Monitoraggio Fiscale, Quadro RW & Quadro RT (Modello Redditi PF)",
+        "badge": "Quadro RW • IVAFE • Conti Esteri",
+        "badge_color": "#10b981",
+        "category": "Dichiarazione Fiscale",
+        "desc": "Prospetto analitico delle attività finanziarie e conti detenuti all'estero, giacenze medie, picchi di consistenza e calcolo dell'IVAFE dovuta.",
+    },
+    "📉 Zainetto Fiscale & Scadenze": {
+        "title": "Zainetto Fiscale Minusvalenze & Monitoraggio Scadenze Quinquennali",
+        "badge": "Zainetto • Minusvalenze • Scadenze 4Y",
+        "badge_color": "#f85149",
+        "category": "Compensazione Fiscale",
+        "desc": "Tracciamento dello stock di minusvalenze pregresse, calendario delle scadenze fiscali a 4 anni e simulatore di compensazione con plusvalenze future.",
+    },
+    "🌾 Tax-Loss Harvesting & Plusvalenze": {
+        "title": "Tax-Loss Harvesting Autonomo & Compensazione Plusvalenze",
+        "badge": "Harvesting • Wash Sale • Tax Credit",
+        "badge_color": "#38bdf8",
+        "category": "Ottimizzazione Tributaria",
+        "desc": "Identificazione proattiva di minusvalenze latenti da realizzare per compensare plusvalenze maturate, minimizzando l'imposta sostitutiva del 26%.",
+    },
+    "⚖️ Ripartizione Italia vs Estero": {
+        "title": "Asset Location & Ripartizione Geografica (Italia vs Estero)",
+        "badge": "Asset Location • Regime Dichiarativo • Amministrato",
+        "badge_color": "#fbbf24",
+        "category": "Allocazione Giurisdizionale",
+        "desc": "Mappatura dell'allocazione tra intermediari residenti (Regime Amministrato con ritenuta alla fonte) e conti esteri (Regime Dichiarativo).",
+    },
+    "💡 Strategie di Efficienza Fiscale": {
+        "title": "Strategie Istituzionali di Efficienza Fiscale & Riforma 2026",
+        "badge": "Riforma 2026 • Armonizzazione • Tax Drag",
+        "badge_color": "#a855f7",
+        "category": "Consulenza Avanzata",
+        "desc": "Guida alle strategie di abbattimento del tax drag: armonizzazione redditi di capitale/diversi, polizze PIR e holding di famiglia.",
+    },
+    "🌍 Fiscalità Internazionale & Cross-Border": {
+        "title": "Fiscalità Internazionale, Trattati Bilaterali & Withholding Tax",
+        "badge": "WHT • W-8BEN • Doppia Imposizione",
+        "badge_color": "#06b6d4",
+        "category": "Cross-Border Wealth",
+        "desc": "Gestione delle ritenute alla fonte estere (Withholding Tax dividendi USA/UE), modulistica W-8BEN e recupero credito d'imposta per doppie imposizioni.",
+    },
+}
+
+active_tax_tab = render_segmented_tabs(
+    WEALTH_TAX_MODELS_CATALOG,
+    key="wealth_tax_active_tab",
+    select_label="Seleziona Modulo Fiscale:",
 )
 
-
-with tab_rw:
+if active_tax_tab == "📑 Prospetto Quadro RW / RT":
     st.markdown("### 📑 Prospetto di Monitoraggio Fiscale (Quadro RW & RT)")
     st.caption("Quadro riassuntivo per la compilazione del Modello Redditi PF o trasmissione al commercialista per le attività finanziarie e conti esteri.")
     
@@ -178,7 +216,7 @@ with tab_rw:
         st.info("Nessuna attività finanziaria estera o crypto identificata per questo profilo patrimoniale.")
 
 
-with tab_minus:
+elif active_tax_tab == "📉 Zainetto Fiscale & Scadenze":
     st.markdown("### 📉 Monitoraggio Zainetto Fiscale & Scadenza Minusvalenze (Art. 68 TUIR)")
     st.caption("Le minusvalenze realizzate hanno una durata di validità di 4 anni solari oltre all'anno di realizzo. Se non compensate entro il 31 dicembre del 4° anno, decadono definitivamente.")
     
@@ -219,7 +257,7 @@ with tab_minus:
             </div>
             """, unsafe_allow_html=True)
 
-with tab_harvest:
+elif active_tax_tab == "🌾 Tax-Loss Harvesting & Plusvalenze":
     st.markdown("### 🌾 Tax-Loss Harvesting & Gestione Plusvalenze Latenti")
     st.caption("Ottimizzazione quantitativa del carico fiscale: calcolo del debito fiscale latente da liquidazione e strategie di compensazione minusvalenze prima del 31 dicembre.")
 
@@ -324,7 +362,7 @@ with tab_harvest:
     """, unsafe_allow_html=True)
 
 
-with tab_split:
+elif active_tax_tab == "⚖️ Ripartizione Italia vs Estero":
 
     st.markdown("### ⚖️ Ripartizione Patrimoniale Fiscale (Italia vs Estero)")
     st.caption("Confronto della localizzazione geografica degli asset e dell'incidenza delle imposte patrimoniali applicate (Bollo IT vs IVAFE).")
@@ -390,7 +428,7 @@ with tab_split:
 
 
 
-with tab_strat:
+elif active_tax_tab == "💡 Strategie di Efficienza Fiscale":
     st.markdown("### 💡 Strategie Istituzionali di Ottimizzazione Fiscale")
     st.caption("Linee guida e best practice operative per massimizzare il rendimento netto e minimizzare il drag fiscale del patrimonio.")
     
@@ -427,7 +465,7 @@ with tab_strat:
     </div>
     """, unsafe_allow_html=True)
 
-with tab_cross:
+elif active_tax_tab == "🌍 Fiscalità Internazionale & Cross-Border":
     st.markdown("### 🌍 Cross-Border Tax & Global Wealth Structuring Engine")
     st.caption("Confronto comparato del carico fiscale e successorio su grandi patrimoni tra regimi e giurisdizioni internazionali (Italia Ordinaria, Art. 24-bis Neo-Residenti, Svizzera Zugo, Lussemburgo SOPARFI, Dubai Zero-Tax).")
 

@@ -202,3 +202,64 @@ def test_all_sidebar_subtabs_exist_in_page_files():
             assert target in content, (
                 f"Mismatch in module '{mod['title']}': target '{target}' not found in {page_path.name}"
             )
+
+
+def test_wealth_telemetry_ribbon():
+    """Verifica che il ribbon di telemetria Wealth calcoli correttamente stato, metriche e HTML."""
+    from core.ui_utils import (
+        build_wealth_telemetry_ribbon_html,
+        build_wealth_telemetry_ribbon_state,
+        render_wealth_telemetry_ribbon,
+    )
+
+    class DummyNW:
+        total_net_worth = 2_500_000.0
+        liquid_cash = 250_000.0
+        runway_months = 18.5
+        financial_investments = 1_400_000.0
+        real_estate_total = 950_000.0
+        total_liabilities = 100_000.0
+
+    state = build_wealth_telemetry_ribbon_state(
+        nw_summary=DummyNW(),
+        page_badge="TEST BADGE",
+        profile_name="Family Trust Alpha",
+    )
+
+    assert state["total_net_worth"] == 2_500_000.0
+    assert state["liquid_cash"] == 250_000.0
+    assert state["runway_months"] == 18.5
+    assert state["solvency_label"] == "🟢 EXCELLENT RUNWAY"
+    assert state["profile_name"] == "Family Trust Alpha"
+
+    html = build_wealth_telemetry_ribbon_html(state)
+    assert "ARGUS WEALTH" in html
+    assert "Family Trust Alpha" in html
+    assert "€ 2.500.000" in html
+    assert "EXCELLENT RUNWAY" in html
+    assert "\n" not in html  # must be single-line compact HTML
+
+    # Rendering test
+    rendered = render_wealth_telemetry_ribbon(
+        nw_summary=DummyNW(),
+        page_badge="TEST BADGE",
+        profile_name="Family Trust Alpha",
+    )
+    assert rendered["total_net_worth"] == 2_500_000.0
+
+
+def test_wealth_db_composite_indexes():
+    """Verifica che init_wealth_db crei gli indici compositi su wealth_cashflow."""
+    from sqlalchemy import create_engine, text
+
+    from core.wealth.wealth_db import init_wealth_db
+
+    mem_engine = create_engine("sqlite:///:memory:")
+    init_wealth_db(mem_engine)
+
+    with mem_engine.connect() as conn:
+        res = conn.execute(text("PRAGMA index_list('wealth_cashflow');")).fetchall()
+        idx_names = [r[1] for r in res]
+
+    assert "idx_cf_port_date" in idx_names
+    assert "idx_cf_port_cat" in idx_names

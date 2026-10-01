@@ -31,6 +31,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_wealth_telemetry_ribbon,
     section,
 )
 from core.wealth.wealth_db import (
@@ -255,6 +256,7 @@ else:
 
 prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p13")
+render_wealth_telemetry_ribbon(nw_summary=nw, page_badge="PATRIMONIO & NET WORTH", profile_name=prof_title)
 render_wealth_executive_badges(nw)
 
 # ── SMART FINANCIAL WATCHDOG SENTINEL ────────────────────────

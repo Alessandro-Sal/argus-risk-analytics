@@ -724,6 +724,12 @@ def init_wealth_db(engine: Engine) -> None:
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_phys_port ON wealth_physical_assets(portfolio_id);"))
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_pens_port ON wealth_pension_plans(portfolio_id);"))
             conn.execute(sqlt("CREATE INDEX IF NOT EXISTS idx_acct_port ON wealth_accounts(portfolio_id);"))
+            conn.execute(
+                sqlt("CREATE INDEX IF NOT EXISTS idx_cf_port_date ON wealth_cashflow(portfolio_id, tx_date DESC);")
+            )
+            conn.execute(
+                sqlt("CREATE INDEX IF NOT EXISTS idx_cf_port_cat ON wealth_cashflow(portfolio_id, category_id);")
+            )
         except Exception:
             pass
 
