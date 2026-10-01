@@ -83,12 +83,14 @@ if len(prof_map) > 1:
         st.caption("Ottimizzazione fiscale art. 51 TUIR (€ 5.164,57), simulazione Monte Carlo e montante pensionistico.")
     with head_c2:
         st.write("")
+        if current_pid in prof_map and st.session_state.get("pension_profile_selector_widget") != current_pid:
+            st.session_state["pension_profile_selector_widget"] = current_pid
         sel_pid = st.selectbox(
             "Profilo Patrimoniale:",
             options=list(prof_map.keys()),
             format_func=lambda pid: f"📁 {prof_map[pid]}",
             index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-            key="pension_profile_selector_widget"
+            key="pension_profile_selector_widget",
         )
         if sel_pid != current_pid:
             from core.workspace_context import WorkspaceContext

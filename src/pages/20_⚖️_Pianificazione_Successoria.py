@@ -101,12 +101,14 @@ from core.wealth.wealth_modals import render_succession_methodology_modal
 col_est_h1, col_est_h2 = st.columns([3.5, 1.2])
 with col_est_h1:
     if len(prof_map) > 1:
+        if current_pid in prof_map and st.session_state.get("estate_profile_selector_widget") != current_pid:
+            st.session_state["estate_profile_selector_widget"] = current_pid
         sel_pid = st.selectbox(
             "Profilo Patrimoniale:",
             options=list(prof_map.keys()),
             format_func=lambda pid: f"📁 {prof_map[pid]}",
             index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-            key="estate_profile_selector_widget"
+            key="estate_profile_selector_widget",
         )
         if sel_pid != current_pid:
             from core.workspace_context import WorkspaceContext

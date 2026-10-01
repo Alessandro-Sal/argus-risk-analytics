@@ -104,12 +104,14 @@ from core.wealth.wealth_modals import render_budget_rule_methodology_modal
 col_f1, col_f2, col_f3, col_f4, col_f5 = st.columns([1.2, 0.8, 1.0, 1.0, 1.0])
 with col_f1:
     if len(prof_map) > 1:
+        if current_pid in prof_map and st.session_state.get("cf_profile_selector_widget") != current_pid:
+            st.session_state["cf_profile_selector_widget"] = current_pid
         sel_pid = st.selectbox(
             "Profilo Patrimoniale:",
             options=list(prof_map.keys()),
             format_func=lambda pid: f"📁 {prof_map[pid]}",
             index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-            key="cf_profile_selector_widget"
+            key="cf_profile_selector_widget",
         )
         if sel_pid != current_pid:
             from core.workspace_context import WorkspaceContext

@@ -352,18 +352,31 @@ class WorkspaceContext:
         if st_state is None:
             return
 
-        # Sincronizzazione atomica di tutti i selettori di pagina e sidebar
+        # 1. Sincronizzazione atomica dello stato attivo primario (single source of truth)
         st_state["wealth_active_portfolio_id"] = new_pid
-        st_state["sb_wealth_profile_selector"] = new_pid
-        st_state["wealth_profile_selector_widget"] = new_pid
-        st_state["nw_profile_selector_widget"] = new_pid
-        st_state["cf_profile_selector_widget"] = new_pid
-        st_state["pension_profile_selector_widget"] = new_pid
-        st_state["fiscal_profile_selector_widget"] = new_pid
-        st_state["estate_profile_selector_widget"] = new_pid
-        st_state["ai_profile_selector_widget"] = new_pid
 
-        # Reset dello snapshot storico per impedire bleed di snapshot tra profili
+        # 2. Sincronizzazione difensiva di tutti i selettori di pagina e sidebar:
+        # Se un widget è già stato istanziato nel run corrente (es. la sidebar viene sempre renderizzata
+        # prima del corpo pagina o dei modal/picker), Streamlit vieta l'assegnazione diretta
+        # sollevando StreamlitAPIException. Il valore viene comunque recepito al successivo ciclo
+        # di esecuzione (st.rerun()) tramite wealth_active_portfolio_id.
+        widget_keys = [
+            "sb_wealth_profile_selector",
+            "wealth_profile_selector_widget",
+            "nw_profile_selector_widget",
+            "cf_profile_selector_widget",
+            "pension_profile_selector_widget",
+            "fiscal_profile_selector_widget",
+            "estate_profile_selector_widget",
+            "ai_profile_selector_widget",
+        ]
+        for wk in widget_keys:
+            try:
+                st_state[wk] = new_pid
+            except Exception:
+                pass
+
+        # 3. Reset dello snapshot storico per impedire bleed di snapshot tra profili
         st_state.pop("wealth_active_snapshot", None)
 
         if profile_name:

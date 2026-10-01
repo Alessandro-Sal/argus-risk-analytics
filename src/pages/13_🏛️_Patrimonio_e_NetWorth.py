@@ -283,12 +283,14 @@ if not is_snapshot_mode and len(prof_map) > 1:
         st.caption(f"Consolidamento olistico del patrimonio netto • Aggiornato al {datetime.now().strftime('%d/%m/%Y %H:%M')}")
     with head_c2:
         st.write("")
+        if current_pid in prof_map and st.session_state.get("nw_profile_selector_widget") != current_pid:
+            st.session_state["nw_profile_selector_widget"] = current_pid
         sel_pid = st.selectbox(
             "Profilo Patrimoniale:",
             options=list(prof_map.keys()),
             format_func=lambda pid: f"📁 {prof_map[pid]}",
             index=list(prof_map.keys()).index(current_pid) if current_pid in prof_map else 0,
-            key="nw_profile_selector_widget"
+            key="nw_profile_selector_widget",
         )
         if sel_pid != current_pid:
             from core.workspace_context import WorkspaceContext
