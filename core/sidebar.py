@@ -1399,6 +1399,13 @@ def render_sidebar():
                 background: transparent !important;
                 background-color: transparent !important;
                 color: #ffffff !important;
+                height: 0px !important;
+                min-height: 0px !important;
+                max-height: 0px !important;
+                padding: 0px !important;
+                margin: 0px !important;
+                border: none !important;
+                pointer-events: none !important;
                 z-index: 99 !important;
             }
 
@@ -1425,6 +1432,8 @@ def render_sidebar():
                 background: transparent !important;
                 background-color: transparent !important;
                 border: none !important;
+                height: 0px !important;
+                min-height: 0px !important;
             }
 
             /* Mantieni il controllo di apertura sidebar (Panel Dock Expand) sempre visibile a sidebar chiusa */
