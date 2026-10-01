@@ -1908,6 +1908,14 @@ def render_command_bar():
                 ):
                     render_spotlight_palette()
 
+                if st.button(
+                    "⌨️",
+                    key="btn_open_cheatsheet_top",
+                    use_container_width=False,
+                    help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
+                ):
+                    render_terminal_cheatsheet_dialog()
+
 
 def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
     """
@@ -2720,6 +2728,9 @@ def render_spotlight_palette():
             unsafe_allow_html=True,
         )
 
+        if st.button("⌨️ Cheatsheet Terminale", key="spot_cheatsheet_modal", use_container_width=True):
+            render_terminal_cheatsheet_dialog()
+
         if st.button("♻️ Reset Cache", key="spot_clean_cache_all", use_container_width=True):
             from core.workspace_manager import clear_session_cache
 
@@ -2730,7 +2741,124 @@ def render_spotlight_palette():
                     del st.session_state[k]
             switch_to_page("0_Control_Room.py")
 
-    st.divider()
+@st.dialog("⌨️ BLOOMBERG TERMINAL SHORTCUTS & NAVIGATION CHEATSHEET", width="large")
+def render_terminal_cheatsheet_dialog():
+    """Modale interattivo istituzionale con la mappa completa dei tasti rapidi e codici <GO> di ARGUS."""
+    st.markdown(
+        """
+        <div style="background: linear-gradient(135deg, rgba(255, 153, 0, 0.1) 0%, rgba(22, 27, 34, 0.95) 100%);
+                    border: 1px solid rgba(255, 153, 0, 0.35); border-left: 4px solid #ff9900;
+                    border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;">
+            <div style="font-size: 13px; font-weight: 700; color: #ff9900;">
+                Bloomberg Launchpad / Terminal Navigation Standard (v10.0)
+            </div>
+            <div style="font-size: 11.5px; color: #94a3b8; margin-top: 2px;">
+                Mappa completa delle combinazioni da tastiera, codici di salto pagina <code>&lt;GO&gt;</code> e trigger rapidi di macro stress.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    t1, t2, t3 = st.tabs(["⚡ Tasti Rapidi Globali", "🔢 Codici Pagine (0-21 <GO>)", "🌪️ Macro Shock (<PRESET> <GO>)"])
+
+    with t1:
+        st.markdown(
+            """
+            <table style="width:100%; border-collapse: collapse; font-size: 12px; margin-top: 6px;">
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                    <th style="padding: 8px; text-align:left; color:#ff9900;">Combinazione Tasti</th>
+                    <th style="padding: 8px; text-align:left; color:#94a3b8;">Azione Terminale</th>
+                    <th style="padding: 8px; text-align:left; color:#94a3b8;">Contesto</th>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 8px; font-family:monospace; color:#38bdf8; font-weight:700;">Ctrl + K / Cmd + K</td>
+                    <td style="padding: 8px; color:#e2e8f0;">Apre la Omnipresent Command Bar (Ricerca globale &amp; esecuzione mnemonica)</td>
+                    <td style="padding: 8px; color:#64748b;">Globale in ogni schermata</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 8px; font-family:monospace; color:#38bdf8; font-weight:700;">◀ Prec. / Succ. ▶</td>
+                    <td style="padding: 8px; color:#e2e8f0;">Navigazione ciclica sequenziale tra le sotto-schede del modulo attivo</td>
+                    <td style="padding: 8px; color:#64748b;">Pagine con Sub-Tabs (Risk, Quant, Stress, Wealth)</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 8px; font-family:monospace; color:#38bdf8; font-weight:700;">F1 / ? / ⌨️</td>
+                    <td style="padding: 8px; color:#e2e8f0;">Apre questo Cheatsheet istituzionale delle scorciatoie</td>
+                    <td style="padding: 8px; color:#64748b;">Globale</td>
+                </tr>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.04);">
+                    <td style="padding: 8px; font-family:monospace; color:#38bdf8; font-weight:700;">Esc</td>
+                    <td style="padding: 8px; color:#e2e8f0;">Chiude qualsiasi popover, modale o cassetto di audit aperto</td>
+                    <td style="padding: 8px; color:#64748b;">Finestre e overlay</td>
+                </tr>
+            </table>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with t2:
+        st.markdown(
+            """
+            <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 11.5px; font-family: monospace;">
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#ff9900;">0 &lt;GO&gt;</b> &bull; Control Room Principale
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#ff9900;">1 &lt;GO&gt; / PORT &lt;GO&gt;</b> &bull; Panoramica Portafoglio
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#ff9900;">2 &lt;GO&gt; / PERF &lt;GO&gt;</b> &bull; Rendimenti &amp; Benchmark
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#ff9900;">3 &lt;GO&gt; / RISK &lt;GO&gt;</b> &bull; Analisi Rischio &amp; VaR
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#ff9900;">4 &lt;GO&gt; / QUANT &lt;GO&gt;</b> &bull; Modelli Quantitativi &amp; Pricing
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#ff9900;">7 &lt;GO&gt; / STRESS &lt;GO&gt;</b> &bull; Regulatory Stress Testing
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#10b981;">12 &lt;GO&gt; / WCTRL &lt;GO&gt;</b> &bull; Wealth Control Room
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#10b981;">13 &lt;GO&gt; / NETWORTH &lt;GO&gt;</b> &bull; Patrimonio &amp; Net Worth
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#10b981;">14 &lt;GO&gt; / CASHFLOW &lt;GO&gt;</b> &bull; Flussi di Cassa &amp; Spese
+                </div>
+                <div style="background: rgba(255,255,255,0.02); padding: 6px 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.06);">
+                    <b style="color:#10b981;">21 &lt;GO&gt; / REPORTS &lt;GO&gt;</b> &bull; Hub Reportistica &amp; Export
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with t3:
+        st.markdown(
+            """
+            <div style="font-size:12px; color:#cbd5e1; margin-bottom:10px;">
+                I comandi di macro stress propagano istantaneamente lo scenario scelto sia al motore di rischio che al patrimonio netto consolidato:
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        sc1, sc2 = st.columns(2)
+        with sc1:
+            if st.button("⚡ SHOCK GFC (Subprime 2008)", use_container_width=True, key="btn_shk_gfc_ch"):
+                st.session_state["global_macro_shock"] = "GFC_2008"
+                st.rerun()
+            if st.button("⚡ SHOCK STAGFLATION (+200bps / 6% Inf)", use_container_width=True, key="btn_shk_stag_ch"):
+                st.session_state["global_macro_shock"] = "STAGFLATION_SHOCK"
+                st.rerun()
+        with sc2:
+            if st.button("⚡ SHOCK LIQUIDITY (Flash Crash)", use_container_width=True, key="btn_shk_liq_ch"):
+                st.session_state["global_macro_shock"] = "LIQUIDITY_FREEZE"
+                st.rerun()
+            if st.button("🔄 SHOCK NONE (Ripristina Baseline)", use_container_width=True, key="btn_shk_none_ch"):
+                st.session_state["global_macro_shock"] = "NONE"
+                st.rerun()
 
 
 @st.dialog("🏛️ ARGUS WEALTH COMMAND GATEWAY", width="large")
@@ -2964,6 +3092,9 @@ def render_wealth_spotlight_palette():
         """,
             unsafe_allow_html=True,
         )
+
+        if st.button("⌨️ Cheatsheet Terminale", key="spot_w_cheatsheet_modal", use_container_width=True):
+            render_terminal_cheatsheet_dialog()
 
         if st.button("♻️ Reset Cache Wealth", key="spot_clean_cache_wealth", use_container_width=True):
             from core.workspace_manager import clear_session_cache
@@ -8778,6 +8909,14 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
                 ):
                     render_wealth_spotlight_palette()
 
+                if st.button(
+                    "⌨️",
+                    key=f"btn_open_cheatsheet_{key_suffix}",
+                    use_container_width=False,
+                    help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
+                ):
+                    render_terminal_cheatsheet_dialog()
+
 
 def render_wealth_executive_badges(net_worth_summary):
     """Renderizza la striscia di badge quantitativi sintetici in stile Private Banking perfettamente allineata al Risk Core."""
@@ -9073,6 +9212,14 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                         render_wealth_spotlight_palette()
                     else:
                         render_spotlight_palette()
+
+                if st.button(
+                    "⌨️",
+                    key=f"omni_btn_cheatsheet_{key_suffix}",
+                    use_container_width=False,
+                    help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
+                ):
+                    render_terminal_cheatsheet_dialog()
 
 
 def render_standard_hero(

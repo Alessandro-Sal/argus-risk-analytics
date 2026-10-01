@@ -198,3 +198,179 @@ class UnifiedCrossAssetStressEngine:
             "post_stress_net_worth": round(stressed_nw, 2),
             "total_net_worth_pnl_pct": round(((stressed_nw / max(1.0, pre_nw)) - 1.0) * 100.0, 2),
         }
+
+
+def map_global_macro_preset_to_factor_shock(preset_key: str) -> MacroFactorShock:
+    """Mappa il preset di shock macroeconomico globale di ARGUS su un vettore di shock multi-asset."""
+    clean_k = str(preset_key or "NONE").upper().strip()
+    if clean_k == "GFC_2008":
+        return MacroFactorShock(
+            equity_mkt_pct=-0.35,
+            yield_curve_shift_bps=-125.0,
+            inflation_rate_pct=0.01,
+            fx_eur_usd_pct=-0.08,
+            credit_spread_bps=350.0,
+            scenario_name="Global Financial Crisis 2008 (Deflationary Credit Crunch)",
+        )
+    elif clean_k == "STAGFLATION_SHOCK":
+        return MacroFactorShock(
+            equity_mkt_pct=-0.18,
+            yield_curve_shift_bps=200.0,
+            inflation_rate_pct=0.06,
+            fx_eur_usd_pct=-0.04,
+            credit_spread_bps=160.0,
+            scenario_name="Stagflation & Rate Spike (+200bps / Inflation 6%)",
+        )
+    elif clean_k == "LIQUIDITY_FREEZE":
+        return MacroFactorShock(
+            equity_mkt_pct=-0.15,
+            yield_curve_shift_bps=50.0,
+            inflation_rate_pct=0.02,
+            fx_eur_usd_pct=-0.02,
+            credit_spread_bps=220.0,
+            scenario_name="Flash Crash & Order Flow Toxicity (Liquidity Freeze)",
+        )
+    else:
+        return MacroFactorShock(
+            equity_mkt_pct=0.0,
+            yield_curve_shift_bps=0.0,
+            inflation_rate_pct=0.0,
+            fx_eur_usd_pct=0.0,
+            credit_spread_bps=0.0,
+            scenario_name="Baseline Normal Market",
+        )
+
+
+def evaluate_active_wealth_macro_shock(
+    wealth_snapshot: Dict[str, Any],
+    session_state_dict: Optional[Dict[str, Any]] = None,
+    portfolio_positions: Optional[pd.DataFrame] = None,
+) -> Dict[str, Any]:
+    """Valuta l'impatto economico olistico dello shock macro globale attivo sul bilancio consolidato Wealth."""
+    import streamlit as st
+
+    state = session_state_dict if session_state_dict is not None else (
+        dict(st.session_state) if hasattr(st, "session_state") else {}
+    )
+    preset_key = str(state.get("global_macro_shock", "NONE")).upper()
+    shock = map_global_macro_preset_to_factor_shock(preset_key)
+    engine = UnifiedCrossAssetStressEngine(portfolio_positions=portfolio_positions)
+    results = engine.evaluate_integrated_shock(shock, wealth_snapshot)
+    results["is_shock_active"] = preset_key != "NONE"
+    results["global_preset_key"] = preset_key
+    return results
+
+
+def render_cross_portal_stress_bridge_banner(
+    wealth_snapshot: Optional[Dict[str, Any]] = None,
+    portfolio_id: Optional[int] = None,
+    key_suffix: str = "",
+) -> Optional[Dict[str, Any]]:
+    """Renderizza il banner istituzionale del Cross-Portal Macro Stress Bridge se uno shock globale è attivo."""
+    import streamlit as st
+
+    from core.ui_utils import fmt_eur, metric_card
+
+    preset_key = str(st.session_state.get("global_macro_shock", "NONE")).upper().strip()
+    if preset_key == "NONE" or not preset_key:
+        return None
+
+    # Costruisci snapshot di base se non fornito
+    snap = wealth_snapshot
+    if snap is None:
+        snap = {
+            "total_net_worth": float(st.session_state.get("wealth_total_net_worth", 1_250_000.0)),
+            "liquid_cash": float(st.session_state.get("wealth_liquid_cash", 120_000.0)),
+            "financial_investments": float(st.session_state.get("wealth_financial_investments", 650_000.0)),
+            "real_estate_total": float(st.session_state.get("wealth_real_estate_total", 480_000.0)),
+            "total_liabilities": float(st.session_state.get("wealth_total_liabilities", 110_000.0)),
+            "runway_months": float(st.session_state.get("wealth_runway_months", 14.5)),
+            "fixed_mortgages_balance": float(st.session_state.get("wealth_total_liabilities", 110_000.0) * 0.7),
+            "variable_mortgages_balance": float(st.session_state.get("wealth_total_liabilities", 110_000.0) * 0.3),
+        }
+
+    pos_df = None
+    last_res = st.session_state.get("last_portfolio_result")
+    if isinstance(last_res, dict) and "positions" in last_res:
+        pos_df = last_res["positions"]
+
+    res = evaluate_active_wealth_macro_shock(snap, portfolio_positions=pos_df)
+    s_name = res.get("scenario_name", preset_key)
+    pnl_pct = res.get("total_net_worth_pnl_pct", 0.0)
+    pnl_eur = res.get("total_wealth_pnl_eur", 0.0)
+    s_nw = res.get("post_stress_net_worth", snap.get("total_net_worth", 0.0))
+    s_runway = res.get("stressed_runway_months", snap.get("runway_months", 0.0))
+    pmt_delta = res.get("pmt_monthly_delta_eur", 0.0)
+    re_haircut = res.get("real_estate_haircut_eur", 0.0)
+
+    st.markdown(
+        f"""
+        <div style="background: linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(30, 27, 46, 0.95) 100%);
+                    border: 1px solid rgba(239, 68, 68, 0.45);
+                    border-left: 4px solid #ef4444;
+                    border-radius: 10px;
+                    padding: 12px 18px;
+                    margin-bottom: 14px;
+                    box-shadow: 0 4px 20px rgba(239, 68, 68, 0.15);">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="background: #ef4444; color: #ffffff; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; letter-spacing: 0.5px;">
+                        ⚡ MACRO STRESS BRIDGE ATTIVO
+                    </span>
+                    <span style="color: #f87171; font-weight: 700; font-size: 13.5px;">
+                        {s_name}
+                    </span>
+                </div>
+                <div style="font-size: 11.5px; color: #94a3b8; font-family: 'JetBrains Mono', monospace;">
+                    Simulazione trasversale dal Terminale Rischio
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        metric_card(
+            "Patrimonio Netto Stressed",
+            fmt_eur(s_nw),
+            delta=f"{pnl_eur:+,.0f} € ({pnl_pct:+.2f}%)".replace(",", "."),
+            delta_color="inverse" if pnl_pct < 0 else "normal",
+        )
+    with k2:
+        metric_card(
+            "Shock Portafoglio Liquido",
+            fmt_eur(res.get("liquid_portfolio_shock_eur", 0.0)),
+            delta="Beta & Duration Trasmesse",
+            delta_color="inverse",
+        )
+    with k3:
+        metric_card(
+            "Haircut Immobiliare",
+            fmt_eur(-abs(re_haircut)),
+            delta=f"Valore Stressed: {fmt_eur(res.get('post_stress_real_estate', 0.0))}",
+            delta_color="inverse",
+        )
+    with k4:
+        r_delta_str = f"Runway: {s_runway:.1f}m (era {snap.get('runway_months', 0.0):.1f}m)"
+        metric_card(
+            "Rata Mutuo Variabile (Δ PMT)",
+            f"{pmt_delta:+,.0f} €/mese".replace(",", "."),
+            delta=r_delta_str,
+            delta_color="inverse" if pmt_delta > 0 else "normal",
+        )
+
+    b1, b2, _ = st.columns([1.5, 2.0, 4.0])
+    with b1:
+        if st.button("🔄 Reset Shock (Baseline)", key=f"btn_reset_macro_bridge_{key_suffix}", use_container_width=True):
+            st.session_state["global_macro_shock"] = "NONE"
+            st.rerun()
+    with b2:
+        if st.button("🌪️ Approfondisci in Stress Testing →", key=f"btn_goto_stress_bridge_{key_suffix}", use_container_width=True):
+            st.session_state["target_subtab_stress_active_tab"] = "🌐 Total Balance Sheet & Human Capital Stress"
+            st.switch_page("pages/7_🌪️_Stress_Testing.py")
+
+    return res
+
+

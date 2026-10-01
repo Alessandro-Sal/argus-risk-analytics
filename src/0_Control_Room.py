@@ -449,7 +449,7 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
 
 # ── BANNER SESSIONE ATTIVA & RESET / ONBOARDING ─────────────
 if st.session_state.get("pipeline_done"):
-    col_act1, col_act2 = st.columns([3.2, 1.2])
+    col_act1, col_act2, col_act3 = st.columns([2.6, 1.3, 1.1])
     with col_act1:
         st.markdown(f"""
         <div style="background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display:flex; align-items:center; gap:10px;">
@@ -462,7 +462,38 @@ if st.session_state.get("pipeline_done"):
         </div>
         """, unsafe_allow_html=True)
     with col_act2:
-        if st.button("🔄 Reset / Nuova Analisi", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
+        with st.popover("📑 Master Board Pack", use_container_width=True):
+            st.markdown("##### 📑 Executive Master Board Pack")
+            st.caption("Dossier unificato Risk & Wealth pronto per CDA e Family Office.")
+            prof_nm = st.session_state.get("portfolio_name", "Portfolio Master")
+            try:
+                from core.fetcher import get_engine
+                from core.wealth.wealth_reporting_hub import (
+                    _get_cached_master_board_pack_html,
+                    _get_cached_master_board_pack_pdf,
+                )
+                eng = get_engine()
+                st.download_button(
+                    "📥 Scarica PDF Master",
+                    data=lambda: _get_cached_master_board_pack_pdf(eng, pid=1, prof_name=prof_nm),
+                    file_name=f"argus_master_board_pack_{prof_nm.lower().replace(' ', '_')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary",
+                    key="dl_mb_pdf_ctrl_room",
+                )
+                st.download_button(
+                    "🌐 Scarica HTML Master",
+                    data=lambda: _get_cached_master_board_pack_html(eng, pid=1, prof_name=prof_nm),
+                    file_name=f"argus_master_board_pack_{prof_nm.lower().replace(' ', '_')}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    key="dl_mb_html_ctrl_room",
+                )
+            except Exception as ex:
+                st.error(f"Errore generazione Master Board Pack: {ex}")
+    with col_act3:
+        if st.button("🔄 Reset / Nuova", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
             from core.workspace_context import WorkspaceContext
             from core.workspace_manager import clear_session_cache
             for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested", "df_clean", "selected_bitemp_port"]:
