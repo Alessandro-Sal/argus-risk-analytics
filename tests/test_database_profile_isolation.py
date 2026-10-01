@@ -14,17 +14,25 @@ import sys
 import tempfile
 import threading
 from datetime import date
-from unittest.mock import MagicMock, patch
-
-import pandas as pd
-import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.exc import OperationalError
+from unittest.mock import MagicMock, Mock, patch
 
 # Ensure repo root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import pandas as pd
+import pytest
 import streamlit as st
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import OperationalError
+
+# Ensure st.cache_data is functional and not polluted by preceding test mocks
+if not hasattr(st, "cache_data") or isinstance(st.cache_data, (Mock, MagicMock)):
+    try:
+        from streamlit.runtime.caching.cache_data_api import CacheDataAPI
+
+        st.cache_data = CacheDataAPI("cache_data")
+    except Exception:
+        pass
 
 # Setup Streamlit session_state proxy for headless pytest execution
 if not hasattr(st, "session_state") or not isinstance(st.session_state, dict):
@@ -62,6 +70,13 @@ from core.workspace_context import WorkspaceContext
 @pytest.fixture
 def isolated_session_state():
     """Garantisce un session_state pulito e isolato prima e dopo ogni test."""
+    if not hasattr(st, "cache_data") or isinstance(st.cache_data, (Mock, MagicMock)):
+        try:
+            from streamlit.runtime.caching.cache_data_api import CacheDataAPI
+
+            st.cache_data = CacheDataAPI("cache_data")
+        except Exception:
+            pass
     st.session_state.clear()
     with WorkspaceContext._LOCK:
         WorkspaceContext._FALLBACK_STORES.clear()
