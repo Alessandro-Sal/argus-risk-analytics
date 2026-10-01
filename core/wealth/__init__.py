@@ -129,6 +129,11 @@ from core.wealth.wealth_models import (
     WealthCategory,
     WealthConsolidatedSummary,
 )
+from core.wealth.wealth_olap import (
+    compute_wealth_cashflow_olap_cube,
+    compute_wealth_snapshot_trajectory_olap,
+    is_wealth_olap_available,
+)
 from core.wealth.wealth_stress_engine import (
     PRESET_STRESS_SCENARIOS,
     UnifiedMacroStressEngine,

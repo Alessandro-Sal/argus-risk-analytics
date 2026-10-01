@@ -24,6 +24,7 @@ importlib.reload(core.wealth)
 
 from core.fetcher import get_engine
 from core.sidebar import render_sidebar
+from core.ui_lifecycle import teardown_view_state
 from core.ui_utils import (
     apply_plotly_theme,
     atomic_computation,
@@ -38,6 +39,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_wealth_telemetry_ribbon,
     resolve_active_subtab,
     section,
 )
@@ -79,9 +81,13 @@ if current_pid is None or current_pid not in prof_map:
     render_wealth_profile_picker(engine, prof_map, key_prefix="p21_picker")
     st.stop()
 
+# ── ATOMIC STATE TEARDOWN ───────────────────────────────────
+teardown_view_state(current_pid, active_page="21_AI_Copilot_e_Advisor")
+
 prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p21")
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
+render_wealth_telemetry_ribbon(nw_summary=nw_curr, page_badge="AI COPILOT & ADVISOR", profile_name=prof_title)
 render_wealth_executive_badges(nw_curr)
 
 # Header
@@ -247,6 +253,44 @@ if active_copilot_tab == "🔍 Diagnostica & Colli di Bottiglia":
             """, unsafe_allow_html=True)
     else:
         st.success("🎉 **Nessun collo di bottiglia critico rilevato!** Il tuo profilo patrimoniale rispetta pienamente tutti i parametri di liquidità, risparmio 50/30/20 e diversificazione.")
+
+    st.markdown("<div style='margin-top: 20px;'></div>", unsafe_allow_html=True)
+    st.markdown("#### 🏛️ Protocollo Advisory 360° & Check-Up Istituzionale Family Office")
+    st.caption("Sintesi diagnostica intermodulare su Solvibilità, Protezione Successoria, Previdenza e Ottimizzazione Fiscale.")
+
+    c_chk1, c_chk2 = st.columns([1.2, 0.8])
+    with c_chk1:
+        st.markdown(
+            f"""
+        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.25); border-left: 4px solid #38bdf8; border-radius: 10px; padding: 16px 20px;">
+            <div style="font-size: 15px; font-weight: 700; color: #ffffff; margin-bottom: 8px;">📋 Executive Action Memo — {prof_title}</div>
+            <div style="font-size: 12.5px; color: #cbd5e1; line-height: 1.6;">
+                • <b>Solvibilità &amp; Runway:</b> Copertura stimata a <b>{nw.runway_months:.1f} mesi</b> su spese correnti. Ratio di solvibilità: <b>{nw.solvency_ratio_pct:.1f}%</b>.<br>
+                • <b>Attivi Produttivi:</b> Investimenti finanziari pari a <b>{fmt_eur(nw.financial_investments)}</b> ({nw.invested_assets_ratio_pct:.1f}% del Net Worth complessivo).<br>
+                • <b>Immobiliare &amp; Leva:</b> Debito residuo mutui <b>{fmt_eur(nw.total_liabilities)}</b> su valore tangibile <b>{fmt_eur(nw.real_estate_total)}</b> (LTV: <b>{(nw.total_liabilities / nw.real_estate_total * 100.0) if nw.real_estate_total > 0 else 0.0:.1f}%</b>).<br>
+                • <b>Scudo Previdenziale:</b> Montante fondi pensione pari a <b>{fmt_eur(nw.pension_total)}</b> con massimizzazione deducibilità art. 51 TUIR (€ 5.164,57).<br>
+                • <b>Salute Complessiva:</b> Rating Istituzionale <b>{'AAA' if nw.wealth_health_score >= 85 else 'AA' if nw.wealth_health_score >= 70 else 'A'}</b> ({nw.wealth_health_score:.0f}/100).
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+    with c_chk2:
+        st.markdown(
+            """
+        <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 16px 20px; height: 100%; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <b style="color: #10b981; font-size: 13.5px;">⚡ Priorità Operative Consigliate:</b>
+                <div style="font-size: 12px; color: #94a3b8; margin-top: 8px; line-height: 1.6;">
+                    1. <b>Fondo Emergenza:</b> Mantenere 6-12 mesi di spese su conto deposito a tasso protetto.<br>
+                    2. <b>Previdenza:</b> Versare la quota residua deducibile entro il 31 dicembre.<br>
+                    3. <b>Ribilanciamento:</b> Eseguire gli ordini con compensazione preventiva minusvalenze.
+                </div>
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
 elif active_copilot_tab == "⚖️ Motore di Ribilanciamento Target":
     st.markdown("### ⚖️ Tax-Smart Rebalancing Watchdog & Drift Monitor")

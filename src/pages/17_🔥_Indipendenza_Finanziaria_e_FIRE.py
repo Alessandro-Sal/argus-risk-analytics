@@ -45,6 +45,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_wealth_telemetry_ribbon,
     resolve_active_subtab,
     section,
 )
@@ -84,6 +85,7 @@ if current_pid is None:
     st.stop()
 
 render_omni_command_bar(portal="wealth", context_name=prof_title, key_suffix="p17")
+render_wealth_telemetry_ribbon(nw_summary=nw_curr, page_badge="INDIPENDENZA & FIRE", profile_name=prof_title)
 render_wealth_executive_badges(nw_curr)
 
 render_standard_hero(

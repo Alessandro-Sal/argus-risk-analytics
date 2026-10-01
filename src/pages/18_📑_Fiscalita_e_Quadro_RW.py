@@ -24,6 +24,7 @@ importlib.reload(core.wealth)
 
 from core.fetcher import get_engine
 from core.sidebar import render_sidebar
+from core.ui_lifecycle import teardown_view_state
 from core.ui_utils import (
     apply_plotly_theme,
     ensure_portfolio_loaded,
@@ -38,6 +39,7 @@ from core.ui_utils import (
     render_table_with_export,
     render_wealth_command_bar,
     render_wealth_executive_badges,
+    render_wealth_telemetry_ribbon,
     resolve_active_subtab,
     section,
 )
@@ -79,9 +81,13 @@ if current_pid is None or current_pid not in prof_map:
     render_wealth_profile_picker(engine, prof_map, key_prefix="p18_picker")
     st.stop()
 
+# ── ATOMIC STATE TEARDOWN ───────────────────────────────────
+teardown_view_state(current_pid, active_page="18_Fiscalita_e_Quadro_RW")
+
 prof_title = prof_map.get(current_pid, "Nessun Profilo")
 render_wealth_command_bar(engine, current_pid=current_pid, prof_name=prof_title, key_suffix="p18")
 nw_curr = compute_consolidated_net_worth(engine, portfolio_id=current_pid)
+render_wealth_telemetry_ribbon(nw_summary=nw_curr, page_badge="FISCALITÀ & QUADRO RW", profile_name=prof_title)
 render_wealth_executive_badges(nw_curr)
 
 # Header
