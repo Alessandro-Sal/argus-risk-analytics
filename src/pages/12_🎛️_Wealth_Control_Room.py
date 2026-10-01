@@ -93,7 +93,7 @@ profile_map = ctx["profile_map"]
 nw_curr = ctx["net_worth"]
 
 render_omni_command_bar(portal="wealth", context_name=active_p_name, key_suffix="p12")
-render_institutional_telemetry_ribbon(page_badge="WEALTH DESK & INGESTION")
+render_institutional_telemetry_ribbon(page_badge="WEALTH CONTROL ROOM & INGESTION")
 render_wealth_control_room_hero(profile_map=profile_map, current_pid=current_pid)
 
 # ── SELETTORE PROFILO & TOOLBAR IN LINEA ─────────────────────
