@@ -75,6 +75,7 @@ def test_sidebar_profile_sync_bidirectional():
 def test_switch_to_page_clean_navigation():
     """Verifica che switch_to_page non inietti blocchi HTML/markdown nel layout della sidebar."""
     from unittest.mock import patch
+
     from core.sidebar import switch_to_page
 
     with patch("streamlit.markdown") as mock_markdown, \
