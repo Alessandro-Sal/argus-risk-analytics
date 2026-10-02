@@ -1916,6 +1916,13 @@ def render_command_bar():
                 ):
                     render_terminal_cheatsheet_dialog()
 
+                try:
+                    from core.watchdog.unified_notification_center import render_institutional_notification_bell
+
+                    render_institutional_notification_bell(key_suffix="top_cmd")
+                except Exception:
+                    pass
+
 
 def parse_terminal_command(raw_query: str) -> Optional[Dict[str, Any]]:
     """
@@ -8917,6 +8924,13 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
                 ):
                     render_terminal_cheatsheet_dialog()
 
+                try:
+                    from core.watchdog.unified_notification_center import render_institutional_notification_bell
+
+                    render_institutional_notification_bell(key_suffix=f"w_cmd_{key_suffix}")
+                except Exception:
+                    pass
+
 
 def render_wealth_executive_badges(net_worth_summary):
     """Renderizza la striscia di badge quantitativi sintetici in stile Private Banking perfettamente allineata al Risk Core."""
@@ -9220,6 +9234,13 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                     help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
                 ):
                     render_terminal_cheatsheet_dialog()
+
+                try:
+                    from core.watchdog.unified_notification_center import render_institutional_notification_bell
+
+                    render_institutional_notification_bell(key_suffix=f"omni_cmd_{key_suffix}")
+                except Exception:
+                    pass
 
 
 def render_standard_hero(

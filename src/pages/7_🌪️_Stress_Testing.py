@@ -226,110 +226,107 @@ def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None
         rate_shock_bps = st.slider("Variazione Tassi BCE/FED (bps)", -200, 300, 100, 25, help="+100 bps = rialzo tassi di 1.00%")
         fx_shock_pct = st.slider("Shock Cambio EUR/USD (%)", -20, 20, -5, 1, help="-5% = svalutazione EUR del 5%")
         oil_shock_pct = st.slider("Shock Petrolio / Materie Prime (%)", -40, 60, 20, 5, help="+20% = impennata prezzi energia")
+        re_haircut_pct = st.slider("Haircut Settore Immobiliare (%)", -35, 15, -10, 1, help="Svalutazione del patrimonio immobiliare a bilancio")
+        infl_shock_pct = st.slider("Shock Inflazione Extra (%)", 0.0, 10.0, 3.0, 0.5, help="Tasso annuo di inflazione aggiuntiva")
 
         st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
-        if st.button("⚖️ Simula Ribilanciamento & Staging Ordini", type="primary", use_container_width=True):
-            try:
-                from components.action_drawers import render_order_blotter_dialog
+        col_b_rebal, col_b_sync = st.columns(2)
+        with col_b_sync:
+            if st.button("⚡ Sincronizza Shock Globale", type="primary", use_container_width=True, help="Propaga questo scenario su tutta la piattaforma (Risk & Wealth)"):
+                from core.wealth.unified_stress_bridge import MacroFactorShock
+                custom_spec = MacroFactorShock(
+                    equity_mkt_pct=benchmark_shock / 100.0,
+                    yield_curve_shift_bps=float(rate_shock_bps),
+                    inflation_rate_pct=float(infl_shock_pct) / 100.0,
+                    fx_eur_usd_pct=float(fx_shock_pct) / 100.0,
+                    credit_spread_bps=float(rate_shock_bps) * 0.4,
+                    scenario_name=f"Custom Sandbox (Eq {benchmark_shock}%, Rates {rate_shock_bps:+d}bps, RE {re_haircut_pct}%)",
+                )
+                st.session_state["custom_macro_shock_spec"] = custom_spec
+                st.session_state["global_macro_shock"] = "CUSTOM_SANDBOX"
+                st.toast("✅ Scenario What-If propagato al Terminale e al Wealth Management!", icon="🌪️")
+                st.rerun()
 
-                # Generazione ordini di de-risking dinamici sulle posizioni effettive
-                orders_sim = []
-                turnover_sim = 0.0
-                tax_sim = 0.0
-                de_risk_factor = min(0.35, max(0.10, abs(benchmark_shock) / 100.0 * 0.7))
+        with col_b_rebal:
+            if st.button("⚖️ Staging Ordini", use_container_width=True, help="Genera proposte di de-risking"):
+                try:
+                    from components.action_drawers import render_order_blotter_dialog
 
-                if isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
-                    col_t = "ticker" if "ticker" in pos_df.columns else ("Ticker" if "Ticker" in pos_df.columns else None)
-                    col_q = "qty_net" if "qty_net" in pos_df.columns else ("shares" if "shares" in pos_df.columns else ("Quantità" if "Quantità" in pos_df.columns else None))
-                    col_p = "last_price" if "last_price" in pos_df.columns else ("current_price" if "current_price" in pos_df.columns else ("Prezzo Mkt (€)" if "Prezzo Mkt (€)" in pos_df.columns else None))
-                    col_pmc = "wacp" if "wacp" in pos_df.columns else ("pmc" if "pmc" in pos_df.columns else ("Prezzo Carico (€)" if "Prezzo Carico (€)" in pos_df.columns else None))
-                    col_ac = "asset_class" if "asset_class" in pos_df.columns else ("Asset Class" if "Asset Class" in pos_df.columns else None)
+                    orders_sim = []
+                    turnover_sim = 0.0
+                    tax_sim = 0.0
+                    de_risk_factor = min(0.35, max(0.10, abs(benchmark_shock) / 100.0 * 0.7))
 
-                    for _, r in pos_df.iterrows():
-                        tk = str(r.get(col_t, "ASSET")).strip()
-                        sh = float(r.get(col_q, 1.0))
-                        px = float(r.get(col_p, 100.0))
-                        pmc = float(r.get(col_pmc, px))
-                        ac = str(r.get(col_ac, "Equity")).lower()
+                    if isinstance(pos_df, pd.DataFrame) and not pos_df.empty:
+                        col_t = "ticker" if "ticker" in pos_df.columns else ("Ticker" if "Ticker" in pos_df.columns else None)
+                        col_q = "qty_net" if "qty_net" in pos_df.columns else ("shares" if "shares" in pos_df.columns else ("Quantità" if "Quantità" in pos_df.columns else None))
+                        col_p = "last_price" if "last_price" in pos_df.columns else ("current_price" if "current_price" in pos_df.columns else ("Prezzo Mkt (€)" if "Prezzo Mkt (€)" in pos_df.columns else None))
+                        col_pmc = "wacp" if "wacp" in pos_df.columns else ("pmc" if "pmc" in pos_df.columns else ("Prezzo Carico (€)" if "Prezzo Carico (€)" in pos_df.columns else None))
+                        col_ac = "asset_class" if "asset_class" in pos_df.columns else ("Asset Class" if "Asset Class" in pos_df.columns else None)
 
-                        if sh <= 0 or px <= 0:
-                            continue
+                        for _, r in pos_df.iterrows():
+                            tk = str(r.get(col_t, "ASSET")).strip()
+                            sh = float(r.get(col_q, 1.0))
+                            px = float(r.get(col_p, 100.0))
+                            pmc = float(r.get(col_pmc, px))
+                            ac = str(r.get(col_ac, "Equity")).lower()
 
-                        t_upper = tk.upper()
-                        is_crypto = (
-                            ("crypto" in ac)
-                            or any(t_upper.endswith(s) for s in ["-EUR", "-USD", "-USDT", "-BTC"])
-                            or (t_upper in ["BTC", "ETH", "SOL", "ADA", "XRP", "BNB", "USDT", "DOGE", "AVAX", "DOT", "LINK"])
-                        )
-                        is_etf = any(k in ac for k in ["etf", "fondo", "oicr"]) or any(k in tk.lower() for k in ["etf", "iwda", "swda"])
-                        is_gov = any(k in ac for k in ["bond", "obbligaz", "gov"]) or any(k in t_upper for k in ["BTP", "BOT", "BUND", "TREASURY"])
+                            if sh <= 0 or px <= 0:
+                                continue
 
-                        isin_raw = str(r.get("isin", r.get("ISIN", ""))).strip()
-                        isin_str = isin_raw if (isin_raw and isin_raw != "None" and len(isin_raw) >= 9) else ("— (Crypto)" if is_crypto else "—")
+                            t_upper = tk.upper()
+                            is_crypto = ("crypto" in ac) or any(t_upper.endswith(s) for s in ["-EUR", "-USD", "-USDT", "-BTC"])
+                            is_etf = any(k in ac for k in ["etf", "fondo", "oicr"])
+                            is_gov = any(k in ac for k in ["bond", "obbligaz", "gov"])
 
-                        if is_gov:
-                            # Titoli governativi/obbligazionari: flight-to-quality
-                            raw_buy = round(sh * de_risk_factor)
-                            sh_buy = max(1.0, float(raw_buy)) if raw_buy >= 1 else 1.0
-                            val_buy = round(sh_buy * px, 2)
-                            turnover_sim += val_buy
-                            orders_sim.append({
-                                "ISIN": isin_str,
-                                "Ticker": tk,
-                                "Azione": "BUY",
-                                "Quantità": str(int(sh_buy)),
-                                "Prezzo Stimato": px,
-                                "Controvalore": val_buy,
-                                "Regime Fiscale": "White List (12.5% Tax)",
-                                "Plus/Minus Stima": "N/D (Acquisto)",
-                            })
-                        else:
-                            # Asset equity/crypto/rischiosi: de-risking prudenziale
-                            if is_crypto:
-                                sh_trim = min(sh, round(sh * de_risk_factor, 4))
-                                qty_disp = f"{sh_trim:.4f}".rstrip("0").rstrip(".")
+                            isin_raw = str(r.get("isin", r.get("ISIN", ""))).strip()
+                            isin_str = isin_raw if (isin_raw and isin_raw != "None" and len(isin_raw) >= 9) else "—"
+
+                            if is_gov:
+                                raw_buy = round(sh * de_risk_factor)
+                                sh_buy = max(1.0, float(raw_buy)) if raw_buy >= 1 else 1.0
+                                val_buy = round(sh_buy * px, 2)
+                                turnover_sim += val_buy
+                                orders_sim.append({
+                                    "ISIN": isin_str,
+                                    "Ticker": tk,
+                                    "Azione": "BUY",
+                                    "Quantità": str(int(sh_buy)),
+                                    "Prezzo Stimato": px,
+                                    "Controvalore": val_buy,
+                                    "Regime Fiscale": "White List (12.5% Tax)",
+                                    "Plus/Minus Stima": "N/D (Acquisto)",
+                                })
                             else:
                                 raw_trim = round(sh * de_risk_factor)
                                 sh_trim = min(sh, max(1.0, float(raw_trim)) if raw_trim >= 1 else 0.0)
-                                qty_disp = str(int(sh_trim))
+                                if sh_trim <= 0:
+                                    continue
+                                val_trim = round(sh_trim * px, 2)
+                                gain = (px - pmc) * sh_trim
+                                tax_cost = gain * 0.26
+                                tax_sim += tax_cost
+                                turnover_sim += val_trim
+                                orders_sim.append({
+                                    "ISIN": isin_str,
+                                    "Ticker": tk,
+                                    "Azione": "SELL",
+                                    "Quantità": str(int(sh_trim)),
+                                    "Prezzo Stimato": px,
+                                    "Controvalore": val_trim,
+                                    "Regime Fiscale": "Art. 67 (Plusvalenze)" if not is_etf else "Art. 44 (OICR)",
+                                    "Plus/Minus Stima": f"{gain:+.2f} €",
+                                })
 
-                            if sh_trim <= 0:
-                                continue
-
-                            val_trim = round(sh_trim * px, 2)
-                            gain = (px - pmc) * sh_trim
-                            tax_rate = 0.26
-                            tax_cost = gain * tax_rate if gain > 0 else gain * 0.26
-                            tax_sim += tax_cost
-                            turnover_sim += val_trim
-
-                            if is_crypto:
-                                tax_regime = "Art. 67 (Plusvalenze Cripto)"
-                            elif is_etf:
-                                tax_regime = "Art. 44 (OICR - Reddito Cap.)"
-                            else:
-                                tax_regime = "Art. 67 (CG - Compensabile)"
-
-                            orders_sim.append({
-                                "ISIN": isin_str,
-                                "Ticker": tk,
-                                "Azione": "SELL",
-                                "Quantità": qty_disp,
-                                "Prezzo Stimato": px,
-                                "Controvalore": val_trim,
-                                "Regime Fiscale": tax_regime,
-                                "Plus/Minus Stima": f"{gain:+.2f} €",
-                            })
-
-                render_order_blotter_dialog({
-                    "turnover": round(turnover_sim, 2),
-                    "net_tax_impact": round(tax_sim, 2),
-                    "pre_var": 2.45,
-                    "post_var": 1.88,
-                    "orders": orders_sim,
-                }, portfolio_value=port_val, positions=pos_df)
-            except Exception as e:
-                st.error(f"Errore apertura drawer ordini: {e}")
+                    render_order_blotter_dialog({
+                        "turnover": round(turnover_sim, 2),
+                        "net_tax_impact": round(tax_sim, 2),
+                        "pre_var": 2.45,
+                        "post_var": 1.88,
+                        "orders": orders_sim,
+                    }, portfolio_value=port_val, positions=pos_df)
+                except Exception as e:
+                    st.error(f"Errore apertura drawer ordini: {e}")
 
     from core.risk_engine import compute_custom_macro_stress
     macro_res = compute_custom_macro_stress(
@@ -340,15 +337,74 @@ def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None
         equity_shock_pct=benchmark_shock
     )
 
+    # Calcolo olistico congiunto Total Balance Sheet via UnifiedCrossAssetStressEngine
+    from core.wealth.unified_stress_bridge import MacroFactorShock, UnifiedCrossAssetStressEngine
+    holistic_eng = UnifiedCrossAssetStressEngine()
+    holistic_snap = {
+        "liquid_investments": port_val,
+        "cash_reserves": max(15000.0, port_val * 0.15),
+        "real_estate_gross": max(50000.0, port_val * 0.85),
+        "total_liabilities": max(20000.0, port_val * 0.25),
+        "variable_debt_principal": max(15000.0, port_val * 0.20),
+        "mortgage_interest_rate": 0.0275,
+        "mortgage_months_remaining": 240,
+        "monthly_expenses": 3200.0,
+    }
+    h_shock = MacroFactorShock(
+        equity_mkt_pct=benchmark_shock / 100.0,
+        yield_curve_shift_bps=float(rate_shock_bps),
+        inflation_rate_pct=float(infl_shock_pct) / 100.0,
+        fx_eur_usd_pct=float(fx_shock_pct) / 100.0,
+        credit_spread_bps=float(rate_shock_bps) * 0.4,
+        scenario_name="Custom Factor Sandbox",
+    )
+    tbs_res = holistic_eng.evaluate_integrated_shock(h_shock, holistic_snap)
+
     with col_sim2:
-        st.markdown("##### 📊 Impatto Stimato sul Portafoglio")
-        c_m1, c_m2, c_m3 = st.columns(3)
+        st.markdown("##### 📊 Impatto Stimato: Portafoglio & Total Balance Sheet")
+        c_m1, c_m2, c_m3, c_m4 = st.columns(4)
         with c_m1:
-            metric_card("Valore Attuale Portafoglio", fmt_eur(macro_res.get("portfolio_val_before", 0.0)))
+            metric_card("P&L Portafoglio Liquido", fmt_eur(macro_res.get("portfolio_loss_eur", 0.0)), sub_title=f"{macro_res.get('portfolio_impact_pct', 0.0):+.2f}%", positive=macro_res.get("portfolio_loss_eur", 0.0) >= 0)
         with c_m2:
-            metric_card("Impatto Macro Stimato (%)", f"{macro_res.get('portfolio_impact_pct', 0.0):+.2f}%", positive=macro_res.get("portfolio_impact_pct", 0.0) >= 0)
+            st_nw = tbs_res["post_stress_net_worth"]
+            delta_nw = st_nw - tbs_res["pre_stress_net_worth"]
+            metric_card("Stressed Net Worth", fmt_eur(st_nw), sub_title=f"Delta: {tbs_res['total_net_worth_pnl_pct']:+.1f}%", positive=delta_nw >= 0)
         with c_m3:
-            metric_card("Variazione Stimata (€)", fmt_eur(macro_res.get("portfolio_loss_eur", 0.0)), positive=macro_res.get("portfolio_loss_eur", 0.0) >= 0)
+            d_pmt = tbs_res["delta_monthly_debt"]
+            metric_card("Delta Rata Mutuo (ΔPMT)", f"+{d_pmt:,.0f} €/m", sub_title=f"Nuova Rata: {tbs_res['new_monthly_payment']:,.0f} €", border_left_color="#f87171" if d_pmt > 0 else "#3fb950")
+        with c_m4:
+            runway = tbs_res["months_to_forced_liquidation"]
+            r_str = f"{runway:.1f} Mesi" if runway < 200 else "> 15 Anni"
+            metric_card("Emergency Runway", r_str, sub_title="Liquidità di Riserva", border_left_color="#3fb950" if runway >= 12 else "#f59e0b")
+
+        # Waterfall Chart di Decomposizione Shock Fattoriale
+        st.markdown("<div style='font-size: 12.5px; font-weight: 700; color: #ff9900; margin-top: 10px; margin-bottom: 4px;'>🌊 Attribuzione P&amp;L Multi-Fattoriale (Balance Sheet Waterfall)</div>", unsafe_allow_html=True)
+        wf_fig = go.Figure(go.Waterfall(
+            name="Factor Transmission",
+            orientation="v",
+            measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+            x=["Net Worth Iniziale", "Shock Azionario", "Shock Tassi", "Shock FX", "Haircut RE", "Stressed Net Worth"],
+            y=[
+                tbs_res["pre_stress_net_worth"],
+                tbs_res["liquid_pnl_eur"],
+                -abs(tbs_res["delta_monthly_debt"] * 12.0),
+                tbs_res["liquid_pnl_eur"] * 0.15 * (fx_shock_pct / 100.0),
+                (holistic_snap["real_estate_gross"] * (re_haircut_pct / 100.0)),
+                0
+            ],
+            connector={"line": {"color": "rgba(255,255,255,0.2)"}},
+            decreasing={"marker": {"color": "#ef4444"}},
+            increasing={"marker": {"color": "#10b981"}},
+            totals={"marker": {"color": "#ff9900"}}
+        ))
+        wf_fig.update_layout(
+            margin=dict(l=10, r=10, t=20, b=10),
+            height=240,
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            yaxis=dict(tickprefix="€ ", tickformat=",.0f", showgrid=True, gridcolor="rgba(255,255,255,0.06)")
+        )
+        st.plotly_chart(wf_fig, use_container_width=True)
 
         if not macro_res["details_df"].empty:
             df_macro_disp = macro_res["details_df"].rename(columns={
@@ -365,7 +421,7 @@ def render_whatif_custom_fragment(pos_df: pd.DataFrame, port_val: float) -> None
             }
             render_table_with_export(
                 df_macro_disp,
-                table_title="📋 Dettaglio Impatto per Singolo Asset",
+                table_title="📋 Dettaglio Impatto per Singolo Titolo",
                 file_prefix="simulazione_macro_whatif_posizioni",
                 key_suffix="macro_whatif",
                 column_config=macro_cfg,

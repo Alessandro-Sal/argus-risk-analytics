@@ -230,6 +230,20 @@ def map_global_macro_preset_to_factor_shock(preset_key: str) -> MacroFactorShock
             credit_spread_bps=220.0,
             scenario_name="Flash Crash & Order Flow Toxicity (Liquidity Freeze)",
         )
+    elif clean_k == "CUSTOM_SANDBOX":
+        import streamlit as st
+
+        custom_spec = st.session_state.get("custom_macro_shock_spec") if hasattr(st, "session_state") else None
+        if custom_spec and isinstance(custom_spec, MacroFactorShock):
+            return custom_spec
+        return MacroFactorShock(
+            equity_mkt_pct=-0.20,
+            yield_curve_shift_bps=100.0,
+            inflation_rate_pct=0.03,
+            fx_eur_usd_pct=-0.05,
+            credit_spread_bps=100.0,
+            scenario_name="Custom Factor Sandbox Shock",
+        )
     else:
         return MacroFactorShock(
             equity_mkt_pct=0.0,

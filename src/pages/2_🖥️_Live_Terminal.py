@@ -1113,35 +1113,46 @@ with col_cls1:
 
 st.divider()
 
-# ── SEZIONE 4: LIVE OMS EXECUTION BLOTTER (FULL-WIDTH ROW) ───────────────────
-st.markdown("#### 📋 Live OMS Execution Blotter (Ordini di Negoziazione)")
-if not term_eng.oms_blotter:
-    st.info("Nessun ordine registrato. Digita `BUY 100 AAPL @ MKT` o `TWAP 500 MSFT 30` nella console sopra.")
-else:
-    blotter_records = []
-    for o in term_eng.oms_blotter[:15]:
-        if o.slices_count > 1:
-            filled_s = o.slices_filled
-            tot_s = o.slices_count
-            bar_fill = int((filled_s / max(1, tot_s)) * 8)
-            prog_bar = f"[{'█' * bar_fill}{'░' * max(0, 8 - bar_fill)}] {filled_s}/{tot_s}"
-        else:
-            prog_bar = "[████████] 100%" if o.status == "FILLED" else "[░░░░░░░░] 0%"
+# ── SEZIONE 4: LIVE OMS / EMSX EXECUTION BLOTTER & FIX 4.4 ROUTER ─────────────
+from core.trade_staging_blotter import render_interactive_emsx_blotter
 
-        blotter_records.append({
-            "Order ID": o.order_id,
-            "Time": o.timestamp,
-            "Ticker": o.ticker,
-            "Side": o.side,
-            "Qty": f"{o.qty:,.1f}",
-            "Type": o.order_type,
-            "Fill Px": f"${o.avg_fill_price:.2f}" if o.avg_fill_price > 0 else "MKT",
-            "Status": o.status,
-            "Execution Progress": prog_bar,
-            "Saved Friction (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
-        })
-    df_blotter_ui = pd.DataFrame(blotter_records)
-    st.dataframe(df_blotter_ui, use_container_width=True, hide_index=True)
+port_notional_val = (
+    float(active_pos["current_value"].sum())
+    if not active_pos.empty and "current_value" in active_pos.columns
+    else 100000.0
+)
+render_interactive_emsx_blotter(
+    positions=active_pos,
+    portfolio_value=port_notional_val,
+    key_suffix="p2_live_terminal",
+)
+
+if term_eng.oms_blotter:
+    with st.expander("📜 Log Storico Ordini Console CLI", expanded=False):
+        blotter_records = []
+        for o in term_eng.oms_blotter[:15]:
+            if o.slices_count > 1:
+                filled_s = o.slices_filled
+                tot_s = o.slices_count
+                bar_fill = int((filled_s / max(1, tot_s)) * 8)
+                prog_bar = f"[{'█' * bar_fill}{'░' * max(0, 8 - bar_fill)}] {filled_s}/{tot_s}"
+            else:
+                prog_bar = "[████████] 100%" if o.status == "FILLED" else "[░░░░░░░░] 0%"
+
+            blotter_records.append({
+                "Order ID": o.order_id,
+                "Time": o.timestamp,
+                "Ticker": o.ticker,
+                "Side": o.side,
+                "Qty": f"{o.qty:,.1f}",
+                "Type": o.order_type,
+                "Fill Px": f"${o.avg_fill_price:.2f}" if o.avg_fill_price > 0 else "MKT",
+                "Status": o.status,
+                "Execution Progress": prog_bar,
+                "Saved Friction (€)": f"€ {o.saved_amount_eur:.2f}" if o.saved_amount_eur > 0 else "—"
+            })
+        df_blotter_ui = pd.DataFrame(blotter_records)
+        st.dataframe(df_blotter_ui, use_container_width=True, hide_index=True)
 
 st.divider()
 
