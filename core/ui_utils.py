@@ -896,7 +896,7 @@ def inject_custom_css():
             justify-content: flex-end !important;
             align-items: center !important;
             flex-wrap: nowrap !important;
-            gap: 6px !important;
+            gap: 5px !important;
             width: 100% !important;
             margin: 0px !important;
             padding: 0px !important;
@@ -963,7 +963,7 @@ def inject_custom_css():
             display: inline-flex !important;
             align-items: center !important;
             justify-content: flex-end !important;
-            gap: 5px !important;
+            gap: 4px !important;
             height: 32px !important;
             line-height: 1 !important;
             white-space: nowrap !important;
@@ -984,7 +984,7 @@ def inject_custom_css():
             height: 32px !important;
             min-height: 32px !important;
             max-height: 32px !important;
-            padding: 0px 9px !important;
+            padding: 0px 8px !important;
             font-size: 11.5px !important;
             font-weight: 600 !important;
             border-radius: 6px !important;
@@ -1021,7 +1021,7 @@ def inject_custom_css():
             justify-content: center !important;
             height: 32px !important;
             min-height: 32px !important;
-            padding: 0px 10px !important;
+            padding: 0px 8px !important;
             border-radius: 6px !important;
             font-size: 11.5px !important;
             font-weight: 500 !important;
@@ -1876,19 +1876,19 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [1.2, 3.8],
+            [1.75, 3.25],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 <span class="status-dot-pulse" style="margin-right: 2px; flex-shrink:0;"></span>
-                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif; flex-shrink:0;">
+                <span style="color:#ffffff; font-weight:800; font-size:12.5px; letter-spacing:0.3px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     ARGUS ENGINE
                 </span>
-                <span style="color:rgba(255,255,255,0.2); margin: 0 2px; flex-shrink:0;">|</span>
-                <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">
+                <span style="color:rgba(255,255,255,0.2); margin: 0 1px; flex-shrink:0;">|</span>
+                <span style="color:{port_color}; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">
                     <span style="flex-shrink:0;">{port_icon}</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{port_label}</span>
                 </span>
             </div>
@@ -8927,24 +8927,24 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
     has_prof = bool(current_pid and prof_name and prof_name != "Nessun Profilo")
     if has_prof:
-        prof_html = f'<span style="color:#34d399; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"><span style="flex-shrink:0;">🏛️</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{prof_name}</span></span>'
+        prof_html = f'<span style="color:#34d399; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"><span style="flex-shrink:0;">🏛️</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{prof_name}</span></span>'
     else:
         prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">⏳ Nessun Profilo (In attesa)</span>'
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.2, 3.8],
+            [1.75, 3.25],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981; flex-shrink:0;"></span>
-                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif; flex-shrink:0;">
+                <span style="color:#ffffff; font-weight:800; font-size:12.5px; letter-spacing:0.3px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     ARGUS WEALTH
                 </span>
-                <span style="color:rgba(255,255,255,0.2); margin: 0 2px; flex-shrink:0;">|</span>
+                <span style="color:rgba(255,255,255,0.2); margin: 0 1px; flex-shrink:0;">|</span>
                 {prof_html}
             </div>
             """,
@@ -9231,19 +9231,19 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.2, 3.8],
+            [1.75, 3.25],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px; flex-shrink:0;"></span>
-                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif; flex-shrink:0;">
+                <span style="color:#ffffff; font-weight:800; font-size:12.5px; letter-spacing:0.3px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     {portal_label}
                 </span>
-                <span style="color:rgba(255,255,255,0.2); margin: 0 2px; flex-shrink:0;">|</span>
-                <span style="color:{accent_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">
+                <span style="color:rgba(255,255,255,0.2); margin: 0 1px; flex-shrink:0;">|</span>
+                <span style="color:{accent_color}; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">
                     <span style="flex-shrink:0;">{icon}</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{context_name}</span>
                 </span>
             </div>
