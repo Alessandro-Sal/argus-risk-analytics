@@ -395,18 +395,6 @@ def switch_to_page(target_page_file: str):
 
     resolved = resolve_page_path(target_page_file)
 
-    # Rendering overlay di transizione prima di commutare rotta
-    try:
-        from core.loading_states import render_transition_overlay
-
-        clean_title = target_clean.replace(".py", "").replace("_", " ")
-        render_transition_overlay(
-            title="Navigazione in corso...",
-            subtitle=f"Inizializzazione vista {clean_title}...",
-        )
-    except Exception:
-        pass
-
     try:
         st.switch_page(resolved)
         return
