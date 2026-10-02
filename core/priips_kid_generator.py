@@ -709,11 +709,16 @@ def render_priips_kid_popover(
     portfolio_name: str = "Portafoglio Master",
     risk_data: dict[str, Any] | None = None,
     key_suffix: str = "ctrl_room",
+    button_label: str = "🇪🇺 PRIIPs KID",
 ) -> None:
     """Render Streamlit Popover for 1-Click PRIIPs KID Factsheet generation & download."""
     import streamlit as st
 
-    with st.popover("🇪🇺 PRIIPs KID & MiFID II Factsheet", use_container_width=True):
+    with st.popover(
+        button_label,
+        use_container_width=True,
+        help="EU PRIIPs KID & MiFID II Regulatory Factsheet (Regolamento UE 1286/2014 & 2019/2088)",
+    ):
         st.markdown(
             """
             <div style="font-size: 13.5px; font-weight: 700; color: #f0f6fc; margin-bottom: 4px;">

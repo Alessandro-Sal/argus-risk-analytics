@@ -449,12 +449,12 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
 
 # ── BANNER SESSIONE ATTIVA & RESET / ONBOARDING ─────────────
 if st.session_state.get("pipeline_done"):
-    col_act1, col_act2, col_act3, col_act4, col_act5 = st.columns([1.9, 0.95, 0.95, 0.95, 0.65])
+    col_act1, col_act2, col_act3, col_act4, col_act5 = st.columns([1.8, 1.0, 1.0, 1.0, 0.7], vertical_alignment="center")
     with col_act1:
         st.markdown(f"""
-        <div style="background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display:flex; align-items:center; gap:10px;">
-            <span style="font-size:18px;">📌</span>
-            <div style="font-size:12.5px; color:#c9d1d9;">
+        <div style="background: rgba(88, 166, 255, 0.08); border: 1px solid rgba(88, 166, 255, 0.25); border-radius: 8px; padding: 0px 12px; height: 38px; display:flex; align-items:center; gap:8px; box-sizing: border-box; overflow: hidden; white-space: nowrap;">
+            <span style="font-size:16px;">📌</span>
+            <div style="font-size:12px; color:#c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
                 <b>Analisi Attiva:</b> <span style="color:#58a6ff; font-weight:700;">{st.session_state.get('portfolio_name', 'Portafoglio')}</span> &nbsp;|&nbsp; 
                 <b>Run ID:</b> <code style="color:#ff9900;">{st.session_state.get('run_id', 'N/A')}</code>
             </div>

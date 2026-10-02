@@ -895,7 +895,8 @@ def inject_custom_css():
             flex-direction: row !important;
             justify-content: flex-end !important;
             align-items: center !important;
-            gap: 6px !important;
+            flex-wrap: nowrap !important;
+            gap: 8px !important;
             width: 100% !important;
             margin: 0px !important;
             padding: 0px !important;
@@ -913,6 +914,9 @@ def inject_custom_css():
             align-items: center !important;
         }}
 
+        div[class*="st-key-argus_top_command_bar_actions"] .stMarkdown,
+        div[class*="st-key-argus_wealth_command_bar_actions"] .stMarkdown,
+        div[class*="st-key-argus_omni_command_bar_actions"] .stMarkdown,
         div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stMarkdownContainer"],
         div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stMarkdownContainer"],
         div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stMarkdownContainer"] {{
@@ -927,10 +931,12 @@ def inject_custom_css():
         div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stPopover"],
         div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"] {{
             width: auto !important;
+            flex: 0 0 auto !important;
             display: inline-flex !important;
             align-items: center !important;
             margin: 0px !important;
             padding: 0px !important;
+            position: relative !important;
         }}
 
         .argus-command-pills-cluster {{
@@ -942,6 +948,7 @@ def inject_custom_css():
             line-height: 1 !important;
             white-space: nowrap !important;
             margin: 0px !important;
+            margin-right: 6px !important;
             padding: 0px !important;
         }}
 
@@ -1843,7 +1850,7 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [2, 3],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
@@ -8874,7 +8881,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [2, 3],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
@@ -9172,7 +9179,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [2, 3],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
