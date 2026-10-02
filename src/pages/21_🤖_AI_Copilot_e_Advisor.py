@@ -1013,3 +1013,12 @@ elif active_copilot_tab == "🎙️ AI Voice Briefing & Audio Podcast":
         mime="text/plain",
         use_container_width=True
     )
+
+    st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 24px 0;'>", unsafe_allow_html=True)
+    st.markdown("#### 🎙️ Morning Meeting Audio Briefing & Executive Daily Note (90 sec)")
+    st.caption("Sintesi vocale interattiva Web Speech per comitato investimenti e nota A4 scaricabile.")
+
+    from core.morning_meeting_engine import generate_morning_meeting_script, render_morning_meeting_audio_widget
+    mm_briefing = generate_morning_meeting_script(portfolio_name=prof_title, risk_data=st.session_state.get("risk_bundle", {}))
+    render_morning_meeting_audio_widget(mm_briefing, key_suffix="p21_mm_widget")
+

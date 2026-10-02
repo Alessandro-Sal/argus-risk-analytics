@@ -449,20 +449,19 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
 
 # ── BANNER SESSIONE ATTIVA & RESET / ONBOARDING ─────────────
 if st.session_state.get("pipeline_done"):
-    col_act1, col_act2, col_act3 = st.columns([2.6, 1.3, 1.1])
+    col_act1, col_act2, col_act3, col_act4, col_act5 = st.columns([1.9, 0.95, 0.95, 0.95, 0.65])
     with col_act1:
         st.markdown(f"""
         <div style="background: rgba(88, 166, 255, 0.1); border: 1px solid rgba(88, 166, 255, 0.3); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px; display:flex; align-items:center; gap:10px;">
             <span style="font-size:18px;">📌</span>
             <div style="font-size:12.5px; color:#c9d1d9;">
-                <b>Analisi Attiva in Sessione:</b> <span style="color:#58a6ff; font-weight:700;">{st.session_state.get('portfolio_name', 'Portafoglio')}</span> &nbsp;|&nbsp; 
-                <b>Run ID:</b> <code style="color:#ff9900;">{st.session_state.get('run_id', 'N/A')}</code> &nbsp;|&nbsp; 
-                <span style="color:#3fb950;">I dati sono caricati e disponibili su tutte le 10 schede analitiche.</span>
+                <b>Analisi Attiva:</b> <span style="color:#58a6ff; font-weight:700;">{st.session_state.get('portfolio_name', 'Portafoglio')}</span> &nbsp;|&nbsp; 
+                <b>Run ID:</b> <code style="color:#ff9900;">{st.session_state.get('run_id', 'N/A')}</code>
             </div>
         </div>
         """, unsafe_allow_html=True)
     with col_act2:
-        with st.popover("📑 Master Board Pack", use_container_width=True):
+        with st.popover("📑 Board Pack", use_container_width=True):
             st.markdown("##### 📑 Executive Master Board Pack")
             st.caption("Dossier unificato Risk & Wealth pronto per CDA e Family Office.")
             prof_nm = st.session_state.get("portfolio_name", "Portfolio Master")
@@ -493,7 +492,19 @@ if st.session_state.get("pipeline_done"):
             except Exception as ex:
                 st.error(f"Errore generazione Master Board Pack: {ex}")
     with col_act3:
-        if st.button("🔄 Reset / Nuova", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
+        from core.priips_kid_generator import render_priips_kid_popover
+        prof_nm = st.session_state.get("portfolio_name", "Portafoglio Master")
+        r_bundle = st.session_state.get("risk_bundle", {})
+        render_priips_kid_popover(portfolio_name=prof_nm, risk_data=r_bundle, key_suffix="ctrl_room_kid")
+    with col_act4:
+        with st.popover("🎙️ Morning Note", use_container_width=True):
+            from core.morning_meeting_engine import generate_morning_meeting_script, render_morning_meeting_audio_widget
+            prof_nm = st.session_state.get("portfolio_name", "Portafoglio Master")
+            r_bundle = st.session_state.get("risk_bundle", {})
+            briefing_obj = generate_morning_meeting_script(portfolio_name=prof_nm, risk_data=r_bundle)
+            render_morning_meeting_audio_widget(briefing_obj, key_suffix="ctrl_room_mm")
+    with col_act5:
+        if st.button("🔄 Reset", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
             from core.workspace_context import WorkspaceContext
             from core.workspace_manager import clear_session_cache
             for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested", "df_clean", "selected_bitemp_port"]:
