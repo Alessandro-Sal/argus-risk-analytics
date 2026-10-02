@@ -449,17 +449,24 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
 
 # ── BANNER SESSIONE ATTIVA & RESET / ONBOARDING ─────────────
 if st.session_state.get("pipeline_done"):
-    col_act1, col_act2, col_act3, col_act4, col_act5 = st.columns([1.8, 1.0, 1.0, 1.0, 0.7], vertical_alignment="center")
+    col_act1, col_act2, col_act3, col_act4, col_act5 = st.columns([2.5, 0.95, 0.95, 0.95, 0.65], vertical_alignment="center")
     with col_act1:
-        st.markdown(f"""
-        <div style="background: rgba(88, 166, 255, 0.08); border: 1px solid rgba(88, 166, 255, 0.25); border-radius: 8px; padding: 0px 12px; height: 38px; display:flex; align-items:center; gap:8px; box-sizing: border-box; overflow: hidden; white-space: nowrap;">
-            <span style="font-size:16px;">📌</span>
-            <div style="font-size:12px; color:#c9d1d9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                <b>Analisi Attiva:</b> <span style="color:#58a6ff; font-weight:700;">{st.session_state.get('portfolio_name', 'Portafoglio')}</span> &nbsp;|&nbsp; 
-                <b>Run ID:</b> <code style="color:#ff9900;">{st.session_state.get('run_id', 'N/A')}</code>
+        port_name = st.session_state.get("portfolio_name", "Portafoglio")
+        run_id = st.session_state.get("run_id", "N/A")
+        run_id_display = (run_id[:16] + "…") if len(run_id) > 18 else run_id
+        st.markdown(
+            f"""
+            <div style="background: rgba(88, 166, 255, 0.08); border: 1px solid rgba(88, 166, 255, 0.25); border-radius: 8px; padding: 0 12px; height: 38px; display: flex; align-items: center; gap: 8px; box-sizing: border-box; overflow: hidden; white-space: nowrap;" title="Analisi Attiva: {port_name} | Run ID: {run_id}">
+                <span style="font-size: 15px; flex-shrink: 0;">📌</span>
+                <span style="font-size: 11.5px; color: #8b949e; flex-shrink: 0; font-weight: 600;">Attivo:</span>
+                <span style="font-size: 12.5px; color: #58a6ff; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 1; min-width: 0;">{port_name}</span>
+                <span style="color: rgba(255,255,255,0.18); flex-shrink: 0; margin: 0 2px;">|</span>
+                <span style="font-size: 11px; color: #8b949e; flex-shrink: 0;">ID:</span>
+                <span style="font-size: 11px; color: #ff9900; background: rgba(255,153,0,0.12); border: 1px solid rgba(255,153,0,0.25); padding: 1px 6px; border-radius: 4px; font-family: monospace; flex-shrink: 0;">{run_id_display}</span>
             </div>
-        </div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
     with col_act2:
         with st.popover("📑 Board Pack", use_container_width=True):
             st.markdown("##### 📑 Executive Master Board Pack")
