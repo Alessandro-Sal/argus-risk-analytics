@@ -859,9 +859,36 @@ def _compute_returns(
     )
     if warnings_list is not None and not pivot.empty:
         try:
+            # Determinazione finestra di pertinenza (holding period o inception portafoglio)
+            # per evitare falsi allarmi su eventi storici remoti (es. shock del 2008 su acquisti del 2022).
+            min_portfolio_date = None
+            if df_tx is not None and not df_tx.empty and "tx_date" in df_tx.columns:
+                try:
+                    min_portfolio_date = pd.to_datetime(df_tx["tx_date"].min())
+                except Exception:
+                    min_portfolio_date = None
+
+            first_tx_by_ticker = {}
+            if df_tx is not None and not df_tx.empty and "tx_date" in df_tx.columns and "ticker" in df_tx.columns:
+                try:
+                    first_tx_by_ticker = pd.to_datetime(df_tx.groupby("ticker")["tx_date"].min()).to_dict()
+                except Exception:
+                    first_tx_by_ticker = {}
+
             for tk in active_tickers:
                 if tk in pivot.columns:
-                    s_tk = pivot[tk].dropna()
+                    s_tk_full = pivot[tk].dropna()
+                    if s_tk_full.empty:
+                        continue
+
+                    # Filtra l'orizzonte di controllo a partire dalla data di prima acquisizione nel portafoglio
+                    gate_start = first_tx_by_ticker.get(tk, min_portfolio_date)
+                    if gate_start is not None:
+                        s_idx = pd.to_datetime(s_tk_full.index)
+                        s_tk = s_tk_full[s_idx >= gate_start]
+                    else:
+                        s_tk = s_tk_full
+
                     if len(s_tk) > 5:
                         zero_diff_streak = int(
                             (s_tk.diff() == 0).astype(int).groupby((s_tk.diff() != 0).cumsum()).sum().max()
@@ -870,12 +897,12 @@ def _compute_returns(
                             warnings_list.append(
                                 f"Data Quality Alert: l'asset {tk} presenta una serie prezzi piatta/stantia per {zero_diff_streak} giorni consecutivi."
                             )
-                    elif len(s_tk) <= 3 and len(pivot) > 30:
+                    elif len(s_tk) <= 3 and len(s_tk_full) > 30:
                         warnings_list.append(
                             f"Data Quality Alert: l'asset {tk} ha solo {len(s_tk)} quotazioni storiche disponibili rispetto all'orizzonte di analisi."
                         )
 
-            # Rilevamento salti estremi di rendimento (Z-score > 6.0)
+            # Rilevamento salti estremi di rendimento (Z-score > 6.0 calcolato sulla serie storica, ma circoscritto al periodo di detenzione)
             pct_chg_check = pivot[[t for t in active_tickers if t in pivot.columns]].pct_change()
             for tk in active_tickers:
                 if tk in pct_chg_check.columns:
@@ -884,11 +911,19 @@ def _compute_returns(
                         std_r = float(r_tk.std())
                         if std_r > 1e-6:
                             z_vals = (r_tk - r_tk.mean()) / std_r
-                            extreme_jumps = z_vals[z_vals.abs() > 6.0]
+                            gate_start = first_tx_by_ticker.get(tk, min_portfolio_date)
+                            if gate_start is not None:
+                                r_idx = pd.to_datetime(z_vals.index)
+                                z_in_scope = z_vals[r_idx >= gate_start]
+                            else:
+                                z_in_scope = z_vals
+
+                            extreme_jumps = z_in_scope[z_in_scope.abs() > 6.0]
                             if not extreme_jumps.empty:
                                 worst_dt = extreme_jumps.abs().idxmax()
+                                dt_label = pd.to_datetime(worst_dt).strftime("%Y-%m-%d")
                                 warnings_list.append(
-                                    f"Data Quality Warning: salto anomalo su {tk} il {worst_dt.strftime('%Y-%m-%d')} ({r_tk[worst_dt] * 100:.1f}%, Z-Score {z_vals[worst_dt]:.1f})."
+                                    f"Data Quality Warning: salto anomalo su {tk} il {dt_label} ({r_tk[worst_dt] * 100:.1f}%, Z-Score {z_vals[worst_dt]:.1f})."
                                 )
         except Exception:
             pass
