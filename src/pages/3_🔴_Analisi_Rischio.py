@@ -83,6 +83,13 @@ RISK_MODELS_CATALOG = {
         "badge_color": "#a855f7",
         "category": "Intelligenza Artificiale",
         "desc": "Algoritmo non supervisionato di isolamento stocastico per intercettare pattern di rendimento anomali, spike improvvisi di correlazione e breakdown strutturali del portafoglio."
+    },
+    "💱 Dynamic FX Overlay & Currency Risk": {
+        "title": "Dynamic FX Overlay, Decomposizione Valutaria & Coperture Forward CIP",
+        "badge": "Min-Var Hedge • Carry Cost • FX Exposure",
+        "badge_color": "#10b981",
+        "category": "Coperture & Rischio Valutario",
+        "desc": "Analisi approfondita del rischio di cambio: scomposizione dei rendimenti tra asset locale e valuta, stima dell'hedge ratio a minima varianza ottimale (h*) e dimensionamento coperture Forward CIP con carry cost."
     }
 }
 
@@ -2710,3 +2717,13 @@ elif active_risk_tab == "🕵️‍♂️ Rilevatore Anomalie ML (Isolation Fore
                 key_suffix="risk_ano",
                 column_config=ano_col_config,
             )
+
+# ==============================================================================
+# TAB 5: DYNAMIC FX OVERLAY & CURRENCY RISK OPTIMIZER
+# ==============================================================================
+elif active_risk_tab == "💱 Dynamic FX Overlay & Currency Risk":
+    from core.fx_overlay_engine import render_fx_overlay_desk
+
+    base_curr = st.session_state.get("base_currency", "EUR")
+    render_fx_overlay_desk(positions=pos, returns=df_returns, base_currency=base_curr)
+
