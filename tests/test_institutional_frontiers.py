@@ -151,3 +151,43 @@ def test_unified_notification_center_standby_and_activation():
     res_wealth = get_unified_compliance_notifications(wealth_snapshot=wealth_active)
     assert res_wealth["has_active_analysis"] is True
 
+
+def test_master_wealth_risk_limits_and_pre_allerta():
+    """Verifica che i limiti di rischio leggano correttamente le metriche annidate e distinguano Pre-Allerta da Violazione."""
+    from core.risk_limits import check_risk_limits
+
+    mock_bundle = {
+        "positions": pd.DataFrame([
+            {"ticker": "AAPL", "current_value": 15000.0, "qty_net": 100, "sector": "Technology"},
+            {"ticker": "MSFT", "current_value": 15000.0, "qty_net": 80, "sector": "Technology"},
+            {"ticker": "SWDA.MI", "current_value": 18000.0, "qty_net": 200, "sector": "Broad Market"},
+            {"ticker": "GOOGL", "current_value": 16000.0, "qty_net": 100, "sector": "Communications"},
+            {"ticker": "AMZN", "current_value": 18000.0, "qty_net": 100, "sector": "Consumer Discretionary"},
+            {"ticker": "ISP.MI", "current_value": 18000.0, "qty_net": 1000, "sector": "Financials"},
+        ]),
+        "metrics": {
+            "market_risk": {"var_95": 2.48, "beta": 1.12},
+            "concentration": {"diversification_ratio": 1.45, "hhi_index": 0.068},
+        },
+    }
+
+    # 1. Verifica estrazione corretta da check_risk_limits
+    evals = check_risk_limits(mock_bundle)
+    df_evals = evals["evaluations"]
+    dr_row = df_evals[df_evals["key"] == "min_diversification_ratio"].iloc[0]
+    assert dr_row["current_value"] == 1.45
+    assert dr_row["status"] == "PASS"
+
+    beta_row = df_evals[df_evals["key"] == "max_beta"].iloc[0]
+    assert beta_row["current_value"] == 1.12
+    assert beta_row["status"] == "WARNING"
+
+    # 2. Verifica formattazione nel notification center: WARNING deve essere Pre-Allerta, non Violazione
+    notifs = get_unified_compliance_notifications(risk_data=mock_bundle)
+    assert notifs["critical_count"] == 0
+    beta_notif = next(n for n in notifs["notifications"] if "Beta" in n.title)
+    assert "Pre-Allerta" in beta_notif.title
+    assert "Violazione" not in beta_notif.title
+    assert "riduzione tattica" in beta_notif.suggested_action
+
+

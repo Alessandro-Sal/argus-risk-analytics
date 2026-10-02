@@ -158,25 +158,38 @@ def get_unified_compliance_notifications(
                         if st_val in ["BREACH", "WARNING"]:
                             is_crit = st_val == "BREACH"
                             sev = "CRITICAL" if is_crit else "WARNING"
+                            r_key = str(row.get("key", ""))
                             r_name = str(row.get("rule_name", "Limite di Rischio"))
                             c_val = float(row.get("current_value", 0.0))
                             l_val = float(row.get("limit_threshold", 0.0))
                             u_str = str(row.get("unit", ""))
 
-                            action_text = (
-                                "Ribilanciare il portafoglio o attivare coperture per ridurre l'esposizione."
-                                if is_crit
-                                else "Monitorare la metrica o valutare una riduzione tattica."
-                            )
+                            is_ge = "min_" in r_key
+                            if is_crit:
+                                status_title = f"🔴 Violazione: {r_name}"
+                                msg_text = f"Valore rilevato {c_val:.2f}{u_str} oltrepassa la soglia di mandato {l_val:.2f}{u_str}."
+                                action_text = (
+                                    "Ribilanciare il portafoglio incrementando la diversificazione su asset decorrelati."
+                                    if is_ge
+                                    else "Ribilanciare il portafoglio o attivare coperture per ridurre l'esposizione."
+                                )
+                            else:
+                                status_title = f"🟡 Pre-Allerta: {r_name}"
+                                msg_text = f"Valore rilevato {c_val:.2f}{u_str} in avvicinamento alla soglia di mandato {l_val:.2f}{u_str}."
+                                action_text = (
+                                    "Monitorare la metrica e considerare una maggiore diversificazione verso la soglia di sicurezza."
+                                    if is_ge
+                                    else "Monitorare la metrica o valutare una riduzione tattica dell'esposizione."
+                                )
 
                             notifications.append(
                                 UnifiedNotification(
-                                    notification_id=f"risk_lim_{row.get('key', 'rule')}",
+                                    notification_id=f"risk_lim_{r_key or 'rule'}",
                                     source="RISK",
                                     severity=sev,
                                     category="RISK_LIMIT",
-                                    title=f"{'🔴' if is_crit else '🟡'} Violazione: {r_name}",
-                                    message=f"Valore rilevato {c_val:.2f}{u_str} rispetto alla soglia di mandato {l_val:.2f}{u_str}.",
+                                    title=status_title,
+                                    message=msg_text,
                                     current_value=c_val,
                                     limit_value=l_val,
                                     unit=u_str,

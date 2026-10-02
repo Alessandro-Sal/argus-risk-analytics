@@ -45,10 +45,59 @@ def check_risk_limits(results: Dict[str, Any], custom_limits: Dict[str, float] =
     else:
         max_sector_w = max_asset_w
 
-    var_95 = float(results.get("var_95_hist", 0.02) or 0.02) * 100.0
-    beta = float(results.get("portfolio_beta", 1.0) or 1.0)
-    dr = float(results.get("diversification_ratio", 1.3) or 1.3)
-    hhi = float(results.get("hhi", 0.10) or 0.10)
+    # Sub-dictionaries resolution
+    m_dict = results.get("metrics") if isinstance(results.get("metrics"), dict) else {}
+    mr_dict = m_dict.get("market_risk", {}) if isinstance(m_dict.get("market_risk"), dict) else {}
+    mc_dict = m_dict.get("concentration", {}) if isinstance(m_dict.get("concentration"), dict) else {}
+    if not mr_dict and isinstance(results.get("market_risk"), dict):
+        mr_dict = results.get("market_risk")
+    if not mc_dict and isinstance(results.get("concentration"), dict):
+        mc_dict = results.get("concentration")
+
+    # VaR 95%
+    raw_var = (
+        results.get("var_95_hist")
+        or results.get("var_95")
+        or m_dict.get("var_95_hist")
+        or m_dict.get("var_95")
+        or mr_dict.get("var_95_hist")
+        or mr_dict.get("var_95")
+        or 0.02
+    )
+    v_val = float(raw_var)
+    var_95 = v_val * 100.0 if abs(v_val) < 0.20 else v_val
+
+    # Beta
+    raw_beta = (
+        results.get("portfolio_beta")
+        or results.get("beta")
+        or m_dict.get("portfolio_beta")
+        or m_dict.get("beta")
+        or mr_dict.get("portfolio_beta")
+        or mr_dict.get("beta")
+        or 1.0
+    )
+    beta = float(raw_beta)
+
+    # Diversification Ratio
+    raw_dr = (
+        results.get("diversification_ratio")
+        or m_dict.get("diversification_ratio")
+        or mc_dict.get("diversification_ratio")
+        or mr_dict.get("diversification_ratio")
+        or 1.30
+    )
+    dr = float(raw_dr)
+
+    # HHI Index
+    raw_hhi = (
+        results.get("hhi")
+        or m_dict.get("hhi")
+        or mc_dict.get("hhi_index")
+        or mc_dict.get("hhi")
+        or 0.10
+    )
+    hhi = float(raw_hhi)
 
     metric_values = {
         "max_single_asset_pct": max_asset_w,
