@@ -70,3 +70,22 @@ def test_sidebar_profile_sync_bidirectional():
             break
 
     assert matched_str == 303
+
+
+def test_switch_to_page_clean_navigation():
+    """Verifica che switch_to_page non inietti blocchi HTML/markdown nel layout della sidebar."""
+    from unittest.mock import patch
+    from core.sidebar import switch_to_page
+
+    with patch("streamlit.markdown") as mock_markdown, \
+         patch("streamlit.switch_page") as mock_switch_page, \
+         patch("streamlit.rerun") as mock_rerun, \
+         patch("core.sidebar.get_current_page_name", return_value="0_Control_Room.py"):
+
+        switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+
+        # Verifica che nessun markdown/overlay HTML venga renderizzato nella sidebar
+        mock_markdown.assert_not_called()
+        # Verifica che switch_page sia stato invocato
+        assert mock_switch_page.called
+

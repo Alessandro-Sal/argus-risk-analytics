@@ -352,6 +352,9 @@ def render_transition_overlay(
     try:
         import streamlit as st
         overlay_html = _clean_html(f"""
+        <style>
+        {LOADING_SHIMMER_CSS}
+        </style>
         <div class="argus-transition-overlay">
             <div class="argus-overlay-panel">
                 <div class="argus-quantum-spinner"></div>
