@@ -742,7 +742,9 @@ def inject_custom_css():
 
         /* Popover scrolling & viewport constraints */
         [data-testid="stPopoverBody"], [data-testid="stPopoverContent"], div[data-testid="stPopoverBody"] {{
-            max-height: 68vh !important;
+            max-height: 72vh !important;
+            min-width: min(500px, 94vw) !important;
+            max-width: min(580px, 96vw) !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
             scrollbar-width: thin !important;
@@ -752,7 +754,7 @@ def inject_custom_css():
             background: rgba(13, 17, 23, 0.98) !important;
             backdrop-filter: blur(16px) !important;
             box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6) !important;
-            padding: 16px 20px !important;
+            padding: 14px 16px !important;
         }}
         [data-testid="stPopoverBody"]::-webkit-scrollbar {{
             width: 6px;

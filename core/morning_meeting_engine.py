@@ -359,52 +359,195 @@ def render_morning_meeting_audio_widget(
 
     # HTML5 + Web Speech API Player
     player_html = f"""
-    <div style="background: linear-gradient(135deg, rgba(22, 27, 34, 0.98) 0%, rgba(13, 17, 23, 0.95) 100%);
-                border: 1px solid rgba(255, 153, 0, 0.35); border-radius: 12px; padding: 16px 20px;
-                color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 38px; height: 38px; border-radius: 50%; background: #ff990022; border: 1px solid #ff9900;
-                      display: flex; align-items: center; justify-content: center; font-size: 18px;">
+    <style>
+      * {{
+        box-sizing: border-box;
+      }}
+      html, body {{
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: transparent;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      }}
+      .mm-player-card {{
+        background: linear-gradient(135deg, rgba(22, 27, 34, 0.98) 0%, rgba(13, 17, 23, 0.95) 100%);
+        border: 1px solid rgba(255, 153, 0, 0.35);
+        border-radius: 12px;
+        padding: 12px 16px;
+        color: #e2e8f0;
+        width: 100%;
+        box-sizing: border-box;
+      }}
+      .mm-header {{
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+        gap: 10px;
+      }}
+      .mm-title-group {{
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        min-width: 0;
+      }}
+      .mm-mic-icon {{
+        width: 36px;
+        height: 36px;
+        min-width: 36px;
+        border-radius: 50%;
+        background: rgba(255, 153, 0, 0.15);
+        border: 1px solid #ff9900;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        flex-shrink: 0;
+      }}
+      .mm-title {{
+        font-size: 13.5px;
+        font-weight: 700;
+        color: #f8fafc;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }}
+      .mm-subtitle {{
+        font-size: 11px;
+        color: #8b949e;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }}
+      .mm-status-badge {{
+        font-size: 10.5px;
+        font-weight: 600;
+        padding: 3px 9px;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.06);
+        color: #8b949e;
+        border: 1px solid rgba(255,255,255,0.08);
+        white-space: nowrap;
+        flex-shrink: 0;
+      }}
+      .mm-controls-row {{
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        white-space: nowrap;
+      }}
+      .mm-btn-play {{
+        background: #ff9900;
+        color: #0d1117;
+        font-weight: 700;
+        border: none;
+        border-radius: 7px;
+        padding: 7px 14px;
+        font-size: 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        line-height: 1;
+        transition: filter 0.15s ease;
+      }}
+      .mm-btn-play:hover {{
+        filter: brightness(1.1);
+      }}
+      .mm-btn-stop {{
+        background: rgba(255,255,255,0.08);
+        color: #e2e8f0;
+        font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.14);
+        border-radius: 7px;
+        padding: 7px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        line-height: 1;
+        transition: background 0.15s ease;
+      }}
+      .mm-btn-stop:hover {{
+        background: rgba(255,255,255,0.15);
+      }}
+      .mm-rate-wrap {{
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        margin-left: auto;
+        flex-shrink: 0;
+      }}
+      .mm-rate-label {{
+        font-size: 11.5px;
+        color: #8b949e;
+        white-space: nowrap;
+      }}
+      .mm-rate-select {{
+        background: #161b22;
+        color: #e2e8f0;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 6px;
+        padding: 4px 6px;
+        font-size: 11px;
+        cursor: pointer;
+        outline: none;
+      }}
+      .mm-wave-container {{
+        display: none;
+        align-items: center;
+        gap: 3px;
+        height: 14px;
+        margin-top: 10px;
+      }}
+    </style>
+
+    <div class="mm-player-card">
+      <div class="mm-header">
+        <div class="mm-title-group">
+          <div class="mm-mic-icon">
             🎙️
           </div>
           <div>
-            <div style="font-size: 14.5px; font-weight: 700; color: #f8fafc;">
+            <div class="mm-title">
               Briefing Vocale Comitato Investimenti
             </div>
-            <div style="font-size: 11.5px; color: #8b949e;">
+            <div class="mm-subtitle">
               Sintesi vocale esecutiva (~{sec}s) • Lingua: Italiano (it-IT)
             </div>
           </div>
         </div>
-        <div id="statusBadge_{key_suffix}" style="font-size: 11px; padding: 3px 9px; border-radius: 10px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
+        <div id="statusBadge_{key_suffix}" class="mm-status-badge">
           Pronto per l'ascolto
         </div>
       </div>
 
       <!-- Controls Row -->
-      <div style="display: flex; gap: 10px; align-items: center; margin-top: 10px;">
-        <button id="playBtn_{key_suffix}" onclick="togglePlay_{key_suffix}()"
-                style="background: #ff9900; color: #0d1117; font-weight: 700; border: none; border-radius: 8px;
-                       padding: 8px 18px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+      <div class="mm-controls-row">
+        <button id="playBtn_{key_suffix}" onclick="togglePlay_{key_suffix}()" class="mm-btn-play">
           <span id="playIcon_{key_suffix}">▶</span> <span id="playLabel_{key_suffix}">Riproduci Briefing</span>
         </button>
-        <button onclick="stopSpeech_{key_suffix}()"
-                style="background: rgba(255,255,255,0.08); color: #e2e8f0; font-weight: 600; border: 1px solid rgba(255,255,255,0.12);
-                       border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer;">
+        <button onclick="stopSpeech_{key_suffix}()" class="mm-btn-stop">
           ⏹ Ferma
         </button>
-        <span style="font-size: 12px; color: #8b949e; margin-left: 8px;">Velocità:</span>
-        <select id="rateSelect_{key_suffix}" onchange="changeRate_{key_suffix}()"
-                style="background: #161b22; color: #e2e8f0; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; padding: 4px 8px; font-size: 12px;">
-          <option value="1.0" selected>1.0x (Naturale)</option>
-          <option value="1.15">1.15x (Dinamico)</option>
-          <option value="1.3">1.3x (Rapido)</option>
-        </select>
+        <div class="mm-rate-wrap">
+          <span class="mm-rate-label">Velocità:</span>
+          <select id="rateSelect_{key_suffix}" onchange="changeRate_{key_suffix}()" class="mm-rate-select">
+            <option value="1.0" selected>1.0x (Naturale)</option>
+            <option value="1.15">1.15x (Dinamico)</option>
+            <option value="1.3">1.3x (Rapido)</option>
+          </select>
+        </div>
       </div>
 
       <!-- Visual Waveform Indicator -->
-      <div id="waveContainer_{key_suffix}" style="display: none; align-items: center; gap: 3px; height: 16px; margin-top: 14px;">
+      <div id="waveContainer_{key_suffix}" class="mm-wave-container">
         <div style="width: 3px; height: 60%; background: #ff9900; border-radius: 2px;"></div>
         <div style="width: 3px; height: 100%; background: #ff9900; border-radius: 2px;"></div>
         <div style="width: 3px; height: 40%; background: #ff9900; border-radius: 2px;"></div>
@@ -505,7 +648,7 @@ def render_morning_meeting_audio_widget(
     </script>
     """
 
-    components.html(player_html, height=140)
+    components.html(player_html, height=152)
 
     # Narrative script expandable transcript & PDF download
     with st.expander("📜 Trascrizione Integrale & Note Comitato (PDF)", expanded=False):
