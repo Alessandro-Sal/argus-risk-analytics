@@ -122,3 +122,32 @@ def test_custom_sandbox_macro_shock():
     shock = map_global_macro_preset_to_factor_shock("CUSTOM_SANDBOX")
     assert isinstance(shock, MacroFactorShock)
     assert shock.equity_mkt_pct != 0.0
+
+
+def test_unified_notification_center_standby_and_activation():
+    """Verifica che senza alcuna analisi attiva il sentinel rimanga in standby e si attivi solo dopo il caricamento."""
+    from core.watchdog.unified_notification_center import check_active_analysis
+
+    # 1. Nessun dato -> Standby
+    assert check_active_analysis(risk_data=None, wealth_snapshot=None) is False
+    assert check_active_analysis(risk_data={}, wealth_snapshot={}) is False
+    res_standby = get_unified_compliance_notifications(risk_data=None, wealth_snapshot=None)
+    assert res_standby["has_active_analysis"] is False
+    assert res_standby["total_count"] == 0
+    assert len(res_standby["notifications"]) == 0
+
+    # 2. Risk bundle con posizioni -> Attivo
+    risk_active = {
+        "positions": pd.DataFrame([{"ticker": "SPY", "current_value": 10000.0, "qty_net": 20}]),
+        "var_95_hist": 0.02,
+    }
+    assert check_active_analysis(risk_data=risk_active) is True
+    res_active = get_unified_compliance_notifications(risk_data=risk_active)
+    assert res_active["has_active_analysis"] is True
+
+    # 3. Wealth snapshot con patrimonio -> Attivo
+    wealth_active = {"total_net_worth": 250000.0, "liquid_cash": 15000.0}
+    assert check_active_analysis(wealth_snapshot=wealth_active) is True
+    res_wealth = get_unified_compliance_notifications(wealth_snapshot=wealth_active)
+    assert res_wealth["has_active_analysis"] is True
+
