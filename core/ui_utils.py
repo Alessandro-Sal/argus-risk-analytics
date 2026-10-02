@@ -2746,15 +2746,28 @@ def render_spotlight_palette():
         if st.button("⌨️ Cheatsheet Terminale", key="spot_cheatsheet_modal", use_container_width=True):
             render_terminal_cheatsheet_dialog()
 
-        if st.button("♻️ Reset Cache", key="spot_clean_cache_all", use_container_width=True):
-            from core.workspace_manager import clear_session_cache
+        if st.session_state.get("confirm_spot_cache_all"):
+            st.warning("⚠️ Confermi lo svuotamento della cache e il reset della sessione?")
+            c_no, c_yes = st.columns([1, 1])
+            with c_no:
+                if st.button("Annulla", key="btn_cancel_spot_cache", use_container_width=True):
+                    st.session_state.pop("confirm_spot_cache_all", None)
+                    st.rerun()
+            with c_yes:
+                if st.button("🔴 Conferma Reset", key="btn_ok_spot_cache", type="primary", use_container_width=True):
+                    st.session_state.pop("confirm_spot_cache_all", None)
+                    from core.workspace_manager import clear_session_cache
 
-            clear_session_cache()
-            st.cache_data.clear()
-            for k in list(st.session_state.keys()):
-                if k not in ["splash_dismissed"]:
-                    del st.session_state[k]
-            switch_to_page("0_Control_Room.py")
+                    clear_session_cache()
+                    st.cache_data.clear()
+                    for k in list(st.session_state.keys()):
+                        if k not in ["splash_dismissed"]:
+                            del st.session_state[k]
+                    switch_to_page("0_Control_Room.py")
+        else:
+            if st.button("♻️ Reset Cache", key="spot_clean_cache_all", use_container_width=True):
+                st.session_state["confirm_spot_cache_all"] = True
+                st.rerun()
 
 @st.dialog("⌨️ BLOOMBERG TERMINAL SHORTCUTS & NAVIGATION CHEATSHEET", width="large")
 def render_terminal_cheatsheet_dialog():
@@ -3111,16 +3124,29 @@ def render_wealth_spotlight_palette():
         if st.button("⌨️ Cheatsheet Terminale", key="spot_w_cheatsheet_modal", use_container_width=True):
             render_terminal_cheatsheet_dialog()
 
-        if st.button("♻️ Reset Cache Wealth", key="spot_clean_cache_wealth", use_container_width=True):
-            from core.workspace_manager import clear_session_cache
+        if st.session_state.get("confirm_spot_cache_wealth"):
+            st.warning("⚠️ Confermi lo svuotamento della cache Wealth e il reset della sessione?")
+            c_no, c_yes = st.columns([1, 1])
+            with c_no:
+                if st.button("Annulla", key="btn_cancel_spot_w_cache", use_container_width=True):
+                    st.session_state.pop("confirm_spot_cache_wealth", None)
+                    st.rerun()
+            with c_yes:
+                if st.button("🔴 Conferma Reset Wealth", key="btn_ok_spot_w_cache", type="primary", use_container_width=True):
+                    st.session_state.pop("confirm_spot_cache_wealth", None)
+                    from core.workspace_manager import clear_session_cache
 
-            clear_session_cache()
-            st.cache_data.clear()
-            for k in list(st.session_state.keys()):
-                if k not in ["splash_dismissed"]:
-                    del st.session_state[k]
-            st.session_state.argus_portal_mode = "🏛️ Wealth Management"
-            switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+                    clear_session_cache()
+                    st.cache_data.clear()
+                    for k in list(st.session_state.keys()):
+                        if k not in ["splash_dismissed"]:
+                            del st.session_state[k]
+                    st.session_state.argus_portal_mode = "🏛️ Wealth Management"
+                    switch_to_page("pages/12_🎛️_Wealth_Control_Room.py")
+        else:
+            if st.button("♻️ Reset Cache Wealth", key="spot_clean_cache_wealth", use_container_width=True):
+                st.session_state["confirm_spot_cache_wealth"] = True
+                st.rerun()
 
     st.divider()
 

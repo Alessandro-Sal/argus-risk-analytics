@@ -145,11 +145,11 @@ with p_bar_c3:
     st.write("")
     if current_pid is not None and len(profile_map) > 1:
         if st.button("🗑️ Elimina", type="secondary", use_container_width=True, key="btn_del_prof_pop"):
-            delete_wealth_portfolio(engine, current_pid)
+            from core.confirm_dialogs import confirm_delete_wealth_portfolio_dialog
+
             remaining = [p for p in profile_map.keys() if p != current_pid]
-            st.session_state["wealth_active_portfolio_id"] = remaining[0] if remaining else None
-            st.warning("Profilo eliminato con successo.")
-            st.rerun()
+            prof_name = profile_map.get(current_pid, f"Profilo #{current_pid}")
+            confirm_delete_wealth_portfolio_dialog(engine, current_pid, prof_name, remaining)
     elif current_pid is not None:
         st.button("🔒 Unico", disabled=True, use_container_width=True, help="Non puoi eliminare l'unico profilo presente. Creane prima un altro con ➕ Nuovo.")
 
@@ -442,11 +442,9 @@ with st.expander("📚 Storico Snapshot & Recall Analisi Patrimoniale", expanded
 
             with col_del_snap:
                 if st.button("🗑️ Elimina Snapshot", type="secondary", use_container_width=True, key="btn_del_snap_action"):
-                    if delete_wealth_snapshot(engine, sel_sid):
-                        if st.session_state.get("wealth_active_snapshot", {}).get("snapshot_id") == sel_sid:
-                            st.session_state.pop("wealth_active_snapshot", None)
-                        st.warning("Snapshot eliminato con successo dal database.")
-                        st.rerun()
+                    from core.confirm_dialogs import confirm_delete_wealth_snapshot_dialog
+
+                    confirm_delete_wealth_snapshot_dialog(engine, sel_sid, str(sel_snap_name), str(sel_dt))
 
             with col_goto_dash:
                 if st.button("🏛️ Vai alla Dashboard Net Worth →", type="secondary", use_container_width=True, key="btn_goto_nw_from_recall"):
@@ -1021,9 +1019,17 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
                 dc1, dc2 = st.columns(2)
                 with dc1:
                     if st.button("🗑️ Elimina Definitivamente Conto", type="primary", use_container_width=True, key="btn_confirm_del_acc_tab2"):
-                        delete_wealth_account(engine, sel_del_id)
-                        st.warning(f"Conto #{sel_del_id} eliminato con successo.")
-                        st.rerun()
+                        from core.confirm_dialogs import confirm_delete_wealth_account_dialog
+
+                        acc_match = df_accs_view[df_accs_view["account_id"] == sel_del_id]
+                        acc_row_del = acc_match.iloc[0] if not acc_match.empty else {}
+                        confirm_delete_wealth_account_dialog(
+                            engine,
+                            sel_del_id,
+                            str(acc_row_del.get("name", f"Conto #{sel_del_id}")),
+                            str(acc_row_del.get("institution", "")),
+                            float(acc_row_del.get("balance", 0.0)),
+                        )
                 with dc2:
                     is_currently_active = bool(df_accs_view[df_accs_view["account_id"] == sel_del_id]["is_active"].iloc[0])
                     toggle_label = "⏸️ Disattiva Conto" if is_currently_active else "▶️ Riattiva Conto"
@@ -1112,9 +1118,9 @@ elif active_cr_tab == "⚙️ Gestione Conti & Categorie":
                             st.rerun()
                     with bcol2:
                         if st.button("🗑️ Scollega", type="secondary", use_container_width=True, key=f"btn_clear_risk_mgmt_{current_pid}"):
-                            set_linked_risk_portfolios(engine, current_pid, [])
-                            st.warning("Portafogli Risk scollegati.")
-                            st.rerun()
+                            from core.confirm_dialogs import confirm_unlink_risk_portfolio_dialog
+
+                            confirm_unlink_risk_portfolio_dialog(engine, current_pid)
 
                 tot_risk_val, df_linked_summary = get_linked_risk_portfolios_summary(engine, wealth_portfolio_id=current_pid)
                 st.markdown(f"##### 📊 Investimenti Consolidati: **{fmt_eur(tot_risk_val)}**")

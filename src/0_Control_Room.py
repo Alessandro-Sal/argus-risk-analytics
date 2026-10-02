@@ -432,20 +432,11 @@ with st.expander(f"📚 Storico Snapshot & Recall Analisi ({st.session_state.get
                         st.rerun()
                 
                 if btn_del:
-                    from sqlalchemy import text as sqlt
-                    with engine_sidebar.begin() as conn:
-                        snap_id = conn.execute(sqlt("SELECT snapshot_id FROM portfolio_snapshots WHERE run_id = :rid"), {"rid": sel_row.run_id}).scalar()
-                        if snap_id:
-                            conn.execute(sqlt("DELETE FROM snapshot_positions WHERE snapshot_id = :sid"), {"sid": snap_id})
-                            conn.execute(sqlt("DELETE FROM portfolio_snapshots WHERE snapshot_id = :sid"), {"sid": snap_id})
-                        
-                        rem_snaps = conn.execute(sqlt("SELECT COUNT(*) FROM portfolio_snapshots WHERE portfolio_id = :pid"), {"pid": sel_row.portfolio_id}).scalar()
-                        rem_tx = conn.execute(sqlt("SELECT COUNT(*) FROM transactions WHERE portfolio_id = :pid"), {"pid": sel_row.portfolio_id}).scalar()
-                        if rem_snaps == 0 and rem_tx == 0:
-                            conn.execute(sqlt("DELETE FROM portfolios WHERE portfolio_id = :pid"), {"pid": sel_row.portfolio_id})
+                    from core.confirm_dialogs import confirm_delete_snapshot_dialog
 
-                    st.success(f"Singola analisi `{sel_row.run_id}` eliminata con successo dal Database `{st.session_state.get('db_name')}`!")
-                    st.rerun()
+                    confirm_delete_snapshot_dialog(
+                        engine_sidebar, sel_row.run_id, sel_row.port_name, sel_row.portfolio_id
+                    )
 
 # ── BANNER SESSIONE ATTIVA & RESET / ONBOARDING ─────────────
 if st.session_state.get("pipeline_done"):
@@ -512,13 +503,9 @@ if st.session_state.get("pipeline_done"):
             render_morning_meeting_audio_widget(briefing_obj, key_suffix="ctrl_room_mm")
     with col_act5:
         if st.button("🔄 Reset", type="secondary", use_container_width=True, help="Azzera lo stato corrente della sessione per caricare o elaborare un nuovo portafoglio."):
-            from core.workspace_context import WorkspaceContext
-            from core.workspace_manager import clear_session_cache
-            for k in ["df_raw_injected", "active_archetype_code", "active_archetype_name", "active_archetype_tx_count", "active_archetype_db_ids", "keep_archetype_expander_open", "archetype_just_injected", "auto_run_pipeline_requested", "df_clean", "selected_bitemp_port"]:
-                st.session_state.pop(k, None)
-            clear_session_cache()
-            WorkspaceContext.sanitize_risk_portfolio_state(preserve_db_creds=True)
-            st.rerun()
+            from core.confirm_dialogs import confirm_reset_session_dialog
+
+            confirm_reset_session_dialog()
 else:
     col_onb1, col_onb2 = st.columns([3.2, 1.2])
     with col_onb1:
@@ -1391,8 +1378,9 @@ with tab_wealth:
                 with c_del:
                     st.markdown('<div style="height: 2px;"></div>', unsafe_allow_html=True)
                     if st.button("🗑️", key=f"btn_del_{p['name']}", use_container_width=True, help="Elimina dal registro"):
-                        delete_saved_portfolio_profile(p["name"])
-                        st.rerun()
+                        from core.confirm_dialogs import confirm_delete_portfolio_profile_dialog
+
+                        confirm_delete_portfolio_profile_dialog(p["name"])
                         
                 st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1863,9 +1851,9 @@ with tab_diagnostics:
             st.markdown("##### 🧹 Azioni Rapide Cache")
             st.warning("Lo svuotamento totale della cache richiederà di riscaricare i dati di mercato da Yahoo Finance alla prossima esecuzione.")
             if st.button("🗑️ Svuota Interamente Cache L1 & L2", type="secondary", use_container_width=True, key="diag_btn_flush_all_cache"):
-                cleared_n = clear_cache()
-                st.success(f"Cache svuotata! Rimossi {cleared_n} record.")
-                st.rerun()
+                from core.confirm_dialogs import confirm_flush_cache_dialog
+
+                confirm_flush_cache_dialog()
 
     with tab_diag_lat:
         st.markdown("##### ⚡ Latenza Algoritmi Quantitativi (Millisecondi)")

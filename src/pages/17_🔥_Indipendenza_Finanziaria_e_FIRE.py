@@ -559,8 +559,14 @@ elif active_fire_tab == "🎯 Goal-Based Multi-Traguardo & SPI %":
                 </div>
                 """, unsafe_allow_html=True)
                 if st.button(f"🗑️ Rimuovi #{g_row['goal_id']}", key=f"btn_del_goal_{g_row['goal_id']}", type="secondary"):
-                    delete_wealth_goal(engine, int(g_row['goal_id']))
-                    st.rerun()
+                    from core.confirm_dialogs import confirm_delete_wealth_goal_dialog
+
+                    confirm_delete_wealth_goal_dialog(
+                        engine,
+                        int(g_row["goal_id"]),
+                        str(g_row.get("name", f"Obiettivo #{g_row['goal_id']}")),
+                        float(g_row.get("target_amount", 0.0)),
+                    )
 
     st.write("")
     st.divider()
