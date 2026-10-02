@@ -896,10 +896,18 @@ def inject_custom_css():
             justify-content: flex-end !important;
             align-items: center !important;
             flex-wrap: nowrap !important;
-            gap: 8px !important;
+            gap: 6px !important;
             width: 100% !important;
             margin: 0px !important;
             padding: 0px !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scrollbar-width: none !important;
+        }}
+        div[class*="st-key-argus_top_command_bar_actions"]::-webkit-scrollbar,
+        div[class*="st-key-argus_wealth_command_bar_actions"]::-webkit-scrollbar,
+        div[class*="st-key-argus_omni_command_bar_actions"]::-webkit-scrollbar {{
+            display: none !important;
         }}
 
         div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stElementContainer"],
@@ -907,7 +915,7 @@ def inject_custom_css():
         div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stElementContainer"] {{
             width: auto !important;
             flex: 0 0 auto !important;
-            min-width: 0 !important;
+            min-width: max-content !important;
             margin: 0px !important;
             padding: 0px !important;
             display: inline-flex !important;
@@ -921,6 +929,8 @@ def inject_custom_css():
         div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stMarkdownContainer"],
         div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stMarkdownContainer"] {{
             width: auto !important;
+            min-width: max-content !important;
+            flex: 0 0 auto !important;
             display: inline-flex !important;
             align-items: center !important;
             margin: 0px !important;
@@ -929,8 +939,18 @@ def inject_custom_css():
 
         div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stPopover"],
         div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stPopover"],
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"] {{
+        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"],
+        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stPopover"] > div,
+        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stPopover"] > div,
+        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"] > div,
+        div[class*="st-key-argus_top_command_bar_actions"] .stButton,
+        div[class*="st-key-argus_wealth_command_bar_actions"] .stButton,
+        div[class*="st-key-argus_omni_command_bar_actions"] .stButton,
+        div[class*="st-key-argus_top_command_bar_actions"] .stButton > div,
+        div[class*="st-key-argus_wealth_command_bar_actions"] .stButton > div,
+        div[class*="st-key-argus_omni_command_bar_actions"] .stButton > div {{
             width: auto !important;
+            min-width: max-content !important;
             flex: 0 0 auto !important;
             display: inline-flex !important;
             align-items: center !important;
@@ -943,13 +963,15 @@ def inject_custom_css():
             display: inline-flex !important;
             align-items: center !important;
             justify-content: flex-end !important;
-            gap: 6px !important;
+            gap: 5px !important;
             height: 32px !important;
             line-height: 1 !important;
             white-space: nowrap !important;
             margin: 0px !important;
-            margin-right: 6px !important;
+            margin-right: 4px !important;
             padding: 0px !important;
+            flex: 0 0 auto !important;
+            min-width: max-content !important;
         }}
 
         /* Command Bar Buttons & Popovers Matching Pill Density & Height */
@@ -962,7 +984,7 @@ def inject_custom_css():
             height: 32px !important;
             min-height: 32px !important;
             max-height: 32px !important;
-            padding: 0px 10px !important;
+            padding: 0px 9px !important;
             font-size: 11.5px !important;
             font-weight: 600 !important;
             border-radius: 6px !important;
@@ -972,6 +994,9 @@ def inject_custom_css():
             justify-content: center !important;
             margin: 0px !important;
             white-space: nowrap !important;
+            width: auto !important;
+            min-width: max-content !important;
+            flex: 0 0 auto !important;
             background: rgba(255, 255, 255, 0.04) !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             color: #c9d1d9 !important;
@@ -1851,20 +1876,20 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [2.1, 2.9],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap;">
-                <span class="status-dot-pulse" style="margin-right: 2px;"></span>
-                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <span class="status-dot-pulse" style="margin-right: 2px; flex-shrink:0;"></span>
+                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     ARGUS ENGINE
                 </span>
-                <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
-                <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    <span>{port_icon}</span> {port_label}
+                <span style="color:rgba(255,255,255,0.2); margin: 0 2px; flex-shrink:0;">|</span>
+                <span style="color:{port_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">
+                    <span style="flex-shrink:0;">{port_icon}</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{port_label}</span>
                 </span>
             </div>
             """,
@@ -8902,24 +8927,24 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
     has_prof = bool(current_pid and prof_name and prof_name != "Nessun Profilo")
     if has_prof:
-        prof_html = f'<span style="color:#34d399; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"><span>🏛️</span> {prof_name}</span>'
+        prof_html = f'<span style="color:#34d399; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"><span style="flex-shrink:0;">🏛️</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{prof_name}</span></span>'
     else:
-        prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic;">⏳ Nessun Profilo (In attesa)</span>'
+        prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">⏳ Nessun Profilo (In attesa)</span>'
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [2.1, 2.9],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap;">
-                <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981;"></span>
-                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981; flex-shrink:0;"></span>
+                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     ARGUS WEALTH
                 </span>
-                <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
+                <span style="color:rgba(255,255,255,0.2); margin: 0 2px; flex-shrink:0;">|</span>
                 {prof_html}
             </div>
             """,
@@ -9206,20 +9231,20 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [2.1, 2.9],
+            [1.2, 3.8],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap;">
-                <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px;"></span>
-                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif;">
+            <div style="display:flex; align-items:center; gap: 8px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px; flex-shrink:0;"></span>
+                <span style="color:#ffffff; font-weight:800; font-size:13px; letter-spacing:0.4px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     {portal_label}
                 </span>
-                <span style="color:rgba(255,255,255,0.2); margin: 0 2px;">|</span>
-                <span style="color:{accent_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                    <span>{icon}</span> {context_name}
+                <span style="color:rgba(255,255,255,0.2); margin: 0 2px; flex-shrink:0;">|</span>
+                <span style="color:{accent_color}; font-size:12.5px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">
+                    <span style="flex-shrink:0;">{icon}</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{context_name}</span>
                 </span>
             </div>
             """,
