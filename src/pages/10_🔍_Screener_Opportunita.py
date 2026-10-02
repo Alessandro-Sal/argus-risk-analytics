@@ -307,87 +307,13 @@ SCREENER_MODELS_CATALOG = {
     }
 }
 
-# Risoluzione dello stato attivo con priorità alla sidebar o global jump
-target_tab = None
-if "target_subtab_screener_segmented_subtab" in st.session_state:
-    target_tab = st.session_state.pop("target_subtab_screener_segmented_subtab")
-elif "global_target_subtab" in st.session_state:
-    target_tab = st.session_state.pop("global_target_subtab")
-elif "target_screener_module" in st.session_state:
-    target_tab = st.session_state.pop("target_screener_module")
+active_screener_tab = render_segmented_tabs(
+    options=SCREENER_MODELS_CATALOG,
+    key="screener_segmented_subtab",
+    select_label="Seleziona Modulo Screener:",
+    show_banner=True,
+)
 
-screener_keys = list(SCREENER_MODELS_CATALOG.keys())
-
-if target_tab and target_tab in screener_keys:
-    st.session_state["screener_segmented_subtab"] = target_tab
-    st.session_state["screener_segmented_subtab_selectbox"] = target_tab
-elif "screener_segmented_subtab_selectbox" in st.session_state and st.session_state["screener_segmented_subtab_selectbox"] in screener_keys:
-    st.session_state["screener_segmented_subtab"] = st.session_state["screener_segmented_subtab_selectbox"]
-elif "screener_segmented_subtab" in st.session_state and st.session_state["screener_segmented_subtab"] in screener_keys:
-    st.session_state["screener_segmented_subtab_selectbox"] = st.session_state["screener_segmented_subtab"]
-else:
-    st.session_state["screener_segmented_subtab"] = screener_keys[0]
-    st.session_state["screener_segmented_subtab_selectbox"] = screener_keys[0]
-
-curr_idx = screener_keys.index(st.session_state["screener_segmented_subtab"])
-
-# Spaziatura e Respiro Layout
-st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
-
-# Barra Selettore Compatta Bloomberg Style
-c_sel_sc, c_prev_sc, c_next_sc = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
-
-with c_prev_sc:
-    if st.button("◀ Prec.", key="btn_screener_prev", use_container_width=True, help="Modulo precedente"):
-        new_i = (curr_idx - 1) % len(screener_keys)
-        st.session_state["target_subtab_screener_segmented_subtab"] = screener_keys[new_i]
-        st.session_state["screener_segmented_subtab"] = screener_keys[new_i]
-        st.session_state["screener_segmented_subtab_selectbox"] = screener_keys[new_i]
-        st.rerun()
-
-with c_next_sc:
-    if st.button("Succ. ▶", key="btn_screener_next", use_container_width=True, help="Modulo successivo"):
-        new_i = (curr_idx + 1) % len(screener_keys)
-        st.session_state["target_subtab_screener_segmented_subtab"] = screener_keys[new_i]
-        st.session_state["screener_segmented_subtab"] = screener_keys[new_i]
-        st.session_state["screener_segmented_subtab_selectbox"] = screener_keys[new_i]
-        st.rerun()
-
-with c_sel_sc:
-    selected_screener_key = st.selectbox(
-        "Seleziona Modulo Screener:",
-        options=screener_keys,
-        index=curr_idx,
-        format_func=lambda k: f"{k}  —  {SCREENER_MODELS_CATALOG[k]['category']} [{SCREENER_MODELS_CATALOG[k]['badge']}]",
-        key="screener_segmented_subtab_selectbox",
-        label_visibility="collapsed"
-    )
-    st.session_state["screener_segmented_subtab"] = selected_screener_key
-
-active_screener_tab = st.session_state["screener_segmented_subtab"]
-active_screener_info = SCREENER_MODELS_CATALOG[active_screener_tab]
-
-# Bloomberg Terminal Header Banner per il Modulo Attivo
-st.markdown(f"""
-<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_screener_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
-    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
-      {active_screener_info['title']}
-    </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
-      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
-        {active_screener_info['category']}
-      </span>
-      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_screener_info['badge_color']}22; color: {active_screener_info['badge_color']}; border: 1px solid {active_screener_info['badge_color']}55;">
-        {active_screener_info['badge']}
-      </span>
-    </div>
-  </div>
-  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
-    {active_screener_info['desc']}
-  </div>
-</div>
-""", unsafe_allow_html=True)
 
 # ── TAB 1: SCREENER MULTI-FATTORIALE ───────────────────────────
 if active_screener_tab == "🔍 Screener Multi-Fattoriale & Archetipi":

@@ -129,87 +129,13 @@ POSITIONS_MODELS_CATALOG = {
     }
 }
 
-# Risoluzione dello stato attivo con priorità alla sidebar o global jump
-target_tab = None
-if "target_subtab_positions_active_tab" in st.session_state:
-    target_tab = st.session_state.pop("target_subtab_positions_active_tab")
-elif "global_target_subtab" in st.session_state:
-    target_tab = st.session_state.pop("global_target_subtab")
-elif "target_positions_module" in st.session_state:
-    target_tab = st.session_state.pop("target_positions_module")
+active_pos_tab = render_segmented_tabs(
+    options=POSITIONS_MODELS_CATALOG,
+    key="positions_active_tab",
+    select_label="Seleziona Modulo Posizioni:",
+    show_banner=True,
+)
 
-pos_keys = list(POSITIONS_MODELS_CATALOG.keys())
-
-if target_tab and target_tab in pos_keys:
-    st.session_state["positions_active_tab"] = target_tab
-    st.session_state["positions_active_tab_selectbox"] = target_tab
-elif "positions_active_tab_selectbox" in st.session_state and st.session_state["positions_active_tab_selectbox"] in pos_keys:
-    st.session_state["positions_active_tab"] = st.session_state["positions_active_tab_selectbox"]
-elif "positions_active_tab" in st.session_state and st.session_state["positions_active_tab"] in pos_keys:
-    st.session_state["positions_active_tab_selectbox"] = st.session_state["positions_active_tab"]
-else:
-    st.session_state["positions_active_tab"] = pos_keys[0]
-    st.session_state["positions_active_tab_selectbox"] = pos_keys[0]
-
-curr_idx = pos_keys.index(st.session_state["positions_active_tab"])
-
-# Spaziatura e Respiro Layout
-st.markdown("<div style='margin-top: 14px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
-
-# Barra Selettore Compatta Bloomberg Style
-c_sel_p, c_prev_p, c_next_p = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
-
-with c_prev_p:
-    if st.button("◀ Prec.", key="btn_pos_prev", use_container_width=True, help="Modulo precedente"):
-        new_i = (curr_idx - 1) % len(pos_keys)
-        st.session_state["target_subtab_positions_active_tab"] = pos_keys[new_i]
-        st.session_state["positions_active_tab"] = pos_keys[new_i]
-        st.session_state["positions_active_tab_selectbox"] = pos_keys[new_i]
-        st.rerun()
-
-with c_next_p:
-    if st.button("Succ. ▶", key="btn_pos_next", use_container_width=True, help="Modulo successivo"):
-        new_i = (curr_idx + 1) % len(pos_keys)
-        st.session_state["target_subtab_positions_active_tab"] = pos_keys[new_i]
-        st.session_state["positions_active_tab"] = pos_keys[new_i]
-        st.session_state["positions_active_tab_selectbox"] = pos_keys[new_i]
-        st.rerun()
-
-with c_sel_p:
-    selected_pos_key = st.selectbox(
-        "Seleziona Modulo Posizioni:",
-        options=pos_keys,
-        index=curr_idx,
-        format_func=lambda k: f"{k}  —  {POSITIONS_MODELS_CATALOG[k]['category']} [{POSITIONS_MODELS_CATALOG[k]['badge']}]",
-        key="positions_active_tab_selectbox",
-        label_visibility="collapsed"
-    )
-    st.session_state["positions_active_tab"] = selected_pos_key
-
-active_pos_tab = st.session_state["positions_active_tab"]
-active_pos_info = POSITIONS_MODELS_CATALOG[active_pos_tab]
-
-# Bloomberg Terminal Header Banner per il Modulo Attivo
-st.markdown(f"""
-<div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_pos_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
-  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
-    <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
-      {active_pos_info['title']}
-    </div>
-    <div style="display: flex; gap: 8px; align-items: center;">
-      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
-        {active_pos_info['category']}
-      </span>
-      <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_pos_info['badge_color']}22; color: {active_pos_info['badge_color']}; border: 1px solid {active_pos_info['badge_color']}55;">
-        {active_pos_info['badge']}
-      </span>
-    </div>
-  </div>
-  <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
-    {active_pos_info['desc']}
-  </div>
-</div>
-""", unsafe_allow_html=True)
 
 # ── TAB 1: POSIZIONI & LIQUIDITÀ ──────────────────────────────
 if active_pos_tab == "📋 Posizioni Attive & Costi FIFO":
@@ -2207,6 +2133,11 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
             ],
             benchmark_supervisory="Almgren & Chriss (2000) Journal of Risk, MiFID II RTS 28 Best Execution & SEC Rule 606 Disclosure."
         )
+
+        st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
+
+        from core.optimal_liquidation_engine import render_optimal_liquidation_lab
+        render_optimal_liquidation_lab(positions=pos, key_prefix="pos_tab5_liq")
 
         st.markdown("<hr style='border: 0; border-top: 1px solid rgba(255,255,255,0.08); margin: 28px 0;'>", unsafe_allow_html=True)
 

@@ -434,87 +434,13 @@ else:
         }
     }
 
-    # Risoluzione dello stato attivo con priorità alla sidebar o global jump
-    target_tab = None
-    if "target_subtab_tech_active_subtab" in st.session_state:
-        target_tab = st.session_state.pop("target_subtab_tech_active_subtab")
-    elif "global_target_subtab" in st.session_state:
-        target_tab = st.session_state.pop("global_target_subtab")
-    elif "target_tech_module" in st.session_state:
-        target_tab = st.session_state.pop("target_tech_module")
+    tab_tech = render_segmented_tabs(
+        options=TECHNICAL_MODELS_CATALOG,
+        key="tech_active_subtab",
+        select_label="Seleziona Modulo di Analisi Tecnica:",
+        show_banner=True,
+    )
 
-    tech_keys = list(TECHNICAL_MODELS_CATALOG.keys())
-
-    if target_tab and target_tab in tech_keys:
-        st.session_state["tech_active_subtab"] = target_tab
-        st.session_state["tech_active_subtab_selectbox"] = target_tab
-    elif "tech_active_subtab_selectbox" in st.session_state and st.session_state["tech_active_subtab_selectbox"] in tech_keys:
-        st.session_state["tech_active_subtab"] = st.session_state["tech_active_subtab_selectbox"]
-    elif "tech_active_subtab" in st.session_state and st.session_state["tech_active_subtab"] in tech_keys:
-        st.session_state["tech_active_subtab_selectbox"] = st.session_state["tech_active_subtab"]
-    else:
-        st.session_state["tech_active_subtab"] = tech_keys[0]
-        st.session_state["tech_active_subtab_selectbox"] = tech_keys[0]
-
-    curr_idx = tech_keys.index(st.session_state["tech_active_subtab"])
-
-    # Spaziatura e Respiro Layout
-    st.markdown("<div style='margin-top: 24px; margin-bottom: 6px;'></div>", unsafe_allow_html=True)
-
-    # Barra Selettore Compatta Bloomberg Style
-    c_sel_t, c_prev_t, c_next_t = st.columns([3.8, 0.6, 0.6], vertical_alignment="center")
-
-    with c_prev_t:
-        if st.button("◀ Prec.", key="btn_tech_prev", use_container_width=True, help="Modulo precedente"):
-            new_i = (curr_idx - 1) % len(tech_keys)
-            st.session_state["target_subtab_tech_active_subtab"] = tech_keys[new_i]
-            st.session_state["tech_active_subtab"] = tech_keys[new_i]
-            st.session_state["tech_active_subtab_selectbox"] = tech_keys[new_i]
-            st.rerun()
-
-    with c_next_t:
-        if st.button("Succ. ▶", key="btn_tech_next", use_container_width=True, help="Modulo successivo"):
-            new_i = (curr_idx + 1) % len(tech_keys)
-            st.session_state["target_subtab_tech_active_subtab"] = tech_keys[new_i]
-            st.session_state["tech_active_subtab"] = tech_keys[new_i]
-            st.session_state["tech_active_subtab_selectbox"] = tech_keys[new_i]
-            st.rerun()
-
-    with c_sel_t:
-        selected_tech_key = st.selectbox(
-            "Seleziona Modulo di Analisi Tecnica:",
-            options=tech_keys,
-            index=curr_idx,
-            format_func=lambda k: f"{k}  —  {TECHNICAL_MODELS_CATALOG[k]['category']} [{TECHNICAL_MODELS_CATALOG[k]['badge']}]",
-            key="tech_active_subtab_selectbox",
-            label_visibility="collapsed"
-        )
-        st.session_state["tech_active_subtab"] = selected_tech_key
-
-    tab_tech = st.session_state["tech_active_subtab"]
-    active_tech_info = TECHNICAL_MODELS_CATALOG[tab_tech]
-
-    # Bloomberg Terminal Header Banner per il Modulo Attivo con Spaziatura Ottimizzata
-    st.markdown(f"""
-    <div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%); border: 1px solid rgba(255,255,255,0.08); border-left: 4px solid {active_tech_info['badge_color']}; border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 22px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 4px;">
-        <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
-          {active_tech_info['title']}
-        </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px; border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e; border: 1px solid rgba(255,255,255,0.08);">
-            {active_tech_info['category']}
-          </span>
-          <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px; background: {active_tech_info['badge_color']}22; color: {active_tech_info['badge_color']}; border: 1px solid {active_tech_info['badge_color']}55;">
-            {active_tech_info['badge']}
-          </span>
-        </div>
-      </div>
-      <div style="font-size: 13px; color: #8b949e; line-height: 1.45;">
-        {active_tech_info['desc']}
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
 
     if tab_tech == "📊 Cockpit & Candlestick":
         col_chart, col_side_profile = st.columns([3.2, 0.95])

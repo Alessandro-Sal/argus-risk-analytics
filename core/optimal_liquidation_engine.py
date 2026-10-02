@@ -270,3 +270,396 @@ def compute_optimal_execution_schedule(
     )
     engine = OptimalLiquidationEngine(config=config)
     return engine.compute_schedule()
+
+
+def render_optimal_liquidation_lab(
+    positions: Any = None,
+    default_ticker: str = "ENI.MI",
+    key_prefix: str = "opt_liq",
+) -> None:
+    """Render interactive Bloomberg-grade Almgren-Chriss Optimal Liquidation Trajectory & Market Impact Lab."""
+    import pandas as pd
+    import plotly.graph_objects as go
+    import streamlit as st
+    from plotly.subplots import make_subplots
+
+    from core.ui_utils import apply_plotly_theme, metric_card
+
+    st.markdown(
+        """
+        <div style="background: linear-gradient(90deg, rgba(22, 27, 34, 0.95) 0%, rgba(13, 17, 23, 0.85) 100%);
+                    border: 1px solid rgba(255, 153, 0, 0.35); border-left: 4px solid #ff9900;
+                    border-radius: 8px; padding: 12px 18px; margin-top: 10px; margin-bottom: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="font-size: 15px; font-weight: 700; color: #f0f6fc;">
+              ⚡ Almgren-Chriss (2001) Optimal Liquidation Trajectory & Market Impact Lab
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; padding: 2px 8px;
+                           border-radius: 12px; background: rgba(255,255,255,0.06); color: #8b949e;
+                           border: 1px solid rgba(255,255,255,0.08);">Institutional Execution</span>
+              <span style="font-size: 11.5px; font-weight: 600; padding: 2px 10px; border-radius: 12px;
+                           background: #ff990022; color: #ff9900; border: 1px solid #ff990055;">
+                Square-Root Law • Hyperbolic Sinh • U-Profile
+              </span>
+            </div>
+          </div>
+          <div style="font-size: 13px; color: #8b949e; line-height: 1.45; margin-top: 4px;">
+            Schedulazione ottima dell'inventario residuo \\(x(t) = X_0 \\frac{\\sinh(\\kappa(T - t))}{\\sinh(\\kappa T)}\\)
+            in presenza di impatto temporaneo sublineare (\\(\\sim \\sqrt{v_k / V_k}\\)), impatto permanente e rischio di timing.
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 1. Parameter extraction from positions or default inputs
+    pos_df = positions if isinstance(positions, pd.DataFrame) and not positions.empty else None
+    available_tickers = []
+    if pos_df is not None and "ticker" in pos_df.columns:
+        available_tickers = [t for t in pos_df["ticker"].dropna().unique().tolist() if str(t).strip()]
+
+    c_in1, c_in2, c_in3, c_in4 = st.columns([1.5, 1.2, 1.2, 1.2])
+
+    with c_in1:
+        if available_tickers:
+            sel_idx = 0
+            if default_ticker in available_tickers:
+                sel_idx = available_tickers.index(default_ticker)
+            ticker_val = st.selectbox("Ticker Asset:", available_tickers, index=sel_idx, key=f"{key_prefix}_ticker")
+        else:
+            ticker_val = st.text_input("Ticker Asset:", value=default_ticker, key=f"{key_prefix}_ticker")
+
+    # Extract default quantities and price if ticker exists in pos_df
+    def_shares = 100_000.0
+    def_price = 15.0
+    if pos_df is not None and "ticker" in pos_df.columns and ticker_val:
+        row_match = pos_df[pos_df["ticker"] == ticker_val]
+        if not row_match.empty:
+            if "qty_net" in row_match.columns:
+                val_q = float(row_match["qty_net"].iloc[0])
+                if val_q > 0:
+                    def_shares = val_q
+            if "last_price" in row_match.columns:
+                val_p = float(row_match["last_price"].iloc[0])
+                if val_p > 0:
+                    def_price = val_p
+
+    with c_in2:
+        order_shares_val = st.number_input(
+            "Quote da Smobilizzare (X₀):",
+            min_value=100.0,
+            max_value=50_000_000.0,
+            value=float(def_shares),
+            step=10_000.0,
+            key=f"{key_prefix}_shares",
+        )
+
+    with c_in3:
+        spot_price_val = st.number_input(
+            "Prezzo Spot (€):",
+            min_value=0.01,
+            max_value=100_000.0,
+            value=float(def_price),
+            step=1.0,
+            key=f"{key_prefix}_price",
+        )
+
+    with c_in4:
+        adv_val = st.number_input(
+            "ADV Medio (Quote/giorno):",
+            min_value=1_000.0,
+            max_value=500_000_000.0,
+            value=max(float(order_shares_val * 20.0), 2_000_000.0),
+            step=500_000.0,
+            key=f"{key_prefix}_adv",
+        )
+
+    with st.expander("🛠️ Parametri Avanzati di Microstruttura & Urgenza (Almgren-Chriss)", expanded=False):
+        c_p1, c_p2, c_p3, c_p4 = st.columns(4)
+        with c_p1:
+            vol_daily_pct = st.slider("Volatilità Giornaliera (%):", 0.5, 8.0, 1.8, 0.1, key=f"{key_prefix}_vol")
+        with c_p2:
+            spread_bps = st.slider("Bid-Ask Spread (bps):", 1.0, 50.0, 4.0, 0.5, key=f"{key_prefix}_spread")
+        with c_p3:
+            lambda_choices = [
+                ("1e-7 (Quasi Neutrale)", 1.0e-7),
+                ("5e-7 (Bassa Avversione)", 5.0e-7),
+                ("1e-6 (Bilanciata)", 1.0e-6),
+                ("2.5e-6 (Istituzionale Standard)", 2.5e-6),
+                ("5e-6 (Alta Urgenza)", 5.0e-6),
+                ("1e-5 (Stress Liquidazione)", 1.0e-5),
+            ]
+            sel_lambda_label = st.selectbox(
+                "Avversione al Rischio (λ):",
+                [item[0] for item in lambda_choices],
+                index=3,
+                key=f"{key_prefix}_lambda",
+            )
+            lambda_val = dict(lambda_choices)[sel_lambda_label]
+        with c_p4:
+            pov_cap_pct = st.slider("POV Cap Massimo (%):", 5, 40, 15, 1, key=f"{key_prefix}_pov")
+
+        c_t1, c_t2, c_t3, c_t4 = st.columns(4)
+        with c_t1:
+            horizon_hrs = st.slider("Orizzonte Trading (ore):", 1.0, 8.5, 6.5, 0.5, key=f"{key_prefix}_hrs")
+        with c_t2:
+            slices_num = st.slider("Numero Tranche (N):", 6, 26, 13, 1, key=f"{key_prefix}_slices")
+        with c_t3:
+            eta_val = st.number_input("Coeff. Temp Impact (η):", 0.01, 1.0, 0.14, 0.01, key=f"{key_prefix}_eta")
+        with c_t4:
+            gamma_val = st.number_input("Coeff. Perm Impact (γ):", 0.01, 1.0, 0.08, 0.01, key=f"{key_prefix}_gamma")
+
+    # 2. Compute Trajectories & Metrics
+    config = OptimalLiquidationConfig(
+        ticker=str(ticker_val),
+        order_shares=float(order_shares_val),
+        spot_price=float(spot_price_val),
+        adv_shares=float(adv_val),
+        daily_volatility=float(vol_daily_pct / 100.0),
+        bid_ask_spread_bps=float(spread_bps),
+        temp_impact_eta=float(eta_val),
+        perm_impact_gamma=float(gamma_val),
+        risk_aversion_lambda=float(lambda_val),
+        horizon_hours=float(horizon_hrs),
+        n_slices=int(slices_num),
+        max_pov_cap=float(pov_cap_pct / 100.0),
+    )
+    engine = OptimalLiquidationEngine(config=config)
+    res = engine.compute_schedule()
+
+    opt_res = res["strategies"]["almgren_chriss_optimal"]
+    vwap_res = res["strategies"]["dynamic_vwap"]
+    twap_res = res["strategies"]["uniform_twap"]
+
+    kappa = float(res["urgency_parameter_kappa"])
+    half_life_hrs = (math.log(2.0) / kappa) if kappa > 1e-6 else horizon_hrs
+    half_life_str = f"{half_life_hrs:.2f}h ({int(half_life_hrs * 60)} min)" if half_life_hrs < 10.0 else ">10h"
+
+    # Fire-sale cost (1 single slice execution at open)
+    mkt_vols = engine.generate_intraday_volume_profile()
+    v_open = max(float(mkt_vols[0]), 1.0)
+    x0 = float(order_shares_val)
+    s0 = float(spot_price_val)
+    notional = x0 * s0
+    vol_daily = float(vol_daily_pct / 100.0)
+
+    spread_cost_fs = 0.5 * (float(spread_bps) * 1e-4) * s0 * x0
+    temp_cost_fs = float(eta_val) * vol_daily * s0 * math.sqrt(max(x0 / v_open, 0.0)) * x0
+    perm_cost_fs = float(gamma_val) * vol_daily * s0 * (x0 / max(float(adv_val), 1.0)) * x0
+    fire_sale_cost_eur = spread_cost_fs + temp_cost_fs + perm_cost_fs
+    fire_sale_cost_bps = (fire_sale_cost_eur / max(notional, 1.0)) * 10_000.0
+    friction_saved_eur = max(fire_sale_cost_eur - opt_res["expected_cost_eur"], 0.0)
+
+    # 3. High-Impact KPI Row
+    k1, k2, k3, k4, k5 = st.columns(5)
+    with k1:
+        metric_card(
+            "Strategia Consigliata",
+            res["recommended_algorithm"].split(" ")[0],
+            res["recommended_algorithm"],
+            positive=True,
+        )
+    with k2:
+        metric_card(
+            "Costo Almgren-Chriss",
+            f"{opt_res['expected_cost_bps']:.1f} bps",
+            f"€ {opt_res['expected_cost_eur']:,.2f}",
+            positive=opt_res["expected_cost_bps"] < 15.0,
+        )
+    with k3:
+        metric_card(
+            "Risparmio vs Fire-Sale",
+            f"€ {friction_saved_eur:,.2f}",
+            f"-{(friction_saved_eur / max(fire_sale_cost_eur, 1.0)) * 100.0:.1f}% impatto",
+            positive=True,
+        )
+    with k4:
+        metric_card(
+            "Half-Life Liquidazione (t½)",
+            half_life_str,
+            f"Urgenza κ = {kappa:.4f}/h",
+            positive=half_life_hrs < horizon_hrs,
+        )
+    with k5:
+        metric_card(
+            "Rischio Timing (σ_T)",
+            f"{opt_res['timing_risk_std_bps']:.1f} bps",
+            f"± € {opt_res['timing_risk_std_eur']:,.2f}",
+            positive=opt_res["timing_risk_std_bps"] < 25.0,
+        )
+
+    # 4. Dual-Axis Interactive Trajectory Chart
+    sched_items = res["intraday_schedule"]
+    time_labels = [item["time_bucket"] for item in sched_items]
+    inv_opt = opt_res["inventory_path"][1:]
+    inv_vwap = vwap_res["inventory_path"][1:]
+    inv_twap = twap_res["inventory_path"][1:]
+
+    mkt_volumes = [item["market_volume_shares"] for item in sched_items]
+    trades_opt_list = [item["optimal_shares"] for item in sched_items]
+    trades_vwap_list = [item["vwap_shares"] for item in sched_items]
+
+    fig_traj = make_subplots(
+        rows=1,
+        cols=2,
+        subplot_titles=[
+            "Traiettoria Inventario Residuo x(t) & Profilo a U dei Volumi",
+            "Scomposizione Analitica Costi & Rischio (bps)",
+        ],
+        column_widths=[0.62, 0.38],
+        specs=[[{"secondary_y": True}, {"secondary_y": False}]],
+    )
+
+    # Subplot 1: Right Y - Market Volume Bars
+    fig_traj.add_trace(
+        go.Bar(
+            x=time_labels,
+            y=mkt_volumes,
+            name="Volume Mercato Intraday (U-Shape)",
+            marker_color="rgba(140, 160, 185, 0.15)",
+            showlegend=True,
+        ),
+        row=1,
+        col=1,
+        secondary_y=True,
+    )
+
+    # Subplot 1: Left Y - Inventory lines
+    fig_traj.add_trace(
+        go.Scatter(
+            x=time_labels,
+            y=inv_opt,
+            name="Almgren-Chriss x(t) [Sinh]",
+            mode="lines+markers",
+            line=dict(color="#ff9900", width=3),
+            marker=dict(size=6, color="#ff9900"),
+        ),
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+    fig_traj.add_trace(
+        go.Scatter(
+            x=time_labels,
+            y=inv_vwap,
+            name="Dynamic VWAP (POV Cap)",
+            mode="lines",
+            line=dict(color="#38bdf8", width=2, dash="dash"),
+        ),
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+    fig_traj.add_trace(
+        go.Scatter(
+            x=time_labels,
+            y=inv_twap,
+            name="Uniform TWAP Benchmark",
+            mode="lines",
+            line=dict(color="#a855f7", width=1.5, dash="dot"),
+        ),
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+
+    # Subplot 2: Cost Breakdown Bar Chart
+    strats = ["Almgren-Chriss", "Dynamic VWAP", "Uniform TWAP", "Fire-Sale (1-Shot)"]
+    spread_costs = [
+        opt_res["spread_cost_bps"],
+        vwap_res["spread_cost_bps"],
+        twap_res["spread_cost_bps"],
+        round((spread_cost_fs / max(notional, 1.0)) * 10_000.0, 2),
+    ]
+    temp_costs = [
+        opt_res["temporary_impact_bps"],
+        vwap_res["temporary_impact_bps"],
+        twap_res["temporary_impact_bps"],
+        round((temp_cost_fs / max(notional, 1.0)) * 10_000.0, 2),
+    ]
+    perm_costs = [
+        opt_res["permanent_impact_bps"],
+        vwap_res["permanent_impact_bps"],
+        twap_res["permanent_impact_bps"],
+        round((perm_cost_fs / max(notional, 1.0)) * 10_000.0, 2),
+    ]
+    timing_risks = [
+        opt_res["timing_risk_std_bps"],
+        vwap_res["timing_risk_std_bps"],
+        twap_res["timing_risk_std_bps"],
+        0.0,
+    ]
+
+    fig_traj.add_trace(
+        go.Bar(name="Half-Spread (bps)", x=strats, y=spread_costs, marker_color="#64748b"),
+        row=1,
+        col=2,
+    )
+    fig_traj.add_trace(
+        go.Bar(name="Impatto Temporaneo (bps)", x=strats, y=temp_costs, marker_color="#f59e0b"),
+        row=1,
+        col=2,
+    )
+    fig_traj.add_trace(
+        go.Bar(name="Impatto Permanente (bps)", x=strats, y=perm_costs, marker_color="#ef4444"),
+        row=1,
+        col=2,
+    )
+    fig_traj.add_trace(
+        go.Bar(name="Timing Risk StdDev (bps)", x=strats, y=timing_risks, marker_color="#3b82f6"),
+        row=1,
+        col=2,
+    )
+
+    fig_traj.update_layout(
+        barmode="stack",
+        height=440,
+        margin=dict(l=10, r=10, t=35, b=10),
+        legend=dict(orientation="h", yanchor="bottom", y=-0.22, xanchor="center", x=0.5),
+        hovermode="x unified",
+    )
+    fig_traj.update_yaxes(title_text="Quote Residue", secondary_y=False, row=1, col=1)
+    fig_traj.update_yaxes(title_text="Volume Mercato", secondary_y=True, showgrid=False, row=1, col=1)
+    fig_traj.update_yaxes(title_text="Costo / Rischio (bps)", row=1, col=2)
+
+    apply_plotly_theme(fig_traj)
+    st.plotly_chart(fig_traj, use_container_width=True, key=f"{key_prefix}_chart")
+
+    # 5. Schedulazione Dettagliata per Tranche
+    with st.expander("📋 Tabella Dettagliata delle Tranche & Profilo di Partecipazione (POV)", expanded=False):
+        df_sched = pd.DataFrame(sched_items)
+        df_sched_disp = df_sched[[
+            "slice_index",
+            "time_bucket",
+            "optimal_shares",
+            "inventory_optimal",
+            "optimal_pov_pct",
+            "optimal_marginal_impact_bps",
+            "vwap_shares",
+            "twap_shares",
+            "market_volume_shares",
+        ]].rename(
+            columns={
+                "slice_index": "Tranche #",
+                "time_bucket": "Fascia Oraria",
+                "optimal_shares": "Tranche Ottima (Quote)",
+                "inventory_optimal": "Inventario Residuo",
+                "optimal_pov_pct": "POV Rate (%)",
+                "optimal_marginal_impact_bps": "Marginal Impact (bps)",
+                "vwap_shares": "VWAP (Quote)",
+                "twap_shares": "TWAP (Quote)",
+                "market_volume_shares": "Volume Mercato Stimato",
+            }
+        )
+        st.dataframe(df_sched_disp, use_container_width=True, hide_index=True)
+
+        csv_data = df_sched_disp.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "📥 Esporta Schedulazione Algoritmica (CSV)",
+            data=csv_data,
+            file_name=f"ARGUS_Optimal_Liquidation_{ticker_val}.csv",
+            mime="text/csv",
+            key=f"{key_prefix}_csv_btn",
+        )
+

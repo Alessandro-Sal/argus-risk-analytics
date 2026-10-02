@@ -800,6 +800,68 @@ def render_wealth_reporting_and_exports_hub(
             except Exception as e:
                 st.error(f"Errore Tear-Sheet: {e}")
 
+        st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+        c_kid1, c_kid2 = st.columns(2)
+        with c_kid1:
+            st.markdown(
+                """
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(255, 153, 0, 0.3); border-left: 3px solid #ff9900; border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <b style="color: #ff9900; font-size: 13.5px;">🇪🇺 PRIIPs KID &amp; MiFID II Factsheet (PDF 2 Pag.)</b>
+                    <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
+                        Documento normativo conforme al Regolamento (UE) 1286/2014 &amp; SFDR: Indicatore Sintetico di Rischio (SRI 1-7), 4 scenari di performance Cornish-Fisher e tabella PAI.
+                    </p>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+            try:
+                from core.priips_kid_generator import generate_priips_kid_data, generate_priips_kid_pdf
+
+                kid_ds = generate_priips_kid_data(portfolio_name=prof_name)
+                st.download_button(
+                    label="📥 Scarica PRIIPs KID (PDF A4)",
+                    data=generate_priips_kid_pdf(kid_ds),
+                    file_name=f"argus_priips_kid_{prof_slug}_{date_slug}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True,
+                    type="primary",
+                    key="dl_priips_pdf_hub",
+                )
+            except Exception as e:
+                st.error(f"Errore PRIIPs KID PDF: {e}")
+
+        with c_kid2:
+            st.markdown(
+                """
+            <div style="background: rgba(22, 27, 34, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-left: 3px solid #38bdf8; border-radius: 10px; padding: 14px 16px; min-height: 170px; display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <b style="color: #38bdf8; font-size: 13.5px;">🌐 Factsheet Regolamentare Interattivo (HTML5)</b>
+                    <p style="color: #cbd5e1; font-size: 12px; margin: 6px 0 12px 0; line-height: 1.5;">
+                        Versione web del KID PRIIPs con gauge visivo SRI responsive, tabelle interattive dei rendimenti futuri e audit trail crittografico SHA-256.
+                    </p>
+                </div>
+            </div>
+            """,
+                unsafe_allow_html=True,
+            )
+            try:
+                from core.priips_kid_generator import generate_priips_kid_data, generate_priips_kid_html
+
+                kid_ds = generate_priips_kid_data(portfolio_name=prof_name)
+                st.download_button(
+                    label="🌐 Scarica Factsheet Web (HTML)",
+                    data=generate_priips_kid_html(kid_ds).encode("utf-8"),
+                    file_name=f"argus_priips_kid_{prof_slug}_{date_slug}.html",
+                    mime="text/html",
+                    use_container_width=True,
+                    key="dl_priips_html_hub",
+                )
+            except Exception as e:
+                st.error(f"Errore PRIIPs KID HTML: {e}")
+
+
     # ── TAB 2: MASTER EXCEL & PARQUET ───────────────────────────
     elif active_rep_tab == "📊 Master Excel & Database Parquet":
         st.markdown("##### 📊 Database & Fogli di Calcolo Strutturati")

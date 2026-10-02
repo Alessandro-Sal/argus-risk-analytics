@@ -1127,6 +1127,11 @@ render_interactive_emsx_blotter(
     key_suffix="p2_live_terminal",
 )
 
+with st.expander("⚡ Traiettoria Ottimale di Liquidazione Almgren-Chriss & Impact Lab", expanded=False):
+    from core.optimal_liquidation_engine import render_optimal_liquidation_lab
+    render_optimal_liquidation_lab(positions=active_pos, key_prefix="live_terminal_liq")
+
+
 if term_eng.oms_blotter:
     with st.expander("📜 Log Storico Ordini Console CLI", expanded=False):
         blotter_records = []
