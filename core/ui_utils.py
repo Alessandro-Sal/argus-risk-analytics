@@ -1032,11 +1032,12 @@ def inject_custom_css():
             border: 1px solid rgba(255, 255, 255, 0.08) !important;
             border-radius: 8px !important;
             font-weight: 600 !important;
-            font-size: 13.5px !important;
+            font-size: 12.5px !important;
             color: #8b949e !important;
-            padding: 9px 20px !important;
+            padding: 8px 13px !important;
             transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
             letter-spacing: 0.2px !important;
+            white-space: nowrap !important;
         }}
         [data-baseweb="tab"]:hover {{
             color: #f0f6fc !important;
@@ -1850,7 +1851,7 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [1.2, 3.8],
+            [2.1, 2.9],
             vertical_alignment="center",
         )
         with col_title:
@@ -8881,7 +8882,7 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.2, 3.8],
+            [2.1, 2.9],
             vertical_alignment="center",
         )
         with col_title:
@@ -9179,7 +9180,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.2, 3.8],
+            [2.1, 2.9],
             vertical_alignment="center",
         )
         with col_title:
