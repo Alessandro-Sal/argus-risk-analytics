@@ -290,9 +290,15 @@ if active_bquant_tab == "🐍 ARGUS BQuant Python Sandbox":
         )
         
     with col_snip2:
-        if st.button("🔄 Reset Template", key="btn_load_snippet", use_container_width=True, help="Ripristina il template originale selezionato eliminando le modifiche manuali."):
+        if st.session_state.pop("bquant_reset_confirmed", False):
             _sync_bquant_snippet_selection()
+            st.toast("✅ Template ripristinato con successo!", icon="🔄")
             st.rerun()
+
+        if st.button("🔄 Reset Template", key="btn_load_snippet", use_container_width=True, help="Ripristina il template originale selezionato eliminando le modifiche manuali."):
+            from core.confirm_dialogs import confirm_reset_bquant_snippet_dialog
+
+            confirm_reset_bquant_snippet_dialog(BQUANT_SNIPPETS.get(sel_snippet_key, {}).get("title", ""))
 
     if sel_snippet_key in BQUANT_SNIPPETS:
         st.caption(f"ℹ️ **Descrizione Snippet:** {BQUANT_SNIPPETS[sel_snippet_key]['description']}")

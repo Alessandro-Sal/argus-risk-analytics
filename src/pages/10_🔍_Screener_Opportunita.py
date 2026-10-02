@@ -1093,8 +1093,9 @@ elif active_screener_tab == "💾 Watchlist & Segnali Operativi":
         col_w_head1, col_w_head2 = st.columns([4, 1], vertical_alignment="center")
         with col_w_head2:
             if st.button("🗑️ Svuota Watchlist", use_container_width=True):
-                st.session_state.screener_watchlist = []
-                st.rerun()
+                from core.confirm_dialogs import confirm_clear_watchlist_dialog
+
+                confirm_clear_watchlist_dialog(len(watchlist_tickers))
 
         df_wl_show = df_wl[[
             "ticker", "name", "sector", "last_price", "upside_pct", "trailing_pe", "peg_ratio",
