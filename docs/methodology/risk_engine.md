@@ -12,7 +12,7 @@ However, empirical financial time series systematically violate Gaussianity. Ass
 
 ## The Cornish-Fisher Quantile Expansion
 
-To overcome the catastrophic underestimation of tail risk by Gaussian models, ARGUS computes the **Cornish-Fisher expansion** (Cornish & Fisher 1937). Given a target confidence level $\alpha$ (e.g. $\alpha = 0.05$ for $95\%$ VaR), let $z_\alpha = \Phi^{-1}(\alpha)$ be the standard normal critical quantile ($z_{0.05} \approx -1.64485$).
+To overcome the catastrophic underestimation of tail risk by Gaussian models, ARGUS computes the **Cornish-Fisher expansion** (Cornish & Fisher 1937). Given a target confidence level $\alpha$ (e.g. $\alpha = 0.05$ for 95% VaR), let $z_\alpha = \Phi^{-1}(\alpha)$ be the standard normal critical quantile ($z_{0.05} \approx -1.64485$).
 
 The modified Cornish-Fisher quantile $z_{\text{CF}}$ accounts for the sample skewness $\mathcal{S}$ and excess kurtosis $\mathcal{K}$:
 
@@ -100,7 +100,7 @@ In alignment with **Federal Reserve SR 11-7 / OCC 2011-12** guidelines, the anal
 
 ## Extreme Value Theory (EVT) Peaks-Over-Threshold (POT) & GPD
 
-When estimating risk in deep tail regions (e.g. $99.0\%$ and $99.9\%$ confidence levels), empirical quantiles become noisy due to sparse observations, while parametric Gaussian or Student-$t$ models impose arbitrary global symmetry.
+When estimating risk in deep tail regions (e.g. 99.0% and 99.9% confidence levels), empirical quantiles become noisy due to sparse observations, while parametric Gaussian or Student-$t$ models impose arbitrary global symmetry.
 
 ### The Pickands-Balkema-de Haan Theorem
 According to the second fundamental theorem of EVT, for a sufficiently high threshold $u$, the distribution of excess losses $Y = X - u$ given $X > u$ converges asymptotically to the **Generalized Pareto Distribution (GPD)**:
@@ -222,4 +222,137 @@ Because liabilities (mortgages, personal debt) are fixed in nominal terms while 
 $$\text{Debt-to-Assets}_{\text{stressed}} = \frac{\text{Liabilities}}{\sum \text{Assets}_{\text{stressed}}} > \text{Debt-to-Assets}_{\text{initial}}$$
 
 This quantifies the financial leverage amplification during severe downturns.
+
+---
+
+## Multi-Asset Hybrid Calendar Harmonization (Compounding Weekend Returns)
+
+In multi-asset portfolios spanning traditional securities (equities, fixed income, ETFs) and digital assets (cryptocurrencies), return time series possess fundamentally incompatible trading calendars:
+- Traditional securities trade on business days ($\sim 252$ trading days/year, excluding exchange holidays).
+- Cryptocurrencies trade continuously 24/7/365.
+
+### Failure of Naïve Approaches
+1. **Truncation / Dropping Weekends**: Discarding Saturday and Sunday returns destroys the continuous compounding identity, underestimating cumulative performance and omitting significant volatility clusters that occur during weekend market hours.
+2. **Zero-Return / Forward-Fill on Equities**: Expanding equity calendars to 365 days by padding weekend returns with zero ($R=0$) artificially depresses annualized volatility ($\sigma_{\text{ann}} = \sigma_{\text{daily}} \sqrt{365}$ with dampened variance) and distorts cross-asset correlation estimates.
+
+### Exact Continuous Compounding Synchronization
+ARGUS maps all assets onto the canonical institutional business day calendar $\mathcal{T}_{\text{business}} = \{t_1, t_2, \dots, t_T\}$ by tracking cumulative geometric wealth:
+
+$$W_t = \prod_{\tau=1}^t (1 + R_\tau)$$
+
+Reindexing cumulative wealth onto business days with forward-fill:
+
+$$W_{t_k}^{\text{business}} = W_{\max\{\tau \le t_k\}}$$
+
+The synchronized daily return series is given by:
+
+$$R_{t_k}^{\text{aligned}} = \frac{W_{t_k}^{\text{business}}}{W_{t_{k-1}}^{\text{business}}} - 1$$
+
+For Monday ($t_{\text{Mon}}$) following a standard weekend:
+
+$$R_{\text{Mon}}^{\text{aligned}} = (1 + R_{\text{Sat}})(1 + R_{\text{Sun}})(1 + R_{\text{Mon}}) - 1 = \prod_{d \in \{\text{Sat}, \text{Sun}, \text{Mon}\}} (1 + R_d) - 1$$
+
+This ensures:
+- **Total Compounded Return Preservation**: $\prod_{t=1}^T (1 + R_t^{\text{aligned}}) \equiv \prod_{\tau=1}^{T_{365}} (1 + R_\tau)$.
+- **Accurate Tail Risk Capture**: Weekend market shocks are fully transmitted to Monday openings, eliminating artificial zero-variance artifacts.
+- **Unbiased Covariance Estimation**: Cross-asset correlations between TradFi equities and crypto accurately reflect systemic spillover effects.
+
+---
+
+## Exact Euler Risk Decomposition & Deterministic Weight Normalization
+
+Because Parametric Value at Risk ($\text{VaR}_p$) and portfolio volatility ($\sigma_p$) are linearly homogeneous functions of degree 1 with respect to the portfolio weight vector $\mathbf{w}$:
+
+$$\text{VaR}_p(\lambda \mathbf{w}) = \lambda \text{VaR}_p(\mathbf{w}), \quad \forall \lambda > 0$$
+
+By **Euler's Homogeneous Function Theorem**, total portfolio risk decomposes exactly into the sum of component risk contributions without residual:
+
+$$\text{VaR}_p = \sum_{i=1}^N w_i \cdot \frac{\partial \text{VaR}_p}{\partial w_i} = \sum_{i=1}^N \text{Component VaR}_i$$
+
+### 1. Deterministic Weight Normalization
+To prevent numerical residuals or truncation of fractional micro-positions ($w_i < 0.01$, i.e. < 1%) caused by pre-rounded percentage weights, ARGUS computes the continuous weight vector directly from live position valuations $V_i$:
+
+$$w_i = \frac{V_i}{\sum_{k=1}^N V_k}, \quad \text{with } \sum_{i=1}^N w_i \equiv 1.00000000$$
+
+### 2. Marginal and Component VaR Formulation
+The Marginal VaR ($\text{MVaR}_i$) measures the sensitivity of total portfolio VaR to an incremental allocation in asset $i$:
+
+$$\text{MVaR}_i = \frac{\partial \text{VaR}_p}{\partial w_i} = z_\alpha \cdot \sqrt{T} \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p}$$
+
+where $(\boldsymbol{\Sigma} \mathbf{w})_i = \text{Cov}(R_i, R_p)$ is the covariance between asset $i$ and the total portfolio.
+
+The Component VaR in percentage and base currency (EUR) terms is:
+
+$$\text{CVaR}_i = w_i \cdot \text{MVaR}_i = w_i \left( z_\alpha \sqrt{T} \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p} \right)$$
+
+$$\text{Component VaR Amount}_i = \text{CVaR}_i \times V_{\text{port}}$$
+
+$$\text{Percentage Contribution}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100$$
+
+### 3. Exact Mathematical Closure
+Summing across all $N$ positions:
+
+$$\sum_{i=1}^N \text{CVaR}_i = \frac{z_\alpha \sqrt{T}}{\sigma_p} \sum_{i=1}^N w_i (\boldsymbol{\Sigma} \mathbf{w})_i = \frac{z_\alpha \sqrt{T}}{\sigma_p} (\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w}) = \frac{z_\alpha \sqrt{T}}{\sigma_p} \sigma_p^2 = z_\alpha \sigma_p \sqrt{T} \equiv \text{VaR}_p$$
+
+$$\sum_{i=1}^N \text{Component VaR Amount}_i = \text{Total VaR Amount}_p$$
+
+The engine verifies this identity on every calculation cycle:
+
+$$\epsilon_{\text{Euler}} = \left| \sum_{i=1}^N \text{Component VaR Amount}_i - \text{Total VaR Amount}_p \right| < 10^{-2}\text{ EUR}$$
+
+---
+
+## Dynamic Wealth ⇄ Risk Bridge: Liquidity-at-Risk & Anti-Forced Selling Buffer
+
+Personal wealth management requires that liquid cash reserves (*Emergency Runway*) adapt dynamically to the market risk profile of liquid investments.
+
+### The Forced Selling Dilemma
+When an investor encounters unexpected liquidity needs during severe market downturns, an inadequate cash buffer forces the distress liquidation of volatile assets (equities or crypto) at market lows (*Forced Selling at Market Trough*), locking in permanent capital losses and forfeiting subsequent market recovery.
+
+### Quantitative Formulation
+ARGUS links balance sheet liquidity to market risk via the **Liquidity-at-Risk** protocol. The target emergency runway is dynamically scaled by the portfolio's annualized Expected Shortfall ($\text{CVaR}_{0.95}$ / 95%) and the equity weighting relative to total net worth:
+
+$$\mathcal{M}_{\text{risk-buffer}} = 1.0 + \left( \lambda \cdot \text{CVaR}_{0.95}^{\text{annual}} \cdot w_{\text{equity}}^{\text{NW}} \right)$$
+
+where:
+- $\lambda = 1.5$ is the institutional anti-forced selling multiplier.
+- $\text{CVaR}_{0.95}^{\text{annual}} \approx \text{CVaR}_{0.95, 1d} \times \sqrt{252}$ is the annualized Expected Shortfall of the liquid portfolio.
+- $w_{\text{equity}}^{\text{NW}} = \frac{V_{\text{equity}}}{\text{Total Net Worth}}$ is the balance-sheet equity concentration ratio.
+
+The risk-adjusted liquidity targets are:
+
+$$\text{Runway Target}_{\text{risk-adjusted}} = \text{Runway Target}_{\text{base}} \times \mathcal{M}_{\text{risk-buffer}}$$
+
+$$\text{Target Emergency Reserve (EUR)} = \text{Runway Target}_{\text{risk-adjusted}} \times \text{Monthly Burn Rate}$$
+
+$$\text{Liquidity Gap (EUR)} = \max\left(0, \; \text{Target Emergency Reserve} - \text{Liquid Cash}\right)$$
+
+A positive Liquidity Gap triggers an automatic advisory constraint prohibiting further risky asset accumulation until the cash runway is replenished.
+
+---
+
+## Spectral Covariance Regularization & Ledoit-Wolf Shrinkage
+
+Sample covariance matrices $\mathbf{S} = \frac{1}{T-1} \mathbf{X}^T \mathbf{X}$ are often ill-conditioned or singular when asset count $N$ approaches sample size $T$, or under high multicollinearity.
+
+### 1. Ledoit-Wolf Optimal Linear Shrinkage (2004)
+To minimize estimation risk without subjective priors, ARGUS employs the **Ledoit-Wolf shrinkage estimator**:
+
+$$\boldsymbol{\Sigma}_{\text{LW}} = (1 - \delta^*) \mathbf{S} + \delta^* \mathbf{F}$$
+
+where:
+- $\mathbf{S}$ is the unbiased sample covariance matrix.
+- $\mathbf{F}$ is the structured target matrix (constant correlation model).
+- $\delta^* \in [0, 1]$ is the analytically optimal shrinkage intensity minimizing the expected Frobenius norm error $\mathbb{E}[\|\boldsymbol{\Sigma}_{\text{LW}} - \boldsymbol{\Sigma}_{\text{true}}\|_F^2]$.
+
+### 2. Positive Semi-Definite (PSD) Spectral Guarantee
+To guarantee invertibility and prevent numerical breakdown in Cholesky factorization ($\boldsymbol{\Sigma} = \mathbf{L} \mathbf{L}^T$) and Monte Carlo sampling, ARGUS enforces spectral eigenvalue clipping:
+
+1. **Symmetrization**: $\boldsymbol{\Sigma}_{\text{sym}} = \frac{1}{2}(\boldsymbol{\Sigma} + \boldsymbol{\Sigma}^T)$.
+2. **Eigenvalue Decomposition**: $\boldsymbol{\Sigma}_{\text{sym}} = \mathbf{V} \boldsymbol{\Lambda} \mathbf{V}^T$, where $\boldsymbol{\Lambda} = \text{diag}(\lambda_1, \dots, \lambda_N)$.
+3. **Eigenvalue Floor**: $\tilde{\lambda}_i = \max(\lambda_i, 10^{-8})$.
+4. **Reconstructed Covariance**: $\boldsymbol{\Sigma}_{\text{PSD}} = \mathbf{V} \cdot \text{diag}(\tilde{\lambda}_1, \dots, \tilde{\lambda}_N) \cdot \mathbf{V}^T$.
+
+This guarantees strictly positive portfolio variances $\mathbf{w}^T \boldsymbol{\Sigma}_{\text{PSD}} \mathbf{w} > 0$ for all non-trivial allocations $\mathbf{w} \ne \mathbf{0}$, ensuring mathematical stability across all downstream quantitative engines.
+
 

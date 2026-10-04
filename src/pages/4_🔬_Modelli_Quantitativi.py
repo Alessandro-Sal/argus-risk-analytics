@@ -5515,7 +5515,7 @@ elif active_quant_tab == "💳 Single-Name CDS & iTraxx/CDX CDO Tranches":
         ),
         chart_guide_html=(
             "• <b>Pannello Sinistro (Curva Survival $Q(0,t)$ & Hazard Rate $\\lambda_t$)</b>: mostra la probabilità cumulativa di sopravvivenza e l'intensità marginale di default.<br>"
-            "• <b>Pannello Destro (Tranche Loss & Spread per Attachment Point)</b>: illustra come la tranche Equity $[0\\%-3\\%]$ assorba le prime perdite idiosincratiche mentre la Senior $[12\\%-22\\%]$ sia esposta alla correlazione sistemica $\\rho$."
+            "• <b>Pannello Destro (Tranche Loss & Spread per Attachment Point)</b>: illustra come la tranche Equity [0%-3%] assorba le prime perdite idiosincratiche mentre la Senior [12%-22%] sia esposta alla correlazione sistemica $\\rho$."
         ),
         regulatory_html=(
             "• <b>FRTB CSR (Credit Spread Risk) & DRC (Default Risk Charge)</b>: CS01 e Jump-to-Default (JTD) alimentano i requisiti patrimoniali Basilea IV per il Trading Book.<br>"

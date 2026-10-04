@@ -1456,10 +1456,10 @@ elif active_stress_tab == "🏛️ FRTB Basel IV, Solvency II & NGFS Climate":
         math_html=(
             "Aggregazione quadratica EIOPA del modulo Market Risk ($\text{SCR}_{\\text{mkt}}$) e Solvency Ratio:<br>"
             "<code>SCR_mkt = √( Σ_{i,j} CorrMkt_{i,j} · SCR_i · SCR_j )  |  Solvency Ratio = Eligible Own Funds / SCR_total</code><br>"
-            "Gli shock azionari base sono del 39% (Type 1 OCSE) e 49% (Type 2 Emergenti/Alt) più il <i>dampener</i> anticiclico $\\pm 10\\%$."
+            "Gli shock azionari base sono del 39% (Type 1 OCSE) e 49% (Type 2 Emergenti/Alt) più il <i>dampener</i> anticiclico ±10%."
         ),
         chart_guide_html=(
-            "• <b>KPI Solvency Ratio</b>: un indice $\\ge 100\\%$ rappresenta il minimo regolamentare (MCR/SCR); le compagnie targettizzano una zona verde $\\ge 160\\%$.<br>"
+            "• <b>KPI Solvency Ratio</b>: un indice ≥ 100% rappresenta il minimo regolamentare (MCR/SCR); le compagnie targettizzano una zona verde ≥ 160%.<br>"
             "• <b>Prospetto QRT S.25.01.21</b>: replica il Quantitative Reporting Template ufficiale inviato alle autorità di vigilanza (IVASS / EIOPA)."
         ),
         regulatory_html=(

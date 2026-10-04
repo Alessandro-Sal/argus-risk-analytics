@@ -3191,7 +3191,7 @@ elif active_nw_tab == "💎 Prodotti Strutturati & PRIIPs/SFDR":
             math_html=(
                 "Calcolo della VaR-Equivalent Volatility (VEV) PRIIPs RTS Allegato II:<br>"
                 "<code>VEV = [ √(3.842 - 2 · VaR_97.5%(CF)) - 1.96 ] / √T_RHP</code><br>"
-                "dove $\\text{VaR}_{97.5\\%}(\\text{CF})$ incorpora i momenti empirici fino al quarto ordine (media, varianza, asimmetria $S$ ed eccesso di curtosi $K$)."
+                "dove $\\text{VaR}_{0.975}(\\text{CF})$ (VaR 97.5%) incorpora i momenti empirici fino al quarto ordine (media, varianza, asimmetria $S$ ed eccesso di curtosi $K$)."
             ),
             chart_guide_html=(
                 "• <b>Scenari di Performance PRIIPs RTS</b>: mostra il capitale finale e il rendimento annuo atteso nei 4 regimi (Stress, Sfavorevole, Moderato, Favorevole) a 1 anno, metà RHP e scadenza RHP.<br>"

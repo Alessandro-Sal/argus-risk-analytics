@@ -331,7 +331,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
   - *Stato Patrimoniale a Sezioni Contrapposte*: Attivo (Liquidità, Investimenti, Previdenza, Asset Reali, Crediti) vs Passivo (Breve e Medio/Lungo termine) vs Patrimonio Netto con quadratura a pareggio matematico esatto ($\text{Attivo} = \text{Passivo} + \text{Patrimonio Netto}$).
   - *Conto Economico di Gestione*: Rendiconto annuale delle Entrate (Lavoro, Capitale, Donazioni, Rimborsi) e Costi di Vita/Consumi con margine di Risparmio Netto e Savings Rate %.
   - *Rendiconto di Allocazione del Capitale*: Scomposizione del surplus tra investimenti in asset produttivi (PAC Titoli/ETF, Cripto, Fondi Pensione) e riserva liquida.
-  - *6 Indici di Bilancio & Rating*: Solvency Ratio ($\ge 70\%$), Debt-to-Assets ($\le 30\%$), Emergency Runway ($\ge 6\text{ mesi}$), Personal Savings Rate ($\ge 20\%$), DSTI ($\le 33\%$), Invested Assets Ratio ($\ge 50\%$) con Radar Chart e rating Private Banking (AAA/AA/A).
+  - *6 Indici di Bilancio & Rating*: Solvency Ratio ($\ge$ 70%), Debt-to-Assets ($\le$ 30%), Emergency Runway ($\ge 6\text{ mesi}$), Personal Savings Rate ($\ge$ 20%), DSTI ($\le$ 33%), Invested Assets Ratio ($\ge$ 50%) con Radar Chart e rating Private Banking (AAA/AA/A).
 - **`wealth_engine.py`**: Modelli computazionali per indipendenza finanziaria (FIRE), simulazione mutui/ammortamenti, calcolo Net Worth at Risk (NWaR), successioni e pianificazione generazionale conforme ad Artt. 536-564 c.c.
 - **`asset_protection_engine.py`**: Motore di tutela del patrimonio e **`GenerationalTransferOptimizer`** istituzionale per Family Office HNWI:
   - *Riunione Fittizia (Art. 556 c.c.)*: $\text{Asse} = \max(0, \text{Relictum} - \text{Debiti}) + \text{Donatum}$.

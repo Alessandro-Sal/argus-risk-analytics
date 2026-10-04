@@ -19,8 +19,8 @@ def render_wealth_methodology_modal():
 
     #### 📊 I 5 Pilastri del Wealth Health Score (0 - 100):
     1. **Liquidità & Runway (Peso 25%)**: Copertura autonoma del fondo di emergenza su base mensile ($> 6$ mesi = punteggio massimo).
-    2. **Tasso di Risparmio (Peso 25%)**: Percentuale di risparmio netto rispetto alle entrate totali ($> 20\%$ = eccellente).
-    3. **Indebitamento & Leva DTI (Peso 20%)**: Rapporto tra rate di debito e reddito lordo ($< 30\%$ = ottimale).
+    2. **Tasso di Risparmio (Peso 25%)**: Percentuale di risparmio netto rispetto alle entrate totali (> 20% = eccellente).
+    3. **Indebitamento & Leva DTI (Peso 20%)**: Rapporto tra rate di debito e reddito lordo (< 30% = ottimale).
     4. **Diversificazione Multi-Asset (Peso 15%)**: Assenza di concentrazione eccessiva su un singolo asset o classe illiquida.
     5. **Efficienza Previdenziale & Fiscale (Peso 15%)**: Saturazione deducibilità fondo pensione (€ 5.164,57) e gestione dello zainetto fiscale.
     """)
@@ -61,7 +61,7 @@ def render_balance_sheet_methodology_modal():
     Classifica con precisione chirurgica le transazioni dell'anno solare separando nettamente i **Costi di Vita (Consumi a perdere)** dai **Trasferimenti Patrimoniali (Investimenti & Risparmio)**:
     
     $$\text{Risparmio Netto (Surplus)} = \text{Entrate Ordinarie Totali} - \text{Spese di Vita (Consumi)}$$
-    $$\text{Personal Savings Rate (\%)} = \frac{\text{Risparmio Netto}}{\text{Entrate Ordinarie Totali}} \times 100$$
+    $$\text{Personal Savings Rate} = \frac{\text{Risparmio Netto}}{\text{Entrate Ordinarie Totali}} \times 100$$
 
     - **Allocazione del Capitale (Waterfall)**:
       $$\text{Risparmio Netto} = \text{Flussi Investiti (PAC / Titoli)} + \text{Variazione Riserve Liquide}$$
@@ -69,12 +69,12 @@ def render_balance_sheet_methodology_modal():
     ---
 
     #### 🎯 3. I 6 Indici Fondamentali di Solidità Finanziaria
-    1. **Indice di Solvibilità Patrimoniale**: $\frac{\text{Patrimonio Netto}}{\text{Attivo Totale}}$ (Benchmark: $\ge 70\%$ Solido, $\ge 50\%$ Adeguato).
-    2. **Debt-to-Assets (Grado di Leva)**: $\frac{\text{Passività Totali}}{\text{Attivo Totale}}$ (Benchmark: $\le 20\%$ Ottimale, $\le 40\%$ Monitorabile).
+    1. **Indice di Solvibilità Patrimoniale**: $\frac{\text{Patrimonio Netto}}{\text{Attivo Totale}}$ (Benchmark: $\ge$ 70% Solido, $\ge$ 50% Adeguato).
+    2. **Debt-to-Assets (Grado di Leva)**: $\frac{\text{Passività Totali}}{\text{Attivo Totale}}$ (Benchmark: $\le$ 20% Ottimale, $\le$ 40% Monitorabile).
     3. **Runway Fondo Emergenza**: $\frac{\text{Liquidità Immediata}}{\text{Spese Mensili Medie}}$ (Benchmark: $\ge 6$ mesi Ottimale, $\ge 3$ mesi Minimo di Sicurezza).
-    4. **Personal Savings Rate**: $\frac{\text{Risparmio Netto}}{\text{Entrate Totali}}$ (Benchmark: $\ge 25\%$ Top-Tier, $\ge 15\%$ Sano).
-    5. **Debt Service-to-Income (DSTI)**: $\frac{\text{Servizio Debito Annuo (Rate)}}{\text{Entrate Totali}}$ (Benchmark: $\le 15\%$ Basso Rischio, $\le 33\%$ Limite di Sostenibilità).
-    6. **Invested Assets Ratio**: $\frac{\text{Investimenti} + \text{Previdenza}}{\text{Patrimonio Netto}}$ (Benchmark: $\ge 50\%$ Capitale che lavora attivamente).
+    4. **Personal Savings Rate**: $\frac{\text{Risparmio Netto}}{\text{Entrate Totali}}$ (Benchmark: $\ge$ 25% Top-Tier, $\ge$ 15% Sano).
+    5. **Debt Service-to-Income (DSTI)**: $\frac{\text{Servizio Debito Annuo (Rate)}}{\text{Entrate Totali}}$ (Benchmark: $\le$ 15% Basso Rischio, $\le$ 33% Limite di Sostenibilità).
+    6. **Invested Assets Ratio**: $\frac{\text{Investimenti} + \text{Previdenza}}{\text{Patrimonio Netto}}$ (Benchmark: $\ge$ 50% Capitale che lavora attivamente).
     """)
     st.caption("Standard di riferimento: CFP Board Financial Planning Practice Standards • IFRS Practice Statement Management Commentary.")
 
@@ -144,7 +144,7 @@ def render_real_estate_methodology_modal():
     $$\text{Net Home Equity} = \text{Valore di Mercato Attuale dell'Immobile} - \text{Debito Residuo del Mutuo}$$
 
     #### 📊 Indicatori Chiave di Rischio:
-    - **Loan-to-Value (LTV %)**: Rapporto percentuale tra debito residuo e valore di perizia attuale ($< 60\%$ = soglia di sicurezza bancaria).
+    - **Loan-to-Value (LTV %)**: Rapporto percentuale tra debito residuo e valore di perizia attuale (< 60% = soglia di sicurezza bancaria).
     - **Cap Rate Netto (Rendimento da Locazione)**: Rapporto tra canoni netti annui e valore di acquisto/mercato.
     - **Piano di Ammortamento alla Francese**: Rata costante con quota interessi decrescente e quota capitale crescente.
     """)

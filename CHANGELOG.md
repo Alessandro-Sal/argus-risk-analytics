@@ -7,6 +7,32 @@ e questo progetto aderisce a [Semantic Versioning](https://semver.org/lang/it/).
 
 ---
 
+## [9.19.0] - 2026-10-04
+
+### 🔬 Quant Risk Audit, Exact Euler Homogeneity, Multi-Asset Calendar Harmonization & Dynamic Wealth-Risk Liquidity Bridge
+
+Questa release consolida l'integrità quantitativa, la quadratura algebrica e l'accuratezza multi-asset dell'intero ecosistema ARGUS:
+
+- **Quadratura Deterministica dei Pesi & Decomposizione di Eulero Esatta (`core/risk_engine.py`, `core/multi_portfolio.py`)**:
+  - Pesi calcolati rigorosamente sui controvalori monetari fisici correnti ($w_i = V_i / \sum V_k$) garantendo identicamente $\sum w_i = 1.00000000$, eliminando troncamenti su allocazioni frazionarie micro ($w_i < 0.01$, ovvero < 1%).
+  - Chiusura algebrica esatta della proprietà di Eulero: $\sum_{i=1}^N \text{Component VaR}_i = \text{Total Portfolio VaR}$ con test di tolleranza automatica $\epsilon_{\text{Euler}} < 10^{-2}\text{ EUR}$ e verifica dell'identità omogenea di primo grado.
+  - Regolarizzazione spettrale della matrice di covarianza con simmetrizzazione, shrinkage ottimale di Ledoit-Wolf e proiezione semi-definita positiva (PSD) con eigenvalue floor ($\epsilon = 10^{-8}$).
+- **Sincronizzazione Multi-Asset Calendario Ibrido 252gg vs 365gg (`core/multi_portfolio.py`)**:
+  - Compounding geometrico continuo dei rendimenti weekend crypto ($W_t = \prod (1 + R_\tau)$) riproiettati sul calendario lavorativo $B$-days ($R_{\text{Mon}} = \prod_{d \in \{\text{Sab, Dom, Lun}\}} (1 + R_d) - 1$).
+  - Eliminazione sia della perdita di rendimento/volatilità dovuta al drop ingenuo del weekend, sia della compressione spuria della deviazione standard da forward-fill su 365 giorni.
+- **Ponte Dinamico Wealth ⇄ Risk: Liquidity-at-Risk & Buffer Anti-Forced Selling (`core/wealth/wealth_engine.py`, `src/pages/12_🏛️_Wealth_Control_Room.py`)**:
+  - Moltiplicatore dinamico della riserva di sicurezza $\mathcal{M}_{\text{risk-buffer}} = 1.0 + 1.5 \cdot \text{CVaR}_{0.95}^{\text{ann}} \cdot w_{\text{equity}}^{\text{NW}}$.
+  - Protezione del patrimonio netto da vendite forzate di asset volatili a prezzi di saldo (*Forced Selling at Market Trough*) durante i crolli di borsa.
+- **Armonizzazione e Coerenza Export Factsheet (`core/html_exporter.py`, `core/report_exporter.py`)**:
+  - Scalatura temporale uniforme del VaR a 20 giorni su base $\sqrt{20}$ e della volatilità annualizzata su 252 giorni.
+  - Piena coerenza tra KPI visualizzati nella dashboard Streamlit e dati esportati nei report PDF, HTML e CSV.
+- **Audit e Validazione Globale della Documentazione & Sintassi LaTeX (`docs/metriche_rischio.md`, `docs/methodology/risk_engine.md`, `docs/index.md`, `README.md`)**:
+  - Aggiunte le sezioni istituzionali 99, 100 e 101 su `docs/metriche_rischio.md` e arricchita la metodologia matematica in `docs/methodology/risk_engine.md`.
+  - Verifica della validità strutturale di oltre 1.100 blocchi ed espressioni LaTeX MathJax v3 / `pymdownx.arithmatex` con test suite dedicata `scripts/test_latex_syntax.py`.
+  - Compilazione del sito documentale MkDocs priva di warning sintattici o errori di rendering.
+
+---
+
 ## [9.18.0] - 2026-09-25
 
 ### 🛡️ ISDA SIMM™ v2.6 & Uncleared Margin Rules (UMR), Asset-Liability Management (ALM / LDI & Cash-Flow Matching LP), Rough Volatility (Rough Bergomi) & SVI Arbitrage-Free Surface, Single-Name CDS & iTraxx/CDX Synthetic CDO Tranches, Avellaneda-Stoikov Market-Making & Hawkes VPIN Toxicity, 1-Click CRO & Investment Committee Board-Pack Generator
@@ -17,7 +43,7 @@ Questa major release introduce 6 motori quantitativi e di reporting esecutivo di
   - Calcolo di *DeltaMargin*, *VegaMargin* e *CurvatureMargin* sulle 6 classi di rischio ISDA (*Interest Rate, Credit Qualifying, Credit Non-Qualifying, Equity, Commodity, FX*) con fattori di concentrazione $CR_k$, correlazioni intra/inter-bucket e matrice cross-risk-class $\psi_{r,s}$.
   - Verifica della soglia regolamentare UMR di €50 Milioni e quantificazione del risparmio MVA tramite Central Clearing (CCP LCH / Eurex con MPOR a 5 giorni vs CSA bilaterale a 10 giorni).
 - **Asset-Liability Management (ALM), Redington Immunization & Cash-Flow Matching LP Engine (`core/alm_ldi_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
-  - Valutazione attuariale di passività pluriennali nominali e indicizzate all'inflazione, Funding Ratio ($PV_A / PV_L$), Surplus contabile e **1-Year 99% Surplus-at-Risk ($SaR_{99\%}$)**.
+  - Valutazione attuariale di passività pluriennali nominali e indicizzate all'inflazione, Funding Ratio ($PV_A / PV_L$), Surplus contabile e **1-Year 99% Surplus-at-Risk ($SaR_{0.99}$ / 99%)**.
   - Verifica delle condizioni di immunizzazione di Redington ($D_A = D_L$, $\text{Convexity}_A > \text{Convexity}_L$), dimensionamento dell'overlay LDI con Receiver IRS 20Y e risoluzione del **Dedicated Bond Cash-Flow Matching LP (`scipy.optimize.linprog` HiGHS)**.
 - **Rough Volatility (Rough Bergomi $H \approx 0.10$) & Gatheral SVI Arbitrage-Free Surface Engine (`core/rough_vol_svi_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
   - Parametrizzazione SVI di Gatheral $w(k) = a + b(\rho(k-m) + \sqrt{(k-m)^2 + \sigma^2})$ con verifica esplicita della condizione di assenza di arbitraggio Butterfly di Durrleman ($g(k) \ge 0$) e Calendar Spread ($\partial_T w \ge 0$).
@@ -55,7 +81,7 @@ Questa major release trasforma l'ergonomia e la User Experience di ARGUS in un t
 - **Pillar 4 — Unified Institutional Plotly Styling & Crosshair Sync (`style_institutional_chart`)**:
   - Standardizzazione estetica dei grafici Plotly con sfondo trasparente glassmorphic (`rgba(0,0,0,0)`), crosshair magnetico sincronizzato (`hovermode="x unified"`, `spikemode="across"`), tipografia `Outfit` / `JetBrains Mono` e palette cromatica istituzionale.
 - **Pillar 5 — Scenario Pin & Delta Comparator (`compute_scenario_delta_comparison`, `render_scenario_delta_comparator`)**:
-  - Funzionalità *"📌 Fissa come Baseline"* in tutti i laboratori avanzati per congelare i risultati di una simulazione e visualizzare fianco a fianco i differenziali assoluti ($\Delta$) e percentuali ($\Delta\%$) quando si modificano i parametri.
+  - Funzionalità *"📌 Fissa come Baseline"* in tutti i laboratori avanzati per congelare i risultati di una simulazione e visualizzare fianco a fianco i differenziali assoluti ($\Delta$) e percentuali ($\Delta$ in %) quando si modificano i parametri.
 - **Pillar 6 — Executive CRO Traffic-Light Radar (`compute_executive_traffic_light_radar`, `render_executive_traffic_light_radar`)**:
   - Semaforo esecutivo a 6 pilastri regolamentari (`Market Risk VaR 99%`, `Basel III LCR & NSFR`, `Fed CCAR / EBA Stressed CET1`, `PRIIPs KID SRI`, `Concentrazione HHI & UCITS`, `Counterparty XVA & Credit IRB`) con classificazione automatica `PASS (🟢)` / `WARNING (🟡)` / `BREACH (🔴)`.
 - **Headless REST API v9.16.0 (`api/main.py`) & Test Suite (`tests/test_v916_ux_ui_overhaul.py`)**:
@@ -79,7 +105,7 @@ Questa major release espande l'architettura istituzionale di ARGUS con 6 nuovi m
   - Induzione all'indietro Least-Squares Monte Carlo (Longstaff & Schwartz 2001) con polinomi di Laguerre/potenza per la valutazione di Bermudan Swaptions (Payer/Receiver) e Callable Bonds, isolando l'Early Exercise Premium (EEP) rispetto al portafoglio di Swaption Europee co-terminali.
 - **CreditMetrics Rating Migration & Vasicek IRB Credit Portfolio Risk Engine (`core/credit_portfolio_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
   - Formula regolamentare Basilea II/III Internal Ratings-Based (IRB) di Vasicek (2002) Asymptotic Single Risk Factor (ASRF): correlazione degli asset $\rho(PD)$, aggiustamento di scadenza $b(PD)$, Expected Loss ($EL$), capitale regolamentare $K_{\text{IRB}}$ e Risk-Weighted Assets (RWA).
-  - Simulazione Monte Carlo multi-debitore J.P. Morgan CreditMetrics basata sulla matrice di transizione S&P a 8 stati (`AAA`, `AA`, `A`, `BBB`, `BB`, `B`, `CCC`, `D`), rivalutazione mark-to-market sugli spread creditizi, Credit VaR (99.0% e 99.9%), Expected Shortfall ($ES_{99.9\%}$), Incremental Risk Charge (IRC) e decomposizione di Eulero per controparte.
+  - Simulazione Monte Carlo multi-debitore J.P. Morgan CreditMetrics basata sulla matrice di transizione S&P a 8 stati (`AAA`, `AA`, `A`, `BBB`, `BB`, `B`, `CCC`, `D`), rivalutazione mark-to-market sugli spread creditizi, Credit VaR (99.0% e 99.9%), Expected Shortfall ($\text{ES}_{0.999}$ / 99.9%), Incremental Risk Charge (IRC) e decomposizione di Eulero per controparte.
 - **Schwartz (1997) 2-Factor Commodity Futures & Convenience Yield Engine (`core/commodity_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
   - Modello stocastico a due fattori di Gibson-Schwartz (1990) / Schwartz (1997) per prezzo spot $S_t$ e convenience yield netto istantaneo mean-reverting $\delta_t$.
   - Soluzione analitica chiusa per la curva futures $F(S_0, \delta_0, T) = S_0 \exp(A(T) - B(T)\delta_0)$ con fattore stagionale sinusoidale, classificazione automatica del regime (`BACKWARDATION`, `CONTANGO`, `HUMPED`), Roll Yield annualizzato e prezzatura di opzioni Calendar / Storage Spread tramite approssimazione di Kirk (1995).
@@ -108,7 +134,7 @@ Questa major release istituzionale completa l'infrastruttura di risk analytics e
     * FVA (Funding Valuation Adjustment, FCA/FBA) per i costi asimmetrici di funding del collaterale non segregato.
     * MVA (Margin Valuation Adjustment) per il costo del capitale vincolato nei margini iniziali segregati ISDA SIMM.
     * KVA (Capital Valuation Adjustment) per il costo opportunità del capitale regolamentare (cost of capital hurdle rate).
-  - Simulazione Monte Carlo dei profili di esposizione creditizia nel tempo: Expected Exposure ($EE$), Potential Future Exposure ($PFE_{95\%}, PFE_{99\%}$), Expected Negative Exposure ($ENE$) ed Effective Expected Positive Exposure ($EEPE$).
+  - Simulazione Monte Carlo dei profili di esposizione creditizia nel tempo: Expected Exposure ($EE$), Potential Future Exposure (PFE 95%, PFE 99%), Expected Negative Exposure ($ENE$) ed Effective Expected Positive Exposure ($EEPE$).
   - Modellazione realistica dei contratti Credit Support Annex (CSA): Netting Set, Soglia di non-collateralizzazione (Threshold), Minimum Transfer Amount (MTA), Independent Amount (IA) e Margin Period of Risk (MPOR a 10 giorni).
 - **Heston Stochastic Volatility FFT Option Pricing & Surface Calibration Engine (`core/heston_fft_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
   - Implementazione analitica della funzione caratteristica di Heston (1993) stabilizzata secondo Lord-Kahl / Albrecher per eliminare discontinuità di branch-cut.
@@ -119,14 +145,14 @@ Questa major release istituzionale completa l'infrastruttura di risk analytics e
 - **Bayesian Black-Litterman Portfolio Optimization Engine (`core/black_litterman_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
   - Formula maestra di Black-Litterman (1992) con reverse optimization per la stima dei rendimenti impliciti di equilibrio di mercato $\boldsymbol{\Pi} = \lambda \boldsymbol{\Sigma} \mathbf{w}_{\text{mkt}}$.
   - Matrice di picking $\mathbf{P}$ e vettore $\mathbf{q}$ per la formulazione flessibile di view assolute (es. "US Equities renderà il 9.5%") e relative (es. "EM Equities sovraperformerà EU Equities del 3.0%").
-  - Modellazione della matrice di covarianza dell'incertezza $\boldsymbol{\Omega}$ secondo il metodo di Idzorek (2005), mappando la confidenza soggettiva espressa in percentuale ($0-100\%$) direttamente nella dispersione della view.
+  - Modellazione della matrice di covarianza dell'incertezza $\boldsymbol{\Omega}$ secondo il metodo di Idzorek (2005), mappando la confidenza soggettiva espressa in percentuale (0-100%) direttamente nella dispersione della view.
   - Calcolo del vettore bayesiano dei rendimenti attesi a posteriori $\mathbf{E}[R]$ e della matrice di covarianza posteriore $\mathbf{M}$.
   - Risoluzione dei pesi ottimi di portafoglio $\mathbf{w}^*$ con vincoli long-only e concentrazione massima tramite programmazione quadratica / SLSQP, tracking error ed information ratio atteso.
 - **Basel III Liquidity Risk Engine (`core/basel_liquidity_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
-  - Liquidity Coverage Ratio (LCR $\ge 100\%$): classificazione degli attivi liquidi di alta qualità (HQLA) in Livello 1 (haircut 0%), Livello 2A (haircut 15%), Livello 2B (haircut 50%).
+  - Liquidity Coverage Ratio (LCR $\ge$ 100%): classificazione degli attivi liquidi di alta qualità (HQLA) in Livello 1 (haircut 0%), Livello 2A (haircut 15%), Livello 2B (haircut 50%).
   - Applicazione analitica dei tetti massimi regolamentari (Cap del 40% su Livello 2 e Cap del 15% su Livello 2B) con formula di deduzione dell'eccesso.
   - Calcolo dei deflussi stressati a 30 giorni (retail stable 5%, less stable 10%, wholesale non-operational 100%, committed facilities 20%) e cap del 75% sui flussi in entrata ammissibili.
-  - Net Stable Funding Ratio (NSFR = Total ASF / Total RSF $\ge 100\%$) con fattori di ponderazione regolamentari per capitale, depositi stabili, mutui e crediti corporate.
+  - Net Stable Funding Ratio (NSFR = Total ASF / Total RSF $\ge$ 100%) con fattori di ponderazione regolamentari per capitale, depositi stabili, mutui e crediti corporate.
   - Dynamic Cash Flow Stress Ladder multi-orizzonte (1d, 7d, 14d, 30d, 60d, 90d, 180d, 360d) con quantificazione dei deflussi cumulati e calcolo dell'orizzonte di sopravvivenza in giorni.
 - **Exotic Derivatives & Worst-Of Structured Products Engine (`core/structured_products_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**:
   - Motore di valutazione Monte Carlo correlato per certificati su panieri Worst-Of:
@@ -275,7 +301,7 @@ Questa major release istituzionale completa l'infrastruttura quantitativa e head
   - Risoluzione dell'allocazione ottima tramite Spinu Convex Risk Budgeting (`solve_spinu_risk_budgeting`).
 - **Total Wealth Reverse Stress Testing (Solvency & Ruin Multi-Asset) (`core/wealth/total_wealth_reverse_stress.py`, `core/macro_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
   - Formulazione di Reverse Stress Testing su 5 fattori di ricchezza familiare/HNWI (Liquid Markets, Real Estate, Corporate Equity / PMI, Debito/Mutui Euribor, Illiquid / Luxury).
-  - Ottimizzazione vincolata a minima distanza di Mahalanobis $D_M$ sotto matrice di covarianza macroeconomica congiunta per barriere di solvibilità (Debt-to-Assets $\ge 60\%$) e rovina patrimoniale (Net Worth loss).
+  - Ottimizzazione vincolata a minima distanza di Mahalanobis $D_M$ sotto matrice di covarianza macroeconomica congiunta per barriere di solvibilità (Debt-to-Assets $\ge$ 60%) e rovina patrimoniale (Net Worth loss).
   - Identificazione analitica del fattore più vulnerabile, stima del periodo di ritorno probabilistico (distribuzione $\chi^2$) e raccomandazioni di salvaguardia patrimoniale.
 - **Mixed-Integer Programming (MIP) Cardinality & Lot-Sizing Rebalancer (`core/mip_rebalancer.py`, `core/services/rebalancing_service.py`)**:
   - Solutore MILP basato su SciPy HiGHS (`scipy.optimize.milp`) per l'allocazione con quote intere e vincoli discreti reali.
@@ -310,7 +336,7 @@ Questa release istituzionale eleva le capacità analitiche e l'interoperabilità
   - Supporto nativo per **Arbitrary Risk Budgeting** (budget di rischio frazionari arbitrari $b_i$, con $\sum b_i = 1$) ed **Equal Risk Contribution (ERC / Pure Risk Parity)** con $b_i = 1/N$.
   - Decomposizione esatta del rischio marginale (MRC) e del contributo percentuale di rischio (PRC).
 - **Motore di Regulatory Reverse Stress Testing (Linee Guida EBA & BCE) (`core/macro_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**:
-  - Risoluzione dell'inverso dello stress test sotto vincolo di perdita target prefissata $\mathcal{L}^*$ (es. $-15\%$ o $-20\%$):
+  - Risoluzione dell'inverso dello stress test sotto vincolo di perdita target prefissata $\mathcal{L}^*$ (es. -15% o -20%):
     $$\min_{\mathbf{f}} \frac{1}{2} \mathbf{f}^T \Sigma_f^{-1} \mathbf{f} \quad \text{s.t.} \quad \boldsymbol{\beta}^T \mathbf{f} \le \frac{\mathcal{L}^*}{100}$$
   - Calcolo della **distanza statistica di Mahalanobis** $d_M = \sqrt{\mathbf{f}^{*T} \Sigma_f^{-1} \mathbf{f}^*}$ e del relativo $p$-value di plausibilità sotto distribuzione $\chi^2$ a 6 gradi di libertà.
   - Rating qualitativo di plausibilità dello scenario con badge di severità (Plausibile, Severo, Molto Severo, Cigno Nero) e stima della frequenza empirica implicita.

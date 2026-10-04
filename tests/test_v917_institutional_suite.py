@@ -84,7 +84,7 @@ def test_avellaneda_stoikov_market_making_and_vpin_hawkes() -> None:
 def test_executive_cro_board_pack_generator() -> None:
     """Verify 1-Click Executive CRO & Investment Committee Board-Pack JSON + HTML5 dossier."""
     bp = generate_executive_board_pack(portfolio_name="Test Mandate", nav_eur=150_000_000.0)
-    assert bp["app_version"] == "9.18.0"
+    assert bp["app_version"] == "9.19.0"
     assert bp["nav_eur"] == 150_000_000.0
     assert len(bp["cro_prescriptions"]) >= 3
     assert "<!DOCTYPE html>" in bp["board_pack_html"]
@@ -96,7 +96,7 @@ def test_v917_api_endpoints_integration() -> None:
 
     h = client.get("/health")
     assert h.status_code == 200
-    assert h.json()["version"] == "9.18.0"
+    assert h.json()["version"] == "9.19.0"
 
     r1 = client.post("/api/v1/margin/isda-simm", json={"funding_spread_bps": 140.0})
     assert r1.status_code == 200

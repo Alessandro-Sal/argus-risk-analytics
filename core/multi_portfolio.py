@@ -50,14 +50,29 @@ def _extract_metrics_safe(data: dict) -> dict:
     # CAGR %
     cagr_pct = ret.get("cagr_pct")
     if cagr_pct is None:
-        cagr_val = mk.get("cagr_pct", mk.get("cagr", 0.0))
-        cagr_pct = cagr_val * 100.0 if abs(cagr_val) < 2.0 and cagr_val != 0.0 else cagr_val
+        if "cagr_pct" in mk:
+            cagr_pct = float(mk["cagr_pct"])
+        elif "cagr" in mk:
+            cagr_pct = float(mk["cagr"]) * 100.0
+        else:
+            cagr_pct = 0.0
+    else:
+        cagr_pct = float(cagr_pct)
 
     # Volatility %
     vol_pct = mr.get("volatility_annual_pct")
     if vol_pct is None:
-        vol_val = mk.get("volatility_annual_pct", mk.get("volatility", 0.0))
-        vol_pct = vol_val * 100.0 if abs(vol_val) < 2.0 and vol_val != 0.0 else vol_val
+        if "volatility_annual_pct" in mk:
+            vol_pct = float(mk["volatility_annual_pct"])
+        elif "volatility_pct" in mk:
+            vol_pct = float(mk["volatility_pct"])
+        elif "volatility" in mk:
+            v = float(mk["volatility"])
+            vol_pct = v * 100.0 if v <= 1.0 and v != 0.0 else v
+        else:
+            vol_pct = 0.0
+    else:
+        vol_pct = float(vol_pct)
 
     # Sharpe Ratio
     sharpe = ret.get("sharpe_ratio", mr.get("sharpe_ratio", mk.get("sharpe_ratio", 0.0)))
@@ -65,19 +80,26 @@ def _extract_metrics_safe(data: dict) -> dict:
     # Sortino Ratio
     sortino = ret.get("sortino_ratio", mr.get("sortino_ratio", mk.get("sortino_ratio", 0.0)))
 
-    # VaR 95 %
+    # VaR 95 % (In market_risk and metrics, var_cf_95 and var_95 are already percentages)
     var_95_pct = mr.get("var_cf_95")
     if var_95_pct is None:
         var_95_pct = mr.get("var_95", mk.get("var_cf_95", mk.get("var_95", 0.0)))
-    if abs(var_95_pct) < 1.0 and var_95_pct != 0.0:
-        var_95_pct = var_95_pct * 100.0
+    var_95_pct = float(var_95_pct or 0.0)
 
     # Max Drawdown %
+    # max_drawdown_pct is percentage (e.g. -38.42), while max_drawdown is decimal (e.g. 0.3842 or -0.3842)
     max_dd_pct = mr.get("max_drawdown_pct")
     if max_dd_pct is None:
-        max_dd_pct = mk.get("max_drawdown_pct", mk.get("max_drawdown", 0.0))
-    if abs(max_dd_pct) < 1.0 and max_dd_pct != 0.0:
-        max_dd_pct = max_dd_pct * 100.0
+        if "max_drawdown_pct" in mk:
+            max_dd_pct = float(mk["max_drawdown_pct"])
+        elif "max_drawdown" in mr:
+            max_dd_pct = float(mr["max_drawdown"]) * 100.0
+        elif "max_drawdown" in mk:
+            max_dd_pct = float(mk["max_drawdown"]) * 100.0
+        else:
+            max_dd_pct = 0.0
+    else:
+        max_dd_pct = float(max_dd_pct)
 
     # HHI & Diversification
     hhi = conc.get("hhi", mk.get("hhi", 0.0))
@@ -108,6 +130,17 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
     if isinstance(positions_raw, pd.DataFrame):
         if positions_raw.empty:
             return []
+        tot_raw_mv = float(positions_raw.get("current_value", positions_raw.get("market_value", pd.Series([0.0]))).sum())
+        sum_w = 0.0
+        for wk in ["weight_pct", "weight"]:
+            if wk in positions_raw.columns:
+                try:
+                    sum_w = float(positions_raw[wk].dropna().sum())
+                    break
+                except Exception:
+                    pass
+        is_pct_scale = sum_w > 1.5
+
         for _, row in positions_raw.iterrows():
             t = str(row.get("ticker", "")).strip()
             if not t or t.lower() in ("nan", "none", "null"):
@@ -143,8 +176,15 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
 
             w_raw = row.get("weight_pct", row.get("weight", 0.0))
             w_val = float(w_raw) if pd.notna(w_raw) else 0.0
-            w_dec = (w_val / 100.0) if w_val > 1.0 else w_val
-            w_pct = w_val if w_val > 1.0 else (w_val * 100.0)
+            if tot_raw_mv > 1e-6:
+                w_dec = mv / tot_raw_mv
+                w_pct = w_dec * 100.0
+            elif is_pct_scale:
+                w_pct = w_val
+                w_dec = w_val / 100.0
+            else:
+                w_dec = w_val
+                w_pct = w_val * 100.0
 
             wacp = float(row.get("avg_cost", (cost / shares) if shares > 0 else 0.0))
             ac = str(row.get("asset_class", "Equity"))
@@ -188,6 +228,18 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                 }
             )
     elif isinstance(positions_raw, list):
+        tot_raw_mv = sum(float(p.get("current_value", p.get("market_value", 0.0))) for p in positions_raw if isinstance(p, dict))
+        sum_w = 0.0
+        for p in positions_raw:
+            if isinstance(p, dict):
+                wr = p.get("weight_pct", p.get("weight"))
+                if wr is not None:
+                    try:
+                        sum_w += float(wr)
+                    except Exception:
+                        pass
+        is_pct_scale = sum_w > 1.5
+
         for p in positions_raw:
             if isinstance(p, dict):
                 t = str(p.get("ticker", "")).strip()
@@ -223,8 +275,15 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
 
                 w_raw = p.get("weight_pct", p.get("weight", 0.0))
                 w_val = float(w_raw) if w_raw is not None else 0.0
-                w_dec = (w_val / 100.0) if w_val > 1.0 else w_val
-                w_pct = w_val if w_val > 1.0 else (w_val * 100.0)
+                if tot_raw_mv > 1e-6:
+                    w_dec = mv / tot_raw_mv
+                    w_pct = w_dec * 100.0
+                elif is_pct_scale:
+                    w_pct = w_val
+                    w_dec = w_val / 100.0
+                else:
+                    w_dec = w_val
+                    w_pct = w_val * 100.0
 
                 wacp = float(p.get("avg_cost", p.get("wacp", (cost / shares) if shares > 0 else 0.0)))
                 ac = str(p.get("asset_class", "Equity"))
@@ -271,6 +330,20 @@ def _normalize_positions_list(positions_raw) -> List[dict]:
                         "market_cap": float(p.get("market_cap")) if pd.notna(p.get("market_cap")) else None,
                     }
                 )
+
+    # Normalizzazione finale assoluta per garantire sum(w) == 1.0 e sum(w_pct) == 100.0
+    tot_rec_mv = sum(r.get("current_value", 0.0) for r in records)
+    if tot_rec_mv > 1e-6:
+        for r in records:
+            r["weight"] = float(r["current_value"] / tot_rec_mv)
+            r["weight_pct"] = float(r["weight"] * 100.0)
+    else:
+        tot_w_dec = sum(r.get("weight", 0.0) for r in records)
+        if tot_w_dec > 0:
+            for r in records:
+                r["weight"] = float(r["weight"] / tot_w_dec)
+                r["weight_pct"] = float(r["weight"] * 100.0)
+
     return records
 
 
@@ -387,14 +460,17 @@ def list_saved_portfolio_profiles() -> List[dict]:
 
 
 def load_portfolio_profile(name: str) -> Optional[dict]:
-    """Carica il profilo completo di un portafoglio salvato."""
+    """Carica il profilo completo di un portafoglio salvato garantendo pesi e posizioni normalizzati."""
     _ensure_dir()
     filepath = os.path.join(PORTFOLIOS_DIR, f"{name}.pkl")
     if not os.path.exists(filepath):
         return None
     try:
         with open(filepath, "rb") as f:
-            return pickle.load(f)
+            prof = pickle.load(f)
+        if isinstance(prof, dict) and "positions" in prof:
+            prof["positions"] = _normalize_positions_list(prof["positions"])
+        return prof
     except Exception:
         return None
 
@@ -452,7 +528,7 @@ def compute_multi_portfolio_comparison(selected_names: List[str]) -> pd.DataFram
                 "Volatilità (%)": f"{mk['volatility_pct']:.2f}%",
                 "Sharpe Ratio": f"{mk['sharpe_ratio']:.2f}",
                 "VaR 95% (1g)": f"{mk['var_95_pct']:.2f}%",
-                "Max Drawdown": f"{mk['max_dd_pct']:.2f}%",
+                "Max Drawdown": f"{-abs(float(mk['max_dd_pct'])):.2f}%" if mk['max_dd_pct'] != 0 else "0.00%",
                 "N° Posizioni": len(pos),
                 "Top Holding": top_h,
             }
@@ -587,8 +663,11 @@ def consolidate_multi_portfolios(
     # Calcolo pesi percentuali e HHI
     df_positions = pd.DataFrame(list(merged_positions.values()))
     if not df_positions.empty:
+        real_tot_mv = float(df_positions["current_value"].sum())
+        if real_tot_mv > 0:
+            total_master_value = real_tot_mv
         df_positions = df_positions.sort_values("current_value", ascending=False).reset_index(drop=True)
-        df_positions["weight"] = df_positions["current_value"] / total_master_value
+        df_positions["weight"] = df_positions["current_value"] / max(1e-6, total_master_value)
         df_positions["weight_pct"] = df_positions["weight"] * 100.0
         df_positions["shares"] = df_positions["qty_net"]
         df_positions["quantity"] = df_positions["qty_net"]
@@ -646,12 +725,44 @@ def consolidate_multi_portfolios(
 
     if all_returns_series:
         cleaned_returns = []
+        has_5day = False
+        has_7day = False
         for s in all_returns_series:
             s_c = s.copy()
             if getattr(s_c.index, "tz", None) is not None:
                 s_c.index = s_c.index.tz_localize(None)
+            if not isinstance(s_c.index, pd.DatetimeIndex):
+                s_c.index = pd.to_datetime(s_c.index)
+            weekend_mask = s_c.index.dayofweek >= 5
+            if weekend_mask.any() and (s_c[weekend_mask] != 0).any():
+                has_7day = True
+            else:
+                has_5day = True
             cleaned_returns.append(s_c)
-        comb_df = pd.concat(cleaned_returns, axis=1).fillna(0.0)
+
+        if has_5day and has_7day:
+            all_min_date = min(s.index.min() for s in cleaned_returns)
+            all_max_date = max(s.index.max() for s in cleaned_returns)
+            common_b_days = pd.bdate_range(all_min_date, all_max_date)
+
+            aligned_returns = []
+            for s in cleaned_returns:
+                weekend_mask = s.index.dayofweek >= 5
+                if weekend_mask.any() and (s[weekend_mask] != 0).any():
+                    cum_w = (1.0 + s.fillna(0.0)).cumprod()
+                    cum_w_b = cum_w.reindex(common_b_days, method="ffill")
+                    s_aligned = cum_w_b.pct_change()
+                    if len(common_b_days) > 0 and common_b_days[0] in s.index:
+                        s_aligned.iloc[0] = s.loc[common_b_days[0]]
+                    s_aligned = s_aligned.fillna(0.0)
+                    aligned_returns.append(s_aligned)
+                else:
+                    aligned_returns.append(s.reindex(common_b_days).fillna(0.0))
+
+            comb_df = pd.concat(aligned_returns, axis=1)
+        else:
+            comb_df = pd.concat(cleaned_returns, axis=1).fillna(0.0)
+
         total_w = sum(weights_list)
         w_arr = np.array([w / total_w for w in weights_list])
         master_returns = comb_df.dot(w_arr).dropna()
@@ -671,9 +782,15 @@ def consolidate_multi_portfolios(
 
     if all_asset_returns:
         combined_asset_returns = pd.concat(all_asset_returns, axis=1)
-        combined_asset_returns = combined_asset_returns.loc[:, ~combined_asset_returns.columns.duplicated()].fillna(0.0)
+        combined_asset_returns = combined_asset_returns.loc[:, ~combined_asset_returns.columns.duplicated()]
         if getattr(combined_asset_returns.index, "tz", None) is not None:
             combined_asset_returns.index = combined_asset_returns.index.tz_localize(None)
+        if not isinstance(combined_asset_returns.index, pd.DatetimeIndex):
+            combined_asset_returns.index = pd.to_datetime(combined_asset_returns.index)
+        if not master_returns.empty:
+            combined_asset_returns = combined_asset_returns.reindex(master_returns.index).fillna(0.0)
+        else:
+            combined_asset_returns = combined_asset_returns.fillna(0.0)
     else:
         combined_asset_returns = pd.DataFrame()
 

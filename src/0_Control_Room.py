@@ -1,6 +1,6 @@
 # ============================================================
 # 0_Control_Room.py (Main Entry Point)
-# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v9.18.0
+# ARGUS Risk Analytics & Wealth Ecosystem | Control Room v9.19.0
 # ============================================================
 
 import sys

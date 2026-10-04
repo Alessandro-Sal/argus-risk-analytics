@@ -1,5 +1,5 @@
 # Core module
-__version__ = "9.4.0"
+__version__ = "9.19.0"
 
 
 from core.duckdb_engine import (

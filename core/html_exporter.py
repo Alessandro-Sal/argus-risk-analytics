@@ -163,16 +163,31 @@ def generate_interactive_html_report(results: Dict[str, Any], output_path: str =
     sharpe_raw = returns.get("sharpe_ratio", returns.get("sharpe", 0.0))
     sharpe = float(sharpe_raw) if sharpe_raw is not None and not pd.isna(sharpe_raw) else 0.0
 
-    var95_raw = m_risk.get("var_95", m_risk.get("var_95_param", m_risk.get("var_95_hist", 0.0)))
-    var95 = abs(float(var95_raw)) if var95_raw is not None and not pd.isna(var95_raw) else 0.0
-    if 0.0 < var95 < 0.50:
+    # VaR 95% (In m_risk, var_95 è già memorizzato in percentuale, es. 2.53%)
+    if "var_95_pct" in m_risk:
+        var95 = abs(float(m_risk["var_95_pct"]))
+    elif "var_95" in m_risk:
+        var95 = abs(float(m_risk["var_95"]))
+    elif "var_95_param" in m_risk:
+        var95 = abs(float(m_risk["var_95_param"]))
+    elif "var_95_hist" in m_risk:
+        var95 = abs(float(m_risk["var_95_hist"]))
+    else:
+        var95 = 0.0
+    if 0.0 < var95 <= 0.08:
         var95 *= 100.0
     var95_eur = tot_val * (var95 / 100.0)
 
-    cagr_raw = returns.get("cagr_pct", returns.get("cagr", returns.get("portfolio_cagr_pct", 0.0)))
-    cagr = float(cagr_raw) if cagr_raw is not None and not pd.isna(cagr_raw) else 0.0
-    if 0.0 < abs(cagr) < 0.50:
-        cagr *= 100.0
+    # CAGR %
+    if "cagr_pct" in returns:
+        cagr = float(returns["cagr_pct"])
+    elif "portfolio_cagr_pct" in returns:
+        cagr = float(returns["portfolio_cagr_pct"])
+    elif "cagr" in returns:
+        cagr_val = float(returns["cagr"])
+        cagr = cagr_val * 100.0 if abs(cagr_val) <= 1.0 and cagr_val != 0.0 else cagr_val
+    else:
+        cagr = 0.0
 
     html_content = f"""<!DOCTYPE html>
 <html lang="it">

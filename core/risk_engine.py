@@ -1134,13 +1134,17 @@ def _calc_risk_contribution(df_returns: pd.DataFrame, df_positions: pd.DataFrame
         return {t: round(100.0 / len(active_tickers), 2) for t in active_tickers}
 
     df_clean_returns = df_returns.loc[:, ~df_returns.columns.duplicated()]
-    if "weight_pct" in active_pos.columns:
-        weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100.0
+    active_subset = active_pos[active_pos["ticker"].isin(common)]
+    tot_common_val = float(active_subset["current_value"].sum()) if "current_value" in active_subset.columns else 0.0
+
+    if tot_common_val > 1e-6:
+        weights = active_subset.groupby("ticker")["current_value"].sum() / tot_common_val
+    elif "weight_pct" in active_subset.columns and active_subset["weight_pct"].sum() > 0:
+        w_sum = float(active_subset["weight_pct"].sum())
+        weights = active_subset.groupby("ticker")["weight_pct"].sum() / w_sum
     else:
-        tot_common_val = active_pos[active_pos["ticker"].isin(common)]["current_value"].sum()
-        weights = active_pos[active_pos["ticker"].isin(common)].groupby("ticker")["current_value"].sum() / (
-            tot_common_val if tot_common_val > 0 else 1.0
-        )
+        n_c = len(common)
+        weights = pd.Series(1.0 / max(1, n_c), index=common)
 
     w = weights.reindex(common).fillna(0.0)
     if w.sum() == 0:
@@ -1640,7 +1644,14 @@ def _compute_efficient_frontier(
         k += 1
 
     # Pesi correnti per comparazione
-    curr_weights_s = df_positions[df_positions["ticker"].isin(common)].groupby("ticker")["weight_pct"].sum() / 100
+    pos_subset = df_positions[df_positions["ticker"].isin(common)]
+    tot_pos_val = float(pos_subset["current_value"].sum()) if "current_value" in pos_subset.columns else 0.0
+    if tot_pos_val > 1e-6:
+        curr_weights_s = pos_subset.groupby("ticker")["current_value"].sum() / tot_pos_val
+    elif "weight_pct" in pos_subset.columns:
+        curr_weights_s = pos_subset.groupby("ticker")["weight_pct"].sum() / 100.0
+    else:
+        curr_weights_s = pd.Series(1.0 / max(1, len(common)), index=common)
     curr_weights = np.array(curr_weights_s.reindex(common).fillna(0).values, dtype=float)
     curr_sum = np.sum(curr_weights)
     if curr_sum > 0:
@@ -2295,9 +2306,14 @@ def _calc_ai_insights(df_positions: pd.DataFrame, df_returns: pd.DataFrame, sr_p
 
     # 2. Monte Carlo Simulation for Portfolio VaR (1 Year) via Multivariate Normal (Cholesky)
     df_sync = df_returns[common_tickers].dropna()
-    weights_series = (
-        df_positions[df_positions["ticker"].isin(common_tickers)].groupby("ticker")["weight_pct"].sum() / 100
-    )
+    pos_subset_mc = df_positions[df_positions["ticker"].isin(common_tickers)]
+    tot_mc_val = float(pos_subset_mc["current_value"].sum()) if "current_value" in pos_subset_mc.columns else 0.0
+    if tot_mc_val > 1e-6:
+        weights_series = pos_subset_mc.groupby("ticker")["current_value"].sum() / tot_mc_val
+    elif "weight_pct" in pos_subset_mc.columns:
+        weights_series = pos_subset_mc.groupby("ticker")["weight_pct"].sum() / 100.0
+    else:
+        weights_series = pd.Series(1.0 / max(1, len(common_tickers)), index=common_tickers)
     weights = weights_series.reindex(common_tickers).fillna(0).values
     weights = weights / weights.sum() if weights.sum() > 0 else weights
 
@@ -3608,10 +3624,14 @@ def compute_marginal_and_component_var(
 
     if active_pos.empty:
         return {
+            "confidence_level": confidence_level,
+            "time_horizon": time_horizon,
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
+            "portfolio_sigma_daily_pct": 0.0,
             "decomposition_df": pd.DataFrame(),
             "euler_check_passed": True,
+            "euler_residual": 0.0,
         }
 
     tot_val = (
@@ -3624,29 +3644,44 @@ def compute_marginal_and_component_var(
     active_tickers = [t for t in active_pos["ticker"].tolist() if t in df_returns.columns]
     if not active_tickers:
         return {
+            "confidence_level": confidence_level,
+            "time_horizon": time_horizon,
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
+            "portfolio_sigma_daily_pct": 0.0,
             "decomposition_df": pd.DataFrame(),
             "euler_check_passed": True,
+            "euler_residual": 0.0,
         }
 
-    # Pesi normalizzati
-    if "weight_pct" in active_pos.columns:
-        weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["weight_pct"].sum() / 100.0
+    # Pesi normalizzati: Priorità assoluta al controvalore di mercato reale (current_value)
+    active_subset = active_pos[active_pos["ticker"].isin(active_tickers)]
+    tot_sub_val = float(active_subset["current_value"].sum()) if "current_value" in active_subset.columns else 0.0
+
+    if tot_sub_val > 1e-6:
+        weights = active_subset.groupby("ticker")["current_value"].sum() / tot_sub_val
+    elif "weight_pct" in active_subset.columns and active_subset["weight_pct"].sum() > 0:
+        w_sum = float(active_subset["weight_pct"].sum())
+        weights = active_subset.groupby("ticker")["weight_pct"].sum() / w_sum
+    elif "weight" in active_subset.columns and active_subset["weight"].sum() > 0:
+        w_sum = float(active_subset["weight"].sum())
+        weights = active_subset.groupby("ticker")["weight"].sum() / w_sum
     else:
-        tot_sub_val = active_pos[active_pos["ticker"].isin(active_tickers)]["current_value"].sum()
-        weights = active_pos[active_pos["ticker"].isin(active_tickers)].groupby("ticker")["current_value"].sum() / max(
-            1e-6, tot_sub_val
-        )
+        n_a = len(active_tickers)
+        weights = pd.Series(1.0 / max(1, n_a), index=active_tickers)
 
     w = weights.reindex(active_tickers).fillna(0.0)
     w_sum = w.sum()
     if w_sum <= 0:
         return {
+            "confidence_level": confidence_level,
+            "time_horizon": time_horizon,
             "portfolio_var_pct": 0.0,
             "portfolio_var_amount": 0.0,
+            "portfolio_sigma_daily_pct": 0.0,
             "decomposition_df": pd.DataFrame(),
             "euler_check_passed": True,
+            "euler_residual": 0.0,
         }
     w = w / w_sum
 

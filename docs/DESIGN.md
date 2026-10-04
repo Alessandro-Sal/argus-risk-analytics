@@ -295,12 +295,12 @@ La piattaforma integra un motore contabile dedicato per il **Bilancio Personale 
 
 ### 13.3 Indici Fondamentali di Bilancio & Rating di Solidità
 La salute del bilancio personale è sintetizzata tramite 6 indici con benchmark istituzionali e traffic-light indicator:
-1. **Indice di Solvibilità Patrimoniale** ($\frac{\text{Patrimonio Netto}}{\text{Attivo Totale}}$): Target $\ge 70\%$.
-2. **Debt-to-Assets** ($\frac{\text{Passività Totali}}{\text{Attivo Totale}}$): Target $\le 30\%$.
+1. **Indice di Solvibilità Patrimoniale** ($\frac{\text{Patrimonio Netto}}{\text{Attivo Totale}}$): Target $\ge$ 70%.
+2. **Debt-to-Assets** ($\frac{\text{Passività Totali}}{\text{Attivo Totale}}$): Target $\le$ 30%.
 3. **Runway Fondo di Emergenza** ($\frac{\text{Liquidità Immediata}}{\text{Spese Mensili Medie}}$): Target $\ge 6,0\text{ mesi}$.
-4. **Personal Savings Rate** ($\frac{\text{Risparmio Netto}}{\text{Entrate Totali}}$): Target $\ge 20\%$.
-5. **Debt Service-to-Income (DSTI)** ($\frac{\text{Rate Debito Annue}}{\text{Entrate Totali}}$): Target $\le 33\%$.
-6. **Invested Assets Ratio** ($\frac{\text{Investimenti} + \text{Previdenza}}{\text{Patrimonio Netto}}$): Target $\ge 50\%$.
+4. **Personal Savings Rate** ($\frac{\text{Risparmio Netto}}{\text{Entrate Totali}}$): Target $\ge$ 20%.
+5. **Debt Service-to-Income (DSTI)** ($\frac{\text{Rate Debito Annue}}{\text{Entrate Totali}}$): Target $\le$ 33%.
+6. **Invested Assets Ratio** ($\frac{\text{Investimenti} + \text{Previdenza}}{\text{Patrimonio Netto}}$): Target $\ge$ 50%.
 * **Radar Chart di Solidità:** Proiezione su coordinate polari normalizzate a 100 per il confronto istantaneo del profilo reale dell'utente rispetto al Benchmark di Private Banking.
 
 ---
@@ -312,7 +312,7 @@ Con la trasformazione Next-Level Tier-1, il design system di ARGUS introduce 4 n
 ### 14.1 MSCI Barra Multi-Asset Factor Risk Decomposition (`src/pages/4_🔬_Modelli_Quantitativi.py`)
 * **Waterfall Chart di Varianza:** Visualizzazione a cascata del rischio totale di portafoglio, distinguendo la quota di Varianza Sistematica Fattoriale ($w^T X F X^T w$) dalla Varianza Idiosincratica/Specifica ($w^T \Delta w$) con palette bicolore (Cyan `#00f3ff` per i fattori di stile e Corallo `#f85149` per il rischio specifico).
 * **Active Style Factor Tilts Radar Chart:** Grafico a coordinate polari centrato su zero per evidenziare le scommesse attive di stile ($X^T (w - w_{\text{bench}})$) rispetto al benchmark (Market, Value, Size, Momentum, Quality, Low Volatility).
-* **Tabella MCTR & PCTR di Eulero:** Data table ad alta densità con gradiente dinamico per PCTR asset ($\sum \text{PCTR}_i = 100\%$) e alert di concentrazione sui titoli con contributo marginale anomalo.
+* **Tabella MCTR & PCTR di Eulero:** Data table ad alta densità con gradiente dinamico per PCTR asset ($\sum \text{PCTR}_i = 100$%) e alert di concentrazione sui titoli con contributo marginale anomalo.
 
 ### 14.2 Total Balance Sheet & Human Capital Cockpit (`src/pages/7_🌪️_Stress_Testing.py`)
 * **Holistic Net Worth Breakdown Card:** Visualizzazione aggregata a 3 pilastri (Portafoglio Liquido, Real Estate, Capitale Umano Attuariale Nelson-Siegel) con calcolo live del TBS-VaR 95% e TBS-CVaR 95%.

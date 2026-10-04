@@ -26,7 +26,7 @@ from core.ux_quant_canvas import (
 
 def test_v918_app_version_and_command_bar_resolver() -> None:
     """Verify APP_VERSION is 9.18.0 and Bloomberg <GO> command bar resolves exact and fuzzy commands."""
-    assert APP_VERSION == "9.18.0"
+    assert APP_VERSION == "9.19.0"
 
     simm_cmd = resolve_terminal_command("SIMM <GO>")
     assert simm_cmd["matched"] is True
@@ -184,7 +184,7 @@ def test_v918_api_command_dispatch_endpoint() -> None:
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["version"] == "9.18.0"
+    assert data["version"] == "9.19.0"
     assert data["command_resolution"]["command_key"] == "SHOCK 2008"
     assert data["shocked_inputs"]["macro_shock_active"] is True
     assert data["shocked_inputs"]["index_spread_bps"] == 450.0

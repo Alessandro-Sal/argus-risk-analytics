@@ -921,7 +921,7 @@ def create_app() -> FastAPI:
             "EBA Reverse Stress Testing, Fama-French multi-factor attribution, Fixed Income YAS, "
             "and ISO/IEC 9075:2011 bitemporal ledger time-travel reconstruction."
         ),
-        version="9.18.0",
+        version="9.19.0",
         docs_url="/docs",
         redoc_url="/redoc",
     )
@@ -946,7 +946,7 @@ def create_app() -> FastAPI:
         from core.bitemporal_engine import HAS_DUCKDB
         return HealthResponse(
             status="healthy",
-            version="9.18.0",
+            version="9.19.0",
             engine="ARGUS Headless Core",
             duckdb_available=HAS_DUCKDB,
             timestamp=datetime.now(timezone.utc).isoformat()
@@ -2165,7 +2165,7 @@ def create_app() -> FastAPI:
             session_state_dict={"global_macro_shock": eff_shock},
         )
         return {
-            "version": "9.18.0",
+            "version": "9.19.0",
             "command_resolution": cmd_res,
             "shocked_inputs": shocked_inputs,
         }

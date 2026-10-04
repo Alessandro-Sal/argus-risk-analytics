@@ -82,7 +82,7 @@ ARGUS implements four core execution strategies:
 | **Almgren-Chriss** | Hyperbolic liquidation curve balancing market risk vs slippage | Large block rebalances with strict risk limits |
 | **VWAP** | Volume-Weighted Average Price tracking the intraday U-curve | Benchmark tracking against official day VWAP |
 | **TWAP** | Time-Weighted Average Price with uniform time slicing | Low ADV illiquid assets or algorithmic stealth |
-| **POV Cap** | Hard ceiling on participation rate ($\le 15\%$ ADV) | Avoiding predatory front-running algorithms |
+| **POV Cap** | Hard ceiling on participation rate ($\le$ 15% ADV) | Avoiding predatory front-running algorithms |
 
 ---
 

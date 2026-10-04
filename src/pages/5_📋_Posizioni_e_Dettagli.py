@@ -2159,7 +2159,7 @@ elif active_pos_tab == "⚡ Liquidità & Smart Order Router":
 <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;">
   <div style="font-weight: 700; color: #58a6ff; margin-bottom: 3px;">📐 TWAP vs VWAP: Quale Algoritmo Scegliere?</div>
   <div style="background: rgba(255,153,0,0.08); border-left: 3px solid #ff9900; padding: 6px 10px; border-radius: 6px; margin: 4px 0; color: #ffb74d; font-size: 12.5px;">
-    • <b>TWAP (Time-Weighted Average Price):</b> Distribuisce il volume in quote uguali nel tempo ($Q_i = Q / N$) applicando un <i>jitter pseudo-casuale</i> ($\pm 4\%$) per impedire agli algoritmi HFT concorrenti di individuare il pattern e fare front-running.<br>
+    • <b>TWAP (Time-Weighted Average Price):</b> Distribuisce il volume in quote uguali nel tempo ($Q_i = Q / N$) applicando un <i>jitter pseudo-casuale</i> (±4%) per impedire agli algoritmi HFT concorrenti di individuare il pattern e fare front-running.<br>
     • <b>VWAP (Volume-Weighted Average Price):</b> Modella la tipica curva a "U" della liquidità intraday (massima in apertura 09:00 e chiusura 17:00, minima a metà giornata), inviando tranche più corpose solo quando il mercato è più profondo.
   </div>
 </div>

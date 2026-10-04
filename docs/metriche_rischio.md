@@ -1,6 +1,6 @@
 # Calcolo delle Metriche di Rischio, Modelli Econometrici e Valutazione Aziendale
 
-Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/universal_ledger.py`, `core/risk_engine.py`, `core/multicurve_ois_irs_engine.py`, `core/hull_white_bermudan_engine.py`, `core/rough_vol_svi_engine.py`, `core/cds_tranche_engine.py`, `core/sabr_local_vol_engine.py`, `core/heston_fft_engine.py`, `core/black_litterman_engine.py`, `core/solvency2_engine.py`, `core/frtb_engine.py`, `core/climate_stress_engine.py`, `core/macro_war_room.py`, `core/xva_engine.py`, `core/isda_simm_engine.py`, `core/basel_liquidity_engine.py`, `core/credit_portfolio_engine.py`, `core/ccar_stress_engine.py`, `core/commodity_engine.py`, `core/optimal_liquidation_engine.py`, `core/market_making_vpin_engine.py`, `core/alm_ldi_engine.py`, `core/ux_institutional_hub.py`) di **ARGUS Risk & Wealth Analytics Platform v9.18.0 Institutional Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
+Questo documento illustra la metodologia, la formulazione matematica e le applicazioni pratiche adottate all'interno del motore quantitativo ed ingegneristico (`core/universal_ledger.py`, `core/risk_engine.py`, `core/multicurve_ois_irs_engine.py`, `core/hull_white_bermudan_engine.py`, `core/rough_vol_svi_engine.py`, `core/cds_tranche_engine.py`, `core/sabr_local_vol_engine.py`, `core/heston_fft_engine.py`, `core/black_litterman_engine.py`, `core/solvency2_engine.py`, `core/frtb_engine.py`, `core/climate_stress_engine.py`, `core/macro_war_room.py`, `core/xva_engine.py`, `core/isda_simm_engine.py`, `core/basel_liquidity_engine.py`, `core/credit_portfolio_engine.py`, `core/ccar_stress_engine.py`, `core/commodity_engine.py`, `core/optimal_liquidation_engine.py`, `core/market_making_vpin_engine.py`, `core/alm_ldi_engine.py`, `core/ux_institutional_hub.py`) di **ARGUS Risk & Wealth Analytics Platform v9.19.0 Institutional Release**. Tutti i calcoli basati su serie storiche considerano i rendimenti giornalieri rettificati (*Adjusted Close*) ed un anno lavorativo standard di 252 giorni di negoziazione.
 
 ---
 
@@ -127,7 +127,7 @@ $$
 |DD| = \frac{\Delta_{\text{asse } Y}}{1 + \text{CumRet}_{\text{peak}}} < \Delta_{\text{asse } Y}
 $$
 
-*Esempio numerico:* Se il portafoglio raggiunge **+98.4%** e poi cade a **+20.6%**, la discesa visiva sull'asse $Y$ è $\Delta = 98.4 - 20.6 = 77.8\%$. Tuttavia, la perdita reale subita dal patrimonio è:
+*Esempio numerico:* Se il portafoglio raggiunge **+98.4%** e poi cade a **+20.6%**, la discesa visiva sull'asse $Y$ è $\Delta = 98.4 - 20.6 = 77.8$%$. Tuttavia, la perdita reale subita dal patrimonio è:
 
 $$
 DD = -\frac{77.8\%}{1 + 0.984} = -\frac{77.8\%}{1.984} = \mathbf{-39.21\%}
@@ -258,7 +258,7 @@ $$
 $$
 mES_\alpha = \max(VaR_{CF, \alpha} \times 1.05, VaR_{CF, \alpha})
 $$
-3. **Monotonicità di Confidenza**: $CVaR_{99\%} \ge CVaR_{95\%}$.
+3. **Monotonicità di Confidenza**: $\text{CVaR}_{0.99} \ge \text{CVaR}_{0.95}$ (CVaR 99% $\ge$ CVaR 95%).
 
 ---
 
@@ -314,7 +314,7 @@ Misura il calo stimato in € e % del portafoglio simulando la rievocazione di 5
 Per i titoli privi di storico nel periodo della crisi, il motore applica un fallback basato sulla sensibilità Beta corrente verso il benchmark.
 
 ### 2. Custom What-If Beta Shock Simulator
-Simula l'impatto di uno shock arbitrario del benchmark $\Delta R_b \in [-50\%, +30\%]$:
+Simula l'impatto di uno shock arbitrario del benchmark $\Delta R_b \in [-50, +30]$%$:
 
 $$
 \Delta R_i = \beta_i \times \Delta R_b
@@ -444,8 +444,8 @@ Il modulo di diagnostica analizza il portafoglio alla ricerca di vulnerabilità 
 
 1. **Punteggio Base**: Inizia da $100$.
 2. **Penalizzazioni**:
-   - **Alta Concentrazione ($HHI > 0.25$ o Top 3 Asset $> 50\%$)**: $-15$ punti.
-   - **Contributo sproporzionato al Rischio ($\text{Component VaR}_i > 25\%$)**: $-15$ punti (calcolato solo sui titoli attivi $q_i > 0$).
+   - **Alta Concentrazione ($HHI > 0.25$ o Top 3 Asset > 50%)**: $-15$ punti.
+   - **Contributo sproporzionato al Rischio ($\text{Component VaR}_i > 25$%$)**: $-15$ punti (calcolato solo sui titoli attivi $q_i > 0$).
    - **Multipli P/E Elevati ($P/E > 45x$)**: Segnalazione d'alert per titoli ad alta valutazione fondamentale.
    - **Inefficienza di Sharpe ($\Delta \text{Sharpe} > 0.30$)**: $-10$ punti quando l'ottimizzatore Markowitz individua un guadagno significativo di rendimento corretto per il rischio.
    - **Aggressività Sistemica ($\beta > 1.3$)**: Alert per elevata sensibilità al mercato.
@@ -861,7 +861,7 @@ $$
 ### 1. Griglia Bivariata Tassi vs Volatilità
 Modellizzazione della superficie di PnL su una griglia bivariata $X \times Y$:
 - **Asse $X$ (Tassi $\Delta r$)**: Varie variazioni dei tassi da $-200\,\text{bps}$ a $+200\,\text{bps}$ (sensibilità duration $-4.5$).
-- **Asse $Y$ (Volatilità $\Delta \sigma$)**: Varie variazioni della volatilità da $-30\%$ a $+50\%$ (sensibilità vega/equity $-0.35$).
+- **Asse $Y$ (Volatilità $\Delta \sigma$)**: Varie variazioni della volatilità da -30% a +50% (sensibilità vega/equity $-0.35$).
 - **Matrice $Z_{i,j}$ (Impatto PnL €)**:
   
 
@@ -1056,9 +1056,9 @@ $$
 
 Classificatore statistico di regime macroeconomico basato sull'osservazione congiunta del rendimento rolling a 21 giorni e della volatilità rolling a 21 giorni rispetto a soglie empiriche calibrate:
 
-- **Stato 1: 🟢 Bull Low-Vol**: Rendimento rolling $\ge +0.5\%$ e Volatilità $\le 16.0\%$. Regime di espansione e trend rialzista ordinato.
+- **Stato 1: 🟢 Bull Low-Vol**: Rendimento rolling $\ge$ +0.5% e Volatilità $\le$ 16.0%. Regime di espansione e trend rialzista ordinato.
 - **Stato 2: 🟡 Transizione / Range-Bound**: Mercato laterale, rotazione settoriale o moderata incertezza macroeconomica.
-- **Stato 3: 🔴 Crisi / Panic Selling (High-Vol)**: Rendimento rolling $< -3.0\%$ o Volatilità $> 24.0\%$. Regime di liquidazione e crollo di mercato.
+- **Stato 3: 🔴 Crisi / Panic Selling (High-Vol)**: Rendimento rolling < -3.0% o Volatilità > 24.0%. Regime di liquidazione e crollo di mercato.
 
 Il modulo calcola la matrice di transizione di stato e la distribuzione delle probabilità recenti.
 
@@ -1153,7 +1153,7 @@ $$
 dove $p = P(R > 0)$ è il Win Rate e $b = \frac{\text{Media Guadagni}}{|\text{Media Perdite}|}$ è il rapporto vincita/perdita.
 
 ### 3. Approccio Istituzionale Half-Kelly ($f^* / 2$)
-L'allocazione a Pieno Kelly ($f^*$) massimizza la crescita geometrica ma espone a drawdown violenti ($>50\%$). L'approccio istituzionale **Half-Kelly** cattura il **75% del tasso di crescita teorico massimo** con il **50% in meno di volatilità** ed azzera la probabilità statistica di dimezzamento del patrimonio.
+L'allocazione a Pieno Kelly ($f^*$) massimizza la crescita geometrica ma espone a drawdown violenti (> 50%). L'approccio istituzionale **Half-Kelly** cattura il **75% del tasso di crescita teorico massimo** con il **50% in meno di volatilità** ed azzera la probabilità statistica di dimezzamento del patrimonio.
 
 ---
 
@@ -1846,34 +1846,70 @@ I fattori di sconto $DF(t) \in (0, 1]$ risultano strettamente decrescenti con la
 
 ## 50. Decomposizione del Rischio di Eulero & Marginal VaR (`core/risk_engine.py`)
 
-Poiché il Value at Risk (VaR) e la deviazione standard di portafoglio sono funzioni omogenee di grado 1 rispetto ai pesi di allocazione $\mathbf{w}$, per il **Teorema di Eulero per funzioni omogenee** il rischio totale di portafoglio può essere esattamente scomposto nella somma dei contributi marginali dei singoli asset senza residui:
+Poiché il Value at Risk parametrico ($\text{VaR}_p$) e la deviazione standard di portafoglio ($\sigma_p$) sono funzioni matematicamente omogenee di grado 1 rispetto al vettore dei pesi di allocazione $\mathbf{w}$ ($f(\lambda \mathbf{w}) = \lambda f(\mathbf{w})$ per qualsiasi scalare $\lambda > 0$), per il **Teorema di Eulero per funzioni omogenee** il rischio totale di portafoglio può essere esattamente scomposto nella somma pesata dei contributi marginali dei singoli costituenti, senza alcun termine residuo:
 
 $$
-\text{VaR}_p = \sum_{i=1}^N w_i \cdot \frac{\partial \text{VaR}_p}{\partial w_i}
+\text{VaR}_p = \sum_{i=1}^N w_i \cdot \frac{\partial \text{VaR}_p}{\partial w_i} = \sum_{i=1}^N \text{Component VaR}_i
 $$
 
-### 1. Marginal VaR ($\text{MVaR}_i$)
-Rappresenta la derivata prima parziale del VaR di portafoglio rispetto al peso dell'asset $i$-esimo:
+### 1. Quadratura dei Pesi e Normalizzazione Deterministica
+Per evitare distorsioni numeriche o la dispersione di posizioni frazionarie micro ($w_i < 0.01$, ovvero < 1%) derivanti da percentuali arrotondate, il motore calcola i pesi reali direttamente dai controvalori fisici correnti (*mark-to-market* in EUR):
 
 $$
-\text{MVaR}_i = \frac{\partial \text{VaR}_p}{\partial w_i} = z_\alpha \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p}
+w_i = \frac{V_i}{\sum_{k=1}^N V_k}, \quad \text{con } \sum_{i=1}^N w_i \equiv 1.00000000
 $$
 
-### 2. Component VaR ($\text{CVaR}_i$)
-Quantifica l'ammontare monetario assoluto (o percentuale) di rischio apportato dalla posizione $i$-esima al portafoglio complessivo:
+### 2. Marginal VaR ($\text{MVaR}_i$)
+Rappresenta la derivata prima parziale del VaR di portafoglio rispetto alla variazione infinitesima del peso dell'asset $i$-esimo:
 
 $$
-\text{CVaR}_i = w_i \cdot \text{MVaR}_i
+\text{MVaR}_i = \frac{\partial \text{VaR}_p}{\partial w_i} = z_\alpha \cdot \sqrt{T} \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p}
+$$
+
+dove:
+- $z_\alpha = \Phi^{-1}(\alpha)$ è il quantile critico della normale standard al livello di confidenza prescelto ($z_{0.95} \approx 1.64485$).
+- $\sqrt{T}$ è il fattore di scalatura temporale per l'orizzonte di detenzione a $T$ giorni.
+- $(\boldsymbol{\Sigma} \mathbf{w})_i = \text{Cov}(R_i, R_p)$ è la covarianza tra il rendimento del titolo $i$ e il rendimento complessivo del portafoglio.
+- $\sigma_p = \sqrt{\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w}}$ è la volatilità giornaliera del portafoglio.
+
+### 3. Component VaR ($\text{CVaR}_i$) e Controvalore Monetario
+Quantifica l'ammontare di rischio (in quota percentuale e in valuta monetaria assoluta EUR) imputabile alla specifica allocazione sull'asset $i$-esimo:
+
+$$
+\text{CVaR}_i = w_i \cdot \text{MVaR}_i = w_i \cdot \left( z_\alpha \cdot \sqrt{T} \cdot \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p} \right)
+$$
+
+$$
+\text{Component VaR Amount}_i = \text{CVaR}_i \times V_{\text{port}}
 $$
 
 $$
 \text{Contributo pct Rischio}_i = \frac{\text{CVaR}_i}{\text{VaR}_p} \times 100\%
 $$
 
-Proprietà di chiusura esatta:
+### 4. Dimostrazione Algebrica di Chiusura Esatta di Eulero
+Moltiplicando e sommando i contributi per tutti gli $N$ asset si ottiene:
 
 $$
-\sum_{i=1}^N \text{Contributo pct Rischio}_i = 100.0\%
+\sum_{i=1}^N \text{CVaR}_i = \sum_{i=1}^N w_i \cdot \left( z_\alpha \sqrt{T} \frac{(\boldsymbol{\Sigma} \mathbf{w})_i}{\sigma_p} \right) = \frac{z_\alpha \sqrt{T}}{\sigma_p} \sum_{i=1}^N w_i (\boldsymbol{\Sigma} \mathbf{w})_i = \frac{z_\alpha \sqrt{T}}{\sigma_p} (\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w})
+$$
+
+Poiché per definizione $\mathbf{w}^T \boldsymbol{\Sigma} \mathbf{w} = \sigma_p^2$:
+
+$$
+\sum_{i=1}^N \text{CVaR}_i = \frac{z_\alpha \sqrt{T}}{\sigma_p} \cdot \sigma_p^2 = z_\alpha \cdot \sigma_p \cdot \sqrt{T} \equiv \text{VaR}_p
+$$
+
+Ne consegue identicamente in termini monetari:
+
+$$
+\sum_{i=1}^N \text{Component VaR Amount}_i = \text{VaR}_p \times V_{\text{port}} = \text{Total VaR Amount}_p
+$$
+
+Il test di audit istituzionale verifica la convergenza algebrica a livello di macchina:
+
+$$
+\epsilon_{\text{Euler}} = \left| \sum_{i=1}^N \text{Component VaR Amount}_i - \text{Total VaR Amount}_p \right| < 10^{-2} \text{ EUR} \implies \text{euler\_check\_passed} = \text{True}
 $$
 
 ---
@@ -1945,7 +1981,7 @@ P_{\text{mkt}} = \sum_{k=1}^N \frac{CF_k}{\left(1 + \frac{r(t_k) + z}{m}\right)^
 $$
 
 ### 4. Modello Credit Default Swap (Hazard Rate & Default Probability)
-Dato lo spread CDS a 5 anni $S_{\text{CDS}}$ e il Recovery Rate $R = 40\%$, l'intensità di default (Hazard Rate $\lambda$) e la probabilità cumulativa di default su orizzonte $t$ sono date da:
+Dato lo spread CDS a 5 anni $S_{\text{CDS}}$ e il Recovery Rate $R = 0.40$ (40%), l'intensità di default (Hazard Rate $\lambda$) e la probabilità cumulativa di default su orizzonte $t$ sono date da:
 
 $$
 \lambda = \frac{S_{\text{CDS}}}{1 - R}
@@ -2181,7 +2217,7 @@ Per gli investitori che operano con intermediari esteri o in regime dichiarativo
 
 ### 3. Pilastro 3: Analizzatore Withholding Tax (WHT) & Doppia Imposizione Dividendi Esteri
 * **Convenzioni contro le Doppie Imposizioni (DTT) & Modulo W-8BEN**:
-  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15\%$, $WHT_{\text{DE}} = 26.375\%$, $WHT_{\text{CH}} = 35\%$, $WHT_{\text{FR}} = 12.8\%$.
+  - Tassazione alla fonte estera: $WHT_{\text{USA}} = 15$%, $WHT_{\text{DE}} = 26.375$%, $WHT_{\text{CH}} = 35$%, $WHT_{\text{FR}} = 12.8$%.
   - Tassazione italiana sul "Netto Frontiera": $T_{\text{IT}} = (\text{Dividendo Lordo} \times (1 - WHT)) \times 0.26$.
   - **Aliquota Effettiva Combinata**:
     
@@ -2190,7 +2226,7 @@ $$
 \tau_{\text{eff}} = 1 - (1 - WHT) \times (1 - 0.26)
 $$
 
-    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10\%$)*.
+    *(Per i titoli USA con W-8BEN: $\tau_{\text{eff}} = 1 - 0.85 \times 0.74 = 37.10$%$)*.
 * **Tax Drag vs ETF UCITS ad Accumulazione**:
   Gli ETF ad accumulazione trattengono internamente il 15% alla fonte senza subire l'imposta italiana immediata sul netto frontiera fino al realizzo finale, eliminando la perdita di rendimento composto da tassazione anticipata.
 
@@ -2225,7 +2261,7 @@ $$
 normalizzata in modo che $\sum_{i=1}^N V_{\text{norm}}(t_i) = 1.0$. Questa profilazione riflette l'evidenza empirica di microstruttura dei mercati regolamentati (Borsa Italiana, NYSE, NASDAQ), dove circa il 35-45% dei volumi giornalieri si concentra nella prima e nell'ultima ora di negoziazione.
 
 ### 2. Algoritmo TWAP (Time-Weighted Average Price) con Jitter Anti-Frontrunning
-Suddivide un ordine totale $Q$ in $N$ intervalli temporali discreti applicando una leggera perturbazione stocastica $\epsilon_t \sim U(-\delta, \delta)$ (con $\delta = 4\%$) per impedire l'identificazione e il front-running da parte di algoritmi HFT concorrenti:
+Suddivide un ordine totale $Q$ in $N$ intervalli temporali discreti applicando una leggera perturbazione stocastica $\epsilon_t \sim U(-\delta, \delta)$ (con $\delta = 4$%) per impedire l'identificazione e il front-running da parte di algoritmi HFT concorrenti:
 
 $$
 q_t = \frac{Q}{N} \cdot (1 + \epsilon_t), \quad \text{con vincolo di conservazione } \sum_{t=1}^N q_t = Q
@@ -2238,7 +2274,7 @@ $$
 $$
 
 ### 3. Algoritmo VWAP (Volume-Weighted Average Price) con POV Cap
-Pesa le quote da negoziare in ciascuna tranche $t$ proporzionalmente al volume di mercato atteso per quell'intervallo ($V_t = \text{ADV} \cdot V_{\text{norm}}(t)$), vincolando la tranche a un tetto di partecipazione massima (Percentage of Volume Cap, tipicamente $15\%$):
+Pesa le quote da negoziare in ciascuna tranche $t$ proporzionalmente al volume di mercato atteso per quell'intervallo ($V_t = \text{ADV} \cdot V_{\text{norm}}(t)$), vincolando la tranche a un tetto di partecipazione massima (Percentage of Volume Cap, tipicamente 15%):
 
 $$
 q_t = \min\left( Q \cdot V_{\text{norm}}(t), \; V_t \cdot \text{POV}_{\text{cap}} \right)
@@ -2322,7 +2358,7 @@ $$
 \text{ARGUS Score} = 0.25 \cdot S_{\text{Valutazione}} + 0.25 \cdot S_{\text{Qualità}} + 0.25 \cdot S_{\text{Rischio}} + 0.25 \cdot S_{\text{Momentum}}
 $$
 
-- **$S_{\text{Valutazione}}$**: Potenziale di rialzo implicito dal consensus target price normalizzato per il differenziale valutario ($\text{Upside } \% = \frac{\text{Target} - P}{P} \times 100$) e PEG Ratio.
+- **$S_{\text{Valutazione}}$**: Potenziale di rialzo implicito dal consensus target price normalizzato per il differenziale valutario (Upside % $= \frac{\text{Target} - P}{P} \times 100$) e PEG Ratio.
 - **$S_{\text{Qualità}}$**: Redditività operativa (Return on Equity ROE), margine netto e indice di solvibilità contabile Altman Z-Score integrato con Piotroski F-Score.
 - **$S_{\text{Rischio}}$**: Volatilità annualizzata storica ($\sigma_a = \sigma_d \sqrt{252}$), Sharpe Ratio rispetto al benchmark e Max Drawdown a 2 anni.
 - **$S_{\text{Momentum}}$**: Performance relativa a 1 anno, posizione del prezzo rispetto alla media mobile SMA 200 e indice di forza relativa RSI 14 oscillatore.
@@ -2561,7 +2597,7 @@ $$
 ### 2. Modellazione Stocastica del Bid-Ask Spread
 Dato il vettore dei pesi di portafoglio $\mathbf{w}$, per ciascun asset $i$ con spread relativo $S_i = \frac{P_{\text{ask}, i} - P_{\text{bid}, i}}{P_{\text{mid}, i}}$, lo spread è trattato come una variabile casuale con media empirica $\mu_{S, i}$ e deviazione standard $\sigma_{S, i}$.
 
-Il costo di liquidazione prudenziale all'estremo percentile $\alpha$ (solitamente $95\%$ o $99\%$, con quantile normale $z_{\alpha}$) per liquidare metà spread è definito da:
+Il costo di liquidazione prudenziale all'estremo percentile $\alpha$ (solitamente 95% o 99%, con quantile normale $z_{\alpha}$) per liquidare metà spread è definito da:
 
 $$
 \text{LC}_{\alpha} = \frac{1}{2} V_{\text{port}} \sum_{i=1}^N w_i \left( \mu_{S, i} + z_{\alpha} \cdot \sigma_{S, i} \right)
@@ -2671,8 +2707,8 @@ I moduli `core/wealth/tax_aware_location.py` e `core/autonomous_rebalancer.py` i
 
 ### 1. Tassazione Asimmetrica TUIR e Scelta del Contenitore Ottimo
 Nell'ordinamento italiano (D.P.R. 917/1986):
-- **Conto Tassabile Ordinario (Regime Amministrato/Dichiarativo)**: Tassazione al $26\%$ su plusvalenze (aliquota agevolata al $12.5\%$ per titoli di Stato). I redditi di capitale (cedole, dividendi ed ETF) non possono compensare minusvalenze pregresse, mentre i redditi diversi (azioni singole, certificati, ETC su materie prime) generano crediti d'imposta utilizzabili entro 4 anni.
-- **Fondo Pensione / Previdenza Complementare**: Tassazione agevolata al $20\%$ sul rendimento maturato, deducibilità IRPEF fino a €5.164,57 annui, e tassazione finale sul capitale al $15\%-9\%$.
+- **Conto Tassabile Ordinario (Regime Amministrato/Dichiarativo)**: Tassazione al 26% su plusvalenze (aliquota agevolata al 12.5% per titoli di Stato). I redditi di capitale (cedole, dividendi ed ETF) non possono compensare minusvalenze pregresse, mentre i redditi diversi (azioni singole, certificati, ETC su materie prime) generano crediti d'imposta utilizzabili entro 4 anni.
+- **Fondo Pensione / Previdenza Complementare**: Tassazione agevolata al 20% sul rendimento maturato, deducibilità IRPEF fino a €5.164,57 annui, e tassazione finale sul capitale al 15%-9%.
 - **Piani Individuali di Risparmio (PIR)**: Esenzione totale da imposte su capital gain se mantenuti per almeno 5 anni.
 
 L'algoritmo di **Tax-Aware Asset Location** ordina le classi di attivo per *Indice di Inefficienza Fiscale ($IFI$)*:
@@ -2834,15 +2870,15 @@ Campi mappati:
 Il processo deliberativo per l'autorizzazione all'esecuzione degli ordini di ribilanciamento è affidato a un comitato autonomo multi-agente (`core/ai_analyst.py`):
 
 1. **`QuantRiskAuditor`**:
-   - Ispezione del Tracking Error ($TE < 3.0\%$).
-   - Concentrazione massima sul singolo emittente ($\max w_i \le 20\%$).
+   - Ispezione del Tracking Error ($TE < 3.0$%).
+   - Concentrazione massima sul singolo emittente ($\max w_i \le 20$%).
    - Impatto sui profili di coda (VaR e CVaR delta post-ribilanciamento).
 2. **`TaxEfficiencySpecialist`**:
-   - Tasso di utilizzo delle minusvalenze in scadenza ($\ge 50\%$).
+   - Tasso di utilizzo delle minusvalenze in scadenza ($\ge$ 50%).
    - Controllo dell'indice di efficienza fiscale (Rapporto tra Plusvalenze compensate e Imposte versate).
    - Verifica dell'assenza di vendite fittizie (*wash-sale rules*).
 3. **`MacroExecutionStrategist`**:
-   - Partecipazione massima all'Average Daily Volume ($\text{OrderQty}_i / ADV_i \le 10\%$).
+   - Partecipazione massima all'Average Daily Volume ($\text{OrderQty}_i / ADV_i \le 10$%).
    - Controllo di congruità del Market Impact Almgren-Chriss ($< 15 \text{ bps}$).
    - Validazione strutturale dei tag FIX 4.4 e del checksum.
 
@@ -2953,7 +2989,7 @@ dove $Z_{1, t}$ e $Z_{2, t}$ sono variabili normali standard correlate con coeff
    $$
    in genere situato nei primi 3-5 anni successivi al pensionamento a causa del *Sequence of Returns Risk*.
 3. **Safe Spending Corridor (95% Confidence)**:
-   La massima spesa annuale prelevabile $C_t^*$ tale per cui la probabilità di sopravvivenza del patrimonio rimanga $\ge 95\%$:
+   La massima spesa annuale prelevabile $C_t^*$ tale per cui la probabilità di sopravvivenza del patrimonio rimanga $\ge$ 95%:
    $$
    C_t^* = \max \left\{ C : P(\text{TBS}_T > 0 \mid \text{Withdrawal}=C) \ge 0.95 \right\}
    $$
@@ -3103,7 +3139,7 @@ La funzione di ripartizione degli eccessi è approssimata dalla distribuzione di
 
 $$G_{\xi, \sigma}(y) = 1 - \left(1 + \frac{\xi y}{\sigma}\right)^{-1/\xi}$$
 
-I quantili di VaR ed Expected Shortfall (CVaR) a $99.0\%$ e $99.9\%$ sono determinati analiticamente:
+I quantili di VaR ed Expected Shortfall (CVaR) a 99.0% e 99.9% sono determinati analiticamente:
 
 $$\text{VaR}_\alpha^{\text{EVT}} = u + \frac{\sigma}{\xi} \left[ \left(\frac{N}{N_u} (1 - \alpha)\right)^{-\xi} - 1 \right]$$
 
@@ -3232,7 +3268,7 @@ Estrae la curva delle intensità di default a tratti $\lambda_k$ e le probabilit
 
 $$\text{Upfront} = (S_{\text{par}} - C_{\text{std}}) \cdot \text{RPV01}(0, T)$$
 
-Per le tranche sintetiche **iTraxx Europe / CDX IG** ($[0\text{-}3\%], [3\text{-}6\%], [6\text{-}9\%], [9\text{-}12\%], [12\text{-}22\%]$), la perdita attesa condizionata al fattore macro comune $M \sim \mathcal{N}(0, 1)$ è integrata via quadratura di Gauss-Hermite:
+Per le tranche sintetiche **iTraxx Europe / CDX IG** ([0-3%], [3-6%], [6-9%], [9-12%], [12-22%]), la perdita attesa condizionata al fattore macro comune $M \sim \mathcal{N}(0, 1)$ è integrata via quadratura di Gauss-Hermite:
 
 $$p(M) = \Phi\!\left(\frac{\Phi^{-1}(\text{PD}) - \sqrt{\rho}\,M}{\sqrt{1 - \rho}}\right), \quad \text{EL}_{[K_1, K_2]} = \mathbb{E}_M\!\left[\frac{\min(\max((1-R)\,p(M) - K_1, 0), K_2 - K_1)}{K_2 - K_1}\right]$$
 
@@ -3260,7 +3296,7 @@ $$\text{Stress Capital Buffer (SCB)} = \max\!\left(2.5\%, \; \text{CET1}_0 - \mi
 
 ## 95. Bilateral XVA Desk & ISDA SIMM™ v2.6 Initial Margin (`core/xva_engine.py`, `core/isda_simm_engine.py`)
 
-1. **Bilateral XVA (CVA, DVA, FVA, MVA, KVA)**: Simula i profili di esposizione collateralizzati CSA ($EE(t)$, $PFE_{95\%}(t)$, $PFE_{99\%}(t)$, $ENE(t)$) con soglia $H$, Minimum Transfer Amount $MTA$ e Margin Period of Risk $MPOR = 10\text{gg}$.
+1. **Bilateral XVA (CVA, DVA, FVA, MVA, KVA)**: Simula i profili di esposizione collateralizzati CSA ($EE(t)$, $\text{PFE}_{0.95}(t)$, $\text{PFE}_{0.99}(t)$, $ENE(t)$) con soglia $H$, Minimum Transfer Amount $MTA$ e Margin Period of Risk $MPOR = 10\text{gg}$.
 2. **ISDA SIMM™ v2.6 & UMR (€50M Phase 6 Threshold)**: Aggrega i margini Delta, Vega e Curvature sulle 6 classi di rischio ($\text{IR}, \text{CreditQ}, \text{CreditNonQ}, \text{Equity}, \text{Commodity}, \text{FX}$) tramite la matrice di correlazione regolamentare $\psi_{r,s}$:
 
 $$\text{SIMM}_{\text{total}} = \sqrt{\sum_{r \in \mathcal{R}} \text{IM}_r^2 + \sum_{r \neq s} \psi_{r,s}\,\text{IM}_r\,\text{IM}_s}, \quad \text{IM}_r = \text{DeltaMargin}_r + \text{VegaMargin}_r + \text{CurvatureMargin}_r$$
@@ -3290,4 +3326,131 @@ Il valore delle opzioni **Calendar / Storage Spread** tra due scadenze $F_1, F_2
 Verifica le tre condizioni attuariali di immunizzazione di **Redington** ($PV_A \ge PV_L$, $D_A^{\text{mod}} = D_L^{\text{mod}}$, $C_A > C_L$), dimensiona l'overlay **Receiver IRS 20Y (LDI)** per chiudere il Duration Gap e risolve il problema di **Programmazione Lineare (`scipy.optimize.linprog`)** per costruire il portafoglio obbligazionario dedicato di costo minimo che copre esattamente i flussi passivi $L_t$:
 
 $$\min_{\mathbf{x} \ge 0} \mathbf{p}^\top \mathbf{x} \quad \text{s.t.} \quad \mathbf{C}\,\mathbf{x} \ge \mathbf{L}$$
+
+---
+
+## 99. Sincronizzazione Multi-Asset Istituzionale: Calendario TradFi 252gg vs Crypto 365gg (`core/multi_portfolio.py`)
+
+Nei portafogli ibridi consolidati (*Master Wealth*), gli asset tradizionali (azioni, obbligazioni, ETF) negoziano sui mercati regolamentati per circa 252 giorni lavorativi all'anno (lunedì-venerdì, esclusi i festivi di borsa), mentre le cripto-attività negoziano ininterrottamente 24 ore su 24, 7 giorni su 7 (365 giorni all'anno).
+
+### 1. Inadeguatezza degli Approcci Ingenui (Drop vs Forward-Fill)
+Due approcci comunemente impiegati risultano quantitativamente fallaci:
+1. **Scarto Semplice del Weekend (Drop)**: Eliminare i rendimenti di sabato e domenica altera il rendimento cumulato dell'asset e rimuove cluster di volatilità e code asimmetriche che spesso si manifestano a mercati chiusi.
+2. **Forward-Fill Ingenuo dei Prezzi su 365 Giorni**: Assegnare rendimento nullo ($R = 0$) agli asset tradizionali durante i weekend introduce un'artificiale compressione della deviazione standard giornaliera e riduce spuriamente le correlazioni cross-asset.
+
+### 2. Algoritmo di Compounding Geometrico di Chiusura
+ARGUS adotta lo standard quantitativo istituzionale di capitalizzazione geometrica continua sul calendario lavorativo unificato ($B$-days):
+
+Sia $R_{\tau}$ la serie dei rendimenti discreti giornalieri a 7 giorni. La ricchezza cumulata dell'asset non-stop al tempo $t$ è:
+
+$$
+W_t = \prod_{\tau=1}^t (1 + R_\tau)
+$$
+
+Campionando la traiettoria di ricchezza unicamente sulle date lavorative standardizzate $t_k \in \mathcal{T}_{\text{business}}$:
+
+$$
+W_{t_k}^{\text{business}} = W_{\max\{\tau \le t_k\}}
+$$
+
+Il rendimento lavorativo continuo allineato per la settimana lavorativa, in particolare per la sessione di riapertura del lunedì ($t_{\text{Mon}}$), è dato esattamente da:
+
+$$
+R_{\text{Mon}}^{\text{aligned}} = \frac{W_{t_{\text{Mon}}}}{W_{t_{\text{Fri}}}} - 1 = \prod_{d \in \{\text{Sabato}, \text{Domenica}, \text{Lunedì}\}} (1 + R_d) - 1
+$$
+
+In questo modo:
+- Il rendimento cumulato geometrico totale è preservato identicamente all'ultimo decimale ($\prod (1 + R_{\text{orig}}) \equiv \prod (1 + R_{\text{aligned}})$).
+- La volatilità e il VaR a 252 giorni incorporano fedelmente i movimenti di mercato del fine settimana.
+- La matrice di covarianza tra titoli azionari e cripto riflette l'effettivo impatto che i mercati digitali riversano sui mercati tradizionali all'apertura settimanale.
+
+---
+
+## 100. Ponte Dinamico Wealth ⇄ Risk: Liquidity-at-Risk & Buffer Anti-Forced Selling (`core/wealth/wealth_engine.py`)
+
+La gestione patrimoniale integrata richiede che le riserve di liquidità (*Emergency Runway*) non siano dimensionate in modo statico o scollegato dal rischio di mercato del portafoglio titoli.
+
+### 1. Il Fenomeno del Forced Selling durante i Crolli di Mercato
+Se un investitore affronta una spesa imprevista o un fabbisogno di liquidità durante un regime di crollo dei mercati finanziari (Drawdown profondo), l'assenza di un cuscinetto monetario adeguato costringe alla liquidazione forzata di asset volatili (azioni o crypto) ai minimi storici (*Forced Selling at Market Trough*), cristallizzando perdite permanenti e distruggendo l'effetto del rimbalzo futuro (Mean-Reversion Drag).
+
+### 2. Formulazione Dinamica del Target di Sicurezza
+ARGUS introduce il protocollo quantitativo **Liquidity-at-Risk**: il target di fondo d'emergenza viene scalato proporzionalmente al rischio di coda estrema (CVaR 95% annualizzato) e all'incidenza azionaria sul patrimonio netto complessivo ($w_{\text{equity}}^{\text{NW}}$):
+
+$$
+\mathcal{M}_{\text{risk-buffer}} = 1.0 + \left( \lambda \cdot \text{CVaR}_{95\%}^{\text{annuale}} \cdot w_{\text{equity}}^{\text{NW}} \right)
+$$
+
+dove:
+- $\lambda = 1.5$ è il moltiplicatore istituzionale di sicurezza patrimoniale anti-liquidazione.
+- $\text{CVaR}_{0.95}^{\text{annuale}}$ è il Conditional Value at Risk annualizzato del portafoglio titoli ($\approx \text{CVaR}_{0.95, 1d} \times \sqrt{252}$).
+- $w_{\text{equity}}^{\text{NW}} = \frac{\text{Valore Azionario}}{\text{Patrimonio Netto Complessivo}}$ rappresenta il grado di leva e di esposizione rischiosa del bilancio personale.
+
+Il runway obiettivo e l'ammontare monetario della riserva di sicurezza risultano:
+
+$$
+\text{Runway Target}_{\text{risk-adjusted}} = \text{Runway Target}_{\text{base}} \times \mathcal{M}_{\text{risk-buffer}}
+$$
+
+$$
+\text{Target Emergency Fund (EUR)} = \text{Runway Target}_{\text{risk-adjusted}} \times \text{Monthly Burn Rate}
+$$
+
+$$
+\text{Liquidity Gap (EUR)} = \max\left(0, \; \text{Target Emergency Fund} - \text{Liquid Cash}\right)
+$$
+
+Se $\text{Liquidity Gap} > 0$, il motore emette una prescrizione vincolante di ricapitalizzazione della riserva monetaria prima di autorizzare nuovi acquisti di asset a rischio.
+
+---
+
+## 101. Regolarizzazione Spettrale e Shrinkage della Matrice di Covarianza (`core/risk_engine.py`)
+
+Nel calcolo del VaR parametrico, della decomposizione di Eulero e dell'ottimizzazione Min-CVaR, la matrice di covarianza empirica dei rendimenti $\mathbf{S} = \frac{1}{T-1}\mathbf{X}^T \mathbf{X}$ risulta frequentemente mal condizionata o singolare quando il numero di asset $N$ è prossimo alla lunghezza della serie storica $T$, o in presenza di asset fortemente correlati.
+
+### 1. Contrazione Lineare Ottimale di Ledoit-Wolf (2004)
+Per ridurre l'errore quadratico medio di stima asintotico senza introdurre bias soggettivi, ARGUS applica lo stimatore di contrazione analitica di **Ledoit & Wolf (2004)**:
+
+$$
+\boldsymbol{\Sigma}_{\text{LW}} = (1 - \delta^*) \mathbf{S} + \delta^* \mathbf{F}
+$$
+
+dove:
+- $\mathbf{S}$ è la matrice di covarianza campionaria non distorta.
+- $\mathbf{F}$ è la matrice target ad alta stabilità (modello a correlazione costante o target a singolo fattore di mercato di Sharpe).
+- $\delta^* \in [0, 1]$ è il parametro di contrazione ottimale computato analiticamente minimizzando la norma di Frobenius attesa:
+
+$$
+\delta^* = \arg\min_\delta \mathbb{E}\left[ \|\boldsymbol{\Sigma}_{\text{LW}} - \boldsymbol{\Sigma}_{\text{true}}\|_F^2 \right]
+$$
+
+### 2. Proiezione Spettrale Semi-Definita Positiva (PSD Guarantee)
+Per garantire che nessun autovalore sia negativo o identicamente nullo (il che causerebbe il fallimento della decomposizione triangolare di Cholesky $\mathbf{L}\mathbf{L}^T$ o della formula di Eulero per divisione per zero), ARGUS applica una regolarizzazione spettrale simmetrica:
+
+1. **Simmetrizzazione Forzata**:
+   $$
+   \boldsymbol{\Sigma}_{\text{sym}} = \frac{\boldsymbol{\Sigma} + \boldsymbol{\Sigma}^T}{2}
+   $$
+
+2. **Decomposizione Spettrale (Eigen-Decomposition)**:
+   $$
+   \boldsymbol{\Sigma}_{\text{sym}} = \mathbf{V} \boldsymbol{\Lambda} \mathbf{V}^T
+   $$
+   dove $\mathbf{V}$ è la matrice ortogonale degli autovettori e $\boldsymbol{\Lambda} = \text{diag}(\lambda_1, \dots, \lambda_N)$ è la matrice diagonale degli autovalori reali.
+
+3. **Troncamento Inferiore degli Autovalori (Floor Clipping)**:
+   Fissando una soglia minima di sicurezza $\epsilon_{\text{floor}} = 10^{-8}$:
+   $$
+   \tilde{\lambda}_i = \max(\lambda_i, \; \epsilon_{\text{floor}})
+   $$
+
+4. **Ricostruzione della Matrice PSD**:
+   $$
+   \boldsymbol{\Sigma}_{\text{PSD}} = \mathbf{V} \cdot \text{diag}(\tilde{\lambda}_1, \dots, \tilde{\lambda}_N) \cdot \mathbf{V}^T
+   $$
+
+Questa procedura assicura analiticamente:
+- $\mathbf{w}^T \boldsymbol{\Sigma}_{\text{PSD}} \mathbf{w} > 0$ per ogni vettore non nullo $\mathbf{w} \ne \mathbf{0}$.
+- Condizionamento numerico ottimale $\kappa(\boldsymbol{\Sigma}) \le \frac{\lambda_{\max}}{\epsilon_{\text{floor}}}$.
+- Esatta computabilità e stabilità deterministica del Marginal VaR, Component VaR e delle simulazioni Monte Carlo.
+
 

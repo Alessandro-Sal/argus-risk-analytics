@@ -2513,7 +2513,9 @@ def compute_tax_loss_harvesting_and_latent_taxes(engine, portfolio_id: int = 1) 
 # ============================================================
 
 
-def compute_wealth_risk_integrated_analytics(engine, wealth_portfolio_id: int = 1) -> Dict[str, Any]:
+def compute_wealth_risk_integrated_analytics(
+    engine, wealth_portfolio_id: int = 1, risk_summary: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Integra quantitativamente il Modulo Risk con il Modulo Wealth:
     - Liquidity-at-Risk (LaR) & Dimensionamento Dinamico del Fondo di Emergenza (Anti-Forced Selling)
@@ -2528,10 +2530,53 @@ def compute_wealth_risk_integrated_analytics(engine, wealth_portfolio_id: int = 
     re_val = nw.real_estate_total
     gold_val = nw.precious_metals_total + (nw.physical_assets * 0.5)
 
-    # Parametri di Rischio Portfolio (Estrapolati dal motore di rischio)
-    vol_ann = 0.185  # Volatilità annua stimata portafoglio titoli (18.5%)
-    cvar_95 = 0.268  # 95% CVaR a 1 anno (Expected Shortfall 26.8%)
-    max_drawdown_hist = 0.312  # Max Drawdown storico
+    # Parametri di Rischio Portfolio Dinamici (Estrapolati da risk_summary o dai profili collegati)
+    vol_ann = None
+    cvar_95 = None
+    max_drawdown_hist = None
+
+    if risk_summary and isinstance(risk_summary, dict) and not risk_summary.get("is_fallback", False):
+        v = risk_summary.get("volatility", risk_summary.get("volatility_pct", risk_summary.get("vol_annual")))
+        if v is not None:
+            vol_ann = float(v) / 100.0 if float(v) > 1.0 else float(v)
+        c = risk_summary.get("cvar_95", risk_summary.get("cvar", risk_summary.get("cvar_hist_95")))
+        if c is not None:
+            cvar_95 = float(c) / 100.0 if float(c) > 1.0 else float(c)
+        m = risk_summary.get("max_drawdown", risk_summary.get("max_dd_pct", risk_summary.get("max_drawdown_pct")))
+        if m is not None:
+            max_drawdown_hist = abs(float(m)) / 100.0 if abs(float(m)) > 1.0 else abs(float(m))
+
+    if (vol_ann is None or cvar_95 is None or max_drawdown_hist is None) and df_risk is not None and not df_risk.empty:
+        try:
+            from core.multi_portfolio import load_portfolio_profile, _extract_metrics_safe
+
+            vols, cvars, mdds, weights = [], [], [], []
+            for _, r_row in df_risk.iterrows():
+                p_name = str(r_row.get("name", ""))
+                p_val = float(r_row.get("latest_value", 0.0))
+                prof = load_portfolio_profile(p_name)
+                if prof and p_val > 0:
+                    m = _extract_metrics_safe(prof)
+                    vols.append(m["volatility_pct"] / 100.0)
+                    c_val = prof.get("metrics", {}).get("cvar_95", m["var_95_pct"] * 1.35)
+                    cvars.append((c_val / 100.0) if c_val > 1.0 else c_val)
+                    mdds.append(abs(m["max_dd_pct"]) / 100.0)
+                    weights.append(p_val)
+            if weights and sum(weights) > 0:
+                tot_w = sum(weights)
+                vol_ann = sum(v * w for v, w in zip(vols, weights)) / tot_w
+                cvar_95 = sum(c * w for c, w in zip(cvars, weights)) / tot_w
+                max_drawdown_hist = max(mdds)
+        except Exception:
+            pass
+
+    # Fallback prudenziale empirico (portafoglio multi-asset Stocks + Crypto)
+    if vol_ann is None or vol_ann <= 0:
+        vol_ann = 0.298
+    if cvar_95 is None or cvar_95 <= 0:
+        cvar_95 = 0.448
+    if max_drawdown_hist is None or max_drawdown_hist <= 0:
+        max_drawdown_hist = 0.384
 
     # 1. Liquidity-at-Risk & Anti-Forced-Selling Buffer
     # Se il portafoglio titoli ha un CVaR elevato o alta concentrazione, il fondo emergenza deve salire

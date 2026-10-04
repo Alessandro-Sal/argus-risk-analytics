@@ -332,10 +332,10 @@ def generate_institutional_audit_dossier(
         v = abs(float(raw_val or 0.0))
         if v <= 0.0:
             return default_pct
-        if v < 0.50:
-            return v * 100.0  # Da decimale (0.025) a percentuale (2.50%)
+        if v <= 0.08:
+            return v * 100.0  # Da decimale (es. 0.025) a percentuale (2.50%)
         if v <= 25.0:
-            return v          # Già in percentuale (es. 2.50%)
+            return v          # Già in percentuale (es. 0.40% o 2.50%)
         return (v / port_val * 100.0) if port_val > 0 else default_pct
 
     var95_p = _extract_var_pct(mk.get("var_95_pct", mk.get("var_95", 0.0)), 1.65)
@@ -2308,13 +2308,13 @@ def generate_excel_report(results: dict, portfolio_name: str = "My Portfolio") -
         if cost_tot <= 0 and val_tot > 0:
             cost_tot = max(0.0, val_tot - pnl_tot)
 
-        var95_pct = abs(float(mk.get("var_95", mk.get("var_95_pct", 0.0)) or 0.0))
-        if 0 < var95_pct < 0.50:
+        var95_pct = abs(float(mk.get("var_95_pct", mk.get("var_95", 0.0)) or 0.0))
+        if 0 < var95_pct <= 0.08:
             var95_pct *= 100.0
         var95_eur = val_tot * (var95_pct / 100.0)
 
-        cvar95_pct = abs(float(mk.get("cvar_95", mk.get("cvar_95_pct", var95_pct * 1.28)) or 0.0))
-        if 0 < cvar95_pct < 0.50:
+        cvar95_pct = abs(float(mk.get("cvar_95_pct", mk.get("cvar_95", var95_pct * 1.28)) or 0.0))
+        if 0 < cvar95_pct <= 0.08:
             cvar95_pct *= 100.0
         cvar95_eur = val_tot * (cvar95_pct / 100.0)
 
