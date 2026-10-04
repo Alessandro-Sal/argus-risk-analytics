@@ -844,26 +844,17 @@ argus-risk-analytics/
 │   └── sync_google_sheets.py    # Pipeline ETL Google Sheets con iniezione dati
 ├── notebooks/                   # Jupyter Notebooks di prototyping quantitativo
 │   └── test_pipeline.ipynb
-├── scripts/                     # Script di Build, Schema SQL, Verifica e Pacchettizzazione
+├── scripts/                     # Script di Build, Schema SQL, Reporting e Packaging
 │   ├── DB.sql                   # Schema DDL Data Warehouse MySQL 8.0 (Risk & Assets)
 │   ├── DB_wealth.sql            # Schema DDL Wealth Management MySQL 8.0
 │   ├── build_desktop_app.py     # Automazione compilazione PyInstaller (.exe standalone)
-│   ├── check_percent_math.py    # Validatore automatico scala percentuale (0-1 vs 0-100%) nelle formule
 │   ├── create_desktop_shortcut.py # Generatore collegamento Desktop con icona (.lnk)
 │   ├── export_star_schema.py    # Generatore pacchetto ZIP Star Schema per Power BI & Looker Studio
-│   ├── find_versions.py         # Script di audit e allineamento versione dell'ecosistema
-│   ├── fix_duplicate_portfolios.py # Utility per deduplicazione e bonifica profili multi-portafoglio
-│   ├── fix_duplicate_portfolios.sql # Script SQL di deduplicazione record portafoglio
 │   ├── freeze_historical_snapshots.py # Script per congelamento deterministico snapshot patrimoniali
 │   ├── generate_excel_model.py  # Generatore standalone modello Excel dinamico con formule RTD
 │   ├── generate_icon.py         # Generatore icona ICO multi-risoluzione
-│   ├── generate_readme_tree.py  # Generatore e validatore deterministico dell'albero repository README
 │   ├── generate_realistic_portfolio.py # Quantitative Simulation Engine (3 Archetipi, PAC, Mutui, Solvibilità)
-│   ├── inspect_readme.py        # Validatore di consistenza per la documentazione del repository
-│   ├── package_release.py       # Pacchettizzatore Release ZIP con hash crittografici
-│   ├── test_latex_syntax.py     # Test suite CI per validazione sintattica KaTeX/LaTeX su tutta la documentazione
-│   ├── test_run.py              # Script di esecuzione rapida smoke test
-│   └── verify_portfolio_test.py # Verifica deterministica di quadratura contabile sui portafogli di test
+│   └── package_release.py       # Pacchettizzatore Release ZIP con hash crittografici
 ├── src/                         # Codice sorgente dell'applicazione Streamlit (22 Moduli Operativi)
 │   ├── 0_Control_Room.py        # Entry point principale, Total Wealth Hub & Control Room
 │   └── pages/                   # Moduli e viste della dashboard (1..21)

@@ -28,7 +28,7 @@ Questa release consolida l'integrità quantitativa, la quadratura algebrica e l'
   - Piena coerenza tra KPI visualizzati nella dashboard Streamlit e dati esportati nei report PDF, HTML e CSV.
 - **Audit e Validazione Globale della Documentazione & Sintassi LaTeX (`docs/metriche_rischio.md`, `docs/methodology/risk_engine.md`, `docs/index.md`, `README.md`)**:
   - Aggiunte le sezioni istituzionali 99, 100 e 101 su `docs/metriche_rischio.md` e arricchita la metodologia matematica in `docs/methodology/risk_engine.md`.
-  - Verifica della validità strutturale di oltre 1.100 blocchi ed espressioni LaTeX MathJax v3 / `pymdownx.arithmatex` con test suite dedicata `scripts/test_latex_syntax.py`.
+  - Verifica della validità strutturale di oltre 1.100 blocchi ed espressioni LaTeX MathJax v3 / `pymdownx.arithmatex`.
   - Compilazione del sito documentale MkDocs priva di warning sintattici o errori di rendering.
 
 ---
