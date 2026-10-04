@@ -30,11 +30,11 @@ ARGUS v9.19.0 consolida l'integrità quantitativa, la quadratura algebrica e l'a
 ARGUS v9.18.0 consolida l'ecosistema istituzionale a **42 pilastri quantitativi e regolamentari** con un'architettura a tab rigorosamente separata, collegamento dinamico al portafoglio attivo (*Master Wealth*) e **Riquadri Informativi Metodologici (`render_institutional_info_box`)** a 3 colonne (*1. Fondamento Matematico & Modello*, *2. Come Leggere i KPI & i Grafici*, *3. Implicazioni Regolamentari & Operative*) su ogni motore:
 - **ISDA SIMM™ v2.6 & Uncleared Margin Rules (UMR) (`core/isda_simm_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Calcolo di *DeltaMargin*, *VegaMargin* e *CurvatureMargin* sulle 6 classi di rischio ISDA con soglie di concentrazione $CR_k$, matrice cross-risk-class $\psi_{r,s}$, verifica soglia UMR €50M e risparmio MVA tramite Central Clearing CCP (MPOR 5d vs 10d).
 - **Bilateral XVA & Counterparty Credit Risk Engine (`core/xva_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Calcolo CVA, DVA, FVA, MVA e KVA, simulazione Monte Carlo profili di esposizione ($EE$, PFE 95%, PFE 99%, $ENE$, $EEPE$) e accordi di compensazione CSA bilaterali.
-- **CreditMetrics™ S&P 8-State Migration, Vasicek IRB & Fed CCAR / EBA 9Q Capital (`core/credit_metrics_engine.py`, `core/ccar_eba_capital_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Matrice di transizione S&P a 8 stati, modello asintotico a singolo fattore di Vasicek (Basilea III Art. 153 CRR) e proiezione trimestrale 9Q del CET1 Ratio con trigger MDA/AT1 CoCo.
+- **CreditMetrics™ S&P 8-State Migration, Vasicek IRB & Fed CCAR / EBA 9Q Capital (`core/credit_portfolio_engine.py`, `core/ccar_stress_engine.py`, `src/pages/7_🌪️_Stress_Testing.py`)**: Matrice di transizione S&P a 8 stati, modello asintotico a singolo fattore di Vasicek (Basilea III Art. 153 CRR) e proiezione trimestrale 9Q del CET1 Ratio con trigger MDA/AT1 CoCo.
 - **Rough Volatility (rBergomi $H \approx 0.10$) & Gatheral SVI Arbitrage-Free Surface (`core/rough_vol_svi_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Parametrizzazione SVI con verifica assenza di arbitraggio Butterfly di Durrleman ($g(k) \ge 0$) e modello frazionario Rough Bergomi per lo skew ATM a breve termine $\mathcal{O}(T^{H-1/2})$.
 - **Single-Name CDS Bootstrapping & Synthetic Credit Index Tranches (`core/cds_tranche_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Bootstrapping curve di sopravvivenza $Q(0,t)$ e hazard rate $\lambda(t)$, CS01/JTD e prezzatura 1-Factor Gaussian Copula / Base Correlation delle tranche iTraxx Europe / CDX IG (`0-3%`..`12-22%`).
-- **Multi-Curve OIS Bootstrapping, Hull-White Bermudan Swaptions, Heston FFT & Bayesian Black-Litterman (`core/multi_curve_ois_engine.py`, `core/bermudan_swaption_engine.py`, `core/heston_fft_engine.py`, `core/black_litterman_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Separazione discounting €STR / forwarding Euribor 6M, albero trinomiale Hull-White 1F, Fast Fourier Transform di Carr-Madan e ottimizzazione bayesiana con confidenza di Idzorek.
-- **ALM / LDI Redington Immunization, Cash-Flow Matching LP, Schwartz 2F Commodities, Almgren-Chriss & VPIN/Hawkes (`core/alm_ldi_engine.py`, `core/commodity_schwartz_engine.py`, `core/almgren_chriss_engine.py`, `core/market_making_vpin_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**: Immunizzazione attuariale delle passività con programmazione lineare HiGHS, curva forward commodity 2-Factor, traiettoria di liquidazione ottima con tossicità VPIN/Hawkes, Phoenix Autocallable Worst-Of e PRIIPs KID (SRI 1-7) / SFDR 14 PAI.
+- **Multi-Curve OIS Bootstrapping, Hull-White Bermudan Swaptions, Heston FFT & Bayesian Black-Litterman (`core/multicurve_engine.py`, `core/hull_white_engine.py`, `core/heston_fft_engine.py`, `core/black_litterman_engine.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**: Separazione discounting €STR / forwarding Euribor 6M, albero trinomiale Hull-White 1F, Fast Fourier Transform di Carr-Madan e ottimizzazione bayesiana con confidenza di Idzorek.
+- **ALM / LDI Redington Immunization, Cash-Flow Matching LP, Schwartz 2F Commodities, Almgren-Chriss & VPIN/Hawkes (`core/alm_ldi_engine.py`, `core/commodity_engine.py`, `core/optimal_liquidation_engine.py`, `core/market_making_vpin_engine.py`, `src/pages/13_🏛️_Patrimonio_e_NetWorth.py`)**: Immunizzazione attuariale delle passività con programmazione lineare HiGHS, curva forward commodity 2-Factor, traiettoria di liquidazione ottima con tossicità VPIN/Hawkes, Phoenix Autocallable Worst-Of e PRIIPs KID (SRI 1-7) / SFDR 14 PAI.
 - **Endpoint REST Headless v9.18.0 (`api/main.py`)**: `/api/v1/margin/isda-simm`, `/api/v1/wealth/alm-ldi`, `/api/v1/pricing/rough-vol-svi`, `/api/v1/credit/cds-tranches`, `/api/v1/execution/market-making-vpin`, `/api/v1/reporting/executive-board-pack`, `/api/v1/risk/xva`, `/api/v1/pricing/heston`, `/api/v1/optimize/black-litterman`, `/api/v1/risk/basel-liquidity`, `/api/v1/pricing/structured-products`, `/api/v1/regulatory/priips-sfdr`.
 
 ---
@@ -611,11 +611,15 @@ L'applicazione risponde su `http://localhost:8501` e il database su porta `3306`
 ```text
 argus-risk-analytics/
 ├── .github/                     # Workflows di CI/CD e Release automatizzata
-│   ├── workflows/
-│   │   ├── ci.yml
-│   │   ├── deploy-pages.yml
-│   │   └── release.yml
-├── components/                  # Modali Istituzionali @st.dialog, Command Palette (Ctrl+K) & Splash
+│   └── workflows/
+│       ├── ci.yml
+│       ├── deploy-pages.yml
+│       └── release.yml
+├── api/                         # Headless FastAPI Microservice (REST OpenAPI & WebSocket Gateway)
+│   ├── __init__.py
+│   └── main.py                  # API Hub v9.19.0: 40+ Endpoint Istituzionali (SIMM, XVA, FRTB, Heston, Solvency II)
+├── components/                  # Modali Istituzionali @st.dialog, Command Palette (Ctrl+K) & Splash Screen
+│   ├── __init__.py
 │   ├── action_drawers.py        # Institutional Drawers (Pre-Trade Blotter, TUIR Lot Inspector, Euler Risk)
 │   ├── command_palette.py       # Bloomberg-Style Command Palette (Ctrl+K) & Switcher Multi-Modulo
 │   └── splash.py                # Bootloader Splash Screen, Animated Vector Logo & Diagnostics
@@ -624,126 +628,215 @@ argus-risk-analytics/
 ├── core/                        # Engine quantitativo, calcoli di rischio e moduli istituzionali
 │   ├── adapters/                # Adapter per broker esterni (DeGiro, Directa, Fineco, IBKR, ecc.)
 │   │   ├── __init__.py
-│   │   ├── broker_hub.py
-│   │   ├── degiro.py
-│   │   ├── directa.py
-│   │   ├── etoro.py
-│   │   ├── fineco.py
-│   │   ├── ibkr.py
-│   │   ├── isin_resolver.py
-│   │   ├── revolut.py
-│   │   ├── scalable.py
-│   │   └── traderepublic.py
-│   ├── wealth/                  # Wealth Management & Personal Finance Subsystem
-│   │   ├── __init__.py
-│   │   ├── wealth_db.py         # Database SQLite/MySQL & Layer relazionale Wealth
-│   │   ├── wealth_engine.py     # Motore analitico FIRE, Ammortamenti, Real Estate & NWaR
-│   │   ├── wealth_exporter.py   # Esportatore Master Workbook Excel (.xlsx)
-│   │   ├── wealth_importer.py   # Parser universale estratti conto bancari
-│   │   ├── wealth_models.py     # Schemi e dataclass di bilancio personale
-│   │   ├── wealth_snapshot.py   # Gestione snapshot patrimoniali temporali
-│   │   ├── wealth_sync.py       # Sincronizzazione Google Sheets & Config_FixedExpenses
-│   │   └── wealth_validator.py  # Validazione template e formati bancari italiani
-│   ├── advanced_quant.py        # Tail Copulas, Kelly Criterion & Equal Risk Contribution (ERC)
-│   ├── advisor.py               # ARGUS Quant Advisor & Health Score Engine
-│   ├── ai_analyst.py            # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
-│   ├── attribution.py           # Brinson-Fachler, Carino Multi-Period & Karnosky-Singer FX
-│   ├── backup_engine.py         # Zero-Downtime Hot Backup, WAL Checkpoint, PRAGMA Audit & Rollback
-│   ├── bquant_engine.py         # ARGUS BQuant In-App Python Sandbox & DuckDB In-Memory SQL
-│   ├── autonomous_rebalancer.py # Autonomous Rebalancer con WACP/PMC reale & Recupero Minusvalenze
-│   ├── broker_detector.py       # Multi-Broker Ingestion Hub & Auto-Detector Formati
-│   ├── cache_shield.py          # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
-│   ├── closed_trades.py         # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
-│   ├── corporate_actions.py     # Corporate Actions, Stock Splits & Stock Dividends Engine
-│   ├── crypto_provider.py       # Aggregatore multi-provider crypto (Binance, Kraken, CoinGecko)
-│   ├── crypto_tax_engine.py     # Fisco Cripto-Attività, Quadri RT/RW/IVAFE & Zainetto Cripto
-│   ├── data_quality_gate.py     # Pydantic v2 Ingestion Gate, Semantic Sanity & SHA-256 Deduplication
-│   ├── database_migration_manager.py # DBRE Migration Engine, Dual Versioning, Shadow Backup & Drift Inspector
-│   ├── db_exporter.py           # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
-│   ├── diagnostics.py           # System Diagnostics, Storage Cockpit & Maintenance
-│   ├── dividend_engine.py       # Cash Flow Forecast & Dividend Calendar
-│   ├── duckdb_engine.py         # Motore Analitico In-Process DuckDB (OLAP) & Parquet Storage
-│   ├── excel_connector.py       # Bloomberg Formula Generator, VBA Macro, Office Scripts & XLSX Exporter
-│   ├── excel_generator.py       # Modello tattico Excel What-If
-│   ├── exporter.py              # Esportatore CSV denormalizzati
-│   ├── factor_library.py        # Kenneth French Factor Library (5-Factor, MOM & Q1-Q5 Backtest)
-│   ├── fetcher.py               # Download dati storici yfinance & conversione valute
-│   ├── financial_analysis.py    # Altman Z-Score, DuPont, Piotroski, WACC, DCF Monte Carlo
-│   ├── fixed_income.py          # Fixed Income YTM, Duration, Convexity, DV01, Z-Spread, CDS, Nelson-Siegel KRD
-│   ├── forensic_accounting.py   # Beneish M-Score (1999) & Sloan Accrual Ratio (1996)
-│   ├── garch_fhs_engine.py      # Volatilità Condizionale GARCH(1,1) & Filtered Historical Simulation (FHS)
-│   ├── hedging.py               # Copertura Beta-Neutral & Tail Risk Protection
-│   ├── hrp_optimizer.py         # Hierarchical Risk Parity (HRP - Marcos López de Prado)
-│   ├── html_exporter.py         # Exporter Report Standalone HTML
+│   │   ├── broker_hub.py        # Hub centralizzato di rilevamento ed esecuzione adapter
+│   │   ├── degiro.py            # Adapter DeGiro CSV (formato standard e avanzato con commissioni)
+│   │   ├── directa.py           # Adapter Directa SIM CSV
+│   │   ├── etoro.py             # Adapter eToro Account Statement XLSX/CSV
+│   │   ├── fineco.py            # Adapter Fineco Bank estratto conto titoli e liquidità
+│   │   ├── ibkr.py              # Adapter Interactive Brokers (IBKR) Activity Statement CSV/XML
+│   │   ├── isin_resolver.py     # Risoluzione deterministica ISIN <-> Ticker via cache e lookup online
+│   │   ├── revolut.py           # Adapter Revolut Trading CSV
+│   │   ├── scalable.py          # Adapter Scalable Capital Baader Bank PDF/CSV
+│   │   └── traderepublic.py     # Adapter Trade Republic PDF/CSV
 │   ├── i18n/                    # Framework Internazionalizzazione, L10n & Multi-Currency FX Engine
-│   │   ├── formatters.py        # Regional Number/Date Formatters, Wall Street Accounting & Compact Currencies
+│   │   ├── __init__.py
+│   │   ├── formatters.py        # Regional Number/Date Formatters, Wall Street Accounting & Currencies
 │   │   ├── fx_engine.py         # ECB Official Historical Rates, Triangular Arbitrage & FX Risk Decomposition
 │   │   ├── translator.py        # O(1) Key-Path Translation Engine con Interpolazione & Fallback
-│   │   └── locales/             # Dizionari Linguistici Strutturati (it.json, en.json)
-│   ├── ingestion_utils.py       # Universal Bank Ingestion, Sniffer & Encoding Detection
-│   ├── macro_provider.py        # Connettore dati macroeconomici FRED, BCE & Term Structure
-│   ├── metadata_resolver.py     # Risoluzione metadati e anagrafiche asset
-│   ├── models.py                # Schema ORM SQLAlchemy (MySQL & SQLite)
-│   ├── modular_factsheet_builder.py # Institutional Factsheet Generator & Section Compositor
-│   ├── msci_barra_risk_engine.py # MSCI Barra Structural Factor Risk & Euler Decomposition (GEM3)
-│   ├── multi_portfolio.py       # Total Wealth Multi-Account Registry, Scorecard & Consolidator
-│   ├── options_hedging.py       # Black-Scholes 1973, 5 Greci, Delta-Hedging & Covered Call
-│   ├── pdf_generator.py         # Exporter Factsheet PDF (ReportLab)
-│   ├── prescriptive_rebalancer.py # Prescriptive Conic Rebalancer & FIX 4.4 Protocol Blotter
-│   ├── rebalancer.py            # Smart Rebalancer & Generatore Ordini
-│   ├── regime_switching.py      # Market Regime Switching (3-State Markov Model)
-│   ├── report_exporter.py       # Manager Centralizzato Esportazione Report
-│   ├── reporting_design_system.py # Obsidian Sovereign Design System & Numbered Canvas
-│   ├── resilient_market_engine.py # Enterprise SRE Circuit Breaker, Jittered Retry & Multi-Provider Engine
-│   ├── risk_engine.py           # Motore FIFO, VaR/CVaR Euler, L-VaR Bangia, Almgren-Chriss, Kupiec
-│   ├── risk_limits.py           # Early Warning System & Controlli di Rischio UCITS/MiFID
-│   ├── schemas.py               # Data Contracts & Validazione Pydantic
-│   ├── screener_engine.py       # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
-│   ├── sec_rag_engine.py        # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
-│   ├── security_engine.py       # CWE-1236 Anti-Formula Injection, PII Masking & ArgusDataVault AES
-│   ├── sidebar.py               # Navigation Rail v9.7.0, Command Palette (Ctrl+K) & Spotlight Search
-│   ├── streaming_engine.py      # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
-│   ├── tax_engine.py            # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
-│   ├── technical_analysis.py    # Motore Analisi Tecnica, Volume Profile & Confluenza
-│   ├── terminal_engine.py       # Live Terminal Desk, Pre-Trade Risk Checks, OMS Blotter & PnL Attribution
-│   ├── ui_utils.py              # Helper Grafici Plotly, Modali Informativi Istituzionali & Vector SVG Icons
-│   ├── universal_ledger.py      # Universal One-Ledger Core, Star Schema & Vectorized PyArrow/DuckDB
-│   ├── validator.py             # Pipeline di Bonifica & Normalizzazione Dati
-│   ├── voice_advisor_engine.py  # Executive Voice Briefing & Script a 2 Voci (CIO & CRO)
-│   ├── volatility_surface.py    # Superficie di Volatilità Implicita 3D, Skew & Smile Calibration
-│   ├── wealth/                  # Moduli Wealth Ecosystem (DB, Engine, Stress, Ingestion)
-│   │   ├── human_capital_engine.py # Human Capital Actuarial Valuation & Total Balance Sheet VaR
+│   │   └── locales/             # Dizionari Linguistici Strutturati
+│   │       ├── en.json          # Dizionario istituzionale lingua inglese
+│   │       └── it.json          # Dizionario istituzionale lingua italiana
+│   ├── wealth/                  # Wealth Management & Personal Finance Subsystem (27 Moduli)
+│   │   ├── __init__.py
+│   │   ├── asset_protection_engine.py # Asset Protection, Trust, Fondo Patrimoniale, Polizze & Holding (S.s.)
+│   │   ├── glidepath_engine.py  # Goal-Based Dynamic Glide Path 3D & Life Events Probabilistic Engine
+│   │   ├── human_capital_engine.py # Human Capital Actuarial Valuation, Quasi-Asset & TBS-VaR
+│   │   ├── neural_advisor_engine.py # Neural Wealth Advisor & Conversational Action Memo Engine
 │   │   ├── personal_balance_sheet.py # Personal Balance Sheet & Net Worth Reconciliation
-│   │   ├── tax_aware_location.py # Tax-Aware Asset Location & Frictional Optimization
+│   │   ├── private_markets_engine.py # Private Equity, Venture Capital, J-Curve & Illiquid Valuation
+│   │   ├── succession_optimizer.py # Generational Transfer Optimizer, Patto di Famiglia & Nuda Proprietà
+│   │   ├── tax_aware_location.py # Tax-Aware Asset Location & Frictional Optimization (TUIR Art. 44 vs 67)
 │   │   ├── tbs_monte_carlo.py   # Lifetime Total Balance Sheet Monte Carlo Engine (5000 Paths)
+│   │   ├── total_wealth_reverse_stress.py # Reverse Stress Testing sul Patrimonio Netto Consolidato (Solvency II)
 │   │   ├── unified_stress_bridge.py # Cross-Asset Macro Factor Stress Bridge Engine
-│   │   ├── universal_bank_parser.py # Universal Bank Ingestion Hub & Layout Sniffer
-│   │   ├── wealth_db.py         # SQLite / MySQL Star Schema & Snapshot Storicizzati
-│   │   ├── wealth_engine.py     # Net Worth Engine, FIRE SWR & Dynamic Glide Path
-│   │   ├── wealth_exporter.py   # Master Excel Dossier & Multi-Tab Exporter
-│   │   ├── wealth_importer.py   # Ingestion Pipeline & Transaction Deduplication
-│   │   └── wealth_stress_engine.py # Unified Macro Stress Engine & French Mortgage Model
-│   ├── workspace_context.py     # Typed Multi-Session Context & Domain Flush Manager
-│   ├── workspace_engine.py      # ARGUS Launchpad, 5 Ruoli Istituzionali & Layout Persistence
-│   ├── workspace_manager.py     # State Manager, Routing Dinamico & URL State Sync
-│   └── yield_curve.py           # Curva Tassi Privi di Rischio Live Dinamica Multi-Valuta & Nelson-Siegel
+│   │   ├── universal_bank_parser.py # Universal Bank Ingestion Hub & Multi-Broker Layout Sniffer
+│   │   ├── wealth_db.py         # SQLite / MySQL Star Schema & Snapshot Storicizzati Wealth
+│   │   ├── wealth_engine.py     # Net Worth Engine, FIRE SWR, Mutui alla Francese & Dynamic Glide Path
+│   │   ├── wealth_exporter.py   # Master Excel Dossier & Multi-Tab Exporter (.xlsx)
+│   │   ├── wealth_importer.py   # Ingestion Pipeline & Transaction Deduplication SHA-256
+│   │   ├── wealth_modals.py     # Modali Informativi ed Educativi Istituzionali Wealth (@st.dialog)
+│   │   ├── wealth_models.py     # Schemi, Enums e Dataclass tipizzate di bilancio personale
+│   │   ├── wealth_olap.py       # Motore OLAP Vettorizzato DuckDB In-Memory & Aggregazioni Temporali
+│   │   ├── wealth_reporting_hub.py # Centralized Wealth Reporting & Factsheet Hub
+│   │   ├── wealth_snapshot.py   # Gestione snapshot patrimoniali temporali e riconciliazione Net Worth
+│   │   ├── wealth_stress_engine.py # Unified Macro Stress Engine & French Mortgage Variable Rate Model
+│   │   ├── wealth_sync.py       # Sincronizzazione Google Sheets & Config_FixedExpenses
+│   │   ├── wealth_temporal_engine.py # Time-Series Wealth Analytics & Historic Reconciliation
+│   │   ├── wealth_validator.py  # Validazione template e formati bancari italiani
+│   │   └── wealth_watchdog.py   # Smart Financial Watchdog & Proactive Anomaly Alert Engine
+│   ├── __init__.py                   # Package init e versione dell'ecosistema (v9.19.0)
+│   ├── advanced_quant.py             # Tail Copulas, Kelly Criterion & Equal Risk Contribution (ERC)
+│   ├── advisor.py                    # ARGUS Quant Advisor & Health Score Engine
+│   ├── ai_analyst.py                 # AI & LLM Narrative Intelligence (Gemini/OpenAI & NLG Offline)
+│   ├── alm_ldi_engine.py             # ALM, Redington Immunization, LDI Receiver Swap & Cash-Flow Matching LP
+│   ├── archetype_manager.py          # Gestione profili patrimoniali istituzionali e archetipi didattici
+│   ├── attribution.py                # Brinson-Fachler, Carino Multi-Period & Karnosky-Singer FX
+│   ├── autonomous_rebalancer.py      # Autonomous Rebalancer con WACP/PMC reale & Recupero Minusvalenze
+│   ├── backup_engine.py              # Zero-Downtime Hot Backup, WAL Checkpoint, PRAGMA Audit & Rollback
+│   ├── barra_risk_model.py           # MSCI Barra GEM3/USE4 Structural Multi-Factor Risk Decomposition
+│   ├── basel_liquidity_engine.py     # Basilea III LCR, NSFR & Dynamic Cash Flow Stress Ladder (BCBS 238)
+│   ├── bitemporal_engine.py          # Motore di persistenza bitemporale (Valid Time vs Transaction Time) & Audit Hash SHA-256
+│   ├── black_litterman_engine.py     # Bayesian Black-Litterman Portfolio Optimization & Idzorek Confidence
+│   ├── bquant_engine.py              # ARGUS BQuant In-App Python Sandbox & DuckDB In-Memory SQL
+│   ├── cache_shield.py               # Multi-Tier LRU & SQLite Rate-Limit Shield (yfinance)
+│   ├── ccar_stress_engine.py         # Supervisory Fed CCAR / EBA 9-Quarter Capital Stress & CET1 Trajectory
+│   ├── cds_tranche_engine.py         # ISDA Single-Name CDS Bootstrapping & Tranche Sintetiche iTraxx/CDX
+│   ├── chart_framework.py            # ARGUS Institutional Plotly Design System & High-Performance Chart Framework
+│   ├── climate_stress_engine.py      # NGFS Phase IV Climate Transition & Physical Risk Stress Engine
+│   ├── closed_trades.py              # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
+│   ├── commodity_engine.py           # Gibson-Schwartz 2-Factor Commodity Futures, Convenience Yield & Kirk Spread
+│   ├── confirm_dialogs.py            # Modali interattivi di conferma operazioni critiche e transazioni (@st.dialog)
+│   ├── corporate_actions.py          # Corporate Actions, Stock Splits & Stock Dividends Engine
+│   ├── credit_portfolio_engine.py    # CreditMetrics S&P 8-State Migration & Vasicek Multi-Obligor IRB
+│   ├── cross_border_tax_engine.py    # Fisco cross-border, convenzioni contro le doppie imposizioni & W-8BEN
+│   ├── crypto_provider.py            # Aggregatore multi-provider crypto (Binance, Kraken, CoinGecko)
+│   ├── crypto_tax_engine.py          # Fisco Cripto-Attività, Quadri RT/RW/IVAFE & Zainetto Cripto
+│   ├── data_quality_gate.py          # Pydantic v2 Ingestion Gate, Semantic Sanity & SHA-256 Deduplication
+│   ├── database_migration_manager.py # DBRE Migration Engine, Dual Versioning, Shadow Backup & Drift Inspector
+│   ├── db_exporter.py                # Layer di storicizzazione snapshot su DB (MySQL & SQLite)
+│   ├── dcc_garch_engine.py           # Engle Dynamic Conditional Correlation (DCC-GARCH) & Asymmetric GJR
+│   ├── diagnostics.py                # System Diagnostics, Storage Cockpit & Lead SRE Observability
+│   ├── dividend_engine.py            # Cash Flow Forecast & Dividend Calendar
+│   ├── duckdb_engine.py              # Motore Analitico In-Process DuckDB (OLAP) & Parquet Storage
+│   ├── esg_engine.py                 # ESG Scoring, Carbon Intensity Scope 1-3 & SFDR Art. 8/9 Classification
+│   ├── excel_connector.py            # Bloomberg Formula Generator, VBA Macro, Office Scripts & XLSX Exporter
+│   ├── excel_generator.py            # Modello tattico Excel What-If
+│   ├── execution_algo.py             # Algoritmi di esecuzione TWAP, VWAP, POV & Square-Root Market Impact
+│   ├── execution_algo_engine.py      # Motore di simulazione avanzata esecuzione algoritmica & Almgren-Chriss
+│   ├── executive_board_pack_engine.py # 1-Click CRO Executive Board-Pack & Actionable Playbook Synthesizer
+│   ├── exporter.py                   # Esportatore CSV denormalizzati
+│   ├── factor_library.py             # Kenneth French Factor Library (5-Factor, MOM & Q1-Q5 Backtest)
+│   ├── fetcher.py                    # Download dati storici yfinance & conversione valute
+│   ├── financial_analysis.py         # Altman Z-Score, DuPont, Piotroski, WACC, DCF Monte Carlo
+│   ├── fix_engine.py                 # Protocollo di negoziazione istituzionale FIX 4.4 (Execution & Routing Mock)
+│   ├── fixed_income.py               # Fixed Income YTM, Duration, Convexity, DV01, Z-Spread, CDS, Nelson-Siegel KRD
+│   ├── forensic_accounting.py        # Beneish M-Score (1999) & Sloan Accrual Ratio (1996)
+│   ├── frtb_engine.py                # FRTB Basilea IV Standardized Approach (SBM, DRC & RRAO - BCBS 365)
+│   ├── fx_overlay_engine.py          # Dynamic FX Hedging Overlay, Carry Trade & Forward FX Pricing
+│   ├── garch_engine.py               # Volatilità condizionale GARCH(1,1), architettura di stima ML & forecasting
+│   ├── hedging.py                    # Copertura Beta-Neutral & Tail Risk Protection
+│   ├── heston_fft_engine.py          # Heston Stochastic Volatility FFT Option Pricing & Surface Calibration
+│   ├── hmm_regime_engine.py          # Hidden Markov Model (HMM) Adaptive Regime Switching & Viterbi Decoding
+│   ├── hrp_optimizer.py              # Hierarchical Risk Parity (HRP - Marcos López de Prado)
+│   ├── html_exporter.py              # Exporter Report Standalone HTML
+│   ├── hull_white_engine.py          # Hull-White 1-Factor Short Rate & Bermudan Swaption Tree Pricing
+│   ├── ingestion_utils.py            # Universal Bank Ingestion, Sniffer & Encoding Detection
+│   ├── isda_simm_engine.py           # ISDA SIMM v2.6 Initial Margin & BCBS-IOSCO UMR €50M Rule Checker
+│   ├── loading_states.py             # UI Lifecycle, Skeleton Loaders, Atomicity & Loading Transitions
+│   ├── macro_provider.py             # Connettore dati macroeconomici FRED, BCE & Term Structure
+│   ├── macro_stress_engine.py        # Stress testing macroeconomico congiunto (tassi, spread, inflazione, PIL)
+│   ├── macro_war_room.py             # Interactive Macro War Room, Geopolitical Stress & Correlation Breakdown
+│   ├── market_making_vpin_engine.py  # Avellaneda-Stoikov Market-Making & Hawkes VPIN Toxicity Engine
+│   ├── metadata_resolver.py          # Risoluzione metadati e anagrafiche asset
+│   ├── mip_rebalancer.py             # Mixed-Integer Programming (MIP/MILP) Cardinality & Lot-Sizing Rebalancer
+│   ├── models.py                     # Schema ORM SQLAlchemy (MySQL & SQLite)
+│   ├── modular_factsheet_builder.py  # Institutional Factsheet Generator & Section Compositor
+│   ├── morning_meeting_engine.py     # Morning Meeting Audio Briefing & Executive Daily Note Engine
+│   ├── msci_barra_risk_engine.py     # MSCI Barra Structural Factor Risk & Euler Decomposition (GEM3)
+│   ├── multi_portfolio.py            # Total Wealth Multi-Account Registry, Scorecard & Consolidator
+│   ├── multicurve_engine.py          # Post-LIBOR Multi-Curve OIS Discounting (€STR/SOFR) & Dual Bootstrapping
+│   ├── onboarding_guard.py           # Onboarding Wizard & Guardrail per primo avvio piattaforma
+│   ├── optimal_liquidation_engine.py # Optimal Liquidation con Square-Root Impact, POV VWAP & Almgren-Chriss
+│   ├── options_hedging.py            # Black-Scholes 1973, 5 Greci, Delta-Hedging & Covered Call
+│   ├── options_workbench.py          # Workbench opzioni interattivo, pay-off diagram & strategie complesse
+│   ├── pdf_generator.py              # Exporter Factsheet PDF (ReportLab) con Numbered Canvas
+│   ├── prescriptive_rebalancer.py    # Prescriptive Conic Rebalancer & FIX 4.4 Protocol Blotter
+│   ├── priips_kid_generator.py       # PRIIPs KID Regulatory Engine (SRI 1-7, 4 Scenari di Performance, SFDR)
+│   ├── private_debt_engine.py        # Private Debt, Mezzanine Financing, Cash Flow Waterfall & Covenants
+│   ├── quarterly_report_generator.py # Generatore di report trimestrali istituzionali white-label
+│   ├── rebalancer.py                 # Smart Rebalancer & Generatore Ordini
+│   ├── regime_allocation.py          # Asset allocation tattica condizionata al regime di mercato
+│   ├── regime_switching.py           # Market Regime Switching (3-State Markov Model)
+│   ├── regulatory_reporting_engine.py # Motore unificato per reporting regolamentare (PRIIPs, SFDR, MiFID II)
+│   ├── reinforcement_learning.py     # Deep Q-Learning & Actor-Critic Portfolio Rebalancing Agent
+│   ├── report_exporter.py            # Manager Centralizzato Esportazione Report
+│   ├── reporting_design_system.py    # Obsidian Sovereign Design System & Numbered Canvas
+│   ├── resilient_market_engine.py    # Enterprise SRE Circuit Breaker, Jittered Retry & Multi-Provider Engine
+│   ├── risk_engine.py                # Motore FIFO, VaR/CVaR Euler, L-VaR Bangia, Almgren-Chriss, Kupiec
+│   ├── risk_limits.py                # Early Warning System & Controlli di Rischio UCITS/MiFID
+│   ├── rough_vol_svi_engine.py       # Rough Volatility (rBergomi H~0.10) & Gatheral SVI Arbitrage-Free Surface
+│   ├── sabr_local_vol_engine.py      # Hagan SABR (2002) & Dupire Local Volatility Surface Calibration
+│   ├── schemas.py                    # Data Contracts & Validazione Pydantic v2
+│   ├── screener_engine.py            # EQS Formula Engine, Screener Multi-Fattoriale & Pre-Trade Simulator
+│   ├── sec_rag_engine.py             # Local RAG & Vector Store Semantico sui Bilanci SEC (10-K/10-Q)
+│   ├── security_engine.py            # CWE-1236 Anti-Formula Injection, PII Masking & ArgusDataVault AES
+│   ├── session_manager.py            # ArgusSessionManager: Type-Safe Session State Governance & Fallback
+│   ├── sidebar.py                    # Navigation Rail v9.19.0, Command Palette (Ctrl+K) & Spotlight Search
+│   ├── smart_order_router.py         # MiFID II RTS 28 Smart Order Router & Execution Venues Slicing
+│   ├── solvency2_engine.py           # Solvency II Standard Formula SCR & Market Risk Correlation Aggregation
+│   ├── stochastic_kernel.py          # Simulatore stocastico Monte Carlo vettorizzato (Browniano, Jump, CIR)
+│   ├── streaming_engine.py           # Real-Time Ring Buffer, VWAP, Order Flow Imbalance & Level-2 Book
+│   ├── structured_products_engine.py # Derivati esotici, Phoenix Autocallable Worst-Of & Reverse Convertible
+│   ├── tax_aware_rebalancer.py       # Ribilanciamento tax-aware con compensazione plusvalenze e minusvalenze pregresse
+│   ├── tax_engine.py                 # Ottimizzazione Fiscale TUIR Art. 67 & Tax-Loss Harvesting Wizard
+│   ├── technical_analysis.py         # Motore Analisi Tecnica, Volume Profile & Confluenza
+│   ├── temporal_engine.py            # Motore di Analisi Temporale, Rolling Risk & Performance Matrix
+│   ├── terminal_engine.py            # Live Terminal Desk, Pre-Trade Risk Checks, OMS Blotter & PnL Attribution
+│   ├── trade_staging_blotter.py      # Blotter per staging ordini pre-trade con validazione limiti
+│   ├── ui_export_utils.py            # Universal Export Toolbar isolata con @st.fragment per tabelle e report
+│   ├── ui_lifecycle.py               # Gestione ciclo di vita UI, caching transitorio e teardown sicuro
+│   ├── ui_utils.py                   # Helper Grafici Plotly, Modali Informativi Istituzionali & Vector SVG Icons
+│   ├── unified_demo_seeder.py        # Seeder universale dataset demo & scenari di prova realistici
+│   ├── universal_ledger.py           # Universal One-Ledger Core, Star Schema & Vectorized PyArrow/DuckDB
+│   ├── ux_institutional_hub.py       # Institutional Terminal UX/UI Hub, Bloomberg Command Bar & Top Bar
+│   ├── ux_quant_canvas.py            # Visual Quant Canvas 3D & 2D Interactive Figures Engine
+│   ├── validator.py                  # Pipeline di Bonifica & Normalizzazione Dati
+│   ├── voice_advisor_engine.py       # Executive Voice Briefing & Script a 2 Voci (CIO & CRO)
+│   ├── volatility_surface.py         # Superficie di Volatilità Implicita 3D, Skew & Smile Calibration
+│   ├── walk_forward_engine.py        # Walk-Forward Rolling Out-of-Sample Optimizer con attrito reale
+│   ├── workspace_context.py          # Typed Multi-Session Context & Domain Flush Manager
+│   ├── workspace_engine.py           # ARGUS Launchpad, 5 Ruoli Istituzionali & Layout Persistence
+│   ├── workspace_manager.py          # State Manager, Routing Dinamico & URL State Sync
+│   ├── xva_engine.py                 # Bilateral XVA (CVA, DVA, FVA, MVA, KVA) & CSA Netting Exposure Simulation
+│   ├── yield_curve.py                # Curva Tassi Privi di Rischio Live Dinamica Multi-Valuta & Nelson-Siegel
 ├── data/                        # Dataset di input & database SQLite fallback
+│   ├── archetypes/              # Profili didattici patrimoniali (Giovane Accumulatore, Famiglia, HNWI)
+│   ├── multi_portfolios/        # Repository JSON profili multi-portafoglio registrati
+│   ├── Transactions.csv         # Dataset storico reale DeGiro WealthApp (400+ operazioni verificate)
 │   ├── portfolio_transactions_realistic.csv # Dataset realistico multi-asset multi-valuta (EUR, USD, GBP, CHF)
-│   ├── argus_workspaces.db      # Database SQLite per persistenza profili Launchpad
-│   ├── argus_wealth.db          # Database SQLite locale Wealth Ecosystem
+│   ├── argus_local.db           # Database SQLite locale Data Warehouse e snapshot storici
+│   ├── argus_wealth.db          # Database SQLite locale Wealth Management Ecosystem
+│   ├── argus_workspaces.db      # Database SQLite per persistenza profili Launchpad & workspaces
+│   ├── bitemporal_ledger.duckdb # Database analitico colonnare DuckDB per One-Ledger bitemporale
+│   ├── yfinance_cache.db        # Database SQLite Cache Shield per rate-limiting e caching 24h
 │   └── .gitkeep
 ├── docker/                      # File di containerizzazione Docker
-│   └── Dockerfile               # Multi-stage build hardening (non-root unprivileged user)
+│   └── Dockerfile               # Multi-stage build hardening (non-root unprivileged user argus:argus)
 ├── docs/                        # Documentazione Tecnica & Specifica Architetturale
+│   ├── compliance/
+│   │   └── whitepaper.md        # Whitepaper di conformità normativa (Basilea IV, MiFID II, TUIR, Solvency II)
+│   ├── getting-started/
+│   │   ├── installation.md      # Guida all'installazione locale, virtual environment e dipendenze
+│   │   └── quickstart.md        # Guida rapida di primo avvio e importazione del primo portafoglio
+│   ├── methodology/
+│   │   ├── bitemporal.md        # Fondamenti teorici del ledger bitemporale e tracciabilità rettifiche
+│   │   ├── execution.md         # Modelli di esecuzione ottima, Almgren-Chriss e market impact radice quadrata
+│   │   ├── hrp.md               # Metodologia Hierarchical Risk Parity (HRP) e clustering gerarchico dei pesi
+│   │   └── risk_engine.md       # Manuale metodologico del Quantitative Risk Engine e quadratura di Eulero
 │   ├── CSV_Format_Specification.md # Specifica tecnica formato CSV & DeGiro
-│   ├── DESIGN.md                # Design System & UI Specs
+│   ├── DESIGN.md                # Design System Sovereign Obsidian & Specifiche UI/UX
+│   ├── EXECUTIVE_REPORT_OUTLINE.md # Struttura standard del dossier esecutivo trimestrale
 │   ├── FLOWCHART.md             # Diagramma di Flusso ETL a 5 Livelli
-│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v9.0.0)
-│   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone
-│   ├── argus-architecture.json  # Specifica Architetturale JSON IR
-│   ├── argus_banner.jpg         # Banner grafico del progetto
+│   ├── POWER_BI_GUIDE.md        # Guida all'integrazione del Data Warehouse Star Schema in Microsoft Power BI
+│   ├── PRESENTATION_SLIDES.md   # Presentazione esecutiva e slide deck del progetto
+│   ├── PROJECT_HANDOFF.md       # Documento di Consegna & Handoff Tecnico (v9.19.0)
+│   ├── architecture-map.html    # Mappa architetturale interattiva a nodi
+│   ├── argus-architecture.html  # Diagramma Architetturale HTML Standalone v9.19.0
+│   ├── argus-architecture.json  # Specifica Architetturale JSON IR v9.19.0
+│   ├── argus_banner.jpg         # Banner grafico istituzionale ARGUS
 │   ├── argus_icon.ico           # Asset icona Occhio di Argus
-│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (72 Sezioni)
+│   ├── index.md                 # Home page documentazione MkDocs
+│   └── metriche_rischio.md      # Manuale Matematico ed Econometrico completo (101 Sezioni Istituzionali)
 ├── exports/                     # Cartella di destinazione report esportati (.xlsx, .pdf, .zip)
 │   └── .gitkeep
 ├── gsheets_sync_subproject/     # Sub-servizio Sincronizzazione ETL Google Sheets
@@ -751,65 +844,79 @@ argus-risk-analytics/
 │   └── sync_google_sheets.py    # Pipeline ETL Google Sheets con iniezione dati
 ├── notebooks/                   # Jupyter Notebooks di prototyping quantitativo
 │   └── test_pipeline.ipynb
-├── scripts/                     # Script di Build, Schema SQL e Pacchettizzazione
+├── scripts/                     # Script di Build, Schema SQL, Verifica e Pacchettizzazione
 │   ├── DB.sql                   # Schema DDL Data Warehouse MySQL 8.0 (Risk & Assets)
 │   ├── DB_wealth.sql            # Schema DDL Wealth Management MySQL 8.0
-│   ├── build_desktop_app.py     # Automazione compilazione PyInstaller (.exe)
+│   ├── build_desktop_app.py     # Automazione compilazione PyInstaller (.exe standalone)
+│   ├── check_percent_math.py    # Validatore automatico scala percentuale (0-1 vs 0-100%) nelle formule
 │   ├── create_desktop_shortcut.py # Generatore collegamento Desktop con icona (.lnk)
-│   ├── export_star_schema.py    # Generatore pacchetto ZIP Star Schema per Power BI
-│   ├── generate_excel_model.py  # Generatore standalone modello Excel
+│   ├── export_star_schema.py    # Generatore pacchetto ZIP Star Schema per Power BI & Looker Studio
+│   ├── find_versions.py         # Script di audit e allineamento versione dell'ecosistema
+│   ├── fix_duplicate_portfolios.py # Utility per deduplicazione e bonifica profili multi-portafoglio
+│   ├── fix_duplicate_portfolios.sql # Script SQL di deduplicazione record portafoglio
+│   ├── freeze_historical_snapshots.py # Script per congelamento deterministico snapshot patrimoniali
+│   ├── generate_excel_model.py  # Generatore standalone modello Excel dinamico con formule RTD
 │   ├── generate_icon.py         # Generatore icona ICO multi-risoluzione
+│   ├── generate_readme_tree.py  # Generatore e validatore deterministico dell'albero repository README
 │   ├── generate_realistic_portfolio.py # Quantitative Simulation Engine (3 Archetipi, PAC, Mutui, Solvibilità)
-│   ├── package_release.py       # Pacchettizzatore Release ZIP
-│   └── test_run.py              # Script di esecuzione e verifica rapida
+│   ├── inspect_readme.py        # Validatore di consistenza per la documentazione del repository
+│   ├── package_release.py       # Pacchettizzatore Release ZIP con hash crittografici
+│   ├── test_latex_syntax.py     # Test suite CI per validazione sintattica KaTeX/LaTeX su tutta la documentazione
+│   ├── test_run.py              # Script di esecuzione rapida smoke test
+│   └── verify_portfolio_test.py # Verifica deterministica di quadratura contabile sui portafogli di test
 ├── src/                         # Codice sorgente dell'applicazione Streamlit (22 Moduli Operativi)
 │   ├── 0_Control_Room.py        # Entry point principale, Total Wealth Hub & Control Room
 │   └── pages/                   # Moduli e viste della dashboard (1..21)
-│       ├── 1_📈_Dashboard_Generale.py
-│       ├── 2_🖥️_Live_Terminal.py
-│       ├── 3_🔴_Analisi_Rischio.py
-│       ├── 4_🔬_Modelli_Quantitativi.py
-│       ├── 5_📋_Posizioni_e_Dettagli.py
-│       ├── 6_🏛️_Valutazione_Aziendale.py
-│       ├── 7_🌪️_Stress_Testing.py
-│       ├── 8_📊_Analisi_Temporale.py
-│       ├── 9_📈_Analisi_Tecnica.py
-│       ├── 10_🔍_Screener_Opportunita.py
-│       ├── 11_💻_BQuant_e_Launchpad.py
-│       ├── 12_🎛️_Wealth_Control_Room.py
-│       ├── 13_🏛️_Patrimonio_e_NetWorth.py
-│       ├── 14_💳_Cash_Flow_e_Spese.py
-│       ├── 15_⌚_Asset_Illiquidi_e_Orologi.py
-│       ├── 16_🛡️_Previdenza_e_Pension_Planning.py
-│       ├── 17_🔥_Indipendenza_Finanziaria_e_FIRE.py
-│       ├── 18_📑_Fiscalita_e_Quadro_RW.py
-│       ├── 19_🏡_Immobili_e_Mutui.py
-│       ├── 20_⚖️_Pianificazione_Successoria.py
-│       └── 21_🤖_AI_Copilot_e_Advisor.py
-├── tests/                       # Test suite automatizzata PyTest (550 Test su 93 File)
-│   ├── test_adapters.py
+│       ├── 1_📈_Dashboard_Generale.py # Executive Cockpit, Asset Allocation & Performance Summary
+│       ├── 2_🖥️_Live_Terminal.py     # Institutional Terminal Desk, Pre-Trade Risk Checks & OMS Blotter
+│       ├── 3_🔴_Analisi_Rischio.py   # Cornish-Fisher CVaR, Euler VaR, GARCH(1,1), L-VaR & Basilea IV
+│       ├── 4_🔬_Modelli_Quantitativi.py # Markowitz, HRP, Copula, Heston FFT, SABR 3D, Hull-White & CDS
+│       ├── 5_📋_Posizioni_e_Dettagli.py # Analisi Granulare Posizioni, PnL Storico & Movimenti
+│       ├── 6_🏛️_Valutazione_Aziendale.py # Altman Z-Score, Beneish M-Score, DCF & DuPont Analysis
+│       ├── 7_🌪️_Stress_Testing.py    # Macro Stress, EBA 2026, CCAR, FRTB SBM, NGFS Climate, ISDA SIMM & XVA
+│       ├── 8_📊_Analisi_Temporale.py  # Rolling Risk Metrics, Drawdown Matrix & Regime Switching
+│       ├── 9_📈_Analisi_Tecnica.py    # Volume Profile (POC/VAH/VAL), ATR Chandelier & Oscillatori
+│       ├── 10_🔍_Screener_Opportunita.py # Multi-Factor Screener, EQS Engine & Fundamental Filters
+│       ├── 11_💻_BQuant_e_Launchpad.py # In-App Python Sandbox, DuckDB SQL & Launchpad Workspace
+│       ├── 12_🎛️_Wealth_Control_Room.py # Wealth Management Cockpit & Data Quality Overview
+│       ├── 13_🏛️_Patrimonio_e_NetWorth.py # Net Worth Consolidato, ALM/LDI Cash-Flow Matching & Reverse Stress
+│       ├── 14_💳_Cash_Flow_e_Spese.py # Cash Flow Analysis, Budgeting 50/30/20 & Emergency Runway
+│       ├── 15_⌚_Asset_Illiquidi_e_Orologi.py # Passion Assets, Real Estate & Private Equity Valuation
+│       ├── 16_🛡️_Previdenza_e_Pension_Planning.py # Human Capital Actuarial Valuation, TBS-VaR & Pension Gap
+│       ├── 17_🔥_Indipendenza_Finanziaria_e_FIRE.py # FIRE Simulator, Guyton-Klinger Dynamic SWR & Monte Carlo
+│       ├── 18_📑_Fiscalita_e_Quadro_RW.py # Ottimizzazione Fiscale TUIR, Quadro RW/RT/IVAFE & Tax-Loss Harvesting
+│       ├── 19_🏡_Immobili_e_Mutui.py  # Mutui alla Francese, Sensibilità Tassi +200 bps & LTV Ratio
+│       ├── 20_⚖️_Pianificazione_Successoria.py # Asse Ereditario, Riunione Fittizia ex art. 556 c.c., Trust & Donazioni
+│       └── 21_🤖_AI_Copilot_e_Advisor.py # Conversational Wealth Copilot, Action Memo Istituzionale & Voice Briefing
+├── tests/                       # Test suite automatizzata PyTest (844 Test su 132 File)
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
-│   ├── test_advisor.py
 │   ├── test_ai_analyst.py
 │   ├── test_ai_governance.py
-│   ├── test_attribution.py
+│   ├── test_all_pages_smoke.py
+│   ├── test_api_endpoints.py
 │   ├── test_backtest.py
 │   ├── test_backup_engine.py
+│   ├── test_bitemporal_engine.py
 │   ├── test_black_litterman_fama_french.py
 │   ├── test_bloomberg_terminal_features.py
 │   ├── test_broker_adapters.py
 │   ├── test_cache_shield_and_diagnostics.py
+│   ├── test_chart_framework.py
 │   ├── test_closed_trades.py
+│   ├── test_confirmation_dialogs.py
 │   ├── test_corporate_actions.py
 │   ├── test_crypto_provider.py
 │   ├── test_crypto_tax.py
 │   ├── test_custom_stress.py
 │   ├── test_data_quality_gate.py
+│   ├── test_database_profile_isolation.py
 │   ├── test_diversification.py
 │   ├── test_duckdb_engine.py
+│   ├── test_empty_state_and_demo.py
 │   ├── test_enhancements.py
 │   ├── test_enterprise_masterplan_features.py
+│   ├── test_estate_planning_optimizer.py
 │   ├── test_excel.py
 │   ├── test_execution_algo.py
 │   ├── test_factor_library.py
@@ -818,47 +925,87 @@ argus-risk-analytics/
 │   ├── test_financial_analysis.py
 │   ├── test_fixed_income_and_streaming.py
 │   ├── test_forensic_accounting.py
-│   ├── test_frontend_smoke.py
 │   ├── test_garch_fhs.py
 │   ├── test_hedging_attribution_limits.py
 │   ├── test_history_analytics.py
 │   ├── test_hrp_optimizer.py
 │   ├── test_html_exporter.py
+│   ├── test_human_capital_and_tbs_var.py
 │   ├── test_i18n_and_fx_engine.py
+│   ├── test_institutional_enhancements.py
+│   ├── test_institutional_enhancements_pack2.py
 │   ├── test_institutional_expansion.py
 │   ├── test_institutional_expansion_v63.py
+│   ├── test_institutional_frontiers.py
 │   ├── test_institutional_metric_modals.py
+│   ├── test_institutional_v910.py
 │   ├── test_kmeans_elbow.py
+│   ├── test_loading_states.py
 │   ├── test_macro_provider.py
 │   ├── test_merton_and_isolation_forest.py
 │   ├── test_metric_knowledge_modals.py
 │   ├── test_migration_manager.py
 │   ├── test_ml_and_3d_features.py
+│   ├── test_model_risk_audit.py
 │   ├── test_monte_carlo_ui.py
+│   ├── test_msci_barra_risk_engine.py
 │   ├── test_multi_portfolio.py
 │   ├── test_new_quant_features.py
 │   ├── test_optimization.py
 │   ├── test_personal_balance_sheet.py
+│   ├── test_personal_balance_sheet_pdf.py
+│   ├── test_phase1_hardening.py
+│   ├── test_phase2_performance_engine.py
+│   ├── test_phase3_services_and_api.py
 │   ├── test_plotly_framework.py
+│   ├── test_prescriptive_rebalancer_and_agents.py
+│   ├── test_property_euler_var.py
+│   ├── test_property_fifo_accounting.py
+│   ├── test_property_numerical_ratios.py
 │   ├── test_quant_audit_gates.py
 │   ├── test_quant_tax_graveyard_enhancements.py
+│   ├── test_realistic_portfolio_generator.py
 │   ├── test_rebalancer_and_advisor.py
 │   ├── test_regime_and_options.py
 │   ├── test_reinforcement_learning.py
 │   ├── test_reporting_standardization.py
+│   ├── test_resilient_market_engine.py
 │   ├── test_risk_engine.py
+│   ├── test_risk_engine_institutional.py
+│   ├── test_risk_math_approx.py
 │   ├── test_screener_engine.py
 │   ├── test_sec_rag.py
 │   ├── test_security_engine.py
+│   ├── test_sidebar_profile_sync.py
+│   ├── test_sidebar_subtab_sync.py
+│   ├── test_splash_component.py
 │   ├── test_sqlite_upsert_and_quality_gate.py
+│   ├── test_structured_logging_and_support_bundle.py
 │   ├── test_tax_engine.py
 │   ├── test_tax_engine_deep_stress.py
 │   ├── test_tax_engine_edge_cases.py
+│   ├── test_tax_engine_normative_audit.py
+│   ├── test_tbs_monte_carlo.py
+│   ├── test_tca_and_optimal_execution.py
 │   ├── test_technical_analysis.py
 │   ├── test_temporal_engine.py
 │   ├── test_terminal_engine.py
+│   ├── test_terminal_ergonomics_sprint1_3.py
+│   ├── test_ui_export_utils.py
+│   ├── test_ui_lifecycle.py
 │   ├── test_ui_modernization.py
+│   ├── test_ui_ux_overhaul.py
+│   ├── test_unified_archetype_sync.py
 │   ├── test_universal_ingestion.py
+│   ├── test_universal_ledger_engine.py
+│   ├── test_v911_institutional_suite.py
+│   ├── test_v912_institutional_suite.py
+│   ├── test_v913_institutional_suite.py
+│   ├── test_v914_institutional_suite.py
+│   ├── test_v915_institutional_suite.py
+│   ├── test_v916_ux_ui_overhaul.py
+│   ├── test_v917_institutional_suite.py
+│   ├── test_v918_ux_visual_canvas.py
 │   ├── test_validator.py
 │   ├── test_var_backtest.py
 │   ├── test_var_cvar.py
@@ -866,22 +1013,18 @@ argus-risk-analytics/
 │   ├── test_volatility_surface.py
 │   ├── test_wealth_engine.py
 │   ├── test_wealth_enhancements.py
+│   ├── test_wealth_olap.py
 │   ├── test_wealth_reporting_hub.py
 │   ├── test_wealth_sync.py
 │   ├── test_wealth_temporal_engine.py
 │   ├── test_wealth_validator.py
 │   ├── test_workspace_context.py
 │   ├── test_workspace_manager.py
-│   ├── test_yield_curve.py
-│   ├── test_tax_engine_normative_audit.py
-│   ├── test_resilient_market_engine.py
-│   ├── test_structured_logging_and_support_bundle.py
-│   ├── test_realistic_portfolio_generator.py
-│   ├── test_tca_and_optimal_execution.py
-│   └── test_bitemporal_engine.py
+│   └── test_yield_curve.py
 ├── .env.example                 # Esempio configurazione variabili d'ambiente
-├── CODE_OF_CONDUCT.md           # Codice di Condotta
-├── CONTRIBUTING.md              # Guida ai contributi
+├── CHANGELOG.md                 # Registro cronologico dettagliato delle versioni (v1.0.0 -> v9.19.0)
+├── CODE_OF_CONDUCT.md           # Codice di Condotta per i contributori
+├── CONTRIBUTING.md              # Guida ai contributi e workflow pull request
 ├── LICENSE.md                   # Licenza Open Source MIT
 ├── README.md                    # Documentazione Principale del Progetto
 ├── SECURITY.md                  # Politica di Sicurezza & Compliance
@@ -889,8 +1032,11 @@ argus-risk-analytics/
 ├── argus_desktop.spec           # Spec PyInstaller per build standalone con isolamento percorsi
 ├── desktop_launcher.py          # Entry point nativo Desktop App (PyWebView + Backup pre-flight)
 ├── docker-compose.yml           # Configurazione Docker Compose (App + MySQL 8.0)
-├── pyproject.toml               # Configurazione tool (PyTest, Ruff)
-├── requirements.txt             # Dipendenze Python (inclusi pyarrow>=14.0.0, pydantic>=2.0.0, cryptography)
+├── mkdocs.yml                   # Configurazione documentazione MkDocs Material con supporto KaTeX
+├── pyproject.toml               # Configurazione tool di sviluppo, PyTest e linter Ruff
+├── pytest.ini                   # Configurazione test runner PyTest e filtri warning
+├── requirements.txt             # Dipendenze Python di produzione (pyarrow, pydantic v2, duckdb, ecc.)
+├── requirements-dev.txt         # Dipendenze per sviluppo, linting e testing (pytest, ruff, mkdocs)
 ├── setup_desktop.bat            # Script di setup 1-Click per ambiente Desktop Windows
 ├── start_dashboard.bat          # Script d'avvio rapido per Windows
 └── start_dashboard.sh           # Script d'avvio per Linux/macOS
@@ -900,7 +1046,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **660+ test automatizzati PyTest** distribuiti su 95 file di test (inclusi i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
+Il progetto include **844 test automatizzati PyTest** distribuiti su 132 file di test (inclusi i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -908,7 +1054,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 660+ passed in ~90.00s (100%) =======================
+======================= 844 passed in ~45.00s (100%) =======================
 ```
 
 ---
