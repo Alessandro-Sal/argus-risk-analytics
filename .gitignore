@@ -39,25 +39,33 @@ logs/
 *.sqlite
 *.sqlite3
 *.db
+*.duckdb
+*.parquet
+*.pkl
+*.gz
+
+# Data folder isolation (only sample benchmark and templates allowed)
 data/*
 !data/.gitkeep
 !data/portfolio_transactions_realistic.csv
 !data/wealth/
 !data/wealth/template_*.csv
-exports/*.csv
-exports/*.xlsx
-exports/*.pdf
-exports/*.zip
+
+# Exports and Generated Reports (NEVER tracked by git)
+exports/*
 !exports/.gitkeep
-gsheets_sync_subproject/logs/
+exports/**/*
+
+# Cloud & Service Credentials
 credentials/
+google_service_account.json
+gsheets_sync_subproject/*.json
+!gsheets_sync_subproject/google_service_account.json.example
+gsheets_sync_subproject/logs/
 *.json
 !config.json
 !docs/argus-architecture.json
 !core/i18n/locales/*.json
-google_service_account.json
-gsheets_sync_subproject/*.json
-gsheets_sync_subproject/google_service_account.json
 
 # PyInstaller builds
 build/
