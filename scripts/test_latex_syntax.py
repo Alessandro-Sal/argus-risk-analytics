@@ -1,6 +1,7 @@
 import glob
 import re
 
+
 def test_latex_in_file(fpath):
     with open(fpath, 'r', encoding='utf-8') as f:
         text = f.read()

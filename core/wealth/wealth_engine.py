@@ -2548,7 +2548,7 @@ def compute_wealth_risk_integrated_analytics(
 
     if (vol_ann is None or cvar_95 is None or max_drawdown_hist is None) and df_risk is not None and not df_risk.empty:
         try:
-            from core.multi_portfolio import load_portfolio_profile, _extract_metrics_safe
+            from core.multi_portfolio import _extract_metrics_safe, load_portfolio_profile
 
             vols, cvars, mdds, weights = [], [], [], []
             for _, r_row in df_risk.iterrows():
