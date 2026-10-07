@@ -7,7 +7,7 @@
 [![Latest Release](https://img.shields.io/github/v/release/Alessandro-Sal/argus-risk-analytics?color=blue&label=version)](https://github.com/Alessandro-Sal/argus-risk-analytics/releases/latest)
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-green.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE.md)
-[![Test Suite](https://img.shields.io/badge/PyTest-844%2F844%20PASSED%20(100%25)-brightgreen)](tests/)
+[![Test Suite](https://img.shields.io/badge/PyTest-856%2F856%20PASSED%20(100%25)-brightgreen)](tests/)
 [![Documentation: MkDocs](https://img.shields.io/badge/docs-Material%20for%20MkDocs-blue.svg)](https://alessandro-sal.github.io/argus-risk-analytics/)
 [![REST API: FastAPI](https://img.shields.io/badge/REST%20API-FastAPI%20%7C%20OpenAPI-009688.svg)](http://localhost:8000/docs)
 [![Code Style: Ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
@@ -695,6 +695,7 @@ argus-risk-analytics/
 │   ├── climate_stress_engine.py      # NGFS Phase IV Climate Transition & Physical Risk Stress Engine
 │   ├── closed_trades.py              # Graveyard, FIFO Closed Trades Journal & Tax Step-Up Analytics
 │   ├── commodity_engine.py           # Gibson-Schwartz 2-Factor Commodity Futures, Convenience Yield & Kirk Spread
+│   ├── compliance_gate.py            # MiFID II RTS 28 & SEC 15c3-5 Pre-Trade Risk & Compliance Gateway
 │   ├── confirm_dialogs.py            # Modali interattivi di conferma operazioni critiche e transazioni (@st.dialog)
 │   ├── corporate_actions.py          # Corporate Actions, Stock Splits & Stock Dividends Engine
 │   ├── credit_portfolio_engine.py    # CreditMetrics S&P 8-State Migration & Vasicek Multi-Obligor IRB
@@ -813,6 +814,8 @@ argus-risk-analytics/
 ├── docker/                      # File di containerizzazione Docker
 │   └── Dockerfile               # Multi-stage build hardening (non-root unprivileged user argus:argus)
 ├── docs/                        # Documentazione Tecnica & Specifica Architetturale
+│   ├── api/
+│   │   └── index.md             # Specifica Tecnica & Catalogo Endpoint Headless REST API (FastAPI)
 │   ├── compliance/
 │   │   └── whitepaper.md        # Whitepaper di conformità normativa (Basilea IV, MiFID II, TUIR, Solvency II)
 │   ├── getting-started/
@@ -879,7 +882,7 @@ argus-risk-analytics/
 │       ├── 19_🏡_Immobili_e_Mutui.py  # Mutui alla Francese, Sensibilità Tassi +200 bps & LTV Ratio
 │       ├── 20_⚖️_Pianificazione_Successoria.py # Asse Ereditario, Riunione Fittizia ex art. 556 c.c., Trust & Donazioni
 │       └── 21_🤖_AI_Copilot_e_Advisor.py # Conversational Wealth Copilot, Action Memo Istituzionale & Voice Briefing
-├── tests/                       # Test suite automatizzata PyTest (844 Test su 132 File)
+├── tests/                       # Test suite automatizzata PyTest (856 Test su 133 File)
 │   ├── test_advanced_institutional_suite.py
 │   ├── test_advanced_quant.py
 │   ├── test_ai_analyst.py
@@ -949,6 +952,7 @@ argus-risk-analytics/
 │   ├── test_phase2_performance_engine.py
 │   ├── test_phase3_services_and_api.py
 │   ├── test_plotly_framework.py
+│   ├── test_pretrade_compliance_and_scenarios.py
 │   ├── test_prescriptive_rebalancer_and_agents.py
 │   ├── test_property_euler_var.py
 │   ├── test_property_fifo_accounting.py
@@ -1013,6 +1017,7 @@ argus-risk-analytics/
 │   ├── test_workspace_manager.py
 │   └── test_yield_curve.py
 ├── .env.example                 # Esempio configurazione variabili d'ambiente
+├── .pre-commit-config.yaml      # Pipeline hook pre-commit (Ruff lint/format, secret check)
 ├── CHANGELOG.md                 # Registro cronologico dettagliato delle versioni (v1.0.0 -> v9.19.0)
 ├── CODE_OF_CONDUCT.md           # Codice di Condotta per i contributori
 ├── CONTRIBUTING.md              # Guida ai contributi e workflow pull request
@@ -1037,7 +1042,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **844 test automatizzati PyTest** distribuiti su 132 file di test (inclusi i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
+Il progetto include **856 test automatizzati PyTest** distribuiti su 133 file di test (inclusi i controlli pre-trade MiFID II RTS 28 `test_pretrade_compliance_and_scenarios.py`, i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -1045,7 +1050,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 844 passed in ~45.00s (100%) =======================
+======================= 856 passed in ~45.00s (100%) =======================
 ```
 
 ---

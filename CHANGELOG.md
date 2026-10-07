@@ -30,6 +30,26 @@ Questa release consolida l'integrità quantitativa, la quadratura algebrica e l'
   - Aggiunte le sezioni istituzionali 99, 100 e 101 su `docs/metriche_rischio.md` e arricchita la metodologia matematica in `docs/methodology/risk_engine.md`.
   - Verifica della validità strutturale di oltre 1.100 blocchi ed espressioni LaTeX MathJax v3 / `pymdownx.arithmatex`.
   - Compilazione del sito documentale MkDocs priva di warning sintattici o errori di rendering.
+- **MiFID II RTS 28 & SEC 15c3-5 Pre-Trade Risk Gateway (`core/compliance_gate.py`, `core/trade_staging_blotter.py`)**:
+  - Implementazione del gateway di conformità pre-trade con controlli Fat-Finger (massimo controvalore e quantità per ordine), ADV volume slicing cap (max 15% del volume medio giornaliero), price collars (bande di tolleranza su oscillazioni di prezzo), capienza di cassa disponibile e lista strumenti soggetti a restrizioni/sanzioni.
+  - Generazione di audit trail crittografico con sigillo SHA-256 e metadata di conformità per ciascun ordine validato o respinto.
+  - Integrazione nativa nel simulatore FIX 4.4 all'interno del blotter ordini di pre-trade.
+- **Scenari Macroeconomici di Stress 2026 (`core/macro_stress_engine.py`)**:
+  - Integrazione di 3 nuovi scenari di stress geopolitico e macroeconomico: `Global_Tariff_War_2026` (guerra commerciale globale US/EU/EM), `AI_CapEx_Bubble_Reset` (rotazione da Tech/AI a settori difensivi con repricing multipli) e `ECB_Inverted_Curve_Stagflation` (stagflazione europea e inversione della curva dei rendimenti con shock energetico).
+  - Aggiunta della funzione di valutazione puntuale `evaluate_macro_stress_scenario`.
+- **Dossier Istituzionale CRO 1-Click (`core/report_exporter.py`, `src/pages/1_📈_Dashboard_Generale.py`)**:
+  - Funzione `generate_cro_institutional_dossier_zip` per il download in un unico archivio compresso di: Factsheet esecutivo HTML con Obsidian Theme, Modello tattico Excel a 6 fogli (`.xlsx`), pacchetto Star Schema CSV per Power BI e manifesto di governance `00_Executive_Governance_Manifest.json`.
+  - Integrazione del pulsante di download ad alta visibilità nella sezione export di Dashboard Generale.
+- **Bloomberg Terminal Shortcuts & Ribbon UX (`components/command_palette.py`, `core/ux_institutional_hub.py`)**:
+  - Modale interattivo `render_shortcuts_cheat_sheet_dialog` attivabile con pulsante dedicato `⌨️ Shortcuts [?]` o tasto `?`.
+  - Indicatore badge live nella barra telemetrica superiore (`🟢 FEED LIVE` / `🟡 CACHE SHIELD`).
+- **Crittografia a Riposo ArgusDataVault (`core/security_engine.py`)**:
+  - Metodi `encrypt_file`, `decrypt_file`, `encrypt_bytes`, `decrypt_bytes` con algoritmo AES-128 Fernet per protezione a riposo dei database locali SQLite (`argus_local.db`, `argus_wealth.db`).
+- **DevOps, Pre-Commit Hooks & Documentazione API (`.pre-commit-config.yaml`, `.github/workflows/ci.yml`, `docs/api/index.md`, `mkdocs.yml`)**:
+  - Hook pre-commit configurati con Ruff (lint & format), controllo file voluminosi (>5MB), rilevamento chiavi private e blocco file sensibili.
+  - Validazione automatizzata del build documentale MkDocs nel workflow CI GitHub Actions.
+  - Catalogo interattivo OpenAPI delle REST API Headless FastAPI con documentazione completa degli endpoint.
+  - Espansione della test suite automatizzata a **856 test (100% pass rate)** su 133 file di test.
 
 ---
 

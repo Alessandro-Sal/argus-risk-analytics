@@ -275,10 +275,82 @@ def render_command_palette_dialog() -> None:
                 st.rerun()
 
     st.divider()
-    c_close, _ = st.columns([2, 8])
+    c_close, c_help = st.columns([2, 8])
     with c_close:
         if st.button("Chiudi [Esc]", use_container_width=True):
             st.rerun()
+    with c_help:
+        if st.button("⌨️ Mostra Mnemonic Cheat Sheet [?]", use_container_width=True, type="secondary"):
+            render_shortcuts_cheat_sheet_dialog()
+
+
+@st.dialog("⌨️ ARGUS Bloomberg Mnemonic & Keyboard Cheat Sheet", width="large")
+def render_shortcuts_cheat_sheet_dialog() -> None:
+    """Mostra la modale istituzionale con l'elenco completo dei comandi mnemonici e shortcut."""
+    st.markdown(
+        """
+        <div style="background: rgba(22, 27, 34, 0.7); border: 1px solid rgba(255, 153, 0, 0.4);
+                    border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+            <span style="color: #ff9900; font-weight: 800; font-size: 14px;">🏛️ TERMINAL MNEMONIC GATEWAY</span>
+            <div style="color: #8b949e; font-size: 12px; margin-top: 4px;">
+                I comandi mnemonici possono essere digitati direttamente nella Command Bar Bloomberg o nella console <code>LIVE</code> desk.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    t1, t2, t3 = st.tabs(["🚀 Mnemonic Rapidi", "🎯 Wealth & Tax Planning", "⌨️ Scorciatoie Tastiera"])
+
+    with t1:
+        st.markdown(
+            """
+            | Mnemonic / Codice | Modulo Destinazione | Descrizione Funzionale |
+            |---|---|---|
+            | `PORT RISK` | **Analisi Rischio (Pagina 3)** | Cornish-Fisher CVaR 95%, Euler VaR, GARCH(1,1), L-VaR |
+            | `LIVE` / `TERM` | **Live Terminal (Pagina 2)** | Terminal Desk Bloomberg, Level-2 Book, OMS Blotter |
+            | `QUANT` / `OPT` | **Modelli Quantitativi (Pagina 4)** | Markowitz, HRP, Copule, Heston FFT, SABR 3D |
+            | `YCRV` / `RATES` | **Curva dei Tassi & Nelson-Siegel** | Tassi sovereign BCE/Fed dinamici e fitting parametrico |
+            | `BTP YAS` | **Fixed Income Desk** | Duration, Convexity, DV01, Z-Spread, CDS Spread |
+            | `STRESS` / `CCAR` | **Stress Testing (Pagina 7)** | EBA 2026, CCAR Severely Adverse, Tariffe Globali 2026 |
+            | `ATTR` | **Performance Attribution** | Decomposizione Brinson-Fachler, Carino e Karnosky FX |
+            | `EQS` | **Screener Opportunità (Pagina 10)** | Multi-Factor EQS Engine, Graham, Piotroski, Altman |
+            | `BQUANT` / `PY` | **BQuant Sandbox (Pagina 11)** | In-App Python Sandbox, DuckDB SQL e Snippet Quant |
+            """
+        )
+
+    with t2:
+        st.markdown(
+            """
+            | Mnemonic / Codice | Modulo Destinazione | Descrizione Funzionale |
+            |---|---|---|
+            | `WEALTH` | **Wealth Control Room (Pagina 12)** | Cockpit Patrimoniale Istituzionale & Data Quality |
+            | `NETWORTH` | **Patrimonio & Net Worth (Pagina 13)** | Total Wealth Consolidato, ALM Cash-Flow Matching |
+            | `CASHFLOW` | **Cash Flow & Spese (Pagina 14)** | Regola 50/30/20, Spese Fisse & Emergency Runway |
+            | `WATCHES` | **Asset Illiquidi (Pagina 15)** | Orologi di lusso, Real Estate, Metalli Preziosi, PE |
+            | `PENSION` | **Previdenza (Pagina 16)** | Capitale Umano Attuariale Nelson-Siegel & TBS-VaR |
+            | `FIRE` | **Indipendenza Finanziaria (Pagina 17)** | Guyton-Klinger Dynamic SWR & Monte Carlo 5000 run |
+            | `TAX` | **Fiscalità & Quadro RW (Pagina 18)** | Regime Dichiarativo TUIR, Zainetto Fiscale, RW/RT |
+            | `ESTATE` | **Pianificazione Successoria (Pagina 20)**| Riunione Fittizia art. 556 c.c., Trust & Donazioni |
+            | `AI` / `COPILOT` | **AI Copilot (Pagina 21)** | Tri-Agent Governance Council & Executive Action Memo |
+            """
+        )
+
+    with t3:
+        st.markdown(
+            """
+            | Scorciatoia | Contesto | Azione |
+            |---|---|---|
+            | `Ctrl + K` / `Cmd + K` | Globale | Apre la **Command Palette** istantanea |
+            | `Esc` | Modali / Dialog | Chiude la modale attiva e torna al desk |
+            | `Enter` | Command Palette | Esegue la navigazione verso il modulo selezionato |
+            | `?` | Menu Rapido | Apre questo Cheat Sheet dei comandi mnemonici |
+            | `Ctrl + R` | Globale | Ricarica e forza il re-run della sessione Streamlit |
+            """
+        )
+
+    if st.button("Chiudi Cheat Sheet", use_container_width=True):
+        st.rerun()
 
 
 def inject_command_palette_support(render_button: bool = True) -> None:
@@ -295,7 +367,12 @@ def inject_command_palette_support(render_button: bool = True) -> None:
     # 2. Iniezione listener JS tramite components.html (altezza 1px per prevenire throttling Chromium/WebView2)
     components.html(HOTKEY_JS_SNIPPET, height=1, width=1)
 
-    # 3. Visualizzazione pulsante trigger se richiesto
+    # 3. Visualizzazione pulsanti trigger se richiesto
     if render_button:
-        if st.button("🔍 Quick Command (Ctrl+K)", key="argus_cmd_palette_btn", use_container_width=True):
-            render_command_palette_dialog()
+        c1, c2 = st.columns([8, 3])
+        with c1:
+            if st.button("🔍 Quick Command (Ctrl+K)", key="argus_cmd_palette_btn", use_container_width=True):
+                render_command_palette_dialog()
+        with c2:
+            if st.button("⌨️ Shortcuts [?]", key="argus_shortcuts_cheat_btn", use_container_width=True):
+                render_shortcuts_cheat_sheet_dialog()

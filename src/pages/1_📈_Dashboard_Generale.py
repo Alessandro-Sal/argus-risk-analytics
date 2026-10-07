@@ -1784,6 +1784,42 @@ section("📥 Centro Esportazione & Deliverable")
 _exp_port_name = str(st.session_state.get("portfolio_name", "Main Portfolio"))
 _exp_n_pos = int(len(pos[pos.get("qty_net", 1) > 1e-6])) if not pos.empty else 0
 
+# ── 1-CLICK CRO INSTITUTIONAL DOSSIER (ALL-IN-ONE BATCH ZIP) ──
+st.markdown(
+    """<div style="background: linear-gradient(135deg, rgba(30, 27, 75, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+                border: 1px solid rgba(168, 85, 247, 0.45); border-left: 4px solid #a855f7;
+                border-radius: 10px; padding: 14px 18px; margin-bottom: 14px;">
+<div style="display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <div>
+        <div style="font-size: 15px; font-weight: 800; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+            <span>📦 1-Click CRO Institutional Dossier</span>
+            <span style="background: rgba(168, 85, 247, 0.25); color: #d8b4fe; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 6px;">ALL-IN-ONE ARCHIVE</span>
+        </div>
+        <div style="font-size: 12px; color: #cbd5e1; margin-top: 4px;">
+            Genera un archivio ZIP unificato contenente: Factsheet PDF, Modello Finanziario Excel What-If a 6 schede, Report HTML5 interattivo, Star Schema per Power BI e Manifest di Governance con sigillo crittografico SHA-256.
+        </div>
+    </div>
+</div>
+</div>""",
+    unsafe_allow_html=True,
+)
+try:
+    from core.report_exporter import generate_cro_institutional_dossier_zip
+    cro_zip_bytes = generate_cro_institutional_dossier_zip(results, portfolio_name=_exp_port_name)
+    st.download_button(
+        label="⚡ Scarica Dossier Istituzionale Completo (ZIP All-in-One)",
+        data=cro_zip_bytes,
+        file_name=f"ARGUS_CRO_Institutional_Dossier_{_exp_port_name.replace(' ', '_')}.zip",
+        mime="application/zip",
+        type="primary",
+        use_container_width=True,
+        key="btn_download_cro_dossier_zip",
+    )
+except Exception as e:
+    st.warning(f"Dossier unificato disponibile dopo il caricamento delle posizioni: {e}")
+
+st.markdown("<div style='margin-top: 14px;'></div>", unsafe_allow_html=True)
+
 # ── RIGA 1: REPORT PDF ISTITUZIONALI (DOSSIER 10 PAG & FACTSHEET 2 PAG) ──
 col_exp_dossier, col_exp_pdf = st.columns(2, vertical_alignment="top")
 

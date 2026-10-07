@@ -1,0 +1,34 @@
+# .pre-commit-config.yaml
+# ARGUS Risk Analytics — Pre-commit Hook Configuration
+# Ensures code quality, formatting, and prevention of credential/data leakage
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(docs/|data/|exports/)
+      - id: end-of-file-fixer
+        exclude: ^(docs/|data/|exports/|\.ipynb$)
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=5000']
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: forbid-sensitive-files
+        name: Forbid Sensitive Files Leakage
+        entry: bash -c 'for f in "$@"; do if [[ "$f" =~ (\.env$|\.db$|\.sqlite$|\.duckdb$|\.parquet$|credentials\.json$) ]]; then echo "BLOCKED: Attempting to commit sensitive/binary file: $f"; exit 1; fi; done' --
+        language: system
+        types: [file]
+        stages: [commit]

@@ -14,6 +14,11 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from core.compliance_gate import (
+    PreTradeComplianceConfig,
+    PreTradeOrderRequest,
+    PreTradeRiskGate,
+)
 from core.fix_engine import (
     MSG_EXECUTION_REPORT,
     MSG_NEW_ORDER_SINGLE,
@@ -129,16 +134,21 @@ def simulate_fix_routing(
     execution_algo: str = "TWAP",
     sender_comp_id: str = "ARGUS_DESK",
     target_comp_id: str = "EXCHANGE_L2",
+    compliance_config: Optional[PreTradeComplianceConfig] = None,
+    portfolio_cash: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Esegue la simulazione di routing a mercato tramite protocollo FIX 4.4:
-    1. Serializza NewOrderSingle (35=D) con checksum valido modulo-256
-    2. Esegue il matching contro il Depth-of-Market L2 sintetico (book walking)
-    3. Calcola l'Implementation Shortfall di Perold (1988) in bps
-    4. Restituisce ExecutionReport (35=8) e log FIX completo
+    Esegue la simulazione di routing a mercato tramite protocollo FIX 4.4 con audit Pre-Trade MiFID II RTS 28:
+    1. Valuta ogni ordine attraverso PreTradeRiskGate (Fat-Finger, ADV Cap, Price Collar, Liquidità)
+    2. Serializza NewOrderSingle (35=D) con checksum valido modulo-256 per ordini approvati
+    3. Esegue il matching contro il Depth-of-Market L2 sintetico (book walking)
+    4. Calcola l'Implementation Shortfall di Perold (1988) in bps
+    5. Restituisce ExecutionReport (35=8), log FIX completo e report di conformità
     """
+    gate = PreTradeRiskGate(compliance_config)
     executed_records = []
     fix_messages_log = []
+    compliance_verdicts = []
     total_shortfall_eur = 0.0
     total_friction_saved_eur = 0.0
     total_notional_executed = 0.0
@@ -146,6 +156,42 @@ def simulate_fix_routing(
     seq_num = 101
 
     for o in staged_orders:
+        # Pre-Trade Compliance Check
+        order_req = PreTradeOrderRequest(
+            order_id=o.cl_ord_id,
+            symbol=o.symbol,
+            side=o.side,
+            order_qty=float(o.order_qty),
+            limit_price=float(o.limit_price),
+            order_type=o.order_type,
+            reference_price=float(o.limit_price) if o.limit_price > 0 else 100.0,
+            available_cash_eur=portfolio_cash,
+        )
+        verdict = gate.evaluate_order(order_req, portfolio_cash=portfolio_cash)
+        compliance_verdicts.append(verdict.to_dict())
+
+        if not verdict.passed:
+            o.status = "REJECTED"
+            executed_records.append(
+                {
+                    "ClOrdID": o.cl_ord_id,
+                    "Symbol": o.symbol,
+                    "Side": o.side,
+                    "Qty": o.order_qty,
+                    "Filled": 0,
+                    "Arrival Px": f"{o.limit_price:.2f}",
+                    "Exec VWAP": "0.00",
+                    "Status": "REJECTED",
+                    "Shortfall (bps)": 0.0,
+                    "Slippage (bps)": 0.0,
+                    "Impact (bps)": 0.0,
+                    "Friction Saved (€)": 0.0,
+                    "Compliance Status": verdict.status.value,
+                    "Rejection Reasons": "; ".join(verdict.rejection_reasons),
+                }
+            )
+            continue
+
         dom_sim = DepthOfMarketSimulator(
             symbol=o.symbol,
             initial_mid=o.limit_price if o.limit_price > 0 else 100.0,
@@ -209,6 +255,8 @@ def simulate_fix_routing(
                 "Slippage (bps)": round(tca_res.slippage_bps, 1),
                 "Impact (bps)": round(tca_res.price_impact_bps, 1),
                 "Friction Saved (€)": round(friction_saved, 2),
+                "Compliance Status": verdict.status.value,
+                "Rejection Reasons": "",
             }
         )
 
@@ -218,6 +266,9 @@ def simulate_fix_routing(
         else 0.0
     )
 
+    passed_count = sum(1 for v in compliance_verdicts if v.get("passed", False))
+    rejected_count = len(compliance_verdicts) - passed_count
+
     return {
         "executed_dataframe": pd.DataFrame(executed_records),
         "total_notional_executed": round(total_notional_executed, 2),
@@ -226,6 +277,13 @@ def simulate_fix_routing(
         "avg_shortfall_bps": avg_shortfall_bps,
         "fix_stream_log": "\n".join(fix_messages_log),
         "orders_count": len(staged_orders),
+        "compliance_verdicts": compliance_verdicts,
+        "compliance_summary": {
+            "total_orders": len(staged_orders),
+            "approved_orders": passed_count,
+            "rejected_orders": rejected_count,
+            "compliance_pass_rate_pct": round((passed_count / max(1, len(staged_orders))) * 100.0, 1),
+        },
     }
 
 

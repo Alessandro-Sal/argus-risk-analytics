@@ -248,6 +248,16 @@ def build_telemetry_ribbon_html(
             f'⚡ SHOCK: {s_info["label"]}</span>'
         )
 
+    is_offline = bool(telemetry.get("offline_mode", False))
+    feed_label = "🟡 CACHE SHIELD" if is_offline else "🟢 FEED LIVE"
+    feed_border = "#f59e0b" if is_offline else "#10b981"
+    feed_color = "#fde68a" if is_offline else "#a7f3d0"
+    feed_pill_html = (
+        f'<span style="background: rgba(16, 185, 129, 0.12); border: 1px solid {feed_border}; '
+        f'color: {feed_color}; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 10px;">'
+        f'{feed_label}</span>'
+    )
+
     raw_html = f"""
     <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
                 border: 1px solid rgba(99, 102, 241, 0.32);
@@ -274,6 +284,7 @@ def build_telemetry_ribbon_html(
             <span style="color: #94a3b8; font-size: 11px; font-weight: 600;">
                 {telemetry['page_badge']}
             </span>
+            {feed_pill_html}
             {shock_pill_html}
         </div>
         <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-family: 'JetBrains Mono', monospace;">

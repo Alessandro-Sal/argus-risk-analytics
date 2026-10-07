@@ -198,3 +198,46 @@ class ArgusDataVault:
 
     def is_encrypted(self, val: Any) -> bool:
         return isinstance(val, str) and val.startswith(CIPHER_PREFIX)
+
+    def encrypt_bytes(self, raw_data: bytes) -> bytes:
+        """Cifra un flusso di byte arbitrario con autenticazione crittografica."""
+        if not raw_data:
+            return b""
+        return self._fernet.encrypt(raw_data)
+
+    def decrypt_bytes(self, encrypted_data: bytes) -> bytes:
+        """Decifra un flusso di byte crittografato verificandone l'integrità HMAC."""
+        if not encrypted_data:
+            return b""
+        return self._fernet.decrypt(encrypted_data)
+
+    def encrypt_file(self, src_path: str, dst_path: Optional[str] = None) -> str:
+        """
+        Cifra un file locale (database SQLite, backup Parquet o CSV) a riposo.
+        Ritorna il percorso del file cifrato (.argus_vault).
+        """
+        target_path = dst_path or f"{src_path}.argus_vault"
+        with open(src_path, "rb") as f_in:
+            data = f_in.read()
+        encrypted = self.encrypt_bytes(data)
+        with open(target_path, "wb") as f_out:
+            f_out.write(encrypted)
+        return target_path
+
+    def decrypt_file(self, src_path: str, dst_path: Optional[str] = None) -> str:
+        """
+        Decifra un file .argus_vault ripristinandone il contenuto originario.
+        """
+        if dst_path:
+            target_path = dst_path
+        elif src_path.endswith(".argus_vault"):
+            target_path = src_path[: -len(".argus_vault")]
+        else:
+            target_path = f"{src_path}.decrypted"
+
+        with open(src_path, "rb") as f_in:
+            encrypted_data = f_in.read()
+        decrypted = self.decrypt_bytes(encrypted_data)
+        with open(target_path, "wb") as f_out:
+            f_out.write(decrypted)
+        return target_path

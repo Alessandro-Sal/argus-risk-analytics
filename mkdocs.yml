@@ -80,3 +80,5 @@ nav:
       - Power BI Integration Guide: POWER_BI_GUIDE.md
       - Presentation Deck: PRESENTATION_SLIDES.md
       - Project Handoff (v9.0.0): PROJECT_HANDOFF.md
+  - Headless REST API:
+      - API Specification & Catalog: api/index.md

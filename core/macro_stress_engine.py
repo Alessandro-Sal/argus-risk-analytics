@@ -55,6 +55,36 @@ def get_standard_macro_scenarios() -> Dict[str, Dict[str, Any]]:
             "fx_usd_shock_pct": 12.0,
             "volatility_multiplier": 2.50,
         },
+        "Global_Tariff_War_2026": {
+            "name": "Guerra Commerciale & Shock Tariffe Globali 2026",
+            "description": "Escalation dazi doganali, rottura catene di fornitura, inflazione da offerta, equity globale -22%, emerging markets FX -15%, commodities +18%.",
+            "equity_shock_pct": -22.0,
+            "bonds_rate_shock_bps": 120.0,
+            "credit_spread_shock_bps": 160.0,
+            "commodities_shock_pct": 18.0,
+            "fx_usd_shock_pct": 7.5,
+            "volatility_multiplier": 1.85,
+        },
+        "AI_CapEx_Bubble_Reset": {
+            "name": "AI CapEx Bubble Reset & Tech Contraction",
+            "description": "Compressione multipli settoriali Tech/Semis (-28%), rotazione verso difensivi/utilities, tassi stabili (+25 bps), corporate spread tech +95 bps.",
+            "equity_shock_pct": -28.0,
+            "bonds_rate_shock_bps": 25.0,
+            "credit_spread_shock_bps": 95.0,
+            "commodities_shock_pct": -8.0,
+            "fx_usd_shock_pct": -4.0,
+            "volatility_multiplier": 2.10,
+        },
+        "ECB_Inverted_Curve_Stagflation": {
+            "name": "Stagflazione BCE & Curva Tassi Invertita",
+            "description": "Rialzo restrittivo BCE +150 bps per inflazione core rigida, allargamento spread periferici BTP/Bund a 220 bps, contrazione immobiliare e banche sotto stress.",
+            "equity_shock_pct": -18.0,
+            "bonds_rate_shock_bps": 150.0,
+            "credit_spread_shock_bps": 190.0,
+            "commodities_shock_pct": 12.0,
+            "fx_usd_shock_pct": -5.0,
+            "volatility_multiplier": 1.70,
+        },
     }
 
 
@@ -206,6 +236,29 @@ def compute_macro_scenario_matrix(
 
 # Alias per retrocompatibilità con le pagine e i test
 compute_macro_scenario_stress_test = compute_macro_scenario_matrix
+
+
+def evaluate_macro_stress_scenario(
+    scenario_key: str,
+    df_positions: Optional[pd.DataFrame] = None,
+    results: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Valuta puntualmente un singolo scenario macro per chiave identificativa."""
+    scenarios = get_standard_macro_scenarios()
+    target_sc = {scenario_key: scenarios.get(scenario_key, {})}
+    res = compute_macro_scenario_matrix(df_positions=df_positions, results=results, custom_scenarios=target_sc)
+    items = res.get("scenario_results", [])
+    if items:
+        item = items[0]
+        return {
+            "scenario_key": scenario_key,
+            "scenario_name": item.get("scenario_name", scenario_key),
+            "stressed_portfolio_value": item.get("post_shock_value_eur", 0.0),
+            "estimated_pnl_eur": item.get("pnl_impact_eur", 0.0),
+            "portfolio_return_pct": item.get("portfolio_return_pct", 0.0),
+            "volatility_multiplier": item.get("volatility_multiplier", 1.0),
+        }
+    return {}
 
 
 def compute_reverse_stress_test(
