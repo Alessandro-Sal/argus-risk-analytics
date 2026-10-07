@@ -369,10 +369,10 @@ def inject_command_palette_support(render_button: bool = True) -> None:
 
     # 3. Visualizzazione pulsanti trigger se richiesto
     if render_button:
-        c1, c2 = st.columns([8, 3])
-        with c1:
-            if st.button("🔍 Quick Command (Ctrl+K)", key="argus_cmd_palette_btn", use_container_width=True):
-                render_command_palette_dialog()
-        with c2:
-            if st.button("⌨️ Shortcuts [?]", key="argus_shortcuts_cheat_btn", use_container_width=True):
-                render_shortcuts_cheat_sheet_dialog()
+        if st.button(
+            "🔍 Quick Command (Ctrl+K)",
+            key="argus_cmd_palette_btn",
+            use_container_width=True,
+            help="Bloomberg-Style Omni-Command Palette (Ctrl+K) & Shortcuts Cheat Sheet (?)",
+        ):
+            render_command_palette_dialog()

@@ -883,6 +883,12 @@ def inject_custom_css():
         /* Unified Right-Side Institutional Action Dock: Single Flush Row, Right-Aligned */
         div[class*="st-key-argus_top_command_bar_actions"],
         div[class*="st-key-argus_wealth_command_bar_actions"],
+        div[class*="st-key-argus_omni_command_bar_actions"] {{
+            padding-right: 14px !important;
+        }}
+
+        div[class*="st-key-argus_top_command_bar_actions"],
+        div[class*="st-key-argus_wealth_command_bar_actions"],
         div[class*="st-key-argus_omni_command_bar_actions"],
         div[class*="st-key-argus_top_command_bar_actions"] > div,
         div[class*="st-key-argus_wealth_command_bar_actions"] > div,
@@ -898,10 +904,12 @@ def inject_custom_css():
             justify-content: flex-end !important;
             align-items: center !important;
             flex-wrap: nowrap !important;
-            gap: 5px !important;
+            gap: 6px !important;
             width: 100% !important;
             margin: 0px !important;
-            padding: 0px !important;
+            padding-top: 0px !important;
+            padding-bottom: 0px !important;
+            padding-left: 0px !important;
             overflow-x: auto !important;
             overflow-y: hidden !important;
             scrollbar-width: none !important;
@@ -954,6 +962,7 @@ def inject_custom_css():
             width: auto !important;
             min-width: max-content !important;
             flex: 0 0 auto !important;
+            flex-shrink: 0 !important;
             display: inline-flex !important;
             align-items: center !important;
             margin: 0px !important;
@@ -973,6 +982,7 @@ def inject_custom_css():
             margin-right: 4px !important;
             padding: 0px !important;
             flex: 0 0 auto !important;
+            flex-shrink: 0 !important;
             min-width: max-content !important;
         }}
 
@@ -999,6 +1009,7 @@ def inject_custom_css():
             width: auto !important;
             min-width: max-content !important;
             flex: 0 0 auto !important;
+            flex-shrink: 0 !important;
             background: rgba(255, 255, 255, 0.04) !important;
             border: 1px solid rgba(255, 255, 255, 0.12) !important;
             color: #c9d1d9 !important;
@@ -1691,12 +1702,12 @@ def render_header(title: str, subtitle: str = None):
 def get_display_portfolio_name():
     """
     Restituisce una tupla (nome_da_visualizzare: str, is_active: bool).
-    Se non ci sono risultati/pipeline_done, restituisce ('Nessun Portafoglio (In attesa)', False).
+    Se non ci sono risultati/pipeline_done, restituisce ('Nessun Portafoglio', False).
     Se i dati sono caricati, restituisce il nome effettivo del portafoglio (es. 'Master Wealth', True).
     """
     has_data = bool(st.session_state.get("pipeline_done") or st.session_state.get("results"))
     if not has_data:
-        return "Nessun Portafoglio (In attesa)", False
+        return "Nessun Portafoglio", False
     name = st.session_state.get("portfolio_name")
     if not name or name == "Master Wealth Google Sheets":
         name = "Master Wealth"
@@ -1857,14 +1868,6 @@ def render_command_bar():
             density = p_dens
             st.session_state["ui_density_level"] = density
 
-    # Iniezione del listener globale per scorciatoia tastiera Ctrl+K / Cmd+K
-    try:
-        from components.command_palette import inject_command_palette_support
-
-        inject_command_palette_support(render_button=False)
-    except Exception:
-        pass
-
     port_label, has_port = get_display_portfolio_name()
     port_color = "#58a6ff" if has_port else "#8b949e"
     port_icon = "💼" if has_port else "⏳"
@@ -1878,13 +1881,13 @@ def render_command_bar():
 
     with st.container(key="argus_top_command_bar_container"):
         col_title, col_actions = st.columns(
-            [1.75, 3.25],
+            [2.15, 2.85],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Portafoglio Attivo: {port_label}">
                 <span class="status-dot-pulse" style="margin-right: 2px; flex-shrink:0;"></span>
                 <span style="color:#ffffff; font-weight:800; font-size:12.5px; letter-spacing:0.3px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     ARGUS ENGINE
@@ -1939,17 +1942,9 @@ def render_command_bar():
                     "⚡ Ctrl+K",
                     key="btn_open_spotlight",
                     use_container_width=False,
-                    help="Bloomberg-style Omni-Command Gateway (Ctrl+K)",
+                    help="Bloomberg-style Omni-Command Gateway (Ctrl+K) & Cheatsheet (?)",
                 ):
                     render_spotlight_palette()
-
-                if st.button(
-                    "⌨️",
-                    key="btn_open_cheatsheet_top",
-                    use_container_width=False,
-                    help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
-                ):
-                    render_terminal_cheatsheet_dialog()
 
                 try:
                     from core.watchdog.unified_notification_center import render_institutional_notification_bell
@@ -8931,17 +8926,17 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
     if has_prof:
         prof_html = f'<span style="color:#34d399; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;"><span style="flex-shrink:0;">🏛️</span> <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{prof_name}</span></span>'
     else:
-        prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">⏳ Nessun Profilo (In attesa)</span>'
+        prof_html = '<span style="color:#8b949e; font-size:12px; font-weight:500; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">⏳ Nessun Profilo</span>'
 
     with st.container(key=f"argus_wealth_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.75, 3.25],
+            [2.15, 2.85],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="Profilo Wealth: {prof_name if has_prof else 'Nessun Profilo'}">
                 <span class="status-dot-pulse" style="margin-right: 2px; background:#10b981; box-shadow:0 0 10px #10b981; flex-shrink:0;"></span>
                 <span style="color:#ffffff; font-weight:800; font-size:12.5px; letter-spacing:0.3px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     ARGUS WEALTH
@@ -8970,20 +8965,12 @@ def render_wealth_command_bar(engine, current_pid: int, prof_name: str, key_suff
                     unsafe_allow_html=True,
                 )
                 if st.button(
-                    "🔍 Spotlight",
+                    "⚡ Ctrl+K",
                     key=f"btn_open_spotlight_{key_suffix}",
                     use_container_width=False,
                     help="Cerca pagine, schede o lancia comandi rapidi Wealth (Ctrl+K)",
                 ):
                     render_wealth_spotlight_palette()
-
-                if st.button(
-                    "⌨️",
-                    key=f"btn_open_cheatsheet_{key_suffix}",
-                    use_container_width=False,
-                    help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
-                ):
-                    render_terminal_cheatsheet_dialog()
 
                 try:
                     from core.watchdog.unified_notification_center import render_institutional_notification_bell
@@ -9233,13 +9220,13 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
 
     with st.container(key=f"argus_omni_command_bar_container_{key_suffix}"):
         col_title, col_actions = st.columns(
-            [1.75, 3.25],
+            [2.15, 2.85],
             vertical_alignment="center",
         )
         with col_title:
             st.markdown(
                 f"""
-            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            <div style="display:flex; align-items:center; gap: 6px; height: 32px; line-height: 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="{portal_label}: {context_name}">
                 <span class="status-dot-pulse" style="background:{accent_color}; box-shadow:0 0 10px {accent_color}; margin-right: 2px; flex-shrink:0;"></span>
                 <span style="color:#ffffff; font-weight:800; font-size:12.5px; letter-spacing:0.3px; font-family:'Outfit', sans-serif; flex-shrink:0;">
                     {portal_label}
@@ -9278,7 +9265,7 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                     unsafe_allow_html=True,
                 )
                 if st.button(
-                    "🔍 Spotlight",
+                    "⚡ Ctrl+K",
                     key=f"omni_btn_spotlight_{key_suffix}",
                     use_container_width=False,
                     help="Cerca pagine, comandi o ticker (Ctrl+K)",
@@ -9287,14 +9274,6 @@ def render_omni_command_bar(portal: str = "auto", context_name: Optional[str] = 
                         render_wealth_spotlight_palette()
                     else:
                         render_spotlight_palette()
-
-                if st.button(
-                    "⌨️",
-                    key=f"omni_btn_cheatsheet_{key_suffix}",
-                    use_container_width=False,
-                    help="Mappa comandi e tasti rapidi Bloomberg Terminal (F1 / ?)",
-                ):
-                    render_terminal_cheatsheet_dialog()
 
                 try:
                     from core.watchdog.unified_notification_center import render_institutional_notification_bell
