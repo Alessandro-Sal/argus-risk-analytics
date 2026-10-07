@@ -43,6 +43,8 @@ logs/
 *.parquet
 *.pkl
 *.gz
+*.enc
+data/vault_backups/
 
 # Data folder isolation (only sample benchmark and templates allowed)
 data/*

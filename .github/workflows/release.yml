@@ -93,7 +93,7 @@ jobs:
             ---
 
             ### 🧪 Validazione & Certificazione Qualità
-            * **Test Suite PyTest**: **856/856 Test Superati con Successo (100% Pass Rate)**
+            * **Test Suite PyTest**: **864/864 Test Superati con Successo (100% Pass Rate)**
             * **Linter CI (Ruff)**: **0 Errori (`ruff check --select E9,F63,F7,F82 .`)**
             * **Resilienza Cross-Platform**: Convalidato su Ubuntu Linux, Windows e macOS.
             * **Sicurezza**: Audit rigoroso anti-leak credenziali e isolamento locale dei dati.

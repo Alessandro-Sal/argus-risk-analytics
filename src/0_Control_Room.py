@@ -1825,6 +1825,50 @@ with tab_diagnostics:
             • <b>Profili Multi-Portafoglio:</b> {storage_st['multi_portfolios_count']} file ({storage_st['multi_portfolios_kb']} KB)
             </div>
             """, unsafe_allow_html=True)
+
+            # ── V9.19.0: ARGUS DATA VAULT AT-REST SECURITY & ENCRYPTED SNAPSHOT ──
+            import hashlib
+            from pathlib import Path
+
+            from core.security_engine import ArgusDataVault
+
+            st.markdown("""
+            <div style="margin-top: 12px; padding: 10px 12px; background: rgba(56, 189, 248, 0.06); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 6px;">
+                <b style="color: #38bdf8; font-size: 12.5px;">🔐 ArgusDataVault — Sicurezza At-Rest & Cifratura</b><br>
+                <span style="font-size: 11px; color: #94a3b8;">Protezione crittografica AES-128 Fernet per database locali e snapshot.</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+            c_vault1, c_vault2 = st.columns(2)
+            with c_vault1:
+                if st.button("🔒 Snapshot Cifrato AES-128", use_container_width=True, key="btn_create_vault_snapshot", help="Genera uno snapshot cifrato di argus_local.db e argus_wealth.db"):
+                    vault = ArgusDataVault()
+                    snap_dir = Path("data/vault_backups")
+                    snap_dir.mkdir(parents=True, exist_ok=True)
+                    backed_up = []
+                    for db_name in ["argus_local.db", "argus_wealth.db"]:
+                        p = Path("data") / db_name
+                        if p.exists():
+                            enc_dst = snap_dir / f"{db_name}.enc"
+                            vault.encrypt_file(p, enc_dst)
+                            backed_up.append(db_name)
+                    if backed_up:
+                        st.success(f"Snapshot cifrati con successo: {', '.join(backed_up)} in `data/vault_backups/`")
+                    else:
+                        st.info("Nessun database locale trovato da cifrare.")
+            with c_vault2:
+                if st.button("🔍 Calcola Hash SHA-256 DB", use_container_width=True, key="btn_calc_db_hash", help="Verifica l'integrità dei file di database"):
+                    hashes = {}
+                    for db_name in ["argus_local.db", "argus_wealth.db"]:
+                        p = Path("data") / db_name
+                        if p.exists():
+                            h = hashlib.sha256(p.read_bytes()).hexdigest()
+                            hashes[db_name] = h[:16] + "…"
+                    if hashes:
+                        st.info(" | ".join([f"**{k}**: `{v}`" for k, v in hashes.items()]))
+                    else:
+                        st.info("Database non inizializzati su disco.")
+
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown("##### 📋 Dettaglio Volumi e Tabelle nel Database")

@@ -22,7 +22,7 @@
 Ingegnerizzata come piattaforma avanzata di Finanza Quantitativa, Wealth Intelligence e Risk Management, **ARGUS** — il cui nome si ispira al mito dell'osservatore dai cento occhi che vede tutto e non dorme mai — è un ecosistema completo per la diagnosi contabile, la profilazione del rischio, la pianificazione patrimoniale multi-generazionale e la protezione strategica di patrimoni d'investimento multi-asset (*Equity, ETF, Fixed Income, Crypto, Immobili, Illiquidi e Cash*).
 
 **Differenziatore Chiave**:
-A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **856 test automatizzati (100% passed)** su 133 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
+A differenza dei benchmark basati su simulazioni sintetiche, **ARGUS** è stato validato empiricamente su un **dataset reale di oltre 400 operazioni finanziarie storiche** (2021–2026 dal progetto WealthApp) e testato con **864 test automatizzati (100% passed)** su 134 file di test. Il sistema garantisce una precisione deterministica centesimale nella gestione di scenari operativi complessi (contabilità FIFO, dividendi frazionati, cambi valuta EUR/USD/GBP/CHF, movimenti di cassa, deduplicazione deterministica SHA-256 e risoluzione ISIN-Ticker).
 
 ---
 
@@ -85,7 +85,7 @@ Presentation Layer (21 Moduli Streamlit / PyWebView):
 
 ## 3. Mappatura e Stato dei Moduli Core (`core/`)
 
-Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**856/856 PyTest PASSED - 100%**):
+Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati con la suite di test automatizzati (**864/864 PyTest PASSED - 100%**):
 
 ### `core/ai_analyst.py` — ✅ AI Narrative Intelligence & Quant Copilot
 - **Dual-Engine Executive Memorandum**: Generazione di diagnosi narrative strutturate in 4 sezioni via REST API con Google Gemini / OpenAI, e fallback istantaneo su motore Natural Language Generation (NLG) quantitativo deterministico offline al 100%.
@@ -414,7 +414,7 @@ Tutti i moduli Python sorgente sono stati sviluppati, ottimizzati e verificati c
 
 ## 5. Suite di Test Automatizzati (PyTest)
 
-Tutti gli **856 test automatizzati passano con successo (100%)** distribuiti su 133 file di test (inclusi i controlli pre-trade MiFID II RTS 28 `tests/test_pretrade_compliance_and_scenarios.py`, i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite del motore DuckDB OLAP `tests/test_wealth_olap.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
+Tutti gli **864 test automatizzati passano con successo (100%)** distribuiti su 134 file di test (inclusi l'ottimizzatore Michaud Resampled Efficient Frontier `tests/test_michaud_and_api_expansion.py`, i controlli pre-trade MiFID II RTS 28 `tests/test_pretrade_compliance_and_scenarios.py`, i test di sincronizzazione bidirezionale della barra laterale e subtab `tests/test_sidebar_subtab_sync.py`, la suite del motore DuckDB OLAP `tests/test_wealth_olap.py`, la suite di loading states atomici `tests/test_loading_states.py`, il teardown lifecycle `tests/test_ui_lifecycle.py`, e gli indici compositi di database):
 
 ```bash
 py -m pytest
@@ -422,7 +422,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 856 passed in ~45.00s (100%) =======================
+======================= 864 passed in ~45.00s (100%) =======================
 ```
 
 ---

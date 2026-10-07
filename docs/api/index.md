@@ -46,6 +46,7 @@ L'interfaccia interattiva nativa Swagger è disponibile all'indirizzo locale:
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
 | `POST` | `/api/v1/optimization/hrp` | Hierarchical Risk Parity (HRP) con clustering gerarchico dei pesi |
+| `POST` | `/api/v1/optimization/michaud-resampled` | Michaud Resampled Efficient Frontier (REF 1998) con bootstrap Monte Carlo |
 | `POST` | `/api/v1/optimization/black-litterman` | Bayesian Black-Litterman con matrice delle views e Idzorek Confidence |
 | `POST` | `/api/v1/optimization/risk-budgeting` | Equal Risk Contribution (ERC) e allocazione convessa SLSQP |
 | `POST` | `/api/v1/optimization/mip-rebalance` | Mixed-Integer Programming (MIP) con vincoli di cardinalità e lotto minimo |
@@ -62,11 +63,19 @@ L'interfaccia interattiva nativa Swagger è disponibile all'indirizzo locale:
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
 | `POST` | `/api/v1/stress/macro` | Reverse Stress Test e scenari EBA 2026 / Fed CCAR / Geopolitica |
+| `POST` | `/api/v1/stress/macro-scenarios-2026` | Valutazione scenari macro 2026 (Guerra Dazi, AI Bubble Reset, Curva Invertita BCE) |
 | `POST` | `/api/v1/regulatory/isda-simm` | Calcolo margine iniziale ISDA SIMM v2.6 e regola UMR €50M |
 | `POST` | `/api/v1/regulatory/frtb` | Standardized Approach Basilea IV (SBM, DRC, RRAO - BCBS 365) |
 | `POST` | `/api/v1/regulatory/solvency2` | Standard Formula SCR e aggregazione correlata sottomoduli di mercato |
 
-### 5. Audit Crittografico & Bitemporale
+### 5. Execution, Compliance Pre-Trade & Reporting Istituzionale
+| Metodo | Endpoint | Descrizione |
+|---|---|---|
+| `POST` | `/api/v1/compliance/pre-trade-check` | Pre-Trade Risk Gate MiFID II RTS 28 & SEC 15c3-5 con sigillo SHA-256 |
+| `GET` | `/api/v1/reporting/cro-institutional-dossier` | Download pacchetto ZIP completo 1-Click CRO Institutional Dossier |
+| `POST` | `/api/v1/execution/market-making-vpin` | Avellaneda-Stoikov (2008) Market-Making & Hawkes VPIN Toxicity |
+
+### 6. Audit Crittografico & Bitemporale
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
 | `POST` | `/api/v1/bitemporal/append` | Inserimento operazione a partita doppia con timestamp bitemporale |

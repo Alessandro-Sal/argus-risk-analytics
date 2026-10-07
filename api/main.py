@@ -32,6 +32,7 @@ from core.ccar_stress_engine import compute_ccar_capital_stress
 from core.cds_tranche_engine import compute_cds_and_tranche_pricing
 from core.climate_stress_engine import compute_ngfs_climate_stress
 from core.commodity_engine import compute_commodity_term_structure
+from core.compliance_gate import PreTradeComplianceConfig, PreTradeOrderRequest, PreTradeRiskGate
 from core.credit_portfolio_engine import compute_credit_portfolio_risk
 from core.dcc_garch_engine import compute_dcc_garch_extreme_risk
 from core.executive_board_pack_engine import generate_executive_board_pack
@@ -42,9 +43,14 @@ from core.frtb_engine import compute_frtb_capital_charges
 from core.heston_fft_engine import compute_heston_surface_and_calibration
 from core.hull_white_engine import compute_hull_white_swaptions
 from core.isda_simm_engine import compute_isda_simm_margin
-from core.macro_stress_engine import compute_reverse_stress_test
+from core.macro_stress_engine import (
+    compute_reverse_stress_test,
+    evaluate_macro_stress_scenario,
+    get_standard_macro_scenarios,
+)
 from core.macro_war_room import compute_macro_war_room_stress
 from core.market_making_vpin_engine import compute_market_making_and_vpin
+from core.michaud_resampling import compute_michaud_resampled_frontier
 from core.mip_rebalancer import solve_mip_rebalance
 from core.multicurve_engine import compute_multicurve_bootstrapping
 from core.optimal_liquidation_engine import compute_optimal_execution_schedule
@@ -54,6 +60,7 @@ from core.pdf_generator import (
 )
 from core.regime_allocation import compute_regime_conditional_allocation
 from core.regulatory_reporting_engine import compute_regulatory_dossier
+from core.report_exporter import generate_cro_institutional_dossier_zip
 from core.risk_engine import compute_portfolio_liquidity_risk
 from core.rough_vol_svi_engine import compute_rough_vol_svi_surface
 from core.sabr_local_vol_engine import compute_sabr_and_local_vol_surface
@@ -902,6 +909,49 @@ class TaxHarvestingResponse(BaseModel):
     summary: Dict[str, Any]
     harvesting_opportunities: List[Dict[str, Any]]
     potential_tax_savings_eur: float
+
+
+class PreTradeOrderItemSchema(BaseModel):
+    """Single order item for pre-trade compliance checks."""
+    order_id: str = Field(..., description="Unique order identifier")
+    symbol: str = Field(..., description="Asset ticker or identifier")
+    side: str = Field(default="BUY", description="'BUY' or 'SELL'")
+    quantity: float = Field(..., gt=0.0, description="Order quantity")
+    limit_price: float = Field(..., gt=0.0, description="Order limit price")
+    market_price: Optional[float] = Field(default=None, description="Current market price for price collar check")
+    adv_shares: Optional[float] = Field(default=None, description="Average daily volume for slicing cap check")
+    isin: Optional[str] = Field(default=None, description="ISIN code")
+
+
+class PreTradeComplianceCheckRequest(BaseModel):
+    """Payload for MiFID II RTS 28 & SEC 15c3-5 Pre-Trade Risk Gateway."""
+    orders: List[PreTradeOrderItemSchema] = Field(..., min_length=1)
+    current_cash: float = Field(default=100000.0, ge=0.0)
+    max_order_value_eur: float = Field(default=500000.0, gt=0.0)
+    max_order_qty: float = Field(default=100000.0, gt=0.0)
+    max_adv_pct: float = Field(default=0.15, gt=0.0, le=1.0)
+    price_collar_pct: float = Field(default=0.05, gt=0.0, le=0.50)
+    restricted_symbols: List[str] = Field(default_factory=list, description="Restricted or sanctioned symbols list")
+
+
+class MacroScenario2026Request(BaseModel):
+    """Payload for evaluating 2026 Macro Stress Scenarios."""
+    scenario_key: str = Field(
+        default="Global_Tariff_War_2026",
+        description="'Global_Tariff_War_2026', 'AI_CapEx_Bubble_Reset', 'ECB_Inverted_Curve_Stagflation'",
+    )
+    positions: Optional[List[Dict[str, Any]]] = Field(
+        default=None,
+        description="Optional positions list [{'symbol': '...', 'current_value': ..., 'asset_class': '...'}]",
+    )
+
+
+class MichaudResampledRequest(BaseModel):
+    """Payload for Michaud Resampled Efficient Frontier optimization."""
+    returns: Dict[str, List[float]] = Field(..., description="Historical returns dictionary {ticker: [ret1, ret2, ...]}")
+    n_samples: int = Field(default=100, ge=10, le=500)
+    n_frontier_points: int = Field(default=20, ge=5, le=50)
+    risk_free_rate: float = Field(default=0.03)
 
 
 # ============================================================
@@ -2169,6 +2219,95 @@ def create_app() -> FastAPI:
             "command_resolution": cmd_res,
             "shocked_inputs": shocked_inputs,
         }
+
+    @app.post("/api/v1/compliance/pre-trade-check", tags=["Rebalancing & Execution"])
+    def run_pre_trade_compliance_check(req: PreTradeComplianceCheckRequest) -> Dict[str, Any]:
+        """MiFID II RTS 28 & SEC 15c3-5 Pre-Trade Risk Gate validation with SHA-256 cryptographic seal."""
+        try:
+            cfg = PreTradeComplianceConfig(
+                max_notional_per_order_eur=req.max_order_value_eur,
+                max_adv_participation_pct=req.max_adv_pct * 100.0 if req.max_adv_pct <= 1.0 else req.max_adv_pct,
+                max_price_collar_pct=req.price_collar_pct * 100.0 if req.price_collar_pct <= 1.0 else req.price_collar_pct,
+                restricted_symbols=req.restricted_symbols,
+            )
+            gate = PreTradeRiskGate(config=cfg)
+            order_reqs = [
+                PreTradeOrderRequest(
+                    order_id=o.order_id,
+                    symbol=o.symbol,
+                    side=o.side,
+                    order_qty=o.quantity,
+                    limit_price=o.limit_price,
+                    reference_price=o.market_price or o.limit_price,
+                    adv_shares=o.adv_shares,
+                    available_cash_eur=req.current_cash,
+                )
+                for o in req.orders
+            ]
+            verdicts = gate.evaluate_batch(order_reqs, portfolio_cash=req.current_cash)
+            batch_seal = verdicts[0].audit_hash if verdicts else ""
+            all_approved = all(v.passed for v in verdicts)
+            return {
+                "version": "9.19.0",
+                "all_approved": all_approved,
+                "batch_audit_seal": batch_seal,
+                "orders_evaluated": len(verdicts),
+                "verdicts": [v.to_dict() for v in verdicts],
+            }
+        except Exception as exc:
+            logger.error("Pre-trade compliance check failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/stress/macro-scenarios-2026", tags=["Risk & Capital Requirements"])
+    def run_macro_scenarios_2026(req: MacroScenario2026Request) -> Dict[str, Any]:
+        """Evaluate 2026 Macro Stress Scenarios (Tariff War, AI CapEx Reset, ECB Inverted Curve)."""
+        try:
+            df_pos = pd.DataFrame(req.positions) if req.positions else None
+            res = evaluate_macro_stress_scenario(req.scenario_key, df_positions=df_pos)
+            return {
+                "version": "9.19.0",
+                "scenario_evaluation": res,
+            }
+        except Exception as exc:
+            logger.error("Macro scenario 2026 evaluation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.post("/api/v1/optimization/michaud-resampled", tags=["Portfolio Optimization"])
+    def run_michaud_resampling(req: MichaudResampledRequest) -> Dict[str, Any]:
+        """Michaud Resampled Efficient Frontier (REF 1998) via Monte Carlo resampling bootstrap."""
+        try:
+            df_ret = pd.DataFrame(req.returns)
+            res = compute_michaud_resampled_frontier(
+                df_returns=df_ret,
+                n_samples=req.n_samples,
+                n_frontier_points=req.n_frontier_points,
+                risk_free_rate=req.risk_free_rate,
+            )
+            if "df_comparison" in res and hasattr(res["df_comparison"], "to_dict"):
+                res["df_comparison"] = res["df_comparison"].to_dict(orient="records")
+            return {
+                "version": "9.19.0",
+                **res,
+            }
+        except Exception as exc:
+            logger.error("Michaud resampling failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
+
+    @app.get("/api/v1/reporting/cro-institutional-dossier", tags=["Institutional UX & Telemetry"])
+    def download_cro_institutional_dossier() -> Response:
+        """Download complete 1-Click CRO Institutional Dossier ZIP package."""
+        try:
+            zip_bytes = generate_cro_institutional_dossier_zip(results={})
+            return Response(
+                content=zip_bytes,
+                media_type="application/zip",
+                headers={
+                    "Content-Disposition": 'attachment; filename="ARGUS_CRO_Institutional_Dossier.zip"'
+                },
+            )
+        except Exception as exc:
+            logger.error("CRO dossier generation failed: %s", exc, exc_info=True)
+            raise HTTPException(status_code=500, detail=str(exc))
 
     return app
 

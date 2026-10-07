@@ -1350,6 +1350,116 @@ elif active_stress_tab == "⚡ Reverse Stress Testing (EBA / BCE)":
         </div>
         """, unsafe_allow_html=True)
 
+    # ── FOCUS INTERATTIVO SCENARI MACROECONOMICI 2026 ──
+    st.write("")
+    st.markdown("#### ⚡ Focus Interattivo Scenari Macroeconomici 2026")
+    st.caption("Analisi approfondita degli shock geopolitici e monetari aggiornati alla congiuntura 2026.")
+
+    from core.macro_stress_engine import evaluate_macro_stress_scenario, get_standard_macro_scenarios
+
+    std_macro = get_standard_macro_scenarios()
+    sc_2026_keys = [
+        "Global_Tariff_War_2026",
+        "AI_CapEx_Bubble_Reset",
+        "ECB_Inverted_Curve_Stagflation",
+    ]
+    sc_labels = {
+        "Global_Tariff_War_2026": "🌐 Guerra Dazi Globale 2026 (USA/UE/Mercati Emergenti)",
+        "AI_CapEx_Bubble_Reset": "🤖 AI CapEx Bubble Reset & Tech Multiple De-Rating",
+        "ECB_Inverted_Curve_Stagflation": "🇪🇺 Stagflazione BCE & Curva Tassi Invertita",
+    }
+
+    sel_sc_key = st.selectbox(
+        "Seleziona Scenario 2026 da Valutare:",
+        options=sc_2026_keys,
+        format_func=lambda k: sc_labels.get(k, k),
+        key="sel_macro_2026_deepdive"
+    )
+
+    sc_spec = std_macro.get(sel_sc_key, {})
+    sc_eval = evaluate_macro_stress_scenario(sel_sc_key, df_positions=pos, results=results)
+
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        metric_card(
+            "Impatto Portafoglio (%)",
+            f"{sc_eval['portfolio_return_pct']:+.2f}%",
+            delta="Drawdown Previsto",
+            delta_color="inverse" if sc_eval['portfolio_return_pct'] < 0 else "normal"
+        )
+    with k2:
+        metric_card(
+            "P&L Stimato (€)",
+            fmt_eur(sc_eval['estimated_pnl_eur']),
+            delta="Shock Monetario",
+            delta_color="inverse" if sc_eval['estimated_pnl_eur'] < 0 else "normal"
+        )
+    with k3:
+        metric_card(
+            "Valore Post-Shock (€)",
+            fmt_eur(sc_eval['stressed_portfolio_value']),
+            delta="NAV Stressed",
+            delta_color="normal"
+        )
+    with k4:
+        metric_card(
+            "Moltiplicatore Coda (Vol)",
+            f"{sc_eval['volatility_multiplier']:.2f}x",
+            delta="Spike di Volatilità",
+            delta_color="normal"
+        )
+
+    col_desc_sc, col_chart_sc = st.columns([1.3, 1])
+    with col_desc_sc:
+        st.markdown(f"""
+        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(56, 189, 248, 0.25); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 12px 16px; margin-top: 6px;">
+            <b style="color: #38bdf8; font-size: 13.5px;">{sc_spec.get('name', sel_sc_key)}</b><br>
+            <p style="font-size: 12px; color: #cbd5e1; margin: 6px 0 10px 0; line-height: 1.45;">
+                {sc_spec.get('description', '')}
+            </p>
+            <div style="font-size: 11.5px; color: #94a3b8; display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                <span>• <b>Shock Azionario:</b> <code style="color: #f87171;">{sc_spec.get('equity_shock_pct', 0.0):+.1f}%</code></span>
+                <span>• <b>Shock Tassi (bps):</b> <code style="color: #fbbf24;">{sc_spec.get('bonds_rate_shock_bps', 0.0):+.0f} bps</code></span>
+                <span>• <b>Credit Spread:</b> <code style="color: #fb923c;">+{sc_spec.get('credit_spread_shock_bps', 0.0):.0f} bps</code></span>
+                <span>• <b>Commodities:</b> <code style="color: #38bdf8;">{sc_spec.get('commodities_shock_pct', 0.0):+.1f}%</code></span>
+                <span>• <b>Shock USD/FX:</b> <code style="color: #a78bfa;">{sc_spec.get('fx_usd_shock_pct', 0.0):+.1f}%</code></span>
+                <span>• <b>Tail Factor:</b> <code style="color: #34d399;">{sc_spec.get('volatility_multiplier', 1.0):.2f}x</code></span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col_chart_sc:
+        factors = ["Azionario (%)", "Tassi (x10 bps)", "Spread (x10 bps)", "Commodities (%)", "USD FX (%)"]
+        shock_vals = [
+            float(sc_spec.get("equity_shock_pct", 0.0)),
+            float(sc_spec.get("bonds_rate_shock_bps", 0.0)) / 10.0,
+            float(sc_spec.get("credit_spread_shock_bps", 0.0)) / 10.0,
+            float(sc_spec.get("commodities_shock_pct", 0.0)),
+            float(sc_spec.get("fx_usd_shock_pct", 0.0)),
+        ]
+        bar_colors = ["#ef4444" if v < 0 else "#10b981" for v in shock_vals]
+
+        fig_sc_bar = go.Figure(go.Bar(
+            x=shock_vals,
+            y=factors,
+            orientation="h",
+            marker=dict(color=bar_colors),
+            text=[f"{v:+.1f}" for v in shock_vals],
+            textposition="auto"
+        ))
+        fig_sc_bar.update_layout(
+            title="Magnitudo Shock dei Fattori di Rischio",
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            template="plotly_dark",
+            height=200,
+            margin=dict(l=10, r=10, t=35, b=10),
+            xaxis=dict(gridcolor="rgba(255,255,255,0.06)", zerolinecolor="rgba(255,255,255,0.2)"),
+            yaxis=dict(gridcolor="rgba(255,255,255,0.06)")
+        )
+        apply_plotly_theme(fig_sc_bar)
+        st.plotly_chart(fig_sc_bar, use_container_width=True)
+
     # ── V9.11.0: REGULATORY STRESS TESTING DOSSIER (4-PAGE PDF) & TOTAL WEALTH REVERSE STRESS ──
     st.markdown("---")
     st.markdown("#### 🏛️ Regulatory Stress Testing Dossier & Total Wealth Ruin Barrier (EBA / Solvency II)")

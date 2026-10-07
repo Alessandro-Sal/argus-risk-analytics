@@ -1478,8 +1478,131 @@ if active_quant_tab == "📊 Markowitz & Rebalancing":
                     height=230
                 )
 
+        # ── SEZIONE MICHAUD RESAMPLED EFFICIENT FRONTIER ──
+        if not df_returns_hrp.empty and df_returns_hrp.shape[1] >= 2:
+            st.divider()
+            col_mch_t1, col_mch_t2 = st.columns([3.2, 1.1])
+            with col_mch_t1:
+                st.markdown("##### 🔬 Frontiera Efficiente Ricampionata di Michaud (1998 — Resampling Bootstrap)")
+                st.caption("Superamento dell'instabilità e dell'errore di stima di Markowitz tramite simulazione Monte Carlo di N universi alternativi e averaging dei pesi ottimali.")
+            with col_mch_t2:
+                st.markdown('<div style="margin-top: 6px;"></div>', unsafe_allow_html=True)
+                render_info_modal(
+                    title="Come Funziona la Frontiera di Michaud (REF)",
+                    content="""
+<div style="font-size: 13.5px; line-height: 1.5; color: #c9d1d9;">
+<div style="background: rgba(56, 189, 248, 0.08); border-left: 3px solid #38bdf8; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px;">
+    <b>Il Paradosso dell'Error Maximizer di Markowitz:</b><br>
+    L'ottimizzazione classica media-varianza presuppone che i rendimenti medi &mu; e la matrice di covarianza &Sigma; storici siano noti con certezza assoluta. In realtà, sono stime affette da elevato errore campionario. Markowitz sovra-alloca sistematicamente verso i titoli con stime sovrastimate di rendimento o sottostimate di rischio, producendo portafogli a coltello (corner solutions) fragili out-of-sample.
+</div>
+<b>La Metodologia di Richard Michaud (1998):</b><br>
+1. <b>Simulazione Bootstrap:</b> Genera centinaia di serie storiche sintetiche campionando dalla distribuzione empirica.<br>
+2. <b>Risoluzione di N Frontiere:</b> Risolve l'ottimizzazione convessa per ciascun universo simulato per K livelli di rischio/rendimento.<br>
+3. <b>Rank Averaging:</b> Media i vettori dei pesi &oline;w<sub>k</sub> = (1/B) &sum; w<sub>k</sub><sup>(b)</sup> per ciascun rango di portafoglio.<br>
+4. <b>Vantaggi Quantitativi:</b> Elimina i portafogli d'angolo, aumenta la diversificazione effettiva (minore HHI) e genera curve di frontiera stabili e replicabili.
+</div>
+                    """,
+                    button_label="💡 Spiegazione Michaud REF",
+                    key_suffix="michaud_ref_modal"
+                )
 
-            
+            with st.expander("⚙️ Parametri & Calcolo Frontiera Ricampionata", expanded=False):
+                c_m1, c_m2 = st.columns(2)
+                with c_m1:
+                    mch_sims = st.slider("Numero di Campioni Bootstrap (B)", min_value=20, max_value=200, value=60, step=20, key="mch_sims_slider")
+                with c_m2:
+                    mch_pts = st.slider("Punti della Frontiera (K)", min_value=10, max_value=30, value=20, step=5, key="mch_pts_slider")
+
+            from core.michaud_resampling import compute_michaud_resampled_frontier
+            try:
+                mch_res = compute_michaud_resampled_frontier(
+                    df_returns_hrp,
+                    n_samples=mch_sims if "mch_sims" in locals() else 60,
+                    n_frontier_points=mch_pts if "mch_pts" in locals() else 20,
+                    seed=42,
+                    risk_free_rate=0.03
+                )
+
+                col_mc_plot, col_mc_stats = st.columns([1.6, 1])
+                with col_mc_plot:
+                    fig_mch = go.Figure()
+                    # Curva Classica Markowitz
+                    fig_mch.add_trace(go.Scatter(
+                        x=mch_res["classic_vols_pct"],
+                        y=mch_res["classic_returns_pct"],
+                        mode="lines",
+                        line=dict(color="rgba(148, 163, 184, 0.6)", width=2, dash="dash"),
+                        name="Markowitz Classico"
+                    ))
+                    # Curva Michaud Resampled
+                    fig_mch.add_trace(go.Scatter(
+                        x=mch_res["resampled_vols_pct"],
+                        y=mch_res["resampled_returns_pct"],
+                        mode="lines+markers",
+                        line=dict(color="#38bdf8", width=3),
+                        marker=dict(size=5, color="#0284c7"),
+                        name="Michaud Resampled"
+                    ))
+                    # Punto Max Sharpe Michaud
+                    msr = mch_res["resampled_max_sharpe"]
+                    fig_mch.add_trace(go.Scatter(
+                        x=[msr["volatility_annual_pct"]],
+                        y=[msr["expected_return_pct"]],
+                        mode="markers",
+                        marker=dict(symbol="star", size=14, color="#f59e0b", line=dict(color="#ffffff", width=1.5)),
+                        name=f"Max Sharpe ({msr['sharpe_ratio']:.2f})"
+                    ))
+                    # Punto Min Variance Michaud
+                    gmv = mch_res["resampled_min_var"]
+                    fig_mch.add_trace(go.Scatter(
+                        x=[gmv["volatility_annual_pct"]],
+                        y=[gmv["expected_return_pct"]],
+                        mode="markers",
+                        marker=dict(symbol="diamond", size=11, color="#10b981", line=dict(color="#ffffff", width=1.5)),
+                        name=f"Min Varianza ({gmv['volatility_annual_pct']:.1f}%)"
+                    ))
+                    fig_mch.update_layout(
+                        title="Frontiera Efficiente: Michaud Resampled vs Markowitz",
+                        xaxis_title="Volatilità Annualizzata (%)",
+                        yaxis_title="Rendimento Atteso Annuo (%)",
+                        template="plotly_dark",
+                        paper_bgcolor="rgba(0,0,0,0)",
+                        plot_bgcolor="rgba(0,0,0,0)",
+                        height=360,
+                        margin=dict(l=10, r=10, t=40, b=10),
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    apply_plotly_theme(fig_mch)
+                    st.plotly_chart(fig_mch, use_container_width=True)
+
+                with col_mc_stats:
+                    st.markdown(f"""
+                    * **Sharpe Ratio Max (Michaud)**: <span style='color:#38bdf8; font-weight:bold;'>{msr['sharpe_ratio']:.2f}</span>
+                    * **Rendimento Atteso**: <span style='color:#00e676; font-weight:bold;'>{msr['expected_return_pct']:.2f}%</span>
+                    * **Volatilità Annua**: <span style='color:#ffab40; font-weight:bold;'>{msr['volatility_annual_pct']:.2f}%</span>
+                    * **Costituenti Effettivi (N<sub>eff</sub>)**: <span style='color:#bc8cff; font-weight:bold;'>{msr['effective_constituents']:.1f}</span>
+                    * **Guadagno di Diversificazione**: <span style='color:#10b981; font-weight:bold;'>+{mch_res['diversification_gain_pct']:.1f}%</span>
+                    """, unsafe_allow_html=True)
+
+                    df_comp = mch_res["df_comparison"].rename(columns={
+                        "Asset": "Asset",
+                        "Michaud Resampled %": "Michaud %",
+                        "Markowitz Classic %": "Markowitz %"
+                    })
+                    st.dataframe(
+                        df_comp,
+                        column_config={
+                            "Asset": st.column_config.TextColumn("Asset", width="small"),
+                            "Michaud %": st.column_config.ProgressColumn("Michaud REF %", format="%.2f%%", min_value=0.0, max_value=100.0),
+                            "Markowitz %": st.column_config.ProgressColumn("Markowitz %", format="%.2f%%", min_value=0.0, max_value=100.0),
+                        },
+                        use_container_width=True,
+                        hide_index=True,
+                        height=220
+                    )
+            except Exception as exc:
+                st.info(f"Ottimizzazione Michaud in elaborazione o non applicabile: {exc}")
+
         # ── BACKTESTING ESTRATTO (HRP / MARKOWITZ / EQUI-PESO) ────────
         bt_data = opt.get("backtest", {})
         if bt_data:

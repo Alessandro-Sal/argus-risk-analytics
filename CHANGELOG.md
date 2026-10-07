@@ -45,11 +45,32 @@ Questa release consolida l'integrità quantitativa, la quadratura algebrica e l'
   - Indicatore badge live nella barra telemetrica superiore (`🟢 FEED LIVE` / `🟡 CACHE SHIELD`).
 - **Crittografia a Riposo ArgusDataVault (`core/security_engine.py`)**:
   - Metodi `encrypt_file`, `decrypt_file`, `encrypt_bytes`, `decrypt_bytes` con algoritmo AES-128 Fernet per protezione a riposo dei database locali SQLite (`argus_local.db`, `argus_wealth.db`).
-- **DevOps, Pre-Commit Hooks & Documentazione API (`.pre-commit-config.yaml`, `.github/workflows/ci.yml`, `docs/api/index.md`, `mkdocs.yml`)**:
-  - Hook pre-commit configurati con Ruff (lint & format), controllo file voluminosi (>5MB), rilevamento chiavi private e blocco file sensibili.
-  - Validazione automatizzata del build documentale MkDocs nel workflow CI GitHub Actions.
-  - Catalogo interattivo OpenAPI delle REST API Headless FastAPI con documentazione completa degli endpoint.
-  - Espansione della test suite automatizzata a **856 test (100% pass rate)** su 133 file di test.
+- **Michaud Resampled Efficient Frontier (1998 — REF Engine) (`core/michaud_resampling.py`, `src/pages/4_🔬_Modelli_Quantitativi.py`)**:
+  - Implementazione del framework di ricampionamento Monte Carlo di Richard & Robert Michaud per superare l'instabilità ("error maximizer") dell'ottimizzazione classica media-varianza di Markowitz.
+  - Simulazione bootstrap di $B$ universi sintetici alternativi campionati dalla distribuzione empirica, risoluzione di $K$ punti di frontiera per ciascun campione e averaging dei pesi ottimali per rango di portafoglio.
+  - Eliminazione dei portafogli a coltello (corner solutions), incremento della stabilità dei pesi out-of-sample, riduzione dell'indice di concentrazione HHI e incremento dei costituenti effettivi ($N_{\text{eff}}$).
+  - Integrazione interattiva nella pagina Modelli Quantitativi con sovrapposizione grafica della frontiera ricampionata rispetto a Markowitz, portafoglio Max Sharpe e Min Varianza.
+- **Audit di Conformità Pre-Trade MiFID II & Fat-Finger in Action Drawers (`components/action_drawers.py`)**:
+  - Integrazione visiva del gateway `PreTradeRiskGate` nel modale `render_order_blotter_dialog` prima della conferma dello staging ordini.
+  - Badge di conformità istantaneo per ogni riga d'ordine (`🟢 CONFORME` / `🔴 BLOCCATO`), controllo Fat-Finger (€500k ceiling), Price Collar (±5%), ADV Slicing Cap (15%) e verifica capienza di cassa.
+  - Esposizione del sigillo crittografico immutabile SHA-256 della sessione e opzione di override istituzionale per il Chief Risk Officer.
+- **Focus Interattivo Scenari Macro 2026 (`src/pages/7_🌪️_Stress_Testing.py`)**:
+  - Card di deep-dive dinamica per gli scenari geopolitici 2026 (`Global_Tariff_War_2026`, `AI_CapEx_Bubble_Reset`, `ECB_Inverted_Curve_Stagflation`).
+  - Metriche istantanee di portafoglio (Drawdown stimato %, P&L monetario €, NAV stressed, spike di volatilità di coda) e diagramma a barre della magnitudo degli shock sui fattori di rischio.
+- **Headless REST API Expansion (`api/main.py`, `docs/api/index.md`)**:
+  - 4 nuovi endpoint RESTful di livello enterprise:
+    - `POST /api/v1/compliance/pre-trade-check`: validazione MiFID II / SEC batch con emissione del sigillo SHA-256.
+    - `POST /api/v1/stress/macro-scenarios-2026`: simulazione degli shock macro 2026 via API.
+    - `POST /api/v1/optimization/michaud-resampled`: calcolo della frontiera ricampionata di Michaud per terminali esterni.
+    - `GET /api/v1/reporting/cro-institutional-dossier`: download programmatico del pacchetto compresso ZIP del Dossier CRO.
+  - Aggiornamento del catalogo OpenAPI interattivo nella documentazione tecnica.
+- **Sicurezza At-Rest ArgusDataVault nel Control Room Cockpit (`src/0_Control_Room.py`, `.gitignore`)**:
+  - Widget integrato nel tab *Telemetria di Sistema & Storage Profiler* per la generazione a 1-click di snapshot cifrati AES-128 Fernet dei database locali (`argus_local.db`, `argus_wealth.db`).
+  - Ispezione dell'integrità fisica dei database tramite calcolo e verifica degli hash crittografici SHA-256.
+  - Isolamento della cartella `data/vault_backups/` e dei file `*.enc` in `.gitignore`.
+- **Test Suite PyTest Espansa a 864 Test (100% Pass Rate)**:
+  - Creata la suite `tests/test_michaud_and_api_expansion.py` (+8 test di copertura completa su convergenza Michaud, validazione input, diversificazione HHI ed endpoint FastAPI).
+  - Risultato test complessivo: **864/864 test passati con successo (100%)** su 134 file di test.
 
 ---
 

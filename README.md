@@ -738,6 +738,7 @@ argus-risk-analytics/
 │   ├── macro_stress_engine.py        # Stress testing macroeconomico congiunto (tassi, spread, inflazione, PIL)
 │   ├── macro_war_room.py             # Interactive Macro War Room, Geopolitical Stress & Correlation Breakdown
 │   ├── market_making_vpin_engine.py  # Avellaneda-Stoikov Market-Making & Hawkes VPIN Toxicity Engine
+│   ├── michaud_resampling.py         # Michaud Resampled Efficient Frontier (1998) & Monte Carlo Bootstrap
 │   ├── metadata_resolver.py          # Risoluzione metadati e anagrafiche asset
 │   ├── mip_rebalancer.py             # Mixed-Integer Programming (MIP/MILP) Cardinality & Lot-Sizing Rebalancer
 │   ├── models.py                     # Schema ORM SQLAlchemy (MySQL & SQLite)
@@ -938,6 +939,7 @@ argus-risk-analytics/
 │   ├── test_macro_provider.py
 │   ├── test_merton_and_isolation_forest.py
 │   ├── test_metric_knowledge_modals.py
+│   ├── test_michaud_and_api_expansion.py
 │   ├── test_migration_manager.py
 │   ├── test_ml_and_3d_features.py
 │   ├── test_model_risk_audit.py
@@ -1042,7 +1044,7 @@ argus-risk-analytics/
 
 ## 🧪 Esecuzione della Test Suite Automatizzata
 
-Il progetto include **856 test automatizzati PyTest** distribuiti su 133 file di test (inclusi i controlli pre-trade MiFID II RTS 28 `test_pretrade_compliance_and_scenarios.py`, i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
+Il progetto include **864 test automatizzati PyTest** distribuiti su 134 file di test (inclusi l'ottimizzatore Michaud Resampled Efficient Frontier e API expansion `test_michaud_and_api_expansion.py`, i controlli pre-trade MiFID II RTS 28 `test_pretrade_compliance_and_scenarios.py`, i test istituzionali di validazione Basilea IV, EVT POT-GPD e ottimizzatori MDP/Min-CVaR `test_risk_engine_institutional.py`, la generazione del Dossier PDF a 4 pagine `test_personal_balance_sheet_pdf.py`, test property-based con **Hypothesis**, audit normativo fiscale TUIR/L. 197/2022, test di resilienza SRE Circuit Breaker/Jitter, simulazioni successorie del Codice Civile / TUS, test DBRE di migrazione/rollback, la suite di logging strutturato con mascheramento PII/finanziario e Support Bundle, il generatore di portafogli realistici ed archetipi didattici, la suite di internazionalizzazione e cambi `test_i18n_and_fx_engine.py`, il framework di esecuzione algoritmica e Pre/Post-Trade TCA `test_tca_and_optimal_execution.py`, e il motore di persistenza bitemporale e audit crittografico `test_bitemporal_engine.py`) con copertura end-to-end del 100%:
 
 ```bash
 py -m pytest
@@ -1050,7 +1052,7 @@ py -m pytest
 
 Output atteso:
 ```text
-======================= 856 passed in ~45.00s (100%) =======================
+======================= 864 passed in ~45.00s (100%) =======================
 ```
 
 ---

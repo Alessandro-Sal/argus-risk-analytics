@@ -274,10 +274,55 @@ def render_order_blotter_dialog(
         delta_color="inverse",
     )
 
-    st.markdown("##### Ordini Pronti per lo Staging")
+    st.markdown("##### 📋 Ordini Pronti per lo Staging & Gate di Conformità MiFID II")
     orders_data = drift_summary.get("orders", [])
+    all_compliant = True
+    any_blocked = False
+    audit_seal_hash = ""
+
     if orders_data:
-        df_orders = pd.DataFrame(orders_data)
+        from core.compliance_gate import PreTradeOrderRequest, PreTradeRiskGate
+
+        gate = PreTradeRiskGate()
+        req_list = []
+        for idx, o in enumerate(orders_data):
+            try:
+                qty_raw = str(o.get("Quantità", 1.0)).replace(",", "")
+                qty_val = float(qty_raw)
+            except ValueError:
+                qty_val = 1.0
+            px_val = float(o.get("Prezzo Stimato", 100.0))
+            req_list.append(
+                PreTradeOrderRequest(
+                    order_id=f"STG-{idx+1:03d}",
+                    symbol=str(o.get("Ticker", "UNKNOWN")),
+                    side=str(o.get("Azione", "BUY")).upper(),
+                    order_qty=max(0.0001, qty_val),
+                    limit_price=px_val,
+                    reference_price=px_val,
+                )
+            )
+
+        # Stima cassa disponibile per pre-trade check
+        cash_avail = float(st.session_state.get("available_cash", max(50000.0, total_val * 0.20)))
+        verdicts = gate.evaluate_batch(req_list, portfolio_cash=cash_avail)
+
+        augmented_orders = []
+        for o, v in zip(orders_data, verdicts):
+            o_copy = dict(o)
+            if v.passed:
+                o_copy["Stato MiFID II"] = "🟢 CONFORME"
+            else:
+                reason_str = v.rejection_reasons[0] if v.rejection_reasons else v.status.value
+                o_copy["Stato MiFID II"] = f"🔴 {reason_str[:24]}"
+                any_blocked = True
+                all_compliant = False
+            o_copy["Audit Seal"] = v.audit_hash[:10] + "…" if v.audit_hash else "—"
+            augmented_orders.append(o_copy)
+            if not audit_seal_hash and v.audit_hash:
+                audit_seal_hash = v.audit_hash
+
+        df_orders = pd.DataFrame(augmented_orders)
         st.dataframe(
             df_orders,
             column_config={
@@ -287,11 +332,31 @@ def render_order_blotter_dialog(
                 "Quantità": st.column_config.TextColumn("Quantità", width="small"),
                 "Prezzo Stimato": st.column_config.NumberColumn("Prezzo Stima", format="€ %,.2f"),
                 "Controvalore": st.column_config.NumberColumn("Controvalore", format="€ %,.2f"),
-                "Regime Fiscale": st.column_config.TextColumn("Regime TUIR", width="medium"),
-                "Plus/Minus Stima": st.column_config.TextColumn("P&L Stimato", width="medium"),
+                "Stato MiFID II": st.column_config.TextColumn("Stato MiFID II", width="medium"),
+                "Regime Fiscale": st.column_config.TextColumn("Regime TUIR", width="small"),
+                "Plus/Minus Stima": st.column_config.TextColumn("P&L Stimato", width="small"),
+                "Audit Seal": st.column_config.TextColumn("Sigillo SHA-256", width="small"),
             },
             use_container_width=True,
             hide_index=True,
+        )
+
+        # Card di Audit Regolamentare MiFID II RTS 28 & SEC 15c3-5
+        status_bg = "rgba(16, 185, 129, 0.12)" if all_compliant else "rgba(239, 68, 68, 0.12)"
+        status_border = "#10b981" if all_compliant else "#ef4444"
+        status_text = "🟢 TUTTI GLI ORDINI CONFORMI A MiFID II RTS 28 & SEC 15c3-5" if all_compliant else "⚠️ ATTENZIONE: ORDINI BLOCCATI DA PRE-TRADE RISK GATE"
+
+        st.markdown(
+            f"""
+            <div style="background: {status_bg}; border: 1px solid {status_border}; border-radius: 8px; padding: 10px 14px; margin-top: 6px; margin-bottom: 10px;">
+                <b style="color: {status_border}; font-size: 13px;">{status_text}</b><br>
+                <span style="font-size: 11.5px; color: #94a3b8;">
+                • <b>Fat-Finger Threshold:</b> Max € 500.000 / ordine | <b>Price Collar:</b> ±5.0% | <b>ADV Slicing Cap:</b> 15.0%<br>
+                • <b>Sigillo Immutabile SHA-256 Batch:</b> <code>{audit_seal_hash}</code>
+                </span>
+            </div>
+            """,
+            unsafe_allow_html=True,
         )
     else:
         st.info("🟢 Portafoglio perfettamente bilanciato: nessun ordine necessario rispetto ai vincoli attuali.")
@@ -305,16 +370,21 @@ def render_order_blotter_dialog(
             horizontal=True,
             label_visibility="collapsed",
         )
+        override_compliance = False
+        if any_blocked:
+            override_compliance = st.checkbox("Forza Staging con Override Istituzionale (Loggare CISO)", value=False)
     with c_right:
         col_cancel, col_confirm = st.columns(2)
         with col_cancel:
             if st.button("Annulla", use_container_width=True):
                 st.rerun()
         with col_confirm:
-            if st.button("🚀 Conferma & Staging", type="primary", use_container_width=True):
+            btn_disabled = any_blocked and not override_compliance
+            if st.button("🚀 Conferma & Staging", type="primary", use_container_width=True, disabled=btn_disabled):
                 st.session_state["staged_orders_active"] = orders_data
                 st.session_state["last_staging_timestamp"] = pd.Timestamp.now().isoformat()
-                st.toast("✅ Ordini registrati nel Blotter con successo!", icon="📋")
+                st.session_state["last_staging_audit_seal"] = audit_seal_hash
+                st.toast("✅ Ordini registrati nel Blotter con successo e sigillo SHA-256!", icon="📋")
                 st.rerun()
 
 
