@@ -689,19 +689,43 @@ def _extract_from_text(
         for p in all_pages:
             if "ALTRE IMPOSTE SOSTITUTIVE" in p:
                 lines = [l.strip() for l in p.split("\n") if l.strip()]
-                for l in lines[-12:]:
-                    parts = l.split()
-                    if "206" in parts and substitute_tax == 0.0:
-                        substitute_tax = 206.0
-                    if "53" in parts and ivafe_val == 0.0:
-                        ivafe_val = 53.0
+                mance_idx = -1
+                for i, l in enumerate(lines):
+                    if "MANCE SETTORE TURISTICO ALBERGHIERO" in l:
+                        mance_idx = i
+                if mance_idx != -1:
+                    tail = lines[mance_idx + 1 :]
+                    if len(tail) == 1 and re.match(r"^\d+\s+\d+$", tail[0]):
+                        ivafe_val = float(tail[0].split()[0])
+                    elif len(tail) >= 3:
+                        m_iv = re.match(r"^(\d+)\s+(\d+)$", tail[0])
+                        if m_iv:
+                            ivafe_val = float(m_iv.group(1))
+                        m_plus = re.match(r"^(\d+)\s+(\d+)$", tail[-1])
+                        if m_plus:
+                            substitute_tax = float(m_plus.group(1))
+                    elif len(tail) == 2:
+                        for t in tail:
+                            m_pr = re.match(r"^(\d+)\s+(\d+)$", t)
+                            if m_pr:
+                                if ivafe_val == 0.0:
+                                    ivafe_val = float(m_pr.group(1))
+                                else:
+                                    substitute_tax = float(m_pr.group(1))
 
         for p in all_pages:
             if "DATI PER LA COMPILAZIONE DEL MODELLO F24" in p or "MODELLO F24" in p:
-                if "1100" in p and substitute_tax == 0.0:
-                    substitute_tax = 206.0
-                if "4043" in p and ivafe_val == 0.0:
-                    ivafe_val = 53.0
+                lines = [l.strip() for l in p.split("\n") if l.strip()]
+                has_1100 = any("1100" in l for l in lines)
+                has_4043 = any("4043" in l for l in lines)
+                if has_1100 and substitute_tax == 0.0:
+                    tail_nums = [l for l in lines[-12:] if l.isdigit() and int(l) > 0]
+                    if tail_nums:
+                        substitute_tax = float(tail_nums[-1])
+                if has_4043 and ivafe_val == 0.0:
+                    tail_nums = [l for l in lines[-12:] if l.isdigit() and int(l) > 0]
+                    if tail_nums:
+                        ivafe_val = float(tail_nums[0])
 
     def _find_amount_by_patterns(patterns: List[str]) -> float:
         for pat in patterns:

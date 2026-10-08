@@ -89,11 +89,12 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         # ── TAB A: FILE UPLOADER & SMART PARSER ──
         with col_up1:
             st.markdown("##### 📄 Caricamento File (PDF / JSON)")
-            uploaded_file = st.file_uploader(
-                "Trascina il PDF o JSON del Modello 730 / Redditi PF:",
+            uploaded_files = st.file_uploader(
+                "Trascina uno o più PDF/JSON del Modello 730 / Redditi PF (anche più anni insieme):",
                 type=["pdf", "json", "txt"],
+                accept_multiple_files=True,
                 key=f"file_uploader_tax_{pid_str}",
-                help="Supporta PDF ufficiali rilasciati dall'AdE con Quadri Redditi, T/RT, Quadro W/RW e prospetto di liquidazione.",
+                help="Supporta PDF ufficiali rilasciati dall'AdE con Quadri Redditi, T/RT, Quadro W/RW e prospetto di liquidazione. Puoi caricare anche più anni contemporaneamente.",
             )
 
             # Template scaricabile per facilitare inserimenti strutturati
@@ -108,53 +109,68 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 help="Scarica un file JSON pre-compilato con le chiavi fiscali richieste (Redditi, Quadri T/RT, W, righi 307/321) per test rapido.",
             )
 
-            if uploaded_file is not None:
-                file_bytes = uploaded_file.read()
-                filename = uploaded_file.name
+            if uploaded_files:
+                parsed_list = []
+                for up_file in uploaded_files:
+                    file_bytes = up_file.read()
+                    filename = up_file.name
+                    with st.spinner(f"Analisi di {filename}..."):
+                        p_data = parse_730_pdf_or_json(file_bytes, filename=filename)
+                        p_data["profile_id"] = pid_str
+                        parsed_list.append((filename, p_data))
 
-                with st.spinner("Analisi ed estrazione automatica dei quadri fiscali in corso..."):
-                    parsed_data = parse_730_pdf_or_json(file_bytes, filename=filename)
-                    parsed_data["profile_id"] = pid_str
+                st.success(f"Caricati ed elaborati con successo **{len(parsed_list)} file**!")
 
-                st.success(f"File **{filename}** elaborato con successo!")
-
-                # Preview e conferma dei dati estratti
-                with st.expander("🔍 Verifica Campi Estratti ed Archiviazione", expanded=True):
-                    c_p1, c_p2 = st.columns(2)
-                    with c_p1:
-                        p_year = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data["tax_year"]), key=f"p_yr_{pid_str}")
-                        p_model = st.selectbox("Modello:", ["730_ORDINARIO", "730_INTEGRATIVO", "REDDITI_PF"], index=0 if parsed_data["model_type"] == "730_ORDINARIO" else (1 if parsed_data["model_type"] == "730_INTEGRATIVO" else 2), key=f"p_md_{pid_str}")
-                        p_proto = st.text_input("Protocollo Telematico:", value=str(parsed_data.get("protocol_id") or ""), key=f"p_pr_{pid_str}")
-                        p_gross = st.number_input("Reddito Complessivo (€):", value=float(parsed_data["gross_income"]), step=500.0, key=f"p_gr_{pid_str}")
-                        p_net_tax = st.number_input("Imposta Netta IRPEF (€):", value=float(parsed_data["net_tax_irpef"]), step=100.0, key=f"p_nt_{pid_str}")
-                    with c_p2:
-                        p_cg = st.number_input("Plusvalenze Quadro T/RT (€):", value=float(parsed_data["capital_gains_declared"]), step=100.0, key=f"p_cg_{pid_str}")
-                        p_cl = st.number_input("Minusvalenze Compensate T13 (€):", value=float(parsed_data["capital_losses_offset"]), step=100.0, key=f"p_cl_{pid_str}")
-                        p_sub = st.number_input("Imposta Sostitutiva 26% (Rigo 321) (€):", value=float(parsed_data["substitute_tax_paid"]), step=50.0, key=f"p_sb_{pid_str}")
-                        p_ivafe = st.number_input("IVAFE (Rigo 307 / Quadro W) (€):", value=float(parsed_data["ivafe_paid"]), step=10.0, key=f"p_iv_{pid_str}")
-                        p_for = st.number_input("Attività Estere Valore Finale (€):", value=float(parsed_data["foreign_assets_val"]), step=1000.0, key=f"p_fa_{pid_str}")
-
-                    if st.button("💾 Conferma & Salva in Archivio", key=f"btn_save_parsed_{pid_str}", type="primary", use_container_width=True):
-                        to_save = {
-                            "profile_id": pid_str,
-                            "tax_year": p_year,
-                            "filing_year": p_year + 1,
-                            "model_type": p_model,
-                            "protocol_id": p_proto,
-                            "gross_income": p_gross,
-                            "taxable_income": float(parsed_data.get("taxable_income", p_gross)),
-                            "net_tax_irpef": p_net_tax,
-                            "capital_gains_declared": p_cg,
-                            "capital_losses_offset": p_cl,
-                            "substitute_tax_paid": p_sub,
-                            "ivafe_paid": p_ivafe,
-                            "foreign_assets_val": p_for,
-                            "notes": str(parsed_data.get("notes") or f"Importato da file: {filename}"),
-                            "source_filename": filename,
-                        }
-                        decl_id = record_declaration(engine, to_save)
-                        st.success(f"✅ Dichiarazione registrata con ID #{decl_id}!")
+                if len(parsed_list) > 1:
+                    if st.button("💾 Conferma & Salva Tutte le Dichiarazioni nel Database (Batch)", key=f"btn_save_all_batch_{pid_str}", type="primary", use_container_width=True):
+                        saved_cnt = 0
+                        for fname, p_data in parsed_list:
+                            record_declaration(engine, p_data)
+                            saved_cnt += 1
+                        st.success(f"✅ Registrate con successo {saved_cnt} dichiarazioni fiscali nel database!")
                         st.rerun()
+
+                for idx, (filename, parsed_data) in enumerate(parsed_list):
+                    is_730_4 = "730-4" in str(parsed_data.get("notes") or "") or "MOD 730/4" in filename
+                    exp_label = f"📄 File #{idx+1}: {filename} — Anno d'Imposta {parsed_data['tax_year']} (Mod. {parsed_data['filing_year']})"
+                    with st.expander(exp_label, expanded=(len(parsed_list) == 1 or idx == 0)):
+                        if is_730_4:
+                            st.warning(f"⚠️ Il file **{filename}** appare come Modello 730-4 (comunicazione al sostituto d'imposta per conguaglio). Per l'estrazione completa dei quadri patrimoniali e finanziari (C, D, E, W/RW, T), carica il modello 730 ordinario completo.")
+                        c_p1, c_p2 = st.columns(2)
+                        with c_p1:
+                            p_year = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data["tax_year"]), key=f"p_yr_{pid_str}_{idx}")
+                            p_model = st.selectbox("Modello:", ["730_ORDINARIO", "730_INTEGRATIVO", "REDDITI_PF"], index=0 if parsed_data["model_type"] == "730_ORDINARIO" else (1 if parsed_data["model_type"] == "730_INTEGRATIVO" else 2), key=f"p_md_{pid_str}_{idx}")
+                            p_proto = st.text_input("Protocollo Telematico:", value=str(parsed_data.get("protocol_id") or ""), key=f"p_pr_{pid_str}_{idx}")
+                            p_gross = st.number_input("Reddito Complessivo (€):", value=float(parsed_data["gross_income"]), step=500.0, key=f"p_gr_{pid_str}_{idx}")
+                            p_net_tax = st.number_input("Imposta Netta IRPEF (€):", value=float(parsed_data["net_tax_irpef"]), step=100.0, key=f"p_nt_{pid_str}_{idx}")
+                        with c_p2:
+                            p_cg = st.number_input("Plusvalenze Quadro T/RT (€):", value=float(parsed_data["capital_gains_declared"]), step=100.0, key=f"p_cg_{pid_str}_{idx}")
+                            p_cl = st.number_input("Minusvalenze Compensate T13 (€):", value=float(parsed_data["capital_losses_offset"]), step=100.0, key=f"p_cl_{pid_str}_{idx}")
+                            p_sub = st.number_input("Imposta Sostitutiva 26% (Rigo 321) (€):", value=float(parsed_data["substitute_tax_paid"]), step=50.0, key=f"p_sb_{pid_str}_{idx}")
+                            p_ivafe = st.number_input("IVAFE (Rigo 307 / Quadro W) (€):", value=float(parsed_data["ivafe_paid"]), step=10.0, key=f"p_iv_{pid_str}_{idx}")
+                            p_for = st.number_input("Attività Estere Valore Finale (€):", value=float(parsed_data["foreign_assets_val"]), step=1000.0, key=f"p_fa_{pid_str}_{idx}")
+
+                        if st.button(f"💾 Conferma & Salva Dichiarazione {p_year}", key=f"btn_save_parsed_{pid_str}_{idx}", type="secondary", use_container_width=True):
+                            to_save = {
+                                "profile_id": pid_str,
+                                "tax_year": p_year,
+                                "filing_year": p_year + 1,
+                                "model_type": p_model,
+                                "protocol_id": p_proto,
+                                "gross_income": p_gross,
+                                "taxable_income": float(parsed_data.get("taxable_income", p_gross)),
+                                "net_tax_irpef": p_net_tax,
+                                "capital_gains_declared": p_cg,
+                                "capital_losses_offset": p_cl,
+                                "substitute_tax_paid": p_sub,
+                                "ivafe_paid": p_ivafe,
+                                "foreign_assets_val": p_for,
+                                "notes": str(parsed_data.get("notes") or f"Importato da file: {filename}"),
+                                "source_filename": filename,
+                            }
+                            decl_id = record_declaration(engine, to_save)
+                            st.success(f"✅ Dichiarazione Anno {p_year} registrata con ID #{decl_id}!")
+                            st.rerun()
 
         # ── TAB B: INSERIMENTO MANUALE RAPIDO ──
         with col_up2:
@@ -207,6 +223,8 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 "tax_year",
                 "model_type",
                 "gross_income",
+                "taxable_income",
+                "net_tax_irpef",
                 "capital_gains_declared",
                 "capital_losses_offset",
                 "substitute_tax_paid",
@@ -223,6 +241,8 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 "tax_year": st.column_config.NumberColumn("Anno Imposta", disabled=True, width="small"),
                 "model_type": st.column_config.SelectboxColumn("Modello", options=["730_ORDINARIO", "730_INTEGRATIVO", "REDDITI_PF"], width="medium"),
                 "gross_income": st.column_config.NumberColumn("Reddito Lordo (€)", format="€ %,.2f"),
+                "taxable_income": st.column_config.NumberColumn("Reddito Imponibile (€)", format="€ %,.2f"),
+                "net_tax_irpef": st.column_config.NumberColumn("Imposta Netta IRPEF (€)", format="€ %,.2f"),
                 "capital_gains_declared": st.column_config.NumberColumn("Plusvalenze T11 (€)", format="€ %,.2f"),
                 "capital_losses_offset": st.column_config.NumberColumn("Minusvalenze T13 (€)", format="€ %,.2f"),
                 "substitute_tax_paid": st.column_config.NumberColumn("Sostitutiva 321 (€)", format="€ %,.2f"),
@@ -255,8 +275,8 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                             "model_type": str(r_dict.get("model_type", "730_ORDINARIO")),
                             "protocol_id": str(r_dict.get("protocol_id", "")) if not pd.isna(r_dict.get("protocol_id")) else None,
                             "gross_income": float(r_dict.get("gross_income", 0.0) or 0.0),
-                            "taxable_income": float(r_dict.get("gross_income", 0.0) or 0.0),
-                            "net_tax_irpef": 0.0,
+                            "taxable_income": float(r_dict.get("taxable_income") or r_dict.get("gross_income", 0.0) or 0.0),
+                            "net_tax_irpef": float(r_dict.get("net_tax_irpef", 0.0) or 0.0),
                             "capital_gains_declared": float(r_dict.get("capital_gains_declared", 0.0) or 0.0),
                             "capital_losses_offset": float(r_dict.get("capital_losses_offset", 0.0) or 0.0),
                             "substitute_tax_paid": float(r_dict.get("substitute_tax_paid", 0.0) or 0.0),

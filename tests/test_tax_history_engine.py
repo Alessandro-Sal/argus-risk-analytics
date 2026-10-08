@@ -253,6 +253,48 @@ class TestTax730Parser:
         assert "SALADINO" in res["notes"]
         assert "SLDLSN00P19M208Y" in res["notes"]
 
+    def test_parse_official_730_2024_pdf(self):
+        pdf_path = Path(r"C:\Users\Alessandro Personale\.gemini\antigravity\brain\eb071f0b-4569-4763-a8a5-a98a8d170f63\.user_uploaded\media_1791482598673_6944a3d5.pdf")
+        if not pdf_path.exists():
+            pytest.skip("Uploaded 730/2024 PDF not available in test environment")
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        res = parse_730_pdf_or_json(pdf_bytes, filename="730_2024_Saladino.pdf")
+        assert res["tax_year"] == 2023
+        assert res["filing_year"] == 2024
+        assert res["model_type"] == "730_ORDINARIO"
+        assert res["protocol_id"] == "12454842525 - 0000472"
+        assert res["gross_income"] == 20500.00
+        assert res["taxable_income"] == 20500.00
+        assert res["net_tax_irpef"] == 2216.00
+        assert res["substitute_tax_paid"] == 0.00
+        assert res["capital_gains_declared"] == 0.00
+        assert res["ivafe_paid"] == 17.00
+        assert res["foreign_assets_val"] == 8500.00
+        assert "SALADINO" in res["notes"]
+
+    def test_parse_official_730_2025_pdf(self):
+        pdf_path = Path(r"C:\Users\Alessandro Personale\Downloads\730_T25092611423143672686_SLDLSN00P19M208Y (4).pdf")
+        if not pdf_path.exists():
+            pytest.skip("730/2025 PDF not available in Downloads")
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        res = parse_730_pdf_or_json(pdf_bytes, filename="730_2025_Saladino.pdf")
+        assert res["tax_year"] == 2024
+        assert res["filing_year"] == 2025
+        assert res["model_type"] == "730_ORDINARIO"
+        assert res["protocol_id"] == "11423143672 - 0000686"
+        assert res["gross_income"] == 22716.00
+        assert res["taxable_income"] == 22716.00
+        assert res["net_tax_irpef"] == 2714.00
+        assert res["substitute_tax_paid"] == 115.00
+        assert res["capital_gains_declared"] == 442.31
+        assert res["ivafe_paid"] == 34.00
+        assert res["foreign_assets_val"] == 17000.00
+        assert "SALADINO" in res["notes"]
+
 
 class TestReconciliationEngine:
     def test_reconcile_with_art_36_bis_unfiled_risk(self, memory_db):
