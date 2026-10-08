@@ -20,6 +20,7 @@ from core.ui_utils import (
     apply_plotly_theme,
     ensure_risk_bundle_loaded,
     fmt_pct,
+    format_display_portfolio_name,
     glossary_modal,
     inject_custom_css,
     metric_card,
@@ -82,8 +83,9 @@ for _, r in equity_pos.iterrows():
 col_head1, col_head2 = st.columns([3.4, 1.2], vertical_alignment="center")
 with col_head1:
     st.title("🏛️ Valutazione Intrinseca & Fair Value")
+    active_p_name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
     if "run_id" in st.session_state:
-        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Analisi dei fondamentali societari, target price dei mercati (Consensus) e simulazioni di private equity (IRR & TVPI).")
+        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {active_p_name} • Analisi dei fondamentali societari, target price dei mercati (Consensus) e simulazioni di private equity (IRR & TVPI).")
 
 with col_head2:
     glossary_modal("Cos'è la Valutazione Aziendale & Fair Value", """

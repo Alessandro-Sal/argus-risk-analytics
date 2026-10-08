@@ -17,6 +17,7 @@ from core.ui_utils import (
     ensure_portfolio_loaded,
     fmt_eur,
     fmt_pct,
+    format_display_portfolio_name,
     glossary_modal,
     inject_custom_css,
     metric_card,
@@ -52,8 +53,9 @@ render_sandbox_banner(page_key="p7")
 col_head1, col_head2 = st.columns([3.4, 1.2], vertical_alignment="center")
 with col_head1:
     st.title("🌪️ Stress Testing & Resilience Analysis")
+    active_p_name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
     if "run_id" in st.session_state:
-        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Simulazione d'impatto e matrice MSCI Barra nei 5 principali scenari storici di crisi e stress macroeconomico.")
+        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {active_p_name} • Simulazione d'impatto e matrice MSCI Barra nei 5 principali scenari storici di crisi e stress macroeconomico.")
     elif results.get("is_sandbox"):
         st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 

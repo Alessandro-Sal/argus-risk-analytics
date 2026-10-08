@@ -772,6 +772,15 @@ def inject_custom_css():
         }}
 
         /* Executive Health Badges */
+        .executive-badges-container {{
+            display: flex !important;
+            flex-wrap: wrap !important;
+            gap: 8px !important;
+            align-items: center !important;
+            margin-top: 6px !important;
+            margin-bottom: 14px !important;
+            line-height: normal !important;
+        }}
         .executive-badge {{
             display: inline-flex;
             align-items: center;
@@ -779,8 +788,8 @@ def inject_custom_css():
             border-radius: 14px;
             font-size: 11.5px;
             font-weight: 600;
-            margin-right: 6px;
-            margin-bottom: 2px;
+            margin-right: 0px;
+            margin-bottom: 0px;
             backdrop-filter: blur(8px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             box-shadow: 0 2px 8px rgba(0,0,0,0.15);
@@ -792,6 +801,13 @@ def inject_custom_css():
         .badge-purple {{ background: rgba(167, 139, 250, 0.12); color: #a78bfa; border-color: rgba(167, 139, 250, 0.25); }}
         .badge-gray {{ background: rgba(255, 255, 255, 0.05); color: #94a3b8; border-color: rgba(255, 255, 255, 0.10); }}
         .badge-emerald {{ background: rgba(16, 185, 129, 0.14); color: #34d399; border-color: rgba(16, 185, 129, 0.30); }}
+
+        /* Institutional Telemetry Ribbon Global Spacing */
+        .institutional-telemetry-ribbon {{
+            margin-top: 6px !important;
+            margin-bottom: 14px !important;
+            clear: both !important;
+        }}
 
 
         /* Section Header */
@@ -1693,6 +1709,21 @@ def render_header(title: str, subtitle: str = None):
         st.caption(subtitle)
 
 
+def format_display_portfolio_name(name: str | None) -> str:
+    """
+    Normalizza e ripulisce il nome del portafoglio per la visualizzazione nella UI,
+    rimuovendo suffissi grezzi di backend (es. 'Master Wealth Google Sheets' -> 'Master Wealth').
+    """
+    if not name or str(name).strip() in ("N/A", "None", ""):
+        return "N/A"
+    clean = str(name).strip()
+    if clean in ("Master Wealth Google Sheets", "Google Sheets Portfolio"):
+        return "Master Wealth"
+    if clean.endswith(" Google Sheets"):
+        clean = clean[:-14].strip()
+    return clean or "Master Wealth"
+
+
 def get_display_portfolio_name():
     """
     Restituisce una tupla (nome_da_visualizzare: str, is_active: bool).
@@ -1702,8 +1733,8 @@ def get_display_portfolio_name():
     has_data = bool(st.session_state.get("pipeline_done") or st.session_state.get("results"))
     if not has_data:
         return "Nessun Portafoglio", False
-    name = st.session_state.get("portfolio_name")
-    if not name or name == "Master Wealth Google Sheets":
+    name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
+    if name == "N/A":
         name = "Master Wealth"
     return name, True
 
@@ -3299,7 +3330,7 @@ def render_executive_badges(metrics_dict: dict):
         dd_badge = '<span class="executive-badge badge-red">🔴 Drawdown Elevato (> 22%)</span>'
 
     st.markdown(
-        f'<div style="margin-top: 4px; margin-bottom: 6px;">{sharpe_badge}{vol_badge}{dd_badge}</div>',
+        f'<div class="executive-badges-container" style="margin-top: 6px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">{sharpe_badge}{vol_badge}{dd_badge}</div>',
         unsafe_allow_html=True,
     )
 
@@ -9012,7 +9043,7 @@ def render_wealth_executive_badges(net_worth_summary):
     sec_badge = '<span class="executive-badge badge-gray">🔒 Zero-Cloud Crittografia Locale</span>'
 
     st.markdown(
-        f'<div style="margin-top: 4px; margin-bottom: 12px; display:flex; flex-wrap:wrap; gap:6px;">{nw_badge}{score_badge}{runway_badge}{sav_badge}{sec_badge}</div>',
+        f'<div class="executive-badges-container" style="margin-top: 6px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">{nw_badge}{score_badge}{runway_badge}{sav_badge}{sec_badge}</div>',
         unsafe_allow_html=True,
     )
 

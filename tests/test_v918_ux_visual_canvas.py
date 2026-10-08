@@ -513,3 +513,46 @@ def test_v918_global_command_registry_full_coverage():
             f"Command '{cmd}' routed to '{res.get('target_page')}', expected containing '{expected_page}'"
         )
 
+
+def test_portfolio_display_sanitization_and_telemetry_spacing() -> None:
+    """Verify that portfolio names are sanitized for UI display and telemetry ribbon classes/spacing are present."""
+    from core.ui_utils import format_display_portfolio_name
+    from core.ux_institutional_hub import (
+        build_telemetry_ribbon_html,
+        build_telemetry_ribbon_state,
+        build_wealth_telemetry_ribbon_html,
+        build_wealth_telemetry_ribbon_state,
+    )
+
+    # 1. format_display_portfolio_name
+    assert format_display_portfolio_name("Master Wealth Google Sheets") == "Master Wealth"
+    assert format_display_portfolio_name("Google Sheets Portfolio") == "Master Wealth"
+    assert format_display_portfolio_name("Corporate Treasury Google Sheets") == "Corporate Treasury"
+    assert format_display_portfolio_name("Family Office Mandato Alpha") == "Family Office Mandato Alpha"
+    assert format_display_portfolio_name(None) == "N/A"
+    assert format_display_portfolio_name("") == "N/A"
+
+    # 2. Institutional ribbon state resolution
+    state_gs = {"portfolio_name": "Master Wealth Google Sheets"}
+    tel = build_telemetry_ribbon_state(session_state_dict=state_gs, page_badge="EXECUTIVE DESK")
+    assert tel["profile_name"] == "Master Wealth"
+
+    html = build_telemetry_ribbon_html(tel, {"is_active": False, "label": "NONE"})
+    assert 'class="institutional-telemetry-ribbon"' in html
+    assert "Master Wealth" in html
+    assert "Google Sheets" not in html
+    assert "\n" not in html
+
+    # 3. Wealth ribbon state resolution
+    w_tel = build_wealth_telemetry_ribbon_state(
+        session_state_dict={"wealth_active_profile_name": "Master Wealth Google Sheets"},
+        page_badge="WEALTH MANAGEMENT",
+    )
+    assert w_tel["profile_name"] == "Master Wealth"
+    w_html = build_wealth_telemetry_ribbon_html(w_tel)
+    assert 'class="institutional-telemetry-ribbon"' in w_html
+    assert "Master Wealth" in w_html
+    assert "Google Sheets" not in w_html
+    assert "\n" not in w_html
+
+

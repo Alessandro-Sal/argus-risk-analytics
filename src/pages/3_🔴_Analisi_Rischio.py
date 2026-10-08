@@ -16,6 +16,7 @@ from core.ui_utils import (
     apply_plotly_theme,
     ensure_portfolio_loaded,
     fmt_pct,
+    format_display_portfolio_name,
     glossary_modal,
     inject_custom_css,
     metric_card,
@@ -44,8 +45,9 @@ pos = results.get("positions", pd.DataFrame())
 render_sandbox_banner(page_key="p2")
 
 st.title("🔴 Analisi del Rischio")
+active_p_name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
 if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Diagnostica quantitativa del rischio di mercato, VaR 95/99%, Tail Risk, modelli Fama-French, ATR Chandelier Exit e ML Anomaly Detection.")
+    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {active_p_name} • Diagnostica quantitativa del rischio di mercato, VaR 95/99%, Tail Risk, modelli Fama-French, ATR Chandelier Exit e ML Anomaly Detection.")
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)

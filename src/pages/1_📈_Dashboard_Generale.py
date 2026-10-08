@@ -16,6 +16,7 @@ from core.ui_utils import (
     ensure_portfolio_loaded,
     fmt_eur,
     fmt_pct,
+    format_display_portfolio_name,
     glossary_modal,
     inject_custom_css,
     metric_card,
@@ -48,8 +49,9 @@ pos = results.get("positions", pd.DataFrame())
 render_omni_command_bar(portal="risk")
 render_sandbox_banner(page_key="p1")
 
+active_p_name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
 if "run_id" in st.session_state:
-    sub_text = f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Quadro sintetico ad alta densità su performance, allocazione, impronta di rischio e conformità regolamentare."
+    sub_text = f"Run ID: {st.session_state['run_id']} | Portafoglio: {active_p_name} • Quadro sintetico ad alta densità su performance, allocazione, impronta di rischio e conformità regolamentare."
 elif results.get("is_sandbox"):
     sub_text = f"🧪 Modalità Sandbox Attiva: {results.get('sandbox_name', 'Benchmark Demo')} ({len(pos)} asset) • Capitale Simulato: $100,000"
 else:

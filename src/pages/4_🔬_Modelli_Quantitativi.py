@@ -83,7 +83,7 @@ import core.reinforcement_learning
 import core.risk_engine
 import core.volatility_surface
 from core.reinforcement_learning import train_and_evaluate_rl_portfolio
-from core.ui_utils import ensure_portfolio_loaded, render_sandbox_banner
+from core.ui_utils import ensure_portfolio_loaded, format_display_portfolio_name, render_sandbox_banner
 
 results, has_real = ensure_portfolio_loaded(module_type="risk")
 has_portfolio = results is not None and isinstance(results, dict) and bool(results.get("positions") is not None and not results.get("positions").empty)
@@ -117,8 +117,9 @@ render_sandbox_banner(page_key="p4")
 col_head1, col_head2 = st.columns([3.0, 1.3], vertical_alignment="center")
 with col_head1:
     st.title("🔬 Modelli Quantitativi & Frontiera di Portafoglio")
+    active_p_name = format_display_portfolio_name(st.session_state.get("portfolio_name"))
     if "run_id" in st.session_state:
-        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Frontiera Markowitz/Ledoit-Wolf, Equal Risk Contribution, Tail Copula, Kelly Sizing, Monte Carlo e Black-Scholes.")
+        st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {active_p_name} • Frontiera Markowitz/Ledoit-Wolf, Equal Risk Contribution, Tail Copula, Kelly Sizing, Monte Carlo e Black-Scholes.")
     elif results.get("is_sandbox"):
         st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 

@@ -64,7 +64,7 @@ def _resolve_active_portfolio_bundle(
         except Exception:
             pass
 
-    profile_name = str(
+    raw_profile = str(
         state.get("portfolio_name")
         or state.get("wealth_active_profile_name")
         or state.get("active_portfolio_name")
@@ -73,6 +73,12 @@ def _resolve_active_portfolio_bundle(
         or res.get("sandbox_name")
         or "Portafoglio Principale (Institutional)"
     )
+    if raw_profile in ("Master Wealth Google Sheets", "Google Sheets Portfolio"):
+        profile_name = "Master Wealth"
+    elif raw_profile.endswith(" Google Sheets"):
+        profile_name = raw_profile[:-14].strip() or "Master Wealth"
+    else:
+        profile_name = raw_profile
     return res, profile_name
 
 
@@ -259,12 +265,14 @@ def build_telemetry_ribbon_html(
     )
 
     raw_html = f"""
-    <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
+    <div class="institutional-telemetry-ribbon"
+         style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
                 border: 1px solid rgba(99, 102, 241, 0.32);
                 border-left: 4px solid #6366f1;
                 border-radius: 10px;
                 padding: 8px 14px;
-                margin-bottom: 8px;
+                margin-top: 6px;
+                margin-bottom: 14px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
@@ -341,7 +349,13 @@ def build_wealth_telemetry_ribbon_state(
     state = session_state_dict if session_state_dict is not None else (
         dict(st.session_state) if st is not None and hasattr(st, "session_state") else {}
     )
-    p_name = profile_name or state.get("wealth_active_profile_name") or state.get("active_portfolio_name") or "Family Office Portfolio"
+    raw_p_name = profile_name or state.get("wealth_active_profile_name") or state.get("active_portfolio_name") or "Family Office Portfolio"
+    if raw_p_name in ("Master Wealth Google Sheets", "Google Sheets Portfolio"):
+        p_name = "Master Wealth"
+    elif raw_p_name.endswith(" Google Sheets"):
+        p_name = raw_p_name[:-14].strip() or "Master Wealth"
+    else:
+        p_name = raw_p_name
 
     tot_nw = float(getattr(nw_summary, "total_net_worth", 0.0) if nw_summary is not None else state.get("wealth_total_net_worth", 1_250_000.0))
     liq_cash = float(getattr(nw_summary, "liquid_cash", 0.0) if nw_summary is not None else state.get("wealth_liquid_cash", 120_000.0))
@@ -430,12 +444,14 @@ def build_wealth_telemetry_ribbon_html(
         )
 
     raw_html = f"""
-    <div style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
+    <div class="institutional-telemetry-ribbon"
+         style="background: linear-gradient(90deg, rgba(15, 23, 42, 0.96) 0%, rgba(22, 27, 34, 0.96) 100%);
                 border: 1px solid rgba(16, 185, 129, 0.32);
                 border-left: 4px solid #10b981;
                 border-radius: 10px;
                 padding: 8px 14px;
-                margin-bottom: 8px;
+                margin-top: 6px;
+                margin-bottom: 14px;
                 display: flex;
                 justify-content: space-between;
                 align-items: center;

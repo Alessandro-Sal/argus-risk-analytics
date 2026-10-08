@@ -32,6 +32,7 @@ from core.ui_utils import (
     apply_plotly_theme,
     ensure_portfolio_loaded,
     fmt_eur,
+    format_display_portfolio_name,
     glossary_modal,
     inject_custom_css,
     metric_card,
@@ -58,13 +59,13 @@ render_institutional_telemetry_ribbon(
 )
 pos = results.get("positions", pd.DataFrame())
 con = results.get("metrics", {}).get("concentration", {})
-portfolio_name = st.session_state.get("portfolio_name", results.get("sandbox_name", "Portfolio"))
+portfolio_name = format_display_portfolio_name(st.session_state.get("portfolio_name", results.get("sandbox_name", "Portfolio")))
 
 render_sandbox_banner(page_key="p4")
 
 st.title("📋 Posizioni, Concentrazione & Fisco")
 if "run_id" in st.session_state:
-    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {st.session_state.get('portfolio_name', 'N/A')} • Mappa dettagliata delle posizioni aperte, analisi dei dividendi passivi ed ottimizzazione fiscale (TUIR Art. 67).")
+    st.caption(f"Run ID: {st.session_state['run_id']} | Portafoglio: {portfolio_name} • Mappa dettagliata delle posizioni aperte, analisi dei dividendi passivi ed ottimizzazione fiscale (TUIR Art. 67).")
 elif results.get("is_sandbox"):
     st.caption(f"🧪 Modalità Sandbox Attiva: **{results.get('sandbox_name', 'Benchmark Demo')}** ({len(pos)} asset) • Capitale Simulato: **$100,000**")
 st.markdown('<div style="margin-bottom: 8px;"></div>', unsafe_allow_html=True)
