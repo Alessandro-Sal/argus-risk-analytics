@@ -302,6 +302,7 @@ NAV_MODULES_WEALTH = [
         "has_subtabs": True,
         "tab_key": "wealth_tax_active_tab",
         "subtabs": [
+            {"label": "🏛️ Storico 730", "target": "🏛️ Storico 730 & Riconciliazione"},
             {"label": "📑 Monitoraggio RW", "target": "📑 Prospetto Quadro RW / RT"},
             {"label": "🪦 Zainetto Minusvalenze", "target": "📉 Zainetto Fiscale & Scadenze"},
             {"label": "🌾 Tax-Loss Harvesting", "target": "🌾 Tax-Loss Harvesting & Plusvalenze"},

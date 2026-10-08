@@ -7104,14 +7104,30 @@ def resolve_active_subtab(options: list, default: str = None, key: str = "active
     if not options:
         return ""
 
+    # Rileva se l'utente ha modificato attivamente la selectbox in questa iterazione
+    sb_k = f"{key}_selectbox"
+    sync_k = f"_synced_tab_val_{key}"
+    user_changed_selectbox = (
+        bool(key)
+        and sb_k in st.session_state
+        and st.session_state[sb_k] in options
+        and st.session_state[sb_k] != st.session_state.get(sync_k)
+    )
+
     # 1. Risoluzione dello stato attivo con priorità alla sidebar o global jump
     target = None
     if key and f"target_subtab_{key}" in st.session_state:
         target = st.session_state.pop(f"target_subtab_{key}")
-    elif "global_target_subtab" in st.session_state:
-        target = st.session_state.pop("global_target_subtab")
+        if "global_target_subtab" in st.session_state:
+            st.session_state.pop("global_target_subtab", None)
     elif key and f"target_{key}" in st.session_state:
         target = st.session_state.pop(f"target_{key}")
+        if "global_target_subtab" in st.session_state:
+            st.session_state.pop("global_target_subtab", None)
+    elif "global_target_subtab" in st.session_state:
+        glob_candidate = st.session_state.pop("global_target_subtab")
+        if not user_changed_selectbox and glob_candidate in options:
+            target = glob_candidate
 
     if target and target in options:
         st.session_state[key] = target
@@ -7191,6 +7207,8 @@ def render_segmented_tabs(
             st.session_state[f"target_subtab_{key}"] = new_val
             st.session_state[f"_synced_tab_val_{key}"] = new_val
             st.session_state[prev_tab_session_key] = new_val
+            if "global_target_subtab" in st.session_state:
+                st.session_state.pop("global_target_subtab", None)
             scroll_to_top()
             st.rerun()
 
@@ -7203,6 +7221,8 @@ def render_segmented_tabs(
             st.session_state[f"target_subtab_{key}"] = new_val
             st.session_state[f"_synced_tab_val_{key}"] = new_val
             st.session_state[prev_tab_session_key] = new_val
+            if "global_target_subtab" in st.session_state:
+                st.session_state.pop("global_target_subtab", None)
             scroll_to_top()
             st.rerun()
 
@@ -7230,6 +7250,8 @@ def render_segmented_tabs(
             st.session_state[f"target_subtab_{key}"] = selected
             st.session_state[f"_synced_tab_val_{key}"] = selected
             st.session_state[prev_tab_session_key] = selected
+            if "global_target_subtab" in st.session_state:
+                st.session_state.pop("global_target_subtab", None)
             current = selected
             scroll_to_top()
             st.rerun()

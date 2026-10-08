@@ -172,6 +172,58 @@ def test_sidebar_subtab_bidirectional_sync_logic():
     assert st.session_state[sync_k] == "Tab 3"
 
 
+def test_sidebar_and_selectbox_subtab_interaction_no_revert():
+    """
+    Verifica che dopo un click su un subtab della sidebar (che imposta target_subtab e global_target_subtab),
+    un successivo cambio della selectbox da parte dell'utente non venga revertito dal target globale stantio.
+    """
+    key = "wealth_tax_active_tab"
+    options = [
+        "🏛️ Storico 730 & Riconciliazione",
+        "📑 Prospetto Quadro RW / RT",
+        "📉 Zainetto Fiscale & Scadenze",
+        "🌾 Tax-Loss Harvesting & Plusvalenze",
+        "⚖️ Ripartizione Italia vs Estero",
+        "💡 Strategie di Efficienza Fiscale",
+        "🌍 Fiscalità Internazionale & Cross-Border",
+    ]
+    for k in [
+        key,
+        f"{key}_selectbox",
+        f"target_subtab_{key}",
+        f"_synced_tab_val_{key}",
+        f"_prev_rendered_tab_{key}",
+        "global_target_subtab",
+    ]:
+        st.session_state.pop(k, None)
+
+    # 1. Simula click sidebar su 'Tax-Loss Harvesting'
+    st.session_state[f"target_subtab_{key}"] = "🌾 Tax-Loss Harvesting & Plusvalenze"
+    st.session_state["global_target_subtab"] = "🌾 Tax-Loss Harvesting & Plusvalenze"
+
+    res1 = resolve_active_subtab(options, key=key)
+    assert res1 == "🌾 Tax-Loss Harvesting & Plusvalenze"
+    assert f"target_subtab_{key}" not in st.session_state
+    # global_target_subtab deve essere stato epurato
+    assert "global_target_subtab" not in st.session_state
+
+    # 2. Utente cambia la selectbox su '🏛️ Storico 730 & Riconciliazione'
+    st.session_state[f"{key}_selectbox"] = "🏛️ Storico 730 & Riconciliazione"
+    res2 = resolve_active_subtab(options, key=key)
+    assert res2 == "🏛️ Storico 730 & Riconciliazione"
+    assert st.session_state[key] == "🏛️ Storico 730 & Riconciliazione"
+    assert st.session_state[f"{key}_selectbox"] == "🏛️ Storico 730 & Riconciliazione"
+
+    # 3. Caso limite: anche se global_target_subtab fosse inquinato da un'altra chiamata,
+    # la modifica diretta della selectbox da parte dell'utente deve prevalere
+    st.session_state["global_target_subtab"] = "🌾 Tax-Loss Harvesting & Plusvalenze"
+    st.session_state[f"{key}_selectbox"] = "📉 Zainetto Fiscale & Scadenze"
+    res3 = resolve_active_subtab(options, key=key)
+    assert res3 == "📉 Zainetto Fiscale & Scadenze"
+    assert "global_target_subtab" not in st.session_state
+
+
+
 def test_all_sidebar_subtabs_exist_in_page_files():
     """
     Test di regressione: verifica che TUTTE le subtabs configurate in NAV_MODULES_RISK
