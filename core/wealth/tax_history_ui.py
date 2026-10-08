@@ -142,14 +142,14 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                             "model_type": p_model,
                             "protocol_id": p_proto,
                             "gross_income": p_gross,
-                            "taxable_income": p_gross,
+                            "taxable_income": float(parsed_data.get("taxable_income", p_gross)),
                             "net_tax_irpef": p_net_tax,
                             "capital_gains_declared": p_cg,
                             "capital_losses_offset": p_cl,
                             "substitute_tax_paid": p_sub,
                             "ivafe_paid": p_ivafe,
                             "foreign_assets_val": p_for,
-                            "notes": f"Importato da file: {filename}",
+                            "notes": str(parsed_data.get("notes") or f"Importato da file: {filename}"),
                             "source_filename": filename,
                         }
                         decl_id = record_declaration(engine, to_save)

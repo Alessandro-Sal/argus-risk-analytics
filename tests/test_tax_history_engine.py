@@ -5,6 +5,7 @@
 
 import io
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -229,6 +230,28 @@ class TestTax730Parser:
         assert res["substitute_tax_paid"] == 572.00
         assert res["ivafe_paid"] == 68.40
         assert res["foreign_assets_val"] == 34200.00
+
+    def test_parse_official_730_2026_pdf(self):
+        pdf_path = Path(r"C:\Users\Alessandro Personale\.gemini\antigravity\brain\eb071f0b-4569-4763-a8a5-a98a8d170f63\.user_uploaded\media_1791481017652_9e42effa.pdf")
+        if not pdf_path.exists():
+            pytest.skip("Uploaded 730 PDF not available in test environment")
+        with open(pdf_path, "rb") as f:
+            pdf_bytes = f.read()
+
+        res = parse_730_pdf_or_json(pdf_bytes, filename="730_2026_Saladino.pdf")
+        assert res["tax_year"] == 2025
+        assert res["filing_year"] == 2026
+        assert res["model_type"] == "730_ORDINARIO"
+        assert res["protocol_id"] == "09064865516 - 0001069"
+        assert res["gross_income"] == 8299.00
+        assert res["taxable_income"] == 8299.00
+        assert res["net_tax_irpef"] == 1131.00
+        assert res["substitute_tax_paid"] == 206.00
+        assert res["capital_gains_declared"] == 792.31
+        assert res["ivafe_paid"] == 53.00
+        assert res["foreign_assets_val"] == 26500.00
+        assert "SALADINO" in res["notes"]
+        assert "SLDLSN00P19M208Y" in res["notes"]
 
 
 class TestReconciliationEngine:
