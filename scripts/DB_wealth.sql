@@ -178,3 +178,47 @@ CREATE TABLE IF NOT EXISTS wealth_networth_snapshots (
     created_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_wealth_snap_date (snapshot_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 8. TAX DECLARATIONS (Archivio Storico Dichiarazioni 730 / Redditi PF)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tax_declarations (
+    id                      INT AUTO_INCREMENT PRIMARY KEY,
+    profile_id              VARCHAR(64) NOT NULL DEFAULT 'default',
+    tax_year                INT NOT NULL,
+    filing_year             INT NOT NULL,
+    model_type              VARCHAR(20) NOT NULL,
+    protocol_id             VARCHAR(50) NULL,
+    gross_income            DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    taxable_income          DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    net_tax_irpef           DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    capital_gains_declared  DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    capital_losses_offset   DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    substitute_tax_paid     DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    ivafe_paid              DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    foreign_assets_val      DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+    notes                   TEXT NULL,
+    source_filename         VARCHAR(255) NULL,
+    created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_tax_profile_year UNIQUE (profile_id, tax_year, model_type),
+    INDEX idx_tax_decl_profile (profile_id, tax_year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- 9. TAX LOSS CARRYFORWARD (Zainetto Fiscale & Scadenziario Minusvalenze)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tax_loss_carryforward (
+    id                      INT AUTO_INCREMENT PRIMARY KEY,
+    profile_id              VARCHAR(64) NOT NULL DEFAULT 'default',
+    generation_year         INT NOT NULL,
+    expiration_year         INT NOT NULL,
+    initial_loss_amount     DECIMAL(12,2) NOT NULL,
+    offset_amount           DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    remaining_amount        DECIMAL(12,2) NOT NULL,
+    status                  VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    is_officially_filed     BOOLEAN NOT NULL DEFAULT TRUE,
+    broker_source           VARCHAR(50) NOT NULL DEFAULT 'DEGIRO',
+    created_at              DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_tax_loss_profile (profile_id, status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

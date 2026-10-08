@@ -43,6 +43,7 @@ from core.ui_utils import (
     resolve_active_subtab,
     section,
 )
+from core.wealth.tax_history_ui import render_tax_history_tab
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
 from core.wealth.wealth_engine import (
     compute_consolidated_net_worth,
@@ -142,6 +143,13 @@ st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 
 # ── SELETTORE MODULI FISCALITÀ STILE BLOOMBERG TERMINAL ─────────
 WEALTH_TAX_MODELS_CATALOG = {
+    "🏛️ Storico 730 & Riconciliazione": {
+        "title": "Archivio Storico Dichiarazioni (730 / Redditi PF) & Riconciliazione Fiscale",
+        "badge": "Archivio 730 • Riconciliazione • Art. 36-bis",
+        "badge_color": "#38bdf8",
+        "category": "Dichiarazione Fiscale",
+        "desc": "Archivio storico dei modelli 730 e Redditi PF, importazione PDF/JSON, tracciamento minusvalenze all'AdE, alert art. 36-bis e riconciliazione automatica con i broker ARGUS.",
+    },
     "📑 Prospetto Quadro RW / RT": {
         "title": "Prospetto Monitoraggio Fiscale, Quadro RW & Quadro RT (Modello Redditi PF)",
         "badge": "Quadro RW • IVAFE • Conti Esteri",
@@ -192,7 +200,10 @@ active_tax_tab = render_segmented_tabs(
     select_label="Seleziona Modulo Fiscale:",
 )
 
-if active_tax_tab == "📑 Prospetto Quadro RW / RT":
+if active_tax_tab == "🏛️ Storico 730 & Riconciliazione":
+    render_tax_history_tab(engine, current_pid)
+
+elif active_tax_tab == "📑 Prospetto Quadro RW / RT":
     st.markdown("### 📑 Prospetto di Monitoraggio Fiscale (Quadro RW & RT)")
     st.caption("Quadro riassuntivo per la compilazione del Modello Redditi PF o trasmissione al commercialista per le attività finanziarie e conti esteri.")
     

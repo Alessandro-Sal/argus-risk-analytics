@@ -915,24 +915,54 @@ def compute_fiscal_analytics(engine, portfolio_id: int = 1) -> Dict[str, Any]:
     total_ivafe = round(ivafe_cash + ivafe_investments, 2)
     total_bollo = round(bollo_cash + bollo_investments, 2)
 
-    # Zainetto Fiscale / Minusvalenze con simulazione calendario quadriennale
+    # Zainetto Fiscale / Minusvalenze con tracciamento reale da DB o fallback
     current_year = datetime.now().year
-    minusvalenze_schedule = [
-        {
-            "anno_origine": current_year - 3,
-            "scadenza": current_year,
-            "importo": 450.00,
-            "stato": "In Scadenza Quest'Anno",
-        },
-        {"anno_origine": current_year - 2, "scadenza": current_year + 1, "importo": 820.50, "stato": "Valido (3 anni)"},
-        {
-            "anno_origine": current_year - 1,
-            "scadenza": current_year + 2,
-            "importo": 1240.00,
-            "stato": "Valido (2 anni)",
-        },
-        {"anno_origine": current_year, "scadenza": current_year + 3, "importo": 350.00, "stato": "Nuovo (1 anno)"},
-    ]
+    minusvalenze_schedule = []
+    try:
+        from core.wealth.tax_history_engine import get_tax_losses
+
+        db_losses = get_tax_losses(engine, profile_id=str(portfolio_id), current_year=current_year)
+        if db_losses:
+            for l in db_losses:
+                rem = float(l.get("remaining_amount", 0.0))
+                if rem > 0:
+                    gen = int(l.get("generation_year", current_year))
+                    exp = int(l.get("expiration_year", gen + 4))
+                    diff = exp - current_year
+                    if diff <= 0:
+                        stato = "In Scadenza Quest'Anno"
+                    else:
+                        stato = f"Valido ({diff} {'anno' if diff == 1 else 'anni'})"
+                    minusvalenze_schedule.append(
+                        {
+                            "anno_origine": gen,
+                            "scadenza": exp,
+                            "importo": rem,
+                            "stato": stato,
+                            "is_officially_filed": bool(l.get("is_officially_filed", True)),
+                            "broker_source": l.get("broker_source", "DEGIRO"),
+                        }
+                    )
+    except Exception as e:
+        logger.debug("get_tax_losses fallback in compute_fiscal_analytics: %s", e)
+
+    if not minusvalenze_schedule:
+        minusvalenze_schedule = [
+            {
+                "anno_origine": current_year - 3,
+                "scadenza": current_year,
+                "importo": 450.00,
+                "stato": "In Scadenza Quest'Anno",
+            },
+            {"anno_origine": current_year - 2, "scadenza": current_year + 1, "importo": 820.50, "stato": "Valido (3 anni)"},
+            {
+                "anno_origine": current_year - 1,
+                "scadenza": current_year + 2,
+                "importo": 1240.00,
+                "stato": "Valido (2 anni)",
+            },
+            {"anno_origine": current_year, "scadenza": current_year + 3, "importo": 350.00, "stato": "Nuovo (1 anno)"},
+        ]
     tot_minus = sum(m["importo"] for m in minusvalenze_schedule)
     tax_shield_potential = round(tot_minus * 0.26, 2)
 
