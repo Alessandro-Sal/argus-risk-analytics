@@ -7,6 +7,7 @@
 # ============================================================
 
 import io
+import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -21,22 +22,29 @@ from core.wealth.tax_history_engine import (
     build_730_predisposition_and_variance_audit,
     build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
+    compute_pension_tax_deduction_optimizer,
     compute_ravvedimento_operoso,
+    compute_tax_loss_harvesting_signals,
     delete_declaration,
     delete_tax_loss,
     delete_verification_document,
+    export_wealth_and_tax_backup_bundle,
     fmt_eur_it,
+    generate_730_precompilata_actionable_guide,
+    generate_f24_payment_slip,
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
     get_unified_tax_document_registry,
     get_verification_documents,
+    import_wealth_and_tax_backup_bundle,
     parse_730_pdf_or_json,
     parse_universal_tax_document,
     reconcile_with_portfolio,
     record_declaration,
     record_tax_loss,
     record_verification_document,
+    sync_tax_events_to_cashflow,
     update_tax_loss_offset,
 )
 
@@ -850,6 +858,41 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         else:
             st.info("Nessuna dichiarazione ancora salvata in archivio. Carica un PDF o usa l'inserimento manuale in alto.")
 
+        # ── SEZIONE BACKUP & RIPRISTINO 1-CLICK ──
+        st.markdown("---")
+        with st.expander("📦 Backup & Ripristino 1-Click (Export / Import JSON Bundle)", expanded=False):
+            st.caption("Esporta l'intero patrimonio e l'archivio fiscale in un unico bundle JSON o ripristina un backup precedente con idempotenza.")
+            c_bk_exp, c_bk_imp = st.columns(2)
+            with c_bk_exp:
+                st.markdown("###### 📤 Esportazione Dati")
+                st.write("Genera uno snapshot istantaneo di tutte le tabelle patrimoniali e fiscali.")
+                bundle = export_wealth_and_tax_backup_bundle(engine, profile_id=pid_str)
+                bundle_json = json.dumps(bundle, indent=2, ensure_ascii=False)
+                st.download_button(
+                    "📥 Scarica Backup Completo (.json)",
+                    data=bundle_json.encode("utf-8"),
+                    file_name=f"argus_backup_wealth_tax_{pid_str}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                    mime="application/json",
+                    key=f"dl_backup_json_{pid_str}",
+                    use_container_width=True,
+                )
+                tot_rec = bundle.get("backup_metadata", {}).get("total_records_count", 0)
+                st.caption(f"Contenuto: {tot_rec} record totali estratti.")
+
+            with c_bk_imp:
+                st.markdown("###### 📥 Ripristino da File")
+                up_backup = st.file_uploader("Carica file JSON di backup:", type=["json"], key=f"up_backup_json_{pid_str}")
+                if up_backup is not None:
+                    if st.button("🔄 Esegui Ripristino nel Database", key=f"btn_do_restore_{pid_str}", type="primary", use_container_width=True):
+                        try:
+                            bundle_data = json.loads(up_backup.read().decode("utf-8"))
+                            res_imp = import_wealth_and_tax_backup_bundle(engine, backup_data=bundle_data, profile_id=pid_str)
+                            restored_cnt = res_imp.get("total_restored_records", 0)
+                            st.success(f"✅ Ripristino completato! {restored_cnt} record fiscali ripristinati con successo.")
+                            st.rerun()
+                        except Exception as exc:
+                            st.error(f"Errore durante il ripristino: {exc}")
+
     # ============================================================
     # SUBTAB 2: REGISTRO UFFICIALE DOCUMENTI FISCALI (AUDIT TRAIL DB)
     # ============================================================
@@ -1263,6 +1306,50 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         else:
             st.info("Nessuna tranche di minusvalenza registrata. Inseriscine una tramite il pannello in alto.")
 
+        # ── 3. SEZIONE STRATEGICA TAX-LOSS HARVESTING ──
+        st.markdown("---")
+        st.markdown("##### 🌾 Opportunità e Segnali di Tax-Loss Harvesting")
+        st.caption(
+            "Identifica le minusvalenze in scadenza entro i prossimi 1-2 anni e consiglia prese di profitto tattiche "
+            "su posizioni in utile per azzerare l'imposta sostitutiva 26% e rigenerare il prezzo medio di carico (PMC)."
+        )
+
+        tlh_data = compute_tax_loss_harvesting_signals(engine, portfolio_id=1, profile_id=pid_str, current_year=selected_tax_year)
+        c_tlh1, c_tlh2, c_tlh3, c_tlh4 = st.columns(4)
+        with c_tlh1:
+            metric_card("Zainetto Attivo Residuo", fmt_eur(tlh_data["total_active_losses"]), f"In scadenza a breve: {fmt_eur(tlh_data['urgent_expiring_losses'])}")
+        with c_tlh2:
+            metric_card("Plusvalenze Idonee", fmt_eur(tlh_data["eligible_unrealized_gains"]), "Azioni / Redditi Diversi")
+        with c_tlh3:
+            comp_pot = min(tlh_data["total_active_losses"], tlh_data["eligible_unrealized_gains"])
+            metric_card("Quota Compensabile Subito", fmt_eur(comp_pot), "Offset a imposta 0,00 €")
+        with c_tlh4:
+            metric_card("Risparmio Fiscale 26%", f"+{fmt_eur(tlh_data['potential_tax_savings_26pct'])}", "Imposte azzerabili", delta_color="normal")
+
+        recs = tlh_data.get("harvesting_recommendations", [])
+        if recs:
+            st.markdown("###### 📋 Azioni Operative Consigliate")
+            for sig in recs:
+                st.markdown(
+                    f"""
+                    <div style="background: rgba(22, 27, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #10b981; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-weight: 700; color: #ffffff; font-size: 14px;">🎯 Ticker: {sig['ticker']}</span>
+                                <span style="margin-left: 10px; font-size: 12px; color: #94a3b8;">Quote da cedere: <b>{sig['quote_da_vendere']}</b> • Plusvalenza: <b>{fmt_eur_it(sig['plusvalenza_realizzabile'])}</b></span>
+                            </div>
+                            <span style="font-size: 11px; font-weight: 700; color: #10b981; background: rgba(16, 185, 129, 0.1); padding: 3px 8px; border-radius: 4px;">Risparmio 26%: +{fmt_eur_it(sig['risparmio_fiscale_26pct'])}</span>
+                        </div>
+                        <div style="font-size: 13px; color: #cbd5e1; margin-top: 6px;">
+                            💡 <b>Strategia:</b> {sig['strategia']}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.info("Nessuna minusvalenza in scadenza immediata o posizioni in utile da compensare per questo profilo.")
+
     # ============================================================
     # SUBTAB 4: AUDIT ADVISOR & RICONCILIAZIONE (ART. 36-BIS)
     # ============================================================
@@ -1405,23 +1492,144 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 use_container_width=True,
             )
 
-            with st.expander("📋 Istruzioni Operative: Modifica Portale AdE & Compilazione Modello F24", expanded=False):
+            # ── 1. GENERATORE MODELLO F24 & ISTRUZIONI HOME BANKING ──
+            st.markdown("---")
+            st.markdown("##### 🏛️ Generatore Modello F24 & Home Banking con Piano Rateale")
+            st.caption("Genera la delega di pagamento F24 esatta per le imposte finanziarie estere (DEGIRO Quadro RT e Quadro W) con simulazione di rateizzazione da 1 a 6 rate mensili.")
+
+            c_f24_p1, c_f24_p2 = st.columns([2, 2])
+            with c_f24_p1:
+                n_inst = st.slider("Numero di Rate di Versamento (F24):", min_value=1, max_value=6, value=1, step=1, key=f"f24_inst_pick_{pid_str}_{selected_tax_year}")
+            with c_f24_p2:
+                st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+                apply_ext = st.checkbox("Applica maggiorazione dello 0,40% (Scadenza differita al 30 Luglio)", value=False, key=f"f24_ext_cb_{pid_str}_{selected_tax_year}")
+
+            f24_data = generate_f24_payment_slip(engine, profile_id=pid_str, tax_year=selected_tax_year, installments=n_inst)
+
+            c_f_k1, c_f_k2, c_f_k3, c_f_k4 = st.columns(4)
+            with c_f_k1:
+                base_f24 = float(f24_data.get("total_debt_eur", 0.0))
+                tot_f24 = base_f24 * (1.004 if apply_ext else 1.0)
+                metric_card("Totale a Debito F24", fmt_eur(tot_f24), f"{len(f24_data.get('payment_rows', []))} Tributi Erariali")
+            with c_f_k2:
+                deadlines = f24_data.get("deadlines", {})
+                scad_label = deadlines.get("differita_con_maggiorazione", {}).get("data", "30/07") if apply_ext else deadlines.get("ordinaria", {}).get("data", "30/06")
+                metric_card("Scadenza Prima Rata", scad_label, "+0,40% Applicato" if apply_ext else "Termine Ordinario")
+            with c_f_k3:
+                plans = f24_data.get("installment_plans", {}).get(n_inst, {})
+                dett_rate = plans.get("dettaglio_rate", [])
+                first_r_amt = (dett_rate[0].get("importo_totale_rata", tot_f24) * (1.004 if apply_ext else 1.0)) if dett_rate else tot_f24
+                metric_card("Importo Singola Rata", fmt_eur(first_r_amt), f"Piano {n_inst} Rate")
+            with c_f_k4:
+                metric_card("Anno di Imposta", f"{selected_tax_year}", f"Presentazione {selected_tax_year + 1}")
+
+            # Quick copy table for home banking
+            st.markdown("###### 📋 Dati per la Compilazione Home Banking (Copia e Incolla Rapido)")
+            df_hb = pd.DataFrame(f24_data.get("home_banking_quick_copy", []))
+            st.dataframe(
+                df_hb,
+                column_config={
+                    "campo": st.column_config.TextColumn("Campo F24 / Home Banking", width="medium"),
+                    "valore": st.column_config.TextColumn("Valore da Inserire", width="medium"),
+                    "anno": st.column_config.NumberColumn("Anno Rif.", width="small"),
+                    "importo": st.column_config.TextColumn("Importo a Debito (€)", width="small"),
+                    "nota": st.column_config.TextColumn("Dettagli / Significato", width="large"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+
+            # Piano rateale dettagliato se rate > 1
+            if n_inst > 1 and dett_rate:
+                with st.expander(f"📅 Visualizza Calendario Completo {n_inst} Rate", expanded=False):
+                    df_inst = pd.DataFrame(dett_rate)
+                    st.dataframe(
+                        df_inst,
+                        column_config={
+                            "numero_rata": st.column_config.TextColumn("Codice Rata", width="small"),
+                            "rata_index": st.column_config.NumberColumn("Rata #", width="small"),
+                            "quota_capitale": st.column_config.NumberColumn("Quota Capitale (€)", format="€ %,.2f"),
+                            "interessi_dilazione": st.column_config.NumberColumn("Interessi Dilazione (€)", format="€ %,.2f"),
+                            "importo_totale_rata": st.column_config.NumberColumn("Totale Rata (€)", format="€ %,.2f"),
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                    )
+
+            # ── 2. GUIDA AZIONABILE 730 PRECOMPILATA CON CHECKLIST ──
+            st.markdown("---")
+            st.markdown("##### 📋 Guida Azionabile Passo-Passo: Rettifica Portale AdE")
+            st.caption("Checklist operativa con i righi e codici esatti da compilare sul sito dell'Agenzia delle Entrate per ottenere il massimo rimborso ed evitare sanzioni.")
+
+            guide_730 = generate_730_precompilata_actionable_guide(engine, profile_id=pid_str, tax_year=selected_tax_year)
+
+            for stp in guide_730.get("steps", []):
                 st.markdown(
                     f"""
-                    **1. Modifica sul Portale dell'Agenzia delle Entrate (Modello 730 Precompilato):**
-                    - Accedi a *dichiarazioneprecompilata.agenziaentrate.gov.it* con SPID o CIE.
-                    - Seleziona **Modifica 730**.
-                    - Accedi al **Quadro E (Oneri e Spese)** -> Sezione I (Spese per le quali spetta la detrazione d'imposta del 19%).
-                    - Al Rigo **E8 / E10**, inserisci Codice Spesa **18** (*Spese per canoni di locazione sostenute da studenti universitari fuori sede*) e importo **€ 519,00** (o € 519,45).
-                    - Verifica che nel prospetto di liquidazione il rimborso a tuo favore salga da **€ 625,00** a **€ 723,70**!
-
-                    **2. Compilazione e Versamento Modello F24 (Investimenti Esteri DEGIRO):**
-                    - Sezione Erario:
-                      * **Codice Tributo 1100:** Imposta sostitutiva su plusvalenze di natura finanziaria — Anno di riferimento: `{selected_tax_year}` — Importo a debito: **€ {predisp_730['rt_sub_tax']:.2f}**
-                      * **Codice Tributo 4043:** IVAFE - Imposta sul valore delle attività finanziarie detenute all'estero — Anno di riferimento: `{selected_tax_year}` — Importo a debito: **€ {predisp_730['w_ivafe']:.2f}**
-                    - **Totale Modello F24:** **€ {predisp_730['f24_foreign_total']:.2f}** da versare entro il termine ordinario delle imposte sui redditi.
-                    """
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); border-left: 4px solid #38bdf8; border-radius: 8px; padding: 12px 16px; margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; color: #38bdf8; font-size: 14px;">Passo {stp['step_num']}: {stp['title']}</span>
+                            <span style="font-size: 11px; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); padding: 2px 8px; border-radius: 4px;">{stp['impact_badge']}</span>
+                        </div>
+                        <div style="font-size: 13px; color: #cbd5e1; margin-top: 6px; line-height: 1.5;">
+                            {stp['action']}
+                        </div>
+                        <div style="font-size: 12px; color: #94a3b8; margin-top: 6px;">
+                            🎯 <b>Esito Atteso:</b> {stp['expected_result']}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
                 )
+
+            # ── 3. SINCRONIZZAZIONE SALDO FISCALE CON CASH FLOW ENGINE ──
+            st.markdown("---")
+            c_cf_info, c_cf_btn = st.columns([3, 1.5])
+            with c_cf_info:
+                st.markdown("##### 💳 Sincronizzazione Flussi Fiscali con il Cash Flow Pianificato")
+                st.caption(
+                    f"Registra automaticamente come eventi di cassa previsionali: l'accredito del rimborso 730 a busta paga (+{fmt_eur_it(predisp_730['new_irpef_refund'])}) ad Agosto "
+                    f"e il versamento della delega F24 (-{fmt_eur_it(predisp_730['f24_foreign_total'])}) a fine Giugno."
+                )
+            with c_cf_btn:
+                st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+                if st.button("💳 Sincronizza nel Cash Flow", key=f"btn_sync_cf_{pid_str}_{selected_tax_year}", type="primary", use_container_width=True):
+                    cf_sync_res = sync_tax_events_to_cashflow(engine, profile_id=pid_str, tax_year=selected_tax_year, portfolio_id=1)
+                    st.success(f"✅ {cf_sync_res.get('message', 'Sincronizzazione completata!')}")
+                    st.rerun()
+
+            # ── 4. OTTIMIZZATORE DEDUCIBILITÀ PREVIDENZA COMPLEMENTARE (FONDO PENSIONE) ──
+            st.markdown("---")
+            with st.expander("🛡️ Ottimizzatore Previdenza Complementare (Deducibilità Art. 10 TUIR fino a € 5.164,57)", expanded=False):
+                st.caption("Simula il vantaggio fiscale immediato derivante dal versamento a forme pensionistiche complementari per abbattere l'aliquota marginale IRPEF.")
+
+                pension_opt = compute_pension_tax_deduction_optimizer(engine, profile_id=pid_str, tax_year=selected_tax_year)
+
+                c_pen1, c_pen2, c_pen3, c_pen4 = st.columns(4)
+                with c_pen1:
+                    metric_card("Reddito Imponibile", fmt_eur(pension_opt["gross_taxable_income"]), "Dichiarazione / CU")
+                with c_pen2:
+                    metric_card("Aliquota Marginale IRPEF", f"{pension_opt['marginal_irpef_rate_pct']:.1f}%", f"+ Addizionali: {pension_opt['total_marginal_benefit_pct']:.1f}% totale")
+                with c_pen3:
+                    metric_card("Plafond Residuo Ded.", fmt_eur(pension_opt["remaining_deductible_cap"]), f"Cap Max: {fmt_eur(pension_opt['max_statutory_cap'])}")
+                with c_pen4:
+                    metric_card("Risparmio Max Potenziale", fmt_eur(pension_opt["max_potential_tax_savings"]), "Cashback fiscale in busta paga", delta_color="normal")
+
+                st.markdown("###### 📊 Simulazione di Risparmio su Differenti Quote di Versamento")
+                df_pen_sim = pd.DataFrame(pension_opt.get("simulation_table", []))
+                if not df_pen_sim.empty:
+                    st.dataframe(
+                        df_pen_sim,
+                        column_config={
+                            "versamento_volontario": st.column_config.NumberColumn("Versamento Effettuato (€)", format="€ %,.2f"),
+                            "quota_deducibile": st.column_config.NumberColumn("Quota Deducibile (€)", format="€ %,.2f"),
+                            "risparmio_imposte_irpef": st.column_config.NumberColumn("Rimborso IRPEF Generato (€)", format="€ %,.2f"),
+                            "costo_effettivo_uscita": st.column_config.NumberColumn("Costo Reale al Netto del Fisco (€)", format="€ %,.2f"),
+                            "ritorno_fiscale_immediato_pct": st.column_config.NumberColumn("Ritorno Fiscale Immediato (%)", format="%.1f %%"),
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                    )
             st.markdown("---")
 
         # ── 1. MATRICE DI AUDIT TRIANGOLARE (ARGUS vs BROKER vs 730 vs AdE 36-BIS) ──

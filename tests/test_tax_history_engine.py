@@ -18,16 +18,22 @@ from core.wealth.tax_history_engine import (
     build_730_predisposition_and_variance_audit,
     build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
+    compute_pension_tax_deduction_optimizer,
     compute_ravvedimento_operoso,
+    compute_tax_loss_harvesting_signals,
     delete_declaration,
     delete_tax_loss,
     delete_verification_document,
     detect_tax_document_type,
+    export_wealth_and_tax_backup_bundle,
+    generate_730_precompilata_actionable_guide,
+    generate_f24_payment_slip,
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
     get_unified_tax_document_registry,
     get_verification_documents,
+    import_wealth_and_tax_backup_bundle,
     parse_730_pdf_or_json,
     parse_ade_notice_36bis,
     parse_ade_precompilata,
@@ -40,6 +46,7 @@ from core.wealth.tax_history_engine import (
     record_declaration,
     record_tax_loss,
     record_verification_document,
+    sync_tax_events_to_cashflow,
     update_tax_loss_offset,
 )
 from core.wealth.wealth_db import init_wealth_db
@@ -941,6 +948,176 @@ class TestUnifiedTaxDocumentRegistry:
         rent_item = next(r for r in reg if r["doc_type"] == "RENT_EXPENSE")
         assert rent_item["secondary_amount"] == 98.70
         assert "E8" in rent_item["status_badge"]
+
+
+class TestF24PaymentSlipAnd730Guide:
+    def test_generate_f24_payment_slip(self, memory_db):
+        profile = "prof_f24"
+        year = 2025
+
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "gross_amount": 793.0,
+            "tax_withheld_or_due": 206.18,
+            "secondary_amount": 62.00,
+            "metadata_json": {
+                "substitute_tax_due": 206.18,
+                "ivafe_due": 62.00,
+            },
+        })
+
+        f24 = generate_f24_payment_slip(memory_db, profile_id=profile, tax_year=year)
+        assert f24["tax_year"] == 2025
+        assert f24["filing_year"] == 2026
+        assert f24["has_liabilities"] is True
+        assert f24["total_debt_eur"] == 268.18
+        assert f24["net_balance_eur"] == 268.18
+        assert len(f24["payment_rows"]) == 2
+        assert any(r["tributo_code"] == "1100" and r["debito_eur"] == 206.18 for r in f24["payment_rows"])
+        assert any(r["tributo_code"] == "4043" and r["debito_eur"] == 62.00 for r in f24["payment_rows"])
+        assert f24["deadlines"]["ordinaria"]["data"] == "30/06/2026"
+        assert f24["deadlines"]["differita_con_maggiorazione"]["importo"] == pytest.approx(269.25, abs=0.05)
+        assert len(f24["installment_plans"]) == 6
+
+    def test_generate_730_precompilata_actionable_guide(self, memory_db):
+        profile = "prof_guide"
+        year = 2025
+
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "PRECOMPILATA_ADE",
+            "gross_amount": 8299.0,
+            "secondary_amount": 625.0,
+            "metadata_json": {"unused_data": {"rent_contract": {"detected": True, "amount": 519.45, "potential_deduction_eur": 98.70}}},
+        })
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "RENT_EXPENSE",
+            "gross_amount": 519.45,
+            "secondary_amount": 98.70,
+        })
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "gross_amount": 793.0,
+            "tax_withheld_or_due": 206.18,
+            "secondary_amount": 62.00,
+        })
+
+        guide = generate_730_precompilata_actionable_guide(memory_db, profile_id=profile, tax_year=year)
+        assert guide["total_steps"] == 5
+        assert guide["summary"]["initial_ade_refund"] == 625.00
+        assert guide["summary"]["optimized_refund"] == 723.70
+        assert guide["summary"]["f24_liabilities"] == 268.18
+        assert guide["summary"]["net_cash_inflow"] == 455.52
+        step_titles = [s["title"] for s in guide["steps"]]
+        assert any("Quadro E" in t for t in step_titles)
+        assert any("Quadro RT" in t for t in step_titles)
+        assert any("Quadro W" in t for t in step_titles)
+
+
+class TestCashflowSyncAndPensionOptimizer:
+    def test_sync_tax_events_to_cashflow(self, memory_db):
+        profile = "prof_cashflow"
+        year = 2025
+
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "PRECOMPILATA_ADE",
+            "secondary_amount": 625.0,
+            "metadata_json": {"unused_data": {"rent_contract": {"detected": True, "amount": 519.45, "potential_deduction_eur": 98.70}}},
+        })
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "RENT_EXPENSE",
+            "gross_amount": 519.45,
+            "secondary_amount": 98.70,
+        })
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "tax_withheld_or_due": 206.18,
+            "secondary_amount": 62.00,
+        })
+
+        sync_res = sync_tax_events_to_cashflow(memory_db, profile_id=profile, tax_year=year, portfolio_id=1)
+        assert sync_res["status"] == "success"
+        assert sync_res["records_synced"] == 2
+        assert sync_res["net_cash_impact"] == 455.52
+
+    def test_compute_pension_tax_deduction_optimizer(self, memory_db):
+        profile = "prof_pension"
+        year = 2025
+
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "gross_income": 35000.0,
+            "net_tax_irpef": 4500.0,
+        })
+
+        pension = compute_pension_tax_deduction_optimizer(memory_db, profile_id=profile, tax_year=year)
+        assert pension["gross_taxable_income"] == 35000.0
+        assert pension["max_statutory_cap"] == 5164.57
+        assert pension["remaining_deductible_cap"] == 5164.57
+        assert pension["marginal_irpef_rate_pct"] == 35.0
+        assert len(pension["simulation_table"]) >= 4
+        assert pension["max_potential_tax_savings"] > 1000.0
+
+
+class TestTaxLossHarvestingAndBackupBundle:
+    def test_compute_tax_loss_harvesting_signals(self, memory_db):
+        profile = "prof_tlh"
+        record_tax_loss(memory_db, {
+            "profile_id": profile,
+            "generation_year": 2022,
+            "expiration_year": 2026,
+            "initial_loss_amount": 800.0,
+            "remaining_amount": 800.0,
+            "status": "ACTIVE",
+        })
+
+        signals = compute_tax_loss_harvesting_signals(memory_db, portfolio_id=1, profile_id=profile, current_year=2025)
+        assert signals["total_active_losses"] == 800.0
+        assert signals["urgent_expiring_losses"] == 800.0
+        assert signals["has_harvesting_opportunity"] is True
+        assert len(signals["harvesting_recommendations"]) > 0
+
+    def test_export_and_import_backup_bundle(self, memory_db):
+        profile = "prof_backup"
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2024,
+            "gross_income": 20000.0,
+            "protocol_id": "TEST-PROTO",
+        })
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2025,
+            "doc_type": "CU",
+            "issuer_name": "TEST ISSUER",
+            "gross_amount": 5000.0,
+        })
+
+        bundle = export_wealth_and_tax_backup_bundle(memory_db, profile_id=profile)
+        assert bundle["backup_metadata"]["version"] == "2.0"
+        assert bundle["backup_metadata"]["total_records_count"] >= 2
+        assert "tax_declarations" in bundle["tables"]
+        assert len(bundle["tables"]["tax_declarations"]) >= 1
+
+        restore_res = import_wealth_and_tax_backup_bundle(memory_db, bundle, profile_id="restored_user")
+        assert restore_res["status"] == "success"
+        assert restore_res["total_restored_records"] >= 2
+
 
 
 
