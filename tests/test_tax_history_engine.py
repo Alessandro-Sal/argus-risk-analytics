@@ -26,6 +26,7 @@ from core.wealth.tax_history_engine import (
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
+    get_unified_tax_document_registry,
     get_verification_documents,
     parse_730_pdf_or_json,
     parse_ade_notice_36bis,
@@ -880,6 +881,67 @@ class Test730PredispositionAndNewParsers:
         assert audit["foreign_f24_to_pay"] == 268.00
         assert audit["final_net_cash_flow"] == 455.70
         assert len(audit["variance_matrix"]) >= 4
+
+
+class TestUnifiedTaxDocumentRegistry:
+    def test_get_unified_tax_document_registry(self, memory_db):
+        profile = "prof_registry"
+
+        # Inserisce 1 dichiarazione ufficiale
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2024,
+            "filing_year": 2025,
+            "gross_income": 22000.0,
+            "net_tax_irpef": 2600.0,
+            "source_filename": "730_2025.pdf",
+            "protocol_id": "T250926-0001",
+        })
+
+        # Inserisce 2 documenti di verifica
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2025,
+            "doc_type": "CU",
+            "issuer_name": "SIXTEMA SPA",
+            "gross_amount": 8300.0,
+            "tax_withheld_or_due": 1670.0,
+            "source_filename": "CU_2026.pdf",
+        })
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2025,
+            "doc_type": "RENT_EXPENSE",
+            "issuer_name": "LOCATORE",
+            "gross_amount": 519.45,
+            "secondary_amount": 98.70,
+            "source_filename": "contratto_affitto.pdf",
+        })
+
+        reg = get_unified_tax_document_registry(memory_db, profile_id=profile)
+        assert len(reg) == 3
+
+        # Verifica ordinamento per tax_year desc
+        assert reg[0]["tax_year"] == 2025
+        assert reg[1]["tax_year"] == 2025
+        assert reg[2]["tax_year"] == 2024
+
+        # Verifica campi unificati
+        decl_item = next(r for r in reg if r["source_table"] == "tax_declarations")
+        assert decl_item["registry_id"].startswith("DECL-")
+        assert decl_item["gross_amount"] == 22000.0
+        assert decl_item["status_badge"] == "Archiviato Ufficiale"
+
+        cu_item = next(r for r in reg if r["doc_type"] == "CU")
+        assert cu_item["registry_id"].startswith("VDOC-")
+        assert cu_item["issuer_name"] == "SIXTEMA SPA"
+        assert cu_item["gross_amount"] == 8300.0
+        assert "Validati" in cu_item["status_badge"]
+
+        rent_item = next(r for r in reg if r["doc_type"] == "RENT_EXPENSE")
+        assert rent_item["secondary_amount"] == 98.70
+        assert "E8" in rent_item["status_badge"]
+
 
 
 

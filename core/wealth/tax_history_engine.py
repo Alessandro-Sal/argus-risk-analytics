@@ -2790,3 +2790,134 @@ def generate_sample_730_json(tax_year: int = 2024) -> str:
         },
     }
     return json.dumps(sample, indent=2, ensure_ascii=False)
+
+
+def get_unified_tax_document_registry(
+    engine: Engine,
+    profile_id: str = "default",
+    tax_year: Optional[int] = None,
+    doc_type: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """
+    Costruisce e restituisce il Registro Ufficiale dei Documenti Fiscali (Audit Trail).
+    Unifica le dichiarazioni ufficiali (730/Redditi) e tutti i documenti probatori/di verifica
+    (Certificazioni Uniche, Precompilata AdE, Rendiconti Broker DEGIRO, Conti Esteri RW,
+    Spese Locazione e Avvisi 36-bis) salvati nel database.
+    """
+    registry: List[Dict[str, Any]] = []
+
+    # 1. Recupera Dichiarazioni Ufficiali
+    decls = get_declarations(engine, profile_id=profile_id, tax_year=tax_year)
+    for d in decls:
+        d_type = d.get("model_type") or "OFFICIAL_DECLARATION"
+        if doc_type and doc_type.upper() not in ["OFFICIAL_DECLARATION", d_type.upper()]:
+            continue
+
+        created_at_val = d.get("created_at")
+        created_str = (
+            created_at_val.strftime("%Y-%m-%d %H:%M:%S")
+            if hasattr(created_at_val, "strftime")
+            else str(created_at_val or datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+
+        registry.append({
+            "registry_id": f"DECL-{d.get('id', 0):04d}",
+            "raw_id": d.get("id"),
+            "source_table": "tax_declarations",
+            "created_at": created_str,
+            "tax_year": int(d.get("tax_year", 0)),
+            "filing_year": int(d.get("filing_year", (d.get("tax_year", 0) + 1))),
+            "category_label": "Dichiarazione Ufficiale 730/Redditi",
+            "doc_type": d_type,
+            "issuer_name": "Agenzia delle Entrate / Contribuente",
+            "protocol_or_code": d.get("protocol_id") or "N/D",
+            "gross_amount": float(d.get("gross_income", 0.0) or 0.0),
+            "tax_amount": float(d.get("net_tax_irpef", 0.0) or 0.0),
+            "secondary_amount": float(d.get("substitute_tax_paid", 0.0) or 0.0),
+            "asset_monitoring_val": float(d.get("foreign_assets_val", 0.0) or 0.0),
+            "source_filename": d.get("source_filename") or "Dichiarazione_Ufficiale.pdf",
+            "status_badge": "Archiviato Ufficiale",
+            "status_color": "#10b981",
+            "notes": d.get("notes") or "",
+            "metadata_json": {
+                "taxable_income": d.get("taxable_income"),
+                "capital_gains_declared": d.get("capital_gains_declared"),
+                "capital_losses_offset": d.get("capital_losses_offset"),
+                "substitute_tax_paid": d.get("substitute_tax_paid"),
+                "ivafe_paid": d.get("ivafe_paid"),
+            },
+        })
+
+    # 2. Recupera Documenti di Riscontro & Verifica
+    vdocs = get_verification_documents(engine, profile_id=profile_id, tax_year=tax_year, doc_type=doc_type)
+    for v in vdocs:
+        vt = v.get("doc_type") or "GENERIC_DOC"
+        created_at_val = v.get("created_at")
+        created_str = (
+            created_at_val.strftime("%Y-%m-%d %H:%M:%S")
+            if hasattr(created_at_val, "strftime")
+            else str(created_at_val or datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        )
+
+        if vt == "CU":
+            cat_label = "Certificazione Unica (CU)"
+            stat_badge = "Redditi & Ritenute Validati"
+            stat_color = "#10b981"
+        elif vt == "PRECOMPILATA_ADE":
+            cat_label = "Modello 730 Precompilato"
+            stat_badge = "Dati non utilizzati Rilevati"
+            stat_color = "#3b82f6"
+        elif vt in ["BROKER_REPORT", "BROKER_TAX_REPORT"]:
+            cat_label = "Rendiconto Fiscale Broker"
+            stat_badge = "Quadro RT / IVAFE Acquisito"
+            stat_color = "#f59e0b"
+        elif vt == "BANK_STATEMENT_RW":
+            cat_label = "Estratto Conto Estero (Quadro W)"
+            stat_badge = "Monitorato (Giacenza/Saldo)"
+            stat_color = "#06b6d4"
+        elif vt == "RENT_EXPENSE":
+            cat_label = "Spesa / Locazione Fuori Sede"
+            stat_badge = "Detrazione 19% Sbloccata (E8)"
+            stat_color = "#a855f7"
+        elif vt == "ADE_NOTICE_36BIS":
+            cat_label = "Avviso Irregolarità Art. 36-bis"
+            stat_badge = "Discrepanza in Autotutela"
+            stat_color = "#ef4444"
+        else:
+            cat_label = f"Documento {vt}"
+            stat_badge = "Archiviato a DB"
+            stat_color = "#64748b"
+
+        meta = v.get("metadata_json")
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except Exception:
+                meta = {}
+        elif not isinstance(meta, dict):
+            meta = {}
+
+        registry.append({
+            "registry_id": f"VDOC-{v.get('id', 0):04d}",
+            "raw_id": v.get("id"),
+            "source_table": "tax_verification_documents",
+            "created_at": created_str,
+            "tax_year": int(v.get("tax_year", 0)),
+            "filing_year": int(v.get("tax_year", 0) + 1),
+            "category_label": cat_label,
+            "doc_type": vt,
+            "issuer_name": v.get("issuer_name") or "Intermediario",
+            "protocol_or_code": v.get("protocol_or_code") or "N/D",
+            "gross_amount": float(v.get("gross_amount", 0.0) or 0.0),
+            "tax_amount": float(v.get("tax_withheld_or_due", 0.0) or 0.0),
+            "secondary_amount": float(v.get("secondary_amount", 0.0) or 0.0),
+            "asset_monitoring_val": float(v.get("asset_monitoring_val", 0.0) or 0.0),
+            "source_filename": v.get("source_filename") or f"{vt.lower()}_documento.pdf",
+            "status_badge": stat_badge,
+            "status_color": stat_color,
+            "notes": v.get("notes") or "",
+            "metadata_json": meta,
+        })
+
+    registry.sort(key=lambda r: (r.get("tax_year", 0), r.get("created_at", "")), reverse=True)
+    return registry

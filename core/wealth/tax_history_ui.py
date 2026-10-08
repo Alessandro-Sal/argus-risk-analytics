@@ -29,6 +29,7 @@ from core.wealth.tax_history_engine import (
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
+    get_unified_tax_document_registry,
     get_verification_documents,
     parse_730_pdf_or_json,
     parse_universal_tax_document,
@@ -77,10 +78,11 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
     st.markdown("---")
 
     # ── SUB-TABS DELLA SEZIONE ──────────────────────────────────
-    subtab_man, subtab_dash, subtab_audit = st.tabs([
+    subtab_man, subtab_reg, subtab_dash, subtab_audit = st.tabs([
         "📥 1. Gestione & Inserimento (Upload / Data Editor)",
-        "📊 2. Dashboard Storica & Zainetto Fiscale",
-        "🚨 3. Audit Advisor & Riconciliazione Broker (Art. 36-bis)",
+        "📑 2. Registro Ufficiale Documenti Fiscali (Audit Trail DB)",
+        "📊 3. Dashboard Storica & Zainetto Fiscale",
+        "🚨 4. Audit Advisor & Riconciliazione Broker (Art. 36-bis)",
     ])
 
     # ============================================================
@@ -849,7 +851,168 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             st.info("Nessuna dichiarazione ancora salvata in archivio. Carica un PDF o usa l'inserimento manuale in alto.")
 
     # ============================================================
-    # SUBTAB 2: DASHBOARD STORICA & ZAINETTO FISCALE
+    # SUBTAB 2: REGISTRO UFFICIALE DOCUMENTI FISCALI (AUDIT TRAIL DB)
+    # ============================================================
+    with subtab_reg:
+        st.markdown("#### 📑 Registro Ufficiale Documenti Fiscali & Audit Trail a Database")
+        st.caption(
+            "Protocollo formale e cronologico di tutti i documenti probatori, dichiarazioni e atti "
+            "archiviati nel database. Fornisce tracciabilità completa, riscontro degli importi e conservazione documentale."
+        )
+
+        reg_entries = get_unified_tax_document_registry(engine, profile_id=pid_str)
+
+        if not reg_entries:
+            st.info("Nessun documento fiscale attualmente registrato nel database. Carica o inserisci i file nella Scheda 1 per popolare il Registro.")
+        else:
+            # ── 1. KPI HIGHLIGHTS DEL REGISTRO ──
+            tot_docs = len(reg_entries)
+            n_decls = sum(1 for r in reg_entries if r["source_table"] == "tax_declarations")
+            n_vdocs = sum(1 for r in reg_entries if r["source_table"] == "tax_verification_documents")
+            years_covered = sorted(list({r["tax_year"] for r in reg_entries}))
+            years_span = f"{years_covered[0]} – {years_covered[-1]}" if len(years_covered) > 1 else str(years_covered[0]) if years_covered else "N/D"
+            tot_gross_tracked = sum(r["gross_amount"] for r in reg_entries)
+            tot_taxes_tracked = sum(r["tax_amount"] for r in reg_entries)
+
+            c_kpi1, c_kpi2, c_kpi3, c_kpi4 = st.columns(4)
+            with c_kpi1:
+                metric_card("Atti a Registro", f"{tot_docs} Documenti", f"{n_decls} Dichiarazioni • {n_vdocs} Riscontri")
+            with c_kpi2:
+                metric_card("Copertura Fiscale", years_span, f"{len(years_covered)} Anni d'Imposta Tracciati")
+            with c_kpi3:
+                metric_card("Totale Flussi / Lordo", fmt_eur_it(tot_gross_tracked), "Somma imponibili & movimenti registrati")
+            with c_kpi4:
+                metric_card("Imposte / Ritenute", fmt_eur_it(tot_taxes_tracked), "IRPEF netta, sostitutive & ritenute")
+
+            st.markdown("---")
+
+            # ── 2. FILTRI INTERATTIVI ──
+            c_f_yr, c_f_cat, c_f_q = st.columns([1.5, 2.5, 2.5])
+            with c_f_yr:
+                filter_year_opts = ["Tutti gli Anni"] + [str(y) for y in sorted(years_covered, reverse=True)]
+                sel_f_yr = st.selectbox("📅 Filtra per Anno:", filter_year_opts, key=f"reg_f_yr_{pid_str}")
+            with c_f_cat:
+                cat_unique = sorted(list({r["category_label"] for r in reg_entries}))
+                filter_cat_opts = ["Tutte le Categorie"] + cat_unique
+                sel_f_cat = st.selectbox("📂 Filtra per Categoria:", filter_cat_opts, key=f"reg_f_cat_{pid_str}")
+            with c_f_q:
+                search_q = st.text_input("🔍 Cerca per File, Protocollo o Emittente:", value="", placeholder="Es. Sixtema, DEGIRO, Locazione, 2025...", key=f"reg_search_{pid_str}")
+
+            # Applicazione filtri
+            filtered_entries = reg_entries
+            if sel_f_yr != "Tutti gli Anni":
+                filtered_entries = [r for r in filtered_entries if str(r["tax_year"]) == sel_f_yr]
+            if sel_f_cat != "Tutte le Categorie":
+                filtered_entries = [r for r in filtered_entries if r["category_label"] == sel_f_cat]
+            if search_q.strip():
+                sq_lower = search_q.strip().lower()
+                filtered_entries = [
+                    r for r in filtered_entries
+                    if sq_lower in r.get("source_filename", "").lower()
+                    or sq_lower in r.get("issuer_name", "").lower()
+                    or sq_lower in r.get("protocol_or_code", "").lower()
+                    or sq_lower in r.get("registry_id", "").lower()
+                    or sq_lower in r.get("notes", "").lower()
+                ]
+
+            st.markdown(f"##### 📋 Tabella Ufficiale del Registro ({len(filtered_entries)} di {tot_docs} documenti)")
+
+            # Costruzione DataFrame per la visualizzazione
+            df_rows = []
+            for r in filtered_entries:
+                df_rows.append({
+                    "Protocollo": r["registry_id"],
+                    "Data Registrazione": r["created_at"],
+                    "Anno Fiscale": r["tax_year"],
+                    "Categoria Atto": r["category_label"],
+                    "Emittente / Sostituto": r["issuer_name"],
+                    "Rif. Telematico / Atto": r["protocol_or_code"],
+                    "Lordo / Base (€)": r["gross_amount"],
+                    "Imposta / Ritenuta (€)": r["tax_amount"],
+                    "Rimborsi / Detrazioni (€)": r["secondary_amount"],
+                    "File Sorgente": r["source_filename"],
+                    "Stato Audit": r["status_badge"],
+                })
+
+            df_reg = pd.DataFrame(df_rows)
+            st.dataframe(
+                df_reg,
+                column_config={
+                    "Lordo / Base (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Imposta / Ritenuta (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Rimborsi / Detrazioni (€)": st.column_config.NumberColumn(format="€ %.2f"),
+                    "Anno Fiscale": st.column_config.NumberColumn(format="%d"),
+                },
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # ── 3. AZIONI & ESPORTAZIONE AUDIT TRAIL ──
+            col_csv, col_exp_all, _ = st.columns([2, 2, 3])
+            with col_csv:
+                csv_bytes = df_reg.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Esporta Registro Completo (CSV)",
+                    data=csv_bytes,
+                    file_name=f"registro_fiscale_audit_trail_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv",
+                    key=f"dl_reg_csv_{pid_str}",
+                    use_container_width=True,
+                )
+            with col_exp_all:
+                if st.button("🔄 Ricarica Dati dal Database", key=f"btn_sync_reg_{pid_str}", use_container_width=True):
+                    st.rerun()
+
+            st.markdown("---")
+
+            # ── 4. ISPEZIONE METADATI & DETTAGLIO ANALITICO ──
+            with st.expander("🔍 Ispezione Analitica / Metadati Completi Documento", expanded=False):
+                reg_options = [r["registry_id"] for r in filtered_entries]
+                if reg_options:
+                    sel_reg_id = st.selectbox(
+                        "Seleziona documento da esaminare:",
+                        options=reg_options,
+                        format_func=lambda x: next(
+                            (f"{x} — {r['category_label']} ({r['tax_year']}) | {r['issuer_name']} | File: {r['source_filename']}" for r in filtered_entries if r["registry_id"] == x),
+                            x,
+                        ),
+                        key=f"sel_inspect_reg_{pid_str}",
+                    )
+                    inspected = next((r for r in filtered_entries if r["registry_id"] == sel_reg_id), None)
+                    if inspected:
+                        c_in1, c_in2, c_in3 = st.columns([2, 2, 2])
+                        with c_in1:
+                            st.write(f"**Tipologia:** {inspected['category_label']}")
+                            st.write(f"**Anno Fiscale:** {inspected['tax_year']} (Filing {inspected['filing_year']})")
+                            st.write(f"**Tabella DB:** `{inspected['source_table']}` (ID #{inspected['raw_id']})")
+                        with c_in2:
+                            st.write(f"**Emittente:** {inspected['issuer_name']}")
+                            st.write(f"**Protocollo / Atto:** `{inspected['protocol_or_code']}`")
+                            st.write(f"**Data Ingestione:** {inspected['created_at']}")
+                        with c_in3:
+                            st.write(f"**Importo Base:** {fmt_eur_it(inspected['gross_amount'])}")
+                            st.write(f"**Imposta/Ritenuta:** {fmt_eur_it(inspected['tax_amount'])}")
+                            st.write(f"**Rimborsi/Detrazioni:** {fmt_eur_it(inspected['secondary_amount'])}")
+
+                        if inspected.get("notes"):
+                            st.info(f"📝 **Note di elaborazione:** {inspected['notes']}")
+
+                        st.markdown("**🔬 Metadati Strutturati (JSON esteso):**")
+                        st.json(inspected.get("metadata_json") or {})
+
+                        # Opzione di cancellazione rapida da registro
+                        with st.popover("⚠️ Elimina questo Documento dal Database"):
+                            st.write(f"Sei sicuro di voler eliminare **{inspected['registry_id']}** ({inspected['source_filename']}) dal database?")
+                            if st.button("Conferma Eliminazione", key=f"btn_confirm_del_reg_{inspected['registry_id']}", type="primary"):
+                                if inspected["source_table"] == "tax_declarations":
+                                    delete_declaration(engine, inspected["raw_id"])
+                                else:
+                                    delete_verification_document(engine, inspected["raw_id"])
+                                st.warning(f"Documento {inspected['registry_id']} eliminato.")
+                                st.rerun()
+
+    # ============================================================
+    # SUBTAB 3: DASHBOARD STORICA & ZAINETTO FISCALE
     # ============================================================
     with subtab_dash:
         st.markdown("#### 📊 Dashboard Storica Pluriennale & Zainetto Fiscale")
@@ -1101,7 +1264,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             st.info("Nessuna tranche di minusvalenza registrata. Inseriscine una tramite il pannello in alto.")
 
     # ============================================================
-    # SUBTAB 3: AUDIT ADVISOR & RICONCILIAZIONE (ART. 36-BIS)
+    # SUBTAB 4: AUDIT ADVISOR & RICONCILIAZIONE (ART. 36-BIS)
     # ============================================================
     with subtab_audit:
         st.markdown("#### 🚨 Audit di Riconciliazione Tributaria & Advisor Alert")
