@@ -245,14 +245,22 @@ class TestTax730Parser:
         assert res["ivafe_paid"] == 68.40
         assert res["foreign_assets_val"] == 34200.00
 
-    def test_parse_official_730_2026_pdf(self):
-        pdf_path = Path(r"C:\Users\Alessandro Personale\.gemini\antigravity\brain\eb071f0b-4569-4763-a8a5-a98a8d170f63\.user_uploaded\media_1791481017652_9e42effa.pdf")
-        if not pdf_path.exists():
-            pytest.skip("Uploaded 730 PDF not available in test environment")
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
-
-        res = parse_730_pdf_or_json(pdf_bytes, filename="730_2026_Saladino.pdf")
+    def test_parse_official_730_2026_layout(self):
+        sample_730_2026 = """
+        MODELLO 730/2026 redditi 2025
+        MINISTERO DELL'ECONOMIA E DELLE FINANZE - AGENZIA DELLE ENTRATE
+        CODICE FISCALE DEL CONTRIBUENTE: RSSMRA85M01H501Z
+        COGNOME E NOME: ROSSI MARIO
+        Protocollo Telematico: 09064865516 - 0001069
+        REDDITO COMPLESSIVO: 8.299,00
+        REDDITO IMPONIBILE: 8.299,00
+        IMPOSTA NETTA: 1.131,00
+        Rigo 321 Imposta Sostitutiva: 206,00
+        Totale Plusvalenze: 792,31
+        Rigo 307 IVAFE: 53,00
+        Quadro W Valore Finale: 26.500,00
+        """
+        res = parse_730_pdf_or_json(sample_730_2026, filename="730_2026_sample.txt")
         assert res["tax_year"] == 2025
         assert res["filing_year"] == 2026
         assert res["model_type"] == "730_ORDINARIO"
@@ -264,17 +272,25 @@ class TestTax730Parser:
         assert res["capital_gains_declared"] == 792.31
         assert res["ivafe_paid"] == 53.00
         assert res["foreign_assets_val"] == 26500.00
-        assert "SALADINO" in res["notes"]
-        assert "SLDLSN00P19M208Y" in res["notes"]
+        assert "ROSSI" in res["notes"]
+        assert "RSSMRA85M01H501Z" in res["notes"]
 
-    def test_parse_official_730_2024_pdf(self):
-        pdf_path = Path(r"C:\Users\Alessandro Personale\.gemini\antigravity\brain\eb071f0b-4569-4763-a8a5-a98a8d170f63\.user_uploaded\media_1791482598673_6944a3d5.pdf")
-        if not pdf_path.exists():
-            pytest.skip("Uploaded 730/2024 PDF not available in test environment")
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
-
-        res = parse_730_pdf_or_json(pdf_bytes, filename="730_2024_Saladino.pdf")
+    def test_parse_official_730_2024_layout(self):
+        sample_730_2024 = """
+        MODELLO 730/2024 redditi 2023
+        MINISTERO DELL'ECONOMIA E DELLE FINANZE - AGENZIA DELLE ENTRATE
+        CODICE FISCALE DEL CONTRIBUENTE: RSSMRA85M01H501Z
+        COGNOME E NOME: ROSSI MARIO
+        Protocollo Telematico: 12454842525 - 0000472
+        REDDITO COMPLESSIVO: 20.500,00
+        REDDITO IMPONIBILE: 20.500,00
+        IMPOSTA NETTA: 2.216,00
+        Rigo 321 Imposta Sostitutiva: 0,00
+        Totale Plusvalenze: 0,00
+        Rigo 307 IVAFE: 17,00
+        Quadro W Valore Finale: 8.500,00
+        """
+        res = parse_730_pdf_or_json(sample_730_2024, filename="730_2024_sample.txt")
         assert res["tax_year"] == 2023
         assert res["filing_year"] == 2024
         assert res["model_type"] == "730_ORDINARIO"
@@ -286,16 +302,24 @@ class TestTax730Parser:
         assert res["capital_gains_declared"] == 0.00
         assert res["ivafe_paid"] == 17.00
         assert res["foreign_assets_val"] == 8500.00
-        assert "SALADINO" in res["notes"]
+        assert "ROSSI" in res["notes"]
 
-    def test_parse_official_730_2025_pdf(self):
-        pdf_path = Path(r"C:\Users\Alessandro Personale\Downloads\730_T25092611423143672686_SLDLSN00P19M208Y (4).pdf")
-        if not pdf_path.exists():
-            pytest.skip("730/2025 PDF not available in Downloads")
-        with open(pdf_path, "rb") as f:
-            pdf_bytes = f.read()
-
-        res = parse_730_pdf_or_json(pdf_bytes, filename="730_2025_Saladino.pdf")
+    def test_parse_official_730_2025_layout(self):
+        sample_730_2025 = """
+        MODELLO 730/2025 redditi 2024
+        MINISTERO DELL'ECONOMIA E DELLE FINANZE - AGENZIA DELLE ENTRATE
+        CODICE FISCALE DEL CONTRIBUENTE: RSSMRA85M01H501Z
+        COGNOME E NOME: ROSSI MARIO
+        Protocollo Telematico: 11423143672 - 0000686
+        REDDITO COMPLESSIVO: 22.716,00
+        REDDITO IMPONIBILE: 22.716,00
+        IMPOSTA NETTA: 2.714,00
+        Rigo 321 Imposta Sostitutiva: 115,00
+        Totale Plusvalenze: 442,31
+        Rigo 307 IVAFE: 34,00
+        Quadro W Valore Finale: 17.000,00
+        """
+        res = parse_730_pdf_or_json(sample_730_2025, filename="730_2025_sample.txt")
         assert res["tax_year"] == 2024
         assert res["filing_year"] == 2025
         assert res["model_type"] == "730_ORDINARIO"
@@ -307,7 +331,7 @@ class TestTax730Parser:
         assert res["capital_gains_declared"] == 442.31
         assert res["ivafe_paid"] == 34.00
         assert res["foreign_assets_val"] == 17000.00
-        assert "SALADINO" in res["notes"]
+        assert "ROSSI" in res["notes"]
 
 
 class TestReconciliationEngine:
@@ -568,9 +592,9 @@ class TestTaxVerificationDocumentsCRUD:
 class TestUniversalTaxParsers:
     def test_detect_tax_document_types(self):
         assert detect_tax_document_type("CERTIFICAZIONE UNICA 2021 RELATIVA ALL'ANNO 2020") == "CERTIFICAZIONE_UNICA"
-        assert detect_tax_document_type("", filename="CUK_T210218120139105620004585_SLDLSN00P19M208Y.pdf") == "CERTIFICAZIONE_UNICA"
+        assert detect_tax_document_type("", filename="CUK_T210218120139105620004585_RSSMRA85M01H501Z.pdf") == "CERTIFICAZIONE_UNICA"
         assert detect_tax_document_type("RENDICONTO FISCALE DEGIRO ANNO FISCALE 2024 QUADRO RT") == "BROKER_TAX_REPORT"
-        assert detect_tax_document_type("COMUNICAZIONE N. 0040847025301 CODICE ATTO N. 20069272514 ART. 36-BIS") == "ADE_NOTICE_36BIS"
+        assert detect_tax_document_type("COMUNICAZIONE N. 0011122233344 CODICE ATTO N. 20000000001 ART. 36-BIS") == "ADE_NOTICE_36BIS"
         assert detect_tax_document_type("MODELLO 730/2025 REDDITI 2024") == "OFFICIAL_DECLARATION"
 
     def test_parse_certificazione_unica_synthetic_payload(self):
@@ -579,7 +603,7 @@ class TestUniversalTaxParsers:
         CERTIFICAZIONE DI CUI ALL'ART. 4 DEL D.P.R. 22 LUGLIO 1998
         RELATIVA ALL'ANNO 2020
         02786551206 ER.GO BOLOGNA BO
-        SLDLSN00P19M208Y SALADINO ALESSANDRO
+        RSSMRA85M01H501Z ROSSI MARIO
         Identificativo dichiarazione: 12013910562 - 0004585 del 18/2/2021
         6 1.028,00
         21 0,00
@@ -620,14 +644,14 @@ class TestUniversalTaxParsers:
     def test_parse_ade_notice_36bis_synthetic_payload(self):
         ade_text = """
         Divisione Servizi - Ufficio Controllo dichiarazioni
-        Comunicazione n. 0040847025301
-        Codice atto n. 20069272514
+        Comunicazione n. 0011122233344
+        Codice atto n. 20000000001
         Gentile Contribuente, dai controlli effettuati sulla sua dichiarazione modello 730 / 2025
         Può regolarizzare la sua posizione versando la somma di euro 261,72 entro 60 giorni.
         art. 36-bis del d.P.R. n. 600 del 1973
         Periodo d'imposta 2024
         Protocollo telematico: T250926114231436720000686
-        Dichiarante : SLDLSN00P19M208Y SALADINO ALESSANDRO
+        Dichiarante : RSSMRA85M01H501Z ROSSI MARIO
         CODICE TRIBUTO 1100 (PL321) PLUSVAL. ASSOGGETTATE A IMPOSTA SOST.
         Imposta a debito 348,38
         Imposta versata 115,00
@@ -697,13 +721,13 @@ class TestTriangularTaxAudit:
             "tax_year": year,
             "doc_type": "ADE_NOTICE_36BIS",
             "issuer_name": "AGENZIA DELLE ENTRATE",
-            "protocol_or_code": "Atto #20069272514",
+            "protocol_or_code": "Atto #20000000001",
             "tax_withheld_or_due": 348.38,
             "tax_paid": 115.0,
             "total_due": 261.72,
             "metadata_json": {
-                "notice_number": "0040847025301",
-                "act_code": "20069272514",
+                "notice_number": "0011122233344",
+                "act_code": "20000000001",
                 "challenged_protocol": "T250926114231436720000686",
             },
         })
@@ -725,14 +749,14 @@ class Test730PredispositionAndNewParsers:
     def test_parse_ade_precompilata(self):
         sample_precompilata = """
         MODELLO 730 PRECOMPILATO 2026 - AGENZIA DELLE ENTRATE
-        Codice fiscale del dichiarante: SLDLSN00P19M208Y
+        Codice fiscale del dichiarante: RSSMRA85M01H501Z
         DATI UTILIZZATI:
         PL, Rigo 11 (Reddito complessivo): 8.299,00 €
         PL, Rigo 50 (Imposta netta): 1.163,00 €
         PL, Rigo 59 (Ritenute): 1.671,00 €
         PL, Rigo 91, colonna 3 (di cui da rimborsare): 625,00 €
         DATI NON UTILIZZATI:
-        Contratto di locazione abitativo Atto TGU-2025-3T-016522
+        Contratto di locazione abitativo Atto TGU-2025-3T-000001
         Spese per canone di locazione studenti fuori sede: 519,45 €
         """
         res = parse_ade_precompilata(sample_precompilata, filename="precompilata_2026.txt")
@@ -744,14 +768,14 @@ class Test730PredispositionAndNewParsers:
         assert res["tax_paid"] == 1671.00
         assert res["secondary_amount"] == 625.00
         assert res["metadata_json"]["unused_data"]["rent_contract"]["detected"] is True
-        assert res["metadata_json"]["unused_data"]["rent_contract"]["contract_code"] == "TGU-2025-3T-016522"
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["contract_code"] == "TGU-2025-3T-000001"
         assert res["metadata_json"]["unused_data"]["rent_contract"]["potential_deduction_eur"] == 98.70
 
     def test_parse_bank_statement_rw(self):
         sample_n26 = """
         N26 Bank AG - Certificazione Giacenza Media e Saldi ai fini ISEE / Fiscali
         Periodo: Anno 2025 (01.01.2025 - 31.12.2025)
-        Titolare: Alessandro Saladino (SLDLSN00P19M208Y)
+        Titolare: Mario Rossi (RSSMRA85M01H501Z)
         Giacenza media annua: 734,91 EUR
         Saldo contabile al 31/12/2025: 1.382,11 EUR
         """
@@ -769,7 +793,7 @@ class Test730PredispositionAndNewParsers:
         RICEVUTA DISPOSIZIONE BONIFICO SEPA
         Data esecuzione: 28/11/2025
         Importo: 270,00 EUR
-        Causale: Pagamento canone di locazione Novembre 2025 contr. TGU-2025-3T-016522
+        Causale: Pagamento canone di locazione Novembre 2025 contr. TGU-2025-3T-000001
         Beneficiario: Mario Rossi
         """
         res = parse_rent_expense(sample_bonifico, filename="bonifico_affitto_nov.txt")
@@ -777,7 +801,7 @@ class Test730PredispositionAndNewParsers:
         assert res["tax_year"] == 2025
         assert res["gross_amount"] == 270.00
         assert res["secondary_amount"] == pytest.approx(51.30, abs=0.01)
-        assert res["metadata_json"]["contract_code"] == "TGU-2025-3T-016522"
+        assert res["metadata_json"]["contract_code"] == "TGU-2025-3T-000001"
         assert "Codice 18" in res["metadata_json"]["quadro_rigo"]
 
     def test_build_730_predisposition_and_variance_audit(self, memory_db):
@@ -822,7 +846,7 @@ class Test730PredispositionAndNewParsers:
             "gross_amount": 519.45,
             "secondary_amount": 98.70,
             "metadata_json": {
-                "contract_code": "TGU-2025-3T-016522",
+                "contract_code": "TGU-2025-3T-000001",
                 "eligible_deduction_19pct": 98.70,
             },
         })

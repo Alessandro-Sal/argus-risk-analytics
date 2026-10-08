@@ -592,7 +592,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                     with c_m3:
                         metric_card("Rigo Destinazione 730", "Quadro E, Rigo E8 cod. 18", "Spese alloggio studenti")
                     with c_m4:
-                        metric_card("Riferimento Atto", str(meta_r.get("contract_code") or "TGU-2025-3T-016522"), "Contratto Registrato AdE")
+                        metric_card("Riferimento Atto", str(meta_r.get("contract_code") or "Atto Registrato"), "Contratto Registrato AdE")
 
                     with st.expander(f"🔍 Dettagli & Modifica Campi Locazione {parsed_data.get('tax_year')}", expanded=False):
                         c_rn1, c_rn2 = st.columns(2)
@@ -636,7 +636,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                                 f"Questo file ha dimensione ridotta (~258 KB, 1 pagina) ed è il **Modello 730-4** (comunicazione di conguaglio per il sostituto d'imposta).\n\n"
                                 f"In questo prospetto **non sono presenti i quadri dei redditi** (C, D, E, W/RW, T), per questo motivo tutti i campi risultano a 0,00.\n\n"
                                 f"👉 **Come risolvere:** Seleziona dalla tua cartella *Download* il file PDF completo da **1,5 MB (16 pagine)** "
-                                f"(denominato `730_T25092611423143672686_SLDLSN00P19M208Y.pdf` senza spazi o variante `(4).pdf`)."
+                                f"(denominato ad esempio `Modello_730_Completo.pdf` o con protocollo telematico completo)."
                             )
                         else:
                             st.markdown(
