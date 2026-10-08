@@ -1549,11 +1549,11 @@ elif active_val_tab == "🧮 Valutazione Intrinseca DCF Monte Carlo":
 
     col_inp1, col_inp2, col_inp3 = st.columns(3)
     with col_inp1:
-        input_price = st.number_input(f"Prezzo Spot Attuale ({dcf_curr_sym}):", value=float(dcf_defaults["price"]), min_value=0.1, step=1.0)
+        input_price = st.number_input(f"Prezzo Spot Attuale ({dcf_curr_sym}):", value=max(0.01, float(dcf_defaults["price"])), min_value=0.01, step=1.0)
     with col_inp2:
-        input_fcf = st.number_input(f"FCF Base Iniziale (M {dcf_curr_sym}):", value=float(dcf_defaults["fcf_m"]), min_value=1.0, step=500.0) * 1e6
+        input_fcf = st.number_input(f"FCF Base Iniziale (M {dcf_curr_sym}):", value=max(0.01, float(dcf_defaults["fcf_m"])), min_value=0.01, step=500.0) * 1e6
     with col_inp3:
-        input_shares = st.number_input("Azioni Diluite (Milioni):", value=float(dcf_defaults["shares_m"]), min_value=1.0, step=100.0) * 1e6
+        input_shares = st.number_input("Azioni Diluite (Milioni):", value=max(0.01, float(dcf_defaults["shares_m"])), min_value=0.01, step=100.0) * 1e6
 
     with st.expander("🛠️ Parametri Avanzati di Simulazione (WACC, Tassi di Crescita & Volatilità)", expanded=False):
         c_adv1, c_adv2, c_adv3 = st.columns(3)

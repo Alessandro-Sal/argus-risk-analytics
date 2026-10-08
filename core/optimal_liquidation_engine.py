@@ -345,34 +345,78 @@ def render_optimal_liquidation_lab(
                 if val_p > 0:
                     def_price = val_p
 
+    min_shares = 0.0001
+    max_shares = 50_000_000.0
+    safe_shares = max(min_shares, min(float(def_shares), max_shares))
+    step_shares = 1.0 if safe_shares < 1000.0 else (100.0 if safe_shares < 100_000.0 else 10_000.0)
+
+    min_price = 0.0001
+    max_price = 1_000_000.0
+    safe_price = max(min_price, min(float(def_price), max_price))
+    step_price = 0.01 if safe_price < 10.0 else 1.0
+
+    min_adv = 100.0
+    max_adv = 500_000_000.0
+
+    # Auto-update inputs when ticker selection changes
+    prev_tk_key = f"{key_prefix}_prev_ticker"
+    if st.session_state.get(prev_tk_key) != ticker_val:
+        st.session_state[prev_tk_key] = ticker_val
+        st.session_state[f"{key_prefix}_shares"] = float(safe_shares)
+        st.session_state[f"{key_prefix}_price"] = float(safe_price)
+
+    # Guard against any stale session_state value outside bounds
+    sh_k = f"{key_prefix}_shares"
+    if sh_k in st.session_state:
+        try:
+            st.session_state[sh_k] = max(min_shares, min(float(st.session_state[sh_k]), max_shares))
+        except (ValueError, TypeError):
+            st.session_state[sh_k] = safe_shares
+
+    px_k = f"{key_prefix}_price"
+    if px_k in st.session_state:
+        try:
+            st.session_state[px_k] = max(min_price, min(float(st.session_state[px_k]), max_price))
+        except (ValueError, TypeError):
+            st.session_state[px_k] = safe_price
+
     with c_in2:
         order_shares_val = st.number_input(
             "Quote da Smobilizzare (X₀):",
-            min_value=100.0,
-            max_value=50_000_000.0,
-            value=float(def_shares),
-            step=10_000.0,
-            key=f"{key_prefix}_shares",
+            min_value=min_shares,
+            max_value=max_shares,
+            value=float(safe_shares),
+            step=float(step_shares),
+            key=sh_k,
         )
 
     with c_in3:
         spot_price_val = st.number_input(
             "Prezzo Spot (€):",
-            min_value=0.01,
-            max_value=100_000.0,
-            value=float(def_price),
-            step=1.0,
-            key=f"{key_prefix}_price",
+            min_value=min_price,
+            max_value=max_price,
+            value=float(safe_price),
+            step=float(step_price),
+            key=px_k,
         )
+
+    safe_adv = max(min_adv, min(max(float(order_shares_val * 20.0), 2_000_000.0), max_adv))
+    step_adv = 10_000.0 if safe_adv < 1_000_000.0 else 500_000.0
+    adv_k = f"{key_prefix}_adv"
+    if adv_k in st.session_state:
+        try:
+            st.session_state[adv_k] = max(min_adv, min(float(st.session_state[adv_k]), max_adv))
+        except (ValueError, TypeError):
+            st.session_state[adv_k] = safe_adv
 
     with c_in4:
         adv_val = st.number_input(
             "ADV Medio (Quote/giorno):",
-            min_value=1_000.0,
-            max_value=500_000_000.0,
-            value=max(float(order_shares_val * 20.0), 2_000_000.0),
-            step=500_000.0,
-            key=f"{key_prefix}_adv",
+            min_value=min_adv,
+            max_value=max_adv,
+            value=float(safe_adv),
+            step=float(step_adv),
+            key=adv_k,
         )
 
     with st.expander("🛠️ Parametri Avanzati di Microstruttura & Urgenza (Almgren-Chriss)", expanded=False):
@@ -396,7 +440,7 @@ def render_optimal_liquidation_lab(
                 index=3,
                 key=f"{key_prefix}_lambda",
             )
-            lambda_val = dict(lambda_choices)[sel_lambda_label]
+            lambda_val = dict(lambda_choices).get(sel_lambda_label, 2.5e-6)
         with c_p4:
             pov_cap_pct = st.slider("POV Cap Massimo (%):", 5, 40, 15, 1, key=f"{key_prefix}_pov")
 

@@ -169,3 +169,88 @@ def test_morning_meeting_briefing_script_and_pdf():
     assert isinstance(pdf_bytes, bytes)
     assert len(pdf_bytes) > 1000
     assert pdf_bytes.startswith(b"%PDF") or b"Buongiorno" in pdf_bytes
+
+
+def test_optimal_liquidation_small_share_quantities():
+    """Verifica che la liquidazione ottima funzioni correttamente anche per piccole quote (es. 28 azioni o frazionarie)."""
+    cfg = OptimalLiquidationConfig(
+        ticker="AAPL",
+        order_shares=28.0,
+        spot_price=220.0,
+        adv_shares=50_000_000.0,
+        daily_volatility=0.015,
+        bid_ask_spread_bps=2.0,
+        risk_aversion_lambda=2.5e-6,
+        horizon_hours=6.5,
+        n_slices=13,
+        max_pov_cap=0.15,
+    )
+    engine = OptimalLiquidationEngine(config=cfg)
+    res = engine.compute_schedule()
+    assert res["order_shares"] == 28.0
+    assert "almgren_chriss_optimal" in res["strategies"]
+
+
+def test_render_optimal_liquidation_lab_with_28_shares():
+    """Verifica che render_optimal_liquidation_lab gestisca posizioni con 28 azioni senza eccezioni di min_value."""
+    from unittest.mock import MagicMock, patch
+
+    from core.optimal_liquidation_engine import render_optimal_liquidation_lab
+
+    pos = pd.DataFrame({
+        "ticker": ["AAPL"],
+        "qty_net": [28.0],
+        "last_price": [220.0],
+        "current_value": [6160.0],
+    })
+
+    mock_st = MagicMock()
+    mock_st.session_state = {}
+
+    def fake_columns(spec, **kwargs):
+        n = len(spec) if isinstance(spec, (list, tuple)) else int(spec)
+        return [MagicMock() for _ in range(n)]
+
+    mock_st.columns.side_effect = fake_columns
+
+    def fake_selectbox(label, options, index=0, **kwargs):
+        if options and index < len(options):
+            return options[index]
+        return options[0] if options else "AAPL"
+
+    mock_st.selectbox.side_effect = fake_selectbox
+
+    def fake_number_input(label, *args, **kwargs):
+        val = kwargs.get("value")
+        min_v = kwargs.get("min_value")
+        max_v = kwargs.get("max_value")
+        if min_v is None and len(args) >= 1:
+            min_v = args[0]
+        if max_v is None and len(args) >= 2:
+            max_v = args[1]
+        if val is None and len(args) >= 3:
+            val = args[2]
+        if val is None:
+            val = min_v if min_v is not None else 1.0
+        if min_v is not None and val is not None:
+            assert val >= min_v, f"StreamlitValueBelowMinError: value {val} < min_value {min_v}"
+        if max_v is not None and val is not None:
+            assert val <= max_v, f"StreamlitValueAboveMaxError: value {val} > max_value {max_v}"
+        return val
+
+    mock_st.number_input.side_effect = fake_number_input
+    mock_st.slider.return_value = 13
+    mock_st.select_slider.return_value = 2.5e-6
+
+    with patch("streamlit.columns", mock_st.columns), \
+         patch("streamlit.selectbox", mock_st.selectbox), \
+         patch("streamlit.number_input", mock_st.number_input), \
+         patch("streamlit.slider", mock_st.slider), \
+         patch("streamlit.select_slider", mock_st.select_slider), \
+         patch("streamlit.session_state", mock_st.session_state), \
+         patch("streamlit.markdown", mock_st.markdown), \
+         patch("streamlit.expander", mock_st.expander), \
+         patch("streamlit.plotly_chart", mock_st.plotly_chart), \
+         patch("streamlit.dataframe", mock_st.dataframe):
+        render_optimal_liquidation_lab(positions=pos, key_prefix="test_liq")
+
