@@ -14,17 +14,27 @@ from sqlalchemy import create_engine
 from core.wealth.tax_history_engine import (
     TaxDeclaration,
     TaxLossCarryforward,
+    TaxVerificationDocument,
+    build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
     compute_ravvedimento_operoso,
     delete_declaration,
     delete_tax_loss,
+    delete_verification_document,
+    detect_tax_document_type,
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
+    get_verification_documents,
     parse_730_pdf_or_json,
+    parse_ade_notice_36bis,
+    parse_broker_tax_report,
+    parse_certificazione_unica,
+    parse_universal_tax_document,
     reconcile_with_portfolio,
     record_declaration,
     record_tax_loss,
+    record_verification_document,
     update_tax_loss_offset,
 )
 from core.wealth.wealth_db import init_wealth_db
@@ -477,4 +487,233 @@ class TestFiscalExtensions:
         assert parsed["model_type"] == "730_ORDINARIO"
         assert "capital_gains_declared" in parsed
         assert "substitute_tax_paid" in parsed
+
+
+class TestTaxVerificationDocumentsCRUD:
+    def test_record_and_get_verification_doc(self, memory_db):
+        data = {
+            "profile_id": "user_test",
+            "tax_year": 2024,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "protocol_or_code": "PROFORMA-DEGIRO-2024",
+            "gross_amount": 1335.0,
+            "net_taxable_amount": 442.0,
+            "tax_withheld_or_due": 115.0,
+            "secondary_amount": 34.0,
+            "asset_monitoring_val": 23563.0,
+            "notes": "Rendiconto Degiro 2024",
+            "source_filename": "degiro_2024.pdf",
+        }
+        doc_id = record_verification_document(memory_db, data)
+        assert doc_id > 0
+
+        docs = get_verification_documents(memory_db, profile_id="user_test", tax_year=2024)
+        assert len(docs) == 1
+        assert docs[0]["doc_type"] == "BROKER_REPORT"
+        assert docs[0]["gross_amount"] == 1335.0
+        assert docs[0]["net_taxable_amount"] == 442.0
+        assert docs[0]["tax_withheld_or_due"] == 115.0
+        assert docs[0]["secondary_amount"] == 34.0
+
+    def test_update_verification_doc_upsert(self, memory_db):
+        data1 = {
+            "profile_id": "user_test",
+            "tax_year": 2024,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "protocol_or_code": "PROFORMA-DEGIRO-2024",
+            "gross_amount": 1000.0,
+        }
+        id1 = record_verification_document(memory_db, data1)
+
+        # Update with new values
+        data2 = {
+            "profile_id": "user_test",
+            "tax_year": 2024,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "protocol_or_code": "PROFORMA-DEGIRO-2024",
+            "gross_amount": 1335.0,
+            "tax_withheld_or_due": 115.0,
+        }
+        id2 = record_verification_document(memory_db, data2)
+        assert id1 == id2
+
+        docs = get_verification_documents(memory_db, profile_id="user_test", tax_year=2024)
+        assert len(docs) == 1
+        assert docs[0]["gross_amount"] == 1335.0
+        assert docs[0]["tax_withheld_or_due"] == 115.0
+
+    def test_delete_verification_doc(self, memory_db):
+        data = {
+            "profile_id": "user_test",
+            "tax_year": 2020,
+            "doc_type": "CU",
+            "issuer_name": "ER.GO",
+            "protocol_or_code": "CU-ERGO-2020",
+        }
+        doc_id = record_verification_document(memory_db, data)
+        assert len(get_verification_documents(memory_db, profile_id="user_test")) == 1
+
+        deleted = delete_verification_document(memory_db, doc_id)
+        assert deleted is True
+        assert len(get_verification_documents(memory_db, profile_id="user_test")) == 0
+
+
+class TestUniversalTaxParsers:
+    def test_detect_tax_document_types(self):
+        assert detect_tax_document_type("CERTIFICAZIONE UNICA 2021 RELATIVA ALL'ANNO 2020") == "CERTIFICAZIONE_UNICA"
+        assert detect_tax_document_type("", filename="CUK_T210218120139105620004585_SLDLSN00P19M208Y.pdf") == "CERTIFICAZIONE_UNICA"
+        assert detect_tax_document_type("RENDICONTO FISCALE DEGIRO ANNO FISCALE 2024 QUADRO RT") == "BROKER_TAX_REPORT"
+        assert detect_tax_document_type("COMUNICAZIONE N. 0040847025301 CODICE ATTO N. 20069272514 ART. 36-BIS") == "ADE_NOTICE_36BIS"
+        assert detect_tax_document_type("MODELLO 730/2025 REDDITI 2024") == "OFFICIAL_DECLARATION"
+
+    def test_parse_certificazione_unica_synthetic_payload(self):
+        cu_text = """
+        CERTIFICAZIONEUNICA2021
+        CERTIFICAZIONE DI CUI ALL'ART. 4 DEL D.P.R. 22 LUGLIO 1998
+        RELATIVA ALL'ANNO 2020
+        02786551206 ER.GO BOLOGNA BO
+        SLDLSN00P19M208Y SALADINO ALESSANDRO
+        Identificativo dichiarazione: 12013910562 - 0004585 del 18/2/2021
+        6 1.028,00
+        21 0,00
+        22 0,00
+        """
+        res = parse_certificazione_unica(cu_text, filename="test_cu.txt")
+        assert res["doc_type"] == "CU"
+        assert res["tax_year"] == 2020
+        assert res["filing_year"] == 2021
+        assert res["issuer_name"] == "ER.GO"
+        assert res["gross_amount"] == 1028.0
+        assert res["tax_withheld_or_due"] == 0.0
+
+    def test_parse_broker_tax_report_synthetic_payload(self):
+        broker_text = """
+        RENDICONTO FISCALE DEGIRO — ANNO FISCALE 2024
+        QUADRO RT - Plusvalenze di natura finanziaria
+        5.510 4.175
+        893
+        1.335
+        893
+        442
+        115
+        115
+        QUADRO RW
+        22.992
+        """
+        res = parse_broker_tax_report(broker_text, filename="degiro_2024.txt")
+        assert res["doc_type"] == "BROKER_REPORT"
+        assert res["tax_year"] == 2024
+        assert res["issuer_name"] == "DEGIRO"
+        assert res["gross_amount"] == 1335.0
+        assert res["net_taxable_amount"] == 442.0
+        assert res["tax_withheld_or_due"] == 115.0
+        assert res["secondary_amount"] == 34.0
+        assert res["asset_monitoring_val"] == 23563.0
+
+    def test_parse_ade_notice_36bis_synthetic_payload(self):
+        ade_text = """
+        Divisione Servizi - Ufficio Controllo dichiarazioni
+        Comunicazione n. 0040847025301
+        Codice atto n. 20069272514
+        Gentile Contribuente, dai controlli effettuati sulla sua dichiarazione modello 730 / 2025
+        Può regolarizzare la sua posizione versando la somma di euro 261,72 entro 60 giorni.
+        art. 36-bis del d.P.R. n. 600 del 1973
+        Periodo d'imposta 2024
+        Protocollo telematico: T250926114231436720000686
+        Dichiarante : SLDLSN00P19M208Y SALADINO ALESSANDRO
+        CODICE TRIBUTO 1100 (PL321) PLUSVAL. ASSOGGETTATE A IMPOSTA SOST.
+        Imposta a debito 348,38
+        Imposta versata 115,00
+        Imposta e minor credito da versare 9242 233,38
+        Sanzioni 9244 19,45
+        Interessi 9243 8,89
+        TOTALE 261,72
+        """
+        res = parse_ade_notice_36bis(ade_text, filename="avviso_36bis.txt")
+        assert res["doc_type"] == "ADE_NOTICE_36BIS"
+        assert res["tax_year"] == 2024
+        assert res["tax_withheld_or_due"] == 348.38
+        assert res["tax_paid"] == 115.00
+        assert res["penalty_amount"] == 19.45
+        assert res["interest_amount"] == 8.89
+        assert res["total_due"] == 261.72
+
+    def test_parse_universal_tax_document_router(self):
+        cu_res = parse_universal_tax_document("CERTIFICAZIONE UNICA 2021 RELATIVA ALL'ANNO 2020 6 1.000,00", "cu.txt")
+        assert cu_res["doc_type"] == "CU"
+
+        brk_res = parse_universal_tax_document("RENDICONTO FISCALE DEGIRO ANNO FISCALE 2024 115", "degiro.txt")
+        assert brk_res["doc_type"] == "BROKER_REPORT"
+
+        ade_res = parse_universal_tax_document("COMUNICAZIONE N. 100 CODICE ATTO N. 200 ART. 36-BIS 261,72", "notice.txt")
+        assert ade_res["doc_type"] == "ADE_NOTICE_36BIS"
+
+
+class TestTriangularTaxAudit:
+    def test_build_triangular_tax_audit_with_discrepancy_and_civis(self, memory_db):
+        profile = "prof_audit"
+        year = 2024
+
+        # 1. 730
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "capital_gains_declared": 442.31,
+            "substitute_tax_paid": 115.0,
+            "gross_income": 22716.0,
+            "foreign_assets_val": 17000.0,
+            "ivafe_paid": 34.0,
+            "protocol_id": "T250926114231436720000686",
+        })
+
+        # 2. Broker Report
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "gross_amount": 1335.0,
+            "net_taxable_amount": 442.0,
+            "tax_withheld_or_due": 115.0,
+            "secondary_amount": 34.0,
+            "asset_monitoring_val": 23563.0,
+            "metadata_json": {
+                "gross_capital_gains": 1335.0,
+                "offset_losses": 893.0,
+                "net_capital_gains": 442.0,
+            },
+        })
+
+        # 3. AdE 36-bis notice
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "ADE_NOTICE_36BIS",
+            "issuer_name": "AGENZIA DELLE ENTRATE",
+            "protocol_or_code": "Atto #20069272514",
+            "tax_withheld_or_due": 348.38,
+            "tax_paid": 115.0,
+            "total_due": 261.72,
+            "metadata_json": {
+                "notice_number": "0040847025301",
+                "act_code": "20069272514",
+                "challenged_protocol": "T250926114231436720000686",
+            },
+        })
+
+        audit = build_triangular_tax_audit(memory_db, profile_id=profile, tax_year=year)
+        assert audit["has_audit_data"] is True
+        assert "BROKER_REPORT" in audit["sources_found"]
+        assert "OFFICIAL_730" in audit["sources_found"]
+        assert "ADE_NOTICE_36BIS" in audit["sources_found"]
+        assert audit["has_ade_notice"] is True
+        assert audit["ade_total_disputed"] == 261.72
+        assert audit["civis_defense_draft"] is not None
+        assert "art. 68, comma 5, del D.P.R. 917/1986" in audit["civis_defense_draft"]
+        assert "DEGIRO" in audit["civis_defense_draft"]
+        assert len(audit["metrics_table"]) >= 6
+
 

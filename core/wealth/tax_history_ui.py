@@ -18,18 +18,23 @@ from sqlalchemy import Engine
 from core.adapters.broker_hub import parse_broker_csv
 from core.ui_utils import fmt_eur, metric_card, render_table_with_export
 from core.wealth.tax_history_engine import (
+    build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
     compute_ravvedimento_operoso,
     delete_declaration,
     delete_tax_loss,
+    delete_verification_document,
     fmt_eur_it,
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
+    get_verification_documents,
     parse_730_pdf_or_json,
+    parse_universal_tax_document,
     reconcile_with_portfolio,
     record_declaration,
     record_tax_loss,
+    record_verification_document,
     update_tax_loss_offset,
 )
 
@@ -112,25 +117,90 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                         unsafe_allow_html=True,
                     )
 
+        # ── STATO DOCUMENTI DI VERIFICA & RISCONTRO (CU, BROKER, 36-BIS) ──
+        vdocs_history = get_verification_documents(engine, profile_id=pid_str)
+        if vdocs_history:
+            st.markdown("##### 📁 Documenti di Riscontro & Verifica in Archivio (CU, Broker, AdE 36-bis)")
+            sorted_vdocs = sorted(vdocs_history, key=lambda x: int(x.get("tax_year", 0)))
+            c_v_cols = st.columns(max(1, min(len(sorted_vdocs), 4)))
+            for v_idx, v_item in enumerate(sorted_vdocs[-4:]):
+                with c_v_cols[v_idx % len(c_v_cols)]:
+                    v_type = v_item.get("doc_type", "DOC")
+                    v_yr = v_item.get("tax_year")
+                    v_issuer = v_item.get("issuer_name") or "Intermediario"
+                    v_gross = float(v_item.get("gross_amount", 0.0) or 0.0)
+                    v_tax = float(v_item.get("tax_withheld_or_due", 0.0) or 0.0)
+                    v_tot = float(v_item.get("total_due", 0.0) or 0.0)
+
+                    if v_type == "CU":
+                        type_label = "Certificazione Unica (CU)"
+                        badge_color = "#10b981"
+                        detail_line = f"Reddito: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Ritenute: <strong style='color: #38bdf8;'>{fmt_eur_it(v_tax)}</strong>"
+                    elif v_type == "BROKER_REPORT":
+                        type_label = f"Rendiconto {v_issuer}"
+                        badge_color = "#f59e0b"
+                        detail_line = f"Plusvalenze: <strong style='color: #10b981;'>{fmt_eur_it(v_gross)}</strong><br/>Imposta 26%: <strong style='color: #f59e0b;'>{fmt_eur_it(v_tax)}</strong>"
+                    elif v_type == "ADE_NOTICE_36BIS":
+                        type_label = "Avviso AdE 36-bis"
+                        badge_color = "#ef4444"
+                        detail_line = f"Contestato: <strong style='color: #ef4444;'>{fmt_eur_it(v_tot or v_tax)}</strong><br/>Atto: <i>{v_item.get('protocol_or_code') or 'N/D'}</i>"
+                    else:
+                        type_label = f"Doc {v_type}"
+                        badge_color = "#38bdf8"
+                        detail_line = f"Importo: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong>"
+
+                    st.markdown(
+                        f"""<div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                                <span style="font-weight: 700; font-size: 13px; color: {badge_color};">{type_label}</span>
+                                <span style="font-size: 11px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1; padding: 2px 6px; border-radius: 4px;">{v_yr}</span>
+                            </div>
+                            <div style="font-size: 12px; color: #94a3b8; line-height: 1.6;">
+                                {detail_line}
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+
+            with st.expander("🗑️ Gestione / Eliminazione Documenti di Riscontro", expanded=False):
+                col_vd1, col_vd2 = st.columns([3, 1])
+                with col_vd1:
+                    sel_del_vd_id = st.selectbox(
+                        "Seleziona documento di verifica da rimuovere:",
+                        options=[v["id"] for v in vdocs_history],
+                        format_func=lambda vid: next(
+                            (f"ID #{vid} — {v.get('doc_type')} {v.get('tax_year')} ({v.get('issuer_name') or 'N/D'})" for v in vdocs_history if v["id"] == vid),
+                            str(vid),
+                        ),
+                        key=f"sel_del_vdoc_{pid_str}",
+                    )
+                with col_vd2:
+                    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                    if st.button("🗑️ Elimina Documento", key=f"btn_del_vdoc_{pid_str}"):
+                        delete_verification_document(engine, sel_del_vd_id)
+                        st.warning(f"Documento #{sel_del_vd_id} eliminato con successo.")
+                        st.rerun()
+
         st.markdown("---")
 
-        # ── SEZIONE PRINCIPALE: CARICAMENTO INTELLIGENTE (FULL WIDTH) ──
-        st.markdown("##### 📄 Caricamento Intelligente Modelli Fiscali (730 / Redditi PF)")
+        # ── SEZIONE PRINCIPALE: CARICAMENTO INTELLIGENTE MULTI-DOCUMENTO (FULL WIDTH) ──
+        st.markdown("##### 📄 Caricamento Intelligente Documenti Fiscali (730 / CU / Broker / AdE 36-bis)")
         st.info(
-            "💡 **Guida Rapida al Caricamento:**\n\n"
-            "- **File da Caricare:** Trascina il **PDF Ufficiale dell'Agenzia delle Entrate da 12–17 pagine** (~1–2 MB), che contiene tutti i quadri (Redditi, Lavoro, Quadro W/RW, Quadro T/RT e Prospetto 730-3).\n"
-            "- **Multi-anno Simultaneo:** Puoi selezionare o trascinare **più anni contemporaneamente** (es. 2023, 2024 e 2025 in un colpo solo).\n"
-            "- **Attenzione al Modello 730-4:** Evita il documento da 1 sola pagina (~258 KB), in quanto è solo la comunicazione di conguaglio per il datore di lavoro e non include i quadri dei redditi."
+            "💡 **Hub Universale di Ingestione Fiscale:**\n\n"
+            "- **Modelli 730 / Redditi PF:** Trascina il PDF completo AdE (12–17 pagine, ~1–2 MB) con Quadri Lavoro, W/RW, T/RT e Prospetto 730-3.\n"
+            "- **Certificazioni Uniche (CU):** Riconosce automaticamente Punti 1–6 (redditi), Punto 21 (ritenute IRPEF), addizionali e sostituto d'imposta.\n"
+            "- **Rendiconti Fiscali Broker:** Acquisisce i prospetti pro-forma (DEGIRO/TasseTrading, Scalable, IBKR) per Quadro RT (plus/minus) e Quadro RW (IVAFE).\n"
+            "- **Avvisi AdE Art. 36-bis:** Rileva le comunicazioni di liquidazione automatica con codice atto, debito contestato, sanzioni e interessi."
         )
 
         c_up_box, c_up_tpl = st.columns([3.5, 1.2])
         with c_up_box:
             uploaded_files = st.file_uploader(
-                "Trascina uno o più PDF/JSON del Modello 730 / Redditi PF:",
+                "Trascina uno o più documenti fiscali (730, Certificazione Unica CU, Rendiconto Broker, Avvisi AdE 36-bis):",
                 type=["pdf", "json", "txt"],
                 accept_multiple_files=True,
                 key=f"file_uploader_tax_{pid_str}",
-                help="Supporta PDF ufficiali rilasciati dall'AdE con Quadri Redditi, T/RT, Quadro W/RW e prospetto di liquidazione. Puoi caricare anche più anni contemporaneamente.",
+                help="Supporta PDF ufficiali AdE (730/Redditi), Certificazioni Uniche (CU), Rendiconti Fiscali Broker (DEGIRO, Scalable) e Comunicazioni di Irregolarità AdE 36-bis.",
             )
         with c_up_tpl:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
@@ -150,105 +220,290 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             for up_file in uploaded_files:
                 file_bytes = up_file.read()
                 filename = up_file.name
-                with st.spinner(f"Analisi automatica di {filename}..."):
-                    p_data = parse_730_pdf_or_json(file_bytes, filename=filename)
+                with st.spinner(f"Analisi automatica e classificazione di {filename}..."):
+                    p_data = parse_universal_tax_document(file_bytes, filename=filename)
                     p_data["profile_id"] = pid_str
                     parsed_list.append((filename, p_data))
 
             st.success(f"Caricati ed elaborati con successo **{len(parsed_list)} file**!")
 
             # Pulsante salvataggio cumulativo per più file
-            valid_to_save = [item for item in parsed_list if item[1].get("gross_income", 0.0) > 0]
-            if len(valid_to_save) > 1:
-                if st.button("💾 Conferma & Salva Tutte le Dichiarazioni nel Database (Batch)", key=f"btn_save_all_batch_{pid_str}", type="primary", use_container_width=True):
+            if len(parsed_list) > 1:
+                if st.button("💾 Conferma & Salva Tutti i Documenti nel Database (Batch)", key=f"btn_save_all_batch_{pid_str}", type="primary", use_container_width=True):
                     saved_cnt = 0
-                    for fname, p_data in valid_to_save:
-                        record_declaration(engine, p_data)
-                        saved_cnt += 1
-                    st.success(f"✅ Registrate con successo {saved_cnt} dichiarazioni fiscali nel database!")
+                    for fname, p_data in parsed_list:
+                        dt = p_data.get("doc_type", "OFFICIAL_DECLARATION")
+                        if dt == "OFFICIAL_DECLARATION":
+                            if p_data.get("gross_income", 0.0) > 0 or p_data.get("capital_gains_declared", 0.0) > 0:
+                                record_declaration(engine, p_data)
+                                saved_cnt += 1
+                        else:
+                            record_verification_document(engine, p_data)
+                            saved_cnt += 1
+                    st.success(f"✅ Registrati con successo {saved_cnt} documenti fiscali nel database!")
                     st.rerun()
 
             for idx, (filename, parsed_data) in enumerate(parsed_list):
-                is_730_4 = "730-4" in str(parsed_data.get("notes") or "") or "MOD 730/4" in filename.upper() or "730-4" in filename.upper()
-                has_zero_income = (parsed_data.get("gross_income", 0.0) == 0.0 and parsed_data.get("net_tax_irpef", 0.0) == 0.0)
+                dt = parsed_data.get("doc_type", "OFFICIAL_DECLARATION")
 
-                with st.container():
-                    if is_730_4 or has_zero_income:
-                        st.error(
-                            f"⚠️ **ATTENZIONE SU {filename} (Modello 730-4 Conguaglio, 1 Pagina)**\n\n"
-                            f"Questo file ha dimensione ridotta (~258 KB, 1 pagina) ed è il **Modello 730-4** (comunicazione di conguaglio per il sostituto d'imposta).\n\n"
-                            f"In questo prospetto **non sono presenti i quadri dei redditi** (C, D, E, W/RW, T), per questo motivo tutti i campi risultano a 0,00.\n\n"
-                            f"👉 **Come risolvere:** Seleziona dalla tua cartella *Download* il file PDF completo da **1,5 MB (16 pagine)** "
-                            f"(denominato `730_T25092611423143672686_SLDLSN00P19M208Y.pdf` senza spazi o variante `(4).pdf`)."
-                        )
-                    else:
-                        st.markdown(
-                            f"""<div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center;">
-                                    <div>
-                                        <span style="font-size: 16px; font-weight: 700; color: #10b981;">📄 File #{idx+1}: Modello {parsed_data['filing_year']} (Redditi {parsed_data['tax_year']})</span>
-                                        <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
-                                    </div>
-                                    <span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 8px; border-radius: 4px; font-weight: 600;">✅ Dati Estratti con Successo</span>
+                if dt == "CU":
+                    st.markdown(
+                        f"""<div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: 700; color: #10b981;">📄 File #{idx+1}: Certificazione Unica {parsed_data.get('filing_year', int(parsed_data.get('tax_year', 2024))+1)} (Redditi {parsed_data.get('tax_year', 2024)})</span>
+                                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
                                 </div>
-                            </div>""",
-                            unsafe_allow_html=True,
-                        )
+                                <span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 8px; border-radius: 4px; font-weight: 600;">✅ Certificazione Unica Riconosciuta</span>
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    with c_m1:
+                        metric_card("Sostituto d'Imposta", parsed_data.get("issuer_name") or "Datore di Lavoro", f"CF: {parsed_data.get('taxpayer_cf') or 'N/D'}")
+                    with c_m2:
+                        days = parsed_data.get("metadata_json", {}).get("days_worked", 0) if isinstance(parsed_data.get("metadata_json"), dict) else 0
+                        metric_card("Redditi Lavoro (Punti 1-6)", fmt_eur(parsed_data.get("gross_amount", 0.0)), f"{days} giorni lavoro" if days else "Assimilati")
+                    with c_m3:
+                        metric_card("Ritenute IRPEF (Punto 21)", fmt_eur(parsed_data.get("tax_withheld_or_due", 0.0)), "Trattenute a titolo d'acconto")
+                    with c_m4:
+                        metric_card("Addizionali Reg./Com.", fmt_eur(parsed_data.get("secondary_amount", 0.0)), "Regionale e Comunale")
 
-                        # Bento Grid Metriche Estratte
-                        c_m1, c_m2, c_m3, c_m4 = st.columns(4)
-                        with c_m1:
-                            metric_card("Reddito Complessivo", fmt_eur(parsed_data["gross_income"]), f"Imponibile: {fmt_eur(parsed_data['taxable_income'])}")
-                        with c_m2:
-                            metric_card("Imposta Netta IRPEF", fmt_eur(parsed_data["net_tax_irpef"]), f"Modello {parsed_data['model_type']}")
-                        with c_m3:
-                            metric_card("Plusvalenze Quadro T/RT", fmt_eur(parsed_data["capital_gains_declared"]), f"Sostitutiva 26%: {fmt_eur(parsed_data['substitute_tax_paid'])}")
-                        with c_m4:
-                            metric_card("Attività Estere Monitorate", fmt_eur(parsed_data["foreign_assets_val"]), f"IVAFE 0,20%: {fmt_eur(parsed_data['ivafe_paid'])}")
-
-                    # Expander opzionale per verifica o rettifica dettagliata
-                    exp_label = f"🔍 Dettagli & Modifica Manuale Campi Anno {parsed_data['tax_year']}"
-                    with st.expander(exp_label, expanded=False):
-                        c_p1, c_p2 = st.columns(2)
-                        with c_p1:
-                            p_year = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data["tax_year"]), key=f"p_yr_{pid_str}_{idx}")
-                            p_model = st.selectbox("Modello:", ["730_ORDINARIO", "730_INTEGRATIVO", "REDDITI_PF"], index=0 if parsed_data["model_type"] == "730_ORDINARIO" else (1 if parsed_data["model_type"] == "730_INTEGRATIVO" else 2), key=f"p_md_{pid_str}_{idx}")
-                            p_proto = st.text_input("Protocollo Telematico:", value=str(parsed_data.get("protocol_id") or ""), key=f"p_pr_{pid_str}_{idx}")
-                            p_gross = st.number_input("Reddito Complessivo (€):", value=float(parsed_data["gross_income"]), step=500.0, key=f"p_gr_{pid_str}_{idx}")
-                            p_taxable = st.number_input("Reddito Imponibile (€):", value=float(parsed_data.get("taxable_income", parsed_data["gross_income"])), step=500.0, key=f"p_tx_{pid_str}_{idx}")
-                            p_net_tax = st.number_input("Imposta Netta IRPEF (€):", value=float(parsed_data["net_tax_irpef"]), step=100.0, key=f"p_nt_{pid_str}_{idx}")
-                        with c_p2:
-                            p_cg = st.number_input("Plusvalenze Quadro T/RT (€):", value=float(parsed_data["capital_gains_declared"]), step=100.0, key=f"p_cg_{pid_str}_{idx}")
-                            p_cl = st.number_input("Minusvalenze Compensate T13 (€):", value=float(parsed_data["capital_losses_offset"]), step=100.0, key=f"p_cl_{pid_str}_{idx}")
-                            p_sub = st.number_input("Imposta Sostitutiva 26% (Rigo 321) (€):", value=float(parsed_data["substitute_tax_paid"]), step=50.0, key=f"p_sb_{pid_str}_{idx}")
-                            p_ivafe = st.number_input("IVAFE (Rigo 307 / Quadro W) (€):", value=float(parsed_data["ivafe_paid"]), step=10.0, key=f"p_iv_{pid_str}_{idx}")
-                            p_for = st.number_input("Attività Estere Valore Finale (€):", value=float(parsed_data["foreign_assets_val"]), step=1000.0, key=f"p_fa_{pid_str}_{idx}")
+                    with st.expander(f"🔍 Dettagli & Modifica Campi CU {parsed_data.get('tax_year')}", expanded=False):
+                        c_cu1, c_cu2 = st.columns(2)
+                        with c_cu1:
+                            cu_yr = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data.get("tax_year", 2024)), key=f"cu_yr_{pid_str}_{idx}")
+                            cu_iss = st.text_input("Sostituto d'Imposta:", value=str(parsed_data.get("issuer_name") or ""), key=f"cu_iss_{pid_str}_{idx}")
+                            cu_gross = st.number_input("Reddito Lordo (€):", value=float(parsed_data.get("gross_amount", 0.0)), step=500.0, key=f"cu_gr_{pid_str}_{idx}")
+                        with c_cu2:
+                            cu_wh = st.number_input("Ritenute IRPEF (P. 21) (€):", value=float(parsed_data.get("tax_withheld_or_due", 0.0)), step=100.0, key=f"cu_wh_{pid_str}_{idx}")
+                            cu_add = st.number_input("Addizionali Regionali/Comunali (€):", value=float(parsed_data.get("secondary_amount", 0.0)), step=50.0, key=f"cu_add_{pid_str}_{idx}")
+                            cu_notes = st.text_input("Note:", value=str(parsed_data.get("notes") or ""), key=f"cu_notes_{pid_str}_{idx}")
 
                     col_save_b1, _ = st.columns([1.5, 3])
                     with col_save_b1:
-                        if st.button(f"💾 Salva Dichiarazione Anno {parsed_data['tax_year']} in Archivio", key=f"btn_save_parsed_{pid_str}_{idx}", type="primary", use_container_width=True):
-                            to_save = {
+                        if st.button(f"💾 Salva CU Anno {parsed_data.get('tax_year')} in Archivio", key=f"btn_save_cu_{pid_str}_{idx}", type="primary", use_container_width=True):
+                            to_save_cu = {
                                 "profile_id": pid_str,
-                                "tax_year": int(parsed_data["tax_year"]),
-                                "filing_year": int(parsed_data["tax_year"]) + 1,
-                                "model_type": str(parsed_data["model_type"]),
-                                "protocol_id": str(parsed_data.get("protocol_id") or "") if parsed_data.get("protocol_id") else None,
-                                "gross_income": float(parsed_data["gross_income"]),
-                                "taxable_income": float(parsed_data.get("taxable_income", parsed_data["gross_income"])),
-                                "net_tax_irpef": float(parsed_data["net_tax_irpef"]),
-                                "capital_gains_declared": float(parsed_data["capital_gains_declared"]),
-                                "capital_losses_offset": float(parsed_data["capital_losses_offset"]),
-                                "substitute_tax_paid": float(parsed_data["substitute_tax_paid"]),
-                                "ivafe_paid": float(parsed_data["ivafe_paid"]),
-                                "foreign_assets_val": float(parsed_data["foreign_assets_val"]),
-                                "notes": str(parsed_data.get("notes") or f"Importato da file: {filename}"),
+                                "tax_year": int(cu_yr),
+                                "doc_type": "CU",
+                                "issuer_name": cu_iss,
+                                "protocol_or_code": parsed_data.get("protocol_or_code"),
+                                "gross_amount": cu_gross,
+                                "tax_withheld_or_due": cu_wh,
+                                "secondary_amount": cu_add,
+                                "metadata_json": parsed_data.get("metadata_json"),
+                                "notes": cu_notes,
                                 "source_filename": filename,
                             }
-                            decl_id = record_declaration(engine, to_save)
-                            st.success(f"✅ Dichiarazione Anno {parsed_data['tax_year']} registrata con ID #{decl_id}!")
+                            v_id = record_verification_document(engine, to_save_cu)
+                            st.success(f"✅ Certificazione Unica registrata con ID #{v_id}!")
                             st.rerun()
 
-                    st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
+                elif dt == "BROKER_REPORT":
+                    b_name = parsed_data.get("issuer_name") or "DEGIRO"
+                    st.markdown(
+                        f"""<div style="background: rgba(245, 158, 11, 0.04); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: 700; color: #f59e0b;">📄 File #{idx+1}: Rendiconto Fiscale {b_name} (Anno {parsed_data.get('tax_year', 2024)})</span>
+                                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
+                                </div>
+                                <span style="font-size: 11px; background: rgba(245, 158, 11, 0.2); color: #f59e0b; padding: 3px 8px; border-radius: 4px; font-weight: 600;">✅ Rendiconto Broker Riconosciuto</span>
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    with c_m1:
+                        metric_card("Plusvalenze Lorde", fmt_eur(parsed_data.get("gross_amount", 0.0)), f"Minusvalenze: {fmt_eur(parsed_data.get('secondary_amount', 0.0))}")
+                    with c_m2:
+                        metric_card("Imponibile Netto", fmt_eur(parsed_data.get("net_taxable_amount", 0.0)), "Art. 68 c. 5 TUIR")
+                    with c_m3:
+                        metric_card("Imposta Sostitutiva 26%", fmt_eur(parsed_data.get("tax_withheld_or_due", 0.0)), "Quadro RT / Rigo 321")
+                    with c_m4:
+                        metric_card("Monitoraggio Quadro RW", fmt_eur(parsed_data.get("asset_monitoring_val", 0.0)), f"IVAFE 2‰: {fmt_eur(parsed_data.get('total_due', 0.0))}")
+
+                    with st.expander(f"🔍 Dettagli & Modifica Campi Broker {b_name} {parsed_data.get('tax_year')}", expanded=False):
+                        c_br1, c_br2 = st.columns(2)
+                        with c_br1:
+                            br_yr = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data.get("tax_year", 2024)), key=f"br_yr_{pid_str}_{idx}")
+                            br_iss = st.text_input("Intermediario / Broker:", value=b_name, key=f"br_iss_{pid_str}_{idx}")
+                            br_cg = st.number_input("Plusvalenze Lorde (€):", value=float(parsed_data.get("gross_amount", 0.0)), step=100.0, key=f"br_cg_{pid_str}_{idx}")
+                            br_cl = st.number_input("Minusvalenze Compensate (€):", value=float(parsed_data.get("secondary_amount", 0.0)), step=100.0, key=f"br_cl_{pid_str}_{idx}")
+                        with c_br2:
+                            br_net = st.number_input("Base Imponibile Netta (€):", value=float(parsed_data.get("net_taxable_amount", 0.0)), step=100.0, key=f"br_net_{pid_str}_{idx}")
+                            br_tax = st.number_input("Imposta Sostitutiva 26% (€):", value=float(parsed_data.get("tax_withheld_or_due", 0.0)), step=50.0, key=f"br_tax_{pid_str}_{idx}")
+                            br_rw = st.number_input("Attività Estere RW (€):", value=float(parsed_data.get("asset_monitoring_val", 0.0)), step=1000.0, key=f"br_rw_{pid_str}_{idx}")
+                            br_ivafe = st.number_input("IVAFE Versata (€):", value=float(parsed_data.get("total_due", 0.0)), step=10.0, key=f"br_ivafe_{pid_str}_{idx}")
+
+                    col_save_b1, _ = st.columns([1.5, 3])
+                    with col_save_b1:
+                        if st.button(f"💾 Salva Rendiconto Broker ({b_name} {parsed_data.get('tax_year')}) in Archivio", key=f"btn_save_brk_{pid_str}_{idx}", type="primary", use_container_width=True):
+                            to_save_brk = {
+                                "profile_id": pid_str,
+                                "tax_year": int(br_yr),
+                                "doc_type": "BROKER_REPORT",
+                                "issuer_name": br_iss,
+                                "gross_amount": br_cg,
+                                "secondary_amount": br_cl,
+                                "net_taxable_amount": br_net,
+                                "tax_withheld_or_due": br_tax,
+                                "asset_monitoring_val": br_rw,
+                                "total_due": br_ivafe,
+                                "metadata_json": parsed_data.get("metadata_json"),
+                                "notes": parsed_data.get("notes") or f"Rendiconto {br_iss}",
+                                "source_filename": filename,
+                            }
+                            v_id = record_verification_document(engine, to_save_brk)
+                            st.success(f"✅ Rendiconto Broker {br_iss} registrato con ID #{v_id}!")
+                            st.rerun()
+
+                elif dt == "ADE_NOTICE_36BIS":
+                    proto_code = parsed_data.get("protocol_or_code") or "Atto AdE"
+                    tot_req = float(parsed_data.get("total_due", 0.0))
+                    st.markdown(
+                        f"""<div style="background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: 700; color: #ef4444;">🚨 File #{idx+1}: Comunicazione di Irregolarità AdE Art. 36-bis ({proto_code})</span>
+                                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
+                                </div>
+                                <span style="font-size: 11px; background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 3px 8px; border-radius: 4px; font-weight: 600;">⚠️ Controllo Automatizzato d.P.R. 600/73</span>
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    with c_m1:
+                        metric_card("Imposta Ricalcolata a Debito", fmt_eur(parsed_data.get("tax_withheld_or_due", 0.0)), f"Versata a Modello: {fmt_eur(parsed_data.get('tax_paid', 0.0))}")
+                    with c_m2:
+                        unpaid = max(0.0, float(parsed_data.get("tax_withheld_or_due", 0.0)) - float(parsed_data.get("tax_paid", 0.0)))
+                        metric_card("Differenza Imposta Richiesta", fmt_eur(unpaid), "Codice Tributo 1100")
+                    with c_m3:
+                        sanz_int = float(parsed_data.get("penalty_amount", 0.0)) + float(parsed_data.get("interest_amount", 0.0))
+                        metric_card("Sanzioni & Interessi", fmt_eur(sanz_int), f"Sanz: {fmt_eur(parsed_data.get('penalty_amount', 0.0))} | Int: {fmt_eur(parsed_data.get('interest_amount', 0.0))}")
+                    with c_m4:
+                        metric_card("Somma Complessiva Richiesta", fmt_eur(tot_req), "Da sgravare via CIVIS", delta_color="inverse")
+
+                    with st.expander(f"🔍 Dettagli & Modifica Campi Avviso AdE {parsed_data.get('tax_year')}", expanded=False):
+                        c_ad1, c_ad2 = st.columns(2)
+                        with c_ad1:
+                            ad_yr = st.number_input("Periodo d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data.get("tax_year", 2024)), key=f"ad_yr_{pid_str}_{idx}")
+                            ad_code = st.text_input("Codice Atto / Protocollo:", value=str(proto_code), key=f"ad_code_{pid_str}_{idx}")
+                            ad_due = st.number_input("Imposta a Debito Ricalcolata (€):", value=float(parsed_data.get("tax_withheld_or_due", 0.0)), step=50.0, key=f"ad_due_{pid_str}_{idx}")
+                            ad_paid = st.number_input("Imposta Già Versata (€):", value=float(parsed_data.get("tax_paid", 0.0)), step=50.0, key=f"ad_paid_{pid_str}_{idx}")
+                        with c_ad2:
+                            ad_sanz = st.number_input("Sanzioni (€):", value=float(parsed_data.get("penalty_amount", 0.0)), step=10.0, key=f"ad_sanz_{pid_str}_{idx}")
+                            ad_int = st.number_input("Interessi di Mora (€):", value=float(parsed_data.get("interest_amount", 0.0)), step=5.0, key=f"ad_int_{pid_str}_{idx}")
+                            ad_tot = st.number_input("Totale Complessivo Richiesto (€):", value=float(tot_req), step=50.0, key=f"ad_tot_{pid_str}_{idx}")
+                            ad_notes = st.text_input("Note:", value=str(parsed_data.get("notes") or ""), key=f"ad_notes_{pid_str}_{idx}")
+
+                    col_save_b1, _ = st.columns([1.5, 3])
+                    with col_save_b1:
+                        if st.button("💾 Salva Avviso AdE 36-bis in Archivio", key=f"btn_save_ade_{pid_str}_{idx}", type="primary", use_container_width=True):
+                            to_save_ade = {
+                                "profile_id": pid_str,
+                                "tax_year": int(ad_yr),
+                                "doc_type": "ADE_NOTICE_36BIS",
+                                "issuer_name": "AGENZIA DELLE ENTRATE",
+                                "protocol_or_code": ad_code,
+                                "tax_withheld_or_due": ad_due,
+                                "tax_paid": ad_paid,
+                                "penalty_amount": ad_sanz,
+                                "interest_amount": ad_int,
+                                "total_due": ad_tot,
+                                "metadata_json": parsed_data.get("metadata_json"),
+                                "notes": ad_notes,
+                                "source_filename": filename,
+                            }
+                            v_id = record_verification_document(engine, to_save_ade)
+                            st.success(f"✅ Comunicazione AdE 36-bis registrata con ID #{v_id}!")
+                            st.rerun()
+
+                else:
+                    # Modello 730 / Redditi PF standard
+                    is_730_4 = "730-4" in str(parsed_data.get("notes") or "") or "MOD 730/4" in filename.upper() or "730-4" in filename.upper()
+                    has_zero_income = (parsed_data.get("gross_income", 0.0) == 0.0 and parsed_data.get("net_tax_irpef", 0.0) == 0.0)
+
+                    with st.container():
+                        if is_730_4 or has_zero_income:
+                            st.error(
+                                f"⚠️ **ATTENZIONE SU {filename} (Modello 730-4 Conguaglio, 1 Pagina)**\n\n"
+                                f"Questo file ha dimensione ridotta (~258 KB, 1 pagina) ed è il **Modello 730-4** (comunicazione di conguaglio per il sostituto d'imposta).\n\n"
+                                f"In questo prospetto **non sono presenti i quadri dei redditi** (C, D, E, W/RW, T), per questo motivo tutti i campi risultano a 0,00.\n\n"
+                                f"👉 **Come risolvere:** Seleziona dalla tua cartella *Download* il file PDF completo da **1,5 MB (16 pagine)** "
+                                f"(denominato `730_T25092611423143672686_SLDLSN00P19M208Y.pdf` senza spazi o variante `(4).pdf`)."
+                            )
+                        else:
+                            st.markdown(
+                                f"""<div style="background: rgba(16, 185, 129, 0.04); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <div>
+                                            <span style="font-size: 16px; font-weight: 700; color: #10b981;">📄 File #{idx+1}: Modello {parsed_data.get('filing_year', int(parsed_data.get('tax_year', 2024))+1)} (Redditi {parsed_data['tax_year']})</span>
+                                            <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
+                                        </div>
+                                        <span style="font-size: 11px; background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 3px 8px; border-radius: 4px; font-weight: 600;">✅ Dati Estratti con Successo</span>
+                                    </div>
+                                </div>""",
+                                unsafe_allow_html=True,
+                            )
+
+                            # Bento Grid Metriche Estratte
+                            c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                            with c_m1:
+                                metric_card("Reddito Complessivo", fmt_eur(parsed_data["gross_income"]), f"Imponibile: {fmt_eur(parsed_data['taxable_income'])}")
+                            with c_m2:
+                                metric_card("Imposta Netta IRPEF", fmt_eur(parsed_data["net_tax_irpef"]), f"Modello {parsed_data['model_type']}")
+                            with c_m3:
+                                metric_card("Plusvalenze Quadro T/RT", fmt_eur(parsed_data["capital_gains_declared"]), f"Sostitutiva 26%: {fmt_eur(parsed_data['substitute_tax_paid'])}")
+                            with c_m4:
+                                metric_card("Attività Estere Monitorate", fmt_eur(parsed_data["foreign_assets_val"]), f"IVAFE 0,20%: {fmt_eur(parsed_data['ivafe_paid'])}")
+
+                        # Expander opzionale per verifica o rettifica dettagliata
+                        exp_label = f"🔍 Dettagli & Modifica Manuale Campi Anno {parsed_data['tax_year']}"
+                        with st.expander(exp_label, expanded=False):
+                            c_p1, c_p2 = st.columns(2)
+                            with c_p1:
+                                p_year = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data["tax_year"]), key=f"p_yr_{pid_str}_{idx}")
+                                p_model = st.selectbox("Modello:", ["730_ORDINARIO", "730_INTEGRATIVO", "REDDITI_PF"], index=0 if parsed_data["model_type"] == "730_ORDINARIO" else (1 if parsed_data["model_type"] == "730_INTEGRATIVO" else 2), key=f"p_md_{pid_str}_{idx}")
+                                p_proto = st.text_input("Protocollo Telematico:", value=str(parsed_data.get("protocol_id") or ""), key=f"p_pr_{pid_str}_{idx}")
+                                p_gross = st.number_input("Reddito Complessivo (€):", value=float(parsed_data["gross_income"]), step=500.0, key=f"p_gr_{pid_str}_{idx}")
+                                p_taxable = st.number_input("Reddito Imponibile (€):", value=float(parsed_data.get("taxable_income", parsed_data["gross_income"])), step=500.0, key=f"p_tx_{pid_str}_{idx}")
+                                p_net_tax = st.number_input("Imposta Netta IRPEF (€):", value=float(parsed_data["net_tax_irpef"]), step=100.0, key=f"p_nt_{pid_str}_{idx}")
+                            with c_p2:
+                                p_cg = st.number_input("Plusvalenze Quadro T/RT (€):", value=float(parsed_data["capital_gains_declared"]), step=100.0, key=f"p_cg_{pid_str}_{idx}")
+                                p_cl = st.number_input("Minusvalenze Compensate T13 (€):", value=float(parsed_data["capital_losses_offset"]), step=100.0, key=f"p_cl_{pid_str}_{idx}")
+                                p_sub = st.number_input("Imposta Sostitutiva 26% (Rigo 321) (€):", value=float(parsed_data["substitute_tax_paid"]), step=50.0, key=f"p_sb_{pid_str}_{idx}")
+                                p_ivafe = st.number_input("IVAFE (Rigo 307 / Quadro W) (€):", value=float(parsed_data["ivafe_paid"]), step=10.0, key=f"p_iv_{pid_str}_{idx}")
+                                p_for = st.number_input("Attività Estere Valore Finale (€):", value=float(parsed_data["foreign_assets_val"]), step=1000.0, key=f"p_fa_{pid_str}_{idx}")
+
+                        col_save_b1, _ = st.columns([1.5, 3])
+                        with col_save_b1:
+                            if st.button(f"💾 Salva Dichiarazione Anno {parsed_data['tax_year']} in Archivio", key=f"btn_save_parsed_{pid_str}_{idx}", type="primary", use_container_width=True):
+                                to_save = {
+                                    "profile_id": pid_str,
+                                    "tax_year": int(parsed_data["tax_year"]),
+                                    "filing_year": int(parsed_data["tax_year"]) + 1,
+                                    "model_type": str(parsed_data["model_type"]),
+                                    "protocol_id": str(parsed_data.get("protocol_id") or "") if parsed_data.get("protocol_id") else None,
+                                    "gross_income": float(parsed_data["gross_income"]),
+                                    "taxable_income": float(parsed_data.get("taxable_income", parsed_data["gross_income"])),
+                                    "net_tax_irpef": float(parsed_data["net_tax_irpef"]),
+                                    "capital_gains_declared": float(parsed_data["capital_gains_declared"]),
+                                    "capital_losses_offset": float(parsed_data["capital_losses_offset"]),
+                                    "substitute_tax_paid": float(parsed_data["substitute_tax_paid"]),
+                                    "ivafe_paid": float(parsed_data["ivafe_paid"]),
+                                    "foreign_assets_val": float(parsed_data["foreign_assets_val"]),
+                                    "notes": str(parsed_data.get("notes") or f"Importato da file: {filename}"),
+                                    "source_filename": filename,
+                                }
+                                decl_id = record_declaration(engine, to_save)
+                                st.success(f"✅ Dichiarazione Anno {parsed_data['tax_year']} registrata con ID #{decl_id}!")
+                                st.rerun()
+
+                st.markdown("<div style='height: 12px;'></div>", unsafe_allow_html=True)
 
         # ── SEZIONE SECONDARIA: INSERIMENTO MANUALE COLLASSATO ──
         st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
@@ -692,6 +947,93 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             )
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+        # ── 1. MATRICE DI AUDIT TRIANGOLARE (ARGUS vs BROKER vs 730 vs AdE 36-BIS) ──
+        tri_audit = build_triangular_tax_audit(engine, profile_id=pid_str, tax_year=selected_tax_year)
+        if tri_audit.get("has_audit_data"):
+            st.markdown(f"##### 📐 Matrice di Riconciliazione Triangolare Inter-Fonte (Anno d'Imposta {selected_tax_year})")
+            st.caption(
+                "Audit incrociato multilivello per certificare la coerenza fiscale tra Ledger Argus, "
+                "Rendiconto Ufficiale del Broker, Modello 730/Redditi e risultanze dei controlli automatizzati AdE."
+            )
+
+            # Badge fonti verificate
+            src_labels = {
+                "LEDGER_ARGUS": "📘 Ledger ARGUS",
+                "BROKER_REPORT": "📙 Rendiconto Broker",
+                "OFFICIAL_730": "📗 Modello 730",
+                "ADE_NOTICE_36BIS": "📕 Avviso AdE 36-bis",
+                "CU": "📓 Certificazione Unica",
+            }
+            src_badges = [src_labels.get(s, s) for s in tri_audit.get("sources_found", [])]
+            st.markdown(f"**Fonti analizzate per l'anno {selected_tax_year}:** " + " • ".join(f"`{b}`" for b in src_badges))
+
+            # Se rilevata contestazione AdE 36-bis, mostra card rossa e CIVIS Defense Assistant
+            if tri_audit.get("has_ade_notice"):
+                st.error(
+                    f"### 🚨 CONTESTAZIONE FISCALE ADE RILEVATA EX ART. 36-BIS\n\n"
+                    f"**Somma Complessiva Richiesta dall'Agenzia delle Entrate:** **{fmt_eur_it(tri_audit['ade_total_disputed'])}**\n\n"
+                    f"**Diagnosi della Causa Radice (Root Cause):** L'Agenzia delle Entrate ha ricalcolato l'imposta applicando il 26% sull'intero importo delle plusvalenze lorde, "
+                    f"omettendo o disconoscendo la compensazione delle minusvalenze certificate nel Rendiconto del broker.\n\n"
+                    f"Tale liquidazione automatica viola il principio di tassazione al netto ex **art. 68, comma 5 del D.P.R. 917/1986 (TUIR)**. "
+                    f"È possibile richiedere lo sgravio totale in autotutela tramite il canale telematico **CIVIS** senza versare la somma richiesta."
+                )
+
+                if tri_audit.get("civis_defense_draft"):
+                    with st.expander("📝 Generatore di Memoria Difensiva per Canale CIVIS (Istanza di Autotutela)", expanded=True):
+                        st.caption(
+                            "Istanza formale di autotutela redatta automaticamente da ARGUS con riferimenti precisi all'atto, al protocollo e alla normativa TUIR. "
+                            "Copia e incolla direttamente nella schermata CIVIS dell'Agenzia delle Entrate oppure scarica il file di testo."
+                        )
+                        civis_txt = tri_audit["civis_defense_draft"]
+                        st.text_area(
+                            "Testo Istanza di Autotutela CIVIS:",
+                            value=civis_txt,
+                            height=260,
+                            key=f"civis_txt_box_{pid_str}_{selected_tax_year}",
+                        )
+                        c_civis_dl, _ = st.columns([1.5, 3])
+                        with c_civis_dl:
+                            st.download_button(
+                                "📥 Scarica Istanza di Autotutela (.txt)",
+                                data=civis_txt,
+                                file_name=f"istanza_autotutela_civis_36bis_{selected_tax_year}.txt",
+                                mime="text/plain",
+                                key=f"dl_civis_file_{pid_str}_{selected_tax_year}",
+                                use_container_width=True,
+                            )
+
+            df_tri = pd.DataFrame(tri_audit["metrics_table"])
+            for c in ["argus", "broker", "decl_730", "ade_36bis", "delta"]:
+                if c in df_tri.columns:
+                    df_tri[c + "_fmt"] = df_tri[c].apply(lambda v: fmt_eur_it(float(v)) if float(v) > 0 or v == 0.0 else "—")
+
+            def _map_badge(s):
+                if s == "OK":
+                    return "🟢 Conforme"
+                elif s == "WARNING":
+                    return "🟡 Attenzione"
+                else:
+                    return "🔴 Disallineato"
+
+            df_tri["status_badge"] = df_tri["status"].apply(_map_badge)
+
+            st.dataframe(
+                df_tri[["item", "argus_fmt", "broker_fmt", "decl_730_fmt", "ade_36bis_fmt", "delta_fmt", "status_badge", "notes"]],
+                column_config={
+                    "item": st.column_config.TextColumn("Parametro Fiscale", width="medium"),
+                    "argus_fmt": st.column_config.TextColumn("1. Ledger ARGUS", width="small"),
+                    "broker_fmt": st.column_config.TextColumn("2. Broker (Degiro)", width="small"),
+                    "decl_730_fmt": st.column_config.TextColumn("3. Modello 730", width="small"),
+                    "ade_36bis_fmt": st.column_config.TextColumn("4. AdE (36-bis)", width="small"),
+                    "delta_fmt": st.column_config.TextColumn("Delta Rilevato", width="small"),
+                    "status_badge": st.column_config.TextColumn("Stato Audit", width="small"),
+                    "notes": st.column_config.TextColumn("Diagnosi & Riferimenti Normativi", width="large"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+            st.markdown("---")
 
         # ── ADVISOR ALERT BOXES INTELLIGENTI ──
         if report.alerts:
