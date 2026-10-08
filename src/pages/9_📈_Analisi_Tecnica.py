@@ -29,6 +29,7 @@ from core.ui_utils import (
     glossary_modal,
     inject_custom_css,
     metric_card,
+    render_command_bar,
     render_export_toolbar,
     render_header,
     render_institutional_telemetry_ribbon,
@@ -40,6 +41,7 @@ from core.workspace_manager import get_url_param, register_workspace_tab, set_ur
 
 inject_custom_css()
 render_sidebar()
+render_command_bar()
 
 col_head1, col_head2 = st.columns([3.2, 1.2], vertical_alignment="center")
 with col_head1:

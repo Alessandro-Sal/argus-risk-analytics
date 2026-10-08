@@ -111,7 +111,8 @@ else:
 
 opt = results.get("optimization", {})
 
-render_sandbox_banner(page_key="p3")
+render_command_bar()
+render_sandbox_banner(page_key="p4")
 
 col_head1, col_head2 = st.columns([3.0, 1.3], vertical_alignment="center")
 with col_head1:
