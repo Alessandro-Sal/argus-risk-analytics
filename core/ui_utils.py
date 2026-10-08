@@ -950,15 +950,9 @@ def inject_custom_css():
         div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stPopover"],
         div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stPopover"],
         div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"],
-        div[class*="st-key-argus_top_command_bar_actions"] [data-testid="stPopover"] > div,
-        div[class*="st-key-argus_wealth_command_bar_actions"] [data-testid="stPopover"] > div,
-        div[class*="st-key-argus_omni_command_bar_actions"] [data-testid="stPopover"] > div,
         div[class*="st-key-argus_top_command_bar_actions"] .stButton,
         div[class*="st-key-argus_wealth_command_bar_actions"] .stButton,
-        div[class*="st-key-argus_omni_command_bar_actions"] .stButton,
-        div[class*="st-key-argus_top_command_bar_actions"] .stButton > div,
-        div[class*="st-key-argus_wealth_command_bar_actions"] .stButton > div,
-        div[class*="st-key-argus_omni_command_bar_actions"] .stButton > div {{
+        div[class*="st-key-argus_omni_command_bar_actions"] .stButton {{
             width: auto !important;
             min-width: max-content !important;
             flex: 0 0 auto !important;
