@@ -6,6 +6,7 @@
 # Sezione 3: Audit & Punti di Miglioria (Advisor Alerts & Art. 36-bis Risk)
 # ============================================================
 
+import io
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -14,11 +15,15 @@ import plotly.graph_objects as go
 import streamlit as st
 from sqlalchemy import Engine
 
+from core.adapters.broker_hub import parse_broker_csv
 from core.ui_utils import fmt_eur, metric_card, render_table_with_export
 from core.wealth.tax_history_engine import (
+    compute_broker_annual_capital_gains,
+    compute_ravvedimento_operoso,
     delete_declaration,
     delete_tax_loss,
     fmt_eur_it,
+    generate_sample_730_json,
     get_declarations,
     get_tax_losses,
     parse_730_pdf_or_json,
@@ -89,6 +94,18 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 type=["pdf", "json", "txt"],
                 key=f"file_uploader_tax_{pid_str}",
                 help="Supporta PDF ufficiali rilasciati dall'AdE con Quadri Redditi, T/RT, Quadro W/RW e prospetto di liquidazione.",
+            )
+
+            # Template scaricabile per facilitare inserimenti strutturati
+            sample_json_str = generate_sample_730_json(selected_tax_year)
+            st.download_button(
+                "📥 Scarica Modello JSON d'Esempio (730 / Redditi PF)",
+                data=sample_json_str,
+                file_name=f"argus_730_template_{selected_tax_year}.json",
+                mime="application/json",
+                key=f"dl_template_json_{pid_str}",
+                use_container_width=True,
+                help="Scarica un file JSON pre-compilato con le chiavi fiscali richieste (Redditi, Quadri T/RT, W, righi 307/321) per test rapido.",
             )
 
             if uploaded_file is not None:
@@ -279,55 +296,129 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             # Considera gli ultimi 5-7 anni
             df_chart = df_chart.tail(6)
 
-            fig_bar = go.Figure()
-            # Plusvalenze
-            fig_bar.add_trace(go.Bar(
-                x=[f"Anno {y}" for y in df_chart["tax_year"]],
-                y=df_chart["capital_gains_declared"],
-                name="Plusvalenze Dichiarate (T11)",
-                marker_color="#10b981",
-                text=[fmt_eur_it(v) for v in df_chart["capital_gains_declared"]],
-                textposition="auto",
-            ))
-            # Minusvalenze compensate
-            fig_bar.add_trace(go.Bar(
-                x=[f"Anno {y}" for y in df_chart["tax_year"]],
-                y=df_chart["capital_losses_offset"],
-                name="Minusvalenze Compensate (T13)",
-                marker_color="#f59e0b",
-                text=[fmt_eur_it(v) for v in df_chart["capital_losses_offset"]],
-                textposition="auto",
-            ))
-            # Imposta Sostitutiva 26%
-            fig_bar.add_trace(go.Scatter(
-                x=[f"Anno {y}" for y in df_chart["tax_year"]],
-                y=df_chart["substitute_tax_paid"],
-                name="Sostitutiva Versata (Rigo 321)",
-                mode="lines+markers",
-                line=dict(color="#38bdf8", width=3),
-                marker=dict(size=8),
-                yaxis="y2",
-            ))
+        # ── 1. GRAFICO A CASCATA PLUSVALENZE VS MINUSVALENZE ──
+        all_decls = get_declarations(engine, profile_id=pid_str)
+        if all_decls:
+            df_chart = pd.DataFrame(all_decls).sort_values("tax_year")
+            # Considera gli ultimi 5-7 anni
+            df_chart = df_chart.tail(6)
 
-            fig_bar.update_layout(
-                title=dict(text="Confronto Pluriennale Plusvalenze, Minusvalenze e Imposta Sostitutiva", font=dict(size=14, color="#ffffff")),
-                template="plotly_dark",
-                paper_bgcolor="rgba(0,0,0,0)",
-                plot_bgcolor="rgba(0,0,0,0)",
-                height=380,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                yaxis=dict(title="Importo (€)", gridcolor="rgba(255,255,255,0.08)"),
-                yaxis2=dict(title="Imposta Versata (€)", overlaying="y", side="right", showgrid=False),
-                margin=dict(l=10, r=10, t=50, b=10),
-            )
-            st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
+            col_ch_t1, col_ch_t2 = st.columns([1.5, 1.5])
+            with col_ch_t1:
+                st.markdown("##### 📈 Dinamica Fiscale Pluriennale")
+            with col_ch_t2:
+                chart_type = st.radio(
+                    "Modalità Grafico:",
+                    ["📊 Confronto Pluriennale", "🌊 Cascata Fiscale (Waterfall)"],
+                    horizontal=True,
+                    key=f"chart_mode_sel_{pid_str}",
+                )
+
+            if chart_type == "🌊 Cascata Fiscale (Waterfall)":
+                decl_cur = next((d for d in all_decls if int(d.get("tax_year", 0)) == int(selected_tax_year)), all_decls[-1])
+                cg_val = float(decl_cur.get("capital_gains_declared", 0.0) or 0.0)
+                cl_val = float(decl_cur.get("capital_losses_offset", 0.0) or 0.0)
+                sub_val = float(decl_cur.get("substitute_tax_paid", 0.0) or 0.0)
+                taxable_net = max(0.0, cg_val - cl_val)
+                final_net = max(0.0, taxable_net - sub_val)
+
+                fig_wf = go.Figure(go.Waterfall(
+                    name=f"Liquidazione {decl_cur.get('tax_year', selected_tax_year)}",
+                    orientation="v",
+                    measure=["relative", "relative", "total", "relative", "total"],
+                    x=[
+                        "Plusvalenze Lorde (T11)",
+                        "Minus Compensate (T13)",
+                        "Base Imponibile Netta",
+                        "Imposta Sostitutiva 26% (321)",
+                        "Utile Netto Rimasto",
+                    ],
+                    textposition="outside",
+                    text=[fmt_eur_it(cg_val), f"-{fmt_eur_it(cl_val)}", fmt_eur_it(taxable_net), f"-{fmt_eur_it(sub_val)}", fmt_eur_it(final_net)],
+                    y=[cg_val, -cl_val, 0, -sub_val, 0],
+                    connector={"line": {"color": "rgba(255, 255, 255, 0.25)"}},
+                    decreasing={"marker": {"color": "#ef4444"}},
+                    increasing={"marker": {"color": "#10b981"}},
+                    totals={"marker": {"color": "#38bdf8"}},
+                ))
+                fig_wf.update_layout(
+                    title=dict(
+                        text=f"Cascata di Liquidazione Fiscale — Anno d'Imposta {decl_cur.get('tax_year', selected_tax_year)} (Art. 68 TUIR)",
+                        font=dict(size=14, color="#ffffff"),
+                    ),
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=390,
+                    yaxis=dict(title="Importo (€)", gridcolor="rgba(255,255,255,0.08)"),
+                    margin=dict(l=10, r=10, t=50, b=10),
+                )
+                st.plotly_chart(fig_wf, use_container_width=True, config={"displayModeBar": False})
+            else:
+                fig_bar = go.Figure()
+                # Plusvalenze
+                fig_bar.add_trace(go.Bar(
+                    x=[f"Anno {y}" for y in df_chart["tax_year"]],
+                    y=df_chart["capital_gains_declared"],
+                    name="Plusvalenze Dichiarate (T11)",
+                    marker_color="#10b981",
+                    text=[fmt_eur_it(v) for v in df_chart["capital_gains_declared"]],
+                    textposition="auto",
+                ))
+                # Minusvalenze compensate
+                fig_bar.add_trace(go.Bar(
+                    x=[f"Anno {y}" for y in df_chart["tax_year"]],
+                    y=df_chart["capital_losses_offset"],
+                    name="Minusvalenze Compensate (T13)",
+                    marker_color="#f59e0b",
+                    text=[fmt_eur_it(v) for v in df_chart["capital_losses_offset"]],
+                    textposition="auto",
+                ))
+                # Imposta Sostitutiva 26%
+                fig_bar.add_trace(go.Scatter(
+                    x=[f"Anno {y}" for y in df_chart["tax_year"]],
+                    y=df_chart["substitute_tax_paid"],
+                    name="Sostitutiva Versata (Rigo 321)",
+                    mode="lines+markers",
+                    line=dict(color="#38bdf8", width=3),
+                    marker=dict(size=8),
+                    yaxis="y2",
+                ))
+
+                fig_bar.update_layout(
+                    title=dict(text="Confronto Pluriennale Plusvalenze, Minusvalenze e Imposta Sostitutiva", font=dict(size=14, color="#ffffff")),
+                    template="plotly_dark",
+                    paper_bgcolor="rgba(0,0,0,0)",
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    height=380,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    yaxis=dict(title="Importo (€)", gridcolor="rgba(255,255,255,0.08)"),
+                    yaxis2=dict(title="Imposta Versata (€)", overlaying="y", side="right", showgrid=False),
+                    margin=dict(l=10, r=10, t=50, b=10),
+                )
+                st.plotly_chart(fig_bar, use_container_width=True, config={"displayModeBar": False})
         else:
             st.info("Carica almeno una dichiarazione per visualizzare il grafico temporale delle plusvalenze.")
 
         # ── 2. SEZIONE ZAINETTO FISCALE & BADGES SEMAFORICI ──
         st.markdown("---")
-        st.markdown("##### 💼 Monitoraggio Tranches Zainetto Fiscale (Art. 68 TUIR)")
-        st.caption("Ogni pacchetto di minusvalenza ha una scadenza inderogabile di 4 anni solari. Il semaforo indica la conformità con l'Anagrafe Tributaria.")
+        c_z_head1, c_z_head2 = st.columns([2.5, 1.5])
+        with c_z_head1:
+            st.markdown("##### 💼 Monitoraggio Tranches Zainetto Fiscale (Art. 68 TUIR)")
+            st.caption("Ogni pacchetto di minusvalenza ha una scadenza inderogabile di 4 anni solari. Il semaforo indica la conformità con l'Anagrafe Tributaria.")
+        with c_z_head2:
+            loss_items_all = get_tax_losses(engine, profile_id=pid_str, current_year=selected_tax_year)
+            if loss_items_all:
+                df_loss_csv = pd.DataFrame(loss_items_all)
+                csv_bytes = df_loss_csv.to_csv(index=False).encode("utf-8")
+                st.download_button(
+                    "📥 Esporta Zainetto (CSV Commercialista)",
+                    data=csv_bytes,
+                    file_name=f"argus_zainetto_fiscale_{pid_str}_{selected_tax_year}.csv",
+                    mime="text/csv",
+                    key=f"dl_zainetto_csv_{pid_str}",
+                    help="Scarica l'estratto delle tranches dello zainetto con scadenza e stato AdE per la dichiarazione dei redditi.",
+                )
 
         # Modale / Form aggiunta nuova tranche
         with st.expander("➕ Registra Nuova Tranche di Minusvalenza (Broker o Certificazione)", expanded=False):
@@ -579,3 +670,158 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 },
                 hide_index=True,
             )
+
+        # ── RICONCILIAZIONE DIRETTA DA FILE ESTRATTO CONTO BROKER ──
+        st.markdown("---")
+        st.markdown("##### 📂 Riconciliazione Real-Time da File Broker (DeGiro, Directa, IBKR, Fineco, ecc.)")
+        st.caption(
+            "Carica l'estratto conto o le transazioni scaricate dal broker per verificare immediatamente la coerenza "
+            f"con i valori dichiarati nel Quadro T/RT del Modello 730/Redditi per l'Anno d'Imposta {selected_tax_year}."
+        )
+
+        broker_file = st.file_uploader(
+            f"Trascina il CSV transazioni del broker per l'anno {selected_tax_year}:",
+            type=["csv", "xlsx", "txt"],
+            key=f"broker_tx_uploader_{pid_str}_{selected_tax_year}",
+            help="Supporta automaticamente DeGiro, Directa SIM, Interactive Brokers, Fineco, Scalable, Trade Republic, eToro, Revolut.",
+        )
+
+        if broker_file is not None:
+            try:
+                # Lettura file
+                if broker_file.name.endswith(".xlsx") or broker_file.name.endswith(".xls"):
+                    df_raw_broker = pd.read_excel(broker_file)
+                else:
+                    content_raw = broker_file.read()
+                    try:
+                        df_raw_broker = pd.read_csv(io.BytesIO(content_raw), sep=None, engine="python")
+                    except Exception:
+                        df_raw_broker = pd.read_csv(io.BytesIO(content_raw), sep=";")
+
+                with st.spinner("Rilevamento formato intermediario ed estrazione lotti FIFO..."):
+                    df_parsed_b, b_key, b_rep = parse_broker_csv(df_raw_broker, broker_key="auto")
+                    broker_fiscal = compute_broker_annual_capital_gains(df_parsed_b, tax_year=selected_tax_year)
+
+                b_icon = b_rep.get("broker_icon", "📄")
+                b_name = b_rep.get("broker_name", b_key.title())
+
+                st.success(f"Intermediario rilevato: **{b_icon} {b_name}** • {b_rep.get('rows_parsed', 0)} movimenti elaborati.")
+
+                b_cg = broker_fiscal["gross_capital_gains"]
+                b_cl = broker_fiscal["gross_capital_losses"]
+                b_net = broker_fiscal["net_gain"]
+                b_tax = broker_fiscal["substitute_tax_estimate"]
+                dec_cg = report.declared_capital_gains
+                diff_cg = b_cg - dec_cg
+
+                c_brk1, c_brk2, c_brk3, c_brk4 = st.columns(4)
+                with c_brk1:
+                    metric_card("Plusvalenze Broker", fmt_eur(b_cg), delta=f"{broker_fiscal['trades_count']} trade chiusi")
+                with c_brk2:
+                    metric_card("Minusvalenze Broker", fmt_eur(b_cl), delta="Zainetto potenziale")
+                with c_brk3:
+                    metric_card("Plusvalenze Dichiarate 730", fmt_eur(dec_cg), delta=f"Anno {selected_tax_year}")
+                with c_brk4:
+                    metric_card("Delta (Broker - 730)", fmt_eur(diff_cg), delta="Anomalia" if abs(diff_cg) > 20 else "Allineato", delta_color="inverse" if abs(diff_cg) > 20 else "normal")
+
+                if abs(diff_cg) > 20.0:
+                    st.warning(
+                        f"⚠️ **Discrepanza Rilevata ({fmt_eur_it(diff_cg)})**: Le plusvalenze calcolate dai trade del broker {b_name} "
+                        f"differiscono da quanto dichiarato nel Quadro RT/T11 ({fmt_eur_it(dec_cg)}). "
+                        "Verifica se sono state effettuate compensazioni interne dal broker (se in regime amministrato) "
+                        "o se è necessaria una dichiarazione integrativa."
+                    )
+                else:
+                    st.success(f"✅ **Dati Allineati**: Le risultanze del broker {b_name} combaciano con la dichiarazione archiviata!")
+
+                if broker_fiscal.get("ticker_breakdown"):
+                    with st.expander("📋 Dettaglio Plus/Minusvalenze Realizzate per Singolo Strumento", expanded=False):
+                        df_tk_brk = pd.DataFrame(broker_fiscal["ticker_breakdown"])
+                        st.dataframe(
+                            df_tk_brk,
+                            column_config={
+                                "ticker": st.column_config.TextColumn("Ticker / Titolo"),
+                                "asset_class": st.column_config.TextColumn("Classe Attivo"),
+                                "trades": st.column_config.NumberColumn("Trade Chiusi"),
+                                "realized_pnl_eur": st.column_config.NumberColumn("PnL Realizzato Netto (€)", format="€ %,.2f"),
+                            },
+                            hide_index=True,
+                            use_container_width=True,
+                        )
+
+            except Exception as e:
+                st.error(f"Errore durante l'elaborazione del file broker: {e}")
+
+        # ── SIMULATORE F24 & RAVVEDIMENTO OPEROSO (ART. 13 D.LGS. 472/1997) ──
+        st.markdown("---")
+        st.markdown("##### ⚖️ Simulatore F24 & Ravvedimento Operoso (Art. 13 D.Lgs. 472/1997)")
+        st.caption(
+            "In caso di omesso o parziale versamento delle imposte sostitutive (Quadro RT / Rigo 321) o di IVAFE, "
+            "è possibile sanare la violazione spontaneamente prima della ricezione della cartella o dell'avviso ex art. 36-bis, "
+            "beneficiando di una riduzione drastica delle sanzioni (fino a 1/10 o 1/8 del minimo)."
+        )
+
+        with st.expander("🛠️ Calcola Ravvedimento Operoso e Genera Prospetto F24", expanded=False):
+            col_rav1, col_rav2, col_rav3 = st.columns(3)
+            with col_rav1:
+                default_unpaid = float(report.art_36_bis_risk_assessment.get("tax_recovery_base_26pct", 0.0) or abs(report.delta_substitute_tax) or 500.0)
+                sim_tax_amt = st.number_input(
+                    "Imposta da Regolarizzare (€):",
+                    min_value=1.0,
+                    value=max(10.0, default_unpaid),
+                    step=50.0,
+                    key=f"rav_tax_amt_{pid_str}_{selected_tax_year}",
+                )
+            with col_rav2:
+                sim_days = st.slider(
+                    "Giorni di Ritardo nel Versamento:",
+                    min_value=1,
+                    max_value=730,
+                    value=45,
+                    step=1,
+                    key=f"rav_days_{pid_str}_{selected_tax_year}",
+                    help="Numero di giorni trascorsi dalla scadenza originaria di versamento (es. 30 giugno).",
+                )
+            with col_rav3:
+                sim_tributo_type = st.selectbox(
+                    "Tributo da Versare:",
+                    ["CAPITAL_GAIN", "IVAFE"],
+                    format_func=lambda x: "Cod. 1100 (Sostitutiva Capital Gain 26%)" if x == "CAPITAL_GAIN" else "Cod. 4043 (IVAFE Estero Saldo)",
+                    key=f"rav_trib_sel_{pid_str}_{selected_tax_year}",
+                )
+
+            rav_res = compute_ravvedimento_operoso(
+                unpaid_tax_amount=sim_tax_amt,
+                days_delayed=sim_days,
+                annual_legal_interest_rate=0.025,
+                tax_type=sim_tributo_type,
+            )
+
+            c_r_res1, c_r_res2, c_r_res3 = st.columns(3)
+            with c_r_res1:
+                metric_card("Totale con Ravvedimento", fmt_eur(rav_res["total_ravvedimento"]), delta=f"Sanzione {rav_res['penalty_rate_pct']:.2f}%")
+            with c_r_res2:
+                metric_card("AdE Art. 36-bis Ordinario", fmt_eur(rav_res["ordinary_total_liability"]), delta="Sanzione 30% + Mora", delta_color="inverse")
+            with c_r_res3:
+                metric_card("Risparmio con Ravvedimento", fmt_eur(rav_res["net_savings_eur"]), delta="Denaro Risparmiato", delta_color="normal")
+
+            st.info(f"📌 **Scaglione di Ravvedimento:** {rav_res['bracket_name']} • Riferimento normativo: *{rav_res['legal_reference']}*")
+
+            # Tabella compilazione delega F24
+            st.markdown("###### 📋 Prospetto di Compilazione Delega F24 (Sezione Erario)")
+            df_f24 = pd.DataFrame(rav_res["f24_rows"])
+            df_f24["importo_debito_fmt"] = df_f24["importo_debito"].apply(lambda v: fmt_eur_it(float(v)))
+
+            st.dataframe(
+                df_f24[["sezione", "codice_tributo", "anno_riferimento", "importo_debito_fmt", "descrizione"]],
+                column_config={
+                    "sezione": st.column_config.TextColumn("Sezione"),
+                    "codice_tributo": st.column_config.TextColumn("Codice Tributo"),
+                    "anno_riferimento": st.column_config.NumberColumn("Anno Rif."),
+                    "importo_debito_fmt": st.column_config.TextColumn("Importo a Debito (€)"),
+                    "descrizione": st.column_config.TextColumn("Causale F24"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+

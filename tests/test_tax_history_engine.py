@@ -4,15 +4,20 @@
 # ============================================================
 
 import io
+import json
 
+import pandas as pd
 import pytest
 from sqlalchemy import create_engine
 
 from core.wealth.tax_history_engine import (
     TaxDeclaration,
     TaxLossCarryforward,
+    compute_broker_annual_capital_gains,
+    compute_ravvedimento_operoso,
     delete_declaration,
     delete_tax_loss,
+    generate_sample_730_json,
     get_declarations,
     get_tax_losses,
     parse_730_pdf_or_json,
@@ -342,3 +347,69 @@ class TestReconciliationEngine:
         opt_alerts = [a for a in report.alerts if a["type"] == "optimization"]
         assert len(opt_alerts) >= 1
         assert "€ 650,00" in opt_alerts[0]["title"]
+
+
+class TestFiscalExtensions:
+    def test_compute_ravvedimento_operoso_sprint_and_breve(self):
+        # Ritardo di 10 giorni -> Sprint (0.1% * 10 = 1.0%)
+        res_sprint = compute_ravvedimento_operoso(unpaid_tax_amount=1000.0, days_delayed=10)
+        assert "Sprint" in res_sprint["bracket_name"]
+        assert res_sprint["penalty_rate_pct"] == pytest.approx(1.0, rel=1e-3)
+        assert res_sprint["reduced_penalty"] == pytest.approx(10.0, abs=0.1)
+        assert res_sprint["ordinary_penalty_30pct"] == 300.0
+        assert res_sprint["net_savings_eur"] > 280.0
+
+        # Ritardo di 25 giorni -> Breve (1.5%)
+        res_breve = compute_ravvedimento_operoso(unpaid_tax_amount=1000.0, days_delayed=25)
+        assert "Breve" in res_breve["bracket_name"]
+        assert res_breve["penalty_rate_pct"] == 1.5
+        assert res_breve["reduced_penalty"] == 15.0
+
+    def test_compute_ravvedimento_operoso_lungo_and_biennale(self):
+        # Ritardo di 120 giorni -> Lungo (3.75%)
+        res_lungo = compute_ravvedimento_operoso(unpaid_tax_amount=2000.0, days_delayed=120)
+        assert "Lungo" in res_lungo["bracket_name"]
+        assert res_lungo["penalty_rate_pct"] == 3.75
+        assert res_lungo["reduced_penalty"] == 75.0
+
+        # Ritardo di 400 giorni -> Biennale (~4.29%)
+        res_biennale = compute_ravvedimento_operoso(unpaid_tax_amount=2000.0, days_delayed=400)
+        assert "Biennale" in res_biennale["bracket_name"]
+        assert res_biennale["penalty_rate_pct"] == pytest.approx(4.286, abs=0.01)
+
+    def test_compute_ravvedimento_operoso_ivafe_f24(self):
+        res_ivafe = compute_ravvedimento_operoso(unpaid_tax_amount=500.0, days_delayed=45, tax_type="IVAFE")
+        assert res_ivafe["tax_type"] == "IVAFE"
+        codes = [row["codice_tributo"] for row in res_ivafe["f24_rows"]]
+        assert "4043" in codes  # Imposta IVAFE
+        assert "8943" in codes  # Sanzione IVAFE
+        assert "1943" in codes  # Interessi IVAFE
+
+    def test_compute_broker_annual_capital_gains(self):
+        # Dataset con acquisti nel 2023 e vendite nel 2024
+        df_tx = pd.DataFrame([
+            {"tx_id": 1, "tx_date": "2023-05-10", "ticker": "AAPL", "tx_type": "buy", "quantity": 10, "price": 150.0, "currency": "EUR"},
+            {"tx_id": 2, "tx_date": "2024-03-15", "ticker": "AAPL", "tx_type": "sell", "quantity": 10, "price": 180.0, "currency": "EUR"}, # +300 EUR gain
+            {"tx_id": 3, "tx_date": "2023-06-01", "ticker": "MSFT", "tx_type": "buy", "quantity": 5, "price": 300.0, "currency": "EUR"},
+            {"tx_id": 4, "tx_date": "2024-08-20", "ticker": "MSFT", "tx_type": "sell", "quantity": 5, "price": 280.0, "currency": "EUR"}, # -100 EUR loss
+        ])
+
+        fiscal_2024 = compute_broker_annual_capital_gains(df_tx, tax_year=2024)
+        assert fiscal_2024["status"] == "success"
+        assert fiscal_2024["trades_count"] == 2
+        assert fiscal_2024["gross_capital_gains"] == 300.0
+        assert fiscal_2024["gross_capital_losses"] == 100.0
+        assert fiscal_2024["net_gain"] == 200.0
+        assert fiscal_2024["substitute_tax_estimate"] == pytest.approx(52.0, abs=0.01) # 200 * 0.26
+        assert len(fiscal_2024["ticker_breakdown"]) == 2
+
+    def test_generate_sample_730_json(self):
+        json_str = generate_sample_730_json(tax_year=2024)
+        assert isinstance(json_str, str)
+        parsed = json.loads(json_str)
+        assert parsed["tax_year"] == 2024
+        assert parsed["filing_year"] == 2025
+        assert parsed["model_type"] == "730_ORDINARIO"
+        assert "capital_gains_declared" in parsed
+        assert "substitute_tax_paid" in parsed
+

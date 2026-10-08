@@ -966,3 +966,250 @@ def _gather_portfolio_tax_metrics(
         "ivafe_est": round(ivafe_est, 2),
         "substitute_tax_est": round(max(0.0, capital_gains - capital_losses) * 0.26, 2),
     }
+
+
+# ============================================================
+# FISCAL EXTENSIONS: RAVVEDIMENTO OPEROSO & BROKER INGESTION
+# ============================================================
+
+
+def compute_ravvedimento_operoso(
+    unpaid_tax_amount: float,
+    days_delayed: int = 30,
+    annual_legal_interest_rate: float = 0.025,
+    tax_type: str = "CAPITAL_GAIN",
+) -> Dict[str, Any]:
+    """
+    Calcola il piano di Ravvedimento Operoso ai sensi dell'Art. 13 D.Lgs. 472/1997
+    per imposte non versate o versate in ritardo (es. Imposta Sostitutiva 26% o IVAFE).
+
+    Parametri:
+    - unpaid_tax_amount: Importo dell'imposta originaria dovuta (€)
+    - days_delayed: Giorni di ritardo trascorsi dalla scadenza originaria di versamento
+    - annual_legal_interest_rate: Saggio degli interessi legali vigente (default 2.5% annuo)
+    - tax_type: 'CAPITAL_GAIN' (Cod. 1100) oppure 'IVAFE' (Cod. 4043)
+    """
+    tax = max(0.0, float(unpaid_tax_amount))
+    days = max(1, int(days_delayed))
+
+    # Definizione scaglioni di ravvedimento secondo la legislazione italiana (D.Lgs. 472/1997)
+    if days <= 14:
+        # Ravvedimento Sprint: 0.1% per giorno (1/10 del 1% giornaliero ex art. 13 c. 1 lett. a)
+        penalty_rate = round(0.001 * days, 6)
+        bracket_name = f"Sprint (entro 14 giorni, {days} gg)"
+        legal_ref = "Art. 13, c. 1, lett. a-bis (0,1% per ciascun giorno di ritardo)"
+    elif days <= 30:
+        # Ravvedimento Breve: 1/10 del 15% = 1.5%
+        penalty_rate = 0.015
+        bracket_name = "Breve (15-30 giorni)"
+        legal_ref = "Art. 13, c. 1, lett. a (1/10 del 15%)"
+    elif days <= 90:
+        # Ravvedimento Medio: 1/9 del 15% = 1.67%
+        penalty_rate = round(0.15 / 9.0, 5)
+        bracket_name = "Intermedio (31-90 giorni)"
+        legal_ref = "Art. 13, c. 1, lett. a-bis (1/9 del 15%)"
+    elif days <= 365:
+        # Ravvedimento Lungo: 1/8 del 30% = 3.75%
+        penalty_rate = 0.0375
+        bracket_name = "Lungo (entro termine dichiarazione anno successivo)"
+        legal_ref = "Art. 13, c. 1, lett. b (1/8 del 30%)"
+    elif days <= 730:
+        # Ravvedimento Biennale: 1/7 del 30% = ~4.29%
+        penalty_rate = round(0.30 / 7.0, 5)
+        bracket_name = "Biennale (entro 2 anni)"
+        legal_ref = "Art. 13, c. 1, lett. b-bis (1/7 del 30%)"
+    else:
+        # Ravvedimento Ultrabiennale: 1/6 del 30% = 5.0%
+        penalty_rate = round(0.30 / 6.0, 5)
+        bracket_name = "Ultrabiennale (oltre 2 anni)"
+        legal_ref = "Art. 13, c. 1, lett. b-ter (1/6 del 30%)"
+
+    reduced_penalty = round(tax * penalty_rate, 2)
+
+    # Interessi legali pro-rata temporis: I = C * r * (gg / 365)
+    daily_rate = annual_legal_interest_rate / 365.0
+    accrued_interest = round(tax * daily_rate * days, 2)
+
+    total_with_ravvedimento = round(tax + reduced_penalty + accrued_interest, 2)
+
+    # Confronto con accertamento automatico ordinario (Sanzione piena 30% + mora 5%)
+    ordinary_penalty_30pct = round(tax * 0.30, 2)
+    ordinary_interest_5pct = round(tax * (0.05 / 365.0) * days, 2)
+    ordinary_total_liability = round(tax + ordinary_penalty_30pct + ordinary_interest_5pct, 2)
+    net_savings = round(ordinary_total_liability - total_with_ravvedimento, 2)
+
+    # Mappatura Codici Tributo Modello F24
+    if tax_type == "IVAFE":
+        tributo_imposta = "4043"
+        tributo_sanzione = "8943"
+        tributo_interessi = "1943"
+        desc_tributo = "IVAFE - Attività finanziarie detenute all'estero"
+    else:
+        tributo_imposta = "1100"
+        tributo_sanzione = "8905"
+        tributo_interessi = "1989"
+        desc_tributo = "Imposta Sostitutiva 26% su Capital Gain (RT / Rigo 321)"
+
+    curr_yr = datetime.now().year
+    f24_rows = [
+        {"sezione": "Erario", "codice_tributo": tributo_imposta, "anno_riferimento": curr_yr - 1, "importo_debito": tax, "descrizione": desc_tributo},
+        {"sezione": "Erario", "codice_tributo": tributo_sanzione, "anno_riferimento": curr_yr - 1, "importo_debito": reduced_penalty, "descrizione": f"Sanzione Ridotta Ravvedimento ({penalty_rate*100:.2f}%)"},
+        {"sezione": "Erario", "codice_tributo": tributo_interessi, "anno_riferimento": curr_yr - 1, "importo_debito": accrued_interest, "descrizione": f"Interessi Legali ({annual_legal_interest_rate*100:.2f}% annuo)"},
+    ]
+
+    return {
+        "unpaid_tax_amount": tax,
+        "days_delayed": days,
+        "bracket_name": bracket_name,
+        "legal_reference": legal_ref,
+        "penalty_rate_pct": round(penalty_rate * 100.0, 3),
+        "reduced_penalty": reduced_penalty,
+        "accrued_interest": accrued_interest,
+        "total_ravvedimento": total_with_ravvedimento,
+        "ordinary_penalty_30pct": ordinary_penalty_30pct,
+        "ordinary_total_liability": ordinary_total_liability,
+        "net_savings_eur": net_savings,
+        "tax_type": tax_type,
+        "f24_rows": f24_rows,
+    }
+
+
+def compute_broker_annual_capital_gains(
+    df_tx: pd.DataFrame,
+    tax_year: int = 2024,
+) -> Dict[str, Any]:
+    """
+    Elabora uno storico di transazioni broker (es. esportato da DeGiro, Directa, IBKR, Fineco, ecc.)
+    ed estrae le plusvalenze e minusvalenze realizzate nello specifico anno d'imposta usando il motore FIFO.
+
+    Distingue:
+    - Plusvalenze Lorde da Redditi Diversi (azioni, bond, derivati, certificati)
+    - Plusvalenze da Redditi di Capitale (ETF, fondi comuni)
+    - Minusvalenze Lorde (spendibili in compensazione per 4 anni)
+    - Proventi netti e stima imposta sostitutiva 26%
+    """
+    if df_tx is None or df_tx.empty:
+        return {
+            "tax_year": tax_year,
+            "status": "empty",
+            "trades_count": 0,
+            "gross_capital_gains": 0.0,
+            "gross_capital_losses": 0.0,
+            "net_gain": 0.0,
+            "gains_diversi": 0.0,
+            "gains_etf_capitale": 0.0,
+            "substitute_tax_estimate": 0.0,
+            "closed_trades": [],
+            "ticker_breakdown": [],
+        }
+
+    try:
+        from core.closed_trades import compute_closed_trades_journal
+
+        res_trades = compute_closed_trades_journal(df_tx=df_tx)
+        df_lots = res_trades.get("df_closed_lots")
+        if isinstance(df_lots, pd.DataFrame) and not df_lots.empty:
+            all_closed = df_lots.to_dict(orient="records")
+        else:
+            all_closed = res_trades.get("closed_lots", [])
+    except Exception as e:
+        logger.warning(f"Fallback compute_closed_trades_journal: {e}")
+        all_closed = []
+
+    # Filtra i trade chiusi nell'anno fiscale selezionato
+    target_yr_str = str(tax_year)
+    closed_in_year = [
+        lot for lot in all_closed
+        if str(lot.get("sell_date", "")).startswith(target_yr_str)
+    ]
+
+    gross_gains = 0.0
+    gross_losses = 0.0
+    gains_diversi = 0.0
+    gains_etf = 0.0
+    ticker_agg: Dict[str, Dict[str, Any]] = {}
+
+    for lot in closed_in_year:
+        pnl = float(lot.get("realized_pnl_eur", 0.0) or 0.0)
+        ac = str(lot.get("asset_class", "")).lower()
+        tk = str(lot.get("ticker", "UNKNOWN"))
+
+        is_etf_asset = "etf" in ac or "fondo" in ac
+
+        if pnl > 0.0:
+            gross_gains += pnl
+            if is_etf_asset:
+                gains_etf += pnl
+            else:
+                gains_diversi += pnl
+        elif pnl < 0.0:
+            gross_losses += abs(pnl)
+
+        if tk not in ticker_agg:
+            ticker_agg[tk] = {"ticker": tk, "realized_pnl": 0.0, "trades": 0, "asset_class": lot.get("asset_class", "Equity")}
+        ticker_agg[tk]["realized_pnl"] += pnl
+        ticker_agg[tk]["trades"] += 1
+
+    net_gain = gross_gains - gross_losses
+    tax_est = max(0.0, net_gain) * 0.26
+
+    # Formatta breakdown per ticker
+    ticker_list = sorted(
+        [
+            {
+                "ticker": v["ticker"],
+                "asset_class": v["asset_class"],
+                "trades": v["trades"],
+                "realized_pnl_eur": round(v["realized_pnl"], 2),
+            }
+            for v in ticker_agg.values()
+        ],
+        key=lambda x: x["realized_pnl_eur"],
+        reverse=True,
+    )
+
+    return {
+        "tax_year": tax_year,
+        "status": "success",
+        "trades_count": len(closed_in_year),
+        "gross_capital_gains": round(gross_gains, 2),
+        "gross_capital_losses": round(gross_losses, 2),
+        "net_gain": round(net_gain, 2),
+        "gains_diversi": round(gains_diversi, 2),
+        "gains_etf_capitale": round(gains_etf, 2),
+        "substitute_tax_estimate": round(tax_est, 2),
+        "closed_trades": closed_in_year,
+        "ticker_breakdown": ticker_list,
+    }
+
+
+def generate_sample_730_json(tax_year: int = 2024) -> str:
+    """
+    Genera un template JSON conforme e documentato per l'importazione di una dichiarazione fiscale
+    (730 Ordinario / Redditi PF) in ARGUS.
+    """
+    sample = {
+        "profile_id": "default",
+        "tax_year": tax_year,
+        "filing_year": tax_year + 1,
+        "model_type": "730_ORDINARIO",
+        "protocol_id": f"{tax_year+1}06159988776655443322",
+        "gross_income": 45000.00,
+        "taxable_income": 42500.00,
+        "net_tax_irpef": 11200.00,
+        "capital_gains_declared": 3850.00,
+        "capital_losses_offset": 1200.00,
+        "substitute_tax_paid": 689.00,
+        "ivafe_paid": 45.00,
+        "foreign_assets_val": 22500.00,
+        "notes": f"Modello 730/Redditi PF Anno {tax_year} con liquidazione Quadro T/RT e Quadro W",
+        "_guida_quadri": {
+            "gross_income": "Reddito complessivo da lavoro o pensione (Rigo 11 / RN1)",
+            "capital_gains_declared": "Plusvalenze totali dichiarate a tassazione sostitutiva (Rigo T11 / RT11)",
+            "capital_losses_offset": "Minusvalenze pregresse portate in compensazione (Rigo T13 / RT13)",
+            "substitute_tax_paid": "Imposta sostitutiva versata 26% (Rigo 321 liquidazione / RT29)",
+            "ivafe_paid": "Imposta IVAFE su conti o dossier esteri (Rigo 307 / RW16)",
+            "foreign_assets_val": "Valore finale delle attività finanziarie estere (Quadro W / RW colonna 8)",
+        },
+    }
+    return json.dumps(sample, indent=2, ensure_ascii=False)
