@@ -5,6 +5,7 @@
 
 import io
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -13,17 +14,31 @@ from sqlalchemy import create_engine
 from core.wealth.tax_history_engine import (
     TaxDeclaration,
     TaxLossCarryforward,
+    TaxVerificationDocument,
+    build_730_predisposition_and_variance_audit,
+    build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
     compute_ravvedimento_operoso,
     delete_declaration,
     delete_tax_loss,
+    delete_verification_document,
+    detect_tax_document_type,
     generate_sample_730_json,
     get_declarations,
     get_tax_losses,
+    get_verification_documents,
     parse_730_pdf_or_json,
+    parse_ade_notice_36bis,
+    parse_ade_precompilata,
+    parse_bank_statement_rw,
+    parse_broker_tax_report,
+    parse_certificazione_unica,
+    parse_rent_expense,
+    parse_universal_tax_document,
     reconcile_with_portfolio,
     record_declaration,
     record_tax_loss,
+    record_verification_document,
     update_tax_loss_offset,
 )
 from core.wealth.wealth_db import init_wealth_db
@@ -230,6 +245,94 @@ class TestTax730Parser:
         assert res["ivafe_paid"] == 68.40
         assert res["foreign_assets_val"] == 34200.00
 
+    def test_parse_official_730_2026_layout(self):
+        sample_730_2026 = """
+        MODELLO 730/2026 redditi 2025
+        MINISTERO DELL'ECONOMIA E DELLE FINANZE - AGENZIA DELLE ENTRATE
+        CODICE FISCALE DEL CONTRIBUENTE: RSSMRA85M01H501Z
+        COGNOME E NOME: ROSSI MARIO
+        Protocollo Telematico: 09064865516 - 0001069
+        REDDITO COMPLESSIVO: 8.299,00
+        REDDITO IMPONIBILE: 8.299,00
+        IMPOSTA NETTA: 1.131,00
+        Rigo 321 Imposta Sostitutiva: 206,00
+        Totale Plusvalenze: 792,31
+        Rigo 307 IVAFE: 53,00
+        Quadro W Valore Finale: 26.500,00
+        """
+        res = parse_730_pdf_or_json(sample_730_2026, filename="730_2026_sample.txt")
+        assert res["tax_year"] == 2025
+        assert res["filing_year"] == 2026
+        assert res["model_type"] == "730_ORDINARIO"
+        assert res["protocol_id"] == "09064865516 - 0001069"
+        assert res["gross_income"] == 8299.00
+        assert res["taxable_income"] == 8299.00
+        assert res["net_tax_irpef"] == 1131.00
+        assert res["substitute_tax_paid"] == 206.00
+        assert res["capital_gains_declared"] == 792.31
+        assert res["ivafe_paid"] == 53.00
+        assert res["foreign_assets_val"] == 26500.00
+        assert "ROSSI" in res["notes"]
+        assert "RSSMRA85M01H501Z" in res["notes"]
+
+    def test_parse_official_730_2024_layout(self):
+        sample_730_2024 = """
+        MODELLO 730/2024 redditi 2023
+        MINISTERO DELL'ECONOMIA E DELLE FINANZE - AGENZIA DELLE ENTRATE
+        CODICE FISCALE DEL CONTRIBUENTE: RSSMRA85M01H501Z
+        COGNOME E NOME: ROSSI MARIO
+        Protocollo Telematico: 12454842525 - 0000472
+        REDDITO COMPLESSIVO: 20.500,00
+        REDDITO IMPONIBILE: 20.500,00
+        IMPOSTA NETTA: 2.216,00
+        Rigo 321 Imposta Sostitutiva: 0,00
+        Totale Plusvalenze: 0,00
+        Rigo 307 IVAFE: 17,00
+        Quadro W Valore Finale: 8.500,00
+        """
+        res = parse_730_pdf_or_json(sample_730_2024, filename="730_2024_sample.txt")
+        assert res["tax_year"] == 2023
+        assert res["filing_year"] == 2024
+        assert res["model_type"] == "730_ORDINARIO"
+        assert res["protocol_id"] == "12454842525 - 0000472"
+        assert res["gross_income"] == 20500.00
+        assert res["taxable_income"] == 20500.00
+        assert res["net_tax_irpef"] == 2216.00
+        assert res["substitute_tax_paid"] == 0.00
+        assert res["capital_gains_declared"] == 0.00
+        assert res["ivafe_paid"] == 17.00
+        assert res["foreign_assets_val"] == 8500.00
+        assert "ROSSI" in res["notes"]
+
+    def test_parse_official_730_2025_layout(self):
+        sample_730_2025 = """
+        MODELLO 730/2025 redditi 2024
+        MINISTERO DELL'ECONOMIA E DELLE FINANZE - AGENZIA DELLE ENTRATE
+        CODICE FISCALE DEL CONTRIBUENTE: RSSMRA85M01H501Z
+        COGNOME E NOME: ROSSI MARIO
+        Protocollo Telematico: 11423143672 - 0000686
+        REDDITO COMPLESSIVO: 22.716,00
+        REDDITO IMPONIBILE: 22.716,00
+        IMPOSTA NETTA: 2.714,00
+        Rigo 321 Imposta Sostitutiva: 115,00
+        Totale Plusvalenze: 442,31
+        Rigo 307 IVAFE: 34,00
+        Quadro W Valore Finale: 17.000,00
+        """
+        res = parse_730_pdf_or_json(sample_730_2025, filename="730_2025_sample.txt")
+        assert res["tax_year"] == 2024
+        assert res["filing_year"] == 2025
+        assert res["model_type"] == "730_ORDINARIO"
+        assert res["protocol_id"] == "11423143672 - 0000686"
+        assert res["gross_income"] == 22716.00
+        assert res["taxable_income"] == 22716.00
+        assert res["net_tax_irpef"] == 2714.00
+        assert res["substitute_tax_paid"] == 115.00
+        assert res["capital_gains_declared"] == 442.31
+        assert res["ivafe_paid"] == 34.00
+        assert res["foreign_assets_val"] == 17000.00
+        assert "ROSSI" in res["notes"]
+
 
 class TestReconciliationEngine:
     def test_reconcile_with_art_36_bis_unfiled_risk(self, memory_db):
@@ -412,4 +515,371 @@ class TestFiscalExtensions:
         assert parsed["model_type"] == "730_ORDINARIO"
         assert "capital_gains_declared" in parsed
         assert "substitute_tax_paid" in parsed
+
+
+class TestTaxVerificationDocumentsCRUD:
+    def test_record_and_get_verification_doc(self, memory_db):
+        data = {
+            "profile_id": "user_test",
+            "tax_year": 2024,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "protocol_or_code": "PROFORMA-DEGIRO-2024",
+            "gross_amount": 1335.0,
+            "net_taxable_amount": 442.0,
+            "tax_withheld_or_due": 115.0,
+            "secondary_amount": 34.0,
+            "asset_monitoring_val": 23563.0,
+            "notes": "Rendiconto Degiro 2024",
+            "source_filename": "degiro_2024.pdf",
+        }
+        doc_id = record_verification_document(memory_db, data)
+        assert doc_id > 0
+
+        docs = get_verification_documents(memory_db, profile_id="user_test", tax_year=2024)
+        assert len(docs) == 1
+        assert docs[0]["doc_type"] == "BROKER_REPORT"
+        assert docs[0]["gross_amount"] == 1335.0
+        assert docs[0]["net_taxable_amount"] == 442.0
+        assert docs[0]["tax_withheld_or_due"] == 115.0
+        assert docs[0]["secondary_amount"] == 34.0
+
+    def test_update_verification_doc_upsert(self, memory_db):
+        data1 = {
+            "profile_id": "user_test",
+            "tax_year": 2024,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "protocol_or_code": "PROFORMA-DEGIRO-2024",
+            "gross_amount": 1000.0,
+        }
+        id1 = record_verification_document(memory_db, data1)
+
+        # Update with new values
+        data2 = {
+            "profile_id": "user_test",
+            "tax_year": 2024,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "protocol_or_code": "PROFORMA-DEGIRO-2024",
+            "gross_amount": 1335.0,
+            "tax_withheld_or_due": 115.0,
+        }
+        id2 = record_verification_document(memory_db, data2)
+        assert id1 == id2
+
+        docs = get_verification_documents(memory_db, profile_id="user_test", tax_year=2024)
+        assert len(docs) == 1
+        assert docs[0]["gross_amount"] == 1335.0
+        assert docs[0]["tax_withheld_or_due"] == 115.0
+
+    def test_delete_verification_doc(self, memory_db):
+        data = {
+            "profile_id": "user_test",
+            "tax_year": 2020,
+            "doc_type": "CU",
+            "issuer_name": "ER.GO",
+            "protocol_or_code": "CU-ERGO-2020",
+        }
+        doc_id = record_verification_document(memory_db, data)
+        assert len(get_verification_documents(memory_db, profile_id="user_test")) == 1
+
+        deleted = delete_verification_document(memory_db, doc_id)
+        assert deleted is True
+        assert len(get_verification_documents(memory_db, profile_id="user_test")) == 0
+
+
+class TestUniversalTaxParsers:
+    def test_detect_tax_document_types(self):
+        assert detect_tax_document_type("CERTIFICAZIONE UNICA 2021 RELATIVA ALL'ANNO 2020") == "CERTIFICAZIONE_UNICA"
+        assert detect_tax_document_type("", filename="CUK_T210218120139105620004585_RSSMRA85M01H501Z.pdf") == "CERTIFICAZIONE_UNICA"
+        assert detect_tax_document_type("RENDICONTO FISCALE DEGIRO ANNO FISCALE 2024 QUADRO RT") == "BROKER_TAX_REPORT"
+        assert detect_tax_document_type("COMUNICAZIONE N. 0011122233344 CODICE ATTO N. 20000000001 ART. 36-BIS") == "ADE_NOTICE_36BIS"
+        assert detect_tax_document_type("MODELLO 730/2025 REDDITI 2024") == "OFFICIAL_DECLARATION"
+
+    def test_parse_certificazione_unica_synthetic_payload(self):
+        cu_text = """
+        CERTIFICAZIONEUNICA2021
+        CERTIFICAZIONE DI CUI ALL'ART. 4 DEL D.P.R. 22 LUGLIO 1998
+        RELATIVA ALL'ANNO 2020
+        02786551206 ER.GO BOLOGNA BO
+        RSSMRA85M01H501Z ROSSI MARIO
+        Identificativo dichiarazione: 12013910562 - 0004585 del 18/2/2021
+        6 1.028,00
+        21 0,00
+        22 0,00
+        """
+        res = parse_certificazione_unica(cu_text, filename="test_cu.txt")
+        assert res["doc_type"] == "CU"
+        assert res["tax_year"] == 2020
+        assert res["filing_year"] == 2021
+        assert res["issuer_name"] == "ER.GO"
+        assert res["gross_amount"] == 1028.0
+        assert res["tax_withheld_or_due"] == 0.0
+
+    def test_parse_broker_tax_report_synthetic_payload(self):
+        broker_text = """
+        RENDICONTO FISCALE DEGIRO — ANNO FISCALE 2024
+        QUADRO RT - Plusvalenze di natura finanziaria
+        5.510 4.175
+        893
+        1.335
+        893
+        442
+        115
+        115
+        QUADRO RW
+        22.992
+        """
+        res = parse_broker_tax_report(broker_text, filename="degiro_2024.txt")
+        assert res["doc_type"] == "BROKER_REPORT"
+        assert res["tax_year"] == 2024
+        assert res["issuer_name"] == "DEGIRO"
+        assert res["gross_amount"] == 1335.0
+        assert res["net_taxable_amount"] == 442.0
+        assert res["tax_withheld_or_due"] == 115.0
+        assert res["secondary_amount"] == 34.0
+        assert res["asset_monitoring_val"] == 23563.0
+
+    def test_parse_ade_notice_36bis_synthetic_payload(self):
+        ade_text = """
+        Divisione Servizi - Ufficio Controllo dichiarazioni
+        Comunicazione n. 0011122233344
+        Codice atto n. 20000000001
+        Gentile Contribuente, dai controlli effettuati sulla sua dichiarazione modello 730 / 2025
+        Può regolarizzare la sua posizione versando la somma di euro 261,72 entro 60 giorni.
+        art. 36-bis del d.P.R. n. 600 del 1973
+        Periodo d'imposta 2024
+        Protocollo telematico: T250926114231436720000686
+        Dichiarante : RSSMRA85M01H501Z ROSSI MARIO
+        CODICE TRIBUTO 1100 (PL321) PLUSVAL. ASSOGGETTATE A IMPOSTA SOST.
+        Imposta a debito 348,38
+        Imposta versata 115,00
+        Imposta e minor credito da versare 9242 233,38
+        Sanzioni 9244 19,45
+        Interessi 9243 8,89
+        TOTALE 261,72
+        """
+        res = parse_ade_notice_36bis(ade_text, filename="avviso_36bis.txt")
+        assert res["doc_type"] == "ADE_NOTICE_36BIS"
+        assert res["tax_year"] == 2024
+        assert res["tax_withheld_or_due"] == 348.38
+        assert res["tax_paid"] == 115.00
+        assert res["penalty_amount"] == 19.45
+        assert res["interest_amount"] == 8.89
+        assert res["total_due"] == 261.72
+
+    def test_parse_universal_tax_document_router(self):
+        cu_res = parse_universal_tax_document("CERTIFICAZIONE UNICA 2021 RELATIVA ALL'ANNO 2020 6 1.000,00", "cu.txt")
+        assert cu_res["doc_type"] == "CU"
+
+        brk_res = parse_universal_tax_document("RENDICONTO FISCALE DEGIRO ANNO FISCALE 2024 115", "degiro.txt")
+        assert brk_res["doc_type"] == "BROKER_REPORT"
+
+        ade_res = parse_universal_tax_document("COMUNICAZIONE N. 100 CODICE ATTO N. 200 ART. 36-BIS 261,72", "notice.txt")
+        assert ade_res["doc_type"] == "ADE_NOTICE_36BIS"
+
+
+class TestTriangularTaxAudit:
+    def test_build_triangular_tax_audit_with_discrepancy_and_civis(self, memory_db):
+        profile = "prof_audit"
+        year = 2024
+
+        # 1. 730
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "capital_gains_declared": 442.31,
+            "substitute_tax_paid": 115.0,
+            "gross_income": 22716.0,
+            "foreign_assets_val": 17000.0,
+            "ivafe_paid": 34.0,
+            "protocol_id": "T250926114231436720000686",
+        })
+
+        # 2. Broker Report
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "gross_amount": 1335.0,
+            "net_taxable_amount": 442.0,
+            "tax_withheld_or_due": 115.0,
+            "secondary_amount": 34.0,
+            "asset_monitoring_val": 23563.0,
+            "metadata_json": {
+                "gross_capital_gains": 1335.0,
+                "offset_losses": 893.0,
+                "net_capital_gains": 442.0,
+            },
+        })
+
+        # 3. AdE 36-bis notice
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "ADE_NOTICE_36BIS",
+            "issuer_name": "AGENZIA DELLE ENTRATE",
+            "protocol_or_code": "Atto #20000000001",
+            "tax_withheld_or_due": 348.38,
+            "tax_paid": 115.0,
+            "total_due": 261.72,
+            "metadata_json": {
+                "notice_number": "0011122233344",
+                "act_code": "20000000001",
+                "challenged_protocol": "T250926114231436720000686",
+            },
+        })
+
+        audit = build_triangular_tax_audit(memory_db, profile_id=profile, tax_year=year)
+        assert audit["has_audit_data"] is True
+        assert "BROKER_REPORT" in audit["sources_found"]
+        assert "OFFICIAL_730" in audit["sources_found"]
+        assert "ADE_NOTICE_36BIS" in audit["sources_found"]
+        assert audit["has_ade_notice"] is True
+        assert audit["ade_total_disputed"] == 261.72
+        assert audit["civis_defense_draft"] is not None
+        assert "art. 68, comma 5, del D.P.R. 917/1986" in audit["civis_defense_draft"]
+        assert "DEGIRO" in audit["civis_defense_draft"]
+        assert len(audit["metrics_table"]) >= 6
+
+
+class Test730PredispositionAndNewParsers:
+    def test_parse_ade_precompilata(self):
+        sample_precompilata = """
+        MODELLO 730 PRECOMPILATO 2026 - AGENZIA DELLE ENTRATE
+        Codice fiscale del dichiarante: RSSMRA85M01H501Z
+        DATI UTILIZZATI:
+        PL, Rigo 11 (Reddito complessivo): 8.299,00 €
+        PL, Rigo 50 (Imposta netta): 1.163,00 €
+        PL, Rigo 59 (Ritenute): 1.671,00 €
+        PL, Rigo 91, colonna 3 (di cui da rimborsare): 625,00 €
+        DATI NON UTILIZZATI:
+        Contratto di locazione abitativo Atto TGU-2025-3T-000001
+        Spese per canone di locazione studenti fuori sede: 519,45 €
+        """
+        res = parse_ade_precompilata(sample_precompilata, filename="precompilata_2026.txt")
+        assert res["doc_type"] == "PRECOMPILATA_ADE"
+        assert res["tax_year"] == 2025
+        assert res["filing_year"] == 2026
+        assert res["gross_amount"] == 8299.00
+        assert res["tax_withheld_or_due"] == 1163.00
+        assert res["tax_paid"] == 1671.00
+        assert res["secondary_amount"] == 625.00
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["detected"] is True
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["contract_code"] == "TGU-2025-3T-000001"
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["potential_deduction_eur"] == 98.70
+
+    def test_parse_bank_statement_rw(self):
+        sample_n26 = """
+        N26 Bank AG - Certificazione Giacenza Media e Saldi ai fini ISEE / Fiscali
+        Periodo: Anno 2025 (01.01.2025 - 31.12.2025)
+        Titolare: Mario Rossi (RSSMRA85M01H501Z)
+        Giacenza media annua: 734,91 EUR
+        Saldo contabile al 31/12/2025: 1.382,11 EUR
+        """
+        res = parse_bank_statement_rw(sample_n26, filename="n26_statement.txt")
+        assert res["doc_type"] == "BANK_STATEMENT_RW"
+        assert res["tax_year"] == 2025
+        assert res["gross_amount"] == 734.91
+        assert res["asset_monitoring_val"] == 1382.11
+        assert res["tax_withheld_or_due"] == 0.0
+        assert res["metadata_json"]["is_exempt_under_5k"] is True
+        assert res["metadata_json"]["quadro_w_compilation_required"] is True
+
+    def test_parse_rent_expense(self):
+        sample_bonifico = """
+        RICEVUTA DISPOSIZIONE BONIFICO SEPA
+        Data esecuzione: 28/11/2025
+        Importo: 270,00 EUR
+        Causale: Pagamento canone di locazione Novembre 2025 contr. TGU-2025-3T-000001
+        Beneficiario: Mario Rossi
+        """
+        res = parse_rent_expense(sample_bonifico, filename="bonifico_affitto_nov.txt")
+        assert res["doc_type"] == "RENT_EXPENSE"
+        assert res["tax_year"] == 2025
+        assert res["gross_amount"] == 270.00
+        assert res["secondary_amount"] == pytest.approx(51.30, abs=0.01)
+        assert res["metadata_json"]["contract_code"] == "TGU-2025-3T-000001"
+        assert "Codice 18" in res["metadata_json"]["quadro_rigo"]
+
+    def test_build_730_predisposition_and_variance_audit(self, memory_db):
+        profile = "prof_predisp"
+        year = 2025
+
+        # 1. Registra Precompilata AdE
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "PRECOMPILATA_ADE",
+            "issuer_name": "AGENZIA DELLE ENTRATE",
+            "gross_amount": 8299.0,
+            "tax_withheld_or_due": 1163.0,
+            "tax_paid": 1671.0,
+            "secondary_amount": 625.0, # Rimborso AdE
+            "metadata_json": {
+                "ade_refund": 625.0,
+                "unused_data": {
+                    "rent_contract": {"detected": True, "amount": 519.45, "potential_deduction_eur": 98.70},
+                },
+            },
+        })
+
+        # 2. Registra CU Sixtema
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "CU",
+            "issuer_name": "SIXTEMA SPA",
+            "gross_amount": 8299.14,
+            "tax_withheld_or_due": 1670.61,
+            "secondary_amount": 168.0,
+        })
+
+        # 3. Registra Spesa Affitto
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "RENT_EXPENSE",
+            "issuer_name": "LOCAZIONE IMMOBILE",
+            "gross_amount": 519.45,
+            "secondary_amount": 98.70,
+            "metadata_json": {
+                "contract_code": "TGU-2025-3T-000001",
+                "eligible_deduction_19pct": 98.70,
+            },
+        })
+
+        # 4. Registra Report Broker DEGIRO
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "gross_amount": 793.0,
+            "net_taxable_amount": 793.0,
+            "tax_withheld_or_due": 206.0,
+            "secondary_amount": 62.0,
+            "asset_monitoring_val": 36098.0,
+            "metadata_json": {
+                "substitute_tax_due": 206.0,
+                "ivafe_due": 62.0,
+            },
+        })
+
+        # Costruisce audit di predisposizione
+        audit = build_730_predisposition_and_variance_audit(memory_db, profile_id=profile, tax_year=year)
+        assert audit["has_audit_data"] is True
+        assert audit["ade_precompilata_refund"] == 625.00
+        assert audit["rent_deduction_to_add"] == 98.70
+        assert audit["argus_optimized_refund"] == 723.70
+        assert audit["net_additional_refund"] == 98.70
+        assert audit["foreign_rt_substitute_tax"] == 206.00
+        assert audit["foreign_ivafe_tax"] == 62.00
+        assert audit["foreign_f24_to_pay"] == 268.00
+        assert audit["final_net_cash_flow"] == 455.70
+        assert len(audit["variance_matrix"]) >= 4
+
+
 

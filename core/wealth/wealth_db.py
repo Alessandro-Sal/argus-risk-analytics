@@ -416,6 +416,31 @@ def init_wealth_db(engine: Engine) -> None:
                 );
             """)
             )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS tax_verification_documents (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    profile_id TEXT NOT NULL DEFAULT 'default',
+                    tax_year INTEGER NOT NULL,
+                    doc_type TEXT NOT NULL,
+                    issuer_name TEXT,
+                    protocol_or_code TEXT,
+                    gross_amount REAL DEFAULT 0.00,
+                    net_taxable_amount REAL DEFAULT 0.00,
+                    tax_withheld_or_due REAL DEFAULT 0.00,
+                    tax_paid REAL DEFAULT 0.00,
+                    penalty_amount REAL DEFAULT 0.00,
+                    interest_amount REAL DEFAULT 0.00,
+                    total_due REAL DEFAULT 0.00,
+                    secondary_amount REAL DEFAULT 0.00,
+                    asset_monitoring_val REAL DEFAULT 0.00,
+                    metadata_json TEXT,
+                    notes TEXT,
+                    source_filename TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            )
 
         else:
             # MySQL DDL
@@ -643,6 +668,33 @@ def init_wealth_db(engine: Engine) -> None:
                     broker_source VARCHAR(50) NOT NULL DEFAULT 'DEGIRO',
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     INDEX idx_tax_loss_profile (profile_id, status)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """)
+            )
+            conn.execute(
+                sqlt("""
+                CREATE TABLE IF NOT EXISTS tax_verification_documents (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    profile_id VARCHAR(64) NOT NULL DEFAULT 'default',
+                    tax_year INT NOT NULL,
+                    doc_type VARCHAR(32) NOT NULL,
+                    issuer_name VARCHAR(150) NULL,
+                    protocol_or_code VARCHAR(100) NULL,
+                    gross_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    net_taxable_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    tax_withheld_or_due DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    tax_paid DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    penalty_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    interest_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    total_due DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    secondary_amount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    asset_monitoring_val DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+                    metadata_json LONGTEXT NULL,
+                    notes TEXT NULL,
+                    source_filename VARCHAR(255) NULL,
+                    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_verif_profile_year (profile_id, tax_year),
+                    INDEX idx_verif_doc_type (doc_type)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
             """)
             )
