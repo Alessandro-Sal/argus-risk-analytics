@@ -15,6 +15,7 @@ from core.wealth.tax_history_engine import (
     TaxDeclaration,
     TaxLossCarryforward,
     TaxVerificationDocument,
+    build_730_predisposition_and_variance_audit,
     build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
     compute_ravvedimento_operoso,
@@ -28,8 +29,11 @@ from core.wealth.tax_history_engine import (
     get_verification_documents,
     parse_730_pdf_or_json,
     parse_ade_notice_36bis,
+    parse_ade_precompilata,
+    parse_bank_statement_rw,
     parse_broker_tax_report,
     parse_certificazione_unica,
+    parse_rent_expense,
     parse_universal_tax_document,
     reconcile_with_portfolio,
     record_declaration,
@@ -715,5 +719,143 @@ class TestTriangularTaxAudit:
         assert "art. 68, comma 5, del D.P.R. 917/1986" in audit["civis_defense_draft"]
         assert "DEGIRO" in audit["civis_defense_draft"]
         assert len(audit["metrics_table"]) >= 6
+
+
+class Test730PredispositionAndNewParsers:
+    def test_parse_ade_precompilata(self):
+        sample_precompilata = """
+        MODELLO 730 PRECOMPILATO 2026 - AGENZIA DELLE ENTRATE
+        Codice fiscale del dichiarante: SLDLSN00P19M208Y
+        DATI UTILIZZATI:
+        PL, Rigo 11 (Reddito complessivo): 8.299,00 €
+        PL, Rigo 50 (Imposta netta): 1.163,00 €
+        PL, Rigo 59 (Ritenute): 1.671,00 €
+        PL, Rigo 91, colonna 3 (di cui da rimborsare): 625,00 €
+        DATI NON UTILIZZATI:
+        Contratto di locazione abitativo Atto TGU-2025-3T-016522
+        Spese per canone di locazione studenti fuori sede: 519,45 €
+        """
+        res = parse_ade_precompilata(sample_precompilata, filename="precompilata_2026.txt")
+        assert res["doc_type"] == "PRECOMPILATA_ADE"
+        assert res["tax_year"] == 2025
+        assert res["filing_year"] == 2026
+        assert res["gross_amount"] == 8299.00
+        assert res["tax_withheld_or_due"] == 1163.00
+        assert res["tax_paid"] == 1671.00
+        assert res["secondary_amount"] == 625.00
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["detected"] is True
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["contract_code"] == "TGU-2025-3T-016522"
+        assert res["metadata_json"]["unused_data"]["rent_contract"]["potential_deduction_eur"] == 98.70
+
+    def test_parse_bank_statement_rw(self):
+        sample_n26 = """
+        N26 Bank AG - Certificazione Giacenza Media e Saldi ai fini ISEE / Fiscali
+        Periodo: Anno 2025 (01.01.2025 - 31.12.2025)
+        Titolare: Alessandro Saladino (SLDLSN00P19M208Y)
+        Giacenza media annua: 734,91 EUR
+        Saldo contabile al 31/12/2025: 1.382,11 EUR
+        """
+        res = parse_bank_statement_rw(sample_n26, filename="n26_statement.txt")
+        assert res["doc_type"] == "BANK_STATEMENT_RW"
+        assert res["tax_year"] == 2025
+        assert res["gross_amount"] == 734.91
+        assert res["asset_monitoring_val"] == 1382.11
+        assert res["tax_withheld_or_due"] == 0.0
+        assert res["metadata_json"]["is_exempt_under_5k"] is True
+        assert res["metadata_json"]["quadro_w_compilation_required"] is True
+
+    def test_parse_rent_expense(self):
+        sample_bonifico = """
+        RICEVUTA DISPOSIZIONE BONIFICO SEPA
+        Data esecuzione: 28/11/2025
+        Importo: 270,00 EUR
+        Causale: Pagamento canone di locazione Novembre 2025 contr. TGU-2025-3T-016522
+        Beneficiario: Mario Rossi
+        """
+        res = parse_rent_expense(sample_bonifico, filename="bonifico_affitto_nov.txt")
+        assert res["doc_type"] == "RENT_EXPENSE"
+        assert res["tax_year"] == 2025
+        assert res["gross_amount"] == 270.00
+        assert res["secondary_amount"] == pytest.approx(51.30, abs=0.01)
+        assert res["metadata_json"]["contract_code"] == "TGU-2025-3T-016522"
+        assert "Codice 18" in res["metadata_json"]["quadro_rigo"]
+
+    def test_build_730_predisposition_and_variance_audit(self, memory_db):
+        profile = "prof_predisp"
+        year = 2025
+
+        # 1. Registra Precompilata AdE
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "PRECOMPILATA_ADE",
+            "issuer_name": "AGENZIA DELLE ENTRATE",
+            "gross_amount": 8299.0,
+            "tax_withheld_or_due": 1163.0,
+            "tax_paid": 1671.0,
+            "secondary_amount": 625.0, # Rimborso AdE
+            "metadata_json": {
+                "ade_refund": 625.0,
+                "unused_data": {
+                    "rent_contract": {"detected": True, "amount": 519.45, "potential_deduction_eur": 98.70},
+                },
+            },
+        })
+
+        # 2. Registra CU Sixtema
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "CU",
+            "issuer_name": "SIXTEMA SPA",
+            "gross_amount": 8299.14,
+            "tax_withheld_or_due": 1670.61,
+            "secondary_amount": 168.0,
+        })
+
+        # 3. Registra Spesa Affitto
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "RENT_EXPENSE",
+            "issuer_name": "LOCAZIONE IMMOBILE",
+            "gross_amount": 519.45,
+            "secondary_amount": 98.70,
+            "metadata_json": {
+                "contract_code": "TGU-2025-3T-016522",
+                "eligible_deduction_19pct": 98.70,
+            },
+        })
+
+        # 4. Registra Report Broker DEGIRO
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": year,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "DEGIRO",
+            "gross_amount": 793.0,
+            "net_taxable_amount": 793.0,
+            "tax_withheld_or_due": 206.0,
+            "secondary_amount": 62.0,
+            "asset_monitoring_val": 36098.0,
+            "metadata_json": {
+                "substitute_tax_due": 206.0,
+                "ivafe_due": 62.0,
+            },
+        })
+
+        # Costruisce audit di predisposizione
+        audit = build_730_predisposition_and_variance_audit(memory_db, profile_id=profile, tax_year=year)
+        assert audit["has_audit_data"] is True
+        assert audit["ade_precompilata_refund"] == 625.00
+        assert audit["rent_deduction_to_add"] == 98.70
+        assert audit["argus_optimized_refund"] == 723.70
+        assert audit["net_additional_refund"] == 98.70
+        assert audit["foreign_rt_substitute_tax"] == 206.00
+        assert audit["foreign_ivafe_tax"] == 62.00
+        assert audit["foreign_f24_to_pay"] == 268.00
+        assert audit["final_net_cash_flow"] == 455.70
+        assert len(audit["variance_matrix"]) >= 4
+
 
 

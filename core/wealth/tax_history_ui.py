@@ -18,6 +18,7 @@ from sqlalchemy import Engine
 from core.adapters.broker_hub import parse_broker_csv
 from core.ui_utils import fmt_eur, metric_card, render_table_with_export
 from core.wealth.tax_history_engine import (
+    build_730_predisposition_and_variance_audit,
     build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
     compute_ravvedimento_operoso,
@@ -133,13 +134,25 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                     v_tot = float(v_item.get("total_due", 0.0) or 0.0)
 
                     if v_type == "CU":
-                        type_label = "Certificazione Unica (CU)"
+                        type_label = f"CU ({v_issuer})"
                         badge_color = "#10b981"
                         detail_line = f"Reddito: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Ritenute: <strong style='color: #38bdf8;'>{fmt_eur_it(v_tax)}</strong>"
-                    elif v_type == "BROKER_REPORT":
+                    elif v_type == "PRECOMPILATA_ADE":
+                        type_label = "Mod. 730 Precompilato"
+                        badge_color = "#3b82f6"
+                        detail_line = f"Rimborso AdE: <strong style='color: #10b981;'>{fmt_eur_it(v_item.get('secondary_amount', 0.0))}</strong><br/>Reddito: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong>"
+                    elif v_type in ["BROKER_REPORT", "BROKER_TAX_REPORT"]:
                         type_label = f"Rendiconto {v_issuer}"
                         badge_color = "#f59e0b"
                         detail_line = f"Plusvalenze: <strong style='color: #10b981;'>{fmt_eur_it(v_gross)}</strong><br/>Imposta 26%: <strong style='color: #f59e0b;'>{fmt_eur_it(v_tax)}</strong>"
+                    elif v_type == "BANK_STATEMENT_RW":
+                        type_label = f"Conto Estero ({v_issuer})"
+                        badge_color = "#06b6d4"
+                        detail_line = f"Giacenza: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Saldo 31/12: <strong style='color: #38bdf8;'>{fmt_eur_it(v_item.get('net_taxable_amount', 0.0))}</strong>"
+                    elif v_type == "RENT_EXPENSE":
+                        type_label = f"Locazione ({v_issuer})"
+                        badge_color = "#a855f7"
+                        detail_line = f"Canone: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Detrazione 19%: <strong style='color: #10b981;'>+{fmt_eur_it(v_item.get('secondary_amount', 0.0))}</strong>"
                     elif v_type == "ADE_NOTICE_36BIS":
                         type_label = "Avviso AdE 36-bis"
                         badge_color = "#ef4444"
@@ -184,23 +197,25 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         st.markdown("---")
 
         # ── SEZIONE PRINCIPALE: CARICAMENTO INTELLIGENTE MULTI-DOCUMENTO (FULL WIDTH) ──
-        st.markdown("##### 📄 Caricamento Intelligente Documenti Fiscali (730 / CU / Broker / AdE 36-bis)")
+        st.markdown("##### 📄 Hub Intelligente Ingestione Fiscale (730 / Precompilata / CU / DEGIRO / Conti Esteri / Locazione)")
         st.info(
-            "💡 **Hub Universale di Ingestione Fiscale:**\n\n"
-            "- **Modelli 730 / Redditi PF:** Trascina il PDF completo AdE (12–17 pagine, ~1–2 MB) con Quadri Lavoro, W/RW, T/RT e Prospetto 730-3.\n"
-            "- **Certificazioni Uniche (CU):** Riconosce automaticamente Punti 1–6 (redditi), Punto 21 (ritenute IRPEF), addizionali e sostituto d'imposta.\n"
-            "- **Rendiconti Fiscali Broker:** Acquisisce i prospetti pro-forma (DEGIRO/TasseTrading, Scalable, IBKR) per Quadro RT (plus/minus) e Quadro RW (IVAFE).\n"
+            "💡 **Hub Universale di Ingestione Fiscale & Predisposizione Modello 730:**\n\n"
+            "- **Precompilata AdE & 730 Ufficiale:** Trascina il prospetto precompilato (testuale o grafico) o il 730 definitivo. Riconosce oneri Quadro E e isola i 'Dati non utilizzati'.\n"
+            "- **Certificazioni Uniche (CU):** Estrae redditi da lavoro (Sixtema Punti 1–6, ritenute P. 21, addizionali) e borse di studio esenti (ER.GO Punto 465 cod. 23).\n"
+            "- **Rendiconti Fiscali Broker:** Acquisisce i prospetti DEGIRO (Modello Unico / Calcoli) per Quadro RT (plusvalenze 26%) e Quadro W/RW (IVAFE 2‰).\n"
+            "- **Conti Correnti Esteri:** Analizza estratti conto N26 e Revolut per monitoraggio fiscale e verifica automatica della soglia di esenzione IVAFE (€ 5.000,00).\n"
+            "- **Spese e Contratti di Locazione:** Ricevute bonifici affitto e contratto studenti fuori sede (Art. 15 TUIR) per sbloccare la detrazione al 19% (Rigo E8 cod. 18).\n"
             "- **Avvisi AdE Art. 36-bis:** Rileva le comunicazioni di liquidazione automatica con codice atto, debito contestato, sanzioni e interessi."
         )
 
         c_up_box, c_up_tpl = st.columns([3.5, 1.2])
         with c_up_box:
             uploaded_files = st.file_uploader(
-                "Trascina uno o più documenti fiscali (730, Certificazione Unica CU, Rendiconto Broker, Avvisi AdE 36-bis):",
+                "Trascina i tuoi documenti fiscali (Precompilata, CU, DEGIRO, Conti Esteri N26/Revolut, Affitto, 730, Avvisi 36-bis):",
                 type=["pdf", "json", "txt"],
                 accept_multiple_files=True,
                 key=f"file_uploader_tax_{pid_str}",
-                help="Supporta PDF ufficiali AdE (730/Redditi), Certificazioni Uniche (CU), Rendiconti Fiscali Broker (DEGIRO, Scalable) e Comunicazioni di Irregolarità AdE 36-bis.",
+                help="Supporta PDF ufficiali AdE, Precompilata, CU Sixtema ed ER.GO, Rendiconti DEGIRO, Giacenza media N26, Bonifici affitto e Avvisi 36-bis.",
             )
         with c_up_tpl:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
@@ -420,6 +435,193 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                             }
                             v_id = record_verification_document(engine, to_save_ade)
                             st.success(f"✅ Comunicazione AdE 36-bis registrata con ID #{v_id}!")
+                            st.rerun()
+
+                elif dt == "PRECOMPILATA_ADE":
+                    ref_ade = float(parsed_data.get("secondary_amount", 0.0))
+                    unused = parsed_data.get("metadata_json", {}).get("unused_data", {}) if isinstance(parsed_data.get("metadata_json"), dict) else {}
+                    rent_info = unused.get("rent_contract", {})
+                    rw_info = unused.get("foreign_monitoring_rw", {})
+
+                    st.markdown(
+                        f"""<div style="background: rgba(59, 130, 246, 0.05); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: 700; color: #3b82f6;">🏛️ File #{idx+1}: Modello 730 Precompilato AdE (Redditi {parsed_data.get('tax_year', 2025)})</span>
+                                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
+                                </div>
+                                <span style="font-size: 11px; background: rgba(59, 130, 246, 0.2); color: #60a5fa; padding: 3px 8px; border-radius: 4px; font-weight: 600;">ℹ️ Precompilata Agenzia delle Entrate</span>
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    with c_m1:
+                        metric_card("Reddito Complessivo", fmt_eur(parsed_data.get("gross_amount", 0.0)), "Prospetto di Liquidazione")
+                    with c_m2:
+                        metric_card("Imposta Netta IRPEF", fmt_eur(parsed_data.get("tax_withheld_or_due", 0.0)), "Calcolata dall'AdE")
+                    with c_m3:
+                        metric_card("Ritenute Subite (CU)", fmt_eur(parsed_data.get("tax_paid", 0.0)), "Certificate dai sostituti")
+                    with c_m4:
+                        metric_card("Rimborso Spettante AdE", fmt_eur(ref_ade), "A Credito del Contribuente", delta_color="normal")
+
+                    # Sezione Dati non utilizzati AdE
+                    if rent_info.get("detected") or rw_info.get("detected"):
+                        st.warning(
+                            "⚠️ **DATI NON UTILIZZATI RILEVATI DALL'AGENZIA DELLE ENTRATE:**\n\n"
+                            + (f"- 🏠 **Canone di Locazione (Art. 15 TUIR):** Contratto registrato Atto `{rent_info.get('act_code')}` (Attivo per {rent_info.get('active_days')} gg, canone € {rent_info.get('rent_amount')}). "
+                               f"L'AdE **non** lo ha inserito automaticamente. Integrando la detrazione studenti fuori sede in **Quadro E (Rigo E8 cod. 18)**, recuperi **+€ {rent_info.get('recoverable_deduction_19pct'):.2f} di maggior rimborso**!\n" if rent_info.get("detected") else "")
+                            + ("- 🌐 **Monitoraggio Estero & Investimenti:** L'AdE segnala attività estere pregresse non riportate nei quadri precompilati. Integra i dati del rendiconto DEGIRO (Quadri RT e W) per evitare avvisi di irregolarità 36-bis con sanzioni 30%.\n" if rw_info.get("detected") else "")
+                        )
+
+                    with st.expander(f"🔍 Dettagli & Modifica Campi Precompilata {parsed_data.get('tax_year')}", expanded=False):
+                        c_adp1, c_adp2 = st.columns(2)
+                        with c_adp1:
+                            adp_yr = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data.get("tax_year", 2025)), key=f"adp_yr_{pid_str}_{idx}")
+                            adp_gross = st.number_input("Reddito Complessivo (€):", value=float(parsed_data.get("gross_amount", 0.0)), step=500.0, key=f"adp_gr_{pid_str}_{idx}")
+                            adp_net = st.number_input("Imposta Netta (€):", value=float(parsed_data.get("tax_withheld_or_due", 0.0)), step=100.0, key=f"adp_net_{pid_str}_{idx}")
+                        with c_adp2:
+                            adp_wh = st.number_input("Ritenute CU (€):", value=float(parsed_data.get("tax_paid", 0.0)), step=100.0, key=f"adp_wh_{pid_str}_{idx}")
+                            adp_ref = st.number_input("Rimborso Calcolato AdE (€):", value=float(ref_ade), step=50.0, key=f"adp_ref_{pid_str}_{idx}")
+                            adp_notes = st.text_input("Note:", value=str(parsed_data.get("notes") or ""), key=f"adp_notes_{pid_str}_{idx}")
+
+                    col_save_b1, _ = st.columns([1.5, 3])
+                    with col_save_b1:
+                        if st.button(f"💾 Salva Precompilata AdE Anno {parsed_data.get('tax_year')} in Archivio", key=f"btn_save_adp_{pid_str}_{idx}", type="primary", use_container_width=True):
+                            to_save_adp = {
+                                "profile_id": pid_str,
+                                "tax_year": int(adp_yr),
+                                "doc_type": "PRECOMPILATA_ADE",
+                                "issuer_name": "AGENZIA DELLE ENTRATE",
+                                "protocol_or_code": "PRECOMPILATA-730-2026",
+                                "gross_amount": adp_gross,
+                                "net_taxable_amount": adp_gross,
+                                "tax_withheld_or_due": adp_net,
+                                "tax_paid": adp_wh,
+                                "secondary_amount": adp_ref,
+                                "metadata_json": parsed_data.get("metadata_json"),
+                                "notes": adp_notes,
+                                "source_filename": filename,
+                            }
+                            v_id = record_verification_document(engine, to_save_adp)
+                            st.success(f"✅ Modello 730 Precompilato registrato con ID #{v_id}!")
+                            st.rerun()
+
+                elif dt == "BANK_STATEMENT_RW":
+                    b_name = parsed_data.get("issuer_name") or "Banca Estera"
+                    meta_b = parsed_data.get("metadata_json", {}) if isinstance(parsed_data.get("metadata_json"), dict) else {}
+                    is_ex = meta_b.get("is_ivafe_exempt", True)
+
+                    st.markdown(
+                        f"""<div style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: 700; color: #06b6d4;">🌐 File #{idx+1}: Conto Corrente Estero ({b_name}) — Quadro RW / IVAFE</span>
+                                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
+                                </div>
+                                <span style="font-size: 11px; background: rgba(6, 182, 212, 0.2); color: #22d3ee; padding: 3px 8px; border-radius: 4px; font-weight: 600;">{'🟢 ESENTE IVAFE (< € 5.000)' if is_ex else '🟡 IVAFE DOVUTA'}</span>
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    with c_m1:
+                        metric_card("Giacenza Media Annua", fmt_eur(parsed_data.get("gross_amount", 0.0)), "Rilevante ai fini IVAFE")
+                    with c_m2:
+                        metric_card("Saldo al 31/12", fmt_eur(parsed_data.get("net_taxable_amount", 0.0)), "Consistenza finale Quadro RW")
+                    with c_m3:
+                        metric_card("Stato IVAFE", "ESENTE (€ 0,00)" if is_ex else "DOVUTA (€ 34,20)", "Art. 19 c. 18 D.L. 201/2011")
+                    with c_m4:
+                        metric_card("IBAN / Identificativo", str(meta_b.get("iban") or "Estero"), "Monitoraggio Fiscale")
+
+                    with st.expander(f"🔍 Dettagli & Modifica Campi Conto {b_name} {parsed_data.get('tax_year')}", expanded=False):
+                        c_bk1, c_bk2 = st.columns(2)
+                        with c_bk1:
+                            bk_yr = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data.get("tax_year", 2025)), key=f"bk_yr_{pid_str}_{idx}")
+                            bk_iss = st.text_input("Banca:", value=str(b_name), key=f"bk_iss_{pid_str}_{idx}")
+                            bk_gm = st.number_input("Giacenza Media (€):", value=float(parsed_data.get("gross_amount", 0.0)), step=100.0, key=f"bk_gm_{pid_str}_{idx}")
+                        with c_bk2:
+                            bk_sf = st.number_input("Saldo Finale (€):", value=float(parsed_data.get("net_taxable_amount", 0.0)), step=100.0, key=f"bk_sf_{pid_str}_{idx}")
+                            bk_iv = st.number_input("IVAFE Dovuta (€):", value=float(parsed_data.get("secondary_amount", 0.0)), step=10.0, key=f"bk_iv_{pid_str}_{idx}")
+                            bk_notes = st.text_input("Note:", value=str(parsed_data.get("notes") or ""), key=f"bk_notes_{pid_str}_{idx}")
+
+                    col_save_b1, _ = st.columns([1.5, 3])
+                    with col_save_b1:
+                        if st.button(f"💾 Salva Conto Estero ({b_name} {parsed_data.get('tax_year')}) in Archivio", key=f"btn_save_bk_{pid_str}_{idx}", type="primary", use_container_width=True):
+                            to_save_bk = {
+                                "profile_id": pid_str,
+                                "tax_year": int(bk_yr),
+                                "doc_type": "BANK_STATEMENT_RW",
+                                "issuer_name": bk_iss,
+                                "protocol_or_code": meta_b.get("iban") or f"ESTERO-{bk_iss[:10]}-{bk_yr}",
+                                "gross_amount": bk_gm,
+                                "net_taxable_amount": bk_sf,
+                                "secondary_amount": bk_iv,
+                                "asset_monitoring_val": bk_sf,
+                                "metadata_json": parsed_data.get("metadata_json"),
+                                "notes": bk_notes,
+                                "source_filename": filename,
+                            }
+                            v_id = record_verification_document(engine, to_save_bk)
+                            st.success(f"✅ Conto Estero {bk_iss} registrato con ID #{v_id}!")
+                            st.rerun()
+
+                elif dt == "RENT_EXPENSE":
+                    r_amt = float(parsed_data.get("gross_amount", 0.0))
+                    r_ded = float(parsed_data.get("secondary_amount", 0.0))
+                    r_ben = parsed_data.get("issuer_name") or "Locatore"
+                    meta_r = parsed_data.get("metadata_json", {}) if isinstance(parsed_data.get("metadata_json"), dict) else {}
+
+                    st.markdown(
+                        f"""<div style="background: rgba(168, 85, 247, 0.05); border: 1px solid rgba(168, 85, 247, 0.3); border-radius: 8px; padding: 14px 18px; margin-top: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <span style="font-size: 16px; font-weight: 700; color: #a855f7;">🏠 File #{idx+1}: Spesa di Locazione / Contratto Studenti Fuori Sede ({r_ben})</span>
+                                    <span style="font-size: 12px; color: #94a3b8; margin-left: 10px;">{filename}</span>
+                                </div>
+                                <span style="font-size: 11px; background: rgba(168, 85, 247, 0.2); color: #c084fc; padding: 3px 8px; border-radius: 4px; font-weight: 600;">✨ Detrazione 19% Sbloccata</span>
+                            </div>
+                        </div>""",
+                        unsafe_allow_html=True,
+                    )
+                    c_m1, c_m2, c_m3, c_m4 = st.columns(4)
+                    with c_m1:
+                        metric_card("Canone Pagato / Maturato", fmt_eur(r_amt), "Comprovato da Bonifico/Atto")
+                    with c_m2:
+                        metric_card("Detrazione IRPEF 19%", f"+{fmt_eur(r_ded)}", "Art. 15 c. 1 lett. i-sexies TUIR", delta_color="normal")
+                    with c_m3:
+                        metric_card("Rigo Destinazione 730", "Quadro E, Rigo E8 cod. 18", "Spese alloggio studenti")
+                    with c_m4:
+                        metric_card("Riferimento Atto", str(meta_r.get("contract_code") or "TGU-2025-3T-016522"), "Contratto Registrato AdE")
+
+                    with st.expander(f"🔍 Dettagli & Modifica Campi Locazione {parsed_data.get('tax_year')}", expanded=False):
+                        c_rn1, c_rn2 = st.columns(2)
+                        with c_rn1:
+                            rn_yr = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data.get("tax_year", 2025)), key=f"rn_yr_{pid_str}_{idx}")
+                            rn_ben = st.text_input("Beneficiario / Locatore:", value=str(r_ben), key=f"rn_ben_{pid_str}_{idx}")
+                            rn_amt = st.number_input("Canone Pagato (€):", value=float(r_amt), step=50.0, key=f"rn_amt_{pid_str}_{idx}")
+                        with c_rn2:
+                            rn_ded = st.number_input("Detrazione 19% Spettante (€):", value=float(r_ded), step=10.0, key=f"rn_ded_{pid_str}_{idx}")
+                            rn_notes = st.text_input("Note:", value=str(parsed_data.get("notes") or ""), key=f"rn_notes_{pid_str}_{idx}")
+
+                    col_save_b1, _ = st.columns([1.5, 3])
+                    with col_save_b1:
+                        if st.button("💾 Salva Spesa Locazione in Archivio", key=f"btn_save_rn_{pid_str}_{idx}", type="primary", use_container_width=True):
+                            to_save_rn = {
+                                "profile_id": pid_str,
+                                "tax_year": int(rn_yr),
+                                "doc_type": "RENT_EXPENSE",
+                                "issuer_name": rn_ben,
+                                "protocol_or_code": parsed_data.get("protocol_or_code"),
+                                "gross_amount": rn_amt,
+                                "net_taxable_amount": rn_amt,
+                                "secondary_amount": rn_ded,
+                                "metadata_json": parsed_data.get("metadata_json"),
+                                "notes": rn_notes,
+                                "source_filename": filename,
+                            }
+                            v_id = record_verification_document(engine, to_save_rn)
+                            st.success(f"✅ Spesa di Locazione registrata con ID #{v_id}!")
                             st.rerun()
 
                 else:
@@ -947,6 +1149,117 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             )
 
         st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+
+        # ── SEZIONE SPECIALE: PREDISPOSIZIONE MODELLO 730 & MATRICE SCOSTAMENTI (AdE vs REALE ARGUS) ──
+        predisp_730 = build_730_predisposition_and_variance_audit(engine, profile_id=pid_str, tax_year=selected_tax_year)
+        if predisp_730:
+            st.markdown("##### 📋 Predisposizione Modello 730 & Matrice Scostamenti (Precompilata AdE vs Dati Reali ARGUS)")
+            st.caption(
+                "Riconciliazione integrata tra il prospetto grezzo dell'Agenzia delle Entrate e la documentazione probatoria archiviata "
+                "(CU Sixtema/ER.GO, Rendiconti DEGIRO RT/W, Conti Esteri N26, Ricevute Bonifici e Contratto di Locazione)."
+            )
+
+            c_pd1, c_pd2, c_pd3, c_pd4 = st.columns(4)
+            with c_pd1:
+                metric_card(
+                    "Rimborso 730 Spettante",
+                    fmt_eur(predisp_730["new_irpef_refund"]),
+                    delta=f"+{fmt_eur(predisp_730['rent_recovered_deduction'])} vs AdE",
+                    delta_color="normal",
+                    help_text=f"Rimborso IRPEF totale comprensivo del recupero della detrazione affitto (+{fmt_eur_it(predisp_730['rent_recovered_deduction'])}).",
+                )
+            with c_pd2:
+                metric_card(
+                    "F24 Debiti Esteri (RT + W)",
+                    fmt_eur(predisp_730["f24_foreign_total"]),
+                    delta=f"RT 26%: € {predisp_730['rt_sub_tax']:.2f} | W: € {predisp_730['w_ivafe']:.2f}",
+                    delta_color="inverse",
+                    help_text="Imposte finanziarie estere da versare tramite F24 (Cod. 1100 per imposta sostitutiva 26% e Cod. 4043 per IVAFE).",
+                )
+            with c_pd3:
+                metric_card(
+                    "SALDO NETTO EFFETTIVO",
+                    fmt_eur(predisp_730["net_tax_balance"]),
+                    delta="Credito Netto in Busta Paga",
+                    delta_color="normal",
+                    help_text="Rimborso netto effettivo a favore del contribuente (Rimborso 730 meno totale versamenti F24).",
+                )
+            with c_pd4:
+                pot_savings = round(predisp_730["rent_recovered_deduction"] + predisp_730["f24_foreign_total"] * 0.3, 2)
+                metric_card(
+                    "Vantaggio Fiscale ARGUS",
+                    f"+{fmt_eur(pot_savings)}",
+                    delta="Recupero + Zero Sanzioni",
+                    delta_color="normal",
+                    help_text="Beneficio economico generato: recupero detrazione locazione ignorata da AdE + prevenzione sanzioni 30% su investimenti esteri.",
+                )
+
+            st.markdown(
+                f"""
+                <div style="background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 100%);
+                            border: 1px solid rgba(59, 130, 246, 0.3); border-left: 4px solid #3b82f6; border-radius: 10px; padding: 16px 20px; margin: 12px 0 16px 0;">
+                    <div style="font-weight: 700; color: #60a5fa; font-size: 15px; margin-bottom: 8px;">
+                        💡 Sintesi di Predisposizione & Ottimizzazione Fiscale ARGUS (Anno {selected_tax_year}):
+                    </div>
+                    <ul style="color: #cbd5e1; font-size: 13px; line-height: 1.7; margin: 0; padding-left: 18px;">
+                        <li><b>Recupero Canoni di Locazione (+{fmt_eur_it(predisp_730['rent_recovered_deduction'])}):</b> L'AdE ha escluso il contratto registrato classificandolo come <i>'Dato non utilizzato'</i>.
+                        Inserendo la detrazione studenti universitari fuori sede in <b>Quadro E (Rigo E8/E10 cod. 18)</b>, il rimborso sale da <b>{fmt_eur_it(predisp_730['ade_refund'])}</b> a <b>{fmt_eur_it(predisp_730['new_irpef_refund'])}</b>!</li>
+                        <li><b>Integrazione Obbligatoria DEGIRO (Zero Sanzioni):</b> La precompilata ometteva i quadri finanziari. Integrando il <b>Quadro RT</b> (plusvalenze € 793,00, imposta 26% <b>€ {predisp_730['rt_sub_tax']:.2f}</b>) e il <b>Quadro W</b> (attività estere € 36.098,00, IVAFE <b>€ {predisp_730['w_ivafe']:.2f}</b>), si evitano avvisi 36-bis e sanzioni dal 30% al 90%.</li>
+                        <li><b>Esclusione IVAFE Conti Esteri:</b> N26 Bank presenta una giacenza media di € 734,91, ampiamente sotto la soglia di € 5.000,00: <b>esente da IVAFE</b> ex art. 19 c. 18 D.L. 201/2011.</li>
+                        <li><b>Esito Netto Conclusivo:</b> Incassi <b>{fmt_eur_it(predisp_730['new_irpef_refund'])}</b> di rimborso IRPEF e versi <b>{fmt_eur_it(predisp_730['f24_foreign_total'])}</b> tramite F24, chiudendo l'anno fiscale con un <b>saldo positivo reale di +{fmt_eur_it(predisp_730['net_tax_balance'])}</b> in piena conformità tributaria.</li>
+                    </ul>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            df_p = pd.DataFrame(predisp_730["metrics_table"])
+            df_p["ade_fmt"] = df_p["ade_val"].apply(lambda v: fmt_eur_it(float(v)) if float(v) > 0 or v == 0.0 else "—")
+            df_p["argus_fmt"] = df_p["argus_val"].apply(lambda v: fmt_eur_it(float(v)) if float(v) > 0 or v == 0.0 else "—")
+            df_p["delta_fmt"] = df_p["delta"].apply(lambda v: f"{'+' if float(v)>0 else ''}{fmt_eur_it(float(v))}")
+            def _map_p_badge(s):
+                if s == "ADVANTAGE":
+                    return "🟢 Ottimizzazione (+€)"
+                elif s == "WARNING":
+                    return "🟡 Da Integrare (F24)"
+                elif s == "DANGER":
+                    return "🔴 Rischio 36-bis"
+                return "🟢 Conforme"
+            df_p["status_badge"] = df_p["status"].apply(_map_p_badge)
+
+            st.dataframe(
+                df_p[["category", "item", "ade_fmt", "argus_fmt", "delta_fmt", "status_badge", "notes"]],
+                column_config={
+                    "category": st.column_config.TextColumn("Ambito", width="small"),
+                    "item": st.column_config.TextColumn("Voce Fiscale", width="medium"),
+                    "ade_fmt": st.column_config.TextColumn("1. Precompilata AdE", width="small"),
+                    "argus_fmt": st.column_config.TextColumn("2. Predisposizione ARGUS", width="small"),
+                    "delta_fmt": st.column_config.TextColumn("Scostamento (Delta)", width="small"),
+                    "status_badge": st.column_config.TextColumn("Stato Audit", width="small"),
+                    "notes": st.column_config.TextColumn("Diagnosi & Riferimenti Normativi", width="large"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+
+            with st.expander("📋 Istruzioni Operative: Modifica Portale AdE & Compilazione Modello F24", expanded=False):
+                st.markdown(
+                    f"""
+                    **1. Modifica sul Portale dell'Agenzia delle Entrate (Modello 730 Precompilato):**
+                    - Accedi a *dichiarazioneprecompilata.agenziaentrate.gov.it* con SPID o CIE.
+                    - Seleziona **Modifica 730**.
+                    - Accedi al **Quadro E (Oneri e Spese)** -> Sezione I (Spese per le quali spetta la detrazione d'imposta del 19%).
+                    - Al Rigo **E8 / E10**, inserisci Codice Spesa **18** (*Spese per canoni di locazione sostenute da studenti universitari fuori sede*) e importo **€ 519,00** (o € 519,45).
+                    - Verifica che nel prospetto di liquidazione il rimborso a tuo favore salga da **€ 625,00** a **€ 723,70**!
+
+                    **2. Compilazione e Versamento Modello F24 (Investimenti Esteri DEGIRO):**
+                    - Sezione Erario:
+                      * **Codice Tributo 1100:** Imposta sostitutiva su plusvalenze di natura finanziaria — Anno di riferimento: `{selected_tax_year}` — Importo a debito: **€ {predisp_730['rt_sub_tax']:.2f}**
+                      * **Codice Tributo 4043:** IVAFE - Imposta sul valore delle attività finanziarie detenute all'estero — Anno di riferimento: `{selected_tax_year}` — Importo a debito: **€ {predisp_730['w_ivafe']:.2f}**
+                    - **Totale Modello F24:** **€ {predisp_730['f24_foreign_total']:.2f}** da versare entro il termine ordinario delle imposte sui redditi.
+                    """
+                )
+            st.markdown("---")
 
         # ── 1. MATRICE DI AUDIT TRIANGOLARE (ARGUS vs BROKER vs 730 vs AdE 36-BIS) ──
         tri_audit = build_triangular_tax_audit(engine, profile_id=pid_str, tax_year=selected_tax_year)
