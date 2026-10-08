@@ -131,11 +131,16 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                         st.rerun()
 
                 for idx, (filename, parsed_data) in enumerate(parsed_list):
-                    is_730_4 = "730-4" in str(parsed_data.get("notes") or "") or "MOD 730/4" in filename
+                    is_730_4 = "730-4" in str(parsed_data.get("notes") or "") or "MOD 730/4" in filename.upper() or "730-4" in filename.upper()
                     exp_label = f"📄 File #{idx+1}: {filename} — Anno d'Imposta {parsed_data['tax_year']} (Mod. {parsed_data['filing_year']})"
                     with st.expander(exp_label, expanded=(len(parsed_list) == 1 or idx == 0)):
-                        if is_730_4:
-                            st.warning(f"⚠️ Il file **{filename}** appare come Modello 730-4 (comunicazione al sostituto d'imposta per conguaglio). Per l'estrazione completa dei quadri patrimoniali e finanziari (C, D, E, W/RW, T), carica il modello 730 ordinario completo.")
+                        if is_730_4 or (parsed_data.get("gross_income", 0.0) == 0.0 and parsed_data.get("net_tax_irpef", 0.0) == 0.0):
+                            st.warning(
+                                f"⚠️ **Attenzione sul file caricato ({filename}):** questo documento ha dimensione ridotta (1 pagina, ~258 KB) ed è il **Modello 730-4** (comunicazione di conguaglio per il sostituto d'imposta).\n\n"
+                                f"In questo prospetto **non sono presenti i quadri dei redditi** (C, D, E, W/RW, T), per questo motivo i campi risultano a 0,00.\n\n"
+                                f"👉 **Per caricare i dati corretti:** Seleziona dalla cartella il file PDF completo da **1,5 MB (16 pagine)** "
+                                f"(denominato `730_T25092611423143672686_SLDLSN00P19M208Y.pdf` o con variante `(4).pdf`) che contiene i tuoi redditi di € 22.716,00, imposta netta € 2.714,00 e quadri finanziari."
+                            )
                         c_p1, c_p2 = st.columns(2)
                         with c_p1:
                             p_year = st.number_input("Anno d'Imposta:", min_value=2015, max_value=2030, value=int(parsed_data["tax_year"]), key=f"p_yr_{pid_str}_{idx}")

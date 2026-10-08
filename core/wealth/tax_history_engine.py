@@ -601,7 +601,7 @@ def _extract_from_text(
     tax_year = datetime.now().year - 1
     filing_year = tax_year + 1
 
-    m_filing = re.search(r"730\s*/\s*(20\d{2})", full_text, re.IGNORECASE)
+    m_filing = re.search(r"730(?:\s*/\s*4)?\s*/?\s*(20\d{2})", full_text, re.IGNORECASE)
     if m_filing:
         filing_year = int(m_filing.group(1))
         tax_year = filing_year - 1
@@ -613,11 +613,16 @@ def _extract_from_text(
     )
     if m_periodo:
         tax_year = int(m_periodo.group(1))
-        if not m_filing:
-            filing_year = tax_year + 1
+        filing_year = tax_year + 1
+    elif m_ident_date := re.search(r"del\s+\d{1,2}/\d{1,2}/(20\d{2})", full_text, re.IGNORECASE):
+        # Se non c'è periodo d'imposta esplicito, la ricevuta telematica indica l'anno di presentazione
+        proto_yr = int(m_ident_date.group(1))
+        filing_year = proto_yr
+        tax_year = proto_yr - 1
 
     # 2. Tipologia Modello
     p1 = all_pages[0] if all_pages else full_text[:2500]
+    is_730_4 = bool(re.search(r"MOD(?:ELLO)?\s*730\s*/\s*4\b", p1, re.IGNORECASE))
     if "MOD. 730 INTEGRATIVO" in p1.upper() or re.search(r"730\s+integrativo[^\n]{0,50}\b[1-9X]\b", p1, re.IGNORECASE):
         model_type = "730_INTEGRATIVO"
     elif "REDDITI PF" in p1.upper() or "MODELLO REDDITI" in p1.upper():
@@ -802,6 +807,8 @@ def _extract_from_text(
     note_items = []
     if filing_year and tax_year:
         note_items.append(f"Modello {filing_year} (Redditi {tax_year})")
+    if is_730_4:
+        note_items.append("⚠️ MODELLO 730-4 CONGUAGLIO SOSTITUTO (1 pag.)")
     if contrib_name:
         note_items.append(f"Contribuente: {contrib_name}")
     if contrib_cf:
