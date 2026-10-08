@@ -213,3 +213,15 @@ class TestUILifecycleArchitecture:
         assert "results" not in st.session_state
         telemetry = get_ui_lifecycle_telemetry()
         assert telemetry["active_profile"] == 2
+
+    def test_teardown_view_state_with_active_page_keyword(self):
+        """Verifica compatibilità retroattiva con chiamata posizionale (current_pid, active_page=...)."""
+        st.session_state["_ui_lifecycle_active_page"] = "14_Conti_e_Cashflow"
+        st.session_state["_ui_lifecycle_active_profile"] = 1
+        st.session_state["wealth_active_portfolio_id"] = 1
+
+        # Chiamata tipica dei moduli wealth: teardown_view_state(current_pid, active_page="18_Fiscalita_e_Quadro_RW")
+        res = teardown_view_state(1, active_page="18_Fiscalita_e_Quadro_RW")
+        assert res["status"] == "success"
+        assert res["active_page"] == "18_Fiscalita_e_Quadro_RW"
+        assert st.session_state["_ui_lifecycle_active_page"] == "18_Fiscalita_e_Quadro_RW"

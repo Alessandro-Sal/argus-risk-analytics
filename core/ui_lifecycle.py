@@ -25,7 +25,7 @@ import logging
 import os
 import re
 import sys
-from typing import Any, Dict, List, MutableMapping, Optional, Set, Tuple
+from typing import Any, Dict, List, MutableMapping, Optional, Set, Tuple, Union
 
 logger = logging.getLogger("argus.ui_lifecycle")
 
@@ -297,9 +297,13 @@ def get_widget_key(
 # ── 3. UNIFIED ATOMIC TEARDOWN CONTROLLER ──────────────────────────
 
 def teardown_view_state(
-    target_page: Optional[str] = None,
+    target_page: Optional[Union[str, int]] = None,
     force: bool = False,
     reason: str = "lifecycle",
+    *,
+    active_page: Optional[str] = None,
+    portfolio_id: Optional[Any] = None,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Esegue il teardown atomico e la bonifica dello stato applicativo e della UI.
@@ -312,6 +316,8 @@ def teardown_view_state(
     - target_page: file o identificativo della pagina di destinazione (se None, rileva la corrente).
     - force: se True, forza un hard reset completo mantenendo solo le credenziali di sistema.
     - reason: etichetta descrittiva del trigger (es. 'navigation', 'profile_switch', 'database_switch').
+    - active_page: alias opzionale per target_page (compatibilità cross-modulo).
+    - portfolio_id: ID profilo/portafoglio opzionale.
 
     Ritorna:
         Dizionario con metriche sull'operazione (tipo transizione, chiavi epurate, tempo).
@@ -320,16 +326,24 @@ def teardown_view_state(
     if st_state is None:
         return {"purged_keys_count": 0, "status": "no_session"}
 
+    if active_page is not None:
+        if portfolio_id is None and target_page is not None:
+            portfolio_id = target_page
+        target_page = active_page
+    elif target_page is not None and isinstance(target_page, (int, float)):
+        portfolio_id = target_page
+        target_page = None
+
     if target_page is None:
         target_page = get_active_page_name()
-    norm_target = normalize_page_identifier(target_page)
+    norm_target = normalize_page_identifier(str(target_page))
 
     last_page = st_state.get("_ui_lifecycle_active_page")
     last_norm = normalize_page_identifier(last_page) if last_page else ""
     last_pid = st_state.get("_ui_lifecycle_active_profile")
     last_db = st_state.get("_ui_lifecycle_active_db")
 
-    curr_pid = st_state.get("wealth_active_portfolio_id")
+    curr_pid = portfolio_id if portfolio_id is not None else st_state.get("wealth_active_portfolio_id")
     if curr_pid is None:
         curr_pid = st_state.get("portfolio_id")
     curr_db = st_state.get("db_name")
