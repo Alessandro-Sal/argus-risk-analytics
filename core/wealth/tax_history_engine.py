@@ -1406,11 +1406,17 @@ def parse_broker_tax_report(
     if foreign_assets > 0.0 and ivafe == 0.0:
         ivafe = round(foreign_assets * 0.002, 2)
 
+    subtype_tag = ""
+    if "MODELLO UNICO" in (filename + text).upper():
+        subtype_tag = "-MODELLO-UNICO"
+    elif "CALCOLI" in (filename + text).upper():
+        subtype_tag = "-CALCOLI"
+
     return {
         "doc_type": "BROKER_REPORT",
         "tax_year": tax_year,
         "issuer_name": broker_name,
-        "protocol_or_code": f"PROFORMA-{broker_name}-{tax_year}",
+        "protocol_or_code": f"PROFORMA-{broker_name}{subtype_tag}-{tax_year}",
         "gross_amount": round(gross_gains, 2),
         "net_taxable_amount": round(net_gains, 2),
         "tax_withheld_or_due": round(sub_tax, 2),
@@ -1470,7 +1476,9 @@ def parse_bank_statement_rw(
     m_si = re.search(r"Saldo\s+(?:inizio\s+periodo|iniziale)\s*[:\s]\s*([\d\.,]+)", text, re.I)
     init_balance = _parse_italian_float(m_si.group(1)) if m_si else 0.0
 
-    m_sf = re.search(r"(?:Saldo\s+(?:fine\s+periodo|contabile(?:\s+al\s+[\d/]+)?|al\s+31/12|finale))\s*[:\s]\s*([\d\.,]+)", text, re.I)
+    m_sf = re.search(r"Saldo\s+fine\s+periodo\s*[:\s]\s*([\d\.,]+)", text, re.I)
+    if not m_sf:
+        m_sf = re.search(r"(?:Saldo\s+(?:contabile\s+al\s+[\d\./]+|al\s+31/12|finale))\s*[:\s]\s*([\d\.,]+)", text, re.I)
     final_balance = _parse_italian_float(m_sf.group(1)) if m_sf else 0.0
 
     # IVAFE: Esente se giacenza media < 5.000 euro
@@ -1802,8 +1810,17 @@ def parse_universal_tax_document(
     else:
         # Fallback a 730 / Redditi PF standard
         res = parse_730_pdf_or_json(file_content, filename)
-        if isinstance(res, dict) and "doc_type" not in res:
-            res["doc_type"] = "OFFICIAL_DECLARATION"
+        if isinstance(res, dict):
+            if "doc_type" not in res:
+                res["doc_type"] = "OFFICIAL_DECLARATION"
+            if "gross_amount" not in res and "gross_income" in res:
+                res["gross_amount"] = res["gross_income"]
+            if "tax_withheld_or_due" not in res and "net_tax_irpef" in res:
+                res["tax_withheld_or_due"] = res["net_tax_irpef"]
+            if "secondary_amount" not in res and "substitute_tax_paid" in res:
+                res["secondary_amount"] = res["substitute_tax_paid"]
+            if "asset_monitoring_val" not in res and "foreign_assets_val" in res:
+                res["asset_monitoring_val"] = res["foreign_assets_val"]
         return res
 
 
@@ -1865,11 +1882,19 @@ def build_730_predisposition_and_variance_audit(
     rent_recovered_deduction = round(rent_period_recognized * 0.19, 2)
 
     # 4. Dati Broker Reali (DEGIRO Quadro RT e W)
+    broker_by_issuer = {}
+    for b in broker_docs:
+        iss = (b.get("issuer_name") or "BROKER").upper()
+        fn = (b.get("source_filename") or "").upper()
+        proto = (b.get("protocol_or_code") or "").upper()
+        if iss not in broker_by_issuer or "MODELLO UNICO" in fn or "MODELLO-UNICO" in proto:
+            broker_by_issuer[iss] = b
+
     brk_cap_gains = 0.0
     brk_sub_tax = 0.0
     brk_assets = 0.0
     brk_ivafe = 0.0
-    for b in broker_docs:
+    for b in broker_by_issuer.values():
         brk_cap_gains += float(b.get("net_taxable_amount", 0.0) or b.get("gross_amount", 0.0))
         brk_sub_tax += float(b.get("tax_withheld_or_due", 0.0))
         brk_assets += float(b.get("asset_monitoring_val", 0.0))
@@ -2030,7 +2055,16 @@ def build_triangular_tax_audit(
     decl = declarations[0] if declarations else {}
 
     vdocs = get_verification_documents(engine, profile_id=profile_id, tax_year=tax_year)
-    broker_doc = next((d for d in vdocs if d.get("doc_type") == "BROKER_REPORT"), {})
+    broker_docs = [d for d in vdocs if d.get("doc_type") in ["BROKER_REPORT", "BROKER_TAX_REPORT"]]
+    broker_doc = next(
+        (
+            d
+            for d in broker_docs
+            if "MODELLO UNICO" in (str(d.get("source_filename")) + str(d.get("protocol_or_code"))).upper()
+            or "MODELLO-UNICO" in (str(d.get("source_filename")) + str(d.get("protocol_or_code"))).upper()
+        ),
+        broker_docs[0] if broker_docs else {},
+    )
     ade_notice = next((d for d in vdocs if d.get("doc_type") == "ADE_NOTICE_36BIS"), {})
     cu_docs = [d for d in vdocs if d.get("doc_type") == "CU"]
 
