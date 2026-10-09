@@ -10,6 +10,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine
+from sqlalchemy import text as sqlt
 
 from core.wealth.tax_history_engine import (
     TaxDeclaration,
@@ -1108,11 +1109,24 @@ class TestTaxLossHarvestingAndBackupBundle:
             "gross_amount": 5000.0,
         })
 
+        # Insert a fixed expense with a real date object to test JSON serialization
+        from datetime import date
+        with memory_db.begin() as conn:
+            conn.execute(
+                sqlt("INSERT INTO wealth_fixed_expenses (portfolio_id, category, note, amount, payment_day, start_date) "
+                     "VALUES (1, 'Fisco', 'Test Note', 100.0, 1, :dt)"),
+                {"dt": date(2025, 6, 30)},
+            )
+
         bundle = export_wealth_and_tax_backup_bundle(memory_db, profile_id=profile)
         assert bundle["backup_metadata"]["version"] == "2.0"
         assert bundle["backup_metadata"]["total_records_count"] >= 2
         assert "tax_declarations" in bundle["tables"]
         assert len(bundle["tables"]["tax_declarations"]) >= 1
+
+        # Test full JSON serialization with indent
+        bundle_json_str = json.dumps(bundle, indent=2, ensure_ascii=False)
+        assert "2025-06-30" in bundle_json_str
 
         restore_res = import_wealth_and_tax_backup_bundle(memory_db, bundle, profile_id="restored_user")
         assert restore_res["status"] == "success"

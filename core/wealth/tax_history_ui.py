@@ -866,18 +866,22 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             with c_bk_exp:
                 st.markdown("###### 📤 Esportazione Dati")
                 st.write("Genera uno snapshot istantaneo di tutte le tabelle patrimoniali e fiscali.")
-                bundle = export_wealth_and_tax_backup_bundle(engine, profile_id=pid_str)
-                bundle_json = json.dumps(bundle, indent=2, ensure_ascii=False)
-                st.download_button(
-                    "📥 Scarica Backup Completo (.json)",
-                    data=bundle_json.encode("utf-8"),
-                    file_name=f"argus_backup_wealth_tax_{pid_str}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-                    mime="application/json",
-                    key=f"dl_backup_json_{pid_str}",
-                    use_container_width=True,
-                )
-                tot_rec = bundle.get("backup_metadata", {}).get("total_records_count", 0)
-                st.caption(f"Contenuto: {tot_rec} record totali estratti.")
+                if st.button("📦 Prepara Snapshot di Backup", key=f"btn_prep_backup_{pid_str}"):
+                    st.session_state[f"ready_backup_{pid_str}"] = True
+
+                if st.session_state.get(f"ready_backup_{pid_str}"):
+                    bundle = export_wealth_and_tax_backup_bundle(engine, profile_id=pid_str)
+                    bundle_json = json.dumps(bundle, indent=2, ensure_ascii=False, default=str)
+                    tot_rec = bundle.get("backup_metadata", {}).get("total_records_count", 0)
+                    st.download_button(
+                        "📥 Scarica Backup Completo (.json)",
+                        data=bundle_json.encode("utf-8"),
+                        file_name=f"argus_backup_wealth_tax_{pid_str}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+                        mime="application/json",
+                        key=f"dl_backup_json_{pid_str}",
+                        use_container_width=True,
+                    )
+                    st.caption(f"✅ Snapshot pronto: {tot_rec} record estratti.")
 
             with c_bk_imp:
                 st.markdown("###### 📥 Ripristino da File")

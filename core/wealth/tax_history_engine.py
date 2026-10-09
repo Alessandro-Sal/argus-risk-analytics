@@ -9,7 +9,7 @@ import json
 import logging
 import re
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
@@ -539,7 +539,7 @@ def record_verification_document(engine: Engine, data: Dict[str, Any]) -> int:
 
     meta = data.get("metadata_json") or {}
     if isinstance(meta, dict):
-        metadata_str = json.dumps(meta, ensure_ascii=False)
+        metadata_str = json.dumps(meta, ensure_ascii=False, default=str)
     else:
         metadata_str = str(meta) if meta else None
 
@@ -3449,7 +3449,7 @@ def export_wealth_and_tax_backup_bundle(
                 for r in res:
                     r_dict = dict(r)
                     for k, v in r_dict.items():
-                        if isinstance(v, datetime):
+                        if isinstance(v, (datetime, date)):
                             r_dict[k] = v.isoformat()
                         elif hasattr(v, "as_tuple") or str(type(v)).find("Decimal") != -1:
                             r_dict[k] = float(v)
