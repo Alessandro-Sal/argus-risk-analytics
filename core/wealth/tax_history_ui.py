@@ -25,6 +25,7 @@ from core.wealth.tax_history_engine import (
     compute_crypto_tax_reporting,
     compute_fire_effective_tax_drag,
     compute_fiscal_reform_2026_etf_harmonization,
+    compute_fiscal_reform_multiyear_projection,
     compute_pension_tax_deduction_optimizer,
     compute_ravvedimento_operoso,
     compute_tax_loss_harvesting_signals,
@@ -36,6 +37,7 @@ from core.wealth.tax_history_engine import (
     generate_730_precompilata_actionable_guide,
     generate_commercialista_tax_dossier_html,
     generate_f24_payment_slip,
+    generate_official_f24_facsimile_html,
     generate_sample_730_json,
     get_declarations,
     get_fiscal_deadlines_calendar,
@@ -44,6 +46,9 @@ from core.wealth.tax_history_engine import (
     get_verification_documents,
     import_wealth_and_tax_backup_bundle,
     parse_730_pdf_or_json,
+    parse_building_renovation,
+    parse_medical_expenses,
+    parse_mortgage_interest,
     parse_universal_tax_document,
     reconcile_with_portfolio,
     record_declaration,
@@ -93,10 +98,38 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
     # ── SCADENZIARIO FISCALE GLOBALE (AdE TAX CALENDAR & COUNTDOWN) ──
     deadlines_list = get_fiscal_deadlines_calendar(tax_year=selected_tax_year, profile_id=pid_str, engine=engine)
     with st.expander(f"📅 Scadenziario Tributario AdE & Conto alla Rovescia Adempimenti (Anno {selected_tax_year}/{selected_tax_year + 1})", expanded=False):
-        st.caption("Scadenzario cronologico unificato con calcolo dinamico del conto alla rovescia, badge di urgenza e codici tributo F24.")
-        c_dl_cols = st.columns(min(len(deadlines_list), 4))
-        for d_i, d_val in enumerate(deadlines_list[:4]):
-            with c_dl_cols[d_i % 4]:
+        st.caption("Scadenzario cronologico unificato con calcolo dinamico del conto alla rovescia, badge di urgenza, filtri interattivi e codici tributo F24.")
+
+        c_dl_filter, c_dl_alert = st.columns([2.5, 1.5])
+        with c_dl_filter:
+            dl_filter = st.radio(
+                "Filtro Scadenze:",
+                ["Tutte le Scadenze", "🚨 In Scadenza (< 30 gg)", "⚠️ Scadute", "📅 Future"],
+                horizontal=True,
+                key=f"dl_filter_radio_{pid_str}_{selected_tax_year}",
+            )
+        with c_dl_alert:
+            expired_count = sum(1 for d in deadlines_list if d["days_remaining"] < 0)
+            urgent_count = sum(1 for d in deadlines_list if 0 <= d["days_remaining"] <= 30)
+            if expired_count > 0:
+                st.warning(f"⚠️ {expired_count} adempimenti scaduti: regolarizzabili con Ravvedimento Operoso!")
+            elif urgent_count > 0:
+                st.info(f"🚨 {urgent_count} scadenze nei prossimi 30 giorni!")
+            else:
+                st.success("🟢 Nessuna urgenza immediata nei prossimi 30 giorni.")
+
+        if dl_filter == "🚨 In Scadenza (< 30 gg)":
+            filtered_deadlines = [d for d in deadlines_list if 0 <= d["days_remaining"] <= 30]
+        elif dl_filter == "⚠️ Scadute":
+            filtered_deadlines = [d for d in deadlines_list if d["days_remaining"] < 0]
+        elif dl_filter == "📅 Future":
+            filtered_deadlines = [d for d in deadlines_list if d["days_remaining"] > 30]
+        else:
+            filtered_deadlines = deadlines_list
+
+        c_dl_cols = st.columns(max(1, min(len(filtered_deadlines), 4)))
+        for d_i, d_val in enumerate(filtered_deadlines[:4]):
+            with c_dl_cols[d_i % len(c_dl_cols)]:
                 diff_d = d_val["days_remaining"]
                 d_delta = f"{abs(diff_d)} gg {'passati' if diff_d < 0 else 'rimasti'}"
                 metric_card(
@@ -105,7 +138,8 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                     delta=f"{d_val['urgency_badge']} ({d_delta})",
                     delta_color="normal" if diff_d > 15 else ("inverse" if diff_d >= 0 else "off"),
                 )
-        df_deadlines = pd.DataFrame(deadlines_list)
+
+        df_deadlines = pd.DataFrame(filtered_deadlines if filtered_deadlines else deadlines_list)
         st.dataframe(
             df_deadlines[["due_date_formatted", "urgency_badge", "title", "tributo_code", "amount_eur", "desc"]],
             column_config={
@@ -198,6 +232,18 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                         type_label = f"Locazione ({v_issuer})"
                         badge_color = "#a855f7"
                         detail_line = f"Canone: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Detrazione 19%: <strong style='color: #10b981;'>+{fmt_eur_it(v_item.get('secondary_amount', 0.0))}</strong>"
+                    elif v_type in ["MEDICAL_EXPENSES", "SPESE_MEDICHE"]:
+                        type_label = f"Spesa Sanitaria ({v_issuer})"
+                        badge_color = "#ec4899"
+                        detail_line = f"Spesa: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Detrazione 19%: <strong style='color: #10b981;'>+{fmt_eur_it(v_item.get('secondary_amount', 0.0))}</strong>"
+                    elif v_type in ["MORTGAGE_INTEREST", "INTERESSI_MUTUO"]:
+                        type_label = f"Interessi Mutuo ({v_issuer})"
+                        badge_color = "#3b82f6"
+                        detail_line = f"Interessi: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Detrazione 19%: <strong style='color: #10b981;'>+{fmt_eur_it(v_item.get('secondary_amount', 0.0))}</strong>"
+                    elif v_type in ["BUILDING_RENOVATION", "RISTRUTTURAZIONE"]:
+                        type_label = f"Ristrutturazione ({v_issuer})"
+                        badge_color = "#14b8a6"
+                        detail_line = f"Spesa: <strong style='color: #f8fafc;'>{fmt_eur_it(v_gross)}</strong><br/>Rata 1/10: <strong style='color: #10b981;'>+{fmt_eur_it(v_item.get('secondary_amount', 0.0))}</strong>"
                     elif v_type == "ADE_NOTICE_36BIS":
                         type_label = "Avviso AdE 36-bis"
                         badge_color = "#ef4444"
@@ -1458,6 +1504,90 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         st.dataframe(df_comp_reform, hide_index=True, use_container_width=True)
         st.info(f"💡 **Verdetto Strategico ARGUS:** {reform_sim['strategic_advice']}")
 
+        # ── 4. PROIEZIONE PLURIENNALE A LUNGO TERMINE (STATUS QUO vs RIFORMA 2026) ──
+        with st.expander("📈 Proiezione Pluriennale di Lungo Termine (5 - 20 Anni): Status Quo vs Riforma 2026", expanded=False):
+            st.caption(
+                "Simulazione quantitativa dell'effetto composto del 'Tax Drag' a lungo termine: "
+                "confronta l'accumulo di capitale con l'attuale asimmetria fiscale rispetto alla riforma ad aliquota armonizzata con riporto integrale."
+            )
+            c_p_in1, c_p_in2, c_p_in3, c_p_in4 = st.columns(4)
+            with c_p_in1:
+                p_cap = st.number_input("Capitale Iniziale (€):", min_value=5000.0, value=100000.0, step=10000.0, key=f"sim_p_cap_{pid_str}")
+            with c_p_in2:
+                p_ret = st.slider("Rendimento Annuo Lordo (%):", min_value=2.0, max_value=15.0, value=7.0, step=0.5, key=f"sim_p_ret_{pid_str}")
+            with c_p_in3:
+                p_trn = st.slider("Turnover Ribilanciamento (%):", min_value=0.0, max_value=50.0, value=15.0, step=5.0, key=f"sim_p_trn_{pid_str}")
+            with c_p_in4:
+                p_los = st.slider("Frazione Minus Realizzate (%):", min_value=0.0, max_value=80.0, value=30.0, step=5.0, key=f"sim_p_los_{pid_str}")
+
+            proj_res = compute_fiscal_reform_multiyear_projection(
+                initial_capital=p_cap,
+                annual_return_pct=p_ret,
+                annual_turnover_pct=p_trn,
+                realized_loss_fraction=p_los / 100.0,
+                projection_years=20,
+            )
+
+            c_pj1, c_pj2, c_pj3, c_pj4 = st.columns(4)
+            with c_pj1:
+                metric_card("Delta Capitale a 10 Anni", f"+{fmt_eur(proj_res['milestones'].get('10y', {}).get('delta_wealth', 0.0))}", "Guadagno da Riforma", delta_color="normal")
+            with c_pj2:
+                metric_card("Delta Capitale a 20 Anni", f"+{fmt_eur(proj_res['total_wealth_alpha_eur'])}", f"CAGR +{proj_res['tax_alpha_basis_points']} bps", delta_color="normal")
+            with c_pj3:
+                metric_card("Imposte Risparmiate (20A)", fmt_eur(proj_res['total_tax_savings_eur']), "Cash Flow Preservato", delta_color="normal")
+            with c_pj4:
+                metric_card("Tax Alpha Annuo", f"+{proj_res['tax_alpha_basis_points']} bps", "Rendimento Netto Extra", delta_color="normal")
+
+            # Grafico Plotly dual curve
+            df_traj = pd.DataFrame(proj_res["trajectory"])
+            fig_proj = go.Figure()
+            fig_proj.add_trace(go.Scatter(
+                x=[f"Anno {y}" for y in df_traj["year"]],
+                y=df_traj["capital_reform"],
+                name="Riforma 2026 (Armonizzata)",
+                line=dict(color="#10b981", width=3),
+                fill=None,
+            ))
+            fig_proj.add_trace(go.Scatter(
+                x=[f"Anno {y}" for y in df_traj["year"]],
+                y=df_traj["capital_status_quo"],
+                name="Status Quo (TUIR Vigente)",
+                line=dict(color="#f59e0b", width=2.5, dash="dash"),
+                fill="tonexty",
+                fillcolor="rgba(16, 185, 129, 0.12)",
+            ))
+            fig_proj.update_layout(
+                title=dict(text="Crescita Patrimoniale Composta: Riforma 2026 vs Status Quo (20 Anni)", font=dict(size=14, color="#ffffff")),
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                height=380,
+                yaxis=dict(title="Patrimonio Netto (€)", gridcolor="rgba(255,255,255,0.08)"),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                margin=dict(l=10, r=10, t=50, b=10),
+            )
+            st.plotly_chart(fig_proj, use_container_width=True, config={"displayModeBar": False})
+
+            # Tabella milestone
+            st.markdown("###### 📋 Proiezione per Scaglioni Temporali")
+            df_ms = pd.DataFrame([
+                {"Orizzonte": "5 Anni", **proj_res["milestones"].get("5y", {})},
+                {"Orizzonte": "10 Anni", **proj_res["milestones"].get("10y", {})},
+                {"Orizzonte": "15 Anni", **proj_res["milestones"].get("15y", {})},
+                {"Orizzonte": "20 Anni", **proj_res["milestones"].get("20y", {})},
+            ])
+            st.dataframe(
+                df_ms,
+                column_config={
+                    "capital_status_quo": st.column_config.NumberColumn("Capitale Status Quo (€)", format="€ %,.2f"),
+                    "capital_reform": st.column_config.NumberColumn("Capitale Riforma 2026 (€)", format="€ %,.2f"),
+                    "delta_wealth": st.column_config.NumberColumn("Extra-Capitale Riforma (€)", format="+€ %,.2f"),
+                    "cumulative_tax_saved": st.column_config.NumberColumn("Imposte Risparmiate (€)", format="€ %,.2f"),
+                },
+                hide_index=True,
+                use_container_width=True,
+            )
+
     # ============================================================
     # SUBTAB 4: AUDIT ADVISOR & RICONCILIAZIONE (ART. 36-BIS)
     # ============================================================
@@ -1646,6 +1776,76 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 hide_index=True,
                 use_container_width=True,
             )
+
+            # Fac-simile Grafico Ufficiale F24 (AdE Print-Ready)
+            f24_facsimile = generate_official_f24_facsimile_html(
+                f24_data,
+                taxpayer_name=st.session_state.get(f"dossier_name_{pid_str}_{selected_tax_year}", "Mario Rossi"),
+                taxpayer_cf=st.session_state.get(f"dossier_cf_{pid_str}_{selected_tax_year}", "RSSMRA85M01H501Z"),
+            )
+
+            c_f24_dl, c_f24_prev = st.columns([2, 2])
+            with c_f24_dl:
+                st.download_button(
+                    "📥 Scarica Modello F24 Ufficiale (.html / PDF-Ready)",
+                    data=f24_facsimile,
+                    file_name=f"modello_f24_{selected_tax_year}_delega_erario.html",
+                    mime="text/html",
+                    key=f"dl_f24_facsimile_{pid_str}_{selected_tax_year}",
+                    type="primary",
+                    use_container_width=True,
+                )
+            with c_f24_prev:
+                show_f24_p = st.checkbox(
+                    "👁️ Mostra Fac-Simile F24 a Video",
+                    value=False,
+                    key=f"cb_show_f24_{pid_str}_{selected_tax_year}",
+                )
+
+            if show_f24_p:
+                import streamlit.components.v1 as components
+                components.html(f24_facsimile, height=650, scrolling=True)
+
+            # Template Home Banking per istituti
+            with st.expander("🏦 Template Copia & Incolla Specifico per Home Banking (UniCredit, Intesa, Fineco, BBVA, Poste)", expanded=False):
+                st.caption("Seleziona il tuo istituto per copiare il testo formattato esatto richiesto dal relativo form bancario online.")
+                b_tab1, b_tab2, b_tab3, b_tab4, b_tab5 = st.tabs(["🔴 UniCredit", "🟢 Intesa Sanpaolo", "🔵 Fineco", "🟣 BBVA", "🟡 Poste Italiane"])
+                rows_f24 = f24_data.get("payment_rows", [])
+
+                with b_tab1:
+                    uc_text = "MODELLO F24 SEMPLIFICATO / ORDINARIO UNICREDIT\nSezione: ERARIO\n"
+                    for r in rows_f24:
+                        uc_text += f"• Tributo: {r['tributo_code']} | Rateazione: {r['rateazione']} | Anno: {r['anno_riferimento']} | Debito: {r['debito_eur']:.2f} €\n"
+                    uc_text += f"Saldo Finale Addebito: {f24_data.get('net_balance_eur', 0.0):.2f} €"
+                    st.text_area("Formato UniCredit Online:", value=uc_text, height=120, key=f"hb_uc_{pid_str}")
+
+                with b_tab2:
+                    isp_text = "INTESA SANPAOLO — MODELLO F24 WEB\nTipo Delega: F24 Ordinario -> Sezione Erario\n"
+                    for r in rows_f24:
+                        isp_text += f"Codice: {r['tributo_code']} | Rif: {r['anno_riferimento']} | Rateaz: {r['rateazione']} | Importo: {r['debito_eur']:.2f}\n"
+                    isp_text += f"Totale da Pagare: {f24_data.get('net_balance_eur', 0.0):.2f} €"
+                    st.text_area("Formato Intesa Sanpaolo:", value=isp_text, height=120, key=f"hb_isp_{pid_str}")
+
+                with b_tab3:
+                    fin_text = "FINECO BANK — F24 ORDINARIO ONLINE\n"
+                    for r in rows_f24:
+                        fin_text += f"Codice Tributo: {r['tributo_code']} | Anno: {r['anno_riferimento']} | Rateazione: {r['rateazione']} | Debito: {r['debito_eur']:.2f} €\n"
+                    fin_text += f"Saldo Netto: {f24_data.get('net_balance_eur', 0.0):.2f} €"
+                    st.text_area("Formato Fineco:", value=fin_text, height=120, key=f"hb_fin_{pid_str}")
+
+                with b_tab4:
+                    bbva_text = "BBVA ITALIA — PAGAMENTO F24\n"
+                    for r in rows_f24:
+                        bbva_text += f"Sezione: Erario | Codice: {r['tributo_code']} | Anno: {r['anno_riferimento']} | Rata: {r['rateazione']} | Importo: € {r['debito_eur']:.2f}\n"
+                    bbva_text += f"Totale Addebito: € {f24_data.get('net_balance_eur', 0.0):.2f}"
+                    st.text_area("Formato BBVA:", value=bbva_text, height=120, key=f"hb_bbva_{pid_str}")
+
+                with b_tab5:
+                    poste_text = "POSTE ITALIANE — BANCOPOSTA F24\n"
+                    for r in rows_f24:
+                        poste_text += f"Tributo: {r['tributo_code']} | Rateazione: {r['rateazione']} | Anno: {r['anno_riferimento']} | Importo a debito: {r['debito_eur']:.2f}\n"
+                    poste_text += f"Saldo da quietanzare: {f24_data.get('net_balance_eur', 0.0):.2f} €"
+                    st.text_area("Formato Poste Italiane:", value=poste_text, height=120, key=f"hb_poste_{pid_str}")
 
             # Piano rateale dettagliato se rate > 1
             if n_inst > 1 and dett_rate:

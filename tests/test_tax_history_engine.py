@@ -22,6 +22,7 @@ from core.wealth.tax_history_engine import (
     compute_crypto_tax_reporting,
     compute_fire_effective_tax_drag,
     compute_fiscal_reform_2026_etf_harmonization,
+    compute_fiscal_reform_multiyear_projection,
     compute_pension_tax_deduction_optimizer,
     compute_ravvedimento_operoso,
     compute_tax_loss_harvesting_signals,
@@ -33,6 +34,7 @@ from core.wealth.tax_history_engine import (
     generate_730_precompilata_actionable_guide,
     generate_commercialista_tax_dossier_html,
     generate_f24_payment_slip,
+    generate_official_f24_facsimile_html,
     generate_sample_730_json,
     get_declarations,
     get_fiscal_deadlines_calendar,
@@ -45,7 +47,10 @@ from core.wealth.tax_history_engine import (
     parse_ade_precompilata,
     parse_bank_statement_rw,
     parse_broker_tax_report,
+    parse_building_renovation,
     parse_certificazione_unica,
+    parse_medical_expenses,
+    parse_mortgage_interest,
     parse_rent_expense,
     parse_universal_tax_document,
     reconcile_with_portfolio,
@@ -610,6 +615,9 @@ class TestUniversalTaxParsers:
         assert detect_tax_document_type("RENDICONTO FISCALE DEGIRO ANNO FISCALE 2024 QUADRO RT") == "BROKER_TAX_REPORT"
         assert detect_tax_document_type("COMUNICAZIONE N. 0011122233344 CODICE ATTO N. 20000000001 ART. 36-BIS") == "ADE_NOTICE_36BIS"
         assert detect_tax_document_type("MODELLO 730/2025 REDDITI 2024") == "OFFICIAL_DECLARATION"
+        assert detect_tax_document_type("FARMACIA CENTRALE SCONTRINO PARLANTE DISPOSITIVO MEDICO") == "MEDICAL_EXPENSES"
+        assert detect_tax_document_type("CERTIFICAZIONE INTERESSI PASSIVI MUTUO IPOTECARIO PRIMA CASA") == "MORTGAGE_INTEREST"
+        assert detect_tax_document_type("BONIFICO PARLANTE RECUPERO DEL PATRIMONIO EDILIZIO DETRAZIONE EDILIZIA") == "BUILDING_RENOVATION"
 
     def test_parse_certificazione_unica_synthetic_payload(self):
         cu_text = """
@@ -1274,7 +1282,112 @@ class TestStrategicFiscalExtensions:
             assert "tributo_code" in d
 
 
+class TestAdvancedFiscalEnhancements:
+    """Test suite per le nuove funzionalità fiscali strategiche (Spese Mediche, Mutui, Ristrutturazioni, Facsimile F24, Proiezione Riforma 2026)."""
 
+    def test_parse_medical_expenses_payload(self):
+        medical_text = """
+        FARMACIA SAN CARLO - SCONTRINO PARLANTE
+        DATA: 15/05/2024
+        CODICE FISCALE: RSSMRA85M01H501Z
+        DISPOSITIVO MEDICO CE: 150,00 €
+        FARMACIA / MEDICINALI: 79,11 €
+        TOTALE: 229,11 €
+        """
+        res = parse_medical_expenses(medical_text, filename="scontrino_farmacia.txt")
+        assert res["doc_type"] == "MEDICAL_EXPENSES"
+        assert res["gross_amount"] == 229.11
+        # Franchigia 129.11 -> eccedenza = 229.11 - 129.11 = 100.00
+        assert res["net_taxable_amount"] == 100.00
+        # Detrazione 19% su 100.00 = 19.00
+        assert res["secondary_amount"] == 19.00
+        assert res["metadata_json"]["franchigia_eur"] == 129.11
+        assert res["metadata_json"]["eligible_deduction_19pct"] == 19.00
+        assert res["taxpayer_cf"] == "RSSMRA85M01H501Z"
 
+    def test_parse_mortgage_interest_payload(self):
+        mortgage_text = """
+        INTESA SANPAOLO - ATTESTAZIONE INTERESSI PASSIVI MUTUO
+        ANNO D'IMPOSTA: 2024
+        CONTRATTO MUTUO N.: MUT-2021-9988
+        OGGETTO: MUTUO IPOTECARIO ACQUISTO ABITAZIONE PRINCIPALE
+        QUOTA INTERESSI PAGATA NEL 2024: 4.800,00 €
+        TOTALE PAGATO: 4.800,00 €
+        """
+        res = parse_mortgage_interest(mortgage_text, filename="certificazione_mutuo.txt")
+        assert res["doc_type"] == "MORTGAGE_INTEREST"
+        assert res["gross_amount"] == 4800.00
+        # Cap normativo a 4.000,00 € -> base ammessa = 4000.00
+        assert res["net_taxable_amount"] == 4000.00
+        # Detrazione 19% su 4000.00 = 760.00
+        assert res["secondary_amount"] == 760.00
+        assert res["metadata_json"]["max_statutory_cap_eur"] == 4000.00
+        assert res["metadata_json"]["eligible_deduction_19pct"] == 760.00
 
+    def test_parse_building_renovation_payload(self):
+        renovation_text = """
+        BONIFICO PARLANTE RECUPERO PATRIMONIO EDILIZIO (ART. 16-BIS TUIR)
+        DATA: 20/09/2024
+        BENEFICIARIO: EDIL COSTRUZIONI SRL
+        IMPORTO FATTURA: 12.000,00 €
+        DETRAZIONE EDILIZIA 50%
+        RIQUALIFICAZIONE
+        """
+        res = parse_building_renovation(renovation_text, filename="bonifico_edilizio.txt")
+        assert res["doc_type"] == "BUILDING_RENOVATION"
+        assert res["gross_amount"] == 12000.00
+        # 50% di 12.000 = 6.000 totale bonus
+        assert res["net_taxable_amount"] == 6000.00
+        # 1/10 rata annua = 600.00
+        assert res["secondary_amount"] == 600.00
+        assert res["metadata_json"]["rate_label"] == "50%"
+        assert res["metadata_json"]["annual_installment_eur"] == 600.00
 
+    def test_universal_router_with_new_documents(self):
+        med_raw = "FARMACIA CENTRALE SCONTRINO PARLANTE 250,00 €"
+        res_med = parse_universal_tax_document(med_raw, filename="doc_med.txt")
+        assert res_med["doc_type"] == "MEDICAL_EXPENSES"
+        assert res_med["gross_amount"] > 0
+
+        mort_raw = "INTESA SANPAOLO CERTIFICAZIONE INTERESSI PASSIVI MUTUO PRIMA CASA 3.200,00 €"
+        res_mort = parse_universal_tax_document(mort_raw, filename="doc_mutuo.txt")
+        assert res_mort["doc_type"] == "MORTGAGE_INTEREST"
+        assert res_mort["net_taxable_amount"] == 3200.00
+
+        reno_raw = "BONIFICO PARLANTE RECUPERO DEL PATRIMONIO EDILIZIO 50% 8.000,00 €"
+        res_reno = parse_universal_tax_document(reno_raw, filename="doc_ristr.txt")
+        assert res_reno["doc_type"] == "BUILDING_RENOVATION"
+        assert res_reno["secondary_amount"] == 400.00
+
+    def test_official_f24_facsimile_html(self, memory_db):
+        f24_data = generate_f24_payment_slip(memory_db, profile_id="test_user", tax_year=2025)
+        html = generate_official_f24_facsimile_html(
+            f24_data=f24_data,
+            taxpayer_name="MARIO ROSSI",
+            taxpayer_cf="RSSMRA85M01H501Z",
+        )
+        assert "<!DOCTYPE html>" in html
+        assert "Modello di Pagamento Unificato" in html
+        assert "RSSMRA85M01H501Z" in html
+        assert "SEZIONE ERARIO" in html
+        assert "1100" in html
+        assert "4043" in html
+        assert "@media print" in html
+
+    def test_compute_fiscal_reform_multiyear_projection(self):
+        res = compute_fiscal_reform_multiyear_projection(
+            initial_capital=50000.0,
+            annual_return_pct=8.0,
+            annual_turnover_pct=20.0,
+            realized_loss_fraction=0.35,
+            projection_years=10,
+        )
+        assert res["initial_capital"] == 50000.0
+        assert res["projection_years"] == 10
+        assert len(res["trajectory"]) == 10
+        assert res["final_capital_reform"] > res["final_capital_status_quo"]
+        assert res["total_wealth_alpha_eur"] > 0
+        assert res["total_tax_savings_eur"] > 0
+        assert res["tax_alpha_basis_points"] > 0
+        assert "5y" in res["milestones"]
+        assert "10y" in res["milestones"]
