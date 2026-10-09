@@ -246,7 +246,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         st.info(
             "💡 **Hub Universale di Ingestione Fiscale & Predisposizione Modello 730:**\n\n"
             "- **Precompilata AdE & 730 Ufficiale:** Trascina il prospetto precompilato (testuale o grafico) o il 730 definitivo. Riconosce oneri Quadro E e isola i 'Dati non utilizzati'.\n"
-            "- **Certificazioni Uniche (CU):** Estrae redditi da lavoro (Sixtema Punti 1–6, ritenute P. 21, addizionali) e borse di studio esenti (ER.GO Punto 465 cod. 23).\n"
+            "- **Certificazioni Uniche (CU):** Estrae redditi da lavoro dipendente (Punti 1–6, ritenute P. 21, addizionali) ed eventuali compensi o borse esenti (Punto 465 cod. 23).\n"
             "- **Rendiconti Fiscali Broker:** Acquisisce i prospetti DEGIRO (Modello Unico / Calcoli) per Quadro RT (plusvalenze 26%) e Quadro W/RW (IVAFE 2‰).\n"
             "- **Conti Correnti Esteri:** Analizza estratti conto N26 e Revolut per monitoraggio fiscale e verifica automatica della soglia di esenzione IVAFE (€ 5.000,00).\n"
             "- **Spese e Contratti di Locazione:** Ricevute bonifici affitto e contratto studenti fuori sede (Art. 15 TUIR) per sbloccare la detrazione al 19% (Rigo E8 cod. 18).\n"
@@ -260,7 +260,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 type=["pdf", "json", "txt"],
                 accept_multiple_files=True,
                 key=f"file_uploader_tax_{pid_str}",
-                help="Supporta PDF ufficiali AdE, Precompilata, CU Sixtema ed ER.GO, Rendiconti DEGIRO, Giacenza media N26, Bonifici affitto e Avvisi 36-bis.",
+                help="Supporta PDF ufficiali AdE, Precompilata, Modelli CU (Lavoro Dipendente / Borse Esenti), Rendiconti DEGIRO, Giacenza media N26, Bonifici affitto e Avvisi 36-bis.",
             )
         with c_up_tpl:
             st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
@@ -978,7 +978,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                 filter_cat_opts = ["Tutte le Categorie"] + cat_unique
                 sel_f_cat = st.selectbox("📂 Filtra per Categoria:", filter_cat_opts, key=f"reg_f_cat_{pid_str}")
             with c_f_q:
-                search_q = st.text_input("🔍 Cerca per File, Protocollo o Emittente:", value="", placeholder="Es. Sixtema, DEGIRO, Locazione, 2025...", key=f"reg_search_{pid_str}")
+                search_q = st.text_input("🔍 Cerca per File, Protocollo o Emittente:", value="", placeholder="Es. Datore di Lavoro, DEGIRO, Locazione, 2025...", key=f"reg_search_{pid_str}")
 
             # Applicazione filtri
             filtered_entries = reg_entries
@@ -1514,7 +1514,7 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
             st.markdown("##### 📋 Predisposizione Modello 730 & Matrice Scostamenti (Precompilata AdE vs Dati Reali ARGUS)")
             st.caption(
                 "Riconciliazione integrata tra il prospetto grezzo dell'Agenzia delle Entrate e la documentazione probatoria archiviata "
-                "(CU Sixtema/ER.GO, Rendiconti DEGIRO RT/W, Conti Esteri N26, Ricevute Bonifici e Contratto di Locazione)."
+                "(Modelli CU Lavoro / Borse Esenti, Rendiconti DEGIRO RT/W, Conti Esteri N26, Ricevute Bonifici e Contratto di Locazione)."
             )
 
             c_pd1, c_pd2, c_pd3, c_pd4 = st.columns(4)

@@ -592,7 +592,7 @@ class TestTaxVerificationDocumentsCRUD:
             "profile_id": "user_test",
             "tax_year": 2020,
             "doc_type": "CU",
-            "issuer_name": "ER.GO",
+            "issuer_name": "AZIENDA DIRITTO STUDIO",
             "protocol_or_code": "CU-ERGO-2020",
         }
         doc_id = record_verification_document(memory_db, data)
@@ -616,7 +616,7 @@ class TestUniversalTaxParsers:
         CERTIFICAZIONEUNICA2021
         CERTIFICAZIONE DI CUI ALL'ART. 4 DEL D.P.R. 22 LUGLIO 1998
         RELATIVA ALL'ANNO 2020
-        02786551206 ER.GO BOLOGNA BO
+        02786551206 AZIENDA DIRITTO STUDIO BOLOGNA BO
         RSSMRA85M01H501Z ROSSI MARIO
         Identificativo dichiarazione: 12013910562 - 0004585 del 18/2/2021
         6 1.028,00
@@ -627,7 +627,7 @@ class TestUniversalTaxParsers:
         assert res["doc_type"] == "CU"
         assert res["tax_year"] == 2020
         assert res["filing_year"] == 2021
-        assert res["issuer_name"] == "ER.GO"
+        assert res["issuer_name"] == "AZIENDA DIRITTO STUDIO"
         assert res["gross_amount"] == 1028.0
         assert res["tax_withheld_or_due"] == 0.0
 
@@ -840,12 +840,12 @@ class Test730PredispositionAndNewParsers:
             },
         })
 
-        # 2. Registra CU Sixtema
+        # 2. Registra CU Datore di Lavoro
         record_verification_document(memory_db, {
             "profile_id": profile,
             "tax_year": year,
             "doc_type": "CU",
-            "issuer_name": "SIXTEMA SPA",
+            "issuer_name": "DATORE DI LAVORO SPA",
             "gross_amount": 8299.14,
             "tax_withheld_or_due": 1670.61,
             "secondary_amount": 168.0,
@@ -916,7 +916,7 @@ class TestUnifiedTaxDocumentRegistry:
             "profile_id": profile,
             "tax_year": 2025,
             "doc_type": "CU",
-            "issuer_name": "SIXTEMA SPA",
+            "issuer_name": "DATORE DI LAVORO SPA",
             "gross_amount": 8300.0,
             "tax_withheld_or_due": 1670.0,
             "source_filename": "CU_2026.pdf",
@@ -947,7 +947,7 @@ class TestUnifiedTaxDocumentRegistry:
 
         cu_item = next(r for r in reg if r["doc_type"] == "CU")
         assert cu_item["registry_id"].startswith("VDOC-")
-        assert cu_item["issuer_name"] == "SIXTEMA SPA"
+        assert cu_item["issuer_name"] == "DATORE DI LAVORO SPA"
         assert cu_item["gross_amount"] == 8300.0
         assert "Validati" in cu_item["status_badge"]
 

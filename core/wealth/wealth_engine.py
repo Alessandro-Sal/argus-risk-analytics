@@ -2081,8 +2081,6 @@ def compute_recurring_subscriptions_analytics(
                 "agenzia entrate",
                 "comune",
                 "inps",
-                "sidera soft",
-                "tirana",
                 "affitto",
             ]
             sub_keywords = [

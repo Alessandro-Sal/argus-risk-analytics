@@ -213,9 +213,9 @@ def classify_category_semantic(raw_cat: str, raw_details: str = "", raw_type: st
         return "Investimenti Titoli & Azioni"
 
     # 3. Entrate & Redditi Attivi
-    if any(k in text for k in ["salary", "stipendio", "sixtema", "sidera", "macelleria lavoro", "14esima"]):
+    if any(k in text for k in ["salary", "stipendio", "emolumenti", "retribuzione", "cedolino", "busta paga", "14esima", "tredicesima"]):
         return "Stipendio & Compensi"
-    if any(k in text for k in ["scholarship", "borsa di studio", "ergo", "unimore", "borsa studio"]) or re.search(
+    if any(k in text for k in ["scholarship", "borsa di studio", "borsa studio", "premio studio", "assegno studio"]) or re.search(
         r"\b(bs)\b", text
     ):
         return "Borse di Studio & Premi"

@@ -46,7 +46,7 @@ def test_sync_expenses_tracker_2026_mocked():
         ['05/01/2026', 'Transfer', 'Internal Transfers', 'Sistemazioni', '-€ 2,50', '', '', '', '', '', ''],
         ['10/01/2026', 'Expense', 'Housing', 'Affitto', '-€ 270,00', '', '-€ 180,00', '', '', '', ''],
         ['14/01/2026', 'Income', 'Salary', 'Buoni pasto', '', '', '', '', '', '€ 100,00', ''],
-        ['27/01/2026', 'Income', 'Salary', 'Sixtema', '€ 1.480,00', '', '', '', '', '', ''],
+        ['27/01/2026', 'Income', 'Salary', 'Stipendio', '€ 1.480,00', '', '', '', '', '', ''],
         ['29/01/2026', 'Investment', 'Stocks', 'Degiro', '-€ 418,16', '', '', '', '', '', 'ID_1769718158852_26']
     ]
 

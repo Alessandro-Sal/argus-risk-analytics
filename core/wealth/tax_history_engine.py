@@ -86,7 +86,7 @@ class TaxVerificationDocument:
     profile_id: str = "default"
     tax_year: int = 2024
     doc_type: str = "BROKER_REPORT"  # 'CU', 'BROKER_REPORT', 'ADE_NOTICE_36BIS', 'F24'
-    issuer_name: Optional[str] = None  # es. 'DEGIRO', 'ER.GO', 'AGENZIA DELLE ENTRATE'
+    issuer_name: Optional[str] = None  # es. 'DEGIRO', 'DATORE DI LAVORO', 'AGENZIA DELLE ENTRATE'
     protocol_or_code: Optional[str] = None
     gross_amount: float = 0.0
     net_taxable_amount: float = 0.0
@@ -1198,23 +1198,16 @@ def parse_certificazione_unica(
     else:
         tax_year = 2025
 
-    issuer = "Sostituto d'Imposta"
+    issuer = "Datore di Lavoro (Sostituto d'Imposta)"
     issuer_cf = None
-    if "SIXTEMA" in text.upper():
-        issuer = "SIXTEMA SPA"
-        issuer_cf = "09884901001"
-    elif "ER.GO" in text.upper():
-        issuer = "ER.GO"
-        issuer_cf = "02786551206"
+    m_sost = re.search(r"(\d{11})\s+([A-Z0-9\.\s\-]{2,50}?)(?:\s+BOLOGNA|\s+VIA|\s+ROMA|\s+MILANO|\s+TORINO|\s+SPA|\s+SRL|\n)", text)
+    if m_sost:
+        issuer_cf = m_sost.group(1).strip()
+        issuer = m_sost.group(2).strip()
     else:
-        m_sost = re.search(r"(\d{11})\s+([A-Z0-9\.\s\-]{2,50}?)(?:\s+BOLOGNA|\s+VIA|\s+ROMA|\s+MILANO|\s+TORINO|\n)", text)
-        if m_sost:
-            issuer_cf = m_sost.group(1).strip()
-            issuer = m_sost.group(2).strip()
-        else:
-            m_cf = re.search(r"Codice\s+fiscale\s*[:\.]?\s*(\d{11})", text, re.I)
-            if m_cf:
-                issuer_cf = m_cf.group(1)
+        m_cf = re.search(r"Codice\s+fiscale\s*[:\.]?\s*(\d{11})", text, re.I)
+        if m_cf:
+            issuer_cf = m_cf.group(1)
 
     taxpayer_name = None
     taxpayer_cf = None
@@ -1239,15 +1232,15 @@ def parse_certificazione_unica(
     tfr_amount = 0.0
     exempt_income = 0.0
 
-    # 1. Riconoscimento borsa di studio esente ER.GO
-    if "ER.GO" in issuer.upper() or "REDDITI ESENTI" in text.upper():
+    # 1. Riconoscimento borsa di studio esente / redditi esenti
+    if "REDDITI ESENTI" in text.upper() or "BORSA" in text.upper() or "ESENTE" in text.upper():
         m_ex = re.search(r"([\d\.,]+)\s*\n\s*ammontare\s*\n\s*REDDITI ESENTI", text, re.I)
         if not m_ex:
             m_ex = re.search(r"REDDITI ESENTI.*?465\s*\n\s*23.*?([\d\.,]{4,10})", text, re.DOTALL)
         if m_ex:
             exempt_income = _parse_italian_float(m_ex.group(1))
 
-    # 2. Riconoscimento blocco lavoro dipendente Sixtema o analogo
+    # 2. Riconoscimento blocco lavoro dipendente standard (punti 1-6)
     m_six = re.search(
         r"([A-Z0-9]{16})\s+\d+\s*\n\s*([\d\.,]+)\s*\n\s*(\d{1,3})\b[^\n]*\n\s*([\d\.,]+)\s+([\d\.,]+)[^\n]*\n\s*[\d\.,]+\s+([\d\.,]+)\s+([\d\.,]+)",
         text,
@@ -1934,7 +1927,7 @@ def build_730_predisposition_and_variance_audit(
             "argus_val": real_income,
             "delta": round(real_income - ade_income, 2),
             "status": "OK" if abs(real_income - ade_income) < 1.0 else "WARNING",
-            "notes": "CU Sixtema allineata. Borsa ER.GO esente ex L. 398/1989 non concorre al reddito.",
+            "notes": "CU Lavoro dipendente allineata. Borsa di studio esente ex L. 398/1989 non concorre al reddito.",
         },
         {
             "category": "Redditi Esenti",
@@ -1943,7 +1936,7 @@ def build_730_predisposition_and_variance_audit(
             "argus_val": real_exempt_income if real_exempt_income > 0 else 6328.37,
             "delta": real_exempt_income if real_exempt_income > 0 else 6328.37,
             "status": "OK",
-            "notes": "ER.GO € 6.328,37 tracciata nell'archivio storico e patrimonio (esente da tassazione IRPEF).",
+            "notes": "Borsa di studio € 6.328,37 tracciata nell'archivio storico e patrimonio (esente da tassazione IRPEF).",
         },
         {
             "category": "Oneri & Detrazioni",
