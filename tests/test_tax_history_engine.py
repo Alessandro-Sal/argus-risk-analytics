@@ -19,6 +19,9 @@ from core.wealth.tax_history_engine import (
     build_730_predisposition_and_variance_audit,
     build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
+    compute_crypto_tax_reporting,
+    compute_fire_effective_tax_drag,
+    compute_fiscal_reform_2026_etf_harmonization,
     compute_pension_tax_deduction_optimizer,
     compute_ravvedimento_operoso,
     compute_tax_loss_harvesting_signals,
@@ -28,9 +31,11 @@ from core.wealth.tax_history_engine import (
     detect_tax_document_type,
     export_wealth_and_tax_backup_bundle,
     generate_730_precompilata_actionable_guide,
+    generate_commercialista_tax_dossier_html,
     generate_f24_payment_slip,
     generate_sample_730_json,
     get_declarations,
+    get_fiscal_deadlines_calendar,
     get_tax_losses,
     get_unified_tax_document_registry,
     get_verification_documents,
@@ -1131,6 +1136,143 @@ class TestTaxLossHarvestingAndBackupBundle:
         restore_res = import_wealth_and_tax_backup_bundle(memory_db, bundle, profile_id="restored_user")
         assert restore_res["status"] == "success"
         assert restore_res["total_restored_records"] >= 2
+
+
+class TestStrategicFiscalExtensions:
+    def test_generate_commercialista_tax_dossier_html(self, memory_db):
+        profile = "prof_dossier"
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2025,
+            "gross_income": 48000.0,
+            "taxable_income": 45000.0,
+            "net_tax_irpef": 11200.0,
+            "capital_gains_declared": 2500.0,
+            "capital_losses_offset": 800.0,
+            "substitute_tax_paid": 442.0,
+            "ivafe_paid": 54.0,
+            "notes": "Dichiarazione ufficiale 2025",
+        })
+        record_tax_loss(memory_db, {
+            "profile_id": profile,
+            "generation_year": 2023,
+            "expiration_year": 2027,
+            "initial_loss_amount": 1500.0,
+            "offset_amount": 300.0,
+            "remaining_amount": 1200.0,
+            "status": "ACTIVE",
+        })
+
+        html = generate_commercialista_tax_dossier_html(
+            memory_db, profile_id=profile, tax_year=2025, taxpayer_name="Mario Rossi", cf="RSSMRA85M01H501Z"
+        )
+        assert isinstance(html, str)
+        assert "<!DOCTYPE html>" in html
+        assert "DOSSIER FISCALE COMPLETO" in html
+        assert "Mario Rossi" in html
+        assert "RSSMRA85M01H501Z" in html
+        assert "F24" in html
+        assert "Quadro RW" in html
+        assert "window.print()" in html
+
+    def test_compute_fiscal_reform_2026_etf_harmonization(self, memory_db):
+        profile = "prof_reform"
+        # Inserisci una minusvalenza attiva di 1500€
+        record_tax_loss(memory_db, {
+            "profile_id": profile,
+            "generation_year": 2023,
+            "expiration_year": 2027,
+            "initial_loss_amount": 2000.0,
+            "offset_amount": 500.0,
+            "remaining_amount": 1500.0,
+            "status": "ACTIVE",
+        })
+
+        res = compute_fiscal_reform_2026_etf_harmonization(
+            memory_db, profile_id=profile, tax_year=2025, simulated_etf_gain=3000.0
+        )
+        assert res["simulated_etf_gain_eur"] == 3000.0
+        assert res["total_active_losses_eur"] == 1500.0
+        # Nel sistema attuale le minusvalenze non compensano gli ETF: imposta dovuta 3000 * 0.26 = 780€
+        assert res["current_system"]["etf_tax_due_eur"] == 780.0
+        assert res["current_system"]["losses_usable_eur"] == 0.0
+        # Nel sistema 2026 riformato (compensazione redditi diversi e di capitale): 3000 - 1500 = 1500 imponibile
+        assert res["reform_2026_system"]["losses_offset_eur"] == 1500.0
+        assert res["reform_2026_system"]["net_taxable_eur"] == 1500.0
+        assert res["reform_2026_system"]["etf_tax_due_eur"] == 390.0
+        # Tax Alpha immediato da riforma: 780 - 390 = 390€ risparmio secco
+        assert res["immediate_tax_alpha_eur"] == 390.0
+        assert res["delta_tax_pct_points"] == 13.0
+
+    def test_compute_fire_effective_tax_drag(self, memory_db):
+        profile = "prof_fire"
+        # Registra una dichiarazione per il profilo con reddito e imposte
+        record_declaration(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2025,
+            "gross_income": 40000.0,
+            "capital_gains_declared": 5000.0,
+            "substitute_tax_paid": 800.0,
+            "ivafe_paid": 50.0,
+        })
+
+        res = compute_fire_effective_tax_drag(
+            memory_db, profile_id=profile, tax_year=2025, annual_portfolio_gain=25000.0, swr_base=0.04
+        )
+        assert "effective_tax_rate_actual_pct" in res
+        assert res["effective_tax_rate_actual_pct"] <= 26.0
+        assert res["effective_tax_rate_actual_pct"] >= 0.0
+        assert res["fire_target_flat_26_eur"] > res["fire_target_actual_eur"]
+        assert res["capital_savings_eur"] > 0
+        assert res["years_advanced_to_fire"] >= 1.0
+        assert res["effective_swr_net_pct"] > 0
+
+    def test_compute_crypto_tax_reporting(self, memory_db):
+        profile = "prof_crypto"
+        # Test con dati di default dimostrativi
+        res_default = compute_crypto_tax_reporting(memory_db, profile_id=profile, tax_year=2025)
+        assert res_default["tax_year"] == 2025
+        assert res_default["crypto_balance_31_12"] > 0
+        assert res_default["imposta_valore_crypto_2_permille"] > 0
+        assert res_default["substitute_tax_26pct"] > 0
+        assert len(res_default["quadro_rw_rows"]) == 1
+        assert res_default["quadro_rw_rows"][0]["codice_tributo_f24"] == "1727"
+        assert len(res_default["quadro_rt_rows"]) == 1
+        assert res_default["quadro_rt_rows"][0]["codice_tributo_f24"] == "1715"
+
+        # Test inserendo un documento di verifica specifico per crypto
+        record_verification_document(memory_db, {
+            "profile_id": profile,
+            "tax_year": 2025,
+            "doc_type": "BROKER_REPORT",
+            "issuer_name": "BINANCE IRELAND",
+            "asset_monitoring_val": 10000.0,
+            "gross_amount": 15000.0,
+            "net_taxable_amount": 2000.0,
+            "notes": "CRYPTO WALLET EXCHANGES",
+        })
+        res_doc = compute_crypto_tax_reporting(memory_db, profile_id=profile, tax_year=2025)
+        assert res_doc["crypto_balance_31_12"] == 10000.0
+        assert res_doc["imposta_valore_crypto_2_permille"] == 20.0  # 10000 * 0.002
+        assert res_doc["substitute_tax_26pct"] == 520.0  # 2000 * 0.26
+        assert res_doc["total_crypto_tax_eur"] == 540.0
+
+    def test_get_fiscal_deadlines_calendar(self, memory_db):
+        deadlines = get_fiscal_deadlines_calendar(tax_year=2025, profile_id="test_user", engine=memory_db)
+        assert isinstance(deadlines, list)
+        assert len(deadlines) >= 6
+        # Verifica campi presenti in ogni scadenza
+        for d in deadlines:
+            assert "id" in d
+            assert "title" in d
+            assert "due_date_str" in d
+            assert "due_date_formatted" in d
+            assert "days_remaining" in d
+            assert "urgency_badge" in d
+            assert d["urgency_badge"] in ["PASSATO", "CRITICO", "IN SCADENZA", "PROGRAMMATO"]
+            assert "badge_color" in d
+            assert "tributo_code" in d
+
 
 
 

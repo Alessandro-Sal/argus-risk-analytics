@@ -22,6 +22,9 @@ from core.wealth.tax_history_engine import (
     build_730_predisposition_and_variance_audit,
     build_triangular_tax_audit,
     compute_broker_annual_capital_gains,
+    compute_crypto_tax_reporting,
+    compute_fire_effective_tax_drag,
+    compute_fiscal_reform_2026_etf_harmonization,
     compute_pension_tax_deduction_optimizer,
     compute_ravvedimento_operoso,
     compute_tax_loss_harvesting_signals,
@@ -31,9 +34,11 @@ from core.wealth.tax_history_engine import (
     export_wealth_and_tax_backup_bundle,
     fmt_eur_it,
     generate_730_precompilata_actionable_guide,
+    generate_commercialista_tax_dossier_html,
     generate_f24_payment_slip,
     generate_sample_730_json,
     get_declarations,
+    get_fiscal_deadlines_calendar,
     get_tax_losses,
     get_unified_tax_document_registry,
     get_verification_documents,
@@ -84,6 +89,36 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         st.metric("Zainetto Fiscale Residuo", fmt_eur(tot_active_losses))
 
     st.markdown("---")
+
+    # ── SCADENZIARIO FISCALE GLOBALE (AdE TAX CALENDAR & COUNTDOWN) ──
+    deadlines_list = get_fiscal_deadlines_calendar(tax_year=selected_tax_year, profile_id=pid_str, engine=engine)
+    with st.expander(f"📅 Scadenziario Tributario AdE & Conto alla Rovescia Adempimenti (Anno {selected_tax_year}/{selected_tax_year + 1})", expanded=False):
+        st.caption("Scadenzario cronologico unificato con calcolo dinamico del conto alla rovescia, badge di urgenza e codici tributo F24.")
+        c_dl_cols = st.columns(min(len(deadlines_list), 4))
+        for d_i, d_val in enumerate(deadlines_list[:4]):
+            with c_dl_cols[d_i % 4]:
+                diff_d = d_val["days_remaining"]
+                d_delta = f"{abs(diff_d)} gg {'passati' if diff_d < 0 else 'rimasti'}"
+                metric_card(
+                    d_val["title"][:25] + "...",
+                    d_val["due_date_formatted"],
+                    delta=f"{d_val['urgency_badge']} ({d_delta})",
+                    delta_color="normal" if diff_d > 15 else ("inverse" if diff_d >= 0 else "off"),
+                )
+        df_deadlines = pd.DataFrame(deadlines_list)
+        st.dataframe(
+            df_deadlines[["due_date_formatted", "urgency_badge", "title", "tributo_code", "amount_eur", "desc"]],
+            column_config={
+                "due_date_formatted": st.column_config.TextColumn("Data Limite", width="small"),
+                "urgency_badge": st.column_config.TextColumn("Urgenza", width="small"),
+                "title": st.column_config.TextColumn("Adempimento Tributario", width="medium"),
+                "tributo_code": st.column_config.TextColumn("Codice Tributo / Canale", width="small"),
+                "amount_eur": st.column_config.NumberColumn("Importo Stimato (€)", format="€ %,.2f"),
+                "desc": st.column_config.TextColumn("Descrizione & Normativa AdE", width="large"),
+            },
+            hide_index=True,
+            use_container_width=True,
+        )
 
     # ── SUB-TABS DELLA SEZIONE ──────────────────────────────────
     subtab_man, subtab_reg, subtab_dash, subtab_audit = st.tabs([
@@ -1354,6 +1389,75 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
         else:
             st.info("Nessuna minusvalenza in scadenza immediata o posizioni in utile da compensare per questo profilo.")
 
+        # ── 3. SIMULATORE RIFORMA FISCALE 2026 (ARMONIZZAZIONE ETF & TUIR) ──
+        st.markdown("---")
+        st.markdown("##### 🏛️ Simulatore Riforma Fiscale 2026: Armonizzazione ETF & TUIR (Categoria Unica)")
+        st.caption(
+            "La Delega Fiscale 2026 unifica i 'Redditi di Capitale' e i 'Redditi Diversi' in un'unica categoria di Redditi Finanziari. "
+            "Le plusvalenze da ETF potranno finalmente compensare direttamente le minusvalenze pregresse nello zainetto fiscale "
+            "senza dover forzare vendite su azioni o ricorrere a complessi certificates a maxi-cedola."
+        )
+
+        c_ref_in1, c_ref_in2 = st.columns([2, 2])
+        with c_ref_in1:
+            sim_etf_g = st.number_input(
+                "Plusvalenza ETF Simulata da Realizzare (€):",
+                min_value=0.0,
+                value=3500.0,
+                step=500.0,
+                key=f"reform_sim_etf_in_{pid_str}_{selected_tax_year}",
+            )
+        with c_ref_in2:
+            st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+            use_real_pos = st.checkbox("Analizza posizioni reali in portafoglio (se presenti)", value=True, key=f"reform_use_pos_{pid_str}")
+
+        reform_sim = compute_fiscal_reform_2026_etf_harmonization(
+            engine,
+            profile_id=pid_str,
+            tax_year=selected_tax_year,
+            simulated_etf_gain=None if use_real_pos else sim_etf_g,
+        )
+
+        c_rf1, c_rf2, c_rf3, c_rf4 = st.columns(4)
+        with c_rf1:
+            metric_card("Plusvalenze ETF", fmt_eur(reform_sim["etf_unrealized_gains"]), "Base di Calcolo")
+        with c_rf2:
+            metric_card("Zainetto Fiscale", fmt_eur(reform_sim["total_active_losses"]), "Minusvalenze Attive")
+        with c_rf3:
+            metric_card(
+                "Tax Alpha da Riforma",
+                f"+{fmt_eur(reform_sim['immediate_tax_alpha_eur'])}",
+                delta=f"Risparmio {reform_sim['delta_tax_pct_points']:.1f}% secco",
+                delta_color="normal",
+            )
+        with c_rf4:
+            metric_card(
+                "Assorbimento Zainetto",
+                f"{reform_sim['reform_2026_regime']['loss_absorption_pct']:.1f}%",
+                "Compensato con ETF",
+                delta_color="normal",
+            )
+
+        # Tabella di confronto regimi
+        df_comp_reform = pd.DataFrame([
+            {
+                "Regime Fiscale": "1. Regime Attuale (TUIR Vigente)",
+                "Classificazione ETF": "Reddito di Capitale (Art. 44)",
+                "Compensazione Minusvalenze": "NON AMMESSA (0,00 €)",
+                "Imposta ETF Dovuta": f"€ {reform_sim['current_system']['etf_tax_due_eur']:,.2f} (26% secco)",
+                "Zainetto Perso / Inutilizzato": f"€ {reform_sim['current_regime']['remaining_unshielded_losses']:,.2f}",
+            },
+            {
+                "Regime Fiscale": "2. Riforma 2026 (Armonizzazione)",
+                "Classificazione ETF": "Reddito Finanziario Unificato",
+                "Compensazione Minusvalenze": f"COMPENSABILE: € {reform_sim['reform_2026_system']['losses_offset_eur']:,.2f}",
+                "Imposta ETF Dovuta": f"€ {reform_sim['reform_2026_system']['etf_tax_due_eur']:,.2f} (Netto Compensato)",
+                "Zainetto Perso / Inutilizzato": f"€ {reform_sim['reform_2026_regime']['remaining_unshielded_losses']:,.2f}",
+            },
+        ])
+        st.dataframe(df_comp_reform, hide_index=True, use_container_width=True)
+        st.info(f"💡 **Verdetto Strategico ARGUS:** {reform_sim['strategic_advice']}")
+
     # ============================================================
     # SUBTAB 4: AUDIT ADVISOR & RICONCILIAZIONE (ART. 36-BIS)
     # ============================================================
@@ -1634,6 +1738,73 @@ def render_tax_history_tab(engine: Engine, portfolio_id: Any) -> None:
                         hide_index=True,
                         use_container_width=True,
                     )
+            st.markdown("---")
+
+            # ── 5. DOSSIER FISCALE COMMERCIALISTA (1-CLICK PRINT & PDF) ──
+            st.markdown("##### 📑 Dossier Fiscale Ufficiale per Commercialista / CAF (1-Click Print & PDF)")
+            st.caption(
+                "Fascicolo probatorio di liquidazione asseverato pronto per la stampa o la trasmissione telematica al professionista: "
+                "include anagrafica, liquidazione d'imposta, righi Quadri E/RT/W, prospetto delega F24 e certificato di consistenza zainetto fiscale."
+            )
+
+            c_dos_in1, c_dos_in2 = st.columns([2, 2])
+            with c_dos_in1:
+                tp_name = st.text_input("Nominativo Contribuente:", value="Mario Rossi", key=f"dossier_name_{pid_str}_{selected_tax_year}")
+            with c_dos_in2:
+                tp_cf = st.text_input("Codice Fiscale:", value="RSSMRA85M01H501Z", key=f"dossier_cf_{pid_str}_{selected_tax_year}")
+
+            dossier_html = generate_commercialista_tax_dossier_html(
+                engine,
+                profile_id=pid_str,
+                tax_year=selected_tax_year,
+                taxpayer_name=tp_name,
+                taxpayer_cf=tp_cf,
+            )
+
+            c_dos_btn1, c_dos_btn2 = st.columns([2, 2])
+            with c_dos_btn1:
+                st.download_button(
+                    "📥 Scarica Dossier Fiscale (.html / PDF-Ready)",
+                    data=dossier_html,
+                    file_name=f"dossier_fiscale_commercialista_{tp_cf}_{selected_tax_year}.html",
+                    mime="text/html",
+                    key=f"dl_dossier_btn_{pid_str}_{selected_tax_year}",
+                    type="primary",
+                    use_container_width=True,
+                )
+            with c_dos_btn2:
+                show_preview = st.checkbox("👁️ Mostra Anteprima Documento nel Browser", value=False, key=f"preview_dossier_cb_{pid_str}_{selected_tax_year}")
+
+            if show_preview:
+                import streamlit.components.v1 as components
+                components.html(dossier_html, height=750, scrolling=True)
+
+            # ── 6. MONITORAGGIO & LIQUIDAZIONE CRIPTO-ATTIVITÀ (L. 197/2022) ──
+            st.markdown("---")
+            with st.expander("₿ Monitoraggio & Liquidazione Cripto-Attività (L. 197/2022 — Quadro RW Cod. 21 & Quadro RT Sez. II-B)", expanded=False):
+                st.caption(
+                    "Quadro fiscale asseverato per le cripto-attività detenute su wallet o exchange esteri (Binance, Kraken, Ledger): "
+                    "imposta sul valore delle cripto-attività del 2‰ (Codice F24 1727) e imposta sostitutiva del 26% sulle plusvalenze eccedenti la franchigia (Codice F24 1715)."
+                )
+                crypto_rep = compute_crypto_tax_reporting(engine, profile_id=pid_str, tax_year=selected_tax_year)
+                c_cr1, c_cr2, c_cr3, c_cr4 = st.columns(4)
+                with c_cr1:
+                    metric_card("Controvalore al 31/12", fmt_eur(crypto_rep["crypto_balance_31_12"]), "Consistenza Totale")
+                with c_cr2:
+                    metric_card("Picco Massimo Anno", fmt_eur(crypto_rep["crypto_peak_value"]), "Rilevazione RW")
+                with c_cr3:
+                    metric_card("Imposta Valore (0,20%)", fmt_eur(crypto_rep["imposta_valore_crypto_2_permille"]), "Codice F24 1727", delta_color="inverse")
+                with c_cr4:
+                    metric_card("Sostitutiva Capital Gains (26%)", fmt_eur(crypto_rep["substitute_tax_26pct"]), "Codice F24 1715", delta_color="inverse")
+
+                st.markdown("###### 📋 Quadro RW (Codice Investimento 21 — Valute Virtuali / Cripto-Attività)")
+                df_cr_rw = pd.DataFrame(crypto_rep["quadro_rw_rows"])
+                st.dataframe(df_cr_rw, hide_index=True, use_container_width=True)
+
+                st.markdown("###### 📈 Quadro RT Sezione II-B (Plusvalenze Realizzate Cripto)")
+                df_cr_rt = pd.DataFrame(crypto_rep["quadro_rt_rows"])
+                st.dataframe(df_cr_rt, hide_index=True, use_container_width=True)
+
             st.markdown("---")
 
         # ── 1. MATRICE DI AUDIT TRIANGOLARE (ARGUS vs BROKER vs 730 vs AdE 36-BIS) ──

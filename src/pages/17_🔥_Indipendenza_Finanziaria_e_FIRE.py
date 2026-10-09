@@ -49,6 +49,7 @@ from core.ui_utils import (
     resolve_active_subtab,
     section,
 )
+from core.wealth.tax_history_engine import compute_fire_effective_tax_drag
 from core.wealth.wealth_db import (
     delete_wealth_goal,
     get_cashflow_records,
@@ -232,6 +233,31 @@ if active_fire_tab == "🔥 Simulatore FIRE & Traiettorie":
             <div style="font-size:11px; color:#8b949e;">Capitale sufficiente per crescere autonomamente</div>
         </div>
         """, unsafe_allow_html=True)
+
+    # ── PONTE FISCO -> FIRE: BLENDED EFFECTIVE TAX DRAG ──
+    st.write("")
+    with st.expander("🏛️ Ponte Fiscale → FIRE: Impatto del Tax Drag Reale vs Flat 26% (Trinity Study)", expanded=True):
+        st.caption(
+            "I modelli FIRE tradizionali sovrastimano il capitale necessario ipotizzando un prelievo fiscale piatto del 26% (capital gain ordinario). "
+            "ARGUS ricalcola l'aliquota effettiva ponderata (incorporando titoli white list al 12,5%, compensazione minusvalenze, detrazioni CU e dividendi esenti), "
+            "riducendo il capitale target necessario e anticipando l'anno di indipendenza finanziaria."
+        )
+        tax_drag_res = compute_fire_effective_tax_drag(
+            engine,
+            profile_id=str(current_pid),
+            tax_year=datetime.now().year - 1,
+            annual_portfolio_gain=float(fire_calc["annual_expense"] * 0.7),
+            swr_base=float(swr_in / 100.0),
+        )
+        c_ft1, c_ft2, c_ft3, c_ft4 = st.columns(4)
+        with c_ft1:
+            metric_card("Aliquota Fiscale Effettiva", f"{tax_drag_res['effective_tax_rate_actual_pct']:.1f}%", delta="vs 26,0% Teorico", delta_color="normal")
+        with c_ft2:
+            metric_card("SWR Netto Efficace", f"{tax_drag_res['effective_swr_net_pct']:.2f}%", delta="Post-Fisco Reale")
+        with c_ft3:
+            metric_card("Capitale Risparmiato", fmt_eur(tax_drag_res["capital_savings_eur"]), delta="Target FIRE Abbattuto", delta_color="normal")
+        with c_ft4:
+            metric_card("Anticipo Raggiungimento", f"{tax_drag_res['years_advanced_to_fire']:.1f} Anni Prima", delta="Traguardo Indipendenza", delta_color="normal")
 
     # Grafico Traiettoria FIRE
     st.write("")

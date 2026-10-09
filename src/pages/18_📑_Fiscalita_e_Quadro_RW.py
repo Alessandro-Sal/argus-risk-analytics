@@ -43,6 +43,10 @@ from core.ui_utils import (
     resolve_active_subtab,
     section,
 )
+from core.wealth.tax_history_engine import (
+    compute_crypto_tax_reporting,
+    compute_fiscal_reform_2026_etf_harmonization,
+)
 from core.wealth.tax_history_ui import render_tax_history_tab
 from core.wealth.wealth_db import get_wealth_portfolios, init_wealth_db
 from core.wealth.wealth_engine import (
@@ -229,8 +233,32 @@ elif active_tax_tab == "📑 Prospetto Quadro RW / RT":
             hide_index=True
         )
         st.info("💡 **Nota Normativa**: I conti correnti esteri con giacenza media annua inferiore a € 5.000 e picco massimo non superiore a € 15.000 non richiedono versamento IVAFE.")
-    else:
-        st.info("Nessuna attività finanziaria estera o crypto identificata per questo profilo patrimoniale.")
+
+    # ── SEZIONE CRIPTO-ATTIVITÀ (L. 197/2022 & QUADRO RW / RT) ──
+    st.markdown("---")
+    st.markdown("#### ₿ Monitoraggio & Liquidazione Cripto-Attività (L. 197/2022)")
+    st.caption(
+        "Disciplina fiscale delle cripto-attività: obbligo di monitoraggio in Quadro RW con codice investimento 21 "
+        "e tassazione del 2‰ sul valore al 31/12 (Tributo F24 1727), oltre all'imposta sostitutiva 26% sulle plusvalenze nette (Tributo F24 1715)."
+    )
+    crypto_data = compute_crypto_tax_reporting(engine, profile_id=str(current_pid), tax_year=datetime.now().year - 1)
+    c_p18_cr1, c_p18_cr2, c_p18_cr3, c_p18_cr4 = st.columns(4)
+    with c_p18_cr1:
+        metric_card("Valore Cripto al 31/12", fmt_eur(crypto_data["crypto_balance_31_12"]), "Consistenza Totale")
+    with c_p18_cr2:
+        metric_card("Picco Massimo Anno", fmt_eur(crypto_data["crypto_peak_value"]), "Rilevazione RW Cod. 21")
+    with c_p18_cr3:
+        metric_card("Imposta Valore (0,20%)", fmt_eur(crypto_data["imposta_valore_crypto_2_permille"]), "Codice F24 1727", delta_color="inverse")
+    with c_p18_cr4:
+        metric_card("Sostitutiva 26% Plusvalenze", fmt_eur(crypto_data["substitute_tax_26pct"]), "Codice F24 1715", delta_color="inverse")
+
+    c_cr_t1, c_cr_t2 = st.columns([1.5, 1.5])
+    with c_cr_t1:
+        st.markdown("###### 📋 Quadro RW — Cripto-Attività & Wallet Esteri")
+        st.dataframe(pd.DataFrame(crypto_data["quadro_rw_rows"]), hide_index=True, use_container_width=True)
+    with c_cr_t2:
+        st.markdown("###### 📈 Quadro RT Sez. II-B — Plusvalenze Cripto")
+        st.dataframe(pd.DataFrame(crypto_data["quadro_rt_rows"]), hide_index=True, use_container_width=True)
 
 
 elif active_tax_tab == "📉 Zainetto Fiscale & Scadenze":
@@ -481,6 +509,45 @@ elif active_tax_tab == "💡 Strategie di Efficienza Fiscale":
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── SIMULATORE RIFORMA FISCALE 2026 (ARMONIZZAZIONE ETF & TUIR) ──
+    st.markdown("---")
+    st.markdown("#### 🏛️ Simulatore Riforma Fiscale 2026: Armonizzazione ETF & TUIR")
+    st.caption(
+        "Simulazione dell'impatto economico della Riforma Tributaria 2026: le plusvalenze da ETF (attualmente redditi di capitale non compensabili) "
+        "potranno assorbire lo zainetto fiscale pregresso, generando un Tax Alpha immediato."
+    )
+    col_p18_rf1, col_p18_rf2 = st.columns([2, 2])
+    with col_p18_rf1:
+        etf_sim_val = st.number_input(
+            "Plusvalenze ETF da Realizzare (€):",
+            min_value=0.0,
+            value=4000.0,
+            step=500.0,
+            key=f"p18_etf_sim_{current_pid}",
+        )
+    with col_p18_rf2:
+        st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
+        use_port_pos = st.checkbox("Carica plusvalenze effettive dal portafoglio", value=True, key=f"p18_rf_pos_{current_pid}")
+
+    rf_res = compute_fiscal_reform_2026_etf_harmonization(
+        engine,
+        profile_id=str(current_pid),
+        tax_year=datetime.now().year - 1,
+        simulated_etf_gain=None if use_port_pos else etf_sim_val,
+    )
+
+    c_rf_k1, c_rf_k2, c_rf_k3, c_rf_k4 = st.columns(4)
+    with c_rf_k1:
+        metric_card("Plusvalenze ETF", fmt_eur(rf_res["etf_unrealized_gains"]), "Base Imponibile")
+    with c_rf_k2:
+        metric_card("Zainetto Fiscale", fmt_eur(rf_res["total_active_losses"]), "Minusvalenze Attive")
+    with c_rf_k3:
+        metric_card("Tax Alpha Riforma", f"+{fmt_eur(rf_res['immediate_tax_alpha_eur'])}", delta=f"-{rf_res['delta_tax_pct_points']:.1f}% Aliquota Reale", delta_color="normal")
+    with c_rf_k4:
+        metric_card("Assorbimento Minus", f"{rf_res['reform_2026_regime']['loss_absorption_pct']:.1f}%", "Compensato con ETF", delta_color="normal")
+
+    st.info(f"💡 **Verdetto Strategico ARGUS:** {rf_res['strategic_advice']}")
 
 elif active_tax_tab == "🌍 Fiscalità Internazionale & Cross-Border":
     st.markdown("### 🌍 Cross-Border Tax & Global Wealth Structuring Engine")
