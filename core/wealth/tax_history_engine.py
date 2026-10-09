@@ -2932,6 +2932,8 @@ def generate_f24_payment_slip(
     engine: Engine,
     profile_id: str = "default",
     tax_year: int = 2025,
+    installments: int = 1,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Genera il prospetto analitico del Modello F24 (Sezione Erario) per la liquidazione
@@ -3050,6 +3052,7 @@ def generate_730_precompilata_actionable_guide(
     engine: Engine,
     profile_id: str = "default",
     tax_year: int = 2025,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Produce la checklist operativa e le istruzioni rigo per rigo per la modifica
@@ -3178,6 +3181,7 @@ def sync_tax_events_to_cashflow(
     profile_id: str = "default",
     tax_year: int = 2025,
     portfolio_id: int = 1,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Sincronizza e registra gli eventi fiscali previsti (Rimborso 730 estivo in busta paga
@@ -3262,6 +3266,7 @@ def compute_pension_tax_deduction_optimizer(
     engine: Engine,
     profile_id: str = "default",
     tax_year: int = 2025,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Calcola l'ottimizzazione della deducibilità fiscale per la previdenza complementare
@@ -3338,13 +3343,16 @@ def compute_tax_loss_harvesting_signals(
     portfolio_id: int = 1,
     profile_id: str = "default",
     current_year: int = 2025,
+    tax_year: Optional[int] = None,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Analizza le minusvalenze fiscali nello zainetto (Art. 68 c. 5 TUIR) e le confronta
     con le posizioni aperte in guadagno nel portafoglio per identificare opportunità
     di compensazione fiscale prima della scadenza quadriennale.
     """
-    losses = get_tax_losses(engine, profile_id=profile_id, current_year=current_year)
+    eff_year = tax_year if tax_year is not None else current_year
+    losses = get_tax_losses(engine, profile_id=profile_id, current_year=eff_year)
     active_losses = [l for l in losses if l.get("status") == "ACTIVE"]
 
     tot_losses = round(sum(float(l.get("remaining_amount", 0.0)) for l in active_losses), 2)
@@ -3414,6 +3422,7 @@ def compute_tax_loss_harvesting_signals(
 def export_wealth_and_tax_backup_bundle(
     engine: Engine,
     profile_id: str = "default",
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Estrae ed esporta un pacchetto completo e strutturato di backup JSON di tutti i dati
@@ -3466,14 +3475,17 @@ def export_wealth_and_tax_backup_bundle(
 
 def import_wealth_and_tax_backup_bundle(
     engine: Engine,
-    backup_data: Dict[str, Any],
+    backup_data: Optional[Dict[str, Any]] = None,
     profile_id: str = "default",
+    bundle_data: Optional[Dict[str, Any]] = None,
+    **kwargs: Any,
 ) -> Dict[str, Any]:
     """
     Ripristina i dati da un pacchetto di backup JSON esportato in precedenza.
     Esegue un ripristino sicuro con aggiornamento/inserimento record.
     """
-    tables = backup_data.get("tables", {})
+    b_data = backup_data or bundle_data or {}
+    tables = b_data.get("tables", {})
     restored_counts: Dict[str, int] = {}
 
     decl_rows = tables.get("tax_declarations", [])
