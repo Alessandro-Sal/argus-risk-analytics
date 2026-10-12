@@ -68,6 +68,12 @@ if _qp is not None:
             pass
 
 # ── Splash Screen & Bootloader Istituzionale (All'avvio) ──────
+import components.splash as _splash_mod
+
+try:
+    importlib.reload(_splash_mod)
+except Exception:
+    pass
 from components.splash import auto_expand_sidebar
 from components.splash import render_splash_screen as render_argus_splash
 from core.ux_institutional_hub import APP_VERSION
