@@ -895,10 +895,20 @@ def render_splash_screen(
 ) -> bool:
     """
     Renderizza lo Splash Screen & Bootloader Istituzionale di ARGUS all'avvio.
+    Se `ARGUS_REQUIRE_LOGIN=true`, mostra PRIMA il Login Gate a tutto schermo.
     
-    Restituisce True se lo splash e' attivo (bloccando l'esecuzione sottostante con st.stop()).
+    Restituisce True se il Login Gate o lo Splash e' attivo (bloccando l'esecuzione sottostante con st.stop()).
     Restituisce False se lo splash e' completato/bypassato (permettendo il caricamento immediato della dashboard).
     """
+    try:
+        from core.supabase_cloud import render_cloud_auth_gate
+
+        if not render_cloud_auth_gate():
+            auto_collapse_sidebar()
+            return True
+    except Exception:
+        pass
+
     # Se splash_dismissed e' esplicitamente False (es. click su 'Schermata di Avvio' nella sidebar)
     if st.session_state.get("splash_dismissed") is False:
         force_show = True

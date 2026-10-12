@@ -1718,7 +1718,7 @@ def apply_authenticated_user_session(auth_res: Dict[str, Any]) -> None:
 
 
 def logout_argus_user() -> None:
-    """Effettua il logout sicuro dell'utente corrente e pulisce tutti i dati in RAM."""
+    """Effettua il logout sicuro dell'utente corrente, resetta lo splash e pulisce tutti i dati in RAM."""
     import streamlit as st
 
     for k in list(st.session_state.keys()):
@@ -1728,24 +1728,27 @@ def logout_argus_user() -> None:
             "db_engine",
             "active_wealth_portfolio_id",
             "active_wealth_profile_name",
+            "wealth_active_portfolio_id",
             "portfolio_id",
             "data_loaded",
             "positions_df",
             "returns_df",
         ):
             st.session_state.pop(k, None)
+    st.session_state["splash_dismissed"] = False
+    st.session_state["_app_initialized"] = False
     st.cache_data.clear()
     st.cache_resource.clear()
 
 
 def render_cloud_auth_gate() -> bool:
     """
-    Se `ARGUS_REQUIRE_LOGIN=true`, mostra un gate istituzionale prima di accedere
-    alla piattaforma online, offrendo:
-    - Login Multi-Utente / Titolare (`argus_users` + Admin Password + Supabase Auth).
-    - Registrazione Nuovo Utente (con spazio isolato o DB Supabase personale).
-    - Accesso 1-Click Ospite / Recruiter in ambiente Demo Sandbox isolato.
-    Restituisce True se l'utente è autorizzato a proseguire.
+    Se `ARGUS_REQUIRE_LOGIN=true`, mostra il terminale di Login Istituzionale a tutto schermo
+    PRIMA dello Splash Screen (con sidebar completamente nascosta), offrendo:
+    - 🔐 Accedi: Login Multi-Utente / Titolare (`argus_users` + Admin/Supabase Password).
+    - ➕ Nuovo Account: Registrazione rapida con spazio isolato o DB Supabase dedicato.
+    - 🚀 Demo Sandbox: Accesso 1-Click Ospite / Recruiter in ambiente sandbox isolato.
+    Restituisce True se l'utente è autorizzato a proseguire verso lo Splash Screen / App.
     """
     import streamlit as st
 
@@ -1756,111 +1759,211 @@ def render_cloud_auth_gate() -> bool:
     if st.session_state.get("argus_auth_verified", False):
         return True
 
+    try:
+        from core.ui_utils import get_argus_eye_svg
+
+        eye_svg = get_argus_eye_svg(size=60, animated=True, accent="#f59e0b", unique_id="auth_gate_eye_logo")
+    except Exception:
+        eye_svg = "🏛️"
+
     st.markdown(
-        """
-        <div style="max-width:600px;margin:36px auto 18px auto;padding:28px 32px;
-                    background:linear-gradient(145deg,rgba(15,23,42,0.96),rgba(30,41,59,0.92));
-                    border:1px solid rgba(99,102,241,0.32);border-radius:16px;
-                    box-shadow:0 20px 50px rgba(0,0,0,0.45);text-align:center;">
-            <div style="font-size:0.75rem;letter-spacing:0.14em;text-transform:uppercase;
-                        color:#818cf8;font-weight:700;margin-bottom:6px;">
-                ARGUS CLOUD PLATFORM • MULTI-USER VAULT
+        f"""
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap');
+
+        /* Nascondi completamente Sidebar, Header e Toolbar durante il Login Gate */
+        header[data-testid="stHeader"],
+        [data-testid="stHeader"],
+        [data-testid="stToolbar"],
+        div[data-testid="stToolbar"],
+        [data-testid="stExpandSidebarButton"],
+        button[data-testid="stExpandSidebarButton"],
+        [data-testid="stSidebarCollapseButton"],
+        button[data-testid="stSidebarCollapseButton"],
+        section[data-testid="stSidebar"],
+        [data-testid="stSidebar"],
+        div[data-testid="collapsedControl"],
+        [data-testid="collapsedControl"],
+        button[data-testid="stSidebarCollapsedControl"] {{
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            width: 0px !important;
+            height: 0px !important;
+            pointer-events: none !important;
+            position: absolute !important;
+            top: -9999px !important;
+            left: -9999px !important;
+        }}
+
+        .block-container,
+        div[data-testid="stAppViewBlockContainer"],
+        .main .block-container {{
+            padding-top: 1.5rem !important;
+            padding-bottom: 1.5rem !important;
+            max-width: 1140px !important;
+            min-height: 92vh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+        }}
+
+        div[data-testid="stVerticalBlockBorderWrapper"] {{
+            background: radial-gradient(900px circle at 50% 0%, rgba(26, 36, 54, 0.92) 0%, rgba(13, 19, 32, 0.97) 65%, rgba(6, 9, 16, 0.99) 100%) !important;
+            border: 1px solid rgba(245, 158, 11, 0.28) !important;
+            border-radius: 20px !important;
+            padding: 22px 26px 24px 26px !important;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.78), 0 0 40px rgba(245, 158, 11, 0.06) !important;
+        }}
+
+        button[data-baseweb="tab"] {{
+            font-family: 'Outfit', sans-serif !important;
+            font-size: 13.5px !important;
+            font-weight: 700 !important;
+            padding: 8px 14px !important;
+        }}
+        </style>
+
+        <div style="text-align:center; max-width:680px; margin: 0 auto 18px auto;">
+            <div style="display:flex; justify-content:center; margin-bottom:6px; filter:drop-shadow(0 0 20px rgba(245,158,11,0.40));">
+                {eye_svg}
             </div>
-            <h2 style="margin:0 0 8px 0;color:#f8fafc;font-size:1.55rem;font-weight:800;">
-                🏛️ Accesso Sicuro & Isolamento Patrimoniale
-            </h2>
-            <p style="color:#94a3b8;font-size:0.88rem;line-height:1.5;margin:0;">
-                Ogni utente dispone di uno spazio patrimoniale crittograficamente isolato
-                (o del proprio database Supabase dedicato). Nessun dato sensibile è condiviso.
-            </p>
+            <div style="font-family:'Outfit',sans-serif; font-size:32px; font-weight:900; letter-spacing:10px;
+                        background:linear-gradient(180deg,#ffffff 25%,#fde68a 68%,#f59e0b 100%);
+                        -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1.15;">
+                ARGUS
+            </div>
+            <div style="font-family:'Outfit',sans-serif; font-size:11px; font-weight:800; color:#f59e0b;
+                        letter-spacing:3.2px; text-transform:uppercase; margin:3px 0 10px 0;">
+                INSTITUTIONAL RISK &amp; WEALTH INTELLIGENCE • CLOUD VAULT
+            </div>
+            <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;">
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#34d399;
+                             background:rgba(16,185,129,0.10); border:1px solid rgba(16,185,129,0.28);
+                             padding:3px 10px; border-radius:999px;">🔒 TLS 1.3 Supabase Cloud</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#fbbf24;
+                             background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.28);
+                             padding:3px 10px; border-radius:999px;">🛡️ PBKDF2-SHA256 Vault</span>
+                <span style="font-family:'JetBrains Mono',monospace; font-size:10px; color:#818cf8;
+                             background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.28);
+                             padding:3px 10px; border-radius:999px;">👥 Multi-User Isolation</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    col_l, col_c, col_r = st.columns([0.8, 2.6, 0.8])
+    col_l, col_c, col_r = st.columns([0.9, 1.8, 0.9])
     with col_c:
-        tab_login, tab_reg, tab_guest = st.tabs(
-            [
-                "🔐 Accedi (Utente / Owner)",
-                "➕ Crea Account Utente",
-                "🚀 Demo Ospite (Sandbox)",
-            ]
-        )
-        with tab_login:
-            user_in = st.text_input(
-                "Username o Email (lascia vuoto o `owner` per accesso Titolare)",
-                key="auth_gate_email",
-                placeholder="es. alessandro, marco, sara...",
+        with st.container(border=True):
+            tab_login, tab_reg, tab_guest = st.tabs(
+                [
+                    "🔐 Accedi",
+                    "➕ Nuovo Account",
+                    "🚀 Demo Sandbox",
+                ]
             )
-            pass_in = st.text_input("Password", type="password", key="auth_gate_pass")
-            if st.button("🔓 Accedi al tuo Spazio Privato", type="primary", use_container_width=True, key="btn_auth_owner"):
-                res = SupabaseAuthManager.authenticate_user(user_in, pass_in)
-                if res.get("ok"):
-                    apply_authenticated_user_session(res)
-                    st.rerun()
-                else:
-                    st.error(f"Autenticazione fallita: {res.get('error')}")
-
-        with tab_reg:
-            st.caption(
-                "Crea un account personale isolato: vedrai esclusivamente i tuoi portafogli e conti, "
-                "senza alcun accesso ai dati degli altri utenti."
-            )
-            reg_uname = st.text_input("Username univoco", key="auth_reg_uname", placeholder="es. marco")
-            reg_disp = st.text_input("Nome visualizzato", key="auth_reg_disp", placeholder="es. Marco Rossi")
-            reg_pass = st.text_input("Scegli una Password", type="password", key="auth_reg_pass")
-            reg_custom_db = st.text_input(
-                "URI Database Supabase Personale (Opzionale — BYOD)",
-                type="password",
-                key="auth_reg_db",
-                placeholder="Lascia vuoto per usare il Cloud condiviso in modalità isolata",
-            )
-            if st.button("✨ Crea Account & Entra", type="primary", use_container_width=True, key="btn_auth_register"):
-                try:
-                    eng = create_supabase_engine(cfg["db_url"], use_cache=True) if cfg.get("is_configured") else None
-                    if eng is None:
-                        from core.fetcher import get_engine
-
-                        eng = get_engine(offline=True)
-                    c_res = SupabaseAuthManager.create_or_update_user(
-                        engine=eng,
-                        username=reg_uname,
-                        password=reg_pass,
-                        role="user",
-                        display_name=reg_disp or reg_uname,
-                        custom_db_url=reg_custom_db,
-                    )
-                    if c_res.get("ok"):
-                        apply_authenticated_user_session(
-                            {
-                                "username": c_res["username"],
-                                "display_name": c_res["display_name"],
-                                "role": c_res["role"],
-                                "custom_db_url": normalize_supabase_db_url(reg_custom_db) if reg_custom_db else "",
-                            }
-                        )
+            with tab_login:
+                st.markdown(
+                    "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:10px;'>"
+                    "Inserisci le tue credenziali per sbloccare il tuo spazio patrimoniale privato e proseguire verso il portale ARGUS."
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                user_in = st.text_input(
+                    "Username o Email",
+                    key="auth_gate_email",
+                    placeholder="es. owner, alessandro, marco, sara...",
+                    help="Lascia vuoto oppure scrivi 'owner' / 'alessandro' per accedere come Titolare principale.",
+                )
+                pass_in = st.text_input(
+                    "Password",
+                    type="password",
+                    key="auth_gate_pass",
+                    placeholder="Inserisci la tua password personale...",
+                )
+                st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+                if st.button(
+                    "🔓 Sblocca & Accedi ad ARGUS",
+                    type="primary",
+                    use_container_width=True,
+                    key="btn_auth_owner",
+                ):
+                    res = SupabaseAuthManager.authenticate_user(user_in, pass_in)
+                    if res.get("ok"):
+                        apply_authenticated_user_session(res)
                         st.rerun()
                     else:
-                        st.error(c_res.get("error", "Errore durante la registrazione."))
-                except Exception as ex:
-                    st.error(f"Errore registrazione: {ex}")
+                        st.error(f"Autenticazione fallita: {res.get('error')}")
 
-        with tab_guest:
-            st.info(
-                "La **Modalità Demo Ospite** avvia un database sandbox separato (`argus_demo_sandbox.db`) "
-                "senza leggere né modificare il database privato Supabase di alcun utente."
-            )
-            if st.button("🚀 Entra in Modalità Demo Ospite", use_container_width=True, key="btn_auth_guest"):
-                apply_authenticated_user_session(
-                    {
-                        "username": "guest_demo",
-                        "display_name": "Ospite Demo (Sandbox)",
-                        "role": "guest_demo",
-                        "custom_db_url": "",
-                    }
+            with tab_reg:
+                st.markdown(
+                    "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:10px;'>"
+                    "Crea un account personale isolato: vedrai esclusivamente i tuoi portafogli e conti, senza alcun accesso ai dati degli altri utenti."
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
-                st.rerun()
+                rc1, rc2 = st.columns(2)
+                with rc1:
+                    reg_uname = st.text_input("Username univoco", key="auth_reg_uname", placeholder="es. marco")
+                with rc2:
+                    reg_disp = st.text_input("Nome Completo", key="auth_reg_disp", placeholder="es. Marco Rossi")
+                reg_pass = st.text_input("Scegli una Password", type="password", key="auth_reg_pass")
+                with st.expander("⚙️ Database Supabase Personale Dedicato (Opzionale — BYOD)", expanded=False):
+                    reg_custom_db = st.text_input(
+                        "URI PostgreSQL Supabase Personale",
+                        type="password",
+                        key="auth_reg_db",
+                        placeholder="Lascia vuoto per usare il Cloud condiviso in modalità isolata",
+                    )
+                if st.button("✨ Crea Account & Entra", type="primary", use_container_width=True, key="btn_auth_register"):
+                    try:
+                        eng = create_supabase_engine(cfg["db_url"], use_cache=True) if cfg.get("is_configured") else None
+                        if eng is None:
+                            from core.fetcher import get_engine
+
+                            eng = get_engine(offline=True)
+                        c_res = SupabaseAuthManager.create_or_update_user(
+                            engine=eng,
+                            username=reg_uname,
+                            password=reg_pass,
+                            role="user",
+                            display_name=reg_disp or reg_uname,
+                            custom_db_url=reg_custom_db,
+                        )
+                        if c_res.get("ok"):
+                            apply_authenticated_user_session(
+                                {
+                                    "username": c_res["username"],
+                                    "display_name": c_res["display_name"],
+                                    "role": c_res["role"],
+                                    "custom_db_url": normalize_supabase_db_url(reg_custom_db) if reg_custom_db else "",
+                                }
+                            )
+                            st.rerun()
+                        else:
+                            st.error(c_res.get("error", "Errore durante la registrazione."))
+                    except Exception as ex:
+                        st.error(f"Errore registrazione: {ex}")
+
+            with tab_guest:
+                st.markdown(
+                    "<div style='font-size:12.5px; color:#94a3b8; margin-bottom:12px;'>"
+                    "La <b>Modalità Demo Sandbox</b> avvia un ambiente dimostrativo locale isolato "
+                    "(<code>argus_demo_sandbox.db</code>) senza leggere né modificare il database Supabase di alcun utente."
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button("🚀 Entra in Modalità Demo Ospite", type="primary", use_container_width=True, key="btn_auth_guest"):
+                    apply_authenticated_user_session(
+                        {
+                            "username": "guest_demo",
+                            "display_name": "Ospite Demo (Sandbox)",
+                            "role": "guest_demo",
+                            "custom_db_url": "",
+                        }
+                    )
+                    st.rerun()
 
     return False
 

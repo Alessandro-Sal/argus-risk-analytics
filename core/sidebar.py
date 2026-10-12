@@ -1415,6 +1415,14 @@ def render_sidebar():
     """Renderizza la Sidebar Istituzionale v9.0.0 con Modalità Esecuzione in alto e Navigation Rail ad albero."""
     ensure_session_restored()
     try:
+        from core.supabase_cloud import render_cloud_auth_gate
+
+        if not render_cloud_auth_gate():
+            st.stop()
+    except Exception:
+        pass
+
+    try:
         from components.splash import auto_expand_sidebar
 
         auto_expand_sidebar()
@@ -1866,11 +1874,8 @@ def render_sidebar():
         st.session_state["_prev_active_db"] = curr_active_db
         st.session_state["_prev_offline_mode"] = curr_offline
 
-        from core.supabase_cloud import is_supabase_configured, render_cloud_auth_gate
+        from core.supabase_cloud import is_supabase_configured
         from core.ui_utils import get_display_portfolio_name
-
-        if not render_cloud_auth_gate():
-            st.stop()
 
         port_label, has_port = get_display_portfolio_name()
         port_text_style = (
